@@ -204,8 +204,6 @@ extern "C" {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_AR NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_AR NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_AR NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_AR NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_AR NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_AR NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_AR NULL
 #define OPTION_VAL_MEMORY_ONLY_AR NULL
@@ -907,22 +905,6 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_AR,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_AR,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_AR,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_AR,
       NULL,
       "video",
       {
@@ -2273,8 +2255,6 @@ struct retro_core_options_v2 options_ar = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_AST NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_AST NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_AST NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_AST NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_AST NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_AST NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_AST NULL
 #define OPTION_VAL_MEMORY_ONLY_AST NULL
@@ -2976,22 +2956,6 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_AST,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_AST,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_AST,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_AST,
       NULL,
       "video",
       {
@@ -4342,8 +4306,6 @@ struct retro_core_options_v2 options_ast = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_BE "Выгружаць тэкстуры якія выкарыстоўваюцца ў <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_BE "Замяняць тэкстуры"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_BE "Замяняць тэкстуры HD-копіямі з <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_BE "Каркасны рэжым (наладка)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_BE "Адмалёўка 3D-мадэляў у выглядзе контураў, без тэкстур і шэйдынгу. Падтрымліваецца толькі апаратным OpenGL-рэндэрам. Нататка: выкарыстоўваецца для адладкі і ў звычайным рэжыме павінна быць выключана."
 #define BEETLE_OPT_PGXP_MODE_LABEL_BE "Рэжым выканання PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_BE NULL
 #define OPTION_VAL_MEMORY_ONLY_BE "Толькі памяць"
@@ -5045,22 +5007,6 @@ struct retro_core_option_v2_definition option_defs_be[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_BE,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_BE,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_BE,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_BE,
       NULL,
       "video",
       {
@@ -6411,8 +6357,6 @@ struct retro_core_options_v2 options_be = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_BG NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_BG NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_BG NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_BG NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_BG NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_BG NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_BG NULL
 #define OPTION_VAL_MEMORY_ONLY_BG NULL
@@ -7114,22 +7058,6 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_BG,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_BG,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_BG,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_BG,
       NULL,
       "video",
       {
@@ -8480,8 +8408,6 @@ struct retro_core_options_v2 options_bg = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_CA "Abocar les textures actuals a <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_CA "Substitueix les textures"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CA "Reemplaça les textures fent servir les versions en alta qualitat (HD) que es troben a <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_CA "Mode malla (depuració)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_CA "Renderitza només les formes dels objectes 3D sense textures ni ombrejats. Només funciona en el renderitzador OpenGL. Nota: Aquesta opció és només per motius de desenvolupament i hauria d'estar desactivada."
 #define BEETLE_OPT_PGXP_MODE_LABEL_CA "Mode d'operació PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CA "Renderitza els objectes 3D amb una precisió subpíxel, utilitzant coordenades dels vèrtexs de coma fixa per minimitzar la distorsió i tremolors dels objectes 3D que hi havia en el maquinari original. 'Només en memòria' dona menys problemes de compatibilitat i es recomana per ús general. 'Memòria + CPU (inestable)' pot reduir més les distorsions visuals, però augmenten els requisits de maquinari."
 #define OPTION_VAL_MEMORY_ONLY_CA "Només en memòria"
@@ -9183,22 +9109,6 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_CA,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CA,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_CA,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_CA,
       NULL,
       "video",
       {
@@ -10549,8 +10459,6 @@ struct retro_core_options_v2 options_ca = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_CHS "将使用的纹理导出到 <cd>-texture-dump/ 目录。"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_CHS "替换纹理"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CHS "使用 <cd>-texture-replacements/ 目录中的高清版本替换纹理。"
-#define BEETLE_OPT_WIREFRAME_LABEL_CHS "线框模式（调试）"
-#define BEETLE_OPT_WIREFRAME_INFO_0_CHS "以无纹理、无着色的轮廓形式渲染 3D 模型。仅由 OpenGL 硬件渲染器支持。注意：此功能用于调试目的，通常应禁用。"
 #define BEETLE_OPT_PGXP_MODE_LABEL_CHS "PGXP 运行模式"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CHS NULL
 #define OPTION_VAL_MEMORY_ONLY_CHS "仅内存"
@@ -11252,22 +11160,6 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_CHS,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CHS,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_CHS,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_CHS,
       NULL,
       "video",
       {
@@ -12618,8 +12510,6 @@ struct retro_core_options_v2 options_chs = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_CHT NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_CHT NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CHT NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_CHT NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_CHT NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_CHT NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CHT NULL
 #define OPTION_VAL_MEMORY_ONLY_CHT "記憶體"
@@ -13321,22 +13211,6 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_CHT,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CHT,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_CHT,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_CHT,
       NULL,
       "video",
       {
@@ -14687,8 +14561,6 @@ struct retro_core_options_v2 options_cht = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_CS "Výpis použitých textur do souboru <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_CS "Nahrazení Textur"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CS "Nahrazení textur pomocí HD verzí z <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_CS "Režim Wireframe (Ladění)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_CS "Vykreslujte 3D modely ve formě obrysů bez textur a stínování. Podporováno pouze hardwarovým rendererem OpenGL. Poznámka: Tato funkce slouží k ladění a měla by být normálně vypnuta."
 #define BEETLE_OPT_PGXP_MODE_LABEL_CS "Provozní Režim PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CS NULL
 #define OPTION_VAL_MEMORY_ONLY_CS "Pouze Paměť"
@@ -15390,22 +15262,6 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_CS,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CS,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_CS,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_CS,
       NULL,
       "video",
       {
@@ -16756,8 +16612,6 @@ struct retro_core_options_v2 options_cs = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_CY NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_CY NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CY NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_CY NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_CY NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_CY NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_CY NULL
 #define OPTION_VAL_MEMORY_ONLY_CY NULL
@@ -17459,22 +17313,6 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_CY,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_CY,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_CY,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_CY,
       NULL,
       "video",
       {
@@ -18825,8 +18663,6 @@ struct retro_core_options_v2 options_cy = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_DA NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_DA NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_DA NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_DA NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_DA NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_DA NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_DA NULL
 #define OPTION_VAL_MEMORY_ONLY_DA NULL
@@ -19528,22 +19364,6 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_DA,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_DA,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_DA,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_DA,
       NULL,
       "video",
       {
@@ -20894,8 +20714,6 @@ struct retro_core_options_v2 options_da = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_DE "Verwendete Texturen nach <cd>-texture-dump/ ausgeben"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_DE "Texturen ersetzen"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_DE "Texturen durch HD-Versionen aus <cd>-texture-replacements/ ersetzen"
-#define BEETLE_OPT_WIREFRAME_LABEL_DE "Wireframe-Modus (Debugging)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_DE "3D-Modelle in Umrissform ohne Texturen oder Schattierungen rendern. Wird nur vom OpenGL-Hardware-Renderer unterstützt. Hinweis: Diese Funktion ist für Debugging-Zwecke gedacht und sollte normalerweise deaktiviert werden."
 #define BEETLE_OPT_PGXP_MODE_LABEL_DE "PGXP-Betriebsart"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_DE "Darstellung von 3D-Objekten mit Unterpixelgenauigkeit, minimiert Verzerrung und Ruckler von 3D-Objekten, die auf Originalhardware durch die Verwendung von fixen Punktvertex-Koordinaten gesehen werden. Der Modus „Nur Speicher“ hat minimale Kompatibilitätsprobleme und wird für den allgemeinen Gebrauch empfohlen. „Speicher und CPU (fehlerbehaftet)“-Modus kann Ruckler noch weiter reduzieren, hat aber hohe Leistungsanforderungen und kann zu verschiedenen Geometriefehlern führen."
 #define OPTION_VAL_MEMORY_ONLY_DE "Nur Speicher"
@@ -21597,22 +21415,6 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_DE,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_DE,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_DE,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_DE,
       NULL,
       "video",
       {
@@ -22963,8 +22765,6 @@ struct retro_core_options_v2 options_de = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_EL NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_EL NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_EL NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_EL NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_EL NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_EL NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_EL NULL
 #define OPTION_VAL_MEMORY_ONLY_EL NULL
@@ -23666,22 +23466,6 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_EL,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_EL,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_EL,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_EL,
       NULL,
       "video",
       {
@@ -25032,8 +24816,6 @@ struct retro_core_options_v2 options_el = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_EN NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_EN NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_EN NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_EN NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_EN NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_EN NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_EN NULL
 #define OPTION_VAL_MEMORY_ONLY_EN NULL
@@ -25735,22 +25517,6 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_EN,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_EN,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_EN,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_EN,
       NULL,
       "video",
       {
@@ -27101,8 +26867,6 @@ struct retro_core_options_v2 options_en = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_EO NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_EO NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_EO NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_EO NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_EO NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_EO NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_EO NULL
 #define OPTION_VAL_MEMORY_ONLY_EO NULL
@@ -27804,22 +27568,6 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_EO,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_EO,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_EO,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_EO,
       NULL,
       "video",
       {
@@ -29170,8 +28918,6 @@ struct retro_core_options_v2 options_eo = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_ES "Vuelca las texturas que se utilicen a <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_ES "Sustituir texturas"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_ES "Sustituye las texturas con las versiones en alta definición que se encuentren en <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_ES "Modo de mallas (depuración)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_ES "Renderiza solo las mallas de los objetos 3D, sin mostrar sus texturas o sombreado. Solo funciona con el renderizador por hardware de OpenGL. Nota: Esta opción solo se utiliza para depuración y debería mantenerse desactivada por norma general."
 #define BEETLE_OPT_PGXP_MODE_LABEL_ES "Modo de operación del PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_ES "Renderiza los objetos 3D con una precisión subpíxel, utilizando coordenadas de vértices de coma fija para minimizar la distorsión y temblores en objetos 3D que tenía el hardware original. «Solo en memoria» apenas da problemas de compatibilidad y se recomienda su uso general. «Memoria + CPU (inestable)» puede reducir aún más las distorsiones visuales, pero tiene unos requisitos de rendimiento elevados y puede provocar fallos en la geometría."
 #define OPTION_VAL_MEMORY_ONLY_ES "Solo en memoria"
@@ -29873,22 +29619,6 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_ES,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_ES,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_ES,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_ES,
       NULL,
       "video",
       {
@@ -31239,8 +30969,6 @@ struct retro_core_options_v2 options_es = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_FA NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_FA NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_FA NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_FA NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_FA NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_FA NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_FA NULL
 #define OPTION_VAL_MEMORY_ONLY_FA NULL
@@ -31942,22 +31670,6 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_FA,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_FA,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_FA,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_FA,
       NULL,
       "video",
       {
@@ -33308,8 +33020,6 @@ struct retro_core_options_v2 options_fa = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_FI NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_FI "Korvaa tekstuureja"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_FI NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_FI NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_FI NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_FI NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_FI NULL
 #define OPTION_VAL_MEMORY_ONLY_FI NULL
@@ -34011,22 +33721,6 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_FI,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_FI,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_FI,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_FI,
       NULL,
       "video",
       {
@@ -35377,8 +35071,6 @@ struct retro_core_options_v2 options_fi = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_FR "Importer les textures utilisées vers <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_FR "Remplacer les textures"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_FR "Remplacer les textures par des versions HD depuis <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_FR "Mode fil de fer (diagnostic)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_FR "Rendre les modèles 3D sous forme de contours sans textures ni ombres. Uniquement pris en charge par le moteur de rendu matériel OpenGL. Remarque : Cette option est utile à des fins de diagnostic, et devrait normalement être désactivée."
 #define BEETLE_OPT_PGXP_MODE_LABEL_FR "Mode d'opération de PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_FR "Rendu des objets 3D avec une précision aux sous-pixels, minimisant la distorsion et les variations des objets 3D vues sur le matériel d'origine en raison de l'utilisation de coordonnées de vertex sur un point fixe. Le mode 'Mémoire uniquement' a un minimum de problèmes de compatibilité et est recommandé pour une utilisation générale. Le mode 'Mémoire + processeur (buggé)' peut réduire encore plus les variations, mais il a des exigences de performances élevées et peut causer diverses erreurs de géométrie."
 #define OPTION_VAL_MEMORY_ONLY_FR "Mémoire uniquement"
@@ -36080,22 +35772,6 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_FR,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_FR,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_FR,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_FR,
       NULL,
       "video",
       {
@@ -37446,8 +37122,6 @@ struct retro_core_options_v2 options_fr = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_GA "Dumpáil uigeachtaí úsáidte chuig <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_GA "Cuir Uigeachtaí in Ionad"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_GA "Cuir uigeachtaí in ionad a chéile ag baint úsáide as leaganacha HD ó <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_GA "Mód Sreangfhráma (Dífhabhtú)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_GA "Rindreáil samhlacha 3T i bhfoirm imlíne gan uigeachtaí ná scáthú. Ní thacaítear leis seo ach amháin ag rindreálaí crua-earraí OpenGL. Tabhair faoi deara: Chun críocha dífhabhtaithe atá sé seo, agus ba chóir é a dhíchumasú de ghnáth."
 #define BEETLE_OPT_PGXP_MODE_LABEL_GA "Mód Oibríochta PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_GA "Déan rudaí 3T a rindreáil le cruinneas fo-phicteilíní, ag íoslaghdú saobhadh agus crith rudaí 3T a fheictear ar chrua-earraí bunaidh mar gheall ar úsáid chomhordanáidí buaicphointí seasta. Tá saincheisteanna comhoiriúnachta íosta ag baint leis an mód 'Cuimhne Amháin' agus moltar é le haghaidh úsáide ginearálta. Is féidir leis an mód 'Cuimhne + LAP (Buggy)' crith a laghdú níos mó fós ach tá ceanglais ardfheidhmíochta aige agus d'fhéadfadh sé earráidí geoiméadrachta éagsúla a chur faoi deara."
 #define OPTION_VAL_MEMORY_ONLY_GA "Cuimhne Amháin"
@@ -38149,22 +37823,6 @@ struct retro_core_option_v2_definition option_defs_ga[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_GA,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_GA,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_GA,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_GA,
       NULL,
       "video",
       {
@@ -39515,8 +39173,6 @@ struct retro_core_options_v2 options_ga = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_GL "Volcar as texturas usadas a <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_GL "Substituír texturas"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_GL "Substitúe texturas usando versións HD de <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_GL "Modo Wireframe (Depuración)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_GL "Renderizar modelos 3D en forma de contorno sen texturas nin sombreados. Só é compatible co renderizador de hardware OpenGL. Nota: Isto é para fins de depuración e normalmente debería estar desactivado."
 #define BEETLE_OPT_PGXP_MODE_LABEL_GL "Modo de operación PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_GL "Renderizar obxectos 3D con precisión subpixel, minimizando distorsións e tremer de obxectos 3D que se observan no soporte físico orixinal debido ao uso de coordenadas de vértice en punto fixo. O modo “Só memoria” ten problemas de compatibilidade mínimos e recoméndase para uso xeral. O modo “Memoria + CPU (Inestable)” pode reducir aínda máis o tremer, pero ten altos requirimentos de rendemento e pode causar varios erros de xeometría."
 #define OPTION_VAL_MEMORY_ONLY_GL "Só memoria"
@@ -40218,22 +39874,6 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_GL,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_GL,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_GL,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_GL,
       NULL,
       "video",
       {
@@ -41584,8 +41224,6 @@ struct retro_core_options_v2 options_gl = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_HE NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_HE NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_HE NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_HE NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_HE NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_HE NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_HE NULL
 #define OPTION_VAL_MEMORY_ONLY_HE NULL
@@ -42287,22 +41925,6 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_HE,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_HE,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_HE,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_HE,
       NULL,
       "video",
       {
@@ -43653,8 +43275,6 @@ struct retro_core_options_v2 options_he = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_HR NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_HR NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_HR NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_HR NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_HR NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_HR NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_HR NULL
 #define OPTION_VAL_MEMORY_ONLY_HR NULL
@@ -44356,22 +43976,6 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_HR,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_HR,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_HR,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_HR,
       NULL,
       "video",
       {
@@ -45722,8 +45326,6 @@ struct retro_core_options_v2 options_hr = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_HU "A használt textúrák kimentése a <cd>texture-dump/ alá"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_HU "Textúrák lecserélése"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_HU "A textúrák lecserélése HD verzióra a <cd>texture-replacements/ alól"
-#define BEETLE_OPT_WIREFRAME_LABEL_HU "Drótváz mód (debug)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_HU "A 3D modellek megjelenítése csak körvonalakkal, textúrák és árnyalás nélkül. Csak az OpenGL hardveres megjelenítő támogatja. Figyelem: ez csak hibakeresési célokat szolgál, és normál esetben kikapcsolva kell lennie."
 #define BEETLE_OPT_PGXP_MODE_LABEL_HU "PGXP működési módja"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_HU NULL
 #define OPTION_VAL_MEMORY_ONLY_HU "Csak memóriában"
@@ -46425,22 +46027,6 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_HU,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_HU,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_HU,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_HU,
       NULL,
       "video",
       {
@@ -47791,8 +47377,6 @@ struct retro_core_options_v2 options_hu = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_ID "Dump tekstur yang digunakan ke <cd>-dump-tekstur/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_ID "Ganti Tekstur"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_ID "Ganti tekstur dengan versi HD dari <cd>-pengganti-tekstur/"
-#define BEETLE_OPT_WIREFRAME_LABEL_ID "Mode Wireframe (Awakutu)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_ID "Merender model 3D ke bentuk garis luar tanpa tekstur atau pencorakan. Hanya didukung perender peranti keras OpenGL. Catatan: Ini hanya untuk awakutu, dan biasanya harus nonaktif."
 #define BEETLE_OPT_PGXP_MODE_LABEL_ID NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_ID NULL
 #define OPTION_VAL_MEMORY_ONLY_ID NULL
@@ -48494,22 +48078,6 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_ID,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_ID,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_ID,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_ID,
       NULL,
       "video",
       {
@@ -49860,8 +49428,6 @@ struct retro_core_options_v2 options_id = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_IT "Scarica le texture usate su <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_IT "Sostituisci Texture"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_IT "Sostituisci le texture con versioni HD da <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_IT "Modalità Wireframe (Debug)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_IT "Render i modelli 3D in forma di contorno senza texture o ombreggiatura. Supportato solo dal renderer hardware OpenGL. Nota: Questo è per scopi di debug, e normalmente dovrebbe essere disabilitato."
 #define BEETLE_OPT_PGXP_MODE_LABEL_IT "Modalità Operazione PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_IT NULL
 #define OPTION_VAL_MEMORY_ONLY_IT "Solo Memoria"
@@ -50563,22 +50129,6 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_IT,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_IT,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_IT,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_IT,
       NULL,
       "video",
       {
@@ -51929,8 +51479,6 @@ struct retro_core_options_v2 options_it = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_JA "使用されているテクスチャを <cd>-texture-dump/ にダンプします。"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_JA "テクスチャを置換"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_JA "テクスチャを <cd>-texture-replacements/ からロードして置換します。"
-#define BEETLE_OPT_WIREFRAME_LABEL_JA "ワイヤーフレームモード (デバッグ)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_JA "テクスチャやシェーディングを適用せずにアウトライン形式で 3D モデルをレンダリングします。 OpenGL ハードウェアレンダラーでのみサポートされています。注意: これはデバッグ用であり、通常は無効にする必要があります。"
 #define BEETLE_OPT_PGXP_MODE_LABEL_JA "PGXP 動作モード"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_JA NULL
 #define OPTION_VAL_MEMORY_ONLY_JA "メモリのみ"
@@ -52632,22 +52180,6 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_JA,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_JA,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_JA,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_JA,
       NULL,
       "video",
       {
@@ -53998,8 +53530,6 @@ struct retro_core_options_v2 options_ja = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_KO "사용된 텍스쳐를 <cd>-texture-dump/에 덤프합니다."
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_KO "텍스쳐 교체하기"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_KO "텍스쳐를 <cd>-texture-replacements/의 HD 버전으로 교체합니다."
-#define BEETLE_OPT_WIREFRAME_LABEL_KO "와이어프레임 모드 (디버그)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_KO "사용할 경우, 3D 모델을 텍스쳐 및 셰이딩 없이 외곽선으로만 표시합니다. OpenGL 하드웨어 렌더러에서만 지원됩니다. 주의: 이 옵션은 디버깅용으로, 일반적으로는 비활성화되어야 합니다."
 #define BEETLE_OPT_PGXP_MODE_LABEL_KO "PGXP 작동 모드"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_KO "3D 개체를 서브픽셀 단위 정확도로 렌더링합니다. 이는 원본 하드웨어가 버텍스 좌표에 고정소수점을 사용하여 발생하는 3D 개체의 뒤틀림과 떨림 현상을 최소화합니다. '메모리만'은 호환성 문제가 적으며 일반적인 사용에 적합합니다. '메모리 + CPU (불안정)'은 떨림 현상을 더 많이 줄일 수 있지만 성능 요구사항이 높으며 다양한 그래픽 오류가 발생할 수 있습니다."
 #define OPTION_VAL_MEMORY_ONLY_KO "메모리만"
@@ -54701,22 +54231,6 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_KO,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_KO,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_KO,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_KO,
       NULL,
       "video",
       {
@@ -56067,8 +55581,6 @@ struct retro_core_options_v2 options_ko = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_NL NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_NL NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_NL NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_NL NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_NL NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_NL NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_NL NULL
 #define OPTION_VAL_MEMORY_ONLY_NL NULL
@@ -56770,22 +56282,6 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_NL,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_NL,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_NL,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_NL,
       NULL,
       "video",
       {
@@ -58136,8 +57632,6 @@ struct retro_core_options_v2 options_nl = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_NO NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_NO NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_NO NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_NO NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_NO NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_NO NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_NO NULL
 #define OPTION_VAL_MEMORY_ONLY_NO NULL
@@ -58839,22 +58333,6 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_NO,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_NO,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_NO,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_NO,
       NULL,
       "video",
       {
@@ -60205,8 +59683,6 @@ struct retro_core_options_v2 options_no = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_OR NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_OR NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_OR NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_OR NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_OR NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_OR NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_OR NULL
 #define OPTION_VAL_MEMORY_ONLY_OR NULL
@@ -60908,22 +60384,6 @@ struct retro_core_option_v2_definition option_defs_or[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_OR,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_OR,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_OR,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_OR,
       NULL,
       "video",
       {
@@ -62274,8 +61734,6 @@ struct retro_core_options_v2 options_or = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_PL NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_PL NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_PL NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_PL NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_PL NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_PL NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_PL NULL
 #define OPTION_VAL_MEMORY_ONLY_PL NULL
@@ -62977,22 +62435,6 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_PL,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_PL,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_PL,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_PL,
       NULL,
       "video",
       {
@@ -64343,8 +63785,6 @@ struct retro_core_options_v2 options_pl = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_PT_BR "Despeja as texturas usadas par <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_PT_BR "Substituir texturas"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_PT_BR "Substitui as texturas usando versões HD de <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_PT_BR "Modo de malhas (depuração)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_PT_BR "Renderiza os modelos 3D em forma de contorno sem texturas ou sombreamento. Somente suportado pelo renderizador de hardware OpenGL. Nota: Isto é para fins de depuração, e normalmente deve ser desativado."
 #define BEETLE_OPT_PGXP_MODE_LABEL_PT_BR "Modo de operação do PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_PT_BR "Renderiza objetos 3D com precisão subpixel, minimizando distorções e jitter observados no hardware original devido ao uso de coordenadas de vértices em ponto fixo. O modo 'Apenas Memória' apresenta problemas mínimos de compatibilidade e é recomendado para uso geral. O modo 'Memória + CPU (Buggy)' pode reduzir ainda mais o jitter, mas possui altos requisitos de desempenho e pode causar diversos erros de geometria."
 #define OPTION_VAL_MEMORY_ONLY_PT_BR "Apenas memória"
@@ -65046,22 +64486,6 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_PT_BR,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_PT_BR,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_PT_BR,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_PT_BR,
       NULL,
       "video",
       {
@@ -66412,8 +65836,6 @@ struct retro_core_options_v2 options_pt_br = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_PT_PT NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_PT_PT NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_PT_PT NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_PT_PT NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_PT_PT NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_PT_PT NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_PT_PT NULL
 #define OPTION_VAL_MEMORY_ONLY_PT_PT NULL
@@ -67115,22 +66537,6 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_PT_PT,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_PT_PT,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_PT_PT,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_PT_PT,
       NULL,
       "video",
       {
@@ -68481,8 +67887,6 @@ struct retro_core_options_v2 options_pt_pt = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_RU "Выгружать используемые текстуры в <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_RU "Замещать текстуры"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_RU "Заменять текстуры HD-копиями из <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_RU "Каркасный режим (отладка)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_RU "Отрисовка 3D-моделей в виде контуров, без текстур и шейдинга. Поддерживается только аппаратным OpenGL-рендером. Примечание: используется для отладки и в обычном режиме должно быть выключено."
 #define BEETLE_OPT_PGXP_MODE_LABEL_RU "Режим выполнения PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_RU NULL
 #define OPTION_VAL_MEMORY_ONLY_RU "Только память"
@@ -69184,22 +68588,6 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_RU,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_RU,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_RU,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_RU,
       NULL,
       "video",
       {
@@ -70550,8 +69938,6 @@ struct retro_core_options_v2 options_ru = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_SK "Dumpovať použité textúry do <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_SK "Nahradiť textúry"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_SK "Nahradiť textúry HD verziami z <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_SK "Drôtený režim (debug)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_SK "Vykreslí 3D modely v drôtenej forme bez textúr a tieňovania. Podporované len hardvérovým rendererom OpenGL. Poznámka: slúži na ladenie a malo by byť bežne vypnuté."
 #define BEETLE_OPT_PGXP_MODE_LABEL_SK "Režim PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SK "Vykresľuje 3D objekty so subpixelovou presnosťou, čo minimalizuje skreslenie a chvenie 3D objektov pozorované na pôvodnom hardvéri kvôli použitiu súradníc vrcholov s pevnou rádovou čiarkou. Režim 'Memory Only' má minimálne problémy s kompatibilitou a odporúča sa na bežné použitie. Režim 'Memory + CPU (Buggy)' môže chvenie znížiť ešte viac, no má vysoké nároky na výkon a môže spôsobiť rôzne chyby geometrie."
 #define OPTION_VAL_MEMORY_ONLY_SK "Iba pamäť"
@@ -71253,22 +70639,6 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_SK,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_SK,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_SK,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_SK,
       NULL,
       "video",
       {
@@ -72619,8 +71989,6 @@ struct retro_core_options_v2 options_sk = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_SR NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_SR NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_SR NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_SR NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_SR NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_SR NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SR NULL
 #define OPTION_VAL_MEMORY_ONLY_SR NULL
@@ -73322,22 +72690,6 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_SR,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_SR,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_SR,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_SR,
       NULL,
       "video",
       {
@@ -74688,8 +74040,6 @@ struct retro_core_options_v2 options_sr = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_SV "Dumpa använda texturer till <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_SV "Ersätt texturer"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_SV "Ersätt texturer med HD-versioner från <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_SV "Trådnätläge (Felsökning)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_SV "Rendera 3D-modeller i konturform utan texturer eller skuggning. Stöds endast av OpenGL-hårdvarurenderaren. Obs!: Detta är för felsökningsändamål och bör normalt sett vara inaktiverat."
 #define BEETLE_OPT_PGXP_MODE_LABEL_SV "PGXP Driftläge"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_SV "Rendera 3D-objekt med subpixelprecision, vilket minimerar distorsion och flimmer hos 3D-objekt som visas på originalhårdvara på grund av användningen av fasta punktkoordinater. Läget ”Endast minne” har minimala kompatibilitetsproblem och rekommenderas för allmänt bruk. Läget ”Minne + CPU (Buggig)” kan minska flimmer ännu mer, men har höga prestandakrav och kan orsaka olika geometrifel."
 #define OPTION_VAL_MEMORY_ONLY_SV "Endast minne"
@@ -75391,22 +74741,6 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_SV,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_SV,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_SV,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_SV,
       NULL,
       "video",
       {
@@ -76757,8 +76091,6 @@ struct retro_core_options_v2 options_sv = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_TH "ดัมป์พื้นผิวที่ใช้ลงใน <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_TH "แทนที่พื้นผิว (Texture)"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_TH "แทนที่พื้นผิว (Texture) โดยใช้เวอร์ชัน HD จาก <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_TH NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_TH "แสดงผลโมเดล 3D เฉพาะเส้นโครงร่างโดยไม่มีพื้นผิวหรือการไล่เงา รองรับเฉพาะตัวเรนเดอร์ฮาร์ดแวร์ OpenGL เท่านั้น หมายเหตุ: ใช้สำหรับตรวจสอบข้อผิดพลาด (Debug) และควรปิดไว้ในการใช้งานปกติ"
 #define BEETLE_OPT_PGXP_MODE_LABEL_TH "โหมดการทำงาน PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_TH "เรนเดอร์วัตถุ 3D ด้วยความละเอียดระดับซับพิกเซล เพื่อลดการบิดเบี้ยวและอาการสั่นของวัตถุ 3D ที่มักพบในฮาร์ดแวร์ดั้งเดิมเนื่องจากการใช้พิกัดจุดยอดแบบเลขฐานคงที่ โหมด 'Memory Only' มีปัญหาความเข้ากันได้น้อยที่สุดและแนะนำสำหรับการใช้งานทั่วไป ส่วนโหมด 'Memory + CPU (Buggy)' สามารถลดอาการสั่นได้ดียิ่งขึ้นแต่ต้องการประสิทธิภาพเครื่องสูงและอาจทำให้เกิดข้อผิดพลาดของรูปทรงเรขาคณิตได้หลากหลายรูปแบบ"
 #define OPTION_VAL_MEMORY_ONLY_TH "หน่วยความจำเท่านั้น"
@@ -77460,22 +76792,6 @@ struct retro_core_option_v2_definition option_defs_th[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_TH,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_TH,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_TH,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_TH,
       NULL,
       "video",
       {
@@ -78826,8 +78142,6 @@ struct retro_core_options_v2 options_th = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_TR "Kullanılan dokuları <cd>-texture-dump/ dizinine saklayın"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_TR "Dokuları Değiştir"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_TR "<cd>-texture-replacements/ adresindeki HD sürümlerini kullanarak dokuları değiştirin"
-#define BEETLE_OPT_WIREFRAME_LABEL_TR "Tel Kafes Kipi (Hata Ayıklama)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_TR "3B modelleri doku veya gölgeleme olmadan anahat biçiminde işleyin. Yalnızca OpenGL donanım oluşturucusu tarafından desteklenir. Not: Bu, hata ayıklama amaçlıdır ve normalde devre dışı bırakılmalıdır."
 #define BEETLE_OPT_PGXP_MODE_LABEL_TR "PGXP Çalışma Kipi"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_TR NULL
 #define OPTION_VAL_MEMORY_ONLY_TR "Yalnızca Bellek"
@@ -79529,22 +78843,6 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_TR,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_TR,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_TR,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_TR,
       NULL,
       "video",
       {
@@ -80895,8 +80193,6 @@ struct retro_core_options_v2 options_tr = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_TT NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_TT NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_TT NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_TT NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_TT NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_TT NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_TT NULL
 #define OPTION_VAL_MEMORY_ONLY_TT NULL
@@ -81598,22 +80894,6 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_TT,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_TT,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_TT,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_TT,
       NULL,
       "video",
       {
@@ -82964,8 +82244,6 @@ struct retro_core_options_v2 options_tt = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_UK "Дамп використаних текстур для <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_UK "Замінити текстури"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_UK "Замінити текстури за допомогою HD версій з <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_UK "Режим Wireframe (налагодження)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_UK "Візуалізація 3D-моделей в обрисній формі без затухання в формі. Підтримується лише рендером апаратного забезпечення OpenGL. Примітка: Це для потреб відладки, і, як правило, має бути вимкнено."
 #define BEETLE_OPT_PGXP_MODE_LABEL_UK "Режим операції PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_UK NULL
 #define OPTION_VAL_MEMORY_ONLY_UK "Лише пам’ять"
@@ -83667,22 +82945,6 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_UK,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_UK,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_UK,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_UK,
       NULL,
       "video",
       {
@@ -85033,8 +84295,6 @@ struct retro_core_options_v2 options_uk = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_VAL NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_VAL NULL
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_VAL NULL
-#define BEETLE_OPT_WIREFRAME_LABEL_VAL NULL
-#define BEETLE_OPT_WIREFRAME_INFO_0_VAL NULL
 #define BEETLE_OPT_PGXP_MODE_LABEL_VAL NULL
 #define BEETLE_OPT_PGXP_MODE_INFO_0_VAL NULL
 #define OPTION_VAL_MEMORY_ONLY_VAL NULL
@@ -85736,22 +84996,6 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_VAL,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_VAL,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_VAL,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_VAL,
       NULL,
       "video",
       {
@@ -87102,8 +86346,6 @@ struct retro_core_options_v2 options_val = {
 #define BEETLE_OPT_DUMP_TEXTURES_INFO_0_VN "Xuất các kết cấu đang dùng vào thư mục <cd>-texture-dump/"
 #define BEETLE_OPT_REPLACE_TEXTURES_LABEL_VN "Thay thế kết cấu"
 #define BEETLE_OPT_REPLACE_TEXTURES_INFO_0_VN "Thay thế kết cấu bằng các phiên bản HD từ thư mục <cd>-texture-replacements/"
-#define BEETLE_OPT_WIREFRAME_LABEL_VN "Chế độ Khung Dây (Gỡ lỗi)"
-#define BEETLE_OPT_WIREFRAME_INFO_0_VN "Hiển thị các mô hình 3D dưới dạng khung dây mà không có texture hoặc shading. Chỉ được hỗ trợ bởi bộ xử lý đồ họa OpenGL. Lưu ý: Chế độ này chỉ dùng để gỡ lỗi và thường nên tắt."
 #define BEETLE_OPT_PGXP_MODE_LABEL_VN "Chế độ hoạt động PGXP"
 #define BEETLE_OPT_PGXP_MODE_INFO_0_VN "Kết xuất đối tượng 3D với độ chính xác subpixel, giảm méo hình và rung (jitter) vốn xuất hiện trên phần cứng gốc do dùng tọa độ đỉnh fixed-point.Chế độ “Memory Only” có ít vấn đề tương thích và được khuyến nghị dùng chung.Chế độ “Memory + CPU (Buggy)” có thể giảm jitter hơn nữa nhưng yêu cầu hiệu năng rất cao và có thể gây nhiều lỗi hình học."
 #define OPTION_VAL_MEMORY_ONLY_VN "Chỉ bộ nhớ"
@@ -87805,22 +87047,6 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       BEETLE_OPT_REPLACE_TEXTURES_LABEL_VN,
       NULL,
       BEETLE_OPT_REPLACE_TEXTURES_INFO_0_VN,
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      BEETLE_OPT_WIREFRAME_LABEL_VN,
-      NULL,
-      BEETLE_OPT_WIREFRAME_INFO_0_VN,
       NULL,
       "video",
       {

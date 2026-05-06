@@ -420,8 +420,6 @@ struct GlRenderer {
    bool opaque;
    /* Current semi-transparency mode */
    SemiTransparencyMode semi_transparency_mode;
-   /* Polygon mode (for wireframe) */
-   GLenum command_polygon_mode;
    /* Texture used to store the VRAM for texture mapping */
    DrawConfig config;
    /* Framebuffer used as a shader input for texturing draw commands */
@@ -1335,9 +1333,6 @@ static void GlRenderer_upload_textures(
 
    glDisable(GL_SCISSOR_TEST);
    glDisable(GL_BLEND);
-#ifndef HAVE_OPENGLES3
-   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-#endif
 
    /* Bind the output framebuffer */
    Framebuffer _fb;
@@ -1346,9 +1341,6 @@ static void GlRenderer_upload_textures(
    if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
       DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
 
-#ifndef HAVE_OPENGLES3
-   glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
-#endif
    glEnable(GL_SCISSOR_TEST);
 
 #ifdef DEBUG
@@ -1510,14 +1502,6 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
          dither_mode  = DITHER_OFF;
    }
 
-   var.key = BEETLE_OPT(wireframe);
-   bool wireframe = false;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (!strcmp(var.value, "enabled"))
-         wireframe = true;
-   }
-
    log_cb(RETRO_LOG_DEBUG, "Building OpenGL state (%dx internal res., %dbpp)\n", upscaling, depth);
 
    switch(renderer->filter_type)
@@ -1591,10 +1575,6 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
       DrawBuffer_enable_attribute(command_buffer, "dither");
    }
 
-#ifndef HAVE_OPENGLES3
-   GLenum command_draw_mode = wireframe ? GL_LINE : GL_FILL;
-#endif
-
    if (command_buffer->program)
    {
       uint32_t dither_scaling = dither_mode == DITHER_UPSCALED ? 1 : upscaling;
@@ -1642,9 +1622,6 @@ static bool GlRenderer_new(GlRenderer *renderer, DrawConfig config)
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
    renderer->command_draw_mode = GL_TRIANGLES;
    renderer->semi_transparency_mode =  SemiTransparencyMode_Average;
-#ifndef HAVE_OPENGLES3
-   renderer->command_polygon_mode = command_draw_mode;
-#endif
    renderer->output_buffer = output_buffer;
    renderer->image_load_buffer = image_load_buffer;
    renderer->config = config;
@@ -2050,14 +2027,6 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       }
    }
 
-   var.key = BEETLE_OPT(wireframe);
-   bool wireframe = false;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (!strcmp(var.value, "enabled"))
-         wireframe = true;
-   }
-
    bool rebuild_fb_out =
       upscaling != renderer->internal_upscaling ||
       depth != renderer->internal_color_depth;
@@ -2119,10 +2088,6 @@ static bool retro_refresh_variables(GlRenderer *renderer)
       glUseProgram(renderer->command_buffer->program->id);
       glUniform1ui(renderer->command_buffer->program->uniforms["dither_scaling"], dither_scaling);
    }
-
-#ifndef HAVE_OPENGLES3
-   renderer->command_polygon_mode = wireframe ? GL_LINE : GL_FILL;
-#endif
 
    glLineWidth((GLfloat) upscaling);
 
@@ -2886,9 +2851,6 @@ void rsx_gl_prepare_frame(void)
    /* In case we're upscaling we need to increase the line width
     * proportionally */
    glLineWidth((GLfloat)renderer->internal_upscaling);
-#ifndef HAVE_OPENGLES3
-   glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
-#endif
    glEnable(GL_SCISSOR_TEST);
    glEnable(GL_DEPTH_TEST);
    glDepthFunc(GL_LEQUAL);
@@ -2977,9 +2939,6 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
    bind_libretro_framebuffer(renderer);
 
    glDisable(GL_SCISSOR_TEST);
-#ifndef HAVE_OPENGLES3
-   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-#endif
    glDisable(GL_DEPTH_TEST);
    glDisable(GL_BLEND);
 
@@ -3073,9 +3032,6 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
 
       glDisable(GL_SCISSOR_TEST);
       glDisable(GL_BLEND);
-#ifndef HAVE_OPENGLES3
-      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-#endif
 
       Framebuffer_init(&_fb, &renderer->fb_texture);
 
@@ -3633,9 +3589,6 @@ void rsx_gl_load_image(
 
    glDisable(GL_SCISSOR_TEST);
    glDisable(GL_BLEND);
-#ifndef HAVE_OPENGLES3
-   glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-#endif
 
    /* Bind the output framebuffer */
    Framebuffer_init(&_fb, &renderer->fb_out);
@@ -3643,9 +3596,6 @@ void rsx_gl_load_image(
    if (!DRAWBUFFER_IS_EMPTY(renderer->image_load_buffer))
       DrawBuffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
 
-#ifndef HAVE_OPENGLES3
-   glPolygonMode(GL_FRONT_AND_BACK, renderer->command_polygon_mode);
-#endif
    glEnable(GL_SCISSOR_TEST);
 
 #ifdef DEBUG

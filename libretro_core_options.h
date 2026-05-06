@@ -530,22 +530,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      "Wireframe Mode (Debug)",
-      NULL,
-      "Render 3D models in outline form without textures or shading. Only supported by the OpenGL hardware renderer. Note: This is for debugging purposes, and should normally be disabled.",
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
    {
       BEETLE_OPT(pgxp_mode),
       "PGXP Operation Mode",
