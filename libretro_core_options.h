@@ -1958,24 +1958,25 @@ static INLINE void libretro_set_core_options(retro_environment_t environ_cb,
                {
                   buf_len += num_values - 1;
                   buf_len += strlen(desc);
+                  buf_len += 3; /* "; " separator (2 bytes) + null terminator (1 byte) */
 
                   values_buf[i] = (char *)calloc(buf_len, sizeof(char));
                   if (!values_buf[i])
                      goto error;
 
-                  strcpy(values_buf[i], desc);
-                  strcat(values_buf[i], "; ");
+                  strlcpy(values_buf[i], desc, buf_len);
+                  strlcat(values_buf[i], "; ", buf_len);
 
                   /* Default value goes first */
-                  strcat(values_buf[i], values[default_index].value);
+                  strlcat(values_buf[i], values[default_index].value, buf_len);
 
                   /* Add remaining values */
                   for (j = 0; j < num_values; j++)
                   {
                      if (j != default_index)
                      {
-                        strcat(values_buf[i], "|");
-                        strcat(values_buf[i], values[j].value);
+                        strlcat(values_buf[i], "|", buf_len);
+                        strlcat(values_buf[i], values[j].value, buf_len);
                      }
                   }
                }
