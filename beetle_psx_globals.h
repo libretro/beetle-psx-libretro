@@ -19,10 +19,25 @@ extern uint8_t widescreen_hack;
 extern uint8_t widescreen_hack_aspect_ratio_setting;
 extern uint8_t psx_gpu_upscale_shift;
 extern uint8_t psx_gpu_upscale_shift_hw;
+/*
+ * When true, the SW renderer:
+ *   - bypasses LineSkipTest so polygons rasterise to every VRAM
+ *     line every frame regardless of the game's `dfe` flag;
+ *   - defers the per-scanline VRAM-to-surface conversion to a
+ *     single end-of-frame flush (GPU_FlushDeferredScanout) so
+ *     scanout doesn't race with rasterisation in titles that
+ *     double-buffer through dfe gating.
+ *
+ * Together these make the SW renderer produce HW-equivalent
+ * output for 480i interlaced games: combless on motion (because
+ * both halves of VRAM are populated with current-frame content
+ * before scanout reads them), no torn intermediates (because
+ * scanout runs only once the frame is settled).  Set by
+ * libretro.c when the user picks Deinterlace Method = Off.
+ */
+extern bool psx_gpu_rasterize_both_fields;
 extern int line_render_mode;
 extern int filter_mode;
-extern bool opaque_check;
-extern bool semitrans_check;
 extern int crop_overscan;
 
 enum core_timing_fps_modes

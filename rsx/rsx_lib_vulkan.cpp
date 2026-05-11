@@ -2,10 +2,11 @@
 
 #include <stdint.h>
 
-#include <functional>
 #include <vector>
 
 #include "rsx/rsx_intf.h" //FPS and audio sample rate macros
+#include "rsx/rsx_defer.h"
+#include "rsx/tt_trace.h"
 #include "parallel-psx/renderer/renderer.hpp"
 #include "libretro_vulkan.h"
 
@@ -16,25 +17,18 @@
 
 #include "libretro_cbs.h"
 #include "libretro_options.h"
+#include "beetle_psx_globals.h"
 
 using namespace Vulkan;
 using namespace PSX;
 using namespace std;
 
-static Context *context;
-static Device *device;
-static Renderer *renderer;
+static Context *context = nullptr;
+static Device *device = nullptr;
+static Renderer *renderer = nullptr;
 static unsigned scaling = 4;
 
-// Declare extern as workaround for now to avoid variable
-// naming conflicts with beetle_psx_globals.h
-extern "C" uint8_t widescreen_hack;
-extern "C" uint8_t widescreen_hack_aspect_ratio_setting;
-extern "C" bool content_is_pal;
-extern "C" int filter_mode;
-extern "C" bool currently_interlaced;
-extern "C" int aspect_ratio_setting;
-
+extern enum rsx_renderer_type rsx_type;
 extern retro_log_printf_t log_cb;
 namespace Granite
 {
@@ -43,7 +37,8 @@ retro_log_printf_t libretro_log;
 
 static retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
-static retro_vulkan_image swapchain_image;
+static vector<retro_vulkan_image> swapchain_images;
+static vector<ImageHandle> scanout_handles;
 static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
@@ -54,12 +49,33 @@ static bool adaptive_smoothing;
 static bool super_sampling;
 static unsigned msaa = 1;
 static bool mdec_yuv;
-static vector<function<void ()>> defer;
+/*
+ * Queue for rsx_vulkan_* operations that arrive between the libretro
+ * frontend's RETRO_ENVIRONMENT_SET_HW_RENDER acceptance and the
+ * frontend invoking vk_context_reset. Drained at the end of
+ * vk_context_reset, after the renderer is constructed. This used to be
+ * a std::vector<std::function<void()>> with per-entry-point lambdas;
+ * it was migrated to the shared C-callable rsx_defer module so the GL
+ * backend (a C TU, can't use std::function) can use the same mechanism
+ * and so both backends share a single defer policy. See
+ * rsx/rsx_defer.h for which ops are deferred and which are dropped.
+ */
+static rsx_defer_queue_t defer = { nullptr, 0, 0 };
 static dither_mode dither_mode = DITHER_NATIVE;
 static bool dump_textures = false;
 static bool replace_textures = false;
 static bool track_textures = false;
-static int crop_overscan;
+/*
+ * File-local copy of the crop_overscan core option, distinct
+ * from the cross-TU `crop_overscan` global declared in
+ * beetle_psx_globals.h. Both are populated from the same
+ * BEETLE_OPT(crop_overscan) env var (in parallel - libretro.cpp
+ * writes the global, this file writes vulkan_crop_overscan), so
+ * their values track identically; renaming here just makes the
+ * shadow explicit and stops the static-after-extern conflict
+ * that fc4d742's switch to the central globals header surfaced.
+ */
+static int vulkan_crop_overscan;
 static int image_offset_cycles;
 static unsigned image_crop;
 static int initial_scanline;
@@ -87,6 +103,75 @@ static const VkApplicationInfo *get_application_info(void)
    return &info;
 }
 
+/*
+ * Dispatcher for the deferred-op queue. Called once per queued op
+ * during vk_context_reset's drain. Each case re-enters the matching
+ * rsx_vulkan_<op>() entry point with the captured arguments; by drain
+ * time the renderer is up so the entry point's "renderer present"
+ * branch executes and actually performs the work that the original
+ * call could not. The user pointer is unused - everything the entry
+ * points need is in this TU's file-statics.
+ */
+static void vk_defer_dispatch(void *user, const rsx_defer_op_t *op)
+{
+   (void)user;
+   if (!op)
+      return;
+
+   switch (op->kind)
+   {
+      case RSX_DEFER_SET_TEX_WINDOW:
+         rsx_vulkan_set_tex_window(op->u.set_tex_window.tww,
+                                   op->u.set_tex_window.twh,
+                                   op->u.set_tex_window.twx,
+                                   op->u.set_tex_window.twy);
+         break;
+      case RSX_DEFER_SET_DRAW_OFFSET:
+         rsx_vulkan_set_draw_offset(op->u.set_draw_offset.x,
+                                    op->u.set_draw_offset.y);
+         break;
+      case RSX_DEFER_SET_DRAW_AREA:
+         rsx_vulkan_set_draw_area(op->u.set_draw_area.x0,
+                                  op->u.set_draw_area.y0,
+                                  op->u.set_draw_area.x1,
+                                  op->u.set_draw_area.y1);
+         break;
+      case RSX_DEFER_SET_VRAM_FRAMEBUFFER_COORDS:
+         rsx_vulkan_set_vram_framebuffer_coords(
+               op->u.set_vram_framebuffer_coords.xstart,
+               op->u.set_vram_framebuffer_coords.ystart);
+         break;
+      case RSX_DEFER_SET_HORIZONTAL_DISPLAY_RANGE:
+         rsx_vulkan_set_horizontal_display_range(
+               op->u.set_horizontal_display_range.x1,
+               op->u.set_horizontal_display_range.x2);
+         break;
+      case RSX_DEFER_SET_VERTICAL_DISPLAY_RANGE:
+         rsx_vulkan_set_vertical_display_range(
+               op->u.set_vertical_display_range.y1,
+               op->u.set_vertical_display_range.y2);
+         break;
+      case RSX_DEFER_SET_DISPLAY_MODE:
+         rsx_vulkan_set_display_mode(op->u.set_display_mode.depth_24bpp,
+                                     op->u.set_display_mode.is_pal,
+                                     op->u.set_display_mode.is_480i,
+                                     op->u.set_display_mode.width_mode);
+         break;
+      case RSX_DEFER_LOAD_IMAGE:
+         rsx_vulkan_load_image(op->u.load_image.x,
+                               op->u.load_image.y,
+                               op->u.load_image.w,
+                               op->u.load_image.h,
+                               op->u.load_image.vram,
+                               op->u.load_image.mask_test,
+                               op->u.load_image.set_mask);
+         break;
+      case RSX_DEFER_TOGGLE_DISPLAY:
+         rsx_vulkan_toggle_display(op->u.toggle_display.status);
+         break;
+   }
+}
+
 static void vk_context_reset(void)
 {
    if (!environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE, (void**)&vulkan) || !vulkan)
@@ -103,18 +188,38 @@ static void vk_context_reset(void)
    device->set_context(*context);
 
    renderer = new Renderer(*device, scaling, msaa, save_state.vram.empty() ? nullptr : &save_state);
+   if (!renderer->is_valid())
+   {
+      delete renderer;
+      delete device;
+      renderer = nullptr;
+      device = nullptr;
+      vulkan = nullptr;
+      return;
+   }
 
-   for (auto &func : defer)
-      func();
-   defer.clear();
+   tt_log_startup("vk renderer init: scaling=%u msaa=%u has_software_fb=%d\n",
+         (unsigned)scaling, (unsigned)msaa, (int)has_software_fb);
+
+   /* Replay any rsx_vulkan_* state-sets / VRAM uploads that arrived
+    * between rsx_vulkan_open's SET_HW_RENDER and this context_reset
+    * firing. By this point `renderer` is non-null so each call lands
+    * on the live renderer instead of being silently dropped. */
+   if (rsx_defer_count(&defer) > 0)
+      rsx_defer_drain(&defer, vk_defer_dispatch, nullptr);
 
    renderer->flush();
 }
 
 static void vk_context_destroy(void)
 {
+   if (device == nullptr)
+      return;
+
    save_state = renderer->save_vram_state();
    vulkan     = nullptr;
+   scanout_handles.clear();
+   swapchain_images.clear();
 
    delete renderer;
    delete device;
@@ -122,6 +227,14 @@ static void vk_context_destroy(void)
    renderer = nullptr;
    device = nullptr;
    context = nullptr;
+
+   /* Free the deferred-op storage. The pre-migration C++ defer queue
+    * never cleared on destroy, which meant any ops queued in the
+    * (rare) gap between destroy and the next reset accumulated; that
+    * was a latent leak that nobody noticed because the gap is normally
+    * empty. The new policy clears here, matching gl_context_destroy
+    * and keeping behaviour symmetric across backends. */
+   rsx_defer_clear(&defer);
 }
 
 static bool libretro_create_device(
@@ -145,14 +258,16 @@ static bool libretro_create_device(
       context = nullptr;
    }
 
-   try
+   /* parallel-psx's Vulkan::Context constructor used to throw on
+    * failure; it now sets a valid=false flag instead. The
+    * try/catch boundary is gone with it. */
+   context = new Vulkan::Context(instance, gpu, surface, required_device_extensions, num_required_device_extensions,
+                                 required_device_layers, num_required_device_layers,
+                                 required_features);
+   if (!context->is_valid())
    {
-      context = new Vulkan::Context(instance, gpu, surface, required_device_extensions, num_required_device_extensions,
-                                    required_device_layers, num_required_device_layers,
-                                    required_features);
-   }
-   catch (const std::exception &)
-   {
+      delete context;
+      context = nullptr;
       return false;
    }
 
@@ -218,7 +333,7 @@ void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
    info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H * (super_sampling ? 1 : scaling);
-   info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, crop_overscan,
+   info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, vulkan_crop_overscan,
                                        content_is_pal ? initial_scanline_pal : initial_scanline,
                                        content_is_pal ? last_scanline_pal : last_scanline,
                                        aspect_ratio_setting, show_vram, widescreen_hack, widescreen_hack_aspect_ratio_setting);
@@ -245,11 +360,14 @@ void rsx_vulkan_refresh_variables(void)
        * we are running in software mode */
       has_software_fb = true;
 
+   tt_log_startup("rsx_vulkan_refresh_variables: has_software_fb=%d\n",
+         (int)has_software_fb);
+
    unsigned old_scaling = scaling;
    unsigned old_msaa = msaa;
    bool old_super_sampling = super_sampling;
    bool old_show_vram = show_vram;
-   int old_crop_overscan = crop_overscan;
+   int old_crop_overscan = vulkan_crop_overscan;
    unsigned old_image_crop = image_crop;
    bool old_widescreen_hack = widescreen_hack;
    unsigned old_widescreen_hack_aspect_ratio_setting = widescreen_hack_aspect_ratio_setting;
@@ -345,11 +463,11 @@ void rsx_vulkan_refresh_variables(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (strcmp(var.value, "disabled") == 0)
-         crop_overscan = 0;
+         vulkan_crop_overscan = 0;
       else if (strcmp(var.value, "static") == 0)
-         crop_overscan = 1;
+         vulkan_crop_overscan = 1;
       else if (strcmp(var.value, "smart") == 0)
-         crop_overscan = 2;
+         vulkan_crop_overscan = 2;
    }
 
    var.key = BEETLE_OPT(image_offset_cycles);
@@ -505,7 +623,7 @@ void rsx_vulkan_refresh_variables(void)
         old_super_sampling != super_sampling ||
         old_msaa != msaa ||
         old_show_vram != show_vram ||
-        old_crop_overscan != crop_overscan ||
+        old_crop_overscan != vulkan_crop_overscan ||
         old_image_crop != image_crop ||
         old_widescreen_hack != widescreen_hack ||
         old_widescreen_hack_aspect_ratio_setting != widescreen_hack_aspect_ratio_setting ||
@@ -525,11 +643,33 @@ void rsx_vulkan_refresh_variables(void)
    }
 }
 
+static void ensure_sync_index_resources(void)
+{
+   unsigned mask = vulkan->get_sync_index_mask(vulkan->handle);
+   unsigned num_frames = 0;
+   for (unsigned i = 0; i < 32; i++)
+      if (mask & (1u << i))
+         num_frames = i + 1;
+
+   if (num_frames != swapchain_images.size())
+   {
+      swapchain_images.resize(num_frames);
+      scanout_handles.resize(num_frames);
+   }
+}
+
 void rsx_vulkan_prepare_frame(void)
 {
+   if (device == nullptr)
+   {
+      rsx_type = RSX_SOFTWARE;
+      return;
+   }
+
    inside_frame = true;
    device->flush_frame();
    vulkan->wait_sync_index(vulkan->handle);
+   ensure_sync_index_resources();
    unsigned index = vulkan->get_sync_index(vulkan->handle);
    device->next_frame_context();
    renderer->reset_counters();
@@ -553,6 +693,13 @@ static Renderer::ScanoutMode get_scanout_mode(bool bpp24)
 void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
                                unsigned height, unsigned pitch)
 {
+   if (device == nullptr)
+      return;
+
+   tt_log("vk finalize_frame display=%ux%u\n",
+         (unsigned)width, (unsigned)height);
+   tt_frame_advance();
+
    if (frame_duping_enabled && !GPU_get_display_change_count())
    {
       /* Any visual core option changes will be deferred to next non-duped frame */
@@ -570,7 +717,7 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_replace_textures(replace_textures);
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
-   renderer->set_horizontal_overscan_cropping(crop_overscan);
+   renderer->set_horizontal_overscan_cropping(vulkan_crop_overscan);
    renderer->set_horizontal_offset_cycles(image_offset_cycles);
    renderer->set_visible_scanlines(initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
    renderer->set_horizontal_additional_cropping(image_crop);
@@ -582,8 +729,9 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
       renderer->set_mdec_filter(Renderer::ScanoutFilter::None);
 
    auto scanout = show_vram ? renderer->scanout_vram_to_texture() : renderer->scanout_to_texture();
+   unsigned index = vulkan->get_sync_index(vulkan->handle);
 
-   retro_vulkan_image *image                          = &swapchain_image;
+   retro_vulkan_image *image                          = &swapchain_images[index];
 
    image->create_info.sType                           = 
       VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -608,22 +756,12 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
          nullptr, VK_QUEUE_FAMILY_IGNORED);
    renderer->flush();
 
-   auto semaphore = device->request_semaphore();
-   vulkan->set_signal_semaphore(vulkan->handle, semaphore->get_semaphore());
-   semaphore->signal_external();
-   renderer->set_scanout_semaphore(semaphore);
+   scanout_handles[index] = scanout;
    video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, scanout->get_width(), scanout->get_height(), 0);
    inside_frame = false;
 
    prev_frame_width = scanout->get_width();
    prev_frame_height = scanout ->get_height();
-
-#if 0
-   printf("%d %d\n", scanout->get_width(), scanout->get_height());
-
-   fprintf(stderr, "Render passes: %u, Readback: %u, Writeout: %u\n",
-         renderer->counters.render_passes, renderer->counters.fragment_readback_pixels, renderer->counters.fragment_writeout_pixels);
-#endif
 }
 
 /* Draw commands */
@@ -637,13 +775,13 @@ void rsx_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
    uint8_t tex_y_or   = (twy & twh) << 3;
 
    if (renderer)
-      renderer->set_texture_window({ tex_x_mask, tex_y_mask, tex_x_or, tex_y_or });
-   else
    {
-      defer.push_back([=]() {
-            renderer->set_texture_window({ tex_x_mask, tex_y_mask, tex_x_or, tex_y_or});
-            });
+      renderer->set_texture_window({ tex_x_mask, tex_y_mask, tex_x_or, tex_y_or });
+      tt_log("vk set_tex_window tww=%u twh=%u twx=%u twy=%u\n",
+            (unsigned)tww, (unsigned)twh, (unsigned)twx, (unsigned)twy);
    }
+   else
+      rsx_defer_push_set_tex_window(&defer, tww, twh, twx, twy);
 }
 
 void rsx_vulkan_set_draw_offset(int16_t x, int16_t y)
@@ -651,11 +789,7 @@ void rsx_vulkan_set_draw_offset(int16_t x, int16_t y)
    if (renderer)
       renderer->set_draw_offset(x, y);
    else
-   {
-      defer.push_back([=]() {
-            renderer->set_draw_offset(x, y);
-            });
-   }
+      rsx_defer_push_set_draw_offset(&defer, x, y);
 }
 
 void rsx_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
@@ -670,13 +804,17 @@ void rsx_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
    height = min(height, int(FB_HEIGHT - y0));
 
    if (renderer)
-      renderer->set_draw_rect({ x0, y0, unsigned(width), unsigned(height) });
-   else
    {
-      defer.push_back([=]() {
-            renderer->set_draw_rect({ x0, y0, unsigned(width), unsigned(height) });
-            });
+      renderer->set_draw_rect({ x0, y0, unsigned(width), unsigned(height) });
+      tt_log("vk set_draw_area top_left=(%u,%u) bot_right_inclusive=(%u,%u)\n",
+            (unsigned)x0, (unsigned)y0, (unsigned)x1, (unsigned)y1);
    }
+   else
+      /* Defer the raw inputs (x0,y0,x1,y1); the dispatcher re-enters
+       * this entry point which redoes the width/height clamp on top of
+       * a live FB_WIDTH/FB_HEIGHT. Functionally identical to capturing
+       * the post-clamp values, just keeps the clamp in one place. */
+      rsx_defer_push_set_draw_area(&defer, x0, y0, x1, y1);
 }
 
 void rsx_vulkan_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
@@ -684,11 +822,7 @@ void rsx_vulkan_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
    if (renderer)
       renderer->set_vram_framebuffer_coords(xstart, ystart);
    else
-   {
-      defer.push_back([=]() {
-            renderer->set_vram_framebuffer_coords(xstart, ystart);
-      });
-   }
+      rsx_defer_push_set_vram_framebuffer_coords(&defer, xstart, ystart);
 }
 
 void rsx_vulkan_set_horizontal_display_range(uint16_t x1, uint16_t x2)
@@ -696,11 +830,7 @@ void rsx_vulkan_set_horizontal_display_range(uint16_t x1, uint16_t x2)
    if (renderer)
       renderer->set_horizontal_display_range(x1, x2);
    else
-   {
-      defer.push_back([=]() {
-         renderer->set_horizontal_display_range(x1, x2);
-      });
-   }
+      rsx_defer_push_set_horizontal_display_range(&defer, x1, x2);
 }
 
 void rsx_vulkan_set_vertical_display_range(uint16_t y1, uint16_t y2)
@@ -708,11 +838,7 @@ void rsx_vulkan_set_vertical_display_range(uint16_t y1, uint16_t y2)
    if (renderer)
       renderer->set_vertical_display_range(y1, y2);
    else
-   {
-      defer.push_back([=]() {
-         renderer->set_vertical_display_range(y1, y2);
-      });
-   }
+      rsx_defer_push_set_vertical_display_range(&defer, y1, y2);
 }
 
 void rsx_vulkan_set_display_mode(bool depth_24bpp,
@@ -724,12 +850,8 @@ void rsx_vulkan_set_display_mode(bool depth_24bpp,
       renderer->set_display_mode(get_scanout_mode(depth_24bpp), is_pal,
                                  is_480i, static_cast<Renderer::WidthMode>(width_mode));
    else
-   {
-      defer.push_back([=]() {
-            renderer->set_display_mode(get_scanout_mode(depth_24bpp), is_pal,
-                                       is_480i, static_cast<Renderer::WidthMode>(width_mode));
-            });
-   }
+      rsx_defer_push_set_display_mode(&defer, depth_24bpp, is_pal,
+                                      is_480i, width_mode);
 }
 
 void rsx_vulkan_push_triangle(
@@ -758,7 +880,6 @@ void rsx_vulkan_push_triangle(
    renderer->set_texture_color_modulate(texture_blend_mode == 2);
    renderer->set_palette_offset(clut_x, clut_y);
    renderer->set_texture_offset(texpage_x, texpage_y);
-   //renderer->set_dither(dither);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
    renderer->set_UV_limits(min_u, min_v, max_u, max_v);
@@ -839,7 +960,6 @@ void rsx_vulkan_push_quad(
    renderer->set_texture_color_modulate(texture_blend_mode == 2);
    renderer->set_palette_offset(clut_x, clut_y);
    renderer->set_texture_offset(texpage_x, texpage_y);
-   //renderer->set_dither(dither);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
    renderer->set_UV_limits(min_u, min_v, max_u, max_v);
@@ -938,7 +1058,6 @@ void rsx_vulkan_push_line(
       { float(p0x), float(p0y), 1.0f, c0, 0, 0 },
       { float(p1x), float(p1y), 1.0f, c1, 0, 0 },
    };
-   //renderer->set_dither(dither);
    renderer->set_texture_color_modulate(false);
    renderer->draw_line(vertices);
 }
@@ -949,17 +1068,20 @@ void rsx_vulkan_load_image(
       uint16_t *vram,
       bool mask_test, bool set_mask)
 {
-#ifndef NDEBUG
-   TT_LOG_VERBOSE(RETRO_LOG_INFO, "rsx_vulkan_load_image(x=%i, y=%i, w=%i, h=%i, mask_test=%i, set_mask=%i).\n", x, y, w, h, mask_test, set_mask);
-#endif
    if (!renderer)
    {
-      // Generally happens if someone loads a save state before the Vulkan context is created.
-      defer.push_back([=]() {
-            rsx_vulkan_load_image(x, y, w, h, vram, mask_test, set_mask);
-      });
+      /* Pre-context_reset uploads (e.g. savestate-load arriving before
+       * the Vulkan context is up, or game boot pushing VRAM ahead of
+       * the frontend's context_reset). The captured `vram` pointer
+       * aliases GPU.vram, which lives for the whole core lifetime, so
+       * holding it across the deferred-replay window is safe. */
+      rsx_defer_push_load_image(&defer, x, y, w, h, vram, mask_test, set_mask);
       return;
    }
+
+   tt_log("vk load_image rect=(%u,%u %ux%u) mask_test=%d set_mask=%d\n",
+         (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h,
+         (int)mask_test, (int)set_mask);
 
    renderer->notify_texture_upload(PSX::Rect { x, y, w, h }, vram);
    bool dual_copy = x + w > FB_WIDTH; // Check if we need to handle wrap-around in X.
@@ -999,6 +1121,9 @@ bool rsx_vulkan_read_vram(uint16_t x, uint16_t y,
    if (!renderer)
       return false;
 
+   tt_log("vk read_vram rect=(%u,%u %ux%u)\n",
+         (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h);
+
    renderer->copy_vram_to_cpu_synchronous({ x, y, w, h }, vram);
    return true;
 }
@@ -1008,7 +1133,12 @@ void rsx_vulkan_fill_rect(uint32_t color,
                           uint16_t w, uint16_t h)
 {
    if (renderer)
+   {
+      tt_log("vk fill_rect rect=(%u,%u %ux%u) color=0x%06x\n",
+            (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h,
+            (unsigned)(color & 0xFFFFFFu));
       renderer->clear_rect({ x, y, w, h }, color);
+   }
 }
 
 void rsx_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
@@ -1018,6 +1148,12 @@ void rsx_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
 {
    if (!renderer)
       return;
+
+   tt_log("vk copy_rect src=(%u,%u) dst=(%u,%u) %ux%u mask_test=%d set_mask=%d\n",
+         (unsigned)src_x, (unsigned)src_y,
+         (unsigned)dst_x, (unsigned)dst_y,
+         (unsigned)w, (unsigned)h,
+         (int)mask_test, (int)set_mask);
 
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
@@ -1029,11 +1165,7 @@ void rsx_vulkan_toggle_display(bool status)
    if (renderer)
       renderer->toggle_display(status == 0);
    else
-   {
-      defer.push_back([=] {
-            renderer->toggle_display(status == 0);
-      });
-   }
+      rsx_defer_push_toggle_display(&defer, status);
 }
 
 bool rsx_vulkan_has_software_renderer(void)

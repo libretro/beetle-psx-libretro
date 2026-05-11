@@ -1,18 +1,186 @@
 #include "renderer.hpp"
-#include "renderer_pipelines.hpp"
-#ifndef NDEBUG
-#include "timer.hpp"
-#endif
 #include <algorithm>
 #include <math.h>
 #include <string.h>
 
+namespace PSX
+{
+static const uint32_t quad_vert[] =
+#include "quad.vert.inc"
+    ;
+static const uint32_t scaled_quad_frag[] =
+#include "scaled.quad.frag.inc"
+    ;
+static const uint32_t scaled_dither_quad_frag[] =
+#include "scaled.dither.quad.frag.inc"
+    ;
+static const uint32_t bpp24_quad_frag[] =
+#include "bpp24.quad.frag.inc"
+    ;
+static const uint32_t bpp24_yuv_quad_frag[] =
+#include "bpp24.yuv.quad.frag.inc"
+    ;
+static const uint32_t unscaled_quad_frag[] =
+#include "unscaled.quad.frag.inc"
+    ;
+static const uint32_t unscaled_dither_quad_frag[] =
+#include "unscaled.dither.quad.frag.inc"
+    ;
+static const uint32_t copy_vram_comp[] =
+#include "copy_vram.comp.inc"
+    ;
+static const uint32_t copy_vram_masked_comp[] =
+#include "copy_vram.masked.comp.inc"
+    ;
+static const uint32_t resolve_to_scaled[] =
+#include "resolve.scaled.comp.inc"
+    ;
+static const uint32_t resolve_to_msaa_scaled[] =
+#include "resolve.msaa.scaled.comp.inc"
+    ;
+static const uint32_t resolve_to_unscaled[] =
+#include "resolve.unscaled.comp.inc"
+    ;
+static const uint32_t resolve_msaa_to_unscaled[] =
+#include "resolve.msaa.unscaled.comp.inc"
+    ;
+
+static const uint32_t flat_vert[] =
+#include "flat.vert.inc"
+    ;
+static const uint32_t flat_unscaled_vert[] =
+#include "flat.unscaled.vert.inc"
+    ;
+static const uint32_t flat_frag[] =
+#include "flat.frag.inc"
+    ;
+static const uint32_t textured_vert[] =
+#include "textured.vert.inc"
+    ;
+static const uint32_t textured_unscaled_vert[] =
+#include "textured.unscaled.vert.inc"
+    ;
+static const uint32_t textured_frag[] =
+#include "textured.frag.inc"
+    ;
+static const uint32_t textured_unscaled_frag[] =
+#include "textured.unscaled.frag.inc"
+    ;
+static const uint32_t textured_msaa_frag[] =
+#include "textured.msaa.frag.inc"
+    ;
+static const uint32_t textured_msaa_unscaled_frag[] =
+#include "textured.msaa.unscaled.frag.inc"
+    ;
+
+static const uint32_t blit_vram_scaled_comp[] =
+#include "blit_vram.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_scaled_masked_comp[] =
+#include "blit_vram.masked.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_cached_scaled_comp[] =
+#include "blit_vram.cached.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_cached_scaled_masked_comp[] =
+#include "blit_vram.cached.masked.scaled.comp.inc"
+    ;
+
+static const uint32_t blit_vram_msaa_scaled_comp[] =
+#include "blit_vram.msaa.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_msaa_scaled_masked_comp[] =
+#include "blit_vram.msaa.masked.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_msaa_cached_scaled_comp[] =
+#include "blit_vram.msaa.cached.scaled.comp.inc"
+    ;
+static const uint32_t blit_vram_msaa_cached_scaled_masked_comp[] =
+#include "blit_vram.msaa.cached.masked.scaled.comp.inc"
+    ;
+
+static const uint32_t blit_vram_unscaled_comp[] =
+#include "blit_vram.unscaled.comp.inc"
+    ;
+static const uint32_t blit_vram_unscaled_masked_comp[] =
+#include "blit_vram.masked.unscaled.comp.inc"
+    ;
+
+static const uint32_t blit_vram_cached_unscaled_comp[] =
+#include "blit_vram.cached.unscaled.comp.inc"
+    ;
+static const uint32_t blit_vram_cached_unscaled_masked_comp[] =
+#include "blit_vram.cached.masked.unscaled.comp.inc"
+    ;
+
+static const uint32_t feedback_frag[] =
+#include "feedback.frag.inc"
+    ;
+static const uint32_t feedback_unscaled_frag[] =
+#include "feedback.unscaled.frag.inc"
+    ;
+static const uint32_t feedback_flat_frag[] =
+#include "feedback.flat.frag.inc"
+    ;
+
+static const uint32_t feedback_msaa_frag[] =
+#include "feedback.msaa.frag.inc"
+    ;
+static const uint32_t feedback_msaa_unscaled_frag[] =
+#include "feedback.msaa.unscaled.frag.inc"
+    ;
+static const uint32_t feedback_msaa_flat_frag[] =
+#include "feedback.msaa.flat.frag.inc"
+    ;
+
+static const uint32_t mipmap_vert[] =
+#include "mipmap.vert.inc"
+    ;
+static const uint32_t mipmap_shifted_vert[] =
+#include "mipmap.shifted.vert.inc"
+    ;
+static const uint32_t mipmap_energy_first_frag[] =
+#include "mipmap.energy.first.frag.inc"
+    ;
+static const uint32_t mipmap_resolve_frag[] =
+#include "mipmap.resolve.frag.inc"
+    ;
+static const uint32_t mipmap_dither_resolve_frag[] =
+#include "mipmap.dither.resolve.frag.inc"
+    ;
+static const uint32_t mipmap_energy_frag[] =
+#include "mipmap.energy.frag.inc"
+    ;
+static const uint32_t mipmap_energy_blur_frag[] =
+#include "mipmap.energy.blur.frag.inc"
+    ;
+}
+
+// 3 LSBs are ignored.
+static inline uint32_t fbcolor_to_rgba8(uint32_t color)
+{
+	return color & 0xfff8f8f8u;
+}
+
+static inline void fbcolor_to_rgba32f(float *v, uint32_t color)
+{
+	// 3 LSBs are ignored.
+	unsigned r = (color >> 0) & 0xf8;
+	unsigned g = (color >> 8) & 0xf8;
+	unsigned b = (color >> 16) & 0xf8;
+	v[0] = r * (1.0f / 255.0f);
+	v[1] = g * (1.0f / 255.0f);
+	v[2] = b * (1.0f / 255.0f);
+	// Mask bit is always cleared.
+	v[3] = 0.0f;
+}
+
 using namespace Vulkan;
-using namespace std;
 
 namespace PSX
 {
-uint32_t colorToRGBA8(float r, float g, float b, float a) {
+uint32_t colorToRGBA8(float r, float g, float b, float a)
+{
 	return ((int)(a * 0xff) << 24) + ((int)(b * 0xff) << 16) + ((int)(g * 0xff) << 8) + (int)(r * 0xff);
 }
 
@@ -58,10 +226,11 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	}
 	else
 	{
-		throw std::runtime_error("[Vulkan]: RGBA8_UNORM is not supported. This should never happen, and something might have been corrupted.\n");
+		LOGE("[Vulkan]: RGBA8_UNORM is not supported. This should never happen, and something might have been corrupted.\n");
+		return;
 	}
 
-	auto info = ImageCreateInfo::render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
+	ImageCreateInfo info = ImageCreateInfo::render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 	info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 	             VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -103,7 +272,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	scaled_framebuffer->set_layout(Layout::General);
 
 	{
-		auto view_info = scaled_framebuffer->get_view().get_create_info();
+		ImageViewCreateInfo view_info = scaled_framebuffer->get_view().get_create_info();
 		for (unsigned i = 0; i < info.levels; i++)
 		{
 			view_info.base_level = i;
@@ -176,7 +345,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 		cmd->clear_image(*framebuffer, {});
 	cmd->full_barrier();
 
-	auto dither_info = ImageCreateInfo::immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM);
+	ImageCreateInfo dither_info = ImageCreateInfo::immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM);
 	// This lut is biased with 4 to be able to use UNORM easily.
 	static const uint8_t dither_lut_data[16] = { 0, 4, 1, 5, 6, 2, 7, 3, 1, 5, 0, 4, 7, 3, 6, 2 };
 
@@ -199,11 +368,8 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	if (state) {
 		tracker.load_state(state->tracker_state);
 	}
-}
 
-void Renderer::set_scanout_semaphore(Semaphore semaphore)
-{
-	scanout_semaphore = semaphore;
+	valid = true;
 }
 
 Renderer::SaveState Renderer::save_vram_state()
@@ -213,7 +379,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	auto buffer = device.create_buffer(buffer_create_info, nullptr);
+	BufferHandle buffer = device.create_buffer(buffer_create_info, nullptr);
 	atlas.read_transfer(Domain::Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	ensure_command_buffer();
 	cmd->copy_image_to_buffer(*buffer, *framebuffer, 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
@@ -228,7 +394,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	std::vector<uint32_t> vram(FB_WIDTH * FB_HEIGHT);
 	memcpy(vram.data(), ptr, FB_WIDTH * FB_HEIGHT * sizeof(uint32_t));
 	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
-	return { move(vram), render_state, tracker.save_state() };
+	return { std::move(vram), render_state, tracker.save_state() };
 }
 
 void Renderer::set_filter_mode(FilterMode mode)
@@ -381,23 +547,24 @@ void Renderer::set_draw_rect(const Rect &rect)
 	atlas.set_draw_rect(rect);
 	render_state.draw_rect = rect;
 
-	const auto nequal = [this](const VkRect2D &a, const Rect &b) {
-		return (a.offset.x != int(b.x * scaling)) || (a.offset.y != int(b.y * scaling)) ||
-		       (a.extent.width != b.width * scaling) || (a.extent.height != b.height * scaling);
-	};
-
-	if (nequal(queue.scissors.back(), rect))
+	const VkRect2D &last = queue.scissors.back();
+	const int scaled_x = int(rect.x * scaling);
+	const int scaled_y = int(rect.y * scaling);
+	const unsigned scaled_w = rect.width * scaling;
+	const unsigned scaled_h = rect.height * scaling;
+	if (last.offset.x != scaled_x || last.offset.y != scaled_y ||
+	    last.extent.width != scaled_w || last.extent.height != scaled_h)
 		queue.scissors.push_back(
-		    { { int(rect.x * scaling), int(rect.y * scaling) }, { rect.width * scaling, rect.height * scaling } });
+		    { { scaled_x, scaled_y }, { scaled_w, scaled_h } });
 }
 
-void Renderer::clear_rect(const Rect &rect, FBColor color)
+void Renderer::clear_rect(const Rect &rect, uint32_t fb_color)
 {
 	if (texture_tracking_enabled) {
 		tracker.clearRegion(rect);
 	}
 	last_scanout.reset();
-	atlas.clear_rect(rect, color);
+	atlas.clear_rect(rect, fb_color);
 
 	VK_ASSERT(rect.x + rect.width <= FB_WIDTH);
 	VK_ASSERT(rect.y + rect.height <= FB_HEIGHT);
@@ -418,56 +585,8 @@ void Renderer::set_texture_window(const TextureWindow &window)
 	render_state.cached_window_rect = compute_window_rect(window);
 }
 
-BufferHandle Renderer::scanout_vram_to_buffer(unsigned &width, unsigned &height)
-{
-	atlas.read_transfer(Domain::Scaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
-	ensure_command_buffer();
-
-	if (msaa > 1)
-	{
-		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-		VkOffset3D offset = { 0, 0, 0 };
-		VkExtent3D extent = { FB_WIDTH * scaling, FB_HEIGHT * scaling, 1 };
-		VkImageResolve region = { subres, offset, subres, offset, extent };
-		vkCmdResolveImage(cmd->get_command_buffer(),
-			scaled_framebuffer_msaa->get_image(), VK_IMAGE_LAYOUT_GENERAL,
-			scaled_framebuffer->get_image(), VK_IMAGE_LAYOUT_GENERAL,
-			1, &region);
-
-		cmd->barrier(
-			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
-	}
-
-	BufferCreateInfo buffer_create_info;
-	buffer_create_info.domain = BufferDomain::CachedHost;
-	buffer_create_info.size = scaling * scaling * FB_WIDTH * FB_HEIGHT * 4;
-	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-	auto buffer = device.create_buffer(buffer_create_info, nullptr);
-	cmd->copy_image_to_buffer(*buffer, *scaled_framebuffer, 0, { 0, 0, 0 },
-	                          { scaling * FB_WIDTH, scaling * FB_HEIGHT, 1 }, 0, 0,
-	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
-
-	cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
-	             VK_ACCESS_HOST_READ_BIT);
-
-	flush();
-	device.wait_idle();
-	width = FB_WIDTH * scaling;
-	height = FB_HEIGHT * scaling;
-	return buffer;
-}
-
 void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 {
-#ifndef NDEBUG
-	Util::Timer timer;
-	timer.start();
-	TT_LOG_VERBOSE(RETRO_LOG_DEBUG,
-		"copy_vram_to_cpu_synchronous(rect={%i, %i, %i x %i}).\n", rect.x, rect.y, rect.width, rect.height
-	);
-#endif
 	bool wrap_x = rect.x + rect.width > FB_WIDTH;
 	bool wrap_y = rect.y + rect.height > FB_HEIGHT;
 	Rect copy_rect = rect;
@@ -489,7 +608,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	buffer_create_info.size = copy_rect.width * copy_rect.height * 4;
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	auto buffer = device.create_buffer(buffer_create_info, nullptr);
+	BufferHandle buffer = device.create_buffer(buffer_create_info, nullptr);
 	cmd->copy_image_to_buffer(*buffer, *framebuffer, 0, { int(copy_rect.x), int(copy_rect.y), 0 },
 	                          { copy_rect.width, copy_rect.height, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
@@ -497,10 +616,10 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 	             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
 
-	auto fence = flush_and_signal();
+	Vulkan::Fence fence = flush_and_signal();
 	fence->wait();
 
-	auto *mapped = static_cast<const uint32_t *>(device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
+	const uint32_t *mapped = static_cast<const uint32_t *>(device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
 
 	if (!wrap)
 	{
@@ -525,76 +644,12 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	}
 
 	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
-
-#ifndef NDEBUG
-	double readback_time = timer.end();
-	LOGI("copy_vram_to_cpu_synchronous() took %.3f ms!\n",
-			readback_time * 1e3);
-#endif
-}
-
-BufferHandle Renderer::scanout_to_buffer(bool draw_area, unsigned &width, unsigned &height)
-{
-	render_state.display_fb_rect = compute_vram_framebuffer_rect();
-	auto &rect = draw_area ? render_state.draw_rect : render_state.display_fb_rect;
-	if (rect.width == 0 || rect.height == 0 || !render_state.display_on)
-		return BufferHandle(nullptr);
-
-	atlas.flush_render_pass();
-
-	atlas.read_transfer(Domain::Scaled, rect);
-	ensure_command_buffer();
-
-	if (msaa > 1)
-	{
-		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-		VkOffset3D offset = { int(scaling * rect.x), int(scaling * rect.y), 0 };
-		VkExtent3D extent = { scaling * rect.width, scaling * rect.height, 1 };
-		if (rect.x + rect.width > FB_WIDTH)
-		{
-			offset.x = 0;
-			extent.width = FB_WIDTH * scaling;
-		}
-		if (rect.y + rect.height > FB_HEIGHT)
-		{
-			offset.y = 0;
-			extent.height = FB_HEIGHT * scaling;
-		}
-		VkImageResolve region = { subres, offset, subres, offset, extent };
-		vkCmdResolveImage(cmd->get_command_buffer(),
-			scaled_framebuffer_msaa->get_image(), VK_IMAGE_LAYOUT_GENERAL,
-			scaled_framebuffer->get_image(), VK_IMAGE_LAYOUT_GENERAL,
-			1, &region);
-
-		cmd->barrier(
-			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
-	}
-
-	BufferCreateInfo buffer_create_info;
-	buffer_create_info.domain = BufferDomain::CachedHost;
-	buffer_create_info.size = scaling * scaling * rect.width * rect.height * 4;
-	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-	auto buffer = device.create_buffer(buffer_create_info, nullptr);
-	cmd->copy_image_to_buffer(*buffer, *scaled_framebuffer, 0, { int(scaling * rect.x), int(scaling * rect.y), 0 },
-	                          { scaling * rect.width, scaling * rect.height, 1 }, 0, 0,
-	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
-
-	cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
-	             VK_ACCESS_HOST_READ_BIT);
-
-	flush();
-	device.wait_idle();
-	width = scaling * rect.width;
-	height = scaling * rect.height;
-	return buffer;
 }
 
 void Renderer::mipmap_framebuffer()
 {
 	// render_state.display_fb_rect = compute_vram_framebuffer_rect();
-	auto rect = render_state.display_fb_rect;
+	Rect rect = render_state.display_fb_rect;
 	if (rect.x + rect.width > FB_WIDTH)
 	{
 		rect.x = 0;
@@ -611,7 +666,7 @@ void Renderer::mipmap_framebuffer()
 	for (unsigned i = 1; i <= levels; i++)
 	{
 		RenderPassInfo rp;
-		unsigned current_scale = max(scaling >> i, 1u);
+		unsigned current_scale = std::max(scaling >> i, 1u);
 
 		if (i == levels)
 			rp.color_attachments[0] = &bias_framebuffer->get_view();
@@ -687,7 +742,7 @@ void Renderer::mipmap_framebuffer()
 void Renderer::ssaa_framebuffer()
 {
 	// render_state.display_fb_rect = compute_vram_framebuffer_rect();
-	auto &rect = render_state.display_fb_rect;
+	Rect &rect = render_state.display_fb_rect;
 	unsigned left = rect.x / BLOCK_WIDTH;
 	unsigned top = rect.y / BLOCK_HEIGHT;
 	unsigned right = (rect.x + rect.width + BLOCK_WIDTH - 1) / BLOCK_WIDTH;
@@ -721,7 +776,7 @@ void Renderer::ssaa_framebuffer()
 	unsigned size = resolves_ssaa.size();
 	for (unsigned i = 0; i < size; i += 1024)
 	{
-		unsigned to_run = min(size - i, 1024u);
+		unsigned to_run = std::min(size - i, 1024u);
 
 		Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 		cmd->push_constants(&push, 0, sizeof(push));
@@ -853,26 +908,12 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 
 	atlas.flush_render_pass();
 
-#if 0
-	if (last_scanout)
-		return last_scanout;
-#endif
-
 	Rect vram_rect = {0, 0, FB_WIDTH, FB_HEIGHT};
 
 	if (scaled)
 		atlas.read_fragment(Domain::Scaled, vram_rect);
 	else
 		atlas.read_fragment(Domain::Unscaled, vram_rect);
-
-	ensure_command_buffer();
-
-	if (scanout_semaphore)
-	{
-		flush();
-		device.add_wait_semaphore(CommandBuffer::Type::Generic, scanout_semaphore, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, true);
-		scanout_semaphore.reset();
-	}
 
 	ensure_command_buffer();
 
@@ -894,26 +935,14 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 
 	unsigned render_scale = scaled ? scaling : 1;
 
-	auto info = ImageCreateInfo::render_target(
+	ImageCreateInfo info = ImageCreateInfo::render_target(
 			FB_WIDTH * render_scale,
 			FB_HEIGHT * render_scale,
 			VK_FORMAT_A1R5G5B5_UNORM_PACK16); // Default to 15bit color for now
 
-#if 0
-	if (!reuseable_scanout ||
-			reuseable_scanout->get_create_info().width != info.width ||
-			reuseable_scanout->get_create_info().height != info.height ||
-			reuseable_scanout->get_create_info().format != info.format)
-	{
-		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-		reuseable_scanout = device.create_image(info);
-	}
-#else
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	reuseable_scanout = device.create_image(info);
-#endif
 
 	RenderPassInfo rp;
 	rp.color_attachments[0] = &reuseable_scanout->get_view();
@@ -987,7 +1016,7 @@ ImageHandle Renderer::scanout_to_texture()
 		return last_scanout;
 
 	render_state.display_fb_rect = compute_vram_framebuffer_rect();
-	auto &rect = render_state.display_fb_rect;
+	Rect &rect = render_state.display_fb_rect;
 
 	if (rect.width == 0 || rect.height == 0 || !render_state.display_on)
 	{
@@ -996,17 +1025,12 @@ ImageHandle Renderer::scanout_to_texture()
 
 		ensure_command_buffer();
 
-		auto info = ImageCreateInfo::render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
+		ImageCreateInfo info = ImageCreateInfo::render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
 
-		if (!reuseable_scanout || reuseable_scanout->get_create_info().width != info.width ||
-		    reuseable_scanout->get_create_info().height != info.height)
-		{
-			//LOG("Creating new scanout image.\n");
-			info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-			info.usage =
-			    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-			reuseable_scanout = device.create_image(info);
-		}
+		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		info.usage =
+		    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		reuseable_scanout = device.create_image(info);
 
 		RenderPassInfo rp;
 		rp.color_attachments[0] = &reuseable_scanout->get_view();
@@ -1033,7 +1057,7 @@ ImageHandle Renderer::scanout_to_texture()
 	bool bpp24 = render_state.scanout_mode == ScanoutMode::BGR24;
 	bool ssaa = render_state.scanout_filter == ScanoutFilter::SSAA && scaling != 1;
 
-	auto read_rect = rect;
+	Rect read_rect = rect;
 	if (rect.x + rect.width > FB_WIDTH)
 	{
 		read_rect.x = 0;
@@ -1046,11 +1070,11 @@ ImageHandle Renderer::scanout_to_texture()
 	}
 	if (bpp24)
 	{
-		auto tmp = read_rect;
+		Rect tmp = read_rect;
 		if (bpp24)
 		{
 			tmp.width = (tmp.width * 3 + 1) / 2;
-			tmp.width = min(tmp.width, FB_WIDTH - tmp.x);
+			tmp.width = std::min(tmp.width, FB_WIDTH - tmp.x);
 		}
 		atlas.read_fragment(Domain::Unscaled, tmp);
 	}
@@ -1091,37 +1115,22 @@ ImageHandle Renderer::scanout_to_texture()
 	if (render_state.adaptive_smoothing && !bpp24 && !ssaa && scaling != 1)
 		mipmap_framebuffer();
 
-	if (scanout_semaphore)
-	{
-		flush();
-		// We only need to wait in the scanout pass.
-		device.add_wait_semaphore(CommandBuffer::Type::Generic, scanout_semaphore, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, true);
-		scanout_semaphore.reset();
-	}
-
 	ensure_command_buffer();
 
 	bool scaled = !ssaa;
 
 	unsigned render_scale = scaled ? scaling : 1;
 
-	auto display_rect = compute_display_rect();
+	DisplayRect display_rect = compute_display_rect();
 
-	auto info = ImageCreateInfo::render_target(
+	ImageCreateInfo info = ImageCreateInfo::render_target(
 			display_rect.width * render_scale,
 			display_rect.height * render_scale,
 			render_state.scanout_mode == ScanoutMode::ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM);
 
-	if (!reuseable_scanout ||
-			reuseable_scanout->get_create_info().width != info.width ||
-			reuseable_scanout->get_create_info().height != info.height ||
-			reuseable_scanout->get_create_info().format != info.format)
-	{
-		//LOG("Creating new scanout image.\n");
-		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-		reuseable_scanout = device.create_image(info);
-	}
+	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	reuseable_scanout = device.create_image(info);
 
 	RenderPassInfo rp;
 	rp.color_attachments[0] = &reuseable_scanout->get_view();
@@ -1139,7 +1148,7 @@ ImageHandle Renderer::scanout_to_texture()
 	cmd->begin_render_pass(rp);
 	cmd->set_quad_state();
 
-	auto old_vp = cmd->get_viewport();
+	VkViewport old_vp = cmd->get_viewport();
 	VkViewport new_vp = {display_rect.x * (float) render_scale,
 	                     display_rect.y * (float) render_scale,
 	                     rect.width * (float) render_scale,
@@ -1198,7 +1207,7 @@ ImageHandle Renderer::scanout_to_texture()
 			float dither_scale;
 			int32_t dither_shift;
 		};
-		auto *dither = cmd->allocate_typed_constant_data<DitherData>(0, 3, 1);
+		DitherData *dither = cmd->allocate_typed_constant_data<DitherData>(0, 3, 1);
 		dither->range = 31.0f;
 		dither->inv_range = 1.0f / 31.0f;
 		dither->dither_scale = 1.0f;
@@ -1252,33 +1261,6 @@ ImageHandle Renderer::scanout_to_texture()
 	last_scanout = reuseable_scanout;
 
 	return reuseable_scanout;
-}
-
-void Renderer::scanout()
-{
-	auto image = scanout_to_texture();
-
-	ensure_command_buffer();
-	cmd->begin_render_pass(device.get_swapchain_render_pass(SwapchainRenderPass::ColorOnly));
-	cmd->set_quad_state();
-	cmd->set_program(*pipelines.scaled_quad_blitter);
-	cmd->set_texture(0, 0, image->get_view(), StockSampler::LinearClamp);
-
-	cmd->set_vertex_binding(0, *quad, 0, 8);
-	struct Push
-	{
-		float offset[2];
-		float scale[2];
-	};
-	const Push push = { { 0.0f, 0.0f }, { 1.0f, 1.0f } };
-
-	cmd->push_constants(&push, 0, sizeof(push));
-	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
-	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-	counters.draw_calls++;
-	counters.vertices += 4;
-	cmd->draw(4);
-	cmd->end_render_pass();
 }
 
 void Renderer::hazard(StatusFlags flags)
@@ -1369,7 +1351,7 @@ void Renderer::flush_resolves()
 		unsigned size = queue.scaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
 		{
-			unsigned to_run = min(size - i, 1024u);
+			unsigned to_run = std::min(size - i, 1024u);
 
 			Push push = { { 1.0f / (scaling * FB_WIDTH), 1.0f / (scaling * FB_HEIGHT) }, scaling };
 			cmd->push_constants(&push, 0, sizeof(push));
@@ -1397,7 +1379,7 @@ void Renderer::flush_resolves()
 		unsigned size = queue.unscaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
 		{
-			unsigned to_run = min(size - i, 1024u);
+			unsigned to_run = std::min(size - i, 1024u);
 
 			Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 			cmd->push_constants(&push, 0, sizeof(push));
@@ -1517,7 +1499,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		else
 		{
 			// If we have a masked texture window, assume this is the true rect we should use.
-			auto effective_rect = render_state.cached_window_rect;
+			Rect effective_rect = render_state.cached_window_rect;
 			atlas.set_texture_window(
 			    { effective_rect.x >> shift, effective_rect.y, effective_rect.width >> shift, effective_rect.height });
 			hd_texture_vram = {
@@ -1545,10 +1527,10 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 	{
 		float tmp_x = vertices[i].x + render_state.draw_offset_x;
 		float tmp_y = vertices[i].y + render_state.draw_offset_y;
-		max_x = max(max_x, tmp_x);
-		max_y = max(max_y, tmp_y);
-		min_x = min(min_x, tmp_x);
-		min_y = min(min_y, tmp_y);
+		max_x = std::max(max_x, tmp_x);
+		max_y = std::max(max_y, tmp_y);
+		min_x = std::min(min_x, tmp_x);
+		min_y = std::min(min_y, tmp_y);
 		x[i] = tmp_x;
 		y[i] = tmp_y;
 
@@ -1556,18 +1538,18 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		{
 			unsigned tmp_u = vertices[i].u + render_state.texture_offset_x;
 			unsigned tmp_v = vertices[i].v + render_state.texture_offset_y;
-			max_u = max(max_u, tmp_u);
-			max_v = max(max_v, tmp_v);
-			min_u = min(min_u, tmp_u);
-			min_v = min(min_v, tmp_v);
+			max_u = std::max(max_u, tmp_u);
+			max_v = std::max(max_v, tmp_v);
+			min_u = std::min(min_u, tmp_u);
+			min_v = std::min(min_v, tmp_v);
 		}
 	}
 
 	// Clamp the rect.
-	min_x = floorf(max(min_x, 0.0f));
-	min_y = floorf(max(min_y, 0.0f));
-	max_x = ceilf(min(max_x, float(FB_WIDTH)));
-	max_y = ceilf(min(max_y, float(FB_HEIGHT)));
+	min_x = floorf(std::max(min_x, 0.0f));
+	min_y = floorf(std::max(min_y, 0.0f));
+	max_x = ceilf(std::min(max_x, float(FB_WIDTH)));
+	max_y = ceilf(std::min(max_y, float(FB_HEIGHT)));
 
 	const Rect rect = {
 		unsigned(min_x), unsigned(min_y), unsigned(max_x) - unsigned(min_x), unsigned(max_y) - unsigned(min_y),
@@ -1635,11 +1617,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 			render_state.texture_window,
 			int16_t(render_state.palette_offset_x),
 			int16_t(render_state.palette_offset_y),
-#if 0
-			int16_t(shift | (render_state.dither << 8)),
-#else
 			param,
-#endif
 			int16_t(vertices[i].u),
 			int16_t(vertices[i].v),
 			int16_t(render_state.texture_offset_x),
@@ -1711,7 +1689,7 @@ void Renderer::build_line_quad(Vertex *output, const Vertex *input)
 		output[3].x = input[1].x + 1.0f;
 		output[3].y = input[1].y + 1.0f;
 
-		auto c = input[0].color;
+		uint32_t c = input[0].color;
 		output[0].w = 1.0f;
 		output[0].color = c;
 		output[1].w = 1.0f;
@@ -1830,7 +1808,7 @@ void Renderer::draw_triangle(const Vertex *vertices)
 	bool offset_uv = false;
 	build_attribs(vert, vertices, 3, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	const int scissor_index = queue.scissor_invariant ? -1 : int(queue.scissors.size() - 1);
-	auto *out = select_pipeline(1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+	std::vector<BufferVertex> *out = select_pipeline(1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	if (out)
 	{
 		for (unsigned i = 0; i < 3; i++)
@@ -1853,13 +1831,8 @@ void Renderer::draw_triangle(const Vertex *vertices)
 												 offset_uv });
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
-
-		// render_pass_is_feedback enables self dependency in renderpass which is necessary for barriers between draws
-		// hence getting rid of the condition
-#if 0
-		if (render_state.mask_test && render_state.semi_transparent != SemiTransparentMode::None)
-#endif
-			render_pass_is_feedback = true;
+		// render_pass_is_feedback enables self dependency in renderpass which is necessary for barriers between draws.
+		render_pass_is_feedback = true;
 	}
 }
 
@@ -1884,7 +1857,7 @@ void Renderer::draw_quad(const Vertex *vertices)
 	bool offset_uv = false;
 	build_attribs(vert, vertices, 4, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	const int scissor_index = queue.scissor_invariant ? -1 : int(queue.scissors.size() - 1);
-	auto *out = select_pipeline(2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+	std::vector<BufferVertex> *out = select_pipeline(2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 
 	if (out)
 	{
@@ -1919,25 +1892,22 @@ void Renderer::draw_quad(const Vertex *vertices)
 		queue.semi_transparent_state.push_back(state);
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
-#if 0
-		if (render_state.mask_test && render_state.semi_transparent != SemiTransparentMode::None)
-#endif
-			render_pass_is_feedback = true;
+		render_pass_is_feedback = true;
 	}
 }
 
-void Renderer::clear_quad(const Rect &rect, FBColor color, bool candidate)
+void Renderer::clear_quad(const Rect &rect, uint32_t fb_color, bool candidate)
 {
 	last_scanout.reset();
-	auto old = atlas.set_texture_mode(TextureMode::None);
+	TextureMode old = atlas.set_texture_mode(TextureMode::None);
 	float z = allocate_depth(Domain::Unscaled, rect);
 	atlas.set_texture_mode(old);
 
-	BufferVertex pos0 = { float(rect.x), float(rect.y), z, 1.0f, fbcolor_to_rgba8(color) };
-	BufferVertex pos1 = { float(rect.x) + float(rect.width), float(rect.y), z, 1.0f, fbcolor_to_rgba8(color) };
-	BufferVertex pos2 = { float(rect.x), float(rect.y) + float(rect.height), z, 1.0f, fbcolor_to_rgba8(color) };
+	BufferVertex pos0 = { float(rect.x), float(rect.y), z, 1.0f, fbcolor_to_rgba8(fb_color) };
+	BufferVertex pos1 = { float(rect.x) + float(rect.width), float(rect.y), z, 1.0f, fbcolor_to_rgba8(fb_color) };
+	BufferVertex pos2 = { float(rect.x), float(rect.y) + float(rect.height), z, 1.0f, fbcolor_to_rgba8(fb_color) };
 	BufferVertex pos3 = { float(rect.x) + float(rect.width), float(rect.y) + float(rect.height), z, 1.0f,
-		                  fbcolor_to_rgba8(color) };
+		                  fbcolor_to_rgba8(fb_color) };
 	queue.opaque.push_back(pos0);
 	queue.opaque.push_back(pos1);
 	queue.opaque.push_back(pos2);
@@ -1948,13 +1918,13 @@ void Renderer::clear_quad(const Rect &rect, FBColor color, bool candidate)
 	queue.opaque_scissor.emplace_back(queue.opaque_scissor.size());
 
 	if (candidate)
-		queue.clear_candidates.push_back({ rect, color, z });
+		queue.clear_candidates.push_back({ rect, fb_color, z });
 }
 
 const Renderer::ClearCandidate *Renderer::find_clear_candidate(const Rect &rect) const
 {
 	const ClearCandidate *ret = nullptr;
-	for (auto &c : queue.clear_candidates)
+	for (const ClearCandidate &c : queue.clear_candidates)
 	{
 		if (c.rect == rect)
 			ret = &c;
@@ -1986,7 +1956,7 @@ void Renderer::flush_render_pass(const Rect &rect)
 	info.subpasses = &subpass;
 	subpass.num_color_attachments = 1;
 
-	auto *clear_candidate = find_clear_candidate(rect);
+	const ClearCandidate *clear_candidate = find_clear_candidate(rect);
 
 	subpass.color_attachments[0] = 0;
 	if (render_pass_is_feedback)
@@ -2036,26 +2006,53 @@ void Renderer::flush_render_pass(const Rect &rect)
 	reset_queue();
 }
 
-void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveInfo> &scissors, bool textured)
+void Renderer::dispatch_set_scaled_read_texture(bool scaled_read, bool textured)
 {
-	sort(begin(scissors), end(scissors), [](const PrimitiveInfo &a, const PrimitiveInfo &b) {
-		if (a.offset_uv != b.offset_uv)
-			return a.offset_uv > b.offset_uv;
-		if (a.shift != b.shift)
-			return a.shift > b.shift;
-		if (a.scaled_read != b.scaled_read)
-			return a.scaled_read > b.scaled_read;
-		if (a.filtering != b.filtering)
-			return a.filtering > b.filtering;
-		if (a.hd_texture_index != b.hd_texture_index)
-			return a.hd_texture_index > b.hd_texture_index;
-		if (a.scissor_index != b.scissor_index)
-			return a.scissor_index > b.scissor_index;
-		return a.triangle_index > b.triangle_index;
-	});
+	if (scaled_read)
+	{
+		if (msaa > 1)
+			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+		else
+			cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
+	}
+	else
+		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
+	if (textured)
+	{
+		if (scaled_read)
+			cmd->set_program(*pipelines.textured_scaled);
+		else
+			cmd->set_program(*pipelines.textured_unscaled);
+	}
+	else
+	{
+		cmd->set_program(*pipelines.flat);
+	}
+}
+
+bool Renderer::primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b)
+{
+	if (a.offset_uv != b.offset_uv)
+		return a.offset_uv > b.offset_uv;
+	if (a.shift != b.shift)
+		return a.shift > b.shift;
+	if (a.scaled_read != b.scaled_read)
+		return a.scaled_read > b.scaled_read;
+	if (a.filtering != b.filtering)
+		return a.filtering > b.filtering;
+	if (a.hd_texture_index != b.hd_texture_index)
+		return a.hd_texture_index > b.hd_texture_index;
+	if (a.scissor_index != b.scissor_index)
+		return a.scissor_index > b.scissor_index;
+	return a.triangle_index > b.triangle_index;
+}
+
+void Renderer::dispatch(const std::vector<BufferVertex> &vertices, std::vector<PrimitiveInfo> &scissors, bool textured)
+{
+	std::sort(scissors.begin(), scissors.end(), primitive_info_sort_gt);
 
 	// Render flat-shaded primitives.
-	auto *vert = static_cast<BufferVertex *>(
+	BufferVertex *vert = static_cast<BufferVertex *>(
 	    cmd->allocate_vertex_data(0, vertices.size() * sizeof(BufferVertex), sizeof(BufferVertex)));
 
 	int scissor = scissors.front().scissor_index;
@@ -2073,29 +2070,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 	cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
 	cmd->set_specialization_constant(SpecConstIndex_Shift, shift);
 	cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
-	auto set_scaled_read_texture = [&] {
-		if (scaled_read)
-		{
-			if (msaa > 1)
-				cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
-			else
-				cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
-		}
-		else
-			cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
-		if (textured)
-		{
-			if (scaled_read)
-				cmd->set_program(*pipelines.textured_scaled);
-			else
-				cmd->set_program(*pipelines.textured_unscaled);
-		}
-		else
-		{
-			cmd->set_program(*pipelines.flat);
-		}
-	};
-	set_scaled_read_texture();
+	dispatch_set_scaled_read_texture(scaled_read, textured);
 	memcpy(vert, vertices.data() + 3 * scissors.front().triangle_index, 3 * sizeof(BufferVertex));
 	vert += 3;
 
@@ -2125,7 +2100,7 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 			}
 			if (scissors[i].scaled_read != scaled_read) {
 				scaled_read = scissors[i].scaled_read;
-				set_scaled_read_texture();
+				dispatch_set_scaled_read_texture(scaled_read, textured);
 			}
 			if (scissors[i].shift != shift) {
 				shift = scissors[i].shift;
@@ -2148,8 +2123,8 @@ void Renderer::dispatch(const vector<BufferVertex> &vertices, vector<PrimitiveIn
 
 void Renderer::render_opaque_primitives()
 {
-	auto &vertices = queue.opaque;
-	auto &scissors = queue.opaque_scissor;
+	std::vector<BufferVertex> &vertices = queue.opaque;
+	std::vector<PrimitiveInfo> &scissors = queue.opaque_scissor;
 	if (vertices.empty())
 		return;
 
@@ -2205,174 +2180,13 @@ void Renderer::render_semi_transparent_primitives()
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-	auto size = queue.semi_transparent.size() * sizeof(BufferVertex);
+	size_t size = queue.semi_transparent.size() * sizeof(BufferVertex);
 	void *verts = cmd->allocate_vertex_data(0, size, sizeof(BufferVertex));
 	memcpy(verts, queue.semi_transparent.data(), size);
 
-	auto last_state = queue.semi_transparent_state[0];
+	SemiTransparentState last_state = queue.semi_transparent_state[0];
 
-	const auto set_state = [&](const SemiTransparentState &state) {
-		if (state.scaled_read)
-		{
-			if (msaa > 1)
-				cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
-			else
-				cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
-		}
-		else
-			cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
-		hd_texture_uniforms(state.hd_texture_index);
-		cmd->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
-		cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
-		cmd->set_specialization_constant(SpecConstIndex_Shift, state.shift);
-		cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)state.offset_uv);
-
-		if (state.scissor_index < 0)
-			cmd->set_scissor(queue.default_scissor);
-		else
-			cmd->set_scissor(queue.scissors[state.scissor_index]);
-
-		auto &textured = state.textured ? state.scaled_read ?
-			*pipelines.textured_scaled : *pipelines.textured_unscaled : *pipelines.flat;
-		auto &textured_masked = state.textured ? state.scaled_read ?
-			*pipelines.textured_masked_scaled : *pipelines.textured_masked_unscaled : *pipelines.flat_masked;
-
-		switch (state.semi_transparent)
-		{
-		case SemiTransparentMode::None:
-		{
-			// For opaque primitives which are just masked, we can make use of fixed function blending.
-			cmd->set_blend_enable(true);
-			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::Opaque);
-			cmd->set_program(textured);
-			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
-			                       VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_DST_ALPHA);
-			break;
-		}
-		case SemiTransparentMode::Add:
-		{
-			if (state.masked)
-			{
-				cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAdd);
-				cmd->set_program(textured_masked);
-				cmd->pixel_barrier();
-				cmd->set_input_attachments(0, 3);
-				cmd->set_blend_enable(false);
-				if (msaa > 1)
-				{
-					// Need to blend per-sample.
-					cmd->set_multisample_state(false, false, true);
-				}
-				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
-				                       VK_BLEND_FACTOR_ONE);
-			}
-			else
-			{
-				cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
-				cmd->set_program(textured);
-				cmd->set_blend_enable(true);
-				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
-				                       VK_BLEND_FACTOR_ZERO);
-			}
-			break;
-		}
-		case SemiTransparentMode::Average:
-		{
-			if (state.masked)
-			{
-				cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAvg);
-				cmd->set_program(textured_masked);
-				cmd->set_input_attachments(0, 3);
-				cmd->pixel_barrier();
-				cmd->set_blend_enable(false);
-				if (msaa > 1)
-				{
-					// Need to blend per-sample.
-					cmd->set_multisample_state(false, false, true);
-				}
-				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
-				                       VK_BLEND_FACTOR_ONE);
-			}
-			else
-			{
-				static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
-				cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
-				cmd->set_program(textured);
-				cmd->set_blend_enable(true);
-				cmd->set_blend_constants(rgba);
-				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-				cmd->set_blend_factors(VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE,
-				                       VK_BLEND_FACTOR_CONSTANT_ALPHA, VK_BLEND_FACTOR_ZERO);
-			}
-			break;
-		}
-		case SemiTransparentMode::Sub:
-		{
-			if (state.masked)
-			{
-				cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendSub);
-				cmd->set_program(textured_masked);
-				cmd->set_input_attachments(0, 3);
-				cmd->pixel_barrier();
-				cmd->set_blend_enable(false);
-				if (msaa > 1)
-				{
-					// Need to blend per-sample.
-					cmd->set_multisample_state(false, false, true);
-				}
-				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
-				                       VK_BLEND_FACTOR_ONE);
-			}
-			else
-			{
-				cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
-				cmd->set_program(textured);
-				cmd->set_blend_enable(true);
-				cmd->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
-				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
-				                       VK_BLEND_FACTOR_ZERO);
-			}
-			break;
-		}
-		case SemiTransparentMode::AddQuarter:
-		{
-			if (state.masked)
-			{
-				cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAddQuarter);
-				cmd->set_program(textured_masked);
-				cmd->set_input_attachments(0, 3);
-				cmd->pixel_barrier();
-				cmd->set_blend_enable(false);
-				if (msaa > 1)
-				{
-					// Need to blend per-sample.
-					cmd->set_multisample_state(false, false, true);
-				}
-				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-				cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
-				                       VK_BLEND_FACTOR_ONE);
-			}
-			else
-			{
-				static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-				cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
-				cmd->set_program(textured);
-				cmd->set_blend_enable(true);
-				cmd->set_blend_constants(rgba);
-				cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-				cmd->set_blend_factors(VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
-				                       VK_BLEND_FACTOR_ZERO);
-			}
-			break;
-		}
-		}
-	};
-	set_state(last_state);
+	semi_transparent_set_state(last_state);
 
 	// These pixels are blended, so we have to render them in-order.
 	// Batch up as long as we can.
@@ -2405,7 +2219,7 @@ void Renderer::render_semi_transparent_primitives()
 			last_draw_offset = i;
 
 			last_state = queue.semi_transparent_state[i];
-			set_state(last_state);
+			semi_transparent_set_state(last_state);
 		}
 	}
 
@@ -2420,8 +2234,8 @@ void Renderer::render_semi_transparent_primitives()
 
 void Renderer::render_semi_transparent_opaque_texture_primitives()
 {
-	auto &vertices = queue.semi_transparent_opaque;
-	auto &scissors = queue.semi_transparent_opaque_scissor;
+	std::vector<BufferVertex> &vertices = queue.semi_transparent_opaque;
+	std::vector<PrimitiveInfo> &scissors = queue.semi_transparent_opaque_scissor;
 	if (vertices.empty())
 		return;
 
@@ -2443,8 +2257,8 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 
 void Renderer::render_opaque_texture_primitives()
 {
-	auto &vertices = queue.opaque_textured;
-	auto &scissors = queue.opaque_textured_scissor;
+	std::vector<BufferVertex> &vertices = queue.opaque_textured;
+	std::vector<PrimitiveInfo> &scissors = queue.opaque_textured_scissor;
 	if (vertices.empty())
 		return;
 
@@ -2467,50 +2281,51 @@ void Renderer::render_opaque_texture_primitives()
 void Renderer::flush_blits()
 {
 	ensure_command_buffer();
-	const auto blit = [&](const std::vector<BlitInfo> &infos, Program &program, bool scaled) {
-		if (infos.empty())
-			return;
-
-		cmd->set_program(program);
-
-		if (scaled)
-		{
-			if (msaa > 1)
-			{
-				cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
-				cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
-			}
-			else
-			{
-				cmd->set_storage_texture(0, 0, *scaled_views[0]);
-				cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
-			}
-		}
-		else
-		{
-			cmd->set_storage_texture(0, 0, framebuffer->get_view());
-			cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler::NearestClamp);
-		}
-
-		unsigned size = infos.size();
-		unsigned scale = scaled ? scaling : 1u;
-		for (unsigned i = 0; i < size; i += 512)
-		{
-			unsigned to_blit = min(size - i, 512u);
-			void *ptr = cmd->allocate_constant_data(1, 0, to_blit * sizeof(BlitInfo));
-			memcpy(ptr, infos.data() + i, to_blit * sizeof(BlitInfo));
-			cmd->dispatch(scale, scale, to_blit);
-		}
-	};
-
-	blit(queue.scaled_blits, *pipelines.blit_vram_scaled, true);
-	blit(queue.scaled_masked_blits, *pipelines.blit_vram_scaled_masked, true);
-	blit(queue.unscaled_blits, *pipelines.blit_vram_unscaled, false);
-	blit(queue.unscaled_masked_blits, *pipelines.blit_vram_unscaled_masked, false);
+	flush_blit(queue.scaled_blits, *pipelines.blit_vram_scaled, true);
+	flush_blit(queue.scaled_masked_blits, *pipelines.blit_vram_scaled_masked, true);
+	flush_blit(queue.unscaled_blits, *pipelines.blit_vram_unscaled, false);
+	flush_blit(queue.unscaled_masked_blits, *pipelines.blit_vram_unscaled_masked, false);
 	queue.scaled_blits.clear();
 	queue.scaled_masked_blits.clear();
 	queue.unscaled_blits.clear();
 	queue.unscaled_masked_blits.clear();
+}
+
+void Renderer::flush_blit(const std::vector<BlitInfo> &infos, Program &program, bool scaled)
+{
+	if (infos.empty())
+		return;
+
+	cmd->set_program(program);
+
+	if (scaled)
+	{
+		if (msaa > 1)
+		{
+			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
+			cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+		}
+		else
+		{
+			cmd->set_storage_texture(0, 0, *scaled_views[0]);
+			cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
+		}
+	}
+	else
+	{
+		cmd->set_storage_texture(0, 0, framebuffer->get_view());
+		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler::NearestClamp);
+	}
+
+	unsigned size = infos.size();
+	unsigned scale = scaled ? scaling : 1u;
+	for (unsigned i = 0; i < size; i += 512)
+	{
+		unsigned to_blit = std::min(size - i, 512u);
+		void *ptr = cmd->allocate_constant_data(1, 0, to_blit * sizeof(BlitInfo));
+		memcpy(ptr, infos.data() + i, to_blit * sizeof(BlitInfo));
+		cmd->dispatch(scale, scale, to_blit);
+	}
 }
 
 void Renderer::blit_vram(const Rect &dst, const Rect &src)
@@ -2531,7 +2346,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	);
 #endif
 	last_scanout.reset();
-	auto domain = atlas.blit_vram(dst, src);
+	Domain domain = atlas.blit_vram(dst, src);
 
 	if (texture_tracking_enabled) {
 		tracker.blit(dst, src);
@@ -2590,7 +2405,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	{
 		if (domain == Domain::Scaled)
 		{
-			auto &q = render_state.mask_test ? queue.scaled_masked_blits : queue.scaled_blits;
+			std::vector<BlitInfo> &q = render_state.mask_test ? queue.scaled_masked_blits : queue.scaled_blits;
 			unsigned width = dst.width;
 			unsigned height = dst.height;
 			for (unsigned y = 0; y < height; y += BLOCK_HEIGHT)
@@ -2599,13 +2414,13 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 						q.push_back({
 							{ (x + src.x) * scaling, (y + src.y) * scaling },
 							{ (x + dst.x) * scaling, (y + dst.y) * scaling },
-							{ min(BLOCK_WIDTH, width - x) * scaling, min(BLOCK_HEIGHT, height - y) * scaling },
+							{ std::min(BLOCK_WIDTH, width - x) * scaling, std::min(BLOCK_HEIGHT, height - y) * scaling },
 							render_state.force_mask_bit ? 0x8000u : 0u, s,
 						});
 		}
 		else
 		{
-			auto &q = render_state.mask_test ? queue.unscaled_masked_blits : queue.unscaled_blits;
+			std::vector<BlitInfo> &q = render_state.mask_test ? queue.unscaled_masked_blits : queue.unscaled_blits;
 			unsigned width = dst.width;
 			unsigned height = dst.height;
 			for (unsigned y = 0; y < height; y += BLOCK_HEIGHT)
@@ -2613,7 +2428,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 					q.push_back({
 					    { x + src.x, y + src.y },
 					    { x + dst.x, y + dst.y },
-					    { min(BLOCK_WIDTH, width - x), min(BLOCK_HEIGHT, height - y) },
+					    { std::min(BLOCK_WIDTH, width - x), std::min(BLOCK_HEIGHT, height - y) },
 						render_state.force_mask_bit ? 0x8000u : 0u, 0,
 					});
 		}
@@ -2652,15 +2467,15 @@ Vulkan::ImageHandle Renderer::upload_texture(std::vector<LoadedImage> &levels) {
 		initial.push_back({ levels[i].owned_data.data() });
 	}
 
-	auto image = device.create_image(info, initial.data());
+	ImageHandle image = device.create_image(info, initial.data());
 	return image;
 }
 Vulkan::ImageHandle Renderer::create_texture(int width, int height, int levels) {
-	auto info = ImageCreateInfo::immutable_2d_image(width, height, VK_FORMAT_R8G8B8A8_UNORM, false);
+	ImageCreateInfo info = ImageCreateInfo::immutable_2d_image(width, height, VK_FORMAT_R8G8B8A8_UNORM, false);
 	info.levels = levels;
 	info.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	auto image = device.create_image(info, nullptr);
+	ImageHandle image = device.create_image(info, nullptr);
 	return image;
 }
 Vulkan::CommandBufferHandle &Renderer::command_buffer_hack_fixme() {
@@ -2704,7 +2519,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 	buffer_create_info.domain = BufferDomain::Host;
 	buffer_create_info.size = size;
 	buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
-	auto buffer = device.create_buffer(buffer_create_info, nullptr);
+	BufferHandle buffer = device.create_buffer(buffer_create_info, nullptr);
 
 	BufferViewCreateInfo view_info = {};
 	view_info.buffer = buffer.get();
@@ -2725,11 +2540,11 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 	{
 		for (unsigned y = 0; y < rect.height; y += BLOCK_HEIGHT)
 		{
-			unsigned y_size = min(rect.height - y, BLOCK_HEIGHT);
+			unsigned y_size = std::min(rect.height - y, BLOCK_HEIGHT);
 			view_info.offset = y * rect.width * sizeof(uint16_t);
 			view_info.range = y_size * rect.width * sizeof(uint16_t);
 			view_info.format = VK_FORMAT_R16_UINT;
-			auto view = device.create_buffer_view(view_info);
+			BufferViewHandle view = device.create_buffer_view(view_info);
 
 			Rect small_rect = { rect.x, rect.y + y, rect.width, y_size };
 
@@ -2744,7 +2559,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 		view_info.offset = 0;
 		view_info.range = size;
 		view_info.format = VK_FORMAT_R16_UINT;
-		auto view = device.create_buffer_view(view_info);
+		BufferViewHandle view = device.create_buffer_view(view_info);
 
 		cmd->set_buffer_view(0, 1, *view);
 
@@ -2766,7 +2581,7 @@ Renderer::~Renderer()
 void Renderer::reset_scissor_queue()
 {
 	queue.scissors.clear();
-	auto &rect = render_state.draw_rect;
+	Rect &rect = render_state.draw_rect;
 	queue.scissors.push_back(
 	    { { int(rect.x * scaling), int(rect.y * scaling) }, { rect.width * scaling, rect.height * scaling } });
 }
@@ -2790,6 +2605,169 @@ void Renderer::reset_queue()
 
 	if (texture_tracking_enabled) {
 		tracker.on_queues_reset();
+	}
+}
+
+void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
+{
+	if (state.scaled_read)
+	{
+		if (msaa > 1)
+			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+		else
+			cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
+	}
+	else
+		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
+	hd_texture_uniforms(state.hd_texture_index);
+	cmd->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
+	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
+	cmd->set_specialization_constant(SpecConstIndex_Shift, state.shift);
+	cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)state.offset_uv);
+
+	if (state.scissor_index < 0)
+		cmd->set_scissor(queue.default_scissor);
+	else
+		cmd->set_scissor(queue.scissors[state.scissor_index]);
+
+	Program &textured = state.textured ? state.scaled_read ?
+		*pipelines.textured_scaled : *pipelines.textured_unscaled : *pipelines.flat;
+	Program &textured_masked = state.textured ? state.scaled_read ?
+		*pipelines.textured_masked_scaled : *pipelines.textured_masked_unscaled : *pipelines.flat_masked;
+
+	switch (state.semi_transparent)
+	{
+	case SemiTransparentMode::None:
+	{
+		// For opaque primitives which are just masked, we can make use of fixed function blending.
+		cmd->set_blend_enable(true);
+		cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::Opaque);
+		cmd->set_program(textured);
+		cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+		cmd->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+		                       VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_DST_ALPHA);
+		break;
+	}
+	case SemiTransparentMode::Add:
+	{
+		if (state.masked)
+		{
+			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAdd);
+			cmd->set_program(textured_masked);
+			cmd->pixel_barrier();
+			cmd->set_input_attachments(0, 3);
+			cmd->set_blend_enable(false);
+			if (msaa > 1)
+			{
+				// Need to blend per-sample.
+				cmd->set_multisample_state(false, false, true);
+			}
+			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			                       VK_BLEND_FACTOR_ONE);
+		}
+		else
+		{
+			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
+			cmd->set_program(textured);
+			cmd->set_blend_enable(true);
+			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			                       VK_BLEND_FACTOR_ZERO);
+		}
+		break;
+	}
+	case SemiTransparentMode::Average:
+	{
+		if (state.masked)
+		{
+			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAvg);
+			cmd->set_program(textured_masked);
+			cmd->set_input_attachments(0, 3);
+			cmd->pixel_barrier();
+			cmd->set_blend_enable(false);
+			if (msaa > 1)
+			{
+				// Need to blend per-sample.
+				cmd->set_multisample_state(false, false, true);
+			}
+			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			                       VK_BLEND_FACTOR_ONE);
+		}
+		else
+		{
+			static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
+			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
+			cmd->set_program(textured);
+			cmd->set_blend_enable(true);
+			cmd->set_blend_constants(rgba);
+			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cmd->set_blend_factors(VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE,
+			                       VK_BLEND_FACTOR_CONSTANT_ALPHA, VK_BLEND_FACTOR_ZERO);
+		}
+		break;
+	}
+	case SemiTransparentMode::Sub:
+	{
+		if (state.masked)
+		{
+			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendSub);
+			cmd->set_program(textured_masked);
+			cmd->set_input_attachments(0, 3);
+			cmd->pixel_barrier();
+			cmd->set_blend_enable(false);
+			if (msaa > 1)
+			{
+				// Need to blend per-sample.
+				cmd->set_multisample_state(false, false, true);
+			}
+			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			                       VK_BLEND_FACTOR_ONE);
+		}
+		else
+		{
+			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
+			cmd->set_program(textured);
+			cmd->set_blend_enable(true);
+			cmd->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
+			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			                       VK_BLEND_FACTOR_ZERO);
+		}
+		break;
+	}
+	case SemiTransparentMode::AddQuarter:
+	{
+		if (state.masked)
+		{
+			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAddQuarter);
+			cmd->set_program(textured_masked);
+			cmd->set_input_attachments(0, 3);
+			cmd->pixel_barrier();
+			cmd->set_blend_enable(false);
+			if (msaa > 1)
+			{
+				// Need to blend per-sample.
+				cmd->set_multisample_state(false, false, true);
+			}
+			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			                       VK_BLEND_FACTOR_ONE);
+		}
+		else
+		{
+			static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
+			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
+			cmd->set_program(textured);
+			cmd->set_blend_enable(true);
+			cmd->set_blend_constants(rgba);
+			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cmd->set_blend_factors(VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			                       VK_BLEND_FACTOR_ZERO);
+		}
+		break;
+	}
 	}
 }
 }

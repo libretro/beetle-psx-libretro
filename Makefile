@@ -1,11 +1,9 @@
 SILENT := 0
 DEBUG = 0
-FRONTEND_SUPPORTS_RGB565 = 1
 HAVE_OPENGL = 0
 GLES = 0
 GLES3 = 0 # HW renderer now supported on GLES3
 HAVE_VULKAN = 0
-HAVE_JIT = 0
 HAVE_CHD = 1
 HAVE_CDROM = 0
 HAVE_LIGHTREC = 1
@@ -15,7 +13,6 @@ LIGHTREC_DEBUG = 0
 LIGHTREC_LOG_LEVEL = 3
 
 CORE_DIR := .
-HAVE_GRIFFIN = 0
 
 SPACE :=
 SPACE := $(SPACE) $(SPACE)
@@ -251,7 +248,10 @@ else ifeq ($(platform), sncps3)
    CXX     = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
    AR      = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
    ENDIANNESS_DEFINES := -DMSB_FIRST
-   CXXFLAGS += -Xc+=exceptions
+   # Previously enabled SNC exception support via '-Xc+=exceptions'
+   # because parallel-psx threw runtime_error on Vulkan failures.
+   # Those have been converted to status returns, so the flag is gone
+   # and the SNC default (no exceptions) is now correct.
    OLD_GCC  := 1
    NO_GCC   := 1
    FLAGS    += -DARCH_POWERPC_ALTIVEC
@@ -474,7 +474,6 @@ else
    IS_X86   = 1
    SHARED  := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm
-   FLAGS   += -DHAVE__MKDIR
    HAVE_CDROM = 1
 
    ifeq ($(HAVE_OPENGL),1)
@@ -596,12 +595,20 @@ ifeq ($(HAVE_VULKAN),1)
    FLAGS += -DHAVE_VULKAN
 endif
 
-ifeq ($(HAVE_JIT),1)
-   LDFLAGS += -ljit
-endif
-
 CXXFLAGS += $(FLAGS)
 CFLAGS   += $(FLAGS)
+
+# The libretro core has been audited to remove all exception throws
+# from C++ code that could unwind across the C ABI boundary. Compile
+# C++ with -fno-exceptions so the compiler can drop the unwinding
+# tables (significant size savings on console targets) and so any
+# accidentally-reintroduced throw becomes a hard build failure rather
+# than silent UB.
+#
+# SPIRV-Cross (vendored Khronos library) is converted via its own
+# SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS flag, which routes its
+# SPIRV_CROSS_THROW macro through report_and_abort() instead of throw.
+CXXFLAGS += -fno-exceptions -DSPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS
 
 ifneq ($(SANITIZER),)
    CFLAGS   := -fsanitize=$(SANITIZER) $(CFLAGS)

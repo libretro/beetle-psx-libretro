@@ -1,8 +1,9 @@
 #include "texture_tracker.hpp"
+#include "../renderer/renderer.hpp"
 #include "libretro.h"
-#include <iostream>
 #include <fstream>
-#include <sstream>
+#include <algorithm>
+#include <memory>
 #include "libretro-common/include/retro_dirent.h"
 #include <assert.h>
 #include "dbg_input_callback.h"
@@ -47,9 +48,9 @@ std::string replacements_path() {
 }
 
 std::string replacement_filename_from_hash(uint32_t hash, uint32_t palette_hash) {
-    std::ostringstream oss;
-    oss << replacements_path() << std::hex << hash << "-" << palette_hash << ".png";
-    return oss.str();
+    char tail[32];
+    snprintf(tail, sizeof(tail), "%x-%x.png", (unsigned)hash, (unsigned)palette_hash);
+    return replacements_path() + tail;
 }
 
 inline uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
@@ -199,7 +200,7 @@ void io_thread(void *user_data) {
         if (channel->done) {
             finished = true;
         }
-        std::vector<std::unique_ptr<IORequest>> requests = std::move(channel->requests); // Take all requests
+        std::vector<IORequest> requests = std::move(channel->requests); // Take all requests
         channel->requests.clear();
         slock_unlock(channel->lock);
 
@@ -207,22 +208,22 @@ void io_thread(void *user_data) {
             break;
         }
 
-        for (std::unique_ptr<IORequest> &owned : requests) {
-            if (LoadRequest *request = dynamic_cast<LoadRequest*>(owned.get())) {
-                uint32_t hash = request->hash;
-                uint32_t palette_hash = request->palette_hash;
+        for (IORequest &request : requests) {
+            if (request.kind == IORequestKind::Load) {
+                uint32_t hash = request.hash;
+                uint32_t palette_hash = request.palette_hash;
                 // TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread sees: %x-%x\n", hash, palette_hash);
 
                 // Read in texture
                 std::string path = replacement_filename_from_hash(hash, palette_hash);
                 // TODO: use formats/image.h instead of stb_image?
-                auto image = load_image(path.c_str());
+                std::unique_ptr<RGBAImage> image = load_image(path.c_str());
                 if (image->data != nullptr) {
                     // convert_tri_to_psx(image.data, image.width, image.height);
                 
                     // Stick the response in the other vector
                     int alpha_flags_out = 0;
-                    auto levels = prepare_texture(*image, alpha_flags_out);
+                    std::vector<LoadedImage> levels = prepare_texture(*image, alpha_flags_out);
                     IOResponse response = { hash, palette_hash, alpha_flags_out, std::move(levels) };
 
                     slock_lock(channel->lock);
@@ -231,11 +232,11 @@ void io_thread(void *user_data) {
                 } else {
                     TT_LOG(RETRO_LOG_ERROR, "failed to load: %s\n", path.c_str());
                 }
-            } else if (DumpRequest *dump = dynamic_cast<DumpRequest*>(owned.get())) {
-                // TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread dumping: %s\n", dump->path.c_str());
-                int success = write_image(dump->path.c_str(), dump->width, dump->height, dump->bytes.data());
+            } else if (request.kind == IORequestKind::Dump) {
+                // TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread dumping: %s\n", request.path.c_str());
+                int success = write_image(request.path.c_str(), request.width, request.height, request.bytes.data());
                 if (success == 0) {
-                    TT_LOG(RETRO_LOG_ERROR, "failed to write to: %s\n", dump->path.c_str());
+                    TT_LOG(RETRO_LOG_ERROR, "failed to write to: %s\n", request.path.c_str());
                 }
             }
         }
@@ -288,36 +289,36 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
             return; // Early out
     }
 
-    std::ostringstream suffixs;
-    suffixs << dump_path() << std::hex << hash;
+    std::string path = dump_path();
+    {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%x", (unsigned)hash);
+        path += buf;
+    }
 
     uint16_t *palette = nullptr;
-    uint32_t palette_hash = 0;
     if (mode.mode == TextureMode::Palette4bpp || mode.mode == TextureMode::Palette8bpp) {
         Rect palette_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode::Palette8bpp ? 256 : 16, 1);
         Palette p = get_palette(palette_rect);
         if (p.data != nullptr) {
             palette = p.data;
-            suffixs << "-" << std::hex << p.hash;
-            palette_hash = p.hash;
+            char buf[16];
+            snprintf(buf, sizeof(buf), "-%x", (unsigned)p.hash);
+            path += buf;
         }
-    }
-
-    if (dump_log != nullptr) {
-        dump_log->dump(frame, hash, palette_hash, mode.mode);
     }
 
     if (palette != nullptr) {
         TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping palette %i, %i.\n", mode.palette_offset_x, mode.palette_offset_y);
     } else if (mode.mode != TextureMode::ABGR1555) {
-        suffixs << "-missing";
+        path += "-missing";
         TT_LOG_VERBOSE(RETRO_LOG_INFO, "MISSING palette %i, %i.\n", mode.palette_offset_x, mode.palette_offset_y);
     }
 
     int ppp = 1 << shift;
     int bpp = 16 >> shift;
     int mask = (1 << bpp) - 1;
-    for (auto pixel : upload.image) {
+    for (uint16_t pixel : upload.image) {
         for (int p = 0; p < ppp; p++) {
             uint16_t subpixel = (pixel >> (p * bpp)) & mask;
             if (mode.mode != TextureMode::ABGR1555 && palette == nullptr) {
@@ -358,20 +359,20 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
         }
     }
 
-    suffixs << ".png";
-    std::string path = suffixs.str();
+    path += ".png";
 
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dump info: mode=%i, w=%i, h=%i, len=%i, bytesLen=%i\n", mode.mode, upload.width, upload.height, upload.image.size(), bytes.size());
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping to %s.\n", path.c_str());
 
     //stbi_write_png(path.c_str(), upload.width * ppp, upload.height, 4, bytes.data(), 4 * upload.width * ppp);
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting dump: %s\n", path.c_str());
-    std::unique_ptr<DumpRequest> dump = std::unique_ptr<DumpRequest>(new DumpRequest);
-    dump->path = path;
-    dump->width = upload.width * ppp;
-    dump->height = upload.height;
-    dump->bytes = std::move(bytes);
-    
+    IORequest dump;
+    dump.kind = IORequestKind::Dump;
+    dump.path = path;
+    dump.width = upload.width * ppp;
+    dump.height = upload.height;
+    dump.bytes = std::move(bytes);
+
     slock_lock(iothread.channel->lock);
     iothread.channel->requests.push_back(std::move(dump));
     slock_unlock(iothread.channel->lock);
@@ -396,7 +397,7 @@ std::set<HdTextureId> read_texture_directory(const char *path) {
             }
 
             result.insert({ hash, palette_hash });
-            TT_LOG_VERBOSE(RETRO_LOG_INFO, "file found: %s\n", ent->d_name);
+            TT_LOG_VERBOSE(RETRO_LOG_INFO, "file found: %s\n", name);
         }
         retro_closedir(dir);
     }
@@ -405,9 +406,6 @@ std::set<HdTextureId> read_texture_directory(const char *path) {
 
 TextureTracker::TextureTracker()
 {
-    // blit_log = std::unique_ptr<BlitLog>(new BlitLog);
-    // dump_log = std::unique_ptr<DumpLog>(new DumpLog);
-
     known_files = read_texture_directory(replacements_path().c_str());
     TT_LOG(RETRO_LOG_INFO, "num hd textures: %d\n", known_files.size());
 
@@ -465,9 +463,6 @@ void TextureTracker::clear_palette_cache(Rect rect) {
 }
 
 void TextureTracker::clearRegion(Rect rect) {
-    if (blit_log != nullptr) {
-        blit_log->clear(rect);
-    }
     if (rect.width == 0 || rect.height == 0) {
         // Some games do this, apparently.
         return;
@@ -496,9 +491,6 @@ bool imageMatches(TextureUpload &upload, Rect rect, uint16_t *vram) {
 }
 
 void TextureTracker::blit(Rect dst, Rect src) {
-    if (blit_log != nullptr) {
-        blit_log->blit(dst, src);
-    }
     tracker.blit(toSRect(dst), toSRect(src));
     fused_pages.mark_dirty(dst);
     fused_pages.rebuild_dirty(tracker, uploader);
@@ -544,7 +536,7 @@ TextureRect subTexture(TextureRect original, SRect sub_vram_rect) {
 }
 
 std::pair<TextureRect, bool> clip_texture_rect_to_vram(TextureRect &t, Rect vram_rect) {
-    auto intersection = intersect(t.vram_rect, toSRect(vram_rect));
+    std::pair<SRect, bool> intersection = intersect(t.vram_rect, toSRect(vram_rect));
     if (intersection.second) {
         return std::make_pair(subTexture(t, intersection.first), true);
     } else {
@@ -565,7 +557,7 @@ void TextureTracker::notifyReadback(Rect rect, uint16_t *vram) {
 
     uint32_t hash = dbgHashVram(rect, vram);
     
-    for (auto it = restorable_rects.begin(); it != restorable_rects.end(); ) {
+    for (std::vector<RestorableRect>::iterator it = restorable_rects.begin(); it != restorable_rects.end(); ) {
         if (it->rect.intersects(rect)) {
             restorable_rects.erase(it);
         } else {
@@ -580,7 +572,7 @@ void TextureTracker::notifyReadback(Rect rect, uint16_t *vram) {
         EnduringTextureRect &e = tracker.textures[index];
         if (e.alive) { // TODO: This check is unnecessary because tracker.overlapping never returns dead indices
             // Clip to the requested rect
-            auto result = clip_texture_rect_to_vram(e.texture_rect, rect);
+            std::pair<TextureRect, bool> result = clip_texture_rect_to_vram(e.texture_rect, rect);
             if (result.second) {
                 // assert(rect.contains(fromSRect(result.first.vram_rect)));
                 to_restore.push_back(result.first);
@@ -642,13 +634,6 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
             preexisting = true;
         }
     }
-    
-    if (blit_log != nullptr) {
-        blit_log->upload(rect, upload->hash);
-    }
-    if (dump_log != nullptr) {
-        dump_log->upload(frame, rect, upload->hash);
-    }
 
     RestorableRect *restore = nullptr;
     for (RestorableRect &other : restorable_rects) {
@@ -674,15 +659,16 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
 }
 
 void TextureTracker::load_hd_texture(uint32_t hash) {
-    auto it_low = known_files.lower_bound({ hash, 0 });
-    auto it_high = known_files.upper_bound({ hash, 0xFFFFFFFF });
+    std::set<HdTextureId>::iterator it_low = known_files.lower_bound({ hash, 0 });
+    std::set<HdTextureId>::iterator it_high = known_files.upper_bound({ hash, 0xFFFFFFFF });
     if (it_low != it_high) {
         slock_lock(iothread.channel->lock);
-        for (auto it = it_low; it != it_high; it++) {
+        for (std::set<HdTextureId>::iterator it = it_low; it != it_high; it++) {
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting texture: %x-%x\n", hash, it->palette_hash);
-            std::unique_ptr<LoadRequest> load = std::unique_ptr<LoadRequest>(new LoadRequest);
-            load->hash = hash;
-            load->palette_hash = it->palette_hash;
+            IORequest load;
+            load.kind = IORequestKind::Load;
+            load.hash = hash;
+            load.palette_hash = it->palette_hash;
             iothread.channel->requests.push_back(std::move(load));
         }
         slock_unlock(iothread.channel->lock);
@@ -704,8 +690,14 @@ void TextureTracker::dump_texture(std::shared_ptr<TextureUpload> &upload, UsedMo
         return;
     }
 
-    auto it = std::find(upload->dumped_modes.begin(), upload->dumped_modes.end(), dump_mode);
-    if (it == upload->dumped_modes.end()) {
+    bool already_dumped = false;
+    for (const DumpedMode &d : upload->dumped_modes) {
+        if (d == dump_mode) {
+            already_dumped = true;
+            break;
+        }
+    }
+    if (!already_dumped) {
         upload->dumped_modes.push_back(dump_mode);
         if (dump_enabled) {
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping %x\n", upload->hash);
@@ -755,7 +747,7 @@ HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, 
     }
     if (hd_textures_enabled) {
         // Check if the same texture as last time is used.
-        auto cache_result = handle_cache.get(rect, palette_hash);
+        std::pair<HdTextureHandle, bool> cache_result = handle_cache.get(rect, palette_hash);
         cache_hit = cache_result.second;
         if (cache_hit) {
             // cache_result.first is currently always a non-fused, non-none, index + palette_hash
@@ -800,7 +792,7 @@ HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, 
     Rect result_rect;
     for (RectIndex index : overlap) {
         TextureRect *tex = tracker.get_index(index);
-        auto overlapped_image = tex->upload->textures.find(palette_hash);
+        std::map<uint32_t, HdImageHandle>::iterator overlapped_image = tex->upload->textures.find(palette_hash);
         if (overlapped_image != tex->upload->textures.end()) {
             if (result == HdTextureHandle::make_none()) {
                 // note that if tex->vram_rect contains rect, then it will be the only entry in overlap, so an early out would be pointless
@@ -846,7 +838,7 @@ HdTexture TextureTracker::get_hd_texture(HdTextureHandle handle) {
         TextureUpload &upload = *tex->upload;
         // Use find rather than index, because if a stale HdTextureHandle was provided this could segfault
         // because indexing on a key that isn't present would initialize a new one with a null pointer
-        auto iter = upload.textures.find(handle.palette_hash);
+        std::map<uint32_t, HdImageHandle>::iterator iter = upload.textures.find(handle.palette_hash);
         if (iter == upload.textures.end()) {
             TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
             return {
@@ -893,7 +885,7 @@ void TextureTracker::on_queues_reset() {
 
     for (IOResponse &response : responses) {
         TT_LOG_VERBOSE(RETRO_LOG_INFO, "received texture: %x\n", response.hash);
-        auto upload = find_upload(response.hash);
+        std::shared_ptr<TextureUpload> upload = find_upload(response.hash);
 
         if (upload != nullptr && upload->textures.find(response.palette_hash) == upload->textures.end()) {
             // warn if the hd texture width/height aren't power of 2 multiples of the original vram
@@ -959,10 +951,6 @@ void TextureTracker::endFrame() {
         handle_cache.dbg_misses = 0;
     }
 
-    if (blit_log != nullptr) {
-        blit_log->set_frame(frame);
-    }
-
     if (frame_dump != nullptr) {
         *frame_dump << "]}\n";
         delete frame_dump;
@@ -1009,6 +997,22 @@ void TextureTracker::endFrame() {
     }
 }
 
+void TextureTracker::set_texture_uploader(Renderer *t) {
+    uploader = t;
+    std::vector<LoadedImage> default_levels;
+
+    LoadedImage default_image;
+    default_image.width = 1;
+    default_image.height = 1;
+    default_image.owned_data.push_back(0);
+    default_image.owned_data.push_back(0);
+    default_image.owned_data.push_back(0);
+    default_image.owned_data.push_back(0);
+    default_levels.push_back(std::move(default_image));
+
+    default_hd_texture = uploader->upload_texture(default_levels);
+}
+
 void TextureTracker::reload_textures_from_disk() {
     // Reload the directory listing
     known_files = read_texture_directory(replacements_path().c_str());
@@ -1036,95 +1040,6 @@ void TextureTracker::reload_textures_from_disk() {
     }
 }
 
-// DumpLog
-std::ostream& operator<<(std::ostream &o, const Rect &rect) {
-    o << std::dec << rect.x << "," << rect.y << " " << rect.width << "x" << rect.height;
-    return o;
-}
-std::ostream& operator<<(std::ostream &o, const TextureMode &mode) {
-    switch(mode) {
-        case TextureMode::Palette4bpp:
-            o << "Palette4bpp";
-            break;
-        case TextureMode::Palette8bpp:
-            o << "Palette8bpp";
-            break;
-        case TextureMode::ABGR1555:
-            o << "ABGR1555";
-            break;
-        case TextureMode::None:
-            o << "None";
-            break;
-    }
-    return o;
-}
-
-DumpLog::DumpLog() {
-    dump_stream = std::ofstream(dump_path() + "dump.log");
-}
-void DumpLog::upload(uint64_t frame, Rect rect, uint32_t hash) {
-    dump_stream << "[" << std::dec << frame << "] Upload: " << std::hex << hash << " @ " << rect <<  "\n";
-}
-void DumpLog::dump(uint64_t frame, uint32_t hash, uint32_t palette_hash, TextureMode mode) {
-    dump_stream << "[" << std::dec << frame << "] Dumped: " << std::hex << hash << " with palette " << std::hex << palette_hash << " in mode " << mode << "\n";
-}
-
-// BlitLog
-
-/*
-    type Rect = { x: number, y: number, width: number, height: number };
-    type BlitEvent
-        = { type: "upload", rect: Rect, hash: number, frame: number }
-        | { type: "blit", dst: Rect, src: Rect, frame: number }
-        | { type: "clear", rect: Rect, frame: number }
-        ;
-    BlitEvent[]
-*/
-
-BlitLog::BlitLog() {
-    dump_stream = std::ofstream(dump_path() + "blit_log.json");
-    dump_stream << "[\n";
-}
-BlitLog::~BlitLog() {
-    dump_stream << "]";
-}
-
-void BlitLog::set_frame(uint32_t frame) {
-    this->frame = frame;
-}
-
-void BlitLog::comma() {
-    if (need_comma) {
-        dump_stream << ",";
-    } else {
-        need_comma = true;
-    }
-}
-
-void BlitLog::upload(Rect rect, uint32_t hash) {
-    comma();
-    dump_stream << " { \"type\": \"upload\", \"rect\": ";
-    output_rect_json(dump_stream, rect);
-    dump_stream << ", \"hash\": " << hash;
-    dump_stream << ", \"frame\": " << frame << " }\n";
-}
-
-void BlitLog::blit(Rect dst, Rect src) {
-    comma();
-    dump_stream << " { \"type\": \"blit\", \"dst\": ";
-    output_rect_json(dump_stream, dst);
-    dump_stream << ", \"src\": ";
-    output_rect_json(dump_stream, src);
-    dump_stream << ", \"frame\": " << frame << " }\n";
-}
-
-void BlitLog::clear(Rect rect) {
-    comma();
-    dump_stream << " { \"type\": \"clear\", \"rect\": ";
-    output_rect_json(dump_stream, rect);
-    dump_stream << ", \"frame\": " << frame << " }\n";
-}
-
 // RectTracker
 
 bool intersects(SRect a, SRect b) {
@@ -1140,10 +1055,10 @@ SRect bounds(int left, int right, int top, int bottom) {
     return SRect(left, top, right - left, bottom - top);
 }
 
-void split(SRect original, SRect remove, std::vector<SRect> &results) {
-    auto intersectionResult = intersect(original, remove);
+void split(SRect original, SRect remove, SRect *results, unsigned &count) {
+    std::pair<SRect, bool> intersectionResult = intersect(original, remove);
     if (!intersectionResult.second) {
-        results.push_back(original);
+        results[count++] = original;
         return;
     }
 
@@ -1151,42 +1066,42 @@ void split(SRect original, SRect remove, std::vector<SRect> &results) {
 
     // Top rect
     if (intersection.top() > original.top()) {
-        results.push_back(bounds(
+        results[count++] = bounds(
             original.left(),
             original.right(),
             original.top(),
             intersection.top()
-        ));
+        );
     }
 
     // Bottom rect
     if (intersection.bottom() < original.bottom()) {
-        results.push_back(bounds(
+        results[count++] = bounds(
             original.left(),
             original.right(),
             intersection.bottom(),
             original.bottom()
-        ));
+        );
     }
 
     // Left rect
     if (intersection.left() > original.left()) {
-        results.push_back(bounds(
+        results[count++] = bounds(
             original.left(),
             intersection.left(),
             intersection.top(),
             intersection.bottom()
-        ));
+        );
     }
 
     // Right rect
     if (intersection.right() < original.right()) {
-        results.push_back(bounds(
+        results[count++] = bounds(
             intersection.right(),
             original.right(),
             intersection.top(),
             intersection.bottom()
-        ));
+        );
     }
 }
 
@@ -1207,10 +1122,10 @@ void RectTracker::blit(SRect dst, SRect src) {
     for (EnduringTextureRect &eold : textures) {
         if (eold.alive) {
             TextureRect &old = eold.texture_rect;
-            auto intersection = intersect(old.vram_rect, src);
+            std::pair<SRect, bool> intersection = intersect(old.vram_rect, src);
             if (intersection.second) {
-                auto sub = subTexture(old, intersection.first);
-                auto subMoved = TextureRect(sub.upload, sub.offset_x, sub.offset_y, moved(sub.vram_rect, moveX, moveY));
+                TextureRect sub = subTexture(old, intersection.first);
+                TextureRect subMoved = TextureRect(sub.upload, sub.offset_x, sub.offset_y, moved(sub.vram_rect, moveX, moveY));
                 to_place.push_back(subMoved);
             }
         }
@@ -1226,8 +1141,8 @@ void RectTracker::clear(SRect rect) {
     lookup_grid_dirty = true;
 }
 void RectTracker::releaseDeadHandles() {
-    auto retainedIt = textures.begin();
-    for (auto it = textures.begin(); it != textures.end(); it++) {
+    std::vector<EnduringTextureRect>::iterator retainedIt = textures.begin();
+    for (std::vector<EnduringTextureRect>::iterator it = textures.begin(); it != textures.end(); it++) {
         if (it->alive) {
             *retainedIt = *it;
             retainedIt++;
@@ -1263,23 +1178,23 @@ TextureRect* RectTracker::get_index(RectIndex index) {
 }
 
 void RectTracker::clear_rect(SRect &rect) {
-    std::vector<SRect> splits;
-    splits.reserve(4);
+    SRect splits[4];
+    unsigned splits_count = 0;
 
     std::vector<TextureRect> newTextures;
     for (EnduringTextureRect &eold : textures) {
         if (eold.alive) {
             TextureRect &old = eold.texture_rect;
 
-            splits.clear();
-            split(old.vram_rect, rect, splits);
-            if (splits.size() == 1 && splits[0] == old.vram_rect) {
+            splits_count = 0;
+            split(old.vram_rect, rect, splits, splits_count);
+            if (splits_count == 1 && splits[0] == old.vram_rect) {
                 // The rect didn't split, do nothing
             } else {
                 // The rect split, mark this texture as dead and push its splits to be added
                 eold.alive = false;
-                for (SRect &vr : splits) {
-                    newTextures.push_back(subTexture(old, vr));
+                for (unsigned i = 0; i < splits_count; i++) {
+                    newTextures.push_back(subTexture(old, splits[i]));
                 }
             }
         }
@@ -1382,6 +1297,15 @@ bool srect_gt(const SRect &a, const SRect &b) {
     return a.height > b.height;
 }
 
+static bool texture_rect_sort_gt(const TextureRect &a, const TextureRect &b) {
+    // Compare .upload by internal pointer
+    if (a.upload.get() != b.upload.get())
+        return a.upload.get() > b.upload.get();
+    if (a.vram_rect != b.vram_rect)
+        return srect_gt(a.vram_rect, b.vram_rect);
+    return srect_gt(a.texture_subrect(), b.texture_subrect());
+}
+
 FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker &tracker) {
     FusionRects f;
     f.scaleX = 0;
@@ -1392,10 +1316,10 @@ FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker
         if (!e.alive) {
             continue;
         }
-        auto intersection = intersect(toSRect(full_page_rect), e.texture_rect.vram_rect);
+        std::pair<SRect, bool> intersection = intersect(toSRect(full_page_rect), e.texture_rect.vram_rect);
         if (intersection.second) {
             TextureUpload &upload = *e.texture_rect.upload;
-            auto hd_texture = upload.textures.find(palette_hash);
+            std::map<uint32_t, HdImageHandle>::iterator hd_texture = upload.textures.find(palette_hash);
             if (hd_texture != upload.textures.end()) {
                 // Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity)
                 TextureRect clipped = subTexture(e.texture_rect, intersection.first);
@@ -1413,19 +1337,12 @@ FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker
     }
 
     // Sort rects so that the vector itself can be compared
-    std::sort(f.rects.begin(), f.rects.end(), [](const TextureRect &a, const TextureRect &b) {
-        // Compare .upload by internal pointer
-        if (a.upload.get() != b.upload.get())
-            return a.upload.get() > b.upload.get();
-		if (a.vram_rect != b.vram_rect)
-			return srect_gt(a.vram_rect, b.vram_rect);
-        return srect_gt(a.texture_subrect(), b.texture_subrect());
-	});
+    std::sort(f.rects.begin(), f.rects.end(), texture_rect_sort_gt);
 
     return f;
 }
 
-void rebuild_page(FusedPage &page, RectTracker &tracker, TextureUploader *uploader) {
+void rebuild_page(FusedPage &page, RectTracker &tracker, Renderer *uploader) {
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilding page for %x, %d,%d %dx%d\n",
         page.palette,
         page.fusion.vram_rect.x,
@@ -1489,7 +1406,7 @@ void rebuild_page(FusedPage &page, RectTracker &tracker, TextureUploader *upload
     for (TextureRect &tex : page.fusion.rects) {
         TextureUpload &upload = *tex.upload;
 
-        auto hd_texture = upload.textures.find(page.palette);
+        std::map<uint32_t, HdImageHandle>::iterator hd_texture = upload.textures.find(page.palette);
         if (hd_texture == upload.textures.end()) {
             // That's odd
             continue;
@@ -1613,7 +1530,7 @@ HdTexture FusedPages::get_from_handle(HdTextureHandle handle, Vulkan::ImageHandl
     };
 }
 
-HdTextureHandle FusedPages::get_or_make(Rect page_rect, uint32_t palette, RectTracker &tracker, TextureUploader *uploader) {
+HdTextureHandle FusedPages::get_or_make(Rect page_rect, uint32_t palette, RectTracker &tracker, Renderer *uploader) {
     for (int x = 0; x < pages.size(); x++) {
         FusedPage &page = pages[x];
         if (!page.dead && page.palette == palette && page.full_page_rect == page_rect) {
@@ -1647,7 +1564,7 @@ void FusedPages::mark_dead(Rect rect) {
         }
     }
 }
-void FusedPages::rebuild_dirty(RectTracker &tracker, TextureUploader *uploader) {
+void FusedPages::rebuild_dirty(RectTracker &tracker, Renderer *uploader) {
     bool changed = false;
     for (FusedPage &page : pages) {
         if (!page.dead && page.dirty) {
@@ -1660,8 +1577,8 @@ void FusedPages::rebuild_dirty(RectTracker &tracker, TextureUploader *uploader) 
     }
 }
 void FusedPages::remove_dead() {
-    auto retainedIt = pages.begin();
-    for (auto it = pages.begin(); it != pages.end(); it++) {
+    std::vector<FusedPage>::iterator retainedIt = pages.begin();
+    for (std::vector<FusedPage>::iterator it = pages.begin(); it != pages.end(); it++) {
         if (!it->dead) {
             *retainedIt = *it;
             retainedIt++;
@@ -1693,7 +1610,7 @@ TextureRectSaveState to_save_state(const TextureRect &t, std::map<uint32_t, Text
     };
 }
 TextureRect from_save_state(const TextureRectSaveState &t, std::map<uint32_t, std::shared_ptr<TextureUpload>> &uploads) {
-    auto it = uploads.find(t.upload_hash);
+    std::map<uint32_t, std::shared_ptr<TextureUpload>>::iterator it = uploads.find(t.upload_hash);
     if (it == uploads.end()) {
         TT_LOG(RETRO_LOG_ERROR, "SaveState upload missing!\n");
     }
@@ -1729,8 +1646,8 @@ TextureTrackerSaveState TextureTracker::save_state() {
 
 void TextureTracker::load_state(const TextureTrackerSaveState &state) {
     std::map<uint32_t, std::shared_ptr<TextureUpload>> uploads;
-    for (auto it = state.uploads.begin(); it != state.uploads.end(); it++) {
-        auto ptr = std::shared_ptr<TextureUpload>(new TextureUpload);
+    for (std::map<uint32_t, TextureUpload>::const_iterator it = state.uploads.begin(); it != state.uploads.end(); it++) {
+        std::shared_ptr<TextureUpload> ptr = std::shared_ptr<TextureUpload>(new TextureUpload);
         *ptr = it->second;
         uploads[it->first] = std::move(ptr);
     }
@@ -1751,7 +1668,7 @@ void TextureTracker::load_state(const TextureTrackerSaveState &state) {
         restorable_rects.push_back(std::move(loaded));
     }
     // Need to reload the hd textures, too
-    for (auto it = state.uploads.begin(); it != state.uploads.end(); it++) {
+    for (std::map<uint32_t, TextureUpload>::const_iterator it = state.uploads.begin(); it != state.uploads.end(); it++) {
         load_hd_texture(it->first);
     }
 }

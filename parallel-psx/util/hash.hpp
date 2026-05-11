@@ -22,7 +22,7 @@
 
 #pragma once
 #include <stdint.h>
-#include <string>
+#include <stddef.h>
 
 namespace Util
 {
@@ -38,12 +38,11 @@ public:
 
 	Hasher() = default;
 
-	template <typename T>
-	inline void data(const T *data, size_t size)
+	inline void data(const uint32_t *p, size_t bytes)
 	{
-		size /= sizeof(*data);
-		for (size_t i = 0; i < size; i++)
-			h = (h * 0x100000001b3ull) ^ data[i];
+		size_t count = bytes / sizeof(uint32_t);
+		for (size_t i = 0; i < count; i++)
+			h = (h * 0x100000001b3ull) ^ p[i];
 	}
 
 	inline void u32(uint32_t value)
@@ -51,47 +50,10 @@ public:
 		h = (h * 0x100000001b3ull) ^ value;
 	}
 
-	inline void s32(int32_t value)
-	{
-		u32(uint32_t(value));
-	}
-
-	inline void f32(float value)
-	{
-		union
-		{
-			float f32;
-			uint32_t u32;
-		} u;
-		u.f32 = value;
-		u32(u.u32);
-	}
-
 	inline void u64(uint64_t value)
 	{
 		u32(value & 0xffffffffu);
 		u32(value >> 32);
-	}
-
-	template <typename T>
-	inline void pointer(T *ptr)
-	{
-		u64(reinterpret_cast<uintptr_t>(ptr));
-	}
-
-	inline void string(const char *str)
-	{
-		char c;
-		u32(0xff);
-		while ((c = *str++) != '\0')
-			u32(uint8_t(c));
-	}
-
-	inline void string(const std::string &str)
-	{
-		u32(0xff);
-		for (auto &c : str)
-			u32(uint8_t(c));
 	}
 
 	inline Hash get() const

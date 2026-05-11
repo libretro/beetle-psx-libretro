@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 #include <vector>
-#include <algorithm>
 
 namespace PSX
 {
@@ -69,57 +68,48 @@ struct Rect
 
 	inline bool intersects(const Rect &rect) const
 	{
-		unsigned xend = std::min(x + width, rect.x + rect.width);
-		unsigned xbegin = std::max(x, rect.x);
-		unsigned yend = std::min(y + height, rect.y + rect.height);
-		unsigned ybegin = std::max(y, rect.y);
+		unsigned x_end_self = x + width;
+		unsigned x_end_other = rect.x + rect.width;
+		unsigned y_end_self = y + height;
+		unsigned y_end_other = rect.y + rect.height;
+		unsigned xend = (x_end_self < x_end_other) ? x_end_self : x_end_other;
+		unsigned xbegin = (x > rect.x) ? x : rect.x;
+		unsigned yend = (y_end_self < y_end_other) ? y_end_self : y_end_other;
+		unsigned ybegin = (y > rect.y) ? y : rect.y;
 		return xbegin < xend && ybegin < yend;
 	}
 
 	inline Rect scissor(const Rect &rect) const
 	{
-		unsigned x0 = std::max(x, rect.x);
-		unsigned y0 = std::max(y, rect.y);
-		unsigned x1 = std::min(x + width, rect.x + rect.width);
-		unsigned y1 = std::min(y + height, rect.y + rect.height);
-		unsigned width = std::max(int(x1) - int(x0), 0);
-		unsigned height = std::max(int(y1) - int(y0), 0);
+		unsigned x_end_self = x + width;
+		unsigned x_end_other = rect.x + rect.width;
+		unsigned y_end_self = y + height;
+		unsigned y_end_other = rect.y + rect.height;
+		unsigned x0 = (x > rect.x) ? x : rect.x;
+		unsigned y0 = (y > rect.y) ? y : rect.y;
+		unsigned x1 = (x_end_self < x_end_other) ? x_end_self : x_end_other;
+		unsigned y1 = (y_end_self < y_end_other) ? y_end_self : y_end_other;
+		unsigned width = (x1 > x0) ? (x1 - x0) : 0u;
+		unsigned height = (y1 > y0) ? (y1 - y0) : 0u;
 		return { x0, y0, width, height };
 	}
 
 	inline void extend_bounding_box(const Rect &rect)
 	{
-		unsigned x0 = std::min(x, rect.x);
-		unsigned y0 = std::min(y, rect.y);
-		unsigned x1 = std::max(x + width, rect.x + rect.width);
-		unsigned y1 = std::max(y + height, rect.y + rect.height);
+		unsigned x_end_self = x + width;
+		unsigned x_end_other = rect.x + rect.width;
+		unsigned y_end_self = y + height;
+		unsigned y_end_other = rect.y + rect.height;
+		unsigned x0 = (x < rect.x) ? x : rect.x;
+		unsigned y0 = (y < rect.y) ? y : rect.y;
+		unsigned x1 = (x_end_self > x_end_other) ? x_end_self : x_end_other;
+		unsigned y1 = (y_end_self > y_end_other) ? y_end_self : y_end_other;
 		x = x0;
 		y = y0;
 		width = x1 - x0;
 		height = y1 - y0;
 	}
 };
-
-using FBColor = uint32_t;
-
-static inline uint32_t fbcolor_to_rgba8(FBColor color)
-{
-	// 3 LSBs are ignored.
-	return color & 0xfff8f8f8u;
-}
-
-static inline void fbcolor_to_rgba32f(float *v, FBColor color)
-{
-	// 3 LSBs are ignored.
-	unsigned r = (color >> 0) & 0xf8;
-	unsigned g = (color >> 8) & 0xf8;
-	unsigned b = (color >> 16) & 0xf8;
-	v[0] = r * (1.0f / 255.0f);
-	v[1] = g * (1.0f / 255.0f);
-	v[2] = b * (1.0f / 255.0f);
-	// Mask bit is always cleared.
-	v[3] = 0.0f;
-}
 
 enum StatusFlag
 {
@@ -161,24 +151,14 @@ enum StatusFlag
 };
 using StatusFlags = uint16_t;
 
-class HazardListener
-{
-public:
-	virtual ~HazardListener() = default;
-	virtual void hazard(StatusFlags flags) = 0;
-	virtual void resolve(Domain target_domain, unsigned x, unsigned y) = 0;
-	virtual void flush_render_pass(const Rect &rect) = 0;
-	virtual void discard_render_pass() = 0;
-	virtual void clear_quad(const Rect &rect, FBColor color, bool clear_candidate) = 0;
-	virtual void set_scissored_invariant(bool invariant) = 0;
-};
+class Renderer;
 
 class FBAtlas
 {
 public:
 	FBAtlas();
 
-	void set_hazard_listener(HazardListener *hazard)
+	void set_hazard_listener(Renderer *hazard)
 	{
 		listener = hazard;
 	}
@@ -193,14 +173,15 @@ public:
 	bool texture_rendered(const Rect &rect);
 
 	void write_fragment(Domain domain, const Rect &rect);
-	void clear_rect(const Rect &rect, FBColor color);
+	void clear_rect(const Rect &rect, uint32_t color);
 	void set_draw_rect(const Rect &rect);
 	void set_texture_window(const Rect &rect);
 
 	TextureMode set_texture_mode(TextureMode mode)
 	{
-		std::swap(renderpass.texture_mode, mode);
-		return mode;
+		TextureMode old = renderpass.texture_mode;
+		renderpass.texture_mode = mode;
+		return old;
 	}
 
 	void set_texture_offset(unsigned x, unsigned y)
@@ -221,7 +202,7 @@ public:
 
 private:
 	StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
-	HazardListener *listener = nullptr;
+	Renderer *listener = nullptr;
 
 	void read_domain(Domain domain, Stage stage, const Rect &rect);
 	bool write_domain(Domain domain, Stage stage, const Rect &rect);

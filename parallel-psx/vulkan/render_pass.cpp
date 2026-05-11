@@ -21,107 +21,117 @@
  */
 
 #include "render_pass.hpp"
-#include "stack_allocator.hpp"
 #include "device.hpp"
 #include "quirks.hpp"
-#include <utility>
 #include <cstring>
+#include <stddef.h>
 
 using namespace std;
 using namespace Util;
 
-#ifdef GRANITE_VULKAN_MT
-#define LOCK() std::lock_guard<std::mutex> holder__{lock}
-#else
+namespace Util
+{
+template <typename T, size_t N>
+class StackAllocator
+{
+public:
+	T *allocate(size_t count)
+	{
+		if (count == 0)
+			return nullptr;
+		if (offset + count > N)
+			return nullptr;
+
+		T *ret = buffer + offset;
+		offset += count;
+		return ret;
+	}
+
+	T *allocate_cleared(size_t count)
+	{
+		T *ret = allocate(count);
+		if (ret)
+		{
+			T defval = T();
+			for (size_t i = 0; i < count; i++)
+				ret[i] = defval;
+		}
+		return ret;
+	}
+
+	void reset()
+	{
+		offset = 0;
+	}
+
+private:
+	T buffer[N];
+	size_t offset = 0;
+};
+}
+
 #define LOCK() ((void)0)
-#endif
 
 namespace Vulkan
 {
-void RenderPass::setup_subpasses(const VkRenderPassCreateInfo &create_info)
+static VkAttachmentLoadOp rp_color_load_op(const RenderPassInfo &info, unsigned index)
 {
-	auto *attachments = create_info.pAttachments;
-
-	// Store the important subpass information for later.
-	for (uint32_t i = 0; i < create_info.subpassCount; i++)
-	{
-		auto &subpass = create_info.pSubpasses[i];
-
-		SubpassInfo subpass_info = {};
-		subpass_info.num_color_attachments = subpass.colorAttachmentCount;
-		subpass_info.num_input_attachments = subpass.inputAttachmentCount;
-		subpass_info.depth_stencil_attachment = *subpass.pDepthStencilAttachment;
-		memcpy(subpass_info.color_attachments, subpass.pColorAttachments,
-		       subpass.colorAttachmentCount * sizeof(*subpass.pColorAttachments));
-		memcpy(subpass_info.input_attachments, subpass.pInputAttachments,
-		       subpass.inputAttachmentCount * sizeof(*subpass.pInputAttachments));
-
-		unsigned samples = 0;
-		for (unsigned i = 0; i < subpass_info.num_color_attachments; i++)
-		{
-			if (subpass_info.color_attachments[i].attachment == VK_ATTACHMENT_UNUSED)
-				continue;
-
-			unsigned samp = attachments[subpass_info.color_attachments[i].attachment].samples;
-			if (samples && (samp != samples))
-				VK_ASSERT(samp == samples);
-			samples = samp;
-		}
-
-		if (subpass_info.depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED)
-		{
-			unsigned samp = attachments[subpass_info.depth_stencil_attachment.attachment].samples;
-			if (samples && (samp != samples))
-				VK_ASSERT(samp == samples);
-			samples = samp;
-		}
-
-		VK_ASSERT(samples > 0);
-		subpass_info.samples = samples;
-		this->subpasses.push_back(subpass_info);
-	}
+	if ((info.clear_attachments & (1u << index)) != 0)
+		return VK_ATTACHMENT_LOAD_OP_CLEAR;
+	else if ((info.load_attachments & (1u << index)) != 0)
+		return VK_ATTACHMENT_LOAD_OP_LOAD;
+	else
+		return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 }
 
-RenderPass::RenderPass(Hash hash, Device *device, const VkRenderPassCreateInfo &create_info)
-	: IntrusiveHashMapEnabled<RenderPass>(hash)
-	, device(device)
+static VkAttachmentStoreOp rp_color_store_op(const RenderPassInfo &info, unsigned index)
 {
-	unsigned num_color_attachments = 0;
-	if (create_info.attachmentCount > 0)
-	{
-		auto &att = create_info.pAttachments[create_info.attachmentCount - 1];
-		if (format_has_depth_or_stencil_aspect(att.format))
-		{
-			depth_stencil = att.format;
-			num_color_attachments = create_info.attachmentCount - 1;
-		}
-		else
-			num_color_attachments = create_info.attachmentCount;
-	}
+	if ((info.store_attachments & (1u << index)) != 0)
+		return VK_ATTACHMENT_STORE_OP_STORE;
+	else
+		return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+}
 
-	for (unsigned i = 0; i < num_color_attachments; i++)
-		color_attachments[i] = create_info.pAttachments[i].format;
+static VkAttachmentReference *rp_find_color(std::vector<VkSubpassDescription> &subpasses,
+                                            unsigned subpass, unsigned attachment)
+{
+	const VkAttachmentReference *colors = subpasses[subpass].pColorAttachments;
+	for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
+		if (colors[i].attachment == attachment)
+			return const_cast<VkAttachmentReference *>(&colors[i]);
+	return nullptr;
+}
 
-	// Store the important subpass information for later.
-	setup_subpasses(create_info);
+static VkAttachmentReference *rp_find_resolve(std::vector<VkSubpassDescription> &subpasses,
+                                              unsigned subpass, unsigned attachment)
+{
+	if (!subpasses[subpass].pResolveAttachments)
+		return nullptr;
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned rp_index = device->register_render_pass(get_hash(), create_info);
-#endif
+	const VkAttachmentReference *resolves = subpasses[subpass].pResolveAttachments;
+	for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
+		if (resolves[i].attachment == attachment)
+			return const_cast<VkAttachmentReference *>(&resolves[i]);
+	return nullptr;
+}
 
-	// Fixup after, we want the Fossilize render pass to be generic.
-	auto info = create_info;
-	VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
-	fixup_render_pass_nvidia(info, fixup_attachments);
-	if (device->get_workarounds().wsi_acquire_barrier_is_expensive)
-		fixup_wsi_barrier(info, fixup_attachments);
+static VkAttachmentReference *rp_find_input(std::vector<VkSubpassDescription> &subpasses,
+                                            unsigned subpass, unsigned attachment)
+{
+	const VkAttachmentReference *inputs = subpasses[subpass].pInputAttachments;
+	for (unsigned i = 0; i < subpasses[subpass].inputAttachmentCount; i++)
+		if (inputs[i].attachment == attachment)
+			return const_cast<VkAttachmentReference *>(&inputs[i]);
+	return nullptr;
+}
 
-	LOGI("Creating render pass.\n");
-	if (vkCreateRenderPass(device->get_device(), &info, nullptr, &render_pass) != VK_SUCCESS)
-		LOGE("Failed to create render pass.");
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	device->set_render_pass_handle(rp_index, render_pass);
-#endif
+static VkAttachmentReference *rp_find_depth_stencil(std::vector<VkSubpassDescription> &subpasses,
+                                                    unsigned subpass, unsigned attachment)
+{
+	if (subpasses[subpass].pDepthStencilAttachment->attachment == attachment)
+		return const_cast<VkAttachmentReference *>(subpasses[subpass].pDepthStencilAttachment);
+	else
+		return nullptr;
 }
 
 RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
@@ -137,7 +147,7 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	bool enable_transient_load = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT) != 0;
 
 	// Set up default subpass info structure if we don't have it.
-	auto *subpass_infos = info.subpasses;
+	const RenderPassInfo::Subpass *subpass_infos = info.subpasses;
 	unsigned num_subpasses = info.num_subpasses;
 	RenderPassInfo::Subpass default_subpass_info;
 	if (!info.subpasses)
@@ -165,22 +175,6 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 
 	VK_ASSERT(!(info.clear_attachments & info.load_attachments));
 
-	const auto color_load_op = [&info](unsigned index) -> VkAttachmentLoadOp {
-		if ((info.clear_attachments & (1u << index)) != 0)
-			return VK_ATTACHMENT_LOAD_OP_CLEAR;
-		else if ((info.load_attachments & (1u << index)) != 0)
-			return VK_ATTACHMENT_LOAD_OP_LOAD;
-		else
-			return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	};
-
-	const auto color_store_op = [&info](unsigned index) -> VkAttachmentStoreOp {
-		if ((info.store_attachments & (1u << index)) != 0)
-			return VK_ATTACHMENT_STORE_OP_STORE;
-		else
-			return VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	};
-
 	if (info.op_flags & RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT)
 		ds_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	else if (info.op_flags & RENDER_PASS_OP_LOAD_DEPTH_STENCIL_BIT)
@@ -203,13 +197,13 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	{
 		VK_ASSERT(info.color_attachments[i]);
 		color_attachments[i] = info.color_attachments[i]->get_format();
-		auto &image = info.color_attachments[i]->get_image();
-		auto &att = attachments[i];
+		Image &image = info.color_attachments[i]->get_image();
+		VkAttachmentDescription &att = attachments[i];
 		att.flags = 0;
 		att.format = color_attachments[i];
 		att.samples = image.get_create_info().samples;
-		att.loadOp = color_load_op(i);
-		att.storeOp = color_store_op(i);
+		att.loadOp = rp_color_load_op(info, i);
+		att.storeOp = rp_color_store_op(info, i);
 		att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		// Undefined final layout here for now means that we will just use the layout of the last
@@ -258,8 +252,8 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	depth_stencil = info.depth_stencil ? info.depth_stencil->get_format() : VK_FORMAT_UNDEFINED;
 	if (info.depth_stencil)
 	{
-		auto &image = info.depth_stencil->get_image();
-		auto &att = attachments[info.num_color_attachments];
+		Image &image = info.depth_stencil->get_image();
+		VkAttachmentDescription &att = attachments[info.num_color_attachments];
 		att.flags = 0;
 		att.format = depth_stencil;
 		att.samples = image.get_create_info().samples;
@@ -317,12 +311,12 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	vector<VkSubpassDependency> external_dependencies;
 	for (unsigned i = 0; i < num_subpasses; i++)
 	{
-		auto *colors = reference_allocator.allocate_cleared(subpass_infos[i].num_color_attachments);
-		auto *inputs = reference_allocator.allocate_cleared(subpass_infos[i].num_input_attachments);
-		auto *resolves = reference_allocator.allocate_cleared(subpass_infos[i].num_color_attachments);
-		auto *depth = reference_allocator.allocate_cleared(1);
+		VkAttachmentReference *colors = reference_allocator.allocate_cleared(subpass_infos[i].num_color_attachments);
+		VkAttachmentReference *inputs = reference_allocator.allocate_cleared(subpass_infos[i].num_input_attachments);
+		VkAttachmentReference *resolves = reference_allocator.allocate_cleared(subpass_infos[i].num_color_attachments);
+		VkAttachmentReference *depth = reference_allocator.allocate_cleared(1);
 
-		auto &subpass = subpasses[i];
+		VkSubpassDescription &subpass = subpasses[i];
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpass.colorAttachmentCount = subpass_infos[i].num_color_attachments;
 		subpass.pColorAttachments = colors;
@@ -338,7 +332,7 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 
 		for (unsigned j = 0; j < subpass.colorAttachmentCount; j++)
 		{
-			auto att = subpass_infos[i].color_attachments[j];
+			uint32_t att = subpass_infos[i].color_attachments[j];
 			VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
 			colors[j].attachment = att;
 			// Fill in later.
@@ -347,7 +341,7 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 
 		for (unsigned j = 0; j < subpass.inputAttachmentCount; j++)
 		{
-			auto att = subpass_infos[i].input_attachments[j];
+			uint32_t att = subpass_infos[i].input_attachments[j];
 			VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
 			inputs[j].attachment = att;
 			// Fill in later.
@@ -358,7 +352,7 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 		{
 			for (unsigned j = 0; j < subpass.colorAttachmentCount; j++)
 			{
-				auto att = subpass_infos[i].resolve_attachments[j];
+				uint32_t att = subpass_infos[i].resolve_attachments[j];
 				VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
 				resolves[j].attachment = att;
 				// Fill in later.
@@ -378,40 +372,6 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 			depth->layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		}
 	}
-
-	const auto find_color = [&](unsigned subpass, unsigned attachment) -> VkAttachmentReference * {
-		auto *colors = subpasses[subpass].pColorAttachments;
-		for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
-			if (colors[i].attachment == attachment)
-				return const_cast<VkAttachmentReference *>(&colors[i]);
-		return nullptr;
-	};
-
-	const auto find_resolve = [&](unsigned subpass, unsigned attachment) -> VkAttachmentReference * {
-		if (!subpasses[subpass].pResolveAttachments)
-			return nullptr;
-
-		auto *resolves = subpasses[subpass].pResolveAttachments;
-		for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
-			if (resolves[i].attachment == attachment)
-				return const_cast<VkAttachmentReference *>(&resolves[i]);
-		return nullptr;
-	};
-
-	const auto find_input = [&](unsigned subpass, unsigned attachment) -> VkAttachmentReference * {
-		auto *inputs = subpasses[subpass].pInputAttachments;
-		for (unsigned i = 0; i < subpasses[subpass].inputAttachmentCount; i++)
-			if (inputs[i].attachment == attachment)
-				return const_cast<VkAttachmentReference *>(&inputs[i]);
-		return nullptr;
-	};
-
-	const auto find_depth_stencil = [&](unsigned subpass, unsigned attachment) -> VkAttachmentReference * {
-		if (subpasses[subpass].pDepthStencilAttachment->attachment == attachment)
-			return const_cast<VkAttachmentReference *>(subpasses[subpass].pDepthStencilAttachment);
-		else
-			return nullptr;
-	};
 
 	// Now, figure out how each attachment is used throughout the subpasses.
 	// Either we don't care (inherit previous pass), or we need something specific.
@@ -442,13 +402,13 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	for (unsigned attachment = 0; attachment < num_attachments; attachment++)
 	{
 		bool used = false;
-		auto current_layout = attachments[attachment].initialLayout;
+		VkImageLayout current_layout = attachments[attachment].initialLayout;
 		for (unsigned subpass = 0; subpass < num_subpasses; subpass++)
 		{
-			auto *color = find_color(subpass, attachment);
-			auto *resolve = find_resolve(subpass, attachment);
-			auto *input = find_input(subpass, attachment);
-			auto *depth = find_depth_stencil(subpass, attachment);
+			VkAttachmentReference *color = rp_find_color(subpasses, subpass, attachment);
+			VkAttachmentReference *resolve = rp_find_resolve(subpasses, subpass, attachment);
+			VkAttachmentReference *input = rp_find_input(subpasses, subpass, attachment);
+			VkAttachmentReference *depth = rp_find_depth_stencil(subpasses, subpass, attachment);
 
 			// Sanity check.
 			if (color || resolve)
@@ -652,13 +612,13 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	// Add preserve attachments as needed.
 	for (unsigned subpass = 0; subpass < num_subpasses; subpass++)
 	{
-		auto &pass = subpasses[subpass];
+		VkSubpassDescription &pass = subpasses[subpass];
 		unsigned preserve_count = 0;
 		for (unsigned attachment = 0; attachment < num_attachments; attachment++)
 			if (preserve_masks[attachment] & (1u << subpass))
 				preserve_count++;
 
-		auto *preserve = preserve_allocator.allocate_cleared(preserve_count);
+		uint32_t *preserve = preserve_allocator.allocate_cleared(preserve_count);
 		pass.pPreserveAttachments = preserve;
 		pass.preserveAttachmentCount = preserve_count;
 		for (unsigned attachment = 0; attachment < num_attachments; attachment++)
@@ -674,10 +634,10 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	rp_info.attachmentCount = num_attachments;
 
 	// Add external subpass dependencies.
-	for_each_bit(external_color_dependencies | external_depth_dependencies | external_input_dependencies,
-	             [&](unsigned subpass) {
+	FOR_EACH_BIT(external_color_dependencies | external_depth_dependencies | external_input_dependencies, subpass)
+	{
 		             external_dependencies.emplace_back();
-		             auto &dep = external_dependencies.back();
+		             VkSubpassDependency &dep = external_dependencies.back();
 		             dep.srcSubpass = VK_SUBPASS_EXTERNAL;
 		             dep.dstSubpass = subpass;
 
@@ -709,12 +669,13 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 			                                  VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			             dep.dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 		             }
-	             });
+	             	}
 
 	// Queue up self-dependencies (COLOR | DEPTH) -> INPUT.
-	for_each_bit(color_self_dependencies | depth_self_dependencies, [&](unsigned subpass) {
+	FOR_EACH_BIT(color_self_dependencies | depth_self_dependencies, subpass)
+	{
 		external_dependencies.emplace_back();
-		auto &dep = external_dependencies.back();
+		VkSubpassDependency &dep = external_dependencies.back();
 		dep.srcSubpass = subpass;
 		dep.dstSubpass = subpass;
 		dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
@@ -733,13 +694,13 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 
 		dep.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 		dep.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-	});
+		}
 
 	// Flush and invalidate caches between each subpass.
 	for (unsigned subpass = 1; subpass < num_subpasses; subpass++)
 	{
 		external_dependencies.emplace_back();
-		auto &dep = external_dependencies.back();
+		VkSubpassDependency &dep = external_dependencies.back();
 		dep.srcSubpass = subpass - 1;
 		dep.dstSubpass = subpass;
 		dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
@@ -788,13 +749,44 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	}
 
 	// Store the important subpass information for later.
-	setup_subpasses(rp_info);
+	for (uint32_t subpass_idx = 0; subpass_idx < rp_info.subpassCount; subpass_idx++)
+	{
+		const VkSubpassDescription &subpass = rp_info.pSubpasses[subpass_idx];
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned rp_index = device->register_render_pass(get_hash(), rp_info);
-#endif
+		SubpassInfo subpass_info = {};
+		subpass_info.num_color_attachments = subpass.colorAttachmentCount;
+		subpass_info.num_input_attachments = subpass.inputAttachmentCount;
+		subpass_info.depth_stencil_attachment = *subpass.pDepthStencilAttachment;
+		memcpy(subpass_info.color_attachments, subpass.pColorAttachments,
+		       subpass.colorAttachmentCount * sizeof(*subpass.pColorAttachments));
+		memcpy(subpass_info.input_attachments, subpass.pInputAttachments,
+		       subpass.inputAttachmentCount * sizeof(*subpass.pInputAttachments));
 
-	// Fixup after, we want the Fossilize render pass to be generic.
+		unsigned samples = 0;
+		for (unsigned i = 0; i < subpass_info.num_color_attachments; i++)
+		{
+			if (subpass_info.color_attachments[i].attachment == VK_ATTACHMENT_UNUSED)
+				continue;
+
+			unsigned samp = attachments[subpass_info.color_attachments[i].attachment].samples;
+			VK_ASSERT(!samples || samp == samples);
+			samples = samp;
+		}
+
+		if (subpass_info.depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED)
+		{
+			unsigned samp = attachments[subpass_info.depth_stencil_attachment.attachment].samples;
+			VK_ASSERT(!samples || samp == samples);
+			samples = samp;
+		}
+
+		VK_ASSERT(samples > 0);
+		subpass_info.samples = samples;
+		this->subpasses.push_back(subpass_info);
+	}
+
+
+	// Fixup after, we want the underlying render pass to be generic.
 	VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
 	fixup_render_pass_nvidia(rp_info, fixup_attachments);
 	if (device->get_workarounds().wsi_acquire_barrier_is_expensive)
@@ -803,9 +795,6 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	LOGI("Creating render pass.\n");
 	if (vkCreateRenderPass(device->get_device(), &rp_info, nullptr, &render_pass) != VK_SUCCESS)
 		LOGE("Failed to create render pass.");
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	device->set_render_pass_handle(rp_index, render_pass);
-#endif
 }
 
 void RenderPass::fixup_wsi_barrier(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments)
@@ -820,7 +809,7 @@ void RenderPass::fixup_wsi_barrier(VkRenderPassCreateInfo &create_info, VkAttach
 
 	for (uint32_t i = 0; i < create_info.attachmentCount; i++)
 	{
-		auto &att = attachments[i];
+		VkAttachmentDescription &att = attachments[i];
 		if (att.initialLayout == VK_IMAGE_LAYOUT_UNDEFINED && att.finalLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
 			att.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	}
@@ -846,7 +835,7 @@ void RenderPass::fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, V
 		for (uint32_t i = 0; i < create_info.attachmentCount; i++)
 		{
 			VkFormat format = attachments[i].format;
-			auto aspect = format_to_aspect_mask(format);
+			VkImageAspectFlags aspect = format_to_aspect_mask(format);
 			if ((aspect & (VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_DEPTH_BIT)) != 0)
 				attachments[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			if ((aspect & VK_IMAGE_ASPECT_STENCIL_BIT) != 0)
@@ -881,7 +870,7 @@ Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassI
 		width = min(width, info.color_attachments[i]->get_image().get_width(lod));
 		height = min(height, info.color_attachments[i]->get_image().get_height(lod));
 		views[num_views++] = info.color_attachments[i]->get_render_target_view(info.layer);
-		attachments.push_back(info.color_attachments[i]);
+		attachments[num_attachments++] = info.color_attachments[i];
 	}
 
 	if (info.depth_stencil)
@@ -890,7 +879,7 @@ Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassI
 		width = min(width, info.depth_stencil->get_image().get_width(lod));
 		height = min(height, info.depth_stencil->get_image().get_height(lod));
 		views[num_views++] = info.depth_stencil->get_render_target_view(info.layer);
-		attachments.push_back(info.depth_stencil);
+		attachments[num_attachments++] = info.depth_stencil;
 	}
 
 	VkFramebufferCreateInfo fb_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
@@ -933,7 +922,7 @@ void FramebufferAllocator::begin_frame()
 
 Framebuffer &FramebufferAllocator::request_framebuffer(const RenderPassInfo &info)
 {
-	auto &rp = device->request_render_pass(info, true);
+	const RenderPass &rp = device->request_render_pass(info, true);
 	Hasher h;
 	h.u64(rp.get_hash());
 
@@ -946,10 +935,10 @@ Framebuffer &FramebufferAllocator::request_framebuffer(const RenderPassInfo &inf
 
 	h.u32(info.layer);
 
-	auto hash = h.get();
+	Hash hash = h.get();
 
 	LOCK();
-	auto *node = framebuffers.request(hash);
+	FramebufferNode *node = framebuffers.request(hash);
 	if (node)
 		return *node;
 
@@ -977,10 +966,10 @@ ImageView &AttachmentAllocator::request_attachment(unsigned width, unsigned heig
 	h.u32(samples);
 	h.u32(layers);
 
-	auto hash = h.get();
+	Hash hash = h.get();
 
 	LOCK();
-	auto *node = attachments.request(hash);
+	TransientNode *node = attachments.request(hash);
 	if (node)
 		return node->handle->get_view();
 

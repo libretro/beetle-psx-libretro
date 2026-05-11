@@ -21,15 +21,8 @@
  */
 
 #include "memory_allocator.hpp"
-#include <algorithm>
 
-using namespace std;
-
-#ifdef GRANITE_VULKAN_MT
-#define ALLOCATOR_LOCK() std::lock_guard<std::mutex> holder__{lock}
-#else
 #define ALLOCATOR_LOCK()
-#endif
 
 namespace Vulkan
 {
@@ -122,17 +115,17 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 	unsigned num_blocks = (size + sub_block_size - 1) >> sub_block_size_log2;
 	uint32_t size_mask = (1u << (num_blocks - 1)) - 1;
 	uint32_t masked_tiling_mode = tiling_mask & tiling;
-	auto &m = tiling_modes[masked_tiling_mode];
+	AllocationTilingHeaps &m = tiling_modes[masked_tiling_mode];
 
 	uint32_t index = trailing_zeroes(m.heap_availability_mask & ~size_mask);
 
 	if (index < Block::NumSubBlocks)
 	{
-		auto itr = m.heaps[index].begin();
+		Util::IntrusiveList<MiniHeap>::Iterator itr = m.heaps[index].begin();
 		VK_ASSERT(itr);
 		VK_ASSERT(index >= (num_blocks - 1));
 
-		auto &heap = *itr;
+		MiniHeap &heap = *itr;
 		suballocate(num_blocks, masked_tiling_mode, memory_type, heap, alloc);
 		unsigned new_index = heap.heap.get_longest_run() - 1;
 
@@ -144,7 +137,7 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 		}
 		else if (new_index != index)
 		{
-			auto &new_heap = m.heaps[new_index];
+			Util::IntrusiveList<MiniHeap> &new_heap = m.heaps[new_index];
 			new_heap.move_to_front(m.heaps[index], itr);
 			m.heap_availability_mask |= 1u << new_index;
 			if (!m.heaps[index].begin())
@@ -158,11 +151,11 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 	}
 
 	// We didn't find a vacant heap, make a new one.
-	auto *node = object_pool.allocate();
+	MiniHeap *node = object_pool.allocate();
 	if (!node)
 		return false;
 
-	auto &heap = *node;
+	MiniHeap &heap = *node;
 	uint32_t alloc_size = sub_block_size * Block::NumSubBlocks;
 
 	if (parent)
@@ -208,12 +201,12 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 ClassAllocator::~ClassAllocator()
 {
 	bool error = false;
-	for (auto &m : tiling_modes)
+	for (AllocationTilingHeaps &m : tiling_modes)
 	{
 		if (m.full_heaps.begin())
 			error = true;
 
-		for (auto &h : m.heaps)
+		for (Util::IntrusiveList<MiniHeap> &h : m.heaps)
 			if (h.begin())
 				error = true;
 	}
@@ -225,10 +218,10 @@ ClassAllocator::~ClassAllocator()
 void ClassAllocator::free(DeviceAllocation *alloc)
 {
 	ALLOCATOR_LOCK();
-	auto *heap = &*alloc->heap;
-	auto &block = heap->heap;
+	MiniHeap *heap = &*alloc->heap;
+	Block &block = heap->heap;
 	bool was_full = block.full();
-	auto &m = tiling_modes[alloc->tiling];
+	AllocationTilingHeaps &m = tiling_modes[alloc->tiling];
 
 	unsigned index = block.get_longest_run() - 1;
 	block.free(alloc->mask);
@@ -302,7 +295,7 @@ DeviceAllocation DeviceAllocation::make_imported_allocation(VkDeviceMemory memor
 
 bool Allocator::allocate(uint32_t size, uint32_t alignment, AllocationTiling mode, DeviceAllocation *alloc)
 {
-	for (auto &c : classes)
+	for (ClassAllocator &c : classes)
 	{
 		// Find a suitable class to allocate from.
 		if (size <= c.sub_block_size * Block::NumSubBlocks)
@@ -404,7 +397,7 @@ bool DeviceAllocator::allocate_global(uint32_t size, uint32_t memory_type, Devic
 
 void DeviceAllocator::Heap::garbage_collect(VkDevice device)
 {
-	for (auto &block : blocks)
+	for (Allocation &block : blocks)
 	{
 		if (block.host_memory)
 			vkUnmapMemory(device, block.memory);
@@ -415,21 +408,21 @@ void DeviceAllocator::Heap::garbage_collect(VkDevice device)
 
 DeviceAllocator::~DeviceAllocator()
 {
-	for (auto &heap : heaps)
+	for (Heap &heap : heaps)
 		heap.garbage_collect(device);
 }
 
 void DeviceAllocator::free(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
 {
 	ALLOCATOR_LOCK();
-	auto &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
+	Heap &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
 	heap.blocks.push_back({ memory, host_memory, size, memory_type });
 }
 
 void DeviceAllocator::free_no_recycle(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
 {
 	ALLOCATOR_LOCK();
-	auto &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
+	Heap &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
 	if (host_memory)
 		vkUnmapMemory(device, memory);
 	vkFreeMemory(device, memory, nullptr);
@@ -439,7 +432,7 @@ void DeviceAllocator::free_no_recycle(uint32_t size, uint32_t memory_type, VkDev
 void DeviceAllocator::garbage_collect()
 {
 	ALLOCATOR_LOCK();
-	for (auto &heap : heaps)
+	for (Heap &heap : heaps)
 		heap.garbage_collect(device);
 }
 
@@ -489,20 +482,28 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
                                VkImage dedicated_image)
 {
 	ALLOCATOR_LOCK();
-	auto &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
+	Heap &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
 
 	// Naive searching is fine here as vkAllocate blocks are *huge* and we won't have many of them.
-	auto itr = find_if(begin(heap.blocks), end(heap.blocks),
-	                   [=](const Allocation &alloc) { return size == alloc.size && memory_type == alloc.type; });
+	size_t found_idx = heap.blocks.size();
+	for (size_t i = 0; i < heap.blocks.size(); i++)
+	{
+		if (heap.blocks[i].size == size && heap.blocks[i].type == memory_type)
+		{
+			found_idx = i;
+			break;
+		}
+	}
 
 	bool host_visible = (mem_props.memoryTypes[memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 
 	// Found previously used block.
-	if (itr != end(heap.blocks))
+	if (found_idx < heap.blocks.size())
 	{
-		*memory = itr->memory;
-		*host_memory = itr->host_memory;
-		heap.blocks.erase(itr);
+		Allocation &block = heap.blocks[found_idx];
+		*memory = block.memory;
+		*host_memory = block.host_memory;
+		heap.blocks.erase(heap.blocks.begin() + found_idx);
 		return true;
 	}
 
@@ -533,8 +534,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	else
 	{
 		// Look through our heap and see if there are blocks of other types we can free.
-		auto itr = begin(heap.blocks);
-		while (res != VK_SUCCESS && itr != end(heap.blocks))
+		std::vector<Allocation>::iterator itr = heap.blocks.begin();
+		while (res != VK_SUCCESS && itr != heap.blocks.end())
 		{
 			if (itr->host_memory)
 				vkUnmapMemory(device, itr->memory);
@@ -544,7 +545,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			++itr;
 		}
 
-		heap.blocks.erase(begin(heap.blocks), itr);
+		heap.blocks.erase(heap.blocks.begin(), itr);
 
 		if (res == VK_SUCCESS)
 		{

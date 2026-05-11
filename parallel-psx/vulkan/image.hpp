@@ -27,7 +27,7 @@
 #include "vulkan_common.hpp"
 #include "memory_allocator.hpp"
 #include "vulkan.hpp"
-#include <algorithm>
+#include <utility>
 
 namespace Vulkan
 {
@@ -117,7 +117,8 @@ static inline VkAccessFlags image_usage_to_possible_access(VkImageUsageFlags usa
 
 static inline uint32_t image_num_miplevels(const VkExtent3D &extent)
 {
-	uint32_t size = std::max(std::max(extent.width, extent.height), extent.depth);
+	uint32_t wh = (extent.width > extent.height) ? extent.width : extent.height;
+	uint32_t size = (wh > extent.depth) ? wh : extent.depth;
 	uint32_t levels = 0;
 	while (size)
 	{
@@ -442,17 +443,20 @@ public:
 
 	uint32_t get_width(uint32_t lod = 0) const
 	{
-		return std::max(1u, create_info.width >> lod);
+		uint32_t v = create_info.width >> lod;
+		return v > 1u ? v : 1u;
 	}
 
 	uint32_t get_height(uint32_t lod = 0) const
 	{
-		return std::max(1u, create_info.height >> lod);
+		uint32_t v = create_info.height >> lod;
+		return v > 1u ? v : 1u;
 	}
 
 	uint32_t get_depth(uint32_t lod = 0) const
 	{
-		return std::max(1u, create_info.depth >> lod);
+		uint32_t v = create_info.depth >> lod;
+		return v > 1u ? v : 1u;
 	}
 
 	const ImageCreateInfo &get_create_info() const

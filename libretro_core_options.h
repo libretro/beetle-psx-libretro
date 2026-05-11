@@ -267,9 +267,26 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "disabled", NULL },
          { "psxonpsp", "PSP PS1 BIOS" },
          { "ps1_rom",  "PS3 PS1 BIOS" },
+         { "openbios", "OpenBIOS"     },
          { NULL, NULL },
       },
       "disabled"
+   },
+   {
+      BEETLE_OPT(region),
+      "System Region",
+      NULL,
+      "Sets the fallback region used when content cannot be auto-detected (e.g. raw PS-X EXE files). Disc-based games still use the region embedded on the disc. Restart required.",
+      NULL,
+      "system",
+      {
+         { "auto",   "Auto" },
+         { "ntsc-j", "NTSC-J (Japan)" },
+         { "ntsc-u", "NTSC-U (North America)" },
+         { "pal",    "PAL (Europe)" },
+         { NULL, NULL },
+      },
+      "auto"
    },
    {
       BEETLE_OPT(internal_resolution),
@@ -519,22 +536,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "Replace Textures",
       NULL,
       "Replace textures using HD versions from <cd>-texture-replacements/",
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-#endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   {
-      BEETLE_OPT(wireframe),
-      "Wireframe Mode (Debug)",
-      NULL,
-      "Render 3D models in outline form without textures or shading. Only supported by the OpenGL hardware renderer. Note: This is for debugging purposes, and should normally be disabled.",
       NULL,
       "video",
       {
@@ -1262,12 +1263,13 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(deinterlacer),
       "Deinterlace Method",
       NULL,
-      "'Weave' shows both fields on the same frame for full high resolution still image, 'Bob' sacrificies resolution clarity for motion clarity.",
+      "'Weave' shows both fields on the same frame for full high resolution still image, 'Bob' sacrificies resolution clarity for motion clarity. 'Off' makes the software renderer match the hardware (Vulkan/OpenGL) renderer behaviour by rasterising to all VRAM lines every frame and deferring scanout to the end of the frame, eliminating comb-on-motion in interlaced games. Note: programs that DMA to VRAM during scanout (some demos using >512-line PAL framebuffer-wrap tricks) may show stale rows under 'Off'; use 'Weave' or 'Bob' for those.",
       NULL,
       "video",
       {
          { "weave", "Weave" },
          { "bob",   "Bob" },
+         { "off",   "Off" },
          { NULL, NULL },
       },
       "weave"
@@ -1972,24 +1974,25 @@ static INLINE void libretro_set_core_options(retro_environment_t environ_cb,
                {
                   buf_len += num_values - 1;
                   buf_len += strlen(desc);
+                  buf_len += 3; /* "; " separator (2 bytes) + null terminator (1 byte) */
 
                   values_buf[i] = (char *)calloc(buf_len, sizeof(char));
                   if (!values_buf[i])
                      goto error;
 
-                  strcpy(values_buf[i], desc);
-                  strcat(values_buf[i], "; ");
+                  strlcpy(values_buf[i], desc, buf_len);
+                  strlcat(values_buf[i], "; ", buf_len);
 
                   /* Default value goes first */
-                  strcat(values_buf[i], values[default_index].value);
+                  strlcat(values_buf[i], values[default_index].value, buf_len);
 
                   /* Add remaining values */
                   for (j = 0; j < num_values; j++)
                   {
                      if (j != default_index)
                      {
-                        strcat(values_buf[i], "|");
-                        strcat(values_buf[i], values[j].value);
+                        strlcat(values_buf[i], "|", buf_len);
+                        strlcat(values_buf[i], values[j].value, buf_len);
                      }
                   }
                }

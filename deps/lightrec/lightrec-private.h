@@ -171,7 +171,7 @@ static inline u32 get_ds_pc(const struct block *block, u16 offset, s16 imm)
 
 	offset += !!(OPT_SWITCH_DELAY_SLOTS && (flags & LIGHTREC_NO_DS));
 
-	return block->pc + (offset + imm << 2);
+	return block->pc + ((offset + imm) << 2);
 }
 
 static inline u32 get_branch_pc(const struct block *block, u16 offset, s16 imm)
@@ -180,7 +180,7 @@ static inline u32 get_branch_pc(const struct block *block, u16 offset, s16 imm)
 
 	offset -= !!(OPT_SWITCH_DELAY_SLOTS && (flags & LIGHTREC_NO_DS));
 
-	return block->pc + (offset + imm << 2);
+	return block->pc + ((offset + imm) << 2);
 }
 
 void lightrec_mtc(struct lightrec_state *state, union code op, u32 data);

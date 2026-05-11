@@ -7,10 +7,9 @@ uint8_t widescreen_hack;
 uint8_t widescreen_hack_aspect_ratio_setting;
 uint8_t psx_gpu_upscale_shift;
 uint8_t psx_gpu_upscale_shift_hw;
+bool psx_gpu_rasterize_both_fields = false;
 int line_render_mode;
 int filter_mode;
-bool opaque_check;
-bool semitrans_check;
 int crop_overscan = 0;
 
 enum core_timing_fps_modes core_timing_fps_mode = AUTO_TOGGLE_TIMING;

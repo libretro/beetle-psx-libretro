@@ -93,7 +93,6 @@ private:
 	double query_period = 0.0;
 
 	void add_pool();
-	void flush_callbacks();
 	bool supports_timestamp = false;
 };
 }

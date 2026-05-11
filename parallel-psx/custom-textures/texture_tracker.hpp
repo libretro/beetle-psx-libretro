@@ -18,34 +18,16 @@ extern retro_log_printf_t log_cb;
 #ifdef VERBOSE_TEXTURE_TRACKING
 #define TT_LOG_VERBOSE(...) TT_LOG(__VA_ARGS__)
 #else
-#define TT_LOG_VERBOSE(...) do {} while (0)
+/* No-op variant must still consume its arguments at the syntactic
+ * level, otherwise locals only used in the verbose branch trip
+ * -Wunused-but-set-variable.  The "(void)0," prefix lets sizeof
+ * accept a 1-arg invocation through the comma operator; sizeof
+ * itself is unevaluated, so each arg is read by the type system
+ * without generating runtime code. */
+#define TT_LOG_VERBOSE(...) ((void)sizeof(((void)0, __VA_ARGS__)))
 #endif
 
 namespace PSX {
-
-class DumpLog {
-public:
-    DumpLog();
-    void upload(uint64_t frame, Rect rect, uint32_t hash);
-    void dump(uint64_t frame, uint32_t hash, uint32_t palette_hash, TextureMode mode);
-private:
-    std::ofstream dump_stream;
-};
-
-class BlitLog {
-public:
-    BlitLog();
-    ~BlitLog();
-    void upload(Rect rect, uint32_t hash);
-    void blit(Rect dst, Rect src);
-    void clear(Rect rect);
-    void set_frame(uint32_t frame);
-private:
-    void comma();
-    uint32_t frame = 0;
-    bool need_comma = false;
-    std::ofstream dump_stream;
-};
 
 struct HdTextureId {
     uint32_t hash;
@@ -113,6 +95,13 @@ struct SRect {
     int y;
     int width;
     int height;
+    // Default-constructed SRect zero-initializes all fields. The result is in
+    // an "invalid" state by the 4-arg constructor's invariant (width == 0 and
+    // height == 0 would fail its width > 0 / height > 0 check) and is intended
+    // only as a placeholder — array slot or struct field — to be overwritten
+    // before being read. The 4-arg constructor below is the validated path;
+    // use it for any SRect that is meant to be immediately usable.
+    SRect() : x(0), y(0), width(0), height(0) {}
     SRect(int x, int y, int width, int height):
     x(x), y(y), width(width), height(height) {
         if (width <= 0 || height <= 0) {
@@ -190,28 +179,23 @@ struct LoadedImage {
     int height;
 };
 
-class TextureUploader
-{
-public:
-	virtual ~TextureUploader() = default;
-	virtual Vulkan::ImageHandle upload_texture(std::vector<LoadedImage> &image) = 0;
-    virtual Vulkan::ImageHandle create_texture(int width, int height, int levels) = 0;
-    virtual Vulkan::CommandBufferHandle &command_buffer_hack_fixme() = 0;
+class Renderer;
+
+enum class IORequestKind {
+    Load,
+    Dump,
 };
 
 struct IORequest {
-    virtual ~IORequest() = default; // Need some virtual method for dynamic_cast
-};
-
-struct DumpRequest : IORequest {
+    IORequestKind kind;
+    // Load payload (valid when kind == Load):
+    uint32_t hash;
+    uint32_t palette_hash;
+    // Dump payload (valid when kind == Dump):
     std::string path;
     int width;
     int height;
     std::vector<uint8_t> bytes;
-};
-struct LoadRequest : IORequest {
-    uint32_t hash;
-    uint32_t palette_hash;
 };
 
 const int ALPHA_FLAG_OPAQUE = 1;
@@ -231,7 +215,7 @@ public:
     ~IOChannel();
     slock_t *lock;
     scond_t *cond;
-    std::vector<std::unique_ptr<IORequest>> requests;
+    std::vector<IORequest> requests;
     std::vector<IOResponse> responses;
     bool done = false;
 private:
@@ -364,11 +348,11 @@ struct FusedPage {
 
 class FusedPages {
 public:
-    HdTextureHandle get_or_make(Rect page_rect, uint32_t palette, RectTracker &tracker, TextureUploader *uploader);
+    HdTextureHandle get_or_make(Rect page_rect, uint32_t palette, RectTracker &tracker, Renderer *uploader);
     HdTexture get_from_handle(HdTextureHandle handle, Vulkan::ImageHandle &default_hd_texture);
     void mark_dirty(Rect rect); // For blit dst, upload, and hd texture load
     void mark_dead(Rect rect); // For clear
-    void rebuild_dirty(RectTracker &tracker, TextureUploader *uploader);
+    void rebuild_dirty(RectTracker &tracker, Renderer *uploader);
     void remove_dead();
 
     void dbg_print_info();
@@ -453,28 +437,13 @@ public:
     void endFrame();
     void on_queues_reset();
 
-	void set_texture_uploader(TextureUploader *t)
-	{
-		uploader = t;
-        std::vector<LoadedImage> default_levels;
-
-        LoadedImage default_image;
-        default_image.width = 1;
-        default_image.height = 1;
-        default_image.owned_data.push_back(0);
-        default_image.owned_data.push_back(0);
-        default_image.owned_data.push_back(0);
-        default_image.owned_data.push_back(0);
-        default_levels.push_back(std::move(default_image));
-        
-        default_hd_texture = uploader->upload_texture(default_levels);
-	}
+	void set_texture_uploader(Renderer *t);
 
     bool dump_enabled = false;
     bool hd_textures_enabled = false;
 private:
     IOThread iothread;
-    TextureUploader *uploader;
+    Renderer *uploader;
 
     Vulkan::ImageHandle default_hd_texture;
 
@@ -496,9 +465,6 @@ private:
     DbgHotkey frame_dump_key = RETROK_LEFTBRACKET; // disgusting
     std::ofstream *frame_dump = nullptr;
     bool frame_dump_need_comma = false;
-
-    std::unique_ptr<BlitLog> blit_log;
-    std::unique_ptr<DumpLog> dump_log;
 
     DbgHotkey hd_toggle_key = RETROK_RIGHTBRACKET;
 

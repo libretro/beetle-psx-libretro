@@ -57,7 +57,7 @@ public:
 
 	VkSemaphore consume()
 	{
-		auto ret = semaphore;
+		VkSemaphore ret = semaphore;
 		VK_ASSERT(semaphore);
 		VK_ASSERT(signalled);
 		semaphore = VK_NULL_HANDLE;
@@ -67,7 +67,7 @@ public:
 
 	VkSemaphore release_semaphore()
 	{
-		auto ret = semaphore;
+		VkSemaphore ret = semaphore;
 		semaphore = VK_NULL_HANDLE;
 		signalled = false;
 		return ret;

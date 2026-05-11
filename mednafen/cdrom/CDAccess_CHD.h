@@ -1,53 +1,34 @@
+/* Mednafen - Multi-system Emulator
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
 #ifndef __MDFN_CDACCESS_CHD_H
 #define __MDFN_CDACCESS_CHD_H
 
 #include "CDAccess.h"
-#include "CDAccess_Image.h"
 
-#include <libchdr/chd.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-class CDAccess_CHD : public CDAccess
-{
-   public:
+CDAccess *CDAccess_CHD_New(bool *success, const char *path,
+      bool image_memcache);
 
-      CDAccess_CHD(const char *path, bool image_memcache);
-      virtual ~CDAccess_CHD();
-
-      virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba);
-
-      virtual bool Read_Raw_PW(uint8_t *buf, int32_t lba);
-
-      virtual bool Read_TOC(TOC *toc);
-
-      virtual void Eject(bool eject_status);
-
-   private:
-      chd_file *chd;
-      /* hunk data cache */
-      uint8_t *hunkmem;
-      /* last hunknum read */
-      int oldhunk;
-
-      int32_t NumTracks;
-      int32_t FirstTrack;
-      int32_t LastTrack;
-      int32_t total_sectors;
-      TOC* ptoc;
-
-      std::string sbi_path;
-
-      bool ImageOpen(const char *path, bool image_memcache);
-      int LoadSBI(const char* sbi_path);
-      void Cleanup(void);
-
-      CDRFILE_TRACK_INFO Tracks[100]; // Track #0(HMM?) through 99
-      struct cpp11_array_doodad
-      {
-         uint8 data[12];
-      };
-      std::map<uint32, cpp11_array_doodad> SubQReplaceMap;
-      int32_t MakeSubPQ(int32 lba, uint8 *SubPWBuf);
-};
-
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -29,7 +29,6 @@
 #include "sampler.hpp"
 #include "shader.hpp"
 #include "vulkan.hpp"
-#include "pipeline_event.hpp"
 #include "query_pool.hpp"
 #include "buffer_pool.hpp"
 #include <string.h>
@@ -64,7 +63,7 @@ using CommandBufferDirtyFlags = uint32_t;
 #define CULL_MODE_BITS 2
 #define FRONT_FACE_BITS 1
 union PipelineState {
-	struct
+	struct State
 	{
 		// Depth state.
 		unsigned depth_write : 1;
@@ -286,13 +285,6 @@ public:
 	void barrier(VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage,
 	             VkAccessFlags dst_access);
 
-	PipelineEvent signal_event(VkPipelineStageFlags stages);
-	void wait_events(unsigned num_events, const VkEvent *events,
-	                 VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages,
-	                 unsigned barriers, const VkMemoryBarrier *globals,
-	                 unsigned buffer_barriers, const VkBufferMemoryBarrier *buffers,
-	                 unsigned image_barriers, const VkImageMemoryBarrier *images);
-
 	void barrier(VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages,
 	             unsigned barriers, const VkMemoryBarrier *globals,
 	             unsigned buffer_barriers, const VkBufferMemoryBarrier *buffers,
@@ -336,11 +328,6 @@ public:
 
 	void set_program(Program &program);
 
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	// Convenience functions for one-off shader binds.
-	void set_program(const std::string &vertex, const std::string &fragment, const std::vector<std::pair<std::string, int>> &defines = {});
-	void set_program(const std::string &compute, const std::vector<std::pair<std::string, int>> &defines = {});
-#endif
 
 	void set_buffer_view(unsigned set, unsigned binding, const BufferView &view);
 	void set_input_attachments(unsigned set, unsigned start_binding);
@@ -655,7 +642,7 @@ private:
 
 	CommandBufferDirtyFlags get_and_clear(CommandBufferDirtyFlags flags)
 	{
-		auto mask = dirty & flags;
+		CommandBufferDirtyFlags mask = dirty & flags;
 		dirty &= ~flags;
 		return mask;
 	}
@@ -693,26 +680,6 @@ private:
 	void init_viewport_scissor(const RenderPassInfo &info, const Framebuffer *framebuffer);
 };
 
-#ifdef GRANITE_VULKAN_FILESYSTEM
-struct CommandBufferUtil
-{
-	static void draw_fullscreen_quad(CommandBuffer &cmd, const std::string &vertex, const std::string &fragment,
-	                                 const std::vector<std::pair<std::string, int>> &defines = {});
-	static void draw_fullscreen_quad_depth(CommandBuffer &cmd, const std::string &vertex, const std::string &fragment,
-	                                       bool depth_test, bool depth_write, VkCompareOp depth_compare,
-	                                       const std::vector<std::pair<std::string, int>> &defines = {});
-	static void set_fullscreen_quad_vertex_state(CommandBuffer &cmd);
-	static void set_quad_vertex_state(CommandBuffer &cmd);
-
-	static void setup_fullscreen_quad(CommandBuffer &cmd, const std::string &vertex, const std::string &fragment,
-	                                  const std::vector<std::pair<std::string, int>> &defines = {},
-	                                  bool depth_test = false, bool depth_write = false,
-	                                  VkCompareOp depth_compare = VK_COMPARE_OP_ALWAYS);
-
-	static void draw_fullscreen_quad(CommandBuffer &cmd, unsigned instances = 1);
-	static void draw_quad(CommandBuffer &cmd, unsigned instances = 1);
-};
-#endif
 
 using CommandBufferHandle = Util::IntrusivePtr<CommandBuffer>;
 }

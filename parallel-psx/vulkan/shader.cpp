@@ -28,7 +28,6 @@
 #include "filesystem.hpp"
 #endif
 
-using namespace std;
 using namespace spirv_cross;
 using namespace Util;
 
@@ -62,15 +61,9 @@ PipelineLayout::PipelineLayout(Hash hash, Device *device, const CombinedResource
 		info.pPushConstantRanges = &layout.push_constant_range;
 	}
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned layout_index = device->register_pipeline_layout(get_hash(), info);
-#endif
 	LOGI("Creating pipeline layout.\n");
 	if (vkCreatePipelineLayout(device->get_device(), &info, nullptr, &pipe_layout) != VK_SUCCESS)
 		LOGE("Failed to create pipeline layout.\n");
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	device->set_pipeline_layout_handle(layout_index, pipe_layout);
-#endif
 }
 
 PipelineLayout::~PipelineLayout()
@@ -100,23 +93,23 @@ const char *Shader::stage_to_name(ShaderStage stage)
 	}
 }
 
-static bool get_stock_sampler(StockSampler &sampler, const string &name)
+static bool get_stock_sampler(StockSampler &sampler, const std::string &name)
 {
-	if (name.find("NearestClamp") != string::npos)
+	if (name.find("NearestClamp") != std::string::npos)
 		sampler = StockSampler::NearestClamp;
-	else if (name.find("LinearClamp") != string::npos)
+	else if (name.find("LinearClamp") != std::string::npos)
 		sampler = StockSampler::LinearClamp;
-	else if (name.find("TrilinearClamp") != string::npos)
+	else if (name.find("TrilinearClamp") != std::string::npos)
 		sampler = StockSampler::TrilinearClamp;
-	else if (name.find("NearestWrap") != string::npos)
+	else if (name.find("NearestWrap") != std::string::npos)
 		sampler = StockSampler::NearestWrap;
-	else if (name.find("LinearWrap") != string::npos)
+	else if (name.find("LinearWrap") != std::string::npos)
 		sampler = StockSampler::LinearWrap;
-	else if (name.find("TrilinearWrap") != string::npos)
+	else if (name.find("TrilinearWrap") != std::string::npos)
 		sampler = StockSampler::TrilinearWrap;
-	else if (name.find("NearestShadow") != string::npos)
+	else if (name.find("NearestShadow") != std::string::npos)
 		sampler = StockSampler::NearestShadow;
-	else if (name.find("LinearShadow") != string::npos)
+	else if (name.find("LinearShadow") != std::string::npos)
 		sampler = StockSampler::LinearShadow;
 	else
 		return false;
@@ -129,7 +122,7 @@ Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
 	, device(device)
 {
 #ifdef GRANITE_SPIRV_DUMP
-	if (!Granite::Filesystem::get().write_buffer_to_file(string("cache://spirv/") + to_string(hash) + ".spv", data, size))
+	if (!Granite::Filesystem::get().write_buffer_to_file(std::string("cache://spirv/") + std::to_string(hash) + ".spv", data, size))
 		LOGE("Failed to dump shader to file.\n");
 #endif
 
@@ -137,24 +130,18 @@ Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
 	info.codeSize = size;
 	info.pCode = data;
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned module_index = device->register_shader_module(get_hash(), info);
-#endif
 	LOGI("Creating shader module.\n");
 	if (vkCreateShaderModule(device->get_device(), &info, nullptr, &module) != VK_SUCCESS)
 		LOGE("Failed to create shader module.\n");
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	device->set_shader_module_handle(module_index, module);
-#endif
 
 	Compiler compiler(data, size / sizeof(uint32_t));
 
-	auto resources = compiler.get_shader_resources();
-	for (auto &image : resources.sampled_images)
+	ShaderResources resources = compiler.get_shader_resources();
+	for (Resource &image : resources.sampled_images)
 	{
-		auto set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-		auto binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-		auto &type = compiler.get_type(image.base_type_id);
+		uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+		const SPIRType &type = compiler.get_type(image.base_type_id);
 		if (type.image.dim == spv::DimBuffer)
 			layout.sets[set].sampled_buffer_mask |= 1u << binding;
 		else
@@ -163,7 +150,7 @@ Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
 		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
 			layout.sets[set].fp_mask |= 1u << binding;
 
-		const string &name = image.name;
+		const std::string &name = image.name;
 		StockSampler sampler;
 		if (type.image.dim != spv::DimBuffer && get_stock_sampler(sampler, name))
 		{
@@ -177,23 +164,23 @@ Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
 		}
 	}
 
-	for (auto &image : resources.subpass_inputs)
+	for (Resource &image : resources.subpass_inputs)
 	{
-		auto set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-		auto binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+		uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
 		layout.sets[set].input_attachment_mask |= 1u << binding;
 
-		auto &type = compiler.get_type(image.base_type_id);
+		const SPIRType &type = compiler.get_type(image.base_type_id);
 		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
 			layout.sets[set].fp_mask |= 1u << binding;
 	}
 
-	for (auto &image : resources.separate_images)
+	for (Resource &image : resources.separate_images)
 	{
-		auto set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-		auto binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+		uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
 
-		auto &type = compiler.get_type(image.base_type_id);
+		const SPIRType &type = compiler.get_type(image.base_type_id);
 		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
 			layout.sets[set].fp_mask |= 1u << binding;
 
@@ -203,13 +190,13 @@ Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
 			layout.sets[set].separate_image_mask |= 1u << binding;
 	}
 
-	for (auto &image : resources.separate_samplers)
+	for (Resource &image : resources.separate_samplers)
 	{
-		auto set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-		auto binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+		uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
 		layout.sets[set].sampler_mask |= 1u << binding;
 
-		const string &name = image.name;
+		const std::string &name = image.name;
 		StockSampler sampler;
 		if (get_stock_sampler(sampler, name))
 		{
@@ -223,40 +210,40 @@ Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
 		}
 	}
 
-	for (auto &image : resources.storage_images)
+	for (Resource &image : resources.storage_images)
 	{
-		auto set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-		auto binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+		uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
 		layout.sets[set].storage_image_mask |= 1u << binding;
 
-		auto &type = compiler.get_type(image.base_type_id);
+		const SPIRType &type = compiler.get_type(image.base_type_id);
 		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
 			layout.sets[set].fp_mask |= 1u << binding;
 	}
 
-	for (auto &buffer : resources.uniform_buffers)
+	for (Resource &buffer : resources.uniform_buffers)
 	{
-		auto set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
-		auto binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
+		uint32_t set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
+		uint32_t binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
 		layout.sets[set].uniform_buffer_mask |= 1u << binding;
 	}
 
-	for (auto &buffer : resources.storage_buffers)
+	for (Resource &buffer : resources.storage_buffers)
 	{
-		auto set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
-		auto binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
+		uint32_t set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
+		uint32_t binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
 		layout.sets[set].storage_buffer_mask |= 1u << binding;
 	}
 
-	for (auto &attrib : resources.stage_inputs)
+	for (Resource &attrib : resources.stage_inputs)
 	{
-		auto location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
+		uint32_t location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
 		layout.input_mask |= 1u << location;
 	}
 
-	for (auto &attrib : resources.stage_outputs)
+	for (Resource &attrib : resources.stage_outputs)
 	{
-		auto location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
+		uint32_t location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
 		layout.output_mask |= 1u << location;
 	}
 
@@ -270,8 +257,8 @@ Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
 		    compiler.get_declared_struct_size(compiler.get_type(resources.push_constant_buffers.front().base_type_id));
 	}
 
-	auto spec_constants = compiler.get_specialization_constants();
-	for (auto &c : spec_constants)
+	std::vector<SpecializationConstant> spec_constants = compiler.get_specialization_constants();
+	for (SpecializationConstant &c : spec_constants)
 	{
 		if (c.constant_id >= VULKAN_NUM_SPEC_CONSTANTS)
 		{
@@ -291,7 +278,7 @@ Shader::~Shader()
 
 void Program::set_shader(ShaderStage stage, Shader *handle)
 {
-	shaders[Util::ecast(stage)] = handle;
+	shaders[(unsigned)stage] = handle;
 }
 
 Program::Program(Device *device, Shader *vertex, Shader *fragment)
@@ -311,7 +298,7 @@ Program::Program(Device *device, Shader *compute)
 
 VkPipeline Program::get_pipeline(Hash hash) const
 {
-	auto *ret = pipelines.find(hash);
+	IntrusivePODWrapper<VkPipeline> *ret = pipelines.find(hash);
 	return ret ? ret->get() : VK_NULL_HANDLE;
 }
 
@@ -322,7 +309,7 @@ VkPipeline Program::add_pipeline(Hash hash, VkPipeline pipeline)
 
 Program::~Program()
 {
-	for (auto &pipe : pipelines)
+	for (IntrusivePODWrapper<VkPipeline> &pipe : pipelines)
 	{
 		if (internal_sync)
 			device->destroy_pipeline_nolock(pipe.get());

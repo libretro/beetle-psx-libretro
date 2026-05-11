@@ -33,10 +33,6 @@
 #include <stdint.h>
 #include <vector>
 
-#ifdef GRANITE_VULKAN_MT
-#include <mutex>
-#endif
-
 namespace Vulkan
 {
 static inline uint32_t log2_integer(uint32_t v)
@@ -86,7 +82,7 @@ public:
 
 	Block()
 	{
-		for (auto &v : free_blocks)
+		for (uint32_t &v : free_blocks)
 			v = AllFree;
 		longest_run = 32;
 	}
@@ -240,9 +236,6 @@ private:
 	uint32_t sub_block_size_log2 = 0;
 	uint32_t tiling_mask = ~0u;
 	uint32_t memory_type = 0;
-#ifdef GRANITE_VULKAN_MT
-	std::mutex lock;
-#endif
 	DeviceAllocator *global_allocator = nullptr;
 
 	void set_global_allocator(DeviceAllocator *allocator)
@@ -286,14 +279,14 @@ public:
 
 	void set_memory_type(uint32_t memory_type)
 	{
-		for (auto &sub : classes)
+		for (ClassAllocator &sub : classes)
 			sub.set_memory_type(memory_type);
 		this->memory_type = memory_type;
 	}
 
 	void set_global_allocator(DeviceAllocator *allocator)
 	{
-		for (auto &sub : classes)
+		for (ClassAllocator &sub : classes)
 			sub.set_global_allocator(allocator);
 		global_allocator = allocator;
 	}
@@ -335,9 +328,6 @@ private:
 	VkDevice device = VK_NULL_HANDLE;
 	VkPhysicalDeviceMemoryProperties mem_props;
 	VkDeviceSize atom_alignment = 1;
-#ifdef GRANITE_VULKAN_MT
-	std::mutex lock;
-#endif
 	bool use_dedicated = false;
 
 	struct Allocation

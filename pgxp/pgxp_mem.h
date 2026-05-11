@@ -37,7 +37,6 @@ extern "C" {
 
    void PGXP_InitMem(void);
 
-   char*	PGXP_GetMem();	// return pointer to precision memory
    u32		PGXP_ConvertAddress(u32 addr);
 
    PGXP_value* GetPtr(u32 addr);
@@ -48,9 +47,6 @@ extern "C" {
 
    void WriteMem(PGXP_value* value, u32 addr);
    void WriteMem16(PGXP_value* src, u32 addr);
-
-   void PGXP_SetLastDMA(u32 addr);
-   u32	 PGXP_GetLastDMA();
 
 #ifdef __cplusplus
 }

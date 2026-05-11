@@ -24,8 +24,6 @@
 #include "device.hpp"
 #include "buffer.hpp"
 
-using namespace std;
-
 namespace Vulkan
 {
 
@@ -68,7 +66,7 @@ ImageView::~ImageView()
 		if (srgb_view != VK_NULL_HANDLE)
 			device->destroy_image_view_nolock(srgb_view);
 
-		for (auto &view : render_target_views)
+		for (VkImageView &view : render_target_views)
 			device->destroy_image_view_nolock(view);
 	}
 	else
@@ -83,7 +81,7 @@ ImageView::~ImageView()
 		if (srgb_view != VK_NULL_HANDLE)
 			device->destroy_image_view(srgb_view);
 
-		for (auto &view : render_target_views)
+		for (VkImageView &view : render_target_views)
 			device->destroy_image_view(view);
 	}
 }
@@ -168,7 +166,7 @@ VkPipelineStageFlags LinearHostImage::get_used_pipeline_stages() const
 }
 
 LinearHostImage::LinearHostImage(Device *device, ImageHandle gpu_image_, BufferHandle cpu_image_, VkPipelineStageFlags stages)
-	: device(device), gpu_image(move(gpu_image_)), cpu_image(move(cpu_image_)), stages(stages)
+	: device(device), gpu_image(std::move(gpu_image_)), cpu_image(std::move(cpu_image_)), stages(stages)
 {
 	if (gpu_image->get_create_info().domain == ImageDomain::LinearHostCached ||
 	    gpu_image->get_create_info().domain == ImageDomain::LinearHost)

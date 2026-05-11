@@ -31,7 +31,7 @@ void SemaphoreManager::init(VkDevice device)
 
 SemaphoreManager::~SemaphoreManager()
 {
-	for (auto &sem : semaphores)
+	for (VkSemaphore &sem : semaphores)
 		vkDestroySemaphore(device, sem, nullptr);
 }
 
@@ -52,7 +52,7 @@ VkSemaphore SemaphoreManager::request_cleared_semaphore()
 	}
 	else
 	{
-		auto sem = semaphores.back();
+		VkSemaphore sem = semaphores.back();
 		semaphores.pop_back();
 		return sem;
 	}

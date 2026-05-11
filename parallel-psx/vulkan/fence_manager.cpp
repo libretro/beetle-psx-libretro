@@ -33,7 +33,7 @@ VkFence FenceManager::request_cleared_fence()
 {
 	if (!fences.empty())
 	{
-		auto ret = fences.back();
+		VkFence ret = fences.back();
 		fences.pop_back();
 		return ret;
 	}
@@ -53,7 +53,7 @@ void FenceManager::recycle_fence(VkFence fence)
 
 FenceManager::~FenceManager()
 {
-	for (auto &fence : fences)
+	for (VkFence &fence : fences)
 		vkDestroyFence(device, fence, nullptr);
 }
 }

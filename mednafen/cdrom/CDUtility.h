@@ -51,11 +51,15 @@ struct TOC
    struct TOC_Track tracks[100 + 1];
 };
 
+typedef struct TOC_Track TOC_Track;
+typedef struct TOC TOC;
+
 // Call once at app startup before creating any threads that could potentially cause re-entrancy to these functions.
 // It will also be called automatically if needed for the first time a function in this namespace that requires
 // the initialization function to be called is called, for potential
 // usage in constructors of statically-declared objects.
 void CDUtility_Init(void);
+void CDUtility_Kill(void);
 
 // Quick definitions here:
 //
@@ -222,9 +226,6 @@ void subpw_interleave(const uint8_t *in_buf, uint8_t *out_buf);
 // subq_input must pass subq_check_checksum().
 // TODO
 //void subq_extrapolate(const uint8_t *subq_input, int32_t position_delta, uint8_t *subq_output);
-
-// (De)Scrambles data sector.
-void scrambleize_data_sector(uint8_t *sector_data);
 
 #ifdef __cplusplus
 }

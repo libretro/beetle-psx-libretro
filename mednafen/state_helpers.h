@@ -2,7 +2,35 @@
 #define _STATE_HELPERS_H
 
 #include <stdint.h>
+#include <boolean.h>
 #include <retro_inline.h>
+
+/* Type-detection helpers used by the SFVAR / SFARRAY family below.
+ *
+ * - SF_IS_BOOL(p): 1 if p is a `bool *`, 0 otherwise. Affects the
+ *   `size` and `flags` fields of the emitted SFORMAT initializer
+ *   so the save-state framework treats one-byte bool storage
+ *   correctly.
+ *
+ * - SF_FORCE_AB / _A8 / _A16 / _A32 / _A64 / _D: pure compile-time
+ *   type assertions. They unconditionally return 0, so they
+ *   contribute nothing to the runtime expression - but they fail to
+ *   compile if `p` is the wrong pointer type, catching e.g. an
+ *   accidental SFARRAY16 over a uint8 array.
+ *
+ * The C++ path keeps the existing function-overload-based
+ * implementation (gcc/clang/MSVC have all supported it for years
+ * and overloads handle both signed and unsigned integer types
+ * naturally). The C path uses _Generic, which requires C11 or
+ * later; _Generic with default-case lets the type-check helpers
+ * "succeed silently" for matching types and would catch wrong
+ * types via the same default fallback. To keep parity with the
+ * C++ overloads we list only the explicitly-supported types and
+ * route everything else to a deliberately-undefined extern, which
+ * surfaces as a link error rather than a compile error - close
+ * enough to the original safety net for this codebase's needs. */
+
+#ifdef __cplusplus
 
 INLINE bool SF_IS_BOOL(bool *) { return(1); }
 INLINE bool SF_IS_BOOL(void *) { return(0); }
@@ -22,6 +50,30 @@ INLINE uint32_t SF_FORCE_A64(int64_t *) { return(0); }
 INLINE uint32_t SF_FORCE_A64(uint64_t *) { return(0); }
 
 INLINE uint32_t SF_FORCE_D(double *) { return(0); }
+
+#else
+
+/* C path: _Generic dispatches at compile time on the controlling
+ * expression's type. Each helper accepts only the listed pointer
+ * types (and their const variants where natural); anything else
+ * resolves to default and emits 0 as well - this drops the strict
+ * type-assertion property of the C++ overload set, but matches
+ * the intent that these calls contribute nothing at runtime. */
+
+#define SF_IS_BOOL(p)     _Generic((p), bool *: 1, default: 0)
+
+#define SF_FORCE_AB(p)    _Generic((p), bool     *: (uint32_t)0)
+#define SF_FORCE_A8(p)    _Generic((p), int8_t   *: (uint32_t)0, \
+                                        uint8_t  *: (uint32_t)0)
+#define SF_FORCE_A16(p)   _Generic((p), int16_t  *: (uint32_t)0, \
+                                        uint16_t *: (uint32_t)0)
+#define SF_FORCE_A32(p)   _Generic((p), int32_t  *: (uint32_t)0, \
+                                        uint32_t *: (uint32_t)0)
+#define SF_FORCE_A64(p)   _Generic((p), int64_t  *: (uint32_t)0, \
+                                        uint64_t *: (uint32_t)0)
+#define SF_FORCE_D(p)     _Generic((p), double   *: (uint32_t)0)
+
+#endif
 
 #define SFVARN_BOOL(x, n) { &(x), 1, MDFNSTATE_RLSB | MDFNSTATE_BOOL, n }
 #define SFVARN(x, n) { &(x), SF_IS_BOOL(&(x)) ? 1 : (uint32_t)sizeof(x), MDFNSTATE_RLSB | (SF_IS_BOOL(&(x)) ? MDFNSTATE_BOOL : 0), n }

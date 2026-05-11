@@ -22,19 +22,15 @@
 
 #include "buffer_pool.hpp"
 #include "device.hpp"
-#include <utility>
-
-using namespace std;
 
 namespace Vulkan
 {
-void BufferPool::init(Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage, bool need_device_local)
+void BufferPool::init(Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage)
 {
 	this->device = device;
 	this->block_size = block_size;
 	this->alignment = alignment;
 	this->usage = usage;
-	this->need_device_local = need_device_local;
 }
 
 BufferBlock::~BufferBlock()
@@ -48,15 +44,12 @@ void BufferPool::reset()
 
 BufferBlock BufferPool::allocate_block(VkDeviceSize size)
 {
-	BufferDomain ideal_domain = need_device_local ? BufferDomain::Device : BufferDomain::Host;
-	VkBufferUsageFlags extra_usage = ideal_domain == BufferDomain::Device ? VK_BUFFER_USAGE_TRANSFER_DST_BIT : 0;
-
 	BufferBlock block;
 
 	BufferCreateInfo info;
-	info.domain = ideal_domain;
+	info.domain = BufferDomain::Host;
 	info.size = size;
-	info.usage = usage | extra_usage;
+	info.usage = usage;
 
 	block.gpu = device->create_buffer(info, nullptr);
 	device->set_name(*block.gpu, "chain-allocated-block-gpu");
@@ -90,11 +83,12 @@ BufferBlock BufferPool::request_block(VkDeviceSize minimum_size)
 {
 	if ((minimum_size > block_size) || blocks.empty())
 	{
-		return allocate_block(max(block_size, minimum_size));
+		VkDeviceSize alloc_size = block_size > minimum_size ? block_size : minimum_size;
+		return allocate_block(alloc_size);
 	}
 	else
 	{
-		auto back = move(blocks.back());
+		BufferBlock back = std::move(blocks.back());
 		blocks.pop_back();
 
 		back.mapped = static_cast<uint8_t *>(device->map_host_buffer(*back.cpu, MEMORY_ACCESS_WRITE_BIT));
@@ -106,7 +100,7 @@ BufferBlock BufferPool::request_block(VkDeviceSize minimum_size)
 void BufferPool::recycle_block(BufferBlock &&block)
 {
 	VK_ASSERT(block.size == block_size);
-	blocks.push_back(move(block));
+	blocks.push_back(std::move(block));
 }
 
 BufferPool::~BufferPool()

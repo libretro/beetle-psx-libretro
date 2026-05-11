@@ -27,6 +27,7 @@
 #include "temporary_hashmap.hpp"
 #include "vulkan.hpp"
 #include "sampler.hpp"
+#include <memory>
 #include <utility>
 #include <vector>
 #include "cookie.hpp"

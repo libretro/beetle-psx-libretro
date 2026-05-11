@@ -31,6 +31,13 @@ static ReedSolomonTables *rt = NULL;
 
 bool Init_LEC_Correct(void)
 {
+   /* Idempotent: if a previous Init_LEC_Correct ran without a paired
+    * Kill_LEC_Correct, free the old tables before allocating new ones.
+    * The previous version always allocated, so any caller pattern of
+    * Init->Init->Kill would leak the first set of tables. */
+   if (gt || rt)
+      Kill_LEC_Correct();
+
    gt = CreateGaloisTables(0x11d);
    rt = CreateReedSolomonTables(gt, 0, 1, 10);
 
@@ -39,8 +46,16 @@ bool Init_LEC_Correct(void)
 
 void Kill_LEC_Correct(void)
 {
-   FreeGaloisTables(gt);
-   FreeReedSolomonTables(rt);
+   if (rt)
+   {
+      FreeReedSolomonTables(rt);
+      rt = NULL;
+   }
+   if (gt)
+   {
+      FreeGaloisTables(gt);
+      gt = NULL;
+   }
 }
 
 /***

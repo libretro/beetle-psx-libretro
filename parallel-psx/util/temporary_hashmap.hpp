@@ -70,15 +70,15 @@ public:
 
 	void clear()
 	{
-		for (auto &ring : rings)
+		for (IntrusiveList<T> &ring : rings)
 		{
-			for (auto &node : ring)
+			for (T &node : ring)
 				object_pool.free(static_cast<T *>(&node));
 			ring.clear();
 		}
 		hashmap.clear();
 
-		for (auto &vacant : vacants)
+		for (typename IntrusiveList<T>::Iterator &vacant : vacants)
 			object_pool.free(static_cast<T *>(&*vacant));
 		vacants.clear();
 		object_pool.clear();
@@ -87,7 +87,7 @@ public:
 	void begin_frame()
 	{
 		index = (index + 1) & (RingSize - 1);
-		for (auto &node : rings[index])
+		for (T &node : rings[index])
 		{
 			hashmap.erase(node.get_hash());
 			free_object(&node, ReuseTag<ReuseObjects>());
@@ -97,10 +97,10 @@ public:
 
 	T *request(Hash hash)
 	{
-		auto *v = hashmap.find(hash);
+		IntrusivePODWrapper<typename IntrusiveList<T>::Iterator> *v = hashmap.find(hash);
 		if (v)
 		{
-			auto node = v->get();
+			typename IntrusiveList<T>::Iterator node = v->get();
 			if (node->get_index() != index)
 			{
 				rings[index].move_to_front(rings[node->get_index()], node);
@@ -124,7 +124,7 @@ public:
 		if (vacants.empty())
 			return nullptr;
 
-		auto top = vacants.back();
+		typename IntrusiveList<T>::Iterator top = vacants.back();
 		vacants.pop_back();
 		top->set_index(index);
 		top->set_hash(hash);
@@ -136,7 +136,7 @@ public:
 	template <typename... P>
 	T *emplace(Hash hash, P &&... p)
 	{
-		auto *node = object_pool.allocate(std::forward<P>(p)...);
+		T *node = object_pool.allocate(std::forward<P>(p)...);
 		node->set_index(index);
 		node->set_hash(hash);
 		hashmap.emplace_replace(hash, node);

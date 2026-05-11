@@ -601,8 +601,8 @@ static void rec_special_or_nor(struct lightrec_state *state, const struct block 
 
 	/* E(rd) = (E(rs) & E(rt)) | (E(rt) & !Z(rt)) | (E(rs) & !Z(rs)) */
 	if ((REG_EXT & flags_rs & flags_rt) ||
-	    (flags_rt & (REG_EXT | REG_ZEXT) == REG_EXT) ||
-	    (flags_rs & (REG_EXT | REG_ZEXT) == REG_EXT))
+	    ((flags_rt & (REG_EXT | REG_ZEXT)) == REG_EXT) ||
+	    ((flags_rs & (REG_EXT | REG_ZEXT)) == REG_EXT))
 		flags_rd |= REG_EXT;
 
 	lightrec_set_reg_out_flags(reg_cache, rd, flags_rd);

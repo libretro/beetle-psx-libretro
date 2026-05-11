@@ -31,22 +31,10 @@
 #endif
 
 #include "util.hpp"
-#include <memory>
-#include <stdexcept>
-#include <functional>
-#include "util.hpp"
 
 #define V_S(x) #x
 #define V_S_(x) V_S(x)
 #define S__LINE__ V_S_(__LINE__)
-
-#define V(x)                                                                                           \
-	do                                                                                                 \
-	{                                                                                                  \
-		VkResult err = x;                                                                              \
-		if (err != VK_SUCCESS && err != VK_INCOMPLETE)                                                 \
-			throw std::runtime_error("Vulkan call failed at " __FILE__ ":" S__LINE__ ".\n"); \
-	} while (0)
 
 #ifdef VULKAN_DEBUG
 #define VK_ASSERT(x)                                             \
@@ -189,7 +177,13 @@ public:
 	static const VkApplicationInfo &get_application_info(bool supports_vulkan_11);
 
 	void notify_validation_error(const char *msg);
-	void set_notification_callback(std::function<void (const char *)> func);
+	void set_notification_callback(void (*func)(const char *));
+
+	/* True iff the constructor finished successfully. The Context
+	 * constructors do not throw; on failure they leave the object in
+	 * a destroyable but otherwise unusable state, and the caller must
+	 * check is_valid() before doing anything else with it. */
+	bool is_valid() const { return valid; }
 
 private:
 	VkDevice device = VK_NULL_HANDLE;
@@ -213,13 +207,14 @@ private:
 
 	bool owned_instance = false;
 	bool owned_device = false;
+	bool valid = false;
 	DeviceFeatures ext;
 
 #ifdef VULKAN_DEBUG
 	VkDebugReportCallbackEXT debug_callback = VK_NULL_HANDLE;
 	VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
 #endif
-	std::function<void (const char *)> message_callback;
+	void (*message_callback)(const char *) = nullptr;
 
 	void destroy();
 };

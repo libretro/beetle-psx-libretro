@@ -76,12 +76,6 @@ typedef uint64_t uint64;
 
   #define MDFN_COLD __attribute__((cold))
   #define MDFN_HOT __attribute__((hot))
-
-  #if MDFN_CLANG_VERSION >= MDFN_MAKE_CLANGV(3,6,0) && defined(HAS_CXX11)
-   #define MDFN_ASSUME_ALIGNED(p, align) ((decltype(p))__builtin_assume_aligned((p), (align)))
-  #else
-   #define MDFN_ASSUME_ALIGNED(p, align) (p)
-  #endif
 #elif defined(__GNUC__)
   //
   // Begin gcc
@@ -138,11 +132,6 @@ typedef uint64_t uint64;
    #define MDFN_HOT
   #endif
 
-  #if MDFN_GCC_VERSION >= MDFN_MAKE_GCCV(4,7,0) && defined(HAS_CXX11)
-   #define MDFN_ASSUME_ALIGNED(p, align) ((decltype(p))__builtin_assume_aligned((p), (align)))
-  #else
-   #define MDFN_ASSUME_ALIGNED(p, align) (p)
-  #endif
 #elif defined(_MSC_VER)
   //
   // Begin MSVC
@@ -165,8 +154,6 @@ typedef uint64_t uint64;
 
   #define MDFN_COLD
   #define MDFN_HOT
-
-  #define MDFN_ASSUME_ALIGNED(p, align) (p)
 #else
   #define INLINE inline
   #define NO_INLINE
@@ -185,8 +172,6 @@ typedef uint64_t uint64;
 
   #define MDFN_COLD
   #define MDFN_HOT
-
-  #define MDFN_ASSUME_ALIGNED(p, align) (p)
 #endif
 
 #ifndef FALSE
@@ -207,12 +192,6 @@ typedef uint64_t uint64;
  #error "Define MSB_FIRST or LSB_FIRST!"
 #elif defined(MSB_FIRST) && defined(LSB_FIRST)
  #error "Define only one of MSB_FIRST or LSB_FIRST, not both!"
-#endif
-
-#ifdef MSB_FIRST
- #define MDFN_IS_BIGENDIAN true
-#else
- #define MDFN_IS_BIGENDIAN false
 #endif
 
 #ifdef _MSC_VER

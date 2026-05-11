@@ -25,8 +25,8 @@
 #include "intrusive_list.hpp"
 #include "hash.hpp"
 #include "object_pool.hpp"
-#include "read_write_lock.hpp"
 #include "util.hpp"
+#include <utility>
 #include <vector>
 #include <assert.h>
 
@@ -98,7 +98,7 @@ public:
 			return nullptr;
 
 		Hash hash_mask = values.size() - 1;
-		auto masked = hash & hash_mask;
+		Hash masked = hash & hash_mask;
 		for (unsigned i = 0; i < load_count; i++)
 		{
 			if (values[masked] && get_hash(values[masked]) == hash)
@@ -107,19 +107,6 @@ public:
 		}
 
 		return nullptr;
-	}
-
-	template <typename P>
-	bool find_and_consume_pod(Hash hash, P &p) const
-	{
-		T *t = find(hash);
-		if (t)
-		{
-			p = t->get();
-			return true;
-		}
-		else
-			return false;
 	}
 
 	// Inserts, if value already exists, insertion does not happen.
@@ -132,8 +119,8 @@ public:
 			grow();
 
 		Hash hash_mask = values.size() - 1;
-		auto hash = get_hash(value);
-		auto masked = hash & hash_mask;
+		Hash hash = get_hash(value);
+		Hash masked = hash & hash_mask;
 
 		for (unsigned i = 0; i < load_count; i++)
 		{
@@ -162,14 +149,16 @@ public:
 			grow();
 
 		Hash hash_mask = values.size() - 1;
-		auto hash = get_hash(value);
-		auto masked = hash & hash_mask;
+		Hash hash = get_hash(value);
+		Hash masked = hash & hash_mask;
 
 		for (unsigned i = 0; i < load_count; i++)
 		{
 			if (values[masked] && get_hash(values[masked]) == hash)
 			{
-				std::swap(values[masked], value);
+				T *tmp = values[masked];
+				values[masked] = value;
+				value = tmp;
 				list.erase(value);
 				list.insert_front(values[masked]);
 				return value;
@@ -191,13 +180,13 @@ public:
 	T *erase(Hash hash)
 	{
 		Hash hash_mask = values.size() - 1;
-		auto masked = hash & hash_mask;
+		Hash masked = hash & hash_mask;
 
 		for (unsigned i = 0; i < load_count; i++)
 		{
 			if (values[masked] && get_hash(values[masked]) == hash)
 			{
-				auto *value = values[masked];
+				T *value = values[masked];
 				list.erase(value);
 				values[masked] = nullptr;
 				return value;
@@ -205,11 +194,6 @@ public:
 			masked = (masked + 1) & hash_mask;
 		}
 		return nullptr;
-	}
-
-	void erase(T *value)
-	{
-		erase(get_hash(value));
 	}
 
 	void clear()
@@ -254,8 +238,8 @@ private:
 	bool insert_inner(T *value)
 	{
 		Hash hash_mask = values.size() - 1;
-		auto hash = get_hash(value);
-		auto masked = hash & hash_mask;
+		Hash hash = get_hash(value);
+		Hash masked = hash & hash_mask;
 
 		for (unsigned i = 0; i < load_count; i++)
 		{
@@ -274,7 +258,7 @@ private:
 		bool success;
 		do
 		{
-			for (auto &v : values)
+			for (T *&v : values)
 				v = nullptr;
 
 			if (values.empty())
@@ -292,7 +276,7 @@ private:
 
 			// Re-insert.
 			success = true;
-			for (auto &t : list)
+			for (T &t : list)
 			{
 				if (!insert_inner(&t))
 				{
@@ -323,11 +307,11 @@ public:
 
 	void clear()
 	{
-		auto &list = hashmap.inner_list();
-		auto itr = list.begin();
+		IntrusiveList<T> &list = hashmap.inner_list();
+		typename IntrusiveList<T>::Iterator itr = list.begin();
 		while (itr != list.end())
 		{
-			auto *to_free = itr.get();
+			T *to_free = itr.get();
 			itr = list.erase(itr);
 			pool.free(to_free);
 		}
@@ -340,29 +324,9 @@ public:
 		return hashmap.find(hash);
 	}
 
-	T &operator[](Hash hash)
-	{
-		auto *t = find(hash);
-		if (!t)
-			t = emplace_yield(hash);
-		return *t;
-	}
-
-	template <typename P>
-	bool find_and_consume_pod(Hash hash, P &p) const
-	{
-		return hashmap.find_and_consume_pod(hash, p);
-	}
-
-	void erase(T *value)
-	{
-		hashmap.erase(value);
-		pool.free(value);
-	}
-
 	void erase(Hash hash)
 	{
-		auto *value = hashmap.erase(hash);
+		T *value = hashmap.erase(hash);
 		if (value)
 			pool.free(value);
 	}
@@ -420,135 +384,9 @@ public:
 		return hashmap.end();
 	}
 
-	IntrusiveHashMap &get_thread_unsafe()
-	{
-		return *this;
-	}
-
 private:
 	IntrusiveHashMapHolder<T> hashmap;
 	ObjectPool<T> pool;
 };
 
-template <typename T>
-using IntrusiveHashMapWrapper = IntrusiveHashMap<IntrusivePODWrapper<T>>;
-
-template <typename T>
-class ThreadSafeIntrusiveHashMap
-{
-public:
-	T *find(Hash hash) const
-	{
-		lock.lock_read();
-		T *t = hashmap.find(hash);
-		lock.unlock_read();
-
-		// We can race with the intrusive list internal pointers,
-		// but that's an internal detail which should never be touched outside the hashmap.
-		return t;
-	}
-
-	template <typename P>
-	bool find_and_consume_pod(Hash hash, P &p) const
-	{
-		lock.lock_read();
-		bool ret = hashmap.find_and_consume_pod(hash, p);
-		lock.unlock_read();
-		return ret;
-	}
-
-	void clear()
-	{
-		lock.lock_write();
-		hashmap.clear();
-		lock.unlock_write();
-	}
-
-	// Assumption is that readers will not be erased while in use by any other thread.
-	void erase(T *value)
-	{
-		lock.lock_write();
-		hashmap.erase(value);
-		lock.unlock_write();
-	}
-
-	void erase(Hash hash)
-	{
-		lock.lock_write();
-		hashmap.erase(hash);
-		lock.unlock_write();
-	}
-
-	template <typename... P>
-	T *allocate(P&&... p)
-	{
-		lock.lock_write();
-		T *t = hashmap.allocate(std::forward<P>(p)...);
-		lock.unlock_write();
-		return t;
-	}
-
-	void free(T *value)
-	{
-		lock.lock_write();
-		hashmap.free(value);
-		lock.unlock_write();
-	}
-
-	T *insert_replace(Hash hash, T *value)
-	{
-		lock.lock_write();
-		value = hashmap.insert_replace(hash, value);
-		lock.unlock_write();
-		return value;
-	}
-
-	T *insert_yield(Hash hash, T *value)
-	{
-		lock.lock_write();
-		value = hashmap.insert_yield(hash, value);
-		lock.unlock_write();
-		return value;
-	}
-
-	// This one is very sketchy, since callers need to make sure there are no readers of this hash.
-	template <typename... P>
-	T *emplace_replace(Hash hash, P&&... p)
-	{
-		lock.lock_write();
-		T *t = hashmap.emplace_replace(hash, std::forward<P>(p)...);
-		lock.unlock_write();
-		return t;
-	}
-
-	template <typename... P>
-	T *emplace_yield(Hash hash, P&&... p)
-	{
-		lock.lock_write();
-		T *t = hashmap.emplace_yield(hash, std::forward<P>(p)...);
-		lock.unlock_write();
-		return t;
-	}
-
-	// Not supposed to be called in racy conditions,
-	// we could have a global read lock and unlock while iterating if necessary.
-	typename IntrusiveList<T>::Iterator begin()
-	{
-		return hashmap.begin();
-	}
-
-	typename IntrusiveList<T>::Iterator end()
-	{
-		return hashmap.end();
-	}
-
-	IntrusiveHashMap<T> &get_thread_unsafe()
-	{
-		return hashmap;
-	}
-
-private:
-	IntrusiveHashMap<T> hashmap;
-	mutable RWSpinLock lock;
-};
 }

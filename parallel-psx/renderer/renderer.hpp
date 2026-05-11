@@ -5,10 +5,6 @@
 #include "../vulkan/vulkan.hpp"
 #include "../custom-textures/texture_tracker.hpp"
 
-#ifdef VULKAN_WSI
-#include "wsi.hpp"
-#endif
-
 #include <string.h>
 
 namespace PSX
@@ -47,7 +43,7 @@ enum class PrimitiveType
 	May_Be_2D_Polygon
 };
 
-class Renderer : private HazardListener, private TextureUploader
+class Renderer
 {
 public:
 	enum class ScanoutMode
@@ -143,7 +139,6 @@ public:
 		bool texture_color_modulate = false;
 		bool mask_test = false;
 		bool display_on = false;
-		//bool dither = false;
 		bool adaptive_smoothing = true;
 
 		UVRect UVLimits;
@@ -175,7 +170,7 @@ public:
 		render_state.draw_offset_y = y;
 	}
 
-	inline void set_scissored_invariant(bool invariant) override
+	inline void set_scissored_invariant(bool invariant)
 	{
 		queue.scissor_invariant = invariant;
 	}
@@ -280,22 +275,11 @@ public:
 		render_state.display_on = enable;
 	}
 
-#if 0
-	void set_dither(bool dither)
-	{
-		render_state.dither = dither;
-	}
-#endif
-
 	void set_dither_native_resolution(bool enable)
 	{
 		render_state.dither_native_resolution = enable;
 	}
 
-	void set_scanout_semaphore(Vulkan::Semaphore semaphore);
-	void scanout();
-	Vulkan::BufferHandle scanout_to_buffer(bool draw_area, unsigned &width, unsigned &height);
-	Vulkan::BufferHandle scanout_vram_to_buffer(unsigned &width, unsigned &height);
 	Vulkan::ImageHandle scanout_vram_to_texture(bool scaled = true);
 	Vulkan::ImageHandle scanout_to_texture();
 
@@ -339,7 +323,7 @@ public:
 	}
 
 	// Draw commands
-	void clear_rect(const Rect &rect, FBColor color);
+	void clear_rect(const Rect &rect, uint32_t fb_color);
 	void draw_line(const Vertex *vertices);
 	void draw_triangle(const Vertex *vertices);
 	void draw_quad(const Vertex *vertices);
@@ -443,11 +427,18 @@ public:
 		scaled_uv_offset = offset;
 	}
 
+	/* True iff the constructor finished successfully. The Renderer
+	 * constructor does not throw; on failure (e.g. RGBA8_UNORM not
+	 * supported) it leaves the object in a destroyable but otherwise
+	 * unusable state. Callers must check is_valid() before use. */
+	bool is_valid() const { return valid; }
+
 private:
 	Vulkan::Device &device;
 	unsigned scaling;
 	unsigned msaa;
 	bool scaled_uv_offset = false;
+	bool valid = false;
 	FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
 	FilterExclude sprite_filter_exclude = FilterExcludeNone;
 	FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
@@ -456,7 +447,6 @@ private:
 	Vulkan::ImageHandle bias_framebuffer;
 	Vulkan::ImageHandle framebuffer;
 	Vulkan::ImageHandle framebuffer_ssaa;
-	Vulkan::Semaphore scanout_semaphore;
 	std::vector<Vulkan::ImageViewHandle> scaled_views;
 	FBAtlas atlas;
 	bool texture_tracking_enabled = false;
@@ -464,21 +454,21 @@ private:
 
 	Vulkan::CommandBufferHandle cmd;
 
-	// HazardListener
-	void hazard(StatusFlags flags) override;
-	void resolve(Domain target_domain, unsigned x, unsigned y) override;
-	void flush_render_pass(const Rect &rect) override;
-	void discard_render_pass() override;
-	void clear_quad(const Rect &rect, FBColor color, bool candidate) override;
+public:
+	// Called by FBAtlas (formerly via HazardListener interface).
+	void hazard(StatusFlags flags);
+	void resolve(Domain target_domain, unsigned x, unsigned y);
+	void flush_render_pass(const Rect &rect);
+	void discard_render_pass();
+	void clear_quad(const Rect &rect, uint32_t fb_color, bool candidate);
 
-	// TextureUploader
-	Vulkan::ImageHandle upload_texture(std::vector<LoadedImage> &image) override;
-	Vulkan::ImageHandle create_texture(int width, int height, int levels) override;
-	Vulkan::CommandBufferHandle &command_buffer_hack_fixme() override;
+	// Called by TextureTracker (formerly via TextureUploader interface).
+	Vulkan::ImageHandle upload_texture(std::vector<LoadedImage> &image);
+	Vulkan::ImageHandle create_texture(int width, int height, int levels);
+	Vulkan::CommandBufferHandle &command_buffer_hack_fixme();
 
+private:
 	void hd_texture_uniforms(HdTextureHandle hd_texture_index);
-	void update_hd_texture(const Rect &imageRect, const Rect &dstRect, const void *pixels);
-	void update_hd_textures();
 	HdTextureHandle get_hd_texture_index(const Rect &uvlimits, bool &fastpath_capable_out, bool &cache_hit_out);
 
 	struct
@@ -578,7 +568,7 @@ private:
 	struct ClearCandidate
 	{
 		Rect rect;
-		FBColor color;
+		uint32_t color; /* fb_color */
 		float z;
 	};
 
@@ -642,10 +632,13 @@ private:
 	float last_uv_scale_x, last_uv_scale_y;
 
 	void dispatch(const std::vector<BufferVertex> &vertices, std::vector<PrimitiveInfo> &scissors, bool textured = false);
+	static bool primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b);
 	void render_opaque_primitives();
 	void render_opaque_texture_primitives();
 	void render_semi_transparent_opaque_texture_primitives();
 	void render_semi_transparent_primitives();
+	void semi_transparent_set_state(const SemiTransparentState &state);
+	void dispatch_set_scaled_read_texture(bool scaled_read, bool textured);
 	void reset_queue();
 
 	float allocate_depth(Domain domain, const Rect &rect);
@@ -672,6 +665,7 @@ private:
 
 	void flush_resolves();
 	void flush_blits();
+	void flush_blit(const std::vector<BlitInfo> &infos, Vulkan::Program &program, bool scaled);
 	void reset_scissor_queue();
 	const ClearCandidate *find_clear_candidate(const Rect &rect) const;
 

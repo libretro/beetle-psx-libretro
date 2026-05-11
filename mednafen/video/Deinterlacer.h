@@ -18,42 +18,75 @@
 #ifndef __MDFN_DEINTERLACER_H
 #define __MDFN_DEINTERLACER_H
 
-#include <vector>
+#include "../mednafen-types.h"
+#include <boolean.h>
 
-class Deinterlacer
+#include "surface.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+enum
 {
- public:
-
- Deinterlacer();
- ~Deinterlacer();
-
- enum
- {
-  DEINT_BOB_OFFSET = 0,	// Code will fall-through to this case under certain conditions, too.
-  DEINT_BOB,
-  DEINT_WEAVE,
- };
-
- void SetType(unsigned t);
- inline unsigned GetType(void)
- {
-  return(DeintType);
- }
-
- void Process(MDFN_Surface *surface, MDFN_Rect &DisplayRect, int32 *LineWidths, const bool field);
-
- void ClearState(void);
-
- private:
-
- template<typename T>
- void InternalProcess(MDFN_Surface *surface, MDFN_Rect &DisplayRect, int32 *LineWidths, const bool field);
-
- MDFN_Surface *FieldBuffer;
- std::vector<int32> LWBuffer;
- bool StateValid;
- MDFN_Rect PrevDRect;
- unsigned DeintType;
+   DEINT_BOB_OFFSET = 0, /* fallback default when state is reset */
+   DEINT_BOB,
+   DEINT_WEAVE,
+   DEINT_OFF             /* SW renderer matches HW: bypass dfe and
+                          * use deferred end-of-frame scanout */
 };
+
+/*
+ * Software-renderer deinterlacer state.
+ *
+ * The deinterlacer sees an MDFN_Surface that the GPU has just
+ * written one interlaced field of pixels into.  Output rows for
+ * that field are at upscaled-row blocks
+ *   [(2k + field) << s .. (2k + field) << s + up - 1]
+ * for k in [0, native_field_h); the opposite-parity row blocks
+ * still hold whatever was there from the previous Process() call.
+ *
+ * Three modes:
+ *   - WEAVE:      no-op; trusts the surface to already hold both
+ *                 fields' row blocks since the previous frame's
+ *                 opposite field was never overwritten.  Surface
+ *                 height presented to libretro is full interlaced
+ *                 height.
+ *   - BOB:        copies this field's row blocks into compact
+ *                 sequential rows, halving vertical resolution.
+ *                 Surface height presented to libretro is half.
+ *   - BOB_OFFSET: copies this field's row blocks down by one
+ *                 native row, leaving the originals in place so
+ *                 the surface ends up double-rowed at full height.
+ *
+ * The previous implementation kept a separate FieldBuffer surface
+ * and an LWBuffer line-widths array to support an out-of-place
+ * WEAVE scheme that copied this field out, then copied the previous
+ * field back in from the buffer.  The buffer round-trip was pure
+ * waste; both fields are already in the surface, just at different
+ * row-block stripes.  Dropped both members.
+ */
+typedef struct
+{
+   bool      StateValid;
+   int32_t   PrevDRect_h;
+   int32_t   PrevDRect_x;
+   unsigned  DeintType;
+} Deinterlacer;
+
+void     Deinterlacer_Init(Deinterlacer *d);
+void     Deinterlacer_Cleanup(Deinterlacer *d);
+
+void     Deinterlacer_SetType(Deinterlacer *d, unsigned t);
+unsigned Deinterlacer_GetType(const Deinterlacer *d);
+
+void     Deinterlacer_Process(Deinterlacer *d, MDFN_Surface *surface,
+            MDFN_Rect *DisplayRect, int32_t *LineWidths, const bool field);
+
+void     Deinterlacer_ClearState(Deinterlacer *d);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -24,98 +24,36 @@
 #include "format.hpp"
 #include "type_to_string.hpp"
 #include "quirks.hpp"
-#include "enum_cast.hpp"
 #include <algorithm>
+#include <memory>
 #include <string.h>
 
-#ifdef GRANITE_VULKAN_MT
-#include "thread_group.hpp"
-#define LOCK() std::lock_guard<std::mutex> holder__{lock.lock}
-#define DRAIN_FRAME_LOCK() \
-	std::unique_lock<std::mutex> holder__{lock.lock}; \
-	lock.cond.wait(holder__, [&]() { \
-		return lock.counter == 0; \
-	})
-
-static inline unsigned get_current_thread_index()
-{
-	return Granite::ThreadGroup::get_current_thread_index();
-}
-#else
 #define LOCK() ((void)0)
 #define DRAIN_FRAME_LOCK() VK_ASSERT(lock.counter == 0)
 static inline unsigned get_current_thread_index()
 {
 	return 0;
 }
-#endif
 
-using namespace std;
 using namespace Util;
 
 namespace Vulkan
 {
+static inline void add_unique_queue_family(VkImageCreateInfo &info, uint32_t *sharing_indices, uint32_t family)
+{
+	for (uint32_t i = 0; i < info.queueFamilyIndexCount; i++)
+	{
+		if (sharing_indices[i] == family)
+			return;
+	}
+	sharing_indices[info.queueFamilyIndexCount++] = family;
+}
+
 Device::Device()
     : framebuffer_allocator(this)
     , transient_allocator(this)
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	, shader_manager(this)
-	, texture_manager(this)
-#endif
 {
-#ifdef GRANITE_VULKAN_MT
-	cookie.store(0);
-#endif
 }
-
-Semaphore Device::request_semaphore()
-{
-	LOCK();
-	auto semaphore = managers.semaphore.request_cleared_semaphore();
-	Semaphore ptr(handle_pool.semaphores.allocate(this, semaphore, false));
-	return ptr;
-}
-
-Semaphore Device::request_external_semaphore(VkSemaphore semaphore, bool signalled)
-{
-	LOCK();
-	VK_ASSERT(semaphore);
-	Semaphore ptr(handle_pool.semaphores.allocate(this, semaphore, signalled));
-	return ptr;
-}
-
-#ifndef _WIN32
-Semaphore Device::request_imported_semaphore(int fd, VkExternalSemaphoreHandleTypeFlagBitsKHR handle_type)
-{
-	LOCK();
-	if (!ext.supports_external)
-		return {};
-
-	VkExternalSemaphorePropertiesKHR props = { VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES_KHR };
-	VkPhysicalDeviceExternalSemaphoreInfoKHR info = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO_KHR };
-	info.handleType = handle_type;
-
-	vkGetPhysicalDeviceExternalSemaphorePropertiesKHR(gpu, &info, &props);
-	if ((props.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT_KHR) == 0)
-		return Semaphore(nullptr);
-
-	auto semaphore = managers.semaphore.request_cleared_semaphore();
-
-	VkImportSemaphoreFdInfoKHR import = { VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR };
-	import.fd = fd;
-	import.semaphore = semaphore;
-	import.handleType = handle_type;
-	import.flags = VK_SEMAPHORE_IMPORT_TEMPORARY_BIT_KHR;
-	Semaphore ptr(handle_pool.semaphores.allocate(this, semaphore, false));
-
-	if (vkImportSemaphoreFdKHR(device, &import) != VK_SUCCESS)
-		return Semaphore(nullptr);
-
-	ptr->signal_external();
-	ptr->destroy_on_consume();
-	return ptr;
-}
-#endif
 
 void Device::add_wait_semaphore(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush)
 {
@@ -129,10 +67,10 @@ void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semap
 	VK_ASSERT(stages != 0);
 	if (flush)
 		flush_frame(type);
-	auto &data = get_queue_data(type);
+	QueueData &data = get_queue_data(type);
 
 #ifdef VULKAN_DEBUG
-	for (auto &sem : data.wait_semaphores)
+	for (Semaphore &sem : data.wait_semaphores)
 		VK_ASSERT(sem.get() != semaphore.get());
 #endif
 
@@ -143,95 +81,6 @@ void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semap
 
 	// Sanity check.
 	VK_ASSERT(data.wait_semaphores.size() < 16 * 1024);
-}
-
-LinearHostImageHandle Device::create_linear_host_image(const LinearHostImageCreateInfo &info)
-{
-	if ((info.usage & ~VK_IMAGE_USAGE_SAMPLED_BIT) != 0)
-		return LinearHostImageHandle(nullptr);
-
-	ImageCreateInfo create_info;
-	create_info.width = info.width;
-	create_info.height = info.height;
-	create_info.domain =
-			(info.flags & LINEAR_HOST_IMAGE_HOST_CACHED_BIT) != 0 ?
-			ImageDomain::LinearHostCached :
-			ImageDomain::LinearHost;
-	create_info.levels = 1;
-	create_info.layers = 1;
-	create_info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-	create_info.format = info.format;
-	create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-	create_info.usage = info.usage;
-	create_info.type = VK_IMAGE_TYPE_2D;
-
-	if ((info.flags & LINEAR_HOST_IMAGE_REQUIRE_LINEAR_FILTER_BIT) != 0)
-		create_info.misc |= IMAGE_MISC_VERIFY_FORMAT_FEATURE_SAMPLED_LINEAR_FILTER_BIT;
-	if ((info.flags & LINEAR_HOST_IMAGE_IGNORE_DEVICE_LOCAL_BIT) != 0)
-		create_info.misc |= IMAGE_MISC_LINEAR_IMAGE_IGNORE_DEVICE_LOCAL_BIT;
-
-	BufferHandle cpu_image;
-	auto gpu_image = create_image(create_info);
-	if (!gpu_image)
-	{
-		// Fall-back to staging buffer.
-		create_info.domain = ImageDomain::Physical;
-		create_info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		create_info.misc = IMAGE_MISC_CONCURRENT_QUEUE_GRAPHICS_BIT | IMAGE_MISC_CONCURRENT_QUEUE_ASYNC_TRANSFER_BIT;
-		create_info.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-		gpu_image = create_image(create_info);
-		if (!gpu_image)
-			return LinearHostImageHandle(nullptr);
-
-		BufferCreateInfo buffer;
-		buffer.domain =
-				(info.flags & LINEAR_HOST_IMAGE_HOST_CACHED_BIT) != 0 ?
-				BufferDomain::CachedHost :
-				BufferDomain::Host;
-		buffer.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		buffer.size = info.width * info.height * TextureFormatLayout::format_block_size(info.format);
-		cpu_image = create_buffer(buffer);
-		if (!cpu_image)
-			return LinearHostImageHandle(nullptr);
-	}
-	else
-		gpu_image->set_layout(Layout::General);
-
-	return LinearHostImageHandle(handle_pool.linear_images.allocate(this, move(gpu_image), move(cpu_image), info.stages));
-}
-
-void *Device::map_linear_host_image(const LinearHostImage &image, MemoryAccessFlags access)
-{
-	void *host = managers.memory.map_memory(image.get_host_visible_allocation(), access);
-	return host;
-}
-
-void Device::unmap_linear_host_image_and_sync(const LinearHostImage &image, MemoryAccessFlags access)
-{
-	managers.memory.unmap_memory(image.get_host_visible_allocation(), access);
-	if (image.need_staging_copy())
-	{
-		// Kinda icky fallback, shouldn't really be used on discrete cards.
-		auto cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
-		cmd->image_barrier(image.get_image(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
-		                   VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
-		cmd->copy_buffer_to_image(image.get_image(), image.get_host_visible_buffer(),
-		                          0, {},
-		                          { image.get_image().get_width(), image.get_image().get_height(), 1 },
-		                          0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
-
-		// Don't care about dstAccessMask, semaphore takes care of everything.
-		cmd->image_barrier(image.get_image(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		                   VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-		                   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
-
-		Semaphore sem;
-		submit(cmd, nullptr, 1, &sem);
-
-		// The queue type is an assumption. Should add some parameter for that.
-		add_wait_semaphore(CommandBuffer::Type::Generic, sem, image.get_used_pipeline_stages(), true);
-	}
 }
 
 void *Device::map_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
@@ -250,8 +99,8 @@ Shader *Device::request_shader(const uint32_t *data, size_t size)
 	Util::Hasher hasher;
 	hasher.data(data, size);
 
-	auto hash = hasher.get();
-	auto *ret = shaders.find(hash);
+	Hash hash = hasher.get();
+	Shader *ret = shaders.find(hash);
 	if (!ret)
 		ret = shaders.emplace_yield(hash, hash, this, data, size);
 	return ret;
@@ -267,8 +116,8 @@ Program *Device::request_program(Vulkan::Shader *compute)
 	Util::Hasher hasher;
 	hasher.u64(compute->get_hash());
 
-	auto hash = hasher.get();
-	auto *ret = programs.find(hash);
+	Hash hash = hasher.get();
+	Program *ret = programs.find(hash);
 	if (!ret)
 		ret = programs.emplace_yield(hash, this, compute);
 	return ret;
@@ -276,7 +125,7 @@ Program *Device::request_program(Vulkan::Shader *compute)
 
 Program *Device::request_program(const uint32_t *compute_data, size_t compute_size)
 {
-	auto *compute = request_shader(compute_data, compute_size);
+	Shader *compute = request_shader(compute_data, compute_size);
 	return request_program(compute);
 }
 
@@ -286,8 +135,8 @@ Program *Device::request_program(Shader *vertex, Shader *fragment)
 	hasher.u64(vertex->get_hash());
 	hasher.u64(fragment->get_hash());
 
-	auto hash = hasher.get();
-	auto *ret = programs.find(hash);
+	Hash hash = hasher.get();
+	Program *ret = programs.find(hash);
 
 	if (!ret)
 		ret = programs.emplace_yield(hash, this, vertex, fragment);
@@ -297,8 +146,8 @@ Program *Device::request_program(Shader *vertex, Shader *fragment)
 Program *Device::request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
                                  size_t fragment_size)
 {
-	auto *vertex = request_shader(vertex_data, vertex_size);
-	auto *fragment = request_shader(fragment_data, fragment_size);
+	Shader *vertex = request_shader(vertex_data, vertex_size);
+	Shader *fragment = request_shader(fragment_data, fragment_size);
 	return request_program(vertex, fragment);
 }
 
@@ -313,8 +162,8 @@ PipelineLayout *Device::request_pipeline_layout(const CombinedResourceLayout &la
 	h.u32(layout.attribute_mask);
 	h.u32(layout.render_target_mask);
 
-	auto hash = h.get();
-	auto *ret = pipeline_layouts.find(hash);
+	Hash hash = h.get();
+	PipelineLayout *ret = pipeline_layouts.find(hash);
 	if (!ret)
 		ret = pipeline_layouts.emplace_yield(hash, hash, this, layout);
 	return ret;
@@ -325,9 +174,9 @@ DescriptorSetAllocator *Device::request_descriptor_set_allocator(const Descripto
 	Hasher h;
 	h.data(reinterpret_cast<const uint32_t *>(&layout), sizeof(layout));
 	h.data(stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
-	auto hash = h.get();
+	Hash hash = h.get();
 
-	auto *ret = descriptor_set_allocators.find(hash);
+	DescriptorSetAllocator *ret = descriptor_set_allocators.find(hash);
 	if (!ret)
 		ret = descriptor_set_allocators.emplace_yield(hash, hash, this, layout, stages_for_bindings);
 	return ret;
@@ -345,13 +194,13 @@ void Device::bake_program(Program &program)
 
 	for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage::Count); i++)
 	{
-		auto *shader = program.get_shader(static_cast<ShaderStage>(i));
+		const Shader *shader = program.get_shader(static_cast<ShaderStage>(i));
 		if (!shader)
 			continue;
 
 		uint32_t stage_mask = 1u << i;
 
-		auto &shader_layout = shader->get_layout();
+		const ResourceLayout &shader_layout = shader->get_layout();
 		for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
 		{
 			layout.sets[set].sampled_image_mask |= shader_layout.sets[set].sampled_image_mask;
@@ -364,7 +213,8 @@ void Device::bake_program(Program &program)
 			layout.sets[set].separate_image_mask |= shader_layout.sets[set].separate_image_mask;
 			layout.sets[set].fp_mask |= shader_layout.sets[set].fp_mask;
 
-			for_each_bit(shader_layout.sets[set].immutable_sampler_mask, [&](uint32_t binding) {
+			FOR_EACH_BIT(shader_layout.sets[set].immutable_sampler_mask, binding)
+			{
 				StockSampler sampler = get_immutable_sampler(shader_layout.sets[set], binding);
 
 				// Do we already have an immutable sampler? Make sure it matches the layout.
@@ -375,7 +225,7 @@ void Device::bake_program(Program &program)
 				}
 
 				set_immutable_sampler(layout.sets[set], binding, sampler);
-			});
+						}
 
 			uint32_t active_binds =
 					shader_layout.sets[set].sampled_image_mask |
@@ -390,9 +240,10 @@ void Device::bake_program(Program &program)
 			if (active_binds)
 				layout.stages_for_sets[set] |= stage_mask;
 
-			for_each_bit(active_binds, [&](uint32_t bit) {
+			FOR_EACH_BIT(active_binds, bit)
+			{
 				layout.stages_for_bindings[set][bit] |= stage_mask;
-			});
+						}
 		}
 
 		// Merge push constant ranges into one range.
@@ -421,32 +272,6 @@ void Device::bake_program(Program &program)
 	program.set_pipeline_layout(request_pipeline_layout(layout));
 }
 
-bool Device::init_pipeline_cache(const uint8_t *data, size_t size)
-{
-	static const auto uuid_size = sizeof(gpu_props.pipelineCacheUUID);
-
-	VkPipelineCacheCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO };
-	if (!data || size < uuid_size)
-	{
-		LOGI("Creating a fresh pipeline cache.\n");
-	}
-	else if (memcmp(data, gpu_props.pipelineCacheUUID, uuid_size) != 0)
-	{
-		LOGI("Pipeline cache UUID changed.\n");
-	}
-	else
-	{
-		info.initialDataSize = size - uuid_size;
-		info.pInitialData = data + uuid_size;
-		LOGI("Initializing pipeline cache.\n");
-	}
-
-	if (pipeline_cache != VK_NULL_HANDLE)
-		vkDestroyPipelineCache(device, pipeline_cache, nullptr);
-	pipeline_cache = VK_NULL_HANDLE;
-	return vkCreatePipelineCache(device, &info, nullptr, &pipeline_cache) == VK_SUCCESS;
-}
-
 static inline char to_hex(uint8_t v)
 {
 	if (v < 10)
@@ -455,12 +280,12 @@ static inline char to_hex(uint8_t v)
 		return char('a' + (v - 10));
 }
 
-string Device::get_pipeline_cache_string() const
+std::string Device::get_pipeline_cache_string() const
 {
-	string res;
+	std::string res;
 	res.reserve(sizeof(gpu_props.pipelineCacheUUID) * 2);
 
-	for (auto &c : gpu_props.pipelineCacheUUID)
+	for (const uint8_t &c : gpu_props.pipelineCacheUUID)
 	{
 		res += to_hex(uint8_t((c >> 4) & 0xf));
 		res += to_hex(uint8_t(c & 0xf));
@@ -471,108 +296,19 @@ string Device::get_pipeline_cache_string() const
 
 void Device::init_pipeline_cache()
 {
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	auto file = Granite::Global::filesystem()->open(Util::join("cache://pipeline_cache_", get_pipeline_cache_string(), ".bin"),
-	                                                Granite::FileMode::ReadOnly);
-	if (file)
-	{
-		auto size = file->get_size();
-		auto *mapped = static_cast<uint8_t *>(file->map());
-		if (mapped && !init_pipeline_cache(mapped, size))
-			LOGE("Failed to initialize pipeline cache.\n");
-	}
-	else if (!init_pipeline_cache(nullptr, 0))
-		LOGE("Failed to initialize pipeline cache.\n");
-#endif
-}
-
-size_t Device::get_pipeline_cache_size()
-{
-	if (pipeline_cache == VK_NULL_HANDLE)
-		return 0;
-
-	static const auto uuid_size = sizeof(gpu_props.pipelineCacheUUID);
-	size_t size = 0;
-	if (vkGetPipelineCacheData(device, pipeline_cache, &size, nullptr) != VK_SUCCESS)
-	{
-		LOGE("Failed to get pipeline cache data.\n");
-		return 0;
-	}
-
-	return size + uuid_size;
-}
-
-bool Device::get_pipeline_cache_data(uint8_t *data, size_t size)
-{
-	if (pipeline_cache == VK_NULL_HANDLE)
-		return false;
-
-	static const auto uuid_size = sizeof(gpu_props.pipelineCacheUUID);
-	if (size < uuid_size)
-		return false;
-
-	size -= uuid_size;
-	memcpy(data, gpu_props.pipelineCacheUUID, uuid_size);
-	data += uuid_size;
-
-	if (vkGetPipelineCacheData(device, pipeline_cache, &size, data) != VK_SUCCESS)
-	{
-		LOGE("Failed to get pipeline cache data.\n");
-		return false;
-	}
-
-	return true;
 }
 
 void Device::flush_pipeline_cache()
 {
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	size_t size = get_pipeline_cache_size();
-	if (!size)
-	{
-		LOGE("Failed to get pipeline cache size.\n");
-		return;
-	}
-
-	auto file = Granite::Global::filesystem()->open(Util::join("cache://pipeline_cache_", get_pipeline_cache_string(), ".bin"),
-	                                                Granite::FileMode::WriteOnly);
-	if (!file)
-	{
-		LOGE("Failed to get pipeline cache data.\n");
-		return;
-	}
-
-	uint8_t *data = static_cast<uint8_t *>(file->map_write(size));
-	if (!data)
-	{
-		LOGE("Failed to get pipeline cache data.\n");
-		return;
-	}
-
-	if (!get_pipeline_cache_data(data, size))
-	{
-		LOGE("Failed to get pipeline cache data.\n");
-		return;
-	}
-#endif
 }
 
 void Device::init_workarounds()
 {
-#if 0
-	workarounds.wsi_acquire_barrier_is_expensive = true;
-	workarounds.emulate_event_as_pipeline_barrier = true;
-	workarounds.optimize_all_graphics_barrier = true;
-#else
 	// UNDEFINED -> COLOR_ATTACHMENT_OPTIMAL stalls, so need to acquire async.
 	workarounds.wsi_acquire_barrier_is_expensive = gpu_props.vendorID == VENDOR_ID_ARM;
 
-	// VkEvent is suboptimal in some cases or not supported (MoltenVK later?).
-	workarounds.emulate_event_as_pipeline_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
-
 	// srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only.
 	workarounds.optimize_all_graphics_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
-#endif
 }
 
 void Device::set_context(const Context &context)
@@ -595,12 +331,6 @@ void Device::set_context(const Context &context)
 
 	init_stock_samplers();
 	init_pipeline_cache();
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	init_pipeline_state();
-#endif
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	init_shader_manager_cache();
-#endif
 
 #ifdef ANDROID
 	init_frame_contexts(3); // Android needs a bit more ... ;)
@@ -614,17 +344,12 @@ void Device::set_context(const Context &context)
 	managers.memory.set_supports_dedicated_allocation(ext.supports_dedicated);
 	managers.semaphore.init(device);
 	managers.fence.init(device);
-	managers.event.init(this);
-	managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	                  ImplementationQuirks::get().staging_need_device_local);
-	managers.ibo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-	                  ImplementationQuirks::get().staging_need_device_local);
+	managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	managers.ibo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 	managers.ubo.init(this, 256 * 1024, std::max<VkDeviceSize>(16u, gpu_props.limits.minUniformBufferOffsetAlignment),
-	                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-	                  ImplementationQuirks::get().staging_need_device_local);
+	                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 	managers.staging.init(this, 64 * 1024, std::max<VkDeviceSize>(16u, gpu_props.limits.optimalBufferCopyOffsetAlignment),
-	                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-	                      false);
+	                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 }
 
 void Device::init_stock_samplers()
@@ -635,7 +360,7 @@ void Device::init_stock_samplers()
 
 	for (unsigned i = 0; i < static_cast<unsigned>(StockSampler::Count); i++)
 	{
-		auto mode = static_cast<StockSampler>(i);
+		StockSampler mode = static_cast<StockSampler>(i);
 
 		switch (mode)
 		{
@@ -714,7 +439,7 @@ static void request_block(Device &device, BufferBlock &block, VkDeviceSize size,
 	if (block.offset == 0)
 	{
 		if (block.size == pool.get_block_size())
-			pool.recycle_block(move(block));
+			pool.recycle_block(std::move(block));
 	}
 	else
 	{
@@ -781,7 +506,7 @@ void Device::request_staging_block_nolock(BufferBlock &block, VkDeviceSize size)
 void Device::submit(CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 {
 	LOCK();
-	submit_nolock(move(cmd), fence, semaphore_count, semaphores);
+	submit_nolock(std::move(cmd), fence, semaphore_count, semaphores);
 }
 
 CommandBuffer::Type Device::get_physical_queue_type(CommandBuffer::Type queue_type) const
@@ -801,13 +526,13 @@ CommandBuffer::Type Device::get_physical_queue_type(CommandBuffer::Type queue_ty
 
 void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 {
-	auto type = cmd->get_command_buffer_type();
-	auto &pool = get_command_pool(type, cmd->get_thread_index());
-	auto &submissions = get_queue_submissions(type);
+	CommandBuffer::Type type = cmd->get_command_buffer_type();
+	CommandPool &pool = get_command_pool(type, cmd->get_thread_index());
+	std::vector<CommandBufferHandle> &submissions = get_queue_submissions(type);
 
 	pool.signal_submitted(cmd->get_command_buffer());
 	cmd->end();
-	submissions.push_back(move(cmd));
+	submissions.push_back(std::move(cmd));
 
 	VkFence cleared_fence = VK_NULL_HANDLE;
 
@@ -823,39 +548,20 @@ void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semap
 	decrement_frame_counter_nolock();
 }
 
-void Device::submit_empty(CommandBuffer::Type type, Fence *fence,
-                          unsigned semaphore_count, Semaphore *semaphores)
-{
-	LOCK();
-	submit_empty_nolock(type, fence, semaphore_count, semaphores);
-}
-
-void Device::submit_empty_nolock(CommandBuffer::Type type, Fence *fence,
-                                 unsigned semaphore_count, Semaphore *semaphores)
-{
-	if (type != CommandBuffer::Type::AsyncTransfer)
-		flush_frame(CommandBuffer::Type::AsyncTransfer);
-
-	VkFence cleared_fence = VK_NULL_HANDLE;
-	submit_queue(type, fence ? &cleared_fence : nullptr, semaphore_count, semaphores);
-	if (fence)
-		*fence = Fence(handle_pool.fences.allocate(this, cleared_fence));
-}
-
 void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
                                 unsigned semaphore_count, Semaphore *semaphores)
 {
-	auto &data = get_queue_data(type);
+	QueueData &data = get_queue_data(type);
 	VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
 	// Add external wait semaphores.
-	vector<VkSemaphore> waits;
-	vector<VkSemaphore> signals;
-	auto stages = move(data.wait_stages);
+	std::vector<VkSemaphore> waits;
+	std::vector<VkSemaphore> signals;
+	std::vector<VkPipelineStageFlags> stages = std::move(data.wait_stages);
 
-	for (auto &semaphore : data.wait_semaphores)
+	for (Semaphore &semaphore : data.wait_semaphores)
 	{
-		auto wait = semaphore->consume();
+		VkSemaphore wait = semaphore->consume();
 		if (semaphore->can_recycle())
 			frame().recycled_semaphores.push_back(wait);
 		else
@@ -899,17 +605,7 @@ void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 	}
 
 	VkFence cleared_fence = fence ? managers.fence.request_cleared_fence() : VK_NULL_HANDLE;
-	if (queue_lock_callback)
-		queue_lock_callback();
-#if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
-	if (cleared_fence)
-		LOGI("Signalling Fence: %llx\n", reinterpret_cast<unsigned long long>(cleared_fence));
-#endif
 	VkResult result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
-	if (ImplementationQuirks::get().queue_wait_on_submission)
-		vkQueueWaitIdle(queue);
-	if (queue_unlock_callback)
-		queue_unlock_callback();
 
 	if (result != VK_SUCCESS)
 		LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
@@ -922,37 +618,6 @@ void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 	}
 	else
 		data.need_fence = true;
-
-#if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
-	const char *queue_name = nullptr;
-	switch (type)
-	{
-	default:
-	case CommandBuffer::Type::Generic:
-		queue_name = "Graphics";
-		break;
-	case CommandBuffer::Type::AsyncCompute:
-		queue_name = "Compute";
-		break;
-	case CommandBuffer::Type::AsyncTransfer:
-		queue_name = "Transfer";
-		break;
-	}
-
-	LOGI("Empty submission to %s queue:\n", queue_name);
-	for (uint32_t i = 0; i < submit.waitSemaphoreCount; i++)
-	{
-		LOGI("  Waiting for semaphore: %llx in stages %s\n",
-		     reinterpret_cast<unsigned long long>(submit.pWaitSemaphores[i]),
-		     stage_flags_to_string(submit.pWaitDstStageMask[i]).c_str());
-	}
-
-	for (uint32_t i = 0; i < submit.signalSemaphoreCount; i++)
-	{
-		LOGI("  Signalling semaphore: %llx\n",
-		     reinterpret_cast<unsigned long long>(submit.pSignalSemaphores[i]));
-	}
-#endif
 }
 
 Fence Device::request_fence()
@@ -963,8 +628,8 @@ Fence Device::request_fence()
 
 void Device::submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush)
 {
-	auto access = buffer_usage_to_possible_access(usage);
-	auto stages = buffer_usage_to_possible_stages(usage);
+	VkAccessFlags access = buffer_usage_to_possible_access(usage);
+	VkPipelineStageFlags stages = buffer_usage_to_possible_stages(usage);
 
 	if (transfer_queue == graphics_queue && transfer_queue == compute_queue)
 	{
@@ -974,12 +639,12 @@ void Device::submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, 
 	}
 	else
 	{
-		auto compute_stages = stages &
+		VkPipelineStageFlags compute_stages = stages &
 		                      (VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
 		                       VK_PIPELINE_STAGE_TRANSFER_BIT |
 		                       VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT);
 
-		auto compute_access = access &
+		VkAccessFlags compute_access = access &
 		                      (VK_ACCESS_SHADER_READ_BIT |
 		                       VK_ACCESS_SHADER_WRITE_BIT |
 		                       VK_ACCESS_TRANSFER_READ_BIT |
@@ -987,7 +652,7 @@ void Device::submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, 
 		                       VK_ACCESS_TRANSFER_WRITE_BIT |
 		                       VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
 
-		auto graphics_stages = stages;
+		VkPipelineStageFlags graphics_stages = stages;
 
 		if (transfer_queue == graphics_queue)
 		{
@@ -1053,8 +718,8 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 	if (type != CommandBuffer::Type::AsyncTransfer)
 		flush_frame(CommandBuffer::Type::AsyncTransfer);
 
-	auto &data = get_queue_data(type);
-	auto &submissions = get_queue_submissions(type);
+	QueueData &data = get_queue_data(type);
+	std::vector<CommandBufferHandle> &submissions = get_queue_submissions(type);
 
 	if (submissions.empty())
 	{
@@ -1063,23 +728,23 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 		return;
 	}
 
-	vector<VkCommandBuffer> cmds;
+	std::vector<VkCommandBuffer> cmds;
 	cmds.reserve(submissions.size());
 
-	vector<VkSubmitInfo> submits;
+	std::vector<VkSubmitInfo> submits;
 	submits.reserve(2);
 	size_t last_cmd = 0;
 
-	vector<VkSemaphore> waits[2];
-	vector<VkSemaphore> signals[2];
-	vector<VkFlags> stages[2];
+	std::vector<VkSemaphore> waits[2];
+	std::vector<VkSemaphore> signals[2];
+	std::vector<VkFlags> stages[2];
 
 	// Add external wait semaphores.
-	stages[0] = move(data.wait_stages);
+	stages[0] = std::move(data.wait_stages);
 
-	for (auto &semaphore : data.wait_semaphores)
+	for (Semaphore &semaphore : data.wait_semaphores)
 	{
-		auto wait = semaphore->consume();
+		VkSemaphore wait = semaphore->consume();
 		if (semaphore->can_recycle())
 			frame().recycled_semaphores.push_back(wait);
 		else
@@ -1089,7 +754,7 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 	data.wait_stages.clear();
 	data.wait_semaphores.clear();
 
-	for (auto &cmd : submissions)
+	for (CommandBufferHandle &cmd : submissions)
 	{
 		if (cmd->swapchain_touched() && !wsi.touched && !wsi.consumed)
 		{
@@ -1098,7 +763,7 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 				// Push all pending cmd buffers to their own submission.
 				submits.emplace_back();
 
-				auto &submit = submits.back();
+				VkSubmitInfo &submit = submits.back();
 				memset(&submit, 0, sizeof(submit));
 				submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 				submit.pNext = nullptr;
@@ -1119,7 +784,7 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 		// Push all pending cmd buffers to their own submission.
 		submits.emplace_back();
 
-		auto &submit = submits.back();
+		VkSubmitInfo &submit = submits.back();
 		memset(&submit, 0, sizeof(submit));
 		submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submit.pNext = nullptr;
@@ -1164,7 +829,7 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 
 	for (unsigned i = 0; i < submits.size(); i++)
 	{
-		auto &submit = submits[i];
+		VkSubmitInfo &submit = submits[i];
 		submit.waitSemaphoreCount = waits[i].size();
 		if (!waits[i].empty())
 		{
@@ -1192,17 +857,7 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 		break;
 	}
 
-	if (queue_lock_callback)
-		queue_lock_callback();
-#if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
-	if (cleared_fence)
-		LOGI("Signalling fence: %llx\n", reinterpret_cast<unsigned long long>(cleared_fence));
-#endif
 	VkResult result = vkQueueSubmit(queue, submits.size(), submits.data(), cleared_fence);
-	if (ImplementationQuirks::get().queue_wait_on_submission)
-		vkQueueWaitIdle(queue);
-	if (queue_unlock_callback)
-		queue_unlock_callback();
 	if (result != VK_SUCCESS)
 		LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
 	submissions.clear();
@@ -1215,43 +870,6 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 	}
 	else
 		data.need_fence = true;
-
-#if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
-	const char *queue_name = nullptr;
-	switch (type)
-	{
-	default:
-	case CommandBuffer::Type::Generic:
-		queue_name = "Graphics";
-		break;
-	case CommandBuffer::Type::AsyncCompute:
-		queue_name = "Compute";
-		break;
-	case CommandBuffer::Type::AsyncTransfer:
-		queue_name = "Transfer";
-		break;
-	}
-
-	for (auto &submit : submits)
-	{
-		LOGI("Submission to %s queue:\n", queue_name);
-		for (uint32_t i = 0; i < submit.waitSemaphoreCount; i++)
-		{
-			LOGI("  Waiting for semaphore: %llx in stages %s\n",
-			     reinterpret_cast<unsigned long long>(submit.pWaitSemaphores[i]),
-			     stage_flags_to_string(submit.pWaitDstStageMask[i]).c_str());
-		}
-
-		for (uint32_t i = 0; i < submit.commandBufferCount; i++)
-			LOGI(" Command Buffer %llx\n", reinterpret_cast<unsigned long long>(submit.pCommandBuffers[i]));
-
-		for (uint32_t i = 0; i < submit.signalSemaphoreCount; i++)
-		{
-			LOGI("  Signalling semaphore: %llx\n",
-			     reinterpret_cast<unsigned long long>(submit.pSignalSemaphores[i]));
-		}
-	}
-#endif
 }
 
 void Device::flush_frame(CommandBuffer::Type type)
@@ -1268,25 +886,25 @@ void Device::sync_buffer_blocks()
 
 	VkBufferUsageFlags usage = 0;
 
-	auto cmd = request_command_buffer_nolock(get_current_thread_index(), CommandBuffer::Type::AsyncTransfer);
+	CommandBufferHandle cmd = request_command_buffer_nolock(get_current_thread_index(), CommandBuffer::Type::AsyncTransfer);
 
 	cmd->begin_region("buffer-block-sync");
 
-	for (auto &block : dma.vbo)
+	for (BufferBlock &block : dma.vbo)
 	{
 		VK_ASSERT(block.offset != 0);
 		cmd->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
 		usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	}
 
-	for (auto &block : dma.ibo)
+	for (BufferBlock &block : dma.ibo)
 	{
 		VK_ASSERT(block.offset != 0);
 		cmd->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
 		usage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 	}
 
-	for (auto &block : dma.ubo)
+	for (BufferBlock &block : dma.ubo)
 	{
 		VK_ASSERT(block.offset != 0);
 		cmd->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
@@ -1304,16 +922,10 @@ void Device::sync_buffer_blocks()
 	submit_staging(cmd, usage, false);
 }
 
-void Device::end_frame_context()
-{
-	DRAIN_FRAME_LOCK();
-	end_frame_nolock();
-}
-
 void Device::end_frame_nolock()
 {
 	// Kept handles alive until end-of-frame, free now if appropriate.
-	for (auto &image : frame().keep_alive_images)
+	for (ImageHandle &image : frame().keep_alive_images)
 	{
 		image->set_internal_sync_object();
 		image->get_view().set_internal_sync_object();
@@ -1386,7 +998,7 @@ CommandPool &Device::get_command_pool(CommandBuffer::Type type, unsigned thread)
 	}
 }
 
-vector<CommandBufferHandle> &Device::get_queue_submissions(CommandBuffer::Type type)
+std::vector<CommandBufferHandle> &Device::get_queue_submissions(CommandBuffer::Type type)
 {
 	switch (get_physical_queue_type(type))
 	{
@@ -1413,10 +1025,8 @@ CommandBufferHandle Device::request_command_buffer_for_thread(unsigned thread_in
 
 CommandBufferHandle Device::request_command_buffer_nolock(unsigned thread_index, CommandBuffer::Type type)
 {
-#ifndef GRANITE_VULKAN_MT
 	VK_ASSERT(thread_index == 0);
-#endif
-	auto cmd = get_command_pool(type, thread_index).request_command_buffer();
+	VkCommandBuffer cmd = get_command_pool(type, thread_index).request_command_buffer();
 
 	VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -1435,7 +1045,7 @@ void Device::submit_secondary(CommandBuffer &primary, CommandBuffer &secondary)
 		decrement_frame_counter_nolock();
 
 #ifdef VULKAN_DEBUG
-		auto &pool = get_command_pool(secondary.get_command_buffer_type(),
+		CommandPool &pool = get_command_pool(secondary.get_command_buffer_type(),
 		                              secondary.get_thread_index());
 		pool.signal_submitted(secondary.get_command_buffer());
 #endif
@@ -1452,7 +1062,7 @@ CommandBufferHandle Device::request_secondary_command_buffer_for_thread(unsigned
 {
 	LOCK();
 
-	auto cmd = get_command_pool(type, thread_index).request_secondary_command_buffer();
+	VkCommandBuffer cmd = get_command_pool(type, thread_index).request_secondary_command_buffer();
 	VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	VkCommandBufferInheritanceInfo inherit = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
 
@@ -1472,7 +1082,7 @@ CommandBufferHandle Device::request_secondary_command_buffer_for_thread(unsigned
 
 void Device::set_acquire_semaphore(unsigned index, Semaphore acquire)
 {
-	wsi.acquire = move(acquire);
+	wsi.acquire = std::move(acquire);
 	wsi.index = index;
 	wsi.touched = false;
 	wsi.consumed = false;
@@ -1486,7 +1096,7 @@ void Device::set_acquire_semaphore(unsigned index, Semaphore acquire)
 
 Semaphore Device::consume_release_semaphore()
 {
-	auto ret = move(wsi.release);
+	Semaphore ret = std::move(wsi.release);
 	wsi.release.reset();
 	return ret;
 }
@@ -1503,14 +1113,10 @@ bool Device::swapchain_touched() const
 
 Device::~Device()
 {
-#ifdef GRANITE_VULKAN_MT
-	Granite::Global::thread_group()->wait_idle();
-#endif
 	wait_idle();
 
 	wsi.acquire.reset();
 	wsi.release.reset();
-	wsi.swapchain.clear();
 
 	if (pipeline_cache != VK_NULL_HANDLE)
 	{
@@ -1518,17 +1124,11 @@ Device::~Device()
 		vkDestroyPipelineCache(device, pipeline_cache, nullptr);
 	}
 
-#ifdef GRANITE_VULKAN_FILESYSTEM
-	flush_shader_manager_cache();
-#endif
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	flush_pipeline_state();
-#endif
 
 	framebuffer_allocator.clear();
 	transient_allocator.clear();
-	for (auto &sampler : samplers)
+	for (SamplerHandle &sampler : samplers)
 		sampler.reset();
 }
 
@@ -1544,68 +1144,8 @@ void Device::init_frame_contexts(unsigned count)
 
 	for (unsigned i = 0; i < count; i++)
 	{
-		auto frame = unique_ptr<PerFrame>(new PerFrame(this));
-		per_frame.emplace_back(move(frame));
-	}
-}
-
-void Device::init_external_swapchain(const vector<ImageHandle> &swapchain_images)
-{
-	DRAIN_FRAME_LOCK();
-	wsi.swapchain.clear();
-	wait_idle_nolock();
-
-	wsi.index = 0;
-	wsi.touched = false;
-	wsi.consumed = false;
-	for (auto &image : swapchain_images)
-	{
-		wsi.swapchain.push_back(image);
-		if (image)
-		{
-			wsi.swapchain.back()->set_internal_sync_object();
-			wsi.swapchain.back()->get_view().set_internal_sync_object();
-		}
-	}
-}
-
-void Device::init_swapchain(const vector<VkImage> &swapchain_images, unsigned width, unsigned height, VkFormat format)
-{
-	DRAIN_FRAME_LOCK();
-	wsi.swapchain.clear();
-	wait_idle_nolock();
-
-	const auto info = ImageCreateInfo::render_target(width, height, format);
-
-	wsi.index = 0;
-	wsi.touched = false;
-	wsi.consumed = false;
-	for (auto &image : swapchain_images)
-	{
-		VkImageViewCreateInfo view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-		view_info.image = image;
-		view_info.format = format;
-		view_info.components.r = VK_COMPONENT_SWIZZLE_R;
-		view_info.components.g = VK_COMPONENT_SWIZZLE_G;
-		view_info.components.b = VK_COMPONENT_SWIZZLE_B;
-		view_info.components.a = VK_COMPONENT_SWIZZLE_A;
-		view_info.subresourceRange.aspectMask = format_to_aspect_mask(format);
-		view_info.subresourceRange.baseMipLevel = 0;
-		view_info.subresourceRange.baseArrayLayer = 0;
-		view_info.subresourceRange.levelCount = 1;
-		view_info.subresourceRange.layerCount = 1;
-		view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-
-		VkImageView image_view;
-		if (vkCreateImageView(device, &view_info, nullptr, &image_view) != VK_SUCCESS)
-			LOGE("Failed to create view for backbuffer.");
-
-		auto backbuffer = ImageHandle(handle_pool.images.allocate(this, image, image_view, DeviceAllocation{}, info));
-		backbuffer->set_internal_sync_object();
-		backbuffer->get_view().set_internal_sync_object();
-		wsi.swapchain.push_back(backbuffer);
-		set_name(*backbuffer, "backbuffer");
-		backbuffer->set_swapchain_layout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+		std::unique_ptr<PerFrame> frame = std::unique_ptr<PerFrame>(new PerFrame(this));
+		per_frame.emplace_back(std::move(frame));
 	}
 }
 
@@ -1614,24 +1154,15 @@ Device::PerFrame::PerFrame(Device *device)
     , managers(device->managers)
     , query_pool(device)
 {
-#ifdef GRANITE_VULKAN_MT
-	unsigned count = Granite::Global::thread_group()->get_num_threads() + 1;
-#else
-	unsigned count = 1;
-#endif
-
-	for (unsigned i = 0; i < count; i++)
-	{
-		graphics_cmd_pool.emplace_back(device->get_device(), device->graphics_queue_family_index);
-		compute_cmd_pool.emplace_back(device->get_device(), device->compute_queue_family_index);
-		transfer_cmd_pool.emplace_back(device->get_device(), device->transfer_queue_family_index);
-	}
+	graphics_cmd_pool.emplace_back(device->get_device(), device->graphics_queue_family_index);
+	compute_cmd_pool.emplace_back(device->get_device(), device->compute_queue_family_index);
+	transfer_cmd_pool.emplace_back(device->get_device(), device->transfer_queue_family_index);
 }
 
 void Device::keep_handle_alive(ImageHandle handle)
 {
 	LOCK();
-	frame().keep_alive_images.push_back(move(handle));
+	frame().keep_alive_images.push_back(std::move(handle));
 }
 
 void Device::free_memory_nolock(const DeviceAllocation &alloc)
@@ -1644,7 +1175,7 @@ void Device::free_memory_nolock(const DeviceAllocation &alloc)
 template <typename T, typename U>
 static inline bool exists(const T &container, const U &value)
 {
-	return find(begin(container), end(container), value) != end(container);
+	return std::find(container.begin(), container.end(), value) != container.end();
 }
 
 #endif
@@ -1671,12 +1202,6 @@ void Device::destroy_buffer_view(VkBufferView view)
 {
 	LOCK();
 	destroy_buffer_view_nolock(view);
-}
-
-void Device::destroy_event(VkEvent event)
-{
-	LOCK();
-	destroy_event_nolock(event);
 }
 
 void Device::destroy_framebuffer(VkFramebuffer framebuffer)
@@ -1750,17 +1275,6 @@ void Device::recycle_semaphore_nolock(VkSemaphore semaphore)
 	managers.semaphore.recycle(semaphore);
 }
 
-void Device::destroy_event_nolock(VkEvent event)
-{
-	VK_ASSERT(!exists(frame().recycled_events, event));
-	frame().recycled_events.push_back(event);
-}
-
-PipelineEvent Device::request_pipeline_event()
-{
-	return PipelineEvent(handle_pool.events.allocate(this, managers.event.request_cleared_event()));
-}
-
 void Device::destroy_image_nolock(VkImage image)
 {
 	VK_ASSERT(!exists(frame().destroyed_images, image));
@@ -1787,11 +1301,11 @@ void Device::destroy_framebuffer_nolock(VkFramebuffer framebuffer)
 
 void Device::clear_wait_semaphores()
 {
-	for (auto &sem : graphics.wait_semaphores)
+	for (Semaphore &sem : graphics.wait_semaphores)
 		vkDestroySemaphore(device, sem->consume(), nullptr);
-	for (auto &sem : compute.wait_semaphores)
+	for (Semaphore &sem : compute.wait_semaphores)
 		vkDestroySemaphore(device, sem->consume(), nullptr);
-	for (auto &sem : transfer.wait_semaphores)
+	for (Semaphore &sem : transfer.wait_semaphores)
 		vkDestroySemaphore(device, sem->consume(), nullptr);
 
 	graphics.wait_semaphores.clear();
@@ -1814,13 +1328,7 @@ void Device::wait_idle_nolock()
 		end_frame_nolock();
 
 	if (device != VK_NULL_HANDLE)
-	{
-		if (queue_lock_callback)
-			queue_lock_callback();
 		vkDeviceWaitIdle(device);
-		if (queue_unlock_callback)
-			queue_unlock_callback();
-	}
 
 	clear_wait_semaphores();
 
@@ -1829,7 +1337,7 @@ void Device::wait_idle_nolock()
 	managers.ubo.reset();
 	managers.ibo.reset();
 	managers.staging.reset();
-	for (auto &frame : per_frame)
+	for (std::unique_ptr<PerFrame> &frame : per_frame)
 	{
 		frame->vbo_blocks.clear();
 		frame->ibo_blocks.clear();
@@ -1839,10 +1347,10 @@ void Device::wait_idle_nolock()
 
 	framebuffer_allocator.clear();
 	transient_allocator.clear();
-	for (auto &allocator : descriptor_set_allocators)
+	for (DescriptorSetAllocator &allocator : descriptor_set_allocators)
 		allocator.clear();
 
-	for (auto &frame : per_frame)
+	for (std::unique_ptr<PerFrame> &frame : per_frame)
 	{
 		// We have done WaitIdle, no need to wait for extra fences, it's also not safe.
 		frame->wait_fences.clear();
@@ -1859,7 +1367,7 @@ void Device::next_frame_context()
 
 	framebuffer_allocator.begin_frame();
 	transient_allocator.begin_frame();
-	for (auto &allocator : descriptor_set_allocators)
+	for (DescriptorSetAllocator &allocator : descriptor_set_allocators)
 		allocator.begin_frame();
 
 	VK_ASSERT(!per_frame.empty());
@@ -1897,79 +1405,63 @@ void Device::decrement_frame_counter_nolock()
 {
 	VK_ASSERT(lock.counter > 0);
 	lock.counter--;
-#ifdef GRANITE_VULKAN_MT
-	lock.cond.notify_one();
-#endif
 }
 
 void Device::PerFrame::begin()
 {
 	if (!wait_fences.empty())
 	{
-#if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
-		for (auto &fence : wait_fences)
-			LOGI("Waiting for Fence: %llx\n", reinterpret_cast<unsigned long long>(fence));
-#endif
 		vkWaitForFences(device, wait_fences.size(), wait_fences.data(), VK_TRUE, UINT64_MAX);
 		wait_fences.clear();
 	}
 
 	if (!recycle_fences.empty())
 	{
-#if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
-		for (auto &fence : recycle_fences)
-			LOGI("Recycling Fence: %llx\n", reinterpret_cast<unsigned long long>(fence));
-#endif
 		vkResetFences(device, recycle_fences.size(), recycle_fences.data());
-		for (auto &fence : recycle_fences)
+		for (VkFence &fence : recycle_fences)
 			managers.fence.recycle_fence(fence);
 		recycle_fences.clear();
 	}
 
-	for (auto &pool : graphics_cmd_pool)
+	for (CommandPool &pool : graphics_cmd_pool)
 		pool.begin();
-	for (auto &pool : compute_cmd_pool)
+	for (CommandPool &pool : compute_cmd_pool)
 		pool.begin();
-	for (auto &pool : transfer_cmd_pool)
+	for (CommandPool &pool : transfer_cmd_pool)
 		pool.begin();
 	query_pool.begin();
 
-	for (auto &framebuffer : destroyed_framebuffers)
+	for (VkFramebuffer &framebuffer : destroyed_framebuffers)
 		vkDestroyFramebuffer(device, framebuffer, nullptr);
-	for (auto &sampler : destroyed_samplers)
+	for (VkSampler &sampler : destroyed_samplers)
 		vkDestroySampler(device, sampler, nullptr);
-	for (auto &pipeline : destroyed_pipelines)
+	for (VkPipeline &pipeline : destroyed_pipelines)
 		vkDestroyPipeline(device, pipeline, nullptr);
-	for (auto &view : destroyed_image_views)
+	for (VkImageView &view : destroyed_image_views)
 		vkDestroyImageView(device, view, nullptr);
-	for (auto &view : destroyed_buffer_views)
+	for (VkBufferView &view : destroyed_buffer_views)
 		vkDestroyBufferView(device, view, nullptr);
-	for (auto &image : destroyed_images)
+	for (VkImage &image : destroyed_images)
 		vkDestroyImage(device, image, nullptr);
-	for (auto &buffer : destroyed_buffers)
+	for (VkBuffer &buffer : destroyed_buffers)
 		vkDestroyBuffer(device, buffer, nullptr);
-	for (auto &semaphore : destroyed_semaphores)
+	for (VkSemaphore &semaphore : destroyed_semaphores)
 		vkDestroySemaphore(device, semaphore, nullptr);
-	for (auto &semaphore : recycled_semaphores)
+	for (VkSemaphore &semaphore : recycled_semaphores)
 	{
-#if defined(VULKAN_DEBUG) && defined(SUBMIT_DEBUG)
-		LOGI("Recycling semaphore: %llx\n", reinterpret_cast<unsigned long long>(semaphore));
-#endif
 		managers.semaphore.recycle(semaphore);
 	}
-	for (auto &event : recycled_events)
-		managers.event.recycle(event);
-	for (auto &alloc : allocations)
+	for (DeviceAllocation &alloc : allocations)
 		alloc.free_immediate(managers.memory);
 
-	for (auto &block : vbo_blocks)
-		managers.vbo.recycle_block(move(block));
-	for (auto &block : ibo_blocks)
-		managers.ibo.recycle_block(move(block));
-	for (auto &block : ubo_blocks)
-		managers.ubo.recycle_block(move(block));
-	for (auto &block : staging_blocks)
-		managers.staging.recycle_block(move(block));
+	for (BufferBlock &block : vbo_blocks)
+		managers.vbo.recycle_block(std::move(block));
+	for (BufferBlock &block : ibo_blocks)
+		managers.ibo.recycle_block(std::move(block));
+	for (BufferBlock &block : ubo_blocks)
+		managers.ubo.recycle_block(std::move(block));
+	for (BufferBlock &block : staging_blocks)
+		managers.staging.recycle_block(std::move(block));
 	vbo_blocks.clear();
 	ibo_blocks.clear();
 	ubo_blocks.clear();
@@ -1984,7 +1476,6 @@ void Device::PerFrame::begin()
 	destroyed_buffers.clear();
 	destroyed_semaphores.clear();
 	recycled_semaphores.clear();
-	recycled_events.clear();
 	allocations.clear();
 }
 
@@ -2039,7 +1530,8 @@ uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
 		}
 	}
 
-	throw runtime_error("Couldn't find memory type.");
+	LOGE("Couldn't find memory type for buffer domain.\n");
+	return UINT32_MAX;
 }
 
 uint32_t Device::find_memory_type(ImageDomain domain, uint32_t mask)
@@ -2088,7 +1580,8 @@ uint32_t Device::find_memory_type(ImageDomain domain, uint32_t mask)
 		}
 	}
 
-	throw runtime_error("Couldn't find memory type.");
+	LOGE("Couldn't find memory type for image domain.\n");
+	return UINT32_MAX;
 }
 
 static inline VkImageViewType get_image_view_type(const ImageCreateInfo &create_info, const ImageViewCreateInfo *view)
@@ -2158,7 +1651,7 @@ BufferViewHandle Device::create_buffer_view(const BufferViewCreateInfo &view_inf
 	info.range = view_info.range;
 
 	VkBufferView view;
-	auto res = vkCreateBufferView(device, &info, nullptr, &view);
+	VkResult res = vkCreateBufferView(device, &info, nullptr, &view);
 	if (res != VK_SUCCESS)
 		return BufferViewHandle(nullptr);
 
@@ -2188,7 +1681,7 @@ public:
 	VkImageView stencil_view = VK_NULL_HANDLE;
 	VkImageView unorm_view = VK_NULL_HANDLE;
 	VkImageView srgb_view = VK_NULL_HANDLE;
-	vector<VkImageView> rt_views;
+	std::vector<VkImageView> rt_views;
 	DeviceAllocation allocation;
 	DeviceAllocator *allocator = nullptr;
 	bool owned = true;
@@ -2229,7 +1722,7 @@ public:
 
 		if (create_unorm_srgb_views)
 		{
-			auto info = *view_info;
+			VkImageViewCreateInfo info = *view_info;
 
 			info.format = view_formats[0];
 			if (vkCreateImageView(device, &info, nullptr, &unorm_view) != VK_SUCCESS)
@@ -2256,7 +1749,7 @@ private:
 		if ((image_create_info.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0 &&
 		    ((info.subresourceRange.levelCount > 1) || (info.subresourceRange.layerCount > 1)))
 		{
-			auto view_info = info;
+			VkImageViewCreateInfo view_info = info;
 			view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 			view_info.subresourceRange.baseMipLevel = info.subresourceRange.baseMipLevel;
 			for (uint32_t layer = 0; layer < info.subresourceRange.layerCount; layer++)
@@ -2302,7 +1795,7 @@ private:
 					return false;
 				}
 
-				auto view_info = info;
+				VkImageViewCreateInfo view_info = info;
 
 				// We need this to be able to sample the texture, or otherwise use it as a non-pure DS attachment.
 				view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -2339,7 +1832,7 @@ private:
 			vkDestroyImageView(device, unorm_view, nullptr);
 		if (srgb_view)
 			vkDestroyImageView(device, srgb_view, nullptr);
-		for (auto &view : rt_views)
+		for (VkImageView &view : rt_views)
 			vkDestroyImageView(device, view, nullptr);
 
 		if (image)
@@ -2354,7 +1847,7 @@ private:
 ImageViewHandle Device::create_image_view(const ImageViewCreateInfo &create_info)
 {
 	ImageResourceHolder holder(device);
-	auto &image_create_info = create_info.image->get_create_info();
+	const ImageCreateInfo &image_create_info = create_info.image->get_create_info();
 
 	VkFormat format = create_info.format != VK_FORMAT_UNDEFINED ? create_info.format : image_create_info.format;
 
@@ -2394,119 +1887,11 @@ ImageViewHandle Device::create_image_view(const ImageViewCreateInfo &create_info
 	{
 		holder.owned = false;
 		ret->set_alt_views(holder.depth_view, holder.stencil_view);
-		ret->set_render_target_views(move(holder.rt_views));
+		ret->set_render_target_views(std::move(holder.rt_views));
 		return ret;
 	}
 	else
 		return ImageViewHandle(nullptr);
-}
-
-#ifndef _WIN32
-ImageHandle Device::create_imported_image(int fd, VkDeviceSize size, uint32_t memory_type,
-                                          VkExternalMemoryHandleTypeFlagBitsKHR handle_type,
-                                          const ImageCreateInfo &create_info)
-{
-	if (!ext.supports_external)
-		return {};
-
-	ImageResourceHolder holder(device);
-
-	VkImageCreateInfo info = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-	info.format = create_info.format;
-	info.extent.width = create_info.width;
-	info.extent.height = create_info.height;
-	info.extent.depth = create_info.depth;
-	info.imageType = create_info.type;
-	info.mipLevels = create_info.levels;
-	info.arrayLayers = create_info.layers;
-	info.samples = create_info.samples;
-	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	info.tiling = VK_IMAGE_TILING_OPTIMAL;
-	info.usage = create_info.usage;
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	info.flags = create_info.flags;
-	VK_ASSERT(create_info.domain != ImageDomain::Transient);
-
-	VkExternalMemoryImageCreateInfoKHR externalInfo = { VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO_KHR };
-	externalInfo.handleTypes = handle_type;
-	info.pNext = &externalInfo;
-
-	VK_ASSERT(image_format_is_supported(create_info.format, image_usage_to_features(info.usage), info.tiling));
-
-	if (vkCreateImage(device, &info, nullptr, &holder.image) != VK_SUCCESS)
-		return ImageHandle(nullptr);
-
-	VkMemoryAllocateInfo alloc_info = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-	alloc_info.allocationSize = size;
-	alloc_info.memoryTypeIndex = memory_type;
-
-	VkMemoryDedicatedAllocateInfoKHR dedicated_info = { VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO_KHR };
-	dedicated_info.image = holder.image;
-	alloc_info.pNext = &dedicated_info;
-
-	VkImportMemoryFdInfoKHR fd_info = { VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR };
-	fd_info.handleType = handle_type;
-	fd_info.fd = fd;
-	dedicated_info.pNext = &fd_info;
-
-	VkMemoryRequirements reqs;
-	vkGetImageMemoryRequirements(device, holder.image, &reqs);
-	if (reqs.size > size)
-		return ImageHandle(nullptr);
-
-	if (((1u << memory_type) & reqs.memoryTypeBits) == 0)
-		return ImageHandle(nullptr);
-
-	if (vkAllocateMemory(device, &alloc_info, nullptr, &holder.memory) != VK_SUCCESS)
-		return ImageHandle(nullptr);
-
-	if (vkBindImageMemory(device, holder.image, holder.memory, 0) != VK_SUCCESS)
-		return ImageHandle(nullptr);
-
-	// Create default image views.
-	// App could of course to this on its own, but it's very handy to have these being created automatically for you.
-	if (info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-	                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT))
-	{
-		if (!holder.create_default_views(create_info, nullptr))
-			return ImageHandle(nullptr);
-	}
-
-	auto allocation = DeviceAllocation::make_imported_allocation(holder.memory, size, memory_type);
-	ImageHandle handle(handle_pool.images.allocate(this, holder.image, holder.image_view, allocation, create_info));
-	if (handle)
-	{
-		holder.owned = false;
-		handle->get_view().set_alt_views(holder.depth_view, holder.stencil_view);
-		handle->get_view().set_render_target_views(move(holder.rt_views));
-
-		// Set possible dstStage and dstAccess.
-		handle->set_stage_flags(image_usage_to_possible_stages(info.usage));
-		handle->set_access_flags(image_usage_to_possible_access(info.usage));
-		return handle;
-	}
-	else
-		return ImageHandle(nullptr);
-}
-#endif
-
-InitialImageBuffer Device::create_image_staging_buffer(const TextureFormatLayout &layout)
-{
-	InitialImageBuffer result;
-
-	BufferCreateInfo buffer_info = {};
-	buffer_info.domain = BufferDomain::Host;
-	buffer_info.size = layout.get_required_size();
-	buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	result.buffer = create_buffer(buffer_info, nullptr);
-	set_name(*result.buffer, "image-upload-staging-buffer");
-
-	auto *mapped = static_cast<uint8_t *>(map_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT));
-	memcpy(mapped, layout.data(), layout.get_required_size());
-	unmap_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT);
-
-	layout.build_buffer_image_copies(result.blits);
-	return result;
 }
 
 InitialImageBuffer Device::create_image_staging_buffer(const ImageCreateInfo &info, const ImageInitialData *initial)
@@ -2547,14 +1932,14 @@ InitialImageBuffer Device::create_image_staging_buffer(const ImageCreateInfo &in
 	set_name(*result.buffer, "image-upload-staging-buffer");
 
 	// And now, do the actual copy.
-	auto *mapped = static_cast<uint8_t *>(map_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT));
+	uint8_t *mapped = static_cast<uint8_t *>(map_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT));
 	unsigned index = 0;
 
 	layout.set_buffer(mapped, layout.get_required_size());
 
 	for (unsigned level = 0; level < copy_levels; level++)
 	{
-		const auto &mip_info = layout.get_mip_info(level);
+		const TextureFormatLayout::MipInfo &mip_info = layout.get_mip_info(level);
 		uint32_t dst_height_stride = layout.get_layer_size(level);
 		size_t row_size = layout.get_row_size(level);
 
@@ -2578,7 +1963,7 @@ InitialImageBuffer Device::create_image_staging_buffer(const ImageCreateInfo &in
 	}
 
 	unmap_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT);
-	layout.build_buffer_image_copies(result.blits);
+	layout.build_buffer_image_copies(result.blits, result.num_blits);
 	return result;
 }
 
@@ -2613,7 +1998,7 @@ ImageHandle Device::create_image(const ImageCreateInfo &create_info, const Image
 {
 	if (initial)
 	{
-		auto staging_buffer = create_image_staging_buffer(create_info, initial);
+		InitialImageBuffer staging_buffer = create_image_staging_buffer(create_info, initial);
 		return create_image_from_staging_buffer(create_info, &staging_buffer);
 	}
 	else
@@ -2694,21 +2079,12 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 	{
 		info.sharingMode = VK_SHARING_MODE_CONCURRENT;
 
-		const auto add_unique_family = [&](uint32_t family) {
-			for (uint32_t i = 0; i < info.queueFamilyIndexCount; i++)
-			{
-				if (sharing_indices[i] == family)
-					return;
-			}
-			sharing_indices[info.queueFamilyIndexCount++] = family;
-		};
-
 		if (queue_flags & (IMAGE_MISC_CONCURRENT_QUEUE_GRAPHICS_BIT | IMAGE_MISC_CONCURRENT_QUEUE_ASYNC_GRAPHICS_BIT))
-			add_unique_family(graphics_queue_family_index);
+			add_unique_queue_family(info, sharing_indices, graphics_queue_family_index);
 		if (queue_flags & IMAGE_MISC_CONCURRENT_QUEUE_ASYNC_COMPUTE_BIT)
-			add_unique_family(compute_queue_family_index);
+			add_unique_queue_family(info, sharing_indices, compute_queue_family_index);
 		if (queue_flags & IMAGE_MISC_CONCURRENT_QUEUE_ASYNC_TRANSFER_BIT)
-			add_unique_family(transfer_queue_family_index);
+			add_unique_queue_family(info, sharing_indices, transfer_queue_family_index);
 
 		if (info.queueFamilyIndexCount > 1)
 			info.pQueueFamilyIndices = sharing_indices;
@@ -2767,6 +2143,8 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 
 	vkGetImageMemoryRequirements(device, holder.image, &reqs);
 	uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+	if (memory_type == UINT32_MAX)
+		return ImageHandle(nullptr);
 
 	if (info.tiling == VK_IMAGE_TILING_LINEAR &&
 	    (create_info.misc & IMAGE_MISC_LINEAR_IMAGE_IGNORE_DEVICE_LOCAL_BIT) == 0)
@@ -2790,7 +2168,7 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 		return ImageHandle(nullptr);
 	}
 
-	auto tmpinfo = create_info;
+	ImageCreateInfo tmpinfo = create_info;
 	tmpinfo.usage = info.usage;
 	tmpinfo.levels = info.mipLevels;
 
@@ -2809,7 +2187,7 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 		if (has_view)
 		{
 			handle->get_view().set_alt_views(holder.depth_view, holder.stencil_view);
-			handle->get_view().set_render_target_views(move(holder.rt_views));
+			handle->get_view().set_render_target_views(std::move(holder.rt_views));
 			handle->get_view().set_unorm_view(holder.unorm_view);
 			handle->get_view().set_srgb_view(holder.srgb_view);
 		}
@@ -2844,7 +2222,7 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 		// For concurrent queue mode, we just need to inject a semaphore.
 		// For non-concurrent queue mode, we will have to inject ownership transfer barrier if the queue families do not match.
 
-		auto graphics_cmd = request_command_buffer(CommandBuffer::Type::Generic);
+		CommandBufferHandle graphics_cmd = request_command_buffer(CommandBuffer::Type::Generic);
 		CommandBufferHandle transfer_cmd;
 
 		// Don't split the upload into multiple command buffers unless we have to.
@@ -2858,7 +2236,7 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 		                            VK_ACCESS_TRANSFER_WRITE_BIT);
 
 		transfer_cmd->begin_region("copy-image-to-gpu");
-		transfer_cmd->copy_buffer_to_image(*handle, *staging_buffer->buffer, staging_buffer->blits.size(), staging_buffer->blits.data());
+		transfer_cmd->copy_buffer_to_image(*handle, *staging_buffer->buffer, staging_buffer->num_blits, staging_buffer->blits);
 		transfer_cmd->end_region();
 
 		if (transfer_queue != graphics_queue)
@@ -2958,7 +2336,7 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 	else if (create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
 	{
 		VK_ASSERT(create_info.domain != ImageDomain::Transient);
-		auto cmd = request_command_buffer(CommandBuffer::Type::Generic);
+		CommandBufferHandle cmd = request_command_buffer(CommandBuffer::Type::Generic);
 		cmd->image_barrier(*handle, info.initialLayout, create_info.initial_layout,
 		                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, handle->get_stage_flags(),
 		                   handle->get_access_flags() &
@@ -3003,29 +2381,13 @@ static VkSamplerCreateInfo fill_vk_sampler_info(const SamplerCreateInfo &sampler
 
 SamplerHandle Device::create_sampler(const SamplerCreateInfo &sampler_info, StockSampler stock_sampler)
 {
-	auto info = fill_vk_sampler_info(sampler_info);
+	VkSamplerCreateInfo info = fill_vk_sampler_info(sampler_info);
 	VkSampler sampler;
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned index = state_recorder.register_sampler(Fossilize::Hash(stock_sampler), info);
-#else
 	(void)stock_sampler;
-#endif
 	if (vkCreateSampler(device, &info, nullptr, &sampler) != VK_SUCCESS)
 		return SamplerHandle(nullptr);
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	state_recorder.set_sampler_handle(index, sampler);
-#endif
-	return SamplerHandle(handle_pool.samplers.allocate(this, sampler, sampler_info));
-}
-
-SamplerHandle Device::create_sampler(const SamplerCreateInfo &sampler_info)
-{
-	auto info = fill_vk_sampler_info(sampler_info);
-	VkSampler sampler;
-	if (vkCreateSampler(device, &info, nullptr, &sampler) != VK_SUCCESS)
-		return SamplerHandle(nullptr);
 	return SamplerHandle(handle_pool.samplers.allocate(this, sampler, sampler_info));
 }
 
@@ -3075,6 +2437,11 @@ BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const vo
 	vkGetBufferMemoryRequirements(device, buffer, &reqs);
 
 	uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+	if (memory_type == UINT32_MAX)
+	{
+		vkDestroyBuffer(device, buffer, nullptr);
+		return BufferHandle(nullptr);
+	}
 
 	if (!managers.memory.allocate(reqs.size, reqs.alignment, memory_type, ALLOCATION_TILING_LINEAR, &allocation))
 	{
@@ -3089,7 +2456,7 @@ BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const vo
 		return BufferHandle(nullptr);
 	}
 
-	auto tmpinfo = create_info;
+	BufferCreateInfo tmpinfo = create_info;
 	tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	BufferHandle handle(handle_pool.buffers.allocate(this, buffer, allocation, tmpinfo));
 
@@ -3098,9 +2465,9 @@ BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const vo
 		CommandBufferHandle cmd;
 		if (initial)
 		{
-			auto staging_info = create_info;
+			BufferCreateInfo staging_info = create_info;
 			staging_info.domain = BufferDomain::Host;
-			auto staging_buffer = create_buffer(staging_info, initial);
+			BufferHandle staging_buffer = create_buffer(staging_info, initial);
 			set_name(*staging_buffer, "buffer-upload-staging-buffer");
 
 			cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
@@ -3144,16 +2511,11 @@ bool Device::memory_type_is_host_visible(uint32_t type) const
 	return (mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 }
 
-void Device::get_format_properties(VkFormat format, VkFormatProperties *properties)
-{
-	vkGetPhysicalDeviceFormatProperties(gpu, format, properties);
-}
-
 bool Device::get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling,
                                          VkImageUsageFlags usage, VkImageCreateFlags flags,
                                          VkImageFormatProperties *properties)
 {
-	auto res = vkGetPhysicalDeviceImageFormatProperties(gpu, format, type, tiling, usage, flags,
+	VkResult res = vkGetPhysicalDeviceImageFormatProperties(gpu, format, type, tiling, usage, flags,
 	                                                    properties);
 	return res == VK_SUCCESS;
 }
@@ -3162,7 +2524,7 @@ bool Device::image_format_is_supported(VkFormat format, VkFormatFeatureFlags req
 {
 	VkFormatProperties props;
 	vkGetPhysicalDeviceFormatProperties(gpu, format, &props);
-	auto flags = tiling == VK_IMAGE_TILING_OPTIMAL ? props.optimalTilingFeatures : props.linearTilingFeatures;
+	VkFormatFeatureFlags flags = tiling == VK_IMAGE_TILING_OPTIMAL ? props.optimalTilingFeatures : props.linearTilingFeatures;
 	return (flags & required) == required;
 }
 
@@ -3191,12 +2553,8 @@ VkFormat Device::get_default_depth_format() const
 uint64_t Device::allocate_cookie()
 {
 	// Reserve lower bits for "special purposes".
-#ifdef GRANITE_VULKAN_MT
-	return cookie.fetch_add(16, memory_order_relaxed) + 16;
-#else
 	cookie += 16;
 	return cookie;
-#endif
 }
 
 const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool compatible)
@@ -3244,7 +2602,7 @@ const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool c
 	}
 
 	depth_stencil = info.depth_stencil ? info.depth_stencil->get_format() : VK_FORMAT_UNDEFINED;
-	h.data(formats, info.num_color_attachments * sizeof(VkFormat));
+	h.data(reinterpret_cast<const uint32_t *>(formats), info.num_color_attachments * sizeof(VkFormat));
 	h.u32(info.num_color_attachments);
 	h.u32(depth_stencil);
 
@@ -3261,9 +2619,9 @@ const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool c
 	// Lazy flag can change external subpass dependencies, which is not compatible.
 	h.u32(lazy);
 
-	auto hash = h.get();
+	Hash hash = h.get();
 
-	auto *ret = render_passes.find(hash);
+	RenderPass *ret = render_passes.find(hash);
 	if (!ret)
 		ret = render_passes.emplace_yield(hash, hash, this, info);
 	return *ret;
@@ -3278,78 +2636,6 @@ ImageView &Device::get_transient_attachment(unsigned width, unsigned height, VkF
                                             unsigned index, unsigned samples, unsigned layers)
 {
 	return transient_allocator.request_attachment(width, height, format, index, samples, layers);
-}
-
-ImageView &Device::get_swapchain_view()
-{
-	VK_ASSERT(wsi.index < wsi.swapchain.size());
-	return wsi.swapchain[wsi.index]->get_view();
-}
-
-ImageView &Device::get_swapchain_view(unsigned index)
-{
-	VK_ASSERT(index < wsi.swapchain.size());
-	return wsi.swapchain[index]->get_view();
-}
-
-unsigned Device::get_num_frame_contexts() const
-{
-	return unsigned(per_frame.size());
-}
-
-unsigned Device::get_num_swapchain_images() const
-{
-	return unsigned(wsi.swapchain.size());
-}
-
-unsigned Device::get_swapchain_index() const
-{
-	return wsi.index;
-}
-
-unsigned Device::get_current_frame_context() const
-{
-	return frame_context_index;
-}
-
-RenderPassInfo Device::get_swapchain_render_pass(SwapchainRenderPass style)
-{
-	RenderPassInfo info;
-	info.num_color_attachments = 1;
-	info.color_attachments[0] = &get_swapchain_view();
-	info.clear_attachments = ~0u;
-	info.store_attachments = 1u << 0;
-
-	switch (style)
-	{
-	case SwapchainRenderPass::Depth:
-	{
-		info.op_flags |= RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
-		info.depth_stencil =
-		    &get_transient_attachment(wsi.swapchain[wsi.index]->get_create_info().width,
-		                              wsi.swapchain[wsi.index]->get_create_info().height, get_default_depth_format());
-		break;
-	}
-
-	case SwapchainRenderPass::DepthStencil:
-	{
-		info.op_flags |= RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
-		info.depth_stencil =
-		    &get_transient_attachment(wsi.swapchain[wsi.index]->get_create_info().width,
-		                              wsi.swapchain[wsi.index]->get_create_info().height, get_default_depth_stencil_format());
-		break;
-	}
-
-	default:
-		break;
-	}
-	return info;
-}
-
-void Device::set_queue_lock(std::function<void()> lock_callback, std::function<void()> unlock_callback)
-{
-	queue_lock_callback = move(lock_callback);
-	queue_unlock_callback = move(unlock_callback);
 }
 
 void Device::set_name(const Buffer &buffer, const char *name)
@@ -3415,30 +2701,6 @@ void Device::set_name(const CommandBuffer &cmd, const char *name)
 	}
 }
 
-#ifdef GRANITE_VULKAN_FILESYSTEM
-TextureManager &Device::get_texture_manager()
-{
-	return texture_manager;
-}
 
-ShaderManager &Device::get_shader_manager()
-{
-	return shader_manager;
-}
-#endif
-
-#ifdef GRANITE_VULKAN_FILESYSTEM
-void Device::init_shader_manager_cache()
-{
-	//if (!shader_manager.load_shader_cache("assets://shader_cache.json"))
-	//	shader_manager.load_shader_cache("cache://shader_cache.json");
-	shader_manager.load_shader_cache("assets://shader_cache.json");
-}
-
-void Device::flush_shader_manager_cache()
-{
-	shader_manager.save_shader_cache("cache://shader_cache.json");
-}
-#endif
 
 }

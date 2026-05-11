@@ -11,18 +11,6 @@
 #define FPS_PAL_INTERLACED     50.000
 #define FPS_PAL_NONINTERLACED  49.761
 
-/* Note: It is possible for the PlayStation GPU to output NTSC
- * on PAL GPU clock and vice versa, but this is unsupported in
- * Mednafen/Beetle PSX. The values below are provided for
- * completion but are not guaranteed to be correct.
- */
-#if 0
-#define FPS_NTSC_ON_PAL_INTERLACED    59.393
-#define FPS_NTSC_ON_PAL_NONINTERLACED 59.280
-#define FPS_PAL_ON_NTSC_INTERLACED    50.460
-#define FPS_PAL_ON_NTSC_NONINTERLACED 50.219
-#endif
-
 enum rsx_renderer_type
 {
    RSX_SOFTWARE = 0,
@@ -60,6 +48,10 @@ enum height_modes
    HEIGHT_MODE_240 = 0,
    HEIGHT_MODE_480
 };
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void rsx_intf_set_environment(retro_environment_t cb);
 void rsx_intf_set_video_refresh(retro_video_refresh_t cb);
@@ -105,8 +97,8 @@ void rsx_intf_push_triangle(float p0x, float p0y, float p0w,
                              * but I don't want to deal with enums in the
                              * FFI */
                             int blend_mode,
-                            uint32_t mask_test,
-                            uint32_t set_mask);
+                            bool mask_test,
+                            bool set_mask);
 
 void rsx_intf_push_quad(float p0x, float p0y, float p0w,
                         float p1x, float p1y, float p1w,
@@ -128,8 +120,8 @@ void rsx_intf_push_quad(float p0x, float p0y, float p0w,
                         uint8_t depth_shift,
                         bool dither,
                         int blend_mode,
-                        uint32_t mask_test,
-                        uint32_t set_mask,
+                        bool mask_test,
+                        bool set_mask,
                         bool is_sprite,
                         bool may_be_2d);
 
@@ -141,14 +133,14 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
                         /* This is really an `enum blending_modes`
                          * but I don't want to deal with enums in the FFI */
                         int blend_mode,
-                        uint32_t mask_test,
-                        uint32_t set_mask);
+                        bool mask_test,
+                        bool set_mask);
 
 void rsx_intf_load_image(uint16_t x, uint16_t y,
                          uint16_t w, uint16_t h,
                          uint16_t *vram,
-                         uint32_t mask_test,
-                         uint32_t set_mask);
+                         bool mask_test,
+                         bool set_mask);
 
 bool rsx_intf_read_vram(uint16_t x, uint16_t y,
                         uint16_t w, uint16_t h,
@@ -161,7 +153,7 @@ void rsx_intf_fill_rect(uint32_t color,
 void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
                         uint16_t dst_x, uint16_t dst_y,
                         uint16_t w, uint16_t h, 
-                        uint32_t mask_test, uint32_t set_mask);
+                        bool mask_test, bool set_mask);
 
 enum rsx_renderer_type rsx_intf_is_type(void);
 
@@ -175,5 +167,9 @@ float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,
                                   int aspect_ratio_setting, bool vram_override, bool widescreen_override,
                                   int widescreen_hack_aspect_ratio_setting);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /*__RSX_H__*/

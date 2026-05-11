@@ -44,7 +44,8 @@ extern "C" {
 
 #include "pgxp_types.h"
 
-	void	PGXP_Init();	// initialise memory
+	void	PGXP_Init(void);	/* initialise memory */
+	void	PGXP_Shutdown(void);	/* free heap-allocated buffers */
 
 	void	PGXP_SetModes(u32 modes);
 	u32		PGXP_GetModes();

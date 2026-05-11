@@ -49,10 +49,10 @@ struct BufferBlock
 
 	BufferBlockAllocation allocate(VkDeviceSize allocate_size)
 	{
-		auto aligned_offset = (offset + alignment - 1) & ~(alignment - 1);
+		VkDeviceSize aligned_offset = (offset + alignment - 1) & ~(alignment - 1);
 		if (aligned_offset + allocate_size <= size)
 		{
-			auto *ret = mapped + aligned_offset;
+			uint8_t *ret = mapped + aligned_offset;
 			offset = aligned_offset + allocate_size;
 			return { ret, aligned_offset };
 		}
@@ -65,7 +65,7 @@ class BufferPool
 {
 public:
 	~BufferPool();
-	void init(Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage, bool need_device_local);
+	void init(Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage);
 	void reset();
 
 	VkDeviceSize get_block_size() const
@@ -83,6 +83,5 @@ private:
 	VkBufferUsageFlags usage = 0;
 	std::vector<BufferBlock> blocks;
 	BufferBlock allocate_block(VkDeviceSize size);
-	bool need_device_local = false;
 };
 }

@@ -99,7 +99,6 @@ public:
 	};
 
 	RenderPass(Util::Hash hash, Device *device, const RenderPassInfo &info);
-	RenderPass(Util::Hash hash, Device *device, const VkRenderPassCreateInfo &create_info);
 	~RenderPass();
 
 	unsigned get_num_subpasses() const
@@ -166,8 +165,6 @@ private:
 	VkFormat depth_stencil = VK_FORMAT_UNDEFINED;
 	std::vector<SubpassInfo> subpasses;
 
-	void setup_subpasses(const VkRenderPassCreateInfo &create_info);
-
 	void fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
 	void fixup_wsi_barrier(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
 };
@@ -185,7 +182,7 @@ public:
 
 	ImageView *get_attachment(unsigned index) const
 	{
-		assert(index < attachments.size());
+		assert(index < num_attachments);
 		return attachments[index];
 	}
 
@@ -212,7 +209,8 @@ private:
 	uint32_t width = 0;
 	uint32_t height = 0;
 
-	std::vector<ImageView *> attachments;
+	ImageView *attachments[VULKAN_NUM_ATTACHMENTS + 1] = {};
+	unsigned num_attachments = 0;
 };
 
 static const unsigned VULKAN_FRAMEBUFFER_RING_SIZE = 8;
@@ -239,9 +237,6 @@ private:
 
 	Device *device;
 	Util::TemporaryHashmap<FramebufferNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> framebuffers;
-#ifdef GRANITE_VULKAN_MT
-	std::mutex lock;
-#endif
 };
 
 class AttachmentAllocator
@@ -271,9 +266,6 @@ private:
 
 	Device *device;
 	Util::TemporaryHashmap<TransientNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> attachments;
-#ifdef GRANITE_VULKAN_MT
-	std::mutex lock;
-#endif
 	bool transient;
 };
 

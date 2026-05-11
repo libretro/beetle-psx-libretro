@@ -22,13 +22,9 @@
 
 #include "descriptor_set.hpp"
 #include "device.hpp"
+#include <memory>
 #include <vector>
 
-#ifdef GRANITE_VULKAN_MT
-#include "thread_group.hpp"
-#endif
-
-using namespace std;
 using namespace Util;
 
 namespace Vulkan
@@ -37,20 +33,14 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 	: IntrusiveHashMapEnabled<DescriptorSetAllocator>(hash)
 	, device(device)
 {
-#ifdef GRANITE_VULKAN_MT
-	unsigned count = Granite::Global::thread_group()->get_num_threads() + 1;
-#else
-	unsigned count = 1;
-#endif
-	for (unsigned i = 0; i < count; i++)
-		per_thread.emplace_back(new PerThread);
+	per_thread.emplace_back(new PerThread);
 
 	VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
-	vector<VkDescriptorSetLayoutBinding> bindings;
+	std::vector<VkDescriptorSetLayoutBinding> bindings;
 	for (unsigned i = 0; i < VULKAN_NUM_BINDINGS; i++)
 	{
-		auto stages = stages_for_binds[i];
+		uint32_t stages = stages_for_binds[i];
 		if (stages == 0)
 			continue;
 
@@ -129,33 +119,27 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 		info.pBindings = bindings.data();
 	}
 
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	unsigned desc_index = device->register_descriptor_set_layout(get_hash(), info);
-#endif
 	LOGI("Creating descriptor set layout.\n");
 	if (vkCreateDescriptorSetLayout(device->get_device(), &info, nullptr, &set_layout) != VK_SUCCESS)
 		LOGE("Failed to create descriptor set layout.");
-#ifdef GRANITE_VULKAN_FOSSILIZE
-	device->set_descriptor_set_layout_handle(desc_index, set_layout);
-#endif
 }
 
 void DescriptorSetAllocator::begin_frame()
 {
-	for (auto &thr : per_thread)
+	for (std::unique_ptr<PerThread> &thr : per_thread)
 		thr->should_begin = true;
 }
 
-pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(unsigned thread_index, Hash hash)
+std::pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(unsigned thread_index, Hash hash)
 {
-	auto &state = *per_thread[thread_index];
+	PerThread &state = *per_thread[thread_index];
 	if (state.should_begin)
 	{
 		state.set_nodes.begin_frame();
 		state.should_begin = false;
 	}
 
-	auto *node = state.set_nodes.request(hash);
+	DescriptorSetNode *node = state.set_nodes.request(hash);
 	if (node)
 		return { node->set, true };
 
@@ -177,7 +161,8 @@ pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(unsigned thread_index, 
 
 	VkDescriptorSet sets[VULKAN_NUM_SETS_PER_POOL];
 	VkDescriptorSetLayout layouts[VULKAN_NUM_SETS_PER_POOL];
-	fill(begin(layouts), end(layouts), set_layout);
+	for (unsigned i = 0; i < VULKAN_NUM_SETS_PER_POOL; i++)
+		layouts[i] = set_layout;
 
 	VkDescriptorSetAllocateInfo alloc = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 	alloc.descriptorPool = pool;
@@ -188,7 +173,7 @@ pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(unsigned thread_index, 
 		LOGE("Failed to allocate descriptor sets.\n");
 	state.pools.push_back(pool);
 
-	for (auto set : sets)
+	for (VkDescriptorSet set : sets)
 		state.set_nodes.make_vacant(set);
 
 	return { state.set_nodes.request_vacant(hash)->set, false };
@@ -196,10 +181,10 @@ pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(unsigned thread_index, 
 
 void DescriptorSetAllocator::clear()
 {
-	for (auto &thr : per_thread)
+	for (std::unique_ptr<PerThread> &thr : per_thread)
 	{
 		thr->set_nodes.clear();
-		for (auto &pool : thr->pools)
+		for (VkDescriptorPool &pool : thr->pools)
 		{
 			vkResetDescriptorPool(device->get_device(), pool, 0);
 			vkDestroyDescriptorPool(device->get_device(), pool, nullptr);

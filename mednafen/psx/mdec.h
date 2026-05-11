@@ -1,6 +1,12 @@
 #ifndef __MDFN_PSX_MDEC_H
 #define __MDFN_PSX_MDEC_H
 
+#include <stdint.h>
+#include <boolean.h>
+
+#include "../mednafen-types.h"
+#include "../state.h"
+
 void MDEC_DMAWrite(uint32_t V);
 
 uint32_t MDEC_DMARead(uint32_t *offs);

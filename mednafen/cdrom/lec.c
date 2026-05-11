@@ -526,30 +526,31 @@ void lec_encode_mode2_form2_sector(uint32_t adr, uint8_t *sector)
 }
 
 /* Scrambles and byte swaps an encoded sector.
- * 'sector' must be 2352 byte wide.
+ * 'sector' must be 2352 bytes wide.  The byte-pair swap intentionally
+ * uses a temporary - the obvious XOR-swap alternative is no faster on
+ * modern hardware (the compiler emits the same load / load / store /
+ * store sequence either way) and reads worse.
  */
 void lec_scramble(uint8_t *sector)
 {
-   uint16_t i;
-   uint8_t *p = sector;
-   uint8_t tmp;
+   uint16_t       i;
+   uint8_t       *p      = sector;
    const uint8_t *stable = scramble_table;
 
-   for (i = 0; i < 6; i++)
+   /* Sync bytes: swap each pair, no scrambling. */
+   for (i = 0; i < 6; i++, p += 2)
    {
-      /* just swap bytes of sector sync */
-      tmp = *p;
-      *p = *(p + 1);
-      p++;
-      *p++ = tmp;
+      uint8_t tmp = p[0];
+      p[0] = p[1];
+      p[1] = tmp;
    }
 
-   for (;i < (2352 / 2); i++)
+   /* Remaining bytes: XOR with scramble table, then swap each pair. */
+   for (; i < (2352 / 2); i++, p += 2)
    {
-      /* scramble and swap bytes */
-      tmp = *p ^ *stable++;
-      *p = *(p + 1) ^ *stable++;
-      p++;
-      *p++ = tmp;
+      uint8_t tmp = p[0] ^ stable[0];
+      p[0]        = p[1] ^ stable[1];
+      p[1]        = tmp;
+      stable     += 2;
    }
 }

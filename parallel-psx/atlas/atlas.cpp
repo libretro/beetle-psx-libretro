@@ -1,5 +1,5 @@
 #include "atlas.hpp"
-#include <algorithm>
+#include "../renderer/renderer.hpp"
 #include <assert.h>
 
 using namespace std;
@@ -9,7 +9,7 @@ namespace PSX
 
 FBAtlas::FBAtlas()
 {
-	for (auto &f : fb_info)
+	for (StatusFlags &f : fb_info)
 		f = STATUS_FB_PREFER;
 }
 
@@ -47,17 +47,7 @@ bool FBAtlas::texture_rendered(const Rect &rect)
 
 Domain FBAtlas::blit_vram(const Rect &dst, const Rect &src)
 {
-#if 0
-	auto src_domain = find_suitable_domain(src);
-	auto dst_domain = find_suitable_domain(dst);
-	Domain domain;
-	if (src_domain != dst_domain)
-		domain = Domain::Unscaled;
-	else
-		domain = src_domain;
-#else
-	auto domain = find_suitable_domain(src);
-#endif
+	Domain domain = find_suitable_domain(src);
 
 	sync_domain(domain, src);
 	sync_domain(domain, dst);
@@ -119,7 +109,7 @@ void FBAtlas::write_transfer(Domain domain, const Rect &rect)
 
 void FBAtlas::read_texture(Domain domain)
 {
-	auto shifted = renderpass.texture_window;
+	Rect shifted = renderpass.texture_window;
 	bool palette;
 	switch (renderpass.texture_mode)
 	{
@@ -135,7 +125,7 @@ void FBAtlas::read_texture(Domain domain)
 	shifted.x += renderpass.texture_offset_x;
 	shifted.y += renderpass.texture_offset_y;
 
-	//auto domain = palette ? Domain::Unscaled : find_suitable_domain(shifted);
+	//Domain domain = palette ? Domain::Unscaled : find_suitable_domain(shifted);
 	sync_domain(domain, shifted);
 
 	Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
@@ -331,7 +321,7 @@ void FBAtlas::sync_domain(Domain domain, const Rect &rect)
 	{
 		for (unsigned x = xbegin; x <= xend; x++)
 		{
-			auto &mask = info(x, y);
+			StatusFlags &mask = info(x, y);
 			// If our block isn't in the ownership class we want,
 			// we need to read from one block and write to the other.
 			// We might have to wait for writers on read,
@@ -350,7 +340,7 @@ void FBAtlas::sync_domain(Domain domain, const Rect &rect)
 	{
 		for (unsigned x = xbegin; x <= xend; x++)
 		{
-			auto &mask = info(x, y);
+			StatusFlags &mask = info(x, y);
 			if ((mask & STATUS_OWNERSHIP_MASK) == ownership)
 			{
 				mask &= ~STATUS_OWNERSHIP_MASK;
@@ -407,11 +397,11 @@ void FBAtlas::flush_render_pass()
 		return;
 
 	// Clear out the "shadow" stage.
-	for (auto &f : fb_info)
+	for (StatusFlags &f : fb_info)
 		f &= ~STATUS_TEXTURE_READ;
 
 	renderpass.inside = false;
-	auto const &rect = renderpass.rect;
+	const Rect &rect = renderpass.rect;
 	if (rect.width == 0 || rect.height == 0)
 		return;
 
@@ -436,7 +426,7 @@ void FBAtlas::extend_render_pass(const Rect &rect, bool scissor)
 {
 	bool scissor_invariant = !scissor || renderpass.scissor.contains(rect);
 	listener->set_scissored_invariant(scissor_invariant);
-	auto scissored_rect = !scissor_invariant ? rect.scissor(renderpass.scissor) : rect;
+	Rect scissored_rect = !scissor_invariant ? rect.scissor(renderpass.scissor) : rect;
 
 	if (!scissored_rect.width || !scissored_rect.height)
 		return;
@@ -512,7 +502,7 @@ void FBAtlas::write_fragment(Domain domain, const Rect &rect)
 	extend_render_pass(rect, true);
 }
 
-void FBAtlas::clear_rect(const Rect &rect, FBColor color)
+void FBAtlas::clear_rect(const Rect &rect, uint32_t fb_color)
 {
 	if (rect.width == 0 || rect.height == 0)
 		return;
@@ -526,7 +516,7 @@ void FBAtlas::clear_rect(const Rect &rect, FBColor color)
 
 	// If the render pass area doesn't increase later, we can use loadOp == CLEAR instead of LOAD,
 	// which helps a lot on mobile GPUs.
-	listener->clear_quad(rect, color, renderpass.rect == rect);
+	listener->clear_quad(rect, fb_color, renderpass.rect == rect);
 
 	unsigned xbegin = rect.x / BLOCK_WIDTH;
 	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -570,7 +560,7 @@ void FBAtlas::notify_external_barrier(StatusFlags domains)
 	if (domains & fragment_read_stages)
 		domains |= fragment_read_stages;
 
-	for (auto &f : fb_info)
+	for (StatusFlags &f : fb_info)
 		f &= ~domains;
 }
 

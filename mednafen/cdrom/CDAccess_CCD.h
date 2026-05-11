@@ -18,38 +18,22 @@
 #ifndef _CDROM_CDACCESS_CCD_H_
 #define _CDROM_CDACCESS_CCD_H_
 
-#include "../FileStream.h"
-#include "../MemoryStream.h"
+#include "../Stream.h"
 #include "CDAccess.h"
 
-#include <vector>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-class CDAccess_CCD : public CDAccess
-{
- public:
+/* Factory: returns a CDAccess* whose vtable dispatches to the CCD
+ * backend.  *success is set to true on success, false on failure;
+ * a non-NULL pointer may still be returned on failure and must be
+ * destroyed with `cda->destroy(cda)`. */
+CDAccess *CDAccess_CCD_New(bool *success, const char *path,
+      bool image_memcache);
 
- CDAccess_CCD(bool *success, const char *path, bool image_memcache);
- virtual ~CDAccess_CCD();
-
- virtual bool Read_Raw_Sector(uint8_t *buf, int32_t lba);
-
- virtual bool Read_Raw_PW(uint8_t *buf, int32_t lba);
-
- virtual bool Read_TOC(TOC *toc);
-
- virtual void Eject(bool eject_status);
-
- private:
-
- bool Load(const char *path, bool image_memcache);
- void Cleanup(void);
-
- bool CheckSubQSanity(void);
-
- Stream* img_stream;
- Stream* sub_stream;
- size_t img_numsectors;
- TOC tocd;
-};
+#ifdef __cplusplus
+}
+#endif
 
 #endif

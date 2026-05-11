@@ -3,7 +3,6 @@ LOCAL_PATH := $(call my-dir)
 CORE_DIR := $(LOCAL_PATH)/..
 
 DEBUG                    := 0
-FRONTEND_SUPPORTS_RGB565 := 1
 NEED_CD                  := 1
 NEED_BPP                 := 32
 NEED_DEINTERLACER        := 1

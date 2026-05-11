@@ -3,43 +3,33 @@ SOURCES_C   :=
 
 DEPS_DIR     := $(CORE_DIR)/deps
 LIBRETRO_COMM_DIR := $(CORE_DIR)/libretro-common
-LIBKIRK_DIR  := $(DEPS_DIR)/libkirk
 MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 RSXGL_DIR    := $(CORE_DIR)/rustation-libretro/src
 CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
-LIBZMA_DIR   := $(DEPS_DIR)/lzma-19.00
 ZLIB_DIR     := $(DEPS_DIR)/zlib-1.2.11
 
 LIBCHDR_INCFLAGS = \
-                     -I$(LIBZMA_DIR)/include \
-                     -I$(DEPS_DIR)/libchdr/include \
-                     -I$(DEPS_DIR)/zstd/lib \
+                     -I$(DEPS_DIR)/libchdr/include
 
 LIBCHDR_SOURCES_C = \
-                     $(LIBZMA_DIR)/src/Alloc.c \
-                     $(LIBZMA_DIR)/src/Bra86.c \
-                     $(LIBZMA_DIR)/src/BraIA64.c \
-                     $(LIBZMA_DIR)/src/CpuArch.c \
-                     $(LIBZMA_DIR)/src/Delta.c \
-                     $(LIBZMA_DIR)/src/LzFind.c \
-                     $(LIBZMA_DIR)/src/Lzma86Dec.c \
-                     $(LIBZMA_DIR)/src/LzmaDec.c \
-                     $(LIBZMA_DIR)/src/LzmaEnc.c \
+                     $(DEPS_DIR)/libchdr/deps/lzma-25.01/src/LzmaDec.c \
+                     $(DEPS_DIR)/libchdr/deps/miniz-3.1.1/miniz.c \
+                     $(DEPS_DIR)/libchdr/deps/zstd-1.5.7/zstddeclib.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_bitstream.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_cdrom.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_chd.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdfl.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdlz.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdzl.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdzs.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_flac.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_huff.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_lzma.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_zlib.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_codec_zstd.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_flac.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_huffman.c \
-                     $(DEPS_DIR)/zstd/lib/common/entropy_common.c \
-                     $(DEPS_DIR)/zstd/lib/common/error_private.c \
-                     $(DEPS_DIR)/zstd/lib/common/fse_decompress.c \
-                     $(DEPS_DIR)/zstd/lib/common/zstd_common.c \
-                     $(DEPS_DIR)/zstd/lib/common/xxhash.c \
-                     $(DEPS_DIR)/zstd/lib/decompress/huf_decompress.c \
-                     $(DEPS_DIR)/zstd/lib/decompress/zstd_ddict.c \
-                     $(DEPS_DIR)/zstd/lib/decompress/zstd_decompress.c \
-                     $(DEPS_DIR)/zstd/lib/decompress/zstd_decompress_block.c \
+                     $(DEPS_DIR)/libchdr/src/libchdr_huffman.c
 
 ZLIB_INCFLAGS = -I$(ZLIB_DIR)
 ZLIB_SOURCES_C = \
@@ -68,28 +58,19 @@ ifeq ($(HAVE_OPENGL), 1)
       SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/glsym_gl.c
    endif
 
-   SOURCES_C += $(LIBRETRO_COMM_DIR)/glsm/glsm.c \
-                $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
+   SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
 
-   SOURCES_CXX += $(CORE_DIR)/rsx/rsx_lib_gl.cpp
+   SOURCES_C += $(CORE_DIR)/rsx/rsx_lib_gl.c
 endif
 
 INCFLAGS := -I$(CORE_DIR) \
             -I$(MEDNAFEN_DIR) \
             -I$(MEDNAFEN_DIR)/include \
-            -I$(MEDNAFEN_DIR)/intl \
-            -I$(MEDNAFEN_DIR)/hw_sound \
-            -I$(MEDNAFEN_DIR)/hw_cpu \
-            -I$(MEDNAFEN_DIR)/hw_misc \
-            -I$(LIBRETRO_COMM_DIR)/include \
-            -I$(DEPS_DIR)/ugui
+            -I$(LIBRETRO_COMM_DIR)/include
 
 ifneq (,$(findstring msvc,$(platform)))
    INCFLAGS += -I$(CORE_DIR)/msvc
 endif
-
-SOURCES_C += $(DEPS_DIR)/ugui/ugui.c \
-               $(CORE_DIR)/ugui_tools.c
 
 ifeq ($(SYSTEM_ZLIB), 1)
    CFLAGS += $(shell pkg-config --cflags zlib)
@@ -99,19 +80,7 @@ else
    SOURCES_C += $(ZLIB_SOURCES_C)
 endif
 
-ifeq ($(HAVE_GRIFFIN),1)
-   SOURCES_CXX += beetle_psx_griffin.cpp \
-                  $(CORE_EMU_DIR)/dma.cpp \
-                  $(CORE_EMU_DIR)/sio.cpp
-
-   SOURCES_C += beetle_psx_griffin_c.c
-endif
-
 FLAGS += -DHAVE_PBP
-
-ifeq ($(DEBUG), 1)
-   SOURCES_CXX += $(CORE_EMU_DIR)/dis.cpp
-endif
 
 ifeq ($(NEED_THREADING), 1)
    FLAGS += -DWANT_THREADING -DHAVE_THREADS
@@ -146,21 +115,18 @@ ifeq ($(NO_COMPUTED_GOTO), 1)
    FLAGS += -DNO_COMPUTED_GOTO
 endif
 
-ifeq ($(FRONTEND_SUPPORTS_RGB565), 1)
-   FLAGS += -DFRONTEND_SUPPORTS_RGB565
-endif
-
 ifeq ($(NEED_CD), 1)
    FLAGS += -DNEED_CD
 endif
 
 ifeq ($(HAVE_CHD), 1)
-   FLAGS += -DHAVE_CHD -D_7ZIP_ST -DZSTD_DISABLE_ASM
+   FLAGS += -DHAVE_CHD
 
    ifeq ($(SYSTEM_LIBCHDR), 1)
       INCFLAGS += $(shell pkg-config --cflags libchdr)
       LIBS += $(shell pkg-config --libs libchdr)
    else
+      FLAGS += -DCHDR_SYSTEM_ZLIB
       INCFLAGS += $(LIBCHDR_INCFLAGS)
    endif
 endif
@@ -212,77 +178,71 @@ ifeq ($(HAVE_LIGHTREC), 1)
                -include $(CORE_DIR)/lightning-lightrec-include/debug.h
 endif
 
-ifneq ($(HAVE_GRIFFIN), 1)
-   SOURCES_CXX += $(CORE_EMU_DIR)/irq.cpp \
-                  $(CORE_EMU_DIR)/timer.cpp \
-                  $(CORE_EMU_DIR)/dma.cpp \
-                  $(CORE_EMU_DIR)/frontio.cpp \
-                  $(CORE_EMU_DIR)/sio.cpp \
-                  $(CORE_EMU_DIR)/cpu.cpp \
-                  $(CORE_EMU_DIR)/gte.cpp \
-                  $(CORE_EMU_DIR)/cdc.cpp \
-                  $(CORE_EMU_DIR)/spu.cpp \
-                  $(CORE_EMU_DIR)/gpu.cpp \
-                  $(CORE_EMU_DIR)/gpu_polygon_sub.cpp \
-                  $(CORE_EMU_DIR)/mdec.cpp \
-                  $(CORE_EMU_DIR)/input/gamepad.cpp \
-                  $(CORE_EMU_DIR)/input/dualanalog.cpp \
-                  $(CORE_EMU_DIR)/input/dualshock.cpp \
-                  $(CORE_EMU_DIR)/input/justifier.cpp \
-                  $(CORE_EMU_DIR)/input/guncon.cpp \
-                  $(CORE_EMU_DIR)/input/negcon.cpp \
-                  $(CORE_EMU_DIR)/input/negconrumble.cpp \
-                  $(CORE_EMU_DIR)/input/memcard.cpp \
-                  $(CORE_EMU_DIR)/input/multitap.cpp \
-                  $(CORE_EMU_DIR)/input/mouse.cpp
-
-   ifeq ($(HAVE_JIT), 1)
-      SOURCES_CXX += $(CORE_EMU_DIR)/decomp.cpp
-   endif
-
    SOURCES_C += $(CORE_DIR)/libretro_cbs.c \
-                $(CORE_DIR)/beetle_psx_globals.c
+                $(CORE_DIR)/beetle_psx_globals.c \
+                $(CORE_EMU_DIR)/cpu.c \
+                $(CORE_EMU_DIR)/cdc.c \
+                $(CORE_EMU_DIR)/frontio.c \
+                $(CORE_EMU_DIR)/gpu.c
 
    ifeq ($(NEED_TREMOR), 1)
       SOURCES_C += $(sort $(wildcard $(MEDNAFEN_DIR)/tremor/*.c))
    endif
 
-   SOURCES_CXX += $(CDROM_DIR)/CDAccess.cpp \
-                  $(CDROM_DIR)/CDAccess_Image.cpp \
-                  $(CDROM_DIR)/CDAccess_CCD.cpp \
-                  $(CDROM_DIR)/CDAccess_PBP.cpp \
-                  $(CDROM_DIR)/audioreader.cpp \
-                  $(CDROM_DIR)/misc.cpp \
-                  $(CDROM_DIR)/cdromif.cpp
-
-   SOURCES_C +=   $(CDROM_DIR)/CDUtility.c \
+   SOURCES_C +=   $(CDROM_DIR)/CDAccess.c \
+                  $(CDROM_DIR)/CDAccess_CCD.c \
+                  $(CDROM_DIR)/CDAccess_Image.c \
+                  $(CDROM_DIR)/CDAccess_PBP.c \
+                  $(CDROM_DIR)/audioreader.c \
+                  $(CDROM_DIR)/cdromif.c \
+                  $(CDROM_DIR)/cdaccess_track.c \
+                  $(CDROM_DIR)/CDUtility.c \
                   $(CDROM_DIR)/galois.c \
                   $(CDROM_DIR)/l-ec.c \
                   $(CDROM_DIR)/lec.c \
                   $(CDROM_DIR)/recover-raw.c \
                   $(CDROM_DIR)/edc_crc32.c
 
-   SOURCES_CXX += $(MEDNAFEN_DIR)/error.cpp \
-                  $(MEDNAFEN_DIR)/general.cpp \
-                  $(MEDNAFEN_DIR)/FileStream.cpp \
-                  $(MEDNAFEN_DIR)/MemoryStream.cpp \
-                  $(MEDNAFEN_DIR)/Stream.cpp \
-                  $(MEDNAFEN_DIR)/mempatcher.cpp \
-                  $(MEDNAFEN_DIR)/video/Deinterlacer.cpp \
-                  $(MEDNAFEN_DIR)/video/surface.cpp \
-                  $(CORE_DIR)/libretro.cpp \
-                  $(MEDNAFEN_DIR)/mednafen-endian.cpp \
-                  $(CORE_DIR)/input.cpp \
-                  $(CORE_DIR)/rsx/rsx_intf.cpp
+   SOURCES_C += $(CORE_DIR)/libretro.c
 
-   SOURCES_C +=   \
-						$(MEDNAFEN_DIR)/settings.c \
+   SOURCES_C +=   $(MEDNAFEN_DIR)/mempatcher.c \
+                  $(MEDNAFEN_DIR)/general.c \
+                  $(MEDNAFEN_DIR)/error.c \
+                  $(MEDNAFEN_DIR)/mednafen-endian.c \
+                  $(MEDNAFEN_DIR)/video/Deinterlacer.c \
+                  $(CORE_DIR)/input.c \
+                  $(CORE_EMU_DIR)/dma.c \
+                  $(CORE_EMU_DIR)/gpu_polygon_sub.c \
+                  $(CORE_EMU_DIR)/gte.c \
+                  $(CORE_EMU_DIR)/irq.c \
+                  $(CORE_EMU_DIR)/mdec.c \
+                  $(CORE_EMU_DIR)/sio.c \
+                  $(CORE_EMU_DIR)/spu.c \
+                  $(CORE_EMU_DIR)/timer.c \
+                  $(CORE_DIR)/rsx/rsx_intf.c \
+                  $(CORE_DIR)/rsx/rsx_defer.c \
+                  $(MEDNAFEN_DIR)/FileStream.c \
+                  $(MEDNAFEN_DIR)/MemoryStream.c \
+                  $(MEDNAFEN_DIR)/Stream.c \
+                  $(MEDNAFEN_DIR)/settings.c \
                   $(MEDNAFEN_DIR)/state.c
 
    ifneq ($(RSX_DUMP),)
-      SOURCES_CXX += $(CORE_DIR)/rsx/rsx_dump.cpp
+      SOURCES_C   += $(CORE_DIR)/rsx/rsx_dump.c
       CFLAGS      += -DRSX_DUMP
       CXXFLAGS    += -DRSX_DUMP
+   endif
+
+   # HAVE_TRACE: env-gated diagnostic tracing of VRAM-mutating ops.
+   # Unset by default - the trace facility is then completely absent
+   # from the build (no source compiled, no symbols, no rodata, no
+   # call instructions emitted at hooked sites). Set HAVE_TRACE=1 to
+   # include it; tracing is then ALSO env-gated at runtime by setting
+   # BEETLE_PSX_TRACE in the environment, see rsx/tt_trace.h.
+   ifeq ($(HAVE_TRACE), 1)
+      SOURCES_C   += $(CORE_DIR)/rsx/tt_trace.c
+      CFLAGS      += -DHAVE_TRACE
+      CXXFLAGS    += -DHAVE_TRACE
    endif
 
    ifeq ($(HAVE_VULKAN), 1)
@@ -293,7 +253,6 @@ ifneq ($(HAVE_GRIFFIN), 1)
                      $(wildcard $(CORE_DIR)/parallel-psx/atlas/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/vulkan/*.cpp) \
                      $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
-                     $(CORE_DIR)/parallel-psx/util/timer.cpp \
                      $(CORE_DIR)/rsx/rsx_lib_vulkan.cpp
 
       SOURCES_C += $(wildcard $(CORE_DIR)/parallel-psx/volk/*.c)
@@ -348,18 +307,8 @@ ifneq ($(HAVE_GRIFFIN), 1)
       endif
 
    endif
-endif ## ifneq($(HAVE_GRIFFIN, 1))
-
-SOURCES_C +=   $(LIBKIRK_DIR)/aes.c \
-               $(LIBKIRK_DIR)/amctrl.c \
-               $(LIBKIRK_DIR)/bn.c \
-               $(LIBKIRK_DIR)/des.c \
-               $(LIBKIRK_DIR)/ec.c \
-               $(LIBKIRK_DIR)/kirk_engine.c \
-               $(LIBKIRK_DIR)/sha1.c
 
 SOURCES_C +=   $(CORE_DIR)/pgxp/pgxp_cpu.c \
-               $(CORE_DIR)/pgxp/pgxp_debug.c \
                $(CORE_DIR)/pgxp/pgxp_gpu.c \
                $(CORE_DIR)/pgxp/pgxp_gte.c \
                $(CORE_DIR)/pgxp/pgxp_main.c \
@@ -371,7 +320,7 @@ ifeq ($(HAVE_CHD), 1)
       SOURCES_C += $(LIBCHDR_SOURCES_C)
    endif
 
-   SOURCES_CXX += $(CDROM_DIR)/CDAccess_CHD.cpp
+   SOURCES_C += $(CDROM_DIR)/CDAccess_CHD.c
 endif ## ifeq ($(HAVE_CHD), 1)
 
 ifeq ($(HAVE_LIGHTREC), 1)

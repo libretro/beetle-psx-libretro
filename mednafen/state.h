@@ -2,6 +2,7 @@
 #define _STATE_H
 
 #include <stdint.h>
+#include <boolean.h>
 #include <retro_inline.h>
 
 typedef struct

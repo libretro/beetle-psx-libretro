@@ -59,6 +59,10 @@ include:
   - project: 'libretro-infrastructure/ci-templates'
     file: '/linux-i686.yml'
 
+  # Linux 64-bit (ARM)
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/linux-aarch64.yml'
+
   # MacOS 64-bit
   - project: 'libretro-infrastructure/ci-templates'
     file: '/osx-x64.yml'
@@ -87,7 +91,10 @@ include:
     file: '/tvos-arm64.yml'
 
   #################################### MISC ##################################
-    
+  # webOS 32-bit (LGTV)
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/webos-make.yml'
+
 # Stages for building
 stages:
   - build-prepare
@@ -145,6 +152,18 @@ libretro-build-linux-x64-hw:
 libretro-build-linux-i686-hw:
   extends:
     - .libretro-linux-i686-make-default
+    - .core-defs-hw-lightrec-static-libcplusplus
+
+# Linux 64-bit (ARM)
+libretro-build-linux-aarch64:
+  extends:
+    - .libretro-linux-aarch64-make-default
+    - .core-defs-lightrec-static-libcplusplus
+
+# Linux 64-bit (ARM, HW)
+libretro-build-linux-aarch64-hw:
+  extends:
+    - .libretro-linux-aarch64-make-default
     - .core-defs-hw-lightrec-static-libcplusplus
 
 # MacOS 64-bit
@@ -244,4 +263,10 @@ libretro-build-tvos-arm64:
 libretro-build-tvos-arm64-hw:
   extends:
     - .libretro-tvos-arm64-make-default
+    - .core-defs-hw
+
+# webOS 32-bit
+libretro-build-webos-armv7a:
+  extends:
+    - .libretro-webos-armv7a-make-default
     - .core-defs-hw

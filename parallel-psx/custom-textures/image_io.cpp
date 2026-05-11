@@ -1,4 +1,5 @@
 #include "image_io.hpp"
+#include <memory>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../stb/stb_image_write.h"
@@ -12,7 +13,7 @@ RGBAImage::~RGBAImage() {
 }
 
 std::unique_ptr<RGBAImage> load_image(const char *path) {
-    auto ptr = std::unique_ptr<RGBAImage>(new RGBAImage);
+    std::unique_ptr<RGBAImage> ptr = std::unique_ptr<RGBAImage>(new RGBAImage);
     int channels;
     ptr->data = stbi_load(path, &ptr->width, &ptr->height, &channels, 4);
     return ptr;

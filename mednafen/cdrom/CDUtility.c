@@ -99,6 +99,23 @@ void CDUtility_Init(void)
    }
 }
 
+/* Companion to CDUtility_Init. Frees the Reed-Solomon and Galois
+ * tables that Init_LEC_Correct allocated. Safe to call when
+ * CDUtility_Init was never called - just a no-op. Must be called
+ * before the libretro core is unloaded; otherwise the ~4KB of LEC
+ * tables leak per dlopen/dlclose cycle (cheats frontend-CD-swap
+ * tooling that load and unload cores in tight loops). The scramble
+ * table and lec_tables are static arrays - no allocation, nothing
+ * to free for those. */
+void CDUtility_Kill(void)
+{
+   if(CDUtility_Inited)
+   {
+      Kill_LEC_Correct();
+      CDUtility_Inited = false;
+   }
+}
+
 void encode_mode0_sector(uint32_t aba, uint8_t *sector_data)
 {
    CDUtility_Init();
@@ -306,19 +323,4 @@ void synth_leadout_sector_lba(uint8_t mode, const struct TOC *toc, const int32_t
             break;
       }
    }
-}
-
-
-/* ISO/IEC 10149:1995 (E): 20.2 */
-#if 0
-/* TODO/FIXME - missing functions */
-void subpw_synth_udapp_lba(const TOC& toc, const int32 lba, const int32 lba_subq_relative_offs, uint8* SubPWBuf);
-void synth_udapp_sector_lba(uint8 mode, const TOC& toc, const int32 lba, int32 lba_subq_relative_offs, uint8* out_buf);
-#endif
-
-void scrambleize_data_sector(uint8_t *sector_data)
-{
-   unsigned i;
-   for(i = 12; i < 2352; i++)
-      sector_data[i] ^= cdutil_scramble_table[i - 12];
 }

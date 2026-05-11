@@ -552,7 +552,7 @@ protected:
 	template <typename T, typename... P>
 	T &set(uint32_t id, P &&... args)
 	{
-		auto &var = variant_set<T>(ir.ids.at(id), std::forward<P>(args)...);
+		T &var = variant_set<T>(ir.ids.at(id), std::forward<P>(args)...);
 		var.self = id;
 		return var;
 	}
@@ -616,7 +616,7 @@ protected:
 
 	inline bool is_single_block_loop(uint32_t next) const
 	{
-		auto &block = get<SPIRBlock>(next);
+		const SPIRBlock &block = get<SPIRBlock>(next);
 		return block.merge == SPIRBlock::MergeLoop && block.continue_block == next;
 	}
 

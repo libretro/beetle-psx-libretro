@@ -8,10 +8,6 @@
 
 #include "../git.h"
 
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-#include <glsm/glsmsym.h>
-#endif
-
 #define INCMD_NONE     0
 #define INCMD_PLINE    1
 #define INCMD_QUAD     2
@@ -38,6 +34,7 @@ struct tri_vertex
    // Precise x, y, and w coordinates using PGXP (if available)
    float precise[3];
 };
+typedef struct tri_vertex tri_vertex;
 
 struct i_group;
 struct i_deltas;
@@ -47,6 +44,7 @@ struct line_point
    int32 x, y;
    uint8 r, g, b;
 };
+typedef struct line_point line_point;
 
 #define vertex_swap(_type, _a, _b) \
 {                           \
@@ -223,24 +221,17 @@ struct PS_GPU
    */
    uint16 *vram;
 };
+typedef struct PS_GPU PS_GPU;
 
+#include "gpu_c.h"
 
-
-uint16 *GPU_get_vram(void);
-
-void GPU_WriteDMA(uint32 V, uint32 addr);
-
-uint32_t GPU_ReadDMA(void);
-
-bool GPU_DMACanWrite(void);
-
-uint8 GPU_get_dither_upscale_shift(void);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void GPU_set_dither_upscale_shift(uint8 factor);
 
 uint8 GPU_get_upscale_shift(void);
-
-void GPU_set_upscale_shift(uint8 factor);
 
 bool GPU_get_display_possibly_dirty(void);
 
@@ -250,20 +241,14 @@ void GPU_set_display_change_count(unsigned a);
 
 unsigned GPU_get_display_change_count(void);
 
-void GPU_Init(bool pal_clock_and_tv,
+bool GPU_Init(bool pal_clock_and_tv,
       int sls, int sle, uint8 upscale_shift);
-
-void GPU_SoftReset(void);
 
 void GPU_RecalcClockRatio(void);
 
 void GPU_Destroy(void);
 
-void GPU_Rescale(uint8 ushift);
-
-int32_t GPU_Update(const int32_t sys_timestamp);
-
-void GPU_FillVideoParams(MDFNGI* gi);
+bool GPU_Rescale(uint8 ushift);
 
 void GPU_Power(void);
 
@@ -274,17 +259,14 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V);
 uint32_t GPU_Read(const int32_t timestamp, uint32_t A);
 
 void GPU_StartFrame(EmulateSpecStruct *espec_arg);
+void GPU_FlushDeferredScanout(void);
 
 int GPU_StateAction(StateMem *sm, int load, int data_only);
 
-uint16 GPU_PeekRAM(uint32 A);
-
-void GPU_PokeRAM(uint32 A, uint16 V);
-
-int32_t GPU_GetScanlineNum(void);
-
-void texel_put(uint32 x, uint32 y, uint16 v);
-
 void GPU_set_visible_scanlines(int sls, int sle); // Beetle PSX addition
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -43,20 +43,33 @@ CommandPool &CommandPool::operator=(CommandPool &&other) noexcept
 	if (this != &other)
 	{
 		device = other.device;
+
+		// Free our owned resources first.
 		if (!buffers.empty())
 			vkFreeCommandBuffers(device, pool, buffers.size(), buffers.data());
+		if (!secondary_buffers.empty())
+			vkFreeCommandBuffers(device, pool, secondary_buffers.size(), secondary_buffers.data());
 		if (pool != VK_NULL_HANDLE)
 			vkDestroyCommandPool(device, pool, nullptr);
 
-		pool = VK_NULL_HANDLE;
-		buffers.clear();
-		std::swap(pool, other.pool);
-		std::swap(buffers, other.buffers);
+		// Adopt other's resources.
+		pool = other.pool;
+		buffers = std::move(other.buffers);
+		secondary_buffers = std::move(other.secondary_buffers);
 		index = other.index;
-		other.index = 0;
+		secondary_index = other.secondary_index;
 #ifdef VULKAN_DEBUG
-		in_flight.clear();
-		std::swap(in_flight, other.in_flight);
+		in_flight = std::move(other.in_flight);
+#endif
+
+		// Leave other in a destructor-safe state (no double-free).
+		other.pool = VK_NULL_HANDLE;
+		other.index = 0;
+		other.secondary_index = 0;
+		other.buffers.clear();
+		other.secondary_buffers.clear();
+#ifdef VULKAN_DEBUG
+		other.in_flight.clear();
 #endif
 	}
 	return *this;
@@ -86,7 +99,7 @@ VkCommandBuffer CommandPool::request_secondary_command_buffer()
 {
 	if (secondary_index < secondary_buffers.size())
 	{
-		auto ret = secondary_buffers[secondary_index++];
+		VkCommandBuffer ret = secondary_buffers[secondary_index++];
 #ifdef VULKAN_DEBUG
 		VK_ASSERT(in_flight.find(ret) == end(in_flight));
 		in_flight.insert(ret);
@@ -116,7 +129,7 @@ VkCommandBuffer CommandPool::request_command_buffer()
 {
 	if (index < buffers.size())
 	{
-		auto ret = buffers[index++];
+		VkCommandBuffer ret = buffers[index++];
 #ifdef VULKAN_DEBUG
 		VK_ASSERT(in_flight.find(ret) == end(in_flight));
 		in_flight.insert(ret);

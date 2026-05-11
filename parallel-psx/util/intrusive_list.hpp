@@ -118,9 +118,9 @@ public:
 
 	Iterator erase(Iterator itr)
 	{
-		auto *node = itr.get();
-		auto *next = node->next;
-		auto *prev = node->prev;
+		T *node = itr.get();
+		IntrusiveListEnabled<T> *next = node->next;
+		IntrusiveListEnabled<T> *prev = node->prev;
 
 		if (prev)
 			prev->next = next;
@@ -135,7 +135,7 @@ public:
 
 	void insert_front(Iterator itr)
 	{
-		auto *node = itr.get();
+		T *node = itr.get();
 		if (head)
 			head->prev = node;
 

@@ -23,7 +23,6 @@
 #pragma once
 
 #include "volk.h"
-#include <vector>
 #include <stddef.h>
 #include <assert.h>
 
@@ -91,7 +90,7 @@ public:
 	{
 		assert(buffer);
 		assert(buffer_size == required_size);
-		auto &mip_info = mips[mip];
+		const MipInfo &mip_info = mips[mip];
 		uint8_t *slice = buffer + mip_info.offset;
 		slice += block_stride * layer * mip_info.block_row_length * mip_info.block_image_height;
 		return slice;
@@ -100,7 +99,7 @@ public:
 	template <typename T>
 	inline T *data_generic(uint32_t x, uint32_t y, uint32_t slice_index, uint32_t mip = 0) const
 	{
-		auto &mip_info = mips[mip];
+		const MipInfo &mip_info = mips[mip];
 		T *slice = reinterpret_cast<T *>(buffer + mip_info.offset);
 		slice += slice_index * mip_info.block_row_length * mip_info.block_image_height;
 		slice += y * mip_info.block_row_length;
@@ -138,7 +137,7 @@ public:
 		return data_generic<T>(x, y, z, mip);
 	}
 
-	void build_buffer_image_copies(std::vector<VkBufferImageCopy> &copies) const;
+	void build_buffer_image_copies(VkBufferImageCopy *copies, unsigned &num_copies) const;
 
 private:
 	uint8_t *buffer = nullptr;

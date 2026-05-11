@@ -1,47 +1,50 @@
 #ifndef __MDFN_MEMPATCHER_DRIVER_H
 #define __MDFN_MEMPATCHER_DRIVER_H
 
-struct MemoryPatch
+#include <stdint.h>
+#include <boolean.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* MemoryPatch describes one cheat entry.  The legacy C++ class had
+ * std::string fields for `name` and `conditions`; with the cheat
+ * table now in plain C we use fixed char buffers.  Names and
+ * conditions are short by construction (libretro composes the name
+ * from "cheat_<index>_<part>", and conditions are GameShark D0/D1/etc
+ * encodings of at most a few comma-separated terms). */
+#define MDFN_MEMPATCH_NAME_LEN       128
+#define MDFN_MEMPATCH_CONDITIONS_LEN 256
+
+typedef struct MemoryPatch
 {
-   MemoryPatch();
-   ~MemoryPatch();
-   std::string name;
-   std::string conditions;
-   uint32 addr;
-   uint64 val;
-   uint64 compare;
-   uint32 mltpl_count;
-   uint32 mltpl_addr_inc;
-   uint64 mltpl_val_inc;
-   uint32 copy_src_addr;
-   uint32 copy_src_addr_inc;
+   char     name      [MDFN_MEMPATCH_NAME_LEN];
+   char     conditions[MDFN_MEMPATCH_CONDITIONS_LEN];
+   uint32_t addr;
+   uint64_t val;
+   uint64_t compare;
+   uint32_t mltpl_count;
+   uint32_t mltpl_addr_inc;
+   uint64_t mltpl_val_inc;
+   uint32_t copy_src_addr;
+   uint32_t copy_src_addr_inc;
    unsigned length;
-   bool bigendian;
-   bool status; // (in)active
+   bool     bigendian;
+   bool     status; /* (in)active */
    unsigned icount;
-   char type; /* 'R' for replace, 'S' for substitute(GG), 'C' for substitute with compare */
-   /* 'T' for copy/transfer data, 'A' for add(variant of type R) */
-   //enum { TypeReplace, TypeSubst, TypeCompSubst };
-   //int type;
-};
+   char     type; /* 'R' replace, 'S' substitute(GG), 'C' substitute+compare,
+                   * 'T' copy/transfer, 'A' add(variant of R) */
+} MemoryPatch;
 
-int MDFNI_DecodePAR(const char *code, uint32 *a, uint8 *v, uint8 *c, char *type);
-int MDFNI_DecodeGG(const char *str, uint32 *a, uint8 *v, uint8 *c, char *type);
-void MDFNI_AddCheat(const MemoryPatch& patch);
-int MDFNI_DelCheat(uint32 which);
-int MDFNI_ToggleCheat(uint32 which);
+/* Reset a MemoryPatch to its zero default state. */
+void MemoryPatch_Init(MemoryPatch *p);
 
-int32 MDFNI_CheatSearchGetCount(void);
-void MDFNI_CheatSearchGetRange(uint32 first, uint32 last, int (*callb)(uint32 a, uint8 last, uint8 current));
-void MDFNI_CheatSearchGet(int (*callb)(uint32 a, uint64 last, uint64 current, void *data), void *data);
-void MDFNI_CheatSearchBegin(void);
-void MDFNI_CheatSearchEnd(int type, uint64 v1, uint64 v2, unsigned int bytelen, bool bigendian);
-void MDFNI_ListCheats(int (*callb)(char *name, uint32 a, uint64 v, uint64 compare, int s, char type, unsigned int length, bool bigendian, void *data), void *data);
+/* Append `patch` to the cheat table.  The table takes a copy. */
+void MDFNI_AddCheat(const MemoryPatch *patch);
 
-int MDFNI_GetCheat(uint32 which, char **name, uint32 *a, uint64 *v, uint64 *compare, int *s, char *type, unsigned int *length, bool *bigendian);
-int MDFNI_SetCheat(uint32 which, const char *name, uint32 a, uint64 v, uint64 compare, int s, char type, unsigned int length, bool bigendian);
-
-void MDFNI_CheatSearchShowExcluded(void);
-void MDFNI_CheatSearchSetCurrentAsOriginal(void);
+#ifdef __cplusplus
+}
+#endif
 
 #endif

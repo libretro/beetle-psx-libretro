@@ -1,41 +1,54 @@
+/* Mednafen - Multi-system Emulator
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ */
+
 #ifndef __MDFN_AUDIOREADER_H
 #define __MDFN_AUDIOREADER_H
 
+#include <stdint.h>
+#include <boolean.h>
+
 #include "../Stream.h"
 
-class AudioReader
-{
-   public:
-      AudioReader();
-      virtual ~AudioReader();
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-      virtual int64_t FrameCount(void);
-      INLINE int64_t Read(int64_t frame_offset, int16_t *buffer, int64_t frames)
-      {
-         int64_t ret;
+/* Audio-track decoder.
+ *
+ * Used to be a C++ AudioReader abstract base class with a single
+ * concrete OggVorbisReader subclass.  Now a plain C struct: Vorbis
+ * is the only format we support (CCD/CUE .wav-aliased-as-Ogg
+ * tracks), so the vtable collapses to direct calls.  All state -
+ * the Vorbis decoder + the last-read-position cursor used by the
+ * frame_offset != LastReadPos seek shortcut - lives in the struct
+ * defined in audioreader.c.
+ *
+ * AR_Open / AR_Close do NOT take ownership of the Stream object;
+ * the caller retains it and is responsible for freeing it.  The
+ * AudioReader does assume exclusive access for its lifetime. */
+typedef struct AudioReader AudioReader;
 
-         if(LastReadPos != frame_offset)
-         {
-            //puts("SEEK");
-            if(!Seek_(frame_offset))
-               return(0);
-            LastReadPos = frame_offset;
-         }
+/* Returns NULL if the input stream is not a valid Ogg Vorbis file. */
+AudioReader *AR_Open(struct Stream *fp);
 
-         ret = Read_(buffer, frames);
-         LastReadPos += ret;
-         return(ret);
-      }
+void    AR_Close     (AudioReader *r);
 
-   private:
-      virtual int64_t Read_(int16_t *buffer, int64_t frames);
-      virtual bool Seek_(int64_t frame_offset);
+/* Read `frames` stereo s16 frames into `buffer`, starting at
+ * `frame_offset`.  Returns the number of frames actually decoded
+ * (may be less than `frames` at EOF).  Internally seeks only when
+ * `frame_offset` doesn't match the cursor. */
+int64_t AR_Read      (AudioReader *r, int64_t frame_offset,
+                      int16_t *buffer, int64_t frames);
 
-      int64_t LastReadPos;
-};
+int64_t AR_FrameCount(AudioReader *r);
 
-// AR_Open(), and AudioReader, will NOT take "ownership" of the Stream object(IE it won't ever delete it).  Though it does assume it has exclusive access
-// to it for as long as the AudioReader object exists.
-AudioReader *AR_Open(Stream *fp);
+#ifdef __cplusplus
+}
+#endif
 
 #endif

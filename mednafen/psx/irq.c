@@ -1,0 +1,112 @@
+/* Mednafen - Multi-system Emulator
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+#include <stdint.h>
+
+#include "../mednafen-types.h"
+#include "../state.h"
+#include "../state_helpers.h"
+
+#include "irq.h"
+#include "../../osd_message.h"
+#include "cpu_c.h"
+
+static uint16_t Asserted;
+static uint16_t Mask;
+static uint16_t Status;
+
+#define Recalc() CPU_AssertIRQ(0, (bool)(Status & Mask))
+
+void IRQ_Power(void)
+{
+   Asserted = 0;
+   Status = 0;
+   Mask = 0;
+
+   Recalc();
+}
+
+int IRQ_StateAction(void *data, int load, int data_only)
+{
+   SFORMAT StateRegs[] =
+   {
+      SFVARN(Asserted, "Asserted"),
+      SFVARN(Mask, "Mask"),
+      SFVARN(Status, "Status"),
+      SFEND
+   };
+   int ret = MDFNSS_StateAction(data, load, data_only, StateRegs, "IRQ");
+
+   if(load)
+   {
+      Recalc();
+   }
+
+   return(ret);
+}
+
+
+void IRQ_Assert(int which, bool status)
+{
+   uint32_t old_Asserted = Asserted;
+
+/*
+   if(which == IRQ_SPU && status && (Asserted & (1 << which)))
+      osd_message(3, RETRO_LOG_ERROR,
+            RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
+            "SPU IRQ glitch??");
+*/
+
+   Asserted &= ~(1 << which);
+
+   if(status)
+   {
+      Asserted |= 1 << which;
+      Status |= (old_Asserted ^ Asserted) & Asserted;
+   }
+
+   Recalc();
+}
+
+
+void IRQ_Write(uint32_t A, uint32_t V)
+{
+   /* FIXME if we ever have "accurate" bus emulation */
+   V <<= (A & 3) * 8;
+
+   if(A & 4)
+      Mask = V;
+   else
+      Status &= V;
+
+   Recalc();
+}
+
+
+uint32_t IRQ_Read(uint32_t A)
+{
+   uint32_t ret = Status;
+
+   if(A & 4)
+      ret = Mask;
+
+   /* FIXME: Might want to move this out to psx.cpp eventually. */
+   ret |= 0x1F800000;
+   ret >>= (A & 3) * 8;
+
+   return(ret);
+}

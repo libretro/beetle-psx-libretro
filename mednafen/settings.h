@@ -20,6 +20,7 @@ extern int setting_last_scanline;
 extern int setting_last_scanline_pal;
 extern int setting_crosshair_color_p1;
 extern int setting_crosshair_color_p2;
+extern int setting_region_default;
 
 /* This should assert() or something if the setting isn't found, 
  * since it would be a totally tubular error! */

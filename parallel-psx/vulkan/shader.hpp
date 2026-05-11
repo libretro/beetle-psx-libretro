@@ -28,7 +28,6 @@
 #include "intrusive.hpp"
 #include "limits.hpp"
 #include "vulkan.hpp"
-#include "enum_cast.hpp"
 
 namespace Vulkan
 {
@@ -63,7 +62,7 @@ struct CombinedResourceLayout
 	uint32_t stages_for_sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
 	VkPushConstantRange push_constant_range = {};
 	uint32_t descriptor_set_mask = 0;
-	uint32_t spec_constant_mask[Util::ecast(ShaderStage::Count)] = {};
+	uint32_t spec_constant_mask[(unsigned)ShaderStage::Count] = {};
 	uint32_t combined_spec_constant_mask = 0;
 	Util::Hash push_constant_layout_hash = 0;
 };
@@ -129,7 +128,7 @@ public:
 
 	inline const Shader *get_shader(ShaderStage stage) const
 	{
-		return shaders[Util::ecast(stage)];
+		return shaders[(unsigned)stage];
 	}
 
 	void set_pipeline_layout(PipelineLayout *new_layout)
@@ -148,7 +147,7 @@ public:
 private:
 	void set_shader(ShaderStage stage, Shader *handle);
 	Device *device;
-	Shader *shaders[Util::ecast(ShaderStage::Count)] = {};
+	Shader *shaders[(unsigned)ShaderStage::Count] = {};
 	PipelineLayout *layout = nullptr;
 	VulkanCache<Util::IntrusivePODWrapper<VkPipeline>> pipelines;
 };
