@@ -37,8 +37,7 @@
 #include <sys/types.h>
 
 #include "../general_c.h"
-#include "../FileStream.h"
-#include "../MemoryStream.h"
+#include "../cdstream.h"
 
 #include "CDAccess.h"
 #include "cdaccess_track.h"
@@ -71,7 +70,7 @@ enum
    _DI_FORMAT_COUNT
 };
 
-static const int32 DI_Size_Table[7] =
+static const int32_t DI_Size_Table[7] =
 {
    2352, /* Audio */
    2048, /* MODE1 */
@@ -105,20 +104,6 @@ static const char *DI_CUE_Strings[7] =
    "MODE2/2324",
    "MODE2/2352"
 };
-
-static void Endian_A16_Swap(void *src, uint32_t nelements)
-{
-   uint32_t i;
-   uint8_t *nsrc = (uint8_t *)src;
-
-   for(i = 0; i < nelements; i++)
-   {
-      uint8_t tmp = nsrc[i * 2];
-
-      nsrc[i * 2] = nsrc[i * 2 + 1];
-      nsrc[i * 2 + 1] = tmp;
-   }
-}
 
 /* Tokenize one whitespace-separated argument out of `src` starting at
  * source_offset.  Writes up to destlen-1 characters into dest, NUL-
@@ -200,8 +185,8 @@ static size_t UnQuotify(const char *src, size_t source_len, size_t source_offset
  * handful of distinct file references. */
 struct toc_streamcache_entry
 {
-   char    *filename;
-   struct Stream *fp;
+   char     *filename;
+   cdstream *fp;
 };
 
 struct toc_streamcache
@@ -211,7 +196,7 @@ struct toc_streamcache
    size_t                        cap;
 };
 
-static struct Stream *toc_streamcache_find(const struct toc_streamcache *c,
+static cdstream *toc_streamcache_find(const struct toc_streamcache *c,
       const char *filename)
 {
    size_t i;
@@ -224,7 +209,7 @@ static struct Stream *toc_streamcache_find(const struct toc_streamcache *c,
 }
 
 static int toc_streamcache_set(struct toc_streamcache *c,
-      const char *filename, struct Stream *fp)
+      const char *filename, cdstream *fp)
 {
    size_t i;
    /* Replace if already present (matches std::map's operator[] semantics). */
@@ -286,31 +271,31 @@ typedef struct CDAccess_Image CDAccess_Image;
 
 /* Forward declarations - methods reference each other regardless of
  * source order. */
-static uint32 CDAccess_Image_GetSectorCount(CDAccess_Image *self, CDRFILE_TRACK_INFO *track);
+static uint32_t CDAccess_Image_GetSectorCount(CDAccess_Image *self, CDRFILE_TRACK_INFO *track);
 static bool   CDAccess_Image_ParseTOCFileLineInfo(CDAccess_Image *self, CDRFILE_TRACK_INFO *track, const int tracknum, const char *filename, const char *binoffset, const char *msfoffset, const char *length, bool image_memcache, struct toc_streamcache *cache);
 static int    CDAccess_Image_LoadSBI(CDAccess_Image *self, const char *sbi_path);
 static bool   CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, bool image_memcache);
 static void   CDAccess_Image_Cleanup(CDAccess_Image *self);
-static void   CDAccess_Image_MakeSubPQ(CDAccess_Image *self, int32 lba, uint8 *SubPWBuf);
+static void   CDAccess_Image_MakeSubPQ(CDAccess_Image *self, int32_t lba, uint8_t *SubPWBuf);
 
 
 
-static uint32 CDAccess_Image_GetSectorCount(CDAccess_Image *self, CDRFILE_TRACK_INFO *track){
-   int64 size;
+static uint32_t CDAccess_Image_GetSectorCount(CDAccess_Image *self, CDRFILE_TRACK_INFO *track){
+   int64_t size;
 
    if(track->DIFormat == DI_FORMAT_AUDIO)
    {
       if(track->AReader)
          return(((AR_FrameCount(track->AReader) * 4) - track->FileOffset) / 2352);
 
-      size = stream_size(track->fp);
+      size = cdstream_size(track->fp);
 
       if(track->SubchannelMode)
          return((size - track->FileOffset) / (2352 + 96));
       return((size - track->FileOffset) / 2352);
    }
 
-   size = stream_size(track->fp);
+   size = cdstream_size(track->fp);
 
    return((size - track->FileOffset) / DI_Size_Table[track->DIFormat]);
 }
@@ -321,9 +306,9 @@ static bool CDAccess_Image_ParseTOCFileLineInfo(CDAccess_Image *self, CDRFILE_TR
    long offset = 0; /* In bytes! */
    long tmp_long;
    int m, s, f;
-   uint32 sector_mult;
+   uint32_t sector_mult;
    long sectors;
-   struct Stream *cached;
+   cdstream *cached;
    size_t flen;
 
    cached = toc_streamcache_find(cache, filename);
@@ -336,48 +321,28 @@ static bool CDAccess_Image_ParseTOCFileLineInfo(CDAccess_Image *self, CDRFILE_TR
    else
    {
       char efn[IMAGE_PATH_BUF];
+      cdstream *file;
 
       track->FirstFileInstance = 1;
 
       MDFN_EvalFIP_c(self->base_dir, filename, efn, sizeof(efn));
 
-      if (image_memcache)
+      file = cdstream_new(efn);
+      if (!file)
       {
-         struct FileStream *file = mdfn_filestream_new(efn);
-         if (!mdfn_filestream_is_open(file))
-         {
-            MDFN_Error(0, "Could not open track file \"%s\"", efn);
-            if (file)
-               stream_destroy(&file->base);
-            return false;
-         }
-         /* mdfn_memstream_new_from_stream consumes &file->base regardless
-          * of success - no further cleanup of `file` required. */
-         {
-            struct MemoryStream *mem = mdfn_memstream_new_from_stream(&file->base);
-            if (!mdfn_memstream_is_valid(mem))
-            {
-               if (mem)
-                  stream_destroy(&mem->base);
-               track->fp = NULL;
-               return false;
-            }
-            track->fp = &mem->base;
-         }
-      }
-      else
-      {
-         struct FileStream *file = mdfn_filestream_new(efn);
-         if (!mdfn_filestream_is_open(file))
-         {
-            MDFN_Error(0, "Could not open track file \"%s\"", efn);
-            if (file)
-               stream_destroy(&file->base);
-            return false;
-         }
-         track->fp = &file->base;
+         MDFN_Error(0, "Could not open track file \"%s\"", efn);
+         return false;
       }
 
+      if (image_memcache && !cdstream_memcache_in_place(file))
+      {
+         /* memcache_in_place closed the stream on failure; free the
+          * shell. */
+         free(file);
+         return false;
+      }
+
+      track->fp = file;
       toc_streamcache_set(cache, filename, track->fp);
    }
 
@@ -447,9 +412,9 @@ static bool CDAccess_Image_ParseTOCFileLineInfo(CDAccess_Image *self, CDRFILE_TR
 
 static int CDAccess_Image_LoadSBI(CDAccess_Image *self, const char* sbi_path){
    /* Loading SBI file */
-   uint8 header[4];
-   uint8 ed[4 + 10];
-   uint8 tmpq[12];
+   uint8_t header[4];
+   uint8_t ed[4 + 10];
+   uint8_t tmpq[12];
    RFILE *sbis      = filestream_open(sbi_path,
          RETRO_VFS_FILE_ACCESS_READ,
          RETRO_VFS_FILE_ACCESS_HINT_NONE);
@@ -464,7 +429,7 @@ static int CDAccess_Image_LoadSBI(CDAccess_Image *self, const char* sbi_path){
 
    while(filestream_read(sbis, ed, sizeof(ed)) == sizeof(ed))
    {
-      uint32 aba;
+      uint32_t aba;
 
       /* Bad BCD MSF offset in SBI file. */
       if(!BCD_is_valid(ed[0]) || !BCD_is_valid(ed[1]) || !BCD_is_valid(ed[2]))
@@ -530,54 +495,49 @@ static void str_trim(char *s)
 }
 
 static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, bool image_memcache){
-   struct FileStream *probe;
-   struct MemoryStream fp;
+   cdstream fp;
    bool ok;
    /* Hoisted from mid-function so the `goto cleanup` paths above don't
     * cross their initialization. They were locals to the post-parse
     * track-fixup loop. */
-   int32 RunningLBA = 0;
-   int32 LastIndex  = 0;
+   int32_t RunningLBA = 0;
+   int32_t LastIndex  = 0;
    long  FileOffset = 0;
    const unsigned max_args = 4;
    char  linebuf[4096];
    char  cmdbuf[256];
    char  args[4][1024];
    bool  IsTOC = false;
-   int32 active_track = -1;
-   int32 AutoTrackInc = 1; /* For TOC */
+   int32_t active_track = -1;
+   int32_t AutoTrackInc = 1; /* For TOC */
    CDRFILE_TRACK_INFO TmpTrack;
    char  file_base_buf[IMAGE_PATH_BUF];
    char  file_ext_buf [IMAGE_PATH_BUF];
    struct toc_streamcache cache;
 
-   probe = mdfn_filestream_new(path);
-   if (!mdfn_filestream_is_open(probe))
+   /* Open the cue/toc sheet itself and slurp it into RAM up-front.
+    * The parser does line-at-a-time reads; doing those against the
+    * filesystem would be tens of thousands of small reads on a
+    * complex multi-track image.  fp is a stack cdstream cleaned up
+    * by the single cdstream_close at the cleanup label - all error
+    * paths below set ok = false and fall through. */
+   if (!cdstream_open(&fp, path))
    {
       MDFN_Error(0, "Could not open \"%s\"", path);
-      if (probe)
-         stream_destroy(&probe->base);
+      return false;
+   }
+   if (!cdstream_memcache_in_place(&fp))
+   {
+      MDFN_Error(0, "Could not load \"%s\" into memory", path);
+      /* memcache_in_place closed fp on failure. */
       return false;
    }
 
-   /* Stack-local MemoryStream that slurps the probe; mdfn_memstream_init_
-    * from_stream consumes &probe->base. fp must be cleaned up via
-    * stream_close (NOT stream_destroy - it's a stack address). All
-    * failure paths in the body below set ok=false and fall through to
-    * the single cleanup at the bottom rather than returning early. */
    ok = true;
    /* Silence GCC warning - LastIndex is assigned but only conditionally read */
    (void)LastIndex;
 
    memset(&cache, 0, sizeof(cache));
-
-   mdfn_memstream_init_from_stream(&fp, &probe->base);
-   if (!mdfn_memstream_is_valid(&fp))
-   {
-      MDFN_Error(0, "Could not load \"%s\" into memory", path);
-      stream_close(&fp.base);
-      return false;
-   }
 
    self->disc_type = DISC_TYPE_CDDA_OR_M1;
    memset(&TmpTrack, 0, sizeof(TmpTrack));
@@ -596,14 +556,14 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
    /* Check for annoying UTF-8 BOM. */
    if(!IsTOC)
    {
-      uint8 bom_tmp[3];
+      uint8_t bom_tmp[3];
 
-      if(stream_read(&fp.base, bom_tmp, 3) == 3 && bom_tmp[0] == 0xEF && bom_tmp[1] == 0xBB && bom_tmp[2] == 0xBF)
+      if(cdstream_read(&fp, bom_tmp, 3) == 3 && bom_tmp[0] == 0xEF && bom_tmp[1] == 0xBB && bom_tmp[2] == 0xBF)
       {
          log_cb(RETRO_LOG_ERROR, "UTF-8 BOM detected at start of CUE sheet.\n");
       }
       else
-         stream_seek(&fp.base, 0, SEEK_SET);
+         cdstream_seek(&fp, 0, SEEK_SET);
    }
 
 
@@ -611,7 +571,7 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
    self->FirstTrack = 99;
    self->LastTrack  = 0;
 
-   while (stream_get_line(&fp.base, linebuf, sizeof(linebuf)) >= 0)
+   while (cdstream_get_line(&fp, linebuf, sizeof(linebuf)) >= 0)
    {
       unsigned argcount = 0;
       size_t   linelen;
@@ -832,26 +792,24 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
                strlcpy(efn, args[0], sizeof(efn));
 
             {
-               struct FileStream *probe2 = mdfn_filestream_new(efn);
-               if (!mdfn_filestream_is_open(probe2))
+               cdstream *probe2 = cdstream_new(efn);
+               if (!probe2)
                {
                   MDFN_Error(0, "Could not open track file \"%s\"", efn);
-                  if (probe2)
-                     stream_destroy(&probe2->base);
                   { ok = false; goto cleanup; }
                }
-               TmpTrack.fp = &probe2->base;
+               TmpTrack.fp = probe2;
             }
             TmpTrack.FirstFileInstance = 1;
 
-            if (image_memcache)
+            if (image_memcache && !cdstream_memcache_in_place(TmpTrack.fp))
             {
-               struct MemoryStream *mem = mdfn_memstream_new_from_stream(TmpTrack.fp);
-               /* mdfn_memstream_new_from_stream consumes its argument
-                * regardless of success; on alloc failure mem is NULL.
-                * In that case TmpTrack.fp is the now-dangling old
-                * pointer - clear it so we don't double-free at cleanup. */
-               TmpTrack.fp = mem ? &mem->base : NULL;
+               /* memcache_in_place closed the stream on failure; free
+                * the shell.  Clear TmpTrack.fp so cleanup doesn't
+                * double-free. */
+               free(TmpTrack.fp);
+               TmpTrack.fp = NULL;
+               { ok = false; goto cleanup; }
             }
 
             if (!strcasecmp(args[1], "BINARY"))
@@ -1125,7 +1083,7 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
 
 cleanup:
    toc_streamcache_free(&cache);
-   stream_close(&fp.base);
+   cdstream_close(&fp);
    return ok;
 }
 
@@ -1146,7 +1104,7 @@ static void CDAccess_Image_Cleanup(CDAccess_Image *self){
 
          if (this_track->fp)
          {
-            stream_destroy(this_track->fp);
+            cdstream_destroy(this_track->fp);
             this_track->fp = NULL;
          }
       }
@@ -1154,7 +1112,7 @@ static void CDAccess_Image_Cleanup(CDAccess_Image *self){
 }
 
 
-static bool CDAccess_Image_Read_Raw_Sector(CDAccess *base_self, uint8 *buf, int32 lba){
+static bool CDAccess_Image_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf, int32_t lba){
    CDAccess_Image *self = (CDAccess_Image *)base_self;
    int32_t track;
    uint8_t SimuQ[0xC];
@@ -1183,10 +1141,22 @@ static bool CDAccess_Image_Read_Raw_Sector(CDAccess *base_self, uint8 *buf, int3
          {
             if(ct->AReader)
             {
-               int16   AudioBuf[588 * 2];
+               /* AR_Read writes host-endian int16 samples; every
+                * caller of CDAccess_Image_Read_Raw_Sector provides a
+                * buf with at least 4-byte alignment - it's either
+                * CDIF_Sector_Buffer.data (offset 12 of a malloc'd
+                * struct) or a stack uint8 array of >=2352 bytes
+                * (gcc/clang default-align such arrays to 16 in the
+                * caller's frame). Reading AR_Read straight into buf
+                * removes the 2352 B memcpy + 2352 B stack scratch
+                * the original code paid per CDDA sector.
+                *
+                * The (void*) intermediate cast keeps -Wcast-align
+                * quiet on strict-alignment targets; the underlying
+                * alignment is safe per above. */
                int64_t frames_read = AR_Read(ct->AReader,
                      (ct->FileOffset / 4) + (lba - ct->LBA) * 588,
-                     AudioBuf, 588);
+                     (int16_t *)(void *)buf, 588);
 
                ct->LastSamplePos += frames_read;
 
@@ -1194,17 +1164,12 @@ static bool CDAccess_Image_Read_Raw_Sector(CDAccess *base_self, uint8 *buf, int3
                   frames_read = 0;
 
                if(frames_read < 588)
-                  memset((uint8 *)AudioBuf + frames_read * 2 * sizeof(int16), 0, (588 - frames_read) * 2 * sizeof(int16));
+                  memset(buf + frames_read * 2 * sizeof(int16_t), 0, (588 - frames_read) * 2 * sizeof(int16_t));
 
-               /* AudioBuf is in host byte order from the decoder; the
-                * raw CDDA sector format requires little-endian samples.
-                * On LE hosts the bytes are already correct, so a single
-                * memcpy suffices.  On BE hosts copy then byteswap in
-                * place. */
-               memcpy(buf, AudioBuf, 588 * 2 * sizeof(int16));
-#ifdef MSB_FIRST
-               Endian_A16_Swap(buf, 588 * 2);
-#endif
+               /* Path 2 contract: buf holds host-endian int16
+                * stereo samples. AR_Read already wrote host-endian
+                * int16 into buf, so we're done - no swap on any
+                * host. */
             }
             else	/* Binary, woo. */
             {
@@ -1216,29 +1181,57 @@ static bool CDAccess_Image_Read_Raw_Sector(CDAccess *base_self, uint8 *buf, int3
                if(ct->SubchannelMode)
                   SeekPos += 96 * (lba - ct->LBA);
 
-               stream_seek(ct->fp, SeekPos, SEEK_SET);
+               cdstream_seek(ct->fp, SeekPos, SEEK_SET);
 
                switch(ct->DIFormat)
                {
                   case DI_FORMAT_AUDIO:
-                     stream_read(ct->fp, buf, 2352);
+                     cdstream_read(ct->fp, buf, 2352);
 
+                     /* Path 2 contract: buf holds host-endian int16
+                      * stereo samples. Swap iff source byte order
+                      * differs from host byte order:
+                      *   LE host + LE source (default BIN)   -> no swap
+                      *   LE host + BE source (cdrdao TOC)    -> swap
+                      *   BE host + LE source                 -> swap
+                      *   BE host + BE source                 -> no swap
+                      * Compile-time #ifdef collapses to a single
+                      * runtime branch on RawAudioMSBFirst. */
+#ifdef MSB_FIRST
+                     if(!ct->RawAudioMSBFirst)
+#else
                      if(ct->RawAudioMSBFirst)
-                        Endian_A16_Swap(buf, 588 * 2);
+#endif
+                     {
+                        /* 32-bit-chunked A16 swap: 2352 bytes / 4 =
+                         * 588 iterations, each handling two 16-bit
+                         * samples via a 32-bit load + bit-mask shuffle
+                         * + 32-bit store. Halves the loop count vs
+                         * the per-pair byte swap. */
+                        uint8_t *_s = (uint8_t *)buf;
+                        int32_t  _i;
+                        for (_i = 0; _i + 3 < 588 * 2 * 2; _i += 4)
+                        {
+                           uint32_t _v;
+                           memcpy(&_v, _s + _i, 4);
+                           _v = ((_v & 0xFF00FF00U) >> 8) | ((_v & 0x00FF00FFU) << 8);
+                           memcpy(_s + _i, &_v, 4);
+                        }
+                     }
                      break;
 
                   case DI_FORMAT_MODE1:
-                     stream_read(ct->fp, buf + 12 + 3 + 1, 2048);
+                     cdstream_read(ct->fp, buf + 12 + 3 + 1, 2048);
                      encode_mode1_sector(lba + 150, buf);
                      break;
 
                   case DI_FORMAT_MODE1_RAW:
                   case DI_FORMAT_MODE2_RAW:
-                     stream_read(ct->fp, buf, 2352);
+                     cdstream_read(ct->fp, buf, 2352);
                      break;
 
                   case DI_FORMAT_MODE2:
-                     stream_read(ct->fp, buf + 16, 2336);
+                     cdstream_read(ct->fp, buf + 16, 2336);
                      encode_mode2_sector(lba + 150, buf);
                      break;
 
@@ -1246,19 +1239,19 @@ static bool CDAccess_Image_Read_Raw_Sector(CDAccess *base_self, uint8 *buf, int3
                      /* FIXME: M2F1, M2F2, does sub-header come before or after user data(standards say before, but I wonder
                       * about cdrdao...). */
                   case DI_FORMAT_MODE2_FORM1:
-                     stream_read(ct->fp, buf + 24, 2048);
+                     cdstream_read(ct->fp, buf + 24, 2048);
                      /*encode_mode2_form1_sector(lba + 150, buf);*/
                      break;
 
                   case DI_FORMAT_MODE2_FORM2:
-                     stream_read(ct->fp, buf + 24, 2324);
+                     cdstream_read(ct->fp, buf + 24, 2324);
                      /*encode_mode2_form2_sector(lba + 150, buf);*/
                      break;
 
                }
 
                if(ct->SubchannelMode)
-                  stream_read(ct->fp, buf + 2352, 96);
+                  cdstream_read(ct->fp, buf + 2352, 96);
             }
          } /* end if audible part of audio track read. */
          break;
@@ -1275,7 +1268,7 @@ static bool CDAccess_Image_Read_Raw_Sector(CDAccess *base_self, uint8 *buf, int3
 }
 
 /* Note: this function makes use of the current contents(as in |=) in SubPWBuf. */
-static void CDAccess_Image_MakeSubPQ(CDAccess_Image *self, int32 lba, uint8 *SubPWBuf){
+static void CDAccess_Image_MakeSubPQ(CDAccess_Image *self, int32_t lba, uint8_t *SubPWBuf){
    unsigned i;
    uint8_t buf[0xC], adr, control;
    int32_t track;
@@ -1299,7 +1292,7 @@ static void CDAccess_Image_MakeSubPQ(CDAccess_Image *self, int32 lba, uint8 *Sub
    if(!track_found)
       track = self->FirstTrack;
 
-   lba_relative = abs((int32)lba - self->Tracks[track].LBA);
+   lba_relative = abs((int32_t)lba - self->Tracks[track].LBA);
 
    f            = (lba_relative % 75);
    s            = ((lba_relative / 75) % 60);
@@ -1318,7 +1311,7 @@ static void CDAccess_Image_MakeSubPQ(CDAccess_Image *self, int32 lba, uint8 *Sub
 
    /* Handle pregap between audio->data track */
    {
-      int32_t pg_offset = (int32)lba - self->Tracks[track].LBA;
+      int32_t pg_offset = (int32_t)lba - self->Tracks[track].LBA;
 
       if(pg_offset < -150)
       {

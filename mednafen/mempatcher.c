@@ -27,9 +27,9 @@
 
 extern retro_log_printf_t log_cb;
 
-static uint8 **RAMPtrs = NULL;
-static uint32  PageSize;
-static uint32  NumPages;
+static uint8_t **RAMPtrs = NULL;
+static uint32_t  PageSize;
+static uint32_t  NumPages;
 
 /* Cheat table.
  *
@@ -149,12 +149,12 @@ static void RebuildSubCheats(void)
    }
 }
 
-bool MDFNMP_Init(uint32 ps, uint32 numpages)
+bool MDFNMP_Init(uint32_t ps, uint32_t numpages)
 {
    PageSize = ps;
    NumPages = numpages;
 
-   RAMPtrs = (uint8 **)calloc(numpages, sizeof(uint8 *));
+   RAMPtrs = (uint8_t **)calloc(numpages, sizeof(uint8_t *));
 
    CheatsActive = MDFN_GetSettingB("cheats");
    return true;
@@ -171,9 +171,9 @@ void MDFNMP_Kill(void)
 }
 
 
-void MDFNMP_AddRAM(uint32 size, uint32 A, uint8 *RAM)
+void MDFNMP_AddRAM(uint32_t size, uint32_t A, uint8_t *RAM)
 {
-   uint32 AB = A / PageSize;
+   uint32_t AB = A / PageSize;
    unsigned int x;
 
    size /= PageSize;
@@ -186,7 +186,7 @@ void MDFNMP_AddRAM(uint32 size, uint32 A, uint8 *RAM)
    }
 }
 
-void MDFNMP_RegSearchable(uint32 addr, uint32 size)
+void MDFNMP_RegSearchable(uint32_t addr, uint32_t size)
 {
    MDFNMP_AddRAM(size, addr, NULL);
 }
@@ -250,9 +250,9 @@ static bool TestConditions(const char *string)
           && sscanf(string, "%u %c %63s %63s %63s",
                    &bytelen, &endian, address, operation, value) == 5)
    {
-      uint32 v_address;
-      uint64 v_value;
-      uint64 value_at_address;
+      uint32_t v_address;
+      uint64_t v_value;
+      uint64_t value_at_address;
       unsigned int x;
 
       if (address[0] == '0' && address[1] == 'x')
@@ -269,7 +269,7 @@ static bool TestConditions(const char *string)
       for (x = 0; x < bytelen; x++)
       {
          unsigned int shiftie = (endian == 'B') ? (bytelen - 1 - x) * 8 : x * 8;
-         value_at_address |= (uint64)PSX_MemPeek8(v_address + x) << shiftie;
+         value_at_address |= (uint64_t)PSX_MemPeek8(v_address + x) << shiftie;
       }
 
       if      (!strcmp(operation, ">="))  { if (!(value_at_address >= v_value)) passed = false; }
@@ -313,32 +313,32 @@ void MDFNMP_ApplyPeriodicCheats(void)
          continue;
 
       {
-         uint32 mltpl_count   = chit->mltpl_count;
-         uint32 mltpl_addr    = chit->addr;
-         uint64 mltpl_val     = chit->val;
-         uint32 copy_src_addr = chit->copy_src_addr;
+         uint32_t mltpl_count   = chit->mltpl_count;
+         uint32_t mltpl_addr    = chit->addr;
+         uint64_t mltpl_val     = chit->val;
+         uint32_t copy_src_addr = chit->copy_src_addr;
 
          while (mltpl_count--)
          {
-            uint8 carry = 0;
+            uint8_t carry = 0;
             unsigned int x;
 
             for (x = 0; x < chit->length; x++)
             {
-               const uint32 tmpaddr = chit->bigendian
+               const uint32_t tmpaddr = chit->bigendian
                   ? (mltpl_addr + chit->length - 1 - x)
                   : (mltpl_addr + x);
-               const uint8  tmpval  = mltpl_val >> (x * 8);
+               const uint8_t  tmpval  = mltpl_val >> (x * 8);
 
                if (chit->type == 'A')
                {
                   const unsigned t = PSX_MemPeek8(tmpaddr) + tmpval + carry;
                   carry = t >> 8;
-                  PSX_MemPoke8(tmpaddr, (uint8)t);
+                  PSX_MemPoke8(tmpaddr, (uint8_t)t);
                }
                else if (chit->type == 'T')
                {
-                  const uint8 cv = PSX_MemPeek8(chit->bigendian
+                  const uint8_t cv = PSX_MemPeek8(chit->bigendian
                         ? (copy_src_addr + chit->length - 1 - x)
                         : (copy_src_addr + x));
                   PSX_MemPoke8(tmpaddr, cv);

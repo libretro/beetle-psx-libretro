@@ -22,7 +22,6 @@
 #include <boolean.h>
 
 #include "CDUtility.h"
-#include "../Stream.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -75,10 +74,6 @@ bool CDIF_ValidateRawSector(uint8_t *buf);
 /* Eject (true) or insert (false) the disc.  Returns true on
  * success or NOP. */
 bool CDIF_Eject(CDIF *cdif, bool eject_status);
-
-/* Construct a Stream view onto a (start_lba, sector_count) region
- * of the disc.  The stream borrows cdif and must not outlive it. */
-struct Stream *CDIF_MakeStream(CDIF *cdif, uint32_t lba, uint32_t sector_count);
 
 #ifdef __cplusplus
 }

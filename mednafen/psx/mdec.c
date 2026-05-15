@@ -77,47 +77,47 @@
  #include <altivec.h>
 #endif
 
-static int32 ClockCounter;
+static int32_t ClockCounter;
 static unsigned MDRPhase;
 static FastFIFO InFIFO;
 static FastFIFO OutFIFO;
 
-static int8 block_y[8][8];
-static int8 block_cb[8][8];	/* [y >> 1][x >> 1] */
-static int8 block_cr[8][8];	/* [y >> 1][x >> 1] */
+static int8_t block_y[8][8];
+static int8_t block_cb[8][8];	/* [y >> 1][x >> 1] */
+static int8_t block_cr[8][8];	/* [y >> 1][x >> 1] */
 
-static uint32 Control;
-static uint32 Command;
+static uint32_t Control;
+static uint32_t Command;
 static bool InCommand;
 
-static uint8 QMatrix[2][64];
-static uint32 QMIndex;
+static uint8_t QMatrix[2][64];
+static uint32_t QMIndex;
 
-MDFN_ALIGN(16) static int16 IDCTMatrix[64];
-static uint32 IDCTMIndex;
+MDFN_ALIGN(16) static int16_t IDCTMatrix[64];
+static uint32_t IDCTMIndex;
 
-static uint8 QScale;
+static uint8_t QScale;
 
-MDFN_ALIGN(16) static int16 Coeff[64];
-static uint32 CoeffIndex;
-static uint32 DecodeWB;
+MDFN_ALIGN(16) static int16_t Coeff[64];
+static uint32_t CoeffIndex;
+static uint32_t DecodeWB;
 
 static union
 {
- uint32 pix32[48];
- uint16 pix16[96];
- uint8   pix8[192];
+ uint32_t pix32[48];
+ uint16_t pix16[96];
+ uint8_t   pix8[192];
 } PixelBuffer;
-static uint32 PixelBufferReadOffset;
-static uint32 PixelBufferCount32;
+static uint32_t PixelBufferReadOffset;
+static uint32_t PixelBufferCount32;
 
-static uint16 InCounter;
+static uint16_t InCounter;
 
-static uint8 RAMOffsetY;
-static uint8 RAMOffsetCounter;
-static uint8 RAMOffsetWWS;
+static uint8_t RAMOffsetY;
+static uint8_t RAMOffsetCounter;
+static uint8_t RAMOffsetWWS;
 
-static const uint8 ZigZag[64] =
+static const uint8_t ZigZag[64] =
 {
  0x00, 0x08, 0x01, 0x02, 0x09, 0x10, 0x18, 0x11,
  0x0a, 0x03, 0x04, 0x0b, 0x12, 0x19, 0x20, 0x28,
@@ -129,7 +129,7 @@ static const uint8 ZigZag[64] =
  0x2e, 0x27, 0x2f, 0x36, 0x3d, 0x3e, 0x37, 0x3f,
 };
 
-extern int32 EventCycles;
+extern int32_t EventCycles;
 
 void MDEC_Power(void)
 {
@@ -232,7 +232,7 @@ int MDEC_StateAction(StateMem *sm, int load, int data_only)
    return(ret);
 }
 
-static INLINE int8 Mask9ClampS8(int32 v)
+static INLINE int8_t Mask9ClampS8(int32_t v)
 {
    v = sign_x_to_s32(9, v);
 
@@ -252,7 +252,7 @@ static INLINE int8 Mask9ClampS8(int32 v)
  * Mask9ClampS8. Splitting them removes a C++ template - the only one
  * in this file - and lets gcc/clang specialize each unconditionally
  * without the dead sizeof(T) branch. */
-static void IDCT_1D_Pass1(const int16 *in_coeff, int16 *out_coeff)
+static void IDCT_1D_Pass1(const int16_t *in_coeff, int16_t *out_coeff)
 {
    unsigned col, x;
 
@@ -265,7 +265,7 @@ static void IDCT_1D_Pass1(const int16 *in_coeff, int16 *out_coeff)
       for (x = 0; x < 8; x++)
       {
 #ifdef __SSE2__
-         MDFN_ALIGN(16) int32 tmp[4];
+         MDFN_ALIGN(16) int32_t tmp[4];
          __m128i m   = _mm_load_si128((__m128i *)&IDCTMatrix[(x * 8)]);
          __m128i sum = _mm_madd_epi16(m, c);
          sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (3 << 0) | (2 << 2) | (1 << 4) | (0 << 6)));
@@ -275,7 +275,7 @@ static void IDCT_1D_Pass1(const int16 *in_coeff, int16 *out_coeff)
 
          out_coeff[(x * 8) + col] = (tmp[0] + 0x4000) >> 15;
 #else
-         int32 sum = 0;
+         int32_t sum = 0;
          unsigned u;
 
          for (u = 0; u < 8; u++)
@@ -287,7 +287,7 @@ static void IDCT_1D_Pass1(const int16 *in_coeff, int16 *out_coeff)
    }
 }
 
-static void IDCT_1D_Pass2(const int16 *in_coeff, int8 *out_coeff)
+static void IDCT_1D_Pass2(const int16_t *in_coeff, int8_t *out_coeff)
 {
    unsigned col, x;
 
@@ -300,7 +300,7 @@ static void IDCT_1D_Pass2(const int16 *in_coeff, int8 *out_coeff)
       for (x = 0; x < 8; x++)
       {
 #ifdef __SSE2__
-         MDFN_ALIGN(16) int32 tmp[4];
+         MDFN_ALIGN(16) int32_t tmp[4];
          __m128i m   = _mm_load_si128((__m128i *)&IDCTMatrix[(x * 8)]);
          __m128i sum = _mm_madd_epi16(m, c);
          sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, (3 << 0) | (2 << 2) | (1 << 4) | (0 << 6)));
@@ -310,7 +310,7 @@ static void IDCT_1D_Pass2(const int16 *in_coeff, int8 *out_coeff)
 
          out_coeff[(col * 8) + x] = Mask9ClampS8((tmp[0] + 0x4000) >> 15);
 #else
-         int32 sum = 0;
+         int32_t sum = 0;
          unsigned u;
 
          for (u = 0; u < 8; u++)
@@ -322,15 +322,15 @@ static void IDCT_1D_Pass2(const int16 *in_coeff, int8 *out_coeff)
    }
 }
 
-static void IDCT(int16 *in_coeff, int8 *out_coeff)
+static void IDCT(int16_t *in_coeff, int8_t *out_coeff)
 {
-   MDFN_ALIGN(16) int16 tmpbuf[64];
+   MDFN_ALIGN(16) int16_t tmpbuf[64];
 
    IDCT_1D_Pass1(in_coeff, tmpbuf);
    IDCT_1D_Pass2(tmpbuf, out_coeff);
 }
 
-static INLINE void YCbCr_to_RGB(const int8 y, const int8 cb, const int8 cr, int *r, int *g, int *b)
+static INLINE void YCbCr_to_RGB(const int8_t y, const int8_t cb, const int8_t cr, int *r, int *g, int *b)
 {
    /* The formula for green is still a bit off(precision/rounding issues when both cb and cr are non-zero). */
    *r = Mask9ClampS8(y + (((359 * cr) + 0x80) >> 8));
@@ -343,7 +343,7 @@ static INLINE void YCbCr_to_RGB(const int8 y, const int8 cb, const int8 cr, int 
    *b ^= 0x80;
 }
 
-static INLINE uint16 RGB_to_RGB555(uint8 r, uint8 g, uint8 b)
+static INLINE uint16_t RGB_to_RGB555(uint8_t r, uint8_t g, uint8_t b)
 {
    r = (r + 4) >> 3;
    g = (g + 4) >> 3;
@@ -370,16 +370,18 @@ static void EncodeImage(const unsigned ybn)
    {
       case 0:	/* 4bpp */
          {
-            const uint8 us_xor = (Command & (1U << 26)) ? 0x00 : 0x88;
-            uint8* pix_out = PixelBuffer.pix8;
+            const uint8_t us_xor = (Command & (1U << 26)) ? 0x00 : 0x88;
+            uint8_t* pix_out = PixelBuffer.pix8;
             int y, x;
 
             for(y = 0; y < 8; y++)
             {
                for(x = 0; x < 8; x += 2)
                {
-                  uint8 p0 = MIN(127, block_y[y][x + 0] + 8);
-                  uint8 p1 = MIN(127, block_y[y][x + 1] + 8);
+                  int v0 = block_y[y][x + 0] + 8;
+                  int v1 = block_y[y][x + 1] + 8;
+                  uint8_t p0 = (uint8_t)(v0 > 127 ? 127 : v0);
+                  uint8_t p1 = (uint8_t)(v1 > 127 ? 127 : v1);
 
                   *pix_out = ((p0 >> 4) | (p1 & 0xF0)) ^ us_xor;
                   pix_out++;
@@ -392,15 +394,15 @@ static void EncodeImage(const unsigned ybn)
 
       case 1:	/* 8bpp */
          {
-            const uint8 us_xor = (Command & (1U << 26)) ? 0x00 : 0x80;
-            uint8* pix_out = PixelBuffer.pix8;
+            const uint8_t us_xor = (Command & (1U << 26)) ? 0x00 : 0x80;
+            uint8_t* pix_out = PixelBuffer.pix8;
             int y, x;
 
             for(y = 0; y < 8; y++)
             {
                for(x = 0; x < 8; x++)
                {
-                  *pix_out = (uint8)block_y[y][x] ^ us_xor;
+                  *pix_out = (uint8_t)block_y[y][x] ^ us_xor;
                   pix_out++;
                }
             }
@@ -410,15 +412,15 @@ static void EncodeImage(const unsigned ybn)
 
       case 2:	/* 24bpp */
          {
-            const uint8 rgb_xor = (Command & (1U << 26)) ? 0x80 : 0x00;
-            uint8* pix_out = PixelBuffer.pix8;
+            const uint8_t rgb_xor = (Command & (1U << 26)) ? 0x80 : 0x00;
+            uint8_t* pix_out = PixelBuffer.pix8;
             int y, x;
 
             for(y = 0; y < 8; y++)
             {
-               const int8* by = &block_y[y][0];
-               const int8* cb = &block_cb[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
-               const int8* cr = &block_cr[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
+               const int8_t* by = &block_y[y][0];
+               const int8_t* cb = &block_cb[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
+               const int8_t* cr = &block_cr[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
 
                for(x = 0; x < 8; x++)
                {
@@ -438,15 +440,15 @@ static void EncodeImage(const unsigned ybn)
 
       case 3:	/* 16bpp */
          {
-            uint16 pixel_xor = ((Command & 0x02000000) ? 0x8000 : 0x0000) | ((Command & (1U << 26)) ? 0x4210 : 0x0000);
-            uint16* pix_out = PixelBuffer.pix16;
+            uint16_t pixel_xor = ((Command & 0x02000000) ? 0x8000 : 0x0000) | ((Command & (1U << 26)) ? 0x4210 : 0x0000);
+            uint16_t* pix_out = PixelBuffer.pix16;
             int y, x;
 
             for(y = 0; y < 8; y++)
             {
-               const int8* by = &block_y[y][0];
-               const int8* cb = &block_cb[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
-               const int8* cr = &block_cr[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
+               const int8_t* by = &block_y[y][0];
+               const int8_t* cb = &block_cb[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
+               const int8_t* cr = &block_cr[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
 
                for(x = 0; x < 8; x++)
                {
@@ -465,9 +467,9 @@ static void EncodeImage(const unsigned ybn)
    }
 }
 
-static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
+static INLINE void WriteImageData(uint16_t V, int32_t* eat_cycles)
 {
-   const uint32 qmw = (bool)(DecodeWB < 2);
+   const uint32_t qmw = (bool)(DecodeWB < 2);
 
 
    if(!CoeffIndex)
@@ -485,12 +487,12 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
          int tmp;
 
          if(q != 0)
-            tmp = (int32)((uint32)(ci * q) << 4) + (ci ? ((ci < 0) ? 8 : -8) : 0);
+            tmp = (int32_t)((uint32_t)(ci * q) << 4) + (ci ? ((ci < 0) ? 8 : -8) : 0);
          else
-            tmp = (uint32)(ci * 2) << 4;
+            tmp = (uint32_t)(ci * 2) << 4;
 
          /* Not sure if it should be 0x3FFF or 0x3FF0 or maybe 0x3FF8? */
-         Coeff[ZigZag[0]] = MIN(0x3FFF, MAX(-0x4000, tmp));
+         { int _v = tmp; if (_v < -0x4000) _v = -0x4000; if (_v > 0x3FFF) _v = 0x3FFF; Coeff[ZigZag[0]] = _v; }
          CoeffIndex++;
       }
    }
@@ -503,8 +505,8 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
       }
       else
       {
-         uint32 rlcount = V >> 10;
-         uint32 i;
+         uint32_t rlcount = V >> 10;
+         uint32_t i;
 
          for(i = 0; i < rlcount && CoeffIndex < 64; i++)
          {
@@ -519,12 +521,12 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
             int tmp;
 
             if(q != 0)
-               tmp = (int32)((uint32)((ci * q) >> 3) << 4) + (ci ? ((ci < 0) ? 8 : -8) : 0);
+               tmp = (int32_t)((uint32_t)((ci * q) >> 3) << 4) + (ci ? ((ci < 0) ? 8 : -8) : 0);
             else
-               tmp = (uint32)(ci * 2) << 4;
+               tmp = (uint32_t)(ci * 2) << 4;
 
             /* Not sure if it should be 0x3FFF or 0x3FF0 or maybe 0x3FF8? */
-            Coeff[ZigZag[CoeffIndex]] = MIN(0x3FFF, MAX(-0x4000, tmp));
+            { int _v = tmp; if (_v < -0x4000) _v = -0x4000; if (_v > 0x3FFF) _v = 0x3FFF; Coeff[ZigZag[CoeffIndex]] = _v; }
             CoeffIndex++;
          }
       }
@@ -564,7 +566,7 @@ static INLINE void WriteImageData(uint16 V, int32* eat_cycles)
    }
 }
 
-void MDEC_Run(int32 clocks)
+void MDEC_Run(int32_t clocks)
 {
    static const unsigned MDRPhaseBias = 0 + 1;
 
@@ -613,8 +615,8 @@ void MDEC_Run(int32 clocks)
             InCounter--;
             do
             {
-               uint32 tfr;
-               int32 need_eat; /* = 0; */
+               uint32_t tfr;
+               int32_t need_eat; /* = 0; */
 
                { { case 5: if(!(InFIFO.in_count)) { MDRPhase = 6 - MDRPhaseBias - 1; return; } }; tfr = FastFIFO_Read(&InFIFO); };
                InCounter--;
@@ -646,7 +648,7 @@ void MDEC_Run(int32 clocks)
             InCounter--;
             do
             {
-               uint32 tfr;
+               uint32_t tfr;
                int i;
 
                { { case 11: if(!(InFIFO.in_count)) { MDRPhase = 12 - MDRPhaseBias - 1; return; } }; tfr = FastFIFO_Read(&InFIFO); };
@@ -655,7 +657,7 @@ void MDEC_Run(int32 clocks)
 
                for(i = 0; i < 4; i++)
                {
-                  QMatrix[QMIndex >> 6][QMIndex & 0x3F] = (uint8)tfr;
+                  QMatrix[QMIndex >> 6][QMIndex & 0x3F] = (uint8_t)tfr;
                   QMIndex = (QMIndex + 1) & 0x7F;
                   tfr >>= 8;
                }
@@ -672,7 +674,7 @@ void MDEC_Run(int32 clocks)
             InCounter--;
             do
             {
-               uint32 tfr;
+               uint32_t tfr;
                unsigned i;
 
                { { case 13: if(!(InFIFO.in_count)) { MDRPhase = 14 - MDRPhaseBias - 1; return; } }; tfr = FastFIFO_Read(&InFIFO); };
@@ -680,7 +682,7 @@ void MDEC_Run(int32 clocks)
 
                for(i = 0; i < 2; i++)
                {
-                  IDCTMatrix[((IDCTMIndex & 0x7) << 3) | ((IDCTMIndex >> 3) & 0x7)] = (int16)(tfr & 0xFFFF) >> 3;
+                  IDCTMatrix[((IDCTMIndex & 0x7) << 3) | ((IDCTMIndex >> 3) & 0x7)] = (int16_t)(tfr & 0xFFFF) >> 3;
                   IDCTMIndex = (IDCTMIndex + 1) & 0x3F;
 
                   tfr >>= 16;
@@ -695,7 +697,7 @@ void MDEC_Run(int32 clocks)
    }
 }
 
-void MDEC_DMAWrite(uint32 V)
+void MDEC_DMAWrite(uint32_t V)
 {
    if(!FastFIFO_CanWrite(&InFIFO))
       return;
@@ -704,9 +706,9 @@ void MDEC_DMAWrite(uint32 V)
    MDEC_Run(0);
 }
 
-uint32 MDEC_DMARead(uint32* offs)
+uint32_t MDEC_DMARead(uint32_t* offs)
 {
-   uint32 V = 0;
+   uint32_t V = 0;
 
    *offs = 0;
 
@@ -744,7 +746,7 @@ bool MDEC_DMACanRead(void)
  return((OutFIFO.in_count >= 0x20) && (Control & (1U << 29)));
 }
 
-void MDEC_Write(const int32_t timestamp, uint32 A, uint32 V)
+void MDEC_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 {
    if(A & 4)
    {
@@ -787,9 +789,9 @@ void MDEC_Write(const int32_t timestamp, uint32 A, uint32 V)
    }
 }
 
-uint32 MDEC_Read(const int32_t timestamp, uint32 A)
+uint32_t MDEC_Read(const int32_t timestamp, uint32_t A)
 {
- uint32 ret = 0;
+ uint32_t ret = 0;
 
  if(A & 4)
  {

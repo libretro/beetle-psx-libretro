@@ -205,7 +205,6 @@ endif
    SOURCES_C +=   $(MEDNAFEN_DIR)/mempatcher.c \
                   $(MEDNAFEN_DIR)/general.c \
                   $(MEDNAFEN_DIR)/error.c \
-                  $(MEDNAFEN_DIR)/mednafen-endian.c \
                   $(MEDNAFEN_DIR)/video/Deinterlacer.c \
                   $(CORE_DIR)/input.c \
                   $(CORE_EMU_DIR)/dma.c \
@@ -218,9 +217,7 @@ endif
                   $(CORE_EMU_DIR)/timer.c \
                   $(CORE_DIR)/rsx/rsx_intf.c \
                   $(CORE_DIR)/rsx/rsx_defer.c \
-                  $(MEDNAFEN_DIR)/FileStream.c \
-                  $(MEDNAFEN_DIR)/MemoryStream.c \
-                  $(MEDNAFEN_DIR)/Stream.c \
+                  $(MEDNAFEN_DIR)/cdstream.c \
                   $(MEDNAFEN_DIR)/settings.c \
                   $(MEDNAFEN_DIR)/state.c
 

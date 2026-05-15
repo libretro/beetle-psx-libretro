@@ -390,9 +390,13 @@ Renderer::SaveState Renderer::save_vram_state()
 	flush();
 
 	device.wait_idle();
-	void *ptr = device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
-	std::vector<uint32_t> vram(FB_WIDTH * FB_HEIGHT);
-	memcpy(vram.data(), ptr, FB_WIDTH * FB_HEIGHT * sizeof(uint32_t));
+	const uint32_t *src = static_cast<const uint32_t *>(
+			device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
+	/* Iterator-range construction copies straight into the vector's
+	 * fresh allocation without the default-ctor's prior zero-fill;
+	 * saves 2 MiB of write traffic per savestate save on a 1024x512
+	 * VRAM. */
+	std::vector<uint32_t> vram(src, src + FB_WIDTH * FB_HEIGHT);
 	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
 	return { std::move(vram), render_state, tracker.save_state() };
 }

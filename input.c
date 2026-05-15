@@ -149,24 +149,15 @@ static const unsigned input_map_controller[ INPUT_MAP_CONTROLLER_SIZE ] =
 {
  /*  libretro input                  at position   || maps to PS1         on bit */
  /* ----------------------------------------------------------------------------- */
-#ifdef MSB_FIRST
-   RETRO_DEVICE_ID_JOYPAD_L2,       /*  L-trigger    -> L2 */
-   RETRO_DEVICE_ID_JOYPAD_R2,       /*  R-trigger    -> R2 */
-   RETRO_DEVICE_ID_JOYPAD_L,        /*  L-shoulder   -> L1 */
-   RETRO_DEVICE_ID_JOYPAD_R,        /*  R-shoulder   -> R1 */
-   RETRO_DEVICE_ID_JOYPAD_X,        /*  X(top)       -> Triangle */
-   RETRO_DEVICE_ID_JOYPAD_A,        /*  A(right)     -> Circle */
-   RETRO_DEVICE_ID_JOYPAD_B,        /*  B(down)      -> Cross */
-   RETRO_DEVICE_ID_JOYPAD_Y,        /*  Y(left)      -> Square */
-   RETRO_DEVICE_ID_JOYPAD_SELECT,   /*  Select       -> Select */
-   RETRO_DEVICE_ID_JOYPAD_L3,       /*  L-thumb      -> L3 */
-   RETRO_DEVICE_ID_JOYPAD_R3,       /*  R-thumb      -> R3 */
-   RETRO_DEVICE_ID_JOYPAD_START,    /*  Start        -> Start */
-   RETRO_DEVICE_ID_JOYPAD_UP,       /*  Pad-Up       -> Pad-Up */
-   RETRO_DEVICE_ID_JOYPAD_RIGHT,    /*  Pad-Right    -> Pad-Right */
-   RETRO_DEVICE_ID_JOYPAD_DOWN,     /*  Pad-Down     -> Pad-Down */
-   RETRO_DEVICE_ID_JOYPAD_LEFT,     /*  Pad-Left     -> Pad-Left */
-#else
+ /*
+  * The PS1 controller bit layout is a hardware-fixed property of the
+  * console, independent of the emulator host's byte ordering. The
+  * previous version of this table reshuffled the mapping under
+  * MSB_FIRST, which would silently rebind every face/shoulder/dpad
+  * button on big-endian hosts. The table consumer (input.c:712) ORs
+  * (1 << i) into a uint32_t at a position computed entirely in host-
+  * integer arithmetic, so endianness never enters the picture.
+  */
    RETRO_DEVICE_ID_JOYPAD_SELECT,   /*  Select       -> Select               0 */
    RETRO_DEVICE_ID_JOYPAD_L3,       /*  L-thumb      -> L3                   1 */
    RETRO_DEVICE_ID_JOYPAD_R3,       /*  R-thumb      -> R3                   2 */
@@ -183,7 +174,6 @@ static const unsigned input_map_controller[ INPUT_MAP_CONTROLLER_SIZE ] =
    RETRO_DEVICE_ID_JOYPAD_A,        /*  A(right)     -> Circle              13 */
    RETRO_DEVICE_ID_JOYPAD_B,        /*  B(down)      -> Cross               14 */
    RETRO_DEVICE_ID_JOYPAD_Y,        /*  Y(left)      -> Square              15 */
-#endif
 };
 
 
@@ -455,7 +445,7 @@ void input_init()
    for (i = 0; i < MAX_CONTROLLERS; ++i )
    {
       input_type[ i ] = RETRO_DEVICE_JOYPAD;
-      FrontIO_SetInput(FIO, i, "gamepad", (uint8*)&input_data[i]);
+      FrontIO_SetInput(FIO, i, "gamepad", (uint8_t*)&input_data[i]);
    }
 }
 
@@ -944,16 +934,24 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
 
             /*  Analog Inputs */
             {
-               uint16_t button_ii = MAX(
-                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L2 ),
-                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_Y )
-                     );
+               /* Hoist each get_analog_button call into a temp so it
+                * fires exactly once per neGcon button. The previous
+                * MAX(f(), g()) macro expansion re-evaluated the
+                * winning side, costing an extra input_state_cb call
+                * through the libretro frontend per MAX (function
+                * pointer, can't be CSE'd by the compiler). */
+               uint16_t a, b;
+               uint16_t button_ii, button_i, left_shoulder;
 
-               uint16_t button_i = MAX(
-                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_R2 ),
-                     get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_B )
-                     );
-               uint16_t left_shoulder = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L );
+               a = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L2 );
+               b = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_Y );
+               button_ii = (a > b) ? a : b;
+
+               a = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_R2 );
+               b = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_B );
+               button_i  = (a > b) ? a : b;
+
+               left_shoulder = get_analog_button( input_state_cb, iplayer, RETRO_DEVICE_ID_JOYPAD_L );
 
                p_input->u32[ 3 ] = button_i;      /* Analog button I */
                p_input->u32[ 4 ] = button_ii;     /* Analog button II */
@@ -1081,62 +1079,62 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
       {
          case RETRO_DEVICE_NONE:
             log_cb( RETRO_LOG_INFO, "Controller %u: Unplugged\n", (in_port+1) );
-	    FrontIO_SetInput(FIO, in_port, "none", (uint8*)&input_data[in_port]);
+	    FrontIO_SetInput(FIO, in_port, "none", (uint8_t*)&input_data[in_port]);
             break;
 
          case RETRO_DEVICE_JOYPAD:
          case RETRO_DEVICE_PS_CONTROLLER:
             log_cb( RETRO_LOG_INFO, "Controller %u: PlayStation Controller\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "gamepad", (uint8*)&input_data[ in_port ] );
+            FrontIO_SetInput(FIO, in_port, "gamepad", (uint8_t*)&input_data[ in_port ] );
             break;
 
          case RETRO_DEVICE_PS_DUALSHOCK:
             log_cb( RETRO_LOG_INFO, "Controller %u: DualShock\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "dualshock", (uint8*)&input_data[ in_port ] );
+            FrontIO_SetInput(FIO, in_port, "dualshock", (uint8_t*)&input_data[ in_port ] );
             break;
 
          case RETRO_DEVICE_PS_ANALOG:
             log_cb( RETRO_LOG_INFO, "Controller %u: Analog Controller\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "dualanalog", (uint8*)&input_data[ in_port ] );
+            FrontIO_SetInput(FIO, in_port, "dualanalog", (uint8_t*)&input_data[ in_port ] );
             break;
 
          case RETRO_DEVICE_PS_ANALOG_JOYSTICK:
             log_cb( RETRO_LOG_INFO, "Controller %u: Analog Joystick\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "analogjoy", (uint8*)&input_data[ in_port ] );
+            FrontIO_SetInput(FIO, in_port, "analogjoy", (uint8_t*)&input_data[ in_port ] );
             break;
 
          case RETRO_DEVICE_PS_GUNCON:
             log_cb( RETRO_LOG_INFO, "Controller %u: Guncon / G-Con 45\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "guncon", (uint8*)&input_data[ in_port ] );
+            FrontIO_SetInput(FIO, in_port, "guncon", (uint8_t*)&input_data[ in_port ] );
             if ( FIO )
                FrontIO_SetCrosshairsCursor(FIO, in_port, gun_cursor);
             break;
 
          case RETRO_DEVICE_PS_JUSTIFIER:
             log_cb( RETRO_LOG_INFO, "Controller %u: Justifier\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "justifier", (uint8*)&input_data[ in_port ] );
+            FrontIO_SetInput(FIO, in_port, "justifier", (uint8_t*)&input_data[ in_port ] );
             if ( FIO )
                FrontIO_SetCrosshairsCursor(FIO, in_port, gun_cursor);
             break;
 
          case RETRO_DEVICE_PS_MOUSE:
             log_cb( RETRO_LOG_INFO, "Controller %u: Mouse\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "mouse", (uint8*)&input_data[ in_port ] );
+            FrontIO_SetInput(FIO, in_port, "mouse", (uint8_t*)&input_data[ in_port ] );
             break;
 
          case RETRO_DEVICE_PS_NEGCON:
             log_cb( RETRO_LOG_INFO, "Controller %u: neGcon\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "negcon", (uint8*)&input_data[ in_port ] );
+            FrontIO_SetInput(FIO, in_port, "negcon", (uint8_t*)&input_data[ in_port ] );
             break;
 
          case RETRO_DEVICE_PS_NEGCON_RUMBLE:
             log_cb( RETRO_LOG_INFO, "Controller %u: neGcon Rumble\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "negconrumble", (uint8*)&input_data[ in_port ] );
+            FrontIO_SetInput(FIO, in_port, "negconrumble", (uint8_t*)&input_data[ in_port ] );
             break;
 
          default:
             log_cb( RETRO_LOG_WARN, "Controller %u: Unsupported Device (%u)\n", (in_port+1), device );
-            FrontIO_SetInput(FIO, in_port, "none", (uint8*)&input_data[ in_port ] );
+            FrontIO_SetInput(FIO, in_port, "none", (uint8_t*)&input_data[ in_port ] );
             break;
       }
 

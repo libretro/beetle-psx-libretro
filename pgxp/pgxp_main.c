@@ -4,7 +4,13 @@
 #include "pgxp_mem.h"
 #include "pgxp_gte.h"
 
-u32 static gMode = 0;
+/* Hot-path: gMode is read on every CPU instruction with a PGXP
+ * branch (see the 50+ PGXP_GetModes() call sites in mednafen/psx/
+ * cpu.c).  Make it externally visible so PGXP_GetModes can live
+ * in the header as a static inline - skipping the cross-TU call
+ * setup at every site - while keeping all writes routed through
+ * apply_modes() here so the vertex-cache free still happens. */
+uint32_t gMode = 0;
 
 void PGXP_Init(void)
 {
@@ -23,30 +29,25 @@ void PGXP_Shutdown(void)
  * cleared (user toggled the vertex-cache core option off at runtime),
  * the 448 MB heap allocation backing the cache is freed immediately
  * rather than waiting for retro_deinit. */
-static void apply_modes(u32 new_modes)
+static void apply_modes(uint32_t new_modes)
 {
-	u32 old_modes = gMode;
+	uint32_t old_modes = gMode;
 	gMode = new_modes;
 	if ((old_modes & PGXP_VERTEX_CACHE) && !(new_modes & PGXP_VERTEX_CACHE))
 		PGXP_FreeVertexCache();
 }
 
-void PGXP_SetModes(u32 modes)
+void PGXP_SetModes(uint32_t modes)
 {
 	apply_modes(modes);
 }
 
-u32	PGXP_GetModes()
-{
-	return gMode;
-}
-
-void PGXP_EnableModes(u32 modes)
+void PGXP_EnableModes(uint32_t modes)
 {
 	apply_modes(gMode | modes);
 }
 
-void PGXP_DisableModes(u32 modes)
+void PGXP_DisableModes(uint32_t modes)
 {
 	apply_modes(gMode & ~modes);
 }

@@ -612,11 +612,12 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "disabled"
    },
+#endif
    {
       BEETLE_OPT(pgxp_texture),
       "PGXP Perspective Correct Texturing",
       NULL,
-      "Replace native PSX affine texture mapping with perspective correct texture mapping. Eliminates position-dependent distortion and warping of textures, resulting in properly aligned textures. This option is applied only when PGXP Operation Mode is enabled. Only supported by the hardware renderers.",
+      "Replace native PSX affine texture mapping with perspective correct texture mapping. Eliminates position-dependent distortion and warping of textures, resulting in properly aligned textures. This option is applied only when PGXP Operation Mode is enabled. Supported by the hardware renderers and the software renderer.",
       NULL,
       "pgxp",
       {
@@ -626,7 +627,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "disabled"
    },
-#endif
    {
       BEETLE_OPT(display_internal_fps),
       "Display Internal FPS",

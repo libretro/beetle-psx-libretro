@@ -43,19 +43,19 @@ typedef struct
 
 typedef struct
 {
-   int16 DecodeBuffer[0x20];
-   int16 DecodeM2;
-   int16 DecodeM1;
+   int16_t DecodeBuffer[0x20];
+   int16_t DecodeM2;
+   int16_t DecodeM1;
 
-   uint32 DecodePlayDelay;
-   uint32 DecodeWritePos;
-   uint32 DecodeReadPos;
-   uint32 DecodeAvail;
+   uint32_t DecodePlayDelay;
+   uint32_t DecodeWritePos;
+   uint32_t DecodeReadPos;
+   uint32_t DecodeAvail;
 
    bool IgnoreSampLA;
 
-   uint8 DecodeShift;
-   uint8 DecodeWeight;
+   uint8_t DecodeShift;
+   uint8_t DecodeWeight;
    uint8_t DecodeFlags;
 
    SPU_Sweep Sweep[2];

@@ -49,12 +49,13 @@
 
 void Deinterlacer_Init(Deinterlacer *d)
 {
-   d->StateValid      = false;
-   d->PrevDRect_h     = 0;
-   d->PrevDRect_x     = 0;
-   d->DeintType       = DEINT_WEAVE;
-   d->MadHist[0]      = NULL;
-   d->MadHist[1]      = NULL;
+   d->StateValid            = false;
+   d->PrevDRect_h           = 0;
+   d->PrevDRect_x           = 0;
+   d->DeintType             = DEINT_WEAVE;
+   d->LastDisturbedMargins  = false;
+   d->MadHist[0]            = NULL;
+   d->MadHist[1]            = NULL;
    d->MadScratch      = NULL;
    d->MadW            = 0;
    d->MadH            = 0;
@@ -91,12 +92,18 @@ unsigned Deinterlacer_GetType(const Deinterlacer *d)
    return d->DeintType;
 }
 
+bool Deinterlacer_DidDisturbMargins(const Deinterlacer *d)
+{
+   return d->LastDisturbedMargins;
+}
+
 void Deinterlacer_ClearState(Deinterlacer *d)
 {
-   d->StateValid     = false;
-   d->PrevDRect_h    = 0;
-   d->PrevDRect_x    = 0;
-   d->MadFramesValid = 0;
+   d->StateValid            = false;
+   d->PrevDRect_h           = 0;
+   d->PrevDRect_x           = 0;
+   d->MadFramesValid        = 0;
+   d->LastDisturbedMargins  = false;
 }
 
 /*
@@ -260,6 +267,18 @@ static bool deint_weave(Deinterlacer *d, uint32_t *pixels, int32_t pitch_pix,
          }
       }
       DisplayRect->x = 0;
+
+      /* The memmove shifts active pixels left by shift_pix.  The
+       * tail [w_native*upscale - shift_pix .. dmw) is untouched
+       * and still holds old margin zeros, but the head [0 ..
+       * shift_pix) of the destination has been overwritten with
+       * what used to live at [shift_pix .. 2*shift_pix) - which
+       * straddles the source row's left margin (zero) and its
+       * active region.  Net effect: the row's left margin (which
+       * the scanout cache assumed was still zero) now has active
+       * pixel data in it.  Signal the disturbance so the SW
+       * scanout cache invalidates. */
+      d->LastDisturbedMargins = true;
    }
 
    return weave_good;
@@ -694,6 +713,11 @@ void Deinterlacer_Process(Deinterlacer *d, MDFN_Surface *surface,
    const int32_t  pitch_pix  = surface->pitchinpix;
    const int32_t  prev_h     = DisplayRect->h;
    const int32_t  prev_x     = DisplayRect->x;
+
+   /* Reset per-call disturbance flag.  Set to true only if the
+    * mode actually mutated surface pixels outside the active
+    * region (currently just WEAVE's XReposition path). */
+   d->LastDisturbedMargins = false;
 
    /*
     * The libretro frontend reads only LineWidths[0]; everything

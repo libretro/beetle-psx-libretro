@@ -797,11 +797,15 @@ void rsx_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
 {
    int width  = x1 - x0 + 1;
    int height = y1 - y0 + 1;
-   width  = max(width, 0);
-   height = max(height, 0);
+   if (width  < 0) width  = 0;
+   if (height < 0) height = 0;
 
-   width  = min(width, int(FB_WIDTH - x0));
-   height = min(height, int(FB_HEIGHT - y0));
+   {
+      int w_max = int(FB_WIDTH  - x0);
+      int h_max = int(FB_HEIGHT - y0);
+      if (width  > w_max) width  = w_max;
+      if (height > h_max) height = h_max;
+   }
 
    if (renderer)
    {
@@ -1084,27 +1088,63 @@ void rsx_vulkan_load_image(
          (int)mask_test, (int)set_mask);
 
    renderer->notify_texture_upload(PSX::Rect { x, y, w, h }, vram);
-   bool dual_copy = x + w > FB_WIDTH; // Check if we need to handle wrap-around in X.
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
    auto handle   = renderer->copy_cpu_to_vram({ x, y, w, h });
    uint16_t *tmp = renderer->begin_copy(handle);
-   for (unsigned off_y = 0; off_y < h; off_y++)
+
+   /* The row loop has two independent invariants: x-wrap (dual_copy)
+    * and y-wrap. Both are determined entirely by (x, y, w, h) before
+    * the loop runs. Hoisting them out lets the inner loops degenerate
+    * to a single straight memcpy in the common no-wrap case and lets
+    * the compiler/CPU prefetcher see the full source-pointer stride.
+    *
+    * The (y + off_y) & (FB_HEIGHT - 1) mask in the original code was
+    * a no-op for every iteration when y + h <= FB_HEIGHT (the dominant
+    * case for upload rects), but the compiler can't prove that without
+    * splitting the loop.
+    */
+   const bool dual_copy = x + w > FB_WIDTH;
+   const bool y_wrap    = y + h > FB_HEIGHT;
+
+   if (dual_copy)
    {
-      if (dual_copy)
+      const unsigned first  = FB_WIDTH - x;
+      const unsigned second = w - first;
+      if (y_wrap)
       {
-         unsigned first = FB_WIDTH - x;
-         unsigned second = w - first;
-         memcpy(tmp + off_y * w, vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH + x, first * sizeof(uint16_t));
-         memcpy(tmp + off_y * w + first,
-               vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH,
-               second * sizeof(uint16_t));
+         for (unsigned off_y = 0; off_y < h; off_y++)
+         {
+            const uint16_t *row = vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH;
+            memcpy(tmp + off_y * w,         row + x, first  * sizeof(uint16_t));
+            memcpy(tmp + off_y * w + first, row,     second * sizeof(uint16_t));
+         }
       }
       else
       {
-         memcpy(tmp + off_y * w,
-               vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH + x,
-               w * sizeof(uint16_t));
+         for (unsigned off_y = 0; off_y < h; off_y++)
+         {
+            const uint16_t *row = vram + (y + off_y) * FB_WIDTH;
+            memcpy(tmp + off_y * w,         row + x, first  * sizeof(uint16_t));
+            memcpy(tmp + off_y * w + first, row,     second * sizeof(uint16_t));
+         }
+      }
+   }
+   else
+   {
+      if (y_wrap)
+      {
+         for (unsigned off_y = 0; off_y < h; off_y++)
+            memcpy(tmp + off_y * w,
+                  vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH + x,
+                  w * sizeof(uint16_t));
+      }
+      else
+      {
+         for (unsigned off_y = 0; off_y < h; off_y++)
+            memcpy(tmp + off_y * w,
+                  vram + (y + off_y) * FB_WIDTH + x,
+                  w * sizeof(uint16_t));
       }
    }
    renderer->end_copy(handle);

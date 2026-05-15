@@ -36,7 +36,6 @@
 #include "../math_ops.h"
 #include "../mednafen.h"
 #include "../../osd_message.h"
-#include "../mednafen-endian.h"
 
 /* PGXP */
 #include "../pgxp/pgxp_cpu.h"
@@ -54,10 +53,10 @@ bool         prev_invalidate;
 bool         prev_spgp_opt;
 extern bool  psx_dynarec_invalidate;
 extern bool  psx_dynarec_spgp_opt;
-extern uint8 psx_mmap;
-extern uint8 *lightrec_codebuffer;
+extern uint8_t psx_mmap;
+extern uint8_t *lightrec_codebuffer;
 static struct lightrec_state *lightrec_state;
-uint8 next_interpreter;
+uint8_t next_interpreter;
 static struct lightrec_registers *lightrec_regs;
 #endif
 
@@ -735,7 +734,15 @@ static INLINE uint32_t ReadInstruction(pscpu_timestamp_t *timestamp, uint32_t ad
 
       if (address >= 0xA0000000 || !(BIU & 0x800))
       {
-         instr = MDFN_de32lsb_aligned((uint8 *)(FastMap[address >> FAST_MAP_SHIFT] + address));
+         const uint8_t *_p = (const uint8_t *)(FastMap[address >> FAST_MAP_SHIFT] + address);
+#ifdef MSB_FIRST
+         instr = (uint32_t)_p[0]
+               | ((uint32_t)_p[1] << 8)
+               | ((uint32_t)_p[2] << 16)
+               | ((uint32_t)_p[3] << 24);
+#else
+         memcpy(&instr, _p, 4);
+#endif
 
          if (!psx_gte_overclock)
             *timestamp += 4; /* Approximate best-case cache-disabled time. */
@@ -743,7 +750,7 @@ static INLINE uint32_t ReadInstruction(pscpu_timestamp_t *timestamp, uint32_t ad
       else
       {
          __ICache    *ICI = &ICache[((address & 0xFF0) >> 2)];
-         const uint8 *FMP = (uint8 *)(FastMap[(address & 0xFFFFFFF0) >> FAST_MAP_SHIFT] + (address & 0xFFFFFFF0));
+         const uint8_t *FMP = (uint8_t *)(FastMap[(address & 0xFFFFFFF0) >> FAST_MAP_SHIFT] + (address & 0xFFFFFFF0));
 
          /* | 0x2 to simulate (in)validity bits. */
          ICI[0x00].TV = (address & 0xFFFFFFF0) | 0x0 | 0x2;
@@ -760,22 +767,50 @@ static INLINE uint32_t ReadInstruction(pscpu_timestamp_t *timestamp, uint32_t ad
                if (!psx_gte_overclock)
                   (*timestamp)++;
                ICI[0x00].TV  &= ~0x2;
-               ICI[0x00].Data = MDFN_de32lsb_aligned(&FMP[0x0]);
+#ifdef MSB_FIRST
+               ICI[0x00].Data = (uint32_t)FMP[0x0]
+                              | ((uint32_t)FMP[0x1] << 8)
+                              | ((uint32_t)FMP[0x2] << 16)
+                              | ((uint32_t)FMP[0x3] << 24);
+#else
+               memcpy(&ICI[0x00].Data, &FMP[0x0], 4);
+#endif
             case 0x4:
                if (!psx_gte_overclock)
                   (*timestamp)++;
                ICI[0x01].TV  &= ~0x2;
-               ICI[0x01].Data = MDFN_de32lsb_aligned(&FMP[0x4]);
+#ifdef MSB_FIRST
+               ICI[0x01].Data = (uint32_t)FMP[0x4]
+                              | ((uint32_t)FMP[0x5] << 8)
+                              | ((uint32_t)FMP[0x6] << 16)
+                              | ((uint32_t)FMP[0x7] << 24);
+#else
+               memcpy(&ICI[0x01].Data, &FMP[0x4], 4);
+#endif
             case 0x8:
                if (!psx_gte_overclock)
                   (*timestamp)++;
                ICI[0x02].TV  &= ~0x2;
-               ICI[0x02].Data = MDFN_de32lsb_aligned(&FMP[0x8]);
+#ifdef MSB_FIRST
+               ICI[0x02].Data = (uint32_t)FMP[0x8]
+                              | ((uint32_t)FMP[0x9] << 8)
+                              | ((uint32_t)FMP[0xA] << 16)
+                              | ((uint32_t)FMP[0xB] << 24);
+#else
+               memcpy(&ICI[0x02].Data, &FMP[0x8], 4);
+#endif
             case 0xC:
                if (!psx_gte_overclock)
                   (*timestamp)++;
                ICI[0x03].TV  &= ~0x2;
-               ICI[0x03].Data = MDFN_de32lsb_aligned(&FMP[0xC]);
+#ifdef MSB_FIRST
+               ICI[0x03].Data = (uint32_t)FMP[0xC]
+                              | ((uint32_t)FMP[0xD] << 8)
+                              | ((uint32_t)FMP[0xE] << 16)
+                              | ((uint32_t)FMP[0xF] << 24);
+#else
+               memcpy(&ICI[0x03].Data, &FMP[0xC], 4);
+#endif
                break;
          }
          instr = ICache[(address & 0xFFC) >> 2].Data;
@@ -832,7 +867,7 @@ static uint32_t NO_INLINE CPU_Exception(uint32_t code, uint32_t PC, const uint32
 
 //
 //
-#define GPR_DEPRES_BEGIN { uint8 back = ReadAbsorb[0];
+#define GPR_DEPRES_BEGIN { uint8_t back = ReadAbsorb[0];
 #define GPR_DEP(n) { unsigned tn = (n); ReadAbsorb[tn] = 0; }
 #define GPR_RES(n) { unsigned tn = (n); ReadAbsorb[tn] = 0; }
 #define GPR_DEPRES_END ReadAbsorb[0] = back; }
@@ -855,7 +890,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  BACKING_TO_ACTIVE;
 
 #if defined(HAVE_LIGHTREC) && defined(LIGHTREC_DEBUG)
- u32 oldpc = PC;
+ uint32_t oldpc = PC;
 #endif
 
  do
@@ -863,8 +898,8 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
   //printf("Running: %d %d\n", timestamp, next_event_ts);
   while(MDFN_LIKELY(timestamp < next_event_ts))
   {
-   uint32 instr;
-   uint32 opf;
+   uint32_t instr;
+   uint32_t opf;
 
    // Zero must be zero...until the Master Plan is enacted.
    GPR[0] = 0;
@@ -907,8 +942,8 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
    #define DO_BRANCH(arg_cond, arg_offset, arg_mask, arg_dolink, arg_linkreg)\
 	{							\
 	 const bool cond = (arg_cond);				\
-	 const uint32 offset = (arg_offset);			\
-	 const uint32 mask = (arg_mask);			\
+	 const uint32_t offset = (arg_offset);			\
+	 const uint32_t mask = (arg_mask);			\
 	 PC = new_PC;						\
 	 new_PC += 4;						\
 	 BDBT = 2;						\
@@ -925,10 +960,10 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	 goto SkipNPCStuff;					\
 	}
 
-   #define ITYPE uint32 rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32 rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32 immediate = (int32)(int16)(instr & 0xFFFF); /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
-   #define ITYPE_ZE uint32 rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32 rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32 immediate = instr & 0xFFFF; /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
-   #define JTYPE uint32 target = instr & ((1 << 26) - 1); /*printf(" target=(%08x) ", target);*/
-   #define RTYPE uint32 rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32 rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32 rd MDFN_NOWARN_UNUSED = (instr >> 11) & 0x1F; uint32 shamt MDFN_NOWARN_UNUSED = (instr >> 6) & 0x1F; /*printf(" rs=%02x(%08x), rt=%02x(%08x), rd=%02x(%08x) ", rs, GPR[rs], rt, GPR[rt], rd, GPR[rd]);*/
+   #define ITYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t immediate = (int32_t)(int16_t)(instr & 0xFFFF); /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
+   #define ITYPE_ZE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t immediate = instr & 0xFFFF; /*printf(" rs=%02x(%08x), rt=%02x(%08x), immediate=(%08x) ", rs, GPR[rs], rt, GPR[rt], immediate);*/
+   #define JTYPE uint32_t target = instr & ((1 << 26) - 1); /*printf(" target=(%08x) ", target);*/
+   #define RTYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t rd MDFN_NOWARN_UNUSED = (instr >> 11) & 0x1F; uint32_t shamt MDFN_NOWARN_UNUSED = (instr >> 6) & 0x1F; /*printf(" rs=%02x(%08x), rt=%02x(%08x), rd=%02x(%08x) ", rs, GPR[rs], rt, GPR[rt], rd, GPR[rd]);*/
 
 #if HAVE_COMPUTED_GOTO
    #if 0
@@ -936,8 +971,8 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	// These truncated 32-bit table values apparently can't be calculated at compile/link time by gcc on x86_64, so gcc inserts initialization code, but
 	// the compare for the initialization code path is placed sub-optimally(near where the table value is used instead of at the beginning of the function).
 	//
-	#define CGBEGIN static const uint32 const op_goto_table[256] = {
-	#define CGE(l) (uint32)(uintptr_t)&&l,
+	#define CGBEGIN static const uint32_t const op_goto_table[256] = {
+	#define CGE(l) (uint32_t)(uintptr_t)&&l,
 	#define CGEND }; goto *(void*)(uintptr_t)op_goto_table[opf];
    #else
 	#define CGBEGIN static const void *const op_goto_table[256] = {
@@ -948,7 +983,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
    /* (uint8) cast for cheaper alternative to generated branch+compare bounds check instructions, but still more
       expensive than computed goto which needs no masking nor bounds checking.
    */
-   #define CGBEGIN { enum { CGESB = 1 + __COUNTER__ }; switch((uint8)opf) {
+   #define CGBEGIN { enum { CGESB = 1 + __COUNTER__ }; switch((uint8_t)opf) {
    #define CGE(l) case __COUNTER__ - CGESB: goto l;
    #define CGEND } }
 #endif
@@ -1011,7 +1046,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] + GPR[rt];
+	uint32_t result = GPR[rs] + GPR[rt];
 	bool ep = ((~(GPR[rs] ^ GPR[rt])) & (GPR[rs] ^ result)) & 0x80000000;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
@@ -1039,7 +1074,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-        uint32 result = GPR[rs] + immediate;
+        uint32_t result = GPR[rs] + immediate;
 	bool ep = ((~(GPR[rs] ^ immediate)) & (GPR[rs] ^ result)) & 0x80000000;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
@@ -1067,7 +1102,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] + immediate;
+	uint32_t result = GPR[rs] + immediate;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ADDIU(instr, result, GPR[rs]);
@@ -1090,7 +1125,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] + GPR[rt];
+	uint32_t result = GPR[rs] + GPR[rt];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ADDU(instr, result, GPR[rs], GPR[rt]);
@@ -1113,7 +1148,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] & GPR[rt];
+	uint32_t result = GPR[rs] & GPR[rt];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_AND(instr, result, GPR[rs], GPR[rt]);
@@ -1135,7 +1170,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] & immediate;
+	uint32_t result = GPR[rs] & immediate;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ANDI(instr, result, GPR[rs]);
@@ -1167,11 +1202,11 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
     // Bah, why does MIPS encoding have to be funky like this. :(
     // Handles BGEZ, BGEZAL, BLTZ, BLTZAL
     BEGIN_OPF(BCOND);
-	const uint32 tv = GPR[(instr >> 21) & 0x1F];
-	const uint32 riv = (instr >> 16) & 0x1F;
-	const uint32 immediate = (int32)(int16)(instr & 0xFFFF);
-	const bool result = (int32)(tv ^ (riv << 31)) < 0;
-	const uint32 link = ((riv & 0x1E) == 0x10) ? 31 : 0;
+	const uint32_t tv = GPR[(instr >> 21) & 0x1F];
+	const uint32_t riv = (instr >> 16) & 0x1F;
+	const uint32_t immediate = (int32_t)(int16_t)(instr & 0xFFFF);
+	const bool result = (int32_t)(tv ^ (riv << 31)) < 0;
+	const uint32_t link = ((riv & 0x1E) == 0x10) ? 31 : 0;
 
 	GPR_DEPRES_BEGIN
 	GPR_DEP((instr >> 21) & 0x1F);
@@ -1194,7 +1229,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-	const bool result = (int32)GPR[rs] > 0;
+	const bool result = (int32_t)GPR[rs] > 0;
 
 	DO_LDS();
 
@@ -1211,7 +1246,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-	const bool result = (int32)GPR[rs] <= 0;
+	const bool result = (int32_t)GPR[rs] <= 0;
 
 	DO_LDS();
 
@@ -1249,10 +1284,10 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
     // COP0 instructions
     //
     BEGIN_OPF(COP0);
-	const uint32 sub_op = (instr >> 21) & 0x1F;
-	const uint32 rt = (instr >> 16) & 0x1F;
-	const uint32 rd = (instr >> 11) & 0x1F;
-	const uint32 val = GPR[rt];
+	const uint32_t sub_op = (instr >> 21) & 0x1F;
+	const uint32_t rt = (instr >> 16) & 0x1F;
+	const uint32_t rd = (instr >> 11) & 0x1F;
+	const uint32_t val = GPR[rt];
 
 	switch(sub_op)
 	{
@@ -1355,7 +1390,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	 case 0x0C:
 		DO_LDS();
 		{
-		 const uint32 immediate = (int32)(int16)(instr & 0xFFFF);
+		 const uint32_t immediate = (int32_t)(int16_t)(instr & 0xFFFF);
 		 const bool result = (false == (bool)(instr & (1U << 16)));
 		 DO_BRANCH(result, (immediate << 2), ~0U, false, 0);
 		}
@@ -1365,7 +1400,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	 case 0x18: case 0x19: case 0x1A: case 0x1B: case 0x1C: case 0x1D: case 0x1E: case 0x1F:
 		DO_LDS();
 		{
-		 const uint32 cp0_op = instr & 0x1F;	// Not 0x3F
+		 const uint32_t cp0_op = instr & 0x1F;	// Not 0x3F
 
 		 if(MDFN_LIKELY(cp0_op == 0x10))	// RFE
 		 {
@@ -1386,10 +1421,10 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
     // COP2
     //
     BEGIN_OPF(COP2);
-	const uint32 sub_op = (instr >> 21) & 0x1F;
-	const uint32 rt = (instr >> 16) & 0x1F;
-	const uint32 rd = (instr >> 11) & 0x1F;
-	const uint32 val = GPR[rt];
+	const uint32_t sub_op = (instr >> 21) & 0x1F;
+	const uint32_t rt = (instr >> 16) & 0x1F;
+	const uint32_t rd = (instr >> 11) & 0x1F;
+	const uint32_t val = GPR[rt];
 
 	if(MDFN_UNLIKELY(!(CP0.SR & (1U << (28 + 2)))))
 	{
@@ -1476,7 +1511,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	 case 0x0C:
 		DO_LDS();
 		{
-		 const uint32 immediate = (int32)(int16)(instr & 0xFFFF);
+		 const uint32_t immediate = (int32_t)(int16_t)(instr & 0xFFFF);
 		 const bool result = (false == (bool)(instr & (1U << 16)));
 		 DO_BRANCH(result, (immediate << 2), ~0U, false, 0);
 		}
@@ -1505,10 +1540,10 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	}
 	else
 	{
-	 const uint32 sub_op = (instr >> 21) & 0x1F;
+	 const uint32_t sub_op = (instr >> 21) & 0x1F;
 	 if(sub_op == 0x08 || sub_op == 0x0C)
 	 {
-	  const uint32 immediate = (int32)(int16)(instr & 0xFFFF);
+	  const uint32_t immediate = (int32_t)(int16_t)(instr & 0xFFFF);
 	  const bool result = (false == (bool)(instr & (1U << 16)));
 
 	  DO_BRANCH(result, (immediate << 2), ~0U, false, 0);
@@ -1521,7 +1556,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
     //
     BEGIN_OPF(LWC013);
         ITYPE;
-	const uint32 address = GPR[rs] + immediate;
+	const uint32_t address = GPR[rs] + immediate;
 
 	DO_LDS();
 
@@ -1546,7 +1581,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
     //
     BEGIN_OPF(LWC2);
         ITYPE;
-	const uint32 address = GPR[rs] + immediate;
+	const uint32_t address = GPR[rs] + immediate;
 
 	DO_LDS();
 
@@ -1575,7 +1610,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
     //
     BEGIN_OPF(SWC013);
         ITYPE;
-	const uint32 address = GPR[rs] + immediate;
+	const uint32_t address = GPR[rs] + immediate;
 
 	DO_LDS();
 
@@ -1598,7 +1633,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
     //
     BEGIN_OPF(SWC2);
         ITYPE;
-	const uint32 address = GPR[rs] + immediate;
+	const uint32_t address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(address & 0x3))
 	{
@@ -1645,8 +1680,8 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	}
         else
         {
-         LO = (int32)GPR[rs] / (int32)GPR[rt];
-         HI = (int32)GPR[rs] % (int32)GPR[rt];
+         LO = (int32_t)GPR[rs] / (int32_t)GPR[rt];
+         HI = (int32_t)GPR[rs] % (int32_t)GPR[rt];
         }
 	muldiv_ts_done = timestamp + 37;
 
@@ -1723,7 +1758,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 tmp = GPR[rs];
+	uint32_t tmp = GPR[rs];
 
 	DO_LDS();
 
@@ -1741,7 +1776,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 bt = GPR[rs];
+	uint32_t bt = GPR[rs];
 
 	DO_LDS();
 
@@ -1887,10 +1922,10 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-	uint64 result;
+	uint64_t result;
 
-	result = (int64)(int32)GPR[rs] * (int32)GPR[rt];
-	muldiv_ts_done = timestamp + MULT_Tab24[MDFN_lzcount32((GPR[rs] ^ ((int32)GPR[rs] >> 31)) | 0x400)];
+	result = (int64_t)(int32_t)GPR[rs] * (int32_t)GPR[rt];
+	muldiv_ts_done = timestamp + MULT_Tab24[MDFN_lzcount32((GPR[rs] ^ ((int32_t)GPR[rs] >> 31)) | 0x400)];
 	DO_LDS();
 
 	LO = result;
@@ -1912,9 +1947,9 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-	uint64 result;
+	uint64_t result;
 
-	result = (uint64)GPR[rs] * GPR[rt];
+	result = (uint64_t)GPR[rs] * GPR[rt];
 	muldiv_ts_done = timestamp + MULT_Tab24[MDFN_lzcount32(GPR[rs] | 0x400)];
 	DO_LDS();
 
@@ -1939,7 +1974,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = ~(GPR[rs] | GPR[rt]);
+	uint32_t result = ~(GPR[rs] | GPR[rt]);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_NOR(instr, result, GPR[rs], GPR[rt]);
@@ -1962,7 +1997,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] | GPR[rt];
+	uint32_t result = GPR[rs] | GPR[rt];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_OR(instr, result, GPR[rs], GPR[rt]);
@@ -1985,7 +2020,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] | immediate;
+	uint32_t result = GPR[rs] | immediate;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ORI(instr, result, GPR[rs]);
@@ -2008,7 +2043,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rt] << shamt;
+	uint32_t result = GPR[rt] << shamt;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLL(instr, result, GPR[rt]);
@@ -2032,7 +2067,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rt] << (GPR[rs] & 0x1F);
+	uint32_t result = GPR[rt] << (GPR[rs] & 0x1F);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLLV(instr, result, GPR[rt], GPR[rs]);
@@ -2055,7 +2090,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = (bool)((int32)GPR[rs] < (int32)GPR[rt]);
+	uint32_t result = (bool)((int32_t)GPR[rs] < (int32_t)GPR[rt]);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLT(instr, result, GPR[rs], GPR[rt]);
@@ -2078,7 +2113,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32 result = (bool)((int32)GPR[rs] < (int32)immediate);
+	uint32_t result = (bool)((int32_t)GPR[rs] < (int32_t)immediate);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLTI(instr, result, GPR[rs]);
@@ -2101,7 +2136,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32 result = (bool)(GPR[rs] < (uint32)immediate);
+	uint32_t result = (bool)(GPR[rs] < (uint32_t)immediate);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLTIU(instr, result, GPR[rs]);
@@ -2125,7 +2160,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = (bool)(GPR[rs] < GPR[rt]);
+	uint32_t result = (bool)(GPR[rs] < GPR[rt]);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SLTU(instr, result, GPR[rs], GPR[rt]);
@@ -2148,7 +2183,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = ((int32)GPR[rt]) >> shamt;
+	uint32_t result = ((int32_t)GPR[rt]) >> shamt;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SRA(instr, result, GPR[rt]);
@@ -2172,7 +2207,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = ((int32)GPR[rt]) >> (GPR[rs] & 0x1F);
+	uint32_t result = ((int32_t)GPR[rt]) >> (GPR[rs] & 0x1F);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SRAV(instr, result, GPR[rt], GPR[rs]);
@@ -2195,7 +2230,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rt] >> shamt;
+	uint32_t result = GPR[rt] >> shamt;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SRL(instr, result, GPR[rt]);
@@ -2218,7 +2253,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rt] >> (GPR[rs] & 0x1F);
+	uint32_t result = GPR[rt] >> (GPR[rs] & 0x1F);
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SRLV(instr, result, GPR[rt], GPR[rs]);
@@ -2242,7 +2277,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] - GPR[rt];
+	uint32_t result = GPR[rs] - GPR[rt];
 	bool ep = (((GPR[rs] ^ GPR[rt])) & (GPR[rs] ^ result)) & 0x80000000;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
@@ -2272,7 +2307,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] - GPR[rt];
+	uint32_t result = GPR[rs] - GPR[rt];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_SUBU(instr, result, GPR[rs], GPR[rt]);
@@ -2306,7 +2341,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  	GPR_RES(rd);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] ^ GPR[rt];
+	uint32_t result = GPR[rs] ^ GPR[rt];
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_XOR(instr, result, GPR[rs], GPR[rt]);
@@ -2328,7 +2363,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_RES(rt);
 	GPR_DEPRES_END
 
-	uint32 result = GPR[rs] ^ immediate;
+	uint32_t result = GPR[rs] ^ immediate;
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_XORI(instr, result, GPR[rs]);
@@ -2352,7 +2387,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-	uint32 address = GPR[rs] + immediate;
+	uint32_t address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(LDWhich == rt))
 	 LDWhich = 0;
@@ -2360,7 +2395,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	DO_LDS();
 
 	LDWhich = rt;
-	LDValue = (int32)(int8)ReadMemory_u8(&timestamp, address);
+	LDValue = (int32_t)(int8_t)ReadMemory_u8(&timestamp, address);
 
 	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
 		PGXP_CPU_LB(instr, LDValue, address);
@@ -2376,7 +2411,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-        uint32 address = GPR[rs] + immediate;
+        uint32_t address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(LDWhich == rt))
 	 LDWhich = 0;
@@ -2400,7 +2435,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-        uint32 address = GPR[rs] + immediate;
+        uint32_t address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(address & 1))
 	{
@@ -2417,7 +2452,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	 DO_LDS();
 
 	 LDWhich = rt;
-         LDValue = (int32)(int16)ReadMemory_u16(&timestamp, address);
+         LDValue = (int32_t)(int16_t)ReadMemory_u16(&timestamp, address);
 	}
 	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
 		PGXP_CPU_LH(instr, LDValue, address);
@@ -2433,7 +2468,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-        uint32 address = GPR[rs] + immediate;
+        uint32_t address = GPR[rs] + immediate;
 
         if(MDFN_UNLIKELY(address & 1))
 	{
@@ -2468,7 +2503,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rs);
 	GPR_DEPRES_END
 
-        uint32 address = GPR[rs] + immediate;
+        uint32_t address = GPR[rs] + immediate;
 
         if(MDFN_UNLIKELY(address & 3))
 	{
@@ -2503,7 +2538,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-	uint32 address = GPR[rs] + immediate;
+	uint32_t address = GPR[rs] + immediate;
 
 	WriteMemory_u8(&timestamp, address, GPR[rt]);
 
@@ -2524,7 +2559,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-        uint32 address = GPR[rs] + immediate;
+        uint32_t address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(address & 0x1))
 	{
@@ -2551,7 +2586,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-        uint32 address = GPR[rs] + immediate;
+        uint32_t address = GPR[rs] + immediate;
 
 	if(MDFN_UNLIKELY(address & 0x3))
 	{
@@ -2580,8 +2615,8 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	//GPR_DEP(rt);
 	GPR_DEPRES_END
 
-	uint32 address = GPR[rs] + immediate;
-	uint32 v = GPR[rt];
+	uint32_t address = GPR[rs] + immediate;
+	uint32_t v = GPR[rt];
 
 	if(LDWhich == rt)
 	{
@@ -2625,7 +2660,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-        uint32 address = GPR[rs] + immediate;
+        uint32_t address = GPR[rs] + immediate;
 
 	switch(address & 0x3)
 	{
@@ -2659,8 +2694,8 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	//GPR_DEP(rt);
 	GPR_DEPRES_END
 
-        uint32 address = GPR[rs] + immediate;
-	uint32 v = GPR[rt];
+        uint32_t address = GPR[rs] + immediate;
+	uint32_t v = GPR[rt];
 
 	if(LDWhich == rt)
 	{
@@ -2704,7 +2739,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
 	GPR_DEP(rt);
 	GPR_DEPRES_END
 
-        uint32 address = GPR[rs] + immediate;
+        uint32_t address = GPR[rs] + immediate;
 
 	switch(address & 0x3)
 	{
@@ -2865,13 +2900,13 @@ enum opcodes {
 static char name[] = "beetle_psx_libretro";
 
 #ifdef LIGHTREC_DEBUG
-u32 lightrec_begin_cycles = 0;
+uint32_t lightrec_begin_cycles = 0;
 
-u32 hash_calculate(const void *buffer, u32 count)
+uint32_t hash_calculate(const void *buffer, uint32_t count)
 {
 	unsigned int i;
-	u32 *data = (u32 *) buffer;
-	u32 hash = 0xffffffff;
+	uint32_t *data = (uint32_t *) buffer;
+	uint32_t hash = 0xffffffff;
 
 	count /= 4;
 	for(i = 0; i < count; ++i) {
@@ -2892,7 +2927,7 @@ static void print_for_big_ass_debugger(int32_t timestamp, uint32_t PC)
 	uint8_t *psxR = (uint8_t *) BIOSROM->data8;
 	uint8_t *psxH = (uint8_t *) ScratchRAM->data8;
 
-	unsigned int i;
+	uint8_t i;
 
 	printf("CYCLE 0x%08x PC 0x%08x", timestamp, PC);
 
@@ -2918,7 +2953,7 @@ static void print_for_big_ass_debugger(int32_t timestamp, uint32_t PC)
 }
 #endif /* LIGHTREC_DEBUG */
 
-static void pgxp_cop2_notify(struct lightrec_state *state, u32 op, u32 data)
+static void pgxp_cop2_notify(struct lightrec_state *state, uint32_t op, uint32_t data)
 {
 	if((op >> 26) == OP_CP2) {
 		switch ((op >> 21) & 0x1F) {
@@ -2935,7 +2970,7 @@ static bool cp2_ops[0x40] = {0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,
                              1,0,0,0,0,0,0,0,1,1,1,0,0,1,1,0,
                              1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1};
 
-static void cop2_op(struct lightrec_state *state, u32 func)
+static void cop2_op(struct lightrec_state *state, uint32_t func)
 {
    if (MDFN_UNLIKELY(!cp2_ops[func & 0x3f]))
    {
@@ -2967,7 +3002,7 @@ static void reset_target_cycle_count(struct lightrec_state *state, pscpu_timesta
 }
 
 static void hw_write_byte(struct lightrec_state *state,
-		u32 opcode, void *host,	u32 mem, u32 val)
+		uint32_t opcode, void *host,	uint32_t mem, uint32_t val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -2977,9 +3012,9 @@ static void hw_write_byte(struct lightrec_state *state,
 }
 
 static void pgxp_nonhw_write_byte(struct lightrec_state *state,
-		u32 opcode, void *host,	u32 mem, u32 val)
+		uint32_t opcode, void *host,	uint32_t mem, uint32_t val)
 {
-	*(u8 *)host = val;
+	*(uint8_t *)host = val;
 	PGXP_CPU_SB(opcode, val, mem);
 
 	if (!psx_dynarec_invalidate)
@@ -2987,7 +3022,7 @@ static void pgxp_nonhw_write_byte(struct lightrec_state *state,
 }
 
 static void pgxp_hw_write_byte(struct lightrec_state *state,
-		u32 opcode, void *host,	u32 mem, u32 val)
+		uint32_t opcode, void *host,	uint32_t mem, uint32_t val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -2999,7 +3034,7 @@ static void pgxp_hw_write_byte(struct lightrec_state *state,
 }
 
 static void hw_write_half(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u32 val)
+		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3009,9 +3044,9 @@ static void hw_write_half(struct lightrec_state *state,
 }
 
 static void pgxp_nonhw_write_half(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u32 val)
+		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
-	*(u16 *)host = HTOLE16(val);
+	*(uint16_t *)host = HTOLE16(val);
 	PGXP_CPU_SH(opcode, val, mem);
 
 	if (!psx_dynarec_invalidate)
@@ -3019,7 +3054,7 @@ static void pgxp_nonhw_write_half(struct lightrec_state *state,
 }
 
 static void pgxp_hw_write_half(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u32 val)
+		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3031,7 +3066,7 @@ static void pgxp_hw_write_half(struct lightrec_state *state,
 }
 
 static void hw_write_word(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u32 val)
+		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3041,9 +3076,9 @@ static void hw_write_word(struct lightrec_state *state,
 }
 
 static void pgxp_nonhw_write_word(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u32 val)
+		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
-	*(u32 *)host = HTOLE32(val);
+	*(uint32_t *)host = HTOLE32(val);
 
 	switch (opcode >> 26){
 		case 0x2A:
@@ -3067,9 +3102,9 @@ static void pgxp_nonhw_write_word(struct lightrec_state *state,
 }
 
 static void pgxp_nonhw_write_word_unsigned(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u32 val)
+		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
-	*(u32 *)host = HTOLE32(val);
+	*(uint32_t *)host = HTOLE32(val);
 
 	PGXP_CPU_SW(opcode, val, mem);
 
@@ -3078,7 +3113,7 @@ static void pgxp_nonhw_write_word_unsigned(struct lightrec_state *state,
 }
 
 static void pgxp_hw_write_word(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u32 val)
+		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3104,10 +3139,10 @@ static void pgxp_hw_write_word(struct lightrec_state *state,
 	reset_target_cycle_count(state, timestamp);
 }
 
-static u8 hw_read_byte(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint8_t hw_read_byte(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
-	u8 val;
+	uint8_t val;
 
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3122,10 +3157,10 @@ static u8 hw_read_byte(struct lightrec_state *state,
 	return val;
 }
 
-static u8 pgxp_nonhw_read_byte(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint8_t pgxp_nonhw_read_byte(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
-	u8 val = *(u8 *)host;
+	uint8_t val = *(uint8_t *)host;
 
 	if((opcode >> 26) == OP_LB)
 		PGXP_CPU_LB(opcode, val, mem);
@@ -3135,10 +3170,10 @@ static u8 pgxp_nonhw_read_byte(struct lightrec_state *state,
 	return val;
 }
 
-static u8 pgxp_hw_read_byte(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint8_t pgxp_hw_read_byte(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
-	u8 val;
+	uint8_t val;
 
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3158,10 +3193,10 @@ static u8 pgxp_hw_read_byte(struct lightrec_state *state,
 	return val;
 }
 
-static u16 hw_read_half(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint16_t hw_read_half(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
-	u16 val;
+	uint16_t val;
 
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3176,10 +3211,10 @@ static u16 hw_read_half(struct lightrec_state *state,
 	return val;
 }
 
-static u16 pgxp_nonhw_read_half(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint16_t pgxp_nonhw_read_half(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
-	u16 val = LE16TOH(*(u16 *)host);
+	uint16_t val = LE16TOH(*(uint16_t *)host);
 
 	if((opcode >> 26) == OP_LH)
 		PGXP_CPU_LH(opcode, val, mem);
@@ -3189,10 +3224,10 @@ static u16 pgxp_nonhw_read_half(struct lightrec_state *state,
 	return val;
 }
 
-static u16 pgxp_hw_read_half(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint16_t pgxp_hw_read_half(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
-	u16 val;
+	uint16_t val;
 
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3212,10 +3247,10 @@ static u16 pgxp_hw_read_half(struct lightrec_state *state,
 	return val;
 }
 
-static u32 hw_read_word(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint32_t hw_read_word(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
-	u32 val;
+	uint32_t val;
 
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3230,10 +3265,10 @@ static u32 hw_read_word(struct lightrec_state *state,
 	return val;
 }
 
-static u32 pgxp_nonhw_read_word(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint32_t pgxp_nonhw_read_word(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
-	u32 val = LE32TOH(*(u32 *)host);
+	uint32_t val = LE32TOH(*(uint32_t *)host);
 
 	switch (opcode >> 26){
 		case OP_LWL:
@@ -3257,20 +3292,20 @@ static u32 pgxp_nonhw_read_word(struct lightrec_state *state,
 	return val;
 }
 
-static u32 pgxp_nonhw_read_word_unsigned(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint32_t pgxp_nonhw_read_word_unsigned(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
-	u32 val = LE32TOH(*(u32 *)host);
+	uint32_t val = LE32TOH(*(uint32_t *)host);
 
 	PGXP_CPU_LW(opcode, val, mem);
 
 	return val;
 }
 
-static u32 pgxp_hw_read_word(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint32_t pgxp_hw_read_word(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
-	u32 val;
+	uint32_t val;
 
 	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
 
@@ -3333,8 +3368,8 @@ static struct lightrec_mem_map_ops hw_regs_ops = {
 	.lw = hw_read_word,
 };
 
-static u32 cache_ctrl_read_word(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem)
+static uint32_t cache_ctrl_read_word(struct lightrec_state *state,
+		uint32_t opcode, void *host, uint32_t mem)
 {
 	if (PGXP_GetModes() & PGXP_MODE_MEMORY)
 		PGXP_CPU_LW(opcode, BIU, mem);
@@ -3343,7 +3378,7 @@ static u32 cache_ctrl_read_word(struct lightrec_state *state,
 }
 
 static void cache_ctrl_write_word(struct lightrec_state *state,
-		u32 opcode, void *host, u32 mem, u32 val)
+		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
 	BIU = val;
 
@@ -3523,7 +3558,7 @@ static int lightrec_plugin_init(PS_CPU *self)
 
    lightrec_regs = lightrec_get_registers(lightrec_state);
 
-   u32 flags = (psx_dynarec_invalidate?LIGHTREC_OPT_INV_DMA_ONLY:0) |
+   uint32_t flags = (psx_dynarec_invalidate?LIGHTREC_OPT_INV_DMA_ONLY:0) |
                (psx_dynarec_spgp_opt?LIGHTREC_OPT_SP_GP_HIT_RAM:0);
 
    lightrec_set_unsafe_opt_flags(lightrec_state, flags);
@@ -3540,7 +3575,7 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
    uint32_t new_PC_mask;
    uint32_t LDWhich;
    uint32_t LDValue;
-   u32      flags;
+   uint32_t      flags;
 
    (void)self;
    (void)new_PC_mask;
@@ -3558,7 +3593,7 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
    do
    {
 #ifdef LIGHTREC_DEBUG
-      u32 oldpc = PC;
+      uint32_t oldpc = PC;
 #endif
       memcpy(lightrec_regs->cp0,&CP0,32*sizeof(uint32_t));
 

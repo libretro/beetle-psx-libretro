@@ -18,10 +18,10 @@
 
 #ifdef MSB_FIRST
 
-static INLINE uint16 LoadU16_LE(const uint16 *a)
+static INLINE uint16_t LoadU16_LE(const uint16_t *a)
 {
 #ifdef ARCH_POWERPC
-   uint16 tmp;
+   uint16_t tmp;
    __asm__ ("lhbrx %0, %y1" : "=r"(tmp) : "Z"(*a));
    return tmp;
 #else
@@ -29,19 +29,19 @@ static INLINE uint16 LoadU16_LE(const uint16 *a)
 #endif
 }
 
-static INLINE uint32 LoadU32_LE(const uint32 *a)
+static INLINE uint32_t LoadU32_LE(const uint32_t *a)
 {
 #ifdef ARCH_POWERPC
-   uint32 tmp;
+   uint32_t tmp;
    __asm__ ("lwbrx %0, %y1" : "=r"(tmp) : "Z"(*a));
    return tmp;
 #else
-   uint32 tmp = *a;
+   uint32_t tmp = *a;
    return (tmp << 24) | ((tmp & 0xFF00) << 8) | ((tmp >> 8) & 0xFF00) | (tmp >> 24);
 #endif
 }
 
-static INLINE void StoreU16_LE(uint16 *a, const uint16 v)
+static INLINE void StoreU16_LE(uint16_t *a, const uint16_t v)
 {
 #ifdef ARCH_POWERPC
    __asm__ ("sthbrx %0, %y1" : : "r"(v), "Z"(*a));
@@ -50,7 +50,7 @@ static INLINE void StoreU16_LE(uint16 *a, const uint16 v)
 #endif
 }
 
-static INLINE void StoreU32_LE(uint32 *a, const uint32 v)
+static INLINE void StoreU32_LE(uint32_t *a, const uint32_t v)
 {
 #ifdef ARCH_POWERPC
    __asm__ ("stwbrx %0, %y1" : : "r"(v), "Z"(*a));
@@ -61,10 +61,10 @@ static INLINE void StoreU32_LE(uint32 *a, const uint32 v)
 
 #else /* !MSB_FIRST */
 
-static INLINE uint16 LoadU16_LE(const uint16 *a)  { return *a; }
-static INLINE uint32 LoadU32_LE(const uint32 *a)  { return *a; }
-static INLINE void   StoreU16_LE(uint16 *a, const uint16 v) { *a = v; }
-static INLINE void   StoreU32_LE(uint32 *a, const uint32 v) { *a = v; }
+static INLINE uint16_t LoadU16_LE(const uint16_t *a)  { return *a; }
+static INLINE uint32_t LoadU32_LE(const uint32_t *a)  { return *a; }
+static INLINE void   StoreU16_LE(uint16_t *a, const uint16_t v) { *a = v; }
+static INLINE void   StoreU32_LE(uint32_t *a, const uint32_t v) { *a = v; }
 
 #endif /* MSB_FIRST */
 

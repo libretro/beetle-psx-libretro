@@ -428,7 +428,8 @@ int DecodePQ(ReedSolomonTables *rt, unsigned char *data, int padding,
     
       /* lambda[i+1] for i even is the formal derivative lambda_pr of lambda[i] */
 
-      for(i=MIN(deg_lambda, NROOTS-1) & ~1; i>=0; i-=2) 
+      i = (deg_lambda < NROOTS-1) ? deg_lambda : NROOTS-1;
+      for(i &= ~1; i>=0; i-=2)
       {  if(lambda[i+1] != GF_ALPHA0)
 	   den ^= gt->alphaTo[mod_fieldmax(lambda[i+1] + i * root[j])];
       }

@@ -197,7 +197,7 @@ static INLINE uint8_t Sat5(int16_t cc)
  * Newton-Raphson division table.  (Initialized at startup; do NOT save in save states!)
  * */
 static uint8_t DivTable[0x100 + 1];
-static INLINE int32_t CalcRecip(uint16 divisor)
+static INLINE int32_t CalcRecip(uint16_t divisor)
 {
  int32_t x = (0x101 + DivTable[(((divisor & 0x7FFF) + 0x40) >> 7)]);
  int32_t tmp = (((int32_t)divisor * -x) + 0x80) >> 8;
@@ -371,7 +371,7 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
       //29: Read-only
 
       _LZCS = DR[30];
-      _LZCR = MDFN_lzcount32(DR[30] ^ ((int32)DR[30] >> 31));
+      _LZCR = MDFN_lzcount32(DR[30] ^ ((int32_t)DR[30] >> 31));
 
       //31: Read-only
    }
@@ -496,7 +496,7 @@ uint32_t GTE_ReadCR(unsigned int which)
 
    ret = CR[which];
    if(which == 4 || which == 12 || which == 20 || which == 26 || which == 27 || which == 29 || which ==30)
-      ret = (int16)ret;
+      ret = (int16_t)ret;
 
    return(ret);
 }
@@ -633,7 +633,7 @@ void GTE_WriteDR(unsigned int which, uint32_t value)
 
       case 30:
          LZCS = value;
-         LZCR = MDFN_lzcount32(value ^ ((int32)value >> 31));
+		     LZCR = MDFN_lzcount32(value ^ (0u - (value >> 31)));
          break;
 
       case 31:	/* Read-only */
@@ -1175,10 +1175,10 @@ static INLINE void MultiplyMatrixByVector_PT(uint32_t mx, uint32_t v, uint32_t c
 }
 
 #define DECODE_FIELDS							\
- const uint32 sf MDFN_NOWARN_UNUSED = (instr & (1 << 19)) ? 12 : 0;		\
- const uint32 mx MDFN_NOWARN_UNUSED = (instr >> 17) & 0x3;			\
- const uint32 v MDFN_NOWARN_UNUSED = (instr >> 15) & 0x3;				\
- const uint32 cv MDFN_NOWARN_UNUSED = (instr >> 13) & 0x3;	\
+ const uint32_t sf MDFN_NOWARN_UNUSED = (instr & (1 << 19)) ? 12 : 0;		\
+ const uint32_t mx MDFN_NOWARN_UNUSED = (instr >> 17) & 0x3;			\
+ const uint32_t v MDFN_NOWARN_UNUSED = (instr >> 15) & 0x3;				\
+ const uint32_t cv MDFN_NOWARN_UNUSED = (instr >> 13) & 0x3;	\
  const int lm MDFN_NOWARN_UNUSED = (instr >> 10) & 1;
 
 /* SQR - Square Vector */
@@ -1220,7 +1220,11 @@ static INLINE uint32_t Divide(uint32_t dividend, uint32_t divisor)
       dividend <<= shift_bias;
       divisor <<= shift_bias;
 
-      return MIN((uint32_t)0x1FFFF, (uint32_t)(((uint64_t)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16));
+      {
+         uint32_t _r = (uint32_t)(((uint64_t)dividend * CalcRecip(divisor | 0x8000) + 32768) >> 16);
+         if (_r > 0x1FFFF) _r = 0x1FFFF;
+         return _r;
+      }
    }
 
    /* If the Z coordinate is smaller than or equal to half the 
@@ -1291,7 +1295,7 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float p
        * previous code did `*((uint32*)&XY_FIFO[3])` which is a strict
        * aliasing violation; memcpy is well-defined and modern compilers
        * fold it into a single mov. */
-      uint32 value;
+      uint32_t value;
       memcpy(&value, &XY_FIFO(3), sizeof(value));
 
       /* Clamp precision values to valid range */
@@ -1309,9 +1313,9 @@ static INLINE void TransformDQ(int64_t h_div_sz)
    SET_IR(0, Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12));
 }
 
-static INLINE int32 RTPS(uint32 instr)
+static INLINE int32_t RTPS(uint32_t instr)
 {
- int64 h_div_sz;
+ int64_t h_div_sz;
  float precise_z;
  float precise_h_div_sz;
  DECODE_FIELDS;
@@ -1328,14 +1332,14 @@ static INLINE int32 RTPS(uint32 instr)
  return(15);
 }
 
-static INLINE int32 RTPT(uint32 instr)
+static INLINE int32_t RTPT(uint32_t instr)
 {
  int i;
  DECODE_FIELDS;
 
  for(i = 0; i < 3; i++)
  {
-  int64 h_div_sz;
+  int64_t h_div_sz;
   float precise_z;
   float precise_h_div_sz;
 
@@ -1434,7 +1438,7 @@ static INLINE void DPC(uint32_t instr)
 
    for(i = 0; i < 3; i++)
    {
-      SET_MAC(1 + i, i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)(int32_t)CR[CRV_FC+i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf);
+      SET_MAC(1 + i, i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)(int32_t)CR[CRV_FC+i] << 12) - (int32_t)((uint32_t)RGB_temp[i] << 12))) >> sf);
       SET_MAC(1 + i, i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC(1 + i), false))) >> sf);
    }
 
@@ -1486,7 +1490,7 @@ static int32_t DPCS(uint32_t instr)
 
    for(i = 0; i < 3; i++)
    {
-      SET_MAC(1 + i, i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)(int32_t)CR[CRV_FC+i] << 12) - (int32)((uint32)RGB_temp[i] << 12))) >> sf);
+      SET_MAC(1 + i, i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)(int32_t)CR[CRV_FC+i] << 12) - (int32_t)((uint32_t)RGB_temp[i] << 12))) >> sf);
       SET_MAC(1 + i, i64_to_i44(i, ((int64_t)((uint64_t)(int64_t)RGB_temp[i] << 12) + IR0 * i32_to_i16_saturate(i, MAC(1 + i), false))) >> sf);
    }
 
@@ -1516,9 +1520,9 @@ static int32_t INTPL(uint32_t instr)
    const uint32_t sf = (instr & (1 << 19)) ? 12 : 0;
    const int      lm = (instr >> 10) & 1;
 
-   SET_MAC(1, i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)(int32_t)CR[CRV_FC] << 12) - (int32)((uint32)(int32)IR1 << 12))) >> sf);
-   SET_MAC(2, i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)(int32_t)CR[CRV_FC+1] << 12) - (int32)((uint32)(int32)IR2 << 12))) >> sf);
-   SET_MAC(3, i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)(int32_t)CR[CRV_FC+2] << 12) - (int32)((uint32)(int32)IR3 << 12))) >> sf);
+   SET_MAC(1, i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)(int32_t)CR[CRV_FC] << 12) - (int32_t)((uint32_t)(int32_t)IR1 << 12))) >> sf);
+   SET_MAC(2, i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)(int32_t)CR[CRV_FC+1] << 12) - (int32_t)((uint32_t)(int32_t)IR2 << 12))) >> sf);
+   SET_MAC(3, i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)(int32_t)CR[CRV_FC+2] << 12) - (int32_t)((uint32_t)(int32_t)IR3 << 12))) >> sf);
 
    SET_MAC(1, i64_to_i44(0, ((int64_t)((uint64_t)(int64_t)IR1 << 12) + IR0 * i32_to_i16_saturate(0, MAC(1), false)) >> sf));
    SET_MAC(2, i64_to_i44(1, ((int64_t)((uint64_t)(int64_t)IR2 << 12) + IR0 * i32_to_i16_saturate(1, MAC(2), false)) >> sf));
@@ -1615,7 +1619,7 @@ static int32_t NCLIP(uint32_t instr)
     * fold it into a single mov per call. */
    bool used_pgxp = false;
    if (PGXP_GetModes() & PGXP_NCLIP_IMPL) {
-      uint32 v0, v1, v2;
+      uint32_t v0, v1, v2;
       memcpy(&v0, &XY_FIFO(0), sizeof(v0));
       memcpy(&v1, &XY_FIFO(1), sizeof(v1));
       memcpy(&v2, &XY_FIFO(2), sizeof(v2));
@@ -2010,7 +2014,7 @@ int32_t GTE_Instruction(uint32_t instr)
       ret = 1;
 
    if(FLAGS & 0x7f87e000)
-      FLAGS |= 1 << 31;
+      FLAGS |= 1u << 31;
 
    CR[31] = FLAGS;
 

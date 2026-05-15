@@ -866,20 +866,26 @@ Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassI
 	for (unsigned i = 0; i < info.num_color_attachments; i++)
 	{
 		VK_ASSERT(info.color_attachments[i]);
-		unsigned lod = info.color_attachments[i]->get_create_info().base_level;
-		width = min(width, info.color_attachments[i]->get_image().get_width(lod));
-		height = min(height, info.color_attachments[i]->get_image().get_height(lod));
-		views[num_views++] = info.color_attachments[i]->get_render_target_view(info.layer);
-		attachments[num_attachments++] = info.color_attachments[i];
+		auto *att = info.color_attachments[i];
+		unsigned lod = att->get_create_info().base_level;
+		unsigned aw  = att->get_image().get_width(lod);
+		unsigned ah  = att->get_image().get_height(lod);
+		if (aw < width)  width  = aw;
+		if (ah < height) height = ah;
+		views[num_views++] = att->get_render_target_view(info.layer);
+		attachments[num_attachments++] = att;
 	}
 
 	if (info.depth_stencil)
 	{
-		unsigned lod = info.depth_stencil->get_create_info().base_level;
-		width = min(width, info.depth_stencil->get_image().get_width(lod));
-		height = min(height, info.depth_stencil->get_image().get_height(lod));
-		views[num_views++] = info.depth_stencil->get_render_target_view(info.layer);
-		attachments[num_attachments++] = info.depth_stencil;
+		auto *att = info.depth_stencil;
+		unsigned lod = att->get_create_info().base_level;
+		unsigned aw  = att->get_image().get_width(lod);
+		unsigned ah  = att->get_image().get_height(lod);
+		if (aw < width)  width  = aw;
+		if (ah < height) height = ah;
+		views[num_views++] = att->get_render_target_view(info.layer);
+		attachments[num_attachments++] = att;
 	}
 
 	VkFramebufferCreateInfo fb_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };

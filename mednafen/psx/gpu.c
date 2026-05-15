@@ -23,6 +23,10 @@
 
 #include <retro_miscellaneous.h>
 
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
+
 #include "../math_ops.h"
 #include "../state_helpers.h"
 #include "../../rsx/rsx_intf.h"
@@ -35,7 +39,7 @@
 /* Forward decl: gpu_common.h's PlotNativePixel template calls
  * texel_put. The actual definition is below at file scope (static)
  * because it's used only inside this translation unit. */
-static void texel_put(uint32 x, uint32 y, uint16 v);
+static void texel_put(uint32_t x, uint32_t y, uint16_t v);
 
 #include "gpu_common.h"
 
@@ -83,9 +87,9 @@ extern bool fast_pal;
    Vertical start and end can be changed during active display, with effect(though it needs to be vs0->ve0->vs1->ve1->..., vs0->vs1->ve0 doesn't apparently do anything
    different from vs0->ve0.
    */
-extern int32 EventCycles;
+extern int32_t EventCycles;
 
-static const int8 dither_table[4][4] =
+static const int8_t dither_table[4][4] =
 {
    { -4,  0, -3,  1 },
    {  2, -2,  3, -1 },
@@ -97,7 +101,7 @@ static FastFIFO GPU_BlitterFIFO; /* 0x10 on an actual PS1 GPU, 0x20 here (see co
 
 struct CTEntry
 {
-   void (*func[4][8])(PS_GPU* g, const uint32 *cb);
+   void (*func[4][8])(PS_GPU* g, const uint32_t *cb);
    uint8_t len;
    uint8_t fifo_fb_len;
    bool ss_cmd;
@@ -112,8 +116,8 @@ PS_GPU GPU;
  * stored at 1x for compatibility). Not part of the GPU state itself
  * - merely shared across the multi-stage RestoreStateP1/P2/P3 flow
  * and the GPU_Rescale path. File-scope, no external use. */
-static uint32  TexCache_Tag[256];
-static uint16  TexCache_Data[256][4];
+static uint32_t  TexCache_Tag[256];
+static uint16_t  TexCache_Data[256][4];
 static uint16_t *vram_new = NULL;
 
 /*
@@ -159,9 +163,77 @@ typedef struct
    bool     rgb24;
 } GPU_DeferredScanline;
 
-#define DEFERRED_SCANOUT_MAX 576
-static GPU_DeferredScanline deferred_scanouts[DEFERRED_SCANOUT_MAX];
+/* Upper bound on the SW surface dest_line index, both for the
+ * deferred-scanout records below and the per-dest_line scanout
+ * cache further down.  Equals MEDNAFEN_CORE_GEOMETRY_MAX_H (576
+ * - PAL 480i), which is the largest dest_line the surface
+ * geometry permits.  Hardcoded here (rather than #include'd from
+ * libretro_options.h) to keep the GPU TU self-contained for the
+ * non-libretro Mednafen build. */
+#define GPU_DEST_LINE_MAX 576
+
+/* Legacy alias kept so historical comments / external readers
+ * referring to DEFERRED_SCANOUT_MAX still resolve.  New code
+ * should use GPU_DEST_LINE_MAX. */
+#define DEFERRED_SCANOUT_MAX GPU_DEST_LINE_MAX
+
+static GPU_DeferredScanline deferred_scanouts[GPU_DEST_LINE_MAX];
 static unsigned              deferred_scanout_count = 0;
+
+/*
+ * Per-dest_line cache for the SW renderer's margin zero-fill skip.
+ *
+ * The per-scanline scanout path zeros the surface row outside the
+ * active region every frame:
+ *
+ *    memset(dest, 0, udx_start * 4);             // left margin
+ *    ReorderRGB_Var(..., udx_start, udx_end);    // VRAM -> XRGB8888
+ *    for (x = udx_end; x < udmw; x++) dest[x]=0; // right margin
+ *
+ * For the steady-state case where (dx_start, dx_end, dmw) is the
+ * same as the previous frame for a given dest_line, those zero
+ * pixels are unchanged from what the previous frame already wrote -
+ * re-zeroing them is wasted memory traffic.  We cache the triple
+ * per dest_line; when it matches, skip both memsets.
+ *
+ * Cache validity (one entry == one "we know that row's margins are
+ * already zero" assertion):
+ *
+ *   - alloc_surface() resets the cache.  The surface is a fresh
+ *     calloc, so every byte is zero; cache entries start invalid
+ *     and the first frame populates them.
+ *   - GPU_Rescale() reallocates the surface (also a fresh calloc)
+ *     and resets the cache.
+ *   - Deinterlace modes that may overwrite margin pixels invalidate
+ *     the cache from libretro.c after Deinterlacer_Process runs.
+ *     DEINT_WEAVE's XReposition shift can shuffle active pixels
+ *     into the margin region; that's the only mode we need to
+ *     guard against in practice (BOB / BOB_OFFSET copy whole rows
+ *     whose source rows already have zero margins, and FASTMAD's
+ *     motion blend on (0,0,0) inputs is 0).  libretro.c uses
+ *     Deinterlacer_DidDisturbMargins() rather than the deint
+ *     mode itself, so steady-state WEAVE (where the XReposition
+ *     memmove doesn't run) keeps the cache hot.
+ *
+ * Sized to GPU_DEST_LINE_MAX so any valid dest_line can index
+ * directly without bounds-arithmetic in the hot path.
+ */
+typedef struct
+{
+   int32_t  dx_start;
+   int32_t  dx_end;
+   uint32_t dmw;
+   bool     valid;
+} GPU_ScanoutCacheEntry;
+
+static GPU_ScanoutCacheEntry scanout_cache[GPU_DEST_LINE_MAX];
+
+void GPU_InvalidateScanoutCache(void)
+{
+   unsigned i;
+   for (i = 0; i < GPU_DEST_LINE_MAX; i++)
+      scanout_cache[i].valid = false;
+}
 
 static INLINE void InvalidateTexCache(PS_GPU *gpu)
 {
@@ -181,7 +253,7 @@ static INLINE void InvalidateCache(PS_GPU *gpu)
  * #includes gpu_polygon.cpp / gpu_sprite.cpp / gpu_line.cpp, and the
  * sole header use is a static-INLINE in gpu_common.h that resolves
  * within this TU). */
-static void texel_put(uint32 x, uint32 y, uint16 v)
+static void texel_put(uint32_t x, uint32_t y, uint16_t v)
 {
    uint32_t dy, dx;
    x <<= GPU.upscale_shift;
@@ -198,7 +270,7 @@ static void texel_put(uint32 x, uint32 y, uint16 v)
 
 /* Internal helper used only by GPU_Rescale; static for the same TU
  * reason as texel_put above. */
-static void GPU_set_upscale_shift(uint8 factor)
+static void GPU_set_upscale_shift(uint8_t factor)
 {
    GPU.upscale_shift = factor;
 }
@@ -263,7 +335,7 @@ static void SetTPage(PS_GPU *gpu, const uint32_t cmdw)
  * wrapper dispatches to.
  */
 #define DEFINE_G_Command_DrawPolygon(SUFFIX, NV_LIT, G_LIT, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
-static void G_Command_DrawPolygon_##SUFFIX(PS_GPU *g, const uint32 *cb) \
+static void G_Command_DrawPolygon_##SUFFIX(PS_GPU *g, const uint32_t *cb) \
 { \
    if (PGXP_enabled()) \
       Command_DrawPolygon_NV##NV_LIT##_G##G_LIT##_T##T_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT##_PG1(g, cb); \
@@ -315,12 +387,12 @@ GCMD_DRAWPOLY_BMGROUP_ALL(4, 0)
 GCMD_DRAWPOLY_BMGROUP_ALL(4, 1)
 
 
-static void Command_ClearCache(PS_GPU* g, const uint32 *cb)
+static void Command_ClearCache(PS_GPU* g, const uint32_t *cb)
 {
    InvalidateCache(g);
 }
 
-static void Command_IRQ(PS_GPU* g, const uint32 *cb)
+static void Command_IRQ(PS_GPU* g, const uint32_t *cb)
 {
    g->IRQPending = true;
    IRQ_Assert(IRQ_GPU, g->IRQPending);
@@ -328,7 +400,7 @@ static void Command_IRQ(PS_GPU* g, const uint32 *cb)
 
 /* Special RAM write mode(16 pixels at a time), */
 /* does *not* appear to use mask drawing environment settings. */
-static void Command_FBFill(PS_GPU* gpu, const uint32 *cb)
+static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
 {
    unsigned y;
    int32_t r                 = cb[0] & 0xFF;
@@ -345,7 +417,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32 *cb)
 
    for(y = 0; y < height; y++)
    {
-      const int32 d_y = (y + destY) & 511;
+      const int32_t d_y = (y + destY) & 511;
 
       if(LineSkipTest(gpu, d_y))
          continue;
@@ -364,7 +436,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32 *cb)
          unsigned x;
          for(x = 0; x < width; x++)
          {
-            const int32 d_x = (x + destX) & 1023;
+            const int32_t d_x = (x + destX) & 1023;
 
             texel_put(d_x, d_y, fill_value);
          }
@@ -374,7 +446,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32 *cb)
    rsx_intf_fill_rect(cb[0], destX, destY, width, height);
 }
 
-static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
+static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
 {
    int32_t sourceX = (cb[1] >> 0) & 0x3FF;
    int32_t sourceY = (cb[1] >> 16) & 0x3FF;
@@ -413,22 +485,23 @@ static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
 
          for(x = 0; x < (unsigned)width; x += 128)
          {
-            const int32 chunk_x_max = MIN((int32)(width - x), 128);
-            uint16 tmpbuf[128]; /* TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache. */
+            int32_t chunk_x_max = (int32_t)(width - x);
+            uint16_t tmpbuf[128]; /* TODO: Check and see if the GPU is actually (ab)using the CLUT or texture cache. */
+            if (chunk_x_max > 128) chunk_x_max = 128;
 
-            for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+            for(int32_t chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
             {
-               int32 s_y = (y + sourceY) & 511;
-               int32 s_x = (x + chunk_x + sourceX) & 1023;
+               int32_t s_y = (y + sourceY) & 511;
+               int32_t s_x = (x + chunk_x + sourceX) & 1023;
 
                /* XXX make upscaling-friendly, as it is we copy at 1x */
                tmpbuf[chunk_x] = texel_fetch(g, s_x, s_y);
             }
 
-            for(int32 chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
+            for(int32_t chunk_x = 0; chunk_x < chunk_x_max; chunk_x++)
             {
-               int32 d_y = (y + destY) & 511;
-               int32 d_x = (x + chunk_x + destX) & 1023;
+               int32_t d_y = (y + destY) & 511;
+               int32_t d_x = (x + chunk_x + destX) & 1023;
 
                if(!(texel_fetch(g, d_x, d_y) & g->MaskEvalAND))
                   texel_put(d_x, d_y, tmpbuf[chunk_x] | g->MaskSetOR);
@@ -440,7 +513,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32 *cb)
    rsx_intf_copy_rect(sourceX, sourceY, destX, destY, width, height, g->MaskEvalAND != 0, g->MaskSetOR != 0);
 }
 
-static void Command_FBWrite(PS_GPU* g, const uint32 *cb)
+static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
 {
    /*assert(InCmd == INCMD_NONE); */
 
@@ -476,7 +549,7 @@ static void Command_FBWrite(PS_GPU* g, const uint32 *cb)
  * raw_height == 0, or raw_height != 0x200 && (raw_height & 0x1FF) == 0
  */
 
-static void Command_FBRead(PS_GPU* g, const uint32 *cb)
+static void Command_FBRead(PS_GPU* g, const uint32_t *cb)
 {
    /*assert(g->InCmd == INCMD_NONE); */
 
@@ -518,9 +591,9 @@ static void Command_FBRead(PS_GPU* g, const uint32 *cb)
    }
 }
 
-static void Command_DrawMode(PS_GPU* g, const uint32 *cb)
+static void Command_DrawMode(PS_GPU* g, const uint32_t *cb)
 {
-   const uint32 cmdw = *cb;
+   const uint32_t cmdw = *cb;
 
    SetTPage(g, cmdw);
 
@@ -532,7 +605,7 @@ static void Command_DrawMode(PS_GPU* g, const uint32 *cb)
       GPU.display_possibly_dirty = true;
 }
 
-static void Command_TexWindow(PS_GPU* g, const uint32 *cb)
+static void Command_TexWindow(PS_GPU* g, const uint32_t *cb)
 {
    g->tww = (*cb & 0x1F);
    g->twh = ((*cb >> 5) & 0x1F);
@@ -543,7 +616,7 @@ static void Command_TexWindow(PS_GPU* g, const uint32 *cb)
    rsx_intf_set_tex_window(g->tww, g->twh, g->twx, g->twy);
 }
 
-static void Command_Clip0(PS_GPU* g, const uint32 *cb)
+static void Command_Clip0(PS_GPU* g, const uint32_t *cb)
 {
    g->ClipX0 = *cb & 1023;
    g->ClipY0 = (*cb >> 10) & 1023;
@@ -551,7 +624,7 @@ static void Command_Clip0(PS_GPU* g, const uint32 *cb)
            g->ClipX1, g->ClipY1);
 }
 
-static void Command_Clip1(PS_GPU* g, const uint32 *cb)
+static void Command_Clip1(PS_GPU* g, const uint32_t *cb)
 {
    g->ClipX1 = *cb & 1023;
    g->ClipY1 = (*cb >> 10) & 1023;
@@ -559,13 +632,13 @@ static void Command_Clip1(PS_GPU* g, const uint32 *cb)
          g->ClipX1, g->ClipY1);
 }
 
-static void Command_DrawingOffset(PS_GPU* g, const uint32 *cb)
+static void Command_DrawingOffset(PS_GPU* g, const uint32_t *cb)
 {
    g->OffsX = sign_x_to_s32(11, (*cb & 2047));
    g->OffsY = sign_x_to_s32(11, ((*cb >> 11) & 2047));
 }
 
-static void Command_MaskSetting(PS_GPU* g, const uint32 *cb)
+static void Command_MaskSetting(PS_GPU* g, const uint32_t *cb)
 {
    g->MaskSetOR   = (*cb & 1) ? 0x8000 : 0x0000;
    g->MaskEvalAND = (*cb & 2) ? 0x8000 : 0x0000;
@@ -844,7 +917,7 @@ static void RSX_UpdateDisplayMode(void)
  * NULL but leaves the global new-handler unspecified. malloc + an
  * explicit NULL check is portable and matches the audit-pass error
  * regime (no exceptions, callers propagate failure via return codes). */
-static uint16_t *VRAM_Alloc(uint8 upscale_shift)
+static uint16_t *VRAM_Alloc(uint8_t upscale_shift)
 {
    unsigned width  = 1024 << upscale_shift;
    unsigned height =  512 << upscale_shift;
@@ -859,7 +932,7 @@ static uint16_t *VRAM_Alloc(uint8 upscale_shift)
 }
 
 bool GPU_Init(bool pal_clock_and_tv,
-      int sls, int sle, uint8 upscale_shift)
+      int sls, int sle, uint8_t upscale_shift)
 {
    int x, y, v;
 
@@ -945,10 +1018,10 @@ void GPU_Destroy(void)
  * touching GPU.vram. Returns true on success, false on allocation
  * failure (state unchanged in that case).
  */
-bool GPU_Rescale(uint8 ushift)
+bool GPU_Rescale(uint8_t ushift)
 {
    uint16_t *old_vram = GPU.vram;
-   uint8     old_shift = GPU.upscale_shift;
+   uint8_t     old_shift = GPU.upscale_shift;
    uint16_t *new_vram;
 
    /* Step 1+2: allocate scratch buffer at 1x. If we're already at 1x
@@ -1453,7 +1526,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
    }
 }
 
-void GPU_WriteDMA(uint32_t V, uint32 addr)
+void GPU_WriteDMA(uint32_t V, uint32_t addr)
 {
    GPU_WriteCB(V, addr);
 }
@@ -1560,14 +1633,14 @@ uint32_t GPU_Read(const int32_t timestamp, uint32_t A)
 static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
       uint32_t out_Gshift, uint32_t out_Bshift,
       bool bpp24, const uint16_t *src, uint32_t *dest,
-      const int32 dx_start, const int32 dx_end, int32 fb_x,
+      const int32_t dx_start, const int32_t dx_end, int32_t fb_x,
       unsigned upscale_shift, unsigned upscale)
 {
   int32_t fb_mask = ((0x7FF << upscale_shift) + upscale - 1);
 
    if(bpp24)   /* 24bpp */
    {
-      for(int32 x = dx_start; x < dx_end; x+= upscale)
+      for(int32_t x = dx_start; x < dx_end; x+= upscale)
       {
          int i;
          uint32_t color;
@@ -1587,7 +1660,69 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
    }           /* 15bpp */
    else
    {
-      for(int32 x = dx_start; x < dx_end; x++)
+      int32_t x = dx_start;
+
+#if defined(__SSE2__)
+      /* 8-pixel SSE2 fast path.  Each PSX 16-bit pixel is
+       *   bit  15: mask  (dropped)
+       *   bits 10-14: B (5 bits)
+       *   bits  5-9:  G (5 bits)
+       *   bits  0-4:  R (5 bits)
+       * and the scalar path produces XRGB8888 by zero-padding each
+       * 5-bit channel to 8 bits (i.e. `<< 3`, NOT bit-replication) -
+       * we match that bit-exactly so SSE2 / scalar output is
+       * indistinguishable.
+       *
+       * Bails to scalar when:
+       *   - fewer than 8 output pixels remain (handles the tail);
+       *   - the 8-pixel source span would cross the fb_x wrap
+       *     boundary (rare: only when starting near the end of the
+       *     upscaled VRAM row, and even then only at the boundary
+       *     itself).  The scalar loop's `& fb_mask` handles wrap
+       *     correctly on its own, so we just break and let it run.
+       */
+      const __m128i mask5         = _mm_set1_epi16(0x001F);
+      const int32_t words_per_row = (fb_mask + 1) >> 1;
+      while ((dx_end - x) >= 8)
+      {
+         const int32_t word_idx = fb_x >> 1;
+         __m128i s, r5, g5, b5, r8, g8, b8, gb_lo, ar_hi;
+         __m128i pixels_lo, pixels_hi;
+
+         /* Would the 8-word load cross the wrap?  Hand off to
+          * scalar if so - it'll wrap correctly via `& fb_mask`. */
+         if (word_idx + 8 > words_per_row)
+            break;
+
+         s     = _mm_loadu_si128((const __m128i*)&src[word_idx]);
+         /* Extract R5/G5/B5 in 16-bit lanes. */
+         r5    = _mm_and_si128(s,                          mask5);
+         g5    = _mm_and_si128(_mm_srli_epi16(s,  5),      mask5);
+         b5    = _mm_and_si128(_mm_srli_epi16(s, 10),      mask5);
+         /* Scale to 8-bit by shifting left 3 (zero-pad low bits -
+          * matches scalar's `<< 3` exactly). */
+         r8    = _mm_slli_epi16(r5, 3);
+         g8    = _mm_slli_epi16(g5, 3);
+         b8    = _mm_slli_epi16(b5, 3);
+         /* Assemble per-pixel halves:
+          *   gb_lo lane i = (G8[i] << 8) | B8[i]   -> low 16 bits of XRGB8888
+          *   ar_hi lane i = 0 | R8[i]              -> high 16 bits of XRGB8888 (alpha=0)
+          */
+         gb_lo = _mm_or_si128(_mm_slli_epi16(g8, 8), b8);
+         ar_hi = r8;
+         /* Interleave 16-bit halves into 32-bit XRGB8888 pixels. */
+         pixels_lo = _mm_unpacklo_epi16(gb_lo, ar_hi);   /* P0..P3 */
+         pixels_hi = _mm_unpackhi_epi16(gb_lo, ar_hi);   /* P4..P7 */
+         _mm_storeu_si128((__m128i*)&dest[x],     pixels_lo);
+         _mm_storeu_si128((__m128i*)&dest[x + 4], pixels_hi);
+
+         x   += 8;
+         fb_x = (fb_x + 16) & fb_mask;
+      }
+#endif
+
+      /* Scalar tail / non-SSE2 fallback / wrap-crossing chunks. */
+      for (; x < dx_end; x++)
       {
          uint32_t srcpix = src[(fb_x >> 1)];
          dest[x] = MAKECOLOR(
@@ -1603,7 +1738,7 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
 
 int32_t GPU_Update(const int32_t sys_timestamp)
 {
-   int32 gpu_clocks;
+   int32_t gpu_clocks;
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
    const uint32_t dmc = (GPU.DisplayMode & 0x40) ? 4 : (GPU.DisplayMode & 0x3);
    const uint32_t dmw = 2800 / DotClockRatios[dmc];   /* Must be <= 768 */
@@ -1622,15 +1757,15 @@ int32_t GPU_Update(const int32_t sys_timestamp)
 
    /*puts("GPU Update Start"); */
 
-   GPU.GPUClockCounter += (uint64)sys_clocks * GPU.GPUClockRatio;
+   GPU.GPUClockCounter += (uint64_t)sys_clocks * GPU.GPUClockRatio;
 
    gpu_clocks       = GPU.GPUClockCounter >> 16;
    GPU.GPUClockCounter -= gpu_clocks << 16;
 
    while(gpu_clocks > 0)
    {
-      int32 chunk_clocks = gpu_clocks;
-      int32 dot_clocks;
+      int32_t chunk_clocks = gpu_clocks;
+      int32_t dot_clocks;
 
       if(chunk_clocks > GPU.LineClockCounter)
          chunk_clocks = GPU.LineClockCounter;
@@ -1748,14 +1883,23 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                      GPU.DisplayRect->w = 384;
                      GPU.DisplayRect->h = VisibleLineCount;
 
-                     for(int32 y = 0; y < GPU.DisplayRect->h; y++)
+                     for(int32_t y = 0; y < GPU.DisplayRect->h; y++)
                      {
                         uint32_t *dest = GPU.surface->pixels + y * GPU.surface->pitch32;
 
                         GPU.LineWidths[y] = 384;
 
-                        memset(dest, 0, 384 * sizeof(int32));
+                        memset(dest, 0, 384 * sizeof(int32_t));
                      }
+
+                     /* The mismatch clear zeroes only [0, 384) per
+                      * row.  If a previous frame had a wider dmw
+                      * cached, [384, dmw_cached) on those rows now
+                      * holds stale data, but the cache thinks the
+                      * margin is clean - drop it.  Cheap because
+                      * this path only runs in the PAL/NTSC
+                      * mode-mismatch transitional state. */
+                     GPU_InvalidateScanoutCache();
                   }
                   else
                   {
@@ -1842,18 +1986,30 @@ int32_t GPU_Update(const int32_t sys_timestamp)
             unsigned pix_clock_div = 0;
             uint32_t *dest = NULL;
 
+            /* Surface pitch handed to FrontIO_GPULineHook below.
+             * The hook only dereferences this when its `pixels`
+             * argument is non-NULL (crosshair plotting, lightgun
+             * sample), and `pixels` is always NULL outside the SW
+             * renderer.  Reading GPU.surface->pitch32 directly
+             * would NULL-deref on the HW renderers because
+             * alloc_surface skips the SW surface allocation
+             * there.  The placeholder value isn't used; we just
+             * need *some* defined value to pass through. */
+            const int32_t surf_pitch =
+               GPU.surface ? GPU.surface->pitch32 : 0;
+
             if((bool)(GPU.DisplayMode & DISP_PAL) == GPU.HardwarePALType
                   && GPU.scanline >= FirstVisibleLine
                   && GPU.scanline < (FirstVisibleLine + VisibleLineCount))
             {
-               int32 fb_x      = GPU.DisplayFB_XStart * 2;
+               int32_t fb_x      = GPU.DisplayFB_XStart * 2;
                /* Restore old center behaviour if GPU.HorizStart is intentionally very high. */
                /* 938 fixes Gunbird (1008) and Mobile Light Force (EU release of Gunbird), */
                /* but this value should be lowered in the future if necessary. */
                /* Additionally cut off everything after GPU.HorizEnd that shouldn't be */
                /* in the viewport (the hardware renderers already takes care of this). */
-               int32 dx_start  = (crop_overscan == 2 && GPU.HorizStart < 938 ? 608 : GPU.HorizStart), dx_end = (crop_overscan == 2 && GPU.HorizStart < 938 ? GPU.HorizEnd - GPU.HorizStart + 608 : GPU.HorizEnd - (GPU.HorizStart < 938 ? 0 : 1));
-               int32 dest_line =
+               int32_t dx_start  = (crop_overscan == 2 && GPU.HorizStart < 938 ? 608 : GPU.HorizStart), dx_end = (crop_overscan == 2 && GPU.HorizStart < 938 ? GPU.HorizEnd - GPU.HorizStart + 608 : GPU.HorizEnd - (GPU.HorizStart < 938 ? 0 : 1));
+               int32_t dest_line =
                   ((GPU.scanline - FirstVisibleLine) << GPU.espec->InterlaceOn)
                   + GPU.espec->InterlaceField;
 
@@ -1873,7 +2029,7 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                   dx_start = 0;
                }
 
-               if((uint32)dx_end > dmw)
+               if((uint32_t)dx_end > dmw)
                   dx_end = dmw;
 
                if(GPU.InVBlank || GPU.DisplayOff)
@@ -1887,9 +2043,9 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                   uint32_t x;
                   uint32_t y        = GPU.DisplayFB_CurLineYReadout << GPU.upscale_shift;
                   uint32_t udmw     = dmw      << GPU.upscale_shift;
-                  int32 udx_start   = dx_start << GPU.upscale_shift;
-                  int32 udx_end     = dx_end   << GPU.upscale_shift;
-                  int32 ufb_x       = fb_x     << GPU.upscale_shift;
+                  int32_t udx_start   = dx_start << GPU.upscale_shift;
+                  int32_t udx_end     = dx_end   << GPU.upscale_shift;
+                  int32_t ufb_x       = fb_x     << GPU.upscale_shift;
                   unsigned _upscale = UPSCALE(&GPU);
 
                   if (psx_gpu_rasterize_both_fields
@@ -1950,6 +2106,24 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                   }
                   else
                   {
+                     /* Margin zero-fill skip: if this dest_line's
+                      * (dx_start, dx_end, dmw) hasn't changed since
+                      * last frame AND nothing has invalidated the
+                      * cache, the [0, udx_start) and [udx_end, udmw)
+                      * regions of the row are still zero from the
+                      * previous frame's writes - skip the memset
+                      * and the trailing zero loop.  Only the active
+                      * region needs to be (re)written by
+                      * ReorderRGB_Var because VRAM may have changed
+                      * since last frame. */
+                     const bool skip_margin =
+                            dest_line >= 0
+                         && dest_line < GPU_DEST_LINE_MAX
+                         && scanout_cache[dest_line].valid
+                         && scanout_cache[dest_line].dx_start == dx_start
+                         && scanout_cache[dest_line].dx_end   == dx_end
+                         && scanout_cache[dest_line].dmw      == (uint32_t)dmw;
+
                      for (uint32_t i = 0; i < _upscale; i++)
                      {
                         const uint16_t *src = GPU.vram +
@@ -1957,7 +2131,9 @@ int32_t GPU_Update(const int32_t sys_timestamp)
 
                         dest = GPU.surface->pixels +
                            ((dest_line << GPU.upscale_shift) + i) * GPU.surface->pitch32;
-                        memset(dest, 0, udx_start * sizeof(int32));
+
+                        if (!skip_margin)
+                           memset(dest, 0, udx_start * sizeof(int32_t));
 
                         ReorderRGB_Var(
                               RED_SHIFT,
@@ -1972,8 +2148,20 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                               GPU.upscale_shift,
                               _upscale);
 
-                        for(x = udx_end; x < udmw; x++)
-                           dest[x] = 0;
+                        if (!skip_margin)
+                           for(x = udx_end; x < udmw; x++)
+                              dest[x] = 0;
+                     }
+
+                     /* Record geometry for next frame's skip check.
+                      * dest_line bound was already validated above
+                      * (GPU_DEST_LINE_MAX covers PAL 480i). */
+                     if (dest_line >= 0 && dest_line < GPU_DEST_LINE_MAX)
+                     {
+                        scanout_cache[dest_line].dx_start = dx_start;
+                        scanout_cache[dest_line].dx_end   = dx_end;
+                        scanout_cache[dest_line].dmw      = (uint32_t)dmw;
+                        scanout_cache[dest_line].valid    = true;
                      }
 
                      /*reset dest back to i=0 for PSX_GPULineHook call */
@@ -1988,25 +2176,25 @@ int32_t GPU_Update(const int32_t sys_timestamp)
 
                FrontIO_GPULineHook(PSX_FIO,
                                sys_timestamp,
-                               sys_timestamp - ((uint64)gpu_clocks * 65536) / GPU.GPUClockRatio,
+                               sys_timestamp - ((uint64_t)gpu_clocks * 65536) / GPU.GPUClockRatio,
                                GPU.scanline == 0,
                                dest,
                                dmw_width,
                                pix_clock_offset,
                                pix_clock,
                                pix_clock_div,
-                               GPU.surface->pitch32,
+                               surf_pitch,
                                (1 << GPU.upscale_shift));
             }
             else
             {
                FrontIO_GPULineHook(PSX_FIO,
                                sys_timestamp,
-                               sys_timestamp - ((uint64)gpu_clocks * 65536) / GPU.GPUClockRatio,
+                               sys_timestamp - ((uint64_t)gpu_clocks * 65536) / GPU.GPUClockRatio,
                                GPU.scanline == 0,
                                NULL,
                                0, 0, 0, 0,
-                               GPU.surface->pitch32,
+                               surf_pitch,
                                (1 << GPU.upscale_shift));
             }
 
@@ -2027,12 +2215,12 @@ int32_t GPU_Update(const int32_t sys_timestamp)
 TheEnd:
    GPU.lastts = sys_timestamp;
 
-   int32 next_dt = GPU.LineClockCounter;
+   int32_t next_dt = GPU.LineClockCounter;
 
-   next_dt = (((int64)next_dt << 16) - GPU.GPUClockCounter + GPU.GPUClockRatio - 1) / GPU.GPUClockRatio;
+   next_dt = (((int64_t)next_dt << 16) - GPU.GPUClockCounter + GPU.GPUClockRatio - 1) / GPU.GPUClockRatio;
 
-   next_dt = MAX(1, next_dt);
-   next_dt = MIN(EventCycles, next_dt);
+   if (next_dt < 1)          next_dt = 1;
+   if (next_dt > EventCycles) next_dt = EventCycles;
 
    return(sys_timestamp + next_dt);
 }
@@ -2066,9 +2254,21 @@ void GPU_FlushDeferredScanout(void)
 {
    const unsigned s = GPU.upscale_shift;
    const unsigned up = 1u << s;
-   const int32_t pitch_pix = GPU.surface->pitch32;
-   uint32_t *pixels = GPU.surface->pixels;
+   int32_t   pitch_pix;
+   uint32_t *pixels;
    unsigned r;
+
+   /* Fast path and HW-renderer safety:  with no deferred records
+    * there's nothing to flush, and dereferencing GPU.surface below
+    * would crash on the HW renderers where alloc_surface() now
+    * skips the SW surface allocation.  Records are only ever
+    * appended in the SW path, so count == 0 implies "no surface
+    * needed". */
+   if (deferred_scanout_count == 0)
+      return;
+
+   pitch_pix = GPU.surface->pitch32;
+   pixels    = GPU.surface->pixels;
 
    for (r = 0; r < deferred_scanout_count; r++)
    {
@@ -2088,6 +2288,17 @@ void GPU_FlushDeferredScanout(void)
          const int32_t  dest_line = field ? rec->dest_line_other : rec->dest_line;
          const uint32_t y_up      = (uint32_t)(field ? rec->vram_y_other
                                                      : rec->vram_y_native) << s;
+         /* Margin zero-fill skip - same rationale as the immediate-
+          * scanout path.  Both fields' rows are checked / updated
+          * independently because they live at different dest_lines
+          * in the surface. */
+         const bool skip_margin =
+                dest_line >= 0
+             && dest_line < GPU_DEST_LINE_MAX
+             && scanout_cache[dest_line].valid
+             && scanout_cache[dest_line].dx_start == rec->dx_start
+             && scanout_cache[dest_line].dx_end   == rec->dx_end
+             && scanout_cache[dest_line].dmw      == (uint32_t)rec->dmw;
          unsigned i;
 
          for (i = 0; i < up; i++)
@@ -2098,7 +2309,8 @@ void GPU_FlushDeferredScanout(void)
                (size_t)(((dest_line << s) + i)) * pitch_pix;
             uint32_t x;
 
-            memset(dest, 0, udx_start * sizeof(uint32_t));
+            if (!skip_margin)
+               memset(dest, 0, udx_start * sizeof(uint32_t));
 
             ReorderRGB_Var(
                   RED_SHIFT,
@@ -2113,8 +2325,17 @@ void GPU_FlushDeferredScanout(void)
                   s,
                   up);
 
-            for (x = (uint32_t)udx_end; x < udmw; x++)
-               dest[x] = 0;
+            if (!skip_margin)
+               for (x = (uint32_t)udx_end; x < udmw; x++)
+                  dest[x] = 0;
+         }
+
+         if (dest_line >= 0 && dest_line < GPU_DEST_LINE_MAX)
+         {
+            scanout_cache[dest_line].dx_start = rec->dx_start;
+            scanout_cache[dest_line].dx_end   = rec->dx_end;
+            scanout_cache[dest_line].dmw      = (uint32_t)rec->dmw;
+            scanout_cache[dest_line].valid    = true;
          }
       }
 
@@ -2414,12 +2635,12 @@ unsigned GPU_get_display_change_count(void)
    return GPU.display_change_count;
 }
 
-void GPU_set_dither_upscale_shift(uint8 factor)
+void GPU_set_dither_upscale_shift(uint8_t factor)
 {
    GPU.dither_upscale_shift = factor;
 }
 
-uint8 GPU_get_upscale_shift(void)
+uint8_t GPU_get_upscale_shift(void)
 {
    return GPU.upscale_shift;
 }

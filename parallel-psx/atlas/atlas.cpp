@@ -64,15 +64,21 @@ Domain FBAtlas::blit_vram(const Rect &dst, const Rect &src)
 	unsigned src_ybegin = src.y / BLOCK_HEIGHT;
 	unsigned src_yend = (src.y + src.height - 1) / BLOCK_HEIGHT;
 
-	for (unsigned j = 0; j <= min(dst_yend - dst_ybegin, src_yend - src_ybegin); j++)
-		for (unsigned i = 0; i <= min(dst_xend - dst_xbegin, src_xend - src_xbegin); i++)
-		{
-			bool rendered = info(src_xbegin + i, src_ybegin + j) & STATUS_TEXTURE_RENDERED;
-			if (rendered)
-				info(dst_xbegin + i, dst_ybegin + j) |= STATUS_TEXTURE_RENDERED;
-			else
-				info(dst_xbegin + i, dst_ybegin + j) &= ~STATUS_TEXTURE_RENDERED;
-		}
+	{
+		unsigned j_max = (dst_yend - dst_ybegin) < (src_yend - src_ybegin)
+		               ? (dst_yend - dst_ybegin) : (src_yend - src_ybegin);
+		unsigned i_max = (dst_xend - dst_xbegin) < (src_xend - src_xbegin)
+		               ? (dst_xend - dst_xbegin) : (src_xend - src_xbegin);
+		for (unsigned j = 0; j <= j_max; j++)
+			for (unsigned i = 0; i <= i_max; i++)
+			{
+				bool rendered = info(src_xbegin + i, src_ybegin + j) & STATUS_TEXTURE_RENDERED;
+				if (rendered)
+					info(dst_xbegin + i, dst_ybegin + j) |= STATUS_TEXTURE_RENDERED;
+				else
+					info(dst_xbegin + i, dst_ybegin + j) &= ~STATUS_TEXTURE_RENDERED;
+			}
+	}
 
 	return domain;
 }
@@ -383,10 +389,12 @@ bool FBAtlas::inside_render_pass(const Rect &rect)
 	unsigned xend = ((rect.x + rect.width - 1) | (BLOCK_WIDTH - 1)) + 1;
 	unsigned yend = ((rect.y + rect.height - 1) | (BLOCK_HEIGHT - 1)) + 1;
 
-	unsigned x0 = max(renderpass.rect.x, xbegin);
-	unsigned x1 = min(renderpass.rect.x + renderpass.rect.width, xend);
-	unsigned y0 = max(renderpass.rect.y, ybegin);
-	unsigned y1 = min(renderpass.rect.y + renderpass.rect.height, yend);
+	unsigned rpx2 = renderpass.rect.x + renderpass.rect.width;
+	unsigned rpy2 = renderpass.rect.y + renderpass.rect.height;
+	unsigned x0 = (renderpass.rect.x > xbegin) ? renderpass.rect.x : xbegin;
+	unsigned x1 = (rpx2 < xend) ? rpx2 : xend;
+	unsigned y0 = (renderpass.rect.y > ybegin) ? renderpass.rect.y : ybegin;
+	unsigned y1 = (rpy2 < yend) ? rpy2 : yend;
 
 	return x1 > x0 && y1 > y0;
 }

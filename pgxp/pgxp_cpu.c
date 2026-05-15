@@ -32,9 +32,9 @@ void PGXP_InitCPU()
 }
 
 /* invalidate register (invalid 8 bit read) */
-void InvalidLoad(u32 addr, u32 code, u32 value)
+void InvalidLoad(uint32_t addr, uint32_t code, uint32_t value)
 {
-	u32 reg = ((code >> 16) & 0x1F); /* The rt part of the instruction register */
+	uint32_t reg = ((code >> 16) & 0x1F); /* The rt part of the instruction register */
 	PGXP_value* pD = NULL;
 	PGXP_value p;
 
@@ -61,9 +61,9 @@ void InvalidLoad(u32 addr, u32 code, u32 value)
 }
 
 /* invalidate memory address (invalid 8 bit write) */
-void InvalidStore(u32 addr, u32 code, u32 value)
+void InvalidStore(uint32_t addr, uint32_t code, uint32_t value)
 {
-	u32 reg = ((code >> 16) & 0x1F); /* The rt part of the instruction register */
+	uint32_t reg = ((code >> 16) & 0x1F); /* The rt part of the instruction register */
 	PGXP_value* pD = NULL;
 	PGXP_value p;
 
@@ -84,7 +84,7 @@ void InvalidStore(u32 addr, u32 code, u32 value)
 /* ============================================================
  * Arithmetic with immediate value
  * ============================================================ */
-void PGXP_CPU_ADDI(u32 instr, u32 rtVal, u32 rsVal)
+void PGXP_CPU_ADDI(uint32_t instr, uint32_t rtVal, uint32_t rsVal)
 {
 	/* Rt = Rs + Imm (signed) */
 	psx_value tempImm;
@@ -94,7 +94,7 @@ void PGXP_CPU_ADDI(u32 instr, u32 rtVal, u32 rsVal)
 	Validate(&CPU_reg[rs(instr)], rsVal);
 	ret = CPU_reg[rs(instr)];
 	tempImm.d = imm(instr);
-	tempImm.sd = (tempImm.sd << 16) >> 16;	/* sign extend */
+	tempImm.sd = (int32_t)(int16_t)tempImm.w.l;	/* sign extend low 16 -> 32 */
 
 	ret.x = f16Unsign(ret.x);
 	ret.x += tempImm.w.l;
@@ -111,13 +111,13 @@ void PGXP_CPU_ADDI(u32 instr, u32 rtVal, u32 rsVal)
 	CPU_reg[rt(instr)].value = rtVal;
 }
 
-void PGXP_CPU_ADDIU(u32 instr, u32 rtVal, u32 rsVal)
+void PGXP_CPU_ADDIU(uint32_t instr, uint32_t rtVal, uint32_t rsVal)
 {
 	/* Rt = Rs + Imm (signed) (unsafe?) */
 	PGXP_CPU_ADDI(instr, rtVal, rsVal);
 }
 
-void PGXP_CPU_ANDI(u32 instr, u32 rtVal, u32 rsVal)
+void PGXP_CPU_ANDI(uint32_t instr, uint32_t rtVal, uint32_t rsVal)
 {
 	/* Rt = Rs & Imm */
 	psx_value vRt;
@@ -151,7 +151,7 @@ void PGXP_CPU_ANDI(u32 instr, u32 rtVal, u32 rsVal)
 	CPU_reg[rt(instr)].value = rtVal;
 }
 
-void PGXP_CPU_ORI(u32 instr, u32 rtVal, u32 rsVal)
+void PGXP_CPU_ORI(uint32_t instr, uint32_t rtVal, uint32_t rsVal)
 {
 	/* Rt = Rs | Imm */
 	psx_value vRt;
@@ -177,7 +177,7 @@ void PGXP_CPU_ORI(u32 instr, u32 rtVal, u32 rsVal)
 	CPU_reg[rt(instr)] = ret;
 }
 
-void PGXP_CPU_XORI(u32 instr, u32 rtVal, u32 rsVal)
+void PGXP_CPU_XORI(uint32_t instr, uint32_t rtVal, uint32_t rsVal)
 {
 	/* Rt = Rs ^ Imm */
 	psx_value vRt;
@@ -203,7 +203,7 @@ void PGXP_CPU_XORI(u32 instr, u32 rtVal, u32 rsVal)
 	CPU_reg[rt(instr)] = ret;
 }
 
-void PGXP_CPU_SLTI(u32 instr, u32 rtVal, u32 rsVal)
+void PGXP_CPU_SLTI(uint32_t instr, uint32_t rtVal, uint32_t rsVal)
 {
 	/* Rt = Rs < Imm (signed) */
 	psx_value tempImm;
@@ -221,7 +221,7 @@ void PGXP_CPU_SLTI(u32 instr, u32 rtVal, u32 rsVal)
 	CPU_reg[rt(instr)] = ret;
 }
 
-void PGXP_CPU_SLTIU(u32 instr, u32 rtVal, u32 rsVal)
+void PGXP_CPU_SLTIU(uint32_t instr, uint32_t rtVal, uint32_t rsVal)
 {
 	/* Rt = Rs < Imm (Unsigned) */
 	psx_value tempImm;
@@ -242,11 +242,11 @@ void PGXP_CPU_SLTIU(u32 instr, u32 rtVal, u32 rsVal)
 /* ============================================================
  * Load Upper
  * ============================================================ */
-void PGXP_CPU_LUI(u32 instr, u32 rtVal)
+void PGXP_CPU_LUI(uint32_t instr, uint32_t rtVal)
 {
 	/*Rt = Imm << 16 */
 	CPU_reg[rt(instr)] = PGXP_value_zero;
-	CPU_reg[rt(instr)].y = (float)(s16)imm(instr);
+	CPU_reg[rt(instr)].y = (float)(int16_t)imm(instr);
 	CPU_reg[rt(instr)].hFlags = VALID_HALF;
 	CPU_reg[rt(instr)].value = rtVal;
 	CPU_reg[rt(instr)].flags = VALID_01;
@@ -256,7 +256,7 @@ void PGXP_CPU_LUI(u32 instr, u32 rtVal)
  * Register Arithmetic
  * ============================================================ */
 
-void PGXP_CPU_ADD(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_ADD(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs + Rt (signed) */
 	PGXP_value ret;
@@ -297,13 +297,13 @@ void PGXP_CPU_ADD(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
 	CPU_reg[rd(instr)] = ret;
 }
 
-void PGXP_CPU_ADDU(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_ADDU(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs + Rt (signed) (unsafe?) */
 	PGXP_CPU_ADD(instr, rdVal, rsVal, rtVal);
 }
 
-void PGXP_CPU_SUB(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_SUB(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs - Rt (signed) */
 	PGXP_value ret;
@@ -342,13 +342,13 @@ void PGXP_CPU_SUB(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
 	CPU_reg[rd(instr)] = ret;
 }
 
-void PGXP_CPU_SUBU(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_SUBU(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs - Rt (signed) (unsafe?) */
 	PGXP_CPU_SUB(instr, rdVal, rsVal, rtVal);
 }
 
-void PGXP_CPU_AND(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_AND(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs & Rt */
 	psx_value vald, vals, valt;
@@ -440,25 +440,25 @@ void PGXP_CPU_AND(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
 	CPU_reg[rd(instr)] = ret;
 }
 
-void PGXP_CPU_OR(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_OR(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs | Rt */
 	PGXP_CPU_AND(instr, rdVal, rsVal, rtVal);
 }
 
-void PGXP_CPU_XOR(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_XOR(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs ^ Rt */
 	PGXP_CPU_AND(instr, rdVal, rsVal, rtVal);
 }
 
-void PGXP_CPU_NOR(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_NOR(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs NOR Rt */
 	PGXP_CPU_AND(instr, rdVal, rsVal, rtVal);
 }
 
-void PGXP_CPU_SLT(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_SLT(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs < Rt (signed) */
 	PGXP_value ret;
@@ -482,7 +482,7 @@ void PGXP_CPU_SLT(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
 	CPU_reg[rd(instr)] = ret;
 }
 
-void PGXP_CPU_SLTU(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_SLTU(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs < Rt (unsigned) */
 	PGXP_value ret;
@@ -510,7 +510,7 @@ void PGXP_CPU_SLTU(u32 instr, u32 rdVal, u32 rsVal, u32 rtVal)
  * Register mult/div
  * ============================================================ */
 
-void PGXP_CPU_MULT(u32 instr, u32 hiVal, u32 loVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_MULT(uint32_t instr, uint32_t hiVal, uint32_t loVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Hi/Lo = Rs * Rt (signed) */
 	double xx, xy, yx, yy;
@@ -556,7 +556,7 @@ void PGXP_CPU_MULT(u32 instr, u32 hiVal, u32 loVal, u32 rsVal, u32 rtVal)
 	CPU_Hi.value = hiVal;
 }
 
-void PGXP_CPU_MULTU(u32 instr, u32 hiVal, u32 loVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_MULTU(uint32_t instr, uint32_t hiVal, uint32_t loVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Hi/Lo = Rs * Rt (unsigned) */
 	double xx, xy, yx, yy;
@@ -602,7 +602,7 @@ void PGXP_CPU_MULTU(u32 instr, u32 hiVal, u32 loVal, u32 rsVal, u32 rtVal)
 	CPU_Hi.value = hiVal;
 }
 
-void PGXP_CPU_DIV(u32 instr, u32 hiVal, u32 loVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_DIV(uint32_t instr, uint32_t hiVal, uint32_t loVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Lo = Rs / Rt (signed)
 	 * Hi = Rs % Rt (signed) */
@@ -637,7 +637,7 @@ void PGXP_CPU_DIV(u32 instr, u32 hiVal, u32 loVal, u32 rsVal, u32 rtVal)
 	CPU_Hi.value = hiVal;
 }
 
-void PGXP_CPU_DIVU(u32 instr, u32 hiVal, u32 loVal, u32 rsVal, u32 rtVal)
+void PGXP_CPU_DIVU(uint32_t instr, uint32_t hiVal, uint32_t loVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Lo = Rs / Rt (unsigned)
 	 * Hi = Rs % Rt (unsigned) */
@@ -675,11 +675,11 @@ void PGXP_CPU_DIVU(u32 instr, u32 hiVal, u32 loVal, u32 rsVal, u32 rtVal)
 /* ============================================================
  * Shift operations (sa)
  * ============================================================ */
-void PGXP_CPU_SLL(u32 instr, u32 rdVal, u32 rtVal)
+void PGXP_CPU_SLL(uint32_t instr, uint32_t rdVal, uint32_t rtVal)
 {
 	/* Rd = Rt << Sa */
 	PGXP_value ret;
-	u32 sh = sa(instr);
+	uint32_t sh = sa(instr);
 #if 1
 	double x, y;
 #else
@@ -773,15 +773,15 @@ void PGXP_CPU_SLL(u32 instr, u32 rdVal, u32 rtVal)
 	CPU_reg[rd(instr)] = ret;
 }
 
-void PGXP_CPU_SRL(u32 instr, u32 rdVal, u32 rtVal)
+void PGXP_CPU_SRL(uint32_t instr, uint32_t rdVal, uint32_t rtVal)
 {
 	/* Rd = Rt >> Sa */
 	PGXP_value ret;
-	u32 sh = sa(instr);
+	uint32_t sh = sa(instr);
 	double x, y;
 #if 0
 	psx_value valt;
-	u16 mask;
+	uint16_t mask;
 #else
 	psx_value iX, iY, dX, dY;
 #endif
@@ -828,7 +828,7 @@ void PGXP_CPU_SRL(u32 instr, u32 rdVal, u32 rtVal)
 	iX.d = rtVal;
 	iY.d = rtVal;
 
-	iX.sd = (iX.sd << 16) >> 16;	/* remove Y */
+	iX.sd = (int32_t)(int16_t)iX.sw.l;	/* sign-extend low 16 to 32, removing Y */
 	iY.sw.l = iX.sw.h;				/* overwrite x with sign(x) */
 
 									/* Shift test values */
@@ -836,7 +836,7 @@ void PGXP_CPU_SRL(u32 instr, u32 rdVal, u32 rtVal)
 	dY.d = iY.d >> sh;
 
 	if (dX.sw.l != iX.sw.h)
-		x = x / (1 << sh);
+		x = x / (1u << sh);
 	else
 		x = dX.sw.l;	/* only sign bits left */
 
@@ -861,7 +861,7 @@ void PGXP_CPU_SRL(u32 instr, u32 rdVal, u32 rtVal)
 	if ((dY.sw.h == 0) || (dY.sw.h == -1))
 		y = dY.sw.h;
 	else
-		y = y / (1 << sh);
+		y = y / (1u << sh);
 
 	x = f16Sign(x);
 	y = f16Sign(y);
@@ -874,15 +874,15 @@ void PGXP_CPU_SRL(u32 instr, u32 rdVal, u32 rtVal)
 	CPU_reg[rd(instr)] = ret;
 }
 
-void PGXP_CPU_SRA(u32 instr, u32 rdVal, u32 rtVal)
+void PGXP_CPU_SRA(uint32_t instr, uint32_t rdVal, uint32_t rtVal)
 {
 	/* Rd = Rt >> Sa */
 	PGXP_value ret;
-	u32 sh = sa(instr);
+	uint32_t sh = sa(instr);
 	double x, y;
 #if 0
 	psx_value valt;
-	u16 mask;
+	uint16_t mask;
 #else
 	psx_value iX, iY, dX, dY;
 #endif
@@ -930,7 +930,7 @@ void PGXP_CPU_SRA(u32 instr, u32 rdVal, u32 rtVal)
 	iX.d = rtVal;
 	iY.d = rtVal;
 
-	iX.sd = (iX.sd << 16) >> 16;	/* remove Y */
+	iX.sd = (int32_t)(int16_t)iX.sw.l;	/* sign-extend low 16 to 32, removing Y */
 	iY.sw.l = iX.sw.h;				/* overwrite x with sign(x) */
 
 									/* Shift test values */
@@ -938,7 +938,7 @@ void PGXP_CPU_SRA(u32 instr, u32 rdVal, u32 rtVal)
 	dY.sd = iY.sd >> sh;
 
 	if (dX.sw.l != iX.sw.h)
-		x = x / (1 << sh);
+		x = x / (1u << sh);
 	else
 		x = dX.sw.l;	/* only sign bits left */
 
@@ -963,7 +963,7 @@ void PGXP_CPU_SRA(u32 instr, u32 rdVal, u32 rtVal)
 	if ((dY.sw.h == 0) || (dY.sw.h == -1))
 		y = dY.sw.h;
 	else
-		y = y / (1 << sh);
+		y = y / (1u << sh);
 
 	x = f16Sign(x);
 	y = f16Sign(y);
@@ -980,11 +980,11 @@ void PGXP_CPU_SRA(u32 instr, u32 rdVal, u32 rtVal)
 /* ============================================================
  * Shift operations variable
  * ============================================================ */
-void PGXP_CPU_SLLV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
+void PGXP_CPU_SLLV(uint32_t instr, uint32_t rdVal, uint32_t rtVal, uint32_t rsVal)
 {
 	/* Rd = Rt << Rs */
 	PGXP_value ret;
-	u32 sh = rsVal & 0x1F;
+	uint32_t sh = rsVal & 0x1F;
 #if 1
 	double x, y;
 #else
@@ -1077,15 +1077,15 @@ void PGXP_CPU_SLLV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
 	CPU_reg[rd(instr)] = ret;
 }
 
-void PGXP_CPU_SRLV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
+void PGXP_CPU_SRLV(uint32_t instr, uint32_t rdVal, uint32_t rtVal, uint32_t rsVal)
 {
 	/* Rd = Rt >> Sa */
 	PGXP_value ret;
-	u32 sh = rsVal & 0x1F;
+	uint32_t sh = rsVal & 0x1F;
 	double x, y;
 #if 0
 	psx_value valt;
-	u16 mask;
+	uint16_t mask;
 #else
 	psx_value iX, iY, dX, dY;
 #endif
@@ -1134,7 +1134,7 @@ void PGXP_CPU_SRLV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
 	iX.d = rtVal;
 	iY.d = rtVal;
 
-	iX.sd = (iX.sd << 16) >> 16;	/* remove Y */
+	iX.sd = (int32_t)(int16_t)iX.sw.l;	/* sign-extend low 16 to 32, removing Y */
 	iY.sw.l = iX.sw.h;				/* overwrite x with sign(x) */
 
 									/* Shift test values */
@@ -1142,7 +1142,7 @@ void PGXP_CPU_SRLV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
 	dY.d = iY.d >> sh;
 
 	if (dX.sw.l != iX.sw.h)
-		x = x / (1 << sh);
+		x = x / (1u << sh);
 	else
 		x = dX.sw.l;	/* only sign bits left */
 
@@ -1167,7 +1167,7 @@ void PGXP_CPU_SRLV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
 	if ((dY.sw.h == 0) || (dY.sw.h == -1))
 		y = dY.sw.h;
 	else
-		y = y / (1 << sh);
+		y = y / (1u << sh);
 
 	x = f16Sign(x);
 	y = f16Sign(y);
@@ -1181,15 +1181,15 @@ void PGXP_CPU_SRLV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
 	CPU_reg[rd(instr)] = ret;
 }
 
-void PGXP_CPU_SRAV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
+void PGXP_CPU_SRAV(uint32_t instr, uint32_t rdVal, uint32_t rtVal, uint32_t rsVal)
 {
 	/* Rd = Rt >> Sa */
 	PGXP_value ret;
-	u32 sh = rsVal & 0x1F;
+	uint32_t sh = rsVal & 0x1F;
 	double x, y;
 #if 0
 	psx_value valt;
-	u16 mask;
+	uint16_t mask;
 #else
 	psx_value iX, iY, dX, dY;
 #endif
@@ -1237,7 +1237,7 @@ void PGXP_CPU_SRAV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
 	iX.d = rtVal;
 	iY.d = rtVal;
 
-	iX.sd = (iX.sd << 16) >> 16;	/* remove Y */
+	iX.sd = (int32_t)(int16_t)iX.sw.l;	/* sign-extend low 16 to 32, removing Y */
 	iY.sw.l = iX.sw.h;				/* overwrite x with sign(x) */
 
 									/* Shift test values */
@@ -1245,7 +1245,7 @@ void PGXP_CPU_SRAV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
 	dY.sd = iY.sd >> sh;
 
 	if (dX.sw.l != iX.sw.h)
-		x = x / (1 << sh);
+		x = x / (1u << sh);
 	else
 		x = dX.sw.l;	/* only sign bits left */
 
@@ -1270,7 +1270,7 @@ void PGXP_CPU_SRAV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
 	if ((dY.sw.h == 0) || (dY.sw.h == -1))
 		y = dY.sw.h;
 	else
-		y = y / (1 << sh);
+		y = y / (1u << sh);
 
 	x = f16Sign(x);
 	y = f16Sign(y);
@@ -1287,7 +1287,7 @@ void PGXP_CPU_SRAV(u32 instr, u32 rdVal, u32 rtVal, u32 rsVal)
 /* ============================================================
  * Move registers
  * ============================================================ */
-void PGXP_CPU_MFHI(u32 instr, u32 rdVal, u32 hiVal)
+void PGXP_CPU_MFHI(uint32_t instr, uint32_t rdVal, uint32_t hiVal)
 {
 	/* Rd = Hi */
 	Validate(&CPU_Hi, hiVal);
@@ -1295,7 +1295,7 @@ void PGXP_CPU_MFHI(u32 instr, u32 rdVal, u32 hiVal)
 	CPU_reg[rd(instr)] = CPU_Hi;
 }
 
-void PGXP_CPU_MTHI(u32 instr, u32 hiVal, u32 rdVal)
+void PGXP_CPU_MTHI(uint32_t instr, uint32_t hiVal, uint32_t rdVal)
 {
 	/* Hi = Rd */
 	Validate(&CPU_reg[rd(instr)], rdVal);
@@ -1303,7 +1303,7 @@ void PGXP_CPU_MTHI(u32 instr, u32 hiVal, u32 rdVal)
 	CPU_Hi = CPU_reg[rd(instr)];
 }
 
-void PGXP_CPU_MFLO(u32 instr, u32 rdVal, u32 loVal)
+void PGXP_CPU_MFLO(uint32_t instr, uint32_t rdVal, uint32_t loVal)
 {
 	/* Rd = Lo */
 	Validate(&CPU_Lo, loVal);
@@ -1311,7 +1311,7 @@ void PGXP_CPU_MFLO(u32 instr, u32 rdVal, u32 loVal)
 	CPU_reg[rd(instr)] = CPU_Lo;
 }
 
-void PGXP_CPU_MTLO(u32 instr, u32 loVal, u32 rdVal)
+void PGXP_CPU_MTLO(uint32_t instr, uint32_t loVal, uint32_t rdVal)
 {
 	/* Lo = Rd */
 	Validate(&CPU_reg[rd(instr)], rdVal);
@@ -1324,34 +1324,34 @@ void PGXP_CPU_MTLO(u32 instr, u32 loVal, u32 rdVal)
  * ============================================================ */
 
 /* Load 32-bit word */
-void PGXP_CPU_LWL(u32 instr, u32 rtVal, u32 addr)
+void PGXP_CPU_LWL(uint32_t instr, uint32_t rtVal, uint32_t addr)
 {
 	/* Rt = Mem[Rs + Im] */
 	PGXP_CPU_LW(instr, rtVal, addr);
 }
 
-void PGXP_CPU_LW(u32 instr, u32 rtVal, u32 addr)
+void PGXP_CPU_LW(uint32_t instr, uint32_t rtVal, uint32_t addr)
 {
 	/* Rt = Mem[Rs + Im] */
 	ValidateAndCopyMem(&CPU_reg[rt(instr)], addr, rtVal);
 }
 
-void PGXP_CPU_LWR(u32 instr, u32 rtVal, u32 addr)
+void PGXP_CPU_LWR(uint32_t instr, uint32_t rtVal, uint32_t addr)
 {
 	/* Rt = Mem[Rs + Im] */
 	PGXP_CPU_LW(instr, rtVal, addr);
 }
 
 /* Load 16-bit */
-void PGXP_CPU_LH(u32 instr, u16 rtVal, u32 addr)
+void PGXP_CPU_LH(uint32_t instr, uint16_t rtVal, uint32_t addr)
 {
 	/* Rt = Mem[Rs + Im] (sign extended) */
 	psx_value val;
-	val.sd = (s32)(s16)rtVal;
+	val.sd = (int32_t)(int16_t)rtVal;
 	ValidateAndCopyMem16(&CPU_reg[rt(instr)], addr, val.d, 1);
 }
 
-void PGXP_CPU_LHU(u32 instr, u16 rtVal, u32 addr)
+void PGXP_CPU_LHU(uint32_t instr, uint16_t rtVal, uint32_t addr)
 {
 	/* Rt = Mem[Rs + Im] (zero extended) */
 	psx_value val;
@@ -1361,38 +1361,38 @@ void PGXP_CPU_LHU(u32 instr, u16 rtVal, u32 addr)
 }
 
 /* Load 8-bit */
-void PGXP_CPU_LB(u32 instr, u8 rtVal, u32 addr)
+void PGXP_CPU_LB(uint32_t instr, uint8_t rtVal, uint32_t addr)
 {
 	InvalidLoad(addr, instr, 116);
 }
 
-void PGXP_CPU_LBU(u32 instr, u8 rtVal, u32 addr)
+void PGXP_CPU_LBU(uint32_t instr, uint8_t rtVal, uint32_t addr)
 {
 	InvalidLoad(addr, instr, 116);
 }
 
 /* Store 32-bit word */
-void PGXP_CPU_SWL(u32 instr, u32 rtVal, u32 addr)
+void PGXP_CPU_SWL(uint32_t instr, uint32_t rtVal, uint32_t addr)
 {
 	/* Mem[Rs + Im] = Rt */
 	PGXP_CPU_SW(instr, rtVal, addr);
 }
 
-void PGXP_CPU_SW(u32 instr, u32 rtVal, u32 addr)
+void PGXP_CPU_SW(uint32_t instr, uint32_t rtVal, uint32_t addr)
 {
 	/* Mem[Rs + Im] = Rt */
 	Validate(&CPU_reg[rt(instr)], rtVal);
 	WriteMem(&CPU_reg[rt(instr)], addr);
 }
 
-void PGXP_CPU_SWR(u32 instr, u32 rtVal, u32 addr)
+void PGXP_CPU_SWR(uint32_t instr, uint32_t rtVal, uint32_t addr)
 {
 	/* Mem[Rs + Im] = Rt */
 	PGXP_CPU_SW(instr, rtVal, addr);
 }
 
 /* Store 16-bit */
-void PGXP_CPU_SH(u32 instr, u16 rtVal, u32 addr)
+void PGXP_CPU_SH(uint32_t instr, uint16_t rtVal, uint32_t addr)
 {
 	/* validate and copy half value */
 	MaskValidate(&CPU_reg[rt(instr)], rtVal, 0xFFFF, VALID_0);
@@ -1400,7 +1400,7 @@ void PGXP_CPU_SH(u32 instr, u16 rtVal, u32 addr)
 }
 
 /* Store 8-bit */
-void PGXP_CPU_SB(u32 instr, u8 rtVal, u32 addr)
+void PGXP_CPU_SB(uint32_t instr, uint8_t rtVal, uint32_t addr)
 {
 	InvalidStore(addr, instr, 208);
 }
@@ -1408,7 +1408,7 @@ void PGXP_CPU_SB(u32 instr, u8 rtVal, u32 addr)
 /* ============================================================
  * Data transfer tracking
  * ============================================================ */
-void PGXP_CP0_MFC0(u32 instr, u32 rtVal, u32 rdVal)
+void PGXP_CP0_MFC0(uint32_t instr, uint32_t rtVal, uint32_t rdVal)
 {
 	/* CPU[Rt] = CP0[Rd] */
 	Validate(&CP0_reg[rd(instr)], rdVal);
@@ -1416,7 +1416,7 @@ void PGXP_CP0_MFC0(u32 instr, u32 rtVal, u32 rdVal)
 	CPU_reg[rt(instr)].value = rtVal;
 }
 
-void PGXP_CP0_MTC0(u32 instr, u32 rdVal, u32 rtVal)
+void PGXP_CP0_MTC0(uint32_t instr, uint32_t rdVal, uint32_t rtVal)
 {
 	/* CP0[Rd] = CPU[Rt] */
 	Validate(&CPU_reg[rt(instr)], rtVal);
@@ -1424,7 +1424,7 @@ void PGXP_CP0_MTC0(u32 instr, u32 rdVal, u32 rtVal)
 	CP0_reg[rd(instr)].value = rdVal;
 }
 
-void PGXP_CP0_CFC0(u32 instr, u32 rtVal, u32 rdVal)
+void PGXP_CP0_CFC0(uint32_t instr, uint32_t rtVal, uint32_t rdVal)
 {
 	/* CPU[Rt] = CP0[Rd] */
 	Validate(&CP0_reg[rd(instr)], rdVal);
@@ -1432,7 +1432,7 @@ void PGXP_CP0_CFC0(u32 instr, u32 rtVal, u32 rdVal)
 	CPU_reg[rt(instr)].value = rtVal;
 }
 
-void PGXP_CP0_CTC0(u32 instr, u32 rdVal, u32 rtVal)
+void PGXP_CP0_CTC0(uint32_t instr, uint32_t rdVal, uint32_t rtVal)
 {
 	/* CP0[Rd] = CPU[Rt] */
 	Validate(&CPU_reg[rt(instr)], rtVal);
@@ -1440,5 +1440,5 @@ void PGXP_CP0_CTC0(u32 instr, u32 rdVal, u32 rtVal)
 	CP0_reg[rd(instr)].value = rdVal;
 }
 
-void PGXP_CP0_RFE(u32 instr)
+void PGXP_CP0_RFE(uint32_t instr)
 {}

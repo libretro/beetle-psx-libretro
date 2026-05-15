@@ -513,10 +513,12 @@ uint32_t TextureTracker::dbgHashVram(Rect rect, uint16_t *vram) {
 }
 
 std::pair<SRect, bool> intersect(SRect a, SRect b) {
-    int left = MAX(a.left(), b.left());
-    int right = MIN(a.right(), b.right());
-    int top = MAX(a.top(), b.top());
-    int bottom = MIN(a.bottom(), b.bottom());
+    int al = a.left(),   ar = a.right(),  at = a.top(), ab = a.bottom();
+    int bl = b.left(),   br = b.right(),  bt = b.top(), bb = b.bottom();
+    int left   = (al > bl) ? al : bl;
+    int right  = (ar < br) ? ar : br;
+    int top    = (at > bt) ? at : bt;
+    int bottom = (ab < bb) ? ab : bb;
     int width = right - left;
     int height = bottom - top;
     if (width <= 0 || height <= 0) {
@@ -1228,7 +1230,9 @@ std::shared_ptr<TextureUpload> RectTracker::find_upload(uint32_t hash) {
 }
 
 int clamp(int x, int low, int high) {
-    return MIN(MAX(x, low), high);
+    if (x < low)  x = low;
+    if (x > high) x = high;
+    return x;
 }
 
 struct CellBounds {

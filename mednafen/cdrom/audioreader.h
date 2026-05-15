@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <boolean.h>
 
-#include "../Stream.h"
+#include "../cdstream.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,13 +28,13 @@ extern "C" {
  * frame_offset != LastReadPos seek shortcut - lives in the struct
  * defined in audioreader.c.
  *
- * AR_Open / AR_Close do NOT take ownership of the Stream object;
+ * AR_Open / AR_Close do NOT take ownership of the cdstream object;
  * the caller retains it and is responsible for freeing it.  The
  * AudioReader does assume exclusive access for its lifetime. */
 typedef struct AudioReader AudioReader;
 
 /* Returns NULL if the input stream is not a valid Ogg Vorbis file. */
-AudioReader *AR_Open(struct Stream *fp);
+AudioReader *AR_Open(cdstream *fp);
 
 void    AR_Close     (AudioReader *r);
 

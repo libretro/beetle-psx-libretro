@@ -71,9 +71,9 @@ void PGXP_InitGTE()
 #define SXY2 (GTE_data_reg[ 14 ])
 #define SXYP (GTE_data_reg[ 15 ])
 
-void PGXP_pushSXYZ2f(float _x, float _y, float _z, unsigned int _v)
+void PGXP_pushSXYZ2f(float _x, float _y, float _z, uint32_t _v)
 {
-	static unsigned int uCount = 0;
+	static uint32_t uCount = 0;
 	low_value temp;
 	/* push values down FIFO */
 	SXY0 = SXY1;
@@ -98,7 +98,7 @@ void PGXP_pushSXYZ2f(float _x, float _y, float _z, unsigned int _v)
 #endif
 }
 
-void PGXP_pushSXYZ2s(s64 _x, s64 _y, s64 _z, u32 v)
+void PGXP_pushSXYZ2s(int64_t _x, int64_t _y, int64_t _z, uint32_t v)
 {
 	float fx = (float)(_x) / (float)(1 << 16);
 	float fy = (float)(_y) / (float)(1 << 16);
@@ -111,7 +111,7 @@ void PGXP_pushSXYZ2s(s64 _x, s64 _y, s64 _z, u32 v)
 #define VY(n) (psxRegs.CP2D.p[ n << 1 ].sw.h)
 #define VZ(n) (psxRegs.CP2D.p[ (n << 1) + 1 ].sw.l)
 
-int PGXP_NCLIP_valid(u32 sxy0, u32 sxy1, u32 sxy2)
+int PGXP_NCLIP_valid(uint32_t sxy0, uint32_t sxy1, uint32_t sxy2)
 {
 	Validate(&SXY0, sxy0);
 	Validate(&SXY1, sxy1);
@@ -133,7 +133,7 @@ float PGXP_NCLIP()
 	return nclip;
 }
 
-static void PGXP_MTC2_int(PGXP_value value, u32 reg)
+static void PGXP_MTC2_int(PGXP_value value, uint32_t reg)
 {
 	switch(reg)
 	{
@@ -167,7 +167,7 @@ void MFC2(int reg) {
 	case 9:
 	case 10:
 	case 11:
-		GTE_data_reg[reg].value = (s32)val.sw.l;
+		GTE_data_reg[reg].value = (int32_t)val.sw.l;
 		GTE_data_reg[reg].y = 0.f;
 		break;
 
@@ -176,7 +176,7 @@ void MFC2(int reg) {
 	case 17:
 	case 18:
 	case 19:
-		GTE_data_reg[reg].value = (u32)val.w.l;
+		GTE_data_reg[reg].value = (uint32_t)val.w.l;
 		GTE_data_reg[reg].y = 0.f;
 		break;
 
@@ -190,7 +190,7 @@ void MFC2(int reg) {
 	}
 }
 
-void PGXP_GTE_MFC2(u32 instr, u32 rtVal, u32 rdVal)
+void PGXP_GTE_MFC2(uint32_t instr, uint32_t rtVal, uint32_t rdVal)
 {
 	/* CPU[Rt] = GTE_D[Rd] */
 	Validate(&GTE_data_reg[rd(instr)], rdVal);
@@ -198,7 +198,7 @@ void PGXP_GTE_MFC2(u32 instr, u32 rtVal, u32 rdVal)
 	CPU_reg[rt(instr)].value = rtVal;
 }
 
-void PGXP_GTE_MTC2(u32 instr, u32 rdVal, u32 rtVal)
+void PGXP_GTE_MTC2(uint32_t instr, uint32_t rdVal, uint32_t rtVal)
 {
 	/* GTE_D[Rd] = CPU[Rt] */
 	Validate(&CPU_reg[rt(instr)], rtVal);
@@ -206,7 +206,7 @@ void PGXP_GTE_MTC2(u32 instr, u32 rdVal, u32 rtVal)
 	GTE_data_reg[rd(instr)].value = rdVal;
 }
 
-void PGXP_GTE_CFC2(u32 instr, u32 rtVal, u32 rdVal)
+void PGXP_GTE_CFC2(uint32_t instr, uint32_t rtVal, uint32_t rdVal)
 {
 	/* CPU[Rt] = GTE_C[Rd] */
 	Validate(&GTE_ctrl_reg[rd(instr)], rdVal);
@@ -214,7 +214,7 @@ void PGXP_GTE_CFC2(u32 instr, u32 rtVal, u32 rdVal)
 	CPU_reg[rt(instr)].value = rtVal;
 }
 
-void PGXP_GTE_CTC2(u32 instr, u32 rdVal, u32 rtVal)
+void PGXP_GTE_CTC2(uint32_t instr, uint32_t rdVal, uint32_t rtVal)
 {
 	/* GTE_C[Rd] = CPU[Rt] */
 	Validate(&CPU_reg[rt(instr)], rtVal);
@@ -225,7 +225,7 @@ void PGXP_GTE_CTC2(u32 instr, u32 rdVal, u32 rtVal)
 /* ============================================================
  * Memory Access
  * ============================================================ */
-void	PGXP_GTE_LWC2(u32 instr, u32 rtVal, u32 addr)
+void	PGXP_GTE_LWC2(uint32_t instr, uint32_t rtVal, uint32_t addr)
 {
 	/* GTE_D[Rt] = Mem[addr] */
 	PGXP_value val;
@@ -233,7 +233,7 @@ void	PGXP_GTE_LWC2(u32 instr, u32 rtVal, u32 addr)
 	PGXP_MTC2_int(val, rt(instr));
 }
 
-void	PGXP_GTE_SWC2(u32 instr, u32 rtVal, u32 addr)
+void	PGXP_GTE_SWC2(uint32_t instr, uint32_t rtVal, uint32_t addr)
 {
 	/*  Mem[addr] = GTE_D[Rt] */
 	Validate(&GTE_data_reg[rt(instr)], rtVal);

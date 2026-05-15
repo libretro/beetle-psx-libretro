@@ -26,10 +26,8 @@
 #include <libretro.h>
 
 #include "../mednafen.h"
-#include "../mednafen-endian.h"
 #include "../error.h"
 #include "../general_c.h"
-#include "../FileStream.h"
 
 #include "CDAccess.h"
 #include "CDAccess_CHD.h"
@@ -52,7 +50,7 @@ struct CDAccess_CHD
 {
    CDAccess     base;
 
-   struct FileStream   file_stream;
+   RFILE              *fp;
    chd_file    *chd;
    uint8_t     *hunkmem;        /* hunk-data cache */
    int          oldhunk;        /* last hunknum read, -1 sentinel */
@@ -83,23 +81,31 @@ enum
    _DI_FORMAT_COUNT
 };
 
-/* libchdr file-IO callbacks - operate on a struct FileStream pointer. */
+/* libchdr file-IO callbacks - operate directly on a libretro-common
+ * RFILE pointer.  The user_data we hand chd_open_core_file_callbacks
+ * IS a RFILE *, not a wrapper. */
 
 static uint64_t Callback_fsize(void *user_data)
 {
-   struct FileStream *file_stream = (struct FileStream *)user_data;
-   return stream_size(&file_stream->base);
+   RFILE  *fp = (RFILE *)user_data;
+   int64_t sz = filestream_get_size(fp);
+   if (sz < 0)
+      return 0;
+   return (uint64_t)sz;
 }
 
 static size_t Callback_fread(void *buffer, size_t size, size_t count,
       void *user_data)
 {
-   struct FileStream *file_stream;
+   RFILE  *fp = (RFILE *)user_data;
+   int64_t got;
    if (size == 0 || count == 0)
       return 0;
 
-   file_stream = (struct FileStream *)user_data;
-   return stream_read(&file_stream->base, buffer, count * size) / size;
+   got = filestream_read(fp, buffer, (int64_t)(count * size));
+   if (got < 0)
+      return 0;
+   return (size_t)got / size;
 }
 
 static int Callback_fclose(void *user_data)
@@ -110,8 +116,15 @@ static int Callback_fclose(void *user_data)
 
 static int Callback_fseek(void *user_data, int64_t offset, int whence)
 {
-   struct FileStream *file_stream = (struct FileStream *)user_data;
-   stream_seek(&file_stream->base, offset, whence);
+   RFILE *fp           = (RFILE *)user_data;
+   int    seek_position = RETRO_VFS_SEEK_POSITION_START;
+   switch (whence)
+   {
+      case SEEK_SET: seek_position = RETRO_VFS_SEEK_POSITION_START;   break;
+      case SEEK_CUR: seek_position = RETRO_VFS_SEEK_POSITION_CURRENT; break;
+      case SEEK_END: seek_position = RETRO_VFS_SEEK_POSITION_END;     break;
+   }
+   filestream_seek(fp, offset, seek_position);
    return 0;
 }
 
@@ -152,7 +165,7 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
    int               i;
    char              sbi_basename[CHD_PATH_BUF];
 
-   err = chd_open_core_file_callbacks(&chd_callbacks, &self->file_stream,
+   err = chd_open_core_file_callbacks(&chd_callbacks, self->fp,
          CHD_OPEN_READ, NULL, &self->chd);
    if (err != CHDERR_NONE)
       return false;
@@ -315,8 +328,11 @@ static void CDAccess_CHD_Cleanup(struct CDAccess_CHD *self)
    if (self->hunkmem)
       free(self->hunkmem);
 
-   /* file_stream is an in-place struct FileStream - close it (NOT destroy). */
-   stream_close(&self->file_stream.base);
+   if (self->fp)
+   {
+      filestream_close(self->fp);
+      self->fp = NULL;
+   }
 }
 
 /* MakeSubPQ ORs the simulated P and Q subchannel data into SubPWBuf. */
@@ -504,8 +520,31 @@ static bool CDAccess_CHD_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf,
 
       memcpy(buf, self->hunkmem + hunkofs * (2352 + 96), 2352);
 
-      if (ct->DIFormat == DI_FORMAT_AUDIO && ct->RawAudioMSBFirst)
-         Endian_A16_Swap(buf, 588 * 2);
+      /* Path 2 contract: buf holds host-endian int16 stereo
+       * samples. Swap iff source byte order differs from host
+       * byte order. CHD AUDIO tracks are always BE-stored
+       * (RawAudioMSBFirst = true). */
+      if (ct->DIFormat == DI_FORMAT_AUDIO
+#ifdef MSB_FIRST
+            && !ct->RawAudioMSBFirst
+#else
+            && ct->RawAudioMSBFirst
+#endif
+         )
+      {
+         /* 32-bit-chunked A16 swap; see CDAccess_Image.c
+          * counterpart for the rationale. 588 iterations
+          * over 2352 bytes of stereo 16-bit samples. */
+         uint8_t *_s = (uint8_t *)buf;
+         int32_t  _i;
+         for (_i = 0; _i + 3 < 588 * 2 * 2; _i += 4)
+         {
+            uint32_t _v;
+            memcpy(&_v, _s + _i, 4);
+            _v = ((_v & 0xFF00FF00U) >> 8) | ((_v & 0x00FF00FFU) << 8);
+            memcpy(_s + _i, &_v, 4);
+         }
+      }
    }
    return true;
 }
@@ -559,17 +598,19 @@ static bool CDAccess_CHD_Read_TOC(CDAccess *base_self, TOC *toc)
 static int CDAccess_CHD_LoadSBI(struct CDAccess_CHD *self,
       const char *sbi_path)
 {
-   /* All return paths past mdfn_filestream_init pass through cleanup:
-    * which closes the in-place struct FileStream. */
-   uint8_t    header[4];
-   uint8_t    ed[4 + 10];
-   uint8_t    tmpq[12];
-   struct FileStream sbis;
-   int        ret = 0;
+   uint8_t header[4];
+   uint8_t ed[4 + 10];
+   uint8_t tmpq[12];
+   RFILE  *sbis;
+   int     ret = 0;
 
-   mdfn_filestream_init(&sbis, sbi_path);
+   sbis = filestream_open(sbi_path,
+         RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if (!sbis)
+      return -1;
 
-   stream_read(&sbis.base, header, 4);
+   filestream_read(sbis, header, 4);
 
    if (memcmp(header, "SBI\0", 4))
    {
@@ -577,7 +618,7 @@ static int CDAccess_CHD_LoadSBI(struct CDAccess_CHD *self,
       goto cleanup;
    }
 
-   while (stream_read(&sbis.base, ed, sizeof(ed)) == sizeof(ed))
+   while (filestream_read(sbis, ed, sizeof(ed)) == sizeof(ed))
    {
       uint32_t aba;
 
@@ -609,7 +650,7 @@ static int CDAccess_CHD_LoadSBI(struct CDAccess_CHD *self,
 
    log_cb(RETRO_LOG_INFO, "[CHD] Loaded SBI file %s\n", sbi_path);
 cleanup:
-   stream_close(&sbis.base);
+   filestream_close(sbis);
    return ret;
 }
 
@@ -654,10 +695,11 @@ CDAccess *CDAccess_CHD_New(bool *success, const char *path,
    self->FirstTrack    = 99;   /* opposites for min/max init */
    self->LastTrack     = 0;
 
-   /* file_stream is in-place struct FileStream; init in place. */
-   mdfn_filestream_init(&self->file_stream, path);
+   self->fp = filestream_open(path,
+         RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
-   if (!mdfn_filestream_is_open(&self->file_stream))
+   if (!self->fp)
    {
       MDFN_Error(0, "CHD: failed to open \"%s\"", path);
       *success = false;

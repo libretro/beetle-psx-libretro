@@ -270,16 +270,16 @@ DEFINE_PlotNativePixel(BMaddq_ME1_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 1)
  * if (TM_VAL < 2) test is a literal-compare, so the entire body
  * vanishes for TM2. */
 #define DEFINE_Update_CLUT_Cache(SUFFIX, TM_VAL) \
-static INLINE void Update_CLUT_Cache_##SUFFIX(PS_GPU *g, uint16 raw_clut) \
+static INLINE void Update_CLUT_Cache_##SUFFIX(PS_GPU *g, uint16_t raw_clut) \
 { \
    if ((TM_VAL) < 2) \
    { \
-      const uint32 new_ccvb = ((raw_clut & 0x7FFF) | ((TM_VAL) << 16)); \
+      const uint32_t new_ccvb = ((raw_clut & 0x7FFF) | ((TM_VAL) << 16)); \
       if (g->CLUT_Cache_VB != new_ccvb) \
       { \
          uint16_t y = (raw_clut >> 6) & 0x1FF; \
-         const uint32 cxo = (raw_clut & 0x3F) << 4; \
-         const uint32 count = ((TM_VAL) ? 256 : 16); \
+         const uint32_t cxo = (raw_clut & 0x3F) << 4; \
+         const uint32_t count = ((TM_VAL) ? 256 : 16); \
          unsigned i; \
          g->DrawTimeAvail -= count; \
          for (i = 0; i < count; i++) \
@@ -308,7 +308,13 @@ static INLINE void RecalcTexWindowStuff(PS_GPU *g)
    uint8_t twy = g->twy;
 
    g->SUCV.TWX_AND = ~(tww << 3);
-   g->SUCV.TWX_ADD = ((twx & tww) << 3) + (g->TexPageX << (2 - MIN(2u, g->TexMode)));
+   {
+      /* PSX TexMode field is 2 bits; value 3 ("reserved") is folded
+       * to 2 here so the shift below stays in range. */
+      uint8_t _tm = g->TexMode;
+      if (_tm > 2) _tm = 2;
+      g->SUCV.TWX_ADD = ((twx & tww) << 3) + (g->TexPageX << (2 - _tm));
+   }
 
    g->SUCV.TWY_AND = ~(twh << 3);
    g->SUCV.TWY_ADD = ((twy & twh) << 3) + g->TexPageY;
@@ -352,7 +358,7 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
    uint32_t gro     = fbtex_y * 1024U + fbtex_x; \
    PS_GPU_TexCache_t *TexCache = &g->TexCache[0]; \
    PS_GPU_TexCache_t *c = NULL; \
-   uint16 fbw; \
+   uint16_t fbw; \
    switch (TM_VAL) \
    { \
       case 0: c = &TexCache[((gro >> 2) & 0x3) | ((gro >> 8) & 0xFC)]; break; \

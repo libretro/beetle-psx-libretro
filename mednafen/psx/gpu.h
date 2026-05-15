@@ -28,9 +28,9 @@ enum dither_mode
 
 struct tri_vertex
 {
-   int32 x, y;
-   int32 u, v;
-   int32 r, g, b;
+   int32_t x, y;
+   int32_t u, v;
+   int32_t r, g, b;
    // Precise x, y, and w coordinates using PGXP (if available)
    float precise[3];
 };
@@ -41,8 +41,8 @@ struct i_deltas;
 
 struct line_point
 {
-   int32 x, y;
-   uint8 r, g, b;
+   int32_t x, y;
+   uint8_t r, g, b;
 };
 typedef struct line_point line_point;
 
@@ -55,46 +55,46 @@ typedef struct line_point line_point;
 
 struct PS_GPU
 {
-   uint16 CLUT_Cache[256];
+   uint16_t CLUT_Cache[256];
 
-   uint32 CLUT_Cache_VB;   // Don't try to be clever and reduce it to 16 bits... ~0U is value for invalidated state.
+   uint32_t CLUT_Cache_VB;   // Don't try to be clever and reduce it to 16 bits... ~0U is value for invalidated state.
 
    struct   // Speedup-cache varibles, derived from other variables; shouldn't be saved in save states.
    {
       // TW*_* variables derived from tww, twh, twx, twy, TexPageX, TexPageY
-      uint32 TWX_AND;
-      uint32 TWX_ADD;
+      uint32_t TWX_AND;
+      uint32_t TWX_ADD;
 
-      uint32 TWY_AND;
-      uint32 TWY_ADD;
+      uint32_t TWY_AND;
+      uint32_t TWY_ADD;
    } SUCV;
 
    struct TexCache_t
    {
-      uint16 Data[4];
-      uint32 Tag;
+      uint16_t Data[4];
+      uint32_t Tag;
    } TexCache[256];
 
-   uint32 DMAControl;
+   uint32_t DMAControl;
 
    /* Beetle-psx upscaling vars */
-   uint8 upscale_shift;
-   uint8 dither_upscale_shift;
+   uint8_t upscale_shift;
+   uint8_t dither_upscale_shift;
 
    // Drawing stuff
-   int32 ClipX0;
-   int32 ClipY0;
-   int32 ClipX1;
-   int32 ClipY1;
+   int32_t ClipX0;
+   int32_t ClipY0;
+   int32_t ClipX1;
+   int32_t ClipY1;
 
-   int32 OffsX;
-   int32 OffsY;
+   int32_t OffsX;
+   int32_t OffsY;
 
    bool dtd;            // Dithering enable 
    bool dfe;
 
-   uint32 MaskSetOR;
-   uint32 MaskEvalAND;
+   uint32_t MaskSetOR;
+   uint32_t MaskEvalAND;
 
    bool TexDisable;
    bool TexDisableAllowChange;
@@ -102,46 +102,46 @@ struct PS_GPU
    uint8_t tww, twh, twx, twy;
    struct
    {
-      uint8 TexWindowXLUT_Pre[16];
-      uint8 TexWindowXLUT[256];
-      uint8 TexWindowXLUT_Post[16];
+      uint8_t TexWindowXLUT_Pre[16];
+      uint8_t TexWindowXLUT[256];
+      uint8_t TexWindowXLUT_Post[16];
    };
 
    struct
    {
-      uint8 TexWindowYLUT_Pre[16];
-      uint8 TexWindowYLUT[256];
-      uint8 TexWindowYLUT_Post[16];
+      uint8_t TexWindowYLUT_Pre[16];
+      uint8_t TexWindowYLUT[256];
+      uint8_t TexWindowYLUT_Post[16];
    };
 
    uint32_t TexPageX; // 0, 64, 128, 192, etc up to 960
    uint32_t TexPageY; // 0 or 256
 
-   uint32 SpriteFlip;
+   uint32_t SpriteFlip;
 
-   uint32 abr;        // Semi-transparency mode(0~3)
-   uint32 TexMode;
+   uint32_t abr;        // Semi-transparency mode(0~3)
+   uint32_t TexMode;
 
    struct
    {
-      uint8 RGB8SAT_Under[256];
-      uint8 RGB8SAT[256];
-      uint8 RGB8SAT_Over[256];
+      uint8_t RGB8SAT_Under[256];
+      uint8_t RGB8SAT[256];
+      uint8_t RGB8SAT_Over[256];
    };
 
-   uint32 DataReadBuffer;
-   uint32 DataReadBufferEx;
+   uint32_t DataReadBuffer;
+   uint32_t DataReadBufferEx;
 
    bool IRQPending;
 
    // Powers of 2 for faster multiple equality testing(just for multi-testing; InCmd itself will only contain 0, or a power of 2).
-   uint8 InCmd;
-   uint8 InCmd_CC;
+   uint8_t InCmd;
+   uint8_t InCmd_CC;
 
    tri_vertex InQuad_F3Vertices[3];
-   uint32 InQuad_clut;
+   uint32_t InQuad_clut;
    bool InQuad_invalidW;
-   uint32 killQuadPart;	// bit flags for tris in quad that are to be culled
+   uint32_t killQuadPart;	// bit flags for tris in quad that are to be culled
 
    // primitive UV offsets (used to correct flipped sprites)
    uint16_t off_u, off_v;
@@ -151,56 +151,56 @@ struct PS_GPU
 
    line_point InPLine_PrevPoint;
 
-   uint32 FBRW_X;
-   uint32 FBRW_Y;
-   uint32 FBRW_W;
-   uint32 FBRW_H;
-   uint32 FBRW_CurY;
-   uint32 FBRW_CurX;
+   uint32_t FBRW_X;
+   uint32_t FBRW_Y;
+   uint32_t FBRW_W;
+   uint32_t FBRW_H;
+   uint32_t FBRW_CurY;
+   uint32_t FBRW_CurX;
 
    //
    // Display Parameters
    //
-   uint32 DisplayMode;
+   uint32_t DisplayMode;
 
    bool DisplayOff;
-   uint32 DisplayFB_XStart;
-   uint32 DisplayFB_YStart;
+   uint32_t DisplayFB_XStart;
+   uint32_t DisplayFB_YStart;
 
    bool display_possibly_dirty;
    unsigned display_change_count;
 
-   uint32 HorizStart;
-   uint32 HorizEnd;
+   uint32_t HorizStart;
+   uint32_t HorizEnd;
 
-   uint32 VertStart;
-   uint32 VertEnd;
+   uint32_t VertStart;
+   uint32_t VertEnd;
 
    //
    // Display work vars
    //
-   uint32 DisplayFB_CurYOffset;
-   uint32 DisplayFB_CurLineYReadout;
+   uint32_t DisplayFB_CurYOffset;
+   uint32_t DisplayFB_CurLineYReadout;
 
    bool InVBlank;
 
    //
    //
    //
-   uint32 LinesPerField;
-   uint32 scanline;
+   uint32_t LinesPerField;
+   uint32_t scanline;
    bool field;
    bool field_ram_readout;
    bool PhaseChange;
 
-   uint32 DotClockCounter;
+   uint32_t DotClockCounter;
 
-   uint64 GPUClockCounter;
-   int32 GPUClockRatio;
-   int32 LineClockCounter;
-   int32 LinePhase;
+   uint64_t GPUClockCounter;
+   int32_t GPUClockRatio;
+   int32_t LineClockCounter;
+   int32_t LinePhase;
 
-   int32 DrawTimeAvail;
+   int32_t DrawTimeAvail;
 
    int32_t lastts;
 
@@ -209,7 +209,7 @@ struct PS_GPU
    EmulateSpecStruct *espec;
    MDFN_Surface *surface;
    MDFN_Rect *DisplayRect;
-   int32 *LineWidths;
+   int32_t *LineWidths;
    bool HardwarePALType;
    int LineVisFirst, LineVisLast;
 
@@ -219,7 +219,7 @@ struct PS_GPU
    VRAM has to be a ptr type or else we have to rely on smartcode void* shenanigans to
    wrestle a variable-sized struct.
    */
-   uint16 *vram;
+   uint16_t *vram;
 };
 typedef struct PS_GPU PS_GPU;
 
@@ -229,9 +229,9 @@ typedef struct PS_GPU PS_GPU;
 extern "C" {
 #endif
 
-void GPU_set_dither_upscale_shift(uint8 factor);
+void GPU_set_dither_upscale_shift(uint8_t factor);
 
-uint8 GPU_get_upscale_shift(void);
+uint8_t GPU_get_upscale_shift(void);
 
 bool GPU_get_display_possibly_dirty(void);
 
@@ -242,13 +242,13 @@ void GPU_set_display_change_count(unsigned a);
 unsigned GPU_get_display_change_count(void);
 
 bool GPU_Init(bool pal_clock_and_tv,
-      int sls, int sle, uint8 upscale_shift);
+      int sls, int sle, uint8_t upscale_shift);
 
 void GPU_RecalcClockRatio(void);
 
 void GPU_Destroy(void);
 
-bool GPU_Rescale(uint8 ushift);
+bool GPU_Rescale(uint8_t ushift);
 
 void GPU_Power(void);
 
@@ -260,6 +260,13 @@ uint32_t GPU_Read(const int32_t timestamp, uint32_t A);
 
 void GPU_StartFrame(EmulateSpecStruct *espec_arg);
 void GPU_FlushDeferredScanout(void);
+
+/* Resets the per-dest_line cache that lets the SW renderer skip
+ * re-zeroing margin pixels each frame when geometry is unchanged.
+ * Must be called whenever the surface storage has been replaced
+ * (alloc_surface, GPU_Rescale) or when external code may have
+ * dirtied the margin pixels (Deinterlacer_Process in WEAVE mode). */
+void GPU_InvalidateScanoutCache(void);
 
 int GPU_StateAction(StateMem *sm, int load, int data_only);
 

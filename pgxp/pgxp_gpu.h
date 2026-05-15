@@ -40,21 +40,21 @@ extern "C" {
 		float	y;
 		float	z;
 		float	w;
-		unsigned char valid_w;
+		uint8_t valid_w;
 	} OGLVertex;
 
-	void		PGXP_WriteFIFO(PGXP_value* pV, u32 pos);
-	PGXP_value*	PGXP_ReadFIFO(u32 pos);
-	void		PGXP_WriteCB(PGXP_value* pV, u32 pos);
-	PGXP_value*	PGXP_ReadCB(u32 pos);
+	void		PGXP_WriteFIFO(PGXP_value* pV, uint32_t pos);
+	PGXP_value*	PGXP_ReadFIFO(uint32_t pos);
+	void		PGXP_WriteCB(PGXP_value* pV, uint32_t pos);
+	PGXP_value*	PGXP_ReadCB(uint32_t pos);
 
-	void	PGXP_CacheVertex(short sx, short sy, const PGXP_value* _pVertex);
+	void	PGXP_CacheVertex(int16_t sx, int16_t sy, const PGXP_value* _pVertex);
 
 	void	PGXP_FreeVertexCache(void);
 
-	void	PGXP_SetAddress(unsigned int addr);
-	int		PGXP_GetVertices(const unsigned int* addr, void* pOutput, int xOffs, int yOffs);
-	int		PGXP_GetVertex(const unsigned int offset, const unsigned int* addr, OGLVertex* pOutput, int xOffs, int yOffs);
+	void	PGXP_SetAddress(uint32_t addr);
+	int		PGXP_GetVertices(const uint32_t* addr, void* pOutput, int xOffs, int yOffs);
+	int		PGXP_GetVertex(const uint32_t offset, const uint32_t* addr, OGLVertex* pOutput, int xOffs, int yOffs);
 
 #ifdef __cplusplus
 }

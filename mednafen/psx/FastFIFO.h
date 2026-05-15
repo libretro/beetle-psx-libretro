@@ -28,10 +28,10 @@
 
 typedef struct
 {
-   uint32 data[FASTFIFO_SIZE];
-   uint32 read_pos;
-   uint32 write_pos;
-   uint32 in_count;
+   uint32_t data[FASTFIFO_SIZE];
+   uint32_t read_pos;
+   uint32_t write_pos;
+   uint32_t in_count;
 } FastFIFO;
 
 static INLINE void FastFIFO_Init(FastFIFO *f)
@@ -56,25 +56,25 @@ static INLINE void FastFIFO_SaveStatePostLoad(FastFIFO *f)
    f->in_count  %= (FASTFIFO_SIZE + 1);
 }
 
-static INLINE uint32 FastFIFO_CanWrite(const FastFIFO *f)
+static INLINE uint32_t FastFIFO_CanWrite(const FastFIFO *f)
 {
    return FASTFIFO_SIZE - f->in_count;
 }
 
-static INLINE uint32 FastFIFO_Peek(const FastFIFO *f)
+static INLINE uint32_t FastFIFO_Peek(const FastFIFO *f)
 {
    return f->data[f->read_pos];
 }
 
-static INLINE uint32 FastFIFO_Read(FastFIFO *f)
+static INLINE uint32_t FastFIFO_Read(FastFIFO *f)
 {
-   uint32 ret = f->data[f->read_pos];
+   uint32_t ret = f->data[f->read_pos];
    f->read_pos = (f->read_pos + 1) & FASTFIFO_SIZE_MASK;
    f->in_count--;
    return ret;
 }
 
-static INLINE void FastFIFO_Write(FastFIFO *f, uint32 v)
+static INLINE void FastFIFO_Write(FastFIFO *f, uint32_t v)
 {
    f->data[f->write_pos] = v;
    f->write_pos = (f->write_pos + 1) & FASTFIFO_SIZE_MASK;

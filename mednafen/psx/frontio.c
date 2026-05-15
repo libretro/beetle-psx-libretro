@@ -35,7 +35,6 @@ extern uint8_t analog_combo_hold;
 
 #include "../state_helpers.h"
 #include "../mednafen.h"
-#include "../mednafen-endian.h"
 #include "../../osd_message.h"
 #include "../video/surface.h"
 
@@ -77,9 +76,9 @@ static void InputDevice_ResetTS(InputDevice *self_);
 static void InputDevice_SetAMCT(InputDevice *self_, bool);
 static void InputDevice_SetCrosshairsCursor(InputDevice *self_, int cursor);
 static void InputDevice_SetCrosshairsColor(InputDevice *self_, uint32_t color);
-INLINE void InputDevice_DrawCrosshairs(InputDevice *self_, uint32 *pixels, const unsigned width, const unsigned pix_clock, const unsigned surf_pitchinpix, const unsigned upscale_factor);
+INLINE void InputDevice_DrawCrosshairs(InputDevice *self_, uint32_t *pixels, const unsigned width, const unsigned pix_clock, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 int FrontIO_StateAction(FrontIO *self_, StateMem* sm, int load, int data_only);
-static int32_t InputDevice_GPULineHook(InputDevice *self_, const int32_t timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
+static int32_t InputDevice_GPULineHook(InputDevice *self_, const int32_t timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 static void InputDevice_UpdateInput(InputDevice *self_, const void *data);
 static void InputDevice_SetDTR(InputDevice *self_, bool new_dtr);
 static bool InputDevice_GetDSR(InputDevice *self_);
@@ -112,7 +111,7 @@ void FrontIO_LoadMemcard(FrontIO *self_, unsigned int which);
 void FrontIO_LoadMemcardFromPath(FrontIO *self_, unsigned int which, const char *path, bool force_load);
 void FrontIO_SaveMemcard(FrontIO *self_, unsigned int which);
 void FrontIO_SaveMemcardToPath(FrontIO *self_, unsigned int which, const char *path, bool force_save);
-void FrontIO_GPULineHook(FrontIO *self_, const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
+void FrontIO_GPULineHook(FrontIO *self_, const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 static void InputDevice_Gamepad_Ctor(InputDevice *self_);
 static void InputDevice_Gamepad_Power(InputDevice *self_);
 static int InputDevice_Gamepad_StateAction(InputDevice *self_, StateMem* sm, int load, int data_only, const char* section_name);
@@ -167,7 +166,7 @@ static void InputDevice_GunCon_Ctor(InputDevice *self_);
 static void InputDevice_GunCon_Power(InputDevice *self_);
 static int InputDevice_GunCon_StateAction(InputDevice *self_, StateMem* sm, int load, int data_only, const char* section_name);
 static void InputDevice_GunCon_UpdateInput(InputDevice *self_, const void *data);
-static int32_t InputDevice_GunCon_GPULineHook(InputDevice *self_, const int32_t line_timestamp, bool vsync, uint32 *pixels, const unsigned width,
+static int32_t InputDevice_GunCon_GPULineHook(InputDevice *self_, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const unsigned width,
       const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 static void InputDevice_GunCon_SetDTR(InputDevice *self_, bool new_dtr);
 static bool InputDevice_GunCon_GetDSR(InputDevice *self_);
@@ -176,7 +175,7 @@ static void InputDevice_Justifier_Ctor(InputDevice *self_);
 static void InputDevice_Justifier_Power(InputDevice *self_);
 static void InputDevice_Justifier_UpdateInput(InputDevice *self_, const void *data);
 static int InputDevice_Justifier_StateAction(InputDevice *self_, StateMem* sm, int load, int data_only, const char* section_name);
-static int32_t InputDevice_Justifier_GPULineHook(InputDevice *self_, const int32_t timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
+static int32_t InputDevice_Justifier_GPULineHook(InputDevice *self_, const int32_t timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor);
 static void InputDevice_Justifier_SetDTR(InputDevice *self_, bool new_dtr);
 static bool InputDevice_Justifier_GetDSR(InputDevice *self_);
 static bool InputDevice_Justifier_Clock(InputDevice *self_, bool TxD, int32_t *dsr_pulse_delay);
@@ -187,11 +186,11 @@ static int InputDevice_Memcard_StateAction(InputDevice *self_, StateMem* sm, int
 static void InputDevice_Memcard_SetDTR(InputDevice *self_, bool new_dtr);
 static bool InputDevice_Memcard_GetDSR(InputDevice *self_);
 static bool InputDevice_Memcard_Clock(InputDevice *self_, bool TxD, int32_t *dsr_pulse_delay);
-static uint8 * InputDevice_Memcard_GetNVData(InputDevice *self_);
-static uint32 InputDevice_Memcard_GetNVSize(InputDevice *self_);
-static void InputDevice_Memcard_ReadNV(InputDevice *self_, uint8 *buffer, uint32 offset, uint32 size);
-static void InputDevice_Memcard_WriteNV(InputDevice *self_, const uint8 *buffer, uint32 offset, uint32 size);
-static uint64 InputDevice_Memcard_GetNVDirtyCount(InputDevice *self_);
+static uint8_t * InputDevice_Memcard_GetNVData(InputDevice *self_);
+static uint32_t InputDevice_Memcard_GetNVSize(InputDevice *self_);
+static void InputDevice_Memcard_ReadNV(InputDevice *self_, uint8_t *buffer, uint32_t offset, uint32_t size);
+static void InputDevice_Memcard_WriteNV(InputDevice *self_, const uint8_t *buffer, uint32_t offset, uint32_t size);
+static uint64_t InputDevice_Memcard_GetNVDirtyCount(InputDevice *self_);
 static void InputDevice_Memcard_ResetNVDirtyCount(InputDevice *self_);
 static void InputDevice_Multitap_Ctor(InputDevice *self_);
 static void InputDevice_Multitap_SetSubDevice(InputDevice *self_, unsigned int sub_index, InputDevice *device, InputDevice *mc_device);
@@ -219,14 +218,14 @@ struct InputDevice_Multitap
          bool full_mode;
          bool mc_mode;
          bool prev_fm_success;
-         uint8 fm_dp;
-         uint8 fm_buffer[4][8];
-         uint8 sb[4][8];
+         uint8_t fm_dp;
+         uint8_t fm_buffer[4][8];
+         uint8_t sb[4][8];
          bool fm_command_error;
-         uint8 command;
-         uint8 receive_buffer;
-         uint8 bit_counter;
-         uint8 byte_counter;
+         uint8_t command;
+         uint8_t receive_buffer;
+         uint8_t bit_counter;
+         uint8_t byte_counter;
 };
 
 
@@ -314,7 +313,7 @@ static void InputDevice_SetCrosshairsColor(InputDevice *self_, uint32_t color)
    self->chair_b = (color >>  0) & 0xFF;
 }
 
-static void crosshair_plot( uint32 *pixels,
+static void crosshair_plot( uint32_t *pixels,
 							int x,
 							unsigned chair_r,
 							unsigned chair_g,
@@ -348,10 +347,10 @@ static void crosshair_plot( uint32 *pixels,
 	pixels[x] = MAKECOLOR(nr, ng, nb, a);
 }
 
-INLINE void InputDevice_DrawCrosshairs(InputDevice *self_, uint32 *pixels, const unsigned width, const unsigned pix_clock, const unsigned surf_pitchinpix, const unsigned upscale_factor)
+INLINE void InputDevice_DrawCrosshairs(InputDevice *self_, uint32_t *pixels, const unsigned width, const unsigned pix_clock, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
    int row;
-   int32 x;
+   int32_t x;
    InputDevice *self = self_;
 
 	switch ( self->chair_cursor )
@@ -364,8 +363,8 @@ INLINE void InputDevice_DrawCrosshairs(InputDevice *self_, uint32 *pixels, const
 
 		if ( self->chair_y >= -8 && self->chair_y <= 8 )
 		{
-			int32 ic;
-			int32 x_start, x_bound;
+			int32_t ic;
+			int32_t x_start, x_bound;
 
 			if ( self->chair_y == 0 ) {
 				ic = pix_clock / 762925;
@@ -373,8 +372,13 @@ INLINE void InputDevice_DrawCrosshairs(InputDevice *self_, uint32 *pixels, const
 				ic = 0;
 			}
 
-			x_start = MAX(0, (self->chair_x - ic) * upscale_factor);
-			x_bound = MIN(width * upscale_factor, (self->chair_x + ic + 1) * upscale_factor);
+			x_start = (self->chair_x - ic) * upscale_factor;
+			if (x_start < 0) x_start = 0;
+			x_bound = (self->chair_x + ic + 1) * upscale_factor;
+			{
+				int32_t _max = width * upscale_factor;
+				if (x_bound > _max) x_bound = _max;
+			}
 
 			for (x = x_start; x < x_bound; x++ )
 			{
@@ -391,13 +395,18 @@ INLINE void InputDevice_DrawCrosshairs(InputDevice *self_, uint32 *pixels, const
 
 		if ( self->chair_y >= -1 && self->chair_y <= 1 )
 		{
-			int32 ic;
-			int32 x_start, x_bound;
+			int32_t ic;
+			int32_t x_start, x_bound;
 
 			ic = pix_clock / ( 762925 * 6 );
 
-			x_start = MAX(0, (self->chair_x - ic) * upscale_factor);
-			x_bound = MIN(width * upscale_factor, (self->chair_x + ic) * upscale_factor);
+			x_start = (self->chair_x - ic) * upscale_factor;
+			if (x_start < 0) x_start = 0;
+			x_bound = (self->chair_x + ic) * upscale_factor;
+			{
+				int32_t _max = width * upscale_factor;
+				if (x_bound > _max) x_bound = _max;
+			}
 
 			for (x = x_start; x < x_bound; x++ )
 			{
@@ -484,7 +493,7 @@ int FrontIO_StateAction(FrontIO *self_, StateMem* sm, int load, int data_only)
  return(ret);
 }
 
-static int32_t InputDevice_GPULineHook(InputDevice *self_, const int32_t timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
+static int32_t InputDevice_GPULineHook(InputDevice *self_, const int32_t timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
    (void)self_;
 
@@ -1330,7 +1339,7 @@ void FrontIO_SaveMemcardToPath(FrontIO *self_, unsigned int which, const char *p
  }
 }
 
-void FrontIO_GPULineHook(FrontIO *self_, const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
+void FrontIO_GPULineHook(FrontIO *self_, const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
    unsigned i;
    FrontIO *self = self_;
@@ -1377,14 +1386,14 @@ struct InputDevice_Gamepad
 {
    InputDevice base;
          bool dtr;
-         uint8 buttons[2];
-         int32 command_phase;
-         uint32 bitpos;
-         uint8 receive_buffer;
-         uint8 command;
-         uint8 transmit_buffer[3];
-         uint32 transmit_pos;
-         uint32 transmit_count;
+         uint8_t buttons[2];
+         int32_t command_phase;
+         uint32_t bitpos;
+         uint8_t receive_buffer;
+         uint8_t command;
+         uint8_t transmit_buffer[3];
+         uint32_t transmit_pos;
+         uint32_t transmit_count;
 };
 
 
@@ -1460,7 +1469,7 @@ static void InputDevice_Gamepad_UpdateInput(InputDevice *self_, const void *data
 {
    InputDevice_Gamepad *self = (InputDevice_Gamepad *)self_;
 
-   uint8 *d8 = (uint8 *)data;
+   uint8_t *d8 = (uint8_t *)data;
 
    self->buttons[0] = d8[0];
    self->buttons[1] = d8[1];
@@ -1594,15 +1603,15 @@ struct InputDevice_DualAnalog
    InputDevice base;
          bool joystick_mode;
          bool dtr;
-         uint8 buttons[2];
-         uint8 axes[2][2];
-         int32 command_phase;
-         uint32 bitpos;
-         uint8 receive_buffer;
-         uint8 command;
-         uint8 transmit_buffer[8];
-         uint32 transmit_pos;
-         uint32 transmit_count;
+         uint8_t buttons[2];
+         uint8_t axes[2][2];
+         int32_t command_phase;
+         uint32_t bitpos;
+         uint8_t receive_buffer;
+         uint8_t command;
+         uint8_t transmit_buffer[8];
+         uint32_t transmit_pos;
+         uint32_t transmit_count;
 };
 
 
@@ -1679,7 +1688,7 @@ static void InputDevice_DualAnalog_UpdateInput(InputDevice *self_, const void *d
    int stick, axis;
    InputDevice_DualAnalog *self = (InputDevice_DualAnalog *)self_;
 
-   uint8 *d8 = (uint8 *)data;
+   uint8_t *d8 = (uint8_t *)data;
 
    self->buttons[0] = d8[0];
    self->buttons[1] = d8[1];
@@ -1688,12 +1697,22 @@ static void InputDevice_DualAnalog_UpdateInput(InputDevice *self_, const void *d
    {
       for (axis = 0; axis < 2; axis++)
       {
-         int32 tmp;
+         int32_t tmp;
+         const uint8_t *_p4 = (const uint8_t *)data + stick * 16 + axis * 8 + 4;
+         const uint8_t *_p8 = (const uint8_t *)data + stick * 16 + axis * 8 + 8;
+         uint32_t _v4, _v8;
 
          /* revert to 0.9.33, should be fixed on libretro side instead */
          /* tmp = 32768 + MDFN_de16lsb(&aba[0]) - ((int32)MDFN_de16lsb(&aba[2]) * 32768 / 32767); */
 
-         tmp = 32768 + MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32767);
+#ifdef MSB_FIRST
+         _v4 = (uint32_t)_p4[0] | ((uint32_t)_p4[1] << 8) | ((uint32_t)_p4[2] << 16) | ((uint32_t)_p4[3] << 24);
+         _v8 = (uint32_t)_p8[0] | ((uint32_t)_p8[1] << 8) | ((uint32_t)_p8[2] << 16) | ((uint32_t)_p8[3] << 24);
+#else
+         memcpy(&_v4, _p4, 4);
+         memcpy(&_v8, _p8, 4);
+#endif
+         tmp = 32768 + _v4 - ((int32_t)_v8 * 32768 / 32767);
          tmp >>= 8;
 
          self->axes[stick][axis] = tmp;
@@ -1867,23 +1886,23 @@ struct InputDevice_DualShock
    InputDevice base;
          bool cur_ana_button_state;
          bool prev_ana_button_state;
-         int64 combo_anatoggle_counter;
+         int64_t combo_anatoggle_counter;
          bool da_rumble_compat;
          bool analog_mode;
          bool analog_mode_locked;
          bool mad_munchkins;
-         uint8 rumble_magic[6];
-         uint8 rumble_param[2];
+         uint8_t rumble_magic[6];
+         uint8_t rumble_param[2];
          bool dtr;
-         uint8 buttons[2];
-         uint8 axes[2][2];
-         int32 command_phase;
-         uint32 bitpos;
-         uint8 receive_buffer;
-         uint8 command;
-         uint8 transmit_buffer[8];
-         uint32 transmit_pos;
-         uint32 transmit_count;
+         uint8_t buttons[2];
+         uint8_t axes[2][2];
+         int32_t command_phase;
+         uint32_t bitpos;
+         uint8_t receive_buffer;
+         uint8_t command;
+         uint8_t transmit_buffer[8];
+         uint32_t transmit_pos;
+         uint32_t transmit_count;
          bool am_prev_info;
          bool aml_prev_info;
          char gp_name[64];
@@ -2077,7 +2096,7 @@ static void InputDevice_DualShock_UpdateInput(InputDevice *self_, const void *da
    int stick, axis;
    InputDevice_DualShock *self = (InputDevice_DualShock *)self_;
 
-   uint8 *d8 = (uint8 *)data;
+   uint8_t *d8 = (uint8_t *)data;
 
    self->buttons[0] = d8[0];
    self->buttons[1] = d8[1];
@@ -2087,13 +2106,23 @@ static void InputDevice_DualShock_UpdateInput(InputDevice *self_, const void *da
    {
       for (axis = 0; axis < 2; axis++)
       {
-         int32 tmp;
+         int32_t tmp;
+         const uint8_t *_p4 = (const uint8_t *)data + stick * 16 + axis * 8 + 4;
+         const uint8_t *_p8 = (const uint8_t *)data + stick * 16 + axis * 8 + 8;
+         uint32_t _v4, _v8;
 
          /* revert to 0.9.33, should be fixed on libretro side instead */
          /* tmp = 32767 + MDFN_de16lsb(&aba[0]) - MDFN_de16lsb(&aba[2]); */
          /* tmp = (tmp * 0x100) / 0xFFFF; */
 
-         tmp = 32768 + MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 4) - ((int32)MDFN_de32lsb((const uint8 *)data + stick * 16 + axis * 8 + 8) * 32768 / 32767);
+#ifdef MSB_FIRST
+         _v4 = (uint32_t)_p4[0] | ((uint32_t)_p4[1] << 8) | ((uint32_t)_p4[2] << 16) | ((uint32_t)_p4[3] << 24);
+         _v8 = (uint32_t)_p8[0] | ((uint32_t)_p8[1] << 8) | ((uint32_t)_p8[2] << 16) | ((uint32_t)_p8[3] << 24);
+#else
+         memcpy(&_v4, _p4, 4);
+         memcpy(&_v8, _p8, 4);
+#endif
+         tmp = 32768 + _v4 - ((int32_t)_v8 * 32768 / 32767);
          tmp >>= 8;
          self->axes[stick][axis] = tmp;
       }
@@ -2105,7 +2134,8 @@ static void InputDevice_DualShock_UpdateInput(InputDevice *self_, const void *da
    /* printf("%d, 0x%02x 0x%02x\n", da_rumble_compat, rumble_param[0], rumble_param[1]); */
    if(self->da_rumble_compat == false)
    {
-      uint8 sneaky_weaky = 0;
+      uint8_t sneaky_weaky = 0;
+      uint32_t _rv;
 
       if(self->rumble_param[0] == 0x01)
          sneaky_weaky = 0xFF;
@@ -2113,18 +2143,35 @@ static void InputDevice_DualShock_UpdateInput(InputDevice *self_, const void *da
       /* revert to 0.9.33, should be fixed on libretro side instead */
       /* MDFN_en16lsb(rumb_dp, (sneaky_weaky << 0) | (rumble_param[1] << 8)); */
 
-      MDFN_en32lsb(&d8[4 + 32 + 0], (sneaky_weaky << 0) | (self->rumble_param[1] << 8));
+      _rv = (uint32_t)((sneaky_weaky << 0) | (self->rumble_param[1] << 8));
+#ifdef MSB_FIRST
+      d8[4 + 32 + 0] = _rv;
+      d8[4 + 32 + 1] = _rv >> 8;
+      d8[4 + 32 + 2] = _rv >> 16;
+      d8[4 + 32 + 3] = _rv >> 24;
+#else
+      memcpy(&d8[4 + 32 + 0], &_rv, 4);
+#endif
    }
    else
    {
-      uint8 sneaky_weaky = 0;
+      uint8_t sneaky_weaky = 0;
+      uint32_t _rv;
 
       if(((self->rumble_param[0] & 0xC0) == 0x40) && ((self->rumble_param[1] & 0x01) == 0x01))
          sneaky_weaky = 0xFF;
 
       /* revert to 0.9.33, should be fixed on libretro side instead */
       /* MDFN_en16lsb(rumb_dp, sneaky_weaky << 0); */
-      MDFN_en32lsb(&d8[4 + 32 + 0], sneaky_weaky << 0);
+      _rv = (uint32_t)(sneaky_weaky << 0);
+#ifdef MSB_FIRST
+      d8[4 + 32 + 0] = _rv;
+      d8[4 + 32 + 1] = _rv >> 8;
+      d8[4 + 32 + 2] = _rv >> 16;
+      d8[4 + 32 + 3] = _rv >> 24;
+#else
+      memcpy(&d8[4 + 32 + 0], &_rv, 4);
+#endif
    }
 
    /* printf("%d %d %d %d\n", axes[0][0], axes[0][1], axes[1][0], axes[1][1]); */
@@ -2874,20 +2921,20 @@ typedef struct InputDevice_Mouse InputDevice_Mouse;
 struct InputDevice_Mouse
 {
    InputDevice base;
-         int32 lastts;
-         int32 clear_timeout;
+         int32_t lastts;
+         int32_t clear_timeout;
          bool dtr;
-         uint8 button;
-         uint8 button_post_mask;
-         int32 accum_xdelta;
-         int32 accum_ydelta;
-         int32 command_phase;
-         uint32 bitpos;
-         uint8 receive_buffer;
-         uint8 command;
-         uint8 transmit_buffer[5];
-         uint32 transmit_pos;
-         uint32 transmit_count;
+         uint8_t button;
+         uint8_t button_post_mask;
+         int32_t accum_xdelta;
+         int32_t accum_ydelta;
+         int32_t command_phase;
+         uint32_t bitpos;
+         uint8_t receive_buffer;
+         uint8_t command;
+         uint8_t transmit_buffer[5];
+         uint32_t transmit_pos;
+         uint32_t transmit_count;
 };
 
 
@@ -2904,7 +2951,7 @@ static void InputDevice_Mouse_Update(InputDevice *self_, const int32_t timestamp
 {
    InputDevice_Mouse *self = (InputDevice_Mouse *)self_;
 
-   int32 cycles = timestamp - self->lastts;
+   int32_t cycles = timestamp - self->lastts;
 
    self->clear_timeout += cycles;
    if(self->clear_timeout >= (33868800 / 4))
@@ -2998,9 +3045,18 @@ static int InputDevice_Mouse_StateAction(InputDevice *self_, StateMem* sm, int l
 static void InputDevice_Mouse_UpdateInput(InputDevice *self_, const void *data)
 {
    InputDevice_Mouse *self = (InputDevice_Mouse *)self_;
+   const uint8_t *_p = (const uint8_t *)data;
+   uint32_t _dx, _dy;
 
-   self->accum_xdelta += (int32)MDFN_de32lsb((uint8*)data + 0);
-   self->accum_ydelta += (int32)MDFN_de32lsb((uint8*)data + 4);
+#ifdef MSB_FIRST
+   _dx = (uint32_t)_p[0] | ((uint32_t)_p[1] << 8) | ((uint32_t)_p[2] << 16) | ((uint32_t)_p[3] << 24);
+   _dy = (uint32_t)_p[4] | ((uint32_t)_p[5] << 8) | ((uint32_t)_p[6] << 16) | ((uint32_t)_p[7] << 24);
+#else
+   memcpy(&_dx, _p + 0, 4);
+   memcpy(&_dy, _p + 4, 4);
+#endif
+   self->accum_xdelta += (int32_t)_dx;
+   self->accum_ydelta += (int32_t)_dy;
 
    if(self->accum_xdelta > 30 * 127) self->accum_xdelta = 30 * 127;
    if(self->accum_xdelta < 30 * -128) self->accum_xdelta = 30 * -128;
@@ -3008,8 +3064,8 @@ static void InputDevice_Mouse_UpdateInput(InputDevice *self_, const void *data)
    if(self->accum_ydelta > 30 * 127) self->accum_ydelta = 30 * 127;
    if(self->accum_ydelta < 30 * -128) self->accum_ydelta = 30 * -128;
 
-   self->button |= *((uint8 *)data + 8);
-   self->button_post_mask = *((uint8 *)data + 8);
+   self->button |= *((uint8_t *)data + 8);
+   self->button_post_mask = *((uint8_t *)data + 8);
 
    /* printf("%d %d\n", accum_xdelta, accum_ydelta); */
 }
@@ -3086,8 +3142,8 @@ static bool InputDevice_Mouse_Clock(InputDevice *self_, bool TxD, int32_t *dsr_p
 
             if(self->command == 0x42)
             {
-               int32 xdelta = self->accum_xdelta;
-               int32 ydelta = self->accum_ydelta;
+               int32_t xdelta = self->accum_xdelta;
+               int32_t ydelta = self->accum_ydelta;
 
                if(xdelta < -128) xdelta = -128;
                if(xdelta > 127) xdelta = 127;
@@ -3139,16 +3195,16 @@ struct InputDevice_neGcon
 {
    InputDevice base;
          bool dtr;
-         uint8 buttons[2];
-         uint8 twist;
-         uint8 anabuttons[3];
-         int32 command_phase;
-         uint32 bitpos;
-         uint8 receive_buffer;
-         uint8 command;
-         uint8 transmit_buffer[8];
-         uint32 transmit_pos;
-         uint32 transmit_count;
+         uint8_t buttons[2];
+         uint8_t twist;
+         uint8_t anabuttons[3];
+         int32_t command_phase;
+         uint32_t bitpos;
+         uint8_t receive_buffer;
+         uint8_t command;
+         uint8_t transmit_buffer[8];
+         uint32_t transmit_pos;
+         uint32_t transmit_count;
 };
 
 
@@ -3191,16 +3247,30 @@ static void InputDevice_neGcon_UpdateInput(InputDevice *self_, const void *data)
 {
    InputDevice_neGcon *self = (InputDevice_neGcon *)self_;
 
-   uint8 *d8 = (uint8 *)data;
+   uint8_t *d8 = (uint8_t *)data;
+   uint32_t _v4, _v8, _v12, _v16, _v20;
+#ifdef MSB_FIRST
+   _v4  = (uint32_t)d8[ 4] | ((uint32_t)d8[ 5] << 8) | ((uint32_t)d8[ 6] << 16) | ((uint32_t)d8[ 7] << 24);
+   _v8  = (uint32_t)d8[ 8] | ((uint32_t)d8[ 9] << 8) | ((uint32_t)d8[10] << 16) | ((uint32_t)d8[11] << 24);
+   _v12 = (uint32_t)d8[12] | ((uint32_t)d8[13] << 8) | ((uint32_t)d8[14] << 16) | ((uint32_t)d8[15] << 24);
+   _v16 = (uint32_t)d8[16] | ((uint32_t)d8[17] << 8) | ((uint32_t)d8[18] << 16) | ((uint32_t)d8[19] << 24);
+   _v20 = (uint32_t)d8[20] | ((uint32_t)d8[21] << 8) | ((uint32_t)d8[22] << 16) | ((uint32_t)d8[23] << 24);
+#else
+   memcpy(&_v4,  d8 +  4, 4);
+   memcpy(&_v8,  d8 +  8, 4);
+   memcpy(&_v12, d8 + 12, 4);
+   memcpy(&_v16, d8 + 16, 4);
+   memcpy(&_v20, d8 + 20, 4);
+#endif
 
    self->buttons[0] = d8[0];
    self->buttons[1] = d8[1];
 
-   self->twist = ((32768 + MDFN_de32lsb((const uint8 *)data + 4) - (((int32)MDFN_de32lsb((const uint8 *)data + 8) * 32768 + 16383) / 32767)) * 255 + 32767) / 65535;
+   self->twist = ((32768 + _v4 - (((int32_t)_v8 * 32768 + 16383) / 32767)) * 255 + 32767) / 65535;
 
-   self->anabuttons[0] = (MDFN_de32lsb((const uint8 *)data + 12) * 255 + 16383) / 32767; 
-   self->anabuttons[1] = (MDFN_de32lsb((const uint8 *)data + 16) * 255 + 16383) / 32767;
-   self->anabuttons[2] = (MDFN_de32lsb((const uint8 *)data + 20) * 255 + 16383) / 32767;
+   self->anabuttons[0] = (_v12 * 255 + 16383) / 32767;
+   self->anabuttons[1] = (_v16 * 255 + 16383) / 32767;
+   self->anabuttons[2] = (_v20 * 255 + 16383) / 32767;
 
    /* printf("%02x %02x %02x %02x\n", twist, anabuttons[0], anabuttons[1], anabuttons[2]); */
 }
@@ -3373,24 +3443,24 @@ struct InputDevice_neGconRumble
    InputDevice base;
          bool cur_ana_button_state;
          bool prev_ana_button_state;
-         int64 combo_anatoggle_counter;
+         int64_t combo_anatoggle_counter;
          bool da_rumble_compat;
          bool analog_mode;
          bool analog_mode_locked;
          bool mad_munchkins;
-         uint8 rumble_magic[6];
-         uint8 rumble_param[2];
+         uint8_t rumble_magic[6];
+         uint8_t rumble_param[2];
          bool dtr;
-         uint8 buttons[2];
-         uint8 twist;
-         uint8 anabuttons[3];
-         int32 command_phase;
-         uint32 bitpos;
-         uint8 receive_buffer;
-         uint8 command;
-         uint8 transmit_buffer[8];
-         uint32 transmit_pos;
-         uint32 transmit_count;
+         uint8_t buttons[2];
+         uint8_t twist;
+         uint8_t anabuttons[3];
+         int32_t command_phase;
+         uint32_t bitpos;
+         uint8_t receive_buffer;
+         uint8_t command;
+         uint8_t transmit_buffer[8];
+         uint32_t transmit_pos;
+         uint32_t transmit_count;
          bool am_prev_info;
          bool aml_prev_info;
          char gp_name[64];
@@ -3570,17 +3640,31 @@ static void InputDevice_neGconRumble_UpdateInput(InputDevice *self_, const void 
 {
    InputDevice_neGconRumble *self = (InputDevice_neGconRumble *)self_;
 
-   uint8 *d8 = (uint8 *)data;
+   uint8_t *d8 = (uint8_t *)data;
+   uint32_t _v4, _v8, _v12, _v16, _v20;
+#ifdef MSB_FIRST
+   _v4  = (uint32_t)d8[ 4] | ((uint32_t)d8[ 5] << 8) | ((uint32_t)d8[ 6] << 16) | ((uint32_t)d8[ 7] << 24);
+   _v8  = (uint32_t)d8[ 8] | ((uint32_t)d8[ 9] << 8) | ((uint32_t)d8[10] << 16) | ((uint32_t)d8[11] << 24);
+   _v12 = (uint32_t)d8[12] | ((uint32_t)d8[13] << 8) | ((uint32_t)d8[14] << 16) | ((uint32_t)d8[15] << 24);
+   _v16 = (uint32_t)d8[16] | ((uint32_t)d8[17] << 8) | ((uint32_t)d8[18] << 16) | ((uint32_t)d8[19] << 24);
+   _v20 = (uint32_t)d8[20] | ((uint32_t)d8[21] << 8) | ((uint32_t)d8[22] << 16) | ((uint32_t)d8[23] << 24);
+#else
+   memcpy(&_v4,  d8 +  4, 4);
+   memcpy(&_v8,  d8 +  8, 4);
+   memcpy(&_v12, d8 + 12, 4);
+   memcpy(&_v16, d8 + 16, 4);
+   memcpy(&_v20, d8 + 20, 4);
+#endif
 
    self->buttons[0] = d8[0];
    self->buttons[1] = d8[1];
    self->cur_ana_button_state = d8[2] & 0x01;
 
-   self->twist = ((32768 + MDFN_de32lsb((const uint8 *)data + 4) - (((int32)MDFN_de32lsb((const uint8 *)data + 8) * 32768 + 16383) / 32767)) * 255 + 32767) / 65535;
+   self->twist = ((32768 + _v4 - (((int32_t)_v8 * 32768 + 16383) / 32767)) * 255 + 32767) / 65535;
 
-   self->anabuttons[0] = (MDFN_de32lsb((const uint8 *)data + 12) * 255 + 16383) / 32767; 
-   self->anabuttons[1] = (MDFN_de32lsb((const uint8 *)data + 16) * 255 + 16383) / 32767;
-   self->anabuttons[2] = (MDFN_de32lsb((const uint8 *)data + 20) * 255 + 16383) / 32767;
+   self->anabuttons[0] = (_v12 * 255 + 16383) / 32767;
+   self->anabuttons[1] = (_v16 * 255 + 16383) / 32767;
+   self->anabuttons[2] = (_v20 * 255 + 16383) / 32767;
 
    /* printf("%02x %02x %02x %02x\n", twist, anabuttons[0], anabuttons[1], anabuttons[2]); */
 
@@ -3588,7 +3672,8 @@ static void InputDevice_neGconRumble_UpdateInput(InputDevice *self_, const void 
    /* printf("%d, 0x%02x 0x%02x\n", da_rumble_compat, rumble_param[0], rumble_param[1]); */
    if(self->da_rumble_compat == false)
    {
-      uint8 sneaky_weaky = 0;
+      uint8_t sneaky_weaky = 0;
+      uint32_t _rv;
 
       if(self->rumble_param[0] == 0x01)
          sneaky_weaky = 0xFF;
@@ -3596,18 +3681,35 @@ static void InputDevice_neGconRumble_UpdateInput(InputDevice *self_, const void 
       /* revert to 0.9.33, should be fixed on libretro side instead */
       /* MDFN_en16lsb(rumb_dp, (sneaky_weaky << 0) | (rumble_param[1] << 8)); */
 
-      MDFN_en32lsb(&d8[4 + 32 + 0], (sneaky_weaky << 0) | (self->rumble_param[1] << 8));
+      _rv = (uint32_t)((sneaky_weaky << 0) | (self->rumble_param[1] << 8));
+#ifdef MSB_FIRST
+      d8[4 + 32 + 0] = _rv;
+      d8[4 + 32 + 1] = _rv >> 8;
+      d8[4 + 32 + 2] = _rv >> 16;
+      d8[4 + 32 + 3] = _rv >> 24;
+#else
+      memcpy(&d8[4 + 32 + 0], &_rv, 4);
+#endif
    }
    else
    {
-      uint8 sneaky_weaky = 0;
+      uint8_t sneaky_weaky = 0;
+      uint32_t _rv;
 
       if(((self->rumble_param[0] & 0xC0) == 0x40) && ((self->rumble_param[1] & 0x01) == 0x01))
          sneaky_weaky = 0xFF;
 
       /* revert to 0.9.33, should be fixed on libretro side instead */
       /* MDFN_en16lsb(rumb_dp, sneaky_weaky << 0); */
-      MDFN_en32lsb(&d8[4 + 32 + 0], sneaky_weaky << 0);
+      _rv = (uint32_t)(sneaky_weaky << 0);
+#ifdef MSB_FIRST
+      d8[4 + 32 + 0] = _rv;
+      d8[4 + 32 + 1] = _rv >> 8;
+      d8[4 + 32 + 2] = _rv >> 16;
+      d8[4 + 32 + 3] = _rv >> 24;
+#else
+      memcpy(&d8[4 + 32 + 0], &_rv, 4);
+#endif
    }
 
    InputDevice_neGconRumble_CheckManualAnaModeChange(self_);
@@ -4353,20 +4455,20 @@ struct InputDevice_GunCon
 {
    InputDevice base;
          bool dtr;
-         uint8 buttons;
+         uint8_t buttons;
          bool trigger_eff;
          bool trigger_noclear;
-         uint16 hit_x, hit_y;
-         int16 nom_x, nom_y;
-         int32 os_shot_counter;
+         uint16_t hit_x, hit_y;
+         int16_t nom_x, nom_y;
+         int32_t os_shot_counter;
          bool prev_oss;
-         int32 command_phase;
-         uint32 bitpos;
-         uint8 receive_buffer;
-         uint8 command;
-         uint8 transmit_buffer[16];
-         uint32 transmit_pos;
-         uint32 transmit_count;
+         int32_t command_phase;
+         uint32_t bitpos;
+         uint8_t receive_buffer;
+         uint8_t command;
+         uint8_t transmit_buffer[16];
+         uint32_t transmit_pos;
+         uint32_t transmit_count;
          bool prev_vsync;
          int line_counter;
 };
@@ -4468,10 +4570,19 @@ static void InputDevice_GunCon_UpdateInput(InputDevice *self_, const void *data)
 {
    InputDevice_GunCon *self = (InputDevice_GunCon *)self_;
 
-   uint8 *d8 = (uint8 *)data;
-
-   self->nom_x = (int16)MDFN_de16lsb(&d8[0]);
-   self->nom_y = (int16)MDFN_de16lsb(&d8[2]);
+   uint8_t *d8 = (uint8_t *)data;
+   {
+      uint16_t _x, _y;
+#ifdef MSB_FIRST
+      _x = (uint16_t)d8[0] | ((uint16_t)d8[1] << 8);
+      _y = (uint16_t)d8[2] | ((uint16_t)d8[3] << 8);
+#else
+      memcpy(&_x, &d8[0], 2);
+      memcpy(&_y, &d8[2], 2);
+#endif
+      self->nom_x = (int16_t)_x;
+      self->nom_y = (int16_t)_y;
+   }
 
    self->trigger_noclear = (bool)(d8[4] & 0x1);
    self->trigger_eff |= self->trigger_noclear;
@@ -4486,7 +4597,7 @@ static void InputDevice_GunCon_UpdateInput(InputDevice *self_, const void *data)
    self->prev_oss = d8[4] & 0x8;
 }
 
-static int32_t InputDevice_GunCon_GPULineHook(InputDevice *self_, const int32_t line_timestamp, bool vsync, uint32 *pixels, const unsigned width,
+static int32_t InputDevice_GunCon_GPULineHook(InputDevice *self_, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const unsigned width,
       const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
    InputDevice_GunCon *self = (InputDevice_GunCon *)self_;
@@ -4497,14 +4608,14 @@ static int32_t InputDevice_GunCon_GPULineHook(InputDevice *self_, const int32_t 
    if(pixels && pix_clock)
    {
       const int avs = 16; /*  Not 16 for PAL, fixme. */
-      int32 gx;
-      int32 gy;
-      int32 ix;
+      int32_t gx;
+      int32_t gy;
+      int32_t ix;
 
       gx = (self->nom_x * 2 + pix_clock_divider) / (pix_clock_divider * 2);
       gy = self->nom_y;
 
-      for (ix = gx; ix < (gx + (int32)(pix_clock / 762925)); ix++)
+      for (ix = gx; ix < (gx + (int32_t)(pix_clock / 762925)); ix++)
       {
          if(ix >= 0 && ix < (int)width && self->line_counter >= (avs + gy) && self->line_counter < (avs + gy + 8))
          {
@@ -4514,7 +4625,7 @@ static int32_t InputDevice_GunCon_GPULineHook(InputDevice *self_, const int32_t 
 
             if((r + g + b) >= 0x40)	/*  Wrong, but not COMPLETELY ABSOLUTELY wrong, at least. ;) */
             {
-               self->hit_x = (int64)(ix + pix_clock_offset) * 8000000 / pix_clock;	/*  GunCon has what appears to be an 8.00MHz ceramic resonator in it. */
+               self->hit_x = (int64_t)(ix + pix_clock_offset) * 8000000 / pix_clock;	/*  GunCon has what appears to be an 8.00MHz ceramic resonator in it. */
                self->hit_y = self->line_counter;
             }
          }
@@ -4636,8 +4747,19 @@ static bool InputDevice_GunCon_Clock(InputDevice *self_, bool TxD, int32_t *dsr_
                   }
                }
 
-               MDFN_en16lsb(&self->transmit_buffer[3], self->hit_x);
-               MDFN_en16lsb(&self->transmit_buffer[5], self->hit_y);
+               {
+                  uint16_t _hx = (uint16_t)self->hit_x;
+                  uint16_t _hy = (uint16_t)self->hit_y;
+#ifdef MSB_FIRST
+                  self->transmit_buffer[3] = (uint8_t)_hx;
+                  self->transmit_buffer[4] = (uint8_t)(_hx >> 8);
+                  self->transmit_buffer[5] = (uint8_t)_hy;
+                  self->transmit_buffer[6] = (uint8_t)(_hy >> 8);
+#else
+                  memcpy(&self->transmit_buffer[3], &_hx, 2);
+                  memcpy(&self->transmit_buffer[5], &_hy, 2);
+#endif
+               }
 
                self->hit_x = 0x01;
                self->hit_y = 0x0A;
@@ -4678,20 +4800,20 @@ struct InputDevice_Justifier
 {
    InputDevice base;
          bool dtr;
-         uint8 buttons;
+         uint8_t buttons;
          bool trigger_eff;
          bool trigger_noclear;
          bool need_hit_detect;
-         int16 nom_x, nom_y;
-         int32 os_shot_counter;
+         int16_t nom_x, nom_y;
+         int32_t os_shot_counter;
          bool prev_oss;
-         int32 command_phase;
-         uint32 bitpos;
-         uint8 receive_buffer;
-         uint8 command;
-         uint8 transmit_buffer[16];
-         uint32 transmit_pos;
-         uint32 transmit_count;
+         int32_t command_phase;
+         uint32_t bitpos;
+         uint8_t receive_buffer;
+         uint8_t command;
+         uint8_t transmit_buffer[16];
+         uint32_t transmit_pos;
+         uint32_t transmit_count;
          bool prev_vsync;
          int line_counter;
 };
@@ -4745,10 +4867,20 @@ static void InputDevice_Justifier_UpdateInput(InputDevice *self_, const void *da
 {
    InputDevice_Justifier *self = (InputDevice_Justifier *)self_;
 
-   uint8 *d8 = (uint8 *)data;
+   uint8_t *d8 = (uint8_t *)data;
 
-   self->nom_x = (int16)MDFN_de16lsb(&d8[0]);
-   self->nom_y = (int16)MDFN_de16lsb(&d8[2]);
+   {
+      uint16_t _x, _y;
+#ifdef MSB_FIRST
+      _x = (uint16_t)d8[0] | ((uint16_t)d8[1] << 8);
+      _y = (uint16_t)d8[2] | ((uint16_t)d8[3] << 8);
+#else
+      memcpy(&_x, &d8[0], 2);
+      memcpy(&_y, &d8[2], 2);
+#endif
+      self->nom_x = (int16_t)_x;
+      self->nom_y = (int16_t)_y;
+   }
 
    self->trigger_noclear = (bool)(d8[4] & 0x1);
    self->trigger_eff |= self->trigger_noclear;
@@ -4811,7 +4943,7 @@ static int InputDevice_Justifier_StateAction(InputDevice *self_, StateMem* sm, i
    return(ret);
 }
 
-static int32_t InputDevice_Justifier_GPULineHook(InputDevice *self_, const int32_t timestamp, bool vsync, uint32 *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
+static int32_t InputDevice_Justifier_GPULineHook(InputDevice *self_, const int32_t timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
    InputDevice_Justifier *self = (InputDevice_Justifier *)self_;
 
@@ -4823,9 +4955,9 @@ static int32_t InputDevice_Justifier_GPULineHook(InputDevice *self_, const int32
    if(pixels && pix_clock)
    {
       const int avs = 16; /*  Not 16 for PAL, fixme. */
-      int32 gx;
-      int32 gy;
-      int32 gxa;
+      int32_t gx;
+      int32_t gy;
+      int32_t gxa;
 
       gx = (self->nom_x * 2 + pix_clock_divider) / (pix_clock_divider * 2);
       gy = self->nom_y;
@@ -4841,7 +4973,7 @@ static int32_t InputDevice_Justifier_GPULineHook(InputDevice *self_, const int32
 
          if((r + g + b) >= 0x40)	/*  Wrong, but not COMPLETELY ABSOLUTELY wrong, at least. ;) */
          {
-            ret = timestamp + (int64)(gxa + pix_clock_offset) * (44100 * 768) / pix_clock - 177;
+            ret = timestamp + (int64_t)(gxa + pix_clock_offset) * (44100 * 768) / pix_clock - 177;
          }
       }
 
@@ -5000,20 +5132,20 @@ struct InputDevice_Memcard
 {
    InputDevice base;
          bool presence_new;
-         uint8 card_data[1 << 17];
-         uint8 rw_buffer[128];
-         uint8 write_xor;
+         uint8_t card_data[1 << 17];
+         uint8_t rw_buffer[128];
+         uint8_t write_xor;
          bool data_used;
-         uint64 dirty_count;
+         uint64_t dirty_count;
          bool dtr;
-         int32 command_phase;
-         uint32 bitpos;
-         uint8 receive_buffer;
-         uint8 command;
-         uint16 addr;
-         uint8 calced_xor;
-         uint8 transmit_buffer;
-         uint32 transmit_count;
+         int32_t command_phase;
+         uint32_t bitpos;
+         uint8_t receive_buffer;
+         uint8_t command;
+         uint16_t addr;
+         uint8_t calced_xor;
+         uint8_t transmit_buffer;
+         uint32_t transmit_count;
 };
 
 
@@ -5410,21 +5542,21 @@ static bool InputDevice_Memcard_Clock(InputDevice *self_, bool TxD, int32_t *dsr
    return(ret);
 }
 
-static uint8 * InputDevice_Memcard_GetNVData(InputDevice *self_)
+static uint8_t * InputDevice_Memcard_GetNVData(InputDevice *self_)
 {
    InputDevice_Memcard *self = (InputDevice_Memcard *)self_;
 
    return self->card_data;
 }
 
-static uint32 InputDevice_Memcard_GetNVSize(InputDevice *self_)
+static uint32_t InputDevice_Memcard_GetNVSize(InputDevice *self_)
 {
    InputDevice_Memcard *self = (InputDevice_Memcard *)self_;
 
    return(sizeof(self->card_data));
 }
 
-static void InputDevice_Memcard_ReadNV(InputDevice *self_, uint8 *buffer, uint32 offset, uint32 size)
+static void InputDevice_Memcard_ReadNV(InputDevice *self_, uint8_t *buffer, uint32_t offset, uint32_t size)
 {
    InputDevice_Memcard *self = (InputDevice_Memcard *)self_;
 
@@ -5436,7 +5568,7 @@ static void InputDevice_Memcard_ReadNV(InputDevice *self_, uint8 *buffer, uint32
    }
 }
 
-static void InputDevice_Memcard_WriteNV(InputDevice *self_, const uint8 *buffer, uint32 offset, uint32 size)
+static void InputDevice_Memcard_WriteNV(InputDevice *self_, const uint8_t *buffer, uint32_t offset, uint32_t size)
 {
    InputDevice_Memcard *self = (InputDevice_Memcard *)self_;
 
@@ -5456,7 +5588,7 @@ static void InputDevice_Memcard_WriteNV(InputDevice *self_, const uint8 *buffer,
    }
 }
 
-static uint64 InputDevice_Memcard_GetNVDirtyCount(InputDevice *self_)
+static uint64_t InputDevice_Memcard_GetNVDirtyCount(InputDevice *self_)
 {
    InputDevice_Memcard *self = (InputDevice_Memcard *)self_;
 
@@ -5722,7 +5854,7 @@ static bool InputDevice_Multitap_Clock(InputDevice *self_, bool TxD, int32_t *ds
    unsigned i;
    InputDevice_Multitap *self = (InputDevice_Multitap *)self_;
    bool ret = 1;
-   int32 tmp_pulse_delay[2][4] = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 } };
+   int32_t tmp_pulse_delay[2][4] = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 } };
 
    if(!self->dtr)
       return(1);
@@ -5870,7 +6002,7 @@ static bool InputDevice_Multitap_Clock(InputDevice *self_, bool TxD, int32_t *ds
 
                for(i = 0; i < 4; i++)
                {
-                  int32 tpd = tmp_pulse_delay[0][i];
+                  int32_t tpd = tmp_pulse_delay[0][i];
 
                   if(self->byte_counter == 3 && (self->fm_dp & (1U << i)) && tpd == 0)
                   {
@@ -5898,7 +6030,9 @@ static bool InputDevice_Multitap_Clock(InputDevice *self_, bool TxD, int32_t *ds
       {
          if((unsigned)self->selected_device < 4)
          {
-            *dsr_pulse_delay = MAX(tmp_pulse_delay[0][self->selected_device], tmp_pulse_delay[1][self->selected_device]);
+            uint32_t _a = tmp_pulse_delay[0][self->selected_device];
+            uint32_t _b = tmp_pulse_delay[1][self->selected_device];
+            *dsr_pulse_delay = (_a > _b) ? _a : _b;
          }
       }
 

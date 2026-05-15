@@ -9,6 +9,19 @@ struct i_group
 {
    uint32_t u, v;
    uint32_t r, g, b;
+   /* Perspective-correct texture interpolants.  Used only when the
+    * `pct` runtime flag is set on the call to DrawTriangle /
+    * DrawSpan (textured + PGXP-on + texture-correction-option-on
+    * + all w > 0).  Carries (1/w), (u/w), (v/w) at the current
+    * pixel.  Per-pixel U,V are then `(u_over_w / inv_w)` and
+    * `(v_over_w / inv_w)`, which produces the same perspective-
+    * correct mapping the HW renderers get for free via
+    * `gl_Position * w` in primitive.vert.
+    *
+    * When `pct` is false these fields are simply not touched. */
+   float pct_inv_w;
+   float pct_u_over_w;
+   float pct_v_over_w;
 };
 typedef struct i_group i_group;
 
@@ -19,6 +32,27 @@ struct i_deltas
 
    uint32_t du_dy, dv_dy;
    uint32_t dr_dy, dg_dy, db_dy;
+
+   /* Per-pixel deltas for the perspective-correct interpolants in
+    * `i_group`.  Computed by CalcIDeltas_Persp when the primitive
+    * takes the pct path; otherwise left uninitialised since
+    * DrawSpan / DrawTriangle won't read them. */
+   float d_inv_w_dx,    d_inv_w_dy;
+   float d_u_over_w_dx, d_u_over_w_dy;
+   float d_v_over_w_dx, d_v_over_w_dy;
+   /* Per-primitive UV bounds (the convex hull of the three vertex
+    * UVs).  We clamp the recovered U/V to these at every pixel:
+    * the rasteriser walks integer pixel positions, but the precise
+    * triangle has float edges, so pixels at the very boundary land
+    * a fraction outside the precise triangle and extrapolate the
+    * perspective interpolants.  Linear extrapolation of u/w then
+    * dividing by an inv_w that drifts toward zero produces UV
+    * overshoots of many texels - which the &0xFF wrap then turns
+    * into completely wrong texels and visible speckles.  Clamping
+    * to [min,max] of the input vertex UVs - which is what the HW
+    * fragment shader does via clamp_coord(vUV) against vTexLimits -
+    * keeps these edge pixels at the closest valid texel. */
+   float min_u, max_u, min_v, max_v;
 };
 typedef struct i_deltas i_deltas;
 
@@ -77,24 +111,24 @@ static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
 #define DEFINE_CalcIDeltas(SUFFIX, GOURAUD_LIT, TEXTURED_LIT) \
 static INLINE bool CalcIDeltas_##SUFFIX(i_deltas *idl, const tri_vertex *A, const tri_vertex *B, const tri_vertex *C) \
 { \
-   int32 denom = CALCIS(x, y); \
+   int32_t denom = CALCIS(x, y); \
    if (!denom) \
       return false; \
    if (GOURAUD_LIT) \
    { \
-      idl->dr_dx = (uint32)(CALCIS(r, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->dr_dy = (uint32)(CALCIS(x, r) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->dg_dx = (uint32)(CALCIS(g, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->dg_dy = (uint32)(CALCIS(x, g) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->db_dx = (uint32)(CALCIS(b, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->db_dy = (uint32)(CALCIS(x, b) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dr_dx = (uint32_t)(CALCIS(r, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dr_dy = (uint32_t)(CALCIS(x, r) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dg_dx = (uint32_t)(CALCIS(g, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dg_dy = (uint32_t)(CALCIS(x, g) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->db_dx = (uint32_t)(CALCIS(b, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->db_dy = (uint32_t)(CALCIS(x, b) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
    } \
    if (TEXTURED_LIT) \
    { \
-      idl->du_dx = (uint32)(CALCIS(u, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->du_dy = (uint32)(CALCIS(x, u) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->dv_dx = (uint32)(CALCIS(v, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->dv_dy = (uint32)(CALCIS(x, v) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->du_dx = (uint32_t)(CALCIS(u, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->du_dy = (uint32_t)(CALCIS(x, u) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dv_dx = (uint32_t)(CALCIS(v, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      idl->dv_dy = (uint32_t)(CALCIS(x, v) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
    } \
    return true; \
 }
@@ -104,6 +138,84 @@ DEFINE_CalcIDeltas(g0_t1, 0, 1)
 DEFINE_CalcIDeltas(g1_t0, 1, 0)
 DEFINE_CalcIDeltas(g1_t1, 1, 1)
 #undef CALCIS
+
+/*
+ * CalcIDeltas_Persp - compute per-pixel deltas for the
+ * perspective-correct interpolants (1/w, u/w, v/w) carried in
+ * `i_group`.
+ *
+ * Mirrors CalcIDeltas above but in float and using the precise
+ * vertex coords (precise[0]/precise[1], in upscaled-pixel space)
+ * for the denominator.  The PGXP-supplied w (precise[2]) is the
+ * pre-projection depth; (u/w), (v/w) and (1/w) interpolate
+ * linearly in screen space, and per-pixel division of the first
+ * two by the third gives the perspective-correct (U,V) that the
+ * HW renderers obtain implicitly via `gl_Position * w` in
+ * primitive.vert.
+ *
+ * Returns false on degenerate triangles (zero precise area); the
+ * caller falls back to the affine path in that case.  Callers are
+ * expected to have already screened for `!invalidW` and `w > 0`.
+ */
+static INLINE bool CalcIDeltas_Persp(i_deltas *idl,
+   const tri_vertex *A, const tri_vertex *B, const tri_vertex *C)
+{
+   float ax = A->precise[0], ay = A->precise[1];
+   float bx = B->precise[0], by = B->precise[1];
+   float cx = C->precise[0], cy = C->precise[1];
+
+   float inv_wA = 1.0f / A->precise[2];
+   float inv_wB = 1.0f / B->precise[2];
+   float inv_wC = 1.0f / C->precise[2];
+
+   float uA = (float)A->u * inv_wA;
+   float uB = (float)B->u * inv_wB;
+   float uC = (float)C->u * inv_wC;
+
+   float vA = (float)A->v * inv_wA;
+   float vB = (float)B->v * inv_wB;
+   float vC = (float)C->v * inv_wC;
+
+   /* CALCIS-style cross product, evaluated in float for the
+    * denominator and per-attribute slopes.  Reject near-degenerate
+    * triangles (precise area essentially zero): the divide would
+    * produce huge per-pixel deltas that the inner-loop bounds
+    * clamp would have to swallow.  Cheaper to fall back to affine
+    * here. */
+   float denom = (bx - ax) * (cy - by) - (cx - bx) * (by - ay);
+   float inv_denom;
+   if (denom > -1e-6f && denom < 1e-6f)
+      return false;
+   inv_denom = 1.0f / denom;
+
+   /* d(attr)/dx = cross(attr,y) / denom
+    * d(attr)/dy = cross(x,attr) / denom */
+   idl->d_inv_w_dx    = ((inv_wB - inv_wA) * (cy - by) - (inv_wC - inv_wB) * (by - ay)) * inv_denom;
+   idl->d_inv_w_dy    = ((bx - ax) * (inv_wC - inv_wB) - (cx - bx) * (inv_wB - inv_wA)) * inv_denom;
+   idl->d_u_over_w_dx = ((uB - uA) * (cy - by) - (uC - uB) * (by - ay)) * inv_denom;
+   idl->d_u_over_w_dy = ((bx - ax) * (uC - uB) - (cx - bx) * (uB - uA)) * inv_denom;
+   idl->d_v_over_w_dx = ((vB - vA) * (cy - by) - (vC - vB) * (by - ay)) * inv_denom;
+   idl->d_v_over_w_dy = ((bx - ax) * (vC - vB) - (cx - bx) * (vB - vA)) * inv_denom;
+
+   /* Convex hull of the input vertex UVs - used at every pixel to
+    * clamp the recovered U/V.  Avoids overshoot at edge pixels
+    * that rasterise just outside the precise triangle. */
+   {
+      float u0 = (float)A->u, u1 = (float)B->u, u2 = (float)C->u;
+      float v0 = (float)A->v, v1 = (float)B->v, v2 = (float)C->v;
+      float min_u = u0, max_u = u0;
+      float min_v = v0, max_v = v0;
+      if (u1 < min_u) min_u = u1; else if (u1 > max_u) max_u = u1;
+      if (u2 < min_u) min_u = u2; else if (u2 > max_u) max_u = u2;
+      if (v1 < min_v) min_v = v1; else if (v1 > max_v) max_v = v1;
+      if (v2 < min_v) min_v = v2; else if (v2 > max_v) max_v = v2;
+      idl->min_u = min_u;
+      idl->max_u = max_u;
+      idl->min_v = min_v;
+      idl->max_v = max_v;
+   }
+   return true;
+}
 
 /*
  * AddIDeltas_DX / AddIDeltas_DY - step the interpolant group
@@ -189,13 +301,13 @@ DEFINE_AddIDeltas_DY(g1_t1, 1, 1)
  * inlined here so the inner loop is fully fused.
  */
 #define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
-static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, const int32 x_bound, i_group ig, const i_deltas *idl) \
+static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas *idl, const bool pct) \
 { \
-   int32 clipx0; \
-   int32 clipx1; \
-   int32 x_ig_adjust; \
-   int32 w; \
-   int32 x; \
+   int32_t clipx0; \
+   int32_t clipx1; \
+   int32_t x_ig_adjust; \
+   int32_t w; \
+   int32_t x; \
    if (LineSkipTest(gpu, y >> gpu->upscale_shift)) \
       return; \
    clipx0 = gpu->ClipX0 << gpu->upscale_shift; \
@@ -209,7 +321,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, co
     * calls.  Dropped to silence -Wunused-but-set-variable. */ \
    if (x < clipx0) \
    { \
-      int32 delta = clipx0 - x; \
+      int32_t delta = clipx0 - x; \
       x_ig_adjust += delta; \
       x += delta; \
       w -= delta; \
@@ -221,6 +333,17 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, co
    /*printf("%d %d %d %d\n", x, w, ClipX0, ClipX1);*/ \
    AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, idl, x_ig_adjust); \
    AddIDeltas_DY_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, idl, y); \
+   /* Step the perspective-correct interpolants to the clipped start \
+    * pixel.  Affine UV is stepped above by AddIDeltas_DX/DY; for the \
+    * pct path we step the float (1/w, u/w, v/w) the same way.  When \
+    * the pct flag is off, idl's pct fields are not initialised, so \
+    * the loads are conditional on `pct`. */ \
+   if (TEXTURED_LIT && pct) \
+   { \
+      ig.pct_inv_w    += idl->d_inv_w_dx    * (float)x_ig_adjust + idl->d_inv_w_dy    * (float)y; \
+      ig.pct_u_over_w += idl->d_u_over_w_dx * (float)x_ig_adjust + idl->d_u_over_w_dy * (float)y; \
+      ig.pct_v_over_w += idl->d_v_over_w_dx * (float)x_ig_adjust + idl->d_v_over_w_dy * (float)y; \
+   } \
    /* Only compute timings for one every `upscale_shift` lines so that we */ \
    /* don't end up "slower" than 1x.  Also skip the charge for native rows */ \
    /* that LineSkipTest would have rejected when dfe-skip is in effect; */ \
@@ -239,15 +362,64 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, co
    } \
    do \
    { \
-      const uint32 r = ig.r >> (COORD_FBS + COORD_POST_PADDING); \
-      const uint32 g = ig.g >> (COORD_FBS + COORD_POST_PADDING); \
-      const uint32 b = ig.b >> (COORD_FBS + COORD_POST_PADDING); \
-      uint32 dither_x = (x >> gpu->dither_upscale_shift) & 3; \
-      uint32 dither_y = (y >> gpu->dither_upscale_shift) & 3; \
+      const uint32_t r = ig.r >> (COORD_FBS + COORD_POST_PADDING); \
+      const uint32_t g = ig.g >> (COORD_FBS + COORD_POST_PADDING); \
+      const uint32_t b = ig.b >> (COORD_FBS + COORD_POST_PADDING); \
+      uint32_t dither_x = (x >> gpu->dither_upscale_shift) & 3; \
+      uint32_t dither_y = (y >> gpu->dither_upscale_shift) & 3; \
       /*assert(x >= ClipX0 && x <= ClipX1);*/ \
       if (TEXTURED_LIT) \
       { \
-         uint16 fbw = GetTexel_TM##MO_LIT(gpu, ig.u >> (COORD_FBS + COORD_POST_PADDING), ig.v >> (COORD_FBS + COORD_POST_PADDING)); \
+         int32_t tex_u, tex_v; \
+         uint16_t fbw; \
+         /* Perspective-correct sampling.  Three guards: \
+          * (1) inv_w > eps - very small inv_w corresponds to a \
+          *     vertex at huge w (effectively at infinity), where \
+          *     1/inv_w explodes; fall through to the affine path. \
+          * (2) clamp recovered U/V to the convex hull of the three \
+          *     vertex UVs.  Critical: the rasteriser walks integer \
+          *     pixel positions, but the precise triangle has float \
+          *     edges, so pixels at the very boundary land a \
+          *     fraction outside the precise triangle and linearly \
+          *     extrapolate u/w, v/w, 1/w.  Dividing the \
+          *     extrapolated u/w by an inv_w that drifts toward \
+          *     zero produces UV values many texels outside the \
+          *     vertex range, which the &0xFF wrap below would turn \
+          *     into completely wrong texels (visible speckles).  \
+          *     The HW fragment shader does the same clamp via \
+          *     clamp_coord(vUV) against vTexLimits. \
+          * (3) AND with 0xFF on the int result, matching the PSX \
+          *     UV byte domain and the affine path's natural uint32 \
+          *     wrap; this also turns small negatives produced by \
+          *     the rounding bias near vertex U/V=0 into the \
+          *     correct 0 (clamp(.,0,max) + +0.5 bias = 0..max+0.5, \
+          *     int cast = 0..max, AND = same; for negative inputs \
+          *     pre-clamp, the clamp brings them to 0 anyway). \
+          * The +bias matches the affine seed's `+(1 << (COORD_FBS \
+          * - 1 - upscale_shift))`: half a native texel added \
+          * before the integer truncation, i.e. round-to-nearest \
+          * sampling.  The HW backends get this implicitly via \
+          * primitive.frag's `int(vUV)` after the GPU's pixel- \
+          * center interpolation. */ \
+         if (pct && ig.pct_inv_w > 1e-6f) \
+         { \
+            float inv  = 1.0f / ig.pct_inv_w; \
+            float bias = 0.5f / (float)(1 << gpu->upscale_shift); \
+            float fu   = ig.pct_u_over_w * inv + bias; \
+            float fv   = ig.pct_v_over_w * inv + bias; \
+            if (fu < idl->min_u) fu = idl->min_u; \
+            else if (fu > idl->max_u) fu = idl->max_u; \
+            if (fv < idl->min_v) fv = idl->min_v; \
+            else if (fv > idl->max_v) fv = idl->max_v; \
+            tex_u = ((int32_t)fu) & 0xFF; \
+            tex_v = ((int32_t)fv) & 0xFF; \
+         } \
+         else \
+         { \
+            tex_u = ig.u >> (COORD_FBS + COORD_POST_PADDING); \
+            tex_v = ig.v >> (COORD_FBS + COORD_POST_PADDING); \
+         } \
+         fbw = GetTexel_TM##MO_LIT(gpu, tex_u, tex_v); \
          if (fbw) \
          { \
             if (TM_LIT) \
@@ -266,7 +438,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, co
       } \
       else \
       { \
-         uint16 pix = 0x8000; \
+         uint16_t pix = 0x8000; \
          if ((GOURAUD_LIT) && DitherEnabled(gpu)) \
          { \
             pix |= gpu->DitherLUT[dither_y][dither_x][r] << 0; \
@@ -283,6 +455,12 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32 x_start, co
       } \
       x++; \
       AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, idl, 1); \
+      if (TEXTURED_LIT && pct) \
+      { \
+         ig.pct_inv_w    += idl->d_inv_w_dx; \
+         ig.pct_u_over_w += idl->d_u_over_w_dx; \
+         ig.pct_v_over_w += idl->d_v_over_w_dx; \
+      } \
    } while (MDFN_LIKELY(--w > 0)); \
 }
 
@@ -347,27 +525,28 @@ DRAWSPAN_T1_BMGROUP(1, 1, 2)
  * is observable in some games' rendering.
  */
 #define DEFINE_DrawTriangle(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
-static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
+static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, const bool pct) \
 { \
    i_deltas idl; \
    unsigned core_vertex; \
-   int32 clipy0 = gpu->ClipY0 << gpu->upscale_shift; \
-   int32 clipy1 = gpu->ClipY1 << gpu->upscale_shift; \
-   int64 base_coord; \
-   int64 base_step; \
-   int64 bound_coord_us; \
-   int64 bound_coord_ls; \
+   int32_t clipy0 = gpu->ClipY0 << gpu->upscale_shift; \
+   int32_t clipy1 = gpu->ClipY1 << gpu->upscale_shift; \
+   int64_t base_coord; \
+   int64_t base_step; \
+   int64_t bound_coord_us; \
+   int64_t bound_coord_ls; \
    bool right_facing; \
+   bool pct_local = pct; \
    i_group ig; \
    unsigned vo = 0; \
    unsigned vp = 0; \
    unsigned i; \
    struct tripart \
    { \
-      uint64 x_coord[2]; \
-      uint64 x_step[2]; \
-      int32 y_coord; \
-      int32 y_bound; \
+      uint64_t x_coord[2]; \
+      uint64_t x_step[2]; \
+      int32_t y_coord; \
+      int32_t y_bound; \
       bool dec_mode; \
    } tripart[2]; \
    /* Calculate the "core" vertex based on the unsorted input vertices, and sort vertices by Y. */ \
@@ -406,6 +585,17 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
       return; \
    if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(&idl, &vertices[0], &vertices[1], &vertices[2])) \
       return; \
+   /* Perspective-correct UV deltas - only when the caller said this \
+    * primitive is eligible (textured + PGXP-on + texture-correction \
+    * + all w > 0).  CalcIDeltas_Persp uses the precise float verts, \
+    * which can degenerate even when the integer ones don't (e.g. all \
+    * three projected to the same float coord); fall back to affine \
+    * in that case. */ \
+   if (TEXTURED_LIT && pct_local) \
+   { \
+      if (!CalcIDeltas_Persp(&idl, &vertices[0], &vertices[1], &vertices[2])) \
+         pct_local = false; \
+   } \
    /* [0] should be top vertex, [2] should be bottom vertex, [1] should be off to the side vertex. */ \
    if (TEXTURED_LIT) \
    { \
@@ -421,6 +611,33 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
             ig.u += (COORD_MF_INT(1) - (1 << (COORD_FBS - gpu->upscale_shift))) << COORD_POST_PADDING; \
          if (gpu->off_v) \
             ig.v += (COORD_MF_INT(1) - (1 << (COORD_FBS - gpu->upscale_shift))) << COORD_POST_PADDING; \
+      } \
+      if (pct_local) \
+      { \
+         /* Seed the perspective interpolants at the core vertex (origin \
+          * for the per-pixel DX/DY stepping that DrawSpan does), then \
+          * subtract the core vertex's screen-space offset so that \
+          * adding (x_ig_adjust, y) inside DrawSpan resolves to the \
+          * value at that pixel.  Use the *float* precise[0]/precise[1] \
+          * coords for the anchor, not the integer vertices[].x/y - the \
+          * (u_corevertex * inv_w_corevertex) seed value is the function \
+          * value at the precise float position, and any sub-pixel drift \
+          * between precise[0]/precise[1] and the integer vertices.x/y \
+          * (which was clobbered to (int)precise[0] earlier) would \
+          * otherwise propagate into a UV error of delta * fract(precise) \
+          * per pixel.  CalcIDeltas_Persp uses the same precise floats for \
+          * the denominator, so this keeps the screen-space math fully \
+          * consistent. */ \
+         float inv_w = 1.0f / vertices[core_vertex].precise[2]; \
+         ig.pct_inv_w    = inv_w; \
+         ig.pct_u_over_w = (float)vertices[core_vertex].u * inv_w; \
+         ig.pct_v_over_w = (float)vertices[core_vertex].v * inv_w; \
+         ig.pct_inv_w    -= idl.d_inv_w_dx    * vertices[core_vertex].precise[0] \
+                          + idl.d_inv_w_dy    * vertices[core_vertex].precise[1]; \
+         ig.pct_u_over_w -= idl.d_u_over_w_dx * vertices[core_vertex].precise[0] \
+                          + idl.d_u_over_w_dy * vertices[core_vertex].precise[1]; \
+         ig.pct_v_over_w -= idl.d_v_over_w_dx * vertices[core_vertex].precise[0] \
+                          + idl.d_v_over_w_dy * vertices[core_vertex].precise[1]; \
       } \
    } \
    ig.r = (COORD_MF_INT(vertices[core_vertex].r) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
@@ -470,17 +687,17 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
    } \
    for (i = 0; i < 2; i++) \
    { \
-      int32 yi = tripart[i].y_coord; \
-      int32 yb = tripart[i].y_bound; \
-      uint64 lc = tripart[i].x_coord[0]; \
-      uint64 ls = tripart[i].x_step[0]; \
-      uint64 rc = tripart[i].x_coord[1]; \
-      uint64 rs = tripart[i].x_step[1]; \
+      int32_t yi = tripart[i].y_coord; \
+      int32_t yb = tripart[i].y_bound; \
+      uint64_t lc = tripart[i].x_coord[0]; \
+      uint64_t ls = tripart[i].x_step[0]; \
+      uint64_t rc = tripart[i].x_coord[1]; \
+      uint64_t rs = tripart[i].x_step[1]; \
       if (tripart[i].dec_mode) \
       { \
          while (MDFN_LIKELY(yi > yb)) \
          { \
-            int32 y; \
+            int32_t y; \
             yi--; \
             lc -= ls; \
             rc -= rs; \
@@ -492,14 +709,14 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
                gpu->DrawTimeAvail -= 2; \
                continue; \
             } \
-            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl); \
+            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl, pct_local); \
          } \
       } \
       else \
       { \
          while (MDFN_LIKELY(yi < yb)) \
          { \
-            int32 y = sign_x_to_s32(11 + gpu->upscale_shift, yi); \
+            int32_t y = sign_x_to_s32(11 + gpu->upscale_shift, yi); \
             if (y > clipy1) \
                break; \
             if (y < clipy0) \
@@ -507,7 +724,7 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices) \
                gpu->DrawTimeAvail -= 2; \
                goto skipit_##SUFFIX; \
             } \
-            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl); \
+            DrawSpan_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, yi, GetPolyXFP_Int(lc), GetPolyXFP_Int(rc), ig, &idl, pct_local); \
             skipit_##SUFFIX: ; \
             yi++; \
             lc += ls; \
@@ -683,7 +900,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    /* else memset(vertices, 0, sizeof(vertices)); */ \
    for (v = sv; v < 3; v++) \
    { \
-      int32 x, y; \
+      int32_t x, y; \
       if (v == 0 || GOURAUD_LIT) \
       { \
          uint32_t raw_color = (*cb & 0xFFFFFF); \
@@ -931,7 +1148,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       { \
          if (PGXP_LIT) \
          { \
-            uint32 i; \
+            uint32_t i; \
             for (i = 0; i < 3; ++i) \
             { \
                vertices[i].x = vertices[i].precise[0]; \
@@ -940,7 +1157,21 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          } \
       } \
       if (rsx_intf_has_software_renderer()) \
-         DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices); \
+      { \
+         /* Perspective-correct texturing for the SW rasteriser. \
+          * Eligible when this primitive came in through the PGXP \
+          * path with valid w (precise[2] still carries the real \
+          * GTE-derived value; invalidW forces it to 1, which would \
+          * collapse the perspective math to affine but more \
+          * expensively), is textured, and the user enabled the \
+          * "PGXP Perspective Correct Texturing" core option. \
+          * With PGXP_LIT or TEXTURED_LIT 0 at compile time the \
+          * whole expression folds to false. */ \
+         bool pct = (PGXP_LIT) && (TEXTURED_LIT) \
+                    && !invalidW \
+                    && PGXP_texture_correction_enabled(); \
+         DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices, pct); \
+      } \
       /* Line Render: Overwrite vertices with those of the second triangle */ \
       if ((lineFound) && (NV_LIT == 3) && (TEXTURED_LIT)) \
          memcpy(&vertices[0], &lineVertices[0], 3 * sizeof(tri_vertex)); \

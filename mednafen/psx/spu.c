@@ -83,264 +83,264 @@ int16_t IntermediateBuffer[4096][2];
 
 extern uint8_t spu_samples;
 
-static const int16 FIR_Table[256][4] =
+static const int16_t FIR_Table[256][4] =
 {
- { (int16)0x12c7, (int16)0x59b3, (int16)0x1307, (int16)0xffff },
- { (int16)0x1288, (int16)0x59b2, (int16)0x1347, (int16)0xffff },
- { (int16)0x1249, (int16)0x59b0, (int16)0x1388, (int16)0xffff },
- { (int16)0x120b, (int16)0x59ad, (int16)0x13c9, (int16)0xffff },
- { (int16)0x11cd, (int16)0x59a9, (int16)0x140b, (int16)0xffff },
- { (int16)0x118f, (int16)0x59a4, (int16)0x144d, (int16)0xffff },
- { (int16)0x1153, (int16)0x599e, (int16)0x1490, (int16)0xffff },
- { (int16)0x1116, (int16)0x5997, (int16)0x14d4, (int16)0xffff },
- { (int16)0x10db, (int16)0x598f, (int16)0x1517, (int16)0xffff },
- { (int16)0x109f, (int16)0x5986, (int16)0x155c, (int16)0xffff },
- { (int16)0x1065, (int16)0x597c, (int16)0x15a0, (int16)0xffff },
- { (int16)0x102a, (int16)0x5971, (int16)0x15e6, (int16)0xffff },
- { (int16)0x0ff1, (int16)0x5965, (int16)0x162c, (int16)0xffff },
- { (int16)0x0fb7, (int16)0x5958, (int16)0x1672, (int16)0xffff },
- { (int16)0x0f7f, (int16)0x5949, (int16)0x16b9, (int16)0xffff },
- { (int16)0x0f46, (int16)0x593a, (int16)0x1700, (int16)0xffff },
- { (int16)0x0f0f, (int16)0x592a, (int16)0x1747, (int16)0x0000 },
- { (int16)0x0ed7, (int16)0x5919, (int16)0x1790, (int16)0x0000 },
- { (int16)0x0ea1, (int16)0x5907, (int16)0x17d8, (int16)0x0000 },
- { (int16)0x0e6b, (int16)0x58f4, (int16)0x1821, (int16)0x0000 },
- { (int16)0x0e35, (int16)0x58e0, (int16)0x186b, (int16)0x0000 },
- { (int16)0x0e00, (int16)0x58cb, (int16)0x18b5, (int16)0x0000 },
- { (int16)0x0dcb, (int16)0x58b5, (int16)0x1900, (int16)0x0000 },
- { (int16)0x0d97, (int16)0x589e, (int16)0x194b, (int16)0x0001 },
- { (int16)0x0d63, (int16)0x5886, (int16)0x1996, (int16)0x0001 },
- { (int16)0x0d30, (int16)0x586d, (int16)0x19e2, (int16)0x0001 },
- { (int16)0x0cfd, (int16)0x5853, (int16)0x1a2e, (int16)0x0001 },
- { (int16)0x0ccb, (int16)0x5838, (int16)0x1a7b, (int16)0x0002 },
- { (int16)0x0c99, (int16)0x581c, (int16)0x1ac8, (int16)0x0002 },
- { (int16)0x0c68, (int16)0x57ff, (int16)0x1b16, (int16)0x0002 },
- { (int16)0x0c38, (int16)0x57e2, (int16)0x1b64, (int16)0x0003 },
- { (int16)0x0c07, (int16)0x57c3, (int16)0x1bb3, (int16)0x0003 },
- { (int16)0x0bd8, (int16)0x57a3, (int16)0x1c02, (int16)0x0003 },
- { (int16)0x0ba9, (int16)0x5782, (int16)0x1c51, (int16)0x0004 },
- { (int16)0x0b7a, (int16)0x5761, (int16)0x1ca1, (int16)0x0004 },
- { (int16)0x0b4c, (int16)0x573e, (int16)0x1cf1, (int16)0x0005 },
- { (int16)0x0b1e, (int16)0x571b, (int16)0x1d42, (int16)0x0005 },
- { (int16)0x0af1, (int16)0x56f6, (int16)0x1d93, (int16)0x0006 },
- { (int16)0x0ac4, (int16)0x56d1, (int16)0x1de5, (int16)0x0007 },
- { (int16)0x0a98, (int16)0x56ab, (int16)0x1e37, (int16)0x0007 },
- { (int16)0x0a6c, (int16)0x5684, (int16)0x1e89, (int16)0x0008 },
- { (int16)0x0a40, (int16)0x565b, (int16)0x1edc, (int16)0x0009 },
- { (int16)0x0a16, (int16)0x5632, (int16)0x1f2f, (int16)0x0009 },
- { (int16)0x09eb, (int16)0x5609, (int16)0x1f82, (int16)0x000a },
- { (int16)0x09c1, (int16)0x55de, (int16)0x1fd6, (int16)0x000b },
- { (int16)0x0998, (int16)0x55b2, (int16)0x202a, (int16)0x000c },
- { (int16)0x096f, (int16)0x5585, (int16)0x207f, (int16)0x000d },
- { (int16)0x0946, (int16)0x5558, (int16)0x20d4, (int16)0x000e },
- { (int16)0x091e, (int16)0x5529, (int16)0x2129, (int16)0x000f },
- { (int16)0x08f7, (int16)0x54fa, (int16)0x217f, (int16)0x0010 },
- { (int16)0x08d0, (int16)0x54ca, (int16)0x21d5, (int16)0x0011 },
- { (int16)0x08a9, (int16)0x5499, (int16)0x222c, (int16)0x0012 },
- { (int16)0x0883, (int16)0x5467, (int16)0x2282, (int16)0x0013 },
- { (int16)0x085d, (int16)0x5434, (int16)0x22da, (int16)0x0015 },
- { (int16)0x0838, (int16)0x5401, (int16)0x2331, (int16)0x0016 },
- { (int16)0x0813, (int16)0x53cc, (int16)0x2389, (int16)0x0018 },
- { (int16)0x07ef, (int16)0x5397, (int16)0x23e1, (int16)0x0019 },
- { (int16)0x07cb, (int16)0x5361, (int16)0x2439, (int16)0x001b },
- { (int16)0x07a7, (int16)0x532a, (int16)0x2492, (int16)0x001c },
- { (int16)0x0784, (int16)0x52f3, (int16)0x24eb, (int16)0x001e },
- { (int16)0x0762, (int16)0x52ba, (int16)0x2545, (int16)0x0020 },
- { (int16)0x0740, (int16)0x5281, (int16)0x259e, (int16)0x0021 },
- { (int16)0x071e, (int16)0x5247, (int16)0x25f8, (int16)0x0023 },
- { (int16)0x06fd, (int16)0x520c, (int16)0x2653, (int16)0x0025 },
- { (int16)0x06dc, (int16)0x51d0, (int16)0x26ad, (int16)0x0027 },
- { (int16)0x06bb, (int16)0x5194, (int16)0x2708, (int16)0x0029 },
- { (int16)0x069b, (int16)0x5156, (int16)0x2763, (int16)0x002c },
- { (int16)0x067c, (int16)0x5118, (int16)0x27be, (int16)0x002e },
- { (int16)0x065c, (int16)0x50da, (int16)0x281a, (int16)0x0030 },
- { (int16)0x063e, (int16)0x509a, (int16)0x2876, (int16)0x0033 },
- { (int16)0x061f, (int16)0x505a, (int16)0x28d2, (int16)0x0035 },
- { (int16)0x0601, (int16)0x5019, (int16)0x292e, (int16)0x0038 },
- { (int16)0x05e4, (int16)0x4fd7, (int16)0x298b, (int16)0x003a },
- { (int16)0x05c7, (int16)0x4f95, (int16)0x29e7, (int16)0x003d },
- { (int16)0x05aa, (int16)0x4f52, (int16)0x2a44, (int16)0x0040 },
- { (int16)0x058e, (int16)0x4f0e, (int16)0x2aa1, (int16)0x0043 },
- { (int16)0x0572, (int16)0x4ec9, (int16)0x2aff, (int16)0x0046 },
- { (int16)0x0556, (int16)0x4e84, (int16)0x2b5c, (int16)0x0049 },
- { (int16)0x053b, (int16)0x4e3e, (int16)0x2bba, (int16)0x004d },
- { (int16)0x0520, (int16)0x4df7, (int16)0x2c18, (int16)0x0050 },
- { (int16)0x0506, (int16)0x4db0, (int16)0x2c76, (int16)0x0054 },
- { (int16)0x04ec, (int16)0x4d68, (int16)0x2cd4, (int16)0x0057 },
- { (int16)0x04d2, (int16)0x4d20, (int16)0x2d33, (int16)0x005b },
- { (int16)0x04b9, (int16)0x4cd7, (int16)0x2d91, (int16)0x005f },
- { (int16)0x04a0, (int16)0x4c8d, (int16)0x2df0, (int16)0x0063 },
- { (int16)0x0488, (int16)0x4c42, (int16)0x2e4f, (int16)0x0067 },
- { (int16)0x0470, (int16)0x4bf7, (int16)0x2eae, (int16)0x006b },
- { (int16)0x0458, (int16)0x4bac, (int16)0x2f0d, (int16)0x006f },
- { (int16)0x0441, (int16)0x4b5f, (int16)0x2f6c, (int16)0x0074 },
- { (int16)0x042a, (int16)0x4b13, (int16)0x2fcc, (int16)0x0078 },
- { (int16)0x0413, (int16)0x4ac5, (int16)0x302b, (int16)0x007d },
- { (int16)0x03fc, (int16)0x4a77, (int16)0x308b, (int16)0x0082 },
- { (int16)0x03e7, (int16)0x4a29, (int16)0x30ea, (int16)0x0087 },
- { (int16)0x03d1, (int16)0x49d9, (int16)0x314a, (int16)0x008c },
- { (int16)0x03bc, (int16)0x498a, (int16)0x31aa, (int16)0x0091 },
- { (int16)0x03a7, (int16)0x493a, (int16)0x3209, (int16)0x0096 },
- { (int16)0x0392, (int16)0x48e9, (int16)0x3269, (int16)0x009c },
- { (int16)0x037e, (int16)0x4898, (int16)0x32c9, (int16)0x00a1 },
- { (int16)0x036a, (int16)0x4846, (int16)0x3329, (int16)0x00a7 },
- { (int16)0x0356, (int16)0x47f4, (int16)0x3389, (int16)0x00ad },
- { (int16)0x0343, (int16)0x47a1, (int16)0x33e9, (int16)0x00b3 },
- { (int16)0x0330, (int16)0x474e, (int16)0x3449, (int16)0x00ba },
- { (int16)0x031d, (int16)0x46fa, (int16)0x34a9, (int16)0x00c0 },
- { (int16)0x030b, (int16)0x46a6, (int16)0x3509, (int16)0x00c7 },
- { (int16)0x02f9, (int16)0x4651, (int16)0x3569, (int16)0x00cd },
- { (int16)0x02e7, (int16)0x45fc, (int16)0x35c9, (int16)0x00d4 },
- { (int16)0x02d6, (int16)0x45a6, (int16)0x3629, (int16)0x00db },
- { (int16)0x02c4, (int16)0x4550, (int16)0x3689, (int16)0x00e3 },
- { (int16)0x02b4, (int16)0x44fa, (int16)0x36e8, (int16)0x00ea },
- { (int16)0x02a3, (int16)0x44a3, (int16)0x3748, (int16)0x00f2 },
- { (int16)0x0293, (int16)0x444c, (int16)0x37a8, (int16)0x00fa },
- { (int16)0x0283, (int16)0x43f4, (int16)0x3807, (int16)0x0101 },
- { (int16)0x0273, (int16)0x439c, (int16)0x3867, (int16)0x010a },
- { (int16)0x0264, (int16)0x4344, (int16)0x38c6, (int16)0x0112 },
- { (int16)0x0255, (int16)0x42eb, (int16)0x3926, (int16)0x011b },
- { (int16)0x0246, (int16)0x4292, (int16)0x3985, (int16)0x0123 },
- { (int16)0x0237, (int16)0x4239, (int16)0x39e4, (int16)0x012c },
- { (int16)0x0229, (int16)0x41df, (int16)0x3a43, (int16)0x0135 },
- { (int16)0x021b, (int16)0x4185, (int16)0x3aa2, (int16)0x013f },
- { (int16)0x020d, (int16)0x412a, (int16)0x3b00, (int16)0x0148 },
- { (int16)0x0200, (int16)0x40d0, (int16)0x3b5f, (int16)0x0152 },
- { (int16)0x01f2, (int16)0x4074, (int16)0x3bbd, (int16)0x015c },
- { (int16)0x01e5, (int16)0x4019, (int16)0x3c1b, (int16)0x0166 },
- { (int16)0x01d9, (int16)0x3fbd, (int16)0x3c79, (int16)0x0171 },
- { (int16)0x01cc, (int16)0x3f62, (int16)0x3cd7, (int16)0x017b },
- { (int16)0x01c0, (int16)0x3f05, (int16)0x3d35, (int16)0x0186 },
- { (int16)0x01b4, (int16)0x3ea9, (int16)0x3d92, (int16)0x0191 },
- { (int16)0x01a8, (int16)0x3e4c, (int16)0x3def, (int16)0x019c },
- { (int16)0x019c, (int16)0x3def, (int16)0x3e4c, (int16)0x01a8 },
- { (int16)0x0191, (int16)0x3d92, (int16)0x3ea9, (int16)0x01b4 },
- { (int16)0x0186, (int16)0x3d35, (int16)0x3f05, (int16)0x01c0 },
- { (int16)0x017b, (int16)0x3cd7, (int16)0x3f62, (int16)0x01cc },
- { (int16)0x0171, (int16)0x3c79, (int16)0x3fbd, (int16)0x01d9 },
- { (int16)0x0166, (int16)0x3c1b, (int16)0x4019, (int16)0x01e5 },
- { (int16)0x015c, (int16)0x3bbd, (int16)0x4074, (int16)0x01f2 },
- { (int16)0x0152, (int16)0x3b5f, (int16)0x40d0, (int16)0x0200 },
- { (int16)0x0148, (int16)0x3b00, (int16)0x412a, (int16)0x020d },
- { (int16)0x013f, (int16)0x3aa2, (int16)0x4185, (int16)0x021b },
- { (int16)0x0135, (int16)0x3a43, (int16)0x41df, (int16)0x0229 },
- { (int16)0x012c, (int16)0x39e4, (int16)0x4239, (int16)0x0237 },
- { (int16)0x0123, (int16)0x3985, (int16)0x4292, (int16)0x0246 },
- { (int16)0x011b, (int16)0x3926, (int16)0x42eb, (int16)0x0255 },
- { (int16)0x0112, (int16)0x38c6, (int16)0x4344, (int16)0x0264 },
- { (int16)0x010a, (int16)0x3867, (int16)0x439c, (int16)0x0273 },
- { (int16)0x0101, (int16)0x3807, (int16)0x43f4, (int16)0x0283 },
- { (int16)0x00fa, (int16)0x37a8, (int16)0x444c, (int16)0x0293 },
- { (int16)0x00f2, (int16)0x3748, (int16)0x44a3, (int16)0x02a3 },
- { (int16)0x00ea, (int16)0x36e8, (int16)0x44fa, (int16)0x02b4 },
- { (int16)0x00e3, (int16)0x3689, (int16)0x4550, (int16)0x02c4 },
- { (int16)0x00db, (int16)0x3629, (int16)0x45a6, (int16)0x02d6 },
- { (int16)0x00d4, (int16)0x35c9, (int16)0x45fc, (int16)0x02e7 },
- { (int16)0x00cd, (int16)0x3569, (int16)0x4651, (int16)0x02f9 },
- { (int16)0x00c7, (int16)0x3509, (int16)0x46a6, (int16)0x030b },
- { (int16)0x00c0, (int16)0x34a9, (int16)0x46fa, (int16)0x031d },
- { (int16)0x00ba, (int16)0x3449, (int16)0x474e, (int16)0x0330 },
- { (int16)0x00b3, (int16)0x33e9, (int16)0x47a1, (int16)0x0343 },
- { (int16)0x00ad, (int16)0x3389, (int16)0x47f4, (int16)0x0356 },
- { (int16)0x00a7, (int16)0x3329, (int16)0x4846, (int16)0x036a },
- { (int16)0x00a1, (int16)0x32c9, (int16)0x4898, (int16)0x037e },
- { (int16)0x009c, (int16)0x3269, (int16)0x48e9, (int16)0x0392 },
- { (int16)0x0096, (int16)0x3209, (int16)0x493a, (int16)0x03a7 },
- { (int16)0x0091, (int16)0x31aa, (int16)0x498a, (int16)0x03bc },
- { (int16)0x008c, (int16)0x314a, (int16)0x49d9, (int16)0x03d1 },
- { (int16)0x0087, (int16)0x30ea, (int16)0x4a29, (int16)0x03e7 },
- { (int16)0x0082, (int16)0x308b, (int16)0x4a77, (int16)0x03fc },
- { (int16)0x007d, (int16)0x302b, (int16)0x4ac5, (int16)0x0413 },
- { (int16)0x0078, (int16)0x2fcc, (int16)0x4b13, (int16)0x042a },
- { (int16)0x0074, (int16)0x2f6c, (int16)0x4b5f, (int16)0x0441 },
- { (int16)0x006f, (int16)0x2f0d, (int16)0x4bac, (int16)0x0458 },
- { (int16)0x006b, (int16)0x2eae, (int16)0x4bf7, (int16)0x0470 },
- { (int16)0x0067, (int16)0x2e4f, (int16)0x4c42, (int16)0x0488 },
- { (int16)0x0063, (int16)0x2df0, (int16)0x4c8d, (int16)0x04a0 },
- { (int16)0x005f, (int16)0x2d91, (int16)0x4cd7, (int16)0x04b9 },
- { (int16)0x005b, (int16)0x2d33, (int16)0x4d20, (int16)0x04d2 },
- { (int16)0x0057, (int16)0x2cd4, (int16)0x4d68, (int16)0x04ec },
- { (int16)0x0054, (int16)0x2c76, (int16)0x4db0, (int16)0x0506 },
- { (int16)0x0050, (int16)0x2c18, (int16)0x4df7, (int16)0x0520 },
- { (int16)0x004d, (int16)0x2bba, (int16)0x4e3e, (int16)0x053b },
- { (int16)0x0049, (int16)0x2b5c, (int16)0x4e84, (int16)0x0556 },
- { (int16)0x0046, (int16)0x2aff, (int16)0x4ec9, (int16)0x0572 },
- { (int16)0x0043, (int16)0x2aa1, (int16)0x4f0e, (int16)0x058e },
- { (int16)0x0040, (int16)0x2a44, (int16)0x4f52, (int16)0x05aa },
- { (int16)0x003d, (int16)0x29e7, (int16)0x4f95, (int16)0x05c7 },
- { (int16)0x003a, (int16)0x298b, (int16)0x4fd7, (int16)0x05e4 },
- { (int16)0x0038, (int16)0x292e, (int16)0x5019, (int16)0x0601 },
- { (int16)0x0035, (int16)0x28d2, (int16)0x505a, (int16)0x061f },
- { (int16)0x0033, (int16)0x2876, (int16)0x509a, (int16)0x063e },
- { (int16)0x0030, (int16)0x281a, (int16)0x50da, (int16)0x065c },
- { (int16)0x002e, (int16)0x27be, (int16)0x5118, (int16)0x067c },
- { (int16)0x002c, (int16)0x2763, (int16)0x5156, (int16)0x069b },
- { (int16)0x0029, (int16)0x2708, (int16)0x5194, (int16)0x06bb },
- { (int16)0x0027, (int16)0x26ad, (int16)0x51d0, (int16)0x06dc },
- { (int16)0x0025, (int16)0x2653, (int16)0x520c, (int16)0x06fd },
- { (int16)0x0023, (int16)0x25f8, (int16)0x5247, (int16)0x071e },
- { (int16)0x0021, (int16)0x259e, (int16)0x5281, (int16)0x0740 },
- { (int16)0x0020, (int16)0x2545, (int16)0x52ba, (int16)0x0762 },
- { (int16)0x001e, (int16)0x24eb, (int16)0x52f3, (int16)0x0784 },
- { (int16)0x001c, (int16)0x2492, (int16)0x532a, (int16)0x07a7 },
- { (int16)0x001b, (int16)0x2439, (int16)0x5361, (int16)0x07cb },
- { (int16)0x0019, (int16)0x23e1, (int16)0x5397, (int16)0x07ef },
- { (int16)0x0018, (int16)0x2389, (int16)0x53cc, (int16)0x0813 },
- { (int16)0x0016, (int16)0x2331, (int16)0x5401, (int16)0x0838 },
- { (int16)0x0015, (int16)0x22da, (int16)0x5434, (int16)0x085d },
- { (int16)0x0013, (int16)0x2282, (int16)0x5467, (int16)0x0883 },
- { (int16)0x0012, (int16)0x222c, (int16)0x5499, (int16)0x08a9 },
- { (int16)0x0011, (int16)0x21d5, (int16)0x54ca, (int16)0x08d0 },
- { (int16)0x0010, (int16)0x217f, (int16)0x54fa, (int16)0x08f7 },
- { (int16)0x000f, (int16)0x2129, (int16)0x5529, (int16)0x091e },
- { (int16)0x000e, (int16)0x20d4, (int16)0x5558, (int16)0x0946 },
- { (int16)0x000d, (int16)0x207f, (int16)0x5585, (int16)0x096f },
- { (int16)0x000c, (int16)0x202a, (int16)0x55b2, (int16)0x0998 },
- { (int16)0x000b, (int16)0x1fd6, (int16)0x55de, (int16)0x09c1 },
- { (int16)0x000a, (int16)0x1f82, (int16)0x5609, (int16)0x09eb },
- { (int16)0x0009, (int16)0x1f2f, (int16)0x5632, (int16)0x0a16 },
- { (int16)0x0009, (int16)0x1edc, (int16)0x565b, (int16)0x0a40 },
- { (int16)0x0008, (int16)0x1e89, (int16)0x5684, (int16)0x0a6c },
- { (int16)0x0007, (int16)0x1e37, (int16)0x56ab, (int16)0x0a98 },
- { (int16)0x0007, (int16)0x1de5, (int16)0x56d1, (int16)0x0ac4 },
- { (int16)0x0006, (int16)0x1d93, (int16)0x56f6, (int16)0x0af1 },
- { (int16)0x0005, (int16)0x1d42, (int16)0x571b, (int16)0x0b1e },
- { (int16)0x0005, (int16)0x1cf1, (int16)0x573e, (int16)0x0b4c },
- { (int16)0x0004, (int16)0x1ca1, (int16)0x5761, (int16)0x0b7a },
- { (int16)0x0004, (int16)0x1c51, (int16)0x5782, (int16)0x0ba9 },
- { (int16)0x0003, (int16)0x1c02, (int16)0x57a3, (int16)0x0bd8 },
- { (int16)0x0003, (int16)0x1bb3, (int16)0x57c3, (int16)0x0c07 },
- { (int16)0x0003, (int16)0x1b64, (int16)0x57e2, (int16)0x0c38 },
- { (int16)0x0002, (int16)0x1b16, (int16)0x57ff, (int16)0x0c68 },
- { (int16)0x0002, (int16)0x1ac8, (int16)0x581c, (int16)0x0c99 },
- { (int16)0x0002, (int16)0x1a7b, (int16)0x5838, (int16)0x0ccb },
- { (int16)0x0001, (int16)0x1a2e, (int16)0x5853, (int16)0x0cfd },
- { (int16)0x0001, (int16)0x19e2, (int16)0x586d, (int16)0x0d30 },
- { (int16)0x0001, (int16)0x1996, (int16)0x5886, (int16)0x0d63 },
- { (int16)0x0001, (int16)0x194b, (int16)0x589e, (int16)0x0d97 },
- { (int16)0x0000, (int16)0x1900, (int16)0x58b5, (int16)0x0dcb },
- { (int16)0x0000, (int16)0x18b5, (int16)0x58cb, (int16)0x0e00 },
- { (int16)0x0000, (int16)0x186b, (int16)0x58e0, (int16)0x0e35 },
- { (int16)0x0000, (int16)0x1821, (int16)0x58f4, (int16)0x0e6b },
- { (int16)0x0000, (int16)0x17d8, (int16)0x5907, (int16)0x0ea1 },
- { (int16)0x0000, (int16)0x1790, (int16)0x5919, (int16)0x0ed7 },
- { (int16)0x0000, (int16)0x1747, (int16)0x592a, (int16)0x0f0f },
- { (int16)0xffff, (int16)0x1700, (int16)0x593a, (int16)0x0f46 },
- { (int16)0xffff, (int16)0x16b9, (int16)0x5949, (int16)0x0f7f },
- { (int16)0xffff, (int16)0x1672, (int16)0x5958, (int16)0x0fb7 },
- { (int16)0xffff, (int16)0x162c, (int16)0x5965, (int16)0x0ff1 },
- { (int16)0xffff, (int16)0x15e6, (int16)0x5971, (int16)0x102a },
- { (int16)0xffff, (int16)0x15a0, (int16)0x597c, (int16)0x1065 },
- { (int16)0xffff, (int16)0x155c, (int16)0x5986, (int16)0x109f },
- { (int16)0xffff, (int16)0x1517, (int16)0x598f, (int16)0x10db },
- { (int16)0xffff, (int16)0x14d4, (int16)0x5997, (int16)0x1116 },
- { (int16)0xffff, (int16)0x1490, (int16)0x599e, (int16)0x1153 },
- { (int16)0xffff, (int16)0x144d, (int16)0x59a4, (int16)0x118f },
- { (int16)0xffff, (int16)0x140b, (int16)0x59a9, (int16)0x11cd },
- { (int16)0xffff, (int16)0x13c9, (int16)0x59ad, (int16)0x120b },
- { (int16)0xffff, (int16)0x1388, (int16)0x59b0, (int16)0x1249 },
- { (int16)0xffff, (int16)0x1347, (int16)0x59b2, (int16)0x1288 },
- { (int16)0xffff, (int16)0x1307, (int16)0x59b3, (int16)0x12c7 },
+ { (int16_t)0x12c7, (int16_t)0x59b3, (int16_t)0x1307, (int16_t)0xffff },
+ { (int16_t)0x1288, (int16_t)0x59b2, (int16_t)0x1347, (int16_t)0xffff },
+ { (int16_t)0x1249, (int16_t)0x59b0, (int16_t)0x1388, (int16_t)0xffff },
+ { (int16_t)0x120b, (int16_t)0x59ad, (int16_t)0x13c9, (int16_t)0xffff },
+ { (int16_t)0x11cd, (int16_t)0x59a9, (int16_t)0x140b, (int16_t)0xffff },
+ { (int16_t)0x118f, (int16_t)0x59a4, (int16_t)0x144d, (int16_t)0xffff },
+ { (int16_t)0x1153, (int16_t)0x599e, (int16_t)0x1490, (int16_t)0xffff },
+ { (int16_t)0x1116, (int16_t)0x5997, (int16_t)0x14d4, (int16_t)0xffff },
+ { (int16_t)0x10db, (int16_t)0x598f, (int16_t)0x1517, (int16_t)0xffff },
+ { (int16_t)0x109f, (int16_t)0x5986, (int16_t)0x155c, (int16_t)0xffff },
+ { (int16_t)0x1065, (int16_t)0x597c, (int16_t)0x15a0, (int16_t)0xffff },
+ { (int16_t)0x102a, (int16_t)0x5971, (int16_t)0x15e6, (int16_t)0xffff },
+ { (int16_t)0x0ff1, (int16_t)0x5965, (int16_t)0x162c, (int16_t)0xffff },
+ { (int16_t)0x0fb7, (int16_t)0x5958, (int16_t)0x1672, (int16_t)0xffff },
+ { (int16_t)0x0f7f, (int16_t)0x5949, (int16_t)0x16b9, (int16_t)0xffff },
+ { (int16_t)0x0f46, (int16_t)0x593a, (int16_t)0x1700, (int16_t)0xffff },
+ { (int16_t)0x0f0f, (int16_t)0x592a, (int16_t)0x1747, (int16_t)0x0000 },
+ { (int16_t)0x0ed7, (int16_t)0x5919, (int16_t)0x1790, (int16_t)0x0000 },
+ { (int16_t)0x0ea1, (int16_t)0x5907, (int16_t)0x17d8, (int16_t)0x0000 },
+ { (int16_t)0x0e6b, (int16_t)0x58f4, (int16_t)0x1821, (int16_t)0x0000 },
+ { (int16_t)0x0e35, (int16_t)0x58e0, (int16_t)0x186b, (int16_t)0x0000 },
+ { (int16_t)0x0e00, (int16_t)0x58cb, (int16_t)0x18b5, (int16_t)0x0000 },
+ { (int16_t)0x0dcb, (int16_t)0x58b5, (int16_t)0x1900, (int16_t)0x0000 },
+ { (int16_t)0x0d97, (int16_t)0x589e, (int16_t)0x194b, (int16_t)0x0001 },
+ { (int16_t)0x0d63, (int16_t)0x5886, (int16_t)0x1996, (int16_t)0x0001 },
+ { (int16_t)0x0d30, (int16_t)0x586d, (int16_t)0x19e2, (int16_t)0x0001 },
+ { (int16_t)0x0cfd, (int16_t)0x5853, (int16_t)0x1a2e, (int16_t)0x0001 },
+ { (int16_t)0x0ccb, (int16_t)0x5838, (int16_t)0x1a7b, (int16_t)0x0002 },
+ { (int16_t)0x0c99, (int16_t)0x581c, (int16_t)0x1ac8, (int16_t)0x0002 },
+ { (int16_t)0x0c68, (int16_t)0x57ff, (int16_t)0x1b16, (int16_t)0x0002 },
+ { (int16_t)0x0c38, (int16_t)0x57e2, (int16_t)0x1b64, (int16_t)0x0003 },
+ { (int16_t)0x0c07, (int16_t)0x57c3, (int16_t)0x1bb3, (int16_t)0x0003 },
+ { (int16_t)0x0bd8, (int16_t)0x57a3, (int16_t)0x1c02, (int16_t)0x0003 },
+ { (int16_t)0x0ba9, (int16_t)0x5782, (int16_t)0x1c51, (int16_t)0x0004 },
+ { (int16_t)0x0b7a, (int16_t)0x5761, (int16_t)0x1ca1, (int16_t)0x0004 },
+ { (int16_t)0x0b4c, (int16_t)0x573e, (int16_t)0x1cf1, (int16_t)0x0005 },
+ { (int16_t)0x0b1e, (int16_t)0x571b, (int16_t)0x1d42, (int16_t)0x0005 },
+ { (int16_t)0x0af1, (int16_t)0x56f6, (int16_t)0x1d93, (int16_t)0x0006 },
+ { (int16_t)0x0ac4, (int16_t)0x56d1, (int16_t)0x1de5, (int16_t)0x0007 },
+ { (int16_t)0x0a98, (int16_t)0x56ab, (int16_t)0x1e37, (int16_t)0x0007 },
+ { (int16_t)0x0a6c, (int16_t)0x5684, (int16_t)0x1e89, (int16_t)0x0008 },
+ { (int16_t)0x0a40, (int16_t)0x565b, (int16_t)0x1edc, (int16_t)0x0009 },
+ { (int16_t)0x0a16, (int16_t)0x5632, (int16_t)0x1f2f, (int16_t)0x0009 },
+ { (int16_t)0x09eb, (int16_t)0x5609, (int16_t)0x1f82, (int16_t)0x000a },
+ { (int16_t)0x09c1, (int16_t)0x55de, (int16_t)0x1fd6, (int16_t)0x000b },
+ { (int16_t)0x0998, (int16_t)0x55b2, (int16_t)0x202a, (int16_t)0x000c },
+ { (int16_t)0x096f, (int16_t)0x5585, (int16_t)0x207f, (int16_t)0x000d },
+ { (int16_t)0x0946, (int16_t)0x5558, (int16_t)0x20d4, (int16_t)0x000e },
+ { (int16_t)0x091e, (int16_t)0x5529, (int16_t)0x2129, (int16_t)0x000f },
+ { (int16_t)0x08f7, (int16_t)0x54fa, (int16_t)0x217f, (int16_t)0x0010 },
+ { (int16_t)0x08d0, (int16_t)0x54ca, (int16_t)0x21d5, (int16_t)0x0011 },
+ { (int16_t)0x08a9, (int16_t)0x5499, (int16_t)0x222c, (int16_t)0x0012 },
+ { (int16_t)0x0883, (int16_t)0x5467, (int16_t)0x2282, (int16_t)0x0013 },
+ { (int16_t)0x085d, (int16_t)0x5434, (int16_t)0x22da, (int16_t)0x0015 },
+ { (int16_t)0x0838, (int16_t)0x5401, (int16_t)0x2331, (int16_t)0x0016 },
+ { (int16_t)0x0813, (int16_t)0x53cc, (int16_t)0x2389, (int16_t)0x0018 },
+ { (int16_t)0x07ef, (int16_t)0x5397, (int16_t)0x23e1, (int16_t)0x0019 },
+ { (int16_t)0x07cb, (int16_t)0x5361, (int16_t)0x2439, (int16_t)0x001b },
+ { (int16_t)0x07a7, (int16_t)0x532a, (int16_t)0x2492, (int16_t)0x001c },
+ { (int16_t)0x0784, (int16_t)0x52f3, (int16_t)0x24eb, (int16_t)0x001e },
+ { (int16_t)0x0762, (int16_t)0x52ba, (int16_t)0x2545, (int16_t)0x0020 },
+ { (int16_t)0x0740, (int16_t)0x5281, (int16_t)0x259e, (int16_t)0x0021 },
+ { (int16_t)0x071e, (int16_t)0x5247, (int16_t)0x25f8, (int16_t)0x0023 },
+ { (int16_t)0x06fd, (int16_t)0x520c, (int16_t)0x2653, (int16_t)0x0025 },
+ { (int16_t)0x06dc, (int16_t)0x51d0, (int16_t)0x26ad, (int16_t)0x0027 },
+ { (int16_t)0x06bb, (int16_t)0x5194, (int16_t)0x2708, (int16_t)0x0029 },
+ { (int16_t)0x069b, (int16_t)0x5156, (int16_t)0x2763, (int16_t)0x002c },
+ { (int16_t)0x067c, (int16_t)0x5118, (int16_t)0x27be, (int16_t)0x002e },
+ { (int16_t)0x065c, (int16_t)0x50da, (int16_t)0x281a, (int16_t)0x0030 },
+ { (int16_t)0x063e, (int16_t)0x509a, (int16_t)0x2876, (int16_t)0x0033 },
+ { (int16_t)0x061f, (int16_t)0x505a, (int16_t)0x28d2, (int16_t)0x0035 },
+ { (int16_t)0x0601, (int16_t)0x5019, (int16_t)0x292e, (int16_t)0x0038 },
+ { (int16_t)0x05e4, (int16_t)0x4fd7, (int16_t)0x298b, (int16_t)0x003a },
+ { (int16_t)0x05c7, (int16_t)0x4f95, (int16_t)0x29e7, (int16_t)0x003d },
+ { (int16_t)0x05aa, (int16_t)0x4f52, (int16_t)0x2a44, (int16_t)0x0040 },
+ { (int16_t)0x058e, (int16_t)0x4f0e, (int16_t)0x2aa1, (int16_t)0x0043 },
+ { (int16_t)0x0572, (int16_t)0x4ec9, (int16_t)0x2aff, (int16_t)0x0046 },
+ { (int16_t)0x0556, (int16_t)0x4e84, (int16_t)0x2b5c, (int16_t)0x0049 },
+ { (int16_t)0x053b, (int16_t)0x4e3e, (int16_t)0x2bba, (int16_t)0x004d },
+ { (int16_t)0x0520, (int16_t)0x4df7, (int16_t)0x2c18, (int16_t)0x0050 },
+ { (int16_t)0x0506, (int16_t)0x4db0, (int16_t)0x2c76, (int16_t)0x0054 },
+ { (int16_t)0x04ec, (int16_t)0x4d68, (int16_t)0x2cd4, (int16_t)0x0057 },
+ { (int16_t)0x04d2, (int16_t)0x4d20, (int16_t)0x2d33, (int16_t)0x005b },
+ { (int16_t)0x04b9, (int16_t)0x4cd7, (int16_t)0x2d91, (int16_t)0x005f },
+ { (int16_t)0x04a0, (int16_t)0x4c8d, (int16_t)0x2df0, (int16_t)0x0063 },
+ { (int16_t)0x0488, (int16_t)0x4c42, (int16_t)0x2e4f, (int16_t)0x0067 },
+ { (int16_t)0x0470, (int16_t)0x4bf7, (int16_t)0x2eae, (int16_t)0x006b },
+ { (int16_t)0x0458, (int16_t)0x4bac, (int16_t)0x2f0d, (int16_t)0x006f },
+ { (int16_t)0x0441, (int16_t)0x4b5f, (int16_t)0x2f6c, (int16_t)0x0074 },
+ { (int16_t)0x042a, (int16_t)0x4b13, (int16_t)0x2fcc, (int16_t)0x0078 },
+ { (int16_t)0x0413, (int16_t)0x4ac5, (int16_t)0x302b, (int16_t)0x007d },
+ { (int16_t)0x03fc, (int16_t)0x4a77, (int16_t)0x308b, (int16_t)0x0082 },
+ { (int16_t)0x03e7, (int16_t)0x4a29, (int16_t)0x30ea, (int16_t)0x0087 },
+ { (int16_t)0x03d1, (int16_t)0x49d9, (int16_t)0x314a, (int16_t)0x008c },
+ { (int16_t)0x03bc, (int16_t)0x498a, (int16_t)0x31aa, (int16_t)0x0091 },
+ { (int16_t)0x03a7, (int16_t)0x493a, (int16_t)0x3209, (int16_t)0x0096 },
+ { (int16_t)0x0392, (int16_t)0x48e9, (int16_t)0x3269, (int16_t)0x009c },
+ { (int16_t)0x037e, (int16_t)0x4898, (int16_t)0x32c9, (int16_t)0x00a1 },
+ { (int16_t)0x036a, (int16_t)0x4846, (int16_t)0x3329, (int16_t)0x00a7 },
+ { (int16_t)0x0356, (int16_t)0x47f4, (int16_t)0x3389, (int16_t)0x00ad },
+ { (int16_t)0x0343, (int16_t)0x47a1, (int16_t)0x33e9, (int16_t)0x00b3 },
+ { (int16_t)0x0330, (int16_t)0x474e, (int16_t)0x3449, (int16_t)0x00ba },
+ { (int16_t)0x031d, (int16_t)0x46fa, (int16_t)0x34a9, (int16_t)0x00c0 },
+ { (int16_t)0x030b, (int16_t)0x46a6, (int16_t)0x3509, (int16_t)0x00c7 },
+ { (int16_t)0x02f9, (int16_t)0x4651, (int16_t)0x3569, (int16_t)0x00cd },
+ { (int16_t)0x02e7, (int16_t)0x45fc, (int16_t)0x35c9, (int16_t)0x00d4 },
+ { (int16_t)0x02d6, (int16_t)0x45a6, (int16_t)0x3629, (int16_t)0x00db },
+ { (int16_t)0x02c4, (int16_t)0x4550, (int16_t)0x3689, (int16_t)0x00e3 },
+ { (int16_t)0x02b4, (int16_t)0x44fa, (int16_t)0x36e8, (int16_t)0x00ea },
+ { (int16_t)0x02a3, (int16_t)0x44a3, (int16_t)0x3748, (int16_t)0x00f2 },
+ { (int16_t)0x0293, (int16_t)0x444c, (int16_t)0x37a8, (int16_t)0x00fa },
+ { (int16_t)0x0283, (int16_t)0x43f4, (int16_t)0x3807, (int16_t)0x0101 },
+ { (int16_t)0x0273, (int16_t)0x439c, (int16_t)0x3867, (int16_t)0x010a },
+ { (int16_t)0x0264, (int16_t)0x4344, (int16_t)0x38c6, (int16_t)0x0112 },
+ { (int16_t)0x0255, (int16_t)0x42eb, (int16_t)0x3926, (int16_t)0x011b },
+ { (int16_t)0x0246, (int16_t)0x4292, (int16_t)0x3985, (int16_t)0x0123 },
+ { (int16_t)0x0237, (int16_t)0x4239, (int16_t)0x39e4, (int16_t)0x012c },
+ { (int16_t)0x0229, (int16_t)0x41df, (int16_t)0x3a43, (int16_t)0x0135 },
+ { (int16_t)0x021b, (int16_t)0x4185, (int16_t)0x3aa2, (int16_t)0x013f },
+ { (int16_t)0x020d, (int16_t)0x412a, (int16_t)0x3b00, (int16_t)0x0148 },
+ { (int16_t)0x0200, (int16_t)0x40d0, (int16_t)0x3b5f, (int16_t)0x0152 },
+ { (int16_t)0x01f2, (int16_t)0x4074, (int16_t)0x3bbd, (int16_t)0x015c },
+ { (int16_t)0x01e5, (int16_t)0x4019, (int16_t)0x3c1b, (int16_t)0x0166 },
+ { (int16_t)0x01d9, (int16_t)0x3fbd, (int16_t)0x3c79, (int16_t)0x0171 },
+ { (int16_t)0x01cc, (int16_t)0x3f62, (int16_t)0x3cd7, (int16_t)0x017b },
+ { (int16_t)0x01c0, (int16_t)0x3f05, (int16_t)0x3d35, (int16_t)0x0186 },
+ { (int16_t)0x01b4, (int16_t)0x3ea9, (int16_t)0x3d92, (int16_t)0x0191 },
+ { (int16_t)0x01a8, (int16_t)0x3e4c, (int16_t)0x3def, (int16_t)0x019c },
+ { (int16_t)0x019c, (int16_t)0x3def, (int16_t)0x3e4c, (int16_t)0x01a8 },
+ { (int16_t)0x0191, (int16_t)0x3d92, (int16_t)0x3ea9, (int16_t)0x01b4 },
+ { (int16_t)0x0186, (int16_t)0x3d35, (int16_t)0x3f05, (int16_t)0x01c0 },
+ { (int16_t)0x017b, (int16_t)0x3cd7, (int16_t)0x3f62, (int16_t)0x01cc },
+ { (int16_t)0x0171, (int16_t)0x3c79, (int16_t)0x3fbd, (int16_t)0x01d9 },
+ { (int16_t)0x0166, (int16_t)0x3c1b, (int16_t)0x4019, (int16_t)0x01e5 },
+ { (int16_t)0x015c, (int16_t)0x3bbd, (int16_t)0x4074, (int16_t)0x01f2 },
+ { (int16_t)0x0152, (int16_t)0x3b5f, (int16_t)0x40d0, (int16_t)0x0200 },
+ { (int16_t)0x0148, (int16_t)0x3b00, (int16_t)0x412a, (int16_t)0x020d },
+ { (int16_t)0x013f, (int16_t)0x3aa2, (int16_t)0x4185, (int16_t)0x021b },
+ { (int16_t)0x0135, (int16_t)0x3a43, (int16_t)0x41df, (int16_t)0x0229 },
+ { (int16_t)0x012c, (int16_t)0x39e4, (int16_t)0x4239, (int16_t)0x0237 },
+ { (int16_t)0x0123, (int16_t)0x3985, (int16_t)0x4292, (int16_t)0x0246 },
+ { (int16_t)0x011b, (int16_t)0x3926, (int16_t)0x42eb, (int16_t)0x0255 },
+ { (int16_t)0x0112, (int16_t)0x38c6, (int16_t)0x4344, (int16_t)0x0264 },
+ { (int16_t)0x010a, (int16_t)0x3867, (int16_t)0x439c, (int16_t)0x0273 },
+ { (int16_t)0x0101, (int16_t)0x3807, (int16_t)0x43f4, (int16_t)0x0283 },
+ { (int16_t)0x00fa, (int16_t)0x37a8, (int16_t)0x444c, (int16_t)0x0293 },
+ { (int16_t)0x00f2, (int16_t)0x3748, (int16_t)0x44a3, (int16_t)0x02a3 },
+ { (int16_t)0x00ea, (int16_t)0x36e8, (int16_t)0x44fa, (int16_t)0x02b4 },
+ { (int16_t)0x00e3, (int16_t)0x3689, (int16_t)0x4550, (int16_t)0x02c4 },
+ { (int16_t)0x00db, (int16_t)0x3629, (int16_t)0x45a6, (int16_t)0x02d6 },
+ { (int16_t)0x00d4, (int16_t)0x35c9, (int16_t)0x45fc, (int16_t)0x02e7 },
+ { (int16_t)0x00cd, (int16_t)0x3569, (int16_t)0x4651, (int16_t)0x02f9 },
+ { (int16_t)0x00c7, (int16_t)0x3509, (int16_t)0x46a6, (int16_t)0x030b },
+ { (int16_t)0x00c0, (int16_t)0x34a9, (int16_t)0x46fa, (int16_t)0x031d },
+ { (int16_t)0x00ba, (int16_t)0x3449, (int16_t)0x474e, (int16_t)0x0330 },
+ { (int16_t)0x00b3, (int16_t)0x33e9, (int16_t)0x47a1, (int16_t)0x0343 },
+ { (int16_t)0x00ad, (int16_t)0x3389, (int16_t)0x47f4, (int16_t)0x0356 },
+ { (int16_t)0x00a7, (int16_t)0x3329, (int16_t)0x4846, (int16_t)0x036a },
+ { (int16_t)0x00a1, (int16_t)0x32c9, (int16_t)0x4898, (int16_t)0x037e },
+ { (int16_t)0x009c, (int16_t)0x3269, (int16_t)0x48e9, (int16_t)0x0392 },
+ { (int16_t)0x0096, (int16_t)0x3209, (int16_t)0x493a, (int16_t)0x03a7 },
+ { (int16_t)0x0091, (int16_t)0x31aa, (int16_t)0x498a, (int16_t)0x03bc },
+ { (int16_t)0x008c, (int16_t)0x314a, (int16_t)0x49d9, (int16_t)0x03d1 },
+ { (int16_t)0x0087, (int16_t)0x30ea, (int16_t)0x4a29, (int16_t)0x03e7 },
+ { (int16_t)0x0082, (int16_t)0x308b, (int16_t)0x4a77, (int16_t)0x03fc },
+ { (int16_t)0x007d, (int16_t)0x302b, (int16_t)0x4ac5, (int16_t)0x0413 },
+ { (int16_t)0x0078, (int16_t)0x2fcc, (int16_t)0x4b13, (int16_t)0x042a },
+ { (int16_t)0x0074, (int16_t)0x2f6c, (int16_t)0x4b5f, (int16_t)0x0441 },
+ { (int16_t)0x006f, (int16_t)0x2f0d, (int16_t)0x4bac, (int16_t)0x0458 },
+ { (int16_t)0x006b, (int16_t)0x2eae, (int16_t)0x4bf7, (int16_t)0x0470 },
+ { (int16_t)0x0067, (int16_t)0x2e4f, (int16_t)0x4c42, (int16_t)0x0488 },
+ { (int16_t)0x0063, (int16_t)0x2df0, (int16_t)0x4c8d, (int16_t)0x04a0 },
+ { (int16_t)0x005f, (int16_t)0x2d91, (int16_t)0x4cd7, (int16_t)0x04b9 },
+ { (int16_t)0x005b, (int16_t)0x2d33, (int16_t)0x4d20, (int16_t)0x04d2 },
+ { (int16_t)0x0057, (int16_t)0x2cd4, (int16_t)0x4d68, (int16_t)0x04ec },
+ { (int16_t)0x0054, (int16_t)0x2c76, (int16_t)0x4db0, (int16_t)0x0506 },
+ { (int16_t)0x0050, (int16_t)0x2c18, (int16_t)0x4df7, (int16_t)0x0520 },
+ { (int16_t)0x004d, (int16_t)0x2bba, (int16_t)0x4e3e, (int16_t)0x053b },
+ { (int16_t)0x0049, (int16_t)0x2b5c, (int16_t)0x4e84, (int16_t)0x0556 },
+ { (int16_t)0x0046, (int16_t)0x2aff, (int16_t)0x4ec9, (int16_t)0x0572 },
+ { (int16_t)0x0043, (int16_t)0x2aa1, (int16_t)0x4f0e, (int16_t)0x058e },
+ { (int16_t)0x0040, (int16_t)0x2a44, (int16_t)0x4f52, (int16_t)0x05aa },
+ { (int16_t)0x003d, (int16_t)0x29e7, (int16_t)0x4f95, (int16_t)0x05c7 },
+ { (int16_t)0x003a, (int16_t)0x298b, (int16_t)0x4fd7, (int16_t)0x05e4 },
+ { (int16_t)0x0038, (int16_t)0x292e, (int16_t)0x5019, (int16_t)0x0601 },
+ { (int16_t)0x0035, (int16_t)0x28d2, (int16_t)0x505a, (int16_t)0x061f },
+ { (int16_t)0x0033, (int16_t)0x2876, (int16_t)0x509a, (int16_t)0x063e },
+ { (int16_t)0x0030, (int16_t)0x281a, (int16_t)0x50da, (int16_t)0x065c },
+ { (int16_t)0x002e, (int16_t)0x27be, (int16_t)0x5118, (int16_t)0x067c },
+ { (int16_t)0x002c, (int16_t)0x2763, (int16_t)0x5156, (int16_t)0x069b },
+ { (int16_t)0x0029, (int16_t)0x2708, (int16_t)0x5194, (int16_t)0x06bb },
+ { (int16_t)0x0027, (int16_t)0x26ad, (int16_t)0x51d0, (int16_t)0x06dc },
+ { (int16_t)0x0025, (int16_t)0x2653, (int16_t)0x520c, (int16_t)0x06fd },
+ { (int16_t)0x0023, (int16_t)0x25f8, (int16_t)0x5247, (int16_t)0x071e },
+ { (int16_t)0x0021, (int16_t)0x259e, (int16_t)0x5281, (int16_t)0x0740 },
+ { (int16_t)0x0020, (int16_t)0x2545, (int16_t)0x52ba, (int16_t)0x0762 },
+ { (int16_t)0x001e, (int16_t)0x24eb, (int16_t)0x52f3, (int16_t)0x0784 },
+ { (int16_t)0x001c, (int16_t)0x2492, (int16_t)0x532a, (int16_t)0x07a7 },
+ { (int16_t)0x001b, (int16_t)0x2439, (int16_t)0x5361, (int16_t)0x07cb },
+ { (int16_t)0x0019, (int16_t)0x23e1, (int16_t)0x5397, (int16_t)0x07ef },
+ { (int16_t)0x0018, (int16_t)0x2389, (int16_t)0x53cc, (int16_t)0x0813 },
+ { (int16_t)0x0016, (int16_t)0x2331, (int16_t)0x5401, (int16_t)0x0838 },
+ { (int16_t)0x0015, (int16_t)0x22da, (int16_t)0x5434, (int16_t)0x085d },
+ { (int16_t)0x0013, (int16_t)0x2282, (int16_t)0x5467, (int16_t)0x0883 },
+ { (int16_t)0x0012, (int16_t)0x222c, (int16_t)0x5499, (int16_t)0x08a9 },
+ { (int16_t)0x0011, (int16_t)0x21d5, (int16_t)0x54ca, (int16_t)0x08d0 },
+ { (int16_t)0x0010, (int16_t)0x217f, (int16_t)0x54fa, (int16_t)0x08f7 },
+ { (int16_t)0x000f, (int16_t)0x2129, (int16_t)0x5529, (int16_t)0x091e },
+ { (int16_t)0x000e, (int16_t)0x20d4, (int16_t)0x5558, (int16_t)0x0946 },
+ { (int16_t)0x000d, (int16_t)0x207f, (int16_t)0x5585, (int16_t)0x096f },
+ { (int16_t)0x000c, (int16_t)0x202a, (int16_t)0x55b2, (int16_t)0x0998 },
+ { (int16_t)0x000b, (int16_t)0x1fd6, (int16_t)0x55de, (int16_t)0x09c1 },
+ { (int16_t)0x000a, (int16_t)0x1f82, (int16_t)0x5609, (int16_t)0x09eb },
+ { (int16_t)0x0009, (int16_t)0x1f2f, (int16_t)0x5632, (int16_t)0x0a16 },
+ { (int16_t)0x0009, (int16_t)0x1edc, (int16_t)0x565b, (int16_t)0x0a40 },
+ { (int16_t)0x0008, (int16_t)0x1e89, (int16_t)0x5684, (int16_t)0x0a6c },
+ { (int16_t)0x0007, (int16_t)0x1e37, (int16_t)0x56ab, (int16_t)0x0a98 },
+ { (int16_t)0x0007, (int16_t)0x1de5, (int16_t)0x56d1, (int16_t)0x0ac4 },
+ { (int16_t)0x0006, (int16_t)0x1d93, (int16_t)0x56f6, (int16_t)0x0af1 },
+ { (int16_t)0x0005, (int16_t)0x1d42, (int16_t)0x571b, (int16_t)0x0b1e },
+ { (int16_t)0x0005, (int16_t)0x1cf1, (int16_t)0x573e, (int16_t)0x0b4c },
+ { (int16_t)0x0004, (int16_t)0x1ca1, (int16_t)0x5761, (int16_t)0x0b7a },
+ { (int16_t)0x0004, (int16_t)0x1c51, (int16_t)0x5782, (int16_t)0x0ba9 },
+ { (int16_t)0x0003, (int16_t)0x1c02, (int16_t)0x57a3, (int16_t)0x0bd8 },
+ { (int16_t)0x0003, (int16_t)0x1bb3, (int16_t)0x57c3, (int16_t)0x0c07 },
+ { (int16_t)0x0003, (int16_t)0x1b64, (int16_t)0x57e2, (int16_t)0x0c38 },
+ { (int16_t)0x0002, (int16_t)0x1b16, (int16_t)0x57ff, (int16_t)0x0c68 },
+ { (int16_t)0x0002, (int16_t)0x1ac8, (int16_t)0x581c, (int16_t)0x0c99 },
+ { (int16_t)0x0002, (int16_t)0x1a7b, (int16_t)0x5838, (int16_t)0x0ccb },
+ { (int16_t)0x0001, (int16_t)0x1a2e, (int16_t)0x5853, (int16_t)0x0cfd },
+ { (int16_t)0x0001, (int16_t)0x19e2, (int16_t)0x586d, (int16_t)0x0d30 },
+ { (int16_t)0x0001, (int16_t)0x1996, (int16_t)0x5886, (int16_t)0x0d63 },
+ { (int16_t)0x0001, (int16_t)0x194b, (int16_t)0x589e, (int16_t)0x0d97 },
+ { (int16_t)0x0000, (int16_t)0x1900, (int16_t)0x58b5, (int16_t)0x0dcb },
+ { (int16_t)0x0000, (int16_t)0x18b5, (int16_t)0x58cb, (int16_t)0x0e00 },
+ { (int16_t)0x0000, (int16_t)0x186b, (int16_t)0x58e0, (int16_t)0x0e35 },
+ { (int16_t)0x0000, (int16_t)0x1821, (int16_t)0x58f4, (int16_t)0x0e6b },
+ { (int16_t)0x0000, (int16_t)0x17d8, (int16_t)0x5907, (int16_t)0x0ea1 },
+ { (int16_t)0x0000, (int16_t)0x1790, (int16_t)0x5919, (int16_t)0x0ed7 },
+ { (int16_t)0x0000, (int16_t)0x1747, (int16_t)0x592a, (int16_t)0x0f0f },
+ { (int16_t)0xffff, (int16_t)0x1700, (int16_t)0x593a, (int16_t)0x0f46 },
+ { (int16_t)0xffff, (int16_t)0x16b9, (int16_t)0x5949, (int16_t)0x0f7f },
+ { (int16_t)0xffff, (int16_t)0x1672, (int16_t)0x5958, (int16_t)0x0fb7 },
+ { (int16_t)0xffff, (int16_t)0x162c, (int16_t)0x5965, (int16_t)0x0ff1 },
+ { (int16_t)0xffff, (int16_t)0x15e6, (int16_t)0x5971, (int16_t)0x102a },
+ { (int16_t)0xffff, (int16_t)0x15a0, (int16_t)0x597c, (int16_t)0x1065 },
+ { (int16_t)0xffff, (int16_t)0x155c, (int16_t)0x5986, (int16_t)0x109f },
+ { (int16_t)0xffff, (int16_t)0x1517, (int16_t)0x598f, (int16_t)0x10db },
+ { (int16_t)0xffff, (int16_t)0x14d4, (int16_t)0x5997, (int16_t)0x1116 },
+ { (int16_t)0xffff, (int16_t)0x1490, (int16_t)0x599e, (int16_t)0x1153 },
+ { (int16_t)0xffff, (int16_t)0x144d, (int16_t)0x59a4, (int16_t)0x118f },
+ { (int16_t)0xffff, (int16_t)0x140b, (int16_t)0x59a9, (int16_t)0x11cd },
+ { (int16_t)0xffff, (int16_t)0x13c9, (int16_t)0x59ad, (int16_t)0x120b },
+ { (int16_t)0xffff, (int16_t)0x1388, (int16_t)0x59b0, (int16_t)0x1249 },
+ { (int16_t)0xffff, (int16_t)0x1347, (int16_t)0x59b2, (int16_t)0x1288 },
+ { (int16_t)0xffff, (int16_t)0x1307, (int16_t)0x59b3, (int16_t)0x12c7 },
 };
 
 /*
@@ -378,30 +378,30 @@ typedef union
       } global;
       union
       {
-         uint16 ReverbRegs[0x20];
+         uint16_t ReverbRegs[0x20];
          struct
          {
-            uint16 FB_SRC_A;
-            uint16 FB_SRC_B;
-            int16 IIR_ALPHA;
-            int16 ACC_COEF_A;
-            int16 ACC_COEF_B;
-            int16 ACC_COEF_C;
-            int16 ACC_COEF_D;
-            int16 IIR_COEF;
-            int16 FB_ALPHA;
-            int16 FB_X;
-            uint16 IIR_DEST_A[2];
-            uint16 ACC_SRC_A[2];
-            uint16 ACC_SRC_B[2];
-            uint16 IIR_SRC_A[2];
-            uint16 IIR_DEST_B[2];
-            uint16 ACC_SRC_C[2];
-            uint16 ACC_SRC_D[2];
-            uint16 IIR_SRC_B[2];
-            uint16 MIX_DEST_A[2];
-            uint16 MIX_DEST_B[2];
-            int16 IN_COEF[2];
+            uint16_t FB_SRC_A;
+            uint16_t FB_SRC_B;
+            int16_t IIR_ALPHA;
+            int16_t ACC_COEF_A;
+            int16_t ACC_COEF_B;
+            int16_t ACC_COEF_C;
+            int16_t ACC_COEF_D;
+            int16_t IIR_COEF;
+            int16_t FB_ALPHA;
+            int16_t FB_X;
+            uint16_t IIR_DEST_A[2];
+            uint16_t ACC_SRC_A[2];
+            uint16_t ACC_SRC_B[2];
+            uint16_t IIR_SRC_A[2];
+            uint16_t IIR_DEST_B[2];
+            uint16_t ACC_SRC_C[2];
+            uint16_t ACC_SRC_D[2];
+            uint16_t IIR_SRC_B[2];
+            uint16_t MIX_DEST_A[2];
+            uint16_t MIX_DEST_B[2];
+            int16_t IN_COEF[2];
          } s;
       } reverb;
    } s;
@@ -443,8 +443,8 @@ static SPU_RegBlock regs;
 
 static uint16_t AuxRegs[0x10];
 
-static int16 RDSB[2][128];	/* [40] */
-static int16 RUSB[2][64];
+static int16_t RDSB[2][128];	/* [40] */
+static int16_t RUSB[2][64];
 static int32_t RvbResPos;
 
 static uint32_t ReverbCur;
@@ -453,18 +453,18 @@ static bool IRQAsserted;
 
 static int32_t clock_divider;
 
-static uint16_t SPURAM[524288 / sizeof(uint16)];
+static uint16_t SPURAM[524288 / sizeof(uint16_t)];
 
 /* Forward declarations for SPU_Sweep operations; defined further down. */
 static INLINE void SPU_Sweep_Power(SPU_Sweep *sweep);
-static INLINE void SPU_Sweep_WriteControl(SPU_Sweep *sweep, uint16 value);
-static INLINE int16 SPU_Sweep_ReadVolume(SPU_Sweep *sweep);
-static INLINE void SPU_Sweep_WriteVolume(SPU_Sweep *sweep, int16 value);
+static INLINE void SPU_Sweep_WriteControl(SPU_Sweep *sweep, uint16_t value);
+static INLINE int16_t SPU_Sweep_ReadVolume(SPU_Sweep *sweep);
+static INLINE void SPU_Sweep_WriteVolume(SPU_Sweep *sweep, int16_t value);
 static void SPU_Sweep_Clock(SPU_Sweep *sweep);
 
 /* Forward declarations for the static reverb helpers. */
-static int16 SPU_RD_RVB(uint16 raw_offs, int32 extra_offs);
-static void SPU_WR_RVB(uint16 raw_offs, int16 sample);
+static int16_t SPU_RD_RVB(uint16_t raw_offs, int32_t extra_offs);
+static void SPU_WR_RVB(uint16_t raw_offs, int16_t sample);
 
   void SPU_Power(void)
 {
@@ -551,7 +551,7 @@ static void SPU_WR_RVB(uint16 raw_offs, int16 sample);
    IRQAsserted = false;
 }
 
-static INLINE void CalcVCDelta(const uint8 zs, uint8 speed, bool log_mode, bool dec_mode, bool inv_increment, int16 Current, int *increment, int *divinco)
+static INLINE void CalcVCDelta(const uint8_t zs, uint8_t speed, bool log_mode, bool dec_mode, bool inv_increment, int16_t Current, int *increment, int *divinco)
 {
    *increment = (7 - (speed & 0x3));
 
@@ -599,14 +599,14 @@ static INLINE void SPU_Sweep_Power(SPU_Sweep *sweep)
    sweep->Divider = 0;
 }
 
-static INLINE void SPU_Sweep_WriteControl(SPU_Sweep *sweep, uint16 value)
+static INLINE void SPU_Sweep_WriteControl(SPU_Sweep *sweep, uint16_t value)
 {
    sweep->Control = value;
 }
 
-static INLINE int16 SPU_Sweep_ReadVolume(SPU_Sweep *sweep)
+static INLINE int16_t SPU_Sweep_ReadVolume(SPU_Sweep *sweep)
 {
-   return((int16)sweep->Current);
+   return((int16_t)sweep->Current);
 }
 
 static void SPU_Sweep_Clock(SPU_Sweep *sweep)
@@ -615,12 +615,12 @@ static void SPU_Sweep_Clock(SPU_Sweep *sweep)
    const bool dec_mode = (bool)(sweep->Control & 0x2000);
    const bool inv_mode = (bool)(sweep->Control & 0x1000);
    const bool inv_increment = (dec_mode ^ inv_mode) | (dec_mode & log_mode);
-   const uint16 vc_cv_xor = (inv_mode & !(dec_mode & log_mode)) ? 0xFFFF : 0x0000;
-   const uint16 TestInvert = inv_mode ? 0xFFFF : 0x0000;
+   const uint16_t vc_cv_xor = (inv_mode & !(dec_mode & log_mode)) ? 0xFFFF : 0x0000;
+   const uint16_t TestInvert = inv_mode ? 0xFFFF : 0x0000;
    int increment;
    int divinco;
 
-   CalcVCDelta(0x7F, sweep->Control & 0x7F, log_mode, dec_mode, inv_increment, (int16)(sweep->Current ^ vc_cv_xor), &increment, &divinco);
+   CalcVCDelta(0x7F, sweep->Control & 0x7F, log_mode, dec_mode, inv_increment, (int16_t)(sweep->Current ^ vc_cv_xor), &increment, &divinco);
 
    if((dec_mode & !(inv_mode & log_mode)) && ((sweep->Current & 0x8000) == (inv_mode ? 0x0000 : 0x8000) || (sweep->Current == 0)))
    {
@@ -637,7 +637,7 @@ static void SPU_Sweep_Clock(SPU_Sweep *sweep)
 
          if(dec_mode || ((sweep->Current ^ TestInvert) != 0x7FFF))
          {
-            uint16 PrevCurrent = sweep->Current;
+            uint16_t PrevCurrent = sweep->Current;
             sweep->Current = sweep->Current + increment;
 
             if(!dec_mode && ((sweep->Current ^ PrevCurrent) & 0x8000) && ((sweep->Current ^ TestInvert) & 0x8000))
@@ -647,7 +647,7 @@ static void SPU_Sweep_Clock(SPU_Sweep *sweep)
    }
 }
 
-static INLINE void SPU_Sweep_WriteVolume(SPU_Sweep *sweep, int16 value)
+static INLINE void SPU_Sweep_WriteVolume(SPU_Sweep *sweep, int16_t value)
 {
    sweep->Current = value;
 }
@@ -657,7 +657,7 @@ static INLINE void SPU_Sweep_WriteVolume(SPU_Sweep *sweep, int16 value)
 static void SPU_RunDecoder(SPU_Voice *voice)
 {
    /* 5 through 0xF appear to be 0 on the real thing. */
-   static const int32 Weights[16][2] =
+   static const int32_t Weights[16][2] =
    {
       /* s-1    s-2 */
       {   0,    0 },
@@ -720,7 +720,7 @@ static void SPU_RunDecoder(SPU_Voice *voice)
 
    if((voice->CurAddr & 0x7) == 0)
    {
-      const uint16 CV = SPURAM[voice->CurAddr];
+      const uint16_t CV = SPURAM[voice->CurAddr];
       voice->DecodeShift = CV & 0xF;
       voice->DecodeWeight = (CV >> 4) & 0xF;
       voice->DecodeFlags = (CV >> 8) & 0xFF;
@@ -736,13 +736,13 @@ static void SPU_RunDecoder(SPU_Voice *voice)
    /* Don't else this block; we need to ALWAYS decode 4 samples per call to SPU_RunDecoder() if DecodeAvail < 11, or else sample playback
     * at higher rates will fail horribly. */
    {
-      const int32 weight_m1 = Weights[voice->DecodeWeight][0];
-      const int32 weight_m2 = Weights[voice->DecodeWeight][1];
-      uint16 CV;
+      const int32_t weight_m1 = Weights[voice->DecodeWeight][0];
+      const int32_t weight_m2 = Weights[voice->DecodeWeight][1];
+      uint16_t CV;
       unsigned shift;
-      uint32 coded;
+      uint32_t coded;
       int i;
-      int16 *tb = &voice->DecodeBuffer[voice->DecodeWritePos];
+      int16_t *tb = &voice->DecodeBuffer[voice->DecodeWritePos];
 
       CV = SPURAM[voice->CurAddr];
       shift = voice->DecodeShift;
@@ -753,12 +753,12 @@ static void SPU_RunDecoder(SPU_Voice *voice)
          CV &= 0x8888;
       }
 
-      coded = (uint32)CV << 12;
+      coded = (uint32_t)CV << 12;
 
 
       for(i = 0; i < 4; i++)
       {
-         int32 sample = (int16)(coded & 0xF000) >> shift;
+         int32_t sample = (int16_t)(coded & 0xF000) >> shift;
 
          sample += ((voice->DecodeM2 * weight_m2) >> 6);
          sample += ((voice->DecodeM1 * weight_m1) >> 6);
@@ -794,10 +794,10 @@ static void SPU_CacheEnvelope(SPU_Voice *voice)
    int32_t     Rr    = (raw >> 16) & 0x1F;
    int32_t     Sr    = (raw >> 22) & 0x7F;
 
-   ADSR->AttackExp   = (bool)(raw & (1 << 15));
-   ADSR->ReleaseExp  = (bool)(raw & (1 << 21));
-   ADSR->SustainExp  = (bool)(raw & (1 << 31));
-   ADSR->SustainDec  = (bool)(raw & (1 << 30));
+   ADSR->AttackExp   = (bool)(raw & (1u << 15));
+   ADSR->ReleaseExp  = (bool)(raw & (1u << 21));
+   ADSR->SustainExp  = (bool)(raw & (1u << 31));
+   ADSR->SustainDec  = (bool)(raw & (1u << 30));
 
    ADSR->AttackRate  = Ar;
    ADSR->DecayRate   = Dr << 2;
@@ -833,7 +833,7 @@ static void SPU_RunEnvelope(SPU_Voice *voice)
     * fall-through path would read uninitialized values. */
    int    increment    = 0;
    int    divinco      = 0;
-   int16  uoflow_reset = 0;
+   int16_t  uoflow_reset = 0;
 
    if(ADSR->Phase == ADSR_ATTACK && ADSR->EnvLevel == 0x7FFF)
       ADSR->Phase++;
@@ -844,22 +844,22 @@ static void SPU_RunEnvelope(SPU_Voice *voice)
                break;
 
       case ADSR_ATTACK:
-               CalcVCDelta(0x7F, ADSR->AttackRate, ADSR->AttackExp, false, false, (int16)ADSR->EnvLevel, &increment, &divinco);
+               CalcVCDelta(0x7F, ADSR->AttackRate, ADSR->AttackExp, false, false, (int16_t)ADSR->EnvLevel, &increment, &divinco);
                uoflow_reset = 0x7FFF;
                break;
 
       case ADSR_DECAY:
-               CalcVCDelta(0x1F << 2, ADSR->DecayRate, true, true, true, (int16)ADSR->EnvLevel, &increment, &divinco);
+               CalcVCDelta(0x1F << 2, ADSR->DecayRate, true, true, true, (int16_t)ADSR->EnvLevel, &increment, &divinco);
                uoflow_reset = 0;
                break;
 
       case ADSR_SUSTAIN:
-               CalcVCDelta(0x7F, ADSR->SustainRate, ADSR->SustainExp, ADSR->SustainDec, ADSR->SustainDec, (int16)ADSR->EnvLevel, &increment, &divinco);
+               CalcVCDelta(0x7F, ADSR->SustainRate, ADSR->SustainExp, ADSR->SustainDec, ADSR->SustainDec, (int16_t)ADSR->EnvLevel, &increment, &divinco);
                uoflow_reset = ADSR->SustainDec ? 0 : 0x7FFF;
                break;
 
       case ADSR_RELEASE:
-               CalcVCDelta(0x1F << 2, ADSR->ReleaseRate, ADSR->ReleaseExp, true, true, (int16)ADSR->EnvLevel, &increment, &divinco);
+               CalcVCDelta(0x1F << 2, ADSR->ReleaseRate, ADSR->ReleaseExp, true, true, (int16_t)ADSR->EnvLevel, &increment, &divinco);
                uoflow_reset = 0;
                break;
    }
@@ -867,7 +867,7 @@ static void SPU_RunEnvelope(SPU_Voice *voice)
    ADSR->Divider += divinco;
    if(ADSR->Divider & 0x8000)
    {
-      const uint16 prev_level = ADSR->EnvLevel;
+      const uint16_t prev_level = ADSR->EnvLevel;
 
       ADSR->Divider = 0;
       ADSR->EnvLevel += increment;
@@ -883,12 +883,12 @@ static void SPU_RunEnvelope(SPU_Voice *voice)
          if(ADSR->EnvLevel & 0x8000)
             ADSR->EnvLevel = uoflow_reset;
       }
-      if(ADSR->Phase == ADSR_DECAY && (uint16)ADSR->EnvLevel < ADSR->SustainLevel)
+      if(ADSR->Phase == ADSR_DECAY && (uint16_t)ADSR->EnvLevel < ADSR->SustainLevel)
          ADSR->Phase++;
    }
 }
 
-static INLINE void SPU_CheckIRQAddr(uint32 addr)
+static INLINE void SPU_CheckIRQAddr(uint32_t addr)
 {
    if(SPUControl & 0x40)
    {
@@ -900,20 +900,20 @@ static INLINE void SPU_CheckIRQAddr(uint32 addr)
    }
 }
 
-static INLINE void SPU_WriteSPURAM(uint32 addr, uint16 value)
+static INLINE void SPU_WriteSPURAM(uint32_t addr, uint16_t value)
 {
    SPU_CheckIRQAddr(addr);
 
    SPURAM[addr] = value;
 }
 
-static INLINE uint16 SPU_ReadSPURAM(uint32 addr)
+static INLINE uint16_t SPU_ReadSPURAM(uint32_t addr)
 {
    SPU_CheckIRQAddr(addr);
    return(SPURAM[addr]);
 }
 
-static INLINE int16 ReverbSat(int32 samp)
+static INLINE int16_t ReverbSat(int32_t samp)
 {
  if(samp > 32767)
   samp = 32767;
@@ -925,36 +925,36 @@ static INLINE int16 ReverbSat(int32 samp)
 
 #define REVERB_NEG(samp) (((samp) == -32768) ? 0x7FFF : -(samp))
 
-static INLINE uint32 SPU_Get_Reverb_Offset(uint32 in_offset)
+static INLINE uint32_t SPU_Get_Reverb_Offset(uint32_t in_offset)
 {
- uint32 offset = ReverbCur + (in_offset & 0x3FFFF);
+ uint32_t offset = ReverbCur + (in_offset & 0x3FFFF);
 
- offset += ReverbWA & ((int32)(offset << 13) >> 31);
+ offset += ReverbWA & (0u - ((offset >> 18) & 1));
  offset &= 0x3FFFF;
 
  return(offset);
 }
 
-static int16 NO_INLINE SPU_RD_RVB(uint16 raw_offs, int32 extra_offs)
+static int16_t NO_INLINE SPU_RD_RVB(uint16_t raw_offs, int32_t extra_offs)
 {
  return SPU_ReadSPURAM(SPU_Get_Reverb_Offset((raw_offs << 2) + extra_offs));
 }
 
-static void NO_INLINE SPU_WR_RVB(uint16 raw_offs, int16 sample)
+static void NO_INLINE SPU_WR_RVB(uint16_t raw_offs, int16_t sample)
 {
    if(SPUControl & 0x80)
       SPU_WriteSPURAM(SPU_Get_Reverb_Offset(raw_offs << 2), sample);
 }
 
 /* Zeroes optimized out; middle removed too(it's 16384) */
-static const int16 ResampTable[20] =
+static const int16_t ResampTable[20] =
 {
  -1, 2, -10, 35, -103, 266, -616, 1332, -2960, 10246, 10246, -2960, 1332, -616, 266, -103, 35, -10, 2, -1,
 };
 
-static INLINE int32 Reverb4422(const int16 *src)
+static INLINE int32_t Reverb4422(const int16_t *src)
 {
-   int32 out = 0; /* 32-bits is adequate (it won't overflow). */
+   int32_t out = 0; /* 32-bits is adequate (it won't overflow). */
    unsigned i;
 
    for (i = 0; i < 20; i++)
@@ -973,7 +973,7 @@ static INLINE int32 Reverb4422(const int16 *src)
    return out;
 }
 
-static INLINE int32 Reverb2244(const int16 *src)
+static INLINE int32_t Reverb2244(const int16_t *src)
 {
    unsigned i;
    int32_t out = 0; /* 32-bits is adequate (it won't overflow). */
@@ -990,7 +990,7 @@ static INLINE int32 Reverb2244(const int16 *src)
    return out;
 }
 
-static int32 IIASM(const int16 alpha, const int16 insamp)
+static int32_t IIASM(const int16_t alpha, const int16_t insamp)
 {
    if(MDFN_UNLIKELY(alpha == -32768))
    {
@@ -1003,10 +1003,10 @@ static int32 IIASM(const int16 alpha, const int16 insamp)
 }
 
 /* Take care to thoroughly test the reverb resampling code when modifying anything that uses RvbResPos. */
-static void SPU_RunReverb(const int32* in, int32* out)
+static void SPU_RunReverb(const int32_t* in, int32_t* out)
 {
    unsigned lr;
- int32 upsampled[2];
+ int32_t upsampled[2];
 
  upsampled[0] = upsampled[1] = 0;
 
@@ -1018,7 +1018,7 @@ static void SPU_RunReverb(const int32* in, int32* out)
 
  if(RvbResPos & 1)
  {
-  int32 downsampled[2];
+  int32_t downsampled[2];
 
   for(lr = 0; lr < 2; lr++)
    downsampled[lr] = Reverb4422(&RDSB[lr][(RvbResPos - 38) & 0x3F]);
@@ -1026,31 +1026,31 @@ static void SPU_RunReverb(const int32* in, int32* out)
   /* Run algorithm */
   for(lr = 0; lr < 2; lr++)
   {
-     const int16 IIR_INPUT_A = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_A[lr ^ 0], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled[lr] * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
-     const int16 IIR_INPUT_B = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_B[lr ^ 1], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled[lr] * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
-     const int16 IIR_A = ReverbSat((((IIR_INPUT_A * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_A[lr], -1)) >> 14)) >> 1);
-     const int16 IIR_B = ReverbSat((((IIR_INPUT_B * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_B[lr], -1)) >> 14)) >> 1);
+     const int16_t IIR_INPUT_A = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_A[lr ^ 0], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled[lr] * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
+     const int16_t IIR_INPUT_B = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_B[lr ^ 1], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled[lr] * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
+     const int16_t IIR_A = ReverbSat((((IIR_INPUT_A * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_A[lr], -1)) >> 14)) >> 1);
+     const int16_t IIR_B = ReverbSat((((IIR_INPUT_B * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_B[lr], -1)) >> 14)) >> 1);
 
      SPU_WR_RVB(regs.s.reverb.s.IIR_DEST_A[lr], IIR_A);
      SPU_WR_RVB(regs.s.reverb.s.IIR_DEST_B[lr], IIR_B);
 
      {
-        const int32 ACC = ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_A[lr], 0) * regs.s.reverb.s.ACC_COEF_A) >> 14) +
+        const int32_t ACC = ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_A[lr], 0) * regs.s.reverb.s.ACC_COEF_A) >> 14) +
            ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_B[lr], 0) * regs.s.reverb.s.ACC_COEF_B) >> 14) +
            ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_C[lr], 0) * regs.s.reverb.s.ACC_COEF_C) >> 14) +
            ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_D[lr], 0) * regs.s.reverb.s.ACC_COEF_D) >> 14);
 
-        const int16 FB_A = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_A[lr] - regs.s.reverb.s.FB_SRC_A, 0);
-        const int16 FB_B = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_B[lr] - regs.s.reverb.s.FB_SRC_B, 0);
-        const int16 MDA = ReverbSat((ACC + ((FB_A * REVERB_NEG(regs.s.reverb.s.FB_ALPHA)) >> 14)) >> 1);
-        const int16 MDB = ReverbSat(FB_A + ((((MDA * regs.s.reverb.s.FB_ALPHA) >> 14) + ((FB_B * REVERB_NEG(regs.s.reverb.s.FB_X)) >> 14)) >> 1));
-        const int16 IVB = ReverbSat(FB_B + ((MDB * regs.s.reverb.s.FB_X) >> 15));
+        const int16_t FB_A = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_A[lr] - regs.s.reverb.s.FB_SRC_A, 0);
+        const int16_t FB_B = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_B[lr] - regs.s.reverb.s.FB_SRC_B, 0);
+        const int16_t MDA = ReverbSat((ACC + ((FB_A * REVERB_NEG(regs.s.reverb.s.FB_ALPHA)) >> 14)) >> 1);
+        const int16_t MDB = ReverbSat(FB_A + ((((MDA * regs.s.reverb.s.FB_ALPHA) >> 14) + ((FB_B * REVERB_NEG(regs.s.reverb.s.FB_X)) >> 14)) >> 1));
+        const int16_t IVB = ReverbSat(FB_B + ((MDB * regs.s.reverb.s.FB_X) >> 15));
 
         SPU_WR_RVB(regs.s.reverb.s.MIX_DEST_A[lr], MDA);
         SPU_WR_RVB(regs.s.reverb.s.MIX_DEST_B[lr], MDB);
 #if 0
         {
-           static uint32 sqcounter;
+           static uint32_t sqcounter;
            RUSB[lr][(RvbResPos >> 1) | 0x20] = RUSB[lr][RvbResPos >> 1] = ((sqcounter & 0xFF) == 0) ? 0x8000 : 0x0000; /* ((sqcounter & 0x80) ? 0x7000 : 0x9000); */
            sqcounter += lr;
         }
@@ -1066,7 +1066,7 @@ static void SPU_RunReverb(const int32* in, int32* out)
 
   for(lr = 0; lr < 2; lr++)
   {
-     const int16 *src = &RUSB[lr][((RvbResPos >> 1) - 19) & 0x1F];
+     const int16_t *src = &RUSB[lr][((RvbResPos >> 1) - 19) & 0x1F];
      upsampled[lr] = Reverb2244(src);
   }
  }
@@ -1074,7 +1074,7 @@ static void SPU_RunReverb(const int32* in, int32* out)
  {
   for(lr = 0; lr < 2; lr++)
   {
-     const int16 *src = &RUSB[lr][((RvbResPos >> 1) - 19) & 0x1F];
+     const int16_t *src = &RUSB[lr][((RvbResPos >> 1) - 19) & 0x1F];
      upsampled[lr] = src[9]; /* Reverb 2244 (Middle non-zero */
   }
  }
@@ -1089,8 +1089,8 @@ static void SPU_RunReverb(const int32* in, int32* out)
 static INLINE void SPU_RunNoise(void)
 {
    const unsigned rf = ((SPUControl >> 8) & 0x3F);
-   uint32 NoiseDividerInc = (2 << (rf >> 2));
-   uint32 NoiseCounterInc = 4 + (rf & 0x3);
+   uint32_t NoiseDividerInc = (2 << (rf >> 2));
+   uint32_t NoiseCounterInc = 4 + (rf & 0x3);
 
    if(rf >= 0x3C)
    {
@@ -1114,9 +1114,9 @@ static INLINE void SPU_RunNoise(void)
    }
 }
 
-  int32 SPU_UpdateFromCDC(int32 clocks)
+  int32_t SPU_UpdateFromCDC(int32_t clocks)
 {
-   int32 sample_clocks = 0;
+   int32_t sample_clocks = 0;
 
    clock_divider -= clocks;
 
@@ -1131,15 +1131,15 @@ static INLINE void SPU_RunNoise(void)
       /* xxx[0] = left, xxx[1] = right */
 
       /* Accumulated sound output. */
-      int32 accum[2];
+      int32_t accum[2];
 
       /* Accumulated sound output for reverb input */
-      int32 accum_fv[2];
+      int32_t accum_fv[2];
 
       /* Output of reverb processing. */
-      int32 reverb[2];
+      int32_t reverb[2];
 
-      uint32 PhaseModCache;
+      uint32_t PhaseModCache;
       int voice_num;
       unsigned lr;
 
@@ -1189,7 +1189,7 @@ static INLINE void SPU_RunNoise(void)
       for(voice_num = 0; voice_num < 24; voice_num++)
       {
          SPU_Voice *voice = &Voices[voice_num];
-         int32 voice_pvs;
+         int32_t voice_pvs;
          int l, r;
          int lr;
 
@@ -1206,7 +1206,7 @@ static INLINE void SPU_RunNoise(void)
 
 
          if(Noise_Mode & (1 << voice_num))
-            voice_pvs = (int16)LFSR;
+            voice_pvs = (int16_t)LFSR;
          else
          {
             const int si = voice->DecodeReadPos;
@@ -1218,7 +1218,7 @@ static INLINE void SPU_RunNoise(void)
                   (voice->DecodeBuffer[(si + 3) & 0x1F] * FIR_Table[pi][3])) >> 15;
          }
 
-         voice_pvs = (voice_pvs * (int16)voice->ADSR.EnvLevel) >> 15;
+         voice_pvs = (voice_pvs * (int16_t)voice->ADSR.EnvLevel) >> 15;
          voice->PreLRSample = voice_pvs;
 
          if(voice_num == 1 || voice_num == 3)
@@ -1262,7 +1262,7 @@ static INLINE void SPU_RunNoise(void)
             {
                /* This old formula: phase_inc = (voice->Pitch * ((voice - 1)->PreLRSample + 0x8000)) >> 15;
                 * is incorrect, as it does not handle carrier pitches >= 0x8000 properly. */
-               phase_inc = voice->Pitch + (((int16)voice->Pitch * ((voice - 1)->PreLRSample)) >> 15);
+               phase_inc = voice->Pitch + (((int16_t)voice->Pitch * ((voice - 1)->PreLRSample)) >> 15);
             }
             else
                phase_inc = voice->Pitch;
@@ -1271,7 +1271,7 @@ static INLINE void SPU_RunNoise(void)
                phase_inc = 0x3FFF;
 
             {
-               const uint32 tmp_phase = voice->CurPhase + phase_inc;
+               const uint32_t tmp_phase = voice->CurPhase + phase_inc;
                const unsigned used = tmp_phase >> 12;
 
                voice->CurPhase = tmp_phase & 0xFFF;
@@ -1351,8 +1351,8 @@ static INLINE void SPU_RunNoise(void)
        * -32768..32767 (the historical contract from
        * PS_CDC::GetCDAudio). */
       {
-         int32 cda_raw[2];
-         int32 cdav[2];
+         int32_t cda_raw[2];
+         int32_t cdav[2];
          unsigned i;
 
          CDC_GetCDAudioSample(cda_raw);
@@ -1423,7 +1423,7 @@ static INLINE void SPU_RunNoise(void)
       {
          for (lr = 0; lr < 2; lr++)
          {
-            int32 out = (accum[lr] * SPU_Sweep_ReadVolume(&GlobalSweep[lr])) >> 15;
+            int32_t out = (accum[lr] * SPU_Sweep_ReadVolume(&GlobalSweep[lr])) >> 15;
             /* Saturate final output sample to signed 16-bit. */
             if      (out < -32768) out = -32768;
             else if (out >  32767) out =  32767;
@@ -1449,7 +1449,7 @@ static INLINE void SPU_RunNoise(void)
    return clock_divider;
 }
 
-  void SPU_WriteDMA(uint32 V)
+  void SPU_WriteDMA(uint32_t V)
 {
    SPU_WriteSPURAM(RWAddr, V);
    RWAddr = (RWAddr + 1) & 0x3FFFF;
@@ -1461,12 +1461,12 @@ static INLINE void SPU_RunNoise(void)
    SPU_CheckIRQAddr(RWAddr);
 }
 
-  uint32 SPU_ReadDMA(void)
+  uint32_t SPU_ReadDMA(void)
 {
-   uint32 ret = (uint16)SPU_ReadSPURAM(RWAddr);
+   uint32_t ret = (uint16_t)SPU_ReadSPURAM(RWAddr);
    RWAddr = (RWAddr + 1) & 0x3FFFF;
 
-   ret |= (uint32)(uint16)SPU_ReadSPURAM(RWAddr) << 16;
+   ret |= (uint32_t)(uint16_t)SPU_ReadSPURAM(RWAddr) << 16;
    RWAddr = (RWAddr + 1) & 0x3FFFF;
 
    SPU_CheckIRQAddr(RWAddr);
@@ -1531,7 +1531,7 @@ void SPU_Init(void)
 {
 }
 
-  void SPU_Write(int32_t timestamp, uint32 A, uint16 V)
+  void SPU_Write(int32_t timestamp, uint32_t A, uint16_t V)
 {
    A &= 0x3FF;
 
@@ -1591,10 +1591,10 @@ void SPU_Init(void)
          case 0x02: SPU_Sweep_WriteControl(&GlobalSweep[(A & 2) >> 1], V);
                     break;
 
-         case 0x04: ReverbVol[0] = (int16)V;
+         case 0x04: ReverbVol[0] = (int16_t)V;
                     break;
 
-         case 0x06: ReverbVol[1] = (int16)V;
+         case 0x06: ReverbVol[1] = (int16_t)V;
                     break;
 
                     /* Voice ON: */
@@ -1701,7 +1701,7 @@ void SPU_Init(void)
    regs.Regs[(A & 0x1FF) >> 1] = V;
 }
 
-  uint16 SPU_Read(int32_t timestamp, uint32 A)
+  uint16_t SPU_Read(int32_t timestamp, uint32_t A)
 {
    A &= 0x3FF;
 
@@ -1743,7 +1743,7 @@ void SPU_Init(void)
             break;
          case 0x28:
             {
-               uint16 ret = SPU_ReadSPURAM(RWAddr);
+               uint16_t ret = SPU_ReadSPURAM(RWAddr);
 
                RWAddr = (RWAddr + 1) & 0x3FFFF;
                SPU_CheckIRQAddr(RWAddr);
@@ -1884,7 +1884,7 @@ void SPU_Init(void)
 
       SFVAR(clock_divider),
 
-      SFARRAY16(SPURAM, 524288 / sizeof(uint16)),
+      SFARRAY16(SPURAM, 524288 / sizeof(uint16_t)),
       SFEND
    };
 #undef SFSWEEP

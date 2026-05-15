@@ -31,8 +31,7 @@
 #include "../mednafen.h"
 #include "../error.h"
 #include "../general_c.h"
-#include "../FileStream.h"
-#include "../MemoryStream.h"
+#include "../cdstream.h"
 
 #include "CDAccess.h"
 #include "cdaccess_track.h"
@@ -2870,7 +2869,7 @@ struct CDAccess_PBP
 {
    CDAccess  base;
 
-   struct Stream *fp;
+   cdstream *fp;
    uint32_t  pbp_file_offsets[8];   /* PBP_NUM_FILES */
 
    uint8_t   buff_raw[16][2352];
@@ -2912,7 +2911,7 @@ enum PBP_FILES{
  * source order. */
 static bool CDAccess_PBP_ImageOpen(struct CDAccess_PBP *self, const char *path, bool image_memcache);
 static void CDAccess_PBP_Cleanup(struct CDAccess_PBP *self);
-static void CDAccess_PBP_MakeSubPQ(struct CDAccess_PBP *self, int32 lba, uint8 *SubPWBuf);
+static void CDAccess_PBP_MakeSubPQ(struct CDAccess_PBP *self, int32_t lba, uint8_t *SubPWBuf);
 static int CDAccess_PBP_decompress2(struct CDAccess_PBP *self, void *out, uint32_t *out_size, void *in, uint32_t in_size);
 static int CDAccess_PBP_LoadSBI(struct CDAccess_PBP *self, const char* sbi_path);
 static int CDAccess_PBP_decrypt_pgd(struct CDAccess_PBP *self, unsigned char* pgd_data, int pgd_size);
@@ -2926,22 +2925,20 @@ static int CDAccess_PBP_fix_sector(struct CDAccess_PBP *self, uint8_t* sector, i
 
 
 static bool CDAccess_PBP_ImageOpen(struct CDAccess_PBP *self, const char *path, bool image_memcache){
-   uint8 magic[4];
+   uint8_t magic[4];
    char psar_sig[12];
    char base_dir [4096];
    char file_base[4096];
    char file_ext [4096];
    char sbi_ext[4];
-   struct FileStream *file = mdfn_filestream_new(path);
+   cdstream *file = cdstream_new(path);
    int i;
 
    sbi_ext[0] = 's'; sbi_ext[1] = 'b'; sbi_ext[2] = 'i'; sbi_ext[3] = 0;
 
-   if (!mdfn_filestream_is_open(file))
+   if (!file)
    {
       log_cb(RETRO_LOG_ERROR, "Could not open PBP file: %s\n", path);
-      if (file)
-         stream_destroy(&file->base);
       return false;
    }
 
@@ -2950,40 +2947,32 @@ static bool CDAccess_PBP_ImageOpen(struct CDAccess_PBP *self, const char *path, 
          file_base, sizeof(file_base),
          file_ext,  sizeof(file_ext));
 
-   if (image_memcache)
+   if (image_memcache && !cdstream_memcache_in_place(file))
    {
-      /* mdfn_memstream_new_from_stream consumes &file->base regardless
-       * of success - no further cleanup of `file` required. */
-      struct MemoryStream *mem = mdfn_memstream_new_from_stream(&file->base);
-      if (!mdfn_memstream_is_valid(mem))
-      {
-         log_cb(RETRO_LOG_ERROR, "Could not load PBP into memory: %s\n", path);
-         if (mem)
-            stream_destroy(&mem->base);
-         return false;
-      }
-      self->fp = &mem->base;
+      log_cb(RETRO_LOG_ERROR, "Could not load PBP into memory: %s\n", path);
+      free(file);
+      return false;
    }
-   else
-      self->fp = &file->base;
+
+   self->fp = file;
 
    /* check for valid pbp */
-   if(stream_read(self->fp, magic, 4) != 4 || magic[0] != 0 || magic[1] != 'P' || magic[2] != 'B' || magic[3] != 'P')
+   if(cdstream_read(self->fp, magic, 4) != 4 || magic[0] != 0 || magic[1] != 'P' || magic[2] != 'B' || magic[3] != 'P')
    {
       log_cb(RETRO_LOG_ERROR, "Invalid PBP header: %s\n", path);
       return false;
    }
 
    /* offsets of internal files */
-   stream_seek(self->fp, 0x8, SEEK_SET);
+   cdstream_seek(self->fp, 0x8, SEEK_SET);
    for (i = 0; i < PBP_NUM_FILES; i++)
-      self->pbp_file_offsets[i] = stream_get_le_u32(self->fp);
+      self->pbp_file_offsets[i] = cdstream_read_le_u32(self->fp);
 
    /* only data.psar is relevant */
    self->psisoimg_offset = self->pbp_file_offsets[DATA_PSAR];
-   stream_seek(self->fp, self->pbp_file_offsets[DATA_PSAR], SEEK_SET);
+   cdstream_seek(self->fp, self->pbp_file_offsets[DATA_PSAR], SEEK_SET);
 
-   stream_read(self->fp, psar_sig, sizeof(psar_sig));
+   cdstream_read(self->fp, psar_sig, sizeof(psar_sig));
    if(strncmp(psar_sig, "PSTITLEIMG00", sizeof(psar_sig)) == 0)
    {
       /* multidisk image */
@@ -2991,8 +2980,8 @@ static bool CDAccess_PBP_ImageOpen(struct CDAccess_PBP *self, const char *path, 
       uint32_t read_offset = 0;
       int      mi;
 
-      stream_seek(self->fp, self->pbp_file_offsets[DATA_PSAR] + 0x200, SEEK_SET);
-      stream_read(self->fp, iso_map, sizeof(iso_map));
+      cdstream_seek(self->fp, self->pbp_file_offsets[DATA_PSAR] + 0x200, SEEK_SET);
+      cdstream_read(self->fp, iso_map, sizeof(iso_map));
 
       /* check for "\0PGD", should indicate whether TOC is encrypted or not? */
       if(iso_map[0] == 0 && iso_map[1] == 'P' && iso_map[2] == 'G' && iso_map[3] == 'D')
@@ -3030,9 +3019,9 @@ static bool CDAccess_PBP_ImageOpen(struct CDAccess_PBP *self, const char *path, 
 
       /* default to first disc on loading */
       self->psisoimg_offset += self->discs_start_offset[0];
-      stream_seek(self->fp, self->psisoimg_offset, SEEK_SET);
+      cdstream_seek(self->fp, self->psisoimg_offset, SEEK_SET);
 
-      stream_read(self->fp, psar_sig, sizeof(psar_sig));
+      cdstream_read(self->fp, psar_sig, sizeof(psar_sig));
    }
 
    if(strncmp(psar_sig, "PSISOIMG0000", sizeof(psar_sig)) != 0)
@@ -3085,7 +3074,7 @@ static bool CDAccess_PBP_ImageOpen(struct CDAccess_PBP *self, const char *path, 
 static void CDAccess_PBP_Cleanup(struct CDAccess_PBP *self){
    if (self->fp != NULL)
    {
-      stream_destroy(self->fp);
+      cdstream_destroy(self->fp);
       self->fp = NULL;
    }
    if(self->index_table != NULL)
@@ -3093,7 +3082,7 @@ static void CDAccess_PBP_Cleanup(struct CDAccess_PBP *self){
 }
 
 /* Note: this function makes use of the current contents(as in |=) in SubPWBuf. */
-static void CDAccess_PBP_MakeSubPQ(struct CDAccess_PBP *self, int32 lba, uint8 *SubPWBuf){
+static void CDAccess_PBP_MakeSubPQ(struct CDAccess_PBP *self, int32_t lba, uint8_t *SubPWBuf){
    unsigned i;
    uint8_t buf[0xC], adr, control;
    int32_t track;
@@ -3115,7 +3104,7 @@ static void CDAccess_PBP_MakeSubPQ(struct CDAccess_PBP *self, int32 lba, uint8 *
    if(!track_found)
       track = self->FirstTrack;
 
-   lba_relative = abs((int32)lba - self->Tracks[track].LBA);
+   lba_relative = abs((int32_t)lba - self->Tracks[track].LBA);
 
    f            = (lba_relative % 75);
    s            = ((lba_relative / 75) % 60);
@@ -3134,7 +3123,7 @@ static void CDAccess_PBP_MakeSubPQ(struct CDAccess_PBP *self, int32 lba, uint8 *
 
    /* Handle pregap between audio->data track */
    {
-      int32_t pg_offset = (int32)lba - self->Tracks[track].LBA;
+      int32_t pg_offset = (int32_t)lba - self->Tracks[track].LBA;
 
       /* If we're more than 2 seconds(150 sectors) from the real "start" of the track/INDEX 01, and the track is a data track, */
       /* and the preceding track is an audio track, encode it as audio(by taking the SubQ control field from the preceding track). */
@@ -3217,7 +3206,7 @@ static int CDAccess_PBP_decompress2(struct CDAccess_PBP *self, void *out, uint32
    return ret == 1 ? 0 : ret;
 }
 
-static bool CDAccess_PBP_Read_Raw_Sector(CDAccess *base_self, uint8 *buf, int32 lba){
+static bool CDAccess_PBP_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf, int32_t lba){
    struct CDAccess_PBP *self = (struct CDAccess_PBP *)base_self;
    uint8_t SimuQ[0xC];
    int32_t block = lba >> 4;
@@ -3248,8 +3237,8 @@ static bool CDAccess_PBP_Read_Raw_Sector(CDAccess *base_self, uint8 *buf, int32 
       else if(size == sizeof(self->buff_compressed))
          is_compressed = false; /* should be the case here? */
 
-      stream_seek(self->fp, start_byte, SEEK_SET);
-      stream_read(self->fp, is_compressed ? self->buff_compressed : self->buff_raw[0], size);
+      cdstream_seek(self->fp, start_byte, SEEK_SET);
+      cdstream_read(self->fp, is_compressed ? self->buff_compressed : self->buff_raw[0], size);
 
       if (is_compressed)
       {
@@ -3333,8 +3322,8 @@ static bool CDAccess_PBP_Read_TOC(CDAccess *base_self, TOC *toc){
    TOC_Clear(toc);
    memset(self->Tracks, 0, sizeof(self->Tracks));
 
-   stream_seek(self->fp, self->psisoimg_offset + 0x400, SEEK_SET);
-   stream_read(self->fp, iso_header, 0xB6600);
+   cdstream_seek(self->fp, self->psisoimg_offset + 0x400, SEEK_SET);
+   cdstream_read(self->fp, iso_header, 0xB6600);
    if(iso_header[0] == 0 && iso_header[1] == 'P' && iso_header[2] == 'G' && iso_header[3] == 'D')
    {
       int pdg_size;
@@ -3519,9 +3508,9 @@ static bool CDAccess_PBP_Read_TOC(CDAccess *base_self, TOC *toc){
 
 static int CDAccess_PBP_LoadSBI(struct CDAccess_PBP *self, const char* sbi_path){
    /* Loading SBI file */
-   uint8  header[4];
-   uint8  ed[4 + 10];
-   uint8  tmpq[12];
+   uint8_t  header[4];
+   uint8_t  ed[4 + 10];
+   uint8_t  tmpq[12];
    RFILE *sbis = filestream_open(sbi_path,
          RETRO_VFS_FILE_ACCESS_READ,
          RETRO_VFS_FILE_ACCESS_HINT_NONE);
@@ -3536,7 +3525,7 @@ static int CDAccess_PBP_LoadSBI(struct CDAccess_PBP *self, const char* sbi_path)
 
    while(filestream_read(sbis, ed, sizeof(ed)) == sizeof(ed))
    {
-      uint32 aba;
+      uint32_t aba;
 
       /* Bad BCD MSF offset in SBI file. */
       if(!BCD_is_valid(ed[0]) || !BCD_is_valid(ed[1]) || !BCD_is_valid(ed[2]))

@@ -39,6 +39,12 @@ typedef struct SimpleFIFO
  * in C as well as C++. */
 #define CDC_SECTOR_PIPE_COUNT 2
 
+/* Each SectorPipe slot holds 2352 bytes of audio/data payload
+ * followed by 96 bytes of P-W subchannel.  HandlePlayRead reads
+ * disc sectors directly into the next slot (no intermediate copy)
+ * and DecodeSubQ consumes the trailing 96 bytes in place. */
+#define CDC_SECTOR_PIPE_BYTES (2352 + 96)
+
 /* PS_CDC was a C++ class with all members private and access via
  * PSX_CDC->Method(...).  It is now a plain struct: the fields
  * below are the former class members in the same declaration
@@ -81,7 +87,7 @@ typedef struct PS_CDC
    uint8_t   SB[2340];
    uint32_t  SB_In;
 
-   uint8_t   SectorPipe[CDC_SECTOR_PIPE_COUNT][2352];
+   uint8_t   SectorPipe[CDC_SECTOR_PIPE_COUNT][CDC_SECTOR_PIPE_BYTES];
    uint8_t   SectorPipe_Pos;
    uint8_t   SectorPipe_In;
 

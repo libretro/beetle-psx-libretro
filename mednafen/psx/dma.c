@@ -277,7 +277,10 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
    }
 
    /* GROSS APPROXIMATION, shoehorning multiple effects together, TODO separate(especially SPU and CDC) */
-   DMACH[ch].ClockCounter -= MAX(extra_cyc_overhead, (CRModeCache & 0x100) ? 7 : 0);
+   {
+      int32_t _crm = (CRModeCache & 0x100) ? 7 : 0;
+      DMACH[ch].ClockCounter -= (extra_cyc_overhead > _crm) ? extra_cyc_overhead : _crm;
+   }
 }
 
 static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)

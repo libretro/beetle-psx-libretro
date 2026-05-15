@@ -2,27 +2,17 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
-typedef int8_t int8;
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
-
-typedef uint8_t uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
 #define INLINE inline
 
-static INLINE int64 MakePolyXFP(int32 x)
+static INLINE int64_t MakePolyXFP(int32_t x)
 {
- return ((int64)x << 32) + ((1LL << 32) - (1 << 11));
+ return ((int64_t)x << 32) + ((1LL << 32) - (1 << 11));
 }
 
-static INLINE int64 MakePolyXFPStep(int32 dx, int32 dy)
+static INLINE int64_t MakePolyXFPStep(int32_t dx, int32_t dy)
 {
- int64 ret;
- int64 dx_ex = (int64)dx << 32;
+ int64_t ret;
+ int64_t dx_ex = (int64_t)dx << 32;
 
  if(dx_ex < 0)
   dx_ex -= dy - 1;
@@ -35,7 +25,7 @@ static INLINE int64 MakePolyXFPStep(int32 dx, int32 dy)
  return(ret);
 }
 
-static INLINE int32 GetPolyXFP_Int(int64 xfp)
+static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
 {
  return(xfp >> 32);
 }
@@ -51,9 +41,9 @@ int main()
   {
    for(int dy = 1; dy <= 511; dy++)
    {
-    int64 x_coord, x_step;
-    int32 alt_x_coord;
-    int32 alt_x_error;
+    int64_t x_coord, x_step;
+    int32_t alt_x_coord;
+    int32_t alt_x_error;
 
     x_coord = MakePolyXFP(xbase);
     x_step = MakePolyXFPStep(dx, dy);

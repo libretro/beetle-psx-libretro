@@ -18,7 +18,6 @@
 #ifndef _CDROM_CDACCESS_CCD_H_
 #define _CDROM_CDACCESS_CCD_H_
 
-#include "../Stream.h"
 #include "CDAccess.h"
 
 #ifdef __cplusplus

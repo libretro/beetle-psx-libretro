@@ -29,17 +29,6 @@
 #include <list>
 #endif
 
-typedef int8_t int8;
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
-
-typedef uint8_t uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
-
 #if !defined(HAVE_NATIVE64BIT) && (SIZEOF_VOID_P >= 8 || defined(__x86_64__))
 #define HAVE_NATIVE64BIT 1
 #endif
@@ -183,15 +172,9 @@ typedef uint64_t uint64;
 #endif
 
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#ifndef MSB_FIRST
 #define MSB_FIRST
-#else
-#define LSB_FIRST
 #endif
-
-#if !defined(MSB_FIRST) && !defined(LSB_FIRST)
- #error "Define MSB_FIRST or LSB_FIRST!"
-#elif defined(MSB_FIRST) && defined(LSB_FIRST)
- #error "Define only one of MSB_FIRST or LSB_FIRST, not both!"
 #endif
 
 #ifdef _MSC_VER

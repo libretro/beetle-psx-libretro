@@ -23,7 +23,6 @@
 #include "parallel-psx/custom-textures/dbg_input_callback.h"
 retro_input_state_t dbg_input_state_cb = 0;
 
-#include "mednafen/mednafen-endian.h"
 #include "mednafen/mednafen-types.h"
 #include "mednafen/psx/psx.h"
 #include "mednafen/error.h"
@@ -116,7 +115,7 @@ unsigned cd_2x_speedup = 1;
 static unsigned cd_speedup_compat_max = 0;
 bool cd_async = false;
 bool cd_warned_slow = false;
-int64 cd_slow_timeout = 8000; // microseconds
+int64_t cd_slow_timeout = 8000; // microseconds
 
 // If true, PAL games will run at 60fps
 bool fast_pal = false;
@@ -126,18 +125,18 @@ unsigned image_height = 0;
 enum DYNAREC psx_dynarec;
 bool         psx_dynarec_invalidate;
 bool         psx_dynarec_spgp_opt;
-uint8        psx_mmap = 0;
-bool hugetlb;
-uint8 *psx_mem = NULL;
-uint8 *psx_bios = NULL;
-uint8 *psx_scratch = NULL;
-uint8 *lightrec_codebuffer = NULL;
+bool         hugetlb;
+uint8_t      psx_mmap = 0;
+uint8_t     *psx_mem = NULL;
+uint8_t     *psx_bios = NULL;
+uint8_t     *psx_scratch = NULL;
+uint8_t     *lightrec_codebuffer = NULL;
 #if defined(HAVE_ASHMEM)
 int memfd;
 #endif
 #endif
 
-int32 EventCycles = 128;
+int32_t EventCycles = 128;
 uint8_t spu_samples = 1;
 
 // CPU overclock factor (or 0 if disabled)
@@ -728,7 +727,6 @@ static uint8_t *psx_expansion1 = NULL;
 
 const uint8_t *PSX_LoadExpansion1(void)
 {
-   uint32_t *p;
    unsigned i;
 
    if (psx_expansion1 == NULL)
@@ -738,10 +736,18 @@ const uint8_t *PSX_LoadExpansion1(void)
          return NULL;
    }
 
-   /* Read 32 bits at a time to speed things up. */
-   p = (uint32_t *)psx_expansion1;
+   /* Read 32 bits at a time to speed things up.  The previous version
+    * aliased psx_expansion1 (a uint8_t*) as uint32_t* to do four-byte
+    * writes; the buffer is returned to callers as uint8_t* and read
+    * byte-wise from there, so the effective type is uint8_t and the
+    * uint32_t write was a strict-aliasing violation.  memcpy() is
+    * bit-exact, lets the compiler still emit a single 4-byte store,
+    * and stays within defined behaviour. */
    for (i = 0; i < PSX_EXPANSION1_SIZE / 4; i++)
-      p[i] = PSX_MemPeek32(PSX_EXPANSION1_BASE + i * 4);
+   {
+      uint32_t word = PSX_MemPeek32(PSX_EXPANSION1_BASE + i * 4);
+      memcpy(psx_expansion1 + i * 4, &word, sizeof(word));
+   }
 
    return psx_expansion1;
 }
@@ -1250,13 +1256,36 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
             }
             else if((A & 0x7FFFFF) < (65536 + TextMem_size))
             {
+               const uint8_t *_p = &TextMem[(A & 0x7FFFFF) - 65536];
                if(access24)
-                  (*V_p) = MDFN_de24lsb(&TextMem[(A & 0x7FFFFF) - 65536]);
+                  (*V_p) = ((uint32_t)_p[0])
+                         | ((uint32_t)_p[1] << 8)
+                         | ((uint32_t)_p[2] << 16);
                else switch(size)
                {
-                  case 1: (*V_p) = TextMem[(A & 0x7FFFFF) - 65536]; break;
-                  case 2: (*V_p) = MDFN_de16lsb(&TextMem[(A & 0x7FFFFF) - 65536]); break;
-                  case 4: (*V_p) = MDFN_de32lsb(&TextMem[(A & 0x7FFFFF) - 65536]); break;
+                  case 1: (*V_p) = _p[0]; break;
+                  case 2:
+                  {
+                     uint16_t _v;
+#ifdef MSB_FIRST
+                     _v = (uint16_t)_p[0] | ((uint16_t)_p[1] << 8);
+#else
+                     memcpy(&_v, _p, 2);
+#endif
+                     (*V_p) = _v;
+                     break;
+                  }
+                  case 4:
+                  {
+                     uint32_t _v;
+#ifdef MSB_FIRST
+                     _v = (uint32_t)_p[0] | ((uint32_t)_p[1] << 8) | ((uint32_t)_p[2] << 16) | ((uint32_t)_p[3] << 24);
+#else
+                     memcpy(&_v, _p, 4);
+#endif
+                     (*V_p) = _v;
+                     break;
+                  }
                }
             }
          }
@@ -1423,16 +1452,35 @@ static INLINE uint32_t MemPeek(int32_t timestamp, uint32_t A, unsigned size, boo
          }
          else if((A & 0x7FFFFF) < (65536 + TextMem_size))
          {
+            const uint8_t *_p = &TextMem[(A & 0x7FFFFF) - 65536];
             if(access24)
-               return(MDFN_de24lsb(&TextMem[(A & 0x7FFFFF) - 65536]));
+               return ((uint32_t)_p[0])
+                    | ((uint32_t)_p[1] << 8)
+                    | ((uint32_t)_p[2] << 16);
             else switch(size)
             {
                case 1:
-                  return(TextMem[(A & 0x7FFFFF) - 65536]);
+                  return _p[0];
                case 2:
-                  return(MDFN_de16lsb(&TextMem[(A & 0x7FFFFF) - 65536]));
+               {
+                  uint16_t _v;
+#ifdef MSB_FIRST
+                  _v = (uint16_t)_p[0] | ((uint16_t)_p[1] << 8);
+#else
+                  memcpy(&_v, _p, 2);
+#endif
+                  return _v;
+               }
                case 4:
-                  return(MDFN_de32lsb(&TextMem[(A & 0x7FFFFF) - 65536]));
+               {
+                  uint32_t _v;
+#ifdef MSB_FIRST
+                  _v = (uint32_t)_p[0] | ((uint32_t)_p[1] << 8) | ((uint32_t)_p[2] << 16) | ((uint32_t)_p[3] << 24);
+#else
+                  memcpy(&_v, _p, 4);
+#endif
+                  return _v;
+               }
             }
          }
       }
@@ -1499,7 +1547,7 @@ static void PSX_Power(void)
    startup_frame_count = 0;
 }
 
-static INLINE void MemPoke(pscpu_timestamp_t timestamp, uint32 A, uint32_t V, unsigned size, bool access24)
+static INLINE void MemPoke(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V, unsigned size, bool access24)
 {
    if(A < 0x00800000)
    {
@@ -1538,7 +1586,7 @@ static INLINE void MemPoke(pscpu_timestamp_t timestamp, uint32 A, uint32_t V, un
    }
 }
 
-void PSX_MemPoke8(uint32 A, uint8 V)
+void PSX_MemPoke8(uint32_t A, uint8_t V)
 {
    MemPoke(0, A, V, 1, false);
 }
@@ -1564,101 +1612,151 @@ static bool TestMagic(const char *name, RFILE *fp, int64_t size)
 
 static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 {
+   /* Find SYSTEM.CNF on the disc and pull the PSX serial out of its
+    * BOOT= line.
+    *
+    * Used to go through CDIF_MakeStream + the abstract Stream API.
+    * That abstraction is gone; we now talk to CDIF_ReadSector
+    * directly, tracking position in whole sectors.  Every read in
+    * this function is naturally sector-aligned (PVD scan, root
+    * directory walk, SYSTEM.CNF fetch), so a sector-granular cursor
+    * is the right primitive here. */
    uint8_t pvd[2048];
+   uint8_t dir_sector[2048];   /* one-sector cache for the root dir walk */
    uint32_t rdel, rdel_len;
-   const char *ret = NULL;
-   struct Stream *fp = NULL;
-   unsigned pvd_search_count = 0;
+   uint32_t dir_cursor_sector = 0;   /* LBA of the sector currently in dir_sector */
+   uint32_t dir_walked        = 0;   /* bytes of dir walked so far */
+   uint32_t dir_off_in_sector = 0;   /* byte offset within dir_sector */
+   bool dir_have_sector       = false;
+   const char *ret            = NULL;
+   unsigned pvd_search_count  = 0;
+   uint32_t pvd_sector;
 
-   fp = CDIF_MakeStream(c, 0, ~0U);
-   if (!fp)
-      return NULL;
-   stream_seek(fp, 0x8000, SEEK_SET);
-
-   do
+   /* PVD scan: ISO 9660 places volume descriptors starting at LBA 16
+    * (0x8000 bytes in).  Read one sector at a time until we find
+    * type 0x01 (Primary VD) or hit the 32-sector safety cap. */
+   for (pvd_sector = 16; ; pvd_sector++)
    {
-      if((pvd_search_count++) == 32)
+      if ((pvd_search_count++) == 32)
       {
          log_cb(RETRO_LOG_ERROR, "PVD search count limit met.\n");
-         goto Breakout;
+         return NULL;
       }
 
-      stream_read(fp, pvd, 2048);
+      if (!CDIF_ReadSector(c, pvd, pvd_sector, 1))
+         return NULL;
 
-      if(memcmp(&pvd[1], "CD001", 5))
+      if (memcmp(&pvd[1], "CD001", 5))
       {
          log_cb(RETRO_LOG_ERROR, "Not ISO-9660\n");
-         goto Breakout;
+         return NULL;
       }
 
-      if(pvd[0] == 0xFF)
+      if (pvd[0] == 0xFF)
       {
          log_cb(RETRO_LOG_ERROR, "Missing Primary Volume Descriptor\n");
-         goto Breakout;
+         return NULL;
       }
-   } while(pvd[0] != 0x01);
 
-   /* [156 ... 189], 34 bytes - Root directory record */
-   rdel     = MDFN_de32lsb(&pvd[0x9E]);
-   rdel_len = MDFN_de32lsb(&pvd[0xA6]);
-
-   if(rdel_len >= (1024 * 1024 * 10))  /* Arbitrary sanity check. */
-   {
-      log_cb(RETRO_LOG_ERROR, "Root directory table too large\n");
-      goto Breakout;
+      if (pvd[0] == 0x01)
+         break;
    }
 
-   stream_seek(fp, (int64)rdel * 2048, SEEK_SET);
+   /* [156 ... 189], 34 bytes - Root directory record */
+#ifdef MSB_FIRST
+   rdel     = (uint32_t)pvd[0x9E] | ((uint32_t)pvd[0x9F] << 8) | ((uint32_t)pvd[0xA0] << 16) | ((uint32_t)pvd[0xA1] << 24);
+   rdel_len = (uint32_t)pvd[0xA6] | ((uint32_t)pvd[0xA7] << 8) | ((uint32_t)pvd[0xA8] << 16) | ((uint32_t)pvd[0xA9] << 24);
+#else
+   memcpy(&rdel,     &pvd[0x9E], 4);
+   memcpy(&rdel_len, &pvd[0xA6], 4);
+#endif
 
-   while(stream_tell(fp) < (((int64)rdel * 2048) + rdel_len))
+   if (rdel_len >= (1024 * 1024 * 10))  /* Arbitrary sanity check. */
    {
-      uint8_t dr[256 + 1];
-      uint8_t len_dr = stream_get_u8(fp);
-      uint8_t len_fi;
+      log_cb(RETRO_LOG_ERROR, "Root directory table too large\n");
+      return NULL;
+   }
 
-      if(!len_dr)
+   /* Walk the root directory: each record starts with its own
+    * length byte (len_dr), and records never cross sector boundaries
+    * (ISO 9660 zero-pads the tail of the sector if the next record
+    * wouldn't fit).  We cache one sector at a time and advance to
+    * the next when the current cursor would read past the end. */
+   while (dir_walked < rdel_len)
+   {
+      uint8_t  dr[256 + 1];
+      uint32_t needed_sector = rdel + (dir_walked / 2048);
+      uint32_t off_in_sector = dir_walked % 2048;
+      uint8_t  len_dr;
+      uint8_t  len_fi;
+
+      if (!dir_have_sector || dir_cursor_sector != needed_sector)
+      {
+         if (!CDIF_ReadSector(c, dir_sector, needed_sector, 1))
+            return NULL;
+         dir_cursor_sector = needed_sector;
+         dir_have_sector   = true;
+      }
+      dir_off_in_sector = off_in_sector;
+
+      len_dr = dir_sector[dir_off_in_sector];
+
+      /* Preserve the historical Stream-based walk's break-on-zero
+       * behaviour.  ISO 9660 zero-pads the tail of a sector when the
+       * next directory record wouldn't fit, but PS1 SYSTEM.CNF is
+       * always in the first sector of the root directory in practice,
+       * so the loop never had to span sectors. */
+      if (!len_dr)
          break;
 
-      /* len_dr counts the directory record header byte itself, so we
-       * read len_dr-1 more bytes. Cap at sizeof(dr)-1 (=256) to be safe. */
-      if (len_dr - 1 > (int)sizeof(dr) - 1)
+      /* Cap dr at sizeof(dr)-1 (=256) to be safe.  len_dr counts the
+       * header byte itself, so we copy len_dr bytes starting at the
+       * len_dr byte. */
+      if ((size_t)len_dr > sizeof(dr))
       {
-         log_cb(RETRO_LOG_ERROR, "Directory record length out of range: %u\n", len_dr);
-         goto Breakout;
+         log_cb(RETRO_LOG_ERROR,
+               "Directory record length out of range: %u\n", len_dr);
+         return NULL;
       }
 
       memset(dr, 0, sizeof(dr));
-      dr[0] = len_dr;
-      stream_read(fp, dr + 1, len_dr - 1);
+      memcpy(dr, &dir_sector[dir_off_in_sector], len_dr);
 
-      len_fi = dr[0x20];
+      dir_walked += len_dr;
+      len_fi      = dr[0x20];
 
-      if(len_fi == 12 && !memcmp(&dr[0x21], "SYSTEM.CNF;1", 12))
+      if (len_fi == 12 && !memcmp(&dr[0x21], "SYSTEM.CNF;1", 12))
       {
-         uint32_t file_lba = MDFN_de32lsb(&dr[0x02]);
-         uint8_t fb[2048 + 1];
-         char *bootpos;
-         char *tmp;
+         uint32_t file_lba;
+         uint8_t  fb[2048 + 1];
+         char    *bootpos;
+         char    *tmp;
+
+#ifdef MSB_FIRST
+         file_lba = (uint32_t)dr[0x02] | ((uint32_t)dr[0x03] << 8) | ((uint32_t)dr[0x04] << 16) | ((uint32_t)dr[0x05] << 24);
+#else
+         memcpy(&file_lba, &dr[0x02], 4);
+#endif
 
          memset(fb, 0, sizeof(fb));
-         stream_seek(fp, file_lba * 2048, SEEK_SET);
-         stream_read(fp, fb, 2048);
+         if (!CDIF_ReadSector(c, fb, file_lba, 1))
+            return NULL;
 
          /* Find "BOOT" in the SYSTEM.CNF buffer; bail out if missing
           * rather than dereferencing strstr's NULL return. */
          bootpos = strstr((char*)fb, "BOOT");
          if (!bootpos)
-            goto Breakout;
+            return NULL;
          bootpos += 4;
 
-         while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
+         while (*bootpos == ' ' || *bootpos == '\t') bootpos++;
          if (*bootpos != '=')
-            goto Breakout;
+            return NULL;
 
          bootpos++;
-         while(*bootpos == ' ' || *bootpos == '\t') bootpos++;
+         while (*bootpos == ' ' || *bootpos == '\t') bootpos++;
          if (strncasecmp(bootpos, "cdrom:\\", 7) != 0)
-            goto Breakout;
+            return NULL;
 
          bootpos += 7;
 
@@ -1721,37 +1819,34 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
          if ((tmp = strchr(bootpos, '.'))) *tmp = 0;
          if ((tmp = strchr(bootpos, ';'))) *tmp = 0;
 
-         if(strlen(bootpos) == 4 && bootpos[0] == 'S' &&
+         if (strlen(bootpos) == 4 && bootpos[0] == 'S' &&
             (bootpos[1] == 'C' || bootpos[1] == 'L' || bootpos[1] == 'I'))
          {
-            switch(bootpos[2])
+            switch (bootpos[2])
             {
                case 'E':
                   if (rr) *rr = REGION_EU;
                   ret = "SCEE";
-                  goto Breakout;
+                  return ret;
 
                case 'U':
                   if (rr) *rr = REGION_NA;
                   ret = "SCEA";
-                  goto Breakout;
+                  return ret;
 
                case 'K':   /* Korea? */
                case 'B':
                case 'P':
                   if (rr) *rr = REGION_JP;
                   ret = "SCEI";
-                  goto Breakout;
+                  return ret;
             }
          }
-      }
-   }
 
-Breakout:
-   if(fp)
-   {
-      stream_destroy(fp);
-      fp = NULL;
+         /* SYSTEM.CNF found but the BOOT line wasn't a recognized
+          * SC/SL/SI serial format; nothing more to find. */
+         return NULL;
+      }
    }
 
    return ret;
@@ -2030,7 +2125,7 @@ int lightrec_try_map(MEMFDTYPE memfd, int i, uintptr_t inc_io_base, uintptr_t ma
 		/* All mirrors mapped - we got a match! */
 		if (nmaps == NUM_MEM)
 		{
-			psx_mem = (uint8 *)io_base;
+			psx_mem = (uint8_t *)io_base;
 
 			if (ENABLE_CODE_BUFFER) {
 				/* Allocate a codebuffer after ram and mirrors, but don't reject if actual location is different */
@@ -2046,7 +2141,7 @@ int lightrec_try_map(MEMFDTYPE memfd, int i, uintptr_t inc_io_base, uintptr_t ma
 			if (map == MFAILED)
 				goto err_unmap;
 
-			psx_bios = (uint8 *)map;
+			psx_bios = (uint8_t *)map;
 
 			if (map != bios)
 				goto err_unmap;
@@ -2055,7 +2150,7 @@ int lightrec_try_map(MEMFDTYPE memfd, int i, uintptr_t inc_io_base, uintptr_t ma
 			if (map == MFAILED)
 				goto err_unmap;
 
-			psx_scratch = (uint8 *)map;
+			psx_scratch = (uint8_t *)map;
 
 			if (map != scratch)
 				goto err_unmap;
@@ -2432,7 +2527,7 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
    }
 
 
-   MDFNMP_Init(1024, ((uint64)1 << 29) / 1024);
+   MDFNMP_Init(1024, ((uint64_t)1 << 29) / 1024);
    MDFNMP_AddRAM(2048 * 1024, 0x00000000, MainRAM->data8);
 
    if(firmware_is_present(region))
@@ -2533,12 +2628,21 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
 
 static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
 {
-   uint32 PC        = MDFN_de32lsb(&data[0x10]);
-   uint32 SP        = MDFN_de32lsb(&data[0x30]);
-   uint32 TextStart = MDFN_de32lsb(&data[0x18]);
-   uint32 TextSize  = MDFN_de32lsb(&data[0x1C]);
-   uint8 *po;
-   uint32 sa;
+   uint32_t PC, SP, TextStart, TextSize;
+   uint8_t *po;
+   uint32_t sa;
+
+#ifdef MSB_FIRST
+   PC        = (uint32_t)data[0x10] | ((uint32_t)data[0x11] << 8) | ((uint32_t)data[0x12] << 16) | ((uint32_t)data[0x13] << 24);
+   SP        = (uint32_t)data[0x30] | ((uint32_t)data[0x31] << 8) | ((uint32_t)data[0x32] << 16) | ((uint32_t)data[0x33] << 24);
+   TextStart = (uint32_t)data[0x18] | ((uint32_t)data[0x19] << 8) | ((uint32_t)data[0x1A] << 16) | ((uint32_t)data[0x1B] << 24);
+   TextSize  = (uint32_t)data[0x1C] | ((uint32_t)data[0x1D] << 8) | ((uint32_t)data[0x1E] << 16) | ((uint32_t)data[0x1F] << 24);
+#else
+   memcpy(&PC,        &data[0x10], 4);
+   memcpy(&SP,        &data[0x30], 4);
+   memcpy(&TextStart, &data[0x18], 4);
+   memcpy(&TextSize,  &data[0x1C], 4);
+#endif
 
    if(ignore_pcsp)
       log_cb(RETRO_LOG_DEBUG, "TextStart=0x%08x\nTextSize=0x%08x\n", TextStart, TextSize);
@@ -2573,7 +2677,7 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
 
    if(TextStart < TextMem_Start)
    {
-      uint32 old_size = TextMem_size;
+      uint32_t old_size = TextMem_size;
 
       //printf("RESIZE: 0x%08x\n", TextMem_Start - TextStart);
 
@@ -2593,23 +2697,59 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
 
    po = &PIOMem->data8[0x0800];
 
-   MDFN_en32lsb(po, (0x0 << 26) | (31 << 21) | (0x8 << 0)); // JR
+   { uint32_t _ev = (uint32_t)((0x0 << 26) | (31 << 21) | (0x8 << 0)); // JR
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
-   MDFN_en32lsb(po, 0); // NOP(kinda)
+   { uint32_t _ev = (uint32_t)(0); // NOP(kinda)
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
    po = &PIOMem->data8[0x1000];
 
    // Load cacheable-region target PC into r2
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16) | (0x9F001010 >> 16));      // LUI
+   { uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16) | (0x9F001010 >> 16));      // LUI
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (2 << 16) | (0x9F001010 & 0xFFFF));   // ORI
+   { uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (2 << 16) | (0x9F001010 & 0xFFFF));   // ORI
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
    // Jump to r2
-   MDFN_en32lsb(po, (0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
+   { uint32_t _ev = (uint32_t)((0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
-   MDFN_en32lsb(po, 0); // NOP(kinda)
+   { uint32_t _ev = (uint32_t)(0); // NOP(kinda)
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
    //
@@ -2618,42 +2758,114 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
 
    // Load source address into r8
    sa = 0x9F000000 + 65536;
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16) | (sa >> 16));  // LUI
+   { uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16) | (sa >> 16));  // LUI
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (8 << 16) | (sa & 0xFFFF));  // ORI
+   { uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (8 << 16) | (sa & 0xFFFF));  // ORI
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
    // Load dest address into r9
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem_Start >> 16));  // LUI
+   { uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem_Start >> 16));  // LUI
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (9 << 16) | (TextMem_Start & 0xFFFF));   // ORI
+   { uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (9 << 16) | (TextMem_Start & 0xFFFF));   // ORI
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
    // Load size into r10
-   MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem_size >> 16)); // LUI
+   { uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16)  | (TextMem_size >> 16)); // LUI
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
-   MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (10 << 16) | (TextMem_size & 0xFFFF));    // ORI
+   { uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (10 << 16) | (TextMem_size & 0xFFFF));    // ORI
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
    //
    // Loop begin
    //
 
-   MDFN_en32lsb(po, (0x24 << 26) | (8 << 21) | (1 << 16));  // LBU to r1
+   { uint32_t _ev = (uint32_t)((0x24 << 26) | (8 << 21) | (1 << 16));  // LBU to r1
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
-   MDFN_en32lsb(po, (0x08 << 26) | (10 << 21) | (10 << 16) | 0xFFFF);   // Decrement size
+   { uint32_t _ev = (uint32_t)((0x08 << 26) | (10 << 21) | (10 << 16) | 0xFFFF);   // Decrement size
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
-   MDFN_en32lsb(po, (0x28 << 26) | (9 << 21) | (1 << 16));  // SB from r1
+   { uint32_t _ev = (uint32_t)((0x28 << 26) | (9 << 21) | (1 << 16));  // SB from r1
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
-   MDFN_en32lsb(po, (0x08 << 26) | (8 << 21) | (8 << 16) | 0x0001);  // Increment source addr
+   { uint32_t _ev = (uint32_t)((0x08 << 26) | (8 << 21) | (8 << 16) | 0x0001);  // Increment source addr
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
-   MDFN_en32lsb(po, (0x05 << 26) | (0 << 21) | (10 << 16) | (-5 & 0xFFFF));
+   { uint32_t _ev = (uint32_t)((0x05 << 26) | (0 << 21) | (10 << 16) | (-5 & 0xFFFF));
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
-   MDFN_en32lsb(po, (0x08 << 26) | (9 << 21) | (9 << 16) | 0x0001);  // Increment dest addr
+   { uint32_t _ev = (uint32_t)((0x08 << 26) | (9 << 21) | (9 << 16) | 0x0001);  // Increment dest addr
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
    //
@@ -2667,31 +2879,73 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
    }
    else
    {
-      MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | (SP >> 16)); // LUI
+      { uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16)  | (SP >> 16)); // LUI
+      #ifdef MSB_FIRST
+         po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+      #else
+         memcpy(po, &_ev, 4);
+      #endif
+      }
       po += 4;
-      MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (29 << 16) | (SP & 0xFFFF));    // ORI
+      { uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (29 << 16) | (SP & 0xFFFF));    // ORI
+      #ifdef MSB_FIRST
+         po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+      #else
+         memcpy(po, &_ev, 4);
+      #endif
+      }
       po += 4;
 
       // Load PC into r2
-      MDFN_en32lsb(po, (0xF << 26) | (0 << 21) | (1 << 16)  | ((PC >> 16) | 0x8000));      // LUI
+      { uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16)  | ((PC >> 16) | 0x8000));      // LUI
+      #ifdef MSB_FIRST
+         po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+      #else
+         memcpy(po, &_ev, 4);
+      #endif
+      }
       po += 4;
-      MDFN_en32lsb(po, (0xD << 26) | (1 << 21) | (2 << 16) | (PC & 0xFFFF));   // ORI
+      { uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (2 << 16) | (PC & 0xFFFF));   // ORI
+      #ifdef MSB_FIRST
+         po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+      #else
+         memcpy(po, &_ev, 4);
+      #endif
+      }
       po += 4;
    }
 
    // Half-assed instruction cache flush. ;)
    for(unsigned i = 0; i < 1024; i++)
    {
-      MDFN_en32lsb(po, 0);
+      { uint32_t _ev = (uint32_t)(0);
+      #ifdef MSB_FIRST
+         po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+      #else
+         memcpy(po, &_ev, 4);
+      #endif
+      }
       po += 4;
    }
 
 
 
    // Jump to r2
-   MDFN_en32lsb(po, (0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
+   { uint32_t _ev = (uint32_t)((0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
-   MDFN_en32lsb(po, 0); // NOP(kinda)
+   { uint32_t _ev = (uint32_t)(0); // NOP(kinda)
+   #ifdef MSB_FIRST
+      po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
+   #else
+      memcpy(po, &_ev, 4);
+   #endif
+   }
    po += 4;
 
 #ifdef HAVE_LIGHTREC
@@ -3010,7 +3264,7 @@ static void DoSimpleCommand(int cmd)
    }
 }
 
-static void GSCondCode(MemoryPatch* patch, const char* cc, const unsigned len, const uint32 addr, const uint16 val)
+static void GSCondCode(MemoryPatch* patch, const char* cc, const unsigned len, const uint32_t addr, const uint16_t val)
 {
    char tmp[256];
 
@@ -3027,11 +3281,11 @@ static void GSCondCode(MemoryPatch* patch, const char* cc, const unsigned len, c
 
 static bool DecodeGS(const char *cheat_string, MemoryPatch *patch)
 {
-   uint64 code = 0;
+   uint64_t code = 0;
    unsigned nybble_count = 0;
    const size_t len = strlen(cheat_string);
-   uint8  code_type;
-   uint64 cl;
+   uint8_t  code_type;
+   uint64_t cl;
    unsigned i;
 
    for(i = 0; i < len; i++)
@@ -3133,9 +3387,9 @@ static bool DecodeGS(const char *cheat_string, MemoryPatch *patch)
 
    case 0x50:   // Repeat thingy
    {
-      const uint8 wcount = (cl >> 24) & 0xFF;
-      const uint8 addr_inc = (cl >> 16) & 0xFF;
-      const uint8 val_inc = (cl >> 0) & 0xFF;
+      const uint8_t wcount = (cl >> 24) & 0xFF;
+      const uint8_t addr_inc = (cl >> 16) & 0xFF;
+      const uint8_t val_inc = (cl >> 0) & 0xFF;
 
       patch->mltpl_count = wcount;
       patch->mltpl_addr_inc = addr_inc;
@@ -3145,7 +3399,7 @@ static bool DecodeGS(const char *cheat_string, MemoryPatch *patch)
 
    case 0xC2:   // Copy
    {
-      const uint16 ccount = cl & 0xFFFF;
+      const uint16_t ccount = cl & 0xFFFF;
 
       patch->type = 'T';
       patch->val = 0;
@@ -3219,6 +3473,27 @@ static void alloc_surface(void)
    uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
    uint32_t height = content_is_pal ? MEDNAFEN_CORE_GEOMETRY_MAX_H : 480;
 
+   /* The hardware renderers (OpenGL, Vulkan) never read or write
+    * this surface - the GPU runs entirely on the GPU and the
+    * libretro-side video callback is the swapchain.  Allocating
+    * a ~21 MB buffer (PAL @ 4x upscale) that nothing ever
+    * touches is pure waste, so skip it unless we know we'll
+    * use it. */
+   if (rsx_intf_is_type() != RSX_SOFTWARE)
+   {
+      if (surf)
+      {
+         MDFN_Surface_Delete(surf);
+         surf = NULL;
+      }
+      /* The per-dest_line scanout cache assumes the surface's
+       * margin pixels are zero; with no surface, the assumption
+       * is vacuous, but resetting keeps it clean if the user
+       * later switches back to SW via a core reload. */
+      GPU_InvalidateScanoutCache();
+      return;
+   }
+
    width  <<= GPU_get_upscale_shift();
    height <<= GPU_get_upscale_shift();
 
@@ -3226,6 +3501,14 @@ static void alloc_surface(void)
       MDFN_Surface_Delete(surf);
 
    surf = MDFN_Surface_New(width, height, width);
+
+   /* The fresh surface is calloc'd (all zero).  Discard any
+    * previously-cached per-dest_line geometry so the first
+    * frame's scanout writes the margin zeros explicitly - those
+    * pixels are already zero from calloc, but the cache is what
+    * lets subsequent frames skip the re-write, and it must
+    * agree with reality before the first match check. */
+   GPU_InvalidateScanoutCache();
 }
 
 static void check_system_specs(void)
@@ -4713,7 +4996,7 @@ static bool MDFNI_LoadCD(const char *devicename)
 
       log_cb(RETRO_LOG_DEBUG, "CD %d Layout:\n", i + 1);
 
-      for(int32 track = toc.first_track; track <= toc.last_track; track++)
+      for(int32_t track = toc.first_track; track <= toc.last_track; track++)
       {
          log_cb(RETRO_LOG_DEBUG, "Track %2d, LBA: %6d  %s\n", track, toc.tracks[track].lba, (toc.tracks[track].control & 0x4) ? "DATA" : "AUDIO");
       }
@@ -4827,7 +5110,11 @@ bool retro_load_game(const struct retro_game_info *info)
    if (cd_speedup_compat_max && cd_2x_speedup > cd_speedup_compat_max)
       cd_2x_speedup = cd_speedup_compat_max;
 
-   alloc_surface();
+   /* Note: alloc_surface() used to run here, before rsx_intf_open.
+    * It now runs AFTER the renderer has been selected so it can
+    * skip the (~21 MB at 4x PAL) allocation when a hardware
+    * renderer is in use - nothing in this block depends on surf
+    * being valid, only on MDFNI_LoadGame having succeeded. */
 
 #ifdef NEED_DEINTERLACER
    PrevInterlaced = false;
@@ -4841,10 +5128,13 @@ bool retro_load_game(const struct retro_game_info *info)
    frame_count = 0;
    internal_frame_count = 0;
 
-   // MDFNI_LoadGame() has been called and surface has been allocated,
-   // we can now perform firmware check
+   // MDFNI_LoadGame() has been called, we can now perform firmware
+   // check and pick a renderer.  alloc_surface follows the renderer
+   // choice so it can be skipped on the HW paths.
    force_software_renderer = false;
    ret = rsx_intf_open(content_is_pal, force_software_renderer);
+
+   alloc_surface();
 
    /* Hide irrelevant core options */
    switch (rsx_intf_is_type())
@@ -4884,8 +5174,10 @@ bool retro_load_game(const struct retro_game_info *info)
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(pgxp_vertex);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-         option_display.key = BEETLE_OPT(pgxp_texture);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+         /* pgxp_texture is no longer hidden in SW mode: the SW
+          * rasteriser implements perspective-correct texturing
+          * via the precise[2] (w) PGXP carries on every vertex.
+          * pgxp_vertex above stays hidden - it's still HW-only. */
 
          option_display.key = BEETLE_OPT(image_offset_cycles);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
@@ -4997,7 +5289,7 @@ static bool retro_set_system_av_info(void)
 void retro_run(void)
 {
    bool updated = false;
-   static int32 rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
+   static int32_t rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
    EmulateSpecStruct spec = {0};
    EmulateSpecStruct *espec;
    int32_t timestamp = 0;
@@ -5324,6 +5616,22 @@ void retro_run(void)
 
          Deinterlacer_Process(&deint, surf, &spec.DisplayRect, rects, spec.InterlaceField);
 
+         /* The scanout cache assumes margin pixels are still zero
+          * from the previous frame's writes.  WEAVE's XReposition
+          * memmove (and only that path) shifts active pixels into
+          * the margin region, breaking the assumption.  BOB,
+          * BOB_OFFSET and FASTMAD copy / blend whole row blocks
+          * whose source rows still have zero margins, so they
+          * preserve the invariant.
+          *
+          * Ask the deinterlacer whether the *last call* actually
+          * disturbed margins, instead of invalidating on every
+          * WEAVE frame.  In steady-state WEAVE (no inter-field
+          * horizontal-resolution change), the memmove doesn't
+          * run and the cache can stay hot. */
+         if (Deinterlacer_DidDisturbMargins(&deint))
+            GPU_InvalidateScanoutCache();
+
          PrevInterlaced = true;
 
          spec.InterlaceOn = false;
@@ -5392,6 +5700,13 @@ void retro_run(void)
          /* Smart height geometry trigger */
          if (crop_overscan == 2)
          {
+            /* Get rid of startup logo shift */
+            if (currently_interlaced || PrevInterlaced)
+            {
+               if (height == 478 || height == 239)
+                  height = (height == 239) ? 236 : 472;
+            }
+
             if (image_height != height)
             {
                image_height = height;

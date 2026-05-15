@@ -9,7 +9,7 @@ void GTE_Init(void);
 void GTE_Power(void);
 int GTE_StateAction(StateMem *sm, int load, int data_only);
 
-int32 GTE_Instruction(uint32_t instr);
+int32_t GTE_Instruction(uint32_t instr);
 
 void GTE_WriteCR(unsigned int which, uint32_t value);
 void GTE_WriteDR(unsigned int which, uint32_t value);

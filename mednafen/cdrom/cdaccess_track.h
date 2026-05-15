@@ -26,14 +26,15 @@ extern "C" {
 #endif
 
 /* Forward declarations - keeps this header light.  The full
- * `struct Stream` lives in mednafen/Stream.h; AudioReader is a
- * still-C++ class declared in mednafen/cdrom/audioreader.h. */
-struct Stream;
+ * cdstream lives in mednafen/cdstream.h; AudioReader is a plain
+ * C struct declared in mednafen/cdrom/audioreader.h. */
+struct cdstream;
+typedef struct cdstream cdstream;
 struct AudioReader;
 
 /* Per-track state shared by the CDAccess_Image / _CHD / _PBP
- * backends.  Holds CD-image metadata + a borrowed Stream pointer
- * for backends that read sectors via a Stream layer (Image, PBP).
+ * backends.  Holds CD-image metadata + a borrowed cdstream pointer
+ * for backends that read sectors via a cdstream (Image, PBP).
  * CHD doesn't use the fp / AReader / FileOffset fields - those are
  * left zero. */
 typedef struct CDRFILE_TRACK_INFO
@@ -49,7 +50,7 @@ typedef struct CDRFILE_TRACK_INFO
    int32_t       index[2];
    int32_t       sectors;          /* Not including pregap */
 
-   struct Stream *fp;
+   cdstream     *fp;
    bool          FirstFileInstance;
    bool          RawAudioMSBFirst;
    long          FileOffset;

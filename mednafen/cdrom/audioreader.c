@@ -25,43 +25,43 @@ struct AudioReader
 
 static size_t iov_read_func(void *ptr, size_t size, size_t nmemb, void *user_data)
 {
-   struct Stream *fw = (struct Stream *)user_data;
+   cdstream *fw = (cdstream *)user_data;
 
    if(!size || !fw)
       return 0;
 
-   return stream_read(fw, ptr, size * nmemb) / size;
+   return cdstream_read(fw, ptr, size * nmemb) / size;
 }
 
 static int iov_seek_func(void *user_data, int64_t offset, int whence)
 {
-   struct Stream *fw = (struct Stream *)user_data;
+   cdstream *fw = (cdstream *)user_data;
 
    if (fw)
-      stream_seek(fw, offset, whence);
+      cdstream_seek(fw, offset, whence);
    return 0;
 }
 
 static int iov_close_func(void *user_data)
 {
-   struct Stream *fw = (struct Stream *)user_data;
+   cdstream *fw = (cdstream *)user_data;
 
    if (fw)
-      stream_close(fw);
+      cdstream_close(fw);
    return 0;
 }
 
 static long iov_tell_func(void *user_data)
 {
-   struct Stream *fw = (struct Stream *)user_data;
+   cdstream *fw = (cdstream *)user_data;
 
    if (!fw)
       return -1;
 
-   return stream_tell(fw);
+   return (long)cdstream_tell(fw);
 }
 
-AudioReader *AR_Open(struct Stream *fp)
+AudioReader *AR_Open(cdstream *fp)
 {
    ov_callbacks cb;
    AudioReader *r;
@@ -79,7 +79,7 @@ AudioReader *AR_Open(struct Stream *fp)
    cb.close_func = iov_close_func;
    cb.tell_func  = iov_tell_func;
 
-   stream_seek(fp, 0, SEEK_SET);
+   cdstream_seek(fp, 0, SEEK_SET);
    if (ov_open_callbacks(fp, &r->ovfile, NULL, 0, cb) != 0)
    {
       free(r);

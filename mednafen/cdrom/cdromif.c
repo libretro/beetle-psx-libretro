@@ -75,7 +75,6 @@
 
 #include "../mednafen.h"
 #include "../error.h"
-#include "../Stream.h"
 #include "CDUtility.h"
 #include "CDAccess.h"
 #include "cdromif.h"
@@ -319,8 +318,10 @@ static int CDIF_ReadThread(void *v_arg)
                   int how_far_ahead = (int)(cdif->ra_lba - new_lba);
 
                   if (how_far_ahead <= max_ra)
-                     cdif->ra_count = MIN(speedmult_ra,
-                           1 + max_ra - how_far_ahead);
+                  {
+                     int _v = 1 + max_ra - how_far_ahead;
+                     cdif->ra_count = (speedmult_ra < _v) ? speedmult_ra : _v;
+                  }
                   else
                      cdif->ra_count++;
                }
@@ -545,6 +546,11 @@ bool CDIF_ValidateRawSector(uint8_t *buf)
 
 int CDIF_ReadSector(CDIF *cdif, uint8_t *pBuf, uint32_t lba, uint32_t nSectors)
 {
+   /* Stack scratch for the raw 2352+96 sector. Hoisted above the
+    * loop to make the intent (one reusable buffer across all
+    * iterations) explicit; gcc already frame-allocated this once
+    * per function call regardless of declaration position. */
+   uint8_t tmpbuf[SECTOR_RAW_BYTES];
    int ret = 0;
 
    if (cdif->UnrecoverableError)
@@ -552,7 +558,6 @@ int CDIF_ReadSector(CDIF *cdif, uint8_t *pBuf, uint32_t lba, uint32_t nSectors)
 
    while (nSectors--)
    {
-      uint8_t tmpbuf[SECTOR_RAW_BYTES];
       int     mode;
 
       if (!CDIF_ReadRawSector(cdif, tmpbuf, lba, -1))
@@ -728,151 +733,3 @@ CDIF *CDIF_Open(bool *success, const char *path,
    return cdif;
 }
 
-/* ------------------------------------------------------------------
- * CDIF_Stream_Thing - a Stream view onto a CDIF.  Same upcast/vtable
- * pattern as FileStream and MemoryStream.
- * ------------------------------------------------------------------ */
-
-typedef struct CDIF_Stream_Thing
-{
-   struct Stream  base;
-   CDIF          *cdintf;
-   uint32_t       start_lba;
-   uint32_t       sector_count;
-   int64_t        position;
-} CDIF_Stream_Thing;
-
-static uint64_t cst_read(struct Stream *s, void *data, uint64_t count)
-{
-   CDIF_Stream_Thing *cst        = (CDIF_Stream_Thing *)s;
-   uint64_t           end_byte   = (uint64_t)cst->sector_count * 2048;
-   uint64_t           total;
-   uint8_t           *out;
-   uint32_t           lba;
-   uint64_t           in_sector_off;
-   uint64_t           full_sectors;
-   uint64_t           tail;
-
-   if (cst->position < 0 || (uint64_t)cst->position >= end_byte)
-      return 0;
-
-   if (count > end_byte - (uint64_t)cst->position)
-      count = end_byte - (uint64_t)cst->position;
-   if (!count)
-      return 0;
-
-   total         = count;
-   out           = (uint8_t *)data;
-   lba           = cst->start_lba + (uint32_t)((uint64_t)cst->position / 2048);
-   in_sector_off = (uint64_t)cst->position & 2047;
-
-   /* Partial first sector: bytes [in_sector_off, 2048) of one sector.
-    * Has to go through a temp buffer because we want a tail of the
-    * sector but ReadSector always writes the full 2048 bytes. */
-   if (in_sector_off)
-   {
-      uint8_t  buf[2048];
-      uint64_t want = 2048 - in_sector_off;
-      if (want > count)
-         want = count;
-
-      CDIF_ReadSector(cst->cdintf, buf, lba, 1);
-      memcpy(out, buf + in_sector_off, (size_t)want);
-
-      out   += want;
-      count -= want;
-      lba++;
-   }
-
-   /* Full middle sectors: read straight into the caller's buffer.
-    * One CDIF_ReadSector call covers the whole run since it loops
-    * internally. */
-   full_sectors = count / 2048;
-   if (full_sectors)
-   {
-      CDIF_ReadSector(cst->cdintf, out, lba, (uint32_t)full_sectors);
-      out   += full_sectors * 2048;
-      count -= full_sectors * 2048;
-      lba   += (uint32_t)full_sectors;
-   }
-
-   /* Partial last sector: bytes [0, count) of one sector.  Same temp-
-    * buffer requirement as the head partial. */
-   tail = count;
-   if (tail)
-   {
-      uint8_t buf[2048];
-      CDIF_ReadSector(cst->cdintf, buf, lba, 1);
-      memcpy(out, buf, (size_t)tail);
-   }
-
-   cst->position += total;
-   return total;
-}
-
-static void cst_seek(struct Stream *s, int64_t offset, int whence)
-{
-   CDIF_Stream_Thing *cst = (CDIF_Stream_Thing *)s;
-   int64_t            new_position;
-
-   switch (whence)
-   {
-      case SEEK_SET: new_position = offset; break;
-      case SEEK_CUR: new_position = cst->position + offset; break;
-      case SEEK_END: new_position = (int64_t)cst->sector_count * 2048 + offset; break;
-      default:       return;
-   }
-
-   if (new_position < 0)
-      return;
-   cst->position = new_position;
-}
-
-static uint64_t cst_tell(struct Stream *s)
-{
-   return (uint64_t)((CDIF_Stream_Thing *)s)->position;
-}
-
-static uint64_t cst_size(struct Stream *s)
-{
-   return (uint64_t)((CDIF_Stream_Thing *)s)->sector_count * 2048;
-}
-
-static void cst_close(struct Stream *s)
-{
-   (void)s;
-}
-
-static void cst_destroy(struct Stream *s)
-{
-   if (!s)
-      return;
-   free(s);
-}
-
-static const struct StreamOps cdif_stream_ops =
-{
-   cst_read,
-   cst_seek,
-   cst_tell,
-   cst_size,
-   cst_close,
-   cst_destroy,
-   NULL
-};
-
-struct Stream *CDIF_MakeStream(CDIF *cdif, uint32_t lba, uint32_t sector_count)
-{
-   CDIF_Stream_Thing *cst =
-      (CDIF_Stream_Thing *)malloc(sizeof(*cst));
-
-   if (!cst)
-      return NULL;
-
-   cst->base.ops     = &cdif_stream_ops;
-   cst->cdintf       = cdif;
-   cst->start_lba    = lba;
-   cst->sector_count = sector_count;
-   cst->position     = 0;
-   return &cst->base;
-}

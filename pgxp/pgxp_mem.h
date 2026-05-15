@@ -37,16 +37,16 @@ extern "C" {
 
    void PGXP_InitMem(void);
 
-   u32		PGXP_ConvertAddress(u32 addr);
+   uint32_t		PGXP_ConvertAddress(uint32_t addr);
 
-   PGXP_value* GetPtr(u32 addr);
-   PGXP_value* ReadMem(u32 addr);
+   PGXP_value* GetPtr(uint32_t addr);
+   PGXP_value* ReadMem(uint32_t addr);
 
-   void ValidateAndCopyMem(PGXP_value* dest, u32 addr, u32 value);
-   void ValidateAndCopyMem16(PGXP_value* dest, u32 addr, u32 value, int sign);
+   void ValidateAndCopyMem(PGXP_value* dest, uint32_t addr, uint32_t value);
+   void ValidateAndCopyMem16(PGXP_value* dest, uint32_t addr, uint32_t value, int sign);
 
-   void WriteMem(PGXP_value* value, u32 addr);
-   void WriteMem16(PGXP_value* src, u32 addr);
+   void WriteMem(PGXP_value* value, uint32_t addr);
+   void WriteMem16(PGXP_value* src, uint32_t addr);
 
 #ifdef __cplusplus
 }

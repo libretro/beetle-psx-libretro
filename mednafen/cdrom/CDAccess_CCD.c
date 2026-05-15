@@ -28,8 +28,7 @@
 #include "../mednafen.h"
 #include "../error.h"
 #include "../general_c.h"
-#include "../FileStream.h"
-#include "../MemoryStream.h"
+#include "../cdstream.h"
 
 #include "CDAccess.h"
 #include "CDAccess_CCD.h"
@@ -169,8 +168,8 @@ struct CDAccess_CCD
 {
    CDAccess       base;
 
-   struct Stream *img_stream;
-   struct Stream *sub_stream;
+   cdstream       img_stream;
+   cdstream       sub_stream;
    size_t         img_numsectors;
    TOC            tocd;
 };
@@ -204,8 +203,8 @@ static bool CDAccess_CCD_CheckSubQSanity(struct CDAccess_CCD *self)
          } parts;
       } buf;
 
-      stream_seek(self->sub_stream, s * 96, SEEK_SET);
-      stream_read(self->sub_stream, buf.full, 96);
+      cdstream_seek(&self->sub_stream, s * 96, SEEK_SET);
+      cdstream_read(&self->sub_stream, buf.full, 96);
 
       if (!subq_check_checksum(buf.parts.qbuf))
          continue;
@@ -310,9 +309,9 @@ static void apply_extension_case(const char *file_ext,
 static bool CDAccess_CCD_Load(struct CDAccess_CCD *self, const char *path,
       bool image_memcache)
 {
-   /* All return paths past mdfn_filestream_init pass through cleanup:
-    * which closes cf.  cf is in-place so use stream_close (NOT destroy). */
-   struct FileStream  cf;
+   /* All return paths past cdstream_open pass through cleanup, which
+    * closes cf. */
+   cdstream           cf;
    bool               ok = true;
    ccd_kv_list       *kv;
    char               linebuf[CCD_LINE_BUF];
@@ -341,8 +340,7 @@ static bool CDAccess_CCD_Load(struct CDAccess_CCD *self, const char *path,
 
    cur_section[0] = 0;
 
-   mdfn_filestream_init(&cf, path);
-   if (!mdfn_filestream_is_open(&cf))
+   if (!cdstream_open(&cf, path))
    {
       MDFN_Error(0, "CCD: failed to open \"%s\"", path);
       ok = false;
@@ -361,7 +359,7 @@ static bool CDAccess_CCD_Load(struct CDAccess_CCD *self, const char *path,
     *    Key=Value
     * Comments and stray whitespace are not part of the format
     * (just blank lines between sections). */
-   while (stream_get_line(&cf.base, linebuf, sizeof(linebuf)) >= 0)
+   while (cdstream_get_line(&cf, linebuf, sizeof(linebuf)) >= 0)
    {
       size_t llen;
 
@@ -533,10 +531,9 @@ static bool CDAccess_CCD_Load(struct CDAccess_CCD *self, const char *path,
 
    /* Open image stream (.img sibling). */
    {
-      char                image_basename[CCD_PATH_BUF];
-      char                image_path    [CCD_PATH_BUF];
-      struct FileStream  *str;
-      int64_t             ss;
+      char    image_basename[CCD_PATH_BUF];
+      char    image_path    [CCD_PATH_BUF];
+      int64_t ss;
 
       /* image_basename = file_base + "." + img_extsd ("img", 3 chars).
        * Reserve 5 bytes (".img\0") so an oversized file_base gets
@@ -552,35 +549,24 @@ static bool CDAccess_CCD_Load(struct CDAccess_CCD *self, const char *path,
       MDFN_EvalFIP_c(dir_path, image_basename,
             image_path, sizeof(image_path));
 
-      str = mdfn_filestream_new(image_path);
-      if (!mdfn_filestream_is_open(str))
+      if (!cdstream_open(&self->img_stream, image_path))
       {
          MDFN_Error(0, "Could not open CCD image \"%s\"", image_path);
-         if (str)
-            stream_destroy(&str->base);
          ok = false;
          goto cleanup;
       }
 
-      if (image_memcache)
+      if (image_memcache && !cdstream_memcache_in_place(&self->img_stream))
       {
-         /* mdfn_memstream_new_from_stream consumes &str->base regardless. */
-         struct MemoryStream *mem = mdfn_memstream_new_from_stream(&str->base);
-         if (!mdfn_memstream_is_valid(mem))
-         {
-            MDFN_Error(0, "Could not load CCD image \"%s\" into memory",
-                  image_path);
-            if (mem)
-               stream_destroy(&mem->base);
-            ok = false;
-            goto cleanup;
-         }
-         self->img_stream = &mem->base;
+         MDFN_Error(0, "Could not load CCD image \"%s\" into memory",
+               image_path);
+         /* cdstream_memcache_in_place closed self->img_stream on
+          * failure - cleanup's cdstream_close is a safe no-op. */
+         ok = false;
+         goto cleanup;
       }
-      else
-         self->img_stream = &str->base;
 
-      ss = stream_size(self->img_stream);
+      ss = (int64_t)cdstream_size(&self->img_stream);
 
       if (ss % 2352)
       {
@@ -594,9 +580,8 @@ static bool CDAccess_CCD_Load(struct CDAccess_CCD *self, const char *path,
 
    /* Open subchannel stream (.sub sibling). */
    {
-      char                sub_basename[CCD_PATH_BUF];
-      char                sub_path    [CCD_PATH_BUF];
-      struct FileStream  *str;
+      char sub_basename[CCD_PATH_BUF];
+      char sub_path    [CCD_PATH_BUF];
 
       /* sub_basename = file_base + "." + sub_extsd ("sub", 3 chars).
        * Reserve 5 bytes (".sub\0") so an oversized file_base gets
@@ -612,34 +597,22 @@ static bool CDAccess_CCD_Load(struct CDAccess_CCD *self, const char *path,
       MDFN_EvalFIP_c(dir_path, sub_basename,
             sub_path, sizeof(sub_path));
 
-      str = mdfn_filestream_new(sub_path);
-      if (!mdfn_filestream_is_open(str))
+      if (!cdstream_open(&self->sub_stream, sub_path))
       {
          MDFN_Error(0, "Could not open CCD subchannel \"%s\"", sub_path);
-         if (str)
-            stream_destroy(&str->base);
          ok = false;
          goto cleanup;
       }
 
-      if (image_memcache)
+      if (image_memcache && !cdstream_memcache_in_place(&self->sub_stream))
       {
-         struct MemoryStream *mem = mdfn_memstream_new_from_stream(&str->base);
-         if (!mdfn_memstream_is_valid(mem))
-         {
-            MDFN_Error(0, "Could not load CCD subchannel \"%s\" into memory",
-                  sub_path);
-            if (mem)
-               stream_destroy(&mem->base);
-            ok = false;
-            goto cleanup;
-         }
-         self->sub_stream = &mem->base;
+         MDFN_Error(0, "Could not load CCD subchannel \"%s\" into memory",
+               sub_path);
+         ok = false;
+         goto cleanup;
       }
-      else
-         self->sub_stream = &str->base;
 
-      if (stream_size(self->sub_stream)
+      if (cdstream_size(&self->sub_stream)
             != (uint64_t)self->img_numsectors * 96)
       {
          MDFN_Error(0, "CCD SUB file size mismatch.");
@@ -655,23 +628,15 @@ static bool CDAccess_CCD_Load(struct CDAccess_CCD *self, const char *path,
    }
 
 cleanup:
-   stream_close(&cf.base);
+   cdstream_close(&cf);
    free(kv);
    return ok;
 }
 
 static void CDAccess_CCD_Cleanup(struct CDAccess_CCD *self)
 {
-   if (self->img_stream)
-   {
-      stream_destroy(self->img_stream);
-      self->img_stream = NULL;
-   }
-   if (self->sub_stream)
-   {
-      stream_destroy(self->sub_stream);
-      self->sub_stream = NULL;
-   }
+   cdstream_close(&self->img_stream);
+   cdstream_close(&self->sub_stream);
 }
 
 static bool CDAccess_CCD_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf,
@@ -686,11 +651,11 @@ static bool CDAccess_CCD_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf,
       return false;
    }
 
-   stream_seek(self->img_stream, lba * 2352, SEEK_SET);
-   stream_read(self->img_stream, buf, 2352);
+   cdstream_seek(&self->img_stream, lba * 2352, SEEK_SET);
+   cdstream_read(&self->img_stream, buf, 2352);
 
-   stream_seek(self->sub_stream, lba * 96, SEEK_SET);
-   stream_read(self->sub_stream, sub_buf, 96);
+   cdstream_seek(&self->sub_stream, lba * 96, SEEK_SET);
+   cdstream_read(&self->sub_stream, sub_buf, 96);
 
    subpw_interleave(sub_buf, buf + 2352);
 
@@ -709,8 +674,8 @@ static bool CDAccess_CCD_Read_Raw_PW(CDAccess *base_self, uint8_t *buf,
       return false;
    }
 
-   stream_seek(self->sub_stream, lba * 96, SEEK_SET);
-   stream_read(self->sub_stream, sub_buf, 96);
+   cdstream_seek(&self->sub_stream, lba * 96, SEEK_SET);
+   cdstream_read(&self->sub_stream, sub_buf, 96);
 
    subpw_interleave(sub_buf, buf);
 
@@ -759,8 +724,8 @@ CDAccess *CDAccess_CCD_New(bool *success, const char *path,
    self->base.Eject           = CDAccess_CCD_Eject;
    self->base.destroy         = CDAccess_CCD_destroy;
 
-   self->img_stream     = NULL;
-   self->sub_stream     = NULL;
+   /* self came from calloc - img_stream and sub_stream are already
+    * zero-initialised (closed cdstream). */
    self->img_numsectors = 0;
    TOC_Clear(&self->tocd);
 

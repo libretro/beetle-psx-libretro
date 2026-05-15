@@ -386,9 +386,12 @@ void CommandBuffer::generate_mipmap(const Image &image)
 	for (unsigned i = 1; i < create_info.levels; i++)
 	{
 		VkOffset3D src_size = size;
-		size.x = max(size.x >> 1, 1);
-		size.y = max(size.y >> 1, 1);
-		size.z = max(size.z >> 1, 1);
+		size.x >>= 1;
+		size.y >>= 1;
+		size.z >>= 1;
+		if (size.x < 1) size.x = 1;
+		if (size.y < 1) size.y = 1;
+		if (size.z < 1) size.z = 1;
 
 		blit_image(image, image,
 		           origin, size, origin, src_size, i, i - 1, 0, 0, create_info.layers, VK_FILTER_LINEAR);
@@ -451,13 +454,19 @@ void CommandBuffer::begin_graphics()
 
 void CommandBuffer::init_viewport_scissor(const RenderPassInfo &info, const Framebuffer *framebuffer)
 {
+	const uint32_t fb_w = framebuffer->get_width();
+	const uint32_t fb_h = framebuffer->get_height();
 	VkRect2D rect = info.render_area;
-	rect.offset.x = min(framebuffer->get_width(), uint32_t(rect.offset.x));
-	rect.offset.y = min(framebuffer->get_height(), uint32_t(rect.offset.y));
-	rect.extent.width = min(framebuffer->get_width() - rect.offset.x, rect.extent.width);
-	rect.extent.height = min(framebuffer->get_height() - rect.offset.y, rect.extent.height);
+	if (uint32_t(rect.offset.x) > fb_w) rect.offset.x = int32_t(fb_w);
+	if (uint32_t(rect.offset.y) > fb_h) rect.offset.y = int32_t(fb_h);
+	{
+		uint32_t w_avail = fb_w - uint32_t(rect.offset.x);
+		uint32_t h_avail = fb_h - uint32_t(rect.offset.y);
+		if (w_avail < rect.extent.width)  rect.extent.width  = w_avail;
+		if (h_avail < rect.extent.height) rect.extent.height = h_avail;
+	}
 
-	viewport = { 0.0f, 0.0f, float(framebuffer->get_width()), float(framebuffer->get_height()), 0.0f, 1.0f };
+	viewport = { 0.0f, 0.0f, float(fb_w), float(fb_h), 0.0f, 1.0f };
 	scissor = rect;
 }
 
@@ -1149,9 +1158,12 @@ void *CommandBuffer::update_image(const Image &image, const VkOffset3D &offset, 
                                   const VkImageSubresourceLayers &subresource)
 {
 	const ImageCreateInfo &create_info = image.get_create_info();
-	uint32_t width = max(image.get_width() >> subresource.mipLevel, 1u);
-	uint32_t height = max(image.get_height() >> subresource.mipLevel, 1u);
-	uint32_t depth = max(image.get_depth() >> subresource.mipLevel, 1u);
+	uint32_t width  = image.get_width()  >> subresource.mipLevel;
+	uint32_t height = image.get_height() >> subresource.mipLevel;
+	uint32_t depth  = image.get_depth()  >> subresource.mipLevel;
+	if (width  < 1u) width  = 1u;
+	if (height < 1u) height = 1u;
+	if (depth  < 1u) depth  = 1u;
 
 	if (!row_length)
 		row_length = width;

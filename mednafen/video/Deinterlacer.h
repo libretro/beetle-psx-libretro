@@ -75,6 +75,17 @@ typedef struct
    int32_t   PrevDRect_x;
    unsigned  DeintType;
 
+   /* Tracks whether the most recent Deinterlacer_Process() call
+    * wrote surface pixels outside the active region (i.e. into
+    * what the SW scanout uses as zero margins).  Only WEAVE's
+    * XReposition memmove ever does this; BOB / BOB_OFFSET /
+    * FASTMAD copy row blocks whose source rows already had
+    * zero margins (or, for FASTMAD, blend zero with zero), so
+    * the invariant is preserved.  The SW scanout cache reads
+    * this via Deinterlacer_DidDisturbMargins() to decide
+    * whether to invalidate. */
+   bool      LastDisturbedMargins;
+
    /* FastMAD state (allocated lazily on first DEINT_FASTMAD call;
     * released by Deinterlacer_Cleanup).  See deint_fastmad() in
     * Deinterlacer.c for the algorithm and the bank-rotation
@@ -98,6 +109,13 @@ void     Deinterlacer_Process(Deinterlacer *d, MDFN_Surface *surface,
             MDFN_Rect *DisplayRect, int32_t *LineWidths, const bool field);
 
 void     Deinterlacer_ClearState(Deinterlacer *d);
+
+/* Returns true iff the most recent Deinterlacer_Process() call
+ * touched margin pixels (only DEINT_WEAVE's XReposition path
+ * does, and only when the inter-field horizontal-resolution
+ * change condition fires).  Reset to false on every Process()
+ * call before the per-mode work runs. */
+bool     Deinterlacer_DidDisturbMargins(const Deinterlacer *d);
 
 #ifdef __cplusplus
 }

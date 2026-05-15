@@ -28,8 +28,8 @@
 void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned count)
 {
 	/* iCB: Just borrowing this from \parallel-psx\renderer\renderer.cpp */
-	uint16 off_u = 0;
-	uint16 off_v = 0;
+	uint16_t off_u = 0;
+	uint16_t off_v = 0;
 	bool may_be_2d = false;
 	if (gpu->InCmd == INCMD_QUAD)
 	{
@@ -174,15 +174,15 @@ void Reset_UVLimits(PS_GPU *gpu)
 /* Determine min and max UVs sampled for a given primitive */
 void Extend_UVLimits(PS_GPU *gpu, tri_vertex *vertices, unsigned count)
 {
-	uint8 twx = gpu->SUCV.TWX_AND;
-	uint8 twy = gpu->SUCV.TWY_AND;
+	uint8_t twx = gpu->SUCV.TWX_AND;
+	uint8_t twy = gpu->SUCV.TWY_AND;
 
-	uint16 min_u = gpu->min_u;
-	uint16 min_v = gpu->min_v;
-	uint16 max_u = gpu->max_u;
-	uint16 max_v = gpu->max_v;
+	uint16_t min_u = gpu->min_u;
+	uint16_t min_v = gpu->min_v;
+	uint16_t max_u = gpu->max_u;
+	uint16_t max_v = gpu->max_v;
 
-	if ((twx == (uint8)0xffu) && (twy == (uint8)0xffu))
+	if ((twx == (uint8_t)0xffu) && (twy == (uint8_t)0xffu))
 	{
 		unsigned int i;
 		/* If we're not using texture window, we're likely accessing a small subset of the texture. */
@@ -190,10 +190,10 @@ void Extend_UVLimits(PS_GPU *gpu, tri_vertex *vertices, unsigned count)
 		{
 			uint16_t u = (uint16_t)vertices[i].u;
 			uint16_t v = (uint16_t)vertices[i].v;
-			min_u = MIN(min_u, u);
-			min_v = MIN(min_v, v);
-			max_u = MAX(max_u, u);
-			max_v = MAX(max_v, v);
+			if (u < min_u) min_u = u;
+			if (v < min_v) min_v = v;
+			if (u > max_u) max_u = u;
+			if (v > max_v) max_v = v;
 		}
 	}
 	else
@@ -214,18 +214,18 @@ void Extend_UVLimits(PS_GPU *gpu, tri_vertex *vertices, unsigned count)
 /* Apply offsets to UV limits before returning */
 void Finalise_UVLimits(PS_GPU *gpu)
 {
-	uint8 twx = gpu->SUCV.TWX_AND;
-	uint8 twy = gpu->SUCV.TWY_AND;
+	uint8_t twx = gpu->SUCV.TWX_AND;
+	uint8_t twy = gpu->SUCV.TWY_AND;
 
-	uint16 min_u = gpu->min_u;
-	uint16 min_v = gpu->min_v;
-	uint16 max_u = gpu->max_u;
-	uint16 max_v = gpu->max_v;
+	uint16_t min_u = gpu->min_u;
+	uint16_t min_v = gpu->min_v;
+	uint16_t max_u = gpu->max_u;
+	uint16_t max_v = gpu->max_v;
 
-	uint16 off_u = gpu->off_u;
-	uint16 off_v = gpu->off_v;
+	uint16_t off_u = gpu->off_u;
+	uint16_t off_v = gpu->off_v;
 
-	if ((twx == (uint8)0xffu) && (twy == (uint8)0xffu))
+	if ((twx == (uint8_t)0xffu) && (twy == (uint8_t)0xffu))
 	{
 		/* offset output UV Limits */
 		min_u += off_u;
@@ -273,8 +273,8 @@ void Finalise_UVLimits(PS_GPU *gpu)
  * Suitable for games like Soul Blade, Doom and Hexen */
 bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices)
 {
-	int32 pxWidth = 1 << gpu->upscale_shift;	/* width of a single pixel */
-	uint8 cornerIdx, shortIdx, longIdx;
+	int32_t pxWidth = 1 << gpu->upscale_shift;	/* width of a single pixel */
+	uint8_t cornerIdx, shortIdx, longIdx;
 
 	/* reject 3D elements */
 	if ((vertices[0].precise[2] != vertices[1].precise[2]) ||
@@ -302,7 +302,7 @@ bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices)
 		 * determine which is truly the corner by checking against the long side, while making sure it is axis aligned */
 		if (vertices[shortIdx].y == vertices[longIdx].y)
 		{
-			uint8 tempIdx = shortIdx;
+			uint8_t tempIdx = shortIdx;
 			shortIdx = cornerIdx;
 			cornerIdx = tempIdx;
 		}
@@ -320,7 +320,7 @@ bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices)
 		 * determine which is truly the corner by checking against the long side, while making sure it is axis aligned */
 		if (vertices[shortIdx].x == vertices[longIdx].x)
 		{
-			uint8 tempIdx = shortIdx;
+			uint8_t tempIdx = shortIdx;
 			shortIdx = cornerIdx;
 			cornerIdx = tempIdx;
 		}
@@ -345,9 +345,9 @@ bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices)
  * Required for games like Dark Forces and Duke Nukem */
 bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices)
 {
-	int32 pxWidth = 1 << gpu->upscale_shift;	/* width of a single pixel */
-	uint8 cornerIdx, shortIdx, longIdx;
-	uint8 A, B, C;
+	int32_t pxWidth = 1 << gpu->upscale_shift;	/* width of a single pixel */
+	uint8_t cornerIdx, shortIdx, longIdx;
+	uint8_t A, B, C;
 
 	/* reject 3D elements */
 	if ((vertices[0].precise[2] != vertices[1].precise[2]) ||
