@@ -1138,6 +1138,22 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "default"
    },
    {
+      BEETLE_OPT(subdivision),
+      "Polygon Subdivision (Software)",
+      NULL,
+      "Refine untextured 3D meshes with Loop subdivision before rasterising, rounding off the chunky low-polygon look of PS1 character models. Higher levels produce smoother silhouettes at the cost of CPU time per draw. Software renderer only. Textured polygons, 2D UI, sprites, and lines are passed through unchanged.",
+      NULL,
+      "hacks",
+      {
+         { "disabled", NULL },
+         { "1",        "1 pass (4x triangle count)" },
+         { "2",        "2 passes (16x triangle count)" },
+         { "3",        "3 passes (64x triangle count)" },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       BEETLE_OPT(widescreen_hack),
       "Widescreen Mode Hack",
       NULL,

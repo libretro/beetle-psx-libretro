@@ -43,6 +43,7 @@ static void texel_put(uint32_t x, uint32_t y, uint16_t v);
 
 #include "gpu_common.h"
 
+#include "gpu_subdiv.c"
 #include "gpu_polygon.c"
 #include "gpu_sprite.c"
 #include "gpu_line.c"
@@ -402,6 +403,7 @@ static void Command_IRQ(PS_GPU* g, const uint32_t *cb)
 /* does *not* appear to use mask drawing environment settings. */
 static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
 {
+   gpu_polygon_subdiv_flush(gpu);
    unsigned y;
    int32_t r                 = cb[0] & 0xFF;
    int32_t g                 = (cb[0] >> 8) & 0xFF;
@@ -448,6 +450,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
 
 static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
 {
+   gpu_polygon_subdiv_flush(g);
    int32_t sourceX = (cb[1] >> 0) & 0x3FF;
    int32_t sourceY = (cb[1] >> 16) & 0x3FF;
    int32_t destX   = (cb[2] >> 0) & 0x3FF;
@@ -516,6 +519,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
 static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
 {
    /*assert(InCmd == INCMD_NONE); */
+   gpu_polygon_subdiv_flush(g);
 
    g->FBRW_X = (cb[1] >>  0) & 0x3FF;
    g->FBRW_Y = (cb[1] >> 16) & 0x3FF;
@@ -552,6 +556,7 @@ static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
 static void Command_FBRead(PS_GPU* g, const uint32_t *cb)
 {
    /*assert(g->InCmd == INCMD_NONE); */
+   gpu_polygon_subdiv_flush(g);
 
    g->FBRW_X = (cb[1] >>  0) & 0x3FF;
    g->FBRW_Y = (cb[1] >> 16) & 0x3FF;
@@ -618,6 +623,7 @@ static void Command_TexWindow(PS_GPU* g, const uint32_t *cb)
 
 static void Command_Clip0(PS_GPU* g, const uint32_t *cb)
 {
+   gpu_polygon_subdiv_flush(g);
    g->ClipX0 = *cb & 1023;
    g->ClipY0 = (*cb >> 10) & 1023;
    rsx_intf_set_draw_area(g->ClipX0, g->ClipY0,
@@ -626,6 +632,7 @@ static void Command_Clip0(PS_GPU* g, const uint32_t *cb)
 
 static void Command_Clip1(PS_GPU* g, const uint32_t *cb)
 {
+   gpu_polygon_subdiv_flush(g);
    g->ClipX1 = *cb & 1023;
    g->ClipY1 = (*cb >> 10) & 1023;
    rsx_intf_set_draw_area(g->ClipX0, g->ClipY0,
@@ -634,6 +641,7 @@ static void Command_Clip1(PS_GPU* g, const uint32_t *cb)
 
 static void Command_DrawingOffset(PS_GPU* g, const uint32_t *cb)
 {
+   gpu_polygon_subdiv_flush(g);
    g->OffsX = sign_x_to_s32(11, (*cb & 2047));
    g->OffsY = sign_x_to_s32(11, ((*cb >> 11) & 2047));
 }
@@ -1450,6 +1458,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             break;
 
          case 0x05:  /* Start of display area in framebuffer */
+            gpu_polygon_subdiv_flush(&GPU);
             GPU.DisplayFB_XStart = V & 0x3FE; /* Lower bit is apparently ignored. */
             GPU.DisplayFB_YStart = (V >> 10) & 0x1FF;
             GPU.display_change_count++;
@@ -2653,6 +2662,14 @@ bool GPU_DMACanWrite(void)
 uint16_t *GPU_get_vram(void)
 {
    return GPU.vram;
+}
+
+/* Singleton wrapper for subdivision flush.  Sits next to the other
+ * C-linkage getters so external translation units (rsx_intf, etc.)
+ * can flush without needing access to the file-scope GPU object. */
+void gpu_polygon_subdiv_flush_global(void)
+{
+   gpu_polygon_subdiv_flush(&GPU);
 }
 
 int32_t GPU_GetScanlineNum(void)

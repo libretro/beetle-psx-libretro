@@ -255,6 +255,7 @@ static void Command_DrawLine_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    const uint8_t cc = cb[0] >> 24; /* For pline handling later. */ \
    int32_t delta_x; \
    int32_t delta_y; \
+   gpu_polygon_subdiv_flush(gpu); \
    gpu->DrawTimeAvail   -= 16;     /* FIXME, correct time. */ \
    if (POLYLINE_LIT && gpu->InCmd == INCMD_PLINE) \
    { \

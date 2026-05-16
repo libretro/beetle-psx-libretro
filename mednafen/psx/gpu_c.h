@@ -35,6 +35,26 @@ void     GPU_RestoreStateP1(bool load);
 void     GPU_RestoreStateP2(bool load);
 void     GPU_RestoreStateP3(void);
 
+/* Flush any pending subdivision-buffered polygons to the SW
+ * rasteriser.  Must be called before any operation that depends on
+ * VRAM state being up-to-date (FBRead, display flip, end of frame)
+ * or that changes drawing state in a way that would make the
+ * buffered polygons inconsistent (texpage, CLUT, drawing-area,
+ * drawing-offset).  Zero cost when subdivision is disabled. */
+struct PS_GPU;
+void gpu_polygon_subdiv_flush(struct PS_GPU *gpu);
+
+/* Variant that uses the singleton GPU instance.  For callers that
+ * don't have a PS_GPU pointer handy (rsx_intf, libretro front-end);
+ * internally just calls gpu_polygon_subdiv_flush(&GPU). */
+void gpu_polygon_subdiv_flush_global(void);
+
+/* Clear the subdivision system's per-vertex normal cache.  Must be
+ * called once per frame after the end-of-frame flush.  See
+ * gpu_subdiv.h for full rationale.  Forwarded here so the rsx_intf
+ * end-of-frame hook can call it without dragging in gpu_subdiv.h. */
+void tt_subdiv_frame_end(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -40,6 +40,18 @@ extern int line_render_mode;
 extern int filter_mode;
 extern int crop_overscan;
 
+/*
+ * Software-renderer Loop subdivision level for untextured 3D
+ * polygons. 0 = off (zero runtime cost), 1..3 = active subdivision
+ * passes. When nonzero, the SW polygon path buffers consecutive
+ * subdivision-eligible polygons, reconstructs adjacency via vertex
+ * hashing, runs Loop subdivision the requested number of times, then
+ * rasterises the refined triangle list. Sprites, lines, textured
+ * polygons, axis-aligned UI rects, and degenerate polygons are
+ * always passed through unchanged.
+ */
+extern int psx_gpu_subdivision_level;
+
 enum core_timing_fps_modes
 {
    FORCE_PROGRESSIVE_TIMING = 0,

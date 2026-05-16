@@ -11,6 +11,7 @@ bool psx_gpu_rasterize_both_fields = false;
 int line_render_mode;
 int filter_mode;
 int crop_overscan = 0;
+int psx_gpu_subdivision_level = 0;
 
 enum core_timing_fps_modes core_timing_fps_mode = AUTO_TOGGLE_TIMING;
 bool currently_interlaced = true;

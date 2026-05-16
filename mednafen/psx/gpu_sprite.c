@@ -335,6 +335,7 @@ static void Command_DrawSprite_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    uint8_t  u    = 0, v = 0; \
    uint32_t color = 0; \
    uint32_t clut  = 0; \
+   gpu_polygon_subdiv_flush(gpu); \
    gpu->DrawTimeAvail -= 16;                /* FIXME, correct time. */ \
    color = *cb & 0x00FFFFFF; \
    cb++; \
