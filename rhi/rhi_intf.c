@@ -497,6 +497,13 @@ void rhi_intf_apply_pending_geometry(void)
 #endif
 }
 
+
+/* Subdivision (Phong tessellation) hooks, defined in the gpu.c
+ * translation unit.  Declared locally since gpu_c.h no longer
+ * exists; these are the only gpu-internal symbols this file
+ * needs. */
+void gpu_polygon_subdiv_flush_global(void);
+void tt_subdiv_frame_end(void);
 void rhi_intf_finalize_frame(const void *fb, unsigned width, 
                              unsigned height, unsigned pitch)
 {
@@ -507,6 +514,19 @@ void rhi_intf_finalize_frame(const void *fb, unsigned width,
    tt_log("finalize_frame display=%ux%u\n",
          (unsigned)width, (unsigned)height);
 #endif
+
+   /* Drain any subdivision-buffered polygons before the renderer
+    * scans out, so the rasteriser sees them in the current frame's
+    * VRAM rather than carrying state across the frame boundary. */
+   gpu_polygon_subdiv_flush_global();
+
+   /* Clear the per-vertex normal cache that Phong tessellation
+    * builds up during the frame.  Cache lifetime is one frame:
+    * within a frame, every triangle sharing a vertex resolves to
+    * the same cached normal (first-write-wins), guaranteeing
+    * crack-free shared edges; across frames the normal needs to
+    * be recomputed because animated meshes deform between frames. */
+   tt_subdiv_frame_end();
 
    switch (rhi_type)
    {

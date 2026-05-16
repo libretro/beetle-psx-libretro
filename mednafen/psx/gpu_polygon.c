@@ -1,5 +1,6 @@
 #include <math.h>
 #include "beetle_psx_globals.h"
+#include "gpu_subdiv.h"
 
 /* PGXP precise colour plumbing to the hardware renderers.
  *
@@ -1142,7 +1143,7 @@ DRAWSPAN_T1_BMGROUP(1, 1, 2)
  * is observable in some games' rendering.
  */
 #define DEFINE_DrawTriangle(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
-static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, const bool pct) \
+static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, const bool pct, const i_deltas *override_idl) \
 { \
    i_deltas idl; \
    unsigned core_vertex; \
@@ -1200,7 +1201,13 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
    /* 0-height, abort out. */ \
    if (vertices[0].y == vertices[2].y) \
       return; \
-   if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(&idl, &vertices[0], &vertices[1], &vertices[2])) \
+   /* When override_idl is supplied (subdivision children, sharing \
+    * the parent's color/UV gradients to avoid per-triangle fixed- \
+    * point rounding seams), use it directly.  Otherwise compute \
+    * deltas from this triangle's own vertices. */ \
+   if (override_idl) \
+      idl = *override_idl; \
+   else if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(&idl, &vertices[0], &vertices[1], &vertices[2])) \
       return; \
    /* Perspective-correct UV deltas - only when the caller said this \
     * primitive is eligible (textured + PGXP-on + texture-correction \
@@ -1440,6 +1447,15 @@ extern int psx_pgxp_2d_tol;
  * reduces to direct calls under -O2 since all parameters are
  * compile-time literals in the macro context.
  */
+/* Forward declaration for the subdivision emit callback.  Used from
+ * inside the DEFINE_Command_DrawPolygon macro body (when flushing
+ * deferred polygons before drawing an ineligible one) and from
+ * gpu_polygon_subdiv_flush() at the bottom of this file.  The actual
+ * definition is at the end of this file, after all DrawTriangle
+ * specs are visible. */
+static void gpu_subdiv_emit_one(PS_GPU *gpu, tri_vertex *vertices,
+      uint8_t flags, const tri_vertex *parent_vertices, void *tag);
+
 #define DEFINE_Command_DrawPolygon(SUFFIX, NV_LIT, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, PGXP_LIT) \
 static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
 { \
@@ -1732,7 +1748,166 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          lineFound = false; \
       if (rhi_intf_is_type() == RHI_OPENGL || rhi_intf_is_type() == RHI_VULKAN) \
       { \
+         /* hw_subdiv_buffered: set when the HW subdivision \
+          * intercept successfully buffered this primitive into the \
+          * S_pending ring.  When true, the original \
+          * rhi_intf_push_quad / rhi_intf_push_triangle calls below \
+          * are skipped (subdivision will rasterise the children \
+          * itself at flush time).  The SW shadow path further \
+          * down still runs normally with the ORIGINAL primitive \
+          * so VRAM emulation observes the unsubdivided pixels -- \
+          * subdivision is a display-side filter only. */ \
+         bool hw_subdiv_buffered = false; \
          Reset_UVLimits(gpu); \
+         /* Phong-tessellation subdivision hook for the HW renderer. \
+          * Compile-time gates dead-code-eliminate this block from \
+          * specs where subdivision can never apply (textured specs \
+          * never subdivide; subdivision requires PGXP precise[]). \
+          * Runtime gate is psx_gpu_subdivision_level > 0 plus the \
+          * usual eligibility check (opaque or plain-blended, \
+          * mask-eval per flags, valid PGXP for every vertex). \
+          * Quad-as-quad batching to rhi_intf_push_quad is preserved \
+          * when subdivision is off or this primitive is ineligible. */ \
+         if (!(TEXTURED_LIT) && psx_gpu_subdivision_level > 0) \
+         { \
+            uint8_t _sd_flags = \
+                  ((GOURAUD_LIT) ? TT_SUBDIV_F_GOURAUD : 0) \
+                /* Encode PSX semi-transparency mode (BM_VAL 0..3) \
+                 * as the 2-bit BLEND0/BLEND1 field plus the \
+                 * BLEND_ENABLE bit.  BM_VAL == -1 means opaque -- \
+                 * BLEND_ENABLE stays clear and the 2-bit field is \
+                 * don't-care.  The HW emit callback decodes these \
+                 * back into the rasteriser's -1/0..3 blend_mode \
+                 * argument so subdivided shadows, additive effects, \
+                 * etc. preserve their transparency. */ \
+                | ((BM_VAL) >= 0 ? TT_SUBDIV_F_BLEND_ENABLE : 0) \
+                | (((BM_VAL) >= 0 && ((BM_VAL) & 1)) ? TT_SUBDIV_F_BLEND0 : 0) \
+                | (((BM_VAL) >= 0 && ((BM_VAL) & 2)) ? TT_SUBDIV_F_BLEND1 : 0) \
+                | ((ME_LIT) ? TT_SUBDIV_F_MASKEVAL : 0) \
+                | ((PGXP_LIT) && !invalidW ? TT_SUBDIV_F_PGXP_VALID : 0); \
+            if ((NV_LIT == 4) && (!gpu->killQuadPart) && (gpu->InCmd == INCMD_NONE)) \
+            { \
+               /* Quad case: try to push two triangles to the \
+                * subdivision buffer.  PSX quad layout: \
+                *   first       vertices[0] \
+                *   vertices[1] vertices[2] \
+                * Split matches parallel-psx: (first, v0, v1) and \
+                * (v2, v1, v0). */ \
+               tri_vertex *first = &gpu->InQuad_F3Vertices[0]; \
+               tri_vertex tri_a[3], tri_b[3]; \
+               tri_a[0] = *first;       tri_a[1] = vertices[0]; tri_a[2] = vertices[1]; \
+               tri_b[0] = vertices[2];  tri_b[1] = vertices[1]; tri_b[2] = vertices[0]; \
+               if (tt_subdiv_is_eligible(tri_a, _sd_flags) \
+                && tt_subdiv_is_eligible(tri_b, _sd_flags)) \
+               { \
+                  /* Both halves eligible: buffer them as a 4-vertex \
+                   * mesh so the shared edge subdivides as interior. */ \
+                  if (tt_subdiv_would_overlap(tri_a) || tt_subdiv_would_overlap(tri_b)) \
+                     tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+                  if (tt_subdiv_push(tri_a, _sd_flags) && tt_subdiv_push(tri_b, _sd_flags)) \
+                     hw_subdiv_buffered = true; \
+                  else \
+                     tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+               } \
+               else \
+                  tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+            } \
+            else if (!(NV_LIT == 4 && !gpu->killQuadPart)) \
+            { \
+               /* Single-triangle case (NV=3, or killQuadPart=2 \
+                * second triangle). */ \
+               tri_vertex *sd_verts = (gpu->killQuadPart == 2) \
+                                   ? &gpu->InQuad_F3Vertices[0] : &vertices[0]; \
+               if (tt_subdiv_is_eligible(sd_verts, _sd_flags)) \
+               { \
+                  if (tt_subdiv_would_overlap(sd_verts)) \
+                     tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+                  if (tt_subdiv_push(sd_verts, _sd_flags)) \
+                  { \
+                     hw_subdiv_buffered = true; \
+                     /* killQuadPart==2 means the fix-up first \
+                      * triangle of a bbox-culled quad; the original \
+                      * path returns after pushing it (the SW shadow \
+                      * already drew it on a previous call).  Mirror \
+                      * that when subdivision buffers it. */ \
+                     if (gpu->killQuadPart == 2) \
+                     { \
+                        gpu->killQuadPart = 0; \
+                        return; \
+                     } \
+                  } \
+                  else \
+                     tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+               } \
+               else \
+               { \
+                  /* Runtime-ineligible: pin hints unless it would \
+                   * paint inside the buffered region. */ \
+                  if (tt_subdiv_would_intersect_ineligible(sd_verts)) \
+                     tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+                  else \
+                     tt_subdiv_add_pin_hints(sd_verts); \
+               } \
+            } \
+         } \
+         else if (!(TEXTURED_LIT) && (PGXP_LIT)) \
+         { \
+            /* Untextured PGXP-tracked but subdivision is off (or \
+             * spec otherwise runtime-ineligible): nothing to do -- \
+             * pin hints are pointless with an empty buffer. */ \
+         } \
+         else if ((TEXTURED_LIT) && (PGXP_LIT) && psx_gpu_subdivision_level > 0) \
+         { \
+            /* Textured PGXP-tracked polygon: record its vertices as \
+             * pin hints so neighbouring untextured geometry pins \
+             * shared boundary vertices flat instead of fragmenting \
+             * the batch (see the original subdivision commit for \
+             * the full mesh-fragmentation rationale).  Overlap \
+             * exception: a textured paint-over draw (eye on a face) \
+             * inside the buffered bbox must flush first to preserve \
+             * paint order. \
+             * \
+             * PORT NOTE: unlike the original branch, this arm is \
+             * additionally gated on psx_gpu_subdivision_level > 0; \
+             * the original performed per-polygon hash inserts even \
+             * with the feature disabled. */ \
+            tri_vertex *hint_v; \
+            if ((NV_LIT == 4) && (!gpu->killQuadPart) && (gpu->InCmd == INCMD_NONE)) \
+            { \
+               tri_vertex quad_a[3], quad_b[3]; \
+               quad_a[0] = gpu->InQuad_F3Vertices[0]; \
+               quad_a[1] = vertices[0]; \
+               quad_a[2] = vertices[1]; \
+               quad_b[0] = vertices[2]; \
+               quad_b[1] = vertices[1]; \
+               quad_b[2] = vertices[0]; \
+               if (tt_subdiv_would_intersect_ineligible(quad_a) || tt_subdiv_would_intersect_ineligible(quad_b)) \
+                  tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+               else \
+               { \
+                  tt_subdiv_add_pin_hints(quad_a); \
+                  tt_subdiv_add_pin_hints(quad_b); \
+               } \
+            } \
+            else \
+            { \
+               hint_v = (gpu->killQuadPart == 2) \
+                        ? &gpu->InQuad_F3Vertices[0] : &vertices[0]; \
+               if (tt_subdiv_would_intersect_ineligible(hint_v)) \
+                  tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+               else \
+                  tt_subdiv_add_pin_hints(hint_v); \
+            } \
+         } \
+         else \
+         { \
+            /* Compile-time PGXP off or textured non-PGXP: no \
+             * reliable precise[] for pin hints; flush conservatively \
+             * to preserve paint order. */ \
+            tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+         } \
+         if (!hw_subdiv_buffered) \
+         { \
          if ((NV_LIT == 4) && (!gpu->killQuadPart)) \
          { \
             if (gpu->InCmd == INCMD_NONE) \
@@ -1823,6 +1998,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
             } \
             gpu->killQuadPart = 0; \
          } \
+         } \
       } \
       if (rhi_intf_is_type() == RHI_SOFTWARE) \
       { \
@@ -1850,7 +2026,49 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          bool pct = (PGXP_LIT) && (TEXTURED_LIT) \
                     && !invalidW \
                     && PGXP_texture_correction_enabled(); \
-         DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices, pct); \
+         /* Phong-tessellation subdivision hook, pure-SW renderer \
+          * only.  Compile-time gates (TEXTURED_LIT, PGXP_LIT) fold \
+          * the block out of specs where subdivision can't apply; \
+          * the runtime gate is one load of \
+          * psx_gpu_subdivision_level.  Buffered polygons skip \
+          * immediate rasterisation (children are emitted at flush \
+          * time); anything that rasterises directly must flush the \
+          * buffer first so paint order is preserved. */ \
+         { \
+            uint8_t _sd_flags = \
+                  ((GOURAUD_LIT) ? TT_SUBDIV_F_GOURAUD : 0) \
+                | ((BM_VAL) >= 0 ? TT_SUBDIV_F_BLEND_ENABLE : 0) \
+                | (((BM_VAL) >= 0 && ((BM_VAL) & 1)) ? TT_SUBDIV_F_BLEND0 : 0) \
+                | (((BM_VAL) >= 0 && ((BM_VAL) & 2)) ? TT_SUBDIV_F_BLEND1 : 0) \
+                | ((ME_LIT) ? TT_SUBDIV_F_MASKEVAL : 0) \
+                | ((PGXP_LIT) && !invalidW ? TT_SUBDIV_F_PGXP_VALID : 0); \
+            if (!(TEXTURED_LIT) && (PGXP_LIT) \
+                && psx_gpu_subdivision_level > 0 \
+                && rhi_intf_is_type() == RHI_SOFTWARE \
+                && tt_subdiv_is_eligible(vertices, _sd_flags)) \
+            { \
+               /* Paint-over draws inside the buffered bbox must \
+                * flush first (FF7 face features). */ \
+               if (tt_subdiv_would_overlap(vertices)) \
+                  tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+               if (tt_subdiv_push(vertices, _sd_flags)) \
+               { \
+                  /* Buffered; skip immediate rasterisation. */ \
+                  if (lineFound) \
+                     memcpy(&vertices[0], &lineVertices[0], 3 * sizeof(tri_vertex)); \
+                  continue; \
+               } \
+               /* Push failed (buffer full): rasterise directly. */ \
+            } \
+            /* Direct rasterisation: drain deferred polygons first \
+             * so they observe the game's intended draw order \
+             * (Battle Arena Toshinden shadows over feet).  Guarded \
+             * on pure-SW because in hybrid mode the HW intercept \
+             * above owns the buffer. */ \
+            if (rhi_intf_is_type() == RHI_SOFTWARE) \
+               tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
+         } \
+         DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices, pct, NULL); \
       } \
       /* Line Render: Overwrite vertices with those of the second triangle */ \
       if ((lineFound) && (NV_LIT == 3) && (TEXTURED_LIT)) \
@@ -1912,3 +2130,167 @@ CMD_DRAWPOLY_BMGROUP_ALL(4, 1, 1)
 #undef COORD_FBS
 #undef COORD_MF_INT
 
+
+/* ---------------------------------------------------------------------
+ * Phong-tessellation subdivision flush bridge
+ *
+ * tt_subdiv_flush() needs to emit refined triangles back to a
+ * concrete DrawTriangle specialisation.  Buffered triangles are
+ * always untextured (enforced by tt_subdiv_is_eligible() and the
+ * polygon-path push gate), so the dispatch is between just two
+ * specialisations: flat-shaded and gouraud-shaded.
+ *
+ * gpu_polygon_subdiv_flush() is the public entry point command-site
+ * callers use.  When subdivision is off (psx_gpu_subdivision_level
+ * == 0) the pending buffer is necessarily empty (we never pushed),
+ * so the inline-guarded tt_subdiv_has_pending() check folds to a
+ * single integer load that returns false, and call sites pay just
+ * that.
+ * ------------------------------------------------------------------ */
+
+/* SW emit: subdivided child triangle -> SW rasteriser via the
+ * override-idl path that suppresses per-triangle gouraud-rounding
+ * seams.
+ *
+ * NOTE: This SW path is currently NOT used at runtime even with the
+ * SW renderer active -- the SW rasteriser's edge-walking math is
+ * not watertight across triangle boundaries (adjacent triangles
+ * sharing an edge can disagree on which pixels each fills), and no
+ * amount of upstream fixing closes the resulting fill-pattern
+ * gaps.  Subdivision is therefore HW-only for now; the SW emit
+ * stays in the tree as dormant code, ready to be re-enabled if/
+ * when the rasteriser's watertightness gets addressed. */
+static void gpu_subdiv_emit_one_sw(PS_GPU *gpu, tri_vertex *vertices,
+      uint8_t flags, const tri_vertex *parent_vertices)
+{
+   i_deltas parent_idl;
+   const tri_vertex *p0 = &parent_vertices[0];
+   const tri_vertex *p1 = &parent_vertices[1];
+   const tri_vertex *p2 = &parent_vertices[2];
+   bool gouraud = (flags & TT_SUBDIV_F_GOURAUD) != 0;
+
+   if (gouraud)
+   {
+      if (!CalcIDeltas_g1_t0(&parent_idl, p0, p1, p2))
+      {
+         DrawTriangle_g1_t0_BMopaque_TM0_MO0_ME0(gpu, vertices, false, NULL);
+         return;
+      }
+   }
+   else
+   {
+      if (!CalcIDeltas_g0_t0(&parent_idl, p0, p1, p2))
+      {
+         DrawTriangle_g0_t0_BMopaque_TM0_MO0_ME0(gpu, vertices, false, NULL);
+         return;
+      }
+   }
+
+   if (gouraud)
+   {
+      int32_t dx0 = p1->x - p0->x;
+      int32_t dy0 = p1->y - p0->y;
+      int32_t dx1 = p2->x - p0->x;
+      int32_t dy1 = p2->y - p0->y;
+      int64_t denom = (int64_t)dx0 * dy1 - (int64_t)dy0 * dx1;
+      int j;
+      if (denom != 0)
+      {
+         float inv = 1.0f / (float)denom;
+         for (j = 0; j < 3; j++)
+         {
+            int32_t cx = vertices[j].x - p0->x;
+            int32_t cy = vertices[j].y - p0->y;
+            float w1 = (float)((int64_t)cx * dy1 - (int64_t)cy * dx1) * inv;
+            float w2 = (float)((int64_t)dx0 * cy - (int64_t)dy0 * cx) * inv;
+            float w0 = 1.0f - w1 - w2;
+            float r  = w0 * p0->r + w1 * p1->r + w2 * p2->r;
+            float g  = w0 * p0->g + w1 * p1->g + w2 * p2->g;
+            float b  = w0 * p0->b + w1 * p1->b + w2 * p2->b;
+            if (r < 0.0f) r = 0.0f; else if (r > 255.0f) r = 255.0f;
+            if (g < 0.0f) g = 0.0f; else if (g > 255.0f) g = 255.0f;
+            if (b < 0.0f) b = 0.0f; else if (b > 255.0f) b = 255.0f;
+            vertices[j].r = (int32_t)(r + 0.5f);
+            vertices[j].g = (int32_t)(g + 0.5f);
+            vertices[j].b = (int32_t)(b + 0.5f);
+         }
+      }
+   }
+   else
+   {
+      vertices[0].r = vertices[1].r = vertices[2].r = p0->r;
+      vertices[0].g = vertices[1].g = vertices[2].g = p0->g;
+      vertices[0].b = vertices[1].b = vertices[2].b = p0->b;
+   }
+
+   if (gouraud)
+      DrawTriangle_g1_t0_BMopaque_TM0_MO0_ME0(gpu, vertices, false, &parent_idl);
+   else
+      DrawTriangle_g0_t0_BMopaque_TM0_MO0_ME0(gpu, vertices, false, &parent_idl);
+}
+
+/* HW emit: subdivided child triangle -> rhi_intf_push_triangle for
+ * the active hardware renderer (GL or Vulkan).  No per-parent
+ * gradient gymnastics needed: HW renderers interpolate in shader
+ * and rasterise watertight, so siblings sharing an edge are
+ * continuous in colour and gap-free in fill.
+ *
+ * PORT NOTE (rhi era): rhi_intf_push_triangle grew precise_rgb and
+ * fog pointer arguments after this feature was written.  The
+ * subdivision buffer interpolates x/y/precise/r/g/b only and knows
+ * nothing about the precise-colour or depth-cue sidecars, so NULL
+ * is passed for both, which the interface documents as "derive from
+ * the packed bytes / no cue" -- the faithful pre-cf behaviour. */
+static void gpu_subdiv_emit_one_hw(PS_GPU *gpu, tri_vertex *vertices,
+      uint8_t flags)
+{
+   int  blend_mode;
+   bool mask_test;
+   /* Decode PSX semi-transparency from flags.  BLEND_ENABLE clear
+    * means opaque (blend_mode -1); when set, BLEND0/BLEND1 give the
+    * low/high bit of the 0..3 mode value. */
+   blend_mode = -1;
+   if (flags & TT_SUBDIV_F_BLEND_ENABLE)
+   {
+      blend_mode = ((flags & TT_SUBDIV_F_BLEND0) ? 1 : 0)
+                 | ((flags & TT_SUBDIV_F_BLEND1) ? 2 : 0);
+   }
+   mask_test = (flags & TT_SUBDIV_F_MASKEVAL) != 0;
+   rhi_intf_push_triangle(
+         vertices[0].precise[0], vertices[0].precise[1], vertices[0].precise[2],
+         vertices[1].precise[0], vertices[1].precise[1], vertices[1].precise[2],
+         vertices[2].precise[0], vertices[2].precise[1], vertices[2].precise[2],
+         ((uint32_t)vertices[0].r) | ((uint32_t)vertices[0].g << 8) | ((uint32_t)vertices[0].b << 16),
+         ((uint32_t)vertices[1].r) | ((uint32_t)vertices[1].g << 8) | ((uint32_t)vertices[1].b << 16),
+         ((uint32_t)vertices[2].r) | ((uint32_t)vertices[2].g << 8) | ((uint32_t)vertices[2].b << 16),
+         NULL,                        /* precise_rgb: derive from bytes */
+         NULL,                        /* fog: no depth cue */
+         0, 0, 0, 0, 0, 0,            /* UVs zero (untextured) */
+         0, 0, 0xFFFF, 0xFFFF,        /* UV limits (don't care) */
+         gpu->TexPageX, gpu->TexPageY,
+         0, 0,                        /* clut_x, clut_y unused */
+         0,                           /* texture_blend_mode 0 = no texture */
+         2,                           /* depth_shift unused for untextured */
+         DitherEnabled(gpu),
+         blend_mode,                  /* PSX semi-transparency from flags */
+         mask_test,                   /* mask test from flags */
+         gpu->MaskSetOR != 0);        /* set_mask preserved */
+}
+
+/* Top-level emit dispatcher.  The eligibility/push decision in the
+ * polygon path is renderer-agnostic but the rasterisation step is
+ * not, so route per emit. */
+static void gpu_subdiv_emit_one(PS_GPU *gpu, tri_vertex *vertices,
+      uint8_t flags, const tri_vertex *parent_vertices, void *tag)
+{
+   (void)tag;
+   if (rhi_intf_is_type() == RHI_SOFTWARE)
+      gpu_subdiv_emit_one_sw(gpu, vertices, flags, parent_vertices);
+   else
+      gpu_subdiv_emit_one_hw(gpu, vertices, flags);
+}
+
+void gpu_polygon_subdiv_flush(PS_GPU *gpu)
+{
+   tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL);
+}

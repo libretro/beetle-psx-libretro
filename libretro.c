@@ -6,6 +6,7 @@
 #include <compat/msvc.h>
 #include "mednafen/psx/gpu.h"
 #include "mednafen/psx/vcd.h"
+#include "mednafen/psx/gpu_subdiv.h"
 #ifdef NEED_DEINTERLACER
 #include "mednafen/video/Deinterlacer.h"
 #endif
@@ -88,6 +89,7 @@ uint8_t psx_gpu_upscale_shift;
 uint8_t psx_gpu_upscale_shift_hw;
 bool psx_gpu_rasterize_both_fields = false;
 int line_render_mode;
+int psx_gpu_subdivision_level = 0;
 int filter_mode;
 int crop_overscan = 0;
 
@@ -4769,6 +4771,21 @@ static void check_variables(bool startup)
          line_render_mode = 2;
    }
 
+   var.key = BEETLE_OPT(subdivision);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "disabled") == 0)
+         psx_gpu_subdivision_level = 0;
+      else if (strcmp(var.value, "1") == 0)
+         psx_gpu_subdivision_level = 1;
+      else if (strcmp(var.value, "2") == 0)
+         psx_gpu_subdivision_level = 2;
+      else if (strcmp(var.value, "3") == 0)
+         psx_gpu_subdivision_level = 3;
+   }
+   else
+      psx_gpu_subdivision_level = 0;
+
    var.key = BEETLE_OPT(filter);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -6543,6 +6560,11 @@ void retro_deinit(void)
    /* Free any lazily-allocated PGXP buffers (vertex cache).  Same
     * dlopen/dlclose-cycle leak concern as CDUtility above. */
    PGXP_Shutdown();
+
+   /* Free the subdivision module's deferred-polygon buffer and
+    * working arrays. Safe to call even if subdivision was never
+    * enabled (init is lazy from the push path). */
+   tt_subdiv_shutdown();
 
    /* Frame/UI state. */
    frame_count           = 0;
