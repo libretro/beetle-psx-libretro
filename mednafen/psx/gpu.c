@@ -298,7 +298,23 @@ static void SetTPage(PS_GPU *gpu, const uint32_t cmdw)
    gpu->abr = (cmdw >> 5) & 0x3;
 
    if(!NewTexMode != !gpu->TexMode || NewTexPageX != gpu->TexPageX || NewTexPageY != gpu->TexPageY)
+   {
+      /* Flush any pending subdivision buffer BEFORE mutating
+       * TexPageX/Y/TexMode -- the HW subdivision emit callback
+       * reads these from gpu state at flush time on the assumption
+       * that texpage changes trigger flushes (the same convention
+       * FBFill / FBCopy / Clip0 / DrawingOffset etc. follow).
+       * SetTPage is called from two paths: the explicit GP0(E1)
+       * DrawMode command and the in-band per-polygon texpage
+       * update at the top of GP0 polygon-command dispatch.  The
+       * latter fires once per textured polygon command, but the
+       * NewTexPageX/Y comparison above means we only flush when
+       * the texpage actually changes -- consecutive textured polys
+       * sharing a page (the common case within a character mesh)
+       * stay batched. */
+      gpu_polygon_subdiv_flush(gpu);
       InvalidateTexCache(gpu);
+   }
 
    if(gpu->TexDisableAllowChange)
    {
