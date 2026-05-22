@@ -3,6 +3,8 @@
 
 #include "../state.h"
 
+void GTE_SwitchRegisters(bool use_regs, uint32_t *regs);
+
 void GTE_Init(void);
 void GTE_Power(void);
 int GTE_StateAction(StateMem *sm, int load, int data_only);

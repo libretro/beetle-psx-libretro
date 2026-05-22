@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2019  Free Software Foundation, Inc.
+ * Copyright (C) 2012-2023  Free Software Foundation, Inc.
  *
  * This file is part of GNU lightning.
  *
@@ -22,6 +22,9 @@
 
 #define JIT_HASH_CONSTS		1
 #define JIT_NUM_OPERANDS	3
+#if defined(_AIX) && !defined(_CALL_AIX) && !defined(_CALL_LINUX)
+#  define _CALL_AIXDESC		1
+#endif
 
 /*
  * Types
@@ -78,5 +81,14 @@ typedef enum {
     _NOREG,
 #define JIT_NOREG		_NOREG
 } jit_reg_t;
+
+typedef struct {
+    jit_uint32_t popcntb	: 1;
+} jit_cpu_t;
+
+/*
+ * Initialization
+ */
+extern jit_cpu_t		jit_cpu;
 
 #endif /* _jit_ppc_h */
