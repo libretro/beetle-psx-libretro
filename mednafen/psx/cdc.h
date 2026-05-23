@@ -192,4 +192,13 @@ void     PS_CDC_SoftReset(PS_CDC *cdc);
 void     PS_CDC_GetCDAudio(PS_CDC *cdc, int32_t samples[2],
                            const unsigned freq);
 
+uint32_t CDC_DMARead(void);
+
+/*
+ * `samples` is always written; if there's no audio playing or the
+ * read pointer is past the end of the decoded buffer, both
+ * channels are zeroed.
+ */
+void     CDC_GetCDAudioSample(int32_t samples[2]);
+
 #endif /* __MDFN_PSX_CDC_H */

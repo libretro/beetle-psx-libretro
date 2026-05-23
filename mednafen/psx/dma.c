@@ -28,7 +28,7 @@
 #include "psx_mem.h"
 #include "irq.h"
 #include "cpu_c.h"
-#include "cdc_c.h"
+#include "cdc.h"
 #include "spu_c.h"
 #include "mdec.h"
 #include "gpu_c.h"

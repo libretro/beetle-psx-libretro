@@ -1892,13 +1892,6 @@ uint32_t PS_CDC_DMARead(PS_CDC *cdc)
    return data;
 }
 
-/*
- * C-linkage shim declared in cdc_c.h. Forwards to PS_CDC::DMARead
- * through the file-scope PSX_CDC pointer. Unlike the cpu_c.h shims,
- * this one touches instance state (DMABuffer), but the indirection
- * is the same one the original PSX_CDC->PS_CDC_DMARead(cdc) call site already
- * carried.
- */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1909,15 +1902,8 @@ uint32_t CDC_DMARead(void)
 }
 
 /*
- * C-linkage shim declared in cdc_c.h. Wraps the historical
- *   freq = AudioBuffer-position-and-rate gate
- *   samples[0] = samples[1] = 0;
- *   if (freq) PS_CDC::GetCDAudio(samples, freq);
- * idiom that was previously inlined at spu.c's CD-DA mix call
- * site. Centralising it here means spu.c doesn't need access to
- * CD_Audio_Buffer's internal layout (which is private to PS_CDC),
- * just to a single C-callable accessor. `samples` is always
- * written; both channels are zeroed when no CD audio is currently
+ * `samples` is always written; both channels are 
+ * zeroed when no CD audio is currently
  * playing or the buffer is exhausted.
  */
 void CDC_GetCDAudioSample(int32_t samples[2])

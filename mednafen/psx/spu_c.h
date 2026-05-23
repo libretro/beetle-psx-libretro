@@ -12,7 +12,7 @@
  * (libretro.cpp, cdc.cpp) see the same calling convention - the
  * implementations in spu.c emit unmangled C symbols that match.
  *
- * Same pattern as cpu_c.h / cdc_c.h / gpu_c.h: a thin C-friendly
+ * Same pattern as cpu_c.h / gpu_c.h: a thin C-friendly
  * surface that exposes just what cross-module consumers need.
  *
  * SPU_Init zeroes all module state (file-scope statics in spu.c).

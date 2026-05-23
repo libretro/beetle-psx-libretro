@@ -75,7 +75,7 @@
 #include <libretro.h>
 
 #include "irq.h"
-#include "cdc_c.h"
+#include "cdc.h"
 #include "spu.h"
 
 uint32_t IntermediateBufferPos;
