@@ -131,7 +131,6 @@ else ifeq ($(platform), osx)
    fpic    := -fPIC
    SHARED  := -dynamiclib -Wl,-exported_symbols_list,libretro.osx.def
    LDFLAGS += $(PTHREAD_FLAGS)
-   FLAGS   += $(PTHREAD_FLAGS)
    ifeq ($(arch),ppc)
       ENDIANNESS_DEFINES := -DMSB_FIRST
       OLD_GCC := 1
@@ -167,7 +166,6 @@ else ifneq (,$(findstring ios,$(platform)))
    fpic    := -fPIC
    SHARED  := -dynamiclib
    LDFLAGS += $(PTHREAD_FLAGS)
-   FLAGS   += $(PTHREAD_FLAGS)
    ifeq ($(IOSSDK),)
       IOSSDK := $(shell xcrun -sdk iphoneos -show-sdk-path)
    endif
@@ -335,7 +333,6 @@ else ifeq ($(platform), gcw0)
    fpic    := -fPIC
    SHARED  := -shared -Wl,--no-undefined -Wl,--version-script=link.T
    LDFLAGS += $(PTHREAD_FLAGS)
-   FLAGS   += $(PTHREAD_FLAGS)
    FLAGS   += -ffast-math -march=mips32 -mtune=mips32r2 -mhard-float
    GLES     = 1
    GL_LIB  := -lGLESv2
