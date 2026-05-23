@@ -27,7 +27,7 @@
 #include "../../osd_message.h"
 #include "psx_mem.h"
 #include "irq.h"
-#include "cpu_c.h"
+#include "cpu.h"
 #include "cdc.h"
 #include "spu.h"
 #include "mdec.h"

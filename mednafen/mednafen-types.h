@@ -4,9 +4,6 @@
 #if defined(__x86_64__) && defined(__code_model_large__)
  #error "Compiling with large memory model is not recommended, for performance reasons."
 #endif
-//
-//
-//
 
 #include <stddef.h>
 #include <assert.h>
@@ -29,18 +26,12 @@
 #include <list>
 #endif
 
-#if !defined(HAVE_NATIVE64BIT) && (SIZEOF_VOID_P >= 8 || defined(__x86_64__))
-#define HAVE_NATIVE64BIT 1
-#endif
-
 #if defined(__GNUC__) || defined(__clang__) || defined(__ICC) || defined(__INTEL_COMPILER)
  #define HAVE_COMPUTED_GOTO 1
 #endif
 
 #if defined(__clang__)
-  //
-  // Begin clang
-  //
+  /* Begin clang */
   #define MDFN_MAKE_CLANGV(maj,min,pl) (((maj)*100*100) + ((min) * 100) + (pl))
   #define MDFN_CLANG_VERSION	MDFN_MAKE_CLANGV(__clang_major__, __clang_minor__, __clang_patchlevel__)
 
@@ -66,9 +57,7 @@
   #define MDFN_COLD __attribute__((cold))
   #define MDFN_HOT __attribute__((hot))
 #elif defined(__GNUC__)
-  //
-  // Begin gcc
-  //
+  /* Begin gcc */
   #define MDFN_MAKE_GCCV(maj,min,pl) (((maj)*100*100) + ((min) * 100) + (pl))
   #define MDFN_GCC_VERSION	MDFN_MAKE_GCCV(__GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__)
 
@@ -88,7 +77,6 @@
    #define alignas(n) __attribute__ ((aligned (n)))	// Kludge for 4.7.x, remove eventually when 4.8+ are not so new.
   #endif
 
-  //
   // Just avoid using fastcall with gcc before 4.1.0, as it(and similar regparm)
   // tend to generate bad code on the older versions(between about 3.1.x and 4.0.x, at least)
   //
@@ -122,9 +110,7 @@
   #endif
 
 #elif defined(_MSC_VER)
-  //
-  // Begin MSVC
-  //
+  /* Begin MSVC */
 
   #define INLINE __forceinline
   #define NO_INLINE __declspec(noinline)

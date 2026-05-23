@@ -285,9 +285,6 @@ void CPU_AssertIRQ_method(PS_CPU *self, unsigned which, bool asserted)
    CPU_RecalcIPCache();
 }
 
-/* C-linkage shims declared in cpu_c.h.  These exist so non-cpu.c
- * TUs (irq.c, gpu.c, mdec.c, ...) can drive the CPU without
- * depending on the full struct layout in cpu.h. */
 void CPU_AssertIRQ(unsigned which, bool asserted)
 {
    CPU_AssertIRQ_method(PSX_CPU, which, asserted);

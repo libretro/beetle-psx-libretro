@@ -23,13 +23,11 @@
 
 #include "irq.h"
 #include "../../osd_message.h"
-#include "cpu_c.h"
+#include "cpu.h"
 
 static uint16_t Asserted;
 static uint16_t Mask;
 static uint16_t Status;
-
-#define Recalc() CPU_AssertIRQ(0, (bool)(Status & Mask))
 
 void IRQ_Power(void)
 {
@@ -37,7 +35,7 @@ void IRQ_Power(void)
    Status = 0;
    Mask = 0;
 
-   Recalc();
+   CPU_AssertIRQ(0, (bool)(Status & Mask));
 }
 
 int IRQ_StateAction(void *data, int load, int data_only)
@@ -53,33 +51,25 @@ int IRQ_StateAction(void *data, int load, int data_only)
 
    if(load)
    {
-      Recalc();
+      CPU_AssertIRQ(0, (bool)(Status & Mask));
    }
 
    return(ret);
 }
 
-
 void IRQ_Assert(int which, bool status)
 {
    uint32_t old_Asserted = Asserted;
-
-/*
-   if(which == IRQ_SPU && status && (Asserted & (1 << which)))
-      osd_message(3, RETRO_LOG_ERROR,
-            RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION_ALT,
-            "SPU IRQ glitch??");
-*/
 
    Asserted &= ~(1 << which);
 
    if(status)
    {
       Asserted |= 1 << which;
-      Status |= (old_Asserted ^ Asserted) & Asserted;
+      Status   |= (old_Asserted ^ Asserted) & Asserted;
    }
 
-   Recalc();
+   CPU_AssertIRQ(0, (bool)(Status & Mask));
 }
 
 
@@ -93,7 +83,7 @@ void IRQ_Write(uint32_t A, uint32_t V)
    else
       Status &= V;
 
-   Recalc();
+   CPU_AssertIRQ(0, (bool)(Status & Mask));
 }
 
 

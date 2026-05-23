@@ -27,17 +27,19 @@
 
 #include "../mednafen-types.h"
 #include "psx_events.h"
+#include "gte.h"
+
 #include "../state.h"
 
-#include "gte.h"
+
 #ifdef HAVE_LIGHTREC
- #include <lightrec-config.h>
- #include <lightrec.h>
+#include <lightrec-config.h>
+#include <lightrec.h>
 
- /* 8MB should rarely fill up (4 IPI average for entire 2MB ram), 0 will disable, 1 will fill and clean the buffer quickly, good for finding issues with codebuffer cleanup */
- #define LIGHTREC_CODEBUFFER_SIZE 8*1024*1024
+/* 8MB should rarely fill up (4 IPI average for entire 2MB ram), 0 will disable, 1 will fill and clean the buffer quickly, good for finding issues with codebuffer cleanup */
+#define LIGHTREC_CODEBUFFER_SIZE 8*1024*1024
 
- enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_RUN_INTERPRETER};
+enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_RUN_INTERPRETER};
 #endif
 
 /* FAST_MAP_* enums are in BYTES (8-bit), not in 32-bit units ("words"
@@ -168,14 +170,22 @@ void              CPU_LightrecClear_method(PS_CPU *self, uint32_t addr, uint32_t
  * scope cpu_next_event_ts. */
 extern int32_t cpu_next_event_ts;
 
-static INLINE void CPU_SetEventNT(int32_t next_event_ts_arg)
-{
-   cpu_next_event_ts = next_event_ts_arg;
-}
+#define CPU_GetEventNT() cpu_next_event_ts
+#define CPU_SetEventNT(next_event_ts_arg) (cpu_next_event_ts = (next_event_ts_arg))
 
-static INLINE int32_t CPU_GetEventNT(void)
-{
-   return cpu_next_event_ts;
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void CPU_AssertIRQ(unsigned which, bool asserted);
+void CPU_SetHalt(bool status);
+
+#ifdef HAVE_LIGHTREC
+void CPU_LightrecClear(uint32_t addr, uint32_t size);
+#endif
+
+#ifdef __cplusplus
 }
+#endif
 
 #endif
