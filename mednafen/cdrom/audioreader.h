@@ -20,9 +20,7 @@ extern "C" {
 
 /* Audio-track decoder.
  *
- * Used to be a C++ AudioReader abstract base class with a single
- * concrete OggVorbisReader subclass.  Now a plain C struct: Vorbis
- * is the only format we support (CCD/CUE .wav-aliased-as-Ogg
+ * Vorbis is the only format we support (CCD/CUE .wav-aliased-as-Ogg
  * tracks), so the vtable collapses to direct calls.  All state -
  * the Vorbis decoder + the last-read-position cursor used by the
  * frame_offset != LastReadPos seek shortcut - lives in the struct

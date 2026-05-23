@@ -339,12 +339,8 @@ static INLINE void RecalcTexWindowStuff(PS_GPU *g)
  * The TexCache is a small (256-entry) read-around cache of
  * recently-fetched VRAM blocks; modes 0 and 1 hit it for
  * spatial-locality wins, mode 2 reads VRAM directly per texel.
- *
- * The static_assert guards against accidental TexMode_TA values
- * outside the hardware-defined range; only the C++ build sees it
- * (HAS_CXX11), the C build will rely on the dispatch table to
- * never produce an out-of-range value.
  */
+
 /* Generator macro for one GetTexel specialisation.  TM_VAL is the
  * literal texture-mode (0/1/2).  The switch on TM_VAL collapses to
  * the matching arm; the if (TM_VAL != 2) and if (TM_VAL == 0) tests
@@ -352,13 +348,13 @@ static INLINE void RecalcTexWindowStuff(PS_GPU *g)
 #define DEFINE_GetTexel(SUFFIX, TM_VAL) \
 static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg) \
 { \
+   uint16_t fbw; \
    uint32_t u_ext   = ((u_arg & g->SUCV.TWX_AND) + g->SUCV.TWX_ADD); \
    uint32_t fbtex_x = ((u_ext >> (2 - (TM_VAL)))) & 1023; \
    uint32_t fbtex_y = (v_arg & g->SUCV.TWY_AND) + g->SUCV.TWY_ADD; \
    uint32_t gro     = fbtex_y * 1024U + fbtex_x; \
    PS_GPU_TexCache_t *TexCache = &g->TexCache[0]; \
    PS_GPU_TexCache_t *c = NULL; \
-   uint16_t fbw; \
    switch (TM_VAL) \
    { \
       case 0: c = &TexCache[((gro >> 2) & 0x3) | ((gro >> 8) & 0xFC)]; break; \
@@ -373,7 +369,7 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
       c->Data[1] = texel_fetch(g, cache_x + 1, fbtex_y); \
       c->Data[2] = texel_fetch(g, cache_x + 2, fbtex_y); \
       c->Data[3] = texel_fetch(g, cache_x + 3, fbtex_y); \
-      c->Tag = (gro &~ 0x3); \
+      c->Tag     = (gro &~ 0x3); \
    } \
    fbw = c->Data[gro & 0x3]; \
    if ((TM_VAL) != 2) \

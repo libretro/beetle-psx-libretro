@@ -24,8 +24,7 @@
 #include "../../beetle_psx_globals.h"
 
 /* Globals defined in libretro.cpp.  Duplicating these declarations
- * here (rather than including psx.h which is C++-only) keeps frontio.c
- * compilable as plain C. */
+ * here keeps frontio.c compilable as plain C. */
 extern uint8_t analog_combo[2];
 extern uint8_t analog_combo_hold;
 

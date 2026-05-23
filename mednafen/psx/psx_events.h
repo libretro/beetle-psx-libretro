@@ -10,10 +10,6 @@
  * modules (timer.c and similar) can use the event API without
  * pulling in psx.h, which transitively includes cpu.h's
  * `class PS_CPU` declaration that a C compiler can't parse.
- *
- * psx.h #includes this header so existing C++ callers see exactly
- * the same declarations - there's no duplication, just a smaller
- * unit that's safe for both languages.
  */
 
 enum

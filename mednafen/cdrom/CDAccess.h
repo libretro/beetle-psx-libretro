@@ -12,9 +12,7 @@ extern "C" {
 
 /* CDAccess: polymorphic disc-image reader.
  *
- * Previously a C++ abstract base class with four pure-virtual
- * methods.  Now a plain C struct with explicit function-pointer
- * vtable.  Each backend (Image / CCD / CHD / PBP) defines a
+ * Each backend (Image / CCD / CHD / PBP) defines a
  * concrete struct that embeds `struct CDAccess base` as its first
  * member and a factory function `CDAccess_<X>_New` that allocates
  * the struct and installs the function pointers.

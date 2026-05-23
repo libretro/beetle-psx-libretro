@@ -8,9 +8,7 @@
 extern "C" {
 #endif
 
-/* MemoryPatch describes one cheat entry.  The legacy C++ class had
- * std::string fields for `name` and `conditions`; with the cheat
- * table now in plain C we use fixed char buffers.  Names and
+/* MemoryPatch describes one cheat entry.  Names and
  * conditions are short by construction (libretro composes the name
  * from "cheat_<index>_<part>", and conditions are GameShark D0/D1/etc
  * encodings of at most a few comma-separated terms). */

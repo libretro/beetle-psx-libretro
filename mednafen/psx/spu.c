@@ -352,13 +352,8 @@ static const int16_t FIR_Table[256][4] =
  * The register block is the only awkward shape: hardware exposes
  * a 0x100-entry uint16 array but with various named sub-regions
  * overlapping it (Voice regs, global regs with named SPUStatus,
- * reverb regs with named coefficient fields). Pre-conversion this
- * was an anonymous union with anonymous struct nesting, which is
- * a C++ feature; portable C can't use anonymous structs inside
- * unions. The conversion gives every nested aggregate a name and
- * accesses go through the explicit chain (e.g.
- * regs.s.global.s.SPUStatus). The `s` field name is short for
- * "structured" - just a tag to navigate the union.
+ * reverb regs with named coefficient fields). The `s` field name 
+ * is short for "structured" - just a tag to navigate the union.
  */
 typedef union
 {

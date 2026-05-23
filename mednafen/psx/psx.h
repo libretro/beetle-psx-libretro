@@ -56,11 +56,7 @@ extern uint8_t analog_combo_hold;
 /*
  * PSX_SetEventNT and PSX_EVENT_TIMER come in via psx_events.h
  * (already C-clean and #included above); the rest are
- * one-offs needed by gpu.c.
- *
- * Header is C-only; the C++ build never includes it (it includes
- * psx.h directly), so no extern "C" wrapping is needed.
- */
+ * one-offs needed by gpu.c. */
 
 void PSX_RequestMLExit(void);
 

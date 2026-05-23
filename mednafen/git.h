@@ -16,16 +16,7 @@
  * GameMediumTypes, MDFN_ROTATE*) was metadata for Mednafen's standalone
  * UI and never read by the libretro driver, so it was removed during
  * the dead-code audit.
- *
- * Now plain C - originally CheatFormatStruct's DecodeCheat callback
- * took `const std::string&` for the cheat string, which trapped this
- * whole header behind C++. The single call site (libretro.cpp's
- * retro_cheat_set) was already constructing a temporary std::string
- * from a C string just to call into DecodeGS, which then read it
- * character-by-character via std::string::operator[] and .size().
- * Switching to `const char *` (with strlen) is shorter at every layer
- * and frees this header (and everything that transitively includes
- * it - notably mednafen/psx/gpu.h) for inclusion from C TUs. */
+ */
 
 #include <libretro.h>
 
@@ -96,20 +87,6 @@ typedef struct
     * system emulation code, to be read by the driver code. */
    int32_t SoundBufSize;
 } EmulateSpecStruct;
-
-/*
- * `extern retro_log_printf_t log_cb;` historically lived here at
- * the bottom of git.h with whatever linkage was current (the old
- * git.h had no extern "C" block; consumers were all C++). Putting
- * the declaration inside this header's new extern "C" block
- * created a C-linkage decl that conflicts with the C++-linkage
- * one force-included from lightning-lightrec-include/debug.h via
- * the build system's -include flag. Every TU that needs log_cb
- * already declares it locally (libretro.cpp, rsx_lib_*.cpp,
- * mednafen/error.c, mempatcher.cpp, every CDAccess_*.cpp,
- * libretro-common/glsm/glsm.c, debug.h) so the central decl was
- * redundant anyway. Removed.
- */
 
 #ifdef __cplusplus
 }

@@ -17,8 +17,7 @@
 
 /*
  * Sorted-array implementation of the SubQ replacement table used
- * by the CD-image backends.  Replaces the std::map<uint32, 12-byte>
- * the C++ codebase used; lookup is bsearch instead of red-black
+ * by the CD-image backends. Lookup is bsearch instead of red-black
  * tree, which is both smaller and friendlier to cache locality at
  * the few-dozen entries SBI files typically have.
  *

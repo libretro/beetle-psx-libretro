@@ -139,14 +139,14 @@ int memfd;
 int32_t EventCycles = 128;
 uint8_t spu_samples = 1;
 
-// CPU overclock factor (or 0 if disabled)
+/* CPU overclock factor (or 0 if disabled) */
 int32_t psx_overclock_factor = 0;
-// GPU rasterizer overclock shift
+/* GPU rasterizer overclock shift */
 unsigned psx_gpu_overclock_shift = 0;
 
-// Sets how often (in number of output frames/retro_run invocations)
-// the internal framerace counter should be updated if
-// display_internal_framerate is true.
+/* Sets how often (in number of output frames/retro_run invocations)
+ * the internal framerace counter should be updated if
+ * display_internal_framerate is true. */
 #define INTERNAL_FPS_SAMPLE_PERIOD 64
 
 static int psx_skipbios;
@@ -154,14 +154,6 @@ static int override_bios;
 
 bool psx_gte_overclock;
 enum dither_mode psx_gpu_dither_mode;
-
-//iCB: PGXP options
-unsigned int psx_pgxp_mode;
-int psx_pgxp_2d_tol;
-unsigned int psx_pgxp_vertex_caching;
-unsigned int psx_pgxp_texture_correction;
-unsigned int psx_pgxp_nclip;
-// \iCB
 
 #define NEGCON_RANGE 0x7FFF
 
@@ -171,10 +163,27 @@ char retro_cd_base_directory[4096];
 static char retro_cd_path[4096];
 char retro_cd_base_name[4096];
 #ifdef _WIN32
-   static const char retro_slash = '\\';
+static const char retro_slash = '\\';
 #else
-   static const char retro_slash = '/';
+static const char retro_slash = '/';
 #endif
+
+/* PGXP options */
+unsigned int psx_pgxp_mode;
+int psx_pgxp_2d_tol;
+unsigned int psx_pgxp_vertex_caching;
+unsigned int psx_pgxp_texture_correction;
+unsigned int psx_pgxp_nclip;
+
+
+/* end of Mednafen psx.cpp */
+
+#ifdef NEED_DEINTERLACER
+static bool PrevInterlaced;
+static Deinterlacer deint;
+#endif
+
+static MDFN_Surface *surf = NULL;
 
 enum
 {
@@ -425,10 +434,6 @@ static void extract_directory(char *buf, const char *path, size_t size)
 #include <stdarg.h>
 #include <ctype.h>
 
-bool setting_apply_analog_toggle  = false;
-bool setting_apply_analog_default = false;
-bool use_mednafen_memcard0_method = false;
-
 /* Based off(but not the same as) public-domain "JKISS" PRNG. */
 struct MDFN_PseudoRNG
 {
@@ -437,6 +442,10 @@ struct MDFN_PseudoRNG
 };
 
 static struct MDFN_PseudoRNG PSX_PRNG;
+
+bool setting_apply_analog_toggle  = false;
+bool setting_apply_analog_default = false;
+bool use_mednafen_memcard0_method = false;
 
 uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa)
 {
@@ -468,16 +477,6 @@ uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa)
 }
 
 /* CDIF storage.
- *
- * Used to be three globals:
- *   static std::vector<CDIF *> CDInterfaces;     // owner
- *   static std::vector<CDIF *> *cdifs = NULL;    // alias set by InitCommon
- *   static std::vector<const char *> cdifs_scex_ids; // parallel SCEx ids
- *
- * They're folded into one struct that owns the CDIF and SCEx id
- * pairs and a flag to indicate whether the emulator side has the
- * array "live" (post-InitCommon, pre-CloseGame).  The old
- * "if (cdifs)" test for liveness becomes "if (cdifs_loaded)".
  *
  * The FIXME on the original CDInterfaces ("Cleanup on error out") is
  * addressed by routing every error path through cdif_array_clear,
@@ -582,8 +581,7 @@ extern int PBP_DiscCount;
 static int PBP_PhysicalDiscCount;
 
 /* Dynamic array of C strings.  Used for the disk-control image
- * paths/labels lists and the M3U file list - all places where the
- * C++ code carried std::vector<std::string>.  count is the number
+ * paths/labels lists and the M3U file list.  count is the number
  * of strings, cap is the allocated slot count; strings are
  * strdup-ed and freed individually by sv_clear. */
 typedef struct
@@ -729,7 +727,7 @@ const uint8_t *PSX_LoadExpansion1(void)
 {
    unsigned i;
 
-   if (psx_expansion1 == NULL)
+   if (!psx_expansion1)
    {
       psx_expansion1 = (uint8_t *)malloc(PSX_EXPANSION1_SIZE);
       if (!psx_expansion1)
@@ -1868,7 +1866,7 @@ static unsigned CalcDiscSCEx(void)
 
          memset(fbuf, 0, sizeof(fbuf));
 
-         if(id == NULL && CDIF_ReadSector(cdifs.items[i], buf, 4, 1) == 0x2)
+         if(!id && CDIF_ReadSector(cdifs.items[i], buf, 4, 1) == 0x2)
          {
             unsigned ipos, opos;
             for(ipos = 0, opos = 0; ipos < 0x48; ipos++)
@@ -1881,27 +1879,27 @@ static unsigned CalcDiscSCEx(void)
 
             fbuf[opos++] = 0;
 
-            if(strstr((char *)fbuf, "licensedby") != NULL)
+            if (strstr((char *)fbuf, "licensedby"))
             {
-               if(strstr((char *)fbuf, "america") != NULL)
+               if (strstr((char *)fbuf, "america"))
                {
                   id = "SCEA";
                   if(!i)
                      ret_region = REGION_NA;
                }
-               else if(strstr((char *)fbuf, "europe") != NULL)
+               else if (strstr((char *)fbuf, "europe"))
                {
                   id = "SCEE";
                   if(!i)
                      ret_region = REGION_EU;
                }
-               else if(strstr((char *)fbuf, "japan") != NULL)
+               else if (strstr((char *)fbuf, "japan"))
                {
                   id = "SCEI";   // ?
                   if(!i)
                      ret_region = REGION_JP;
                }
-               else if(strstr((char *)fbuf, "sonycomputerentertainmentinc.") != NULL)
+               else if (strstr((char *)fbuf, "sonycomputerentertainmentinc."))
                {
                   id = "SCEI";
                   if(!i)
@@ -1909,7 +1907,7 @@ static unsigned CalcDiscSCEx(void)
                }
                else  // Failure case
                {
-                  if(prev_valid_id != NULL)
+                  if (prev_valid_id)
                      id = prev_valid_id;
                   else
                   {
@@ -1932,7 +1930,7 @@ static unsigned CalcDiscSCEx(void)
             }
          }
 
-         if(id != NULL)
+         if (id)
             prev_valid_id = id;
 
          cdifs.scex_ids[i] = id;
@@ -2090,7 +2088,8 @@ int lightrec_try_map(MEMFDTYPE memfd, int i, uintptr_t inc_io_base, uintptr_t ma
 	void *bios, *scratch, *map;
 
 	/* Try to map at various io_base addresses*/
-	for (; i*inc_io_base <= max_io_base; i++) {
+	for (; i*inc_io_base <= max_io_base; i++)
+	{
 		io_base = i*inc_io_base;
 
 		/* Skip base=0: even if mmap honors NULL+MAP_FIXED_NOREPLACE
@@ -2099,7 +2098,8 @@ int lightrec_try_map(MEMFDTYPE memfd, int i, uintptr_t inc_io_base, uintptr_t ma
 		 * "no mmap" and would then be passed to placement-new for
 		 * MainRAM, leaving MainRAM->data8 also NULL and breaking
 		 * retro_get_memory_data + every direct RAM access. The first
-		 * usable base is 0x10000000 or min_io_base, whichever is higher. */
+		 * usable base is 0x10000000 or min_io_base, whichever is 
+                 * higher. */
 		if(io_base < min_io_base || io_base == 0)
 			continue;
 
@@ -2185,18 +2185,20 @@ err_unmap:
 }
 
 /* Returns number of maps, 0 on failure, NUM_MEM on success*/
-int lightrec_init_mmap()
+int lightrec_init_mmap(void)
 {
 	int ret = 0;
-
-/* open memfd and set size */
 #ifdef HAVE_ASHMEM
+	/* open memfd and set size */
 	memfd = open("/dev/ashmem", O_RDWR);
 
 	if (memfd < 0) {
-		/* Android 10+ / API 29+ gives EACCES (permission denied) opening /dev/ashmem
-		 * fallback to ASharedMemory_create available since Android 8 / API 26 */
-		if(errno == EACCES) {
+		/* Android 10+ / API 29+ gives EACCES (permission denied) 
+                 * opening /dev/ashmem
+		 * fallback to ASharedMemory_create available 
+                 * since Android 8 / API 26 */
+		if (errno == EACCES)
+                {
 			void *lib;
 			int (*create)(const char*, size_t);
 			int (*setProt)(int, int);
@@ -2204,7 +2206,8 @@ int lightrec_init_mmap()
 
 			dlerror();      /* Clear any existing error */
 			lib = dlopen("libandroid.so", RTLD_NOW);
-			if (lib == NULL) {
+			if (!lib)
+                        {
 				log_cb(RETRO_LOG_ERROR, "Failed to dlopen: %s\n", dlerror());
 				return 0;
 			}
@@ -2214,19 +2217,20 @@ int lightrec_init_mmap()
 			*(void **)(&setProt) = dlsym(lib, "ASharedMemory_setProt");
 			error2 = dlerror();
 
-			if (error1 == NULL)
+			if (!error1)
 				memfd = (*create)("lightrec_memfd",RAM_SIZE);
 
-			if (memfd < 0) {
+			if (memfd < 0)
+                        {
 				log_cb(RETRO_LOG_ERROR, "Failed to ASharedMemory_create: %s\n",
-							(error1 != NULL) ? error1 : strerror(errno));
+							(error1) ? error1 : strerror(errno));
 				dlclose(lib);
 				return 0;
 			}
 
-			if (error2 != NULL || (((*setProt)(memfd, PROT_READ|PROT_WRITE)) < 0))
+			if (error2 || (((*setProt)(memfd, PROT_READ|PROT_WRITE)) < 0))
 				log_cb(RETRO_LOG_ERROR, "Failed to ASharedMemory_setProt: %s\n",
-							(error2 != NULL) ? error2 : strerror(errno));
+							(error2) ? error2 : strerror(errno));
 
 			dlclose(lib);
 		} else {
@@ -2239,19 +2243,19 @@ int lightrec_init_mmap()
 	}
 #endif
 #ifdef HAVE_SHM
-	int memfd;
 	const char *shm_name = "/lightrec_memfd_beetle";
-
-	//try HUGETLB then fallback to normal memfd
-	memfd = syscall(SYS_memfd_create,shm_name,hugetlb?MFD_HUGETLB:0);
+	/* Try HUGETLB then fallback to normal memfd */
+	int memfd = syscall(SYS_memfd_create,shm_name,hugetlb?MFD_HUGETLB:0);
 
 #ifndef __ANDROID__
-/* Android can build with HAVE_SHM, but doesn't have shm_open/unlink
-   Support platforms with shm_open, but without memfd_create */
-	if (memfd < 0) {
+	/* Android can build with HAVE_SHM, but doesn't have shm_open/unlink
+	   Support platforms with shm_open, but without memfd_create */
+	if (memfd < 0)
+        {
 		memfd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
 
-		if (memfd < 0 && errno == EEXIST) {
+		if (memfd < 0 && errno == EEXIST)
+                {
 			shm_unlink(shm_name);
 			memfd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
 		}
@@ -2261,23 +2265,24 @@ int lightrec_init_mmap()
 	}
 #endif
 
-	if (memfd < 0) {
+	if (memfd < 0)
+        {
 		log_cb(RETRO_LOG_ERROR, "Failed to create SHM: %s\n", strerror(errno));
 		return 0;
 	}
 
 
-	if (ftruncate(memfd, RAM_SIZE) < 0) {
+	if (ftruncate(memfd, RAM_SIZE) < 0)
+        {
 		log_cb(RETRO_LOG_ERROR, "Could not truncate memfd size: %s\n", strerror(errno));
 		goto close_return;
 	}
 #endif
 #ifdef HAVE_WIN_SHM
-	HANDLE memfd;
+	HANDLE memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, RAM_SIZE+LIGHTREC_CODEBUFFER_SIZE+BIOS_SIZE+SCRATCH_SIZE, NULL);
 
-	memfd = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, RAM_SIZE+LIGHTREC_CODEBUFFER_SIZE+BIOS_SIZE+SCRATCH_SIZE, NULL);
-
-	if (memfd == NULL) {
+	if (!memfd)
+        {
 		log_cb(RETRO_LOG_ERROR, "Failed to create WIN_SHM: %s (%d)\n", strerror(errno), GetLastError());
 		return 0;
 	}
@@ -2288,19 +2293,18 @@ int lightrec_init_mmap()
 
 #ifdef max_io_base_64
 	/* Try higher base address on 64 bit if first lightrec_try_map failed */
-	if (ret != NUM_MEM) {
+	if (ret != NUM_MEM)
 		ret = lightrec_try_map(memfd, start_i_64, inc_io_base_64, max_io_base_64);
-	}
 #endif
 
-	/* We have tried all io_base addresses, give warning unless we are still in hugetlb mode,
-	 which will fallback to non-hugetlb and attempt lightrec_init_mmap() again */
-	if (!hugetlb && ret != NUM_MEM) {
+	/* We have tried all io_base addresses, give warning unless 
+         * we are still in hugetlb mode, which will fallback to 
+         * non-hugetlb and attempt lightrec_init_mmap() again */
+	if (!hugetlb && ret != NUM_MEM)
 		log_cb(RETRO_LOG_WARN, "Unable to mmap on any base address, dynarec will be slower numberof mmaps: %d\n",ret);
-	}
 
-close_return:
 #ifdef HAVE_SHM
+close_return:
 	close(memfd);
 #endif
 #ifdef HAVE_WIN_SHM
@@ -2309,7 +2313,7 @@ close_return:
 	return ret;
 }
 
-void lightrec_free_mmap()
+void lightrec_free_mmap(void)
 {
 	for (int i = 0; i < NUM_MEM; i++)
 		UNMAP((void *)((uintptr_t)psx_mem + i * RAM_SIZE), RAM_SIZE);
@@ -2351,12 +2355,123 @@ static void retro_led_interface(void)
    }
 }
 
-/* Forward declarations, required for disk control
- * 'set initial disk' functionality */
-static unsigned disk_get_num_images(void);
-static void CDInsertEject(void);
-static void CDEject(void);
-static void Cleanup(void);
+static unsigned disk_get_num_images(void)
+{
+   if(cdifs_loaded)
+      return CD_IsPBP ? PBP_PhysicalDiscCount : (unsigned)cdifs.count;
+   return 0;
+}
+
+static void Cleanup(void)
+{
+   TextMem_resize(0);
+
+   if (PSX_CDC)
+   {
+      PS_CDC_Destroy(PSX_CDC);
+      free(PSX_CDC);
+   }
+   PSX_CDC = NULL;
+
+   SPU_Kill();
+
+   GPU_Destroy();
+
+   if (PSX_CPU)
+   {
+      CPU_Destroy(PSX_CPU);
+      PSX_CPU = NULL;
+   }
+
+   if(PSX_FIO)
+   {
+      FrontIO_Free(PSX_FIO);
+      PSX_FIO = NULL;
+   }
+   input_set_fio(NULL);
+
+#ifdef HAVE_LIGHTREC
+   /* InitCommon picks one of two allocation strategies based on whether
+    * lightrec_init_mmap() was able to reserve the requested base
+    * address: the mmap path stores pointers obtained from MAP() into
+    * psx_mem/psx_bios/psx_scratch, while the fallback uses plain
+    * operator new. We must free along whichever path was taken;
+    * previously the HAVE_LIGHTREC branch always skipped delete and
+    * relied solely on lightrec_free_mmap, leaking ~2.5MB per load
+    * cycle on the fallback path. */
+   if (psx_mmap > 0)
+   {
+      lightrec_free_mmap();
+   }
+   else
+   {
+      if (MainRAM)
+         MultiAccessSizeMem_Free(MainRAM);
+      if (ScratchRAM)
+         MultiAccessSizeMem_Free(ScratchRAM);
+      if (BIOSROM)
+         MultiAccessSizeMem_Free(BIOSROM);
+   }
+   MainRAM    = NULL;
+   ScratchRAM = NULL;
+   BIOSROM    = NULL;
+   if(lightrec_codebuffer)
+      lightrec_codebuffer = NULL;
+#else
+   if (MainRAM)
+      MultiAccessSizeMem_Free(MainRAM);
+   MainRAM = NULL;
+
+   if (ScratchRAM)
+      MultiAccessSizeMem_Free(ScratchRAM);
+   ScratchRAM = NULL;
+
+   if (BIOSROM)
+      MultiAccessSizeMem_Free(BIOSROM);
+   BIOSROM = NULL;
+#endif
+
+   if(PIOMem)
+      MultiAccessSizeMem_Free(PIOMem);
+   PIOMem = NULL;
+
+#ifdef HAVE_LIGHTREC
+   PSX_FreeExpansion1();
+#endif
+
+   cdifs_loaded = 0;
+}
+
+static void CDInsertEject(void)
+{
+   CD_TrayOpen = !CD_TrayOpen;
+
+   /* cdifs_loaded is 0 when no game is loaded; individual entries may
+    * still be NULL after disk_add_image_index() reserves a slot but
+    * before disk_replace_image_index() fills it. */
+   if (cdifs_loaded)
+   {
+      size_t disc;
+      for (disc = 0; disc < cdifs.count; disc++)
+      {
+         CDIF *cdif = cdifs.items[disc];
+         if (!cdif)
+            continue;
+         if (!CDIF_Eject(cdif, CD_TrayOpen))
+            CD_TrayOpen = !CD_TrayOpen;
+      }
+   }
+
+   SetDiscWrapper(CD_TrayOpen);
+}
+
+
+
+static void CDEject(void)
+{
+   if (!CD_TrayOpen)
+      CDInsertEject();
+}
 
 static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
 {
@@ -3022,86 +3137,6 @@ static int LoadCD(void)
    return 1;
 }
 
-static void Cleanup(void)
-{
-   TextMem_resize(0);
-
-   if (PSX_CDC)
-   {
-      PS_CDC_Destroy(PSX_CDC);
-      free(PSX_CDC);
-   }
-   PSX_CDC = NULL;
-
-   SPU_Kill();
-
-   GPU_Destroy();
-
-   if (PSX_CPU)
-   {
-      CPU_Destroy(PSX_CPU);
-      PSX_CPU = NULL;
-   }
-
-   if(PSX_FIO)
-   {
-      FrontIO_Free(PSX_FIO);
-      PSX_FIO = NULL;
-   }
-   input_set_fio(NULL);
-
-#ifdef HAVE_LIGHTREC
-   /* InitCommon picks one of two allocation strategies based on whether
-    * lightrec_init_mmap() was able to reserve the requested base
-    * address: the mmap path stores pointers obtained from MAP() into
-    * psx_mem/psx_bios/psx_scratch, while the fallback uses plain
-    * operator new. We must free along whichever path was taken;
-    * previously the HAVE_LIGHTREC branch always skipped delete and
-    * relied solely on lightrec_free_mmap, leaking ~2.5MB per load
-    * cycle on the fallback path. */
-   if (psx_mmap > 0)
-   {
-      lightrec_free_mmap();
-   }
-   else
-   {
-      if (MainRAM)
-         MultiAccessSizeMem_Free(MainRAM);
-      if (ScratchRAM)
-         MultiAccessSizeMem_Free(ScratchRAM);
-      if (BIOSROM)
-         MultiAccessSizeMem_Free(BIOSROM);
-   }
-   MainRAM    = NULL;
-   ScratchRAM = NULL;
-   BIOSROM    = NULL;
-   if(lightrec_codebuffer)
-      lightrec_codebuffer = NULL;
-#else
-   if (MainRAM)
-      MultiAccessSizeMem_Free(MainRAM);
-   MainRAM = NULL;
-
-   if (ScratchRAM)
-      MultiAccessSizeMem_Free(ScratchRAM);
-   ScratchRAM = NULL;
-
-   if (BIOSROM)
-      MultiAccessSizeMem_Free(BIOSROM);
-   BIOSROM = NULL;
-#endif
-
-   if(PIOMem)
-      MultiAccessSizeMem_Free(PIOMem);
-   PIOMem = NULL;
-
-#ifdef HAVE_LIGHTREC
-   PSX_FreeExpansion1();
-#endif
-
-   cdifs_loaded = 0;
-}
-
 static void CloseGame(void)
 {
    int i;
@@ -3137,35 +3172,6 @@ static void CloseGame(void)
    }
 
    Cleanup();
-}
-
-static void CDInsertEject(void)
-{
-   CD_TrayOpen = !CD_TrayOpen;
-
-   /* cdifs_loaded is 0 when no game is loaded; individual entries may
-    * still be NULL after disk_add_image_index() reserves a slot but
-    * before disk_replace_image_index() fills it. */
-   if (cdifs_loaded)
-   {
-      size_t disc;
-      for (disc = 0; disc < cdifs.count; disc++)
-      {
-         CDIF *cdif = cdifs.items[disc];
-         if (!cdif)
-            continue;
-         if (!CDIF_Eject(cdif, CD_TrayOpen))
-            CD_TrayOpen = !CD_TrayOpen;
-      }
-   }
-
-   SetDiscWrapper(CD_TrayOpen);
-}
-
-static void CDEject(void)
-{
-   if(!CD_TrayOpen)
-      CDInsertEject();
 }
 
 static void CDSelect(void)
@@ -3451,23 +3457,6 @@ static bool DecodeGS(const char *cheat_string, MemoryPatch *patch)
  }
 }
 
-static CheatFormatStruct CheatFormats[] =
-{
-   { "GameShark", "Sharks with lamprey eels for eyes.", DecodeGS },
-};
-
-/* end of Mednafen psx.cpp */
-
-//forward decls
-extern void Emulate(EmulateSpecStruct *espec);
-
-#ifdef NEED_DEINTERLACER
-static bool PrevInterlaced;
-static Deinterlacer deint;
-#endif
-
-static MDFN_Surface *surf = NULL;
-
 static void alloc_surface(void)
 {
    uint32_t width  = MEDNAFEN_CORE_GEOMETRY_MAX_W;
@@ -3497,7 +3486,7 @@ static void alloc_surface(void)
    width  <<= GPU_get_upscale_shift();
    height <<= GPU_get_upscale_shift();
 
-   if (surf != NULL)
+   if (surf)
       MDFN_Surface_Delete(surf);
 
    surf = MDFN_Surface_New(width, height, width);
@@ -3516,13 +3505,6 @@ static void check_system_specs(void)
    // Hints that we need a fairly powerful system to run this.
    unsigned level = 15;
    environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
-}
-
-static unsigned disk_get_num_images(void)
-{
-   if(cdifs_loaded)
-      return CD_IsPBP ? PBP_PhysicalDiscCount : (unsigned)cdifs.count;
-   return 0;
 }
 
 static bool disk_set_eject_state(bool ejected)
@@ -4796,14 +4778,14 @@ static void ReadM3U(string_vec_t *file_list, const char *path, unsigned depth)
    fp = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
          RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
-   if (fp == NULL)
+   if (!fp)
       return;
 
    MDFN_GetFilePathComponents_c(path,
          dir_path, sizeof(dir_path),
          NULL, 0, NULL, 0);
 
-   while(filestream_gets(fp, linebuf, sizeof(linebuf)) != NULL)
+   while (filestream_gets(fp, linebuf, sizeof(linebuf)))
    {
       char efp_buf[4096];
       size_t efp_len;
@@ -5445,8 +5427,8 @@ void retro_run(void)
 
       if (frame_count % INTERNAL_FPS_SAMPLE_PERIOD == 0)
       {
-         char msg_buffer[64];
          float fps;
+         char msg_buffer[64];
          float internal_fps;
 
          msg_buffer[0] = '\0';
@@ -6074,6 +6056,11 @@ void retro_cheat_reset(void)
    MDFN_FlushGameCheats(1);
 }
 
+static CheatFormatStruct CheatFormats[] =
+{
+   { "GameShark", "Sharks with lamprey eels for eyes.", DecodeGS },
+};
+
 void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
 {
    const CheatFormatStruct* cf = CheatFormats;
@@ -6090,7 +6077,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char * codeLine)
    char part[32];
    MemoryPatch patch;
 
-   if (codeLine == NULL)
+   if (!codeLine)
       return;
 
    /* Break the code into Parts */

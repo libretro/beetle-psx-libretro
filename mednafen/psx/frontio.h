@@ -7,10 +7,7 @@
 #include "../state_helpers.h"
 #include "../state.h"
 
-/* Crosshair-cursor selector values, formerly the FrontIO::SETTING_GUN_*
- * enum.  Promoted to file scope so both the InputDevice base struct
- * and external callers (e.g. libretro.cpp) can reference them without
- * pulling in C++ class scoping. */
+/* Crosshair-cursor selector values  */
 enum
 {
    SETTING_GUN_CROSSHAIR_OFF   = 0,
@@ -49,8 +46,7 @@ struct InputDevice
 /* Per-device dispatch table.  Each concrete device type has a single
  * static const InputDevice_VTable instance and points its embedded
  * InputDevice::vt at it.  All polymorphic calls go through
- * (dev->vt->Method)(dev, args).  Reference parameters in the original
- * C++ (e.g. int32_t &) become pointers in C - see Clock below. */
+ * (dev->vt->Method)(dev, args). */
 struct InputDevice_VTable
 {
    void     (*Power)            (InputDevice *self_);
@@ -136,9 +132,8 @@ void     FrontIO_SetCrosshairsColor (FrontIO *fio, unsigned port, uint32_t color
 
 InputDevice *FrontIO_GetMemcardDevice(FrontIO *fio, unsigned which);
 uint64_t     FrontIO_GetMemcardDirtyCount(FrontIO *fio, unsigned which);
-/* The C++ overloads of LoadMemcard / SaveMemcard collapse to two
- * functions each: the (which, path, force_load) form is the
- * primitive; the (which) form picks up the path from the saved
+
+/* the (which) form picks up the path from the saved
  * mc_filenames[] cache and is implemented as a thin wrapper. */
 void     FrontIO_LoadMemcardFromPath(FrontIO *fio, unsigned which,
                                      const char *path, bool force_load);

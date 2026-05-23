@@ -63,9 +63,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* SimpleFIFO is declared in cdc.h; the access helpers used to be
- * inline methods on the C++ class.  They are now static-inline
- * functions in this translation unit. */
+/* SimpleFIFO is declared in cdc.h */
 static INLINE bool SimpleFIFO_Init(SimpleFIFO *f, uint32_t the_size)
 {
    f->data = (uint8_t *)malloc(the_size * sizeof(uint8_t));
@@ -318,10 +316,8 @@ static const CDC_CTEntry Commands[0x20] =
 void PS_CDC_Init(PS_CDC *cdc)
 {
    /* SimpleFIFO_Init malloc-failure leaves the FIFO unusable but
-    * the rest of the struct is still in a defined-zero state.  The
-    * old C++ ctor proceeded silently on alloc failure too, so this
-    * matches the historical behaviour for the moment.  Future work:
-    * surface the failure to the caller. */
+    * the rest of the struct is still in a defined-zero state.
+    *  Future work: surface the failure to the caller. */
    SimpleFIFO_Init(&cdc->DMABuffer, 4096);
 
    cdc->IsPSXDisc           = false;

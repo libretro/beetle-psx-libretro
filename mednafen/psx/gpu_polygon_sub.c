@@ -1,20 +1,11 @@
 /*
  * gpu_polygon_sub.c - polygon-helper free functions used by the
- * software rasteriser's polygon decoder. Originally a .cpp; the
- * file uses no actual C++ features beyond `float(x)` functional-
- * style casts (replaced by C-style `(float)x`) and includes that
- * pulled in psx.h's heavy class definitions transitively
- * (PS_CPU, FrontIO, etc) when none are actually used here.
+ * software rasteriser's polygon decoder.
  *
  * Switched to a minimal include set: gpu.h gives us PS_GPU and
  * tri_vertex (both now C-includable as of 7d257de), rsx_intf.h
  * gives us RSX_VULKAN and rsx_intf_is_type, and
  * beetle_psx_globals.h gives us psx_gpu_upscale_shift_hw.
- *
- * The forward declarations in gpu_polygon.cpp (lines 561-566 of
- * the C++ TU that #includes gpu_polygon.cpp) link against the
- * external linkage of these C functions; no extern "C" is needed
- * since C functions have C linkage by default.
  */
 
 #include "gpu.h"

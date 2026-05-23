@@ -46,8 +46,7 @@ extern retro_log_printf_t log_cb;
 /* ------------------------------------------------------------------
  * CCD parser: flat list of (section, key, value) tuples.
  *
- * Replaces the std::map<std::string, std::map<std::string, std::string>>
- * the C++ version used.  CCD files in the wild rarely exceed 200
+ * CCD files in the wild rarely exceed 200
  * entries; linear scan over a contiguous array is small on both
  * code-size and cache-locality grounds at that scale.
  * ------------------------------------------------------------------ */
@@ -97,11 +96,7 @@ static void ccd_kv_set(ccd_kv_list *kv, const char *section,
 
 /* CCD_ReadInt: parse an integer from a CCD section.
  *
- * The C++ version was a template parameterised on T (unsigned,
- * uint8_t, signed); the only thing that varied with T was the
- * signedness of the strtoul/strtol call.  Replaced with two
- * non-template C functions, one signed and one unsigned, both
- * returning long.  Callers narrow to the type they need at the
+ * Callers narrow to the type they need at the
  * use site (the original code already did the narrowing too,
  * just implicitly).
  *
@@ -399,8 +394,7 @@ static bool CDAccess_CCD_Load(struct CDAccess_CCD *self, const char *path,
             ok = false;
             goto cleanup;
          }
-         /* Reject lines with multiple '=' (matches the C++ feqpos !=
-          * leqpos check). */
+         /* Reject lines with multiple '=' */
          eq_check = strchr(eq + 1, '=');
          if (eq_check)
          {

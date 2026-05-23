@@ -74,9 +74,7 @@ static INLINE void   StoreU32_LE(uint32_t *a, const uint32_t v) { *a = v; }
  * 8/16/24/32-bit access against the same backing storage.  Used for
  * MainRAM (2 MB), BIOSROM (512 KB), ScratchRAM (1 KB), PIOMem (64 KB).
  *
- * Plain C struct now - the previous C++ class with member functions
- * has been split into the struct + free functions below.  The
- * constructor pattern (MultiAccessSizeMem_New(N)) returns a calloc-d
+ * The constructor pattern (MultiAccessSizeMem_New(N)) returns a calloc-d
  * struct with init'd storage; MultiAccessSizeMem_Attach binds an
  * existing buffer (lightrec mmap path) without taking ownership.
  */

@@ -134,9 +134,7 @@ typedef struct PS_CPU
    uint8_t   DummyPage[CPU_FAST_MAP_PSIZE];
 } PS_CPU;
 
-/* Field shorthands for direct access in cpu.c.  These index the
- * GPR_full array and are equivalent to the named members the C++
- * class had via an anonymous-struct-in-union. */
+/* Field shorthands for direct access in cpu.c. */
 #define CPU_GPR(self)      ((self)->GPR_full)
 #define CPU_LO(self)       ((self)->GPR_full[32])
 #define CPU_HI(self)       ((self)->GPR_full[33])

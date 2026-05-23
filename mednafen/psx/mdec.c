@@ -245,13 +245,9 @@ static INLINE int8_t Mask9ClampS8(int32_t v)
    return v;
 }
 
-/* Two specialized IDCT 1-D pass functions, formerly a single template
- * `IDCT_1D_Multi<T>` with sizeof(T)-dispatched output handling. The
- * pass-1 (int16) variant writes the result transposed to feed pass-2;
- * pass-2 (int8) writes non-transposed and saturates through
- * Mask9ClampS8. Splitting them removes a C++ template - the only one
- * in this file - and lets gcc/clang specialize each unconditionally
- * without the dead sizeof(T) branch. */
+/* Two specialized IDCT 1-D pass functions.
+ * The pass-1 (int16) variant writes the result transposed to feed pass-2;
+ * pass-2 (int8) writes non-transposed and saturates through Mask9ClampS8. */
 static void IDCT_1D_Pass1(const int16_t *in_coeff, int16_t *out_coeff)
 {
    unsigned col, x;

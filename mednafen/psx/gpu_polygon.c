@@ -785,14 +785,8 @@ void Finalise_UVLimits(PS_GPU *gpu);
 bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 
-/* The C++ template wrapper for DrawTriangle that previously sat
- * here is gone in stage 4: Command_DrawPolygon below is now itself
- * macro-generated, so the per-spec call to DrawTriangle resolves
- * to a direct mangled-name reference at preprocessor time.  No
- * runtime switch on BlendMode / TexMode_TA / TexMult / MaskEval is
- * needed since every parameter is a literal in the macro context.
- */
-
+/* No runtime switch on BlendMode / TexMode_TA / TexMult / MaskEval is
+ * needed since every parameter is a literal in the macro context.*/
 extern int psx_pgxp_2d_tol;
 
 /*

@@ -24,21 +24,15 @@
 extern "C" {
 #endif
 
-/* C-callable counterparts to the std::string entry points in
- * general.h.  These let plain-C TUs (cdrom backends mid-conversion,
- * etc.) drive the same path-manipulation primitives via char
- * buffers without pulling <string> in.
- *
+/* 
  * Buffer ownership in all cases is the caller's; on overflow the
- * output is truncated and NUL-terminated (no error reporting).
- *
- * The C++ overloads in general.h forward to these. */
+ * output is truncated and NUL-terminated (no error reporting). */
 
 /* MDFN_GetFilePathComponents_c: split file_path into directory,
  * file base name, and extension.  Any of dir_out / base_out /
  * ext_out may be NULL to skip that component.  *_outlen specifies
  * each output buffer's capacity in bytes.  ext_out includes the
- * leading '.' (matches the std::string overload's behaviour). */
+ * leading '.'. */
 void MDFN_GetFilePathComponents_c(const char *file_path,
       char *dir_out,  size_t dir_outlen,
       char *base_out, size_t base_outlen,
@@ -54,8 +48,7 @@ void MDFN_EvalFIP_c(const char *dir_path, const char *rel_path,
  * (' ', '\r', '\n', '\t', '\v') from str. */
 void MDFN_trim_c(char *str);
 
-/* MDFN_strtoupper_c: in-place lowercase->uppercase ASCII conversion.
- * Counterpart to misc.h's MDFN_strtoupper(std::string&). */
+/* MDFN_strtoupper_c: in-place lowercase->uppercase ASCII conversion. */
 void MDFN_strtoupper_c(char *str);
 
 /* The full Mednafen enum had eleven entries covering save states,

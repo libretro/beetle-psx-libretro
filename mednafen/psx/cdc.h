@@ -21,9 +21,7 @@ typedef struct CD_Audio_Buffer
 
 /* SimpleFIFO is a fixed-power-of-two-capacity ring buffer of bytes,
  * used by the CDC DMA path; the only place it lives is inside
- * struct PS_CDC.  Was a tiny C++ class with inline methods - now
- * a plain C struct, with the access helpers static-inlined into
- * cdc.c.  Field layout is preserved for savestate compatibility. */
+ * struct PS_CDC. */
 typedef struct SimpleFIFO
 {
    uint8_t  *data;
@@ -34,9 +32,7 @@ typedef struct SimpleFIFO
 } SimpleFIFO;
 
 /* Number of pipelined sectors held by the disc-read delay buffer.
- * Was a class-scoped enum constant inside PS_CDC; promoted to a
- * #define so the array dimension below is a constant expression
- * in C as well as C++. */
+ * Was a class-scoped enum constant inside PS_CDC */
 #define CDC_SECTOR_PIPE_COUNT 2
 
 /* Each SectorPipe slot holds 2352 bytes of audio/data payload
@@ -45,12 +41,6 @@ typedef struct SimpleFIFO
  * and DecodeSubQ consumes the trailing 96 bytes in place. */
 #define CDC_SECTOR_PIPE_BYTES (2352 + 96)
 
-/* PS_CDC was a C++ class with all members private and access via
- * PSX_CDC->Method(...).  It is now a plain struct: the fields
- * below are the former class members in the same declaration
- * order (savestate-compatible), and the former member functions
- * are declared at the bottom of this header as free functions
- * PS_CDC_*(struct PS_CDC *cdc, ...). */
 typedef struct PS_CDC
 {
    /* Fields formerly in the public section. */
@@ -163,9 +153,7 @@ void     PS_CDC_Init(PS_CDC *cdc);
 void     PS_CDC_Destroy(PS_CDC *cdc);
 
 /* Global instance pointer.  Allocated in libretro.cpp's InitCommon
- * and freed in Cleanup; declared here so both C++ callers (libretro.cpp,
- * gpu.cpp) and the in-file C-linkage shims (CDC_DMARead, CDC_GetCDAudioSample,
- * defined in cdc.cpp) agree on the symbol. */
+ * and freed in Cleanup. */
 extern PS_CDC *PSX_CDC;
 
 void     PS_CDC_SetDisc(PS_CDC *cdc, bool tray_open,
