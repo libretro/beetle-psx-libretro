@@ -20,7 +20,7 @@
 
 #include <file/file_path.h>
 
-#include "general_c.h"
+#include "general.h"
 
 static void copy_truncate(char *out, size_t outlen, const char *src,
       size_t srclen)

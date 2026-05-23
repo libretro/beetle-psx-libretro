@@ -27,7 +27,7 @@
 
 #include "../mednafen.h"
 #include "../error.h"
-#include "../general_c.h"
+#include "../general.h"
 #include "../cdstream.h"
 
 #include "CDAccess.h"

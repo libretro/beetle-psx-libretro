@@ -1,7 +1,7 @@
 #include "mednafen/mednafen.h"
 #include "mednafen/mempatcher.h"
 #include "mednafen/git.h"
-#include "mednafen/general_c.h"
+#include "mednafen/general.h"
 #include "mednafen/settings.h"
 #include <compat/msvc.h>
 #include "mednafen/psx/gpu.h"
@@ -1547,7 +1547,7 @@ static void PSX_Power(void)
    startup_frame_count = 0;
 }
 
-static INLINE void MemPoke(pscpu_timestamp_t timestamp, uint32_t A, uint32_t V, unsigned size, bool access24)
+static INLINE void MemPoke(int32_t timestamp, uint32_t A, uint32_t V, unsigned size, bool access24)
 {
    if(A < 0x00800000)
    {

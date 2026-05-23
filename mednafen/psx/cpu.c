@@ -104,7 +104,7 @@ enum
  * in CPU_New. */
 static PS_CPU            s_cpu;
 PS_CPU                  *PSX_CPU = &s_cpu;
-pscpu_timestamp_t        cpu_next_event_ts;
+int32_t                  cpu_next_event_ts;
 static uint32_t          cpu_IPCache;
 static uint32_t          cpu_BIU;
 static bool              cpu_Halted;
@@ -184,7 +184,7 @@ static const uint8_t cpu_MULT_Tab24[24] =
 
 /* Forward decls for methods called before they're defined. */
 static uint32_t CPU_Exception(uint32_t code, uint32_t PC, const uint32_t NP, const uint32_t instr);
-static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_in);
+static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in);
 #ifdef HAVE_LIGHTREC
 static int     lightrec_plugin_init(PS_CPU *self);
 static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp);
@@ -503,10 +503,10 @@ uint32_t CPU_GetBIU(PS_CPU *self)
  * apply to the 32-bit path - the 8 and 16 variants drop those
  * arguments. */
 
-static INLINE uint8_t ReadMemory_u8(pscpu_timestamp_t *timestamp, uint32_t address)
+static INLINE uint8_t ReadMemory_u8(int32_t *timestamp, uint32_t address)
 {
-   uint8_t           ret;
-   pscpu_timestamp_t lts;
+   uint8_t ret;
+   int32_t lts;
 
    ReadAbsorb[ReadAbsorbWhich] = 0;
    ReadAbsorbWhich             = 0;
@@ -531,10 +531,10 @@ static INLINE uint8_t ReadMemory_u8(pscpu_timestamp_t *timestamp, uint32_t addre
    return ret;
 }
 
-static INLINE uint16_t ReadMemory_u16(pscpu_timestamp_t *timestamp, uint32_t address)
+static INLINE uint16_t ReadMemory_u16(int32_t *timestamp, uint32_t address)
 {
-   uint16_t          ret;
-   pscpu_timestamp_t lts;
+   uint16_t ret;
+   int32_t lts;
 
    ReadAbsorb[ReadAbsorbWhich] = 0;
    ReadAbsorbWhich             = 0;
@@ -559,10 +559,10 @@ static INLINE uint16_t ReadMemory_u16(pscpu_timestamp_t *timestamp, uint32_t add
    return ret;
 }
 
-static INLINE uint32_t ReadMemory_u32(pscpu_timestamp_t *timestamp, uint32_t address, bool DS24, bool LWC_timing)
+static INLINE uint32_t ReadMemory_u32(int32_t *timestamp, uint32_t address, bool DS24, bool LWC_timing)
 {
-   uint32_t          ret;
-   pscpu_timestamp_t lts;
+   uint32_t ret;
+   int32_t lts;
 
    ReadAbsorb[ReadAbsorbWhich] = 0;
    ReadAbsorbWhich             = 0;
@@ -626,7 +626,7 @@ static INLINE void WriteMemory_IsC_misc(uint32_t address, uint32_t value)
    }
 }
 
-static INLINE void WriteMemory_u8(pscpu_timestamp_t *timestamp, uint32_t address, uint32_t value)
+static INLINE void WriteMemory_u8(int32_t *timestamp, uint32_t address, uint32_t value)
 {
    if (MDFN_LIKELY(!(CP0.SR & 0x10000)))
    {
@@ -647,7 +647,7 @@ static INLINE void WriteMemory_u8(pscpu_timestamp_t *timestamp, uint32_t address
       MASMEM_WriteU8(ScratchRAM, address & 0x3FF, value);
 }
 
-static INLINE void WriteMemory_u16(pscpu_timestamp_t *timestamp, uint32_t address, uint32_t value)
+static INLINE void WriteMemory_u16(int32_t *timestamp, uint32_t address, uint32_t value)
 {
    if (MDFN_LIKELY(!(CP0.SR & 0x10000)))
    {
@@ -668,7 +668,7 @@ static INLINE void WriteMemory_u16(pscpu_timestamp_t *timestamp, uint32_t addres
       MASMEM_WriteU16(ScratchRAM, address & 0x3FF, value);
 }
 
-static INLINE void WriteMemory_u32(pscpu_timestamp_t *timestamp, uint32_t address, uint32_t value, bool DS24)
+static INLINE void WriteMemory_u32(int32_t *timestamp, uint32_t address, uint32_t value, bool DS24)
 {
    if (MDFN_LIKELY(!(CP0.SR & 0x10000)))
    {
@@ -721,7 +721,7 @@ static INLINE void WriteMemory_u32(pscpu_timestamp_t *timestamp, uint32_t addres
 // Fill size of 2-words seems to work on a PS1, and even behaves as if the line size is 2 words in regards to clearing
 // the valid bits(when the tag matches, of course), but is obviously not very efficient unless running code that's just endless branching.
 //
-static INLINE uint32_t ReadInstruction(pscpu_timestamp_t *timestamp, uint32_t address)
+static INLINE uint32_t ReadInstruction(int32_t *timestamp, uint32_t address)
 {
    uint32_t instr;
 
@@ -872,42 +872,37 @@ static uint32_t NO_INLINE CPU_Exception(uint32_t code, uint32_t PC, const uint32
 #define GPR_RES(n) { unsigned tn = (n); ReadAbsorb[tn] = 0; }
 #define GPR_DEPRES_END ReadAbsorb[0] = back; }
 
-static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_in)
+static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 {
-   pscpu_timestamp_t timestamp = timestamp_in;
-
+   int32_t timestamp = timestamp_in;
+#if defined(HAVE_LIGHTREC) && defined(LIGHTREC_DEBUG)
+   uint32_t oldpc;
+#endif
    uint32_t PC;
    uint32_t new_PC;
    uint32_t LDWhich;
    uint32_t LDValue;
 
-   (void)self;
- //printf("%d %d\n", gte_ts_done, muldiv_ts_done);
+   gte_ts_done += timestamp;
+   muldiv_ts_done += timestamp;
 
- gte_ts_done += timestamp;
- muldiv_ts_done += timestamp;
-
- BACKING_TO_ACTIVE;
+   BACKING_TO_ACTIVE;
 
 #if defined(HAVE_LIGHTREC) && defined(LIGHTREC_DEBUG)
- uint32_t oldpc = PC;
+ oldpc = PC;
 #endif
 
  do
  {
-  //printf("Running: %d %d\n", timestamp, next_event_ts);
   while(MDFN_LIKELY(timestamp < next_event_ts))
   {
    uint32_t instr;
    uint32_t opf;
 
-   // Zero must be zero...until the Master Plan is enacted.
+   /* Zero must be zero...until the Master Plan is enacted. */
    GPR[0] = 0;
 
-
-   //
-   // Instruction fetch
-   //
+   /* Instruction fetch */
    if(MDFN_UNLIKELY(PC & 0x3))
    {
     // This will block interrupt processing, but since we're going more for keeping broken homebrew/hacks from working
@@ -2807,7 +2802,7 @@ static pscpu_timestamp_t CPU_RunReal(PS_CPU *self, pscpu_timestamp_t timestamp_i
  return(timestamp);
 }
 
-pscpu_timestamp_t CPU_Run(PS_CPU *self, pscpu_timestamp_t timestamp_in)
+int32_t CPU_Run(PS_CPU *self, int32_t timestamp_in)
 {
 #ifdef HAVE_LIGHTREC
    /* Track options changing. */
@@ -2988,15 +2983,16 @@ static void cop2_op(struct lightrec_state *state, uint32_t func)
        * dropped the return value, so any subsequent MFC2/CFC2 issued
        * by recompiled code returned the GTE result without the proper
        * stall, while the interpreter blocked on the latency. */
-      pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
-      pscpu_timestamp_t latency   = GTE_Instruction(func);
+      int32_t timestamp = lightrec_current_cycle_count(state);
+      int32_t latency   = GTE_Instruction(func);
       if (timestamp < gte_ts_done)
          timestamp = gte_ts_done;
       gte_ts_done = timestamp + latency;
    }
 }
 
-static void reset_target_cycle_count(struct lightrec_state *state, pscpu_timestamp_t timestamp){
+static void reset_target_cycle_count(struct lightrec_state *state, int32_t timestamp)
+{
 	if (timestamp >= next_event_ts)
 		lightrec_set_exit_flags(state, LIGHTREC_EXIT_CHECK_INTERRUPT);
 }
@@ -3004,7 +3000,7 @@ static void reset_target_cycle_count(struct lightrec_state *state, pscpu_timesta
 static void hw_write_byte(struct lightrec_state *state,
 		uint32_t opcode, void *host,	uint32_t mem, uint32_t val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	int32_t timestamp = lightrec_current_cycle_count(state);
 
 	PSX_MemWrite8(timestamp, mem, val);
 
@@ -3024,7 +3020,7 @@ static void pgxp_nonhw_write_byte(struct lightrec_state *state,
 static void pgxp_hw_write_byte(struct lightrec_state *state,
 		uint32_t opcode, void *host,	uint32_t mem, uint32_t val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	int32_t timestamp = lightrec_current_cycle_count(state);
 
 	PSX_MemWrite8(timestamp, mem, val);
 
@@ -3036,7 +3032,7 @@ static void pgxp_hw_write_byte(struct lightrec_state *state,
 static void hw_write_half(struct lightrec_state *state,
 		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	int32_t timestamp = lightrec_current_cycle_count(state);
 
 	PSX_MemWrite16(timestamp, mem, val);
 
@@ -3056,7 +3052,7 @@ static void pgxp_nonhw_write_half(struct lightrec_state *state,
 static void pgxp_hw_write_half(struct lightrec_state *state,
 		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	int32_t timestamp = lightrec_current_cycle_count(state);
 
 	PSX_MemWrite16(timestamp, mem, val);
 
@@ -3068,7 +3064,7 @@ static void pgxp_hw_write_half(struct lightrec_state *state,
 static void hw_write_word(struct lightrec_state *state,
 		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	int32_t timestamp = lightrec_current_cycle_count(state);
 
 	PSX_MemWrite32(timestamp, mem, val);
 
@@ -3115,7 +3111,7 @@ static void pgxp_nonhw_write_word_unsigned(struct lightrec_state *state,
 static void pgxp_hw_write_word(struct lightrec_state *state,
 		uint32_t opcode, void *host, uint32_t mem, uint32_t val)
 {
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
+	int32_t timestamp = lightrec_current_cycle_count(state);
 
 	PSX_MemWrite32(timestamp, mem, val);
 
@@ -3142,11 +3138,8 @@ static void pgxp_hw_write_word(struct lightrec_state *state,
 static uint8_t hw_read_byte(struct lightrec_state *state,
 		uint32_t opcode, void *host, uint32_t mem)
 {
-	uint8_t val;
-
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
-
-	val = PSX_MemRead8(&timestamp, mem);
+	int32_t timestamp = lightrec_current_cycle_count(state);
+	uint8_t val       = PSX_MemRead8(&timestamp, mem);
 
 	/* Calling PSX_MemRead* might update timestamp - Make sure
 	 * here that state->current_cycle stays in sync. */
@@ -3173,11 +3166,8 @@ static uint8_t pgxp_nonhw_read_byte(struct lightrec_state *state,
 static uint8_t pgxp_hw_read_byte(struct lightrec_state *state,
 		uint32_t opcode, void *host, uint32_t mem)
 {
-	uint8_t val;
-
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
-
-	val = PSX_MemRead8(&timestamp, mem);
+	int32_t timestamp = lightrec_current_cycle_count(state);
+	uint8_t val       = PSX_MemRead8(&timestamp, mem);
 
 	if((opcode >> 26) == OP_LB)
 		PGXP_CPU_LB(opcode, val, mem);
@@ -3196,11 +3186,8 @@ static uint8_t pgxp_hw_read_byte(struct lightrec_state *state,
 static uint16_t hw_read_half(struct lightrec_state *state,
 		uint32_t opcode, void *host, uint32_t mem)
 {
-	uint16_t val;
-
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
-
-	val = PSX_MemRead16(&timestamp, mem);
+	int32_t timestamp = lightrec_current_cycle_count(state);
+	uint16_t val      = PSX_MemRead16(&timestamp, mem);
 
 	/* Calling PSX_MemRead* might update timestamp - Make sure
 	 * here that state->current_cycle stays in sync. */
@@ -3227,11 +3214,8 @@ static uint16_t pgxp_nonhw_read_half(struct lightrec_state *state,
 static uint16_t pgxp_hw_read_half(struct lightrec_state *state,
 		uint32_t opcode, void *host, uint32_t mem)
 {
-	uint16_t val;
-
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
-
-	val = PSX_MemRead16(&timestamp, mem);
+	int32_t timestamp = lightrec_current_cycle_count(state);
+	uint16_t val      = PSX_MemRead16(&timestamp, mem);
 
 	if((opcode >> 26) == OP_LH)
 		PGXP_CPU_LH(opcode, val, mem);
@@ -3250,11 +3234,8 @@ static uint16_t pgxp_hw_read_half(struct lightrec_state *state,
 static uint32_t hw_read_word(struct lightrec_state *state,
 		uint32_t opcode, void *host, uint32_t mem)
 {
-	uint32_t val;
-
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
-
-	val = PSX_MemRead32(&timestamp, mem);
+	int32_t timestamp = lightrec_current_cycle_count(state);
+	uint32_t val      = PSX_MemRead32(&timestamp, mem);
 
 	/* Calling PSX_MemRead* might update timestamp - Make sure
 	 * here that state->current_cycle stays in sync. */
@@ -3305,13 +3286,11 @@ static uint32_t pgxp_nonhw_read_word_unsigned(struct lightrec_state *state,
 static uint32_t pgxp_hw_read_word(struct lightrec_state *state,
 		uint32_t opcode, void *host, uint32_t mem)
 {
-	uint32_t val;
+	int32_t timestamp = lightrec_current_cycle_count(state);
+	uint32_t val      = PSX_MemRead32(&timestamp, mem);
 
-	pscpu_timestamp_t timestamp = lightrec_current_cycle_count(state);
-
-	val = PSX_MemRead32(&timestamp, mem);
-
-	switch (opcode >> 26){
+	switch (opcode >> 26)
+	{
 		case OP_LWL:
 			//TODO: OR with masked register
 			PGXP_CPU_LWL(opcode, val << (24-(opcode & 0x3)*8), mem + (opcode & 0x3));

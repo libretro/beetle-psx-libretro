@@ -115,8 +115,8 @@ typedef struct PS_CPU
    uint32_t BACKED_LDValue;
    uint32_t LDAbsorb;
 
-   pscpu_timestamp_t gte_ts_done;
-   pscpu_timestamp_t muldiv_ts_done;
+   int32_t gte_ts_done;
+   int32_t muldiv_ts_done;
 
    uint32_t addr_mask[8];
 
@@ -152,7 +152,7 @@ PS_CPU *CPU_New(void);
 void    CPU_Destroy(PS_CPU *self);
 
 void              CPU_SetFastMap(PS_CPU *self, void *region_mem, uint32_t region_address, uint32_t region_size);
-pscpu_timestamp_t CPU_Run        (PS_CPU *self, pscpu_timestamp_t timestamp_in);
+int32_t CPU_Run        (PS_CPU *self, int32_t timestamp_in);
 void              CPU_Power      (PS_CPU *self);
 void              CPU_AssertIRQ_method(PS_CPU *self, unsigned which, bool asserted);
 void              CPU_SetHalt_method  (PS_CPU *self, bool status);
@@ -166,14 +166,14 @@ void              CPU_LightrecClear_method(PS_CPU *self, uint32_t addr, uint32_t
 /* SetEventNT / GetEventNT are accessed every memory op in the CPU
  * loop; defined inline so they fold to a load/store on the file-
  * scope cpu_next_event_ts. */
-extern pscpu_timestamp_t cpu_next_event_ts;
+extern int32_t cpu_next_event_ts;
 
-static INLINE void CPU_SetEventNT(pscpu_timestamp_t next_event_ts_arg)
+static INLINE void CPU_SetEventNT(int32_t next_event_ts_arg)
 {
    cpu_next_event_ts = next_event_ts_arg;
 }
 
-static INLINE pscpu_timestamp_t CPU_GetEventNT(void)
+static INLINE int32_t CPU_GetEventNT(void)
 {
    return cpu_next_event_ts;
 }
