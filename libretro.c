@@ -1994,6 +1994,12 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
 /* don't try to map as hugetlb if not defined */
 #define MAP_HUGETLB 0
 #endif
+#ifndef MAP_HUGE_SHIFT
+/* MAP_HUGE_SHIFT is a newer addition than MAP_HUGETLB and may be missing on
+   older kernel headers (e.g. some webOS toolchains). 26 is the kernel ABI
+   value; only used when MAP_HUGETLB is real and hugetlb is requested. */
+#define MAP_HUGE_SHIFT 26
+#endif
 
 #if __MACOS__
 #define min_io_base MACOS_VM_BASE
@@ -2033,6 +2039,7 @@ static void * mmap_huge(void *addr, size_t length, int prot, int flags,
 {
 	void *map = MAP_FAILED;
 
+#if MAP_HUGETLB
 	if (hugetlb && length >= 0x200000) {
 		map = mmap(addr, length, prot,
 			   flags | MAP_HUGETLB | (21 << MAP_HUGE_SHIFT),
@@ -2040,7 +2047,9 @@ static void * mmap_huge(void *addr, size_t length, int prot, int flags,
 		if (map != MAP_FAILED)
 			log_cb(RETRO_LOG_DEBUG, "Hugetlb mmap to address 0x%lx succeeded\n", (uintptr_t) addr);
 	}
-	else {
+	else
+#endif
+	{
 		map = mmap(addr, length, prot, flags, fd, offset);
 		if (map != MAP_FAILED) {
 			log_cb(RETRO_LOG_DEBUG, "Regular mmap to address 0x%lx succeeded\n", (uintptr_t) addr);
@@ -2244,8 +2253,15 @@ int lightrec_init_mmap(void)
 #endif
 #ifdef HAVE_SHM
 	const char *shm_name = "/lightrec_memfd_beetle";
-	/* Try HUGETLB then fallback to normal memfd */
+	/* Try memfd_create (HUGETLB when requested) first, then fall back to
+	   the shm_open path below. Platforms without the syscall (macOS/iOS,
+	   older webOS toolchains) skip straight to shm_open. Gating here also
+	   avoids the syscall() deprecation warning on macOS. */
+#ifdef SYS_memfd_create
 	int memfd = syscall(SYS_memfd_create,shm_name,hugetlb?MFD_HUGETLB:0);
+#else
+	int memfd = -1;
+#endif
 
 #ifndef __ANDROID__
 	/* Android can build with HAVE_SHM, but doesn't have shm_open/unlink
