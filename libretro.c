@@ -419,7 +419,7 @@ static void extract_directory(char *buf, const char *path, size_t size)
 #include "mednafen/psx/timer.h"
 #include "mednafen/psx/sio.h"
 #include "mednafen/psx/cdc.h"
-#include "mednafen/psx/spu_c.h"
+#include "mednafen/psx/spu.h"
 #include "mednafen/mempatcher.h"
 
 #include <stdarg.h>

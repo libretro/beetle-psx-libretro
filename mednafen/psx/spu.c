@@ -1479,10 +1479,7 @@ static INLINE void SPU_RunNoise(void)
  * External API for the SPU module. The public functions
  * (SPU_Power / SPU_Write / SPU_Read / etc.) are defined directly
  * earlier in this file as plain free functions operating on the
- * file-scope state - no forwarder indirection. spu_c.h declares
- * them with `extern "C"` so C++ consumers (libretro.cpp,
- * cdc.cpp) link against the same C-linkage symbols this TU
- * emits.
+ * file-scope state - no forwarder indirection.
  *
  * SPU_Init clears every piece of mutable state to a known-zero
  * value (matching what `new PS_SPU()` did historically: ctor

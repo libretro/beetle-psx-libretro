@@ -29,7 +29,7 @@
 #include "irq.h"
 #include "cpu_c.h"
 #include "cdc.h"
-#include "spu_c.h"
+#include "spu.h"
 #include "mdec.h"
 #include "gpu_c.h"
 #include "dma.h"

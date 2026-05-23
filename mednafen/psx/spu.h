@@ -1,7 +1,9 @@
 #ifndef __MDFN_PSX_SPU_H
 #define __MDFN_PSX_SPU_H
 
-#include "spu_c.h"
+#include <stdint.h>
+
+#include "../state.h"
 
 enum
 {
@@ -75,5 +77,30 @@ typedef struct
 
    SPU_ADSR ADSR;
 } SPU_Voice;
+
+/*
+ * Audio output buffer. SPU samples are mixed into this buffer at
+ * the SPU's internal 44.1 kHz rate; the libretro frontend drains
+ * it once per video frame via audio_batch_cb. Sized for two
+ * worst-case frames (2*882 samples in PAL) plus headroom for
+ * resampler leftovers and jitter; 4096 because powers of two are
+ * convenient.
+ */
+extern uint32_t IntermediateBufferPos;
+extern int16_t  IntermediateBuffer[4096][2];
+
+void     SPU_Init(void);
+void     SPU_Kill(void);
+
+void     SPU_Power(void);
+void     SPU_Write(int32_t timestamp, uint32_t A, uint16_t V);
+uint16_t SPU_Read(int32_t timestamp, uint32_t A);
+
+void     SPU_WriteDMA(uint32_t V);
+uint32_t SPU_ReadDMA(void);
+
+int32_t  SPU_UpdateFromCDC(int32_t clocks);
+
+int      SPU_StateAction(StateMem *sm, int load, int data_only);
 
 #endif

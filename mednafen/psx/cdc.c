@@ -51,7 +51,7 @@
 #include "psx_events.h"
 #include "irq.h"
 #include "cdc.h"
-#include "spu_c.h"
+#include "spu.h"
 
 #include "../mednafen-types.h"
 #include "../../osd_message.h"

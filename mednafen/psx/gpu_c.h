@@ -11,7 +11,7 @@
  * plain C - plus a heavy PS_GPU struct definition that dma doesn't
  * need any of.
  *
- * Same pattern as cpu_c.h / spu_c.h: a thin C-friendly
+ * Same pattern as cpu_c.h: a thin C-friendly
  * surface that exposes just what cross-module C consumers need,
  * so they don't have to drag in the whole module header (and the
  * compile-time cost of parsing a 268-line struct full of
