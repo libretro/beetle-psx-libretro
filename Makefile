@@ -55,7 +55,6 @@ NEED_BPP = 32
 NEED_DEINTERLACER = 1
 NEED_THREADING = 1
 SET_HAVE_HW = 0
-CORE_DEFINE := -DWANT_PSX_EMU
 TARGET_NAME := mednafen_psx
 
 ifeq ($(HAVE_HW), 1)
@@ -564,10 +563,7 @@ FLAGS   += $(INCFLAGS)
 
 FLAGS += $(ENDIANNESS_DEFINES) \
          $(WARNINGS) \
-         -DMEDNAFEN_VERSION=\"0.9.38.6\" \
          -DMEDNAFEN_VERSION_NUMERIC=9386 \
-         -DMPC_FIXED_POINT \
-         $(CORE_DEFINE) \
          -DSTDC_HEADERS \
          -D__STDC_LIMIT_MACROS \
          -D__LIBRETRO__ \
