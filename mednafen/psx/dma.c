@@ -31,7 +31,7 @@
 #include "cdc.h"
 #include "spu.h"
 #include "mdec.h"
-#include "gpu_c.h"
+#include "gpu.h"
 #include "dma.h"
 
 /* Notes:
