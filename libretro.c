@@ -192,6 +192,60 @@ enum
    REGION_EU = 2,
 };
 
+#include <lists/dir_list.h>
+
+static bool search_firmware(char *obtained_sha1, const char *bios_sha1)
+{
+   int i, r;
+   RFILE *BIOSFile;
+
+   log_cb(RETRO_LOG_INFO, "Searching for Firmware checksum: %s\n", bios_sha1);
+
+   /* Consider setting recursive flag */
+   struct string_list *dir_list = dir_list_new(retro_base_directory, NULL, false, false, false, false);
+
+   if (dir_list == NULL)
+      return false;
+
+   for (i = 0; i < (int)dir_list->size; i++)
+   {
+      r = snprintf(bios_path, sizeof(bios_path), "%s", dir_list->elems[i].data);
+      if (r >= 4096)
+      {
+         bios_path[4095] = '\0';
+         log_cb(RETRO_LOG_ERROR, "Firmware path longer than 4095: %s\n", bios_path);
+         break;
+      }
+
+      BIOSFile = filestream_open(bios_path,
+                 RETRO_VFS_FILE_ACCESS_READ,
+                 RETRO_VFS_FILE_ACCESS_HINT_NONE);
+
+      if (BIOSFile)
+      {
+         const int64_t expected = 512 * 1024;
+         int64_t bios_size      = filestream_get_size(BIOSFile);
+
+         filestream_close(BIOSFile);
+
+         /* SHA1 is expensive, verify correct file size first */
+         if(bios_size == expected)
+         {
+            sha1_calculate(bios_path, obtained_sha1);
+
+            if (strcmp(obtained_sha1, bios_sha1) == 0)
+            {
+               string_list_free(dir_list);
+               return true;
+            }
+         }
+      }
+   }
+
+   string_list_free(dir_list);
+   return false;
+}
+
 static bool firmware_is_present(unsigned region)
 {
    /* C90 requires array sizes to be integer constant expressions; a
@@ -256,6 +310,10 @@ static bool firmware_is_present(unsigned region)
             break;
          }
       }
+
+      /* Attempt firmware search on failure to find bios_path */
+      if (!firmware_found)
+         firmware_found = search_firmware(obtained_sha1, bios_sha1);
 
       if (firmware_found)
       {
@@ -344,6 +402,10 @@ static bool firmware_is_present(unsigned region)
          break;
       }
    }
+
+   /* Attempt firmware search on failure to find bios_path */
+   if (!firmware_found)
+      firmware_found = search_firmware(obtained_sha1, bios_sha1);
 
    if (!firmware_found)
    {
