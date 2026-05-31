@@ -98,10 +98,6 @@ public:
 	friend class Framebuffer;
 	friend class PipelineLayout;
 	friend class FramebufferAllocator;
-	friend class RenderPass;
-	friend class Texture;
-	friend class DescriptorSetAllocator;
-	friend class Shader;
 
 	Device();
 	~Device();
