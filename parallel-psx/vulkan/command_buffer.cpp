@@ -518,18 +518,6 @@ void CommandBuffer::submit_secondary(CommandBufferHandle secondary)
 	device->submit_secondary(*this, *secondary);
 }
 
-void CommandBuffer::next_subpass(VkSubpassContents contents)
-{
-	VK_ASSERT(framebuffer);
-	VK_ASSERT(compatible_render_pass);
-	VK_ASSERT(actual_render_pass);
-	current_subpass++;
-	VK_ASSERT(current_subpass < actual_render_pass->get_num_subpasses());
-	vkCmdNextSubpass(cmd, contents);
-	current_contents = contents;
-	begin_graphics();
-}
-
 void CommandBuffer::begin_render_pass(const RenderPassInfo &info, VkSubpassContents contents)
 {
 	VK_ASSERT(!framebuffer);
@@ -1245,16 +1233,6 @@ void CommandBuffer::set_storage_buffer(unsigned set, unsigned binding, const Buf
 	dirty_sets |= 1u << set;
 }
 
-void CommandBuffer::set_uniform_buffer(unsigned set, unsigned binding, const Buffer &buffer)
-{
-	set_uniform_buffer(set, binding, buffer, 0, buffer.get_create_info().size);
-}
-
-void CommandBuffer::set_storage_buffer(unsigned set, unsigned binding, const Buffer &buffer)
-{
-	set_storage_buffer(set, binding, buffer, 0, buffer.get_create_info().size);
-}
-
 void CommandBuffer::set_sampler(unsigned set, unsigned binding, const Sampler &sampler)
 {
 	VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
@@ -1341,30 +1319,6 @@ void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView 
 	            view.get_image().get_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.get_cookie());
 }
 
-enum CookieBits
-{
-	COOKIE_BIT_UNORM = 1 << 0,
-	COOKIE_BIT_SRGB = 1 << 1
-};
-
-void CommandBuffer::set_unorm_texture(unsigned set, unsigned binding, const ImageView &view)
-{
-	VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
-	VkImageView unorm_view = view.get_unorm_view();
-	VK_ASSERT(unorm_view != VK_NULL_HANDLE);
-	set_texture(set, binding, unorm_view, unorm_view,
-	            view.get_image().get_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.get_cookie() | COOKIE_BIT_UNORM);
-}
-
-void CommandBuffer::set_srgb_texture(unsigned set, unsigned binding, const ImageView &view)
-{
-	VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
-	VkImageView srgb_view = view.get_srgb_view();
-	VK_ASSERT(srgb_view != VK_NULL_HANDLE);
-	set_texture(set, binding, srgb_view, srgb_view,
-	            view.get_image().get_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.get_cookie() | COOKIE_BIT_SRGB);
-}
-
 void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler)
 {
 	set_sampler(set, binding, sampler);
@@ -1378,12 +1332,6 @@ void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView 
 	VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
 	const Sampler &sampler = device->get_stock_sampler(stock);
 	set_texture(set, binding, view, sampler);
-}
-
-void CommandBuffer::set_sampler(unsigned set, unsigned binding, StockSampler stock)
-{
-	const Sampler &sampler = device->get_stock_sampler(stock);
-	set_sampler(set, binding, sampler);
 }
 
 void CommandBuffer::set_storage_texture(unsigned set, unsigned binding, const ImageView &view)
@@ -1642,32 +1590,6 @@ void CommandBuffer::draw_indexed(uint32_t index_count, uint32_t instance_count, 
 	vkCmdDrawIndexed(cmd, index_count, instance_count, first_index, vertex_offset, first_instance);
 }
 
-void CommandBuffer::draw_indirect(const Vulkan::Buffer &buffer,
-                                  uint32_t offset, uint32_t draw_count, uint32_t stride)
-{
-	VK_ASSERT(current_program);
-	VK_ASSERT(!is_compute);
-	flush_render_state();
-	vkCmdDrawIndirect(cmd, buffer.get_buffer(), offset, draw_count, stride);
-}
-
-void CommandBuffer::draw_indexed_indirect(const Vulkan::Buffer &buffer,
-                                          uint32_t offset, uint32_t draw_count, uint32_t stride)
-{
-	VK_ASSERT(current_program);
-	VK_ASSERT(!is_compute);
-	flush_render_state();
-	vkCmdDrawIndexedIndirect(cmd, buffer.get_buffer(), offset, draw_count, stride);
-}
-
-void CommandBuffer::dispatch_indirect(const Buffer &buffer, uint32_t offset)
-{
-	VK_ASSERT(current_program);
-	VK_ASSERT(is_compute);
-	flush_compute_state();
-	vkCmdDispatchIndirect(cmd, buffer.get_buffer(), offset);
-}
-
 void CommandBuffer::dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z)
 {
 	VK_ASSERT(current_program);
@@ -1707,132 +1629,6 @@ void CommandBuffer::set_quad_state()
 	state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 	state.write_mask = ~0u;
 	set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
-}
-
-void CommandBuffer::set_opaque_sprite_state()
-{
-	PipelineState::State &state = static_state.state;
-	memset(&state, 0, sizeof(state));
-	state.front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	state.cull_mode = VK_CULL_MODE_NONE;
-	state.blend_enable = false;
-	state.depth_compare = VK_COMPARE_OP_LESS;
-	state.depth_test = true;
-	state.depth_write = true;
-	state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-	state.write_mask = ~0u;
-	set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
-}
-
-void CommandBuffer::set_transparent_sprite_state()
-{
-	PipelineState::State &state = static_state.state;
-	memset(&state, 0, sizeof(state));
-	state.front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	state.cull_mode = VK_CULL_MODE_NONE;
-	state.blend_enable = true;
-	state.depth_test = true;
-	state.depth_compare = VK_COMPARE_OP_LESS;
-	state.depth_write = false;
-	state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-	state.write_mask = ~0u;
-
-	// The alpha layer should start at 1 (fully transparent).
-	// As layers are blended in, the transparency is multiplied with other transparencies (1 - alpha).
-	set_blend_factors(VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ZERO,
-	                  VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA);
-	set_blend_op(VK_BLEND_OP_ADD);
-
-	set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
-}
-
-void CommandBuffer::restore_state(const CommandBufferSavedState &state)
-{
-	for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
-	{
-		if (state.flags & (COMMAND_BUFFER_SAVED_BINDINGS_0_BIT << i))
-		{
-			if (memcmp(state.bindings.bindings[i], bindings.bindings[i], sizeof(bindings.bindings[i])))
-			{
-				memcpy(bindings.bindings[i], state.bindings.bindings[i], sizeof(bindings.bindings[i]));
-				memcpy(bindings.cookies[i], state.bindings.cookies[i], sizeof(bindings.cookies[i]));
-				memcpy(bindings.secondary_cookies[i], state.bindings.secondary_cookies[i], sizeof(bindings.secondary_cookies[i]));
-				dirty_sets |= 1u << i;
-			}
-		}
-	}
-
-	if (state.flags & COMMAND_BUFFER_SAVED_PUSH_CONSTANT_BIT)
-	{
-		if (memcmp(state.bindings.push_constant_data, bindings.push_constant_data, sizeof(bindings.push_constant_data)))
-		{
-			memcpy(bindings.push_constant_data, state.bindings.push_constant_data, sizeof(bindings.push_constant_data));
-			set_dirty(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
-		}
-	}
-
-	if ((state.flags & COMMAND_BUFFER_SAVED_VIEWPORT_BIT) && memcmp(&state.viewport, &viewport, sizeof(viewport)))
-	{
-		viewport = state.viewport;
-		set_dirty(COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
-	}
-
-	if ((state.flags & COMMAND_BUFFER_SAVED_SCISSOR_BIT) && memcmp(&state.scissor, &scissor, sizeof(scissor)))
-	{
-		scissor = state.scissor;
-		set_dirty(COMMAND_BUFFER_DIRTY_SCISSOR_BIT);
-	}
-
-	if (state.flags & COMMAND_BUFFER_SAVED_RENDER_STATE_BIT)
-	{
-		if (memcmp(&state.static_state, &static_state, sizeof(static_state)))
-		{
-			memcpy(&static_state, &state.static_state, sizeof(static_state));
-			set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
-		}
-
-		if (memcmp(&state.potential_static_state, &potential_static_state, sizeof(potential_static_state)))
-		{
-			memcpy(&potential_static_state, &state.potential_static_state, sizeof(potential_static_state));
-			set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
-		}
-
-		if (memcmp(&state.dynamic_state, &dynamic_state, sizeof(dynamic_state)))
-		{
-			memcpy(&dynamic_state, &state.dynamic_state, sizeof(dynamic_state));
-			set_dirty(COMMAND_BUFFER_DIRTY_STENCIL_REFERENCE_BIT | COMMAND_BUFFER_DIRTY_DEPTH_BIAS_BIT);
-		}
-	}
-}
-
-void CommandBuffer::save_state(CommandBufferSaveStateFlags flags, CommandBufferSavedState &state)
-{
-	for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
-	{
-		if (flags & (COMMAND_BUFFER_SAVED_BINDINGS_0_BIT << i))
-		{
-			memcpy(state.bindings.bindings[i], bindings.bindings[i], sizeof(bindings.bindings[i]));
-			memcpy(state.bindings.cookies[i], bindings.cookies[i], sizeof(bindings.cookies[i]));
-			memcpy(state.bindings.secondary_cookies[i], bindings.secondary_cookies[i],
-			       sizeof(bindings.secondary_cookies[i]));
-		}
-	}
-
-	if (flags & COMMAND_BUFFER_SAVED_VIEWPORT_BIT)
-		state.viewport = viewport;
-	if (flags & COMMAND_BUFFER_SAVED_SCISSOR_BIT)
-		state.scissor = scissor;
-	if (flags & COMMAND_BUFFER_SAVED_RENDER_STATE_BIT)
-	{
-		memcpy(&state.static_state, &static_state, sizeof(static_state));
-		state.potential_static_state = potential_static_state;
-		state.dynamic_state = dynamic_state;
-	}
-
-	if (flags & COMMAND_BUFFER_SAVED_PUSH_CONSTANT_BIT)
-		memcpy(state.bindings.push_constant_data, bindings.push_constant_data, sizeof(bindings.push_constant_data));
-
-	state.flags = flags;
 }
 
 QueryPoolHandle CommandBuffer::write_timestamp(VkPipelineStageFlagBits stage)

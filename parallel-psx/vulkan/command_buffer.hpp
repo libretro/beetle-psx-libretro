@@ -168,31 +168,7 @@ struct ResourceBindings
 	uint8_t push_constant_data[VULKAN_PUSH_CONSTANT_SIZE];
 };
 
-enum CommandBufferSavedStateBits
-{
-	COMMAND_BUFFER_SAVED_BINDINGS_0_BIT = 1u << 0,
-	COMMAND_BUFFER_SAVED_BINDINGS_1_BIT = 1u << 1,
-	COMMAND_BUFFER_SAVED_BINDINGS_2_BIT = 1u << 2,
-	COMMAND_BUFFER_SAVED_BINDINGS_3_BIT = 1u << 3,
-	COMMAND_BUFFER_SAVED_VIEWPORT_BIT = 1u << 4,
-	COMMAND_BUFFER_SAVED_SCISSOR_BIT = 1u << 5,
-	COMMAND_BUFFER_SAVED_RENDER_STATE_BIT = 1u << 6,
-	COMMAND_BUFFER_SAVED_PUSH_CONSTANT_BIT = 1u << 7
-};
 static_assert(VULKAN_NUM_DESCRIPTOR_SETS == 4, "Number of descriptor sets != 4.");
-using CommandBufferSaveStateFlags = uint32_t;
-
-struct CommandBufferSavedState
-{
-	CommandBufferSaveStateFlags flags = 0;
-	ResourceBindings bindings;
-	VkViewport viewport;
-	VkRect2D scissor;
-
-	PipelineState static_state;
-	PotentialState potential_static_state;
-	DynamicState dynamic_state;
-};
 
 class CommandBuffer;
 struct CommandBufferDeleter
@@ -315,7 +291,6 @@ public:
 	void generate_mipmap(const Image &image);
 
 	void begin_render_pass(const RenderPassInfo &info, VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
-	void next_subpass(VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
 	void end_render_pass();
 	void submit_secondary(Util::IntrusivePtr<CommandBuffer> secondary);
 	inline unsigned get_current_subpass() const
@@ -332,17 +307,12 @@ public:
 	void set_buffer_view(unsigned set, unsigned binding, const BufferView &view);
 	void set_input_attachments(unsigned set, unsigned start_binding);
 	void set_texture(unsigned set, unsigned binding, const ImageView &view);
-	void set_unorm_texture(unsigned set, unsigned binding, const ImageView &view);
-	void set_srgb_texture(unsigned set, unsigned binding, const ImageView &view);
 	void set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler);
 	void set_texture(unsigned set, unsigned binding, const ImageView &view, StockSampler sampler);
 	void set_storage_texture(unsigned set, unsigned binding, const ImageView &view);
 	void set_sampler(unsigned set, unsigned binding, const Sampler &sampler);
-	void set_sampler(unsigned set, unsigned binding, StockSampler sampler);
-	void set_uniform_buffer(unsigned set, unsigned binding, const Buffer &buffer);
 	void set_uniform_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
 	                        VkDeviceSize range);
-	void set_storage_buffer(unsigned set, unsigned binding, const Buffer &buffer);
 	void set_storage_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
 	                        VkDeviceSize range);
 	void push_constants(const void *data, VkDeviceSize offset, VkDeviceSize range);
@@ -380,17 +350,8 @@ public:
 
 	void dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
 
-	void draw_indirect(const Buffer &buffer, uint32_t offset, uint32_t draw_count, uint32_t stride);
-	void draw_indexed_indirect(const Buffer &buffer, uint32_t offset, uint32_t draw_count, uint32_t stride);
-	void dispatch_indirect(const Buffer &buffer, uint32_t offset);
-
 	void set_opaque_state();
 	void set_quad_state();
-	void set_opaque_sprite_state();
-	void set_transparent_sprite_state();
-
-	void save_state(CommandBufferSaveStateFlags flags, CommandBufferSavedState &state);
-	void restore_state(const CommandBufferSavedState &state);
 
 #define SET_STATIC_STATE(value)                               \
 	do                                                        \
@@ -473,31 +434,6 @@ public:
 		SET_STATIC_STATE(stencil_test);
 	}
 
-	inline void set_stencil_front_ops(VkCompareOp stencil_front_compare_op, VkStencilOp stencil_front_pass,
-	                                  VkStencilOp stencil_front_fail, VkStencilOp stencil_front_depth_fail)
-	{
-		SET_STATIC_STATE(stencil_front_compare_op);
-		SET_STATIC_STATE(stencil_front_pass);
-		SET_STATIC_STATE(stencil_front_fail);
-		SET_STATIC_STATE(stencil_front_depth_fail);
-	}
-
-	inline void set_stencil_back_ops(VkCompareOp stencil_back_compare_op, VkStencilOp stencil_back_pass,
-	                                 VkStencilOp stencil_back_fail, VkStencilOp stencil_back_depth_fail)
-	{
-		SET_STATIC_STATE(stencil_back_compare_op);
-		SET_STATIC_STATE(stencil_back_pass);
-		SET_STATIC_STATE(stencil_back_fail);
-		SET_STATIC_STATE(stencil_back_depth_fail);
-	}
-
-	inline void set_stencil_ops(VkCompareOp stencil_compare_op, VkStencilOp stencil_pass, VkStencilOp stencil_fail,
-	                            VkStencilOp stencil_depth_fail)
-	{
-		set_stencil_front_ops(stencil_compare_op, stencil_pass, stencil_fail, stencil_depth_fail);
-		set_stencil_back_ops(stencil_compare_op, stencil_pass, stencil_fail, stencil_depth_fail);
-	}
-
 	inline void set_primitive_topology(VkPrimitiveTopology topology)
 	{
 		SET_STATIC_STATE(topology);
@@ -566,27 +502,6 @@ public:
 	{
 		SET_DYNAMIC_STATE(depth_bias_constant, COMMAND_BUFFER_DIRTY_DEPTH_BIAS_BIT);
 		SET_DYNAMIC_STATE(depth_bias_slope, COMMAND_BUFFER_DIRTY_DEPTH_BIAS_BIT);
-	}
-
-	inline void set_stencil_front_reference(uint8_t front_compare_mask, uint8_t front_write_mask,
-	                                        uint8_t front_reference)
-	{
-		SET_DYNAMIC_STATE(front_compare_mask, COMMAND_BUFFER_DIRTY_STENCIL_REFERENCE_BIT);
-		SET_DYNAMIC_STATE(front_write_mask, COMMAND_BUFFER_DIRTY_STENCIL_REFERENCE_BIT);
-		SET_DYNAMIC_STATE(front_reference, COMMAND_BUFFER_DIRTY_STENCIL_REFERENCE_BIT);
-	}
-
-	inline void set_stencil_back_reference(uint8_t back_compare_mask, uint8_t back_write_mask, uint8_t back_reference)
-	{
-		SET_DYNAMIC_STATE(back_compare_mask, COMMAND_BUFFER_DIRTY_STENCIL_REFERENCE_BIT);
-		SET_DYNAMIC_STATE(back_write_mask, COMMAND_BUFFER_DIRTY_STENCIL_REFERENCE_BIT);
-		SET_DYNAMIC_STATE(back_reference, COMMAND_BUFFER_DIRTY_STENCIL_REFERENCE_BIT);
-	}
-
-	inline void set_stencil_reference(uint8_t compare_mask, uint8_t write_mask, uint8_t reference)
-	{
-		set_stencil_front_reference(compare_mask, write_mask, reference);
-		set_stencil_back_reference(compare_mask, write_mask, reference);
 	}
 
 	inline Type get_command_buffer_type() const
