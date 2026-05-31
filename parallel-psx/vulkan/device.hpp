@@ -134,7 +134,6 @@ public:
 
 	// Request shaders and programs. These objects are owned by the Device.
 	Shader *request_shader(const uint32_t *code, size_t size);
-	Shader *request_shader_by_hash(Util::Hash hash);
 	Program *request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
 	                         size_t fragment_size);
 	Program *request_program(const uint32_t *compute_data, size_t compute_size);
@@ -162,7 +161,6 @@ public:
 	bool get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags,
 	                                 VkImageFormatProperties *properties);
 
-	VkFormat get_default_depth_stencil_format() const;
 	VkFormat get_default_depth_format() const;
 	ImageView &get_transient_attachment(unsigned width, unsigned height, VkFormat format,
 	                                    unsigned index = 0, unsigned samples = 1, unsigned layers = 1);
@@ -194,8 +192,6 @@ public:
 	{
 		return ext;
 	}
-
-	bool swapchain_touched() const;
 
 private:
 	VkInstance instance = VK_NULL_HANDLE;

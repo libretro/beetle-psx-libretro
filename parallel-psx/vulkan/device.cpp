@@ -106,11 +106,6 @@ Shader *Device::request_shader(const uint32_t *data, size_t size)
 	return ret;
 }
 
-Shader *Device::request_shader_by_hash(Hash hash)
-{
-	return shaders.find(hash);
-}
-
 Program *Device::request_program(Vulkan::Shader *compute)
 {
 	Util::Hasher hasher;
@@ -1104,11 +1099,6 @@ Semaphore Device::consume_release_semaphore()
 const Sampler &Device::get_stock_sampler(StockSampler sampler) const
 {
 	return *samplers[static_cast<unsigned>(sampler)];
-}
-
-bool Device::swapchain_touched() const
-{
-	return wsi.touched;
 }
 
 Device::~Device()
@@ -2526,16 +2516,6 @@ bool Device::image_format_is_supported(VkFormat format, VkFormatFeatureFlags req
 	vkGetPhysicalDeviceFormatProperties(gpu, format, &props);
 	VkFormatFeatureFlags flags = tiling == VK_IMAGE_TILING_OPTIMAL ? props.optimalTilingFeatures : props.linearTilingFeatures;
 	return (flags & required) == required;
-}
-
-VkFormat Device::get_default_depth_stencil_format() const
-{
-	if (image_format_is_supported(VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
-		return VK_FORMAT_D24_UNORM_S8_UINT;
-	if (image_format_is_supported(VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
-		return VK_FORMAT_D32_SFLOAT_S8_UINT;
-
-	return VK_FORMAT_UNDEFINED;
 }
 
 VkFormat Device::get_default_depth_format() const
