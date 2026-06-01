@@ -1,4 +1,3 @@
-#include "texture_tracker.hpp"
 #include "../renderer/renderer.hpp"
 #include "libretro.h"
 #include <fstream>
