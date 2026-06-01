@@ -779,19 +779,9 @@ public:
 
 private:
 
-	inline bool compare_key(Hash masked, Hash hash) const
-	{
-		return get_key_for_index(masked) == hash;
-	}
-
 	inline Hash get_hash(const T *value) const
 	{
 		return static_cast<const IntrusiveHashMapEnabled<T> *>(value)->get_hash();
-	}
-
-	inline Hash get_key_for_index(Hash masked) const
-	{
-		return get_hash(values[masked]);
 	}
 
 	bool insert_inner(T *value)
@@ -1332,12 +1322,6 @@ public:
 	uint32_t get_width(uint32_t mip = 0) const;
 	uint32_t get_height(uint32_t mip = 0) const;
 	uint32_t get_depth(uint32_t mip = 0) const;
-	uint32_t get_levels() const;
-	uint32_t get_layers() const;
-	uint32_t get_block_stride() const;
-	uint32_t get_block_dim_x() const;
-	uint32_t get_block_dim_y() const;
-	VkImageType get_image_type() const;
 	VkFormat get_format() const;
 
 	size_t get_required_size() const;
@@ -1543,18 +1527,6 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 	}
 }
 
-/* Below this point: helpers that depend on the C++ TextureFormatLayout class
- * (texture_format.hpp). These cannot be lowered to C without first detangling
- * the layout machinery and would need a separate C-friendly accessor. */
-
-static inline void format_num_blocks(VkFormat format, uint32_t *width, uint32_t *height)
-{
-	uint32_t align_width, align_height;
-	Vulkan::TextureFormatLayout::format_block_dim(format, align_width, align_height);
-	*width = (*width + align_width - 1) / align_width;
-	*height = (*height + align_height - 1) / align_height;
-}
-
 /* ============================================================
  * sampler.hpp
  * ============================================================ */
@@ -1742,11 +1714,6 @@ public:
 	inline VkDeviceMemory get_memory() const
 	{
 		return base;
-	}
-
-	inline bool allocation_is_global() const
-	{
-		return !alloc && base;
 	}
 
 	inline uint32_t get_offset() const
@@ -1988,7 +1955,6 @@ static inline VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags u
 enum class BufferDomain
 {
 	Device, // Device local. Probably not visible from CPU.
-	LinkedDeviceHost, // On desktop, directly mapped VRAM over PCI.
 	Host, // Host-only, needs to be synced to GPU. Might be device local as well on iGPUs.
 	CachedHost // Host-only, used for readbacks.
 };
@@ -3101,8 +3067,8 @@ private:
 class AttachmentAllocator
 {
 public:
-	AttachmentAllocator(Device *device, bool transient)
-		: device(device), transient(transient)
+	AttachmentAllocator(Device *device)
+		: device(device)
 	{
 	}
 
@@ -3125,25 +3091,6 @@ private:
 
 	Device *device;
 	Util::TemporaryHashmap<TransientNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> attachments;
-	bool transient;
-};
-
-class TransientAttachmentAllocator : public AttachmentAllocator
-{
-public:
-	TransientAttachmentAllocator(Device *device)
-		: AttachmentAllocator(device, true)
-	{
-	}
-};
-
-class PhysicalAttachmentAllocator : public AttachmentAllocator
-{
-public:
-	PhysicalAttachmentAllocator(Device *device)
-		: AttachmentAllocator(device, false)
-	{
-	}
 };
 
 }
@@ -3320,13 +3267,6 @@ struct VertexAttribState
 	uint32_t offset;
 };
 
-struct IndexState
-{
-	VkBuffer buffer;
-	VkDeviceSize offset;
-	VkIndexType index_type;
-};
-
 struct VertexBindingState
 {
 	VkBuffer buffers[VULKAN_NUM_VERTEX_BUFFERS];
@@ -3472,7 +3412,6 @@ public:
 	void set_vertex_attrib(uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset);
 	void set_vertex_binding(uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride,
 	                        VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
-	void set_index_buffer(const Buffer &buffer, VkDeviceSize offset, VkIndexType index_type);
 
 	void draw(uint32_t vertex_count, uint32_t instance_count = 1, uint32_t first_vertex = 0,
 	          uint32_t first_instance = 0);
@@ -3607,7 +3546,6 @@ private:
 	const RenderPass *compatible_render_pass = nullptr;
 
 	VertexAttribState attribs[VULKAN_NUM_VERTEX_ATTRIBS] = {};
-	IndexState index = {};
 	VertexBindingState vbo = {};
 	ResourceBindings bindings;
 
@@ -3947,7 +3885,7 @@ private:
 	VulkanCache<Program> programs;
 
 	FramebufferAllocator framebuffer_allocator;
-	TransientAttachmentAllocator transient_allocator;
+	AttachmentAllocator transient_allocator;
 
 	SamplerHandle create_sampler(const SamplerCreateInfo &info, StockSampler sampler);
 

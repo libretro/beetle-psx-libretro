@@ -3146,29 +3146,9 @@ uint32_t TextureFormatLayout::get_depth(uint32_t mip) const
 	return mips[mip].depth;
 }
 
-uint32_t TextureFormatLayout::get_layers() const
-{
-	return array_layers;
-}
-
-VkImageType TextureFormatLayout::get_image_type() const
-{
-	return image_type;
-}
-
 VkFormat TextureFormatLayout::get_format() const
 {
 	return format;
-}
-
-uint32_t TextureFormatLayout::get_block_stride() const
-{
-	return block_stride;
-}
-
-uint32_t TextureFormatLayout::get_levels() const
-{
-	return mip_levels;
 }
 
 size_t TextureFormatLayout::get_required_size() const
@@ -3179,16 +3159,6 @@ size_t TextureFormatLayout::get_required_size() const
 const TextureFormatLayout::MipInfo &TextureFormatLayout::get_mip_info(uint32_t mip) const
 {
 	return mips[mip];
-}
-
-uint32_t TextureFormatLayout::get_block_dim_x() const
-{
-	return block_dim_x;
-}
-
-uint32_t TextureFormatLayout::get_block_dim_y() const
-{
-	return block_dim_y;
 }
 
 size_t TextureFormatLayout::row_byte_stride(uint32_t row_length) const
@@ -5619,17 +5589,7 @@ ImageView &AttachmentAllocator::request_attachment(unsigned width, unsigned heig
 	if (node)
 		return node->handle->get_view();
 
-	ImageCreateInfo image_info;
-	if (transient)
-	{
-		image_info = ImageCreateInfo::transient_render_target(width, height, format);
-	}
-	else
-	{
-		image_info = ImageCreateInfo::render_target(width, height, format);
-		image_info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		image_info.usage |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	}
+	ImageCreateInfo image_info = ImageCreateInfo::transient_render_target(width, height, format);
 
 	image_info.samples = static_cast<VkSampleCountFlagBits>(samples);
 	image_info.layers = layers;
@@ -5948,7 +5908,6 @@ void CommandBuffer::begin_context()
 	current_program = nullptr;
 	memset(bindings.cookies, 0, sizeof(bindings.cookies));
 	memset(bindings.secondary_cookies, 0, sizeof(bindings.secondary_cookies));
-	memset(&index, 0, sizeof(index));
 	memset(vbo.buffers, 0, sizeof(vbo.buffers));
 }
 
@@ -6420,17 +6379,6 @@ void CommandBuffer::set_vertex_attrib(uint32_t attrib, uint32_t binding, VkForma
 	attr.binding = binding;
 	attr.format = format;
 	attr.offset = offset;
-}
-
-void CommandBuffer::set_index_buffer(const Buffer &buffer, VkDeviceSize offset, VkIndexType index_type)
-{
-	if (index.buffer == buffer.get_buffer() && index.offset == offset && index.index_type == index_type)
-		return;
-
-	index.buffer = buffer.get_buffer();
-	index.offset = offset;
-	index.index_type = index_type;
-	vkCmdBindIndexBuffer(cmd, buffer.get_buffer(), offset, index_type);
 }
 
 void CommandBuffer::set_vertex_binding(uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride,
@@ -8537,11 +8485,6 @@ uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
 	case BufferDomain::Device:
 		desired = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		fallback = 0;
-		break;
-
-	case BufferDomain::LinkedDeviceHost:
-		desired = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		fallback = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 		break;
 
 	case BufferDomain::Host:
