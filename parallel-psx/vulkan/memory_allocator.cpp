@@ -282,17 +282,6 @@ bool Allocator::allocate_dedicated(uint32_t size, DeviceAllocation *alloc, VkIma
 	return true;
 }
 
-DeviceAllocation DeviceAllocation::make_imported_allocation(VkDeviceMemory memory, VkDeviceSize size,
-                                                            uint32_t memory_type)
-{
-	DeviceAllocation alloc = {};
-	alloc.base = memory;
-	alloc.offset = 0;
-	alloc.size = size;
-	alloc.memory_type = memory_type;
-	return alloc;
-}
-
 bool Allocator::allocate(uint32_t size, uint32_t alignment, AllocationTiling mode, DeviceAllocation *alloc)
 {
 	for (ClassAllocator &c : classes)

@@ -161,15 +161,8 @@ public:
 		return size;
 	}
 
-	inline uint32_t get_mask() const
-	{
-		return mask;
-	}
-
 	void free_immediate();
 	void free_immediate(DeviceAllocator &allocator);
-
-	static DeviceAllocation make_imported_allocation(VkDeviceMemory memory, VkDeviceSize size, uint32_t memory_type);
 
 private:
 	VkDeviceMemory base = VK_NULL_HANDLE;
@@ -185,11 +178,6 @@ private:
 	bool hierarchical = false;
 
 	void free_global(DeviceAllocator &allocator, uint32_t size, uint32_t memory_type);
-
-	inline uint8_t *get_host_memory() const
-	{
-		return host_base;
-	}
 };
 
 struct MiniHeap : Util::IntrusiveListEnabled<MiniHeap>
