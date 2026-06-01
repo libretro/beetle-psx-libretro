@@ -74,68 +74,11 @@ void CommandBuffer::copy_buffer(const Buffer &dst, const Buffer &src)
 	copy_buffer(dst, 0, src, 0, dst.get_create_info().size);
 }
 
-void CommandBuffer::copy_image(const Vulkan::Image &dst, const Vulkan::Image &src, const VkOffset3D &dst_offset,
-                               const VkOffset3D &src_offset, const VkExtent3D &extent,
-                               const VkImageSubresourceLayers &dst_subresource,
-                               const VkImageSubresourceLayers &src_subresource)
-{
-	VkImageCopy region = {};
-	region.dstOffset = dst_offset;
-	region.srcOffset = src_offset;
-	region.extent = extent;
-	region.srcSubresource = src_subresource;
-	region.dstSubresource = dst_subresource;
-
-	vkCmdCopyImage(cmd, src.get_image(), src.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-	               dst.get_image(), dst.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
-	               1, &region);
-}
-
-void CommandBuffer::copy_image(const Image &dst, const Image &src)
-{
-	uint32_t levels = src.get_create_info().levels;
-	VK_ASSERT(src.get_create_info().levels == dst.get_create_info().levels);
-	VK_ASSERT(src.get_create_info().width == dst.get_create_info().width);
-	VK_ASSERT(src.get_create_info().height == dst.get_create_info().height);
-	VK_ASSERT(src.get_create_info().depth == dst.get_create_info().depth);
-	VK_ASSERT(src.get_create_info().type == dst.get_create_info().type);
-	VK_ASSERT(src.get_create_info().layers == dst.get_create_info().layers);
-	VK_ASSERT(src.get_create_info().levels == dst.get_create_info().levels);
-
-	VkImageCopy regions[32] = {};
-
-	for (uint32_t i = 0; i < levels; i++)
-	{
-		VkImageCopy &region = regions[i];
-		region.extent.width = src.get_create_info().width;
-		region.extent.height = src.get_create_info().height;
-		region.extent.depth = src.get_create_info().depth;
-		region.srcSubresource.aspectMask = format_to_aspect_mask(src.get_format());
-		region.srcSubresource.layerCount = src.get_create_info().layers;
-		region.dstSubresource.aspectMask = format_to_aspect_mask(dst.get_format());
-		region.dstSubresource.layerCount = dst.get_create_info().layers;
-		region.srcSubresource.mipLevel = i;
-		region.dstSubresource.mipLevel = i;
-		VK_ASSERT(region.srcSubresource.aspectMask == region.dstSubresource.aspectMask);
-	}
-
-	vkCmdCopyImage(cmd, src.get_image(), src.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-	               dst.get_image(), dst.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
-	               levels, regions);
-}
-
 void CommandBuffer::copy_buffer_to_image(const Image &image, const Buffer &buffer, unsigned num_blits,
                                          const VkBufferImageCopy *blits)
 {
 	vkCmdCopyBufferToImage(cmd, buffer.get_buffer(),
 	                       image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), num_blits, blits);
-}
-
-void CommandBuffer::copy_image_to_buffer(const Buffer &buffer, const Image &image, unsigned num_blits,
-                                         const VkBufferImageCopy *blits)
-{
-	vkCmdCopyImageToBuffer(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-	                       buffer.get_buffer(), num_blits, blits);
 }
 
 void CommandBuffer::copy_buffer_to_image(const Image &image, const Buffer &src, VkDeviceSize buffer_offset,
@@ -186,25 +129,6 @@ void CommandBuffer::clear_image(const Image &image, const VkClearValue &value)
 		vkCmdClearDepthStencilImage(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 		                            &value.depthStencil, 1, &range);
 	}
-}
-
-void CommandBuffer::clear_quad(unsigned attachment, const VkClearRect &rect, const VkClearValue &value,
-                               VkImageAspectFlags aspect)
-{
-	VK_ASSERT(framebuffer);
-	VK_ASSERT(actual_render_pass);
-	VkClearAttachment att = {};
-	att.clearValue = value;
-	att.colorAttachment = attachment;
-	att.aspectMask = aspect;
-	vkCmdClearAttachments(cmd, 1, &att, 1, &rect);
-}
-
-void CommandBuffer::clear_quad(const VkClearRect &rect, const VkClearAttachment *attachments, unsigned num_attachments)
-{
-	VK_ASSERT(framebuffer);
-	VK_ASSERT(actual_render_pass);
-	vkCmdClearAttachments(cmd, num_attachments, attachments, 1, &rect);
 }
 
 void CommandBuffer::full_barrier()
