@@ -300,9 +300,7 @@ using ImageViewHandle = Util::IntrusivePtr<ImageView>;
 enum class ImageDomain
 {
 	Physical,
-	Transient,
-	LinearHostCached,
-	LinearHost
+	Transient
 };
 
 struct ImageCreateInfo
@@ -538,61 +536,4 @@ private:
 };
 
 using ImageHandle = Util::IntrusivePtr<Image>;
-
-class LinearHostImage;
-struct LinearHostImageDeleter
-{
-	void operator()(LinearHostImage *image);
-};
-
-class Buffer;
-
-enum LinearHostImageCreateInfoFlagBits
-{
-	LINEAR_HOST_IMAGE_HOST_CACHED_BIT = 1 << 0,
-	LINEAR_HOST_IMAGE_REQUIRE_LINEAR_FILTER_BIT = 1 << 1,
-	LINEAR_HOST_IMAGE_IGNORE_DEVICE_LOCAL_BIT = 1 << 2
-};
-using LinearHostImageCreateInfoFlags = uint32_t;
-
-struct LinearHostImageCreateInfo
-{
-	unsigned width = 0;
-	unsigned height = 0;
-	VkFormat format = VK_FORMAT_UNDEFINED;
-	VkImageUsageFlags usage = 0;
-	VkPipelineStageFlags stages = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-	LinearHostImageCreateInfoFlags flags = 0;
-};
-
-// Special image type which supports direct CPU mapping.
-// Useful optimization for UMA implementations of Vulkan where we don't necessarily need
-// to perform staging copies. It gracefully falls back to staging buffer as needed.
-// Only usage flag SAMPLED_BIT is currently supported.
-class LinearHostImage : public Util::IntrusivePtrEnabled<LinearHostImage, LinearHostImageDeleter, HandleCounter>
-{
-public:
-	friend struct LinearHostImageDeleter;
-
-	size_t get_row_pitch_bytes() const;
-	size_t get_offset() const;
-	const ImageView &get_view() const;
-	const Image &get_image() const;
-	const DeviceAllocation &get_host_visible_allocation() const;
-	const Buffer &get_host_visible_buffer() const;
-	bool need_staging_copy() const;
-	VkPipelineStageFlags get_used_pipeline_stages() const;
-
-private:
-	friend class Util::ObjectPool<LinearHostImage>;
-	LinearHostImage(Device *device, ImageHandle gpu_image, Util::IntrusivePtr<Buffer> cpu_image,
-	                VkPipelineStageFlags stages);
-	Device *device;
-	ImageHandle gpu_image;
-	Util::IntrusivePtr<Buffer> cpu_image;
-	VkPipelineStageFlags stages;
-	size_t row_pitch;
-	size_t row_offset;
-};
-using LinearHostImageHandle = Util::IntrusivePtr<LinearHostImage>;
 }

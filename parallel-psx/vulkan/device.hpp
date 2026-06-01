@@ -59,7 +59,6 @@ struct HandlePool
 {
 	VulkanObjectPool<Buffer> buffers;
 	VulkanObjectPool<Image> images;
-	VulkanObjectPool<LinearHostImage> linear_images;
 	VulkanObjectPool<ImageView> image_views;
 	VulkanObjectPool<BufferView> buffer_views;
 	VulkanObjectPool<Sampler> samplers;
@@ -90,7 +89,6 @@ public:
 	friend struct ImageViewDeleter;
 	friend class Image;
 	friend struct ImageDeleter;
-	friend struct LinearHostImageDeleter;
 	friend class CommandBuffer;
 	friend struct CommandBufferDeleter;
 	friend class Program;

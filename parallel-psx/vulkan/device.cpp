@@ -1538,16 +1538,6 @@ uint32_t Device::find_memory_type(ImageDomain domain, uint32_t mask)
 		desired = VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
 		fallback = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		break;
-
-	case ImageDomain::LinearHostCached:
-		desired = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-		fallback = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-		break;
-
-	case ImageDomain::LinearHost:
-		desired = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-		fallback = 0;
-		break;
 	}
 
 	for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
@@ -2011,16 +2001,8 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 	info.arrayLayers = create_info.layers;
 	info.samples = create_info.samples;
 
-	if (create_info.domain == ImageDomain::LinearHostCached || create_info.domain == ImageDomain::LinearHost)
-	{
-		info.tiling = VK_IMAGE_TILING_LINEAR;
-		info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-	}
-	else
-	{
-		info.tiling = VK_IMAGE_TILING_OPTIMAL;
-		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	}
+	info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	info.usage = create_info.usage;
 	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
