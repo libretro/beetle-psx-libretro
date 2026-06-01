@@ -214,16 +214,6 @@ public:
 		return thread_index;
 	}
 
-	void set_is_secondary()
-	{
-		is_secondary = true;
-	}
-
-	bool get_is_secondary() const
-	{
-		return is_secondary;
-	}
-
 	void clear_image(const Image &image, const VkClearValue &value);
 	void clear_quad(unsigned attachment, const VkClearRect &rect, const VkClearValue &value,
 	                VkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT);
@@ -259,9 +249,6 @@ public:
 	             unsigned buffer_barriers, const VkBufferMemoryBarrier *buffers,
 	             unsigned image_barriers, const VkImageMemoryBarrier *images);
 
-	void buffer_barrier(const Buffer &buffer, VkPipelineStageFlags src_stage, VkAccessFlags src_access,
-	                    VkPipelineStageFlags dst_stage, VkAccessFlags dst_access);
-
 	void image_barrier(const Image &image, VkImageLayout old_layout, VkImageLayout new_layout,
 	                   VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage,
 	                   VkAccessFlags dst_access);
@@ -285,15 +272,6 @@ public:
 
 	void begin_render_pass(const RenderPassInfo &info, VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
 	void end_render_pass();
-	void submit_secondary(Util::IntrusivePtr<CommandBuffer> secondary);
-	inline unsigned get_current_subpass() const
-	{
-		return current_subpass;
-	}
-	Util::IntrusivePtr<CommandBuffer> request_secondary_command_buffer(unsigned thread_index, unsigned subpass);
-	static Util::IntrusivePtr<CommandBuffer> request_secondary_command_buffer(Device &device,
-	                                                                          const RenderPassInfo &rp, unsigned thread_index, unsigned subpass);
-
 	void set_program(Program &program);
 
 
@@ -338,8 +316,6 @@ public:
 
 	void draw(uint32_t vertex_count, uint32_t instance_count = 1, uint32_t first_vertex = 0,
 	          uint32_t first_instance = 0);
-	void draw_indexed(uint32_t index_count, uint32_t instance_count = 1, uint32_t first_index = 0,
-	                  int32_t vertex_offset = 0, uint32_t first_instance = 0);
 
 	void dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
 
@@ -540,7 +516,6 @@ private:
 	uint32_t dirty_vbos = 0;
 	uint32_t active_vbos = 0;
 	bool is_compute = true;
-	bool is_secondary = false;
 
 	void set_dirty(CommandBufferDirtyFlags flags)
 	{

@@ -378,13 +378,8 @@ private:
 	void request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size);
 	void request_staging_block_nolock(BufferBlock &block, VkDeviceSize size);
 
-	CommandBufferHandle request_secondary_command_buffer_for_thread(unsigned thread_index,
-	                                                                const Framebuffer *framebuffer,
-	                                                                unsigned subpass,
-	                                                                CommandBuffer::Type type = CommandBuffer::Type::Generic);
 	void add_frame_counter_nolock();
 	void decrement_frame_counter_nolock();
-	void submit_secondary(CommandBuffer &primary, CommandBuffer &secondary);
 	void wait_idle_nolock();
 	void end_frame_nolock();
 

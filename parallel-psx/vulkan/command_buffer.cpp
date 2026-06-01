@@ -270,22 +270,6 @@ void CommandBuffer::barrier(VkPipelineStageFlags src_stages, VkPipelineStageFlag
 	vkCmdPipelineBarrier(cmd, src_stages, dst_stages, 0, barriers, globals, buffer_barriers, buffers, image_barriers, images);
 }
 
-void CommandBuffer::buffer_barrier(const Buffer &buffer, VkPipelineStageFlags src_stages, VkAccessFlags src_access,
-                                   VkPipelineStageFlags dst_stages, VkAccessFlags dst_access)
-{
-	VK_ASSERT(!actual_render_pass);
-	VK_ASSERT(!framebuffer);
-	VkBufferMemoryBarrier barrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
-	barrier.srcAccessMask = src_access;
-	barrier.dstAccessMask = dst_access;
-	barrier.buffer = buffer.get_buffer();
-	barrier.offset = 0;
-	barrier.size = buffer.get_create_info().size;
-
-	fixup_src_stage(src_stages, device->get_workarounds().optimize_all_graphics_barrier);
-	vkCmdPipelineBarrier(cmd, src_stages, dst_stages, 0, 0, nullptr, 1, &barrier, 0, nullptr);
-}
-
 void CommandBuffer::image_barrier(const Image &image, VkImageLayout old_layout, VkImageLayout new_layout,
                                   VkPipelineStageFlags src_stages, VkAccessFlags src_access,
                                   VkPipelineStageFlags dst_stages, VkAccessFlags dst_access)
@@ -458,54 +442,6 @@ void CommandBuffer::init_viewport_scissor(const RenderPassInfo &info, const Fram
 
 	viewport = { 0.0f, 0.0f, float(fb_w), float(fb_h), 0.0f, 1.0f };
 	scissor = rect;
-}
-
-CommandBufferHandle CommandBuffer::request_secondary_command_buffer(Device &device, const RenderPassInfo &info,
-                                                                    unsigned thread_index, unsigned subpass)
-{
-	const Framebuffer *fb = &device.request_framebuffer(info);
-	CommandBufferHandle cmd = device.request_secondary_command_buffer_for_thread(thread_index, fb, subpass);
-	cmd->begin_graphics();
-
-	cmd->framebuffer = fb;
-	cmd->compatible_render_pass = &fb->get_compatible_render_pass();
-	cmd->actual_render_pass = &device.request_render_pass(info, false);
-
-	cmd->init_viewport_scissor(info, fb);
-	cmd->current_subpass = subpass;
-	cmd->current_contents = VK_SUBPASS_CONTENTS_INLINE;
-
-	return cmd;
-}
-
-CommandBufferHandle CommandBuffer::request_secondary_command_buffer(unsigned thread_index, unsigned subpass)
-{
-	VK_ASSERT(framebuffer);
-	VK_ASSERT(!is_secondary);
-
-	CommandBufferHandle cmd = device->request_secondary_command_buffer_for_thread(thread_index, framebuffer, subpass);
-	cmd->begin_graphics();
-
-	cmd->framebuffer = framebuffer;
-	cmd->compatible_render_pass = compatible_render_pass;
-	cmd->actual_render_pass = actual_render_pass;
-
-	cmd->current_subpass = subpass;
-	cmd->viewport = viewport;
-	cmd->scissor = scissor;
-	cmd->current_contents = VK_SUBPASS_CONTENTS_INLINE;
-
-	return cmd;
-}
-
-void CommandBuffer::submit_secondary(CommandBufferHandle secondary)
-{
-	VK_ASSERT(!is_secondary);
-	VK_ASSERT(secondary->is_secondary);
-	VK_ASSERT(current_subpass == secondary->current_subpass);
-	VK_ASSERT(current_contents == VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-
-	device->submit_secondary(*this, *secondary);
 }
 
 void CommandBuffer::begin_render_pass(const RenderPassInfo &info, VkSubpassContents contents)
@@ -1565,16 +1501,6 @@ void CommandBuffer::draw(uint32_t vertex_count, uint32_t instance_count, uint32_
 	VK_ASSERT(!is_compute);
 	flush_render_state();
 	vkCmdDraw(cmd, vertex_count, instance_count, first_vertex, first_instance);
-}
-
-void CommandBuffer::draw_indexed(uint32_t index_count, uint32_t instance_count, uint32_t first_index,
-                                 int32_t vertex_offset, uint32_t first_instance)
-{
-	VK_ASSERT(current_program);
-	VK_ASSERT(!is_compute);
-	VK_ASSERT(index.buffer != VK_NULL_HANDLE);
-	flush_render_state();
-	vkCmdDrawIndexed(cmd, index_count, instance_count, first_index, vertex_offset, first_instance);
 }
 
 void CommandBuffer::dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z)

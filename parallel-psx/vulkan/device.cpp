@@ -976,49 +976,6 @@ CommandBufferHandle Device::request_command_buffer_nolock(unsigned thread_index,
 	return handle;
 }
 
-void Device::submit_secondary(CommandBuffer &primary, CommandBuffer &secondary)
-{
-	{
-		LOCK();
-		secondary.end();
-		decrement_frame_counter_nolock();
-
-#ifdef VULKAN_DEBUG
-		CommandPool &pool = get_command_pool(secondary.get_command_buffer_type(),
-		                              secondary.get_thread_index());
-		pool.signal_submitted(secondary.get_command_buffer());
-#endif
-	}
-
-	VkCommandBuffer secondary_cmd = secondary.get_command_buffer();
-	vkCmdExecuteCommands(primary.get_command_buffer(), 1, &secondary_cmd);
-}
-
-CommandBufferHandle Device::request_secondary_command_buffer_for_thread(unsigned thread_index,
-                                                                        const Framebuffer *framebuffer,
-                                                                        unsigned subpass,
-                                                                        CommandBuffer::Type type)
-{
-	LOCK();
-
-	VkCommandBuffer cmd = get_command_pool(type, thread_index).request_secondary_command_buffer();
-	VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-	VkCommandBufferInheritanceInfo inherit = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
-
-	inherit.framebuffer = framebuffer->get_framebuffer();
-	inherit.renderPass = framebuffer->get_compatible_render_pass().get_render_pass();
-	inherit.subpass = subpass;
-	info.pInheritanceInfo = &inherit;
-	info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-
-	vkBeginCommandBuffer(cmd, &info);
-	add_frame_counter_nolock();
-	CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, pipeline_cache, type));
-	handle->set_thread_index(thread_index);
-	handle->set_is_secondary();
-	return handle;
-}
-
 const Sampler &Device::get_stock_sampler(StockSampler sampler) const
 {
 	return *samplers[static_cast<unsigned>(sampler)];
