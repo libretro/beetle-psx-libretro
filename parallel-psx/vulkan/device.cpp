@@ -64,7 +64,6 @@ void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semap
 		VK_ASSERT(sem.get() != semaphore.get());
 #endif
 
-	semaphore->signal_pending_wait();
 	data.wait_semaphores.push_back(semaphore);
 	data.wait_stages.push_back(stages);
 	data.need_fence = true;
@@ -547,10 +546,7 @@ void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 	for (Semaphore &semaphore : data.wait_semaphores)
 	{
 		VkSemaphore wait = semaphore->consume();
-		if (semaphore->can_recycle())
-			frame().recycled_semaphores.push_back(wait);
-		else
-			frame().destroyed_semaphores.push_back(wait);
+		frame().recycled_semaphores.push_back(wait);
 		waits.push_back(wait);
 	}
 	data.wait_stages.clear();
@@ -730,10 +726,7 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 	for (Semaphore &semaphore : data.wait_semaphores)
 	{
 		VkSemaphore wait = semaphore->consume();
-		if (semaphore->can_recycle())
-			frame().recycled_semaphores.push_back(wait);
-		else
-			frame().destroyed_semaphores.push_back(wait);
+		frame().recycled_semaphores.push_back(wait);
 		waits[0].push_back(wait);
 	}
 	data.wait_stages.clear();
