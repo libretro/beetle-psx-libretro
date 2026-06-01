@@ -481,20 +481,6 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 		LOGI("GPU supports Vulkan 1.0.\n");
 	}
 
-	// Only need GetPhysicalDeviceProperties2 for Vulkan 1.1-only code, so don't bother getting KHR variant.
-	ext.subgroup_properties = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES };
-	VkPhysicalDeviceProperties2 props = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-	void **ppNext = &props.pNext;
-
-	if (ext.supports_vulkan_11_instance && ext.supports_vulkan_11_device)
-	{
-		*ppNext = &ext.subgroup_properties;
-		ppNext = &ext.subgroup_properties.pNext;
-	}
-
-	if (ext.supports_vulkan_11_instance && ext.supports_vulkan_11_device)
-		vkGetPhysicalDeviceProperties2(gpu, &props);
-
 	uint32_t queue_count;
 	vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, nullptr);
 	std::vector<VkQueueFamilyProperties> queue_props(queue_count);
@@ -652,34 +638,9 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 #endif
 
 	VkPhysicalDeviceFeatures2KHR features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR };
-	ext.storage_8bit_features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES_KHR };
-	ext.storage_16bit_features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES_KHR };
-	ext.float16_int8_features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR };
-	ppNext = &features.pNext;
 
 	if (has_vk_extension(queried_extensions, VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME))
 		enabled_extensions.push_back(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
-
-	if (ext.supports_physical_device_properties2 && has_vk_extension(queried_extensions, VK_KHR_8BIT_STORAGE_EXTENSION_NAME))
-	{
-		enabled_extensions.push_back(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
-		*ppNext = &ext.storage_8bit_features;
-		ppNext = &ext.storage_8bit_features.pNext;
-	}
-
-	if (ext.supports_physical_device_properties2 && has_vk_extension(queried_extensions, VK_KHR_16BIT_STORAGE_EXTENSION_NAME))
-	{
-		enabled_extensions.push_back(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
-		*ppNext = &ext.storage_16bit_features;
-		ppNext = &ext.storage_16bit_features.pNext;
-	}
-
-	if (ext.supports_physical_device_properties2 && has_vk_extension(queried_extensions, VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME))
-	{
-		enabled_extensions.push_back(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
-		*ppNext = &ext.float16_int8_features;
-		ppNext = &ext.float16_int8_features.pNext;
-	}
 
 	if (ext.supports_physical_device_properties2)
 		vkGetPhysicalDeviceFeatures2KHR(gpu, &features);

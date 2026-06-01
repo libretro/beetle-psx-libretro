@@ -71,10 +71,6 @@ struct DeviceFeatures
 	bool supports_debug_utils = false;
 	bool supports_vulkan_11_instance = false;
 	bool supports_vulkan_11_device = false;
-	VkPhysicalDeviceSubgroupProperties subgroup_properties = {};
-	VkPhysicalDevice8BitStorageFeaturesKHR storage_8bit_features = {};
-	VkPhysicalDevice16BitStorageFeaturesKHR storage_16bit_features = {};
-	VkPhysicalDeviceFloat16Int8FeaturesKHR float16_int8_features = {};
 	VkPhysicalDeviceFeatures enabled_features = {};
 };
 
