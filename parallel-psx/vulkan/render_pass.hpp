@@ -145,13 +145,6 @@ public:
 		       format_has_depth_aspect(depth_stencil);
 	}
 
-	bool has_stencil(unsigned subpass) const
-	{
-		VK_ASSERT(subpass < subpasses.size());
-		return subpasses[subpass].depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
-		       format_has_stencil_aspect(depth_stencil);
-	}
-
 private:
 	Device *device;
 	VkRenderPass render_pass = VK_NULL_HANDLE;

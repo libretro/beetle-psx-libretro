@@ -239,8 +239,6 @@ public:
 	void set_sampler(unsigned set, unsigned binding, const Sampler &sampler);
 	void set_uniform_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
 	                        VkDeviceSize range);
-	void set_storage_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
-	                        VkDeviceSize range);
 	void push_constants(const void *data, VkDeviceSize offset, VkDeviceSize range);
 
 	void *allocate_constant_data(unsigned set, unsigned binding, VkDeviceSize size);

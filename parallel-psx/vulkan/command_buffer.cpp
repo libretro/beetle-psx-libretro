@@ -1103,23 +1103,6 @@ void CommandBuffer::set_uniform_buffer(unsigned set, unsigned binding, const Buf
 	dirty_sets |= 1u << set;
 }
 
-void CommandBuffer::set_storage_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
-                                       VkDeviceSize range)
-{
-	VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
-	VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-	VK_ASSERT(buffer.get_create_info().usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-	ResourceBinding &b = bindings.bindings[set][binding];
-
-	if (buffer.get_cookie() == bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
-		return;
-
-	b.buffer = { buffer.get_buffer(), offset, range };
-	bindings.cookies[set][binding] = buffer.get_cookie();
-	bindings.secondary_cookies[set][binding] = 0;
-	dirty_sets |= 1u << set;
-}
-
 void CommandBuffer::set_sampler(unsigned set, unsigned binding, const Sampler &sampler)
 {
 	VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
