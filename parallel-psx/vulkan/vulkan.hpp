@@ -67,11 +67,8 @@ struct DeviceFeatures
 	bool supports_physical_device_properties2 = false;
 	bool supports_external = false;
 	bool supports_dedicated = false;
-	bool supports_image_format_list = false;
 	bool supports_debug_marker = false;
 	bool supports_debug_utils = false;
-	bool supports_mirror_clamp_to_edge = false;
-	bool supports_google_display_timing = false;
 	bool supports_vulkan_11_instance = false;
 	bool supports_vulkan_11_device = false;
 	VkPhysicalDeviceSubgroupProperties subgroup_properties = {};
@@ -157,11 +154,6 @@ public:
 	uint32_t get_transfer_queue_family() const
 	{
 		return transfer_queue_family;
-	}
-
-	void release_instance()
-	{
-		owned_instance = false;
 	}
 
 	void release_device()

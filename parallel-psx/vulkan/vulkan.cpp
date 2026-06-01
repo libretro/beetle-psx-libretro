@@ -626,28 +626,10 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 		enabled_extensions.push_back(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
 	}
 
-	if (has_vk_extension(queried_extensions, VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME))
-	{
-		ext.supports_image_format_list = true;
-		enabled_extensions.push_back(VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME);
-	}
-
 	if (has_vk_extension(queried_extensions, VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
 	{
 		ext.supports_debug_marker = true;
 		enabled_extensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
-	}
-
-	if (has_vk_extension(queried_extensions, VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME))
-	{
-		ext.supports_mirror_clamp_to_edge = true;
-		enabled_extensions.push_back(VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME);
-	}
-
-	if (has_vk_extension(queried_extensions, VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME))
-	{
-		ext.supports_google_display_timing = true;
-		enabled_extensions.push_back(VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME);
 	}
 
 #ifdef _WIN32
