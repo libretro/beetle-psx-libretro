@@ -75,9 +75,6 @@ public:
 
 	void operator=(const IntrusivePtrEnabled &) = delete;
 
-protected:
-	Util::IntrusivePtr<T> reference_from_this();
-
 private:
 	ReferenceOps reference_count;
 };
@@ -244,27 +241,5 @@ public:
 private:
 	T *data = nullptr;
 };
-
-template <typename T, typename Deleter, typename ReferenceOps>
-IntrusivePtr<T> IntrusivePtrEnabled<T, Deleter, ReferenceOps>::reference_from_this()
-{
-	add_reference();
-	return IntrusivePtr<T>(static_cast<T *>(this));
-}
-
-template <typename Derived>
-using DerivedIntrusivePtrType = IntrusivePtr<Derived>;
-
-template <typename T, typename... P>
-DerivedIntrusivePtrType<T> make_handle(P &&... p)
-{
-	return DerivedIntrusivePtrType<T>(new T(std::forward<P>(p)...));
-}
-
-template <typename Base, typename Derived, typename... P>
-typename Base::IntrusivePtrType make_derived_handle(P &&... p)
-{
-	return typename Base::IntrusivePtrType(new Derived(std::forward<P>(p)...));
-}
 
 }

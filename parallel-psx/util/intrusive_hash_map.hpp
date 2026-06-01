@@ -351,11 +351,6 @@ public:
 		return pool.allocate(std::forward<P>(p)...);
 	}
 
-	void free(T *value)
-	{
-		pool.free(value);
-	}
-
 	T *insert_replace(Hash hash, T *value)
 	{
 		static_cast<IntrusiveHashMapEnabled<T> *>(value)->set_hash(hash);
