@@ -5012,7 +5012,11 @@ public:
 
 	void copy_buffer(const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
 	                 VkDeviceSize size);
-	void copy_buffer(const Buffer &dst, const Buffer &src);
+	void copy_buffer(const Buffer &dst, const Buffer &src)
+	{
+		VK_ASSERT(dst.get_create_info().size == src.get_create_info().size);
+		copy_buffer(dst, 0, src, 0, dst.get_create_info().size);
+	}
 
 	void copy_buffer_to_image(const Image &image, const Buffer &buffer, VkDeviceSize buffer_offset,
 	                          const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
@@ -6253,7 +6257,11 @@ public:
     void place(TextureRect texture);
     void upload(SRect rect, std::shared_ptr<TextureUpload> upload);
     void blit(SRect dst, SRect src);
-    void clear(SRect rect);
+    void clear(SRect rect)
+    {
+        clear_rect(rect);
+        lookup_grid_dirty = true;
+    }
     void releaseDeadHandles();
     std::vector<EnduringTextureRect> textures;
     std::unordered_set<RectIndex>& overlapping(Rect rect, std::unordered_set<RectIndex>& results);
@@ -12643,12 +12651,6 @@ void CommandBuffer::copy_buffer(const Buffer &dst, VkDeviceSize dst_offset, cons
 	vkCmdCopyBuffer(cmd, src.get_buffer(), dst.get_buffer(), 1, &region);
 }
 
-void CommandBuffer::copy_buffer(const Buffer &dst, const Buffer &src)
-{
-	VK_ASSERT(dst.get_create_info().size == src.get_create_info().size);
-	copy_buffer(dst, 0, src, 0, dst.get_create_info().size);
-}
-
 void CommandBuffer::copy_buffer_to_image(const Image &image, const Buffer &buffer, unsigned num_blits,
                                          const VkBufferImageCopy *blits)
 {
@@ -18095,10 +18097,6 @@ void RectTracker::blit(SRect dst, SRect src) {
     }
     lookup_grid_dirty = true;
 }
-void RectTracker::clear(SRect rect) {
-    clear_rect(rect);
-    lookup_grid_dirty = true;
-}
 void RectTracker::releaseDeadHandles() {
     std::vector<EnduringTextureRect>::iterator retainedIt = textures.begin();
     for (std::vector<EnduringTextureRect>::iterator it = textures.begin(); it != textures.end(); it++) {
@@ -18236,7 +18234,7 @@ void LookupGrid::clear() {
 
 // FusedPages
 
-int64_t page_bytes(FusionRects &fusion) {
+static inline int64_t page_bytes(FusionRects &fusion) {
     return fusion.scaleX * fusion.scaleY * fusion.vram_rect.width * fusion.vram_rect.height * 4;
 }
 
