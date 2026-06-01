@@ -179,11 +179,6 @@ using namespace Vulkan;
 
 namespace PSX
 {
-uint32_t colorToRGBA8(float r, float g, float b, float a)
-{
-	return ((int)(a * 0xff) << 24) + ((int)(b * 0xff) << 16) + ((int)(g * 0xff) << 8) + (int)(r * 0xff);
-}
-
 Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const SaveState *state)
     : device(device)
     , scaling(scaling_)
