@@ -4791,7 +4791,13 @@ class BufferPool
 {
 public:
 	~BufferPool();
-	void init(Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage);
+	void init(Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage)
+	{
+		this->device = device;
+		this->block_size = block_size;
+		this->alignment = alignment;
+		this->usage = usage;
+	}
 	void reset();
 
 	VkDeviceSize get_block_size() const
@@ -5389,8 +5395,14 @@ public:
 	Program *request_program(Shader *compute);
 
 	// Map and unmap buffer objects.
-	void *map_host_buffer(const Buffer &buffer, MemoryAccessFlags access);
-	void unmap_host_buffer(const Buffer &buffer, MemoryAccessFlags access);
+	void *map_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
+	{
+		return managers.memory.map_memory(buffer.get_allocation(), access);
+	}
+	void unmap_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
+	{
+		managers.memory.unmap_memory(buffer.get_allocation(), access);
+	}
 
 	// Create buffers and images.
 	BufferHandle create_buffer(const BufferCreateInfo &info, const void *initial = nullptr);
@@ -5452,7 +5464,12 @@ private:
 
 	uint64_t cookie = 0;
 
-	uint64_t allocate_cookie();
+	uint64_t allocate_cookie()
+	{
+		// Reserve lower bits for "special purposes".
+		cookie += 16;
+		return cookie;
+	}
 	void bake_program(Program &program);
 
 	void request_vertex_block(BufferBlock &block, VkDeviceSize size)
@@ -5648,7 +5665,11 @@ private:
 	void end_frame_nolock();
 
 	ImplementationWorkarounds workarounds;
-	void init_workarounds();
+	void init_workarounds()
+	{
+		// srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only.
+		workarounds.optimize_all_graphics_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
+	}
 };
 }
 
@@ -6303,7 +6324,10 @@ public:
     HandleLRUCache(int max_size): max_size(max_size) { entries.reserve(max_size); }
     std::pair<HdTextureHandle, bool> get(Rect rect, uint32_t palette_hash);
     void insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle);
-    void clear();
+    void clear()
+    {
+        entries.clear();
+    }
     int64_t dbg_hits;
     int64_t dbg_misses;
 private:
@@ -6396,7 +6420,10 @@ private:
 
     void dump_image(TextureUpload &upload, UsedMode &mode);
 
-    void clear_palette_cache(Rect rect);
+    void clear_palette_cache(Rect rect)
+    {
+        cached_palette_hashes.clear();
+    }
 
     /** Returns nullptr if no texture with the given hash can be found */
     std::shared_ptr<TextureUpload> find_upload(uint32_t hash);
@@ -10481,14 +10508,6 @@ VkSemaphore SemaphoreManager::request_cleared_semaphore()
 
 namespace Vulkan
 {
-void BufferPool::init(Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage)
-{
-	this->device = device;
-	this->block_size = block_size;
-	this->alignment = alignment;
-	this->usage = usage;
-}
-
 BufferBlock::~BufferBlock()
 {
 }
@@ -14361,17 +14380,6 @@ void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semap
 	VK_ASSERT(data.wait_semaphores.size() < 16 * 1024);
 }
 
-void *Device::map_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
-{
-	void *host = managers.memory.map_memory(buffer.get_allocation(), access);
-	return host;
-}
-
-void Device::unmap_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
-{
-	managers.memory.unmap_memory(buffer.get_allocation(), access);
-}
-
 Shader *Device::request_shader(const uint32_t *data, size_t size)
 {
 	Util::Hasher hasher;
@@ -14543,12 +14551,6 @@ void Device::bake_program(Program &program)
 	h.u32(layout.push_constant_range.size);
 	layout.push_constant_layout_hash = h.get();
 	program.set_pipeline_layout(request_pipeline_layout(layout));
-}
-
-void Device::init_workarounds()
-{
-	// srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only.
-	workarounds.optimize_all_graphics_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
 }
 
 void Device::set_context(const Context &context)
@@ -16235,13 +16237,6 @@ VkFormat Device::get_default_depth_format() const
 	return VK_FORMAT_UNDEFINED;
 }
 
-uint64_t Device::allocate_cookie()
-{
-	// Reserve lower bits for "special purposes".
-	cookie += 16;
-	return cookie;
-}
-
 const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool compatible)
 {
 	Hasher h;
@@ -17438,10 +17433,6 @@ uint32_t TextureTracker::get_palette_hash(Rect palette_rect) {
     return 0; // TODO: better way to indicate no palette found?
 }
 
-void TextureTracker::clear_palette_cache(Rect rect) {
-    cached_palette_hashes.clear();
-}
-
 void TextureTracker::clearRegion(Rect rect) {
     if (rect.width == 0 || rect.height == 0) {
         // Some games do this, apparently.
@@ -17709,9 +17700,6 @@ void HandleLRUCache::insert(Rect rect, uint32_t palette_hash, HdTextureHandle ha
         entries.pop_back();
     }
     entries.insert(entries.begin(), { rect, handle });
-}
-void HandleLRUCache::clear() {
-    entries.clear();
 }
 
 HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
