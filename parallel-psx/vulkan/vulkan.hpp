@@ -156,10 +156,6 @@ public:
 		return ext;
 	}
 
-	static const VkApplicationInfo &get_application_info(bool supports_vulkan_11);
-
-	void set_notification_callback(void (*func)(const char *));
-
 	/* True iff the constructor finished successfully. The Context
 	 * constructors do not throw; on failure they leave the object in
 	 * a destroyable but otherwise unusable state, and the caller must
@@ -189,8 +185,6 @@ private:
 	bool owned_device = false;
 	bool valid = false;
 	DeviceFeatures ext;
-
-	void (*message_callback)(const char *) = nullptr;
 
 	void destroy();
 };

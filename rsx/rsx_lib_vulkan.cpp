@@ -271,9 +271,6 @@ static bool libretro_create_device(
       return false;
    }
 
-   context->set_notification_callback([](const char* message) {
-      printf("Vulkan Validation Layer Says: %s\n", message);
-   });
    context->release_device();
    libretro_context->gpu = context->get_gpu();
    libretro_context->device = context->get_device();

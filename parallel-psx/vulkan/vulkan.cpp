@@ -129,24 +129,6 @@ Context::~Context()
 	destroy();
 }
 
-const VkApplicationInfo &Context::get_application_info(bool supports_vulkan_11)
-{
-	static const VkApplicationInfo info_11 = {
-		VK_STRUCTURE_TYPE_APPLICATION_INFO, nullptr, "Granite", 0, "Granite", 0, VK_API_VERSION_1_1,
-	};
-
-	static const VkApplicationInfo info = {
-		VK_STRUCTURE_TYPE_APPLICATION_INFO, nullptr, "Granite", 0, "Granite", 0, VK_MAKE_VERSION(1, 0, 57),
-	};
-	return supports_vulkan_11 ? info_11 : info;
-}
-
-void Context::set_notification_callback(void (*func)(const char *))
-{
-	message_callback = func;
-}
-
-
 bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
                             unsigned num_required_device_extensions, const char **required_device_layers,
                             unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features)
