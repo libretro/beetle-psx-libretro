@@ -85,8 +85,6 @@ enum VendorID
 class Context
 {
 public:
-	Context(const char **instance_ext, uint32_t instance_ext_count, const char **device_ext, uint32_t device_ext_count);
-	Context(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, VkQueue queue, uint32_t queue_family);
 	Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
 	        unsigned num_required_device_extensions, const char **required_device_layers,
 	        unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
@@ -164,7 +162,6 @@ public:
 
 	static const VkApplicationInfo &get_application_info(bool supports_vulkan_11);
 
-	void notify_validation_error(const char *msg);
 	void set_notification_callback(void (*func)(const char *));
 
 	/* True iff the constructor finished successfully. The Context
@@ -188,7 +185,6 @@ private:
 	uint32_t compute_queue_family = VK_QUEUE_FAMILY_IGNORED;
 	uint32_t transfer_queue_family = VK_QUEUE_FAMILY_IGNORED;
 
-	bool create_instance(const char **instance_ext, uint32_t instance_ext_count);
 	bool create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
 	                   unsigned num_required_device_extensions, const char **required_device_layers,
 	                   unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
