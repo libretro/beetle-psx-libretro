@@ -22,7 +22,6 @@
 
 #include "render_pass.hpp"
 #include "device.hpp"
-#include "quirks.hpp"
 #include <cstring>
 #include <stddef.h>
 
