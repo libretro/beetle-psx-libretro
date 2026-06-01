@@ -5857,10 +5857,26 @@ public:
 		listener = hazard;
 	}
 
-	void read_compute(Domain domain, const Rect &rect);
-	void write_compute(Domain domain, const Rect &rect);
-	void read_transfer(Domain domain, const Rect &rect);
-	void write_transfer(Domain domain, const Rect &rect);
+	void read_compute(Domain domain, const Rect &rect)
+	{
+		sync_domain(domain, rect);
+		read_domain(domain, Stage::Compute, rect);
+	}
+	void write_compute(Domain domain, const Rect &rect)
+	{
+		sync_domain(domain, rect);
+		write_domain(domain, Stage::Compute, rect);
+	}
+	void read_transfer(Domain domain, const Rect &rect)
+	{
+		sync_domain(domain, rect);
+		read_domain(domain, Stage::Transfer, rect);
+	}
+	void write_transfer(Domain domain, const Rect &rect)
+	{
+		sync_domain(domain, rect);
+		write_domain(domain, Stage::Transfer, rect);
+	}
 	void read_fragment(Domain domain, const Rect &rect);
 	Domain blit_vram(const Rect &dst, const Rect &src);
 	void load_image(const Rect &rect);
@@ -6640,7 +6656,11 @@ public:
 		queue.scissor_invariant = invariant;
 	}
 
-	void set_texture_window(const TextureWindow &rect);
+	void set_texture_window(const TextureWindow &window)
+	{
+		render_state.texture_window = window;
+		render_state.cached_window_rect = compute_window_rect(window);
+	}
 	inline void set_texture_offset(unsigned x, unsigned y)
 	{
 		atlas.set_texture_offset(x, y);
@@ -7721,12 +7741,6 @@ Rect Renderer::compute_window_rect(const TextureWindow &window)
 	unsigned x = window.or_x & ~((1u << mask_bits_x) - 1);
 	unsigned y = window.or_y & ~((1u << mask_bits_y) - 1);
 	return { x, y, 1u << mask_bits_x, 1u << mask_bits_y };
-}
-
-void Renderer::set_texture_window(const TextureWindow &window)
-{
-	render_state.texture_window = window;
-	render_state.cached_window_rect = compute_window_rect(window);
 }
 
 void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
@@ -16408,30 +16422,6 @@ void FBAtlas::read_fragment(Domain domain, const Rect &rect)
 {
 	sync_domain(domain, rect);
 	read_domain(domain, Stage::Fragment, rect);
-}
-
-void FBAtlas::read_compute(Domain domain, const Rect &rect)
-{
-	sync_domain(domain, rect);
-	read_domain(domain, Stage::Compute, rect);
-}
-
-void FBAtlas::write_compute(Domain domain, const Rect &rect)
-{
-	sync_domain(domain, rect);
-	write_domain(domain, Stage::Compute, rect);
-}
-
-void FBAtlas::read_transfer(Domain domain, const Rect &rect)
-{
-	sync_domain(domain, rect);
-	read_domain(domain, Stage::Transfer, rect);
-}
-
-void FBAtlas::write_transfer(Domain domain, const Rect &rect)
-{
-	sync_domain(domain, rect);
-	write_domain(domain, Stage::Transfer, rect);
 }
 
 void FBAtlas::read_texture(Domain domain)
