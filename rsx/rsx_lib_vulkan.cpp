@@ -9,42 +9,11 @@
 
 #include "rsx/rsx_lib_vulkan.h"
 
-#include <stdint.h>
-
-#include <vector>
-
 #include "rsx/rsx_intf.h" //FPS and audio sample rate macros
 #include "rsx/rsx_defer.h"
 #include "rsx/tt_trace.h"
-/* === folded parallel-psx/renderer/renderer.hpp === */
-/* Copyright (c) 2017-2018 Hans-Kristian Arntzen, parallel-psx contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * SPDX-License-Identifier: MIT */
-
-/* renderer.hpp - consolidated parallel-psx interface.
- *
- * Previously the implementation lived under parallel-psx/util/,
- * parallel-psx/vulkan/, parallel-psx/atlas/, and
- * parallel-psx/custom-textures/ across many separate header files.
- * They have all been folded here in topological dependency order;
- * the matching .cpp bodies live in renderer.cpp and the
- * custom-textures/ .cpp files. */
-
-#pragma once
 
 #include <volk.h>
-#include "libretro.h"
 
 #include <algorithm>
 #include <assert.h>
@@ -63,6 +32,13 @@
 #include <vector>
 
 #include <rthreads/rthreads.h>
+
+/* The remainder of this file is the consolidated parallel-psx
+ * implementation - originally spread across parallel-psx/util/,
+ * parallel-psx/vulkan/, parallel-psx/atlas/,
+ * parallel-psx/custom-textures/, and parallel-psx/renderer/ - all
+ * folded into this single translation unit alongside the libretro
+ * RSX Vulkan backend that was always its only consumer. */
 
 
 /* ============================================================
@@ -1649,8 +1625,7 @@ enum AllocationTiling
 enum MemoryAccessFlag
 {
 	MEMORY_ACCESS_WRITE_BIT = 1,
-	MEMORY_ACCESS_READ_BIT = 2,
-	MEMORY_ACCESS_READ_WRITE_BIT = MEMORY_ACCESS_WRITE_BIT | MEMORY_ACCESS_READ_BIT
+	MEMORY_ACCESS_READ_BIT = 2
 };
 using MemoryAccessFlags = uint32_t;
 
@@ -4089,10 +4064,7 @@ enum StatusFlag
 	STATUS_FB_READ = STATUS_COMPUTE_FB_READ | STATUS_TRANSFER_FB_READ | STATUS_FRAGMENT_FB_READ,
 	STATUS_FB_WRITE = STATUS_COMPUTE_FB_WRITE | STATUS_TRANSFER_FB_WRITE | STATUS_FRAGMENT_FB_WRITE,
 	STATUS_SFB_READ = STATUS_COMPUTE_SFB_READ | STATUS_TRANSFER_SFB_READ | STATUS_FRAGMENT_SFB_READ,
-	STATUS_SFB_WRITE = STATUS_COMPUTE_SFB_WRITE | STATUS_TRANSFER_SFB_WRITE | STATUS_FRAGMENT_SFB_WRITE,
-	STATUS_FRAGMENT =
-	    STATUS_FRAGMENT_FB_READ | STATUS_FRAGMENT_FB_WRITE | STATUS_FRAGMENT_SFB_READ | STATUS_FRAGMENT_SFB_WRITE,
-	STATUS_ALL = STATUS_FB_READ | STATUS_FB_WRITE | STATUS_SFB_READ | STATUS_SFB_WRITE
+	STATUS_SFB_WRITE = STATUS_COMPUTE_SFB_WRITE | STATUS_TRANSFER_SFB_WRITE | STATUS_FRAGMENT_SFB_WRITE
 };
 using StatusFlags = uint16_t;
 
@@ -5357,10 +5329,8 @@ private:
 };
 }
 
-/* === folded parallel-psx/renderer/renderer.cpp === */
-#include <algorithm>
+
 #include <math.h>
-#include <string.h>
 
 namespace PSX
 {

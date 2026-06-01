@@ -14,7 +14,6 @@ void rsx_vulkan_set_video_refresh(retro_video_refresh_t cb);
 void rsx_vulkan_get_system_av_info(struct retro_system_av_info *info);
 
 bool rsx_vulkan_open(bool is_pal);
-void rsx_vulkan_close(void);
 void rsx_vulkan_refresh_variables(void);
 void rsx_vulkan_prepare_frame(void);
 void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
@@ -22,8 +21,6 @@ void rsx_vulkan_finalize_frame(const void *fb, unsigned width,
 
 void rsx_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
                                uint8_t twx, uint8_t twy);
-
-void rsx_vulkan_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and);
 
 void rsx_vulkan_set_draw_offset(int16_t x, int16_t y);
 
