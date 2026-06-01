@@ -1544,11 +1544,6 @@ void CommandBuffer::set_quad_state()
 	set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 }
 
-QueryPoolHandle CommandBuffer::write_timestamp(VkPipelineStageFlagBits stage)
-{
-	return device->write_timestamp(cmd, stage);
-}
-
 void CommandBuffer::end()
 {
 	if (vkEndCommandBuffer(cmd) != VK_SUCCESS)

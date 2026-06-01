@@ -478,8 +478,6 @@ public:
 		return type;
 	}
 
-	QueryPoolHandle write_timestamp(VkPipelineStageFlagBits stage);
-
 	void end();
 
 private:

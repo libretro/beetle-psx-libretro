@@ -47,16 +47,6 @@ public:
 		has_timestamp = true;
 	}
 
-	double get_timestamp() const
-	{
-		return timestamp;
-	}
-
-	bool is_signalled() const
-	{
-		return has_timestamp;
-	}
-
 private:
 	friend class Util::ObjectPool<QueryPoolResult>;
 	QueryPoolResult(Device *device) : device(device)
@@ -75,7 +65,6 @@ public:
 	~QueryPool();
 
 	void begin();
-	QueryPoolHandle write_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits stage);
 
 private:
 	Device *device;

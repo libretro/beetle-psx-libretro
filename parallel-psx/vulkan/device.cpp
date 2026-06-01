@@ -1238,12 +1238,6 @@ void Device::next_frame_context()
 	frame().begin();
 }
 
-QueryPoolHandle Device::write_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits stage)
-{
-	LOCK();
-	return frame().query_pool.write_timestamp(cmd, stage);
-}
-
 void Device::add_frame_counter_nolock()
 {
 	lock.counter++;

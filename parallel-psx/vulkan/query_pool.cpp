@@ -86,32 +86,6 @@ void QueryPool::add_pool()
 	pools.push_back(std::move(pool));
 }
 
-QueryPoolHandle QueryPool::write_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits stage)
-{
-	if (!supports_timestamp)
-	{
-		LOGI("Timestamps are not supported on this implementation.\n");
-		return {};
-	}
-
-	if (pools[pool_index].index >= pools[pool_index].size)
-		pool_index++;
-
-	if (pool_index >= pools.size())
-		add_pool();
-
-	Pool &pool = pools[pool_index];
-
-	QueryPoolHandle cookie = QueryPoolHandle(device->handle_pool.query.allocate(device));
-	pool.cookies[pool.index] = cookie;
-
-	vkCmdResetQueryPool(cmd, pool.pool, pool.index, 1);
-	vkCmdWriteTimestamp(cmd, stage, pool.pool, pool.index);
-
-	pool.index++;
-	return cookie;
-}
-
 void QueryPoolResultDeleter::operator()(QueryPoolResult *query)
 {
 	query->device->handle_pool.query.free(query);

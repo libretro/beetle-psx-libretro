@@ -199,8 +199,6 @@ private:
 	void request_uniform_block(BufferBlock &block, VkDeviceSize size);
 	void request_staging_block(BufferBlock &block, VkDeviceSize size);
 
-	QueryPoolHandle write_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits stage);
-
 	PipelineLayout *request_pipeline_layout(const CombinedResourceLayout &layout);
 	DescriptorSetAllocator *request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_sets);
 	const Framebuffer &request_framebuffer(const RenderPassInfo &info);
