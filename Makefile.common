@@ -241,14 +241,12 @@ endif
    ifeq ($(HAVE_VULKAN), 1)
       CFLAGS      += -DTEXTURE_DUMPING_ENABLED
       CXXFLAGS    += -DTEXTURE_DUMPING_ENABLED
-      SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/renderer/*.cpp) \
-                     $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
+      SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
                      $(CORE_DIR)/rsx/rsx_lib_vulkan.cpp
 
       SOURCES_C += $(wildcard $(CORE_DIR)/parallel-psx/volk/*.c)
 
       EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/SPIRV-Cross \
-                        -I$(CORE_DIR)/parallel-psx/renderer \
                         -I$(CORE_DIR)/parallel-psx/khronos/include \
                         -I$(CORE_DIR)/parallel-psx/volk \
                         -I$(CORE_DIR)/parallel-psx/glsl/prebuilt
