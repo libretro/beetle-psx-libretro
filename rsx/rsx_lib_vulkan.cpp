@@ -4091,8 +4091,16 @@ public:
 
 	void write_fragment(Domain domain, const Rect &rect);
 	void clear_rect(const Rect &rect, uint32_t color);
-	void set_draw_rect(const Rect &rect);
-	void set_texture_window(const Rect &rect);
+
+	void set_draw_rect(const Rect &rect)
+	{
+		renderpass.scissor = rect;
+	}
+
+	void set_texture_window(const Rect &rect)
+	{
+		renderpass.texture_window = rect;
+	}
 
 	TextureMode set_texture_mode(TextureMode mode)
 	{
@@ -4815,9 +4823,18 @@ public:
 	Renderer(Vulkan::Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
 	~Renderer();
 
-	void set_track_textures(bool enable);
-	void set_dump_textures(bool enable);
-	void set_replace_textures(bool enable);
+	void set_track_textures(bool enable)
+	{
+		texture_tracking_enabled = enable;
+	}
+	void set_dump_textures(bool enable)
+	{
+		tracker.dump_enabled = enable;
+	}
+	void set_replace_textures(bool enable)
+	{
+		tracker.hd_textures_enabled = enable;
+	}
 
 	void set_adaptive_smoothing(bool enable)
 	{
@@ -4853,10 +4870,20 @@ public:
 
 	Vulkan::BufferHandle copy_cpu_to_vram(const Rect &rect);
 	void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
-	uint16_t *begin_copy(Vulkan::BufferHandle handle);
-	void end_copy(Vulkan::BufferHandle handle);
+	uint16_t *begin_copy(Vulkan::BufferHandle handle)
+	{
+		return static_cast<uint16_t *>(device.map_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT));
+	}
+	void end_copy(Vulkan::BufferHandle handle)
+	{
+		device.unmap_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT);
+	}
 
-	void notify_texture_upload(Rect rect, uint16_t *vram);
+	void notify_texture_upload(Rect rect, uint16_t *vram)
+	{
+		if (texture_tracking_enabled)
+			tracker.upload(rect, vram);
+	}
 
 	void blit_vram(const Rect &dst, const Rect &src);
 
@@ -5052,7 +5079,10 @@ public:
 		BlendAddQuarter = 3
 	};
 
-	void set_filter_mode(FilterMode mode);
+	void set_filter_mode(FilterMode mode)
+	{
+		primitive_filter_mode = mode;
+	}
 	ScanoutMode get_scanout_mode() const
 	{
 		return render_state.scanout_mode;
@@ -5105,13 +5135,20 @@ public:
 	void hazard(StatusFlags flags);
 	void resolve(Domain target_domain, unsigned x, unsigned y);
 	void flush_render_pass(const Rect &rect);
-	void discard_render_pass();
+	void discard_render_pass()
+	{
+		reset_queue();
+	}
 	void clear_quad(const Rect &rect, uint32_t fb_color, bool candidate);
 
 	// Called by TextureTracker (formerly via TextureUploader interface).
 	Vulkan::ImageHandle upload_texture(std::vector<LoadedImage> &image);
 	Vulkan::ImageHandle create_texture(int width, int height, int levels);
-	Vulkan::CommandBufferHandle &command_buffer_hack_fixme();
+	Vulkan::CommandBufferHandle &command_buffer_hack_fixme()
+	{
+		ensure_command_buffer();
+		return cmd;
+	}
 
 private:
 	void hd_texture_uniforms(HdTextureHandle hd_texture_index);
@@ -5723,14 +5760,6 @@ Renderer::SaveState Renderer::save_vram_state()
 	std::vector<uint32_t> vram(src, src + FB_WIDTH * FB_HEIGHT);
 	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
 	return { std::move(vram), render_state, tracker.save_state() };
-}
-
-void Renderer::set_filter_mode(FilterMode mode)
-{
-	if (mode != primitive_filter_mode)
-	{
-		primitive_filter_mode = mode;
-	}
 }
 
 void Renderer::init_primitive_pipelines()
@@ -6728,11 +6757,6 @@ void Renderer::ensure_command_buffer()
 {
 	if (!cmd)
 		cmd = device.request_command_buffer();
-}
-
-void Renderer::discard_render_pass()
-{
-	reset_queue();
 }
 
 float Renderer::allocate_depth(Domain domain, const Rect &rect)
@@ -7775,35 +7799,6 @@ Vulkan::ImageHandle Renderer::create_texture(int width, int height, int levels) 
 	info.initial_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	ImageHandle image = device.create_image(info, nullptr);
 	return image;
-}
-Vulkan::CommandBufferHandle &Renderer::command_buffer_hack_fixme() {
-	ensure_command_buffer();
-	return cmd;
-}
-
-void Renderer::notify_texture_upload(Rect uploadRect, uint16_t *vram) {
-	if (texture_tracking_enabled) {
-		tracker.upload(uploadRect, vram);
-	}
-}
-void Renderer::set_track_textures(bool enable) {
-	texture_tracking_enabled = enable;
-}
-void Renderer::set_dump_textures(bool enable) {
-	tracker.dump_enabled = enable;
-}
-void Renderer::set_replace_textures(bool enable) {
-	tracker.hd_textures_enabled = enable;
-}
-
-uint16_t *Renderer::begin_copy(BufferHandle handle)
-{
-	return static_cast<uint16_t *>(device.map_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT));
-}
-
-void Renderer::end_copy(BufferHandle handle)
-{
-	device.unmap_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT);
 }
 
 BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
@@ -15197,11 +15192,6 @@ void FBAtlas::flush_render_pass()
 			info(x, y) |= STATUS_TEXTURE_RENDERED;
 }
 
-void FBAtlas::set_texture_window(const Rect &rect)
-{
-	renderpass.texture_window = rect;
-}
-
 void FBAtlas::extend_render_pass(const Rect &rect, bool scissor)
 {
 	bool scissor_invariant = !scissor || renderpass.scissor.contains(rect);
@@ -15305,11 +15295,6 @@ void FBAtlas::clear_rect(const Rect &rect, uint32_t fb_color)
 	for (unsigned y = ybegin; y <= yend; y++)
 		for (unsigned x = xbegin; x <= xend; x++)
 			info(x, y) &= ~STATUS_TEXTURE_RENDERED;
-}
-
-void FBAtlas::set_draw_rect(const Rect &rect)
-{
-	renderpass.scissor = rect;
 }
 
 void FBAtlas::discard_render_pass()
