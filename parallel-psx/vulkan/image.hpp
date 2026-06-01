@@ -179,7 +179,7 @@ struct ImageViewDeleter
 };
 
 class ImageView : public Util::IntrusivePtrEnabled<ImageView, ImageViewDeleter, HandleCounter>,
-                  public Cookie, public InternalSyncEnabled
+                  public Cookie
 {
 public:
 	friend struct ImageViewDeleter;
@@ -367,7 +367,7 @@ enum class Layout
 };
 
 class Image : public Util::IntrusivePtrEnabled<Image, ImageDeleter, HandleCounter>,
-              public Cookie, public InternalSyncEnabled
+              public Cookie
 {
 public:
 	friend struct ImageDeleter;

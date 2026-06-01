@@ -310,11 +310,6 @@ VkPipeline Program::add_pipeline(Hash hash, VkPipeline pipeline)
 Program::~Program()
 {
 	for (IntrusivePODWrapper<VkPipeline> &pipe : pipelines)
-	{
-		if (internal_sync)
-			device->destroy_pipeline_nolock(pipe.get());
-		else
-			device->destroy_pipeline(pipe.get());
-	}
+		device->destroy_pipeline_nolock(pipe.get());
 }
 }

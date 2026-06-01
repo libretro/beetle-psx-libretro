@@ -96,7 +96,7 @@ struct BufferViewDeleter
 };
 
 class Buffer : public Util::IntrusivePtrEnabled<Buffer, BufferDeleter, HandleCounter>,
-               public Cookie, public InternalSyncEnabled
+               public Cookie
 {
 public:
 	friend struct BufferDeleter;
@@ -142,7 +142,7 @@ struct BufferViewCreateInfo
 };
 
 class BufferView : public Util::IntrusivePtrEnabled<BufferView, BufferViewDeleter, HandleCounter>,
-                   public Cookie, public InternalSyncEnabled
+                   public Cookie
 {
 public:
 	friend struct BufferViewDeleter;

@@ -46,16 +46,4 @@ private:
 
 template <typename T>
 using HashedObject = Util::IntrusiveHashMapEnabled<T>;
-
-class InternalSyncEnabled
-{
-public:
-	void set_internal_sync_object()
-	{
-		internal_sync = true;
-	}
-
-protected:
-	bool internal_sync = false;
-};
 }

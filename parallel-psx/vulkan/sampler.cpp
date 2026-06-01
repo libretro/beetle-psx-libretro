@@ -35,12 +35,7 @@ Sampler::Sampler(Device *device, VkSampler sampler)
 Sampler::~Sampler()
 {
 	if (sampler)
-	{
-		if (internal_sync)
-			device->destroy_sampler_nolock(sampler);
-		else
-			device->destroy_sampler(sampler);
-	}
+		device->destroy_sampler_nolock(sampler);
 }
 
 void SamplerDeleter::operator()(Vulkan::Sampler *sampler)

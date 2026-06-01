@@ -403,7 +403,6 @@ void Device::init_stock_samplers()
 			break;
 		}
 		samplers[i] = create_sampler(info, mode);
-		samplers[i]->set_internal_sync_object();
 	}
 }
 
@@ -849,12 +848,6 @@ void Device::sync_buffer_blocks()
 
 void Device::end_frame_nolock()
 {
-	// Kept handles alive until end-of-frame, free now if appropriate.
-	for (ImageHandle &image : frame().keep_alive_images)
-	{
-		image->set_internal_sync_object();
-		image->get_view().set_internal_sync_object();
-	}
 	frame().keep_alive_images.clear();
 
 	// Make sure we have a fence which covers all submissions in the frame.
@@ -1025,70 +1018,10 @@ static inline bool exists(const T &container, const U &value)
 
 #endif
 
-void Device::destroy_pipeline(VkPipeline pipeline)
-{
-	LOCK();
-	destroy_pipeline_nolock(pipeline);
-}
-
 void Device::reset_fence(VkFence fence)
 {
 	LOCK();
 	frame().recycle_fences.push_back(fence);
-}
-
-void Device::destroy_buffer(VkBuffer buffer)
-{
-	LOCK();
-	destroy_buffer_nolock(buffer);
-}
-
-void Device::destroy_buffer_view(VkBufferView view)
-{
-	LOCK();
-	destroy_buffer_view_nolock(view);
-}
-
-void Device::destroy_framebuffer(VkFramebuffer framebuffer)
-{
-	LOCK();
-	destroy_framebuffer_nolock(framebuffer);
-}
-
-void Device::destroy_image(VkImage image)
-{
-	LOCK();
-	destroy_image_nolock(image);
-}
-
-void Device::destroy_semaphore(VkSemaphore semaphore)
-{
-	LOCK();
-	destroy_semaphore_nolock(semaphore);
-}
-
-void Device::recycle_semaphore(VkSemaphore semaphore)
-{
-	LOCK();
-	recycle_semaphore_nolock(semaphore);
-}
-
-void Device::free_memory(const DeviceAllocation &alloc)
-{
-	LOCK();
-	free_memory_nolock(alloc);
-}
-
-void Device::destroy_sampler(VkSampler sampler)
-{
-	LOCK();
-	destroy_sampler_nolock(sampler);
-}
-
-void Device::destroy_image_view(VkImageView view)
-{
-	LOCK();
-	destroy_image_view_nolock(view);
 }
 
 void Device::destroy_pipeline_nolock(VkPipeline pipeline)

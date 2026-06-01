@@ -119,7 +119,7 @@ private:
 	ResourceLayout layout;
 };
 
-class Program : public HashedObject<Program>, public InternalSyncEnabled
+class Program : public HashedObject<Program>
 {
 public:
 	Program(Device *device, Shader *vertex, Shader *fragment);

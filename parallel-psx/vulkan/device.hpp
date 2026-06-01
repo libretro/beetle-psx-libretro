@@ -334,16 +334,6 @@ private:
 	                        unsigned semaphore_count,
 	                        Semaphore *semaphore);
 
-	void destroy_buffer(VkBuffer buffer);
-	void destroy_image(VkImage image);
-	void destroy_image_view(VkImageView view);
-	void destroy_buffer_view(VkBufferView view);
-	void destroy_pipeline(VkPipeline pipeline);
-	void destroy_sampler(VkSampler sampler);
-	void destroy_framebuffer(VkFramebuffer framebuffer);
-	void destroy_semaphore(VkSemaphore semaphore);
-	void recycle_semaphore(VkSemaphore semaphore);
-	void free_memory(const DeviceAllocation &alloc);
 	void reset_fence(VkFence fence);
 	void keep_handle_alive(ImageHandle handle);
 

@@ -36,16 +36,8 @@ Buffer::Buffer(Device *device, VkBuffer buffer, const DeviceAllocation &alloc, c
 
 Buffer::~Buffer()
 {
-	if (internal_sync)
-	{
-		device->destroy_buffer_nolock(buffer);
-		device->free_memory_nolock(alloc);
-	}
-	else
-	{
-		device->destroy_buffer(buffer);
-		device->free_memory(alloc);
-	}
+	device->destroy_buffer_nolock(buffer);
+	device->free_memory_nolock(alloc);
 }
 
 void BufferDeleter::operator()(Buffer *buffer)
@@ -64,12 +56,7 @@ BufferView::BufferView(Device *device, VkBufferView view, const BufferViewCreate
 BufferView::~BufferView()
 {
 	if (view != VK_NULL_HANDLE)
-	{
-		if (internal_sync)
-			device->destroy_buffer_view_nolock(view);
-		else
-			device->destroy_buffer_view(view);
-	}
+		device->destroy_buffer_view_nolock(view);
 }
 
 void BufferViewDeleter::operator()(BufferView *view)

@@ -54,28 +54,14 @@ VkImageView ImageView::get_render_target_view(unsigned layer) const
 
 ImageView::~ImageView()
 {
-	if (internal_sync)
-	{
+	device->destroy_image_view_nolock(view);
+	if (depth_view != VK_NULL_HANDLE)
+		device->destroy_image_view_nolock(depth_view);
+	if (stencil_view != VK_NULL_HANDLE)
+		device->destroy_image_view_nolock(stencil_view);
+
+	for (VkImageView &view : render_target_views)
 		device->destroy_image_view_nolock(view);
-		if (depth_view != VK_NULL_HANDLE)
-			device->destroy_image_view_nolock(depth_view);
-		if (stencil_view != VK_NULL_HANDLE)
-			device->destroy_image_view_nolock(stencil_view);
-
-		for (VkImageView &view : render_target_views)
-			device->destroy_image_view_nolock(view);
-	}
-	else
-	{
-		device->destroy_image_view(view);
-		if (depth_view != VK_NULL_HANDLE)
-			device->destroy_image_view(depth_view);
-		if (stencil_view != VK_NULL_HANDLE)
-			device->destroy_image_view(stencil_view);
-
-		for (VkImageView &view : render_target_views)
-			device->destroy_image_view(view);
-	}
 }
 
 Image::Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
@@ -103,16 +89,8 @@ Image::~Image()
 {
 	if (alloc.get_memory())
 	{
-		if (internal_sync)
-		{
-			device->destroy_image_nolock(image);
-			device->free_memory_nolock(alloc);
-		}
-		else
-		{
-			device->destroy_image(image);
-			device->free_memory(alloc);
-		}
+		device->destroy_image_nolock(image);
+		device->free_memory_nolock(alloc);
 	}
 }
 

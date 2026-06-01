@@ -68,7 +68,7 @@ struct SamplerDeleter
 };
 
 class Sampler : public Util::IntrusivePtrEnabled<Sampler, SamplerDeleter, HandleCounter>,
-                public Cookie, public InternalSyncEnabled
+                public Cookie
 {
 public:
 	friend struct SamplerDeleter;

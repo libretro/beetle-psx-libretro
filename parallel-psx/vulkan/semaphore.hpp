@@ -37,8 +37,7 @@ struct SemaphoreHolderDeleter
 	void operator()(SemaphoreHolder *semaphore);
 };
 
-class SemaphoreHolder : public Util::IntrusivePtrEnabled<SemaphoreHolder, SemaphoreHolderDeleter, HandleCounter>,
-                        public InternalSyncEnabled
+class SemaphoreHolder : public Util::IntrusivePtrEnabled<SemaphoreHolder, SemaphoreHolderDeleter, HandleCounter>
 {
 public:
 	friend struct SemaphoreHolderDeleter;

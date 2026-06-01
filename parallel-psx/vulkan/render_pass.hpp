@@ -163,7 +163,7 @@ private:
 	void fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
 };
 
-class Framebuffer : public Cookie, public NoCopyNoMove, public InternalSyncEnabled
+class Framebuffer : public Cookie, public NoCopyNoMove
 {
 public:
 	Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info);
@@ -225,7 +225,6 @@ private:
 		FramebufferNode(Device *device, const RenderPass &rp, const RenderPassInfo &info)
 		    : Framebuffer(device, rp, info)
 		{
-			set_internal_sync_object();
 		}
 	};
 

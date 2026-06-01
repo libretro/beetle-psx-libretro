@@ -859,12 +859,7 @@ Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassI
 Framebuffer::~Framebuffer()
 {
 	if (framebuffer != VK_NULL_HANDLE)
-	{
-		if (internal_sync)
-			device->destroy_framebuffer_nolock(framebuffer);
-		else
-			device->destroy_framebuffer(framebuffer);
-	}
+		device->destroy_framebuffer_nolock(framebuffer);
 }
 
 FramebufferAllocator::FramebufferAllocator(Device *device)
@@ -950,8 +945,6 @@ ImageView &AttachmentAllocator::request_attachment(unsigned width, unsigned heig
 	image_info.samples = static_cast<VkSampleCountFlagBits>(samples);
 	image_info.layers = layers;
 	node = attachments.emplace(hash, device->create_image(image_info, nullptr));
-	node->handle->set_internal_sync_object();
-	node->handle->get_view().set_internal_sync_object();
 	device->set_name(*node->handle, "AttachmentAllocator");
 	return node->handle->get_view();
 }
