@@ -2769,7 +2769,10 @@ public:
 	void operator=(const Context &) = delete;
 	static bool init_loader(PFN_vkGetInstanceProcAddr addr);
 
-	~Context();
+	~Context()
+	{
+		destroy();
+	}
 
 	VkInstance get_instance() const
 	{
@@ -3509,11 +3512,17 @@ public:
 	~DeviceAllocator();
 
 	bool allocate(uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling,
-	              DeviceAllocation *alloc);
+	              DeviceAllocation *alloc)
+	{
+		return allocators[memory_type]->allocate(size, alignment, tiling, alloc);
+	}
 	bool allocate_image_memory(uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling,
 	                           DeviceAllocation *alloc, VkImage image);
 
-	bool allocate_global(uint32_t size, uint32_t memory_type, DeviceAllocation *alloc);
+	bool allocate_global(uint32_t size, uint32_t memory_type, DeviceAllocation *alloc)
+	{
+		return allocators[memory_type]->allocate_global(size, alloc);
+	}
 
 	void garbage_collect();
 	void *map_memory(const DeviceAllocation &alloc, MemoryAccessFlags flags);
@@ -4981,7 +4990,11 @@ public:
 		AsyncTransfer
 	};
 
-	~CommandBuffer();
+	~CommandBuffer()
+	{
+		VK_ASSERT(vbo_block.mapped == nullptr);
+		VK_ASSERT(ubo_block.mapped == nullptr);
+	}
 	VkCommandBuffer get_command_buffer() const
 	{
 		return cmd;
@@ -5068,7 +5081,12 @@ public:
 	void *allocate_vertex_data(unsigned binding, VkDeviceSize size, VkDeviceSize stride,
 	                           VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
 
-	void set_viewport(const VkViewport &viewport);
+	void set_viewport(const VkViewport &viewport)
+	{
+		VK_ASSERT(framebuffer);
+		this->viewport = viewport;
+		set_dirty(COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
+	}
 	const VkViewport &get_viewport() const
 	{
 		return viewport;
@@ -11016,12 +11034,6 @@ void DeviceAllocator::init(VkPhysicalDevice gpu, VkDevice vkdevice)
 	}
 }
 
-bool DeviceAllocator::allocate(uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling mode,
-                               DeviceAllocation *alloc)
-{
-	return allocators[memory_type]->allocate(size, alignment, mode, alloc);
-}
-
 bool DeviceAllocator::allocate_image_memory(uint32_t size, uint32_t alignment, uint32_t memory_type,
                                             AllocationTiling tiling, DeviceAllocation *alloc, VkImage image)
 {
@@ -11040,11 +11052,6 @@ bool DeviceAllocator::allocate_image_memory(uint32_t size, uint32_t alignment, u
 		return allocators[memory_type]->allocate_dedicated(size, alloc, image);
 	else
 		return allocate(size, alignment, memory_type, tiling, alloc);
-}
-
-bool DeviceAllocator::allocate_global(uint32_t size, uint32_t memory_type, DeviceAllocation *alloc)
-{
-	return allocators[memory_type]->allocate_global(size, alloc);
 }
 
 void DeviceAllocator::Heap::garbage_collect(VkDevice device)
@@ -12627,12 +12634,6 @@ CommandBuffer::CommandBuffer(Device *device, VkCommandBuffer cmd, Type type)
 	memset(&bindings, 0, sizeof(bindings));
 }
 
-CommandBuffer::~CommandBuffer()
-{
-	VK_ASSERT(vbo_block.mapped == nullptr);
-	VK_ASSERT(ubo_block.mapped == nullptr);
-}
-
 void CommandBuffer::copy_buffer(const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
                                 VkDeviceSize size)
 {
@@ -13386,13 +13387,6 @@ void CommandBuffer::set_vertex_binding(uint32_t binding, const Buffer &buffer, V
 	vbo.input_rates[binding] = step_rate;
 }
 
-void CommandBuffer::set_viewport(const VkViewport &viewport)
-{
-	VK_ASSERT(framebuffer);
-	this->viewport = viewport;
-	set_dirty(COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
-}
-
 void CommandBuffer::set_scissor(const VkRect2D &rect)
 {
 	VK_ASSERT(framebuffer);
@@ -14027,11 +14021,6 @@ void Context::destroy()
 
 	if (owned_device && device != VK_NULL_HANDLE)
 		vkDestroyDevice(device, nullptr);
-}
-
-Context::~Context()
-{
-	destroy();
 }
 
 bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
