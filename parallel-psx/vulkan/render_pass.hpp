@@ -161,7 +161,6 @@ private:
 	std::vector<SubpassInfo> subpasses;
 
 	void fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
-	void fixup_wsi_barrier(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
 };
 
 class Framebuffer : public Cookie, public NoCopyNoMove, public InternalSyncEnabled

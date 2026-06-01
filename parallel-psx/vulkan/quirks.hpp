@@ -26,7 +26,6 @@ namespace Vulkan
 {
 struct ImplementationWorkarounds
 {
-	bool wsi_acquire_barrier_is_expensive = false;
 	bool optimize_all_graphics_barrier = false;
 };
 }
