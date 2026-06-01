@@ -1012,7 +1012,6 @@ void Device::init_frame_contexts(unsigned count)
 Device::PerFrame::PerFrame(Device *device)
     : device(device->get_device())
     , managers(device->managers)
-    , query_pool(device)
 {
 	graphics_cmd_pool.emplace_back(device->get_device(), device->graphics_queue_family_index);
 	compute_cmd_pool.emplace_back(device->get_device(), device->compute_queue_family_index);
@@ -1271,7 +1270,6 @@ void Device::PerFrame::begin()
 		pool.begin();
 	for (CommandPool &pool : transfer_cmd_pool)
 		pool.begin();
-	query_pool.begin();
 
 	for (VkFramebuffer &framebuffer : destroyed_framebuffers)
 		vkDestroyFramebuffer(device, framebuffer, nullptr);

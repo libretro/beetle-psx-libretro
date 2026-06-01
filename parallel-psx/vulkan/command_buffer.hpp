@@ -29,7 +29,6 @@
 #include "sampler.hpp"
 #include "shader.hpp"
 #include "vulkan.hpp"
-#include "query_pool.hpp"
 #include "buffer_pool.hpp"
 #include <string.h>
 

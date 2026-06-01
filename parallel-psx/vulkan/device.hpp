@@ -35,7 +35,6 @@
 #include "semaphore_manager.hpp"
 #include "shader.hpp"
 #include "vulkan.hpp"
-#include "query_pool.hpp"
 #include "buffer_pool.hpp"
 #include <memory>
 #include <vector>
@@ -64,7 +63,6 @@ struct HandlePool
 	VulkanObjectPool<Sampler> samplers;
 	VulkanObjectPool<FenceHolder> fences;
 	VulkanObjectPool<SemaphoreHolder> semaphores;
-	VulkanObjectPool<QueryPoolResult> query;
 	VulkanObjectPool<CommandBuffer> command_buffers;
 };
 
@@ -73,8 +71,6 @@ class Device
 public:
 	// Device-based objects which need to poke at internal data structures when their lifetimes end.
 	// Don't want to expose a lot of internal guts to make this work.
-	friend class QueryPool;
-	friend struct QueryPoolResultDeleter;
 	friend class SemaphoreHolder;
 	friend struct SemaphoreHolderDeleter;
 	friend class FenceHolder;
@@ -241,7 +237,6 @@ private:
 		std::vector<CommandPool> graphics_cmd_pool;
 		std::vector<CommandPool> compute_cmd_pool;
 		std::vector<CommandPool> transfer_cmd_pool;
-		QueryPool query_pool;
 
 		std::vector<BufferBlock> vbo_blocks;
 		std::vector<BufferBlock> ibo_blocks;
