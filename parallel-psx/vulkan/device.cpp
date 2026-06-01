@@ -1659,15 +1659,12 @@ public:
 	VkImageView image_view = VK_NULL_HANDLE;
 	VkImageView depth_view = VK_NULL_HANDLE;
 	VkImageView stencil_view = VK_NULL_HANDLE;
-	VkImageView unorm_view = VK_NULL_HANDLE;
-	VkImageView srgb_view = VK_NULL_HANDLE;
 	std::vector<VkImageView> rt_views;
 	DeviceAllocation allocation;
 	DeviceAllocator *allocator = nullptr;
 	bool owned = true;
 
-	bool create_default_views(const ImageCreateInfo &create_info, const VkImageViewCreateInfo *view_info,
-	                          bool create_unorm_srgb_views = false, const VkFormat *view_formats = nullptr)
+	bool create_default_views(const ImageCreateInfo &create_info, const VkImageViewCreateInfo *view_info)
 	{
 		if ((create_info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 		                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) == 0)
@@ -1699,19 +1696,6 @@ public:
 
 		if (!create_default_view(*view_info))
 			return false;
-
-		if (create_unorm_srgb_views)
-		{
-			VkImageViewCreateInfo info = *view_info;
-
-			info.format = view_formats[0];
-			if (vkCreateImageView(device, &info, nullptr, &unorm_view) != VK_SUCCESS)
-				return false;
-
-			info.format = view_formats[1];
-			if (vkCreateImageView(device, &info, nullptr, &srgb_view) != VK_SUCCESS)
-				return false;
-		}
 
 		return true;
 	}
@@ -1808,10 +1792,6 @@ private:
 			vkDestroyImageView(device, depth_view, nullptr);
 		if (stencil_view)
 			vkDestroyImageView(device, stencil_view, nullptr);
-		if (unorm_view)
-			vkDestroyImageView(device, unorm_view, nullptr);
-		if (srgb_view)
-			vkDestroyImageView(device, srgb_view, nullptr);
 		for (VkImageView &view : rt_views)
 			vkDestroyImageView(device, view, nullptr);
 
@@ -1947,33 +1927,6 @@ InitialImageBuffer Device::create_image_staging_buffer(const ImageCreateInfo &in
 	return result;
 }
 
-static bool fill_image_format_list(VkFormat *formats, VkFormat format)
-{
-	switch (format)
-	{
-	case VK_FORMAT_R8G8B8A8_UNORM:
-	case VK_FORMAT_R8G8B8A8_SRGB:
-		formats[0] = VK_FORMAT_R8G8B8A8_UNORM;
-		formats[1] = VK_FORMAT_R8G8B8A8_SRGB;
-		return true;
-
-	case VK_FORMAT_B8G8R8A8_UNORM:
-	case VK_FORMAT_B8G8R8A8_SRGB:
-		formats[0] = VK_FORMAT_B8G8R8A8_UNORM;
-		formats[1] = VK_FORMAT_B8G8R8A8_SRGB;
-		return true;
-
-	case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
-	case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
-		formats[0] = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-		formats[1] = VK_FORMAT_A8B8G8R8_SRGB_PACK32;
-		return true;
-
-	default:
-		return false;
-	}
-}
-
 ImageHandle Device::create_image(const ImageCreateInfo &create_info, const ImageInitialData *initial)
 {
 	if (initial)
@@ -2016,27 +1969,8 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 	if (info.mipLevels == 0)
 		info.mipLevels = image_num_miplevels(info.extent);
 
-	VkImageFormatListCreateInfoKHR format_info = { VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO_KHR };
-	VkFormat view_formats[2];
-	format_info.pViewFormats = view_formats;
-	format_info.viewFormatCount = 2;
-	bool create_unorm_srgb_views = false;
-
-	if (create_info.misc & IMAGE_MISC_MUTABLE_SRGB_BIT)
-	{
-		if (fill_image_format_list(view_formats, info.format))
-		{
-			create_unorm_srgb_views = true;
-			if (ext.supports_image_format_list)
-				info.pNext = &format_info;
-		}
-	}
-
-	if ((create_info.usage & VK_IMAGE_USAGE_STORAGE_BIT) ||
-	    (create_info.misc & IMAGE_MISC_MUTABLE_SRGB_BIT))
-	{
+	if (create_info.usage & VK_IMAGE_USAGE_STORAGE_BIT)
 		info.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
-	}
 
 	// Only do this conditionally.
 	// On AMD, using CONCURRENT with async compute disables compression.
@@ -2148,7 +2082,7 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 	                               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) != 0;
 	if (has_view)
 	{
-		if (!holder.create_default_views(tmpinfo, nullptr, create_unorm_srgb_views, view_formats))
+		if (!holder.create_default_views(tmpinfo, nullptr))
 			return ImageHandle(nullptr);
 	}
 
@@ -2160,8 +2094,6 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 		{
 			handle->get_view().set_alt_views(holder.depth_view, holder.stencil_view);
 			handle->get_view().set_render_target_views(std::move(holder.rt_views));
-			handle->get_view().set_unorm_view(holder.unorm_view);
-			handle->get_view().set_srgb_view(holder.srgb_view);
 		}
 
 		// Set possible dstStage and dstAccess.

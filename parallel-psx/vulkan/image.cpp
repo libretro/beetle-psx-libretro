@@ -61,10 +61,6 @@ ImageView::~ImageView()
 			device->destroy_image_view_nolock(depth_view);
 		if (stencil_view != VK_NULL_HANDLE)
 			device->destroy_image_view_nolock(stencil_view);
-		if (unorm_view != VK_NULL_HANDLE)
-			device->destroy_image_view_nolock(unorm_view);
-		if (srgb_view != VK_NULL_HANDLE)
-			device->destroy_image_view_nolock(srgb_view);
 
 		for (VkImageView &view : render_target_views)
 			device->destroy_image_view_nolock(view);
@@ -76,10 +72,6 @@ ImageView::~ImageView()
 			device->destroy_image_view(depth_view);
 		if (stencil_view != VK_NULL_HANDLE)
 			device->destroy_image_view(stencil_view);
-		if (unorm_view != VK_NULL_HANDLE)
-			device->destroy_image_view(unorm_view);
-		if (srgb_view != VK_NULL_HANDLE)
-			device->destroy_image_view(srgb_view);
 
 		for (VkImageView &view : render_target_views)
 			device->destroy_image_view(view);
