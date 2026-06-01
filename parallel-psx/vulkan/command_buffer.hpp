@@ -52,11 +52,9 @@ enum CommandBufferDirtyBits
 using CommandBufferDirtyFlags = uint32_t;
 
 #define COMPARE_OP_BITS 3
-#define STENCIL_OP_BITS 3
 #define BLEND_FACTOR_BITS 5
 #define BLEND_OP_BITS 3
 #define CULL_MODE_BITS 2
-#define FRONT_FACE_BITS 1
 union PipelineState {
 	struct State
 	{
@@ -66,20 +64,8 @@ union PipelineState {
 		unsigned blend_enable : 1;
 
 		unsigned cull_mode : CULL_MODE_BITS;
-		unsigned front_face : FRONT_FACE_BITS;
-		unsigned depth_bias_enable : 1;
 
 		unsigned depth_compare : COMPARE_OP_BITS;
-
-		unsigned stencil_test : 1;
-		unsigned stencil_front_fail : STENCIL_OP_BITS;
-		unsigned stencil_front_pass : STENCIL_OP_BITS;
-		unsigned stencil_front_depth_fail : STENCIL_OP_BITS;
-		unsigned stencil_front_compare_op : COMPARE_OP_BITS;
-		unsigned stencil_back_fail : STENCIL_OP_BITS;
-		unsigned stencil_back_pass : STENCIL_OP_BITS;
-		unsigned stencil_back_depth_fail : STENCIL_OP_BITS;
-		unsigned stencil_back_compare_op : COMPARE_OP_BITS;
 
 		unsigned alpha_to_coverage : 1;
 		unsigned alpha_to_one : 1;
@@ -91,13 +77,9 @@ union PipelineState {
 		unsigned src_alpha_blend : BLEND_FACTOR_BITS;
 		unsigned dst_alpha_blend : BLEND_FACTOR_BITS;
 		unsigned alpha_blend_op : BLEND_OP_BITS;
-		unsigned primitive_restart : 1;
 		unsigned topology : 4;
 
-		unsigned wireframe : 1;
 		unsigned spec_constant_mask : 8;
-
-		uint32_t write_mask;
 	} state;
 	uint32_t words[4];
 };
@@ -106,18 +88,6 @@ struct PotentialState
 {
 	float blend_constants[4];
 	uint32_t spec_constants[VULKAN_NUM_SPEC_CONSTANTS];
-};
-
-struct DynamicState
-{
-	float depth_bias_constant = 0.0f;
-	float depth_bias_slope = 0.0f;
-	uint8_t front_compare_mask = 0;
-	uint8_t front_write_mask = 0;
-	uint8_t front_reference = 0;
-	uint8_t back_compare_mask = 0;
-	uint8_t back_write_mask = 0;
-	uint8_t back_reference = 0;
 };
 
 struct VertexAttribState
@@ -478,7 +448,6 @@ private:
 
 	PipelineState static_state;
 	PotentialState potential_static_state = {};
-	DynamicState dynamic_state = {};
 #ifndef _MSC_VER
 	static_assert(sizeof(static_state.words) >= sizeof(static_state.state),
 	              "Hashable pipeline state is not large enough!");
