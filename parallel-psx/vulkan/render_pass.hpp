@@ -101,11 +101,6 @@ public:
 	RenderPass(Util::Hash hash, Device *device, const RenderPassInfo &info);
 	~RenderPass();
 
-	unsigned get_num_subpasses() const
-	{
-		return unsigned(subpasses.size());
-	}
-
 	VkRenderPass get_render_pass() const
 	{
 		return render_pass;

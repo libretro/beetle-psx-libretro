@@ -2057,7 +2057,7 @@ SamplerHandle Device::create_sampler(const SamplerCreateInfo &sampler_info, Stoc
 	if (vkCreateSampler(device, &info, nullptr, &sampler) != VK_SUCCESS)
 		return SamplerHandle(nullptr);
 
-	return SamplerHandle(handle_pool.samplers.allocate(this, sampler, sampler_info));
+	return SamplerHandle(handle_pool.samplers.allocate(this, sampler));
 }
 
 BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const void *initial)

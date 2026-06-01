@@ -153,11 +153,6 @@ public:
 		return view;
 	}
 
-	const BufferViewCreateInfo &get_create_info()
-	{
-		return info;
-	}
-
 	const Buffer &get_buffer() const
 	{
 		return *info.buffer;

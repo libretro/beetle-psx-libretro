@@ -79,18 +79,12 @@ public:
 		return sampler;
 	}
 
-	const SamplerCreateInfo &get_create_info() const
-	{
-		return create_info;
-	}
-
 private:
 	friend class Util::ObjectPool<Sampler>;
-	Sampler(Device *device, VkSampler sampler, const SamplerCreateInfo &info);
+	Sampler(Device *device, VkSampler sampler);
 
 	Device *device;
 	VkSampler sampler;
-	SamplerCreateInfo create_info;
 };
 using SamplerHandle = Util::IntrusivePtr<Sampler>;
 }
