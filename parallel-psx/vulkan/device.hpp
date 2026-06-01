@@ -359,8 +359,6 @@ private:
 	void wait_idle_nolock();
 	void end_frame_nolock();
 
-	Fence request_fence();
-
 	ImplementationWorkarounds workarounds;
 	void init_workarounds();
 };

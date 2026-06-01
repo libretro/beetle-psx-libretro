@@ -44,11 +44,6 @@ public:
 
 	~SemaphoreHolder();
 
-	const VkSemaphore &get_semaphore() const
-	{
-		return semaphore;
-	}
-
 	bool is_signalled() const
 	{
 		return signalled;

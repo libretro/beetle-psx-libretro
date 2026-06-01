@@ -28,24 +28,6 @@
  * switch statements; they have no C++ dependencies and could be lowered to C
  * verbatim after a future namespace-removal pass. The TextureFormatLayout-
  * dependent helpers below are kept separate and remain C++-only. */
-static inline bool format_is_srgb(VkFormat format)
-{
-	switch (format)
-	{
-	case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
-	case VK_FORMAT_R8G8B8A8_SRGB:
-	case VK_FORMAT_B8G8R8A8_SRGB:
-	case VK_FORMAT_R8_SRGB:
-	case VK_FORMAT_R8G8_SRGB:
-	case VK_FORMAT_R8G8B8_SRGB:
-	case VK_FORMAT_B8G8R8_SRGB:
-		return true;
-
-	default:
-		return false;
-	}
-}
-
 static inline bool format_has_depth_aspect(VkFormat format)
 {
 	switch (format)
@@ -113,29 +95,10 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
  * the layout machinery and would need a separate C-friendly accessor. */
 #include "texture_format.hpp"
 
-static inline void format_align_dim(VkFormat format, uint32_t *width, uint32_t *height)
-{
-	uint32_t align_width, align_height;
-	Vulkan::TextureFormatLayout::format_block_dim(format, align_width, align_height);
-	*width = ((*width + align_width - 1) / align_width) * align_width;
-	*height = ((*height + align_height - 1) / align_height) * align_height;
-}
-
 static inline void format_num_blocks(VkFormat format, uint32_t *width, uint32_t *height)
 {
 	uint32_t align_width, align_height;
 	Vulkan::TextureFormatLayout::format_block_dim(format, align_width, align_height);
 	*width = (*width + align_width - 1) / align_width;
 	*height = (*height + align_height - 1) / align_height;
-}
-
-static inline VkDeviceSize format_get_layer_size(VkFormat format, unsigned width, unsigned height, unsigned depth)
-{
-	uint32_t blocks_x = width;
-	uint32_t blocks_y = height;
-	format_num_blocks(format, &blocks_x, &blocks_y);
-	format_align_dim(format, &width, &height);
-
-	VkDeviceSize size = Vulkan::TextureFormatLayout::format_block_size(format) * depth * blocks_x * blocks_y;
-	return size;
 }

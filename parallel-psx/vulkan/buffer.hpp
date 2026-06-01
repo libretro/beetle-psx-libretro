@@ -112,11 +112,6 @@ public:
 		return info;
 	}
 
-	DeviceAllocation &get_allocation()
-	{
-		return alloc;
-	}
-
 	const DeviceAllocation &get_allocation() const
 	{
 		return alloc;
