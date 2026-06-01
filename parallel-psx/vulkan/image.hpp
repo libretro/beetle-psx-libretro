@@ -448,11 +448,6 @@ public:
 		return swapchain_layout;
 	}
 
-	void set_swapchain_layout(VkImageLayout layout)
-	{
-		swapchain_layout = layout;
-	}
-
 	void set_stage_flags(VkPipelineStageFlags flags)
 	{
 		stage_flags = flags;

@@ -1065,27 +1065,6 @@ CommandBufferHandle Device::request_secondary_command_buffer_for_thread(unsigned
 	return handle;
 }
 
-void Device::set_acquire_semaphore(unsigned index, Semaphore acquire)
-{
-	wsi.acquire = std::move(acquire);
-	wsi.index = index;
-	wsi.touched = false;
-	wsi.consumed = false;
-
-	if (wsi.acquire)
-	{
-		wsi.acquire->set_internal_sync_object();
-		VK_ASSERT(wsi.acquire->is_signalled());
-	}
-}
-
-Semaphore Device::consume_release_semaphore()
-{
-	Semaphore ret = std::move(wsi.release);
-	wsi.release.reset();
-	return ret;
-}
-
 const Sampler &Device::get_stock_sampler(StockSampler sampler) const
 {
 	return *samplers[static_cast<unsigned>(sampler)];
@@ -1362,18 +1341,6 @@ QueryPoolHandle Device::write_timestamp(VkCommandBuffer cmd, VkPipelineStageFlag
 {
 	LOCK();
 	return frame().query_pool.write_timestamp(cmd, stage);
-}
-
-void Device::add_frame_counter()
-{
-	LOCK();
-	add_frame_counter_nolock();
-}
-
-void Device::decrement_frame_counter()
-{
-	LOCK();
-	decrement_frame_counter_nolock();
 }
 
 void Device::add_frame_counter_nolock()
@@ -2458,28 +2425,5 @@ void Device::set_name(const Image &image, const char *name)
 		vkDebugMarkerSetObjectNameEXT(device, &info);
 	}
 }
-
-void Device::set_name(const CommandBuffer &cmd, const char *name)
-{
-	if (ext.supports_debug_utils)
-	{
-		VkDebugUtilsObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT };
-		info.objectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
-		info.objectHandle = (uint64_t)cmd.get_command_buffer();
-		info.pObjectName = name;
-		if (vkSetDebugUtilsObjectNameEXT)
-			vkSetDebugUtilsObjectNameEXT(device, &info);
-	}
-	else if (ext.supports_debug_marker)
-	{
-		VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
-		info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT;
-		info.object = (uint64_t)cmd.get_command_buffer();
-		info.pObjectName = name;
-		vkDebugMarkerSetObjectNameEXT(device, &info);
-	}
-}
-
-
 
 }

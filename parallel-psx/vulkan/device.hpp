@@ -115,7 +115,6 @@ public:
 	// Set names for objects for debuggers and profilers.
 	void set_name(const Buffer &buffer, const char *name);
 	void set_name(const Image &image, const char *name);
-	void set_name(const CommandBuffer &cmd, const char *name);
 
 	// Submission interface, may be called from any thread at any time.
 	void flush_frame();
@@ -164,11 +163,6 @@ public:
 		return device;
 	}
 
-	const VkPhysicalDeviceMemoryProperties &get_memory_properties() const
-	{
-		return mem_props;
-	}
-
 	const VkPhysicalDeviceProperties &get_gpu_properties() const
 	{
 		return gpu_props;
@@ -207,9 +201,6 @@ private:
 
 	QueryPoolHandle write_timestamp(VkCommandBuffer cmd, VkPipelineStageFlagBits stage);
 
-	void set_acquire_semaphore(unsigned index, Semaphore acquire);
-	Semaphore consume_release_semaphore();
-
 	PipelineLayout *request_pipeline_layout(const CombinedResourceLayout &layout);
 	DescriptorSetAllocator *request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_sets);
 	const Framebuffer &request_framebuffer(const RenderPassInfo &info);
@@ -237,8 +228,6 @@ private:
 	{
 		unsigned counter = 0;
 	} lock;
-	void add_frame_counter();
-	void decrement_frame_counter();
 
 	struct PerFrame
 	{
