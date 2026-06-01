@@ -5250,9 +5250,17 @@ private:
 	void flush_graphics_pipeline();
 	void flush_compute_pipeline();
 	void flush_descriptor_sets();
-	void begin_graphics();
+	void begin_graphics()
+	{
+		is_compute = false;
+		begin_context();
+	}
 	void flush_descriptor_set(uint32_t set);
-	void begin_compute();
+	void begin_compute()
+	{
+		is_compute = true;
+		begin_context();
+	}
 	void begin_context();
 
 	void flush_compute_state();
@@ -5303,6 +5311,13 @@ struct HandlePool
 	VulkanObjectPool<CommandBuffer> command_buffers;
 };
 
+/* Thread-locking primitives used by the Device implementation
+ * below. Defined here (instead of just before device.cpp's
+ * out-of-line bodies further down the TU) so the Device class
+ * declaration's inline methods can use them too. */
+#define LOCK() ((void)0)
+#define DRAIN_FRAME_LOCK() VK_ASSERT(lock.counter == 0)
+
 class Device
 {
 public:
@@ -5343,14 +5358,22 @@ public:
 
 	// Frame-pushing interface.
 	void next_frame_context();
-	void wait_idle();
+	void wait_idle()
+	{
+		DRAIN_FRAME_LOCK();
+		wait_idle_nolock();
+	}
 
 	// Set names for objects for debuggers and profilers.
 	void set_name(const Buffer &buffer, const char *name);
 	void set_name(const Image &image, const char *name);
 
 	// Submission interface, may be called from any thread at any time.
-	void flush_frame();
+	void flush_frame()
+	{
+		LOCK();
+		flush_frame_nolock();
+	}
 	CommandBufferHandle request_command_buffer(CommandBuffer::Type type = CommandBuffer::Type::Generic);
 	void submit(CommandBufferHandle &cmd, Fence *fence = nullptr,
 	            unsigned semaphore_count = 0, Semaphore *semaphore = nullptr);
@@ -5388,7 +5411,10 @@ public:
 
 	VkFormat get_default_depth_format() const;
 	ImageView &get_transient_attachment(unsigned width, unsigned height, VkFormat format,
-	                                    unsigned index = 0, unsigned samples = 1, unsigned layers = 1);
+	                                    unsigned index = 0, unsigned samples = 1, unsigned layers = 1)
+	{
+		return transient_allocator.request_attachment(width, height, format, index, samples, layers);
+	}
 
 	VkDevice get_device()
 	{
@@ -5400,7 +5426,10 @@ public:
 		return gpu_props;
 	}
 
-	const Sampler &get_stock_sampler(StockSampler sampler) const;
+	const Sampler &get_stock_sampler(StockSampler sampler) const
+	{
+		return *samplers[static_cast<unsigned>(sampler)];
+	}
 
 
 	const ImplementationWorkarounds &get_workarounds() const
@@ -5426,12 +5455,23 @@ private:
 	uint64_t allocate_cookie();
 	void bake_program(Program &program);
 
-	void request_vertex_block(BufferBlock &block, VkDeviceSize size);
-	void request_uniform_block(BufferBlock &block, VkDeviceSize size);
+	void request_vertex_block(BufferBlock &block, VkDeviceSize size)
+	{
+		LOCK();
+		request_vertex_block_nolock(block, size);
+	}
+	void request_uniform_block(BufferBlock &block, VkDeviceSize size)
+	{
+		LOCK();
+		request_uniform_block_nolock(block, size);
+	}
 
 	PipelineLayout *request_pipeline_layout(const CombinedResourceLayout &layout);
 	DescriptorSetAllocator *request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_sets);
-	const Framebuffer &request_framebuffer(const RenderPassInfo &info);
+	const Framebuffer &request_framebuffer(const RenderPassInfo &info)
+	{
+		return framebuffer_allocator.request_framebuffer(info);
+	}
 	const RenderPass &request_render_pass(const RenderPassInfo &info, bool compatible);
 
 	VkPhysicalDeviceMemoryProperties mem_props;
@@ -5534,7 +5574,10 @@ private:
 
 	uint32_t find_memory_type(BufferDomain domain, uint32_t mask);
 	uint32_t find_memory_type(ImageDomain domain, uint32_t mask);
-	bool memory_type_is_host_visible(uint32_t type) const;
+	bool memory_type_is_host_visible(uint32_t type) const
+	{
+		return (mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
+	}
 
 	SamplerHandle samplers[static_cast<unsigned>(StockSampler::Count)];
 
@@ -5555,7 +5598,12 @@ private:
 	void clear_wait_semaphores();
 	void submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
 
-	void flush_frame(CommandBuffer::Type type);
+	void flush_frame(CommandBuffer::Type type)
+	{
+		if (type == CommandBuffer::Type::AsyncTransfer)
+			sync_buffer_blocks();
+		submit_queue(type, nullptr, 0, nullptr);
+	}
 	void sync_buffer_blocks();
 	void submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 	                        unsigned semaphore_count,
@@ -5571,7 +5619,10 @@ private:
 	void destroy_sampler_nolock(VkSampler sampler);
 	void destroy_framebuffer_nolock(VkFramebuffer framebuffer);
 	void destroy_semaphore_nolock(VkSemaphore semaphore);
-	void recycle_semaphore_nolock(VkSemaphore semaphore);
+	void recycle_semaphore_nolock(VkSemaphore semaphore)
+	{
+		managers.semaphore.recycle(semaphore);
+	}
 	void free_memory_nolock(const DeviceAllocation &alloc);
 
 	void flush_frame_nolock();
@@ -11660,8 +11711,6 @@ private:
 };
 }
 
-#define LOCK() ((void)0)
-
 namespace Vulkan
 {
 static VkAttachmentLoadOp rp_color_load_op(const RenderPassInfo &info, unsigned index)
@@ -12840,18 +12889,6 @@ void CommandBuffer::begin_context()
 	memset(bindings.cookies, 0, sizeof(bindings.cookies));
 	memset(bindings.secondary_cookies, 0, sizeof(bindings.secondary_cookies));
 	memset(vbo.buffers, 0, sizeof(vbo.buffers));
-}
-
-void CommandBuffer::begin_compute()
-{
-	is_compute = true;
-	begin_context();
-}
-
-void CommandBuffer::begin_graphics()
-{
-	is_compute = false;
-	begin_context();
 }
 
 void CommandBuffer::init_viewport_scissor(const RenderPassInfo &info, const Framebuffer *framebuffer)
@@ -14287,9 +14324,6 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 /* === device.cpp === */
 
 
-#define LOCK() ((void)0)
-#define DRAIN_FRAME_LOCK() VK_ASSERT(lock.counter == 0)
-
 using namespace Util;
 
 namespace Vulkan
@@ -14660,21 +14694,9 @@ static void request_block(Device &device, BufferBlock &block, VkDeviceSize size,
 		block = {};
 }
 
-void Device::request_vertex_block(BufferBlock &block, VkDeviceSize size)
-{
-	LOCK();
-	request_vertex_block_nolock(block, size);
-}
-
 void Device::request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size)
 {
 	request_block(*this, block, size, managers.vbo, &dma.vbo, frame().vbo_blocks);
-}
-
-void Device::request_uniform_block(BufferBlock &block, VkDeviceSize size)
-{
-	LOCK();
-	request_uniform_block_nolock(block, size);
 }
 
 void Device::request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size)
@@ -14993,13 +15015,6 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 		data.need_fence = true;
 }
 
-void Device::flush_frame(CommandBuffer::Type type)
-{
-	if (type == CommandBuffer::Type::AsyncTransfer)
-		sync_buffer_blocks();
-	submit_queue(type, nullptr, 0, nullptr);
-}
-
 void Device::sync_buffer_blocks()
 {
 	if (dma.vbo.empty() && dma.ubo.empty())
@@ -15060,12 +15075,6 @@ void Device::end_frame_nolock()
 		frame().recycle_fences.push_back(fence);
 		compute.need_fence = false;
 	}
-}
-
-void Device::flush_frame()
-{
-	LOCK();
-	flush_frame_nolock();
 }
 
 void Device::flush_frame_nolock()
@@ -15133,11 +15142,6 @@ CommandBufferHandle Device::request_command_buffer_nolock(CommandBuffer::Type ty
 	add_frame_counter_nolock();
 	CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, type));
 	return handle;
-}
-
-const Sampler &Device::get_stock_sampler(StockSampler sampler) const
-{
-	return *samplers[static_cast<unsigned>(sampler)];
 }
 
 Device::~Device()
@@ -15221,11 +15225,6 @@ void Device::destroy_semaphore_nolock(VkSemaphore semaphore)
 	frame().destroyed_semaphores.push_back(semaphore);
 }
 
-void Device::recycle_semaphore_nolock(VkSemaphore semaphore)
-{
-	managers.semaphore.recycle(semaphore);
-}
-
 void Device::destroy_image_nolock(VkImage image)
 {
 	VK_ASSERT(!exists(frame().destroyed_images, image));
@@ -15265,12 +15264,6 @@ void Device::clear_wait_semaphores()
 	compute.wait_stages.clear();
 	transfer.wait_semaphores.clear();
 	transfer.wait_stages.clear();
-}
-
-void Device::wait_idle()
-{
-	DRAIN_FRAME_LOCK();
-	wait_idle_nolock();
 }
 
 void Device::wait_idle_nolock()
@@ -16213,11 +16206,6 @@ BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const vo
 	return handle;
 }
 
-bool Device::memory_type_is_host_visible(uint32_t type) const
-{
-	return (mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
-}
-
 bool Device::get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling,
                                          VkImageUsageFlags usage, VkImageCreateFlags flags,
                                          VkImageFormatProperties *properties)
@@ -16319,17 +16307,6 @@ const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool c
 	if (!ret)
 		ret = render_passes.emplace_yield(hash, hash, this, info);
 	return *ret;
-}
-
-const Framebuffer &Device::request_framebuffer(const RenderPassInfo &info)
-{
-	return framebuffer_allocator.request_framebuffer(info);
-}
-
-ImageView &Device::get_transient_attachment(unsigned width, unsigned height, VkFormat format,
-                                            unsigned index, unsigned samples, unsigned layers)
-{
-	return transient_allocator.request_attachment(width, height, format, index, samples, layers);
 }
 
 void Device::set_name(const Buffer &buffer, const char *name)
@@ -17419,10 +17396,10 @@ TextureTracker::TextureTracker()
     }
 }
 
-SRect toSRect(Rect rect) {
+static inline SRect toSRect(Rect rect) {
     return SRect(rect.x, rect.y, rect.width, rect.height);
 }
-Rect fromSRect(SRect rect) {
+static inline Rect fromSRect(SRect rect) {
     return Rect(rect.x, rect.y, rect.width, rect.height);
 }
 
@@ -17871,7 +17848,7 @@ HdTexture TextureTracker::get_hd_texture(HdTextureHandle handle) {
     }
 }
 
-bool is_power_of_two(int n) {
+static inline bool is_power_of_two(int n) {
     // https://stackoverflow.com/questions/108318/whats-the-simplest-way-to-test-whether-a-number-is-a-power-of-2-in-c
     return n != 0 && (n & (n - 1)) == 0;
 }
@@ -18232,7 +18209,7 @@ std::shared_ptr<TextureUpload> RectTracker::find_upload(uint32_t hash) {
     return nullptr;
 }
 
-int clamp(int x, int low, int high) {
+static inline int clamp(int x, int low, int high) {
     if (x < low)  x = low;
     if (x > high) x = high;
     return x;
