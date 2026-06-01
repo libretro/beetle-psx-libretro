@@ -60,16 +60,6 @@ CommandBuffer::~CommandBuffer()
 	VK_ASSERT(staging_block.mapped == nullptr);
 }
 
-void CommandBuffer::fill_buffer(const Buffer &dst, uint32_t value)
-{
-	fill_buffer(dst, value, 0, VK_WHOLE_SIZE);
-}
-
-void CommandBuffer::fill_buffer(const Buffer &dst, uint32_t value, VkDeviceSize offset, VkDeviceSize size)
-{
-	vkCmdFillBuffer(cmd, dst.get_buffer(), offset, size, value);
-}
-
 void CommandBuffer::copy_buffer(const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
                                 VkDeviceSize size)
 {

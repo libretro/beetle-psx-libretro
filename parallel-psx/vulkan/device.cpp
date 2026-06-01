@@ -2206,13 +2206,6 @@ BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const vo
 	VkMemoryRequirements reqs;
 	DeviceAllocation allocation;
 
-	bool zero_initialize = (create_info.misc & BUFFER_MISC_ZERO_INITIALIZE_BIT) != 0;
-	if (initial && zero_initialize)
-	{
-		LOGE("Cannot initialize buffer with data and clear.\n");
-		return BufferHandle{};
-	}
-
 	VkBufferCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
 	info.size = create_info.size;
 	info.usage = create_info.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -2269,42 +2262,29 @@ BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const vo
 	tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	BufferHandle handle(handle_pool.buffers.allocate(this, buffer, allocation, tmpinfo));
 
-	if (create_info.domain == BufferDomain::Device && (initial || zero_initialize) && !memory_type_is_host_visible(memory_type))
+	if (create_info.domain == BufferDomain::Device && initial && !memory_type_is_host_visible(memory_type))
 	{
 		CommandBufferHandle cmd;
-		if (initial)
-		{
-			BufferCreateInfo staging_info = create_info;
-			staging_info.domain = BufferDomain::Host;
-			BufferHandle staging_buffer = create_buffer(staging_info, initial);
-			set_name(*staging_buffer, "buffer-upload-staging-buffer");
+		BufferCreateInfo staging_info = create_info;
+		staging_info.domain = BufferDomain::Host;
+		BufferHandle staging_buffer = create_buffer(staging_info, initial);
+		set_name(*staging_buffer, "buffer-upload-staging-buffer");
 
-			cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
-			cmd->begin_region("copy-buffer-staging");
-			cmd->copy_buffer(*handle, *staging_buffer);
-			cmd->end_region();
-		}
-		else
-		{
-			cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
-			cmd->begin_region("fill-buffer-staging");
-			cmd->fill_buffer(*handle, 0);
-			cmd->end_region();
-		}
+		cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
+		cmd->begin_region("copy-buffer-staging");
+		cmd->copy_buffer(*handle, *staging_buffer);
+		cmd->end_region();
 
 		LOCK();
 		submit_staging(cmd, info.usage, true);
 	}
-	else if (initial || zero_initialize)
+	else if (initial)
 	{
 		void *ptr = managers.memory.map_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
 		if (!ptr)
 			return BufferHandle(nullptr);
 
-		if (initial)
-			memcpy(ptr, initial, create_info.size);
-		else
-			memset(ptr, 0, create_info.size);
+		memcpy(ptr, initial, create_info.size);
 		managers.memory.unmap_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
 	}
 	return handle;
