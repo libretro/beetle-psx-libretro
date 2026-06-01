@@ -244,12 +244,8 @@ endif
       SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
                      $(CORE_DIR)/rsx/rsx_lib_vulkan.cpp
 
-      SOURCES_C += $(wildcard $(CORE_DIR)/parallel-psx/volk/*.c)
-
       EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/SPIRV-Cross \
-                        -I$(CORE_DIR)/parallel-psx/khronos/include \
-                        -I$(CORE_DIR)/parallel-psx/volk \
-                        -I$(CORE_DIR)/parallel-psx/glsl/prebuilt
+                        -I$(CORE_DIR)/parallel-psx/khronos/include
 
       CXXFLAGS += -std=c++11 -DHAVE_LIBRETRO
       ifneq ($(VULKAN_DEBUG),)
