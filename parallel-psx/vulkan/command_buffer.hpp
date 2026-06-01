@@ -241,12 +241,6 @@ public:
 
 	void *allocate_vertex_data(unsigned binding, VkDeviceSize size, VkDeviceSize stride,
 	                           VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
-	void *allocate_index_data(VkDeviceSize size, VkIndexType index_type);
-
-	void *update_buffer(const Buffer &buffer, VkDeviceSize offset, VkDeviceSize size);
-	void *update_image(const Image &image, const VkOffset3D &offset, const VkExtent3D &extent, uint32_t row_length,
-	                   uint32_t image_height, const VkImageSubresourceLayers &subresource);
-	void *update_image(const Image &image, uint32_t row_length = 0, uint32_t image_height = 0);
 
 	void set_viewport(const VkViewport &viewport);
 	const VkViewport &get_viewport() const;
