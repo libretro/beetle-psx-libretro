@@ -169,16 +169,6 @@ public:
 		return *device;
 	}
 
-	void set_thread_index(unsigned index)
-	{
-		thread_index = index;
-	}
-
-	unsigned get_thread_index() const
-	{
-		return thread_index;
-	}
-
 	void clear_image(const Image &image, const VkClearValue &value);
 	void clear_quad(unsigned attachment, const VkClearRect &rect, const VkClearValue &value,
 	                VkImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT);
@@ -423,7 +413,6 @@ private:
 	Program *current_program = nullptr;
 	unsigned current_subpass = 0;
 	VkSubpassContents current_contents = VK_SUBPASS_CONTENTS_INLINE;
-	unsigned thread_index = 0;
 
 	VkViewport viewport = {};
 	VkRect2D scissor = {};

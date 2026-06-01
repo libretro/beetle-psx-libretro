@@ -30,10 +30,6 @@
 
 #define LOCK() ((void)0)
 #define DRAIN_FRAME_LOCK() VK_ASSERT(lock.counter == 0)
-static inline unsigned get_current_thread_index()
-{
-	return 0;
-}
 
 using namespace Util;
 
@@ -508,7 +504,7 @@ CommandBuffer::Type Device::get_physical_queue_type(CommandBuffer::Type queue_ty
 void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 {
 	CommandBuffer::Type type = cmd->get_command_buffer_type();
-	CommandPool &pool = get_command_pool(type, cmd->get_thread_index());
+	CommandPool &pool = get_command_pool(type);
 	std::vector<CommandBufferHandle> &submissions = get_queue_submissions(type);
 
 	pool.signal_submitted(cmd->get_command_buffer());
@@ -815,7 +811,7 @@ void Device::sync_buffer_blocks()
 
 	VkBufferUsageFlags usage = 0;
 
-	CommandBufferHandle cmd = request_command_buffer_nolock(get_current_thread_index(), CommandBuffer::Type::AsyncTransfer);
+	CommandBufferHandle cmd = request_command_buffer_nolock(CommandBuffer::Type::AsyncTransfer);
 
 	cmd->begin_region("buffer-block-sync");
 
@@ -913,17 +909,17 @@ Device::QueueData &Device::get_queue_data(CommandBuffer::Type type)
 	}
 }
 
-CommandPool &Device::get_command_pool(CommandBuffer::Type type, unsigned thread)
+CommandPool &Device::get_command_pool(CommandBuffer::Type type)
 {
 	switch (get_physical_queue_type(type))
 	{
 	default:
 	case CommandBuffer::Type::Generic:
-		return frame().graphics_cmd_pool[thread];
+		return frame().graphics_cmd_pool[0];
 	case CommandBuffer::Type::AsyncCompute:
-		return frame().compute_cmd_pool[thread];
+		return frame().compute_cmd_pool[0];
 	case CommandBuffer::Type::AsyncTransfer:
-		return frame().transfer_cmd_pool[thread];
+		return frame().transfer_cmd_pool[0];
 	}
 }
 
@@ -943,26 +939,19 @@ std::vector<CommandBufferHandle> &Device::get_queue_submissions(CommandBuffer::T
 
 CommandBufferHandle Device::request_command_buffer(CommandBuffer::Type type)
 {
-	return request_command_buffer_for_thread(get_current_thread_index(), type);
-}
-
-CommandBufferHandle Device::request_command_buffer_for_thread(unsigned thread_index, CommandBuffer::Type type)
-{
 	LOCK();
-	return request_command_buffer_nolock(thread_index, type);
+	return request_command_buffer_nolock(type);
 }
 
-CommandBufferHandle Device::request_command_buffer_nolock(unsigned thread_index, CommandBuffer::Type type)
+CommandBufferHandle Device::request_command_buffer_nolock(CommandBuffer::Type type)
 {
-	VK_ASSERT(thread_index == 0);
-	VkCommandBuffer cmd = get_command_pool(type, thread_index).request_command_buffer();
+	VkCommandBuffer cmd = get_command_pool(type).request_command_buffer();
 
 	VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	vkBeginCommandBuffer(cmd, &info);
 	add_frame_counter_nolock();
 	CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, pipeline_cache, type));
-	handle->set_thread_index(thread_index);
 	return handle;
 }
 

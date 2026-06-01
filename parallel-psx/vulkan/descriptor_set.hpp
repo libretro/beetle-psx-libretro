@@ -81,7 +81,7 @@ public:
 	DescriptorSetAllocator(const DescriptorSetAllocator &) = delete;
 
 	void begin_frame();
-	std::pair<VkDescriptorSet, bool> find(unsigned thread_index, Util::Hash hash);
+	std::pair<VkDescriptorSet, bool> find(Util::Hash hash);
 
 	VkDescriptorSetLayout get_layout() const
 	{

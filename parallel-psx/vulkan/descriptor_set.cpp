@@ -130,9 +130,9 @@ void DescriptorSetAllocator::begin_frame()
 		thr->should_begin = true;
 }
 
-std::pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(unsigned thread_index, Hash hash)
+std::pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(Hash hash)
 {
-	PerThread &state = *per_thread[thread_index];
+	PerThread &state = *per_thread[0];
 	if (state.should_begin)
 	{
 		state.set_nodes.begin_frame();
