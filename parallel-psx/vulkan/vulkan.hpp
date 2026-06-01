@@ -64,13 +64,9 @@ namespace Vulkan
 {
 struct DeviceFeatures
 {
-	bool supports_physical_device_properties2 = false;
 	bool supports_external = false;
 	bool supports_dedicated = false;
 	bool supports_debug_marker = false;
-	bool supports_debug_utils = false;
-	bool supports_vulkan_11_instance = false;
-	bool supports_vulkan_11_device = false;
 	VkPhysicalDeviceFeatures enabled_features = {};
 };
 
@@ -194,10 +190,6 @@ private:
 	bool valid = false;
 	DeviceFeatures ext;
 
-#ifdef VULKAN_DEBUG
-	VkDebugReportCallbackEXT debug_callback = VK_NULL_HANDLE;
-	VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
-#endif
 	void (*message_callback)(const char *) = nullptr;
 
 	void destroy();

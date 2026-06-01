@@ -118,13 +118,6 @@ void Context::destroy()
 	if (device != VK_NULL_HANDLE)
 		vkDeviceWaitIdle(device);
 
-#ifdef VULKAN_DEBUG
-	if (debug_callback)
-		vkDestroyDebugReportCallbackEXT(instance, debug_callback, nullptr);
-	if (debug_messenger)
-		vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
-#endif
-
 	if (owned_device && device != VK_NULL_HANDLE)
 		vkDestroyDevice(device, nullptr);
 	if (owned_instance && instance != VK_NULL_HANDLE)
@@ -231,15 +224,9 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	LOGI("Selected Vulkan GPU: %s\n", gpu_props.deviceName);
 
 	if (gpu_props.apiVersion >= VK_API_VERSION_1_1)
-	{
-		ext.supports_vulkan_11_device = ext.supports_vulkan_11_instance;
 		LOGI("GPU supports Vulkan 1.1.\n");
-	}
 	else if (gpu_props.apiVersion >= VK_API_VERSION_1_0)
-	{
-		ext.supports_vulkan_11_device = false;
 		LOGI("GPU supports Vulkan 1.0.\n");
-	}
 
 	uint32_t queue_count;
 	vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, nullptr);
@@ -402,10 +389,7 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	if (has_vk_extension(queried_extensions, VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME))
 		enabled_extensions.push_back(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
 
-	if (ext.supports_physical_device_properties2)
-		vkGetPhysicalDeviceFeatures2KHR(gpu, &features);
-	else
-		vkGetPhysicalDeviceFeatures(gpu, &features.features);
+	vkGetPhysicalDeviceFeatures(gpu, &features.features);
 
 	// Enable device features we might care about.
 	{
@@ -439,10 +423,7 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 		ext.enabled_features = enabled_features;
 	}
 
-	if (ext.supports_physical_device_properties2)
-		device_info.pNext = &features;
-	else
-		device_info.pEnabledFeatures = &features.features;
+	device_info.pEnabledFeatures = &features.features;
 
 #ifdef VULKAN_DEBUG
 	{
