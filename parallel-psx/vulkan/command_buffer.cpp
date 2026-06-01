@@ -558,19 +558,10 @@ VkPipeline CommandBuffer::build_graphics_pipeline(Hash hash)
 	// Dynamic state
 	VkPipelineDynamicStateCreateInfo dyn = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
 	dyn.dynamicStateCount = 2;
-	VkDynamicState states[7] = {
+	static const VkDynamicState states[2] = {
 		VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_VIEWPORT,
 	};
 	dyn.pDynamicStates = states;
-
-	if (static_state.state.depth_bias_enable)
-		states[dyn.dynamicStateCount++] = VK_DYNAMIC_STATE_DEPTH_BIAS;
-	if (static_state.state.stencil_test)
-	{
-		states[dyn.dynamicStateCount++] = VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK;
-		states[dyn.dynamicStateCount++] = VK_DYNAMIC_STATE_STENCIL_REFERENCE;
-		states[dyn.dynamicStateCount++] = VK_DYNAMIC_STATE_STENCIL_WRITE_MASK;
-	}
 
 	// Blend state
 	VkPipelineColorBlendAttachmentState blend_attachments[VULKAN_NUM_ATTACHMENTS];
@@ -585,7 +576,7 @@ VkPipeline CommandBuffer::build_graphics_pipeline(Hash hash)
 		if (compatible_render_pass->get_color_attachment(current_subpass, i).attachment != VK_ATTACHMENT_UNUSED &&
 			(current_layout->get_resource_layout().render_target_mask & (1u << i)))
 		{
-			att.colorWriteMask = (static_state.state.write_mask >> (4 * i)) & 0xf;
+			att.colorWriteMask = 0xf;
 			att.blendEnable = static_state.state.blend_enable;
 			if (att.blendEnable)
 			{
@@ -602,24 +593,11 @@ VkPipeline CommandBuffer::build_graphics_pipeline(Hash hash)
 
 	// Depth state
 	VkPipelineDepthStencilStateCreateInfo ds = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-	ds.stencilTestEnable = compatible_render_pass->has_stencil(current_subpass) && static_state.state.stencil_test;
 	ds.depthTestEnable = compatible_render_pass->has_depth(current_subpass) && static_state.state.depth_test;
 	ds.depthWriteEnable = compatible_render_pass->has_depth(current_subpass) && static_state.state.depth_write;
 
 	if (ds.depthTestEnable)
 		ds.depthCompareOp = static_cast<VkCompareOp>(static_state.state.depth_compare);
-
-	if (ds.stencilTestEnable)
-	{
-		ds.front.compareOp = static_cast<VkCompareOp>(static_state.state.stencil_front_compare_op);
-		ds.front.passOp = static_cast<VkStencilOp>(static_state.state.stencil_front_pass);
-		ds.front.failOp = static_cast<VkStencilOp>(static_state.state.stencil_front_fail);
-		ds.front.depthFailOp = static_cast<VkStencilOp>(static_state.state.stencil_front_depth_fail);
-		ds.back.compareOp = static_cast<VkCompareOp>(static_state.state.stencil_back_compare_op);
-		ds.back.passOp = static_cast<VkStencilOp>(static_state.state.stencil_back_pass);
-		ds.back.failOp = static_cast<VkStencilOp>(static_state.state.stencil_back_fail);
-		ds.back.depthFailOp = static_cast<VkStencilOp>(static_state.state.stencil_back_depth_fail);
-	}
 
 	// Vertex input
 	VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
@@ -649,7 +627,6 @@ VkPipeline CommandBuffer::build_graphics_pipeline(Hash hash)
 
 	// Input assembly
 	VkPipelineInputAssemblyStateCreateInfo ia = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-	ia.primitiveRestartEnable = static_state.state.primitive_restart;
 	ia.topology = static_cast<VkPrimitiveTopology>(static_state.state.topology);
 
 	// Multisample
@@ -667,10 +644,9 @@ VkPipeline CommandBuffer::build_graphics_pipeline(Hash hash)
 	// Raster
 	VkPipelineRasterizationStateCreateInfo raster = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
 	raster.cullMode = static_cast<VkCullModeFlags>(static_state.state.cull_mode);
-	raster.frontFace = static_cast<VkFrontFace>(static_state.state.front_face);
+	raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	raster.lineWidth = 1.0f;
-	raster.polygonMode = static_state.state.wireframe ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
-	raster.depthBiasEnable = static_state.state.depth_bias_enable != 0;
+	raster.polygonMode = VK_POLYGON_MODE_FILL;
 
 	// Stages
 	VkPipelineShaderStageCreateInfo stages[static_cast<unsigned>(ShaderStage::Count)];
@@ -878,17 +854,6 @@ void CommandBuffer::flush_render_state()
 		vkCmdSetViewport(cmd, 0, 1, &viewport);
 	if (get_and_clear(COMMAND_BUFFER_DIRTY_SCISSOR_BIT))
 		vkCmdSetScissor(cmd, 0, 1, &scissor);
-	if (static_state.state.depth_bias_enable && get_and_clear(COMMAND_BUFFER_DIRTY_DEPTH_BIAS_BIT))
-		vkCmdSetDepthBias(cmd, dynamic_state.depth_bias_constant, 0.0f, dynamic_state.depth_bias_slope);
-	if (static_state.state.stencil_test && get_and_clear(COMMAND_BUFFER_DIRTY_STENCIL_REFERENCE_BIT))
-	{
-		vkCmdSetStencilCompareMask(cmd, VK_STENCIL_FACE_FRONT_BIT, dynamic_state.front_compare_mask);
-		vkCmdSetStencilReference(cmd, VK_STENCIL_FACE_FRONT_BIT, dynamic_state.front_reference);
-		vkCmdSetStencilWriteMask(cmd, VK_STENCIL_FACE_FRONT_BIT, dynamic_state.front_write_mask);
-		vkCmdSetStencilCompareMask(cmd, VK_STENCIL_FACE_BACK_BIT, dynamic_state.back_compare_mask);
-		vkCmdSetStencilReference(cmd, VK_STENCIL_FACE_BACK_BIT, dynamic_state.back_reference);
-		vkCmdSetStencilWriteMask(cmd, VK_STENCIL_FACE_BACK_BIT, dynamic_state.back_write_mask);
-	}
 
 	uint32_t update_vbo_mask = dirty_vbos & active_vbos;
 	FOR_EACH_BIT_RANGE(update_vbo_mask, binding, binding_count)
@@ -1515,17 +1480,12 @@ void CommandBuffer::set_opaque_state()
 {
 	PipelineState::State &state = static_state.state;
 	memset(&state, 0, sizeof(state));
-	state.front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	state.cull_mode = VK_CULL_MODE_BACK_BIT;
 	state.blend_enable = false;
 	state.depth_test = true;
 	state.depth_compare = VK_COMPARE_OP_LESS_OR_EQUAL;
 	state.depth_write = true;
-	state.depth_bias_enable = false;
-	state.primitive_restart = false;
-	state.stencil_test = false;
 	state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	state.write_mask = ~0u;
 
 	set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 }
@@ -1534,13 +1494,11 @@ void CommandBuffer::set_quad_state()
 {
 	PipelineState::State &state = static_state.state;
 	memset(&state, 0, sizeof(state));
-	state.front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	state.cull_mode = VK_CULL_MODE_NONE;
 	state.blend_enable = false;
 	state.depth_test = false;
 	state.depth_write = false;
 	state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-	state.write_mask = ~0u;
 	set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 }
 
