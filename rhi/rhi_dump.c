@@ -79,7 +79,7 @@ void rhi_dump_init(const char *path)
 
    file = fopen(path, "wb");
    if (file)
-      fwrite("RSXDUMP3", 8, 1, file);
+      fwrite("RHIDUMP3", 8, 1, file);
 }
 
 void rhi_dump_deinit(void)

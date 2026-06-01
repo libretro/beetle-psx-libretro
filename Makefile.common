@@ -5,7 +5,6 @@ DEPS_DIR     := $(CORE_DIR)/deps
 LIBRETRO_COMM_DIR := $(CORE_DIR)/libretro-common
 MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
-RSXGL_DIR    := $(CORE_DIR)/rustation-libretro/src
 CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
 ZLIB_DIR     := $(DEPS_DIR)/zlib-1.2.11
 
