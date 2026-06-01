@@ -347,11 +347,6 @@ public:
 		SET_STATIC_STATE(depth_write);
 	}
 
-	inline void set_wireframe(bool wireframe)
-	{
-		SET_STATIC_STATE(wireframe);
-	}
-
 	inline void set_depth_compare(VkCompareOp depth_compare)
 	{
 		SET_STATIC_STATE(depth_compare);
@@ -387,29 +382,9 @@ public:
 		set_blend_op(blend_op, blend_op);
 	}
 
-	inline void set_depth_bias(bool depth_bias_enable)
-	{
-		SET_STATIC_STATE(depth_bias_enable);
-	}
-
-	inline void set_color_write_mask(uint32_t write_mask)
-	{
-		SET_STATIC_STATE(write_mask);
-	}
-
-	inline void set_stencil_test(bool stencil_test)
-	{
-		SET_STATIC_STATE(stencil_test);
-	}
-
 	inline void set_primitive_topology(VkPrimitiveTopology topology)
 	{
 		SET_STATIC_STATE(topology);
-	}
-
-	inline void set_primitive_restart(bool primitive_restart)
-	{
-		SET_STATIC_STATE(primitive_restart);
 	}
 
 	inline void set_multisample_state(bool alpha_to_coverage, bool alpha_to_one = false, bool sample_shading = false)
@@ -417,11 +392,6 @@ public:
 		SET_STATIC_STATE(alpha_to_coverage);
 		SET_STATIC_STATE(alpha_to_one);
 		SET_STATIC_STATE(sample_shading);
-	}
-
-	inline void set_front_face(VkFrontFace front_face)
-	{
-		SET_STATIC_STATE(front_face);
 	}
 
 	inline void set_cull_mode(VkCullModeFlags cull_mode)
@@ -454,22 +424,6 @@ public:
 			if (static_state.state.spec_constant_mask & (1u << index))
 				set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 		}
-	}
-
-#define SET_DYNAMIC_STATE(state, flags)   \
-	do                                    \
-	{                                     \
-		if (dynamic_state.state != state) \
-		{                                 \
-			dynamic_state.state = state;  \
-			set_dirty(flags);             \
-		}                                 \
-	} while (0)
-
-	inline void set_depth_bias(float depth_bias_constant, float depth_bias_slope)
-	{
-		SET_DYNAMIC_STATE(depth_bias_constant, COMMAND_BUFFER_DIRTY_DEPTH_BIAS_BIT);
-		SET_DYNAMIC_STATE(depth_bias_slope, COMMAND_BUFFER_DIRTY_DEPTH_BIAS_BIT);
 	}
 
 	inline Type get_command_buffer_type() const
