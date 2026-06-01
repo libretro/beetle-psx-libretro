@@ -437,9 +437,7 @@ private:
 	void flush_compute_state();
 
 	BufferBlock vbo_block;
-	BufferBlock ibo_block;
 	BufferBlock ubo_block;
-	BufferBlock staging_block;
 
 	void set_texture(unsigned set, unsigned binding, VkImageView float_view, VkImageView integer_view,
 	                 VkImageLayout layout,

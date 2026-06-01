@@ -291,11 +291,8 @@ void Device::set_context(const Context &context)
 	managers.semaphore.init(device);
 	managers.fence.init(device);
 	managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	managers.ibo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 	managers.ubo.init(this, 256 * 1024, std::max<VkDeviceSize>(16u, gpu_props.limits.minUniformBufferOffsetAlignment),
 	                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	managers.staging.init(this, 64 * 1024, std::max<VkDeviceSize>(16u, gpu_props.limits.optimalBufferCopyOffsetAlignment),
-	                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 }
 
 void Device::init_stock_samplers()
@@ -415,17 +412,6 @@ void Device::request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size)
 	request_block(*this, block, size, managers.vbo, &dma.vbo, frame().vbo_blocks);
 }
 
-void Device::request_index_block(BufferBlock &block, VkDeviceSize size)
-{
-	LOCK();
-	request_index_block_nolock(block, size);
-}
-
-void Device::request_index_block_nolock(BufferBlock &block, VkDeviceSize size)
-{
-	request_block(*this, block, size, managers.ibo, &dma.ibo, frame().ibo_blocks);
-}
-
 void Device::request_uniform_block(BufferBlock &block, VkDeviceSize size)
 {
 	LOCK();
@@ -435,17 +421,6 @@ void Device::request_uniform_block(BufferBlock &block, VkDeviceSize size)
 void Device::request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size)
 {
 	request_block(*this, block, size, managers.ubo, &dma.ubo, frame().ubo_blocks);
-}
-
-void Device::request_staging_block(BufferBlock &block, VkDeviceSize size)
-{
-	LOCK();
-	request_staging_block_nolock(block, size);
-}
-
-void Device::request_staging_block_nolock(BufferBlock &block, VkDeviceSize size)
-{
-	request_block(*this, block, size, managers.staging, nullptr, frame().staging_blocks);
 }
 
 void Device::submit(CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
@@ -768,7 +743,7 @@ void Device::flush_frame(CommandBuffer::Type type)
 
 void Device::sync_buffer_blocks()
 {
-	if (dma.vbo.empty() && dma.ibo.empty() && dma.ubo.empty())
+	if (dma.vbo.empty() && dma.ubo.empty())
 		return;
 
 	VkBufferUsageFlags usage = 0;
@@ -784,13 +759,6 @@ void Device::sync_buffer_blocks()
 		usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	}
 
-	for (BufferBlock &block : dma.ibo)
-	{
-		VK_ASSERT(block.offset != 0);
-		cmd->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
-		usage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-	}
-
 	for (BufferBlock &block : dma.ubo)
 	{
 		VK_ASSERT(block.offset != 0);
@@ -799,7 +767,6 @@ void Device::sync_buffer_blocks()
 	}
 
 	dma.vbo.clear();
-	dma.ibo.clear();
 	dma.ubo.clear();
 
 	cmd->end_region();
@@ -1060,14 +1027,10 @@ void Device::wait_idle_nolock()
 	// Free memory for buffer pools.
 	managers.vbo.reset();
 	managers.ubo.reset();
-	managers.ibo.reset();
-	managers.staging.reset();
 	for (std::unique_ptr<PerFrame> &frame : per_frame)
 	{
 		frame->vbo_blocks.clear();
-		frame->ibo_blocks.clear();
 		frame->ubo_blocks.clear();
-		frame->staging_blocks.clear();
 	}
 
 	framebuffer_allocator.clear();
@@ -1159,16 +1122,10 @@ void Device::PerFrame::begin()
 
 	for (BufferBlock &block : vbo_blocks)
 		managers.vbo.recycle_block(std::move(block));
-	for (BufferBlock &block : ibo_blocks)
-		managers.ibo.recycle_block(std::move(block));
 	for (BufferBlock &block : ubo_blocks)
 		managers.ubo.recycle_block(std::move(block));
-	for (BufferBlock &block : staging_blocks)
-		managers.staging.recycle_block(std::move(block));
 	vbo_blocks.clear();
-	ibo_blocks.clear();
 	ubo_blocks.clear();
-	staging_blocks.clear();
 
 	destroyed_framebuffers.clear();
 	destroyed_samplers.clear();

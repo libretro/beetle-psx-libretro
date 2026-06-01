@@ -54,9 +54,7 @@ CommandBuffer::CommandBuffer(Device *device, VkCommandBuffer cmd, Type type)
 CommandBuffer::~CommandBuffer()
 {
 	VK_ASSERT(vbo_block.mapped == nullptr);
-	VK_ASSERT(ibo_block.mapped == nullptr);
 	VK_ASSERT(ubo_block.mapped == nullptr);
-	VK_ASSERT(staging_block.mapped == nullptr);
 }
 
 void CommandBuffer::copy_buffer(const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
@@ -1347,12 +1345,8 @@ void CommandBuffer::end()
 
 	if (vbo_block.mapped)
 		device->request_vertex_block_nolock(vbo_block, 0);
-	if (ibo_block.mapped)
-		device->request_index_block_nolock(ibo_block, 0);
 	if (ubo_block.mapped)
 		device->request_uniform_block_nolock(ubo_block, 0);
-	if (staging_block.mapped)
-		device->request_staging_block_nolock(staging_block, 0);
 }
 
 void CommandBuffer::begin_region(const char *name, const float *color)

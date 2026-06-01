@@ -190,9 +190,7 @@ private:
 	void bake_program(Program &program);
 
 	void request_vertex_block(BufferBlock &block, VkDeviceSize size);
-	void request_index_block(BufferBlock &block, VkDeviceSize size);
 	void request_uniform_block(BufferBlock &block, VkDeviceSize size);
-	void request_staging_block(BufferBlock &block, VkDeviceSize size);
 
 	PipelineLayout *request_pipeline_layout(const CombinedResourceLayout &layout);
 	DescriptorSetAllocator *request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_sets);
@@ -213,7 +211,7 @@ private:
 		DeviceAllocator memory;
 		FenceManager fence;
 		SemaphoreManager semaphore;
-		BufferPool vbo, ibo, ubo, staging;
+		BufferPool vbo, ubo;
 	};
 	Managers managers;
 
@@ -238,9 +236,7 @@ private:
 		CommandPool transfer_cmd_pool;
 
 		std::vector<BufferBlock> vbo_blocks;
-		std::vector<BufferBlock> ibo_blocks;
 		std::vector<BufferBlock> ubo_blocks;
-		std::vector<BufferBlock> staging_blocks;
 
 		std::vector<VkFence> wait_fences;
 		std::vector<VkFence> recycle_fences;
@@ -273,7 +269,6 @@ private:
 	struct
 	{
 		std::vector<BufferBlock> vbo;
-		std::vector<BufferBlock> ibo;
 		std::vector<BufferBlock> ubo;
 	} dma;
 
@@ -350,9 +345,7 @@ private:
 	                               bool flush);
 
 	void request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size);
-	void request_index_block_nolock(BufferBlock &block, VkDeviceSize size);
 	void request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size);
-	void request_staging_block_nolock(BufferBlock &block, VkDeviceSize size);
 
 	void add_frame_counter_nolock();
 	void decrement_frame_counter_nolock();
