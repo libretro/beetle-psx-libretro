@@ -3,13 +3,13 @@
  * software rasteriser's polygon decoder.
  *
  * Switched to a minimal include set: gpu.h gives us PS_GPU and
- * tri_vertex (both now C-includable as of 7d257de), rsx_intf.h
- * gives us RSX_VULKAN and rsx_intf_is_type, and
+ * tri_vertex (both now C-includable as of 7d257de), rhi_intf.h
+ * gives us RHI_VULKAN and rhi_intf_is_type, and
  * beetle_psx_globals.h gives us psx_gpu_upscale_shift_hw.
  */
 
 #include "gpu.h"
-#include "../../rsx/rsx_intf.h"
+#include "../../rhi/rhi_intf.h"
 #include "../../beetle_psx_globals.h"
 
 #include <float.h>
@@ -105,7 +105,7 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 			 * Case 2: U is decreasing in Y, but no change in X.
 			 * Case 3: V is decreasing in X, but no change in Y.
 			 * Case 4: V is decreasing in Y, but no change in X. */
-			if (rsx_intf_is_type() != RSX_VULKAN || psx_gpu_upscale_shift_hw)
+			if (rhi_intf_is_type() != RHI_VULKAN || psx_gpu_upscale_shift_hw)
 			{
 				if (neg_dudx && zero_dudy)
 					off_u = 1;
@@ -226,7 +226,7 @@ void Finalise_UVLimits(PS_GPU *gpu)
 
 		/* In nearest neighbor, we'll get *very* close to this UV, but not close enough to actually sample it.
 		 * If du/dx or dv/dx are negative, we probably need to invert this though ... */
-		if ((rsx_intf_is_type() != RSX_VULKAN || psx_gpu_upscale_shift_hw) && gpu->may_be_2d)
+		if ((rhi_intf_is_type() != RHI_VULKAN || psx_gpu_upscale_shift_hw) && gpu->may_be_2d)
 		{
 			if (max_u > min_u)
 				max_u--;

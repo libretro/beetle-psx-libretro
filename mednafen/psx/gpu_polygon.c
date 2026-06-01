@@ -1009,7 +1009,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       if (NV_LIT == 4) \
          gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2; \
       /* hardware renderer still needs to render first triangle */ \
-      if ((rsx_intf_is_type() == RSX_SOFTWARE) || (gpu->killQuadPart != 2)) \
+      if ((rhi_intf_is_type() == RHI_SOFTWARE) || (gpu->killQuadPart != 2)) \
          return; \
    } \
    if (abs(vertices[2].x - vertices[0].x) >= (1024 << gpu->upscale_shift) || \
@@ -1019,7 +1019,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       if (NV_LIT == 4) \
          gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2; \
       /* hardware renderer still needs to render first triangle */ \
-      if ((rsx_intf_is_type() == RSX_SOFTWARE) || (gpu->killQuadPart != 2)) \
+      if ((rhi_intf_is_type() == RHI_SOFTWARE) || (gpu->killQuadPart != 2)) \
          return; \
    } \
    clut_x = (clut & (0x3f << 4)); \
@@ -1048,7 +1048,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       } \
       else \
          lineFound = false; \
-      if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN) \
+      if (rhi_intf_is_type() == RHI_OPENGL || rhi_intf_is_type() == RHI_VULKAN) \
       { \
          Reset_UVLimits(gpu); \
          if ((NV_LIT == 4) && (!gpu->killQuadPart)) \
@@ -1060,7 +1060,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                Extend_UVLimits(gpu, first, 1); \
                Extend_UVLimits(gpu, vertices, 3); \
                Finalise_UVLimits(gpu); \
-               rsx_intf_push_quad(first->precise[0], \
+               rhi_intf_push_quad(first->precise[0], \
                   first->precise[1], \
                   first->precise[2], \
                   vertices[0].precise[0], \
@@ -1105,7 +1105,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
             Extend_UVLimits(gpu, verts, 3); \
             Finalise_UVLimits(gpu); \
             /* Push a single triangle */ \
-            rsx_intf_push_triangle(verts[0].precise[0], \
+            rhi_intf_push_triangle(verts[0].precise[0], \
                verts[0].precise[1], \
                verts[0].precise[2], \
                verts[1].precise[0], \
@@ -1138,7 +1138,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
             gpu->killQuadPart = 0; \
          } \
       } \
-      if (rsx_intf_is_type() == RSX_SOFTWARE) \
+      if (rhi_intf_is_type() == RHI_SOFTWARE) \
       { \
          if (PGXP_LIT) \
          { \
@@ -1150,7 +1150,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
             } \
          } \
       } \
-      if (rsx_intf_has_software_renderer()) \
+      if (rhi_intf_has_software_renderer()) \
       { \
          /* Perspective-correct texturing for the SW rasteriser. \
           * Eligible when this primitive came in through the PGXP \

@@ -1,4 +1,4 @@
-#include "rsx/rsx_intf.h"
+#include "rhi/rhi_intf.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -16,73 +16,73 @@
 #include "mednafen/psx/gpu.h"
 #include "mednafen/settings.h"
 
-#ifdef RSX_DUMP
-#include "rsx_dump.h"
+#ifdef RHI_DUMP
+#include "rhi_dump.h"
 #endif
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-#include "rsx_lib_gl.h"
+#include "rhi_lib_gl.h"
 #endif
 
 #if defined(HAVE_VULKAN)
-#include "rsx_lib_vulkan.h"
+#include "rhi_lib_vulkan.h"
 #endif
 
 extern bool fast_pal;
 extern unsigned int image_height;
 
-enum rsx_renderer_type rsx_type                 = RSX_SOFTWARE;
+enum rhi_renderer_type rhi_type                 = RHI_SOFTWARE;
 
 static bool gl_initialized                      = false;
 static bool vk_initialized                      = false;
 
 /* GPU reset defaults */
-static int rsx_width_mode = WIDTH_MODE_256;
-static int rsx_height_mode = HEIGHT_MODE_240;
+static int rhi_width_mode = WIDTH_MODE_256;
+static int rhi_height_mode = HEIGHT_MODE_240;
 
-static bool rsx_soft_open(bool is_pal)
+static bool rhi_soft_open(bool is_pal)
 {
    content_is_pal = is_pal;
    return true;
 }
 
-void rsx_intf_set_environment(retro_environment_t cb)
+void rhi_intf_set_environment(retro_environment_t cb)
 {
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_set_environment(cb);
+         rhi_vulkan_set_environment(cb);
 #endif
          break;
    }
 }
 
-void rsx_intf_set_video_refresh(retro_video_refresh_t cb)
+void rhi_intf_set_video_refresh(retro_video_refresh_t cb)
 {
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_set_video_refresh(cb);
+         rhi_vulkan_set_video_refresh(cb);
 #endif
          break;
    }
 }
 
-void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
+void rhi_intf_get_system_av_info(struct retro_system_av_info *info)
 {
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
       {
          int first_visible_scanline = MDFN_GetSettingI(content_is_pal ? "psx.slstartp" : "psx.slstart");
          int last_visible_scanline  = MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend");
@@ -96,33 +96,33 @@ void rsx_intf_get_system_av_info(struct retro_system_av_info *info)
          }
 
          memset(info, 0, sizeof(*info));
-         info->timing.fps            = rsx_common_get_timing_fps();
+         info->timing.fps            = rhi_common_get_timing_fps();
          info->timing.sample_rate    = SOUND_FREQUENCY;
          info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
          info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
          info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W  << psx_gpu_upscale_shift;
          info->geometry.max_height   = MEDNAFEN_CORE_GEOMETRY_MAX_H  << psx_gpu_upscale_shift;
-         info->geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, crop_overscan,
+         info->geometry.aspect_ratio = rhi_common_get_aspect_ratio(content_is_pal, crop_overscan,
                                           first_visible_scanline, last_visible_scanline,
                                           aspect_ratio_setting, false, widescreen_hack, widescreen_hack_aspect_ratio_setting);
          break;
       }
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_get_system_av_info(info);
+         rhi_gl_get_system_av_info(info);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_get_system_av_info(info);
+         rhi_vulkan_get_system_av_info(info);
 #endif
          break;
    }
 }
 
-enum rsx_renderer_type rsx_intf_is_type(void)
+enum rhi_renderer_type rhi_intf_is_type(void)
 {
-   return rsx_type;
+   return rhi_type;
 }
 
 /* `static inline` (rather than the original plain `inline`) so that
@@ -131,22 +131,22 @@ enum rsx_renderer_type rsx_intf_is_type(void)
  * (-O0) the inliner doesn't fire, and per C99/C11 semantics a plain
  * `inline` definition without a matching `extern` declaration does
  * not emit a symbol either - producing the link-time
- *   undefined reference to `rsx_intf_dump_init'
+ *   undefined reference to `rhi_intf_dump_init'
  * from every call site in this file. `static inline` keeps the
  * intent (compiler may inline) and guarantees a TU-local symbol when
  * inlining is suppressed. */
-static inline void rsx_intf_dump_init(void)
+static inline void rhi_intf_dump_init(void)
 {
-#if defined(RSX_DUMP)
+#if defined(RHI_DUMP)
    {
-      const char *env = getenv("RSX_DUMP");
+      const char *env = getenv("RHI_DUMP");
       if (env)
-         rsx_dump_init(env);
+         rhi_dump_init(env);
    }
 #endif
 }
 
-bool rsx_intf_open(bool is_pal, bool force_software)
+bool rhi_intf_open(bool is_pal, bool force_software)
 {
    bool software_selected    = false;
    enum force_renderer_type force_type = AUTO;
@@ -180,11 +180,11 @@ bool rsx_intf_open(bool is_pal, bool force_software)
       if (force_type == FORCE_VULKAN)
       {
 #if defined (HAVE_VULKAN)
-         if (rsx_vulkan_open(is_pal))
+         if (rhi_vulkan_open(is_pal))
          {
-            rsx_type = RSX_VULKAN;
+            rhi_type = RHI_VULKAN;
             vk_initialized = true;
-            rsx_intf_dump_init();
+            rhi_intf_dump_init();
             return true;
          }
          osd_message(3, RETRO_LOG_ERROR,
@@ -201,11 +201,11 @@ bool rsx_intf_open(bool is_pal, bool force_software)
       else if (force_type == FORCE_OPENGL)
       {
 #if defined (HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         if (rsx_gl_open(is_pal))
+         if (rhi_gl_open(is_pal))
          {
-            rsx_type = RSX_OPENGL;
+            rhi_type = RHI_OPENGL;
             gl_initialized = true;
-            rsx_intf_dump_init();
+            rhi_intf_dump_init();
             return true;
          }
          osd_message(3, RETRO_LOG_ERROR,
@@ -230,11 +230,11 @@ bool rsx_intf_open(bool is_pal, bool force_software)
 #if defined(HAVE_VULKAN)
       if ((preferred == RETRO_HW_CONTEXT_DUMMY ||
            preferred == RETRO_HW_CONTEXT_VULKAN)
-          && rsx_vulkan_open(is_pal))
+          && rhi_vulkan_open(is_pal))
       {
-         rsx_type       = RSX_VULKAN;
+         rhi_type       = RHI_VULKAN;
          vk_initialized = true;
-         rsx_intf_dump_init();
+         rhi_intf_dump_init();
          return true;
       }
 #endif
@@ -243,11 +243,11 @@ bool rsx_intf_open(bool is_pal, bool force_software)
       if ((   preferred == RETRO_HW_CONTEXT_DUMMY
            || preferred == RETRO_HW_CONTEXT_OPENGL
            || preferred == RETRO_HW_CONTEXT_OPENGL_CORE)
-          && rsx_gl_open(is_pal))
+          && rhi_gl_open(is_pal))
       {
-         rsx_type       = RSX_OPENGL;
+         rhi_type       = RHI_OPENGL;
          gl_initialized = true;
-         rsx_intf_dump_init();
+         rhi_intf_dump_init();
          return true;
       }
 #endif
@@ -263,11 +263,11 @@ bool rsx_intf_open(bool is_pal, bool force_software)
    }
 
 soft:
-   /* rsx_soft_open(is_pal) always returns true */
-   if (rsx_soft_open(is_pal))
+   /* rhi_soft_open(is_pal) always returns true */
+   if (rhi_soft_open(is_pal))
    {
-      rsx_type = RSX_SOFTWARE;
-      rsx_intf_dump_init();
+      rhi_type = RHI_SOFTWARE;
+      rhi_intf_dump_init();
       return true;
    }
 
@@ -282,110 +282,110 @@ soft:
    return false;
 }
 
-void rsx_intf_close(void)
+void rhi_intf_close(void)
 {
-#if defined(RSX_DUMP)
-   rsx_dump_deinit();
+#if defined(RHI_DUMP)
+   rhi_dump_deinit();
 #endif
 
 #if defined(HAVE_VULKAN)
-   if (rsx_type != RSX_SOFTWARE && vk_initialized)
+   if (rhi_type != RHI_SOFTWARE && vk_initialized)
       return;
 #endif
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   if (rsx_type != RSX_SOFTWARE && gl_initialized)
+   if (rhi_type != RHI_SOFTWARE && gl_initialized)
    {
-      rsx_gl_close();
+      rhi_gl_close();
       return;
    }
 #endif
 }
 
-void rsx_intf_refresh_variables(void)
+void rhi_intf_refresh_variables(void)
 {
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_refresh_variables();
+         rhi_gl_refresh_variables();
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_refresh_variables();
+         rhi_vulkan_refresh_variables();
 #endif
          break;
    }
 }
 
-void rsx_intf_prepare_frame(void)
+void rhi_intf_prepare_frame(void)
 {
-#ifdef RSX_DUMP
-   rsx_dump_prepare_frame();
+#ifdef RHI_DUMP
+   rhi_dump_prepare_frame();
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_prepare_frame();
+         rhi_gl_prepare_frame();
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_prepare_frame();
+         rhi_vulkan_prepare_frame();
 #endif
          break;
    }
 }
 
-void rsx_intf_finalize_frame(const void *fb, unsigned width, 
+void rhi_intf_finalize_frame(const void *fb, unsigned width, 
                              unsigned height, unsigned pitch)
 {
-#ifdef RSX_DUMP
-   rsx_dump_finalize_frame();
+#ifdef RHI_DUMP
+   rhi_dump_finalize_frame();
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          video_cb(fb, width, height, pitch);
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_finalize_frame(fb, width, height, pitch);
+         rhi_gl_finalize_frame(fb, width, height, pitch);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_finalize_frame(fb, width, height, pitch);
+         rhi_vulkan_finalize_frame(fb, width, height, pitch);
 #endif
          break;
    }
 }
 
-void rsx_intf_set_tex_window(uint8_t tww, uint8_t twh,
+void rhi_intf_set_tex_window(uint8_t tww, uint8_t twh,
                              uint8_t twx, uint8_t twy)
 {
-#ifdef RSX_DUMP
-   rsx_dump_set_tex_window(tww, twh, twx, twy);
+#ifdef RHI_DUMP
+   rhi_dump_set_tex_window(tww, twh, twx, twy);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_tex_window(tww, twh, twx, twy);
+         rhi_gl_set_tex_window(tww, twh, twx, twy);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_set_tex_window(tww, twh, twx, twy);
+         rhi_vulkan_set_tex_window(tww, twh, twx, twy);
 #endif
          break;
       default:
@@ -393,144 +393,144 @@ void rsx_intf_set_tex_window(uint8_t tww, uint8_t twh,
    }
 }
 
-void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
+void rhi_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 {
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
          /* TODO/FIXME */
          break;
    }
 }
 
-void rsx_intf_set_draw_offset(int16_t x, int16_t y)
+void rhi_intf_set_draw_offset(int16_t x, int16_t y)
 {
-#ifdef RSX_DUMP
-   rsx_dump_set_draw_offset(x, y);
+#ifdef RHI_DUMP
+   rhi_dump_set_draw_offset(x, y);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_draw_offset(x, y);
+         rhi_gl_set_draw_offset(x, y);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_set_draw_offset(x, y);
+         rhi_vulkan_set_draw_offset(x, y);
 #endif
          break;
    }
 }
 
-void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
+void rhi_intf_set_draw_area(uint16_t x0, uint16_t y0,
                             uint16_t x1, uint16_t y1)
 {
-#ifdef RSX_DUMP
-   rsx_dump_set_draw_area(x0, y0, x1, y1);
+#ifdef RHI_DUMP
+   rhi_dump_set_draw_area(x0, y0, x1, y1);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_draw_area(x0, y0, x1, y1);
+         rhi_gl_set_draw_area(x0, y0, x1, y1);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_set_draw_area(x0, y0, x1, y1);
+         rhi_vulkan_set_draw_area(x0, y0, x1, y1);
 #endif
          break;
    }
 }
 
-void rsx_intf_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
+void rhi_intf_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
 {
-#ifdef RSX_DUMP
-   rsx_dump_set_vram_framebuffer_coords(xstart, ystart);
+#ifdef RHI_DUMP
+   rhi_dump_set_vram_framebuffer_coords(xstart, ystart);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_vram_framebuffer_coords(xstart, ystart);
+         rhi_gl_set_vram_framebuffer_coords(xstart, ystart);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_set_vram_framebuffer_coords(xstart, ystart);
+         rhi_vulkan_set_vram_framebuffer_coords(xstart, ystart);
 #endif
          break;
    }
 }
 
-void rsx_intf_set_horizontal_display_range(uint16_t x1, uint16_t x2)
+void rhi_intf_set_horizontal_display_range(uint16_t x1, uint16_t x2)
 {
-#ifdef RSX_DUMP
-   rsx_dump_set_horizontal_display_range(x1, x2);
+#ifdef RHI_DUMP
+   rhi_dump_set_horizontal_display_range(x1, x2);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_horizontal_display_range(x1, x2);
+         rhi_gl_set_horizontal_display_range(x1, x2);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_set_horizontal_display_range(x1, x2);
+         rhi_vulkan_set_horizontal_display_range(x1, x2);
 #endif
          break;
    }
 }
 
-void rsx_intf_set_vertical_display_range(uint16_t y1, uint16_t y2)
+void rhi_intf_set_vertical_display_range(uint16_t y1, uint16_t y2)
 {
-#ifdef RSX_DUMP
-   rsx_dump_set_vertical_display_range(y1, y2);
+#ifdef RHI_DUMP
+   rhi_dump_set_vertical_display_range(y1, y2);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_vertical_display_range(y1, y2);
+         rhi_gl_set_vertical_display_range(y1, y2);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_set_vertical_display_range(y1, y2);
+         rhi_vulkan_set_vertical_display_range(y1, y2);
 #endif
          break;
    }
 }
 
-void rsx_intf_set_display_mode(bool depth_24bpp,
+void rhi_intf_set_display_mode(bool depth_24bpp,
                                bool is_pal, 
                                bool is_480i,
                                int width_mode)
 {
    bool boot_debounce;
-#ifdef RSX_DUMP
-   rsx_dump_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
+#ifdef RHI_DUMP
+   rhi_dump_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
 #endif
 
    /* During the first 10 GP1(0x08) writes (the BIOS boot animation),
@@ -563,32 +563,32 @@ void rsx_intf_set_display_mode(bool depth_24bpp,
    }
 
    /* Also verify if this is accurate for 240i */
-   if ((rsx_width_mode != width_mode) || (rsx_height_mode != (int)is_480i))
+   if ((rhi_width_mode != width_mode) || (rhi_height_mode != (int)is_480i))
    {
-      rsx_width_mode = width_mode;
-      rsx_height_mode = (int)is_480i;
+      rhi_width_mode = width_mode;
+      rhi_height_mode = (int)is_480i;
       if (!boot_debounce)
          aspect_ratio_dirty = true;
    }
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
+         rhi_gl_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
+         rhi_vulkan_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
 #endif
          break;
    }
 }
 
-void rsx_intf_push_triangle(
+void rhi_intf_push_triangle(
       float p0x, float p0y, float p0w,
       float p1x, float p1y, float p1w,
       float p2x, float p2y, float p2w,
@@ -609,26 +609,26 @@ void rsx_intf_push_triangle(
       bool mask_test,
       bool set_mask)
 {
-#ifdef RSX_DUMP
-   const rsx_dump_vertex vertices[3] = {
+#ifdef RHI_DUMP
+   const rhi_dump_vertex vertices[3] = {
       { p0x, p0y, p0w, c0, t0x, t0y },
       { p1x, p1y, p1w, c1, t1x, t1y },
       { p2x, p2y, p2w, c2, t2x, t2y },
    };
-   const rsx_render_state state = {
+   const rhi_render_state state = {
       texpage_x, texpage_y, clut_x, clut_y, texture_blend_mode, depth_shift, dither, blend_mode,
       mask_test, set_mask,
    };
-   rsx_dump_triangle(vertices, &state);
+   rhi_dump_triangle(vertices, &state);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
+         rhi_gl_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
                c0, c1, c2, t0x, t0y, t1x, t1y, t2x, t2y,
                min_u, min_v, max_u, max_v,
                texpage_x, texpage_y, clut_x, clut_y,
@@ -638,9 +638,9 @@ void rsx_intf_push_triangle(
                blend_mode, mask_test, set_mask);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
+         rhi_vulkan_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
                c0, c1, c2, t0x, t0y, t1x, t1y, t2x, t2y,
                min_u, min_v, max_u, max_v,
                texpage_x, texpage_y, clut_x, clut_y,
@@ -653,7 +653,7 @@ void rsx_intf_push_triangle(
    }
 }
 
-void rsx_intf_push_quad(
+void rhi_intf_push_quad(
    float p0x, float p0y, float p0w,
    float p1x, float p1y, float p1w,
    float p2x, float p2y, float p2w,
@@ -676,27 +676,27 @@ void rsx_intf_push_quad(
    bool is_sprite,
    bool may_be_2d)
 {
-#ifdef RSX_DUMP
-   const rsx_dump_vertex vertices[4] = {
+#ifdef RHI_DUMP
+   const rhi_dump_vertex vertices[4] = {
       { p0x, p0y, p0w, c0, t0x, t0y },
       { p1x, p1y, p1w, c1, t1x, t1y },
       { p2x, p2y, p2w, c2, t2x, t2y },
       { p3x, p3y, p3w, c3, t3x, t3y },
    };
-   const rsx_render_state state = {
+   const rhi_render_state state = {
       texpage_x, texpage_y, clut_x, clut_y, texture_blend_mode, depth_shift, dither, blend_mode,
       mask_test, set_mask,
    };
-   rsx_dump_quad(vertices, &state);
+   rhi_dump_quad(vertices, &state);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
+         rhi_gl_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
                c0, c1, c2, c3,
                t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
                min_u, min_v, max_u, max_v,
@@ -707,9 +707,9 @@ void rsx_intf_push_quad(
                blend_mode, mask_test, set_mask);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
+         rhi_vulkan_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
                c0, c1, c2, c3,
                t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
                min_u, min_v, max_u, max_v,
@@ -723,7 +723,7 @@ void rsx_intf_push_quad(
    }
 }
 
-void rsx_intf_push_line(int16_t p0x, int16_t p0y,
+void rhi_intf_push_line(int16_t p0x, int16_t p0y,
       int16_t p1x, int16_t p1y,
       uint32_t c0, uint32_t c1,
       bool dither,
@@ -731,43 +731,43 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
       bool mask_test,
       bool set_mask)
 {
-#ifdef RSX_DUMP
-   const rsx_dump_line_data line = {
+#ifdef RHI_DUMP
+   const rhi_dump_line_data line = {
       p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode,
       mask_test, set_mask,
    };
-   rsx_dump_line(&line);
+   rhi_dump_line(&line);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test, set_mask);
+         rhi_gl_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test, set_mask);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test, set_mask);
+         rhi_vulkan_push_line(p0x, p0y, p1x, p1y, c0, c1, dither, blend_mode, mask_test, set_mask);
 #endif
          break;
    }
 }
 
-bool rsx_intf_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *vram)
+bool rhi_intf_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *vram)
 {
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         return rsx_vulkan_read_vram(x, y, w, h, vram);
+         return rhi_vulkan_read_vram(x, y, w, h, vram);
 #endif
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         return rsx_gl_read_vram(x, y, w, h, vram);
+         return rhi_gl_read_vram(x, y, w, h, vram);
 #endif
          break;
       default:
@@ -777,97 +777,97 @@ bool rsx_intf_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t
    return false;
 }
 
-void rsx_intf_load_image(uint16_t x, uint16_t y,
+void rhi_intf_load_image(uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       uint16_t *vram, bool mask_test, bool set_mask)
 {
-#ifdef RSX_DUMP
-   rsx_dump_load_image(x, y, w, h, vram, mask_test, set_mask);
+#ifdef RHI_DUMP
+   rhi_dump_load_image(x, y, w, h, vram, mask_test, set_mask);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_load_image(x, y, w, h, vram, mask_test, set_mask);
+         rhi_gl_load_image(x, y, w, h, vram, mask_test, set_mask);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_load_image(x, y, w, h, vram, mask_test, set_mask);
+         rhi_vulkan_load_image(x, y, w, h, vram, mask_test, set_mask);
 #endif
          break;
    }
 }
 
-void rsx_intf_fill_rect(uint32_t color,
+void rhi_intf_fill_rect(uint32_t color,
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h)
 {
-#ifdef RSX_DUMP
-   rsx_dump_fill_rect(color, x, y, w, h);
+#ifdef RHI_DUMP
+   rhi_dump_fill_rect(color, x, y, w, h);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_fill_rect(color, x, y, w, h);
+         rhi_gl_fill_rect(color, x, y, w, h);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_fill_rect(color, x, y, w, h);
+         rhi_vulkan_fill_rect(color, x, y, w, h);
 #endif
          break;
    }
 }
 
-void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
+void rhi_intf_copy_rect(uint16_t src_x, uint16_t src_y,
       uint16_t dst_x, uint16_t dst_y,
       uint16_t w, uint16_t h, 
       bool mask_test, bool set_mask)
 {
-#ifdef RSX_DUMP
-   rsx_dump_copy_rect(src_x, src_y, dst_x, dst_y, w, h, mask_test, set_mask);
+#ifdef RHI_DUMP
+   rhi_dump_copy_rect(src_x, src_y, dst_x, dst_y, w, h, mask_test, set_mask);
 #endif
 
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          break;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         rsx_gl_copy_rect(src_x, src_y, dst_x, dst_y,
+         rhi_gl_copy_rect(src_x, src_y, dst_x, dst_y,
                w, h, mask_test, set_mask);
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         rsx_vulkan_copy_rect(src_x, src_y, dst_x, dst_y, w, h, mask_test, set_mask);
+         rhi_vulkan_copy_rect(src_x, src_y, dst_x, dst_y, w, h, mask_test, set_mask);
 #endif
          break;
    }
 }
 
-bool rsx_intf_has_software_renderer(void)
+bool rhi_intf_has_software_renderer(void)
 {
-   switch (rsx_type)
+   switch (rhi_type)
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
          return true;
-      case RSX_OPENGL:
+      case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         return rsx_gl_has_software_renderer();
+         return rhi_gl_has_software_renderer();
 #endif
          break;
-      case RSX_VULKAN:
+      case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-         return rsx_vulkan_has_software_renderer();
+         return rhi_vulkan_has_software_renderer();
 #else
          break;
 #endif
@@ -876,30 +876,30 @@ bool rsx_intf_has_software_renderer(void)
    return false;
 }
 
-void rsx_intf_toggle_display(bool status)
+void rhi_intf_toggle_display(bool status)
 {
-#ifdef RSX_DUMP
-   rsx_dump_toggle_display(status);
+#ifdef RHI_DUMP
+   rhi_dump_toggle_display(status);
 #endif
 
-    switch (rsx_type)
+    switch (rhi_type)
     {
-    case RSX_SOFTWARE:
+    case RHI_SOFTWARE:
         break;
-    case RSX_OPENGL:
+    case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-      rsx_gl_toggle_display(status);
+      rhi_gl_toggle_display(status);
 #endif
         break;
-    case RSX_VULKAN:
+    case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
-      rsx_vulkan_toggle_display(status);
+      rhi_vulkan_toggle_display(status);
 #endif
         break;
     }
 }
 
-double rsx_common_get_timing_fps(void)
+double rhi_common_get_timing_fps(void)
 {
    bool pal_timings = content_is_pal && !fast_pal;
 
@@ -915,7 +915,7 @@ double rsx_common_get_timing_fps(void)
                (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED));
 }
 
-float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
+float rhi_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,
                                   int aspect_ratio_setting, bool vram_override, bool widescreen_override,
                                   int widescreen_hack_aspect_ratio_setting)
@@ -971,7 +971,7 @@ float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
       int width_base = 0;
       double height_base;
 
-      switch (rsx_width_mode)
+      switch (rhi_width_mode)
       {
          case WIDTH_MODE_256:
             width_base = crop_overscan ? 256 : 280;
@@ -992,7 +992,7 @@ float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
       }
 
       height_base = (last_visible_scanline - first_visible_scanline + 1) *
-                    (rsx_height_mode == HEIGHT_MODE_480 ? 2.0 : 1.0);
+                    (rhi_height_mode == HEIGHT_MODE_480 ? 2.0 : 1.0);
 
       /* Calculate aspect ratio as quotient of raw native framebuffer width and height */
       return width_base / height_base;

@@ -60,7 +60,7 @@ ifeq ($(HAVE_OPENGL), 1)
 
    SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
 
-   SOURCES_C += $(CORE_DIR)/rsx/rsx_lib_gl.c
+   SOURCES_C += $(CORE_DIR)/rhi/rhi_lib_gl.c
 endif
 
 INCFLAGS := -I$(CORE_DIR) \
@@ -214,16 +214,16 @@ endif
                   $(CORE_EMU_DIR)/sio.c \
                   $(CORE_EMU_DIR)/spu.c \
                   $(CORE_EMU_DIR)/timer.c \
-                  $(CORE_DIR)/rsx/rsx_intf.c \
-                  $(CORE_DIR)/rsx/rsx_defer.c \
+                  $(CORE_DIR)/rhi/rhi_intf.c \
+                  $(CORE_DIR)/rhi/rhi_defer.c \
                   $(MEDNAFEN_DIR)/cdstream.c \
                   $(MEDNAFEN_DIR)/settings.c \
                   $(MEDNAFEN_DIR)/state.c
 
-   ifneq ($(RSX_DUMP),)
-      SOURCES_C   += $(CORE_DIR)/rsx/rsx_dump.c
-      CFLAGS      += -DRSX_DUMP
-      CXXFLAGS    += -DRSX_DUMP
+   ifneq ($(RHI_DUMP),)
+      SOURCES_C   += $(CORE_DIR)/rhi/rhi_dump.c
+      CFLAGS      += -DRHI_DUMP
+      CXXFLAGS    += -DRHI_DUMP
    endif
 
    # HAVE_TRACE: env-gated diagnostic tracing of VRAM-mutating ops.
@@ -231,9 +231,9 @@ endif
    # from the build (no source compiled, no symbols, no rodata, no
    # call instructions emitted at hooked sites). Set HAVE_TRACE=1 to
    # include it; tracing is then ALSO env-gated at runtime by setting
-   # BEETLE_PSX_TRACE in the environment, see rsx/tt_trace.h.
+   # BEETLE_PSX_TRACE in the environment, see rhi/tt_trace.h.
    ifeq ($(HAVE_TRACE), 1)
-      SOURCES_C   += $(CORE_DIR)/rsx/tt_trace.c
+      SOURCES_C   += $(CORE_DIR)/rhi/tt_trace.c
       CFLAGS      += -DHAVE_TRACE
       CXXFLAGS    += -DHAVE_TRACE
    endif
@@ -242,7 +242,7 @@ endif
       CFLAGS      += -DTEXTURE_DUMPING_ENABLED
       CXXFLAGS    += -DTEXTURE_DUMPING_ENABLED
       SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
-                     $(CORE_DIR)/rsx/rsx_lib_vulkan.cpp
+                     $(CORE_DIR)/rhi/rhi_lib_vulkan.cpp
 
       EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/SPIRV-Cross \
                         -I$(CORE_DIR)/parallel-psx/khronos/include

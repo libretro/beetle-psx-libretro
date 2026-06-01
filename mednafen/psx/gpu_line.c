@@ -208,15 +208,15 @@ DEFINE_DrawLine(g1_BMsub_ME1,    1, BMsub,    1)
 DEFINE_DrawLine(g1_BMaddq_ME0,   1, BMaddq,   0)
 DEFINE_DrawLine(g1_BMaddq_ME1,   1, BMaddq,   1)
 
-/* The optional rsx_intf_push_line() call factored out for the
+/* The optional rhi_intf_push_line() call factored out for the
  * Command_DrawLine macro since it conditionally compiles based on
  * backend availability and we want the macro body compact. */
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-#define GPU_LINE_RSX_PUSH_HOOK(gpu, points, BM_VAL, MASKEVAL_LIT) \
+#define GPU_LINE_RHI_PUSH_HOOK(gpu, points, BM_VAL, MASKEVAL_LIT) \
    do { \
-      if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN) \
+      if (rhi_intf_is_type() == RHI_OPENGL || rhi_intf_is_type() == RHI_VULKAN) \
       { \
-         rsx_intf_push_line(  (points)[0].x, (points)[0].y, \
+         rhi_intf_push_line(  (points)[0].x, (points)[0].y, \
                (points)[1].x, (points)[1].y, \
                ((uint32_t)(points)[0].r) | ((uint32_t)(points)[0].g << 8) | ((uint32_t)(points)[0].b << 16), \
                ((uint32_t)(points)[1].r) | ((uint32_t)(points)[1].g << 8) | ((uint32_t)(points)[1].b << 16), \
@@ -227,7 +227,7 @@ DEFINE_DrawLine(g1_BMaddq_ME1,   1, BMaddq,   1)
       } \
    } while (0)
 #else
-#define GPU_LINE_RSX_PUSH_HOOK(gpu, points, BM_VAL, MASKEVAL_LIT) ((void)0)
+#define GPU_LINE_RHI_PUSH_HOOK(gpu, points, BM_VAL, MASKEVAL_LIT) ((void)0)
 #endif
 
 /*
@@ -302,8 +302,8 @@ static void Command_DrawLine_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       return; \
    if (delta_y >= 512) \
       return; \
-   GPU_LINE_RSX_PUSH_HOOK(gpu, points, BM_VAL, MASKEVAL_LIT); \
-   if (rsx_intf_has_software_renderer()) \
+   GPU_LINE_RHI_PUSH_HOOK(gpu, points, BM_VAL, MASKEVAL_LIT); \
+   if (rhi_intf_has_software_renderer()) \
       DrawLine_g##GOURAUD_LIT##_##BM_TAG##_ME##MASKEVAL_LIT(gpu, points); \
 }
 

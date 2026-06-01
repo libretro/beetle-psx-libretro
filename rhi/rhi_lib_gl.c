@@ -1,4 +1,4 @@
-#include "rsx_lib_gl.h"
+#include "rhi_lib_gl.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -16,9 +16,9 @@
 #include "libretro.h"
 #include "libretro_options.h"
 
-#include "rsx/rsx_intf.h" /* enums */
-#include "rsx/rsx_defer.h"
-#include "rsx/tt_trace.h"
+#include "rhi/rhi_intf.h" /* enums */
+#include "rhi/rhi_defer.h"
+#include "rhi/tt_trace.h"
 #include "beetle_psx_globals.h"
 
 #define gl_draw_buffer_is_empty(x)           ((x)->map_index == 0)
@@ -280,7 +280,7 @@ static INLINE void glVertexAttribLPointer(
 #define VRAM_HEIGHT 512
 #define VRAM_PIXELS (VRAM_WIDTH_PIXELS * VRAM_HEIGHT)
 
-extern enum rsx_renderer_type rsx_type;
+extern enum rhi_renderer_type rhi_type;
 extern retro_log_printf_t log_cb;
 
 /* === GL hardware-render plumbing ============================
@@ -770,19 +770,19 @@ static gl_draw_config persistent_config = {
 static retro_gl static_renderer;
 
 /*
- * Queue for rsx_gl_* operations that arrive between the libretro
- * frontend's RETRO_ENVIRONMENT_SET_HW_RENDER acceptance (in rsx_gl_open)
+ * Queue for rhi_gl_* operations that arrive between the libretro
+ * frontend's RETRO_ENVIRONMENT_SET_HW_RENDER acceptance (in rhi_gl_open)
  * and the frontend actually calling our gl_context_reset to bring the
  * GL renderer up. Drained at the end of gl_context_reset so the buffered
- * state and VRAM uploads land on a live renderer. See rsx/rsx_defer.h
+ * state and VRAM uploads land on a live renderer. See rhi/rhi_defer.h
  * for the policy on which ops are deferred and which are dropped.
  */
-static rsx_defer_queue_t gl_defer_queue;
+static rhi_defer_queue_t gl_defer_queue;
 
-/* Forward declarations for the rsx_gl_* entry points the dispatcher
+/* Forward declarations for the rhi_gl_* entry points the dispatcher
  * replays into. They are defined further down in this file; the
  * dispatcher itself is static so no header touch is needed. */
-static void gl_defer_dispatch(void *user, const rsx_defer_op_t *op);
+static void gl_defer_dispatch(void *user, const rhi_defer_op_t *op);
 
 static bool has_software_fb = false;
 
@@ -2328,7 +2328,7 @@ static void bind_libretro_framebuffer(gl_renderer *renderer)
    _w        = renderer->config.display_resolution[0];
    _h        = renderer->config.display_resolution[1];
 
-   /* vp_w and vp_h currently contingent on rsx_intf_set_display_mode behavior... */
+   /* vp_w and vp_h currently contingent on rhi_intf_set_display_mode behavior... */
    vp_w = renderer->config.display_resolution[0];
    vp_h = renderer->config.display_resolution[1];
 
@@ -2368,7 +2368,7 @@ static void bind_libretro_framebuffer(gl_renderer *renderer)
       geometry.max_width  = MEDNAFEN_CORE_GEOMETRY_MAX_W * upscale;
       geometry.max_height = MEDNAFEN_CORE_GEOMETRY_MAX_H * upscale;
 
-      geometry.aspect_ratio = rsx_common_get_aspect_ratio(content_is_pal, renderer->crop_overscan,
+      geometry.aspect_ratio = rhi_common_get_aspect_ratio(content_is_pal, renderer->crop_overscan,
                                                           content_is_pal ? renderer->initial_scanline_pal :
                                                                            renderer->initial_scanline,
                                                           content_is_pal ? renderer->last_scanline_pal :
@@ -2419,7 +2419,7 @@ static bool retro_refresh_variables(gl_renderer *renderer)
        * we are running in software mode */
       has_software_fb = true;
 
-   tt_log_startup("rsx_gl_refresh_variables: has_software_fb=%d\n",
+   tt_log_startup("rhi_gl_refresh_variables: has_software_fb=%d\n",
          (int)has_software_fb);
 
    get_variables(&upscaling, &display_vram);
@@ -3035,14 +3035,14 @@ static void gl_caps_init(void)
 /*
  * Dispatcher for the deferred-op queue. Invoked once per queued op
  * during gl_context_reset's drain. Each case calls back into the
- * matching rsx_gl_<op>() entry point with the captured arguments. By
+ * matching rhi_gl_<op>() entry point with the captured arguments. By
  * drain time the renderer is up, so the entry point's "renderer present"
  * branch executes and actually performs the work that was originally
  * dropped. The `user` parameter is unused - we don't need any extra
  * state because the entry points already read everything they need from
  * the file-static `static_renderer`.
  */
-static void gl_defer_dispatch(void *user, const rsx_defer_op_t *op)
+static void gl_defer_dispatch(void *user, const rhi_defer_op_t *op)
 {
    (void)user;
    if (!op)
@@ -3050,45 +3050,45 @@ static void gl_defer_dispatch(void *user, const rsx_defer_op_t *op)
 
    switch (op->kind)
    {
-      case RSX_DEFER_SET_TEX_WINDOW:
-         rsx_gl_set_tex_window(op->u.set_tex_window.tww,
+      case RHI_DEFER_SET_TEX_WINDOW:
+         rhi_gl_set_tex_window(op->u.set_tex_window.tww,
                                op->u.set_tex_window.twh,
                                op->u.set_tex_window.twx,
                                op->u.set_tex_window.twy);
          break;
-      case RSX_DEFER_SET_DRAW_OFFSET:
-         rsx_gl_set_draw_offset(op->u.set_draw_offset.x,
+      case RHI_DEFER_SET_DRAW_OFFSET:
+         rhi_gl_set_draw_offset(op->u.set_draw_offset.x,
                                 op->u.set_draw_offset.y);
          break;
-      case RSX_DEFER_SET_DRAW_AREA:
-         rsx_gl_set_draw_area(op->u.set_draw_area.x0,
+      case RHI_DEFER_SET_DRAW_AREA:
+         rhi_gl_set_draw_area(op->u.set_draw_area.x0,
                               op->u.set_draw_area.y0,
                               op->u.set_draw_area.x1,
                               op->u.set_draw_area.y1);
          break;
-      case RSX_DEFER_SET_VRAM_FRAMEBUFFER_COORDS:
-         rsx_gl_set_vram_framebuffer_coords(
+      case RHI_DEFER_SET_VRAM_FRAMEBUFFER_COORDS:
+         rhi_gl_set_vram_framebuffer_coords(
                op->u.set_vram_framebuffer_coords.xstart,
                op->u.set_vram_framebuffer_coords.ystart);
          break;
-      case RSX_DEFER_SET_HORIZONTAL_DISPLAY_RANGE:
-         rsx_gl_set_horizontal_display_range(
+      case RHI_DEFER_SET_HORIZONTAL_DISPLAY_RANGE:
+         rhi_gl_set_horizontal_display_range(
                op->u.set_horizontal_display_range.x1,
                op->u.set_horizontal_display_range.x2);
          break;
-      case RSX_DEFER_SET_VERTICAL_DISPLAY_RANGE:
-         rsx_gl_set_vertical_display_range(
+      case RHI_DEFER_SET_VERTICAL_DISPLAY_RANGE:
+         rhi_gl_set_vertical_display_range(
                op->u.set_vertical_display_range.y1,
                op->u.set_vertical_display_range.y2);
          break;
-      case RSX_DEFER_SET_DISPLAY_MODE:
-         rsx_gl_set_display_mode(op->u.set_display_mode.depth_24bpp,
+      case RHI_DEFER_SET_DISPLAY_MODE:
+         rhi_gl_set_display_mode(op->u.set_display_mode.depth_24bpp,
                                  op->u.set_display_mode.is_pal,
                                  op->u.set_display_mode.is_480i,
                                  op->u.set_display_mode.width_mode);
          break;
-      case RSX_DEFER_LOAD_IMAGE:
-         rsx_gl_load_image(op->u.load_image.x,
+      case RHI_DEFER_LOAD_IMAGE:
+         rhi_gl_load_image(op->u.load_image.x,
                            op->u.load_image.y,
                            op->u.load_image.w,
                            op->u.load_image.h,
@@ -3096,8 +3096,8 @@ static void gl_defer_dispatch(void *user, const rsx_defer_op_t *op)
                            op->u.load_image.mask_test,
                            op->u.load_image.set_mask);
          break;
-      case RSX_DEFER_TOGGLE_DISPLAY:
-         rsx_gl_toggle_display(op->u.toggle_display.status);
+      case RHI_DEFER_TOGGLE_DISPLAY:
+         rhi_gl_toggle_display(op->u.toggle_display.status);
          break;
    }
 }
@@ -3118,7 +3118,7 @@ static void gl_context_reset(void)
    gl_caps_init();
 
    /* If the version is below our floor, leave the renderer in
-    * GL_STATE_INVALID so all subsequent rsx_gl_* entry points
+    * GL_STATE_INVALID so all subsequent rhi_gl_* entry points
     * short-circuit.  The user sees nothing render but gets an
     * unambiguous error in the log explaining why. */
    if (gl_caps.unsupported)
@@ -3152,8 +3152,8 @@ static void gl_context_reset(void)
       GPU_RestoreStateP2(true);
       GPU_RestoreStateP3();
 
-      /* Replay any rsx_gl_* state-sets / VRAM uploads / display
-       * toggles that arrived between rsx_gl_open's SET_HW_RENDER
+      /* Replay any rhi_gl_* state-sets / VRAM uploads / display
+       * toggles that arrived between rhi_gl_open's SET_HW_RENDER
        * and this context_reset firing. By this point the renderer
        * is live, so every push the dispatcher makes lands on a
        * real GL renderer rather than getting silently dropped.
@@ -3162,12 +3162,12 @@ static void gl_context_reset(void)
        * on top of the freshly-restored P3 baseline; this matches
        * the Vulkan backend, which also drains its queue after
        * the renderer has taken its initial state snapshot. */
-      if (rsx_defer_count(&gl_defer_queue) > 0)
+      if (rhi_defer_count(&gl_defer_queue) > 0)
       {
          log_cb(RETRO_LOG_INFO,
-               "[gl_context_reset] replaying %u deferred RSX op(s)\n",
-               (unsigned)rsx_defer_count(&gl_defer_queue));
-         rsx_defer_drain(&gl_defer_queue, gl_defer_dispatch, NULL);
+               "[gl_context_reset] replaying %u deferred RHI op(s)\n",
+               (unsigned)rhi_defer_count(&gl_defer_queue));
+         rhi_defer_drain(&gl_defer_queue, gl_defer_dispatch, NULL);
       }
    }
    else
@@ -3183,7 +3183,7 @@ static void gl_context_reset(void)
        * can never be replayed, and surviving across a failed
        * context_reset would let them leak into a future, unrelated
        * reset attempt. */
-      rsx_defer_clear(&gl_defer_queue);
+      rhi_defer_clear(&gl_defer_queue);
    }
 }
 
@@ -3202,7 +3202,7 @@ static void gl_context_destroy(void)
    /* Free the deferred-op storage. A new context_reset would start
     * from an empty queue anyway; carrying allocations across a
     * destroy would just hold memory we have no use for. */
-   rsx_defer_clear(&gl_defer_queue);
+   rhi_defer_clear(&gl_defer_queue);
 }
 
 static struct retro_system_av_info get_av_info(gl_video_clock std)
@@ -3307,31 +3307,31 @@ static struct retro_system_av_info get_av_info(gl_video_clock std)
    info.geometry.base_height    = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info.geometry.max_width      = max_width  * upscaling;
    info.geometry.max_height     = max_height * upscaling;
-   info.geometry.aspect_ratio = rsx_common_get_aspect_ratio(std, crop_overscan,
+   info.geometry.aspect_ratio = rhi_common_get_aspect_ratio(std, crop_overscan,
                                                             std ? initial_scanline_pal : initial_scanline_ntsc,
                                                             std ? last_scanline_pal : last_scanline_ntsc,
                                                             aspect_ratio_setting, display_vram, widescreen_hack,
                                                             widescreen_hack_aspect_ratio_setting);
 
-   info.timing.fps = rsx_common_get_timing_fps();
+   info.timing.fps = rhi_common_get_timing_fps();
    info.timing.sample_rate = SOUND_FREQUENCY;
 
    return info;
 }
 
-void rsx_gl_get_system_av_info(struct retro_system_av_info *info)
+void rhi_gl_get_system_av_info(struct retro_system_av_info *info)
 {
    struct retro_system_av_info result;
 
    /* This will possibly trigger the frontend to reconfigure itself */
    if (static_renderer.inited)
-      rsx_gl_refresh_variables();
+      rhi_gl_refresh_variables();
 
    result = get_av_info(static_renderer.video_clock);
    memcpy(info, &result, sizeof(result));
 }
 
-bool rsx_gl_open(bool is_pal)
+bool rhi_gl_open(bool is_pal)
 {
    enum retro_pixel_format f = RETRO_PIXEL_FORMAT_XRGB8888;
    gl_video_clock clock = is_pal ? VIDEO_CLOCK_PAL : VIDEO_CLOCK_NTSC;
@@ -3382,13 +3382,13 @@ bool rsx_gl_open(bool is_pal)
    hw_render.cache_context      = false;
 
    log_cb(RETRO_LOG_INFO,
-         "[rsx_gl_open] requesting hardware render context: %s\n",
+         "[rhi_gl_open] requesting hardware render context: %s\n",
          profile_str);
 
    if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
    {
       log_cb(RETRO_LOG_ERROR,
-            "[rsx_gl_open] frontend rejected SET_HW_RENDER for %s\n",
+            "[rhi_gl_open] frontend rejected SET_HW_RENDER for %s\n",
             profile_str);
       return false;
    }
@@ -3399,13 +3399,13 @@ bool rsx_gl_open(bool is_pal)
    return true;
 }
 
-void rsx_gl_close(void)
+void rhi_gl_close(void)
 {
    static_renderer.state       = GL_STATE_INVALID;
    static_renderer.video_clock = VIDEO_CLOCK_NTSC;
 }
 
-void rsx_gl_refresh_variables(void)
+void rhi_gl_refresh_variables(void)
 {
    gl_renderer* renderer = NULL;
    bool reconfigure_frontend;
@@ -3447,7 +3447,7 @@ void rsx_gl_refresh_variables(void)
    }
 }
 
-void rsx_gl_prepare_frame(void)
+void rhi_gl_prepare_frame(void)
 {
    gl_renderer *renderer;
 
@@ -3457,8 +3457,8 @@ void rsx_gl_prepare_frame(void)
    renderer = static_renderer.state_data;
    if (!renderer)
    {
-      rsx_type = RSX_SOFTWARE;
-      log_cb(RETRO_LOG_ERROR, "[rsx_gl_prepare_frame] Renderer state marked as valid but state data is null.\n");
+      rhi_type = RHI_SOFTWARE;
+      log_cb(RETRO_LOG_ERROR, "[rhi_gl_prepare_frame] Renderer state marked as valid but state data is null.\n");
       return;
    }
 
@@ -3525,7 +3525,7 @@ static void compute_vram_framebuffer_dimensions(gl_renderer *renderer)
    renderer->config.display_resolution[1] = fb_height;
 }
 
-void rsx_gl_finalize_frame(const void *fb, unsigned width,
+void rhi_gl_finalize_frame(const void *fb, unsigned width,
                            unsigned height, unsigned pitch)
 {
    gl_renderer *renderer;
@@ -3677,7 +3677,7 @@ void rsx_gl_finalize_frame(const void *fb, unsigned width,
          renderer->frontend_resolution[1], 0);
 }
 
-void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx, uint8_t twy)
+void rhi_gl_set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx, uint8_t twy)
 {
    gl_renderer *renderer;
 
@@ -3690,7 +3690,7 @@ void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx, uint8_t twy)
       /* Renderer not yet constructed - buffer the call so it lands
        * once gl_context_reset brings the renderer up. Matches the
        * Vulkan backend's defer policy for the same entry point. */
-      rsx_defer_push_set_tex_window(&gl_defer_queue, tww, twh, twx, twy);
+      rhi_defer_push_set_tex_window(&gl_defer_queue, tww, twh, twx, twy);
       return;
    }
 
@@ -3703,19 +3703,19 @@ void rsx_gl_set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx, uint8_t twy)
          (unsigned)tww, (unsigned)twh, (unsigned)twx, (unsigned)twy);
 }
 
-void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
+void rhi_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
 {
    /* No-op for the GL backend.  The PS1 GPU's mask state
     * (MaskSetOR / MaskEvalAND) is forwarded to the renderer
     * per-draw via the `mask_test` and `set_mask` parameters on
-    * each push_primitive / rsx_gl_load_image / rsx_gl_copy_rect /
-    * rsx_gl_fill_rect call (see e.g. push_primitive's mask_test
+    * each push_primitive / rhi_gl_load_image / rhi_gl_copy_rect /
+    * rhi_gl_fill_rect call (see e.g. push_primitive's mask_test
     * argument).  The GL renderer batches by mask_test value (see
     * the comparison in gl_renderer_*_finalize) and never reads
     * any persistent renderer-global mask register, so there's
     * nothing for this entry point to update.
     *
-    * The interface exists because the rsx_intf vtable is shared
+    * The interface exists because the rhi_intf vtable is shared
     * across SW / GL / Vulkan backends, and at least one backend
     * (the SW path, kept in sync via the gpu.cpp-side MaskSetOR /
     * MaskEvalAND fields) does care about the global form of this
@@ -3724,7 +3724,7 @@ void rsx_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
    (void)mask_eval_and;
 }
 
-void rsx_gl_set_draw_offset(int16_t x, int16_t y)
+void rhi_gl_set_draw_offset(int16_t x, int16_t y)
 {
    gl_renderer *renderer;
 
@@ -3734,7 +3734,7 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y)
    renderer = static_renderer.state_data;
    if (!renderer)
    {
-      rsx_defer_push_set_draw_offset(&gl_defer_queue, x, y);
+      rhi_defer_push_set_draw_offset(&gl_defer_queue, x, y);
       return;
    }
 
@@ -3746,7 +3746,7 @@ void rsx_gl_set_draw_offset(int16_t x, int16_t y)
    renderer->config.draw_offset[1] = y;
 }
 
-void rsx_gl_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
+void rhi_gl_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
 
    gl_renderer *renderer;
@@ -3757,7 +3757,7 @@ void rsx_gl_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
    renderer = static_renderer.state_data;
    if (!renderer)
    {
-      rsx_defer_push_set_draw_area(&gl_defer_queue, x0, y0, x1, y1);
+      rhi_defer_push_set_draw_area(&gl_defer_queue, x0, y0, x1, y1);
       return;
    }
 
@@ -3777,7 +3777,7 @@ void rsx_gl_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
    apply_scissor(renderer);
 }
 
-void rsx_gl_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
+void rhi_gl_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
 {
    gl_renderer *renderer;
 
@@ -3787,7 +3787,7 @@ void rsx_gl_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
    renderer = static_renderer.state_data;
    if (!renderer)
    {
-      rsx_defer_push_set_vram_framebuffer_coords(&gl_defer_queue,
+      rhi_defer_push_set_vram_framebuffer_coords(&gl_defer_queue,
             xstart, ystart);
       return;
    }
@@ -3796,7 +3796,7 @@ void rsx_gl_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
    renderer->config.display_top_left[1] = ystart;
 }
 
-void rsx_gl_set_horizontal_display_range(uint16_t x1, uint16_t x2)
+void rhi_gl_set_horizontal_display_range(uint16_t x1, uint16_t x2)
 {
    gl_renderer *renderer;
 
@@ -3806,7 +3806,7 @@ void rsx_gl_set_horizontal_display_range(uint16_t x1, uint16_t x2)
    renderer = static_renderer.state_data;
    if (!renderer)
    {
-      rsx_defer_push_set_horizontal_display_range(&gl_defer_queue, x1, x2);
+      rhi_defer_push_set_horizontal_display_range(&gl_defer_queue, x1, x2);
       return;
    }
 
@@ -3814,7 +3814,7 @@ void rsx_gl_set_horizontal_display_range(uint16_t x1, uint16_t x2)
    renderer->config.display_area_hrange[1] = x2;
 }
 
-void rsx_gl_set_vertical_display_range(uint16_t y1, uint16_t y2)
+void rhi_gl_set_vertical_display_range(uint16_t y1, uint16_t y2)
 {
    gl_renderer *renderer;
 
@@ -3824,7 +3824,7 @@ void rsx_gl_set_vertical_display_range(uint16_t y1, uint16_t y2)
    renderer = static_renderer.state_data;
    if (!renderer)
    {
-      rsx_defer_push_set_vertical_display_range(&gl_defer_queue, y1, y2);
+      rhi_defer_push_set_vertical_display_range(&gl_defer_queue, y1, y2);
       return;
    }
 
@@ -3832,7 +3832,7 @@ void rsx_gl_set_vertical_display_range(uint16_t y1, uint16_t y2)
    renderer->config.display_area_vrange[1] = y2;
 }
 
-void rsx_gl_set_display_mode(bool depth_24bpp,
+void rhi_gl_set_display_mode(bool depth_24bpp,
                              bool is_pal,
                              bool is_480i,
                              int width_mode)
@@ -3845,7 +3845,7 @@ void rsx_gl_set_display_mode(bool depth_24bpp,
    renderer = static_renderer.state_data;
    if (!renderer)
    {
-      rsx_defer_push_set_display_mode(&gl_defer_queue,
+      rhi_defer_push_set_display_mode(&gl_defer_queue,
             depth_24bpp, is_pal, is_480i, width_mode);
       return;
    }
@@ -3860,7 +3860,7 @@ void rsx_gl_set_display_mode(bool depth_24bpp,
 
 /* Draw commands */
 
-void rsx_gl_push_triangle(
+void rhi_gl_push_triangle(
       float p0x, float p0y, float p0w,
       float p1x, float p1y, float p1w,
       float p2x, float p2y, float p2w,
@@ -3975,7 +3975,7 @@ void rsx_gl_push_triangle(
    }
 }
 
-void rsx_gl_push_quad(
+void rhi_gl_push_quad(
       float p0x, float p0y, float p0w,
       float p1x, float p1y, float p1w,
       float p2x, float p2y, float p2w,
@@ -4130,7 +4130,7 @@ void rsx_gl_push_quad(
    }
 }
 
-void rsx_gl_push_line(
+void rhi_gl_push_line(
       int16_t p0x, int16_t p0y,
       int16_t p1x, int16_t p1y,
       uint32_t c0, uint32_t c1,
@@ -4214,7 +4214,7 @@ void rsx_gl_push_line(
    }
 }
 
-void rsx_gl_load_image(
+void rhi_gl_load_image(
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h,
       uint16_t *vram,
@@ -4245,7 +4245,7 @@ void rsx_gl_load_image(
        * gl_context_reset's drain will replay it on the live
        * renderer. The captured `vram` pointer aliases GPU.vram,
        * which lives for the whole core lifetime - safe to hold. */
-      rsx_defer_push_load_image(&gl_defer_queue,
+      rhi_defer_push_load_image(&gl_defer_queue,
             x, y, w, h, vram, mask_test, set_mask);
       return;
    }
@@ -4320,7 +4320,7 @@ void rsx_gl_load_image(
    glEnable(GL_SCISSOR_TEST);
 
 #ifdef DEBUG
-   get_error("rsx_gl_load_image");
+   get_error("rhi_gl_load_image");
 #endif
 
    glDeleteFramebuffers(1, &_fb.id);
@@ -4364,7 +4364,7 @@ void rsx_gl_load_image(
  *     desktop / GLES3 drivers expose it, so this is a fallback rather
  *     than a hot path.
  */
-bool rsx_gl_read_vram(uint16_t x, uint16_t y,
+bool rhi_gl_read_vram(uint16_t x, uint16_t y,
                       uint16_t w, uint16_t h,
                       uint16_t *vram)
 {
@@ -4651,7 +4651,7 @@ bool rsx_gl_read_vram(uint16_t x, uint16_t y,
        * IMPORTANT: `vram` is always the native-resolution PS1 mirror
        * (1024 x 512 uint16). When a hardware backend is in use the
        * core forces psx_gpu_upscale_shift=0 (see
-       * libretro.c:rsx_intf_open's hw_renderer branch); GPU.vram is
+       * libretro.c:rhi_intf_open's hw_renderer branch); GPU.vram is
        * therefore allocated 1024*512*sizeof(uint16) = 1 MiB, NOT
        * (1024*upscale)*(512*upscale)*sizeof(uint16). The GL renderer's
        * `internal_upscaling` is independent and applies only to the
@@ -4666,7 +4666,7 @@ bool rsx_gl_read_vram(uint16_t x, uint16_t y,
        * sized to upscale resolution - it isn't. With internal_upscaling=8
        * and a Dino Crisis 2 FBRead of (x=0, y=256, w=320, h=240), the
        * loop wrote ~41 MiB into a 1 MiB buffer and crashed in
-       * Command_FBRead via rsx_intf_read_vram. */
+       * Command_FBRead via rhi_intf_read_vram. */
       const size_t vram_stride = (size_t)VRAM_WIDTH_PIXELS;
 
       for (row = 0; row < h; row++)
@@ -4723,7 +4723,7 @@ cleanup:
  *                 portable GL).
  *
  * They're loosely synchronised by an unconditional fb_out -> fb_texture
- * blit at end-of-frame (see the bottom of rsx_gl_finalize_frame). That
+ * blit at end-of-frame (see the bottom of rhi_gl_finalize_frame). That
  * is sufficient for fb_out mutations whose effect only needs to be
  * visible to the *next* frame's textured draws. It is NOT sufficient
  * when the same frame later samples the mutated region as a texture -
@@ -4737,14 +4737,14 @@ cleanup:
  * actually want, to avoid the per-frame CPU bookkeeping), the gap is
  * exposed.
  *
- * This helper closes the gap on demand. Call it from any rsx_gl_*
+ * This helper closes the gap on demand. Call it from any rhi_gl_*
  * entry point that mutates a region of fb_out and wants subsequent
  * same-frame textured draws to see the new pixels. The blit goes
  * through GL_NEAREST (matching the historical 1x-degrade behaviour
  * the SW path would have produced) and downsamples from upscaled
  * fb_out to native fb_texture in one call.
  *
- * Gating (the same conditions the long-standing rsx_gl_copy_rect
+ * Gating (the same conditions the long-standing rhi_gl_copy_rect
  * mirror has used since the FF7-swirl fix):
  *
  *   - has_software_fb is false. When it's true the shadow SW renderer
@@ -4843,7 +4843,7 @@ static void gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
 #endif /* GL_READ_FRAMEBUFFER */
 
 
-void rsx_gl_fill_rect(
+void rhi_gl_fill_rect(
       uint32_t color,
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h)
@@ -4948,7 +4948,7 @@ void rsx_gl_fill_rect(
 #endif
 }
 
-void rsx_gl_copy_rect(
+void rhi_gl_copy_rect(
       uint16_t src_x, uint16_t src_y,
       uint16_t dst_x, uint16_t dst_y,
       uint16_t w, uint16_t h,
@@ -5071,17 +5071,17 @@ void rsx_gl_copy_rect(
    /* Mirror the FBCopy result into fb_texture for same-frame
     * sampling. See gl_mirror_fb_out_to_fb_texture for the full
     * rationale - this used to be ~60 lines of inline FBO dance
-    * here, extracted so rsx_gl_fill_rect can share it. */
+    * here, extracted so rhi_gl_fill_rect can share it. */
 #ifdef GL_READ_FRAMEBUFFER
    gl_mirror_fb_out_to_fb_texture(renderer, dst_x, dst_y, w, h);
 #endif
 
 #ifdef DEBUG
-   get_error("rsx_gl_copy_rect");
+   get_error("rhi_gl_copy_rect");
 #endif
 }
 
-void rsx_gl_toggle_display(bool status)
+void rhi_gl_toggle_display(bool status)
 {
    gl_renderer *renderer;
 
@@ -5091,14 +5091,14 @@ void rsx_gl_toggle_display(bool status)
    renderer = static_renderer.state_data;
    if (!renderer)
    {
-      rsx_defer_push_toggle_display(&gl_defer_queue, status);
+      rhi_defer_push_toggle_display(&gl_defer_queue, status);
       return;
    }
 
    renderer->config.display_off = status;
 }
 
-bool rsx_gl_has_software_renderer(void)
+bool rhi_gl_has_software_renderer(void)
 {
    if (!static_renderer.inited)
       return false;

@@ -1,5 +1,5 @@
-#ifndef __RSX_INTF_H__
-#define __RSX_INTF_H__
+#ifndef __RHI_INTF_H__
+#define __RHI_INTF_H__
 
 #include "libretro.h"
 
@@ -11,11 +11,11 @@
 #define FPS_PAL_INTERLACED     50.000
 #define FPS_PAL_NONINTERLACED  49.761
 
-enum rsx_renderer_type
+enum rhi_renderer_type
 {
-   RSX_SOFTWARE = 0,
-   RSX_OPENGL,
-   RSX_VULKAN
+   RHI_SOFTWARE = 0,
+   RHI_OPENGL,
+   RHI_VULKAN
 };
 
 enum force_renderer_type
@@ -53,33 +53,33 @@ enum height_modes
 extern "C" {
 #endif
 
-void rsx_intf_set_environment(retro_environment_t cb);
-void rsx_intf_set_video_refresh(retro_video_refresh_t cb);
-void rsx_intf_get_system_av_info(struct retro_system_av_info *info);
+void rhi_intf_set_environment(retro_environment_t cb);
+void rhi_intf_set_video_refresh(retro_video_refresh_t cb);
+void rhi_intf_get_system_av_info(struct retro_system_av_info *info);
 
-bool rsx_intf_open(bool is_pal, bool force_software);
-void rsx_intf_close(void);
-void rsx_intf_refresh_variables(void);
-void rsx_intf_prepare_frame(void);
-void rsx_intf_finalize_frame(const void *fb, unsigned width,
+bool rhi_intf_open(bool is_pal, bool force_software);
+void rhi_intf_close(void);
+void rhi_intf_refresh_variables(void);
+void rhi_intf_prepare_frame(void);
+void rhi_intf_finalize_frame(const void *fb, unsigned width,
                              unsigned height, unsigned pitch);
 
-void rsx_intf_set_tex_window(uint8_t tww, uint8_t twh,
+void rhi_intf_set_tex_window(uint8_t tww, uint8_t twh,
                              uint8_t twx, uint8_t twy);
 
-void rsx_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and);
-void rsx_intf_set_draw_offset(int16_t x, int16_t y);
-void rsx_intf_set_draw_area(uint16_t x0, uint16_t y0,
+void rhi_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and);
+void rhi_intf_set_draw_offset(int16_t x, int16_t y);
+void rhi_intf_set_draw_area(uint16_t x0, uint16_t y0,
                             uint16_t x1, uint16_t y1);
-void rsx_intf_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart);
-void rsx_intf_set_horizontal_display_range(uint16_t x1, uint16_t x2);
-void rsx_intf_set_vertical_display_range(uint16_t y1, uint16_t y2);
-void rsx_intf_set_display_mode(bool depth_24bpp,
+void rhi_intf_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart);
+void rhi_intf_set_horizontal_display_range(uint16_t x1, uint16_t x2);
+void rhi_intf_set_vertical_display_range(uint16_t y1, uint16_t y2);
+void rhi_intf_set_display_mode(bool depth_24bpp,
                                bool is_pal,
                                bool is_480i,
                                int width_mode); //enum
 
-void rsx_intf_push_triangle(float p0x, float p0y, float p0w,
+void rhi_intf_push_triangle(float p0x, float p0y, float p0w,
                             float p1x, float p1y, float p1w,
                             float p2x, float p2y, float p2w,
                             uint32_t c0, uint32_t c1, uint32_t c2,
@@ -100,7 +100,7 @@ void rsx_intf_push_triangle(float p0x, float p0y, float p0w,
                             bool mask_test,
                             bool set_mask);
 
-void rsx_intf_push_quad(float p0x, float p0y, float p0w,
+void rhi_intf_push_quad(float p0x, float p0y, float p0w,
                         float p1x, float p1y, float p1w,
                         float p2x, float p2y, float p2w,
                         float p3x, float p3y, float p3w,
@@ -125,7 +125,7 @@ void rsx_intf_push_quad(float p0x, float p0y, float p0w,
                         bool is_sprite,
                         bool may_be_2d);
 
-void rsx_intf_push_line(int16_t p0x, int16_t p0y,
+void rhi_intf_push_line(int16_t p0x, int16_t p0y,
                         int16_t p1x, int16_t p1y,
                         uint32_t c0,
                         uint32_t c1,
@@ -136,34 +136,34 @@ void rsx_intf_push_line(int16_t p0x, int16_t p0y,
                         bool mask_test,
                         bool set_mask);
 
-void rsx_intf_load_image(uint16_t x, uint16_t y,
+void rhi_intf_load_image(uint16_t x, uint16_t y,
                          uint16_t w, uint16_t h,
                          uint16_t *vram,
                          bool mask_test,
                          bool set_mask);
 
-bool rsx_intf_read_vram(uint16_t x, uint16_t y,
+bool rhi_intf_read_vram(uint16_t x, uint16_t y,
                         uint16_t w, uint16_t h,
                         uint16_t *vram);
 
-void rsx_intf_fill_rect(uint32_t color,
+void rhi_intf_fill_rect(uint32_t color,
                         uint16_t x, uint16_t y,
                         uint16_t w, uint16_t h);
 
-void rsx_intf_copy_rect(uint16_t src_x, uint16_t src_y,
+void rhi_intf_copy_rect(uint16_t src_x, uint16_t src_y,
                         uint16_t dst_x, uint16_t dst_y,
                         uint16_t w, uint16_t h, 
                         bool mask_test, bool set_mask);
 
-enum rsx_renderer_type rsx_intf_is_type(void);
+enum rhi_renderer_type rhi_intf_is_type(void);
 
-void rsx_intf_toggle_display(bool status);
+void rhi_intf_toggle_display(bool status);
 
-bool rsx_intf_has_software_renderer(void);
+bool rhi_intf_has_software_renderer(void);
 
-double rsx_common_get_timing_fps(void);
+double rhi_common_get_timing_fps(void);
 
-float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
+float rhi_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,
                                   int aspect_ratio_setting, bool vram_override, bool widescreen_override,
                                   int widescreen_hack_aspect_ratio_setting);
@@ -172,4 +172,4 @@ float rsx_common_get_aspect_ratio(bool pal_content, int crop_overscan,
 }
 #endif
 
-#endif /*__RSX_H__*/
+#endif /*__RHI_H__*/

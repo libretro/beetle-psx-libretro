@@ -223,7 +223,7 @@ DRAWSPRITE_T1_BMGROUP(1, 2, 1, 1)
  * Reached from the GP0 dispatch via Commands[0x60..0x7F].
  */
 
-/* The optional rsx_intf_push_quad() backend hook is factored out
+/* The optional rhi_intf_push_quad() backend hook is factored out
  * since it conditionally compiles based on backend availability.
  *
  * The hook does the (clut_x, clut_y) bit-extraction itself rather
@@ -231,7 +231,7 @@ DRAWSPRITE_T1_BMGROUP(1, 2, 1, 1)
  * caller entirely so the empty-hook build (no GL/GLES/Vulkan) does
  * not declare two locals just to drop them. */
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-#define GPU_SPR_RSX_PUSH_HOOK(gpu, x, y, w, h, u, v, color, clut, T_LIT, TM_LIT, MO_LIT, BM_VAL, ME_LIT) \
+#define GPU_SPR_RHI_PUSH_HOOK(gpu, x, y, w, h, u, v, color, clut, T_LIT, TM_LIT, MO_LIT, BM_VAL, ME_LIT) \
    do { \
       enum blending_modes blend_mode = BLEND_MODE_AVERAGE; \
       if (T_LIT) \
@@ -241,9 +241,9 @@ DRAWSPRITE_T1_BMGROUP(1, 2, 1, 1)
          else \
             blend_mode = BLEND_MODE_ADD; \
       } \
-      if (rsx_intf_is_type() == RSX_OPENGL || rsx_intf_is_type() == RSX_VULKAN) \
+      if (rhi_intf_is_type() == RHI_OPENGL || rhi_intf_is_type() == RHI_VULKAN) \
       { \
-         rsx_intf_push_quad(  (x),                    /* p0x */ \
+         rhi_intf_push_quad(  (x),                    /* p0x */ \
                               (y),                    /* p0y */ \
                               1, \
                               (x) + (w),              /* p1x */ \
@@ -277,7 +277,7 @@ DRAWSPRITE_T1_BMGROUP(1, 2, 1, 1)
       } \
    } while (0)
 #else
-#define GPU_SPR_RSX_PUSH_HOOK(gpu, x, y, w, h, u, v, color, clut, T_LIT, TM_LIT, MO_LIT, BM_VAL, ME_LIT) ((void)0)
+#define GPU_SPR_RHI_PUSH_HOOK(gpu, x, y, w, h, u, v, color, clut, T_LIT, TM_LIT, MO_LIT, BM_VAL, ME_LIT) ((void)0)
 #endif
 
 /* Inner switch helper macro: emit the 4-way SpriteFlip switch with
@@ -359,8 +359,8 @@ static void Command_DrawSprite_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    } \
    x = sign_x_to_s32(11, x + gpu->OffsX); \
    y = sign_x_to_s32(11, y + gpu->OffsY); \
-   GPU_SPR_RSX_PUSH_HOOK(gpu, x, y, w, h, u, v, color, clut, T_LIT, TM_LIT, MO_LIT, BM_VAL, ME_LIT); \
-   if (!rsx_intf_has_software_renderer()) \
+   GPU_SPR_RHI_PUSH_HOOK(gpu, x, y, w, h, u, v, color, clut, T_LIT, TM_LIT, MO_LIT, BM_VAL, ME_LIT); \
+   if (!rhi_intf_has_software_renderer()) \
       return; \
    SPR_DISPATCH_DRAW(TM_LIT, BM_TAG, MO_LIT, ME_LIT, T_LIT) \
 }

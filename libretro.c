@@ -13,7 +13,7 @@
 #include <streams/file_stream.h>
 #include <string/stdstring.h>
 #include <rhash.h>
-#include "rsx/rsx_intf.h"
+#include "rhi/rhi_intf.h"
 #include "libretro_cbs.h"
 #include "beetle_psx_globals.h"
 #include "libretro_options.h"
@@ -3545,7 +3545,7 @@ static void alloc_surface(void)
     * a ~21 MB buffer (PAL @ 4x upscale) that nothing ever
     * touches is pure waste, so skip it unless we know we'll
     * use it. */
-   if (rsx_intf_is_type() != RSX_SOFTWARE)
+   if (rhi_intf_is_type() != RHI_SOFTWARE)
    {
       if (surf)
       {
@@ -4259,7 +4259,7 @@ static void check_variables(bool startup)
    }
    else
    {
-      rsx_intf_refresh_variables();
+      rhi_intf_refresh_variables();
 
       var.key = BEETLE_OPT(internal_resolution);
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -4279,13 +4279,13 @@ static void check_variables(bool startup)
       else
          psx_gpu_upscale_shift_hw = 0;
 
-      switch (rsx_intf_is_type())
+      switch (rhi_intf_is_type())
       {
-         case RSX_SOFTWARE:
+         case RHI_SOFTWARE:
             psx_gpu_upscale_shift = psx_gpu_upscale_shift_hw;
             break;
-         case RSX_OPENGL:
-         case RSX_VULKAN:
+         case RHI_OPENGL:
+         case RHI_VULKAN:
             psx_gpu_upscale_shift = 0;
             break;
       }
@@ -5169,7 +5169,7 @@ bool retro_load_game(const struct retro_game_info *info)
    if (cd_speedup_compat_max && cd_2x_speedup > cd_speedup_compat_max)
       cd_2x_speedup = cd_speedup_compat_max;
 
-   /* Note: alloc_surface() used to run here, before rsx_intf_open.
+   /* Note: alloc_surface() used to run here, before rhi_intf_open.
     * It now runs AFTER the renderer has been selected so it can
     * skip the (~21 MB at 4x PAL) allocation when a hardware
     * renderer is in use - nothing in this block depends on surf
@@ -5191,14 +5191,14 @@ bool retro_load_game(const struct retro_game_info *info)
    // check and pick a renderer.  alloc_surface follows the renderer
    // choice so it can be skipped on the HW paths.
    force_software_renderer = false;
-   ret = rsx_intf_open(content_is_pal, force_software_renderer);
+   ret = rhi_intf_open(content_is_pal, force_software_renderer);
 
    alloc_surface();
 
    /* Hide irrelevant core options */
-   switch (rsx_intf_is_type())
+   switch (rhi_intf_is_type())
    {
-      case RSX_SOFTWARE:
+      case RHI_SOFTWARE:
       {
          struct retro_core_option_display option_display;
          option_display.visible = false;
@@ -5243,7 +5243,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
          break;
       }
-      case RSX_OPENGL:
+      case RHI_OPENGL:
       {
          struct retro_core_option_display option_display;
          option_display.visible = false;
@@ -5277,7 +5277,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
          break;
       }
-      case RSX_VULKAN:
+      case RHI_VULKAN:
       {
          struct retro_core_option_display option_display;
          option_display.visible = false;
@@ -5314,7 +5314,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
 void retro_unload_game(void)
 {
-   rsx_intf_close();
+   rhi_intf_close();
 
    MDFN_FlushGameCheats(0);
 
@@ -5365,7 +5365,7 @@ void retro_run(void)
    if (!PSX_CPU || !PSX_FIO || !PSX_CDC)
       return;
 
-   rsx_intf_prepare_frame();
+   rhi_intf_prepare_frame();
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
    {
@@ -5649,7 +5649,7 @@ void retro_run(void)
    }
 
    // Check if timing needs to be changed due to interlacing change on this frame
-   // May be possible to track interlacing via espec instead of via RSX?
+   // May be possible to track interlacing via espec instead of via RHI?
    if (MDFN_UNLIKELY((core_timing_fps_mode == AUTO_TOGGLE_TIMING) && interlace_setting_dirty))
    {
       // This may cause video and audio reinit on the frontend, so it may be preferable to
@@ -5665,7 +5665,7 @@ void retro_run(void)
    height        = spec.DisplayRect.h;
    upscale_shift = GPU_get_upscale_shift();
 
-   if (rsx_intf_is_type() == RSX_SOFTWARE)
+   if (rhi_intf_is_type() == RHI_SOFTWARE)
    {
 #ifdef NEED_DEINTERLACER
       if (spec.InterlaceOn)
@@ -5785,7 +5785,7 @@ void retro_run(void)
          fb = pix;
    }
 
-   rsx_intf_finalize_frame(fb, width, height,
+   rhi_intf_finalize_frame(fb, width, height,
 		   MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
 
    if (audio_batch_cb)
@@ -5823,7 +5823,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    if (!info)
       return;
-   rsx_intf_get_system_av_info(info);
+   rhi_intf_get_system_av_info(info);
 }
 
 /* Reset all process-lifetime state so that a subsequent retro_init()
@@ -5934,7 +5934,7 @@ void retro_set_environment(retro_environment_t cb)
 
    input_set_env(cb);
 
-   rsx_intf_set_environment(cb);
+   rhi_intf_set_environment(cb);
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
@@ -5962,7 +5962,7 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
 {
    video_cb = cb;
 
-   rsx_intf_set_video_refresh(cb);
+   rhi_intf_set_video_refresh(cb);
 }
 
 size_t retro_serialize_size(void)

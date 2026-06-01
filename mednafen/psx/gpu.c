@@ -29,8 +29,8 @@
 
 #include "../math_ops.h"
 #include "../state_helpers.h"
-#include "../../rsx/rsx_intf.h"
-#include "../../rsx/tt_trace.h"
+#include "../../rhi/rhi_intf.h"
+#include "../../rhi/tt_trace.h"
 
 #include "../pgxp/pgxp_main.h"
 #include "../pgxp/pgxp_gpu.h"
@@ -124,7 +124,7 @@ static uint16_t *vram_new = NULL;
  * Deferred SW-renderer scanout records.
  *
  * The per-scanline path that writes VRAM to the SW surface
- * (rsx_intf_is_type() == RSX_SOFTWARE) interleaves with polygon
+ * (rhi_intf_is_type() == RHI_SOFTWARE) interleaves with polygon
  * rasterisation; if the rasteriser writes to the same VRAM rows
  * that the scanout is reading - which it does in 480i double-
  * buffered titles when dfe-based field gating is bypassed
@@ -411,7 +411,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
    int32_t destY             = (cb[1] >> 16) & 0x3FF;
    int32_t width             = (((cb[2] >> 0) & 0x3FF) + 0xF) & ~0xF;
    int32_t height            = (cb[2] >> 16) & 0x1FF;
-   const bool sw             = rsx_intf_has_software_renderer();
+   const bool sw             = rhi_intf_has_software_renderer();
 
    gpu->DrawTimeAvail       -= 46; /* Approximate */
 
@@ -427,7 +427,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
 
       /* Only execute the per-pixel software writes when a software
        * renderer is actually consuming GPU.vram - the trailing
-       * rsx_intf_fill_rect handles the work for hardware backends
+       * rhi_intf_fill_rect handles the work for hardware backends
        * directly, so dirtying VRAM here would just be a wasted
        * width-many texel_puts (each splatting UPSCALE^2 subpixels)
        * that nothing reads. */
@@ -443,7 +443,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
       }
    }
 
-   rsx_intf_fill_rect(cb[0], destX, destY, width, height);
+   rhi_intf_fill_rect(cb[0], destX, destY, width, height);
 }
 
 static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
@@ -464,7 +464,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
    tt_log("gpu Command_FBCopy src=(%d,%d) dst=(%d,%d) %dx%d sw=%d mask_eval=%d mask_set=%d\n",
          (int)sourceX, (int)sourceY, (int)destX, (int)destY,
          (int)width, (int)height,
-         (int)rsx_intf_has_software_renderer(),
+         (int)rhi_intf_has_software_renderer(),
          (int)(g->MaskEvalAND != 0),
          (int)(g->MaskSetOR != 0));
 
@@ -474,9 +474,9 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
 
    /* Run the in-VRAM copy only when something will actually read
     * back from GPU.vram.  Hardware backends do the copy themselves
-    * via rsx_intf_copy_rect below, so the per-pixel software loop
+    * via rhi_intf_copy_rect below, so the per-pixel software loop
     * would just dirty VRAM that nothing consumes. */
-   if (rsx_intf_has_software_renderer())
+   if (rhi_intf_has_software_renderer())
    {
       unsigned y;
       for(y = 0; y < (unsigned)height; y++)
@@ -510,7 +510,7 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
       }
    }
 
-   rsx_intf_copy_rect(sourceX, sourceY, destX, destY, width, height, g->MaskEvalAND != 0, g->MaskSetOR != 0);
+   rhi_intf_copy_rect(sourceX, sourceY, destX, destY, width, height, g->MaskEvalAND != 0, g->MaskSetOR != 0);
 }
 
 static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
@@ -535,7 +535,7 @@ static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
    tt_log("gpu Command_FBWrite rect=(%u,%u %ux%u) sw=%d mask_eval=%d mask_set=%d\n",
          (unsigned)g->FBRW_X, (unsigned)g->FBRW_Y,
          (unsigned)g->FBRW_W, (unsigned)g->FBRW_H,
-         (int)rsx_intf_has_software_renderer(),
+         (int)rhi_intf_has_software_renderer(),
          (int)(g->MaskEvalAND != 0),
          (int)(g->MaskSetOR != 0));
 
@@ -571,20 +571,20 @@ static void Command_FBRead(PS_GPU* g, const uint32_t *cb)
    tt_log("gpu Command_FBRead rect=(%u,%u %ux%u) sw=%d\n",
          (unsigned)g->FBRW_X, (unsigned)g->FBRW_Y,
          (unsigned)g->FBRW_W, (unsigned)g->FBRW_H,
-         (int)rsx_intf_has_software_renderer());
+         (int)rhi_intf_has_software_renderer());
 
    InvalidateTexCache(g);
 
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
       g->InCmd = INCMD_FBREAD;
 
-   if (!rsx_intf_has_software_renderer())
+   if (!rhi_intf_has_software_renderer())
    {
        /* Need a hard readback from GPU renderer.  Return value
         * is intentionally discarded here - on Vulkan-renderer
         * failure or non-Vulkan hardware the call is a no-op and
         * g->vram keeps its prior contents. */
-       (void)rsx_intf_read_vram(
+       (void)rhi_intf_read_vram(
                g->FBRW_X, g->FBRW_Y,
                g->FBRW_W, g->FBRW_H,
                g->vram);
@@ -613,14 +613,14 @@ static void Command_TexWindow(PS_GPU* g, const uint32_t *cb)
    g->twy = ((*cb >> 15) & 0x1F);
 
    RecalcTexWindowStuff(g);
-   rsx_intf_set_tex_window(g->tww, g->twh, g->twx, g->twy);
+   rhi_intf_set_tex_window(g->tww, g->twh, g->twx, g->twy);
 }
 
 static void Command_Clip0(PS_GPU* g, const uint32_t *cb)
 {
    g->ClipX0 = *cb & 1023;
    g->ClipY0 = (*cb >> 10) & 1023;
-   rsx_intf_set_draw_area(g->ClipX0, g->ClipY0,
+   rhi_intf_set_draw_area(g->ClipX0, g->ClipY0,
            g->ClipX1, g->ClipY1);
 }
 
@@ -628,7 +628,7 @@ static void Command_Clip1(PS_GPU* g, const uint32_t *cb)
 {
    g->ClipX1 = *cb & 1023;
    g->ClipY1 = (*cb >> 10) & 1023;
-   rsx_intf_set_draw_area(g->ClipX0, g->ClipY0,
+   rhi_intf_set_draw_area(g->ClipX0, g->ClipY0,
          g->ClipX1, g->ClipY1);
 }
 
@@ -643,7 +643,7 @@ static void Command_MaskSetting(PS_GPU* g, const uint32_t *cb)
    g->MaskSetOR   = (*cb & 1) ? 0x8000 : 0x0000;
    g->MaskEvalAND = (*cb & 2) ? 0x8000 : 0x0000;
 
-   rsx_intf_set_mask_setting(g->MaskSetOR, g->MaskEvalAND);
+   rhi_intf_set_mask_setting(g->MaskSetOR, g->MaskEvalAND);
 }
 
 
@@ -849,7 +849,7 @@ static INLINE bool CalcFIFOReadyBit(void)
    return(true);
 }
 
-static void RSX_UpdateDisplayMode(void)
+static void RHI_UpdateDisplayMode(void)
 {
    bool depth_24bpp = !!(GPU.DisplayMode & 0x10);
 
@@ -904,7 +904,7 @@ static void RSX_UpdateDisplayMode(void)
       }
    }
 
-   rsx_intf_set_display_mode(
+   rhi_intf_set_display_mode(
          depth_24bpp,
          is_pal_mode, 
          is_480i_mode,
@@ -1270,7 +1270,7 @@ static void ProcessFIFO(uint32_t in_count)
    uint32_t cc            = GPU.InCmd_CC;
    const CTEntry *command = &Commands[cc];
    bool read_fifo         = false;
-   bool sw                = rsx_intf_has_software_renderer();
+   bool sw                = rhi_intf_has_software_renderer();
 
    switch (GPU.InCmd)
    {
@@ -1298,8 +1298,8 @@ static void ProcessFIFO(uint32_t in_count)
                GPU.FBRW_CurY++;
                if(GPU.FBRW_CurY == (GPU.FBRW_Y + GPU.FBRW_H))
                {
-                  /* Upload complete, send over to RSX */
-                  rsx_intf_load_image(
+                  /* Upload complete, send over to RHI */
+                  rhi_intf_load_image(
                         GPU.FBRW_X, GPU.FBRW_Y,
                         GPU.FBRW_W, GPU.FBRW_H,
                         GPU.vram,
@@ -1419,13 +1419,13 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             break;
          case 0x00:  /* Reset GPU */
             GPU_SoftReset();
-            rsx_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
+            rhi_intf_set_draw_area(GPU.ClipX0, GPU.ClipY0,
                                    GPU.ClipX1, GPU.ClipY1);
-            rsx_intf_toggle_display(GPU.DisplayOff); /* `true` set by GPU_SoftReset() */
-            rsx_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart); /* (0, 0) set by GPU_SoftReset() */
-            rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd); /* 0x200, 0xC00 set by GPU_SoftReset() */
-            rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd); /* 0x10, 0x100 set by GPU_SoftReset() */
-            RSX_UpdateDisplayMode();
+            rhi_intf_toggle_display(GPU.DisplayOff); /* `true` set by GPU_SoftReset() */
+            rhi_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart); /* (0, 0) set by GPU_SoftReset() */
+            rhi_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd); /* 0x200, 0xC00 set by GPU_SoftReset() */
+            rhi_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd); /* 0x10, 0x100 set by GPU_SoftReset() */
+            RHI_UpdateDisplayMode();
             break;
 
          case 0x01:  /* Reset command buffer */
@@ -1442,7 +1442,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 
          case 0x03:  /* Display enable */
             GPU.DisplayOff = V & 1;
-            rsx_intf_toggle_display(GPU.DisplayOff);
+            rhi_intf_toggle_display(GPU.DisplayOff);
             break;
 
          case 0x04:  /* DMA Setup */
@@ -1453,24 +1453,24 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             GPU.DisplayFB_XStart = V & 0x3FE; /* Lower bit is apparently ignored. */
             GPU.DisplayFB_YStart = (V >> 10) & 0x1FF;
             GPU.display_change_count++;
-            rsx_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
+            rhi_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
             break;
 
          case 0x06:  /* Horizontal display range */
             GPU.HorizStart = V & 0xFFF;
             GPU.HorizEnd = (V >> 12) & 0xFFF;
-            rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
+            rhi_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
             break;
 
          case 0x07:
             GPU.VertStart = V & 0x3FF;
             GPU.VertEnd = (V >> 10) & 0x3FF;
-            rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd);
+            rhi_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd);
             break;
 
          case 0x08:
             GPU.DisplayMode = V & 0xFF;
-            RSX_UpdateDisplayMode();
+            RHI_UpdateDisplayMode();
             break;
 
          case 0x09:
@@ -1874,7 +1874,7 @@ int32_t GPU_Update(const int32_t sys_timestamp)
                }
 
 
-               if (rsx_intf_is_type() == RSX_SOFTWARE && GPU.espec)
+               if (rhi_intf_is_type() == RHI_SOFTWARE && GPU.espec)
                {
                   if((bool)(GPU.DisplayMode & DISP_PAL) != GPU.HardwarePALType)
                   {
@@ -2037,7 +2037,7 @@ int32_t GPU_Update(const int32_t sys_timestamp)
 
                GPU.LineWidths[dest_line] = dmw;
 
-               if (rsx_intf_is_type() == RSX_SOFTWARE)
+               if (rhi_intf_is_type() == RHI_SOFTWARE)
                {
                   /* Convert the necessary variables to the upscaled version */
                   uint32_t x;
@@ -2415,7 +2415,7 @@ void GPU_RestoreStateP3(void)
          GPU.TexCache[i].Data[j] = TexCache_Data[i][j];
    }
    RecalcTexWindowStuff(&GPU);
-   rsx_intf_set_tex_window(GPU.tww, GPU.twh, GPU.twx, GPU.twy);
+   rhi_intf_set_tex_window(GPU.tww, GPU.twh, GPU.twx, GPU.twy);
 
    FastFIFO_SaveStatePostLoad(&GPU_BlitterFIFO);
 
@@ -2440,19 +2440,19 @@ void GPU_RestoreStateP3(void)
 
    IRQ_Assert(IRQ_GPU, GPU.IRQPending);
 
-   rsx_intf_toggle_display(GPU.DisplayOff);
-   rsx_intf_set_draw_area( GPU.ClipX0, GPU.ClipY0,
+   rhi_intf_toggle_display(GPU.DisplayOff);
+   rhi_intf_set_draw_area( GPU.ClipX0, GPU.ClipY0,
                            GPU.ClipX1, GPU.ClipY1);
 
-   rsx_intf_load_image( 0,    0,
+   rhi_intf_load_image( 0,    0,
                         1024, 512,
                         GPU.vram, false, false);
 
-   rsx_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
-   rsx_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
-   rsx_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd);
+   rhi_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
+   rhi_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
+   rhi_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd);
 
-   RSX_UpdateDisplayMode();
+   RHI_UpdateDisplayMode();
 }
 
 int GPU_StateAction(StateMem *sm, int load, int data_only)

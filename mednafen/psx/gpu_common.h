@@ -17,7 +17,7 @@ extern enum dither_mode psx_gpu_dither_mode;
  * Apply one of the PS1 hardware semi-transparency blend modes to
  * `*fore_pix`, using `bg_pix` as the previously-stored framebuffer
  * value. `BlendMode` is one of the BLEND_MODE_* values from
- * rsx_intf.h (BLEND_MODE_AVERAGE / _ADD / _SUBTRACT / _ADD_FOURTH);
+ * rhi_intf.h (BLEND_MODE_AVERAGE / _ADD / _SUBTRACT / _ADD_FOURTH);
  * BLEND_MODE_OPAQUE is -1 and never reaches this function -
  * callers gate on `BlendMode >= 0` first.
  *

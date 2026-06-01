@@ -46,7 +46,7 @@ extern "C" {
  * First call reads the env var; subsequent calls return cached value. */
 bool tt_enabled(void);
 
-/* Bump the frame counter (call from rsx_*_finalize_frame). */
+/* Bump the frame counter (call from rhi_*_finalize_frame). */
 void tt_frame_advance(void);
 
 /* Emit a trace line. Format must NOT include a trailing newline if you

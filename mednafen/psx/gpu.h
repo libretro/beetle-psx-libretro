@@ -235,7 +235,7 @@ bool     GPU_DMACanWrite(void);
 int32_t  GPU_Update(const int32_t sys_timestamp);
 int32_t  GPU_GetScanlineNum(void);
 
-/* Used by rsx_lib_gl.c to access the VRAM contents and
+/* Used by rhi_lib_gl.c to access the VRAM contents and
  * to drive state restore points. */
 uint16_t *GPU_get_vram(void);
 void     GPU_RestoreStateP1(bool load);
