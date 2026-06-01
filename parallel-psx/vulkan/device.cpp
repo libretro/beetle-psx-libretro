@@ -39,16 +39,6 @@ using namespace Util;
 
 namespace Vulkan
 {
-static inline void add_unique_queue_family(VkImageCreateInfo &info, uint32_t *sharing_indices, uint32_t family)
-{
-	for (uint32_t i = 0; i < info.queueFamilyIndexCount; i++)
-	{
-		if (sharing_indices[i] == family)
-			return;
-	}
-	sharing_indices[info.queueFamilyIndexCount++] = family;
-}
-
 Device::Device()
     : framebuffer_allocator(this)
     , transient_allocator(this)
@@ -1572,9 +1562,6 @@ static inline VkImageViewType get_image_view_type(const ImageCreateInfo &create_
 	if (layers == VK_REMAINING_ARRAY_LAYERS)
 		layers = create_info.layers - base_layer;
 
-	bool force_array =
-	    view ? (view->misc & IMAGE_VIEW_MISC_FORCE_ARRAY_BIT) : (create_info.misc & IMAGE_MISC_FORCE_ARRAY_BIT);
-
 	switch (create_info.type)
 	{
 	case VK_IMAGE_TYPE_1D:
@@ -1583,7 +1570,7 @@ static inline VkImageViewType get_image_view_type(const ImageCreateInfo &create_
 		VK_ASSERT(create_info.depth == 1);
 		VK_ASSERT(create_info.samples == VK_SAMPLE_COUNT_1_BIT);
 
-		if (layers > 1 || force_array)
+		if (layers > 1)
 			return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
 		else
 			return VK_IMAGE_VIEW_TYPE_1D;
@@ -1597,14 +1584,14 @@ static inline VkImageViewType get_image_view_type(const ImageCreateInfo &create_
 		{
 			VK_ASSERT(create_info.width == create_info.height);
 
-			if (layers > 6 || force_array)
+			if (layers > 6)
 				return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
 			else
 				return VK_IMAGE_VIEW_TYPE_CUBE;
 		}
 		else
 		{
-			if (layers > 1 || force_array)
+			if (layers > 1)
 				return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
 			else
 				return VK_IMAGE_VIEW_TYPE_2D;
@@ -1972,70 +1959,7 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 	if (create_info.usage & VK_IMAGE_USAGE_STORAGE_BIT)
 		info.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
 
-	// Only do this conditionally.
-	// On AMD, using CONCURRENT with async compute disables compression.
-	uint32_t sharing_indices[3] = {};
-
-	uint32_t queue_flags = create_info.misc & (IMAGE_MISC_CONCURRENT_QUEUE_GRAPHICS_BIT |
-	                                           IMAGE_MISC_CONCURRENT_QUEUE_ASYNC_COMPUTE_BIT |
-	                                           IMAGE_MISC_CONCURRENT_QUEUE_ASYNC_GRAPHICS_BIT |
-	                                           IMAGE_MISC_CONCURRENT_QUEUE_ASYNC_TRANSFER_BIT);
-	bool concurrent_queue = queue_flags != 0;
-	if (concurrent_queue)
-	{
-		info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-
-		if (queue_flags & (IMAGE_MISC_CONCURRENT_QUEUE_GRAPHICS_BIT | IMAGE_MISC_CONCURRENT_QUEUE_ASYNC_GRAPHICS_BIT))
-			add_unique_queue_family(info, sharing_indices, graphics_queue_family_index);
-		if (queue_flags & IMAGE_MISC_CONCURRENT_QUEUE_ASYNC_COMPUTE_BIT)
-			add_unique_queue_family(info, sharing_indices, compute_queue_family_index);
-		if (queue_flags & IMAGE_MISC_CONCURRENT_QUEUE_ASYNC_TRANSFER_BIT)
-			add_unique_queue_family(info, sharing_indices, transfer_queue_family_index);
-
-		if (info.queueFamilyIndexCount > 1)
-			info.pQueueFamilyIndices = sharing_indices;
-		else
-		{
-			info.pQueueFamilyIndices = nullptr;
-			info.queueFamilyIndexCount = 0;
-			info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		}
-	}
-
-	VkFormatFeatureFlags check_extra_features = 0;
-	if ((create_info.misc & IMAGE_MISC_VERIFY_FORMAT_FEATURE_SAMPLED_LINEAR_FILTER_BIT) != 0)
-		check_extra_features |= VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
-
-	if (info.tiling == VK_IMAGE_TILING_LINEAR)
-	{
-		if (staging_buffer)
-			return ImageHandle(nullptr);
-
-		// Do some more stringent checks.
-		if (info.mipLevels > 1)
-			return ImageHandle(nullptr);
-		if (info.arrayLayers > 1)
-			return ImageHandle(nullptr);
-		if (info.imageType != VK_IMAGE_TYPE_2D)
-			return ImageHandle(nullptr);
-		if (info.samples != VK_SAMPLE_COUNT_1_BIT)
-			return ImageHandle(nullptr);
-
-		VkImageFormatProperties props;
-		if (!get_image_format_properties(info.format, info.imageType, info.tiling, info.usage, info.flags, &props))
-			return ImageHandle(nullptr);
-
-		if (!props.maxArrayLayers ||
-		    !props.maxMipLevels ||
-		    (info.extent.width > props.maxExtent.width) ||
-		    (info.extent.height > props.maxExtent.height) ||
-		    (info.extent.depth > props.maxExtent.depth))
-		{
-			return ImageHandle(nullptr);
-		}
-	}
-
-	if (!image_format_is_supported(create_info.format, image_usage_to_features(info.usage) | check_extra_features, info.tiling))
+	if (!image_format_is_supported(create_info.format, image_usage_to_features(info.usage), info.tiling))
 	{
 		LOGE("Format %u is not supported for usage flags!\n", unsigned(create_info.format));
 		return ImageHandle(nullptr);
@@ -2052,16 +1976,8 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 	if (memory_type == UINT32_MAX)
 		return ImageHandle(nullptr);
 
-	if (info.tiling == VK_IMAGE_TILING_LINEAR &&
-	    (create_info.misc & IMAGE_MISC_LINEAR_IMAGE_IGNORE_DEVICE_LOCAL_BIT) == 0)
-	{
-		// Is it also device local?
-		if ((mem_props.memoryTypes[memory_type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) == 0)
-			return ImageHandle(nullptr);
-	}
-
 	if (!managers.memory.allocate_image_memory(reqs.size, reqs.alignment, memory_type,
-	                                           info.tiling == VK_IMAGE_TILING_OPTIMAL ? ALLOCATION_TILING_OPTIMAL : ALLOCATION_TILING_LINEAR,
+	                                           ALLOCATION_TILING_OPTIMAL,
 	                                           &holder.allocation, holder.image))
 	{
 		LOGE("Failed to allocate image memory (type %u, size: %u).\n", unsigned(memory_type), unsigned(reqs.size));
@@ -2150,7 +2066,7 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 
 			// We can't just use semaphores, we will also need a release + acquire barrier to marshal ownership from
 			// transfer queue over to graphics ...
-			if (!concurrent_queue && transfer_queue_family_index != graphics_queue_family_index)
+			if (transfer_queue_family_index != graphics_queue_family_index)
 			{
 				need_mipmap_barrier = false;
 
@@ -2219,12 +2135,10 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 					handle->get_access_flags() & image_layout_to_possible_access(create_info.initial_layout));
 		}
 
-		bool share_compute = concurrent_queue && graphics_queue != compute_queue;
 		bool share_async_graphics = get_physical_queue_type(CommandBuffer::Type::AsyncGraphics) == CommandBuffer::Type::AsyncCompute;
 
-		// For concurrent queue, make sure that compute can see the final image as well.
-		// Also add semaphore if the compute queue can be used for async graphics as well.
-		if (share_compute || share_async_graphics)
+		// Add semaphore if the compute queue can be used for async graphics as well.
+		if (share_async_graphics)
 		{
 			Semaphore sem;
 			submit(graphics_cmd, nullptr, 1, &sem);
@@ -2246,16 +2160,7 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 		                   handle->get_access_flags() &
 		                   image_layout_to_possible_access(create_info.initial_layout));
 
-		// For concurrent queue, make sure that compute can see the final image as well.
-		if (concurrent_queue && graphics_queue != compute_queue)
-		{
-			Semaphore sem;
-			submit(cmd, nullptr, 1, &sem);
-			add_wait_semaphore(CommandBuffer::Type::AsyncCompute,
-			                   sem, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, true);
-		}
-		else
-			submit(cmd);
+		submit(cmd);
 	}
 
 	return handle;
