@@ -257,7 +257,6 @@ private:
 		std::vector<CommandBufferHandle> transfer_submissions;
 		std::vector<VkSemaphore> recycled_semaphores;
 		std::vector<VkSemaphore> destroyed_semaphores;
-		std::vector<ImageHandle> keep_alive_images;
 	};
 	// The per frame structure must be destroyed after
 	// the hashmap data structures below, so it must be declared before.
@@ -303,7 +302,6 @@ private:
 
 	uint32_t find_memory_type(BufferDomain domain, uint32_t mask);
 	uint32_t find_memory_type(ImageDomain domain, uint32_t mask);
-	bool memory_type_is_device_optimal(uint32_t type) const;
 	bool memory_type_is_host_visible(uint32_t type) const;
 
 	SamplerHandle samplers[static_cast<unsigned>(StockSampler::Count)];
@@ -316,11 +314,8 @@ private:
 
 	FramebufferAllocator framebuffer_allocator;
 	TransientAttachmentAllocator transient_allocator;
-	VkPipelineCache pipeline_cache = VK_NULL_HANDLE;
 
 	SamplerHandle create_sampler(const SamplerCreateInfo &info, StockSampler sampler);
-	void init_pipeline_cache();
-	void flush_pipeline_cache();
 
 	CommandPool &get_command_pool(CommandBuffer::Type type);
 	QueueData &get_queue_data(CommandBuffer::Type type);
@@ -335,7 +330,6 @@ private:
 	                        Semaphore *semaphore);
 
 	void reset_fence(VkFence fence);
-	void keep_handle_alive(ImageHandle handle);
 
 	void destroy_buffer_nolock(VkBuffer buffer);
 	void destroy_image_nolock(VkImage image);
@@ -366,10 +360,6 @@ private:
 	void end_frame_nolock();
 
 	Fence request_fence();
-
-
-	std::string get_pipeline_cache_string() const;
-
 
 	ImplementationWorkarounds workarounds;
 	void init_workarounds();

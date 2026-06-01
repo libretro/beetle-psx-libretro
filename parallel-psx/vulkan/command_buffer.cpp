@@ -40,10 +40,9 @@ static inline bool cb_needs_blend_constant(VkBlendFactor factor)
 	return factor == VK_BLEND_FACTOR_CONSTANT_COLOR || factor == VK_BLEND_FACTOR_CONSTANT_ALPHA;
 }
 
-CommandBuffer::CommandBuffer(Device *device, VkCommandBuffer cmd, VkPipelineCache cache, Type type)
+CommandBuffer::CommandBuffer(Device *device, VkCommandBuffer cmd, Type type)
     : device(device)
     , cmd(cmd)
-    , cache(cache)
     , type(type)
 {
 	begin_compute();
@@ -542,7 +541,7 @@ VkPipeline CommandBuffer::build_compute_pipeline(Hash hash)
 	VkPipeline compute_pipeline;
 
 	LOGI("Creating compute pipeline.\n");
-	if (vkCreateComputePipelines(device->get_device(), cache, 1, &info, nullptr, &compute_pipeline) != VK_SUCCESS)
+	if (vkCreateComputePipelines(device->get_device(), VK_NULL_HANDLE, 1, &info, nullptr, &compute_pipeline) != VK_SUCCESS)
 		LOGE("Failed to create compute pipeline!\n");
 
 	return current_program->add_pipeline(hash, compute_pipeline);
@@ -711,7 +710,7 @@ VkPipeline CommandBuffer::build_graphics_pipeline(Hash hash)
 	VkPipeline pipeline;
 
 	LOGI("Creating graphics pipeline.\n");
-	VkResult res = vkCreateGraphicsPipelines(device->get_device(), cache, 1, &pipe, nullptr, &pipeline);
+	VkResult res = vkCreateGraphicsPipelines(device->get_device(), VK_NULL_HANDLE, 1, &pipe, nullptr, &pipeline);
 	if (res != VK_SUCCESS)
 		LOGE("Failed to create graphics pipeline!\n");
 

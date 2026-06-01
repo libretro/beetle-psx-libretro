@@ -252,36 +252,6 @@ void Device::bake_program(Program &program)
 	program.set_pipeline_layout(request_pipeline_layout(layout));
 }
 
-static inline char to_hex(uint8_t v)
-{
-	if (v < 10)
-		return char('0' + v);
-	else
-		return char('a' + (v - 10));
-}
-
-std::string Device::get_pipeline_cache_string() const
-{
-	std::string res;
-	res.reserve(sizeof(gpu_props.pipelineCacheUUID) * 2);
-
-	for (const uint8_t &c : gpu_props.pipelineCacheUUID)
-	{
-		res += to_hex(uint8_t((c >> 4) & 0xf));
-		res += to_hex(uint8_t(c & 0xf));
-	}
-
-	return res;
-}
-
-void Device::init_pipeline_cache()
-{
-}
-
-void Device::flush_pipeline_cache()
-{
-}
-
 void Device::init_workarounds()
 {
 	// srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only.
@@ -307,7 +277,6 @@ void Device::set_context(const Context &context)
 	init_workarounds();
 
 	init_stock_samplers();
-	init_pipeline_cache();
 
 #ifdef ANDROID
 	init_frame_contexts(3); // Android needs a bit more ... ;)
@@ -848,8 +817,6 @@ void Device::sync_buffer_blocks()
 
 void Device::end_frame_nolock()
 {
-	frame().keep_alive_images.clear();
-
 	// Make sure we have a fence which covers all submissions in the frame.
 	VkFence fence;
 
@@ -944,7 +911,7 @@ CommandBufferHandle Device::request_command_buffer_nolock(CommandBuffer::Type ty
 	info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	vkBeginCommandBuffer(cmd, &info);
 	add_frame_counter_nolock();
-	CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, pipeline_cache, type));
+	CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, type));
 	return handle;
 }
 
@@ -956,14 +923,6 @@ const Sampler &Device::get_stock_sampler(StockSampler sampler) const
 Device::~Device()
 {
 	wait_idle();
-
-	if (pipeline_cache != VK_NULL_HANDLE)
-	{
-		flush_pipeline_cache();
-		vkDestroyPipelineCache(device, pipeline_cache, nullptr);
-	}
-
-
 
 	framebuffer_allocator.clear();
 	transient_allocator.clear();
@@ -995,12 +954,6 @@ Device::PerFrame::PerFrame(Device *device)
     , compute_cmd_pool(device->get_device(), device->compute_queue_family_index)
     , transfer_cmd_pool(device->get_device(), device->transfer_queue_family_index)
 {
-}
-
-void Device::keep_handle_alive(ImageHandle handle)
-{
-	LOCK();
-	frame().keep_alive_images.push_back(std::move(handle));
 }
 
 void Device::free_memory_nolock(const DeviceAllocation &alloc)
@@ -2064,11 +2017,6 @@ BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const vo
 		managers.memory.unmap_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
 	}
 	return handle;
-}
-
-bool Device::memory_type_is_device_optimal(uint32_t type) const
-{
-	return (mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0;
 }
 
 bool Device::memory_type_is_host_visible(uint32_t type) const

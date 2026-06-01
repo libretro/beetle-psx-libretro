@@ -391,11 +391,10 @@ public:
 
 private:
 	friend class Util::ObjectPool<CommandBuffer>;
-	CommandBuffer(Device *device, VkCommandBuffer cmd, VkPipelineCache cache, Type type);
+	CommandBuffer(Device *device, VkCommandBuffer cmd, Type type);
 
 	Device *device;
 	VkCommandBuffer cmd;
-	VkPipelineCache cache;
 	Type type;
 
 	const Framebuffer *framebuffer = nullptr;
