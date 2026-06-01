@@ -168,7 +168,6 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	const unsigned num_attachments = info.num_color_attachments + (info.depth_stencil ? 1 : 0);
 	VkAttachmentDescription attachments[VULKAN_NUM_ATTACHMENTS + 1];
 	uint32_t implicit_transitions = 0;
-	uint32_t implicit_bottom_of_pipe = 0;
 
 	VkAttachmentLoadOp ds_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	VkAttachmentStoreOp ds_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -227,22 +226,6 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 			if (!enable_transient_store)
 				att.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
-			implicit_transitions |= 1u << i;
-		}
-		else if (image.is_swapchain_image())
-		{
-			if (att.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
-				att.initialLayout = image.get_swapchain_layout();
-			else
-				att.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-			att.finalLayout = image.get_swapchain_layout();
-
-			// If we transition from PRESENT_SRC_KHR, this came from an implicit external subpass dependency
-			// which happens in BOTTOM_OF_PIPE. To properly transition away from it, we must wait for BOTTOM_OF_PIPE,
-			// without any memory barriers, since memory has been made available in the implicit barrier.
-			if (att.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
-				implicit_bottom_of_pipe |= 1u << i;
 			implicit_transitions |= 1u << i;
 		}
 		else
@@ -397,7 +380,6 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	uint32_t external_color_dependencies = 0;
 	uint32_t external_depth_dependencies = 0;
 	uint32_t external_input_dependencies = 0;
-	uint32_t external_bottom_of_pipe_dependencies = 0;
 
 	for (unsigned attachment = 0; attachment < num_attachments; attachment++)
 	{
@@ -435,9 +417,6 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 				if (input)
 					external_input_dependencies |= 1u << subpass;
 			}
-
-			if (!used && (implicit_bottom_of_pipe & (1u << attachment)))
-				external_bottom_of_pipe_dependencies |= 1u << subpass;
 
 			if (resolve && input) // If used as both resolve attachment and input attachment in same subpass, need GENERAL.
 			{
@@ -640,9 +619,6 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 		             VkSubpassDependency &dep = external_dependencies.back();
 		             dep.srcSubpass = VK_SUBPASS_EXTERNAL;
 		             dep.dstSubpass = subpass;
-
-		             if (external_bottom_of_pipe_dependencies & (1u << subpass))
-			             dep.srcStageMask |= VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 
 		             if (external_color_dependencies & (1u << subpass))
 		             {

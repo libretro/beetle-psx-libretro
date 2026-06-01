@@ -271,15 +271,6 @@ private:
 	// the hashmap data structures below, so it must be declared before.
 	std::vector<std::unique_ptr<PerFrame>> per_frame;
 
-	struct
-	{
-		Semaphore acquire;
-		Semaphore release;
-		bool touched = false;
-		bool consumed = false;
-		unsigned index = 0;
-	} wsi;
-
 	struct QueueData
 	{
 		std::vector<Semaphore> wait_semaphores;

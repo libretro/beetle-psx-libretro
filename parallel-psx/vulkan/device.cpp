@@ -740,32 +740,10 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 	data.wait_semaphores.clear();
 
 	for (CommandBufferHandle &cmd : submissions)
-	{
-		if (cmd->swapchain_touched() && !wsi.touched && !wsi.consumed)
-		{
-			if (!cmds.empty())
-			{
-				// Push all pending cmd buffers to their own submission.
-				submits.emplace_back();
-
-				VkSubmitInfo &submit = submits.back();
-				memset(&submit, 0, sizeof(submit));
-				submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-				submit.pNext = nullptr;
-				submit.commandBufferCount = cmds.size() - last_cmd;
-				submit.pCommandBuffers = cmds.data() + last_cmd;
-				last_cmd = cmds.size();
-			}
-			wsi.touched = true;
-		}
-
 		cmds.push_back(cmd->get_command_buffer());
-	}
 
 	if (cmds.size() > last_cmd)
 	{
-		unsigned index = submits.size();
-
 		// Push all pending cmd buffers to their own submission.
 		submits.emplace_back();
 
@@ -775,30 +753,6 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 		submit.pNext = nullptr;
 		submit.commandBufferCount = cmds.size() - last_cmd;
 		submit.pCommandBuffers = cmds.data() + last_cmd;
-		if (wsi.touched && !wsi.consumed)
-		{
-			static const VkFlags wait = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			if (wsi.acquire && wsi.acquire->get_semaphore() != VK_NULL_HANDLE)
-			{
-				VK_ASSERT(wsi.acquire->is_signalled());
-				VkSemaphore sem = wsi.acquire->consume();
-				waits[index].push_back(sem);
-
-				if (wsi.acquire->can_recycle())
-					frame().recycled_semaphores.push_back(sem);
-				else
-					frame().destroyed_semaphores.push_back(sem);
-
-				stages[index].push_back(wait);
-				wsi.acquire.reset();
-			}
-
-			VkSemaphore release = managers.semaphore.request_cleared_semaphore();
-			wsi.release = Semaphore(handle_pool.semaphores.allocate(this, release, true));
-			wsi.release->set_internal_sync_object();
-			signals[index].push_back(wsi.release->get_semaphore());
-			wsi.consumed = true;
-		}
 		last_cmd = cmds.size();
 	}
 
@@ -1073,9 +1027,6 @@ const Sampler &Device::get_stock_sampler(StockSampler sampler) const
 Device::~Device()
 {
 	wait_idle();
-
-	wsi.acquire.reset();
-	wsi.release.reset();
 
 	if (pipeline_cache != VK_NULL_HANDLE)
 	{
@@ -2319,9 +2270,6 @@ const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool c
 			lazy |= 1u << i;
 		if (info.color_attachments[i]->get_image().get_layout_type() == Layout::Optimal)
 			optimal |= 1u << i;
-
-		// This can change external subpass dependencies, so it must always be hashed.
-		h.u32(info.color_attachments[i]->get_image().get_swapchain_layout());
 	}
 
 	if (info.depth_stencil)

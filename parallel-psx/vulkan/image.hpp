@@ -438,16 +438,6 @@ public:
 		layout_type = layout;
 	}
 
-	bool is_swapchain_image() const
-	{
-		return swapchain_layout != VK_IMAGE_LAYOUT_UNDEFINED;
-	}
-
-	VkImageLayout get_swapchain_layout() const
-	{
-		return swapchain_layout;
-	}
-
 	void set_stage_flags(VkPipelineStageFlags flags)
 	{
 		stage_flags = flags;
@@ -488,7 +478,6 @@ private:
 	Layout layout_type = Layout::Optimal;
 	VkPipelineStageFlags stage_flags = 0;
 	VkAccessFlags access_flags = 0;
-	VkImageLayout swapchain_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 };
 
 using ImageHandle = Util::IntrusivePtr<Image>;

@@ -204,11 +204,6 @@ public:
 		return *device;
 	}
 
-	bool swapchain_touched() const
-	{
-		return uses_swapchain;
-	}
-
 	void set_thread_index(unsigned index)
 	{
 		thread_index = index;
@@ -544,7 +539,6 @@ private:
 	uint32_t dirty_sets = 0;
 	uint32_t dirty_vbos = 0;
 	uint32_t active_vbos = 0;
-	bool uses_swapchain = false;
 	bool is_compute = true;
 	bool is_secondary = false;
 
