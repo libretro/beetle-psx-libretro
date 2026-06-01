@@ -2439,18 +2439,6 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	}
 }
 
-static inline uint32_t image_num_miplevels(const VkExtent3D &extent)
-{
-	uint32_t size = std::max(std::max(extent.width, extent.height), extent.depth);
-	uint32_t levels = 0;
-	while (size)
-	{
-		levels++;
-		size >>= 1;
-	}
-	return levels;
-}
-
 Vulkan::ImageHandle Renderer::upload_texture(std::vector<LoadedImage> &levels) {
 	ImageCreateInfo info;
 	info.width = levels[0].width;

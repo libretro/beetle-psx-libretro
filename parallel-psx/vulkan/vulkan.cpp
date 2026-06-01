@@ -99,7 +99,6 @@ Context::Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface
                  const char **required_device_layers, unsigned num_required_device_layers,
                  const VkPhysicalDeviceFeatures *required_features)
     : instance(instance)
-    , owned_instance(false)
     , owned_device(true)
 {
 	volkLoadInstance(instance);
@@ -120,8 +119,6 @@ void Context::destroy()
 
 	if (owned_device && device != VK_NULL_HANDLE)
 		vkDestroyDevice(device, nullptr);
-	if (owned_instance && instance != VK_NULL_HANDLE)
-		vkDestroyInstance(instance, nullptr);
 }
 
 Context::~Context()

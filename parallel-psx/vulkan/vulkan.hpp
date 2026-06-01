@@ -72,9 +72,7 @@ struct DeviceFeatures
 
 enum VendorID
 {
-	VENDOR_ID_AMD = 0x1002,
 	VENDOR_ID_NVIDIA = 0x10de,
-	VENDOR_ID_INTEL = 0x8086,
 	VENDOR_ID_ARM = 0x13b5
 };
 
@@ -181,7 +179,6 @@ private:
 	                   unsigned num_required_device_extensions, const char **required_device_layers,
 	                   unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
 
-	bool owned_instance = false;
 	bool owned_device = false;
 	bool valid = false;
 	DeviceFeatures ext;
