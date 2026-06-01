@@ -2933,21 +2933,46 @@ public:
 	static void format_block_dim(VkFormat format, uint32_t &width, uint32_t &height);
 	static uint32_t num_miplevels(uint32_t width, uint32_t height = 1, uint32_t depth = 1);
 
-	void set_buffer(void *buffer, size_t size);
+	void set_buffer(void *buffer, size_t size)
+	{
+		this->buffer = static_cast<uint8_t *>(buffer);
+		buffer_size = size;
+	}
 	inline void *get_buffer()
 	{
 		return buffer;
 	}
 
-	uint32_t get_width(uint32_t mip = 0) const;
-	uint32_t get_height(uint32_t mip = 0) const;
-	uint32_t get_depth(uint32_t mip = 0) const;
-	VkFormat get_format() const;
+	uint32_t get_width(uint32_t mip = 0) const
+	{
+		return mips[mip].width;
+	}
+	uint32_t get_height(uint32_t mip = 0) const
+	{
+		return mips[mip].height;
+	}
+	uint32_t get_depth(uint32_t mip = 0) const
+	{
+		return mips[mip].depth;
+	}
+	VkFormat get_format() const
+	{
+		return format;
+	}
 
-	size_t get_required_size() const;
+	size_t get_required_size() const
+	{
+		return required_size;
+	}
 
-	size_t row_byte_stride(uint32_t row_length) const;
-	size_t layer_byte_stride(uint32_t row_length, size_t row_byte_stride) const;
+	size_t row_byte_stride(uint32_t row_length) const
+	{
+		return ((row_length + block_dim_x - 1) / block_dim_x) * block_stride;
+	}
+	size_t layer_byte_stride(uint32_t image_height, size_t row_byte_stride) const
+	{
+		return ((image_height + block_dim_y - 1) / block_dim_y) * row_byte_stride;
+	}
 
 	inline size_t get_row_size(uint32_t mip) const
 	{
@@ -2972,7 +2997,10 @@ public:
 		uint32_t row_length = 0;
 	};
 
-	const MipInfo &get_mip_info(uint32_t mip) const;
+	const MipInfo &get_mip_info(uint32_t mip) const
+	{
+		return mips[mip];
+	}
 
 	inline void *data(uint32_t layer = 0, uint32_t mip = 0) const
 	{
@@ -4165,7 +4193,10 @@ namespace Vulkan
 class FenceManager
 {
 public:
-	void init(VkDevice device);
+	void init(VkDevice device)
+	{
+		this->device = device;
+	}
 	~FenceManager();
 
 	VkFence request_cleared_fence();
@@ -4243,7 +4274,10 @@ namespace Vulkan
 class SemaphoreManager
 {
 public:
-	void init(VkDevice device);
+	void init(VkDevice device)
+	{
+		this->device = device;
+	}
 	~SemaphoreManager();
 
 	VkSemaphore request_cleared_semaphore();
@@ -4309,7 +4343,10 @@ public:
 	void operator=(const DescriptorSetAllocator &) = delete;
 	DescriptorSetAllocator(const DescriptorSetAllocator &) = delete;
 
-	void begin_frame();
+	void begin_frame()
+	{
+		per_thread.should_begin = true;
+	}
 	std::pair<VkDescriptorSet, bool> find(Util::Hash hash);
 
 	VkDescriptorSetLayout get_layout() const
@@ -4466,7 +4503,10 @@ public:
 	VkPipeline add_pipeline(Util::Hash hash, VkPipeline pipeline);
 
 private:
-	void set_shader(ShaderStage stage, Shader *handle);
+	void set_shader(ShaderStage stage, Shader *handle)
+	{
+		shaders[(unsigned)stage] = handle;
+	}
 	Device *device;
 	Shader *shaders[(unsigned)ShaderStage::Count] = {};
 	PipelineLayout *layout = nullptr;
@@ -4793,7 +4833,15 @@ public:
 
 	void begin();
 	VkCommandBuffer request_command_buffer();
-	void signal_submitted(VkCommandBuffer cmd);
+	void signal_submitted(VkCommandBuffer cmd)
+	{
+#ifdef VULKAN_DEBUG
+		VK_ASSERT(in_flight.find(cmd) != end(in_flight));
+		in_flight.erase(cmd);
+#else
+		(void)cmd;
+#endif
+	}
 
 private:
 	VkDevice device = VK_NULL_HANDLE;
@@ -5015,7 +5063,10 @@ public:
 	                           VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
 
 	void set_viewport(const VkViewport &viewport);
-	const VkViewport &get_viewport() const;
+	const VkViewport &get_viewport() const
+	{
+		return viewport;
+	}
 	void set_scissor(const VkRect2D &rect);
 
 	void set_vertex_attrib(uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset);
@@ -5533,8 +5584,15 @@ private:
 	void request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size);
 	void request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size);
 
-	void add_frame_counter_nolock();
-	void decrement_frame_counter_nolock();
+	void add_frame_counter_nolock()
+	{
+		lock.counter++;
+	}
+	void decrement_frame_counter_nolock()
+	{
+		VK_ASSERT(lock.counter > 0);
+		lock.counter--;
+	}
 	void wait_idle_nolock();
 	void end_frame_nolock();
 
@@ -10074,52 +10132,6 @@ void TextureFormatLayout::set_3d(VkFormat format, uint32_t width, uint32_t heigh
 	fill_mipinfo(width, height, depth);
 }
 
-void TextureFormatLayout::set_buffer(void *buffer, size_t size)
-{
-	this->buffer = static_cast<uint8_t *>(buffer);
-	buffer_size = size;
-}
-
-uint32_t TextureFormatLayout::get_width(uint32_t mip) const
-{
-	return mips[mip].width;
-}
-
-uint32_t TextureFormatLayout::get_height(uint32_t mip) const
-{
-	return mips[mip].height;
-}
-
-uint32_t TextureFormatLayout::get_depth(uint32_t mip) const
-{
-	return mips[mip].depth;
-}
-
-VkFormat TextureFormatLayout::get_format() const
-{
-	return format;
-}
-
-size_t TextureFormatLayout::get_required_size() const
-{
-	return required_size;
-}
-
-const TextureFormatLayout::MipInfo &TextureFormatLayout::get_mip_info(uint32_t mip) const
-{
-	return mips[mip];
-}
-
-size_t TextureFormatLayout::row_byte_stride(uint32_t row_length) const
-{
-	return ((row_length + block_dim_x - 1) / block_dim_x) * block_stride;
-}
-
-size_t TextureFormatLayout::layer_byte_stride(uint32_t image_height, size_t row_byte_stride) const
-{
-	return ((image_height + block_dim_y - 1) / block_dim_y) * row_byte_stride;
-}
-
 void TextureFormatLayout::build_buffer_image_copies(VkBufferImageCopy *copies, unsigned &num_copies) const
 {
 	assert(mip_levels <= 16);
@@ -10327,11 +10339,6 @@ void FenceHolderDeleter::operator()(Vulkan::FenceHolder *fence)
 
 namespace Vulkan
 {
-void FenceManager::init(VkDevice device)
-{
-	this->device = device;
-}
-
 VkFence FenceManager::request_cleared_fence()
 {
 	if (!fences.empty())
@@ -10388,11 +10395,6 @@ void SemaphoreHolderDeleter::operator()(Vulkan::SemaphoreHolder *semaphore)
 
 namespace Vulkan
 {
-void SemaphoreManager::init(VkDevice device)
-{
-	this->device = device;
-}
-
 SemaphoreManager::~SemaphoreManager()
 {
 	for (VkSemaphore &sem : semaphores)
@@ -10567,16 +10569,6 @@ CommandPool::~CommandPool()
 		vkFreeCommandBuffers(device, pool, buffers.size(), buffers.data());
 	if (pool != VK_NULL_HANDLE)
 		vkDestroyCommandPool(device, pool, nullptr);
-}
-
-void CommandPool::signal_submitted(VkCommandBuffer cmd)
-{
-#ifdef VULKAN_DEBUG
-	VK_ASSERT(in_flight.find(cmd) != end(in_flight));
-	in_flight.erase(cmd);
-#else
-	(void)cmd;
-#endif
 }
 
 VkCommandBuffer CommandPool::request_command_buffer()
@@ -11420,11 +11412,6 @@ Shader::~Shader()
 		vkDestroyShaderModule(device->get_device(), module, nullptr);
 }
 
-void Program::set_shader(ShaderStage stage, Shader *handle)
-{
-	shaders[(unsigned)stage] = handle;
-}
-
 Program::Program(Device *device, Shader *vertex, Shader *fragment)
     : device(device)
 {
@@ -11556,11 +11543,6 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 	LOGI("Creating descriptor set layout.\n");
 	if (vkCreateDescriptorSetLayout(device->get_device(), &info, nullptr, &set_layout) != VK_SUCCESS)
 		LOGE("Failed to create descriptor set layout.");
-}
-
-void DescriptorSetAllocator::begin_frame()
-{
-	per_thread.should_begin = true;
 }
 
 std::pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(Hash hash)
@@ -13353,11 +13335,6 @@ void CommandBuffer::set_viewport(const VkViewport &viewport)
 	VK_ASSERT(framebuffer);
 	this->viewport = viewport;
 	set_dirty(COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
-}
-
-const VkViewport &CommandBuffer::get_viewport() const
-{
-	return this->viewport;
 }
 
 void CommandBuffer::set_scissor(const VkRect2D &rect)
@@ -15346,17 +15323,6 @@ void Device::next_frame_context()
 		frame_context_index = 0;
 
 	frame().begin();
-}
-
-void Device::add_frame_counter_nolock()
-{
-	lock.counter++;
-}
-
-void Device::decrement_frame_counter_nolock()
-{
-	VK_ASSERT(lock.counter > 0);
-	lock.counter--;
 }
 
 void Device::PerFrame::begin()
