@@ -33,8 +33,6 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 	: IntrusiveHashMapEnabled<DescriptorSetAllocator>(hash)
 	, device(device)
 {
-	per_thread.emplace_back(new PerThread);
-
 	VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
 	std::vector<VkDescriptorSetLayoutBinding> bindings;
@@ -126,13 +124,12 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 
 void DescriptorSetAllocator::begin_frame()
 {
-	for (std::unique_ptr<PerThread> &thr : per_thread)
-		thr->should_begin = true;
+	per_thread.should_begin = true;
 }
 
 std::pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(Hash hash)
 {
-	PerThread &state = *per_thread[0];
+	PerThread &state = per_thread;
 	if (state.should_begin)
 	{
 		state.set_nodes.begin_frame();
@@ -181,16 +178,13 @@ std::pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(Hash hash)
 
 void DescriptorSetAllocator::clear()
 {
-	for (std::unique_ptr<PerThread> &thr : per_thread)
+	per_thread.set_nodes.clear();
+	for (VkDescriptorPool &pool : per_thread.pools)
 	{
-		thr->set_nodes.clear();
-		for (VkDescriptorPool &pool : thr->pools)
-		{
-			vkResetDescriptorPool(device->get_device(), pool, 0);
-			vkDestroyDescriptorPool(device->get_device(), pool, nullptr);
-		}
-		thr->pools.clear();
+		vkResetDescriptorPool(device->get_device(), pool, 0);
+		vkDestroyDescriptorPool(device->get_device(), pool, nullptr);
 	}
+	per_thread.pools.clear();
 }
 
 DescriptorSetAllocator::~DescriptorSetAllocator()

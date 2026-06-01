@@ -233,9 +233,9 @@ private:
 
 		VkDevice device;
 		Managers &managers;
-		std::vector<CommandPool> graphics_cmd_pool;
-		std::vector<CommandPool> compute_cmd_pool;
-		std::vector<CommandPool> transfer_cmd_pool;
+		CommandPool graphics_cmd_pool;
+		CommandPool compute_cmd_pool;
+		CommandPool transfer_cmd_pool;
 
 		std::vector<BufferBlock> vbo_blocks;
 		std::vector<BufferBlock> ibo_blocks;

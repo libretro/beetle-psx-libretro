@@ -915,11 +915,11 @@ CommandPool &Device::get_command_pool(CommandBuffer::Type type)
 	{
 	default:
 	case CommandBuffer::Type::Generic:
-		return frame().graphics_cmd_pool[0];
+		return frame().graphics_cmd_pool;
 	case CommandBuffer::Type::AsyncCompute:
-		return frame().compute_cmd_pool[0];
+		return frame().compute_cmd_pool;
 	case CommandBuffer::Type::AsyncTransfer:
-		return frame().transfer_cmd_pool[0];
+		return frame().transfer_cmd_pool;
 	}
 }
 
@@ -998,10 +998,10 @@ void Device::init_frame_contexts(unsigned count)
 Device::PerFrame::PerFrame(Device *device)
     : device(device->get_device())
     , managers(device->managers)
+    , graphics_cmd_pool(device->get_device(), device->graphics_queue_family_index)
+    , compute_cmd_pool(device->get_device(), device->compute_queue_family_index)
+    , transfer_cmd_pool(device->get_device(), device->transfer_queue_family_index)
 {
-	graphics_cmd_pool.emplace_back(device->get_device(), device->graphics_queue_family_index);
-	compute_cmd_pool.emplace_back(device->get_device(), device->compute_queue_family_index);
-	transfer_cmd_pool.emplace_back(device->get_device(), device->transfer_queue_family_index);
 }
 
 void Device::keep_handle_alive(ImageHandle handle)
@@ -1250,12 +1250,9 @@ void Device::PerFrame::begin()
 		recycle_fences.clear();
 	}
 
-	for (CommandPool &pool : graphics_cmd_pool)
-		pool.begin();
-	for (CommandPool &pool : compute_cmd_pool)
-		pool.begin();
-	for (CommandPool &pool : transfer_cmd_pool)
-		pool.begin();
+	graphics_cmd_pool.begin();
+	compute_cmd_pool.begin();
+	transfer_cmd_pool.begin();
 
 	for (VkFramebuffer &framebuffer : destroyed_framebuffers)
 		vkDestroyFramebuffer(device, framebuffer, nullptr);
