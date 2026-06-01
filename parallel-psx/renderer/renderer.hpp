@@ -330,11 +330,6 @@ public:
 
 	SaveState save_vram_state();
 
-	void reset_counters()
-	{
-		counters = {};
-	}
-
 	void flush()
 	{
 		if (cmd)
@@ -352,16 +347,6 @@ public:
 		device.flush_frame();
 		return fence;
 	}
-
-	struct
-	{
-		unsigned render_passes = 0;
-		unsigned fragment_readback_pixels = 0;
-		unsigned fragment_writeout_pixels = 0;
-		unsigned draw_calls = 0;
-		unsigned vertices = 0;
-		unsigned native_draw_calls = 0;
-	} counters;
 
 	enum
 	{

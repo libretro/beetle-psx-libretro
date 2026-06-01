@@ -720,8 +720,6 @@ void Renderer::mipmap_framebuffer()
 		cmd->push_constants(&push, 0, sizeof(push));
 		cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 		cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-		counters.draw_calls++;
-		counters.vertices += 4;
 		cmd->draw(4);
 
 		cmd->end_render_pass();
@@ -993,8 +991,6 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	cmd->push_constants(&push, 0, sizeof(push));
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-	counters.draw_calls++;
-	counters.vertices += 4;
 	cmd->draw(4);
 
 	cmd->end_render_pass();
@@ -1251,8 +1247,6 @@ ImageHandle Renderer::scanout_to_texture()
 	cmd->push_constants(&push, 0, sizeof(push));
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-	counters.draw_calls++;
-	counters.vertices += 4;
 	cmd->draw(4);
 
 	cmd->end_render_pass();
@@ -1802,7 +1796,6 @@ void Renderer::draw_triangle(const Vertex *vertices)
 		return;
 
 	last_scanout.reset();
-	counters.native_draw_calls++;
 
 	BufferVertex vert[3];
 	HdTextureHandle hd_texture_index = HdTextureHandle::make_none();
@@ -1846,7 +1839,6 @@ void Renderer::draw_quad(const Vertex *vertices)
 		return;
 
 	last_scanout.reset();
-	counters.native_draw_calls++;
 
 	BufferVertex vert[4];
 	// build_attribs may flush the queues, thus calling reset_queue and invalidating any pre-existing HdTextureHandle.
@@ -1978,15 +1970,12 @@ void Renderer::flush_render_pass(const Rect &rect)
 	else
 	{
 		info.load_attachments = 1 << 0;
-		counters.fragment_readback_pixels += rect.width * rect.height * scaling * scaling;
 	}
 
-	counters.fragment_writeout_pixels += rect.width * rect.height * scaling * scaling;
 
 	info.render_area.offset = { int(rect.x * scaling), int(rect.y * scaling) };
 	info.render_area.extent = { rect.width * scaling, rect.height * scaling };
 
-	counters.render_passes++;
 	cmd->begin_render_pass(info);
 	cmd->set_scissor(info.render_area);
 	queue.default_scissor = info.render_area;
@@ -2087,7 +2076,6 @@ void Renderer::dispatch(const std::vector<BufferVertex> &vertices, std::vector<P
 			unsigned to_draw = i - last_draw;
 			cmd->set_specialization_constant_mask(-1);
 			cmd->draw(3 * to_draw, 1, 3 * last_draw, 0);
-			counters.draw_calls++;
 			last_draw = i;
 
 			if (scissors[i].scissor_index != scissor) {
@@ -2121,8 +2109,6 @@ void Renderer::dispatch(const std::vector<BufferVertex> &vertices, std::vector<P
 	unsigned to_draw = size - last_draw;
 	cmd->set_specialization_constant_mask(-1);
 	cmd->draw(3 * to_draw, 1, 3 * last_draw, 0);
-	counters.draw_calls++;
-	counters.vertices += vertices.size();
 }
 
 void Renderer::render_opaque_primitives()
@@ -2202,8 +2188,6 @@ void Renderer::render_semi_transparent_primitives()
 		    (last_state != queue.semi_transparent_state[i]))
 		{
 			unsigned to_draw = i - last_draw_offset;
-			counters.draw_calls++;
-			counters.vertices += to_draw * 3;
 			cmd->set_specialization_constant_mask(-1);
 
 			{
@@ -2228,8 +2212,6 @@ void Renderer::render_semi_transparent_primitives()
 	}
 
 	unsigned to_draw = prims - last_draw_offset;
-	counters.draw_calls++;
-	counters.vertices += to_draw * 3;
 	cmd->set_specialization_constant_mask(-1);
 	cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
 	if (msaa > 1)

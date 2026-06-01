@@ -669,7 +669,6 @@ void rsx_vulkan_prepare_frame(void)
    ensure_sync_index_resources();
    unsigned index = vulkan->get_sync_index(vulkan->handle);
    device->next_frame_context();
-   renderer->reset_counters();
 
    renderer->set_scaled_uv_offset(scaled_uv_offset);
    renderer->set_filter_mode(static_cast<Renderer::FilterMode>(filter_mode));
