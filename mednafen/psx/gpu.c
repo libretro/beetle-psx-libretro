@@ -1683,7 +1683,68 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
 
    if(bpp24)   /* 24bpp */
    {
-      for(int32_t x = dx_start; x < dx_end; x+= upscale)
+      int32_t x = dx_start;
+#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
+      /* Native-res fast path.  At upscale_shift == 0 the 24bpp source
+       * is a plain byte stream of consecutive R,G,B triplets: output
+       * pixel p reads bytes [fb_x + 3*p + 0..2] as R,G,B and writes
+       * dest = B | (G<<8) | (R<<16) (the RED/GREEN/BLUE_SHIFT layout,
+       * 16/8/0).  fb_x advances by 3 per pixel and wraps at the
+       * 0x7FF-word VRAM-row boundary; we vectorise only the contiguous
+       * span before the wrap and let the scalar loop finish the tail
+       * (it re-derives the wrap via `& fb_mask`).  Upscaled output
+       * replicates pixels and strides differently, so it stays scalar. */
+      if (upscale_shift == 0)
+      {
+         const uint8_t *bytes = (const uint8_t*)src;
+#if defined(__SSE2__)
+         /* 4 px from three stride-3 unaligned words.  word_p has bytes
+          * [R,G,B,next] in ascending memory order; we want B|G<<8|R<<16,
+          * i.e. swap the R and B bytes and drop the 4th. */
+         while (x + 4 <= dx_end)
+         {
+            __m128i w, b0, b2, g, out;
+            /* The block reads bytes [fb_x .. fb_x+12]; fb_x wraps at
+             * byte 0x800 (fb_mask is a byte mask).  Bail if the linear
+             * read would cross the wrap - the scalar tail handles it. */
+            if ((fb_x + 12) > (fb_mask + 1))
+               break;
+            w  = _mm_setr_epi32(
+                  *(const uint32_t*)&bytes[fb_x + 0], *(const uint32_t*)&bytes[fb_x + 3],
+                  *(const uint32_t*)&bytes[fb_x + 6], *(const uint32_t*)&bytes[fb_x + 9]);
+            b0  = _mm_and_si128(w, _mm_set1_epi32(0x000000FF));                       /* R */
+            b2  = _mm_and_si128(_mm_srli_epi32(w, 16), _mm_set1_epi32(0x000000FF));   /* B */
+            g   = _mm_and_si128(w, _mm_set1_epi32(0x0000FF00));                       /* G<<8 */
+            out = _mm_or_si128(_mm_or_si128(_mm_slli_epi32(b0, 16), b2), g);
+            _mm_storeu_si128((__m128i*)&dest[x], out);
+            x   += 4;
+            fb_x = (fb_x + 12) & fb_mask;
+         }
+#else /* GPU_HAVE_NEON */
+         /* vld3 de-interleaves 8 RGB triplets straight into R/G/B. */
+         while (x + 8 <= dx_end)
+         {
+            uint8x8x3_t rgb;
+            uint16x8_t  lo, hi;
+            uint32x4_t  p0, p1;
+            /* vld3 reads bytes [fb_x .. fb_x+24); fb_x wraps at byte
+             * 0x800.  Bail if the read would cross the wrap. */
+            if ((fb_x + 24) > (fb_mask + 1))
+               break;
+            rgb = vld3_u8(&bytes[fb_x]);
+            lo  = vorrq_u16(vmovl_u8(rgb.val[2]), vshlq_n_u16(vmovl_u8(rgb.val[1]), 8)); /* B|G<<8 */
+            hi  = vmovl_u8(rgb.val[0]);                                                  /* R */
+            p0  = vorrq_u32(vmovl_u16(vget_low_u16(lo)),  vshlq_n_u32(vmovl_u16(vget_low_u16(hi)),  16));
+            p1  = vorrq_u32(vmovl_u16(vget_high_u16(lo)), vshlq_n_u32(vmovl_u16(vget_high_u16(hi)), 16));
+            vst1q_u32(&dest[x],     p0);
+            vst1q_u32(&dest[x + 4], p1);
+            x   += 8;
+            fb_x = (fb_x + 24) & fb_mask;
+         }
+#endif
+      }
+#endif
+      for(; x < dx_end; x+= upscale)
       {
          int i;
          uint32_t color;
