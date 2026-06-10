@@ -340,6 +340,17 @@ static bool deint_weave(Deinterlacer *d, uint32_t *pixels, int32_t pitch_pix,
 #define MAD_HAVE_SSE2 1
 #endif
 
+/* NEON counterpart to the SSE2 motion-adaptive blend.  __ARM_NEON
+ * covers AArch64 (mandatory) and 32-bit ARM -mfpu=neon; arm_neon.h
+ * supplies the same intrinsics on both.  Only used when __SSE2__ is
+ * absent.  The NEON path is written to match the SSE2 path
+ * byte-for-byte (including its alpha-channel handling) so x86 and ARM
+ * produce identical output. */
+#if !defined(__SSE2__) && (defined(__ARM_NEON) || defined(__ARM_NEON__))
+#include <arm_neon.h>
+#define MAD_HAVE_NEON 1
+#endif
+
 #define MAD_SENSITIVITY 20
 #define MAD_MAX_PIXELS  (1024 * 1024)
 #define MAD_WARMUP      4
@@ -418,6 +429,41 @@ static __m128i mad_motion_mask_sse2(
 }
 #endif
 
+#if MAD_HAVE_NEON
+/* NEON twin of mad_motion_mask_sse2: per-32-bit-lane motion mask for
+ * 4 pixels.  Mirrors the SSE2 op sequence one-to-one - saturating
+ * abs-diff per channel (vqsubq both ways, or), subtract threshold
+ * (saturating), OR the three, mask off alpha, then collapse each
+ * 32-bit lane to all-ones iff any byte in it was non-zero. */
+static uint8x16_t mad_motion_mask_neon(
+      uint8x16_t hn, uint8x16_t ho,
+      uint8x16_t cn, uint8x16_t co,
+      uint8x16_t ln, uint8x16_t lo,
+      uint8x16_t thresh,
+      uint8x16_t alpha_mask)
+{
+   uint8x16_t dh, dc, dl, any;
+   uint32x4_t still;
+
+   dh = vorrq_u8(vqsubq_u8(hn, ho), vqsubq_u8(ho, hn));
+   dc = vorrq_u8(vqsubq_u8(cn, co), vqsubq_u8(co, cn));
+   dl = vorrq_u8(vqsubq_u8(ln, lo), vqsubq_u8(lo, ln));
+
+   dh = vqsubq_u8(dh, thresh);
+   dc = vqsubq_u8(dc, thresh);
+   dl = vqsubq_u8(dl, thresh);
+
+   any = vorrq_u8(vorrq_u8(dh, dc), dl);
+   any = vandq_u8(any, alpha_mask);
+
+   /* still lane = all-ones where the 32-bit lane is entirely zero.
+    * Reinterpret bytes as u32 and compare to zero: vceqq_u32 yields
+    * all-ones per 32-bit lane only when all four bytes are zero. */
+   still = vceqq_u32(vreinterpretq_u32_u8(any), vdupq_n_u32(0));
+   return vreinterpretq_u8_u32(vmvnq_u32(still));
+}
+#endif
+
 /* Reconstruct one native row of MAD output into dst (w pixels). */
 static void mad_reconstruct_row(
       uint32_t       *dst,
@@ -450,6 +496,25 @@ static void mad_reconstruct_row(
                _mm_and_si128(mask, avg),
                _mm_andnot_si128(mask, cn));
          _mm_storeu_si128((__m128i*)(dst + x), out);
+      }
+   }
+#elif MAD_HAVE_NEON
+   {
+      const uint8x16_t thresh     = vdupq_n_u8((uint8_t)MAD_SENSITIVITY);
+      const uint8x16_t alpha_mask = vreinterpretq_u8_u32(vdupq_n_u32(0x00FFFFFF));
+      for (; x + 4 <= w; x += 4)
+      {
+         uint8x16_t hn   = vld1q_u8((const uint8_t*)(hn_row + x));
+         uint8x16_t cn   = vld1q_u8((const uint8_t*)(cn_row + x));
+         uint8x16_t ln   = vld1q_u8((const uint8_t*)(ln_row + x));
+         uint8x16_t ho   = vld1q_u8((const uint8_t*)(ho_row + x));
+         uint8x16_t co   = vld1q_u8((const uint8_t*)(co_row + x));
+         uint8x16_t lo   = vld1q_u8((const uint8_t*)(lo_row + x));
+         uint8x16_t mask = mad_motion_mask_neon(hn, ho, cn, co, ln, lo,
+               thresh, alpha_mask);
+         uint8x16_t avg  = vrhaddq_u8(hn, ln);   /* (hn+ln+1)>>1, == _mm_avg_epu8 */
+         uint8x16_t out  = vbslq_u8(mask, avg, cn);
+         vst1q_u8((uint8_t*)(dst + x), out);
       }
    }
 #endif
