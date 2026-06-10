@@ -73,6 +73,15 @@
 #include <emmintrin.h>
 #endif
 
+/* NEON counterpart to the SSE2 MDEC fast paths (YCbCr->RGB).
+ * __ARM_NEON covers AArch64 (mandatory) and 32-bit ARM -mfpu=neon;
+ * arm_neon.h supplies the same intrinsics on both.  Only used when
+ * __SSE2__ is absent. */
+#if !defined(__SSE2__) && (defined(__ARM_NEON) || defined(__ARM_NEON__))
+#include <arm_neon.h>
+#define MDEC_HAVE_NEON 1
+#endif
+
 #if defined(ARCH_POWERPC_ALTIVEC) && defined(HAVE_ALTIVEC_H)
  #include <altivec.h>
 #endif
@@ -357,6 +366,171 @@ static INLINE uint16_t RGB_to_RGB555(uint8_t r, uint8_t g, uint8_t b)
    return((r << 0) | (g << 5) | (b << 10));
 }
 
+#if defined(__SSE2__) || defined(MDEC_HAVE_NEON)
+/*
+ * Vectorised YCbCr->RGB for one 8-pixel row of an MDEC macroblock.
+ * by[0..7] is luma (one per pixel); cb[0..3]/cr[0..3] are chroma (one
+ * per two pixels, i.e. the x>>1 subsampling).  Two output variants
+ * match the scalar EncodeImage 24bpp and 16bpp arms bit-for-bit.
+ *
+ * Per-pixel scalar reference (YCbCr_to_RGB):
+ *   r = M9(y + ((359*cr + 0x80) >> 8))                          ^ 0x80
+ *   g = M9(y + (((-88*cb &~ 0x1F) + (-183*cr &~ 0x07) + 0x80) >> 8)) ^ 0x80
+ *   b = M9(y + ((454*cb + 0x80) >> 8))                          ^ 0x80
+ * with M9(v) = clamp(sign9(v), -128, 127), sign9(v) the low 9 bits of
+ * v interpreted signed.  The chroma products overflow int16 (454*127
+ * > 32767), so the multiplies and the >>8 run in 32-bit lanes (split
+ * into low/high halves); results pack back to 16-bit for M9 (a
+ * 16-bit (v<<7)>>7 reproduces sign9 exactly for the actual operand
+ * range, which is within +/-512) and the channel assembly.  ^0x80
+ * maps the signed [-128,127] result into the [0,255] byte domain.
+ *
+ * SSE2 has no 32-bit packed multiply (mullo_epi32 is SSE4.1) or
+ * unsigned 32->16 pack, so MUL32 emulates the multiply via two
+ * mul_epu32 halves; the channel values stay small enough that
+ * packs_epi32 (signed) is exact.  NEON has vmulq_s32 / vmovn_s32
+ * directly.
+ */
+#if defined(__SSE2__)
+#define MDEC_MUL32(a, b) _mm_or_si128( \
+   _mm_and_si128(_mm_mul_epu32(a, b), _mm_set1_epi64x(0xFFFFFFFF)), \
+   _mm_slli_epi64(_mm_mul_epu32(_mm_srli_epi64(a, 32), _mm_srli_epi64(b, 32)), 32))
+#define MDEC_M9(v) _mm_min_epi16(_mm_max_epi16( \
+   _mm_srai_epi16(_mm_slli_epi16(v, 7), 7), _mm_set1_epi16(-128)), _mm_set1_epi16(127))
+
+static INLINE void mdec_ycbcr_row(const int8_t *by, const int8_t *cb,
+      const int8_t *cr, __m128i *R_out, __m128i *G_out, __m128i *B_out)
+{
+   __m128i y16 = _mm_srai_epi16(_mm_slli_epi16(
+                   _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i*)by), _mm_setzero_si128()), 8), 8);
+   int16_t cbd[8], crd[8];
+   int l;
+   for (l = 0; l < 4; l++) { cbd[2*l]=cbd[2*l+1]=cb[l]; crd[2*l]=crd[2*l+1]=cr[l]; }
+   {
+      __m128i CB = _mm_loadu_si128((const __m128i*)cbd);
+      __m128i CR = _mm_loadu_si128((const __m128i*)crd);
+      __m128i cb_lo=_mm_srai_epi32(_mm_unpacklo_epi16(CB,CB),16), cb_hi=_mm_srai_epi32(_mm_unpackhi_epi16(CB,CB),16);
+      __m128i cr_lo=_mm_srai_epi32(_mm_unpacklo_epi16(CR,CR),16), cr_hi=_mm_srai_epi32(_mm_unpackhi_epi16(CR,CR),16);
+      __m128i y_lo=_mm_srai_epi32(_mm_unpacklo_epi16(y16,y16),16), y_hi=_mm_srai_epi32(_mm_unpackhi_epi16(y16,y16),16);
+      const __m128i k359=_mm_set1_epi32(359),k454=_mm_set1_epi32(454),km88=_mm_set1_epi32(-88),km183=_mm_set1_epi32(-183),bias=_mm_set1_epi32(0x80);
+      __m128i r_lo=_mm_add_epi32(y_lo,_mm_srai_epi32(_mm_add_epi32(MDEC_MUL32(k359,cr_lo),bias),8));
+      __m128i r_hi=_mm_add_epi32(y_hi,_mm_srai_epi32(_mm_add_epi32(MDEC_MUL32(k359,cr_hi),bias),8));
+      __m128i b_lo=_mm_add_epi32(y_lo,_mm_srai_epi32(_mm_add_epi32(MDEC_MUL32(k454,cb_lo),bias),8));
+      __m128i b_hi=_mm_add_epi32(y_hi,_mm_srai_epi32(_mm_add_epi32(MDEC_MUL32(k454,cb_hi),bias),8));
+      __m128i a0=_mm_andnot_si128(_mm_set1_epi32(0x1F),MDEC_MUL32(km88,cb_lo));
+      __m128i a1=_mm_andnot_si128(_mm_set1_epi32(0x1F),MDEC_MUL32(km88,cb_hi));
+      __m128i c0=_mm_andnot_si128(_mm_set1_epi32(0x07),MDEC_MUL32(km183,cr_lo));
+      __m128i c1=_mm_andnot_si128(_mm_set1_epi32(0x07),MDEC_MUL32(km183,cr_hi));
+      __m128i g_lo=_mm_add_epi32(y_lo,_mm_srai_epi32(_mm_add_epi32(_mm_add_epi32(a0,c0),bias),8));
+      __m128i g_hi=_mm_add_epi32(y_hi,_mm_srai_epi32(_mm_add_epi32(_mm_add_epi32(a1,c1),bias),8));
+      *R_out = MDEC_M9(_mm_packs_epi32(r_lo,r_hi));
+      *G_out = MDEC_M9(_mm_packs_epi32(g_lo,g_hi));
+      *B_out = MDEC_M9(_mm_packs_epi32(b_lo,b_hi));
+   }
+}
+
+static INLINE void EncodeRow24(const int8_t *by, const int8_t *cb,
+      const int8_t *cr, uint8_t rgb_xor, uint8_t *out)
+{
+   __m128i R, G, B;
+   __m128i flip = _mm_set1_epi16((short)(0x80 ^ rgb_xor));
+   uint8_t r8[8], g8[8], b8[8];
+   int i;
+   mdec_ycbcr_row(by, cb, cr, &R, &G, &B);
+   R = _mm_xor_si128(_mm_and_si128(R, _mm_set1_epi16(0xFF)), flip);
+   G = _mm_xor_si128(_mm_and_si128(G, _mm_set1_epi16(0xFF)), flip);
+   B = _mm_xor_si128(_mm_and_si128(B, _mm_set1_epi16(0xFF)), flip);
+   _mm_storel_epi64((__m128i*)r8, _mm_packus_epi16(R, R));
+   _mm_storel_epi64((__m128i*)g8, _mm_packus_epi16(G, G));
+   _mm_storel_epi64((__m128i*)b8, _mm_packus_epi16(B, B));
+   for (i = 0; i < 8; i++) { out[i*3+0]=r8[i]; out[i*3+1]=g8[i]; out[i*3+2]=b8[i]; }
+}
+
+static INLINE void EncodeRow16(const int8_t *by, const int8_t *cb,
+      const int8_t *cr, uint16_t pixel_xor, uint16_t *out)
+{
+   __m128i R, G, B, r5, g5, b5, pix;
+   __m128i o80 = _mm_set1_epi16(0x80), four=_mm_set1_epi16(4), m1F=_mm_set1_epi16(0x1F);
+   mdec_ycbcr_row(by, cb, cr, &R, &G, &B);
+   R = _mm_add_epi16(R, o80); G = _mm_add_epi16(G, o80); B = _mm_add_epi16(B, o80);
+   r5 = _mm_min_epi16(_mm_srli_epi16(_mm_add_epi16(R, four), 3), m1F);
+   g5 = _mm_min_epi16(_mm_srli_epi16(_mm_add_epi16(G, four), 3), m1F);
+   b5 = _mm_min_epi16(_mm_srli_epi16(_mm_add_epi16(B, four), 3), m1F);
+   pix = _mm_or_si128(r5, _mm_or_si128(_mm_slli_epi16(g5, 5), _mm_slli_epi16(b5, 10)));
+   pix = _mm_xor_si128(pix, _mm_set1_epi16((short)pixel_xor));
+   _mm_storeu_si128((__m128i*)out, pix);
+}
+#undef MDEC_MUL32
+#undef MDEC_M9
+
+#else /* MDEC_HAVE_NEON */
+#define MDEC_M9(v) vminq_s16(vmaxq_s16( \
+   vshrq_n_s16(vshlq_n_s16(v, 7), 7), vdupq_n_s16(-128)), vdupq_n_s16(127))
+
+static INLINE void mdec_ycbcr_row(const int8_t *by, const int8_t *cb,
+      const int8_t *cr, int16x8_t *R_out, int16x8_t *G_out, int16x8_t *B_out)
+{
+   int16x8_t y16 = vmovl_s8(vld1_s8(by));
+   int16_t cbd[8], crd[8];
+   int l;
+   for (l = 0; l < 4; l++) { cbd[2*l]=cbd[2*l+1]=cb[l]; crd[2*l]=crd[2*l+1]=cr[l]; }
+   {
+      int16x8_t CB = vld1q_s16(cbd), CR = vld1q_s16(crd);
+      int32x4_t cb_lo=vmovl_s16(vget_low_s16(CB)), cb_hi=vmovl_s16(vget_high_s16(CB));
+      int32x4_t cr_lo=vmovl_s16(vget_low_s16(CR)), cr_hi=vmovl_s16(vget_high_s16(CR));
+      int32x4_t y_lo=vmovl_s16(vget_low_s16(y16)), y_hi=vmovl_s16(vget_high_s16(y16));
+      const int32x4_t bias=vdupq_n_s32(0x80);
+      int32x4_t r_lo=vaddq_s32(y_lo,vshrq_n_s32(vaddq_s32(vmulq_n_s32(cr_lo,359),bias),8));
+      int32x4_t r_hi=vaddq_s32(y_hi,vshrq_n_s32(vaddq_s32(vmulq_n_s32(cr_hi,359),bias),8));
+      int32x4_t b_lo=vaddq_s32(y_lo,vshrq_n_s32(vaddq_s32(vmulq_n_s32(cb_lo,454),bias),8));
+      int32x4_t b_hi=vaddq_s32(y_hi,vshrq_n_s32(vaddq_s32(vmulq_n_s32(cb_hi,454),bias),8));
+      int32x4_t a0=vbicq_s32(vmulq_n_s32(cb_lo,-88),vdupq_n_s32(0x1F));
+      int32x4_t a1=vbicq_s32(vmulq_n_s32(cb_hi,-88),vdupq_n_s32(0x1F));
+      int32x4_t c0=vbicq_s32(vmulq_n_s32(cr_lo,-183),vdupq_n_s32(0x07));
+      int32x4_t c1=vbicq_s32(vmulq_n_s32(cr_hi,-183),vdupq_n_s32(0x07));
+      int32x4_t g_lo=vaddq_s32(y_lo,vshrq_n_s32(vaddq_s32(vaddq_s32(a0,c0),bias),8));
+      int32x4_t g_hi=vaddq_s32(y_hi,vshrq_n_s32(vaddq_s32(vaddq_s32(a1,c1),bias),8));
+      *R_out = MDEC_M9(vcombine_s16(vmovn_s32(r_lo),vmovn_s32(r_hi)));
+      *G_out = MDEC_M9(vcombine_s16(vmovn_s32(g_lo),vmovn_s32(g_hi)));
+      *B_out = MDEC_M9(vcombine_s16(vmovn_s32(b_lo),vmovn_s32(b_hi)));
+   }
+}
+
+static INLINE void EncodeRow24(const int8_t *by, const int8_t *cb,
+      const int8_t *cr, uint8_t rgb_xor, uint8_t *out)
+{
+   int16x8_t R, G, B;
+   int16x8_t flip = vdupq_n_s16((int16_t)(0x80 ^ rgb_xor));
+   uint8x8_t r8, g8, b8;
+   uint8_t rb[8], gb[8], bb[8];
+   int i;
+   mdec_ycbcr_row(by, cb, cr, &R, &G, &B);
+   R = veorq_s16(vandq_s16(R, vdupq_n_s16(0xFF)), flip);
+   G = veorq_s16(vandq_s16(G, vdupq_n_s16(0xFF)), flip);
+   B = veorq_s16(vandq_s16(B, vdupq_n_s16(0xFF)), flip);
+   r8 = vqmovun_s16(R); g8 = vqmovun_s16(G); b8 = vqmovun_s16(B);
+   vst1_u8(rb, r8); vst1_u8(gb, g8); vst1_u8(bb, b8);
+   for (i = 0; i < 8; i++) { out[i*3+0]=rb[i]; out[i*3+1]=gb[i]; out[i*3+2]=bb[i]; }
+}
+
+static INLINE void EncodeRow16(const int8_t *by, const int8_t *cb,
+      const int8_t *cr, uint16_t pixel_xor, uint16_t *out)
+{
+   int16x8_t R, G, B, r5, g5, b5, pix;
+   int16x8_t o80=vdupq_n_s16(0x80), four=vdupq_n_s16(4), m1F=vdupq_n_s16(0x1F);
+   mdec_ycbcr_row(by, cb, cr, &R, &G, &B);
+   R = vaddq_s16(R, o80); G = vaddq_s16(G, o80); B = vaddq_s16(B, o80);
+   r5 = vminq_s16(vshrq_n_s16(vaddq_s16(R, four), 3), m1F);
+   g5 = vminq_s16(vshrq_n_s16(vaddq_s16(G, four), 3), m1F);
+   b5 = vminq_s16(vshrq_n_s16(vaddq_s16(B, four), 3), m1F);
+   pix = vorrq_s16(r5, vorrq_s16(vshlq_n_s16(g5, 5), vshlq_n_s16(b5, 10)));
+   pix = veorq_s16(pix, vdupq_n_s16((int16_t)pixel_xor));
+   vst1q_u16(out, vreinterpretq_u16_s16(pix));
+}
+#undef MDEC_M9
+#endif
+#endif /* SSE2 || NEON */
+
 static void EncodeImage(const unsigned ybn)
 {
 
@@ -410,7 +584,7 @@ static void EncodeImage(const unsigned ybn)
          {
             const uint8_t rgb_xor = (Command & (1U << 26)) ? 0x80 : 0x00;
             uint8_t* pix_out = PixelBuffer.pix8;
-            int y, x;
+            int y;
 
             for(y = 0; y < 8; y++)
             {
@@ -418,6 +592,11 @@ static void EncodeImage(const unsigned ybn)
                const int8_t* cb = &block_cb[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
                const int8_t* cr = &block_cr[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
 
+#if defined(__SSE2__) || defined(MDEC_HAVE_NEON)
+               EncodeRow24(by, cb, cr, rgb_xor, pix_out);
+               pix_out += 24;
+#else
+               int x;
                for(x = 0; x < 8; x++)
                {
                   int r, g, b;
@@ -429,6 +608,7 @@ static void EncodeImage(const unsigned ybn)
                   pix_out[2] = b ^ rgb_xor;
                   pix_out += 3;
                }
+#endif
             }
             PixelBufferCount32 = 48;
          }
@@ -438,7 +618,7 @@ static void EncodeImage(const unsigned ybn)
          {
             uint16_t pixel_xor = ((Command & 0x02000000) ? 0x8000 : 0x0000) | ((Command & (1U << 26)) ? 0x4210 : 0x0000);
             uint16_t* pix_out = PixelBuffer.pix16;
-            int y, x;
+            int y;
 
             for(y = 0; y < 8; y++)
             {
@@ -446,6 +626,13 @@ static void EncodeImage(const unsigned ybn)
                const int8_t* cb = &block_cb[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
                const int8_t* cr = &block_cr[(y >> 1) | ((ybn & 2) << 1)][(ybn & 1) << 2];
 
+#if defined(__SSE2__) || defined(MDEC_HAVE_NEON)
+               /* Native 128-bit store; the SSE2/NEON targets are all
+                * little-endian, matching the scalar StoreU16_LE. */
+               EncodeRow16(by, cb, cr, pixel_xor, pix_out);
+               pix_out += 8;
+#else
+               int x;
                for(x = 0; x < 8; x++)
                {
                   int r, g, b;
@@ -455,6 +642,7 @@ static void EncodeImage(const unsigned ybn)
                   StoreU16_LE(pix_out, pixel_xor ^ RGB_to_RGB555(r, g, b));
                   pix_out++;
                }
+#endif
             }
             PixelBufferCount32 = 32;
          }
