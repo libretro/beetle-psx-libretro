@@ -1,6 +1,12 @@
 #include <math.h>
 #include "beetle_psx_globals.h"
 
+/* Defined later in the same translation unit (gpu.c includes this
+ * file before the dither_table definition).  Forward-declared here so
+ * the non-textured SSE2/NEON span helper below can read it; the later
+ * definition in gpu.c provides storage. */
+static const int8_t dither_table[4][4];
+
 #define COORD_FBS 12
 #define COORD_MF_INT(n) ((n) << COORD_FBS)
 #define COORD_POST_PADDING 12
@@ -300,6 +306,254 @@ DEFINE_AddIDeltas_DY(g1_t1, 1, 1)
  * is specialised on (BlendMode, MaskEval_TA, textured), and is
  * inlined here so the inner loop is fully fused.
  */
+
+#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
+/*
+ * Vectorised inner loop for the *non-textured* span at native
+ * resolution.  Processes pixels in SIMD chunks and returns the count
+ * consumed; the macro's scalar do/while finishes the remainder (and
+ * runs the whole span when this returns 0).
+ *
+ * Bit-exactness contract (matches the scalar T0 path exactly):
+ *   - colour comes from the affine interpolants ig.r/g/b, each a
+ *     uint32 stepped by idl->d{r,g,b}_dx per pixel; lane i carries
+ *     base + i*delta with native uint32 wrap (GOURAUD only - flat
+ *     fill has zero deltas so all lanes share the base, still exact).
+ *   - 555 build: dithered  -> DitherLUT[y&3][x&3][chan] which is
+ *     clamp((chan + dither_table[y&3][x&3]) >> 3, 0, 0x1F);
+ *     non-dithered -> chan >> 3.  We reproduce the LUT arithmetic
+ *     directly (add period-4 offset, arithmetic >>3, clamp).
+ *   - blend: the same SWAR math as PlotPixelBlend_*, widened.  AVG/
+ *     ADD/ADD_FOURTH stay in 16-bit lanes (8 px/iter).  SUBTRACT's
+ *     borrow mask 0x108420 has a bit above lane 15, so it runs in
+ *     32-bit lanes (4 px/iter); still ahead of scalar.
+ *   - mask-eval (ME_LIT): keep the destination word where its 0x8000
+ *     bit is set, else take the new pixel.  Native-res second fetch
+ *     equals the blend's bg fetch (no write between), so one load
+ *     serves both.
+ *   - store: (pix & 0x7FFF) | MaskSetOR.
+ *
+ * Gated by the caller on upscale_shift == 0 (which also forces
+ * dither_upscale_shift == 0, so the dither phase is plain x&3) and on
+ * the run being contiguous in a single VRAM row (y already masked,
+ * x in [0,1024)); the caller passes a span that does not cross the
+ * 1024 column wrap.
+ *
+ * GOURAUD_LIT/DITHER_ON/BM_VAL/ME_LIT are passed as literal ints from
+ * the macro so this fully specialises and inlines per call site.
+ */
+static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
+      const i_group *igp, const i_deltas *idl,
+      const int GOURAUD_LIT, const int DITHER_ON,
+      const int BM_VAL, const int ME_LIT)
+{
+   uint16_t *row       = &gpu->vram[(uint32_t)(y & 511) << 10];
+   const uint16_t mso  = gpu->MaskSetOR;
+   uint32_t cr         = igp->r;
+   uint32_t cg         = igp->g;
+   uint32_t cb         = igp->b;
+   const uint32_t dr   = GOURAUD_LIT ? idl->dr_dx : 0;
+   const uint32_t dg   = GOURAUD_LIT ? idl->dg_dx : 0;
+   const uint32_t db   = GOURAUD_LIT ? idl->db_dx : 0;
+   const int      step = (BM_VAL == BLEND_MODE_SUBTRACT) ? 4 : 8;
+   int32_t        done = 0;
+   const int      use_dither = (GOURAUD_LIT && DITHER_ON);
+#define CHAN(base, d, l) (((base) + (d) * (uint32_t)(l)) >> (COORD_FBS + COORD_POST_PADDING))
+
+#if defined(__SSE2__)
+   const __m128i  v7FFF = _mm_set1_epi16(0x7FFF);
+   const __m128i  v8000 = _mm_set1_epi16((short)0x8000);
+   const __m128i  vmso  = _mm_set1_epi16((short)mso);
+#else
+   const uint16x8_t v7FFF = vdupq_n_u16(0x7FFF);
+   const uint16x8_t v8000 = vdupq_n_u16(0x8000);
+   const uint16x8_t vmso  = vdupq_n_u16(mso);
+#endif
+
+   for (; done + step <= w; done += step)
+   {
+      const int32_t bx = x + done;
+      uint16_t      R8[8], G8[8], B8[8];
+      int           l;
+
+      for (l = 0; l < step; l++)
+      {
+         R8[l] = (uint16_t)CHAN(cr, dr, l);
+         G8[l] = (uint16_t)CHAN(cg, dg, l);
+         B8[l] = (uint16_t)CHAN(cb, db, l);
+      }
+
+#if defined(__SSE2__)
+      {
+         __m128i R, G, B, pr, pg, pb, pix, bg, out;
+         if (step == 4) { R8[4]=R8[5]=R8[6]=R8[7]=0; G8[4]=G8[5]=G8[6]=G8[7]=0; B8[4]=B8[5]=B8[6]=B8[7]=0; }
+         R = _mm_loadu_si128((const __m128i*)R8);
+         G = _mm_loadu_si128((const __m128i*)G8);
+         B = _mm_loadu_si128((const __m128i*)B8);
+         if (use_dither)
+         {
+            int16_t doff[8];
+            for (l = 0; l < step; l++) doff[l] = dither_table[y & 3][(bx + l) & 3];
+            if (step == 4) doff[4]=doff[5]=doff[6]=doff[7]=0;
+            {
+               __m128i d = _mm_loadu_si128((const __m128i*)doff);
+               __m128i z = _mm_setzero_si128(), m1F = _mm_set1_epi16(0x1F);
+               pr = _mm_min_epi16(_mm_max_epi16(_mm_srai_epi16(_mm_add_epi16(R, d), 3), z), m1F);
+               pg = _mm_min_epi16(_mm_max_epi16(_mm_srai_epi16(_mm_add_epi16(G, d), 3), z), m1F);
+               pb = _mm_min_epi16(_mm_max_epi16(_mm_srai_epi16(_mm_add_epi16(B, d), 3), z), m1F);
+            }
+         }
+         else
+         {
+            pr = _mm_srli_epi16(R, 3);
+            pg = _mm_srli_epi16(G, 3);
+            pb = _mm_srli_epi16(B, 3);
+         }
+         pix = _mm_or_si128(v8000,
+               _mm_or_si128(pr, _mm_or_si128(_mm_slli_epi16(pg, 5), _mm_slli_epi16(pb, 10))));
+         bg  = _mm_loadu_si128((const __m128i*)&row[bx]);
+
+         if (BM_VAL == BLEND_MODE_AVERAGE)
+         {
+            __m128i bgo = _mm_or_si128(bg, v8000);
+            __m128i xr  = _mm_and_si128(_mm_xor_si128(pix, bgo), _mm_set1_epi16(0x0421));
+            pix = _mm_srli_epi16(_mm_sub_epi16(_mm_add_epi16(pix, bgo), xr), 1);
+         }
+         else if (BM_VAL == BLEND_MODE_ADD)
+         {
+            __m128i b2  = _mm_andnot_si128(v8000, bg);
+            __m128i sum = _mm_add_epi16(pix, b2);
+            __m128i car = _mm_and_si128(_mm_sub_epi16(sum, _mm_and_si128(_mm_xor_si128(pix, b2), _mm_set1_epi16((short)0x8421))), _mm_set1_epi16((short)0x8420));
+            pix = _mm_or_si128(_mm_sub_epi16(sum, car), _mm_sub_epi16(car, _mm_srli_epi16(car, 5)));
+         }
+         else if (BM_VAL == BLEND_MODE_ADD_FOURTH)
+         {
+            __m128i b2  = _mm_andnot_si128(v8000, bg);
+            __m128i fp2 = _mm_or_si128(_mm_and_si128(_mm_srli_epi16(pix, 2), _mm_set1_epi16(0x1CE7)), v8000);
+            __m128i sum = _mm_add_epi16(fp2, b2);
+            __m128i car = _mm_and_si128(_mm_sub_epi16(sum, _mm_and_si128(_mm_xor_si128(fp2, b2), _mm_set1_epi16((short)0x8421))), _mm_set1_epi16((short)0x8420));
+            pix = _mm_or_si128(_mm_sub_epi16(sum, car), _mm_sub_epi16(car, _mm_srli_epi16(car, 5)));
+         }
+         else if (BM_VAL == BLEND_MODE_SUBTRACT)
+         {
+            /* 32-bit lanes: widen pix/bg low 4 lanes, do the 0x108420 SWAR, repack. */
+            __m128i z   = _mm_setzero_si128();
+            __m128i m84 = _mm_set1_epi32(0x108420), m80 = _mm_set1_epi32(0x8000);
+            __m128i fp32 = _mm_unpacklo_epi16(pix, z);
+            __m128i bg32 = _mm_unpacklo_epi16(bg, z);
+            __m128i bgo  = _mm_or_si128(bg32, m80);
+            __m128i fpc  = _mm_andnot_si128(m80, fp32);
+            __m128i diff = _mm_add_epi32(_mm_sub_epi32(bgo, fpc), m84);
+            __m128i xr   = _mm_and_si128(_mm_xor_si128(bgo, fpc), m84);
+            __m128i bor  = _mm_and_si128(_mm_sub_epi32(diff, xr), m84);
+            __m128i res  = _mm_and_si128(_mm_sub_epi32(diff, bor), _mm_sub_epi32(bor, _mm_srli_epi32(bor, 5)));
+            /* Truncate each 32-bit lane to 16 bits into lanes 0..3.
+             * SSE2 has no unsigned 32->16 pack (packus_epi32 is
+             * SSE4.1) and packs_epi32 signed-saturates (the subtract
+             * result can have bit 15 set, e.g. 0x900e), so emulate
+             * packus via the bias trick: subtract 0x8000 to bring the
+             * value into signed-16 range, signed-pack, then add 0x8000
+             * back in 16-bit lanes.  Only the low 4 lanes are stored. */
+            res = _mm_and_si128(res, _mm_set1_epi32(0xFFFF));
+            pix = _mm_add_epi16(_mm_packs_epi32(_mm_sub_epi32(res, _mm_set1_epi32(0x8000)), z),
+                                _mm_set1_epi16((short)0x8000));
+         }
+
+         out = _mm_or_si128(_mm_and_si128(pix, v7FFF), vmso);
+         if (ME_LIT)
+         {
+            __m128i keep = _mm_srai_epi16(bg, 15);
+            out = _mm_or_si128(_mm_and_si128(keep, bg), _mm_andnot_si128(keep, out));
+         }
+         if (step == 8)
+            _mm_storeu_si128((__m128i*)&row[bx], out);
+         else
+            _mm_storel_epi64((__m128i*)&row[bx], out); /* 4 px */
+      }
+#else /* GPU_HAVE_NEON */
+      {
+         uint16x8_t R, G, B, pr, pg, pb, pix, bg, out;
+         if (step == 4) { R8[4]=R8[5]=R8[6]=R8[7]=0; G8[4]=G8[5]=G8[6]=G8[7]=0; B8[4]=B8[5]=B8[6]=B8[7]=0; }
+         R = vld1q_u16(R8); G = vld1q_u16(G8); B = vld1q_u16(B8);
+         if (use_dither)
+         {
+            int16_t doff[8];
+            for (l = 0; l < step; l++) doff[l] = dither_table[y & 3][(bx + l) & 3];
+            if (step == 4) doff[4]=doff[5]=doff[6]=doff[7]=0;
+            {
+               int16x8_t d  = vld1q_s16(doff);
+               int16x8_t m1F = vdupq_n_s16(0x1F), z = vdupq_n_s16(0);
+               int16x8_t sr = vshrq_n_s16(vaddq_s16(vreinterpretq_s16_u16(R), d), 3);
+               int16x8_t sg = vshrq_n_s16(vaddq_s16(vreinterpretq_s16_u16(G), d), 3);
+               int16x8_t sb = vshrq_n_s16(vaddq_s16(vreinterpretq_s16_u16(B), d), 3);
+               pr = vreinterpretq_u16_s16(vminq_s16(vmaxq_s16(sr, z), m1F));
+               pg = vreinterpretq_u16_s16(vminq_s16(vmaxq_s16(sg, z), m1F));
+               pb = vreinterpretq_u16_s16(vminq_s16(vmaxq_s16(sb, z), m1F));
+            }
+         }
+         else
+         {
+            pr = vshrq_n_u16(R, 3); pg = vshrq_n_u16(G, 3); pb = vshrq_n_u16(B, 3);
+         }
+         pix = vorrq_u16(v8000, vorrq_u16(pr, vorrq_u16(vshlq_n_u16(pg, 5), vshlq_n_u16(pb, 10))));
+         bg  = vld1q_u16(&row[bx]);
+
+         if (BM_VAL == BLEND_MODE_AVERAGE)
+         {
+            uint16x8_t bgo = vorrq_u16(bg, v8000);
+            uint16x8_t xr  = vandq_u16(veorq_u16(pix, bgo), vdupq_n_u16(0x0421));
+            pix = vshrq_n_u16(vsubq_u16(vaddq_u16(pix, bgo), xr), 1);
+         }
+         else if (BM_VAL == BLEND_MODE_ADD)
+         {
+            uint16x8_t b2  = vbicq_u16(bg, v8000);
+            uint16x8_t sum = vaddq_u16(pix, b2);
+            uint16x8_t car = vandq_u16(vsubq_u16(sum, vandq_u16(veorq_u16(pix, b2), vdupq_n_u16(0x8421))), vdupq_n_u16(0x8420));
+            pix = vorrq_u16(vsubq_u16(sum, car), vsubq_u16(car, vshrq_n_u16(car, 5)));
+         }
+         else if (BM_VAL == BLEND_MODE_ADD_FOURTH)
+         {
+            uint16x8_t b2  = vbicq_u16(bg, v8000);
+            uint16x8_t fp2 = vorrq_u16(vandq_u16(vshrq_n_u16(pix, 2), vdupq_n_u16(0x1CE7)), v8000);
+            uint16x8_t sum = vaddq_u16(fp2, b2);
+            uint16x8_t car = vandq_u16(vsubq_u16(sum, vandq_u16(veorq_u16(fp2, b2), vdupq_n_u16(0x8421))), vdupq_n_u16(0x8420));
+            pix = vorrq_u16(vsubq_u16(sum, car), vsubq_u16(car, vshrq_n_u16(car, 5)));
+         }
+         else if (BM_VAL == BLEND_MODE_SUBTRACT)
+         {
+            uint32x4_t m84 = vdupq_n_u32(0x108420), m80 = vdupq_n_u32(0x8000);
+            uint32x4_t fp32 = vmovl_u16(vget_low_u16(pix));
+            uint32x4_t bg32 = vmovl_u16(vget_low_u16(bg));
+            uint32x4_t bgo  = vorrq_u32(bg32, m80);
+            uint32x4_t fpc  = vbicq_u32(fp32, m80);
+            uint32x4_t diff = vaddq_u32(vsubq_u32(bgo, fpc), m84);
+            uint32x4_t xr   = vandq_u32(veorq_u32(bgo, fpc), m84);
+            uint32x4_t bor  = vandq_u32(vsubq_u32(diff, xr), m84);
+            uint32x4_t res  = vandq_u32(vsubq_u32(diff, bor), vsubq_u32(bor, vshrq_n_u32(bor, 5)));
+            pix = vcombine_u16(vmovn_u32(res), vdup_n_u16(0));
+         }
+
+         out = vorrq_u16(vandq_u16(pix, v7FFF), vmso);
+         if (ME_LIT)
+         {
+            uint16x8_t keep = vcgeq_u16(bg, v8000); /* 0xFFFF where high bit set (bg >= 0x8000) */
+            out = vbslq_u16(keep, bg, out);
+         }
+         if (step == 8)
+            vst1q_u16(&row[bx], out);
+         else
+            vst1_u16(&row[bx], vget_low_u16(out)); /* 4 px */
+      }
+#endif
+      cr += dr * (uint32_t)step;
+      cg += dg * (uint32_t)step;
+      cb += db * (uint32_t)step;
+   }
+#undef CHAN
+   return done;
+}
+#endif /* SSE2 || NEON */
+
 #define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
 static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas *idl, const bool pct) \
 { \
@@ -359,6 +613,30 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
          gpu->DrawTimeAvail -= (w + ((w + 1) >> 1)) >> gpu->upscale_shift; \
       else \
          gpu->DrawTimeAvail -= w >> gpu->upscale_shift; \
+   } \
+   /* Native-res, non-textured fast path: vectorise the contiguous run \
+    * (the span lies within [ClipX0,ClipX1] in [0,1023], so it never \
+    * crosses the x==1024 VRAM wrap).  Advances x/w and steps the affine \
+    * colour interpolants past the consumed pixels; the scalar do/while \
+    * below finishes any 4/8-pixel remainder.  Textured spans and any \
+    * upscale are left entirely to the scalar loop. */ \
+   if (!(TEXTURED_LIT) && gpu->upscale_shift == 0) \
+   { \
+      int32_t _vn = DrawSpanVec_NT(gpu, y, x, w, &ig, idl, \
+            (GOURAUD_LIT), DitherEnabled(gpu), (BM_VAL), (ME_LIT)); \
+      if (_vn > 0) \
+      { \
+         if (GOURAUD_LIT) \
+         { \
+            ig.r += idl->dr_dx * (uint32_t)_vn; \
+            ig.g += idl->dg_dx * (uint32_t)_vn; \
+            ig.b += idl->db_dx * (uint32_t)_vn; \
+         } \
+         x += _vn; \
+         w -= _vn; \
+         if (w <= 0) \
+            return; \
+      } \
    } \
    do \
    { \
