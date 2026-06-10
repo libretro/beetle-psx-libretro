@@ -27,6 +27,17 @@
 #include <emmintrin.h>
 #endif
 
+/* NEON counterpart to the SSE2 GPU fast paths.  __ARM_NEON is defined
+ * by both AArch64 (-march=armv8-a, NEON is mandatory) and 32-bit ARM
+ * built with -mfpu=neon; __ARM_NEON__ is the older spelling some
+ * toolchains use.  arm_neon.h provides the same vdupq/vst1q/vld1q
+ * intrinsics on both, so a single GPU_HAVE_NEON guard covers 32- and
+ * 64-bit.  Only used when __SSE2__ is absent (no target has both). */
+#if !defined(__SSE2__) && (defined(__ARM_NEON) || defined(__ARM_NEON__))
+#include <arm_neon.h>
+#define GPU_HAVE_NEON 1
+#endif
+
 #include "../math_ops.h"
 #include "../state_helpers.h"
 #include "../../rhi/rhi_intf.h"
@@ -434,7 +445,7 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
       if (sw)
       {
          unsigned x = 0;
-#if defined(__SSE2__)
+#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
          /* Native-res 8-pixel fast path.  At upscale_shift == 0,
           * texel_put() reduces to a single vram_put() into a flat
           * uint16 row whose base is (d_y << 10), so a fill row is a
@@ -450,13 +461,20 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
           * own.  Bails entirely (x stays 0) when not at native res. */
          if (GPU.upscale_shift == 0)
          {
-            uint16_t       *row    = &GPU.vram[(uint32_t)d_y << 10];
+            uint16_t       *row     = &GPU.vram[(uint32_t)d_y << 10];
             const int32_t   to_wrap = 1024 - destX; /* pixels before x hits 1024 */
             const int32_t   contig  = (width < to_wrap) ? width : to_wrap;
+#if defined(__SSE2__)
             const __m128i   splat   = _mm_set1_epi16((short)fill_value);
 
             for(; (int32_t)x + 8 <= contig; x += 8)
                _mm_storeu_si128((__m128i*)&row[destX + x], splat);
+#else /* GPU_HAVE_NEON */
+            const uint16x8_t splat  = vdupq_n_u16(fill_value);
+
+            for(; (int32_t)x + 8 <= contig; x += 8)
+               vst1q_u16(&row[destX + x], splat);
+#endif
          }
 #endif
          for(; x < (unsigned)width; x++)
