@@ -179,9 +179,22 @@ enum
    DS_STOPPED         = 0,
    DS_SEEKING,
    DS_SEEKING_LOGICAL,
-   DS_PLAY_SEEKING,
+   /* Second phase of a logical seek: the physical movement is done
+    * (CurSector == SeekTarget) and the drive is reading sectors,
+    * waiting for a data-sector header whose AMSF matches SeekTarget
+    * (or any sector when MODE_CDDA permits) before declaring the
+    * seek finished.  Takes the enum slot of the long-orphaned
+    * DS_PLAY_SEEKING (which no code referenced), so every other
+    * state keeps its serialized numeric value and old save states
+    * remain layout-compatible. */
+   DS_SEEKING_LOGICAL2,
    DS_PLAYING,
    DS_READING,
+   /* Legacy: new code never enters DS_RESETTING (command 0x0A now
+    * performs a real seek to sector 0, like the hardware); the state
+    * and its clock-loop handler are retained only so save states
+    * written while an old-style reset was in flight still drain
+    * correctly. */
    DS_RESETTING
 };
 
@@ -287,7 +300,7 @@ static const CDC_CTEntry Commands[0x20] =
    { /* 0x07, */ 0, 0, "Standby", PS_CDC_Command_Standby, PS_CDC_Command_Standby_Part2 },
    { /* 0x08, */ 0, 0, "Stop", PS_CDC_Command_Stop, PS_CDC_Command_Stop_Part2 },
    { /* 0x09, */ 0, 0, "Pause", PS_CDC_Command_Pause, PS_CDC_Command_Pause_Part2 },
-   { /* 0x0A, */ 0, 0, "Reset", PS_CDC_Command_Reset, NULL },
+   { /* 0x0A, */ 0, 0, "Reset", PS_CDC_Command_Reset, PS_CDC_Command_Seek_PartN },
    { /* 0x0B, */ 0, 0, "Mute", PS_CDC_Command_Mute, NULL },
    { /* 0x0C, */ 0, 0, "Demute", PS_CDC_Command_Demute, NULL },
    { /* 0x0D, */ 2, 2, "Setfilter", PS_CDC_Command_Setfilter, NULL },
@@ -350,6 +363,7 @@ void PS_CDC_DMForceStop(PS_CDC *cdc)
    }
 
    cdc->HeaderBufValid = false;
+   cdc->SeekFinished = -1;
    cdc->DriveStatus = DS_STOPPED;
    PS_CDC_CLEAR_AIP(cdc);
    cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
@@ -481,6 +495,16 @@ void PS_CDC_SoftReset(PS_CDC *cdc)
     * report frame. */
    cdc->ReportLastF = 0xFF;
 
+   /* Reports are permitted immediately after a soft reset; the
+    * 24000000-clock startup delay is only armed at seek-completion
+    * points. */
+   cdc->ReportStartupDelay = 0;
+
+   /* No seek can be in flight after a soft reset; -1 (finished with
+    * error) matches upstream and makes a stray Seek_PartN report a
+    * disc error rather than hanging waiting for completion. */
+   cdc->SeekFinished = -1;
+
    cdc->SeekTarget = 0;
 
    cdc->CommandLoc = 0;
@@ -495,6 +519,8 @@ void PS_CDC_Power(PS_CDC *cdc)
 
    PS_CDC_SoftReset(cdc);
 
+   cdc->HoldLogicalPos = false;
+
    cdc->DiscStartupDelay = 0;
 
    cdc->SPUCounter = SPU_UpdateFromCDC(0);
@@ -503,6 +529,7 @@ void PS_CDC_Power(PS_CDC *cdc)
 
 int PS_CDC_StateAction(PS_CDC *cdc, StateMem *sm, int load, int data_only)
 {
+   int ret;
    SFORMAT StateRegs[] =
    {
       SFVARN_BOOL(cdc->DiscChanged, "DiscChanged"),
@@ -616,10 +643,30 @@ int PS_CDC_StateAction(PS_CDC *cdc, StateMem *sm, int load, int data_only)
 
       SFVAR(cdc->ReportLastF),
 
+      /* Appended at the end of the section so states written before
+       * these fields existed still load: missing entries leave the
+       * preset defaults (see the pre-load block below) in place. */
+      SFVAR(cdc->SeekFinished),
+      SFVAR(cdc->HoldLogicalPos),
+      SFVAR(cdc->ReportStartupDelay),
+
       SFEND
    };
 
-   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "CDC");
+   if(load)
+   {
+      /* Defaults for save states that predate the seek-state-machine
+       * fields; overwritten when the entries are present in the
+       * state.  SeekFinished defaults to 1 ("finished OK") because
+       * the old machine signalled completion purely by leaving the
+       * seeking DriveStatus values; a pending Seek_PartN polled
+       * against such a state must complete, not error or hang. */
+      cdc->SeekFinished = 1;
+      cdc->HoldLogicalPos = false;
+      cdc->ReportStartupDelay = 0;
+   }
+
+   ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "CDC");
 
    if(load)
    {
@@ -638,6 +685,20 @@ int PS_CDC_StateAction(PS_CDC *cdc, StateMem *sm, int load, int data_only)
 
       cdc->ADPCM_ResampCurPos &= 0x1F;
       cdc->ADPCM_ResampCurPhase %= 7;
+
+      /* Seek-state coherence.  While any seek is in flight the
+       * completion flag must read "in progress"; conversely a
+       * non-seeking drive with SeekFinished still 0 would make a
+       * pending Seek_PartN spin forever without ever raising its
+       * completion IRQ (upstream flags this combination as a
+       * shouldn't-happen), so resolve it to success. */
+      if(cdc->DriveStatus == DS_SEEKING || cdc->DriveStatus == DS_SEEKING_LOGICAL || cdc->DriveStatus == DS_SEEKING_LOGICAL2)
+         cdc->SeekFinished = 0;
+      else if(!cdc->SeekFinished)
+         cdc->SeekFinished = 1;
+
+      if(cdc->DriveStatus == DS_SEEKING_LOGICAL2)
+         cdc->HoldLogicalPos = true;
 
 
       /* Handle pre-0.9.37 state loading, and maliciously-constructed/corrupted save states. */
@@ -723,6 +784,7 @@ uint8_t PS_CDC_MakeStatus(PS_CDC *cdc, bool cmd_error)
          /* fall-through */
       case DS_SEEKING:
       case DS_SEEKING_LOGICAL:
+      case DS_SEEKING_LOGICAL2:
          ret |= 0x40;
          break;
    }
@@ -1213,6 +1275,7 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
 
    if(cdc->CurSector >= ((int32_t)cdc->toc.tracks[100].lba + 300) && cdc->CurSector >= (75 * 60 * 75 - 150))
    {
+      cdc->SeekFinished = -1;
       cdc->DriveStatus = DS_STOPPED;
       cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
       cdc->SectorsRead = 0;
@@ -1238,13 +1301,46 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
       uint8_t *buf = target;
       cdc->SectorPipe_In--;
 
-      if(cdc->DriveStatus == DS_READING)
+      if(cdc->SubQBuf_Safe[0] & 0x40) /* Data sector */
       {
-         if(cdc->SubQBuf_Safe[0] & 0x40)
+         /* Latch the sector header whenever the logical position is
+          * being tracked: during the second phase of a logical seek,
+          * while reading, and - when HoldLogicalPos is set - while
+          * paused/standby hovering after a logical seek.  Keeping
+          * HeaderBuf live in the holding states is what makes GetlocL
+          * valid after a SeekL ("Incredible Crisis", "Harukanaru Toki
+          * no Naka de - Banjou Yuugi", "Mortal Kombat Trilogy" music
+          * resumption after pause). */
+         if(cdc->DriveStatus == DS_SEEKING_LOGICAL2 || cdc->DriveStatus == DS_READING ||
+            (cdc->HoldLogicalPos && (cdc->DriveStatus == DS_PAUSED || cdc->DriveStatus == DS_STANDBY)))
          {
             memcpy(cdc->HeaderBuf, buf + 12, 12);
             cdc->HeaderBufValid = true;
 
+            if(cdc->DriveStatus == DS_SEEKING_LOGICAL2)
+            {
+               if(AMSF_to_LBA(BCD_to_U8(cdc->HeaderBuf[0]), BCD_to_U8(cdc->HeaderBuf[1]), BCD_to_U8(cdc->HeaderBuf[2])) == cdc->SeekTarget)
+               {
+                  cdc->DriveStatus = cdc->StatusAfterSeek;
+                  cdc->SeekFinished = true;
+                  cdc->ReportStartupDelay = 24000000;
+               }
+               else
+               {
+                  if(!cdc->SeekRetryCounter)
+                  {
+                     cdc->HoldLogicalPos = false;
+                     cdc->DriveStatus = DS_STANDBY;
+                     cdc->SeekFinished = -1;
+                  }
+                  else
+                     cdc->SeekRetryCounter--;
+               }
+            }
+         }
+
+         if(cdc->DriveStatus == DS_READING)
+         {
             if((cdc->Mode & MODE_STRSND) && (buf[12 + 3] == 0x2) && ((buf[12 + 6] & 0x64) == 0x64))
             {
                if(PS_CDC_XA_Test(cdc, buf))
@@ -1283,11 +1379,38 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
             }
          }
       }
-
-      if(!(cdc->SubQBuf_Safe[0] & 0x40) && ((cdc->Mode & MODE_CDDA) || cdc->DriveStatus == DS_PLAYING))
+      else /* CD-DA sector */
       {
-         if(!(cdc->AudioBuffer.ReadPos < cdc->AudioBuffer.Size))
-            PS_CDC_EnbufferizeCDDASector(cdc, buf);
+         if(cdc->DriveStatus == DS_SEEKING_LOGICAL2)
+         {
+            if(cdc->Mode & MODE_CDDA)
+            {
+               cdc->DriveStatus = cdc->StatusAfterSeek;
+               cdc->SeekFinished = true;
+               cdc->ReportStartupDelay = 24000000;
+            }
+            else
+            {
+               if(!cdc->SeekRetryCounter)
+               {
+                  cdc->HoldLogicalPos = false;
+                  cdc->DriveStatus = DS_STANDBY;
+                  cdc->SeekFinished = -1;
+               }
+               else
+                  cdc->SeekRetryCounter--;
+            }
+         }
+
+         /* Upstream qualifies the read-mode arm with DS_READING; the
+          * old, looser (Mode & MODE_CDDA) alone would enbufferize
+          * CD-DA while the drive merely hovers in a holding state
+          * under the new model. */
+         if((cdc->DriveStatus == DS_READING && (cdc->Mode & MODE_CDDA)) || cdc->DriveStatus == DS_PLAYING)
+         {
+            if(!(cdc->AudioBuffer.ReadPos < cdc->AudioBuffer.Size))
+               PS_CDC_EnbufferizeCDDASector(cdc, buf);
+         }
       }
    }
 
@@ -1329,12 +1452,13 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
 
    PS_CDC_DecodeSubQ(cdc, target + 2352);
 
-   if(cdc->SubQBuf_Safe[1] == 0xAA && (cdc->DriveStatus == DS_PLAYING || (!(cdc->SubQBuf_Safe[0] & 0x40) && (cdc->Mode & MODE_CDDA))))
+   if(cdc->SubQBuf_Safe[1] == 0xAA && (cdc->DriveStatus == DS_PLAYING || (cdc->DriveStatus == DS_READING && !(cdc->SubQBuf_Safe[0] & 0x40) && (cdc->Mode & MODE_CDDA))))
    {
       cdc->HeaderBufValid = false;
 
 
       /* Status in this end-of-disc context here should be generated after we're in the pause state. */
+      cdc->SeekTarget = cdc->CurSector;
       cdc->DriveStatus = DS_PAUSED;
       cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
       cdc->SectorsRead = 0;
@@ -1361,6 +1485,7 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
             /* Status needs to be taken before we're paused(IE it should still report playing). */
             PS_CDC_SetAIP1(cdc, CDCIRQ_DATA_END, PS_CDC_MakeStatus(cdc, false));
 
+            cdc->SeekTarget = cdc->CurSector;
             cdc->DriveStatus = DS_PAUSED;
             cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
             cdc->SectorsRead = 0;
@@ -1369,7 +1494,10 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
          }
       }
 
-      if((cdc->Mode & MODE_REPORT) && (((cdc->SubQBuf_Safe[0x9] >> 4) != cdc->ReportLastF) || cdc->Forward || cdc->Backward) && cdc->SubQChecksumOK)
+      /* Reports are suppressed for ReportStartupDelay clocks after a
+       * seek completes, per tests on a PS1; fixes missing music in
+       * "Roswell Conspiracies - Aliens, Myths & Legends". */
+      if((cdc->Mode & MODE_REPORT) && cdc->ReportStartupDelay <= 0 && (((cdc->SubQBuf_Safe[0x9] >> 4) != cdc->ReportLastF) || cdc->Forward || cdc->Backward) && cdc->SubQChecksumOK)
       {
          uint8_t tr[8];
 #if 1
@@ -1394,8 +1522,6 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
          abs_lev_max |= abs_lev_chselect << 15;
 #endif
 
-         cdc->ReportLastF = cdc->SubQBuf_Safe[0x9] >> 4;
-
          tr[0] = PS_CDC_MakeStatus(cdc, false);
          tr[1] = cdc->SubQBuf_Safe[0x1];  /* Track */
          tr[2] = cdc->SubQBuf_Safe[0x2];  /* Index */
@@ -1418,6 +1544,12 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
 
          PS_CDC_SetAIP_Buf(cdc, CDCIRQ_DATA_READY, 8, tr);
       }
+
+      /* Unconditional, matching upstream: ReportLastF tracks the
+       * current frame even while reports are suppressed by the
+       * startup delay, so the first report after the delay expires
+       * fires on a genuinely new frame value rather than instantly. */
+      cdc->ReportLastF = cdc->SubQBuf_Safe[0x9] >> 4;
    }
 
    /* Commit the new sector: advance write position and increment
@@ -1463,7 +1595,25 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
    else
       cdc->CurSector++;
 
-   cdc->SectorsRead++;
+   if(cdc->DriveStatus == DS_PAUSED || cdc->DriveStatus == DS_STANDBY)
+   {
+      /* The hover: while holding position the head keeps reading and
+       * dances around just before SeekTarget - advance one sector per
+       * read, then drop back 9 once at/past the target (offset by 2
+       * when holding a logical position).  This is what GetlocP
+       * reports after a SeekP completes ("Tomb Raider": CD-DA tracks
+       * at M:S:F=x:x:0 fail to play and the game hangs without it).
+       * -150 (lead-in start) is the lower clamp; the image layer
+       * handles sub-track LBAs by synthesizing null sectors. */
+      if(cdc->CurSector >= (cdc->SeekTarget + (cdc->HoldLogicalPos ? 2 : 0)))
+      {
+         cdc->CurSector -= 9;
+         if(cdc->CurSector < -150)
+            cdc->CurSector = -150;
+      }
+   }
+   else
+      cdc->SectorsRead++;
 }
 
 int32_t PS_CDC_Update(PS_CDC *cdc, const int32_t timestamp)
@@ -1501,7 +1651,11 @@ int32_t PS_CDC_Update(PS_CDC *cdc, const int32_t timestamp)
          cdc->DiscStartupDelay -= chunk_clocks;
 
          if(cdc->DiscStartupDelay <= 0)
+         {
+            cdc->SeekTarget = cdc->CurSector;
+            cdc->HoldLogicalPos = false;
             cdc->DriveStatus = DS_PAUSED;  /* or is it supposed to be DS_STANDBY? */
+         }
       }
 
       if(!(cdc->IRQBuffer & 0xF))
@@ -1520,81 +1674,77 @@ int32_t PS_CDC_Update(PS_CDC *cdc, const int32_t timestamp)
 
          cdc->PSRCounter -= chunk_clocks;
 
+         if(cdc->ReportStartupDelay > 0)
+            cdc->ReportStartupDelay -= chunk_clocks;
+
          if(cdc->PSRCounter <= 0) 
          {
-            switch (cdc->DriveStatus)
+            if(cdc->DriveStatus == DS_RESETTING)
             {
-               case DS_RESETTING:
-                  PS_CDC_SetAIP1(cdc, CDCIRQ_COMPLETE, PS_CDC_MakeStatus(cdc, false));
+               /* Legacy handler: only reachable when a save state was
+                * written while the old one-shot Reset implementation
+                * had a reset in flight.  New code performs command
+                * 0x0A as a real seek to sector 0 instead. */
+               PS_CDC_SetAIP1(cdc, CDCIRQ_COMPLETE, PS_CDC_MakeStatus(cdc, false));
 
-                  cdc->Muted = false;  /* Does it get reset here? */
-                  PS_CDC_ClearAudioBuffers(cdc);
+               cdc->Muted = false;  /* Does it get reset here? */
+               PS_CDC_ClearAudioBuffers(cdc);
 
-                  cdc->SB_In          = 0;
-                  cdc->SectorPipe_Pos = 0;
-                  cdc->SectorPipe_In  = 0;
-                  cdc->SectorsRead    = 0;
-                  cdc->Mode           = 0x20; /* Confirmed (and see "This Is Football 2"). */
-                  cdc->CurSector      = 0;
-                  cdc->CommandLoc     = 0;
+               cdc->SB_In          = 0;
+               cdc->SectorPipe_Pos = 0;
+               cdc->SectorPipe_In  = 0;
+               cdc->SectorsRead    = 0;
+               cdc->Mode           = 0x20; /* Confirmed (and see "This Is Football 2"). */
+               cdc->CurSector      = 0;
+               cdc->CommandLoc     = 0;
 
-                  cdc->DriveStatus    = DS_PAUSED;  /* or DS_STANDBY? */
-                  PS_CDC_CLEAR_AIP(cdc);
-                  break;
-               case DS_SEEKING:
-                  {
-                     int x;
-                     cdc->CurSector = cdc->SeekTarget;
+               cdc->SeekTarget     = 0;
+               cdc->HoldLogicalPos = false;
+               cdc->SeekFinished   = 1;
 
-                     /* CurSector + x for "Tomb Raider"'s sake, as it relies on behavior that we can't emulate very well without a more accurate CD drive */
-                     /* emulation model. */
-                     for(x = -1; x >= -16; x--)
-                     {
-                        uint8_t pwbuf[96];
-                        CDIF_ReadRawSectorPWOnly(cdc->Cur_CDIF, pwbuf, cdc->CurSector + x, false);
-                        if(PS_CDC_DecodeSubQ(cdc, pwbuf))
-                           break;
-                     }
+               cdc->DriveStatus    = DS_PAUSED;  /* or DS_STANDBY? */
+               PS_CDC_CLEAR_AIP(cdc);
+            }
+            else if(cdc->DriveStatus == DS_SEEKING)
+            {
+               cdc->CurSector = cdc->SeekTarget;
 
-                     cdc->DriveStatus = cdc->StatusAfterSeek;
+               cdc->HoldLogicalPos = false;
+               cdc->DriveStatus = cdc->StatusAfterSeek;
+               cdc->SeekFinished = true;
+               cdc->ReportStartupDelay = 24000000;
 
-                     if(cdc->DriveStatus != DS_PAUSED && cdc->DriveStatus != DS_STANDBY)
-                        cdc->PSRCounter = 33868800 / (75 * ((cdc->Mode & MODE_SPEED) ? (2 * cd_2x_speedup) : 1));
-                  }
-                  break;
-               case DS_SEEKING_LOGICAL:
-                  {
-                     uint8_t pwbuf[96];
-                     cdc->CurSector = cdc->SeekTarget;
-                     CDIF_ReadRawSectorPWOnly(cdc->Cur_CDIF, pwbuf, cdc->CurSector, false);
-                     PS_CDC_DecodeSubQ(cdc, pwbuf);
+               /* When the physical seek lands the drive in a holding
+                * state, start the hover slightly before the target so
+                * GetlocP reflects the head dancing around just before
+                * the seek position, as on real hardware ("Tomb
+                * Raider": CD-DA tracks at M:S:F=x:x:0). */
+               if(cdc->DriveStatus == DS_PAUSED || cdc->DriveStatus == DS_STANDBY)
+               {
+                  cdc->CurSector -= 9;
+                  if(cdc->CurSector < -150)
+                     cdc->CurSector = -150;
+               }
 
-                     if(!(cdc->Mode & MODE_CDDA) && !(cdc->SubQBuf_Safe[0] & 0x40))
-                     {
-                        if(!cdc->SeekRetryCounter)
-                        {
-                           cdc->DriveStatus = DS_STANDBY;
-                           PS_CDC_SetAIP2(cdc, CDCIRQ_DISC_ERROR, PS_CDC_MakeStatus(cdc, false) | 0x04, 0x04);
-                        }
-                        else
-                        {
-                           cdc->SeekRetryCounter--;
-                           cdc->PSRCounter = 33868800 / 75;
-                        }
-                     }
-                     else
-                     {
-                        cdc->DriveStatus = cdc->StatusAfterSeek;
+               cdc->PSRCounter = 33868800 / (75 * ((cdc->Mode & MODE_SPEED) ? 2 : 1));
+            }
+            else if(cdc->DriveStatus == DS_SEEKING_LOGICAL)
+            {
+               /* Physical phase of a logical seek done; now read
+                * sectors until a data header matching SeekTarget (or
+                * CD-DA when the mode permits) confirms the logical
+                * position - handled per-sector in HandlePlayRead. */
+               cdc->CurSector = cdc->SeekTarget;
 
-                        if(cdc->DriveStatus != DS_PAUSED && cdc->DriveStatus != DS_STANDBY)
-                           cdc->PSRCounter = 33868800 / (75 * ((cdc->Mode & MODE_SPEED) ? (2 * cd_2x_speedup) : 1));
-                     }
-                  }
-                  break;
-               case DS_READING:
-               case DS_PLAYING:
-                  PS_CDC_HandlePlayRead(cdc);
-                  break;
+               cdc->HoldLogicalPos = true;
+               cdc->DriveStatus = DS_SEEKING_LOGICAL2;
+            }
+
+            if(cdc->DriveStatus == DS_PAUSED || cdc->DriveStatus == DS_STANDBY ||
+               cdc->DriveStatus == DS_READING || cdc->DriveStatus == DS_PLAYING ||
+               cdc->DriveStatus == DS_SEEKING_LOGICAL2)
+            {
+               PS_CDC_HandlePlayRead(cdc);
             }
          }
       }
@@ -2012,6 +2162,17 @@ int32_t PS_CDC_CalcSeekTime(PS_CDC *cdc, int32_t initial, int32_t target, bool m
          }
       }
    }
+   else if(abs(initial - target) >= 3 && abs(initial - target) < 12)
+   {
+      /* Short-seek penalty (3..11 sectors), per tests on a PS1: such
+       * seeks overshoot and the head has to wait most of a revolution
+       * for the target to come around again - about 4 sector periods
+       * at the current read speed.  Part of the upstream seek/pause
+       * timing cluster ("Incredible Crisis", "Ballerburg - Castle
+       * Chaos", "Transformers - Beast Wars Transmetals", "Simple 1500
+       * Series Vol. 057 - The Maze"). */
+      ret += 33868800 / (75 * ((cdc->Mode & MODE_SPEED) ? 2 : 1)) * 4;
+   }
    /*else if(target < initial) */
    /* ret += 1000000; */
 
@@ -2079,6 +2240,7 @@ int32_t PS_CDC_Command_Play(PS_CDC *cdc, const int arg_count, const uint8_t *arg
 
       cdc->ReportLastF = 0xFF;
 
+      cdc->SeekFinished = false;
       cdc->DriveStatus = DS_SEEKING;
       cdc->StatusAfterSeek = DS_PLAYING;
    }
@@ -2101,6 +2263,7 @@ int32_t PS_CDC_Command_Play(PS_CDC *cdc, const int arg_count, const uint8_t *arg
 
       cdc->ReportLastF = 0xFF;
 
+      cdc->SeekFinished = false;
       cdc->DriveStatus = DS_SEEKING;
       cdc->StatusAfterSeek = DS_PLAYING;
    }
@@ -2152,7 +2315,7 @@ void PS_CDC_ReadBase(PS_CDC *cdc)
    PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false));
    PS_CDC_WriteIRQ(cdc, CDCIRQ_ACKNOWLEDGE);
 
-   if(cdc->DriveStatus == DS_SEEKING_LOGICAL && cdc->SeekTarget == cdc->CommandLoc && cdc->StatusAfterSeek == DS_READING)
+   if((cdc->DriveStatus == DS_SEEKING_LOGICAL || cdc->DriveStatus == DS_SEEKING_LOGICAL2) && cdc->SeekTarget == cdc->CommandLoc && cdc->StatusAfterSeek == DS_READING)
    {
       cdc->CommandLoc_Dirty = false;
       return;
@@ -2171,13 +2334,18 @@ void PS_CDC_ReadBase(PS_CDC *cdc)
 
       if(cdc->CommandLoc_Dirty)
          cdc->SeekTarget = cdc->CommandLoc;
-      else
+      else if(cdc->DriveStatus != DS_PAUSED && cdc->DriveStatus != DS_STANDBY)
          cdc->SeekTarget = cdc->CurSector;
+      /* else: holding states keep the SeekTarget they're hovering
+       * around - resuming a read without a new Setloc must return to
+       * the held position, not to wherever the hover currently sits
+       * (a few sectors before the target). */
 
-      cdc->PSRCounter = /*903168 * 1.5 +*/ PS_CDC_CalcSeekTime(cdc, cdc->CurSector, cdc->SeekTarget, cdc->DriveStatus != DS_STOPPED, cdc->DriveStatus == DS_PAUSED);
+      cdc->PSRCounter = 33868800 / (75 * ((cdc->Mode & MODE_SPEED) ? 2 : 1)) + PS_CDC_CalcSeekTime(cdc, cdc->CurSector, cdc->SeekTarget, cdc->DriveStatus != DS_STOPPED, cdc->DriveStatus == DS_PAUSED);
       cdc->HeaderBufValid = false;
       PS_CDC_PreSeekHack(cdc, cdc->SeekTarget);
 
+      cdc->SeekFinished = false;
       cdc->DriveStatus = DS_SEEKING_LOGICAL;
       cdc->StatusAfterSeek = DS_READING;
    }
@@ -2252,6 +2420,8 @@ int32_t PS_CDC_Command_Standby(PS_CDC *cdc, const int arg_count, const uint8_t *
    cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
    cdc->SectorsRead = 0;
 
+   cdc->SeekTarget = cdc->CurSector;	/* FIXME?  CurSector = 0? */
+   cdc->HoldLogicalPos = false;
    cdc->DriveStatus = DS_STANDBY;
 
    return((int64_t)33868800 * 100 / 1000);  /* No idea, FIXME. */
@@ -2288,16 +2458,24 @@ int32_t PS_CDC_Command_Pause(PS_CDC *cdc, const int arg_count, const uint8_t *ar
    /*PS_CDC_ClearAudioBuffers(cdc); */
    cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
    PS_CDC_CLEAR_AIP(cdc);
+   cdc->SeekTarget = cdc->CurSector;
    cdc->DriveStatus = DS_PAUSED;
+   /* The drive keeps reading while paused, hovering around SeekTarget
+    * (see the tail of HandlePlayRead); arm the next sector read. */
+   cdc->PSRCounter = 33868800 / (75 * ((cdc->Mode & MODE_SPEED) ? 2 : 1));
 
-   /* An approximation. */
-   return((1124584 + ((int64_t)cdc->CurSector * 42596 / (75 * 60))) * ((cdc->Mode & MODE_SPEED) ? 1 : 2));
+   /* An approximation; the pseudorandom component addresses
+    * loading-related hangs in "Colony Wars - Vengeance (Europe)" and
+    * "Army Men - Air Attack (Europe)". */
+   return((1124584 + ((int64_t)cdc->CurSector * 42596 / (75 * 60))) * ((cdc->Mode & MODE_SPEED) ? 1 : 2) + PSX_GetRandU32(0, 100000));
 }
 
 int32_t PS_CDC_Command_Pause_Part2(PS_CDC *cdc)
 {
-   cdc->PSRCounter = 0;
-
+   /* Upstream does NOT zero PSRCounter here: the paused drive keeps
+    * hovering (reading) around SeekTarget, which feeds GetlocP/GetlocL
+    * while paused.  Zeroing it would freeze the hover the moment the
+    * Pause command completes. */
    PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false));
    PS_CDC_WriteIRQ(cdc, CDCIRQ_COMPLETE);
 
@@ -2309,14 +2487,51 @@ int32_t PS_CDC_Command_Reset(PS_CDC *cdc, const int arg_count, const uint8_t *ar
    PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false));
    PS_CDC_WriteIRQ(cdc, CDCIRQ_ACKNOWLEDGE);
 
-   if(cdc->DriveStatus != DS_RESETTING)
-   {
-      cdc->HeaderBufValid = false;
-      cdc->DriveStatus = DS_RESETTING;
-      cdc->PSRCounter = 1136000;
-   }
+   /* Command 0x0A performs a real seek back to sector 0 and completes
+    * (via Seek_PartN as its second phase) only when that seek
+    * finishes, per tests on a PS1; fixes the hang in "Goryuujin
+    * Electro" and missing music / hangs in "Grind Session".  The old
+    * DS_RESETTING one-shot timer remains in the clock loop only to
+    * drain save states written mid-reset by previous builds. */
+   cdc->Muted = false; /* Does it get reset here? */
+   cdc->Mode = 0x20;	/* Confirmed(and see "This Is Football 2"). */
+   cdc->CommandLoc = 0;
 
-   return(0);
+   if(cdc->Cur_CDIF && cdc->DiscStartupDelay <= 0)
+   {
+      if((cdc->DriveStatus == DS_SEEKING_LOGICAL || cdc->DriveStatus == DS_SEEKING) && cdc->StatusAfterSeek == DS_PAUSED && cdc->SeekTarget == 0)
+      {
+         /* A reset-seek is already in flight; just keep polling. */
+         return(256);
+      }
+      else
+      {
+         PS_CDC_ClearAudioBuffers(cdc);
+
+         cdc->SB_In = 0;
+         cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
+         cdc->SectorsRead = 0;
+
+         cdc->SeekTarget = 0;
+         {
+            int32_t st = PS_CDC_CalcSeekTime(cdc, cdc->CurSector, cdc->SeekTarget, cdc->DriveStatus != DS_STOPPED, cdc->DriveStatus == DS_PAUSED);
+            int32_t rt = (int32_t)PSX_GetRandU32(0, 3250000);
+            cdc->PSRCounter = (rt > st) ? rt : st;
+         }
+         PS_CDC_PreSeekHack(cdc, cdc->SeekTarget);
+         cdc->SeekFinished = false;
+         cdc->DriveStatus = cdc->HoldLogicalPos ? DS_SEEKING_LOGICAL : DS_SEEKING;
+         cdc->StatusAfterSeek = DS_PAUSED;
+         PS_CDC_CLEAR_AIP(cdc);
+
+         return(4100000);
+      }
+   }
+   else
+   {
+      cdc->SeekFinished = true;
+      return(70000);
+   }
 }
 
 int32_t PS_CDC_Command_Mute(PS_CDC *cdc, const int arg_count, const uint8_t *args)
@@ -2498,9 +2713,16 @@ int32_t PS_CDC_Command_SeekL(PS_CDC *cdc, const int arg_count, const uint8_t *ar
 
    cdc->SeekTarget = cdc->CommandLoc;
 
-   cdc->PSRCounter = (33868800 / (75 * ((cdc->Mode & MODE_SPEED) ? 2 : 1))) + PS_CDC_CalcSeekTime(cdc, cdc->CurSector, cdc->SeekTarget, cdc->DriveStatus != DS_STOPPED, cdc->DriveStatus == DS_PAUSED);
-   cdc->HeaderBufValid = false;
+   cdc->SectorsRead = 0;
+   cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
+
+   cdc->PSRCounter = PS_CDC_CalcSeekTime(cdc, cdc->CurSector, cdc->SeekTarget, cdc->DriveStatus != DS_STOPPED, cdc->DriveStatus == DS_PAUSED);
+   /* Upstream intentionally does NOT invalidate HeaderBuf here: the
+    * previously-latched header stays readable via GetlocL while the
+    * seek is in flight, and DS_SEEKING_LOGICAL2 re-latches it from
+    * real sectors as the seek converges. */
    PS_CDC_PreSeekHack(cdc, cdc->SeekTarget);
+   cdc->SeekFinished = false;
    cdc->DriveStatus = DS_SEEKING_LOGICAL;
    cdc->StatusAfterSeek = DS_STANDBY;
    PS_CDC_CLEAR_AIP(cdc);
@@ -2521,6 +2743,7 @@ int32_t PS_CDC_Command_SeekP(PS_CDC *cdc, const int arg_count, const uint8_t *ar
    cdc->PSRCounter = PS_CDC_CalcSeekTime(cdc, cdc->CurSector, cdc->SeekTarget, cdc->DriveStatus != DS_STOPPED, cdc->DriveStatus == DS_PAUSED);
    cdc->HeaderBufValid = false;
    PS_CDC_PreSeekHack(cdc, cdc->SeekTarget);
+   cdc->SeekFinished = false;
    cdc->DriveStatus = DS_SEEKING;
    cdc->StatusAfterSeek = DS_STANDBY;
    PS_CDC_CLEAR_AIP(cdc);
@@ -2528,13 +2751,27 @@ int32_t PS_CDC_Command_SeekP(PS_CDC *cdc, const int arg_count, const uint8_t *ar
    return(cdc->PSRCounter);
 }
 
+/* Also used as Command_Reset's completion poll. */
 int32_t PS_CDC_Command_Seek_PartN(PS_CDC *cdc)
 {
-   if(cdc->DriveStatus == DS_STANDBY)
+   if(cdc->DriveStatus != DS_SEEKING && cdc->DriveStatus != DS_SEEKING_LOGICAL && cdc->DriveStatus != DS_SEEKING_LOGICAL2)
    {
-      PS_CDC_BeginResults(cdc);
-      PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false));
-      PS_CDC_WriteIRQ(cdc, CDCIRQ_COMPLETE);
+      if(cdc->SeekFinished)
+      {
+         PS_CDC_BeginResults(cdc);
+
+         if(cdc->SeekFinished < 0)
+         {
+            PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false) | 0x04);
+            PS_CDC_WriteResult(cdc, 0x04);
+            PS_CDC_WriteIRQ(cdc, CDCIRQ_DISC_ERROR);
+         }
+         else
+         {
+            PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false));
+            PS_CDC_WriteIRQ(cdc, CDCIRQ_COMPLETE);
+         }
+      }
 
       return(0);
    }
@@ -2732,6 +2969,8 @@ int32_t PS_CDC_Command_ReadTOC(PS_CDC *cdc, const int arg_count, const uint8_t *
    /* ...and not to mention the time taken varies from disc to disc even! */
    ret_time = 30000000 + PS_CDC_CalcSeekTime(cdc, cdc->CurSector, 0, cdc->DriveStatus != DS_STOPPED, cdc->DriveStatus == DS_PAUSED);
 
+   cdc->SeekTarget = 0;
+   cdc->HoldLogicalPos = false;
    cdc->DriveStatus = DS_PAUSED;  /* Ends up in a pause state when the command is finished.  Maybe we should add DS_READTOC or something... */
    PS_CDC_CLEAR_AIP(cdc);
 

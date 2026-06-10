@@ -129,6 +129,28 @@ typedef struct PS_CDC
    int32_t   SeekTarget;
    uint32_t  SeekRetryCounter;
 
+   /* Seek-completion flag consumed by Seek_PartN (and Reset's Part2):
+    *   0  -> seek still in progress
+    *   1  -> seek finished successfully
+    *  -1  -> seek finished with error (also set on forced stop)
+    * Serialized at the END of the CDC state block; states predating
+    * the field load with a preset default (see StateAction). */
+   int       SeekFinished;
+
+   /* True after a logical seek (SeekL / ReadN / ReadS / data-mode
+    * Play seek path) completes its physical phase: the drive then
+    * "holds" the logical position - HeaderBuf keeps being latched
+    * from data sectors even while paused/standby, and the paused
+    * hover point sits slightly differently relative to SeekTarget.
+    * Cleared by physical seeks, Standby, ReadTOC, reset paths. */
+   bool      HoldLogicalPos;
+
+   /* Number of CPU clocks remaining before MODE_REPORT CD-DA report
+    * IRQs are allowed after a seek completes; set to 24000000 at each
+    * seek-completion point per tests on a PS1 (fixes missing music in
+    * games that issue GetlocP-dependent logic off the first report). */
+   int32_t   ReportStartupDelay;
+
    int32_t   lastts;
 
    TOC       toc;
