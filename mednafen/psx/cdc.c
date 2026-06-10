@@ -2499,7 +2499,7 @@ int32_t PS_CDC_Command_Reset(PS_CDC *cdc, const int arg_count, const uint8_t *ar
 
    if(cdc->Cur_CDIF && cdc->DiscStartupDelay <= 0)
    {
-      if((cdc->DriveStatus == DS_SEEKING_LOGICAL || cdc->DriveStatus == DS_SEEKING) && cdc->StatusAfterSeek == DS_PAUSED && cdc->SeekTarget == 0)
+      if((cdc->DriveStatus == DS_SEEKING_LOGICAL || cdc->DriveStatus == DS_SEEKING || cdc->DriveStatus == DS_SEEKING_LOGICAL2) && cdc->StatusAfterSeek == DS_PAUSED && cdc->SeekTarget == 0)
       {
          /* A reset-seek is already in flight; just keep polling. */
          return(256);
