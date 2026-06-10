@@ -954,23 +954,17 @@ bool PS_CDC_XA_Test(PS_CDC *cdc, const uint8_t *sdata)
    if((cdc->Mode & MODE_SF) && (sh->file != cdc->FilterFile || sh->channel != cdc->FilterChan))
       return false;
 
-   if(!cdc->xa_cur_set || (cdc->Mode & MODE_SF))
-   {
-      cdc->xa_cur_set = true;
-      cdc->xa_cur_file = sh->file;
-      cdc->xa_cur_chan = sh->channel;
-   }
-   else if(sh->file != cdc->xa_cur_file || sh->channel != cdc->xa_cur_chan)
-      return false;
-
-   if(sh->submode & XA_SUBMODE_EOF)
-   {
-      /*puts("YAY"); */
-      cdc->xa_cur_set = false;
-      cdc->xa_cur_file = 0;
-      cdc->xa_cur_chan = 0;
-   }
-
+   /* Upstream Mednafen removed the file/channel "sticky filter" that
+    * used to live here (the xa_cur_set/xa_cur_file/xa_cur_chan tracking
+    * below).  It was added in 0.9.24-WIP to fix speech in "Yarudora
+    * Series Vol.1: Double Cast", but later sector-buffering accuracy
+    * improvements made it unnecessary, and it actively breaks audio:
+    * it suppresses valid ADPCM sectors whose file/channel differ from
+    * the first one seen, causing missing audio in the FMVs of "Blue's
+    * Clues: Blue's Big Musical" (and similar). MODE_SF filtering above
+    * already honours an explicitly-set filter; nothing else should be
+    * dropped. The xa_cur_* fields are retained (always reset, still
+    * serialized) only to keep the save-state layout unchanged. */
    return true;
 }
 
