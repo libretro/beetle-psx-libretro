@@ -433,8 +433,33 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
        * that nothing reads. */
       if (sw)
       {
-         unsigned x;
-         for(x = 0; x < width; x++)
+         unsigned x = 0;
+#if defined(__SSE2__)
+         /* Native-res 8-pixel fast path.  At upscale_shift == 0,
+          * texel_put() reduces to a single vram_put() into a flat
+          * uint16 row whose base is (d_y << 10), so a fill row is a
+          * contiguous run of `fill_value` stores - splat 8 at a time.
+          *
+          * The destination column wraps at x == 1024 (the scalar
+          * loop's `& 1023`); destX is 16-aligned (cb decode `& 0x3F0`)
+          * and width is a multiple of 16 (`& ~0xF`), but destX + width
+          * can exceed 1024, so a single row may straddle the wrap.
+          * We only vectorise the contiguous span up to the wrap and
+          * hand the remainder (if any) back to the scalar loop, which
+          * re-derives d_x with `& 1023` and wraps correctly on its
+          * own.  Bails entirely (x stays 0) when not at native res. */
+         if (GPU.upscale_shift == 0)
+         {
+            uint16_t       *row    = &GPU.vram[(uint32_t)d_y << 10];
+            const int32_t   to_wrap = 1024 - destX; /* pixels before x hits 1024 */
+            const int32_t   contig  = (width < to_wrap) ? width : to_wrap;
+            const __m128i   splat   = _mm_set1_epi16((short)fill_value);
+
+            for(; (int32_t)x + 8 <= contig; x += 8)
+               _mm_storeu_si128((__m128i*)&row[destX + x], splat);
+         }
+#endif
+         for(; x < (unsigned)width; x++)
          {
             const int32_t d_x = (x + destX) & 1023;
 
