@@ -1345,20 +1345,28 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
 
    if(cdc->DriveStatus == DS_PLAYING)
    {
-      /* Note: Some game(s) start playing in the pregap of a track(so don't replace this with a simple subq index == 0 check for autopause). */
-      if(cdc->PlayTrackMatch == -1 && cdc->SubQChecksumOK)
-         cdc->PlayTrackMatch = cdc->SubQBuf_Safe[0x1];
-
-      if((cdc->Mode & MODE_AUTOPAUSE) && cdc->PlayTrackMatch != -1 && cdc->SubQBuf_Safe[0x1] != cdc->PlayTrackMatch)
+      if(cdc->Mode & MODE_AUTOPAUSE)
       {
-         /* Status needs to be taken before we're paused(IE it should still report playing). */
-         PS_CDC_SetAIP1(cdc, CDCIRQ_DATA_END, PS_CDC_MakeStatus(cdc, false));
+         /* Note: Some game(s) start playing in the pregap of a track (so don't
+          * replace this with a simple subq index == 0 check for autopause).
+          * Pitball enables autopause a while after playing starts, so the
+          * track-match value must only be latched once autopause is actually
+          * enabled - latching it unconditionally captures the wrong (e.g.
+          * pregap) track and breaks autopause, dropping music in "Pitball". */
+         if(cdc->PlayTrackMatch == -1 && cdc->SubQChecksumOK)
+            cdc->PlayTrackMatch = cdc->SubQBuf_Safe[0x1];
 
-         cdc->DriveStatus = DS_PAUSED;
-         cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
-         cdc->SectorsRead = 0;
-         cdc->PSRCounter = 0;
-         return;
+         if(cdc->PlayTrackMatch != -1 && cdc->SubQBuf_Safe[0x1] != cdc->PlayTrackMatch)
+         {
+            /* Status needs to be taken before we're paused(IE it should still report playing). */
+            PS_CDC_SetAIP1(cdc, CDCIRQ_DATA_END, PS_CDC_MakeStatus(cdc, false));
+
+            cdc->DriveStatus = DS_PAUSED;
+            cdc->SectorPipe_Pos = cdc->SectorPipe_In = 0;
+            cdc->SectorsRead = 0;
+            cdc->PSRCounter = 0;
+            return;
+         }
       }
 
       if((cdc->Mode & MODE_REPORT) && (((cdc->SubQBuf_Safe[0x9] >> 4) != cdc->ReportLastF) || cdc->Forward || cdc->Backward) && cdc->SubQChecksumOK)
