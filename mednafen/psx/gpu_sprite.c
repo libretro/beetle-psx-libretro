@@ -27,6 +27,156 @@
  * the clipped region before drawing begins so the visible part
  * samples the right texels.
  */
+
+#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
+/*
+ * Vectorised inner loop for a *flat* (non-textured) sprite fill row
+ * at native resolution.  The colour is the constant fill_color (which
+ * always carries 0x8000), so this is the non-textured polygon span
+ * with zero interpolation and no dither: build is trivial, only the
+ * blend / mask-eval / mask-set vary.  Processes the row in SIMD
+ * chunks and returns the pixel count consumed; the caller's scalar
+ * loop finishes the remainder.
+ *
+ * Bit-exact with PlotNativePixel_*_T0:
+ *   - BM_VAL >= 0: blend fill_color against the framebuffer with the
+ *     same SWAR math as PlotPixelBlend_* (AVG/ADD/ADD_FOURTH in 16-bit
+ *     lanes 8 px/iter; SUBTRACT in 32-bit lanes 4 px/iter, since its
+ *     0x108420 borrow mask has a bit above lane 15);
+ *   - ME_LIT: keep the destination word where its 0x8000 bit is set;
+ *   - store (pix & 0x7FFF) | MaskSetOR.
+ * Caller gates on upscale_shift == 0 (texel_put then reduces to a
+ * single vram_put into the native row) and on a contiguous run within
+ * [0,1023] (sprite x is clipped to ClipX0..ClipX1, so no x==1024 wrap).
+ */
+static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
+      int32_t w, uint16_t fill_color, const int BM_VAL, const int ME_LIT)
+{
+   uint16_t      *row  = &gpu->vram[(uint32_t)(y & 511) << 10];
+   const uint16_t mso  = gpu->MaskSetOR;
+   const int      step = (BM_VAL == BLEND_MODE_SUBTRACT) ? 4 : 8;
+   int32_t        done = 0;
+#if defined(__SSE2__)
+   const __m128i  FP    = _mm_set1_epi16((short)fill_color);
+   const __m128i  v7FFF = _mm_set1_epi16(0x7FFF);
+   const __m128i  v8000 = _mm_set1_epi16((short)0x8000);
+   const __m128i  vmso  = _mm_set1_epi16((short)mso);
+
+   for (; done + step <= w; done += step)
+   {
+      const int32_t bx = x + done;
+      __m128i pix = FP, bg = _mm_loadu_si128((const __m128i*)&row[bx]), out;
+
+      if (BM_VAL == BLEND_MODE_AVERAGE)
+      {
+         __m128i bgo = _mm_or_si128(bg, v8000);
+         __m128i xr  = _mm_and_si128(_mm_xor_si128(pix, bgo), _mm_set1_epi16(0x0421));
+         pix = _mm_srli_epi16(_mm_sub_epi16(_mm_add_epi16(pix, bgo), xr), 1);
+      }
+      else if (BM_VAL == BLEND_MODE_ADD)
+      {
+         __m128i b2  = _mm_andnot_si128(v8000, bg);
+         __m128i sum = _mm_add_epi16(pix, b2);
+         __m128i car = _mm_and_si128(_mm_sub_epi16(sum, _mm_and_si128(_mm_xor_si128(pix, b2), _mm_set1_epi16((short)0x8421))), _mm_set1_epi16((short)0x8420));
+         pix = _mm_or_si128(_mm_sub_epi16(sum, car), _mm_sub_epi16(car, _mm_srli_epi16(car, 5)));
+      }
+      else if (BM_VAL == BLEND_MODE_ADD_FOURTH)
+      {
+         __m128i b2  = _mm_andnot_si128(v8000, bg);
+         __m128i fp2 = _mm_or_si128(_mm_and_si128(_mm_srli_epi16(pix, 2), _mm_set1_epi16(0x1CE7)), v8000);
+         __m128i sum = _mm_add_epi16(fp2, b2);
+         __m128i car = _mm_and_si128(_mm_sub_epi16(sum, _mm_and_si128(_mm_xor_si128(fp2, b2), _mm_set1_epi16((short)0x8421))), _mm_set1_epi16((short)0x8420));
+         pix = _mm_or_si128(_mm_sub_epi16(sum, car), _mm_sub_epi16(car, _mm_srli_epi16(car, 5)));
+      }
+      else if (BM_VAL == BLEND_MODE_SUBTRACT)
+      {
+         __m128i z   = _mm_setzero_si128();
+         __m128i m84 = _mm_set1_epi32(0x108420), m80 = _mm_set1_epi32(0x8000);
+         __m128i fp32 = _mm_unpacklo_epi16(pix, z);
+         __m128i bg32 = _mm_unpacklo_epi16(bg, z);
+         __m128i bgo  = _mm_or_si128(bg32, m80);
+         __m128i fpc  = _mm_andnot_si128(m80, fp32);
+         __m128i diff = _mm_add_epi32(_mm_sub_epi32(bgo, fpc), m84);
+         __m128i xr   = _mm_and_si128(_mm_xor_si128(bgo, fpc), m84);
+         __m128i bor  = _mm_and_si128(_mm_sub_epi32(diff, xr), m84);
+         __m128i res  = _mm_and_si128(_mm_sub_epi32(diff, bor), _mm_sub_epi32(bor, _mm_srli_epi32(bor, 5)));
+         res = _mm_and_si128(res, _mm_set1_epi32(0xFFFF));
+         pix = _mm_add_epi16(_mm_packs_epi32(_mm_sub_epi32(res, _mm_set1_epi32(0x8000)), z), _mm_set1_epi16((short)0x8000));
+      }
+
+      out = _mm_or_si128(_mm_and_si128(pix, v7FFF), vmso);
+      if (ME_LIT)
+      {
+         __m128i keep = _mm_srai_epi16(bg, 15);
+         out = _mm_or_si128(_mm_and_si128(keep, bg), _mm_andnot_si128(keep, out));
+      }
+      if (step == 8)
+         _mm_storeu_si128((__m128i*)&row[bx], out);
+      else
+         _mm_storel_epi64((__m128i*)&row[bx], out);
+   }
+#else /* GPU_HAVE_NEON */
+   const uint16x8_t FP    = vdupq_n_u16(fill_color);
+   const uint16x8_t v7FFF = vdupq_n_u16(0x7FFF);
+   const uint16x8_t v8000 = vdupq_n_u16(0x8000);
+   const uint16x8_t vmso  = vdupq_n_u16(mso);
+
+   for (; done + step <= w; done += step)
+   {
+      const int32_t bx = x + done;
+      uint16x8_t pix = FP, bg = vld1q_u16(&row[bx]), out;
+
+      if (BM_VAL == BLEND_MODE_AVERAGE)
+      {
+         uint16x8_t bgo = vorrq_u16(bg, v8000);
+         uint16x8_t xr  = vandq_u16(veorq_u16(pix, bgo), vdupq_n_u16(0x0421));
+         pix = vshrq_n_u16(vsubq_u16(vaddq_u16(pix, bgo), xr), 1);
+      }
+      else if (BM_VAL == BLEND_MODE_ADD)
+      {
+         uint16x8_t b2  = vbicq_u16(bg, v8000);
+         uint16x8_t sum = vaddq_u16(pix, b2);
+         uint16x8_t car = vandq_u16(vsubq_u16(sum, vandq_u16(veorq_u16(pix, b2), vdupq_n_u16(0x8421))), vdupq_n_u16(0x8420));
+         pix = vorrq_u16(vsubq_u16(sum, car), vsubq_u16(car, vshrq_n_u16(car, 5)));
+      }
+      else if (BM_VAL == BLEND_MODE_ADD_FOURTH)
+      {
+         uint16x8_t b2  = vbicq_u16(bg, v8000);
+         uint16x8_t fp2 = vorrq_u16(vandq_u16(vshrq_n_u16(pix, 2), vdupq_n_u16(0x1CE7)), v8000);
+         uint16x8_t sum = vaddq_u16(fp2, b2);
+         uint16x8_t car = vandq_u16(vsubq_u16(sum, vandq_u16(veorq_u16(fp2, b2), vdupq_n_u16(0x8421))), vdupq_n_u16(0x8420));
+         pix = vorrq_u16(vsubq_u16(sum, car), vsubq_u16(car, vshrq_n_u16(car, 5)));
+      }
+      else if (BM_VAL == BLEND_MODE_SUBTRACT)
+      {
+         uint32x4_t m84 = vdupq_n_u32(0x108420), m80 = vdupq_n_u32(0x8000);
+         uint32x4_t fp32 = vmovl_u16(vget_low_u16(pix));
+         uint32x4_t bg32 = vmovl_u16(vget_low_u16(bg));
+         uint32x4_t bgo  = vorrq_u32(bg32, m80);
+         uint32x4_t fpc  = vbicq_u32(fp32, m80);
+         uint32x4_t diff = vaddq_u32(vsubq_u32(bgo, fpc), m84);
+         uint32x4_t xr   = vandq_u32(veorq_u32(bgo, fpc), m84);
+         uint32x4_t bor  = vandq_u32(vsubq_u32(diff, xr), m84);
+         uint32x4_t res  = vandq_u32(vsubq_u32(diff, bor), vsubq_u32(bor, vshrq_n_u32(bor, 5)));
+         pix = vcombine_u16(vmovn_u32(res), vdup_n_u16(0));
+      }
+
+      out = vorrq_u16(vandq_u16(pix, v7FFF), vmso);
+      if (ME_LIT)
+      {
+         uint16x8_t keep = vcgeq_u16(bg, v8000);
+         out = vbslq_u16(keep, bg, out);
+      }
+      if (step == 8)
+         vst1q_u16(&row[bx], out);
+      else
+         vst1_u16(&row[bx], vget_low_u16(out));
+   }
+#endif
+   return done;
+}
+#endif /* SSE2 || NEON */
+
 #define DEFINE_DrawSprite(SUFFIX, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, FX_LIT, FY_LIT) \
 static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32_t w, int32_t h, \
       uint8_t u_arg, uint8_t v_arg, uint32_t color, uint32_t clut_offset) \
@@ -97,7 +247,17 @@ static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32
                suck_time += (((x_bound + 1) & ~1) - (x_start & ~1)) >> 1; \
             gpu->DrawTimeAvail -= suck_time; \
          } \
-         for (x = x_start; MDFN_LIKELY(x < x_bound); x++) \
+         x = x_start; \
+         /* Native-res flat-fill fast path.  Textured sprites and any \
+          * upscale stay scalar; the run is within [ClipX0,ClipX1] so \
+          * it never crosses the x==1024 VRAM wrap. */ \
+         if (!(T_LIT) && gpu->upscale_shift == 0) \
+         { \
+            int _vn = DrawSpriteFillVec(gpu, x_start, y, x_bound - x_start, \
+                  fill_color, (BM_VAL), (ME_LIT)); \
+            x = x_start + _vn; \
+         } \
+         for (; MDFN_LIKELY(x < x_bound); x++) \
          { \
             if (T_LIT) \
             { \
