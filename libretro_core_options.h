@@ -1204,12 +1204,12 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(dynarec_op_cycles),
       "Dynarec Cycles Per Instruction",
       NULL,
-      "Cycles the dynarec charges per CPU instruction. '2' is faster, but the emulated CPU appears half-speed to games that pace themselves against it - set '1' for games whose CD streaming stalls or hangs under the dynarec (e.g. Parasite Eve 2).",
+      "Cycles the dynarec charges per CPU instruction. '2' is faster, but the emulated CPU appears half-speed to games that pace themselves against it - set '1' for games whose CD streaming stalls or hangs under the dynarec (e.g. Parasite Eve 2). The '1' setting charges memory accesses two cycles and everything else one, close to the real CPU.",
       NULL,
       "hacks",
       {
          { "2", "2 (Default)" },
-         { "1", "1 (Fixes Parasite Eve 2 etc.)" },
+         { "1", "1 (Accurate, Fixes Parasite Eve 2 etc.)" },
          { NULL, NULL },
       },
       "2"

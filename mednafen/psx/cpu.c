@@ -2804,10 +2804,14 @@ int32_t CPU_Run(PS_CPU *self, int32_t timestamp_in)
 {
 #ifdef HAVE_LIGHTREC
    /* Track options changing. */
-   /* Cycles-per-instruction changes are handled by lightrec itself
-    * (it invalidates and frees all compiled blocks); no re-init needed. */
+   /* Cycle-cost changes are handled by lightrec itself (it invalidates
+    * and frees all compiled blocks); no re-init needed. */
    if (lightrec_state && psx_dynarec != DYNAREC_DISABLED)
+   {
       lightrec_set_cycles_per_opcode(lightrec_state, psx_dynarec_op_cycles);
+      lightrec_set_mem_cycle_penalty(lightrec_state,
+                                     (psx_dynarec_op_cycles == 1) ? 1 : 0);
+   }
 
    if (MDFN_UNLIKELY(psx_dynarec != prev_dynarec || pgxpMode != PGXP_GetModes()) ||
        prev_invalidate != psx_dynarec_invalidate || prev_spgp_opt != psx_dynarec_spgp_opt)
@@ -3549,8 +3553,14 @@ static int lightrec_plugin_init(PS_CPU *self)
     * compared to the interpreter (and to real hardware, for cached
     * code) to games that pace themselves against it - e.g. Parasite
     * Eve 2's CD streaming, which then times out and hangs on the
-    * publisher screen and needs the option set to 1. */
+    * publisher screen and needs the option set to 1.
+    *
+    * The accurate setting charges one cycle per instruction plus a
+    * one-cycle penalty on loads and stores, approximating the real
+    * machine's memory access cost instead of undercounting it. */
    lightrec_set_cycles_per_opcode(lightrec_state, psx_dynarec_op_cycles);
+   lightrec_set_mem_cycle_penalty(lightrec_state,
+                                  (psx_dynarec_op_cycles == 1) ? 1 : 0);
 
    GTE_SwitchRegisters(true,lightrec_regs->cp2d);
 
