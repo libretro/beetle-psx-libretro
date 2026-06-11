@@ -1374,7 +1374,17 @@ union code lightrec_read_opcode(struct lightrec_state *state, u32 pc)
 unsigned int lightrec_cycles_of_opcode(const struct lightrec_state *state,
 				       union code code)
 {
-	return state->cycles_per_op;
+	u32 cycles = state->cycles_per_op;
+
+	/* Memory accesses are slower than ALU operations on the real
+	 * CPU. The penalty defaults to zero, which keeps the historical
+	 * flat cost; setting cycles_per_op=1 and a penalty of 1 charges
+	 * loads and stores two cycles and everything else one, which is
+	 * much closer to the real machine than either flat value. */
+	if (state->cycles_per_op_mem && opcode_is_io(code))
+		cycles += state->cycles_per_op_mem;
+
+	return cycles;
 }
 
 void lightrec_free_opcode_list(struct lightrec_state *state, struct opcode *ops)
@@ -2019,6 +2029,7 @@ struct lightrec_state * lightrec_init(char *argv0,
 	state->with_32bit_lut = with_32bit_lut;
 	state->in_delay_slot_n = 0xff;
 	state->cycles_per_op = 2;
+	state->cycles_per_op_mem = 0;
 
 	state->block_cache = lightrec_blockcache_init(state);
 	if (!state->block_cache)
@@ -2220,6 +2231,26 @@ void lightrec_set_target_cycle_count(struct lightrec_state *state, u32 cycles)
 struct lightrec_registers * lightrec_get_registers(struct lightrec_state *state)
 {
 	return &state->regs;
+}
+
+void lightrec_set_mem_cycle_penalty(struct lightrec_state *state, u32 cycles)
+{
+	if (state->cycles_per_op_mem == cycles)
+		return;
+
+	state->cycles_per_op_mem = cycles;
+
+	/* Cycle counts are baked into compiled blocks. */
+	if (ENABLE_THREADED_COMPILER) {
+		lightrec_recompiler_pause(state->rec);
+		lightrec_reaper_reap(state->reaper);
+	}
+
+	lightrec_invalidate_all(state);
+	lightrec_free_all_blocks(state->block_cache);
+
+	if (ENABLE_THREADED_COMPILER)
+		lightrec_recompiler_unpause(state->rec);
 }
 
 void lightrec_set_cycles_per_opcode(struct lightrec_state *state, u32 cycles)
