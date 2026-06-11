@@ -184,11 +184,76 @@ static void rec_special_JALR(struct lightrec_cstate *state, const struct block *
 
 static void rec_J(struct lightrec_cstate *state, const struct block *block, u16 offset)
 {
-	union code c = block->opcode_list[offset].c;
+	struct regcache *reg_cache = state->reg_cache;
+	jit_state_t *_jit = block->_jit;
+	const struct opcode *op = &block->opcode_list[offset],
+			    *ds = get_delay_slot(block->opcode_list, offset);
+	union code c = op->c;
+	u32 target = (block->pc & 0xf0000000) | (c.j.imm << 2);
 
 	_jit_name(block->_jit, __func__);
-	lightrec_emit_end_of_block(state, block, offset, -1,
-				   (block->pc & 0xf0000000) | (c.j.imm << 2),
+
+	/* A jump to a target inside the same block is compiled as a local
+	 * branch, like the conditional branches: a forward jump is a plain
+	 * unconditional branch, and a backward jump (a loop, most commonly
+	 * an idle loop jumping to its own first opcode) loops directly
+	 * while the cycle budget lasts and only goes through the
+	 * dispatcher when it runs out. The semantics are identical to the
+	 * dispatcher path: the cycle counter is reloaded from the state
+	 * after every C call, so a hardware access that flags an exit
+	 * zeroes the remaining budget and the back-edge check falls
+	 * through to the dispatcher exactly like the dispatcher's own
+	 * check would. */
+	if (op_flag_local_branch(op->flags)) {
+		s32 target_offset = ((s32)(target - block->pc)) >> 2;
+		bool is_forward = target_offset > (s32)offset;
+		int op_cycles = lightrec_cycles_of_opcode(state->state, op->c);
+		u32 cycles = state->cycles + op_cycles;
+		struct lightrec_branch *branch;
+
+		jit_note(__FILE__, __LINE__);
+
+		if (!op_flag_no_ds(op->flags))
+			cycles += lightrec_cycles_of_opcode(state->state, ds->c);
+
+		state->cycles = -op_cycles;
+
+		if (cycles)
+			jit_subi(LIGHTREC_REG_CYCLE, LIGHTREC_REG_CYCLE, cycles);
+
+		/* Recompile the delay slot */
+		if (!op_flag_no_ds(op->flags) && ds->opcode) {
+			state->no_load_delay = true;
+			lightrec_rec_opcode(state, block, offset + 1);
+		}
+
+		/* Clean remaining registers */
+		lightrec_clean_regs(reg_cache, _jit);
+
+		pr_debug("Adding local branch to offset 0x%"PRIx32"\n",
+			 target_offset << 2);
+		branch = &state->local_branches[state->nb_local_branches++];
+		branch->target = target_offset;
+
+		if (is_forward)
+			branch->branch = jit_b();
+		else
+			branch->branch = jit_bgti(LIGHTREC_REG_CYCLE, 0);
+
+		if (!is_forward) {
+			/* The cycle budget ran out: exit via the
+			 * dispatcher. The delay slot was already
+			 * recompiled above; the local-branch flag makes
+			 * the end-of-block emission skip it. */
+			state->no_load_delay = true;
+			lightrec_emit_end_of_block(state, block, offset, -1,
+						   target, 31, 0, false);
+		}
+
+		return;
+	}
+
+	lightrec_emit_end_of_block(state, block, offset, -1, target,
 				   31, 0, true);
 }
 

@@ -868,6 +868,17 @@ static void lightrec_patch_known_zero(struct opcode *op,
 	}
 }
 
+/* Opcode-list index of an OP_J opcode's target, which may lie outside
+ * [0, nb_ops). Unlike the conditional branches, the target is absolute:
+ * it does not move when the branch opcode is reordered, so no no-ds
+ * adjustment is ever needed. */
+static s32 get_j_target_offset(const struct block *block, union code c)
+{
+	u32 target = (block->pc & 0xf0000000) | (c.j.imm << 2);
+
+	return ((s32)(target - block->pc)) >> 2;
+}
+
 static void lightrec_reset_syncs(struct block *block)
 {
 	struct opcode *op, *list = block->opcode_list;
@@ -882,7 +893,10 @@ static void lightrec_reset_syncs(struct block *block)
 
 		if (has_delay_slot(op->c)) {
 			if (op_flag_local_branch(op->flags)) {
-				offset = i + 1 - op_flag_no_ds(op->flags) + (s16)op->i.imm;
+				if (op->c.i.op == OP_J)
+					offset = get_j_target_offset(block, op->c);
+				else
+					offset = i + 1 - op_flag_no_ds(op->flags) + (s16)op->i.imm;
 				list[offset].flags |= LIGHTREC_SYNC;
 			}
 
@@ -1383,6 +1397,11 @@ static bool is_local_branch(const struct block *block, unsigned int idx)
 		offset = idx + 1 + (s16)op->c.i.imm;
 		if (offset >= 0 && offset < block->nb_ops)
 			return true;
+		return false;
+	case OP_J:
+		offset = get_j_target_offset(block, op->c);
+		if (offset >= 0 && offset < block->nb_ops)
+			return true;
 		fallthrough;
 	default:
 		return false;
@@ -1409,9 +1428,16 @@ static int lightrec_handle_load_delays(struct lightrec_state *state,
 		}
 
 		if (is_local_branch(block, i - 1)) {
-			imm = (s16)list[i - 1].c.i.imm;
+			s32 tgt;
 
-			if (!opcode_reads_register(list[i + imm].c, op->c.i.rt)) {
+			if (list[i - 1].c.i.op == OP_J)
+				tgt = get_j_target_offset(block, list[i - 1].c);
+			else {
+				imm = (s16)list[i - 1].c.i.imm;
+				tgt = i + imm;
+			}
+
+			if (!opcode_reads_register(list[tgt].c, op->c.i.rt)) {
 				/* The target opcode of the branch is inside
 				 * the block, and it does not read the register
 				 * written to by the load opcode; we can ignore
@@ -1485,7 +1511,10 @@ static int lightrec_local_branches(struct lightrec_state *state, struct block *b
 		if (should_emulate(list) || !is_local_branch(block, i))
 			continue;
 
-		offset = i + 1 + (s16)list->c.i.imm;
+		if (list->c.i.op == OP_J)
+			offset = get_j_target_offset(block, list->c);
+		else
+			offset = i + 1 + (s16)list->c.i.imm;
 
 		pr_debug("Found local branch to offset 0x%"PRIx32"\n", offset << 2);
 
