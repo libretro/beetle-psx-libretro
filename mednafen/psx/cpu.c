@@ -3610,6 +3610,18 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
 
    memcpy(&s_cpu.GPR_full,lightrec_regs->gpr,sizeof(lightrec_regs->gpr));
 
+   /* lightrec has no branch-delay pipeline state and never exits
+    * mid-delay-slot, so the next instruction is always PC + 4.  The
+    * new_PC local is otherwise left at whatever BACKING_TO_ACTIVE
+    * loaded - the power-on value on a pure-dynarec session - and
+    * ACTIVE_TO_BACKING would write that stale value into
+    * BACKED_new_PC.  Savestates taken from a dynarec session then
+    * carry a poisoned next-PC: resuming them under the Beetle
+    * interpreter executes one instruction at BACKED_PC and "branches"
+    * to the stale BACKED_new_PC (0xBFC00004 = BIOS reset path),
+    * rebooting the machine instead of resuming. */
+   new_PC = PC + 4;
+
    ACTIVE_TO_BACKING;
 
    return timestamp;
