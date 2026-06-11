@@ -3545,11 +3545,11 @@ static int lightrec_plugin_init(PS_CPU *self)
 
    lightrec_set_unsafe_opt_flags(lightrec_state, flags);
 
-   /* lightrec's default is 2 cycles per instruction, which makes the
-    * emulated CPU appear half-speed compared to the interpreter (and to
-    * real hardware, for cached code) to games that calibrate their
-    * timing against the CPU - e.g. Parasite Eve 2's CD streaming, which
-    * otherwise times out and hangs on the publisher screen. */
+   /* At 2 cycles per instruction the emulated CPU appears half-speed
+    * compared to the interpreter (and to real hardware, for cached
+    * code) to games that pace themselves against it - e.g. Parasite
+    * Eve 2's CD streaming, which then times out and hangs on the
+    * publisher screen and needs the option set to 1. */
    lightrec_set_cycles_per_opcode(lightrec_state, psx_dynarec_op_cycles);
 
    GTE_SwitchRegisters(true,lightrec_regs->cp2d);

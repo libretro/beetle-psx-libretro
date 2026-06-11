@@ -3962,9 +3962,9 @@ static void check_variables(bool startup)
    var.key = BEETLE_OPT(dynarec_op_cycles);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      psx_dynarec_op_cycles = (strcmp(var.value, "2") == 0) ? 2 : 1;
+      psx_dynarec_op_cycles = (strcmp(var.value, "1") == 0) ? 1 : 2;
    else
-      psx_dynarec_op_cycles = 1;
+      psx_dynarec_op_cycles = 2;
 
    var.key = BEETLE_OPT(dynarec_spgp_opt);
 
