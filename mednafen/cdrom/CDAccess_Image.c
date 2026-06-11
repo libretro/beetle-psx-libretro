@@ -508,6 +508,7 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
    char  cmdbuf[256];
    char  args[4][1024];
    bool  IsTOC = false;
+   bool  RawImage = false;
    int32_t active_track = -1;
    int32_t AutoTrackInc = 1; /* For TOC */
    CDRFILE_TRACK_INFO TmpTrack;
@@ -552,9 +553,23 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
       log_cb(RETRO_LOG_INFO, "TOC file detected.\n");
       IsTOC = true;
    }
+   /* A raw track image with no accompanying cue/toc sheet: the file we
+    * just opened is sector data, not a text sheet to parse.  Treat it
+    * as a single MODE2/2352 data track spanning the whole file, exactly
+    * as a one-line cue ("FILE BINARY / TRACK 01 MODE2/2352 /
+    * INDEX 01 00:00:00") would.  Detected by extension so we never feed
+    * binary sector data to the cue tokenizer. */
+   else if(   !strcasecmp(file_ext_buf, ".bin")
+           || !strcasecmp(file_ext_buf, ".img")
+           || !strcasecmp(file_ext_buf, ".iso"))
+   {
+      log_cb(RETRO_LOG_INFO,
+            "Raw track image (no cue/toc) detected; treating as single MODE2/2352 data track.\n");
+      RawImage = true;
+   }
 
    /* Check for annoying UTF-8 BOM. */
-   if(!IsTOC)
+   if(!IsTOC && !RawImage)
    {
       uint8_t bom_tmp[3];
 
@@ -571,6 +586,8 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
    self->FirstTrack = 99;
    self->LastTrack  = 0;
 
+   if (!RawImage)
+   {
    while (cdstream_get_line(&fp, linebuf, sizeof(linebuf)) >= 0)
    {
       unsigned argcount = 0;
@@ -968,6 +985,35 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
 
    if (active_track >= 0)
       memcpy(&self->Tracks[active_track], &TmpTrack, sizeof(TmpTrack));
+   } /* end of if (!RawImage) */
+   else
+   {
+      /* Synthesize a single data track covering the whole image.
+       * Mirrors what the cue parser would produce for:
+       *   FILE "<path>" BINARY
+       *     TRACK 01 MODE2/2352
+       *       INDEX 01 00:00:00
+       * ParseTOCFileLineInfo opens the image (the same `path` we were
+       * given), computes its sector count from the file length, and
+       * leaves FileOffset at 0.  The shared fixup loop below then lays
+       * out LBA/pregap exactly as for a one-track cue. */
+      CDRFILE_TRACK_INFO *t = &self->Tracks[1];
+
+      memset(t, 0, sizeof(*t));
+      t->DIFormat = DI_FORMAT_MODE2_RAW;
+      t->index[0] = -1;
+      t->index[1] = 0;
+
+      if (!CDAccess_Image_ParseTOCFileLineInfo(self, t, 1,
+            path, NULL, NULL, NULL, image_memcache, &cache))
+      {
+         ok = false;
+         goto cleanup;
+      }
+
+      self->FirstTrack = 1;
+      self->LastTrack  = 1;
+   }
 
    if (self->FirstTrack > self->LastTrack)
    {
