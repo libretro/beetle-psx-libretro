@@ -246,11 +246,24 @@ lightrec_get_map_idx(struct lightrec_state *state, u32 kaddr)
 	const struct lightrec_mem_map *map;
 	unsigned int i;
 
+	/* Memory accesses through the C path are heavily clustered: a
+	 * polling loop hits the same hardware register thousands of times
+	 * in a row, and data loops walk a single region. Try the map that
+	 * matched last before scanning the table. The hint is read and
+	 * written without synchronization; a stale value simply fails the
+	 * range check and falls through to the scan. */
+	i = state->last_map_idx;
+	map = &state->maps[i];
+	if (kaddr >= map->pc && kaddr - map->pc < map->length)
+		return (enum psx_map) i;
+
 	for (i = 0; i < state->nb_maps; i++) {
 		map = &state->maps[i];
 
-		if (kaddr >= map->pc && kaddr < map->pc + map->length)
+		if (kaddr >= map->pc && kaddr < map->pc + map->length) {
+			state->last_map_idx = i;
 			return (enum psx_map) i;
+		}
 	}
 
 	return PSX_MAP_UNKNOWN;

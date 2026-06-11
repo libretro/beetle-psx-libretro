@@ -181,6 +181,7 @@ struct lightrec_state {
 	u32 old_cycle_counter;
 	u32 cycles_per_op;
 	u32 cycles_per_op_mem;
+	u32 last_map_idx;
 	void *c_wrapper;
 	struct block *dispatcher, *c_wrapper_block;
 	void *c_wrappers[C_WRAPPERS_COUNT];
