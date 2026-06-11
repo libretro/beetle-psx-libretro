@@ -2094,6 +2094,14 @@ void lightrec_invalidate(struct lightrec_state *state, u32 addr, u32 len)
 
 	memset(lut_address(state, lut_offset(kaddr)), 0,
 	       ((len + 3) / 4) * lut_elm_size(state));
+
+	/* Blocks can span the invalidated range while starting before it;
+	 * their entry-point LUT slots are not covered by the memset above,
+	 * so the staleness check would never re-run for them. Clear the
+	 * entry slot of every block overlapping the range. The per-page
+	 * block counters make this a no-op for writes into pages that
+	 * contain no cached code. */
+	lightrec_invalidate_blocks_in_range(state->block_cache, kaddr, len);
 }
 
 void lightrec_invalidate_all(struct lightrec_state *state)

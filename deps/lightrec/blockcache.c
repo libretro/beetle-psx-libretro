@@ -17,9 +17,17 @@
 /* Must be power of two */
 #define LUT_SIZE 0x4000
 
+#define CODE_PAGE_SHIFT	12
+#define NB_CODE_PAGES	(0x200000 >> CODE_PAGE_SHIFT)
+
 struct blockcache {
 	struct lightrec_state *state;
 	struct block * lut[LUT_SIZE];
+
+	/* Number of cached blocks overlapping each RAM page. Used to make
+	 * invalidation of block interiors cheap: writes to pages with no
+	 * cached code skip the block walk entirely. */
+	u16 nb_blocks_in_page[NB_CODE_PAGES];
 };
 
 u16 lightrec_get_lut_entry(const struct block *block)
@@ -70,8 +78,27 @@ void remove_from_code_lut(struct blockcache *cache, struct block *block)
 	}
 }
 
+static void lightrec_account_block_pages(struct blockcache *cache,
+					 const struct block *block, s32 inc)
+{
+	u32 start, end, page;
+
+	/* Only RAM (and its mirrors) can host self-modified code blocks
+	 * that we track here; skip BIOS and other maps. */
+	if (kunseg(block->pc) & ~0x7FFFFF)
+		return;
+
+	start = (kunseg(block->pc) & 0x1FFFFF) >> CODE_PAGE_SHIFT;
+	end = ((kunseg(block->pc) & 0x1FFFFF)
+	       + (block->nb_ops << 2) - 1) >> CODE_PAGE_SHIFT;
+
+	for (page = start; page <= end && page < NB_CODE_PAGES; page++)
+		cache->nb_blocks_in_page[page] += inc;
+}
+
 void lightrec_register_block(struct blockcache *cache, struct block *block)
 {
+	lightrec_account_block_pages(cache, block, 1);
 	u32 pc = kunseg(block->pc);
 	struct block *old;
 
@@ -86,6 +113,7 @@ void lightrec_register_block(struct blockcache *cache, struct block *block)
 
 void lightrec_unregister_block(struct blockcache *cache, struct block *block)
 {
+	lightrec_account_block_pages(cache, block, -1);
 	u32 pc = kunseg(block->pc);
 	struct block *old = cache->lut[(pc >> 2) & (LUT_SIZE - 1)];
 
@@ -147,6 +175,49 @@ static void lightrec_free_blocks(struct blockcache *cache,
 				lightrec_unregister_block(cache, block);
 				lightrec_free_block(state, block);
 			}
+		}
+	}
+}
+
+void lightrec_invalidate_blocks_in_range(struct blockcache *cache,
+					 u32 start, u32 len)
+{
+	struct block *block;
+	struct lightrec_state *state = cache->state;
+	u32 end = start + len;
+	u32 block_start, block_end, page, first_page, last_page;
+	bool has_code = false;
+	unsigned int i;
+
+	start &= 0x1FFFFF;
+	end = (end - 1) & 0x1FFFFF;
+
+	first_page = start >> CODE_PAGE_SHIFT;
+	last_page = end >> CODE_PAGE_SHIFT;
+
+	for (page = first_page;
+	     page <= last_page && page < NB_CODE_PAGES; page++)
+		has_code |= cache->nb_blocks_in_page[page] != 0;
+
+	/* No cached block overlaps the written pages - nothing to do.
+	 * This is the common case for data writes. */
+	if (!has_code)
+		return;
+
+	end = end + 1;
+
+	/* A block whose entry point precedes the written range will not be
+	 * caught by clearing the LUT entries of the written words; its
+	 * staleness check only looks at the entry-point LUT slot. Clear the
+	 * entry slot of every block overlapping the range, so that the next
+	 * fetch re-validates the block against the current code in memory. */
+	for (i = 0; i < LUT_SIZE; i++) {
+		for (block = cache->lut[i]; block; block = block->next) {
+			block_start = kunseg(block->pc) & 0x1FFFFF;
+			block_end = block_start + (block->nb_ops << 2);
+
+			if (block_start < end && start < block_end)
+				lut_write(state, lut_offset(block->pc), NULL);
 		}
 	}
 }
