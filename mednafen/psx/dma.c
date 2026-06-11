@@ -285,6 +285,9 @@ static INLINE void ChRW(const unsigned ch, const uint32_t CRModeCache, const uin
 
 static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
 {
+#ifdef HAVE_LIGHTREC
+   uint32_t inv_min = 0, inv_max = 0, inv_count = 0;
+#endif
    /* Mask out the bits that the DMA controller will modify during the course of operation. */
    uint32_t CRModeCache = DMACH[ch].ChanControl &~(0x11 << 24);
    uint32_t crmodecache = CRModeCache;
@@ -445,9 +448,22 @@ static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
 
             if(!(CRModeCache & 0x1))
             {
-               MASMEM_WriteU32(MainRAM, (DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC, vtmp);
+               uint32_t waddr = (DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC;
+               MASMEM_WriteU32(MainRAM, waddr, vtmp);
 #ifdef HAVE_LIGHTREC
-               CPU_LightrecClear((DMACH[ch].CurAddr + (voffs << 2)) & 0x1FFFFC, 1);
+               if(!inv_count)
+               {
+                  inv_min = waddr;
+                  inv_max = waddr;
+               }
+               else
+               {
+                  if(waddr < inv_min)
+                     inv_min = waddr;
+                  if(waddr > inv_max)
+                     inv_max = waddr;
+               }
+               inv_count++;
 #endif
             }
          }
@@ -513,6 +529,17 @@ SkipPayloadStuff: ;
       if(DMACH[ch].ClockCounter > 0)
          DMACH[ch].ClockCounter = 0;
    }
+
+#ifdef HAVE_LIGHTREC
+   /* Invalidate the whole written range in one call once the transfer
+    * slice is done. Doing it per-word leaves a window where a block
+    * overlapping the range can be fetched and re-validated against
+    * half-written code, and per-word invalidation never clears the
+    * entry-point LUT slot of blocks that start before the written
+    * range. */
+   if(inv_count)
+      CPU_LightrecClear(inv_min, ((inv_max - inv_min) >> 2) + 1);
+#endif
 }
 
 static INLINE int32_t CalcNextEvent(int32_t next_event)
