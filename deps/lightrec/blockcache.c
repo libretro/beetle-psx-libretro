@@ -19,6 +19,7 @@
 
 struct blockcache {
 	struct lightrec_state *state;
+	u32 max_block_ops;
 	struct block * lut[LUT_SIZE];
 };
 
@@ -113,6 +114,12 @@ void lightrec_register_block(struct blockcache *cache, struct block *block)
 {
 	lightrec_account_block_pages(cache, block, 1);
 	u32 pc = kunseg(block->pc);
+
+	/* High-water mark of the longest block ever registered; bounds the
+	 * lookback of the range walk in
+	 * lightrec_invalidate_blocks_in_range(). */
+	if (block->nb_ops > cache->max_block_ops)
+		cache->max_block_ops = block->nb_ops;
 	struct block *old;
 
 	old = cache->lut[(pc >> 2) & (LUT_SIZE - 1)];
@@ -212,6 +219,23 @@ void lightrec_invalidate_blocks_in_range(struct blockcache *cache,
 	     page <= last_page && page < CODE_NB_PAGES; page++)
 		has_code |= cache->state->nb_blocks_in_page[page] != 0;
 
+	/* No cached block overlaps the written pages. This is the common
+	 * case for data writes; clear only the per-word bits covering the
+	 * written range itself (bits can be left set by freed blocks, and
+	 * would otherwise keep tripping the emitted store check) and skip
+	 * the page expansion, the code LUT clear and the block walk. */
+	if (!has_code) {
+		for (w = (start >> 2) & ~31u; w <= (end >> 2); w += 32)
+			state->code_walk_map[w >> 5] = 0;
+		return;
+	}
+
+	/* Clear the code LUT entries of the written words, so that block
+	 * heads inside the range stop dispatching into stale code. (Moved
+	 * from lightrec_invalidate(); only needed when code is present.) */
+	memset(lut_address(state, lut_offset(start)), 0,
+	       (((end - start) >> 2) + 1) * lut_elm_size(state));
+
 	/* Expand to whole pages: every block head overlapping the window
 	 * is cleared below, so the per-word bits of the whole window can
 	 * be cleared as well. This makes bulk overwrites of cached code
@@ -223,11 +247,6 @@ void lightrec_invalidate_blocks_in_range(struct blockcache *cache,
 	for (w = start >> 2; w < (end >> 2); w += 32)
 		state->code_walk_map[w >> 5] = 0;
 
-	/* No cached block overlaps the written pages - nothing more to do.
-	 * This is the common case for data writes. */
-	if (!has_code)
-		return;
-
 	/* A block whose entry point precedes the written range will not be
 	 * caught by clearing the LUT entries of the written words; its
 	 * staleness check only looks at the entry-point LUT slot. Clear the
@@ -236,16 +255,37 @@ void lightrec_invalidate_blocks_in_range(struct blockcache *cache,
 	 * the current code in memory. Clearing the full range (and not
 	 * just the entry slot) also drops the inner entry points that
 	 * compilation may have installed for covered blocks; those would
-	 * otherwise keep dispatching straight into the stale code. */
-	for (i = 0; i < LUT_SIZE; i++) {
-		for (block = cache->lut[i]; block; block = block->next) {
-			block_start = kunseg(block->pc) & 0x1FFFFF;
-			block_end = block_start + (block->nb_ops << 2);
+	 * otherwise keep dispatching straight into the stale code.
+	 *
+	 * The hash of the block cache is address-local ((pc >> 2) masked),
+	 * so every block whose start address lies in
+	 * [start - longest_block, end] has its bucket inside a contiguous
+	 * (modulo wrap-around) index range; blocks starting earlier cannot
+	 * reach the written range. Walking that bucket range instead of
+	 * the whole table makes invalidation cost proportional to the
+	 * written size, not to the number of cached blocks. */
+	{
+		u32 lookback = cache->max_block_ops << 2;
+		u32 wstart = start - lookback;
+		u32 nb_buckets = ((end - wstart) >> 2) + 1;
+		u32 base = (wstart >> 2) & (LUT_SIZE - 1);
+		u32 j;
 
-			if (block_start < end && start < block_end)
-				memset(lut_address(state,
-						   lut_offset(block->pc)), 0,
-				       block->nb_ops * lut_elm_size(state));
+		if (nb_buckets > LUT_SIZE)
+			nb_buckets = LUT_SIZE;
+
+		for (j = 0; j < nb_buckets; j++) {
+			i = (base + j) & (LUT_SIZE - 1);
+
+			for (block = cache->lut[i]; block; block = block->next) {
+				block_start = kunseg(block->pc) & 0x1FFFFF;
+				block_end = block_start + (block->nb_ops << 2);
+
+				if (block_start < end && start < block_end)
+					memset(lut_address(state,
+							   lut_offset(block->pc)), 0,
+					       block->nb_ops * lut_elm_size(state));
+			}
 		}
 	}
 }

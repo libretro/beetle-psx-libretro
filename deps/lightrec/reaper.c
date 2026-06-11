@@ -119,6 +119,14 @@ void lightrec_reaper_reap(struct reaper *reaper)
 	struct reaper_elm *reaper_elm;
 	struct slist_elm *elm;
 
+	/* This function runs on every exit from the execution loop, and
+	 * the list is empty the vast majority of the time. Checking the
+	 * head pointer without the lock is safe: a stale non-NULL read
+	 * takes the lock and finds nothing to do, and a stale NULL read
+	 * just postpones the reaping to the next call. */
+	if (slist_empty(&reaper->reap_list))
+		return;
+
 	pthread_mutex_lock(&reaper->mutex);
 
 	while (lightrec_reaper_can_reap(reaper) &&
