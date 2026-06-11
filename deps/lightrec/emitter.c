@@ -1318,6 +1318,13 @@ static void rec_store_invalidate_blocks(struct lightrec_cstate *cstate,
 	struct native_register *regs_backup;
 	u8 tmp, tmp2, rs;
 
+	/* Stores that the optimizer proved can never hit code do not need
+	 * the check. Note that this deliberately does not depend on the
+	 * DMA-only invalidation mode: this check is what keeps games that
+	 * patch their own code working in that mode. */
+	if (op_flag_no_invalidate(block->opcode_list[offset].flags))
+		return;
+
 	/* Exiting the block from a delay slot would lose the branch;
 	 * skip the check there. */
 	if (offset > 0 && has_delay_slot(block->opcode_list[offset - 1].c))
@@ -1402,8 +1409,7 @@ static void rec_store_memory(struct lightrec_cstate *cstate,
 	bool swc2 = c.i.op == OP_SWC2;
 	u8 in_reg = swc2 ? REG_TEMP : c.i.rt;
 
-	if (invalidate)
-		rec_store_invalidate_blocks(cstate, block, offset);
+	rec_store_invalidate_blocks(cstate, block, offset);
 
 	rs = lightrec_alloc_reg_in(reg_cache, _jit, c.i.rs, 0);
 	if (need_tmp)
@@ -1539,6 +1545,9 @@ static void rec_store_direct_no_invalidate(struct lightrec_cstate *cstate,
 	s16 imm;
 
 	jit_note(__FILE__, __LINE__);
+
+	rec_store_invalidate_blocks(cstate, block, offset);
+
 	rs = lightrec_alloc_reg_in(reg_cache, _jit, c.i.rs, 0);
 	tmp = lightrec_alloc_reg_temp(reg_cache, _jit);
 
@@ -1725,8 +1734,16 @@ static void rec_store(struct lightrec_cstate *state,
 {
 	u32 flags = block->opcode_list[offset].flags;
 	u32 mode = LIGHTREC_FLAGS_GET_IO_MODE(flags);
+	bool in_ds = offset > 0 &&
+		has_delay_slot(block->opcode_list[offset - 1].c);
+	/* In DMA-only invalidation mode, stores normally skip the inline
+	 * LUT invalidation; the per-word code check catches the ones that
+	 * overwrite cached code. That check cannot be emitted for stores
+	 * in branch delay slots (the block cannot be exited there), so
+	 * those keep the inline invalidation even in DMA-only mode. */
 	bool no_invalidate = op_flag_no_invalidate(flags) ||
-		(state->state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY);
+		(!in_ds &&
+		 (state->state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY));
 	union code c = block->opcode_list[offset].c;
 	bool is_swc2 = c.i.op == OP_SWC2;
 

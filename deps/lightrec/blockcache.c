@@ -231,15 +231,21 @@ void lightrec_invalidate_blocks_in_range(struct blockcache *cache,
 	/* A block whose entry point precedes the written range will not be
 	 * caught by clearing the LUT entries of the written words; its
 	 * staleness check only looks at the entry-point LUT slot. Clear the
-	 * entry slot of every block overlapping the range, so that the next
-	 * fetch re-validates the block against the current code in memory. */
+	 * code LUT over the whole range of every block overlapping the
+	 * window, so that the next fetch re-validates the block against
+	 * the current code in memory. Clearing the full range (and not
+	 * just the entry slot) also drops the inner entry points that
+	 * compilation may have installed for covered blocks; those would
+	 * otherwise keep dispatching straight into the stale code. */
 	for (i = 0; i < LUT_SIZE; i++) {
 		for (block = cache->lut[i]; block; block = block->next) {
 			block_start = kunseg(block->pc) & 0x1FFFFF;
 			block_end = block_start + (block->nb_ops << 2);
 
 			if (block_start < end && start < block_end)
-				lut_write(state, lut_offset(block->pc), NULL);
+				memset(lut_address(state,
+						   lut_offset(block->pc)), 0,
+				       block->nb_ops * lut_elm_size(state));
 		}
 	}
 }
@@ -300,19 +306,17 @@ static void lightrec_reset_lut_offset(struct lightrec_state *state, void *d)
 {
 	u32 pc = (u32)(uintptr_t) d;
 	struct block *block;
-	void *addr;
 
 	block = lightrec_find_block(state->block_cache, pc);
 	if (!block)
 		return;
 
+	/* Do not reinstall the compiled function: the code may have been
+	 * overwritten while the LUT entry was empty, and the staleness
+	 * check only runs when the entry is left empty. The next fetch
+	 * re-validates the block and reinstalls its function if it is
+	 * still current. */
 	lightrec_mark_block_pages(state, block);
-
-	if (block_has_flag(block, BLOCK_IS_DEAD))
-		return;
-
-	addr = block->function ?: state->get_next_block;
-	lut_write(state, lut_offset(pc), addr);
 }
 
 bool lightrec_block_is_outdated(struct lightrec_state *state, struct block *block)

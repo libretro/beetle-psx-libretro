@@ -38,12 +38,24 @@ static u32 lightrec_mfc2(struct lightrec_state *state, u8 reg);
 
 static void lightrec_reap_block(struct lightrec_state *state, void *data);
 
+/* True if the written address lies inside a cached block installed in
+ * the code LUT. Used in DMA-only invalidation mode to catch the rare
+ * stores that actually patch cached code, while still skipping the
+ * invalidation work for all other stores. */
+static bool lightrec_store_hits_code(struct lightrec_state *state, u32 addr)
+{
+	u32 w = (kunseg(addr) & 0x1FFFFF) >> 2;
+
+	return state->code_walk_map[w >> 5] & BIT(w & 0x1f);
+}
+
 static void lightrec_default_sb(struct lightrec_state *state, u32 opcode,
 				void *host, u32 addr, u32 data)
 {
 	*(u8 *)host = (u8)data;
 
-	if (!(state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY))
+	if (!(state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY) ||
+	    lightrec_store_hits_code(state, addr))
 		lightrec_invalidate(state, addr, 1);
 }
 
@@ -52,7 +64,8 @@ static void lightrec_default_sh(struct lightrec_state *state, u32 opcode,
 {
 	*(u16 *)host = HTOLE16((u16)data);
 
-	if (!(state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY))
+	if (!(state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY) ||
+	    lightrec_store_hits_code(state, addr))
 		lightrec_invalidate(state, addr, 2);
 }
 
@@ -61,7 +74,8 @@ static void lightrec_default_sw(struct lightrec_state *state, u32 opcode,
 {
 	*(u32 *)host = HTOLE32(data);
 
-	if (!(state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY))
+	if (!(state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY) ||
+	    lightrec_store_hits_code(state, addr))
 		lightrec_invalidate(state, addr, 4);
 }
 
@@ -100,7 +114,9 @@ static void lightrec_default_swu(struct lightrec_state *state, u32 opcode,
 
 	memcpy(host, &data, 4);
 
-	if (!(state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY))
+	if (!(state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY) ||
+	    lightrec_store_hits_code(state, addr) ||
+	    lightrec_store_hits_code(state, addr + 4))
 		lightrec_invalidate(state, addr & ~0x3, 8);
 }
 
@@ -1060,8 +1076,9 @@ static u32 lightrec_memset(struct lightrec_state *state)
 		 kunseg_pc, (uintptr_t)host, length);
 	memset(host, 0, length);
 
-	if (!(state->opt_flags & LIGHTREC_OPT_INV_DMA_ONLY))
-		lightrec_invalidate_map(state, map, kunseg_pc, length);
+	/* The kernel memset can wipe whole regions; always invalidate it,
+	 * even in DMA-only mode. */
+	lightrec_invalidate_map(state, map, kunseg_pc, length);
 
 	/* Rough estimation of the number of cycles consumed */
 	return 8 + 5 * (length  + 3 / 4);
@@ -1684,8 +1701,24 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 	block->function = new_fn;
 	block_clear_flags(block, BLOCK_SHOULD_RECOMPILE);
 
-	/* Add compiled function to the LUT */
-	lut_write(state, lut_offset(block->pc), block->function);
+	/* The code may have been overwritten while it was being compiled.
+	 * Install the compiled function only if the block still matches
+	 * the code in memory; otherwise install the resolver, which will
+	 * re-validate the block and recompile it. */
+	if (block->hash == lightrec_calculate_block_hash(block)) {
+		/* Add compiled function to the LUT */
+		lut_write(state, lut_offset(block->pc), block->function);
+
+		/* Re-arm the per-word code check for the block's range;
+		 * walks may have cleared it between the block's creation
+		 * and the end of its compilation. */
+		lightrec_mark_block_pages(state, block);
+	} else {
+		/* Leave the LUT entry empty: a non-empty entry would make
+		 * the staleness check consider the block up-to-date. The
+		 * next fetch re-validates it and recompiles. */
+		lut_write(state, lut_offset(block->pc), NULL);
+	}
 
 	/* Detect old blocks that have been covered by the new one */
 	for (i = 0; ENABLE_THREADED_COMPILER && i < cstate->nb_targets; i++) {
