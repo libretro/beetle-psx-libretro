@@ -294,7 +294,7 @@ static u32 int_delay_slot(struct interpreter *inter, u32 pc, bool branch)
 		/* If the branch at the target of the branch opcode is not
 		 * taken, we jump to its delay slot */
 		next_pc = pc + sizeof(u32);
-	} else if (branch_at_addr || (!branch && branch_in_ds)) {
+	} else if (branch_at_addr || (!branch && branch_in_ds && ds_next_pc)) {
 		next_pc = ds_next_pc;
 	}
 
@@ -320,6 +320,21 @@ static u32 int_delay_slot(struct interpreter *inter, u32 pc, bool branch)
 
 		pr_debug("Running delay slot of branch at target of impossible "
 			 "branch\n");
+		lightrec_int_op(&inter2);
+	}
+
+	if (!branch && branch_in_ds && ds_next_pc) {
+		/* The branch in our delay slot is taken while we are not:
+		 * we jump to its target, so its own delay slot opcode must
+		 * be executed here. */
+		op_next = lightrec_read_opcode(state, int_get_ds_pc(inter, 2));
+
+		new_op.c = op_next;
+		new_op.flags = 0;
+		inter2.op = &new_op;
+		inter2.block = NULL;
+
+		inter->cycles += lightrec_cycles_of_opcode(inter->state, op_next);
 		lightrec_int_op(&inter2);
 	}
 
@@ -413,6 +428,9 @@ static u32 int_branch(struct interpreter *inter, u32 pc,
 
 	if (branch)
 		return int_do_branch(inter, pc, next_pc);
+
+	if (!inter->delay_slot && has_delay_slot(next_op(inter)->c))
+		return next_pc;
 
 	if (op_flag_emulate_branch(inter->op->flags))
 		return pc + 8;
