@@ -396,6 +396,24 @@ static void lightrec_rw_helper(struct lightrec_state *state,
 	}
 }
 
+/* Handle a LIGHTREC_EXIT_CODE_INV exit: a compiled store opcode is about
+ * to write into a page that contains cached code. Re-validate the cached
+ * blocks overlapping the written address, then execution resumes at the
+ * store opcode, whose page check will now pass. */
+static void lightrec_handle_code_inv(struct lightrec_state *state)
+{
+	union code c;
+	u32 kaddr;
+
+	c.opcode = state->code_inv_op;
+	kaddr = kunseg(state->regs.gpr[c.i.rs] + (s16)c.i.imm) & 0x1ffffc;
+
+	/* 8 bytes: covers the unaligned SWU case as well. The walk expands
+	 * the range to whole pages, so a bulk overwrite of cached code
+	 * takes this path once per page. */
+	lightrec_invalidate_blocks_in_range(state->block_cache, kaddr, 8);
+}
+
 static void lightrec_rw_cb(struct lightrec_state *state, u32 arg)
 {
 	lightrec_rw_helper(state, (union code) arg, NULL, NULL, 0);
@@ -1812,15 +1830,28 @@ u32 lightrec_execute(struct lightrec_state *state, u32 pc, u32 target_cycle)
 	state->target_cycle = target_cycle;
 	state->curr_pc = pc;
 
-	block_trace = get_next_block_func(state, pc);
-	if (block_trace) {
+	do {
+		block_trace = get_next_block_func(state, state->curr_pc);
+		if (!block_trace)
+			break;
+
 		cycles_delta = state->target_cycle - state->current_cycle;
 
 		cycles_delta = (*func)(state, state->curr_pc,
 				       block_trace, cycles_delta);
 
 		state->current_cycle = state->target_cycle - cycles_delta;
-	}
+
+		if (likely(!(state->exit_flags & LIGHTREC_EXIT_CODE_INV)))
+			break;
+
+		/* A store is about to overwrite cached code; re-validate
+		 * the affected blocks and resume at the store opcode. */
+		lightrec_handle_code_inv(state);
+
+		state->exit_flags = LIGHTREC_EXIT_NORMAL;
+		state->target_cycle = target_cycle;
+	} while (state->current_cycle < state->target_cycle);
 
 	if (ENABLE_THREADED_COMPILER)
 		lightrec_reaper_reap(state->reaper);

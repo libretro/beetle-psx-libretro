@@ -26,6 +26,8 @@ void lightrec_free_all_blocks(struct blockcache *cache);
 u32 lightrec_calculate_block_hash(const struct block *block);
 _Bool lightrec_block_is_outdated(struct lightrec_state *state, struct block *block);
 
+void lightrec_mark_block_pages(struct lightrec_state *state,
+			       const struct block *block);
 void lightrec_invalidate_blocks_in_range(struct blockcache *cache,
 					 u32 start, u32 len);
 void lightrec_remove_outdated_blocks(struct blockcache *cache,

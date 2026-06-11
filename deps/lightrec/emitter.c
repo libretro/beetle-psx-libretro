@@ -1294,6 +1294,90 @@ static void rec_and_mask(struct lightrec_cstate *cstate,
 	}
 }
 
+static void rec_exit_early(struct lightrec_cstate *state,
+			   const struct block *block, u16 offset,
+			   u32 exit_code, u32 pc);
+
+/* Emit a check of the per-page cached-code flags for the target address
+ * of a store opcode. If the page contains cached code that has not been
+ * re-validated since it was installed, exit the block early with
+ * LIGHTREC_EXIT_CODE_INV; lightrec_execute() will re-validate the blocks
+ * overlapping the written address and resume execution at this store
+ * opcode, whose page check will then pass. This catches stores that
+ * patch the interior of an already-cached block, which the inline LUT
+ * invalidation cannot detect. The hot path costs a few ALU ops, one
+ * 8-bit load and one normally-not-taken branch. */
+static void rec_store_invalidate_blocks(struct lightrec_cstate *cstate,
+					const struct block *block,
+					u16 offset)
+{
+	struct regcache *reg_cache = cstate->reg_cache;
+	union code c = block->opcode_list[offset].c;
+	jit_state_t *_jit = block->_jit;
+	jit_node_t *no_code;
+	struct native_register *regs_backup;
+	u8 tmp, tmp2, rs;
+
+	/* Exiting the block from a delay slot would lose the branch;
+	 * skip the check there. */
+	if (offset > 0 && has_delay_slot(block->opcode_list[offset - 1].c))
+		return;
+
+	/* All registers must be clean so that no spill code is emitted
+	 * inside the branched-over region (the regcache must emit
+	 * identical code on both sides of the branch), and so that the
+	 * guest registers are in sync when the early exit is taken. */
+	lightrec_clean_regs(reg_cache, _jit);
+
+	rs = lightrec_alloc_reg_in(reg_cache, _jit, c.i.rs, 0);
+	tmp = lightrec_alloc_reg_temp(reg_cache, _jit);
+	tmp2 = lightrec_alloc_reg_temp(reg_cache, _jit);
+
+	if (c.i.imm)
+		jit_addi(tmp, rs, (s16)c.i.imm);
+	else
+		jit_movr(tmp, rs);
+
+	lightrec_free_reg(reg_cache, rs);
+
+	/* Word index within RAM */
+	jit_andi(tmp, tmp, 0x1FFFFF);
+	jit_rshi_u(tmp, tmp, 2);
+
+	/* Load the bitmap word */
+	jit_rshi_u(tmp2, tmp, 5);
+	jit_lshi(tmp2, tmp2, 2);
+	jit_add_state(tmp2, tmp2);
+	jit_ldxi_ui(tmp2, tmp2, lightrec_offset(code_walk_map));
+
+	/* Test the bit for this word */
+	jit_andi(tmp, tmp, 0x1f);
+	jit_rshr_u(tmp2, tmp2, tmp);
+
+	lightrec_free_reg(reg_cache, tmp);
+
+	no_code = jit_bmci(tmp2, 1);
+
+	lightrec_free_reg(reg_cache, tmp2);
+
+	regs_backup = lightrec_regcache_enter_branch(reg_cache);
+
+	/* Cold path: record the store opcode and exit the block at the
+	 * current PC. All allocations below find clean registers, so no
+	 * code is emitted by the register cache in this region. */
+	tmp2 = lightrec_alloc_reg_temp(reg_cache, _jit);
+	jit_movi(tmp2, c.opcode);
+	jit_stxi_i(lightrec_offset(code_inv_op), LIGHTREC_REG_STATE, tmp2);
+	lightrec_free_reg(reg_cache, tmp2);
+
+	rec_exit_early(cstate, block, offset, LIGHTREC_EXIT_CODE_INV,
+		       get_ds_pc(block, offset, 0));
+
+	lightrec_regcache_leave_branch(reg_cache, regs_backup);
+
+	jit_patch(no_code);
+}
+
 static void rec_store_memory(struct lightrec_cstate *cstate,
 			     const struct block *block,
 			     u16 offset, jit_code_t code,
@@ -1317,6 +1401,9 @@ static void rec_store_memory(struct lightrec_cstate *cstate,
 	bool need_tmp = !no_mask || add_imm || invalidate;
 	bool swc2 = c.i.op == OP_SWC2;
 	u8 in_reg = swc2 ? REG_TEMP : c.i.rt;
+
+	if (invalidate)
+		rec_store_invalidate_blocks(cstate, block, offset);
 
 	rs = lightrec_alloc_reg_in(reg_cache, _jit, c.i.rs, 0);
 	if (need_tmp)
@@ -1528,6 +1615,8 @@ static void rec_store_direct(struct lightrec_cstate *cstate, const struct block 
 	bool different_offsets = state->offset_ram != state->offset_scratch;
 
 	jit_note(__FILE__, __LINE__);
+
+	rec_store_invalidate_blocks(cstate, block, offset);
 
 	rs = lightrec_alloc_reg_in(reg_cache, _jit, c.i.rs, 0);
 	tmp2 = lightrec_alloc_reg_temp(reg_cache, _jit);

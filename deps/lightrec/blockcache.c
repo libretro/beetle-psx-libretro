@@ -17,17 +17,9 @@
 /* Must be power of two */
 #define LUT_SIZE 0x4000
 
-#define CODE_PAGE_SHIFT	12
-#define NB_CODE_PAGES	(0x200000 >> CODE_PAGE_SHIFT)
-
 struct blockcache {
 	struct lightrec_state *state;
 	struct block * lut[LUT_SIZE];
-
-	/* Number of cached blocks overlapping each RAM page. Used to make
-	 * invalidation of block interiors cheap: writes to pages with no
-	 * cached code skip the block walk entirely. */
-	u16 nb_blocks_in_page[NB_CODE_PAGES];
 };
 
 u16 lightrec_get_lut_entry(const struct block *block)
@@ -92,8 +84,29 @@ static void lightrec_account_block_pages(struct blockcache *cache,
 	end = ((kunseg(block->pc) & 0x1FFFFF)
 	       + (block->nb_ops << 2) - 1) >> CODE_PAGE_SHIFT;
 
-	for (page = start; page <= end && page < NB_CODE_PAGES; page++)
-		cache->nb_blocks_in_page[page] += inc;
+	for (page = start; page <= end && page < CODE_NB_PAGES; page++)
+		cache->state->nb_blocks_in_page[page] += inc;
+
+	if (inc > 0)
+		lightrec_mark_block_pages(cache->state, block);
+}
+
+/* Set the per-word bits over the range of this block, so that stores
+ * into it will trigger a re-validation walk. Must be called whenever the
+ * block is (re-)installed in the code LUT. */
+void lightrec_mark_block_pages(struct lightrec_state *state,
+			       const struct block *block)
+{
+	u32 start, end, w;
+
+	if (kunseg(block->pc) & ~0x7FFFFF)
+		return;
+
+	start = ((kunseg(block->pc) & 0x1FFFFF) >> 2);
+	end = start + block->nb_ops;
+
+	for (w = start; w < end; w++)
+		state->code_walk_map[w >> 5] |= BIT(w & 0x1f);
 }
 
 void lightrec_register_block(struct blockcache *cache, struct block *block)
@@ -185,7 +198,7 @@ void lightrec_invalidate_blocks_in_range(struct blockcache *cache,
 	struct block *block;
 	struct lightrec_state *state = cache->state;
 	u32 end = start + len;
-	u32 block_start, block_end, page, first_page, last_page;
+	u32 block_start, block_end, page, first_page, last_page, w;
 	bool has_code = false;
 	unsigned int i;
 
@@ -196,15 +209,24 @@ void lightrec_invalidate_blocks_in_range(struct blockcache *cache,
 	last_page = end >> CODE_PAGE_SHIFT;
 
 	for (page = first_page;
-	     page <= last_page && page < NB_CODE_PAGES; page++)
-		has_code |= cache->nb_blocks_in_page[page] != 0;
+	     page <= last_page && page < CODE_NB_PAGES; page++)
+		has_code |= cache->state->nb_blocks_in_page[page] != 0;
 
-	/* No cached block overlaps the written pages - nothing to do.
+	/* Expand to whole pages: every block head overlapping the window
+	 * is cleared below, so the per-word bits of the whole window can
+	 * be cleared as well. This makes bulk overwrites of cached code
+	 * (e.g. an executable load) take this path once per page instead
+	 * of once per word. */
+	start = first_page << CODE_PAGE_SHIFT;
+	end = ((last_page + 1) << CODE_PAGE_SHIFT);
+
+	for (w = start >> 2; w < (end >> 2); w += 32)
+		state->code_walk_map[w >> 5] = 0;
+
+	/* No cached block overlaps the written pages - nothing more to do.
 	 * This is the common case for data writes. */
 	if (!has_code)
 		return;
-
-	end = end + 1;
 
 	/* A block whose entry point precedes the written range will not be
 	 * caught by clearing the LUT entries of the written words; its
@@ -284,6 +306,8 @@ static void lightrec_reset_lut_offset(struct lightrec_state *state, void *d)
 	if (!block)
 		return;
 
+	lightrec_mark_block_pages(state, block);
+
 	if (block_has_flag(block, BLOCK_IS_DEAD))
 		return;
 
@@ -318,8 +342,10 @@ bool lightrec_block_is_outdated(struct lightrec_state *state, struct block *bloc
 					    (void *)(uintptr_t) block->pc);
 		} else if (block->function) {
 			lut_write(state, offset, block->function);
+			lightrec_mark_block_pages(state, block);
 		} else {
 			lut_write(state, offset, state->get_next_block);
+			lightrec_mark_block_pages(state, block);
 		}
 	}
 

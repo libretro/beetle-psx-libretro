@@ -165,6 +165,9 @@ struct lightrec_cstate {
 	_Bool no_load_delay;
 };
 
+#define CODE_PAGE_SHIFT	12
+#define CODE_NB_PAGES	(0x200000 >> CODE_PAGE_SHIFT)
+
 struct lightrec_state {
 	struct lightrec_registers regs;
 	u32 temp_reg;
@@ -199,6 +202,25 @@ struct lightrec_state {
 	u32 opt_flags;
 	_Bool with_32bit_lut;
 	_Bool mirrors_mapped;
+
+	/* Number of cached blocks overlapping each RAM page. Maintained by
+	 * the block cache; used to cheaply detect stores into pages that
+	 * contain cached code, so that blocks whose interior is overwritten
+	 * can be re-validated. */
+	u16 nb_blocks_in_page[CODE_NB_PAGES];
+
+	/* Store opcode that triggered a LIGHTREC_EXIT_CODE_INV exit. */
+	u32 code_inv_op;
+
+	/* One bit per RAM word; set if the word lies inside a cached block
+	 * that has been installed in the code LUT and not re-validated
+	 * since. A compiled store opcode whose target word has its bit set
+	 * exits the block with LIGHTREC_EXIT_CODE_INV so that the blocks
+	 * overlapping the written address can be re-validated. Bits are set
+	 * over a block's range when it is installed, and cleared in 4 KiB
+	 * windows by the re-validation walk. */
+	u32 code_walk_map[0x200000 / 4 / 32];
+
 	void *code_lut[];
 };
 

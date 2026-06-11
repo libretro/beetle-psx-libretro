@@ -64,6 +64,7 @@ struct lightrec_mem_map;
 #define LIGHTREC_EXIT_SEGFAULT	(1 << 3)
 #define LIGHTREC_EXIT_NOMEM	(1 << 4)
 #define LIGHTREC_EXIT_UNKNOWN_OP	(1 << 5)
+#define LIGHTREC_EXIT_CODE_INV	(1 << 6)
 
 /* Unsafe optimizations flags */
 #define LIGHTREC_OPT_INV_DMA_ONLY	(1 << 0)
