@@ -1330,12 +1330,6 @@ static void rec_store_invalidate_blocks(struct lightrec_cstate *cstate,
 	if (offset > 0 && has_delay_slot(block->opcode_list[offset - 1].c))
 		return;
 
-	/* All registers must be clean so that no spill code is emitted
-	 * inside the branched-over region (the regcache must emit
-	 * identical code on both sides of the branch), and so that the
-	 * guest registers are in sync when the early exit is taken. */
-	lightrec_clean_regs(reg_cache, _jit);
-
 	rs = lightrec_alloc_reg_in(reg_cache, _jit, c.i.rs, 0);
 	tmp = lightrec_alloc_reg_temp(reg_cache, _jit);
 	tmp2 = lightrec_alloc_reg_temp(reg_cache, _jit);
@@ -1370,8 +1364,10 @@ static void rec_store_invalidate_blocks(struct lightrec_cstate *cstate,
 	regs_backup = lightrec_regcache_enter_branch(reg_cache);
 
 	/* Cold path: record the store opcode and exit the block at the
-	 * current PC. All allocations below find clean registers, so no
-	 * code is emitted by the register cache in this region. */
+	 * current PC. The end-of-block emission performs the register
+	 * sync; any spill code it emits lives in this branched-over
+	 * region and the register cache state is restored below, so the
+	 * hot path is unaffected. */
 	tmp2 = lightrec_alloc_reg_temp(reg_cache, _jit);
 	jit_movi(tmp2, c.opcode);
 	jit_stxi_i(lightrec_offset(code_inv_op), LIGHTREC_REG_STATE, tmp2);
@@ -1408,8 +1404,6 @@ static void rec_store_memory(struct lightrec_cstate *cstate,
 	bool need_tmp = !no_mask || add_imm || invalidate;
 	bool swc2 = c.i.op == OP_SWC2;
 	u8 in_reg = swc2 ? REG_TEMP : c.i.rt;
-
-	rec_store_invalidate_blocks(cstate, block, offset);
 
 	rs = lightrec_alloc_reg_in(reg_cache, _jit, c.i.rs, 0);
 	if (need_tmp)
@@ -1501,6 +1495,11 @@ static void rec_store_ram(struct lightrec_cstate *cstate,
 	const struct lightrec_state *state = cstate->state;
 
 	_jit_note(block->_jit, __FILE__, __LINE__);
+
+	/* Stores to the scratchpad or to hardware registers also go
+	 * through rec_store_memory, but cannot hit code; only emit the
+	 * cached-code check for stores known to target RAM. */
+	rec_store_invalidate_blocks(cstate, block, offset);
 
 	return rec_store_memory(cstate, block, offset, code, swap_code,
 				state->offset_ram, rec_ram_mask(state),

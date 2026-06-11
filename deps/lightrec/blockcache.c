@@ -306,16 +306,23 @@ static void lightrec_reset_lut_offset(struct lightrec_state *state, void *d)
 {
 	u32 pc = (u32)(uintptr_t) d;
 	struct block *block;
+	void *addr;
 
 	block = lightrec_find_block(state->block_cache, pc);
-	if (!block)
+	if (!block || block_has_flag(block, BLOCK_IS_DEAD))
 		return;
 
-	/* Do not reinstall the compiled function: the code may have been
-	 * overwritten while the LUT entry was empty, and the staleness
-	 * check only runs when the entry is left empty. The next fetch
-	 * re-validates the block and reinstalls its function if it is
-	 * still current. */
+	/* This callback runs some time after the staleness check that
+	 * scheduled it; the code may have been overwritten in between.
+	 * Re-validate before reinstalling - blindly installing the
+	 * compiled function here can resurrect stale code, and leaving
+	 * the entry empty forces a full re-validation through the C
+	 * path on every subsequent dispatch of the block. */
+	if (block->hash != lightrec_calculate_block_hash(block))
+		return;
+
+	addr = block->function ?: state->get_next_block;
+	lut_write(state, lut_offset(pc), addr);
 	lightrec_mark_block_pages(state, block);
 }
 
