@@ -3579,13 +3579,20 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
     * intact across the call. */
    memcpy(lightrec_regs->gpr,&s_cpu.GPR_full,sizeof(lightrec_regs->gpr));
 
+   /* Synchronize the COP0 file once on entry; inside the loop the
+    * authoritative copy is lightrec's. Anything that asserts IRQs
+    * while the loop runs (PSX_EventHandler and the hardware write
+    * handlers) goes through CPU_AssertIRQ, which updates both
+    * copies, so per-iteration copies are not needed: copying 2x128
+    * bytes per quantum dominated the dynarec's cost on workloads
+    * that exit often (the default event quantum is 128 cycles). */
+   memcpy(lightrec_regs->cp0,&CP0,32*sizeof(uint32_t));
+
    do
    {
 #ifdef LIGHTREC_DEBUG
       uint32_t oldpc = PC;
 #endif
-      memcpy(lightrec_regs->cp0,&CP0,32*sizeof(uint32_t));
-
       lightrec_reset_cycle_count(lightrec_state, timestamp);
 
       if (next_interpreter > 0 || psx_dynarec == DYNAREC_RUN_INTERPRETER)
@@ -3594,8 +3601,6 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
          PC = lightrec_execute(lightrec_state, PC, next_event_ts);
 
       timestamp = lightrec_current_cycle_count(lightrec_state);
-
-      memcpy(&CP0,lightrec_regs->cp0,32*sizeof(uint32_t));
 
       flags = lightrec_exit_flags(lightrec_state);
 
@@ -3608,18 +3613,31 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
          exit(1);
       }
       else if (flags & LIGHTREC_EXIT_SYSCALL)
+      {
+         /* CPU_Exception works on Beetle's COP0 copy; synchronize
+          * around it. Exceptions are rare next to loop iterations. */
+         memcpy(&CP0,lightrec_regs->cp0,32*sizeof(uint32_t));
          PC = CPU_Exception(EXCEPTION_SYSCALL, PC, PC, 0);
+         memcpy(lightrec_regs->cp0,&CP0,32*sizeof(uint32_t));
+      }
 
 #ifdef LIGHTREC_DEBUG
       if (timestamp >= lightrec_begin_cycles && PC != oldpc)
          print_for_big_ass_debugger(timestamp, PC);
 #endif
-      if ((CP0.SR & CP0.CAUSE & 0xFF00) && (CP0.SR & 1))
+      if ((lightrec_regs->cp0[CP0REG_SR] & lightrec_regs->cp0[CP0REG_CAUSE] & 0xFF00) &&
+          (lightrec_regs->cp0[CP0REG_SR] & 1))
       {
          /* Handle software interrupts */
+         memcpy(&CP0,lightrec_regs->cp0,32*sizeof(uint32_t));
          PC = CPU_Exception(EXCEPTION_INT, PC, PC, 0);
+         memcpy(lightrec_regs->cp0,&CP0,32*sizeof(uint32_t));
       }
    } while (MDFN_LIKELY(PSX_EventHandler(timestamp)));
+
+   /* Write the COP0 file back once on exit, so savestates and engine
+    * switches see the current state. */
+   memcpy(&CP0,lightrec_regs->cp0,32*sizeof(uint32_t));
 
    memcpy(&s_cpu.GPR_full,lightrec_regs->gpr,sizeof(lightrec_regs->gpr));
 
