@@ -427,6 +427,8 @@ static uint32_t RWAddr;
 
 static uint16_t SPUControl;
 
+extern bool psx_spu_silent_voice_opt;
+
 static uint32_t VoiceOn;
 static uint32_t VoiceOff;
 
@@ -1187,6 +1189,30 @@ static INLINE void SPU_RunNoise(void)
          int32_t voice_pvs;
          int l, r;
          int lr;
+
+         /* A voice whose envelope has fully released contributes zero
+          * to every accumulator, so the decoder, the interpolation
+          * FIR, the envelope and the sweeps can be skipped wholesale.
+          * The skip is disabled while the SPU IRQ is enabled, because
+          * the decoder's address walk must keep testing against the
+          * IRQ address. What this freezes for the skipped voice is the
+          * register-visible decoder state (the loop address register
+          * and the block-end flag re-assertions of a looping silent
+          * voice, and the current sweep volume): all idempotent or
+          * inert in practice, and audio output is bit-identical. */
+         if (psx_spu_silent_voice_opt &&
+             !(SPUControl & 0x40) &&
+             voice->ADSR.EnvLevel == 0 &&
+             voice->ADSR.Phase == ADSR_RELEASE &&
+             !voice->DecodePlayDelay &&
+             !(VoiceOn & (1U << voice_num)) &&
+             !(Noise_Mode & (1 << voice_num)))
+         {
+            voice->PreLRSample = 0;
+            if(voice_num == 1 || voice_num == 3)
+               SPU_WriteSPURAM(0x400 | ((voice_num >> 1) * 0x200) | CWA, 0);
+            continue;
+         }
 
          voice->PreLRSample = 0;
 

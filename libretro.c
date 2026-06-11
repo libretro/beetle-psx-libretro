@@ -124,6 +124,7 @@ unsigned image_height = 0;
 enum DYNAREC psx_dynarec;
 bool         psx_dynarec_invalidate;
 uint8_t      psx_dynarec_op_cycles;
+bool         psx_spu_silent_voice_opt;
 bool         psx_dynarec_spgp_opt;
 bool         hugetlb;
 uint8_t      psx_mmap = 0;
@@ -3958,6 +3959,13 @@ static void check_variables(bool startup)
    }
    else
       psx_dynarec_invalidate = false;
+
+   var.key = BEETLE_OPT(spu_silent_voice);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      psx_spu_silent_voice_opt = strcmp(var.value, "disabled") != 0;
+   else
+      psx_spu_silent_voice_opt = true;
 
    var.key = BEETLE_OPT(dynarec_op_cycles);
 

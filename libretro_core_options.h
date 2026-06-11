@@ -1201,6 +1201,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "full"
    },
    {
+      BEETLE_OPT(spu_silent_voice),
+      "SPU Silent Voice Optimization",
+      NULL,
+      "Skip the per-sample processing of voices whose envelope has fully released. Audio output is identical; the optimization automatically disables itself while the SPU IRQ is in use. Saves roughly 5-10% of frame time. Disable for fully accurate SPU register state.",
+      NULL,
+      "hacks",
+      {
+         { "enabled",  NULL },
+         { "disabled", NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(dynarec_op_cycles),
       "Dynarec Cycles Per Instruction",
       NULL,
