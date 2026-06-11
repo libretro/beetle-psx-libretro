@@ -358,6 +358,29 @@ static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
             {
                uint32_t header;
 
+               /* An initial MADR equal to the linked-list end marker
+                * means the list is empty: the hardware sees the end
+                * marker and completes the transfer without fetching a
+                * header from it.  (Games hit this by passing a
+                * terminator value as the list head, e.g. DrawOTag on
+                * an empty table.)  Without this check the end marker
+                * falls through to the bus-error path below, which
+                * latches DICR bit15 and holds the DMA IRQ line high
+                * permanently, silently killing every future DMA
+                * completion interrupt.  In-walk end markers never get
+                * here; they're caught by the channel-end check after
+                * each block. */
+               if(MDFN_UNLIKELY(DMACH[ch].CurAddr == 0xFFFFFF))
+               {
+                  DMACH[ch].ChanControl &= ~(0x11 << 24);
+                  if(DMAIntControl & (1U << (16 + ch)))
+                  {
+                     DMAIntStatus |= 1U << ch;
+                     RecalcIRQOut();
+                  }
+                  break;
+               }
+
                if(MDFN_UNLIKELY(DMACH[ch].CurAddr & 0x800000))
                {
                   DMACH[ch].ChanControl &= ~(0x11 << 24);
