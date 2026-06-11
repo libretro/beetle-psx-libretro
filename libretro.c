@@ -5094,7 +5094,14 @@ static bool MDFNI_LoadGame(const char *name)
       !strcasecmp(name + name_len - 3, "toc") ||
       !strcasecmp(name + name_len - 3, "m3u") ||
       !strcasecmp(name + name_len - 3, "chd") ||
-      !strcasecmp(name + name_len - 3, "pbp")
+      !strcasecmp(name + name_len - 3, "pbp") ||
+      /* Raw track images with no cue/toc sheet: the CD backend
+       * synthesizes a single MODE2/2352 data track for these, so
+       * route them to the disc loader rather than the PS-X EXE
+       * loader (which would reject them as an unknown format). */
+      !strcasecmp(name + name_len - 3, "bin") ||
+      !strcasecmp(name + name_len - 3, "img") ||
+      !strcasecmp(name + name_len - 3, "iso")
       ))
     return MDFNI_LoadCD(name);
 
