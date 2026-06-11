@@ -937,6 +937,20 @@ void PSX_SetEventNT(const int type, const int32_t next_timestamp)
 {
    struct event_list_entry *e = &events[type];
 
+   /* Fast path: the new timestamp keeps the event in its current list
+    * position - by far the most common case, since periodic events
+    * re-arm to a nearby time. The conditions reproduce the insertion
+    * points of the full walks below exactly, including the placement
+    * among equal timestamps, so the resulting list is identical. */
+   if(next_timestamp != e->event_time &&
+      next_timestamp >= e->prev->event_time &&
+      next_timestamp <= e->next->event_time)
+   {
+      e->event_time = next_timestamp;
+      CPU_SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time & Running);
+      return;
+   }
+
    if(next_timestamp < e->event_time)
    {
       struct event_list_entry *fe = e;
