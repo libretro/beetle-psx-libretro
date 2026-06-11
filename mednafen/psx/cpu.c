@@ -52,6 +52,7 @@ enum DYNAREC prev_dynarec;
 bool         prev_invalidate;
 bool         prev_spgp_opt;
 extern bool  psx_dynarec_invalidate;
+extern uint8_t psx_dynarec_op_cycles;
 extern bool  psx_dynarec_spgp_opt;
 extern uint8_t psx_mmap;
 extern uint8_t *lightrec_codebuffer;
@@ -2803,6 +2804,11 @@ int32_t CPU_Run(PS_CPU *self, int32_t timestamp_in)
 {
 #ifdef HAVE_LIGHTREC
    /* Track options changing. */
+   /* Cycles-per-instruction changes are handled by lightrec itself
+    * (it invalidates and frees all compiled blocks); no re-init needed. */
+   if (lightrec_state && psx_dynarec != DYNAREC_DISABLED)
+      lightrec_set_cycles_per_opcode(lightrec_state, psx_dynarec_op_cycles);
+
    if (MDFN_UNLIKELY(psx_dynarec != prev_dynarec || pgxpMode != PGXP_GetModes()) ||
        prev_invalidate != psx_dynarec_invalidate || prev_spgp_opt != psx_dynarec_spgp_opt)
    {
@@ -3538,6 +3544,13 @@ static int lightrec_plugin_init(PS_CPU *self)
                (psx_dynarec_spgp_opt?LIGHTREC_OPT_SP_GP_HIT_RAM:0);
 
    lightrec_set_unsafe_opt_flags(lightrec_state, flags);
+
+   /* lightrec's default is 2 cycles per instruction, which makes the
+    * emulated CPU appear half-speed compared to the interpreter (and to
+    * real hardware, for cached code) to games that calibrate their
+    * timing against the CPU - e.g. Parasite Eve 2's CD streaming, which
+    * otherwise times out and hangs on the publisher screen. */
+   lightrec_set_cycles_per_opcode(lightrec_state, psx_dynarec_op_cycles);
 
    GTE_SwitchRegisters(true,lightrec_regs->cp2d);
 
