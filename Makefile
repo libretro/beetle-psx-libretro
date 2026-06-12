@@ -163,6 +163,14 @@ else ifeq ($(platform), osx)
       LDFLAGS += -lSystem
       FLAGS += -DHAVE_SHM -DUSE_FIXED
    endif
+   # Apple Silicon: NEON is architecturally guaranteed. Covers native
+   # builds (uname) and cross builds (the target triple). An x86 slice
+   # is unaffected either way: the GPU code prefers SSE2 when present.
+   ifneq (,$(filter arm64 aarch64,$(shell uname -m)))
+      FLAGS += -DGPU_HAVE_NEON=1
+   else ifneq (,$(findstring arm64,$(LIBRETRO_APPLE_PLATFORM)))
+      FLAGS += -DGPU_HAVE_NEON=1
+   endif
    ifeq ($(HAVE_OPENGL),1)
       GL_LIB := -framework OpenGL
    endif
@@ -203,6 +211,9 @@ else ifneq (,$(findstring ios,$(platform)))
       IPHONEMINVER = -miphoneos-version-min=5.0
    endif
    HAVE_LIGHTREC = 0
+   # Every iOS device has NEON (the armv7 baseline is Cortex-A8 class,
+   # and arm64 includes it architecturally).
+   FLAGS += -DGPU_HAVE_NEON=1
    LDFLAGS += $(IPHONEMINVER)
    FLAGS   += $(IPHONEMINVER) -DHAVE_UNISTD_H -DIOS=1
    CC      += $(IPHONEMINVER)
@@ -215,6 +226,8 @@ else ifeq ($(platform), tvos-arm64)
    SHARED := -dynamiclib
    HAVE_LIGHTREC = 0
    FLAGS += -DHAVE_UNISTD_H -DIOS=1 -DTVOS=1
+   # tvOS is arm64 only; NEON is architecturally guaranteed.
+   FLAGS += -DGPU_HAVE_NEON=1
 
    ifeq ($(IOSSDK),)
       IOSSDK := $(shell xcrun -sdk appletvos -show-sdk-path)

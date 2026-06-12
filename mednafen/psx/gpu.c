@@ -33,9 +33,12 @@
  * toolchains use.  arm_neon.h provides the same vdupq/vst1q/vld1q
  * intrinsics on both, so a single GPU_HAVE_NEON guard covers 32- and
  * 64-bit.  Only used when __SSE2__ is absent (no target has both). */
-#if !defined(__SSE2__) && (defined(__ARM_NEON) || defined(__ARM_NEON__))
+#if !defined(__SSE2__) && \
+    (defined(GPU_HAVE_NEON) || defined(__ARM_NEON) || defined(__ARM_NEON__))
 #include <arm_neon.h>
+#ifndef GPU_HAVE_NEON
 #define GPU_HAVE_NEON 1
+#endif
 #endif
 
 #include "../math_ops.h"
