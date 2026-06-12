@@ -120,11 +120,13 @@ int64_t cd_slow_timeout = 8000; // microseconds
 bool fast_pal = false;
 unsigned image_height = 0;
 
+/* Engine-independent: referenced unconditionally by the SPU. */
+bool         psx_spu_silent_voice_opt = true;
+
 #ifdef HAVE_LIGHTREC
 enum DYNAREC psx_dynarec;
 bool         psx_dynarec_invalidate;
 uint8_t      psx_dynarec_op_cycles;
-bool         psx_spu_silent_voice_opt;
 bool         psx_dynarec_spgp_opt;
 bool         hugetlb;
 uint8_t      psx_mmap = 0;
@@ -3974,13 +3976,6 @@ static void check_variables(bool startup)
    else
       psx_dynarec_invalidate = false;
 
-   var.key = BEETLE_OPT(spu_silent_voice);
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      psx_spu_silent_voice_opt = strcmp(var.value, "disabled") != 0;
-   else
-      psx_spu_silent_voice_opt = true;
-
    var.key = BEETLE_OPT(dynarec_op_cycles);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -4018,6 +4013,13 @@ static void check_variables(bool startup)
    else
       spu_samples = 1;
 #endif
+
+   var.key = BEETLE_OPT(spu_silent_voice);
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      psx_spu_silent_voice_opt = strcmp(var.value, "disabled") != 0;
+   else
+      psx_spu_silent_voice_opt = true;
 
    var.key = BEETLE_OPT(cpu_freq_scale);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
