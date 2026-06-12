@@ -1200,11 +1200,11 @@ static INLINE void SPU_RunNoise(void)
           * and the block-end flag re-assertions of a looping silent
           * voice, and the current sweep volume): all idempotent or
           * inert in practice, and audio output is bit-identical. */
-         if (psx_spu_silent_voice_opt &&
-             !(SPUControl & 0x40) &&
-             voice->ADSR.EnvLevel == 0 &&
+         if (voice->ADSR.EnvLevel == 0 &&
              voice->ADSR.Phase == ADSR_RELEASE &&
+             psx_spu_silent_voice_opt &&
              !voice->DecodePlayDelay &&
+             !(SPUControl & 0x40) &&
              !(VoiceOn & (1U << voice_num)) &&
              !(Noise_Mode & (1 << voice_num)))
          {
