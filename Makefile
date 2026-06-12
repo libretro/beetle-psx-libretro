@@ -41,6 +41,26 @@ ifeq ($(platform),)
    endif
 else ifneq (,$(findstring armv,$(platform)))
    override platform += unix
+   # Parse the canonical libretro ARM platform string
+   # (e.g. armv7-neon-hardfloat), like the other cores do. Without
+   # this the substrings were discarded and ARM builds got no
+   # NEON/float-ABI flags, leaving the GPU's vector fast paths
+   # compiled out.
+   ifneq (,$(findstring cortexa8,$(platform)))
+      FLAGS += -marm -mcpu=cortex-a8
+   else ifneq (,$(findstring cortexa9,$(platform)))
+      FLAGS += -marm -mcpu=cortex-a9
+   endif
+   FLAGS += -marm
+   ifneq (,$(findstring neon,$(platform)))
+      FLAGS += -mfpu=neon
+      HAVE_NEON = 1
+   endif
+   ifneq (,$(findstring softfloat,$(platform)))
+      FLAGS += -mfloat-abi=softfp
+   else ifneq (,$(findstring hardfloat,$(platform)))
+      FLAGS += -mfloat-abi=hard
+   endif
 endif
 
 ifneq ($(platform), osx)
