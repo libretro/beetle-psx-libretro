@@ -175,6 +175,16 @@ static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
 #endif
    return done;
 }
+#else /* SSE2 || NEON */
+/* Scalar-only build (e.g. baseline i686): no vector fast path. The
+ * caller treats the return value as the number of pixels consumed by
+ * the vector path and lets the scalar loop finish the remainder, so
+ * returning zero hands the whole run to the scalar loop. */
+static INLINE int DrawSpriteFillVec(PS_GPU *gpu, int32_t x, int32_t y,
+      int32_t w, uint16_t fill_color, const int BM_VAL, const int ME_LIT)
+{
+   return 0;
+}
 #endif /* SSE2 || NEON */
 
 #define DEFINE_DrawSprite(SUFFIX, T_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, FX_LIT, FY_LIT) \

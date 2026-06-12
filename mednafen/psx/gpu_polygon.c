@@ -552,6 +552,18 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
 #undef CHAN
    return done;
 }
+#else /* SSE2 || NEON */
+/* Scalar-only build (e.g. baseline i686): no vector fast path. The
+ * caller treats the return value as the number of pixels consumed by
+ * the vector path and lets the scalar loop finish the remainder, so
+ * returning zero hands the whole span to the scalar loop. */
+static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
+      const i_group *igp, const i_deltas *idl,
+      const int GOURAUD_LIT, const int DITHER_ON,
+      const int BM_VAL, const int ME_LIT)
+{
+   return 0;
+}
 #endif /* SSE2 || NEON */
 
 #define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
