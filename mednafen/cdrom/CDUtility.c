@@ -248,6 +248,101 @@ void subpw_interleave(const uint8_t *in_buf, uint8_t *out_buf)
 //  and the leadout entry together before extracting the D2 bit.  Audio track->data leadout is fairly benign though maybe noisy(especially if we ever implement
 //  data scrambling properly), but data track->audio leadout could break things in an insidious manner for the more accurate drive emulation code).
 //
+/* User-data-area pre-gap / lead-in (negative LBA) Q-subchannel synthesis,
+ * per ISO/IEC 10149:1995 (E) 20.2. The lead-in is not stored in disc
+ * images, so it is synthesized on read. Track-relative address counts
+ * down toward the first track (hence the 0 - 1 - lba_tmp folding for the
+ * portion before the logical track start). Mirrors subpw_synth_leadout_lba
+ * for the opposite end of the disc. */
+void subpw_synth_udapp_lba(const struct TOC *toc, const int32_t lba, const int32_t lba_subq_relative_offs, uint8_t* SubPWBuf)
+{
+   unsigned i;
+   uint8_t buf[0xC];
+   uint32_t lba_relative;
+   uint32_t m, s, f;
+   uint32_t ma, sa, fa;
+   int32_t lba_tmp = lba + lba_subq_relative_offs;
+
+   if(lba_tmp < 0)
+      lba_relative = 0 - 1 - lba_tmp;
+   else
+      lba_relative = lba_tmp - 0;
+
+   f  = (lba_relative  % 75);
+   s  = ((lba_relative / 75) % 60);
+   m  = (lba_relative  / 75 / 60);
+
+   fa = (lba + 150)    % 75;
+   sa = ((lba + 150)  / 75) % 60;
+   ma = ((lba + 150)  / 75 / 60);
+
+   {
+      uint8_t adr     = 0x1; /* Q channel data encodes position */
+      uint8_t control = 0x0;
+
+      if(toc->disc_type == DISC_TYPE_CD_I && toc->first_track > 1)
+         control = 0x4;
+      else if(toc->tracks[toc->first_track].valid)
+         control = toc->tracks[toc->first_track].control;
+
+      memset(buf, 0, 0xC);
+      buf[0] = (adr << 0) | (control << 4);
+      buf[1] = U8_to_BCD(toc->first_track);
+      buf[2] = U8_to_BCD(0x00);
+
+      /* Track relative MSF address */
+      buf[3] = U8_to_BCD(m);
+      buf[4] = U8_to_BCD(s);
+      buf[5] = U8_to_BCD(f);
+
+      buf[6] = 0; /* Zerroooo */
+
+      /* Absolute MSF address */
+      buf[7] = U8_to_BCD(ma);
+      buf[8] = U8_to_BCD(sa);
+      buf[9] = U8_to_BCD(fa);
+
+      subq_generate_checksum(buf);
+
+      for(i = 0; i < 96; i++)
+         SubPWBuf[i] = (((buf[i >> 3] >> (7 - (i & 0x7))) & 1) ? 0x40 : 0x00) | 0x80;
+   }
+}
+
+void synth_udapp_sector_lba(uint8_t mode, const struct TOC *toc, const int32_t lba, int32_t lba_subq_relative_offs, uint8_t* out_buf)
+{
+   memset(out_buf, 0, 2352 + 96);
+   subpw_synth_udapp_lba(toc, lba, lba_subq_relative_offs, out_buf + 2352);
+
+   if(out_buf[2352 + 1] & 0x40)
+   {
+      if(mode == 0xFF)
+      {
+         if(toc->disc_type == DISC_TYPE_CD_XA || toc->disc_type == DISC_TYPE_CD_I)
+            mode = 0x02;
+         else
+            mode = 0x01;
+      }
+
+      switch(mode)
+      {
+         default:
+            encode_mode0_sector(LBA_to_ABA(lba), out_buf);
+            break;
+
+         case 0x01:
+            encode_mode1_sector(LBA_to_ABA(lba), out_buf);
+            break;
+
+         case 0x02:
+            out_buf[12 +  6] = 0x20;
+            out_buf[12 + 10] = 0x20;
+            encode_mode2_form2_sector(LBA_to_ABA(lba), out_buf);
+            break;
+      }
+   }
+}
+
 void subpw_synth_leadout_lba(const struct TOC *toc, const int32_t lba, uint8_t* SubPWBuf)
 {
    unsigned i;

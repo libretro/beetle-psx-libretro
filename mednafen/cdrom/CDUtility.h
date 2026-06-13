@@ -183,7 +183,11 @@ void encode_mode2_form2_sector(uint32_t aba, uint8_t *sector_data);	// 2324+8 by
 
 // out_buf must be able to contain 2352+96 bytes.
 // "mode" is only used if(toc.tracks[100].control & 0x4)
+void subpw_synth_leadout_lba(const struct TOC *toc, const int32_t lba, uint8_t* SubPWBuf);
 void synth_leadout_sector_lba(uint8_t mode, const struct TOC *toc, const int32_t lba, uint8_t* out_buf);
+void subpw_synth_udapp_lba(const struct TOC *toc, const int32_t lba, const int32_t lba_subq_relative_offs, uint8_t* SubPWBuf);
+void synth_udapp_sector_lba(uint8_t mode, const struct TOC *toc, const int32_t lba, int32_t lba_subq_relative_offs, uint8_t* out_buf);
+
 
 //
 // User data error detection and correction

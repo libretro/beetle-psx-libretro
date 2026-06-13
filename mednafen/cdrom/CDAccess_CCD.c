@@ -639,10 +639,21 @@ static bool CDAccess_CCD_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf,
    struct CDAccess_CCD *self = (struct CDAccess_CCD *)base_self;
    uint8_t              sub_buf[96];
 
-   if (lba < 0 || (size_t)lba >= self->img_numsectors)
+   /* The lead-in (negative LBA) and lead-out (past the last stored
+    * sector) are not present in a CloneCD image, so synthesize them,
+    * matching the .cue/.bin and CHD readers. The PS1 CDC reads these
+    * regions during normal pregap seeks (it parks at LBA -150), so
+    * erroring here breaks otherwise-valid .ccd rips. */
+   if (lba < 0)
    {
-      MDFN_Error(0, "LBA out of range.");
-      return false;
+      synth_udapp_sector_lba(0xFF, &self->tocd, lba, 0, buf);
+      return true;
+   }
+
+   if ((size_t)lba >= self->img_numsectors)
+   {
+      synth_leadout_sector_lba(0xFF, &self->tocd, lba, buf);
+      return true;
    }
 
    cdstream_seek(&self->img_stream, lba * 2352, SEEK_SET);
@@ -662,10 +673,16 @@ static bool CDAccess_CCD_Read_Raw_PW(CDAccess *base_self, uint8_t *buf,
    struct CDAccess_CCD *self = (struct CDAccess_CCD *)base_self;
    uint8_t              sub_buf[96];
 
-   if (lba < 0 || (size_t)lba >= self->img_numsectors)
+   if (lba < 0)
    {
-      MDFN_Error(0, "LBA out of range.");
-      return false;
+      subpw_synth_udapp_lba(&self->tocd, lba, 0, buf);
+      return true;
+   }
+
+   if ((size_t)lba >= self->img_numsectors)
+   {
+      subpw_synth_leadout_lba(&self->tocd, lba, buf);
+      return true;
    }
 
    cdstream_seek(&self->sub_stream, lba * 96, SEEK_SET);
