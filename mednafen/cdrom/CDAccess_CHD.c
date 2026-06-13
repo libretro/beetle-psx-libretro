@@ -23,6 +23,8 @@
 #include <compat/strl.h>
 
 #include <streams/file_stream.h>
+#include <retro_dirent.h>
+#include <file/file_path.h>
 #include <libretro.h>
 
 #include "../mednafen.h"
@@ -54,6 +56,16 @@ struct CDAccess_CHD
    chd_file    *chd;
    uint8_t     *hunkmem;        /* hunk-data cache */
    int          oldhunk;        /* last hunknum read, -1 sentinel */
+
+   /* Parent (clone) CHD chain. A child CHD references unchanged data in
+    * a parent file; libchdr needs the parent opened and handed in. A
+    * parent can itself be a child, so the chain can be several deep.
+    * Both the chd_file handles and their backing RFILEs must stay alive
+    * for as long as the child is open, and are released in Cleanup. */
+#define CHD_MAX_PARENTS 8
+   chd_file    *parent_chd[CHD_MAX_PARENTS];
+   RFILE       *parent_fp[CHD_MAX_PARENTS];
+   int          num_parents;
 
    int32_t      NumTracks;
    int32_t      FirstTrack;
@@ -144,6 +156,157 @@ static int CDAccess_CHD_LoadSBI(struct CDAccess_CHD *self,
  * Body methods.
  * ------------------------------------------------------------------ */
 
+/* Read just the CHD header of a file (no full open, no parent needed),
+ * so we can inspect its SHA1 / parent-SHA1 while hunting for a parent. */
+static bool chd_peek_header(const char *path, chd_header *out)
+{
+   RFILE    *fp;
+   chd_error err;
+
+   fp = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if (!fp)
+      return false;
+
+   err = chd_read_header_core_file_callbacks(&chd_callbacks, fp, out);
+   filestream_close(fp);
+   return err == CHDERR_NONE;
+}
+
+/* True if the header indicates the file is a child that needs a parent. */
+static bool chd_header_needs_parent(const chd_header *h)
+{
+   static const uint8_t nullsha1[CHD_SHA1_BYTES] = { 0 };
+   if (h->version < 5)
+      return (h->flags & CHDFLAGS_HAS_PARENT) != 0;
+   return memcmp(nullsha1, h->parentsha1, sizeof(h->parentsha1)) != 0;
+}
+
+/* Search dir for a .chd whose own SHA1 matches want_parentsha1 (the
+ * child's parentsha1). Returns true and fills found_path on a match.
+ * skip_path is the child itself, never a candidate for its own parent. */
+static bool chd_find_parent_in_dir(const char *dir,
+      const uint8_t *want_parentsha1, const char *skip_path,
+      char *found_path, size_t found_path_len)
+{
+   struct RDIR *rdir = retro_opendir(dir);
+   bool         ok   = false;
+
+   if (!rdir)
+      return false;
+
+   while (retro_readdir(rdir))
+   {
+      const char *name = retro_dirent_get_name(rdir);
+      const char *ext;
+      char        cand[CHD_PATH_BUF];
+      chd_header  ch;
+
+      if (!name || retro_dirent_is_dir(rdir, NULL))
+         continue;
+
+      ext = path_get_extension(name);
+      if (!ext || strcasecmp(ext, "chd"))
+         continue;
+
+      fill_pathname_join(cand, dir, name, sizeof(cand));
+
+      /* Don't consider the child file itself. */
+      if (!strcmp(cand, skip_path))
+         continue;
+
+      if (!chd_peek_header(cand, &ch))
+         continue;
+
+      /* libchdr validates a parent by comparing the child's parentsha1
+       * against the parent's (combined) sha1; match the same way. */
+      if (!memcmp(ch.sha1, want_parentsha1, CHD_SHA1_BYTES))
+      {
+         strlcpy(found_path, cand, found_path_len);
+         ok = true;
+         break;
+      }
+   }
+
+   retro_closedir(rdir);
+   return ok;
+}
+
+/* Open a CHD, resolving any parent chain by searching base_dir. On
+ * success returns CHDERR_NONE with *out_chd set; the opened parent
+ * handles and their RFILEs are appended to self so they outlive the
+ * child and are freed in Cleanup. depth guards against cycles / absurd
+ * chains. The RFILE for *this* file is supplied by the caller in fp
+ * (it must stay open for the lifetime of the returned chd_file). */
+static chd_error chd_open_resolving_parents(struct CDAccess_CHD *self,
+      const char *path, const char *base_dir, RFILE *fp, int depth,
+      chd_file **out_chd)
+{
+   chd_header  hdr;
+   chd_error   err;
+   chd_file   *parent = NULL;
+
+   *out_chd = NULL;
+
+   if (depth >= CHD_MAX_PARENTS)
+      return CHDERR_REQUIRES_PARENT;
+
+   /* First, try a plain open. If the file needs no parent this succeeds. */
+   err = chd_open_core_file_callbacks(&chd_callbacks, fp,
+         CHD_OPEN_READ, NULL, out_chd);
+   if (err != CHDERR_REQUIRES_PARENT)
+      return err;
+
+   /* It's a child: read its header to learn the parent SHA1, find the
+    * parent file in the same directory, open it (recursively), then
+    * re-open this file with the parent handle. */
+   if (!chd_peek_header(path, &hdr) || !chd_header_needs_parent(&hdr))
+      return CHDERR_REQUIRES_PARENT;
+
+   {
+      char   parent_path[CHD_PATH_BUF];
+      RFILE *parent_fp;
+
+      if (!chd_find_parent_in_dir(base_dir, hdr.parentsha1, path,
+               parent_path, sizeof(parent_path)))
+      {
+         log_cb(RETRO_LOG_ERROR,
+               "CHD: \"%s\" needs a parent CHD that was not found in %s\n",
+               path, base_dir);
+         return CHDERR_REQUIRES_PARENT;
+      }
+
+      parent_fp = filestream_open(parent_path, RETRO_VFS_FILE_ACCESS_READ,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
+      if (!parent_fp)
+         return CHDERR_FILE_NOT_FOUND;
+
+      err = chd_open_resolving_parents(self, parent_path, base_dir,
+            parent_fp, depth + 1, &parent);
+      if (err != CHDERR_NONE)
+      {
+         filestream_close(parent_fp);
+         return err;
+      }
+
+      /* Stash the parent so it lives as long as the child. */
+      if (self->num_parents < CHD_MAX_PARENTS)
+      {
+         self->parent_chd[self->num_parents] = parent;
+         self->parent_fp[self->num_parents]  = parent_fp;
+         self->num_parents++;
+      }
+
+      log_cb(RETRO_LOG_INFO, "CHD: \"%s\" using parent \"%s\"\n",
+            path, parent_path);
+   }
+
+   /* Re-open the child now that we have its parent. */
+   err = chd_open_core_file_callbacks(&chd_callbacks, fp,
+         CHD_OPEN_READ, parent, out_chd);
+   return err;
+}
+
 static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
       const char *path, bool image_memcache)
 {
@@ -165,8 +328,14 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
    int               i;
    char              sbi_basename[CHD_PATH_BUF];
 
-   err = chd_open_core_file_callbacks(&chd_callbacks, self->fp,
-         CHD_OPEN_READ, NULL, &self->chd);
+   {
+      char base_dir[CHD_PATH_BUF];
+      base_dir[0] = '\0';
+      fill_pathname_basedir(base_dir, path, sizeof(base_dir));
+
+      err = chd_open_resolving_parents(self, path, base_dir,
+            self->fp, 0, &self->chd);
+   }
    if (err != CHDERR_NONE)
       return false;
 
@@ -322,8 +491,23 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
 
 static void CDAccess_CHD_Cleanup(struct CDAccess_CHD *self)
 {
+   int i;
+
    if (self->chd)
       chd_close(self->chd);
+
+   /* Close parents from child-most to root, then their backing files.
+    * The child chd_file was closed above; libchdr does not close
+    * parents for us, and the RFILEs are owned here (Callback_fclose is
+    * a no-op). */
+   for (i = self->num_parents - 1; i >= 0; i--)
+   {
+      if (self->parent_chd[i])
+         chd_close(self->parent_chd[i]);
+      if (self->parent_fp[i])
+         filestream_close(self->parent_fp[i]);
+   }
+   self->num_parents = 0;
 
    if (self->hunkmem)
       free(self->hunkmem);
