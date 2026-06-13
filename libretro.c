@@ -2739,6 +2739,10 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
 
    MDFNMP_Init(1024, ((uint64_t)1 << 29) / 1024);
    MDFNMP_AddRAM(2048 * 1024, 0x00000000, MainRAM->data8);
+   /* Scratchpad (1KB at 0x1F800000): exposed for cheats. Games such as
+    * the Rockman Complete Works ports keep lives/health/ammo here, and
+    * "1F800XXX" GameShark codes target it. */
+   MDFNMP_AddRAM(1024, 0x1F800000, ScratchRAM->data8);
 
    if(firmware_is_present(region))
    {
@@ -5346,6 +5350,39 @@ bool retro_load_game(const struct retro_game_info *info)
       environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
       option_display.key = BEETLE_OPT(last_scanline_pal);
       environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+   }
+
+   /* Publish the memory map so frontends (RetroAchievements, cheat
+    * search, debuggers) can read the console's address space. Main RAM
+    * was always reachable via RETRO_MEMORY_SYSTEM_RAM, but the 1KB
+    * scratchpad at 0x1F800000 was not exposed anywhere; games such as
+    * the Rockman Complete Works ports keep lives/health/ammo there.
+    * RetroAchievements maps the scratchpad immediately after main RAM
+    * (so it appears at RA offset 0x200000), which falls out naturally
+    * from these two descriptors. */
+   if (MainRAM && ScratchRAM)
+   {
+      struct retro_memory_descriptor descs[2];
+      struct retro_memory_map mmap;
+
+      memset(descs, 0, sizeof(descs));
+
+      descs[0].flags  = RETRO_MEMDESC_SYSTEM_RAM;
+      descs[0].ptr    = MainRAM->data8;
+      descs[0].start  = 0x00000000;
+      descs[0].len    = 2048 * 1024;
+      descs[0].select = 0;
+
+      descs[1].flags  = RETRO_MEMDESC_SYSTEM_RAM;
+      descs[1].ptr    = ScratchRAM->data8;
+      descs[1].start  = 0x1F800000;
+      descs[1].len    = 1024;
+      descs[1].select = 0;
+
+      mmap.descriptors     = descs;
+      mmap.num_descriptors = 2;
+
+      environ_cb(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &mmap);
    }
 
    return ret;
