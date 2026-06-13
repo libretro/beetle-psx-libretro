@@ -29,6 +29,8 @@
 
 #include "../mednafen.h"
 
+#include <streams/file_stream.h>
+
 #include "CDAccess.h"
 #include "CDAccess_Image.h"
 #include "CDAccess_CCD.h"
@@ -38,6 +40,30 @@
 #ifdef HAVE_CHD
 #include "CDAccess_CHD.h"
 #endif
+
+/* Sniff the file's leading bytes for a CHD container. A CHD always
+ * begins with the 8-byte tag "MComprHD"; checking it lets multi-disc
+ * sets whose discs were renamed to nonstandard extensions (e.g. .CD1 /
+ * .CD2 to keep them out of a playlist scan) still be recognized,
+ * instead of being fed to the CUE parser - which used to choke on the
+ * binary header with an "Unknown CUE sheet directive" and could then
+ * carry on parsing garbage (issue #752). */
+static bool file_is_chd(const char *path)
+{
+   RFILE  *fp;
+   uint8_t tag[8];
+   int64_t got;
+
+   fp = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if (!fp)
+      return false;
+
+   got = filestream_read(fp, tag, sizeof(tag));
+   filestream_close(fp);
+
+   return (got == (int64_t)sizeof(tag) && !memcmp(tag, "MComprHD", 8));
+}
 
 CDAccess *cdaccess_open_image(bool *success, const char *path,
       bool image_memcache)
@@ -53,6 +79,8 @@ CDAccess *cdaccess_open_image(bool *success, const char *path,
 #endif
 #ifdef HAVE_CHD
    else if (path_len >= 3 && !strcasecmp(path + path_len - 3, "chd"))
+      cda = CDAccess_CHD_New(success, path, image_memcache);
+   else if (file_is_chd(path))
       cda = CDAccess_CHD_New(success, path, image_memcache);
 #endif
    else
