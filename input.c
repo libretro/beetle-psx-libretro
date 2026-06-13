@@ -1067,6 +1067,94 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
 /*  Libretro Interface */
 /* ------------------------------------------------------------------------------ */
 
+/* Build and publish per-port input descriptors reflecting each port's
+ * currently selected device. This is re-pushed whenever a device
+ * changes so the frontend's remap UI shows controls that match the
+ * physical pad. In particular the neGcon exposes its own controls -
+ * the analog I/II/A/B buttons, the left shoulder L, and the steering
+ * twist - rather than the DualShock face/shoulder labels, which was
+ * the long-standing complaint (issue #472). The labels here name the
+ * exact libretro inputs the neGcon read path in update_input()
+ * consumes, so the remap UI and the emulation agree. */
+static void update_input_descriptors(void)
+{
+   /* Worst case: every port emits the full standard block (20 entries)
+    * plus the terminator. The neGcon block is smaller, so this bound
+    * is safe for any mix of devices. */
+   struct retro_input_descriptor desc[MAX_CONTROLLERS * 20 + 1];
+   unsigned port;
+   unsigned n = 0;
+
+   if (!environ_cb)
+      return;
+
+   for (port = 0; port < MAX_CONTROLLERS; port++)
+   {
+      if (input_type[port] == RETRO_DEVICE_PS_NEGCON ||
+          input_type[port] == RETRO_DEVICE_PS_NEGCON_RUMBLE)
+      {
+         /* neGcon: D-pad + Start, the two digital face buttons A and
+          * B, the analog buttons I and II and the left shoulder L
+          * (read via get_analog_button), and the steering twist on the
+          * left-stick X axis. Mapping mirrors update_input():
+          *   I  <- R2 / B (analog)      II <- L2 / Y (analog)
+          *   L  <- L1 (analog)          twist <- left analog X */
+         struct retro_input_descriptor nd[] = {
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "D-Pad Left" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "A" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "B" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "I (analog)" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "II (analog)" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "L (analog)" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Start" },
+            { port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Twist" },
+         };
+         unsigned i;
+         for (i = 0; i < sizeof(nd) / sizeof(nd[0]); i++)
+            desc[n++] = nd[i];
+      }
+      else
+      {
+         /* Standard PlayStation pad / DualShock layout. */
+         struct retro_input_descriptor sd[] = {
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "D-Pad Left" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Cross" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Circle" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Triangle" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Square" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "L1" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "L2" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "L3" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "R1" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "R2" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "R3" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Select" },
+            { port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Start" },
+            { port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,  RETRO_DEVICE_ID_ANALOG_X, "Left Analog X" },
+            { port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,  RETRO_DEVICE_ID_ANALOG_Y, "Left Analog Y" },
+            { port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Right Analog X" },
+            { port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Right Analog Y" },
+         };
+         unsigned i;
+         for (i = 0; i < sizeof(sd) / sizeof(sd[0]); i++)
+            desc[n++] = sd[i];
+      }
+   }
+
+   {
+      struct retro_input_descriptor term = { 0 };
+      desc[n++] = term;
+   }
+
+   environ_cb( RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc );
+}
+
 void retro_set_controller_port_device( unsigned in_port, unsigned device )
 {
    /* valid port? */
@@ -1145,5 +1233,8 @@ void retro_set_controller_port_device( unsigned in_port, unsigned device )
          rumble.set_rumble_state(in_port, RETRO_RUMBLE_WEAK, 0);
       }
       input_data[ in_port ].u32[ 9 ] = 0;
+
+      /* Re-publish descriptors so the remap UI tracks the new device. */
+      update_input_descriptors();
    }
 }
