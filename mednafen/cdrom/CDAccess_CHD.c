@@ -75,12 +75,24 @@ struct CDAccess_CHD
 
    char         sbi_path[CHD_PATH_BUF];
 
+   /* Set when the CHD carries real subchannel data (RW / RW_RAW); when
+    * true the per-sector read uses the recorded subchannel instead of
+    * the synthesized one, which is what LibCrypt-protected discs need. */
+   bool         has_subchannel;
+
    CDRFILE_TRACK_INFO Tracks[100];   /* Tracks #0 (HMM?) through 99 */
 
    subq_map     SubQReplaceMap;
 };
 
 /* Disk-image (rip) track/sector formats - kept file-static. */
+enum
+{
+   CDRF_SUBM_NONE = 0,
+   CDRF_SUBM_RW,
+   CDRF_SUBM_RW_RAW
+};
+
 enum
 {
    DI_FORMAT_AUDIO       = 0x00,
@@ -391,7 +403,13 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
                type);
          return false;
       }
-      else if (strncmp(subtype, "NONE", 4) != 0)
+      /* "NONE" = no subchannel. "RW_RAW" = raw (interleaved) R-W
+       * subchannel recorded in the image, used by LibCrypt-protected
+       * discs; the data trails each 2352-byte sector in the hunk. "RW"
+       * (deinterleaved) is accepted as well. Anything else is unknown. */
+      else if (strncmp(subtype, "NONE", 4) != 0
+            && strncmp(subtype, "RW_RAW", 6) != 0
+            && strncmp(subtype, "RW", 2) != 0)
       {
          log_cb(RETRO_LOG_ERROR, "chd_parse track subtype %s unsupported\n",
                subtype);
@@ -423,7 +441,14 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
       self->Tracks[tkid].LBA       = plba;
       self->Tracks[tkid].postgap   = postgap;
       self->Tracks[tkid].sectors   = frames - self->Tracks[tkid].pregap_dv;
-      self->Tracks[tkid].SubchannelMode = 0;
+      if (strncmp(subtype, "RW_RAW", 6) == 0)
+         self->Tracks[tkid].SubchannelMode = CDRF_SUBM_RW_RAW;
+      else if (strncmp(subtype, "RW", 2) == 0)
+         self->Tracks[tkid].SubchannelMode = CDRF_SUBM_RW;
+      else
+         self->Tracks[tkid].SubchannelMode = CDRF_SUBM_NONE;
+      if (self->Tracks[tkid].SubchannelMode != CDRF_SUBM_NONE)
+         self->has_subchannel = true;
       self->Tracks[tkid].index[0]  = -1;
       self->Tracks[tkid].index[1]  = 0;
 
@@ -703,6 +728,26 @@ static bool CDAccess_CHD_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf,
       }
 
       memcpy(buf, self->hunkmem + hunkofs * (2352 + 96), 2352);
+
+      /* If the disc carries real subchannel data (LibCrypt), use the
+       * recorded 96 bytes that trail the sector in the hunk instead of
+       * the synthesized subchannel placed in buf+2352 above. RW_RAW is
+       * interleaved P-W exactly as the rest of the pipeline expects, so
+       * it is copied verbatim; a deinterleaved "RW" image is rare and
+       * is interleaved into the same layout. The SBI replacement map,
+       * applied during synthesis, is intentionally not re-applied here
+       * because the recorded subchannel already contains the protection
+       * data SBI would otherwise patch in. */
+      if (self->has_subchannel
+            && ct->SubchannelMode != CDRF_SUBM_NONE)
+      {
+         const uint8_t *sub = self->hunkmem + hunkofs * (2352 + 96) + 2352;
+
+         if (ct->SubchannelMode == CDRF_SUBM_RW_RAW)
+            memcpy(buf + 2352, sub, 96);
+         else /* CDRF_SUBM_RW: deinterleaved on disc, re-interleave it. */
+            subpw_interleave(sub, buf + 2352);
+      }
 
       /* Path 2 contract: buf holds host-endian int16 stereo
        * samples. Swap iff source byte order differs from host
