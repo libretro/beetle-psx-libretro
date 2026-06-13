@@ -414,6 +414,45 @@ static void Command_IRQ(PS_GPU* g, const uint32_t *cb)
 
 /* Special RAM write mode(16 pixels at a time), */
 /* does *not* appear to use mask drawing environment settings. */
+/* True if a VRAM rectangle (in 16-bit cells) overlaps the region the GPU
+ * is currently scanning out for display. A direct VRAM write into the
+ * displayed area (FBFill / FBCopy / FBWrite - used for FMVs, loading
+ * screens, effects like FF7's battle swirl) changes what's on screen
+ * without the game re-issuing GP1(05h), so the internal-FPS / frame-dupe
+ * machinery must treat it as a display update or it will wrongly dupe
+ * the previous frame (e.g. the Twisted Metal 4 loading bar). The test is
+ * deliberately conservative: a generous display height is used so the
+ * answer never misses a real on-screen change (a false positive only
+ * costs a dupe we skip; a false negative drops a real frame). Renderer-
+ * agnostic - it reads only GPU display state, so SW, GL and Vulkan all
+ * go through the same flag. */
+static bool RectOverlapsDisplay(int32_t x, int32_t y, int32_t w, int32_t h)
+{
+   static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
+   const uint32_t dmc = (GPU.DisplayMode & 0x40) ? 4 : (GPU.DisplayMode & 0x3);
+   /* Display width in VRAM cells (matches the scanout dmw; <= 768). */
+   const int32_t  disp_w = (int32_t)(2800 / DotClockRatios[dmc]);
+   /* Generous height bound: a 480i field reads up to 512 lines. Using
+    * the maximum keeps the test from ever under-covering the visible
+    * region regardless of the current vertical timing. */
+   const int32_t  disp_h = 512;
+   const int32_t  dx = (int32_t)GPU.DisplayFB_XStart;
+   const int32_t  dy = (int32_t)GPU.DisplayFB_YStart;
+
+   if (w <= 0 || h <= 0)
+      return false;
+
+   /* Axis-aligned bounding-box overlap, no VRAM wrap handling (a
+    * transfer that wraps the 1024x512 VRAM edge is rare and would only
+    * ever make this return true more often). */
+   if (x >= dx + disp_w || dx >= x + w)
+      return false;
+   if (y >= dy + disp_h || dy >= y + h)
+      return false;
+
+   return true;
+}
+
 static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
 {
    unsigned y;
@@ -490,6 +529,9 @@ static void Command_FBFill(PS_GPU* gpu, const uint32_t *cb)
    }
 
    rhi_intf_fill_rect(cb[0], destX, destY, width, height);
+
+   if (RectOverlapsDisplay(destX, destY, width, height))
+      GPU.display_possibly_dirty = true;
 }
 
 static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
@@ -557,6 +599,9 @@ static void Command_FBCopy(PS_GPU* g, const uint32_t *cb)
    }
 
    rhi_intf_copy_rect(sourceX, sourceY, destX, destY, width, height, g->MaskEvalAND != 0, g->MaskSetOR != 0);
+
+   if (RectOverlapsDisplay(destX, destY, width, height))
+      GPU.display_possibly_dirty = true;
 }
 
 static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
@@ -589,6 +634,10 @@ static void Command_FBWrite(PS_GPU* g, const uint32_t *cb)
 
    if(g->FBRW_W != 0 && g->FBRW_H != 0)
       g->InCmd = INCMD_FBWRITE;
+
+   if (RectOverlapsDisplay((int32_t)g->FBRW_X, (int32_t)g->FBRW_Y,
+            (int32_t)g->FBRW_W, (int32_t)g->FBRW_H))
+      GPU.display_possibly_dirty = true;
 }
 
 /* FBRead: PS1 GPU in SCPH-5501 gives odd, inconsistent results when
