@@ -2028,6 +2028,20 @@ static void InputDevice_DualShock_Power(InputDevice *self_)
    self->transmit_pos = 0;
    self->transmit_count = 0;
 
+   /* Restore the startup analog mode on power/reset, mirroring the
+    * SetAMCT logic. Real hardware (and upstream Mednafen) powers up in
+    * digital mode; here we additionally honour the analog-toggle /
+    * forced-analog settings so a Reset returns the pad to the user's
+    * configured startup state instead of leaving it in whatever mode
+    * the game had switched to. Without this, a pad set to digital
+    * startup comes back in analog mode after a Reset (issue #889).
+    * amct_enabled is false during the Ctor's first call, yielding the
+    * digital default; SetInput re-applies the real setting right
+    * afterward. */
+   if(self->amct_enabled)
+      self->analog_mode = setting_apply_analog_default;
+   else
+      self->analog_mode = true;
    self->analog_mode_locked = false;
 
    self->mad_munchkins = false;
