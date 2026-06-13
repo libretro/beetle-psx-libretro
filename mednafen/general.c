@@ -98,6 +98,24 @@ void MDFN_EvalFIP_c(const char *dir_path, const char *rel_path,
    if (!out || outlen == 0)
       return;
 
+#ifdef _WIN32
+   /* On Windows a path that merely begins with a slash (e.g. an .m3u
+    * entry like "/Test/Disc 1.chd") is not actually absolute: it has no
+    * drive letter and is not a UNC path, so opening it verbatim resolves
+    * against the current drive's root rather than the file's location
+    * and fails. Portable multi-disc packs (and other emulators) treat
+    * such an entry as relative to the referring file's directory, so
+    * strip the leading slash(es) and fall through to the join below.
+    * Genuine absolute paths - drive-lettered (X:\...) and UNC (\\host) -
+    * still satisfy path_is_absolute() and are used verbatim. */
+   if ((rel_path[0] == '/' || rel_path[0] == '\\')
+         && rel_path[1] != '/' && rel_path[1] != '\\')
+   {
+      while (rel_path[0] == '/' || rel_path[0] == '\\')
+         rel_path++;
+   }
+   else
+#endif
    if (path_is_absolute(rel_path))
    {
       copy_truncate(out, outlen, rel_path, strlen(rel_path));
