@@ -404,7 +404,17 @@ bool CDIF_ReadRawSector(CDIF *cdif, uint8_t *buf, uint32_t lba,
    }
 
    if (lba >= cdif->disc_toc.tracks[100].lba)
+   {
+      /* Read past the lead-out (e.g. CD-DA playback running off the end
+       * of the last track as it loops). Zero the buffer before
+       * returning failure: callers - notably the CDC's CD-DA play path -
+       * decode buf regardless of the return value, so leaving the
+       * previous sector's contents here plays back as corrupted audio
+       * when the final audio track loops (issue #924). Matches upstream
+       * and the PW-only reader below. */
+      memset(buf, 0, SECTOR_RAW_BYTES);
       return false;
+   }
 
    if (!cdif->is_mt)
    {
