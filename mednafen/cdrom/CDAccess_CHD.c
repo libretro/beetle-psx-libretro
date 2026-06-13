@@ -93,6 +93,17 @@ enum
    CDRF_SUBM_RW_RAW
 };
 
+/* Field-width-limited copies of libchdr's CDROM_TRACK_METADATA*_FORMAT.
+ * The upstream macros use bare %s with no width, so a crafted CHD whose
+ * TYPE/SUBTYPE/PGTYPE/PGSUB metadata strings exceed the destination
+ * buffers (type[64], subtype/pgtype/pgsub[32]) overflows them. The
+ * widths below are sizeof(dest)-1 and keep sscanf from writing past the
+ * buffers regardless of the metadata contents. */
+#define CHD_TRACK_METADATA_FMT_SAFE \
+   "TRACK:%d TYPE:%63s SUBTYPE:%31s FRAMES:%d"
+#define CHD_TRACK_METADATA2_FMT_SAFE \
+   "TRACK:%d TYPE:%63s SUBTYPE:%31s FRAMES:%d PREGAP:%d PGTYPE:%31s PGSUB:%31s POSTGAP:%d"
+
 enum
 {
    DI_FORMAT_AUDIO       = 0x00,
@@ -378,7 +389,7 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
             &meta_entry_size, NULL, NULL);
       if (err == CHDERR_NONE)
       {
-         sscanf(meta_entry, CDROM_TRACK_METADATA2_FORMAT,
+         sscanf(meta_entry, CHD_TRACK_METADATA2_FMT_SAFE,
                &tkid, type, subtype, &frames, &pregap, pgtype, pgsub,
                &postgap);
       }
@@ -389,7 +400,7 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
                &meta_entry_size, NULL, NULL);
          if (err == CHDERR_NONE)
          {
-            sscanf(meta_entry, CDROM_TRACK_METADATA_FORMAT,
+            sscanf(meta_entry, CHD_TRACK_METADATA_FMT_SAFE,
                   &tkid, type, subtype, &frames);
          }
          else
@@ -413,6 +424,17 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
       {
          log_cb(RETRO_LOG_ERROR, "chd_parse track subtype %s unsupported\n",
                subtype);
+         return false;
+      }
+
+      /* tkid is parsed straight from attacker-controlled CHD metadata
+       * and is used unchecked as Tracks[tkid]. Valid CD track numbers
+       * are 1..99 (Tracks[] has 100 slots, index 0 is reserved); reject
+       * anything outside that range instead of writing out of bounds. */
+      if (tkid < 1 || tkid >= 100)
+      {
+         log_cb(RETRO_LOG_ERROR,
+               "chd_parse track number %d out of range (1-99)\n", tkid);
          return false;
       }
 

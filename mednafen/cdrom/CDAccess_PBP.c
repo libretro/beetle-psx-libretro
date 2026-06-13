@@ -3353,6 +3353,19 @@ static bool CDAccess_PBP_Read_TOC(CDAccess *base_self, TOC *toc){
    read_offset += sizeof(toc_entry);
    self->NumTracks = BCD_to_U8(toc_entry.index1[0]);
 
+   /* NumTracks is decoded from attacker-controlled PBP TOC data (a
+    * non-BCD byte such as 0xFF decodes to 165) and then drives the
+    * loop below that writes Tracks[i]. Tracks[] holds 100 entries and
+    * the loop runs i = 1..NumTracks, so anything above 99 writes past
+    * the array. Reject an out-of-range count rather than overflowing. */
+   if (self->NumTracks < 0 || self->NumTracks >= 100)
+   {
+      log_cb(RETRO_LOG_ERROR,
+            "[PBP] invalid track count %d (must be 0-99)\n",
+            self->NumTracks);
+      return false;
+   }
+
    /* total length */
    memcpy(&toc_entry, iso_header+read_offset, sizeof(toc_entry));
    read_offset += sizeof(toc_entry);
