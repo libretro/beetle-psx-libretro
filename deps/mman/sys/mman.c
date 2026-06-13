@@ -7,7 +7,7 @@
 
 #ifndef FILE_MAP_EXECUTE
 #define FILE_MAP_EXECUTE    0x0020
-#endif /* FILE_MAP_EXECUTE */
+#endif
 
 static int __map_mman_error(const DWORD err, const int deferr)
 {
@@ -112,13 +112,9 @@ void* mmap(void *addr, size_t len, int prot, int flags, int fildes, OffsetType o
     }
   
     if ((flags & MAP_FIXED) == 0)
-    {
         map = MapViewOfFile(fm, desiredAccess, dwFileOffsetHigh, dwFileOffsetLow, len);
-    }
     else
-    {
         map = MapViewOfFileEx(fm, desiredAccess, dwFileOffsetHigh, dwFileOffsetLow, len, addr);
-    }
 
     CloseHandle(fm);
   
