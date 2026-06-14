@@ -567,6 +567,15 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
 }
 #endif /* SSE2 || NEON */
 
+/* The vectorised UV recovery needs a true IEEE single-precision divide so the
+ * recovered coordinates are bit-identical to the scalar 1.0f / inv_w.  SSE2 has
+ * _mm_div_ps and AArch64 NEON has vdivq_f32; 32-bit ARMv7 NEON has no vector
+ * float divide (only the vrecpe_f32 estimate + Newton-Raphson, which is not
+ * bit-exact), so ARMv7 falls through to the bit-exact scalar tail below. */
+#if defined(__SSE2__) || ((defined(GPU_HAVE_NEON)) && (defined(__aarch64__) || defined(_M_ARM64)))
+#define PCT_UV_SIMD 1
+#endif
+
 /*
  * Perspective-correct (PGXP texture-correction) UV batch.
  *
@@ -603,7 +612,7 @@ static INLINE void PCT_UVBatch(int n, float bias,
    float u_over_w  = *p_u_over_w;
    float v_over_w  = *p_v_over_w;
    int   i         = 0;
-#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
+#if defined(PCT_UV_SIMD)
    int   batch     = n & ~3;
 #if defined(__SSE2__)
    const __m128  vbias = _mm_set1_ps(bias);
@@ -638,7 +647,7 @@ static INLINE void PCT_UVBatch(int n, float bias,
       _mm_storeu_si128((__m128i *)&out_v[i], iv);
       inv_w = iw3 + d_inv_w; u_over_w = uo3 + d_u_over_w; v_over_w = vo3 + d_v_over_w;
    }
-#else /* GPU_HAVE_NEON */
+#else /* AArch64 NEON (PCT_UV_SIMD set, not SSE2) */
    const float32x4_t vbias = vdupq_n_f32(bias);
    const float32x4_t veps  = vdupq_n_f32(1e-6f);
    const float32x4_t vmnu  = vdupq_n_f32(min_u);
@@ -675,8 +684,8 @@ static INLINE void PCT_UVBatch(int n, float bias,
       vst1q_s32(&out_v[i], iv);
       inv_w = iw3 + d_inv_w; u_over_w = uo3 + d_u_over_w; v_over_w = vo3 + d_v_over_w;
    }
-#endif /* SSE2 / NEON loop bodies */
-#endif /* SSE2 || NEON (batch decl + loops) */
+#endif /* SSE2 vs AArch64-NEON loop body */
+#endif /* PCT_UV_SIMD (batch decl + loops) */
    /* Scalar tail (and the whole batch on a non-SIMD build). */
    for (; i < n; i++)
    {
@@ -699,6 +708,10 @@ static INLINE void PCT_UVBatch(int n, float bias,
    }
    *p_inv_w = inv_w; *p_u_over_w = u_over_w; *p_v_over_w = v_over_w;
 }
+
+#ifdef PCT_UV_SIMD
+#undef PCT_UV_SIMD
+#endif
 
 #define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
 static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas *idl, const bool pct) \
