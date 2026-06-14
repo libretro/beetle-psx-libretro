@@ -8,6 +8,7 @@
 static const int8_t dither_table[4][4];
 
 #define COORD_FBS 12
+#define PCT_UV_BLOCK 64
 #define COORD_MF_INT(n) ((n) << COORD_FBS)
 #define COORD_POST_PADDING 12
 
@@ -566,6 +567,139 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
 }
 #endif /* SSE2 || NEON */
 
+/*
+ * Perspective-correct (PGXP texture-correction) UV batch.
+ *
+ * The textured span's pct path computes, per pixel, the float work
+ * 1/inv_w, two multiply-adds, four clamps and two truncations to recover
+ * (tex_u, tex_v) before the (scalar, gather-bound) texel fetch.  gcc does
+ * not autovectorise that loop at either -O2 or -O3 (the inv_w > eps branch
+ * and the clamps defeat it), so it stays scalar even in -O3 builds.  This
+ * helper does the same arithmetic four pixels at a time, filling caller
+ * scratch arrays that the plot loop then indexes.  The texel fetch / blend
+ * / plot stay scalar - only the float coordinate recovery is vectorised.
+ *
+ * Bit-exactness: the lanes are seeded by the *same* sequential float add
+ * chain the scalar path walks (lane k = base stepped k times, not
+ * base + k*delta computed by multiply), because float addition is not
+ * associative and a multiply-seeded lane can differ in the last bit and
+ * flip an integer-truncation boundary.  The per-batch base is likewise
+ * advanced by four sequential adds.  Lanes with inv_w <= 1e-6 are written
+ * as -1 so the caller takes the affine fallback for them, exactly as the
+ * scalar `if (pct && ig.pct_inv_w > 1e-6f)` guard does.
+ *
+ * Output matches, pixel for pixel, the scalar expression
+ *   fu = clamp(u_over_w / inv_w + bias, min_u, max_u); ((int)fu) & 0xFF
+ * (and likewise for v), advancing inv_w / u_over_w / v_over_w by their dx
+ * deltas each pixel.
+ */
+static INLINE void PCT_UVBatch(int n, float bias,
+      float *p_inv_w, float *p_u_over_w, float *p_v_over_w,
+      float d_inv_w, float d_u_over_w, float d_v_over_w,
+      float min_u, float max_u, float min_v, float max_v,
+      int32_t *out_u, int32_t *out_v)
+{
+   float inv_w     = *p_inv_w;
+   float u_over_w  = *p_u_over_w;
+   float v_over_w  = *p_v_over_w;
+   int   i         = 0;
+#if defined(__SSE2__) || defined(GPU_HAVE_NEON)
+   int   batch     = n & ~3;
+#if defined(__SSE2__)
+   const __m128  vbias = _mm_set1_ps(bias);
+   const __m128  veps  = _mm_set1_ps(1e-6f);
+   const __m128  vmnu  = _mm_set1_ps(min_u);
+   const __m128  vmxu  = _mm_set1_ps(max_u);
+   const __m128  vmnv  = _mm_set1_ps(min_v);
+   const __m128  vmxv  = _mm_set1_ps(max_v);
+   const __m128i vmask = _mm_set1_epi32(0xFF);
+   const __m128i vsent = _mm_set1_epi32(-1);
+   for (; i < batch; i += 4)
+   {
+      /* Seed four lanes by sequential adds (bit-identical to scalar). */
+      float iw0 = inv_w,    iw1 = iw0 + d_inv_w,    iw2 = iw1 + d_inv_w,    iw3 = iw2 + d_inv_w;
+      float uo0 = u_over_w, uo1 = uo0 + d_u_over_w, uo2 = uo1 + d_u_over_w, uo3 = uo2 + d_u_over_w;
+      float vo0 = v_over_w, vo1 = vo0 + d_v_over_w, vo2 = vo1 + d_v_over_w, vo3 = vo2 + d_v_over_w;
+      __m128 iw = _mm_setr_ps(iw0, iw1, iw2, iw3);
+      __m128 uo = _mm_setr_ps(uo0, uo1, uo2, uo3);
+      __m128 vo = _mm_setr_ps(vo0, vo1, vo2, vo3);
+      __m128 inv = _mm_div_ps(_mm_set1_ps(1.0f), iw);
+      __m128 fu  = _mm_add_ps(_mm_mul_ps(uo, inv), vbias);
+      __m128 fv  = _mm_add_ps(_mm_mul_ps(vo, inv), vbias);
+      __m128i iu, iv, ok;
+      fu = _mm_min_ps(_mm_max_ps(fu, vmnu), vmxu);
+      fv = _mm_min_ps(_mm_max_ps(fv, vmnv), vmxv);
+      iu = _mm_and_si128(_mm_cvttps_epi32(fu), vmask);
+      iv = _mm_and_si128(_mm_cvttps_epi32(fv), vmask);
+      ok = _mm_castps_si128(_mm_cmpgt_ps(iw, veps));
+      iu = _mm_or_si128(_mm_and_si128(ok, iu), _mm_andnot_si128(ok, vsent));
+      iv = _mm_or_si128(_mm_and_si128(ok, iv), _mm_andnot_si128(ok, vsent));
+      _mm_storeu_si128((__m128i *)&out_u[i], iu);
+      _mm_storeu_si128((__m128i *)&out_v[i], iv);
+      inv_w = iw3 + d_inv_w; u_over_w = uo3 + d_u_over_w; v_over_w = vo3 + d_v_over_w;
+   }
+#else /* GPU_HAVE_NEON */
+   const float32x4_t vbias = vdupq_n_f32(bias);
+   const float32x4_t veps  = vdupq_n_f32(1e-6f);
+   const float32x4_t vmnu  = vdupq_n_f32(min_u);
+   const float32x4_t vmxu  = vdupq_n_f32(max_u);
+   const float32x4_t vmnv  = vdupq_n_f32(min_v);
+   const float32x4_t vmxv  = vdupq_n_f32(max_v);
+   const int32x4_t   vmask = vdupq_n_s32(0xFF);
+   const int32x4_t   vsent = vdupq_n_s32(-1);
+   for (; i < batch; i += 4)
+   {
+      float iw0 = inv_w,    iw1 = iw0 + d_inv_w,    iw2 = iw1 + d_inv_w,    iw3 = iw2 + d_inv_w;
+      float uo0 = u_over_w, uo1 = uo0 + d_u_over_w, uo2 = uo1 + d_u_over_w, uo3 = uo2 + d_u_over_w;
+      float vo0 = v_over_w, vo1 = vo0 + d_v_over_w, vo2 = vo1 + d_v_over_w, vo3 = vo2 + d_v_over_w;
+      float32x4_t iw, uo, vo, inv, fu, fv;
+      int32x4_t   iu, iv;
+      uint32x4_t  ok;
+      float       iwa[4] = { iw0, iw1, iw2, iw3 };
+      float       uoa[4] = { uo0, uo1, uo2, uo3 };
+      float       voa[4] = { vo0, vo1, vo2, vo3 };
+      iw = vld1q_f32(iwa); uo = vld1q_f32(uoa); vo = vld1q_f32(voa);
+      /* 1/iw: one Newton-Raphson step after the estimate is not bit-exact
+       * with the scalar 1.0f/iw, so use a true divide. */
+      inv = vdivq_f32(vdupq_n_f32(1.0f), iw);
+      fu  = vaddq_f32(vmulq_f32(uo, inv), vbias);
+      fv  = vaddq_f32(vmulq_f32(vo, inv), vbias);
+      fu  = vminq_f32(vmaxq_f32(fu, vmnu), vmxu);
+      fv  = vminq_f32(vmaxq_f32(fv, vmnv), vmxv);
+      iu  = vandq_s32(vcvtq_s32_f32(fu), vmask);
+      iv  = vandq_s32(vcvtq_s32_f32(fv), vmask);
+      ok  = vcgtq_f32(iw, veps);
+      iu  = vbslq_s32(ok, iu, vsent);
+      iv  = vbslq_s32(ok, iv, vsent);
+      vst1q_s32(&out_u[i], iu);
+      vst1q_s32(&out_v[i], iv);
+      inv_w = iw3 + d_inv_w; u_over_w = uo3 + d_u_over_w; v_over_w = vo3 + d_v_over_w;
+   }
+#endif /* SSE2 / NEON loop bodies */
+#endif /* SSE2 || NEON (batch decl + loops) */
+   /* Scalar tail (and the whole batch on a non-SIMD build). */
+   for (; i < n; i++)
+   {
+      if (inv_w > 1e-6f)
+      {
+         float inv = 1.0f / inv_w;
+         float fu  = u_over_w * inv + bias;
+         float fv  = v_over_w * inv + bias;
+         if (fu < min_u) fu = min_u; else if (fu > max_u) fu = max_u;
+         if (fv < min_v) fv = min_v; else if (fv > max_v) fv = max_v;
+         out_u[i] = ((int32_t)fu) & 0xFF;
+         out_v[i] = ((int32_t)fv) & 0xFF;
+      }
+      else
+      {
+         out_u[i] = -1;
+         out_v[i] = -1;
+      }
+      inv_w += d_inv_w; u_over_w += d_u_over_w; v_over_w += d_v_over_w;
+   }
+   *p_inv_w = inv_w; *p_u_over_w = u_over_w; *p_v_over_w = v_over_w;
+}
+
 #define DEFINE_DrawSpan(SUFFIX, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT) \
 static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, const int32_t x_bound, i_group ig, const i_deltas *idl, const bool pct) \
 { \
@@ -574,6 +708,15 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
    int32_t x_ig_adjust; \
    int32_t w; \
    int32_t x; \
+   /* pct UV precompute scratch.  Only used on the textured perspective- \
+    * correct path; PCT_UV_BLOCK pixels are SIMD-computed at a time and the \
+    * plot loop reads them back.  pct_idx counts down the pixels remaining \
+    * in the current block (0 forces a refill).  Kept on stack, fixed size \
+    * regardless of span width / upscale. */ \
+   int32_t pct_u_buf[PCT_UV_BLOCK]; \
+   int32_t pct_v_buf[PCT_UV_BLOCK]; \
+   int     pct_idx = 0; \
+   int     pct_pos = 0; \
    if (LineSkipTest(gpu, y >> gpu->upscale_shift)) \
       return; \
    clipx0 = gpu->ClipX0 << gpu->upscale_shift; \
@@ -691,18 +834,44 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
           * sampling.  The HW backends get this implicitly via \
           * primitive.frag's `int(vUV)` after the GPU's pixel- \
           * center interpolation. */ \
-         if (pct && ig.pct_inv_w > 1e-6f) \
+         if (pct) \
          { \
-            float inv  = 1.0f / ig.pct_inv_w; \
-            float bias = 0.5f / (float)(1 << gpu->upscale_shift); \
-            float fu   = ig.pct_u_over_w * inv + bias; \
-            float fv   = ig.pct_v_over_w * inv + bias; \
-            if (fu < idl->min_u) fu = idl->min_u; \
-            else if (fu > idl->max_u) fu = idl->max_u; \
-            if (fv < idl->min_v) fv = idl->min_v; \
-            else if (fv > idl->max_v) fv = idl->max_v; \
-            tex_u = ((int32_t)fu) & 0xFF; \
-            tex_v = ((int32_t)fv) & 0xFF; \
+            /* Pull the perspective-correct UV from the SIMD-precomputed \
+             * block, refilling it when exhausted.  PCT_UVBatch advances \
+             * ig.pct_* by exactly the per-pixel scalar chain and encodes \
+             * the per-pixel inv_w > eps decision in its output: a -1 \
+             * entry means that pixel's inv_w was <= eps, so fall through \
+             * to the affine path for it (matching the old scalar guard \
+             * `pct && ig.pct_inv_w > 1e-6f`).  Because the batch consumes \
+             * ig.pct_*, the per-pixel advance at the loop bottom is \
+             * skipped for the pct path. */ \
+            int32_t pu, pv; \
+            if (pct_idx == 0) \
+            { \
+               int remain = (int)w; \
+               int blk    = (remain < PCT_UV_BLOCK) ? remain : PCT_UV_BLOCK; \
+               float bias = 0.5f / (float)(1 << gpu->upscale_shift); \
+               PCT_UVBatch(blk, bias, &ig.pct_inv_w, &ig.pct_u_over_w, \
+                     &ig.pct_v_over_w, idl->d_inv_w_dx, idl->d_u_over_w_dx, \
+                     idl->d_v_over_w_dx, idl->min_u, idl->max_u, \
+                     idl->min_v, idl->max_v, pct_u_buf, pct_v_buf); \
+               pct_idx = blk; \
+               pct_pos = 0; \
+            } \
+            pu = pct_u_buf[pct_pos]; \
+            pv = pct_v_buf[pct_pos]; \
+            pct_pos++; \
+            pct_idx--; \
+            if (pu >= 0) \
+            { \
+               tex_u = pu; \
+               tex_v = pv; \
+            } \
+            else \
+            { \
+               tex_u = ig.u >> (COORD_FBS + COORD_POST_PADDING); \
+               tex_v = ig.v >> (COORD_FBS + COORD_POST_PADDING); \
+            } \
          } \
          else \
          { \
@@ -745,12 +914,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
       } \
       x++; \
       AddIDeltas_DX_g##GOURAUD_LIT##_t##TEXTURED_LIT(&ig, idl, 1); \
-      if (TEXTURED_LIT && pct) \
-      { \
-         ig.pct_inv_w    += idl->d_inv_w_dx; \
-         ig.pct_u_over_w += idl->d_u_over_w_dx; \
-         ig.pct_v_over_w += idl->d_v_over_w_dx; \
-      } \
+      /* ig.pct_* are advanced by PCT_UVBatch, not here. */ \
    } while (MDFN_LIKELY(--w > 0)); \
 }
 
