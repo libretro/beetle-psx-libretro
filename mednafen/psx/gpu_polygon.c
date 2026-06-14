@@ -377,20 +377,78 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
       uint16_t      R8[8], G8[8], B8[8];
       int           l;
 
+#if !defined(__SSE2__)
+      /* NEON / scalar path keeps the scalar lane fill -- vld1q + vget_lane
+       * extracts to GPR without a stack roundtrip, so the spill multiplier
+       * the SSE2 path saw doesn't apply. */
       for (l = 0; l < step; l++)
       {
          R8[l] = (uint16_t)CHAN(cr, dr, l);
          G8[l] = (uint16_t)CHAN(cg, dg, l);
          B8[l] = (uint16_t)CHAN(cb, db, l);
       }
+#endif
 
 #if defined(__SSE2__)
       {
          __m128i R, G, B, pr, pg, pb, pix, bg, out;
-         if (step == 4) { R8[4]=R8[5]=R8[6]=R8[7]=0; G8[4]=G8[5]=G8[6]=G8[7]=0; B8[4]=B8[5]=B8[6]=B8[7]=0; }
-         R = _mm_loadu_si128((const __m128i*)R8);
-         G = _mm_loadu_si128((const __m128i*)G8);
-         B = _mm_loadu_si128((const __m128i*)B8);
+         /* Direct SSE2 Gouraud lane build: lane l holds (base + d*l) >> 24.
+          * The natural form -- a scalar `for (l = 0; l < step; l++) R8[l]
+          * = CHAN(cr, dr, l);` loop feeding _mm_loadu_si128 -- lowers
+          * under gcc 13 -O3 to per-lane leal (cr + dr*l) into GPRs, store
+          * to stack at R8[l], movd back to xmm, punpck-chains.  That
+          * scalar-then-pack contributes the dominant spill pressure in
+          * the GOURAUD-on hot loops (.L31928 family in the generated
+          * gpu.s shows ~39 stack writes against ~100 xmm ops), because
+          * the GPR live range straddles the dense SIMD blend body that
+          * follows.  Building [R, G, B] directly in xmm keeps the
+          * intermediates xmm-resident through the blend body and removes
+          * the spill multiplier.
+          *
+          * Maximum cr/dr is bounded by Gouraud delta range; lane sum
+          * (cr + dr*7) cannot overflow u32 (dr is ~22 bits worst-case so
+          * dr*7 fits in ~25, and cr + dr*7 fits in u32 with the same
+          * margin the scalar version has).  After >> 24 each lane is
+          * <= 255, well within int16 positive range, so packs_epi32 is
+          * non-saturating.
+          *
+          * d2..d7 derived by paired adds (cheaper than the imuls gcc would
+          * pick for `dr * l`); rodata-folded when dr is constant. */
+         {
+            const uint32_t r2 = dr + dr, r3 = r2 + dr, r4 = r2 + r2;
+            const uint32_t r5 = r4 + dr, r6 = r4 + r2, r7 = r6 + dr;
+            const uint32_t g2 = dg + dg, g3 = g2 + dg, g4 = g2 + g2;
+            const uint32_t g5 = g4 + dg, g6 = g4 + g2, g7 = g6 + dg;
+            const uint32_t b2 = db + db, b3 = b2 + db, b4 = b2 + b2;
+            const uint32_t b5 = b4 + db, b6 = b4 + b2, b7 = b6 + db;
+            __m128i brv = _mm_set1_epi32((int)cr);
+            __m128i bgv = _mm_set1_epi32((int)cg);
+            __m128i bbv = _mm_set1_epi32((int)cb);
+            __m128i sR_lo = _mm_setr_epi32(0,       (int)dr, (int)r2, (int)r3);
+            __m128i sR_hi = _mm_setr_epi32((int)r4, (int)r5, (int)r6, (int)r7);
+            __m128i sG_lo = _mm_setr_epi32(0,       (int)dg, (int)g2, (int)g3);
+            __m128i sG_hi = _mm_setr_epi32((int)g4, (int)g5, (int)g6, (int)g7);
+            __m128i sB_lo = _mm_setr_epi32(0,       (int)db, (int)b2, (int)b3);
+            __m128i sB_hi = _mm_setr_epi32((int)b4, (int)b5, (int)b6, (int)b7);
+            __m128i Rlo = _mm_srli_epi32(_mm_add_epi32(brv, sR_lo), 24);
+            __m128i Rhi = _mm_srli_epi32(_mm_add_epi32(brv, sR_hi), 24);
+            __m128i Glo = _mm_srli_epi32(_mm_add_epi32(bgv, sG_lo), 24);
+            __m128i Ghi = _mm_srli_epi32(_mm_add_epi32(bgv, sG_hi), 24);
+            __m128i Blo = _mm_srli_epi32(_mm_add_epi32(bbv, sB_lo), 24);
+            __m128i Bhi = _mm_srli_epi32(_mm_add_epi32(bbv, sB_hi), 24);
+            R = _mm_packs_epi32(Rlo, Rhi);
+            G = _mm_packs_epi32(Glo, Ghi);
+            B = _mm_packs_epi32(Blo, Bhi);
+            if (step == 4) {
+               /* Match the original `R8[4..7]=0` zeroing for the SUBTRACT
+                * 4-pixel chunk so downstream lane reads stay quiet. */
+               const __m128i lo4 = _mm_setr_epi16(-1, -1, -1, -1, 0, 0, 0, 0);
+               R = _mm_and_si128(R, lo4);
+               G = _mm_and_si128(G, lo4);
+               B = _mm_and_si128(B, lo4);
+            }
+         }
+         (void)R8; (void)G8; (void)B8; (void)l;
          if (use_dither)
          {
             int16_t doff[8];
