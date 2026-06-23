@@ -6162,11 +6162,107 @@ struct TextureUpload {
 	//  upload being recreated as the sprite animation churns VRAM.)
 };
 
+// Decoded RGBA image level (one mip). C-style ownership: a plain malloc'd
+// byte buffer plus its size, rather than std::vector<uint8_t>. This is a POD
+// (trivially copyable) struct - copying it copies the pointer, NOT the bytes,
+// so ownership is by convention: exactly one LoadedLevels owns each buffer and
+// frees it. Ownership transfers are explicit pointer-steals (push_move /
+// move-assign helpers below); there is no implicit deep copy and no
+// destructor. This keeps it storable in plain arrays and realloc-movable.
 struct LoadedImage {
-    std::vector<uint8_t> owned_data; // RGBA format
+    uint8_t *owned_data; // RGBA, owned_size bytes (NULL if empty)
+    size_t   owned_size;
     int width;
     int height;
 };
+
+// Allocate the RGBA buffer for a level (width*height*4). Frees any prior
+// buffer. Returns 0 on success, -1 on allocation failure (buffer left NULL).
+static inline int loaded_image_alloc(LoadedImage *img, int width, int height)
+{
+    size_t bytes = (size_t)width * (size_t)height * 4u;
+    free(img->owned_data);
+    img->owned_data = (uint8_t *)malloc(bytes ? bytes : 1);
+    img->owned_size = img->owned_data ? bytes : 0;
+    img->width  = width;
+    img->height = height;
+    return img->owned_data ? 0 : -1;
+}
+
+// Zero-initialise a level (no buffer). Use before loaded_image_alloc.
+static inline void loaded_image_init(LoadedImage *img)
+{
+    img->owned_data = NULL;
+    img->owned_size = 0;
+    img->width      = 0;
+    img->height     = 0;
+}
+
+// A decoded texture as a set of mip levels. C-style dynamic array: `levels`
+// is a malloc'd array of `count` LoadedImage, owning all buffers. Replaces
+// std::vector<LoadedImage>. POD/trivially-copyable: a copy aliases the same
+// buffers, so callers move ownership explicitly (loaded_levels_move) and free
+// explicitly (loaded_levels_reset). Initialise with loaded_levels_init or
+// zero-init before first use.
+struct LoadedLevels {
+    LoadedImage *levels;
+    int          count;
+
+    bool empty() const { return count == 0; }
+
+    // Total owned bytes across all levels.
+    size_t byte_size() const
+    {
+        size_t b = 0;
+        int i;
+        for (i = 0; i < count; i++)
+            b += levels[i].owned_size;
+        return b;
+    }
+
+    // Append by stealing *src's buffer (src left empty). Grows with realloc.
+    // Returns the stored level, or NULL on alloc failure.
+    LoadedImage *push_move(LoadedImage *src)
+    {
+        LoadedImage *grown = (LoadedImage *)realloc(levels, (size_t)(count + 1) * sizeof(LoadedImage));
+        if (!grown)
+            return NULL;
+        levels = grown;
+        levels[count] = *src; /* POD: copies the pointer (steal) */
+        loaded_image_init(src);
+        return &levels[count++];
+    }
+
+    // Free all buffers + the array, return to empty state.
+    void reset()
+    {
+        int i;
+        for (i = 0; i < count; i++)
+            free(levels[i].owned_data);
+        free(levels);
+        levels = NULL;
+        count  = 0;
+    }
+};
+
+// Zero-initialise (no allocation).
+static inline void loaded_levels_init(LoadedLevels *l)
+{
+    l->levels = NULL;
+    l->count  = 0;
+}
+
+// Move ownership src -> dst (dst's prior contents freed; src left empty).
+static inline void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
+{
+    if (dst == src)
+        return;
+    dst->reset();
+    dst->levels = src->levels;
+    dst->count  = src->count;
+    src->levels = NULL;
+    src->count  = 0;
+}
 
 class Renderer;
 
@@ -6195,7 +6291,7 @@ struct IOResponse {
     uint32_t hash;
     uint32_t palette_hash;
     int alpha_flags;
-    std::vector<LoadedImage> levels;
+    LoadedLevels levels;
 };
 
 class IOChannel {
@@ -6713,7 +6809,7 @@ private:
 };
 
 struct CachedHdImage {
-    std::vector<LoadedImage> levels; // decoded RGBA + mips (CPU side)
+    LoadedLevels levels; // decoded RGBA + mips (CPU side)
     int alpha_flags;
     size_t bytes;
 };
@@ -6740,15 +6836,18 @@ public:
     // Returns the entry (marking it most-recently-used), or NULL.
     CachedHdImage *get(HdTextureId id) { return HdLruArena<CachedHdImage>::get(hd_pack_key(id)); }
 
-    void put(HdTextureId id, std::vector<LoadedImage> levels, int alpha_flags)
+    // Takes ownership of *levels (left empty on return).
+    void put(HdTextureId id, LoadedLevels *levels, int alpha_flags)
     {
         uint64_t key = hd_pack_key(id);
         bool created = false;
         CachedHdImage *e = put_slot(key, &created);
         size_t old_bytes = created ? 0 : e->bytes;
-        e->levels = std::move(levels);
+        if (created)
+            loaded_levels_init(&e->levels); /* fresh slot: payload is indeterminate */
+        loaded_levels_move(&e->levels, levels);
         e->alpha_flags = alpha_flags;
-        e->bytes = measure(e->levels);
+        e->bytes = e->levels.byte_size();
         set_entry_bytes(key, e->bytes);
         account(old_bytes, e->bytes);
     }
@@ -6760,16 +6859,7 @@ protected:
     // the slot to be overwritten by a future insert).
     virtual void dispose(CachedHdImage &p)
     {
-        std::vector<LoadedImage>().swap(p.levels);
-    }
-
-private:
-    static size_t measure(const std::vector<LoadedImage> &levels)
-    {
-        size_t b = 0;
-        for (size_t i = 0; i < levels.size(); i++)
-            b += levels[i].owned_data.size();
-        return b;
+        p.levels.reset();
     }
 };
 
@@ -7408,7 +7498,7 @@ public:
 	void clear_quad(const Rect &rect, uint32_t fb_color, bool candidate);
 
 	// Called by TextureTracker (formerly via TextureUploader interface).
-	Vulkan::ImageHandle upload_texture(std::vector<LoadedImage> &image);
+	Vulkan::ImageHandle upload_texture(LoadedLevels &image);
 	Vulkan::ImageHandle create_texture(int width, int height, int levels);
 	Vulkan::CommandBufferHandle &command_buffer_hack_fixme()
 	{
@@ -10029,12 +10119,17 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	}
 }
 
-Vulkan::ImageHandle Renderer::upload_texture(std::vector<LoadedImage> &levels) {
+Vulkan::ImageHandle Renderer::upload_texture(LoadedLevels &levels) {
 	ImageCreateInfo info;
-	info.width = levels[0].width;
-	info.height = levels[0].height;
+	ImageInitialData initial[16]; /* Vulkan caps mip levels well under this */
+	int i;
+	int n = levels.count;
+	if (n > 16)
+		n = 16;
+	info.width = levels.levels[0].width;
+	info.height = levels.levels[0].height;
 	info.depth = 1;
-	info.levels = levels.size();
+	info.levels = n;
 	info.format = VK_FORMAT_R8G8B8A8_UNORM;
 	info.type = VK_IMAGE_TYPE_2D;
 	info.layers = 1;
@@ -10044,12 +10139,13 @@ Vulkan::ImageHandle Renderer::upload_texture(std::vector<LoadedImage> &levels) {
 	info.misc = 0u;
 	info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-	std::vector<ImageInitialData> initial;
-	for (int i = 0; i < levels.size(); i++) {
-		initial.push_back({ levels[i].owned_data.data() });
+	for (i = 0; i < n; i++) {
+		initial[i].data = levels.levels[i].owned_data;
+		initial[i].row_length = 0;
+		initial[i].image_height = 0;
 	}
 
-	ImageHandle image = device.create_image(info, initial.data());
+	ImageHandle image = device.create_image(info, initial);
 	return image;
 }
 Vulkan::ImageHandle Renderer::create_texture(int width, int height, int levels) {
@@ -17480,12 +17576,12 @@ LoadedImage generate_mip(LoadedImage &higher) {
     // mixing to create some dark opaque value (r, g, b, a<128).
 
     LoadedImage result;
+    int x, y;
     // Assumes higher.width and higher.height are both divisible by 2 (and also therefore > 1)
-    result.width = higher.width / 2;
-    result.height = higher.height / 2;
-    result.owned_data.resize(result.width * result.height * 4);
-    for (int y = 0; y < result.height; y++) {
-        for (int x = 0; x < result.width; x++) {
+    loaded_image_init(&result);
+    loaded_image_alloc(&result, higher.width / 2, higher.height / 2);
+    for (y = 0; y < result.height; y++) {
+        for (x = 0; x < result.width; x++) {
             uint8_t *src00 = loaded_pixel(higher, x * 2 + 0, y * 2 + 0);
             uint8_t *src10 = loaded_pixel(higher, x * 2 + 1, y * 2 + 0);
             uint8_t *src01 = loaded_pixel(higher, x * 2 + 0, y * 2 + 1);
@@ -17522,11 +17618,11 @@ LoadedImage generate_mip(LoadedImage &higher) {
 
 LoadedImage convert_tri_to_psx(uint8_t *image, int width, int height, int& alpha_flags) {
     LoadedImage result;
-    result.width = width;
-    result.height = height;
-    result.owned_data.resize(width * height * 4);
+    size_t i;
+    loaded_image_init(&result);
+    loaded_image_alloc(&result, width, height);
     alpha_flags = 0;
-    for (int i = 0; i < result.owned_data.size(); i += 4) {
+    for (i = 0; i < result.owned_size; i += 4) {
         uint8_t *src = &image[i];
         uint8_t *dst = &result.owned_data[i];
         if (src[3] == 0) {
@@ -17571,13 +17667,17 @@ LoadedImage convert_tri_to_psx(uint8_t *image, int width, int height, int& alpha
     return result;
 }
 
-std::vector<LoadedImage> prepare_texture(RGBAImage &image, int& alpha_flags) {
-    std::vector<LoadedImage> levels;
+LoadedLevels prepare_texture(RGBAImage &image, int& alpha_flags) {
+    LoadedLevels levels;
     int width = image.width;
     int height = image.height;
-    levels.push_back(convert_tri_to_psx(image.data, width, height, alpha_flags));
+    LoadedImage base;
+    loaded_levels_init(&levels);
+    base = convert_tri_to_psx(image.data, width, height, alpha_flags);
+    levels.push_move(&base);
     while (width % 2 == 0 && height % 2 == 0) {
-        levels.push_back(generate_mip(levels.back()));
+        LoadedImage mip = generate_mip(levels.levels[levels.count - 1]);
+        levels.push_move(&mip);
 
         width /= 2;
         height /= 2;
@@ -17649,8 +17749,13 @@ void io_thread(void *user_data) {
             std::unique_ptr<RGBAImage> image = load_image(path.c_str());
             if (image->data != nullptr) {
                 int alpha_flags_out = 0;
-                std::vector<LoadedImage> levels = prepare_texture(*image, alpha_flags_out);
-                IOResponse response = { hash, palette_hash, alpha_flags_out, std::move(levels) };
+                LoadedLevels levels = prepare_texture(*image, alpha_flags_out);
+                IOResponse response;
+                response.hash         = hash;
+                response.palette_hash = palette_hash;
+                response.alpha_flags  = alpha_flags_out;
+                loaded_levels_init(&response.levels);
+                loaded_levels_move(&response.levels, &levels);
 
                 slock_lock(channel->lock);
                 channel->responses.push_back(std::move(response));
@@ -18402,7 +18507,7 @@ void TextureTracker::on_queues_reset() {
         dbg_responses_received++;
         HdTextureId id = { response.hash, response.palette_hash };
         requested.erase(id); // no longer in flight; now cached
-        hd_cache.put(id, std::move(response.levels), response.alpha_flags);
+        hd_cache.put(id, &response.levels, response.alpha_flags);
         pending_attach.insert(id);
     }
 
@@ -18437,8 +18542,8 @@ void TextureTracker::on_queues_reset() {
         if (cached == nullptr)
             continue; // evicted from both caches; will be re-requested on draw
 
-        int width = cached->levels[0].width;
-        int height = cached->levels[0].height;
+        int width = cached->levels.levels[0].width;
+        int height = cached->levels.levels[0].height;
         if (width  % upload->width  == 0 && is_power_of_two(width  / upload->width) &&
             height % upload->height == 0 && is_power_of_two(height / upload->height))
         {
@@ -18551,16 +18656,16 @@ void TextureTracker::endFrame() {
 
 void TextureTracker::set_texture_uploader(Renderer *t) {
     uploader = t;
-    std::vector<LoadedImage> default_levels;
-
+    LoadedLevels default_levels;
     LoadedImage default_image;
-    default_image.width = 1;
-    default_image.height = 1;
-    default_image.owned_data.push_back(0);
-    default_image.owned_data.push_back(0);
-    default_image.owned_data.push_back(0);
-    default_image.owned_data.push_back(0);
-    default_levels.push_back(std::move(default_image));
+    loaded_levels_init(&default_levels);
+    loaded_image_init(&default_image);
+    loaded_image_alloc(&default_image, 1, 1);
+    default_image.owned_data[0] = 0;
+    default_image.owned_data[1] = 0;
+    default_image.owned_data[2] = 0;
+    default_image.owned_data[3] = 0;
+    default_levels.push_move(&default_image);
 
     default_hd_texture = uploader->upload_texture(default_levels);
 }
