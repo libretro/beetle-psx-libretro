@@ -6271,6 +6271,10 @@ static inline void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
 
 class Renderer;
 
+/* Max length for HD texture file paths built by the path helpers below.
+ * Defined here so both IORequest and the path helpers can use it. */
+enum { PATH_MAX_TT = 4096 + 256 };
+
 enum class IORequestKind {
     Load,
     Dump,
@@ -17655,7 +17659,6 @@ namespace PSX {
 
 // Path helpers write into a caller-provided buffer (PATH_MAX_TT bytes) and
 // return it, C-style, instead of allocating a std::string.
-enum { PATH_MAX_TT = 4096 + 256 };
 
 char *dump_path(char *out, size_t cap) {
     snprintf(out, cap, "%s%c%s-texture-dump%c",
@@ -17944,13 +17947,11 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
             return; // Early out
     }
 
-    char dpath[PATH_MAX_TT];
-    std::string path = dump_path(dpath, sizeof(dpath));
-    {
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%x", (unsigned)hash);
-        path += buf;
-    }
+    char path[PATH_MAX_TT];
+    size_t plen;
+    dump_path(path, sizeof(path));
+    plen = strlen(path);
+    snprintf(path + plen, sizeof(path) - plen, "%x", (unsigned)hash);
 
     uint16_t *palette = nullptr;
     if (mode.mode == TextureMode::Palette4bpp || mode.mode == TextureMode::Palette8bpp) {
@@ -17958,16 +17959,16 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
         Palette p = get_palette(palette_rect);
         if (p.data != nullptr) {
             palette = p.data;
-            char buf[16];
-            snprintf(buf, sizeof(buf), "-%x", (unsigned)p.hash);
-            path += buf;
+            plen = strlen(path);
+            snprintf(path + plen, sizeof(path) - plen, "-%x", (unsigned)p.hash);
         }
     }
 
     if (palette != nullptr) {
         TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping palette %i, %i.\n", mode.palette_offset_x, mode.palette_offset_y);
     } else if (mode.mode != TextureMode::ABGR1555) {
-        path += "-missing";
+        plen = strlen(path);
+        snprintf(path + plen, sizeof(path) - plen, "-missing");
         TT_LOG_VERBOSE(RETRO_LOG_INFO, "MISSING palette %i, %i.\n", mode.palette_offset_x, mode.palette_offset_y);
     }
 
@@ -18015,13 +18016,14 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
         }
     }
 
-    path += ".png";
+    plen = strlen(path);
+    snprintf(path + plen, sizeof(path) - plen, ".png");
 
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dump info: mode=%i, w=%i, h=%i, len=%i, bytesLen=%i\n", mode.mode, upload.width, upload.height, upload.image.size(), bytes.size());
-    TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping to %s.\n", path.c_str());
+    TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping to %s.\n", path);
 
-    //stbi_write_png(path.c_str(), upload.width * ppp, upload.height, 4, bytes.data(), 4 * upload.width * ppp);
-    TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting dump: %s\n", path.c_str());
+    //stbi_write_png(path, upload.width * ppp, upload.height, 4, bytes.data(), 4 * upload.width * ppp);
+    TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting dump: %s\n", path);
     IORequest dump;
     dump.kind = IORequestKind::Dump;
     dump.path = path;
