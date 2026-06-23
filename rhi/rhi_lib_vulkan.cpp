@@ -7499,6 +7499,48 @@ private:
 namespace PSX
 {
 
+/* ------------------------------------------------------------------------- *
+ * POD_VEC - a typed dynamic array of trivially-relocatable elements, MSVC C89.
+ *
+ * Replaces std::vector<T> for the renderer's per-frame draw queues, whose
+ * elements (BufferVertex, PrimitiveInfo, BlitInfo, VkRect2D, ...) are all POD /
+ * trivially relocatable. Growth is a realloc (bitwise relocation - no
+ * per-element move-ctor and no exception scaffolding), which is what the hot
+ * per-vertex push path wants; the std::vector equivalent emitted an
+ * out-of-line _M_realloc_insert plus EH tables on every push. clear keeps the
+ * allocation for reuse (these are refilled every frame). The struct is brace-
+ * initialisable to { NULL, 0, 0 } so it needs no constructor. */
+#define POD_VEC_DECLARE(NAME, T)                                              \
+struct NAME {                                                                 \
+    T  *items;                                                                \
+    int count;                                                                \
+    int cap;                                                                  \
+    T       *data()        { return items; }                                  \
+    const T *data() const  { return items; }                                  \
+    int      size() const  { return count; }                                  \
+    bool     empty() const { return count == 0; }                             \
+    void     clear()       { count = 0; }                                     \
+    T       *begin()       { return items; }                                  \
+    T       *end()         { return items + count; }                          \
+    const T *begin() const { return items; }                                  \
+    const T *end()   const { return items + count; }                          \
+    T &operator[](int i)             { return items[i]; }                     \
+    const T &operator[](int i) const { return items[i]; }                     \
+    T &back()              { return items[count - 1]; }                       \
+    const T &back() const  { return items[count - 1]; }                       \
+    T &front()             { return items[0]; }                               \
+    const T &front() const { return items[0]; }                               \
+    void grow_by_one() {                                                      \
+        if (count == cap) {                                                   \
+            int ncap = cap ? cap * 2 : 64;                                    \
+            items = (T *)realloc(items, (size_t)ncap * sizeof(T));            \
+            cap = ncap;                                                       \
+        }                                                                     \
+    }                                                                         \
+    void push(const T &v) { grow_by_one(); items[count++] = v; }              \
+    void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }  \
+}
+
 struct Vertex
 {
 	float x, y, w;
@@ -8111,34 +8153,41 @@ private:
 		{}
 	};
 
+	POD_VEC_DECLARE(BufferVertexVec, BufferVertex);
+	POD_VEC_DECLARE(PrimitiveInfoVec, PrimitiveInfo);
+	POD_VEC_DECLARE(SemiTransparentStateVec, SemiTransparentState);
+	POD_VEC_DECLARE(BlitInfoVec, BlitInfo);
+	POD_VEC_DECLARE(ClearCandidateVec, ClearCandidate);
+	POD_VEC_DECLARE(Rect2DVec, VkRect2D);
+
 	struct OpaqueQueue
 	{
 		// Non-textured primitives.
-		std::vector<BufferVertex> opaque;
-		std::vector<PrimitiveInfo> opaque_scissor;
+		BufferVertexVec opaque{};
+		PrimitiveInfoVec opaque_scissor{};
 
 		// Textured primitives, no semi-transparency.
-		std::vector<BufferVertex> opaque_textured;
-		std::vector<PrimitiveInfo> opaque_textured_scissor;
+		BufferVertexVec opaque_textured{};
+		PrimitiveInfoVec opaque_textured_scissor{};
 
 		// Textured primitives, semi-transparency enabled.
-		std::vector<BufferVertex> semi_transparent_opaque;
-		std::vector<PrimitiveInfo> semi_transparent_opaque_scissor;
+		BufferVertexVec semi_transparent_opaque{};
+		PrimitiveInfoVec semi_transparent_opaque_scissor{};
 
-		std::vector<BufferVertex> semi_transparent;
-		std::vector<SemiTransparentState> semi_transparent_state;
+		BufferVertexVec semi_transparent{};
+		SemiTransparentStateVec semi_transparent_state{};
 
-		std::vector<Vulkan::ImageHandle> textures;
+		std::vector<Vulkan::ImageHandle> textures; // refcounted handles: std::vector is correct
 
-		std::vector<VkRect2D> scaled_resolves;
-		std::vector<VkRect2D> unscaled_resolves;
-		std::vector<BlitInfo> scaled_blits;
-		std::vector<BlitInfo> scaled_masked_blits;
-		std::vector<BlitInfo> unscaled_blits;
-		std::vector<BlitInfo> unscaled_masked_blits;
+		Rect2DVec scaled_resolves{};
+		Rect2DVec unscaled_resolves{};
+		BlitInfoVec scaled_blits{};
+		BlitInfoVec scaled_masked_blits{};
+		BlitInfoVec unscaled_blits{};
+		BlitInfoVec unscaled_masked_blits{};
 
-		std::vector<VkRect2D> scissors;
-		std::vector<ClearCandidate> clear_candidates;
+		Rect2DVec scissors{};
+		ClearCandidateVec clear_candidates{};
 		VkRect2D default_scissor;
 		bool scissor_invariant = false;
 	} queue;
@@ -8146,7 +8195,7 @@ private:
 	bool render_pass_is_feedback = false;
 	float last_uv_scale_x, last_uv_scale_y;
 
-	void dispatch(const std::vector<BufferVertex> &vertices, std::vector<PrimitiveInfo> &scissors, bool textured = false);
+	void dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured = false);
 	static bool primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b);
 	void render_opaque_primitives();
 	void render_opaque_texture_primitives();
@@ -8161,7 +8210,7 @@ private:
 	void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index,
 		bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv);
 	void build_line_quad(Vertex *quad, const Vertex *line);
-	std::vector<BufferVertex> *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
+	BufferVertexVec *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
 		bool filtering, bool scaled_read, unsigned shift, bool offset_uv);
 	bool get_filer_exclude(FilterExclude exclude)
 	{
@@ -8180,7 +8229,7 @@ private:
 
 	void flush_resolves();
 	void flush_blits();
-	void flush_blit(const std::vector<BlitInfo> &infos, Vulkan::Program &program, bool scaled);
+	void flush_blit(const BlitInfoVec &infos, Vulkan::Program &program, bool scaled);
 	void reset_scissor_queue();
 	const ClearCandidate *find_clear_candidate(const Rect &rect) const;
 
@@ -8743,7 +8792,7 @@ void Renderer::set_draw_rect(const Rect &rect)
 	const unsigned scaled_h = rect.height * scaling;
 	if (last.offset.x != scaled_x || last.offset.y != scaled_y ||
 	    last.extent.width != scaled_w || last.extent.height != scaled_h)
-		queue.scissors.push_back(
+		queue.scissors.push(
 		    { { scaled_x, scaled_y }, { scaled_w, scaled_h } });
 }
 
@@ -9574,9 +9623,9 @@ void Renderer::flush_resolves()
 void Renderer::resolve(Domain target_domain, unsigned x, unsigned y)
 {
 	if (target_domain == Domain::Scaled)
-		queue.scaled_resolves.push_back({ { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } });
+		queue.scaled_resolves.push({ { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } });
 	else
-		queue.unscaled_resolves.push_back({ { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } });
+		queue.unscaled_resolves.push({ { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } });
 }
 
 void Renderer::ensure_command_buffer()
@@ -9807,7 +9856,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 	}
 }
 
-std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
+Renderer::BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
 	bool filtering, bool scaled_read, unsigned shift, bool offset_uv)
 {
 	// For mask testing, force primitives through the serialized blend path.
@@ -9822,15 +9871,15 @@ std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, i
 		if (render_state.semi_transparent != SemiTransparentMode::None)
 		{
 			for (unsigned i = 0; i < prims; i++)
-				queue.semi_transparent_opaque_scissor.emplace_back(queue.semi_transparent_opaque_scissor.size(), scissor, hd_texture,
-					filtering, scaled_read, shift, offset_uv);
+				queue.semi_transparent_opaque_scissor.push(PrimitiveInfo(queue.semi_transparent_opaque_scissor.size(), scissor, hd_texture,
+					filtering, scaled_read, shift, offset_uv));
 			return &queue.semi_transparent_opaque;
 		}
 		else
 		{
 			for (unsigned i = 0; i < prims; i++)
-				queue.opaque_textured_scissor.emplace_back(queue.opaque_textured_scissor.size(), scissor, hd_texture,
-					filtering, scaled_read, shift, offset_uv);
+				queue.opaque_textured_scissor.push(PrimitiveInfo(queue.opaque_textured_scissor.size(), scissor, hd_texture,
+					filtering, scaled_read, shift, offset_uv));
 			return &queue.opaque_textured;
 		}
 	}
@@ -9839,8 +9888,8 @@ std::vector<Renderer::BufferVertex> *Renderer::select_pipeline(unsigned prims, i
 	else
 	{
 		for (unsigned i = 0; i < prims; i++)
-			queue.opaque_scissor.emplace_back(queue.opaque_scissor.size(), scissor, hd_texture,
-				filtering, scaled_read, shift, offset_uv);
+			queue.opaque_scissor.push(PrimitiveInfo(queue.opaque_scissor.size(), scissor, hd_texture,
+				filtering, scaled_read, shift, offset_uv));
 		return &queue.opaque;
 	}
 }
@@ -9979,11 +10028,11 @@ void Renderer::draw_triangle(const Vertex *vertices)
 	bool offset_uv = false;
 	build_attribs(vert, vertices, 3, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	const int scissor_index = queue.scissor_invariant ? -1 : int(queue.scissors.size() - 1);
-	std::vector<BufferVertex> *out = select_pipeline(1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+	BufferVertexVec *out = select_pipeline(1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	if (out)
 	{
 		for (unsigned i = 0; i < 3; i++)
-			out->push_back(vert[i]);
+			out->push(vert[i]);
 	}
 
 	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode::None)
@@ -9992,8 +10041,8 @@ void Renderer::draw_triangle(const Vertex *vertices)
 			filtering = !get_filer_exclude(FilterExcludeOpaqueAndSemiTrans);
 
 		for (unsigned i = 0; i < 3; i++)
-			queue.semi_transparent.push_back(vert[i]);
-		queue.semi_transparent_state.push_back({ scissor_index, hd_texture_index, render_state.semi_transparent,
+			queue.semi_transparent.push(vert[i]);
+		queue.semi_transparent_state.push({ scissor_index, hd_texture_index, render_state.semi_transparent,
 		                                         render_state.texture_mode != TextureMode::None,
 		                                         render_state.mask_test,
 		                                         filtering,
@@ -10027,16 +10076,16 @@ void Renderer::draw_quad(const Vertex *vertices)
 	bool offset_uv = false;
 	build_attribs(vert, vertices, 4, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	const int scissor_index = queue.scissor_invariant ? -1 : int(queue.scissors.size() - 1);
-	std::vector<BufferVertex> *out = select_pipeline(2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+	BufferVertexVec *out = select_pipeline(2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 
 	if (out)
 	{
-		out->push_back(vert[0]);
-		out->push_back(vert[1]);
-		out->push_back(vert[2]);
-		out->push_back(vert[3]);
-		out->push_back(vert[2]);
-		out->push_back(vert[1]);
+		out->push(vert[0]);
+		out->push(vert[1]);
+		out->push(vert[2]);
+		out->push(vert[3]);
+		out->push(vert[2]);
+		out->push(vert[1]);
 	}
 
 	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode::None)
@@ -10052,14 +10101,14 @@ void Renderer::draw_quad(const Vertex *vertices)
 			scaled_read,
 			shift,
 			offset_uv };
-		queue.semi_transparent.push_back(vert[0]);
-		queue.semi_transparent.push_back(vert[1]);
-		queue.semi_transparent.push_back(vert[2]);
-		queue.semi_transparent.push_back(vert[3]);
-		queue.semi_transparent.push_back(vert[2]);
-		queue.semi_transparent.push_back(vert[1]);
-		queue.semi_transparent_state.push_back(state);
-		queue.semi_transparent_state.push_back(state);
+		queue.semi_transparent.push(vert[0]);
+		queue.semi_transparent.push(vert[1]);
+		queue.semi_transparent.push(vert[2]);
+		queue.semi_transparent.push(vert[3]);
+		queue.semi_transparent.push(vert[2]);
+		queue.semi_transparent.push(vert[1]);
+		queue.semi_transparent_state.push(state);
+		queue.semi_transparent_state.push(state);
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
 		render_pass_is_feedback = true;
@@ -10078,17 +10127,17 @@ void Renderer::clear_quad(const Rect &rect, uint32_t fb_color, bool candidate)
 	BufferVertex pos2 = { float(rect.x), float(rect.y) + float(rect.height), z, 1.0f, fbcolor_to_rgba8(fb_color) };
 	BufferVertex pos3 = { float(rect.x) + float(rect.width), float(rect.y) + float(rect.height), z, 1.0f,
 		                  fbcolor_to_rgba8(fb_color) };
-	queue.opaque.push_back(pos0);
-	queue.opaque.push_back(pos1);
-	queue.opaque.push_back(pos2);
-	queue.opaque.push_back(pos3);
-	queue.opaque.push_back(pos2);
-	queue.opaque.push_back(pos1);
-	queue.opaque_scissor.emplace_back(queue.opaque_scissor.size());
-	queue.opaque_scissor.emplace_back(queue.opaque_scissor.size());
+	queue.opaque.push(pos0);
+	queue.opaque.push(pos1);
+	queue.opaque.push(pos2);
+	queue.opaque.push(pos3);
+	queue.opaque.push(pos2);
+	queue.opaque.push(pos1);
+	queue.opaque_scissor.push(PrimitiveInfo(queue.opaque_scissor.size()));
+	queue.opaque_scissor.push(PrimitiveInfo(queue.opaque_scissor.size()));
 
 	if (candidate)
-		queue.clear_candidates.push_back({ rect, fb_color, z });
+		queue.clear_candidates.push({ rect, fb_color, z });
 }
 
 const Renderer::ClearCandidate *Renderer::find_clear_candidate(const Rect &rect) const
@@ -10214,9 +10263,9 @@ bool Renderer::primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInf
 	return a.triangle_index > b.triangle_index;
 }
 
-void Renderer::dispatch(const std::vector<BufferVertex> &vertices, std::vector<PrimitiveInfo> &scissors, bool textured)
+void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured)
 {
-	std::sort(scissors.begin(), scissors.end(), primitive_info_sort_gt);
+	std::sort(scissors.data(), scissors.data() + scissors.size(), primitive_info_sort_gt);
 
 	// Render flat-shaded primitives.
 	BufferVertex *vert = static_cast<BufferVertex *>(
@@ -10287,8 +10336,8 @@ void Renderer::dispatch(const std::vector<BufferVertex> &vertices, std::vector<P
 
 void Renderer::render_opaque_primitives()
 {
-	std::vector<BufferVertex> &vertices = queue.opaque;
-	std::vector<PrimitiveInfo> &scissors = queue.opaque_scissor;
+	BufferVertexVec &vertices = queue.opaque;
+	PrimitiveInfoVec &scissors = queue.opaque_scissor;
 	if (vertices.empty())
 		return;
 
@@ -10394,8 +10443,8 @@ void Renderer::render_semi_transparent_primitives()
 
 void Renderer::render_semi_transparent_opaque_texture_primitives()
 {
-	std::vector<BufferVertex> &vertices = queue.semi_transparent_opaque;
-	std::vector<PrimitiveInfo> &scissors = queue.semi_transparent_opaque_scissor;
+	BufferVertexVec &vertices = queue.semi_transparent_opaque;
+	PrimitiveInfoVec &scissors = queue.semi_transparent_opaque_scissor;
 	if (vertices.empty())
 		return;
 
@@ -10417,8 +10466,8 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 
 void Renderer::render_opaque_texture_primitives()
 {
-	std::vector<BufferVertex> &vertices = queue.opaque_textured;
-	std::vector<PrimitiveInfo> &scissors = queue.opaque_textured_scissor;
+	BufferVertexVec &vertices = queue.opaque_textured;
+	PrimitiveInfoVec &scissors = queue.opaque_textured_scissor;
 	if (vertices.empty())
 		return;
 
@@ -10451,7 +10500,7 @@ void Renderer::flush_blits()
 	queue.unscaled_masked_blits.clear();
 }
 
-void Renderer::flush_blit(const std::vector<BlitInfo> &infos, Program &program, bool scaled)
+void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scaled)
 {
 	if (infos.empty())
 		return;
@@ -10565,13 +10614,13 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	{
 		if (domain == Domain::Scaled)
 		{
-			std::vector<BlitInfo> &q = render_state.mask_test ? queue.scaled_masked_blits : queue.scaled_blits;
+			BlitInfoVec &q = render_state.mask_test ? queue.scaled_masked_blits : queue.scaled_blits;
 			unsigned width = dst.width;
 			unsigned height = dst.height;
 			for (unsigned y = 0; y < height; y += BLOCK_HEIGHT)
 				for (unsigned x = 0; x < width; x += BLOCK_WIDTH)
 					for (unsigned s = 0; s < msaa; s++)
-						q.push_back({
+						q.push({
 							{ (x + src.x) * scaling, (y + src.y) * scaling },
 							{ (x + dst.x) * scaling, (y + dst.y) * scaling },
 							{ std::min(BLOCK_WIDTH, width - x) * scaling, std::min(BLOCK_HEIGHT, height - y) * scaling },
@@ -10580,12 +10629,12 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		}
 		else
 		{
-			std::vector<BlitInfo> &q = render_state.mask_test ? queue.unscaled_masked_blits : queue.unscaled_blits;
+			BlitInfoVec &q = render_state.mask_test ? queue.unscaled_masked_blits : queue.unscaled_blits;
 			unsigned width = dst.width;
 			unsigned height = dst.height;
 			for (unsigned y = 0; y < height; y += BLOCK_HEIGHT)
 				for (unsigned x = 0; x < width; x += BLOCK_WIDTH)
-					q.push_back({
+					q.push({
 					    { x + src.x, y + src.y },
 					    { x + dst.x, y + dst.y },
 					    { std::min(BLOCK_WIDTH, width - x), std::min(BLOCK_HEIGHT, height - y) },
@@ -10701,13 +10750,30 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 Renderer::~Renderer()
 {
 	flush();
+	/* Free the per-frame draw-queue arrays (POD_VEC backing storage). */
+	queue.opaque.free_storage();
+	queue.opaque_scissor.free_storage();
+	queue.opaque_textured.free_storage();
+	queue.opaque_textured_scissor.free_storage();
+	queue.semi_transparent_opaque.free_storage();
+	queue.semi_transparent_opaque_scissor.free_storage();
+	queue.semi_transparent.free_storage();
+	queue.semi_transparent_state.free_storage();
+	queue.scaled_resolves.free_storage();
+	queue.unscaled_resolves.free_storage();
+	queue.scaled_blits.free_storage();
+	queue.scaled_masked_blits.free_storage();
+	queue.unscaled_blits.free_storage();
+	queue.unscaled_masked_blits.free_storage();
+	queue.scissors.free_storage();
+	queue.clear_candidates.free_storage();
 }
 
 void Renderer::reset_scissor_queue()
 {
 	queue.scissors.clear();
 	Rect &rect = render_state.draw_rect;
-	queue.scissors.push_back(
+	queue.scissors.push(
 	    { { int(rect.x * scaling), int(rect.y * scaling) }, { rect.width * scaling, rect.height * scaling } });
 }
 
