@@ -1658,6 +1658,7 @@ PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
 #include <vector>
 
 #include <rthreads/rthreads.h>
+#include <streams/file_stream.h>
 
 /* The remainder of this file is the consolidated parallel-psx
  * implementation - originally spread across parallel-psx/util/,
@@ -5967,21 +5968,29 @@ private:
 
 
 namespace PSX {
-    class RectMatch {
-    public:
-        RectMatch(int x, int y, int w, int h): x(x), y(y), w(w), h(h) {}
-        bool matches(Rect r) {
-            return (x == -1 || x== r.x) && (y == -1 || y == r.y) && (w == -1 || w == r.width) && (h == -1 || h == r.height);
-        }
-        int x = -1;
-        int y = -1;
-        int w = -1;
-        int h = -1;
-    private:
+    /* POD match rule from dump.cfg: a value of -1 means "wildcard" (matches
+     * any) for that field. Was a class with a ctor + NSDMI + matches() method. */
+    struct RectMatch {
+        int x;
+        int y;
+        int w;
+        int h;
     };
+
+    static inline bool rect_match_matches(const RectMatch *m, Rect r) {
+        return (m->x == -1 || m->x == r.x) && (m->y == -1 || m->y == r.y) &&
+               (m->w == -1 || m->w == (int)r.width) && (m->h == -1 || m->h == (int)r.height);
+    }
 };
 
-std::vector<PSX::RectMatch> parse_config_file(const char *path);
+/* Maximum number of "ignore" rules read from dump.cfg. A fixed cap keeps the
+ * list a plain inline array (no heap / no destructor); real dump configs have
+ * a handful of entries, so this is never approached. */
+#define DUMP_IGNORE_MAX 256
+
+/* Parse dump.cfg at `path`, writing up to `max` ignore rules into `out`.
+ * Returns the number written. */
+int parse_config_file(const char *path, PSX::RectMatch *out, int max);
 
 /* ============================================================
  * texture_tracker.hpp
@@ -6951,7 +6960,8 @@ private:
     Palette get_palette(Rect palette_rect);
     uint32_t get_palette_hash(Rect palette_rect);
 
-    std::vector<RectMatch> dump_ignore;
+    RectMatch dump_ignore[DUMP_IGNORE_MAX];
+    int       dump_ignore_count;
 
     std::set<HdTextureId> known_files;
     std::vector<CachedPaletteHash> cached_palette_hashes;
@@ -17446,37 +17456,85 @@ void FBAtlas::pipeline_barrier(StatusFlags domains)
  * ============================================================ */
 
 /* === config_parser.cpp === */
-#include <regex>
 
-int ignore_arg_to_number(const char *arg) {
-    if (arg[0] == '*' && arg[1] == '\0') {
-        return -1;
-    }
-    return atoi(arg);
+int parse_config_file(const char *path, PSX::RectMatch *out, int max);
+
+/* Whitespace per std::regex ECMAScript \s: space, tab, newline, CR, FF, VT. */
+static inline int cfg_is_space(int c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v';
+}
+static inline const char *cfg_skip_ws(const char *p) {
+    while (*p && cfg_is_space((unsigned char)*p)) p++;
+    return p;
 }
 
-std::vector<PSX::RectMatch> parse_config_file(const char *path) {
-    std::vector<PSX::RectMatch> result;
-    // https://stackoverflow.com/questions/7868936/read-file-line-by-line-using-ifstream-in-c
-    std::string line;
-    std::ifstream in(path);
-    std::regex ignore_command("^\\s*ignore\\s+(\\d+|\\*)\\s*,\\s*(\\d+|\\*)\\s*,\\s*(\\d+|\\*)\\s*,\\s*(\\d+|\\*)\\s*(?:#.*)?$");
-    while (std::getline(in, line)) {
-        std::smatch sm;
-        if (std::regex_match(line, sm, ignore_command)) {
-            std::string a1 = sm[1].str();
-            std::string a2 = sm[2].str();
-            std::string a3 = sm[3].str();
-            std::string a4 = sm[4].str();
-            result.push_back(PSX::RectMatch(
-                ignore_arg_to_number(a1.c_str()),
-                ignore_arg_to_number(a2.c_str()),
-                ignore_arg_to_number(a3.c_str()),
-                ignore_arg_to_number(a4.c_str())
-            ));
+/* Parse one "(\d+|\*)" field with surrounding optional whitespace. On success
+ * advances *pp past the field and returns 0, writing the value (-1 for '*');
+ * returns -1 if the field doesn't match. */
+static int cfg_parse_field(const char **pp, int *out) {
+    const char *p = cfg_skip_ws(*pp);
+    if (*p == '*') {
+        *out = -1;
+        p++;
+    } else if (*p >= '0' && *p <= '9') {
+        int v = 0;
+        while (*p >= '0' && *p <= '9') {
+            v = v * 10 + (*p - '0');
+            p++;
+        }
+        *out = v;
+    } else {
+        return -1;
+    }
+    *pp = cfg_skip_ws(p);
+    return 0;
+}
+
+/* Match one config line against:
+ *   ^\s*ignore\s+(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*(?:#.*)?$
+ * On match, fills *m and returns true. Hand-rolled replacement for std::regex. */
+static bool cfg_match_ignore(const char *line, PSX::RectMatch *m) {
+    const char *p = cfg_skip_ws(line);
+    int i;
+    int *fields[4];
+    if (strncmp(p, "ignore", 6) != 0)
+        return false;
+    p += 6;
+    /* \s+ : at least one whitespace after the keyword */
+    if (!cfg_is_space((unsigned char)*p))
+        return false;
+    p = cfg_skip_ws(p);
+
+    fields[0] = &m->x; fields[1] = &m->y; fields[2] = &m->w; fields[3] = &m->h;
+    for (i = 0; i < 4; i++) {
+        if (cfg_parse_field(&p, fields[i]) != 0)
+            return false;
+        if (i < 3) {
+            if (*p != ',')
+                return false;
+            p++;
         }
     }
-    return result;
+    /* optional trailing comment, then end of line */
+    if (*p == '#')
+        return true;
+    return *p == '\0';
+}
+
+int parse_config_file(const char *path, PSX::RectMatch *out, int max) {
+    char line[1024];
+    int count = 0;
+    RFILE *in = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
+                                RETRO_VFS_FILE_ACCESS_HINT_NONE);
+    if (!in)
+        return 0;
+    while (count < max && filestream_gets(in, line, sizeof(line))) {
+        PSX::RectMatch m;
+        if (cfg_match_ignore(line, &m))
+            out[count++] = m;
+    }
+    filestream_close(in);
+    return count;
 }
 
 /* === image_io.hpp (private; only used within this TU) === */
@@ -17954,8 +18012,9 @@ TextureTracker::TextureTracker()
     // Read in the dump config file
     dump_path(cfg, sizeof(cfg));
     snprintf(cfg + strlen(cfg), sizeof(cfg) - strlen(cfg), "/dump.cfg");
-    dump_ignore = parse_config_file(cfg);
-    for (RectMatch m : dump_ignore) {
+    dump_ignore_count = parse_config_file(cfg, dump_ignore, DUMP_IGNORE_MAX);
+    for (int mi = 0; mi < dump_ignore_count; mi++) {
+        RectMatch m = dump_ignore[mi];
         TT_LOG_VERBOSE(RETRO_LOG_INFO, "Ignoring %d,%d,%d,%d\n", m.x, m.y, m.w, m.h);
     }
 }
@@ -18167,8 +18226,8 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
             upload->hash = hash;
             upload->dumpable = true;
             // Don't dump uploads specified by dump.cfg
-            for (RectMatch rm : dump_ignore) {
-                if (rm.matches(rect)) {
+            for (int ri = 0; ri < dump_ignore_count; ri++) {
+                if (PSX::rect_match_matches(&dump_ignore[ri], rect)) {
                     upload->dumpable = false;
                     break;
                 }
