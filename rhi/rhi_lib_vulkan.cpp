@@ -6281,27 +6281,46 @@ enum class IORequestKind {
 };
 
 struct IORequest {
+    struct IORequest *next;        /* intrusive FIFO link (queue-owned) */
     IORequestKind kind;
     // Load payload (valid when kind == Load):
     uint32_t hash;
     uint32_t palette_hash;
     // Dump payload (valid when kind == Dump):
-    std::string path;
-    int width;
-    int height;
-    std::vector<uint8_t> bytes;
+    char     path[PATH_MAX_TT];
+    int      width;
+    int      height;
+    uint8_t *bytes;                /* owned RGBA bytes (NULL if none) */
+    size_t   bytes_len;
 };
+
+static void io_request_free(IORequest *r)
+{
+    if (r) {
+        free(r->bytes);
+        free(r);
+    }
+}
 
 const int ALPHA_FLAG_OPAQUE = 1;
 const int ALPHA_FLAG_SEMI_TRANSPARENT = 2;
 const int ALPHA_FLAG_TRANSPARENT = 4;
 
 struct IOResponse {
+    struct IOResponse *next;       /* intrusive FIFO link (queue-owned) */
     uint32_t hash;
     uint32_t palette_hash;
     int alpha_flags;
     LoadedLevels levels;
 };
+
+static void io_response_free(IOResponse *r)
+{
+    if (r) {
+        loaded_levels_reset(&r->levels);
+        free(r);
+    }
+}
 
 class IOChannel {
 public:
@@ -6309,11 +6328,42 @@ public:
     ~IOChannel();
     slock_t *lock;
     scond_t *cond;
-    std::vector<IORequest> requests;
-    std::vector<IOResponse> responses;
+    /* Intrusive FIFO lists (protected by `lock`). Heads are popped/drained,
+     * tails are where producers append. Replaces std::vector<IORequest> /
+     * std::vector<IOResponse>. */
+    IORequest  *req_head,  *req_tail;
+    IOResponse *resp_head, *resp_tail;
     bool done = false;
 private:
 };
+
+/* FIFO helpers (caller holds channel->lock). Defined here so the IO worker
+ * (io_thread) and the producers can all see them. */
+static void io_channel_push_request(IOChannel *c, IORequest *r) {
+    r->next = NULL;
+    if (c->req_tail) c->req_tail->next = r; else c->req_head = r;
+    c->req_tail = r;
+}
+static IORequest *io_channel_pop_request(IOChannel *c) {
+    IORequest *r = c->req_head;
+    if (r) {
+        c->req_head = r->next;
+        if (!c->req_head) c->req_tail = NULL;
+        r->next = NULL;
+    }
+    return r;
+}
+static void io_channel_push_response(IOChannel *c, IOResponse *r) {
+    r->next = NULL;
+    if (c->resp_tail) c->resp_tail->next = r; else c->resp_head = r;
+    c->resp_tail = r;
+}
+/* Steal the entire response list; channel left empty. Returns the head. */
+static IOResponse *io_channel_take_responses(IOChannel *c) {
+    IOResponse *head = c->resp_head;
+    c->resp_head = c->resp_tail = NULL;
+    return head;
+}
 
 class IOThread {
 public:
@@ -17827,24 +17877,24 @@ void io_thread(void *user_data) {
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread starting\n");
 
     while (true) {
-        IORequest request;
+        IORequest *request = NULL;
         {
             slock_lock(channel->lock);
-            while (channel->requests.empty() && !channel->done) {
+            while (channel->req_head == NULL && !channel->done) {
                 scond_wait(channel->cond, channel->lock);
             }
             if (channel->done) {
                 // Prompt shutdown; drop any unprocessed requests (matches the
-                // previous single-thread behaviour).
+                // previous single-thread behaviour). The channel destructor
+                // frees whatever is still queued.
                 slock_unlock(channel->lock);
                 break;
             }
             // Take ONE request from the front so work spreads across the pool
             // and the producer's priority order (visible palette first) is
             // preserved. Wake another worker if more remain.
-            request = std::move(channel->requests.front());
-            channel->requests.erase(channel->requests.begin());
-            if (!channel->requests.empty()) {
+            request = io_channel_pop_request(channel.get());
+            if (channel->req_head != NULL) {
                 scond_signal(channel->cond);
             }
             slock_unlock(channel->lock);
@@ -17853,9 +17903,9 @@ void io_thread(void *user_data) {
         // The expensive part (PNG decode + mipmaps, or PNG write) runs WITHOUT
         // the lock so workers process in parallel; only the queue access and
         // the response push are serialised.
-        if (request.kind == IORequestKind::Load) {
-            uint32_t hash = request.hash;
-            uint32_t palette_hash = request.palette_hash;
+        if (request->kind == IORequestKind::Load) {
+            uint32_t hash = request->hash;
+            uint32_t palette_hash = request->palette_hash;
 
             char path[PATH_MAX_TT];
             RGBAImage image;
@@ -17865,27 +17915,29 @@ void io_thread(void *user_data) {
             if (image.data != NULL) {
                 int alpha_flags_out = 0;
                 LoadedLevels levels = prepare_texture(image, alpha_flags_out);
-                IOResponse response;
-                response.hash         = hash;
-                response.palette_hash = palette_hash;
-                response.alpha_flags  = alpha_flags_out;
-                loaded_levels_init(&response.levels);
-                loaded_levels_move(&response.levels, &levels);
+                IOResponse *response = (IOResponse *)malloc(sizeof(IOResponse));
+                response->next         = NULL;
+                response->hash         = hash;
+                response->palette_hash = palette_hash;
+                response->alpha_flags  = alpha_flags_out;
+                loaded_levels_init(&response->levels);
+                loaded_levels_move(&response->levels, &levels);
 
                 slock_lock(channel->lock);
-                channel->responses.push_back(std::move(response));
+                io_channel_push_response(channel.get(), response);
                 slock_unlock(channel->lock);
 
                 rgba_image_free(&image);
             } else {
                 TT_LOG(RETRO_LOG_ERROR, "failed to load: %s\n", path);
             }
-        } else if (request.kind == IORequestKind::Dump) {
-            int success = write_image(request.path.c_str(), request.width, request.height, request.bytes.data());
+        } else if (request->kind == IORequestKind::Dump) {
+            int success = write_image(request->path, request->width, request->height, request->bytes);
             if (success == 0) {
-                TT_LOG(RETRO_LOG_ERROR, "failed to write to: %s\n", request.path.c_str());
+                TT_LOG(RETRO_LOG_ERROR, "failed to write to: %s\n", request->path);
             }
         }
+        io_request_free(request);
     }
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread ending\n");
 }
@@ -17893,9 +17945,16 @@ void io_thread(void *user_data) {
 IOChannel::IOChannel() {
     lock = slock_new();
     cond = scond_new();
+    req_head = req_tail = NULL;
+    resp_head = resp_tail = NULL;
     // TODO: check for NULL
 }
 IOChannel::~IOChannel() {
+    /* Free any nodes still queued at shutdown. */
+    IORequest *r = req_head;
+    IOResponse *p = resp_head;
+    while (r) { IORequest *n = r->next; io_request_free(r); r = n; }
+    while (p) { IOResponse *n = p->next; io_response_free(p); p = n; }
     slock_free(lock);
     scond_free(cond);
 }
@@ -17927,7 +17986,10 @@ IOThread::~IOThread() {
 void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
     uint32_t hash = upload.hash;
 
-    std::vector<uint8_t> bytes;
+    uint8_t *bytes;
+    size_t   bytes_len;
+    size_t   bi;
+    size_t   img_count;
 
     // from glsl/vram.h
     int shift;
@@ -17975,15 +18037,24 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
     int ppp = 1 << shift;
     int bpp = 16 >> shift;
     int mask = (1 << bpp) - 1;
-    for (uint16_t pixel : upload.image) {
-        for (int p = 0; p < ppp; p++) {
+    /* Output is exactly 4 bytes per (subpixel) = image.size() * ppp * 4. */
+    img_count = upload.image.size();
+    bytes_len = img_count * (size_t)ppp * 4u;
+    bytes = (uint8_t *)malloc(bytes_len ? bytes_len : 1);
+    bi = 0;
+    {
+      size_t ii;
+      for (ii = 0; ii < img_count; ii++) {
+        uint16_t pixel = upload.image[ii];
+        int p;
+        for (p = 0; p < ppp; p++) {
             uint16_t subpixel = (pixel >> (p * bpp)) & mask;
             if (mode.mode != TextureMode::ABGR1555 && palette == nullptr) {
                 // Missing palette, dump a grayscale version of the image data
-                bytes.push_back(255.0 * subpixel / mask);
-                bytes.push_back(255.0 * subpixel / mask);
-                bytes.push_back(255.0 * subpixel / mask);
-                bytes.push_back(255.0);
+                bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
+                bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
+                bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
+                bytes[bi++] = (uint8_t)255;
             } else {
                 uint16_t abgr1555;
                 if (mode.mode == TextureMode::ABGR1555) {
@@ -18008,33 +18079,38 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
                     // Semi-transparent
                     a = 127;
                 }
-                bytes.push_back(r);
-                bytes.push_back(g);
-                bytes.push_back(b);
-                bytes.push_back(a);
-            } 
+                bytes[bi++] = (uint8_t)r;
+                bytes[bi++] = (uint8_t)g;
+                bytes[bi++] = (uint8_t)b;
+                bytes[bi++] = (uint8_t)a;
+            }
         }
+      }
     }
 
     plen = strlen(path);
     snprintf(path + plen, sizeof(path) - plen, ".png");
 
-    TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dump info: mode=%i, w=%i, h=%i, len=%i, bytesLen=%i\n", mode.mode, upload.width, upload.height, upload.image.size(), bytes.size());
+    TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dump info: mode=%i, w=%i, h=%i, len=%i, bytesLen=%i\n", mode.mode, upload.width, upload.height, (int)upload.image.size(), (int)bytes_len);
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping to %s.\n", path);
 
-    //stbi_write_png(path, upload.width * ppp, upload.height, 4, bytes.data(), 4 * upload.width * ppp);
+    //stbi_write_png(path, upload.width * ppp, upload.height, 4, bytes, 4 * upload.width * ppp);
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting dump: %s\n", path);
-    IORequest dump;
-    dump.kind = IORequestKind::Dump;
-    dump.path = path;
-    dump.width = upload.width * ppp;
-    dump.height = upload.height;
-    dump.bytes = std::move(bytes);
+    {
+        IORequest *dump = (IORequest *)malloc(sizeof(IORequest));
+        dump->next = NULL;
+        dump->kind = IORequestKind::Dump;
+        snprintf(dump->path, sizeof(dump->path), "%s", path);
+        dump->width = upload.width * ppp;
+        dump->height = upload.height;
+        dump->bytes = bytes;          /* transfer ownership to the request */
+        dump->bytes_len = bytes_len;
 
-    slock_lock(iothread.channel->lock);
-    iothread.channel->requests.push_back(std::move(dump));
-    slock_unlock(iothread.channel->lock);
-    scond_signal(iothread.channel->cond);
+        slock_lock(iothread.channel->lock);
+        io_channel_push_request(iothread.channel.get(), dump);
+        slock_unlock(iothread.channel->lock);
+        scond_signal(iothread.channel->cond);
+    }
 }
 
 void read_texture_directory(HdKeySet *out, const char *path) {
@@ -18357,12 +18433,15 @@ void TextureTracker::load_hd_texture(uint32_t hash) {
         slock_lock(iothread.channel->lock);
         for (ki = lo; ki < hi; ki++) {
             uint32_t palette_hash = (uint32_t)known_files.keys[ki];
-            IORequest load;
+            IORequest *load = (IORequest *)malloc(sizeof(IORequest));
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting texture: %x-%x\n", hash, palette_hash);
-            load.kind = IORequestKind::Load;
-            load.hash = hash;
-            load.palette_hash = palette_hash;
-            iothread.channel->requests.push_back(std::move(load));
+            load->next = NULL;
+            load->kind = IORequestKind::Load;
+            load->hash = hash;
+            load->palette_hash = palette_hash;
+            load->bytes = NULL;
+            load->bytes_len = 0;
+            io_channel_push_request(iothread.channel.get(), load);
         }
         slock_unlock(iothread.channel->lock);
         scond_signal(iothread.channel->cond);
@@ -18383,11 +18462,16 @@ void TextureTracker::want_combo(HdTextureId id) {
         return; // no file on disk
 
     slock_lock(iothread.channel->lock);
-    IORequest load;
-    load.kind = IORequestKind::Load;
-    load.hash = id.hash;
-    load.palette_hash = id.palette_hash;
-    iothread.channel->requests.push_back(std::move(load));
+    {
+        IORequest *load = (IORequest *)malloc(sizeof(IORequest));
+        load->next = NULL;
+        load->kind = IORequestKind::Load;
+        load->hash = id.hash;
+        load->palette_hash = id.palette_hash;
+        load->bytes = NULL;
+        load->bytes_len = 0;
+        io_channel_push_request(iothread.channel.get(), load);
+    }
     slock_unlock(iothread.channel->lock);
     scond_signal(iothread.channel->cond);
 }
@@ -18635,18 +18719,26 @@ void TextureTracker::on_queues_reset() {
     // Poll HD uploads
 
     slock_lock(iothread.channel->lock);
-    std::vector<IOResponse> responses = std::move(iothread.channel->responses); // Take the responses
-    iothread.channel->responses.clear();
+    IOResponse *responses = io_channel_take_responses(iothread.channel.get()); // steal the list
     slock_unlock(iothread.channel->lock);
 
     // Move freshly decoded images into the cache (decode-once); mark them for
     // attach. The cache owns them regardless of whether their hash is resident.
-    for (IOResponse &response : responses) {
+    // Each response node is freed after its levels are moved into the cache.
+    {
+      IOResponse *response = responses;
+      while (response != NULL) {
+        IOResponse *rnext = response->next;
+        HdTextureId id;
         dbg_responses_received++;
-        HdTextureId id = { response.hash, response.palette_hash };
+        id.hash = response->hash;
+        id.palette_hash = response->palette_hash;
         hd_key_set_erase(&requested, hd_pack_key(id)); // no longer in flight; now cached
-        hd_image_cache_put(&hd_cache, id, &response.levels, response.alpha_flags);
+        hd_image_cache_put(&hd_cache, id, &response->levels, response->alpha_flags);
         hd_key_set_insert(&pending_attach, hd_pack_key(id));
+        io_response_free(response); // levels already moved out (now empty)
+        response = rnext;
+      }
     }
 
     // Attach pass: for every wanted combo whose base hash is currently
