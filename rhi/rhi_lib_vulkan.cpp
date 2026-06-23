@@ -6575,43 +6575,20 @@ struct CachedPaletteHash {
 
 //============
 // RectTracker
+/* TextureRect is a trivially-copyable POD: a borrowed view of an upload plus a
+ * subrect. It does NOT manage the refcount in special members (so it relocates
+ * with a bitwise move - no per-copy acquire/release, no exception scaffolding in
+ * the containers that hold it). Ownership lives at container boundaries instead:
+ * a container retains on insert and releases on erase/clear/destroy via
+ * texture_rect_retain / texture_rect_release. Transient TextureRect values
+ * (subTexture results, clip pairs, scratch arrays) are borrowing and need no
+ * ref ops. */
 struct TextureRect {
-    /* Shared (refcounted) reference to the upload. Was
-     * std::shared_ptr<TextureUpload>; now a raw pointer with the refcount
-     * managed by this struct's ctor/copy/assign/dtor (acquire on take, release
-     * on drop), reproducing shared_ptr value semantics. */
     TextureUpload *upload;
     // the offset into the original upload rect (offset_x + vram_rect.width <= upload->width)
     int offset_x;
     int offset_y;
     SRect vram_rect;
-    TextureRect(TextureUpload *upload_, int offset_x, int offset_y, SRect vram_rect):
-    upload(upload_), offset_x(offset_x), offset_y(offset_y), vram_rect(vram_rect)
-    {
-        texture_upload_acquire(upload);
-    }
-    TextureRect(const TextureRect &o):
-    upload(o.upload), offset_x(o.offset_x), offset_y(o.offset_y), vram_rect(o.vram_rect)
-    {
-        texture_upload_acquire(upload);
-    }
-    TextureRect &operator=(const TextureRect &o)
-    {
-        if (this != &o) {
-            TextureUpload *old = upload;
-            upload = o.upload;
-            texture_upload_acquire(upload);
-            texture_upload_release(old);
-            offset_x = o.offset_x;
-            offset_y = o.offset_y;
-            vram_rect = o.vram_rect;
-        }
-        return *this;
-    }
-    ~TextureRect()
-    {
-        texture_upload_release(upload);
-    }
 
     // in vram size (not hd), local to the uploaded data, different hd textures for different palettes could have different sizes anyway
     SRect texture_subrect() const {
@@ -6628,10 +6605,106 @@ struct TextureRect {
     }
 };
 
+/* Build a TextureRect (borrowing - does not take a reference). */
+static inline TextureRect make_texture_rect(TextureUpload *upload, int offset_x, int offset_y, SRect vram_rect)
+{
+    TextureRect t;
+    t.upload = upload;
+    t.offset_x = offset_x;
+    t.offset_y = offset_y;
+    t.vram_rect = vram_rect;
+    return t;
+}
+/* Ownership transfer helpers, used by owning containers only. */
+static inline void texture_rect_retain(const TextureRect *t)  { texture_upload_acquire(t->upload); }
+static inline void texture_rect_release(const TextureRect *t) { texture_upload_release(t->upload); }
+
 // TODO: better name
 struct EnduringTextureRect {
     TextureRect texture_rect;
     bool alive;
+};
+
+/* Owning, trivially-relocatable array of EnduringTextureRect (replaces
+ * std::vector<EnduringTextureRect>). Because TextureRect is now POD, growth is a
+ * realloc (bitwise relocation, no per-element move-ctor or exception
+ * scaffolding). Ownership is explicit: push retains the upload, and any slot
+ * that leaves the array (compaction drop, clear, free) releases it. */
+struct EnduringRectArr {
+    EnduringTextureRect *a;
+    int count;
+    int cap;
+    /* Pointer-range iteration so existing range-for loops work unchanged. */
+    EnduringTextureRect *begin() { return a; }
+    EnduringTextureRect *end()   { return a + count; }
+    const EnduringTextureRect *begin() const { return a; }
+    const EnduringTextureRect *end()   const { return a + count; }
+};
+static inline void enduring_arr_init(EnduringRectArr *v) { v->a = NULL; v->count = 0; v->cap = 0; }
+static inline void enduring_arr_push(EnduringRectArr *v, TextureRect tr, bool alive) {
+    if (v->count == v->cap) {
+        int ncap = v->cap ? v->cap * 2 : 16;
+        v->a = (EnduringTextureRect *)realloc(v->a, (size_t)ncap * sizeof(EnduringTextureRect));
+        v->cap = ncap;
+    }
+    texture_rect_retain(&tr);            /* the array now owns a reference */
+    v->a[v->count].texture_rect = tr;
+    v->a[v->count].alive = alive;
+    v->count++;
+}
+/* Drop !alive slots, releasing their refs; survivors relocate by bitwise move. */
+static inline void enduring_arr_compact(EnduringRectArr *v) {
+    int w = 0, i;
+    for (i = 0; i < v->count; i++) {
+        if (v->a[i].alive) {
+            if (w != i) v->a[w] = v->a[i];
+            w++;
+        } else {
+            texture_rect_release(&v->a[i].texture_rect);
+        }
+    }
+    v->count = w;
+}
+static inline void enduring_arr_clear(EnduringRectArr *v) {
+    int i;
+    for (i = 0; i < v->count; i++)
+        texture_rect_release(&v->a[i].texture_rect);
+    v->count = 0;
+}
+static inline void enduring_arr_free(EnduringRectArr *v) {
+    enduring_arr_clear(v);
+    free(v->a);
+    v->a = NULL;
+    v->cap = 0;
+}
+
+/* Owning vector of (POD) TextureRects, used where the rect list is itself
+ * value-copied/compared (FusionRects, RestorableRect). The element is trivially
+ * relocatable so the backing std::vector relocates cheaply, but ownership must
+ * be explicit: this wrapper retains on push and on copy, and releases on
+ * destroy/clear/assign. */
+struct OwnedRectVec {
+    std::vector<TextureRect> v;
+    OwnedRectVec() {}
+    ~OwnedRectVec() { for (size_t i = 0; i < v.size(); i++) texture_rect_release(&v[i]); }
+    OwnedRectVec(const OwnedRectVec &o) : v(o.v) { for (size_t i = 0; i < v.size(); i++) texture_rect_retain(&v[i]); }
+    OwnedRectVec &operator=(const OwnedRectVec &o) {
+        if (this != &o) {
+            for (size_t i = 0; i < v.size(); i++) texture_rect_release(&v[i]);
+            v = o.v;
+            for (size_t i = 0; i < v.size(); i++) texture_rect_retain(&v[i]);
+        }
+        return *this;
+    }
+    void push(TextureRect t) { texture_rect_retain(&t); v.push_back(t); }
+    size_t size() const { return v.size(); }
+    TextureRect &operator[](size_t i) { return v[i]; }
+    const TextureRect &operator[](size_t i) const { return v[i]; }
+    bool operator==(const OwnedRectVec &o) const { return v == o.v; }
+    TextureRect *begin() { return v.data(); }
+    TextureRect *end()   { return v.data() + v.size(); }
+    const TextureRect *begin() const { return v.data(); }
+    const TextureRect *end()   const { return v.data() + v.size(); }
 };
 
 const int LOOKUP_GRID_COLUMNS = 16;
@@ -6695,6 +6768,8 @@ private:
 
 class RectTracker {
 public:
+    RectTracker() { enduring_arr_init(&textures); }
+    ~RectTracker() { enduring_arr_free(&textures); }
     void place(TextureRect texture);
     void upload(SRect rect, TextureUpload *upload);
     void blit(SRect dst, SRect src);
@@ -6704,7 +6779,7 @@ public:
         lookup_grid_dirty = true;
     }
     void releaseDeadHandles();
-    std::vector<EnduringTextureRect> textures;
+    EnduringRectArr textures; // owning trivially-relocatable array
     RectIndexSet& overlapping(Rect rect, RectIndexSet& results);
 
     /**
@@ -6726,7 +6801,7 @@ private:
 //============
 
 struct FusionRects {
-    std::vector<TextureRect> rects;
+    OwnedRectVec rects;
     Rect vram_rect;
     unsigned int scaleX = 0;
     unsigned int scaleY = 0;
@@ -6769,7 +6844,7 @@ private:
 struct RestorableRect {
     Rect rect;
     uint32_t hash;
-    std::vector<TextureRect> to_restore;
+    OwnedRectVec to_restore;
 };
 
 class DbgHotkey {
@@ -18465,7 +18540,7 @@ Palette TextureTracker::get_palette(Rect palette_rect) {
     tracker.overlapping(palette_rect, overlap);
     for (int oi = 0; oi < overlap.count; oi++) {
         RectIndex index = overlap.items[oi];
-        EnduringTextureRect &other = tracker.textures[index]; // TODO: The `other.alive` check is unnecessary because tracker.overlapping never returns dead indices
+        EnduringTextureRect &other = tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because tracker.overlapping never returns dead indices
         if (fromSRect(other.texture_rect.vram_rect).contains(palette_rect) && other.alive) {
             if (other.texture_rect.offset_x != 0 || other.texture_rect.offset_y != 0) {
                 continue; // TODO: handle offset subrects
@@ -18572,7 +18647,7 @@ std::pair<SRect, bool> intersect(SRect a, SRect b) {
 }
 
 TextureRect subTexture(TextureRect original, SRect sub_vram_rect) {
-    return TextureRect(
+    return make_texture_rect(
         original.upload,
         original.offset_x + sub_vram_rect.left() - original.vram_rect.left(),
         original.offset_y + sub_vram_rect.top() - original.vram_rect.top(),
@@ -18585,7 +18660,7 @@ std::pair<TextureRect, bool> clip_texture_rect_to_vram(TextureRect &t, Rect vram
     if (intersection.second) {
         return std::make_pair(subTexture(t, intersection.first), true);
     } else {
-        return std::make_pair(TextureRect(nullptr, 0, 0, SRect(0, 0, 1, 1)), false);
+        return std::make_pair(make_texture_rect(nullptr, 0, 0, SRect(0, 0, 1, 1)), false);
     }
 }
 
@@ -18612,22 +18687,26 @@ void TextureTracker::notifyReadback(Rect rect, uint16_t *vram) {
 
     static RectIndexSet overlap = { NULL, 0, 0 };
 
-    std::vector<TextureRect> to_restore;
+    OwnedRectVec to_restore;
     tracker.overlapping(rect, overlap);
     for (int oi = 0; oi < overlap.count; oi++) {
         RectIndex index = overlap.items[oi];
-        EnduringTextureRect &e = tracker.textures[index];
+        EnduringTextureRect &e = tracker.textures.a[index];
         if (e.alive) { // TODO: This check is unnecessary because tracker.overlapping never returns dead indices
             // Clip to the requested rect
             std::pair<TextureRect, bool> result = clip_texture_rect_to_vram(e.texture_rect, rect);
             if (result.second) {
                 // assert(rect.contains(fromSRect(result.first.vram_rect)));
-                to_restore.push_back(result.first);
+                to_restore.push(result.first);
             }
         }
     }
 
-    restorable_rects.push_back({ rect, hash, std::move(to_restore) });
+    RestorableRect rr;
+    rr.rect = rect;
+    rr.hash = hash;
+    rr.to_restore = std::move(to_restore);
+    restorable_rects.push_back(std::move(rr));
 }
 
 void TextureTracker::upload(Rect rect, uint16_t *vram) {
@@ -18909,7 +18988,7 @@ HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, 
         if (cache_hit) {
             // cache_result.handle is currently always a non-fused, non-none, index + palette_hash
             // in the future it may be useful to cache none, but there's currently no way to check if such a containing rect is still alive (since HdTextureHandle's index would be -1)
-            EnduringTextureRect &tex = tracker.textures[cache_result.handle.index]; // Forgive me
+            EnduringTextureRect &tex = tracker.textures.a[cache_result.handle.index]; // Forgive me
             if (tex.alive) {
                 fastpath_capable_out = fastpath_enabled && ((hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash) ? hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
                 return cache_result.handle;
@@ -19332,7 +19411,7 @@ void split(SRect original, SRect remove, SRect *results, unsigned &count) {
 }
 
 void RectTracker::upload(SRect rect, TextureUpload *upload) {
-    TextureRect texture(upload, 0, 0, rect);
+    TextureRect texture = make_texture_rect(upload, 0, 0, rect);
     place(texture);
     lookup_grid_dirty = true;
 }
@@ -19351,7 +19430,7 @@ void RectTracker::blit(SRect dst, SRect src) {
             std::pair<SRect, bool> intersection = intersect(old.vram_rect, src);
             if (intersection.second) {
                 TextureRect sub = subTexture(old, intersection.first);
-                TextureRect subMoved = TextureRect(sub.upload, sub.offset_x, sub.offset_y, moved(sub.vram_rect, moveX, moveY));
+                TextureRect subMoved = make_texture_rect(sub.upload, sub.offset_x, sub.offset_y, moved(sub.vram_rect, moveX, moveY));
                 to_place.push_back(subMoved);
             }
         }
@@ -19363,15 +19442,7 @@ void RectTracker::blit(SRect dst, SRect src) {
     lookup_grid_dirty = true;
 }
 void RectTracker::releaseDeadHandles() {
-    std::vector<EnduringTextureRect>::iterator retainedIt = textures.begin();
-    for (std::vector<EnduringTextureRect>::iterator it = textures.begin(); it != textures.end(); it++) {
-        if (it->alive) {
-            *retainedIt = *it;
-            retainedIt++;
-        }
-    }
-    textures.erase(retainedIt, textures.end());
-
+    enduring_arr_compact(&textures);
     lookup_grid_dirty = true;
 }
 
@@ -19393,10 +19464,10 @@ RectIndexSet& RectTracker::overlapping(Rect uvrect, RectIndexSet &results) {
 }
 
 TextureRect* RectTracker::get_index(RectIndex index) {
-    if (index < 0 || index >= textures.size()) {
+    if (index < 0 || index >= textures.count) {
         return nullptr;
     }
-    return &textures[index].texture_rect;
+    return &textures.a[index].texture_rect;
 }
 
 void RectTracker::clear_rect(SRect &rect) {
@@ -19404,7 +19475,8 @@ void RectTracker::clear_rect(SRect &rect) {
     unsigned splits_count = 0;
 
     std::vector<TextureRect> newTextures;
-    for (EnduringTextureRect &eold : textures) {
+    for (int ti = 0; ti < textures.count; ti++) {
+        EnduringTextureRect &eold = textures.a[ti];
         if (eold.alive) {
             TextureRect &old = eold.texture_rect;
 
@@ -19422,26 +19494,27 @@ void RectTracker::clear_rect(SRect &rect) {
         }
     }
     for (TextureRect newTexture : newTextures) {
-        textures.push_back({ newTexture, true });
+        enduring_arr_push(&textures, newTexture, true);
     }
 }
 void RectTracker::place(TextureRect texture) {
     clear_rect(texture.vram_rect);
-    textures.push_back({ texture, true });
+    enduring_arr_push(&textures, texture, true);
 }
 
 void RectTracker::rebuild_lookup_grid() {
     lookup_grid.clear();
-    for (int i = 0; i < textures.size(); i++) {
-        if (textures[i].alive) {
-            lookup_grid.insert(textures[i].texture_rect.vram_rect, i);
+    for (int i = 0; i < textures.count; i++) {
+        if (textures.a[i].alive) {
+            lookup_grid.insert(textures.a[i].texture_rect.vram_rect, i);
         }
     }
     lookup_grid_dirty = false;
 }
 
 TextureUpload *RectTracker::find_upload(uint32_t hash) {
-    for (EnduringTextureRect &eold : textures) {
+    for (int i = 0; i < textures.count; i++) {
+        EnduringTextureRect &eold = textures.a[i];
         if (eold.texture_rect.upload->hash == hash) {
             return eold.texture_rect.upload;
         }
@@ -19578,13 +19651,13 @@ FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker
                 } else {
                     f.vram_rect.extend_bounding_box(r);
                 }
-                f.rects.push_back(clipped);
+                f.rects.push(clipped);
             }
         }
     }
 
     // Sort rects so that the vector itself can be compared
-    std::sort(f.rects.begin(), f.rects.end(), texture_rect_sort_gt);
+    std::sort(f.rects.v.begin(), f.rects.v.end(), texture_rect_sort_gt);
 
     return f;
 }
@@ -19900,7 +19973,7 @@ void TextureTracker::load_state(const TextureTrackerSaveState &state) {
     }
 
     clearRegion({ 0, 0, FB_WIDTH, FB_HEIGHT });
-    tracker.textures.clear(); // load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway
+    enduring_arr_clear(&tracker.textures); // load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway
     for (const TextureRectSaveState &r : state.rects) {
         tracker.place(from_save_state(r, uploads));
     }
@@ -19910,7 +19983,7 @@ void TextureTracker::load_state(const TextureTrackerSaveState &state) {
         loaded.hash = r.hash;
         loaded.rect = r.rect;
         for (const TextureRectSaveState &t : r.to_restore) {
-            loaded.to_restore.push_back(from_save_state(t, uploads));
+            loaded.to_restore.push(from_save_state(t, uploads));
         }
         restorable_rects.push_back(std::move(loaded));
     }
