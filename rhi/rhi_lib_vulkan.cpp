@@ -6152,10 +6152,117 @@ struct UsedMode {
 	}
 };
 
-struct HdImageHandle {
-    Vulkan::ImageHandle image;
-    int alpha_flags;
+/* ------------------------------------------------------------------------- *
+ * HdTexMap - palette_hash -> (Vulkan image, alpha flags), MSVC C89.
+ *
+ * Replaces std::map<uint32_t, HdImageHandle> on TextureUpload. Backed by a
+ * sorted, malloc'd array of POD entries keyed by palette hash (binary-search
+ * lookup, insert keeps it sorted). The image is held as a raw Vulkan::Image*
+ * (so the array can realloc) with the intrusive refcount managed by hand: a
+ * reference is taken when an entry is stored and released on
+ * replace/erase/clear/free - matching the raw-pointer scheme already used by
+ * the GPU image cache. Entries are POD, so TextureUpload can be a plain
+ * malloc-backed value once this and the other members are converted.
+ * ------------------------------------------------------------------------- */
+struct HdTexEntry {
+    uint32_t       key;          /* palette hash */
+    Vulkan::Image *image;        /* owns one reference while stored */
+    int            alpha_flags;
 };
+struct HdTexMap {
+    HdTexEntry *entries;
+    int         count;
+    int         cap;
+};
+
+static void hd_tex_map_init(HdTexMap *m)
+{
+    m->entries = NULL;
+    m->count = 0;
+    m->cap = 0;
+}
+static int hd_tex_map_lower_bound(const HdTexMap *m, uint32_t key)
+{
+    int lo = 0, hi = m->count;
+    while (lo < hi) {
+        int mid = lo + ((hi - lo) >> 1);
+        if (m->entries[mid].key < key)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+    return lo;
+}
+/* Returns the entry for key, or NULL. */
+static HdTexEntry *hd_tex_map_find(HdTexMap *m, uint32_t key)
+{
+    int i = hd_tex_map_lower_bound(m, key);
+    if (i < m->count && m->entries[i].key == key)
+        return &m->entries[i];
+    return NULL;
+}
+static int hd_tex_map_contains(const HdTexMap *m, uint32_t key)
+{
+    int i = hd_tex_map_lower_bound(m, key);
+    return i < m->count && m->entries[i].key == key;
+}
+/* Insert or replace key -> (image, alpha). Takes a reference on `image`;
+ * releases any image previously stored at this key. */
+static void hd_tex_map_set(HdTexMap *m, uint32_t key, Vulkan::Image *image, int alpha_flags)
+{
+    int i = hd_tex_map_lower_bound(m, key);
+    if (i < m->count && m->entries[i].key == key) {
+        if (image) image->add_reference();
+        if (m->entries[i].image) m->entries[i].image->release_reference();
+        m->entries[i].image = image;
+        m->entries[i].alpha_flags = alpha_flags;
+        return;
+    }
+    if (m->count == m->cap) {
+        int ncap = m->cap ? m->cap * 2 : 8;
+        m->entries = (HdTexEntry *)realloc(m->entries, (size_t)ncap * sizeof(HdTexEntry));
+        m->cap = ncap;
+    }
+    memmove(&m->entries[i + 1], &m->entries[i], (size_t)(m->count - i) * sizeof(HdTexEntry));
+    if (image) image->add_reference();
+    m->entries[i].key = key;
+    m->entries[i].image = image;
+    m->entries[i].alpha_flags = alpha_flags;
+    m->count++;
+}
+/* Release all image refs and reset to empty (keeps allocation). */
+static void hd_tex_map_clear(HdTexMap *m)
+{
+    int i;
+    for (i = 0; i < m->count; i++)
+        if (m->entries[i].image)
+            m->entries[i].image->release_reference();
+    m->count = 0;
+}
+static void hd_tex_map_free(HdTexMap *m)
+{
+    hd_tex_map_clear(m);
+    free(m->entries);
+    m->entries = NULL;
+    m->cap = 0;
+}
+/* Deep-copy src into dst (dst assumed empty/inited); re-acquires image refs. */
+static void hd_tex_map_copy(HdTexMap *dst, const HdTexMap *src)
+{
+    int i;
+    dst->entries = NULL;
+    dst->count = src->count;
+    dst->cap = src->count;
+    if (src->count) {
+        dst->entries = (HdTexEntry *)malloc((size_t)src->count * sizeof(HdTexEntry));
+        for (i = 0; i < src->count; i++) {
+            dst->entries[i] = src->entries[i];
+            if (dst->entries[i].image)
+                dst->entries[i].image->add_reference();
+        }
+    }
+}
+
 struct TextureUpload {
     /* VRAM source pixels (owned). Was std::vector<uint16_t>; filled once at
      * creation and thereafter read-only. */
@@ -6170,26 +6277,29 @@ struct TextureUpload {
     DumpedMode *dumped_modes;
     int         dumped_modes_count;
     int         dumped_modes_cap;
-	std::map<uint32_t, HdImageHandle> textures; // palette hash -> imagehandle
+	HdTexMap textures; // palette hash -> (image, alpha)
 	// (HD load bookkeeping lives on the TextureTracker: hd_gpu_cache / hd_cache /
 	//  requested / pending_attach, keyed by (hash,palette) so it survives this
 	//  upload being recreated as the sprite animation churns VRAM.)
 
     TextureUpload()
         : image(NULL), image_count(0), dumpable(false), width(0), height(0),
-          hash(0), dumped_modes(NULL), dumped_modes_count(0), dumped_modes_cap(0) {}
+          hash(0), dumped_modes(NULL), dumped_modes_count(0), dumped_modes_cap(0) {
+        hd_tex_map_init(&textures);
+    }
     ~TextureUpload() {
         free(image);
         free(dumped_modes);
+        hd_tex_map_free(&textures);
     }
     /* Owns malloc'd buffers, so copies must be deep. Copy/assign are used by
      * the save-state path (TextureUpload value map) and load_state's `*ptr =
-     * value`. The std::map<> member copies itself. */
+     * value`. The textures map is deep-copied (re-acquiring image refs). */
     TextureUpload(const TextureUpload &o)
         : image(NULL), image_count(o.image_count), dumpable(o.dumpable),
           width(o.width), height(o.height), hash(o.hash),
           dumped_modes(NULL), dumped_modes_count(o.dumped_modes_count),
-          dumped_modes_cap(o.dumped_modes_count), textures(o.textures) {
+          dumped_modes_cap(o.dumped_modes_count) {
         if (image_count) {
             image = (uint16_t *)malloc((size_t)image_count * sizeof(uint16_t));
             memcpy(image, o.image, (size_t)image_count * sizeof(uint16_t));
@@ -6198,16 +6308,17 @@ struct TextureUpload {
             dumped_modes = (DumpedMode *)malloc((size_t)dumped_modes_count * sizeof(DumpedMode));
             memcpy(dumped_modes, o.dumped_modes, (size_t)dumped_modes_count * sizeof(DumpedMode));
         }
+        hd_tex_map_copy(&textures, &o.textures);
     }
     TextureUpload &operator=(const TextureUpload &o) {
         if (this != &o) {
             free(image); free(dumped_modes);
+            hd_tex_map_free(&textures);
             image = NULL; dumped_modes = NULL;
             image_count = o.image_count;
             dumped_modes_count = o.dumped_modes_count;
             dumped_modes_cap = o.dumped_modes_count;
             dumpable = o.dumpable; width = o.width; height = o.height; hash = o.hash;
-            textures = o.textures;
             if (image_count) {
                 image = (uint16_t *)malloc((size_t)image_count * sizeof(uint16_t));
                 memcpy(image, o.image, (size_t)image_count * sizeof(uint16_t));
@@ -6216,6 +6327,7 @@ struct TextureUpload {
                 dumped_modes = (DumpedMode *)malloc((size_t)dumped_modes_count * sizeof(DumpedMode));
                 memcpy(dumped_modes, o.dumped_modes, (size_t)dumped_modes_count * sizeof(DumpedMode));
             }
+            hd_tex_map_copy(&textures, &o.textures);
         }
         return *this;
     }
@@ -18581,7 +18693,7 @@ void TextureTracker::want_combo(HdTextureId id) {
 // combos that were never drawn - thrashing the RAM cache and clogging the IO
 // queue ahead of the combos actually on screen, which made pop-in worse.)
 void TextureTracker::request_hd_texture(std::shared_ptr<TextureUpload> &upload, uint32_t palette_hash) {
-    if (upload->textures.count(palette_hash))
+    if (hd_tex_map_contains(&upload->textures, palette_hash))
         return; // already attached to this upload
 
     HdTextureId current = { upload->hash, palette_hash };
@@ -18594,7 +18706,7 @@ void TextureTracker::request_hd_texture(std::shared_ptr<TextureUpload> &upload, 
     // image was fully cached.
     CachedGpuImage *gpu = HdGpuCache_get(&hd_gpu_cache, hd_pack_key(current));
     if (gpu != nullptr) {
-        upload->textures[palette_hash] = { hd_gpu_image_handle(gpu), gpu->alpha_flags };
+        hd_tex_map_set(&upload->textures, palette_hash, gpu->image, gpu->alpha_flags);
         dbg_attaches++;
         return;
     }
@@ -18699,7 +18811,7 @@ HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, 
             // in the future it may be useful to cache none, but there's currently no way to check if such a containing rect is still alive (since HdTextureHandle's index would be -1)
             EnduringTextureRect &tex = tracker.textures[cache_result.handle.index]; // Forgive me
             if (tex.alive) {
-                fastpath_capable_out = fastpath_enabled && (tex.texture_rect.upload->textures[palette_hash].alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
+                fastpath_capable_out = fastpath_enabled && ((hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash) ? hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
                 return cache_result.handle;
             }
         }
@@ -18736,20 +18848,20 @@ HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, 
     Rect result_rect;
     for (RectIndex index : overlap) {
         TextureRect *tex = tracker.get_index(index);
-        std::map<uint32_t, HdImageHandle>::iterator overlapped_image = tex->upload->textures.find(palette_hash);
-        if (overlapped_image == tex->upload->textures.end()) {
+        HdTexEntry *overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
+        if (overlapped_image == NULL) {
             // Not bound to this upload yet. Bind it now: a GPU-cache hit binds
             // in-frame (handle copy, used by THIS draw - no 1-frame native
             // flicker), otherwise this schedules a decode / GPU upload that
             // lands on a later frame.
             request_hd_texture(tex->upload, palette_hash);
-            overlapped_image = tex->upload->textures.find(palette_hash);
+            overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
         }
-        if (overlapped_image != tex->upload->textures.end()) {
+        if (overlapped_image != NULL) {
             if (result == HdTextureHandle::make_none()) {
                 // note that if tex->vram_rect contains rect, then it will be the only entry in overlap, so an early out would be pointless
                 result_rect = fromSRect(tex->vram_rect);
-                fastpath_capable_out = fastpath_enabled && fromSRect(tex->vram_rect).contains(rect) && (overlapped_image->second.alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
+                fastpath_capable_out = fastpath_enabled && fromSRect(tex->vram_rect).contains(rect) && (overlapped_image->alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
                 result = HdTextureHandle::make(index, palette_hash);
             } else {
                 // Multiple overlap, must fuse
@@ -18790,8 +18902,8 @@ HdTexture TextureTracker::get_hd_texture(HdTextureHandle handle) {
         TextureUpload &upload = *tex->upload;
         // Use find rather than index, because if a stale HdTextureHandle was provided this could segfault
         // because indexing on a key that isn't present would initialize a new one with a null pointer
-        std::map<uint32_t, HdImageHandle>::iterator iter = upload.textures.find(handle.palette_hash);
-        if (iter == upload.textures.end()) {
+        HdTexEntry *iter = hd_tex_map_find(&upload.textures, handle.palette_hash);
+        if (iter == NULL) {
             TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
             return {
                 {0, 0, 1, 1},
@@ -18799,7 +18911,10 @@ HdTexture TextureTracker::get_hd_texture(HdTextureHandle handle) {
                 default_hd_texture
             };
         }
-        Vulkan::ImageHandle &image = iter->second.image;
+        /* Reconstruct a counted handle from the stored raw image (add_reference
+         * then adopt), matching hd_gpu_image_handle. */
+        iter->image->add_reference();
+        Vulkan::ImageHandle image(iter->image);
         int scaleX = image->get_width() / upload.width;
         int scaleY = image->get_height() / upload.height;
         SRect texture_subrect = tex->texture_subrect();
@@ -18867,13 +18982,13 @@ void TextureTracker::on_queues_reset() {
         std::shared_ptr<TextureUpload> upload = find_upload(id.hash);
         if (upload == nullptr)
             continue; // not resident yet; kept in cache
-        if (upload->textures.count(id.palette_hash))
+        if (hd_tex_map_contains(&upload->textures, id.palette_hash))
             continue; // already attached
 
         // Tier 1: ready-to-bind GPU image - just copy the handle.
         CachedGpuImage *gpu = HdGpuCache_get(&hd_gpu_cache, hd_pack_key(id));
         if (gpu != nullptr) {
-            upload->textures[id.palette_hash] = { hd_gpu_image_handle(gpu), gpu->alpha_flags };
+            hd_tex_map_set(&upload->textures, id.palette_hash, gpu->image, gpu->alpha_flags);
             dbg_attaches++;
             for (EnduringTextureRect &e : tracker.textures) {
                 if (e.alive && e.texture_rect.upload == upload) {
@@ -18895,7 +19010,7 @@ void TextureTracker::on_queues_reset() {
         {
             Vulkan::ImageHandle texture = uploader->upload_texture(cached->levels);
             hd_gpu_cache_put(&hd_gpu_cache, id, texture, cached->alpha_flags, cached->bytes);
-            upload->textures[id.palette_hash] = { texture, cached->alpha_flags };
+            hd_tex_map_set(&upload->textures, id.palette_hash, texture.get(), cached->alpha_flags);
             dbg_gpu_uploads++;
             dbg_attaches++;
             for (EnduringTextureRect &e : tracker.textures) {
@@ -19036,10 +19151,10 @@ void TextureTracker::reload_textures_from_disk() {
     hd_key_set_clear(&requested);
     hd_key_set_clear(&pending_attach);
     for (EnduringTextureRect &texture : tracker.textures)
-        texture.texture_rect.upload->textures.clear();
+        hd_tex_map_clear(&texture.texture_rect.upload->textures);
     for (RestorableRect &restorable : restorable_rects) {
         for (TextureRect &tr : restorable.to_restore) {
-            tr.upload->textures.clear();
+            hd_tex_map_clear(&tr.upload->textures);
         }
     }
 
@@ -19326,12 +19441,12 @@ FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker
         std::pair<SRect, bool> intersection = intersect(toSRect(full_page_rect), e.texture_rect.vram_rect);
         if (intersection.second) {
             TextureUpload &upload = *e.texture_rect.upload;
-            std::map<uint32_t, HdImageHandle>::iterator hd_texture = upload.textures.find(palette_hash);
-            if (hd_texture != upload.textures.end()) {
+            HdTexEntry *hd_texture = hd_tex_map_find(&upload.textures, palette_hash);
+            if (hd_texture != NULL) {
                 // Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity)
                 TextureRect clipped = subTexture(e.texture_rect, intersection.first);
-                f.scaleX = std::max(f.scaleX, hd_texture->second.image->get_width() / upload.width);
-                f.scaleY = std::max(f.scaleY, hd_texture->second.image->get_height() / upload.height);
+                f.scaleX = std::max(f.scaleX, hd_texture->image->get_width() / upload.width);
+                f.scaleY = std::max(f.scaleY, hd_texture->image->get_height() / upload.height);
                 Rect r = fromSRect(clipped.vram_rect);
                 if (f.vram_rect.width == 0) {
                     f.vram_rect = r;
@@ -19413,13 +19528,13 @@ void rebuild_page(FusedPage &page, RectTracker &tracker, Renderer *uploader) {
     for (TextureRect &tex : page.fusion.rects) {
         TextureUpload &upload = *tex.upload;
 
-        std::map<uint32_t, HdImageHandle>::iterator hd_texture = upload.textures.find(page.palette);
-        if (hd_texture == upload.textures.end()) {
+        HdTexEntry *hd_texture = hd_tex_map_find(&upload.textures, page.palette);
+        if (hd_texture == NULL) {
             // That's odd
             continue;
         }
 
-        Vulkan::ImageHandle &image = hd_texture->second.image;
+        Vulkan::Image *image = hd_texture->image;
 
         int srcWidth = image->get_width();
         int srcHeight = image->get_height();
@@ -19600,7 +19715,7 @@ void FusedPages::remove_dead() {
 
 TextureUpload copy_upload_without_handles(const TextureUpload &to_copy) {
     TextureUpload copy = to_copy;
-    copy.textures.clear();
+    hd_tex_map_clear(&copy.textures);
     return copy;
 }
 
