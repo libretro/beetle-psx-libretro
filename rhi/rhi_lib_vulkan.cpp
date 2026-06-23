@@ -7092,7 +7092,11 @@ private:
     int       dump_ignore_count;
 
     HdKeySet known_files;
-    std::vector<CachedPaletteHash> cached_palette_hashes;
+    // Palette-hash cache: a plain growable array (append-only until cleared,
+    // no eviction/order), replacing std::vector<CachedPaletteHash>.
+    CachedPaletteHash *cached_palette_hashes;
+    int cached_palette_hashes_count;
+    int cached_palette_hashes_cap;
     std::vector<RestorableRect> restorable_rects;
     FusedPages fused_pages;
     uint64_t frame = 0;
@@ -7144,7 +7148,7 @@ private:
 
     void clear_palette_cache(Rect rect)
     {
-        cached_palette_hashes.clear();
+        cached_palette_hashes_count = 0; /* keep allocation for reuse */
     }
 
     /** Returns nullptr if no texture with the given hash can be found */
@@ -18163,6 +18167,9 @@ TextureTracker::TextureTracker()
     hd_key_set_init(&known_files);
     hd_key_set_init(&requested);
     hd_key_set_init(&pending_attach);
+    cached_palette_hashes = NULL;
+    cached_palette_hashes_count = 0;
+    cached_palette_hashes_cap = 0;
     read_texture_directory(&known_files, replacements_path(rpath, sizeof(rpath)));
     TT_LOG(RETRO_LOG_INFO, "num hd textures: %d\n", (int)known_files.count);
 
@@ -18183,6 +18190,7 @@ TextureTracker::~TextureTracker()
     hd_key_set_free(&known_files);
     hd_key_set_free(&requested);
     hd_key_set_free(&pending_attach);
+    free(cached_palette_hashes);
 }
 
 static inline SRect toSRect(Rect rect) {
@@ -18214,14 +18222,23 @@ Palette TextureTracker::get_palette(Rect palette_rect) {
 }
 
 uint32_t TextureTracker::get_palette_hash(Rect palette_rect) {
-    for (CachedPaletteHash &cached : cached_palette_hashes) {
-        if (cached.rect == palette_rect) {
-            return cached.hash;
+    int i;
+    for (i = 0; i < cached_palette_hashes_count; i++) {
+        if (cached_palette_hashes[i].rect == palette_rect) {
+            return cached_palette_hashes[i].hash;
         }
     }
     Palette palette = get_palette(palette_rect);
     if (palette.data != nullptr) {
-        cached_palette_hashes.push_back({ palette_rect, palette.hash });
+        if (cached_palette_hashes_count == cached_palette_hashes_cap) {
+            int ncap = cached_palette_hashes_cap ? cached_palette_hashes_cap * 2 : 16;
+            cached_palette_hashes = (CachedPaletteHash *)realloc(cached_palette_hashes,
+                                        (size_t)ncap * sizeof(CachedPaletteHash));
+            cached_palette_hashes_cap = ncap;
+        }
+        cached_palette_hashes[cached_palette_hashes_count].rect = palette_rect;
+        cached_palette_hashes[cached_palette_hashes_count].hash = palette.hash;
+        cached_palette_hashes_count++;
         return palette.hash;
     }
     return 0; // TODO: better way to indicate no palette found?
