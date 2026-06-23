@@ -6264,6 +6264,12 @@ static void hd_tex_map_copy(HdTexMap *dst, const HdTexMap *src)
 }
 
 struct TextureUpload {
+    /* Intrusive refcount for shared ownership across TextureRects (replaces
+     * std::shared_ptr<TextureUpload>). A freshly constructed upload starts at
+     * 0; texture_upload_new() bumps it to 1. Copies (deep-copy ctor/assignment,
+     * used by the by-value save-state map) get their OWN fresh count - the
+     * refcount is deliberately not copied. */
+    int refcount;
     /* VRAM source pixels (owned). Was std::vector<uint16_t>; filled once at
      * creation and thereafter read-only. */
     uint16_t *image;
@@ -6283,7 +6289,7 @@ struct TextureUpload {
 	//  upload being recreated as the sprite animation churns VRAM.)
 
     TextureUpload()
-        : image(NULL), image_count(0), dumpable(false), width(0), height(0),
+        : refcount(0), image(NULL), image_count(0), dumpable(false), width(0), height(0),
           hash(0), dumped_modes(NULL), dumped_modes_count(0), dumped_modes_cap(0) {
         hd_tex_map_init(&textures);
     }
@@ -6296,7 +6302,7 @@ struct TextureUpload {
      * the save-state path (TextureUpload value map) and load_state's `*ptr =
      * value`. The textures map is deep-copied (re-acquiring image refs). */
     TextureUpload(const TextureUpload &o)
-        : image(NULL), image_count(o.image_count), dumpable(o.dumpable),
+        : refcount(0), image(NULL), image_count(o.image_count), dumpable(o.dumpable),
           width(o.width), height(o.height), hash(o.hash),
           dumped_modes(NULL), dumped_modes_count(o.dumped_modes_count),
           dumped_modes_cap(o.dumped_modes_count) {
@@ -6333,7 +6339,27 @@ struct TextureUpload {
     }
 };
 
-// Decoded RGBA image level (one mip). C-style ownership: a plain malloc'd
+/* Allocate a new TextureUpload with refcount 1 (the caller owns that ref).
+ * Uses operator new so the C++ members (the deep-copy ctor's machinery and the
+ * HdTexMap/owned buffers) are constructed; texture_upload_release matches it
+ * with delete. */
+static TextureUpload *texture_upload_new()
+{
+    TextureUpload *u = new TextureUpload();
+    u->refcount = 1;
+    return u;
+}
+static void texture_upload_acquire(TextureUpload *u)
+{
+    if (u)
+        u->refcount++;
+}
+static void texture_upload_release(TextureUpload *u)
+{
+    if (u && --u->refcount == 0)
+        delete u; /* dtor frees image/dumped_modes and releases the texmap refs */
+}
+
 // byte buffer plus its size, rather than std::vector<uint8_t>. This is a POD
 // (trivially copyable) struct - copying it copies the pointer, NOT the bytes,
 // so ownership is by convention: exactly one LoadedLevels owns each buffer and
@@ -6550,14 +6576,41 @@ struct CachedPaletteHash {
 //============
 // RectTracker
 struct TextureRect {
-    std::shared_ptr<TextureUpload> upload;
+    /* Shared (refcounted) reference to the upload. Was
+     * std::shared_ptr<TextureUpload>; now a raw pointer with the refcount
+     * managed by this struct's ctor/copy/assign/dtor (acquire on take, release
+     * on drop), reproducing shared_ptr value semantics. */
+    TextureUpload *upload;
     // the offset into the original upload rect (offset_x + vram_rect.width <= upload->width)
     int offset_x;
     int offset_y;
     SRect vram_rect;
-    TextureRect(std::shared_ptr<TextureUpload> upload, int offset_x, int offset_y, SRect vram_rect): 
-    upload(upload), offset_x(offset_x), offset_y(offset_y), vram_rect(vram_rect)
+    TextureRect(TextureUpload *upload_, int offset_x, int offset_y, SRect vram_rect):
+    upload(upload_), offset_x(offset_x), offset_y(offset_y), vram_rect(vram_rect)
     {
+        texture_upload_acquire(upload);
+    }
+    TextureRect(const TextureRect &o):
+    upload(o.upload), offset_x(o.offset_x), offset_y(o.offset_y), vram_rect(o.vram_rect)
+    {
+        texture_upload_acquire(upload);
+    }
+    TextureRect &operator=(const TextureRect &o)
+    {
+        if (this != &o) {
+            TextureUpload *old = upload;
+            upload = o.upload;
+            texture_upload_acquire(upload);
+            texture_upload_release(old);
+            offset_x = o.offset_x;
+            offset_y = o.offset_y;
+            vram_rect = o.vram_rect;
+        }
+        return *this;
+    }
+    ~TextureRect()
+    {
+        texture_upload_release(upload);
     }
 
     // in vram size (not hd), local to the uploaded data, different hd textures for different palettes could have different sizes anyway
@@ -6567,7 +6620,7 @@ struct TextureRect {
 
 	inline bool operator==(const TextureRect &other) const
 	{
-		return upload.get() == other.upload.get() && offset_x == other.offset_x && offset_y == other.offset_y && vram_rect == other.vram_rect;
+		return upload == other.upload && offset_x == other.offset_x && offset_y == other.offset_y && vram_rect == other.vram_rect;
 	}
     inline bool operator!=(const TextureRect &other) const
     {
@@ -6602,7 +6655,7 @@ private:
 class RectTracker {
 public:
     void place(TextureRect texture);
-    void upload(SRect rect, std::shared_ptr<TextureUpload> upload);
+    void upload(SRect rect, TextureUpload *upload);
     void blit(SRect dst, SRect src);
     void clear(SRect rect)
     {
@@ -6620,7 +6673,7 @@ public:
     TextureRect* get_index(RectIndex index);
 
     /** Returns nullptr if no texture with the given hash can be found */
-    std::shared_ptr<TextureUpload> find_upload(uint32_t hash);
+    TextureUpload *find_upload(uint32_t hash);
 private:
     LookupGrid lookup_grid;
     bool lookup_grid_dirty = false;
@@ -7290,7 +7343,7 @@ private:
     uint64_t dbg_attaches = 0;                 // combos bound to an upload (handle copy or fresh upload)
     uint64_t dbg_attaches_last = 0;
 
-    void dump_texture(std::shared_ptr<TextureUpload> &upload, UsedMode &mode, DumpedMode dump_mode);
+    void dump_texture(TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode);
     
     DbgHotkey frame_dump_key = RETROK_LEFTBRACKET; // disgusting
     RFILE *frame_dump = NULL;
@@ -7300,7 +7353,7 @@ private:
 
     void load_hd_texture(uint32_t hash); // eager per-hash loader, still used by load_state (savestate)
     // Cache-backed lazy HD texture binding for a drawn (hash,palette); see definition.
-    void request_hd_texture(std::shared_ptr<TextureUpload> &upload, uint32_t palette_hash);
+    void request_hd_texture(TextureUpload *upload, uint32_t palette_hash);
 
     DbgHotkey reload_key = RETROK_QUOTE;
     void reload_textures_from_disk();
@@ -7316,7 +7369,7 @@ private:
     }
 
     /** Returns nullptr if no texture with the given hash can be found */
-    std::shared_ptr<TextureUpload> find_upload(uint32_t hash);
+    TextureUpload *find_upload(uint32_t hash);
 };
 
 }
@@ -18547,7 +18600,7 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
         return;
     }
 
-    std::shared_ptr<TextureUpload> upload;
+    TextureUpload *upload = NULL;
     bool preexisting = false;
     {
         unsigned x = rect.x,
@@ -18567,9 +18620,9 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
         // TODO: check for hash collision, by checking if existing upload has different dimensions. not sure how to recover if it does,
         //       but the odds of a collision are probably much higher than the odds that both textures would be in play simultaneously,
         //       so it'd probably be safe to simply ignore the newest upload and clear instead.
-        upload = find_upload(hash);
+        upload = find_upload(hash);    /* borrowed */
         if (upload == nullptr) {
-            upload = std::make_shared<TextureUpload>();
+            upload = texture_upload_new();  /* owns +1 */
             upload->image = img;            /* transfer ownership */
             upload->image_count = (int)img_n;
             img = NULL;
@@ -18586,6 +18639,7 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
             }
         } else {
             preexisting = true;
+            texture_upload_acquire(upload); /* take our own ref on the borrowed result */
         }
         free(img); /* NULL if ownership was transferred */
     }
@@ -18627,6 +18681,7 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
             want_combo(combo);
         }
     }
+    texture_upload_release(upload); /* drop the local ref; rects hold their own */
 }
 
 void TextureTracker::load_hd_texture(uint32_t hash) {
@@ -18692,7 +18747,7 @@ void TextureTracker::want_combo(HdTextureId id) {
 // already free, so warming the whole palette hash-set up front mostly decoded
 // combos that were never drawn - thrashing the RAM cache and clogging the IO
 // queue ahead of the combos actually on screen, which made pop-in worse.)
-void TextureTracker::request_hd_texture(std::shared_ptr<TextureUpload> &upload, uint32_t palette_hash) {
+void TextureTracker::request_hd_texture(TextureUpload *upload, uint32_t palette_hash) {
     if (hd_tex_map_contains(&upload->textures, palette_hash))
         return; // already attached to this upload
 
@@ -18725,7 +18780,7 @@ void output_rect_json(RFILE *stream, Rect &rect) {
         rect.x, rect.y, rect.width, rect.height);
 }
 
-void TextureTracker::dump_texture(std::shared_ptr<TextureUpload> &upload, UsedMode &mode, DumpedMode dump_mode) {
+void TextureTracker::dump_texture(TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode) {
     if (!upload->dumpable) {
         return;
     }
@@ -18979,7 +19034,7 @@ void TextureTracker::on_queues_reset() {
         HdTextureId id;
         id.hash = (uint32_t)(pending_attach.keys[pi] >> 32);
         id.palette_hash = (uint32_t)pending_attach.keys[pi];
-        std::shared_ptr<TextureUpload> upload = find_upload(id.hash);
+        TextureUpload *upload = find_upload(id.hash); /* borrowed */
         if (upload == nullptr)
             continue; // not resident yet; kept in cache
         if (hd_tex_map_contains(&upload->textures, id.palette_hash))
@@ -19031,8 +19086,8 @@ void TextureTracker::on_queues_reset() {
     fused_pages.rebuild_dirty(tracker, uploader);
     fused_pages.remove_dead();
 }
-std::shared_ptr<TextureUpload> TextureTracker::find_upload(uint32_t hash) {
-    std::shared_ptr<TextureUpload> upload = tracker.find_upload(hash);
+TextureUpload *TextureTracker::find_upload(uint32_t hash) {
+    TextureUpload *upload = tracker.find_upload(hash); /* borrowed */
 
     if (upload != nullptr) {
         return upload;
@@ -19229,7 +19284,7 @@ void split(SRect original, SRect remove, SRect *results, unsigned &count) {
     }
 }
 
-void RectTracker::upload(SRect rect, std::shared_ptr<TextureUpload> upload) {
+void RectTracker::upload(SRect rect, TextureUpload *upload) {
     TextureRect texture(upload, 0, 0, rect);
     place(texture);
     lookup_grid_dirty = true;
@@ -19338,7 +19393,7 @@ void RectTracker::rebuild_lookup_grid() {
     lookup_grid_dirty = false;
 }
 
-std::shared_ptr<TextureUpload> RectTracker::find_upload(uint32_t hash) {
+TextureUpload *RectTracker::find_upload(uint32_t hash) {
     for (EnduringTextureRect &eold : textures) {
         if (eold.texture_rect.upload->hash == hash) {
             return eold.texture_rect.upload;
@@ -19420,9 +19475,9 @@ bool srect_gt(const SRect &a, const SRect &b) {
 }
 
 static bool texture_rect_sort_gt(const TextureRect &a, const TextureRect &b) {
-    // Compare .upload by internal pointer
-    if (a.upload.get() != b.upload.get())
-        return a.upload.get() > b.upload.get();
+    // Compare .upload by pointer
+    if (a.upload != b.upload)
+        return a.upload > b.upload;
     if (a.vram_rect != b.vram_rect)
         return srect_gt(a.vram_rect, b.vram_rect);
     return srect_gt(a.texture_subrect(), b.texture_subrect());
@@ -19731,13 +19786,13 @@ TextureRectSaveState to_save_state(const TextureRect &t, std::map<uint32_t, Text
         t.vram_rect
     };
 }
-TextureRect from_save_state(const TextureRectSaveState &t, std::map<uint32_t, std::shared_ptr<TextureUpload>> &uploads) {
-    std::map<uint32_t, std::shared_ptr<TextureUpload>>::iterator it = uploads.find(t.upload_hash);
+TextureRect from_save_state(const TextureRectSaveState &t, std::map<uint32_t, TextureUpload*> &uploads) {
+    std::map<uint32_t, TextureUpload*>::iterator it = uploads.find(t.upload_hash);
     if (it == uploads.end()) {
         TT_LOG(RETRO_LOG_ERROR, "SaveState upload missing!\n");
     }
     return {
-        it->second,
+        it->second,    /* TextureRect ctor acquires its own ref */
         t.offset_x,
         t.offset_y,
         t.vram_rect
@@ -19767,11 +19822,11 @@ TextureTrackerSaveState TextureTracker::save_state() {
 
 
 void TextureTracker::load_state(const TextureTrackerSaveState &state) {
-    std::map<uint32_t, std::shared_ptr<TextureUpload>> uploads;
+    std::map<uint32_t, TextureUpload*> uploads;
     for (std::map<uint32_t, TextureUpload>::const_iterator it = state.uploads.begin(); it != state.uploads.end(); it++) {
-        std::shared_ptr<TextureUpload> ptr = std::shared_ptr<TextureUpload>(new TextureUpload);
-        *ptr = it->second;
-        uploads[it->first] = std::move(ptr);
+        TextureUpload *ptr = texture_upload_new(); /* owns +1 */
+        *ptr = it->second;                         /* deep-copy contents (refcount untouched) */
+        uploads[it->first] = ptr;
     }
 
     clearRegion({ 0, 0, FB_WIDTH, FB_HEIGHT });
@@ -19792,6 +19847,11 @@ void TextureTracker::load_state(const TextureTrackerSaveState &state) {
     // Need to reload the hd textures, too
     for (std::map<uint32_t, TextureUpload>::const_iterator it = state.uploads.begin(); it != state.uploads.end(); it++) {
         load_hd_texture(it->first);
+    }
+    // Drop the map's construction refs; the placed/restorable TextureRects now
+    // hold their own references to each upload.
+    for (std::map<uint32_t, TextureUpload*>::iterator it = uploads.begin(); it != uploads.end(); it++) {
+        texture_upload_release(it->second);
     }
 }
 // End of Save State
