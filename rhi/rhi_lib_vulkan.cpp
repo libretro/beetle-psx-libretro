@@ -1642,7 +1642,6 @@ PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
 
 #include <algorithm>
 #include <assert.h>
-#include <fstream>
 #include <map>
 #include <memory>
 #include <set>
@@ -7055,7 +7054,7 @@ private:
     void dump_texture(std::shared_ptr<TextureUpload> &upload, UsedMode &mode, DumpedMode dump_mode);
     
     DbgHotkey frame_dump_key = RETROK_LEFTBRACKET; // disgusting
-    std::ofstream *frame_dump = nullptr;
+    RFILE *frame_dump = NULL;
     bool frame_dump_need_comma = false;
 
     DbgHotkey hd_toggle_key = RETROK_RIGHTBRACKET;
@@ -18430,13 +18429,10 @@ void TextureTracker::request_hd_texture(std::shared_ptr<TextureUpload> &upload, 
         want_combo(current);            // queue a single disk load for the drawn combo
 }
 
-void output_rect_json(std::ostream &stream, Rect &rect) {
-    stream << "{ "
-           << "\"x\": " << rect.x << ","
-           << "\"y\": " << rect.y << ","
-           << "\"width\": " << rect.width << ","
-           << "\"height\": " << rect.height
-           << "}\n";
+void output_rect_json(RFILE *stream, Rect &rect) {
+    filestream_printf(stream,
+        "{ \"x\": %u,\"y\": %u,\"width\": %u,\"height\": %u}\n",
+        rect.x, rect.y, rect.width, rect.height);
 }
 
 void TextureTracker::dump_texture(std::shared_ptr<TextureUpload> &upload, UsedMode &mode, DumpedMode dump_mode) {
@@ -18519,18 +18515,17 @@ HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, 
         TextureRect *tex = tracker.get_index(index);
         dump_texture(tex->upload, mode, { mode.mode, palette_hash });
     }
-    if (frame_dump != nullptr) {
+    if (frame_dump != NULL) {
         if (frame_dump_need_comma) {
-            *frame_dump << ",";
+            filestream_printf(frame_dump, ",");
         } else {
             frame_dump_need_comma = true;
         }
-        *frame_dump << " { \"rect\": ";
-        output_rect_json(*frame_dump, rect);
-        *frame_dump << ", \"mode\": { \"mode\": " << int(mode.mode)
-            << ", \"palette_x\": " << mode.palette_offset_x
-            << ", \"palette_y\": " << mode.palette_offset_y
-            << "} }\n";
+        filestream_printf(frame_dump, " { \"rect\": ");
+        output_rect_json(frame_dump, rect);
+        filestream_printf(frame_dump,
+            ", \"mode\": { \"mode\": %d, \"palette_x\": %u, \"palette_y\": %u} }\n",
+            (int)mode.mode, mode.palette_offset_x, mode.palette_offset_y);
     }
 
     if (!hd_textures_enabled) {
@@ -18754,10 +18749,10 @@ void TextureTracker::endFrame() {
         dbg_attaches_last = dbg_attaches;
     }
 
-    if (frame_dump != nullptr) {
-        *frame_dump << "]}\n";
-        delete frame_dump;
-        frame_dump = nullptr;
+    if (frame_dump != NULL) {
+        filestream_printf(frame_dump, "]}\n");
+        filestream_close(frame_dump);
+        frame_dump = NULL;
     }
 
     if (dbg_input_state_cb != 0) {
@@ -18766,24 +18761,28 @@ void TextureTracker::endFrame() {
             dump_path(fdpath, sizeof(fdpath));
             snprintf(fdpath + strlen(fdpath), sizeof(fdpath) - strlen(fdpath), "test_dump.json");
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "Left bracket!\n");
-            frame_dump = new std::ofstream(fdpath);
+            frame_dump = filestream_open(fdpath, RETRO_VFS_FILE_ACCESS_WRITE,
+                                         RETRO_VFS_FILE_ACCESS_HINT_NONE);
             frame_dump_need_comma = false;
-            *frame_dump << "{ \"initial\": [\n";
-            bool need_comma = false;
-            for (EnduringTextureRect &etexture : tracker.textures) {
-                if (!etexture.alive) continue;
-                TextureRect &texture = etexture.texture_rect;
-                if (need_comma) {
-                    *frame_dump << ",";
-                } else {
-                    need_comma = true;
+            if (frame_dump != NULL) {
+                bool need_comma = false;
+                filestream_printf(frame_dump, "{ \"initial\": [\n");
+                for (EnduringTextureRect &etexture : tracker.textures) {
+                    if (!etexture.alive) continue;
+                    TextureRect &texture = etexture.texture_rect;
+                    Rect rect;
+                    if (need_comma) {
+                        filestream_printf(frame_dump, ",");
+                    } else {
+                        need_comma = true;
+                    }
+                    filestream_printf(frame_dump, " { \"rect\": ");
+                    rect = fromSRect(texture.vram_rect);
+                    output_rect_json(frame_dump, rect);
+                    filestream_printf(frame_dump, ", \"hash\": \"%x\" }\n", texture.upload->hash);
                 }
-                *frame_dump << " { \"rect\": ";
-                Rect rect = fromSRect(texture.vram_rect);
-                output_rect_json(*frame_dump, rect);
-                *frame_dump << ", \"hash\": \"" << std::hex << texture.upload->hash << "\" }\n" << std::dec;
+                filestream_printf(frame_dump, "], \"events\": [\n");
             }
-            *frame_dump << "], \"events\": [\n";
         }
 
         if (hd_toggle_key.query()) {
