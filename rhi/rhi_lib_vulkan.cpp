@@ -1643,7 +1643,6 @@ PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
 #include <algorithm>
 #include <assert.h>
 #include <fstream>
-#include <list>
 #include <map>
 #include <memory>
 #include <set>
@@ -6216,43 +6215,41 @@ static inline void loaded_image_init(LoadedImage *img)
 struct LoadedLevels {
     LoadedImage *levels;
     int          count;
-
-    bool empty() const { return count == 0; }
-
-    // Total owned bytes across all levels.
-    size_t byte_size() const
-    {
-        size_t b = 0;
-        int i;
-        for (i = 0; i < count; i++)
-            b += levels[i].owned_size;
-        return b;
-    }
-
-    // Append by stealing *src's buffer (src left empty). Grows with realloc.
-    // Returns the stored level, or NULL on alloc failure.
-    LoadedImage *push_move(LoadedImage *src)
-    {
-        LoadedImage *grown = (LoadedImage *)realloc(levels, (size_t)(count + 1) * sizeof(LoadedImage));
-        if (!grown)
-            return NULL;
-        levels = grown;
-        levels[count] = *src; /* POD: copies the pointer (steal) */
-        loaded_image_init(src);
-        return &levels[count++];
-    }
-
-    // Free all buffers + the array, return to empty state.
-    void reset()
-    {
-        int i;
-        for (i = 0; i < count; i++)
-            free(levels[i].owned_data);
-        free(levels);
-        levels = NULL;
-        count  = 0;
-    }
 };
+
+/* Total owned bytes across all levels. */
+static size_t loaded_levels_byte_size(const LoadedLevels *l)
+{
+    size_t b = 0;
+    int i;
+    for (i = 0; i < l->count; i++)
+        b += l->levels[i].owned_size;
+    return b;
+}
+
+/* Append by stealing *src's buffer (src left empty). Grows with realloc.
+ * Returns the stored level, or NULL on alloc failure. */
+static LoadedImage *loaded_levels_push_move(LoadedLevels *l, LoadedImage *src)
+{
+    LoadedImage *grown = (LoadedImage *)realloc(l->levels, (size_t)(l->count + 1) * sizeof(LoadedImage));
+    if (!grown)
+        return NULL;
+    l->levels = grown;
+    l->levels[l->count] = *src; /* POD: copies the pointer (steal) */
+    loaded_image_init(src);
+    return &l->levels[l->count++];
+}
+
+/* Free all buffers + the array, return to empty state. */
+static void loaded_levels_reset(LoadedLevels *l)
+{
+    int i;
+    for (i = 0; i < l->count; i++)
+        free(l->levels[i].owned_data);
+    free(l->levels);
+    l->levels = NULL;
+    l->count  = 0;
+}
 
 // Zero-initialise (no allocation).
 static inline void loaded_levels_init(LoadedLevels *l)
@@ -6266,7 +6263,7 @@ static inline void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
 {
     if (dst == src)
         return;
-    dst->reset();
+    loaded_levels_reset(dst);
     dst->levels = src->levels;
     dst->count  = src->count;
     src->levels = NULL;
@@ -6517,411 +6514,472 @@ struct TextureTrackerSaveState {
 // End of Save State
 //========================================
 
-// Tunable HD-texture cache budgets. hd_cache = system RAM (decoded CPU levels);
-// hd_gpu_cache = VRAM (uploaded Vulkan images). The VRAM budget targets 8 GB
-// cards - lower it if you see VRAM-pressure "QueuePresent failed" / swapchain
-// churn, raise it on larger cards.
-static const size_t HD_CACHE_RAM_BUDGET  = (size_t)2 * 1024 * 1024 * 1024; // 2 GB
-static const size_t HD_CACHE_VRAM_BUDGET = (size_t)3 * 1024 * 1024 * 1024; // 3 GB
+/* Tunable HD-texture cache budgets. hd_cache = system RAM (decoded CPU levels);
+ * hd_gpu_cache = VRAM (uploaded Vulkan images). The VRAM budget targets 8 GB
+ * cards - lower it if you see VRAM-pressure "QueuePresent failed" / swapchain
+ * churn, raise it on larger cards. */
+static const size_t HD_CACHE_RAM_BUDGET  = (size_t)2 * 1024 * 1024 * 1024; /* 2 GB */
+static const size_t HD_CACHE_VRAM_BUDGET = (size_t)3 * 1024 * 1024 * 1024; /* 3 GB */
 
-// (hash, palette_hash) packed into one 64-bit key. The two caches below are
-// keyed by this instead of HdTextureId so the hash table compares a single
-// integer (no struct operator< / no tree descent).
-static inline uint64_t hd_pack_key(HdTextureId id)
+/* (hash, palette_hash) packed into one 64-bit key. The caches below are keyed
+ * by this single integer instead of HdTextureId, so lookups compare one int
+ * with no struct operator< / tree descent. */
+static uint64_t hd_pack_key(HdTextureId id)
 {
     return ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash;
 }
 
-// ---------------------------------------------------------------------------
-// HdLruArena<T> - the storage engine shared by both HD caches.
-//
-// Replaces the stock std::list<Entry> + std::map<id, list::iterator> design.
-// That design did two heap node allocations per insert (list node + map node)
-// and an O(log n) red-black descent with pointer-chasing on every lookup. This
-// one keeps every entry in one contiguous std::vector<Slot> arena, threads the
-// LRU order through that arena as a doubly linked list of *indices* (so it is
-// cache-dense and survives vector reallocation - raw pointers would not), and
-// resolves keys through an open-addressed (linear-probe) flat hash table of
-// indices rather than a tree. Result: O(1) average lookup, zero per-entry
-// allocations, and contiguous traversal. Measured ~3x faster than the stock
-// list+map under animated-sprite combo churn.
-//
-// Conservative C++ (MSVC-clean): no NSDMI, no aggregate brace-temporaries in
-// calls, explicit iterator/index types, no C99/C11 leakage.
-//
-// T is the per-entry payload (CachedHdImage or CachedGpuImage). The arena does
-// not know how to size a payload; the owning cache reports each entry's byte
-// cost via account() and supplies a Disposer so eviction can release payload
-// resources (e.g. drop a Vulkan::ImageHandle) at the moment a slot is reclaimed.
-// ---------------------------------------------------------------------------
-template <typename T>
-class HdLruArena {
-public:
-    explicit HdLruArena(size_t budget_bytes_) :
-        head(-1), tail(-1), free_head(-1), live(0),
-        total_bytes(0), budget_bytes(budget_bytes_), mask(0) {}
+/* ------------------------------------------------------------------------- *
+ * Byte-budgeted LRU cache, MSVC C89.
+ *
+ * Replaces the original std::list<Entry> + std::map<id, list::iterator>
+ * design - two heap node allocations per insert and an O(log n) red-black
+ * descent per lookup - with a contiguous index-LRU + open-addressed
+ * (linear-probe) flat hash table, all held in malloc'd arrays. No templates,
+ * no classes, no virtual, no STL. The two cache variants (RAM levels, VRAM
+ * images) are produced by macro instantiation: HD_LRU_DECLARE emits the struct
+ * and prototypes, HD_LRU_DEFINE emits the bodies, with a DISPOSE callback that
+ * frees payload-owned resources when a live entry leaves the cache.
+ * ------------------------------------------------------------------------- */
 
-    bool contains(uint64_t key) const { return find_slot(key) >= 0; }
+/* fmix64 - cheap, strong avalanche for integer keys. The multipliers are built
+ * from 32-bit halves so no C99 long-long (ULL) literals appear. */
+static uint64_t hd_lru_mix(uint64_t x)
+{
+    uint64_t k1 = ((uint64_t)0xff51afd7u << 32) | (uint64_t)0xed558ccdu;
+    uint64_t k2 = ((uint64_t)0xc4ceb9feu << 32) | (uint64_t)0x1a85ec53u;
+    x ^= x >> 33;
+    x *= k1;
+    x ^= x >> 33;
+    x *= k2;
+    x ^= x >> 33;
+    return x;
+}
 
-    size_t size_bytes() const { return total_bytes; }
-    size_t count() const { return (size_t)live; }
-    void set_budget(size_t bytes) { budget_bytes = bytes; evict(); }
-    size_t budget() const { return budget_bytes; }
+#define HD_LRU_NO_DISPOSE(p) ((void)(p))
 
-    // Look up, marking the entry most-recently-used. Returns NULL on miss.
-    T *get(uint64_t key)
-    {
-        int s = find_slot(key);
-        if (s < 0)
-            return NULL;
-        touch(s);
-        return &slots[(size_t)s].payload;
-    }
+#define HD_LRU_DECLARE(NAME, PAYLOAD_T)                                        \
+typedef struct NAME##_slot {                                                   \
+    uint64_t  key;                                                             \
+    int       prev;   /* LRU links by arena index (-1 = none) */               \
+    int       next;                                                            \
+    size_t    bytes;  /* cached payload footprint */                           \
+    PAYLOAD_T payload;                                                         \
+} NAME##_slot;                                                                 \
+                                                                               \
+typedef struct NAME {                                                          \
+    NAME##_slot *slots;                                                        \
+    int          slots_len;                                                    \
+    int          slots_cap;                                                    \
+    int         *table;        /* open-addressed slot indices; -1 = empty */   \
+    size_t       table_len;    /* power of two, 0 if unallocated */            \
+    size_t       mask;         /* table_len - 1 */                             \
+    int          head, tail;   /* MRU / LRU ends */                            \
+    int          free_head;    /* recycled-slot free list head */              \
+    int          live;                                                         \
+    size_t       total_bytes;                                                  \
+    size_t       budget_bytes;                                                 \
+} NAME;                                                                        \
+                                                                               \
+static void   NAME##_init(NAME *c, size_t budget_bytes);                       \
+static int    NAME##_contains(const NAME *c, uint64_t key);                    \
+static PAYLOAD_T *NAME##_get(NAME *c, uint64_t key);                           \
+static PAYLOAD_T *NAME##_put_slot(NAME *c, uint64_t key, int *created);        \
+static void   NAME##_account(NAME *c, size_t old_bytes, size_t new_bytes);     \
+static void   NAME##_erase(NAME *c, uint64_t key);                             \
+static void   NAME##_clear(NAME *c);                                           \
+static void   NAME##_set_entry_bytes(NAME *c, uint64_t key, size_t bytes);     \
+static void   NAME##_set_budget(NAME *c, size_t bytes);                        \
+static size_t NAME##_size_bytes(const NAME *c);                                \
+static size_t NAME##_count(const NAME *c);                                     \
+static size_t NAME##_budget(const NAME *c)
 
-    // Return the payload slot for key, creating it (zero-initialised T) if
-    // absent, and mark it most-recently-used. *created tells the caller whether
-    // it is fresh. The caller mutates the payload, then calls account() with
-    // the byte delta so the arena can enforce the budget. Splitting "find/make
-    // the slot" from "tell me its size" keeps T opaque to the arena.
-    T *put_slot(uint64_t key, bool *created)
-    {
-        int s = find_slot(key);
-        if (s >= 0)
-        {
-            *created = false;
-            touch(s);
-            return &slots[(size_t)s].payload;
-        }
-        *created = true;
-        ensure_table(live + 1);      // may rehash BEFORE we hand out a table cell
-        s = alloc_slot();
-        slots[(size_t)s].key = key;
-        link_front(s);
-        raw_insert(key, s);
-        ++live;
-        return &slots[(size_t)s].payload;
-    }
+#define HD_LRU_DEFINE(NAME, PAYLOAD_T, DISPOSE)                                \
+static int NAME##_find_slot(const NAME *c, uint64_t key)                       \
+{                                                                              \
+    size_t i;                                                                  \
+    if (c->table_len == 0)                                                     \
+        return -1;                                                             \
+    i = (size_t)hd_lru_mix(key) & c->mask;                                     \
+    for (;;) {                                                                 \
+        int s = c->table[i];                                                   \
+        if (s < 0)                                                             \
+            return -1;                                                         \
+        if (c->slots[s].key == key)                                            \
+            return s;                                                          \
+        i = (i + 1) & c->mask;                                                 \
+    }                                                                          \
+}                                                                              \
+static void NAME##_raw_insert(NAME *c, uint64_t key, int s)                    \
+{                                                                              \
+    size_t i = (size_t)hd_lru_mix(key) & c->mask;                             \
+    while (c->table[i] >= 0)                                                   \
+        i = (i + 1) & c->mask;                                                 \
+    c->table[i] = s;                                                           \
+}                                                                              \
+static void NAME##_ensure_table(NAME *c, size_t want)                          \
+{                                                                              \
+    size_t need = 8;                                                           \
+    size_t i;                                                                  \
+    int s;                                                                     \
+    while (need < want * 2)                                                    \
+        need <<= 1;                                                            \
+    if (c->table_len != 0 && need <= c->table_len)                             \
+        return;                                                                \
+    c->table = (int *)realloc(c->table, need * sizeof(int));                   \
+    c->table_len = need;                                                       \
+    c->mask = need - 1;                                                        \
+    for (i = 0; i < need; i++)                                                 \
+        c->table[i] = -1;                                                      \
+    for (s = c->head; s >= 0; s = c->slots[s].next)                           \
+        NAME##_raw_insert(c, c->slots[s].key, s);                             \
+}                                                                              \
+static void NAME##_hash_remove(NAME *c, uint64_t key)                          \
+{                                                                              \
+    size_t i = (size_t)hd_lru_mix(key) & c->mask;                             \
+    size_t j;                                                                  \
+    for (;;) {                                                                 \
+        int s = c->table[i];                                                   \
+        if (s >= 0 && c->slots[s].key == key)                                  \
+            break;                                                             \
+        i = (i + 1) & c->mask;                                                 \
+    }                                                                          \
+    j = i;                                                                     \
+    c->table[i] = -1;                                                          \
+    for (;;) {                                                                 \
+        int sj;                                                                \
+        size_t home;                                                          \
+        int can_move;                                                          \
+        j = (j + 1) & c->mask;                                                 \
+        sj = c->table[j];                                                      \
+        if (sj < 0)                                                            \
+            break;                                                             \
+        home = (size_t)hd_lru_mix(c->slots[sj].key) & c->mask;               \
+        if (i <= j)                                                            \
+            can_move = !(home > i && home <= j);                               \
+        else                                                                   \
+            can_move = !(home > i || home <= j);                               \
+        if (can_move) {                                                        \
+            c->table[i] = sj;                                                  \
+            c->table[j] = -1;                                                  \
+            i = j;                                                             \
+        }                                                                      \
+    }                                                                          \
+}                                                                              \
+static int NAME##_alloc_slot(NAME *c)                                          \
+{                                                                              \
+    int s;                                                                     \
+    if (c->free_head >= 0) {                                                   \
+        s = c->free_head;                                                      \
+        c->free_head = c->slots[s].next;                                       \
+        return s;                                                              \
+    }                                                                          \
+    if (c->slots_len == c->slots_cap) {                                        \
+        int ncap = c->slots_cap ? c->slots_cap * 2 : 16;                       \
+        c->slots = (NAME##_slot *)realloc(c->slots,                            \
+                       (size_t)ncap * sizeof(NAME##_slot));                    \
+        c->slots_cap = ncap;                                                   \
+    }                                                                          \
+    s = c->slots_len++;                                                        \
+    c->slots[s].key = 0;                                                       \
+    c->slots[s].prev = -1;                                                     \
+    c->slots[s].next = -1;                                                     \
+    c->slots[s].bytes = 0;                                                     \
+    return s;                                                                  \
+}                                                                              \
+static void NAME##_free_slot(NAME *c, int s)                                   \
+{                                                                              \
+    c->slots[s].next = c->free_head;                                          \
+    c->free_head = s;                                                          \
+}                                                                              \
+static void NAME##_link_front(NAME *c, int s)                                  \
+{                                                                              \
+    c->slots[s].prev = -1;                                                     \
+    c->slots[s].next = c->head;                                                \
+    if (c->head >= 0)                                                          \
+        c->slots[c->head].prev = s;                                            \
+    c->head = s;                                                               \
+    if (c->tail < 0)                                                           \
+        c->tail = s;                                                           \
+}                                                                              \
+static void NAME##_unlink(NAME *c, int s)                                      \
+{                                                                              \
+    int p = c->slots[s].prev;                                                  \
+    int n = c->slots[s].next;                                                  \
+    if (p >= 0) c->slots[p].next = n; else c->head = n;                        \
+    if (n >= 0) c->slots[n].prev = p; else c->tail = p;                        \
+}                                                                              \
+static void NAME##_touch(NAME *c, int s)                                       \
+{                                                                              \
+    if (c->head == s)                                                          \
+        return;                                                                \
+    NAME##_unlink(c, s);                                                       \
+    NAME##_link_front(c, s);                                                   \
+}                                                                              \
+static void NAME##_evict(NAME *c)                                              \
+{                                                                              \
+    while (c->total_bytes > c->budget_bytes && c->tail >= 0) {                 \
+        int s = c->tail;                                                       \
+        uint64_t key = c->slots[s].key;                                        \
+        c->total_bytes -= c->slots[s].bytes;                                   \
+        DISPOSE(&c->slots[s].payload);                                         \
+        NAME##_unlink(c, s);                                                   \
+        NAME##_hash_remove(c, key);                                            \
+        NAME##_free_slot(c, s);                                                \
+        c->live--;                                                             \
+    }                                                                          \
+}                                                                              \
+static void NAME##_init(NAME *c, size_t budget_bytes)                          \
+{                                                                              \
+    c->slots = NULL; c->slots_len = 0; c->slots_cap = 0;                       \
+    c->table = NULL; c->table_len = 0; c->mask = 0;                            \
+    c->head = c->tail = c->free_head = -1;                                     \
+    c->live = 0; c->total_bytes = 0; c->budget_bytes = budget_bytes;           \
+}                                                                              \
+static int NAME##_contains(const NAME *c, uint64_t key)                        \
+{                                                                              \
+    return NAME##_find_slot(c, key) >= 0;                                      \
+}                                                                              \
+static PAYLOAD_T *NAME##_get(NAME *c, uint64_t key)                            \
+{                                                                              \
+    int s = NAME##_find_slot(c, key);                                          \
+    if (s < 0)                                                                 \
+        return NULL;                                                           \
+    NAME##_touch(c, s);                                                        \
+    return &c->slots[s].payload;                                               \
+}                                                                              \
+static PAYLOAD_T *NAME##_put_slot(NAME *c, uint64_t key, int *created)         \
+{                                                                              \
+    int s = NAME##_find_slot(c, key);                                          \
+    if (s >= 0) {                                                              \
+        *created = 0;                                                          \
+        NAME##_touch(c, s);                                                    \
+        return &c->slots[s].payload;                                           \
+    }                                                                          \
+    *created = 1;                                                              \
+    NAME##_ensure_table(c, (size_t)c->live + 1);                               \
+    s = NAME##_alloc_slot(c);                                                  \
+    c->slots[s].key = key;                                                     \
+    NAME##_link_front(c, s);                                                   \
+    NAME##_raw_insert(c, key, s);                                              \
+    c->live++;                                                                 \
+    return &c->slots[s].payload;                                               \
+}                                                                              \
+static void NAME##_account(NAME *c, size_t old_bytes, size_t new_bytes)        \
+{                                                                              \
+    c->total_bytes = c->total_bytes - old_bytes + new_bytes;                   \
+    NAME##_evict(c);                                                           \
+}                                                                              \
+static void NAME##_erase(NAME *c, uint64_t key)                                \
+{                                                                              \
+    int s = NAME##_find_slot(c, key);                                          \
+    if (s < 0)                                                                 \
+        return;                                                                \
+    c->total_bytes -= c->slots[s].bytes;                                       \
+    DISPOSE(&c->slots[s].payload);                                             \
+    NAME##_unlink(c, s);                                                       \
+    NAME##_hash_remove(c, key);                                                \
+    NAME##_free_slot(c, s);                                                    \
+    c->live--;                                                                 \
+}                                                                              \
+static void NAME##_clear(NAME *c)                                              \
+{                                                                              \
+    int s;                                                                     \
+    for (s = c->head; s >= 0; s = c->slots[s].next)                           \
+        DISPOSE(&c->slots[s].payload);                                         \
+    free(c->slots); free(c->table);                                            \
+    c->slots = NULL; c->slots_len = 0; c->slots_cap = 0;                       \
+    c->table = NULL; c->table_len = 0; c->mask = 0;                            \
+    c->head = c->tail = c->free_head = -1;                                     \
+    c->live = 0; c->total_bytes = 0;                                           \
+}                                                                              \
+static void NAME##_set_entry_bytes(NAME *c, uint64_t key, size_t bytes)        \
+{                                                                              \
+    int s = NAME##_find_slot(c, key);                                          \
+    if (s >= 0)                                                                \
+        c->slots[s].bytes = bytes;                                             \
+}                                                                              \
+static void NAME##_set_budget(NAME *c, size_t bytes)                           \
+{                                                                              \
+    c->budget_bytes = bytes;                                                   \
+    NAME##_evict(c);                                                           \
+}                                                                              \
+static size_t NAME##_size_bytes(const NAME *c) { return c->total_bytes; }      \
+static size_t NAME##_count(const NAME *c)      { return (size_t)c->live; }     \
+static size_t NAME##_budget(const NAME *c)     { return c->budget_bytes; }
 
-    // Apply a byte-size change for the current MRU entry and evict to budget.
-    void account(size_t old_bytes, size_t new_bytes)
-    {
-        total_bytes = total_bytes - old_bytes + new_bytes;
-        evict();
-    }
-
-    void erase(uint64_t key)
-    {
-        int s = find_slot(key);
-        if (s < 0)
-            return;
-        total_bytes -= slots[(size_t)s].bytes;
-        dispose(slots[(size_t)s].payload);
-        unlink(s);
-        hash_remove(key);
-        free_slot(s);
-        --live;
-    }
-
-    void clear()
-    {
-        for (int s = head; s >= 0; s = slots[(size_t)s].next)
-            dispose(slots[(size_t)s].payload);
-        slots.clear();
-        table.clear();
-        head = tail = free_head = -1;
-        live = 0;
-        total_bytes = 0;
-        mask = 0;
-    }
-
-    // Per-entry byte cost is stored on the slot so eviction is O(1) and never
-    // re-measures the payload.
-    void set_entry_bytes(uint64_t key, size_t bytes)
-    {
-        int s = find_slot(key);
-        if (s >= 0)
-            slots[(size_t)s].bytes = bytes;
-    }
-    size_t entry_bytes(uint64_t key) const
-    {
-        int s = find_slot(key);
-        return s >= 0 ? slots[(size_t)s].bytes : 0;
-    }
-
-protected:
-    // Override in the derived cache to release payload-owned resources (Vulkan
-    // image handle, decoded levels). Default: nothing (T's destructor on slot
-    // reuse handles trivial payloads).
-    virtual void dispose(T & /*payload*/) {}
-
-private:
-    struct Slot {
-        uint64_t key;
-        int      prev;     // LRU links, by arena index (-1 = none)
-        int      next;
-        size_t   bytes;    // cached payload footprint
-        T        payload;
-    };
-
-    std::vector<Slot> slots;   // entry arena (also the free list via `next`)
-    std::vector<int>  table;   // open-addressed index table; -1 = empty
-    int    head, tail;         // MRU / LRU ends of the live list
-    int    free_head;          // head of the recycled-slot free list
-    int    live;               // number of live entries
-    size_t total_bytes;
-    size_t budget_bytes;
-    size_t mask;               // table.size() - 1 (power of two), 0 if empty
-
-    // Finalizer mix (fmix64) - cheap, good avalanche for 64-bit integer keys.
-    static uint64_t mix(uint64_t x)
-    {
-        x ^= x >> 33;
-        x *= (uint64_t)0xff51afd7ed558ccdULL;
-        x ^= x >> 33;
-        x *= (uint64_t)0xc4ceb9fe1a85ec53ULL;
-        x ^= x >> 33;
-        return x;
-    }
-
-    int find_slot(uint64_t key) const
-    {
-        if (table.empty())
-            return -1;
-        size_t i = (size_t)mix(key) & mask;
-        for (;;)
-        {
-            int s = table[i];
-            if (s < 0)
-                return -1;
-            if (slots[(size_t)s].key == key)
-                return s;
-            i = (i + 1) & mask;
-        }
-    }
-
-    void raw_insert(uint64_t key, int s)
-    {
-        size_t i = (size_t)mix(key) & mask;
-        while (table[i] >= 0)
-            i = (i + 1) & mask;
-        table[i] = s;
-    }
-
-    // Grow + rehash so the table stays <=50% full (keeps probe chains short).
-    void ensure_table(size_t want)
-    {
-        size_t need = 8;
-        while (need < want * 2)
-            need <<= 1;
-        if (!table.empty() && need <= table.size())
-            return;
-        table.assign(need, -1);
-        mask = need - 1;
-        for (int s = head; s >= 0; s = slots[(size_t)s].next)
-            raw_insert(slots[(size_t)s].key, s);
-    }
-
-    // Linear-probe deletion with backward-shift repair (no tombstones, so the
-    // table never degrades after churn).
-    void hash_remove(uint64_t key)
-    {
-        size_t i = (size_t)mix(key) & mask;
-        for (;;)
-        {
-            int s = table[i];
-            if (s >= 0 && slots[(size_t)s].key == key)
-                break;
-            i = (i + 1) & mask;
-        }
-        size_t j = i;
-        table[i] = -1;
-        for (;;)
-        {
-            j = (j + 1) & mask;
-            int sj = table[j];
-            if (sj < 0)
-                break;
-            size_t home = (size_t)mix(slots[(size_t)sj].key) & mask;
-            bool can_move;
-            if (i <= j)
-                can_move = !(home > i && home <= j);
-            else
-                can_move = !(home > i || home <= j);
-            if (can_move)
-            {
-                table[i] = sj;
-                table[j] = -1;
-                i = j;
-            }
-        }
-    }
-
-    int alloc_slot()
-    {
-        if (free_head >= 0)
-        {
-            int s = free_head;
-            free_head = slots[(size_t)s].next;
-            return s;
-        }
-        Slot e;
-        e.key = 0;
-        e.prev = -1;
-        e.next = -1;
-        e.bytes = 0;
-        slots.push_back(e);
-        return (int)slots.size() - 1;
-    }
-    void free_slot(int s)
-    {
-        slots[(size_t)s].next = free_head;
-        free_head = s;
-    }
-    void link_front(int s)
-    {
-        slots[(size_t)s].prev = -1;
-        slots[(size_t)s].next = head;
-        if (head >= 0)
-            slots[(size_t)head].prev = s;
-        head = s;
-        if (tail < 0)
-            tail = s;
-    }
-    void unlink(int s)
-    {
-        int p = slots[(size_t)s].prev;
-        int n = slots[(size_t)s].next;
-        if (p >= 0) slots[(size_t)p].next = n; else head = n;
-        if (n >= 0) slots[(size_t)n].prev = p; else tail = p;
-    }
-    void touch(int s)
-    {
-        if (head == s)
-            return;
-        unlink(s);
-        link_front(s);
-    }
-    void evict()
-    {
-        while (total_bytes > budget_bytes && tail >= 0)
-        {
-            int s = tail;
-            uint64_t key = slots[(size_t)s].key;
-            total_bytes -= slots[(size_t)s].bytes;
-            dispose(slots[(size_t)s].payload);
-            unlink(s);
-            hash_remove(key);
-            free_slot(s);
-            --live;
-        }
-    }
-};
-
-struct CachedHdImage {
-    LoadedLevels levels; // decoded RGBA + mips (CPU side)
-    int alpha_flags;
+/* --- RAM cache: decoded CPU levels, keyed by (hash, palette) ------------- *
+ * Lives independent of TextureUpload lifetime, so images survive the rapid
+ * VRAM upload churn of animated sprites. Decode-once: a combo is read+decoded
+ * from disk at most once until evicted. CPU-side only - the GPU upload happens
+ * on attach via Renderer::upload_texture, so it survives device/swapchain
+ * resets. The disposer frees the decoded levels. */
+typedef struct CachedHdImage {
+    LoadedLevels levels; /* decoded RGBA + mips (CPU side) */
+    int    alpha_flags;
     size_t bytes;
-};
+} CachedHdImage;
 
-// LRU cache of decoded HD replacement images keyed by (hash, palette).
-//
-// Lives independent of TextureUpload lifetime, so images survive the rapid
-// VRAM upload churn of animated sprites (each animation frame is a different
-// hash, resident only briefly). This gives decode-once semantics: a combo is
-// read+decoded from disk at most once until evicted, instead of being decoded,
-// dropped (hash not resident), and re-decoded next loop. Bounded by a byte
-// budget; least-recently-used entries are evicted first. CPU-side only - the
-// GPU upload happens on attach via Renderer::upload_texture (which just reads
-// the levels), so the cache also survives Vulkan device/swapchain resets.
-//
-// Storage is the contiguous index-LRU + flat-hash arena above (was
-// std::list + std::map upstream); the public surface is unchanged.
-class HdImageCache : public HdLruArena<CachedHdImage> {
-public:
-    explicit HdImageCache(size_t budget_bytes) : HdLruArena<CachedHdImage>(budget_bytes) {}
+static void cached_hd_image_dispose(CachedHdImage *p)
+{
+    loaded_levels_reset(&p->levels);
+}
 
-    bool contains(HdTextureId id) const { return HdLruArena<CachedHdImage>::contains(hd_pack_key(id)); }
+HD_LRU_DECLARE(HdImageCache, CachedHdImage);
+HD_LRU_DEFINE(HdImageCache, CachedHdImage, cached_hd_image_dispose)
 
-    // Returns the entry (marking it most-recently-used), or NULL.
-    CachedHdImage *get(HdTextureId id) { return HdLruArena<CachedHdImage>::get(hd_pack_key(id)); }
+/* Insert/replace a combo's decoded levels; takes ownership of *levels (left
+ * empty on return). */
+static void hd_image_cache_put(HdImageCache *c, HdTextureId id,
+                               LoadedLevels *levels, int alpha_flags)
+{
+    uint64_t key = hd_pack_key(id);
+    int created = 0;
+    CachedHdImage *e = HdImageCache_put_slot(c, key, &created);
+    size_t old_bytes = created ? 0 : e->bytes;
+    if (created)
+        loaded_levels_init(&e->levels); /* fresh slot: payload is indeterminate */
+    loaded_levels_move(&e->levels, levels);
+    e->alpha_flags = alpha_flags;
+    e->bytes = loaded_levels_byte_size(&e->levels);
+    HdImageCache_set_entry_bytes(c, key, e->bytes);
+    HdImageCache_account(c, old_bytes, e->bytes);
+}
 
-    // Takes ownership of *levels (left empty on return).
-    void put(HdTextureId id, LoadedLevels *levels, int alpha_flags)
-    {
-        uint64_t key = hd_pack_key(id);
-        bool created = false;
-        CachedHdImage *e = put_slot(key, &created);
-        size_t old_bytes = created ? 0 : e->bytes;
-        if (created)
-            loaded_levels_init(&e->levels); /* fresh slot: payload is indeterminate */
-        loaded_levels_move(&e->levels, levels);
-        e->alpha_flags = alpha_flags;
-        e->bytes = e->levels.byte_size();
-        set_entry_bytes(key, e->bytes);
-        account(old_bytes, e->bytes);
+/* --- VRAM cache: uploaded Vulkan images, keyed by (hash, palette) -------- *
+ * Sits above the RAM cache. Re-attaching a combo to a recreated TextureUpload
+ * becomes a ref-counted handle copy instead of a fresh upload_texture. The
+ * image is held as a RAW Vulkan::Image* (trivially relocatable, so the malloc
+ * arena can realloc it) with the refcount managed by hand: a reference is
+ * taken on insert and released by the disposer on eviction/clear, freeing VRAM
+ * once no live draw still holds the image. */
+typedef struct CachedGpuImage {
+    Vulkan::Image *image; /* owns one reference while resident (NULL = empty) */
+    int    alpha_flags;
+    size_t bytes;         /* approximate VRAM footprint (== decoded levels size) */
+} CachedGpuImage;
+
+static void cached_gpu_image_dispose(CachedGpuImage *p)
+{
+    if (p->image) {
+        p->image->release_reference();
+        p->image = NULL;
     }
+}
 
-    void erase(HdTextureId id) { HdLruArena<CachedHdImage>::erase(hd_pack_key(id)); }
+HD_LRU_DECLARE(HdGpuCache, CachedGpuImage);
+HD_LRU_DEFINE(HdGpuCache, CachedGpuImage, cached_gpu_image_dispose)
 
-protected:
-    // Drop the decoded levels eagerly when a slot is reclaimed (don't wait for
-    // the slot to be overwritten by a future insert).
-    virtual void dispose(CachedHdImage &p)
-    {
-        p.levels.reset();
+/* Take a counted reference to a cached image and return it as an ImageHandle
+ * the caller can store/copy/destroy normally. IntrusivePtr(T*) adopts without
+ * bumping, so add the reference explicitly first. */
+static Vulkan::ImageHandle hd_gpu_image_handle(CachedGpuImage *g)
+{
+    g->image->add_reference();
+    return Vulkan::ImageHandle(g->image);
+}
+
+/* Insert/replace a combo's GPU image. Adds a reference to `handle`'s image
+ * (held until eviction); a prior image at this key is released first. */
+static void hd_gpu_cache_put(HdGpuCache *c, HdTextureId id,
+                             Vulkan::ImageHandle handle, int alpha_flags, size_t bytes)
+{
+    uint64_t key = hd_pack_key(id);
+    int created = 0;
+    CachedGpuImage *e = HdGpuCache_put_slot(c, key, &created);
+    size_t old_bytes = created ? 0 : e->bytes;
+    if (!created && e->image)
+        e->image->release_reference(); /* drop the image we're replacing */
+    e->image = handle.get();
+    if (e->image)
+        e->image->add_reference();      /* cache holds its own reference */
+    e->alpha_flags = alpha_flags;
+    e->bytes = bytes;
+    HdGpuCache_set_entry_bytes(c, key, bytes);
+    HdGpuCache_account(c, old_bytes, bytes);
+}
+
+/* ------------------------------------------------------------------------- *
+ * HdKeySet - an ordered set of packed (hash, palette) uint64_t keys, MSVC C89.
+ *
+ * Replaces std::set<HdTextureId>. Backed by a single sorted, malloc'd
+ * uint64_t array: membership is O(log n) binary search, insert/erase keep it
+ * sorted (O(n) shift, fine for these small sets). Because the key packs
+ * (hash << 32) | palette, the array is ordered by hash then palette, so all
+ * combos of one hash form a contiguous run - found with lower_bound over the
+ * half-open key range [hash<<32, (hash+1)<<32), which is exactly what the old
+ * std::set lower_bound/upper_bound({hash,0})/({hash,0xFFFFFFFF}) gave.
+ * ------------------------------------------------------------------------- */
+typedef struct HdKeySet {
+    uint64_t *keys;
+    int       count;
+    int       cap;
+} HdKeySet;
+
+static void hd_key_set_init(HdKeySet *s)
+{
+    s->keys = NULL;
+    s->count = 0;
+    s->cap = 0;
+}
+static void hd_key_set_free(HdKeySet *s)
+{
+    free(s->keys);
+    s->keys = NULL;
+    s->count = 0;
+    s->cap = 0;
+}
+static void hd_key_set_clear(HdKeySet *s)
+{
+    s->count = 0; /* keep the allocation for reuse */
+}
+/* First index with keys[i] >= key (i.e. std::lower_bound). */
+static int hd_key_set_lower_bound(const HdKeySet *s, uint64_t key)
+{
+    int lo = 0, hi = s->count;
+    while (lo < hi) {
+        int mid = lo + ((hi - lo) >> 1);
+        if (s->keys[mid] < key)
+            lo = mid + 1;
+        else
+            hi = mid;
     }
-};
-
-struct CachedGpuImage {
-    Vulkan::ImageHandle handle;
-    int alpha_flags;
-    size_t bytes; // approximate VRAM footprint (== decoded levels size)
-};
-
-// LRU cache of uploaded HD Vulkan images keyed by (hash, palette), in VRAM.
-//
-// Sits above HdImageCache (the RAM/levels tier). Re-attaching a combo to a
-// recreated TextureUpload becomes a ref-counted handle copy instead of a fresh
-// upload_texture, killing the per-loop GPU-upload churn of animated sprites.
-// Bounded by a VRAM byte budget. Owned by the Renderer (via TextureTracker) and
-// destroyed with the device in vk_context_destroy, so handles never go stale
-// across a context reset; plain swapchain recreation keeps the device (and
-// these images) valid.
-//
-// Same contiguous index-LRU + flat-hash storage as HdImageCache.
-class HdGpuCache : public HdLruArena<CachedGpuImage> {
-public:
-    explicit HdGpuCache(size_t budget_bytes) : HdLruArena<CachedGpuImage>(budget_bytes) {}
-
-    bool contains(HdTextureId id) const { return HdLruArena<CachedGpuImage>::contains(hd_pack_key(id)); }
-
-    CachedGpuImage *get(HdTextureId id) { return HdLruArena<CachedGpuImage>::get(hd_pack_key(id)); }
-
-    void put(HdTextureId id, Vulkan::ImageHandle handle, int alpha_flags, size_t bytes)
-    {
-        uint64_t key = hd_pack_key(id);
-        bool created = false;
-        CachedGpuImage *e = put_slot(key, &created);
-        size_t old_bytes = created ? 0 : e->bytes;
-        e->handle = handle;
-        e->alpha_flags = alpha_flags;
-        e->bytes = bytes;
-        set_entry_bytes(key, bytes);
-        account(old_bytes, bytes);
+    return lo;
+}
+static int hd_key_set_contains(const HdKeySet *s, uint64_t key)
+{
+    int i = hd_key_set_lower_bound(s, key);
+    return i < s->count && s->keys[i] == key;
+}
+/* Insert key; returns 1 if newly added, 0 if already present. */
+static int hd_key_set_insert(HdKeySet *s, uint64_t key)
+{
+    int i = hd_key_set_lower_bound(s, key);
+    if (i < s->count && s->keys[i] == key)
+        return 0;
+    if (s->count == s->cap) {
+        int ncap = s->cap ? s->cap * 2 : 16;
+        s->keys = (uint64_t *)realloc(s->keys, (size_t)ncap * sizeof(uint64_t));
+        s->cap = ncap;
     }
-
-protected:
-    // Release the Vulkan image handle (drop our ref) as soon as the slot is
-    // evicted/cleared, so VRAM is reclaimed promptly once no live draw holds it.
-    virtual void dispose(CachedGpuImage &p)
-    {
-        p.handle.reset();
-    }
-};
+    memmove(&s->keys[i + 1], &s->keys[i], (size_t)(s->count - i) * sizeof(uint64_t));
+    s->keys[i] = key;
+    s->count++;
+    return 1;
+}
+static void hd_key_set_erase(HdKeySet *s, uint64_t key)
+{
+    int i = hd_key_set_lower_bound(s, key);
+    if (i >= s->count || s->keys[i] != key)
+        return;
+    memmove(&s->keys[i], &s->keys[i + 1], (size_t)(s->count - i - 1) * sizeof(uint64_t));
+    s->count--;
+}
 
 class TextureTracker {
 public:
     TextureTracker();
+    ~TextureTracker();
 
     TextureTrackerSaveState save_state();
     void load_state(const TextureTrackerSaveState &state);
@@ -6944,8 +7002,8 @@ public:
 
     // Runtime cache budgets (bytes), driven by core options.
     void set_cache_budgets(size_t ram_bytes, size_t vram_bytes) {
-        hd_cache.set_budget(ram_bytes);
-        hd_gpu_cache.set_budget(vram_bytes);
+        HdImageCache_set_budget(&hd_cache, ram_bytes);
+        HdGpuCache_set_budget(&hd_gpu_cache, vram_bytes);
     }
 
     bool dump_enabled = false;
@@ -6963,7 +7021,7 @@ private:
     RectMatch dump_ignore[DUMP_IGNORE_MAX];
     int       dump_ignore_count;
 
-    std::set<HdTextureId> known_files;
+    HdKeySet known_files;
     std::vector<CachedPaletteHash> cached_palette_hashes;
     std::vector<RestorableRect> restorable_rects;
     FusedPages fused_pages;
@@ -6975,11 +7033,12 @@ private:
     // HD image caches, independent of upload lifetime. Tier 1 = GPU (VRAM,
     // ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier 3
     // = disk. Re-attach prefers the GPU cache (handle copy), falls back to a
-    // GPU upload from the CPU cache, then to a disk load.
-    HdGpuCache hd_gpu_cache{ HD_CACHE_VRAM_BUDGET };
-    HdImageCache hd_cache{ HD_CACHE_RAM_BUDGET };
-    std::set<HdTextureId> requested;        // disk load in flight, or known to have no file (negative cache)
-    std::set<HdTextureId> pending_attach;   // cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset
+    // GPU upload from the CPU cache, then to a disk load. Initialised in the
+    // TextureTracker constructor via HdGpuCache_init / HdImageCache_init.
+    HdGpuCache hd_gpu_cache;
+    HdImageCache hd_cache;
+    HdKeySet requested;        // disk load in flight, or known to have no file (negative cache)
+    HdKeySet pending_attach;   // cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset
 
     // Queue a disk load for a combo unless it's already cached / in flight / fileless.
     void want_combo(HdTextureId id);
@@ -17725,10 +17784,10 @@ LoadedLevels prepare_texture(RGBAImage &image, int& alpha_flags) {
     LoadedImage base;
     loaded_levels_init(&levels);
     base = convert_tri_to_psx(image.data, width, height, alpha_flags);
-    levels.push_move(&base);
+    loaded_levels_push_move(&levels, &base);
     while (width % 2 == 0 && height % 2 == 0) {
         LoadedImage mip = generate_mip(levels.levels[levels.count - 1]);
-        levels.push_move(&mip);
+        loaded_levels_push_move(&levels, &mip);
 
         width /= 2;
         height /= 2;
@@ -17977,9 +18036,9 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
     scond_signal(iothread.channel->cond);
 }
 
-std::set<HdTextureId> read_texture_directory(const char *path) {
-    std::set<HdTextureId> result;
+void read_texture_directory(HdKeySet *out, const char *path) {
     RDIR *dir;
+    hd_key_set_clear(out);
     dir = retro_opendir(path);
     if (dir != NULL) {
         while (retro_readdir(dir)) {
@@ -17994,20 +18053,24 @@ std::set<HdTextureId> read_texture_directory(const char *path) {
                 continue;
             }
 
-            result.insert({ hash, palette_hash });
+            hd_key_set_insert(out, ((uint64_t)hash << 32) | (uint64_t)palette_hash);
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "file found: %s\n", name);
         }
         retro_closedir(dir);
     }
-    return result;
 }
 
 TextureTracker::TextureTracker()
 {
     char rpath[PATH_MAX_TT];
     char cfg[PATH_MAX_TT];
-    known_files = read_texture_directory(replacements_path(rpath, sizeof(rpath)));
-    TT_LOG(RETRO_LOG_INFO, "num hd textures: %d\n", known_files.size());
+    HdImageCache_init(&hd_cache, HD_CACHE_RAM_BUDGET);
+    HdGpuCache_init(&hd_gpu_cache, HD_CACHE_VRAM_BUDGET);
+    hd_key_set_init(&known_files);
+    hd_key_set_init(&requested);
+    hd_key_set_init(&pending_attach);
+    read_texture_directory(&known_files, replacements_path(rpath, sizeof(rpath)));
+    TT_LOG(RETRO_LOG_INFO, "num hd textures: %d\n", (int)known_files.count);
 
     // Read in the dump config file
     dump_path(cfg, sizeof(cfg));
@@ -18017,6 +18080,15 @@ TextureTracker::TextureTracker()
         RectMatch m = dump_ignore[mi];
         TT_LOG_VERBOSE(RETRO_LOG_INFO, "Ignoring %d,%d,%d,%d\n", m.x, m.y, m.w, m.h);
     }
+}
+
+TextureTracker::~TextureTracker()
+{
+    HdImageCache_clear(&hd_cache);   /* frees decoded levels + arena */
+    HdGpuCache_clear(&hd_gpu_cache); /* releases cached image refs + arena */
+    hd_key_set_free(&known_files);
+    hd_key_set_free(&requested);
+    hd_key_set_free(&pending_attach);
 }
 
 static inline SRect toSRect(Rect rect) {
@@ -18264,24 +18336,31 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
     //    (decode-once / dedup) and the VRAM/RAM budgets, unlike stock Beetle's
     //    raw load_hd_texture.
     if (eager_textures && hd_textures_enabled && !preexisting) {
-        std::set<HdTextureId>::iterator lo = known_files.lower_bound({ upload->hash, 0 });
-        std::set<HdTextureId>::iterator hi = known_files.upper_bound({ upload->hash, 0xFFFFFFFF });
-        for (std::set<HdTextureId>::iterator it = lo; it != hi; it++)
-            want_combo({ upload->hash, it->palette_hash });
+        int lo = hd_key_set_lower_bound(&known_files, (uint64_t)upload->hash << 32);
+        int hi = hd_key_set_lower_bound(&known_files, ((uint64_t)upload->hash + 1) << 32);
+        int ki;
+        for (ki = lo; ki < hi; ki++) {
+            HdTextureId combo;
+            combo.hash = upload->hash;
+            combo.palette_hash = (uint32_t)known_files.keys[ki];
+            want_combo(combo);
+        }
     }
 }
 
 void TextureTracker::load_hd_texture(uint32_t hash) {
-    std::set<HdTextureId>::iterator it_low = known_files.lower_bound({ hash, 0 });
-    std::set<HdTextureId>::iterator it_high = known_files.upper_bound({ hash, 0xFFFFFFFF });
-    if (it_low != it_high) {
+    int lo = hd_key_set_lower_bound(&known_files, (uint64_t)hash << 32);
+    int hi = hd_key_set_lower_bound(&known_files, ((uint64_t)hash + 1) << 32);
+    if (lo != hi) {
+        int ki;
         slock_lock(iothread.channel->lock);
-        for (std::set<HdTextureId>::iterator it = it_low; it != it_high; it++) {
-            TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting texture: %x-%x\n", hash, it->palette_hash);
+        for (ki = lo; ki < hi; ki++) {
+            uint32_t palette_hash = (uint32_t)known_files.keys[ki];
             IORequest load;
+            TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting texture: %x-%x\n", hash, palette_hash);
             load.kind = IORequestKind::Load;
             load.hash = hash;
-            load.palette_hash = it->palette_hash;
+            load.palette_hash = palette_hash;
             iothread.channel->requests.push_back(std::move(load));
         }
         slock_unlock(iothread.channel->lock);
@@ -18295,11 +18374,11 @@ void TextureTracker::load_hd_texture(uint32_t hash) {
 // thread only pushes a response on success, so a failed/missing load stays in
 // `requested` and is never retried (until a reload clears it).
 void TextureTracker::want_combo(HdTextureId id) {
-    if (hd_gpu_cache.contains(id) || hd_cache.contains(id))
+    if (HdGpuCache_contains(&hd_gpu_cache, hd_pack_key(id)) || HdImageCache_contains(&hd_cache, hd_pack_key(id)))
         return; // already resident in VRAM, or already decoded in RAM
-    if (!requested.insert(id).second)
+    if (!hd_key_set_insert(&requested, hd_pack_key(id)))
         return; // already in flight, or negatively cached
-    if (known_files.find(id) == known_files.end())
+    if (!hd_key_set_contains(&known_files, hd_pack_key(id)))
         return; // no file on disk
 
     slock_lock(iothread.channel->lock);
@@ -18336,17 +18415,17 @@ void TextureTracker::request_hd_texture(std::shared_ptr<TextureUpload> &upload, 
     // cost a 1-frame native flicker every time an animation frame's upload was
     // recreated (constant for sprites) - i.e. persistent pop-in even when the
     // image was fully cached.
-    CachedGpuImage *gpu = hd_gpu_cache.get(current);
+    CachedGpuImage *gpu = HdGpuCache_get(&hd_gpu_cache, hd_pack_key(current));
     if (gpu != nullptr) {
-        upload->textures[palette_hash] = { gpu->handle, gpu->alpha_flags };
+        upload->textures[palette_hash] = { hd_gpu_image_handle(gpu), gpu->alpha_flags };
         dbg_attaches++;
         return;
     }
 
     // CPU-cache hit (decoded but not in VRAM): needs a GPU upload, which we keep
     // at the safe point - schedule it for on_queues_reset.
-    if (hd_cache.contains(current))
-        pending_attach.insert(current);
+    if (HdImageCache_contains(&hd_cache, hd_pack_key(current)))
+        hd_key_set_insert(&pending_attach, hd_pack_key(current));
     else
         want_combo(current);            // queue a single disk load for the drawn combo
 }
@@ -18568,9 +18647,9 @@ void TextureTracker::on_queues_reset() {
     for (IOResponse &response : responses) {
         dbg_responses_received++;
         HdTextureId id = { response.hash, response.palette_hash };
-        requested.erase(id); // no longer in flight; now cached
-        hd_cache.put(id, &response.levels, response.alpha_flags);
-        pending_attach.insert(id);
+        hd_key_set_erase(&requested, hd_pack_key(id)); // no longer in flight; now cached
+        hd_image_cache_put(&hd_cache, id, &response.levels, response.alpha_flags);
+        hd_key_set_insert(&pending_attach, hd_pack_key(id));
     }
 
     // Attach pass: for every wanted combo whose base hash is currently
@@ -18578,8 +18657,12 @@ void TextureTracker::on_queues_reset() {
     // handle copy - no upload); otherwise build the image from the CPU cache
     // and store it in the GPU cache. Combos whose hash isn't resident yet stay
     // cached (NOT discarded) and attach on a later frame.
-    for (std::set<HdTextureId>::iterator it = pending_attach.begin(); it != pending_attach.end(); it++) {
-        HdTextureId id = *it;
+    {
+      int pi;
+      for (pi = 0; pi < pending_attach.count; pi++) {
+        HdTextureId id;
+        id.hash = (uint32_t)(pending_attach.keys[pi] >> 32);
+        id.palette_hash = (uint32_t)pending_attach.keys[pi];
         std::shared_ptr<TextureUpload> upload = find_upload(id.hash);
         if (upload == nullptr)
             continue; // not resident yet; kept in cache
@@ -18587,9 +18670,9 @@ void TextureTracker::on_queues_reset() {
             continue; // already attached
 
         // Tier 1: ready-to-bind GPU image - just copy the handle.
-        CachedGpuImage *gpu = hd_gpu_cache.get(id);
+        CachedGpuImage *gpu = HdGpuCache_get(&hd_gpu_cache, hd_pack_key(id));
         if (gpu != nullptr) {
-            upload->textures[id.palette_hash] = { gpu->handle, gpu->alpha_flags };
+            upload->textures[id.palette_hash] = { hd_gpu_image_handle(gpu), gpu->alpha_flags };
             dbg_attaches++;
             for (EnduringTextureRect &e : tracker.textures) {
                 if (e.alive && e.texture_rect.upload == upload) {
@@ -18600,7 +18683,7 @@ void TextureTracker::on_queues_reset() {
         }
 
         // Tier 2: decoded CPU levels - upload to GPU, then cache the image.
-        CachedHdImage *cached = hd_cache.get(id);
+        CachedHdImage *cached = HdImageCache_get(&hd_cache, hd_pack_key(id));
         if (cached == nullptr)
             continue; // evicted from both caches; will be re-requested on draw
 
@@ -18610,7 +18693,7 @@ void TextureTracker::on_queues_reset() {
             height % upload->height == 0 && is_power_of_two(height / upload->height))
         {
             Vulkan::ImageHandle texture = uploader->upload_texture(cached->levels);
-            hd_gpu_cache.put(id, texture, cached->alpha_flags, cached->bytes);
+            hd_gpu_cache_put(&hd_gpu_cache, id, texture, cached->alpha_flags, cached->bytes);
             upload->textures[id.palette_hash] = { texture, cached->alpha_flags };
             dbg_gpu_uploads++;
             dbg_attaches++;
@@ -18622,11 +18705,12 @@ void TextureTracker::on_queues_reset() {
         } else {
             TT_LOG(RETRO_LOG_WARN, "Dimension mismatch for %x-%x, original=%dx%d, replacement=%dx%d\n",
                 id.hash, id.palette_hash, upload->width, upload->height, width, height);
-            hd_cache.erase(id);    // don't keep a bad-sized image around
-            requested.insert(id);  // negatively cache so we don't reload + re-warn every frame
+            HdImageCache_erase(&hd_cache, hd_pack_key(id));    // don't keep a bad-sized image around
+            hd_key_set_insert(&requested, hd_pack_key(id));  // negatively cache so we don't reload + re-warn every frame
         }
+      }
     }
-    pending_attach.clear();
+    hd_key_set_clear(&pending_attach);
 
     fused_pages.rebuild_dirty(tracker, uploader);
     fused_pages.remove_dead();
@@ -18663,8 +18747,8 @@ void TextureTracker::endFrame() {
             (unsigned long long)(dbg_attaches - dbg_attaches_last));
         TT_LOG(RETRO_LOG_INFO, "[hdcache] mode=%s ; ram %zu/%zu MB (%zu entries) ; vram %zu/%zu MB (%zu entries)\n",
             eager_textures ? "eager" : "lazy",
-            hd_cache.size_bytes() / (1024 * 1024), hd_cache.budget() / (1024 * 1024), hd_cache.count(),
-            hd_gpu_cache.size_bytes() / (1024 * 1024), hd_gpu_cache.budget() / (1024 * 1024), hd_gpu_cache.count());
+            HdImageCache_size_bytes(&hd_cache) / (1024 * 1024), HdImageCache_budget(&hd_cache) / (1024 * 1024), HdImageCache_count(&hd_cache),
+            HdGpuCache_size_bytes(&hd_gpu_cache) / (1024 * 1024), HdGpuCache_budget(&hd_gpu_cache) / (1024 * 1024), HdGpuCache_count(&hd_gpu_cache));
         dbg_responses_received_last = dbg_responses_received;
         dbg_gpu_uploads_last = dbg_gpu_uploads;
         dbg_attaches_last = dbg_attaches;
@@ -18730,7 +18814,7 @@ void TextureTracker::set_texture_uploader(Renderer *t) {
     default_image.owned_data[1] = 0;
     default_image.owned_data[2] = 0;
     default_image.owned_data[3] = 0;
-    default_levels.push_move(&default_image);
+    loaded_levels_push_move(&default_levels, &default_image);
 
     default_hd_texture = uploader->upload_texture(default_levels);
 }
@@ -18738,14 +18822,14 @@ void TextureTracker::set_texture_uploader(Renderer *t) {
 void TextureTracker::reload_textures_from_disk() {
     char rpath[PATH_MAX_TT];
     // Reload the directory listing
-    known_files = read_texture_directory(replacements_path(rpath, sizeof(rpath)));
-    TT_LOG_VERBOSE(RETRO_LOG_INFO, "Found %d hd textures\n", known_files.size());
+    read_texture_directory(&known_files, replacements_path(rpath, sizeof(rpath)));
+    TT_LOG_VERBOSE(RETRO_LOG_INFO, "Found %d hd textures\n", (int)known_files.count);
 
     // Drop all cached / loaded HD state so edited files on disk take effect.
-    hd_gpu_cache.clear();
-    hd_cache.clear();
-    requested.clear();
-    pending_attach.clear();
+    HdGpuCache_clear(&hd_gpu_cache);
+    HdImageCache_clear(&hd_cache);
+    hd_key_set_clear(&requested);
+    hd_key_set_clear(&pending_attach);
     for (EnduringTextureRect &texture : tracker.textures)
         texture.texture_rect.upload->textures.clear();
     for (RestorableRect &restorable : restorable_rects) {
