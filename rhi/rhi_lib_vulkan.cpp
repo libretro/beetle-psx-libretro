@@ -5992,16 +5992,24 @@ extern retro_log_printf_t log_cb;
 
 // #define VERBOSE_TEXTURE_TRACKING
 
+/* Texture-tracker logging is debug-only: it compiles to real log_cb calls
+ * in DEBUG builds (the build system passes -DDEBUG when DEBUG=1) and to a
+ * no-op everywhere else, so release cores carry no logging overhead.
+ *
+ * The no-op variants must still consume their arguments at the syntactic
+ * level, otherwise locals only used in a log statement trip
+ * -Wunused-but-set-variable.  The "(void)0," prefix lets sizeof accept a
+ * 1-arg invocation through the comma operator; sizeof itself is unevaluated,
+ * so each arg is read by the type system without generating runtime code. */
+#ifdef DEBUG
 #define TT_LOG(...) log_cb(__VA_ARGS__)
-#ifdef VERBOSE_TEXTURE_TRACKING
+#else
+#define TT_LOG(...) ((void)sizeof(((void)0, __VA_ARGS__)))
+#endif
+
+#if defined(DEBUG) && defined(VERBOSE_TEXTURE_TRACKING)
 #define TT_LOG_VERBOSE(...) TT_LOG(__VA_ARGS__)
 #else
-/* No-op variant must still consume its arguments at the syntactic
- * level, otherwise locals only used in the verbose branch trip
- * -Wunused-but-set-variable.  The "(void)0," prefix lets sizeof
- * accept a 1-arg invocation through the comma operator; sizeof
- * itself is unevaluated, so each arg is read by the type system
- * without generating runtime code. */
 #define TT_LOG_VERBOSE(...) ((void)sizeof(((void)0, __VA_ARGS__)))
 #endif
 
@@ -17344,12 +17352,11 @@ void FBAtlas::pipeline_barrier(StatusFlags domains)
 /* === config_parser.cpp === */
 #include <regex>
 
-int ignore_arg_to_number(std::string arg) {
-    if (arg == "*") {
+int ignore_arg_to_number(const char *arg) {
+    if (arg[0] == '*' && arg[1] == '\0') {
         return -1;
-    } else {
-        return atoi(arg.c_str());
     }
+    return atoi(arg);
 }
 
 std::vector<PSX::RectMatch> parse_config_file(const char *path) {
@@ -17361,11 +17368,15 @@ std::vector<PSX::RectMatch> parse_config_file(const char *path) {
     while (std::getline(in, line)) {
         std::smatch sm;
         if (std::regex_match(line, sm, ignore_command)) {
+            std::string a1 = sm[1].str();
+            std::string a2 = sm[2].str();
+            std::string a3 = sm[3].str();
+            std::string a4 = sm[4].str();
             result.push_back(PSX::RectMatch(
-                ignore_arg_to_number(sm[1]),
-                ignore_arg_to_number(sm[2]),
-                ignore_arg_to_number(sm[3]),
-                ignore_arg_to_number(sm[4])
+                ignore_arg_to_number(a1.c_str()),
+                ignore_arg_to_number(a2.c_str()),
+                ignore_arg_to_number(a3.c_str()),
+                ignore_arg_to_number(a4.c_str())
             ));
         }
     }
@@ -17900,8 +17911,9 @@ bool imageMatches(TextureUpload &upload, Rect rect, uint16_t *vram) {
              w = rect.width,
              h = rect.height;
     int index = 0;
-    for (int j = y; j < y + h; j++) {
-        for (int i = x; i < x + w; i++) {
+    unsigned i, j;
+    for (j = y; j < y + h; j++) {
+        for (i = x; i < x + w; i++) {
             if (upload.image[index] != vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))]) {
                 return false;
             }
