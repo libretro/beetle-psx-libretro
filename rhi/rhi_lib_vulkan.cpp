@@ -6157,16 +6157,68 @@ struct HdImageHandle {
     int alpha_flags;
 };
 struct TextureUpload {
-    std::vector<uint16_t> image;
+    /* VRAM source pixels (owned). Was std::vector<uint16_t>; filled once at
+     * creation and thereafter read-only. */
+    uint16_t *image;
+    int       image_count;
     bool dumpable;
     int width;
     int height;
     uint32_t hash;
-    std::vector<DumpedMode> dumped_modes;
+    /* Modes already dumped to disk (owned growable array, append-only).
+     * Was std::vector<DumpedMode>. */
+    DumpedMode *dumped_modes;
+    int         dumped_modes_count;
+    int         dumped_modes_cap;
 	std::map<uint32_t, HdImageHandle> textures; // palette hash -> imagehandle
 	// (HD load bookkeeping lives on the TextureTracker: hd_gpu_cache / hd_cache /
 	//  requested / pending_attach, keyed by (hash,palette) so it survives this
 	//  upload being recreated as the sprite animation churns VRAM.)
+
+    TextureUpload()
+        : image(NULL), image_count(0), dumpable(false), width(0), height(0),
+          hash(0), dumped_modes(NULL), dumped_modes_count(0), dumped_modes_cap(0) {}
+    ~TextureUpload() {
+        free(image);
+        free(dumped_modes);
+    }
+    /* Owns malloc'd buffers, so copies must be deep. Copy/assign are used by
+     * the save-state path (TextureUpload value map) and load_state's `*ptr =
+     * value`. The std::map<> member copies itself. */
+    TextureUpload(const TextureUpload &o)
+        : image(NULL), image_count(o.image_count), dumpable(o.dumpable),
+          width(o.width), height(o.height), hash(o.hash),
+          dumped_modes(NULL), dumped_modes_count(o.dumped_modes_count),
+          dumped_modes_cap(o.dumped_modes_count), textures(o.textures) {
+        if (image_count) {
+            image = (uint16_t *)malloc((size_t)image_count * sizeof(uint16_t));
+            memcpy(image, o.image, (size_t)image_count * sizeof(uint16_t));
+        }
+        if (dumped_modes_count) {
+            dumped_modes = (DumpedMode *)malloc((size_t)dumped_modes_count * sizeof(DumpedMode));
+            memcpy(dumped_modes, o.dumped_modes, (size_t)dumped_modes_count * sizeof(DumpedMode));
+        }
+    }
+    TextureUpload &operator=(const TextureUpload &o) {
+        if (this != &o) {
+            free(image); free(dumped_modes);
+            image = NULL; dumped_modes = NULL;
+            image_count = o.image_count;
+            dumped_modes_count = o.dumped_modes_count;
+            dumped_modes_cap = o.dumped_modes_count;
+            dumpable = o.dumpable; width = o.width; height = o.height; hash = o.hash;
+            textures = o.textures;
+            if (image_count) {
+                image = (uint16_t *)malloc((size_t)image_count * sizeof(uint16_t));
+                memcpy(image, o.image, (size_t)image_count * sizeof(uint16_t));
+            }
+            if (dumped_modes_count) {
+                dumped_modes = (DumpedMode *)malloc((size_t)dumped_modes_count * sizeof(DumpedMode));
+                memcpy(dumped_modes, o.dumped_modes, (size_t)dumped_modes_count * sizeof(DumpedMode));
+            }
+        }
+        return *this;
+    }
 };
 
 // Decoded RGBA image level (one mip). C-style ownership: a plain malloc'd
@@ -18059,7 +18111,7 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
     int bpp = 16 >> shift;
     int mask = (1 << bpp) - 1;
     /* Output is exactly 4 bytes per (subpixel) = image.size() * ppp * 4. */
-    img_count = upload.image.size();
+    img_count = (size_t)upload.image_count;
     bytes_len = img_count * (size_t)ppp * 4u;
     bytes = (uint8_t *)malloc(bytes_len ? bytes_len : 1);
     bi = 0;
@@ -18112,7 +18164,7 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
     plen = strlen(path);
     snprintf(path + plen, sizeof(path) - plen, ".png");
 
-    TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dump info: mode=%i, w=%i, h=%i, len=%i, bytesLen=%i\n", mode.mode, upload.width, upload.height, (int)upload.image.size(), (int)bytes_len);
+    TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dump info: mode=%i, w=%i, h=%i, len=%i, bytesLen=%i\n", mode.mode, upload.width, upload.height, upload.image_count, (int)bytes_len);
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping to %s.\n", path);
 
     //stbi_write_png(path, upload.width * ppp, upload.height, 4, bytes, 4 * upload.width * ppp);
@@ -18213,7 +18265,7 @@ Palette TextureTracker::get_palette(Rect palette_rect) {
             int x = palette_rect.x - other.texture_rect.vram_rect.x;
             int y = palette_rect.y - other.texture_rect.vram_rect.y;
             int offset = y * other.texture_rect.vram_rect.width + x;
-            uint16_t *data = other.texture_rect.upload->image.data() + offset;
+            uint16_t *data = other.texture_rect.upload->image + offset;
             uint32_t hash = crc32(0, (unsigned char*)data, palette_rect.width * sizeof(uint16_t));
             return { data, hash };
         }
@@ -18386,24 +18438,29 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
     std::shared_ptr<TextureUpload> upload;
     bool preexisting = false;
     {
-        std::vector<uint16_t> vec;
         unsigned x = rect.x,
                 y = rect.y,
                 w = rect.width,
                 h = rect.height;
-        for (int j = y; j < y + h; j++) {
-            for (int i = x; i < x + w; i++) {
-                vec.push_back(vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))]);
+        size_t img_n = (size_t)w * (size_t)h;
+        uint16_t *img = (uint16_t *)malloc(img_n * sizeof(uint16_t));
+        size_t vi = 0;
+        int j, i;
+        for (j = y; j < (int)(y + h); j++) {
+            for (i = x; i < (int)(x + w); i++) {
+                img[vi++] = vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))];
             }
         }
-        uint32_t hash = crc32(0, (unsigned char*)vec.data(), rect.width * rect.height * sizeof(uint16_t));
+        uint32_t hash = crc32(0, (unsigned char*)img, rect.width * rect.height * sizeof(uint16_t));
         // TODO: check for hash collision, by checking if existing upload has different dimensions. not sure how to recover if it does,
         //       but the odds of a collision are probably much higher than the odds that both textures would be in play simultaneously,
         //       so it'd probably be safe to simply ignore the newest upload and clear instead.
         upload = find_upload(hash);
         if (upload == nullptr) {
             upload = std::make_shared<TextureUpload>();
-            upload->image = std::move(vec);
+            upload->image = img;            /* transfer ownership */
+            upload->image_count = (int)img_n;
+            img = NULL;
             upload->width = rect.width;
             upload->height = rect.height;
             upload->hash = hash;
@@ -18418,6 +18475,7 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
         } else {
             preexisting = true;
         }
+        free(img); /* NULL if ownership was transferred */
     }
 
     RestorableRect *restore = nullptr;
@@ -18561,14 +18619,21 @@ void TextureTracker::dump_texture(std::shared_ptr<TextureUpload> &upload, UsedMo
     }
 
     bool already_dumped = false;
-    for (const DumpedMode &d : upload->dumped_modes) {
-        if (d == dump_mode) {
+    int dmi;
+    for (dmi = 0; dmi < upload->dumped_modes_count; dmi++) {
+        if (upload->dumped_modes[dmi] == dump_mode) {
             already_dumped = true;
             break;
         }
     }
     if (!already_dumped) {
-        upload->dumped_modes.push_back(dump_mode);
+        if (upload->dumped_modes_count == upload->dumped_modes_cap) {
+            int ncap = upload->dumped_modes_cap ? upload->dumped_modes_cap * 2 : 4;
+            upload->dumped_modes = (DumpedMode *)realloc(upload->dumped_modes,
+                                       (size_t)ncap * sizeof(DumpedMode));
+            upload->dumped_modes_cap = ncap;
+        }
+        upload->dumped_modes[upload->dumped_modes_count++] = dump_mode;
         if (dump_enabled) {
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping %x\n", upload->hash);
             dump_image(*upload, mode);
