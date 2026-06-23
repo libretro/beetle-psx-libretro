@@ -17486,11 +17486,12 @@ struct RGBAImage {
     uint8_t* data;
     int width;
     int height;
-
-    ~RGBAImage();
 };
 
-std::unique_ptr<RGBAImage> load_image(const char *path);
+// Decode an image from disk into *img (RGBA, 4 channels). On failure img->data
+// is NULL. The caller owns img->data and must release it with rgba_image_free.
+void load_image(const char *path, RGBAImage *img);
+void rgba_image_free(RGBAImage *img);
 bool write_image(const char *path, int width, int height, const void *data);
 
 /* === image_io.cpp === */
@@ -17500,17 +17501,16 @@ bool write_image(const char *path, int width, int height, const void *data);
 #define STB_IMAGE_IMPLEMENTATION
 #include "../stb/stb_image.h"
 
-RGBAImage::~RGBAImage() {
-    if (this->data != nullptr) {
-        stbi_image_free(this->data);
+void rgba_image_free(RGBAImage *img) {
+    if (img->data != NULL) {
+        stbi_image_free(img->data);
+        img->data = NULL;
     }
 }
 
-std::unique_ptr<RGBAImage> load_image(const char *path) {
-    std::unique_ptr<RGBAImage> ptr = std::unique_ptr<RGBAImage>(new RGBAImage);
+void load_image(const char *path, RGBAImage *img) {
     int channels;
-    ptr->data = stbi_load(path, &ptr->width, &ptr->height, &channels, 4);
-    return ptr;
+    img->data = stbi_load(path, &img->width, &img->height, &channels, 4);
 }
 bool write_image(const char *path, int width, int height, const void *data) {
     return stbi_write_png(path, width, height, 4, data, 4 * width);
@@ -17537,34 +17537,27 @@ extern char retro_cd_base_directory[4096];
 
 namespace PSX {
 
-std::string dump_path() {
-    std::string fullpath;
+// Path helpers write into a caller-provided buffer (PATH_MAX_TT bytes) and
+// return it, C-style, instead of allocating a std::string.
+enum { PATH_MAX_TT = 4096 + 256 };
 
-    fullpath += retro_cd_base_directory;
-    fullpath += retro_slash;
-    fullpath += retro_cd_base_name;
-    fullpath += "-texture-dump";
-    fullpath += retro_slash;
-
-    return fullpath;
+char *dump_path(char *out, size_t cap) {
+    snprintf(out, cap, "%s%c%s-texture-dump%c",
+        retro_cd_base_directory, retro_slash, retro_cd_base_name, retro_slash);
+    return out;
 }
 
-std::string replacements_path() {
-    std::string fullpath;
-
-    fullpath += retro_cd_base_directory;
-    fullpath += retro_slash;
-    fullpath += retro_cd_base_name;
-    fullpath += "-texture-replacements";
-    fullpath += retro_slash;
-
-    return fullpath;
+char *replacements_path(char *out, size_t cap) {
+    snprintf(out, cap, "%s%c%s-texture-replacements%c",
+        retro_cd_base_directory, retro_slash, retro_cd_base_name, retro_slash);
+    return out;
 }
 
-std::string replacement_filename_from_hash(uint32_t hash, uint32_t palette_hash) {
-    char tail[32];
-    snprintf(tail, sizeof(tail), "%x-%x.png", (unsigned)hash, (unsigned)palette_hash);
-    return replacements_path() + tail;
+char *replacement_filename_from_hash(char *out, size_t cap, uint32_t hash, uint32_t palette_hash) {
+    char base[PATH_MAX_TT];
+    replacements_path(base, sizeof(base));
+    snprintf(out, cap, "%s%x-%x.png", base, (unsigned)hash, (unsigned)palette_hash);
+    return out;
 }
 
 inline uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
@@ -17745,11 +17738,14 @@ void io_thread(void *user_data) {
             uint32_t hash = request.hash;
             uint32_t palette_hash = request.palette_hash;
 
-            std::string path = replacement_filename_from_hash(hash, palette_hash);
-            std::unique_ptr<RGBAImage> image = load_image(path.c_str());
-            if (image->data != nullptr) {
+            char path[PATH_MAX_TT];
+            RGBAImage image;
+            replacement_filename_from_hash(path, sizeof(path), hash, palette_hash);
+            image.data = NULL;
+            load_image(path, &image);
+            if (image.data != NULL) {
                 int alpha_flags_out = 0;
-                LoadedLevels levels = prepare_texture(*image, alpha_flags_out);
+                LoadedLevels levels = prepare_texture(image, alpha_flags_out);
                 IOResponse response;
                 response.hash         = hash;
                 response.palette_hash = palette_hash;
@@ -17760,8 +17756,10 @@ void io_thread(void *user_data) {
                 slock_lock(channel->lock);
                 channel->responses.push_back(std::move(response));
                 slock_unlock(channel->lock);
+
+                rgba_image_free(&image);
             } else {
-                TT_LOG(RETRO_LOG_ERROR, "failed to load: %s\n", path.c_str());
+                TT_LOG(RETRO_LOG_ERROR, "failed to load: %s\n", path);
             }
         } else if (request.kind == IORequestKind::Dump) {
             int success = write_image(request.path.c_str(), request.width, request.height, request.bytes.data());
@@ -17830,7 +17828,8 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
             return; // Early out
     }
 
-    std::string path = dump_path();
+    char dpath[PATH_MAX_TT];
+    std::string path = dump_path(dpath, sizeof(dpath));
     {
         char buf[16];
         snprintf(buf, sizeof(buf), "%x", (unsigned)hash);
@@ -17947,11 +17946,15 @@ std::set<HdTextureId> read_texture_directory(const char *path) {
 
 TextureTracker::TextureTracker()
 {
-    known_files = read_texture_directory(replacements_path().c_str());
+    char rpath[PATH_MAX_TT];
+    char cfg[PATH_MAX_TT];
+    known_files = read_texture_directory(replacements_path(rpath, sizeof(rpath)));
     TT_LOG(RETRO_LOG_INFO, "num hd textures: %d\n", known_files.size());
 
     // Read in the dump config file
-    dump_ignore = parse_config_file((dump_path() + "/dump.cfg").c_str());
+    dump_path(cfg, sizeof(cfg));
+    snprintf(cfg + strlen(cfg), sizeof(cfg) - strlen(cfg), "/dump.cfg");
+    dump_ignore = parse_config_file(cfg);
     for (RectMatch m : dump_ignore) {
         TT_LOG_VERBOSE(RETRO_LOG_INFO, "Ignoring %d,%d,%d,%d\n", m.x, m.y, m.w, m.h);
     }
@@ -18616,8 +18619,11 @@ void TextureTracker::endFrame() {
 
     if (dbg_input_state_cb != 0) {
         if (frame_dump_key.query()) {
+            char fdpath[PATH_MAX_TT];
+            dump_path(fdpath, sizeof(fdpath));
+            snprintf(fdpath + strlen(fdpath), sizeof(fdpath) - strlen(fdpath), "test_dump.json");
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "Left bracket!\n");
-            frame_dump = new std::ofstream(dump_path() + "test_dump.json");
+            frame_dump = new std::ofstream(fdpath);
             frame_dump_need_comma = false;
             *frame_dump << "{ \"initial\": [\n";
             bool need_comma = false;
@@ -18671,8 +18677,9 @@ void TextureTracker::set_texture_uploader(Renderer *t) {
 }
 
 void TextureTracker::reload_textures_from_disk() {
+    char rpath[PATH_MAX_TT];
     // Reload the directory listing
-    known_files = read_texture_directory(replacements_path().c_str());
+    known_files = read_texture_directory(replacements_path(rpath, sizeof(rpath)));
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "Found %d hd textures\n", known_files.size());
 
     // Drop all cached / loaded HD state so edited files on disk take effect.
