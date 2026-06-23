@@ -6673,6 +6673,8 @@ static void rect_index_set_insert(RectIndexSet *s, RectIndex v) {
 
 class LookupGrid {
 public:
+    LookupGrid();
+    ~LookupGrid();
     void insert(SRect r, RectIndex index);
     void get(SRect r, RectIndexSet &results);
     void clear();
@@ -6681,7 +6683,14 @@ private:
         SRect rect;
         RectIndex index;
     };
-    std::vector<LookupEntry> cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS]; // Each cell is a psx texture page, 64x256
+    /* Each cell is a psx texture page (64x256); was std::vector<LookupEntry>.
+     * Now a malloc'd growable array per cell (POD entries). */
+    struct Cell {
+        LookupEntry *entries;
+        int count;
+        int cap;
+    };
+    Cell cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS];
 };
 
 class RectTracker {
@@ -19462,11 +19471,32 @@ CellBounds cellBounds(SRect vram) {
     });
 }
 
+LookupGrid::LookupGrid() {
+    int i;
+    for (i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++) {
+        cells[i].entries = NULL;
+        cells[i].count = 0;
+        cells[i].cap = 0;
+    }
+}
+LookupGrid::~LookupGrid() {
+    int i;
+    for (i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++)
+        free(cells[i].entries);
+}
 void LookupGrid::insert(SRect r, RectIndex index) {
     CellBounds c = cellBounds(r);
     for (int x = c.lowX; x < c.highX; x++) {
         for (int y = c.lowY; y < c.highY; y++) {
-            cells[y * LOOKUP_GRID_COLUMNS + x].push_back({r, index});
+            Cell *cell = &cells[y * LOOKUP_GRID_COLUMNS + x];
+            if (cell->count == cell->cap) {
+                int ncap = cell->cap ? cell->cap * 2 : 8;
+                cell->entries = (LookupEntry *)realloc(cell->entries, (size_t)ncap * sizeof(LookupEntry));
+                cell->cap = ncap;
+            }
+            cell->entries[cell->count].rect = r;
+            cell->entries[cell->count].index = index;
+            cell->count++;
         }
     }
 }
@@ -19474,9 +19504,11 @@ void LookupGrid::get(SRect r, RectIndexSet &results) {
     CellBounds c = cellBounds(r);
     for (int x = c.lowX; x < c.highX; x++) {
         for (int y = c.lowY; y < c.highY; y++) {
-            for (LookupEntry &entry : cells[y * LOOKUP_GRID_COLUMNS + x]) {
-                if (intersects(entry.rect, r)) {
-                    rect_index_set_insert(&results, entry.index);
+            Cell *cell = &cells[y * LOOKUP_GRID_COLUMNS + x];
+            int e;
+            for (e = 0; e < cell->count; e++) {
+                if (intersects(cell->entries[e].rect, r)) {
+                    rect_index_set_insert(&results, cell->entries[e].index);
                 }
             }
         }
@@ -19484,7 +19516,7 @@ void LookupGrid::get(SRect r, RectIndexSet &results) {
 }
 void LookupGrid::clear() {
     for (int i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++) {
-        cells[i].clear();
+        cells[i].count = 0; /* keep allocation for reuse */
     }
 }
 
