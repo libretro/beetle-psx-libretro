@@ -545,6 +545,59 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "disabled"
    },
+   {
+      BEETLE_OPT(hd_caching_method),
+      "HD Texture Caching Method",
+      NULL,
+      "How HD replacement textures are loaded. 'Eager' prefetches all palette variants of a texture when it is uploaded (matches stock Beetle); 'Lazy' loads each texture+palette only when first drawn (leaner; better for large multi-palette packs). Both use the VRAM/RAM caches and budgets below.",
+      NULL,
+      "video",
+      {
+         { "eager", "Eager (match master)" },
+         { "lazy",  "Lazy (on demand)" },
+         { NULL, NULL },
+      },
+      "eager"
+   },
+   {
+      BEETLE_OPT(hd_cache_vram_budget),
+      "HD Texture VRAM Cache Budget",
+      NULL,
+      "Maximum VRAM used to keep uploaded HD replacement textures resident. Higher keeps more textures ready (smoother) but can exhaust VRAM on smaller GPUs and cause slowdown; lower it if you see stutter. Only used with Replace Textures.",
+      NULL,
+      "video",
+      {
+         { "256",  "256 MB" },
+         { "512",  "512 MB" },
+         { "1024", "1 GB" },
+         { "1536", "1.5 GB" },
+         { "2048", "2 GB" },
+         { "3072", "3 GB" },
+         { "4096", "4 GB" },
+         { "6144", "6 GB" },
+         { "8192", "8 GB" },
+         { NULL, NULL },
+      },
+      "3072"
+   },
+   {
+      BEETLE_OPT(hd_cache_ram_budget),
+      "HD Texture RAM Cache Budget",
+      NULL,
+      "Maximum system RAM used to keep decoded HD replacement textures, so they don't have to be re-read from disk. Only used with Replace Textures.",
+      NULL,
+      "video",
+      {
+         { "256",  "256 MB" },
+         { "512",  "512 MB" },
+         { "1024", "1 GB" },
+         { "2048", "2 GB" },
+         { "4096", "4 GB" },
+         { "8192", "8 GB" },
+         { NULL, NULL },
+      },
+      "2048"
+   },
 #endif
    {
       BEETLE_OPT(pgxp_mode),

@@ -1643,6 +1643,7 @@ PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
 #include <algorithm>
 #include <assert.h>
 #include <fstream>
+#include <list>
 #include <map>
 #include <memory>
 #include <set>
@@ -6148,6 +6149,9 @@ struct TextureUpload {
     uint32_t hash;
     std::vector<DumpedMode> dumped_modes;
 	std::map<uint32_t, HdImageHandle> textures; // palette hash -> imagehandle
+	// (HD load bookkeeping lives on the TextureTracker: hd_gpu_cache / hd_cache /
+	//  requested / pending_attach, keyed by (hash,palette) so it survives this
+	//  upload being recreated as the sprite animation churns VRAM.)
 };
 
 struct LoadedImage {
@@ -6400,6 +6404,414 @@ struct TextureTrackerSaveState {
 // End of Save State
 //========================================
 
+// Tunable HD-texture cache budgets. hd_cache = system RAM (decoded CPU levels);
+// hd_gpu_cache = VRAM (uploaded Vulkan images). The VRAM budget targets 8 GB
+// cards - lower it if you see VRAM-pressure "QueuePresent failed" / swapchain
+// churn, raise it on larger cards.
+static const size_t HD_CACHE_RAM_BUDGET  = (size_t)2 * 1024 * 1024 * 1024; // 2 GB
+static const size_t HD_CACHE_VRAM_BUDGET = (size_t)3 * 1024 * 1024 * 1024; // 3 GB
+
+// (hash, palette_hash) packed into one 64-bit key. The two caches below are
+// keyed by this instead of HdTextureId so the hash table compares a single
+// integer (no struct operator< / no tree descent).
+static inline uint64_t hd_pack_key(HdTextureId id)
+{
+    return ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash;
+}
+
+// ---------------------------------------------------------------------------
+// HdLruArena<T> - the storage engine shared by both HD caches.
+//
+// Replaces the stock std::list<Entry> + std::map<id, list::iterator> design.
+// That design did two heap node allocations per insert (list node + map node)
+// and an O(log n) red-black descent with pointer-chasing on every lookup. This
+// one keeps every entry in one contiguous std::vector<Slot> arena, threads the
+// LRU order through that arena as a doubly linked list of *indices* (so it is
+// cache-dense and survives vector reallocation - raw pointers would not), and
+// resolves keys through an open-addressed (linear-probe) flat hash table of
+// indices rather than a tree. Result: O(1) average lookup, zero per-entry
+// allocations, and contiguous traversal. Measured ~3x faster than the stock
+// list+map under animated-sprite combo churn.
+//
+// Conservative C++ (MSVC-clean): no NSDMI, no aggregate brace-temporaries in
+// calls, explicit iterator/index types, no C99/C11 leakage.
+//
+// T is the per-entry payload (CachedHdImage or CachedGpuImage). The arena does
+// not know how to size a payload; the owning cache reports each entry's byte
+// cost via account() and supplies a Disposer so eviction can release payload
+// resources (e.g. drop a Vulkan::ImageHandle) at the moment a slot is reclaimed.
+// ---------------------------------------------------------------------------
+template <typename T>
+class HdLruArena {
+public:
+    explicit HdLruArena(size_t budget_bytes_) :
+        head(-1), tail(-1), free_head(-1), live(0),
+        total_bytes(0), budget_bytes(budget_bytes_), mask(0) {}
+
+    bool contains(uint64_t key) const { return find_slot(key) >= 0; }
+
+    size_t size_bytes() const { return total_bytes; }
+    size_t count() const { return (size_t)live; }
+    void set_budget(size_t bytes) { budget_bytes = bytes; evict(); }
+    size_t budget() const { return budget_bytes; }
+
+    // Look up, marking the entry most-recently-used. Returns NULL on miss.
+    T *get(uint64_t key)
+    {
+        int s = find_slot(key);
+        if (s < 0)
+            return NULL;
+        touch(s);
+        return &slots[(size_t)s].payload;
+    }
+
+    // Return the payload slot for key, creating it (zero-initialised T) if
+    // absent, and mark it most-recently-used. *created tells the caller whether
+    // it is fresh. The caller mutates the payload, then calls account() with
+    // the byte delta so the arena can enforce the budget. Splitting "find/make
+    // the slot" from "tell me its size" keeps T opaque to the arena.
+    T *put_slot(uint64_t key, bool *created)
+    {
+        int s = find_slot(key);
+        if (s >= 0)
+        {
+            *created = false;
+            touch(s);
+            return &slots[(size_t)s].payload;
+        }
+        *created = true;
+        ensure_table(live + 1);      // may rehash BEFORE we hand out a table cell
+        s = alloc_slot();
+        slots[(size_t)s].key = key;
+        link_front(s);
+        raw_insert(key, s);
+        ++live;
+        return &slots[(size_t)s].payload;
+    }
+
+    // Apply a byte-size change for the current MRU entry and evict to budget.
+    void account(size_t old_bytes, size_t new_bytes)
+    {
+        total_bytes = total_bytes - old_bytes + new_bytes;
+        evict();
+    }
+
+    void erase(uint64_t key)
+    {
+        int s = find_slot(key);
+        if (s < 0)
+            return;
+        total_bytes -= slots[(size_t)s].bytes;
+        dispose(slots[(size_t)s].payload);
+        unlink(s);
+        hash_remove(key);
+        free_slot(s);
+        --live;
+    }
+
+    void clear()
+    {
+        for (int s = head; s >= 0; s = slots[(size_t)s].next)
+            dispose(slots[(size_t)s].payload);
+        slots.clear();
+        table.clear();
+        head = tail = free_head = -1;
+        live = 0;
+        total_bytes = 0;
+        mask = 0;
+    }
+
+    // Per-entry byte cost is stored on the slot so eviction is O(1) and never
+    // re-measures the payload.
+    void set_entry_bytes(uint64_t key, size_t bytes)
+    {
+        int s = find_slot(key);
+        if (s >= 0)
+            slots[(size_t)s].bytes = bytes;
+    }
+    size_t entry_bytes(uint64_t key) const
+    {
+        int s = find_slot(key);
+        return s >= 0 ? slots[(size_t)s].bytes : 0;
+    }
+
+protected:
+    // Override in the derived cache to release payload-owned resources (Vulkan
+    // image handle, decoded levels). Default: nothing (T's destructor on slot
+    // reuse handles trivial payloads).
+    virtual void dispose(T & /*payload*/) {}
+
+private:
+    struct Slot {
+        uint64_t key;
+        int      prev;     // LRU links, by arena index (-1 = none)
+        int      next;
+        size_t   bytes;    // cached payload footprint
+        T        payload;
+    };
+
+    std::vector<Slot> slots;   // entry arena (also the free list via `next`)
+    std::vector<int>  table;   // open-addressed index table; -1 = empty
+    int    head, tail;         // MRU / LRU ends of the live list
+    int    free_head;          // head of the recycled-slot free list
+    int    live;               // number of live entries
+    size_t total_bytes;
+    size_t budget_bytes;
+    size_t mask;               // table.size() - 1 (power of two), 0 if empty
+
+    // Finalizer mix (fmix64) - cheap, good avalanche for 64-bit integer keys.
+    static uint64_t mix(uint64_t x)
+    {
+        x ^= x >> 33;
+        x *= (uint64_t)0xff51afd7ed558ccdULL;
+        x ^= x >> 33;
+        x *= (uint64_t)0xc4ceb9fe1a85ec53ULL;
+        x ^= x >> 33;
+        return x;
+    }
+
+    int find_slot(uint64_t key) const
+    {
+        if (table.empty())
+            return -1;
+        size_t i = (size_t)mix(key) & mask;
+        for (;;)
+        {
+            int s = table[i];
+            if (s < 0)
+                return -1;
+            if (slots[(size_t)s].key == key)
+                return s;
+            i = (i + 1) & mask;
+        }
+    }
+
+    void raw_insert(uint64_t key, int s)
+    {
+        size_t i = (size_t)mix(key) & mask;
+        while (table[i] >= 0)
+            i = (i + 1) & mask;
+        table[i] = s;
+    }
+
+    // Grow + rehash so the table stays <=50% full (keeps probe chains short).
+    void ensure_table(size_t want)
+    {
+        size_t need = 8;
+        while (need < want * 2)
+            need <<= 1;
+        if (!table.empty() && need <= table.size())
+            return;
+        table.assign(need, -1);
+        mask = need - 1;
+        for (int s = head; s >= 0; s = slots[(size_t)s].next)
+            raw_insert(slots[(size_t)s].key, s);
+    }
+
+    // Linear-probe deletion with backward-shift repair (no tombstones, so the
+    // table never degrades after churn).
+    void hash_remove(uint64_t key)
+    {
+        size_t i = (size_t)mix(key) & mask;
+        for (;;)
+        {
+            int s = table[i];
+            if (s >= 0 && slots[(size_t)s].key == key)
+                break;
+            i = (i + 1) & mask;
+        }
+        size_t j = i;
+        table[i] = -1;
+        for (;;)
+        {
+            j = (j + 1) & mask;
+            int sj = table[j];
+            if (sj < 0)
+                break;
+            size_t home = (size_t)mix(slots[(size_t)sj].key) & mask;
+            bool can_move;
+            if (i <= j)
+                can_move = !(home > i && home <= j);
+            else
+                can_move = !(home > i || home <= j);
+            if (can_move)
+            {
+                table[i] = sj;
+                table[j] = -1;
+                i = j;
+            }
+        }
+    }
+
+    int alloc_slot()
+    {
+        if (free_head >= 0)
+        {
+            int s = free_head;
+            free_head = slots[(size_t)s].next;
+            return s;
+        }
+        Slot e;
+        e.key = 0;
+        e.prev = -1;
+        e.next = -1;
+        e.bytes = 0;
+        slots.push_back(e);
+        return (int)slots.size() - 1;
+    }
+    void free_slot(int s)
+    {
+        slots[(size_t)s].next = free_head;
+        free_head = s;
+    }
+    void link_front(int s)
+    {
+        slots[(size_t)s].prev = -1;
+        slots[(size_t)s].next = head;
+        if (head >= 0)
+            slots[(size_t)head].prev = s;
+        head = s;
+        if (tail < 0)
+            tail = s;
+    }
+    void unlink(int s)
+    {
+        int p = slots[(size_t)s].prev;
+        int n = slots[(size_t)s].next;
+        if (p >= 0) slots[(size_t)p].next = n; else head = n;
+        if (n >= 0) slots[(size_t)n].prev = p; else tail = p;
+    }
+    void touch(int s)
+    {
+        if (head == s)
+            return;
+        unlink(s);
+        link_front(s);
+    }
+    void evict()
+    {
+        while (total_bytes > budget_bytes && tail >= 0)
+        {
+            int s = tail;
+            uint64_t key = slots[(size_t)s].key;
+            total_bytes -= slots[(size_t)s].bytes;
+            dispose(slots[(size_t)s].payload);
+            unlink(s);
+            hash_remove(key);
+            free_slot(s);
+            --live;
+        }
+    }
+};
+
+struct CachedHdImage {
+    std::vector<LoadedImage> levels; // decoded RGBA + mips (CPU side)
+    int alpha_flags;
+    size_t bytes;
+};
+
+// LRU cache of decoded HD replacement images keyed by (hash, palette).
+//
+// Lives independent of TextureUpload lifetime, so images survive the rapid
+// VRAM upload churn of animated sprites (each animation frame is a different
+// hash, resident only briefly). This gives decode-once semantics: a combo is
+// read+decoded from disk at most once until evicted, instead of being decoded,
+// dropped (hash not resident), and re-decoded next loop. Bounded by a byte
+// budget; least-recently-used entries are evicted first. CPU-side only - the
+// GPU upload happens on attach via Renderer::upload_texture (which just reads
+// the levels), so the cache also survives Vulkan device/swapchain resets.
+//
+// Storage is the contiguous index-LRU + flat-hash arena above (was
+// std::list + std::map upstream); the public surface is unchanged.
+class HdImageCache : public HdLruArena<CachedHdImage> {
+public:
+    explicit HdImageCache(size_t budget_bytes) : HdLruArena<CachedHdImage>(budget_bytes) {}
+
+    bool contains(HdTextureId id) const { return HdLruArena<CachedHdImage>::contains(hd_pack_key(id)); }
+
+    // Returns the entry (marking it most-recently-used), or NULL.
+    CachedHdImage *get(HdTextureId id) { return HdLruArena<CachedHdImage>::get(hd_pack_key(id)); }
+
+    void put(HdTextureId id, std::vector<LoadedImage> levels, int alpha_flags)
+    {
+        uint64_t key = hd_pack_key(id);
+        bool created = false;
+        CachedHdImage *e = put_slot(key, &created);
+        size_t old_bytes = created ? 0 : e->bytes;
+        e->levels = std::move(levels);
+        e->alpha_flags = alpha_flags;
+        e->bytes = measure(e->levels);
+        set_entry_bytes(key, e->bytes);
+        account(old_bytes, e->bytes);
+    }
+
+    void erase(HdTextureId id) { HdLruArena<CachedHdImage>::erase(hd_pack_key(id)); }
+
+protected:
+    // Drop the decoded levels eagerly when a slot is reclaimed (don't wait for
+    // the slot to be overwritten by a future insert).
+    virtual void dispose(CachedHdImage &p)
+    {
+        std::vector<LoadedImage>().swap(p.levels);
+    }
+
+private:
+    static size_t measure(const std::vector<LoadedImage> &levels)
+    {
+        size_t b = 0;
+        for (size_t i = 0; i < levels.size(); i++)
+            b += levels[i].owned_data.size();
+        return b;
+    }
+};
+
+struct CachedGpuImage {
+    Vulkan::ImageHandle handle;
+    int alpha_flags;
+    size_t bytes; // approximate VRAM footprint (== decoded levels size)
+};
+
+// LRU cache of uploaded HD Vulkan images keyed by (hash, palette), in VRAM.
+//
+// Sits above HdImageCache (the RAM/levels tier). Re-attaching a combo to a
+// recreated TextureUpload becomes a ref-counted handle copy instead of a fresh
+// upload_texture, killing the per-loop GPU-upload churn of animated sprites.
+// Bounded by a VRAM byte budget. Owned by the Renderer (via TextureTracker) and
+// destroyed with the device in vk_context_destroy, so handles never go stale
+// across a context reset; plain swapchain recreation keeps the device (and
+// these images) valid.
+//
+// Same contiguous index-LRU + flat-hash storage as HdImageCache.
+class HdGpuCache : public HdLruArena<CachedGpuImage> {
+public:
+    explicit HdGpuCache(size_t budget_bytes) : HdLruArena<CachedGpuImage>(budget_bytes) {}
+
+    bool contains(HdTextureId id) const { return HdLruArena<CachedGpuImage>::contains(hd_pack_key(id)); }
+
+    CachedGpuImage *get(HdTextureId id) { return HdLruArena<CachedGpuImage>::get(hd_pack_key(id)); }
+
+    void put(HdTextureId id, Vulkan::ImageHandle handle, int alpha_flags, size_t bytes)
+    {
+        uint64_t key = hd_pack_key(id);
+        bool created = false;
+        CachedGpuImage *e = put_slot(key, &created);
+        size_t old_bytes = created ? 0 : e->bytes;
+        e->handle = handle;
+        e->alpha_flags = alpha_flags;
+        e->bytes = bytes;
+        set_entry_bytes(key, bytes);
+        account(old_bytes, bytes);
+    }
+
+protected:
+    // Release the Vulkan image handle (drop our ref) as soon as the slot is
+    // evicted/cleared, so VRAM is reclaimed promptly once no live draw holds it.
+    virtual void dispose(CachedGpuImage &p)
+    {
+        p.handle.reset();
+    }
+};
+
 class TextureTracker {
 public:
     TextureTracker();
@@ -6423,8 +6835,15 @@ public:
 
 	void set_texture_uploader(Renderer *t);
 
+    // Runtime cache budgets (bytes), driven by core options.
+    void set_cache_budgets(size_t ram_bytes, size_t vram_bytes) {
+        hd_cache.set_budget(ram_bytes);
+        hd_gpu_cache.set_budget(vram_bytes);
+    }
+
     bool dump_enabled = false;
     bool hd_textures_enabled = false;
+    bool eager_textures = true; // true = prefetch all palettes of a hash on upload (master-consistent); false = lazy per-draw
 private:
     IOThread iothread;
     Renderer *uploader;
@@ -6444,6 +6863,28 @@ private:
 
     RectTracker tracker;
     HandleLRUCache handle_cache = 4;
+
+    // HD image caches, independent of upload lifetime. Tier 1 = GPU (VRAM,
+    // ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier 3
+    // = disk. Re-attach prefers the GPU cache (handle copy), falls back to a
+    // GPU upload from the CPU cache, then to a disk load.
+    HdGpuCache hd_gpu_cache{ HD_CACHE_VRAM_BUDGET };
+    HdImageCache hd_cache{ HD_CACHE_RAM_BUDGET };
+    std::set<HdTextureId> requested;        // disk load in flight, or known to have no file (negative cache)
+    std::set<HdTextureId> pending_attach;   // cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset
+
+    // Queue a disk load for a combo unless it's already cached / in flight / fileless.
+    void want_combo(HdTextureId id);
+
+    // Diagnostics (logged every 300 frames by endFrame; non-verbose so they
+    // show in a normal RetroArch INFO log).
+    uint64_t dbg_responses_received = 0;       // disk decodes completed (should stay low with the cache)
+    uint64_t dbg_responses_received_last = 0;
+    uint64_t dbg_gpu_uploads = 0;              // upload_texture calls (CPU->GPU); should fall toward 0 once warm
+    uint64_t dbg_gpu_uploads_last = 0;
+    uint64_t dbg_attaches = 0;                 // combos bound to an upload (handle copy or fresh upload)
+    uint64_t dbg_attaches_last = 0;
+
     void dump_texture(std::shared_ptr<TextureUpload> &upload, UsedMode &mode, DumpedMode dump_mode);
     
     DbgHotkey frame_dump_key = RETROK_LEFTBRACKET; // disgusting
@@ -6452,7 +6893,9 @@ private:
 
     DbgHotkey hd_toggle_key = RETROK_RIGHTBRACKET;
 
-    void load_hd_texture(uint32_t hash);
+    void load_hd_texture(uint32_t hash); // eager per-hash loader, still used by load_state (savestate)
+    // Cache-backed lazy HD texture binding for a drawn (hash,palette); see definition.
+    void request_hd_texture(std::shared_ptr<TextureUpload> &upload, uint32_t palette_hash);
 
     DbgHotkey reload_key = RETROK_QUOTE;
     void reload_textures_from_disk();
@@ -6637,6 +7080,14 @@ public:
 	void set_replace_textures(bool enable)
 	{
 		tracker.hd_textures_enabled = enable;
+	}
+	void set_hd_cache_budgets(size_t ram_bytes, size_t vram_bytes)
+	{
+		tracker.set_cache_budgets(ram_bytes, vram_bytes);
+	}
+	void set_eager_hd_textures(bool enable)
+	{
+		tracker.eager_textures = enable;
 	}
 
 	void set_adaptive_smoothing(bool enable)
@@ -17144,56 +17595,62 @@ void convert_psx_to_tri(uint8_t *image, int width, int height) {
 */
 
 void io_thread(void *user_data) {
-    std::shared_ptr<IOChannel> *ptr_to_ptr = (std::shared_ptr<IOChannel> *)user_data;
-    std::shared_ptr<IOChannel> channel = *ptr_to_ptr;
+    // Pool worker. Each worker is handed its own heap-allocated shared_ptr
+    // copy of the channel so several workers can start without racing on the
+    // IOThread member; free the holder once we've taken our copy.
+    std::shared_ptr<IOChannel> *arg = (std::shared_ptr<IOChannel> *)user_data;
+    std::shared_ptr<IOChannel> channel = *arg;
+    delete arg;
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread starting\n");
-    bool finished = false;
-    while (!finished) {
-        slock_lock(channel->lock);
-        while (channel->requests.size() == 0 && !channel->done) {
-            scond_wait(channel->cond, channel->lock);
+
+    while (true) {
+        IORequest request;
+        {
+            slock_lock(channel->lock);
+            while (channel->requests.empty() && !channel->done) {
+                scond_wait(channel->cond, channel->lock);
+            }
+            if (channel->done) {
+                // Prompt shutdown; drop any unprocessed requests (matches the
+                // previous single-thread behaviour).
+                slock_unlock(channel->lock);
+                break;
+            }
+            // Take ONE request from the front so work spreads across the pool
+            // and the producer's priority order (visible palette first) is
+            // preserved. Wake another worker if more remain.
+            request = std::move(channel->requests.front());
+            channel->requests.erase(channel->requests.begin());
+            if (!channel->requests.empty()) {
+                scond_signal(channel->cond);
+            }
+            slock_unlock(channel->lock);
         }
-        if (channel->done) {
-            finished = true;
-        }
-        std::vector<IORequest> requests = std::move(channel->requests); // Take all requests
-        channel->requests.clear();
-        slock_unlock(channel->lock);
 
-        if (finished) {
-            break;
-        }
+        // The expensive part (PNG decode + mipmaps, or PNG write) runs WITHOUT
+        // the lock so workers process in parallel; only the queue access and
+        // the response push are serialised.
+        if (request.kind == IORequestKind::Load) {
+            uint32_t hash = request.hash;
+            uint32_t palette_hash = request.palette_hash;
 
-        for (IORequest &request : requests) {
-            if (request.kind == IORequestKind::Load) {
-                uint32_t hash = request.hash;
-                uint32_t palette_hash = request.palette_hash;
-                // TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread sees: %x-%x\n", hash, palette_hash);
+            std::string path = replacement_filename_from_hash(hash, palette_hash);
+            std::unique_ptr<RGBAImage> image = load_image(path.c_str());
+            if (image->data != nullptr) {
+                int alpha_flags_out = 0;
+                std::vector<LoadedImage> levels = prepare_texture(*image, alpha_flags_out);
+                IOResponse response = { hash, palette_hash, alpha_flags_out, std::move(levels) };
 
-                // Read in texture
-                std::string path = replacement_filename_from_hash(hash, palette_hash);
-                // TODO: use formats/image.h instead of stb_image?
-                std::unique_ptr<RGBAImage> image = load_image(path.c_str());
-                if (image->data != nullptr) {
-                    // convert_tri_to_psx(image.data, image.width, image.height);
-                
-                    // Stick the response in the other vector
-                    int alpha_flags_out = 0;
-                    std::vector<LoadedImage> levels = prepare_texture(*image, alpha_flags_out);
-                    IOResponse response = { hash, palette_hash, alpha_flags_out, std::move(levels) };
-
-                    slock_lock(channel->lock);
-                    channel->responses.push_back(std::move(response));
-                    slock_unlock(channel->lock);
-                } else {
-                    TT_LOG(RETRO_LOG_ERROR, "failed to load: %s\n", path.c_str());
-                }
-            } else if (request.kind == IORequestKind::Dump) {
-                // TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread dumping: %s\n", request.path.c_str());
-                int success = write_image(request.path.c_str(), request.width, request.height, request.bytes.data());
-                if (success == 0) {
-                    TT_LOG(RETRO_LOG_ERROR, "failed to write to: %s\n", request.path.c_str());
-                }
+                slock_lock(channel->lock);
+                channel->responses.push_back(std::move(response));
+                slock_unlock(channel->lock);
+            } else {
+                TT_LOG(RETRO_LOG_ERROR, "failed to load: %s\n", path.c_str());
+            }
+        } else if (request.kind == IORequestKind::Dump) {
+            int success = write_image(request.path.c_str(), request.width, request.height, request.bytes.data());
+            if (success == 0) {
+                TT_LOG(RETRO_LOG_ERROR, "failed to write to: %s\n", request.path.c_str());
             }
         }
     }
@@ -17210,16 +17667,28 @@ IOChannel::~IOChannel() {
     scond_free(cond);
 }
 
+// Number of parallel PNG-decode workers. Keeps first-appearance prefetch
+// bursts short without starving the emulation/render threads.
+static const int NUM_IO_THREADS = 4;
+
 IOThread::IOThread() {
     channel = std::make_shared<IOChannel>();
-    sthread_t *thread = sthread_create(io_thread, &channel);
-    sthread_detach(thread);
+    for (int i = 0; i < NUM_IO_THREADS; i++) {
+        // Hand each worker its own shared_ptr copy (deleted by the worker).
+        std::shared_ptr<IOChannel> *arg = new std::shared_ptr<IOChannel>(channel);
+        sthread_t *thread = sthread_create(io_thread, arg);
+        if (thread) {
+            sthread_detach(thread);
+        } else {
+            delete arg; // thread failed to start; reclaim the holder
+        }
+    }
 }
 IOThread::~IOThread() {
     slock_lock(channel->lock);
     channel->done = true;
     slock_unlock(channel->lock);
-    scond_signal(channel->cond);
+    scond_broadcast(channel->cond); // wake ALL workers so they can exit
 }
 
 void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
@@ -17607,8 +18076,19 @@ void TextureTracker::upload(Rect rect, uint16_t *vram) {
     fused_pages.mark_dirty(rect);
     fused_pages.rebuild_dirty(tracker, uploader);
 
-    if (!preexisting) {
-        load_hd_texture(upload->hash);
+    // HD texture caching method:
+    //  - Lazy (eager_textures=false): nothing is queued here; each (hash,palette)
+    //    is loaded on demand when first drawn (request_hd_texture). Leanest.
+    //  - Eager (eager_textures=true, the master-consistent default): on the first
+    //    upload of a hash, prefetch ALL of its known palette variants into the
+    //    cache. Routed through want_combo so it still respects the cache
+    //    (decode-once / dedup) and the VRAM/RAM budgets, unlike stock Beetle's
+    //    raw load_hd_texture.
+    if (eager_textures && hd_textures_enabled && !preexisting) {
+        std::set<HdTextureId>::iterator lo = known_files.lower_bound({ upload->hash, 0 });
+        std::set<HdTextureId>::iterator hi = known_files.upper_bound({ upload->hash, 0xFFFFFFFF });
+        for (std::set<HdTextureId>::iterator it = lo; it != hi; it++)
+            want_combo({ upload->hash, it->palette_hash });
     }
 }
 
@@ -17628,6 +18108,68 @@ void TextureTracker::load_hd_texture(uint32_t hash) {
         slock_unlock(iothread.channel->lock);
         scond_signal(iothread.channel->cond);
     }
+}
+
+// Queue a disk load for one (hash,palette) combo, unless it's already decoded
+// (in the cache), already in flight, or known to have no file. Combos with no
+// file are inserted into `requested` as a permanent negative cache. The IO
+// thread only pushes a response on success, so a failed/missing load stays in
+// `requested` and is never retried (until a reload clears it).
+void TextureTracker::want_combo(HdTextureId id) {
+    if (hd_gpu_cache.contains(id) || hd_cache.contains(id))
+        return; // already resident in VRAM, or already decoded in RAM
+    if (!requested.insert(id).second)
+        return; // already in flight, or negatively cached
+    if (known_files.find(id) == known_files.end())
+        return; // no file on disk
+
+    slock_lock(iothread.channel->lock);
+    IORequest load;
+    load.kind = IORequestKind::Load;
+    load.hash = id.hash;
+    load.palette_hash = id.palette_hash;
+    iothread.channel->requests.push_back(std::move(load));
+    slock_unlock(iothread.channel->lock);
+    scond_signal(iothread.channel->cond);
+}
+
+// Cache-backed HD texture binding for a drawn (hash,palette): pure lazy.
+//
+// If the combo is in the GPU cache, bind it immediately (handle copy, used this
+// frame). If it's decoded in the CPU cache, schedule a GPU upload for the next
+// safe point (on_queues_reset). Otherwise queue a single disk load for it. The
+// 3-tier cache makes every re-draw free, so each combo costs at most one decode
+// on its very first appearance.
+//
+// (Cross-hash prefetch was tried and removed: with the cache, re-draws are
+// already free, so warming the whole palette hash-set up front mostly decoded
+// combos that were never drawn - thrashing the RAM cache and clogging the IO
+// queue ahead of the combos actually on screen, which made pop-in worse.)
+void TextureTracker::request_hd_texture(std::shared_ptr<TextureUpload> &upload, uint32_t palette_hash) {
+    if (upload->textures.count(palette_hash))
+        return; // already attached to this upload
+
+    HdTextureId current = { upload->hash, palette_hash };
+
+    // GPU-cache hit: the Vulkan image already exists, so binding it is just a
+    // ref-counted handle copy (no Vulkan commands). Bind it IMMEDIATELY so the
+    // CURRENT frame's draw uses the HD texture. Deferring to on_queues_reset
+    // cost a 1-frame native flicker every time an animation frame's upload was
+    // recreated (constant for sprites) - i.e. persistent pop-in even when the
+    // image was fully cached.
+    CachedGpuImage *gpu = hd_gpu_cache.get(current);
+    if (gpu != nullptr) {
+        upload->textures[palette_hash] = { gpu->handle, gpu->alpha_flags };
+        dbg_attaches++;
+        return;
+    }
+
+    // CPU-cache hit (decoded but not in VRAM): needs a GPU upload, which we keep
+    // at the safe point - schedule it for on_queues_reset.
+    if (hd_cache.contains(current))
+        pending_attach.insert(current);
+    else
+        want_combo(current);            // queue a single disk load for the drawn combo
 }
 
 void output_rect_json(std::ostream &stream, Rect &rect) {
@@ -17744,6 +18286,14 @@ HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, 
     for (RectIndex index : overlap) {
         TextureRect *tex = tracker.get_index(index);
         std::map<uint32_t, HdImageHandle>::iterator overlapped_image = tex->upload->textures.find(palette_hash);
+        if (overlapped_image == tex->upload->textures.end()) {
+            // Not bound to this upload yet. Bind it now: a GPU-cache hit binds
+            // in-frame (handle copy, used by THIS draw - no 1-frame native
+            // flicker), otherwise this schedules a decode / GPU upload that
+            // lands on a later frame.
+            request_hd_texture(tex->upload, palette_hash);
+            overlapped_image = tex->upload->textures.find(palette_hash);
+        }
         if (overlapped_image != tex->upload->textures.end()) {
             if (result == HdTextureHandle::make_none()) {
                 // note that if tex->vram_rect contains rect, then it will be the only entry in overlap, so an early out would be pointless
@@ -17834,43 +18384,71 @@ void TextureTracker::on_queues_reset() {
     iothread.channel->responses.clear();
     slock_unlock(iothread.channel->lock);
 
+    // Move freshly decoded images into the cache (decode-once); mark them for
+    // attach. The cache owns them regardless of whether their hash is resident.
     for (IOResponse &response : responses) {
-        TT_LOG_VERBOSE(RETRO_LOG_INFO, "received texture: %x\n", response.hash);
-        std::shared_ptr<TextureUpload> upload = find_upload(response.hash);
+        dbg_responses_received++;
+        HdTextureId id = { response.hash, response.palette_hash };
+        requested.erase(id); // no longer in flight; now cached
+        hd_cache.put(id, std::move(response.levels), response.alpha_flags);
+        pending_attach.insert(id);
+    }
 
-        if (upload != nullptr && upload->textures.find(response.palette_hash) == upload->textures.end()) {
-            // warn if the hd texture width/height aren't power of 2 multiples of the original vram
-            int width = response.levels[0].width;
-            int height = response.levels[0].height;
+    // Attach pass: for every wanted combo whose base hash is currently
+    // resident, bind an HD image to it. Prefer the GPU cache (a ref-counted
+    // handle copy - no upload); otherwise build the image from the CPU cache
+    // and store it in the GPU cache. Combos whose hash isn't resident yet stay
+    // cached (NOT discarded) and attach on a later frame.
+    for (std::set<HdTextureId>::iterator it = pending_attach.begin(); it != pending_attach.end(); it++) {
+        HdTextureId id = *it;
+        std::shared_ptr<TextureUpload> upload = find_upload(id.hash);
+        if (upload == nullptr)
+            continue; // not resident yet; kept in cache
+        if (upload->textures.count(id.palette_hash))
+            continue; // already attached
 
-            if (width  % upload->width  == 0 && is_power_of_two(width  / upload->width) &&
-                height % upload->height == 0 && is_power_of_two(height / upload->height))
-            {
-                TT_LOG_VERBOSE(RETRO_LOG_INFO, "Found active texture found for %x (0x%x)\n",
-                    response.hash, response.alpha_flags
-                );
-
-                Vulkan::ImageHandle texture = uploader->upload_texture(response.levels);
-
-                upload->textures[response.palette_hash] = { texture, response.alpha_flags };
-
-                for (EnduringTextureRect &e : tracker.textures) {
-                    if (e.alive && e.texture_rect.upload == upload) {
-                        fused_pages.mark_dirty(fromSRect(e.texture_rect.vram_rect));
-                    }
+        // Tier 1: ready-to-bind GPU image - just copy the handle.
+        CachedGpuImage *gpu = hd_gpu_cache.get(id);
+        if (gpu != nullptr) {
+            upload->textures[id.palette_hash] = { gpu->handle, gpu->alpha_flags };
+            dbg_attaches++;
+            for (EnduringTextureRect &e : tracker.textures) {
+                if (e.alive && e.texture_rect.upload == upload) {
+                    fused_pages.mark_dirty(fromSRect(e.texture_rect.vram_rect));
                 }
-            } else {
-                TT_LOG(RETRO_LOG_WARN, "Dimension mismatch for %x-%x, original=%dx%d, replacement=%dx%d\n",
-                    response.hash,
-                    response.palette_hash,
-                    upload->width,
-                    upload->height,
-                    width,
-                    height
-                );
             }
+            continue;
+        }
+
+        // Tier 2: decoded CPU levels - upload to GPU, then cache the image.
+        CachedHdImage *cached = hd_cache.get(id);
+        if (cached == nullptr)
+            continue; // evicted from both caches; will be re-requested on draw
+
+        int width = cached->levels[0].width;
+        int height = cached->levels[0].height;
+        if (width  % upload->width  == 0 && is_power_of_two(width  / upload->width) &&
+            height % upload->height == 0 && is_power_of_two(height / upload->height))
+        {
+            Vulkan::ImageHandle texture = uploader->upload_texture(cached->levels);
+            hd_gpu_cache.put(id, texture, cached->alpha_flags, cached->bytes);
+            upload->textures[id.palette_hash] = { texture, cached->alpha_flags };
+            dbg_gpu_uploads++;
+            dbg_attaches++;
+            for (EnduringTextureRect &e : tracker.textures) {
+                if (e.alive && e.texture_rect.upload == upload) {
+                    fused_pages.mark_dirty(fromSRect(e.texture_rect.vram_rect));
+                }
+            }
+        } else {
+            TT_LOG(RETRO_LOG_WARN, "Dimension mismatch for %x-%x, original=%dx%d, replacement=%dx%d\n",
+                id.hash, id.palette_hash, upload->width, upload->height, width, height);
+            hd_cache.erase(id);    // don't keep a bad-sized image around
+            requested.insert(id);  // negatively cache so we don't reload + re-warn every frame
         }
     }
+    pending_attach.clear();
+
     fused_pages.rebuild_dirty(tracker, uploader);
     fused_pages.remove_dead();
 }
@@ -17900,6 +18478,17 @@ void TextureTracker::endFrame() {
         TT_LOG_VERBOSE(RETRO_LOG_INFO, "hit ratio: %f (%ld, %ld)\n", double(handle_cache.dbg_hits) / (handle_cache.dbg_hits + handle_cache.dbg_misses), handle_cache.dbg_hits, handle_cache.dbg_misses);
         handle_cache.dbg_hits = 0;
         handle_cache.dbg_misses = 0;
+        TT_LOG(RETRO_LOG_INFO, "[hdcache] last 300f: %llu decodes, %llu gpu-uploads, %llu attaches\n",
+            (unsigned long long)(dbg_responses_received - dbg_responses_received_last),
+            (unsigned long long)(dbg_gpu_uploads - dbg_gpu_uploads_last),
+            (unsigned long long)(dbg_attaches - dbg_attaches_last));
+        TT_LOG(RETRO_LOG_INFO, "[hdcache] mode=%s ; ram %zu/%zu MB (%zu entries) ; vram %zu/%zu MB (%zu entries)\n",
+            eager_textures ? "eager" : "lazy",
+            hd_cache.size_bytes() / (1024 * 1024), hd_cache.budget() / (1024 * 1024), hd_cache.count(),
+            hd_gpu_cache.size_bytes() / (1024 * 1024), hd_gpu_cache.budget() / (1024 * 1024), hd_gpu_cache.count());
+        dbg_responses_received_last = dbg_responses_received;
+        dbg_gpu_uploads_last = dbg_gpu_uploads;
+        dbg_attaches_last = dbg_attaches;
     }
 
     if (frame_dump != nullptr) {
@@ -17969,26 +18558,23 @@ void TextureTracker::reload_textures_from_disk() {
     known_files = read_texture_directory(replacements_path().c_str());
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "Found %d hd textures\n", known_files.size());
 
-    // Delete existing textures
-    std::set<uint32_t> hashes;
-    for (EnduringTextureRect &texture : tracker.textures) {
+    // Drop all cached / loaded HD state so edited files on disk take effect.
+    hd_gpu_cache.clear();
+    hd_cache.clear();
+    requested.clear();
+    pending_attach.clear();
+    for (EnduringTextureRect &texture : tracker.textures)
         texture.texture_rect.upload->textures.clear();
-        hashes.insert(texture.texture_rect.upload->hash);
-    }
     for (RestorableRect &restorable : restorable_rects) {
         for (TextureRect &tr : restorable.to_restore) {
             tr.upload->textures.clear();
-            hashes.insert(tr.upload->hash);
         }
     }
 
     // Delete fused textures
     fused_pages.mark_dead({0, 0, FB_WIDTH, FB_HEIGHT});
 
-    // Issue requests to the iothread to load the hd textures
-    for (uint32_t hash : hashes) {
-        load_hd_texture(hash);
-    }
+    // Draws will lazily re-request and the cache repopulates.
 }
 
 // RectTracker
@@ -18691,6 +19277,9 @@ static dither_mode dither_mode = DITHER_NATIVE;
 static bool dump_textures = false;
 static bool replace_textures = false;
 static bool track_textures = false;
+static size_t hd_cache_vram_bytes = (size_t)3 * 1024 * 1024 * 1024; // 3 GB default (matches HD_CACHE_VRAM_BUDGET)
+static size_t hd_cache_ram_bytes  = (size_t)2 * 1024 * 1024 * 1024; // 2 GB default (matches HD_CACHE_RAM_BUDGET)
+static bool   eager_hd_textures   = true; // default eager (master-consistent); false = lazy
 /*
  * File-local copy of the crop_overscan core option, distinct
  * from the cross-TU `crop_overscan` global declared in
@@ -19207,6 +19796,18 @@ void rhi_vulkan_refresh_variables(void)
          replace_textures = false;
    }
 
+   var.key = BEETLE_OPT(hd_cache_vram_budget);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      hd_cache_vram_bytes = (size_t)atoi(var.value) * 1024 * 1024;
+
+   var.key = BEETLE_OPT(hd_cache_ram_budget);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      hd_cache_ram_bytes = (size_t)atoi(var.value) * 1024 * 1024;
+
+   var.key = BEETLE_OPT(hd_caching_method);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      eager_hd_textures = (strcmp(var.value, "lazy") != 0); // "eager" (default) or "lazy"
+
    struct retro_core_option_display option_display;
    option_display.visible = track_textures;
 
@@ -19337,6 +19938,8 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_track_textures(track_textures);
    renderer->set_dump_textures(dump_textures);
    renderer->set_replace_textures(replace_textures);
+   renderer->set_hd_cache_budgets(hd_cache_ram_bytes, hd_cache_vram_bytes);
+   renderer->set_eager_hd_textures(eager_hd_textures);
    renderer->set_adaptive_smoothing(adaptive_smoothing);
    renderer->set_dither_native_resolution(dither_mode == DITHER_NATIVE);
    renderer->set_horizontal_overscan_cropping(vulkan_crop_overscan);
