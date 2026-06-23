@@ -6639,10 +6639,42 @@ const int LOOKUP_GRID_ROWS = 2;
 const int LOOKUP_CELL_WIDTH = 64;
 const int LOOKUP_CELL_HEIGHT = 256;
 
+/* Sorted set of RectIndex (int), MSVC C89. Replaces std::unordered_set<RectIndex>
+ * for the overlap-dedup scratch set: a malloc'd sorted int array with
+ * binary-search insert (dedups), cleared and refilled each query, then iterated
+ * in order. Order differs from the old unordered_set (now ascending by index),
+ * which only affects iteration order of overlapping rects - the consumers don't
+ * depend on it. */
+struct RectIndexSet {
+    RectIndex *items;
+    int        count;
+    int        cap;
+};
+static void rect_index_set_init(RectIndexSet *s) { s->items = NULL; s->count = 0; s->cap = 0; }
+static void rect_index_set_free(RectIndexSet *s) { free(s->items); s->items = NULL; s->count = 0; s->cap = 0; }
+static void rect_index_set_clear(RectIndexSet *s) { s->count = 0; }
+static int rect_index_set_lower_bound(const RectIndexSet *s, RectIndex v) {
+    int lo = 0, hi = s->count;
+    while (lo < hi) { int mid = lo + ((hi - lo) >> 1); if (s->items[mid] < v) lo = mid + 1; else hi = mid; }
+    return lo;
+}
+static void rect_index_set_insert(RectIndexSet *s, RectIndex v) {
+    int i = rect_index_set_lower_bound(s, v);
+    if (i < s->count && s->items[i] == v) return;
+    if (s->count == s->cap) {
+        int ncap = s->cap ? s->cap * 2 : 16;
+        s->items = (RectIndex *)realloc(s->items, (size_t)ncap * sizeof(RectIndex));
+        s->cap = ncap;
+    }
+    memmove(&s->items[i + 1], &s->items[i], (size_t)(s->count - i) * sizeof(RectIndex));
+    s->items[i] = v;
+    s->count++;
+}
+
 class LookupGrid {
 public:
     void insert(SRect r, RectIndex index);
-    void get(SRect r, std::unordered_set<RectIndex> &results);
+    void get(SRect r, RectIndexSet &results);
     void clear();
 private:
     struct LookupEntry {
@@ -6664,7 +6696,7 @@ public:
     }
     void releaseDeadHandles();
     std::vector<EnduringTextureRect> textures;
-    std::unordered_set<RectIndex>& overlapping(Rect rect, std::unordered_set<RectIndex>& results);
+    RectIndexSet& overlapping(Rect rect, RectIndexSet& results);
 
     /**
      * This pointer will be valid until the next upload/blit/clear/endFrame, so use it immediately and don't try anything funny.
@@ -18420,8 +18452,10 @@ static inline Rect fromSRect(SRect rect) {
 Palette TextureTracker::get_palette(Rect palette_rect) {
     assert(palette_rect.height == 1);
 
-    static std::unordered_set<RectIndex> overlap;
-    for (RectIndex index : tracker.overlapping(palette_rect, overlap)) {
+    static RectIndexSet overlap = { NULL, 0, 0 };
+    tracker.overlapping(palette_rect, overlap);
+    for (int oi = 0; oi < overlap.count; oi++) {
+        RectIndex index = overlap.items[oi];
         EnduringTextureRect &other = tracker.textures[index]; // TODO: The `other.alive` check is unnecessary because tracker.overlapping never returns dead indices
         if (fromSRect(other.texture_rect.vram_rect).contains(palette_rect) && other.alive) {
             if (other.texture_rect.offset_x != 0 || other.texture_rect.offset_y != 0) {
@@ -18567,10 +18601,12 @@ void TextureTracker::notifyReadback(Rect rect, uint16_t *vram) {
         }
     }
 
-    static std::unordered_set<RectIndex> overlap;
+    static RectIndexSet overlap = { NULL, 0, 0 };
 
     std::vector<TextureRect> to_restore;
-    for (RectIndex index : tracker.overlapping(rect, overlap)) {
+    tracker.overlapping(rect, overlap);
+    for (int oi = 0; oi < overlap.count; oi++) {
+        RectIndex index = overlap.items[oi];
         EnduringTextureRect &e = tracker.textures[index];
         if (e.alive) { // TODO: This check is unnecessary because tracker.overlapping never returns dead indices
             // Clip to the requested rect
@@ -18872,11 +18908,12 @@ HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, 
         }
     }
 
-    static std::unordered_set<RectIndex> overlap;
+    static RectIndexSet overlap = { NULL, 0, 0 };
     tracker.overlapping(rect, overlap);
 
     // Dump texture
-    for (RectIndex index : overlap) {
+    for (int oi = 0; oi < overlap.count; oi++) {
+        RectIndex index = overlap.items[oi];
         TextureRect *tex = tracker.get_index(index);
         dump_texture(tex->upload, mode, { mode.mode, palette_hash });
     }
@@ -18901,7 +18938,8 @@ HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, 
     HdTextureHandle result = HdTextureHandle::make_none();
 
     Rect result_rect;
-    for (RectIndex index : overlap) {
+    for (int oi = 0; oi < overlap.count; oi++) {
+        RectIndex index = overlap.items[oi];
         TextureRect *tex = tracker.get_index(index);
         HdTexEntry *overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
         if (overlapped_image == NULL) {
@@ -19328,7 +19366,7 @@ void RectTracker::releaseDeadHandles() {
     lookup_grid_dirty = true;
 }
 
-std::unordered_set<RectIndex>& RectTracker::overlapping(Rect uvrect, std::unordered_set<RectIndex> &results) {
+RectIndexSet& RectTracker::overlapping(Rect uvrect, RectIndexSet &results) {
     if (lookup_grid_dirty) {
         rebuild_lookup_grid();
     }
@@ -19340,7 +19378,7 @@ std::unordered_set<RectIndex>& RectTracker::overlapping(Rect uvrect, std::unorde
 
     SRect rect = toSRect(uvrect);
 
-    results.clear();
+    rect_index_set_clear(&results);
     lookup_grid.get(rect, results);
     return results;
 }
@@ -19432,13 +19470,13 @@ void LookupGrid::insert(SRect r, RectIndex index) {
         }
     }
 }
-void LookupGrid::get(SRect r, std::unordered_set<RectIndex> &results) {
+void LookupGrid::get(SRect r, RectIndexSet &results) {
     CellBounds c = cellBounds(r);
     for (int x = c.lowX; x < c.highX; x++) {
         for (int y = c.lowY; y < c.highY; y++) {
             for (LookupEntry &entry : cells[y * LOOKUP_GRID_COLUMNS + x]) {
                 if (intersects(entry.rect, r)) {
-                    results.insert(entry.index);
+                    rect_index_set_insert(&results, entry.index);
                 }
             }
         }
