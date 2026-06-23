@@ -6526,22 +6526,39 @@ private:
 struct CacheEntry {
     Rect rect;
     HdTextureHandle handle;
+    CacheEntry() : rect(), handle(HdTextureHandle::make_none()) {}
 };
+
+/* Result of a handle-cache lookup (replaces std::pair<HdTextureHandle,bool>). */
+struct HandleCacheResult {
+    HdTextureHandle handle;
+    bool found;
+    HandleCacheResult() : handle(HdTextureHandle::make_none()), found(false) {}
+};
+
+/* Small fixed-capacity move-to-front cache of recently-used HD texture
+ * handles. CacheEntry is POD, so the entries live in an inline array (capacity
+ * HANDLE_LRU_MAX) with a count - no std::vector, no heap. */
+enum { HANDLE_LRU_MAX = 4 };
 
 class HandleLRUCache {
 public:
-    HandleLRUCache(int max_size): max_size(max_size) { entries.reserve(max_size); }
-    std::pair<HdTextureHandle, bool> get(Rect rect, uint32_t palette_hash);
+    HandleLRUCache(int max_size_): max_size(max_size_), count(0) {
+        if (max_size > HANDLE_LRU_MAX)
+            max_size = HANDLE_LRU_MAX;
+    }
+    HandleCacheResult get(Rect rect, uint32_t palette_hash);
     void insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle);
     void clear()
     {
-        entries.clear();
+        count = 0;
     }
     int64_t dbg_hits;
     int64_t dbg_misses;
 private:
     int max_size;
-    std::vector<CacheEntry> entries;
+    int count;
+    CacheEntry entries[HANDLE_LRU_MAX];
 };
 
 //========================================
@@ -18542,27 +18559,40 @@ void TextureTracker::dump_texture(std::shared_ptr<TextureUpload> &upload, UsedMo
     }
 }
 
-std::pair<HdTextureHandle, bool> HandleLRUCache::get(Rect rect, uint32_t palette_hash) {
-    for (int i = 0; i < entries.size(); i++) {
+HandleCacheResult HandleLRUCache::get(Rect rect, uint32_t palette_hash) {
+    HandleCacheResult res;
+    int i, j;
+    for (i = 0; i < count; i++) {
         CacheEntry &entry = entries[i];
         if (entry.handle.palette_hash == palette_hash && entry.rect.contains(rect)) {
             CacheEntry hit = entry;
-            for (int j = i; j > 0; j--) {
+            for (j = i; j > 0; j--) {
                 entries[j] = entries[j - 1];
             }
             entries[0] = hit;
             dbg_hits += 1;
-            return { hit.handle, true };
+            res.handle = hit.handle;
+            res.found = true;
+            return res;
         }
     }
     dbg_misses += 1;
-    return { HdTextureHandle::make_none(), false };
+    res.handle = HdTextureHandle::make_none();
+    res.found = false;
+    return res;
 }
 void HandleLRUCache::insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle) {
-    if (entries.size() >= max_size) {
-        entries.pop_back();
-    }
-    entries.insert(entries.begin(), { rect, handle });
+    int j;
+    CacheEntry e;
+    e.rect = rect;
+    e.handle = handle;
+    /* If full, the entry at index max_size-1 (the LRU) is dropped by the shift
+     * below not preserving it. Otherwise grow by one. */
+    if (count < max_size)
+        count++;
+    for (j = count - 1; j > 0; j--)
+        entries[j] = entries[j - 1];
+    entries[0] = e;
 }
 
 HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
@@ -18580,15 +18610,15 @@ HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, 
     }
     if (hd_textures_enabled) {
         // Check if the same texture as last time is used.
-        std::pair<HdTextureHandle, bool> cache_result = handle_cache.get(rect, palette_hash);
-        cache_hit = cache_result.second;
+        HandleCacheResult cache_result = handle_cache.get(rect, palette_hash);
+        cache_hit = cache_result.found;
         if (cache_hit) {
-            // cache_result.first is currently always a non-fused, non-none, index + palette_hash
+            // cache_result.handle is currently always a non-fused, non-none, index + palette_hash
             // in the future it may be useful to cache none, but there's currently no way to check if such a containing rect is still alive (since HdTextureHandle's index would be -1)
-            EnduringTextureRect &tex = tracker.textures[cache_result.first.index]; // Forgive me
+            EnduringTextureRect &tex = tracker.textures[cache_result.handle.index]; // Forgive me
             if (tex.alive) {
                 fastpath_capable_out = fastpath_enabled && (tex.texture_rect.upload->textures[palette_hash].alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
-                return cache_result.first;
+                return cache_result.handle;
             }
         }
     }
