@@ -2221,26 +2221,14 @@ protected:
 };
 
 template <typename T>
-class IntrusiveHashMapEnabled : public IntrusiveListEnabled<T>
+struct IntrusiveHashMapEnabled : public IntrusiveListEnabled<T>
 {
-public:
 	IntrusiveHashMapEnabled() = default;
 	IntrusiveHashMapEnabled(Util::Hash hash)
 		: intrusive_hashmap_key(hash)
 	{
 	}
 
-	void set_hash(Util::Hash hash)
-	{
-		intrusive_hashmap_key = hash;
-	}
-
-	Util::Hash get_hash() const
-	{
-		return intrusive_hashmap_key;
-	}
-
-private:
 	Hash intrusive_hashmap_key = 0;
 };
 
@@ -2410,7 +2398,7 @@ private:
 
 	inline Hash get_hash(const T *value) const
 	{
-		return static_cast<const IntrusiveHashMapEnabled<T> *>(value)->get_hash();
+		return static_cast<const IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key;
 	}
 
 	bool insert_inner(T *value)
@@ -2531,7 +2519,7 @@ public:
 
 	T *insert_replace(Hash hash, T *value)
 	{
-		static_cast<IntrusiveHashMapEnabled<T> *>(value)->set_hash(hash);
+		static_cast<IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key = hash;
 		T *to_delete = hashmap.insert_replace(value);
 		if (to_delete)
 			pool.free(to_delete);
@@ -2540,7 +2528,7 @@ public:
 
 	T *insert_yield(Hash hash, T *value)
 	{
-		static_cast<IntrusiveHashMapEnabled<T> *>(value)->set_hash(hash);
+		static_cast<IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key = hash;
 		T *to_delete = hashmap.insert_yield(value);
 		if (to_delete)
 			pool.free(to_delete);
@@ -13587,7 +13575,7 @@ Framebuffer &FramebufferAllocator::request_framebuffer(const RenderPassInfo &inf
 {
 	const RenderPass &rp = device->request_render_pass(info, true);
 	Hasher h;
-	h.u64(rp.get_hash());
+	h.u64(rp.intrusive_hashmap_key);
 
 	for (unsigned i = 0; i < info.num_color_attachments; i++)
 		if (info.color_attachments[i])
@@ -14031,7 +14019,7 @@ namespace Vulkan
 #ifdef GRANITE_SPIRV_DUMP
 		LOGI("Compiling SPIR-V file: (%s) %s\n",
 				Shader::stage_to_name(ShaderStage::Compute),
-				(to_string(shader.get_hash()) + ".spv").c_str());
+				(to_string(shader.intrusive_hashmap_key) + ".spv").c_str());
 #endif
 
 		VkSpecializationInfo spec_info = {};
@@ -14182,7 +14170,7 @@ namespace Vulkan
 #ifdef GRANITE_SPIRV_DUMP
 				LOGI("Compiling SPIR-V file: (%s) %s\n",
 						Shader::stage_to_name(stage),
-						(to_string(current_program->get_shader(stage)->get_hash()) + ".spv").c_str());
+						(to_string(current_program->get_shader(stage)->intrusive_hashmap_key) + ".spv").c_str());
 #endif
 				s.pName = "main";
 				s.stage = static_cast<VkShaderStageFlagBits>(1u << i);
@@ -14237,7 +14225,7 @@ namespace Vulkan
 	void CommandBuffer::flush_compute_pipeline()
 	{
 		Hasher h;
-		h.u64(current_program->get_hash());
+		h.u64(current_program->intrusive_hashmap_key);
 
 		// Spec constants.
 		const CombinedResourceLayout &layout = current_layout->get_resource_layout();
@@ -14275,9 +14263,9 @@ namespace Vulkan
 			h.u32(vbo.strides[bit]);
 		}
 
-		h.u64(compatible_render_pass->get_hash());
+		h.u64(compatible_render_pass->intrusive_hashmap_key);
 		h.u32(current_subpass);
-		h.u64(current_program->get_hash());
+		h.u64(current_program->intrusive_hashmap_key);
 		h.data(static_state.words, sizeof(static_state.words));
 
 		if (static_state.state.blend_enable)
@@ -14456,7 +14444,7 @@ namespace Vulkan
 			current_layout = program.get_pipeline_layout();
 			current_pipeline_layout = current_layout->get_layout();
 		}
-		else if (program.get_pipeline_layout()->get_hash() != current_layout->get_hash())
+		else if (program.get_pipeline_layout()->intrusive_hashmap_key != current_layout->intrusive_hashmap_key)
 		{
 			const CombinedResourceLayout &new_layout = program.get_pipeline_layout()->get_resource_layout();
 			const CombinedResourceLayout &old_layout = current_layout->get_resource_layout();
@@ -15431,7 +15419,7 @@ Shader *Device::request_shader(const uint32_t *data, size_t size)
 Program *Device::request_program(Vulkan::Shader *compute)
 {
 	Util::Hasher hasher;
-	hasher.u64(compute->get_hash());
+	hasher.u64(compute->intrusive_hashmap_key);
 
 	Hash hash = hasher.get();
 	Program *ret = programs.find(hash);
@@ -15449,8 +15437,8 @@ Program *Device::request_program(const uint32_t *compute_data, size_t compute_si
 Program *Device::request_program(Shader *vertex, Shader *fragment)
 {
 	Util::Hasher hasher;
-	hasher.u64(vertex->get_hash());
-	hasher.u64(fragment->get_hash());
+	hasher.u64(vertex->intrusive_hashmap_key);
+	hasher.u64(fragment->intrusive_hashmap_key);
 
 	Hash hash = hasher.get();
 	Program *ret = programs.find(hash);
