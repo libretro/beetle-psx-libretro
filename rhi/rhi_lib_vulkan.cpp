@@ -3441,6 +3441,63 @@ private:
 	uint32_t memory_type = 0;
 };
 
+/* Owning array of Allocator* (one per memory type). Replaces
+ * std::vector<std::unique_ptr<Allocator>>: the container owns each heap-allocated
+ * Allocator and deletes it on clear()/destruction, so ownership is explicit
+ * new/delete instead of unique_ptr. The pointers themselves are trivially
+ * relocatable, so the backing array grows by realloc. push() takes ownership of
+ * an already-new'd Allocator; operator[]/back() return the raw pointer for the
+ * ->allocate() calls. ::malloc/::free are qualified because the surrounding code
+ * has free() members in scope. */
+struct AllocatorPtrVec
+{
+	Allocator **items;
+	int count;
+	int cap;
+
+	AllocatorPtrVec() : items(NULL), count(0), cap(0) {}
+	~AllocatorPtrVec() { destroy(); }
+	AllocatorPtrVec(AllocatorPtrVec &&o) noexcept
+		: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+	AllocatorPtrVec &operator=(AllocatorPtrVec &&o) noexcept {
+		if (this != &o) {
+			destroy();
+			items = o.items; count = o.count; cap = o.cap;
+			o.items = NULL; o.count = 0; o.cap = 0;
+		}
+		return *this;
+	}
+	AllocatorPtrVec(const AllocatorPtrVec &) = delete;
+	AllocatorPtrVec &operator=(const AllocatorPtrVec &) = delete;
+
+	/* Takes ownership of an already-allocated Allocator. */
+	void push(Allocator *p) {
+		if (count >= cap) {
+			int ncap = cap ? cap * 2 : 8;
+			items = (Allocator **)::realloc(items, (size_t)ncap * sizeof(Allocator *));
+			cap = ncap;
+		}
+		items[count++] = p;
+	}
+	int size() const { return count; }
+	bool empty() const { return count == 0; }
+	Allocator *operator[](int i) const { return items[i]; }
+	Allocator *back() const { return items[count - 1]; }
+	void clear() {
+		for (int i = 0; i < count; i++)
+			delete items[i];
+		count = 0;
+	}
+
+private:
+	void destroy() {
+		for (int i = 0; i < count; i++)
+			delete items[i];
+		::free(items);
+		items = NULL; count = 0; cap = 0;
+	}
+};
+
 class DeviceAllocator
 {
 public:
@@ -3474,7 +3531,7 @@ public:
 	void free_no_recycle(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory);
 
 private:
-	std::vector<std::unique_ptr<Allocator>> allocators;
+	AllocatorPtrVec allocators;
 	VkDevice device = VK_NULL_HANDLE;
 	VkPhysicalDeviceMemoryProperties mem_props;
 	VkDeviceSize atom_alignment = 1;
@@ -12830,7 +12887,7 @@ void DeviceAllocator::init(VkPhysicalDevice gpu, VkDevice vkdevice)
 	heaps.resize(mem_props.memoryHeapCount);
 	for (unsigned i = 0; i < mem_props.memoryTypeCount; i++)
 	{
-		allocators.emplace_back(new Allocator);
+		allocators.push(new Allocator);
 		allocators.back()->set_memory_type(i);
 		allocators.back()->set_global_allocator(this);
 	}
