@@ -12742,6 +12742,11 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 	VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
 	DescriptorBindingVec bindings = { NULL, 0, 0 };
+	/* Immutable-sampler handles referenced by pImmutableSamplers must stay alive
+	 * until vkCreateDescriptorSetLayout below; keep one slot per binding index in
+	 * function scope rather than taking the address of a loop-body local (which
+	 * would dangle by the time the create call reads it). */
+	VkSampler immutable_samplers[VULKAN_NUM_BINDINGS];
 	for (unsigned i = 0; i < VULKAN_NUM_BINDINGS; i++)
 	{
 		uint32_t stages = stages_for_binds[i];
@@ -12751,11 +12756,11 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 		unsigned types = 0;
 		if (layout.sampled_image_mask & (1u << i))
 		{
-			VkSampler sampler = VK_NULL_HANDLE;
+			immutable_samplers[i] = VK_NULL_HANDLE;
 			if (has_immutable_sampler(layout, i))
-				sampler = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
+				immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
 
-			bindings.push({ i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, sampler != VK_NULL_HANDLE ? &sampler : nullptr });
+			bindings.push({ i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : nullptr });
 			pool_size.push({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
@@ -12804,11 +12809,11 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 
 		if (layout.sampler_mask & (1u << i))
 		{
-			VkSampler sampler = VK_NULL_HANDLE;
+			immutable_samplers[i] = VK_NULL_HANDLE;
 			if (has_immutable_sampler(layout, i))
-				sampler = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
+				immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
 
-			bindings.push({ i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, sampler != VK_NULL_HANDLE ? &sampler : nullptr });
+			bindings.push({ i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : nullptr });
 			pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
