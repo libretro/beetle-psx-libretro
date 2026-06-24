@@ -7004,27 +7004,54 @@ namespace PSX
 	 * be explicit: this wrapper retains on push and on copy, and releases on
 	 * destroy/clear/assign. */
 	struct OwnedRectVec {
-		std::vector<TextureRect> v;
-		OwnedRectVec() {}
-		~OwnedRectVec() { for (size_t i = 0; i < v.size(); i++) texture_rect_release(&v[i]); }
-		OwnedRectVec(const OwnedRectVec &o) : v(o.v) { for (size_t i = 0; i < v.size(); i++) texture_rect_retain(&v[i]); }
+		TextureRectVec v;
+		OwnedRectVec() { v.items = NULL; v.count = 0; v.cap = 0; }
+		~OwnedRectVec() {
+			for (int i = 0; i < v.count; i++) texture_rect_release(&v.items[i]);
+			v.free_storage();
+		}
+		OwnedRectVec(const OwnedRectVec &o) {
+			v.items = NULL; v.count = 0; v.cap = 0;
+			copy_from(o.v);
+			for (int i = 0; i < v.count; i++) texture_rect_retain(&v.items[i]);
+		}
 		OwnedRectVec &operator=(const OwnedRectVec &o) {
 			if (this != &o) {
-				for (size_t i = 0; i < v.size(); i++) texture_rect_release(&v[i]);
-				v = o.v;
-				for (size_t i = 0; i < v.size(); i++) texture_rect_retain(&v[i]);
+				for (int i = 0; i < v.count; i++) texture_rect_release(&v.items[i]);
+				copy_from(o.v);
+				for (int i = 0; i < v.count; i++) texture_rect_retain(&v.items[i]);
 			}
 			return *this;
 		}
-		void push(TextureRect t) { texture_rect_retain(&t); v.push_back(t); }
-		size_t size() const { return v.size(); }
-		TextureRect &operator[](size_t i) { return v[i]; }
-		const TextureRect &operator[](size_t i) const { return v[i]; }
-		bool operator==(const OwnedRectVec &o) const { return v == o.v; }
-		TextureRect *begin() { return v.data(); }
-		TextureRect *end()   { return v.data() + v.size(); }
-		const TextureRect *begin() const { return v.data(); }
-		const TextureRect *end()   const { return v.data() + v.size(); }
+		void push(TextureRect t) { texture_rect_retain(&t); v.push(t); }
+		size_t size() const { return (size_t)v.count; }
+		TextureRect &operator[](size_t i) { return v.items[i]; }
+		const TextureRect &operator[](size_t i) const { return v.items[i]; }
+		bool operator==(const OwnedRectVec &o) const {
+			if (v.count != o.v.count) return false;
+			for (int i = 0; i < v.count; i++)
+				if (!(v.items[i] == o.v.items[i])) return false;
+			return true;
+		}
+		TextureRect *begin() { return v.items; }
+		TextureRect *end()   { return v.items + v.count; }
+		const TextureRect *begin() const { return v.items; }
+		const TextureRect *end()   const { return v.items + v.count; }
+
+	private:
+		/* Deep-copy the POD elements of src into v (replacing v's storage).
+		 * Refcounts are adjusted by the caller (retain after, release before). */
+		void copy_from(const TextureRectVec &src) {
+			v.count = 0;
+			if (src.count > v.cap) {
+				v.items = (TextureRect *)realloc(v.items, (size_t)src.count * sizeof(TextureRect));
+				v.cap = src.count;
+			}
+			if (src.count) {
+				memcpy(v.items, src.items, (size_t)src.count * sizeof(TextureRect));
+				v.count = src.count;
+			}
+		}
 	};
 
 	const int LOOKUP_GRID_COLUMNS = 16;
