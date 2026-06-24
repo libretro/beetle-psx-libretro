@@ -4692,6 +4692,8 @@ namespace Vulkan
 		}
 		BufferBlock &back() { return items[count - 1]; }
 		void pop_back() { if (count) { count--; items[count].~BufferBlock(); } }
+		BufferBlock *begin() { return items; }
+		BufferBlock *end() { return items + count; }
 
 	private:
 		void grow(int ncap) {
@@ -5535,8 +5537,8 @@ namespace Vulkan
 				CommandPool compute_cmd_pool;
 				CommandPool transfer_cmd_pool;
 
-				std::vector<BufferBlock> vbo_blocks;
-				std::vector<BufferBlock> ubo_blocks;
+				BufferBlockVec vbo_blocks;
+				BufferBlockVec ubo_blocks;
 
 				FenceVec wait_fences;
 				FenceVec recycle_fences;
@@ -16006,7 +16008,7 @@ void Device::init_stock_samplers()
 }
 
 static void request_block(Device &device, BufferBlock &block, VkDeviceSize size,
-                          BufferPool &pool, std::vector<BufferBlock> *dma, std::vector<BufferBlock> &recycle)
+                          BufferPool &pool, std::vector<BufferBlock> *dma, BufferBlockVec &recycle)
 {
 	if (block.mapped)
 		device.unmap_host_buffer(*block.cpu, MEMORY_ACCESS_WRITE_BIT);
@@ -16025,7 +16027,7 @@ static void request_block(Device &device, BufferBlock &block, VkDeviceSize size,
 		}
 
 		if (block.size == pool.get_block_size())
-			recycle.push_back(block);
+			recycle.push(block);
 	}
 
 	if (size)
