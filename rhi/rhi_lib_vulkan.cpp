@@ -5756,6 +5756,7 @@ namespace Vulkan
 			POD_VEC_DECLARE(VkBufferViewVec, VkBufferView);
 			POD_VEC_DECLARE(VkImageVec, VkImage);
 			POD_VEC_DECLARE(VkBufferVec, VkBuffer);
+			POD_VEC_DECLARE(VkPipelineStageVec, VkPipelineStageFlags);
 
 			/* Owning array of CommandBufferHandle (= IntrusivePtr<CommandBuffer>).
 			 * Replaces std::vector<CommandBufferHandle> for the per-queue submission
@@ -5862,7 +5863,7 @@ namespace Vulkan
 			struct QueueData
 			{
 				SemaphoreHandleVec wait_semaphores;
-				std::vector<VkPipelineStageFlags> wait_stages;
+				VkPipelineStageVec wait_stages;
 				bool need_fence = false;
 			} graphics, compute, transfer;
 
@@ -16083,7 +16084,7 @@ void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semap
 #endif
 
 	data.wait_semaphores.push(semaphore);
-	data.wait_stages.push_back(stages);
+	data.wait_stages.push(stages);
 	data.need_fence = true;
 
 	// Sanity check.
