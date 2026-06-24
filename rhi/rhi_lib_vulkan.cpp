@@ -7100,14 +7100,15 @@ namespace PSX
 		 * Refcounts are adjusted by the caller (retain after, release before). */
 		void copy_from(const TextureRectVec &src) {
 			v.count = 0;
+			if (src.count <= 0)
+				return;
+			size_t n = (size_t)src.count;
 			if (src.count > v.cap) {
-				v.items = (TextureRect *)realloc(v.items, (size_t)src.count * sizeof(TextureRect));
+				v.items = (TextureRect *)realloc(v.items, n * sizeof(TextureRect));
 				v.cap = src.count;
 			}
-			if (src.count) {
-				memcpy(v.items, src.items, (size_t)src.count * sizeof(TextureRect));
-				v.count = src.count;
-			}
+			memcpy(v.items, src.items, n * sizeof(TextureRect));
+			v.count = src.count;
 		}
 	};
 
