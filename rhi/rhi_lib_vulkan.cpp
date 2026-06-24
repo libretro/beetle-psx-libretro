@@ -4390,6 +4390,9 @@ static inline void set_immutable_sampler(DescriptorSetLayout &layout, unsigned b
 static const unsigned VULKAN_NUM_SETS_PER_POOL = 16;
 static const unsigned VULKAN_DESCRIPTOR_RING_SIZE = 8;
 
+POD_VEC_DECLARE(DescriptorPoolVec, VkDescriptorPool);
+POD_VEC_DECLARE(DescriptorPoolSizeVec, VkDescriptorPoolSize);
+
 class DescriptorSetAllocator : public HashedObject<DescriptorSetAllocator>
 {
 public:
@@ -4428,11 +4431,11 @@ private:
 	struct PerThread
 	{
 		Util::TemporaryHashmap<DescriptorSetNode, VULKAN_DESCRIPTOR_RING_SIZE, true> set_nodes;
-		std::vector<VkDescriptorPool> pools;
+		DescriptorPoolVec pools = { NULL, 0, 0 };
 		bool should_begin = true;
 	};
 	PerThread per_thread;
-	std::vector<VkDescriptorPoolSize> pool_size;
+	DescriptorPoolSizeVec pool_size = { NULL, 0, 0 };
 };
 }
 
@@ -12748,49 +12751,49 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 				sampler = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
 
 			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, sampler != VK_NULL_HANDLE ? &sampler : nullptr });
-			pool_size.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
+			pool_size.push({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.sampled_buffer_mask & (1u << i))
 		{
 			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, nullptr });
-			pool_size.push_back({ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL });
+			pool_size.push({ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.storage_image_mask & (1u << i))
 		{
 			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, nullptr });
-			pool_size.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL });
+			pool_size.push({ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.uniform_buffer_mask & (1u << i))
 		{
 			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, nullptr });
-			pool_size.push_back({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL });
+			pool_size.push({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.storage_buffer_mask & (1u << i))
 		{
 			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr });
-			pool_size.push_back({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL });
+			pool_size.push({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.input_attachment_mask & (1u << i))
 		{
 			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, nullptr });
-			pool_size.push_back({ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL });
+			pool_size.push({ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.separate_image_mask & (1u << i))
 		{
 			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, nullptr });
-			pool_size.push_back({ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL });
+			pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
@@ -12801,7 +12804,7 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 				sampler = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
 
 			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, sampler != VK_NULL_HANDLE ? &sampler : nullptr });
-			pool_size.push_back({ VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
+			pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
@@ -12861,7 +12864,7 @@ std::pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(Hash hash)
 
 	if (vkAllocateDescriptorSets(device->get_device(), &alloc, sets) != VK_SUCCESS)
 		LOGE("Failed to allocate descriptor sets.\n");
-	state.pools.push_back(pool);
+	state.pools.push(pool);
 
 	for (VkDescriptorSet set : sets)
 		state.set_nodes.make_vacant(set);
@@ -12885,6 +12888,8 @@ DescriptorSetAllocator::~DescriptorSetAllocator()
 	if (set_layout != VK_NULL_HANDLE)
 		vkDestroyDescriptorSetLayout(device->get_device(), set_layout, nullptr);
 	clear();
+	per_thread.pools.free_storage();
+	pool_size.free_storage();
 }
 }
 
