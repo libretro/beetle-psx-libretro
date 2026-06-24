@@ -6677,65 +6677,70 @@ namespace PSX
 				   // (HD load bookkeeping lives on the TextureTracker: hd_gpu_cache / hd_cache /
 				   //  requested / pending_attach, keyed by (hash,palette) so it survives this
 				   //  upload being recreated as the sprite animation churns VRAM.)
-
-		TextureUpload()
-			: refcount(0), image(NULL), image_count(0), dumpable(false), width(0), height(0),
-			hash(0), dumped_modes(NULL), dumped_modes_count(0), dumped_modes_cap(0) {
-				hd_tex_map_init(&textures);
-			}
-		~TextureUpload() {
-			free(image);
-			free(dumped_modes);
-			hd_tex_map_free(&textures);
-		}
-		/* Owns malloc'd buffers, so copies must be deep. Copy/assign are used by
-		 * the save-state path (TextureUpload value map) and load_state's `*ptr =
-		 * value`. The textures map is deep-copied (re-acquiring image refs). */
-		TextureUpload(const TextureUpload &o)
-			: refcount(0), image(NULL), image_count(o.image_count), dumpable(o.dumpable),
-			width(o.width), height(o.height), hash(o.hash),
-			dumped_modes(NULL), dumped_modes_count(o.dumped_modes_count),
-			dumped_modes_cap(o.dumped_modes_count) {
-				if (image_count) {
-					image = (uint16_t *)malloc((size_t)image_count * sizeof(uint16_t));
-					memcpy(image, o.image, (size_t)image_count * sizeof(uint16_t));
-				}
-				if (dumped_modes_count) {
-					dumped_modes = (DumpedMode *)malloc((size_t)dumped_modes_count * sizeof(DumpedMode));
-					memcpy(dumped_modes, o.dumped_modes, (size_t)dumped_modes_count * sizeof(DumpedMode));
-				}
-				hd_tex_map_copy(&textures, &o.textures);
-			}
-		TextureUpload &operator=(const TextureUpload &o) {
-			if (this != &o) {
-				free(image); free(dumped_modes);
-				hd_tex_map_free(&textures);
-				image = NULL; dumped_modes = NULL;
-				image_count = o.image_count;
-				dumped_modes_count = o.dumped_modes_count;
-				dumped_modes_cap = o.dumped_modes_count;
-				dumpable = o.dumpable; width = o.width; height = o.height; hash = o.hash;
-				if (image_count) {
-					image = (uint16_t *)malloc((size_t)image_count * sizeof(uint16_t));
-					memcpy(image, o.image, (size_t)image_count * sizeof(uint16_t));
-				}
-				if (dumped_modes_count) {
-					dumped_modes = (DumpedMode *)malloc((size_t)dumped_modes_count * sizeof(DumpedMode));
-					memcpy(dumped_modes, o.dumped_modes, (size_t)dumped_modes_count * sizeof(DumpedMode));
-				}
-				hd_tex_map_copy(&textures, &o.textures);
-			}
-			return *this;
-		}
 	};
 
-	/* Allocate a new TextureUpload with refcount 1 (the caller owns that ref).
-	 * Uses operator new so the C++ members (the deep-copy ctor's machinery and the
-	 * HdTexMap/owned buffers) are constructed; texture_upload_release matches it
-	 * with delete. */
+	/* TextureUpload owns malloc'd buffers (image, dumped_modes) and an HdTexMap,
+	 * but is a plain struct with no C++ special members: it is created, copied
+	 * and destroyed only through the explicit helpers below. texture_upload_init
+	 * mirrors the former default constructor, texture_upload_destroy the former
+	 * destructor, and texture_upload_copy_contents the former deep copy (a fresh
+	 * refcount is NOT taken from the source - the destination keeps its own). */
+	static void texture_upload_init(TextureUpload *u)
+	{
+		u->refcount = 0;
+		u->image = NULL;
+		u->image_count = 0;
+		u->dumpable = false;
+		u->width = 0;
+		u->height = 0;
+		u->hash = 0;
+		u->dumped_modes = NULL;
+		u->dumped_modes_count = 0;
+		u->dumped_modes_cap = 0;
+		hd_tex_map_init(&u->textures);
+	}
+	static void texture_upload_destroy(TextureUpload *u)
+	{
+		free(u->image);
+		free(u->dumped_modes);
+		hd_tex_map_free(&u->textures);
+		free(u);
+	}
+	/* Deep-copy the owned contents of src into dst, releasing dst's existing
+	 * buffers/texmap first. dst->refcount is left untouched (matching the old
+	 * copy-assignment, which never copied the refcount). */
+	static void texture_upload_copy_contents(TextureUpload *dst, const TextureUpload *src)
+	{
+		if (dst == src)
+			return;
+		free(dst->image);
+		free(dst->dumped_modes);
+		hd_tex_map_free(&dst->textures);
+		dst->image = NULL;
+		dst->dumped_modes = NULL;
+		dst->image_count = src->image_count;
+		dst->dumped_modes_count = src->dumped_modes_count;
+		dst->dumped_modes_cap = src->dumped_modes_count;
+		dst->dumpable = src->dumpable;
+		dst->width = src->width;
+		dst->height = src->height;
+		dst->hash = src->hash;
+		if (dst->image_count) {
+			dst->image = (uint16_t *)malloc((size_t)dst->image_count * sizeof(uint16_t));
+			memcpy(dst->image, src->image, (size_t)dst->image_count * sizeof(uint16_t));
+		}
+		if (dst->dumped_modes_count) {
+			dst->dumped_modes = (DumpedMode *)malloc((size_t)dst->dumped_modes_count * sizeof(DumpedMode));
+			memcpy(dst->dumped_modes, src->dumped_modes, (size_t)dst->dumped_modes_count * sizeof(DumpedMode));
+		}
+		hd_tex_map_copy(&dst->textures, &src->textures);
+	}
+
+	/* Allocate a new TextureUpload with refcount 1 (the caller owns that ref). */
 	static TextureUpload *texture_upload_new()
 	{
-		TextureUpload *u = new TextureUpload();
+		TextureUpload *u = (TextureUpload *)malloc(sizeof(TextureUpload));
+		texture_upload_init(u);
 		u->refcount = 1;
 		return u;
 	}
@@ -6747,7 +6752,7 @@ namespace PSX
 	static void texture_upload_release(TextureUpload *u)
 	{
 		if (u && --u->refcount == 0)
-			delete u; /* dtor frees image/dumped_modes and releases the texmap refs */
+			texture_upload_destroy(u); /* frees image/dumped_modes and releases the texmap refs */
 	}
 
 	// byte buffer plus its size, rather than std::vector<uint8_t>. This is a POD
@@ -7569,7 +7574,7 @@ namespace PSX
 	private:
 		void destroy() {
 			for (int i = 0; i < count; i++)
-				delete items[i].val;
+				texture_upload_destroy(items[i].val);
 			free(items);
 			items = NULL; count = 0; cap = 0;
 		}
@@ -20882,9 +20887,12 @@ namespace PSX {
 	//========================================
 	// Save State
 
-	TextureUpload copy_upload_without_handles(const TextureUpload &to_copy) {
-		TextureUpload copy = to_copy;
-		hd_tex_map_clear(&copy.textures);
+	/* Allocate a new upload (refcount 1) that is a deep copy of to_copy with the
+	 * HD textures map cleared. Replaces the old by-value copy ctor flow. */
+	TextureUpload *texture_upload_new_copy_without_handles(const TextureUpload *to_copy) {
+		TextureUpload *copy = texture_upload_new();
+		texture_upload_copy_contents(copy, to_copy);
+		hd_tex_map_clear(&copy->textures);
 		return copy;
 	}
 
@@ -20899,7 +20907,7 @@ namespace PSX {
 	TextureRectSaveState to_save_state(const TextureRect &t, UploadOwningMap &uploads) {
 		uint32_t hash = t.upload->hash;
 		if (!uploads.contains(hash))
-			uploads.insert(hash, new TextureUpload(copy_upload_without_handles(*t.upload)));
+			uploads.insert(hash, texture_upload_new_copy_without_handles(t.upload));
 		return {
 			t.upload->hash,
 			t.offset_x,
@@ -20955,7 +20963,7 @@ namespace PSX {
 		UploadPtrVec uploads = { NULL, 0, 0 };
 		for (int e = 0; e < state.uploads.count; e++) {
 			TextureUpload *ptr = texture_upload_new(); /* owns +1 */
-			*ptr = *state.uploads.items[e].val;        /* deep-copy contents (refcount untouched) */
+			texture_upload_copy_contents(ptr, state.uploads.items[e].val); /* deep-copy contents (refcount untouched) */
 			UploadPtrEntry pe = { state.uploads.items[e].key, ptr };
 			uploads.push(pe);
 		}
