@@ -1649,6 +1649,49 @@ PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* ------------------------------------------------------------------------- *
+ * POD_VEC - a typed dynamic array of trivially-relocatable elements, MSVC C89.
+ *
+ * Replaces std::vector<T> for the renderer's per-frame draw queues, whose
+ * elements (BufferVertex, PrimitiveInfo, BlitInfo, VkRect2D, ...) are all POD /
+ * trivially relocatable. Growth is a realloc (bitwise relocation - no
+ * per-element move-ctor and no exception scaffolding), which is what the hot
+ * per-vertex push path wants; the std::vector equivalent emitted an
+ * out-of-line _M_realloc_insert plus EH tables on every push. clear keeps the
+ * allocation for reuse (these are refilled every frame). The struct is brace-
+ * initialisable to { NULL, 0, 0 } so it needs no constructor. */
+#define POD_VEC_DECLARE(NAME, T)                                              \
+struct NAME {                                                                 \
+    T  *items;                                                                \
+    int count;                                                                \
+    int cap;                                                                  \
+    T       *data()        { return items; }                                  \
+    const T *data() const  { return items; }                                  \
+    int      size() const  { return count; }                                  \
+    bool     empty() const { return count == 0; }                             \
+    void     clear()       { count = 0; }                                     \
+    T       *begin()       { return items; }                                  \
+    T       *end()         { return items + count; }                          \
+    const T *begin() const { return items; }                                  \
+    const T *end()   const { return items + count; }                          \
+    T &operator[](int i)             { return items[i]; }                     \
+    const T &operator[](int i) const { return items[i]; }                     \
+    T &back()              { return items[count - 1]; }                       \
+    const T &back() const  { return items[count - 1]; }                       \
+    T &front()             { return items[0]; }                               \
+    const T &front() const { return items[0]; }                               \
+    void grow_by_one() {                                                      \
+        if (count == cap) {                                                   \
+            int ncap = cap ? cap * 2 : 64;                                    \
+            items = (T *)realloc(items, (size_t)ncap * sizeof(T));            \
+            cap = ncap;                                                       \
+        }                                                                     \
+    }                                                                         \
+    void push(const T &v) { grow_by_one(); items[count++] = v; }              \
+    void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }  \
+}
+
 #include <string>
 #include <type_traits>
 #include <unordered_set>
@@ -5536,6 +5579,19 @@ private:
 		unsigned counter = 0;
 	} lock;
 
+	/* Per-frame deletion/recycle queues hold plain Vulkan handles (POD); use
+	 * POD_VEC instead of std::vector to avoid a heap allocation per frame for
+	 * each queue. */
+	POD_VEC_DECLARE(VkFenceVec, VkFence);
+	POD_VEC_DECLARE(VkFramebufferVec, VkFramebuffer);
+	POD_VEC_DECLARE(VkSamplerVec, VkSampler);
+	POD_VEC_DECLARE(VkPipelineVec, VkPipeline);
+	POD_VEC_DECLARE(VkImageViewVec, VkImageView);
+	POD_VEC_DECLARE(VkBufferViewVec, VkBufferView);
+	POD_VEC_DECLARE(VkImageVec, VkImage);
+	POD_VEC_DECLARE(VkBufferVec, VkBuffer);
+	POD_VEC_DECLARE(VkSemaphoreVec2, VkSemaphore);
+
 	struct PerFrame
 	{
 		PerFrame(Device *device);
@@ -5554,21 +5610,21 @@ private:
 		std::vector<BufferBlock> vbo_blocks;
 		std::vector<BufferBlock> ubo_blocks;
 
-		std::vector<VkFence> wait_fences;
-		std::vector<VkFence> recycle_fences;
+		VkFenceVec wait_fences;
+		VkFenceVec recycle_fences;
 		std::vector<DeviceAllocation> allocations;
-		std::vector<VkFramebuffer> destroyed_framebuffers;
-		std::vector<VkSampler> destroyed_samplers;
-		std::vector<VkPipeline> destroyed_pipelines;
-		std::vector<VkImageView> destroyed_image_views;
-		std::vector<VkBufferView> destroyed_buffer_views;
-		std::vector<VkImage> destroyed_images;
-		std::vector<VkBuffer> destroyed_buffers;
+		VkFramebufferVec destroyed_framebuffers;
+		VkSamplerVec destroyed_samplers;
+		VkPipelineVec destroyed_pipelines;
+		VkImageViewVec destroyed_image_views;
+		VkBufferViewVec destroyed_buffer_views;
+		VkImageVec destroyed_images;
+		VkBufferVec destroyed_buffers;
 		std::vector<CommandBufferHandle> graphics_submissions;
 		std::vector<CommandBufferHandle> compute_submissions;
 		std::vector<CommandBufferHandle> transfer_submissions;
-		std::vector<VkSemaphore> recycled_semaphores;
-		std::vector<VkSemaphore> destroyed_semaphores;
+		VkSemaphoreVec2 recycled_semaphores;
+		VkSemaphoreVec2 destroyed_semaphores;
 	};
 	// The per frame structure must be destroyed after
 	// the hashmap data structures below, so it must be declared before.
@@ -6613,47 +6669,6 @@ struct CachedPaletteHash {
 
 //============
 // RectTracker
-/* ------------------------------------------------------------------------- *
- * POD_VEC - a typed dynamic array of trivially-relocatable elements, MSVC C89.
- *
- * Replaces std::vector<T> for the renderer's per-frame draw queues, whose
- * elements (BufferVertex, PrimitiveInfo, BlitInfo, VkRect2D, ...) are all POD /
- * trivially relocatable. Growth is a realloc (bitwise relocation - no
- * per-element move-ctor and no exception scaffolding), which is what the hot
- * per-vertex push path wants; the std::vector equivalent emitted an
- * out-of-line _M_realloc_insert plus EH tables on every push. clear keeps the
- * allocation for reuse (these are refilled every frame). The struct is brace-
- * initialisable to { NULL, 0, 0 } so it needs no constructor. */
-#define POD_VEC_DECLARE(NAME, T)                                              \
-struct NAME {                                                                 \
-    T  *items;                                                                \
-    int count;                                                                \
-    int cap;                                                                  \
-    T       *data()        { return items; }                                  \
-    const T *data() const  { return items; }                                  \
-    int      size() const  { return count; }                                  \
-    bool     empty() const { return count == 0; }                             \
-    void     clear()       { count = 0; }                                     \
-    T       *begin()       { return items; }                                  \
-    T       *end()         { return items + count; }                          \
-    const T *begin() const { return items; }                                  \
-    const T *end()   const { return items + count; }                          \
-    T &operator[](int i)             { return items[i]; }                     \
-    const T &operator[](int i) const { return items[i]; }                     \
-    T &back()              { return items[count - 1]; }                       \
-    const T &back() const  { return items[count - 1]; }                       \
-    T &front()             { return items[0]; }                               \
-    const T &front() const { return items[0]; }                               \
-    void grow_by_one() {                                                      \
-        if (count == cap) {                                                   \
-            int ncap = cap ? cap * 2 : 64;                                    \
-            items = (T *)realloc(items, (size_t)ncap * sizeof(T));            \
-            cap = ncap;                                                       \
-        }                                                                     \
-    }                                                                         \
-    void push(const T &v) { grow_by_one(); items[count++] = v; }              \
-    void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }  \
-}
 
 /* TextureRect is a trivially-copyable POD: a borrowed view of an upload plus a
  * subrect. It does NOT manage the refcount in special members (so it relocates
@@ -15921,7 +15936,7 @@ void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 	for (Semaphore &semaphore : data.wait_semaphores)
 	{
 		VkSemaphore wait = semaphore->consume();
-		frame().recycled_semaphores.push_back(wait);
+		frame().recycled_semaphores.push(wait);
 		waits.push_back(wait);
 	}
 	data.wait_stages.clear();
@@ -15968,7 +15983,7 @@ void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 
 	if (fence)
 	{
-		frame().wait_fences.push_back(cleared_fence);
+		frame().wait_fences.push(cleared_fence);
 		*fence = cleared_fence;
 		data.need_fence = false;
 	}
@@ -16103,7 +16118,7 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 	for (Semaphore &semaphore : data.wait_semaphores)
 	{
 		VkSemaphore wait = semaphore->consume();
-		frame().recycled_semaphores.push_back(wait);
+		frame().recycled_semaphores.push(wait);
 		waits[0].push(wait);
 	}
 	data.wait_stages.clear();
@@ -16180,7 +16195,7 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 
 	if (fence)
 	{
-		frame().wait_fences.push_back(cleared_fence);
+		frame().wait_fences.push(cleared_fence);
 		*fence = cleared_fence;
 		data.need_fence = false;
 	}
@@ -16231,21 +16246,21 @@ void Device::end_frame_nolock()
 	if (transfer.need_fence || !frame().transfer_submissions.empty())
 	{
 		submit_queue(CommandBuffer::Type::AsyncTransfer, &fence, 0, nullptr);
-		frame().recycle_fences.push_back(fence);
+		frame().recycle_fences.push(fence);
 		transfer.need_fence = false;
 	}
 
 	if (graphics.need_fence || !frame().graphics_submissions.empty())
 	{
 		submit_queue(CommandBuffer::Type::Generic, &fence, 0, nullptr);
-		frame().recycle_fences.push_back(fence);
+		frame().recycle_fences.push(fence);
 		graphics.need_fence = false;
 	}
 
 	if (compute.need_fence || !frame().compute_submissions.empty())
 	{
 		submit_queue(CommandBuffer::Type::AsyncCompute, &fence, 0, nullptr);
-		frame().recycle_fences.push_back(fence);
+		frame().recycle_fences.push(fence);
 		compute.need_fence = false;
 	}
 }
@@ -16351,6 +16366,18 @@ Device::PerFrame::PerFrame(Device *device)
     , compute_cmd_pool(device->get_device(), device->compute_queue_family_index)
     , transfer_cmd_pool(device->get_device(), device->transfer_queue_family_index)
 {
+	/* POD_VEC members have no constructor; zero-initialise them. */
+	memset(&wait_fences, 0, sizeof(wait_fences));
+	memset(&recycle_fences, 0, sizeof(recycle_fences));
+	memset(&destroyed_framebuffers, 0, sizeof(destroyed_framebuffers));
+	memset(&destroyed_samplers, 0, sizeof(destroyed_samplers));
+	memset(&destroyed_pipelines, 0, sizeof(destroyed_pipelines));
+	memset(&destroyed_image_views, 0, sizeof(destroyed_image_views));
+	memset(&destroyed_buffer_views, 0, sizeof(destroyed_buffer_views));
+	memset(&destroyed_images, 0, sizeof(destroyed_images));
+	memset(&destroyed_buffers, 0, sizeof(destroyed_buffers));
+	memset(&recycled_semaphores, 0, sizeof(recycled_semaphores));
+	memset(&destroyed_semaphores, 0, sizeof(destroyed_semaphores));
 }
 
 void Device::free_memory_nolock(const DeviceAllocation &alloc)
@@ -16371,55 +16398,55 @@ static inline bool exists(const T &container, const U &value)
 void Device::reset_fence(VkFence fence)
 {
 	LOCK();
-	frame().recycle_fences.push_back(fence);
+	frame().recycle_fences.push(fence);
 }
 
 void Device::destroy_pipeline_nolock(VkPipeline pipeline)
 {
 	VK_ASSERT(!exists(frame().destroyed_pipelines, pipeline));
-	frame().destroyed_pipelines.push_back(pipeline);
+	frame().destroyed_pipelines.push(pipeline);
 }
 
 void Device::destroy_image_view_nolock(VkImageView view)
 {
 	VK_ASSERT(!exists(frame().destroyed_image_views, view));
-	frame().destroyed_image_views.push_back(view);
+	frame().destroyed_image_views.push(view);
 }
 
 void Device::destroy_buffer_view_nolock(VkBufferView view)
 {
 	VK_ASSERT(!exists(frame().destroyed_buffer_views, view));
-	frame().destroyed_buffer_views.push_back(view);
+	frame().destroyed_buffer_views.push(view);
 }
 
 void Device::destroy_semaphore_nolock(VkSemaphore semaphore)
 {
 	VK_ASSERT(!exists(frame().destroyed_semaphores, semaphore));
-	frame().destroyed_semaphores.push_back(semaphore);
+	frame().destroyed_semaphores.push(semaphore);
 }
 
 void Device::destroy_image_nolock(VkImage image)
 {
 	VK_ASSERT(!exists(frame().destroyed_images, image));
-	frame().destroyed_images.push_back(image);
+	frame().destroyed_images.push(image);
 }
 
 void Device::destroy_buffer_nolock(VkBuffer buffer)
 {
 	VK_ASSERT(!exists(frame().destroyed_buffers, buffer));
-	frame().destroyed_buffers.push_back(buffer);
+	frame().destroyed_buffers.push(buffer);
 }
 
 void Device::destroy_sampler_nolock(VkSampler sampler)
 {
 	VK_ASSERT(!exists(frame().destroyed_samplers, sampler));
-	frame().destroyed_samplers.push_back(sampler);
+	frame().destroyed_samplers.push(sampler);
 }
 
 void Device::destroy_framebuffer_nolock(VkFramebuffer framebuffer)
 {
 	VK_ASSERT(!exists(frame().destroyed_framebuffers, framebuffer));
-	frame().destroyed_framebuffers.push_back(framebuffer);
+	frame().destroyed_framebuffers.push(framebuffer);
 }
 
 void Device::clear_wait_semaphores()
@@ -16556,6 +16583,18 @@ void Device::PerFrame::begin()
 Device::PerFrame::~PerFrame()
 {
 	begin();
+	/* Release the POD_VEC backing storage (begin() only resets the counts). */
+	wait_fences.free_storage();
+	recycle_fences.free_storage();
+	destroyed_framebuffers.free_storage();
+	destroyed_samplers.free_storage();
+	destroyed_pipelines.free_storage();
+	destroyed_image_views.free_storage();
+	destroyed_buffer_views.free_storage();
+	destroyed_images.free_storage();
+	destroyed_buffers.free_storage();
+	recycled_semaphores.free_storage();
+	destroyed_semaphores.free_storage();
 }
 
 uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
