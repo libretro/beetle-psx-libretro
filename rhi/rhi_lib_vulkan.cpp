@@ -2675,10 +2675,10 @@ private:
 #define VK_ASSERT(x)                                             \
 	do                                                           \
 	{                                                            \
-		if (!bool(x))                                            \
+		if (!(x))                                                \
 		{                                                        \
 			LOGE("Vulkan error at %s:%d.\n", __FILE__, __LINE__); \
-			std::abort();                                        \
+			abort();                                             \
 		}                                                        \
 	} while (0)
 #else
