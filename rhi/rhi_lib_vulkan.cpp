@@ -2623,7 +2623,13 @@ public:
 		for (T &node : rings[index])
 		{
 			hashmap.erase(node.get_hash());
-			free_object(&node, ReuseTag<ReuseObjects>());
+			/* Folded free_object: ReuseObjects is a compile-time constant, so
+			 * the dead branch is eliminated - reuse keeps the node in the vacant
+			 * pool, otherwise it goes back to the object pool. */
+			if (ReuseObjects)
+				vacants.push_back(&node);
+			else
+				object_pool.free(&node);
 		}
 		rings[index].clear();
 	}
@@ -2683,21 +2689,6 @@ private:
 	unsigned index = 0;
 	IntrusiveHashMap<IntrusivePODWrapper<typename IntrusiveList<T>::Iterator>> hashmap;
 	std::vector<typename IntrusiveList<T>::Iterator> vacants;
-
-	template <bool reuse>
-	struct ReuseTag
-	{
-	};
-
-	void free_object(T *object, const ReuseTag<false> &)
-	{
-		object_pool.free(object);
-	}
-
-	void free_object(T *object, const ReuseTag<true> &)
-	{
-		vacants.push_back(object);
-	}
 };
 
 }
