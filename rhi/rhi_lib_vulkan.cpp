@@ -9016,13 +9016,20 @@ void Renderer::ssaa_framebuffer()
 	unsigned right = (rect.x + rect.width + BLOCK_WIDTH - 1) / BLOCK_WIDTH;
 	unsigned bottom = (rect.y + rect.height + BLOCK_HEIGHT - 1) / BLOCK_HEIGHT;
 
-	std::vector<VkRect2D> resolves_ssaa;
+	/* Exact element count is known up front (block grid), so use a single
+	 * malloc'd buffer filled by index rather than a growing std::vector. */
+	unsigned resolves_count = (bottom > top && right > left) ? (bottom - top) * (right - left) : 0;
+	VkRect2D *resolves_ssaa = (VkRect2D *)malloc((resolves_count ? resolves_count : 1) * sizeof(VkRect2D));
+	unsigned resolves_n = 0;
 	for (unsigned y = top; y < bottom; y++)
 		for (unsigned x = left; x < right; x++)
-			resolves_ssaa.push_back({
+		{
+			VkRect2D r = {
 				{ int(x * BLOCK_WIDTH % FB_WIDTH), int(y * BLOCK_HEIGHT % FB_HEIGHT) },
 				{ BLOCK_WIDTH, BLOCK_HEIGHT }
-			});
+			};
+			resolves_ssaa[resolves_n++] = r;
+		}
 
 	ensure_command_buffer();
 
@@ -9041,7 +9048,7 @@ void Renderer::ssaa_framebuffer()
 		float inv_size[2];
 		uint32_t scale;
 	};
-	unsigned size = resolves_ssaa.size();
+	unsigned size = resolves_n;
 	for (unsigned i = 0; i < size; i += 1024)
 	{
 		unsigned to_run = std::min(size - i, 1024u);
@@ -9049,10 +9056,11 @@ void Renderer::ssaa_framebuffer()
 		Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 		cmd->push_constants(&push, 0, sizeof(push));
 		void *ptr = cmd->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
-		memcpy(ptr, resolves_ssaa.data() + i, to_run * sizeof(VkRect2D));
+		memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
 		cmd->set_specialization_constant_mask(-1);
 		cmd->dispatch(1, 1, to_run);
 	}
+	free(resolves_ssaa);
 }
 
 Rect Renderer::compute_vram_framebuffer_rect()
@@ -18724,17 +18732,21 @@ void TextureTracker::blit(Rect dst, Rect src) {
 }
 
 uint32_t TextureTracker::dbgHashVram(Rect rect, uint16_t *vram) {
-    std::vector<uint16_t> vec;
     unsigned x = rect.x,
             y = rect.y,
             w = rect.width,
             h = rect.height;
-    for (int j = y; j < y + h; j++) {
-        for (int i = x; i < x + w; i++) {
-            vec.push_back(vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))]);
+    size_t n = (size_t)w * (size_t)h;
+    uint16_t *buf = (uint16_t *)malloc(n * sizeof(uint16_t));
+    size_t bi = 0;
+    uint32_t hash;
+    for (int j = y; j < (int)(y + h); j++) {
+        for (int i = x; i < (int)(x + w); i++) {
+            buf[bi++] = vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))];
         }
     }
-    uint32_t hash = crc32(0, (unsigned char*)vec.data(), rect.width * rect.height * sizeof(uint16_t));
+    hash = crc32(0, (unsigned char*)buf, rect.width * rect.height * sizeof(uint16_t));
+    free(buf);
     return hash;
 }
 
