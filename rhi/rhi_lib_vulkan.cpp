@@ -7264,6 +7264,81 @@ namespace PSX
 		OwnedRectVec to_restore;
 	};
 
+	/* Owning array of RestorableRect. Replaces std::vector<RestorableRect>.
+	 * RestorableRect holds an OwnedRectVec (retain/release on copy, move
+	 * suppressed), so it is copyable but not movable - the same way std::vector
+	 * relocated it by copy. This container therefore copy-constructs/-assigns
+	 * elements: growth copy-constructs each into new storage with placement new
+	 * and destroys the old slot; push() copy-inserts (matching the old
+	 * push_back(std::move(rr)), which - move being suppressed - was a copy);
+	 * clear()/the destructor run each element's destructor (releasing its rect
+	 * refs). erase_at(i) removes one element by copy-assigning the tail down and
+	 * destroying the now-duplicated last slot, matching std::vector::erase. */
+	struct RestorableRectVec {
+		RestorableRect *items;
+		int count;
+		int cap;
+
+		RestorableRectVec() : items(NULL), count(0), cap(0) {}
+		~RestorableRectVec() { destroy(); }
+		RestorableRectVec(RestorableRectVec &&o) noexcept
+			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+		RestorableRectVec &operator=(RestorableRectVec &&o) noexcept {
+			if (this != &o) {
+				destroy();
+				items = o.items; count = o.count; cap = o.cap;
+				o.items = NULL; o.count = 0; o.cap = 0;
+			}
+			return *this;
+		}
+		RestorableRectVec(const RestorableRectVec &) = delete;
+		RestorableRectVec &operator=(const RestorableRectVec &) = delete;
+
+		void push(const RestorableRect &v) {
+			if (count >= cap)
+				grow(cap ? cap * 2 : 8);
+			new (&items[count]) RestorableRect(v);
+			count++;
+		}
+		int size() const { return count; }
+		bool empty() const { return count == 0; }
+		RestorableRect &operator[](int i) { return items[i]; }
+		const RestorableRect &operator[](int i) const { return items[i]; }
+		RestorableRect *begin() { return items; }
+		RestorableRect *end() { return items + count; }
+		const RestorableRect *begin() const { return items; }
+		const RestorableRect *end() const { return items + count; }
+		void clear() {
+			for (int i = 0; i < count; i++)
+				items[i].~RestorableRect();
+			count = 0;
+		}
+		void erase_at(int i) {
+			for (int j = i; j + 1 < count; j++)
+				items[j] = items[j + 1];
+			items[count - 1].~RestorableRect();
+			count--;
+		}
+
+	private:
+		void grow(int ncap) {
+			RestorableRect *nitems = (RestorableRect *)malloc((size_t)ncap * sizeof(RestorableRect));
+			for (int i = 0; i < count; i++) {
+				new (&nitems[i]) RestorableRect(items[i]);
+				items[i].~RestorableRect();
+			}
+			free(items);
+			items = nitems;
+			cap = ncap;
+		}
+		void destroy() {
+			for (int i = 0; i < count; i++)
+				items[i].~RestorableRect();
+			free(items);
+			items = NULL; count = 0; cap = 0;
+		}
+	};
+
 	class DbgHotkey {
 		public:
 			DbgHotkey(retro_key key): key(key) {}
@@ -8019,7 +8094,7 @@ namespace PSX
 			CachedPaletteHash *cached_palette_hashes;
 			int cached_palette_hashes_count;
 			int cached_palette_hashes_cap;
-			std::vector<RestorableRect> restorable_rects;
+			RestorableRectVec restorable_rects;
 			FusedPages fused_pages;
 			uint64_t frame = 0;
 
@@ -19441,12 +19516,12 @@ namespace PSX {
 
 		uint32_t hash = dbgHashVram(rect, vram);
 
-		for (std::vector<RestorableRect>::iterator it = restorable_rects.begin(); it != restorable_rects.end(); )
+		for (int i = 0; i < restorable_rects.size(); )
 		{
-			if (it->rect.intersects(rect))
-				restorable_rects.erase(it);
+			if (restorable_rects[i].rect.intersects(rect))
+				restorable_rects.erase_at(i);
 			else
-				it++;
+				i++;
 		}
 
 		static RectIndexSet overlap = { NULL, 0, 0 };
@@ -19470,7 +19545,7 @@ namespace PSX {
 		rr.rect = rect;
 		rr.hash = hash;
 		rr.to_restore = std::move(to_restore);
-		restorable_rects.push_back(std::move(rr));
+		restorable_rects.push(rr);
 	}
 
 	void TextureTracker::upload(Rect rect, uint16_t *vram) {
@@ -20786,7 +20861,7 @@ namespace PSX {
 			loaded.rect = r.rect;
 			for (const TextureRectSaveState &t : r.to_restore)
 				loaded.to_restore.push(from_save_state(t, uploads));
-			restorable_rects.push_back(std::move(loaded));
+			restorable_rects.push(loaded);
 		}
 		// Need to reload the hd textures, too
 		for (int e = 0; e < state.uploads.count; e++)
