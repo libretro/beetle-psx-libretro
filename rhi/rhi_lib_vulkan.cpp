@@ -8071,6 +8071,7 @@ namespace PSX
 
 			void dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured = false);
 			static bool primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b);
+			static int primitive_info_qsort_cmp(const void *a, const void *b);
 			void render_opaque_primitives();
 			void render_opaque_texture_primitives();
 			void render_semi_transparent_opaque_texture_primitives();
@@ -10135,9 +10136,21 @@ bool Renderer::primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInf
 	return a.triangle_index > b.triangle_index;
 }
 
+/* qsort comparator: descending order, matching primitive_info_sort_gt. */
+int Renderer::primitive_info_qsort_cmp(const void *pa, const void *pb)
+{
+	const PrimitiveInfo &a = *static_cast<const PrimitiveInfo *>(pa);
+	const PrimitiveInfo &b = *static_cast<const PrimitiveInfo *>(pb);
+	if (primitive_info_sort_gt(a, b))
+		return -1;
+	if (primitive_info_sort_gt(b, a))
+		return 1;
+	return 0;
+}
+
 void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured)
 {
-	std::sort(scissors.data(), scissors.data() + scissors.size(), primitive_info_sort_gt);
+	qsort(scissors.data(), scissors.size(), sizeof(PrimitiveInfo), primitive_info_qsort_cmp);
 
 	// Render flat-shaded primitives.
 	BufferVertex *vert = static_cast<BufferVertex *>(
@@ -19676,6 +19689,20 @@ static bool texture_rect_sort_gt(const TextureRect &a, const TextureRect &b) {
     return srect_gt(a.texture_subrect(), b.texture_subrect());
 }
 
+/* qsort comparator: descending order, matching texture_rect_sort_gt. Equal
+ * elements (fully identical under the predicate) are interchangeable, so the
+ * unstable order among them does not affect the canonical-form comparison this
+ * sort exists to enable. */
+static int texture_rect_qsort_cmp(const void *pa, const void *pb) {
+    const TextureRect &a = *static_cast<const TextureRect *>(pa);
+    const TextureRect &b = *static_cast<const TextureRect *>(pb);
+    if (texture_rect_sort_gt(a, b))
+        return -1;
+    if (texture_rect_sort_gt(b, a))
+        return 1;
+    return 0;
+}
+
 FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker &tracker) {
     FusionRects f;
     f.scaleX = 0;
@@ -19706,7 +19733,7 @@ FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker
     }
 
     // Sort rects so that the vector itself can be compared
-    std::sort(f.rects.v.begin(), f.rects.v.end(), texture_rect_sort_gt);
+    qsort(f.rects.v.data(), f.rects.v.size(), sizeof(TextureRect), texture_rect_qsort_cmp);
 
     return f;
 }
