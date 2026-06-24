@@ -16059,6 +16059,11 @@ void Device::submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, 
 	}
 }
 
+POD_VEC_DECLARE(VkCommandBufferVec, VkCommandBuffer);
+POD_VEC_DECLARE(VkSubmitInfoVec, VkSubmitInfo);
+POD_VEC_DECLARE(VkSemaphoreVec, VkSemaphore);
+POD_VEC_DECLARE(VkFlagsVec, VkFlags);
+
 void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
                           unsigned semaphore_count, Semaphore *semaphores)
 {
@@ -16078,39 +16083,43 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 		return;
 	}
 
-	std::vector<VkCommandBuffer> cmds;
-	cmds.reserve(submissions.size());
+	VkCommandBufferVec cmds = { NULL, 0, 0 };
 
-	std::vector<VkSubmitInfo> submits;
-	submits.reserve(2);
+	VkSubmitInfoVec submits = { NULL, 0, 0 };
 	size_t last_cmd = 0;
 
-	std::vector<VkSemaphore> waits[2];
-	std::vector<VkSemaphore> signals[2];
-	std::vector<VkFlags> stages[2];
+	VkSemaphoreVec waits[2]   = { { NULL, 0, 0 }, { NULL, 0, 0 } };
+	VkSemaphoreVec signals[2] = { { NULL, 0, 0 }, { NULL, 0, 0 } };
+	VkFlagsVec stages[2]      = { { NULL, 0, 0 }, { NULL, 0, 0 } };
 
 	// Add external wait semaphores.
-	stages[0] = std::move(data.wait_stages);
+	{
+		// Move the pending wait stages across (then the source is cleared below).
+		size_t ws;
+		for (ws = 0; ws < data.wait_stages.size(); ws++)
+			stages[0].push(data.wait_stages[ws]);
+	}
 
 	for (Semaphore &semaphore : data.wait_semaphores)
 	{
 		VkSemaphore wait = semaphore->consume();
 		frame().recycled_semaphores.push_back(wait);
-		waits[0].push_back(wait);
+		waits[0].push(wait);
 	}
 	data.wait_stages.clear();
 	data.wait_semaphores.clear();
 
 	for (CommandBufferHandle &cmd : submissions)
-		cmds.push_back(cmd->get_command_buffer());
+		cmds.push(cmd->get_command_buffer());
 
-	if (cmds.size() > last_cmd)
+	if (cmds.size() > (int)last_cmd)
 	{
 		// Push all pending cmd buffers to their own submission.
-		submits.emplace_back();
+		VkSubmitInfo zero_submit;
+		memset(&zero_submit, 0, sizeof(zero_submit));
+		submits.push(zero_submit);
 
 		VkSubmitInfo &submit = submits.back();
-		memset(&submit, 0, sizeof(submit));
 		submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submit.pNext = nullptr;
 		submit.commandBufferCount = cmds.size() - last_cmd;
@@ -16123,12 +16132,12 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 	for (unsigned i = 0; i < semaphore_count; i++)
 	{
 		VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
-		signals[submits.size() - 1].push_back(cleared_semaphore);
+		signals[submits.size() - 1].push(cleared_semaphore);
 		VK_ASSERT(!semaphores[i]);
 		semaphores[i] = Semaphore(handle_pool.semaphores.allocate(this, cleared_semaphore, true));
 	}
 
-	for (unsigned i = 0; i < submits.size(); i++)
+	for (int i = 0; i < submits.size(); i++)
 	{
 		VkSubmitInfo &submit = submits[i];
 		submit.waitSemaphoreCount = waits[i].size();
@@ -16162,6 +16171,12 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 	if (result != VK_SUCCESS)
 		LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
 	submissions.clear();
+
+	cmds.free_storage();
+	submits.free_storage();
+	waits[0].free_storage();  waits[1].free_storage();
+	signals[0].free_storage(); signals[1].free_storage();
+	stages[0].free_storage();  stages[1].free_storage();
 
 	if (fence)
 	{
