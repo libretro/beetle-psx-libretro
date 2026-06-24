@@ -5596,15 +5596,12 @@ private:
 	/* Per-frame deletion/recycle queues hold plain Vulkan handles (POD); use
 	 * POD_VEC instead of std::vector to avoid a heap allocation per frame for
 	 * each queue. */
-	POD_VEC_DECLARE(VkFenceVec, VkFence);
 	POD_VEC_DECLARE(VkFramebufferVec, VkFramebuffer);
 	POD_VEC_DECLARE(VkSamplerVec, VkSampler);
 	POD_VEC_DECLARE(VkPipelineVec, VkPipeline);
-	POD_VEC_DECLARE(VkImageViewVec, VkImageView);
 	POD_VEC_DECLARE(VkBufferViewVec, VkBufferView);
 	POD_VEC_DECLARE(VkImageVec, VkImage);
 	POD_VEC_DECLARE(VkBufferVec, VkBuffer);
-	POD_VEC_DECLARE(VkSemaphoreVec2, VkSemaphore);
 
 	struct PerFrame
 	{
@@ -5624,21 +5621,21 @@ private:
 		std::vector<BufferBlock> vbo_blocks;
 		std::vector<BufferBlock> ubo_blocks;
 
-		VkFenceVec wait_fences;
-		VkFenceVec recycle_fences;
+		FenceVec wait_fences;
+		FenceVec recycle_fences;
 		std::vector<DeviceAllocation> allocations;
 		VkFramebufferVec destroyed_framebuffers;
 		VkSamplerVec destroyed_samplers;
 		VkPipelineVec destroyed_pipelines;
-		VkImageViewVec destroyed_image_views;
+		RenderTargetViewVec destroyed_image_views;
 		VkBufferViewVec destroyed_buffer_views;
 		VkImageVec destroyed_images;
 		VkBufferVec destroyed_buffers;
 		std::vector<CommandBufferHandle> graphics_submissions;
 		std::vector<CommandBufferHandle> compute_submissions;
 		std::vector<CommandBufferHandle> transfer_submissions;
-		VkSemaphoreVec2 recycled_semaphores;
-		VkSemaphoreVec2 destroyed_semaphores;
+		SemaphoreVec recycled_semaphores;
+		SemaphoreVec destroyed_semaphores;
 	};
 	// The per frame structure must be destroyed after
 	// the hashmap data structures below, so it must be declared before.
@@ -15975,7 +15972,6 @@ void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semap
 	decrement_frame_counter_nolock();
 }
 
-POD_VEC_DECLARE(VkSemaphoreVec, VkSemaphore);
 POD_VEC_DECLARE(VkFlagsVec, VkFlags);
 void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
                                 unsigned semaphore_count, Semaphore *semaphores)
@@ -15984,8 +15980,8 @@ void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 	VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
 	// Add external wait semaphores.
-	VkSemaphoreVec waits   = { NULL, 0, 0 };
-	VkSemaphoreVec signals = { NULL, 0, 0 };
+	SemaphoreVec waits   = { NULL, 0, 0 };
+	SemaphoreVec signals = { NULL, 0, 0 };
 	VkFlagsVec stages      = { NULL, 0, 0 };
 	{
 		size_t ws;
@@ -16138,7 +16134,6 @@ void Device::submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, 
 	}
 }
 
-POD_VEC_DECLARE(VkCommandBufferVec, VkCommandBuffer);
 POD_VEC_DECLARE(VkSubmitInfoVec, VkSubmitInfo);
 
 void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
@@ -16160,13 +16155,13 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 		return;
 	}
 
-	VkCommandBufferVec cmds = { NULL, 0, 0 };
+	CommandBufferVec cmds = { NULL, 0, 0 };
 
 	VkSubmitInfoVec submits = { NULL, 0, 0 };
 	size_t last_cmd = 0;
 
-	VkSemaphoreVec waits[2]   = { { NULL, 0, 0 }, { NULL, 0, 0 } };
-	VkSemaphoreVec signals[2] = { { NULL, 0, 0 }, { NULL, 0, 0 } };
+	SemaphoreVec waits[2]   = { { NULL, 0, 0 }, { NULL, 0, 0 } };
+	SemaphoreVec signals[2] = { { NULL, 0, 0 }, { NULL, 0, 0 } };
 	VkFlagsVec stages[2]      = { { NULL, 0, 0 }, { NULL, 0, 0 } };
 
 	// Add external wait semaphores.
