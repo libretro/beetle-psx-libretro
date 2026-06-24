@@ -5913,9 +5913,67 @@ namespace Vulkan
 				SemaphoreVec recycled_semaphores;
 				SemaphoreVec destroyed_semaphores;
 			};
+			/* Owning array of PerFrame* (the frame-context ring). Replaces
+			 * std::vector<std::unique_ptr<PerFrame>>: the container owns each
+			 * heap-allocated PerFrame and deletes it on clear()/destruction, so
+			 * ownership is explicit new/delete instead of unique_ptr. Pointers are
+			 * trivially relocatable, so the backing array grows by realloc.
+			 * push() takes ownership of an already-new'd PerFrame; operator[]
+			 * returns the raw pointer (so frame() can dereference it and the
+			 * null-asserts still work), and begin/end iterate the pointers. The
+			 * default constructor zero-initialises the members (it is not a bare
+			 * POD_VEC), so a default-constructed ring is valid before build(). */
+			struct PerFramePtrVec {
+				PerFrame **items;
+				int count;
+				int cap;
+
+				PerFramePtrVec() : items(NULL), count(0), cap(0) {}
+				~PerFramePtrVec() { destroy(); }
+				PerFramePtrVec(PerFramePtrVec &&o) noexcept
+					: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+				PerFramePtrVec &operator=(PerFramePtrVec &&o) noexcept {
+					if (this != &o) {
+						destroy();
+						items = o.items; count = o.count; cap = o.cap;
+						o.items = NULL; o.count = 0; o.cap = 0;
+					}
+					return *this;
+				}
+				PerFramePtrVec(const PerFramePtrVec &) = delete;
+				PerFramePtrVec &operator=(const PerFramePtrVec &) = delete;
+
+				/* Takes ownership of an already-allocated PerFrame. */
+				void push(PerFrame *p) {
+					if (count >= cap) {
+						int ncap = cap ? cap * 2 : 8;
+						items = (PerFrame **)::realloc(items, (size_t)ncap * sizeof(PerFrame *));
+						cap = ncap;
+					}
+					items[count++] = p;
+				}
+				int size() const { return count; }
+				bool empty() const { return count == 0; }
+				PerFrame *operator[](int i) const { return items[i]; }
+				PerFrame **begin() { return items; }
+				PerFrame **end() { return items + count; }
+				void clear() {
+					for (int i = 0; i < count; i++)
+						delete items[i];
+					count = 0;
+				}
+
+			private:
+				void destroy() {
+					for (int i = 0; i < count; i++)
+						delete items[i];
+					::free(items);
+					items = NULL; count = 0; cap = 0;
+				}
+			};
 			// The per frame structure must be destroyed after
 			// the hashmap data structures below, so it must be declared before.
-			std::vector<std::unique_ptr<PerFrame>> per_frame;
+			PerFramePtrVec per_frame;
 
 			struct QueueData
 			{
@@ -17058,8 +17116,7 @@ void Device::init_frame_contexts(unsigned count)
 
 	for (unsigned i = 0; i < count; i++)
 	{
-		std::unique_ptr<PerFrame> frame = std::unique_ptr<PerFrame>(new PerFrame(this));
-		per_frame.emplace_back(std::move(frame));
+		per_frame.push(new PerFrame(this));
 	}
 }
 
@@ -17188,7 +17245,7 @@ void Device::wait_idle_nolock()
 	// Free memory for buffer pools.
 	managers.vbo.reset();
 	managers.ubo.reset();
-	for (std::unique_ptr<PerFrame> &frame : per_frame)
+	for (PerFrame *frame : per_frame)
 	{
 		frame->vbo_blocks.clear();
 		frame->ubo_blocks.clear();
@@ -17199,7 +17256,7 @@ void Device::wait_idle_nolock()
 	for (DescriptorSetAllocator &allocator : descriptor_set_allocators)
 		allocator.clear();
 
-	for (std::unique_ptr<PerFrame> &frame : per_frame)
+	for (PerFrame *frame : per_frame)
 	{
 		// We have done WaitIdle, no need to wait for extra fences, it's also not safe.
 		frame->wait_fences.clear();
