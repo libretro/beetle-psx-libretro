@@ -15121,18 +15121,20 @@ void CommandBufferDeleter::operator()(Vulkan::CommandBuffer *cmd)
 
 namespace Vulkan
 {
-static bool has_vk_extension(const std::vector<VkExtensionProperties> &exts, const char *name)
+static bool has_vk_extension(const VkExtensionProperties *exts, uint32_t count, const char *name)
 {
-	for (const VkExtensionProperties &e : exts)
-		if (strcmp(e.extensionName, name) == 0)
+	uint32_t i;
+	for (i = 0; i < count; i++)
+		if (strcmp(exts[i].extensionName, name) == 0)
 			return true;
 	return false;
 }
 
-static bool has_vk_layer(const std::vector<VkLayerProperties> &layers, const char *name)
+static bool has_vk_layer(const VkLayerProperties *layers, uint32_t count, const char *name)
 {
-	for (const VkLayerProperties &e : layers)
-		if (strcmp(e.layerName, name) == 0)
+	uint32_t i;
+	for (i = 0; i < count; i++)
+		if (strcmp(layers[i].layerName, name) == 0)
 			return true;
 	return false;
 }
@@ -15221,17 +15223,19 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 		if (gpu_count == 0)
 			return false;
 
-		std::vector<VkPhysicalDevice> gpus(gpu_count);
-		if (vkEnumeratePhysicalDevices(instance, &gpu_count, gpus.data()) != VK_SUCCESS)
+		VkPhysicalDevice *gpus = (VkPhysicalDevice *)malloc(gpu_count * sizeof(VkPhysicalDevice));
+		if (vkEnumeratePhysicalDevices(instance, &gpu_count, gpus) != VK_SUCCESS)
 		{
 			LOGE("vkEnumeratePhysicalDevices failed.\n");
+			free(gpus);
 			return false;
 		}
 
-		for (VkPhysicalDevice &gpu : gpus)
+		for (uint32_t gi = 0; gi < gpu_count; gi++)
 		{
+			VkPhysicalDevice cur = gpus[gi];
 			VkPhysicalDeviceProperties props;
-			vkGetPhysicalDeviceProperties(gpu, &props);
+			vkGetPhysicalDeviceProperties(cur, &props);
 			LOGI("Found Vulkan GPU: %s\n", props.deviceName);
 			LOGI("    API: %u.%u.%u\n",
 			     VK_VERSION_MAJOR(props.apiVersion),
@@ -15252,28 +15256,29 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 		}
 
 		if (gpu == VK_NULL_HANDLE)
-			gpu = gpus.front();
+			gpu = gpus[0];
+		free(gpus);
 	}
 
 	uint32_t ext_count = 0;
 	vkEnumerateDeviceExtensionProperties(gpu, nullptr, &ext_count, nullptr);
-	std::vector<VkExtensionProperties> queried_extensions(ext_count);
+	VkExtensionProperties *queried_extensions = (VkExtensionProperties *)malloc((ext_count ? ext_count : 1) * sizeof(VkExtensionProperties));
 	if (ext_count)
-		vkEnumerateDeviceExtensionProperties(gpu, nullptr, &ext_count, queried_extensions.data());
+		vkEnumerateDeviceExtensionProperties(gpu, nullptr, &ext_count, queried_extensions);
 
 	uint32_t layer_count = 0;
 	vkEnumerateDeviceLayerProperties(gpu, &layer_count, nullptr);
-	std::vector<VkLayerProperties> queried_layers(layer_count);
+	VkLayerProperties *queried_layers = (VkLayerProperties *)malloc((layer_count ? layer_count : 1) * sizeof(VkLayerProperties));
 	if (layer_count)
-		vkEnumerateDeviceLayerProperties(gpu, &layer_count, queried_layers.data());
+		vkEnumerateDeviceLayerProperties(gpu, &layer_count, queried_layers);
 
 	for (uint32_t i = 0; i < num_required_device_extensions; i++)
-		if (!has_vk_extension(queried_extensions, required_device_extensions[i]))
-			return false;
+		if (!has_vk_extension(queried_extensions, ext_count, required_device_extensions[i]))
+			{ free(queried_extensions); free(queried_layers); return false; }
 
 	for (uint32_t i = 0; i < num_required_device_layers; i++)
-		if (!has_vk_layer(queried_layers, required_device_layers[i]))
-			return false;
+		if (!has_vk_layer(queried_layers, layer_count, required_device_layers[i]))
+			{ free(queried_extensions); free(queried_layers); return false; }
 
 	this->gpu = gpu;
 	vkGetPhysicalDeviceProperties(gpu, &gpu_props);
@@ -15288,8 +15293,8 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 
 	uint32_t queue_count;
 	vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, nullptr);
-	std::vector<VkQueueFamilyProperties> queue_props(queue_count);
-	vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, queue_props.data());
+	VkQueueFamilyProperties *queue_props = (VkQueueFamilyProperties *)malloc((queue_count ? queue_count : 1) * sizeof(VkQueueFamilyProperties));
+	vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, queue_props);
 
 	for (unsigned i = 0; i < queue_count; i++)
 	{
@@ -15339,7 +15344,7 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	}
 
 	if (graphics_queue_family == VK_QUEUE_FAMILY_IGNORED)
-		return false;
+		{ free(queried_extensions); free(queried_layers); free(queue_props); return false; }
 
 	unsigned universal_queue_index = 1;
 	uint32_t graphics_queue_index = 0;
@@ -15401,42 +15406,46 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 
 	device_info.queueCreateInfoCount = queue_family_count;
 
-	std::vector<const char *> enabled_extensions;
-	std::vector<const char *> enabled_layers;
+	/* At most the caller-required extensions plus a fixed set of optional ones
+	 * added below; size to that bound exactly. */
+	const char **enabled_extensions = (const char **)malloc((num_required_device_extensions + 16) * sizeof(const char *));
+	unsigned enabled_extensions_count = 0;
+	const char **enabled_layers = (const char **)malloc((num_required_device_layers + 4) * sizeof(const char *));
+	unsigned enabled_layers_count = 0;
 
 	for (uint32_t i = 0; i < num_required_device_extensions; i++)
-		enabled_extensions.push_back(required_device_extensions[i]);
+		enabled_extensions[enabled_extensions_count++] = (required_device_extensions[i]);
 	for (uint32_t i = 0; i < num_required_device_layers; i++)
-		enabled_layers.push_back(required_device_layers[i]);
+		enabled_layers[enabled_layers_count++] = (required_device_layers[i]);
 
-	if (has_vk_extension(queried_extensions, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) &&
-	    has_vk_extension(queried_extensions, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME))
+	if (has_vk_extension(queried_extensions, ext_count, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) &&
+	    has_vk_extension(queried_extensions, ext_count, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME))
 	{
 		ext.supports_dedicated = true;
-		enabled_extensions.push_back(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
-		enabled_extensions.push_back(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+		enabled_extensions[enabled_extensions_count++] = (VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
+		enabled_extensions[enabled_extensions_count++] = (VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
 	}
 
-	if (has_vk_extension(queried_extensions, VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+	if (has_vk_extension(queried_extensions, ext_count, VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
 	{
 		ext.supports_debug_marker = true;
-		enabled_extensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+		enabled_extensions[enabled_extensions_count++] = (VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
 	}
 
 #ifdef _WIN32
 	ext.supports_external = false;
 #else
 	if (ext.supports_external && ext.supports_dedicated &&
-	    has_vk_extension(queried_extensions, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME) &&
-	    has_vk_extension(queried_extensions, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) &&
-	    has_vk_extension(queried_extensions, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME) &&
-	    has_vk_extension(queried_extensions, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME))
+	    has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME) &&
+	    has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) &&
+	    has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME) &&
+	    has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME))
 	{
 		ext.supports_external = true;
-		enabled_extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
-		enabled_extensions.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
-		enabled_extensions.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
-		enabled_extensions.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+		enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
+		enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+		enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+		enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
 	}
 	else
 		ext.supports_external = false;
@@ -15444,8 +15453,8 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 
 	VkPhysicalDeviceFeatures2KHR features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR };
 
-	if (has_vk_extension(queried_extensions, VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME))
-		enabled_extensions.push_back(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
+	if (has_vk_extension(queried_extensions, ext_count, VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME))
+		enabled_extensions[enabled_extensions_count++] = (VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
 
 	vkGetPhysicalDeviceFeatures(gpu, &features.features);
 
@@ -15489,17 +15498,24 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 		const char *no_validation = getenv("GRANITE_VULKAN_NO_VALIDATION");
 		if (no_validation && strtoul(no_validation, nullptr, 0) != 0)
 			force_no_validation = true;
-		if (!force_no_validation && has_vk_layer(queried_layers, "VK_LAYER_LUNARG_standard_validation"))
-			enabled_layers.push_back("VK_LAYER_LUNARG_standard_validation");
+		if (!force_no_validation && has_vk_layer(queried_layers, layer_count, "VK_LAYER_LUNARG_standard_validation"))
+			enabled_layers[enabled_layers_count++] = ("VK_LAYER_LUNARG_standard_validation");
 	}
 #endif
 
-	device_info.enabledExtensionCount = enabled_extensions.size();
-	device_info.ppEnabledExtensionNames = enabled_extensions.empty() ? nullptr : enabled_extensions.data();
-	device_info.enabledLayerCount = enabled_layers.size();
-	device_info.ppEnabledLayerNames = enabled_layers.empty() ? nullptr : enabled_layers.data();
+	device_info.enabledExtensionCount = enabled_extensions_count;
+	device_info.ppEnabledExtensionNames = enabled_extensions_count ? enabled_extensions : nullptr;
+	device_info.enabledLayerCount = enabled_layers_count;
+	device_info.ppEnabledLayerNames = enabled_layers_count ? enabled_layers : nullptr;
 
-	if (vkCreateDevice(gpu, &device_info, nullptr, &device) != VK_SUCCESS)
+	free(queried_extensions);
+	free(queried_layers);
+	free(queue_props);
+
+	VkResult dev_res = vkCreateDevice(gpu, &device_info, nullptr, &device);
+	free(enabled_extensions);
+	free(enabled_layers);
+	if (dev_res != VK_SUCCESS)
 		return false;
 
 	volkLoadDevice(device);
