@@ -1640,7 +1640,6 @@ PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
 #endif
 /* === end folded volk === */
 
-#include <algorithm>
 #include <assert.h>
 #include <map>
 #include <memory>
@@ -12834,7 +12833,8 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 	: IntrusiveHashMapEnabled<RenderPass>(hash)
 	, device(device)
 {
-	fill(begin(color_attachments), end(color_attachments), VK_FORMAT_UNDEFINED);
+	for (unsigned att = 0; att < VULKAN_NUM_ATTACHMENTS; att++)
+		color_attachments[att] = VK_FORMAT_UNDEFINED;
 
 	VK_ASSERT(info.num_color_attachments || info.depth_stencil);
 
