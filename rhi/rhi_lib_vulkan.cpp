@@ -1702,6 +1702,15 @@ struct NAME {                                                                 \
 #include <rthreads/rthreads.h>
 #include <streams/file_stream.h>
 
+/* Local single-evaluation min/max, so the file does not depend on std::min /
+ * std::max from <algorithm>. Templated to cover the unsigned/int/float/
+ * VkDeviceSize uses (and the one explicit-argument max_<VkDeviceSize>(...)
+ * call), with the same semantics as std::min/std::max, including returning the
+ * first argument on a tie. */
+template <typename T> static inline const T &min_(const T &a, const T &b) { return b < a ? b : a; }
+template <typename T> static inline const T &max_(const T &a, const T &b) { return a < b ? b : a; }
+
+
 /* The remainder of this file is the consolidated parallel-psx
  * implementation - originally spread across parallel-psx/util/,
  * parallel-psx/vulkan/, parallel-psx/atlas/,
@@ -8320,7 +8329,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 				0,
 				&props))
 	{
-		unsigned max_scaling = std::min(props.maxExtent.width / FB_WIDTH, props.maxExtent.height / FB_HEIGHT);
+		unsigned max_scaling = min_(props.maxExtent.width / FB_WIDTH, props.maxExtent.height / FB_HEIGHT);
 		unsigned new_scale = scaling;
 		while (new_scale > max_scaling)
 			new_scale >>= 1;
@@ -8764,7 +8773,7 @@ void Renderer::mipmap_framebuffer()
 	for (unsigned i = 1; i <= levels; i++)
 	{
 		RenderPassInfo rp;
-		unsigned current_scale = std::max(scaling >> i, 1u);
+		unsigned current_scale = max_(scaling >> i, 1u);
 
 		if (i == levels)
 			rp.color_attachments[0] = &bias_framebuffer->get_view();
@@ -8879,7 +8888,7 @@ void Renderer::ssaa_framebuffer()
 	unsigned size = resolves_n;
 	for (unsigned i = 0; i < size; i += 1024)
 	{
-		unsigned to_run = std::min(size - i, 1024u);
+		unsigned to_run = min_(size - i, 1024u);
 
 		Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 		cmd->push_constants(&push, 0, sizeof(push));
@@ -9176,7 +9185,7 @@ ImageHandle Renderer::scanout_to_texture()
 		if (bpp24)
 		{
 			tmp.width = (tmp.width * 3 + 1) / 2;
-			tmp.width = std::min(tmp.width, FB_WIDTH - tmp.x);
+			tmp.width = min_(tmp.width, FB_WIDTH - tmp.x);
 		}
 		atlas.read_fragment(Domain::Unscaled, tmp);
 	}
@@ -9451,7 +9460,7 @@ void Renderer::flush_resolves()
 		unsigned size = queue.scaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
 		{
-			unsigned to_run = std::min(size - i, 1024u);
+			unsigned to_run = min_(size - i, 1024u);
 
 			Push push = { { 1.0f / (scaling * FB_WIDTH), 1.0f / (scaling * FB_HEIGHT) }, scaling };
 			cmd->push_constants(&push, 0, sizeof(push));
@@ -9479,7 +9488,7 @@ void Renderer::flush_resolves()
 		unsigned size = queue.unscaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
 		{
-			unsigned to_run = std::min(size - i, 1024u);
+			unsigned to_run = min_(size - i, 1024u);
 
 			Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 			cmd->push_constants(&push, 0, sizeof(push));
@@ -9622,10 +9631,10 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 	{
 		float tmp_x = vertices[i].x + render_state.draw_offset_x;
 		float tmp_y = vertices[i].y + render_state.draw_offset_y;
-		max_x = std::max(max_x, tmp_x);
-		max_y = std::max(max_y, tmp_y);
-		min_x = std::min(min_x, tmp_x);
-		min_y = std::min(min_y, tmp_y);
+		max_x = max_(max_x, tmp_x);
+		max_y = max_(max_y, tmp_y);
+		min_x = min_(min_x, tmp_x);
+		min_y = min_(min_y, tmp_y);
 		x[i] = tmp_x;
 		y[i] = tmp_y;
 
@@ -9633,18 +9642,18 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		{
 			unsigned tmp_u = vertices[i].u + render_state.texture_offset_x;
 			unsigned tmp_v = vertices[i].v + render_state.texture_offset_y;
-			max_u = std::max(max_u, tmp_u);
-			max_v = std::max(max_v, tmp_v);
-			min_u = std::min(min_u, tmp_u);
-			min_v = std::min(min_v, tmp_v);
+			max_u = max_(max_u, tmp_u);
+			max_v = max_(max_v, tmp_v);
+			min_u = min_(min_u, tmp_u);
+			min_v = min_(min_v, tmp_v);
 		}
 	}
 
 	// Clamp the rect.
-	min_x = floorf(std::max(min_x, 0.0f));
-	min_y = floorf(std::max(min_y, 0.0f));
-	max_x = ceilf(std::min(max_x, float(FB_WIDTH)));
-	max_y = ceilf(std::min(max_y, float(FB_HEIGHT)));
+	min_x = floorf(max_(min_x, 0.0f));
+	min_y = floorf(max_(min_y, 0.0f));
+	max_x = ceilf(min_(max_x, float(FB_WIDTH)));
+	max_y = ceilf(min_(max_y, float(FB_HEIGHT)));
 
 	const Rect rect = {
 		unsigned(min_x), unsigned(min_y), unsigned(max_x) - unsigned(min_x), unsigned(max_y) - unsigned(min_y),
@@ -10415,7 +10424,7 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 	unsigned scale = scaled ? scaling : 1u;
 	for (unsigned i = 0; i < size; i += 512)
 	{
-		unsigned to_blit = std::min(size - i, 512u);
+		unsigned to_blit = min_(size - i, 512u);
 		void *ptr = cmd->allocate_constant_data(1, 0, to_blit * sizeof(BlitInfo));
 		memcpy(ptr, infos.data() + i, to_blit * sizeof(BlitInfo));
 		cmd->dispatch(scale, scale, to_blit);
@@ -10508,7 +10517,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 						q.push({
 							{ (x + src.x) * scaling, (y + src.y) * scaling },
 							{ (x + dst.x) * scaling, (y + dst.y) * scaling },
-							{ std::min(BLOCK_WIDTH, width - x) * scaling, std::min(BLOCK_HEIGHT, height - y) * scaling },
+							{ min_(BLOCK_WIDTH, width - x) * scaling, min_(BLOCK_HEIGHT, height - y) * scaling },
 							render_state.force_mask_bit ? 0x8000u : 0u, s,
 						});
 		}
@@ -10522,7 +10531,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 					q.push({
 					    { x + src.x, y + src.y },
 					    { x + dst.x, y + dst.y },
-					    { std::min(BLOCK_WIDTH, width - x), std::min(BLOCK_HEIGHT, height - y) },
+					    { min_(BLOCK_WIDTH, width - x), min_(BLOCK_HEIGHT, height - y) },
 						render_state.force_mask_bit ? 0x8000u : 0u, 0,
 					});
 		}
@@ -10599,7 +10608,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 	{
 		for (unsigned y = 0; y < rect.height; y += BLOCK_HEIGHT)
 		{
-			unsigned y_size = std::min(rect.height - y, BLOCK_HEIGHT);
+			unsigned y_size = min_(rect.height - y, BLOCK_HEIGHT);
 			view_info.offset = y * rect.width * sizeof(uint16_t);
 			view_info.range = y_size * rect.width * sizeof(uint16_t);
 			view_info.format = VK_FORMAT_R16_UINT;
@@ -15194,18 +15203,18 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	if (compute_queue_family == VK_QUEUE_FAMILY_IGNORED)
 	{
 		compute_queue_family = graphics_queue_family;
-		compute_queue_index = std::min(queue_props[graphics_queue_family].queueCount - 1, universal_queue_index);
+		compute_queue_index = min_(queue_props[graphics_queue_family].queueCount - 1, universal_queue_index);
 		universal_queue_index++;
 	}
 
 	if (transfer_queue_family == VK_QUEUE_FAMILY_IGNORED)
 	{
 		transfer_queue_family = graphics_queue_family;
-		transfer_queue_index = std::min(queue_props[graphics_queue_family].queueCount - 1, universal_queue_index);
+		transfer_queue_index = min_(queue_props[graphics_queue_family].queueCount - 1, universal_queue_index);
 		universal_queue_index++;
 	}
 	else if (transfer_queue_family == compute_queue_family)
-		transfer_queue_index = std::min(queue_props[compute_queue_family].queueCount - 1, 1u);
+		transfer_queue_index = min_(queue_props[compute_queue_family].queueCount - 1, 1u);
 
 	static const float graphics_queue_prio = 0.5f;
 	static const float compute_queue_prio = 1.0f;
@@ -15220,7 +15229,7 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 
 	queue_info[queue_family_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 	queue_info[queue_family_count].queueFamilyIndex = graphics_queue_family;
-	queue_info[queue_family_count].queueCount = std::min(universal_queue_index,
+	queue_info[queue_family_count].queueCount = min_(universal_queue_index,
 	                                                     queue_props[graphics_queue_family].queueCount);
 	queue_info[queue_family_count].pQueuePriorities = prio;
 	queue_family_count++;
@@ -15229,7 +15238,7 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	{
 		queue_info[queue_family_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queue_info[queue_family_count].queueFamilyIndex = compute_queue_family;
-		queue_info[queue_family_count].queueCount = std::min(transfer_queue_family == compute_queue_family ? 2u : 1u,
+		queue_info[queue_family_count].queueCount = min_(transfer_queue_family == compute_queue_family ? 2u : 1u,
 		                                                     queue_props[compute_queue_family].queueCount);
 		queue_info[queue_family_count].pQueuePriorities = prio + 1;
 		queue_family_count++;
@@ -15560,7 +15569,7 @@ void Device::bake_program(Program &program)
 		{
 			layout.push_constant_range.stageFlags |= 1u << i;
 			layout.push_constant_range.size =
-					std::max(layout.push_constant_range.size, shader_layout.push_constant_size);
+					max_(layout.push_constant_range.size, shader_layout.push_constant_size);
 		}
 
 		layout.spec_constant_mask[i] = shader_layout.spec_constant_mask;
@@ -15613,7 +15622,7 @@ void Device::set_context(const Context &context)
 	managers.semaphore.init(device);
 	managers.fence.init(device);
 	managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	managers.ubo.init(this, 256 * 1024, std::max<VkDeviceSize>(16u, gpu_props.limits.minUniformBufferOffsetAlignment),
+	managers.ubo.init(this, 256 * 1024, max_<VkDeviceSize>(16u, gpu_props.limits.minUniformBufferOffsetAlignment),
 	                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 }
 
@@ -19719,8 +19728,8 @@ FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker
             if (hd_texture != NULL) {
                 // Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity)
                 TextureRect clipped = subTexture(e.texture_rect, intersection.first);
-                f.scaleX = std::max(f.scaleX, hd_texture->image->get_width() / upload.width);
-                f.scaleY = std::max(f.scaleY, hd_texture->image->get_height() / upload.height);
+                f.scaleX = max_(f.scaleX, hd_texture->image->get_width() / upload.width);
+                f.scaleY = max_(f.scaleY, hd_texture->image->get_height() / upload.height);
                 Rect r = fromSRect(clipped.vram_rect);
                 if (f.vram_rect.width == 0) {
                     f.vram_rect = r;
@@ -19781,7 +19790,7 @@ void rebuild_page(FusedPage &page, RectTracker &tracker, Renderer *uploader) {
     // texels.
     VkClearValue fallthrough = {0.0, 0.0, 0.0, 1.0};
 
-    int mip_levels = log2(std::min(page.fusion.scaleX, page.fusion.scaleY)) + 1;
+    int mip_levels = log2(min_(page.fusion.scaleX, page.fusion.scaleY)) + 1;
 
     if (page.texture && page.texture->get_width() == texture_width && page.texture->get_height() == texture_height) {
         // Switch back into transfer dst layout
@@ -19845,11 +19854,11 @@ void rebuild_page(FusedPage &page, RectTracker &tracker, Renderer *uploader) {
         // Blit into every mipmap level down to base vram
         // TODO: this isn't a great way to do this, will probably be blurrier than it could be if src and dst aspect ratios are different
         // TODO: is this line even right? it sure doesn't look right
-        int full_res_levels = log2(std::max(rx, ry)) + 1;
+        int full_res_levels = log2(max_(rx, ry)) + 1;
         // assert(max_level >= 0 && max_level <= 6);
         // TODO: this is incredibly finicky, and one bad (out of bounds) blit can bork everything
         for (int dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
-            int srcLevel = std::max(0, dstLevel - full_res_levels);
+            int srcLevel = max_(0, dstLevel - full_res_levels);
 
             cmd->blit_image(*page.texture, *image,
                 dst_offset,
@@ -19870,8 +19879,8 @@ void rebuild_page(FusedPage &page, RectTracker &tracker, Renderer *uploader) {
             
             dst_offset.x >>= 1;
             dst_offset.y >>= 1;
-            dst_extent.x = std::max(dst_extent.x >> 1, 1);
-            dst_extent.y = std::max(dst_extent.y >> 1, 1);
+            dst_extent.x = max_(dst_extent.x >> 1, 1);
+            dst_extent.y = max_(dst_extent.y >> 1, 1);
         }
 
         // Change back to shader read
