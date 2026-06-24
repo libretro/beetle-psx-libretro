@@ -19958,6 +19958,14 @@ namespace PSX {
 		return copy;
 	}
 
+	/* Transient hash -> upload-pointer lookup used only while loading a save
+	 * state. Non-owning (the pointers are owned by the +1 ref taken in
+	 * load_state and dropped at the end), keys are unique and inserted once, so
+	 * a flat POD array with a linear scan replaces the old
+	 * std::map<uint32_t, TextureUpload*>. */
+	struct UploadPtrEntry { uint32_t key; TextureUpload *val; };
+	POD_VEC_DECLARE(UploadPtrVec, UploadPtrEntry);
+
 	TextureRectSaveState to_save_state(const TextureRect &t, std::map<uint32_t, TextureUpload> &uploads) {
 		uint32_t hash = t.upload->hash;
 		if (uploads.find(hash) == uploads.end())
@@ -19970,13 +19978,19 @@ namespace PSX {
 		};
 	}
 
-	TextureRect from_save_state(const TextureRectSaveState &t, std::map<uint32_t, TextureUpload*> &uploads) {
-		std::map<uint32_t, TextureUpload*>::iterator it = uploads.find(t.upload_hash);
-		if (it == uploads.end()) {
+	TextureRect from_save_state(const TextureRectSaveState &t, UploadPtrVec &uploads) {
+		TextureUpload *found = NULL;
+		for (int i = 0; i < uploads.count; i++) {
+			if (uploads.items[i].key == t.upload_hash) {
+				found = uploads.items[i].val;
+				break;
+			}
+		}
+		if (!found) {
 			TT_LOG(RETRO_LOG_ERROR, "SaveState upload missing!\n");
 		}
 		return {
-			it->second,    /* TextureRect ctor acquires its own ref */
+			found,    /* TextureRect ctor acquires its own ref */
 			t.offset_x,
 			t.offset_y,
 			t.vram_rect
@@ -20008,11 +20022,12 @@ namespace PSX {
 
 	void TextureTracker::load_state(const TextureTrackerSaveState &state)
 	{
-		std::map<uint32_t, TextureUpload*> uploads;
+		UploadPtrVec uploads = { NULL, 0, 0 };
 		for (std::map<uint32_t, TextureUpload>::const_iterator it = state.uploads.begin(); it != state.uploads.end(); it++) {
 			TextureUpload *ptr = texture_upload_new(); /* owns +1 */
 			*ptr = it->second;                         /* deep-copy contents (refcount untouched) */
-			uploads[it->first] = ptr;
+			UploadPtrEntry e = { it->first, ptr };
+			uploads.push(e);
 		}
 
 		clearRegion({ 0, 0, FB_WIDTH, FB_HEIGHT });
@@ -20034,8 +20049,9 @@ namespace PSX {
 			load_hd_texture(it->first);
 		// Drop the map's construction refs; the placed/restorable TextureRects now
 		// hold their own references to each upload.
-		for (std::map<uint32_t, TextureUpload*>::iterator it = uploads.begin(); it != uploads.end(); it++)
-			texture_upload_release(it->second);
+		for (int i = 0; i < uploads.count; i++)
+			texture_upload_release(uploads.items[i].val);
+		uploads.free_storage();
 	}
 	// End of Save State
 	//========================================
