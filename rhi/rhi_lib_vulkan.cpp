@@ -6904,8 +6904,6 @@ namespace PSX
 
 	class IOChannel {
 		public:
-			IOChannel();
-			~IOChannel();
 			slock_t *lock;
 			scond_t *cond;
 			/* Intrusive FIFO lists (protected by `lock`). Heads are popped/drained,
@@ -6913,7 +6911,7 @@ namespace PSX
 			 * std::vector<IOResponse>. */
 			IORequest  *req_head,  *req_tail;
 			IOResponse *resp_head, *resp_tail;
-			bool done = false;
+			bool done;
 			/* Cross-thread refcount (replaces std::shared_ptr<IOChannel>). The owning
 			 * IOThread holds one reference and each detached worker holds one; whichever
 			 * releases last frees the channel. Mutated only outside the lock, at
@@ -6922,8 +6920,14 @@ namespace PSX
 		private:
 	};
 
+	static void io_channel_destroy(IOChannel *c);
 	static IOChannel *io_channel_new() {
-		IOChannel *c = new IOChannel();
+		IOChannel *c = (IOChannel *)malloc(sizeof(IOChannel));
+		c->lock = slock_new();
+		c->cond = scond_new();
+		c->req_head = c->req_tail = NULL;
+		c->resp_head = c->resp_tail = NULL;
+		c->done = false;
 		c->refcount = 1;
 		return c;
 	}
@@ -6952,7 +6956,7 @@ namespace PSX
 		should_free = (--c->refcount == 0);
 		slock_unlock(io_channel_rc_lock);
 		if (should_free)
-			delete c;
+			io_channel_destroy(c);
 	}
 
 	/* FIFO helpers (caller holds channel->lock). Defined here so the IO worker
@@ -19235,21 +19239,15 @@ namespace PSX {
 		TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread ending\n");
 	}
 
-	IOChannel::IOChannel() {
-		lock = slock_new();
-		cond = scond_new();
-		req_head = req_tail = NULL;
-		resp_head = resp_tail = NULL;
-		// TODO: check for NULL
-	}
-	IOChannel::~IOChannel() {
+	static void io_channel_destroy(IOChannel *c) {
 		/* Free any nodes still queued at shutdown. */
-		IORequest *r = req_head;
-		IOResponse *p = resp_head;
+		IORequest *r = c->req_head;
+		IOResponse *p = c->resp_head;
 		while (r) { IORequest *n = r->next; io_request_free(r); r = n; }
 		while (p) { IOResponse *n = p->next; io_response_free(p); p = n; }
-		slock_free(lock);
-		scond_free(cond);
+		slock_free(c->lock);
+		scond_free(c->cond);
+		free(c);
 	}
 
 	// Number of parallel PNG-decode workers. Keeps first-appearance prefetch
