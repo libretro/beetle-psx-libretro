@@ -4392,6 +4392,7 @@ static const unsigned VULKAN_DESCRIPTOR_RING_SIZE = 8;
 
 POD_VEC_DECLARE(DescriptorPoolVec, VkDescriptorPool);
 POD_VEC_DECLARE(DescriptorPoolSizeVec, VkDescriptorPoolSize);
+POD_VEC_DECLARE(DescriptorBindingVec, VkDescriptorSetLayoutBinding);
 
 class DescriptorSetAllocator : public HashedObject<DescriptorSetAllocator>
 {
@@ -4645,6 +4646,8 @@ public:
 		unsigned samples;
 	};
 
+	POD_VEC_DECLARE(SubpassInfoVec, SubpassInfo);
+
 	RenderPass(Util::Hash hash, Device *device, const RenderPassInfo &info);
 	~RenderPass();
 
@@ -4698,7 +4701,7 @@ private:
 
 	VkFormat color_attachments[VULKAN_NUM_ATTACHMENTS] = {};
 	VkFormat depth_stencil = VK_FORMAT_UNDEFINED;
-	std::vector<SubpassInfo> subpasses;
+	SubpassInfoVec subpasses = { NULL, 0, 0 };
 
 	void fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
 };
@@ -12736,7 +12739,7 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 {
 	VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
-	std::vector<VkDescriptorSetLayoutBinding> bindings;
+	DescriptorBindingVec bindings = { NULL, 0, 0 };
 	for (unsigned i = 0; i < VULKAN_NUM_BINDINGS; i++)
 	{
 		uint32_t stages = stages_for_binds[i];
@@ -12750,49 +12753,49 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 			if (has_immutable_sampler(layout, i))
 				sampler = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
 
-			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, sampler != VK_NULL_HANDLE ? &sampler : nullptr });
+			bindings.push({ i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, sampler != VK_NULL_HANDLE ? &sampler : nullptr });
 			pool_size.push({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.sampled_buffer_mask & (1u << i))
 		{
-			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, nullptr });
+			bindings.push({ i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, nullptr });
 			pool_size.push({ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.storage_image_mask & (1u << i))
 		{
-			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, nullptr });
+			bindings.push({ i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, nullptr });
 			pool_size.push({ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.uniform_buffer_mask & (1u << i))
 		{
-			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, nullptr });
+			bindings.push({ i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, nullptr });
 			pool_size.push({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.storage_buffer_mask & (1u << i))
 		{
-			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr });
+			bindings.push({ i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr });
 			pool_size.push({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.input_attachment_mask & (1u << i))
 		{
-			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, nullptr });
+			bindings.push({ i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, nullptr });
 			pool_size.push({ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
 
 		if (layout.separate_image_mask & (1u << i))
 		{
-			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, nullptr });
+			bindings.push({ i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, nullptr });
 			pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
@@ -12803,7 +12806,7 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 			if (has_immutable_sampler(layout, i))
 				sampler = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
 
-			bindings.push_back({ i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, sampler != VK_NULL_HANDLE ? &sampler : nullptr });
+			bindings.push({ i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, sampler != VK_NULL_HANDLE ? &sampler : nullptr });
 			pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
 			types++;
 		}
@@ -12821,6 +12824,7 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 	LOGI("Creating descriptor set layout.\n");
 	if (vkCreateDescriptorSetLayout(device->get_device(), &info, nullptr, &set_layout) != VK_SUCCESS)
 		LOGE("Failed to create descriptor set layout.");
+	bindings.free_storage();
 }
 
 std::pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(Hash hash)
@@ -13626,7 +13630,7 @@ RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
 
 		VK_ASSERT(samples > 0);
 		subpass_info.samples = samples;
-		this->subpasses.push_back(subpass_info);
+		this->subpasses.push(subpass_info);
 	}
 
 
@@ -13672,6 +13676,7 @@ RenderPass::~RenderPass()
 {
 	if (render_pass != VK_NULL_HANDLE)
 		vkDestroyRenderPass(device->get_device(), render_pass, nullptr);
+	subpasses.free_storage();
 }
 
 Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info)
