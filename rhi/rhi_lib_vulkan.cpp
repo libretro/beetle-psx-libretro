@@ -6972,6 +6972,76 @@ namespace PSX
 		FusionRects fusion;
 	};
 
+	/* Owning array of FusedPage. Replaces std::vector<FusedPage>. FusedPage owns
+	 * an ImageHandle and a FusionRects (whose OwnedRectVec retains/releases its
+	 * TextureRects), and is used by copy (push_back(page) and the compaction's
+	 * element copy-assign), so this container copy-constructs/-assigns elements
+	 * rather than moving: growth copy-constructs each element into new storage
+	 * with placement new and destroys the old slot. push() copy-inserts;
+	 * indexed access and pointer-range iteration keep the existing size()/
+	 * operator[]/range-for uses. truncate(n) destroys the tail [n, count) and is
+	 * how remove_dead() drops compacted-out entries (replacing erase(it, end())).
+	 * Move-only at the container level. */
+	struct FusedPageVec {
+		FusedPage *items;
+		int count;
+		int cap;
+
+		FusedPageVec() : items(NULL), count(0), cap(0) {}
+		~FusedPageVec() { destroy(); }
+		FusedPageVec(FusedPageVec &&o) noexcept
+			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+		FusedPageVec &operator=(FusedPageVec &&o) noexcept {
+			if (this != &o) {
+				destroy();
+				items = o.items; count = o.count; cap = o.cap;
+				o.items = NULL; o.count = 0; o.cap = 0;
+			}
+			return *this;
+		}
+		FusedPageVec(const FusedPageVec &) = delete;
+		FusedPageVec &operator=(const FusedPageVec &) = delete;
+
+		void push(const FusedPage &v) {
+			if (count >= cap)
+				grow(cap ? cap * 2 : 8);
+			new (&items[count]) FusedPage(v);
+			count++;
+		}
+		int size() const { return count; }
+		bool empty() const { return count == 0; }
+		FusedPage &operator[](int i) { return items[i]; }
+		const FusedPage &operator[](int i) const { return items[i]; }
+		FusedPage *begin() { return items; }
+		FusedPage *end() { return items + count; }
+		const FusedPage *begin() const { return items; }
+		const FusedPage *end() const { return items + count; }
+		/* Destroy elements [n, count); used to drop the compacted-out tail. */
+		void truncate(int n) {
+			for (int i = n; i < count; i++)
+				items[i].~FusedPage();
+			count = n;
+		}
+
+	private:
+		void grow(int ncap) {
+			FusedPage *nitems = (FusedPage *)malloc((size_t)ncap * sizeof(FusedPage));
+			for (int i = 0; i < count; i++) {
+				new (&nitems[i]) FusedPage(items[i]);
+				items[i].~FusedPage();
+			}
+			free(items);
+			items = nitems;
+			cap = ncap;
+		}
+		void destroy() {
+			for (int i = 0; i < count; i++)
+				items[i].~FusedPage();
+			free(items);
+			items = NULL; count = 0; cap = 0;
+		}
+	};
+
 	class FusedPages {
 		public:
 			HdTextureHandle get_or_make(Rect page_rect, uint32_t palette, RectTracker &tracker, Renderer *uploader);
@@ -6983,7 +7053,7 @@ namespace PSX
 
 			void dbg_print_info();
 		private:
-			std::vector<FusedPage> pages;
+			FusedPageVec pages;
 	};
 
 	struct RestorableRect {
@@ -20379,7 +20449,7 @@ namespace PSX {
 		page.full_page_rect = page_rect;
 		page.palette = palette;
 		rebuild_page(page, tracker, uploader);
-		pages.push_back(page);
+		pages.push(page);
 		return HdTextureHandle::make_fused(pages.size() - 1);
 	}
 	void FusedPages::mark_dirty(Rect rect) {
@@ -20408,14 +20478,15 @@ namespace PSX {
 			dbg_print_info();
 	}
 	void FusedPages::remove_dead() {
-		std::vector<FusedPage>::iterator retainedIt = pages.begin();
-		for (std::vector<FusedPage>::iterator it = pages.begin(); it != pages.end(); it++) {
-			if (!it->dead) {
-				*retainedIt = *it;
-				retainedIt++;
+		int retained = 0;
+		for (int i = 0; i < pages.size(); i++) {
+			if (!pages[i].dead) {
+				if (retained != i)
+					pages[retained] = pages[i];
+				retained++;
 			}
 		}
-		pages.erase(retainedIt, pages.end());
+		pages.truncate(retained);
 	}
 
 
