@@ -6917,9 +6917,65 @@ namespace PSX
 		RestorableRectSaveState &operator=(const RestorableRectSaveState &) = delete;
 	};
 
+	/* Owning array of (move-only) RestorableRectSaveState. Replaces
+	 * std::vector<RestorableRectSaveState>. The element owns a heap array
+	 * (to_restore) and is not trivially relocatable, so growth move-constructs
+	 * each element into the new storage via placement new and destroys the old
+	 * one, rather than memcpy. Move-only so it composes inside the move-assigned
+	 * save-state structs. */
+	struct RestorableRectSaveStateVec {
+		RestorableRectSaveState *items;
+		int count;
+		int cap;
+
+		RestorableRectSaveStateVec() : items(NULL), count(0), cap(0) {}
+		~RestorableRectSaveStateVec() { destroy(); }
+		RestorableRectSaveStateVec(RestorableRectSaveStateVec &&o) noexcept
+			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+		RestorableRectSaveStateVec &operator=(RestorableRectSaveStateVec &&o) noexcept {
+			if (this != &o) {
+				destroy();
+				items = o.items; count = o.count; cap = o.cap;
+				o.items = NULL; o.count = 0; o.cap = 0;
+			}
+			return *this;
+		}
+		RestorableRectSaveStateVec(const RestorableRectSaveStateVec &) = delete;
+		RestorableRectSaveStateVec &operator=(const RestorableRectSaveStateVec &) = delete;
+
+		void push(RestorableRectSaveState &&v) {
+			if (count >= cap)
+				grow(cap ? cap * 2 : 8);
+			new (&items[count]) RestorableRectSaveState(static_cast<RestorableRectSaveState &&>(v));
+			count++;
+		}
+		int size() const { return count; }
+		const RestorableRectSaveState *begin() const { return items; }
+		const RestorableRectSaveState *end() const { return items + count; }
+
+	private:
+		void grow(int ncap) {
+			RestorableRectSaveState *nitems =
+				(RestorableRectSaveState *)malloc((size_t)ncap * sizeof(RestorableRectSaveState));
+			for (int i = 0; i < count; i++) {
+				new (&nitems[i]) RestorableRectSaveState(static_cast<RestorableRectSaveState &&>(items[i]));
+				items[i].~RestorableRectSaveState();
+			}
+			free(items);
+			items = nitems;
+			cap = ncap;
+		}
+		void destroy() {
+			for (int i = 0; i < count; i++)
+				items[i].~RestorableRectSaveState();
+			free(items);
+			items = NULL; count = 0; cap = 0;
+		}
+	};
+
 	struct TextureTrackerSaveState {
 		TextureRectSaveStateVec rects;
-		std::vector<RestorableRectSaveState> restorable;
+		RestorableRectSaveStateVec restorable;
 		UploadOwningMap uploads;
 	};
 	// End of Save State
@@ -20172,7 +20228,7 @@ namespace PSX {
 			saved.rect = r.rect;
 			for (TextureRect &t : r.to_restore)
 				saved.to_restore.push(to_save_state(t, state.uploads));
-			state.restorable.push_back(std::move(saved));
+			state.restorable.push(std::move(saved));
 		}
 
 		return state;
