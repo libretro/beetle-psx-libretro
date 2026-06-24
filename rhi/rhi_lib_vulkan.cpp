@@ -1772,11 +1772,6 @@ static inline uint32_t util_ctz(uint32_t x)
 	     base_var = trailing_zeroes(_fe_v),                                        \
 	     range_var = (_fe_v ? trailing_ones(_fe_v >> base_var) : 0u))
 
-/* ============================================================
- * hash.hpp
- * ============================================================ */
-
-
 namespace Util
 {
 using Hash = uint64_t;
@@ -1817,16 +1812,7 @@ public:
 private:
 	Hash h = 0xcbf29ce484222325ull;
 };
-}
 
-/* ============================================================
- * intrusive.hpp
- * ============================================================ */
-
-
-
-namespace Util
-{
 class SingleThreadCounter
 {
 public:
@@ -2040,15 +2026,6 @@ private:
 	T *data = nullptr;
 };
 
-}
-
-/* ============================================================
- * intrusive_list.hpp
- * ============================================================ */
-
-
-namespace Util
-{
 template <typename T>
 struct IntrusiveListEnabled
 {
@@ -2183,16 +2160,7 @@ public:
 private:
 	IntrusiveListEnabled<T> *head = nullptr;
 };
-}
 
-/* ============================================================
- * object_pool.hpp
- * ============================================================ */
-
-
-
-namespace Util
-{
 template<typename T>
 class ObjectPool
 {
@@ -2245,16 +2213,6 @@ protected:
 	std::vector<std::unique_ptr<T, MallocDeleter>> memory;
 };
 
-}
-
-/* ============================================================
- * intrusive_hash_map.hpp
- * ============================================================ */
-
-
-
-namespace Util
-{
 template <typename T>
 class IntrusiveHashMapEnabled : public IntrusiveListEnabled<T>
 {
@@ -2597,16 +2555,6 @@ private:
 	ObjectPool<T> pool;
 };
 
-}
-
-/* ============================================================
- * temporary_hashmap.hpp
- * ============================================================ */
-
-
-
-namespace Util
-{
 template <typename T>
 class TemporaryHashmapEnabled
 {
@@ -2743,16 +2691,15 @@ private:
 		vacants.push_back(object);
 	}
 };
+
 }
 
 /* ============================================================
  * vulkan.hpp
  * ============================================================ */
 
-
-
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
-// Workaround silly Xlib headers that define macros for these globally :(
+/* Workaround silly Xlib headers that define macros for these globally :( */
 #undef None
 #undef Bool
 #endif
@@ -2778,383 +2725,335 @@ private:
 
 namespace Vulkan
 {
-struct NoCopyNoMove
-{
-	NoCopyNoMove() = default;
-	NoCopyNoMove(const NoCopyNoMove &) = delete;
-	void operator=(const NoCopyNoMove &) = delete;
-};
-}
-
-namespace Vulkan
-{
-struct DeviceFeatures
-{
-	bool supports_external = false;
-	bool supports_dedicated = false;
-	bool supports_debug_marker = false;
-	VkPhysicalDeviceFeatures enabled_features = {};
-};
-
-enum VendorID
-{
-	VENDOR_ID_NVIDIA = 0x10de,
-	VENDOR_ID_ARM = 0x13b5
-};
-
-class Context
-{
-public:
-	Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
-	        unsigned num_required_device_extensions, const char **required_device_layers,
-	        unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
-
-	Context(const Context &) = delete;
-	void operator=(const Context &) = delete;
-	static bool init_loader(PFN_vkGetInstanceProcAddr addr);
-
-	~Context()
+	struct NoCopyNoMove
 	{
-		destroy();
-	}
-
-	VkInstance get_instance() const
-	{
-		return instance;
-	}
-
-	VkPhysicalDevice get_gpu() const
-	{
-		return gpu;
-	}
-
-	VkDevice get_device() const
-	{
-		return device;
-	}
-
-	VkQueue get_graphics_queue() const
-	{
-		return graphics_queue;
-	}
-
-	VkQueue get_compute_queue() const
-	{
-		return compute_queue;
-	}
-
-	VkQueue get_transfer_queue() const
-	{
-		return transfer_queue;
-	}
-
-	const VkPhysicalDeviceProperties &get_gpu_props() const
-	{
-		return gpu_props;
-	}
-
-	const VkPhysicalDeviceMemoryProperties &get_mem_props() const
-	{
-		return mem_props;
-	}
-
-	uint32_t get_graphics_queue_family() const
-	{
-		return graphics_queue_family;
-	}
-
-	uint32_t get_compute_queue_family() const
-	{
-		return compute_queue_family;
-	}
-
-	uint32_t get_transfer_queue_family() const
-	{
-		return transfer_queue_family;
-	}
-
-	void release_device()
-	{
-		owned_device = false;
-	}
-
-	const DeviceFeatures &get_enabled_device_features() const
-	{
-		return ext;
-	}
-
-	/* True iff the constructor finished successfully. The Context
-	 * constructors do not throw; on failure they leave the object in
-	 * a destroyable but otherwise unusable state, and the caller must
-	 * check is_valid() before doing anything else with it. */
-	bool is_valid() const { return valid; }
-
-private:
-	VkDevice device = VK_NULL_HANDLE;
-	VkInstance instance = VK_NULL_HANDLE;
-	VkPhysicalDevice gpu = VK_NULL_HANDLE;
-
-	VkPhysicalDeviceProperties gpu_props;
-	VkPhysicalDeviceMemoryProperties mem_props;
-
-	VkQueue graphics_queue = VK_NULL_HANDLE;
-	VkQueue compute_queue = VK_NULL_HANDLE;
-	VkQueue transfer_queue = VK_NULL_HANDLE;
-	uint32_t graphics_queue_family = VK_QUEUE_FAMILY_IGNORED;
-	uint32_t compute_queue_family = VK_QUEUE_FAMILY_IGNORED;
-	uint32_t transfer_queue_family = VK_QUEUE_FAMILY_IGNORED;
-
-	bool create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
-	                   unsigned num_required_device_extensions, const char **required_device_layers,
-	                   unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
-
-	bool owned_device = false;
-	bool valid = false;
-	DeviceFeatures ext;
-
-	void destroy();
-};
-}
-
-/* ============================================================
- * vulkan_common.hpp
- * ============================================================ */
-
-
-
-namespace Vulkan
-{
-using HandleCounter = Util::SingleThreadCounter;
-
-template <typename T>
-using VulkanObjectPool = Util::ObjectPool<T>;
-template <typename T>
-using VulkanCache = Util::IntrusiveHashMap<T>;
-}
-
-/* ============================================================
- * limits.hpp
- * ============================================================ */
-
-
-namespace Vulkan
-{
-static const unsigned VULKAN_NUM_DESCRIPTOR_SETS = 4;
-static const unsigned VULKAN_NUM_BINDINGS = 16;
-static const unsigned VULKAN_NUM_ATTACHMENTS = 8;
-static const unsigned VULKAN_NUM_VERTEX_ATTRIBS = 16;
-static const unsigned VULKAN_NUM_VERTEX_BUFFERS = 4;
-static const unsigned VULKAN_PUSH_CONSTANT_SIZE = 128;
-static const unsigned VULKAN_NUM_SPEC_CONSTANTS = 8;
-}
-
-/* ============================================================
- * quirks.hpp
- * ============================================================ */
-
-
-namespace Vulkan
-{
-struct ImplementationWorkarounds
-{
-	bool optimize_all_graphics_barrier = false;
-};
-}
-
-/* ============================================================
- * texture_format.hpp
- * ============================================================ */
-
-
-
-namespace Vulkan
-{
-class TextureFormatLayout
-{
-public:
-	void set_1d(VkFormat format, uint32_t width, uint32_t array_layers = 1, uint32_t mip_levels = 1);
-	void set_2d(VkFormat format, uint32_t width, uint32_t height, uint32_t array_layers = 1, uint32_t mip_levels = 1);
-	void set_3d(VkFormat format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels = 1);
-
-	static uint32_t format_block_size(VkFormat format);
-	static void format_block_dim(VkFormat format, uint32_t &width, uint32_t &height);
-	static uint32_t num_miplevels(uint32_t width, uint32_t height = 1, uint32_t depth = 1);
-
-	void set_buffer(void *buffer, size_t size)
-	{
-		this->buffer = static_cast<uint8_t *>(buffer);
-		buffer_size = size;
-	}
-	inline void *get_buffer()
-	{
-		return buffer;
-	}
-
-	uint32_t get_width(uint32_t mip = 0) const
-	{
-		return mips[mip].width;
-	}
-	uint32_t get_height(uint32_t mip = 0) const
-	{
-		return mips[mip].height;
-	}
-	uint32_t get_depth(uint32_t mip = 0) const
-	{
-		return mips[mip].depth;
-	}
-	VkFormat get_format() const
-	{
-		return format;
-	}
-
-	size_t get_required_size() const
-	{
-		return required_size;
-	}
-
-	size_t row_byte_stride(uint32_t row_length) const
-	{
-		return ((row_length + block_dim_x - 1) / block_dim_x) * block_stride;
-	}
-	size_t layer_byte_stride(uint32_t image_height, size_t row_byte_stride) const
-	{
-		return ((image_height + block_dim_y - 1) / block_dim_y) * row_byte_stride;
-	}
-
-	inline size_t get_row_size(uint32_t mip) const
-	{
-		return mips[mip].block_row_length * block_stride;
-	}
-
-	inline size_t get_layer_size(uint32_t mip) const
-	{
-		return mips[mip].block_image_height * get_row_size(mip);
-	}
-
-	struct MipInfo
-	{
-		size_t offset = 0;
-		uint32_t width = 1;
-		uint32_t height = 1;
-		uint32_t depth = 1;
-
-		uint32_t block_image_height = 0;
-		uint32_t block_row_length = 0;
-		uint32_t image_height = 0;
-		uint32_t row_length = 0;
+		NoCopyNoMove() = default;
+		NoCopyNoMove(const NoCopyNoMove &) = delete;
+		void operator=(const NoCopyNoMove &) = delete;
 	};
 
-	const MipInfo &get_mip_info(uint32_t mip) const
+	struct DeviceFeatures
 	{
-		return mips[mip];
-	}
+		bool supports_external = false;
+		bool supports_dedicated = false;
+		bool supports_debug_marker = false;
+		VkPhysicalDeviceFeatures enabled_features = {};
+	};
 
-	inline void *data(uint32_t layer = 0, uint32_t mip = 0) const
+	enum VendorID
 	{
-		assert(buffer);
-		assert(buffer_size == required_size);
-		const MipInfo &mip_info = mips[mip];
-		uint8_t *slice = buffer + mip_info.offset;
-		slice += block_stride * layer * mip_info.block_row_length * mip_info.block_image_height;
-		return slice;
-	}
+		VENDOR_ID_NVIDIA = 0x10de,
+		VENDOR_ID_ARM = 0x13b5
+	};
+
+	class Context
+	{
+		public:
+			Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
+					unsigned num_required_device_extensions, const char **required_device_layers,
+					unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
+
+			Context(const Context &) = delete;
+			void operator=(const Context &) = delete;
+			static bool init_loader(PFN_vkGetInstanceProcAddr addr);
+
+			~Context()
+			{
+				destroy();
+			}
+
+			VkInstance get_instance() const
+			{
+				return instance;
+			}
+
+			VkPhysicalDevice get_gpu() const
+			{
+				return gpu;
+			}
+
+			VkDevice get_device() const
+			{
+				return device;
+			}
+
+			VkQueue get_graphics_queue() const
+			{
+				return graphics_queue;
+			}
+
+			VkQueue get_compute_queue() const
+			{
+				return compute_queue;
+			}
+
+			VkQueue get_transfer_queue() const
+			{
+				return transfer_queue;
+			}
+
+			const VkPhysicalDeviceProperties &get_gpu_props() const
+			{
+				return gpu_props;
+			}
+
+			const VkPhysicalDeviceMemoryProperties &get_mem_props() const
+			{
+				return mem_props;
+			}
+
+			uint32_t get_graphics_queue_family() const
+			{
+				return graphics_queue_family;
+			}
+
+			uint32_t get_compute_queue_family() const
+			{
+				return compute_queue_family;
+			}
+
+			uint32_t get_transfer_queue_family() const
+			{
+				return transfer_queue_family;
+			}
+
+			void release_device()
+			{
+				owned_device = false;
+			}
+
+			const DeviceFeatures &get_enabled_device_features() const
+			{
+				return ext;
+			}
+
+			/* True iff the constructor finished successfully. The Context
+			 * constructors do not throw; on failure they leave the object in
+			 * a destroyable but otherwise unusable state, and the caller must
+			 * check is_valid() before doing anything else with it. */
+			bool is_valid() const { return valid; }
+
+		private:
+			VkDevice device = VK_NULL_HANDLE;
+			VkInstance instance = VK_NULL_HANDLE;
+			VkPhysicalDevice gpu = VK_NULL_HANDLE;
+
+			VkPhysicalDeviceProperties gpu_props;
+			VkPhysicalDeviceMemoryProperties mem_props;
+
+			VkQueue graphics_queue = VK_NULL_HANDLE;
+			VkQueue compute_queue = VK_NULL_HANDLE;
+			VkQueue transfer_queue = VK_NULL_HANDLE;
+			uint32_t graphics_queue_family = VK_QUEUE_FAMILY_IGNORED;
+			uint32_t compute_queue_family = VK_QUEUE_FAMILY_IGNORED;
+			uint32_t transfer_queue_family = VK_QUEUE_FAMILY_IGNORED;
+
+			bool create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
+					unsigned num_required_device_extensions, const char **required_device_layers,
+					unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
+
+			bool owned_device = false;
+			bool valid = false;
+			DeviceFeatures ext;
+
+			void destroy();
+	};
+
+	using HandleCounter = Util::SingleThreadCounter;
 
 	template <typename T>
-	inline T *data_generic(uint32_t x, uint32_t y, uint32_t slice_index, uint32_t mip = 0) const
+		using VulkanObjectPool = Util::ObjectPool<T>;
+	template <typename T>
+		using VulkanCache = Util::IntrusiveHashMap<T>;
+
+	static const unsigned VULKAN_NUM_DESCRIPTOR_SETS = 4;
+	static const unsigned VULKAN_NUM_BINDINGS = 16;
+	static const unsigned VULKAN_NUM_ATTACHMENTS = 8;
+	static const unsigned VULKAN_NUM_VERTEX_ATTRIBS = 16;
+	static const unsigned VULKAN_NUM_VERTEX_BUFFERS = 4;
+	static const unsigned VULKAN_PUSH_CONSTANT_SIZE = 128;
+	static const unsigned VULKAN_NUM_SPEC_CONSTANTS = 8;
+
+	struct ImplementationWorkarounds
 	{
-		const MipInfo &mip_info = mips[mip];
-		T *slice = reinterpret_cast<T *>(buffer + mip_info.offset);
-		slice += slice_index * mip_info.block_row_length * mip_info.block_image_height;
-		slice += y * mip_info.block_row_length;
-		slice += x;
-		return slice;
-	}
+		bool optimize_all_graphics_barrier = false;
+	};
+
+	class TextureFormatLayout
+	{
+		public:
+			void set_1d(VkFormat format, uint32_t width, uint32_t array_layers = 1, uint32_t mip_levels = 1);
+			void set_2d(VkFormat format, uint32_t width, uint32_t height, uint32_t array_layers = 1, uint32_t mip_levels = 1);
+			void set_3d(VkFormat format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels = 1);
+
+			static uint32_t format_block_size(VkFormat format);
+			static void format_block_dim(VkFormat format, uint32_t &width, uint32_t &height);
+			static uint32_t num_miplevels(uint32_t width, uint32_t height = 1, uint32_t depth = 1);
+
+			void set_buffer(void *buffer, size_t size)
+			{
+				this->buffer = static_cast<uint8_t *>(buffer);
+				buffer_size = size;
+			}
+			inline void *get_buffer()
+			{
+				return buffer;
+			}
+
+			uint32_t get_width(uint32_t mip = 0) const
+			{
+				return mips[mip].width;
+			}
+			uint32_t get_height(uint32_t mip = 0) const
+			{
+				return mips[mip].height;
+			}
+			uint32_t get_depth(uint32_t mip = 0) const
+			{
+				return mips[mip].depth;
+			}
+			VkFormat get_format() const
+			{
+				return format;
+			}
+
+			size_t get_required_size() const
+			{
+				return required_size;
+			}
+
+			size_t row_byte_stride(uint32_t row_length) const
+			{
+				return ((row_length + block_dim_x - 1) / block_dim_x) * block_stride;
+			}
+			size_t layer_byte_stride(uint32_t image_height, size_t row_byte_stride) const
+			{
+				return ((image_height + block_dim_y - 1) / block_dim_y) * row_byte_stride;
+			}
+
+			inline size_t get_row_size(uint32_t mip) const
+			{
+				return mips[mip].block_row_length * block_stride;
+			}
+
+			inline size_t get_layer_size(uint32_t mip) const
+			{
+				return mips[mip].block_image_height * get_row_size(mip);
+			}
+
+			struct MipInfo
+			{
+				size_t offset = 0;
+				uint32_t width = 1;
+				uint32_t height = 1;
+				uint32_t depth = 1;
+
+				uint32_t block_image_height = 0;
+				uint32_t block_row_length = 0;
+				uint32_t image_height = 0;
+				uint32_t row_length = 0;
+			};
+
+			const MipInfo &get_mip_info(uint32_t mip) const
+			{
+				return mips[mip];
+			}
+
+			inline void *data(uint32_t layer = 0, uint32_t mip = 0) const
+			{
+				assert(buffer);
+				assert(buffer_size == required_size);
+				const MipInfo &mip_info = mips[mip];
+				uint8_t *slice = buffer + mip_info.offset;
+				slice += block_stride * layer * mip_info.block_row_length * mip_info.block_image_height;
+				return slice;
+			}
+
+			template <typename T>
+				inline T *data_generic(uint32_t x, uint32_t y, uint32_t slice_index, uint32_t mip = 0) const
+				{
+					const MipInfo &mip_info = mips[mip];
+					T *slice = reinterpret_cast<T *>(buffer + mip_info.offset);
+					slice += slice_index * mip_info.block_row_length * mip_info.block_image_height;
+					slice += y * mip_info.block_row_length;
+					slice += x;
+					return slice;
+				}
+
+			template <typename T>
+				inline T *data_1d(uint32_t x, uint32_t layer = 0, uint32_t mip = 0) const
+				{
+					assert(sizeof(T) == block_stride);
+					assert(buffer);
+					assert(image_type == VK_IMAGE_TYPE_1D);
+					assert(buffer_size == required_size);
+					return data_generic<T>(x, 0, layer, mip);
+				}
+
+			template <typename T>
+				inline T *data_2d(uint32_t x, uint32_t y, uint32_t layer = 0, uint32_t mip = 0) const
+				{
+					assert(sizeof(T) == block_stride);
+					assert(buffer);
+					assert(image_type == VK_IMAGE_TYPE_2D);
+					assert(buffer_size == required_size);
+					return data_generic<T>(x, y, layer, mip);
+				}
+
+			template <typename T>
+				inline T *data_3d(uint32_t x, uint32_t y, uint32_t z, uint32_t mip = 0) const
+				{
+					assert(sizeof(T) == block_stride);
+					assert(buffer);
+					assert(image_type == VK_IMAGE_TYPE_3D);
+					assert(buffer_size == required_size);
+					return data_generic<T>(x, y, z, mip);
+				}
+
+			void build_buffer_image_copies(VkBufferImageCopy *copies, unsigned &num_copies) const;
+
+		private:
+			uint8_t *buffer = nullptr;
+			size_t buffer_size = 0;
+
+			VkImageType image_type = VK_IMAGE_TYPE_RANGE_SIZE;
+			VkFormat format = VK_FORMAT_UNDEFINED;
+			size_t required_size = 0;
+
+			uint32_t block_stride = 1;
+			uint32_t mip_levels = 1;
+			uint32_t array_layers = 1;
+			uint32_t block_dim_x = 1;
+			uint32_t block_dim_y = 1;
+
+			MipInfo mips[16];
+
+			void fill_mipinfo(uint32_t width, uint32_t height, uint32_t depth);
+	};
+
+	class Device;
+
+	class Cookie
+	{
+		public:
+			Cookie(Device *device);
+
+			uint64_t get_cookie() const
+			{
+				return cookie;
+			}
+
+		private:
+			uint64_t cookie;
+	};
 
 	template <typename T>
-	inline T *data_1d(uint32_t x, uint32_t layer = 0, uint32_t mip = 0) const
-	{
-		assert(sizeof(T) == block_stride);
-		assert(buffer);
-		assert(image_type == VK_IMAGE_TYPE_1D);
-		assert(buffer_size == required_size);
-		return data_generic<T>(x, 0, layer, mip);
-	}
-
-	template <typename T>
-	inline T *data_2d(uint32_t x, uint32_t y, uint32_t layer = 0, uint32_t mip = 0) const
-	{
-		assert(sizeof(T) == block_stride);
-		assert(buffer);
-		assert(image_type == VK_IMAGE_TYPE_2D);
-		assert(buffer_size == required_size);
-		return data_generic<T>(x, y, layer, mip);
-	}
-
-	template <typename T>
-	inline T *data_3d(uint32_t x, uint32_t y, uint32_t z, uint32_t mip = 0) const
-	{
-		assert(sizeof(T) == block_stride);
-		assert(buffer);
-		assert(image_type == VK_IMAGE_TYPE_3D);
-		assert(buffer_size == required_size);
-		return data_generic<T>(x, y, z, mip);
-	}
-
-	void build_buffer_image_copies(VkBufferImageCopy *copies, unsigned &num_copies) const;
-
-private:
-	uint8_t *buffer = nullptr;
-	size_t buffer_size = 0;
-
-	VkImageType image_type = VK_IMAGE_TYPE_RANGE_SIZE;
-	VkFormat format = VK_FORMAT_UNDEFINED;
-	size_t required_size = 0;
-
-	uint32_t block_stride = 1;
-	uint32_t mip_levels = 1;
-	uint32_t array_layers = 1;
-	uint32_t block_dim_x = 1;
-	uint32_t block_dim_y = 1;
-
-	MipInfo mips[16];
-
-	void fill_mipinfo(uint32_t width, uint32_t height, uint32_t depth);
-};
-}
-
-/* ============================================================
- * cookie.hpp
- * ============================================================ */
-
-
-
-namespace Vulkan
-{
-class Device;
-
-class Cookie
-{
-public:
-	Cookie(Device *device);
-
-	uint64_t get_cookie() const
-	{
-		return cookie;
-	}
-
-private:
-	uint64_t cookie;
-};
-
-template <typename T>
-using HashedObject = Util::IntrusiveHashMapEnabled<T>;
+		using HashedObject = Util::IntrusiveHashMapEnabled<T>;
 }
 
 /* ============================================================
  * format.hpp
  * ============================================================ */
-
-
 
 /* Pure-VkFormat predicates and the aspect-mask classifier are all simple
  * switch statements; they have no C++ dependencies and could be lowered to C
@@ -3164,32 +3063,34 @@ static inline bool format_has_depth_aspect(VkFormat format)
 {
 	switch (format)
 	{
-	case VK_FORMAT_D16_UNORM:
-	case VK_FORMAT_D16_UNORM_S8_UINT:
-	case VK_FORMAT_D24_UNORM_S8_UINT:
-	case VK_FORMAT_D32_SFLOAT:
-	case VK_FORMAT_X8_D24_UNORM_PACK32:
-	case VK_FORMAT_D32_SFLOAT_S8_UINT:
-		return true;
+		case VK_FORMAT_D16_UNORM:
+		case VK_FORMAT_D16_UNORM_S8_UINT:
+		case VK_FORMAT_D24_UNORM_S8_UINT:
+		case VK_FORMAT_D32_SFLOAT:
+		case VK_FORMAT_X8_D24_UNORM_PACK32:
+		case VK_FORMAT_D32_SFLOAT_S8_UINT:
+			return true;
 
-	default:
-		return false;
+		default:
+			break;
 	}
+	return false;
 }
 
 static inline bool format_has_stencil_aspect(VkFormat format)
 {
 	switch (format)
 	{
-	case VK_FORMAT_D16_UNORM_S8_UINT:
-	case VK_FORMAT_D24_UNORM_S8_UINT:
-	case VK_FORMAT_D32_SFLOAT_S8_UINT:
-	case VK_FORMAT_S8_UINT:
-		return true;
+		case VK_FORMAT_D16_UNORM_S8_UINT:
+		case VK_FORMAT_D24_UNORM_S8_UINT:
+		case VK_FORMAT_D32_SFLOAT_S8_UINT:
+		case VK_FORMAT_S8_UINT:
+			return true;
 
-	default:
-		return false;
+		default:
+			break;
 	}
+	return false;
 }
 
 static inline bool format_has_depth_or_stencil_aspect(VkFormat format)
@@ -3201,93 +3102,92 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 {
 	switch (format)
 	{
-	case VK_FORMAT_UNDEFINED:
-		return 0;
+		case VK_FORMAT_UNDEFINED:
+			return 0;
 
-	case VK_FORMAT_S8_UINT:
-		return VK_IMAGE_ASPECT_STENCIL_BIT;
+		case VK_FORMAT_S8_UINT:
+			return VK_IMAGE_ASPECT_STENCIL_BIT;
 
-	case VK_FORMAT_D16_UNORM_S8_UINT:
-	case VK_FORMAT_D24_UNORM_S8_UINT:
-	case VK_FORMAT_D32_SFLOAT_S8_UINT:
-		return VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_DEPTH_BIT;
+		case VK_FORMAT_D16_UNORM_S8_UINT:
+		case VK_FORMAT_D24_UNORM_S8_UINT:
+		case VK_FORMAT_D32_SFLOAT_S8_UINT:
+			return VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_DEPTH_BIT;
 
-	case VK_FORMAT_D16_UNORM:
-	case VK_FORMAT_D32_SFLOAT:
-	case VK_FORMAT_X8_D24_UNORM_PACK32:
-		return VK_IMAGE_ASPECT_DEPTH_BIT;
+		case VK_FORMAT_D16_UNORM:
+		case VK_FORMAT_D32_SFLOAT:
+		case VK_FORMAT_X8_D24_UNORM_PACK32:
+			return VK_IMAGE_ASPECT_DEPTH_BIT;
 
-	default:
-		return VK_IMAGE_ASPECT_COLOR_BIT;
+		default:
+			break;
 	}
+	return VK_IMAGE_ASPECT_COLOR_BIT;
 }
 
 /* ============================================================
  * sampler.hpp
  * ============================================================ */
 
-
-
 namespace Vulkan
 {
-enum class StockSampler
-{
-	NearestClamp,
-	LinearClamp,
-	TrilinearClamp,
-	NearestWrap,
-	LinearWrap,
-	TrilinearWrap,
-	NearestShadow,
-	LinearShadow,
-	Count
-};
-
-struct SamplerCreateInfo
-{
-	VkFilter mag_filter;
-	VkFilter min_filter;
-	VkSamplerMipmapMode mipmap_mode;
-	VkSamplerAddressMode address_mode_u;
-	VkSamplerAddressMode address_mode_v;
-	VkSamplerAddressMode address_mode_w;
-	float mip_lod_bias;
-	VkBool32 anisotropy_enable;
-	float max_anisotropy;
-	VkBool32 compare_enable;
-	VkCompareOp compare_op;
-	float min_lod;
-	float max_lod;
-	VkBorderColor border_color;
-	VkBool32 unnormalized_coordinates;
-};
-
-class Sampler;
-struct SamplerDeleter
-{
-	void operator()(Sampler *sampler);
-};
-
-class Sampler : public Util::IntrusivePtrEnabled<Sampler, SamplerDeleter, HandleCounter>,
-                public Cookie
-{
-public:
-	friend struct SamplerDeleter;
-	~Sampler();
-
-	VkSampler get_sampler() const
+	enum class StockSampler
 	{
-		return sampler;
-	}
+		NearestClamp,
+		LinearClamp,
+		TrilinearClamp,
+		NearestWrap,
+		LinearWrap,
+		TrilinearWrap,
+		NearestShadow,
+		LinearShadow,
+		Count
+	};
 
-private:
-	friend class Util::ObjectPool<Sampler>;
-	Sampler(Device *device, VkSampler sampler);
+	struct SamplerCreateInfo
+	{
+		VkFilter mag_filter;
+		VkFilter min_filter;
+		VkSamplerMipmapMode mipmap_mode;
+		VkSamplerAddressMode address_mode_u;
+		VkSamplerAddressMode address_mode_v;
+		VkSamplerAddressMode address_mode_w;
+		float mip_lod_bias;
+		VkBool32 anisotropy_enable;
+		float max_anisotropy;
+		VkBool32 compare_enable;
+		VkCompareOp compare_op;
+		float min_lod;
+		float max_lod;
+		VkBorderColor border_color;
+		VkBool32 unnormalized_coordinates;
+	};
 
-	Device *device;
-	VkSampler sampler;
-};
-using SamplerHandle = Util::IntrusivePtr<Sampler>;
+	class Sampler;
+	struct SamplerDeleter
+	{
+		void operator()(Sampler *sampler);
+	};
+
+	class Sampler : public Util::IntrusivePtrEnabled<Sampler, SamplerDeleter, HandleCounter>,
+	public Cookie
+	{
+		public:
+			friend struct SamplerDeleter;
+			~Sampler();
+
+			VkSampler get_sampler() const
+			{
+				return sampler;
+			}
+
+		private:
+			friend class Util::ObjectPool<Sampler>;
+			Sampler(Device *device, VkSampler sampler);
+
+			Device *device;
+			VkSampler sampler;
+	};
+	using SamplerHandle = Util::IntrusivePtr<Sampler>;
 }
 
 /* ============================================================
@@ -3296,7 +3196,6 @@ using SamplerHandle = Util::IntrusivePtr<Sampler>;
 
 #ifndef FRAMEWORK_MEMORY_ALLOCATOR_HPP
 #define FRAMEWORK_MEMORY_ALLOCATOR_HPP
-
 
 namespace Vulkan
 {
@@ -3604,1283 +3503,1216 @@ private:
 
 #endif
 
-/* ============================================================
- * buffer.hpp
- * ============================================================ */
-
-
-
 namespace Vulkan
 {
-class Device;
+	class Device;
 
-static inline VkPipelineStageFlags buffer_usage_to_possible_stages(VkBufferUsageFlags usage)
-{
-	VkPipelineStageFlags flags = 0;
-	if (usage & (VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT))
-		flags |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-	if (usage & (VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT))
-		flags |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
-	if (usage & VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)
-		flags |= VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
-	if (usage & (VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
-	             VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT))
-		flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-		         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	if (usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-		flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-	return flags;
-}
-
-static inline VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
-{
-	VkAccessFlags flags = 0;
-	if (usage & (VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT))
-		flags |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-	if (usage & VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
-		flags |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-	if (usage & VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
-		flags |= VK_ACCESS_INDEX_READ_BIT;
-	if (usage & VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)
-		flags |= VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-	if (usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-		flags |= VK_ACCESS_UNIFORM_READ_BIT;
-	if (usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-		flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-
-	return flags;
-}
-
-enum class BufferDomain
-{
-	Device, // Device local. Probably not visible from CPU.
-	Host, // Host-only, needs to be synced to GPU. Might be device local as well on iGPUs.
-	CachedHost // Host-only, used for readbacks.
-};
-
-struct BufferCreateInfo
-{
-	BufferDomain domain = BufferDomain::Device;
-	VkDeviceSize size = 0;
-	VkBufferUsageFlags usage = 0;
-};
-
-class Buffer;
-struct BufferDeleter
-{
-	void operator()(Buffer *buffer);
-};
-
-class BufferView;
-struct BufferViewDeleter
-{
-	void operator()(BufferView *view);
-};
-
-class Buffer : public Util::IntrusivePtrEnabled<Buffer, BufferDeleter, HandleCounter>,
-               public Cookie
-{
-public:
-	friend struct BufferDeleter;
-	~Buffer();
-
-	VkBuffer get_buffer() const
+	static inline VkPipelineStageFlags buffer_usage_to_possible_stages(VkBufferUsageFlags usage)
 	{
-		return buffer;
+		VkPipelineStageFlags flags = 0;
+		if (usage & (VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT))
+			flags |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+		if (usage & (VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT))
+			flags |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+		if (usage & VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)
+			flags |= VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+		if (usage & (VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
+					VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT))
+			flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+			flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+		return flags;
 	}
 
-	const BufferCreateInfo &get_create_info() const
+	static inline VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
 	{
-		return info;
+		VkAccessFlags flags = 0;
+		if (usage & (VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT))
+			flags |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+		if (usage & VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+			flags |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+		if (usage & VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
+			flags |= VK_ACCESS_INDEX_READ_BIT;
+		if (usage & VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)
+			flags |= VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+		if (usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+			flags |= VK_ACCESS_UNIFORM_READ_BIT;
+		if (usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+			flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+
+		return flags;
 	}
 
-	const DeviceAllocation &get_allocation() const
+	enum class BufferDomain
 	{
-		return alloc;
-	}
+		Device, // Device local. Probably not visible from CPU.
+		Host, // Host-only, needs to be synced to GPU. Might be device local as well on iGPUs.
+		CachedHost // Host-only, used for readbacks.
+	};
 
-private:
-	friend class Util::ObjectPool<Buffer>;
-	Buffer(Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info);
-
-	Device *device;
-	VkBuffer buffer;
-	DeviceAllocation alloc;
-	BufferCreateInfo info;
-};
-using BufferHandle = Util::IntrusivePtr<Buffer>;
-
-struct BufferViewCreateInfo
-{
-	const Buffer *buffer;
-	VkFormat format;
-	VkDeviceSize offset;
-	VkDeviceSize range;
-};
-
-class BufferView : public Util::IntrusivePtrEnabled<BufferView, BufferViewDeleter, HandleCounter>,
-                   public Cookie
-{
-public:
-	friend struct BufferViewDeleter;
-	~BufferView();
-
-	VkBufferView get_view() const
+	struct BufferCreateInfo
 	{
-		return view;
-	}
+		BufferDomain domain = BufferDomain::Device;
+		VkDeviceSize size = 0;
+		VkBufferUsageFlags usage = 0;
+	};
 
-	const Buffer &get_buffer() const
+	class Buffer;
+	struct BufferDeleter
 	{
-		return *info.buffer;
-	}
+		void operator()(Buffer *buffer);
+	};
 
-private:
-	friend class Util::ObjectPool<BufferView>;
-	BufferView(Device *device, VkBufferView view, const BufferViewCreateInfo &info);
-
-	Device *device;
-	VkBufferView view;
-	BufferViewCreateInfo info;
-};
-using BufferViewHandle = Util::IntrusivePtr<BufferView>;
-}
-
-/* ============================================================
- * image.hpp
- * ============================================================ */
-
-
-
-namespace Vulkan
-{
-class Device;
-
-static inline VkPipelineStageFlags image_usage_to_possible_stages(VkImageUsageFlags usage)
-{
-	VkPipelineStageFlags flags = 0;
-
-	if (usage & (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT))
-		flags |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-	if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
-		flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-		         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
-		flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-	if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
-		flags |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
-		flags |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-	if (usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
-		flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-
-	if (usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT)
+	class BufferView;
+	struct BufferViewDeleter
 	{
-		VkPipelineStageFlags possible = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-		                                VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-		                                VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		void operator()(BufferView *view);
+	};
 
+	class Buffer : public Util::IntrusivePtrEnabled<Buffer, BufferDeleter, HandleCounter>,
+	public Cookie
+	{
+		public:
+			friend struct BufferDeleter;
+			~Buffer();
+
+			VkBuffer get_buffer() const
+			{
+				return buffer;
+			}
+
+			const BufferCreateInfo &get_create_info() const
+			{
+				return info;
+			}
+
+			const DeviceAllocation &get_allocation() const
+			{
+				return alloc;
+			}
+
+		private:
+			friend class Util::ObjectPool<Buffer>;
+			Buffer(Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info);
+
+			Device *device;
+			VkBuffer buffer;
+			DeviceAllocation alloc;
+			BufferCreateInfo info;
+	};
+	using BufferHandle = Util::IntrusivePtr<Buffer>;
+
+	struct BufferViewCreateInfo
+	{
+		const Buffer *buffer;
+		VkFormat format;
+		VkDeviceSize offset;
+		VkDeviceSize range;
+	};
+
+	class BufferView : public Util::IntrusivePtrEnabled<BufferView, BufferViewDeleter, HandleCounter>,
+	public Cookie
+	{
+		public:
+			friend struct BufferViewDeleter;
+			~BufferView();
+
+			VkBufferView get_view() const
+			{
+				return view;
+			}
+
+			const Buffer &get_buffer() const
+			{
+				return *info.buffer;
+			}
+
+		private:
+			friend class Util::ObjectPool<BufferView>;
+			BufferView(Device *device, VkBufferView view, const BufferViewCreateInfo &info);
+
+			Device *device;
+			VkBufferView view;
+			BufferViewCreateInfo info;
+	};
+	using BufferViewHandle = Util::IntrusivePtr<BufferView>;
+
+	class Device;
+
+	static inline VkPipelineStageFlags image_usage_to_possible_stages(VkImageUsageFlags usage)
+	{
+		VkPipelineStageFlags flags = 0;
+
+		if (usage & (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT))
+			flags |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+		if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
+			flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
+			flags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+			flags |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+			flags |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
 		if (usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
-			possible |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			flags |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
-		flags &= possible;
+		if (usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT)
+		{
+			VkPipelineStageFlags possible = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+				VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+
+			if (usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
+				possible |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+
+			flags &= possible;
+		}
+
+		return flags;
 	}
 
-	return flags;
-}
-
-static inline VkAccessFlags image_layout_to_possible_access(VkImageLayout layout)
-{
-	switch (layout)
+	static inline VkAccessFlags image_layout_to_possible_access(VkImageLayout layout)
 	{
-	case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-		return VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-	case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-		return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-	case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-		return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-	case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
-		return VK_ACCESS_INPUT_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-	case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-		return VK_ACCESS_TRANSFER_READ_BIT;
-	case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-		return VK_ACCESS_TRANSFER_WRITE_BIT;
-	default:
-		return ~0u;
+		switch (layout)
+		{
+			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+				return VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+				return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+				return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+				return VK_ACCESS_INPUT_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+				return VK_ACCESS_TRANSFER_READ_BIT;
+			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+				return VK_ACCESS_TRANSFER_WRITE_BIT;
+			default:
+				return ~0u;
+		}
 	}
-}
 
-static inline VkAccessFlags image_usage_to_possible_access(VkImageUsageFlags usage)
-{
-	VkAccessFlags flags = 0;
-
-	if (usage & (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT))
-		flags |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-	if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
-		flags |= VK_ACCESS_SHADER_READ_BIT;
-	if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
-		flags |= VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-	if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
-		flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-	if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
-		flags |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-	if (usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
-		flags |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-
-	// Transient attachments can only be attachments, and never other resources.
-	if (usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT)
+	static inline VkAccessFlags image_usage_to_possible_access(VkImageUsageFlags usage)
 	{
-		flags &= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-		         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-		         VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		VkAccessFlags flags = 0;
+
+		if (usage & (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT))
+			flags |= VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+		if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
+			flags |= VK_ACCESS_SHADER_READ_BIT;
+		if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
+			flags |= VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+		if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+			flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+		if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+			flags |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+		if (usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
+			flags |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+
+		// Transient attachments can only be attachments, and never other resources.
+		if (usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT)
+		{
+			flags &= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+				VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		}
+
+		return flags;
 	}
 
-	return flags;
-}
-
-static inline uint32_t image_num_miplevels(const VkExtent3D &extent)
-{
-	uint32_t wh = (extent.width > extent.height) ? extent.width : extent.height;
-	uint32_t size = (wh > extent.depth) ? wh : extent.depth;
-	uint32_t levels = 0;
-	while (size)
+	static inline uint32_t image_num_miplevels(const VkExtent3D &extent)
 	{
-		levels++;
-		size >>= 1;
+		uint32_t wh = (extent.width > extent.height) ? extent.width : extent.height;
+		uint32_t size = (wh > extent.depth) ? wh : extent.depth;
+		uint32_t levels = 0;
+		while (size)
+		{
+			levels++;
+			size >>= 1;
+		}
+		return levels;
 	}
-	return levels;
-}
 
-static inline VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
-{
-	VkFormatFeatureFlags flags = 0;
-	if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
-		flags |= VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
-	if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
-		flags |= VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT;
-	if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
-		flags |= VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT;
-	if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
-		flags |= VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-	return flags;
-}
-
-struct ImageInitialData
-{
-	const void *data;
-	unsigned row_length;
-	unsigned image_height;
-};
-
-enum ImageMiscFlagBits
-{
-	IMAGE_MISC_GENERATE_MIPS_BIT = 1 << 0
-};
-using ImageMiscFlags = uint32_t;
-
-class Image;
-
-struct ImageViewCreateInfo
-{
-	Image *image = nullptr;
-	VkFormat format = VK_FORMAT_UNDEFINED;
-	unsigned base_level = 0;
-	unsigned levels = VK_REMAINING_MIP_LEVELS;
-	unsigned base_layer = 0;
-	unsigned layers = VK_REMAINING_ARRAY_LAYERS;
-	VkComponentMapping swizzle = {
-			VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
-	};
-};
-
-class ImageView;
-
-struct ImageViewDeleter
-{
-	void operator()(ImageView *view);
-};
-
-POD_VEC_DECLARE(RenderTargetViewVec, VkImageView);
-
-class ImageView : public Util::IntrusivePtrEnabled<ImageView, ImageViewDeleter, HandleCounter>,
-                  public Cookie
-{
-public:
-	friend struct ImageViewDeleter;
-
-	ImageView(Device *device, VkImageView view, const ImageViewCreateInfo &info);
-
-	~ImageView();
-
-	void set_alt_views(VkImageView depth, VkImageView stencil)
+	static inline VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
 	{
-		VK_ASSERT(depth_view == VK_NULL_HANDLE);
-		VK_ASSERT(stencil_view == VK_NULL_HANDLE);
-		depth_view = depth;
-		stencil_view = stencil;
+		VkFormatFeatureFlags flags = 0;
+		if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
+			flags |= VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+		if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
+			flags |= VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT;
+		if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+			flags |= VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT;
+		if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+			flags |= VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+		return flags;
 	}
 
-	void set_render_target_views(RenderTargetViewVec views)
+	struct ImageInitialData
 	{
-		VK_ASSERT(render_target_views.empty());
-		// POD_VEC passed by value: adopt its backing array (the caller nulls its
-		// own copy so ownership transfers cleanly, mirroring the old move).
-		render_target_views = views;
-	}
-
-	// By default, gets a combined view which includes all aspects in the image.
-	// This would be used mostly for render targets.
-	VkImageView get_view() const
-	{
-		return view;
-	}
-
-	VkImageView get_render_target_view(unsigned layer) const;
-
-	// Gets an image view which only includes floating point domains.
-	// Takes effect when we want to sample from an image which is Depth/Stencil,
-	// but we only want to sample depth.
-	VkImageView get_float_view() const
-	{
-		return depth_view != VK_NULL_HANDLE ? depth_view : view;
-	}
-
-	// Gets an image view which only includes integer domains.
-	// Takes effect when we want to sample from an image which is Depth/Stencil,
-	// but we only want to sample stencil.
-	VkImageView get_integer_view() const
-	{
-		return stencil_view != VK_NULL_HANDLE ? stencil_view : view;
-	}
-
-	VkFormat get_format() const
-	{
-		return info.format;
-	}
-
-	const Image &get_image() const
-	{
-		return *info.image;
-	}
-
-	Image &get_image()
-	{
-		return *info.image;
-	}
-
-	const ImageViewCreateInfo &get_create_info() const
-	{
-		return info;
-	}
-
-private:
-	Device *device;
-	VkImageView view;
-	RenderTargetViewVec render_target_views = { NULL, 0, 0 };
-	VkImageView depth_view = VK_NULL_HANDLE;
-	VkImageView stencil_view = VK_NULL_HANDLE;
-	ImageViewCreateInfo info;
-};
-
-using ImageViewHandle = Util::IntrusivePtr<ImageView>;
-
-enum class ImageDomain
-{
-	Physical,
-	Transient
-};
-
-struct ImageCreateInfo
-{
-	ImageDomain domain = ImageDomain::Physical;
-	unsigned width = 0;
-	unsigned height = 0;
-	unsigned depth = 1;
-	unsigned levels = 1;
-	VkFormat format = VK_FORMAT_UNDEFINED;
-	VkImageType type = VK_IMAGE_TYPE_2D;
-	unsigned layers = 1;
-	VkImageUsageFlags usage = 0;
-	VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-	VkImageCreateFlags flags = 0;
-	ImageMiscFlags misc = 0;
-	VkImageLayout initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-	VkComponentMapping swizzle = {
-			VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
+		const void *data;
+		unsigned row_length;
+		unsigned image_height;
 	};
 
-	static ImageCreateInfo immutable_2d_image(unsigned width, unsigned height, VkFormat format, bool mipmapped = false)
+	enum ImageMiscFlagBits
 	{
-		ImageCreateInfo info;
-		info.width = width;
-		info.height = height;
-		info.depth = 1;
-		info.levels = mipmapped ? 0u : 1u;
-		info.format = format;
-		info.type = VK_IMAGE_TYPE_2D;
-		info.layers = 1;
-		info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-		info.samples = VK_SAMPLE_COUNT_1_BIT;
-		info.flags = 0;
-		info.misc = mipmapped ? unsigned(IMAGE_MISC_GENERATE_MIPS_BIT) : 0u;
-		info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		return info;
-	}
+		IMAGE_MISC_GENERATE_MIPS_BIT = 1 << 0
+	};
+	using ImageMiscFlags = uint32_t;
 
-	static ImageCreateInfo render_target(unsigned width, unsigned height, VkFormat format)
+	class Image;
+
+	struct ImageViewCreateInfo
 	{
-		ImageCreateInfo info;
-		info.width = width;
-		info.height = height;
-		info.depth = 1;
-		info.levels = 1;
-		info.format = format;
-		info.type = VK_IMAGE_TYPE_2D;
-		info.layers = 1;
-		info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
-		              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
-		             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		Image *image = nullptr;
+		VkFormat format = VK_FORMAT_UNDEFINED;
+		unsigned base_level = 0;
+		unsigned levels = VK_REMAINING_MIP_LEVELS;
+		unsigned base_layer = 0;
+		unsigned layers = VK_REMAINING_ARRAY_LAYERS;
+		VkComponentMapping swizzle = {
+			VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
+		};
+	};
 
-		info.samples = VK_SAMPLE_COUNT_1_BIT;
-		info.flags = 0;
-		info.misc = 0;
-		info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-		return info;
-	}
+	class ImageView;
 
-	static ImageCreateInfo transient_render_target(unsigned width, unsigned height, VkFormat format)
+	struct ImageViewDeleter
 	{
-		ImageCreateInfo info;
-		info.domain = ImageDomain::Transient;
-		info.width = width;
-		info.height = height;
-		info.depth = 1;
-		info.levels = 1;
-		info.format = format;
-		info.type = VK_IMAGE_TYPE_2D;
-		info.layers = 1;
-		info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
-		              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
-		             VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-		info.samples = VK_SAMPLE_COUNT_1_BIT;
-		info.flags = 0;
-		info.misc = 0;
-		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		return info;
-	}
-};
+		void operator()(ImageView *view);
+	};
 
-class Image;
+	POD_VEC_DECLARE(RenderTargetViewVec, VkImageView);
 
-struct ImageDeleter
-{
-	void operator()(Image *image);
-};
-
-enum class Layout
-{
-	Optimal,
-	General
-};
-
-class Image : public Util::IntrusivePtrEnabled<Image, ImageDeleter, HandleCounter>,
-              public Cookie
-{
-public:
-	friend struct ImageDeleter;
-
-	~Image();
-
-	Image(Image &&) = delete;
-
-	Image &operator=(Image &&) = delete;
-
-	const ImageView &get_view() const
+	class ImageView : public Util::IntrusivePtrEnabled<ImageView, ImageViewDeleter, HandleCounter>,
+	public Cookie
 	{
-		VK_ASSERT(view);
-		return *view;
-	}
+		public:
+			friend struct ImageViewDeleter;
 
-	ImageView &get_view()
+			ImageView(Device *device, VkImageView view, const ImageViewCreateInfo &info);
+
+			~ImageView();
+
+			void set_alt_views(VkImageView depth, VkImageView stencil)
+			{
+				VK_ASSERT(depth_view == VK_NULL_HANDLE);
+				VK_ASSERT(stencil_view == VK_NULL_HANDLE);
+				depth_view = depth;
+				stencil_view = stencil;
+			}
+
+			void set_render_target_views(RenderTargetViewVec views)
+			{
+				VK_ASSERT(render_target_views.empty());
+				// POD_VEC passed by value: adopt its backing array (the caller nulls its
+				// own copy so ownership transfers cleanly, mirroring the old move).
+				render_target_views = views;
+			}
+
+			// By default, gets a combined view which includes all aspects in the image.
+			// This would be used mostly for render targets.
+			VkImageView get_view() const
+			{
+				return view;
+			}
+
+			VkImageView get_render_target_view(unsigned layer) const;
+
+			// Gets an image view which only includes floating point domains.
+			// Takes effect when we want to sample from an image which is Depth/Stencil,
+			// but we only want to sample depth.
+			VkImageView get_float_view() const
+			{
+				return depth_view != VK_NULL_HANDLE ? depth_view : view;
+			}
+
+			// Gets an image view which only includes integer domains.
+			// Takes effect when we want to sample from an image which is Depth/Stencil,
+			// but we only want to sample stencil.
+			VkImageView get_integer_view() const
+			{
+				return stencil_view != VK_NULL_HANDLE ? stencil_view : view;
+			}
+
+			VkFormat get_format() const
+			{
+				return info.format;
+			}
+
+			const Image &get_image() const
+			{
+				return *info.image;
+			}
+
+			Image &get_image()
+			{
+				return *info.image;
+			}
+
+			const ImageViewCreateInfo &get_create_info() const
+			{
+				return info;
+			}
+
+		private:
+			Device *device;
+			VkImageView view;
+			RenderTargetViewVec render_target_views = { NULL, 0, 0 };
+			VkImageView depth_view = VK_NULL_HANDLE;
+			VkImageView stencil_view = VK_NULL_HANDLE;
+			ImageViewCreateInfo info;
+	};
+
+	using ImageViewHandle = Util::IntrusivePtr<ImageView>;
+
+	enum class ImageDomain
 	{
-		VK_ASSERT(view);
-		return *view;
-	}
+		Physical,
+		Transient
+	};
 
-	VkImage get_image() const
+	struct ImageCreateInfo
 	{
-		return image;
-	}
+		ImageDomain domain = ImageDomain::Physical;
+		unsigned width = 0;
+		unsigned height = 0;
+		unsigned depth = 1;
+		unsigned levels = 1;
+		VkFormat format = VK_FORMAT_UNDEFINED;
+		VkImageType type = VK_IMAGE_TYPE_2D;
+		unsigned layers = 1;
+		VkImageUsageFlags usage = 0;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+		VkImageCreateFlags flags = 0;
+		ImageMiscFlags misc = 0;
+		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+		VkComponentMapping swizzle = {
+			VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
+		};
 
-	VkFormat get_format() const
+		static ImageCreateInfo immutable_2d_image(unsigned width, unsigned height, VkFormat format, bool mipmapped = false)
+		{
+			ImageCreateInfo info;
+			info.width = width;
+			info.height = height;
+			info.depth = 1;
+			info.levels = mipmapped ? 0u : 1u;
+			info.format = format;
+			info.type = VK_IMAGE_TYPE_2D;
+			info.layers = 1;
+			info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+			info.samples = VK_SAMPLE_COUNT_1_BIT;
+			info.flags = 0;
+			info.misc = mipmapped ? unsigned(IMAGE_MISC_GENERATE_MIPS_BIT) : 0u;
+			info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			return info;
+		}
+
+		static ImageCreateInfo render_target(unsigned width, unsigned height, VkFormat format)
+		{
+			ImageCreateInfo info;
+			info.width = width;
+			info.height = height;
+			info.depth = 1;
+			info.levels = 1;
+			info.format = format;
+			info.type = VK_IMAGE_TYPE_2D;
+			info.layers = 1;
+			info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
+					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+				VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+			info.samples = VK_SAMPLE_COUNT_1_BIT;
+			info.flags = 0;
+			info.misc = 0;
+			info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+			return info;
+		}
+
+		static ImageCreateInfo transient_render_target(unsigned width, unsigned height, VkFormat format)
+		{
+			ImageCreateInfo info;
+			info.domain = ImageDomain::Transient;
+			info.width = width;
+			info.height = height;
+			info.depth = 1;
+			info.levels = 1;
+			info.format = format;
+			info.type = VK_IMAGE_TYPE_2D;
+			info.layers = 1;
+			info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
+					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+				VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+			info.samples = VK_SAMPLE_COUNT_1_BIT;
+			info.flags = 0;
+			info.misc = 0;
+			info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+			return info;
+		}
+	};
+
+	class Image;
+
+	struct ImageDeleter
 	{
-		return create_info.format;
-	}
+		void operator()(Image *image);
+	};
 
-	uint32_t get_width(uint32_t lod = 0) const
+	enum class Layout
 	{
-		uint32_t v = create_info.width >> lod;
-		return v > 1u ? v : 1u;
-	}
+		Optimal,
+		General
+	};
 
-	uint32_t get_height(uint32_t lod = 0) const
+	class Image : public Util::IntrusivePtrEnabled<Image, ImageDeleter, HandleCounter>,
+	public Cookie
 	{
-		uint32_t v = create_info.height >> lod;
-		return v > 1u ? v : 1u;
-	}
+		public:
+			friend struct ImageDeleter;
 
-	uint32_t get_depth(uint32_t lod = 0) const
+			~Image();
+
+			Image(Image &&) = delete;
+
+			Image &operator=(Image &&) = delete;
+
+			const ImageView &get_view() const
+			{
+				VK_ASSERT(view);
+				return *view;
+			}
+
+			ImageView &get_view()
+			{
+				VK_ASSERT(view);
+				return *view;
+			}
+
+			VkImage get_image() const
+			{
+				return image;
+			}
+
+			VkFormat get_format() const
+			{
+				return create_info.format;
+			}
+
+			uint32_t get_width(uint32_t lod = 0) const
+			{
+				uint32_t v = create_info.width >> lod;
+				return v > 1u ? v : 1u;
+			}
+
+			uint32_t get_height(uint32_t lod = 0) const
+			{
+				uint32_t v = create_info.height >> lod;
+				return v > 1u ? v : 1u;
+			}
+
+			uint32_t get_depth(uint32_t lod = 0) const
+			{
+				uint32_t v = create_info.depth >> lod;
+				return v > 1u ? v : 1u;
+			}
+
+			const ImageCreateInfo &get_create_info() const
+			{
+				return create_info;
+			}
+
+			VkImageLayout get_layout(VkImageLayout optimal) const
+			{
+				return layout_type == Layout::Optimal ? optimal : VK_IMAGE_LAYOUT_GENERAL;
+			}
+
+			Layout get_layout_type() const
+			{
+				return layout_type;
+			}
+
+			void set_layout(Layout layout)
+			{
+				layout_type = layout;
+			}
+
+			void set_stage_flags(VkPipelineStageFlags flags)
+			{
+				stage_flags = flags;
+			}
+
+			void set_access_flags(VkAccessFlags flags)
+			{
+				access_flags = flags;
+			}
+
+			VkPipelineStageFlags get_stage_flags() const
+			{
+				return stage_flags;
+			}
+
+			VkAccessFlags get_access_flags() const
+			{
+				return access_flags;
+			}
+
+			const DeviceAllocation &get_allocation() const
+			{
+				return alloc;
+			}
+
+		private:
+			friend class Util::ObjectPool<Image>;
+
+			Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
+					const ImageCreateInfo &info);
+
+			Device *device;
+			VkImage image;
+			ImageViewHandle view;
+			DeviceAllocation alloc;
+			ImageCreateInfo create_info;
+
+			Layout layout_type = Layout::Optimal;
+			VkPipelineStageFlags stage_flags = 0;
+			VkAccessFlags access_flags = 0;
+	};
+
+	using ImageHandle = Util::IntrusivePtr<Image>;
+
+	class Device;
+
+	class FenceHolder;
+	struct FenceHolderDeleter
 	{
-		uint32_t v = create_info.depth >> lod;
-		return v > 1u ? v : 1u;
-	}
+		void operator()(FenceHolder *fence);
+	};
 
-	const ImageCreateInfo &get_create_info() const
+	class FenceHolder : public Util::IntrusivePtrEnabled<FenceHolder, FenceHolderDeleter, HandleCounter>
 	{
-		return create_info;
-	}
+		public:
+			friend struct FenceHolderDeleter;
 
-	VkImageLayout get_layout(VkImageLayout optimal) const
-	{
-		return layout_type == Layout::Optimal ? optimal : VK_IMAGE_LAYOUT_GENERAL;
-	}
+			~FenceHolder();
+			void wait();
 
-	Layout get_layout_type() const
-	{
-		return layout_type;
-	}
-
-	void set_layout(Layout layout)
-	{
-		layout_type = layout;
-	}
-
-	void set_stage_flags(VkPipelineStageFlags flags)
-	{
-		stage_flags = flags;
-	}
-
-	void set_access_flags(VkAccessFlags flags)
-	{
-		access_flags = flags;
-	}
-
-	VkPipelineStageFlags get_stage_flags() const
-	{
-		return stage_flags;
-	}
-
-	VkAccessFlags get_access_flags() const
-	{
-		return access_flags;
-	}
-
-	const DeviceAllocation &get_allocation() const
-	{
-		return alloc;
-	}
-
-private:
-	friend class Util::ObjectPool<Image>;
-
-	Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
-	      const ImageCreateInfo &info);
-
-	Device *device;
-	VkImage image;
-	ImageViewHandle view;
-	DeviceAllocation alloc;
-	ImageCreateInfo create_info;
-
-	Layout layout_type = Layout::Optimal;
-	VkPipelineStageFlags stage_flags = 0;
-	VkAccessFlags access_flags = 0;
-};
-
-using ImageHandle = Util::IntrusivePtr<Image>;
-}
-
-/* ============================================================
- * fence.hpp
- * ============================================================ */
-
-
-
-namespace Vulkan
-{
-class Device;
-
-class FenceHolder;
-struct FenceHolderDeleter
-{
-	void operator()(FenceHolder *fence);
-};
-
-class FenceHolder : public Util::IntrusivePtrEnabled<FenceHolder, FenceHolderDeleter, HandleCounter>
-{
-public:
-	friend struct FenceHolderDeleter;
-
-	~FenceHolder();
-	void wait();
-
-private:
-	friend class Util::ObjectPool<FenceHolder>;
-	FenceHolder(Device *device, VkFence fence) : device(device), fence(fence)
-	{
-	}
-
-	Device *device;
-	VkFence fence;
-};
-
-using Fence = Util::IntrusivePtr<FenceHolder>;
-}
-
-/* ============================================================
- * fence_manager.hpp
- * ============================================================ */
-
-
-
-namespace Vulkan
-{
-POD_VEC_DECLARE(FenceVec, VkFence);
-class FenceManager
-{
-public:
-	void init(VkDevice device)
-	{
-		this->device = device;
-	}
-	~FenceManager();
-
-	VkFence request_cleared_fence();
-	void recycle_fence(VkFence fence);
-
-private:
-	VkDevice device = VK_NULL_HANDLE;
-	FenceVec fences = { NULL, 0, 0 };
-};
-}
-
-/* ============================================================
- * semaphore.hpp
- * ============================================================ */
-
-
-
-namespace Vulkan
-{
-class Device;
-
-class SemaphoreHolder;
-struct SemaphoreHolderDeleter
-{
-	void operator()(SemaphoreHolder *semaphore);
-};
-
-class SemaphoreHolder : public Util::IntrusivePtrEnabled<SemaphoreHolder, SemaphoreHolderDeleter, HandleCounter>
-{
-public:
-	friend struct SemaphoreHolderDeleter;
-
-	~SemaphoreHolder();
-
-	bool is_signalled() const
-	{
-		return signalled;
-	}
-
-	VkSemaphore consume()
-	{
-		VkSemaphore ret = semaphore;
-		VK_ASSERT(semaphore);
-		VK_ASSERT(signalled);
-		semaphore = VK_NULL_HANDLE;
-		signalled = false;
-		return ret;
-	}
-
-private:
-	friend class Util::ObjectPool<SemaphoreHolder>;
-	SemaphoreHolder(Device *device, VkSemaphore semaphore, bool signalled)
-	    : device(device)
-	    , semaphore(semaphore)
-	    , signalled(signalled)
-	{
-	}
-
-	Device *device;
-	VkSemaphore semaphore;
-	bool signalled = true;
-};
-
-using Semaphore = Util::IntrusivePtr<SemaphoreHolder>;
-}
-
-/* ============================================================
- * semaphore_manager.hpp
- * ============================================================ */
-
-
-
-namespace Vulkan
-{
-POD_VEC_DECLARE(SemaphoreVec, VkSemaphore);
-class SemaphoreManager
-{
-public:
-	void init(VkDevice device)
-	{
-		this->device = device;
-	}
-	~SemaphoreManager();
-
-	VkSemaphore request_cleared_semaphore();
-	void recycle(VkSemaphore semaphore);
-
-private:
-	VkDevice device = VK_NULL_HANDLE;
-	SemaphoreVec semaphores = { NULL, 0, 0 };
-};
-}
-
-/* ============================================================
- * descriptor_set.hpp
- * ============================================================ */
-
-
-
-namespace Vulkan
-{
-class Device;
-struct DescriptorSetLayout
-{
-	uint32_t sampled_image_mask = 0;
-	uint32_t storage_image_mask = 0;
-	uint32_t uniform_buffer_mask = 0;
-	uint32_t storage_buffer_mask = 0;
-	uint32_t sampled_buffer_mask = 0;
-	uint32_t input_attachment_mask = 0;
-	uint32_t sampler_mask = 0;
-	uint32_t separate_image_mask = 0;
-	uint32_t fp_mask = 0;
-	uint32_t immutable_sampler_mask = 0;
-	uint64_t immutable_samplers = 0;
-};
-
-// Avoid -Wclass-memaccess warnings since we hash DescriptorSetLayout.
-
-static inline bool has_immutable_sampler(const DescriptorSetLayout &layout, unsigned binding)
-{
-	return (layout.immutable_sampler_mask & (1u << binding)) != 0;
-}
-
-static inline StockSampler get_immutable_sampler(const DescriptorSetLayout &layout, unsigned binding)
-{
-	VK_ASSERT(has_immutable_sampler(layout, binding));
-	return static_cast<StockSampler>((layout.immutable_samplers >> (4 * binding)) & 0xf);
-}
-
-static inline void set_immutable_sampler(DescriptorSetLayout &layout, unsigned binding, StockSampler sampler)
-{
-	layout.immutable_samplers |= uint64_t(sampler) << (4 * binding);
-	layout.immutable_sampler_mask |= 1u << binding;
-}
-
-static const unsigned VULKAN_NUM_SETS_PER_POOL = 16;
-static const unsigned VULKAN_DESCRIPTOR_RING_SIZE = 8;
-
-POD_VEC_DECLARE(DescriptorPoolVec, VkDescriptorPool);
-POD_VEC_DECLARE(DescriptorPoolSizeVec, VkDescriptorPoolSize);
-POD_VEC_DECLARE(DescriptorBindingVec, VkDescriptorSetLayoutBinding);
-
-class DescriptorSetAllocator : public HashedObject<DescriptorSetAllocator>
-{
-public:
-	DescriptorSetAllocator(Util::Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
-	~DescriptorSetAllocator();
-	void operator=(const DescriptorSetAllocator &) = delete;
-	DescriptorSetAllocator(const DescriptorSetAllocator &) = delete;
-
-	void begin_frame()
-	{
-		per_thread.should_begin = true;
-	}
-	std::pair<VkDescriptorSet, bool> find(Util::Hash hash);
-
-	VkDescriptorSetLayout get_layout() const
-	{
-		return set_layout;
-	}
-
-	void clear();
-
-private:
-	struct DescriptorSetNode : Util::TemporaryHashmapEnabled<DescriptorSetNode>, Util::IntrusiveListEnabled<DescriptorSetNode>
-	{
-		DescriptorSetNode(VkDescriptorSet set)
-		    : set(set)
+		private:
+			friend class Util::ObjectPool<FenceHolder>;
+			FenceHolder(Device *device, VkFence fence) : device(device), fence(fence)
 		{
 		}
 
-		VkDescriptorSet set;
+			Device *device;
+			VkFence fence;
 	};
 
-	Device *device;
-	VkDescriptorSetLayout set_layout = VK_NULL_HANDLE;
+	using Fence = Util::IntrusivePtr<FenceHolder>;
 
-	struct PerThread
+	POD_VEC_DECLARE(FenceVec, VkFence);
+	class FenceManager
 	{
-		Util::TemporaryHashmap<DescriptorSetNode, VULKAN_DESCRIPTOR_RING_SIZE, true> set_nodes;
-		DescriptorPoolVec pools = { NULL, 0, 0 };
-		bool should_begin = true;
+		public:
+			void init(VkDevice device)
+			{
+				this->device = device;
+			}
+			~FenceManager();
+
+			VkFence request_cleared_fence();
+			void recycle_fence(VkFence fence);
+
+		private:
+			VkDevice device = VK_NULL_HANDLE;
+			FenceVec fences = { NULL, 0, 0 };
 	};
-	PerThread per_thread;
-	DescriptorPoolSizeVec pool_size = { NULL, 0, 0 };
-};
+
+	class Device;
+
+	class SemaphoreHolder;
+	struct SemaphoreHolderDeleter
+	{
+		void operator()(SemaphoreHolder *semaphore);
+	};
+
+	class SemaphoreHolder : public Util::IntrusivePtrEnabled<SemaphoreHolder, SemaphoreHolderDeleter, HandleCounter>
+	{
+		public:
+			friend struct SemaphoreHolderDeleter;
+
+			~SemaphoreHolder();
+
+			bool is_signalled() const
+			{
+				return signalled;
+			}
+
+			VkSemaphore consume()
+			{
+				VkSemaphore ret = semaphore;
+				VK_ASSERT(semaphore);
+				VK_ASSERT(signalled);
+				semaphore = VK_NULL_HANDLE;
+				signalled = false;
+				return ret;
+			}
+
+		private:
+			friend class Util::ObjectPool<SemaphoreHolder>;
+			SemaphoreHolder(Device *device, VkSemaphore semaphore, bool signalled)
+				: device(device)
+				  , semaphore(semaphore)
+				  , signalled(signalled)
+		{
+		}
+
+			Device *device;
+			VkSemaphore semaphore;
+			bool signalled = true;
+	};
+
+	using Semaphore = Util::IntrusivePtr<SemaphoreHolder>;
+
+	POD_VEC_DECLARE(SemaphoreVec, VkSemaphore);
+	class SemaphoreManager
+	{
+		public:
+			void init(VkDevice device)
+			{
+				this->device = device;
+			}
+			~SemaphoreManager();
+
+			VkSemaphore request_cleared_semaphore();
+			void recycle(VkSemaphore semaphore);
+
+		private:
+			VkDevice device = VK_NULL_HANDLE;
+			SemaphoreVec semaphores = { NULL, 0, 0 };
+	};
+
+	class Device;
+	struct DescriptorSetLayout
+	{
+		uint32_t sampled_image_mask = 0;
+		uint32_t storage_image_mask = 0;
+		uint32_t uniform_buffer_mask = 0;
+		uint32_t storage_buffer_mask = 0;
+		uint32_t sampled_buffer_mask = 0;
+		uint32_t input_attachment_mask = 0;
+		uint32_t sampler_mask = 0;
+		uint32_t separate_image_mask = 0;
+		uint32_t fp_mask = 0;
+		uint32_t immutable_sampler_mask = 0;
+		uint64_t immutable_samplers = 0;
+	};
+
+	// Avoid -Wclass-memaccess warnings since we hash DescriptorSetLayout.
+
+	static inline bool has_immutable_sampler(const DescriptorSetLayout &layout, unsigned binding)
+	{
+		return (layout.immutable_sampler_mask & (1u << binding)) != 0;
+	}
+
+	static inline StockSampler get_immutable_sampler(const DescriptorSetLayout &layout, unsigned binding)
+	{
+		VK_ASSERT(has_immutable_sampler(layout, binding));
+		return static_cast<StockSampler>((layout.immutable_samplers >> (4 * binding)) & 0xf);
+	}
+
+	static inline void set_immutable_sampler(DescriptorSetLayout &layout, unsigned binding, StockSampler sampler)
+	{
+		layout.immutable_samplers |= uint64_t(sampler) << (4 * binding);
+		layout.immutable_sampler_mask |= 1u << binding;
+	}
+
+	static const unsigned VULKAN_NUM_SETS_PER_POOL = 16;
+	static const unsigned VULKAN_DESCRIPTOR_RING_SIZE = 8;
+
+	POD_VEC_DECLARE(DescriptorPoolVec, VkDescriptorPool);
+	POD_VEC_DECLARE(DescriptorPoolSizeVec, VkDescriptorPoolSize);
+	POD_VEC_DECLARE(DescriptorBindingVec, VkDescriptorSetLayoutBinding);
+
+	class DescriptorSetAllocator : public HashedObject<DescriptorSetAllocator>
+	{
+		public:
+			DescriptorSetAllocator(Util::Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
+			~DescriptorSetAllocator();
+			void operator=(const DescriptorSetAllocator &) = delete;
+			DescriptorSetAllocator(const DescriptorSetAllocator &) = delete;
+
+			void begin_frame()
+			{
+				per_thread.should_begin = true;
+			}
+			std::pair<VkDescriptorSet, bool> find(Util::Hash hash);
+
+			VkDescriptorSetLayout get_layout() const
+			{
+				return set_layout;
+			}
+
+			void clear();
+
+		private:
+			struct DescriptorSetNode : Util::TemporaryHashmapEnabled<DescriptorSetNode>, Util::IntrusiveListEnabled<DescriptorSetNode>
+		{
+			DescriptorSetNode(VkDescriptorSet set)
+				: set(set)
+			{
+			}
+
+			VkDescriptorSet set;
+		};
+
+			Device *device;
+			VkDescriptorSetLayout set_layout = VK_NULL_HANDLE;
+
+			struct PerThread
+			{
+				Util::TemporaryHashmap<DescriptorSetNode, VULKAN_DESCRIPTOR_RING_SIZE, true> set_nodes;
+				DescriptorPoolVec pools = { NULL, 0, 0 };
+				bool should_begin = true;
+			};
+			PerThread per_thread;
+			DescriptorPoolSizeVec pool_size = { NULL, 0, 0 };
+	};
 }
 
 /* ============================================================
  * shader.hpp
  * ============================================================ */
 
-
-
 namespace Vulkan
 {
-class Device;
+	class Device;
 
-enum class ShaderStage
-{
-	Vertex = 0,
-	TessControl = 1,
-	TessEvaluation = 2,
-	Geometry = 3,
-	Fragment = 4,
-	Compute = 5,
-	Count
-};
-
-struct ResourceLayout
-{
-	uint32_t input_mask = 0;
-	uint32_t output_mask = 0;
-	uint32_t push_constant_size = 0;
-	uint32_t spec_constant_mask = 0;
-	DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS];
-};
-
-struct CombinedResourceLayout
-{
-	uint32_t attribute_mask = 0;
-	uint32_t render_target_mask = 0;
-	DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
-	uint32_t stages_for_bindings[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS] = {};
-	uint32_t stages_for_sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
-	VkPushConstantRange push_constant_range = {};
-	uint32_t descriptor_set_mask = 0;
-	uint32_t spec_constant_mask[(unsigned)ShaderStage::Count] = {};
-	uint32_t combined_spec_constant_mask = 0;
-	Util::Hash push_constant_layout_hash = 0;
-};
-
-class PipelineLayout : public HashedObject<PipelineLayout>
-{
-public:
-	PipelineLayout(Util::Hash hash, Device *device, const CombinedResourceLayout &layout);
-	~PipelineLayout();
-
-	const CombinedResourceLayout &get_resource_layout() const
+	enum class ShaderStage
 	{
-		return layout;
-	}
+		Vertex = 0,
+		TessControl = 1,
+		TessEvaluation = 2,
+		Geometry = 3,
+		Fragment = 4,
+		Compute = 5,
+		Count
+	};
 
-	VkPipelineLayout get_layout() const
+	struct ResourceLayout
 	{
-		return pipe_layout;
-	}
+		uint32_t input_mask = 0;
+		uint32_t output_mask = 0;
+		uint32_t push_constant_size = 0;
+		uint32_t spec_constant_mask = 0;
+		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS];
+	};
 
-	DescriptorSetAllocator *get_allocator(unsigned set) const
+	struct CombinedResourceLayout
 	{
-		return set_allocators[set];
-	}
+		uint32_t attribute_mask = 0;
+		uint32_t render_target_mask = 0;
+		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
+		uint32_t stages_for_bindings[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS] = {};
+		uint32_t stages_for_sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
+		VkPushConstantRange push_constant_range = {};
+		uint32_t descriptor_set_mask = 0;
+		uint32_t spec_constant_mask[(unsigned)ShaderStage::Count] = {};
+		uint32_t combined_spec_constant_mask = 0;
+		Util::Hash push_constant_layout_hash = 0;
+	};
 
-private:
-	Device *device;
-	VkPipelineLayout pipe_layout = VK_NULL_HANDLE;
-	CombinedResourceLayout layout;
-	DescriptorSetAllocator *set_allocators[VULKAN_NUM_DESCRIPTOR_SETS] = {};
-};
-
-class Shader : public HashedObject<Shader>
-{
-public:
-	Shader(Util::Hash hash, Device *device, const uint32_t *data, size_t size);
-	~Shader();
-
-	const ResourceLayout &get_layout() const
+	class PipelineLayout : public HashedObject<PipelineLayout>
 	{
-		return layout;
-	}
+		public:
+			PipelineLayout(Util::Hash hash, Device *device, const CombinedResourceLayout &layout);
+			~PipelineLayout();
 
-	VkShaderModule get_module() const
+			const CombinedResourceLayout &get_resource_layout() const
+			{
+				return layout;
+			}
+
+			VkPipelineLayout get_layout() const
+			{
+				return pipe_layout;
+			}
+
+			DescriptorSetAllocator *get_allocator(unsigned set) const
+			{
+				return set_allocators[set];
+			}
+
+		private:
+			Device *device;
+			VkPipelineLayout pipe_layout = VK_NULL_HANDLE;
+			CombinedResourceLayout layout;
+			DescriptorSetAllocator *set_allocators[VULKAN_NUM_DESCRIPTOR_SETS] = {};
+	};
+
+	class Shader : public HashedObject<Shader>
 	{
-		return module;
-	}
+		public:
+			Shader(Util::Hash hash, Device *device, const uint32_t *data, size_t size);
+			~Shader();
 
-	static const char *stage_to_name(ShaderStage stage);
+			const ResourceLayout &get_layout() const
+			{
+				return layout;
+			}
 
-private:
-	Device *device;
-	VkShaderModule module;
-	ResourceLayout layout;
-};
+			VkShaderModule get_module() const
+			{
+				return module;
+			}
 
-class Program : public HashedObject<Program>
-{
-public:
-	Program(Device *device, Shader *vertex, Shader *fragment);
-	Program(Device *device, Shader *compute);
-	~Program();
+			static const char *stage_to_name(ShaderStage stage);
 
-	inline const Shader *get_shader(ShaderStage stage) const
+		private:
+			Device *device;
+			VkShaderModule module;
+			ResourceLayout layout;
+	};
+
+	class Program : public HashedObject<Program>
 	{
-		return shaders[(unsigned)stage];
-	}
+		public:
+			Program(Device *device, Shader *vertex, Shader *fragment);
+			Program(Device *device, Shader *compute);
+			~Program();
 
-	void set_pipeline_layout(PipelineLayout *new_layout)
-	{
-		layout = new_layout;
-	}
+			inline const Shader *get_shader(ShaderStage stage) const
+			{
+				return shaders[(unsigned)stage];
+			}
 
-	PipelineLayout *get_pipeline_layout() const
-	{
-		return layout;
-	}
+			void set_pipeline_layout(PipelineLayout *new_layout)
+			{
+				layout = new_layout;
+			}
 
-	VkPipeline get_pipeline(Util::Hash hash) const;
-	VkPipeline add_pipeline(Util::Hash hash, VkPipeline pipeline);
+			PipelineLayout *get_pipeline_layout() const
+			{
+				return layout;
+			}
 
-private:
-	void set_shader(ShaderStage stage, Shader *handle)
-	{
-		shaders[(unsigned)stage] = handle;
-	}
-	Device *device;
-	Shader *shaders[(unsigned)ShaderStage::Count] = {};
-	PipelineLayout *layout = nullptr;
-	VulkanCache<Util::IntrusivePODWrapper<VkPipeline>> pipelines;
-};
+			VkPipeline get_pipeline(Util::Hash hash) const;
+			VkPipeline add_pipeline(Util::Hash hash, VkPipeline pipeline);
+
+		private:
+			void set_shader(ShaderStage stage, Shader *handle)
+			{
+				shaders[(unsigned)stage] = handle;
+			}
+			Device *device;
+			Shader *shaders[(unsigned)ShaderStage::Count] = {};
+			PipelineLayout *layout = nullptr;
+			VulkanCache<Util::IntrusivePODWrapper<VkPipeline>> pipelines;
+	};
 }
 
 /* ============================================================
  * render_pass.hpp
  * ============================================================ */
 
-
-
 namespace Vulkan
 {
-enum RenderPassOp
-{
-	RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT = 1 << 0,
-	RENDER_PASS_OP_LOAD_DEPTH_STENCIL_BIT = 1 << 1,
-	RENDER_PASS_OP_STORE_DEPTH_STENCIL_BIT = 1 << 2,
-	RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT = 1 << 3,
-	RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT = 1 << 4,
-	RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT = 1 << 5
-};
-using RenderPassOpFlags = uint32_t;
-
-class ImageView;
-struct RenderPassInfo
-{
-	ImageView *color_attachments[VULKAN_NUM_ATTACHMENTS];
-	ImageView *depth_stencil = nullptr;
-	unsigned num_color_attachments = 0;
-	RenderPassOpFlags op_flags = 0;
-	uint32_t clear_attachments = 0;
-	uint32_t load_attachments = 0;
-	uint32_t store_attachments = 0;
-	uint32_t layer = 0;
-
-	// Render area will be clipped to the actual framebuffer.
-	VkRect2D render_area = { { 0, 0 }, { UINT32_MAX, UINT32_MAX } };
-
-	VkClearColorValue clear_color[VULKAN_NUM_ATTACHMENTS] = {};
-	VkClearDepthStencilValue clear_depth_stencil = { 1.0f, 0 };
-
-	enum class DepthStencil
+	enum RenderPassOp
 	{
-		None,
-		ReadOnly,
-		ReadWrite
+		RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT = 1 << 0,
+		RENDER_PASS_OP_LOAD_DEPTH_STENCIL_BIT = 1 << 1,
+		RENDER_PASS_OP_STORE_DEPTH_STENCIL_BIT = 1 << 2,
+		RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT = 1 << 3,
+		RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT = 1 << 4,
+		RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT = 1 << 5
 	};
+	using RenderPassOpFlags = uint32_t;
 
-	struct Subpass
+	class ImageView;
+	struct RenderPassInfo
 	{
-		uint32_t color_attachments[VULKAN_NUM_ATTACHMENTS];
-		uint32_t input_attachments[VULKAN_NUM_ATTACHMENTS];
-		uint32_t resolve_attachments[VULKAN_NUM_ATTACHMENTS];
+		ImageView *color_attachments[VULKAN_NUM_ATTACHMENTS];
+		ImageView *depth_stencil = nullptr;
 		unsigned num_color_attachments = 0;
-		unsigned num_input_attachments = 0;
-		unsigned num_resolve_attachments = 0;
-		DepthStencil depth_stencil_mode = DepthStencil::ReadWrite;
-	};
-	// If 0/nullptr, assume a default subpass.
-	const Subpass *subpasses = nullptr;
-	unsigned num_subpasses = 0;
-};
+		RenderPassOpFlags op_flags = 0;
+		uint32_t clear_attachments = 0;
+		uint32_t load_attachments = 0;
+		uint32_t store_attachments = 0;
+		uint32_t layer = 0;
 
-class RenderPass : public HashedObject<RenderPass>, public NoCopyNoMove
-{
-public:
-	struct SubpassInfo
-	{
-		VkAttachmentReference color_attachments[VULKAN_NUM_ATTACHMENTS];
-		unsigned num_color_attachments;
-		VkAttachmentReference input_attachments[VULKAN_NUM_ATTACHMENTS];
-		unsigned num_input_attachments;
-		VkAttachmentReference depth_stencil_attachment;
+		// Render area will be clipped to the actual framebuffer.
+		VkRect2D render_area = { { 0, 0 }, { UINT32_MAX, UINT32_MAX } };
 
-		unsigned samples;
-	};
+		VkClearColorValue clear_color[VULKAN_NUM_ATTACHMENTS] = {};
+		VkClearDepthStencilValue clear_depth_stencil = { 1.0f, 0 };
 
-	POD_VEC_DECLARE(SubpassInfoVec, SubpassInfo);
-
-	RenderPass(Util::Hash hash, Device *device, const RenderPassInfo &info);
-	~RenderPass();
-
-	VkRenderPass get_render_pass() const
-	{
-		return render_pass;
-	}
-
-	uint32_t get_sample_count(unsigned subpass) const
-	{
-		VK_ASSERT(subpass < subpasses.size());
-		return subpasses[subpass].samples;
-	}
-
-	unsigned get_num_color_attachments(unsigned subpass) const
-	{
-		VK_ASSERT(subpass < subpasses.size());
-		return subpasses[subpass].num_color_attachments;
-	}
-
-	unsigned get_num_input_attachments(unsigned subpass) const
-	{
-		VK_ASSERT(subpass < subpasses.size());
-		return subpasses[subpass].num_input_attachments;
-	}
-
-	const VkAttachmentReference &get_color_attachment(unsigned subpass, unsigned index) const
-	{
-		VK_ASSERT(subpass < subpasses.size());
-		VK_ASSERT(index < subpasses[subpass].num_color_attachments);
-		return subpasses[subpass].color_attachments[index];
-	}
-
-	const VkAttachmentReference &get_input_attachment(unsigned subpass, unsigned index) const
-	{
-		VK_ASSERT(subpass < subpasses.size());
-		VK_ASSERT(index < subpasses[subpass].num_input_attachments);
-		return subpasses[subpass].input_attachments[index];
-	}
-
-	bool has_depth(unsigned subpass) const
-	{
-		VK_ASSERT(subpass < subpasses.size());
-		return subpasses[subpass].depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
-		       format_has_depth_aspect(depth_stencil);
-	}
-
-private:
-	Device *device;
-	VkRenderPass render_pass = VK_NULL_HANDLE;
-
-	VkFormat color_attachments[VULKAN_NUM_ATTACHMENTS] = {};
-	VkFormat depth_stencil = VK_FORMAT_UNDEFINED;
-	SubpassInfoVec subpasses = { NULL, 0, 0 };
-
-	void fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
-};
-
-class Framebuffer : public Cookie, public NoCopyNoMove
-{
-public:
-	Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info);
-	~Framebuffer();
-
-	VkFramebuffer get_framebuffer() const
-	{
-		return framebuffer;
-	}
-
-	ImageView *get_attachment(unsigned index) const
-	{
-		assert(index < num_attachments);
-		return attachments[index];
-	}
-
-	uint32_t get_width() const
-	{
-		return width;
-	}
-
-	uint32_t get_height() const
-	{
-		return height;
-	}
-
-	const RenderPass &get_compatible_render_pass() const
-	{
-		return render_pass;
-	}
-
-private:
-	Device *device;
-	VkFramebuffer framebuffer = VK_NULL_HANDLE;
-	const RenderPass &render_pass;
-	RenderPassInfo info;
-	uint32_t width = 0;
-	uint32_t height = 0;
-
-	ImageView *attachments[VULKAN_NUM_ATTACHMENTS + 1] = {};
-	unsigned num_attachments = 0;
-};
-
-static const unsigned VULKAN_FRAMEBUFFER_RING_SIZE = 8;
-class FramebufferAllocator
-{
-public:
-	FramebufferAllocator(Device *device);
-	Framebuffer &request_framebuffer(const RenderPassInfo &info);
-
-	void begin_frame();
-	void clear();
-
-private:
-	struct FramebufferNode : Util::TemporaryHashmapEnabled<FramebufferNode>,
-	                         Util::IntrusiveListEnabled<FramebufferNode>,
-	                         Framebuffer
-	{
-		FramebufferNode(Device *device, const RenderPass &rp, const RenderPassInfo &info)
-		    : Framebuffer(device, rp, info)
+		enum class DepthStencil
 		{
-		}
-	};
+			None,
+			ReadOnly,
+			ReadWrite
+		};
 
-	Device *device;
-	Util::TemporaryHashmap<FramebufferNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> framebuffers;
-};
-
-class AttachmentAllocator
-{
-public:
-	AttachmentAllocator(Device *device)
-		: device(device)
-	{
-	}
-
-	ImageView &request_attachment(unsigned width, unsigned height, VkFormat format,
-	                              unsigned index = 0, unsigned samples = 1, unsigned layers = 1);
-
-	void begin_frame();
-	void clear();
-
-private:
-	struct TransientNode : Util::TemporaryHashmapEnabled<TransientNode>, Util::IntrusiveListEnabled<TransientNode>
-	{
-		TransientNode(ImageHandle handle)
-		    : handle(handle)
+		struct Subpass
 		{
-		}
-
-		ImageHandle handle;
+			uint32_t color_attachments[VULKAN_NUM_ATTACHMENTS];
+			uint32_t input_attachments[VULKAN_NUM_ATTACHMENTS];
+			uint32_t resolve_attachments[VULKAN_NUM_ATTACHMENTS];
+			unsigned num_color_attachments = 0;
+			unsigned num_input_attachments = 0;
+			unsigned num_resolve_attachments = 0;
+			DepthStencil depth_stencil_mode = DepthStencil::ReadWrite;
+		};
+		// If 0/nullptr, assume a default subpass.
+		const Subpass *subpasses = nullptr;
+		unsigned num_subpasses = 0;
 	};
 
-	Device *device;
-	Util::TemporaryHashmap<TransientNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> attachments;
-};
+	class RenderPass : public HashedObject<RenderPass>, public NoCopyNoMove
+	{
+		public:
+			struct SubpassInfo
+			{
+				VkAttachmentReference color_attachments[VULKAN_NUM_ATTACHMENTS];
+				unsigned num_color_attachments;
+				VkAttachmentReference input_attachments[VULKAN_NUM_ATTACHMENTS];
+				unsigned num_input_attachments;
+				VkAttachmentReference depth_stencil_attachment;
+
+				unsigned samples;
+			};
+
+			POD_VEC_DECLARE(SubpassInfoVec, SubpassInfo);
+
+			RenderPass(Util::Hash hash, Device *device, const RenderPassInfo &info);
+			~RenderPass();
+
+			VkRenderPass get_render_pass() const
+			{
+				return render_pass;
+			}
+
+			uint32_t get_sample_count(unsigned subpass) const
+			{
+				VK_ASSERT(subpass < subpasses.size());
+				return subpasses[subpass].samples;
+			}
+
+			unsigned get_num_color_attachments(unsigned subpass) const
+			{
+				VK_ASSERT(subpass < subpasses.size());
+				return subpasses[subpass].num_color_attachments;
+			}
+
+			unsigned get_num_input_attachments(unsigned subpass) const
+			{
+				VK_ASSERT(subpass < subpasses.size());
+				return subpasses[subpass].num_input_attachments;
+			}
+
+			const VkAttachmentReference &get_color_attachment(unsigned subpass, unsigned index) const
+			{
+				VK_ASSERT(subpass < subpasses.size());
+				VK_ASSERT(index < subpasses[subpass].num_color_attachments);
+				return subpasses[subpass].color_attachments[index];
+			}
+
+			const VkAttachmentReference &get_input_attachment(unsigned subpass, unsigned index) const
+			{
+				VK_ASSERT(subpass < subpasses.size());
+				VK_ASSERT(index < subpasses[subpass].num_input_attachments);
+				return subpasses[subpass].input_attachments[index];
+			}
+
+			bool has_depth(unsigned subpass) const
+			{
+				VK_ASSERT(subpass < subpasses.size());
+				return subpasses[subpass].depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
+					format_has_depth_aspect(depth_stencil);
+			}
+
+		private:
+			Device *device;
+			VkRenderPass render_pass = VK_NULL_HANDLE;
+
+			VkFormat color_attachments[VULKAN_NUM_ATTACHMENTS] = {};
+			VkFormat depth_stencil = VK_FORMAT_UNDEFINED;
+			SubpassInfoVec subpasses = { NULL, 0, 0 };
+
+			void fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
+	};
+
+	class Framebuffer : public Cookie, public NoCopyNoMove
+	{
+		public:
+			Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info);
+			~Framebuffer();
+
+			VkFramebuffer get_framebuffer() const
+			{
+				return framebuffer;
+			}
+
+			ImageView *get_attachment(unsigned index) const
+			{
+				assert(index < num_attachments);
+				return attachments[index];
+			}
+
+			uint32_t get_width() const
+			{
+				return width;
+			}
+
+			uint32_t get_height() const
+			{
+				return height;
+			}
+
+			const RenderPass &get_compatible_render_pass() const
+			{
+				return render_pass;
+			}
+
+		private:
+			Device *device;
+			VkFramebuffer framebuffer = VK_NULL_HANDLE;
+			const RenderPass &render_pass;
+			RenderPassInfo info;
+			uint32_t width = 0;
+			uint32_t height = 0;
+
+			ImageView *attachments[VULKAN_NUM_ATTACHMENTS + 1] = {};
+			unsigned num_attachments = 0;
+	};
+
+	static const unsigned VULKAN_FRAMEBUFFER_RING_SIZE = 8;
+	class FramebufferAllocator
+	{
+		public:
+			FramebufferAllocator(Device *device);
+			Framebuffer &request_framebuffer(const RenderPassInfo &info);
+
+			void begin_frame();
+			void clear();
+
+		private:
+			struct FramebufferNode : Util::TemporaryHashmapEnabled<FramebufferNode>,
+			Util::IntrusiveListEnabled<FramebufferNode>,
+			Framebuffer
+		{
+			FramebufferNode(Device *device, const RenderPass &rp, const RenderPassInfo &info)
+				: Framebuffer(device, rp, info)
+			{
+			}
+		};
+
+			Device *device;
+			Util::TemporaryHashmap<FramebufferNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> framebuffers;
+	};
+
+	class AttachmentAllocator
+	{
+		public:
+			AttachmentAllocator(Device *device)
+				: device(device)
+			{
+			}
+
+			ImageView &request_attachment(unsigned width, unsigned height, VkFormat format,
+					unsigned index = 0, unsigned samples = 1, unsigned layers = 1);
+
+			void begin_frame();
+			void clear();
+
+		private:
+			struct TransientNode : Util::TemporaryHashmapEnabled<TransientNode>, Util::IntrusiveListEnabled<TransientNode>
+		{
+			TransientNode(ImageHandle handle)
+				: handle(handle)
+			{
+			}
+
+			ImageHandle handle;
+		};
+
+			Device *device;
+			Util::TemporaryHashmap<TransientNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> attachments;
+	};
 
 }
-
 
 /* ============================================================
  * buffer_pool.hpp
  * ============================================================ */
 
-
-
 namespace Vulkan
 {
-class Device;
-class Buffer;
+	class Device;
+	class Buffer;
 
-struct BufferBlockAllocation
-{
-	uint8_t *host;
-	VkDeviceSize offset;
-};
-
-struct BufferBlock
-{
-	~BufferBlock();
-	Util::IntrusivePtr<Buffer> gpu;
-	Util::IntrusivePtr<Buffer> cpu;
-	VkDeviceSize offset = 0;
-	VkDeviceSize alignment = 0;
-	VkDeviceSize size = 0;
-	uint8_t *mapped = nullptr;
-
-	BufferBlockAllocation allocate(VkDeviceSize allocate_size)
+	struct BufferBlockAllocation
 	{
-		VkDeviceSize aligned_offset = (offset + alignment - 1) & ~(alignment - 1);
-		if (aligned_offset + allocate_size <= size)
+		uint8_t *host;
+		VkDeviceSize offset;
+	};
+
+	struct BufferBlock
+	{
+		~BufferBlock();
+		Util::IntrusivePtr<Buffer> gpu;
+		Util::IntrusivePtr<Buffer> cpu;
+		VkDeviceSize offset = 0;
+		VkDeviceSize alignment = 0;
+		VkDeviceSize size = 0;
+		uint8_t *mapped = nullptr;
+
+		BufferBlockAllocation allocate(VkDeviceSize allocate_size)
 		{
-			uint8_t *ret = mapped + aligned_offset;
-			offset = aligned_offset + allocate_size;
-			return { ret, aligned_offset };
+			VkDeviceSize aligned_offset = (offset + alignment - 1) & ~(alignment - 1);
+			if (aligned_offset + allocate_size <= size)
+			{
+				uint8_t *ret = mapped + aligned_offset;
+				offset = aligned_offset + allocate_size;
+				return { ret, aligned_offset };
+			}
+			else
+				return { nullptr, 0 };
 		}
-		else
-			return { nullptr, 0 };
-	}
-};
+	};
 
-class BufferPool
-{
-public:
-	~BufferPool();
-	void init(Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage)
+	class BufferPool
 	{
-		this->device = device;
-		this->block_size = block_size;
-		this->alignment = alignment;
-		this->usage = usage;
-	}
-	void reset();
+		public:
+			~BufferPool();
+			void init(Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage)
+			{
+				this->device = device;
+				this->block_size = block_size;
+				this->alignment = alignment;
+				this->usage = usage;
+			}
+			void reset();
 
-	VkDeviceSize get_block_size() const
-	{
-		return block_size;
-	}
+			VkDeviceSize get_block_size() const
+			{
+				return block_size;
+			}
 
-	BufferBlock request_block(VkDeviceSize minimum_size);
-	void recycle_block(BufferBlock &&block);
+			BufferBlock request_block(VkDeviceSize minimum_size);
+			void recycle_block(BufferBlock &&block);
 
-private:
-	Device *device = nullptr;
-	VkDeviceSize block_size = 0;
-	VkDeviceSize alignment = 0;
-	VkBufferUsageFlags usage = 0;
-	std::vector<BufferBlock> blocks;
-	BufferBlock allocate_block(VkDeviceSize size);
-};
+		private:
+			Device *device = nullptr;
+			VkDeviceSize block_size = 0;
+			VkDeviceSize alignment = 0;
+			VkBufferUsageFlags usage = 0;
+			std::vector<BufferBlock> blocks;
+			BufferBlock allocate_block(VkDeviceSize size);
+	};
 }
 
 /* ============================================================
@@ -4891,1180 +4723,1161 @@ private:
 
 namespace Vulkan
 {
-POD_VEC_DECLARE(CommandBufferVec, VkCommandBuffer);
-class CommandPool
-{
-public:
-	CommandPool(VkDevice device, uint32_t queue_family_index);
-	~CommandPool();
-
-	CommandPool(CommandPool &&) noexcept;
-	CommandPool &operator=(CommandPool &&) noexcept;
-	CommandPool(const CommandPool &) = delete;
-	void operator=(const CommandPool &) = delete;
-
-	void begin();
-	VkCommandBuffer request_command_buffer();
-	void signal_submitted(VkCommandBuffer cmd)
+	POD_VEC_DECLARE(CommandBufferVec, VkCommandBuffer);
+	class CommandPool
 	{
-#ifdef VULKAN_DEBUG
-		VK_ASSERT(in_flight.find(cmd) != end(in_flight));
-		in_flight.erase(cmd);
-#else
-		(void)cmd;
-#endif
-	}
+		public:
+			CommandPool(VkDevice device, uint32_t queue_family_index);
+			~CommandPool();
 
-private:
-	VkDevice device = VK_NULL_HANDLE;
-	VkCommandPool pool = VK_NULL_HANDLE;
-	CommandBufferVec buffers = { NULL, 0, 0 };
+			CommandPool(CommandPool &&) noexcept;
+			CommandPool &operator=(CommandPool &&) noexcept;
+			CommandPool(const CommandPool &) = delete;
+			void operator=(const CommandPool &) = delete;
+
+			void begin();
+			VkCommandBuffer request_command_buffer();
+			void signal_submitted(VkCommandBuffer cmd)
+			{
 #ifdef VULKAN_DEBUG
-	std::unordered_set<VkCommandBuffer> in_flight;
+				VK_ASSERT(in_flight.find(cmd) != end(in_flight));
+				in_flight.erase(cmd);
+#else
+				(void)cmd;
 #endif
-	unsigned index = 0;
-};
+			}
+
+		private:
+			VkDevice device = VK_NULL_HANDLE;
+			VkCommandPool pool = VK_NULL_HANDLE;
+			CommandBufferVec buffers = { NULL, 0, 0 };
+#ifdef VULKAN_DEBUG
+			std::unordered_set<VkCommandBuffer> in_flight;
+#endif
+			unsigned index = 0;
+	};
 }
 
 /* ============================================================
  * command_buffer.hpp
  * ============================================================ */
 
-
-
 namespace Vulkan
 {
+	enum CommandBufferDirtyBits
+	{
+		COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT = 1 << 0,
+		COMMAND_BUFFER_DIRTY_PIPELINE_BIT = 1 << 1,
 
-enum CommandBufferDirtyBits
-{
-	COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT = 1 << 0,
-	COMMAND_BUFFER_DIRTY_PIPELINE_BIT = 1 << 1,
+		COMMAND_BUFFER_DIRTY_VIEWPORT_BIT = 1 << 2,
+		COMMAND_BUFFER_DIRTY_SCISSOR_BIT = 1 << 3,
 
-	COMMAND_BUFFER_DIRTY_VIEWPORT_BIT = 1 << 2,
-	COMMAND_BUFFER_DIRTY_SCISSOR_BIT = 1 << 3,
+		COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT = 1 << 6,
 
-	COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT = 1 << 6,
+		COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT = 1 << 7,
 
-	COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT = 1 << 7,
-
-	COMMAND_BUFFER_DYNAMIC_BITS = COMMAND_BUFFER_DIRTY_VIEWPORT_BIT | COMMAND_BUFFER_DIRTY_SCISSOR_BIT
-};
-using CommandBufferDirtyFlags = uint32_t;
+		COMMAND_BUFFER_DYNAMIC_BITS = COMMAND_BUFFER_DIRTY_VIEWPORT_BIT | COMMAND_BUFFER_DIRTY_SCISSOR_BIT
+	};
+	using CommandBufferDirtyFlags = uint32_t;
 
 #define COMPARE_OP_BITS 3
 #define BLEND_FACTOR_BITS 5
 #define BLEND_OP_BITS 3
 #define CULL_MODE_BITS 2
-union PipelineState {
-	struct State
-	{
-		// Depth state.
-		unsigned depth_write : 1;
-		unsigned depth_test : 1;
-		unsigned blend_enable : 1;
-
-		unsigned cull_mode : CULL_MODE_BITS;
-
-		unsigned depth_compare : COMPARE_OP_BITS;
-
-		unsigned alpha_to_coverage : 1;
-		unsigned alpha_to_one : 1;
-		unsigned sample_shading : 1;
-
-		unsigned src_color_blend : BLEND_FACTOR_BITS;
-		unsigned dst_color_blend : BLEND_FACTOR_BITS;
-		unsigned color_blend_op : BLEND_OP_BITS;
-		unsigned src_alpha_blend : BLEND_FACTOR_BITS;
-		unsigned dst_alpha_blend : BLEND_FACTOR_BITS;
-		unsigned alpha_blend_op : BLEND_OP_BITS;
-		unsigned topology : 4;
-
-		unsigned spec_constant_mask : 8;
-	} state;
-	uint32_t words[4];
-};
-
-struct PotentialState
-{
-	float blend_constants[4];
-	uint32_t spec_constants[VULKAN_NUM_SPEC_CONSTANTS];
-};
-
-struct VertexAttribState
-{
-	uint32_t binding;
-	VkFormat format;
-	uint32_t offset;
-};
-
-struct VertexBindingState
-{
-	VkBuffer buffers[VULKAN_NUM_VERTEX_BUFFERS];
-	VkDeviceSize offsets[VULKAN_NUM_VERTEX_BUFFERS];
-	VkDeviceSize strides[VULKAN_NUM_VERTEX_BUFFERS];
-	VkVertexInputRate input_rates[VULKAN_NUM_VERTEX_BUFFERS];
-};
-
-struct ResourceBinding
-{
-	union {
-		VkDescriptorBufferInfo buffer;
-		struct
+	union PipelineState {
+		struct State
 		{
-			VkDescriptorImageInfo fp;
-			VkDescriptorImageInfo integer;
-		} image;
-		VkBufferView buffer_view;
-	};
-};
+			// Depth state.
+			unsigned depth_write : 1;
+			unsigned depth_test : 1;
+			unsigned blend_enable : 1;
 
-struct ResourceBindings
-{
-	ResourceBinding bindings[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS];
-	uint64_t cookies[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS];
-	uint64_t secondary_cookies[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS];
-	uint8_t push_constant_data[VULKAN_PUSH_CONSTANT_SIZE];
-};
+			unsigned cull_mode : CULL_MODE_BITS;
 
-static_assert(VULKAN_NUM_DESCRIPTOR_SETS == 4, "Number of descriptor sets != 4.");
+			unsigned depth_compare : COMPARE_OP_BITS;
 
-class CommandBuffer;
-struct CommandBufferDeleter
-{
-	void operator()(CommandBuffer *cmd);
-};
+			unsigned alpha_to_coverage : 1;
+			unsigned alpha_to_one : 1;
+			unsigned sample_shading : 1;
 
-class Device;
-class CommandBuffer : public Util::IntrusivePtrEnabled<CommandBuffer, CommandBufferDeleter, HandleCounter>
-{
-public:
-	friend struct CommandBufferDeleter;
-	enum class Type
-	{
-		Generic,
-		AsyncGraphics,
-		AsyncCompute,
-		AsyncTransfer
+			unsigned src_color_blend : BLEND_FACTOR_BITS;
+			unsigned dst_color_blend : BLEND_FACTOR_BITS;
+			unsigned color_blend_op : BLEND_OP_BITS;
+			unsigned src_alpha_blend : BLEND_FACTOR_BITS;
+			unsigned dst_alpha_blend : BLEND_FACTOR_BITS;
+			unsigned alpha_blend_op : BLEND_OP_BITS;
+			unsigned topology : 4;
+
+			unsigned spec_constant_mask : 8;
+		} state;
+		uint32_t words[4];
 	};
 
-	~CommandBuffer()
+	struct PotentialState
 	{
-		VK_ASSERT(vbo_block.mapped == nullptr);
-		VK_ASSERT(ubo_block.mapped == nullptr);
-	}
-	VkCommandBuffer get_command_buffer() const
+		float blend_constants[4];
+		uint32_t spec_constants[VULKAN_NUM_SPEC_CONSTANTS];
+	};
+
+	struct VertexAttribState
 	{
-		return cmd;
-	}
+		uint32_t binding;
+		VkFormat format;
+		uint32_t offset;
+	};
 
-	void begin_region(const char *name, const float *color = nullptr);
-	void end_region();
-
-	Device &get_device()
+	struct VertexBindingState
 	{
-		return *device;
-	}
+		VkBuffer buffers[VULKAN_NUM_VERTEX_BUFFERS];
+		VkDeviceSize offsets[VULKAN_NUM_VERTEX_BUFFERS];
+		VkDeviceSize strides[VULKAN_NUM_VERTEX_BUFFERS];
+		VkVertexInputRate input_rates[VULKAN_NUM_VERTEX_BUFFERS];
+	};
 
-	void clear_image(const Image &image, const VkClearValue &value);
-
-	void copy_buffer(const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
-	                 VkDeviceSize size);
-	void copy_buffer(const Buffer &dst, const Buffer &src)
+	struct ResourceBinding
 	{
-		VK_ASSERT(dst.get_create_info().size == src.get_create_info().size);
-		copy_buffer(dst, 0, src, 0, dst.get_create_info().size);
-	}
+		union {
+			VkDescriptorBufferInfo buffer;
+			struct
+			{
+				VkDescriptorImageInfo fp;
+				VkDescriptorImageInfo integer;
+			} image;
+			VkBufferView buffer_view;
+		};
+	};
 
-	void copy_buffer_to_image(const Image &image, const Buffer &buffer, VkDeviceSize buffer_offset,
-	                          const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
-	                          unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
-	void copy_buffer_to_image(const Image &image, const Buffer &buffer, unsigned num_blits, const VkBufferImageCopy *blits);
-
-	void copy_image_to_buffer(const Buffer &dst, const Image &src, VkDeviceSize buffer_offset, const VkOffset3D &offset,
-	                          const VkExtent3D &extent, unsigned row_length, unsigned slice_height,
-	                          const VkImageSubresourceLayers &subresrouce);
-
-	void full_barrier();
-	void pixel_barrier();
-	void barrier(VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage,
-	             VkAccessFlags dst_access);
-
-	void barrier(VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages,
-	             unsigned barriers, const VkMemoryBarrier *globals,
-	             unsigned buffer_barriers, const VkBufferMemoryBarrier *buffers,
-	             unsigned image_barriers, const VkImageMemoryBarrier *images);
-
-	void image_barrier(const Image &image, VkImageLayout old_layout, VkImageLayout new_layout,
-	                   VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage,
-	                   VkAccessFlags dst_access);
-
-	void blit_image(const Image &dst,
-	                const Image &src,
-	                const VkOffset3D &dst_offset0, const VkOffset3D &dst_extent,
-	                const VkOffset3D &src_offset0, const VkOffset3D &src_extent, unsigned dst_level, unsigned src_level,
-	                unsigned dst_base_layer = 0, uint32_t src_base_layer = 0, unsigned num_layers = 1,
-	                VkFilter filter = VK_FILTER_LINEAR);
-
-	// Prepares an image to have its mipmap generated.
-	// Puts the top-level into TRANSFER_SRC_OPTIMAL, and all other levels are invalidated with an UNDEFINED -> TRANSFER_DST_OPTIMAL.
-	void barrier_prepare_generate_mipmap(const Image &image, VkImageLayout base_level_layout, VkPipelineStageFlags src_stage, VkAccessFlags src_access,
-	                                     bool need_top_level_barrier = true);
-
-	// The image must have been transitioned with barrier_prepare_generate_mipmap before calling this function.
-	// After calling this function, the image will be entirely in TRANSFER_SRC_OPTIMAL layout.
-	// Wait for TRANSFER stage to drain before transitioning away from TRANSFER_SRC_OPTIMAL.
-	void generate_mipmap(const Image &image);
-
-	void begin_render_pass(const RenderPassInfo &info, VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
-	void end_render_pass();
-	void set_program(Program &program);
-
-
-	void set_buffer_view(unsigned set, unsigned binding, const BufferView &view);
-	void set_input_attachments(unsigned set, unsigned start_binding);
-	void set_texture(unsigned set, unsigned binding, const ImageView &view);
-	void set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler);
-	void set_texture(unsigned set, unsigned binding, const ImageView &view, StockSampler sampler);
-	void set_storage_texture(unsigned set, unsigned binding, const ImageView &view);
-	void set_sampler(unsigned set, unsigned binding, const Sampler &sampler);
-	void set_uniform_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
-	                        VkDeviceSize range);
-	void push_constants(const void *data, VkDeviceSize offset, VkDeviceSize range);
-
-	void *allocate_constant_data(unsigned set, unsigned binding, VkDeviceSize size);
-
-	template <typename T>
-	T *allocate_typed_constant_data(unsigned set, unsigned binding, unsigned count)
+	struct ResourceBindings
 	{
-		return static_cast<T *>(allocate_constant_data(set, binding, count * sizeof(T)));
-	}
+		ResourceBinding bindings[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS];
+		uint64_t cookies[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS];
+		uint64_t secondary_cookies[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS];
+		uint8_t push_constant_data[VULKAN_PUSH_CONSTANT_SIZE];
+	};
 
-	void *allocate_vertex_data(unsigned binding, VkDeviceSize size, VkDeviceSize stride,
-	                           VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
+	static_assert(VULKAN_NUM_DESCRIPTOR_SETS == 4, "Number of descriptor sets != 4.");
 
-	void set_viewport(const VkViewport &viewport)
+	class CommandBuffer;
+	struct CommandBufferDeleter
 	{
-		VK_ASSERT(framebuffer);
-		this->viewport = viewport;
-		set_dirty(COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
-	}
-	const VkViewport &get_viewport() const
+		void operator()(CommandBuffer *cmd);
+	};
+
+	class Device;
+	class CommandBuffer : public Util::IntrusivePtrEnabled<CommandBuffer, CommandBufferDeleter, HandleCounter>
 	{
-		return viewport;
-	}
-	void set_scissor(const VkRect2D &rect);
+		public:
+			friend struct CommandBufferDeleter;
+			enum class Type
+			{
+				Generic,
+				AsyncGraphics,
+				AsyncCompute,
+				AsyncTransfer
+			};
 
-	void set_vertex_attrib(uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset);
-	void set_vertex_binding(uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride,
-	                        VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
+			~CommandBuffer()
+			{
+				VK_ASSERT(vbo_block.mapped == nullptr);
+				VK_ASSERT(ubo_block.mapped == nullptr);
+			}
+			VkCommandBuffer get_command_buffer() const
+			{
+				return cmd;
+			}
 
-	void draw(uint32_t vertex_count, uint32_t instance_count = 1, uint32_t first_vertex = 0,
-	          uint32_t first_instance = 0);
+			void begin_region(const char *name, const float *color = nullptr);
+			void end_region();
 
-	void dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
+			Device &get_device()
+			{
+				return *device;
+			}
 
-	void set_opaque_state();
-	void set_quad_state();
+			void clear_image(const Image &image, const VkClearValue &value);
+
+			void copy_buffer(const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
+					VkDeviceSize size);
+			void copy_buffer(const Buffer &dst, const Buffer &src)
+			{
+				VK_ASSERT(dst.get_create_info().size == src.get_create_info().size);
+				copy_buffer(dst, 0, src, 0, dst.get_create_info().size);
+			}
+
+			void copy_buffer_to_image(const Image &image, const Buffer &buffer, VkDeviceSize buffer_offset,
+					const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
+					unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
+			void copy_buffer_to_image(const Image &image, const Buffer &buffer, unsigned num_blits, const VkBufferImageCopy *blits);
+
+			void copy_image_to_buffer(const Buffer &dst, const Image &src, VkDeviceSize buffer_offset, const VkOffset3D &offset,
+					const VkExtent3D &extent, unsigned row_length, unsigned slice_height,
+					const VkImageSubresourceLayers &subresrouce);
+
+			void full_barrier();
+			void pixel_barrier();
+			void barrier(VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage,
+					VkAccessFlags dst_access);
+
+			void barrier(VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages,
+					unsigned barriers, const VkMemoryBarrier *globals,
+					unsigned buffer_barriers, const VkBufferMemoryBarrier *buffers,
+					unsigned image_barriers, const VkImageMemoryBarrier *images);
+
+			void image_barrier(const Image &image, VkImageLayout old_layout, VkImageLayout new_layout,
+					VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage,
+					VkAccessFlags dst_access);
+
+			void blit_image(const Image &dst,
+					const Image &src,
+					const VkOffset3D &dst_offset0, const VkOffset3D &dst_extent,
+					const VkOffset3D &src_offset0, const VkOffset3D &src_extent, unsigned dst_level, unsigned src_level,
+					unsigned dst_base_layer = 0, uint32_t src_base_layer = 0, unsigned num_layers = 1,
+					VkFilter filter = VK_FILTER_LINEAR);
+
+			// Prepares an image to have its mipmap generated.
+			// Puts the top-level into TRANSFER_SRC_OPTIMAL, and all other levels are invalidated with an UNDEFINED -> TRANSFER_DST_OPTIMAL.
+			void barrier_prepare_generate_mipmap(const Image &image, VkImageLayout base_level_layout, VkPipelineStageFlags src_stage, VkAccessFlags src_access,
+					bool need_top_level_barrier = true);
+
+			// The image must have been transitioned with barrier_prepare_generate_mipmap before calling this function.
+			// After calling this function, the image will be entirely in TRANSFER_SRC_OPTIMAL layout.
+			// Wait for TRANSFER stage to drain before transitioning away from TRANSFER_SRC_OPTIMAL.
+			void generate_mipmap(const Image &image);
+
+			void begin_render_pass(const RenderPassInfo &info, VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
+			void end_render_pass();
+			void set_program(Program &program);
+
+
+			void set_buffer_view(unsigned set, unsigned binding, const BufferView &view);
+			void set_input_attachments(unsigned set, unsigned start_binding);
+			void set_texture(unsigned set, unsigned binding, const ImageView &view);
+			void set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler);
+			void set_texture(unsigned set, unsigned binding, const ImageView &view, StockSampler sampler);
+			void set_storage_texture(unsigned set, unsigned binding, const ImageView &view);
+			void set_sampler(unsigned set, unsigned binding, const Sampler &sampler);
+			void set_uniform_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
+					VkDeviceSize range);
+			void push_constants(const void *data, VkDeviceSize offset, VkDeviceSize range);
+
+			void *allocate_constant_data(unsigned set, unsigned binding, VkDeviceSize size);
+
+			template <typename T>
+				T *allocate_typed_constant_data(unsigned set, unsigned binding, unsigned count)
+				{
+					return static_cast<T *>(allocate_constant_data(set, binding, count * sizeof(T)));
+				}
+
+			void *allocate_vertex_data(unsigned binding, VkDeviceSize size, VkDeviceSize stride,
+					VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
+
+			void set_viewport(const VkViewport &viewport)
+			{
+				VK_ASSERT(framebuffer);
+				this->viewport = viewport;
+				set_dirty(COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
+			}
+			const VkViewport &get_viewport() const
+			{
+				return viewport;
+			}
+			void set_scissor(const VkRect2D &rect);
+
+			void set_vertex_attrib(uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset);
+			void set_vertex_binding(uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride,
+					VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
+
+			void draw(uint32_t vertex_count, uint32_t instance_count = 1, uint32_t first_vertex = 0,
+					uint32_t first_instance = 0);
+
+			void dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
+
+			void set_opaque_state();
+			void set_quad_state();
 
 #define SET_STATIC_STATE(value)                               \
-	do                                                        \
-	{                                                         \
-		if (static_state.state.value != value)                \
-		{                                                     \
-			static_state.state.value = value;                 \
-			set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
-		}                                                     \
-	} while (0)
+			do                                                        \
+			{                                                         \
+				if (static_state.state.value != value)                \
+				{                                                     \
+					static_state.state.value = value;                 \
+					set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
+				}                                                     \
+			} while (0)
 
 #define SET_POTENTIALLY_STATIC_STATE(value)                   \
-	do                                                        \
-	{                                                         \
-		if (potential_static_state.value != value)            \
-		{                                                     \
-			potential_static_state.value = value;             \
-			set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
-		}                                                     \
-	} while (0)
+			do                                                        \
+			{                                                         \
+				if (potential_static_state.value != value)            \
+				{                                                     \
+					potential_static_state.value = value;             \
+					set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
+				}                                                     \
+			} while (0)
 
-	inline void set_depth_test(bool depth_test, bool depth_write)
-	{
-		SET_STATIC_STATE(depth_test);
-		SET_STATIC_STATE(depth_write);
-	}
+			inline void set_depth_test(bool depth_test, bool depth_write)
+			{
+				SET_STATIC_STATE(depth_test);
+				SET_STATIC_STATE(depth_write);
+			}
 
-	inline void set_depth_compare(VkCompareOp depth_compare)
-	{
-		SET_STATIC_STATE(depth_compare);
-	}
+			inline void set_depth_compare(VkCompareOp depth_compare)
+			{
+				SET_STATIC_STATE(depth_compare);
+			}
 
-	inline void set_blend_enable(bool blend_enable)
-	{
-		SET_STATIC_STATE(blend_enable);
-	}
+			inline void set_blend_enable(bool blend_enable)
+			{
+				SET_STATIC_STATE(blend_enable);
+			}
 
-	inline void set_blend_factors(VkBlendFactor src_color_blend, VkBlendFactor src_alpha_blend,
-	                              VkBlendFactor dst_color_blend, VkBlendFactor dst_alpha_blend)
-	{
-		SET_STATIC_STATE(src_color_blend);
-		SET_STATIC_STATE(dst_color_blend);
-		SET_STATIC_STATE(src_alpha_blend);
-		SET_STATIC_STATE(dst_alpha_blend);
-	}
+			inline void set_blend_factors(VkBlendFactor src_color_blend, VkBlendFactor src_alpha_blend,
+					VkBlendFactor dst_color_blend, VkBlendFactor dst_alpha_blend)
+			{
+				SET_STATIC_STATE(src_color_blend);
+				SET_STATIC_STATE(dst_color_blend);
+				SET_STATIC_STATE(src_alpha_blend);
+				SET_STATIC_STATE(dst_alpha_blend);
+			}
 
-	inline void set_blend_factors(VkBlendFactor src_blend, VkBlendFactor dst_blend)
-	{
-		set_blend_factors(src_blend, src_blend, dst_blend, dst_blend);
-	}
+			inline void set_blend_factors(VkBlendFactor src_blend, VkBlendFactor dst_blend)
+			{
+				set_blend_factors(src_blend, src_blend, dst_blend, dst_blend);
+			}
 
-	inline void set_blend_op(VkBlendOp color_blend_op, VkBlendOp alpha_blend_op)
-	{
-		SET_STATIC_STATE(color_blend_op);
-		SET_STATIC_STATE(alpha_blend_op);
-	}
+			inline void set_blend_op(VkBlendOp color_blend_op, VkBlendOp alpha_blend_op)
+			{
+				SET_STATIC_STATE(color_blend_op);
+				SET_STATIC_STATE(alpha_blend_op);
+			}
 
-	inline void set_blend_op(VkBlendOp blend_op)
-	{
-		set_blend_op(blend_op, blend_op);
-	}
+			inline void set_blend_op(VkBlendOp blend_op)
+			{
+				set_blend_op(blend_op, blend_op);
+			}
 
-	inline void set_primitive_topology(VkPrimitiveTopology topology)
-	{
-		SET_STATIC_STATE(topology);
-	}
+			inline void set_primitive_topology(VkPrimitiveTopology topology)
+			{
+				SET_STATIC_STATE(topology);
+			}
 
-	inline void set_multisample_state(bool alpha_to_coverage, bool alpha_to_one = false, bool sample_shading = false)
-	{
-		SET_STATIC_STATE(alpha_to_coverage);
-		SET_STATIC_STATE(alpha_to_one);
-		SET_STATIC_STATE(sample_shading);
-	}
+			inline void set_multisample_state(bool alpha_to_coverage, bool alpha_to_one = false, bool sample_shading = false)
+			{
+				SET_STATIC_STATE(alpha_to_coverage);
+				SET_STATIC_STATE(alpha_to_one);
+				SET_STATIC_STATE(sample_shading);
+			}
 
-	inline void set_cull_mode(VkCullModeFlags cull_mode)
-	{
-		SET_STATIC_STATE(cull_mode);
-	}
+			inline void set_cull_mode(VkCullModeFlags cull_mode)
+			{
+				SET_STATIC_STATE(cull_mode);
+			}
 
-	inline void set_blend_constants(const float blend_constants[4])
-	{
-		SET_POTENTIALLY_STATIC_STATE(blend_constants[0]);
-		SET_POTENTIALLY_STATIC_STATE(blend_constants[1]);
-		SET_POTENTIALLY_STATIC_STATE(blend_constants[2]);
-		SET_POTENTIALLY_STATIC_STATE(blend_constants[3]);
-	}
+			inline void set_blend_constants(const float blend_constants[4])
+			{
+				SET_POTENTIALLY_STATIC_STATE(blend_constants[0]);
+				SET_POTENTIALLY_STATIC_STATE(blend_constants[1]);
+				SET_POTENTIALLY_STATIC_STATE(blend_constants[2]);
+				SET_POTENTIALLY_STATIC_STATE(blend_constants[3]);
+			}
 
-	inline void set_specialization_constant_mask(uint32_t spec_constant_mask)
-	{
-		VK_ASSERT((spec_constant_mask & ~((1u << VULKAN_NUM_SPEC_CONSTANTS) - 1u)) == 0u);
-		SET_STATIC_STATE(spec_constant_mask);
-	}
+			inline void set_specialization_constant_mask(uint32_t spec_constant_mask)
+			{
+				VK_ASSERT((spec_constant_mask & ~((1u << VULKAN_NUM_SPEC_CONSTANTS) - 1u)) == 0u);
+				SET_STATIC_STATE(spec_constant_mask);
+			}
 
-	template <typename T>
-	inline void set_specialization_constant(unsigned index, const T &value)
-	{
-		VK_ASSERT(index < VULKAN_NUM_SPEC_CONSTANTS);
-		static_assert(sizeof(value) == sizeof(uint32_t), "Spec constant data must be 32-bit.");
-		if (memcmp(&potential_static_state.spec_constants[index], &value, sizeof(value)))
-		{
-			memcpy(&potential_static_state.spec_constants[index], &value, sizeof(value));
-			if (static_state.state.spec_constant_mask & (1u << index))
-				set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
-		}
-	}
+			template <typename T>
+				inline void set_specialization_constant(unsigned index, const T &value)
+				{
+					VK_ASSERT(index < VULKAN_NUM_SPEC_CONSTANTS);
+					static_assert(sizeof(value) == sizeof(uint32_t), "Spec constant data must be 32-bit.");
+					if (memcmp(&potential_static_state.spec_constants[index], &value, sizeof(value)))
+					{
+						memcpy(&potential_static_state.spec_constants[index], &value, sizeof(value));
+						if (static_state.state.spec_constant_mask & (1u << index))
+							set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
+					}
+				}
 
-	inline Type get_command_buffer_type() const
-	{
-		return type;
-	}
+			inline Type get_command_buffer_type() const
+			{
+				return type;
+			}
 
-	void end();
+			void end();
 
-private:
-	friend class Util::ObjectPool<CommandBuffer>;
-	CommandBuffer(Device *device, VkCommandBuffer cmd, Type type);
+		private:
+			friend class Util::ObjectPool<CommandBuffer>;
+			CommandBuffer(Device *device, VkCommandBuffer cmd, Type type);
 
-	Device *device;
-	VkCommandBuffer cmd;
-	Type type;
+			Device *device;
+			VkCommandBuffer cmd;
+			Type type;
 
-	const Framebuffer *framebuffer = nullptr;
-	const RenderPass *actual_render_pass = nullptr;
-	const RenderPass *compatible_render_pass = nullptr;
+			const Framebuffer *framebuffer = nullptr;
+			const RenderPass *actual_render_pass = nullptr;
+			const RenderPass *compatible_render_pass = nullptr;
 
-	VertexAttribState attribs[VULKAN_NUM_VERTEX_ATTRIBS] = {};
-	VertexBindingState vbo = {};
-	ResourceBindings bindings;
+			VertexAttribState attribs[VULKAN_NUM_VERTEX_ATTRIBS] = {};
+			VertexBindingState vbo = {};
+			ResourceBindings bindings;
 
-	VkPipeline current_pipeline = VK_NULL_HANDLE;
-	VkPipelineLayout current_pipeline_layout = VK_NULL_HANDLE;
-	PipelineLayout *current_layout = nullptr;
-	Program *current_program = nullptr;
-	unsigned current_subpass = 0;
-	VkSubpassContents current_contents = VK_SUBPASS_CONTENTS_INLINE;
+			VkPipeline current_pipeline = VK_NULL_HANDLE;
+			VkPipelineLayout current_pipeline_layout = VK_NULL_HANDLE;
+			PipelineLayout *current_layout = nullptr;
+			Program *current_program = nullptr;
+			unsigned current_subpass = 0;
+			VkSubpassContents current_contents = VK_SUBPASS_CONTENTS_INLINE;
 
-	VkViewport viewport = {};
-	VkRect2D scissor = {};
+			VkViewport viewport = {};
+			VkRect2D scissor = {};
 
-	CommandBufferDirtyFlags dirty = ~0u;
-	uint32_t dirty_sets = 0;
-	uint32_t dirty_vbos = 0;
-	uint32_t active_vbos = 0;
-	bool is_compute = true;
+			CommandBufferDirtyFlags dirty = ~0u;
+			uint32_t dirty_sets = 0;
+			uint32_t dirty_vbos = 0;
+			uint32_t active_vbos = 0;
+			bool is_compute = true;
 
-	void set_dirty(CommandBufferDirtyFlags flags)
-	{
-		dirty |= flags;
-	}
+			void set_dirty(CommandBufferDirtyFlags flags)
+			{
+				dirty |= flags;
+			}
 
-	CommandBufferDirtyFlags get_and_clear(CommandBufferDirtyFlags flags)
-	{
-		CommandBufferDirtyFlags mask = dirty & flags;
-		dirty &= ~flags;
-		return mask;
-	}
+			CommandBufferDirtyFlags get_and_clear(CommandBufferDirtyFlags flags)
+			{
+				CommandBufferDirtyFlags mask = dirty & flags;
+				dirty &= ~flags;
+				return mask;
+			}
 
-	PipelineState static_state;
-	PotentialState potential_static_state = {};
+			PipelineState static_state;
+			PotentialState potential_static_state = {};
 #ifndef _MSC_VER
-	static_assert(sizeof(static_state.words) >= sizeof(static_state.state),
-	              "Hashable pipeline state is not large enough!");
+			static_assert(sizeof(static_state.words) >= sizeof(static_state.state),
+					"Hashable pipeline state is not large enough!");
 #endif
 
-	void flush_render_state();
-	VkPipeline build_graphics_pipeline(Util::Hash hash);
-	VkPipeline build_compute_pipeline(Util::Hash hash);
-	void flush_graphics_pipeline();
-	void flush_compute_pipeline();
-	void flush_descriptor_sets();
-	void begin_graphics()
-	{
-		is_compute = false;
-		begin_context();
-	}
-	void flush_descriptor_set(uint32_t set);
-	void begin_compute()
-	{
-		is_compute = true;
-		begin_context();
-	}
-	void begin_context();
+			void flush_render_state();
+			VkPipeline build_graphics_pipeline(Util::Hash hash);
+			VkPipeline build_compute_pipeline(Util::Hash hash);
+			void flush_graphics_pipeline();
+			void flush_compute_pipeline();
+			void flush_descriptor_sets();
+			void begin_graphics()
+			{
+				is_compute = false;
+				begin_context();
+			}
+			void flush_descriptor_set(uint32_t set);
+			void begin_compute()
+			{
+				is_compute = true;
+				begin_context();
+			}
+			void begin_context();
 
-	void flush_compute_state();
+			void flush_compute_state();
 
-	BufferBlock vbo_block;
-	BufferBlock ubo_block;
+			BufferBlock vbo_block;
+			BufferBlock ubo_block;
 
-	void set_texture(unsigned set, unsigned binding, VkImageView float_view, VkImageView integer_view,
-	                 VkImageLayout layout,
-	                 uint64_t cookie);
+			void set_texture(unsigned set, unsigned binding, VkImageView float_view, VkImageView integer_view,
+					VkImageLayout layout,
+					uint64_t cookie);
 
-	void init_viewport_scissor(const RenderPassInfo &info, const Framebuffer *framebuffer);
-};
+			void init_viewport_scissor(const RenderPassInfo &info, const Framebuffer *framebuffer);
+	};
 
 
-using CommandBufferHandle = Util::IntrusivePtr<CommandBuffer>;
+	using CommandBufferHandle = Util::IntrusivePtr<CommandBuffer>;
 }
 
 /* ============================================================
  * device.hpp
  * ============================================================ */
 
-
-
-
 namespace Vulkan
 {
-struct InitialImageBuffer
-{
-	BufferHandle buffer;
-	// Bound matches the implicit invariant in TextureFormatLayout::mips[16]:
-	// callers must pass <= 16 mip levels (no runtime check exists in
-	// fill_mipinfo). build_buffer_image_copies is the sole writer of these
-	// fields; it asserts num_blits <= 16 before writing.
-	VkBufferImageCopy blits[16];
-	unsigned num_blits = 0;
-};
+	struct InitialImageBuffer
+	{
+		BufferHandle buffer;
+		// Bound matches the implicit invariant in TextureFormatLayout::mips[16]:
+		// callers must pass <= 16 mip levels (no runtime check exists in
+		// fill_mipinfo). build_buffer_image_copies is the sole writer of these
+		// fields; it asserts num_blits <= 16 before writing.
+		VkBufferImageCopy blits[16];
+		unsigned num_blits = 0;
+	};
 
-struct HandlePool
-{
-	VulkanObjectPool<Buffer> buffers;
-	VulkanObjectPool<Image> images;
-	VulkanObjectPool<ImageView> image_views;
-	VulkanObjectPool<BufferView> buffer_views;
-	VulkanObjectPool<Sampler> samplers;
-	VulkanObjectPool<FenceHolder> fences;
-	VulkanObjectPool<SemaphoreHolder> semaphores;
-	VulkanObjectPool<CommandBuffer> command_buffers;
-};
+	struct HandlePool
+	{
+		VulkanObjectPool<Buffer> buffers;
+		VulkanObjectPool<Image> images;
+		VulkanObjectPool<ImageView> image_views;
+		VulkanObjectPool<BufferView> buffer_views;
+		VulkanObjectPool<Sampler> samplers;
+		VulkanObjectPool<FenceHolder> fences;
+		VulkanObjectPool<SemaphoreHolder> semaphores;
+		VulkanObjectPool<CommandBuffer> command_buffers;
+	};
 
-/* Thread-locking primitives used by the Device implementation
- * below. Defined here (instead of just before device.cpp's
- * out-of-line bodies further down the TU) so the Device class
- * declaration's inline methods can use them too. */
+	/* Thread-locking primitives used by the Device implementation
+	 * below. Defined here (instead of just before device.cpp's
+	 * out-of-line bodies further down the TU) so the Device class
+	 * declaration's inline methods can use them too. */
 #define LOCK() ((void)0)
 #define DRAIN_FRAME_LOCK() VK_ASSERT(lock.counter == 0)
 
-class Device
-{
-public:
-	// Device-based objects which need to poke at internal data structures when their lifetimes end.
-	// Don't want to expose a lot of internal guts to make this work.
-	friend class SemaphoreHolder;
-	friend struct SemaphoreHolderDeleter;
-	friend class FenceHolder;
-	friend struct FenceHolderDeleter;
-	friend class Sampler;
-	friend struct SamplerDeleter;
-	friend class Buffer;
-	friend struct BufferDeleter;
-	friend class BufferView;
-	friend struct BufferViewDeleter;
-	friend class ImageView;
-	friend struct ImageViewDeleter;
-	friend class Image;
-	friend struct ImageDeleter;
-	friend class CommandBuffer;
-	friend struct CommandBufferDeleter;
-	friend class Program;
-	friend class Cookie;
-	friend class Framebuffer;
-	friend class PipelineLayout;
-	friend class FramebufferAllocator;
-
-	Device();
-	~Device();
-
-	// No move-copy.
-	void operator=(Device &&) = delete;
-	Device(Device &&) = delete;
-
-	// Only called by main thread, during setup phase.
-	void set_context(const Context &context);
-	void init_frame_contexts(unsigned count);
-
-	// Frame-pushing interface.
-	void next_frame_context();
-	void wait_idle()
+	class Device
 	{
-		DRAIN_FRAME_LOCK();
-		wait_idle_nolock();
-	}
+		public:
+			// Device-based objects which need to poke at internal data structures when their lifetimes end.
+			// Don't want to expose a lot of internal guts to make this work.
+			friend class SemaphoreHolder;
+			friend struct SemaphoreHolderDeleter;
+			friend class FenceHolder;
+			friend struct FenceHolderDeleter;
+			friend class Sampler;
+			friend struct SamplerDeleter;
+			friend class Buffer;
+			friend struct BufferDeleter;
+			friend class BufferView;
+			friend struct BufferViewDeleter;
+			friend class ImageView;
+			friend struct ImageViewDeleter;
+			friend class Image;
+			friend struct ImageDeleter;
+			friend class CommandBuffer;
+			friend struct CommandBufferDeleter;
+			friend class Program;
+			friend class Cookie;
+			friend class Framebuffer;
+			friend class PipelineLayout;
+			friend class FramebufferAllocator;
 
-	// Set names for objects for debuggers and profilers.
-	void set_name(const Buffer &buffer, const char *name);
-	void set_name(const Image &image, const char *name);
+			Device();
+			~Device();
 
-	// Submission interface, may be called from any thread at any time.
-	void flush_frame()
-	{
-		LOCK();
-		flush_frame_nolock();
-	}
-	CommandBufferHandle request_command_buffer(CommandBuffer::Type type = CommandBuffer::Type::Generic);
-	void submit(CommandBufferHandle &cmd, Fence *fence = nullptr,
-	            unsigned semaphore_count = 0, Semaphore *semaphore = nullptr);
-	void add_wait_semaphore(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush);
-	CommandBuffer::Type get_physical_queue_type(CommandBuffer::Type queue_type) const;
+			// No move-copy.
+			void operator=(Device &&) = delete;
+			Device(Device &&) = delete;
 
-	// Request shaders and programs. These objects are owned by the Device.
-	Shader *request_shader(const uint32_t *code, size_t size);
-	Program *request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
-	                         size_t fragment_size);
-	Program *request_program(const uint32_t *compute_data, size_t compute_size);
-	Program *request_program(Shader *vertex, Shader *fragment);
-	Program *request_program(Shader *compute);
+			// Only called by main thread, during setup phase.
+			void set_context(const Context &context);
+			void init_frame_contexts(unsigned count);
 
-	// Map and unmap buffer objects.
-	void *map_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
-	{
-		return managers.memory.map_memory(buffer.get_allocation(), access);
-	}
-	void unmap_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
-	{
-		managers.memory.unmap_memory(buffer.get_allocation(), access);
-	}
+			// Frame-pushing interface.
+			void next_frame_context();
+			void wait_idle()
+			{
+				DRAIN_FRAME_LOCK();
+				wait_idle_nolock();
+			}
 
-	// Create buffers and images.
-	BufferHandle create_buffer(const BufferCreateInfo &info, const void *initial = nullptr);
-	ImageHandle create_image(const ImageCreateInfo &info, const ImageInitialData *initial = nullptr);
-	ImageHandle create_image_from_staging_buffer(const ImageCreateInfo &info, const InitialImageBuffer *buffer);
+			// Set names for objects for debuggers and profilers.
+			void set_name(const Buffer &buffer, const char *name);
+			void set_name(const Image &image, const char *name);
 
-	// Create staging buffers for images.
-	InitialImageBuffer create_image_staging_buffer(const ImageCreateInfo &info, const ImageInitialData *initial);
+			// Submission interface, may be called from any thread at any time.
+			void flush_frame()
+			{
+				LOCK();
+				flush_frame_nolock();
+			}
+			CommandBufferHandle request_command_buffer(CommandBuffer::Type type = CommandBuffer::Type::Generic);
+			void submit(CommandBufferHandle &cmd, Fence *fence = nullptr,
+					unsigned semaphore_count = 0, Semaphore *semaphore = nullptr);
+			void add_wait_semaphore(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush);
+			CommandBuffer::Type get_physical_queue_type(CommandBuffer::Type queue_type) const;
 
-	// Create image view, buffer views and samplers.
-	ImageViewHandle create_image_view(const ImageViewCreateInfo &view_info);
-	BufferViewHandle create_buffer_view(const BufferViewCreateInfo &view_info);
+			// Request shaders and programs. These objects are owned by the Device.
+			Shader *request_shader(const uint32_t *code, size_t size);
+			Program *request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
+					size_t fragment_size);
+			Program *request_program(const uint32_t *compute_data, size_t compute_size);
+			Program *request_program(Shader *vertex, Shader *fragment);
+			Program *request_program(Shader *compute);
 
-	// Render pass helpers.
-	bool image_format_is_supported(VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL) const;
-	bool get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags,
-	                                 VkImageFormatProperties *properties);
+			// Map and unmap buffer objects.
+			void *map_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
+			{
+				return managers.memory.map_memory(buffer.get_allocation(), access);
+			}
+			void unmap_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
+			{
+				managers.memory.unmap_memory(buffer.get_allocation(), access);
+			}
 
-	VkFormat get_default_depth_format() const;
-	ImageView &get_transient_attachment(unsigned width, unsigned height, VkFormat format,
-	                                    unsigned index = 0, unsigned samples = 1, unsigned layers = 1)
-	{
-		return transient_allocator.request_attachment(width, height, format, index, samples, layers);
-	}
+			// Create buffers and images.
+			BufferHandle create_buffer(const BufferCreateInfo &info, const void *initial = nullptr);
+			ImageHandle create_image(const ImageCreateInfo &info, const ImageInitialData *initial = nullptr);
+			ImageHandle create_image_from_staging_buffer(const ImageCreateInfo &info, const InitialImageBuffer *buffer);
 
-	VkDevice get_device()
-	{
-		return device;
-	}
+			// Create staging buffers for images.
+			InitialImageBuffer create_image_staging_buffer(const ImageCreateInfo &info, const ImageInitialData *initial);
 
-	const VkPhysicalDeviceProperties &get_gpu_properties() const
-	{
-		return gpu_props;
-	}
+			// Create image view, buffer views and samplers.
+			ImageViewHandle create_image_view(const ImageViewCreateInfo &view_info);
+			BufferViewHandle create_buffer_view(const BufferViewCreateInfo &view_info);
 
-	const Sampler &get_stock_sampler(StockSampler sampler) const
-	{
-		return *samplers[static_cast<unsigned>(sampler)];
-	}
+			// Render pass helpers.
+			bool image_format_is_supported(VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL) const;
+			bool get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags,
+					VkImageFormatProperties *properties);
+
+			VkFormat get_default_depth_format() const;
+			ImageView &get_transient_attachment(unsigned width, unsigned height, VkFormat format,
+					unsigned index = 0, unsigned samples = 1, unsigned layers = 1)
+			{
+				return transient_allocator.request_attachment(width, height, format, index, samples, layers);
+			}
+
+			VkDevice get_device()
+			{
+				return device;
+			}
+
+			const VkPhysicalDeviceProperties &get_gpu_properties() const
+			{
+				return gpu_props;
+			}
+
+			const Sampler &get_stock_sampler(StockSampler sampler) const
+			{
+				return *samplers[static_cast<unsigned>(sampler)];
+			}
 
 
-	const ImplementationWorkarounds &get_workarounds() const
-	{
-		return workarounds;
-	}
+			const ImplementationWorkarounds &get_workarounds() const
+			{
+				return workarounds;
+			}
 
-	const DeviceFeatures &get_device_features() const
-	{
-		return ext;
-	}
+			const DeviceFeatures &get_device_features() const
+			{
+				return ext;
+			}
 
-private:
-	VkInstance instance = VK_NULL_HANDLE;
-	VkPhysicalDevice gpu = VK_NULL_HANDLE;
-	VkDevice device = VK_NULL_HANDLE;
-	VkQueue graphics_queue = VK_NULL_HANDLE;
-	VkQueue compute_queue = VK_NULL_HANDLE;
-	VkQueue transfer_queue = VK_NULL_HANDLE;
+		private:
+			VkInstance instance = VK_NULL_HANDLE;
+			VkPhysicalDevice gpu = VK_NULL_HANDLE;
+			VkDevice device = VK_NULL_HANDLE;
+			VkQueue graphics_queue = VK_NULL_HANDLE;
+			VkQueue compute_queue = VK_NULL_HANDLE;
+			VkQueue transfer_queue = VK_NULL_HANDLE;
 
-	uint64_t cookie = 0;
+			uint64_t cookie = 0;
 
-	uint64_t allocate_cookie()
-	{
-		// Reserve lower bits for "special purposes".
-		cookie += 16;
-		return cookie;
-	}
-	void bake_program(Program &program);
+			uint64_t allocate_cookie()
+			{
+				// Reserve lower bits for "special purposes".
+				cookie += 16;
+				return cookie;
+			}
+			void bake_program(Program &program);
 
-	void request_vertex_block(BufferBlock &block, VkDeviceSize size)
-	{
-		LOCK();
-		request_vertex_block_nolock(block, size);
-	}
-	void request_uniform_block(BufferBlock &block, VkDeviceSize size)
-	{
-		LOCK();
-		request_uniform_block_nolock(block, size);
-	}
+			void request_vertex_block(BufferBlock &block, VkDeviceSize size)
+			{
+				LOCK();
+				request_vertex_block_nolock(block, size);
+			}
+			void request_uniform_block(BufferBlock &block, VkDeviceSize size)
+			{
+				LOCK();
+				request_uniform_block_nolock(block, size);
+			}
 
-	PipelineLayout *request_pipeline_layout(const CombinedResourceLayout &layout);
-	DescriptorSetAllocator *request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_sets);
-	const Framebuffer &request_framebuffer(const RenderPassInfo &info)
-	{
-		return framebuffer_allocator.request_framebuffer(info);
-	}
-	const RenderPass &request_render_pass(const RenderPassInfo &info, bool compatible);
+			PipelineLayout *request_pipeline_layout(const CombinedResourceLayout &layout);
+			DescriptorSetAllocator *request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_sets);
+			const Framebuffer &request_framebuffer(const RenderPassInfo &info)
+			{
+				return framebuffer_allocator.request_framebuffer(info);
+			}
+			const RenderPass &request_render_pass(const RenderPassInfo &info, bool compatible);
 
-	VkPhysicalDeviceMemoryProperties mem_props;
-	VkPhysicalDeviceProperties gpu_props;
+			VkPhysicalDeviceMemoryProperties mem_props;
+			VkPhysicalDeviceProperties gpu_props;
 
-	DeviceFeatures ext;
-	void init_stock_samplers();
+			DeviceFeatures ext;
+			void init_stock_samplers();
 
-	// Make sure this is deleted last.
-	HandlePool handle_pool;
+			// Make sure this is deleted last.
+			HandlePool handle_pool;
 
-	struct Managers
-	{
-		DeviceAllocator memory;
-		FenceManager fence;
-		SemaphoreManager semaphore;
-		BufferPool vbo, ubo;
+			struct Managers
+			{
+				DeviceAllocator memory;
+				FenceManager fence;
+				SemaphoreManager semaphore;
+				BufferPool vbo, ubo;
+			};
+			Managers managers;
+
+			struct
+			{
+				unsigned counter = 0;
+			} lock;
+
+			/* Per-frame deletion/recycle queues hold plain Vulkan handles (POD); use
+			 * POD_VEC instead of std::vector to avoid a heap allocation per frame for
+			 * each queue. */
+			POD_VEC_DECLARE(VkFramebufferVec, VkFramebuffer);
+			POD_VEC_DECLARE(VkSamplerVec, VkSampler);
+			POD_VEC_DECLARE(VkPipelineVec, VkPipeline);
+			POD_VEC_DECLARE(VkBufferViewVec, VkBufferView);
+			POD_VEC_DECLARE(VkImageVec, VkImage);
+			POD_VEC_DECLARE(VkBufferVec, VkBuffer);
+
+			struct PerFrame
+			{
+				PerFrame(Device *device);
+				~PerFrame();
+				void operator=(const PerFrame &) = delete;
+				PerFrame(const PerFrame &) = delete;
+
+				void begin();
+
+				VkDevice device;
+				Managers &managers;
+				CommandPool graphics_cmd_pool;
+				CommandPool compute_cmd_pool;
+				CommandPool transfer_cmd_pool;
+
+				std::vector<BufferBlock> vbo_blocks;
+				std::vector<BufferBlock> ubo_blocks;
+
+				FenceVec wait_fences;
+				FenceVec recycle_fences;
+				std::vector<DeviceAllocation> allocations;
+				VkFramebufferVec destroyed_framebuffers;
+				VkSamplerVec destroyed_samplers;
+				VkPipelineVec destroyed_pipelines;
+				RenderTargetViewVec destroyed_image_views;
+				VkBufferViewVec destroyed_buffer_views;
+				VkImageVec destroyed_images;
+				VkBufferVec destroyed_buffers;
+				std::vector<CommandBufferHandle> graphics_submissions;
+				std::vector<CommandBufferHandle> compute_submissions;
+				std::vector<CommandBufferHandle> transfer_submissions;
+				SemaphoreVec recycled_semaphores;
+				SemaphoreVec destroyed_semaphores;
+			};
+			// The per frame structure must be destroyed after
+			// the hashmap data structures below, so it must be declared before.
+			std::vector<std::unique_ptr<PerFrame>> per_frame;
+
+			struct QueueData
+			{
+				std::vector<Semaphore> wait_semaphores;
+				std::vector<VkPipelineStageFlags> wait_stages;
+				bool need_fence = false;
+			} graphics, compute, transfer;
+
+			// Pending buffers which need to be copied from CPU to GPU before submitting graphics or compute work.
+			struct
+			{
+				std::vector<BufferBlock> vbo;
+				std::vector<BufferBlock> ubo;
+			} dma;
+
+			void submit_queue(CommandBuffer::Type type, VkFence *fence,
+					unsigned semaphore_count = 0,
+					Semaphore *semaphore = nullptr);
+
+			PerFrame &frame()
+			{
+				VK_ASSERT(frame_context_index < per_frame.size());
+				VK_ASSERT(per_frame[frame_context_index]);
+				return *per_frame[frame_context_index];
+			}
+
+			const PerFrame &frame() const
+			{
+				VK_ASSERT(frame_context_index < per_frame.size());
+				VK_ASSERT(per_frame[frame_context_index]);
+				return *per_frame[frame_context_index];
+			}
+
+			unsigned frame_context_index = 0;
+			uint32_t graphics_queue_family_index = 0;
+			uint32_t compute_queue_family_index = 0;
+			uint32_t transfer_queue_family_index = 0;
+
+			uint32_t find_memory_type(BufferDomain domain, uint32_t mask);
+			uint32_t find_memory_type(ImageDomain domain, uint32_t mask);
+			bool memory_type_is_host_visible(uint32_t type) const
+			{
+				return (mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
+			}
+
+			SamplerHandle samplers[static_cast<unsigned>(StockSampler::Count)];
+
+			VulkanCache<PipelineLayout> pipeline_layouts;
+			VulkanCache<DescriptorSetAllocator> descriptor_set_allocators;
+			VulkanCache<RenderPass> render_passes;
+			VulkanCache<Shader> shaders;
+			VulkanCache<Program> programs;
+
+			FramebufferAllocator framebuffer_allocator;
+			AttachmentAllocator transient_allocator;
+
+			SamplerHandle create_sampler(const SamplerCreateInfo &info, StockSampler sampler);
+
+			CommandPool &get_command_pool(CommandBuffer::Type type);
+			QueueData &get_queue_data(CommandBuffer::Type type);
+			std::vector<CommandBufferHandle> &get_queue_submissions(CommandBuffer::Type type);
+			void clear_wait_semaphores();
+			void submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
+
+			void flush_frame(CommandBuffer::Type type)
+			{
+				if (type == CommandBuffer::Type::AsyncTransfer)
+					sync_buffer_blocks();
+				submit_queue(type, nullptr, 0, nullptr);
+			}
+			void sync_buffer_blocks();
+			void submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
+					unsigned semaphore_count,
+					Semaphore *semaphore);
+
+			void reset_fence(VkFence fence);
+
+			void destroy_buffer_nolock(VkBuffer buffer);
+			void destroy_image_nolock(VkImage image);
+			void destroy_image_view_nolock(VkImageView view);
+			void destroy_buffer_view_nolock(VkBufferView view);
+			void destroy_pipeline_nolock(VkPipeline pipeline);
+			void destroy_sampler_nolock(VkSampler sampler);
+			void destroy_framebuffer_nolock(VkFramebuffer framebuffer);
+			void destroy_semaphore_nolock(VkSemaphore semaphore);
+			void recycle_semaphore_nolock(VkSemaphore semaphore)
+			{
+				managers.semaphore.recycle(semaphore);
+			}
+			void free_memory_nolock(const DeviceAllocation &alloc);
+
+			void flush_frame_nolock();
+			CommandBufferHandle request_command_buffer_nolock(CommandBuffer::Type type = CommandBuffer::Type::Generic);
+			void submit_nolock(CommandBufferHandle cmd, Fence *fence,
+					unsigned semaphore_count, Semaphore *semaphore);
+			void add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages,
+					bool flush);
+
+			void request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size);
+			void request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size);
+
+			void add_frame_counter_nolock()
+			{
+				lock.counter++;
+			}
+			void decrement_frame_counter_nolock()
+			{
+				VK_ASSERT(lock.counter > 0);
+				lock.counter--;
+			}
+			void wait_idle_nolock();
+			void end_frame_nolock();
+
+			ImplementationWorkarounds workarounds;
+			void init_workarounds()
+			{
+				// srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only.
+				workarounds.optimize_all_graphics_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
+			}
 	};
-	Managers managers;
-
-	struct
-	{
-		unsigned counter = 0;
-	} lock;
-
-	/* Per-frame deletion/recycle queues hold plain Vulkan handles (POD); use
-	 * POD_VEC instead of std::vector to avoid a heap allocation per frame for
-	 * each queue. */
-	POD_VEC_DECLARE(VkFramebufferVec, VkFramebuffer);
-	POD_VEC_DECLARE(VkSamplerVec, VkSampler);
-	POD_VEC_DECLARE(VkPipelineVec, VkPipeline);
-	POD_VEC_DECLARE(VkBufferViewVec, VkBufferView);
-	POD_VEC_DECLARE(VkImageVec, VkImage);
-	POD_VEC_DECLARE(VkBufferVec, VkBuffer);
-
-	struct PerFrame
-	{
-		PerFrame(Device *device);
-		~PerFrame();
-		void operator=(const PerFrame &) = delete;
-		PerFrame(const PerFrame &) = delete;
-
-		void begin();
-
-		VkDevice device;
-		Managers &managers;
-		CommandPool graphics_cmd_pool;
-		CommandPool compute_cmd_pool;
-		CommandPool transfer_cmd_pool;
-
-		std::vector<BufferBlock> vbo_blocks;
-		std::vector<BufferBlock> ubo_blocks;
-
-		FenceVec wait_fences;
-		FenceVec recycle_fences;
-		std::vector<DeviceAllocation> allocations;
-		VkFramebufferVec destroyed_framebuffers;
-		VkSamplerVec destroyed_samplers;
-		VkPipelineVec destroyed_pipelines;
-		RenderTargetViewVec destroyed_image_views;
-		VkBufferViewVec destroyed_buffer_views;
-		VkImageVec destroyed_images;
-		VkBufferVec destroyed_buffers;
-		std::vector<CommandBufferHandle> graphics_submissions;
-		std::vector<CommandBufferHandle> compute_submissions;
-		std::vector<CommandBufferHandle> transfer_submissions;
-		SemaphoreVec recycled_semaphores;
-		SemaphoreVec destroyed_semaphores;
-	};
-	// The per frame structure must be destroyed after
-	// the hashmap data structures below, so it must be declared before.
-	std::vector<std::unique_ptr<PerFrame>> per_frame;
-
-	struct QueueData
-	{
-		std::vector<Semaphore> wait_semaphores;
-		std::vector<VkPipelineStageFlags> wait_stages;
-		bool need_fence = false;
-	} graphics, compute, transfer;
-
-	// Pending buffers which need to be copied from CPU to GPU before submitting graphics or compute work.
-	struct
-	{
-		std::vector<BufferBlock> vbo;
-		std::vector<BufferBlock> ubo;
-	} dma;
-
-	void submit_queue(CommandBuffer::Type type, VkFence *fence,
-	                  unsigned semaphore_count = 0,
-	                  Semaphore *semaphore = nullptr);
-
-	PerFrame &frame()
-	{
-		VK_ASSERT(frame_context_index < per_frame.size());
-		VK_ASSERT(per_frame[frame_context_index]);
-		return *per_frame[frame_context_index];
-	}
-
-	const PerFrame &frame() const
-	{
-		VK_ASSERT(frame_context_index < per_frame.size());
-		VK_ASSERT(per_frame[frame_context_index]);
-		return *per_frame[frame_context_index];
-	}
-
-	unsigned frame_context_index = 0;
-	uint32_t graphics_queue_family_index = 0;
-	uint32_t compute_queue_family_index = 0;
-	uint32_t transfer_queue_family_index = 0;
-
-	uint32_t find_memory_type(BufferDomain domain, uint32_t mask);
-	uint32_t find_memory_type(ImageDomain domain, uint32_t mask);
-	bool memory_type_is_host_visible(uint32_t type) const
-	{
-		return (mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
-	}
-
-	SamplerHandle samplers[static_cast<unsigned>(StockSampler::Count)];
-
-	VulkanCache<PipelineLayout> pipeline_layouts;
-	VulkanCache<DescriptorSetAllocator> descriptor_set_allocators;
-	VulkanCache<RenderPass> render_passes;
-	VulkanCache<Shader> shaders;
-	VulkanCache<Program> programs;
-
-	FramebufferAllocator framebuffer_allocator;
-	AttachmentAllocator transient_allocator;
-
-	SamplerHandle create_sampler(const SamplerCreateInfo &info, StockSampler sampler);
-
-	CommandPool &get_command_pool(CommandBuffer::Type type);
-	QueueData &get_queue_data(CommandBuffer::Type type);
-	std::vector<CommandBufferHandle> &get_queue_submissions(CommandBuffer::Type type);
-	void clear_wait_semaphores();
-	void submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
-
-	void flush_frame(CommandBuffer::Type type)
-	{
-		if (type == CommandBuffer::Type::AsyncTransfer)
-			sync_buffer_blocks();
-		submit_queue(type, nullptr, 0, nullptr);
-	}
-	void sync_buffer_blocks();
-	void submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
-	                        unsigned semaphore_count,
-	                        Semaphore *semaphore);
-
-	void reset_fence(VkFence fence);
-
-	void destroy_buffer_nolock(VkBuffer buffer);
-	void destroy_image_nolock(VkImage image);
-	void destroy_image_view_nolock(VkImageView view);
-	void destroy_buffer_view_nolock(VkBufferView view);
-	void destroy_pipeline_nolock(VkPipeline pipeline);
-	void destroy_sampler_nolock(VkSampler sampler);
-	void destroy_framebuffer_nolock(VkFramebuffer framebuffer);
-	void destroy_semaphore_nolock(VkSemaphore semaphore);
-	void recycle_semaphore_nolock(VkSemaphore semaphore)
-	{
-		managers.semaphore.recycle(semaphore);
-	}
-	void free_memory_nolock(const DeviceAllocation &alloc);
-
-	void flush_frame_nolock();
-	CommandBufferHandle request_command_buffer_nolock(CommandBuffer::Type type = CommandBuffer::Type::Generic);
-	void submit_nolock(CommandBufferHandle cmd, Fence *fence,
-	                   unsigned semaphore_count, Semaphore *semaphore);
-	void add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages,
-	                               bool flush);
-
-	void request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size);
-	void request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size);
-
-	void add_frame_counter_nolock()
-	{
-		lock.counter++;
-	}
-	void decrement_frame_counter_nolock()
-	{
-		VK_ASSERT(lock.counter > 0);
-		lock.counter--;
-	}
-	void wait_idle_nolock();
-	void end_frame_nolock();
-
-	ImplementationWorkarounds workarounds;
-	void init_workarounds()
-	{
-		// srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only.
-		workarounds.optimize_all_graphics_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
-	}
-};
 }
 
 /* ============================================================
  * atlas.hpp
  * ============================================================ */
 
-
 namespace PSX
 {
-static const unsigned FB_WIDTH = 1024;
-static const unsigned FB_HEIGHT = 512;
-static const unsigned BLOCK_WIDTH = 8;
-static const unsigned BLOCK_HEIGHT = 8;
-static const unsigned NUM_BLOCKS_X = FB_WIDTH / BLOCK_WIDTH;
-static const unsigned NUM_BLOCKS_Y = FB_HEIGHT / BLOCK_HEIGHT;
+	static const unsigned FB_WIDTH = 1024;
+	static const unsigned FB_HEIGHT = 512;
+	static const unsigned BLOCK_WIDTH = 8;
+	static const unsigned BLOCK_HEIGHT = 8;
+	static const unsigned NUM_BLOCKS_X = FB_WIDTH / BLOCK_WIDTH;
+	static const unsigned NUM_BLOCKS_Y = FB_HEIGHT / BLOCK_HEIGHT;
 
-enum class Domain : unsigned
-{
-	Unscaled,
-	Scaled
-};
-
-enum class Stage : unsigned
-{
-	Compute,
-	Transfer,
-	Fragment,
-	FragmentTexture
-};
-
-enum class TextureMode
-{
-	None,
-	Palette4bpp,
-	Palette8bpp,
-	ABGR1555
-};
-
-struct Rect
-{
-	unsigned x = 0;
-	unsigned y = 0;
-	unsigned width = 0;
-	unsigned height = 0;
-
-	Rect() = default;
-	Rect(unsigned x, unsigned y, unsigned width, unsigned height)
-	    : x(x)
-	    , y(y)
-	    , width(width)
-	    , height(height)
+	enum class Domain : unsigned
 	{
+		Unscaled,
+		Scaled
+	};
+
+	enum class Stage : unsigned
+	{
+		Compute,
+		Transfer,
+		Fragment,
+		FragmentTexture
+	};
+
+	enum class TextureMode
+	{
+		None,
+		Palette4bpp,
+		Palette8bpp,
+		ABGR1555
+	};
+
+	struct Rect
+	{
+		unsigned x = 0;
+		unsigned y = 0;
+		unsigned width = 0;
+		unsigned height = 0;
+
+		Rect() = default;
+		Rect(unsigned x, unsigned y, unsigned width, unsigned height)
+			: x(x)
+			  , y(y)
+			  , width(width)
+			  , height(height)
+		{
+		}
+
+		inline bool operator==(const Rect &rect) const
+		{
+			return x == rect.x && y == rect.y && width == rect.width && height == rect.height;
+		}
+
+		inline bool operator!=(const Rect &rect) const
+		{
+			return x != rect.x || y != rect.y || width != rect.width || height != rect.height;
+		}
+
+		inline bool contains(const Rect &rect) const
+		{
+			return x <= rect.x && y <= rect.y && (x + width) >= (rect.x + rect.width) &&
+				(y + height) >= (rect.y + rect.height);
+		}
+
+		inline bool intersects(const Rect &rect) const
+		{
+			unsigned x_end_self = x + width;
+			unsigned x_end_other = rect.x + rect.width;
+			unsigned y_end_self = y + height;
+			unsigned y_end_other = rect.y + rect.height;
+			unsigned xend = (x_end_self < x_end_other) ? x_end_self : x_end_other;
+			unsigned xbegin = (x > rect.x) ? x : rect.x;
+			unsigned yend = (y_end_self < y_end_other) ? y_end_self : y_end_other;
+			unsigned ybegin = (y > rect.y) ? y : rect.y;
+			return xbegin < xend && ybegin < yend;
+		}
+
+		inline Rect scissor(const Rect &rect) const
+		{
+			unsigned x_end_self = x + width;
+			unsigned x_end_other = rect.x + rect.width;
+			unsigned y_end_self = y + height;
+			unsigned y_end_other = rect.y + rect.height;
+			unsigned x0 = (x > rect.x) ? x : rect.x;
+			unsigned y0 = (y > rect.y) ? y : rect.y;
+			unsigned x1 = (x_end_self < x_end_other) ? x_end_self : x_end_other;
+			unsigned y1 = (y_end_self < y_end_other) ? y_end_self : y_end_other;
+			unsigned width = (x1 > x0) ? (x1 - x0) : 0u;
+			unsigned height = (y1 > y0) ? (y1 - y0) : 0u;
+			return { x0, y0, width, height };
+		}
+
+		inline void extend_bounding_box(const Rect &rect)
+		{
+			unsigned x_end_self = x + width;
+			unsigned x_end_other = rect.x + rect.width;
+			unsigned y_end_self = y + height;
+			unsigned y_end_other = rect.y + rect.height;
+			unsigned x0 = (x < rect.x) ? x : rect.x;
+			unsigned y0 = (y < rect.y) ? y : rect.y;
+			unsigned x1 = (x_end_self > x_end_other) ? x_end_self : x_end_other;
+			unsigned y1 = (y_end_self > y_end_other) ? y_end_self : y_end_other;
+			x = x0;
+			y = y0;
+			width = x1 - x0;
+			height = y1 - y0;
+		}
+	};
+
+	enum StatusFlag
+	{
+		STATUS_FB_ONLY = 0,
+		STATUS_FB_PREFER = 1,
+		STATUS_SFB_ONLY = 2,
+		STATUS_SFB_PREFER = 3,
+		STATUS_OWNERSHIP_MASK = 3,
+
+		STATUS_COMPUTE_FB_READ = 1 << 2,
+		STATUS_COMPUTE_FB_WRITE = 1 << 3,
+		STATUS_COMPUTE_SFB_READ = 1 << 4,
+		STATUS_COMPUTE_SFB_WRITE = 1 << 5,
+
+		STATUS_TRANSFER_FB_READ = 1 << 6,
+		STATUS_TRANSFER_SFB_READ = 1 << 7,
+		STATUS_TRANSFER_FB_WRITE = 1 << 8,
+		STATUS_TRANSFER_SFB_WRITE = 1 << 9,
+
+		STATUS_FRAGMENT_SFB_READ = 1 << 10,
+		STATUS_FRAGMENT_SFB_WRITE = 1 << 11,
+		STATUS_FRAGMENT_FB_READ = 1 << 12,
+		STATUS_FRAGMENT_FB_WRITE = 1 << 13,
+
+		// A special stage to allow fragment to detect when it's causing a feedback loop with texture read -> fragment write.
+		// This flag is added in combination with FRAGMENT_FB_READ.
+		STATUS_TEXTURE_READ = 1 << 14,
+
+		// For determining if a texture read is from a loaded image or previous rendered content
+		STATUS_TEXTURE_RENDERED = 1 << 15,
+
+		STATUS_FB_READ = STATUS_COMPUTE_FB_READ | STATUS_TRANSFER_FB_READ | STATUS_FRAGMENT_FB_READ,
+		STATUS_FB_WRITE = STATUS_COMPUTE_FB_WRITE | STATUS_TRANSFER_FB_WRITE | STATUS_FRAGMENT_FB_WRITE,
+		STATUS_SFB_READ = STATUS_COMPUTE_SFB_READ | STATUS_TRANSFER_SFB_READ | STATUS_FRAGMENT_SFB_READ,
+		STATUS_SFB_WRITE = STATUS_COMPUTE_SFB_WRITE | STATUS_TRANSFER_SFB_WRITE | STATUS_FRAGMENT_SFB_WRITE
+	};
+	using StatusFlags = uint16_t;
+
+	class Renderer;
+
+	class FBAtlas
+	{
+		public:
+			FBAtlas();
+
+			void set_hazard_listener(Renderer *hazard)
+			{
+				listener = hazard;
+			}
+
+			void read_compute(Domain domain, const Rect &rect)
+			{
+				sync_domain(domain, rect);
+				read_domain(domain, Stage::Compute, rect);
+			}
+			void write_compute(Domain domain, const Rect &rect)
+			{
+				sync_domain(domain, rect);
+				write_domain(domain, Stage::Compute, rect);
+			}
+			void read_transfer(Domain domain, const Rect &rect)
+			{
+				sync_domain(domain, rect);
+				read_domain(domain, Stage::Transfer, rect);
+			}
+			void write_transfer(Domain domain, const Rect &rect)
+			{
+				sync_domain(domain, rect);
+				write_domain(domain, Stage::Transfer, rect);
+			}
+			void read_fragment(Domain domain, const Rect &rect);
+			Domain blit_vram(const Rect &dst, const Rect &src);
+			void load_image(const Rect &rect);
+			bool texture_rendered(const Rect &rect);
+
+			void write_fragment(Domain domain, const Rect &rect);
+			void clear_rect(const Rect &rect, uint32_t color);
+
+			void set_draw_rect(const Rect &rect)
+			{
+				renderpass.scissor = rect;
+			}
+
+			void set_texture_window(const Rect &rect)
+			{
+				renderpass.texture_window = rect;
+			}
+
+			TextureMode set_texture_mode(TextureMode mode)
+			{
+				TextureMode old = renderpass.texture_mode;
+				renderpass.texture_mode = mode;
+				return old;
+			}
+
+			void set_texture_offset(unsigned x, unsigned y)
+			{
+				renderpass.texture_offset_x = x;
+				renderpass.texture_offset_y = y;
+			}
+
+			void set_palette_offset(unsigned x, unsigned y)
+			{
+				renderpass.palette_offset_x = x;
+				renderpass.palette_offset_y = y;
+			}
+
+			void pipeline_barrier(StatusFlags domains);
+			void notify_external_barrier(StatusFlags domains);
+			void flush_render_pass();
+
+		private:
+			StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
+			Renderer *listener = nullptr;
+
+			void read_domain(Domain domain, Stage stage, const Rect &rect);
+			bool write_domain(Domain domain, Stage stage, const Rect &rect);
+			void sync_domain(Domain domain, const Rect &rect);
+			void read_texture(Domain domain);
+			Domain find_suitable_domain(const Rect &rect);
+
+			struct
+			{
+				Rect rect;
+				Rect scissor;
+				Rect texture_window;
+				unsigned texture_offset_x = 0, texture_offset_y = 0;
+				unsigned palette_offset_x = 0, palette_offset_y = 0;
+				TextureMode texture_mode = TextureMode::None;
+				bool inside = false;
+			} renderpass;
+
+			void extend_render_pass(const Rect &rect, bool scissor);
+
+			StatusFlags &info(unsigned block_x, unsigned block_y)
+			{
+				block_x &= NUM_BLOCKS_X - 1;
+				block_y &= NUM_BLOCKS_Y - 1;
+				return fb_info[NUM_BLOCKS_X * block_y + block_x];
+			}
+
+			const StatusFlags &info(unsigned block_x, unsigned block_y) const
+			{
+				block_x &= NUM_BLOCKS_X - 1;
+				block_y &= NUM_BLOCKS_Y - 1;
+				return fb_info[NUM_BLOCKS_X * block_y + block_x];
+			}
+
+			void discard_render_pass();
+			bool inside_render_pass(const Rect &rect);
+	};
+
+	/* POD match rule from dump.cfg: a value of -1 means "wildcard" (matches
+	 * any) for that field. Was a class with a ctor + NSDMI + matches() method. */
+	struct RectMatch {
+		int x;
+		int y;
+		int w;
+		int h;
+	};
+
+	static inline bool rect_match_matches(const RectMatch *m, Rect r) {
+		return (m->x == -1 || m->x == r.x) && (m->y == -1 || m->y == r.y) &&
+			(m->w == -1 || m->w == (int)r.width) && (m->h == -1 || m->h == (int)r.height);
 	}
-
-	inline bool operator==(const Rect &rect) const
-	{
-		return x == rect.x && y == rect.y && width == rect.width && height == rect.height;
-	}
-
-	inline bool operator!=(const Rect &rect) const
-	{
-		return x != rect.x || y != rect.y || width != rect.width || height != rect.height;
-	}
-
-	inline bool contains(const Rect &rect) const
-	{
-		return x <= rect.x && y <= rect.y && (x + width) >= (rect.x + rect.width) &&
-		       (y + height) >= (rect.y + rect.height);
-	}
-
-	inline bool intersects(const Rect &rect) const
-	{
-		unsigned x_end_self = x + width;
-		unsigned x_end_other = rect.x + rect.width;
-		unsigned y_end_self = y + height;
-		unsigned y_end_other = rect.y + rect.height;
-		unsigned xend = (x_end_self < x_end_other) ? x_end_self : x_end_other;
-		unsigned xbegin = (x > rect.x) ? x : rect.x;
-		unsigned yend = (y_end_self < y_end_other) ? y_end_self : y_end_other;
-		unsigned ybegin = (y > rect.y) ? y : rect.y;
-		return xbegin < xend && ybegin < yend;
-	}
-
-	inline Rect scissor(const Rect &rect) const
-	{
-		unsigned x_end_self = x + width;
-		unsigned x_end_other = rect.x + rect.width;
-		unsigned y_end_self = y + height;
-		unsigned y_end_other = rect.y + rect.height;
-		unsigned x0 = (x > rect.x) ? x : rect.x;
-		unsigned y0 = (y > rect.y) ? y : rect.y;
-		unsigned x1 = (x_end_self < x_end_other) ? x_end_self : x_end_other;
-		unsigned y1 = (y_end_self < y_end_other) ? y_end_self : y_end_other;
-		unsigned width = (x1 > x0) ? (x1 - x0) : 0u;
-		unsigned height = (y1 > y0) ? (y1 - y0) : 0u;
-		return { x0, y0, width, height };
-	}
-
-	inline void extend_bounding_box(const Rect &rect)
-	{
-		unsigned x_end_self = x + width;
-		unsigned x_end_other = rect.x + rect.width;
-		unsigned y_end_self = y + height;
-		unsigned y_end_other = rect.y + rect.height;
-		unsigned x0 = (x < rect.x) ? x : rect.x;
-		unsigned y0 = (y < rect.y) ? y : rect.y;
-		unsigned x1 = (x_end_self > x_end_other) ? x_end_self : x_end_other;
-		unsigned y1 = (y_end_self > y_end_other) ? y_end_self : y_end_other;
-		x = x0;
-		y = y0;
-		width = x1 - x0;
-		height = y1 - y0;
-	}
-};
-
-enum StatusFlag
-{
-	STATUS_FB_ONLY = 0,
-	STATUS_FB_PREFER = 1,
-	STATUS_SFB_ONLY = 2,
-	STATUS_SFB_PREFER = 3,
-	STATUS_OWNERSHIP_MASK = 3,
-
-	STATUS_COMPUTE_FB_READ = 1 << 2,
-	STATUS_COMPUTE_FB_WRITE = 1 << 3,
-	STATUS_COMPUTE_SFB_READ = 1 << 4,
-	STATUS_COMPUTE_SFB_WRITE = 1 << 5,
-
-	STATUS_TRANSFER_FB_READ = 1 << 6,
-	STATUS_TRANSFER_SFB_READ = 1 << 7,
-	STATUS_TRANSFER_FB_WRITE = 1 << 8,
-	STATUS_TRANSFER_SFB_WRITE = 1 << 9,
-
-	STATUS_FRAGMENT_SFB_READ = 1 << 10,
-	STATUS_FRAGMENT_SFB_WRITE = 1 << 11,
-	STATUS_FRAGMENT_FB_READ = 1 << 12,
-	STATUS_FRAGMENT_FB_WRITE = 1 << 13,
-
-	// A special stage to allow fragment to detect when it's causing a feedback loop with texture read -> fragment write.
-	// This flag is added in combination with FRAGMENT_FB_READ.
-	STATUS_TEXTURE_READ = 1 << 14,
-
-	// For determining if a texture read is from a loaded image or previous rendered content
-	STATUS_TEXTURE_RENDERED = 1 << 15,
-
-	STATUS_FB_READ = STATUS_COMPUTE_FB_READ | STATUS_TRANSFER_FB_READ | STATUS_FRAGMENT_FB_READ,
-	STATUS_FB_WRITE = STATUS_COMPUTE_FB_WRITE | STATUS_TRANSFER_FB_WRITE | STATUS_FRAGMENT_FB_WRITE,
-	STATUS_SFB_READ = STATUS_COMPUTE_SFB_READ | STATUS_TRANSFER_SFB_READ | STATUS_FRAGMENT_SFB_READ,
-	STATUS_SFB_WRITE = STATUS_COMPUTE_SFB_WRITE | STATUS_TRANSFER_SFB_WRITE | STATUS_FRAGMENT_SFB_WRITE
-};
-using StatusFlags = uint16_t;
-
-class Renderer;
-
-class FBAtlas
-{
-public:
-	FBAtlas();
-
-	void set_hazard_listener(Renderer *hazard)
-	{
-		listener = hazard;
-	}
-
-	void read_compute(Domain domain, const Rect &rect)
-	{
-		sync_domain(domain, rect);
-		read_domain(domain, Stage::Compute, rect);
-	}
-	void write_compute(Domain domain, const Rect &rect)
-	{
-		sync_domain(domain, rect);
-		write_domain(domain, Stage::Compute, rect);
-	}
-	void read_transfer(Domain domain, const Rect &rect)
-	{
-		sync_domain(domain, rect);
-		read_domain(domain, Stage::Transfer, rect);
-	}
-	void write_transfer(Domain domain, const Rect &rect)
-	{
-		sync_domain(domain, rect);
-		write_domain(domain, Stage::Transfer, rect);
-	}
-	void read_fragment(Domain domain, const Rect &rect);
-	Domain blit_vram(const Rect &dst, const Rect &src);
-	void load_image(const Rect &rect);
-	bool texture_rendered(const Rect &rect);
-
-	void write_fragment(Domain domain, const Rect &rect);
-	void clear_rect(const Rect &rect, uint32_t color);
-
-	void set_draw_rect(const Rect &rect)
-	{
-		renderpass.scissor = rect;
-	}
-
-	void set_texture_window(const Rect &rect)
-	{
-		renderpass.texture_window = rect;
-	}
-
-	TextureMode set_texture_mode(TextureMode mode)
-	{
-		TextureMode old = renderpass.texture_mode;
-		renderpass.texture_mode = mode;
-		return old;
-	}
-
-	void set_texture_offset(unsigned x, unsigned y)
-	{
-		renderpass.texture_offset_x = x;
-		renderpass.texture_offset_y = y;
-	}
-
-	void set_palette_offset(unsigned x, unsigned y)
-	{
-		renderpass.palette_offset_x = x;
-		renderpass.palette_offset_y = y;
-	}
-
-	void pipeline_barrier(StatusFlags domains);
-	void notify_external_barrier(StatusFlags domains);
-	void flush_render_pass();
-
-private:
-	StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
-	Renderer *listener = nullptr;
-
-	void read_domain(Domain domain, Stage stage, const Rect &rect);
-	bool write_domain(Domain domain, Stage stage, const Rect &rect);
-	void sync_domain(Domain domain, const Rect &rect);
-	void read_texture(Domain domain);
-	Domain find_suitable_domain(const Rect &rect);
-
-	struct
-	{
-		Rect rect;
-		Rect scissor;
-		Rect texture_window;
-		unsigned texture_offset_x = 0, texture_offset_y = 0;
-		unsigned palette_offset_x = 0, palette_offset_y = 0;
-		TextureMode texture_mode = TextureMode::None;
-		bool inside = false;
-	} renderpass;
-
-	void extend_render_pass(const Rect &rect, bool scissor);
-
-	StatusFlags &info(unsigned block_x, unsigned block_y)
-	{
-		block_x &= NUM_BLOCKS_X - 1;
-		block_y &= NUM_BLOCKS_Y - 1;
-		return fb_info[NUM_BLOCKS_X * block_y + block_x];
-	}
-
-	const StatusFlags &info(unsigned block_x, unsigned block_y) const
-	{
-		block_x &= NUM_BLOCKS_X - 1;
-		block_y &= NUM_BLOCKS_Y - 1;
-		return fb_info[NUM_BLOCKS_X * block_y + block_x];
-	}
-
-	void discard_render_pass();
-	bool inside_render_pass(const Rect &rect);
-};
 }
-
-/* ============================================================
- * config_parser.h
- * ============================================================ */
-
-
-namespace PSX {
-    /* POD match rule from dump.cfg: a value of -1 means "wildcard" (matches
-     * any) for that field. Was a class with a ctor + NSDMI + matches() method. */
-    struct RectMatch {
-        int x;
-        int y;
-        int w;
-        int h;
-    };
-
-    static inline bool rect_match_matches(const RectMatch *m, Rect r) {
-        return (m->x == -1 || m->x == r.x) && (m->y == -1 || m->y == r.y) &&
-               (m->w == -1 || m->w == (int)r.width) && (m->h == -1 || m->h == (int)r.height);
-    }
-};
 
 /* Maximum number of "ignore" rules read from dump.cfg. A fixed cap keeps the
  * list a plain inline array (no heap / no destructor); real dump configs have
  * a handful of entries, so this is never approached. */
 #define DUMP_IGNORE_MAX 256
 
-/* Parse dump.cfg at `path`, writing up to `max` ignore rules into `out`.
- * Returns the number written. */
-int parse_config_file(const char *path, PSX::RectMatch *out, int max);
-
 /* ============================================================
  * texture_tracker.hpp
  * ============================================================ */
 
-
 extern retro_log_printf_t log_cb;
 
-// #define VERBOSE_TEXTURE_TRACKING
+//#define VERBOSE_TEXTURE_TRACKING
 
 /* Texture-tracker logging is debug-only: it compiles to real log_cb calls
  * in DEBUG builds (the build system passes -DDEBUG when DEBUG=1) and to a
@@ -6087,2399 +5900,2379 @@ extern retro_log_printf_t log_cb;
 #define TT_LOG_VERBOSE(...) ((void)sizeof(((void)0, __VA_ARGS__)))
 #endif
 
-namespace PSX {
-
-struct HdTextureId {
-    uint32_t hash;
-    uint32_t palette_hash;
-
-    bool operator>(const HdTextureId &other) const
-    {
-        if (hash != other.hash)
-			return hash > other.hash;
-		return palette_hash > other.palette_hash;
-    }
-    bool operator<(const HdTextureId &other) const
-    {
-        if (hash != other.hash)
-			return hash < other.hash;
-		return palette_hash < other.palette_hash;
-    }
-};
-
-typedef int RectIndex; // I wanted a newtype but it's too much work in C++, so maybe TODO that later
-struct HdTextureHandle {
-    RectIndex index;
-    uint32_t palette_hash;
-    bool fused;
-
-    bool operator==(const HdTextureHandle &other) const
-    {
-        return index == other.index && palette_hash == other.palette_hash && fused == other.fused;
-    }
-
-    bool operator!=(const HdTextureHandle &other) const
-    {
-        return !(*this == other);
-    }
-
-    bool operator>(const HdTextureHandle &other) const
-    {
-        if (index != other.index)
-			return index > other.index;
-		if (palette_hash != other.palette_hash)
-            return palette_hash > other.palette_hash;
-        return fused > other.fused;
-    }
-
-    static HdTextureHandle make(RectIndex index, uint32_t palette_hash) {
-        return HdTextureHandle(index, palette_hash, false);
-    }
-    static HdTextureHandle make_fused(RectIndex index) {
-        return HdTextureHandle(index, 0, true);
-    }
-    static HdTextureHandle make_none() {
-        return HdTextureHandle::make(-1, 0);
-    }
-
-private:
-    HdTextureHandle(RectIndex index, uint32_t palette_hash, bool fused)
-    : index(index), palette_hash(palette_hash), fused(fused)
-    {
-
-    }
-};
-
-struct SRect {
-    int x;
-    int y;
-    int width;
-    int height;
-    // Default-constructed SRect zero-initializes all fields. The result is in
-    // an "invalid" state by the 4-arg constructor's invariant (width == 0 and
-    // height == 0 would fail its width > 0 / height > 0 check) and is intended
-    // only as a placeholder — array slot or struct field — to be overwritten
-    // before being read. The 4-arg constructor below is the validated path;
-    // use it for any SRect that is meant to be immediately usable.
-    SRect() : x(0), y(0), width(0), height(0) {}
-    SRect(int x, int y, int width, int height):
-    x(x), y(y), width(width), height(height) {
-        if (width <= 0 || height <= 0) {
-            printf("Illegally sized SRect: %d, %d\n", width, height);
-            exit(1);
-        }
-    }
-    inline int left() {
-        return x;
-    }
-    inline int right() {
-        return x + width;
-    }
-    inline int top() {
-        return y;
-    }
-    inline int bottom() {
-        return y + height;
-    }
-
-	inline bool operator==(const SRect &other) const
-	{
-		return x == other.x && y == other.y && width == other.width && height == other.height;
-	}
-    inline bool operator!=(const SRect &other) const
-    {
-        return !(*this == other);
-    }
-};
-
-struct HdTexture {
-    SRect vram_rect;
-    SRect texel_rect; // hd texels
-    Vulkan::ImageHandle texture;
-};
-
-struct DumpedMode {
-    TextureMode mode;
-    uint32_t palette_hash;
-
-	inline bool operator==(const DumpedMode &other) const
-	{
-		return mode == other.mode && palette_hash == other.palette_hash;
-	}
-};
-
-struct UsedMode {
-    TextureMode mode;
-    unsigned int palette_offset_x;
-    unsigned int palette_offset_y;
-
-	inline bool operator==(const UsedMode &other) const
-	{
-		return mode == other.mode && palette_offset_x == other.palette_offset_x && palette_offset_y == other.palette_offset_y;
-	}
-};
-
-/* ------------------------------------------------------------------------- *
- * HdTexMap - palette_hash -> (Vulkan image, alpha flags), MSVC C89.
- *
- * Replaces std::map<uint32_t, HdImageHandle> on TextureUpload. Backed by a
- * sorted, malloc'd array of POD entries keyed by palette hash (binary-search
- * lookup, insert keeps it sorted). The image is held as a raw Vulkan::Image*
- * (so the array can realloc) with the intrusive refcount managed by hand: a
- * reference is taken when an entry is stored and released on
- * replace/erase/clear/free - matching the raw-pointer scheme already used by
- * the GPU image cache. Entries are POD, so TextureUpload can be a plain
- * malloc-backed value once this and the other members are converted.
- * ------------------------------------------------------------------------- */
-struct HdTexEntry {
-    uint32_t       key;          /* palette hash */
-    Vulkan::Image *image;        /* owns one reference while stored */
-    int            alpha_flags;
-};
-struct HdTexMap {
-    HdTexEntry *entries;
-    int         count;
-    int         cap;
-};
-
-static void hd_tex_map_init(HdTexMap *m)
-{
-    m->entries = NULL;
-    m->count = 0;
-    m->cap = 0;
-}
-static int hd_tex_map_lower_bound(const HdTexMap *m, uint32_t key)
-{
-    int lo = 0, hi = m->count;
-    while (lo < hi) {
-        int mid = lo + ((hi - lo) >> 1);
-        if (m->entries[mid].key < key)
-            lo = mid + 1;
-        else
-            hi = mid;
-    }
-    return lo;
-}
-/* Returns the entry for key, or NULL. */
-static HdTexEntry *hd_tex_map_find(HdTexMap *m, uint32_t key)
-{
-    int i = hd_tex_map_lower_bound(m, key);
-    if (i < m->count && m->entries[i].key == key)
-        return &m->entries[i];
-    return NULL;
-}
-static int hd_tex_map_contains(const HdTexMap *m, uint32_t key)
-{
-    int i = hd_tex_map_lower_bound(m, key);
-    return i < m->count && m->entries[i].key == key;
-}
-/* Insert or replace key -> (image, alpha). Takes a reference on `image`;
- * releases any image previously stored at this key. */
-static void hd_tex_map_set(HdTexMap *m, uint32_t key, Vulkan::Image *image, int alpha_flags)
-{
-    int i = hd_tex_map_lower_bound(m, key);
-    if (i < m->count && m->entries[i].key == key) {
-        if (image) image->add_reference();
-        if (m->entries[i].image) m->entries[i].image->release_reference();
-        m->entries[i].image = image;
-        m->entries[i].alpha_flags = alpha_flags;
-        return;
-    }
-    if (m->count == m->cap) {
-        int ncap = m->cap ? m->cap * 2 : 8;
-        m->entries = (HdTexEntry *)realloc(m->entries, (size_t)ncap * sizeof(HdTexEntry));
-        m->cap = ncap;
-    }
-    memmove(&m->entries[i + 1], &m->entries[i], (size_t)(m->count - i) * sizeof(HdTexEntry));
-    if (image) image->add_reference();
-    m->entries[i].key = key;
-    m->entries[i].image = image;
-    m->entries[i].alpha_flags = alpha_flags;
-    m->count++;
-}
-/* Release all image refs and reset to empty (keeps allocation). */
-static void hd_tex_map_clear(HdTexMap *m)
-{
-    int i;
-    for (i = 0; i < m->count; i++)
-        if (m->entries[i].image)
-            m->entries[i].image->release_reference();
-    m->count = 0;
-}
-static void hd_tex_map_free(HdTexMap *m)
-{
-    hd_tex_map_clear(m);
-    free(m->entries);
-    m->entries = NULL;
-    m->cap = 0;
-}
-/* Deep-copy src into dst (dst assumed empty/inited); re-acquires image refs. */
-static void hd_tex_map_copy(HdTexMap *dst, const HdTexMap *src)
-{
-    int i;
-    dst->entries = NULL;
-    dst->count = src->count;
-    dst->cap = src->count;
-    if (src->count) {
-        dst->entries = (HdTexEntry *)malloc((size_t)src->count * sizeof(HdTexEntry));
-        for (i = 0; i < src->count; i++) {
-            dst->entries[i] = src->entries[i];
-            if (dst->entries[i].image)
-                dst->entries[i].image->add_reference();
-        }
-    }
-}
-
-struct TextureUpload {
-    /* Intrusive refcount for shared ownership across TextureRects (replaces
-     * std::shared_ptr<TextureUpload>). A freshly constructed upload starts at
-     * 0; texture_upload_new() bumps it to 1. Copies (deep-copy ctor/assignment,
-     * used by the by-value save-state map) get their OWN fresh count - the
-     * refcount is deliberately not copied. */
-    int refcount;
-    /* VRAM source pixels (owned). Was std::vector<uint16_t>; filled once at
-     * creation and thereafter read-only. */
-    uint16_t *image;
-    int       image_count;
-    bool dumpable;
-    int width;
-    int height;
-    uint32_t hash;
-    /* Modes already dumped to disk (owned growable array, append-only).
-     * Was std::vector<DumpedMode>. */
-    DumpedMode *dumped_modes;
-    int         dumped_modes_count;
-    int         dumped_modes_cap;
-	HdTexMap textures; // palette hash -> (image, alpha)
-	// (HD load bookkeeping lives on the TextureTracker: hd_gpu_cache / hd_cache /
-	//  requested / pending_attach, keyed by (hash,palette) so it survives this
-	//  upload being recreated as the sprite animation churns VRAM.)
-
-    TextureUpload()
-        : refcount(0), image(NULL), image_count(0), dumpable(false), width(0), height(0),
-          hash(0), dumped_modes(NULL), dumped_modes_count(0), dumped_modes_cap(0) {
-        hd_tex_map_init(&textures);
-    }
-    ~TextureUpload() {
-        free(image);
-        free(dumped_modes);
-        hd_tex_map_free(&textures);
-    }
-    /* Owns malloc'd buffers, so copies must be deep. Copy/assign are used by
-     * the save-state path (TextureUpload value map) and load_state's `*ptr =
-     * value`. The textures map is deep-copied (re-acquiring image refs). */
-    TextureUpload(const TextureUpload &o)
-        : refcount(0), image(NULL), image_count(o.image_count), dumpable(o.dumpable),
-          width(o.width), height(o.height), hash(o.hash),
-          dumped_modes(NULL), dumped_modes_count(o.dumped_modes_count),
-          dumped_modes_cap(o.dumped_modes_count) {
-        if (image_count) {
-            image = (uint16_t *)malloc((size_t)image_count * sizeof(uint16_t));
-            memcpy(image, o.image, (size_t)image_count * sizeof(uint16_t));
-        }
-        if (dumped_modes_count) {
-            dumped_modes = (DumpedMode *)malloc((size_t)dumped_modes_count * sizeof(DumpedMode));
-            memcpy(dumped_modes, o.dumped_modes, (size_t)dumped_modes_count * sizeof(DumpedMode));
-        }
-        hd_tex_map_copy(&textures, &o.textures);
-    }
-    TextureUpload &operator=(const TextureUpload &o) {
-        if (this != &o) {
-            free(image); free(dumped_modes);
-            hd_tex_map_free(&textures);
-            image = NULL; dumped_modes = NULL;
-            image_count = o.image_count;
-            dumped_modes_count = o.dumped_modes_count;
-            dumped_modes_cap = o.dumped_modes_count;
-            dumpable = o.dumpable; width = o.width; height = o.height; hash = o.hash;
-            if (image_count) {
-                image = (uint16_t *)malloc((size_t)image_count * sizeof(uint16_t));
-                memcpy(image, o.image, (size_t)image_count * sizeof(uint16_t));
-            }
-            if (dumped_modes_count) {
-                dumped_modes = (DumpedMode *)malloc((size_t)dumped_modes_count * sizeof(DumpedMode));
-                memcpy(dumped_modes, o.dumped_modes, (size_t)dumped_modes_count * sizeof(DumpedMode));
-            }
-            hd_tex_map_copy(&textures, &o.textures);
-        }
-        return *this;
-    }
-};
-
-/* Allocate a new TextureUpload with refcount 1 (the caller owns that ref).
- * Uses operator new so the C++ members (the deep-copy ctor's machinery and the
- * HdTexMap/owned buffers) are constructed; texture_upload_release matches it
- * with delete. */
-static TextureUpload *texture_upload_new()
-{
-    TextureUpload *u = new TextureUpload();
-    u->refcount = 1;
-    return u;
-}
-static void texture_upload_acquire(TextureUpload *u)
-{
-    if (u)
-        u->refcount++;
-}
-static void texture_upload_release(TextureUpload *u)
-{
-    if (u && --u->refcount == 0)
-        delete u; /* dtor frees image/dumped_modes and releases the texmap refs */
-}
-
-// byte buffer plus its size, rather than std::vector<uint8_t>. This is a POD
-// (trivially copyable) struct - copying it copies the pointer, NOT the bytes,
-// so ownership is by convention: exactly one LoadedLevels owns each buffer and
-// frees it. Ownership transfers are explicit pointer-steals (push_move /
-// move-assign helpers below); there is no implicit deep copy and no
-// destructor. This keeps it storable in plain arrays and realloc-movable.
-struct LoadedImage {
-    uint8_t *owned_data; // RGBA, owned_size bytes (NULL if empty)
-    size_t   owned_size;
-    int width;
-    int height;
-};
-
-// Allocate the RGBA buffer for a level (width*height*4). Frees any prior
-// buffer. Returns 0 on success, -1 on allocation failure (buffer left NULL).
-static inline int loaded_image_alloc(LoadedImage *img, int width, int height)
-{
-    size_t bytes = (size_t)width * (size_t)height * 4u;
-    free(img->owned_data);
-    img->owned_data = (uint8_t *)malloc(bytes ? bytes : 1);
-    img->owned_size = img->owned_data ? bytes : 0;
-    img->width  = width;
-    img->height = height;
-    return img->owned_data ? 0 : -1;
-}
-
-// Zero-initialise a level (no buffer). Use before loaded_image_alloc.
-static inline void loaded_image_init(LoadedImage *img)
-{
-    img->owned_data = NULL;
-    img->owned_size = 0;
-    img->width      = 0;
-    img->height     = 0;
-}
-
-// A decoded texture as a set of mip levels. C-style dynamic array: `levels`
-// is a malloc'd array of `count` LoadedImage, owning all buffers. Replaces
-// std::vector<LoadedImage>. POD/trivially-copyable: a copy aliases the same
-// buffers, so callers move ownership explicitly (loaded_levels_move) and free
-// explicitly (loaded_levels_reset). Initialise with loaded_levels_init or
-// zero-init before first use.
-struct LoadedLevels {
-    LoadedImage *levels;
-    int          count;
-};
-
-/* Total owned bytes across all levels. */
-static size_t loaded_levels_byte_size(const LoadedLevels *l)
-{
-    size_t b = 0;
-    int i;
-    for (i = 0; i < l->count; i++)
-        b += l->levels[i].owned_size;
-    return b;
-}
-
-/* Append by stealing *src's buffer (src left empty). Grows with realloc.
- * Returns the stored level, or NULL on alloc failure. */
-static LoadedImage *loaded_levels_push_move(LoadedLevels *l, LoadedImage *src)
-{
-    LoadedImage *grown = (LoadedImage *)realloc(l->levels, (size_t)(l->count + 1) * sizeof(LoadedImage));
-    if (!grown)
-        return NULL;
-    l->levels = grown;
-    l->levels[l->count] = *src; /* POD: copies the pointer (steal) */
-    loaded_image_init(src);
-    return &l->levels[l->count++];
-}
-
-/* Free all buffers + the array, return to empty state. */
-static void loaded_levels_reset(LoadedLevels *l)
-{
-    int i;
-    for (i = 0; i < l->count; i++)
-        free(l->levels[i].owned_data);
-    free(l->levels);
-    l->levels = NULL;
-    l->count  = 0;
-}
-
-// Zero-initialise (no allocation).
-static inline void loaded_levels_init(LoadedLevels *l)
-{
-    l->levels = NULL;
-    l->count  = 0;
-}
-
-// Move ownership src -> dst (dst's prior contents freed; src left empty).
-static inline void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
-{
-    if (dst == src)
-        return;
-    loaded_levels_reset(dst);
-    dst->levels = src->levels;
-    dst->count  = src->count;
-    src->levels = NULL;
-    src->count  = 0;
-}
-
-class Renderer;
-
-/* Max length for HD texture file paths built by the path helpers below.
- * Defined here so both IORequest and the path helpers can use it. */
-enum { PATH_MAX_TT = 4096 + 256 };
-
-enum class IORequestKind {
-    Load,
-    Dump,
-};
-
-struct IORequest {
-    struct IORequest *next;        /* intrusive FIFO link (queue-owned) */
-    IORequestKind kind;
-    // Load payload (valid when kind == Load):
-    uint32_t hash;
-    uint32_t palette_hash;
-    // Dump payload (valid when kind == Dump):
-    char     path[PATH_MAX_TT];
-    int      width;
-    int      height;
-    uint8_t *bytes;                /* owned RGBA bytes (NULL if none) */
-    size_t   bytes_len;
-};
-
-static void io_request_free(IORequest *r)
-{
-    if (r) {
-        free(r->bytes);
-        free(r);
-    }
-}
-
-const int ALPHA_FLAG_OPAQUE = 1;
-const int ALPHA_FLAG_SEMI_TRANSPARENT = 2;
-const int ALPHA_FLAG_TRANSPARENT = 4;
-
-struct IOResponse {
-    struct IOResponse *next;       /* intrusive FIFO link (queue-owned) */
-    uint32_t hash;
-    uint32_t palette_hash;
-    int alpha_flags;
-    LoadedLevels levels;
-};
-
-static void io_response_free(IOResponse *r)
-{
-    if (r) {
-        loaded_levels_reset(&r->levels);
-        free(r);
-    }
-}
-
-class IOChannel {
-public:
-    IOChannel();
-    ~IOChannel();
-    slock_t *lock;
-    scond_t *cond;
-    /* Intrusive FIFO lists (protected by `lock`). Heads are popped/drained,
-     * tails are where producers append. Replaces std::vector<IORequest> /
-     * std::vector<IOResponse>. */
-    IORequest  *req_head,  *req_tail;
-    IOResponse *resp_head, *resp_tail;
-    bool done = false;
-    /* Cross-thread refcount (replaces std::shared_ptr<IOChannel>). The owning
-     * IOThread holds one reference and each detached worker holds one; whichever
-     * releases last frees the channel. Mutated only outside the lock, at
-     * thread-spawn and thread-exit, so a plain int with no overlap is fine. */
-    int refcount;
-private:
-};
-
-static IOChannel *io_channel_new() {
-    IOChannel *c = new IOChannel();
-    c->refcount = 1;
-    return c;
-}
-/* The refcount is touched from the owning thread (spawn/teardown) and from the
- * detached workers (exit), so the increment/decrement must be serialised. A
- * single process-wide lock guards every transition; the actual free happens
- * after the lock is dropped so we never reference the channel's own lock once
- * it may be gone. */
-static slock_t *io_channel_rc_lock = NULL;
-static void io_channel_rc_lock_init() {
-    if (!io_channel_rc_lock)
-        io_channel_rc_lock = slock_new();
-}
-static void io_channel_acquire(IOChannel *c) {
-    if (!c)
-        return;
-    slock_lock(io_channel_rc_lock);
-    c->refcount++;
-    slock_unlock(io_channel_rc_lock);
-}
-static void io_channel_release(IOChannel *c) {
-    bool should_free;
-    if (!c)
-        return;
-    slock_lock(io_channel_rc_lock);
-    should_free = (--c->refcount == 0);
-    slock_unlock(io_channel_rc_lock);
-    if (should_free)
-        delete c;
-}
-
-/* FIFO helpers (caller holds channel->lock). Defined here so the IO worker
- * (io_thread) and the producers can all see them. */
-static void io_channel_push_request(IOChannel *c, IORequest *r) {
-    r->next = NULL;
-    if (c->req_tail) c->req_tail->next = r; else c->req_head = r;
-    c->req_tail = r;
-}
-static IORequest *io_channel_pop_request(IOChannel *c) {
-    IORequest *r = c->req_head;
-    if (r) {
-        c->req_head = r->next;
-        if (!c->req_head) c->req_tail = NULL;
-        r->next = NULL;
-    }
-    return r;
-}
-static void io_channel_push_response(IOChannel *c, IOResponse *r) {
-    r->next = NULL;
-    if (c->resp_tail) c->resp_tail->next = r; else c->resp_head = r;
-    c->resp_tail = r;
-}
-/* Steal the entire response list; channel left empty. Returns the head. */
-static IOResponse *io_channel_take_responses(IOChannel *c) {
-    IOResponse *head = c->resp_head;
-    c->resp_head = c->resp_tail = NULL;
-    return head;
-}
-
-class IOThread {
-public:
-    IOThread();
-    ~IOThread();
-    IOChannel *channel; /* refcounted; one ref held here, one per worker */
-private:
-};
-
-struct Palette {
-    uint16_t *data;
-    uint32_t hash;
-};
-
-struct CachedPaletteHash {
-    Rect rect;
-    uint32_t hash;
-};
-
-//============
-// RectTracker
-
-/* TextureRect is a trivially-copyable POD: a borrowed view of an upload plus a
- * subrect. It does NOT manage the refcount in special members (so it relocates
- * with a bitwise move - no per-copy acquire/release, no exception scaffolding in
- * the containers that hold it). Ownership lives at container boundaries instead:
- * a container retains on insert and releases on erase/clear/destroy via
- * texture_rect_retain / texture_rect_release. Transient TextureRect values
- * (subTexture results, clip pairs, scratch arrays) are borrowing and need no
- * ref ops. */
-struct TextureRect {
-    TextureUpload *upload;
-    // the offset into the original upload rect (offset_x + vram_rect.width <= upload->width)
-    int offset_x;
-    int offset_y;
-    SRect vram_rect;
-
-    // in vram size (not hd), local to the uploaded data, different hd textures for different palettes could have different sizes anyway
-    SRect texture_subrect() const {
-        return SRect(offset_x, offset_y, vram_rect.width, vram_rect.height);
-    }
-
-	inline bool operator==(const TextureRect &other) const
-	{
-		return upload == other.upload && offset_x == other.offset_x && offset_y == other.offset_y && vram_rect == other.vram_rect;
-	}
-    inline bool operator!=(const TextureRect &other) const
-    {
-        return !(*this == other);
-    }
-};
-
-/* Build a TextureRect (borrowing - does not take a reference). */
-static inline TextureRect make_texture_rect(TextureUpload *upload, int offset_x, int offset_y, SRect vram_rect)
-{
-    TextureRect t;
-    t.upload = upload;
-    t.offset_x = offset_x;
-    t.offset_y = offset_y;
-    t.vram_rect = vram_rect;
-    return t;
-}
-/* Ownership transfer helpers, used by owning containers only. */
-static inline void texture_rect_retain(const TextureRect *t)  { texture_upload_acquire(t->upload); }
-static inline void texture_rect_release(const TextureRect *t) { texture_upload_release(t->upload); }
-
-/* Borrowing scratch array of (POD) TextureRects - no ownership, used for the
- * blit/clear_rect transients that are immediately re-placed into owning
- * containers. Trivially relocatable, so push is a bare realloc/append. */
-POD_VEC_DECLARE(TextureRectVec, TextureRect);
-
-
-// TODO: better name
-struct EnduringTextureRect {
-    TextureRect texture_rect;
-    bool alive;
-};
-
-/* Owning, trivially-relocatable array of EnduringTextureRect (replaces
- * std::vector<EnduringTextureRect>). Because TextureRect is now POD, growth is a
- * realloc (bitwise relocation, no per-element move-ctor or exception
- * scaffolding). Ownership is explicit: push retains the upload, and any slot
- * that leaves the array (compaction drop, clear, free) releases it. */
-struct EnduringRectArr {
-    EnduringTextureRect *a;
-    int count;
-    int cap;
-    /* Pointer-range iteration so existing range-for loops work unchanged. */
-    EnduringTextureRect *begin() { return a; }
-    EnduringTextureRect *end()   { return a + count; }
-    const EnduringTextureRect *begin() const { return a; }
-    const EnduringTextureRect *end()   const { return a + count; }
-};
-static inline void enduring_arr_init(EnduringRectArr *v) { v->a = NULL; v->count = 0; v->cap = 0; }
-static inline void enduring_arr_push(EnduringRectArr *v, TextureRect tr, bool alive) {
-    if (v->count == v->cap) {
-        int ncap = v->cap ? v->cap * 2 : 16;
-        v->a = (EnduringTextureRect *)realloc(v->a, (size_t)ncap * sizeof(EnduringTextureRect));
-        v->cap = ncap;
-    }
-    texture_rect_retain(&tr);            /* the array now owns a reference */
-    v->a[v->count].texture_rect = tr;
-    v->a[v->count].alive = alive;
-    v->count++;
-}
-/* Drop !alive slots, releasing their refs; survivors relocate by bitwise move. */
-static inline void enduring_arr_compact(EnduringRectArr *v) {
-    int w = 0, i;
-    for (i = 0; i < v->count; i++) {
-        if (v->a[i].alive) {
-            if (w != i) v->a[w] = v->a[i];
-            w++;
-        } else {
-            texture_rect_release(&v->a[i].texture_rect);
-        }
-    }
-    v->count = w;
-}
-static inline void enduring_arr_clear(EnduringRectArr *v) {
-    int i;
-    for (i = 0; i < v->count; i++)
-        texture_rect_release(&v->a[i].texture_rect);
-    v->count = 0;
-}
-static inline void enduring_arr_free(EnduringRectArr *v) {
-    enduring_arr_clear(v);
-    free(v->a);
-    v->a = NULL;
-    v->cap = 0;
-}
-
-/* Owning vector of (POD) TextureRects, used where the rect list is itself
- * value-copied/compared (FusionRects, RestorableRect). The element is trivially
- * relocatable so the backing std::vector relocates cheaply, but ownership must
- * be explicit: this wrapper retains on push and on copy, and releases on
- * destroy/clear/assign. */
-struct OwnedRectVec {
-    std::vector<TextureRect> v;
-    OwnedRectVec() {}
-    ~OwnedRectVec() { for (size_t i = 0; i < v.size(); i++) texture_rect_release(&v[i]); }
-    OwnedRectVec(const OwnedRectVec &o) : v(o.v) { for (size_t i = 0; i < v.size(); i++) texture_rect_retain(&v[i]); }
-    OwnedRectVec &operator=(const OwnedRectVec &o) {
-        if (this != &o) {
-            for (size_t i = 0; i < v.size(); i++) texture_rect_release(&v[i]);
-            v = o.v;
-            for (size_t i = 0; i < v.size(); i++) texture_rect_retain(&v[i]);
-        }
-        return *this;
-    }
-    void push(TextureRect t) { texture_rect_retain(&t); v.push_back(t); }
-    size_t size() const { return v.size(); }
-    TextureRect &operator[](size_t i) { return v[i]; }
-    const TextureRect &operator[](size_t i) const { return v[i]; }
-    bool operator==(const OwnedRectVec &o) const { return v == o.v; }
-    TextureRect *begin() { return v.data(); }
-    TextureRect *end()   { return v.data() + v.size(); }
-    const TextureRect *begin() const { return v.data(); }
-    const TextureRect *end()   const { return v.data() + v.size(); }
-};
-
-const int LOOKUP_GRID_COLUMNS = 16;
-const int LOOKUP_GRID_ROWS = 2;
-const int LOOKUP_CELL_WIDTH = 64;
-const int LOOKUP_CELL_HEIGHT = 256;
-
-/* Sorted set of RectIndex (int), MSVC C89. Replaces std::unordered_set<RectIndex>
- * for the overlap-dedup scratch set: a malloc'd sorted int array with
- * binary-search insert (dedups), cleared and refilled each query, then iterated
- * in order. Order differs from the old unordered_set (now ascending by index),
- * which only affects iteration order of overlapping rects - the consumers don't
- * depend on it. */
-struct RectIndexSet {
-    RectIndex *items;
-    int        count;
-    int        cap;
-};
-static void rect_index_set_init(RectIndexSet *s) { s->items = NULL; s->count = 0; s->cap = 0; }
-static void rect_index_set_free(RectIndexSet *s) { free(s->items); s->items = NULL; s->count = 0; s->cap = 0; }
-static void rect_index_set_clear(RectIndexSet *s) { s->count = 0; }
-static int rect_index_set_lower_bound(const RectIndexSet *s, RectIndex v) {
-    int lo = 0, hi = s->count;
-    while (lo < hi) { int mid = lo + ((hi - lo) >> 1); if (s->items[mid] < v) lo = mid + 1; else hi = mid; }
-    return lo;
-}
-static void rect_index_set_insert(RectIndexSet *s, RectIndex v) {
-    int i = rect_index_set_lower_bound(s, v);
-    if (i < s->count && s->items[i] == v) return;
-    if (s->count == s->cap) {
-        int ncap = s->cap ? s->cap * 2 : 16;
-        s->items = (RectIndex *)realloc(s->items, (size_t)ncap * sizeof(RectIndex));
-        s->cap = ncap;
-    }
-    memmove(&s->items[i + 1], &s->items[i], (size_t)(s->count - i) * sizeof(RectIndex));
-    s->items[i] = v;
-    s->count++;
-}
-
-class LookupGrid {
-public:
-    LookupGrid();
-    ~LookupGrid();
-    void insert(SRect r, RectIndex index);
-    void get(SRect r, RectIndexSet &results);
-    void clear();
-private:
-    struct LookupEntry {
-        SRect rect;
-        RectIndex index;
-    };
-    /* Each cell is a psx texture page (64x256); was std::vector<LookupEntry>.
-     * Now a malloc'd growable array per cell (POD entries). */
-    struct Cell {
-        LookupEntry *entries;
-        int count;
-        int cap;
-    };
-    Cell cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS];
-};
-
-class RectTracker {
-public:
-    RectTracker() { enduring_arr_init(&textures); }
-    ~RectTracker() { enduring_arr_free(&textures); }
-    void place(TextureRect texture);
-    void upload(SRect rect, TextureUpload *upload);
-    void blit(SRect dst, SRect src);
-    void clear(SRect rect)
-    {
-        clear_rect(rect);
-        lookup_grid_dirty = true;
-    }
-    void releaseDeadHandles();
-    EnduringRectArr textures; // owning trivially-relocatable array
-    RectIndexSet& overlapping(Rect rect, RectIndexSet& results);
-
-    /**
-     * This pointer will be valid until the next upload/blit/clear/endFrame, so use it immediately and don't try anything funny.
-     * Returns nullptr when index is out of range
-    **/
-    TextureRect* get_index(RectIndex index);
-
-    /** Returns nullptr if no texture with the given hash can be found */
-    TextureUpload *find_upload(uint32_t hash);
-private:
-    LookupGrid lookup_grid;
-    bool lookup_grid_dirty = false;
-
-    void clear_rect(SRect &rect);
-    void rebuild_lookup_grid();
-};
-// RectTracker
-//============
-
-struct FusionRects {
-    OwnedRectVec rects;
-    Rect vram_rect;
-    unsigned int scaleX = 0;
-    unsigned int scaleY = 0;
-
-    bool operator==(const FusionRects &other) const {
-        return vram_rect == other.vram_rect && scaleX == other.scaleX && scaleY == other.scaleY && rects == other.rects;
-    }
-
-    bool operator!=(const FusionRects &other) const {
-        return !(*this == other);
-    }
-};
-
-struct FusedPage {
-    Vulkan::ImageHandle texture;
-
-    uint32_t palette;
-    Rect full_page_rect;
-
-    bool dirty = false;
-    bool dead = false;
-
-    FusionRects fusion;
-};
-
-class FusedPages {
-public:
-    HdTextureHandle get_or_make(Rect page_rect, uint32_t palette, RectTracker &tracker, Renderer *uploader);
-    HdTexture get_from_handle(HdTextureHandle handle, Vulkan::ImageHandle &default_hd_texture);
-    void mark_dirty(Rect rect); // For blit dst, upload, and hd texture load
-    void mark_dead(Rect rect); // For clear
-    void rebuild_dirty(RectTracker &tracker, Renderer *uploader);
-    void remove_dead();
-
-    void dbg_print_info();
-private:
-    std::vector<FusedPage> pages;
-};
-
-struct RestorableRect {
-    Rect rect;
-    uint32_t hash;
-    OwnedRectVec to_restore;
-};
-
-class DbgHotkey {
-public:
-    DbgHotkey(retro_key key): key(key) {}
-    bool query();
-    retro_key key;
-private:
-    bool was_key_down = false;
-};
-
-struct CacheEntry {
-    Rect rect;
-    HdTextureHandle handle;
-    CacheEntry() : rect(), handle(HdTextureHandle::make_none()) {}
-};
-
-/* Result of a handle-cache lookup (replaces std::pair<HdTextureHandle,bool>). */
-struct HandleCacheResult {
-    HdTextureHandle handle;
-    bool found;
-    HandleCacheResult() : handle(HdTextureHandle::make_none()), found(false) {}
-};
-
-/* Small fixed-capacity move-to-front cache of recently-used HD texture
- * handles. CacheEntry is POD, so the entries live in an inline array (capacity
- * HANDLE_LRU_MAX) with a count - no std::vector, no heap. */
-enum { HANDLE_LRU_MAX = 4 };
-
-class HandleLRUCache {
-public:
-    HandleLRUCache(int max_size_): max_size(max_size_), count(0) {
-        if (max_size > HANDLE_LRU_MAX)
-            max_size = HANDLE_LRU_MAX;
-    }
-    HandleCacheResult get(Rect rect, uint32_t palette_hash);
-    void insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle);
-    void clear()
-    {
-        count = 0;
-    }
-    int64_t dbg_hits;
-    int64_t dbg_misses;
-private:
-    int max_size;
-    int count;
-    CacheEntry entries[HANDLE_LRU_MAX];
-};
-
-//========================================
-// Save State
-struct TextureRectSaveState {
-    uint32_t upload_hash;
-    int offset_x;
-    int offset_y;
-    SRect vram_rect;
-};
-
-struct RestorableRectSaveState {
-    Rect rect;
-    uint32_t hash;
-    std::vector<TextureRectSaveState> to_restore;
-};
-
-struct TextureTrackerSaveState {
-    std::vector<TextureRectSaveState> rects;
-    std::vector<RestorableRectSaveState> restorable;
-    std::map<uint32_t, TextureUpload> uploads;
-};
-// End of Save State
-//========================================
-
-/* Tunable HD-texture cache budgets. hd_cache = system RAM (decoded CPU levels);
- * hd_gpu_cache = VRAM (uploaded Vulkan images). The VRAM budget targets 8 GB
- * cards - lower it if you see VRAM-pressure "QueuePresent failed" / swapchain
- * churn, raise it on larger cards. */
-static const size_t HD_CACHE_RAM_BUDGET  = (size_t)2 * 1024 * 1024 * 1024; /* 2 GB */
-static const size_t HD_CACHE_VRAM_BUDGET = (size_t)3 * 1024 * 1024 * 1024; /* 3 GB */
-
-/* (hash, palette_hash) packed into one 64-bit key. The caches below are keyed
- * by this single integer instead of HdTextureId, so lookups compare one int
- * with no struct operator< / tree descent. */
-static uint64_t hd_pack_key(HdTextureId id)
-{
-    return ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash;
-}
-
-/* ------------------------------------------------------------------------- *
- * Byte-budgeted LRU cache, MSVC C89.
- *
- * Replaces the original std::list<Entry> + std::map<id, list::iterator>
- * design - two heap node allocations per insert and an O(log n) red-black
- * descent per lookup - with a contiguous index-LRU + open-addressed
- * (linear-probe) flat hash table, all held in malloc'd arrays. No templates,
- * no classes, no virtual, no STL. The two cache variants (RAM levels, VRAM
- * images) are produced by macro instantiation: HD_LRU_DECLARE emits the struct
- * and prototypes, HD_LRU_DEFINE emits the bodies, with a DISPOSE callback that
- * frees payload-owned resources when a live entry leaves the cache.
- * ------------------------------------------------------------------------- */
-
-/* fmix64 - cheap, strong avalanche for integer keys. The multipliers are built
- * from 32-bit halves so no C99 long-long (ULL) literals appear. */
-static uint64_t hd_lru_mix(uint64_t x)
-{
-    uint64_t k1 = ((uint64_t)0xff51afd7u << 32) | (uint64_t)0xed558ccdu;
-    uint64_t k2 = ((uint64_t)0xc4ceb9feu << 32) | (uint64_t)0x1a85ec53u;
-    x ^= x >> 33;
-    x *= k1;
-    x ^= x >> 33;
-    x *= k2;
-    x ^= x >> 33;
-    return x;
-}
-
-#define HD_LRU_NO_DISPOSE(p) ((void)(p))
-
-#define HD_LRU_DECLARE(NAME, PAYLOAD_T)                                        \
-typedef struct NAME##_slot {                                                   \
-    uint64_t  key;                                                             \
-    int       prev;   /* LRU links by arena index (-1 = none) */               \
-    int       next;                                                            \
-    size_t    bytes;  /* cached payload footprint */                           \
-    PAYLOAD_T payload;                                                         \
-} NAME##_slot;                                                                 \
-                                                                               \
-typedef struct NAME {                                                          \
-    NAME##_slot *slots;                                                        \
-    int          slots_len;                                                    \
-    int          slots_cap;                                                    \
-    int         *table;        /* open-addressed slot indices; -1 = empty */   \
-    size_t       table_len;    /* power of two, 0 if unallocated */            \
-    size_t       mask;         /* table_len - 1 */                             \
-    int          head, tail;   /* MRU / LRU ends */                            \
-    int          free_head;    /* recycled-slot free list head */              \
-    int          live;                                                         \
-    size_t       total_bytes;                                                  \
-    size_t       budget_bytes;                                                 \
-} NAME;                                                                        \
-                                                                               \
-static void   NAME##_init(NAME *c, size_t budget_bytes);                       \
-static int    NAME##_contains(const NAME *c, uint64_t key);                    \
-static PAYLOAD_T *NAME##_get(NAME *c, uint64_t key);                           \
-static PAYLOAD_T *NAME##_put_slot(NAME *c, uint64_t key, int *created);        \
-static void   NAME##_account(NAME *c, size_t old_bytes, size_t new_bytes);     \
-static void   NAME##_erase(NAME *c, uint64_t key);                             \
-static void   NAME##_clear(NAME *c);                                           \
-static void   NAME##_set_entry_bytes(NAME *c, uint64_t key, size_t bytes);     \
-static void   NAME##_set_budget(NAME *c, size_t bytes);                        \
-static size_t NAME##_size_bytes(const NAME *c);                                \
-static size_t NAME##_count(const NAME *c);                                     \
-static size_t NAME##_budget(const NAME *c)
-
-#define HD_LRU_DEFINE(NAME, PAYLOAD_T, DISPOSE)                                \
-static int NAME##_find_slot(const NAME *c, uint64_t key)                       \
-{                                                                              \
-    size_t i;                                                                  \
-    if (c->table_len == 0)                                                     \
-        return -1;                                                             \
-    i = (size_t)hd_lru_mix(key) & c->mask;                                     \
-    for (;;) {                                                                 \
-        int s = c->table[i];                                                   \
-        if (s < 0)                                                             \
-            return -1;                                                         \
-        if (c->slots[s].key == key)                                            \
-            return s;                                                          \
-        i = (i + 1) & c->mask;                                                 \
-    }                                                                          \
-}                                                                              \
-static void NAME##_raw_insert(NAME *c, uint64_t key, int s)                    \
-{                                                                              \
-    size_t i = (size_t)hd_lru_mix(key) & c->mask;                             \
-    while (c->table[i] >= 0)                                                   \
-        i = (i + 1) & c->mask;                                                 \
-    c->table[i] = s;                                                           \
-}                                                                              \
-static void NAME##_ensure_table(NAME *c, size_t want)                          \
-{                                                                              \
-    size_t need = 8;                                                           \
-    size_t i;                                                                  \
-    int s;                                                                     \
-    while (need < want * 2)                                                    \
-        need <<= 1;                                                            \
-    if (c->table_len != 0 && need <= c->table_len)                             \
-        return;                                                                \
-    c->table = (int *)realloc(c->table, need * sizeof(int));                   \
-    c->table_len = need;                                                       \
-    c->mask = need - 1;                                                        \
-    for (i = 0; i < need; i++)                                                 \
-        c->table[i] = -1;                                                      \
-    for (s = c->head; s >= 0; s = c->slots[s].next)                           \
-        NAME##_raw_insert(c, c->slots[s].key, s);                             \
-}                                                                              \
-static void NAME##_hash_remove(NAME *c, uint64_t key)                          \
-{                                                                              \
-    size_t i = (size_t)hd_lru_mix(key) & c->mask;                             \
-    size_t j;                                                                  \
-    for (;;) {                                                                 \
-        int s = c->table[i];                                                   \
-        if (s >= 0 && c->slots[s].key == key)                                  \
-            break;                                                             \
-        i = (i + 1) & c->mask;                                                 \
-    }                                                                          \
-    j = i;                                                                     \
-    c->table[i] = -1;                                                          \
-    for (;;) {                                                                 \
-        int sj;                                                                \
-        size_t home;                                                          \
-        int can_move;                                                          \
-        j = (j + 1) & c->mask;                                                 \
-        sj = c->table[j];                                                      \
-        if (sj < 0)                                                            \
-            break;                                                             \
-        home = (size_t)hd_lru_mix(c->slots[sj].key) & c->mask;               \
-        if (i <= j)                                                            \
-            can_move = !(home > i && home <= j);                               \
-        else                                                                   \
-            can_move = !(home > i || home <= j);                               \
-        if (can_move) {                                                        \
-            c->table[i] = sj;                                                  \
-            c->table[j] = -1;                                                  \
-            i = j;                                                             \
-        }                                                                      \
-    }                                                                          \
-}                                                                              \
-static int NAME##_alloc_slot(NAME *c)                                          \
-{                                                                              \
-    int s;                                                                     \
-    if (c->free_head >= 0) {                                                   \
-        s = c->free_head;                                                      \
-        c->free_head = c->slots[s].next;                                       \
-        return s;                                                              \
-    }                                                                          \
-    if (c->slots_len == c->slots_cap) {                                        \
-        int ncap = c->slots_cap ? c->slots_cap * 2 : 16;                       \
-        c->slots = (NAME##_slot *)realloc(c->slots,                            \
-                       (size_t)ncap * sizeof(NAME##_slot));                    \
-        c->slots_cap = ncap;                                                   \
-    }                                                                          \
-    s = c->slots_len++;                                                        \
-    c->slots[s].key = 0;                                                       \
-    c->slots[s].prev = -1;                                                     \
-    c->slots[s].next = -1;                                                     \
-    c->slots[s].bytes = 0;                                                     \
-    return s;                                                                  \
-}                                                                              \
-static void NAME##_free_slot(NAME *c, int s)                                   \
-{                                                                              \
-    c->slots[s].next = c->free_head;                                          \
-    c->free_head = s;                                                          \
-}                                                                              \
-static void NAME##_link_front(NAME *c, int s)                                  \
-{                                                                              \
-    c->slots[s].prev = -1;                                                     \
-    c->slots[s].next = c->head;                                                \
-    if (c->head >= 0)                                                          \
-        c->slots[c->head].prev = s;                                            \
-    c->head = s;                                                               \
-    if (c->tail < 0)                                                           \
-        c->tail = s;                                                           \
-}                                                                              \
-static void NAME##_unlink(NAME *c, int s)                                      \
-{                                                                              \
-    int p = c->slots[s].prev;                                                  \
-    int n = c->slots[s].next;                                                  \
-    if (p >= 0) c->slots[p].next = n; else c->head = n;                        \
-    if (n >= 0) c->slots[n].prev = p; else c->tail = p;                        \
-}                                                                              \
-static void NAME##_touch(NAME *c, int s)                                       \
-{                                                                              \
-    if (c->head == s)                                                          \
-        return;                                                                \
-    NAME##_unlink(c, s);                                                       \
-    NAME##_link_front(c, s);                                                   \
-}                                                                              \
-static void NAME##_evict(NAME *c)                                              \
-{                                                                              \
-    while (c->total_bytes > c->budget_bytes && c->tail >= 0) {                 \
-        int s = c->tail;                                                       \
-        uint64_t key = c->slots[s].key;                                        \
-        c->total_bytes -= c->slots[s].bytes;                                   \
-        DISPOSE(&c->slots[s].payload);                                         \
-        NAME##_unlink(c, s);                                                   \
-        NAME##_hash_remove(c, key);                                            \
-        NAME##_free_slot(c, s);                                                \
-        c->live--;                                                             \
-    }                                                                          \
-}                                                                              \
-static void NAME##_init(NAME *c, size_t budget_bytes)                          \
-{                                                                              \
-    c->slots = NULL; c->slots_len = 0; c->slots_cap = 0;                       \
-    c->table = NULL; c->table_len = 0; c->mask = 0;                            \
-    c->head = c->tail = c->free_head = -1;                                     \
-    c->live = 0; c->total_bytes = 0; c->budget_bytes = budget_bytes;           \
-}                                                                              \
-static int NAME##_contains(const NAME *c, uint64_t key)                        \
-{                                                                              \
-    return NAME##_find_slot(c, key) >= 0;                                      \
-}                                                                              \
-static PAYLOAD_T *NAME##_get(NAME *c, uint64_t key)                            \
-{                                                                              \
-    int s = NAME##_find_slot(c, key);                                          \
-    if (s < 0)                                                                 \
-        return NULL;                                                           \
-    NAME##_touch(c, s);                                                        \
-    return &c->slots[s].payload;                                               \
-}                                                                              \
-static PAYLOAD_T *NAME##_put_slot(NAME *c, uint64_t key, int *created)         \
-{                                                                              \
-    int s = NAME##_find_slot(c, key);                                          \
-    if (s >= 0) {                                                              \
-        *created = 0;                                                          \
-        NAME##_touch(c, s);                                                    \
-        return &c->slots[s].payload;                                           \
-    }                                                                          \
-    *created = 1;                                                              \
-    NAME##_ensure_table(c, (size_t)c->live + 1);                               \
-    s = NAME##_alloc_slot(c);                                                  \
-    c->slots[s].key = key;                                                     \
-    NAME##_link_front(c, s);                                                   \
-    NAME##_raw_insert(c, key, s);                                              \
-    c->live++;                                                                 \
-    return &c->slots[s].payload;                                               \
-}                                                                              \
-static void NAME##_account(NAME *c, size_t old_bytes, size_t new_bytes)        \
-{                                                                              \
-    c->total_bytes = c->total_bytes - old_bytes + new_bytes;                   \
-    NAME##_evict(c);                                                           \
-}                                                                              \
-static void NAME##_erase(NAME *c, uint64_t key)                                \
-{                                                                              \
-    int s = NAME##_find_slot(c, key);                                          \
-    if (s < 0)                                                                 \
-        return;                                                                \
-    c->total_bytes -= c->slots[s].bytes;                                       \
-    DISPOSE(&c->slots[s].payload);                                             \
-    NAME##_unlink(c, s);                                                       \
-    NAME##_hash_remove(c, key);                                                \
-    NAME##_free_slot(c, s);                                                    \
-    c->live--;                                                                 \
-}                                                                              \
-static void NAME##_clear(NAME *c)                                              \
-{                                                                              \
-    int s;                                                                     \
-    for (s = c->head; s >= 0; s = c->slots[s].next)                           \
-        DISPOSE(&c->slots[s].payload);                                         \
-    free(c->slots); free(c->table);                                            \
-    c->slots = NULL; c->slots_len = 0; c->slots_cap = 0;                       \
-    c->table = NULL; c->table_len = 0; c->mask = 0;                            \
-    c->head = c->tail = c->free_head = -1;                                     \
-    c->live = 0; c->total_bytes = 0;                                           \
-}                                                                              \
-static void NAME##_set_entry_bytes(NAME *c, uint64_t key, size_t bytes)        \
-{                                                                              \
-    int s = NAME##_find_slot(c, key);                                          \
-    if (s >= 0)                                                                \
-        c->slots[s].bytes = bytes;                                             \
-}                                                                              \
-static void NAME##_set_budget(NAME *c, size_t bytes)                           \
-{                                                                              \
-    c->budget_bytes = bytes;                                                   \
-    NAME##_evict(c);                                                           \
-}                                                                              \
-static size_t NAME##_size_bytes(const NAME *c) { return c->total_bytes; }      \
-static size_t NAME##_count(const NAME *c)      { return (size_t)c->live; }     \
-static size_t NAME##_budget(const NAME *c)     { return c->budget_bytes; }
-
-/* --- RAM cache: decoded CPU levels, keyed by (hash, palette) ------------- *
- * Lives independent of TextureUpload lifetime, so images survive the rapid
- * VRAM upload churn of animated sprites. Decode-once: a combo is read+decoded
- * from disk at most once until evicted. CPU-side only - the GPU upload happens
- * on attach via Renderer::upload_texture, so it survives device/swapchain
- * resets. The disposer frees the decoded levels. */
-typedef struct CachedHdImage {
-    LoadedLevels levels; /* decoded RGBA + mips (CPU side) */
-    int    alpha_flags;
-    size_t bytes;
-} CachedHdImage;
-
-static void cached_hd_image_dispose(CachedHdImage *p)
-{
-    loaded_levels_reset(&p->levels);
-}
-
-HD_LRU_DECLARE(HdImageCache, CachedHdImage);
-HD_LRU_DEFINE(HdImageCache, CachedHdImage, cached_hd_image_dispose)
-
-/* Insert/replace a combo's decoded levels; takes ownership of *levels (left
- * empty on return). */
-static void hd_image_cache_put(HdImageCache *c, HdTextureId id,
-                               LoadedLevels *levels, int alpha_flags)
-{
-    uint64_t key = hd_pack_key(id);
-    int created = 0;
-    CachedHdImage *e = HdImageCache_put_slot(c, key, &created);
-    size_t old_bytes = created ? 0 : e->bytes;
-    if (created)
-        loaded_levels_init(&e->levels); /* fresh slot: payload is indeterminate */
-    loaded_levels_move(&e->levels, levels);
-    e->alpha_flags = alpha_flags;
-    e->bytes = loaded_levels_byte_size(&e->levels);
-    HdImageCache_set_entry_bytes(c, key, e->bytes);
-    HdImageCache_account(c, old_bytes, e->bytes);
-}
-
-/* --- VRAM cache: uploaded Vulkan images, keyed by (hash, palette) -------- *
- * Sits above the RAM cache. Re-attaching a combo to a recreated TextureUpload
- * becomes a ref-counted handle copy instead of a fresh upload_texture. The
- * image is held as a RAW Vulkan::Image* (trivially relocatable, so the malloc
- * arena can realloc it) with the refcount managed by hand: a reference is
- * taken on insert and released by the disposer on eviction/clear, freeing VRAM
- * once no live draw still holds the image. */
-typedef struct CachedGpuImage {
-    Vulkan::Image *image; /* owns one reference while resident (NULL = empty) */
-    int    alpha_flags;
-    size_t bytes;         /* approximate VRAM footprint (== decoded levels size) */
-} CachedGpuImage;
-
-static void cached_gpu_image_dispose(CachedGpuImage *p)
-{
-    if (p->image) {
-        p->image->release_reference();
-        p->image = NULL;
-    }
-}
-
-HD_LRU_DECLARE(HdGpuCache, CachedGpuImage);
-HD_LRU_DEFINE(HdGpuCache, CachedGpuImage, cached_gpu_image_dispose)
-
-/* Take a counted reference to a cached image and return it as an ImageHandle
- * the caller can store/copy/destroy normally. IntrusivePtr(T*) adopts without
- * bumping, so add the reference explicitly first. */
-static Vulkan::ImageHandle hd_gpu_image_handle(CachedGpuImage *g)
-{
-    g->image->add_reference();
-    return Vulkan::ImageHandle(g->image);
-}
-
-/* Insert/replace a combo's GPU image. Adds a reference to `handle`'s image
- * (held until eviction); a prior image at this key is released first. */
-static void hd_gpu_cache_put(HdGpuCache *c, HdTextureId id,
-                             Vulkan::ImageHandle handle, int alpha_flags, size_t bytes)
-{
-    uint64_t key = hd_pack_key(id);
-    int created = 0;
-    CachedGpuImage *e = HdGpuCache_put_slot(c, key, &created);
-    size_t old_bytes = created ? 0 : e->bytes;
-    if (!created && e->image)
-        e->image->release_reference(); /* drop the image we're replacing */
-    e->image = handle.get();
-    if (e->image)
-        e->image->add_reference();      /* cache holds its own reference */
-    e->alpha_flags = alpha_flags;
-    e->bytes = bytes;
-    HdGpuCache_set_entry_bytes(c, key, bytes);
-    HdGpuCache_account(c, old_bytes, bytes);
-}
-
-/* ------------------------------------------------------------------------- *
- * HdKeySet - an ordered set of packed (hash, palette) uint64_t keys, MSVC C89.
- *
- * Replaces std::set<HdTextureId>. Backed by a single sorted, malloc'd
- * uint64_t array: membership is O(log n) binary search, insert/erase keep it
- * sorted (O(n) shift, fine for these small sets). Because the key packs
- * (hash << 32) | palette, the array is ordered by hash then palette, so all
- * combos of one hash form a contiguous run - found with lower_bound over the
- * half-open key range [hash<<32, (hash+1)<<32), which is exactly what the old
- * std::set lower_bound/upper_bound({hash,0})/({hash,0xFFFFFFFF}) gave.
- * ------------------------------------------------------------------------- */
-typedef struct HdKeySet {
-    uint64_t *keys;
-    int       count;
-    int       cap;
-} HdKeySet;
-
-static void hd_key_set_init(HdKeySet *s)
-{
-    s->keys = NULL;
-    s->count = 0;
-    s->cap = 0;
-}
-static void hd_key_set_free(HdKeySet *s)
-{
-    free(s->keys);
-    s->keys = NULL;
-    s->count = 0;
-    s->cap = 0;
-}
-static void hd_key_set_clear(HdKeySet *s)
-{
-    s->count = 0; /* keep the allocation for reuse */
-}
-/* First index with keys[i] >= key (i.e. std::lower_bound). */
-static int hd_key_set_lower_bound(const HdKeySet *s, uint64_t key)
-{
-    int lo = 0, hi = s->count;
-    while (lo < hi) {
-        int mid = lo + ((hi - lo) >> 1);
-        if (s->keys[mid] < key)
-            lo = mid + 1;
-        else
-            hi = mid;
-    }
-    return lo;
-}
-static int hd_key_set_contains(const HdKeySet *s, uint64_t key)
-{
-    int i = hd_key_set_lower_bound(s, key);
-    return i < s->count && s->keys[i] == key;
-}
-/* Insert key; returns 1 if newly added, 0 if already present. */
-static int hd_key_set_insert(HdKeySet *s, uint64_t key)
-{
-    int i = hd_key_set_lower_bound(s, key);
-    if (i < s->count && s->keys[i] == key)
-        return 0;
-    if (s->count == s->cap) {
-        int ncap = s->cap ? s->cap * 2 : 16;
-        s->keys = (uint64_t *)realloc(s->keys, (size_t)ncap * sizeof(uint64_t));
-        s->cap = ncap;
-    }
-    memmove(&s->keys[i + 1], &s->keys[i], (size_t)(s->count - i) * sizeof(uint64_t));
-    s->keys[i] = key;
-    s->count++;
-    return 1;
-}
-static void hd_key_set_erase(HdKeySet *s, uint64_t key)
-{
-    int i = hd_key_set_lower_bound(s, key);
-    if (i >= s->count || s->keys[i] != key)
-        return;
-    memmove(&s->keys[i], &s->keys[i + 1], (size_t)(s->count - i - 1) * sizeof(uint64_t));
-    s->count--;
-}
-
-class TextureTracker {
-public:
-    TextureTracker();
-    ~TextureTracker();
-
-    TextureTrackerSaveState save_state();
-    void load_state(const TextureTrackerSaveState &state);
-
-    // Put texture in highres vram
-    void upload(Rect rect, uint16_t *vram);
-    void blit(Rect dst, Rect src);
-    // Clear highres vram to fallback to lowres
-    void clearRegion(Rect rect);
-    // Monitor VRAM readback
-    void notifyReadback(Rect rect, uint16_t *vram);
-    uint32_t dbgHashVram(Rect rect, uint16_t *vram);
-
-    HdTextureHandle get_hd_texture_index(Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable, bool &cache_hit);
-    HdTexture get_hd_texture(HdTextureHandle index);
-    void endFrame();
-    void on_queues_reset();
-
-	void set_texture_uploader(Renderer *t);
-
-    // Runtime cache budgets (bytes), driven by core options.
-    void set_cache_budgets(size_t ram_bytes, size_t vram_bytes) {
-        HdImageCache_set_budget(&hd_cache, ram_bytes);
-        HdGpuCache_set_budget(&hd_gpu_cache, vram_bytes);
-    }
-
-    bool dump_enabled = false;
-    bool hd_textures_enabled = false;
-    bool eager_textures = true; // true = prefetch all palettes of a hash on upload (master-consistent); false = lazy per-draw
-private:
-    IOThread iothread;
-    Renderer *uploader;
-
-    Vulkan::ImageHandle default_hd_texture;
-
-    Palette get_palette(Rect palette_rect);
-    uint32_t get_palette_hash(Rect palette_rect);
-
-    RectMatch dump_ignore[DUMP_IGNORE_MAX];
-    int       dump_ignore_count;
-
-    HdKeySet known_files;
-    // Palette-hash cache: a plain growable array (append-only until cleared,
-    // no eviction/order), replacing std::vector<CachedPaletteHash>.
-    CachedPaletteHash *cached_palette_hashes;
-    int cached_palette_hashes_count;
-    int cached_palette_hashes_cap;
-    std::vector<RestorableRect> restorable_rects;
-    FusedPages fused_pages;
-    uint64_t frame = 0;
-
-    RectTracker tracker;
-    HandleLRUCache handle_cache = 4;
-
-    // HD image caches, independent of upload lifetime. Tier 1 = GPU (VRAM,
-    // ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier 3
-    // = disk. Re-attach prefers the GPU cache (handle copy), falls back to a
-    // GPU upload from the CPU cache, then to a disk load. Initialised in the
-    // TextureTracker constructor via HdGpuCache_init / HdImageCache_init.
-    HdGpuCache hd_gpu_cache;
-    HdImageCache hd_cache;
-    HdKeySet requested;        // disk load in flight, or known to have no file (negative cache)
-    HdKeySet pending_attach;   // cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset
-
-    // Queue a disk load for a combo unless it's already cached / in flight / fileless.
-    void want_combo(HdTextureId id);
-
-    // Diagnostics (logged every 300 frames by endFrame; non-verbose so they
-    // show in a normal RetroArch INFO log).
-    uint64_t dbg_responses_received = 0;       // disk decodes completed (should stay low with the cache)
-    uint64_t dbg_responses_received_last = 0;
-    uint64_t dbg_gpu_uploads = 0;              // upload_texture calls (CPU->GPU); should fall toward 0 once warm
-    uint64_t dbg_gpu_uploads_last = 0;
-    uint64_t dbg_attaches = 0;                 // combos bound to an upload (handle copy or fresh upload)
-    uint64_t dbg_attaches_last = 0;
-
-    void dump_texture(TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode);
-    
-    DbgHotkey frame_dump_key = RETROK_LEFTBRACKET; // disgusting
-    RFILE *frame_dump = NULL;
-    bool frame_dump_need_comma = false;
-
-    DbgHotkey hd_toggle_key = RETROK_RIGHTBRACKET;
-
-    void load_hd_texture(uint32_t hash); // eager per-hash loader, still used by load_state (savestate)
-    // Cache-backed lazy HD texture binding for a drawn (hash,palette); see definition.
-    void request_hd_texture(TextureUpload *upload, uint32_t palette_hash);
-
-    DbgHotkey reload_key = RETROK_QUOTE;
-    void reload_textures_from_disk();
-
-    DbgHotkey fastpath_key = RETROK_SEMICOLON;
-    bool fastpath_enabled = true;
-
-    void dump_image(TextureUpload &upload, UsedMode &mode);
-
-    void clear_palette_cache(Rect rect)
-    {
-        cached_palette_hashes_count = 0; /* keep allocation for reuse */
-    }
-
-    /** Returns nullptr if no texture with the given hash can be found */
-    TextureUpload *find_upload(uint32_t hash);
-};
-
-}
-
-/* ============================================================
- * existing renderer.hpp content
- * ============================================================ */
-
-
+#include <math.h>
 
 namespace PSX
 {
+	struct HdTextureId {
+		uint32_t hash;
+		uint32_t palette_hash;
 
-
-
-struct Vertex
-{
-	float x, y, w;
-	uint32_t color;
-	uint16_t u, v;
-};
-
-struct TextureWindow
-{
-	uint8_t mask_x, mask_y, or_x, or_y;
-};
-
-struct UVRect
-{
-	uint16_t min_u, min_v, max_u, max_v;
-};
-
-enum class SemiTransparentMode
-{
-	None,
-	Average,
-	Add,
-	Sub,
-	AddQuarter
-};
-
-enum class PrimitiveType
-{
-	Sprite,
-	Polygon,
-	May_Be_2D_Polygon
-};
-
-class Renderer
-{
-public:
-	enum class ScanoutMode
-	{
-		// Use extra precision bits.
-		ABGR1555_555,
-		// Use extra precision bits to dither down to a native ABGR1555 image.
-		// The dither happens in the wrong place, but should be "good" enough to feel authentic.
-		ABGR1555_Dither,
-		// MDEC
-		BGR24
-	};
-
-	enum class ScanoutFilter
-	{
-		None,
-		SSAA,
-		MDEC_YUV
-	};
-
-	enum class WidthMode
-	{
-		WIDTH_MODE_256 = 0,
-		WIDTH_MODE_320 = 1,
-		WIDTH_MODE_512 = 2,
-		WIDTH_MODE_640 = 3,
-		WIDTH_MODE_368 = 4
-	};
-
-	struct DisplayRect
-	{
-		// Unlike Rect, the x-y coordinates for a DisplayRect can be negative
-		int x = 0;
-		int y = 0;
-		unsigned width = 0;
-		unsigned height = 0;
-
-		DisplayRect() = default;
-		DisplayRect(int x, int y, unsigned width, unsigned height)
-		    : x(x)
-		    , y(y)
-		    , width(width)
-		    , height(height)
+		bool operator>(const HdTextureId &other) const
 		{
+			if (hash != other.hash)
+				return hash > other.hash;
+			return palette_hash > other.palette_hash;
+		}
+		bool operator<(const HdTextureId &other) const
+		{
+			if (hash != other.hash)
+				return hash < other.hash;
+			return palette_hash < other.palette_hash;
 		}
 	};
 
-	struct RenderState
-	{
-		//Rect display_mode;
-		Rect display_fb_rect;
-		TextureWindow texture_window;
-		Rect cached_window_rect;
-		Rect draw_rect;
-		int draw_offset_x = 0;
-		int draw_offset_y = 0;
-		unsigned palette_offset_x = 0;
-		unsigned palette_offset_y = 0;
-		unsigned texture_offset_x = 0;
-		unsigned texture_offset_y = 0;
-
-		int vert_start = 0x10;
-		int vert_end = 0x100;
-		int horiz_start = 0x200;
-		int horiz_end = 0xC00;
-
-		bool is_pal = false;
-		bool is_480i = false;
-		WidthMode width_mode = WidthMode::WIDTH_MODE_320;
-		int crop_overscan = 0;
-		unsigned image_crop = 0;
-
-		// Experimental horizontal offset feature
-		int offset_cycles = 0;
-
-		int slstart = 0;
-		int slend = 239;
-
-		int slstart_pal = 0;
-		int slend_pal = 287;
-
-		unsigned display_fb_xstart = 0;
-		unsigned display_fb_ystart = 0;
-
-		TextureMode texture_mode = TextureMode::None;
-		SemiTransparentMode semi_transparent = SemiTransparentMode::None;
-		PrimitiveType primitive_type = PrimitiveType::Polygon;
-		ScanoutMode scanout_mode = ScanoutMode::ABGR1555_555;
-		ScanoutFilter scanout_filter = ScanoutFilter::None;
-		ScanoutFilter scanout_mdec_filter = ScanoutFilter::None;
-		bool dither_native_resolution = false;
-		bool force_mask_bit = false;
-		bool texture_color_modulate = false;
-		bool mask_test = false;
-		bool display_on = false;
-		bool adaptive_smoothing = true;
-
-		UVRect UVLimits;
-	};
-
-	struct SaveState
-	{
-		std::vector<uint32_t> vram;
-		RenderState state;
-		TextureTrackerSaveState tracker_state;
-	};
-
-	Renderer(Vulkan::Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
-	~Renderer();
-
-	void set_track_textures(bool enable)
-	{
-		texture_tracking_enabled = enable;
-	}
-	void set_dump_textures(bool enable)
-	{
-		tracker.dump_enabled = enable;
-	}
-	void set_replace_textures(bool enable)
-	{
-		tracker.hd_textures_enabled = enable;
-	}
-	void set_hd_cache_budgets(size_t ram_bytes, size_t vram_bytes)
-	{
-		tracker.set_cache_budgets(ram_bytes, vram_bytes);
-	}
-	void set_eager_hd_textures(bool enable)
-	{
-		tracker.eager_textures = enable;
-	}
-
-	void set_adaptive_smoothing(bool enable)
-	{
-		render_state.adaptive_smoothing = enable;
-	}
-
-	void set_draw_rect(const Rect &rect);
-	inline void set_draw_offset(int x, int y)
-	{
-		render_state.draw_offset_x = x;
-		render_state.draw_offset_y = y;
-	}
-
-	inline void set_scissored_invariant(bool invariant)
-	{
-		queue.scissor_invariant = invariant;
-	}
-
-	void set_texture_window(const TextureWindow &window)
-	{
-		render_state.texture_window = window;
-		render_state.cached_window_rect = compute_window_rect(window);
-	}
-	inline void set_texture_offset(unsigned x, unsigned y)
-	{
-		atlas.set_texture_offset(x, y);
-		render_state.texture_offset_x = x;
-		render_state.texture_offset_y = y;
-	}
-
-	inline void set_palette_offset(unsigned x, unsigned y)
-	{
-		atlas.set_palette_offset(x, y);
-		render_state.palette_offset_x = x;
-		render_state.palette_offset_y = y;
-	}
-
-	Vulkan::BufferHandle copy_cpu_to_vram(const Rect &rect);
-	void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
-	uint16_t *begin_copy(Vulkan::BufferHandle handle)
-	{
-		return static_cast<uint16_t *>(device.map_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT));
-	}
-	void end_copy(Vulkan::BufferHandle handle)
-	{
-		device.unmap_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT);
-	}
-
-	void notify_texture_upload(Rect rect, uint16_t *vram)
-	{
-		if (texture_tracking_enabled)
-			tracker.upload(rect, vram);
-	}
-
-	void blit_vram(const Rect &dst, const Rect &src);
-
-	void set_vram_framebuffer_coords(unsigned xstart, unsigned ystart)
-	{
-		last_scanout.reset();
-
-		render_state.display_fb_xstart = xstart;
-		render_state.display_fb_ystart = ystart;
-	}
-
-	void set_horizontal_display_range(int x1, int x2)
-	{
-		render_state.horiz_start = x1;
-		render_state.horiz_end = x2;
-	}
-
-	void set_vertical_display_range(int y1, int y2)
-	{
-		render_state.vert_start = y1;
-		render_state.vert_end = y2;
-	}
-
-	void set_display_mode(ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
-	{
-		//if (rect != render_state.display_mode || render_state.scanout_mode != mode)
-		//	last_scanout.reset();
-		last_scanout.reset();
-
-		//render_state.display_mode = rect;
-		render_state.scanout_mode = mode;
-
-		render_state.is_pal = is_pal;
-		render_state.is_480i = is_480i;
-		render_state.width_mode = width_mode;
-	}
-
-	void set_horizontal_overscan_cropping(int crop_overscan)
-	{
-		render_state.crop_overscan = crop_overscan;
-	}
-
-	void set_horizontal_offset_cycles(int offset_cycles)
-	{
-		render_state.offset_cycles = offset_cycles;
-	}
-	
-	void set_horizontal_additional_cropping(unsigned image_crop)
-	{
-		render_state.image_crop = image_crop;
-	}
-
-	void set_visible_scanlines(int slstart, int slend, int slstart_pal, int slend_pal)
-	{
-		// May need bounds checking to reject bad inputs. Currently assume all inputs are valid.
-		render_state.slstart = slstart;
-		render_state.slend = slend;
-		render_state.slstart_pal = slstart_pal;
-		render_state.slend_pal = slend_pal;
-	}
-
-	void set_display_filter(ScanoutFilter filter)
-	{
-		render_state.scanout_filter = filter;
-	}
-
-	void set_mdec_filter(ScanoutFilter mdec_filter)
-	{
-		render_state.scanout_mdec_filter = mdec_filter;
-	}
-
-	void toggle_display(bool enable)
-	{
-		if (enable != render_state.display_on)
-			last_scanout.reset();
-
-		render_state.display_on = enable;
-	}
-
-	void set_dither_native_resolution(bool enable)
-	{
-		render_state.dither_native_resolution = enable;
-	}
-
-	Vulkan::ImageHandle scanout_vram_to_texture(bool scaled = true);
-	Vulkan::ImageHandle scanout_to_texture();
-
-	inline void set_texture_mode(TextureMode mode)
-	{
-		render_state.texture_mode = mode;
-		atlas.set_texture_mode(mode);
-	}
-
-	inline void set_semi_transparent(SemiTransparentMode state)
-	{
-		render_state.semi_transparent = state;
-	}
-
-	inline void set_primitive_type(PrimitiveType primitive_type)
-	{
-		render_state.primitive_type = primitive_type;
-	}
-
-	inline void set_force_mask_bit(bool enable)
-	{
-		render_state.force_mask_bit = enable;
-	}
-
-	inline void set_mask_test(bool enable)
-	{
-		render_state.mask_test = enable;
-	}
-
-	inline void set_texture_color_modulate(bool enable)
-	{
-		render_state.texture_color_modulate = enable;
-	}
-
-	inline void set_UV_limits(uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v)
-	{
-		render_state.UVLimits.min_u = min_u;
-		render_state.UVLimits.min_v = min_v;
-		render_state.UVLimits.max_u = max_u;
-		render_state.UVLimits.max_v = max_v;
-	}
-
-	// Draw commands
-	void clear_rect(const Rect &rect, uint32_t fb_color);
-	void draw_line(const Vertex *vertices);
-	void draw_triangle(const Vertex *vertices);
-	void draw_quad(const Vertex *vertices);
-
-	SaveState save_vram_state();
-
-	void flush()
-	{
-		if (cmd)
-			device.submit(cmd);
-		cmd.reset();
-		device.flush_frame();
-	}
-
-	Vulkan::Fence flush_and_signal()
-	{
-		Vulkan::Fence fence;
-		if (cmd)
-			device.submit(cmd, &fence);
-		cmd.reset();
-		device.flush_frame();
-		return fence;
-	}
-
-	enum
-	{
-		SpecConstIndex_TransMode = 0,
-		SpecConstIndex_FilterMode = 1,
-		SpecConstIndex_BlendMode = 2,
-		SpecConstIndex_Scaling = 3,
-		SpecConstIndex_Shift = 4,
-		SpecConstIndex_OffsetUV = 5,
-		SpecConstIndex_Samples = 0,
-	};
-
-	enum FilterExclude
-	{
-		FilterExcludeNone = 0,
-		FilterExcludeOpaque = 1,
-		FilterExcludeOpaqueAndSemiTrans = 2,
-	};
-
-	enum class FilterMode : uint32_t
-	{
-		NearestNeighbor = 0,
-		XBR = 1,
-		SABR = 2,
-		Bilinear = 3,
-		Bilinear3Point = 4,
-		JINC2 = 5
-	};
-
-	enum class TransMode : uint32_t
-	{
-		Opaque = 0,
-		SemiTrans = 1,
-		SemiTransOpaque = 2
-	};
-
-	enum class BlendMode : uint32_t
-	{
-		BlendAdd = 0,
-		BlendAvg = 1,
-		BlendSub = 2,
-		BlendAddQuarter = 3
-	};
-
-	void set_filter_mode(FilterMode mode)
-	{
-		primitive_filter_mode = mode;
-	}
-	ScanoutMode get_scanout_mode() const
-	{
-		return render_state.scanout_mode;
-	}
-
-	void set_sprite_filter_exclude(FilterExclude exclude)
-	{
-		sprite_filter_exclude = exclude;
-	}
-
-	void set_polygon_2d_filter_exclude(FilterExclude exclude)
-	{
-		polygon_2d_filter_exclude = exclude;
-	}
-
-	void set_scaled_uv_offset(bool offset)
-	{
-		scaled_uv_offset = offset;
-	}
-
-	/* True iff the constructor finished successfully. The Renderer
-	 * constructor does not throw; on failure (e.g. RGBA8_UNORM not
-	 * supported) it leaves the object in a destroyable but otherwise
-	 * unusable state. Callers must check is_valid() before use. */
-	bool is_valid() const { return valid; }
-
-private:
-	Vulkan::Device &device;
-	unsigned scaling;
-	unsigned msaa;
-	bool scaled_uv_offset = false;
-	bool valid = false;
-	FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
-	FilterExclude sprite_filter_exclude = FilterExcludeNone;
-	FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
-	Vulkan::ImageHandle scaled_framebuffer;
-	Vulkan::ImageHandle scaled_framebuffer_msaa;
-	Vulkan::ImageHandle bias_framebuffer;
-	Vulkan::ImageHandle framebuffer;
-	Vulkan::ImageHandle framebuffer_ssaa;
-	std::vector<Vulkan::ImageViewHandle> scaled_views;
-	FBAtlas atlas;
-	bool texture_tracking_enabled = false;
-	TextureTracker tracker;
-
-	Vulkan::CommandBufferHandle cmd;
-
-public:
-	// Called by FBAtlas (formerly via HazardListener interface).
-	void hazard(StatusFlags flags);
-	void resolve(Domain target_domain, unsigned x, unsigned y);
-	void flush_render_pass(const Rect &rect);
-	void discard_render_pass()
-	{
-		reset_queue();
-	}
-	void clear_quad(const Rect &rect, uint32_t fb_color, bool candidate);
-
-	// Called by TextureTracker (formerly via TextureUploader interface).
-	Vulkan::ImageHandle upload_texture(LoadedLevels &image);
-	Vulkan::ImageHandle create_texture(int width, int height, int levels);
-	Vulkan::CommandBufferHandle &command_buffer_hack_fixme()
-	{
-		ensure_command_buffer();
-		return cmd;
-	}
-
-private:
-	void hd_texture_uniforms(HdTextureHandle hd_texture_index);
-	HdTextureHandle get_hd_texture_index(const Rect &uvlimits, bool &fastpath_capable_out, bool &cache_hit_out);
-
-	struct
-	{
-		Vulkan::Program *copy_to_vram;
-		Vulkan::Program *copy_to_vram_masked;
-		Vulkan::Program *unscaled_quad_blitter;
-		Vulkan::Program *scaled_quad_blitter;
-		Vulkan::Program *unscaled_dither_quad_blitter;
-		Vulkan::Program *scaled_dither_quad_blitter;
-		Vulkan::Program *bpp24_quad_blitter;
-		Vulkan::Program *bpp24_yuv_quad_blitter;
-		Vulkan::Program *resolve_to_scaled;
-		Vulkan::Program *resolve_to_unscaled;
-
-		Vulkan::Program *blit_vram_scaled;
-		Vulkan::Program *blit_vram_scaled_masked;
-
-		Vulkan::Program *blit_vram_cached_scaled;
-		Vulkan::Program *blit_vram_cached_scaled_masked;
-		Vulkan::Program *blit_vram_msaa_cached_scaled;
-		Vulkan::Program *blit_vram_msaa_cached_scaled_masked;
-
-		Vulkan::Program *blit_vram_unscaled;
-		Vulkan::Program *blit_vram_unscaled_masked;
-		Vulkan::Program *blit_vram_cached_unscaled;
-		Vulkan::Program *blit_vram_cached_unscaled_masked;
-
-		Vulkan::Program *flat;
-		Vulkan::Program *textured_scaled;
-		Vulkan::Program *textured_unscaled;
-		Vulkan::Program *flat_masked;
-		Vulkan::Program *textured_masked_scaled;
-		Vulkan::Program *textured_masked_unscaled;
-
-		Vulkan::Program *mipmap_resolve;
-		Vulkan::Program *mipmap_dither_resolve;
-		Vulkan::Program *mipmap_energy_first;
-		Vulkan::Program *mipmap_energy;
-		Vulkan::Program *mipmap_energy_blur;
-	} pipelines;
-
-	Vulkan::ImageHandle dither_lut;
-
-	void init_pipelines();
-	void init_primitive_pipelines();
-	void init_primitive_feedback_pipelines();
-	void ensure_command_buffer();
-
-	RenderState render_state;
-
-	struct BufferVertex
-	{
-		float x, y, z, w;
-		uint32_t color;
-		TextureWindow window;
-		int16_t pal_x, pal_y, params;
-		int16_t u, v, base_uv_x, base_uv_y;
-		uint16_t min_u, min_v, max_u, max_v;
-	};
-
-	struct BlitInfo
-	{
-		uint32_t src_offset[2];
-		uint32_t dst_offset[2];
-		uint32_t extent[2];
-		uint32_t mask;
-		uint32_t sample;
-	};
-
-	struct SemiTransparentState
-	{
-		int scissor_index;
-		HdTextureHandle hd_texture_index;
-		SemiTransparentMode semi_transparent;
-		bool textured;
-		bool masked;
-		bool filtering;
-		bool scaled_read;
-		unsigned shift;
-		bool offset_uv;
-
-		bool operator==(const SemiTransparentState &other) const
+	typedef int RectIndex; // I wanted a newtype but it's too much work in C++, so maybe TODO that later
+	struct HdTextureHandle {
+		RectIndex index;
+		uint32_t palette_hash;
+		bool fused;
+
+		bool operator==(const HdTextureHandle &other) const
 		{
-			return scissor_index == other.scissor_index && hd_texture_index == other.hd_texture_index &&
-			       semi_transparent == other.semi_transparent && textured == other.textured && masked == other.masked &&
-				   filtering == other.filtering && scaled_read == other.scaled_read && shift == other.shift &&
-				   offset_uv == other.offset_uv;
+			return index == other.index && palette_hash == other.palette_hash && fused == other.fused;
 		}
 
-		bool operator!=(const SemiTransparentState &other) const
+		bool operator!=(const HdTextureHandle &other) const
+		{
+			return !(*this == other);
+		}
+
+		bool operator>(const HdTextureHandle &other) const
+		{
+			if (index != other.index)
+				return index > other.index;
+			if (palette_hash != other.palette_hash)
+				return palette_hash > other.palette_hash;
+			return fused > other.fused;
+		}
+
+		static HdTextureHandle make(RectIndex index, uint32_t palette_hash) {
+			return HdTextureHandle(index, palette_hash, false);
+		}
+		static HdTextureHandle make_fused(RectIndex index) {
+			return HdTextureHandle(index, 0, true);
+		}
+		static HdTextureHandle make_none() {
+			return HdTextureHandle::make(-1, 0);
+		}
+
+		private:
+		HdTextureHandle(RectIndex index, uint32_t palette_hash, bool fused)
+			: index(index), palette_hash(palette_hash), fused(fused)
+		{
+
+		}
+	};
+
+	struct SRect {
+		int x;
+		int y;
+		int width;
+		int height;
+		// Default-constructed SRect zero-initializes all fields. The result is in
+		// an "invalid" state by the 4-arg constructor's invariant (width == 0 and
+		// height == 0 would fail its width > 0 / height > 0 check) and is intended
+		// only as a placeholder — array slot or struct field — to be overwritten
+		// before being read. The 4-arg constructor below is the validated path;
+		// use it for any SRect that is meant to be immediately usable.
+		SRect() : x(0), y(0), width(0), height(0) {}
+		SRect(int x, int y, int width, int height):
+			x(x), y(y), width(width), height(height) {
+				if (width <= 0 || height <= 0) {
+					printf("Illegally sized SRect: %d, %d\n", width, height);
+					exit(1);
+				}
+			}
+		inline int left() {
+			return x;
+		}
+		inline int right() {
+			return x + width;
+		}
+		inline int top() {
+			return y;
+		}
+		inline int bottom() {
+			return y + height;
+		}
+
+		inline bool operator==(const SRect &other) const
+		{
+			return x == other.x && y == other.y && width == other.width && height == other.height;
+		}
+		inline bool operator!=(const SRect &other) const
 		{
 			return !(*this == other);
 		}
 	};
 
-	struct ClearCandidate
-	{
-		Rect rect;
-		uint32_t color; /* fb_color */
-		float z;
+	struct HdTexture {
+		SRect vram_rect;
+		SRect texel_rect; // hd texels
+		Vulkan::ImageHandle texture;
 	};
 
-	struct PrimitiveInfo {
-		unsigned triangle_index;
-		int scissor_index;
-		HdTextureHandle hd_texture_index;
-		bool filtering;
-		bool scaled_read;
-		unsigned shift;
-		bool offset_uv;
+	struct DumpedMode {
+		TextureMode mode;
+		uint32_t palette_hash;
 
-		// needed for emplace_back
-		PrimitiveInfo(
-			unsigned triangle_index,
-			int scissor_index = -1,
-			HdTextureHandle hd_texture_index = HdTextureHandle::make_none(),
-			bool filtering = false,
-			bool scaled_read = false,
-			unsigned shift = 0,
-			bool offset_uv = false
-		)
-			: triangle_index(triangle_index), scissor_index(scissor_index), hd_texture_index(hd_texture_index),
-			filtering(filtering), scaled_read(scaled_read), shift(shift), offset_uv(offset_uv)
-		{}
+		inline bool operator==(const DumpedMode &other) const
+		{
+			return mode == other.mode && palette_hash == other.palette_hash;
+		}
 	};
 
-	POD_VEC_DECLARE(BufferVertexVec, BufferVertex);
-	POD_VEC_DECLARE(PrimitiveInfoVec, PrimitiveInfo);
-	POD_VEC_DECLARE(SemiTransparentStateVec, SemiTransparentState);
-	POD_VEC_DECLARE(BlitInfoVec, BlitInfo);
-	POD_VEC_DECLARE(ClearCandidateVec, ClearCandidate);
-	POD_VEC_DECLARE(Rect2DVec, VkRect2D);
+	struct UsedMode {
+		TextureMode mode;
+		unsigned int palette_offset_x;
+		unsigned int palette_offset_y;
 
-	struct OpaqueQueue
+		inline bool operator==(const UsedMode &other) const
+		{
+			return mode == other.mode && palette_offset_x == other.palette_offset_x && palette_offset_y == other.palette_offset_y;
+		}
+	};
+
+	/* ------------------------------------------------------------------------- *
+	 * HdTexMap - palette_hash -> (Vulkan image, alpha flags), MSVC C89.
+	 *
+	 * Replaces std::map<uint32_t, HdImageHandle> on TextureUpload. Backed by a
+	 * sorted, malloc'd array of POD entries keyed by palette hash (binary-search
+	 * lookup, insert keeps it sorted). The image is held as a raw Vulkan::Image*
+	 * (so the array can realloc) with the intrusive refcount managed by hand: a
+	 * reference is taken when an entry is stored and released on
+	 * replace/erase/clear/free - matching the raw-pointer scheme already used by
+	 * the GPU image cache. Entries are POD, so TextureUpload can be a plain
+	 * malloc-backed value once this and the other members are converted.
+	 * ------------------------------------------------------------------------- */
+	struct HdTexEntry {
+		uint32_t       key;          /* palette hash */
+		Vulkan::Image *image;        /* owns one reference while stored */
+		int            alpha_flags;
+	};
+	struct HdTexMap {
+		HdTexEntry *entries;
+		int         count;
+		int         cap;
+	};
+
+	static void hd_tex_map_init(HdTexMap *m)
 	{
-		// Non-textured primitives.
-		BufferVertexVec opaque{};
-		PrimitiveInfoVec opaque_scissor{};
-
-		// Textured primitives, no semi-transparency.
-		BufferVertexVec opaque_textured{};
-		PrimitiveInfoVec opaque_textured_scissor{};
-
-		// Textured primitives, semi-transparency enabled.
-		BufferVertexVec semi_transparent_opaque{};
-		PrimitiveInfoVec semi_transparent_opaque_scissor{};
-
-		BufferVertexVec semi_transparent{};
-		SemiTransparentStateVec semi_transparent_state{};
-
-		std::vector<Vulkan::ImageHandle> textures; // refcounted handles: std::vector is correct
-
-		Rect2DVec scaled_resolves{};
-		Rect2DVec unscaled_resolves{};
-		BlitInfoVec scaled_blits{};
-		BlitInfoVec scaled_masked_blits{};
-		BlitInfoVec unscaled_blits{};
-		BlitInfoVec unscaled_masked_blits{};
-
-		Rect2DVec scissors{};
-		ClearCandidateVec clear_candidates{};
-		VkRect2D default_scissor;
-		bool scissor_invariant = false;
-	} queue;
-	unsigned primitive_index = 0;
-	bool render_pass_is_feedback = false;
-	float last_uv_scale_x, last_uv_scale_y;
-
-	void dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured = false);
-	static bool primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b);
-	void render_opaque_primitives();
-	void render_opaque_texture_primitives();
-	void render_semi_transparent_opaque_texture_primitives();
-	void render_semi_transparent_primitives();
-	void semi_transparent_set_state(const SemiTransparentState &state);
-	void dispatch_set_scaled_read_texture(bool scaled_read, bool textured);
-	void reset_queue();
-
-	float allocate_depth(Domain domain, const Rect &rect);
-
-	void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index,
-		bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv);
-	void build_line_quad(Vertex *quad, const Vertex *line);
-	BufferVertexVec *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
-		bool filtering, bool scaled_read, unsigned shift, bool offset_uv);
-	bool get_filer_exclude(FilterExclude exclude)
+		m->entries = NULL;
+		m->count = 0;
+		m->cap = 0;
+	}
+	static int hd_tex_map_lower_bound(const HdTexMap *m, uint32_t key)
 	{
-		if (
-			render_state.primitive_type == PrimitiveType::Sprite &&
-			sprite_filter_exclude >= exclude
-		)
-			return true;
-		if (
-			render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
-			polygon_2d_filter_exclude >= exclude
-		)
-			return true;
-		return false;
+		int lo = 0, hi = m->count;
+		while (lo < hi) {
+			int mid = lo + ((hi - lo) >> 1);
+			if (m->entries[mid].key < key)
+				lo = mid + 1;
+			else
+				hi = mid;
+		}
+		return lo;
+	}
+	/* Returns the entry for key, or NULL. */
+	static HdTexEntry *hd_tex_map_find(HdTexMap *m, uint32_t key)
+	{
+		int i = hd_tex_map_lower_bound(m, key);
+		if (i < m->count && m->entries[i].key == key)
+			return &m->entries[i];
+		return NULL;
+	}
+	static int hd_tex_map_contains(const HdTexMap *m, uint32_t key)
+	{
+		int i = hd_tex_map_lower_bound(m, key);
+		return i < m->count && m->entries[i].key == key;
+	}
+	/* Insert or replace key -> (image, alpha). Takes a reference on `image`;
+	 * releases any image previously stored at this key. */
+	static void hd_tex_map_set(HdTexMap *m, uint32_t key, Vulkan::Image *image, int alpha_flags)
+	{
+		int i = hd_tex_map_lower_bound(m, key);
+		if (i < m->count && m->entries[i].key == key) {
+			if (image) image->add_reference();
+			if (m->entries[i].image) m->entries[i].image->release_reference();
+			m->entries[i].image = image;
+			m->entries[i].alpha_flags = alpha_flags;
+			return;
+		}
+		if (m->count == m->cap) {
+			int ncap = m->cap ? m->cap * 2 : 8;
+			m->entries = (HdTexEntry *)realloc(m->entries, (size_t)ncap * sizeof(HdTexEntry));
+			m->cap = ncap;
+		}
+		memmove(&m->entries[i + 1], &m->entries[i], (size_t)(m->count - i) * sizeof(HdTexEntry));
+		if (image) image->add_reference();
+		m->entries[i].key = key;
+		m->entries[i].image = image;
+		m->entries[i].alpha_flags = alpha_flags;
+		m->count++;
+	}
+	/* Release all image refs and reset to empty (keeps allocation). */
+	static void hd_tex_map_clear(HdTexMap *m)
+	{
+		int i;
+		for (i = 0; i < m->count; i++)
+			if (m->entries[i].image)
+				m->entries[i].image->release_reference();
+		m->count = 0;
+	}
+	static void hd_tex_map_free(HdTexMap *m)
+	{
+		hd_tex_map_clear(m);
+		free(m->entries);
+		m->entries = NULL;
+		m->cap = 0;
+	}
+	/* Deep-copy src into dst (dst assumed empty/inited); re-acquires image refs. */
+	static void hd_tex_map_copy(HdTexMap *dst, const HdTexMap *src)
+	{
+		int i;
+		dst->entries = NULL;
+		dst->count = src->count;
+		dst->cap = src->count;
+		if (src->count) {
+			dst->entries = (HdTexEntry *)malloc((size_t)src->count * sizeof(HdTexEntry));
+			for (i = 0; i < src->count; i++) {
+				dst->entries[i] = src->entries[i];
+				if (dst->entries[i].image)
+					dst->entries[i].image->add_reference();
+			}
+		}
 	}
 
-	void flush_resolves();
-	void flush_blits();
-	void flush_blit(const BlitInfoVec &infos, Vulkan::Program &program, bool scaled);
-	void reset_scissor_queue();
-	const ClearCandidate *find_clear_candidate(const Rect &rect) const;
+	struct TextureUpload {
+		/* Intrusive refcount for shared ownership across TextureRects (replaces
+		 * std::shared_ptr<TextureUpload>). A freshly constructed upload starts at
+		 * 0; texture_upload_new() bumps it to 1. Copies (deep-copy ctor/assignment,
+		 * used by the by-value save-state map) get their OWN fresh count - the
+		 * refcount is deliberately not copied. */
+		int refcount;
+		/* VRAM source pixels (owned). Was std::vector<uint16_t>; filled once at
+		 * creation and thereafter read-only. */
+		uint16_t *image;
+		int       image_count;
+		bool dumpable;
+		int width;
+		int height;
+		uint32_t hash;
+		/* Modes already dumped to disk (owned growable array, append-only).
+		 * Was std::vector<DumpedMode>. */
+		DumpedMode *dumped_modes;
+		int         dumped_modes_count;
+		int         dumped_modes_cap;
+		HdTexMap textures; // palette hash -> (image, alpha)
+				   // (HD load bookkeeping lives on the TextureTracker: hd_gpu_cache / hd_cache /
+				   //  requested / pending_attach, keyed by (hash,palette) so it survives this
+				   //  upload being recreated as the sprite animation churns VRAM.)
 
-	Rect compute_window_rect(const TextureWindow &window);
+		TextureUpload()
+			: refcount(0), image(NULL), image_count(0), dumpable(false), width(0), height(0),
+			hash(0), dumped_modes(NULL), dumped_modes_count(0), dumped_modes_cap(0) {
+				hd_tex_map_init(&textures);
+			}
+		~TextureUpload() {
+			free(image);
+			free(dumped_modes);
+			hd_tex_map_free(&textures);
+		}
+		/* Owns malloc'd buffers, so copies must be deep. Copy/assign are used by
+		 * the save-state path (TextureUpload value map) and load_state's `*ptr =
+		 * value`. The textures map is deep-copied (re-acquiring image refs). */
+		TextureUpload(const TextureUpload &o)
+			: refcount(0), image(NULL), image_count(o.image_count), dumpable(o.dumpable),
+			width(o.width), height(o.height), hash(o.hash),
+			dumped_modes(NULL), dumped_modes_count(o.dumped_modes_count),
+			dumped_modes_cap(o.dumped_modes_count) {
+				if (image_count) {
+					image = (uint16_t *)malloc((size_t)image_count * sizeof(uint16_t));
+					memcpy(image, o.image, (size_t)image_count * sizeof(uint16_t));
+				}
+				if (dumped_modes_count) {
+					dumped_modes = (DumpedMode *)malloc((size_t)dumped_modes_count * sizeof(DumpedMode));
+					memcpy(dumped_modes, o.dumped_modes, (size_t)dumped_modes_count * sizeof(DumpedMode));
+				}
+				hd_tex_map_copy(&textures, &o.textures);
+			}
+		TextureUpload &operator=(const TextureUpload &o) {
+			if (this != &o) {
+				free(image); free(dumped_modes);
+				hd_tex_map_free(&textures);
+				image = NULL; dumped_modes = NULL;
+				image_count = o.image_count;
+				dumped_modes_count = o.dumped_modes_count;
+				dumped_modes_cap = o.dumped_modes_count;
+				dumpable = o.dumpable; width = o.width; height = o.height; hash = o.hash;
+				if (image_count) {
+					image = (uint16_t *)malloc((size_t)image_count * sizeof(uint16_t));
+					memcpy(image, o.image, (size_t)image_count * sizeof(uint16_t));
+				}
+				if (dumped_modes_count) {
+					dumped_modes = (DumpedMode *)malloc((size_t)dumped_modes_count * sizeof(DumpedMode));
+					memcpy(dumped_modes, o.dumped_modes, (size_t)dumped_modes_count * sizeof(DumpedMode));
+				}
+				hd_tex_map_copy(&textures, &o.textures);
+			}
+			return *this;
+		}
+	};
 
-	Vulkan::ImageHandle last_scanout;
-	Vulkan::ImageHandle reuseable_scanout;
-	DisplayRect compute_display_rect();
+	/* Allocate a new TextureUpload with refcount 1 (the caller owns that ref).
+	 * Uses operator new so the C++ members (the deep-copy ctor's machinery and the
+	 * HdTexMap/owned buffers) are constructed; texture_upload_release matches it
+	 * with delete. */
+	static TextureUpload *texture_upload_new()
+	{
+		TextureUpload *u = new TextureUpload();
+		u->refcount = 1;
+		return u;
+	}
+	static void texture_upload_acquire(TextureUpload *u)
+	{
+		if (u)
+			u->refcount++;
+	}
+	static void texture_upload_release(TextureUpload *u)
+	{
+		if (u && --u->refcount == 0)
+			delete u; /* dtor frees image/dumped_modes and releases the texmap refs */
+	}
 
-	Rect compute_vram_framebuffer_rect();
+	// byte buffer plus its size, rather than std::vector<uint8_t>. This is a POD
+	// (trivially copyable) struct - copying it copies the pointer, NOT the bytes,
+	// so ownership is by convention: exactly one LoadedLevels owns each buffer and
+	// frees it. Ownership transfers are explicit pointer-steals (push_move /
+	// move-assign helpers below); there is no implicit deep copy and no
+	// destructor. This keeps it storable in plain arrays and realloc-movable.
+	struct LoadedImage {
+		uint8_t *owned_data; // RGBA, owned_size bytes (NULL if empty)
+		size_t   owned_size;
+		int width;
+		int height;
+	};
 
-	void mipmap_framebuffer();
-	void ssaa_framebuffer();
-	Vulkan::BufferHandle quad;
-};
-}
+	// Allocate the RGBA buffer for a level (width*height*4). Frees any prior
+	// buffer. Returns 0 on success, -1 on allocation failure (buffer left NULL).
+	static inline int loaded_image_alloc(LoadedImage *img, int width, int height)
+	{
+		size_t bytes = (size_t)width * (size_t)height * 4u;
+		free(img->owned_data);
+		img->owned_data = (uint8_t *)malloc(bytes ? bytes : 1);
+		img->owned_size = img->owned_data ? bytes : 0;
+		img->width  = width;
+		img->height = height;
+		return img->owned_data ? 0 : -1;
+	}
+
+	// Zero-initialise a level (no buffer). Use before loaded_image_alloc.
+	static inline void loaded_image_init(LoadedImage *img)
+	{
+		img->owned_data = NULL;
+		img->owned_size = 0;
+		img->width      = 0;
+		img->height     = 0;
+	}
+
+	// A decoded texture as a set of mip levels. C-style dynamic array: `levels`
+	// is a malloc'd array of `count` LoadedImage, owning all buffers. Replaces
+	// std::vector<LoadedImage>. POD/trivially-copyable: a copy aliases the same
+	// buffers, so callers move ownership explicitly (loaded_levels_move) and free
+	// explicitly (loaded_levels_reset). Initialise with loaded_levels_init or
+	// zero-init before first use.
+	struct LoadedLevels {
+		LoadedImage *levels;
+		int          count;
+	};
+
+	/* Total owned bytes across all levels. */
+	static size_t loaded_levels_byte_size(const LoadedLevels *l)
+	{
+		size_t b = 0;
+		int i;
+		for (i = 0; i < l->count; i++)
+			b += l->levels[i].owned_size;
+		return b;
+	}
+
+	/* Append by stealing *src's buffer (src left empty). Grows with realloc.
+	 * Returns the stored level, or NULL on alloc failure. */
+	static LoadedImage *loaded_levels_push_move(LoadedLevels *l, LoadedImage *src)
+	{
+		LoadedImage *grown = (LoadedImage *)realloc(l->levels, (size_t)(l->count + 1) * sizeof(LoadedImage));
+		if (!grown)
+			return NULL;
+		l->levels = grown;
+		l->levels[l->count] = *src; /* POD: copies the pointer (steal) */
+		loaded_image_init(src);
+		return &l->levels[l->count++];
+	}
+
+	/* Free all buffers + the array, return to empty state. */
+	static void loaded_levels_reset(LoadedLevels *l)
+	{
+		int i;
+		for (i = 0; i < l->count; i++)
+			free(l->levels[i].owned_data);
+		free(l->levels);
+		l->levels = NULL;
+		l->count  = 0;
+	}
+
+	// Zero-initialise (no allocation).
+	static inline void loaded_levels_init(LoadedLevels *l)
+	{
+		l->levels = NULL;
+		l->count  = 0;
+	}
+
+	// Move ownership src -> dst (dst's prior contents freed; src left empty).
+	static inline void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
+	{
+		if (dst == src)
+			return;
+		loaded_levels_reset(dst);
+		dst->levels = src->levels;
+		dst->count  = src->count;
+		src->levels = NULL;
+		src->count  = 0;
+	}
+
+	class Renderer;
+
+	/* Max length for HD texture file paths built by the path helpers below.
+	 * Defined here so both IORequest and the path helpers can use it. */
+	enum { PATH_MAX_TT = 4096 + 256 };
+
+	enum class IORequestKind {
+		Load,
+		Dump,
+	};
+
+	struct IORequest {
+		struct IORequest *next;        /* intrusive FIFO link (queue-owned) */
+		IORequestKind kind;
+		// Load payload (valid when kind == Load):
+		uint32_t hash;
+		uint32_t palette_hash;
+		// Dump payload (valid when kind == Dump):
+		char     path[PATH_MAX_TT];
+		int      width;
+		int      height;
+		uint8_t *bytes;                /* owned RGBA bytes (NULL if none) */
+		size_t   bytes_len;
+	};
+
+	static void io_request_free(IORequest *r)
+	{
+		if (r) {
+			free(r->bytes);
+			free(r);
+		}
+	}
+
+	const int ALPHA_FLAG_OPAQUE = 1;
+	const int ALPHA_FLAG_SEMI_TRANSPARENT = 2;
+	const int ALPHA_FLAG_TRANSPARENT = 4;
+
+	struct IOResponse {
+		struct IOResponse *next;       /* intrusive FIFO link (queue-owned) */
+		uint32_t hash;
+		uint32_t palette_hash;
+		int alpha_flags;
+		LoadedLevels levels;
+	};
+
+	static void io_response_free(IOResponse *r)
+	{
+		if (r) {
+			loaded_levels_reset(&r->levels);
+			free(r);
+		}
+	}
+
+	class IOChannel {
+		public:
+			IOChannel();
+			~IOChannel();
+			slock_t *lock;
+			scond_t *cond;
+			/* Intrusive FIFO lists (protected by `lock`). Heads are popped/drained,
+			 * tails are where producers append. Replaces std::vector<IORequest> /
+			 * std::vector<IOResponse>. */
+			IORequest  *req_head,  *req_tail;
+			IOResponse *resp_head, *resp_tail;
+			bool done = false;
+			/* Cross-thread refcount (replaces std::shared_ptr<IOChannel>). The owning
+			 * IOThread holds one reference and each detached worker holds one; whichever
+			 * releases last frees the channel. Mutated only outside the lock, at
+			 * thread-spawn and thread-exit, so a plain int with no overlap is fine. */
+			int refcount;
+		private:
+	};
+
+	static IOChannel *io_channel_new() {
+		IOChannel *c = new IOChannel();
+		c->refcount = 1;
+		return c;
+	}
+	/* The refcount is touched from the owning thread (spawn/teardown) and from the
+	 * detached workers (exit), so the increment/decrement must be serialised. A
+	 * single process-wide lock guards every transition; the actual free happens
+	 * after the lock is dropped so we never reference the channel's own lock once
+	 * it may be gone. */
+	static slock_t *io_channel_rc_lock = NULL;
+	static void io_channel_rc_lock_init() {
+		if (!io_channel_rc_lock)
+			io_channel_rc_lock = slock_new();
+	}
+	static void io_channel_acquire(IOChannel *c) {
+		if (!c)
+			return;
+		slock_lock(io_channel_rc_lock);
+		c->refcount++;
+		slock_unlock(io_channel_rc_lock);
+	}
+	static void io_channel_release(IOChannel *c) {
+		bool should_free;
+		if (!c)
+			return;
+		slock_lock(io_channel_rc_lock);
+		should_free = (--c->refcount == 0);
+		slock_unlock(io_channel_rc_lock);
+		if (should_free)
+			delete c;
+	}
+
+	/* FIFO helpers (caller holds channel->lock). Defined here so the IO worker
+	 * (io_thread) and the producers can all see them. */
+	static void io_channel_push_request(IOChannel *c, IORequest *r) {
+		r->next = NULL;
+		if (c->req_tail) c->req_tail->next = r; else c->req_head = r;
+		c->req_tail = r;
+	}
+	static IORequest *io_channel_pop_request(IOChannel *c) {
+		IORequest *r = c->req_head;
+		if (r) {
+			c->req_head = r->next;
+			if (!c->req_head) c->req_tail = NULL;
+			r->next = NULL;
+		}
+		return r;
+	}
+	static void io_channel_push_response(IOChannel *c, IOResponse *r) {
+		r->next = NULL;
+		if (c->resp_tail) c->resp_tail->next = r; else c->resp_head = r;
+		c->resp_tail = r;
+	}
+	/* Steal the entire response list; channel left empty. Returns the head. */
+	static IOResponse *io_channel_take_responses(IOChannel *c) {
+		IOResponse *head = c->resp_head;
+		c->resp_head = c->resp_tail = NULL;
+		return head;
+	}
+
+	class IOThread {
+		public:
+			IOThread();
+			~IOThread();
+			IOChannel *channel; /* refcounted; one ref held here, one per worker */
+		private:
+	};
+
+	struct Palette {
+		uint16_t *data;
+		uint32_t hash;
+	};
+
+	struct CachedPaletteHash {
+		Rect rect;
+		uint32_t hash;
+	};
+
+	//============
+	// RectTracker
+
+	/* TextureRect is a trivially-copyable POD: a borrowed view of an upload plus a
+	 * subrect. It does NOT manage the refcount in special members (so it relocates
+	 * with a bitwise move - no per-copy acquire/release, no exception scaffolding in
+	 * the containers that hold it). Ownership lives at container boundaries instead:
+	 * a container retains on insert and releases on erase/clear/destroy via
+	 * texture_rect_retain / texture_rect_release. Transient TextureRect values
+	 * (subTexture results, clip pairs, scratch arrays) are borrowing and need no
+	 * ref ops. */
+	struct TextureRect {
+		TextureUpload *upload;
+		// the offset into the original upload rect (offset_x + vram_rect.width <= upload->width)
+		int offset_x;
+		int offset_y;
+		SRect vram_rect;
+
+		// in vram size (not hd), local to the uploaded data, different hd textures for different palettes could have different sizes anyway
+		SRect texture_subrect() const {
+			return SRect(offset_x, offset_y, vram_rect.width, vram_rect.height);
+		}
+
+		inline bool operator==(const TextureRect &other) const
+		{
+			return upload == other.upload && offset_x == other.offset_x && offset_y == other.offset_y && vram_rect == other.vram_rect;
+		}
+		inline bool operator!=(const TextureRect &other) const
+		{
+			return !(*this == other);
+		}
+	};
+
+	/* Build a TextureRect (borrowing - does not take a reference). */
+	static inline TextureRect make_texture_rect(TextureUpload *upload, int offset_x, int offset_y, SRect vram_rect)
+	{
+		TextureRect t;
+		t.upload = upload;
+		t.offset_x = offset_x;
+		t.offset_y = offset_y;
+		t.vram_rect = vram_rect;
+		return t;
+	}
+	/* Ownership transfer helpers, used by owning containers only. */
+	static inline void texture_rect_retain(const TextureRect *t)  { texture_upload_acquire(t->upload); }
+	static inline void texture_rect_release(const TextureRect *t) { texture_upload_release(t->upload); }
+
+	/* Borrowing scratch array of (POD) TextureRects - no ownership, used for the
+	 * blit/clear_rect transients that are immediately re-placed into owning
+	 * containers. Trivially relocatable, so push is a bare realloc/append. */
+	POD_VEC_DECLARE(TextureRectVec, TextureRect);
 
 
-#include <math.h>
+	// TODO: better name
+	struct EnduringTextureRect {
+		TextureRect texture_rect;
+		bool alive;
+	};
 
-namespace PSX
-{
-static const uint32_t quad_vert[] =
+	/* Owning, trivially-relocatable array of EnduringTextureRect (replaces
+	 * std::vector<EnduringTextureRect>). Because TextureRect is now POD, growth is a
+	 * realloc (bitwise relocation, no per-element move-ctor or exception
+	 * scaffolding). Ownership is explicit: push retains the upload, and any slot
+	 * that leaves the array (compaction drop, clear, free) releases it. */
+	struct EnduringRectArr {
+		EnduringTextureRect *a;
+		int count;
+		int cap;
+		/* Pointer-range iteration so existing range-for loops work unchanged. */
+		EnduringTextureRect *begin() { return a; }
+		EnduringTextureRect *end()   { return a + count; }
+		const EnduringTextureRect *begin() const { return a; }
+		const EnduringTextureRect *end()   const { return a + count; }
+	};
+	static inline void enduring_arr_init(EnduringRectArr *v) { v->a = NULL; v->count = 0; v->cap = 0; }
+	static inline void enduring_arr_push(EnduringRectArr *v, TextureRect tr, bool alive) {
+		if (v->count == v->cap) {
+			int ncap = v->cap ? v->cap * 2 : 16;
+			v->a = (EnduringTextureRect *)realloc(v->a, (size_t)ncap * sizeof(EnduringTextureRect));
+			v->cap = ncap;
+		}
+		texture_rect_retain(&tr);            /* the array now owns a reference */
+		v->a[v->count].texture_rect = tr;
+		v->a[v->count].alive = alive;
+		v->count++;
+	}
+	/* Drop !alive slots, releasing their refs; survivors relocate by bitwise move. */
+	static inline void enduring_arr_compact(EnduringRectArr *v) {
+		int w = 0, i;
+		for (i = 0; i < v->count; i++) {
+			if (v->a[i].alive) {
+				if (w != i) v->a[w] = v->a[i];
+				w++;
+			} else {
+				texture_rect_release(&v->a[i].texture_rect);
+			}
+		}
+		v->count = w;
+	}
+	static inline void enduring_arr_clear(EnduringRectArr *v) {
+		int i;
+		for (i = 0; i < v->count; i++)
+			texture_rect_release(&v->a[i].texture_rect);
+		v->count = 0;
+	}
+	static inline void enduring_arr_free(EnduringRectArr *v) {
+		enduring_arr_clear(v);
+		free(v->a);
+		v->a = NULL;
+		v->cap = 0;
+	}
+
+	/* Owning vector of (POD) TextureRects, used where the rect list is itself
+	 * value-copied/compared (FusionRects, RestorableRect). The element is trivially
+	 * relocatable so the backing std::vector relocates cheaply, but ownership must
+	 * be explicit: this wrapper retains on push and on copy, and releases on
+	 * destroy/clear/assign. */
+	struct OwnedRectVec {
+		std::vector<TextureRect> v;
+		OwnedRectVec() {}
+		~OwnedRectVec() { for (size_t i = 0; i < v.size(); i++) texture_rect_release(&v[i]); }
+		OwnedRectVec(const OwnedRectVec &o) : v(o.v) { for (size_t i = 0; i < v.size(); i++) texture_rect_retain(&v[i]); }
+		OwnedRectVec &operator=(const OwnedRectVec &o) {
+			if (this != &o) {
+				for (size_t i = 0; i < v.size(); i++) texture_rect_release(&v[i]);
+				v = o.v;
+				for (size_t i = 0; i < v.size(); i++) texture_rect_retain(&v[i]);
+			}
+			return *this;
+		}
+		void push(TextureRect t) { texture_rect_retain(&t); v.push_back(t); }
+		size_t size() const { return v.size(); }
+		TextureRect &operator[](size_t i) { return v[i]; }
+		const TextureRect &operator[](size_t i) const { return v[i]; }
+		bool operator==(const OwnedRectVec &o) const { return v == o.v; }
+		TextureRect *begin() { return v.data(); }
+		TextureRect *end()   { return v.data() + v.size(); }
+		const TextureRect *begin() const { return v.data(); }
+		const TextureRect *end()   const { return v.data() + v.size(); }
+	};
+
+	const int LOOKUP_GRID_COLUMNS = 16;
+	const int LOOKUP_GRID_ROWS = 2;
+	const int LOOKUP_CELL_WIDTH = 64;
+	const int LOOKUP_CELL_HEIGHT = 256;
+
+	/* Sorted set of RectIndex (int), MSVC C89. Replaces std::unordered_set<RectIndex>
+	 * for the overlap-dedup scratch set: a malloc'd sorted int array with
+	 * binary-search insert (dedups), cleared and refilled each query, then iterated
+	 * in order. Order differs from the old unordered_set (now ascending by index),
+	 * which only affects iteration order of overlapping rects - the consumers don't
+	 * depend on it. */
+	struct RectIndexSet {
+		RectIndex *items;
+		int        count;
+		int        cap;
+	};
+	static void rect_index_set_init(RectIndexSet *s) { s->items = NULL; s->count = 0; s->cap = 0; }
+	static void rect_index_set_free(RectIndexSet *s) { free(s->items); s->items = NULL; s->count = 0; s->cap = 0; }
+	static void rect_index_set_clear(RectIndexSet *s) { s->count = 0; }
+	static int rect_index_set_lower_bound(const RectIndexSet *s, RectIndex v) {
+		int lo = 0, hi = s->count;
+		while (lo < hi) { int mid = lo + ((hi - lo) >> 1); if (s->items[mid] < v) lo = mid + 1; else hi = mid; }
+		return lo;
+	}
+	static void rect_index_set_insert(RectIndexSet *s, RectIndex v) {
+		int i = rect_index_set_lower_bound(s, v);
+		if (i < s->count && s->items[i] == v) return;
+		if (s->count == s->cap) {
+			int ncap = s->cap ? s->cap * 2 : 16;
+			s->items = (RectIndex *)realloc(s->items, (size_t)ncap * sizeof(RectIndex));
+			s->cap = ncap;
+		}
+		memmove(&s->items[i + 1], &s->items[i], (size_t)(s->count - i) * sizeof(RectIndex));
+		s->items[i] = v;
+		s->count++;
+	}
+
+	class LookupGrid {
+		public:
+			LookupGrid();
+			~LookupGrid();
+			void insert(SRect r, RectIndex index);
+			void get(SRect r, RectIndexSet &results);
+			void clear();
+		private:
+			struct LookupEntry {
+				SRect rect;
+				RectIndex index;
+			};
+			/* Each cell is a psx texture page (64x256); was std::vector<LookupEntry>.
+			 * Now a malloc'd growable array per cell (POD entries). */
+			struct Cell {
+				LookupEntry *entries;
+				int count;
+				int cap;
+			};
+			Cell cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS];
+	};
+
+	class RectTracker {
+		public:
+			RectTracker() { enduring_arr_init(&textures); }
+			~RectTracker() { enduring_arr_free(&textures); }
+			void place(TextureRect texture);
+			void upload(SRect rect, TextureUpload *upload);
+			void blit(SRect dst, SRect src);
+			void clear(SRect rect)
+			{
+				clear_rect(rect);
+				lookup_grid_dirty = true;
+			}
+			void releaseDeadHandles();
+			EnduringRectArr textures; // owning trivially-relocatable array
+			RectIndexSet& overlapping(Rect rect, RectIndexSet& results);
+
+			/**
+			 * This pointer will be valid until the next upload/blit/clear/endFrame, so use it immediately and don't try anything funny.
+			 * Returns nullptr when index is out of range
+			 **/
+			TextureRect* get_index(RectIndex index);
+
+			/** Returns nullptr if no texture with the given hash can be found */
+			TextureUpload *find_upload(uint32_t hash);
+		private:
+			LookupGrid lookup_grid;
+			bool lookup_grid_dirty = false;
+
+			void clear_rect(SRect &rect);
+			void rebuild_lookup_grid();
+	};
+	// RectTracker
+	//============
+
+	struct FusionRects {
+		OwnedRectVec rects;
+		Rect vram_rect;
+		unsigned int scaleX = 0;
+		unsigned int scaleY = 0;
+
+		bool operator==(const FusionRects &other) const {
+			return vram_rect == other.vram_rect && scaleX == other.scaleX && scaleY == other.scaleY && rects == other.rects;
+		}
+
+		bool operator!=(const FusionRects &other) const {
+			return !(*this == other);
+		}
+	};
+
+	struct FusedPage {
+		Vulkan::ImageHandle texture;
+
+		uint32_t palette;
+		Rect full_page_rect;
+
+		bool dirty = false;
+		bool dead = false;
+
+		FusionRects fusion;
+	};
+
+	class FusedPages {
+		public:
+			HdTextureHandle get_or_make(Rect page_rect, uint32_t palette, RectTracker &tracker, Renderer *uploader);
+			HdTexture get_from_handle(HdTextureHandle handle, Vulkan::ImageHandle &default_hd_texture);
+			void mark_dirty(Rect rect); // For blit dst, upload, and hd texture load
+			void mark_dead(Rect rect); // For clear
+			void rebuild_dirty(RectTracker &tracker, Renderer *uploader);
+			void remove_dead();
+
+			void dbg_print_info();
+		private:
+			std::vector<FusedPage> pages;
+	};
+
+	struct RestorableRect {
+		Rect rect;
+		uint32_t hash;
+		OwnedRectVec to_restore;
+	};
+
+	class DbgHotkey {
+		public:
+			DbgHotkey(retro_key key): key(key) {}
+			bool query();
+			retro_key key;
+		private:
+			bool was_key_down = false;
+	};
+
+	struct CacheEntry {
+		Rect rect;
+		HdTextureHandle handle;
+		CacheEntry() : rect(), handle(HdTextureHandle::make_none()) {}
+	};
+
+	/* Result of a handle-cache lookup (replaces std::pair<HdTextureHandle,bool>). */
+	struct HandleCacheResult {
+		HdTextureHandle handle;
+		bool found;
+		HandleCacheResult() : handle(HdTextureHandle::make_none()), found(false) {}
+	};
+
+	/* Small fixed-capacity move-to-front cache of recently-used HD texture
+	 * handles. CacheEntry is POD, so the entries live in an inline array (capacity
+	 * HANDLE_LRU_MAX) with a count - no std::vector, no heap. */
+	enum { HANDLE_LRU_MAX = 4 };
+
+	class HandleLRUCache {
+		public:
+			HandleLRUCache(int max_size_): max_size(max_size_), count(0) {
+				if (max_size > HANDLE_LRU_MAX)
+					max_size = HANDLE_LRU_MAX;
+			}
+			HandleCacheResult get(Rect rect, uint32_t palette_hash);
+			void insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle);
+			void clear()
+			{
+				count = 0;
+			}
+			int64_t dbg_hits;
+			int64_t dbg_misses;
+		private:
+			int max_size;
+			int count;
+			CacheEntry entries[HANDLE_LRU_MAX];
+	};
+
+	//========================================
+	// Save State
+	struct TextureRectSaveState {
+		uint32_t upload_hash;
+		int offset_x;
+		int offset_y;
+		SRect vram_rect;
+	};
+
+	struct RestorableRectSaveState {
+		Rect rect;
+		uint32_t hash;
+		std::vector<TextureRectSaveState> to_restore;
+	};
+
+	struct TextureTrackerSaveState {
+		std::vector<TextureRectSaveState> rects;
+		std::vector<RestorableRectSaveState> restorable;
+		std::map<uint32_t, TextureUpload> uploads;
+	};
+	// End of Save State
+	//========================================
+
+	/* Tunable HD-texture cache budgets. hd_cache = system RAM (decoded CPU levels);
+	 * hd_gpu_cache = VRAM (uploaded Vulkan images). The VRAM budget targets 8 GB
+	 * cards - lower it if you see VRAM-pressure "QueuePresent failed" / swapchain
+	 * churn, raise it on larger cards. */
+	static const size_t HD_CACHE_RAM_BUDGET  = (size_t)2 * 1024 * 1024 * 1024; /* 2 GB */
+	static const size_t HD_CACHE_VRAM_BUDGET = (size_t)3 * 1024 * 1024 * 1024; /* 3 GB */
+
+	/* (hash, palette_hash) packed into one 64-bit key. The caches below are keyed
+	 * by this single integer instead of HdTextureId, so lookups compare one int
+	 * with no struct operator< / tree descent. */
+	static uint64_t hd_pack_key(HdTextureId id)
+	{
+		return ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash;
+	}
+
+	/* ------------------------------------------------------------------------- *
+	 * Byte-budgeted LRU cache, MSVC C89.
+	 *
+	 * Replaces the original std::list<Entry> + std::map<id, list::iterator>
+	 * design - two heap node allocations per insert and an O(log n) red-black
+	 * descent per lookup - with a contiguous index-LRU + open-addressed
+	 * (linear-probe) flat hash table, all held in malloc'd arrays. No templates,
+	 * no classes, no virtual, no STL. The two cache variants (RAM levels, VRAM
+	 * images) are produced by macro instantiation: HD_LRU_DECLARE emits the struct
+	 * and prototypes, HD_LRU_DEFINE emits the bodies, with a DISPOSE callback that
+	 * frees payload-owned resources when a live entry leaves the cache.
+	 * ------------------------------------------------------------------------- */
+
+	/* fmix64 - cheap, strong avalanche for integer keys. The multipliers are built
+	 * from 32-bit halves so no C99 long-long (ULL) literals appear. */
+	static uint64_t hd_lru_mix(uint64_t x)
+	{
+		uint64_t k1 = ((uint64_t)0xff51afd7u << 32) | (uint64_t)0xed558ccdu;
+		uint64_t k2 = ((uint64_t)0xc4ceb9feu << 32) | (uint64_t)0x1a85ec53u;
+		x ^= x >> 33;
+		x *= k1;
+		x ^= x >> 33;
+		x *= k2;
+		x ^= x >> 33;
+		return x;
+	}
+
+#define HD_LRU_NO_DISPOSE(p) ((void)(p))
+
+#define HD_LRU_DECLARE(NAME, PAYLOAD_T)                                        \
+	typedef struct NAME##_slot {                                                   \
+		uint64_t  key;                                                             \
+		int       prev;   /* LRU links by arena index (-1 = none) */               \
+		int       next;                                                            \
+		size_t    bytes;  /* cached payload footprint */                           \
+		PAYLOAD_T payload;                                                         \
+	} NAME##_slot;                                                                 \
+	\
+	typedef struct NAME {                                                          \
+		NAME##_slot *slots;                                                        \
+		int          slots_len;                                                    \
+		int          slots_cap;                                                    \
+		int         *table;        /* open-addressed slot indices; -1 = empty */   \
+		size_t       table_len;    /* power of two, 0 if unallocated */            \
+		size_t       mask;         /* table_len - 1 */                             \
+		int          head, tail;   /* MRU / LRU ends */                            \
+		int          free_head;    /* recycled-slot free list head */              \
+		int          live;                                                         \
+		size_t       total_bytes;                                                  \
+		size_t       budget_bytes;                                                 \
+	} NAME;                                                                        \
+	\
+	static void   NAME##_init(NAME *c, size_t budget_bytes);                       \
+	static int    NAME##_contains(const NAME *c, uint64_t key);                    \
+	static PAYLOAD_T *NAME##_get(NAME *c, uint64_t key);                           \
+	static PAYLOAD_T *NAME##_put_slot(NAME *c, uint64_t key, int *created);        \
+	static void   NAME##_account(NAME *c, size_t old_bytes, size_t new_bytes);     \
+	static void   NAME##_erase(NAME *c, uint64_t key);                             \
+	static void   NAME##_clear(NAME *c);                                           \
+	static void   NAME##_set_entry_bytes(NAME *c, uint64_t key, size_t bytes);     \
+	static void   NAME##_set_budget(NAME *c, size_t bytes);                        \
+	static size_t NAME##_size_bytes(const NAME *c);                                \
+	static size_t NAME##_count(const NAME *c);                                     \
+	static size_t NAME##_budget(const NAME *c)
+
+#define HD_LRU_DEFINE(NAME, PAYLOAD_T, DISPOSE)                                \
+	static int NAME##_find_slot(const NAME *c, uint64_t key)                       \
+	{                                                                              \
+		size_t i;                                                                  \
+		if (c->table_len == 0)                                                     \
+		return -1;                                                             \
+		i = (size_t)hd_lru_mix(key) & c->mask;                                     \
+		for (;;) {                                                                 \
+			int s = c->table[i];                                                   \
+			if (s < 0)                                                             \
+			return -1;                                                         \
+			if (c->slots[s].key == key)                                            \
+			return s;                                                          \
+			i = (i + 1) & c->mask;                                                 \
+		}                                                                          \
+	}                                                                              \
+	static void NAME##_raw_insert(NAME *c, uint64_t key, int s)                    \
+	{                                                                              \
+		size_t i = (size_t)hd_lru_mix(key) & c->mask;                             \
+		while (c->table[i] >= 0)                                                   \
+		i = (i + 1) & c->mask;                                                 \
+		c->table[i] = s;                                                           \
+	}                                                                              \
+	static void NAME##_ensure_table(NAME *c, size_t want)                          \
+	{                                                                              \
+		size_t need = 8;                                                           \
+		size_t i;                                                                  \
+		int s;                                                                     \
+		while (need < want * 2)                                                    \
+		need <<= 1;                                                            \
+		if (c->table_len != 0 && need <= c->table_len)                             \
+		return;                                                                \
+		c->table = (int *)realloc(c->table, need * sizeof(int));                   \
+		c->table_len = need;                                                       \
+		c->mask = need - 1;                                                        \
+		for (i = 0; i < need; i++)                                                 \
+		c->table[i] = -1;                                                      \
+		for (s = c->head; s >= 0; s = c->slots[s].next)                           \
+		NAME##_raw_insert(c, c->slots[s].key, s);                             \
+	}                                                                              \
+	static void NAME##_hash_remove(NAME *c, uint64_t key)                          \
+	{                                                                              \
+		size_t i = (size_t)hd_lru_mix(key) & c->mask;                             \
+		size_t j;                                                                  \
+		for (;;) {                                                                 \
+			int s = c->table[i];                                                   \
+			if (s >= 0 && c->slots[s].key == key)                                  \
+			break;                                                             \
+			i = (i + 1) & c->mask;                                                 \
+		}                                                                          \
+		j = i;                                                                     \
+		c->table[i] = -1;                                                          \
+		for (;;) {                                                                 \
+			int sj;                                                                \
+			size_t home;                                                          \
+			int can_move;                                                          \
+			j = (j + 1) & c->mask;                                                 \
+			sj = c->table[j];                                                      \
+			if (sj < 0)                                                            \
+			break;                                                             \
+			home = (size_t)hd_lru_mix(c->slots[sj].key) & c->mask;               \
+			if (i <= j)                                                            \
+			can_move = !(home > i && home <= j);                               \
+			else                                                                   \
+			can_move = !(home > i || home <= j);                               \
+			if (can_move) {                                                        \
+				c->table[i] = sj;                                                  \
+				c->table[j] = -1;                                                  \
+				i = j;                                                             \
+			}                                                                      \
+		}                                                                          \
+	}                                                                              \
+	static int NAME##_alloc_slot(NAME *c)                                          \
+	{                                                                              \
+		int s;                                                                     \
+		if (c->free_head >= 0) {                                                   \
+			s = c->free_head;                                                      \
+			c->free_head = c->slots[s].next;                                       \
+			return s;                                                              \
+		}                                                                          \
+		if (c->slots_len == c->slots_cap) {                                        \
+			int ncap = c->slots_cap ? c->slots_cap * 2 : 16;                       \
+			c->slots = (NAME##_slot *)realloc(c->slots,                            \
+					(size_t)ncap * sizeof(NAME##_slot));                    \
+			c->slots_cap = ncap;                                                   \
+		}                                                                          \
+		s = c->slots_len++;                                                        \
+		c->slots[s].key = 0;                                                       \
+		c->slots[s].prev = -1;                                                     \
+		c->slots[s].next = -1;                                                     \
+		c->slots[s].bytes = 0;                                                     \
+		return s;                                                                  \
+	}                                                                              \
+	static void NAME##_free_slot(NAME *c, int s)                                   \
+	{                                                                              \
+		c->slots[s].next = c->free_head;                                          \
+		c->free_head = s;                                                          \
+	}                                                                              \
+	static void NAME##_link_front(NAME *c, int s)                                  \
+	{                                                                              \
+		c->slots[s].prev = -1;                                                     \
+		c->slots[s].next = c->head;                                                \
+		if (c->head >= 0)                                                          \
+		c->slots[c->head].prev = s;                                            \
+		c->head = s;                                                               \
+		if (c->tail < 0)                                                           \
+		c->tail = s;                                                           \
+	}                                                                              \
+	static void NAME##_unlink(NAME *c, int s)                                      \
+	{                                                                              \
+		int p = c->slots[s].prev;                                                  \
+		int n = c->slots[s].next;                                                  \
+		if (p >= 0) c->slots[p].next = n; else c->head = n;                        \
+		if (n >= 0) c->slots[n].prev = p; else c->tail = p;                        \
+	}                                                                              \
+	static void NAME##_touch(NAME *c, int s)                                       \
+	{                                                                              \
+		if (c->head == s)                                                          \
+		return;                                                                \
+		NAME##_unlink(c, s);                                                       \
+		NAME##_link_front(c, s);                                                   \
+	}                                                                              \
+	static void NAME##_evict(NAME *c)                                              \
+	{                                                                              \
+		while (c->total_bytes > c->budget_bytes && c->tail >= 0) {                 \
+			int s = c->tail;                                                       \
+			uint64_t key = c->slots[s].key;                                        \
+			c->total_bytes -= c->slots[s].bytes;                                   \
+			DISPOSE(&c->slots[s].payload);                                         \
+			NAME##_unlink(c, s);                                                   \
+			NAME##_hash_remove(c, key);                                            \
+			NAME##_free_slot(c, s);                                                \
+			c->live--;                                                             \
+		}                                                                          \
+	}                                                                              \
+	static void NAME##_init(NAME *c, size_t budget_bytes)                          \
+	{                                                                              \
+		c->slots = NULL; c->slots_len = 0; c->slots_cap = 0;                       \
+		c->table = NULL; c->table_len = 0; c->mask = 0;                            \
+		c->head = c->tail = c->free_head = -1;                                     \
+		c->live = 0; c->total_bytes = 0; c->budget_bytes = budget_bytes;           \
+	}                                                                              \
+	static int NAME##_contains(const NAME *c, uint64_t key)                        \
+	{                                                                              \
+		return NAME##_find_slot(c, key) >= 0;                                      \
+	}                                                                              \
+	static PAYLOAD_T *NAME##_get(NAME *c, uint64_t key)                            \
+	{                                                                              \
+		int s = NAME##_find_slot(c, key);                                          \
+		if (s < 0)                                                                 \
+		return NULL;                                                           \
+		NAME##_touch(c, s);                                                        \
+		return &c->slots[s].payload;                                               \
+	}                                                                              \
+	static PAYLOAD_T *NAME##_put_slot(NAME *c, uint64_t key, int *created)         \
+	{                                                                              \
+		int s = NAME##_find_slot(c, key);                                          \
+		if (s >= 0) {                                                              \
+			*created = 0;                                                          \
+			NAME##_touch(c, s);                                                    \
+			return &c->slots[s].payload;                                           \
+		}                                                                          \
+		*created = 1;                                                              \
+		NAME##_ensure_table(c, (size_t)c->live + 1);                               \
+		s = NAME##_alloc_slot(c);                                                  \
+		c->slots[s].key = key;                                                     \
+		NAME##_link_front(c, s);                                                   \
+		NAME##_raw_insert(c, key, s);                                              \
+		c->live++;                                                                 \
+		return &c->slots[s].payload;                                               \
+	}                                                                              \
+	static void NAME##_account(NAME *c, size_t old_bytes, size_t new_bytes)        \
+	{                                                                              \
+		c->total_bytes = c->total_bytes - old_bytes + new_bytes;                   \
+		NAME##_evict(c);                                                           \
+	}                                                                              \
+	static void NAME##_erase(NAME *c, uint64_t key)                                \
+	{                                                                              \
+		int s = NAME##_find_slot(c, key);                                          \
+		if (s < 0)                                                                 \
+		return;                                                                \
+		c->total_bytes -= c->slots[s].bytes;                                       \
+		DISPOSE(&c->slots[s].payload);                                             \
+		NAME##_unlink(c, s);                                                       \
+		NAME##_hash_remove(c, key);                                                \
+		NAME##_free_slot(c, s);                                                    \
+		c->live--;                                                                 \
+	}                                                                              \
+	static void NAME##_clear(NAME *c)                                              \
+	{                                                                              \
+		int s;                                                                     \
+		for (s = c->head; s >= 0; s = c->slots[s].next)                           \
+		DISPOSE(&c->slots[s].payload);                                         \
+		free(c->slots); free(c->table);                                            \
+		c->slots = NULL; c->slots_len = 0; c->slots_cap = 0;                       \
+		c->table = NULL; c->table_len = 0; c->mask = 0;                            \
+		c->head = c->tail = c->free_head = -1;                                     \
+		c->live = 0; c->total_bytes = 0;                                           \
+	}                                                                              \
+	static void NAME##_set_entry_bytes(NAME *c, uint64_t key, size_t bytes)        \
+	{                                                                              \
+		int s = NAME##_find_slot(c, key);                                          \
+		if (s >= 0)                                                                \
+		c->slots[s].bytes = bytes;                                             \
+	}                                                                              \
+	static void NAME##_set_budget(NAME *c, size_t bytes)                           \
+	{                                                                              \
+		c->budget_bytes = bytes;                                                   \
+		NAME##_evict(c);                                                           \
+	}                                                                              \
+	static size_t NAME##_size_bytes(const NAME *c) { return c->total_bytes; }      \
+	static size_t NAME##_count(const NAME *c)      { return (size_t)c->live; }     \
+	static size_t NAME##_budget(const NAME *c)     { return c->budget_bytes; }
+
+	/* --- RAM cache: decoded CPU levels, keyed by (hash, palette) ------------- *
+	 * Lives independent of TextureUpload lifetime, so images survive the rapid
+	 * VRAM upload churn of animated sprites. Decode-once: a combo is read+decoded
+	 * from disk at most once until evicted. CPU-side only - the GPU upload happens
+	 * on attach via Renderer::upload_texture, so it survives device/swapchain
+	 * resets. The disposer frees the decoded levels. */
+	typedef struct CachedHdImage {
+		LoadedLevels levels; /* decoded RGBA + mips (CPU side) */
+		int    alpha_flags;
+		size_t bytes;
+	} CachedHdImage;
+
+	static void cached_hd_image_dispose(CachedHdImage *p)
+	{
+		loaded_levels_reset(&p->levels);
+	}
+
+	HD_LRU_DECLARE(HdImageCache, CachedHdImage);
+	HD_LRU_DEFINE(HdImageCache, CachedHdImage, cached_hd_image_dispose)
+
+		/* Insert/replace a combo's decoded levels; takes ownership of *levels (left
+		 * empty on return). */
+		static void hd_image_cache_put(HdImageCache *c, HdTextureId id,
+				LoadedLevels *levels, int alpha_flags)
+		{
+			uint64_t key = hd_pack_key(id);
+			int created = 0;
+			CachedHdImage *e = HdImageCache_put_slot(c, key, &created);
+			size_t old_bytes = created ? 0 : e->bytes;
+			if (created)
+				loaded_levels_init(&e->levels); /* fresh slot: payload is indeterminate */
+			loaded_levels_move(&e->levels, levels);
+			e->alpha_flags = alpha_flags;
+			e->bytes = loaded_levels_byte_size(&e->levels);
+			HdImageCache_set_entry_bytes(c, key, e->bytes);
+			HdImageCache_account(c, old_bytes, e->bytes);
+		}
+
+	/* --- VRAM cache: uploaded Vulkan images, keyed by (hash, palette) -------- *
+	 * Sits above the RAM cache. Re-attaching a combo to a recreated TextureUpload
+	 * becomes a ref-counted handle copy instead of a fresh upload_texture. The
+	 * image is held as a RAW Vulkan::Image* (trivially relocatable, so the malloc
+	 * arena can realloc it) with the refcount managed by hand: a reference is
+	 * taken on insert and released by the disposer on eviction/clear, freeing VRAM
+	 * once no live draw still holds the image. */
+	typedef struct CachedGpuImage {
+		Vulkan::Image *image; /* owns one reference while resident (NULL = empty) */
+		int    alpha_flags;
+		size_t bytes;         /* approximate VRAM footprint (== decoded levels size) */
+	} CachedGpuImage;
+
+	static void cached_gpu_image_dispose(CachedGpuImage *p)
+	{
+		if (p->image) {
+			p->image->release_reference();
+			p->image = NULL;
+		}
+	}
+
+	HD_LRU_DECLARE(HdGpuCache, CachedGpuImage);
+	HD_LRU_DEFINE(HdGpuCache, CachedGpuImage, cached_gpu_image_dispose)
+
+		/* Take a counted reference to a cached image and return it as an ImageHandle
+		 * the caller can store/copy/destroy normally. IntrusivePtr(T*) adopts without
+		 * bumping, so add the reference explicitly first. */
+		static Vulkan::ImageHandle hd_gpu_image_handle(CachedGpuImage *g)
+		{
+			g->image->add_reference();
+			return Vulkan::ImageHandle(g->image);
+		}
+
+	/* Insert/replace a combo's GPU image. Adds a reference to `handle`'s image
+	 * (held until eviction); a prior image at this key is released first. */
+	static void hd_gpu_cache_put(HdGpuCache *c, HdTextureId id,
+			Vulkan::ImageHandle handle, int alpha_flags, size_t bytes)
+	{
+		uint64_t key = hd_pack_key(id);
+		int created = 0;
+		CachedGpuImage *e = HdGpuCache_put_slot(c, key, &created);
+		size_t old_bytes = created ? 0 : e->bytes;
+		if (!created && e->image)
+			e->image->release_reference(); /* drop the image we're replacing */
+		e->image = handle.get();
+		if (e->image)
+			e->image->add_reference();      /* cache holds its own reference */
+		e->alpha_flags = alpha_flags;
+		e->bytes = bytes;
+		HdGpuCache_set_entry_bytes(c, key, bytes);
+		HdGpuCache_account(c, old_bytes, bytes);
+	}
+
+	/* ------------------------------------------------------------------------- *
+	 * HdKeySet - an ordered set of packed (hash, palette) uint64_t keys, MSVC C89.
+	 *
+	 * Replaces std::set<HdTextureId>. Backed by a single sorted, malloc'd
+	 * uint64_t array: membership is O(log n) binary search, insert/erase keep it
+	 * sorted (O(n) shift, fine for these small sets). Because the key packs
+	 * (hash << 32) | palette, the array is ordered by hash then palette, so all
+	 * combos of one hash form a contiguous run - found with lower_bound over the
+	 * half-open key range [hash<<32, (hash+1)<<32), which is exactly what the old
+	 * std::set lower_bound/upper_bound({hash,0})/({hash,0xFFFFFFFF}) gave.
+	 * ------------------------------------------------------------------------- */
+	typedef struct HdKeySet {
+		uint64_t *keys;
+		int       count;
+		int       cap;
+	} HdKeySet;
+
+	static void hd_key_set_init(HdKeySet *s)
+	{
+		s->keys = NULL;
+		s->count = 0;
+		s->cap = 0;
+	}
+	static void hd_key_set_free(HdKeySet *s)
+	{
+		free(s->keys);
+		s->keys = NULL;
+		s->count = 0;
+		s->cap = 0;
+	}
+	static void hd_key_set_clear(HdKeySet *s)
+	{
+		s->count = 0; /* keep the allocation for reuse */
+	}
+	/* First index with keys[i] >= key (i.e. std::lower_bound). */
+	static int hd_key_set_lower_bound(const HdKeySet *s, uint64_t key)
+	{
+		int lo = 0, hi = s->count;
+		while (lo < hi) {
+			int mid = lo + ((hi - lo) >> 1);
+			if (s->keys[mid] < key)
+				lo = mid + 1;
+			else
+				hi = mid;
+		}
+		return lo;
+	}
+	static int hd_key_set_contains(const HdKeySet *s, uint64_t key)
+	{
+		int i = hd_key_set_lower_bound(s, key);
+		return i < s->count && s->keys[i] == key;
+	}
+	/* Insert key; returns 1 if newly added, 0 if already present. */
+	static int hd_key_set_insert(HdKeySet *s, uint64_t key)
+	{
+		int i = hd_key_set_lower_bound(s, key);
+		if (i < s->count && s->keys[i] == key)
+			return 0;
+		if (s->count == s->cap) {
+			int ncap = s->cap ? s->cap * 2 : 16;
+			s->keys = (uint64_t *)realloc(s->keys, (size_t)ncap * sizeof(uint64_t));
+			s->cap = ncap;
+		}
+		memmove(&s->keys[i + 1], &s->keys[i], (size_t)(s->count - i) * sizeof(uint64_t));
+		s->keys[i] = key;
+		s->count++;
+		return 1;
+	}
+	static void hd_key_set_erase(HdKeySet *s, uint64_t key)
+	{
+		int i = hd_key_set_lower_bound(s, key);
+		if (i >= s->count || s->keys[i] != key)
+			return;
+		memmove(&s->keys[i], &s->keys[i + 1], (size_t)(s->count - i - 1) * sizeof(uint64_t));
+		s->count--;
+	}
+
+	class TextureTracker {
+		public:
+			TextureTracker();
+			~TextureTracker();
+
+			TextureTrackerSaveState save_state();
+			void load_state(const TextureTrackerSaveState &state);
+
+			// Put texture in highres vram
+			void upload(Rect rect, uint16_t *vram);
+			void blit(Rect dst, Rect src);
+			// Clear highres vram to fallback to lowres
+			void clearRegion(Rect rect);
+			// Monitor VRAM readback
+			void notifyReadback(Rect rect, uint16_t *vram);
+			uint32_t dbgHashVram(Rect rect, uint16_t *vram);
+
+			HdTextureHandle get_hd_texture_index(Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable, bool &cache_hit);
+			HdTexture get_hd_texture(HdTextureHandle index);
+			void endFrame();
+			void on_queues_reset();
+
+			void set_texture_uploader(Renderer *t);
+
+			// Runtime cache budgets (bytes), driven by core options.
+			void set_cache_budgets(size_t ram_bytes, size_t vram_bytes) {
+				HdImageCache_set_budget(&hd_cache, ram_bytes);
+				HdGpuCache_set_budget(&hd_gpu_cache, vram_bytes);
+			}
+
+			bool dump_enabled = false;
+			bool hd_textures_enabled = false;
+			bool eager_textures = true; // true = prefetch all palettes of a hash on upload (master-consistent); false = lazy per-draw
+		private:
+			IOThread iothread;
+			Renderer *uploader;
+
+			Vulkan::ImageHandle default_hd_texture;
+
+			Palette get_palette(Rect palette_rect);
+			uint32_t get_palette_hash(Rect palette_rect);
+
+			RectMatch dump_ignore[DUMP_IGNORE_MAX];
+			int       dump_ignore_count;
+
+			HdKeySet known_files;
+			// Palette-hash cache: a plain growable array (append-only until cleared,
+			// no eviction/order), replacing std::vector<CachedPaletteHash>.
+			CachedPaletteHash *cached_palette_hashes;
+			int cached_palette_hashes_count;
+			int cached_palette_hashes_cap;
+			std::vector<RestorableRect> restorable_rects;
+			FusedPages fused_pages;
+			uint64_t frame = 0;
+
+			RectTracker tracker;
+			HandleLRUCache handle_cache = 4;
+
+			// HD image caches, independent of upload lifetime. Tier 1 = GPU (VRAM,
+			// ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier 3
+			// = disk. Re-attach prefers the GPU cache (handle copy), falls back to a
+			// GPU upload from the CPU cache, then to a disk load. Initialised in the
+			// TextureTracker constructor via HdGpuCache_init / HdImageCache_init.
+			HdGpuCache hd_gpu_cache;
+			HdImageCache hd_cache;
+			HdKeySet requested;        // disk load in flight, or known to have no file (negative cache)
+			HdKeySet pending_attach;   // cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset
+
+			// Queue a disk load for a combo unless it's already cached / in flight / fileless.
+			void want_combo(HdTextureId id);
+
+			// Diagnostics (logged every 300 frames by endFrame; non-verbose so they
+			// show in a normal RetroArch INFO log).
+			uint64_t dbg_responses_received = 0;       // disk decodes completed (should stay low with the cache)
+			uint64_t dbg_responses_received_last = 0;
+			uint64_t dbg_gpu_uploads = 0;              // upload_texture calls (CPU->GPU); should fall toward 0 once warm
+			uint64_t dbg_gpu_uploads_last = 0;
+			uint64_t dbg_attaches = 0;                 // combos bound to an upload (handle copy or fresh upload)
+			uint64_t dbg_attaches_last = 0;
+
+			void dump_texture(TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode);
+
+			DbgHotkey frame_dump_key = RETROK_LEFTBRACKET; // disgusting
+			RFILE *frame_dump = NULL;
+			bool frame_dump_need_comma = false;
+
+			DbgHotkey hd_toggle_key = RETROK_RIGHTBRACKET;
+
+			void load_hd_texture(uint32_t hash); // eager per-hash loader, still used by load_state (savestate)
+							     // Cache-backed lazy HD texture binding for a drawn (hash,palette); see definition.
+			void request_hd_texture(TextureUpload *upload, uint32_t palette_hash);
+
+			DbgHotkey reload_key = RETROK_QUOTE;
+			void reload_textures_from_disk();
+
+			DbgHotkey fastpath_key = RETROK_SEMICOLON;
+			bool fastpath_enabled = true;
+
+			void dump_image(TextureUpload &upload, UsedMode &mode);
+
+			void clear_palette_cache(Rect rect)
+			{
+				cached_palette_hashes_count = 0; /* keep allocation for reuse */
+			}
+
+			/** Returns nullptr if no texture with the given hash can be found */
+			TextureUpload *find_upload(uint32_t hash);
+	};
+
+	struct Vertex
+	{
+		float x, y, w;
+		uint32_t color;
+		uint16_t u, v;
+	};
+
+	struct TextureWindow
+	{
+		uint8_t mask_x, mask_y, or_x, or_y;
+	};
+
+	struct UVRect
+	{
+		uint16_t min_u, min_v, max_u, max_v;
+	};
+
+	enum class SemiTransparentMode
+	{
+		None,
+		Average,
+		Add,
+		Sub,
+		AddQuarter
+	};
+
+	enum class PrimitiveType
+	{
+		Sprite,
+		Polygon,
+		May_Be_2D_Polygon
+	};
+
+	class Renderer
+	{
+		public:
+			enum class ScanoutMode
+			{
+				// Use extra precision bits.
+				ABGR1555_555,
+				// Use extra precision bits to dither down to a native ABGR1555 image.
+				// The dither happens in the wrong place, but should be "good" enough to feel authentic.
+				ABGR1555_Dither,
+				// MDEC
+				BGR24
+			};
+
+			enum class ScanoutFilter
+			{
+				None,
+				SSAA,
+				MDEC_YUV
+			};
+
+			enum class WidthMode
+			{
+				WIDTH_MODE_256 = 0,
+				WIDTH_MODE_320 = 1,
+				WIDTH_MODE_512 = 2,
+				WIDTH_MODE_640 = 3,
+				WIDTH_MODE_368 = 4
+			};
+
+			struct DisplayRect
+			{
+				// Unlike Rect, the x-y coordinates for a DisplayRect can be negative
+				int x = 0;
+				int y = 0;
+				unsigned width = 0;
+				unsigned height = 0;
+
+				DisplayRect() = default;
+				DisplayRect(int x, int y, unsigned width, unsigned height)
+					: x(x)
+					  , y(y)
+					  , width(width)
+					  , height(height)
+				{
+				}
+			};
+
+			struct RenderState
+			{
+				//Rect display_mode;
+				Rect display_fb_rect;
+				TextureWindow texture_window;
+				Rect cached_window_rect;
+				Rect draw_rect;
+				int draw_offset_x = 0;
+				int draw_offset_y = 0;
+				unsigned palette_offset_x = 0;
+				unsigned palette_offset_y = 0;
+				unsigned texture_offset_x = 0;
+				unsigned texture_offset_y = 0;
+
+				int vert_start = 0x10;
+				int vert_end = 0x100;
+				int horiz_start = 0x200;
+				int horiz_end = 0xC00;
+
+				bool is_pal = false;
+				bool is_480i = false;
+				WidthMode width_mode = WidthMode::WIDTH_MODE_320;
+				int crop_overscan = 0;
+				unsigned image_crop = 0;
+
+				// Experimental horizontal offset feature
+				int offset_cycles = 0;
+
+				int slstart = 0;
+				int slend = 239;
+
+				int slstart_pal = 0;
+				int slend_pal = 287;
+
+				unsigned display_fb_xstart = 0;
+				unsigned display_fb_ystart = 0;
+
+				TextureMode texture_mode = TextureMode::None;
+				SemiTransparentMode semi_transparent = SemiTransparentMode::None;
+				PrimitiveType primitive_type = PrimitiveType::Polygon;
+				ScanoutMode scanout_mode = ScanoutMode::ABGR1555_555;
+				ScanoutFilter scanout_filter = ScanoutFilter::None;
+				ScanoutFilter scanout_mdec_filter = ScanoutFilter::None;
+				bool dither_native_resolution = false;
+				bool force_mask_bit = false;
+				bool texture_color_modulate = false;
+				bool mask_test = false;
+				bool display_on = false;
+				bool adaptive_smoothing = true;
+
+				UVRect UVLimits;
+			};
+
+			struct SaveState
+			{
+				std::vector<uint32_t> vram;
+				RenderState state;
+				TextureTrackerSaveState tracker_state;
+			};
+
+			Renderer(Vulkan::Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
+			~Renderer();
+
+			void set_track_textures(bool enable)
+			{
+				texture_tracking_enabled = enable;
+			}
+			void set_dump_textures(bool enable)
+			{
+				tracker.dump_enabled = enable;
+			}
+			void set_replace_textures(bool enable)
+			{
+				tracker.hd_textures_enabled = enable;
+			}
+			void set_hd_cache_budgets(size_t ram_bytes, size_t vram_bytes)
+			{
+				tracker.set_cache_budgets(ram_bytes, vram_bytes);
+			}
+			void set_eager_hd_textures(bool enable)
+			{
+				tracker.eager_textures = enable;
+			}
+
+			void set_adaptive_smoothing(bool enable)
+			{
+				render_state.adaptive_smoothing = enable;
+			}
+
+			void set_draw_rect(const Rect &rect);
+			inline void set_draw_offset(int x, int y)
+			{
+				render_state.draw_offset_x = x;
+				render_state.draw_offset_y = y;
+			}
+
+			inline void set_scissored_invariant(bool invariant)
+			{
+				queue.scissor_invariant = invariant;
+			}
+
+			void set_texture_window(const TextureWindow &window)
+			{
+				render_state.texture_window = window;
+				render_state.cached_window_rect = compute_window_rect(window);
+			}
+			inline void set_texture_offset(unsigned x, unsigned y)
+			{
+				atlas.set_texture_offset(x, y);
+				render_state.texture_offset_x = x;
+				render_state.texture_offset_y = y;
+			}
+
+			inline void set_palette_offset(unsigned x, unsigned y)
+			{
+				atlas.set_palette_offset(x, y);
+				render_state.palette_offset_x = x;
+				render_state.palette_offset_y = y;
+			}
+
+			Vulkan::BufferHandle copy_cpu_to_vram(const Rect &rect);
+			void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
+			uint16_t *begin_copy(Vulkan::BufferHandle handle)
+			{
+				return static_cast<uint16_t *>(device.map_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT));
+			}
+			void end_copy(Vulkan::BufferHandle handle)
+			{
+				device.unmap_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT);
+			}
+
+			void notify_texture_upload(Rect rect, uint16_t *vram)
+			{
+				if (texture_tracking_enabled)
+					tracker.upload(rect, vram);
+			}
+
+			void blit_vram(const Rect &dst, const Rect &src);
+
+			void set_vram_framebuffer_coords(unsigned xstart, unsigned ystart)
+			{
+				last_scanout.reset();
+
+				render_state.display_fb_xstart = xstart;
+				render_state.display_fb_ystart = ystart;
+			}
+
+			void set_horizontal_display_range(int x1, int x2)
+			{
+				render_state.horiz_start = x1;
+				render_state.horiz_end = x2;
+			}
+
+			void set_vertical_display_range(int y1, int y2)
+			{
+				render_state.vert_start = y1;
+				render_state.vert_end = y2;
+			}
+
+			void set_display_mode(ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
+			{
+				//if (rect != render_state.display_mode || render_state.scanout_mode != mode)
+				//	last_scanout.reset();
+				last_scanout.reset();
+
+				//render_state.display_mode = rect;
+				render_state.scanout_mode = mode;
+
+				render_state.is_pal = is_pal;
+				render_state.is_480i = is_480i;
+				render_state.width_mode = width_mode;
+			}
+
+			void set_horizontal_overscan_cropping(int crop_overscan)
+			{
+				render_state.crop_overscan = crop_overscan;
+			}
+
+			void set_horizontal_offset_cycles(int offset_cycles)
+			{
+				render_state.offset_cycles = offset_cycles;
+			}
+
+			void set_horizontal_additional_cropping(unsigned image_crop)
+			{
+				render_state.image_crop = image_crop;
+			}
+
+			void set_visible_scanlines(int slstart, int slend, int slstart_pal, int slend_pal)
+			{
+				// May need bounds checking to reject bad inputs. Currently assume all inputs are valid.
+				render_state.slstart = slstart;
+				render_state.slend = slend;
+				render_state.slstart_pal = slstart_pal;
+				render_state.slend_pal = slend_pal;
+			}
+
+			void set_display_filter(ScanoutFilter filter)
+			{
+				render_state.scanout_filter = filter;
+			}
+
+			void set_mdec_filter(ScanoutFilter mdec_filter)
+			{
+				render_state.scanout_mdec_filter = mdec_filter;
+			}
+
+			void toggle_display(bool enable)
+			{
+				if (enable != render_state.display_on)
+					last_scanout.reset();
+
+				render_state.display_on = enable;
+			}
+
+			void set_dither_native_resolution(bool enable)
+			{
+				render_state.dither_native_resolution = enable;
+			}
+
+			Vulkan::ImageHandle scanout_vram_to_texture(bool scaled = true);
+			Vulkan::ImageHandle scanout_to_texture();
+
+			inline void set_texture_mode(TextureMode mode)
+			{
+				render_state.texture_mode = mode;
+				atlas.set_texture_mode(mode);
+			}
+
+			inline void set_semi_transparent(SemiTransparentMode state)
+			{
+				render_state.semi_transparent = state;
+			}
+
+			inline void set_primitive_type(PrimitiveType primitive_type)
+			{
+				render_state.primitive_type = primitive_type;
+			}
+
+			inline void set_force_mask_bit(bool enable)
+			{
+				render_state.force_mask_bit = enable;
+			}
+
+			inline void set_mask_test(bool enable)
+			{
+				render_state.mask_test = enable;
+			}
+
+			inline void set_texture_color_modulate(bool enable)
+			{
+				render_state.texture_color_modulate = enable;
+			}
+
+			inline void set_UV_limits(uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v)
+			{
+				render_state.UVLimits.min_u = min_u;
+				render_state.UVLimits.min_v = min_v;
+				render_state.UVLimits.max_u = max_u;
+				render_state.UVLimits.max_v = max_v;
+			}
+
+			// Draw commands
+			void clear_rect(const Rect &rect, uint32_t fb_color);
+			void draw_line(const Vertex *vertices);
+			void draw_triangle(const Vertex *vertices);
+			void draw_quad(const Vertex *vertices);
+
+			SaveState save_vram_state();
+
+			void flush()
+			{
+				if (cmd)
+					device.submit(cmd);
+				cmd.reset();
+				device.flush_frame();
+			}
+
+			Vulkan::Fence flush_and_signal()
+			{
+				Vulkan::Fence fence;
+				if (cmd)
+					device.submit(cmd, &fence);
+				cmd.reset();
+				device.flush_frame();
+				return fence;
+			}
+
+			enum
+			{
+				SpecConstIndex_TransMode = 0,
+				SpecConstIndex_FilterMode = 1,
+				SpecConstIndex_BlendMode = 2,
+				SpecConstIndex_Scaling = 3,
+				SpecConstIndex_Shift = 4,
+				SpecConstIndex_OffsetUV = 5,
+				SpecConstIndex_Samples = 0,
+			};
+
+			enum FilterExclude
+			{
+				FilterExcludeNone = 0,
+				FilterExcludeOpaque = 1,
+				FilterExcludeOpaqueAndSemiTrans = 2,
+			};
+
+			enum class FilterMode : uint32_t
+		{
+			NearestNeighbor = 0,
+			XBR = 1,
+			SABR = 2,
+			Bilinear = 3,
+			Bilinear3Point = 4,
+			JINC2 = 5
+		};
+
+			enum class TransMode : uint32_t
+		{
+			Opaque = 0,
+			SemiTrans = 1,
+			SemiTransOpaque = 2
+		};
+
+			enum class BlendMode : uint32_t
+		{
+			BlendAdd = 0,
+			BlendAvg = 1,
+			BlendSub = 2,
+			BlendAddQuarter = 3
+		};
+
+			void set_filter_mode(FilterMode mode)
+			{
+				primitive_filter_mode = mode;
+			}
+			ScanoutMode get_scanout_mode() const
+			{
+				return render_state.scanout_mode;
+			}
+
+			void set_sprite_filter_exclude(FilterExclude exclude)
+			{
+				sprite_filter_exclude = exclude;
+			}
+
+			void set_polygon_2d_filter_exclude(FilterExclude exclude)
+			{
+				polygon_2d_filter_exclude = exclude;
+			}
+
+			void set_scaled_uv_offset(bool offset)
+			{
+				scaled_uv_offset = offset;
+			}
+
+			/* True iff the constructor finished successfully. The Renderer
+			 * constructor does not throw; on failure (e.g. RGBA8_UNORM not
+			 * supported) it leaves the object in a destroyable but otherwise
+			 * unusable state. Callers must check is_valid() before use. */
+			bool is_valid() const { return valid; }
+
+		private:
+			Vulkan::Device &device;
+			unsigned scaling;
+			unsigned msaa;
+			bool scaled_uv_offset = false;
+			bool valid = false;
+			FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
+			FilterExclude sprite_filter_exclude = FilterExcludeNone;
+			FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
+			Vulkan::ImageHandle scaled_framebuffer;
+			Vulkan::ImageHandle scaled_framebuffer_msaa;
+			Vulkan::ImageHandle bias_framebuffer;
+			Vulkan::ImageHandle framebuffer;
+			Vulkan::ImageHandle framebuffer_ssaa;
+			std::vector<Vulkan::ImageViewHandle> scaled_views;
+			FBAtlas atlas;
+			bool texture_tracking_enabled = false;
+			TextureTracker tracker;
+
+			Vulkan::CommandBufferHandle cmd;
+
+		public:
+			// Called by FBAtlas (formerly via HazardListener interface).
+			void hazard(StatusFlags flags);
+			void resolve(Domain target_domain, unsigned x, unsigned y);
+			void flush_render_pass(const Rect &rect);
+			void discard_render_pass()
+			{
+				reset_queue();
+			}
+			void clear_quad(const Rect &rect, uint32_t fb_color, bool candidate);
+
+			// Called by TextureTracker (formerly via TextureUploader interface).
+			Vulkan::ImageHandle upload_texture(LoadedLevels &image);
+			Vulkan::ImageHandle create_texture(int width, int height, int levels);
+			Vulkan::CommandBufferHandle &command_buffer_hack_fixme()
+			{
+				ensure_command_buffer();
+				return cmd;
+			}
+
+		private:
+			void hd_texture_uniforms(HdTextureHandle hd_texture_index);
+			HdTextureHandle get_hd_texture_index(const Rect &uvlimits, bool &fastpath_capable_out, bool &cache_hit_out);
+
+			struct
+			{
+				Vulkan::Program *copy_to_vram;
+				Vulkan::Program *copy_to_vram_masked;
+				Vulkan::Program *unscaled_quad_blitter;
+				Vulkan::Program *scaled_quad_blitter;
+				Vulkan::Program *unscaled_dither_quad_blitter;
+				Vulkan::Program *scaled_dither_quad_blitter;
+				Vulkan::Program *bpp24_quad_blitter;
+				Vulkan::Program *bpp24_yuv_quad_blitter;
+				Vulkan::Program *resolve_to_scaled;
+				Vulkan::Program *resolve_to_unscaled;
+
+				Vulkan::Program *blit_vram_scaled;
+				Vulkan::Program *blit_vram_scaled_masked;
+
+				Vulkan::Program *blit_vram_cached_scaled;
+				Vulkan::Program *blit_vram_cached_scaled_masked;
+				Vulkan::Program *blit_vram_msaa_cached_scaled;
+				Vulkan::Program *blit_vram_msaa_cached_scaled_masked;
+
+				Vulkan::Program *blit_vram_unscaled;
+				Vulkan::Program *blit_vram_unscaled_masked;
+				Vulkan::Program *blit_vram_cached_unscaled;
+				Vulkan::Program *blit_vram_cached_unscaled_masked;
+
+				Vulkan::Program *flat;
+				Vulkan::Program *textured_scaled;
+				Vulkan::Program *textured_unscaled;
+				Vulkan::Program *flat_masked;
+				Vulkan::Program *textured_masked_scaled;
+				Vulkan::Program *textured_masked_unscaled;
+
+				Vulkan::Program *mipmap_resolve;
+				Vulkan::Program *mipmap_dither_resolve;
+				Vulkan::Program *mipmap_energy_first;
+				Vulkan::Program *mipmap_energy;
+				Vulkan::Program *mipmap_energy_blur;
+			} pipelines;
+
+			Vulkan::ImageHandle dither_lut;
+
+			void init_pipelines();
+			void init_primitive_pipelines();
+			void init_primitive_feedback_pipelines();
+			void ensure_command_buffer();
+
+			RenderState render_state;
+
+			struct BufferVertex
+			{
+				float x, y, z, w;
+				uint32_t color;
+				TextureWindow window;
+				int16_t pal_x, pal_y, params;
+				int16_t u, v, base_uv_x, base_uv_y;
+				uint16_t min_u, min_v, max_u, max_v;
+			};
+
+			struct BlitInfo
+			{
+				uint32_t src_offset[2];
+				uint32_t dst_offset[2];
+				uint32_t extent[2];
+				uint32_t mask;
+				uint32_t sample;
+			};
+
+			struct SemiTransparentState
+			{
+				int scissor_index;
+				HdTextureHandle hd_texture_index;
+				SemiTransparentMode semi_transparent;
+				bool textured;
+				bool masked;
+				bool filtering;
+				bool scaled_read;
+				unsigned shift;
+				bool offset_uv;
+
+				bool operator==(const SemiTransparentState &other) const
+				{
+					return scissor_index == other.scissor_index && hd_texture_index == other.hd_texture_index &&
+						semi_transparent == other.semi_transparent && textured == other.textured && masked == other.masked &&
+						filtering == other.filtering && scaled_read == other.scaled_read && shift == other.shift &&
+						offset_uv == other.offset_uv;
+				}
+
+				bool operator!=(const SemiTransparentState &other) const
+				{
+					return !(*this == other);
+				}
+			};
+
+			struct ClearCandidate
+			{
+				Rect rect;
+				uint32_t color; /* fb_color */
+				float z;
+			};
+
+			struct PrimitiveInfo {
+				unsigned triangle_index;
+				int scissor_index;
+				HdTextureHandle hd_texture_index;
+				bool filtering;
+				bool scaled_read;
+				unsigned shift;
+				bool offset_uv;
+
+				// needed for emplace_back
+				PrimitiveInfo(
+						unsigned triangle_index,
+						int scissor_index = -1,
+						HdTextureHandle hd_texture_index = HdTextureHandle::make_none(),
+						bool filtering = false,
+						bool scaled_read = false,
+						unsigned shift = 0,
+						bool offset_uv = false
+					     )
+					: triangle_index(triangle_index), scissor_index(scissor_index), hd_texture_index(hd_texture_index),
+					filtering(filtering), scaled_read(scaled_read), shift(shift), offset_uv(offset_uv)
+				{}
+			};
+
+			POD_VEC_DECLARE(BufferVertexVec, BufferVertex);
+			POD_VEC_DECLARE(PrimitiveInfoVec, PrimitiveInfo);
+			POD_VEC_DECLARE(SemiTransparentStateVec, SemiTransparentState);
+			POD_VEC_DECLARE(BlitInfoVec, BlitInfo);
+			POD_VEC_DECLARE(ClearCandidateVec, ClearCandidate);
+			POD_VEC_DECLARE(Rect2DVec, VkRect2D);
+
+			struct OpaqueQueue
+			{
+				// Non-textured primitives.
+				BufferVertexVec opaque{};
+				PrimitiveInfoVec opaque_scissor{};
+
+				// Textured primitives, no semi-transparency.
+				BufferVertexVec opaque_textured{};
+				PrimitiveInfoVec opaque_textured_scissor{};
+
+				// Textured primitives, semi-transparency enabled.
+				BufferVertexVec semi_transparent_opaque{};
+				PrimitiveInfoVec semi_transparent_opaque_scissor{};
+
+				BufferVertexVec semi_transparent{};
+				SemiTransparentStateVec semi_transparent_state{};
+
+				std::vector<Vulkan::ImageHandle> textures; // refcounted handles: std::vector is correct
+
+				Rect2DVec scaled_resolves{};
+				Rect2DVec unscaled_resolves{};
+				BlitInfoVec scaled_blits{};
+				BlitInfoVec scaled_masked_blits{};
+				BlitInfoVec unscaled_blits{};
+				BlitInfoVec unscaled_masked_blits{};
+
+				Rect2DVec scissors{};
+				ClearCandidateVec clear_candidates{};
+				VkRect2D default_scissor;
+				bool scissor_invariant = false;
+			} queue;
+			unsigned primitive_index = 0;
+			bool render_pass_is_feedback = false;
+			float last_uv_scale_x, last_uv_scale_y;
+
+			void dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured = false);
+			static bool primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b);
+			void render_opaque_primitives();
+			void render_opaque_texture_primitives();
+			void render_semi_transparent_opaque_texture_primitives();
+			void render_semi_transparent_primitives();
+			void semi_transparent_set_state(const SemiTransparentState &state);
+			void dispatch_set_scaled_read_texture(bool scaled_read, bool textured);
+			void reset_queue();
+
+			float allocate_depth(Domain domain, const Rect &rect);
+
+			void build_attribs(BufferVertex *verts, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index,
+					bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv);
+			void build_line_quad(Vertex *quad, const Vertex *line);
+			BufferVertexVec *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
+					bool filtering, bool scaled_read, unsigned shift, bool offset_uv);
+			bool get_filer_exclude(FilterExclude exclude)
+			{
+				if (
+						render_state.primitive_type == PrimitiveType::Sprite &&
+						sprite_filter_exclude >= exclude
+				   )
+					return true;
+				if (
+						render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
+						polygon_2d_filter_exclude >= exclude
+				   )
+					return true;
+				return false;
+			}
+
+			void flush_resolves();
+			void flush_blits();
+			void flush_blit(const BlitInfoVec &infos, Vulkan::Program &program, bool scaled);
+			void reset_scissor_queue();
+			const ClearCandidate *find_clear_candidate(const Rect &rect) const;
+
+			Rect compute_window_rect(const TextureWindow &window);
+
+			Vulkan::ImageHandle last_scanout;
+			Vulkan::ImageHandle reuseable_scanout;
+			DisplayRect compute_display_rect();
+
+			Rect compute_vram_framebuffer_rect();
+
+			void mipmap_framebuffer();
+			void ssaa_framebuffer();
+			Vulkan::BufferHandle quad;
+	};
+
+	static const uint32_t quad_vert[] =
 #include "shaders_vulkan/prebuilt/quad.vert.inc"
-    ;
-static const uint32_t scaled_quad_frag[] =
+		;
+	static const uint32_t scaled_quad_frag[] =
 #include "shaders_vulkan/prebuilt/scaled.quad.frag.inc"
-    ;
-static const uint32_t scaled_dither_quad_frag[] =
+		;
+	static const uint32_t scaled_dither_quad_frag[] =
 #include "shaders_vulkan/prebuilt/scaled.dither.quad.frag.inc"
-    ;
-static const uint32_t bpp24_quad_frag[] =
+		;
+	static const uint32_t bpp24_quad_frag[] =
 #include "shaders_vulkan/prebuilt/bpp24.quad.frag.inc"
-    ;
-static const uint32_t bpp24_yuv_quad_frag[] =
+		;
+	static const uint32_t bpp24_yuv_quad_frag[] =
 #include "shaders_vulkan/prebuilt/bpp24.yuv.quad.frag.inc"
-    ;
-static const uint32_t unscaled_quad_frag[] =
+		;
+	static const uint32_t unscaled_quad_frag[] =
 #include "shaders_vulkan/prebuilt/unscaled.quad.frag.inc"
-    ;
-static const uint32_t unscaled_dither_quad_frag[] =
+		;
+	static const uint32_t unscaled_dither_quad_frag[] =
 #include "shaders_vulkan/prebuilt/unscaled.dither.quad.frag.inc"
-    ;
-static const uint32_t copy_vram_comp[] =
+		;
+	static const uint32_t copy_vram_comp[] =
 #include "shaders_vulkan/prebuilt/copy_vram.comp.inc"
-    ;
-static const uint32_t copy_vram_masked_comp[] =
+		;
+	static const uint32_t copy_vram_masked_comp[] =
 #include "shaders_vulkan/prebuilt/copy_vram.masked.comp.inc"
-    ;
-static const uint32_t resolve_to_scaled[] =
+		;
+	static const uint32_t resolve_to_scaled[] =
 #include "shaders_vulkan/prebuilt/resolve.scaled.comp.inc"
-    ;
-static const uint32_t resolve_to_msaa_scaled[] =
+		;
+	static const uint32_t resolve_to_msaa_scaled[] =
 #include "shaders_vulkan/prebuilt/resolve.msaa.scaled.comp.inc"
-    ;
-static const uint32_t resolve_to_unscaled[] =
+		;
+	static const uint32_t resolve_to_unscaled[] =
 #include "shaders_vulkan/prebuilt/resolve.unscaled.comp.inc"
-    ;
-static const uint32_t resolve_msaa_to_unscaled[] =
+		;
+	static const uint32_t resolve_msaa_to_unscaled[] =
 #include "shaders_vulkan/prebuilt/resolve.msaa.unscaled.comp.inc"
-    ;
+		;
 
-static const uint32_t flat_vert[] =
+	static const uint32_t flat_vert[] =
 #include "shaders_vulkan/prebuilt/flat.vert.inc"
-    ;
-static const uint32_t flat_unscaled_vert[] =
+		;
+	static const uint32_t flat_unscaled_vert[] =
 #include "shaders_vulkan/prebuilt/flat.unscaled.vert.inc"
-    ;
-static const uint32_t flat_frag[] =
+		;
+	static const uint32_t flat_frag[] =
 #include "shaders_vulkan/prebuilt/flat.frag.inc"
-    ;
-static const uint32_t textured_vert[] =
+		;
+	static const uint32_t textured_vert[] =
 #include "shaders_vulkan/prebuilt/textured.vert.inc"
-    ;
-static const uint32_t textured_unscaled_vert[] =
+		;
+	static const uint32_t textured_unscaled_vert[] =
 #include "shaders_vulkan/prebuilt/textured.unscaled.vert.inc"
-    ;
-static const uint32_t textured_frag[] =
+		;
+	static const uint32_t textured_frag[] =
 #include "shaders_vulkan/prebuilt/textured.frag.inc"
-    ;
-static const uint32_t textured_unscaled_frag[] =
+		;
+	static const uint32_t textured_unscaled_frag[] =
 #include "shaders_vulkan/prebuilt/textured.unscaled.frag.inc"
-    ;
-static const uint32_t textured_msaa_frag[] =
+		;
+	static const uint32_t textured_msaa_frag[] =
 #include "shaders_vulkan/prebuilt/textured.msaa.frag.inc"
-    ;
-static const uint32_t textured_msaa_unscaled_frag[] =
+		;
+	static const uint32_t textured_msaa_unscaled_frag[] =
 #include "shaders_vulkan/prebuilt/textured.msaa.unscaled.frag.inc"
-    ;
+		;
 
-static const uint32_t blit_vram_scaled_comp[] =
+	static const uint32_t blit_vram_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.scaled.comp.inc"
-    ;
-static const uint32_t blit_vram_scaled_masked_comp[] =
+		;
+	static const uint32_t blit_vram_scaled_masked_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.masked.scaled.comp.inc"
-    ;
-static const uint32_t blit_vram_cached_scaled_comp[] =
+		;
+	static const uint32_t blit_vram_cached_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.cached.scaled.comp.inc"
-    ;
-static const uint32_t blit_vram_cached_scaled_masked_comp[] =
+		;
+	static const uint32_t blit_vram_cached_scaled_masked_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.cached.masked.scaled.comp.inc"
-    ;
+		;
 
-static const uint32_t blit_vram_msaa_scaled_comp[] =
+	static const uint32_t blit_vram_msaa_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.msaa.scaled.comp.inc"
-    ;
-static const uint32_t blit_vram_msaa_scaled_masked_comp[] =
+		;
+	static const uint32_t blit_vram_msaa_scaled_masked_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.msaa.masked.scaled.comp.inc"
-    ;
-static const uint32_t blit_vram_msaa_cached_scaled_comp[] =
+		;
+	static const uint32_t blit_vram_msaa_cached_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.msaa.cached.scaled.comp.inc"
-    ;
-static const uint32_t blit_vram_msaa_cached_scaled_masked_comp[] =
+		;
+	static const uint32_t blit_vram_msaa_cached_scaled_masked_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.msaa.cached.masked.scaled.comp.inc"
-    ;
+		;
 
-static const uint32_t blit_vram_unscaled_comp[] =
+	static const uint32_t blit_vram_unscaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.unscaled.comp.inc"
-    ;
-static const uint32_t blit_vram_unscaled_masked_comp[] =
+		;
+	static const uint32_t blit_vram_unscaled_masked_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.masked.unscaled.comp.inc"
-    ;
+		;
 
-static const uint32_t blit_vram_cached_unscaled_comp[] =
+	static const uint32_t blit_vram_cached_unscaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.cached.unscaled.comp.inc"
-    ;
-static const uint32_t blit_vram_cached_unscaled_masked_comp[] =
+		;
+	static const uint32_t blit_vram_cached_unscaled_masked_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.cached.masked.unscaled.comp.inc"
-    ;
+		;
 
-static const uint32_t feedback_frag[] =
+	static const uint32_t feedback_frag[] =
 #include "shaders_vulkan/prebuilt/feedback.frag.inc"
-    ;
-static const uint32_t feedback_unscaled_frag[] =
+		;
+	static const uint32_t feedback_unscaled_frag[] =
 #include "shaders_vulkan/prebuilt/feedback.unscaled.frag.inc"
-    ;
-static const uint32_t feedback_flat_frag[] =
+		;
+	static const uint32_t feedback_flat_frag[] =
 #include "shaders_vulkan/prebuilt/feedback.flat.frag.inc"
-    ;
+		;
 
-static const uint32_t feedback_msaa_frag[] =
+	static const uint32_t feedback_msaa_frag[] =
 #include "shaders_vulkan/prebuilt/feedback.msaa.frag.inc"
-    ;
-static const uint32_t feedback_msaa_unscaled_frag[] =
+		;
+	static const uint32_t feedback_msaa_unscaled_frag[] =
 #include "shaders_vulkan/prebuilt/feedback.msaa.unscaled.frag.inc"
-    ;
-static const uint32_t feedback_msaa_flat_frag[] =
+		;
+	static const uint32_t feedback_msaa_flat_frag[] =
 #include "shaders_vulkan/prebuilt/feedback.msaa.flat.frag.inc"
-    ;
+		;
 
-static const uint32_t mipmap_vert[] =
+	static const uint32_t mipmap_vert[] =
 #include "shaders_vulkan/prebuilt/mipmap.vert.inc"
-    ;
-static const uint32_t mipmap_shifted_vert[] =
+		;
+	static const uint32_t mipmap_shifted_vert[] =
 #include "shaders_vulkan/prebuilt/mipmap.shifted.vert.inc"
-    ;
-static const uint32_t mipmap_energy_first_frag[] =
+		;
+	static const uint32_t mipmap_energy_first_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.energy.first.frag.inc"
-    ;
-static const uint32_t mipmap_resolve_frag[] =
+		;
+	static const uint32_t mipmap_resolve_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.resolve.frag.inc"
-    ;
-static const uint32_t mipmap_dither_resolve_frag[] =
+		;
+	static const uint32_t mipmap_dither_resolve_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.dither.resolve.frag.inc"
-    ;
-static const uint32_t mipmap_energy_frag[] =
+		;
+	static const uint32_t mipmap_energy_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.energy.frag.inc"
-    ;
-static const uint32_t mipmap_energy_blur_frag[] =
+		;
+	static const uint32_t mipmap_energy_blur_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.energy.blur.frag.inc"
-    ;
+		;
 }
 
 // 3 LSBs are ignored.
-static inline uint32_t fbcolor_to_rgba8(uint32_t color)
-{
-	return color & 0xfff8f8f8u;
-}
+#define FBCOLOR_TO_RGBA8(color) ((color) & 0xfff8f8f8u)
 
 static inline void fbcolor_to_rgba32f(float *v, uint32_t color)
 {
@@ -10202,11 +9995,10 @@ void Renderer::clear_quad(const Rect &rect, uint32_t fb_color, bool candidate)
 	float z = allocate_depth(Domain::Unscaled, rect);
 	atlas.set_texture_mode(old);
 
-	BufferVertex pos0 = { float(rect.x), float(rect.y), z, 1.0f, fbcolor_to_rgba8(fb_color) };
-	BufferVertex pos1 = { float(rect.x) + float(rect.width), float(rect.y), z, 1.0f, fbcolor_to_rgba8(fb_color) };
-	BufferVertex pos2 = { float(rect.x), float(rect.y) + float(rect.height), z, 1.0f, fbcolor_to_rgba8(fb_color) };
-	BufferVertex pos3 = { float(rect.x) + float(rect.width), float(rect.y) + float(rect.height), z, 1.0f,
-		                  fbcolor_to_rgba8(fb_color) };
+	BufferVertex pos0 = { float(rect.x), float(rect.y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
+	BufferVertex pos1 = { float(rect.x) + float(rect.width), float(rect.y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
+	BufferVertex pos2 = { float(rect.x), float(rect.y) + float(rect.height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
+	BufferVertex pos3 = { float(rect.x) + float(rect.width), float(rect.y) + float(rect.height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
 	queue.opaque.push(pos0);
 	queue.opaque.push(pos1);
 	queue.opaque.push(pos2);
@@ -13834,1315 +13626,1311 @@ ImageView &AttachmentAllocator::request_attachment(unsigned width, unsigned heig
 
 /* === command_buffer.cpp === */
 
-
 using namespace std;
 using namespace Util;
 
+#define COMBINER_NEEDS_BLEND_CONSTANT(factor) ((factor) == VK_BLEND_FACTOR_CONSTANT_COLOR || (factor) == VK_BLEND_FACTOR_CONSTANT_ALPHA)
+
 namespace Vulkan
 {
-static inline VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
-{
-	return { a.x + b.x, a.y + b.y, a.z + b.z };
-}
-
-static inline bool cb_needs_blend_constant(VkBlendFactor factor)
-{
-	return factor == VK_BLEND_FACTOR_CONSTANT_COLOR || factor == VK_BLEND_FACTOR_CONSTANT_ALPHA;
-}
-
-CommandBuffer::CommandBuffer(Device *device, VkCommandBuffer cmd, Type type)
-    : device(device)
-    , cmd(cmd)
-    , type(type)
-{
-	begin_compute();
-	set_opaque_state();
-	memset(&static_state, 0, sizeof(static_state));
-	memset(&bindings, 0, sizeof(bindings));
-}
-
-void CommandBuffer::copy_buffer(const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
-                                VkDeviceSize size)
-{
-	const VkBufferCopy region = {
-		src_offset, dst_offset, size,
-	};
-	vkCmdCopyBuffer(cmd, src.get_buffer(), dst.get_buffer(), 1, &region);
-}
-
-void CommandBuffer::copy_buffer_to_image(const Image &image, const Buffer &buffer, unsigned num_blits,
-                                         const VkBufferImageCopy *blits)
-{
-	vkCmdCopyBufferToImage(cmd, buffer.get_buffer(),
-	                       image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), num_blits, blits);
-}
-
-void CommandBuffer::copy_buffer_to_image(const Image &image, const Buffer &src, VkDeviceSize buffer_offset,
-                                         const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
-                                         unsigned slice_height, const VkImageSubresourceLayers &subresource)
-{
-	const VkBufferImageCopy region = {
-		buffer_offset,
-		row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
-		subresource, offset, extent,
-	};
-	vkCmdCopyBufferToImage(cmd, src.get_buffer(), image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
-	                       1, &region);
-}
-
-void CommandBuffer::copy_image_to_buffer(const Buffer &buffer, const Image &image, VkDeviceSize buffer_offset,
-                                         const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
-                                         unsigned slice_height, const VkImageSubresourceLayers &subresource)
-{
-	const VkBufferImageCopy region = {
-		buffer_offset,
-		row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
-		subresource, offset, extent,
-	};
-	vkCmdCopyImageToBuffer(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-	                       buffer.get_buffer(), 1, &region);
-}
-
-void CommandBuffer::clear_image(const Image &image, const VkClearValue &value)
-{
-	VK_ASSERT(!framebuffer);
-	VK_ASSERT(!actual_render_pass);
-
-	VkImageAspectFlags aspect = format_to_aspect_mask(image.get_format());
-	VkImageSubresourceRange range = {};
-	range.aspectMask = aspect;
-	range.baseArrayLayer = 0;
-	range.baseMipLevel = 0;
-	range.levelCount = image.get_create_info().levels;
-	range.layerCount = image.get_create_info().layers;
-	if (aspect & VK_IMAGE_ASPECT_COLOR_BIT)
+	static inline VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 	{
-		vkCmdClearColorImage(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
-		                     &value.color, 1, &range);
+		return { a.x + b.x, a.y + b.y, a.z + b.z };
 	}
-	else
+
+	CommandBuffer::CommandBuffer(Device *device, VkCommandBuffer cmd, Type type)
+		: device(device)
+		  , cmd(cmd)
+		  , type(type)
 	{
-		vkCmdClearDepthStencilImage(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
-		                            &value.depthStencil, 1, &range);
+		begin_compute();
+		set_opaque_state();
+		memset(&static_state, 0, sizeof(static_state));
+		memset(&bindings, 0, sizeof(bindings));
 	}
-}
 
-void CommandBuffer::full_barrier()
-{
-	VK_ASSERT(!actual_render_pass);
-	VK_ASSERT(!framebuffer);
-	barrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-	        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT |
-	            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
-	        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-	        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-	            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-	            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT);
-}
-
-void CommandBuffer::pixel_barrier()
-{
-	VK_ASSERT(actual_render_pass);
-	VK_ASSERT(framebuffer);
-	VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-	barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-	                     VK_DEPENDENCY_BY_REGION_BIT, 1, &barrier, 0, nullptr, 0, nullptr);
-}
-
-static inline void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
-{
-	// ALL_GRAPHICS_BIT waits for vertex as well which causes performance issues on some drivers.
-	// It shouldn't matter, but hey.
-	//
-	// We aren't using vertex with side-effects on relevant hardware so dropping VERTEX_SHADER_BIT is fine.
-	if ((src_stages & VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT) != 0 && fixup)
+	void CommandBuffer::copy_buffer(const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
+			VkDeviceSize size)
 	{
-		src_stages &= ~VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-		src_stages |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-		              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-		              VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		const VkBufferCopy region = {
+			src_offset, dst_offset, size,
+		};
+		vkCmdCopyBuffer(cmd, src.get_buffer(), dst.get_buffer(), 1, &region);
 	}
-}
 
-void CommandBuffer::barrier(VkPipelineStageFlags src_stages, VkAccessFlags src_access, VkPipelineStageFlags dst_stages,
-                            VkAccessFlags dst_access)
-{
-	VK_ASSERT(!actual_render_pass);
-	VK_ASSERT(!framebuffer);
-	VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-	barrier.srcAccessMask = src_access;
-	barrier.dstAccessMask = dst_access;
-	fixup_src_stage(src_stages, device->get_workarounds().optimize_all_graphics_barrier);
-	vkCmdPipelineBarrier(cmd, src_stages, dst_stages, 0, 1, &barrier, 0, nullptr, 0, nullptr);
-}
-
-void CommandBuffer::barrier(VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages, unsigned barriers,
-                            const VkMemoryBarrier *globals, unsigned buffer_barriers,
-                            const VkBufferMemoryBarrier *buffers, unsigned image_barriers,
-                            const VkImageMemoryBarrier *images)
-{
-	VK_ASSERT(!actual_render_pass);
-	VK_ASSERT(!framebuffer);
-	fixup_src_stage(src_stages, device->get_workarounds().optimize_all_graphics_barrier);
-	vkCmdPipelineBarrier(cmd, src_stages, dst_stages, 0, barriers, globals, buffer_barriers, buffers, image_barriers, images);
-}
-
-void CommandBuffer::image_barrier(const Image &image, VkImageLayout old_layout, VkImageLayout new_layout,
-                                  VkPipelineStageFlags src_stages, VkAccessFlags src_access,
-                                  VkPipelineStageFlags dst_stages, VkAccessFlags dst_access)
-{
-	VK_ASSERT(!actual_render_pass);
-	VK_ASSERT(!framebuffer);
-	VK_ASSERT(image.get_create_info().domain != ImageDomain::Transient);
-
-	VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-	barrier.srcAccessMask = src_access;
-	barrier.dstAccessMask = dst_access;
-	barrier.oldLayout = old_layout;
-	barrier.newLayout = new_layout;
-	barrier.image = image.get_image();
-	barrier.subresourceRange.aspectMask = format_to_aspect_mask(image.get_create_info().format);
-	barrier.subresourceRange.levelCount = image.get_create_info().levels;
-	barrier.subresourceRange.layerCount = image.get_create_info().layers;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-
-	fixup_src_stage(src_stages, device->get_workarounds().optimize_all_graphics_barrier);
-	vkCmdPipelineBarrier(cmd, src_stages, dst_stages, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-}
-
-void CommandBuffer::barrier_prepare_generate_mipmap(const Image &image, VkImageLayout base_level_layout,
-                                                    VkPipelineStageFlags src_stage, VkAccessFlags src_access,
-                                                    bool need_top_level_barrier)
-{
-	const ImageCreateInfo &create_info = image.get_create_info();
-	VkImageMemoryBarrier barriers[2] = {};
-	VK_ASSERT(create_info.levels > 1);
-	(void)create_info;
-
-	for (unsigned i = 0; i < 2; i++)
+	void CommandBuffer::copy_buffer_to_image(const Image &image, const Buffer &buffer, unsigned num_blits,
+			const VkBufferImageCopy *blits)
 	{
-		barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		barriers[i].image = image.get_image();
-		barriers[i].subresourceRange.aspectMask = format_to_aspect_mask(image.get_format());
-		barriers[i].subresourceRange.layerCount = image.get_create_info().layers;
-		barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		vkCmdCopyBufferToImage(cmd, buffer.get_buffer(),
+				image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), num_blits, blits);
+	}
 
-		if (i == 0)
+	void CommandBuffer::copy_buffer_to_image(const Image &image, const Buffer &src, VkDeviceSize buffer_offset,
+			const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
+			unsigned slice_height, const VkImageSubresourceLayers &subresource)
+	{
+		const VkBufferImageCopy region = {
+			buffer_offset,
+			row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
+			subresource, offset, extent,
+		};
+		vkCmdCopyBufferToImage(cmd, src.get_buffer(), image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+				1, &region);
+	}
+
+	void CommandBuffer::copy_image_to_buffer(const Buffer &buffer, const Image &image, VkDeviceSize buffer_offset,
+			const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
+			unsigned slice_height, const VkImageSubresourceLayers &subresource)
+	{
+		const VkBufferImageCopy region = {
+			buffer_offset,
+			row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
+			subresource, offset, extent,
+		};
+		vkCmdCopyImageToBuffer(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+				buffer.get_buffer(), 1, &region);
+	}
+
+	void CommandBuffer::clear_image(const Image &image, const VkClearValue &value)
+	{
+		VK_ASSERT(!framebuffer);
+		VK_ASSERT(!actual_render_pass);
+
+		VkImageAspectFlags aspect = format_to_aspect_mask(image.get_format());
+		VkImageSubresourceRange range = {};
+		range.aspectMask = aspect;
+		range.baseArrayLayer = 0;
+		range.baseMipLevel = 0;
+		range.levelCount = image.get_create_info().levels;
+		range.layerCount = image.get_create_info().layers;
+		if (aspect & VK_IMAGE_ASPECT_COLOR_BIT)
 		{
-			barriers[i].oldLayout = base_level_layout;
-			barriers[i].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-			barriers[i].srcAccessMask = src_access;
-			barriers[i].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-			barriers[i].subresourceRange.baseMipLevel = 0;
-			barriers[i].subresourceRange.levelCount = 1;
+			vkCmdClearColorImage(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+					&value.color, 1, &range);
 		}
 		else
 		{
-			barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			barriers[i].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-			barriers[i].srcAccessMask = 0;
-			barriers[i].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			barriers[i].subresourceRange.baseMipLevel = 1;
-			barriers[i].subresourceRange.levelCount = image.get_create_info().levels - 1;
+			vkCmdClearDepthStencilImage(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+					&value.depthStencil, 1, &range);
 		}
 	}
 
-	barrier(src_stage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, nullptr, 0, nullptr,
-	        need_top_level_barrier ? 2 : 1,
-	        need_top_level_barrier ? barriers : barriers + 1);
-}
-
-void CommandBuffer::generate_mipmap(const Image &image)
-{
-	const ImageCreateInfo &create_info = image.get_create_info();
-	VkOffset3D size = { int(create_info.width), int(create_info.height), int(create_info.depth) };
-	const VkOffset3D origin = { 0, 0, 0 };
-
-	VK_ASSERT(image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-	VkImageMemoryBarrier b = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-	b.image = image.get_image();
-	b.subresourceRange.levelCount = 1;
-	b.subresourceRange.layerCount = image.get_create_info().layers;
-	b.subresourceRange.aspectMask = format_to_aspect_mask(image.get_format());
-	b.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-	b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-	b.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-	b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-
-	for (unsigned i = 1; i < create_info.levels; i++)
+	void CommandBuffer::full_barrier()
 	{
-		VkOffset3D src_size = size;
-		size.x >>= 1;
-		size.y >>= 1;
-		size.z >>= 1;
-		if (size.x < 1) size.x = 1;
-		if (size.y < 1) size.y = 1;
-		if (size.z < 1) size.z = 1;
-
-		blit_image(image, image,
-		           origin, size, origin, src_size, i, i - 1, 0, 0, create_info.layers, VK_FILTER_LINEAR);
-
-		b.subresourceRange.baseMipLevel = i;
-		barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-		        0, nullptr, 0, nullptr, 1, &b);
+		VK_ASSERT(!actual_render_pass);
+		VK_ASSERT(!framebuffer);
+		barrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT |
+				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
+				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT);
 	}
-}
 
-void CommandBuffer::blit_image(const Image &dst, const Image &src,
-                               const VkOffset3D &dst_offset,
-                               const VkOffset3D &dst_extent, const VkOffset3D &src_offset, const VkOffset3D &src_extent,
-                               unsigned dst_level, unsigned src_level, unsigned dst_base_layer, unsigned src_base_layer,
-                               unsigned num_layers, VkFilter filter)
-{
-	// RADV workaround: blit one layer at a time.
-	for (unsigned i = 0; i < num_layers; i++)
+	void CommandBuffer::pixel_barrier()
 	{
-		const VkImageBlit blit = {
+		VK_ASSERT(actual_render_pass);
+		VK_ASSERT(framebuffer);
+		VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+		barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				VK_DEPENDENCY_BY_REGION_BIT, 1, &barrier, 0, nullptr, 0, nullptr);
+	}
+
+	static inline void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
+	{
+		// ALL_GRAPHICS_BIT waits for vertex as well which causes performance issues on some drivers.
+		// It shouldn't matter, but hey.
+		//
+		// We aren't using vertex with side-effects on relevant hardware so dropping VERTEX_SHADER_BIT is fine.
+		if ((src_stages & VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT) != 0 && fixup)
+		{
+			src_stages &= ~VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+			src_stages |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+				VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		}
+	}
+
+	void CommandBuffer::barrier(VkPipelineStageFlags src_stages, VkAccessFlags src_access, VkPipelineStageFlags dst_stages,
+			VkAccessFlags dst_access)
+	{
+		VK_ASSERT(!actual_render_pass);
+		VK_ASSERT(!framebuffer);
+		VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+		barrier.srcAccessMask = src_access;
+		barrier.dstAccessMask = dst_access;
+		fixup_src_stage(src_stages, device->get_workarounds().optimize_all_graphics_barrier);
+		vkCmdPipelineBarrier(cmd, src_stages, dst_stages, 0, 1, &barrier, 0, nullptr, 0, nullptr);
+	}
+
+	void CommandBuffer::barrier(VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages, unsigned barriers,
+			const VkMemoryBarrier *globals, unsigned buffer_barriers,
+			const VkBufferMemoryBarrier *buffers, unsigned image_barriers,
+			const VkImageMemoryBarrier *images)
+	{
+		VK_ASSERT(!actual_render_pass);
+		VK_ASSERT(!framebuffer);
+		fixup_src_stage(src_stages, device->get_workarounds().optimize_all_graphics_barrier);
+		vkCmdPipelineBarrier(cmd, src_stages, dst_stages, 0, barriers, globals, buffer_barriers, buffers, image_barriers, images);
+	}
+
+	void CommandBuffer::image_barrier(const Image &image, VkImageLayout old_layout, VkImageLayout new_layout,
+			VkPipelineStageFlags src_stages, VkAccessFlags src_access,
+			VkPipelineStageFlags dst_stages, VkAccessFlags dst_access)
+	{
+		VK_ASSERT(!actual_render_pass);
+		VK_ASSERT(!framebuffer);
+		VK_ASSERT(image.get_create_info().domain != ImageDomain::Transient);
+
+		VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+		barrier.srcAccessMask = src_access;
+		barrier.dstAccessMask = dst_access;
+		barrier.oldLayout = old_layout;
+		barrier.newLayout = new_layout;
+		barrier.image = image.get_image();
+		barrier.subresourceRange.aspectMask = format_to_aspect_mask(image.get_create_info().format);
+		barrier.subresourceRange.levelCount = image.get_create_info().levels;
+		barrier.subresourceRange.layerCount = image.get_create_info().layers;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+		fixup_src_stage(src_stages, device->get_workarounds().optimize_all_graphics_barrier);
+		vkCmdPipelineBarrier(cmd, src_stages, dst_stages, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+	}
+
+	void CommandBuffer::barrier_prepare_generate_mipmap(const Image &image, VkImageLayout base_level_layout,
+			VkPipelineStageFlags src_stage, VkAccessFlags src_access,
+			bool need_top_level_barrier)
+	{
+		const ImageCreateInfo &create_info = image.get_create_info();
+		VkImageMemoryBarrier barriers[2] = {};
+		VK_ASSERT(create_info.levels > 1);
+		(void)create_info;
+
+		for (unsigned i = 0; i < 2; i++)
+		{
+			barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barriers[i].image = image.get_image();
+			barriers[i].subresourceRange.aspectMask = format_to_aspect_mask(image.get_format());
+			barriers[i].subresourceRange.layerCount = image.get_create_info().layers;
+			barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+			if (i == 0)
+			{
+				barriers[i].oldLayout = base_level_layout;
+				barriers[i].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+				barriers[i].srcAccessMask = src_access;
+				barriers[i].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+				barriers[i].subresourceRange.baseMipLevel = 0;
+				barriers[i].subresourceRange.levelCount = 1;
+			}
+			else
+			{
+				barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+				barriers[i].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+				barriers[i].srcAccessMask = 0;
+				barriers[i].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+				barriers[i].subresourceRange.baseMipLevel = 1;
+				barriers[i].subresourceRange.levelCount = image.get_create_info().levels - 1;
+			}
+		}
+
+		barrier(src_stage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, nullptr, 0, nullptr,
+				need_top_level_barrier ? 2 : 1,
+				need_top_level_barrier ? barriers : barriers + 1);
+	}
+
+	void CommandBuffer::generate_mipmap(const Image &image)
+	{
+		const ImageCreateInfo &create_info = image.get_create_info();
+		VkOffset3D size = { int(create_info.width), int(create_info.height), int(create_info.depth) };
+		const VkOffset3D origin = { 0, 0, 0 };
+
+		VK_ASSERT(image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+		VkImageMemoryBarrier b = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+		b.image = image.get_image();
+		b.subresourceRange.levelCount = 1;
+		b.subresourceRange.layerCount = image.get_create_info().layers;
+		b.subresourceRange.aspectMask = format_to_aspect_mask(image.get_format());
+		b.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		b.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+		for (unsigned i = 1; i < create_info.levels; i++)
+		{
+			VkOffset3D src_size = size;
+			size.x >>= 1;
+			size.y >>= 1;
+			size.z >>= 1;
+			if (size.x < 1) size.x = 1;
+			if (size.y < 1) size.y = 1;
+			if (size.z < 1) size.z = 1;
+
+			blit_image(image, image,
+					origin, size, origin, src_size, i, i - 1, 0, 0, create_info.layers, VK_FILTER_LINEAR);
+
+			b.subresourceRange.baseMipLevel = i;
+			barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+					0, nullptr, 0, nullptr, 1, &b);
+		}
+	}
+
+	void CommandBuffer::blit_image(const Image &dst, const Image &src,
+			const VkOffset3D &dst_offset,
+			const VkOffset3D &dst_extent, const VkOffset3D &src_offset, const VkOffset3D &src_extent,
+			unsigned dst_level, unsigned src_level, unsigned dst_base_layer, unsigned src_base_layer,
+			unsigned num_layers, VkFilter filter)
+	{
+		// RADV workaround: blit one layer at a time.
+		for (unsigned i = 0; i < num_layers; i++)
+		{
+			const VkImageBlit blit = {
 				{ format_to_aspect_mask(src.get_create_info().format), src_level, src_base_layer + i, 1 },
 				{ src_offset,                                          cb_add_offset(src_offset, src_extent) },
 				{ format_to_aspect_mask(dst.get_create_info().format), dst_level, dst_base_layer + i, 1 },
 				{ dst_offset,                                          cb_add_offset(dst_offset, dst_extent) },
-		};
+			};
 
-		vkCmdBlitImage(cmd,
-		               src.get_image(), src.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-		               dst.get_image(), dst.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
-		               1, &blit, filter);
-	}
-}
-
-void CommandBuffer::begin_context()
-{
-	dirty = ~0u;
-	dirty_sets = ~0u;
-	dirty_vbos = ~0u;
-	current_pipeline = VK_NULL_HANDLE;
-	current_pipeline_layout = VK_NULL_HANDLE;
-	current_layout = nullptr;
-	current_program = nullptr;
-	memset(bindings.cookies, 0, sizeof(bindings.cookies));
-	memset(bindings.secondary_cookies, 0, sizeof(bindings.secondary_cookies));
-	memset(vbo.buffers, 0, sizeof(vbo.buffers));
-}
-
-void CommandBuffer::init_viewport_scissor(const RenderPassInfo &info, const Framebuffer *framebuffer)
-{
-	const uint32_t fb_w = framebuffer->get_width();
-	const uint32_t fb_h = framebuffer->get_height();
-	VkRect2D rect = info.render_area;
-	if (uint32_t(rect.offset.x) > fb_w) rect.offset.x = int32_t(fb_w);
-	if (uint32_t(rect.offset.y) > fb_h) rect.offset.y = int32_t(fb_h);
-	{
-		uint32_t w_avail = fb_w - uint32_t(rect.offset.x);
-		uint32_t h_avail = fb_h - uint32_t(rect.offset.y);
-		if (w_avail < rect.extent.width)  rect.extent.width  = w_avail;
-		if (h_avail < rect.extent.height) rect.extent.height = h_avail;
-	}
-
-	viewport = { 0.0f, 0.0f, float(fb_w), float(fb_h), 0.0f, 1.0f };
-	scissor = rect;
-}
-
-void CommandBuffer::begin_render_pass(const RenderPassInfo &info, VkSubpassContents contents)
-{
-	VK_ASSERT(!framebuffer);
-	VK_ASSERT(!compatible_render_pass);
-	VK_ASSERT(!actual_render_pass);
-
-	framebuffer = &device->request_framebuffer(info);
-	compatible_render_pass = &framebuffer->get_compatible_render_pass();
-	actual_render_pass = &device->request_render_pass(info, false);
-
-	init_viewport_scissor(info, framebuffer);
-
-	VkClearValue clear_values[VULKAN_NUM_ATTACHMENTS + 1];
-	unsigned num_clear_values = 0;
-
-	for (unsigned i = 0; i < info.num_color_attachments; i++)
-	{
-		VK_ASSERT(info.color_attachments[i]);
-		if (info.clear_attachments & (1u << i))
-		{
-			clear_values[i].color = info.clear_color[i];
-			num_clear_values = i + 1;
+			vkCmdBlitImage(cmd,
+					src.get_image(), src.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+					dst.get_image(), dst.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+					1, &blit, filter);
 		}
 	}
 
-	if (info.depth_stencil && (info.op_flags & RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT) != 0)
+	void CommandBuffer::begin_context()
 	{
-		clear_values[info.num_color_attachments].depthStencil = info.clear_depth_stencil;
-		num_clear_values = info.num_color_attachments + 1;
-	}
-
-	VkRenderPassBeginInfo begin_info = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-	begin_info.renderPass = actual_render_pass->get_render_pass();
-	begin_info.framebuffer = framebuffer->get_framebuffer();
-	begin_info.renderArea = scissor;
-	begin_info.clearValueCount = num_clear_values;
-	begin_info.pClearValues = clear_values;
-
-	vkCmdBeginRenderPass(cmd, &begin_info, contents);
-
-	current_contents = contents;
-	begin_graphics();
-}
-
-void CommandBuffer::end_render_pass()
-{
-	VK_ASSERT(framebuffer);
-	VK_ASSERT(actual_render_pass);
-	VK_ASSERT(compatible_render_pass);
-
-	vkCmdEndRenderPass(cmd);
-
-	framebuffer = nullptr;
-	actual_render_pass = nullptr;
-	compatible_render_pass = nullptr;
-	begin_compute();
-}
-
-VkPipeline CommandBuffer::build_compute_pipeline(Hash hash)
-{
-	const Shader &shader = *current_program->get_shader(ShaderStage::Compute);
-	VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-	info.layout = current_program->get_pipeline_layout()->get_layout();
-	info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	info.stage.module = shader.get_module();
-	info.stage.pName = "main";
-	info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-
-#ifdef GRANITE_SPIRV_DUMP
-	LOGI("Compiling SPIR-V file: (%s) %s\n",
-		     Shader::stage_to_name(ShaderStage::Compute),
-		     (to_string(shader.get_hash()) + ".spv").c_str());
-#endif
-
-	VkSpecializationInfo spec_info = {};
-	VkSpecializationMapEntry spec_entries[VULKAN_NUM_SPEC_CONSTANTS];
-	uint32_t mask = current_layout->get_resource_layout().combined_spec_constant_mask &
-	            static_state.state.spec_constant_mask;
-
-	if (mask)
-	{
-		info.stage.pSpecializationInfo = &spec_info;
-		spec_info.pData = potential_static_state.spec_constants;
-		spec_info.dataSize = sizeof(potential_static_state.spec_constants);
-		spec_info.pMapEntries = spec_entries;
-
-		FOR_EACH_BIT(mask, bit)
-		{
-			VkSpecializationMapEntry &entry = spec_entries[spec_info.mapEntryCount++];
-			entry.offset = sizeof(uint32_t) * bit;
-			entry.size = sizeof(uint32_t);
-			entry.constantID = bit;
-				}
-	}
-
-	VkPipeline compute_pipeline;
-
-	LOGI("Creating compute pipeline.\n");
-	if (vkCreateComputePipelines(device->get_device(), VK_NULL_HANDLE, 1, &info, nullptr, &compute_pipeline) != VK_SUCCESS)
-		LOGE("Failed to create compute pipeline!\n");
-
-	return current_program->add_pipeline(hash, compute_pipeline);
-}
-
-VkPipeline CommandBuffer::build_graphics_pipeline(Hash hash)
-{
-	// Viewport state
-	VkPipelineViewportStateCreateInfo vp = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
-	vp.viewportCount = 1;
-	vp.scissorCount = 1;
-
-	// Dynamic state
-	VkPipelineDynamicStateCreateInfo dyn = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
-	dyn.dynamicStateCount = 2;
-	static const VkDynamicState states[2] = {
-		VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_VIEWPORT,
-	};
-	dyn.pDynamicStates = states;
-
-	// Blend state
-	VkPipelineColorBlendAttachmentState blend_attachments[VULKAN_NUM_ATTACHMENTS];
-	VkPipelineColorBlendStateCreateInfo blend = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-	blend.attachmentCount = compatible_render_pass->get_num_color_attachments(current_subpass);
-	blend.pAttachments = blend_attachments;
-	for (unsigned i = 0; i < blend.attachmentCount; i++)
-	{
-		VkPipelineColorBlendAttachmentState &att = blend_attachments[i];
-		att = {};
-
-		if (compatible_render_pass->get_color_attachment(current_subpass, i).attachment != VK_ATTACHMENT_UNUSED &&
-			(current_layout->get_resource_layout().render_target_mask & (1u << i)))
-		{
-			att.colorWriteMask = 0xf;
-			att.blendEnable = static_state.state.blend_enable;
-			if (att.blendEnable)
-			{
-				att.alphaBlendOp = static_cast<VkBlendOp>(static_state.state.alpha_blend_op);
-				att.colorBlendOp = static_cast<VkBlendOp>(static_state.state.color_blend_op);
-				att.dstAlphaBlendFactor = static_cast<VkBlendFactor>(static_state.state.dst_alpha_blend);
-				att.srcAlphaBlendFactor = static_cast<VkBlendFactor>(static_state.state.src_alpha_blend);
-				att.dstColorBlendFactor = static_cast<VkBlendFactor>(static_state.state.dst_color_blend);
-				att.srcColorBlendFactor = static_cast<VkBlendFactor>(static_state.state.src_color_blend);
-			}
-		}
-	}
-	memcpy(blend.blendConstants, potential_static_state.blend_constants, sizeof(blend.blendConstants));
-
-	// Depth state
-	VkPipelineDepthStencilStateCreateInfo ds = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-	ds.depthTestEnable = compatible_render_pass->has_depth(current_subpass) && static_state.state.depth_test;
-	ds.depthWriteEnable = compatible_render_pass->has_depth(current_subpass) && static_state.state.depth_write;
-
-	if (ds.depthTestEnable)
-		ds.depthCompareOp = static_cast<VkCompareOp>(static_state.state.depth_compare);
-
-	// Vertex input
-	VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
-	VkVertexInputAttributeDescription vi_attribs[VULKAN_NUM_VERTEX_ATTRIBS];
-	vi.pVertexAttributeDescriptions = vi_attribs;
-	uint32_t attr_mask = current_layout->get_resource_layout().attribute_mask;
-	uint32_t binding_mask = 0;
-	FOR_EACH_BIT(attr_mask, bit)
-	{
-		VkVertexInputAttributeDescription &attr = vi_attribs[vi.vertexAttributeDescriptionCount++];
-		attr.location = bit;
-		attr.binding = attribs[bit].binding;
-		attr.format = attribs[bit].format;
-		attr.offset = attribs[bit].offset;
-		binding_mask |= 1u << attr.binding;
-		}
-
-	VkVertexInputBindingDescription vi_bindings[VULKAN_NUM_VERTEX_BUFFERS];
-	vi.pVertexBindingDescriptions = vi_bindings;
-	FOR_EACH_BIT(binding_mask, bit)
-	{
-		VkVertexInputBindingDescription &bind = vi_bindings[vi.vertexBindingDescriptionCount++];
-		bind.binding = bit;
-		bind.inputRate = vbo.input_rates[bit];
-		bind.stride = vbo.strides[bit];
-		}
-
-	// Input assembly
-	VkPipelineInputAssemblyStateCreateInfo ia = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-	ia.topology = static_cast<VkPrimitiveTopology>(static_state.state.topology);
-
-	// Multisample
-	VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-	ms.rasterizationSamples = static_cast<VkSampleCountFlagBits>(compatible_render_pass->get_sample_count(current_subpass));
-
-	if (compatible_render_pass->get_sample_count(current_subpass) > 1)
-	{
-		ms.alphaToCoverageEnable = static_state.state.alpha_to_coverage;
-		ms.alphaToOneEnable = static_state.state.alpha_to_one;
-		ms.sampleShadingEnable = static_state.state.sample_shading;
-		ms.minSampleShading = 1.0f;
-	}
-
-	// Raster
-	VkPipelineRasterizationStateCreateInfo raster = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-	raster.cullMode = static_cast<VkCullModeFlags>(static_state.state.cull_mode);
-	raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	raster.lineWidth = 1.0f;
-	raster.polygonMode = VK_POLYGON_MODE_FILL;
-
-	// Stages
-	VkPipelineShaderStageCreateInfo stages[static_cast<unsigned>(ShaderStage::Count)];
-	unsigned num_stages = 0;
-
-	VkSpecializationInfo spec_info[(unsigned)ShaderStage::Count] = {};
-	VkSpecializationMapEntry spec_entries[(unsigned)ShaderStage::Count][VULKAN_NUM_SPEC_CONSTANTS];
-
-	for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage::Count); i++)
-	{
-		ShaderStage stage = static_cast<ShaderStage>(i);
-		if (current_program->get_shader(stage))
-		{
-			VkPipelineShaderStageCreateInfo &s = stages[num_stages++];
-			s = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-			s.module = current_program->get_shader(stage)->get_module();
-#ifdef GRANITE_SPIRV_DUMP
-			LOGI("Compiling SPIR-V file: (%s) %s\n",
-			     Shader::stage_to_name(stage),
-			     (to_string(current_program->get_shader(stage)->get_hash()) + ".spv").c_str());
-#endif
-			s.pName = "main";
-			s.stage = static_cast<VkShaderStageFlagBits>(1u << i);
-
-			uint32_t mask = current_layout->get_resource_layout().spec_constant_mask[i] &
-			            static_state.state.spec_constant_mask;
-
-			if (mask)
-			{
-				s.pSpecializationInfo = &spec_info[i];
-				spec_info[i].pData = potential_static_state.spec_constants;
-				spec_info[i].dataSize = sizeof(potential_static_state.spec_constants);
-				spec_info[i].pMapEntries = spec_entries[i];
-
-				FOR_EACH_BIT(mask, bit)
-				{
-					VkSpecializationMapEntry &entry = spec_entries[i][spec_info[i].mapEntryCount++];
-					entry.offset = sizeof(uint32_t) * bit;
-					entry.size = sizeof(uint32_t);
-					entry.constantID = bit;
-								}
-			}
-		}
-	}
-
-	VkGraphicsPipelineCreateInfo pipe = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-	pipe.layout = current_pipeline_layout;
-	pipe.renderPass = compatible_render_pass->get_render_pass();
-	pipe.subpass = current_subpass;
-
-	pipe.pViewportState = &vp;
-	pipe.pDynamicState = &dyn;
-	pipe.pColorBlendState = &blend;
-	pipe.pDepthStencilState = &ds;
-	pipe.pVertexInputState = &vi;
-	pipe.pInputAssemblyState = &ia;
-	pipe.pMultisampleState = &ms;
-	pipe.pRasterizationState = &raster;
-	pipe.pStages = stages;
-	pipe.stageCount = num_stages;
-
-	VkPipeline pipeline;
-
-	LOGI("Creating graphics pipeline.\n");
-	VkResult res = vkCreateGraphicsPipelines(device->get_device(), VK_NULL_HANDLE, 1, &pipe, nullptr, &pipeline);
-	if (res != VK_SUCCESS)
-		LOGE("Failed to create graphics pipeline!\n");
-
-	return current_program->add_pipeline(hash, pipeline);
-}
-
-void CommandBuffer::flush_compute_pipeline()
-{
-	Hasher h;
-	h.u64(current_program->get_hash());
-
-	// Spec constants.
-	const CombinedResourceLayout &layout = current_layout->get_resource_layout();
-	uint32_t combined_spec_constant = layout.combined_spec_constant_mask;
-	combined_spec_constant &= static_state.state.spec_constant_mask;
-	h.u32(combined_spec_constant);
-	FOR_EACH_BIT(combined_spec_constant, bit)
-	{
-		h.u32(potential_static_state.spec_constants[bit]);
-		}
-
-	Hash hash = h.get();
-	current_pipeline = current_program->get_pipeline(hash);
-	if (current_pipeline == VK_NULL_HANDLE)
-		current_pipeline = build_compute_pipeline(hash);
-}
-
-void CommandBuffer::flush_graphics_pipeline()
-{
-	Hasher h;
-	active_vbos = 0;
-	const CombinedResourceLayout &layout = current_layout->get_resource_layout();
-	FOR_EACH_BIT(layout.attribute_mask, bit)
-	{
-		h.u32(bit);
-		active_vbos |= 1u << attribs[bit].binding;
-		h.u32(attribs[bit].binding);
-		h.u32(attribs[bit].format);
-		h.u32(attribs[bit].offset);
-		}
-
-	FOR_EACH_BIT(active_vbos, bit)
-	{
-		h.u32(vbo.input_rates[bit]);
-		h.u32(vbo.strides[bit]);
-		}
-
-	h.u64(compatible_render_pass->get_hash());
-	h.u32(current_subpass);
-	h.u64(current_program->get_hash());
-	h.data(static_state.words, sizeof(static_state.words));
-
-	if (static_state.state.blend_enable)
-	{
-		bool b0 = cb_needs_blend_constant(static_cast<VkBlendFactor>(static_state.state.src_color_blend));
-		bool b1 = cb_needs_blend_constant(static_cast<VkBlendFactor>(static_state.state.src_alpha_blend));
-		bool b2 = cb_needs_blend_constant(static_cast<VkBlendFactor>(static_state.state.dst_color_blend));
-		bool b3 = cb_needs_blend_constant(static_cast<VkBlendFactor>(static_state.state.dst_alpha_blend));
-		if (b0 || b1 || b2 || b3)
-			h.data(reinterpret_cast<uint32_t *>(potential_static_state.blend_constants),
-			       sizeof(potential_static_state.blend_constants));
-	}
-
-	// Spec constants.
-	uint32_t combined_spec_constant = layout.combined_spec_constant_mask;
-	combined_spec_constant &= static_state.state.spec_constant_mask;
-	h.u32(combined_spec_constant);
-	FOR_EACH_BIT(combined_spec_constant, bit)
-	{
-		h.u32(potential_static_state.spec_constants[bit]);
-		}
-
-	Hash hash = h.get();
-	current_pipeline = current_program->get_pipeline(hash);
-	if (current_pipeline == VK_NULL_HANDLE)
-		current_pipeline = build_graphics_pipeline(hash);
-}
-
-void CommandBuffer::flush_compute_state()
-{
-	VK_ASSERT(current_layout);
-	VK_ASSERT(current_program);
-
-	if (get_and_clear(COMMAND_BUFFER_DIRTY_PIPELINE_BIT))
-	{
-		VkPipeline old_pipe = current_pipeline;
-		flush_compute_pipeline();
-		if (old_pipe != current_pipeline)
-			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, current_pipeline);
-	}
-
-	flush_descriptor_sets();
-
-	if (get_and_clear(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
-	{
-		const VkPushConstantRange &range = current_layout->get_resource_layout().push_constant_range;
-		if (range.stageFlags != 0)
-		{
-			VK_ASSERT(range.offset == 0);
-			vkCmdPushConstants(cmd, current_pipeline_layout, range.stageFlags,
-			                   0, range.size,
-			                   bindings.push_constant_data);
-		}
-	}
-}
-
-void CommandBuffer::flush_render_state()
-{
-	VK_ASSERT(current_layout);
-	VK_ASSERT(current_program);
-
-	// We've invalidated pipeline state, update the VkPipeline.
-	if (get_and_clear(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT | COMMAND_BUFFER_DIRTY_PIPELINE_BIT |
-	                  COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT))
-	{
-		VkPipeline old_pipe = current_pipeline;
-		flush_graphics_pipeline();
-		if (old_pipe != current_pipeline)
-		{
-			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, current_pipeline);
-			set_dirty(COMMAND_BUFFER_DYNAMIC_BITS);
-		}
-	}
-
-	flush_descriptor_sets();
-
-	if (get_and_clear(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
-	{
-		const VkPushConstantRange &range = current_layout->get_resource_layout().push_constant_range;
-		if (range.stageFlags != 0)
-		{
-			VK_ASSERT(range.offset == 0);
-			vkCmdPushConstants(cmd, current_pipeline_layout, range.stageFlags,
-			                   0, range.size,
-			                   bindings.push_constant_data);
-		}
-	}
-
-	if (get_and_clear(COMMAND_BUFFER_DIRTY_VIEWPORT_BIT))
-		vkCmdSetViewport(cmd, 0, 1, &viewport);
-	if (get_and_clear(COMMAND_BUFFER_DIRTY_SCISSOR_BIT))
-		vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-	uint32_t update_vbo_mask = dirty_vbos & active_vbos;
-	FOR_EACH_BIT_RANGE(update_vbo_mask, binding, binding_count)
-	{
-#ifdef VULKAN_DEBUG
-		for (unsigned i = binding; i < binding + binding_count; i++)
-			VK_ASSERT(vbo.buffers[i] != VK_NULL_HANDLE);
-#endif
-		vkCmdBindVertexBuffers(cmd, binding, binding_count, vbo.buffers + binding, vbo.offsets + binding);
-		}
-	dirty_vbos &= ~update_vbo_mask;
-}
-
-void CommandBuffer::set_vertex_attrib(uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset)
-{
-	VK_ASSERT(attrib < VULKAN_NUM_VERTEX_ATTRIBS);
-	VK_ASSERT(framebuffer);
-
-	VertexAttribState &attr = attribs[attrib];
-
-	if (attr.binding != binding || attr.format != format || attr.offset != offset)
-		set_dirty(COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
-
-	VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
-
-	attr.binding = binding;
-	attr.format = format;
-	attr.offset = offset;
-}
-
-void CommandBuffer::set_vertex_binding(uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride,
-                                       VkVertexInputRate step_rate)
-{
-	VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
-	VK_ASSERT(framebuffer);
-
-	VkBuffer vkbuffer = buffer.get_buffer();
-	if (vbo.buffers[binding] != vkbuffer || vbo.offsets[binding] != offset)
-		dirty_vbos |= 1u << binding;
-	if (vbo.strides[binding] != stride || vbo.input_rates[binding] != step_rate)
-		set_dirty(COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
-
-	vbo.buffers[binding] = vkbuffer;
-	vbo.offsets[binding] = offset;
-	vbo.strides[binding] = stride;
-	vbo.input_rates[binding] = step_rate;
-}
-
-void CommandBuffer::set_scissor(const VkRect2D &rect)
-{
-	VK_ASSERT(framebuffer);
-	VK_ASSERT(rect.offset.x >= 0);
-	VK_ASSERT(rect.offset.y >= 0);
-	scissor = rect;
-	set_dirty(COMMAND_BUFFER_DIRTY_SCISSOR_BIT);
-}
-
-void CommandBuffer::push_constants(const void *data, VkDeviceSize offset, VkDeviceSize range)
-{
-	VK_ASSERT(offset + range <= VULKAN_PUSH_CONSTANT_SIZE);
-	memcpy(bindings.push_constant_data + offset, data, range);
-	set_dirty(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
-}
-
-
-void CommandBuffer::set_program(Program &program)
-{
-	if (current_program == &program)
-		return;
-
-	current_program = &program;
-	current_pipeline = VK_NULL_HANDLE;
-
-	VK_ASSERT((framebuffer && current_program->get_shader(ShaderStage::Vertex)) ||
-	          (!framebuffer && current_program->get_shader(ShaderStage::Compute)));
-
-	set_dirty(COMMAND_BUFFER_DIRTY_PIPELINE_BIT | COMMAND_BUFFER_DYNAMIC_BITS);
-
-	if (!current_layout)
-	{
+		dirty = ~0u;
 		dirty_sets = ~0u;
-		set_dirty(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
-
-		current_layout = program.get_pipeline_layout();
-		current_pipeline_layout = current_layout->get_layout();
+		dirty_vbos = ~0u;
+		current_pipeline = VK_NULL_HANDLE;
+		current_pipeline_layout = VK_NULL_HANDLE;
+		current_layout = nullptr;
+		current_program = nullptr;
+		memset(bindings.cookies, 0, sizeof(bindings.cookies));
+		memset(bindings.secondary_cookies, 0, sizeof(bindings.secondary_cookies));
+		memset(vbo.buffers, 0, sizeof(vbo.buffers));
 	}
-	else if (program.get_pipeline_layout()->get_hash() != current_layout->get_hash())
-	{
-		const CombinedResourceLayout &new_layout = program.get_pipeline_layout()->get_resource_layout();
-		const CombinedResourceLayout &old_layout = current_layout->get_resource_layout();
 
-		// If the push constant layout changes, all descriptor sets
-		// are invalidated.
-		if (new_layout.push_constant_layout_hash != old_layout.push_constant_layout_hash)
+	void CommandBuffer::init_viewport_scissor(const RenderPassInfo &info, const Framebuffer *framebuffer)
+	{
+		const uint32_t fb_w = framebuffer->get_width();
+		const uint32_t fb_h = framebuffer->get_height();
+		VkRect2D rect = info.render_area;
+		if (uint32_t(rect.offset.x) > fb_w) rect.offset.x = int32_t(fb_w);
+		if (uint32_t(rect.offset.y) > fb_h) rect.offset.y = int32_t(fb_h);
+		{
+			uint32_t w_avail = fb_w - uint32_t(rect.offset.x);
+			uint32_t h_avail = fb_h - uint32_t(rect.offset.y);
+			if (w_avail < rect.extent.width)  rect.extent.width  = w_avail;
+			if (h_avail < rect.extent.height) rect.extent.height = h_avail;
+		}
+
+		viewport = { 0.0f, 0.0f, float(fb_w), float(fb_h), 0.0f, 1.0f };
+		scissor = rect;
+	}
+
+	void CommandBuffer::begin_render_pass(const RenderPassInfo &info, VkSubpassContents contents)
+	{
+		VK_ASSERT(!framebuffer);
+		VK_ASSERT(!compatible_render_pass);
+		VK_ASSERT(!actual_render_pass);
+
+		framebuffer = &device->request_framebuffer(info);
+		compatible_render_pass = &framebuffer->get_compatible_render_pass();
+		actual_render_pass = &device->request_render_pass(info, false);
+
+		init_viewport_scissor(info, framebuffer);
+
+		VkClearValue clear_values[VULKAN_NUM_ATTACHMENTS + 1];
+		unsigned num_clear_values = 0;
+
+		for (unsigned i = 0; i < info.num_color_attachments; i++)
+		{
+			VK_ASSERT(info.color_attachments[i]);
+			if (info.clear_attachments & (1u << i))
+			{
+				clear_values[i].color = info.clear_color[i];
+				num_clear_values = i + 1;
+			}
+		}
+
+		if (info.depth_stencil && (info.op_flags & RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT) != 0)
+		{
+			clear_values[info.num_color_attachments].depthStencil = info.clear_depth_stencil;
+			num_clear_values = info.num_color_attachments + 1;
+		}
+
+		VkRenderPassBeginInfo begin_info = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+		begin_info.renderPass = actual_render_pass->get_render_pass();
+		begin_info.framebuffer = framebuffer->get_framebuffer();
+		begin_info.renderArea = scissor;
+		begin_info.clearValueCount = num_clear_values;
+		begin_info.pClearValues = clear_values;
+
+		vkCmdBeginRenderPass(cmd, &begin_info, contents);
+
+		current_contents = contents;
+		begin_graphics();
+	}
+
+	void CommandBuffer::end_render_pass()
+	{
+		VK_ASSERT(framebuffer);
+		VK_ASSERT(actual_render_pass);
+		VK_ASSERT(compatible_render_pass);
+
+		vkCmdEndRenderPass(cmd);
+
+		framebuffer = nullptr;
+		actual_render_pass = nullptr;
+		compatible_render_pass = nullptr;
+		begin_compute();
+	}
+
+	VkPipeline CommandBuffer::build_compute_pipeline(Hash hash)
+	{
+		const Shader &shader = *current_program->get_shader(ShaderStage::Compute);
+		VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+		info.layout = current_program->get_pipeline_layout()->get_layout();
+		info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		info.stage.module = shader.get_module();
+		info.stage.pName = "main";
+		info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+
+#ifdef GRANITE_SPIRV_DUMP
+		LOGI("Compiling SPIR-V file: (%s) %s\n",
+				Shader::stage_to_name(ShaderStage::Compute),
+				(to_string(shader.get_hash()) + ".spv").c_str());
+#endif
+
+		VkSpecializationInfo spec_info = {};
+		VkSpecializationMapEntry spec_entries[VULKAN_NUM_SPEC_CONSTANTS];
+		uint32_t mask = current_layout->get_resource_layout().combined_spec_constant_mask &
+			static_state.state.spec_constant_mask;
+
+		if (mask)
+		{
+			info.stage.pSpecializationInfo = &spec_info;
+			spec_info.pData = potential_static_state.spec_constants;
+			spec_info.dataSize = sizeof(potential_static_state.spec_constants);
+			spec_info.pMapEntries = spec_entries;
+
+			FOR_EACH_BIT(mask, bit)
+			{
+				VkSpecializationMapEntry &entry = spec_entries[spec_info.mapEntryCount++];
+				entry.offset = sizeof(uint32_t) * bit;
+				entry.size = sizeof(uint32_t);
+				entry.constantID = bit;
+			}
+		}
+
+		VkPipeline compute_pipeline;
+
+		LOGI("Creating compute pipeline.\n");
+		if (vkCreateComputePipelines(device->get_device(), VK_NULL_HANDLE, 1, &info, nullptr, &compute_pipeline) != VK_SUCCESS)
+			LOGE("Failed to create compute pipeline!\n");
+
+		return current_program->add_pipeline(hash, compute_pipeline);
+	}
+
+	VkPipeline CommandBuffer::build_graphics_pipeline(Hash hash)
+	{
+		// Viewport state
+		VkPipelineViewportStateCreateInfo vp = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+		vp.viewportCount = 1;
+		vp.scissorCount = 1;
+
+		// Dynamic state
+		VkPipelineDynamicStateCreateInfo dyn = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
+		dyn.dynamicStateCount = 2;
+		static const VkDynamicState states[2] = {
+			VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_VIEWPORT,
+		};
+		dyn.pDynamicStates = states;
+
+		// Blend state
+		VkPipelineColorBlendAttachmentState blend_attachments[VULKAN_NUM_ATTACHMENTS];
+		VkPipelineColorBlendStateCreateInfo blend = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
+		blend.attachmentCount = compatible_render_pass->get_num_color_attachments(current_subpass);
+		blend.pAttachments = blend_attachments;
+		for (unsigned i = 0; i < blend.attachmentCount; i++)
+		{
+			VkPipelineColorBlendAttachmentState &att = blend_attachments[i];
+			att = {};
+
+			if (compatible_render_pass->get_color_attachment(current_subpass, i).attachment != VK_ATTACHMENT_UNUSED &&
+					(current_layout->get_resource_layout().render_target_mask & (1u << i)))
+			{
+				att.colorWriteMask = 0xf;
+				att.blendEnable = static_state.state.blend_enable;
+				if (att.blendEnable)
+				{
+					att.alphaBlendOp = static_cast<VkBlendOp>(static_state.state.alpha_blend_op);
+					att.colorBlendOp = static_cast<VkBlendOp>(static_state.state.color_blend_op);
+					att.dstAlphaBlendFactor = static_cast<VkBlendFactor>(static_state.state.dst_alpha_blend);
+					att.srcAlphaBlendFactor = static_cast<VkBlendFactor>(static_state.state.src_alpha_blend);
+					att.dstColorBlendFactor = static_cast<VkBlendFactor>(static_state.state.dst_color_blend);
+					att.srcColorBlendFactor = static_cast<VkBlendFactor>(static_state.state.src_color_blend);
+				}
+			}
+		}
+		memcpy(blend.blendConstants, potential_static_state.blend_constants, sizeof(blend.blendConstants));
+
+		// Depth state
+		VkPipelineDepthStencilStateCreateInfo ds = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+		ds.depthTestEnable = compatible_render_pass->has_depth(current_subpass) && static_state.state.depth_test;
+		ds.depthWriteEnable = compatible_render_pass->has_depth(current_subpass) && static_state.state.depth_write;
+
+		if (ds.depthTestEnable)
+			ds.depthCompareOp = static_cast<VkCompareOp>(static_state.state.depth_compare);
+
+		// Vertex input
+		VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+		VkVertexInputAttributeDescription vi_attribs[VULKAN_NUM_VERTEX_ATTRIBS];
+		vi.pVertexAttributeDescriptions = vi_attribs;
+		uint32_t attr_mask = current_layout->get_resource_layout().attribute_mask;
+		uint32_t binding_mask = 0;
+		FOR_EACH_BIT(attr_mask, bit)
+		{
+			VkVertexInputAttributeDescription &attr = vi_attribs[vi.vertexAttributeDescriptionCount++];
+			attr.location = bit;
+			attr.binding = attribs[bit].binding;
+			attr.format = attribs[bit].format;
+			attr.offset = attribs[bit].offset;
+			binding_mask |= 1u << attr.binding;
+		}
+
+		VkVertexInputBindingDescription vi_bindings[VULKAN_NUM_VERTEX_BUFFERS];
+		vi.pVertexBindingDescriptions = vi_bindings;
+		FOR_EACH_BIT(binding_mask, bit)
+		{
+			VkVertexInputBindingDescription &bind = vi_bindings[vi.vertexBindingDescriptionCount++];
+			bind.binding = bit;
+			bind.inputRate = vbo.input_rates[bit];
+			bind.stride = vbo.strides[bit];
+		}
+
+		// Input assembly
+		VkPipelineInputAssemblyStateCreateInfo ia = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
+		ia.topology = static_cast<VkPrimitiveTopology>(static_state.state.topology);
+
+		// Multisample
+		VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+		ms.rasterizationSamples = static_cast<VkSampleCountFlagBits>(compatible_render_pass->get_sample_count(current_subpass));
+
+		if (compatible_render_pass->get_sample_count(current_subpass) > 1)
+		{
+			ms.alphaToCoverageEnable = static_state.state.alpha_to_coverage;
+			ms.alphaToOneEnable = static_state.state.alpha_to_one;
+			ms.sampleShadingEnable = static_state.state.sample_shading;
+			ms.minSampleShading = 1.0f;
+		}
+
+		// Raster
+		VkPipelineRasterizationStateCreateInfo raster = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+		raster.cullMode = static_cast<VkCullModeFlags>(static_state.state.cull_mode);
+		raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		raster.lineWidth = 1.0f;
+		raster.polygonMode = VK_POLYGON_MODE_FILL;
+
+		// Stages
+		VkPipelineShaderStageCreateInfo stages[static_cast<unsigned>(ShaderStage::Count)];
+		unsigned num_stages = 0;
+
+		VkSpecializationInfo spec_info[(unsigned)ShaderStage::Count] = {};
+		VkSpecializationMapEntry spec_entries[(unsigned)ShaderStage::Count][VULKAN_NUM_SPEC_CONSTANTS];
+
+		for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage::Count); i++)
+		{
+			ShaderStage stage = static_cast<ShaderStage>(i);
+			if (current_program->get_shader(stage))
+			{
+				VkPipelineShaderStageCreateInfo &s = stages[num_stages++];
+				s = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+				s.module = current_program->get_shader(stage)->get_module();
+#ifdef GRANITE_SPIRV_DUMP
+				LOGI("Compiling SPIR-V file: (%s) %s\n",
+						Shader::stage_to_name(stage),
+						(to_string(current_program->get_shader(stage)->get_hash()) + ".spv").c_str());
+#endif
+				s.pName = "main";
+				s.stage = static_cast<VkShaderStageFlagBits>(1u << i);
+
+				uint32_t mask = current_layout->get_resource_layout().spec_constant_mask[i] &
+					static_state.state.spec_constant_mask;
+
+				if (mask)
+				{
+					s.pSpecializationInfo = &spec_info[i];
+					spec_info[i].pData = potential_static_state.spec_constants;
+					spec_info[i].dataSize = sizeof(potential_static_state.spec_constants);
+					spec_info[i].pMapEntries = spec_entries[i];
+
+					FOR_EACH_BIT(mask, bit)
+					{
+						VkSpecializationMapEntry &entry = spec_entries[i][spec_info[i].mapEntryCount++];
+						entry.offset = sizeof(uint32_t) * bit;
+						entry.size = sizeof(uint32_t);
+						entry.constantID = bit;
+					}
+				}
+			}
+		}
+
+		VkGraphicsPipelineCreateInfo pipe = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+		pipe.layout = current_pipeline_layout;
+		pipe.renderPass = compatible_render_pass->get_render_pass();
+		pipe.subpass = current_subpass;
+
+		pipe.pViewportState = &vp;
+		pipe.pDynamicState = &dyn;
+		pipe.pColorBlendState = &blend;
+		pipe.pDepthStencilState = &ds;
+		pipe.pVertexInputState = &vi;
+		pipe.pInputAssemblyState = &ia;
+		pipe.pMultisampleState = &ms;
+		pipe.pRasterizationState = &raster;
+		pipe.pStages = stages;
+		pipe.stageCount = num_stages;
+
+		VkPipeline pipeline;
+
+		LOGI("Creating graphics pipeline.\n");
+		VkResult res = vkCreateGraphicsPipelines(device->get_device(), VK_NULL_HANDLE, 1, &pipe, nullptr, &pipeline);
+		if (res != VK_SUCCESS)
+			LOGE("Failed to create graphics pipeline!\n");
+
+		return current_program->add_pipeline(hash, pipeline);
+	}
+
+	void CommandBuffer::flush_compute_pipeline()
+	{
+		Hasher h;
+		h.u64(current_program->get_hash());
+
+		// Spec constants.
+		const CombinedResourceLayout &layout = current_layout->get_resource_layout();
+		uint32_t combined_spec_constant = layout.combined_spec_constant_mask;
+		combined_spec_constant &= static_state.state.spec_constant_mask;
+		h.u32(combined_spec_constant);
+		FOR_EACH_BIT(combined_spec_constant, bit)
+		{
+			h.u32(potential_static_state.spec_constants[bit]);
+		}
+
+		Hash hash = h.get();
+		current_pipeline = current_program->get_pipeline(hash);
+		if (current_pipeline == VK_NULL_HANDLE)
+			current_pipeline = build_compute_pipeline(hash);
+	}
+
+	void CommandBuffer::flush_graphics_pipeline()
+	{
+		Hasher h;
+		active_vbos = 0;
+		const CombinedResourceLayout &layout = current_layout->get_resource_layout();
+		FOR_EACH_BIT(layout.attribute_mask, bit)
+		{
+			h.u32(bit);
+			active_vbos |= 1u << attribs[bit].binding;
+			h.u32(attribs[bit].binding);
+			h.u32(attribs[bit].format);
+			h.u32(attribs[bit].offset);
+		}
+
+		FOR_EACH_BIT(active_vbos, bit)
+		{
+			h.u32(vbo.input_rates[bit]);
+			h.u32(vbo.strides[bit]);
+		}
+
+		h.u64(compatible_render_pass->get_hash());
+		h.u32(current_subpass);
+		h.u64(current_program->get_hash());
+		h.data(static_state.words, sizeof(static_state.words));
+
+		if (static_state.state.blend_enable)
+		{
+			bool b0 = COMBINER_NEEDS_BLEND_CONSTANT(static_cast<VkBlendFactor>(static_state.state.src_color_blend));
+			bool b1 = COMBINER_NEEDS_BLEND_CONSTANT(static_cast<VkBlendFactor>(static_state.state.src_alpha_blend));
+			bool b2 = COMBINER_NEEDS_BLEND_CONSTANT(static_cast<VkBlendFactor>(static_state.state.dst_color_blend));
+			bool b3 = COMBINER_NEEDS_BLEND_CONSTANT(static_cast<VkBlendFactor>(static_state.state.dst_alpha_blend));
+			if (b0 || b1 || b2 || b3)
+				h.data(reinterpret_cast<uint32_t *>(potential_static_state.blend_constants),
+						sizeof(potential_static_state.blend_constants));
+		}
+
+		// Spec constants.
+		uint32_t combined_spec_constant = layout.combined_spec_constant_mask;
+		combined_spec_constant &= static_state.state.spec_constant_mask;
+		h.u32(combined_spec_constant);
+		FOR_EACH_BIT(combined_spec_constant, bit)
+		{
+			h.u32(potential_static_state.spec_constants[bit]);
+		}
+
+		Hash hash = h.get();
+		current_pipeline = current_program->get_pipeline(hash);
+		if (current_pipeline == VK_NULL_HANDLE)
+			current_pipeline = build_graphics_pipeline(hash);
+	}
+
+	void CommandBuffer::flush_compute_state()
+	{
+		VK_ASSERT(current_layout);
+		VK_ASSERT(current_program);
+
+		if (get_and_clear(COMMAND_BUFFER_DIRTY_PIPELINE_BIT))
+		{
+			VkPipeline old_pipe = current_pipeline;
+			flush_compute_pipeline();
+			if (old_pipe != current_pipeline)
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, current_pipeline);
+		}
+
+		flush_descriptor_sets();
+
+		if (get_and_clear(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
+		{
+			const VkPushConstantRange &range = current_layout->get_resource_layout().push_constant_range;
+			if (range.stageFlags != 0)
+			{
+				VK_ASSERT(range.offset == 0);
+				vkCmdPushConstants(cmd, current_pipeline_layout, range.stageFlags,
+						0, range.size,
+						bindings.push_constant_data);
+			}
+		}
+	}
+
+	void CommandBuffer::flush_render_state()
+	{
+		VK_ASSERT(current_layout);
+		VK_ASSERT(current_program);
+
+		// We've invalidated pipeline state, update the VkPipeline.
+		if (get_and_clear(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT | COMMAND_BUFFER_DIRTY_PIPELINE_BIT |
+					COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT))
+		{
+			VkPipeline old_pipe = current_pipeline;
+			flush_graphics_pipeline();
+			if (old_pipe != current_pipeline)
+			{
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, current_pipeline);
+				set_dirty(COMMAND_BUFFER_DYNAMIC_BITS);
+			}
+		}
+
+		flush_descriptor_sets();
+
+		if (get_and_clear(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
+		{
+			const VkPushConstantRange &range = current_layout->get_resource_layout().push_constant_range;
+			if (range.stageFlags != 0)
+			{
+				VK_ASSERT(range.offset == 0);
+				vkCmdPushConstants(cmd, current_pipeline_layout, range.stageFlags,
+						0, range.size,
+						bindings.push_constant_data);
+			}
+		}
+
+		if (get_and_clear(COMMAND_BUFFER_DIRTY_VIEWPORT_BIT))
+			vkCmdSetViewport(cmd, 0, 1, &viewport);
+		if (get_and_clear(COMMAND_BUFFER_DIRTY_SCISSOR_BIT))
+			vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+		uint32_t update_vbo_mask = dirty_vbos & active_vbos;
+		FOR_EACH_BIT_RANGE(update_vbo_mask, binding, binding_count)
+		{
+#ifdef VULKAN_DEBUG
+			for (unsigned i = binding; i < binding + binding_count; i++)
+				VK_ASSERT(vbo.buffers[i] != VK_NULL_HANDLE);
+#endif
+			vkCmdBindVertexBuffers(cmd, binding, binding_count, vbo.buffers + binding, vbo.offsets + binding);
+		}
+		dirty_vbos &= ~update_vbo_mask;
+	}
+
+	void CommandBuffer::set_vertex_attrib(uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset)
+	{
+		VK_ASSERT(attrib < VULKAN_NUM_VERTEX_ATTRIBS);
+		VK_ASSERT(framebuffer);
+
+		VertexAttribState &attr = attribs[attrib];
+
+		if (attr.binding != binding || attr.format != format || attr.offset != offset)
+			set_dirty(COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
+
+		VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
+
+		attr.binding = binding;
+		attr.format = format;
+		attr.offset = offset;
+	}
+
+	void CommandBuffer::set_vertex_binding(uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride,
+			VkVertexInputRate step_rate)
+	{
+		VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
+		VK_ASSERT(framebuffer);
+
+		VkBuffer vkbuffer = buffer.get_buffer();
+		if (vbo.buffers[binding] != vkbuffer || vbo.offsets[binding] != offset)
+			dirty_vbos |= 1u << binding;
+		if (vbo.strides[binding] != stride || vbo.input_rates[binding] != step_rate)
+			set_dirty(COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
+
+		vbo.buffers[binding] = vkbuffer;
+		vbo.offsets[binding] = offset;
+		vbo.strides[binding] = stride;
+		vbo.input_rates[binding] = step_rate;
+	}
+
+	void CommandBuffer::set_scissor(const VkRect2D &rect)
+	{
+		VK_ASSERT(framebuffer);
+		VK_ASSERT(rect.offset.x >= 0);
+		VK_ASSERT(rect.offset.y >= 0);
+		scissor = rect;
+		set_dirty(COMMAND_BUFFER_DIRTY_SCISSOR_BIT);
+	}
+
+	void CommandBuffer::push_constants(const void *data, VkDeviceSize offset, VkDeviceSize range)
+	{
+		VK_ASSERT(offset + range <= VULKAN_PUSH_CONSTANT_SIZE);
+		memcpy(bindings.push_constant_data + offset, data, range);
+		set_dirty(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
+	}
+
+
+	void CommandBuffer::set_program(Program &program)
+	{
+		if (current_program == &program)
+			return;
+
+		current_program = &program;
+		current_pipeline = VK_NULL_HANDLE;
+
+		VK_ASSERT((framebuffer && current_program->get_shader(ShaderStage::Vertex)) ||
+				(!framebuffer && current_program->get_shader(ShaderStage::Compute)));
+
+		set_dirty(COMMAND_BUFFER_DIRTY_PIPELINE_BIT | COMMAND_BUFFER_DYNAMIC_BITS);
+
+		if (!current_layout)
 		{
 			dirty_sets = ~0u;
 			set_dirty(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
+
+			current_layout = program.get_pipeline_layout();
+			current_pipeline_layout = current_layout->get_layout();
 		}
-		else
+		else if (program.get_pipeline_layout()->get_hash() != current_layout->get_hash())
 		{
-			// Find the first set whose descriptor set layout differs.
-			PipelineLayout *new_pipe_layout = program.get_pipeline_layout();
-			for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
+			const CombinedResourceLayout &new_layout = program.get_pipeline_layout()->get_resource_layout();
+			const CombinedResourceLayout &old_layout = current_layout->get_resource_layout();
+
+			// If the push constant layout changes, all descriptor sets
+			// are invalidated.
+			if (new_layout.push_constant_layout_hash != old_layout.push_constant_layout_hash)
 			{
-				if (new_pipe_layout->get_allocator(set) != current_layout->get_allocator(set))
+				dirty_sets = ~0u;
+				set_dirty(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
+			}
+			else
+			{
+				// Find the first set whose descriptor set layout differs.
+				PipelineLayout *new_pipe_layout = program.get_pipeline_layout();
+				for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
 				{
-					dirty_sets |= ~((1u << set) - 1);
-					break;
+					if (new_pipe_layout->get_allocator(set) != current_layout->get_allocator(set))
+					{
+						dirty_sets |= ~((1u << set) - 1);
+						break;
+					}
 				}
 			}
+			current_layout = program.get_pipeline_layout();
+			current_pipeline_layout = current_layout->get_layout();
 		}
-		current_layout = program.get_pipeline_layout();
-		current_pipeline_layout = current_layout->get_layout();
-	}
-}
-
-void *CommandBuffer::allocate_constant_data(unsigned set, unsigned binding, VkDeviceSize size)
-{
-	BufferBlockAllocation data = ubo_block.allocate(size);
-	if (!data.host)
-	{
-		device->request_uniform_block(ubo_block, size);
-		data = ubo_block.allocate(size);
-	}
-	set_uniform_buffer(set, binding, *ubo_block.gpu, data.offset, size);
-	return data.host;
-}
-
-void *CommandBuffer::allocate_vertex_data(unsigned binding, VkDeviceSize size, VkDeviceSize stride,
-                                          VkVertexInputRate step_rate)
-{
-	BufferBlockAllocation data = vbo_block.allocate(size);
-	if (!data.host)
-	{
-		device->request_vertex_block(vbo_block, size);
-		data = vbo_block.allocate(size);
 	}
 
-	set_vertex_binding(binding, *vbo_block.gpu, data.offset, stride, step_rate);
-	return data.host;
-}
-
-void CommandBuffer::set_uniform_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
-                                       VkDeviceSize range)
-{
-	VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
-	VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-	VK_ASSERT(buffer.get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-	ResourceBinding &b = bindings.bindings[set][binding];
-
-	if (buffer.get_cookie() == bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
-		return;
-
-	b.buffer = { buffer.get_buffer(), offset, range };
-	bindings.cookies[set][binding] = buffer.get_cookie();
-	bindings.secondary_cookies[set][binding] = 0;
-	dirty_sets |= 1u << set;
-}
-
-void CommandBuffer::set_sampler(unsigned set, unsigned binding, const Sampler &sampler)
-{
-	VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
-	VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-	if (sampler.get_cookie() == bindings.secondary_cookies[set][binding])
-		return;
-
-	ResourceBinding &b = bindings.bindings[set][binding];
-	b.image.fp.sampler = sampler.get_sampler();
-	b.image.integer.sampler = sampler.get_sampler();
-	dirty_sets |= 1u << set;
-	bindings.secondary_cookies[set][binding] = sampler.get_cookie();
-}
-
-void CommandBuffer::set_buffer_view(unsigned set, unsigned binding, const BufferView &view)
-{
-	VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
-	VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-	VK_ASSERT(view.get_buffer().get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-	if (view.get_cookie() == bindings.cookies[set][binding])
-		return;
-	ResourceBinding &b = bindings.bindings[set][binding];
-	b.buffer_view = view.get_view();
-	bindings.cookies[set][binding] = view.get_cookie();
-	bindings.secondary_cookies[set][binding] = 0;
-	dirty_sets |= 1u << set;
-}
-
-void CommandBuffer::set_input_attachments(unsigned set, unsigned start_binding)
-{
-	VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
-	VK_ASSERT(start_binding + actual_render_pass->get_num_input_attachments(current_subpass) <= VULKAN_NUM_BINDINGS);
-	unsigned num_input_attachments = actual_render_pass->get_num_input_attachments(current_subpass);
-	for (unsigned i = 0; i < num_input_attachments; i++)
+	void *CommandBuffer::allocate_constant_data(unsigned set, unsigned binding, VkDeviceSize size)
 	{
-		const VkAttachmentReference &ref = actual_render_pass->get_input_attachment(current_subpass, i);
-		if (ref.attachment == VK_ATTACHMENT_UNUSED)
-			continue;
-
-		ImageView *view = framebuffer->get_attachment(ref.attachment);
-		VK_ASSERT(view);
-		VK_ASSERT(view->get_image().get_create_info().usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
-
-		if (view->get_cookie() == bindings.cookies[set][start_binding + i] &&
-		    bindings.bindings[set][start_binding + i].image.fp.imageLayout == ref.layout)
+		BufferBlockAllocation data = ubo_block.allocate(size);
+		if (!data.host)
 		{
-			continue;
+			device->request_uniform_block(ubo_block, size);
+			data = ubo_block.allocate(size);
+		}
+		set_uniform_buffer(set, binding, *ubo_block.gpu, data.offset, size);
+		return data.host;
+	}
+
+	void *CommandBuffer::allocate_vertex_data(unsigned binding, VkDeviceSize size, VkDeviceSize stride,
+			VkVertexInputRate step_rate)
+	{
+		BufferBlockAllocation data = vbo_block.allocate(size);
+		if (!data.host)
+		{
+			device->request_vertex_block(vbo_block, size);
+			data = vbo_block.allocate(size);
 		}
 
-		ResourceBinding &b = bindings.bindings[set][start_binding + i];
-		b.image.fp.imageLayout = ref.layout;
-		b.image.integer.imageLayout = ref.layout;
-		b.image.fp.imageView = view->get_float_view();
-		b.image.integer.imageView = view->get_integer_view();
-		bindings.cookies[set][start_binding + i] = view->get_cookie();
+		set_vertex_binding(binding, *vbo_block.gpu, data.offset, stride, step_rate);
+		return data.host;
+	}
+
+	void CommandBuffer::set_uniform_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
+			VkDeviceSize range)
+	{
+		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
+		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
+		VK_ASSERT(buffer.get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		ResourceBinding &b = bindings.bindings[set][binding];
+
+		if (buffer.get_cookie() == bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
+			return;
+
+		b.buffer = { buffer.get_buffer(), offset, range };
+		bindings.cookies[set][binding] = buffer.get_cookie();
+		bindings.secondary_cookies[set][binding] = 0;
 		dirty_sets |= 1u << set;
 	}
-}
 
-void CommandBuffer::set_texture(unsigned set, unsigned binding,
-                                VkImageView float_view, VkImageView integer_view,
-                                VkImageLayout layout,
-                                uint64_t cookie)
-{
-	VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
-	VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-
-	if (cookie == bindings.cookies[set][binding] && bindings.bindings[set][binding].image.fp.imageLayout == layout)
-		return;
-
-	ResourceBinding &b = bindings.bindings[set][binding];
-	b.image.fp.imageLayout = layout;
-	b.image.fp.imageView = float_view;
-	b.image.integer.imageLayout = layout;
-	b.image.integer.imageView = integer_view;
-	bindings.cookies[set][binding] = cookie;
-	dirty_sets |= 1u << set;
-}
-
-void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view)
-{
-	VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
-	set_texture(set, binding, view.get_float_view(), view.get_integer_view(),
-	            view.get_image().get_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.get_cookie());
-}
-
-void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler)
-{
-	set_sampler(set, binding, sampler);
-	set_texture(set, binding, view);
-}
-
-void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view, StockSampler stock)
-{
-	VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
-	VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-	VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
-	const Sampler &sampler = device->get_stock_sampler(stock);
-	set_texture(set, binding, view, sampler);
-}
-
-void CommandBuffer::set_storage_texture(unsigned set, unsigned binding, const ImageView &view)
-{
-	VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_STORAGE_BIT);
-	set_texture(set, binding, view.get_float_view(), view.get_integer_view(),
-	            view.get_image().get_layout(VK_IMAGE_LAYOUT_GENERAL), view.get_cookie());
-}
-
-void CommandBuffer::flush_descriptor_set(uint32_t set)
-{
-	const CombinedResourceLayout &layout = current_layout->get_resource_layout();
-	const DescriptorSetLayout &set_layout = layout.sets[set];
-	uint32_t num_dynamic_offsets = 0;
-	uint32_t dynamic_offsets[VULKAN_NUM_BINDINGS];
-	Hasher h;
-
-	h.u32(set_layout.fp_mask);
-
-	// UBOs
-	FOR_EACH_BIT(set_layout.uniform_buffer_mask, binding)
+	void CommandBuffer::set_sampler(unsigned set, unsigned binding, const Sampler &sampler)
 	{
-		h.u64(bindings.cookies[set][binding]);
-		h.u32(bindings.bindings[set][binding].buffer.range);
-		VK_ASSERT(bindings.bindings[set][binding].buffer.buffer != VK_NULL_HANDLE);
+		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
+		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
+		if (sampler.get_cookie() == bindings.secondary_cookies[set][binding])
+			return;
 
-		dynamic_offsets[num_dynamic_offsets++] = bindings.bindings[set][binding].buffer.offset;
+		ResourceBinding &b = bindings.bindings[set][binding];
+		b.image.fp.sampler = sampler.get_sampler();
+		b.image.integer.sampler = sampler.get_sampler();
+		dirty_sets |= 1u << set;
+		bindings.secondary_cookies[set][binding] = sampler.get_cookie();
+	}
+
+	void CommandBuffer::set_buffer_view(unsigned set, unsigned binding, const BufferView &view)
+	{
+		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
+		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
+		VK_ASSERT(view.get_buffer().get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
+		if (view.get_cookie() == bindings.cookies[set][binding])
+			return;
+		ResourceBinding &b = bindings.bindings[set][binding];
+		b.buffer_view = view.get_view();
+		bindings.cookies[set][binding] = view.get_cookie();
+		bindings.secondary_cookies[set][binding] = 0;
+		dirty_sets |= 1u << set;
+	}
+
+	void CommandBuffer::set_input_attachments(unsigned set, unsigned start_binding)
+	{
+		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
+		VK_ASSERT(start_binding + actual_render_pass->get_num_input_attachments(current_subpass) <= VULKAN_NUM_BINDINGS);
+		unsigned num_input_attachments = actual_render_pass->get_num_input_attachments(current_subpass);
+		for (unsigned i = 0; i < num_input_attachments; i++)
+		{
+			const VkAttachmentReference &ref = actual_render_pass->get_input_attachment(current_subpass, i);
+			if (ref.attachment == VK_ATTACHMENT_UNUSED)
+				continue;
+
+			ImageView *view = framebuffer->get_attachment(ref.attachment);
+			VK_ASSERT(view);
+			VK_ASSERT(view->get_image().get_create_info().usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+
+			if (view->get_cookie() == bindings.cookies[set][start_binding + i] &&
+					bindings.bindings[set][start_binding + i].image.fp.imageLayout == ref.layout)
+			{
+				continue;
+			}
+
+			ResourceBinding &b = bindings.bindings[set][start_binding + i];
+			b.image.fp.imageLayout = ref.layout;
+			b.image.integer.imageLayout = ref.layout;
+			b.image.fp.imageView = view->get_float_view();
+			b.image.integer.imageView = view->get_integer_view();
+			bindings.cookies[set][start_binding + i] = view->get_cookie();
+			dirty_sets |= 1u << set;
+		}
+	}
+
+	void CommandBuffer::set_texture(unsigned set, unsigned binding,
+			VkImageView float_view, VkImageView integer_view,
+			VkImageLayout layout,
+			uint64_t cookie)
+	{
+		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
+		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
+
+		if (cookie == bindings.cookies[set][binding] && bindings.bindings[set][binding].image.fp.imageLayout == layout)
+			return;
+
+		ResourceBinding &b = bindings.bindings[set][binding];
+		b.image.fp.imageLayout = layout;
+		b.image.fp.imageView = float_view;
+		b.image.integer.imageLayout = layout;
+		b.image.integer.imageView = integer_view;
+		bindings.cookies[set][binding] = cookie;
+		dirty_sets |= 1u << set;
+	}
+
+	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view)
+	{
+		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
+		set_texture(set, binding, view.get_float_view(), view.get_integer_view(),
+				view.get_image().get_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.get_cookie());
+	}
+
+	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler)
+	{
+		set_sampler(set, binding, sampler);
+		set_texture(set, binding, view);
+	}
+
+	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view, StockSampler stock)
+	{
+		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
+		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
+		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
+		const Sampler &sampler = device->get_stock_sampler(stock);
+		set_texture(set, binding, view, sampler);
+	}
+
+	void CommandBuffer::set_storage_texture(unsigned set, unsigned binding, const ImageView &view)
+	{
+		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_STORAGE_BIT);
+		set_texture(set, binding, view.get_float_view(), view.get_integer_view(),
+				view.get_image().get_layout(VK_IMAGE_LAYOUT_GENERAL), view.get_cookie());
+	}
+
+	void CommandBuffer::flush_descriptor_set(uint32_t set)
+	{
+		const CombinedResourceLayout &layout = current_layout->get_resource_layout();
+		const DescriptorSetLayout &set_layout = layout.sets[set];
+		uint32_t num_dynamic_offsets = 0;
+		uint32_t dynamic_offsets[VULKAN_NUM_BINDINGS];
+		Hasher h;
+
+		h.u32(set_layout.fp_mask);
+
+		// UBOs
+		FOR_EACH_BIT(set_layout.uniform_buffer_mask, binding)
+		{
+			h.u64(bindings.cookies[set][binding]);
+			h.u32(bindings.bindings[set][binding].buffer.range);
+			VK_ASSERT(bindings.bindings[set][binding].buffer.buffer != VK_NULL_HANDLE);
+
+			dynamic_offsets[num_dynamic_offsets++] = bindings.bindings[set][binding].buffer.offset;
 		}
 
-	// SSBOs
-	FOR_EACH_BIT(set_layout.storage_buffer_mask, binding)
-	{
-		h.u64(bindings.cookies[set][binding]);
-		h.u32(bindings.bindings[set][binding].buffer.offset);
-		h.u32(bindings.bindings[set][binding].buffer.range);
-		VK_ASSERT(bindings.bindings[set][binding].buffer.buffer != VK_NULL_HANDLE);
+		// SSBOs
+		FOR_EACH_BIT(set_layout.storage_buffer_mask, binding)
+		{
+			h.u64(bindings.cookies[set][binding]);
+			h.u32(bindings.bindings[set][binding].buffer.offset);
+			h.u32(bindings.bindings[set][binding].buffer.range);
+			VK_ASSERT(bindings.bindings[set][binding].buffer.buffer != VK_NULL_HANDLE);
 		}
 
-	// Sampled buffers
-	FOR_EACH_BIT(set_layout.sampled_buffer_mask, binding)
-	{
-		h.u64(bindings.cookies[set][binding]);
-		VK_ASSERT(bindings.bindings[set][binding].buffer_view != VK_NULL_HANDLE);
+		// Sampled buffers
+		FOR_EACH_BIT(set_layout.sampled_buffer_mask, binding)
+		{
+			h.u64(bindings.cookies[set][binding]);
+			VK_ASSERT(bindings.bindings[set][binding].buffer_view != VK_NULL_HANDLE);
 		}
 
-	// Sampled images
-	FOR_EACH_BIT(set_layout.sampled_image_mask, binding)
-	{
-		h.u64(bindings.cookies[set][binding]);
-		if (!has_immutable_sampler(set_layout, binding))
+		// Sampled images
+		FOR_EACH_BIT(set_layout.sampled_image_mask, binding)
+		{
+			h.u64(bindings.cookies[set][binding]);
+			if (!has_immutable_sampler(set_layout, binding))
+			{
+				h.u64(bindings.secondary_cookies[set][binding]);
+				VK_ASSERT(bindings.bindings[set][binding].image.fp.sampler != VK_NULL_HANDLE);
+			}
+			h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
+			VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
+		}
+
+		// Separate images
+		FOR_EACH_BIT(set_layout.separate_image_mask, binding)
+		{
+			h.u64(bindings.cookies[set][binding]);
+			h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
+			VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
+		}
+
+		// Separate samplers
+		FOR_EACH_BIT(set_layout.sampler_mask & ~set_layout.immutable_sampler_mask, binding)
 		{
 			h.u64(bindings.secondary_cookies[set][binding]);
 			VK_ASSERT(bindings.bindings[set][binding].image.fp.sampler != VK_NULL_HANDLE);
 		}
-		h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
-		VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
-		}
 
-	// Separate images
-	FOR_EACH_BIT(set_layout.separate_image_mask, binding)
-	{
-		h.u64(bindings.cookies[set][binding]);
-		h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
-		VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
-		}
-
-	// Separate samplers
-	FOR_EACH_BIT(set_layout.sampler_mask & ~set_layout.immutable_sampler_mask, binding)
-	{
-		h.u64(bindings.secondary_cookies[set][binding]);
-		VK_ASSERT(bindings.bindings[set][binding].image.fp.sampler != VK_NULL_HANDLE);
-		}
-
-	// Storage images
-	FOR_EACH_BIT(set_layout.storage_image_mask, binding)
-	{
-		h.u64(bindings.cookies[set][binding]);
-		h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
-		VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
-		}
-
-	// Input attachments
-	FOR_EACH_BIT(set_layout.input_attachment_mask, binding)
-	{
-		h.u64(bindings.cookies[set][binding]);
-		h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
-		VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
-		}
-
-	Hash hash = h.get();
-	std::pair<VkDescriptorSet, bool> allocated = current_layout->get_allocator(set)->find(hash);
-
-	// The descriptor set was not successfully cached, rebuild.
-	if (!allocated.second)
-	{
-		uint32_t write_count = 0;
-		uint32_t buffer_info_count = 0;
-		VkWriteDescriptorSet writes[VULKAN_NUM_BINDINGS];
-		VkDescriptorBufferInfo buffer_info[VULKAN_NUM_BINDINGS];
-
-		FOR_EACH_BIT(set_layout.uniform_buffer_mask, binding)
-		{
-			VkWriteDescriptorSet &write = writes[write_count++];
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.pNext = nullptr;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-			write.dstArrayElement = 0;
-			write.dstBinding = binding;
-			write.dstSet = allocated.first;
-
-			// Offsets are applied dynamically.
-			VkDescriptorBufferInfo &buffer = buffer_info[buffer_info_count++];
-			buffer = bindings.bindings[set][binding].buffer;
-			buffer.offset = 0;
-			write.pBufferInfo = &buffer;
-				}
-
-		FOR_EACH_BIT(set_layout.storage_buffer_mask, binding)
-		{
-			VkWriteDescriptorSet &write = writes[write_count++];
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.pNext = nullptr;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			write.dstArrayElement = 0;
-			write.dstBinding = binding;
-			write.dstSet = allocated.first;
-			write.pBufferInfo = &bindings.bindings[set][binding].buffer;
-				}
-
-		FOR_EACH_BIT(set_layout.sampled_buffer_mask, binding)
-		{
-			VkWriteDescriptorSet &write = writes[write_count++];
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.pNext = nullptr;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-			write.dstArrayElement = 0;
-			write.dstBinding = binding;
-			write.dstSet = allocated.first;
-			write.pTexelBufferView = &bindings.bindings[set][binding].buffer_view;
-				}
-
-		FOR_EACH_BIT(set_layout.sampled_image_mask, binding)
-		{
-			VkWriteDescriptorSet &write = writes[write_count++];
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.pNext = nullptr;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			write.dstArrayElement = 0;
-			write.dstBinding = binding;
-			write.dstSet = allocated.first;
-
-			if (set_layout.fp_mask & (1u << binding))
-				write.pImageInfo = &bindings.bindings[set][binding].image.fp;
-			else
-				write.pImageInfo = &bindings.bindings[set][binding].image.integer;
-				}
-
-		FOR_EACH_BIT(set_layout.separate_image_mask, binding)
-		{
-			VkWriteDescriptorSet &write = writes[write_count++];
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.pNext = nullptr;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-			write.dstArrayElement = 0;
-			write.dstBinding = binding;
-			write.dstSet = allocated.first;
-
-			if (set_layout.fp_mask & (1u << binding))
-				write.pImageInfo = &bindings.bindings[set][binding].image.fp;
-			else
-				write.pImageInfo = &bindings.bindings[set][binding].image.integer;
-				}
-
-		FOR_EACH_BIT(set_layout.sampler_mask & ~set_layout.immutable_sampler_mask, binding)
-		{
-			VkWriteDescriptorSet &write = writes[write_count++];
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.pNext = nullptr;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-			write.dstArrayElement = 0;
-			write.dstBinding = binding;
-			write.dstSet = allocated.first;
-			write.pImageInfo = &bindings.bindings[set][binding].image.fp;
-				}
-
+		// Storage images
 		FOR_EACH_BIT(set_layout.storage_image_mask, binding)
 		{
-			VkWriteDescriptorSet &write = writes[write_count++];
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.pNext = nullptr;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-			write.dstArrayElement = 0;
-			write.dstBinding = binding;
-			write.dstSet = allocated.first;
+			h.u64(bindings.cookies[set][binding]);
+			h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
+			VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
+		}
 
-			if (set_layout.fp_mask & (1u << binding))
-				write.pImageInfo = &bindings.bindings[set][binding].image.fp;
-			else
-				write.pImageInfo = &bindings.bindings[set][binding].image.integer;
-				}
-
+		// Input attachments
 		FOR_EACH_BIT(set_layout.input_attachment_mask, binding)
 		{
-			VkWriteDescriptorSet &write = writes[write_count++];
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.pNext = nullptr;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-			write.dstArrayElement = 0;
-			write.dstBinding = binding;
-			write.dstSet = allocated.first;
-			if (set_layout.fp_mask & (1u << binding))
+			h.u64(bindings.cookies[set][binding]);
+			h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
+			VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
+		}
+
+		Hash hash = h.get();
+		std::pair<VkDescriptorSet, bool> allocated = current_layout->get_allocator(set)->find(hash);
+
+		// The descriptor set was not successfully cached, rebuild.
+		if (!allocated.second)
+		{
+			uint32_t write_count = 0;
+			uint32_t buffer_info_count = 0;
+			VkWriteDescriptorSet writes[VULKAN_NUM_BINDINGS];
+			VkDescriptorBufferInfo buffer_info[VULKAN_NUM_BINDINGS];
+
+			FOR_EACH_BIT(set_layout.uniform_buffer_mask, binding)
+			{
+				VkWriteDescriptorSet &write = writes[write_count++];
+				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write.pNext = nullptr;
+				write.descriptorCount = 1;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+				write.dstArrayElement = 0;
+				write.dstBinding = binding;
+				write.dstSet = allocated.first;
+
+				// Offsets are applied dynamically.
+				VkDescriptorBufferInfo &buffer = buffer_info[buffer_info_count++];
+				buffer = bindings.bindings[set][binding].buffer;
+				buffer.offset = 0;
+				write.pBufferInfo = &buffer;
+			}
+
+			FOR_EACH_BIT(set_layout.storage_buffer_mask, binding)
+			{
+				VkWriteDescriptorSet &write = writes[write_count++];
+				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write.pNext = nullptr;
+				write.descriptorCount = 1;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				write.dstArrayElement = 0;
+				write.dstBinding = binding;
+				write.dstSet = allocated.first;
+				write.pBufferInfo = &bindings.bindings[set][binding].buffer;
+			}
+
+			FOR_EACH_BIT(set_layout.sampled_buffer_mask, binding)
+			{
+				VkWriteDescriptorSet &write = writes[write_count++];
+				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write.pNext = nullptr;
+				write.descriptorCount = 1;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+				write.dstArrayElement = 0;
+				write.dstBinding = binding;
+				write.dstSet = allocated.first;
+				write.pTexelBufferView = &bindings.bindings[set][binding].buffer_view;
+			}
+
+			FOR_EACH_BIT(set_layout.sampled_image_mask, binding)
+			{
+				VkWriteDescriptorSet &write = writes[write_count++];
+				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write.pNext = nullptr;
+				write.descriptorCount = 1;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				write.dstArrayElement = 0;
+				write.dstBinding = binding;
+				write.dstSet = allocated.first;
+
+				if (set_layout.fp_mask & (1u << binding))
+					write.pImageInfo = &bindings.bindings[set][binding].image.fp;
+				else
+					write.pImageInfo = &bindings.bindings[set][binding].image.integer;
+			}
+
+			FOR_EACH_BIT(set_layout.separate_image_mask, binding)
+			{
+				VkWriteDescriptorSet &write = writes[write_count++];
+				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write.pNext = nullptr;
+				write.descriptorCount = 1;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+				write.dstArrayElement = 0;
+				write.dstBinding = binding;
+				write.dstSet = allocated.first;
+
+				if (set_layout.fp_mask & (1u << binding))
+					write.pImageInfo = &bindings.bindings[set][binding].image.fp;
+				else
+					write.pImageInfo = &bindings.bindings[set][binding].image.integer;
+			}
+
+			FOR_EACH_BIT(set_layout.sampler_mask & ~set_layout.immutable_sampler_mask, binding)
+			{
+				VkWriteDescriptorSet &write = writes[write_count++];
+				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write.pNext = nullptr;
+				write.descriptorCount = 1;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+				write.dstArrayElement = 0;
+				write.dstBinding = binding;
+				write.dstSet = allocated.first;
 				write.pImageInfo = &bindings.bindings[set][binding].image.fp;
-			else
-				write.pImageInfo = &bindings.bindings[set][binding].image.integer;
-				}
+			}
 
-		vkUpdateDescriptorSets(device->get_device(), write_count, writes, 0, nullptr);
+			FOR_EACH_BIT(set_layout.storage_image_mask, binding)
+			{
+				VkWriteDescriptorSet &write = writes[write_count++];
+				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write.pNext = nullptr;
+				write.descriptorCount = 1;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				write.dstArrayElement = 0;
+				write.dstBinding = binding;
+				write.dstSet = allocated.first;
+
+				if (set_layout.fp_mask & (1u << binding))
+					write.pImageInfo = &bindings.bindings[set][binding].image.fp;
+				else
+					write.pImageInfo = &bindings.bindings[set][binding].image.integer;
+			}
+
+			FOR_EACH_BIT(set_layout.input_attachment_mask, binding)
+			{
+				VkWriteDescriptorSet &write = writes[write_count++];
+				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write.pNext = nullptr;
+				write.descriptorCount = 1;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+				write.dstArrayElement = 0;
+				write.dstBinding = binding;
+				write.dstSet = allocated.first;
+				if (set_layout.fp_mask & (1u << binding))
+					write.pImageInfo = &bindings.bindings[set][binding].image.fp;
+				else
+					write.pImageInfo = &bindings.bindings[set][binding].image.integer;
+			}
+
+			vkUpdateDescriptorSets(device->get_device(), write_count, writes, 0, nullptr);
+		}
+
+		vkCmdBindDescriptorSets(cmd, actual_render_pass ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE,
+				current_pipeline_layout, set, 1, &allocated.first, num_dynamic_offsets, dynamic_offsets);
 	}
 
-	vkCmdBindDescriptorSets(cmd, actual_render_pass ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE,
-	                        current_pipeline_layout, set, 1, &allocated.first, num_dynamic_offsets, dynamic_offsets);
-}
-
-void CommandBuffer::flush_descriptor_sets()
-{
-	const CombinedResourceLayout &layout = current_layout->get_resource_layout();
-	uint32_t set_update = layout.descriptor_set_mask & dirty_sets;
-	FOR_EACH_BIT(set_update, set)
-	{ flush_descriptor_set(set); 	}
-	dirty_sets &= ~set_update;
-}
-
-void CommandBuffer::draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance)
-{
-	VK_ASSERT(current_program);
-	VK_ASSERT(!is_compute);
-	flush_render_state();
-	vkCmdDraw(cmd, vertex_count, instance_count, first_vertex, first_instance);
-}
-
-void CommandBuffer::dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z)
-{
-	VK_ASSERT(current_program);
-	VK_ASSERT(is_compute);
-	flush_compute_state();
-	vkCmdDispatch(cmd, groups_x, groups_y, groups_z);
-}
-
-void CommandBuffer::set_opaque_state()
-{
-	PipelineState::State &state = static_state.state;
-	memset(&state, 0, sizeof(state));
-	state.cull_mode = VK_CULL_MODE_BACK_BIT;
-	state.blend_enable = false;
-	state.depth_test = true;
-	state.depth_compare = VK_COMPARE_OP_LESS_OR_EQUAL;
-	state.depth_write = true;
-	state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-
-	set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
-}
-
-void CommandBuffer::set_quad_state()
-{
-	PipelineState::State &state = static_state.state;
-	memset(&state, 0, sizeof(state));
-	state.cull_mode = VK_CULL_MODE_NONE;
-	state.blend_enable = false;
-	state.depth_test = false;
-	state.depth_write = false;
-	state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-	set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
-}
-
-void CommandBuffer::end()
-{
-	if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
-		LOGE("Failed to end command buffer.\n");
-
-	if (vbo_block.mapped)
-		device->request_vertex_block_nolock(vbo_block, 0);
-	if (ubo_block.mapped)
-		device->request_uniform_block_nolock(ubo_block, 0);
-}
-
-void CommandBuffer::begin_region(const char *name, const float *color)
-{
-	if (device->ext.supports_debug_marker)
+	void CommandBuffer::flush_descriptor_sets()
 	{
-		VkDebugMarkerMarkerInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT };
-		if (color)
-		{
-			for (unsigned i = 0; i < 4; i++)
-				info.color[i] = color[i];
-		}
-		else
-		{
-			for (unsigned i = 0; i < 4; i++)
-				info.color[i] = 1.0f;
-		}
-
-		info.pMarkerName = name;
-		vkCmdDebugMarkerBeginEXT(cmd, &info);
+		const CombinedResourceLayout &layout = current_layout->get_resource_layout();
+		uint32_t set_update = layout.descriptor_set_mask & dirty_sets;
+		FOR_EACH_BIT(set_update, set)
+		{ flush_descriptor_set(set); 	}
+		dirty_sets &= ~set_update;
 	}
-}
 
-void CommandBuffer::end_region()
-{
-	if (device->ext.supports_debug_marker)
-		vkCmdDebugMarkerEndEXT(cmd);
-}
+	void CommandBuffer::draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance)
+	{
+		VK_ASSERT(current_program);
+		VK_ASSERT(!is_compute);
+		flush_render_state();
+		vkCmdDraw(cmd, vertex_count, instance_count, first_vertex, first_instance);
+	}
+
+	void CommandBuffer::dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z)
+	{
+		VK_ASSERT(current_program);
+		VK_ASSERT(is_compute);
+		flush_compute_state();
+		vkCmdDispatch(cmd, groups_x, groups_y, groups_z);
+	}
+
+	void CommandBuffer::set_opaque_state()
+	{
+		PipelineState::State &state = static_state.state;
+		memset(&state, 0, sizeof(state));
+		state.cull_mode = VK_CULL_MODE_BACK_BIT;
+		state.blend_enable = false;
+		state.depth_test = true;
+		state.depth_compare = VK_COMPARE_OP_LESS_OR_EQUAL;
+		state.depth_write = true;
+		state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+		set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
+	}
+
+	void CommandBuffer::set_quad_state()
+	{
+		PipelineState::State &state = static_state.state;
+		memset(&state, 0, sizeof(state));
+		state.cull_mode = VK_CULL_MODE_NONE;
+		state.blend_enable = false;
+		state.depth_test = false;
+		state.depth_write = false;
+		state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+		set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
+	}
+
+	void CommandBuffer::end()
+	{
+		if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
+			LOGE("Failed to end command buffer.\n");
+
+		if (vbo_block.mapped)
+			device->request_vertex_block_nolock(vbo_block, 0);
+		if (ubo_block.mapped)
+			device->request_uniform_block_nolock(ubo_block, 0);
+	}
+
+	void CommandBuffer::begin_region(const char *name, const float *color)
+	{
+		if (device->ext.supports_debug_marker)
+		{
+			VkDebugMarkerMarkerInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT };
+			if (color)
+			{
+				for (unsigned i = 0; i < 4; i++)
+					info.color[i] = color[i];
+			}
+			else
+			{
+				for (unsigned i = 0; i < 4; i++)
+					info.color[i] = 1.0f;
+			}
+
+			info.pMarkerName = name;
+			vkCmdDebugMarkerBeginEXT(cmd, &info);
+		}
+	}
+
+	void CommandBuffer::end_region()
+	{
+		if (device->ext.supports_debug_marker)
+			vkCmdDebugMarkerEndEXT(cmd);
+	}
 
 
-void CommandBufferDeleter::operator()(Vulkan::CommandBuffer *cmd)
-{
-	cmd->device->handle_pool.command_buffers.free(cmd);
-}
+	void CommandBufferDeleter::operator()(Vulkan::CommandBuffer *cmd)
+	{
+		cmd->device->handle_pool.command_buffers.free(cmd);
+	}
 }
 
 /* === vulkan.cpp === */
@@ -18167,13 +17955,14 @@ void FBAtlas::pipeline_barrier(StatusFlags domains)
 
 /* === config_parser.cpp === */
 
-int parse_config_file(const char *path, PSX::RectMatch *out, int max);
-
 /* Whitespace per std::regex ECMAScript \s: space, tab, newline, CR, FF, VT. */
-static inline int cfg_is_space(int c) {
+static inline int cfg_is_space(int c)
+{
     return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v';
 }
-static inline const char *cfg_skip_ws(const char *p) {
+
+static inline const char *cfg_skip_ws(const char *p)
+{
     while (*p && cfg_is_space((unsigned char)*p)) p++;
     return p;
 }
@@ -18181,7 +17970,8 @@ static inline const char *cfg_skip_ws(const char *p) {
 /* Parse one "(\d+|\*)" field with surrounding optional whitespace. On success
  * advances *pp past the field and returns 0, writing the value (-1 for '*');
  * returns -1 if the field doesn't match. */
-static int cfg_parse_field(const char **pp, int *out) {
+static int cfg_parse_field(const char **pp, int *out)
+{
     const char *p = cfg_skip_ws(*pp);
     if (*p == '*') {
         *out = -1;
@@ -18203,7 +17993,8 @@ static int cfg_parse_field(const char **pp, int *out) {
 /* Match one config line against:
  *   ^\s*ignore\s+(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*(?:#.*)?$
  * On match, fills *m and returns true. Hand-rolled replacement for std::regex. */
-static bool cfg_match_ignore(const char *line, PSX::RectMatch *m) {
+static bool cfg_match_ignore(const char *line, PSX::RectMatch *m)
+{
     const char *p = cfg_skip_ws(line);
     int i;
     int *fields[4];
@@ -18231,7 +18022,7 @@ static bool cfg_match_ignore(const char *line, PSX::RectMatch *m) {
     return *p == '\0';
 }
 
-int parse_config_file(const char *path, PSX::RectMatch *out, int max) {
+static int parse_config_file(const char *path, PSX::RectMatch *out, int max) {
     char line[1024];
     int count = 0;
     RFILE *in = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
@@ -18327,7 +18118,7 @@ char *replacement_filename_from_hash(char *out, size_t cap, uint32_t hash, uint3
     return out;
 }
 
-inline uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
+static inline uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
     return &image.owned_data[(y * image.width + x) * 4];
 }
 
@@ -18832,7 +18623,7 @@ void TextureTracker::clearRegion(Rect rect) {
         // Some games do this, apparently.
         return;
     }
-    tracker.clear(toSRect(rect));
+    tracker.clear(SRect(rect.x, rect.y, rect.width, rect.height));
     fused_pages.mark_dead(rect);
 
     clear_palette_cache(rect);
@@ -18857,7 +18648,7 @@ bool imageMatches(TextureUpload &upload, Rect rect, uint16_t *vram) {
 }
 
 void TextureTracker::blit(Rect dst, Rect src) {
-    tracker.blit(toSRect(dst), toSRect(src));
+    tracker.blit(SRect(dst.x, dst.y, dst.width, dst.height), SRect(src.x, src.y, src.width, src.height));
     fused_pages.mark_dirty(dst);
     fused_pages.rebuild_dirty(tracker, uploader);
     clear_palette_cache(dst);
@@ -18883,19 +18674,17 @@ uint32_t TextureTracker::dbgHashVram(Rect rect, uint16_t *vram) {
 }
 
 std::pair<SRect, bool> intersect(SRect a, SRect b) {
-    int al = a.left(),   ar = a.right(),  at = a.top(), ab = a.bottom();
-    int bl = b.left(),   br = b.right(),  bt = b.top(), bb = b.bottom();
+    int al     = a.left(),   ar = a.right(),  at = a.top(), ab = a.bottom();
+    int bl     = b.left(),   br = b.right(),  bt = b.top(), bb = b.bottom();
     int left   = (al > bl) ? al : bl;
     int right  = (ar < br) ? ar : br;
     int top    = (at > bt) ? at : bt;
     int bottom = (ab < bb) ? ab : bb;
-    int width = right - left;
+    int width  = right - left;
     int height = bottom - top;
-    if (width <= 0 || height <= 0) {
+    if (width <= 0 || height <= 0)
         return std::make_pair(SRect(0, 0, 1, 1), false);
-    } else {
-        return std::make_pair(SRect(left, top, width, height), true);
-    }
+    return std::make_pair(SRect(left, top, width, height), true);
 }
 
 TextureRect subTexture(TextureRect original, SRect sub_vram_rect) {
@@ -18909,11 +18698,9 @@ TextureRect subTexture(TextureRect original, SRect sub_vram_rect) {
 
 std::pair<TextureRect, bool> clip_texture_rect_to_vram(TextureRect &t, Rect vram_rect) {
     std::pair<SRect, bool> intersection = intersect(t.vram_rect, toSRect(vram_rect));
-    if (intersection.second) {
+    if (intersection.second)
         return std::make_pair(subTexture(t, intersection.first), true);
-    } else {
-        return std::make_pair(make_texture_rect(nullptr, 0, 0, SRect(0, 0, 1, 1)), false);
-    }
+    return std::make_pair(make_texture_rect(nullptr, 0, 0, SRect(0, 0, 1, 1)), false);
 }
 
 void TextureTracker::notifyReadback(Rect rect, uint16_t *vram) {
@@ -18929,12 +18716,12 @@ void TextureTracker::notifyReadback(Rect rect, uint16_t *vram) {
 
     uint32_t hash = dbgHashVram(rect, vram);
     
-    for (std::vector<RestorableRect>::iterator it = restorable_rects.begin(); it != restorable_rects.end(); ) {
-        if (it->rect.intersects(rect)) {
+    for (std::vector<RestorableRect>::iterator it = restorable_rects.begin(); it != restorable_rects.end(); )
+    {
+        if (it->rect.intersects(rect))
             restorable_rects.erase(it);
-        } else {
+        else
             it++;
-        }
     }
 
     static RectIndexSet overlap = { NULL, 0, 0 };
@@ -19612,9 +19399,11 @@ SRect bounds(int left, int right, int top, int bottom) {
     return SRect(left, top, right - left, bottom - top);
 }
 
-void split(SRect original, SRect remove, SRect *results, unsigned &count) {
+static void split(SRect original, SRect remove, SRect *results, unsigned &count)
+{
     std::pair<SRect, bool> intersectionResult = intersect(original, remove);
-    if (!intersectionResult.second) {
+    if (!intersectionResult.second)
+    {
         results[count++] = original;
         return;
     }
@@ -19688,26 +19477,27 @@ void RectTracker::blit(SRect dst, SRect src) {
         }
     }
     clear_rect(dst);
-    for (TextureRect &t : to_place) {
+    for (TextureRect &t : to_place)
         place(t);
-    }
     to_place.free_storage();
     lookup_grid_dirty = true;
 }
-void RectTracker::releaseDeadHandles() {
+
+void RectTracker::releaseDeadHandles()
+{
     enduring_arr_compact(&textures);
     lookup_grid_dirty = true;
 }
 
-RectIndexSet& RectTracker::overlapping(Rect uvrect, RectIndexSet &results) {
-    if (lookup_grid_dirty) {
+RectIndexSet& RectTracker::overlapping(Rect uvrect, RectIndexSet &results)
+{
+    if (lookup_grid_dirty)
         rebuild_lookup_grid();
-    }
 
-    // TODO: remove this when renderer/build_attribs doesn't have an unnecessary - 1
-    if (uvrect.width == 0) {
+    // TODO: remove this when renderer/build_attribs doesn't 
+    // have an unnecessary - 1
+    if (uvrect.width == 0)
         uvrect.width = 1;
-    }
 
     SRect rect = toSRect(uvrect);
 
@@ -19716,10 +19506,10 @@ RectIndexSet& RectTracker::overlapping(Rect uvrect, RectIndexSet &results) {
     return results;
 }
 
-TextureRect* RectTracker::get_index(RectIndex index) {
-    if (index < 0 || index >= textures.count) {
+TextureRect* RectTracker::get_index(RectIndex index)
+{
+    if (index < 0 || index >= textures.count)
         return nullptr;
-    }
     return &textures.a[index].texture_rect;
 }
 
@@ -19735,14 +19525,14 @@ void RectTracker::clear_rect(SRect &rect) {
 
             splits_count = 0;
             split(old.vram_rect, rect, splits, splits_count);
-            if (splits_count == 1 && splits[0] == old.vram_rect) {
-                // The rect didn't split, do nothing
-            } else {
+	    // The rect didn't split, do nothing
+            if (splits_count == 1 && splits[0] == old.vram_rect) { }
+	    else
+	    {
                 // The rect split, mark this texture as dead and push its splits to be added
                 eold.alive = false;
-                for (unsigned i = 0; i < splits_count; i++) {
+                for (unsigned i = 0; i < splits_count; i++)
                     newTextures.push(subTexture(old, splits[i]));
-                }
             }
         }
     }
@@ -19758,31 +19548,33 @@ void RectTracker::place(TextureRect texture) {
 
 void RectTracker::rebuild_lookup_grid() {
     lookup_grid.clear();
-    for (int i = 0; i < textures.count; i++) {
-        if (textures.a[i].alive) {
+    for (int i = 0; i < textures.count; i++)
+    {
+        if (textures.a[i].alive)
             lookup_grid.insert(textures.a[i].texture_rect.vram_rect, i);
-        }
     }
     lookup_grid_dirty = false;
 }
 
 TextureUpload *RectTracker::find_upload(uint32_t hash) {
-    for (int i = 0; i < textures.count; i++) {
+    for (int i = 0; i < textures.count; i++)
+    {
         EnduringTextureRect &eold = textures.a[i];
-        if (eold.texture_rect.upload->hash == hash) {
+        if (eold.texture_rect.upload->hash == hash)
             return eold.texture_rect.upload;
-        }
     }
     return nullptr;
 }
 
-static inline int clamp(int x, int low, int high) {
+static inline int clamp(int x, int low, int high)
+{
     if (x < low)  x = low;
     if (x > high) x = high;
     return x;
 }
 
-struct CellBounds {
+struct CellBounds
+{
     int lowX;
     int highX; // exclusive
     int lowY;
@@ -19806,12 +19598,15 @@ LookupGrid::LookupGrid() {
         cells[i].cap = 0;
     }
 }
+
 LookupGrid::~LookupGrid() {
     int i;
     for (i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++)
         free(cells[i].entries);
 }
-void LookupGrid::insert(SRect r, RectIndex index) {
+
+void LookupGrid::insert(SRect r, RectIndex index)
+{
     CellBounds c = cellBounds(r);
     for (int x = c.lowX; x < c.highX; x++) {
         for (int y = c.lowY; y < c.highY; y++) {
@@ -19849,19 +19644,20 @@ void LookupGrid::clear() {
 
 // FusedPages
 
-static inline int64_t page_bytes(FusionRects &fusion) {
+static inline int64_t page_bytes(FusionRects &fusion)
+{
     return fusion.scaleX * fusion.scaleY * fusion.vram_rect.width * fusion.vram_rect.height * 4;
 }
 
 void FusedPages::dbg_print_info() {
     int64_t num_bytes = 0;
-    for (FusedPage &page : pages) {
+    for (FusedPage &page : pages)
         num_bytes += page_bytes(page.fusion);
-    }
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "Fused Pages: %lu, Bytes: %ld (%.1f MiB)\n", pages.size(), num_bytes, num_bytes / 1048576.0);
 }
 
-bool srect_gt(const SRect &a, const SRect &b) {
+static bool srect_gt(const SRect &a, const SRect &b)
+{
     if (a.x != b.x)
         return a.x > b.x;
     if (a.y != b.y)
@@ -19887,9 +19683,8 @@ FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker
     f.vram_rect = {0, 0, 0, 0};
 
     for (EnduringTextureRect &e : tracker.textures) {
-        if (!e.alive) {
+        if (!e.alive)
             continue;
-        }
         std::pair<SRect, bool> intersection = intersect(toSRect(full_page_rect), e.texture_rect.vram_rect);
         if (intersection.second) {
             TextureUpload &upload = *e.texture_rect.upload;
@@ -19950,8 +19745,6 @@ void rebuild_page(FusedPage &page, RectTracker &tracker, Renderer *uploader) {
 
     int texture_width = page.fusion.vram_rect.width * page.fusion.scaleX;
     int texture_height = page.fusion.vram_rect.height * page.fusion.scaleY;
-    // assert(texture_width > 0 && texture_width < 10000);
-    // assert(texture_height > 0 && texture_height < 10000);
 
     // TODO: I don't know SHIT about barriers.
     
