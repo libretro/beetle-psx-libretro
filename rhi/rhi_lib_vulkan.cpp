@@ -1694,7 +1694,6 @@ struct NAME {                                                                 \
 
 #include <string>
 #include <type_traits>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -4748,8 +4747,15 @@ namespace Vulkan
 			void signal_submitted(VkCommandBuffer cmd)
 			{
 #ifdef VULKAN_DEBUG
-				VK_ASSERT(in_flight.find(cmd) != end(in_flight));
-				in_flight.erase(cmd);
+				int found = -1;
+				for (int i = 0; i < in_flight.count; i++)
+					if (in_flight.items[i] == cmd) { found = i; break; }
+				VK_ASSERT(found >= 0);
+				if (found >= 0)
+				{
+					in_flight.items[found] = in_flight.items[in_flight.count - 1];
+					in_flight.pop_back();
+				}
 #else
 				(void)cmd;
 #endif
@@ -4760,7 +4766,7 @@ namespace Vulkan
 			VkCommandPool pool = VK_NULL_HANDLE;
 			CommandBufferVec buffers = { NULL, 0, 0 };
 #ifdef VULKAN_DEBUG
-			std::unordered_set<VkCommandBuffer> in_flight;
+			CommandBufferVec in_flight = { NULL, 0, 0 };
 #endif
 			unsigned index = 0;
 	};
@@ -11653,7 +11659,8 @@ CommandPool &CommandPool::operator=(CommandPool &&other) noexcept
 		buffers = other.buffers;          // POD_VEC: bitwise steal of the backing array
 		index = other.index;
 #ifdef VULKAN_DEBUG
-		in_flight = std::move(other.in_flight);
+		in_flight.free_storage();         // free our own debug set first
+		in_flight = other.in_flight;      // POD_VEC: bitwise steal of the backing array
 #endif
 
 		// Leave other in a destructor-safe state (no double-free).
@@ -11663,7 +11670,9 @@ CommandPool &CommandPool::operator=(CommandPool &&other) noexcept
 		other.buffers.count = 0;
 		other.buffers.cap = 0;
 #ifdef VULKAN_DEBUG
-		other.in_flight.clear();
+		other.in_flight.items = NULL;     // source no longer owns the array
+		other.in_flight.count = 0;
+		other.in_flight.cap = 0;
 #endif
 	}
 	return *this;
@@ -11676,6 +11685,9 @@ CommandPool::~CommandPool()
 	if (pool != VK_NULL_HANDLE)
 		vkDestroyCommandPool(device, pool, nullptr);
 	buffers.free_storage();
+#ifdef VULKAN_DEBUG
+	in_flight.free_storage();
+#endif
 }
 
 VkCommandBuffer CommandPool::request_command_buffer()
@@ -11684,8 +11696,13 @@ VkCommandBuffer CommandPool::request_command_buffer()
 	{
 		VkCommandBuffer ret = buffers[index++];
 #ifdef VULKAN_DEBUG
-		VK_ASSERT(in_flight.find(ret) == end(in_flight));
-		in_flight.insert(ret);
+		{
+			bool present = false;
+			for (int i = 0; i < in_flight.count; i++)
+				if (in_flight.items[i] == ret) { present = true; break; }
+			VK_ASSERT(!present);
+			in_flight.push(ret);
+		}
 #endif
 		return ret;
 	}
@@ -11699,8 +11716,13 @@ VkCommandBuffer CommandPool::request_command_buffer()
 
 		vkAllocateCommandBuffers(device, &info, &cmd);
 #ifdef VULKAN_DEBUG
-		VK_ASSERT(in_flight.find(cmd) == end(in_flight));
-		in_flight.insert(cmd);
+		{
+			bool present = false;
+			for (int i = 0; i < in_flight.count; i++)
+				if (in_flight.items[i] == cmd) { present = true; break; }
+			VK_ASSERT(!present);
+			in_flight.push(cmd);
+		}
 #endif
 		buffers.push(cmd);
 		index++;
