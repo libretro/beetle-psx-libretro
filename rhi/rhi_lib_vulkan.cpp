@@ -1641,7 +1641,6 @@ PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
 /* === end folded volk === */
 
 #include <assert.h>
-#include <map>
 #include <memory>
 #include <set>
 #include <stddef.h>
@@ -6788,6 +6787,73 @@ namespace PSX
 
 	//========================================
 	// Save State
+	/* Owning hash -> TextureUpload map for the texture-tracker save state.
+	 * Replaces std::map<uint32_t, TextureUpload>: each entry owns a heap
+	 * TextureUpload (deep-copied in on insert, deleted on destroy). The values
+	 * are non-trivially-copyable (owned image/dumped_modes/textures), so the
+	 * backing array holds pointers - trivially relocatable - and ownership is
+	 * explicit new/delete. The type is move-only: it is move-constructed up out
+	 * of save_state() and move-assigned into the file-static save_state across
+	 * renderer recreations, so move-assign must free any entries it already
+	 * holds before adopting the source's. Copying is deleted to prevent any
+	 * accidental double-ownership. */
+	struct UploadOwningMap {
+		struct Entry { uint32_t key; TextureUpload *val; };
+		Entry *items;
+		int count;
+		int cap;
+
+		UploadOwningMap() : items(NULL), count(0), cap(0) {}
+
+		~UploadOwningMap() { destroy(); }
+
+		UploadOwningMap(UploadOwningMap &&o) : items(o.items), count(o.count), cap(o.cap) {
+			o.items = NULL; o.count = 0; o.cap = 0;
+		}
+
+		UploadOwningMap &operator=(UploadOwningMap &&o) {
+			if (this != &o) {
+				destroy();
+				items = o.items; count = o.count; cap = o.cap;
+				o.items = NULL; o.count = 0; o.cap = 0;
+			}
+			return *this;
+		}
+
+		/* No copies: the entries are owning pointers. */
+		UploadOwningMap(const UploadOwningMap &) = delete;
+		UploadOwningMap &operator=(const UploadOwningMap &) = delete;
+
+		bool contains(uint32_t key) const {
+			for (int i = 0; i < count; i++)
+				if (items[i].key == key)
+					return true;
+			return false;
+		}
+
+		/* Takes ownership of an already-heap-allocated upload under key. Caller
+		 * must have ensured the key is absent (mirrors the old map's insert-if-
+		 * absent guard). */
+		void insert(uint32_t key, TextureUpload *val) {
+			if (count >= cap) {
+				int ncap = cap ? cap * 2 : 8;
+				items = (Entry *)realloc(items, (size_t)ncap * sizeof(Entry));
+				cap = ncap;
+			}
+			items[count].key = key;
+			items[count].val = val;
+			count++;
+		}
+
+	private:
+		void destroy() {
+			for (int i = 0; i < count; i++)
+				delete items[i].val;
+			free(items);
+			items = NULL; count = 0; cap = 0;
+		}
+	};
+
 	struct TextureRectSaveState {
 		uint32_t upload_hash;
 		int offset_x;
@@ -6804,7 +6870,7 @@ namespace PSX
 	struct TextureTrackerSaveState {
 		std::vector<TextureRectSaveState> rects;
 		std::vector<RestorableRectSaveState> restorable;
-		std::map<uint32_t, TextureUpload> uploads;
+		UploadOwningMap uploads;
 	};
 	// End of Save State
 	//========================================
@@ -19966,10 +20032,10 @@ namespace PSX {
 	struct UploadPtrEntry { uint32_t key; TextureUpload *val; };
 	POD_VEC_DECLARE(UploadPtrVec, UploadPtrEntry);
 
-	TextureRectSaveState to_save_state(const TextureRect &t, std::map<uint32_t, TextureUpload> &uploads) {
+	TextureRectSaveState to_save_state(const TextureRect &t, UploadOwningMap &uploads) {
 		uint32_t hash = t.upload->hash;
-		if (uploads.find(hash) == uploads.end())
-			uploads[hash] = copy_upload_without_handles(*t.upload);
+		if (!uploads.contains(hash))
+			uploads.insert(hash, new TextureUpload(copy_upload_without_handles(*t.upload)));
 		return {
 			t.upload->hash,
 			t.offset_x,
@@ -20023,11 +20089,11 @@ namespace PSX {
 	void TextureTracker::load_state(const TextureTrackerSaveState &state)
 	{
 		UploadPtrVec uploads = { NULL, 0, 0 };
-		for (std::map<uint32_t, TextureUpload>::const_iterator it = state.uploads.begin(); it != state.uploads.end(); it++) {
+		for (int e = 0; e < state.uploads.count; e++) {
 			TextureUpload *ptr = texture_upload_new(); /* owns +1 */
-			*ptr = it->second;                         /* deep-copy contents (refcount untouched) */
-			UploadPtrEntry e = { it->first, ptr };
-			uploads.push(e);
+			*ptr = *state.uploads.items[e].val;        /* deep-copy contents (refcount untouched) */
+			UploadPtrEntry pe = { state.uploads.items[e].key, ptr };
+			uploads.push(pe);
 		}
 
 		clearRegion({ 0, 0, FB_WIDTH, FB_HEIGHT });
@@ -20045,8 +20111,8 @@ namespace PSX {
 			restorable_rects.push_back(std::move(loaded));
 		}
 		// Need to reload the hd textures, too
-		for (std::map<uint32_t, TextureUpload>::const_iterator it = state.uploads.begin(); it != state.uploads.end(); it++)
-			load_hd_texture(it->first);
+		for (int e = 0; e < state.uploads.count; e++)
+			load_hd_texture(state.uploads.items[e].key);
 		// Drop the map's construction refs; the placed/restorable TextureRects now
 		// hold their own references to each upload.
 		for (int i = 0; i < uploads.count; i++)
