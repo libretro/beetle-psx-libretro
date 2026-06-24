@@ -5392,6 +5392,70 @@ namespace Vulkan
 			POD_VEC_DECLARE(VkImageVec, VkImage);
 			POD_VEC_DECLARE(VkBufferVec, VkBuffer);
 
+			/* Owning array of CommandBufferHandle (= IntrusivePtr<CommandBuffer>).
+			 * Replaces std::vector<CommandBufferHandle> for the per-queue submission
+			 * lists. The element is a refcounting smart pointer with a non-trivial
+			 * destructor (decref), so growth move-constructs each handle into new
+			 * storage with placement new and destroys the moved-from slot, and
+			 * clear()/the destructor run each handle's destructor (dropping its
+			 * ref). push takes ownership by move (no incref), matching the old
+			 * push_back(std::move(cmd)). clear() keeps the capacity so the lists
+			 * are reused across frames without reallocating. */
+			struct CommandBufferHandleVec {
+				CommandBufferHandle *items;
+				int count;
+				int cap;
+
+				CommandBufferHandleVec() : items(NULL), count(0), cap(0) {}
+				~CommandBufferHandleVec() { destroy(); }
+				CommandBufferHandleVec(CommandBufferHandleVec &&o) noexcept
+					: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+				CommandBufferHandleVec &operator=(CommandBufferHandleVec &&o) noexcept {
+					if (this != &o) {
+						destroy();
+						items = o.items; count = o.count; cap = o.cap;
+						o.items = NULL; o.count = 0; o.cap = 0;
+					}
+					return *this;
+				}
+				CommandBufferHandleVec(const CommandBufferHandleVec &) = delete;
+				CommandBufferHandleVec &operator=(const CommandBufferHandleVec &) = delete;
+
+				void push(CommandBufferHandle &&v) {
+					if (count >= cap)
+						grow(cap ? cap * 2 : 8);
+					new (&items[count]) CommandBufferHandle(static_cast<CommandBufferHandle &&>(v));
+					count++;
+				}
+				bool empty() const { return count == 0; }
+				void clear() {
+					for (int i = 0; i < count; i++)
+						items[i].~CommandBufferHandle();
+					count = 0;
+				}
+				CommandBufferHandle *begin() { return items; }
+				CommandBufferHandle *end() { return items + count; }
+
+			private:
+				void grow(int ncap) {
+					CommandBufferHandle *nitems =
+						(CommandBufferHandle *)malloc((size_t)ncap * sizeof(CommandBufferHandle));
+					for (int i = 0; i < count; i++) {
+						new (&nitems[i]) CommandBufferHandle(static_cast<CommandBufferHandle &&>(items[i]));
+						items[i].~CommandBufferHandle();
+					}
+					free(items);
+					items = nitems;
+					cap = ncap;
+				}
+				void destroy() {
+					for (int i = 0; i < count; i++)
+						items[i].~CommandBufferHandle();
+					free(items);
+					items = NULL; count = 0; cap = 0;
+				}
+			};
+
 			struct PerFrame
 			{
 				PerFrame(Device *device);
@@ -5420,9 +5484,9 @@ namespace Vulkan
 				VkBufferViewVec destroyed_buffer_views;
 				VkImageVec destroyed_images;
 				VkBufferVec destroyed_buffers;
-				std::vector<CommandBufferHandle> graphics_submissions;
-				std::vector<CommandBufferHandle> compute_submissions;
-				std::vector<CommandBufferHandle> transfer_submissions;
+				CommandBufferHandleVec graphics_submissions;
+				CommandBufferHandleVec compute_submissions;
+				CommandBufferHandleVec transfer_submissions;
 				SemaphoreVec recycled_semaphores;
 				SemaphoreVec destroyed_semaphores;
 			};
@@ -5489,7 +5553,7 @@ namespace Vulkan
 
 			CommandPool &get_command_pool(CommandBuffer::Type type);
 			QueueData &get_queue_data(CommandBuffer::Type type);
-			std::vector<CommandBufferHandle> &get_queue_submissions(CommandBuffer::Type type);
+			CommandBufferHandleVec &get_queue_submissions(CommandBuffer::Type type);
 			void clear_wait_semaphores();
 			void submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
 
@@ -15940,11 +16004,11 @@ void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semap
 {
 	CommandBuffer::Type type = cmd->get_command_buffer_type();
 	CommandPool &pool = get_command_pool(type);
-	std::vector<CommandBufferHandle> &submissions = get_queue_submissions(type);
+	CommandBufferHandleVec &submissions = get_queue_submissions(type);
 
 	pool.signal_submitted(cmd->get_command_buffer());
 	cmd->end();
-	submissions.push_back(std::move(cmd));
+	submissions.push(std::move(cmd));
 
 	VkFence cleared_fence = VK_NULL_HANDLE;
 
@@ -16134,7 +16198,7 @@ void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
 		flush_frame(CommandBuffer::Type::AsyncTransfer);
 
 	QueueData &data = get_queue_data(type);
-	std::vector<CommandBufferHandle> &submissions = get_queue_submissions(type);
+	CommandBufferHandleVec &submissions = get_queue_submissions(type);
 
 	if (submissions.empty())
 	{
@@ -16345,7 +16409,7 @@ CommandPool &Device::get_command_pool(CommandBuffer::Type type)
 	}
 }
 
-std::vector<CommandBufferHandle> &Device::get_queue_submissions(CommandBuffer::Type type)
+Device::CommandBufferHandleVec &Device::get_queue_submissions(CommandBuffer::Type type)
 {
 	switch (get_physical_queue_type(type))
 	{
