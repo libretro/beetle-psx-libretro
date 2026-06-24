@@ -7577,9 +7577,53 @@ namespace PSX
 				UVRect UVLimits;
 			};
 
+			/* Owning uint32_t buffer for the saved VRAM image. Replaces
+			 * std::vector<uint32_t>; like the other save-state members it lives
+			 * in a file-static that is move-assigned across renderer
+			 * recreations, so it is move-only with a free-existing move-assign
+			 * and a destructor, and copying is deleted. */
+			struct OwnedU32Buf
+			{
+				uint32_t *items;
+				size_t    n;
+
+				OwnedU32Buf() : items(NULL), n(0) {}
+				~OwnedU32Buf() { free(items); }
+
+				OwnedU32Buf(OwnedU32Buf &&o) : items(o.items), n(o.n) { o.items = NULL; o.n = 0; }
+				OwnedU32Buf &operator=(OwnedU32Buf &&o)
+				{
+					if (this != &o)
+					{
+						free(items);
+						items = o.items; n = o.n;
+						o.items = NULL; o.n = 0;
+					}
+					return *this;
+				}
+				OwnedU32Buf(const OwnedU32Buf &) = delete;
+				OwnedU32Buf &operator=(const OwnedU32Buf &) = delete;
+
+				/* Deep-copy n elements from src into a fresh buffer. */
+				void assign(const uint32_t *src, size_t count)
+				{
+					free(items);
+					items = NULL; n = 0;
+					if (count)
+					{
+						items = (uint32_t *)malloc(count * sizeof(uint32_t));
+						memcpy(items, src, count * sizeof(uint32_t));
+						n = count;
+					}
+				}
+
+				const uint32_t *data() const { return items; }
+				bool empty() const { return n == 0; }
+			};
+
 			struct SaveState
 			{
-				std::vector<uint32_t> vram;
+				OwnedU32Buf vram;
 				RenderState state;
 				TextureTrackerSaveState tracker_state;
 			};
@@ -8528,11 +8572,10 @@ Renderer::SaveState Renderer::save_vram_state()
 	device.wait_idle();
 	const uint32_t *src = static_cast<const uint32_t *>(
 			device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
-	/* Iterator-range construction copies straight into the vector's
-	 * fresh allocation without the default-ctor's prior zero-fill;
-	 * saves 2 MiB of write traffic per savestate save on a 1024x512
-	 * VRAM. */
-	std::vector<uint32_t> vram(src, src + FB_WIDTH * FB_HEIGHT);
+	/* Deep-copy the mapped VRAM straight into the owning buffer (no
+	 * default zero-fill), then move it into the returned SaveState. */
+	Renderer::OwnedU32Buf vram;
+	vram.assign(src, FB_WIDTH * FB_HEIGHT);
 	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
 	return { std::move(vram), render_state, tracker.save_state() };
 }
