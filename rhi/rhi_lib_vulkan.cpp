@@ -5570,8 +5570,8 @@ namespace Vulkan
 			// Pending buffers which need to be copied from CPU to GPU before submitting graphics or compute work.
 			struct
 			{
-				std::vector<BufferBlock> vbo;
-				std::vector<BufferBlock> ubo;
+				BufferBlockVec vbo;
+				BufferBlockVec ubo;
 			} dma;
 
 			void submit_queue(CommandBuffer::Type type, VkFence *fence,
@@ -16008,7 +16008,7 @@ void Device::init_stock_samplers()
 }
 
 static void request_block(Device &device, BufferBlock &block, VkDeviceSize size,
-                          BufferPool &pool, std::vector<BufferBlock> *dma, BufferBlockVec &recycle)
+                          BufferPool &pool, BufferBlockVec *dma, BufferBlockVec &recycle)
 {
 	if (block.mapped)
 		device.unmap_host_buffer(*block.cpu, MEMORY_ACCESS_WRITE_BIT);
@@ -16023,7 +16023,7 @@ static void request_block(Device &device, BufferBlock &block, VkDeviceSize size,
 		if (block.cpu != block.gpu)
 		{
 			VK_ASSERT(dma);
-			dma->push_back(block);
+			dma->push(block);
 		}
 
 		if (block.size == pool.get_block_size())
