@@ -2997,18 +2997,11 @@ namespace Vulkan
 
 	class Device;
 
-	class Cookie
+	struct Cookie
 	{
-		public:
-			Cookie(Device *device);
+		Cookie(Device *device);
 
-			uint64_t get_cookie() const
-			{
-				return cookie;
-			}
-
-		private:
-			uint64_t cookie;
+		uint64_t cookie;
 	};
 
 	template <typename T>
@@ -13560,10 +13553,10 @@ Framebuffer &FramebufferAllocator::request_framebuffer(const RenderPassInfo &inf
 
 	for (unsigned i = 0; i < info.num_color_attachments; i++)
 		if (info.color_attachments[i])
-			h.u64(info.color_attachments[i]->get_cookie());
+			h.u64(info.color_attachments[i]->cookie);
 
 	if (info.depth_stencil)
-		h.u64(info.depth_stencil->get_cookie());
+		h.u64(info.depth_stencil->cookie);
 
 	h.u32(info.layer);
 
@@ -14487,11 +14480,11 @@ namespace Vulkan
 		VK_ASSERT(buffer.get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		ResourceBinding &b = bindings.bindings[set][binding];
 
-		if (buffer.get_cookie() == bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
+		if (buffer.cookie == bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
 			return;
 
 		b.buffer = { buffer.get_buffer(), offset, range };
-		bindings.cookies[set][binding] = buffer.get_cookie();
+		bindings.cookies[set][binding] = buffer.cookie;
 		bindings.secondary_cookies[set][binding] = 0;
 		dirty_sets |= 1u << set;
 	}
@@ -14500,14 +14493,14 @@ namespace Vulkan
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		if (sampler.get_cookie() == bindings.secondary_cookies[set][binding])
+		if (sampler.cookie == bindings.secondary_cookies[set][binding])
 			return;
 
 		ResourceBinding &b = bindings.bindings[set][binding];
 		b.image.fp.sampler = sampler.get_sampler();
 		b.image.integer.sampler = sampler.get_sampler();
 		dirty_sets |= 1u << set;
-		bindings.secondary_cookies[set][binding] = sampler.get_cookie();
+		bindings.secondary_cookies[set][binding] = sampler.cookie;
 	}
 
 	void CommandBuffer::set_buffer_view(unsigned set, unsigned binding, const BufferView &view)
@@ -14515,11 +14508,11 @@ namespace Vulkan
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 		VK_ASSERT(view.get_buffer().get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-		if (view.get_cookie() == bindings.cookies[set][binding])
+		if (view.cookie == bindings.cookies[set][binding])
 			return;
 		ResourceBinding &b = bindings.bindings[set][binding];
 		b.buffer_view = view.get_view();
-		bindings.cookies[set][binding] = view.get_cookie();
+		bindings.cookies[set][binding] = view.cookie;
 		bindings.secondary_cookies[set][binding] = 0;
 		dirty_sets |= 1u << set;
 	}
@@ -14539,7 +14532,7 @@ namespace Vulkan
 			VK_ASSERT(view);
 			VK_ASSERT(view->get_image().get_create_info().usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
 
-			if (view->get_cookie() == bindings.cookies[set][start_binding + i] &&
+			if (view->cookie == bindings.cookies[set][start_binding + i] &&
 					bindings.bindings[set][start_binding + i].image.fp.imageLayout == ref.layout)
 			{
 				continue;
@@ -14550,7 +14543,7 @@ namespace Vulkan
 			b.image.integer.imageLayout = ref.layout;
 			b.image.fp.imageView = view->get_float_view();
 			b.image.integer.imageView = view->get_integer_view();
-			bindings.cookies[set][start_binding + i] = view->get_cookie();
+			bindings.cookies[set][start_binding + i] = view->cookie;
 			dirty_sets |= 1u << set;
 		}
 	}
@@ -14579,7 +14572,7 @@ namespace Vulkan
 	{
 		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
 		set_texture(set, binding, view.get_float_view(), view.get_integer_view(),
-				view.get_image().get_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.get_cookie());
+				view.get_image().get_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.cookie);
 	}
 
 	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler)
@@ -14601,7 +14594,7 @@ namespace Vulkan
 	{
 		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_STORAGE_BIT);
 		set_texture(set, binding, view.get_float_view(), view.get_integer_view(),
-				view.get_image().get_layout(VK_IMAGE_LAYOUT_GENERAL), view.get_cookie());
+				view.get_image().get_layout(VK_IMAGE_LAYOUT_GENERAL), view.cookie);
 	}
 
 	void CommandBuffer::flush_descriptor_set(uint32_t set)
