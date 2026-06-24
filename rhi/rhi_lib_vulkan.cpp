@@ -2563,30 +2563,8 @@ private:
 };
 
 template <typename T>
-class TemporaryHashmapEnabled
+struct TemporaryHashmapEnabled
 {
-public:
-	void set_hash(Hash hash)
-	{
-		this->hash = hash;
-	}
-
-	void set_index(unsigned index)
-	{
-		this->index = index;
-	}
-
-	Hash get_hash()
-	{
-		return hash;
-	}
-
-	unsigned get_index() const
-	{
-		return index;
-	}
-
-private:
 	Hash hash = 0;
 	unsigned index = 0;
 };
@@ -2621,7 +2599,7 @@ public:
 		index = (index + 1) & (RingSize - 1);
 		for (T &node : rings[index])
 		{
-			hashmap.erase(node.get_hash());
+			hashmap.erase(node.hash);
 			/* Folded free_object: ReuseObjects is a compile-time constant, so
 			 * the dead branch is eliminated - reuse keeps the node in the vacant
 			 * pool, otherwise it goes back to the object pool. */
@@ -2639,10 +2617,10 @@ public:
 		if (v)
 		{
 			typename IntrusiveList<T>::Iterator node = v->get();
-			if (node->get_index() != index)
+			if (node->index != index)
 			{
-				rings[index].move_to_front(rings[node->get_index()], node);
-				node->set_index(index);
+				rings[index].move_to_front(rings[node->index], node);
+				node->index = index;
 			}
 
 			return &*node;
@@ -2664,8 +2642,8 @@ public:
 
 		typename IntrusiveList<T>::Iterator top = vacants.back();
 		vacants.pop_back();
-		top->set_index(index);
-		top->set_hash(hash);
+		top->index = index;
+		top->hash = hash;
 		hashmap.emplace_replace(hash, top);
 		rings[index].insert_front(top);
 		return &*top;
@@ -2675,8 +2653,8 @@ public:
 	T *emplace(Hash hash, P &&... p)
 	{
 		T *node = object_pool.allocate(std::forward<P>(p)...);
-		node->set_index(index);
-		node->set_hash(hash);
+		node->index = index;
+		node->hash = hash;
 		hashmap.emplace_replace(hash, node);
 		rings[index].insert_front(node);
 		return node;
