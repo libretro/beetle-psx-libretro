@@ -3293,6 +3293,49 @@ private:
 	void free_global(DeviceAllocator &allocator, uint32_t size, uint32_t memory_type);
 };
 
+/* Owning array of (trivially copyable) DeviceAllocation. Replaces
+ * std::vector<DeviceAllocation> for a frame's deferred-free list. DeviceAllocation
+ * is a trivially relocatable bookkeeping value (handles, an intrusive-list
+ * iterator, and PODs - it frees its backing memory only via an explicit
+ * free_immediate(), not a destructor), so growth is a realloc and clear() just
+ * resets the count; no per-element construction or destruction. push() copy-
+ * appends; the frame drains the list with a range-for then clear(). */
+struct DeviceAllocationVec
+{
+	DeviceAllocation *items;
+	int count;
+	int cap;
+
+	DeviceAllocationVec() : items(NULL), count(0), cap(0) {}
+	~DeviceAllocationVec() { ::free(items); }
+	DeviceAllocationVec(DeviceAllocationVec &&o) noexcept
+		: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+	DeviceAllocationVec &operator=(DeviceAllocationVec &&o) noexcept {
+		if (this != &o) {
+			::free(items);
+			items = o.items; count = o.count; cap = o.cap;
+			o.items = NULL; o.count = 0; o.cap = 0;
+		}
+		return *this;
+	}
+	DeviceAllocationVec(const DeviceAllocationVec &) = delete;
+	DeviceAllocationVec &operator=(const DeviceAllocationVec &) = delete;
+
+	void push(const DeviceAllocation &v) {
+		if (count >= cap) {
+			int ncap = cap ? cap * 2 : 8;
+			items = (DeviceAllocation *)::realloc(items, (size_t)ncap * sizeof(DeviceAllocation));
+			cap = ncap;
+		}
+		items[count++] = v;
+	}
+	int size() const { return count; }
+	bool empty() const { return count == 0; }
+	void clear() { count = 0; }
+	DeviceAllocation *begin() { return items; }
+	DeviceAllocation *end() { return items + count; }
+};
+
 struct MiniHeap : Util::IntrusiveListEnabled<MiniHeap>
 {
 	DeviceAllocation allocation;
@@ -5798,7 +5841,7 @@ namespace Vulkan
 
 				FenceVec wait_fences;
 				FenceVec recycle_fences;
-				std::vector<DeviceAllocation> allocations;
+				DeviceAllocationVec allocations;
 				VkFramebufferVec destroyed_framebuffers;
 				VkSamplerVec destroyed_samplers;
 				VkPipelineVec destroyed_pipelines;
@@ -16882,7 +16925,7 @@ Device::PerFrame::PerFrame(Device *device)
 
 void Device::free_memory_nolock(const DeviceAllocation &alloc)
 {
-	frame().allocations.push_back(alloc);
+	frame().allocations.push(alloc);
 }
 
 #ifdef VULKAN_DEBUG
