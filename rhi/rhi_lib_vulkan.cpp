@@ -3825,6 +3825,67 @@ namespace Vulkan
 
 	using ImageViewHandle = Util::IntrusivePtr<ImageView>;
 
+	/* Owning array of ImageViewHandle (= IntrusivePtr<ImageView>). Replaces
+	 * std::vector<ImageViewHandle> for the renderer's scaled mip-view chain,
+	 * which is built once (push during init) and then only indexed/read. The
+	 * element is a refcounting handle with a non-trivial destructor, so growth
+	 * move-constructs each handle into new storage with placement new and
+	 * destroys the moved-from slot, and the destructor runs each handle's
+	 * destructor (dropping its ref). push() takes ownership by move (no incref),
+	 * matching push_back(device.create_image_view(...)) of a temporary. Move-
+	 * only at the container level; indexed access returns a mutable reference so
+	 * existing scaled_views[i].get() / *scaled_views[i] uses are unchanged. */
+	struct ImageViewHandleVec {
+		ImageViewHandle *items;
+		int count;
+		int cap;
+
+		ImageViewHandleVec() : items(NULL), count(0), cap(0) {}
+		~ImageViewHandleVec() { destroy(); }
+		ImageViewHandleVec(ImageViewHandleVec &&o) noexcept
+			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+		ImageViewHandleVec &operator=(ImageViewHandleVec &&o) noexcept {
+			if (this != &o) {
+				destroy();
+				items = o.items; count = o.count; cap = o.cap;
+				o.items = NULL; o.count = 0; o.cap = 0;
+			}
+			return *this;
+		}
+		ImageViewHandleVec(const ImageViewHandleVec &) = delete;
+		ImageViewHandleVec &operator=(const ImageViewHandleVec &) = delete;
+
+		void push(ImageViewHandle &&v) {
+			if (count >= cap)
+				grow(cap ? cap * 2 : 8);
+			new (&items[count]) ImageViewHandle(static_cast<ImageViewHandle &&>(v));
+			count++;
+		}
+		int size() const { return count; }
+		bool empty() const { return count == 0; }
+		ImageViewHandle &operator[](int i) { return items[i]; }
+		const ImageViewHandle &operator[](int i) const { return items[i]; }
+		ImageViewHandle &front() { return items[0]; }
+
+	private:
+		void grow(int ncap) {
+			ImageViewHandle *nitems = (ImageViewHandle *)malloc((size_t)ncap * sizeof(ImageViewHandle));
+			for (int i = 0; i < count; i++) {
+				new (&nitems[i]) ImageViewHandle(static_cast<ImageViewHandle &&>(items[i]));
+				items[i].~ImageViewHandle();
+			}
+			free(items);
+			items = nitems;
+			cap = ncap;
+		}
+		void destroy() {
+			for (int i = 0; i < count; i++)
+				items[i].~ImageViewHandle();
+			free(items);
+			items = NULL; count = 0; cap = 0;
+		}
+	};
+
 	enum class ImageDomain
 	{
 		Physical,
@@ -8244,7 +8305,7 @@ namespace PSX
 			Vulkan::ImageHandle bias_framebuffer;
 			Vulkan::ImageHandle framebuffer;
 			Vulkan::ImageHandle framebuffer_ssaa;
-			std::vector<Vulkan::ImageViewHandle> scaled_views;
+			Vulkan::ImageViewHandleVec scaled_views;
 			FBAtlas atlas;
 			bool texture_tracking_enabled = false;
 			TextureTracker tracker;
@@ -8758,7 +8819,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 		{
 			view_info.base_level = i;
 			view_info.levels = 1;
-			scaled_views.push_back(device.create_image_view(view_info));
+			scaled_views.push(device.create_image_view(view_info));
 		}
 	}
 
