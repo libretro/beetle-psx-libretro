@@ -1642,7 +1642,6 @@ PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
 
 #include <assert.h>
 #include <memory>
-#include <set>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
