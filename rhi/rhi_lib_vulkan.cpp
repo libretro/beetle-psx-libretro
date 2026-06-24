@@ -4132,6 +4132,70 @@ namespace Vulkan
 
 	using Semaphore = Util::IntrusivePtr<SemaphoreHolder>;
 
+	/* Owning array of Semaphore (= IntrusivePtr<SemaphoreHolder>). Replaces
+	 * std::vector<Semaphore> for the per-queue wait-semaphore lists. The element
+	 * is a refcounting handle with a non-trivial destructor, so growth copy-
+	 * constructs each handle into new storage with placement new and destroys
+	 * the old slot, and clear()/the destructor run each handle's destructor
+	 * (dropping its ref). push() copy-inserts (the wait list is filled from a
+	 * const Semaphore &, an incref, as the std::vector was). clear() keeps the
+	 * capacity so the lists are reused across frames. Distinct from SemaphoreVec
+	 * above, which holds raw VkSemaphore handles (POD). */
+	struct SemaphoreHandleVec {
+		Semaphore *items;
+		int count;
+		int cap;
+
+		SemaphoreHandleVec() : items(NULL), count(0), cap(0) {}
+		~SemaphoreHandleVec() { destroy(); }
+		SemaphoreHandleVec(SemaphoreHandleVec &&o) noexcept
+			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+		SemaphoreHandleVec &operator=(SemaphoreHandleVec &&o) noexcept {
+			if (this != &o) {
+				destroy();
+				items = o.items; count = o.count; cap = o.cap;
+				o.items = NULL; o.count = 0; o.cap = 0;
+			}
+			return *this;
+		}
+		SemaphoreHandleVec(const SemaphoreHandleVec &) = delete;
+		SemaphoreHandleVec &operator=(const SemaphoreHandleVec &) = delete;
+
+		void push(const Semaphore &v) {
+			if (count >= cap)
+				grow(cap ? cap * 2 : 8);
+			new (&items[count]) Semaphore(v);
+			count++;
+		}
+		int size() const { return count; }
+		bool empty() const { return count == 0; }
+		void clear() {
+			for (int i = 0; i < count; i++)
+				items[i].~Semaphore();
+			count = 0;
+		}
+		Semaphore *begin() { return items; }
+		Semaphore *end() { return items + count; }
+
+	private:
+		void grow(int ncap) {
+			Semaphore *nitems = (Semaphore *)malloc((size_t)ncap * sizeof(Semaphore));
+			for (int i = 0; i < count; i++) {
+				new (&nitems[i]) Semaphore(items[i]);
+				items[i].~Semaphore();
+			}
+			free(items);
+			items = nitems;
+			cap = ncap;
+		}
+		void destroy() {
+			for (int i = 0; i < count; i++)
+				items[i].~Semaphore();
+			free(items);
+			items = NULL; count = 0; cap = 0;
+		}
+	};
+
 	POD_VEC_DECLARE(SemaphoreVec, VkSemaphore);
 	class SemaphoreManager
 	{
@@ -5562,7 +5626,7 @@ namespace Vulkan
 
 			struct QueueData
 			{
-				std::vector<Semaphore> wait_semaphores;
+				SemaphoreHandleVec wait_semaphores;
 				std::vector<VkPipelineStageFlags> wait_stages;
 				bool need_fence = false;
 			} graphics, compute, transfer;
@@ -15712,7 +15776,7 @@ void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semap
 		VK_ASSERT(sem.get() != semaphore.get());
 #endif
 
-	data.wait_semaphores.push_back(semaphore);
+	data.wait_semaphores.push(semaphore);
 	data.wait_stages.push_back(stages);
 	data.need_fence = true;
 
