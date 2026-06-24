@@ -16452,7 +16452,13 @@ void Device::free_memory_nolock(const DeviceAllocation &alloc)
 template <typename T, typename U>
 static inline bool exists(const T &container, const U &value)
 {
-	return std::find(container.begin(), container.end(), value) != container.end();
+	/* Linear membership test (debug-only). Hand-rolled over begin()/end() so it
+	 * does not pull in std::find; the containers are POD_VEC whose iterators are
+	 * raw pointers. */
+	for (auto first = container.begin(), last = container.end(); first != last; ++first)
+		if (*first == value)
+			return true;
+	return false;
 }
 
 #endif
