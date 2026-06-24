@@ -4648,6 +4648,70 @@ namespace Vulkan
 		}
 	};
 
+	/* Owning array of BufferBlock for the buffer pool's recycle list. Replaces
+	 * std::vector<BufferBlock>. BufferBlock has a user-declared destructor, so
+	 * its implicit move is suppressed and std::vector relocated it by copy
+	 * (incref/decref of its two IntrusivePtr<Buffer> handles); this container
+	 * preserves that exactly - growth copy-constructs each element into the new
+	 * storage and destroys the old one, and pop_back/clear/the destructor run
+	 * the element destructor (dropping the handle refs). Move-only at the
+	 * container level so it composes by ownership. */
+	struct BufferBlockVec {
+		BufferBlock *items;
+		int count;
+		int cap;
+
+		BufferBlockVec() : items(NULL), count(0), cap(0) {}
+		~BufferBlockVec() { destroy(); }
+		BufferBlockVec(BufferBlockVec &&o) noexcept
+			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+		BufferBlockVec &operator=(BufferBlockVec &&o) noexcept {
+			if (this != &o) {
+				destroy();
+				items = o.items; count = o.count; cap = o.cap;
+				o.items = NULL; o.count = 0; o.cap = 0;
+			}
+			return *this;
+		}
+		BufferBlockVec(const BufferBlockVec &) = delete;
+		BufferBlockVec &operator=(const BufferBlockVec &) = delete;
+
+		/* Copy-insert, matching the old push_back(std::move(block)) which - with
+		 * BufferBlock's move suppressed - was itself a copy. */
+		void push(const BufferBlock &v) {
+			if (count >= cap)
+				grow(cap ? cap * 2 : 8);
+			new (&items[count]) BufferBlock(v);
+			count++;
+		}
+		bool empty() const { return count == 0; }
+		void clear() {
+			for (int i = 0; i < count; i++)
+				items[i].~BufferBlock();
+			count = 0;
+		}
+		BufferBlock &back() { return items[count - 1]; }
+		void pop_back() { if (count) { count--; items[count].~BufferBlock(); } }
+
+	private:
+		void grow(int ncap) {
+			BufferBlock *nitems = (BufferBlock *)malloc((size_t)ncap * sizeof(BufferBlock));
+			for (int i = 0; i < count; i++) {
+				new (&nitems[i]) BufferBlock(items[i]);
+				items[i].~BufferBlock();
+			}
+			free(items);
+			items = nitems;
+			cap = ncap;
+		}
+		void destroy() {
+			for (int i = 0; i < count; i++)
+				items[i].~BufferBlock();
+			free(items);
+			items = NULL; count = 0; cap = 0;
+		}
+	};
+
 	class BufferPool
 	{
 		public:
@@ -4674,7 +4738,7 @@ namespace Vulkan
 			VkDeviceSize block_size = 0;
 			VkDeviceSize alignment = 0;
 			VkBufferUsageFlags usage = 0;
-			std::vector<BufferBlock> blocks;
+			BufferBlockVec blocks;
 			BufferBlock allocate_block(VkDeviceSize size);
 	};
 }
@@ -11840,7 +11904,7 @@ BufferBlock BufferPool::request_block(VkDeviceSize minimum_size)
 void BufferPool::recycle_block(BufferBlock &&block)
 {
 	VK_ASSERT(block.size == block_size);
-	blocks.push_back(std::move(block));
+	blocks.push(block);
 }
 
 BufferPool::~BufferPool()
