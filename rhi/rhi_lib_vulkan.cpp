@@ -6613,6 +6613,48 @@ struct CachedPaletteHash {
 
 //============
 // RectTracker
+/* ------------------------------------------------------------------------- *
+ * POD_VEC - a typed dynamic array of trivially-relocatable elements, MSVC C89.
+ *
+ * Replaces std::vector<T> for the renderer's per-frame draw queues, whose
+ * elements (BufferVertex, PrimitiveInfo, BlitInfo, VkRect2D, ...) are all POD /
+ * trivially relocatable. Growth is a realloc (bitwise relocation - no
+ * per-element move-ctor and no exception scaffolding), which is what the hot
+ * per-vertex push path wants; the std::vector equivalent emitted an
+ * out-of-line _M_realloc_insert plus EH tables on every push. clear keeps the
+ * allocation for reuse (these are refilled every frame). The struct is brace-
+ * initialisable to { NULL, 0, 0 } so it needs no constructor. */
+#define POD_VEC_DECLARE(NAME, T)                                              \
+struct NAME {                                                                 \
+    T  *items;                                                                \
+    int count;                                                                \
+    int cap;                                                                  \
+    T       *data()        { return items; }                                  \
+    const T *data() const  { return items; }                                  \
+    int      size() const  { return count; }                                  \
+    bool     empty() const { return count == 0; }                             \
+    void     clear()       { count = 0; }                                     \
+    T       *begin()       { return items; }                                  \
+    T       *end()         { return items + count; }                          \
+    const T *begin() const { return items; }                                  \
+    const T *end()   const { return items + count; }                          \
+    T &operator[](int i)             { return items[i]; }                     \
+    const T &operator[](int i) const { return items[i]; }                     \
+    T &back()              { return items[count - 1]; }                       \
+    const T &back() const  { return items[count - 1]; }                       \
+    T &front()             { return items[0]; }                               \
+    const T &front() const { return items[0]; }                               \
+    void grow_by_one() {                                                      \
+        if (count == cap) {                                                   \
+            int ncap = cap ? cap * 2 : 64;                                    \
+            items = (T *)realloc(items, (size_t)ncap * sizeof(T));            \
+            cap = ncap;                                                       \
+        }                                                                     \
+    }                                                                         \
+    void push(const T &v) { grow_by_one(); items[count++] = v; }              \
+    void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }  \
+}
+
 /* TextureRect is a trivially-copyable POD: a borrowed view of an upload plus a
  * subrect. It does NOT manage the refcount in special members (so it relocates
  * with a bitwise move - no per-copy acquire/release, no exception scaffolding in
@@ -6656,6 +6698,12 @@ static inline TextureRect make_texture_rect(TextureUpload *upload, int offset_x,
 /* Ownership transfer helpers, used by owning containers only. */
 static inline void texture_rect_retain(const TextureRect *t)  { texture_upload_acquire(t->upload); }
 static inline void texture_rect_release(const TextureRect *t) { texture_upload_release(t->upload); }
+
+/* Borrowing scratch array of (POD) TextureRects - no ownership, used for the
+ * blit/clear_rect transients that are immediately re-placed into owning
+ * containers. Trivially relocatable, so push is a bare realloc/append. */
+POD_VEC_DECLARE(TextureRectVec, TextureRect);
+
 
 // TODO: better name
 struct EnduringTextureRect {
@@ -7537,47 +7585,7 @@ private:
 namespace PSX
 {
 
-/* ------------------------------------------------------------------------- *
- * POD_VEC - a typed dynamic array of trivially-relocatable elements, MSVC C89.
- *
- * Replaces std::vector<T> for the renderer's per-frame draw queues, whose
- * elements (BufferVertex, PrimitiveInfo, BlitInfo, VkRect2D, ...) are all POD /
- * trivially relocatable. Growth is a realloc (bitwise relocation - no
- * per-element move-ctor and no exception scaffolding), which is what the hot
- * per-vertex push path wants; the std::vector equivalent emitted an
- * out-of-line _M_realloc_insert plus EH tables on every push. clear keeps the
- * allocation for reuse (these are refilled every frame). The struct is brace-
- * initialisable to { NULL, 0, 0 } so it needs no constructor. */
-#define POD_VEC_DECLARE(NAME, T)                                              \
-struct NAME {                                                                 \
-    T  *items;                                                                \
-    int count;                                                                \
-    int cap;                                                                  \
-    T       *data()        { return items; }                                  \
-    const T *data() const  { return items; }                                  \
-    int      size() const  { return count; }                                  \
-    bool     empty() const { return count == 0; }                             \
-    void     clear()       { count = 0; }                                     \
-    T       *begin()       { return items; }                                  \
-    T       *end()         { return items + count; }                          \
-    const T *begin() const { return items; }                                  \
-    const T *end()   const { return items + count; }                          \
-    T &operator[](int i)             { return items[i]; }                     \
-    const T &operator[](int i) const { return items[i]; }                     \
-    T &back()              { return items[count - 1]; }                       \
-    const T &back() const  { return items[count - 1]; }                       \
-    T &front()             { return items[0]; }                               \
-    const T &front() const { return items[0]; }                               \
-    void grow_by_one() {                                                      \
-        if (count == cap) {                                                   \
-            int ncap = cap ? cap * 2 : 64;                                    \
-            items = (T *)realloc(items, (size_t)ncap * sizeof(T));            \
-            cap = ncap;                                                       \
-        }                                                                     \
-    }                                                                         \
-    void push(const T &v) { grow_by_one(); items[count++] = v; }              \
-    void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }  \
-}
+
 
 struct Vertex
 {
@@ -19541,7 +19549,7 @@ SRect moved(SRect rect, int dx, int dy) {
 }
 
 void RectTracker::blit(SRect dst, SRect src) {
-    std::vector<TextureRect> to_place;
+    TextureRectVec to_place = { NULL, 0, 0 };
     int moveX = dst.x - src.x;
     int moveY = dst.y - src.y;
     for (EnduringTextureRect &eold : textures) {
@@ -19551,7 +19559,7 @@ void RectTracker::blit(SRect dst, SRect src) {
             if (intersection.second) {
                 TextureRect sub = subTexture(old, intersection.first);
                 TextureRect subMoved = make_texture_rect(sub.upload, sub.offset_x, sub.offset_y, moved(sub.vram_rect, moveX, moveY));
-                to_place.push_back(subMoved);
+                to_place.push(subMoved);
             }
         }
     }
@@ -19559,6 +19567,7 @@ void RectTracker::blit(SRect dst, SRect src) {
     for (TextureRect &t : to_place) {
         place(t);
     }
+    to_place.free_storage();
     lookup_grid_dirty = true;
 }
 void RectTracker::releaseDeadHandles() {
@@ -19594,7 +19603,7 @@ void RectTracker::clear_rect(SRect &rect) {
     SRect splits[4];
     unsigned splits_count = 0;
 
-    std::vector<TextureRect> newTextures;
+    TextureRectVec newTextures = { NULL, 0, 0 };
     for (int ti = 0; ti < textures.count; ti++) {
         EnduringTextureRect &eold = textures.a[ti];
         if (eold.alive) {
@@ -19608,14 +19617,15 @@ void RectTracker::clear_rect(SRect &rect) {
                 // The rect split, mark this texture as dead and push its splits to be added
                 eold.alive = false;
                 for (unsigned i = 0; i < splits_count; i++) {
-                    newTextures.push_back(subTexture(old, splits[i]));
+                    newTextures.push(subTexture(old, splits[i]));
                 }
             }
         }
     }
-    for (TextureRect newTexture : newTextures) {
-        enduring_arr_push(&textures, newTexture, true);
+    for (int ni = 0; ni < newTextures.count; ni++) {
+        enduring_arr_push(&textures, newTextures.items[ni], true);
     }
+    newTextures.free_storage();
 }
 void RectTracker::place(TextureRect texture) {
     clear_rect(texture.vram_rect);
