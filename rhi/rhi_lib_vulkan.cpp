@@ -6524,8 +6524,46 @@ public:
     IORequest  *req_head,  *req_tail;
     IOResponse *resp_head, *resp_tail;
     bool done = false;
+    /* Cross-thread refcount (replaces std::shared_ptr<IOChannel>). The owning
+     * IOThread holds one reference and each detached worker holds one; whichever
+     * releases last frees the channel. Mutated only outside the lock, at
+     * thread-spawn and thread-exit, so a plain int with no overlap is fine. */
+    int refcount;
 private:
 };
+
+static IOChannel *io_channel_new() {
+    IOChannel *c = new IOChannel();
+    c->refcount = 1;
+    return c;
+}
+/* The refcount is touched from the owning thread (spawn/teardown) and from the
+ * detached workers (exit), so the increment/decrement must be serialised. A
+ * single process-wide lock guards every transition; the actual free happens
+ * after the lock is dropped so we never reference the channel's own lock once
+ * it may be gone. */
+static slock_t *io_channel_rc_lock = NULL;
+static void io_channel_rc_lock_init() {
+    if (!io_channel_rc_lock)
+        io_channel_rc_lock = slock_new();
+}
+static void io_channel_acquire(IOChannel *c) {
+    if (!c)
+        return;
+    slock_lock(io_channel_rc_lock);
+    c->refcount++;
+    slock_unlock(io_channel_rc_lock);
+}
+static void io_channel_release(IOChannel *c) {
+    bool should_free;
+    if (!c)
+        return;
+    slock_lock(io_channel_rc_lock);
+    should_free = (--c->refcount == 0);
+    slock_unlock(io_channel_rc_lock);
+    if (should_free)
+        delete c;
+}
 
 /* FIFO helpers (caller holds channel->lock). Defined here so the IO worker
  * (io_thread) and the producers can all see them. */
@@ -6559,7 +6597,7 @@ class IOThread {
 public:
     IOThread();
     ~IOThread();
-    std::shared_ptr<IOChannel> channel;
+    IOChannel *channel; /* refcounted; one ref held here, one per worker */
 private:
 };
 
@@ -18288,12 +18326,10 @@ void convert_psx_to_tri(uint8_t *image, int width, int height) {
 */
 
 void io_thread(void *user_data) {
-    // Pool worker. Each worker is handed its own heap-allocated shared_ptr
-    // copy of the channel so several workers can start without racing on the
-    // IOThread member; free the holder once we've taken our copy.
-    std::shared_ptr<IOChannel> *arg = (std::shared_ptr<IOChannel> *)user_data;
-    std::shared_ptr<IOChannel> channel = *arg;
-    delete arg;
+    // Pool worker. Each worker is handed the channel pointer with a reference
+    // already taken on its behalf (at spawn); it releases that reference on the
+    // way out. Whichever holder releases last frees the channel.
+    IOChannel *channel = (IOChannel *)user_data;
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread starting\n");
 
     while (true) {
@@ -18313,7 +18349,7 @@ void io_thread(void *user_data) {
             // Take ONE request from the front so work spreads across the pool
             // and the producer's priority order (visible palette first) is
             // preserved. Wake another worker if more remain.
-            request = io_channel_pop_request(channel.get());
+            request = io_channel_pop_request(channel);
             if (channel->req_head != NULL) {
                 scond_signal(channel->cond);
             }
@@ -18344,7 +18380,7 @@ void io_thread(void *user_data) {
                 loaded_levels_move(&response->levels, &levels);
 
                 slock_lock(channel->lock);
-                io_channel_push_response(channel.get(), response);
+                io_channel_push_response(channel, response);
                 slock_unlock(channel->lock);
 
                 rgba_image_free(&image);
@@ -18359,6 +18395,7 @@ void io_thread(void *user_data) {
         }
         io_request_free(request);
     }
+    io_channel_release(channel); /* drop this worker's reference */
     TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread ending\n");
 }
 
@@ -18384,15 +18421,17 @@ IOChannel::~IOChannel() {
 static const int NUM_IO_THREADS = 4;
 
 IOThread::IOThread() {
-    channel = std::make_shared<IOChannel>();
+    io_channel_rc_lock_init();
+    channel = io_channel_new(); /* this IOThread holds one reference */
     for (int i = 0; i < NUM_IO_THREADS; i++) {
-        // Hand each worker its own shared_ptr copy (deleted by the worker).
-        std::shared_ptr<IOChannel> *arg = new std::shared_ptr<IOChannel>(channel);
-        sthread_t *thread = sthread_create(io_thread, arg);
+        // Take a reference on the worker's behalf BEFORE it starts, so the
+        // channel can't be freed out from under it; the worker releases on exit.
+        io_channel_acquire(channel);
+        sthread_t *thread = sthread_create(io_thread, channel);
         if (thread) {
             sthread_detach(thread);
         } else {
-            delete arg; // thread failed to start; reclaim the holder
+            io_channel_release(channel); // thread failed to start; undo its ref
         }
     }
 }
@@ -18401,6 +18440,9 @@ IOThread::~IOThread() {
     channel->done = true;
     slock_unlock(channel->lock);
     scond_broadcast(channel->cond); // wake ALL workers so they can exit
+    io_channel_release(channel);    // drop this IOThread's reference; the last
+                                    // worker to exit frees the channel
+    channel = NULL;
 }
 
 void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
@@ -18527,7 +18569,7 @@ void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
         dump->bytes_len = bytes_len;
 
         slock_lock(iothread.channel->lock);
-        io_channel_push_request(iothread.channel.get(), dump);
+        io_channel_push_request(iothread.channel, dump);
         slock_unlock(iothread.channel->lock);
         scond_signal(iothread.channel->cond);
     }
@@ -18890,7 +18932,7 @@ void TextureTracker::load_hd_texture(uint32_t hash) {
             load->palette_hash = palette_hash;
             load->bytes = NULL;
             load->bytes_len = 0;
-            io_channel_push_request(iothread.channel.get(), load);
+            io_channel_push_request(iothread.channel, load);
         }
         slock_unlock(iothread.channel->lock);
         scond_signal(iothread.channel->cond);
@@ -18919,7 +18961,7 @@ void TextureTracker::want_combo(HdTextureId id) {
         load->palette_hash = id.palette_hash;
         load->bytes = NULL;
         load->bytes_len = 0;
-        io_channel_push_request(iothread.channel.get(), load);
+        io_channel_push_request(iothread.channel, load);
     }
     slock_unlock(iothread.channel->lock);
     scond_signal(iothread.channel->cond);
@@ -19193,7 +19235,7 @@ void TextureTracker::on_queues_reset() {
     // Poll HD uploads
 
     slock_lock(iothread.channel->lock);
-    IOResponse *responses = io_channel_take_responses(iothread.channel.get()); // steal the list
+    IOResponse *responses = io_channel_take_responses(iothread.channel); // steal the list
     slock_unlock(iothread.channel->lock);
 
     // Move freshly decoded images into the cache (decode-once); mark them for
