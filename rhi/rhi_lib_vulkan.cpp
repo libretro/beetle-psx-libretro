@@ -3902,6 +3902,8 @@ struct ImageViewDeleter
 	void operator()(ImageView *view);
 };
 
+POD_VEC_DECLARE(RenderTargetViewVec, VkImageView);
+
 class ImageView : public Util::IntrusivePtrEnabled<ImageView, ImageViewDeleter, HandleCounter>,
                   public Cookie
 {
@@ -3920,10 +3922,12 @@ public:
 		stencil_view = stencil;
 	}
 
-	void set_render_target_views(std::vector<VkImageView> views)
+	void set_render_target_views(RenderTargetViewVec views)
 	{
 		VK_ASSERT(render_target_views.empty());
-		render_target_views = std::move(views);
+		// POD_VEC passed by value: adopt its backing array (the caller nulls its
+		// own copy so ownership transfers cleanly, mirroring the old move).
+		render_target_views = views;
 	}
 
 	// By default, gets a combined view which includes all aspects in the image.
@@ -3974,7 +3978,7 @@ public:
 private:
 	Device *device;
 	VkImageView view;
-	std::vector<VkImageView> render_target_views;
+	RenderTargetViewVec render_target_views = { NULL, 0, 0 };
 	VkImageView depth_view = VK_NULL_HANDLE;
 	VkImageView stencil_view = VK_NULL_HANDLE;
 	ImageViewCreateInfo info;
@@ -11562,6 +11566,7 @@ ImageView::~ImageView()
 
 	for (VkImageView &view : render_target_views)
 		device->destroy_image_view_nolock(view);
+	render_target_views.free_storage();
 }
 
 Image::Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
@@ -16819,7 +16824,7 @@ public:
 	VkImageView image_view = VK_NULL_HANDLE;
 	VkImageView depth_view = VK_NULL_HANDLE;
 	VkImageView stencil_view = VK_NULL_HANDLE;
-	std::vector<VkImageView> rt_views;
+	RenderTargetViewVec rt_views = { NULL, 0, 0 };
 	DeviceAllocation allocation;
 	DeviceAllocator *allocator = nullptr;
 	bool owned = true;
@@ -16863,7 +16868,6 @@ public:
 private:
 	bool create_render_target_views(const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info)
 	{
-		rt_views.reserve(info.subresourceRange.layerCount);
 
 		if (info.viewType == VK_IMAGE_VIEW_TYPE_3D)
 			return true;
@@ -16886,7 +16890,7 @@ private:
 				if (vkCreateImageView(device, &view_info, nullptr, &rt_view) != VK_SUCCESS)
 					return false;
 
-				rt_views.push_back(rt_view);
+				rt_views.push(rt_view);
 			}
 		}
 
@@ -16954,6 +16958,7 @@ private:
 			vkDestroyImageView(device, stencil_view, nullptr);
 		for (VkImageView &view : rt_views)
 			vkDestroyImageView(device, view, nullptr);
+		rt_views.free_storage();
 
 		if (image)
 			vkDestroyImage(device, image, nullptr);
@@ -17007,7 +17012,8 @@ ImageViewHandle Device::create_image_view(const ImageViewCreateInfo &create_info
 	{
 		holder.owned = false;
 		ret->set_alt_views(holder.depth_view, holder.stencil_view);
-		ret->set_render_target_views(std::move(holder.rt_views));
+		ret->set_render_target_views(holder.rt_views);
+		holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
 		return ret;
 	}
 	else
@@ -17182,7 +17188,8 @@ ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &crea
 		if (has_view)
 		{
 			handle->get_view().set_alt_views(holder.depth_view, holder.stencil_view);
-			handle->get_view().set_render_target_views(std::move(holder.rt_views));
+			handle->get_view().set_render_target_views(holder.rt_views);
+			holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
 		}
 
 		// Set possible dstStage and dstAccess.
