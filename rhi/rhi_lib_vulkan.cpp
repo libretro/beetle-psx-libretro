@@ -5920,7 +5920,7 @@ namespace Vulkan
 			struct QueueData
 			{
 				SemaphoreHandleVec wait_semaphores;
-				VkPipelineStageVec wait_stages;
+				VkPipelineStageVec wait_stages = { NULL, 0, 0 };
 				bool need_fence = false;
 			} graphics, compute, transfer;
 
