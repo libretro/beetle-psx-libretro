@@ -15953,6 +15953,8 @@ void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semap
 	decrement_frame_counter_nolock();
 }
 
+POD_VEC_DECLARE(VkSemaphoreVec, VkSemaphore);
+POD_VEC_DECLARE(VkFlagsVec, VkFlags);
 void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
                                 unsigned semaphore_count, Semaphore *semaphores)
 {
@@ -15960,15 +15962,20 @@ void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 	VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
 	// Add external wait semaphores.
-	std::vector<VkSemaphore> waits;
-	std::vector<VkSemaphore> signals;
-	std::vector<VkPipelineStageFlags> stages = std::move(data.wait_stages);
+	VkSemaphoreVec waits   = { NULL, 0, 0 };
+	VkSemaphoreVec signals = { NULL, 0, 0 };
+	VkFlagsVec stages      = { NULL, 0, 0 };
+	{
+		size_t ws;
+		for (ws = 0; ws < data.wait_stages.size(); ws++)
+			stages.push(data.wait_stages[ws]);
+	}
 
 	for (Semaphore &semaphore : data.wait_semaphores)
 	{
 		VkSemaphore wait = semaphore->consume();
 		frame().recycled_semaphores.push(wait);
-		waits.push_back(wait);
+		waits.push(wait);
 	}
 	data.wait_stages.clear();
 	data.wait_semaphores.clear();
@@ -15977,7 +15984,7 @@ void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 	for (unsigned i = 0; i < semaphore_count; i++)
 	{
 		VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
-		signals.push_back(cleared_semaphore);
+		signals.push(cleared_semaphore);
 		VK_ASSERT(!semaphores[i]);
 		semaphores[i] = Semaphore(handle_pool.semaphores.allocate(this, cleared_semaphore, true));
 	}
@@ -16011,6 +16018,10 @@ void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
 
 	if (result != VK_SUCCESS)
 		LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
+
+	waits.free_storage();
+	signals.free_storage();
+	stages.free_storage();
 
 	if (fence)
 	{
@@ -16107,8 +16118,6 @@ void Device::submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, 
 
 POD_VEC_DECLARE(VkCommandBufferVec, VkCommandBuffer);
 POD_VEC_DECLARE(VkSubmitInfoVec, VkSubmitInfo);
-POD_VEC_DECLARE(VkSemaphoreVec, VkSemaphore);
-POD_VEC_DECLARE(VkFlagsVec, VkFlags);
 
 void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
                           unsigned semaphore_count, Semaphore *semaphores)
