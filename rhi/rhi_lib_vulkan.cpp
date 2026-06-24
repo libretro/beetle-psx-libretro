@@ -1689,6 +1689,7 @@ struct NAME {                                                                 \
         }                                                                     \
     }                                                                         \
     void push(const T &v) { grow_by_one(); items[count++] = v; }              \
+    void pop_back() { if (count) count--; }                                   \
     void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }  \
 }
 
@@ -4242,6 +4243,7 @@ using Fence = Util::IntrusivePtr<FenceHolder>;
 
 namespace Vulkan
 {
+POD_VEC_DECLARE(FenceVec, VkFence);
 class FenceManager
 {
 public:
@@ -4255,8 +4257,8 @@ public:
 	void recycle_fence(VkFence fence);
 
 private:
-	VkDevice device;
-	std::vector<VkFence> fences;
+	VkDevice device = VK_NULL_HANDLE;
+	FenceVec fences = { NULL, 0, 0 };
 };
 }
 
@@ -4323,6 +4325,7 @@ using Semaphore = Util::IntrusivePtr<SemaphoreHolder>;
 
 namespace Vulkan
 {
+POD_VEC_DECLARE(SemaphoreVec, VkSemaphore);
 class SemaphoreManager
 {
 public:
@@ -4337,7 +4340,7 @@ public:
 
 private:
 	VkDevice device = VK_NULL_HANDLE;
-	std::vector<VkSemaphore> semaphores;
+	SemaphoreVec semaphores = { NULL, 0, 0 };
 };
 }
 
@@ -11642,13 +11645,14 @@ VkFence FenceManager::request_cleared_fence()
 
 void FenceManager::recycle_fence(VkFence fence)
 {
-	fences.push_back(fence);
+	fences.push(fence);
 }
 
 FenceManager::~FenceManager()
 {
 	for (VkFence &fence : fences)
 		vkDestroyFence(device, fence, nullptr);
+	fences.free_storage();
 }
 }
 
@@ -11683,12 +11687,13 @@ SemaphoreManager::~SemaphoreManager()
 {
 	for (VkSemaphore &sem : semaphores)
 		vkDestroySemaphore(device, sem, nullptr);
+	semaphores.free_storage();
 }
 
 void SemaphoreManager::recycle(VkSemaphore sem)
 {
 	if (sem != VK_NULL_HANDLE)
-		semaphores.push_back(sem);
+		semaphores.push(sem);
 }
 
 VkSemaphore SemaphoreManager::request_cleared_semaphore()
