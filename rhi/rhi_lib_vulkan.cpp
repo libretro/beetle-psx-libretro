@@ -13221,23 +13221,23 @@ const char *Shader::stage_to_name(ShaderStage stage)
 	}
 }
 
-static bool get_stock_sampler(StockSampler &sampler, const std::string &name)
+static bool get_stock_sampler(StockSampler &sampler, const char *name)
 {
-	if (name.find("NearestClamp") != std::string::npos)
+	if (strstr(name, "NearestClamp"))
 		sampler = StockSampler::NearestClamp;
-	else if (name.find("LinearClamp") != std::string::npos)
+	else if (strstr(name, "LinearClamp"))
 		sampler = StockSampler::LinearClamp;
-	else if (name.find("TrilinearClamp") != std::string::npos)
+	else if (strstr(name, "TrilinearClamp"))
 		sampler = StockSampler::TrilinearClamp;
-	else if (name.find("NearestWrap") != std::string::npos)
+	else if (strstr(name, "NearestWrap"))
 		sampler = StockSampler::NearestWrap;
-	else if (name.find("LinearWrap") != std::string::npos)
+	else if (strstr(name, "LinearWrap"))
 		sampler = StockSampler::LinearWrap;
-	else if (name.find("TrilinearWrap") != std::string::npos)
+	else if (strstr(name, "TrilinearWrap"))
 		sampler = StockSampler::TrilinearWrap;
-	else if (name.find("NearestShadow") != std::string::npos)
+	else if (strstr(name, "NearestShadow"))
 		sampler = StockSampler::NearestShadow;
-	else if (name.find("LinearShadow") != std::string::npos)
+	else if (strstr(name, "LinearShadow"))
 		sampler = StockSampler::LinearShadow;
 	else
 		return false;
@@ -13278,9 +13278,8 @@ Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
 		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
 			layout.sets[set].fp_mask |= 1u << binding;
 
-		const std::string &name = image.name;
 		StockSampler sampler;
-		if (type.image.dim != spv::DimBuffer && get_stock_sampler(sampler, name))
+		if (type.image.dim != spv::DimBuffer && get_stock_sampler(sampler, image.name.c_str()))
 		{
 			if (has_immutable_sampler(layout.sets[set], binding))
 			{
@@ -13324,9 +13323,8 @@ Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
 		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
 		layout.sets[set].sampler_mask |= 1u << binding;
 
-		const std::string &name = image.name;
 		StockSampler sampler;
-		if (get_stock_sampler(sampler, name))
+		if (get_stock_sampler(sampler, image.name.c_str()))
 		{
 			if (has_immutable_sampler(layout.sets[set], binding))
 			{
