@@ -3508,7 +3508,82 @@ private:
 		void garbage_collect(VkDevice device);
 	};
 
-	std::vector<Heap> heaps;
+	/* Owning array of Heap. Replaces std::vector<Heap>. Heap owns a move-only
+	 * AllocationVec, so it is move-only too; growth move-constructs each Heap
+	 * into new storage with placement new and destroys the moved-from slot, and
+	 * resize(n) default-constructs new tail elements (growing) or destroys the
+	 * tail (shrinking). The allocator only ever clear()s then resize()s to the
+	 * memory-heap count and indexes/iterates after that. Uses ::operator
+	 * new/delete-free raw storage with explicit ctor/dtor; ::free/::realloc are
+	 * qualified because DeviceAllocator has its own free() members. */
+	struct HeapVec
+	{
+		Heap *items;
+		int count;
+		int cap;
+
+		HeapVec() : items(NULL), count(0), cap(0) {}
+		~HeapVec() { destroy(); }
+		HeapVec(HeapVec &&o) noexcept
+			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
+		HeapVec &operator=(HeapVec &&o) noexcept {
+			if (this != &o) {
+				destroy();
+				items = o.items; count = o.count; cap = o.cap;
+				o.items = NULL; o.count = 0; o.cap = 0;
+			}
+			return *this;
+		}
+		HeapVec(const HeapVec &) = delete;
+		HeapVec &operator=(const HeapVec &) = delete;
+
+		int size() const { return count; }
+		bool empty() const { return count == 0; }
+		Heap &operator[](int i) { return items[i]; }
+		const Heap &operator[](int i) const { return items[i]; }
+		Heap *begin() { return items; }
+		Heap *end() { return items + count; }
+		const Heap *begin() const { return items; }
+		const Heap *end() const { return items + count; }
+
+		void clear() {
+			for (int i = 0; i < count; i++)
+				items[i].~Heap();
+			count = 0;
+		}
+		void resize(int n) {
+			if (n > count) {
+				if (n > cap)
+					grow(n);
+				for (int i = count; i < n; i++)
+					new (&items[i]) Heap();
+			} else {
+				for (int i = n; i < count; i++)
+					items[i].~Heap();
+			}
+			count = n;
+		}
+
+	private:
+		void grow(int ncap) {
+			Heap *nitems = (Heap *)::malloc((size_t)ncap * sizeof(Heap));
+			for (int i = 0; i < count; i++) {
+				new (&nitems[i]) Heap(static_cast<Heap &&>(items[i]));
+				items[i].~Heap();
+			}
+			::free(items);
+			items = nitems;
+			cap = ncap;
+		}
+		void destroy() {
+			for (int i = 0; i < count; i++)
+				items[i].~Heap();
+			::free(items);
+			items = NULL; count = 0; cap = 0;
+		}
+	};
+
+	HeapVec heaps;
 };
 }
 
