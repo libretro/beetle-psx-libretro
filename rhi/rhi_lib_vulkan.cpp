@@ -4881,6 +4881,7 @@ private:
 
 namespace Vulkan
 {
+POD_VEC_DECLARE(CommandBufferVec, VkCommandBuffer);
 class CommandPool
 {
 public:
@@ -4907,7 +4908,7 @@ public:
 private:
 	VkDevice device = VK_NULL_HANDLE;
 	VkCommandPool pool = VK_NULL_HANDLE;
-	std::vector<VkCommandBuffer> buffers;
+	CommandBufferVec buffers = { NULL, 0, 0 };
 #ifdef VULKAN_DEBUG
 	std::unordered_set<VkCommandBuffer> in_flight;
 #endif
@@ -11824,10 +11825,11 @@ CommandPool &CommandPool::operator=(CommandPool &&other) noexcept
 			vkFreeCommandBuffers(device, pool, buffers.size(), buffers.data());
 		if (pool != VK_NULL_HANDLE)
 			vkDestroyCommandPool(device, pool, nullptr);
+		buffers.free_storage();
 
 		// Adopt other's resources.
 		pool = other.pool;
-		buffers = std::move(other.buffers);
+		buffers = other.buffers;          // POD_VEC: bitwise steal of the backing array
 		index = other.index;
 #ifdef VULKAN_DEBUG
 		in_flight = std::move(other.in_flight);
@@ -11836,7 +11838,9 @@ CommandPool &CommandPool::operator=(CommandPool &&other) noexcept
 		// Leave other in a destructor-safe state (no double-free).
 		other.pool = VK_NULL_HANDLE;
 		other.index = 0;
-		other.buffers.clear();
+		other.buffers.items = NULL;       // source no longer owns the array
+		other.buffers.count = 0;
+		other.buffers.cap = 0;
 #ifdef VULKAN_DEBUG
 		other.in_flight.clear();
 #endif
@@ -11850,6 +11854,7 @@ CommandPool::~CommandPool()
 		vkFreeCommandBuffers(device, pool, buffers.size(), buffers.data());
 	if (pool != VK_NULL_HANDLE)
 		vkDestroyCommandPool(device, pool, nullptr);
+	buffers.free_storage();
 }
 
 VkCommandBuffer CommandPool::request_command_buffer()
@@ -11876,7 +11881,7 @@ VkCommandBuffer CommandPool::request_command_buffer()
 		VK_ASSERT(in_flight.find(cmd) == end(in_flight));
 		in_flight.insert(cmd);
 #endif
-		buffers.push_back(cmd);
+		buffers.push(cmd);
 		index++;
 		return cmd;
 	}
