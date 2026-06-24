@@ -4236,6 +4236,15 @@ namespace Vulkan
 	POD_VEC_DECLARE(DescriptorPoolSizeVec, VkDescriptorPoolSize);
 	POD_VEC_DECLARE(DescriptorBindingVec, VkDescriptorSetLayoutBinding);
 
+	/* Result of DescriptorSetAllocator::find: the set plus whether it was an
+	 * existing (already-populated) entry. Replaces std::pair<VkDescriptorSet,
+	 * bool>; 'cached' is the old .second. */
+	struct DescriptorSetAllocation
+	{
+		VkDescriptorSet set;
+		bool cached;
+	};
+
 	class DescriptorSetAllocator : public HashedObject<DescriptorSetAllocator>
 	{
 		public:
@@ -4248,7 +4257,7 @@ namespace Vulkan
 			{
 				per_thread.should_begin = true;
 			}
-			std::pair<VkDescriptorSet, bool> find(Util::Hash hash);
+			DescriptorSetAllocation find(Util::Hash hash);
 
 			VkDescriptorSetLayout get_layout() const
 			{
@@ -12638,7 +12647,7 @@ DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const 
 	bindings.free_storage();
 }
 
-std::pair<VkDescriptorSet, bool> DescriptorSetAllocator::find(Hash hash)
+DescriptorSetAllocation DescriptorSetAllocator::find(Hash hash)
 {
 	PerThread &state = per_thread;
 	if (state.should_begin)
@@ -14709,10 +14718,10 @@ namespace Vulkan
 		}
 
 		Hash hash = h.get();
-		std::pair<VkDescriptorSet, bool> allocated = current_layout->get_allocator(set)->find(hash);
+		DescriptorSetAllocation allocated = current_layout->get_allocator(set)->find(hash);
 
 		// The descriptor set was not successfully cached, rebuild.
-		if (!allocated.second)
+		if (!allocated.cached)
 		{
 			uint32_t write_count = 0;
 			uint32_t buffer_info_count = 0;
@@ -14728,7 +14737,7 @@ namespace Vulkan
 				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 				write.dstArrayElement = 0;
 				write.dstBinding = binding;
-				write.dstSet = allocated.first;
+				write.dstSet = allocated.set;
 
 				// Offsets are applied dynamically.
 				VkDescriptorBufferInfo &buffer = buffer_info[buffer_info_count++];
@@ -14746,7 +14755,7 @@ namespace Vulkan
 				write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 				write.dstArrayElement = 0;
 				write.dstBinding = binding;
-				write.dstSet = allocated.first;
+				write.dstSet = allocated.set;
 				write.pBufferInfo = &bindings.bindings[set][binding].buffer;
 			}
 
@@ -14759,7 +14768,7 @@ namespace Vulkan
 				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
 				write.dstArrayElement = 0;
 				write.dstBinding = binding;
-				write.dstSet = allocated.first;
+				write.dstSet = allocated.set;
 				write.pTexelBufferView = &bindings.bindings[set][binding].buffer_view;
 			}
 
@@ -14772,7 +14781,7 @@ namespace Vulkan
 				write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 				write.dstArrayElement = 0;
 				write.dstBinding = binding;
-				write.dstSet = allocated.first;
+				write.dstSet = allocated.set;
 
 				if (set_layout.fp_mask & (1u << binding))
 					write.pImageInfo = &bindings.bindings[set][binding].image.fp;
@@ -14789,7 +14798,7 @@ namespace Vulkan
 				write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 				write.dstArrayElement = 0;
 				write.dstBinding = binding;
-				write.dstSet = allocated.first;
+				write.dstSet = allocated.set;
 
 				if (set_layout.fp_mask & (1u << binding))
 					write.pImageInfo = &bindings.bindings[set][binding].image.fp;
@@ -14806,7 +14815,7 @@ namespace Vulkan
 				write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
 				write.dstArrayElement = 0;
 				write.dstBinding = binding;
-				write.dstSet = allocated.first;
+				write.dstSet = allocated.set;
 				write.pImageInfo = &bindings.bindings[set][binding].image.fp;
 			}
 
@@ -14819,7 +14828,7 @@ namespace Vulkan
 				write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 				write.dstArrayElement = 0;
 				write.dstBinding = binding;
-				write.dstSet = allocated.first;
+				write.dstSet = allocated.set;
 
 				if (set_layout.fp_mask & (1u << binding))
 					write.pImageInfo = &bindings.bindings[set][binding].image.fp;
@@ -14836,7 +14845,7 @@ namespace Vulkan
 				write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 				write.dstArrayElement = 0;
 				write.dstBinding = binding;
-				write.dstSet = allocated.first;
+				write.dstSet = allocated.set;
 				if (set_layout.fp_mask & (1u << binding))
 					write.pImageInfo = &bindings.bindings[set][binding].image.fp;
 				else
@@ -14847,7 +14856,7 @@ namespace Vulkan
 		}
 
 		vkCmdBindDescriptorSets(cmd, actual_render_pass ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE,
-				current_pipeline_layout, set, 1, &allocated.first, num_dynamic_offsets, dynamic_offsets);
+				current_pipeline_layout, set, 1, &allocated.set, num_dynamic_offsets, dynamic_offsets);
 	}
 
 	void CommandBuffer::flush_descriptor_sets()
