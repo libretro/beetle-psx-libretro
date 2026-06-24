@@ -18695,7 +18695,12 @@ uint32_t TextureTracker::dbgHashVram(Rect rect, uint16_t *vram) {
     return hash;
 }
 
-std::pair<SRect, bool> intersect(SRect a, SRect b) {
+/* Geometry helpers used to return std::pair<...,bool> (result + validity).
+ * Named structs make the boolean's meaning explicit and drop std::pair. */
+struct SRectResult { SRect rect; bool valid; };
+struct TextureRectResult { TextureRect rect; bool valid; };
+
+SRectResult intersect(SRect a, SRect b) {
     int al     = a.left(),   ar = a.right(),  at = a.top(), ab = a.bottom();
     int bl     = b.left(),   br = b.right(),  bt = b.top(), bb = b.bottom();
     int left   = (al > bl) ? al : bl;
@@ -18705,8 +18710,8 @@ std::pair<SRect, bool> intersect(SRect a, SRect b) {
     int width  = right - left;
     int height = bottom - top;
     if (width <= 0 || height <= 0)
-        return std::make_pair(SRect(0, 0, 1, 1), false);
-    return std::make_pair(SRect(left, top, width, height), true);
+        { SRectResult r = { SRect(0, 0, 1, 1), false }; return r; }
+    { SRectResult r = { SRect(left, top, width, height), true }; return r; }
 }
 
 TextureRect subTexture(TextureRect original, SRect sub_vram_rect) {
@@ -18718,11 +18723,14 @@ TextureRect subTexture(TextureRect original, SRect sub_vram_rect) {
     );
 }
 
-std::pair<TextureRect, bool> clip_texture_rect_to_vram(TextureRect &t, Rect vram_rect) {
-    std::pair<SRect, bool> intersection = intersect(t.vram_rect, toSRect(vram_rect));
-    if (intersection.second)
-        return std::make_pair(subTexture(t, intersection.first), true);
-    return std::make_pair(make_texture_rect(nullptr, 0, 0, SRect(0, 0, 1, 1)), false);
+TextureRectResult clip_texture_rect_to_vram(TextureRect &t, Rect vram_rect) {
+    SRectResult intersection = intersect(t.vram_rect, toSRect(vram_rect));
+    if (intersection.valid) {
+        TextureRectResult r = { subTexture(t, intersection.rect), true };
+        return r;
+    }
+    TextureRectResult r = { make_texture_rect(nullptr, 0, 0, SRect(0, 0, 1, 1)), false };
+    return r;
 }
 
 void TextureTracker::notifyReadback(Rect rect, uint16_t *vram) {
@@ -18755,10 +18763,10 @@ void TextureTracker::notifyReadback(Rect rect, uint16_t *vram) {
         EnduringTextureRect &e = tracker.textures.a[index];
         if (e.alive) { // TODO: This check is unnecessary because tracker.overlapping never returns dead indices
             // Clip to the requested rect
-            std::pair<TextureRect, bool> result = clip_texture_rect_to_vram(e.texture_rect, rect);
-            if (result.second) {
-                // assert(rect.contains(fromSRect(result.first.vram_rect)));
-                to_restore.push(result.first);
+            TextureRectResult result = clip_texture_rect_to_vram(e.texture_rect, rect);
+            if (result.valid) {
+                // assert(rect.contains(fromSRect(result.rect.vram_rect)));
+                to_restore.push(result.rect);
             }
         }
     }
@@ -19423,14 +19431,14 @@ SRect bounds(int left, int right, int top, int bottom) {
 
 static void split(SRect original, SRect remove, SRect *results, unsigned &count)
 {
-    std::pair<SRect, bool> intersectionResult = intersect(original, remove);
-    if (!intersectionResult.second)
+    SRectResult intersectionResult = intersect(original, remove);
+    if (!intersectionResult.valid)
     {
         results[count++] = original;
         return;
     }
 
-    SRect intersection = intersectionResult.first;
+    SRect intersection = intersectionResult.rect;
 
     // Top rect
     if (intersection.top() > original.top()) {
@@ -19490,9 +19498,9 @@ void RectTracker::blit(SRect dst, SRect src) {
     for (EnduringTextureRect &eold : textures) {
         if (eold.alive) {
             TextureRect &old = eold.texture_rect;
-            std::pair<SRect, bool> intersection = intersect(old.vram_rect, src);
-            if (intersection.second) {
-                TextureRect sub = subTexture(old, intersection.first);
+            SRectResult intersection = intersect(old.vram_rect, src);
+            if (intersection.valid) {
+                TextureRect sub = subTexture(old, intersection.rect);
                 TextureRect subMoved = make_texture_rect(sub.upload, sub.offset_x, sub.offset_y, moved(sub.vram_rect, moveX, moveY));
                 to_place.push(subMoved);
             }
@@ -19721,13 +19729,13 @@ FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker
     for (EnduringTextureRect &e : tracker.textures) {
         if (!e.alive)
             continue;
-        std::pair<SRect, bool> intersection = intersect(toSRect(full_page_rect), e.texture_rect.vram_rect);
-        if (intersection.second) {
+        SRectResult intersection = intersect(toSRect(full_page_rect), e.texture_rect.vram_rect);
+        if (intersection.valid) {
             TextureUpload &upload = *e.texture_rect.upload;
             HdTexEntry *hd_texture = hd_tex_map_find(&upload.textures, palette_hash);
             if (hd_texture != NULL) {
                 // Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity)
-                TextureRect clipped = subTexture(e.texture_rect, intersection.first);
+                TextureRect clipped = subTexture(e.texture_rect, intersection.rect);
                 f.scaleX = max_(f.scaleX, hd_texture->image->get_width() / upload.width);
                 f.scaleY = max_(f.scaleY, hd_texture->image->get_height() / upload.height);
                 Rect r = fromSRect(clipped.vram_rect);
