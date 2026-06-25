@@ -3057,11 +3057,24 @@ namespace Vulkan
 		void operator()(Sampler *sampler);
 	};
 
-	class Sampler : public Util::IntrusivePtrEnabled<Sampler, SamplerDeleter, HandleCounter>,
-	public Cookie
+	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
+	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
+	 * base, which provides the hash identity, is unrelated and stays. */
+	class Sampler : public Cookie
 	{
 		public:
 			friend struct SamplerDeleter;
+
+			void release_reference()
+			{
+				if (reference_count.release())
+					SamplerDeleter()(this);
+			}
+			void add_reference()
+			{
+				reference_count.add_ref();
+			}
+
 			~Sampler();
 
 			VkSampler get_sampler() const
@@ -3075,6 +3088,7 @@ namespace Vulkan
 
 			Device *device;
 			VkSampler sampler;
+			HandleCounter reference_count;
 	};
 	using SamplerHandle = Util::IntrusivePtr<Sampler>;
 }
