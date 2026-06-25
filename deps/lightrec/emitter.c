@@ -1830,9 +1830,23 @@ static void rec_store(struct lightrec_cstate *state,
 			      swap_code, !no_invalidate);
 		break;
 	case LIGHTREC_IO_SCRATCH:
+		/* The scratchpad direct store masks with 0x1fffffff and adds a
+		 * fixed offset with no runtime bounds check; on a sub-par map a
+		 * strayed address escapes the scratchpad region into unmapped
+		 * space and faults. Fall back to the generic wrapper, which
+		 * resolves the real map at runtime. */
+		if (!state->state->mirrors_mapped) {
+			rec_io(state, block, offset, true, false);
+			return;
+		}
 		rec_store_scratch(state, block, offset, code, swap_code);
 		break;
 	case LIGHTREC_IO_DIRECT:
+		/* Likewise unsafe on a sub-par map (see above). */
+		if (!state->state->mirrors_mapped) {
+			rec_io(state, block, offset, true, false);
+			return;
+		}
 		if (no_invalidate) {
 			rec_store_direct_no_invalidate(state, block, offset,
 						       code, swap_code);
@@ -2152,15 +2166,37 @@ static void rec_load(struct lightrec_cstate *state, const struct block *block,
 		rec_load_ram(state, block, offset, code, swap_code, is_unsigned);
 		break;
 	case LIGHTREC_IO_BIOS:
-		rec_load_bios(state, block, offset, code, swap_code, is_unsigned);
-		break;
 	case LIGHTREC_IO_SCRATCH:
-		rec_load_scratch(state, block, offset, code, swap_code, is_unsigned);
+		/* The BIOS and scratchpad direct loads mask the address with
+		 * 0x1fffffff and add a fixed offset with no runtime bounds
+		 * check, so they only stay in bounds when the whole segment is
+		 * backed by the host mapping. On a sub-par map (mirrors_mapped
+		 * == false) only the individual regions are mapped, so an
+		 * address that const propagation tagged as BIOS/scratchpad but
+		 * that strays at runtime (e.g. into the 0x1f801xxx hardware
+		 * window) is offset-loaded into unmapped space and faults. The
+		 * tight RAM path (rec_load_ram) is safe because its mask keeps
+		 * the address inside the RAM window, but these wider-masked
+		 * paths are not. Fall back to the generic wrapper, which
+		 * resolves the real map at runtime. */
+		if (!state->state->mirrors_mapped) {
+			rec_io(state, block, offset, false, true);
+			return;
+		}
+		if (LIGHTREC_FLAGS_GET_IO_MODE(flags) == LIGHTREC_IO_BIOS)
+			rec_load_bios(state, block, offset, code, swap_code, is_unsigned);
+		else
+			rec_load_scratch(state, block, offset, code, swap_code, is_unsigned);
 		break;
 	case LIGHTREC_IO_DIRECT_HW:
 		rec_load_io(state, block, offset, code, swap_code, is_unsigned);
 		break;
 	case LIGHTREC_IO_DIRECT:
+		/* Likewise unsafe on a sub-par map (see above). */
+		if (!state->state->mirrors_mapped) {
+			rec_io(state, block, offset, false, true);
+			return;
+		}
 		rec_load_direct(state, block, offset, code, swap_code, is_unsigned);
 		break;
 	default:
