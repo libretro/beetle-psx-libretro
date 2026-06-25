@@ -1898,7 +1898,14 @@ static int lightrec_flag_io(struct lightrec_state *state, struct block *block)
 				 * with no corruption risk. Without the opt the IO mode is
 				 * left unset and every such access goes through the
 				 * wrapper. */
-				if (state->opt_flags & LIGHTREC_OPT_SP_GP_HIT_RAM)
+				/* The guarded fast path can exit the block early
+				 * (LIGHTREC_EXIT_SPGP_SLOW) when the address strays
+				 * out of RAM. Exiting from a branch delay slot would
+				 * lose the branch, so never take the guarded path
+				 * there: leave the op untagged and let it go through
+				 * the generic wrapper, which stays inside the block. */
+				if ((state->opt_flags & LIGHTREC_OPT_SP_GP_HIT_RAM)
+				    && !is_delay_slot(block->opcode_list, i))
 					list->flags |= LIGHTREC_IO_MODE(LIGHTREC_IO_RAM_GUARDED);
 			}
 

@@ -214,10 +214,9 @@ struct lightrec_state {
 	/* Store opcode that triggered a LIGHTREC_EXIT_CODE_INV exit. */
 	u32 code_inv_op;
 
-	/* Opcode and its guest PC that triggered a LIGHTREC_EXIT_SPGP_SLOW
-	 * exit: an unprovable $sp/$gp access (SP_GP_HIT_RAM opt) whose runtime
-	 * address fell outside the RAM window, so the fast inline path bailed
-	 * and the access must be redone through the slow/correct memory path. */
+	/* Opcode and guest PC that triggered a LIGHTREC_EXIT_SPGP_SLOW exit:
+	 * an unprovable $sp/$gp access (SP_GP_HIT_RAM opt) whose runtime
+	 * address fell outside RAM, redone through the slow path. */
 	u32 spgp_slow_op;
 	u32 spgp_slow_pc;
 

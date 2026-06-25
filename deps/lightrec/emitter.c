@@ -1601,7 +1601,9 @@ static void rec_store_ram_guarded(struct lightrec_cstate *cstate,
 
 	lightrec_free_reg(reg_cache, rs);
 
-	to_slow = jit_bgei(tmp, RAM_SIZE);
+	/* Reject addresses outside the host-backed RAM region (RAM plus mirrors,
+	 * rec_ram_mask + 1 bytes); see rec_load_ram_guarded. */
+	to_slow = jit_bgei(tmp, rec_ram_mask(state) + 1);
 	lightrec_free_reg(reg_cache, tmp);
 
 	/* Hot path. */
@@ -2075,7 +2077,11 @@ static void rec_load_ram_guarded(struct lightrec_cstate *cstate,
 
 	lightrec_free_reg(reg_cache, rs);
 
-	to_slow = jit_bgei(tmp, RAM_SIZE);
+	/* Reject addresses outside the host-backed RAM region (RAM plus its
+	 * mirrors, i.e. rec_ram_mask + 1 bytes) - using the bare 2 MiB RAM_SIZE
+	 * would wrongly send legitimate stack accesses that land in a mirror to
+	 * the slow path. */
+	to_slow = jit_bgei(tmp, rec_ram_mask(cstate->state) + 1);
 	lightrec_free_reg(reg_cache, tmp);
 
 	/* Hot path: runtime-proven RAM access. */

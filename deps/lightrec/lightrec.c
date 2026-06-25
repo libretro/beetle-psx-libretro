@@ -462,24 +462,33 @@ static void lightrec_handle_spgp_slow(struct lightrec_state *state)
 	base = state->regs.gpr[c.i.rs];
 	data = c.i.rt ? state->regs.gpr[c.i.rt] : 0;
 
-	/* Perform the one access through the correct slow path. Pass flags=NULL
-	 * so the wrapper does not try to re-tag the opcode (the block keeps its
+	/* Perform the one access through the correct slow path. flags=NULL so
+	 * the wrapper does not re-tag the opcode (the block keeps its
 	 * IO_RAM_GUARDED tag and fast path for the common RAM case). */
 	val = lightrec_rw(state, c, base, data, NULL, NULL, 0);
 
-	/* Loads write their result back to rt; stores return 0 and write
-	 * nothing. $0 is never written. */
+	/* Write back exactly as lightrec_rw_cb does, so the load-delay timing
+	 * matches the recompiled path: a load that is not already inside a
+	 * load-delay window stashes its value in temp_reg and arms the delay
+	 * (the next instruction still sees the old rt); otherwise it writes rt
+	 * directly. Stores write nothing. $0 is never written. The guarded op
+	 * is never in a branch delay slot (the optimizer does not tag those),
+	 * so resuming at the following instruction is correct. */
 	switch (c.i.op) {
 	case OP_LB:
 	case OP_LBU:
 	case OP_LH:
 	case OP_LHU:
-	case OP_LW:
 	case OP_LWL:
 	case OP_LWR:
+	case OP_LW:
 	case OP_META_LWU:
-		if (c.i.rt)
+		if (OPT_HANDLE_LOAD_DELAYS && !state->in_delay_slot_n) {
+			state->temp_reg = val;
+			state->in_delay_slot_n = 0xff;
+		} else if (c.i.rt) {
 			state->regs.gpr[c.i.rt] = val;
+		}
 		break;
 	default:
 		break;
