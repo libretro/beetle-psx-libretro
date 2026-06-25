@@ -7439,14 +7439,22 @@ namespace PSX
 		}
 	};
 
-	class DbgHotkey {
-		public:
-			DbgHotkey(retro_key key): key(key) {}
-			bool query();
-			retro_key key;
-		private:
-			bool was_key_down = false;
+	/* Edge-triggered debug keyboard hotkey. Formerly a class with an int
+	 * constructor; now a plain struct driven by dbg_hotkey_init. query() does the
+	 * rising-edge detection. TextureTracker embeds three of these by value and
+	 * initialises them in its constructor. */
+	struct DbgHotkey {
+		retro_key key;
+		bool was_key_down;
+
+		bool query();
 	};
+
+	static void dbg_hotkey_init(DbgHotkey *h, retro_key key)
+	{
+		h->key = key;
+		h->was_key_down = false;
+	}
 
 	struct CacheEntry {
 		Rect rect;
@@ -8239,20 +8247,20 @@ namespace PSX
 
 			void dump_texture(TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode);
 
-			DbgHotkey frame_dump_key = RETROK_LEFTBRACKET; // disgusting
+			DbgHotkey frame_dump_key;
 			RFILE *frame_dump = NULL;
 			bool frame_dump_need_comma = false;
 
-			DbgHotkey hd_toggle_key = RETROK_RIGHTBRACKET;
+			DbgHotkey hd_toggle_key;
 
 			void load_hd_texture(uint32_t hash); // eager per-hash loader, still used by load_state (savestate)
 							     // Cache-backed lazy HD texture binding for a drawn (hash,palette); see definition.
 			void request_hd_texture(TextureUpload *upload, uint32_t palette_hash);
 
-			DbgHotkey reload_key = RETROK_QUOTE;
+			DbgHotkey reload_key;
 			void reload_textures_from_disk();
 
-			DbgHotkey fastpath_key = RETROK_SEMICOLON;
+			DbgHotkey fastpath_key;
 			bool fastpath_enabled = true;
 
 			void dump_image(TextureUpload &upload, UsedMode &mode);
@@ -19400,6 +19408,10 @@ namespace PSX
 		HdImageCache_init(&hd_cache, HD_CACHE_RAM_BUDGET);
 		HdGpuCache_init(&hd_gpu_cache, HD_CACHE_VRAM_BUDGET);
 		handle_lru_cache_init(&handle_cache, 4);
+		dbg_hotkey_init(&frame_dump_key, RETROK_LEFTBRACKET);
+		dbg_hotkey_init(&hd_toggle_key, RETROK_RIGHTBRACKET);
+		dbg_hotkey_init(&reload_key, RETROK_QUOTE);
+		dbg_hotkey_init(&fastpath_key, RETROK_SEMICOLON);
 		hd_key_set_init(&known_files);
 		hd_key_set_init(&requested);
 		hd_key_set_init(&pending_attach);
