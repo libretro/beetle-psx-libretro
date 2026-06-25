@@ -5875,8 +5875,12 @@ namespace Vulkan
 			friend class PipelineLayout;
 			friend class FramebufferAllocator;
 
-			Device();
-			~Device();
+			/* Lifecycle for a malloc'd Device (no constructor/destructor runs).
+			 * device_init establishes every member's empty state; device_deinit
+			 * tears the device down so the storage can be freed. Static so they take
+			 * the raw Device* explicitly. */
+			static void device_init(Device *self);
+			static void device_deinit(Device *self);
 
 			// No move-copy.
 			void operator=(Device &&) = delete;
@@ -16553,10 +16557,88 @@ using namespace Util;
 
 namespace Vulkan
 {
-	Device::Device()
+	/* Establish a Device in raw (uninitialised) storage. This sets every member
+	 * that the members' constructors and NSDMIs would, so it is correct when called
+	 * on malloc'd memory where no constructor has run. No member allocates at this
+	 * point, so the established state is simply "empty". */
+	void Device::device_init(Device *self)
 	{
-		framebuffer_allocator.init(this);
-		transient_allocator.init(this);
+		/* Scalar handles / ids (the VK_NULL_HANDLE and 0 NSDMIs). */
+		self->instance       = VK_NULL_HANDLE;
+		self->gpu            = VK_NULL_HANDLE;
+		self->device         = VK_NULL_HANDLE;
+		self->graphics_queue = VK_NULL_HANDLE;
+		self->compute_queue  = VK_NULL_HANDLE;
+		self->transfer_queue = VK_NULL_HANDLE;
+		self->cookie         = 0;
+		self->frame_context_index         = 0;
+		self->graphics_queue_family_index = 0;
+		self->compute_queue_family_index  = 0;
+		self->transfer_queue_family_index = 0;
+		self->lock.counter   = 0;
+
+		/* POD aggregates with no NSDMI - the constructor leaves them indeterminate
+		 * and set_context()/init() fill them before use; zero them so a malloc'd
+		 * Device starts from a defined state. */
+		memset(&self->mem_props,   0, sizeof(self->mem_props));
+		memset(&self->gpu_props,   0, sizeof(self->gpu_props));
+		memset(&self->ext,         0, sizeof(self->ext));
+		memset(&self->workarounds, 0, sizeof(self->workarounds));
+
+		/* Fixed stock-sampler handle array: each SamplerHandle is a single pointer
+		 * defaulting to NULL, so a zero-fill is the empty state. */
+		memset(self->samplers, 0, sizeof(self->samplers));
+
+		/* Owning members - establish each one's empty state via its raw-memory init. */
+		self->handle_pool.init();
+		self->managers.memory.init_empty();
+		self->managers.fence.init_empty();
+		self->managers.semaphore.init_empty();
+		self->managers.vbo.init_empty();
+		self->managers.ubo.init_empty();
+		self->per_frame.init_empty();
+		self->pipeline_layouts.init_empty();
+		self->descriptor_set_allocators.init_empty();
+		self->render_passes.init_empty();
+		self->shaders.init_empty();
+		self->programs.init_empty();
+		self->framebuffer_allocator.init(self);
+		self->transient_allocator.init(self);
+	}
+
+	/* Tear a Device down to the point where its storage can be freed. Runs the
+	 * former ~Device prologue first (in the same order), then the teardown the
+	 * implicit member destruction used to perform, deepest-owned last. */
+	void Device::device_deinit(Device *self)
+	{
+		self->wait_idle();
+
+		self->framebuffer_allocator.clear();
+		self->transient_allocator.clear();
+		for (unsigned i = 0; i < (unsigned)StockSampler::Count; i++)
+			self->samplers[i].reset();
+
+		self->managers.fence.deinit();
+		self->managers.semaphore.deinit();
+
+		/* Remaining teardown in reverse member-declaration order, matching what the
+		 * implicit member destructors did. Declaration order is handle_pool,
+		 * managers, per_frame, the five VulkanCache, then the two allocators; so the
+		 * destruction order is allocators, caches, per_frame, managers, handle_pool.
+		 * In particular per_frame is destroyed AFTER the caches, as its declaration
+		 * comment requires. */
+		self->framebuffer_allocator.deinit();
+		self->transient_allocator.deinit();
+		self->programs.deinit();
+		self->shaders.deinit();
+		self->render_passes.deinit();
+		self->descriptor_set_allocators.deinit();
+		self->pipeline_layouts.deinit();
+		self->per_frame.deinit();
+		self->managers.vbo.deinit();
+		self->managers.ubo.deinit();
+		self->managers.memory.deinit();
+		self->handle_pool.deinit();
 	}
 
 	void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages,
@@ -17364,22 +17446,6 @@ namespace Vulkan
 		add_frame_counter_nolock();
 		CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, type));
 		return handle;
-	}
-
-	Device::~Device()
-	{
-		wait_idle();
-
-		framebuffer_allocator.clear();
-		transient_allocator.clear();
-		for (SamplerHandle &sampler : samplers)
-			sampler.reset();
-
-		/* The fence/semaphore managers no longer self-destruct (their dtors became
-		 * explicit deinit()); tear them down here, after wait_idle, as the implicit
-		 * member destruction used to. */
-		managers.fence.deinit();
-		managers.semaphore.deinit();
 	}
 
 	void Device::init_frame_contexts(unsigned count)
@@ -21460,14 +21526,16 @@ static void vk_context_reset(void)
    }
 
    assert(context);
-   device = new Device;
+   device = (Vulkan::Device *)malloc(sizeof(Vulkan::Device));
+   Vulkan::Device::device_init(device);
    device->set_context(*context);
 
    renderer = new Renderer(*device, scaling, msaa, save_state.vram.empty() ? nullptr : &save_state);
    if (!renderer->is_valid())
    {
       delete renderer;
-      delete device;
+      Vulkan::Device::device_deinit(device);
+      free(device);
       renderer = nullptr;
       device = nullptr;
       vulkan = nullptr;
@@ -21498,7 +21566,8 @@ static void vk_context_destroy(void)
    swapchain_images.clear();
 
    delete renderer;
-   delete device;
+   Vulkan::Device::device_deinit(device);
+   free(device);
    Vulkan::context_deinit(context);
    free(context);
    renderer = nullptr;
