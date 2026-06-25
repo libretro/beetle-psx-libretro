@@ -6957,13 +6957,18 @@ namespace PSX
 		return head;
 	}
 
-	class IOThread {
-		public:
-			IOThread();
-			~IOThread();
-			IOChannel *channel; /* refcounted; one ref held here, one per worker */
-		private:
+	/* Owns the IO worker thread pool. Formerly a class with a constructor
+	 * (create the channel, spin up NUM_IO_THREADS detached workers each holding a
+	 * channel reference) and destructor (signal done, wake the workers, drop this
+	 * thread's reference); now a plain struct driven by io_thread_init /
+	 * io_thread_deinit. The single member is the refcounted channel pointer.
+	 * TextureTracker embeds one by value and drives its init/deinit. */
+	struct IOThread {
+		IOChannel *channel; /* refcounted; one ref held here, one per worker */
 	};
+
+	static void io_thread_init(IOThread *t);
+	static void io_thread_deinit(IOThread *t);
 
 	struct Palette {
 		uint16_t *data;
@@ -19209,29 +19214,29 @@ namespace PSX
 	// bursts short without starving the emulation/render threads.
 	static const int NUM_IO_THREADS = 4;
 
-	IOThread::IOThread() {
+	void io_thread_init(IOThread *t) {
 		io_channel_rc_lock_init();
-		channel = io_channel_new(); /* this IOThread holds one reference */
+		t->channel = io_channel_new(); /* this IOThread holds one reference */
 		for (int i = 0; i < NUM_IO_THREADS; i++) {
 			// Take a reference on the worker's behalf BEFORE it starts, so the
 			// channel can't be freed out from under it; the worker releases on exit.
-			io_channel_acquire(channel);
-			sthread_t *thread = sthread_create(io_thread, channel);
+			io_channel_acquire(t->channel);
+			sthread_t *thread = sthread_create(io_thread, t->channel);
 			if (thread) {
 				sthread_detach(thread);
 			} else {
-				io_channel_release(channel); // thread failed to start; undo its ref
+				io_channel_release(t->channel); // thread failed to start; undo its ref
 			}
 		}
 	}
-	IOThread::~IOThread() {
-		slock_lock(channel->lock);
-		channel->done = true;
-		slock_unlock(channel->lock);
-		scond_broadcast(channel->cond); // wake ALL workers so they can exit
-		io_channel_release(channel);    // drop this IOThread's reference; the last
+	void io_thread_deinit(IOThread *t) {
+		slock_lock(t->channel->lock);
+		t->channel->done = true;
+		slock_unlock(t->channel->lock);
+		scond_broadcast(t->channel->cond); // wake ALL workers so they can exit
+		io_channel_release(t->channel);    // drop this IOThread's reference; the last
 						// worker to exit frees the channel
-		channel = NULL;
+		t->channel = NULL;
 	}
 
 	void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
@@ -19412,6 +19417,8 @@ namespace PSX
 			RectMatch m = dump_ignore[mi];
 			TT_LOG_VERBOSE(RETRO_LOG_INFO, "Ignoring %d,%d,%d,%d\n", m.x, m.y, m.w, m.h);
 		}
+		/* Spin up the IO worker pool last, once the tracker is fully built. */
+		io_thread_init(&iothread);
 	}
 
 	TextureTracker::~TextureTracker()
@@ -19422,6 +19429,10 @@ namespace PSX
 		hd_key_set_free(&requested);
 		hd_key_set_free(&pending_attach);
 		free(cached_palette_hashes);
+		/* Signal and drop the IO worker pool last. Previously iothread was a
+		 * by-value member, so its destructor ran after this body; preserve that
+		 * ordering by deinitialising it here at the end. */
+		io_thread_deinit(&iothread);
 	}
 
 	static inline SRect toSRect(Rect rect) {
