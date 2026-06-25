@@ -3705,11 +3705,24 @@ namespace Vulkan
 		void operator()(BufferView *view);
 	};
 
-	class Buffer : public Util::IntrusivePtrEnabled<Buffer, BufferDeleter, HandleCounter>,
-	public Cookie
+	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
+	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
+	 * base, which provides the hash identity, is unrelated and stays. */
+	class Buffer : public Cookie
 	{
 		public:
 			friend struct BufferDeleter;
+
+			void release_reference()
+			{
+				if (reference_count.release())
+					BufferDeleter()(this);
+			}
+			void add_reference()
+			{
+				reference_count.add_ref();
+			}
+
 			~Buffer();
 
 			VkBuffer get_buffer() const
@@ -3735,6 +3748,7 @@ namespace Vulkan
 			VkBuffer buffer;
 			DeviceAllocation alloc;
 			BufferCreateInfo info;
+			HandleCounter reference_count;
 	};
 	using BufferHandle = Util::IntrusivePtr<Buffer>;
 
