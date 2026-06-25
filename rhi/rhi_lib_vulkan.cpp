@@ -3070,17 +3070,16 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 
 namespace Vulkan
 {
-	enum class StockSampler
-	{
-		NearestClamp,
-		LinearClamp,
-		TrilinearClamp,
-		NearestWrap,
-		LinearWrap,
-		TrilinearWrap,
-		NearestShadow,
-		LinearShadow,
-		Count
+	enum StockSampler {
+		StockSampler_NearestClamp,
+		StockSampler_LinearClamp,
+		StockSampler_TrilinearClamp,
+		StockSampler_NearestWrap,
+		StockSampler_LinearWrap,
+		StockSampler_TrilinearWrap,
+		StockSampler_NearestShadow,
+		StockSampler_LinearShadow,
+		StockSampler_Count
 	};
 
 	struct SamplerCreateInfo
@@ -3769,16 +3768,15 @@ namespace Vulkan
 		return flags;
 	}
 
-	enum class BufferDomain
-	{
-		Device, // Device local. Probably not visible from CPU.
-		Host, // Host-only, needs to be synced to GPU. Might be device local as well on iGPUs.
-		CachedHost // Host-only, used for readbacks.
+	enum BufferDomain {
+		BufferDomain_Device, // BufferDomain_Device local. Probably not visible from CPU.
+		BufferDomain_Host, // BufferDomain_Host-only, needs to be synced to GPU. Might be device local as well on iGPUs.
+		BufferDomain_CachedHost // BufferDomain_Host-only, used for readbacks.
 	};
 
 	struct BufferCreateInfo
 	{
-		BufferDomain domain = BufferDomain::Device;
+		BufferDomain domain = BufferDomain_Device;
 		VkDeviceSize size = 0;
 		VkBufferUsageFlags usage = 0;
 	};
@@ -4196,15 +4194,14 @@ namespace Vulkan
 		}
 	};
 
-	enum class ImageDomain
-	{
-		Physical,
-		Transient
+	enum ImageDomain {
+		ImageDomain_Physical,
+		ImageDomain_Transient
 	};
 
 	struct ImageCreateInfo
 	{
-		ImageDomain domain = ImageDomain::Physical;
+		ImageDomain domain = ImageDomain_Physical;
 		unsigned width = 0;
 		unsigned height = 0;
 		unsigned depth = 1;
@@ -4263,7 +4260,7 @@ namespace Vulkan
 		static ImageCreateInfo transient_render_target(unsigned width, unsigned height, VkFormat format)
 		{
 			ImageCreateInfo info;
-			info.domain = ImageDomain::Transient;
+			info.domain = ImageDomain_Transient;
 			info.width = width;
 			info.height = height;
 			info.depth = 1;
@@ -4289,10 +4286,9 @@ namespace Vulkan
 		void operator()(Image *image);
 	};
 
-	enum class Layout
-	{
-		Optimal,
-		General
+	enum Layout {
+		Layout_Optimal,
+		Layout_General
 	};
 
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
@@ -4366,7 +4362,7 @@ namespace Vulkan
 
 			VkImageLayout get_layout(VkImageLayout optimal) const
 			{
-				return layout_type == Layout::Optimal ? optimal : VK_IMAGE_LAYOUT_GENERAL;
+				return layout_type == Layout_Optimal ? optimal : VK_IMAGE_LAYOUT_GENERAL;
 			}
 
 			Layout get_layout_type() const
@@ -4416,7 +4412,7 @@ namespace Vulkan
 			DeviceAllocation alloc;
 			ImageCreateInfo create_info;
 
-			Layout layout_type = Layout::Optimal;
+			Layout layout_type = Layout_Optimal;
 			VkPipelineStageFlags stage_flags = 0;
 			VkAccessFlags access_flags = 0;
 			HandleCounter reference_count;
@@ -4760,15 +4756,14 @@ namespace Vulkan
 {
 	class Device;
 
-	enum class ShaderStage
-	{
-		Vertex = 0,
-		TessControl = 1,
-		TessEvaluation = 2,
-		Geometry = 3,
-		Fragment = 4,
-		Compute = 5,
-		Count
+	enum ShaderStage {
+		ShaderStage_Vertex = 0,
+		ShaderStage_TessControl = 1,
+		ShaderStage_TessEvaluation = 2,
+		ShaderStage_Geometry = 3,
+		ShaderStage_Fragment = 4,
+		ShaderStage_Compute = 5,
+		ShaderStage_Count
 	};
 
 	struct ResourceLayout
@@ -4789,7 +4784,7 @@ namespace Vulkan
 		uint32_t stages_for_sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
 		VkPushConstantRange push_constant_range = {};
 		uint32_t descriptor_set_mask = 0;
-		uint32_t spec_constant_mask[(unsigned)ShaderStage::Count] = {};
+		uint32_t spec_constant_mask[(unsigned)ShaderStage_Count] = {};
 		uint32_t combined_spec_constant_mask = 0;
 		Util::Hash push_constant_layout_hash = 0;
 	};
@@ -4877,7 +4872,7 @@ namespace Vulkan
 				shaders[(unsigned)stage] = handle;
 			}
 			Device *device;
-			Shader *shaders[(unsigned)ShaderStage::Count] = {};
+			Shader *shaders[(unsigned)ShaderStage_Count] = {};
 			PipelineLayout *layout = NULL;
 			VulkanCache<Util::IntrusivePODWrapper<VkPipeline>> pipelines;
 	};
@@ -6274,7 +6269,7 @@ namespace Vulkan
 				return (mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 			}
 
-			SamplerHandle samplers[static_cast<unsigned>(StockSampler::Count)];
+			SamplerHandle samplers[static_cast<unsigned>(StockSampler_Count)];
 
 			VulkanCache<PipelineLayout> pipeline_layouts;
 			VulkanCache<DescriptorSetAllocator> descriptor_set_allocators;
@@ -9564,9 +9559,9 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 		state ? state->vram.data() : NULL, 0, 0,
 	};
 	framebuffer = device->create_image(info, state ? &initial_vram : NULL);
-	framebuffer->set_layout(Layout::General);
+	framebuffer->set_layout(Layout_General);
 	framebuffer_ssaa = device->create_image(info);
-	framebuffer_ssaa->set_layout(Layout::General);
+	framebuffer_ssaa->set_layout(Layout_General);
 
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -9583,7 +9578,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	             VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 	scaled_framebuffer = device->create_image(info);
-	scaled_framebuffer->set_layout(Layout::General);
+	scaled_framebuffer->set_layout(Layout_General);
 
 	{
 		ImageViewCreateInfo view_info = scaled_framebuffer->get_view().get_create_info();
@@ -9643,7 +9638,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 		info.levels = 1;
 		info.samples = static_cast<VkSampleCountFlagBits>(msaa);
 		scaled_framebuffer_msaa = device->create_image(info);
-		scaled_framebuffer_msaa->set_layout(Layout::General);
+		scaled_framebuffer_msaa->set_layout(Layout_General);
 		// General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
 		// The expectation is that this will be used with a lower scaling factor to compensate.
 	}
@@ -9671,7 +9666,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	};
 
 	BufferCreateInfo buffer_create_info;
-	buffer_create_info.domain = BufferDomain::Device;
+	buffer_create_info.domain = BufferDomain_Device;
 	buffer_create_info.size = sizeof(quad_data);
 	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	quad = device->create_buffer(buffer_create_info, quad_data);
@@ -9689,7 +9684,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 Renderer::SaveState Renderer::save_vram_state()
 {
 	BufferCreateInfo buffer_create_info;
-	buffer_create_info.domain = BufferDomain::CachedHost;
+	buffer_create_info.domain = BufferDomain_CachedHost;
 	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
@@ -9907,7 +9902,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	ensure_command_buffer();
 
 	BufferCreateInfo buffer_create_info;
-	buffer_create_info.domain = BufferDomain::CachedHost;
+	buffer_create_info.domain = BufferDomain_CachedHost;
 	buffer_create_info.size = copy_rect.width * copy_rect.height * 4;
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
@@ -9997,7 +9992,7 @@ void Renderer::mipmap_framebuffer()
 		else
 			cmd->set_program(*pipelines.mipmap_energy);
 
-		cmd->set_texture(0, 0, *scaled_views[i - 1], StockSampler::LinearClamp);
+		cmd->set_texture(0, 0, *scaled_views[i - 1], StockSampler_LinearClamp);
 
 		cmd->set_quad_state();
 		cmd->set_vertex_binding(0, *quad, 0, 8);
@@ -10072,9 +10067,9 @@ void Renderer::ssaa_framebuffer()
 	cmd->set_program(*pipelines.resolve_to_unscaled);
 	cmd->set_storage_texture(0, 0, framebuffer_ssaa->get_view());
 	if (msaa > 1)
-		cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+		cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler_NearestClamp);
 	else
-		cmd->set_texture(0, 1, *scaled_views[0], StockSampler::LinearClamp);
+		cmd->set_texture(0, 1, *scaled_views[0], StockSampler_LinearClamp);
 
 	struct Push
 	{
@@ -10271,12 +10266,12 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	if (scaled)
 	{
 		cmd->set_program(*pipelines.scaled_quad_blitter);
-		cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearClamp);
+		cmd->set_texture(0, 0, *scaled_views[0], StockSampler_LinearClamp);
 	}
 	else
 	{
 		cmd->set_program(*pipelines.unscaled_quad_blitter);
-		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::LinearClamp);
+		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler_LinearClamp);
 	}
 
 	cmd->set_vertex_binding(0, *quad, 0, 8);
@@ -10473,7 +10468,7 @@ ImageHandle Renderer::scanout_to_texture()
 			cmd->set_program(*pipelines.bpp24_yuv_quad_blitter);
 		else
 			cmd->set_program(*pipelines.bpp24_quad_blitter);
-		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestWrap);
+		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler_NearestWrap);
 	}
 	else if (ssaa)
 	{
@@ -10482,7 +10477,7 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cmd->set_program(*pipelines.unscaled_quad_blitter);
 
-		cmd->set_texture(0, 0, framebuffer_ssaa->get_view(), StockSampler::NearestWrap);
+		cmd->set_texture(0, 0, framebuffer_ssaa->get_view(), StockSampler_NearestWrap);
 	}
 	else if (!render_state.adaptive_smoothing || scaling == 1)
 	{
@@ -10491,7 +10486,7 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cmd->set_program(*pipelines.scaled_quad_blitter);
 
-		cmd->set_texture(0, 0, *scaled_views[0], StockSampler::LinearWrap);
+		cmd->set_texture(0, 0, *scaled_views[0], StockSampler_LinearWrap);
 	}
 	else
 	{
@@ -10500,13 +10495,13 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cmd->set_program(*pipelines.mipmap_resolve);
 
-		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler::TrilinearWrap);
-		cmd->set_texture(0, 1, bias_framebuffer->get_view(), StockSampler::LinearWrap);
+		cmd->set_texture(0, 0, scaled_framebuffer->get_view(), StockSampler_TrilinearWrap);
+		cmd->set_texture(0, 1, bias_framebuffer->get_view(), StockSampler_LinearWrap);
 	}
 
 	if (dither)
 	{
-		cmd->set_texture(0, 2, dither_lut->get_view(), StockSampler::NearestWrap);
+		cmd->set_texture(0, 2, dither_lut->get_view(), StockSampler_NearestWrap);
 		struct DitherData
 		{
 			float range;
@@ -10647,7 +10642,7 @@ void Renderer::flush_resolves()
 		ensure_command_buffer();
 		cmd->set_program(*pipelines.resolve_to_scaled);
 
-		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler::NearestClamp);
+		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler_NearestClamp);
 		if (msaa > 1)
 			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
 		else
@@ -10677,9 +10672,9 @@ void Renderer::flush_resolves()
 		cmd->set_program(*pipelines.resolve_to_unscaled);
 		cmd->set_storage_texture(0, 0, framebuffer->get_view());
 		if (msaa > 1)
-			cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+			cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler_NearestClamp);
 		else
-			cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
+			cmd->set_texture(0, 1, *scaled_views[0], StockSampler_NearestClamp);
 
 		unsigned size = queue.unscaled_resolves.size();
 		for (unsigned i = 0; i < size; i += 1024)
@@ -11280,7 +11275,7 @@ void Renderer::flush_render_pass(const Rect &rect)
 	cmd->begin_render_pass(info);
 	cmd->set_scissor(info.render_area);
 	queue.default_scissor = info.render_area;
-	cmd->set_texture(0, 2, dither_lut->get_view(), StockSampler::NearestWrap);
+	cmd->set_texture(0, 2, dither_lut->get_view(), StockSampler_NearestWrap);
 
 	render_opaque_primitives();
 	render_opaque_texture_primitives();
@@ -11305,12 +11300,12 @@ void Renderer::dispatch_set_scaled_read_texture(bool scaled_read, bool textured)
 	if (scaled_read)
 	{
 		if (msaa > 1)
-			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler_NearestClamp);
 		else
-			cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
+			cmd->set_texture(0, 0, *scaled_views[0], StockSampler_NearestClamp);
 	}
 	else
-		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
+		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler_NearestClamp);
 	if (textured)
 	{
 		if (scaled_read)
@@ -11443,7 +11438,7 @@ void Renderer::render_opaque_primitives()
 
 void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
 	HdTexture hd = tracker.get_hd_texture(hd_texture_index);
-	cmd->set_texture(0, 4, hd.texture->get_view(), StockSampler::TrilinearClamp); // Type of sampler only matters for the fast path
+	cmd->set_texture(0, 4, hd.texture->get_view(), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
 	// ivec4, ivec4
 	struct HDPush {
 		int32_t vram_rect_x;
@@ -11602,18 +11597,18 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 		if (msaa > 1)
 		{
 			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
-			cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+			cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler_NearestClamp);
 		}
 		else
 		{
 			cmd->set_storage_texture(0, 0, *scaled_views[0]);
-			cmd->set_texture(0, 1, *scaled_views[0], StockSampler::NearestClamp);
+			cmd->set_texture(0, 1, *scaled_views[0], StockSampler_NearestClamp);
 		}
 	}
 	else
 	{
 		cmd->set_storage_texture(0, 0, framebuffer->get_view());
-		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler::NearestClamp);
+		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler_NearestClamp);
 	}
 
 	unsigned size = infos.size();
@@ -11780,7 +11775,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 
 	// TODO: Chain allocate this.
 	BufferCreateInfo buffer_create_info;
-	buffer_create_info.domain = BufferDomain::Host;
+	buffer_create_info.domain = BufferDomain_Host;
 	buffer_create_info.size = size;
 	buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
 	BufferHandle buffer = device->create_buffer(buffer_create_info, NULL);
@@ -11893,12 +11888,12 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	if (state.scaled_read)
 	{
 		if (msaa > 1)
-			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler::NearestClamp);
+			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler_NearestClamp);
 		else
-			cmd->set_texture(0, 0, *scaled_views[0], StockSampler::NearestClamp);
+			cmd->set_texture(0, 0, *scaled_views[0], StockSampler_NearestClamp);
 	}
 	else
-		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler::NearestClamp);
+		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler_NearestClamp);
 	hd_texture_uniforms(state.hd_texture_index);
 	cmd->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
 	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
@@ -12548,7 +12543,7 @@ ImageView::ImageView(Device *device, VkImageView view, const ImageViewCreateInfo
 VkImageView ImageView::get_render_target_view(unsigned layer) const
 {
 	// Transient images just have one layer.
-	if (info.image->get_create_info().domain == ImageDomain::Transient)
+	if (info.image->get_create_info().domain == ImageDomain_Transient)
 		return view;
 
 	VK_ASSERT(layer < get_create_info().layers);
@@ -12751,7 +12746,7 @@ BufferBlock BufferPool::allocate_block(VkDeviceSize size)
 	BufferBlock block;
 
 	BufferCreateInfo info;
-	info.domain = BufferDomain::Host;
+	info.domain = BufferDomain_Host;
 	info.size = size;
 	info.usage = usage;
 
@@ -12764,7 +12759,7 @@ BufferBlock BufferPool::allocate_block(VkDeviceSize size)
 	{
 		// Fall back to host memory, and remember to sync to gpu on submission time using DMA queue. :)
 		BufferCreateInfo cpu_info;
-		cpu_info.domain = BufferDomain::Host;
+		cpu_info.domain = BufferDomain_Host;
 		cpu_info.size = size;
 		cpu_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
@@ -13474,17 +13469,17 @@ namespace Vulkan
 	{
 		switch (stage)
 		{
-			case ShaderStage::Compute:
+			case ShaderStage_Compute:
 				return "compute";
-			case ShaderStage::Vertex:
+			case ShaderStage_Vertex:
 				return "vertex";
-			case ShaderStage::Fragment:
+			case ShaderStage_Fragment:
 				return "fragment";
-			case ShaderStage::Geometry:
+			case ShaderStage_Geometry:
 				return "geometry";
-			case ShaderStage::TessControl:
+			case ShaderStage_TessControl:
 				return "tess_control";
-			case ShaderStage::TessEvaluation:
+			case ShaderStage_TessEvaluation:
 				return "tess_evaluation";
 			default:
 				return "unknown";
@@ -13527,15 +13522,15 @@ namespace Vulkan
 	Program::Program(Device *device, Shader *vertex, Shader *fragment)
 		: device(device)
 	{
-		set_shader(ShaderStage::Vertex, vertex);
-		set_shader(ShaderStage::Fragment, fragment);
+		set_shader(ShaderStage_Vertex, vertex);
+		set_shader(ShaderStage_Fragment, fragment);
 		device->bake_program(*this);
 	}
 
 	Program::Program(Device *device, Shader *compute)
 		: device(device)
 	{
-		set_shader(ShaderStage::Compute, compute);
+		set_shader(ShaderStage_Compute, compute);
 		device->bake_program(*this);
 	}
 
@@ -13918,7 +13913,7 @@ namespace Vulkan
 			// subpass which uses this attachment to avoid any dummy transition at the end.
 			att.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-			if (image.get_create_info().domain == ImageDomain::Transient)
+			if (image.get_create_info().domain == ImageDomain_Transient)
 			{
 				if (enable_transient_load)
 				{
@@ -13966,7 +13961,7 @@ namespace Vulkan
 				att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
 
-			if (image.get_create_info().domain == ImageDomain::Transient)
+			if (image.get_create_info().domain == ImageDomain_Transient)
 			{
 				if (enable_transient_load)
 				{
@@ -14810,7 +14805,7 @@ namespace Vulkan
 	{
 		VK_ASSERT(!actual_render_pass);
 		VK_ASSERT(!framebuffer);
-		VK_ASSERT(image.get_create_info().domain != ImageDomain::Transient);
+		VK_ASSERT(image.get_create_info().domain != ImageDomain_Transient);
 
 		VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
 		barrier.srcAccessMask = src_access;
@@ -15025,7 +15020,7 @@ namespace Vulkan
 
 	VkPipeline CommandBuffer::build_compute_pipeline(Hash hash)
 	{
-		const Shader &shader = *current_program->get_shader(ShaderStage::Compute);
+		const Shader &shader = *current_program->get_shader(ShaderStage_Compute);
 		VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
 		info.layout = current_program->get_pipeline_layout()->get_layout();
 		info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -15035,7 +15030,7 @@ namespace Vulkan
 
 #ifdef GRANITE_SPIRV_DUMP
 		LOGI("Compiling SPIR-V file: (%s) %s\n",
-				Shader::stage_to_name(ShaderStage::Compute),
+				Shader::stage_to_name(ShaderStage_Compute),
 				(to_string(shader.intrusive_hashmap_key) + ".spv").c_str());
 #endif
 
@@ -15170,13 +15165,13 @@ namespace Vulkan
 		raster.polygonMode = VK_POLYGON_MODE_FILL;
 
 		// Stages
-		VkPipelineShaderStageCreateInfo stages[static_cast<unsigned>(ShaderStage::Count)];
+		VkPipelineShaderStageCreateInfo stages[static_cast<unsigned>(ShaderStage_Count)];
 		unsigned num_stages = 0;
 
-		VkSpecializationInfo spec_info[(unsigned)ShaderStage::Count] = {};
-		VkSpecializationMapEntry spec_entries[(unsigned)ShaderStage::Count][VULKAN_NUM_SPEC_CONSTANTS];
+		VkSpecializationInfo spec_info[(unsigned)ShaderStage_Count] = {};
+		VkSpecializationMapEntry spec_entries[(unsigned)ShaderStage_Count][VULKAN_NUM_SPEC_CONSTANTS];
 
-		for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage::Count); i++)
+		for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage_Count); i++)
 		{
 			ShaderStage stage = static_cast<ShaderStage>(i);
 			if (current_program->get_shader(stage))
@@ -15448,8 +15443,8 @@ namespace Vulkan
 		current_program = &program;
 		current_pipeline = VK_NULL_HANDLE;
 
-		VK_ASSERT((framebuffer && current_program->get_shader(ShaderStage::Vertex)) ||
-				(!framebuffer && current_program->get_shader(ShaderStage::Compute)));
+		VK_ASSERT((framebuffer && current_program->get_shader(ShaderStage_Vertex)) ||
+				(!framebuffer && current_program->get_shader(ShaderStage_Compute)));
 
 		set_dirty(COMMAND_BUFFER_DIRTY_PIPELINE_BIT | COMMAND_BUFFER_DYNAMIC_BITS);
 
@@ -16470,7 +16465,7 @@ namespace Vulkan
 
 		self->framebuffer_allocator.clear();
 		self->transient_allocator.clear();
-		for (unsigned i = 0; i < (unsigned)StockSampler::Count; i++)
+		for (unsigned i = 0; i < (unsigned)StockSampler_Count; i++)
 			self->samplers[i].reset();
 
 		self->managers.fence.deinit();
@@ -16603,14 +16598,14 @@ namespace Vulkan
 	void Device::bake_program(Program &program)
 	{
 		CombinedResourceLayout layout;
-		if (program.get_shader(ShaderStage::Vertex))
-			layout.attribute_mask = program.get_shader(ShaderStage::Vertex)->get_layout().input_mask;
-		if (program.get_shader(ShaderStage::Fragment))
-			layout.render_target_mask = program.get_shader(ShaderStage::Fragment)->get_layout().output_mask;
+		if (program.get_shader(ShaderStage_Vertex))
+			layout.attribute_mask = program.get_shader(ShaderStage_Vertex)->get_layout().input_mask;
+		if (program.get_shader(ShaderStage_Fragment))
+			layout.render_target_mask = program.get_shader(ShaderStage_Fragment)->get_layout().output_mask;
 
 		layout.descriptor_set_mask = 0;
 
-		for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage::Count); i++)
+		for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage_Count); i++)
 		{
 			const Shader *shader = program.get_shader(static_cast<ShaderStage>(i));
 			if (!shader)
@@ -16733,14 +16728,14 @@ namespace Vulkan
 		info.max_lod = VK_LOD_CLAMP_NONE;
 		info.max_anisotropy = 1.0f;
 
-		for (unsigned i = 0; i < static_cast<unsigned>(StockSampler::Count); i++)
+		for (unsigned i = 0; i < static_cast<unsigned>(StockSampler_Count); i++)
 		{
 			StockSampler mode = static_cast<StockSampler>(i);
 
 			switch (mode)
 			{
-				case StockSampler::NearestShadow:
-				case StockSampler::LinearShadow:
+				case StockSampler_NearestShadow:
+				case StockSampler_LinearShadow:
 					info.compare_enable = true;
 					info.compare_op = VK_COMPARE_OP_LESS_OR_EQUAL;
 					break;
@@ -16752,8 +16747,8 @@ namespace Vulkan
 
 			switch (mode)
 			{
-				case StockSampler::TrilinearClamp:
-				case StockSampler::TrilinearWrap:
+				case StockSampler_TrilinearClamp:
+				case StockSampler_TrilinearWrap:
 					info.mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 					break;
 
@@ -16764,11 +16759,11 @@ namespace Vulkan
 
 			switch (mode)
 			{
-				case StockSampler::LinearClamp:
-				case StockSampler::LinearWrap:
-				case StockSampler::TrilinearClamp:
-				case StockSampler::TrilinearWrap:
-				case StockSampler::LinearShadow:
+				case StockSampler_LinearClamp:
+				case StockSampler_LinearWrap:
+				case StockSampler_TrilinearClamp:
+				case StockSampler_TrilinearWrap:
+				case StockSampler_LinearShadow:
 					info.mag_filter = VK_FILTER_LINEAR;
 					info.min_filter = VK_FILTER_LINEAR;
 					break;
@@ -16782,19 +16777,19 @@ namespace Vulkan
 			switch (mode)
 			{
 				default:
-				case StockSampler::LinearWrap:
-				case StockSampler::NearestWrap:
-				case StockSampler::TrilinearWrap:
+				case StockSampler_LinearWrap:
+				case StockSampler_NearestWrap:
+				case StockSampler_TrilinearWrap:
 					info.address_mode_u = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 					info.address_mode_v = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 					info.address_mode_w = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 					break;
 
-				case StockSampler::LinearClamp:
-				case StockSampler::NearestClamp:
-				case StockSampler::TrilinearClamp:
-				case StockSampler::NearestShadow:
-				case StockSampler::LinearShadow:
+				case StockSampler_LinearClamp:
+				case StockSampler_NearestClamp:
+				case StockSampler_TrilinearClamp:
+				case StockSampler_NearestShadow:
+				case StockSampler_LinearShadow:
 					info.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 					info.address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 					info.address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -17572,17 +17567,17 @@ namespace Vulkan
 		uint32_t desired = 0, fallback = 0;
 		switch (domain)
 		{
-			case BufferDomain::Device:
+			case BufferDomain_Device:
 				desired = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 				fallback = 0;
 				break;
 
-			case BufferDomain::Host:
+			case BufferDomain_Host:
 				desired = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 				fallback = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 				break;
 
-			case BufferDomain::CachedHost:
+			case BufferDomain_CachedHost:
 				desired = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
 				fallback = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 				break;
@@ -17617,12 +17612,12 @@ namespace Vulkan
 		uint32_t desired = 0, fallback = 0;
 		switch (domain)
 		{
-			case ImageDomain::Physical:
+			case ImageDomain_Physical:
 				desired = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 				fallback = 0;
 				break;
 
-			case ImageDomain::Transient:
+			case ImageDomain_Transient:
 				desired = VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
 				fallback = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 				break;
@@ -17971,7 +17966,7 @@ namespace Vulkan
 		}
 
 		BufferCreateInfo buffer_info = {};
-		buffer_info.domain = BufferDomain::Host;
+		buffer_info.domain = BufferDomain_Host;
 		buffer_info.size = layout.get_required_size();
 		buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		result.buffer = create_buffer(buffer_info, NULL);
@@ -18045,7 +18040,7 @@ namespace Vulkan
 
 		info.usage = create_info.usage;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		if (create_info.domain == ImageDomain::Transient)
+		if (create_info.domain == ImageDomain_Transient)
 			info.usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
 		if (staging_buffer)
 			info.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -18120,7 +18115,7 @@ namespace Vulkan
 		// Copy initial data to texture.
 		if (staging_buffer)
 		{
-			VK_ASSERT(create_info.domain != ImageDomain::Transient);
+			VK_ASSERT(create_info.domain != ImageDomain_Transient);
 			VK_ASSERT(create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED);
 			bool generate_mips = (create_info.misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
 
@@ -18253,7 +18248,7 @@ namespace Vulkan
 		}
 		else if (create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
 		{
-			VK_ASSERT(create_info.domain != ImageDomain::Transient);
+			VK_ASSERT(create_info.domain != ImageDomain_Transient);
 			CommandBufferHandle cmd = request_command_buffer(CommandBuffer::Type::Generic);
 			cmd->image_barrier(*handle, info.initialLayout, create_info.initial_layout,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, handle->get_stage_flags(),
@@ -18362,11 +18357,11 @@ namespace Vulkan
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		BufferHandle handle(handle_pool.buffers.allocate(this, buffer, allocation, tmpinfo));
 
-		if (create_info.domain == BufferDomain::Device && initial && !memory_type_is_host_visible(memory_type))
+		if (create_info.domain == BufferDomain_Device && initial && !memory_type_is_host_visible(memory_type))
 		{
 			CommandBufferHandle cmd;
 			BufferCreateInfo staging_info = create_info;
-			staging_info.domain = BufferDomain::Host;
+			staging_info.domain = BufferDomain_Host;
 			BufferHandle staging_buffer = create_buffer(staging_info, initial);
 			set_name(*staging_buffer, "buffer-upload-staging-buffer");
 
@@ -18430,17 +18425,17 @@ namespace Vulkan
 		{
 			VK_ASSERT(info.color_attachments[i]);
 			formats[i] = info.color_attachments[i]->get_format();
-			if (info.color_attachments[i]->get_image().get_create_info().domain == ImageDomain::Transient)
+			if (info.color_attachments[i]->get_image().get_create_info().domain == ImageDomain_Transient)
 				lazy |= 1u << i;
-			if (info.color_attachments[i]->get_image().get_layout_type() == Layout::Optimal)
+			if (info.color_attachments[i]->get_image().get_layout_type() == Layout_Optimal)
 				optimal |= 1u << i;
 		}
 
 		if (info.depth_stencil)
 		{
-			if (info.depth_stencil->get_image().get_create_info().domain == ImageDomain::Transient)
+			if (info.depth_stencil->get_image().get_create_info().domain == ImageDomain_Transient)
 				lazy |= 1u << info.num_color_attachments;
-			if (info.depth_stencil->get_image().get_layout_type() == Layout::Optimal)
+			if (info.depth_stencil->get_image().get_layout_type() == Layout_Optimal)
 				optimal |= 1u << info.num_color_attachments;
 		}
 
