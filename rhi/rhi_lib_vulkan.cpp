@@ -1960,6 +1960,103 @@ static inline uint32_t util_ctz(uint32_t x)
 				IntrusiveListEnabled<T> *head = NULL;
 		};
 
+	/* Concrete, element-size-driven object pool (the de-templated form of the
+	 * standalone ObjectPool<T> instantiations). Same slab + vacant-stack design as
+	 * ObjectPool<T>, but type-erased: allocate_raw() returns an uninitialised slot
+	 * of element_size bytes and free_raw() returns one to the free list, so a single
+	 * concrete type serves every pooled object. Construction/destruction is done by
+	 * the caller via placement new / explicit destructor (matching the
+	 * malloc + placement-new idiom used for Device/Renderer). The remaining
+	 * template ObjectPool<T> below is still used inside the intrusive hash maps and
+	 * is converted with them in a later stage. */
+	struct ObjectPoolRaw
+	{
+		void **vacants;
+		int    vac_count;
+		int    vac_cap;
+		void **memory;
+		int    mem_count;
+		int    mem_cap;
+		size_t element_size;
+	};
+
+	static inline void object_pool_raw_init(struct ObjectPoolRaw *p, size_t element_size)
+	{
+		p->vacants      = NULL;
+		p->vac_count    = 0;
+		p->vac_cap      = 0;
+		p->memory       = NULL;
+		p->mem_count    = 0;
+		p->mem_cap      = 0;
+		p->element_size = element_size;
+	}
+
+	static inline void object_pool_raw_vac_push(struct ObjectPoolRaw *p, void *v)
+	{
+		if (p->vac_count == p->vac_cap)
+		{
+			int ncap   = p->vac_cap ? p->vac_cap * 2 : 64;
+			p->vacants = (void **)realloc(p->vacants, (size_t)ncap * sizeof(void *));
+			p->vac_cap = ncap;
+		}
+		p->vacants[p->vac_count++] = v;
+	}
+
+	static inline void object_pool_raw_mem_push(struct ObjectPoolRaw *p, void *v)
+	{
+		if (p->mem_count == p->mem_cap)
+		{
+			int ncap   = p->mem_cap ? p->mem_cap * 2 : 8;
+			p->memory  = (void **)realloc(p->memory, (size_t)ncap * sizeof(void *));
+			p->mem_cap = ncap;
+		}
+		p->memory[p->mem_count++] = v;
+	}
+
+	/* Return an uninitialised slot of element_size bytes (or NULL on OOM). The
+	 * caller placement-constructs into it. */
+	static inline void *object_pool_raw_allocate(struct ObjectPoolRaw *p)
+	{
+		if (p->vac_count == 0)
+		{
+			unsigned num_objects = 64u << (unsigned)p->mem_count;
+			char    *ptr         = (char *)malloc(num_objects * p->element_size);
+			unsigned i;
+			if (!ptr)
+				return NULL;
+			for (i = 0; i < num_objects; i++)
+				object_pool_raw_vac_push(p, ptr + (size_t)i * p->element_size);
+			object_pool_raw_mem_push(p, ptr);
+		}
+		return p->vacants[--p->vac_count];
+	}
+
+	/* Return a slot to the free list. The caller has already destroyed the object. */
+	static inline void object_pool_raw_free(struct ObjectPoolRaw *p, void *ptr)
+	{
+		object_pool_raw_vac_push(p, ptr);
+	}
+
+	static inline void object_pool_raw_clear(struct ObjectPoolRaw *p)
+	{
+		int i;
+		for (i = 0; i < p->mem_count; i++)
+			::free(p->memory[i]);
+		p->vac_count = 0;
+		p->mem_count = 0;
+	}
+
+	static inline void object_pool_raw_deinit(struct ObjectPoolRaw *p)
+	{
+		object_pool_raw_clear(p);
+		::free(p->vacants);
+		::free(p->memory);
+		p->vacants = NULL;
+		p->memory  = NULL;
+		p->vac_cap = 0;
+		p->mem_cap = 0;
+	}
+
 	template<typename T>
 		class ObjectPool
 		{
@@ -3088,7 +3185,7 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 			}
 
 		private:
-			friend class ObjectPool<Sampler>;
+			friend class Device;
 			Sampler(Device *device, VkSampler sampler);
 
 			Device *device;
@@ -3315,7 +3412,7 @@ public:
 	void free(DeviceAllocation *alloc);
 
 private:
-	ClassAllocator() = default;
+	ClassAllocator() { object_pool_raw_init(&object_pool, sizeof(MiniHeap)); }
 	struct AllocationTilingHeaps
 	{
 		IntrusiveList<MiniHeap> heaps[Block::NumSubBlocks];
@@ -3324,7 +3421,7 @@ private:
 	};
 	ClassAllocator *parent = NULL;
 	AllocationTilingHeaps tiling_modes[ALLOCATION_TILING_COUNT];
-	ObjectPool<MiniHeap> object_pool;
+	struct ObjectPoolRaw object_pool;
 
 	uint32_t sub_block_size = 1;
 	uint32_t sub_block_size_log2 = 0;
@@ -3778,7 +3875,7 @@ private:
 			}
 
 		private:
-			friend class ObjectPool<Buffer>;
+			friend class Device;
 			Buffer(Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info);
 
 			Device *device;
@@ -3828,7 +3925,7 @@ private:
 			}
 
 		private:
-			friend class ObjectPool<BufferView>;
+			friend class Device;
 			BufferView(Device *device, VkBufferView view, const BufferViewCreateInfo &info);
 
 			Device *device;
@@ -4350,7 +4447,7 @@ private:
 			}
 
 		private:
-			friend class ObjectPool<Image>;
+			friend class Device;
 
 			Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
 					const ImageCreateInfo &info);
@@ -4399,7 +4496,7 @@ private:
 			void wait();
 
 		private:
-			friend class ObjectPool<FenceHolder>;
+			friend class Device;
 			FenceHolder(Device *device, VkFence fence) : device(device), fence(fence)
 		{
 		}
@@ -4488,7 +4585,7 @@ private:
 			}
 
 		private:
-			friend class ObjectPool<SemaphoreHolder>;
+			friend class Device;
 			SemaphoreHolder(Device *device, VkSemaphore semaphore, bool signalled)
 				: device(device)
 				  , semaphore(semaphore)
@@ -5624,7 +5721,7 @@ private:
 			void end();
 
 		private:
-			friend class ObjectPool<CommandBuffer>;
+			friend class Device;
 			CommandBuffer(Device *device, VkCommandBuffer cmd, Type type);
 
 			Device *device;
@@ -5726,40 +5823,40 @@ private:
 	};
 	struct HandlePool
 	{
-		VulkanObjectPool<Buffer> buffers;
-		VulkanObjectPool<Image> images;
-		VulkanObjectPool<ImageView> image_views;
-		VulkanObjectPool<BufferView> buffer_views;
-		VulkanObjectPool<Sampler> samplers;
-		VulkanObjectPool<FenceHolder> fences;
-		VulkanObjectPool<SemaphoreHolder> semaphores;
-		VulkanObjectPool<CommandBuffer> command_buffers;
+		struct ObjectPoolRaw buffers;
+		struct ObjectPoolRaw images;
+		struct ObjectPoolRaw image_views;
+		struct ObjectPoolRaw buffer_views;
+		struct ObjectPoolRaw samplers;
+		struct ObjectPoolRaw fences;
+		struct ObjectPoolRaw semaphores;
+		struct ObjectPoolRaw command_buffers;
 
 		/* For a malloc'd owner (Device), where the pools' constructors and
 		 * destructors do not run: init() puts every pool in the empty state and
 		 * deinit() runs each pool's teardown (free pooled nodes and slabs). */
 		void init()
 		{
-			buffers.init();
-			images.init();
-			image_views.init();
-			buffer_views.init();
-			samplers.init();
-			fences.init();
-			semaphores.init();
-			command_buffers.init();
+			object_pool_raw_init(&buffers,         sizeof(Buffer));
+			object_pool_raw_init(&images,          sizeof(Image));
+			object_pool_raw_init(&image_views,     sizeof(ImageView));
+			object_pool_raw_init(&buffer_views,    sizeof(BufferView));
+			object_pool_raw_init(&samplers,        sizeof(Sampler));
+			object_pool_raw_init(&fences,          sizeof(FenceHolder));
+			object_pool_raw_init(&semaphores,      sizeof(SemaphoreHolder));
+			object_pool_raw_init(&command_buffers, sizeof(CommandBuffer));
 		}
 
 		void deinit()
 		{
-			buffers.deinit();
-			images.deinit();
-			image_views.deinit();
-			buffer_views.deinit();
-			samplers.deinit();
-			fences.deinit();
-			semaphores.deinit();
-			command_buffers.deinit();
+			object_pool_raw_deinit(&buffers);
+			object_pool_raw_deinit(&images);
+			object_pool_raw_deinit(&image_views);
+			object_pool_raw_deinit(&buffer_views);
+			object_pool_raw_deinit(&samplers);
+			object_pool_raw_deinit(&fences);
+			object_pool_raw_deinit(&semaphores);
+			object_pool_raw_deinit(&command_buffers);
 		}
 	};
 
@@ -12367,7 +12464,7 @@ Sampler::~Sampler()
 
 void SamplerDeleter::operator()(Sampler *sampler)
 {
-	sampler->device->handle_pool.samplers.free(sampler);
+	{ struct ObjectPoolRaw *_pool = &sampler->device->handle_pool.samplers; sampler->~Sampler(); object_pool_raw_free(_pool, sampler); }
 }
 
 /* === buffer.cpp === */
@@ -12390,7 +12487,7 @@ Buffer::~Buffer()
 
 void BufferDeleter::operator()(Buffer *buffer)
 {
-	buffer->device->handle_pool.buffers.free(buffer);
+	{ struct ObjectPoolRaw *_pool = &buffer->device->handle_pool.buffers; buffer->~Buffer(); object_pool_raw_free(_pool, buffer); }
 }
 
 BufferView::BufferView(Device *device, VkBufferView view, const BufferViewCreateInfo &create_info)
@@ -12409,7 +12506,7 @@ BufferView::~BufferView()
 
 void BufferViewDeleter::operator()(BufferView *view)
 {
-	view->device->handle_pool.buffer_views.free(view);
+	{ struct ObjectPoolRaw *_pool = &view->device->handle_pool.buffer_views; view->~BufferView(); object_pool_raw_free(_pool, view); }
 }
 
 
@@ -12472,7 +12569,7 @@ Image::Image(Device *device, VkImage image, VkImageView default_view, const Devi
 		info.levels = create_info.levels;
 		info.base_layer = 0;
 		info.layers = create_info.layers;
-		view = ImageViewHandle(device->handle_pool.image_views.allocate(device, default_view, info));
+		view = ImageViewHandle(new (object_pool_raw_allocate(&device->handle_pool.image_views)) ImageView(device, default_view, info));
 	}
 }
 
@@ -12487,12 +12584,12 @@ Image::~Image()
 
 void ImageViewDeleter::operator()(ImageView *view)
 {
-	view->device->handle_pool.image_views.free(view);
+	{ struct ObjectPoolRaw *_pool = &view->device->handle_pool.image_views; view->~ImageView(); object_pool_raw_free(_pool, view); }
 }
 
 void ImageDeleter::operator()(Image *image)
 {
-	image->device->handle_pool.images.free(image);
+	{ struct ObjectPoolRaw *_pool = &image->device->handle_pool.images; image->~Image(); object_pool_raw_free(_pool, image); }
 }
 
 /* === fence.cpp === */
@@ -12512,7 +12609,7 @@ void FenceHolder::wait()
 
 void FenceHolderDeleter::operator()(FenceHolder *fence)
 {
-	fence->device->handle_pool.fences.free(fence);
+	{ struct ObjectPoolRaw *_pool = &fence->device->handle_pool.fences; fence->~FenceHolder(); object_pool_raw_free(_pool, fence); }
 }
 
 /* === fence_manager.cpp === */
@@ -12563,7 +12660,7 @@ SemaphoreHolder::~SemaphoreHolder()
 
 void SemaphoreHolderDeleter::operator()(SemaphoreHolder *semaphore)
 {
-	semaphore->device->handle_pool.semaphores.free(semaphore);
+	{ struct ObjectPoolRaw *_pool = &semaphore->device->handle_pool.semaphores; semaphore->~SemaphoreHolder(); object_pool_raw_free(_pool, semaphore); }
 }
 
 /* === semaphore_manager.cpp === */
@@ -12883,7 +12980,7 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 	}
 
 	// We didn't find a vacant heap, make a new one.
-	MiniHeap *node = object_pool.allocate();
+	MiniHeap *node = new (object_pool_raw_allocate(&object_pool)) MiniHeap();
 	if (!node)
 		return false;
 
@@ -12895,7 +12992,7 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 		// We cannot allocate a new block from parent ... This is fatal.
 		if (!parent->allocate(alloc_size, tiling, &heap.allocation, true))
 		{
-			object_pool.free(node);
+			node->~MiniHeap(); object_pool_raw_free(&object_pool, node);
 			return false;
 		}
 	}
@@ -12905,7 +13002,7 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 		if (!global_allocator->allocate(alloc_size, memory_type, &heap.allocation.base, &heap.allocation.host_base,
 		                                VK_NULL_HANDLE))
 		{
-			object_pool.free(node);
+			node->~MiniHeap(); object_pool_raw_free(&object_pool, node);
 			return false;
 		}
 	}
@@ -12945,6 +13042,8 @@ ClassAllocator::~ClassAllocator()
 
 	if (error)
 		LOGE("Memory leaked in class allocator!\n");
+
+	object_pool_raw_deinit(&object_pool);
 }
 
 void ClassAllocator::free(DeviceAllocation *alloc)
@@ -12975,7 +13074,7 @@ void ClassAllocator::free(DeviceAllocation *alloc)
 				m.heap_availability_mask &= ~(1u << index);
 		}
 
-		object_pool.free(heap);
+		heap->~MiniHeap(); object_pool_raw_free(&object_pool, heap);
 	}
 	else if (was_full)
 	{
@@ -15826,7 +15925,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void CommandBufferDeleter::operator()(CommandBuffer *cmd)
 	{
-		cmd->device->handle_pool.command_buffers.free(cmd);
+		{ struct ObjectPoolRaw *_pool = &cmd->device->handle_pool.command_buffers; cmd->~CommandBuffer(); object_pool_raw_free(_pool, cmd); }
 	}
 
 /* === vulkan.cpp === */
@@ -16744,7 +16843,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (fence)
 		{
 			VK_ASSERT(!*fence);
-			*fence = Fence(handle_pool.fences.allocate(this, cleared_fence));
+			*fence = Fence(new (object_pool_raw_allocate(&handle_pool.fences)) FenceHolder(this, cleared_fence));
 		}
 
 		decrement_frame_counter_nolock();
@@ -16782,7 +16881,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
 			signals.push(cleared_semaphore);
 			VK_ASSERT(!semaphores[i]);
-			semaphores[i] = Semaphore(handle_pool.semaphores.allocate(this, cleared_semaphore, true));
+			semaphores[i] = Semaphore(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
 		}
 
 		submit.signalSemaphoreCount = signals.size();
@@ -16984,7 +17083,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
 			signals[submits.size() - 1].push(cleared_semaphore);
 			VK_ASSERT(!semaphores[i]);
-			semaphores[i] = Semaphore(handle_pool.semaphores.allocate(this, cleared_semaphore, true));
+			semaphores[i] = Semaphore(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
 		}
 
 		for (int i = 0; i < submits.size(); i++)
@@ -17162,7 +17261,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		vkBeginCommandBuffer(cmd, &info);
 		add_frame_counter_nolock();
-		CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, type));
+		CommandBufferHandle handle(new (object_pool_raw_allocate(&handle_pool.command_buffers)) CommandBuffer(this, cmd, type));
 		return handle;
 	}
 
@@ -17591,7 +17690,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (res != VK_SUCCESS)
 			return BufferViewHandle(NULL);
 
-		return BufferViewHandle(handle_pool.buffer_views.allocate(this, view, view_info));
+		return BufferViewHandle(new (object_pool_raw_allocate(&handle_pool.buffer_views)) BufferView(this, view, view_info));
 	}
 
 	class ImageResourceHolder
@@ -17798,7 +17897,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		ImageViewCreateInfo tmp = create_info;
 		tmp.format = format;
-		ImageViewHandle ret(handle_pool.image_views.allocate(this, holder.image_view, tmp));
+		ImageViewHandle ret(new (object_pool_raw_allocate(&handle_pool.image_views)) ImageView(this, holder.image_view, tmp));
 		if (ret)
 		{
 			holder.owned = false;
@@ -17972,7 +18071,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				return ImageHandle(NULL);
 		}
 
-		ImageHandle handle(handle_pool.images.allocate(this, holder.image, holder.image_view, holder.allocation, tmpinfo));
+		ImageHandle handle(new (object_pool_raw_allocate(&handle_pool.images)) Image(this, holder.image, holder.image_view, holder.allocation, tmpinfo));
 		if (handle)
 		{
 			holder.owned = false;
@@ -18168,7 +18267,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (vkCreateSampler(device, &info, NULL, &sampler) != VK_SUCCESS)
 			return SamplerHandle(NULL);
 
-		return SamplerHandle(handle_pool.samplers.allocate(this, sampler));
+		return SamplerHandle(new (object_pool_raw_allocate(&handle_pool.samplers)) Sampler(this, sampler));
 	}
 
 	BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const void *initial)
@@ -18231,7 +18330,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		BufferCreateInfo tmpinfo = create_info;
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		BufferHandle handle(handle_pool.buffers.allocate(this, buffer, allocation, tmpinfo));
+		BufferHandle handle(new (object_pool_raw_allocate(&handle_pool.buffers)) Buffer(this, buffer, allocation, tmpinfo));
 
 		if (create_info.domain == BufferDomain_Device && initial && !memory_type_is_host_visible(memory_type))
 		{
