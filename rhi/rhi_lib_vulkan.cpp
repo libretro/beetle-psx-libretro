@@ -7129,9 +7129,9 @@ namespace PSX
 	 * Defined here so both IORequest and the path helpers can use it. */
 	enum { PATH_MAX_TT = 4096 + 256 };
 
-	enum class IORequestKind {
-		Load,
-		Dump,
+	enum IORequestKind {
+		IORequestKind_Load,
+		IORequestKind_Dump,
 	};
 
 	struct IORequest {
@@ -19396,7 +19396,7 @@ namespace PSX
 			// The expensive part (PNG decode + mipmaps, or PNG write) runs WITHOUT
 			// the lock so workers process in parallel; only the queue access and
 			// the response push are serialised.
-			if (request->kind == IORequestKind::Load) {
+			if (request->kind == IORequestKind_Load) {
 				uint32_t hash = request->hash;
 				uint32_t palette_hash = request->palette_hash;
 
@@ -19424,7 +19424,7 @@ namespace PSX
 				} else {
 					TT_LOG(RETRO_LOG_ERROR, "failed to load: %s\n", path);
 				}
-			} else if (request->kind == IORequestKind::Dump) {
+			} else if (request->kind == IORequestKind_Dump) {
 				int success = write_image(request->path, request->width, request->height, request->bytes);
 				if (success == 0) {
 					TT_LOG(RETRO_LOG_ERROR, "failed to write to: %s\n", request->path);
@@ -19592,7 +19592,7 @@ namespace PSX
 		{
 			IORequest *dump = (IORequest *)malloc(sizeof(IORequest));
 			dump->next = NULL;
-			dump->kind = IORequestKind::Dump;
+			dump->kind = IORequestKind_Dump;
 			snprintf(dump->path, sizeof(dump->path), "%s", path);
 			dump->width = upload.width * ppp;
 			dump->height = upload.height;
@@ -19977,7 +19977,7 @@ namespace PSX
 				IORequest *load = (IORequest *)malloc(sizeof(IORequest));
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting texture: %x-%x\n", hash, palette_hash);
 				load->next = NULL;
-				load->kind = IORequestKind::Load;
+				load->kind = IORequestKind_Load;
 				load->hash = hash;
 				load->palette_hash = palette_hash;
 				load->bytes = NULL;
@@ -20006,7 +20006,7 @@ namespace PSX
 		{
 			IORequest *load = (IORequest *)malloc(sizeof(IORequest));
 			load->next = NULL;
-			load->kind = IORequestKind::Load;
+			load->kind = IORequestKind_Load;
 			load->hash = id.hash;
 			load->palette_hash = id.palette_hash;
 			load->bytes = NULL;
