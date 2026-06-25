@@ -7447,25 +7447,39 @@ namespace PSX
 	 * HANDLE_LRU_MAX) with a count - no std::vector, no heap. */
 	enum { HANDLE_LRU_MAX = 4 };
 
-	class HandleLRUCache {
-		public:
-			HandleLRUCache(int max_size_): max_size(max_size_), count(0) {
-				if (max_size > HANDLE_LRU_MAX)
-					max_size = HANDLE_LRU_MAX;
-			}
-			HandleCacheResult get(Rect rect, uint32_t palette_hash);
-			void insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle);
-			void clear()
-			{
-				count = 0;
-			}
-			int64_t dbg_hits;
-			int64_t dbg_misses;
-		private:
-			int max_size;
-			int count;
-			CacheEntry entries[HANDLE_LRU_MAX];
+	/* Small fixed-capacity move-to-front cache of recently-used HD texture
+	 * handles. Formerly a class with a constructor; now a plain struct driven by
+	 * handle_lru_cache_init. CacheEntry is POD (its defensive default-init is never
+	 * read before being written - get only scans entries[0..count) and insert
+	 * writes entries[0] within that range), so the entries live in an inline array
+	 * (capacity HANDLE_LRU_MAX) with a count - no std::vector, no heap. */
+	struct HandleLRUCache {
+		int64_t dbg_hits;
+		int64_t dbg_misses;
+		int max_size;
+		int count;
+		CacheEntry entries[HANDLE_LRU_MAX];
+
+		HandleCacheResult get(Rect rect, uint32_t palette_hash);
+		void insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle);
+		void clear()
+		{
+			count = 0;
+		}
 	};
+
+	static void handle_lru_cache_init(HandleLRUCache *c, int max_size)
+	{
+		if (max_size > HANDLE_LRU_MAX)
+			max_size = HANDLE_LRU_MAX;
+		c->max_size = max_size;
+		c->count = 0;
+		/* The former constructor left these uninitialised (they were only ever
+		 * zeroed inside a TT_LOG_VERBOSE block after first use); zero them here so
+		 * the hit/miss counters start from a defined value. */
+		c->dbg_hits = 0;
+		c->dbg_misses = 0;
+	}
 
 	//========================================
 	// Save State
@@ -8180,7 +8194,7 @@ namespace PSX
 			uint64_t frame = 0;
 
 			RectTracker tracker;
-			HandleLRUCache handle_cache = 4;
+			HandleLRUCache handle_cache;
 
 			// HD image caches, independent of upload lifetime. Tier 1 = GPU (VRAM,
 			// ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier 3
@@ -19371,6 +19385,7 @@ namespace PSX
 		char cfg[PATH_MAX_TT];
 		HdImageCache_init(&hd_cache, HD_CACHE_RAM_BUDGET);
 		HdGpuCache_init(&hd_gpu_cache, HD_CACHE_VRAM_BUDGET);
+		handle_lru_cache_init(&handle_cache, 4);
 		hd_key_set_init(&known_files);
 		hd_key_set_init(&requested);
 		hd_key_set_init(&pending_attach);
