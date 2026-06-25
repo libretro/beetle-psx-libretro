@@ -13421,17 +13421,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 /* === shader.cpp === */
 
-#include <spirv_cross.hpp>
+#include "rhi_spirv_reflect.h"
 
 #ifdef GRANITE_SPIRV_DUMP
 #include "filesystem.hpp"
 #endif
 
-using spirv_cross::Compiler;
-using spirv_cross::Resource;
-using spirv_cross::ShaderResources;
-using spirv_cross::SpecializationConstant;
-using spirv_cross::SPIRType;
 using namespace Util;
 
 namespace Vulkan
@@ -13496,30 +13491,6 @@ namespace Vulkan
 		}
 	}
 
-	static bool get_stock_sampler(StockSampler &sampler, const char *name)
-	{
-		if (strstr(name, "NearestClamp"))
-			sampler = StockSampler::NearestClamp;
-		else if (strstr(name, "LinearClamp"))
-			sampler = StockSampler::LinearClamp;
-		else if (strstr(name, "TrilinearClamp"))
-			sampler = StockSampler::TrilinearClamp;
-		else if (strstr(name, "NearestWrap"))
-			sampler = StockSampler::NearestWrap;
-		else if (strstr(name, "LinearWrap"))
-			sampler = StockSampler::LinearWrap;
-		else if (strstr(name, "TrilinearWrap"))
-			sampler = StockSampler::TrilinearWrap;
-		else if (strstr(name, "NearestShadow"))
-			sampler = StockSampler::NearestShadow;
-		else if (strstr(name, "LinearShadow"))
-			sampler = StockSampler::LinearShadow;
-		else
-			return false;
-
-		return true;
-	}
-
 	Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
 		: IntrusiveHashMapEnabled<Shader>(hash)
 		  , device(device)
@@ -13537,138 +13508,14 @@ namespace Vulkan
 		if (vkCreateShaderModule(device->get_device(), &info, nullptr, &module) != VK_SUCCESS)
 			LOGE("Failed to create shader module.\n");
 
-		Compiler compiler(data, size / sizeof(uint32_t));
-
-		ShaderResources resources = compiler.get_shader_resources();
-		for (Resource &image : resources.sampled_images)
-		{
-			uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-			const SPIRType &type = compiler.get_type(image.base_type_id);
-			if (type.image.dim == spv::DimBuffer)
-				layout.sets[set].sampled_buffer_mask |= 1u << binding;
-			else
-				layout.sets[set].sampled_image_mask |= 1u << binding;
-
-			if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
-				layout.sets[set].fp_mask |= 1u << binding;
-
-			StockSampler sampler;
-			if (type.image.dim != spv::DimBuffer && get_stock_sampler(sampler, image.name.c_str()))
-			{
-				if (has_immutable_sampler(layout.sets[set], binding))
-				{
-					if (sampler != get_immutable_sampler(layout.sets[set], binding))
-						LOGE("Immutable sampler mismatch detected!\n");
-				}
-				else
-					set_immutable_sampler(layout.sets[set], binding, sampler);
-			}
-		}
-
-		for (Resource &image : resources.subpass_inputs)
-		{
-			uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-			layout.sets[set].input_attachment_mask |= 1u << binding;
-
-			const SPIRType &type = compiler.get_type(image.base_type_id);
-			if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
-				layout.sets[set].fp_mask |= 1u << binding;
-		}
-
-		for (Resource &image : resources.separate_images)
-		{
-			uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-
-			const SPIRType &type = compiler.get_type(image.base_type_id);
-			if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
-				layout.sets[set].fp_mask |= 1u << binding;
-
-			if (type.image.dim == spv::DimBuffer)
-				layout.sets[set].sampled_buffer_mask |= 1u << binding;
-			else
-				layout.sets[set].separate_image_mask |= 1u << binding;
-		}
-
-		for (Resource &image : resources.separate_samplers)
-		{
-			uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-			layout.sets[set].sampler_mask |= 1u << binding;
-
-			StockSampler sampler;
-			if (get_stock_sampler(sampler, image.name.c_str()))
-			{
-				if (has_immutable_sampler(layout.sets[set], binding))
-				{
-					if (sampler != get_immutable_sampler(layout.sets[set], binding))
-						LOGE("Immutable sampler mismatch detected!\n");
-				}
-				else
-					set_immutable_sampler(layout.sets[set], binding, sampler);
-			}
-		}
-
-		for (Resource &image : resources.storage_images)
-		{
-			uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-			layout.sets[set].storage_image_mask |= 1u << binding;
-
-			const SPIRType &type = compiler.get_type(image.base_type_id);
-			if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
-				layout.sets[set].fp_mask |= 1u << binding;
-		}
-
-		for (Resource &buffer : resources.uniform_buffers)
-		{
-			uint32_t set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
-			layout.sets[set].uniform_buffer_mask |= 1u << binding;
-		}
-
-		for (Resource &buffer : resources.storage_buffers)
-		{
-			uint32_t set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
-			layout.sets[set].storage_buffer_mask |= 1u << binding;
-		}
-
-		for (Resource &attrib : resources.stage_inputs)
-		{
-			uint32_t location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
-			layout.input_mask |= 1u << location;
-		}
-
-		for (Resource &attrib : resources.stage_outputs)
-		{
-			uint32_t location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
-			layout.output_mask |= 1u << location;
-		}
-
-		if (!resources.push_constant_buffers.empty())
-		{
-			// Don't bother trying to extract which part of a push constant block we're using.
-			// Just assume we're accessing everything. At least on older validation layers,
-			// it did not do a static analysis to determine similar information, so we got a lot
-			// of false positives.
-			layout.push_constant_size =
-				compiler.get_declared_struct_size(compiler.get_type(resources.push_constant_buffers.front().base_type_id));
-		}
-
-		std::vector<SpecializationConstant> spec_constants = compiler.get_specialization_constants();
-		for (SpecializationConstant &c : spec_constants)
-		{
-			if (c.constant_id >= VULKAN_NUM_SPEC_CONSTANTS)
-			{
-				LOGE("Spec constant ID: %u is out of range, will be ignored.\n", c.constant_id);
-				continue;
-			}
-
-			layout.spec_constant_mask |= 1u << c.constant_id;
-		}
+		/* SPIR-V reflection is done in a separate C++ shim (rhi_spirv_reflect.cpp)
+		 * so this translation unit does not depend on SPIRV-Cross. The shim writes
+		 * a POD layout whose fields mirror ResourceLayout; copy it across. */
+		RhiSpirvResourceLayout reflected;
+		rhi_spirv_reflect(data, size / sizeof(uint32_t), &reflected);
+		static_assert(sizeof(reflected) == sizeof(layout),
+				"reflection layout mirror size mismatch");
+		memcpy(&layout, &reflected, sizeof(layout));
 	}
 
 	Shader::~Shader()
