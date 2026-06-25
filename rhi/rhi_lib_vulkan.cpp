@@ -2240,6 +2240,28 @@ namespace Util
 					load_count = 0;
 				}
 
+				/* Raw-memory lifecycle, for an owner allocated with malloc (so this
+				 * holder's and its members' constructors/destructors do not run).
+				 * init_empty() establishes the constructed empty state directly:
+				 * the value table NULL/0/0, the intrusive list head null, the load
+				 * count zero - without touching the (garbage) table storage the way
+				 * clear() would. deinit() drops the table's backing storage the
+				 * ValueTable destructor used to free (the nodes themselves are owned
+				 * by the object pool, freed separately). */
+				void init_empty()
+				{
+					values.items = NULL;
+					values.count = 0;
+					values.cap   = 0;
+					list.clear();
+					load_count = 0;
+				}
+
+				void deinit()
+				{
+					values.~ValueTable();
+				}
+
 				typename IntrusiveList<T>::Iterator begin()
 				{
 					return list.begin();
@@ -2389,6 +2411,25 @@ namespace Util
 					}
 
 					hashmap.clear();
+				}
+
+				/* Raw-memory lifecycle, for an owner allocated with malloc. init_empty
+				 * establishes the empty state the default constructor would (the
+				 * holder empty and the object pool empty); deinit performs the
+				 * destructor's teardown (clear() frees the pooled nodes) plus the
+				 * teardown the holder's and pool's destructors did (free the table
+				 * storage and the pool slabs). */
+				void init_empty()
+				{
+					hashmap.init_empty();
+					pool.init();
+				}
+
+				void deinit()
+				{
+					clear();
+					hashmap.deinit();
+					pool.deinit();
 				}
 
 				T *find(Hash hash) const
