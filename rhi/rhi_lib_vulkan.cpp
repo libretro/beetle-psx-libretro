@@ -13605,50 +13605,50 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				if (has_immutable_sampler(layout, i))
 					immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
 
-				bindings.push({ i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL });
-				pool_size.push({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
+				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL });
+				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
 				types++;
 			}
 
 			if (layout.sampled_buffer_mask & (1u << i))
 			{
-				bindings.push({ i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, NULL });
-				pool_size.push({ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL });
+				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, NULL });
+				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL });
 				types++;
 			}
 
 			if (layout.storage_image_mask & (1u << i))
 			{
-				bindings.push({ i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, NULL });
-				pool_size.push({ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL });
+				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, NULL });
+				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL });
 				types++;
 			}
 
 			if (layout.uniform_buffer_mask & (1u << i))
 			{
-				bindings.push({ i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, NULL });
-				pool_size.push({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL });
+				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, NULL });
+				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL });
 				types++;
 			}
 
 			if (layout.storage_buffer_mask & (1u << i))
 			{
-				bindings.push({ i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, NULL });
-				pool_size.push({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL });
+				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, NULL });
+				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL });
 				types++;
 			}
 
 			if (layout.input_attachment_mask & (1u << i))
 			{
-				bindings.push({ i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, NULL });
-				pool_size.push({ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL });
+				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, NULL });
+				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL });
 				types++;
 			}
 
 			if (layout.separate_image_mask & (1u << i))
 			{
-				bindings.push({ i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, NULL });
-				pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL });
+				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, NULL });
+				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL });
 				types++;
 			}
 
@@ -13658,8 +13658,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				if (has_immutable_sampler(layout, i))
 					immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
 
-				bindings.push({ i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL });
-				pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
+				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL });
+				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
 				types++;
 			}
 
@@ -13667,16 +13667,16 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VK_ASSERT(types <= 1 && "Descriptor set aliasing!");
 		}
 
-		if (!bindings.empty())
+		if (!DescriptorBindingVec_empty(&bindings))
 		{
-			info.bindingCount = bindings.size();
-			info.pBindings = bindings.data();
+			info.bindingCount = DescriptorBindingVec_size(&bindings);
+			info.pBindings = DescriptorBindingVec_data(&bindings);
 		}
 
 		LOGI("Creating descriptor set layout.\n");
 		if (vkCreateDescriptorSetLayout(device->get_device(), &info, NULL, &set_layout) != VK_SUCCESS)
 			LOGE("Failed to create descriptor set layout.");
-		bindings.free_storage();
+		DescriptorBindingVec_free_storage(&bindings);
 	}
 
 	DescriptorSetAllocation DescriptorSetAllocator::find(Hash hash)
@@ -13699,10 +13699,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VkDescriptorPool pool;
 		VkDescriptorPoolCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
 		info.maxSets = VULKAN_NUM_SETS_PER_POOL;
-		if (!pool_size.empty())
+		if (!DescriptorPoolSizeVec_empty(&pool_size))
 		{
-			info.poolSizeCount = pool_size.size();
-			info.pPoolSizes = pool_size.data();
+			info.poolSizeCount = DescriptorPoolSizeVec_size(&pool_size);
+			info.pPoolSizes = DescriptorPoolSizeVec_data(&pool_size);
 		}
 
 		if (vkCreateDescriptorPool(device->get_device(), &info, NULL, &pool) != VK_SUCCESS)
@@ -13720,7 +13720,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		if (vkAllocateDescriptorSets(device->get_device(), &alloc, sets) != VK_SUCCESS)
 			LOGE("Failed to allocate descriptor sets.\n");
-		state.pools.push(pool);
+		DescriptorPoolVec_push(&state.pools, pool);
 
 		for (VkDescriptorSet set : sets)
 			descriptor_set_thmap_make_vacant(&state.set_nodes, set);
@@ -13736,7 +13736,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			vkResetDescriptorPool(device->get_device(), pool, 0);
 			vkDestroyDescriptorPool(device->get_device(), pool, NULL);
 		}
-		per_thread.pools.clear();
+		DescriptorPoolVec_clear(&per_thread.pools);
 	}
 
 	DescriptorSetAllocator::~DescriptorSetAllocator()
@@ -13745,8 +13745,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			vkDestroyDescriptorSetLayout(device->get_device(), set_layout, NULL);
 		clear();
 		descriptor_set_thmap_deinit(&per_thread.set_nodes);
-		per_thread.pools.free_storage();
-		pool_size.free_storage();
+		DescriptorPoolVec_free_storage(&per_thread.pools);
+		DescriptorPoolSizeVec_free_storage(&pool_size);
 	}
 
 /* === render_pass.cpp === */
@@ -16963,7 +16963,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			size_t ws;
 			for (ws = 0; ws < data.wait_stages.size(); ws++)
-				stages.push(data.wait_stages[ws]);
+				VkFlagsVec_push(&stages, data.wait_stages[ws]);
 		}
 
 		for (Semaphore &semaphore : data.wait_semaphores)
@@ -16988,8 +16988,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		submit.waitSemaphoreCount = waits.size();
 		if (!signals.empty())
 			submit.pSignalSemaphores = signals.data();
-		if (!stages.empty())
-			submit.pWaitDstStageMask = stages.data();
+		if (!VkFlagsVec_empty(&stages))
+			submit.pWaitDstStageMask = VkFlagsVec_data(&stages);
 		if (!waits.empty())
 			submit.pWaitSemaphores = waits.data();
 
@@ -17016,7 +17016,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		waits.free_storage();
 		signals.free_storage();
-		stages.free_storage();
+		VkFlagsVec_free_storage(&stages);
 
 		if (fence)
 		{
@@ -17158,7 +17158,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			// Move the pending wait stages across (then the source is cleared below).
 			size_t ws;
 			for (ws = 0; ws < data.wait_stages.size(); ws++)
-				stages[0].push(data.wait_stages[ws]);
+				VkFlagsVec_push(&stages[0], data.wait_stages[ws]);
 		}
 
 		for (Semaphore &semaphore : data.wait_semaphores)
@@ -17205,7 +17205,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			if (!waits[i].empty())
 			{
 				submit.pWaitSemaphores = waits[i].data();
-				submit.pWaitDstStageMask = stages[i].data();
+				submit.pWaitDstStageMask = VkFlagsVec_data(&stages[i]);
 			}
 
 			submit.signalSemaphoreCount = signals[i].size();
@@ -17237,7 +17237,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VkSubmitInfoVec_free_storage(&submits);
 		waits[0].free_storage();  waits[1].free_storage();
 		signals[0].free_storage(); signals[1].free_storage();
-		stages[0].free_storage();  stages[1].free_storage();
+		VkFlagsVec_free_storage(&stages[0]);  VkFlagsVec_free_storage(&stages[1]);
 
 		if (fence)
 		{
@@ -21305,7 +21305,7 @@ static char retro_slash = '/';
 			TextureUpload *ptr = texture_upload_new(); /* owns +1 */
 			texture_upload_copy_contents(ptr, state.uploads.items[e].val); /* deep-copy contents (refcount untouched) */
 			UploadPtrEntry pe = { state.uploads.items[e].key, ptr };
-			uploads.push(pe);
+			UploadPtrVec_push(&uploads, pe);
 		}
 
 		clearRegion({ 0, 0, FB_WIDTH, FB_HEIGHT });
@@ -21329,7 +21329,7 @@ static char retro_slash = '/';
 		// hold their own references to each upload.
 		for (int i = 0; i < uploads.count; i++)
 			texture_upload_release(uploads.items[i].val);
-		uploads.free_storage();
+		UploadPtrVec_free_storage(&uploads);
 	}
 	// End of Save State
 	//========================================
