@@ -3950,11 +3950,23 @@ namespace Vulkan
 
 	POD_VEC_DECLARE(RenderTargetViewVec, VkImageView);
 
-	class ImageView : public Util::IntrusivePtrEnabled<ImageView, ImageViewDeleter, HandleCounter>,
-	public Cookie
+	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
+	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
+	 * base, which provides the hash identity, is unrelated and stays. */
+	class ImageView : public Cookie
 	{
 		public:
 			friend struct ImageViewDeleter;
+
+			void release_reference()
+			{
+				if (reference_count.release())
+					ImageViewDeleter()(this);
+			}
+			void add_reference()
+			{
+				reference_count.add_ref();
+			}
 
 			ImageView(Device *device, VkImageView view, const ImageViewCreateInfo &info);
 
@@ -4028,6 +4040,7 @@ namespace Vulkan
 			VkImageView depth_view = VK_NULL_HANDLE;
 			VkImageView stencil_view = VK_NULL_HANDLE;
 			ImageViewCreateInfo info;
+			HandleCounter reference_count;
 	};
 
 	using ImageViewHandle = Util::IntrusivePtr<ImageView>;
