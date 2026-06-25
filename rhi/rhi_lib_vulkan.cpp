@@ -13887,7 +13887,6 @@ namespace Vulkan
 
 /* === render_pass.cpp === */
 
-using namespace std;
 using namespace Util;
 
 namespace Util
@@ -14808,7 +14807,6 @@ namespace Vulkan
 
 /* === command_buffer.cpp === */
 
-using namespace std;
 using namespace Util;
 
 #define COMBINER_NEEDS_BLEND_CONSTANT(factor) ((factor) == VK_BLEND_FACTOR_CONSTANT_COLOR || (factor) == VK_BLEND_FACTOR_CONSTANT_ALPHA)
@@ -18668,7 +18666,6 @@ namespace Vulkan
 
 /* === atlas.cpp === */
 
-using namespace std;
 
 namespace PSX
 {
@@ -21376,7 +21373,6 @@ namespace PSX
 
 using namespace Vulkan;
 using namespace PSX;
-using namespace std;
 
 static Context *context = nullptr;
 static Device *device = nullptr;
@@ -21388,8 +21384,67 @@ extern retro_log_printf_t log_cb;
 
 static retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
-static vector<retro_vulkan_image> swapchain_images;
-static vector<ImageHandle> scanout_handles;
+
+/* Owning vector of retro_vulkan_image (POD), replacing
+ * std::vector<retro_vulkan_image>. resize() grows/shrinks the backing array;
+ * grown slots are zero-initialised. */
+struct SwapchainImageVec {
+	retro_vulkan_image *items;
+	int count;
+	int cap;
+	void clear() { count = 0; }
+	int size() const { return count; }
+	retro_vulkan_image &operator[](int i) { return items[i]; }
+	void resize(int n) {
+		if (n > cap) {
+			items = (retro_vulkan_image *)realloc(items, (size_t)n * sizeof(retro_vulkan_image));
+			cap = n;
+		}
+		if (n > count)
+			memset(&items[count], 0, (size_t)(n - count) * sizeof(retro_vulkan_image));
+		count = n;
+	}
+	void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }
+};
+
+/* Owning vector of ImageHandle (refcounted), replacing
+ * std::vector<ImageHandle>. resize() default-constructs grown slots (NULL
+ * handles) and resets/destroys dropped ones; clear() resets every element.
+ * operator[] returns a reference so assignment goes through ImageHandle's own
+ * release-old/retain-new assignment. */
+struct ScanoutHandleVec {
+	ImageHandle *items;
+	int count;
+	int cap;
+	void clear() {
+		for (int i = 0; i < count; i++)
+			items[i].~ImageHandle();
+		count = 0;
+	}
+	int size() const { return count; }
+	ImageHandle &operator[](int i) { return items[i]; }
+	void resize(int n) {
+		for (int i = n; i < count; i++)
+			items[i].~ImageHandle();
+		if (n > cap) {
+			ImageHandle *nitems = (ImageHandle *)malloc((size_t)n * sizeof(ImageHandle));
+			for (int i = 0; i < count && i < n; i++) {
+				new (&nitems[i]) ImageHandle(static_cast<ImageHandle &&>(items[i]));
+				items[i].~ImageHandle();
+			}
+			::free(items);
+			items = nitems;
+			cap = n;
+		}
+		for (int i = count; i < n; i++)
+			new (&items[i]) ImageHandle();
+		count = n;
+	}
+	void free_storage() { clear(); ::free(items); items = NULL; cap = 0; }
+};
+
+static SwapchainImageVec swapchain_images;
+static ScanoutHandleVec scanout_handles;
 static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
