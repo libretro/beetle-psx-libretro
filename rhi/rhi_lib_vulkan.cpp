@@ -4470,6 +4470,17 @@ namespace Vulkan
 			{
 				this->device = device;
 			}
+			/* Raw-memory empty state, for a malloc'd owner (so the constructor and
+			 * the fence-vector's aggregate initialiser do not run). The heavyweight
+			 * setup is still init(device); deinit() already tears down from any
+			 * state (destroy recycled fences, free the array). */
+			void init_empty()
+			{
+				device = VK_NULL_HANDLE;
+				fences.items = NULL;
+				fences.count = 0;
+				fences.cap   = 0;
+			}
 			/* Explicit teardown (formerly ~FenceManager): destroys the recycled
 			 * fences and frees the backing array. Called from Device's teardown. */
 			void deinit();
@@ -4615,6 +4626,17 @@ namespace Vulkan
 			void init(VkDevice device)
 			{
 				this->device = device;
+			}
+			/* Raw-memory empty state, for a malloc'd owner (so the constructor and
+			 * the semaphore-vector's aggregate initialiser do not run). The
+			 * heavyweight setup is still init(device); deinit() already tears down
+			 * from any state (destroy recycled semaphores, free the array). */
+			void init_empty()
+			{
+				device = VK_NULL_HANDLE;
+				semaphores.items = NULL;
+				semaphores.count = 0;
+				semaphores.cap   = 0;
 			}
 			/* Explicit teardown (formerly ~SemaphoreManager): destroys the
 			 * recycled semaphores and frees the backing array. Called from
