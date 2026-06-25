@@ -6198,11 +6198,13 @@ namespace PSX
 
 	class Renderer;
 
-	class FBAtlas
+	/* VRAM framebuffer atlas / hazard tracker. Formerly a class whose only
+	 * C++-ism was a constructor that filled fb_info[] (relying on NSDMIs for the
+	 * listener pointer and the renderpass sub-struct); now a plain struct driven
+	 * by fbatlas_init. Renderer embeds one by value and calls fbatlas_init at the
+	 * top of its constructor. All methods stay as struct methods. */
+	struct FBAtlas
 	{
-		public:
-			FBAtlas();
-
 			void set_hazard_listener(Renderer *hazard)
 			{
 				listener = hazard;
@@ -6269,9 +6271,8 @@ namespace PSX
 			void notify_external_barrier(StatusFlags domains);
 			void flush_render_pass();
 
-		private:
 			StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
-			Renderer *listener = nullptr;
+			Renderer *listener;
 
 			void read_domain(Domain domain, Stage stage, const Rect &rect);
 			bool write_domain(Domain domain, Stage stage, const Rect &rect);
@@ -6279,15 +6280,15 @@ namespace PSX
 			void read_texture(Domain domain);
 			Domain find_suitable_domain(const Rect &rect);
 
-			struct
+			struct RenderPassState
 			{
 				Rect rect;
 				Rect scissor;
 				Rect texture_window;
-				unsigned texture_offset_x = 0, texture_offset_y = 0;
-				unsigned palette_offset_x = 0, palette_offset_y = 0;
-				TextureMode texture_mode = TextureMode::None;
-				bool inside = false;
+				unsigned texture_offset_x, texture_offset_y;
+				unsigned palette_offset_x, palette_offset_y;
+				TextureMode texture_mode;
+				bool inside;
 			} renderpass;
 
 			void extend_render_pass(const Rect &rect, bool scissor);
@@ -6309,6 +6310,19 @@ namespace PSX
 			void discard_render_pass();
 			bool inside_render_pass(const Rect &rect);
 	};
+
+	static void fbatlas_init(FBAtlas *a)
+	{
+		unsigned i;
+		for (i = 0; i < NUM_BLOCKS_X * NUM_BLOCKS_Y; i++)
+			a->fb_info[i] = STATUS_FB_PREFER;
+		a->listener = NULL;
+		/* renderpass is POD (Rect is four unsigneds; the rest are unsigned/enum/
+		 * bool); zero-initialise it. This matches the former NSDMIs: the three
+		 * Rects become {0,0,0,0}, the offsets 0, texture_mode TextureMode::None
+		 * (value 0) and inside false. */
+		memset(&a->renderpass, 0, sizeof(a->renderpass));
+	}
 
 	/* POD match rule from dump.cfg: a value of -1 means "wildcard" (matches
 	 * any) for that field. Was a class with a ctor + NSDMI + matches() method. */
@@ -9173,6 +9187,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
     , scaling(scaling_)
     , msaa(msaa_)
 {
+	fbatlas_init(&atlas);
 	// Sanity check settings, 16x IR with 16x MSAA will exhaust most GPUs VRAM alone.
 	if (scaling == 16 && msaa > 1)
 	{
@@ -18259,12 +18274,6 @@ using namespace std;
 
 namespace PSX
 {
-
-	FBAtlas::FBAtlas()
-	{
-		for (StatusFlags &f : fb_info)
-			f = STATUS_FB_PREFER;
-	}
 
 	void FBAtlas::load_image(const Rect &rect)
 	{
