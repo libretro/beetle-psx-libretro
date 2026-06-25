@@ -3959,7 +3959,7 @@ private:
 
 			void set_render_target_views(RenderTargetViewVec views)
 			{
-				VK_ASSERT(render_target_views.empty());
+				VK_ASSERT(RenderTargetViewVec_empty(&render_target_views));
 				// POD_VEC passed by value: adopt its backing array (the caller nulls its
 				// own copy so ownership transfers cleanly, mirroring the old move).
 				render_target_views = views;
@@ -5370,7 +5370,7 @@ private:
 			if (found >= 0)
 			{
 				in_flight.items[found] = in_flight.items[in_flight.count - 1];
-				in_flight.pop_back();
+				CommandBufferVec_pop_back(&in_flight);
 			}
 #else
 			(void)cmd;
@@ -12573,12 +12573,12 @@ VkImageView ImageView::get_render_target_view(unsigned layer) const
 
 	VK_ASSERT(layer < get_create_info().layers);
 
-	if (render_target_views.empty())
+	if (RenderTargetViewVec_empty(&render_target_views))
 		return view;
 	else
 	{
-		VK_ASSERT(layer < render_target_views.size());
-		return render_target_views[layer];
+		VK_ASSERT(layer < (unsigned)RenderTargetViewVec_size(&render_target_views));
+		return *RenderTargetViewVec_at((struct RenderTargetViewVec *)&render_target_views, layer);
 	}
 }
 
@@ -12590,9 +12590,12 @@ ImageView::~ImageView()
 	if (stencil_view != VK_NULL_HANDLE)
 		device->destroy_image_view_nolock(stencil_view);
 
-	for (VkImageView &view : render_target_views)
-		device->destroy_image_view_nolock(view);
-	render_target_views.free_storage();
+	{
+		int _i;
+		for (_i = 0; _i < RenderTargetViewVec_size(&render_target_views); _i++)
+			device->destroy_image_view_nolock(*RenderTargetViewVec_at(&render_target_views, _i));
+	}
+	RenderTargetViewVec_free_storage(&render_target_views);
 }
 
 Image::Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
@@ -12720,20 +12723,23 @@ void SemaphoreHolderDeleter::operator()(SemaphoreHolder *semaphore)
 
 void SemaphoreManager::deinit()
 {
-	for (VkSemaphore &sem : semaphores)
-		vkDestroySemaphore(device, sem, NULL);
-	semaphores.free_storage();
+	{
+		int _i;
+		for (_i = 0; _i < SemaphoreVec_size(&semaphores); _i++)
+			vkDestroySemaphore(device, *SemaphoreVec_at(&semaphores, _i), NULL);
+	}
+	SemaphoreVec_free_storage(&semaphores);
 }
 
 void SemaphoreManager::recycle(VkSemaphore sem)
 {
 	if (sem != VK_NULL_HANDLE)
-		semaphores.push(sem);
+		SemaphoreVec_push(&semaphores, sem);
 }
 
 VkSemaphore SemaphoreManager::request_cleared_semaphore()
 {
-	if (semaphores.empty())
+	if (SemaphoreVec_empty(&semaphores))
 	{
 		VkSemaphore semaphore;
 		VkSemaphoreCreateInfo info = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
@@ -12742,8 +12748,8 @@ VkSemaphore SemaphoreManager::request_cleared_semaphore()
 	}
 	else
 	{
-		VkSemaphore sem = semaphores.back();
-		semaphores.pop_back();
+		VkSemaphore sem = *SemaphoreVec_back(&semaphores);
+		SemaphoreVec_pop_back(&semaphores);
 		return sem;
 	}
 }
@@ -12846,19 +12852,19 @@ void command_pool_init(CommandPool *cp, VkDevice device, uint32_t queue_family_i
 
 void command_pool_deinit(CommandPool *cp)
 {
-	if (!cp->buffers.empty())
-		vkFreeCommandBuffers(cp->device, cp->pool, cp->buffers.size(), cp->buffers.data());
+	if (!CommandBufferVec_empty(&cp->buffers))
+		vkFreeCommandBuffers(cp->device, cp->pool, CommandBufferVec_size(&cp->buffers), CommandBufferVec_data(&cp->buffers));
 	if (cp->pool != VK_NULL_HANDLE)
 		vkDestroyCommandPool(cp->device, cp->pool, NULL);
-	cp->buffers.free_storage();
+	CommandBufferVec_free_storage(&cp->buffers);
 #ifdef VULKAN_DEBUG
-	cp->in_flight.free_storage();
+	CommandBufferVec_free_storage(&cp->in_flight);
 #endif
 }
 
 VkCommandBuffer CommandPool::request_command_buffer()
 {
-	if (index < buffers.size())
+	if (index < CommandBufferVec_size(&buffers))
 	{
 		VkCommandBuffer ret = buffers[index++];
 #ifdef VULKAN_DEBUG
@@ -12867,7 +12873,7 @@ VkCommandBuffer CommandPool::request_command_buffer()
 			for (int i = 0; i < in_flight.count; i++)
 				if (in_flight.items[i] == ret) { present = true; break; }
 			VK_ASSERT(!present);
-			in_flight.push(ret);
+			CommandBufferVec_push(&in_flight, ret);
 		}
 #endif
 		return ret;
@@ -12887,10 +12893,10 @@ VkCommandBuffer CommandPool::request_command_buffer()
 			for (int i = 0; i < in_flight.count; i++)
 				if (in_flight.items[i] == cmd) { present = true; break; }
 			VK_ASSERT(!present);
-			in_flight.push(cmd);
+			CommandBufferVec_push(&in_flight, cmd);
 		}
 #endif
-		buffers.push(cmd);
+		CommandBufferVec_push(&buffers, cmd);
 		index++;
 		return cmd;
 	}
@@ -12899,7 +12905,7 @@ VkCommandBuffer CommandPool::request_command_buffer()
 void CommandPool::begin()
 {
 #ifdef VULKAN_DEBUG
-	VK_ASSERT(in_flight.empty());
+	VK_ASSERT(CommandBufferVec_empty(&in_flight));
 #endif
 	if (index > 0)
 		vkResetCommandPool(device, pool, 0);
@@ -16969,8 +16975,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (Semaphore &semaphore : data.wait_semaphores)
 		{
 			VkSemaphore wait = semaphore->consume();
-			frame().recycled_semaphores.push(wait);
-			waits.push(wait);
+			SemaphoreVec_push(&frame().recycled_semaphores, wait);
+			SemaphoreVec_push(&waits, wait);
 		}
 		data.wait_stages.clear();
 		data.wait_semaphores.clear();
@@ -16979,19 +16985,19 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (unsigned i = 0; i < semaphore_count; i++)
 		{
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
-			signals.push(cleared_semaphore);
+			SemaphoreVec_push(&signals, cleared_semaphore);
 			VK_ASSERT(!semaphores[i]);
 			semaphores[i] = Semaphore(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
 		}
 
-		submit.signalSemaphoreCount = signals.size();
-		submit.waitSemaphoreCount = waits.size();
-		if (!signals.empty())
-			submit.pSignalSemaphores = signals.data();
+		submit.signalSemaphoreCount = SemaphoreVec_size(&signals);
+		submit.waitSemaphoreCount = SemaphoreVec_size(&waits);
+		if (!SemaphoreVec_empty(&signals))
+			submit.pSignalSemaphores = SemaphoreVec_data(&signals);
 		if (!VkFlagsVec_empty(&stages))
 			submit.pWaitDstStageMask = VkFlagsVec_data(&stages);
-		if (!waits.empty())
-			submit.pWaitSemaphores = waits.data();
+		if (!SemaphoreVec_empty(&waits))
+			submit.pWaitSemaphores = SemaphoreVec_data(&waits);
 
 		VkQueue queue;
 		switch (type)
@@ -17014,8 +17020,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (result != VK_SUCCESS)
 			LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
 
-		waits.free_storage();
-		signals.free_storage();
+		SemaphoreVec_free_storage(&waits);
+		SemaphoreVec_free_storage(&signals);
 		VkFlagsVec_free_storage(&stages);
 
 		if (fence)
@@ -17164,16 +17170,16 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (Semaphore &semaphore : data.wait_semaphores)
 		{
 			VkSemaphore wait = semaphore->consume();
-			frame().recycled_semaphores.push(wait);
-			waits[0].push(wait);
+			SemaphoreVec_push(&frame().recycled_semaphores, wait);
+			SemaphoreVec_push(&waits[0], wait);
 		}
 		data.wait_stages.clear();
 		data.wait_semaphores.clear();
 
 		for (CommandBufferHandle &cmd : submissions)
-			cmds.push(cmd->get_command_buffer());
+			CommandBufferVec_push(&cmds, cmd->get_command_buffer());
 
-		if (cmds.size() > (int)last_cmd)
+		if (CommandBufferVec_size(&cmds) > (int)last_cmd)
 		{
 			// Push all pending cmd buffers to their own submission.
 			VkSubmitInfo zero_submit;
@@ -17183,9 +17189,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkSubmitInfo &submit = *VkSubmitInfoVec_back(&submits);
 			submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submit.pNext = NULL;
-			submit.commandBufferCount = cmds.size() - last_cmd;
-			submit.pCommandBuffers = cmds.data() + last_cmd;
-			last_cmd = cmds.size();
+			submit.commandBufferCount = CommandBufferVec_size(&cmds) - last_cmd;
+			submit.pCommandBuffers = CommandBufferVec_data(&cmds) + last_cmd;
+			last_cmd = CommandBufferVec_size(&cmds);
 		}
 
 		VkFence cleared_fence = fence ? managers.fence.request_cleared_fence() : VK_NULL_HANDLE;
@@ -17193,7 +17199,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (unsigned i = 0; i < semaphore_count; i++)
 		{
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
-			signals[VkSubmitInfoVec_size(&submits) - 1].push(cleared_semaphore);
+			SemaphoreVec_push(&signals[VkSubmitInfoVec_size(&submits) - 1], cleared_semaphore);
 			VK_ASSERT(!semaphores[i]);
 			semaphores[i] = Semaphore(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
 		}
@@ -17201,16 +17207,16 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (int i = 0; i < VkSubmitInfoVec_size(&submits); i++)
 		{
 			VkSubmitInfo &submit = *VkSubmitInfoVec_at(&submits, i);
-			submit.waitSemaphoreCount = waits[i].size();
-			if (!waits[i].empty())
+			submit.waitSemaphoreCount = SemaphoreVec_size(&waits[i]);
+			if (!SemaphoreVec_empty(&waits[i]))
 			{
-				submit.pWaitSemaphores = waits[i].data();
+				submit.pWaitSemaphores = SemaphoreVec_data(&waits[i]);
 				submit.pWaitDstStageMask = VkFlagsVec_data(&stages[i]);
 			}
 
-			submit.signalSemaphoreCount = signals[i].size();
-			if (!signals[i].empty())
-				submit.pSignalSemaphores = signals[i].data();
+			submit.signalSemaphoreCount = SemaphoreVec_size(&signals[i]);
+			if (!SemaphoreVec_empty(&signals[i]))
+				submit.pSignalSemaphores = SemaphoreVec_data(&signals[i]);
 		}
 
 		VkQueue queue;
@@ -17233,10 +17239,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
 		submissions.clear();
 
-		cmds.free_storage();
+		CommandBufferVec_free_storage(&cmds);
 		VkSubmitInfoVec_free_storage(&submits);
-		waits[0].free_storage();  waits[1].free_storage();
-		signals[0].free_storage(); signals[1].free_storage();
+		SemaphoreVec_free_storage(&waits[0]);  SemaphoreVec_free_storage(&waits[1]);
+		SemaphoreVec_free_storage(&signals[0]); SemaphoreVec_free_storage(&signals[1]);
 		VkFlagsVec_free_storage(&stages[0]);  VkFlagsVec_free_storage(&stages[1]);
 
 		if (fence)
@@ -17490,7 +17496,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	void Device::destroy_semaphore_nolock(VkSemaphore semaphore)
 	{
 		VK_ASSERT_NOT_IN_VEC(frame().destroyed_semaphores, semaphore);
-		frame().destroyed_semaphores.push(semaphore);
+		SemaphoreVec_push(&frame().destroyed_semaphores, semaphore);
 	}
 
 	void Device::destroy_image_nolock(VkImage image)
@@ -17628,11 +17634,15 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			vkDestroyImage(device, image, NULL);
 		for (VkBuffer &buffer : destroyed_buffers)
 			vkDestroyBuffer(device, buffer, NULL);
-		for (VkSemaphore &semaphore : destroyed_semaphores)
-			vkDestroySemaphore(device, semaphore, NULL);
-		for (VkSemaphore &semaphore : recycled_semaphores)
 		{
-			managers->semaphore.recycle(semaphore);
+			int _i;
+			for (_i = 0; _i < SemaphoreVec_size(&destroyed_semaphores); _i++)
+				vkDestroySemaphore(device, *SemaphoreVec_at(&destroyed_semaphores, _i), NULL);
+		}
+		{
+			int _i;
+			for (_i = 0; _i < SemaphoreVec_size(&recycled_semaphores); _i++)
+				managers->semaphore.recycle(*SemaphoreVec_at(&recycled_semaphores, _i));
 		}
 		for (DeviceAllocation &alloc : allocations)
 			alloc.free_immediate(managers->memory);
@@ -17651,8 +17661,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		destroyed_buffer_views.clear();
 		destroyed_images.clear();
 		destroyed_buffers.clear();
-		destroyed_semaphores.clear();
-		recycled_semaphores.clear();
+		SemaphoreVec_clear(&destroyed_semaphores);
+		SemaphoreVec_clear(&recycled_semaphores);
 		allocations.clear();
 	}
 
@@ -17675,8 +17685,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		destroyed_buffer_views.free_storage();
 		destroyed_images.free_storage();
 		destroyed_buffers.free_storage();
-		recycled_semaphores.free_storage();
-		destroyed_semaphores.free_storage();
+		SemaphoreVec_free_storage(&recycled_semaphores);
+		SemaphoreVec_free_storage(&destroyed_semaphores);
 	}
 
 	uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
@@ -17922,7 +17932,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 						if (vkCreateImageView(device, &view_info, NULL, &rt_view) != VK_SUCCESS)
 							return false;
 
-						rt_views.push(rt_view);
+						RenderTargetViewVec_push(&rt_views, rt_view);
 					}
 				}
 
@@ -17990,7 +18000,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					vkDestroyImageView(device, stencil_view, NULL);
 				for (VkImageView &view : rt_views)
 					vkDestroyImageView(device, view, NULL);
-				rt_views.free_storage();
+				RenderTargetViewVec_free_storage(&rt_views);
 
 				if (image)
 					vkDestroyImage(device, image, NULL);
