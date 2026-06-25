@@ -4322,10 +4322,25 @@ namespace Vulkan
 		void operator()(SemaphoreHolder *semaphore);
 	};
 
-	class SemaphoreHolder : public Util::IntrusivePtrEnabled<SemaphoreHolder, SemaphoreHolderDeleter, HandleCounter>
+	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
+	 * CRTP base (IntrusivePtr now dispatches release_reference/add_reference
+	 * through the pointee directly). release_reference frees through the same
+	 * deleter path on reaching zero. This is the first pointee taken off the
+	 * template base, toward concrete per-type handles. */
+	class SemaphoreHolder
 	{
 		public:
 			friend struct SemaphoreHolderDeleter;
+
+			void release_reference()
+			{
+				if (reference_count.release())
+					SemaphoreHolderDeleter()(this);
+			}
+			void add_reference()
+			{
+				reference_count.add_ref();
+			}
 
 			~SemaphoreHolder();
 
@@ -4356,6 +4371,7 @@ namespace Vulkan
 			Device *device;
 			VkSemaphore semaphore;
 			bool signalled = true;
+			HandleCounter reference_count;
 	};
 
 	using Semaphore = Util::IntrusivePtr<SemaphoreHolder>;
