@@ -5291,10 +5291,24 @@ namespace Vulkan
 	};
 
 	class Device;
-	class CommandBuffer : public Util::IntrusivePtrEnabled<CommandBuffer, CommandBufferDeleter, HandleCounter>
+	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
+	 * CRTP base (IntrusivePtr dispatches through the pointee directly). This is the
+	 * last of the eight pointees taken off the template base. */
+	class CommandBuffer
 	{
 		public:
 			friend struct CommandBufferDeleter;
+
+			void release_reference()
+			{
+				if (reference_count.release())
+					CommandBufferDeleter()(this);
+			}
+			void add_reference()
+			{
+				reference_count.add_ref();
+			}
+
 			enum class Type
 			{
 				Generic,
@@ -5614,6 +5628,8 @@ namespace Vulkan
 					uint64_t cookie);
 
 			void init_viewport_scissor(const RenderPassInfo &info, const Framebuffer *framebuffer);
+
+			HandleCounter reference_count;
 	};
 
 
