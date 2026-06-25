@@ -3483,15 +3483,19 @@ struct AllocatorPtrVec
 	Allocator *operator[](int i) const { return items[i]; }
 	Allocator *back() const { return items[count - 1]; }
 	void clear() {
-		for (int i = 0; i < count; i++)
-			delete items[i];
+		for (int i = 0; i < count; i++) {
+			items[i]->~Allocator();
+			::free(items[i]);
+		}
 		count = 0;
 	}
 
 private:
 	void destroy() {
-		for (int i = 0; i < count; i++)
-			delete items[i];
+		for (int i = 0; i < count; i++) {
+			items[i]->~Allocator();
+			::free(items[i]);
+		}
 		::free(items);
 		items = NULL; count = 0; cap = 0;
 	}
@@ -6191,8 +6195,10 @@ namespace Vulkan
 				PerFrame **begin() { return items; }
 				PerFrame **end() { return items + count; }
 				void clear() {
-					for (int i = 0; i < count; i++)
-						delete items[i];
+					for (int i = 0; i < count; i++) {
+						items[i]->~PerFrame();
+						::free(items[i]);
+					}
 					count = 0;
 				}
 
@@ -6212,8 +6218,10 @@ namespace Vulkan
 
 			private:
 				void destroy() {
-					for (int i = 0; i < count; i++)
-						delete items[i];
+					for (int i = 0; i < count; i++) {
+						items[i]->~PerFrame();
+						::free(items[i]);
+					}
 					::free(items);
 					items = NULL; count = 0; cap = 0;
 				}
@@ -13211,7 +13219,9 @@ void DeviceAllocator::init(VkPhysicalDevice gpu, VkDevice vkdevice)
 	heaps.resize(mem_props.memoryHeapCount);
 	for (unsigned i = 0; i < mem_props.memoryTypeCount; i++)
 	{
-		allocators.push(new Allocator);
+		Allocator *a = (Allocator *)malloc(sizeof(Allocator));
+		new (a) Allocator();
+		allocators.push(a);
 		allocators.back()->set_memory_type(i);
 		allocators.back()->set_global_allocator(this);
 	}
@@ -17459,7 +17469,9 @@ namespace Vulkan
 
 		for (unsigned i = 0; i < count; i++)
 		{
-			per_frame.push(new PerFrame(this));
+			PerFrame *pf = (PerFrame *)malloc(sizeof(PerFrame));
+			new (pf) PerFrame(this);
+			per_frame.push(pf);
 		}
 	}
 
