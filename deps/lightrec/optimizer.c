@@ -1872,13 +1872,27 @@ static int lightrec_flag_io(struct lightrec_state *state, struct block *block)
 			if (!LIGHTREC_FLAGS_GET_IO_MODE(list->flags)
 			    && list->i.rs >= 28 && list->i.rs <= 29
 			    && !state->maps[PSX_MAP_KERNEL_USER_RAM].ops) {
-				/* Assume that all I/O operations that target
-				 * $sp or $gp will always only target a mapped
-				 * memory (RAM, BIOS, scratchpad). */
+				/* When constant propagation cannot prove which map a
+				 * $sp/$gp-relative access targets, the address is not
+				 * actually known to hit RAM: $gp in particular routinely
+				 * points at the hardware-register window (0x1f801xxx).
+				 *
+				 * The old heuristic assumed "RAM or bust" and emitted a
+				 * direct load (offset_ram + (addr & 0x1fffffff)). That
+				 * faults on any host that does not back the full 512 MiB
+				 * segment - e.g. a sub-par map where only the 2 MiB RAM
+				 * window is mapped - because an I/O address is offset past
+				 * the end of the RAM mapping into unmapped space.
+				 *
+				 * Only take that shortcut when the user explicitly opts in
+				 * via LIGHTREC_OPT_SP_GP_HIT_RAM (and even then via the
+				 * masked IO_RAM path, which stays in bounds). Otherwise
+				 * leave the IO mode unset so the emitter falls back to the
+				 * generic C wrapper (rec_io), which dispatches on the real
+				 * map at runtime and handles hardware-register, scratchpad
+				 * and RAM targets correctly. */
 				if (state->opt_flags & LIGHTREC_OPT_SP_GP_HIT_RAM)
 					list->flags |= LIGHTREC_IO_MODE(LIGHTREC_IO_RAM);
-				else
-					list->flags |= LIGHTREC_IO_MODE(LIGHTREC_IO_DIRECT);
 			}
 
 			fallthrough;
