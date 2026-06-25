@@ -1620,39 +1620,6 @@ struct NAME {                                                                 \
     T  *items;                                                                \
     int count;                                                                \
     int cap;                                                                  \
-    T       *data()        { return items; }                                  \
-    const T *data() const  { return items; }                                  \
-    int      size() const  { return count; }                                  \
-    bool     empty() const { return count == 0; }                             \
-    void     clear()       { count = 0; }                                     \
-    T       *begin()       { return items; }                                  \
-    T       *end()         { return items + count; }                          \
-    const T *begin() const { return items; }                                  \
-    const T *end()   const { return items + count; }                          \
-    T &operator[](int i)             { return items[i]; }                     \
-    const T &operator[](int i) const { return items[i]; }                     \
-    T &back()              { return items[count - 1]; }                       \
-    const T &back() const  { return items[count - 1]; }                       \
-    T &front()             { return items[0]; }                               \
-    const T &front() const { return items[0]; }                               \
-    bool grow_by_one() {                                                      \
-        if (count == cap) {                                                   \
-            int ncap = cap ? cap * 2 : 64;                                    \
-            T *nitems = (T *)realloc(items, (size_t)ncap * sizeof(T));        \
-            if (!nitems)                                                      \
-                return false;       /* keep old storage; caller must bail */  \
-            items = nitems;                                                   \
-            cap = ncap;                                                       \
-        }                                                                     \
-        return true;                                                          \
-    }                                                                         \
-    void push(const T &v) {                                                   \
-        T tmp = v;     /* copy before grow: v may alias items[] (realloc) */  \
-        if (grow_by_one())                                                    \
-            items[count++] = tmp;                                             \
-    }                                                                         \
-    void pop_back() { if (count) count--; }                                   \
-    void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }  \
 };                                                                            \
 static inline T   *NAME##_data(struct NAME *v)        { return v->items; }    \
 static inline int  NAME##_size(const struct NAME *v)  { return v->count; }    \
@@ -11155,7 +11122,7 @@ void Renderer::draw_triangle(const Vertex *vertices)
 	if (out)
 	{
 		for (unsigned i = 0; i < 3; i++)
-			out->push(vert[i]);
+			BufferVertexVec_push(out, &vert[i]);
 	}
 
 	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode_None)
@@ -11206,12 +11173,12 @@ void Renderer::draw_quad(const Vertex *vertices)
 
 	if (out)
 	{
-		out->push(vert[0]);
-		out->push(vert[1]);
-		out->push(vert[2]);
-		out->push(vert[3]);
-		out->push(vert[2]);
-		out->push(vert[1]);
+		BufferVertexVec_push(out, &vert[0]);
+		BufferVertexVec_push(out, &vert[1]);
+		BufferVertexVec_push(out, &vert[2]);
+		BufferVertexVec_push(out, &vert[3]);
+		BufferVertexVec_push(out, &vert[2]);
+		BufferVertexVec_push(out, &vert[1]);
 	}
 
 	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode_None)
@@ -11649,7 +11616,7 @@ void Renderer::flush_blits()
 
 void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scaled)
 {
-	if (infos.empty())
+	if (BlitInfoVec_empty(&infos))
 		return;
 
 	cmd->set_program(program);
@@ -11673,13 +11640,13 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 		cmd->set_texture(0, 1, framebuffer->get_view(), StockSampler_NearestClamp);
 	}
 
-	unsigned size = infos.size();
+	unsigned size = BlitInfoVec_size(&infos);
 	unsigned scale = scaled ? scaling : 1u;
 	for (unsigned i = 0; i < size; i += 512)
 	{
 		unsigned to_blit = min_(size - i, 512u);
 		void *ptr = cmd->allocate_constant_data(1, 0, to_blit * sizeof(BlitInfo));
-		memcpy(ptr, infos.data() + i, to_blit * sizeof(BlitInfo));
+		memcpy(ptr, BlitInfoVec_data((struct BlitInfoVec *)&infos) + i, to_blit * sizeof(BlitInfo));
 		cmd->dispatch(scale, scale, to_blit);
 	}
 }
@@ -12893,7 +12860,7 @@ VkCommandBuffer CommandPool::request_command_buffer()
 {
 	if (index < CommandBufferVec_size(&buffers))
 	{
-		VkCommandBuffer ret = buffers[index++];
+		VkCommandBuffer ret = *CommandBufferVec_at(&buffers, index++);
 #ifdef VULKAN_DEBUG
 		{
 			bool present = false;
@@ -13764,12 +13731,16 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	void DescriptorSetAllocator::clear()
 	{
 		descriptor_set_thmap_clear(&per_thread.set_nodes);
-		for (VkDescriptorPool &pool : per_thread.pools)
 		{
+		int _i;
+		for (_i = 0; _i < DescriptorPoolVec_size(&per_thread.pools); _i++)
+		{
+			VkDescriptorPool &pool = *DescriptorPoolVec_at(&per_thread.pools, _i);
 			vkResetDescriptorPool(device->get_device(), pool, 0);
 			vkDestroyDescriptorPool(device->get_device(), pool, NULL);
 		}
 		DescriptorPoolVec_clear(&per_thread.pools);
+	}
 	}
 
 	DescriptorSetAllocator::~DescriptorSetAllocator()
@@ -18031,8 +18002,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					vkDestroyImageView(device, depth_view, NULL);
 				if (stencil_view)
 					vkDestroyImageView(device, stencil_view, NULL);
-				for (VkImageView &view : rt_views)
-					vkDestroyImageView(device, view, NULL);
+				{
+					int _i;
+					for (_i = 0; _i < RenderTargetViewVec_size(&rt_views); _i++)
+						vkDestroyImageView(device, *RenderTargetViewVec_at(&rt_views, _i), NULL);
+				}
 				RenderTargetViewVec_free_storage(&rt_views);
 
 				if (image)
@@ -20775,8 +20749,11 @@ static char retro_slash = '/';
 			}
 		}
 		clear_rect(dst);
-		for (TextureRect &t : to_place)
-			place(t);
+		{
+			int _i;
+			for (_i = 0; _i < TextureRectVec_size(&to_place); _i++)
+				place(*TextureRectVec_at(&to_place, _i));
+		}
 		TextureRectVec_free_storage(&to_place);
 		lookup_grid_dirty = true;
 	}
