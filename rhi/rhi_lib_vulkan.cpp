@@ -3460,6 +3460,41 @@ class DeviceAllocator
 {
 public:
 	void init(VkPhysicalDevice gpu, VkDevice device);
+
+	/* Raw-memory lifecycle, for an owner allocated with malloc (so this object's
+	 * constructor and destructor, and its members' constructors/destructors, do
+	 * not run). init_empty() establishes the same empty state the constructor and
+	 * the owning-vector constructors would (NULL/0/0 vectors and the scalar
+	 * defaults); the heavyweight setup still happens in init(gpu, device), which is
+	 * re-init-safe via the vectors' clear(). deinit() performs the teardown the
+	 * destructor and the vectors' destructors did (garbage-collect the heaps, then
+	 * free both vectors' storage). mem_props is left untouched, exactly as the
+	 * constructor leaves it - init(gpu, device) fills it before use. */
+	void init_empty()
+	{
+		allocators.items = NULL;
+		allocators.count = 0;
+		allocators.cap   = 0;
+		heaps.items = NULL;
+		heaps.count = 0;
+		heaps.cap   = 0;
+		device         = VK_NULL_HANDLE;
+		atom_alignment = 1;
+		use_dedicated  = false;
+	}
+
+	void deinit()
+	{
+		int i;
+		for (i = 0; i < heaps.count; i++)
+			heaps.items[i].garbage_collect(device);
+		/* Run the owning vectors' destructors explicitly (they free their storage
+		 * and delete owned entries) - the malloc'd-owner equivalent of the implicit
+		 * member destruction. */
+		allocators.~AllocatorPtrVec();
+		heaps.~HeapVec();
+	}
+
 	void set_supports_dedicated_allocation(bool enable)
 	{
 		use_dedicated = enable;
