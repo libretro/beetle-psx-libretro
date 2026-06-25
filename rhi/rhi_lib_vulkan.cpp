@@ -17260,18 +17260,26 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 #ifdef VULKAN_DEBUG
 
-	template <typename T, typename U>
-		static inline bool exists(const T &container, const U &value)
-		{
-			/* Linear membership test (debug-only). Hand-rolled over begin()/end() so it
-			 * does not pull in std::find; the containers are POD_VEC whose iterators are
-			 * raw pointers. */
-			for (auto first = container.begin(), last = container.end(); first != last; ++first)
-				if (*first == value)
-					return true;
-			return false;
-		}
+	/* Debug-only check that a value is not already queued in a POD_VEC (the
+	 * double-destroy guard that used the exists<>() template). C has no function
+	 * templates, so this is a macro doing the linear scan inline over the vec's
+	 * items/count; it works for any element type comparable with ==. */
+#define VK_ASSERT_NOT_IN_VEC(vec, value)                                       \
+	do                                                                         \
+	{                                                                          \
+		int _vk_i;                                                             \
+		for (_vk_i = 0; _vk_i < (vec).count; _vk_i++)                          \
+		{                                                                      \
+			if ((vec).items[_vk_i] == (value))                                 \
+			{                                                                  \
+				LOGE("Vulkan error at %s:%d.\n", __FILE__, __LINE__);          \
+				abort();                                                       \
+			}                                                                  \
+		}                                                                      \
+	} while (0)
 
+#else
+#define VK_ASSERT_NOT_IN_VEC(vec, value) ((void)0)
 #endif
 
 	void Device::reset_fence(VkFence fence)
@@ -17281,49 +17289,49 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void Device::destroy_pipeline_nolock(VkPipeline pipeline)
 	{
-		VK_ASSERT(!exists(frame().destroyed_pipelines, pipeline));
+		VK_ASSERT_NOT_IN_VEC(frame().destroyed_pipelines, pipeline);
 		frame().destroyed_pipelines.push(pipeline);
 	}
 
 	void Device::destroy_image_view_nolock(VkImageView view)
 	{
-		VK_ASSERT(!exists(frame().destroyed_image_views, view));
+		VK_ASSERT_NOT_IN_VEC(frame().destroyed_image_views, view);
 		frame().destroyed_image_views.push(view);
 	}
 
 	void Device::destroy_buffer_view_nolock(VkBufferView view)
 	{
-		VK_ASSERT(!exists(frame().destroyed_buffer_views, view));
+		VK_ASSERT_NOT_IN_VEC(frame().destroyed_buffer_views, view);
 		frame().destroyed_buffer_views.push(view);
 	}
 
 	void Device::destroy_semaphore_nolock(VkSemaphore semaphore)
 	{
-		VK_ASSERT(!exists(frame().destroyed_semaphores, semaphore));
+		VK_ASSERT_NOT_IN_VEC(frame().destroyed_semaphores, semaphore);
 		frame().destroyed_semaphores.push(semaphore);
 	}
 
 	void Device::destroy_image_nolock(VkImage image)
 	{
-		VK_ASSERT(!exists(frame().destroyed_images, image));
+		VK_ASSERT_NOT_IN_VEC(frame().destroyed_images, image);
 		frame().destroyed_images.push(image);
 	}
 
 	void Device::destroy_buffer_nolock(VkBuffer buffer)
 	{
-		VK_ASSERT(!exists(frame().destroyed_buffers, buffer));
+		VK_ASSERT_NOT_IN_VEC(frame().destroyed_buffers, buffer);
 		frame().destroyed_buffers.push(buffer);
 	}
 
 	void Device::destroy_sampler_nolock(VkSampler sampler)
 	{
-		VK_ASSERT(!exists(frame().destroyed_samplers, sampler));
+		VK_ASSERT_NOT_IN_VEC(frame().destroyed_samplers, sampler);
 		frame().destroyed_samplers.push(sampler);
 	}
 
 	void Device::destroy_framebuffer_nolock(VkFramebuffer framebuffer)
 	{
-		VK_ASSERT(!exists(frame().destroyed_framebuffers, framebuffer));
+		VK_ASSERT_NOT_IN_VEC(frame().destroyed_framebuffers, framebuffer);
 		frame().destroyed_framebuffers.push(framebuffer);
 	}
 
