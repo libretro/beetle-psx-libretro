@@ -1,4 +1,4 @@
-#include "rhi/rhi_intf.h"
+#include "rhi_intf.h"
 
 #include <math.h>
 #include <stdint.h>

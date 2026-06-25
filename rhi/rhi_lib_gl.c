@@ -16,9 +16,9 @@
 #include "libretro.h"
 #include "libretro_options.h"
 
-#include "rhi/rhi_intf.h" /* enums */
-#include "rhi/rhi_defer.h"
-#include "rhi/tt_trace.h"
+#include "rhi_intf.h" /* enums */
+#include "rhi_defer.h"
+#include "tt_trace.h"
 #include "beetle_psx_globals.h"
 
 #define gl_draw_buffer_is_empty(x)           ((x)->map_index == 0)

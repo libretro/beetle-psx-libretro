@@ -7,44 +7,28 @@
  * and its contents (header content first, then implementation) sit
  * directly below the libretro plumbing's preamble. */
 
-#include "rhi/rhi_lib_vulkan.h"
+#include "rhi_lib_vulkan.h"
 
-#include "rhi/rhi_intf.h" //FPS and audio sample rate macros
-#include "rhi/rhi_defer.h"
-#include "rhi/tt_trace.h"
+#include "rhi_intf.h" /* FPS and audio sample rate macros */
+#include "rhi_defer.h"
+#include "tt_trace.h"
 
 /* === folded parallel-psx/volk/volk.h + volk.c === */
 /* Folded from parallel-psx/volk/volk.h ((c) 2018 Arseny Kapoulkine, MIT).
  * volkInitialize/volkGetInstanceVersion/volkLoadDeviceTable and the
- * VolkDeviceTable struct were dropped: the renderer only uses
- * volkInitializeCustom/volkLoadInstance/volkLoadDevice. */
-
-#if defined(VULKAN_H_) && !defined(VK_NO_PROTOTYPES)
-#	error To use volk, you need to define VK_NO_PROTOTYPES before including vulkan.h
-#endif
+ * VolkDeviceTable struct were dropped */
 
 #ifndef VK_NO_PROTOTYPES
-#	define VK_NO_PROTOTYPES
+#define VK_NO_PROTOTYPES
 #endif
 
 #ifndef VULKAN_H_
-#	include <vulkan/vulkan.h>
+#include <vulkan/vulkan.h>
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* Initialize library by providing a custom handler to load global symbols.
- * Used instead of volkInitialize when the caller already has a
- * vkGetInstanceProcAddr in hand (e.g. from libretro's HW context). */
-void volkInitializeCustom(PFN_vkGetInstanceProcAddr handler);
-
-/* Load global+instance function pointers using application-created VkInstance. */
-void volkLoadInstance(VkInstance instance);
-
-/* Load global function pointers using application-created VkDevice. */
-void volkLoadDevice(VkDevice device);
 
 /* VOLK_GENERATE_PROTOTYPES_H */
 #if defined(VK_VERSION_1_0)
@@ -549,50 +533,9 @@ extern PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
 #endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 /* VOLK_GENERATE_PROTOTYPES_H */
 
-#ifdef __cplusplus
-}
-#endif
-
-
-/* Folded from parallel-psx/volk/volk.c. Dropped: volkInitialize
- * (dlopen-based, unused - we use volkInitializeCustom),
- * volkGetInstanceVersion (unused), volkLoadDeviceTable (unused),
- * volkGenLoadDeviceTable (unused). */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-static void volkGenLoadLoader(void* context, PFN_vkVoidFunction (*load)(void*, const char*));
-static void volkGenLoadInstance(void* context, PFN_vkVoidFunction (*load)(void*, const char*));
-static void volkGenLoadDevice(void* context, PFN_vkVoidFunction (*load)(void*, const char*));
-
 static PFN_vkVoidFunction vkGetInstanceProcAddrStub(void* context, const char* name)
 {
 	return vkGetInstanceProcAddr((VkInstance)context, name);
-}
-
-static PFN_vkVoidFunction vkGetDeviceProcAddrStub(void* context, const char* name)
-{
-	return vkGetDeviceProcAddr((VkDevice)context, name);
-}
-
-void volkInitializeCustom(PFN_vkGetInstanceProcAddr handler)
-{
-	vkGetInstanceProcAddr = handler;
-
-	volkGenLoadLoader(NULL, vkGetInstanceProcAddrStub);
-}
-
-void volkLoadInstance(VkInstance instance)
-{
-	volkGenLoadInstance(instance, vkGetInstanceProcAddrStub);
-	volkGenLoadDevice(instance, vkGetInstanceProcAddrStub);
-}
-
-void volkLoadDevice(VkDevice device)
-{
-	volkGenLoadDevice(device, vkGetDeviceProcAddrStub);
 }
 
 static void volkGenLoadLoader(void* context, PFN_vkVoidFunction (*load)(void*, const char*))
@@ -608,7 +551,6 @@ static void volkGenLoadLoader(void* context, PFN_vkVoidFunction (*load)(void*, c
 #endif /* defined(VK_VERSION_1_1) */
 	/* VOLK_GENERATE_LOAD_LOADER */
 }
-
 
 static void volkGenLoadInstance(void* context, PFN_vkVoidFunction (*load)(void*, const char*))
 {
@@ -756,7 +698,6 @@ static void volkGenLoadInstance(void* context, PFN_vkVoidFunction (*load)(void*,
 #endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 	/* VOLK_GENERATE_LOAD_INSTANCE */
 }
-
 
 static void volkGenLoadDevice(void* context, PFN_vkVoidFunction (*load)(void*, const char*))
 {
@@ -1131,6 +1072,23 @@ static void volkGenLoadDevice(void* context, PFN_vkVoidFunction (*load)(void*, c
 #endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 	/* VOLK_GENERATE_LOAD_DEVICE */
 }
+
+static PFN_vkVoidFunction vkGetDeviceProcAddrStub(void* context, const char* name)
+{
+	return vkGetDeviceProcAddr((VkDevice)context, name);
+}
+
+#ifdef __cplusplus
+}
+#endif
+
+/* Folded from parallel-psx/volk/volk.c. Dropped: volkInitialize
+ * volkGetInstanceVersion (unused), volkLoadDeviceTable (unused),
+ * volkGenLoadDeviceTable (unused). */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* VOLK_GENERATE_PROTOTYPES_C */
 #if defined(VK_VERSION_1_0)
@@ -15931,7 +15889,8 @@ bool Context::init_loader(PFN_vkGetInstanceProcAddr addr)
 #endif
 	}
 
-	volkInitializeCustom(addr);
+	vkGetInstanceProcAddr = addr;
+	volkGenLoadLoader(NULL, vkGetInstanceProcAddrStub);
 	return true;
 }
 
@@ -15942,7 +15901,9 @@ Context::Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface
     : instance(instance)
     , owned_device(true)
 {
-	volkLoadInstance(instance);
+	/* Load global+instance function pointers using application-created VkInstance. */
+	volkGenLoadInstance(instance, vkGetInstanceProcAddrStub);
+	volkGenLoadDevice(instance, vkGetInstanceProcAddrStub);
 	if (!create_device(gpu, surface, required_device_extensions, num_required_device_extensions, required_device_layers,
 	                   num_required_device_layers, required_features))
 	{
@@ -16273,7 +16234,8 @@ bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const ch
 	if (dev_res != VK_SUCCESS)
 		return false;
 
-	volkLoadDevice(device);
+	/* Load global function pointers using application-created VkDevice. */
+	volkGenLoadDevice(device, vkGetDeviceProcAddrStub);
 	vkGetDeviceQueue(device, graphics_queue_family, graphics_queue_index, &graphics_queue);
 	vkGetDeviceQueue(device, compute_queue_family, compute_queue_index, &compute_queue);
 	vkGetDeviceQueue(device, transfer_queue_family, transfer_queue_index, &transfer_queue);
