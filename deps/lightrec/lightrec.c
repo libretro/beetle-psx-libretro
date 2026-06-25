@@ -326,8 +326,31 @@ u32 lightrec_rw(struct lightrec_state *state, union code op, u32 base,
 			 * later initialized to point to hardware registers. */
 			else if (op.i.rs && base == 0x0)
 				*flags |= LIGHTREC_IO_MODE(LIGHTREC_IO_HW);
-			else
+			/* The direct emitters mask the address and add a fixed
+			 * RAM/BIOS/scratch offset with no runtime map check, so a
+			 * direct access only stays in bounds when the whole segment
+			 * is backed by the host mapping (mirrors_mapped). On a
+			 * sub-par map only the individual regions are mapped, so an
+			 * op that resolves to a direct-mappable region on one
+			 * execution but whose address later strays into the
+			 * hardware-register window (e.g. a $tN-relative load that
+			 * computes 0x1f801xxx) would be offset-loaded past the end
+			 * of the RAM mapping and fault. Tagging it IO_DIRECT bakes
+			 * that unsafe load permanently into the recompiled block.
+			 * Only promote to the direct path when it is safe; otherwise
+			 * leave the op untagged so it keeps going through the generic
+			 * C wrapper, which re-resolves the real map at runtime on
+			 * every execution and handles an address that varies between
+			 * RAM and I/O across runs. */
+			else if (state->mirrors_mapped)
 				*flags |= LIGHTREC_IO_MODE(LIGHTREC_IO_DIRECT);
+			/* Keep the op on the generic wrapper. It stays untagged,
+			 * so suppress the recompilation trigger below: recompiling
+			 * would only re-emit the same generic wrapper, and leaving
+			 * was_tagged clear here would re-flag the block on every
+			 * execution and thrash. */
+			else
+				was_tagged = true;
 		}
 
 		ops = &lightrec_default_ops;
