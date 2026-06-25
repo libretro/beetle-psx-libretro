@@ -3732,11 +3732,24 @@ namespace Vulkan
 		VkDeviceSize range;
 	};
 
-	class BufferView : public Util::IntrusivePtrEnabled<BufferView, BufferViewDeleter, HandleCounter>,
-	public Cookie
+	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
+	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
+	 * base, which provides the hash identity, is unrelated and stays. */
+	class BufferView : public Cookie
 	{
 		public:
 			friend struct BufferViewDeleter;
+
+			void release_reference()
+			{
+				if (reference_count.release())
+					BufferViewDeleter()(this);
+			}
+			void add_reference()
+			{
+				reference_count.add_ref();
+			}
+
 			~BufferView();
 
 			VkBufferView get_view() const
@@ -3756,6 +3769,7 @@ namespace Vulkan
 			Device *device;
 			VkBufferView view;
 			BufferViewCreateInfo info;
+			HandleCounter reference_count;
 	};
 	using BufferViewHandle = Util::IntrusivePtr<BufferView>;
 
