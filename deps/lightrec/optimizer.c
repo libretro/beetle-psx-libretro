@@ -1874,25 +1874,32 @@ static int lightrec_flag_io(struct lightrec_state *state, struct block *block)
 			    && !state->maps[PSX_MAP_KERNEL_USER_RAM].ops) {
 				/* When constant propagation cannot prove which map a
 				 * $sp/$gp-relative access targets, the address is not
-				 * actually known to hit RAM: $gp in particular routinely
-				 * points at the hardware-register window (0x1f801xxx).
+				 * known to hit RAM: $gp routinely points at the
+				 * hardware-register window (0x1f801xxx), and $sp can
+				 * momentarily stray (e.g. into the scratchpad) during a
+				 * transition.
 				 *
-				 * The old heuristic assumed "RAM or bust" and emitted a
-				 * direct load (offset_ram + (addr & 0x1fffffff)). That
-				 * faults on any host that does not back the full 512 MiB
-				 * segment - e.g. a sub-par map where only the 2 MiB RAM
-				 * window is mapped - because an I/O address is offset past
-				 * the end of the RAM mapping into unmapped space.
+				 * The old heuristic assumed "RAM or bust" and emitted an
+				 * unconditional masked RAM access. On a host that backs
+				 * only RAM plus its mirrors, an address that is really I/O
+				 * or scratchpad masks to the wrong RAM offset and silently
+				 * reads or writes RAM there - a store corrupts memory (seen
+				 * wrecking a saved $sp in Tekken 3, which then faulted later
+				 * as a wild pointer).
 				 *
-				 * Only take that shortcut when the user explicitly opts in
-				 * via LIGHTREC_OPT_SP_GP_HIT_RAM (and even then via the
-				 * masked IO_RAM path, which stays in bounds). Otherwise
-				 * leave the IO mode unset so the emitter falls back to the
-				 * generic C wrapper (rec_io), which dispatches on the real
-				 * map at runtime and handles hardware-register, scratchpad
-				 * and RAM targets correctly. */
+				 * When the user opts in via LIGHTREC_OPT_SP_GP_HIT_RAM, tag
+				 * the access LIGHTREC_IO_RAM_GUARDED: the emitter keeps the
+				 * fast inline masked RAM access for the common case (the
+				 * base really is RAM) but guards it with a runtime RAM-range
+				 * test; an address that falls outside RAM exits the block
+				 * with LIGHTREC_EXIT_SPGP_SLOW so the access is redone
+				 * through the correct slow path and execution resumes after
+				 * it. That keeps the speedup on hot stack/global accesses
+				 * with no corruption risk. Without the opt the IO mode is
+				 * left unset and every such access goes through the
+				 * wrapper. */
 				if (state->opt_flags & LIGHTREC_OPT_SP_GP_HIT_RAM)
-					list->flags |= LIGHTREC_IO_MODE(LIGHTREC_IO_RAM);
+					list->flags |= LIGHTREC_IO_MODE(LIGHTREC_IO_RAM_GUARDED);
 			}
 
 			fallthrough;

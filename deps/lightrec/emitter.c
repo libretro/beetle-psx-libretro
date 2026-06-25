@@ -1571,6 +1571,61 @@ static void rec_store_ram(struct lightrec_cstate *cstate,
 				invalidate);
 }
 
+/* Guarded RAM store for unprovable $sp/$gp accesses (IO_RAM_GUARDED). Mirror
+ * of rec_load_ram_guarded: runtime-test the address, fast masked store when it
+ * really is RAM, otherwise record the opcode and exit with
+ * LIGHTREC_EXIT_SPGP_SLOW for the C side to redo through the slow path. */
+static void rec_store_ram_guarded(struct lightrec_cstate *cstate,
+				  const struct block *block, u16 offset,
+				  jit_code_t code, jit_code_t swap_code,
+				  bool invalidate)
+{
+	struct regcache *reg_cache = cstate->reg_cache;
+	const struct lightrec_state *state = cstate->state;
+	const union code c = block->opcode_list[offset].c;
+	jit_state_t *_jit = block->_jit;
+	struct native_register *regs_backup;
+	jit_node_t *to_slow, *to_end;
+	u8 rs, tmp;
+
+	_jit_note(block->_jit, __FILE__, __LINE__);
+
+	rs  = lightrec_alloc_reg_in(reg_cache, _jit, c.i.rs, 0);
+	tmp = lightrec_alloc_reg_temp(reg_cache, _jit);
+
+	if (c.i.imm)
+		jit_addi(tmp, rs, (s16)c.i.imm);
+	else
+		jit_movr(tmp, rs);
+	jit_andi(tmp, tmp, 0x1fffffff);
+
+	lightrec_free_reg(reg_cache, rs);
+
+	to_slow = jit_bgei(tmp, RAM_SIZE);
+	lightrec_free_reg(reg_cache, tmp);
+
+	/* Hot path. */
+	rec_store_invalidate_blocks(cstate, block, offset);
+	rec_store_memory(cstate, block, offset, code, swap_code,
+			 state->offset_ram, rec_ram_mask(state), invalidate);
+	to_end = jit_b();
+
+	/* Cold path: not RAM - record opcode/PC and exit the block. */
+	jit_patch(to_slow);
+	regs_backup = lightrec_regcache_enter_branch(reg_cache);
+	tmp = lightrec_alloc_reg_temp(reg_cache, _jit);
+	jit_movi(tmp, c.opcode);
+	jit_stxi_i(lightrec_offset(spgp_slow_op), LIGHTREC_REG_STATE, tmp);
+	jit_movi(tmp, get_ds_pc(block, offset, 0));
+	jit_stxi_i(lightrec_offset(spgp_slow_pc), LIGHTREC_REG_STATE, tmp);
+	lightrec_free_reg(reg_cache, tmp);
+	rec_exit_early(cstate, block, offset, LIGHTREC_EXIT_SPGP_SLOW,
+		       get_ds_pc(block, offset, 0));
+	lightrec_regcache_leave_branch(reg_cache, regs_backup);
+
+	jit_patch(to_end);
+}
+
 static void rec_store_scratch(struct lightrec_cstate *cstate,
 			      const struct block *block, u16 offset,
 			      jit_code_t code, jit_code_t swap_code)
@@ -1829,6 +1884,10 @@ static void rec_store(struct lightrec_cstate *state,
 		rec_store_ram(state, block, offset, code,
 			      swap_code, !no_invalidate);
 		break;
+	case LIGHTREC_IO_RAM_GUARDED:
+		rec_store_ram_guarded(state, block, offset, code,
+				      swap_code, !no_invalidate);
+		break;
 	case LIGHTREC_IO_SCRATCH:
 		/* The scratchpad direct store masks with 0x1fffffff and adds a
 		 * fixed offset with no runtime bounds check; on a sub-par map a
@@ -1981,6 +2040,65 @@ static void rec_load_ram(struct lightrec_cstate *cstate,
 
 	rec_load_memory(cstate, block, offset, code, swap_code, is_unsigned,
 			cstate->state->offset_ram, rec_ram_mask(cstate->state));
+}
+
+/* Guarded RAM load for unprovable $sp/$gp accesses (IO_RAM_GUARDED). Emit an
+ * inline test of the kunseg'd guest address against the RAM window: if it is
+ * RAM, take the fast masked load (hot path, falls through); otherwise record
+ * the opcode and exit the block with LIGHTREC_EXIT_SPGP_SLOW so the C side can
+ * redo the access through the correct slow memory path and resume after it.
+ * The cold path uses the same exit-early/regcache-snapshot structure as the
+ * code-invalidation guard, so the hot path's register cache is unaffected and
+ * there is no in-block join with the wrapper. */
+static void rec_load_ram_guarded(struct lightrec_cstate *cstate,
+				 const struct block *block, u16 offset,
+				 jit_code_t code, jit_code_t swap_code,
+				 bool is_unsigned)
+{
+	struct regcache *reg_cache = cstate->reg_cache;
+	const union code c = block->opcode_list[offset].c;
+	jit_state_t *_jit = block->_jit;
+	struct native_register *regs_backup;
+	jit_node_t *to_slow, *to_end;
+	u8 rs, tmp;
+
+	_jit_note(block->_jit, __FILE__, __LINE__);
+
+	rs  = lightrec_alloc_reg_in(reg_cache, _jit, c.i.rs, 0);
+	tmp = lightrec_alloc_reg_temp(reg_cache, _jit);
+
+	if (c.i.imm)
+		jit_addi(tmp, rs, (s16)c.i.imm);
+	else
+		jit_movr(tmp, rs);
+	jit_andi(tmp, tmp, 0x1fffffff);
+
+	lightrec_free_reg(reg_cache, rs);
+
+	to_slow = jit_bgei(tmp, RAM_SIZE);
+	lightrec_free_reg(reg_cache, tmp);
+
+	/* Hot path: runtime-proven RAM access. */
+	rec_load_memory(cstate, block, offset, code, swap_code, is_unsigned,
+			cstate->state->offset_ram, rec_ram_mask(cstate->state));
+	to_end = jit_b();
+
+	/* Cold path: not RAM. Record the opcode + PC and exit the block; the
+	 * register cache is snapshotted so the end-of-block sync's spill code
+	 * stays in this branched-over region and the hot path is unaffected. */
+	jit_patch(to_slow);
+	regs_backup = lightrec_regcache_enter_branch(reg_cache);
+	tmp = lightrec_alloc_reg_temp(reg_cache, _jit);
+	jit_movi(tmp, c.opcode);
+	jit_stxi_i(lightrec_offset(spgp_slow_op), LIGHTREC_REG_STATE, tmp);
+	jit_movi(tmp, get_ds_pc(block, offset, 0));
+	jit_stxi_i(lightrec_offset(spgp_slow_pc), LIGHTREC_REG_STATE, tmp);
+	lightrec_free_reg(reg_cache, tmp);
+	rec_exit_early(cstate, block, offset, LIGHTREC_EXIT_SPGP_SLOW,
+		       get_ds_pc(block, offset, 0));
+	lightrec_regcache_leave_branch(reg_cache, regs_backup);
+
+	jit_patch(to_end);
 }
 
 static void rec_load_bios(struct lightrec_cstate *cstate,
@@ -2165,6 +2283,9 @@ static void rec_load(struct lightrec_cstate *state, const struct block *block,
 	switch (LIGHTREC_FLAGS_GET_IO_MODE(flags)) {
 	case LIGHTREC_IO_RAM:
 		rec_load_ram(state, block, offset, code, swap_code, is_unsigned);
+		break;
+	case LIGHTREC_IO_RAM_GUARDED:
+		rec_load_ram_guarded(state, block, offset, code, swap_code, is_unsigned);
 		break;
 	case LIGHTREC_IO_BIOS:
 	case LIGHTREC_IO_SCRATCH:

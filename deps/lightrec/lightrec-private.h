@@ -214,6 +214,13 @@ struct lightrec_state {
 	/* Store opcode that triggered a LIGHTREC_EXIT_CODE_INV exit. */
 	u32 code_inv_op;
 
+	/* Opcode and its guest PC that triggered a LIGHTREC_EXIT_SPGP_SLOW
+	 * exit: an unprovable $sp/$gp access (SP_GP_HIT_RAM opt) whose runtime
+	 * address fell outside the RAM window, so the fast inline path bailed
+	 * and the access must be redone through the slow/correct memory path. */
+	u32 spgp_slow_op;
+	u32 spgp_slow_pc;
+
 	/* One bit per RAM word; set if the word lies inside a cached block
 	 * that has been installed in the code LUT and not re-validated
 	 * since. A compiled store opcode whose target word has its bit set

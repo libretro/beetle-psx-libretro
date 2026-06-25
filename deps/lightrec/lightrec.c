@@ -452,6 +452,43 @@ static void lightrec_rw_helper(struct lightrec_state *state,
  * to write into a page that contains cached code. Re-validate the cached
  * blocks overlapping the written address, then execution resumes at the
  * store opcode, whose page check will now pass. */
+static void lightrec_handle_spgp_slow(struct lightrec_state *state)
+{
+	union code c;
+	u32 base, data, val;
+
+	c.opcode = state->spgp_slow_op;
+
+	base = state->regs.gpr[c.i.rs];
+	data = c.i.rt ? state->regs.gpr[c.i.rt] : 0;
+
+	/* Perform the one access through the correct slow path. Pass flags=NULL
+	 * so the wrapper does not try to re-tag the opcode (the block keeps its
+	 * IO_RAM_GUARDED tag and fast path for the common RAM case). */
+	val = lightrec_rw(state, c, base, data, NULL, NULL, 0);
+
+	/* Loads write their result back to rt; stores return 0 and write
+	 * nothing. $0 is never written. */
+	switch (c.i.op) {
+	case OP_LB:
+	case OP_LBU:
+	case OP_LH:
+	case OP_LHU:
+	case OP_LW:
+	case OP_LWL:
+	case OP_LWR:
+	case OP_META_LWU:
+		if (c.i.rt)
+			state->regs.gpr[c.i.rt] = val;
+		break;
+	default:
+		break;
+	}
+
+	/* Resume at the instruction after the access. */
+	state->curr_pc = state->spgp_slow_pc + 4;
+}
+
 static void lightrec_handle_code_inv(struct lightrec_state *state)
 {
 	union code c;
@@ -1920,6 +1957,19 @@ u32 lightrec_execute(struct lightrec_state *state, u32 pc, u32 target_cycle)
 				       block_trace, cycles_delta);
 
 		state->current_cycle = state->target_cycle - cycles_delta;
+
+		if (unlikely(state->exit_flags & LIGHTREC_EXIT_SPGP_SLOW)) {
+			/* An unprovable $sp/$gp access (SP_GP_HIT_RAM opt) found
+			 * at runtime that its address was not RAM, so the fast
+			 * inline path bailed before touching memory. Redo the one
+			 * access through the correct slow path and resume after
+			 * it. */
+			lightrec_handle_spgp_slow(state);
+
+			state->exit_flags = LIGHTREC_EXIT_NORMAL;
+			state->target_cycle = target_cycle;
+			continue;
+		}
 
 		if (likely(!(state->exit_flags & LIGHTREC_EXIT_CODE_INV)))
 			break;
