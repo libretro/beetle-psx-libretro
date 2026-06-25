@@ -1436,16 +1436,31 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
    }
    else if (!CDIF_ReadRawSector(cdc->Cur_CDIF, target, cdc->CurSector, cd_slow_timeout))
    {
-      if (cd_async)
-         osd_message(3, RETRO_LOG_WARN,
-               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
-               "*Really* slow CD image read detected: consider using precache CD Access Method");
-      else
-         osd_message(3, RETRO_LOG_WARN,
-               RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
-               "Slow CD image read detected: consider using async or precache CD Access Method");
+      /* A false return is NOT necessarily slow media.  CDIF_ReadRawSector
+       * also returns false the moment CurSector reaches the lead-out
+       * (lba >= tracks[100].lba) or on an unrecoverable image error,
+       * both decided before any timed wait.  The DS_SEEKING_LOGICAL2
+       * header hunt added by the seek-state-machine rework reads
+       * sectors past SeekTarget and can step into the lead-out window
+       * on perfectly ordinary seeks, which made this branch fire a
+       * spurious "Slow CD" notification on essentially every game start
+       * (issue #966).  Only treat the failure as slow media when the
+       * sector is actually inside the disc; a lead-out/error read is
+       * handled silently (buffer already zeroed). */
+      if (cdc->CurSector < (int32_t)cdc->toc.tracks[100].lba)
+      {
+         if (cd_async)
+            osd_message(3, RETRO_LOG_WARN,
+                  RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+                  "*Really* slow CD image read detected: consider using precache CD Access Method");
+         else
+            osd_message(3, RETRO_LOG_WARN,
+                  RETRO_MESSAGE_TARGET_ALL, RETRO_MESSAGE_TYPE_NOTIFICATION,
+                  "Slow CD image read detected: consider using async or precache CD Access Method");
 
-      cd_warned_slow = true;
+         cd_warned_slow = true;
+      }
+
       /* Same intentional-discard contract as above. */
       (void)CDIF_ReadRawSector(cdc->Cur_CDIF, target, cdc->CurSector, -1);
    }
