@@ -28,42 +28,26 @@
 /* Implementation of strlcpy()/strlcat() based on OpenBSD. */
 
 #if !(defined(__MACH__) && defined(__APPLE__))
-
-size_t strlcpy(char *dest, const char *source, size_t size)
+size_t strlcpy(char *s, const char *in, size_t len)
 {
-   size_t src_size = 0;
-   size_t        n = size;
-
-   if (n)
-      while (--n && (*dest++ = *source++)) src_size++;
-
-   if (!n)
-   {
-      if (size) *dest = '\0';
-      while (*source++) src_size++;
-   }
-
-   return src_size;
+    size_t _len = strlen(in);
+    if (len)
+    {
+        size_t __len = _len < len - 1 ? _len : len - 1;
+        memcpy(s, in, __len);
+        s[__len] = '\0';
+    }
+    return _len;
 }
 
-size_t strlcat(char *dest, const char *source, size_t size)
+size_t strlcat(char *s, const char *source, size_t len)
 {
-   size_t len = strlen(dest);
-
-   dest += len;
-
-   if (len > size)
-      size = 0;
+   size_t _len = strlen(s);
+   s += _len;
+   if (_len > len)
+      len = 0;
    else
-      size -= len;
-
-   return len + strlcpy(dest, source, size);
+      len -= _len;
+   return _len + strlcpy(s, source, len);
 }
 #endif
-
-char *strldup(const char *s, size_t n)
-{
-   char *dst = (char*)malloc(sizeof(char) * (n + 1));
-   strlcpy(dst, s, n);
-   return dst;
-}
