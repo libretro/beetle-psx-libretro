@@ -6357,18 +6357,16 @@ namespace PSX
 	static const unsigned NUM_BLOCKS_X = FB_WIDTH / BLOCK_WIDTH;
 	static const unsigned NUM_BLOCKS_Y = FB_HEIGHT / BLOCK_HEIGHT;
 
-	enum class Domain : unsigned
-	{
-		Unscaled,
-		Scaled
+	enum Domain {
+		Domain_Unscaled,
+		Domain_Scaled
 	};
 
-	enum class Stage : unsigned
-	{
-		Compute,
-		Transfer,
-		Fragment,
-		FragmentTexture
+	enum Stage {
+		Stage_Compute,
+		Stage_Transfer,
+		Stage_Fragment,
+		Stage_FragmentTexture
 	};
 
 	enum TextureMode {
@@ -6509,22 +6507,22 @@ namespace PSX
 			void read_compute(Domain domain, const Rect &rect)
 			{
 				sync_domain(domain, rect);
-				read_domain(domain, Stage::Compute, rect);
+				read_domain(domain, Stage_Compute, rect);
 			}
 			void write_compute(Domain domain, const Rect &rect)
 			{
 				sync_domain(domain, rect);
-				write_domain(domain, Stage::Compute, rect);
+				write_domain(domain, Stage_Compute, rect);
 			}
 			void read_transfer(Domain domain, const Rect &rect)
 			{
 				sync_domain(domain, rect);
-				read_domain(domain, Stage::Transfer, rect);
+				read_domain(domain, Stage_Transfer, rect);
 			}
 			void write_transfer(Domain domain, const Rect &rect)
 			{
 				sync_domain(domain, rect);
-				write_domain(domain, Stage::Transfer, rect);
+				write_domain(domain, Stage_Transfer, rect);
 			}
 			void read_fragment(Domain domain, const Rect &rect);
 			Domain blit_vram(const Rect &dst, const Rect &src);
@@ -8996,29 +8994,26 @@ namespace PSX
 				FilterExcludeOpaqueAndSemiTrans = 2,
 			};
 
-			enum class FilterMode : uint32_t
-		{
-			NearestNeighbor = 0,
-			XBR = 1,
-			SABR = 2,
-			Bilinear = 3,
-			Bilinear3Point = 4,
-			JINC2 = 5
+			enum FilterMode {
+			FilterMode_NearestNeighbor = 0,
+			FilterMode_XBR = 1,
+			FilterMode_SABR = 2,
+			FilterMode_Bilinear = 3,
+			FilterMode_Bilinear3Point = 4,
+			FilterMode_JINC2 = 5
 		};
 
-			enum class TransMode : uint32_t
-		{
-			Opaque = 0,
-			SemiTrans = 1,
-			SemiTransOpaque = 2
+			enum TransMode {
+			TransMode_Opaque = 0,
+			TransMode_SemiTrans = 1,
+			TransMode_SemiTransOpaque = 2
 		};
 
-			enum class BlendMode : uint32_t
-		{
-			BlendAdd = 0,
-			BlendAvg = 1,
-			BlendSub = 2,
-			BlendAddQuarter = 3
+			enum BlendMode {
+			BlendMode_BlendAdd = 0,
+			BlendMode_BlendAvg = 1,
+			BlendMode_BlendSub = 2,
+			BlendMode_BlendAddQuarter = 3
 		};
 
 			void set_filter_mode(FilterMode mode)
@@ -9057,7 +9052,7 @@ namespace PSX
 			unsigned msaa;
 			bool scaled_uv_offset = false;
 			bool valid = false;
-			FilterMode primitive_filter_mode = FilterMode::NearestNeighbor;
+			FilterMode primitive_filter_mode = FilterMode_NearestNeighbor;
 			FilterExclude sprite_filter_exclude = FilterExcludeNone;
 			FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
 			Vulkan::ImageHandle scaled_framebuffer;
@@ -9544,7 +9539,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 		atlas.set_draw_rect(render_state.draw_rect);
 		atlas.set_palette_offset(render_state.palette_offset_x, render_state.palette_offset_y);
 		atlas.set_texture_window(render_state.cached_window_rect);
-		atlas.write_transfer(Domain::Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
+		atlas.write_transfer(Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	}
 
 	ImageInitialData initial_vram = {
@@ -9681,7 +9676,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	BufferHandle buffer = device->create_buffer(buffer_create_info, NULL);
-	atlas.read_transfer(Domain::Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
+	atlas.read_transfer(Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	ensure_command_buffer();
 	cmd->copy_image_to_buffer(*buffer, *framebuffer, 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
@@ -9890,7 +9885,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 		copy_rect.height = FB_HEIGHT;
 	}
 
-	atlas.read_transfer(Domain::Unscaled, copy_rect);
+	atlas.read_transfer(Domain_Unscaled, copy_rect);
 	ensure_command_buffer();
 
 	BufferCreateInfo buffer_create_info;
@@ -10207,9 +10202,9 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	Rect vram_rect = {0, 0, FB_WIDTH, FB_HEIGHT};
 
 	if (scaled)
-		atlas.read_fragment(Domain::Scaled, vram_rect);
+		atlas.read_fragment(Domain_Scaled, vram_rect);
 	else
-		atlas.read_fragment(Domain::Unscaled, vram_rect);
+		atlas.read_fragment(Domain_Unscaled, vram_rect);
 
 	ensure_command_buffer();
 
@@ -10315,7 +10310,7 @@ ImageHandle Renderer::scanout_to_texture()
 	if (rect.width == 0 || rect.height == 0 || !render_state.display_on)
 	{
 		// Black screen, just flush out everything.
-		atlas.read_fragment(Domain::Scaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
+		atlas.read_fragment(Domain_Scaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 
 		ensure_command_buffer();
 
@@ -10370,12 +10365,12 @@ ImageHandle Renderer::scanout_to_texture()
 			tmp.width = (tmp.width * 3 + 1) / 2;
 			tmp.width = min_(tmp.width, FB_WIDTH - tmp.x);
 		}
-		atlas.read_fragment(Domain::Unscaled, tmp);
+		atlas.read_fragment(Domain_Unscaled, tmp);
 	}
 	else if (ssaa)
-		atlas.read_compute(Domain::Scaled, read_rect);
+		atlas.read_compute(Domain_Scaled, read_rect);
 	else
-		atlas.read_fragment(Domain::Scaled, read_rect);
+		atlas.read_fragment(Domain_Scaled, read_rect);
 
 	if (!bpp24 && ssaa)
 		ssaa_framebuffer();
@@ -10688,7 +10683,7 @@ void Renderer::flush_resolves()
 
 void Renderer::resolve(Domain target_domain, unsigned x, unsigned y)
 {
-	if (target_domain == Domain::Scaled)
+	if (target_domain == Domain_Scaled)
 		queue.scaled_resolves.push({ { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } });
 	else
 		queue.unscaled_resolves.push({ { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } });
@@ -10865,7 +10860,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 	}
 	offset_uv = scaled_uv_offset && render_state.primitive_type == PrimitiveType_Polygon;
 
-	float z = allocate_depth(scaled_read ? Domain::Scaled : Domain::Unscaled, rect);
+	float z = allocate_depth(scaled_read ? Domain_Scaled : Domain_Unscaled, rect);
 
 	// Look up the hd texture index
 	// This is done here at the end of the function because the `allocate_depth`
@@ -11185,7 +11180,7 @@ void Renderer::clear_quad(const Rect &rect, uint32_t fb_color, bool candidate)
 {
 	last_scanout.reset();
 	TextureMode old = atlas.set_texture_mode(TextureMode_None);
-	float z = allocate_depth(Domain::Unscaled, rect);
+	float z = allocate_depth(Domain_Unscaled, rect);
 	atlas.set_texture_mode(old);
 
 	BufferVertex pos0 = { float(rect.x), float(rect.y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
@@ -11360,7 +11355,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 
 	hd_texture_uniforms(hd_texture);
 	cmd->set_scissor(scissor < 0 ? queue.default_scissor : queue.scissors[scissor]);
-	cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
+	cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 	cmd->set_specialization_constant(SpecConstIndex_Shift, shift);
 	cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
 	dispatch_set_scaled_read_texture(scaled_read, textured);
@@ -11388,7 +11383,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 			}
 			if (scissors[i].filtering != filtering) {
 				filtering = scissors[i].filtering;
-				cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
+				cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 			}
 			if (scissors[i].scaled_read != scaled_read) {
 				scaled_read = scissors[i].scaled_read;
@@ -11528,7 +11523,7 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 	cmd->set_opaque_state();
 	cmd->set_cull_mode(VK_CULL_MODE_NONE);
 	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
-	cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTransOpaque);
+	cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTransOpaque);
 	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
@@ -11551,7 +11546,7 @@ void Renderer::render_opaque_texture_primitives()
 	cmd->set_opaque_state();
 	cmd->set_cull_mode(VK_CULL_MODE_NONE);
 	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
-	cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::Opaque);
+	cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_Opaque);
 	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
@@ -11644,7 +11639,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		// We can do it with compute.
 		ensure_command_buffer();
 
-		unsigned factor = domain == Domain::Scaled ? scaling : 1u;
+		unsigned factor = domain == Domain_Scaled ? scaling : 1u;
 
 		// Slower path where we do this in a single workgroup which steps through line by line, just like the software version.
 		struct Push
@@ -11659,7 +11654,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		};
 		cmd->push_constants(&push, 0, sizeof(push));
 
-		if (domain == Domain::Scaled)
+		if (domain == Domain_Scaled)
 		{
 			if (msaa > 1)
 			{
@@ -11689,7 +11684,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	}
 	else
 	{
-		if (domain == Domain::Scaled)
+		if (domain == Domain_Scaled)
 		{
 			BlitInfoVec &q = render_state.mask_test ? queue.scaled_masked_blits : queue.scaled_blits;
 			unsigned width = dst.width;
@@ -11887,7 +11882,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	else
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler_NearestClamp);
 	hd_texture_uniforms(state.hd_texture_index);
-	cmd->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode::NearestNeighbor);
+	cmd->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 	cmd->set_specialization_constant(SpecConstIndex_Shift, state.shift);
 	cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)state.offset_uv);
@@ -11908,7 +11903,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		// For opaque primitives which are just masked, we can make use of fixed function blending.
 		cmd->set_blend_enable(true);
-		cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::Opaque);
+		cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_Opaque);
 		cmd->set_program(textured);
 		cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
 		cmd->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
@@ -11919,7 +11914,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAdd);
+			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAdd);
 			cmd->set_program(textured_masked);
 			cmd->pixel_barrier();
 			cmd->set_input_attachments(0, 3);
@@ -11935,7 +11930,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		}
 		else
 		{
-			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
+			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
 			cmd->set_program(textured);
 			cmd->set_blend_enable(true);
 			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -11948,7 +11943,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAvg);
+			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAvg);
 			cmd->set_program(textured_masked);
 			cmd->set_input_attachments(0, 3);
 			cmd->pixel_barrier();
@@ -11965,7 +11960,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		else
 		{
 			static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
-			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
+			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
 			cmd->set_program(textured);
 			cmd->set_blend_enable(true);
 			cmd->set_blend_constants(rgba);
@@ -11979,7 +11974,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendSub);
+			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendSub);
 			cmd->set_program(textured_masked);
 			cmd->set_input_attachments(0, 3);
 			cmd->pixel_barrier();
@@ -11995,7 +11990,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		}
 		else
 		{
-			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
+			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
 			cmd->set_program(textured);
 			cmd->set_blend_enable(true);
 			cmd->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
@@ -12008,7 +12003,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode::BlendAddQuarter);
+			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAddQuarter);
 			cmd->set_program(textured_masked);
 			cmd->set_input_attachments(0, 3);
 			cmd->pixel_barrier();
@@ -12025,7 +12020,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		else
 		{
 			static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode::SemiTrans);
+			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
 			cmd->set_program(textured);
 			cmd->set_blend_enable(true);
 			cmd->set_blend_constants(rgba);
@@ -18509,7 +18504,7 @@ namespace PSX
 		if (rect.width == 0 || rect.height == 0)
 			return;
 
-		write_compute(Domain::Unscaled, rect);
+		write_compute(Domain_Unscaled, rect);
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -18542,8 +18537,8 @@ namespace PSX
 
 		sync_domain(domain, src);
 		sync_domain(domain, dst);
-		read_domain(domain, Stage::Compute, src);
-		write_domain(domain, Stage::Compute, dst);
+		read_domain(domain, Stage_Compute, src);
+		write_domain(domain, Stage_Compute, dst);
 
 		unsigned dst_xbegin = dst.x / BLOCK_WIDTH;
 		unsigned dst_xend = (dst.x + dst.width - 1) / BLOCK_WIDTH;
@@ -18577,7 +18572,7 @@ namespace PSX
 	void FBAtlas::read_fragment(Domain domain, const Rect &rect)
 	{
 		sync_domain(domain, rect);
-		read_domain(domain, Stage::Fragment, rect);
+		read_domain(domain, Stage_Fragment, rect);
 	}
 
 	void FBAtlas::read_texture(Domain domain)
@@ -18598,7 +18593,7 @@ namespace PSX
 		shifted.x += renderpass.texture_offset_x;
 		shifted.y += renderpass.texture_offset_y;
 
-		//Domain domain = palette ? Domain::Unscaled : find_suitable_domain(shifted);
+		//Domain domain = palette ? Domain_Unscaled : find_suitable_domain(shifted);
 		sync_domain(domain, shifted);
 
 		Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
@@ -18607,9 +18602,9 @@ namespace PSX
 		if (palette)
 			sync_domain(domain, palette_rect);
 
-		read_domain(domain, Stage::FragmentTexture, shifted);
+		read_domain(domain, Stage_FragmentTexture, shifted);
 		if (palette)
-			read_domain(domain, Stage::FragmentTexture, palette_rect);
+			read_domain(domain, Stage_FragmentTexture, palette_rect);
 	}
 
 	bool FBAtlas::write_domain(Domain domain, Stage stage, const Rect &rect)
@@ -18625,14 +18620,14 @@ namespace PSX
 		unsigned write_domains = 0;
 		unsigned hazard_domains = 0;
 		unsigned resolve_domains = 0;
-		if (domain == Domain::Unscaled)
+		if (domain == Domain_Unscaled)
 		{
 			hazard_domains = STATUS_FB_WRITE | STATUS_FB_READ | STATUS_TEXTURE_READ;
-			if (stage == Stage::Compute)
+			if (stage == Stage_Compute)
 				resolve_domains = STATUS_COMPUTE_FB_WRITE;
-			else if (stage == Stage::Transfer)
+			else if (stage == Stage_Transfer)
 				resolve_domains = STATUS_TRANSFER_FB_WRITE;
-			else if (stage == Stage::Fragment)
+			else if (stage == Stage_Fragment)
 			{
 				// Write-after-write in fragment is handled implicitly.
 				// Write-after-read means rendering to a block after reading it as a texture.
@@ -18645,9 +18640,9 @@ namespace PSX
 		else
 		{
 			hazard_domains = STATUS_SFB_WRITE | STATUS_SFB_READ | STATUS_TEXTURE_READ;
-			if (stage == Stage::Compute)
+			if (stage == Stage_Compute)
 				resolve_domains = STATUS_COMPUTE_SFB_WRITE;
-			else if (stage == Stage::Fragment)
+			else if (stage == Stage_Fragment)
 			{
 				// Write-after-write in fragment is handled implicitly.
 				// Write-after-read means rendering to a block after reading it as a texture.
@@ -18655,7 +18650,7 @@ namespace PSX
 				hazard_domains &= ~STATUS_FRAGMENT_SFB_WRITE;
 				resolve_domains = STATUS_FRAGMENT_SFB_WRITE;
 			}
-			else if (stage == Stage::Transfer)
+			else if (stage == Stage_Transfer)
 				resolve_domains = STATUS_TRANSFER_SFB_WRITE;
 			resolve_domains |= STATUS_SFB_ONLY;
 		}
@@ -18692,19 +18687,19 @@ namespace PSX
 		unsigned write_domains = 0;
 		unsigned hazard_domains = 0;
 		unsigned resolve_domains = 0;
-		if (domain == Domain::Unscaled)
+		if (domain == Domain_Unscaled)
 		{
 			hazard_domains = STATUS_FB_WRITE;
-			if (stage == Stage::Compute)
+			if (stage == Stage_Compute)
 				resolve_domains = STATUS_COMPUTE_FB_READ;
-			else if (stage == Stage::Transfer)
+			else if (stage == Stage_Transfer)
 				resolve_domains = STATUS_TRANSFER_FB_READ;
-			else if (stage == Stage::Fragment)
+			else if (stage == Stage_Fragment)
 			{
 				hazard_domains &= ~STATUS_FRAGMENT_FB_READ;
 				resolve_domains = STATUS_FRAGMENT_FB_READ;
 			}
-			else if (stage == Stage::FragmentTexture)
+			else if (stage == Stage_FragmentTexture)
 			{
 				hazard_domains &= ~(STATUS_FRAGMENT_FB_READ | STATUS_TEXTURE_READ);
 				resolve_domains = STATUS_FRAGMENT_FB_READ | STATUS_TEXTURE_READ;
@@ -18713,16 +18708,16 @@ namespace PSX
 		else
 		{
 			hazard_domains = STATUS_SFB_WRITE;
-			if (stage == Stage::Compute)
+			if (stage == Stage_Compute)
 				resolve_domains = STATUS_COMPUTE_SFB_READ;
-			else if (stage == Stage::Transfer)
+			else if (stage == Stage_Transfer)
 				resolve_domains = STATUS_TRANSFER_SFB_READ;
-			else if (stage == Stage::Fragment)
+			else if (stage == Stage_Fragment)
 			{
 				hazard_domains &= ~STATUS_FRAGMENT_SFB_READ;
 				resolve_domains = STATUS_FRAGMENT_SFB_READ;
 			}
-			else if (stage == Stage::FragmentTexture)
+			else if (stage == Stage_FragmentTexture)
 			{
 				hazard_domains &= ~(STATUS_FRAGMENT_SFB_READ | STATUS_TEXTURE_READ);
 				resolve_domains = STATUS_FRAGMENT_SFB_READ | STATUS_TEXTURE_READ;
@@ -18754,7 +18749,7 @@ namespace PSX
 		// If we need to see a "clean" version
 		// of a framebuffer domain, we need to see
 		// anything other than this flag.
-		unsigned dirty_bits = 1u << (domain == Domain::Unscaled ? STATUS_SFB_ONLY : STATUS_FB_ONLY);
+		unsigned dirty_bits = 1u << (domain == Domain_Unscaled ? STATUS_SFB_ONLY : STATUS_FB_ONLY);
 		unsigned bits = 0;
 
 		for (unsigned y = ybegin; y <= yend; y++)
@@ -18773,7 +18768,7 @@ namespace PSX
 		unsigned ownership;
 		unsigned hazard_domains;
 		unsigned resolve_domains;
-		if (domain == Domain::Scaled)
+		if (domain == Domain_Scaled)
 		{
 			ownership = STATUS_FB_ONLY;
 			hazard_domains = STATUS_FB_WRITE | STATUS_SFB_WRITE | STATUS_SFB_READ;
@@ -18827,7 +18822,7 @@ namespace PSX
 	Domain FBAtlas::find_suitable_domain(const Rect &rect)
 	{
 		if (inside_render_pass(rect))
-			return Domain::Scaled;
+			return Domain_Scaled;
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -18840,10 +18835,10 @@ namespace PSX
 			{
 				unsigned i = info(x, y) & STATUS_OWNERSHIP_MASK;
 				if (i == STATUS_FB_ONLY || i == STATUS_FB_PREFER)
-					return Domain::Unscaled;
+					return Domain_Unscaled;
 			}
 		}
-		return Domain::Scaled;
+		return Domain_Scaled;
 	}
 
 	bool FBAtlas::inside_render_pass(const Rect &rect)
@@ -18880,7 +18875,7 @@ namespace PSX
 		if (rect.width == 0 || rect.height == 0)
 			return;
 
-		write_domain(Domain::Scaled, Stage::Fragment, rect);
+		write_domain(Domain_Scaled, Stage_Fragment, rect);
 		listener->flush_render_pass(rect);
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
@@ -18904,8 +18899,8 @@ namespace PSX
 		if (!renderpass.inside)
 		{
 			renderpass.rect = scissored_rect;
-			sync_domain(Domain::Scaled, renderpass.rect);
-			write_domain(Domain::Scaled, Stage::Fragment, renderpass.rect);
+			sync_domain(Domain_Scaled, renderpass.rect);
+			write_domain(Domain_Scaled, Stage_Fragment, renderpass.rect);
 			renderpass.inside = true;
 		}
 		else if (!renderpass.rect.contains(scissored_rect))
@@ -18920,8 +18915,8 @@ namespace PSX
 			if (!scissor && scissored_rect == renderpass.rect)
 				discard_render_pass();
 
-			sync_domain(Domain::Scaled, renderpass.rect);
-			if (write_domain(Domain::Scaled, Stage::Fragment, renderpass.rect))
+			sync_domain(Domain_Scaled, renderpass.rect);
+			if (write_domain(Domain_Scaled, Stage_Fragment, renderpass.rect))
 			{
 				// If render pass was flushed here due to write-after-read hazards, set rect to
 				// our new scissored_rect instead.
