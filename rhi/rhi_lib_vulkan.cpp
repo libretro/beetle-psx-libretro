@@ -1825,16 +1825,11 @@ static inline uint32_t util_ctz(uint32_t x)
 		~HandleName() { reset(); }                                                   \
 	}
 
-	/* Concrete intrusive doubly-linked list (the de-templated form of the
-	 * standalone IntrusiveList<T> instantiations). The template's links are already
-	 * type-erased - prev/next are just IntrusiveListEnabled<T>* - and T* is
-	 * recovered with static_cast because the list-enabled base sits at offset 0 of
-	 * each node. So a single concrete node base (IntrusiveListNode) and list
-	 * (IntrusiveListC) serve every standalone list; callers recover the node type by
-	 * casting, valid because the node base is the first member (offset 0).
-	 *
-	 * The template IntrusiveListEnabled<T>/IntrusiveList<T> below are still used
-	 * inside the intrusive hash maps and are converted with them in a later stage. */
+	/* Concrete intrusive doubly-linked list. Links are type-erased - prev/next are
+	 * plain IntrusiveListNode pointers - and a node's owning type is recovered by
+	 * casting, valid because the node base is the first member (offset 0). A single
+	 * concrete node base (IntrusiveListNode) and list (IntrusiveListC) serve every
+	 * intrusive list in the file. */
 	struct IntrusiveListNode
 	{
 		struct IntrusiveListNode *prev;
@@ -1893,150 +1888,13 @@ static inline uint32_t util_ctz(uint32_t x)
 		ilist_insert_front(list, node);
 	}
 
-	template <typename T>
-		struct IntrusiveListEnabled
-		{
-			IntrusiveListEnabled<T> *prev = NULL;
-			IntrusiveListEnabled<T> *next = NULL;
-		};
-
-	template <typename T>
-		class IntrusiveList
-		{
-			public:
-				void clear()
-				{
-					head = NULL;
-				}
-
-				class Iterator
-				{
-					public:
-						friend class IntrusiveList<T>;
-						Iterator(IntrusiveListEnabled<T> *node)
-							: node(node)
-						{
-						}
-
-						Iterator() = default;
-
-						explicit operator bool() const
-						{
-							return node != NULL;
-						}
-
-						bool operator==(const Iterator &other) const
-						{
-							return node == other.node;
-						}
-
-						bool operator!=(const Iterator &other) const
-						{
-							return node != other.node;
-						}
-
-						T &operator*()
-						{
-							return *static_cast<T *>(node);
-						}
-
-						const T &operator*() const
-						{
-							return *static_cast<T *>(node);
-						}
-
-						T *get()
-						{
-							return static_cast<T *>(node);
-						}
-
-						const T *get() const
-						{
-							return static_cast<const T *>(node);
-						}
-
-						T *operator->()
-						{
-							return static_cast<T *>(node);
-						}
-
-						const T *operator->() const
-						{
-							return static_cast<T *>(node);
-						}
-
-						Iterator &operator++()
-						{
-							node = node->next;
-							return *this;
-						}
-
-					private:
-						IntrusiveListEnabled<T> *node = NULL;
-				};
-
-				Iterator begin()
-				{
-					return Iterator(head);
-				}
-
-				Iterator end()
-				{
-					return Iterator();
-				}
-
-				Iterator erase(Iterator itr)
-				{
-					T *node = itr.get();
-					IntrusiveListEnabled<T> *next = node->next;
-					IntrusiveListEnabled<T> *prev = node->prev;
-
-					if (prev)
-						prev->next = next;
-					else
-						head = next;
-
-					if (next)
-						next->prev = prev;
-
-					return next;
-				}
-
-				void insert_front(Iterator itr)
-				{
-					T *node = itr.get();
-					if (head)
-						head->prev = node;
-
-					node->next = head;
-					node->prev = NULL;
-					head = node;
-				}
-
-				void move_to_front(IntrusiveList<T> &other, Iterator itr)
-				{
-					other.erase(itr);
-					insert_front(itr);
-				}
-
-				bool empty() const
-				{
-					return head == NULL;
-				}
-
-			private:
-				IntrusiveListEnabled<T> *head = NULL;
-		};
-
 	/* Concrete, element-size-driven object pool (the de-templated form of the
 	 * standalone ObjectPool<T> instantiations). Same slab + vacant-stack design as
 	 * ObjectPool<T>, but type-erased: allocate_raw() returns an uninitialised slot
 	 * of element_size bytes and free_raw() returns one to the free list, so a single
 	 * concrete type serves every pooled object. Construction/destruction is done by
 	 * the caller via placement new / explicit destructor (matching the
-	 * malloc + placement-new idiom used for Device/Renderer). The remaining
-	 * template ObjectPool<T> below is still used inside the intrusive hash maps and
-	 * is converted with them in a later stage. */
+	 * malloc + placement-new idiom used for Device/Renderer). */
 	struct ObjectPoolRaw
 	{
 		void **vacants;
@@ -2124,129 +1982,6 @@ static inline uint32_t util_ctz(uint32_t x)
 		p->vac_cap = 0;
 		p->mem_cap = 0;
 	}
-
-	template<typename T>
-		class ObjectPool
-		{
-			public:
-				ObjectPool()
-					: vacants(NULL), vac_count(0), vac_cap(0),
-					  memory(NULL), mem_count(0), mem_cap(0)
-				{
-				}
-
-				~ObjectPool()
-				{
-					clear();
-					::free(vacants);
-					::free(memory);
-					vacants = NULL;
-					memory  = NULL;
-					vac_cap = 0;
-					mem_cap = 0;
-				}
-
-				/* Explicit init/deinit mirroring the constructor/destructor, for
-				 * owners that are allocated with malloc (so the constructor and
-				 * destructor do not run). init() establishes the empty state;
-				 * deinit() performs the destructor's teardown. Embedding objects
-				 * that are normally constructed keep using the ctor/dtor. */
-				void init()
-				{
-					vacants   = NULL;
-					vac_count = 0;
-					vac_cap   = 0;
-					memory    = NULL;
-					mem_count = 0;
-					mem_cap   = 0;
-				}
-
-				void deinit()
-				{
-					clear();
-					::free(vacants);
-					::free(memory);
-					vacants = NULL;
-					memory  = NULL;
-					vac_cap = 0;
-					mem_cap = 0;
-				}
-
-				template<typename... P>
-					T *allocate(P &&... p)
-					{
-						if (vac_count == 0)
-						{
-							unsigned num_objects = 64u << (unsigned)mem_count;
-							T *ptr = static_cast<T *>(malloc(num_objects * sizeof(T)));
-							if (!ptr)
-								return NULL;
-
-							for (unsigned i = 0; i < num_objects; i++)
-								vac_push(&ptr[i]);
-
-							mem_push(ptr);
-						}
-
-						T *ptr = vacants[--vac_count];
-						new(ptr) T(std::forward<P>(p)...);
-						return ptr;
-					}
-
-				void free(T *ptr)
-				{
-					ptr->~T();
-					vac_push(ptr);
-				}
-
-				void clear()
-				{
-					/* memory[] holds the malloc'd slab bases; free each
-					 * (the std::unique_ptr<T, MallocDeleter> members used to
-					 * do this on destruction). vacants[] just indexes into
-					 * those slabs, so it is only reset, not freed here. */
-					int i;
-					for (i = 0; i < mem_count; i++)
-						::free(memory[i]);
-					vac_count = 0;
-					mem_count = 0;
-				}
-
-			protected:
-				/* POD owning pointer-arrays replacing std::vector<T *> vacants and
-				 * std::vector<std::unique_ptr<T, MallocDeleter>> memory, so the pool
-				 * has no STL dependency. vacants holds free object slots; memory
-				 * holds the slab base pointers to free. */
-				void vac_push(T *v)
-				{
-					if (vac_count == vac_cap)
-					{
-						int ncap = vac_cap ? vac_cap * 2 : 64;
-						vacants = (T **)realloc(vacants, (size_t)ncap * sizeof(T *));
-						vac_cap = ncap;
-					}
-					vacants[vac_count++] = v;
-				}
-
-				void mem_push(T *v)
-				{
-					if (mem_count == mem_cap)
-					{
-						int ncap = mem_cap ? mem_cap * 2 : 8;
-						memory = (T **)realloc(memory, (size_t)ncap * sizeof(T *));
-						mem_cap = ncap;
-					}
-					memory[mem_count++] = v;
-				}
-
-				T **vacants;
-				int vac_count;
-				int vac_cap;
-
-				T **memory;
-				int mem_count;
-				int mem_cap;
-		};
 
 	/* Concrete intrusive-hash-map node base (the de-templated form of
 	 * IntrusiveHashMapEnabled<T>). It carries the intrusive list links (for the
@@ -3005,8 +2740,6 @@ static inline uint32_t util_ctz(uint32_t x)
 
 	using HandleCounter = SingleThreadCounter;
 
-	template <typename T>
-		using VulkanObjectPool = ObjectPool<T>;
 	template <typename T>
 		using VulkanCache = IntrusiveHashMap<T>;
 
