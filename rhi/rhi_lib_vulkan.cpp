@@ -1787,35 +1787,10 @@ namespace Util
 	template <typename T>
 		class IntrusivePtr;
 
-	template <typename T, typename Deleter = std::default_delete<T>, typename ReferenceOps = SingleThreadCounter>
-		class IntrusivePtrEnabled
-		{
-			public:
-				using IntrusivePtrType = IntrusivePtr<T>;
-				using EnabledBase = T;
-				using EnabledDeleter = Deleter;
-				using EnabledReferenceOp = ReferenceOps;
-
-				void release_reference()
-				{
-					if (reference_count.release())
-						Deleter()(static_cast<T *>(this));
-				}
-
-				void add_reference()
-				{
-					reference_count.add_ref();
-				}
-
-				IntrusivePtrEnabled() = default;
-
-				IntrusivePtrEnabled(const IntrusivePtrEnabled &) = delete;
-
-				void operator=(const IntrusivePtrEnabled &) = delete;
-
-			private:
-				ReferenceOps reference_count;
-		};
+	/* IntrusivePtrEnabled (the CRTP refcount base) has been removed: every pointee
+	 * now carries its own HandleCounter and provides release_reference/
+	 * add_reference as plain members, and IntrusivePtr dispatches to them
+	 * directly. */
 
 	template <typename T>
 		class IntrusivePtr
