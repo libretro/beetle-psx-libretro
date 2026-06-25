@@ -4867,40 +4867,40 @@ private:
 
 			uint32_t get_sample_count(unsigned subpass) const
 			{
-				VK_ASSERT(subpass < subpasses.size());
-				return subpasses[subpass].samples;
+				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
+				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).samples;
 			}
 
 			unsigned get_num_color_attachments(unsigned subpass) const
 			{
-				VK_ASSERT(subpass < subpasses.size());
-				return subpasses[subpass].num_color_attachments;
+				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
+				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).num_color_attachments;
 			}
 
 			unsigned get_num_input_attachments(unsigned subpass) const
 			{
-				VK_ASSERT(subpass < subpasses.size());
-				return subpasses[subpass].num_input_attachments;
+				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
+				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).num_input_attachments;
 			}
 
 			const VkAttachmentReference &get_color_attachment(unsigned subpass, unsigned index) const
 			{
-				VK_ASSERT(subpass < subpasses.size());
-				VK_ASSERT(index < subpasses[subpass].num_color_attachments);
-				return subpasses[subpass].color_attachments[index];
+				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
+				VK_ASSERT(index < (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).num_color_attachments);
+				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).color_attachments[index];
 			}
 
 			const VkAttachmentReference &get_input_attachment(unsigned subpass, unsigned index) const
 			{
-				VK_ASSERT(subpass < subpasses.size());
-				VK_ASSERT(index < subpasses[subpass].num_input_attachments);
-				return subpasses[subpass].input_attachments[index];
+				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
+				VK_ASSERT(index < (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).num_input_attachments);
+				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).input_attachments[index];
 			}
 
 			bool has_depth(unsigned subpass) const
 			{
-				VK_ASSERT(subpass < subpasses.size());
-				return subpasses[subpass].depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
+				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
+				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
 					format_has_depth_aspect(depth_stencil);
 			}
 
@@ -7434,7 +7434,7 @@ extern retro_log_printf_t log_cb;
 		OwnedRectVec() { v.items = NULL; v.count = 0; v.cap = 0; }
 		~OwnedRectVec() {
 			for (int i = 0; i < v.count; i++) texture_rect_release(&v.items[i]);
-			v.free_storage();
+			TextureRectVec_free_storage(&v);
 		}
 		OwnedRectVec(const OwnedRectVec &o) {
 			v.items = NULL; v.count = 0; v.cap = 0;
@@ -7449,7 +7449,7 @@ extern retro_log_printf_t log_cb;
 			}
 			return *this;
 		}
-		void push(TextureRect t) { texture_rect_retain(&t); v.push(t); }
+		void push(TextureRect t) { texture_rect_retain(&t); TextureRectVec_push(&v, &t); }
 		size_t size() const { return (size_t)v.count; }
 		TextureRect &operator[](size_t i) { return v.items[i]; }
 		const TextureRect &operator[](size_t i) const { return v.items[i]; }
@@ -11412,21 +11412,21 @@ int Renderer::primitive_info_qsort_cmp(const void *pa, const void *pb)
 
 void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured)
 {
-	qsort(scissors.data(), scissors.size(), sizeof(PrimitiveInfo), primitive_info_qsort_cmp);
+	qsort(PrimitiveInfoVec_data(&scissors), PrimitiveInfoVec_size(&scissors), sizeof(PrimitiveInfo), primitive_info_qsort_cmp);
 
 	// Render flat-shaded primitives.
 	BufferVertex *vert = (BufferVertex *)(
-	    cmd->allocate_vertex_data(0, vertices.size() * sizeof(BufferVertex), sizeof(BufferVertex)));
+	    cmd->allocate_vertex_data(0, BufferVertexVec_size((struct BufferVertexVec *)&vertices) * sizeof(BufferVertex), sizeof(BufferVertex)));
 
-	int scissor = scissors.front().scissor_index;
-	HdTextureHandle hd_texture = scissors.front().hd_texture_index;
-	bool filtering = scissors.front().filtering;
-	bool scaled_read = scissors.front().scaled_read;
-	unsigned shift = scissors.front().shift;
-	bool offset_uv = scissors.front().offset_uv;
+	int scissor = (*PrimitiveInfoVec_front(&scissors)).scissor_index;
+	HdTextureHandle hd_texture = (*PrimitiveInfoVec_front(&scissors)).hd_texture_index;
+	bool filtering = (*PrimitiveInfoVec_front(&scissors)).filtering;
+	bool scaled_read = (*PrimitiveInfoVec_front(&scissors)).scaled_read;
+	unsigned shift = (*PrimitiveInfoVec_front(&scissors)).shift;
+	bool offset_uv = (*PrimitiveInfoVec_front(&scissors)).offset_uv;
 	unsigned last_draw = 0;
 	unsigned i = 1;
-	unsigned size = scissors.size();
+	unsigned size = PrimitiveInfoVec_size(&scissors);
 
 	hd_texture_uniforms(hd_texture);
 	cmd->set_scissor(scissor < 0 ? queue.default_scissor : *Rect2DVec_at(&queue.scissors, scissor));
@@ -11434,46 +11434,46 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 	cmd->set_specialization_constant(SpecConstIndex_Shift, shift);
 	cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
 	dispatch_set_scaled_read_texture(scaled_read, textured);
-	memcpy(vert, vertices.data() + 3 * scissors.front().triangle_index, 3 * sizeof(BufferVertex));
+	memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_front(&scissors)).triangle_index, 3 * sizeof(BufferVertex));
 	vert += 3;
 
 	for (; i < size; i++, vert += 3)
 	{
-		if (scissors[i].scissor_index != scissor || scissors[i].hd_texture_index != hd_texture ||
-			scissors[i].filtering != filtering || scissors[i].scaled_read != scaled_read || scissors[i].shift != shift ||
-			scissors[i].offset_uv != offset_uv)
+		if ((*PrimitiveInfoVec_at(&scissors, i)).scissor_index != scissor || (*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index != hd_texture ||
+			(*PrimitiveInfoVec_at(&scissors, i)).filtering != filtering || (*PrimitiveInfoVec_at(&scissors, i)).scaled_read != scaled_read || (*PrimitiveInfoVec_at(&scissors, i)).shift != shift ||
+			(*PrimitiveInfoVec_at(&scissors, i)).offset_uv != offset_uv)
 		{
 			unsigned to_draw = i - last_draw;
 			cmd->set_specialization_constant_mask(-1);
 			cmd->draw(3 * to_draw, 1, 3 * last_draw, 0);
 			last_draw = i;
 
-			if (scissors[i].scissor_index != scissor) {
-				scissor = scissors[i].scissor_index;
+			if ((*PrimitiveInfoVec_at(&scissors, i)).scissor_index != scissor) {
+				scissor = (*PrimitiveInfoVec_at(&scissors, i)).scissor_index;
 				cmd->set_scissor(scissor < 0 ? queue.default_scissor : *Rect2DVec_at(&queue.scissors, scissor));
 			}
-			if (scissors[i].hd_texture_index != hd_texture) {
-				hd_texture = scissors[i].hd_texture_index;
+			if ((*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index != hd_texture) {
+				hd_texture = (*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index;
 				hd_texture_uniforms(hd_texture);
 			}
-			if (scissors[i].filtering != filtering) {
-				filtering = scissors[i].filtering;
+			if ((*PrimitiveInfoVec_at(&scissors, i)).filtering != filtering) {
+				filtering = (*PrimitiveInfoVec_at(&scissors, i)).filtering;
 				cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 			}
-			if (scissors[i].scaled_read != scaled_read) {
-				scaled_read = scissors[i].scaled_read;
+			if ((*PrimitiveInfoVec_at(&scissors, i)).scaled_read != scaled_read) {
+				scaled_read = (*PrimitiveInfoVec_at(&scissors, i)).scaled_read;
 				dispatch_set_scaled_read_texture(scaled_read, textured);
 			}
-			if (scissors[i].shift != shift) {
-				shift = scissors[i].shift;
+			if ((*PrimitiveInfoVec_at(&scissors, i)).shift != shift) {
+				shift = (*PrimitiveInfoVec_at(&scissors, i)).shift;
 				cmd->set_specialization_constant(SpecConstIndex_Shift, shift);
 			}
-			if (scissors[i].offset_uv != offset_uv) {
-				offset_uv = scissors[i].offset_uv;
+			if ((*PrimitiveInfoVec_at(&scissors, i)).offset_uv != offset_uv) {
+				offset_uv = (*PrimitiveInfoVec_at(&scissors, i)).offset_uv;
 				cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
 			}
 		}
-		memcpy(vert, vertices.data() + 3 * scissors[i].triangle_index, 3 * sizeof(BufferVertex));
+		memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_at(&scissors, i)).triangle_index, 3 * sizeof(BufferVertex));
 	}
 
 	unsigned to_draw = size - last_draw;
@@ -11483,9 +11483,9 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 
 void Renderer::render_opaque_primitives()
 {
-	BufferVertexVec &vertices = queue.opaque;
-	PrimitiveInfoVec &scissors = queue.opaque_scissor;
-	if (vertices.empty())
+	BufferVertexVec *vertices = &queue.opaque;
+	PrimitiveInfoVec *scissors = &queue.opaque_scissor;
+	if (BufferVertexVec_empty(vertices))
 		return;
 
 	cmd->set_opaque_state();
@@ -11495,7 +11495,7 @@ void Renderer::render_opaque_primitives()
 	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
 	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-	dispatch(vertices, scissors);
+	dispatch(*vertices, *scissors);
 }
 
 void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
@@ -11590,9 +11590,9 @@ void Renderer::render_semi_transparent_primitives()
 
 void Renderer::render_semi_transparent_opaque_texture_primitives()
 {
-	BufferVertexVec &vertices = queue.semi_transparent_opaque;
-	PrimitiveInfoVec &scissors = queue.semi_transparent_opaque_scissor;
-	if (vertices.empty())
+	BufferVertexVec *vertices = &queue.semi_transparent_opaque;
+	PrimitiveInfoVec *scissors = &queue.semi_transparent_opaque_scissor;
+	if (BufferVertexVec_empty(vertices))
 		return;
 
 	cmd->set_opaque_state();
@@ -11608,14 +11608,14 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-	dispatch(vertices, scissors, true);
+	dispatch(*vertices, *scissors, true);
 }
 
 void Renderer::render_opaque_texture_primitives()
 {
-	BufferVertexVec &vertices = queue.opaque_textured;
-	PrimitiveInfoVec &scissors = queue.opaque_textured_scissor;
-	if (vertices.empty())
+	BufferVertexVec *vertices = &queue.opaque_textured;
+	PrimitiveInfoVec *scissors = &queue.opaque_textured_scissor;
+	if (BufferVertexVec_empty(vertices))
 		return;
 
 	cmd->set_opaque_state();
@@ -11631,7 +11631,7 @@ void Renderer::render_opaque_texture_primitives()
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-	dispatch(vertices, scissors, true);
+	dispatch(*vertices, *scissors, true);
 }
 
 void Renderer::flush_blits()
@@ -11761,32 +11761,38 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	{
 		if (domain == Domain_Scaled)
 		{
-			BlitInfoVec &q = render_state.mask_test ? queue.scaled_masked_blits : queue.scaled_blits;
+			BlitInfoVec *q = render_state.mask_test ? &queue.scaled_masked_blits : &queue.scaled_blits;
 			unsigned width = dst.width;
 			unsigned height = dst.height;
 			for (unsigned y = 0; y < height; y += BLOCK_HEIGHT)
 				for (unsigned x = 0; x < width; x += BLOCK_WIDTH)
 					for (unsigned s = 0; s < msaa; s++)
-						q.push({
+						{
+						BlitInfo _bi = {
 							{ (x + src.x) * scaling, (y + src.y) * scaling },
 							{ (x + dst.x) * scaling, (y + dst.y) * scaling },
 							{ min_(BLOCK_WIDTH, width - x) * scaling, min_(BLOCK_HEIGHT, height - y) * scaling },
 							render_state.force_mask_bit ? 0x8000u : 0u, s,
-						});
+						};
+						BlitInfoVec_push(q, &_bi);
+					}
 		}
 		else
 		{
-			BlitInfoVec &q = render_state.mask_test ? queue.unscaled_masked_blits : queue.unscaled_blits;
+			BlitInfoVec *q = render_state.mask_test ? &queue.unscaled_masked_blits : &queue.unscaled_blits;
 			unsigned width = dst.width;
 			unsigned height = dst.height;
 			for (unsigned y = 0; y < height; y += BLOCK_HEIGHT)
 				for (unsigned x = 0; x < width; x += BLOCK_WIDTH)
-					q.push({
+					{
+					BlitInfo _bi = {
 					    { x + src.x, y + src.y },
 					    { x + dst.x, y + dst.y },
 					    { min_(BLOCK_WIDTH, width - x), min_(BLOCK_HEIGHT, height - y) },
 						render_state.force_mask_bit ? 0x8000u : 0u, 0,
-					});
+					};
+					BlitInfoVec_push(q, &_bi);
+				}
 		}
 	}
 }
@@ -14072,7 +14078,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkSubpassDescription zero_sp;
 			memset(&zero_sp, 0, sizeof(zero_sp));
 			for (unsigned sp = 0; sp < num_subpasses; sp++)
-				subpasses.push(zero_sp);
+				{ VkSubpassDescription _sp = zero_sp; VkSubpassDescriptionVec_push(&subpasses, &_sp); }
 		}
 		VkSubpassDependencyVec external_dependencies = { NULL, 0, 0 };
 		for (unsigned i = 0; i < num_subpasses; i++)
@@ -14082,7 +14088,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkAttachmentReference *resolves = stackalloc_ref_allocate_cleared(&reference_allocator, subpass_infos[i].num_color_attachments);
 			VkAttachmentReference *depth = stackalloc_ref_allocate_cleared(&reference_allocator, 1);
 
-			VkSubpassDescription &subpass = subpasses[i];
+			VkSubpassDescription &subpass = *VkSubpassDescriptionVec_at(&subpasses, i);
 			subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 			subpass.colorAttachmentCount = subpass_infos[i].num_color_attachments;
 			subpass.pColorAttachments = colors;
@@ -14170,10 +14176,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkImageLayout current_layout = attachments[attachment].initialLayout;
 			for (unsigned subpass = 0; subpass < num_subpasses; subpass++)
 			{
-				VkAttachmentReference *color = rp_find_color(subpasses.data(), subpass, attachment);
-				VkAttachmentReference *resolve = rp_find_resolve(subpasses.data(), subpass, attachment);
-				VkAttachmentReference *input = rp_find_input(subpasses.data(), subpass, attachment);
-				VkAttachmentReference *depth = rp_find_depth_stencil(subpasses.data(), subpass, attachment);
+				VkAttachmentReference *color = rp_find_color(VkSubpassDescriptionVec_data(&subpasses), subpass, attachment);
+				VkAttachmentReference *resolve = rp_find_resolve(VkSubpassDescriptionVec_data(&subpasses), subpass, attachment);
+				VkAttachmentReference *input = rp_find_input(VkSubpassDescriptionVec_data(&subpasses), subpass, attachment);
+				VkAttachmentReference *depth = rp_find_depth_stencil(VkSubpassDescriptionVec_data(&subpasses), subpass, attachment);
 
 				// Sanity check.
 				if (color || resolve)
@@ -14374,7 +14380,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		// Add preserve attachments as needed.
 		for (unsigned subpass = 0; subpass < num_subpasses; subpass++)
 		{
-			VkSubpassDescription &pass = subpasses[subpass];
+			VkSubpassDescription &pass = *VkSubpassDescriptionVec_at(&subpasses, subpass);
 			unsigned preserve_count = 0;
 			for (unsigned attachment = 0; attachment < num_attachments; attachment++)
 				if (preserve_masks[attachment] & (1u << subpass))
@@ -14391,15 +14397,15 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VK_ASSERT(num_subpasses > 0);
 		VkRenderPassCreateInfo rp_info = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
 		rp_info.subpassCount = num_subpasses;
-		rp_info.pSubpasses = subpasses.data();
+		rp_info.pSubpasses = VkSubpassDescriptionVec_data(&subpasses);
 		rp_info.pAttachments = attachments;
 		rp_info.attachmentCount = num_attachments;
 
 		// Add external subpass dependencies.
 		FOR_EACH_BIT(external_color_dependencies | external_depth_dependencies | external_input_dependencies, subpass)
 		{
-			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); external_dependencies.push(zero_dep); }
-			VkSubpassDependency &dep = external_dependencies.back();
+			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
+			VkSubpassDependency &dep = *VkSubpassDependencyVec_back(&external_dependencies);
 			dep.srcSubpass = VK_SUBPASS_EXTERNAL;
 			dep.dstSubpass = subpass;
 
@@ -14433,8 +14439,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		// Queue up self-dependencies (COLOR | DEPTH) -> INPUT.
 		FOR_EACH_BIT(color_self_dependencies | depth_self_dependencies, subpass)
 		{
-			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); external_dependencies.push(zero_dep); }
-			VkSubpassDependency &dep = external_dependencies.back();
+			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
+			VkSubpassDependency &dep = *VkSubpassDependencyVec_back(&external_dependencies);
 			dep.srcSubpass = subpass;
 			dep.dstSubpass = subpass;
 			dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
@@ -14458,8 +14464,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		// Flush and invalidate caches between each subpass.
 		for (unsigned subpass = 1; subpass < num_subpasses; subpass++)
 		{
-			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); external_dependencies.push(zero_dep); }
-			VkSubpassDependency &dep = external_dependencies.back();
+			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
+			VkSubpassDependency &dep = *VkSubpassDependencyVec_back(&external_dependencies);
 			dep.srcSubpass = subpass - 1;
 			dep.dstSubpass = subpass;
 			dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
@@ -14501,10 +14507,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			}
 		}
 
-		if (!external_dependencies.empty())
+		if (!VkSubpassDependencyVec_empty(&external_dependencies))
 		{
-			rp_info.dependencyCount = external_dependencies.size();
-			rp_info.pDependencies = external_dependencies.data();
+			rp_info.dependencyCount = VkSubpassDependencyVec_size(&external_dependencies);
+			rp_info.pDependencies = VkSubpassDependencyVec_data(&external_dependencies);
 		}
 
 		// Store the important subpass information for later.
@@ -14559,7 +14565,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 			VK_ASSERT(samples > 0);
 			subpass_info.samples = samples;
-			this->subpasses.push(subpass_info);
+			SubpassInfoVec_push(&this->subpasses, &subpass_info);
 		}
 
 
@@ -14571,8 +14577,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (vkCreateRenderPass(device->get_device(), &rp_info, NULL, &render_pass) != VK_SUCCESS)
 			LOGE("Failed to create render pass.");
 
-		subpasses.free_storage();
-		external_dependencies.free_storage();
+		VkSubpassDescriptionVec_free_storage(&subpasses);
+		VkSubpassDependencyVec_free_storage(&external_dependencies);
 	}
 
 	void RenderPass::fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments)
@@ -14608,7 +14614,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		if (render_pass != VK_NULL_HANDLE)
 			vkDestroyRenderPass(device->get_device(), render_pass, NULL);
-		subpasses.free_storage();
+		SubpassInfoVec_free_storage(&subpasses);
 	}
 
 	Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info)
@@ -16599,7 +16605,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 #endif
 
 		data.wait_semaphores.push(semaphore);
-		data.wait_stages.push(stages);
+		VkPipelineStageVec_push(&data.wait_stages, &stages);
 		data.need_fence = true;
 
 		// Sanity check.
@@ -16989,8 +16995,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VkFlagsVec stages      = { NULL, 0, 0 };
 		{
 			size_t ws;
-			for (ws = 0; ws < data.wait_stages.size(); ws++)
-				VkFlagsVec_push(&stages, &data.wait_stages[ws]);
+			for (ws = 0; ws < VkPipelineStageVec_size(&data.wait_stages); ws++)
+				VkFlagsVec_push(&stages, VkPipelineStageVec_at(&data.wait_stages, ws));
 		}
 
 		for (Semaphore &semaphore : data.wait_semaphores)
@@ -16999,7 +17005,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits, &wait);
 		}
-		data.wait_stages.clear();
+		VkPipelineStageVec_clear(&data.wait_stages);
 		data.wait_semaphores.clear();
 
 		// Add external signal semaphores.
@@ -17184,8 +17190,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			// Move the pending wait stages across (then the source is cleared below).
 			size_t ws;
-			for (ws = 0; ws < data.wait_stages.size(); ws++)
-				VkFlagsVec_push(&stages[0], &data.wait_stages[ws]);
+			for (ws = 0; ws < VkPipelineStageVec_size(&data.wait_stages); ws++)
+				VkFlagsVec_push(&stages[0], VkPipelineStageVec_at(&data.wait_stages, ws));
 		}
 
 		for (Semaphore &semaphore : data.wait_semaphores)
@@ -17194,7 +17200,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits[0], &wait);
 		}
-		data.wait_stages.clear();
+		VkPipelineStageVec_clear(&data.wait_stages);
 		data.wait_semaphores.clear();
 
 		for (CommandBufferHandle &cmd : submissions)
@@ -17502,19 +17508,19 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	void Device::destroy_pipeline_nolock(VkPipeline pipeline)
 	{
 		VK_ASSERT_NOT_IN_VEC(frame().destroyed_pipelines, pipeline);
-		frame().destroyed_pipelines.push(pipeline);
+		VkPipelineVec_push(&frame().destroyed_pipelines, &pipeline);
 	}
 
 	void Device::destroy_image_view_nolock(VkImageView view)
 	{
 		VK_ASSERT_NOT_IN_VEC(frame().destroyed_image_views, view);
-		frame().destroyed_image_views.push(view);
+		RenderTargetViewVec_push(&frame().destroyed_image_views, &view);
 	}
 
 	void Device::destroy_buffer_view_nolock(VkBufferView view)
 	{
 		VK_ASSERT_NOT_IN_VEC(frame().destroyed_buffer_views, view);
-		frame().destroyed_buffer_views.push(view);
+		VkBufferViewVec_push(&frame().destroyed_buffer_views, &view);
 	}
 
 	void Device::destroy_semaphore_nolock(VkSemaphore semaphore)
@@ -17526,25 +17532,25 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	void Device::destroy_image_nolock(VkImage image)
 	{
 		VK_ASSERT_NOT_IN_VEC(frame().destroyed_images, image);
-		frame().destroyed_images.push(image);
+		VkImageVec_push(&frame().destroyed_images, &image);
 	}
 
 	void Device::destroy_buffer_nolock(VkBuffer buffer)
 	{
 		VK_ASSERT_NOT_IN_VEC(frame().destroyed_buffers, buffer);
-		frame().destroyed_buffers.push(buffer);
+		VkBufferVec_push(&frame().destroyed_buffers, &buffer);
 	}
 
 	void Device::destroy_sampler_nolock(VkSampler sampler)
 	{
 		VK_ASSERT_NOT_IN_VEC(frame().destroyed_samplers, sampler);
-		frame().destroyed_samplers.push(sampler);
+		VkSamplerVec_push(&frame().destroyed_samplers, &sampler);
 	}
 
 	void Device::destroy_framebuffer_nolock(VkFramebuffer framebuffer)
 	{
 		VK_ASSERT_NOT_IN_VEC(frame().destroyed_framebuffers, framebuffer);
-		frame().destroyed_framebuffers.push(framebuffer);
+		VkFramebufferVec_push(&frame().destroyed_framebuffers, &framebuffer);
 	}
 
 	void Device::clear_wait_semaphores()
@@ -17557,11 +17563,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			vkDestroySemaphore(device, sem->consume(), NULL);
 
 		graphics.wait_semaphores.clear();
-		graphics.wait_stages.clear();
+		VkPipelineStageVec_clear(&graphics.wait_stages);
 		compute.wait_semaphores.clear();
-		compute.wait_stages.clear();
+		VkPipelineStageVec_clear(&compute.wait_stages);
 		transfer.wait_semaphores.clear();
-		transfer.wait_stages.clear();
+		VkPipelineStageVec_clear(&transfer.wait_stages);
 	}
 
 	void Device::wait_idle_nolock()
@@ -17644,20 +17650,23 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		compute_cmd_pool.begin();
 		transfer_cmd_pool.begin();
 
-		for (VkFramebuffer &framebuffer : destroyed_framebuffers)
-			vkDestroyFramebuffer(device, framebuffer, NULL);
-		for (VkSampler &sampler : destroyed_samplers)
-			vkDestroySampler(device, sampler, NULL);
-		for (VkPipeline &pipeline : destroyed_pipelines)
-			vkDestroyPipeline(device, pipeline, NULL);
-		for (VkImageView &view : destroyed_image_views)
-			vkDestroyImageView(device, view, NULL);
-		for (VkBufferView &view : destroyed_buffer_views)
-			vkDestroyBufferView(device, view, NULL);
-		for (VkImage &image : destroyed_images)
-			vkDestroyImage(device, image, NULL);
-		for (VkBuffer &buffer : destroyed_buffers)
-			vkDestroyBuffer(device, buffer, NULL);
+		{
+			int _i;
+			for (_i = 0; _i < VkFramebufferVec_size(&destroyed_framebuffers); _i++)
+				vkDestroyFramebuffer(device, *VkFramebufferVec_at(&destroyed_framebuffers, _i), NULL);
+			for (_i = 0; _i < VkSamplerVec_size(&destroyed_samplers); _i++)
+				vkDestroySampler(device, *VkSamplerVec_at(&destroyed_samplers, _i), NULL);
+			for (_i = 0; _i < VkPipelineVec_size(&destroyed_pipelines); _i++)
+				vkDestroyPipeline(device, *VkPipelineVec_at(&destroyed_pipelines, _i), NULL);
+			for (_i = 0; _i < RenderTargetViewVec_size(&destroyed_image_views); _i++)
+				vkDestroyImageView(device, *RenderTargetViewVec_at(&destroyed_image_views, _i), NULL);
+			for (_i = 0; _i < VkBufferViewVec_size(&destroyed_buffer_views); _i++)
+				vkDestroyBufferView(device, *VkBufferViewVec_at(&destroyed_buffer_views, _i), NULL);
+			for (_i = 0; _i < VkImageVec_size(&destroyed_images); _i++)
+				vkDestroyImage(device, *VkImageVec_at(&destroyed_images, _i), NULL);
+			for (_i = 0; _i < VkBufferVec_size(&destroyed_buffers); _i++)
+				vkDestroyBuffer(device, *VkBufferVec_at(&destroyed_buffers, _i), NULL);
+		}
 		{
 			int _i;
 			for (_i = 0; _i < SemaphoreVec_size(&destroyed_semaphores); _i++)
@@ -17678,13 +17687,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		vbo_blocks.clear();
 		ubo_blocks.clear();
 
-		destroyed_framebuffers.clear();
-		destroyed_samplers.clear();
-		destroyed_pipelines.clear();
-		destroyed_image_views.clear();
-		destroyed_buffer_views.clear();
-		destroyed_images.clear();
-		destroyed_buffers.clear();
+		VkFramebufferVec_clear(&destroyed_framebuffers);
+		VkSamplerVec_clear(&destroyed_samplers);
+		VkPipelineVec_clear(&destroyed_pipelines);
+		RenderTargetViewVec_clear(&destroyed_image_views);
+		VkBufferViewVec_clear(&destroyed_buffer_views);
+		VkImageVec_clear(&destroyed_images);
+		VkBufferVec_clear(&destroyed_buffers);
 		SemaphoreVec_clear(&destroyed_semaphores);
 		SemaphoreVec_clear(&recycled_semaphores);
 		allocations.clear();
@@ -17702,13 +17711,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		/* Release the POD_VEC backing storage (begin() only resets the counts). */
 		FenceVec_free_storage(&wait_fences);
 		FenceVec_free_storage(&recycle_fences);
-		destroyed_framebuffers.free_storage();
-		destroyed_samplers.free_storage();
-		destroyed_pipelines.free_storage();
-		destroyed_image_views.free_storage();
-		destroyed_buffer_views.free_storage();
-		destroyed_images.free_storage();
-		destroyed_buffers.free_storage();
+		VkFramebufferVec_free_storage(&destroyed_framebuffers);
+		VkSamplerVec_free_storage(&destroyed_samplers);
+		VkPipelineVec_free_storage(&destroyed_pipelines);
+		RenderTargetViewVec_free_storage(&destroyed_image_views);
+		VkBufferViewVec_free_storage(&destroyed_buffer_views);
+		VkImageVec_free_storage(&destroyed_images);
+		VkBufferVec_free_storage(&destroyed_buffers);
 		SemaphoreVec_free_storage(&recycled_semaphores);
 		SemaphoreVec_free_storage(&destroyed_semaphores);
 	}
@@ -20761,14 +20770,14 @@ static char retro_slash = '/';
 				if (intersection.valid) {
 					TextureRect sub = subTexture(old, intersection.rect);
 					TextureRect subMoved = make_texture_rect(sub.upload, sub.offset_x, sub.offset_y, moved(sub.vram_rect, moveX, moveY));
-					to_place.push(subMoved);
+					TextureRectVec_push(&to_place, &subMoved);
 				}
 			}
 		}
 		clear_rect(dst);
 		for (TextureRect &t : to_place)
 			place(t);
-		to_place.free_storage();
+		TextureRectVec_free_storage(&to_place);
 		lookup_grid_dirty = true;
 	}
 
@@ -20821,13 +20830,13 @@ static char retro_slash = '/';
 					// The rect split, mark this texture as dead and push its splits to be added
 					eold.alive = false;
 					for (unsigned i = 0; i < splits_count; i++)
-						newTextures.push(subTexture(old, splits[i]));
+						{ TextureRect _tr = subTexture(old, splits[i]); TextureRectVec_push(&newTextures, &_tr); }
 				}
 			}
 		}
 		for (int ni = 0; ni < newTextures.count; ni++)
 			enduring_arr_push(&textures, newTextures.items[ni], true);
-		newTextures.free_storage();
+		TextureRectVec_free_storage(&newTextures);
 	}
 	void RectTracker::place(TextureRect texture) {
 		clear_rect(texture.vram_rect);
@@ -21016,7 +21025,7 @@ static char retro_slash = '/';
 		}
 
 		// Sort rects so that the vector itself can be compared
-		qsort(f.rects.v.data(), f.rects.v.size(), sizeof(TextureRect), texture_rect_qsort_cmp);
+		qsort(TextureRectVec_data(&f.rects.v), TextureRectVec_size(&f.rects.v), sizeof(TextureRect), texture_rect_qsort_cmp);
 
 		return f;
 	}
