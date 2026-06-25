@@ -4368,7 +4368,9 @@ namespace Vulkan
 			{
 				this->device = device;
 			}
-			~FenceManager();
+			/* Explicit teardown (formerly ~FenceManager): destroys the recycled
+			 * fences and frees the backing array. Called from Device's teardown. */
+			void deinit();
 
 			VkFence request_cleared_fence();
 			void recycle_fence(VkFence fence);
@@ -4496,7 +4498,10 @@ namespace Vulkan
 			{
 				this->device = device;
 			}
-			~SemaphoreManager();
+			/* Explicit teardown (formerly ~SemaphoreManager): destroys the
+			 * recycled semaphores and frees the backing array. Called from
+			 * Device's teardown. */
+			void deinit();
 
 			VkSemaphore request_cleared_semaphore();
 			void recycle(VkSemaphore semaphore);
@@ -12367,7 +12372,7 @@ void FenceManager::recycle_fence(VkFence fence)
 	fences.push(fence);
 }
 
-FenceManager::~FenceManager()
+void FenceManager::deinit()
 {
 	for (VkFence &fence : fences)
 		vkDestroyFence(device, fence, nullptr);
@@ -12402,7 +12407,7 @@ void SemaphoreHolderDeleter::operator()(Vulkan::SemaphoreHolder *semaphore)
 
 namespace Vulkan
 {
-SemaphoreManager::~SemaphoreManager()
+void SemaphoreManager::deinit()
 {
 	for (VkSemaphore &sem : semaphores)
 		vkDestroySemaphore(device, sem, nullptr);
@@ -17110,6 +17115,12 @@ Device::~Device()
 	transient_allocator.clear();
 	for (SamplerHandle &sampler : samplers)
 		sampler.reset();
+
+	/* The fence/semaphore managers no longer self-destruct (their dtors became
+	 * explicit deinit()); tear them down here, after wait_idle, as the implicit
+	 * member destruction used to. */
+	managers.fence.deinit();
+	managers.semaphore.deinit();
 }
 
 void Device::init_frame_contexts(unsigned count)
