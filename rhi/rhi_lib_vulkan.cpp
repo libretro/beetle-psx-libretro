@@ -2456,8 +2456,11 @@ namespace Util
 					}
 					hashmap.clear();
 
-					for (typename IntrusiveList<T>::Iterator &vacant : vacants)
-						object_pool.free(static_cast<T *>(&*vacant));
+					{
+						size_t i, n = vacants.size();
+						for (i = 0; i < n; i++)
+							object_pool.free(static_cast<T *>(&*vacants[i]));
+					}
 					vacants.clear();
 					object_pool.clear();
 				}
@@ -2472,7 +2475,7 @@ namespace Util
 						 * the dead branch is eliminated - reuse keeps the node in the vacant
 						 * pool, otherwise it goes back to the object pool. */
 						if (ReuseObjects)
-							vacants.push_back(&node);
+							vacants.push(&node);
 						else
 							object_pool.free(&node);
 					}
@@ -2500,7 +2503,7 @@ namespace Util
 				template <typename... P>
 					void make_vacant(P &&... p)
 					{
-						vacants.push_back(object_pool.allocate(std::forward<P>(p)...));
+						vacants.push(object_pool.allocate(std::forward<P>(p)...));
 					}
 
 				T *request_vacant(Hash hash)
@@ -2529,11 +2532,46 @@ namespace Util
 					}
 
 			private:
+				/* POD list of vacant-node iterators, replacing
+				 * std::vector<IntrusiveList<T>::Iterator>. The Iterator is a
+				 * single-pointer trivially-copyable wrapper, so a plain realloc'd
+				 * array suffices. Only empty/back/pop_back/clear/push and index
+				 * iteration are used. push takes an Iterator (the call sites pass a
+				 * node pointer, which converts implicitly as before). */
+				struct VacantList
+				{
+					typedef typename IntrusiveList<T>::Iterator Iter;
+					Iter *items;
+					size_t count;
+					size_t cap;
+
+					VacantList() : items(NULL), count(0), cap(0) {}
+					~VacantList() { ::free(items); items = NULL; count = 0; cap = 0; }
+
+					bool empty() const { return count == 0; }
+					size_t size() const { return count; }
+					Iter &operator[](size_t i) { return items[i]; }
+					Iter &back() { return items[count - 1]; }
+					void pop_back() { if (count) count--; }
+					void clear() { count = 0; }
+
+					void push(const Iter &v)
+					{
+						if (count == cap)
+						{
+							size_t ncap = cap ? cap * 2 : 16;
+							items = (Iter *)realloc(items, ncap * sizeof(Iter));
+							cap = ncap;
+						}
+						items[count++] = v;
+					}
+				};
+
 				IntrusiveList<T> rings[RingSize];
 				ObjectPool<T> object_pool;
 				unsigned index = 0;
 				IntrusiveHashMap<IntrusivePODWrapper<typename IntrusiveList<T>::Iterator>> hashmap;
-				std::vector<typename IntrusiveList<T>::Iterator> vacants;
+				VacantList vacants;
 		};
 
 }
