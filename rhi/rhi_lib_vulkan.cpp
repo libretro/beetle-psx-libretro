@@ -14,9 +14,7 @@
 #include "tt_trace.h"
 
 /* === folded parallel-psx/volk/volk.h + volk.c === */
-/* Folded from parallel-psx/volk/volk.h ((c) 2018 Arseny Kapoulkine, MIT).
- * volkInitialize/volkGetInstanceVersion/volkLoadDeviceTable and the
- * VolkDeviceTable struct were dropped */
+/* Folded from parallel-psx/volk/volk.h ((c) 2018 Arseny Kapoulkine, MIT). */
 
 #ifndef VK_NO_PROTOTYPES
 #define VK_NO_PROTOTYPES
@@ -1082,9 +1080,7 @@ static PFN_vkVoidFunction vkGetDeviceProcAddrStub(void* context, const char* nam
 }
 #endif
 
-/* Folded from parallel-psx/volk/volk.c. Dropped: volkInitialize
- * volkGetInstanceVersion (unused), volkLoadDeviceTable (unused),
- * volkGenLoadDeviceTable (unused). */
+/* Folded from parallel-psx/volk/volk.c. */
 
 #ifdef __cplusplus
 extern "C" {
@@ -1672,19 +1668,14 @@ template <typename T> static inline const T &max_(const T &a, const T &b) { retu
  * folded into this single translation unit alongside the libretro
  * RHI Vulkan backend that was always its only consumer. */
 
+retro_log_printf_t libretro_log;
 
 /* ============================================================
  * util.hpp
  * ============================================================ */
 
-
-
-namespace Granite
-{
-extern retro_log_printf_t libretro_log;
-}
-#define LOGE(...) do { if (::Granite::libretro_log) ::Granite::libretro_log(RETRO_LOG_ERROR, __VA_ARGS__); } while(0)
-#define LOGI(...) do { if (::Granite::libretro_log) ::Granite::libretro_log(RETRO_LOG_INFO, __VA_ARGS__); } while(0)
+#define LOGE(...) do { if (libretro_log) libretro_log(RETRO_LOG_ERROR, __VA_ARGS__); } while(0)
+#define LOGI(...) do { if (libretro_log) libretro_log(RETRO_LOG_INFO, __VA_ARGS__); } while(0)
 
 #ifdef _MSC_VER
 #endif
@@ -1737,880 +1728,880 @@ static inline uint32_t util_ctz(uint32_t x)
 
 namespace Util
 {
-using Hash = uint64_t;
+	using Hash = uint64_t;
 
-class Hasher
-{
-public:
-	Hasher(Hash h)
-		: h(h)
+	class Hasher
 	{
-	}
+		public:
+			Hasher(Hash h)
+				: h(h)
+			{
+			}
 
-	Hasher() = default;
+			Hasher() = default;
 
-	inline void data(const uint32_t *p, size_t bytes)
-	{
-		size_t count = bytes / sizeof(uint32_t);
-		for (size_t i = 0; i < count; i++)
-			h = (h * 0x100000001b3ull) ^ p[i];
-	}
+			inline void data(const uint32_t *p, size_t bytes)
+			{
+				size_t count = bytes / sizeof(uint32_t);
+				for (size_t i = 0; i < count; i++)
+					h = (h * 0x100000001b3ull) ^ p[i];
+			}
 
-	inline void u32(uint32_t value)
-	{
-		h = (h * 0x100000001b3ull) ^ value;
-	}
+			inline void u32(uint32_t value)
+			{
+				h = (h * 0x100000001b3ull) ^ value;
+			}
 
-	inline void u64(uint64_t value)
-	{
-		u32(value & 0xffffffffu);
-		u32(value >> 32);
-	}
+			inline void u64(uint64_t value)
+			{
+				u32(value & 0xffffffffu);
+				u32(value >> 32);
+			}
 
-	inline Hash get() const
-	{
-		return h;
-	}
+			inline Hash get() const
+			{
+				return h;
+			}
 
-private:
-	Hash h = 0xcbf29ce484222325ull;
-};
-
-class SingleThreadCounter
-{
-public:
-	inline void add_ref()
-	{
-		count++;
-	}
-
-	inline bool release()
-	{
-		return --count == 0;
-	}
-
-private:
-	size_t count = 1;
-};
-
-template <typename T>
-class IntrusivePtr;
-
-template <typename T, typename Deleter = std::default_delete<T>, typename ReferenceOps = SingleThreadCounter>
-class IntrusivePtrEnabled
-{
-public:
-	using IntrusivePtrType = IntrusivePtr<T>;
-	using EnabledBase = T;
-	using EnabledDeleter = Deleter;
-	using EnabledReferenceOp = ReferenceOps;
-
-	void release_reference()
-	{
-		if (reference_count.release())
-			Deleter()(static_cast<T *>(this));
-	}
-
-	void add_reference()
-	{
-		reference_count.add_ref();
-	}
-
-	IntrusivePtrEnabled() = default;
-
-	IntrusivePtrEnabled(const IntrusivePtrEnabled &) = delete;
-
-	void operator=(const IntrusivePtrEnabled &) = delete;
-
-private:
-	ReferenceOps reference_count;
-};
-
-template <typename T>
-class IntrusivePtr
-{
-public:
-	template <typename U>
-	friend class IntrusivePtr;
-
-	IntrusivePtr() = default;
-
-	explicit IntrusivePtr(T *handle)
-		: data(handle)
-	{
-	}
-
-	T &operator*()
-	{
-		return *data;
-	}
-
-	const T &operator*() const
-	{
-		return *data;
-	}
-
-	T *operator->()
-	{
-		return data;
-	}
-
-	const T *operator->() const
-	{
-		return data;
-	}
-
-	explicit operator bool() const
-	{
-		return data != nullptr;
-	}
-
-	bool operator==(const IntrusivePtr &other) const
-	{
-		return data == other.data;
-	}
-
-	bool operator!=(const IntrusivePtr &other) const
-	{
-		return data != other.data;
-	}
-
-	T *get()
-	{
-		return data;
-	}
-
-	const T *get() const
-	{
-		return data;
-	}
-
-	void reset()
-	{
-		using ReferenceBase = IntrusivePtrEnabled<
-				typename T::EnabledBase,
-				typename T::EnabledDeleter,
-				typename T::EnabledReferenceOp>;
-
-		// Static up-cast here to avoid potential issues with multiple intrusive inheritance.
-		// Also makes sure that the pointer type actually inherits from this type.
-		if (data)
-			static_cast<ReferenceBase *>(data)->release_reference();
-		data = nullptr;
-	}
-
-	template <typename U>
-	IntrusivePtr &operator=(const IntrusivePtr<U> &other)
-	{
-		static_assert(std::is_base_of<T, U>::value,
-		              "Cannot safely assign downcasted intrusive pointers.");
-
-		using ReferenceBase = IntrusivePtrEnabled<
-				typename T::EnabledBase,
-				typename T::EnabledDeleter,
-				typename T::EnabledReferenceOp>;
-
-		reset();
-		data = static_cast<T *>(other.data);
-
-		// Static up-cast here to avoid potential issues with multiple intrusive inheritance.
-		// Also makes sure that the pointer type actually inherits from this type.
-		if (data)
-			static_cast<ReferenceBase *>(data)->add_reference();
-		return *this;
-	}
-
-	IntrusivePtr &operator=(const IntrusivePtr &other)
-	{
-		using ReferenceBase = IntrusivePtrEnabled<
-				typename T::EnabledBase,
-				typename T::EnabledDeleter,
-				typename T::EnabledReferenceOp>;
-
-		if (this != &other)
-		{
-			reset();
-			data = other.data;
-			if (data)
-				static_cast<ReferenceBase *>(data)->add_reference();
-		}
-		return *this;
-	}
-
-	template <typename U>
-	IntrusivePtr(const IntrusivePtr<U> &other)
-	{
-		*this = other;
-	}
-
-	IntrusivePtr(const IntrusivePtr &other)
-	{
-		*this = other;
-	}
-
-	~IntrusivePtr()
-	{
-		reset();
-	}
-
-	template <typename U>
-	IntrusivePtr &operator=(IntrusivePtr<U> &&other) noexcept
-	{
-		reset();
-		data = other.data;
-		other.data = nullptr;
-		return *this;
-	}
-
-	IntrusivePtr &operator=(IntrusivePtr &&other) noexcept
-	{
-		if (this != &other)
-		{
-			reset();
-			data = other.data;
-			other.data = nullptr;
-		}
-		return *this;
-	}
-
-	template <typename U>
-	IntrusivePtr(IntrusivePtr<U> &&other) noexcept
-	{
-		*this = std::move(other);
-	}
-
-	template <typename U>
-	IntrusivePtr(IntrusivePtr &&other) noexcept
-	{
-		*this = std::move(other);
-	}
-
-private:
-	T *data = nullptr;
-};
-
-template <typename T>
-struct IntrusiveListEnabled
-{
-	IntrusiveListEnabled<T> *prev = nullptr;
-	IntrusiveListEnabled<T> *next = nullptr;
-};
-
-template <typename T>
-class IntrusiveList
-{
-public:
-	void clear()
-	{
-		head = nullptr;
-	}
-
-	class Iterator
-	{
-	public:
-		friend class IntrusiveList<T>;
-		Iterator(IntrusiveListEnabled<T> *node)
-		    : node(node)
-		{
-		}
-
-		Iterator() = default;
-
-		explicit operator bool() const
-		{
-			return node != nullptr;
-		}
-
-		bool operator==(const Iterator &other) const
-		{
-			return node == other.node;
-		}
-
-		bool operator!=(const Iterator &other) const
-		{
-			return node != other.node;
-		}
-
-		T &operator*()
-		{
-			return *static_cast<T *>(node);
-		}
-
-		const T &operator*() const
-		{
-			return *static_cast<T *>(node);
-		}
-
-		T *get()
-		{
-			return static_cast<T *>(node);
-		}
-
-		const T *get() const
-		{
-			return static_cast<const T *>(node);
-		}
-
-		T *operator->()
-		{
-			return static_cast<T *>(node);
-		}
-
-		const T *operator->() const
-		{
-			return static_cast<T *>(node);
-		}
-
-		Iterator &operator++()
-		{
-			node = node->next;
-			return *this;
-		}
-
-	private:
-		IntrusiveListEnabled<T> *node = nullptr;
+		private:
+			Hash h = 0xcbf29ce484222325ull;
 	};
 
-	Iterator begin()
+	class SingleThreadCounter
 	{
-		return Iterator(head);
-	}
+		public:
+			inline void add_ref()
+			{
+				count++;
+			}
 
-	Iterator end()
-	{
-		return Iterator();
-	}
+			inline bool release()
+			{
+				return --count == 0;
+			}
 
-	Iterator erase(Iterator itr)
-	{
-		T *node = itr.get();
-		IntrusiveListEnabled<T> *next = node->next;
-		IntrusiveListEnabled<T> *prev = node->prev;
-
-		if (prev)
-			prev->next = next;
-		else
-			head = next;
-
-		if (next)
-			next->prev = prev;
-
-		return next;
-	}
-
-	void insert_front(Iterator itr)
-	{
-		T *node = itr.get();
-		if (head)
-			head->prev = node;
-
-		node->next = head;
-		node->prev = nullptr;
-		head = node;
-	}
-
-	void move_to_front(IntrusiveList<T> &other, Iterator itr)
-	{
-		other.erase(itr);
-		insert_front(itr);
-	}
-
-	bool empty() const
-	{
-		return head == nullptr;
-	}
-
-private:
-	IntrusiveListEnabled<T> *head = nullptr;
-};
-
-template<typename T>
-class ObjectPool
-{
-public:
-	template<typename... P>
-	T *allocate(P &&... p)
-	{
-		if (vacants.empty())
-		{
-			unsigned num_objects = 64u << memory.size();
-			T *ptr = static_cast<T *>(malloc(num_objects * sizeof(T)));
-			if (!ptr)
-				return nullptr;
-
-			for (unsigned i = 0; i < num_objects; i++)
-				vacants.push_back(&ptr[i]);
-
-			memory.emplace_back(ptr);
-		}
-
-		T *ptr = vacants.back();
-		vacants.pop_back();
-		new(ptr) T(std::forward<P>(p)...);
-		return ptr;
-	}
-
-	void free(T *ptr)
-	{
-		ptr->~T();
-		vacants.push_back(ptr);
-	}
-
-	void clear()
-	{
-		vacants.clear();
-		memory.clear();
-	}
-
-protected:
-	std::vector<T *> vacants;
-
-	struct MallocDeleter
-	{
-		void operator()(T *ptr)
-		{
-			::free(ptr);
-		}
+		private:
+			size_t count = 1;
 	};
 
-	std::vector<std::unique_ptr<T, MallocDeleter>> memory;
-};
+	template <typename T>
+		class IntrusivePtr;
 
-template <typename T>
-struct IntrusiveHashMapEnabled : public IntrusiveListEnabled<T>
-{
-	IntrusiveHashMapEnabled() = default;
-	IntrusiveHashMapEnabled(Util::Hash hash)
-		: intrusive_hashmap_key(hash)
-	{
-	}
-
-	Hash intrusive_hashmap_key = 0;
-};
-
-template <typename T>
-struct IntrusivePODWrapper : public IntrusiveHashMapEnabled<IntrusivePODWrapper<T>>
-{
-	template <typename U>
-	explicit IntrusivePODWrapper(U&& value_)
-		: value(std::forward<U>(value_))
-	{
-	}
-
-	IntrusivePODWrapper() = default;
-
-	T& get()
-	{
-		return value;
-	}
-
-	const T& get() const
-	{
-		return value;
-	}
-
-	T value = {};
-};
-
-// This HashMap is non-owning. It just arranges a list of pointers.
-// It's kind of special purpose container used by the Vulkan backend.
-// Dealing with memory ownership is done through composition by a different class.
-// T must inherit from IntrusiveHashMapEnabled<T>.
-// Each instance of T can only be part of one hashmap.
-
-template <typename T>
-class IntrusiveHashMapHolder
-{
-public:
-	enum { InitialSize = 16, InitialLoadCount = 3 };
-
-	T *find(Hash hash) const
-	{
-		if (values.empty())
-			return nullptr;
-
-		Hash hash_mask = values.size() - 1;
-		Hash masked = hash & hash_mask;
-		for (unsigned i = 0; i < load_count; i++)
+	template <typename T, typename Deleter = std::default_delete<T>, typename ReferenceOps = SingleThreadCounter>
+		class IntrusivePtrEnabled
 		{
-			if (values[masked] && get_hash(values[masked]) == hash)
-				return values[masked];
-			masked = (masked + 1) & hash_mask;
-		}
+			public:
+				using IntrusivePtrType = IntrusivePtr<T>;
+				using EnabledBase = T;
+				using EnabledDeleter = Deleter;
+				using EnabledReferenceOp = ReferenceOps;
 
-		return nullptr;
-	}
-
-	// Inserts, if value already exists, insertion does not happen.
-	// Return value is the data which is not part of the hashmap.
-	// It should be deleted or similar.
-	// Returns nullptr if nothing was in the hashmap for this key.
-	T *insert_yield(T *&value)
-	{
-		if (values.empty())
-			grow();
-
-		Hash hash_mask = values.size() - 1;
-		Hash hash = get_hash(value);
-		Hash masked = hash & hash_mask;
-
-		for (unsigned i = 0; i < load_count; i++)
-		{
-			if (values[masked] && get_hash(values[masked]) == hash)
-			{
-				T *ret = value;
-				value = values[masked];
-				return ret;
-			}
-			else if (!values[masked])
-			{
-				values[masked] = value;
-				list.insert_front(value);
-				return nullptr;
-			}
-			masked = (masked + 1) & hash_mask;
-		}
-
-		grow();
-		return insert_yield(value);
-	}
-
-	T *insert_replace(T *value)
-	{
-		if (values.empty())
-			grow();
-
-		Hash hash_mask = values.size() - 1;
-		Hash hash = get_hash(value);
-		Hash masked = hash & hash_mask;
-
-		for (unsigned i = 0; i < load_count; i++)
-		{
-			if (values[masked] && get_hash(values[masked]) == hash)
-			{
-				T *tmp = values[masked];
-				values[masked] = value;
-				value = tmp;
-				list.erase(value);
-				list.insert_front(values[masked]);
-				return value;
-			}
-			else if (!values[masked])
-			{
-				assert(!values[masked]);
-				values[masked] = value;
-				list.insert_front(value);
-				return nullptr;
-			}
-			masked = (masked + 1) & hash_mask;
-		}
-
-		grow();
-		return insert_replace(value);
-	}
-
-	T *erase(Hash hash)
-	{
-		Hash hash_mask = values.size() - 1;
-		Hash masked = hash & hash_mask;
-
-		for (unsigned i = 0; i < load_count; i++)
-		{
-			if (values[masked] && get_hash(values[masked]) == hash)
-			{
-				T *value = values[masked];
-				list.erase(value);
-				values[masked] = nullptr;
-				return value;
-			}
-			masked = (masked + 1) & hash_mask;
-		}
-		return nullptr;
-	}
-
-	void clear()
-	{
-		list.clear();
-		values.clear();
-		load_count = 0;
-	}
-
-	typename IntrusiveList<T>::Iterator begin()
-	{
-		return list.begin();
-	}
-
-	typename IntrusiveList<T>::Iterator end()
-	{
-		return list.end();
-	}
-
-	IntrusiveList<T> &inner_list()
-	{
-		return list;
-	}
-
-private:
-
-	inline Hash get_hash(const T *value) const
-	{
-		return static_cast<const IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key;
-	}
-
-	bool insert_inner(T *value)
-	{
-		Hash hash_mask = values.size() - 1;
-		Hash hash = get_hash(value);
-		Hash masked = hash & hash_mask;
-
-		for (unsigned i = 0; i < load_count; i++)
-		{
-			if (!values[masked])
-			{
-				values[masked] = value;
-				return true;
-			}
-			masked = (masked + 1) & hash_mask;
-		}
-		return false;
-	}
-
-	void grow()
-	{
-		bool success;
-		do
-		{
-			for (T *&v : values)
-				v = nullptr;
-
-			if (values.empty())
-			{
-				values.resize(InitialSize);
-				load_count = InitialLoadCount;
-				//LOGI("Growing hashmap to %u elements.\n", InitialSize);
-			}
-			else
-			{
-				values.resize(values.size() * 2);
-				//LOGI("Growing hashmap to %u elements.\n", unsigned(values.size()));
-				load_count++;
-			}
-
-			// Re-insert.
-			success = true;
-			for (T &t : list)
-			{
-				if (!insert_inner(&t))
+				void release_reference()
 				{
-					success = false;
-					break;
+					if (reference_count.release())
+						Deleter()(static_cast<T *>(this));
 				}
-			}
-		} while (!success);
-	}
 
-	std::vector<T *> values;
-	IntrusiveList<T> list;
-	unsigned load_count = 0;
-};
+				void add_reference()
+				{
+					reference_count.add_ref();
+				}
 
-template <typename T>
-class IntrusiveHashMap
-{
-public:
-	~IntrusiveHashMap()
-	{
-		clear();
-	}
+				IntrusivePtrEnabled() = default;
 
-	IntrusiveHashMap() = default;
-	IntrusiveHashMap(const IntrusiveHashMap &) = delete;
-	void operator=(const IntrusiveHashMap &) = delete;
+				IntrusivePtrEnabled(const IntrusivePtrEnabled &) = delete;
 
-	void clear()
-	{
-		IntrusiveList<T> &list = hashmap.inner_list();
-		typename IntrusiveList<T>::Iterator itr = list.begin();
-		while (itr != list.end())
+				void operator=(const IntrusivePtrEnabled &) = delete;
+
+			private:
+				ReferenceOps reference_count;
+		};
+
+	template <typename T>
+		class IntrusivePtr
 		{
-			T *to_free = itr.get();
-			itr = list.erase(itr);
-			pool.free(to_free);
+			public:
+				template <typename U>
+					friend class IntrusivePtr;
+
+				IntrusivePtr() = default;
+
+				explicit IntrusivePtr(T *handle)
+					: data(handle)
+				{
+				}
+
+				T &operator*()
+				{
+					return *data;
+				}
+
+				const T &operator*() const
+				{
+					return *data;
+				}
+
+				T *operator->()
+				{
+					return data;
+				}
+
+				const T *operator->() const
+				{
+					return data;
+				}
+
+				explicit operator bool() const
+				{
+					return data != nullptr;
+				}
+
+				bool operator==(const IntrusivePtr &other) const
+				{
+					return data == other.data;
+				}
+
+				bool operator!=(const IntrusivePtr &other) const
+				{
+					return data != other.data;
+				}
+
+				T *get()
+				{
+					return data;
+				}
+
+				const T *get() const
+				{
+					return data;
+				}
+
+				void reset()
+				{
+					using ReferenceBase = IntrusivePtrEnabled<
+						typename T::EnabledBase,
+							 typename T::EnabledDeleter,
+							 typename T::EnabledReferenceOp>;
+
+					// Static up-cast here to avoid potential issues with multiple intrusive inheritance.
+					// Also makes sure that the pointer type actually inherits from this type.
+					if (data)
+						static_cast<ReferenceBase *>(data)->release_reference();
+					data = nullptr;
+				}
+
+				template <typename U>
+					IntrusivePtr &operator=(const IntrusivePtr<U> &other)
+					{
+						static_assert(std::is_base_of<T, U>::value,
+								"Cannot safely assign downcasted intrusive pointers.");
+
+						using ReferenceBase = IntrusivePtrEnabled<
+							typename T::EnabledBase,
+								 typename T::EnabledDeleter,
+								 typename T::EnabledReferenceOp>;
+
+						reset();
+						data = static_cast<T *>(other.data);
+
+						// Static up-cast here to avoid potential issues with multiple intrusive inheritance.
+						// Also makes sure that the pointer type actually inherits from this type.
+						if (data)
+							static_cast<ReferenceBase *>(data)->add_reference();
+						return *this;
+					}
+
+				IntrusivePtr &operator=(const IntrusivePtr &other)
+				{
+					using ReferenceBase = IntrusivePtrEnabled<
+						typename T::EnabledBase,
+					typename T::EnabledDeleter,
+					typename T::EnabledReferenceOp>;
+
+					if (this != &other)
+					{
+						reset();
+						data = other.data;
+						if (data)
+							static_cast<ReferenceBase *>(data)->add_reference();
+					}
+					return *this;
+				}
+
+				template <typename U>
+					IntrusivePtr(const IntrusivePtr<U> &other)
+					{
+						*this = other;
+					}
+
+				IntrusivePtr(const IntrusivePtr &other)
+				{
+					*this = other;
+				}
+
+				~IntrusivePtr()
+				{
+					reset();
+				}
+
+				template <typename U>
+					IntrusivePtr &operator=(IntrusivePtr<U> &&other) noexcept
+					{
+						reset();
+						data = other.data;
+						other.data = nullptr;
+						return *this;
+					}
+
+				IntrusivePtr &operator=(IntrusivePtr &&other) noexcept
+				{
+					if (this != &other)
+					{
+						reset();
+						data = other.data;
+						other.data = nullptr;
+					}
+					return *this;
+				}
+
+				template <typename U>
+					IntrusivePtr(IntrusivePtr<U> &&other) noexcept
+					{
+						*this = std::move(other);
+					}
+
+				template <typename U>
+					IntrusivePtr(IntrusivePtr &&other) noexcept
+					{
+						*this = std::move(other);
+					}
+
+			private:
+				T *data = nullptr;
+		};
+
+	template <typename T>
+		struct IntrusiveListEnabled
+		{
+			IntrusiveListEnabled<T> *prev = nullptr;
+			IntrusiveListEnabled<T> *next = nullptr;
+		};
+
+	template <typename T>
+		class IntrusiveList
+		{
+			public:
+				void clear()
+				{
+					head = nullptr;
+				}
+
+				class Iterator
+				{
+					public:
+						friend class IntrusiveList<T>;
+						Iterator(IntrusiveListEnabled<T> *node)
+							: node(node)
+						{
+						}
+
+						Iterator() = default;
+
+						explicit operator bool() const
+						{
+							return node != nullptr;
+						}
+
+						bool operator==(const Iterator &other) const
+						{
+							return node == other.node;
+						}
+
+						bool operator!=(const Iterator &other) const
+						{
+							return node != other.node;
+						}
+
+						T &operator*()
+						{
+							return *static_cast<T *>(node);
+						}
+
+						const T &operator*() const
+						{
+							return *static_cast<T *>(node);
+						}
+
+						T *get()
+						{
+							return static_cast<T *>(node);
+						}
+
+						const T *get() const
+						{
+							return static_cast<const T *>(node);
+						}
+
+						T *operator->()
+						{
+							return static_cast<T *>(node);
+						}
+
+						const T *operator->() const
+						{
+							return static_cast<T *>(node);
+						}
+
+						Iterator &operator++()
+						{
+							node = node->next;
+							return *this;
+						}
+
+					private:
+						IntrusiveListEnabled<T> *node = nullptr;
+				};
+
+				Iterator begin()
+				{
+					return Iterator(head);
+				}
+
+				Iterator end()
+				{
+					return Iterator();
+				}
+
+				Iterator erase(Iterator itr)
+				{
+					T *node = itr.get();
+					IntrusiveListEnabled<T> *next = node->next;
+					IntrusiveListEnabled<T> *prev = node->prev;
+
+					if (prev)
+						prev->next = next;
+					else
+						head = next;
+
+					if (next)
+						next->prev = prev;
+
+					return next;
+				}
+
+				void insert_front(Iterator itr)
+				{
+					T *node = itr.get();
+					if (head)
+						head->prev = node;
+
+					node->next = head;
+					node->prev = nullptr;
+					head = node;
+				}
+
+				void move_to_front(IntrusiveList<T> &other, Iterator itr)
+				{
+					other.erase(itr);
+					insert_front(itr);
+				}
+
+				bool empty() const
+				{
+					return head == nullptr;
+				}
+
+			private:
+				IntrusiveListEnabled<T> *head = nullptr;
+		};
+
+	template<typename T>
+		class ObjectPool
+		{
+			public:
+				template<typename... P>
+					T *allocate(P &&... p)
+					{
+						if (vacants.empty())
+						{
+							unsigned num_objects = 64u << memory.size();
+							T *ptr = static_cast<T *>(malloc(num_objects * sizeof(T)));
+							if (!ptr)
+								return nullptr;
+
+							for (unsigned i = 0; i < num_objects; i++)
+								vacants.push_back(&ptr[i]);
+
+							memory.emplace_back(ptr);
+						}
+
+						T *ptr = vacants.back();
+						vacants.pop_back();
+						new(ptr) T(std::forward<P>(p)...);
+						return ptr;
+					}
+
+				void free(T *ptr)
+				{
+					ptr->~T();
+					vacants.push_back(ptr);
+				}
+
+				void clear()
+				{
+					vacants.clear();
+					memory.clear();
+				}
+
+			protected:
+				std::vector<T *> vacants;
+
+				struct MallocDeleter
+				{
+					void operator()(T *ptr)
+					{
+						::free(ptr);
+					}
+				};
+
+				std::vector<std::unique_ptr<T, MallocDeleter>> memory;
+		};
+
+	template <typename T>
+		struct IntrusiveHashMapEnabled : public IntrusiveListEnabled<T>
+	{
+		IntrusiveHashMapEnabled() = default;
+		IntrusiveHashMapEnabled(Util::Hash hash)
+			: intrusive_hashmap_key(hash)
+		{
 		}
 
-		hashmap.clear();
-	}
+		Hash intrusive_hashmap_key = 0;
+	};
 
-	T *find(Hash hash) const
+	template <typename T>
+		struct IntrusivePODWrapper : public IntrusiveHashMapEnabled<IntrusivePODWrapper<T>>
 	{
-		return hashmap.find(hash);
-	}
-
-	void erase(Hash hash)
-	{
-		T *value = hashmap.erase(hash);
-		if (value)
-			pool.free(value);
-	}
-
-	template <typename... P>
-	T *emplace_replace(Hash hash, P&&... p)
-	{
-		T *t = allocate(std::forward<P>(p)...);
-		return insert_replace(hash, t);
-	}
-
-	template <typename... P>
-	T *emplace_yield(Hash hash, P&&... p)
-	{
-		T *t = allocate(std::forward<P>(p)...);
-		return insert_yield(hash, t);
-	}
-
-	template <typename... P>
-	T *allocate(P&&... p)
-	{
-		return pool.allocate(std::forward<P>(p)...);
-	}
-
-	T *insert_replace(Hash hash, T *value)
-	{
-		static_cast<IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key = hash;
-		T *to_delete = hashmap.insert_replace(value);
-		if (to_delete)
-			pool.free(to_delete);
-		return value;
-	}
-
-	T *insert_yield(Hash hash, T *value)
-	{
-		static_cast<IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key = hash;
-		T *to_delete = hashmap.insert_yield(value);
-		if (to_delete)
-			pool.free(to_delete);
-		return value;
-	}
-
-	typename IntrusiveList<T>::Iterator begin()
-	{
-		return hashmap.begin();
-	}
-
-	typename IntrusiveList<T>::Iterator end()
-	{
-		return hashmap.end();
-	}
-
-private:
-	IntrusiveHashMapHolder<T> hashmap;
-	ObjectPool<T> pool;
-};
-
-template <typename T>
-struct TemporaryHashmapEnabled
-{
-	Hash hash = 0;
-	unsigned index = 0;
-};
-
-template <typename T, unsigned RingSize = 4, bool ReuseObjects = false>
-class TemporaryHashmap
-{
-public:
-	~TemporaryHashmap()
-	{
-		clear();
-	}
-
-	void clear()
-	{
-		for (IntrusiveList<T> &ring : rings)
-		{
-			for (T &node : ring)
-				object_pool.free(static_cast<T *>(&node));
-			ring.clear();
-		}
-		hashmap.clear();
-
-		for (typename IntrusiveList<T>::Iterator &vacant : vacants)
-			object_pool.free(static_cast<T *>(&*vacant));
-		vacants.clear();
-		object_pool.clear();
-	}
-
-	void begin_frame()
-	{
-		index = (index + 1) & (RingSize - 1);
-		for (T &node : rings[index])
-		{
-			hashmap.erase(node.hash);
-			/* Folded free_object: ReuseObjects is a compile-time constant, so
-			 * the dead branch is eliminated - reuse keeps the node in the vacant
-			 * pool, otherwise it goes back to the object pool. */
-			if (ReuseObjects)
-				vacants.push_back(&node);
-			else
-				object_pool.free(&node);
-		}
-		rings[index].clear();
-	}
-
-	T *request(Hash hash)
-	{
-		IntrusivePODWrapper<typename IntrusiveList<T>::Iterator> *v = hashmap.find(hash);
-		if (v)
-		{
-			typename IntrusiveList<T>::Iterator node = v->get();
-			if (node->index != index)
+		template <typename U>
+			explicit IntrusivePODWrapper(U&& value_)
+			: value(std::forward<U>(value_))
 			{
-				rings[index].move_to_front(rings[node->index], node);
-				node->index = index;
 			}
 
-			return &*node;
+		IntrusivePODWrapper() = default;
+
+		T& get()
+		{
+			return value;
 		}
-		else
-			return nullptr;
-	}
 
-	template <typename... P>
-	void make_vacant(P &&... p)
-	{
-		vacants.push_back(object_pool.allocate(std::forward<P>(p)...));
-	}
+		const T& get() const
+		{
+			return value;
+		}
 
-	T *request_vacant(Hash hash)
-	{
-		if (vacants.empty())
-			return nullptr;
+		T value = {};
+	};
 
-		typename IntrusiveList<T>::Iterator top = vacants.back();
-		vacants.pop_back();
-		top->index = index;
-		top->hash = hash;
-		hashmap.emplace_replace(hash, top);
-		rings[index].insert_front(top);
-		return &*top;
-	}
+	// This HashMap is non-owning. It just arranges a list of pointers.
+	// It's kind of special purpose container used by the Vulkan backend.
+	// Dealing with memory ownership is done through composition by a different class.
+	// T must inherit from IntrusiveHashMapEnabled<T>.
+	// Each instance of T can only be part of one hashmap.
 
-	template <typename... P>
-	T *emplace(Hash hash, P &&... p)
-	{
-		T *node = object_pool.allocate(std::forward<P>(p)...);
-		node->index = index;
-		node->hash = hash;
-		hashmap.emplace_replace(hash, node);
-		rings[index].insert_front(node);
-		return node;
-	}
+	template <typename T>
+		class IntrusiveHashMapHolder
+		{
+			public:
+				enum { InitialSize = 16, InitialLoadCount = 3 };
 
-private:
-	IntrusiveList<T> rings[RingSize];
-	ObjectPool<T> object_pool;
-	unsigned index = 0;
-	IntrusiveHashMap<IntrusivePODWrapper<typename IntrusiveList<T>::Iterator>> hashmap;
-	std::vector<typename IntrusiveList<T>::Iterator> vacants;
-};
+				T *find(Hash hash) const
+				{
+					if (values.empty())
+						return nullptr;
+
+					Hash hash_mask = values.size() - 1;
+					Hash masked = hash & hash_mask;
+					for (unsigned i = 0; i < load_count; i++)
+					{
+						if (values[masked] && get_hash(values[masked]) == hash)
+							return values[masked];
+						masked = (masked + 1) & hash_mask;
+					}
+
+					return nullptr;
+				}
+
+				// Inserts, if value already exists, insertion does not happen.
+				// Return value is the data which is not part of the hashmap.
+				// It should be deleted or similar.
+				// Returns nullptr if nothing was in the hashmap for this key.
+				T *insert_yield(T *&value)
+				{
+					if (values.empty())
+						grow();
+
+					Hash hash_mask = values.size() - 1;
+					Hash hash = get_hash(value);
+					Hash masked = hash & hash_mask;
+
+					for (unsigned i = 0; i < load_count; i++)
+					{
+						if (values[masked] && get_hash(values[masked]) == hash)
+						{
+							T *ret = value;
+							value = values[masked];
+							return ret;
+						}
+						else if (!values[masked])
+						{
+							values[masked] = value;
+							list.insert_front(value);
+							return nullptr;
+						}
+						masked = (masked + 1) & hash_mask;
+					}
+
+					grow();
+					return insert_yield(value);
+				}
+
+				T *insert_replace(T *value)
+				{
+					if (values.empty())
+						grow();
+
+					Hash hash_mask = values.size() - 1;
+					Hash hash = get_hash(value);
+					Hash masked = hash & hash_mask;
+
+					for (unsigned i = 0; i < load_count; i++)
+					{
+						if (values[masked] && get_hash(values[masked]) == hash)
+						{
+							T *tmp = values[masked];
+							values[masked] = value;
+							value = tmp;
+							list.erase(value);
+							list.insert_front(values[masked]);
+							return value;
+						}
+						else if (!values[masked])
+						{
+							assert(!values[masked]);
+							values[masked] = value;
+							list.insert_front(value);
+							return nullptr;
+						}
+						masked = (masked + 1) & hash_mask;
+					}
+
+					grow();
+					return insert_replace(value);
+				}
+
+				T *erase(Hash hash)
+				{
+					Hash hash_mask = values.size() - 1;
+					Hash masked = hash & hash_mask;
+
+					for (unsigned i = 0; i < load_count; i++)
+					{
+						if (values[masked] && get_hash(values[masked]) == hash)
+						{
+							T *value = values[masked];
+							list.erase(value);
+							values[masked] = nullptr;
+							return value;
+						}
+						masked = (masked + 1) & hash_mask;
+					}
+					return nullptr;
+				}
+
+				void clear()
+				{
+					list.clear();
+					values.clear();
+					load_count = 0;
+				}
+
+				typename IntrusiveList<T>::Iterator begin()
+				{
+					return list.begin();
+				}
+
+				typename IntrusiveList<T>::Iterator end()
+				{
+					return list.end();
+				}
+
+				IntrusiveList<T> &inner_list()
+				{
+					return list;
+				}
+
+			private:
+
+				inline Hash get_hash(const T *value) const
+				{
+					return static_cast<const IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key;
+				}
+
+				bool insert_inner(T *value)
+				{
+					Hash hash_mask = values.size() - 1;
+					Hash hash = get_hash(value);
+					Hash masked = hash & hash_mask;
+
+					for (unsigned i = 0; i < load_count; i++)
+					{
+						if (!values[masked])
+						{
+							values[masked] = value;
+							return true;
+						}
+						masked = (masked + 1) & hash_mask;
+					}
+					return false;
+				}
+
+				void grow()
+				{
+					bool success;
+					do
+					{
+						for (T *&v : values)
+							v = nullptr;
+
+						if (values.empty())
+						{
+							values.resize(InitialSize);
+							load_count = InitialLoadCount;
+							//LOGI("Growing hashmap to %u elements.\n", InitialSize);
+						}
+						else
+						{
+							values.resize(values.size() * 2);
+							//LOGI("Growing hashmap to %u elements.\n", unsigned(values.size()));
+							load_count++;
+						}
+
+						// Re-insert.
+						success = true;
+						for (T &t : list)
+						{
+							if (!insert_inner(&t))
+							{
+								success = false;
+								break;
+							}
+						}
+					} while (!success);
+				}
+
+				std::vector<T *> values;
+				IntrusiveList<T> list;
+				unsigned load_count = 0;
+		};
+
+	template <typename T>
+		class IntrusiveHashMap
+		{
+			public:
+				~IntrusiveHashMap()
+				{
+					clear();
+				}
+
+				IntrusiveHashMap() = default;
+				IntrusiveHashMap(const IntrusiveHashMap &) = delete;
+				void operator=(const IntrusiveHashMap &) = delete;
+
+				void clear()
+				{
+					IntrusiveList<T> &list = hashmap.inner_list();
+					typename IntrusiveList<T>::Iterator itr = list.begin();
+					while (itr != list.end())
+					{
+						T *to_free = itr.get();
+						itr = list.erase(itr);
+						pool.free(to_free);
+					}
+
+					hashmap.clear();
+				}
+
+				T *find(Hash hash) const
+				{
+					return hashmap.find(hash);
+				}
+
+				void erase(Hash hash)
+				{
+					T *value = hashmap.erase(hash);
+					if (value)
+						pool.free(value);
+				}
+
+				template <typename... P>
+					T *emplace_replace(Hash hash, P&&... p)
+					{
+						T *t = allocate(std::forward<P>(p)...);
+						return insert_replace(hash, t);
+					}
+
+				template <typename... P>
+					T *emplace_yield(Hash hash, P&&... p)
+					{
+						T *t = allocate(std::forward<P>(p)...);
+						return insert_yield(hash, t);
+					}
+
+				template <typename... P>
+					T *allocate(P&&... p)
+					{
+						return pool.allocate(std::forward<P>(p)...);
+					}
+
+				T *insert_replace(Hash hash, T *value)
+				{
+					static_cast<IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key = hash;
+					T *to_delete = hashmap.insert_replace(value);
+					if (to_delete)
+						pool.free(to_delete);
+					return value;
+				}
+
+				T *insert_yield(Hash hash, T *value)
+				{
+					static_cast<IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key = hash;
+					T *to_delete = hashmap.insert_yield(value);
+					if (to_delete)
+						pool.free(to_delete);
+					return value;
+				}
+
+				typename IntrusiveList<T>::Iterator begin()
+				{
+					return hashmap.begin();
+				}
+
+				typename IntrusiveList<T>::Iterator end()
+				{
+					return hashmap.end();
+				}
+
+			private:
+				IntrusiveHashMapHolder<T> hashmap;
+				ObjectPool<T> pool;
+		};
+
+	template <typename T>
+		struct TemporaryHashmapEnabled
+		{
+			Hash hash = 0;
+			unsigned index = 0;
+		};
+
+	template <typename T, unsigned RingSize = 4, bool ReuseObjects = false>
+		class TemporaryHashmap
+		{
+			public:
+				~TemporaryHashmap()
+				{
+					clear();
+				}
+
+				void clear()
+				{
+					for (IntrusiveList<T> &ring : rings)
+					{
+						for (T &node : ring)
+							object_pool.free(static_cast<T *>(&node));
+						ring.clear();
+					}
+					hashmap.clear();
+
+					for (typename IntrusiveList<T>::Iterator &vacant : vacants)
+						object_pool.free(static_cast<T *>(&*vacant));
+					vacants.clear();
+					object_pool.clear();
+				}
+
+				void begin_frame()
+				{
+					index = (index + 1) & (RingSize - 1);
+					for (T &node : rings[index])
+					{
+						hashmap.erase(node.hash);
+						/* Folded free_object: ReuseObjects is a compile-time constant, so
+						 * the dead branch is eliminated - reuse keeps the node in the vacant
+						 * pool, otherwise it goes back to the object pool. */
+						if (ReuseObjects)
+							vacants.push_back(&node);
+						else
+							object_pool.free(&node);
+					}
+					rings[index].clear();
+				}
+
+				T *request(Hash hash)
+				{
+					IntrusivePODWrapper<typename IntrusiveList<T>::Iterator> *v = hashmap.find(hash);
+					if (v)
+					{
+						typename IntrusiveList<T>::Iterator node = v->get();
+						if (node->index != index)
+						{
+							rings[index].move_to_front(rings[node->index], node);
+							node->index = index;
+						}
+
+						return &*node;
+					}
+					else
+						return nullptr;
+				}
+
+				template <typename... P>
+					void make_vacant(P &&... p)
+					{
+						vacants.push_back(object_pool.allocate(std::forward<P>(p)...));
+					}
+
+				T *request_vacant(Hash hash)
+				{
+					if (vacants.empty())
+						return nullptr;
+
+					typename IntrusiveList<T>::Iterator top = vacants.back();
+					vacants.pop_back();
+					top->index = index;
+					top->hash = hash;
+					hashmap.emplace_replace(hash, top);
+					rings[index].insert_front(top);
+					return &*top;
+				}
+
+				template <typename... P>
+					T *emplace(Hash hash, P &&... p)
+					{
+						T *node = object_pool.allocate(std::forward<P>(p)...);
+						node->index = index;
+						node->hash = hash;
+						hashmap.emplace_replace(hash, node);
+						rings[index].insert_front(node);
+						return node;
+					}
+
+			private:
+				IntrusiveList<T> rings[RingSize];
+				ObjectPool<T> object_pool;
+				unsigned index = 0;
+				IntrusiveHashMap<IntrusivePODWrapper<typename IntrusiveList<T>::Iterator>> hashmap;
+				std::vector<typename IntrusiveList<T>::Iterator> vacants;
+		};
 
 }
 
@@ -13133,1381 +13124,1379 @@ using namespace Util;
 
 namespace Vulkan
 {
-PipelineLayout::PipelineLayout(Hash hash, Device *device, const CombinedResourceLayout &layout)
-	: IntrusiveHashMapEnabled<PipelineLayout>(hash)
-	, device(device)
-	, layout(layout)
-{
-	VkDescriptorSetLayout layouts[VULKAN_NUM_DESCRIPTOR_SETS] = {};
-	unsigned num_sets = 0;
-	for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
+	PipelineLayout::PipelineLayout(Hash hash, Device *device, const CombinedResourceLayout &layout)
+		: IntrusiveHashMapEnabled<PipelineLayout>(hash)
+		  , device(device)
+		  , layout(layout)
 	{
-		set_allocators[i] = device->request_descriptor_set_allocator(layout.sets[i], layout.stages_for_bindings[i]);
-		layouts[i] = set_allocators[i]->get_layout();
-		if (layout.descriptor_set_mask & (1u << i))
-			num_sets = i + 1;
+		VkDescriptorSetLayout layouts[VULKAN_NUM_DESCRIPTOR_SETS] = {};
+		unsigned num_sets = 0;
+		for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
+		{
+			set_allocators[i] = device->request_descriptor_set_allocator(layout.sets[i], layout.stages_for_bindings[i]);
+			layouts[i] = set_allocators[i]->get_layout();
+			if (layout.descriptor_set_mask & (1u << i))
+				num_sets = i + 1;
+		}
+
+		VkPipelineLayoutCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+		if (num_sets)
+		{
+			info.setLayoutCount = num_sets;
+			info.pSetLayouts = layouts;
+		}
+
+		if (layout.push_constant_range.stageFlags != 0)
+		{
+			info.pushConstantRangeCount = 1;
+			info.pPushConstantRanges = &layout.push_constant_range;
+		}
+
+		LOGI("Creating pipeline layout.\n");
+		if (vkCreatePipelineLayout(device->get_device(), &info, nullptr, &pipe_layout) != VK_SUCCESS)
+			LOGE("Failed to create pipeline layout.\n");
 	}
 
-	VkPipelineLayoutCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-	if (num_sets)
+	PipelineLayout::~PipelineLayout()
 	{
-		info.setLayoutCount = num_sets;
-		info.pSetLayouts = layouts;
+		if (pipe_layout != VK_NULL_HANDLE)
+			vkDestroyPipelineLayout(device->get_device(), pipe_layout, nullptr);
 	}
 
-	if (layout.push_constant_range.stageFlags != 0)
+	const char *Shader::stage_to_name(ShaderStage stage)
 	{
-		info.pushConstantRangeCount = 1;
-		info.pPushConstantRanges = &layout.push_constant_range;
+		switch (stage)
+		{
+			case ShaderStage::Compute:
+				return "compute";
+			case ShaderStage::Vertex:
+				return "vertex";
+			case ShaderStage::Fragment:
+				return "fragment";
+			case ShaderStage::Geometry:
+				return "geometry";
+			case ShaderStage::TessControl:
+				return "tess_control";
+			case ShaderStage::TessEvaluation:
+				return "tess_evaluation";
+			default:
+				return "unknown";
+		}
 	}
 
-	LOGI("Creating pipeline layout.\n");
-	if (vkCreatePipelineLayout(device->get_device(), &info, nullptr, &pipe_layout) != VK_SUCCESS)
-		LOGE("Failed to create pipeline layout.\n");
-}
-
-PipelineLayout::~PipelineLayout()
-{
-	if (pipe_layout != VK_NULL_HANDLE)
-		vkDestroyPipelineLayout(device->get_device(), pipe_layout, nullptr);
-}
-
-const char *Shader::stage_to_name(ShaderStage stage)
-{
-	switch (stage)
+	static bool get_stock_sampler(StockSampler &sampler, const char *name)
 	{
-	case ShaderStage::Compute:
-		return "compute";
-	case ShaderStage::Vertex:
-		return "vertex";
-	case ShaderStage::Fragment:
-		return "fragment";
-	case ShaderStage::Geometry:
-		return "geometry";
-	case ShaderStage::TessControl:
-		return "tess_control";
-	case ShaderStage::TessEvaluation:
-		return "tess_evaluation";
-	default:
-		return "unknown";
+		if (strstr(name, "NearestClamp"))
+			sampler = StockSampler::NearestClamp;
+		else if (strstr(name, "LinearClamp"))
+			sampler = StockSampler::LinearClamp;
+		else if (strstr(name, "TrilinearClamp"))
+			sampler = StockSampler::TrilinearClamp;
+		else if (strstr(name, "NearestWrap"))
+			sampler = StockSampler::NearestWrap;
+		else if (strstr(name, "LinearWrap"))
+			sampler = StockSampler::LinearWrap;
+		else if (strstr(name, "TrilinearWrap"))
+			sampler = StockSampler::TrilinearWrap;
+		else if (strstr(name, "NearestShadow"))
+			sampler = StockSampler::NearestShadow;
+		else if (strstr(name, "LinearShadow"))
+			sampler = StockSampler::LinearShadow;
+		else
+			return false;
+
+		return true;
 	}
-}
 
-static bool get_stock_sampler(StockSampler &sampler, const char *name)
-{
-	if (strstr(name, "NearestClamp"))
-		sampler = StockSampler::NearestClamp;
-	else if (strstr(name, "LinearClamp"))
-		sampler = StockSampler::LinearClamp;
-	else if (strstr(name, "TrilinearClamp"))
-		sampler = StockSampler::TrilinearClamp;
-	else if (strstr(name, "NearestWrap"))
-		sampler = StockSampler::NearestWrap;
-	else if (strstr(name, "LinearWrap"))
-		sampler = StockSampler::LinearWrap;
-	else if (strstr(name, "TrilinearWrap"))
-		sampler = StockSampler::TrilinearWrap;
-	else if (strstr(name, "NearestShadow"))
-		sampler = StockSampler::NearestShadow;
-	else if (strstr(name, "LinearShadow"))
-		sampler = StockSampler::LinearShadow;
-	else
-		return false;
-
-	return true;
-}
-
-Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
-	: IntrusiveHashMapEnabled<Shader>(hash)
-	, device(device)
-{
+	Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
+		: IntrusiveHashMapEnabled<Shader>(hash)
+		  , device(device)
+	{
 #ifdef GRANITE_SPIRV_DUMP
-	if (!Granite::Filesystem::get().write_buffer_to_file(std::string("cache://spirv/") + std::to_string(hash) + ".spv", data, size))
-		LOGE("Failed to dump shader to file.\n");
+		if (!Granite::Filesystem::get().write_buffer_to_file(std::string("cache://spirv/") + std::to_string(hash) + ".spv", data, size))
+			LOGE("Failed to dump shader to file.\n");
 #endif
 
-	VkShaderModuleCreateInfo info = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-	info.codeSize = size;
-	info.pCode = data;
+		VkShaderModuleCreateInfo info = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+		info.codeSize = size;
+		info.pCode = data;
 
-	LOGI("Creating shader module.\n");
-	if (vkCreateShaderModule(device->get_device(), &info, nullptr, &module) != VK_SUCCESS)
-		LOGE("Failed to create shader module.\n");
+		LOGI("Creating shader module.\n");
+		if (vkCreateShaderModule(device->get_device(), &info, nullptr, &module) != VK_SUCCESS)
+			LOGE("Failed to create shader module.\n");
 
-	Compiler compiler(data, size / sizeof(uint32_t));
+		Compiler compiler(data, size / sizeof(uint32_t));
 
-	ShaderResources resources = compiler.get_shader_resources();
-	for (Resource &image : resources.sampled_images)
-	{
-		uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-		const SPIRType &type = compiler.get_type(image.base_type_id);
-		if (type.image.dim == spv::DimBuffer)
-			layout.sets[set].sampled_buffer_mask |= 1u << binding;
-		else
-			layout.sets[set].sampled_image_mask |= 1u << binding;
-
-		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
-			layout.sets[set].fp_mask |= 1u << binding;
-
-		StockSampler sampler;
-		if (type.image.dim != spv::DimBuffer && get_stock_sampler(sampler, image.name.c_str()))
+		ShaderResources resources = compiler.get_shader_resources();
+		for (Resource &image : resources.sampled_images)
 		{
-			if (has_immutable_sampler(layout.sets[set], binding))
-			{
-				if (sampler != get_immutable_sampler(layout.sets[set], binding))
-					LOGE("Immutable sampler mismatch detected!\n");
-			}
+			uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+			uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+			const SPIRType &type = compiler.get_type(image.base_type_id);
+			if (type.image.dim == spv::DimBuffer)
+				layout.sets[set].sampled_buffer_mask |= 1u << binding;
 			else
-				set_immutable_sampler(layout.sets[set], binding, sampler);
-		}
-	}
+				layout.sets[set].sampled_image_mask |= 1u << binding;
 
-	for (Resource &image : resources.subpass_inputs)
-	{
-		uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-		layout.sets[set].input_attachment_mask |= 1u << binding;
+			if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
+				layout.sets[set].fp_mask |= 1u << binding;
 
-		const SPIRType &type = compiler.get_type(image.base_type_id);
-		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
-			layout.sets[set].fp_mask |= 1u << binding;
-	}
-
-	for (Resource &image : resources.separate_images)
-	{
-		uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-
-		const SPIRType &type = compiler.get_type(image.base_type_id);
-		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
-			layout.sets[set].fp_mask |= 1u << binding;
-
-		if (type.image.dim == spv::DimBuffer)
-			layout.sets[set].sampled_buffer_mask |= 1u << binding;
-		else
-			layout.sets[set].separate_image_mask |= 1u << binding;
-	}
-
-	for (Resource &image : resources.separate_samplers)
-	{
-		uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-		layout.sets[set].sampler_mask |= 1u << binding;
-
-		StockSampler sampler;
-		if (get_stock_sampler(sampler, image.name.c_str()))
-		{
-			if (has_immutable_sampler(layout.sets[set], binding))
+			StockSampler sampler;
+			if (type.image.dim != spv::DimBuffer && get_stock_sampler(sampler, image.name.c_str()))
 			{
-				if (sampler != get_immutable_sampler(layout.sets[set], binding))
-					LOGE("Immutable sampler mismatch detected!\n");
+				if (has_immutable_sampler(layout.sets[set], binding))
+				{
+					if (sampler != get_immutable_sampler(layout.sets[set], binding))
+						LOGE("Immutable sampler mismatch detected!\n");
+				}
+				else
+					set_immutable_sampler(layout.sets[set], binding, sampler);
 			}
-			else
-				set_immutable_sampler(layout.sets[set], binding, sampler);
 		}
-	}
 
-	for (Resource &image : resources.storage_images)
-	{
-		uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-		uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
-		layout.sets[set].storage_image_mask |= 1u << binding;
-
-		const SPIRType &type = compiler.get_type(image.base_type_id);
-		if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
-			layout.sets[set].fp_mask |= 1u << binding;
-	}
-
-	for (Resource &buffer : resources.uniform_buffers)
-	{
-		uint32_t set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
-		uint32_t binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
-		layout.sets[set].uniform_buffer_mask |= 1u << binding;
-	}
-
-	for (Resource &buffer : resources.storage_buffers)
-	{
-		uint32_t set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
-		uint32_t binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
-		layout.sets[set].storage_buffer_mask |= 1u << binding;
-	}
-
-	for (Resource &attrib : resources.stage_inputs)
-	{
-		uint32_t location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
-		layout.input_mask |= 1u << location;
-	}
-
-	for (Resource &attrib : resources.stage_outputs)
-	{
-		uint32_t location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
-		layout.output_mask |= 1u << location;
-	}
-
-	if (!resources.push_constant_buffers.empty())
-	{
-		// Don't bother trying to extract which part of a push constant block we're using.
-		// Just assume we're accessing everything. At least on older validation layers,
-		// it did not do a static analysis to determine similar information, so we got a lot
-		// of false positives.
-		layout.push_constant_size =
-		    compiler.get_declared_struct_size(compiler.get_type(resources.push_constant_buffers.front().base_type_id));
-	}
-
-	std::vector<SpecializationConstant> spec_constants = compiler.get_specialization_constants();
-	for (SpecializationConstant &c : spec_constants)
-	{
-		if (c.constant_id >= VULKAN_NUM_SPEC_CONSTANTS)
+		for (Resource &image : resources.subpass_inputs)
 		{
-			LOGE("Spec constant ID: %u is out of range, will be ignored.\n", c.constant_id);
-			continue;
+			uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+			uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+			layout.sets[set].input_attachment_mask |= 1u << binding;
+
+			const SPIRType &type = compiler.get_type(image.base_type_id);
+			if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
+				layout.sets[set].fp_mask |= 1u << binding;
 		}
 
-		layout.spec_constant_mask |= 1u << c.constant_id;
+		for (Resource &image : resources.separate_images)
+		{
+			uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+			uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+
+			const SPIRType &type = compiler.get_type(image.base_type_id);
+			if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
+				layout.sets[set].fp_mask |= 1u << binding;
+
+			if (type.image.dim == spv::DimBuffer)
+				layout.sets[set].sampled_buffer_mask |= 1u << binding;
+			else
+				layout.sets[set].separate_image_mask |= 1u << binding;
+		}
+
+		for (Resource &image : resources.separate_samplers)
+		{
+			uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+			uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+			layout.sets[set].sampler_mask |= 1u << binding;
+
+			StockSampler sampler;
+			if (get_stock_sampler(sampler, image.name.c_str()))
+			{
+				if (has_immutable_sampler(layout.sets[set], binding))
+				{
+					if (sampler != get_immutable_sampler(layout.sets[set], binding))
+						LOGE("Immutable sampler mismatch detected!\n");
+				}
+				else
+					set_immutable_sampler(layout.sets[set], binding, sampler);
+			}
+		}
+
+		for (Resource &image : resources.storage_images)
+		{
+			uint32_t set = compiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+			uint32_t binding = compiler.get_decoration(image.id, spv::DecorationBinding);
+			layout.sets[set].storage_image_mask |= 1u << binding;
+
+			const SPIRType &type = compiler.get_type(image.base_type_id);
+			if (compiler.get_type(type.image.type).basetype == SPIRType::BaseType::Float)
+				layout.sets[set].fp_mask |= 1u << binding;
+		}
+
+		for (Resource &buffer : resources.uniform_buffers)
+		{
+			uint32_t set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
+			uint32_t binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
+			layout.sets[set].uniform_buffer_mask |= 1u << binding;
+		}
+
+		for (Resource &buffer : resources.storage_buffers)
+		{
+			uint32_t set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
+			uint32_t binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
+			layout.sets[set].storage_buffer_mask |= 1u << binding;
+		}
+
+		for (Resource &attrib : resources.stage_inputs)
+		{
+			uint32_t location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
+			layout.input_mask |= 1u << location;
+		}
+
+		for (Resource &attrib : resources.stage_outputs)
+		{
+			uint32_t location = compiler.get_decoration(attrib.id, spv::DecorationLocation);
+			layout.output_mask |= 1u << location;
+		}
+
+		if (!resources.push_constant_buffers.empty())
+		{
+			// Don't bother trying to extract which part of a push constant block we're using.
+			// Just assume we're accessing everything. At least on older validation layers,
+			// it did not do a static analysis to determine similar information, so we got a lot
+			// of false positives.
+			layout.push_constant_size =
+				compiler.get_declared_struct_size(compiler.get_type(resources.push_constant_buffers.front().base_type_id));
+		}
+
+		std::vector<SpecializationConstant> spec_constants = compiler.get_specialization_constants();
+		for (SpecializationConstant &c : spec_constants)
+		{
+			if (c.constant_id >= VULKAN_NUM_SPEC_CONSTANTS)
+			{
+				LOGE("Spec constant ID: %u is out of range, will be ignored.\n", c.constant_id);
+				continue;
+			}
+
+			layout.spec_constant_mask |= 1u << c.constant_id;
+		}
 	}
-}
 
-Shader::~Shader()
-{
-	if (module)
-		vkDestroyShaderModule(device->get_device(), module, nullptr);
-}
+	Shader::~Shader()
+	{
+		if (module)
+			vkDestroyShaderModule(device->get_device(), module, nullptr);
+	}
 
-Program::Program(Device *device, Shader *vertex, Shader *fragment)
-    : device(device)
-{
-	set_shader(ShaderStage::Vertex, vertex);
-	set_shader(ShaderStage::Fragment, fragment);
-	device->bake_program(*this);
-}
+	Program::Program(Device *device, Shader *vertex, Shader *fragment)
+		: device(device)
+	{
+		set_shader(ShaderStage::Vertex, vertex);
+		set_shader(ShaderStage::Fragment, fragment);
+		device->bake_program(*this);
+	}
 
-Program::Program(Device *device, Shader *compute)
-    : device(device)
-{
-	set_shader(ShaderStage::Compute, compute);
-	device->bake_program(*this);
-}
+	Program::Program(Device *device, Shader *compute)
+		: device(device)
+	{
+		set_shader(ShaderStage::Compute, compute);
+		device->bake_program(*this);
+	}
 
-VkPipeline Program::get_pipeline(Hash hash) const
-{
-	IntrusivePODWrapper<VkPipeline> *ret = pipelines.find(hash);
-	return ret ? ret->get() : VK_NULL_HANDLE;
-}
+	VkPipeline Program::get_pipeline(Hash hash) const
+	{
+		IntrusivePODWrapper<VkPipeline> *ret = pipelines.find(hash);
+		return ret ? ret->get() : VK_NULL_HANDLE;
+	}
 
-VkPipeline Program::add_pipeline(Hash hash, VkPipeline pipeline)
-{
-	return pipelines.emplace_yield(hash, pipeline)->get();
-}
+	VkPipeline Program::add_pipeline(Hash hash, VkPipeline pipeline)
+	{
+		return pipelines.emplace_yield(hash, pipeline)->get();
+	}
 
-Program::~Program()
-{
-	for (IntrusivePODWrapper<VkPipeline> &pipe : pipelines)
-		device->destroy_pipeline_nolock(pipe.get());
-}
+	Program::~Program()
+	{
+		for (IntrusivePODWrapper<VkPipeline> &pipe : pipelines)
+			device->destroy_pipeline_nolock(pipe.get());
+	}
 }
 
 /* === descriptor_set.cpp === */
-
 
 using namespace Util;
 
 namespace Vulkan
 {
-DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_binds)
-	: IntrusiveHashMapEnabled<DescriptorSetAllocator>(hash)
-	, device(device)
-{
-	VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-
-	DescriptorBindingVec bindings = { NULL, 0, 0 };
-	/* Immutable-sampler handles referenced by pImmutableSamplers must stay alive
-	 * until vkCreateDescriptorSetLayout below; keep one slot per binding index in
-	 * function scope rather than taking the address of a loop-body local (which
-	 * would dangle by the time the create call reads it). */
-	VkSampler immutable_samplers[VULKAN_NUM_BINDINGS];
-	for (unsigned i = 0; i < VULKAN_NUM_BINDINGS; i++)
+	DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_binds)
+		: IntrusiveHashMapEnabled<DescriptorSetAllocator>(hash)
+		  , device(device)
 	{
-		uint32_t stages = stages_for_binds[i];
-		if (stages == 0)
-			continue;
+		VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
-		unsigned types = 0;
-		if (layout.sampled_image_mask & (1u << i))
+		DescriptorBindingVec bindings = { NULL, 0, 0 };
+		/* Immutable-sampler handles referenced by pImmutableSamplers must stay alive
+		 * until vkCreateDescriptorSetLayout below; keep one slot per binding index in
+		 * function scope rather than taking the address of a loop-body local (which
+		 * would dangle by the time the create call reads it). */
+		VkSampler immutable_samplers[VULKAN_NUM_BINDINGS];
+		for (unsigned i = 0; i < VULKAN_NUM_BINDINGS; i++)
 		{
-			immutable_samplers[i] = VK_NULL_HANDLE;
-			if (has_immutable_sampler(layout, i))
-				immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
+			uint32_t stages = stages_for_binds[i];
+			if (stages == 0)
+				continue;
 
-			bindings.push({ i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : nullptr });
-			pool_size.push({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
-			types++;
+			unsigned types = 0;
+			if (layout.sampled_image_mask & (1u << i))
+			{
+				immutable_samplers[i] = VK_NULL_HANDLE;
+				if (has_immutable_sampler(layout, i))
+					immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
+
+				bindings.push({ i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : nullptr });
+				pool_size.push({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
+				types++;
+			}
+
+			if (layout.sampled_buffer_mask & (1u << i))
+			{
+				bindings.push({ i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, nullptr });
+				pool_size.push({ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL });
+				types++;
+			}
+
+			if (layout.storage_image_mask & (1u << i))
+			{
+				bindings.push({ i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, nullptr });
+				pool_size.push({ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL });
+				types++;
+			}
+
+			if (layout.uniform_buffer_mask & (1u << i))
+			{
+				bindings.push({ i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, nullptr });
+				pool_size.push({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL });
+				types++;
+			}
+
+			if (layout.storage_buffer_mask & (1u << i))
+			{
+				bindings.push({ i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr });
+				pool_size.push({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL });
+				types++;
+			}
+
+			if (layout.input_attachment_mask & (1u << i))
+			{
+				bindings.push({ i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, nullptr });
+				pool_size.push({ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL });
+				types++;
+			}
+
+			if (layout.separate_image_mask & (1u << i))
+			{
+				bindings.push({ i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, nullptr });
+				pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL });
+				types++;
+			}
+
+			if (layout.sampler_mask & (1u << i))
+			{
+				immutable_samplers[i] = VK_NULL_HANDLE;
+				if (has_immutable_sampler(layout, i))
+					immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
+
+				bindings.push({ i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : nullptr });
+				pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
+				types++;
+			}
+
+			(void)types;
+			VK_ASSERT(types <= 1 && "Descriptor set aliasing!");
 		}
 
-		if (layout.sampled_buffer_mask & (1u << i))
+		if (!bindings.empty())
 		{
-			bindings.push({ i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, nullptr });
-			pool_size.push({ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL });
-			types++;
+			info.bindingCount = bindings.size();
+			info.pBindings = bindings.data();
 		}
 
-		if (layout.storage_image_mask & (1u << i))
-		{
-			bindings.push({ i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, nullptr });
-			pool_size.push({ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL });
-			types++;
-		}
-
-		if (layout.uniform_buffer_mask & (1u << i))
-		{
-			bindings.push({ i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, nullptr });
-			pool_size.push({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL });
-			types++;
-		}
-
-		if (layout.storage_buffer_mask & (1u << i))
-		{
-			bindings.push({ i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr });
-			pool_size.push({ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL });
-			types++;
-		}
-
-		if (layout.input_attachment_mask & (1u << i))
-		{
-			bindings.push({ i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, nullptr });
-			pool_size.push({ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL });
-			types++;
-		}
-
-		if (layout.separate_image_mask & (1u << i))
-		{
-			bindings.push({ i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, nullptr });
-			pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL });
-			types++;
-		}
-
-		if (layout.sampler_mask & (1u << i))
-		{
-			immutable_samplers[i] = VK_NULL_HANDLE;
-			if (has_immutable_sampler(layout, i))
-				immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
-
-			bindings.push({ i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : nullptr });
-			pool_size.push({ VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
-			types++;
-		}
-
-		(void)types;
-		VK_ASSERT(types <= 1 && "Descriptor set aliasing!");
+		LOGI("Creating descriptor set layout.\n");
+		if (vkCreateDescriptorSetLayout(device->get_device(), &info, nullptr, &set_layout) != VK_SUCCESS)
+			LOGE("Failed to create descriptor set layout.");
+		bindings.free_storage();
 	}
 
-	if (!bindings.empty())
+	DescriptorSetAllocation DescriptorSetAllocator::find(Hash hash)
 	{
-		info.bindingCount = bindings.size();
-		info.pBindings = bindings.data();
+		PerThread &state = per_thread;
+		if (state.should_begin)
+		{
+			state.set_nodes.begin_frame();
+			state.should_begin = false;
+		}
+
+		DescriptorSetNode *node = state.set_nodes.request(hash);
+		if (node)
+			return { node->set, true };
+
+		node = state.set_nodes.request_vacant(hash);
+		if (node)
+			return { node->set, false };
+
+		VkDescriptorPool pool;
+		VkDescriptorPoolCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+		info.maxSets = VULKAN_NUM_SETS_PER_POOL;
+		if (!pool_size.empty())
+		{
+			info.poolSizeCount = pool_size.size();
+			info.pPoolSizes = pool_size.data();
+		}
+
+		if (vkCreateDescriptorPool(device->get_device(), &info, nullptr, &pool) != VK_SUCCESS)
+			LOGE("Failed to create descriptor pool.\n");
+
+		VkDescriptorSet sets[VULKAN_NUM_SETS_PER_POOL];
+		VkDescriptorSetLayout layouts[VULKAN_NUM_SETS_PER_POOL];
+		for (unsigned i = 0; i < VULKAN_NUM_SETS_PER_POOL; i++)
+			layouts[i] = set_layout;
+
+		VkDescriptorSetAllocateInfo alloc = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+		alloc.descriptorPool = pool;
+		alloc.descriptorSetCount = VULKAN_NUM_SETS_PER_POOL;
+		alloc.pSetLayouts = layouts;
+
+		if (vkAllocateDescriptorSets(device->get_device(), &alloc, sets) != VK_SUCCESS)
+			LOGE("Failed to allocate descriptor sets.\n");
+		state.pools.push(pool);
+
+		for (VkDescriptorSet set : sets)
+			state.set_nodes.make_vacant(set);
+
+		return { state.set_nodes.request_vacant(hash)->set, false };
 	}
 
-	LOGI("Creating descriptor set layout.\n");
-	if (vkCreateDescriptorSetLayout(device->get_device(), &info, nullptr, &set_layout) != VK_SUCCESS)
-		LOGE("Failed to create descriptor set layout.");
-	bindings.free_storage();
-}
-
-DescriptorSetAllocation DescriptorSetAllocator::find(Hash hash)
-{
-	PerThread &state = per_thread;
-	if (state.should_begin)
+	void DescriptorSetAllocator::clear()
 	{
-		state.set_nodes.begin_frame();
-		state.should_begin = false;
+		per_thread.set_nodes.clear();
+		for (VkDescriptorPool &pool : per_thread.pools)
+		{
+			vkResetDescriptorPool(device->get_device(), pool, 0);
+			vkDestroyDescriptorPool(device->get_device(), pool, nullptr);
+		}
+		per_thread.pools.clear();
 	}
 
-	DescriptorSetNode *node = state.set_nodes.request(hash);
-	if (node)
-		return { node->set, true };
-
-	node = state.set_nodes.request_vacant(hash);
-	if (node)
-		return { node->set, false };
-
-	VkDescriptorPool pool;
-	VkDescriptorPoolCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-	info.maxSets = VULKAN_NUM_SETS_PER_POOL;
-	if (!pool_size.empty())
+	DescriptorSetAllocator::~DescriptorSetAllocator()
 	{
-		info.poolSizeCount = pool_size.size();
-		info.pPoolSizes = pool_size.data();
+		if (set_layout != VK_NULL_HANDLE)
+			vkDestroyDescriptorSetLayout(device->get_device(), set_layout, nullptr);
+		clear();
+		per_thread.pools.free_storage();
+		pool_size.free_storage();
 	}
-
-	if (vkCreateDescriptorPool(device->get_device(), &info, nullptr, &pool) != VK_SUCCESS)
-		LOGE("Failed to create descriptor pool.\n");
-
-	VkDescriptorSet sets[VULKAN_NUM_SETS_PER_POOL];
-	VkDescriptorSetLayout layouts[VULKAN_NUM_SETS_PER_POOL];
-	for (unsigned i = 0; i < VULKAN_NUM_SETS_PER_POOL; i++)
-		layouts[i] = set_layout;
-
-	VkDescriptorSetAllocateInfo alloc = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-	alloc.descriptorPool = pool;
-	alloc.descriptorSetCount = VULKAN_NUM_SETS_PER_POOL;
-	alloc.pSetLayouts = layouts;
-
-	if (vkAllocateDescriptorSets(device->get_device(), &alloc, sets) != VK_SUCCESS)
-		LOGE("Failed to allocate descriptor sets.\n");
-	state.pools.push(pool);
-
-	for (VkDescriptorSet set : sets)
-		state.set_nodes.make_vacant(set);
-
-	return { state.set_nodes.request_vacant(hash)->set, false };
-}
-
-void DescriptorSetAllocator::clear()
-{
-	per_thread.set_nodes.clear();
-	for (VkDescriptorPool &pool : per_thread.pools)
-	{
-		vkResetDescriptorPool(device->get_device(), pool, 0);
-		vkDestroyDescriptorPool(device->get_device(), pool, nullptr);
-	}
-	per_thread.pools.clear();
-}
-
-DescriptorSetAllocator::~DescriptorSetAllocator()
-{
-	if (set_layout != VK_NULL_HANDLE)
-		vkDestroyDescriptorSetLayout(device->get_device(), set_layout, nullptr);
-	clear();
-	per_thread.pools.free_storage();
-	pool_size.free_storage();
-}
 }
 
 /* === render_pass.cpp === */
-
 
 using namespace std;
 using namespace Util;
 
 namespace Util
 {
-template <typename T, size_t N>
-class StackAllocator
-{
-public:
-	T *allocate(size_t count)
-	{
-		if (count == 0)
-			return nullptr;
-		if (offset + count > N)
-			return nullptr;
-
-		T *ret = buffer + offset;
-		offset += count;
-		return ret;
-	}
-
-	T *allocate_cleared(size_t count)
-	{
-		T *ret = allocate(count);
-		if (ret)
+	template <typename T, size_t N>
+		class StackAllocator
 		{
-			T defval = T();
-			for (size_t i = 0; i < count; i++)
-				ret[i] = defval;
-		}
-		return ret;
-	}
+			public:
+				T *allocate(size_t count)
+				{
+					if (count == 0)
+						return nullptr;
+					if (offset + count > N)
+						return nullptr;
 
-	void reset()
-	{
-		offset = 0;
-	}
+					T *ret = buffer + offset;
+					offset += count;
+					return ret;
+				}
 
-private:
-	T buffer[N];
-	size_t offset = 0;
-};
+				T *allocate_cleared(size_t count)
+				{
+					T *ret = allocate(count);
+					if (ret)
+					{
+						T defval = T();
+						for (size_t i = 0; i < count; i++)
+							ret[i] = defval;
+					}
+					return ret;
+				}
+
+				void reset()
+				{
+					offset = 0;
+				}
+
+			private:
+				T buffer[N];
+				size_t offset = 0;
+		};
 }
 
 namespace Vulkan
 {
-static VkAttachmentLoadOp rp_color_load_op(const RenderPassInfo &info, unsigned index)
-{
-	if ((info.clear_attachments & (1u << index)) != 0)
-		return VK_ATTACHMENT_LOAD_OP_CLEAR;
-	else if ((info.load_attachments & (1u << index)) != 0)
-		return VK_ATTACHMENT_LOAD_OP_LOAD;
-	else
-		return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-}
-
-static VkAttachmentStoreOp rp_color_store_op(const RenderPassInfo &info, unsigned index)
-{
-	if ((info.store_attachments & (1u << index)) != 0)
-		return VK_ATTACHMENT_STORE_OP_STORE;
-	else
-		return VK_ATTACHMENT_STORE_OP_DONT_CARE;
-}
-
-POD_VEC_DECLARE(VkSubpassDescriptionVec, VkSubpassDescription);
-POD_VEC_DECLARE(VkSubpassDependencyVec, VkSubpassDependency);
-
-static VkAttachmentReference *rp_find_color(VkSubpassDescription *subpasses,
-                                            unsigned subpass, unsigned attachment)
-{
-	const VkAttachmentReference *colors = subpasses[subpass].pColorAttachments;
-	for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
-		if (colors[i].attachment == attachment)
-			return const_cast<VkAttachmentReference *>(&colors[i]);
-	return nullptr;
-}
-
-static VkAttachmentReference *rp_find_resolve(VkSubpassDescription *subpasses,
-                                              unsigned subpass, unsigned attachment)
-{
-	if (!subpasses[subpass].pResolveAttachments)
-		return nullptr;
-
-	const VkAttachmentReference *resolves = subpasses[subpass].pResolveAttachments;
-	for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
-		if (resolves[i].attachment == attachment)
-			return const_cast<VkAttachmentReference *>(&resolves[i]);
-	return nullptr;
-}
-
-static VkAttachmentReference *rp_find_input(VkSubpassDescription *subpasses,
-                                            unsigned subpass, unsigned attachment)
-{
-	const VkAttachmentReference *inputs = subpasses[subpass].pInputAttachments;
-	for (unsigned i = 0; i < subpasses[subpass].inputAttachmentCount; i++)
-		if (inputs[i].attachment == attachment)
-			return const_cast<VkAttachmentReference *>(&inputs[i]);
-	return nullptr;
-}
-
-static VkAttachmentReference *rp_find_depth_stencil(VkSubpassDescription *subpasses,
-                                                    unsigned subpass, unsigned attachment)
-{
-	if (subpasses[subpass].pDepthStencilAttachment->attachment == attachment)
-		return const_cast<VkAttachmentReference *>(subpasses[subpass].pDepthStencilAttachment);
-	else
-		return nullptr;
-}
-
-RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
-	: IntrusiveHashMapEnabled<RenderPass>(hash)
-	, device(device)
-{
-	for (unsigned att = 0; att < VULKAN_NUM_ATTACHMENTS; att++)
-		color_attachments[att] = VK_FORMAT_UNDEFINED;
-
-	VK_ASSERT(info.num_color_attachments || info.depth_stencil);
-
-	// Want to make load/store to transient a very explicit thing to do, since it will kill performance.
-	bool enable_transient_store = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT) != 0;
-	bool enable_transient_load = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT) != 0;
-
-	// Set up default subpass info structure if we don't have it.
-	const RenderPassInfo::Subpass *subpass_infos = info.subpasses;
-	unsigned num_subpasses = info.num_subpasses;
-	RenderPassInfo::Subpass default_subpass_info;
-	if (!info.subpasses)
+	static VkAttachmentLoadOp rp_color_load_op(const RenderPassInfo &info, unsigned index)
 	{
-		default_subpass_info.num_color_attachments = info.num_color_attachments;
-		if (info.op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT)
-			default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil::ReadOnly;
+		if ((info.clear_attachments & (1u << index)) != 0)
+			return VK_ATTACHMENT_LOAD_OP_CLEAR;
+		else if ((info.load_attachments & (1u << index)) != 0)
+			return VK_ATTACHMENT_LOAD_OP_LOAD;
 		else
-			default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil::ReadWrite;
+			return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	}
+
+	static VkAttachmentStoreOp rp_color_store_op(const RenderPassInfo &info, unsigned index)
+	{
+		if ((info.store_attachments & (1u << index)) != 0)
+			return VK_ATTACHMENT_STORE_OP_STORE;
+		else
+			return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	}
+
+	POD_VEC_DECLARE(VkSubpassDescriptionVec, VkSubpassDescription);
+	POD_VEC_DECLARE(VkSubpassDependencyVec, VkSubpassDependency);
+
+	static VkAttachmentReference *rp_find_color(VkSubpassDescription *subpasses,
+			unsigned subpass, unsigned attachment)
+	{
+		const VkAttachmentReference *colors = subpasses[subpass].pColorAttachments;
+		for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
+			if (colors[i].attachment == attachment)
+				return const_cast<VkAttachmentReference *>(&colors[i]);
+		return nullptr;
+	}
+
+	static VkAttachmentReference *rp_find_resolve(VkSubpassDescription *subpasses,
+			unsigned subpass, unsigned attachment)
+	{
+		if (!subpasses[subpass].pResolveAttachments)
+			return nullptr;
+
+		const VkAttachmentReference *resolves = subpasses[subpass].pResolveAttachments;
+		for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
+			if (resolves[i].attachment == attachment)
+				return const_cast<VkAttachmentReference *>(&resolves[i]);
+		return nullptr;
+	}
+
+	static VkAttachmentReference *rp_find_input(VkSubpassDescription *subpasses,
+			unsigned subpass, unsigned attachment)
+	{
+		const VkAttachmentReference *inputs = subpasses[subpass].pInputAttachments;
+		for (unsigned i = 0; i < subpasses[subpass].inputAttachmentCount; i++)
+			if (inputs[i].attachment == attachment)
+				return const_cast<VkAttachmentReference *>(&inputs[i]);
+		return nullptr;
+	}
+
+	static VkAttachmentReference *rp_find_depth_stencil(VkSubpassDescription *subpasses,
+			unsigned subpass, unsigned attachment)
+	{
+		if (subpasses[subpass].pDepthStencilAttachment->attachment == attachment)
+			return const_cast<VkAttachmentReference *>(subpasses[subpass].pDepthStencilAttachment);
+		else
+			return nullptr;
+	}
+
+	RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
+		: IntrusiveHashMapEnabled<RenderPass>(hash)
+		  , device(device)
+	{
+		for (unsigned att = 0; att < VULKAN_NUM_ATTACHMENTS; att++)
+			color_attachments[att] = VK_FORMAT_UNDEFINED;
+
+		VK_ASSERT(info.num_color_attachments || info.depth_stencil);
+
+		// Want to make load/store to transient a very explicit thing to do, since it will kill performance.
+		bool enable_transient_store = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT) != 0;
+		bool enable_transient_load = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT) != 0;
+
+		// Set up default subpass info structure if we don't have it.
+		const RenderPassInfo::Subpass *subpass_infos = info.subpasses;
+		unsigned num_subpasses = info.num_subpasses;
+		RenderPassInfo::Subpass default_subpass_info;
+		if (!info.subpasses)
+		{
+			default_subpass_info.num_color_attachments = info.num_color_attachments;
+			if (info.op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT)
+				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil::ReadOnly;
+			else
+				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil::ReadWrite;
+
+			for (unsigned i = 0; i < info.num_color_attachments; i++)
+				default_subpass_info.color_attachments[i] = i;
+			num_subpasses = 1;
+			subpass_infos = &default_subpass_info;
+		}
+
+		// First, set up attachment descriptions.
+		const unsigned num_attachments = info.num_color_attachments + (info.depth_stencil ? 1 : 0);
+		VkAttachmentDescription attachments[VULKAN_NUM_ATTACHMENTS + 1];
+		uint32_t implicit_transitions = 0;
+
+		VkAttachmentLoadOp ds_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		VkAttachmentStoreOp ds_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+		VK_ASSERT(!(info.clear_attachments & info.load_attachments));
+
+		if (info.op_flags & RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT)
+			ds_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		else if (info.op_flags & RENDER_PASS_OP_LOAD_DEPTH_STENCIL_BIT)
+			ds_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+
+		if (info.op_flags & RENDER_PASS_OP_STORE_DEPTH_STENCIL_BIT)
+			ds_store_op = VK_ATTACHMENT_STORE_OP_STORE;
+
+		bool ds_read_only = (info.op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT) != 0;
+		VkImageLayout depth_stencil_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		if (info.depth_stencil)
+		{
+			depth_stencil_layout = info.depth_stencil->get_image().get_layout(
+					ds_read_only ?
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL :
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+		}
 
 		for (unsigned i = 0; i < info.num_color_attachments; i++)
-			default_subpass_info.color_attachments[i] = i;
-		num_subpasses = 1;
-		subpass_infos = &default_subpass_info;
-	}
-
-	// First, set up attachment descriptions.
-	const unsigned num_attachments = info.num_color_attachments + (info.depth_stencil ? 1 : 0);
-	VkAttachmentDescription attachments[VULKAN_NUM_ATTACHMENTS + 1];
-	uint32_t implicit_transitions = 0;
-
-	VkAttachmentLoadOp ds_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	VkAttachmentStoreOp ds_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-	VK_ASSERT(!(info.clear_attachments & info.load_attachments));
-
-	if (info.op_flags & RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT)
-		ds_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	else if (info.op_flags & RENDER_PASS_OP_LOAD_DEPTH_STENCIL_BIT)
-		ds_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
-
-	if (info.op_flags & RENDER_PASS_OP_STORE_DEPTH_STENCIL_BIT)
-		ds_store_op = VK_ATTACHMENT_STORE_OP_STORE;
-
-	bool ds_read_only = (info.op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT) != 0;
-	VkImageLayout depth_stencil_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-	if (info.depth_stencil)
-	{
-		depth_stencil_layout = info.depth_stencil->get_image().get_layout(
-				ds_read_only ?
-				VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL :
-				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-	}
-
-	for (unsigned i = 0; i < info.num_color_attachments; i++)
-	{
-		VK_ASSERT(info.color_attachments[i]);
-		color_attachments[i] = info.color_attachments[i]->get_format();
-		Image &image = info.color_attachments[i]->get_image();
-		VkAttachmentDescription &att = attachments[i];
-		att.flags = 0;
-		att.format = color_attachments[i];
-		att.samples = image.get_create_info().samples;
-		att.loadOp = rp_color_load_op(info, i);
-		att.storeOp = rp_color_store_op(info, i);
-		att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		// Undefined final layout here for now means that we will just use the layout of the last
-		// subpass which uses this attachment to avoid any dummy transition at the end.
-		att.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-		if (image.get_create_info().domain == ImageDomain::Transient)
 		{
-			if (enable_transient_load)
-			{
-				// The transient will behave like a normal image.
-				att.initialLayout = info.color_attachments[i]->get_image().get_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-			}
-			else
-			{
-				// Force a clean discard.
-				VK_ASSERT(att.loadOp != VK_ATTACHMENT_LOAD_OP_LOAD);
-				att.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			}
-
-			if (!enable_transient_store)
-				att.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-			implicit_transitions |= 1u << i;
-		}
-		else
-			att.initialLayout = info.color_attachments[i]->get_image().get_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	}
-
-	depth_stencil = info.depth_stencil ? info.depth_stencil->get_format() : VK_FORMAT_UNDEFINED;
-	if (info.depth_stencil)
-	{
-		Image &image = info.depth_stencil->get_image();
-		VkAttachmentDescription &att = attachments[info.num_color_attachments];
-		att.flags = 0;
-		att.format = depth_stencil;
-		att.samples = image.get_create_info().samples;
-		att.loadOp = ds_load_op;
-		att.storeOp = ds_store_op;
-		// Undefined final layout here for now means that we will just use the layout of the last
-		// subpass which uses this attachment to avoid any dummy transition at the end.
-		att.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-		if (format_to_aspect_mask(depth_stencil) & VK_IMAGE_ASPECT_STENCIL_BIT)
-		{
-			att.stencilLoadOp = ds_load_op;
-			att.stencilStoreOp = ds_store_op;
-		}
-		else
-		{
+			VK_ASSERT(info.color_attachments[i]);
+			color_attachments[i] = info.color_attachments[i]->get_format();
+			Image &image = info.color_attachments[i]->get_image();
+			VkAttachmentDescription &att = attachments[i];
+			att.flags = 0;
+			att.format = color_attachments[i];
+			att.samples = image.get_create_info().samples;
+			att.loadOp = rp_color_load_op(info, i);
+			att.storeOp = rp_color_store_op(info, i);
 			att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			// Undefined final layout here for now means that we will just use the layout of the last
+			// subpass which uses this attachment to avoid any dummy transition at the end.
+			att.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+			if (image.get_create_info().domain == ImageDomain::Transient)
+			{
+				if (enable_transient_load)
+				{
+					// The transient will behave like a normal image.
+					att.initialLayout = info.color_attachments[i]->get_image().get_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+				}
+				else
+				{
+					// Force a clean discard.
+					VK_ASSERT(att.loadOp != VK_ATTACHMENT_LOAD_OP_LOAD);
+					att.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+				}
+
+				if (!enable_transient_store)
+					att.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+				implicit_transitions |= 1u << i;
+			}
+			else
+				att.initialLayout = info.color_attachments[i]->get_image().get_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		}
 
-		if (image.get_create_info().domain == ImageDomain::Transient)
+		depth_stencil = info.depth_stencil ? info.depth_stencil->get_format() : VK_FORMAT_UNDEFINED;
+		if (info.depth_stencil)
 		{
-			if (enable_transient_load)
+			Image &image = info.depth_stencil->get_image();
+			VkAttachmentDescription &att = attachments[info.num_color_attachments];
+			att.flags = 0;
+			att.format = depth_stencil;
+			att.samples = image.get_create_info().samples;
+			att.loadOp = ds_load_op;
+			att.storeOp = ds_store_op;
+			// Undefined final layout here for now means that we will just use the layout of the last
+			// subpass which uses this attachment to avoid any dummy transition at the end.
+			att.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+			if (format_to_aspect_mask(depth_stencil) & VK_IMAGE_ASPECT_STENCIL_BIT)
 			{
-				// The transient will behave like a normal image.
-				att.initialLayout = depth_stencil_layout;
+				att.stencilLoadOp = ds_load_op;
+				att.stencilStoreOp = ds_store_op;
 			}
 			else
 			{
-				if (att.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
-					att.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-				if (att.stencilLoadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
-					att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-
-				// For transient attachments we force the layouts.
-				att.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			}
-
-			if (!enable_transient_store)
-			{
-				att.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+				att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 				att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
 
-			implicit_transitions |= 1u << info.num_color_attachments;
-		}
-		else
-			att.initialLayout = depth_stencil_layout;
-	}
+			if (image.get_create_info().domain == ImageDomain::Transient)
+			{
+				if (enable_transient_load)
+				{
+					// The transient will behave like a normal image.
+					att.initialLayout = depth_stencil_layout;
+				}
+				else
+				{
+					if (att.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
+						att.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+					if (att.stencilLoadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
+						att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 
-	Util::StackAllocator<VkAttachmentReference, 1024> reference_allocator;
-	Util::StackAllocator<uint32_t, 1024> preserve_allocator;
+					// For transient attachments we force the layouts.
+					att.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+				}
 
-	VkSubpassDescriptionVec subpasses = { NULL, 0, 0 };
-	{
-		VkSubpassDescription zero_sp;
-		memset(&zero_sp, 0, sizeof(zero_sp));
-		for (unsigned sp = 0; sp < num_subpasses; sp++)
-			subpasses.push(zero_sp);
-	}
-	VkSubpassDependencyVec external_dependencies = { NULL, 0, 0 };
-	for (unsigned i = 0; i < num_subpasses; i++)
-	{
-		VkAttachmentReference *colors = reference_allocator.allocate_cleared(subpass_infos[i].num_color_attachments);
-		VkAttachmentReference *inputs = reference_allocator.allocate_cleared(subpass_infos[i].num_input_attachments);
-		VkAttachmentReference *resolves = reference_allocator.allocate_cleared(subpass_infos[i].num_color_attachments);
-		VkAttachmentReference *depth = reference_allocator.allocate_cleared(1);
+				if (!enable_transient_store)
+				{
+					att.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+					att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+				}
 
-		VkSubpassDescription &subpass = subpasses[i];
-		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpass.colorAttachmentCount = subpass_infos[i].num_color_attachments;
-		subpass.pColorAttachments = colors;
-		subpass.inputAttachmentCount = subpass_infos[i].num_input_attachments;
-		subpass.pInputAttachments = inputs;
-		subpass.pDepthStencilAttachment = depth;
-
-		if (subpass_infos[i].num_resolve_attachments)
-		{
-			VK_ASSERT(subpass_infos[i].num_color_attachments == subpass_infos[i].num_resolve_attachments);
-			subpass.pResolveAttachments = resolves;
+				implicit_transitions |= 1u << info.num_color_attachments;
+			}
+			else
+				att.initialLayout = depth_stencil_layout;
 		}
 
-		for (unsigned j = 0; j < subpass.colorAttachmentCount; j++)
-		{
-			uint32_t att = subpass_infos[i].color_attachments[j];
-			VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
-			colors[j].attachment = att;
-			// Fill in later.
-			colors[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		}
+		Util::StackAllocator<VkAttachmentReference, 1024> reference_allocator;
+		Util::StackAllocator<uint32_t, 1024> preserve_allocator;
 
-		for (unsigned j = 0; j < subpass.inputAttachmentCount; j++)
+		VkSubpassDescriptionVec subpasses = { NULL, 0, 0 };
 		{
-			uint32_t att = subpass_infos[i].input_attachments[j];
-			VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
-			inputs[j].attachment = att;
-			// Fill in later.
-			inputs[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
+			VkSubpassDescription zero_sp;
+			memset(&zero_sp, 0, sizeof(zero_sp));
+			for (unsigned sp = 0; sp < num_subpasses; sp++)
+				subpasses.push(zero_sp);
 		}
-
-		if (subpass.pResolveAttachments)
+		VkSubpassDependencyVec external_dependencies = { NULL, 0, 0 };
+		for (unsigned i = 0; i < num_subpasses; i++)
 		{
+			VkAttachmentReference *colors = reference_allocator.allocate_cleared(subpass_infos[i].num_color_attachments);
+			VkAttachmentReference *inputs = reference_allocator.allocate_cleared(subpass_infos[i].num_input_attachments);
+			VkAttachmentReference *resolves = reference_allocator.allocate_cleared(subpass_infos[i].num_color_attachments);
+			VkAttachmentReference *depth = reference_allocator.allocate_cleared(1);
+
+			VkSubpassDescription &subpass = subpasses[i];
+			subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+			subpass.colorAttachmentCount = subpass_infos[i].num_color_attachments;
+			subpass.pColorAttachments = colors;
+			subpass.inputAttachmentCount = subpass_infos[i].num_input_attachments;
+			subpass.pInputAttachments = inputs;
+			subpass.pDepthStencilAttachment = depth;
+
+			if (subpass_infos[i].num_resolve_attachments)
+			{
+				VK_ASSERT(subpass_infos[i].num_color_attachments == subpass_infos[i].num_resolve_attachments);
+				subpass.pResolveAttachments = resolves;
+			}
+
 			for (unsigned j = 0; j < subpass.colorAttachmentCount; j++)
 			{
-				uint32_t att = subpass_infos[i].resolve_attachments[j];
+				uint32_t att = subpass_infos[i].color_attachments[j];
 				VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
-				resolves[j].attachment = att;
+				colors[j].attachment = att;
 				// Fill in later.
-				resolves[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
+				colors[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
+			}
+
+			for (unsigned j = 0; j < subpass.inputAttachmentCount; j++)
+			{
+				uint32_t att = subpass_infos[i].input_attachments[j];
+				VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
+				inputs[j].attachment = att;
+				// Fill in later.
+				inputs[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
+			}
+
+			if (subpass.pResolveAttachments)
+			{
+				for (unsigned j = 0; j < subpass.colorAttachmentCount; j++)
+				{
+					uint32_t att = subpass_infos[i].resolve_attachments[j];
+					VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
+					resolves[j].attachment = att;
+					// Fill in later.
+					resolves[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
+				}
+			}
+
+			if (info.depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo::DepthStencil::None)
+			{
+				depth->attachment = info.num_color_attachments;
+				// Fill in later.
+				depth->layout = VK_IMAGE_LAYOUT_UNDEFINED;
+			}
+			else
+			{
+				depth->attachment = VK_ATTACHMENT_UNUSED;
+				depth->layout = VK_IMAGE_LAYOUT_UNDEFINED;
 			}
 		}
 
-		if (info.depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo::DepthStencil::None)
+		// Now, figure out how each attachment is used throughout the subpasses.
+		// Either we don't care (inherit previous pass), or we need something specific.
+		// Start with initial layouts.
+		uint32_t preserve_masks[VULKAN_NUM_ATTACHMENTS + 1] = {};
+
+		// Last subpass which makes use of an attachment.
+		unsigned last_subpass_for_attachment[VULKAN_NUM_ATTACHMENTS + 1] = {};
+
+		VK_ASSERT(num_subpasses <= 32);
+
+		// 1 << subpass bit set if there are color attachment self-dependencies in the subpass.
+		uint32_t color_self_dependencies = 0;
+		// 1 << subpass bit set if there are depth-stencil attachment self-dependencies in the subpass.
+		uint32_t depth_self_dependencies = 0;
+
+		// 1 << subpass bit set if any input attachment is read in the subpass.
+		uint32_t input_attachment_read = 0;
+		uint32_t color_attachment_read_write = 0;
+		uint32_t depth_stencil_attachment_write = 0;
+		uint32_t depth_stencil_attachment_read = 0;
+
+		uint32_t external_color_dependencies = 0;
+		uint32_t external_depth_dependencies = 0;
+		uint32_t external_input_dependencies = 0;
+
+		for (unsigned attachment = 0; attachment < num_attachments; attachment++)
 		{
-			depth->attachment = info.num_color_attachments;
-			// Fill in later.
-			depth->layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		}
-		else
-		{
-			depth->attachment = VK_ATTACHMENT_UNUSED;
-			depth->layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		}
-	}
-
-	// Now, figure out how each attachment is used throughout the subpasses.
-	// Either we don't care (inherit previous pass), or we need something specific.
-	// Start with initial layouts.
-	uint32_t preserve_masks[VULKAN_NUM_ATTACHMENTS + 1] = {};
-
-	// Last subpass which makes use of an attachment.
-	unsigned last_subpass_for_attachment[VULKAN_NUM_ATTACHMENTS + 1] = {};
-
-	VK_ASSERT(num_subpasses <= 32);
-
-	// 1 << subpass bit set if there are color attachment self-dependencies in the subpass.
-	uint32_t color_self_dependencies = 0;
-	// 1 << subpass bit set if there are depth-stencil attachment self-dependencies in the subpass.
-	uint32_t depth_self_dependencies = 0;
-
-	// 1 << subpass bit set if any input attachment is read in the subpass.
-	uint32_t input_attachment_read = 0;
-	uint32_t color_attachment_read_write = 0;
-	uint32_t depth_stencil_attachment_write = 0;
-	uint32_t depth_stencil_attachment_read = 0;
-
-	uint32_t external_color_dependencies = 0;
-	uint32_t external_depth_dependencies = 0;
-	uint32_t external_input_dependencies = 0;
-
-	for (unsigned attachment = 0; attachment < num_attachments; attachment++)
-	{
-		bool used = false;
-		VkImageLayout current_layout = attachments[attachment].initialLayout;
-		for (unsigned subpass = 0; subpass < num_subpasses; subpass++)
-		{
-			VkAttachmentReference *color = rp_find_color(subpasses.data(), subpass, attachment);
-			VkAttachmentReference *resolve = rp_find_resolve(subpasses.data(), subpass, attachment);
-			VkAttachmentReference *input = rp_find_input(subpasses.data(), subpass, attachment);
-			VkAttachmentReference *depth = rp_find_depth_stencil(subpasses.data(), subpass, attachment);
-
-			// Sanity check.
-			if (color || resolve)
-				VK_ASSERT(!depth);
-			if (depth)
-				VK_ASSERT(!color && !resolve);
-			if (resolve)
-				VK_ASSERT(!color && !depth);
-
-			if (!color && !input && !depth && !resolve)
+			bool used = false;
+			VkImageLayout current_layout = attachments[attachment].initialLayout;
+			for (unsigned subpass = 0; subpass < num_subpasses; subpass++)
 			{
-				if (used)
-					preserve_masks[attachment] |= 1u << subpass;
-				continue;
-			}
+				VkAttachmentReference *color = rp_find_color(subpasses.data(), subpass, attachment);
+				VkAttachmentReference *resolve = rp_find_resolve(subpasses.data(), subpass, attachment);
+				VkAttachmentReference *input = rp_find_input(subpasses.data(), subpass, attachment);
+				VkAttachmentReference *depth = rp_find_depth_stencil(subpasses.data(), subpass, attachment);
 
-			if (!used && (implicit_transitions & (1u << attachment)))
-			{
-				// This is the first subpass we need implicit transitions.
-				if (color)
-					external_color_dependencies |= 1u << subpass;
+				// Sanity check.
+				if (color || resolve)
+					VK_ASSERT(!depth);
 				if (depth)
-					external_depth_dependencies |= 1u << subpass;
-				if (input)
-					external_input_dependencies |= 1u << subpass;
-			}
+					VK_ASSERT(!color && !resolve);
+				if (resolve)
+					VK_ASSERT(!color && !depth);
 
-			if (resolve && input) // If used as both resolve attachment and input attachment in same subpass, need GENERAL.
-			{
-				current_layout = VK_IMAGE_LAYOUT_GENERAL;
-				resolve->layout = current_layout;
-				input->layout = current_layout;
-
-				// If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL.
-				if (!used && attachments[attachment].initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
-					attachments[attachment].initialLayout = current_layout;
-
-				// If first subpass changes the layout, we'll need to inject an external subpass dependency.
-				if (!used && attachments[attachment].initialLayout != current_layout)
+				if (!color && !input && !depth && !resolve)
 				{
-					external_color_dependencies |= 1u << subpass;
-					external_input_dependencies |= 1u << subpass;
+					if (used)
+						preserve_masks[attachment] |= 1u << subpass;
+					continue;
 				}
 
-				used = true;
-				last_subpass_for_attachment[attachment] = subpass;
-
-				color_attachment_read_write |= 1u << subpass;
-				input_attachment_read |= 1u << subpass;
-			}
-			else if (resolve)
-			{
-				if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
-					current_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-				// If first subpass changes the layout, we'll need to inject an external subpass dependency.
-				if (!used && attachments[attachment].initialLayout != current_layout)
-					external_color_dependencies |= 1u << subpass;
-
-				resolve->layout = current_layout;
-				used = true;
-				last_subpass_for_attachment[attachment] = subpass;
-				color_attachment_read_write |= 1u << subpass;
-			}
-			else if (color && input) // If used as both input attachment and color attachment in same subpass, need GENERAL.
-			{
-				current_layout = VK_IMAGE_LAYOUT_GENERAL;
-				color->layout = current_layout;
-				input->layout = current_layout;
-
-				// If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL.
-				if (!used && attachments[attachment].initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
-					attachments[attachment].initialLayout = current_layout;
-
-				// If first subpass changes the layout, we'll need to inject an external subpass dependency.
-				if (!used && attachments[attachment].initialLayout != current_layout)
+				if (!used && (implicit_transitions & (1u << attachment)))
 				{
-					external_color_dependencies |= 1u << subpass;
-					external_input_dependencies |= 1u << subpass;
+					// This is the first subpass we need implicit transitions.
+					if (color)
+						external_color_dependencies |= 1u << subpass;
+					if (depth)
+						external_depth_dependencies |= 1u << subpass;
+					if (input)
+						external_input_dependencies |= 1u << subpass;
 				}
 
-				used = true;
-				last_subpass_for_attachment[attachment] = subpass;
-				color_self_dependencies |= 1u << subpass;
-
-				color_attachment_read_write |= 1u << subpass;
-				input_attachment_read |= 1u << subpass;
-			}
-			else if (color) // No particular preference
-			{
-				if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
-					current_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-				color->layout = current_layout;
-
-				// If first subpass changes the layout, we'll need to inject an external subpass dependency.
-				if (!used && attachments[attachment].initialLayout != current_layout)
-					external_color_dependencies |= 1u << subpass;
-
-				used = true;
-				last_subpass_for_attachment[attachment] = subpass;
-				color_attachment_read_write |= 1u << subpass;
-			}
-			else if (depth && input) // Depends on the depth mode
-			{
-				VK_ASSERT(subpass_infos[subpass].depth_stencil_mode != RenderPassInfo::DepthStencil::None);
-				if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil::ReadWrite)
+				if (resolve && input) // If used as both resolve attachment and input attachment in same subpass, need GENERAL.
 				{
-					depth_self_dependencies |= 1u << subpass;
 					current_layout = VK_IMAGE_LAYOUT_GENERAL;
-					depth_stencil_attachment_write |= 1u << subpass;
+					resolve->layout = current_layout;
+					input->layout = current_layout;
 
 					// If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL.
 					if (!used && attachments[attachment].initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
 						attachments[attachment].initialLayout = current_layout;
+
+					// If first subpass changes the layout, we'll need to inject an external subpass dependency.
+					if (!used && attachments[attachment].initialLayout != current_layout)
+					{
+						external_color_dependencies |= 1u << subpass;
+						external_input_dependencies |= 1u << subpass;
+					}
+
+					used = true;
+					last_subpass_for_attachment[attachment] = subpass;
+
+					color_attachment_read_write |= 1u << subpass;
+					input_attachment_read |= 1u << subpass;
+				}
+				else if (resolve)
+				{
+					if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
+						current_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+					// If first subpass changes the layout, we'll need to inject an external subpass dependency.
+					if (!used && attachments[attachment].initialLayout != current_layout)
+						external_color_dependencies |= 1u << subpass;
+
+					resolve->layout = current_layout;
+					used = true;
+					last_subpass_for_attachment[attachment] = subpass;
+					color_attachment_read_write |= 1u << subpass;
+				}
+				else if (color && input) // If used as both input attachment and color attachment in same subpass, need GENERAL.
+				{
+					current_layout = VK_IMAGE_LAYOUT_GENERAL;
+					color->layout = current_layout;
+					input->layout = current_layout;
+
+					// If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL.
+					if (!used && attachments[attachment].initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+						attachments[attachment].initialLayout = current_layout;
+
+					// If first subpass changes the layout, we'll need to inject an external subpass dependency.
+					if (!used && attachments[attachment].initialLayout != current_layout)
+					{
+						external_color_dependencies |= 1u << subpass;
+						external_input_dependencies |= 1u << subpass;
+					}
+
+					used = true;
+					last_subpass_for_attachment[attachment] = subpass;
+					color_self_dependencies |= 1u << subpass;
+
+					color_attachment_read_write |= 1u << subpass;
+					input_attachment_read |= 1u << subpass;
+				}
+				else if (color) // No particular preference
+				{
+					if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
+						current_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+					color->layout = current_layout;
+
+					// If first subpass changes the layout, we'll need to inject an external subpass dependency.
+					if (!used && attachments[attachment].initialLayout != current_layout)
+						external_color_dependencies |= 1u << subpass;
+
+					used = true;
+					last_subpass_for_attachment[attachment] = subpass;
+					color_attachment_read_write |= 1u << subpass;
+				}
+				else if (depth && input) // Depends on the depth mode
+				{
+					VK_ASSERT(subpass_infos[subpass].depth_stencil_mode != RenderPassInfo::DepthStencil::None);
+					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil::ReadWrite)
+					{
+						depth_self_dependencies |= 1u << subpass;
+						current_layout = VK_IMAGE_LAYOUT_GENERAL;
+						depth_stencil_attachment_write |= 1u << subpass;
+
+						// If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL.
+						if (!used && attachments[attachment].initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+							attachments[attachment].initialLayout = current_layout;
+					}
+					else
+					{
+						if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
+							current_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+					}
+
+					// If first subpass changes the layout, we'll need to inject an external subpass dependency.
+					if (!used && attachments[attachment].initialLayout != current_layout)
+					{
+						external_input_dependencies |= 1u << subpass;
+						external_depth_dependencies |= 1u << subpass;
+					}
+
+					depth_stencil_attachment_read |= 1u << subpass;
+					input_attachment_read |= 1u << subpass;
+					depth->layout = current_layout;
+					input->layout = current_layout;
+					used = true;
+					last_subpass_for_attachment[attachment] = subpass;
+				}
+				else if (depth)
+				{
+					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil::ReadWrite)
+					{
+						depth_stencil_attachment_write |= 1u << subpass;
+						if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
+							current_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+					}
+					else
+					{
+						if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
+							current_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+					}
+
+					// If first subpass changes the layout, we'll need to inject an external subpass dependency.
+					if (!used && attachments[attachment].initialLayout != current_layout)
+						external_depth_dependencies |= 1u << subpass;
+
+					depth_stencil_attachment_read |= 1u << subpass;
+					depth->layout = current_layout;
+					used = true;
+					last_subpass_for_attachment[attachment] = subpass;
+				}
+				else if (input)
+				{
+					if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
+						current_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+					// If the attachment is first used as an input attachment, the initial layout should actually be
+					// SHADER_READ_ONLY_OPTIMAL.
+					if (!used && attachments[attachment].initialLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+						attachments[attachment].initialLayout = current_layout;
+
+					// If first subpass changes the layout, we'll need to inject an external subpass dependency.
+					if (!used && attachments[attachment].initialLayout != current_layout)
+						external_input_dependencies |= 1u << subpass;
+
+					input->layout = current_layout;
+					used = true;
+					last_subpass_for_attachment[attachment] = subpass;
 				}
 				else
 				{
-					if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
-						current_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+					VK_ASSERT(0 && "Unhandled attachment usage.");
 				}
-
-				// If first subpass changes the layout, we'll need to inject an external subpass dependency.
-				if (!used && attachments[attachment].initialLayout != current_layout)
-				{
-					external_input_dependencies |= 1u << subpass;
-					external_depth_dependencies |= 1u << subpass;
-				}
-
-				depth_stencil_attachment_read |= 1u << subpass;
-				input_attachment_read |= 1u << subpass;
-				depth->layout = current_layout;
-				input->layout = current_layout;
-				used = true;
-				last_subpass_for_attachment[attachment] = subpass;
 			}
-			else if (depth)
+
+			// If we don't have a specific layout we need to end up in, just
+			// use the last one.
+			// Assert that we actually use all the attachments we have ...
+			VK_ASSERT(used);
+			if (attachments[attachment].finalLayout == VK_IMAGE_LAYOUT_UNDEFINED)
 			{
-				if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil::ReadWrite)
-				{
-					depth_stencil_attachment_write |= 1u << subpass;
-					if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
-						current_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-				}
-				else
-				{
-					if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
-						current_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-				}
-
-				// If first subpass changes the layout, we'll need to inject an external subpass dependency.
-				if (!used && attachments[attachment].initialLayout != current_layout)
-					external_depth_dependencies |= 1u << subpass;
-
-				depth_stencil_attachment_read |= 1u << subpass;
-				depth->layout = current_layout;
-				used = true;
-				last_subpass_for_attachment[attachment] = subpass;
-			}
-			else if (input)
-			{
-				if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
-					current_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-				// If the attachment is first used as an input attachment, the initial layout should actually be
-				// SHADER_READ_ONLY_OPTIMAL.
-				if (!used && attachments[attachment].initialLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-					attachments[attachment].initialLayout = current_layout;
-
-				// If first subpass changes the layout, we'll need to inject an external subpass dependency.
-				if (!used && attachments[attachment].initialLayout != current_layout)
-					external_input_dependencies |= 1u << subpass;
-
-				input->layout = current_layout;
-				used = true;
-				last_subpass_for_attachment[attachment] = subpass;
-			}
-			else
-			{
-				VK_ASSERT(0 && "Unhandled attachment usage.");
+				VK_ASSERT(current_layout != VK_IMAGE_LAYOUT_UNDEFINED);
+				attachments[attachment].finalLayout = current_layout;
 			}
 		}
 
-		// If we don't have a specific layout we need to end up in, just
-		// use the last one.
-		// Assert that we actually use all the attachments we have ...
-		VK_ASSERT(used);
-		if (attachments[attachment].finalLayout == VK_IMAGE_LAYOUT_UNDEFINED)
-		{
-			VK_ASSERT(current_layout != VK_IMAGE_LAYOUT_UNDEFINED);
-			attachments[attachment].finalLayout = current_layout;
-		}
-	}
-
-	// Only consider preserve masks before last subpass which uses an attachment.
-	for (unsigned attachment = 0; attachment < num_attachments; attachment++)
-		preserve_masks[attachment] &= (1u << last_subpass_for_attachment[attachment]) - 1;
-
-	// Add preserve attachments as needed.
-	for (unsigned subpass = 0; subpass < num_subpasses; subpass++)
-	{
-		VkSubpassDescription &pass = subpasses[subpass];
-		unsigned preserve_count = 0;
+		// Only consider preserve masks before last subpass which uses an attachment.
 		for (unsigned attachment = 0; attachment < num_attachments; attachment++)
-			if (preserve_masks[attachment] & (1u << subpass))
-				preserve_count++;
+			preserve_masks[attachment] &= (1u << last_subpass_for_attachment[attachment]) - 1;
 
-		uint32_t *preserve = preserve_allocator.allocate_cleared(preserve_count);
-		pass.pPreserveAttachments = preserve;
-		pass.preserveAttachmentCount = preserve_count;
-		for (unsigned attachment = 0; attachment < num_attachments; attachment++)
-			if (preserve_masks[attachment] & (1u << subpass))
-				*preserve++ = attachment;
+		// Add preserve attachments as needed.
+		for (unsigned subpass = 0; subpass < num_subpasses; subpass++)
+		{
+			VkSubpassDescription &pass = subpasses[subpass];
+			unsigned preserve_count = 0;
+			for (unsigned attachment = 0; attachment < num_attachments; attachment++)
+				if (preserve_masks[attachment] & (1u << subpass))
+					preserve_count++;
+
+			uint32_t *preserve = preserve_allocator.allocate_cleared(preserve_count);
+			pass.pPreserveAttachments = preserve;
+			pass.preserveAttachmentCount = preserve_count;
+			for (unsigned attachment = 0; attachment < num_attachments; attachment++)
+				if (preserve_masks[attachment] & (1u << subpass))
+					*preserve++ = attachment;
+		}
+
+		VK_ASSERT(num_subpasses > 0);
+		VkRenderPassCreateInfo rp_info = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+		rp_info.subpassCount = num_subpasses;
+		rp_info.pSubpasses = subpasses.data();
+		rp_info.pAttachments = attachments;
+		rp_info.attachmentCount = num_attachments;
+
+		// Add external subpass dependencies.
+		FOR_EACH_BIT(external_color_dependencies | external_depth_dependencies | external_input_dependencies, subpass)
+		{
+			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); external_dependencies.push(zero_dep); }
+			VkSubpassDependency &dep = external_dependencies.back();
+			dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+			dep.dstSubpass = subpass;
+
+			if (external_color_dependencies & (1u << subpass))
+			{
+				dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				dep.dstStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				dep.dstAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			}
+
+			if (external_depth_dependencies & (1u << subpass))
+			{
+				dep.srcStageMask |= VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				dep.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+			}
+
+			if (external_input_dependencies & (1u << subpass))
+			{
+				dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+					VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+					VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				dep.dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			}
+		}
+
+		// Queue up self-dependencies (COLOR | DEPTH) -> INPUT.
+		FOR_EACH_BIT(color_self_dependencies | depth_self_dependencies, subpass)
+		{
+			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); external_dependencies.push(zero_dep); }
+			VkSubpassDependency &dep = external_dependencies.back();
+			dep.srcSubpass = subpass;
+			dep.dstSubpass = subpass;
+			dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+			if (color_self_dependencies & (1u << subpass))
+			{
+				dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			}
+
+			if (depth_self_dependencies & (1u << subpass))
+			{
+				dep.srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			}
+
+			dep.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			dep.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		}
+
+		// Flush and invalidate caches between each subpass.
+		for (unsigned subpass = 1; subpass < num_subpasses; subpass++)
+		{
+			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); external_dependencies.push(zero_dep); }
+			VkSubpassDependency &dep = external_dependencies.back();
+			dep.srcSubpass = subpass - 1;
+			dep.dstSubpass = subpass;
+			dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+			if (color_attachment_read_write & (1u << (subpass - 1)))
+			{
+				dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			}
+
+			if (depth_stencil_attachment_write & (1u << (subpass - 1)))
+			{
+				dep.srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			}
+
+			if (color_attachment_read_write & (1u << subpass))
+			{
+				dep.dstStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				dep.dstAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+			}
+
+			if (depth_stencil_attachment_read & (1u << subpass))
+			{
+				dep.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+			}
+
+			if (depth_stencil_attachment_write & (1u << subpass))
+			{
+				dep.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+			}
+
+			if (input_attachment_read & (1u << subpass))
+			{
+				dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				dep.dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			}
+		}
+
+		if (!external_dependencies.empty())
+		{
+			rp_info.dependencyCount = external_dependencies.size();
+			rp_info.pDependencies = external_dependencies.data();
+		}
+
+		// Store the important subpass information for later.
+		for (uint32_t subpass_idx = 0; subpass_idx < rp_info.subpassCount; subpass_idx++)
+		{
+			const VkSubpassDescription &subpass = rp_info.pSubpasses[subpass_idx];
+
+			SubpassInfo subpass_info = {};
+			subpass_info.num_color_attachments = subpass.colorAttachmentCount;
+			subpass_info.num_input_attachments = subpass.inputAttachmentCount;
+			subpass_info.depth_stencil_attachment = *subpass.pDepthStencilAttachment;
+			memcpy(subpass_info.color_attachments, subpass.pColorAttachments,
+					subpass.colorAttachmentCount * sizeof(*subpass.pColorAttachments));
+			memcpy(subpass_info.input_attachments, subpass.pInputAttachments,
+					subpass.inputAttachmentCount * sizeof(*subpass.pInputAttachments));
+
+			unsigned samples = 0;
+			for (unsigned i = 0; i < subpass_info.num_color_attachments; i++)
+			{
+				if (subpass_info.color_attachments[i].attachment == VK_ATTACHMENT_UNUSED)
+					continue;
+
+				unsigned samp = attachments[subpass_info.color_attachments[i].attachment].samples;
+				VK_ASSERT(!samples || samp == samples);
+				samples = samp;
+			}
+
+			if (subpass_info.depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED)
+			{
+				unsigned samp = attachments[subpass_info.depth_stencil_attachment.attachment].samples;
+				VK_ASSERT(!samples || samp == samples);
+				samples = samp;
+			}
+
+			VK_ASSERT(samples > 0);
+			subpass_info.samples = samples;
+			this->subpasses.push(subpass_info);
+		}
+
+
+		// Fixup after, we want the underlying render pass to be generic.
+		VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
+		fixup_render_pass_nvidia(rp_info, fixup_attachments);
+
+		LOGI("Creating render pass.\n");
+		if (vkCreateRenderPass(device->get_device(), &rp_info, nullptr, &render_pass) != VK_SUCCESS)
+			LOGE("Failed to create render pass.");
+
+		subpasses.free_storage();
+		external_dependencies.free_storage();
 	}
 
-	VK_ASSERT(num_subpasses > 0);
-	VkRenderPassCreateInfo rp_info = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
-	rp_info.subpassCount = num_subpasses;
-	rp_info.pSubpasses = subpasses.data();
-	rp_info.pAttachments = attachments;
-	rp_info.attachmentCount = num_attachments;
-
-	// Add external subpass dependencies.
-	FOR_EACH_BIT(external_color_dependencies | external_depth_dependencies | external_input_dependencies, subpass)
+	void RenderPass::fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments)
 	{
-		             { VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); external_dependencies.push(zero_dep); }
-		             VkSubpassDependency &dep = external_dependencies.back();
-		             dep.srcSubpass = VK_SUBPASS_EXTERNAL;
-		             dep.dstSubpass = subpass;
-
-		             if (external_color_dependencies & (1u << subpass))
-		             {
-			             dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			             dep.dstStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			             dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			             dep.dstAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		             }
-
-		             if (external_depth_dependencies & (1u << subpass))
-		             {
-			             dep.srcStageMask |= VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-			             dep.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-			             dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			             dep.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-		             }
-
-		             if (external_input_dependencies & (1u << subpass))
-		             {
-			             dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-			                                 VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-			             dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			             dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-			                                  VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			             dep.dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-		             }
-	             	}
-
-	// Queue up self-dependencies (COLOR | DEPTH) -> INPUT.
-	FOR_EACH_BIT(color_self_dependencies | depth_self_dependencies, subpass)
-	{
-		{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); external_dependencies.push(zero_dep); }
-		VkSubpassDependency &dep = external_dependencies.back();
-		dep.srcSubpass = subpass;
-		dep.dstSubpass = subpass;
-		dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-		if (color_self_dependencies & (1u << subpass))
-		{
-			dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		}
-
-		if (depth_self_dependencies & (1u << subpass))
-		{
-			dep.srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-			dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		}
-
-		dep.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		dep.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-		}
-
-	// Flush and invalidate caches between each subpass.
-	for (unsigned subpass = 1; subpass < num_subpasses; subpass++)
-	{
-		{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); external_dependencies.push(zero_dep); }
-		VkSubpassDependency &dep = external_dependencies.back();
-		dep.srcSubpass = subpass - 1;
-		dep.dstSubpass = subpass;
-		dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-		if (color_attachment_read_write & (1u << (subpass - 1)))
-		{
-			dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		}
-
-		if (depth_stencil_attachment_write & (1u << (subpass - 1)))
-		{
-			dep.srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-			dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		}
-
-		if (color_attachment_read_write & (1u << subpass))
-		{
-			dep.dstStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			dep.dstAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-		}
-
-		if (depth_stencil_attachment_read & (1u << subpass))
-		{
-			dep.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-			dep.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-		}
-
-		if (depth_stencil_attachment_write & (1u << subpass))
-		{
-			dep.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-			dep.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-		}
-
-		if (input_attachment_read & (1u << subpass))
-		{
-			dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			dep.dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-		}
-	}
-
-	if (!external_dependencies.empty())
-	{
-		rp_info.dependencyCount = external_dependencies.size();
-		rp_info.pDependencies = external_dependencies.data();
-	}
-
-	// Store the important subpass information for later.
-	for (uint32_t subpass_idx = 0; subpass_idx < rp_info.subpassCount; subpass_idx++)
-	{
-		const VkSubpassDescription &subpass = rp_info.pSubpasses[subpass_idx];
-
-		SubpassInfo subpass_info = {};
-		subpass_info.num_color_attachments = subpass.colorAttachmentCount;
-		subpass_info.num_input_attachments = subpass.inputAttachmentCount;
-		subpass_info.depth_stencil_attachment = *subpass.pDepthStencilAttachment;
-		memcpy(subpass_info.color_attachments, subpass.pColorAttachments,
-		       subpass.colorAttachmentCount * sizeof(*subpass.pColorAttachments));
-		memcpy(subpass_info.input_attachments, subpass.pInputAttachments,
-		       subpass.inputAttachmentCount * sizeof(*subpass.pInputAttachments));
-
-		unsigned samples = 0;
-		for (unsigned i = 0; i < subpass_info.num_color_attachments; i++)
-		{
-			if (subpass_info.color_attachments[i].attachment == VK_ATTACHMENT_UNUSED)
-				continue;
-
-			unsigned samp = attachments[subpass_info.color_attachments[i].attachment].samples;
-			VK_ASSERT(!samples || samp == samples);
-			samples = samp;
-		}
-
-		if (subpass_info.depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED)
-		{
-			unsigned samp = attachments[subpass_info.depth_stencil_attachment.attachment].samples;
-			VK_ASSERT(!samples || samp == samples);
-			samples = samp;
-		}
-
-		VK_ASSERT(samples > 0);
-		subpass_info.samples = samples;
-		this->subpasses.push(subpass_info);
-	}
-
-
-	// Fixup after, we want the underlying render pass to be generic.
-	VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
-	fixup_render_pass_nvidia(rp_info, fixup_attachments);
-
-	LOGI("Creating render pass.\n");
-	if (vkCreateRenderPass(device->get_device(), &rp_info, nullptr, &render_pass) != VK_SUCCESS)
-		LOGE("Failed to create render pass.");
-
-	subpasses.free_storage();
-	external_dependencies.free_storage();
-}
-
-void RenderPass::fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments)
-{
-	if (device->get_gpu_properties().vendorID == VENDOR_ID_NVIDIA &&
+		if (device->get_gpu_properties().vendorID == VENDOR_ID_NVIDIA &&
 #ifdef _WIN32
-	    VK_VERSION_MAJOR(device->get_gpu_properties().driverVersion) < 417)
+				VK_VERSION_MAJOR(device->get_gpu_properties().driverVersion) < 417)
 #else
-	    VK_VERSION_MAJOR(device->get_gpu_properties().driverVersion) < 415)
+			VK_VERSION_MAJOR(device->get_gpu_properties().driverVersion) < 415)
 #endif
+			{
+				// Workaround a bug on NV where depth-stencil input attachments break if we have STORE_OP_DONT_CARE.
+				// Force STORE_OP_STORE for all attachments.
+				if (attachments != create_info.pAttachments)
+				{
+					memcpy(attachments, create_info.pAttachments, create_info.attachmentCount * sizeof(attachments[0]));
+					create_info.pAttachments = attachments;
+				}
+
+				for (uint32_t i = 0; i < create_info.attachmentCount; i++)
+				{
+					VkFormat format = attachments[i].format;
+					VkImageAspectFlags aspect = format_to_aspect_mask(format);
+					if ((aspect & (VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_DEPTH_BIT)) != 0)
+						attachments[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+					if ((aspect & VK_IMAGE_ASPECT_STENCIL_BIT) != 0)
+						attachments[i].stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+				}
+			}
+	}
+
+	RenderPass::~RenderPass()
 	{
-		// Workaround a bug on NV where depth-stencil input attachments break if we have STORE_OP_DONT_CARE.
-		// Force STORE_OP_STORE for all attachments.
-		if (attachments != create_info.pAttachments)
+		if (render_pass != VK_NULL_HANDLE)
+			vkDestroyRenderPass(device->get_device(), render_pass, nullptr);
+		subpasses.free_storage();
+	}
+
+	Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info)
+		: Cookie(device)
+		  , device(device)
+		  , render_pass(rp)
+		  , info(info)
+	{
+		width = UINT32_MAX;
+		height = UINT32_MAX;
+		VkImageView views[VULKAN_NUM_ATTACHMENTS + 1];
+		unsigned num_views = 0;
+
+		VK_ASSERT(info.num_color_attachments || info.depth_stencil);
+
+		for (unsigned i = 0; i < info.num_color_attachments; i++)
 		{
-			memcpy(attachments, create_info.pAttachments, create_info.attachmentCount * sizeof(attachments[0]));
-			create_info.pAttachments = attachments;
+			VK_ASSERT(info.color_attachments[i]);
+			auto *att = info.color_attachments[i];
+			unsigned lod = att->get_create_info().base_level;
+			unsigned aw  = att->get_image().get_width(lod);
+			unsigned ah  = att->get_image().get_height(lod);
+			if (aw < width)  width  = aw;
+			if (ah < height) height = ah;
+			views[num_views++] = att->get_render_target_view(info.layer);
+			attachments[num_attachments++] = att;
 		}
 
-		for (uint32_t i = 0; i < create_info.attachmentCount; i++)
+		if (info.depth_stencil)
 		{
-			VkFormat format = attachments[i].format;
-			VkImageAspectFlags aspect = format_to_aspect_mask(format);
-			if ((aspect & (VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_DEPTH_BIT)) != 0)
-				attachments[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			if ((aspect & VK_IMAGE_ASPECT_STENCIL_BIT) != 0)
-				attachments[i].stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			auto *att = info.depth_stencil;
+			unsigned lod = att->get_create_info().base_level;
+			unsigned aw  = att->get_image().get_width(lod);
+			unsigned ah  = att->get_image().get_height(lod);
+			if (aw < width)  width  = aw;
+			if (ah < height) height = ah;
+			views[num_views++] = att->get_render_target_view(info.layer);
+			attachments[num_attachments++] = att;
 		}
+
+		VkFramebufferCreateInfo fb_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+		fb_info.renderPass = rp.get_render_pass();
+		fb_info.attachmentCount = num_views;
+		fb_info.pAttachments = views;
+		fb_info.width = width;
+		fb_info.height = height;
+		fb_info.layers = 1;
+
+		if (vkCreateFramebuffer(device->get_device(), &fb_info, nullptr, &framebuffer) != VK_SUCCESS)
+			LOGE("Failed to create framebuffer.");
 	}
-}
 
-RenderPass::~RenderPass()
-{
-	if (render_pass != VK_NULL_HANDLE)
-		vkDestroyRenderPass(device->get_device(), render_pass, nullptr);
-	subpasses.free_storage();
-}
-
-Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info)
-    : Cookie(device)
-    , device(device)
-    , render_pass(rp)
-    , info(info)
-{
-	width = UINT32_MAX;
-	height = UINT32_MAX;
-	VkImageView views[VULKAN_NUM_ATTACHMENTS + 1];
-	unsigned num_views = 0;
-
-	VK_ASSERT(info.num_color_attachments || info.depth_stencil);
-
-	for (unsigned i = 0; i < info.num_color_attachments; i++)
+	Framebuffer::~Framebuffer()
 	{
-		VK_ASSERT(info.color_attachments[i]);
-		auto *att = info.color_attachments[i];
-		unsigned lod = att->get_create_info().base_level;
-		unsigned aw  = att->get_image().get_width(lod);
-		unsigned ah  = att->get_image().get_height(lod);
-		if (aw < width)  width  = aw;
-		if (ah < height) height = ah;
-		views[num_views++] = att->get_render_target_view(info.layer);
-		attachments[num_attachments++] = att;
+		if (framebuffer != VK_NULL_HANDLE)
+			device->destroy_framebuffer_nolock(framebuffer);
 	}
 
-	if (info.depth_stencil)
+	FramebufferAllocator::FramebufferAllocator(Device *device)
+		: device(device)
 	{
-		auto *att = info.depth_stencil;
-		unsigned lod = att->get_create_info().base_level;
-		unsigned aw  = att->get_image().get_width(lod);
-		unsigned ah  = att->get_image().get_height(lod);
-		if (aw < width)  width  = aw;
-		if (ah < height) height = ah;
-		views[num_views++] = att->get_render_target_view(info.layer);
-		attachments[num_attachments++] = att;
 	}
 
-	VkFramebufferCreateInfo fb_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-	fb_info.renderPass = rp.get_render_pass();
-	fb_info.attachmentCount = num_views;
-	fb_info.pAttachments = views;
-	fb_info.width = width;
-	fb_info.height = height;
-	fb_info.layers = 1;
+	void FramebufferAllocator::clear()
+	{
+		framebuffers.clear();
+	}
 
-	if (vkCreateFramebuffer(device->get_device(), &fb_info, nullptr, &framebuffer) != VK_SUCCESS)
-		LOGE("Failed to create framebuffer.");
-}
+	void FramebufferAllocator::begin_frame()
+	{
+		framebuffers.begin_frame();
+	}
 
-Framebuffer::~Framebuffer()
-{
-	if (framebuffer != VK_NULL_HANDLE)
-		device->destroy_framebuffer_nolock(framebuffer);
-}
+	Framebuffer &FramebufferAllocator::request_framebuffer(const RenderPassInfo &info)
+	{
+		const RenderPass &rp = device->request_render_pass(info, true);
+		Hasher h;
+		h.u64(rp.intrusive_hashmap_key);
 
-FramebufferAllocator::FramebufferAllocator(Device *device)
-    : device(device)
-{
-}
+		for (unsigned i = 0; i < info.num_color_attachments; i++)
+			if (info.color_attachments[i])
+				h.u64(info.color_attachments[i]->cookie);
 
-void FramebufferAllocator::clear()
-{
-	framebuffers.clear();
-}
+		if (info.depth_stencil)
+			h.u64(info.depth_stencil->cookie);
 
-void FramebufferAllocator::begin_frame()
-{
-	framebuffers.begin_frame();
-}
+		h.u32(info.layer);
 
-Framebuffer &FramebufferAllocator::request_framebuffer(const RenderPassInfo &info)
-{
-	const RenderPass &rp = device->request_render_pass(info, true);
-	Hasher h;
-	h.u64(rp.intrusive_hashmap_key);
+		Hash hash = h.get();
 
-	for (unsigned i = 0; i < info.num_color_attachments; i++)
-		if (info.color_attachments[i])
-			h.u64(info.color_attachments[i]->cookie);
+		FramebufferNode *node = framebuffers.request(hash);
+		if (node)
+			return *node;
 
-	if (info.depth_stencil)
-		h.u64(info.depth_stencil->cookie);
+		return *framebuffers.emplace(hash, device, rp, info);
+	}
 
-	h.u32(info.layer);
+	void AttachmentAllocator::clear()
+	{
+		attachments.clear();
+	}
 
-	Hash hash = h.get();
+	void AttachmentAllocator::begin_frame()
+	{
+		attachments.begin_frame();
+	}
 
-	FramebufferNode *node = framebuffers.request(hash);
-	if (node)
-		return *node;
+	ImageView &AttachmentAllocator::request_attachment(unsigned width, unsigned height, VkFormat format,
+			unsigned index, unsigned samples, unsigned layers)
+	{
+		Hasher h;
+		h.u32(width);
+		h.u32(height);
+		h.u32(format);
+		h.u32(index);
+		h.u32(samples);
+		h.u32(layers);
 
-	return *framebuffers.emplace(hash, device, rp, info);
-}
+		Hash hash = h.get();
 
-void AttachmentAllocator::clear()
-{
-	attachments.clear();
-}
+		TransientNode *node = attachments.request(hash);
+		if (node)
+			return node->handle->get_view();
 
-void AttachmentAllocator::begin_frame()
-{
-	attachments.begin_frame();
-}
+		ImageCreateInfo image_info = ImageCreateInfo::transient_render_target(width, height, format);
 
-ImageView &AttachmentAllocator::request_attachment(unsigned width, unsigned height, VkFormat format,
-                                                   unsigned index, unsigned samples, unsigned layers)
-{
-	Hasher h;
-	h.u32(width);
-	h.u32(height);
-	h.u32(format);
-	h.u32(index);
-	h.u32(samples);
-	h.u32(layers);
-
-	Hash hash = h.get();
-
-	TransientNode *node = attachments.request(hash);
-	if (node)
+		image_info.samples = static_cast<VkSampleCountFlagBits>(samples);
+		image_info.layers = layers;
+		node = attachments.emplace(hash, device->create_image(image_info, nullptr));
+		device->set_name(*node->handle, "AttachmentAllocator");
 		return node->handle->get_view();
-
-	ImageCreateInfo image_info = ImageCreateInfo::transient_render_target(width, height, format);
-
-	image_info.samples = static_cast<VkSampleCountFlagBits>(samples);
-	image_info.layers = layers;
-	node = attachments.emplace(hash, device->create_image(image_info, nullptr));
-	device->set_name(*node->handle, "AttachmentAllocator");
-	return node->handle->get_view();
-}
+	}
 }
 
 /* === command_buffer.cpp === */
@@ -15834,584 +15823,581 @@ namespace Vulkan
 
 namespace Vulkan
 {
-static bool has_vk_extension(const VkExtensionProperties *exts, uint32_t count, const char *name)
-{
-	uint32_t i;
-	for (i = 0; i < count; i++)
-		if (strcmp(exts[i].extensionName, name) == 0)
-			return true;
-	return false;
-}
-
-static bool has_vk_layer(const VkLayerProperties *layers, uint32_t count, const char *name)
-{
-	uint32_t i;
-	for (i = 0; i < count; i++)
-		if (strcmp(layers[i].layerName, name) == 0)
-			return true;
-	return false;
-}
-
-bool Context::init_loader(PFN_vkGetInstanceProcAddr addr)
-{
-	if (!addr)
+	static bool has_vk_extension(const VkExtensionProperties *exts, uint32_t count, const char *name)
 	{
+		uint32_t i;
+		for (i = 0; i < count; i++)
+			if (strcmp(exts[i].extensionName, name) == 0)
+				return true;
+		return false;
+	}
+
+	static bool has_vk_layer(const VkLayerProperties *layers, uint32_t count, const char *name)
+	{
+		uint32_t i;
+		for (i = 0; i < count; i++)
+			if (strcmp(layers[i].layerName, name) == 0)
+				return true;
+		return false;
+	}
+
+	bool Context::init_loader(PFN_vkGetInstanceProcAddr addr)
+	{
+		if (!addr)
+		{
 #ifndef _WIN32
-		static void *module;
-		if (!module)
-		{
-			const char *vulkan_path = getenv("GRANITE_VULKAN_LIBRARY");
-			if (vulkan_path)
-				module = dlopen(vulkan_path, RTLD_LOCAL | RTLD_LAZY);
+			static void *module;
 			if (!module)
-				module = dlopen("libvulkan.so.1", RTLD_LOCAL | RTLD_LAZY);
-			if (!module)
-				module = dlopen("libvulkan.so", RTLD_LOCAL | RTLD_LAZY);
-			if (!module)
-				return false;
-		}
+			{
+				const char *vulkan_path = getenv("GRANITE_VULKAN_LIBRARY");
+				if (vulkan_path)
+					module = dlopen(vulkan_path, RTLD_LOCAL | RTLD_LAZY);
+				if (!module)
+					module = dlopen("libvulkan.so.1", RTLD_LOCAL | RTLD_LAZY);
+				if (!module)
+					module = dlopen("libvulkan.so", RTLD_LOCAL | RTLD_LAZY);
+				if (!module)
+					return false;
+			}
 
-		addr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(module, "vkGetInstanceProcAddr"));
-		if (!addr)
-			return false;
+			addr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(module, "vkGetInstanceProcAddr"));
+			if (!addr)
+				return false;
 #else
-		static HMODULE module;
-		if (!module)
-		{
-			module = LoadLibraryA("vulkan-1.dll");
+			static HMODULE module;
 			if (!module)
+			{
+				module = LoadLibraryA("vulkan-1.dll");
+				if (!module)
+					return false;
+			}
+
+			addr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(module, "vkGetInstanceProcAddr"));
+			if (!addr)
 				return false;
-		}
-
-		addr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(module, "vkGetInstanceProcAddr"));
-		if (!addr)
-			return false;
 #endif
+		}
+
+		vkGetInstanceProcAddr = addr;
+		volkGenLoadLoader(NULL, vkGetInstanceProcAddrStub);
+		return true;
 	}
 
-	vkGetInstanceProcAddr = addr;
-	volkGenLoadLoader(NULL, vkGetInstanceProcAddrStub);
-	return true;
-}
-
-Context::Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface,
-                 const char **required_device_extensions, unsigned num_required_device_extensions,
-                 const char **required_device_layers, unsigned num_required_device_layers,
-                 const VkPhysicalDeviceFeatures *required_features)
-    : instance(instance)
-    , owned_device(true)
-{
-	/* Load global+instance function pointers using application-created VkInstance. */
-	volkGenLoadInstance(instance, vkGetInstanceProcAddrStub);
-	volkGenLoadDevice(instance, vkGetInstanceProcAddrStub);
-	if (!create_device(gpu, surface, required_device_extensions, num_required_device_extensions, required_device_layers,
-	                   num_required_device_layers, required_features))
+	Context::Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface,
+			const char **required_device_extensions, unsigned num_required_device_extensions,
+			const char **required_device_layers, unsigned num_required_device_layers,
+			const VkPhysicalDeviceFeatures *required_features)
+		: instance(instance)
+		  , owned_device(true)
 	{
-		LOGE("Failed to create Vulkan device.\n");
-		destroy();
-		return;
+		/* Load global+instance function pointers using application-created VkInstance. */
+		volkGenLoadInstance(instance, vkGetInstanceProcAddrStub);
+		volkGenLoadDevice(instance, vkGetInstanceProcAddrStub);
+		if (!create_device(gpu, surface, required_device_extensions, num_required_device_extensions, required_device_layers,
+					num_required_device_layers, required_features))
+		{
+			LOGE("Failed to create Vulkan device.\n");
+			destroy();
+			return;
+		}
+		valid = true;
 	}
-	valid = true;
-}
 
-void Context::destroy()
-{
-	if (device != VK_NULL_HANDLE)
-		vkDeviceWaitIdle(device);
-
-	if (owned_device && device != VK_NULL_HANDLE)
-		vkDestroyDevice(device, nullptr);
-}
-
-bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
-                            unsigned num_required_device_extensions, const char **required_device_layers,
-                            unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features)
-{
-	if (gpu == VK_NULL_HANDLE)
+	void Context::destroy()
 	{
-		uint32_t gpu_count = 0;
-		if (vkEnumeratePhysicalDevices(instance, &gpu_count, nullptr) != VK_SUCCESS)
-		{
-			LOGE("vkEnumeratePhysicalDevices failed.\n");
-			return false;
-		}
+		if (device != VK_NULL_HANDLE)
+			vkDeviceWaitIdle(device);
 
-		if (gpu_count == 0)
-			return false;
+		if (owned_device && device != VK_NULL_HANDLE)
+			vkDestroyDevice(device, nullptr);
+	}
 
-		VkPhysicalDevice *gpus = (VkPhysicalDevice *)malloc(gpu_count * sizeof(VkPhysicalDevice));
-		if (vkEnumeratePhysicalDevices(instance, &gpu_count, gpus) != VK_SUCCESS)
-		{
-			LOGE("vkEnumeratePhysicalDevices failed.\n");
-			free(gpus);
-			return false;
-		}
-
-		for (uint32_t gi = 0; gi < gpu_count; gi++)
-		{
-			VkPhysicalDevice cur = gpus[gi];
-			VkPhysicalDeviceProperties props;
-			vkGetPhysicalDeviceProperties(cur, &props);
-			LOGI("Found Vulkan GPU: %s\n", props.deviceName);
-			LOGI("    API: %u.%u.%u\n",
-			     VK_VERSION_MAJOR(props.apiVersion),
-			     VK_VERSION_MINOR(props.apiVersion),
-			     VK_VERSION_PATCH(props.apiVersion));
-			LOGI("    Driver: %u.%u.%u\n",
-			     VK_VERSION_MAJOR(props.driverVersion),
-			     VK_VERSION_MINOR(props.driverVersion),
-			     VK_VERSION_PATCH(props.driverVersion));
-		}
-
-		const char *gpu_index = getenv("GRANITE_VULKAN_DEVICE_INDEX");
-		if (gpu_index)
-		{
-			unsigned index = strtoul(gpu_index, nullptr, 0);
-			if (index < gpu_count)
-				gpu = gpus[index];
-		}
-
+	bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
+			unsigned num_required_device_extensions, const char **required_device_layers,
+			unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features)
+	{
 		if (gpu == VK_NULL_HANDLE)
-			gpu = gpus[0];
-		free(gpus);
-	}
+		{
+			uint32_t gpu_count = 0;
+			if (vkEnumeratePhysicalDevices(instance, &gpu_count, nullptr) != VK_SUCCESS)
+			{
+				LOGE("vkEnumeratePhysicalDevices failed.\n");
+				return false;
+			}
 
-	uint32_t ext_count = 0;
-	vkEnumerateDeviceExtensionProperties(gpu, nullptr, &ext_count, nullptr);
-	VkExtensionProperties *queried_extensions = (VkExtensionProperties *)malloc((ext_count ? ext_count : 1) * sizeof(VkExtensionProperties));
-	if (ext_count)
-		vkEnumerateDeviceExtensionProperties(gpu, nullptr, &ext_count, queried_extensions);
+			if (gpu_count == 0)
+				return false;
 
-	uint32_t layer_count = 0;
-	vkEnumerateDeviceLayerProperties(gpu, &layer_count, nullptr);
-	VkLayerProperties *queried_layers = (VkLayerProperties *)malloc((layer_count ? layer_count : 1) * sizeof(VkLayerProperties));
-	if (layer_count)
-		vkEnumerateDeviceLayerProperties(gpu, &layer_count, queried_layers);
+			VkPhysicalDevice *gpus = (VkPhysicalDevice *)malloc(gpu_count * sizeof(VkPhysicalDevice));
+			if (vkEnumeratePhysicalDevices(instance, &gpu_count, gpus) != VK_SUCCESS)
+			{
+				LOGE("vkEnumeratePhysicalDevices failed.\n");
+				free(gpus);
+				return false;
+			}
 
-	for (uint32_t i = 0; i < num_required_device_extensions; i++)
-		if (!has_vk_extension(queried_extensions, ext_count, required_device_extensions[i]))
+			for (uint32_t gi = 0; gi < gpu_count; gi++)
+			{
+				VkPhysicalDevice cur = gpus[gi];
+				VkPhysicalDeviceProperties props;
+				vkGetPhysicalDeviceProperties(cur, &props);
+				LOGI("Found Vulkan GPU: %s\n", props.deviceName);
+				LOGI("    API: %u.%u.%u\n",
+						VK_VERSION_MAJOR(props.apiVersion),
+						VK_VERSION_MINOR(props.apiVersion),
+						VK_VERSION_PATCH(props.apiVersion));
+				LOGI("    Driver: %u.%u.%u\n",
+						VK_VERSION_MAJOR(props.driverVersion),
+						VK_VERSION_MINOR(props.driverVersion),
+						VK_VERSION_PATCH(props.driverVersion));
+			}
+
+			const char *gpu_index = getenv("GRANITE_VULKAN_DEVICE_INDEX");
+			if (gpu_index)
+			{
+				unsigned index = strtoul(gpu_index, nullptr, 0);
+				if (index < gpu_count)
+					gpu = gpus[index];
+			}
+
+			if (gpu == VK_NULL_HANDLE)
+				gpu = gpus[0];
+			free(gpus);
+		}
+
+		uint32_t ext_count = 0;
+		vkEnumerateDeviceExtensionProperties(gpu, nullptr, &ext_count, nullptr);
+		VkExtensionProperties *queried_extensions = (VkExtensionProperties *)malloc((ext_count ? ext_count : 1) * sizeof(VkExtensionProperties));
+		if (ext_count)
+			vkEnumerateDeviceExtensionProperties(gpu, nullptr, &ext_count, queried_extensions);
+
+		uint32_t layer_count = 0;
+		vkEnumerateDeviceLayerProperties(gpu, &layer_count, nullptr);
+		VkLayerProperties *queried_layers = (VkLayerProperties *)malloc((layer_count ? layer_count : 1) * sizeof(VkLayerProperties));
+		if (layer_count)
+			vkEnumerateDeviceLayerProperties(gpu, &layer_count, queried_layers);
+
+		for (uint32_t i = 0; i < num_required_device_extensions; i++)
+			if (!has_vk_extension(queried_extensions, ext_count, required_device_extensions[i]))
 			{ free(queried_extensions); free(queried_layers); return false; }
 
-	for (uint32_t i = 0; i < num_required_device_layers; i++)
-		if (!has_vk_layer(queried_layers, layer_count, required_device_layers[i]))
+		for (uint32_t i = 0; i < num_required_device_layers; i++)
+			if (!has_vk_layer(queried_layers, layer_count, required_device_layers[i]))
 			{ free(queried_extensions); free(queried_layers); return false; }
 
-	this->gpu = gpu;
-	vkGetPhysicalDeviceProperties(gpu, &gpu_props);
-	vkGetPhysicalDeviceMemoryProperties(gpu, &mem_props);
+		this->gpu = gpu;
+		vkGetPhysicalDeviceProperties(gpu, &gpu_props);
+		vkGetPhysicalDeviceMemoryProperties(gpu, &mem_props);
 
-	LOGI("Selected Vulkan GPU: %s\n", gpu_props.deviceName);
+		LOGI("Selected Vulkan GPU: %s\n", gpu_props.deviceName);
 
-	if (gpu_props.apiVersion >= VK_API_VERSION_1_1)
-		LOGI("GPU supports Vulkan 1.1.\n");
-	else if (gpu_props.apiVersion >= VK_API_VERSION_1_0)
-		LOGI("GPU supports Vulkan 1.0.\n");
+		if (gpu_props.apiVersion >= VK_API_VERSION_1_1)
+			LOGI("GPU supports Vulkan 1.1.\n");
+		else if (gpu_props.apiVersion >= VK_API_VERSION_1_0)
+			LOGI("GPU supports Vulkan 1.0.\n");
 
-	uint32_t queue_count;
-	vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, nullptr);
-	VkQueueFamilyProperties *queue_props = (VkQueueFamilyProperties *)malloc((queue_count ? queue_count : 1) * sizeof(VkQueueFamilyProperties));
-	vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, queue_props);
+		uint32_t queue_count;
+		vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, nullptr);
+		VkQueueFamilyProperties *queue_props = (VkQueueFamilyProperties *)malloc((queue_count ? queue_count : 1) * sizeof(VkQueueFamilyProperties));
+		vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, queue_props);
 
-	for (unsigned i = 0; i < queue_count; i++)
-	{
-		VkBool32 supported = surface == VK_NULL_HANDLE;
-		if (surface != VK_NULL_HANDLE)
-			vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &supported);
-
-		static const VkQueueFlags required = VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT;
-		if (supported && ((queue_props[i].queueFlags & required) == required))
+		for (unsigned i = 0; i < queue_count; i++)
 		{
-			graphics_queue_family = i;
-			break;
-		}
-	}
+			VkBool32 supported = surface == VK_NULL_HANDLE;
+			if (surface != VK_NULL_HANDLE)
+				vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &supported);
 
-	for (unsigned i = 0; i < queue_count; i++)
-	{
-		static const VkQueueFlags required = VK_QUEUE_COMPUTE_BIT;
-		if (i != graphics_queue_family && (queue_props[i].queueFlags & required) == required)
+			static const VkQueueFlags required = VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT;
+			if (supported && ((queue_props[i].queueFlags & required) == required))
+			{
+				graphics_queue_family = i;
+				break;
+			}
+		}
+
+		for (unsigned i = 0; i < queue_count; i++)
 		{
-			compute_queue_family = i;
-			break;
+			static const VkQueueFlags required = VK_QUEUE_COMPUTE_BIT;
+			if (i != graphics_queue_family && (queue_props[i].queueFlags & required) == required)
+			{
+				compute_queue_family = i;
+				break;
+			}
 		}
-	}
 
-	for (unsigned i = 0; i < queue_count; i++)
-	{
-		static const VkQueueFlags required = VK_QUEUE_TRANSFER_BIT;
-		if (i != graphics_queue_family && i != compute_queue_family && (queue_props[i].queueFlags & required) == required)
-		{
-			transfer_queue_family = i;
-			break;
-		}
-	}
-
-	if (transfer_queue_family == VK_QUEUE_FAMILY_IGNORED)
-	{
 		for (unsigned i = 0; i < queue_count; i++)
 		{
 			static const VkQueueFlags required = VK_QUEUE_TRANSFER_BIT;
-			if (i != graphics_queue_family && (queue_props[i].queueFlags & required) == required)
+			if (i != graphics_queue_family && i != compute_queue_family && (queue_props[i].queueFlags & required) == required)
 			{
 				transfer_queue_family = i;
 				break;
 			}
 		}
-	}
 
-	if (graphics_queue_family == VK_QUEUE_FAMILY_IGNORED)
+		if (transfer_queue_family == VK_QUEUE_FAMILY_IGNORED)
+		{
+			for (unsigned i = 0; i < queue_count; i++)
+			{
+				static const VkQueueFlags required = VK_QUEUE_TRANSFER_BIT;
+				if (i != graphics_queue_family && (queue_props[i].queueFlags & required) == required)
+				{
+					transfer_queue_family = i;
+					break;
+				}
+			}
+		}
+
+		if (graphics_queue_family == VK_QUEUE_FAMILY_IGNORED)
 		{ free(queried_extensions); free(queried_layers); free(queue_props); return false; }
 
-	unsigned universal_queue_index = 1;
-	uint32_t graphics_queue_index = 0;
-	uint32_t compute_queue_index = 0;
-	uint32_t transfer_queue_index = 0;
+		unsigned universal_queue_index = 1;
+		uint32_t graphics_queue_index = 0;
+		uint32_t compute_queue_index = 0;
+		uint32_t transfer_queue_index = 0;
 
-	if (compute_queue_family == VK_QUEUE_FAMILY_IGNORED)
-	{
-		compute_queue_family = graphics_queue_family;
-		compute_queue_index = min_(queue_props[graphics_queue_family].queueCount - 1, universal_queue_index);
-		universal_queue_index++;
-	}
+		if (compute_queue_family == VK_QUEUE_FAMILY_IGNORED)
+		{
+			compute_queue_family = graphics_queue_family;
+			compute_queue_index = min_(queue_props[graphics_queue_family].queueCount - 1, universal_queue_index);
+			universal_queue_index++;
+		}
 
-	if (transfer_queue_family == VK_QUEUE_FAMILY_IGNORED)
-	{
-		transfer_queue_family = graphics_queue_family;
-		transfer_queue_index = min_(queue_props[graphics_queue_family].queueCount - 1, universal_queue_index);
-		universal_queue_index++;
-	}
-	else if (transfer_queue_family == compute_queue_family)
-		transfer_queue_index = min_(queue_props[compute_queue_family].queueCount - 1, 1u);
+		if (transfer_queue_family == VK_QUEUE_FAMILY_IGNORED)
+		{
+			transfer_queue_family = graphics_queue_family;
+			transfer_queue_index = min_(queue_props[graphics_queue_family].queueCount - 1, universal_queue_index);
+			universal_queue_index++;
+		}
+		else if (transfer_queue_family == compute_queue_family)
+			transfer_queue_index = min_(queue_props[compute_queue_family].queueCount - 1, 1u);
 
-	static const float graphics_queue_prio = 0.5f;
-	static const float compute_queue_prio = 1.0f;
-	static const float transfer_queue_prio = 1.0f;
-	float prio[3] = { graphics_queue_prio, compute_queue_prio, transfer_queue_prio };
+		static const float graphics_queue_prio = 0.5f;
+		static const float compute_queue_prio = 1.0f;
+		static const float transfer_queue_prio = 1.0f;
+		float prio[3] = { graphics_queue_prio, compute_queue_prio, transfer_queue_prio };
 
-	unsigned queue_family_count = 0;
-	VkDeviceQueueCreateInfo queue_info[3] = {};
+		unsigned queue_family_count = 0;
+		VkDeviceQueueCreateInfo queue_info[3] = {};
 
-	VkDeviceCreateInfo device_info = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
-	device_info.pQueueCreateInfos = queue_info;
+		VkDeviceCreateInfo device_info = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
+		device_info.pQueueCreateInfos = queue_info;
 
-	queue_info[queue_family_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	queue_info[queue_family_count].queueFamilyIndex = graphics_queue_family;
-	queue_info[queue_family_count].queueCount = min_(universal_queue_index,
-	                                                     queue_props[graphics_queue_family].queueCount);
-	queue_info[queue_family_count].pQueuePriorities = prio;
-	queue_family_count++;
-
-	if (compute_queue_family != graphics_queue_family)
-	{
 		queue_info[queue_family_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queue_info[queue_family_count].queueFamilyIndex = compute_queue_family;
-		queue_info[queue_family_count].queueCount = min_(transfer_queue_family == compute_queue_family ? 2u : 1u,
-		                                                     queue_props[compute_queue_family].queueCount);
-		queue_info[queue_family_count].pQueuePriorities = prio + 1;
+		queue_info[queue_family_count].queueFamilyIndex = graphics_queue_family;
+		queue_info[queue_family_count].queueCount = min_(universal_queue_index,
+				queue_props[graphics_queue_family].queueCount);
+		queue_info[queue_family_count].pQueuePriorities = prio;
 		queue_family_count++;
-	}
 
-	if (transfer_queue_family != graphics_queue_family && transfer_queue_family != compute_queue_family)
-	{
-		queue_info[queue_family_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queue_info[queue_family_count].queueFamilyIndex = transfer_queue_family;
-		queue_info[queue_family_count].queueCount = 1;
-		queue_info[queue_family_count].pQueuePriorities = prio + 2;
-		queue_family_count++;
-	}
+		if (compute_queue_family != graphics_queue_family)
+		{
+			queue_info[queue_family_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			queue_info[queue_family_count].queueFamilyIndex = compute_queue_family;
+			queue_info[queue_family_count].queueCount = min_(transfer_queue_family == compute_queue_family ? 2u : 1u,
+					queue_props[compute_queue_family].queueCount);
+			queue_info[queue_family_count].pQueuePriorities = prio + 1;
+			queue_family_count++;
+		}
 
-	device_info.queueCreateInfoCount = queue_family_count;
+		if (transfer_queue_family != graphics_queue_family && transfer_queue_family != compute_queue_family)
+		{
+			queue_info[queue_family_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			queue_info[queue_family_count].queueFamilyIndex = transfer_queue_family;
+			queue_info[queue_family_count].queueCount = 1;
+			queue_info[queue_family_count].pQueuePriorities = prio + 2;
+			queue_family_count++;
+		}
 
-	/* At most the caller-required extensions plus a fixed set of optional ones
-	 * added below; size to that bound exactly. */
-	const char **enabled_extensions = (const char **)malloc((num_required_device_extensions + 16) * sizeof(const char *));
-	unsigned enabled_extensions_count = 0;
-	const char **enabled_layers = (const char **)malloc((num_required_device_layers + 4) * sizeof(const char *));
-	unsigned enabled_layers_count = 0;
+		device_info.queueCreateInfoCount = queue_family_count;
 
-	for (uint32_t i = 0; i < num_required_device_extensions; i++)
-		enabled_extensions[enabled_extensions_count++] = (required_device_extensions[i]);
-	for (uint32_t i = 0; i < num_required_device_layers; i++)
-		enabled_layers[enabled_layers_count++] = (required_device_layers[i]);
+		/* At most the caller-required extensions plus a fixed set of optional ones
+		 * added below; size to that bound exactly. */
+		const char **enabled_extensions = (const char **)malloc((num_required_device_extensions + 16) * sizeof(const char *));
+		unsigned enabled_extensions_count = 0;
+		const char **enabled_layers = (const char **)malloc((num_required_device_layers + 4) * sizeof(const char *));
+		unsigned enabled_layers_count = 0;
 
-	if (has_vk_extension(queried_extensions, ext_count, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) &&
-	    has_vk_extension(queried_extensions, ext_count, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME))
-	{
-		ext.supports_dedicated = true;
-		enabled_extensions[enabled_extensions_count++] = (VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
-		enabled_extensions[enabled_extensions_count++] = (VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
-	}
+		for (uint32_t i = 0; i < num_required_device_extensions; i++)
+			enabled_extensions[enabled_extensions_count++] = (required_device_extensions[i]);
+		for (uint32_t i = 0; i < num_required_device_layers; i++)
+			enabled_layers[enabled_layers_count++] = (required_device_layers[i]);
 
-	if (has_vk_extension(queried_extensions, ext_count, VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
-	{
-		ext.supports_debug_marker = true;
-		enabled_extensions[enabled_extensions_count++] = (VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
-	}
+		if (has_vk_extension(queried_extensions, ext_count, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) &&
+				has_vk_extension(queried_extensions, ext_count, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME))
+		{
+			ext.supports_dedicated = true;
+			enabled_extensions[enabled_extensions_count++] = (VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
+			enabled_extensions[enabled_extensions_count++] = (VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+		}
+
+		if (has_vk_extension(queried_extensions, ext_count, VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+		{
+			ext.supports_debug_marker = true;
+			enabled_extensions[enabled_extensions_count++] = (VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+		}
 
 #ifdef _WIN32
-	ext.supports_external = false;
-#else
-	if (ext.supports_external && ext.supports_dedicated &&
-	    has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME) &&
-	    has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) &&
-	    has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME) &&
-	    has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME))
-	{
-		ext.supports_external = true;
-		enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
-		enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
-		enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
-		enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
-	}
-	else
 		ext.supports_external = false;
+#else
+		if (ext.supports_external && ext.supports_dedicated &&
+				has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME) &&
+				has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) &&
+				has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME) &&
+				has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME))
+		{
+			ext.supports_external = true;
+			enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
+			enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+			enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+			enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+		}
+		else
+			ext.supports_external = false;
 #endif
 
-	VkPhysicalDeviceFeatures2KHR features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR };
+		VkPhysicalDeviceFeatures2KHR features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR };
 
-	if (has_vk_extension(queried_extensions, ext_count, VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME))
-		enabled_extensions[enabled_extensions_count++] = (VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
+		if (has_vk_extension(queried_extensions, ext_count, VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME))
+			enabled_extensions[enabled_extensions_count++] = (VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
 
-	vkGetPhysicalDeviceFeatures(gpu, &features.features);
+		vkGetPhysicalDeviceFeatures(gpu, &features.features);
 
-	// Enable device features we might care about.
-	{
-		VkPhysicalDeviceFeatures enabled_features = *required_features;
-		if (features.features.textureCompressionETC2)
-			enabled_features.textureCompressionETC2 = VK_TRUE;
-		if (features.features.textureCompressionBC)
-			enabled_features.textureCompressionBC = VK_TRUE;
-		if (features.features.textureCompressionASTC_LDR)
-			enabled_features.textureCompressionASTC_LDR = VK_TRUE;
-		if (features.features.fullDrawIndexUint32)
-			enabled_features.fullDrawIndexUint32 = VK_TRUE;
-		if (features.features.imageCubeArray)
-			enabled_features.imageCubeArray = VK_TRUE;
-		if (features.features.fillModeNonSolid)
-			enabled_features.fillModeNonSolid = VK_TRUE;
-		if (features.features.independentBlend)
-			enabled_features.independentBlend = VK_TRUE;
-		if (features.features.sampleRateShading)
-			enabled_features.sampleRateShading = VK_TRUE;
-		if (features.features.fragmentStoresAndAtomics)
-			enabled_features.fragmentStoresAndAtomics = VK_TRUE;
-		if (features.features.shaderStorageImageExtendedFormats)
-			enabled_features.shaderStorageImageExtendedFormats = VK_TRUE;
-		if (features.features.shaderStorageImageMultisample)
-			enabled_features.shaderStorageImageMultisample = VK_TRUE;
-		if (features.features.largePoints)
-			enabled_features.largePoints = VK_TRUE;
+		// Enable device features we might care about.
+		{
+			VkPhysicalDeviceFeatures enabled_features = *required_features;
+			if (features.features.textureCompressionETC2)
+				enabled_features.textureCompressionETC2 = VK_TRUE;
+			if (features.features.textureCompressionBC)
+				enabled_features.textureCompressionBC = VK_TRUE;
+			if (features.features.textureCompressionASTC_LDR)
+				enabled_features.textureCompressionASTC_LDR = VK_TRUE;
+			if (features.features.fullDrawIndexUint32)
+				enabled_features.fullDrawIndexUint32 = VK_TRUE;
+			if (features.features.imageCubeArray)
+				enabled_features.imageCubeArray = VK_TRUE;
+			if (features.features.fillModeNonSolid)
+				enabled_features.fillModeNonSolid = VK_TRUE;
+			if (features.features.independentBlend)
+				enabled_features.independentBlend = VK_TRUE;
+			if (features.features.sampleRateShading)
+				enabled_features.sampleRateShading = VK_TRUE;
+			if (features.features.fragmentStoresAndAtomics)
+				enabled_features.fragmentStoresAndAtomics = VK_TRUE;
+			if (features.features.shaderStorageImageExtendedFormats)
+				enabled_features.shaderStorageImageExtendedFormats = VK_TRUE;
+			if (features.features.shaderStorageImageMultisample)
+				enabled_features.shaderStorageImageMultisample = VK_TRUE;
+			if (features.features.largePoints)
+				enabled_features.largePoints = VK_TRUE;
 
-		features.features = enabled_features;
-		ext.enabled_features = enabled_features;
-	}
+			features.features = enabled_features;
+			ext.enabled_features = enabled_features;
+		}
 
-	device_info.pEnabledFeatures = &features.features;
+		device_info.pEnabledFeatures = &features.features;
 
 #ifdef VULKAN_DEBUG
-	{
-		bool force_no_validation = false;
-		const char *no_validation = getenv("GRANITE_VULKAN_NO_VALIDATION");
-		if (no_validation && strtoul(no_validation, nullptr, 0) != 0)
-			force_no_validation = true;
-		if (!force_no_validation && has_vk_layer(queried_layers, layer_count, "VK_LAYER_LUNARG_standard_validation"))
-			enabled_layers[enabled_layers_count++] = ("VK_LAYER_LUNARG_standard_validation");
-	}
+		{
+			bool force_no_validation = false;
+			const char *no_validation = getenv("GRANITE_VULKAN_NO_VALIDATION");
+			if (no_validation && strtoul(no_validation, nullptr, 0) != 0)
+				force_no_validation = true;
+			if (!force_no_validation && has_vk_layer(queried_layers, layer_count, "VK_LAYER_LUNARG_standard_validation"))
+				enabled_layers[enabled_layers_count++] = ("VK_LAYER_LUNARG_standard_validation");
+		}
 #endif
 
-	device_info.enabledExtensionCount = enabled_extensions_count;
-	device_info.ppEnabledExtensionNames = enabled_extensions_count ? enabled_extensions : nullptr;
-	device_info.enabledLayerCount = enabled_layers_count;
-	device_info.ppEnabledLayerNames = enabled_layers_count ? enabled_layers : nullptr;
+		device_info.enabledExtensionCount = enabled_extensions_count;
+		device_info.ppEnabledExtensionNames = enabled_extensions_count ? enabled_extensions : nullptr;
+		device_info.enabledLayerCount = enabled_layers_count;
+		device_info.ppEnabledLayerNames = enabled_layers_count ? enabled_layers : nullptr;
 
-	free(queried_extensions);
-	free(queried_layers);
-	free(queue_props);
+		free(queried_extensions);
+		free(queried_layers);
+		free(queue_props);
 
-	VkResult dev_res = vkCreateDevice(gpu, &device_info, nullptr, &device);
-	free(enabled_extensions);
-	free(enabled_layers);
-	if (dev_res != VK_SUCCESS)
-		return false;
+		VkResult dev_res = vkCreateDevice(gpu, &device_info, nullptr, &device);
+		free(enabled_extensions);
+		free(enabled_layers);
+		if (dev_res != VK_SUCCESS)
+			return false;
 
-	/* Load global function pointers using application-created VkDevice. */
-	volkGenLoadDevice(device, vkGetDeviceProcAddrStub);
-	vkGetDeviceQueue(device, graphics_queue_family, graphics_queue_index, &graphics_queue);
-	vkGetDeviceQueue(device, compute_queue_family, compute_queue_index, &compute_queue);
-	vkGetDeviceQueue(device, transfer_queue_family, transfer_queue_index, &transfer_queue);
+		/* Load global function pointers using application-created VkDevice. */
+		volkGenLoadDevice(device, vkGetDeviceProcAddrStub);
+		vkGetDeviceQueue(device, graphics_queue_family, graphics_queue_index, &graphics_queue);
+		vkGetDeviceQueue(device, compute_queue_family, compute_queue_index, &compute_queue);
+		vkGetDeviceQueue(device, transfer_queue_family, transfer_queue_index, &transfer_queue);
 
-	return true;
+		return true;
+	}
 }
-}
-
-/* === device.cpp === */
-
 
 using namespace Util;
 
 namespace Vulkan
 {
-Device::Device()
-    : framebuffer_allocator(this)
-    , transient_allocator(this)
-{
-}
+	Device::Device()
+		: framebuffer_allocator(this)
+		  , transient_allocator(this)
+	{
+	}
 
-void Device::add_wait_semaphore(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush)
-{
-	add_wait_semaphore_nolock(type, semaphore, stages, flush);
-}
+	void Device::add_wait_semaphore(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush)
+	{
+		add_wait_semaphore_nolock(type, semaphore, stages, flush);
+	}
 
-void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages,
-                                       bool flush)
-{
-	VK_ASSERT(stages != 0);
-	if (flush)
-		flush_frame(type);
-	QueueData &data = get_queue_data(type);
+	void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages,
+			bool flush)
+	{
+		VK_ASSERT(stages != 0);
+		if (flush)
+			flush_frame(type);
+		QueueData &data = get_queue_data(type);
 
 #ifdef VULKAN_DEBUG
-	for (Semaphore &sem : data.wait_semaphores)
-		VK_ASSERT(sem.get() != semaphore.get());
+		for (Semaphore &sem : data.wait_semaphores)
+			VK_ASSERT(sem.get() != semaphore.get());
 #endif
 
-	data.wait_semaphores.push(semaphore);
-	data.wait_stages.push(stages);
-	data.need_fence = true;
+		data.wait_semaphores.push(semaphore);
+		data.wait_stages.push(stages);
+		data.need_fence = true;
 
-	// Sanity check.
-	VK_ASSERT(data.wait_semaphores.size() < 16 * 1024);
-}
+		// Sanity check.
+		VK_ASSERT(data.wait_semaphores.size() < 16 * 1024);
+	}
 
-Shader *Device::request_shader(const uint32_t *data, size_t size)
-{
-	Util::Hasher hasher;
-	hasher.data(data, size);
-
-	Hash hash = hasher.get();
-	Shader *ret = shaders.find(hash);
-	if (!ret)
-		ret = shaders.emplace_yield(hash, hash, this, data, size);
-	return ret;
-}
-
-Program *Device::request_program(Vulkan::Shader *compute)
-{
-	Util::Hasher hasher;
-	hasher.u64(compute->intrusive_hashmap_key);
-
-	Hash hash = hasher.get();
-	Program *ret = programs.find(hash);
-	if (!ret)
-		ret = programs.emplace_yield(hash, this, compute);
-	return ret;
-}
-
-Program *Device::request_program(const uint32_t *compute_data, size_t compute_size)
-{
-	Shader *compute = request_shader(compute_data, compute_size);
-	return request_program(compute);
-}
-
-Program *Device::request_program(Shader *vertex, Shader *fragment)
-{
-	Util::Hasher hasher;
-	hasher.u64(vertex->intrusive_hashmap_key);
-	hasher.u64(fragment->intrusive_hashmap_key);
-
-	Hash hash = hasher.get();
-	Program *ret = programs.find(hash);
-
-	if (!ret)
-		ret = programs.emplace_yield(hash, this, vertex, fragment);
-	return ret;
-}
-
-Program *Device::request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
-                                 size_t fragment_size)
-{
-	Shader *vertex = request_shader(vertex_data, vertex_size);
-	Shader *fragment = request_shader(fragment_data, fragment_size);
-	return request_program(vertex, fragment);
-}
-
-PipelineLayout *Device::request_pipeline_layout(const CombinedResourceLayout &layout)
-{
-	Hasher h;
-	h.data(reinterpret_cast<const uint32_t *>(layout.sets), sizeof(layout.sets));
-	h.data(&layout.stages_for_bindings[0][0], sizeof(layout.stages_for_bindings));
-	h.u32(layout.push_constant_range.stageFlags);
-	h.u32(layout.push_constant_range.size);
-	h.data(layout.spec_constant_mask, sizeof(layout.spec_constant_mask));
-	h.u32(layout.attribute_mask);
-	h.u32(layout.render_target_mask);
-
-	Hash hash = h.get();
-	PipelineLayout *ret = pipeline_layouts.find(hash);
-	if (!ret)
-		ret = pipeline_layouts.emplace_yield(hash, hash, this, layout);
-	return ret;
-}
-
-DescriptorSetAllocator *Device::request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings)
-{
-	Hasher h;
-	h.data(reinterpret_cast<const uint32_t *>(&layout), sizeof(layout));
-	h.data(stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
-	Hash hash = h.get();
-
-	DescriptorSetAllocator *ret = descriptor_set_allocators.find(hash);
-	if (!ret)
-		ret = descriptor_set_allocators.emplace_yield(hash, hash, this, layout, stages_for_bindings);
-	return ret;
-}
-
-void Device::bake_program(Program &program)
-{
-	CombinedResourceLayout layout;
-	if (program.get_shader(ShaderStage::Vertex))
-		layout.attribute_mask = program.get_shader(ShaderStage::Vertex)->get_layout().input_mask;
-	if (program.get_shader(ShaderStage::Fragment))
-		layout.render_target_mask = program.get_shader(ShaderStage::Fragment)->get_layout().output_mask;
-
-	layout.descriptor_set_mask = 0;
-
-	for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage::Count); i++)
+	Shader *Device::request_shader(const uint32_t *data, size_t size)
 	{
-		const Shader *shader = program.get_shader(static_cast<ShaderStage>(i));
-		if (!shader)
-			continue;
+		Util::Hasher hasher;
+		hasher.data(data, size);
 
-		uint32_t stage_mask = 1u << i;
+		Hash hash = hasher.get();
+		Shader *ret = shaders.find(hash);
+		if (!ret)
+			ret = shaders.emplace_yield(hash, hash, this, data, size);
+		return ret;
+	}
 
-		const ResourceLayout &shader_layout = shader->get_layout();
-		for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
+	Program *Device::request_program(Vulkan::Shader *compute)
+	{
+		Util::Hasher hasher;
+		hasher.u64(compute->intrusive_hashmap_key);
+
+		Hash hash = hasher.get();
+		Program *ret = programs.find(hash);
+		if (!ret)
+			ret = programs.emplace_yield(hash, this, compute);
+		return ret;
+	}
+
+	Program *Device::request_program(const uint32_t *compute_data, size_t compute_size)
+	{
+		Shader *compute = request_shader(compute_data, compute_size);
+		return request_program(compute);
+	}
+
+	Program *Device::request_program(Shader *vertex, Shader *fragment)
+	{
+		Util::Hasher hasher;
+		hasher.u64(vertex->intrusive_hashmap_key);
+		hasher.u64(fragment->intrusive_hashmap_key);
+
+		Hash hash = hasher.get();
+		Program *ret = programs.find(hash);
+
+		if (!ret)
+			ret = programs.emplace_yield(hash, this, vertex, fragment);
+		return ret;
+	}
+
+	Program *Device::request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
+			size_t fragment_size)
+	{
+		Shader *vertex = request_shader(vertex_data, vertex_size);
+		Shader *fragment = request_shader(fragment_data, fragment_size);
+		return request_program(vertex, fragment);
+	}
+
+	PipelineLayout *Device::request_pipeline_layout(const CombinedResourceLayout &layout)
+	{
+		Hasher h;
+		h.data(reinterpret_cast<const uint32_t *>(layout.sets), sizeof(layout.sets));
+		h.data(&layout.stages_for_bindings[0][0], sizeof(layout.stages_for_bindings));
+		h.u32(layout.push_constant_range.stageFlags);
+		h.u32(layout.push_constant_range.size);
+		h.data(layout.spec_constant_mask, sizeof(layout.spec_constant_mask));
+		h.u32(layout.attribute_mask);
+		h.u32(layout.render_target_mask);
+
+		Hash hash = h.get();
+		PipelineLayout *ret = pipeline_layouts.find(hash);
+		if (!ret)
+			ret = pipeline_layouts.emplace_yield(hash, hash, this, layout);
+		return ret;
+	}
+
+	DescriptorSetAllocator *Device::request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings)
+	{
+		Hasher h;
+		h.data(reinterpret_cast<const uint32_t *>(&layout), sizeof(layout));
+		h.data(stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
+		Hash hash = h.get();
+
+		DescriptorSetAllocator *ret = descriptor_set_allocators.find(hash);
+		if (!ret)
+			ret = descriptor_set_allocators.emplace_yield(hash, hash, this, layout, stages_for_bindings);
+		return ret;
+	}
+
+	void Device::bake_program(Program &program)
+	{
+		CombinedResourceLayout layout;
+		if (program.get_shader(ShaderStage::Vertex))
+			layout.attribute_mask = program.get_shader(ShaderStage::Vertex)->get_layout().input_mask;
+		if (program.get_shader(ShaderStage::Fragment))
+			layout.render_target_mask = program.get_shader(ShaderStage::Fragment)->get_layout().output_mask;
+
+		layout.descriptor_set_mask = 0;
+
+		for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage::Count); i++)
 		{
-			layout.sets[set].sampled_image_mask |= shader_layout.sets[set].sampled_image_mask;
-			layout.sets[set].storage_image_mask |= shader_layout.sets[set].storage_image_mask;
-			layout.sets[set].uniform_buffer_mask |= shader_layout.sets[set].uniform_buffer_mask;
-			layout.sets[set].storage_buffer_mask |= shader_layout.sets[set].storage_buffer_mask;
-			layout.sets[set].sampled_buffer_mask |= shader_layout.sets[set].sampled_buffer_mask;
-			layout.sets[set].input_attachment_mask |= shader_layout.sets[set].input_attachment_mask;
-			layout.sets[set].sampler_mask |= shader_layout.sets[set].sampler_mask;
-			layout.sets[set].separate_image_mask |= shader_layout.sets[set].separate_image_mask;
-			layout.sets[set].fp_mask |= shader_layout.sets[set].fp_mask;
+			const Shader *shader = program.get_shader(static_cast<ShaderStage>(i));
+			if (!shader)
+				continue;
 
-			FOR_EACH_BIT(shader_layout.sets[set].immutable_sampler_mask, binding)
+			uint32_t stage_mask = 1u << i;
+
+			const ResourceLayout &shader_layout = shader->get_layout();
+			for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
 			{
-				StockSampler sampler = get_immutable_sampler(shader_layout.sets[set], binding);
+				layout.sets[set].sampled_image_mask |= shader_layout.sets[set].sampled_image_mask;
+				layout.sets[set].storage_image_mask |= shader_layout.sets[set].storage_image_mask;
+				layout.sets[set].uniform_buffer_mask |= shader_layout.sets[set].uniform_buffer_mask;
+				layout.sets[set].storage_buffer_mask |= shader_layout.sets[set].storage_buffer_mask;
+				layout.sets[set].sampled_buffer_mask |= shader_layout.sets[set].sampled_buffer_mask;
+				layout.sets[set].input_attachment_mask |= shader_layout.sets[set].input_attachment_mask;
+				layout.sets[set].sampler_mask |= shader_layout.sets[set].sampler_mask;
+				layout.sets[set].separate_image_mask |= shader_layout.sets[set].separate_image_mask;
+				layout.sets[set].fp_mask |= shader_layout.sets[set].fp_mask;
 
-				// Do we already have an immutable sampler? Make sure it matches the layout.
-				if (has_immutable_sampler(layout.sets[set], binding))
+				FOR_EACH_BIT(shader_layout.sets[set].immutable_sampler_mask, binding)
 				{
-					if (sampler != get_immutable_sampler(layout.sets[set], binding))
-						LOGE("Immutable sampler mismatch detected!\n");
+					StockSampler sampler = get_immutable_sampler(shader_layout.sets[set], binding);
+
+					// Do we already have an immutable sampler? Make sure it matches the layout.
+					if (has_immutable_sampler(layout.sets[set], binding))
+					{
+						if (sampler != get_immutable_sampler(layout.sets[set], binding))
+							LOGE("Immutable sampler mismatch detected!\n");
+					}
+
+					set_immutable_sampler(layout.sets[set], binding, sampler);
 				}
 
-				set_immutable_sampler(layout.sets[set], binding, sampler);
-						}
-
-			uint32_t active_binds =
+				uint32_t active_binds =
 					shader_layout.sets[set].sampled_image_mask |
 					shader_layout.sets[set].storage_image_mask |
 					shader_layout.sets[set].uniform_buffer_mask|
@@ -16421,1867 +16407,1867 @@ void Device::bake_program(Program &program)
 					shader_layout.sets[set].sampler_mask |
 					shader_layout.sets[set].separate_image_mask;
 
-			if (active_binds)
-				layout.stages_for_sets[set] |= stage_mask;
+				if (active_binds)
+					layout.stages_for_sets[set] |= stage_mask;
 
-			FOR_EACH_BIT(active_binds, bit)
+				FOR_EACH_BIT(active_binds, bit)
+				{
+					layout.stages_for_bindings[set][bit] |= stage_mask;
+				}
+			}
+
+			// Merge push constant ranges into one range.
+			// Do not try to split into multiple ranges as it just complicates things for no obvious gain.
+			if (shader_layout.push_constant_size != 0)
 			{
-				layout.stages_for_bindings[set][bit] |= stage_mask;
-						}
-		}
-
-		// Merge push constant ranges into one range.
-		// Do not try to split into multiple ranges as it just complicates things for no obvious gain.
-		if (shader_layout.push_constant_size != 0)
-		{
-			layout.push_constant_range.stageFlags |= 1u << i;
-			layout.push_constant_range.size =
+				layout.push_constant_range.stageFlags |= 1u << i;
+				layout.push_constant_range.size =
 					max_(layout.push_constant_range.size, shader_layout.push_constant_size);
+			}
+
+			layout.spec_constant_mask[i] = shader_layout.spec_constant_mask;
+			layout.combined_spec_constant_mask |= shader_layout.spec_constant_mask;
 		}
 
-		layout.spec_constant_mask[i] = shader_layout.spec_constant_mask;
-		layout.combined_spec_constant_mask |= shader_layout.spec_constant_mask;
+		for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
+		{
+			if (layout.stages_for_sets[i] != 0)
+				layout.descriptor_set_mask |= 1u << i;
+		}
+
+		Hasher h;
+		h.u32(layout.push_constant_range.stageFlags);
+		h.u32(layout.push_constant_range.size);
+		layout.push_constant_layout_hash = h.get();
+		program.set_pipeline_layout(request_pipeline_layout(layout));
 	}
 
-	for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
+	void Device::set_context(const Context &context)
 	{
-		if (layout.stages_for_sets[i] != 0)
-			layout.descriptor_set_mask |= 1u << i;
-	}
+		instance = context.get_instance();
+		gpu = context.get_gpu();
+		device = context.get_device();
 
-	Hasher h;
-	h.u32(layout.push_constant_range.stageFlags);
-	h.u32(layout.push_constant_range.size);
-	layout.push_constant_layout_hash = h.get();
-	program.set_pipeline_layout(request_pipeline_layout(layout));
-}
+		graphics_queue_family_index = context.get_graphics_queue_family();
+		graphics_queue = context.get_graphics_queue();
+		compute_queue_family_index = context.get_compute_queue_family();
+		compute_queue = context.get_compute_queue();
+		transfer_queue_family_index = context.get_transfer_queue_family();
+		transfer_queue = context.get_transfer_queue();
 
-void Device::set_context(const Context &context)
-{
-	instance = context.get_instance();
-	gpu = context.get_gpu();
-	device = context.get_device();
+		mem_props = context.get_mem_props();
+		gpu_props = context.get_gpu_props();
 
-	graphics_queue_family_index = context.get_graphics_queue_family();
-	graphics_queue = context.get_graphics_queue();
-	compute_queue_family_index = context.get_compute_queue_family();
-	compute_queue = context.get_compute_queue();
-	transfer_queue_family_index = context.get_transfer_queue_family();
-	transfer_queue = context.get_transfer_queue();
+		init_workarounds();
 
-	mem_props = context.get_mem_props();
-	gpu_props = context.get_gpu_props();
-
-	init_workarounds();
-
-	init_stock_samplers();
+		init_stock_samplers();
 
 #ifdef ANDROID
-	init_frame_contexts(3); // Android needs a bit more ... ;)
+		init_frame_contexts(3); // Android needs a bit more ... ;)
 #else
-	init_frame_contexts(2); // By default, regular double buffer between CPU and GPU.
+		init_frame_contexts(2); // By default, regular double buffer between CPU and GPU.
 #endif
 
-	ext = context.get_enabled_device_features();
+		ext = context.get_enabled_device_features();
 
-	managers.memory.init(gpu, device);
-	managers.memory.set_supports_dedicated_allocation(ext.supports_dedicated);
-	managers.semaphore.init(device);
-	managers.fence.init(device);
-	managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	managers.ubo.init(this, 256 * 1024, max_<VkDeviceSize>(16u, gpu_props.limits.minUniformBufferOffsetAlignment),
-	                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-}
+		managers.memory.init(gpu, device);
+		managers.memory.set_supports_dedicated_allocation(ext.supports_dedicated);
+		managers.semaphore.init(device);
+		managers.fence.init(device);
+		managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		managers.ubo.init(this, 256 * 1024, max_<VkDeviceSize>(16u, gpu_props.limits.minUniformBufferOffsetAlignment),
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	}
 
-void Device::init_stock_samplers()
-{
-	SamplerCreateInfo info = {};
-	info.max_lod = VK_LOD_CLAMP_NONE;
-	info.max_anisotropy = 1.0f;
-
-	for (unsigned i = 0; i < static_cast<unsigned>(StockSampler::Count); i++)
+	void Device::init_stock_samplers()
 	{
-		StockSampler mode = static_cast<StockSampler>(i);
+		SamplerCreateInfo info = {};
+		info.max_lod = VK_LOD_CLAMP_NONE;
+		info.max_anisotropy = 1.0f;
 
-		switch (mode)
+		for (unsigned i = 0; i < static_cast<unsigned>(StockSampler::Count); i++)
 		{
-		case StockSampler::NearestShadow:
-		case StockSampler::LinearShadow:
-			info.compare_enable = true;
-			info.compare_op = VK_COMPARE_OP_LESS_OR_EQUAL;
-			break;
+			StockSampler mode = static_cast<StockSampler>(i);
 
-		default:
-			info.compare_enable = false;
-			break;
-		}
-
-		switch (mode)
-		{
-		case StockSampler::TrilinearClamp:
-		case StockSampler::TrilinearWrap:
-			info.mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-			break;
-
-		default:
-			info.mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			break;
-		}
-
-		switch (mode)
-		{
-		case StockSampler::LinearClamp:
-		case StockSampler::LinearWrap:
-		case StockSampler::TrilinearClamp:
-		case StockSampler::TrilinearWrap:
-		case StockSampler::LinearShadow:
-			info.mag_filter = VK_FILTER_LINEAR;
-			info.min_filter = VK_FILTER_LINEAR;
-			break;
-
-		default:
-			info.mag_filter = VK_FILTER_NEAREST;
-			info.min_filter = VK_FILTER_NEAREST;
-			break;
-		}
-
-		switch (mode)
-		{
-		default:
-		case StockSampler::LinearWrap:
-		case StockSampler::NearestWrap:
-		case StockSampler::TrilinearWrap:
-			info.address_mode_u = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.address_mode_v = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.address_mode_w = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			break;
-
-		case StockSampler::LinearClamp:
-		case StockSampler::NearestClamp:
-		case StockSampler::TrilinearClamp:
-		case StockSampler::NearestShadow:
-		case StockSampler::LinearShadow:
-			info.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			info.address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			break;
-		}
-		samplers[i] = create_sampler(info, mode);
-	}
-}
-
-static void request_block(Device &device, BufferBlock &block, VkDeviceSize size,
-                          BufferPool &pool, BufferBlockVec *dma, BufferBlockVec &recycle)
-{
-	if (block.mapped)
-		device.unmap_host_buffer(*block.cpu, MEMORY_ACCESS_WRITE_BIT);
-
-	if (block.offset == 0)
-	{
-		if (block.size == pool.get_block_size())
-			pool.recycle_block(std::move(block));
-	}
-	else
-	{
-		if (block.cpu != block.gpu)
-		{
-			VK_ASSERT(dma);
-			dma->push(block);
-		}
-
-		if (block.size == pool.get_block_size())
-			recycle.push(block);
-	}
-
-	if (size)
-		block = pool.request_block(size);
-	else
-		block = {};
-}
-
-void Device::request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size)
-{
-	request_block(*this, block, size, managers.vbo, &dma.vbo, frame().vbo_blocks);
-}
-
-void Device::request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size)
-{
-	request_block(*this, block, size, managers.ubo, &dma.ubo, frame().ubo_blocks);
-}
-
-void Device::submit(CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
-{
-	submit_nolock(std::move(cmd), fence, semaphore_count, semaphores);
-}
-
-CommandBuffer::Type Device::get_physical_queue_type(CommandBuffer::Type queue_type) const
-{
-	if (queue_type != CommandBuffer::Type::AsyncGraphics)
-	{
-		return queue_type;
-	}
-	else
-	{
-		if (graphics_queue_family_index == compute_queue_family_index && graphics_queue != compute_queue)
-			return CommandBuffer::Type::AsyncCompute;
-		else
-			return CommandBuffer::Type::Generic;
-	}
-}
-
-void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
-{
-	CommandBuffer::Type type = cmd->get_command_buffer_type();
-	CommandPool &pool = get_command_pool(type);
-	CommandBufferHandleVec &submissions = get_queue_submissions(type);
-
-	pool.signal_submitted(cmd->get_command_buffer());
-	cmd->end();
-	submissions.push(std::move(cmd));
-
-	VkFence cleared_fence = VK_NULL_HANDLE;
-
-	if (fence || semaphore_count)
-		submit_queue(type, fence ? &cleared_fence : nullptr, semaphore_count, semaphores);
-
-	if (fence)
-	{
-		VK_ASSERT(!*fence);
-		*fence = Fence(handle_pool.fences.allocate(this, cleared_fence));
-	}
-
-	decrement_frame_counter_nolock();
-}
-
-POD_VEC_DECLARE(VkFlagsVec, VkFlags);
-void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
-                                unsigned semaphore_count, Semaphore *semaphores)
-{
-	QueueData &data = get_queue_data(type);
-	VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-
-	// Add external wait semaphores.
-	SemaphoreVec waits   = { NULL, 0, 0 };
-	SemaphoreVec signals = { NULL, 0, 0 };
-	VkFlagsVec stages      = { NULL, 0, 0 };
-	{
-		size_t ws;
-		for (ws = 0; ws < data.wait_stages.size(); ws++)
-			stages.push(data.wait_stages[ws]);
-	}
-
-	for (Semaphore &semaphore : data.wait_semaphores)
-	{
-		VkSemaphore wait = semaphore->consume();
-		frame().recycled_semaphores.push(wait);
-		waits.push(wait);
-	}
-	data.wait_stages.clear();
-	data.wait_semaphores.clear();
-
-	// Add external signal semaphores.
-	for (unsigned i = 0; i < semaphore_count; i++)
-	{
-		VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
-		signals.push(cleared_semaphore);
-		VK_ASSERT(!semaphores[i]);
-		semaphores[i] = Semaphore(handle_pool.semaphores.allocate(this, cleared_semaphore, true));
-	}
-
-	submit.signalSemaphoreCount = signals.size();
-	submit.waitSemaphoreCount = waits.size();
-	if (!signals.empty())
-		submit.pSignalSemaphores = signals.data();
-	if (!stages.empty())
-		submit.pWaitDstStageMask = stages.data();
-	if (!waits.empty())
-		submit.pWaitSemaphores = waits.data();
-
-	VkQueue queue;
-	switch (type)
-	{
-	default:
-	case CommandBuffer::Type::Generic:
-		queue = graphics_queue;
-		break;
-	case CommandBuffer::Type::AsyncCompute:
-		queue = compute_queue;
-		break;
-	case CommandBuffer::Type::AsyncTransfer:
-		queue = transfer_queue;
-		break;
-	}
-
-	VkFence cleared_fence = fence ? managers.fence.request_cleared_fence() : VK_NULL_HANDLE;
-	VkResult result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
-
-	if (result != VK_SUCCESS)
-		LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
-
-	waits.free_storage();
-	signals.free_storage();
-	stages.free_storage();
-
-	if (fence)
-	{
-		frame().wait_fences.push(cleared_fence);
-		*fence = cleared_fence;
-		data.need_fence = false;
-	}
-	else
-		data.need_fence = true;
-}
-
-void Device::submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush)
-{
-	VkAccessFlags access = buffer_usage_to_possible_access(usage);
-	VkPipelineStageFlags stages = buffer_usage_to_possible_stages(usage);
-
-	if (transfer_queue == graphics_queue && transfer_queue == compute_queue)
-	{
-		// For single-queue systems, just use a pipeline barrier.
-		cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, stages, access);
-		submit_nolock(cmd, nullptr, 0, nullptr);
-	}
-	else
-	{
-		VkPipelineStageFlags compute_stages = stages &
-		                      (VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
-		                       VK_PIPELINE_STAGE_TRANSFER_BIT |
-		                       VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT);
-
-		VkAccessFlags compute_access = access &
-		                      (VK_ACCESS_SHADER_READ_BIT |
-		                       VK_ACCESS_SHADER_WRITE_BIT |
-		                       VK_ACCESS_TRANSFER_READ_BIT |
-		                       VK_ACCESS_UNIFORM_READ_BIT |
-		                       VK_ACCESS_TRANSFER_WRITE_BIT |
-		                       VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
-
-		VkPipelineStageFlags graphics_stages = stages;
-
-		if (transfer_queue == graphics_queue)
-		{
-			cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-			             graphics_stages, access);
-
-			if (compute_stages != 0)
+			switch (mode)
 			{
-				Semaphore sem;
-				submit_nolock(cmd, nullptr, 1, &sem);
-				add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, sem, compute_stages, flush);
-			}
-			else
-				submit_nolock(cmd, nullptr, 0, nullptr);
-		}
-		else if (transfer_queue == compute_queue)
-		{
-			cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-			             compute_stages, compute_access);
+				case StockSampler::NearestShadow:
+				case StockSampler::LinearShadow:
+					info.compare_enable = true;
+					info.compare_op = VK_COMPARE_OP_LESS_OR_EQUAL;
+					break;
 
-			if (graphics_stages != 0)
-			{
-				Semaphore sem;
-				submit_nolock(cmd, nullptr, 1, &sem);
-				add_wait_semaphore_nolock(CommandBuffer::Type::Generic, sem, graphics_stages, flush);
+				default:
+					info.compare_enable = false;
+					break;
 			}
-			else
-				submit_nolock(cmd, nullptr, 0, nullptr);
+
+			switch (mode)
+			{
+				case StockSampler::TrilinearClamp:
+				case StockSampler::TrilinearWrap:
+					info.mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+					break;
+
+				default:
+					info.mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+					break;
+			}
+
+			switch (mode)
+			{
+				case StockSampler::LinearClamp:
+				case StockSampler::LinearWrap:
+				case StockSampler::TrilinearClamp:
+				case StockSampler::TrilinearWrap:
+				case StockSampler::LinearShadow:
+					info.mag_filter = VK_FILTER_LINEAR;
+					info.min_filter = VK_FILTER_LINEAR;
+					break;
+
+				default:
+					info.mag_filter = VK_FILTER_NEAREST;
+					info.min_filter = VK_FILTER_NEAREST;
+					break;
+			}
+
+			switch (mode)
+			{
+				default:
+				case StockSampler::LinearWrap:
+				case StockSampler::NearestWrap:
+				case StockSampler::TrilinearWrap:
+					info.address_mode_u = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+					info.address_mode_v = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+					info.address_mode_w = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+					break;
+
+				case StockSampler::LinearClamp:
+				case StockSampler::NearestClamp:
+				case StockSampler::TrilinearClamp:
+				case StockSampler::NearestShadow:
+				case StockSampler::LinearShadow:
+					info.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+					info.address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+					info.address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+					break;
+			}
+			samplers[i] = create_sampler(info, mode);
+		}
+	}
+
+	static void request_block(Device &device, BufferBlock &block, VkDeviceSize size,
+			BufferPool &pool, BufferBlockVec *dma, BufferBlockVec &recycle)
+	{
+		if (block.mapped)
+			device.unmap_host_buffer(*block.cpu, MEMORY_ACCESS_WRITE_BIT);
+
+		if (block.offset == 0)
+		{
+			if (block.size == pool.get_block_size())
+				pool.recycle_block(std::move(block));
 		}
 		else
 		{
-			if (graphics_stages != 0 && compute_stages != 0)
+			if (block.cpu != block.gpu)
 			{
-				Semaphore semaphores[2];
-				submit_nolock(cmd, nullptr, 2, semaphores);
-				add_wait_semaphore_nolock(CommandBuffer::Type::Generic, semaphores[0], graphics_stages, flush);
-				add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, semaphores[1], compute_stages, flush);
+				VK_ASSERT(dma);
+				dma->push(block);
 			}
-			else if (graphics_stages != 0)
-			{
-				Semaphore sem;
-				submit_nolock(cmd, nullptr, 1, &sem);
-				add_wait_semaphore_nolock(CommandBuffer::Type::Generic, sem, graphics_stages, flush);
-			}
-			else if (compute_stages != 0)
-			{
-				Semaphore sem;
-				submit_nolock(cmd, nullptr, 1, &sem);
-				add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, sem, compute_stages, flush);
-			}
+
+			if (block.size == pool.get_block_size())
+				recycle.push(block);
+		}
+
+		if (size)
+			block = pool.request_block(size);
+		else
+			block = {};
+	}
+
+	void Device::request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size)
+	{
+		request_block(*this, block, size, managers.vbo, &dma.vbo, frame().vbo_blocks);
+	}
+
+	void Device::request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size)
+	{
+		request_block(*this, block, size, managers.ubo, &dma.ubo, frame().ubo_blocks);
+	}
+
+	void Device::submit(CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
+	{
+		submit_nolock(std::move(cmd), fence, semaphore_count, semaphores);
+	}
+
+	CommandBuffer::Type Device::get_physical_queue_type(CommandBuffer::Type queue_type) const
+	{
+		if (queue_type != CommandBuffer::Type::AsyncGraphics)
+		{
+			return queue_type;
+		}
+		else
+		{
+			if (graphics_queue_family_index == compute_queue_family_index && graphics_queue != compute_queue)
+				return CommandBuffer::Type::AsyncCompute;
 			else
-				submit_nolock(cmd, nullptr, 0, nullptr);
+				return CommandBuffer::Type::Generic;
 		}
 	}
-}
 
-POD_VEC_DECLARE(VkSubmitInfoVec, VkSubmitInfo);
-
-void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
-                          unsigned semaphore_count, Semaphore *semaphores)
-{
-	type = get_physical_queue_type(type);
-
-	// Always check if we need to flush pending transfers.
-	if (type != CommandBuffer::Type::AsyncTransfer)
-		flush_frame(CommandBuffer::Type::AsyncTransfer);
-
-	QueueData &data = get_queue_data(type);
-	CommandBufferHandleVec &submissions = get_queue_submissions(type);
-
-	if (submissions.empty())
+	void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 	{
+		CommandBuffer::Type type = cmd->get_command_buffer_type();
+		CommandPool &pool = get_command_pool(type);
+		CommandBufferHandleVec &submissions = get_queue_submissions(type);
+
+		pool.signal_submitted(cmd->get_command_buffer());
+		cmd->end();
+		submissions.push(std::move(cmd));
+
+		VkFence cleared_fence = VK_NULL_HANDLE;
+
 		if (fence || semaphore_count)
-			submit_empty_inner(type, fence, semaphore_count, semaphores);
-		return;
-	}
+			submit_queue(type, fence ? &cleared_fence : nullptr, semaphore_count, semaphores);
 
-	CommandBufferVec cmds = { NULL, 0, 0 };
-
-	VkSubmitInfoVec submits = { NULL, 0, 0 };
-	size_t last_cmd = 0;
-
-	SemaphoreVec waits[2]   = { { NULL, 0, 0 }, { NULL, 0, 0 } };
-	SemaphoreVec signals[2] = { { NULL, 0, 0 }, { NULL, 0, 0 } };
-	VkFlagsVec stages[2]      = { { NULL, 0, 0 }, { NULL, 0, 0 } };
-
-	// Add external wait semaphores.
-	{
-		// Move the pending wait stages across (then the source is cleared below).
-		size_t ws;
-		for (ws = 0; ws < data.wait_stages.size(); ws++)
-			stages[0].push(data.wait_stages[ws]);
-	}
-
-	for (Semaphore &semaphore : data.wait_semaphores)
-	{
-		VkSemaphore wait = semaphore->consume();
-		frame().recycled_semaphores.push(wait);
-		waits[0].push(wait);
-	}
-	data.wait_stages.clear();
-	data.wait_semaphores.clear();
-
-	for (CommandBufferHandle &cmd : submissions)
-		cmds.push(cmd->get_command_buffer());
-
-	if (cmds.size() > (int)last_cmd)
-	{
-		// Push all pending cmd buffers to their own submission.
-		VkSubmitInfo zero_submit;
-		memset(&zero_submit, 0, sizeof(zero_submit));
-		submits.push(zero_submit);
-
-		VkSubmitInfo &submit = submits.back();
-		submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submit.pNext = nullptr;
-		submit.commandBufferCount = cmds.size() - last_cmd;
-		submit.pCommandBuffers = cmds.data() + last_cmd;
-		last_cmd = cmds.size();
-	}
-
-	VkFence cleared_fence = fence ? managers.fence.request_cleared_fence() : VK_NULL_HANDLE;
-
-	for (unsigned i = 0; i < semaphore_count; i++)
-	{
-		VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
-		signals[submits.size() - 1].push(cleared_semaphore);
-		VK_ASSERT(!semaphores[i]);
-		semaphores[i] = Semaphore(handle_pool.semaphores.allocate(this, cleared_semaphore, true));
-	}
-
-	for (int i = 0; i < submits.size(); i++)
-	{
-		VkSubmitInfo &submit = submits[i];
-		submit.waitSemaphoreCount = waits[i].size();
-		if (!waits[i].empty())
+		if (fence)
 		{
-			submit.pWaitSemaphores = waits[i].data();
-			submit.pWaitDstStageMask = stages[i].data();
+			VK_ASSERT(!*fence);
+			*fence = Fence(handle_pool.fences.allocate(this, cleared_fence));
 		}
 
-		submit.signalSemaphoreCount = signals[i].size();
-		if (!signals[i].empty())
-			submit.pSignalSemaphores = signals[i].data();
+		decrement_frame_counter_nolock();
 	}
 
-	VkQueue queue;
-	switch (type)
+	POD_VEC_DECLARE(VkFlagsVec, VkFlags);
+	void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
+			unsigned semaphore_count, Semaphore *semaphores)
 	{
-	default:
-	case CommandBuffer::Type::Generic:
-		queue = graphics_queue;
-		break;
-	case CommandBuffer::Type::AsyncCompute:
-		queue = compute_queue;
-		break;
-	case CommandBuffer::Type::AsyncTransfer:
-		queue = transfer_queue;
-		break;
+		QueueData &data = get_queue_data(type);
+		VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+
+		// Add external wait semaphores.
+		SemaphoreVec waits   = { NULL, 0, 0 };
+		SemaphoreVec signals = { NULL, 0, 0 };
+		VkFlagsVec stages      = { NULL, 0, 0 };
+		{
+			size_t ws;
+			for (ws = 0; ws < data.wait_stages.size(); ws++)
+				stages.push(data.wait_stages[ws]);
+		}
+
+		for (Semaphore &semaphore : data.wait_semaphores)
+		{
+			VkSemaphore wait = semaphore->consume();
+			frame().recycled_semaphores.push(wait);
+			waits.push(wait);
+		}
+		data.wait_stages.clear();
+		data.wait_semaphores.clear();
+
+		// Add external signal semaphores.
+		for (unsigned i = 0; i < semaphore_count; i++)
+		{
+			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
+			signals.push(cleared_semaphore);
+			VK_ASSERT(!semaphores[i]);
+			semaphores[i] = Semaphore(handle_pool.semaphores.allocate(this, cleared_semaphore, true));
+		}
+
+		submit.signalSemaphoreCount = signals.size();
+		submit.waitSemaphoreCount = waits.size();
+		if (!signals.empty())
+			submit.pSignalSemaphores = signals.data();
+		if (!stages.empty())
+			submit.pWaitDstStageMask = stages.data();
+		if (!waits.empty())
+			submit.pWaitSemaphores = waits.data();
+
+		VkQueue queue;
+		switch (type)
+		{
+			default:
+			case CommandBuffer::Type::Generic:
+				queue = graphics_queue;
+				break;
+			case CommandBuffer::Type::AsyncCompute:
+				queue = compute_queue;
+				break;
+			case CommandBuffer::Type::AsyncTransfer:
+				queue = transfer_queue;
+				break;
+		}
+
+		VkFence cleared_fence = fence ? managers.fence.request_cleared_fence() : VK_NULL_HANDLE;
+		VkResult result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
+
+		if (result != VK_SUCCESS)
+			LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
+
+		waits.free_storage();
+		signals.free_storage();
+		stages.free_storage();
+
+		if (fence)
+		{
+			frame().wait_fences.push(cleared_fence);
+			*fence = cleared_fence;
+			data.need_fence = false;
+		}
+		else
+			data.need_fence = true;
 	}
 
-	VkResult result = vkQueueSubmit(queue, submits.size(), submits.data(), cleared_fence);
-	if (result != VK_SUCCESS)
-		LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
-	submissions.clear();
-
-	cmds.free_storage();
-	submits.free_storage();
-	waits[0].free_storage();  waits[1].free_storage();
-	signals[0].free_storage(); signals[1].free_storage();
-	stages[0].free_storage();  stages[1].free_storage();
-
-	if (fence)
+	void Device::submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush)
 	{
-		frame().wait_fences.push(cleared_fence);
-		*fence = cleared_fence;
-		data.need_fence = false;
+		VkAccessFlags access = buffer_usage_to_possible_access(usage);
+		VkPipelineStageFlags stages = buffer_usage_to_possible_stages(usage);
+
+		if (transfer_queue == graphics_queue && transfer_queue == compute_queue)
+		{
+			// For single-queue systems, just use a pipeline barrier.
+			cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, stages, access);
+			submit_nolock(cmd, nullptr, 0, nullptr);
+		}
+		else
+		{
+			VkPipelineStageFlags compute_stages = stages &
+				(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+				 VK_PIPELINE_STAGE_TRANSFER_BIT |
+				 VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT);
+
+			VkAccessFlags compute_access = access &
+				(VK_ACCESS_SHADER_READ_BIT |
+				 VK_ACCESS_SHADER_WRITE_BIT |
+				 VK_ACCESS_TRANSFER_READ_BIT |
+				 VK_ACCESS_UNIFORM_READ_BIT |
+				 VK_ACCESS_TRANSFER_WRITE_BIT |
+				 VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
+
+			VkPipelineStageFlags graphics_stages = stages;
+
+			if (transfer_queue == graphics_queue)
+			{
+				cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+						graphics_stages, access);
+
+				if (compute_stages != 0)
+				{
+					Semaphore sem;
+					submit_nolock(cmd, nullptr, 1, &sem);
+					add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, sem, compute_stages, flush);
+				}
+				else
+					submit_nolock(cmd, nullptr, 0, nullptr);
+			}
+			else if (transfer_queue == compute_queue)
+			{
+				cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+						compute_stages, compute_access);
+
+				if (graphics_stages != 0)
+				{
+					Semaphore sem;
+					submit_nolock(cmd, nullptr, 1, &sem);
+					add_wait_semaphore_nolock(CommandBuffer::Type::Generic, sem, graphics_stages, flush);
+				}
+				else
+					submit_nolock(cmd, nullptr, 0, nullptr);
+			}
+			else
+			{
+				if (graphics_stages != 0 && compute_stages != 0)
+				{
+					Semaphore semaphores[2];
+					submit_nolock(cmd, nullptr, 2, semaphores);
+					add_wait_semaphore_nolock(CommandBuffer::Type::Generic, semaphores[0], graphics_stages, flush);
+					add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, semaphores[1], compute_stages, flush);
+				}
+				else if (graphics_stages != 0)
+				{
+					Semaphore sem;
+					submit_nolock(cmd, nullptr, 1, &sem);
+					add_wait_semaphore_nolock(CommandBuffer::Type::Generic, sem, graphics_stages, flush);
+				}
+				else if (compute_stages != 0)
+				{
+					Semaphore sem;
+					submit_nolock(cmd, nullptr, 1, &sem);
+					add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, sem, compute_stages, flush);
+				}
+				else
+					submit_nolock(cmd, nullptr, 0, nullptr);
+			}
+		}
 	}
-	else
-		data.need_fence = true;
-}
 
-void Device::sync_buffer_blocks()
-{
-	if (dma.vbo.empty() && dma.ubo.empty())
-		return;
+	POD_VEC_DECLARE(VkSubmitInfoVec, VkSubmitInfo);
 
-	VkBufferUsageFlags usage = 0;
-
-	CommandBufferHandle cmd = request_command_buffer_nolock(CommandBuffer::Type::AsyncTransfer);
-
-	cmd->begin_region("buffer-block-sync");
-
-	for (BufferBlock &block : dma.vbo)
+	void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
+			unsigned semaphore_count, Semaphore *semaphores)
 	{
-		VK_ASSERT(block.offset != 0);
-		cmd->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
-		usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		type = get_physical_queue_type(type);
+
+		// Always check if we need to flush pending transfers.
+		if (type != CommandBuffer::Type::AsyncTransfer)
+			flush_frame(CommandBuffer::Type::AsyncTransfer);
+
+		QueueData &data = get_queue_data(type);
+		CommandBufferHandleVec &submissions = get_queue_submissions(type);
+
+		if (submissions.empty())
+		{
+			if (fence || semaphore_count)
+				submit_empty_inner(type, fence, semaphore_count, semaphores);
+			return;
+		}
+
+		CommandBufferVec cmds = { NULL, 0, 0 };
+
+		VkSubmitInfoVec submits = { NULL, 0, 0 };
+		size_t last_cmd = 0;
+
+		SemaphoreVec waits[2]   = { { NULL, 0, 0 }, { NULL, 0, 0 } };
+		SemaphoreVec signals[2] = { { NULL, 0, 0 }, { NULL, 0, 0 } };
+		VkFlagsVec stages[2]      = { { NULL, 0, 0 }, { NULL, 0, 0 } };
+
+		// Add external wait semaphores.
+		{
+			// Move the pending wait stages across (then the source is cleared below).
+			size_t ws;
+			for (ws = 0; ws < data.wait_stages.size(); ws++)
+				stages[0].push(data.wait_stages[ws]);
+		}
+
+		for (Semaphore &semaphore : data.wait_semaphores)
+		{
+			VkSemaphore wait = semaphore->consume();
+			frame().recycled_semaphores.push(wait);
+			waits[0].push(wait);
+		}
+		data.wait_stages.clear();
+		data.wait_semaphores.clear();
+
+		for (CommandBufferHandle &cmd : submissions)
+			cmds.push(cmd->get_command_buffer());
+
+		if (cmds.size() > (int)last_cmd)
+		{
+			// Push all pending cmd buffers to their own submission.
+			VkSubmitInfo zero_submit;
+			memset(&zero_submit, 0, sizeof(zero_submit));
+			submits.push(zero_submit);
+
+			VkSubmitInfo &submit = submits.back();
+			submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submit.pNext = nullptr;
+			submit.commandBufferCount = cmds.size() - last_cmd;
+			submit.pCommandBuffers = cmds.data() + last_cmd;
+			last_cmd = cmds.size();
+		}
+
+		VkFence cleared_fence = fence ? managers.fence.request_cleared_fence() : VK_NULL_HANDLE;
+
+		for (unsigned i = 0; i < semaphore_count; i++)
+		{
+			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
+			signals[submits.size() - 1].push(cleared_semaphore);
+			VK_ASSERT(!semaphores[i]);
+			semaphores[i] = Semaphore(handle_pool.semaphores.allocate(this, cleared_semaphore, true));
+		}
+
+		for (int i = 0; i < submits.size(); i++)
+		{
+			VkSubmitInfo &submit = submits[i];
+			submit.waitSemaphoreCount = waits[i].size();
+			if (!waits[i].empty())
+			{
+				submit.pWaitSemaphores = waits[i].data();
+				submit.pWaitDstStageMask = stages[i].data();
+			}
+
+			submit.signalSemaphoreCount = signals[i].size();
+			if (!signals[i].empty())
+				submit.pSignalSemaphores = signals[i].data();
+		}
+
+		VkQueue queue;
+		switch (type)
+		{
+			default:
+			case CommandBuffer::Type::Generic:
+				queue = graphics_queue;
+				break;
+			case CommandBuffer::Type::AsyncCompute:
+				queue = compute_queue;
+				break;
+			case CommandBuffer::Type::AsyncTransfer:
+				queue = transfer_queue;
+				break;
+		}
+
+		VkResult result = vkQueueSubmit(queue, submits.size(), submits.data(), cleared_fence);
+		if (result != VK_SUCCESS)
+			LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
+		submissions.clear();
+
+		cmds.free_storage();
+		submits.free_storage();
+		waits[0].free_storage();  waits[1].free_storage();
+		signals[0].free_storage(); signals[1].free_storage();
+		stages[0].free_storage();  stages[1].free_storage();
+
+		if (fence)
+		{
+			frame().wait_fences.push(cleared_fence);
+			*fence = cleared_fence;
+			data.need_fence = false;
+		}
+		else
+			data.need_fence = true;
 	}
 
-	for (BufferBlock &block : dma.ubo)
+	void Device::sync_buffer_blocks()
 	{
-		VK_ASSERT(block.offset != 0);
-		cmd->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
-		usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		if (dma.vbo.empty() && dma.ubo.empty())
+			return;
+
+		VkBufferUsageFlags usage = 0;
+
+		CommandBufferHandle cmd = request_command_buffer_nolock(CommandBuffer::Type::AsyncTransfer);
+
+		cmd->begin_region("buffer-block-sync");
+
+		for (BufferBlock &block : dma.vbo)
+		{
+			VK_ASSERT(block.offset != 0);
+			cmd->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
+			usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+		}
+
+		for (BufferBlock &block : dma.ubo)
+		{
+			VK_ASSERT(block.offset != 0);
+			cmd->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
+			usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		}
+
+		dma.vbo.clear();
+		dma.ubo.clear();
+
+		cmd->end_region();
+
+		// Do not flush graphics or compute in this context.
+		// We must be able to inject semaphores into all currently enqueued graphics / compute.
+		submit_staging(cmd, usage, false);
 	}
 
-	dma.vbo.clear();
-	dma.ubo.clear();
-
-	cmd->end_region();
-
-	// Do not flush graphics or compute in this context.
-	// We must be able to inject semaphores into all currently enqueued graphics / compute.
-	submit_staging(cmd, usage, false);
-}
-
-void Device::end_frame_nolock()
-{
-	// Make sure we have a fence which covers all submissions in the frame.
-	VkFence fence;
-
-	if (transfer.need_fence || !frame().transfer_submissions.empty())
+	void Device::end_frame_nolock()
 	{
-		submit_queue(CommandBuffer::Type::AsyncTransfer, &fence, 0, nullptr);
-		frame().recycle_fences.push(fence);
-		transfer.need_fence = false;
+		// Make sure we have a fence which covers all submissions in the frame.
+		VkFence fence;
+
+		if (transfer.need_fence || !frame().transfer_submissions.empty())
+		{
+			submit_queue(CommandBuffer::Type::AsyncTransfer, &fence, 0, nullptr);
+			frame().recycle_fences.push(fence);
+			transfer.need_fence = false;
+		}
+
+		if (graphics.need_fence || !frame().graphics_submissions.empty())
+		{
+			submit_queue(CommandBuffer::Type::Generic, &fence, 0, nullptr);
+			frame().recycle_fences.push(fence);
+			graphics.need_fence = false;
+		}
+
+		if (compute.need_fence || !frame().compute_submissions.empty())
+		{
+			submit_queue(CommandBuffer::Type::AsyncCompute, &fence, 0, nullptr);
+			frame().recycle_fences.push(fence);
+			compute.need_fence = false;
+		}
 	}
 
-	if (graphics.need_fence || !frame().graphics_submissions.empty())
+	void Device::flush_frame_nolock()
 	{
-		submit_queue(CommandBuffer::Type::Generic, &fence, 0, nullptr);
-		frame().recycle_fences.push(fence);
-		graphics.need_fence = false;
+		flush_frame(CommandBuffer::Type::AsyncTransfer);
+		flush_frame(CommandBuffer::Type::Generic);
+		flush_frame(CommandBuffer::Type::AsyncCompute);
 	}
 
-	if (compute.need_fence || !frame().compute_submissions.empty())
+	Device::QueueData &Device::get_queue_data(CommandBuffer::Type type)
 	{
-		submit_queue(CommandBuffer::Type::AsyncCompute, &fence, 0, nullptr);
-		frame().recycle_fences.push(fence);
-		compute.need_fence = false;
+		switch (get_physical_queue_type(type))
+		{
+			default:
+			case CommandBuffer::Type::Generic:
+				return graphics;
+			case CommandBuffer::Type::AsyncCompute:
+				return compute;
+			case CommandBuffer::Type::AsyncTransfer:
+				return transfer;
+		}
 	}
-}
 
-void Device::flush_frame_nolock()
-{
-	flush_frame(CommandBuffer::Type::AsyncTransfer);
-	flush_frame(CommandBuffer::Type::Generic);
-	flush_frame(CommandBuffer::Type::AsyncCompute);
-}
-
-Device::QueueData &Device::get_queue_data(CommandBuffer::Type type)
-{
-	switch (get_physical_queue_type(type))
+	CommandPool &Device::get_command_pool(CommandBuffer::Type type)
 	{
-	default:
-	case CommandBuffer::Type::Generic:
-		return graphics;
-	case CommandBuffer::Type::AsyncCompute:
-		return compute;
-	case CommandBuffer::Type::AsyncTransfer:
-		return transfer;
+		switch (get_physical_queue_type(type))
+		{
+			default:
+			case CommandBuffer::Type::Generic:
+				return frame().graphics_cmd_pool;
+			case CommandBuffer::Type::AsyncCompute:
+				return frame().compute_cmd_pool;
+			case CommandBuffer::Type::AsyncTransfer:
+				return frame().transfer_cmd_pool;
+		}
 	}
-}
 
-CommandPool &Device::get_command_pool(CommandBuffer::Type type)
-{
-	switch (get_physical_queue_type(type))
+	Device::CommandBufferHandleVec &Device::get_queue_submissions(CommandBuffer::Type type)
 	{
-	default:
-	case CommandBuffer::Type::Generic:
-		return frame().graphics_cmd_pool;
-	case CommandBuffer::Type::AsyncCompute:
-		return frame().compute_cmd_pool;
-	case CommandBuffer::Type::AsyncTransfer:
-		return frame().transfer_cmd_pool;
+		switch (get_physical_queue_type(type))
+		{
+			default:
+			case CommandBuffer::Type::Generic:
+				return frame().graphics_submissions;
+			case CommandBuffer::Type::AsyncCompute:
+				return frame().compute_submissions;
+			case CommandBuffer::Type::AsyncTransfer:
+				return frame().transfer_submissions;
+		}
 	}
-}
 
-Device::CommandBufferHandleVec &Device::get_queue_submissions(CommandBuffer::Type type)
-{
-	switch (get_physical_queue_type(type))
+	CommandBufferHandle Device::request_command_buffer(CommandBuffer::Type type)
 	{
-	default:
-	case CommandBuffer::Type::Generic:
-		return frame().graphics_submissions;
-	case CommandBuffer::Type::AsyncCompute:
-		return frame().compute_submissions;
-	case CommandBuffer::Type::AsyncTransfer:
-		return frame().transfer_submissions;
+		return request_command_buffer_nolock(type);
 	}
-}
 
-CommandBufferHandle Device::request_command_buffer(CommandBuffer::Type type)
-{
-	return request_command_buffer_nolock(type);
-}
-
-CommandBufferHandle Device::request_command_buffer_nolock(CommandBuffer::Type type)
-{
-	VkCommandBuffer cmd = get_command_pool(type).request_command_buffer();
-
-	VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-	info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	vkBeginCommandBuffer(cmd, &info);
-	add_frame_counter_nolock();
-	CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, type));
-	return handle;
-}
-
-Device::~Device()
-{
-	wait_idle();
-
-	framebuffer_allocator.clear();
-	transient_allocator.clear();
-	for (SamplerHandle &sampler : samplers)
-		sampler.reset();
-
-	/* The fence/semaphore managers no longer self-destruct (their dtors became
-	 * explicit deinit()); tear them down here, after wait_idle, as the implicit
-	 * member destruction used to. */
-	managers.fence.deinit();
-	managers.semaphore.deinit();
-}
-
-void Device::init_frame_contexts(unsigned count)
-{
-	wait_idle_nolock();
-
-	// Clear out caches which might contain stale data from now on.
-	framebuffer_allocator.clear();
-	transient_allocator.clear();
-	per_frame.clear();
-
-	for (unsigned i = 0; i < count; i++)
+	CommandBufferHandle Device::request_command_buffer_nolock(CommandBuffer::Type type)
 	{
-		per_frame.push(new PerFrame(this));
+		VkCommandBuffer cmd = get_command_pool(type).request_command_buffer();
+
+		VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+		info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		vkBeginCommandBuffer(cmd, &info);
+		add_frame_counter_nolock();
+		CommandBufferHandle handle(handle_pool.command_buffers.allocate(this, cmd, type));
+		return handle;
 	}
-}
 
-Device::PerFrame::PerFrame(Device *device)
-    : device(device->get_device())
-    , managers(device->managers)
-    , graphics_cmd_pool(device->get_device(), device->graphics_queue_family_index)
-    , compute_cmd_pool(device->get_device(), device->compute_queue_family_index)
-    , transfer_cmd_pool(device->get_device(), device->transfer_queue_family_index)
-{
-	/* POD_VEC members have no constructor; zero-initialise them. */
-	memset(&wait_fences, 0, sizeof(wait_fences));
-	memset(&recycle_fences, 0, sizeof(recycle_fences));
-	memset(&destroyed_framebuffers, 0, sizeof(destroyed_framebuffers));
-	memset(&destroyed_samplers, 0, sizeof(destroyed_samplers));
-	memset(&destroyed_pipelines, 0, sizeof(destroyed_pipelines));
-	memset(&destroyed_image_views, 0, sizeof(destroyed_image_views));
-	memset(&destroyed_buffer_views, 0, sizeof(destroyed_buffer_views));
-	memset(&destroyed_images, 0, sizeof(destroyed_images));
-	memset(&destroyed_buffers, 0, sizeof(destroyed_buffers));
-	memset(&recycled_semaphores, 0, sizeof(recycled_semaphores));
-	memset(&destroyed_semaphores, 0, sizeof(destroyed_semaphores));
-}
+	Device::~Device()
+	{
+		wait_idle();
 
-void Device::free_memory_nolock(const DeviceAllocation &alloc)
-{
-	frame().allocations.push(alloc);
-}
+		framebuffer_allocator.clear();
+		transient_allocator.clear();
+		for (SamplerHandle &sampler : samplers)
+			sampler.reset();
+
+		/* The fence/semaphore managers no longer self-destruct (their dtors became
+		 * explicit deinit()); tear them down here, after wait_idle, as the implicit
+		 * member destruction used to. */
+		managers.fence.deinit();
+		managers.semaphore.deinit();
+	}
+
+	void Device::init_frame_contexts(unsigned count)
+	{
+		wait_idle_nolock();
+
+		// Clear out caches which might contain stale data from now on.
+		framebuffer_allocator.clear();
+		transient_allocator.clear();
+		per_frame.clear();
+
+		for (unsigned i = 0; i < count; i++)
+		{
+			per_frame.push(new PerFrame(this));
+		}
+	}
+
+	Device::PerFrame::PerFrame(Device *device)
+		: device(device->get_device())
+		  , managers(device->managers)
+		  , graphics_cmd_pool(device->get_device(), device->graphics_queue_family_index)
+		  , compute_cmd_pool(device->get_device(), device->compute_queue_family_index)
+		  , transfer_cmd_pool(device->get_device(), device->transfer_queue_family_index)
+	{
+		/* POD_VEC members have no constructor; zero-initialise them. */
+		memset(&wait_fences, 0, sizeof(wait_fences));
+		memset(&recycle_fences, 0, sizeof(recycle_fences));
+		memset(&destroyed_framebuffers, 0, sizeof(destroyed_framebuffers));
+		memset(&destroyed_samplers, 0, sizeof(destroyed_samplers));
+		memset(&destroyed_pipelines, 0, sizeof(destroyed_pipelines));
+		memset(&destroyed_image_views, 0, sizeof(destroyed_image_views));
+		memset(&destroyed_buffer_views, 0, sizeof(destroyed_buffer_views));
+		memset(&destroyed_images, 0, sizeof(destroyed_images));
+		memset(&destroyed_buffers, 0, sizeof(destroyed_buffers));
+		memset(&recycled_semaphores, 0, sizeof(recycled_semaphores));
+		memset(&destroyed_semaphores, 0, sizeof(destroyed_semaphores));
+	}
+
+	void Device::free_memory_nolock(const DeviceAllocation &alloc)
+	{
+		frame().allocations.push(alloc);
+	}
 
 #ifdef VULKAN_DEBUG
 
-template <typename T, typename U>
-static inline bool exists(const T &container, const U &value)
-{
-	/* Linear membership test (debug-only). Hand-rolled over begin()/end() so it
-	 * does not pull in std::find; the containers are POD_VEC whose iterators are
-	 * raw pointers. */
-	for (auto first = container.begin(), last = container.end(); first != last; ++first)
-		if (*first == value)
-			return true;
-	return false;
-}
+	template <typename T, typename U>
+		static inline bool exists(const T &container, const U &value)
+		{
+			/* Linear membership test (debug-only). Hand-rolled over begin()/end() so it
+			 * does not pull in std::find; the containers are POD_VEC whose iterators are
+			 * raw pointers. */
+			for (auto first = container.begin(), last = container.end(); first != last; ++first)
+				if (*first == value)
+					return true;
+			return false;
+		}
 
 #endif
 
-void Device::reset_fence(VkFence fence)
-{
-	frame().recycle_fences.push(fence);
-}
+	void Device::reset_fence(VkFence fence)
+	{
+		frame().recycle_fences.push(fence);
+	}
 
-void Device::destroy_pipeline_nolock(VkPipeline pipeline)
-{
-	VK_ASSERT(!exists(frame().destroyed_pipelines, pipeline));
-	frame().destroyed_pipelines.push(pipeline);
-}
+	void Device::destroy_pipeline_nolock(VkPipeline pipeline)
+	{
+		VK_ASSERT(!exists(frame().destroyed_pipelines, pipeline));
+		frame().destroyed_pipelines.push(pipeline);
+	}
 
-void Device::destroy_image_view_nolock(VkImageView view)
-{
-	VK_ASSERT(!exists(frame().destroyed_image_views, view));
-	frame().destroyed_image_views.push(view);
-}
+	void Device::destroy_image_view_nolock(VkImageView view)
+	{
+		VK_ASSERT(!exists(frame().destroyed_image_views, view));
+		frame().destroyed_image_views.push(view);
+	}
 
-void Device::destroy_buffer_view_nolock(VkBufferView view)
-{
-	VK_ASSERT(!exists(frame().destroyed_buffer_views, view));
-	frame().destroyed_buffer_views.push(view);
-}
+	void Device::destroy_buffer_view_nolock(VkBufferView view)
+	{
+		VK_ASSERT(!exists(frame().destroyed_buffer_views, view));
+		frame().destroyed_buffer_views.push(view);
+	}
 
-void Device::destroy_semaphore_nolock(VkSemaphore semaphore)
-{
-	VK_ASSERT(!exists(frame().destroyed_semaphores, semaphore));
-	frame().destroyed_semaphores.push(semaphore);
-}
+	void Device::destroy_semaphore_nolock(VkSemaphore semaphore)
+	{
+		VK_ASSERT(!exists(frame().destroyed_semaphores, semaphore));
+		frame().destroyed_semaphores.push(semaphore);
+	}
 
-void Device::destroy_image_nolock(VkImage image)
-{
-	VK_ASSERT(!exists(frame().destroyed_images, image));
-	frame().destroyed_images.push(image);
-}
+	void Device::destroy_image_nolock(VkImage image)
+	{
+		VK_ASSERT(!exists(frame().destroyed_images, image));
+		frame().destroyed_images.push(image);
+	}
 
-void Device::destroy_buffer_nolock(VkBuffer buffer)
-{
-	VK_ASSERT(!exists(frame().destroyed_buffers, buffer));
-	frame().destroyed_buffers.push(buffer);
-}
+	void Device::destroy_buffer_nolock(VkBuffer buffer)
+	{
+		VK_ASSERT(!exists(frame().destroyed_buffers, buffer));
+		frame().destroyed_buffers.push(buffer);
+	}
 
-void Device::destroy_sampler_nolock(VkSampler sampler)
-{
-	VK_ASSERT(!exists(frame().destroyed_samplers, sampler));
-	frame().destroyed_samplers.push(sampler);
-}
+	void Device::destroy_sampler_nolock(VkSampler sampler)
+	{
+		VK_ASSERT(!exists(frame().destroyed_samplers, sampler));
+		frame().destroyed_samplers.push(sampler);
+	}
 
-void Device::destroy_framebuffer_nolock(VkFramebuffer framebuffer)
-{
-	VK_ASSERT(!exists(frame().destroyed_framebuffers, framebuffer));
-	frame().destroyed_framebuffers.push(framebuffer);
-}
+	void Device::destroy_framebuffer_nolock(VkFramebuffer framebuffer)
+	{
+		VK_ASSERT(!exists(frame().destroyed_framebuffers, framebuffer));
+		frame().destroyed_framebuffers.push(framebuffer);
+	}
 
-void Device::clear_wait_semaphores()
-{
-	for (Semaphore &sem : graphics.wait_semaphores)
-		vkDestroySemaphore(device, sem->consume(), nullptr);
-	for (Semaphore &sem : compute.wait_semaphores)
-		vkDestroySemaphore(device, sem->consume(), nullptr);
-	for (Semaphore &sem : transfer.wait_semaphores)
-		vkDestroySemaphore(device, sem->consume(), nullptr);
+	void Device::clear_wait_semaphores()
+	{
+		for (Semaphore &sem : graphics.wait_semaphores)
+			vkDestroySemaphore(device, sem->consume(), nullptr);
+		for (Semaphore &sem : compute.wait_semaphores)
+			vkDestroySemaphore(device, sem->consume(), nullptr);
+		for (Semaphore &sem : transfer.wait_semaphores)
+			vkDestroySemaphore(device, sem->consume(), nullptr);
 
-	graphics.wait_semaphores.clear();
-	graphics.wait_stages.clear();
-	compute.wait_semaphores.clear();
-	compute.wait_stages.clear();
-	transfer.wait_semaphores.clear();
-	transfer.wait_stages.clear();
-}
+		graphics.wait_semaphores.clear();
+		graphics.wait_stages.clear();
+		compute.wait_semaphores.clear();
+		compute.wait_stages.clear();
+		transfer.wait_semaphores.clear();
+		transfer.wait_stages.clear();
+	}
 
-void Device::wait_idle_nolock()
-{
-	if (!per_frame.empty())
+	void Device::wait_idle_nolock()
+	{
+		if (!per_frame.empty())
+			end_frame_nolock();
+
+		if (device != VK_NULL_HANDLE)
+			vkDeviceWaitIdle(device);
+
+		clear_wait_semaphores();
+
+		// Free memory for buffer pools.
+		managers.vbo.reset();
+		managers.ubo.reset();
+		for (PerFrame *frame : per_frame)
+		{
+			frame->vbo_blocks.clear();
+			frame->ubo_blocks.clear();
+		}
+
+		framebuffer_allocator.clear();
+		transient_allocator.clear();
+		for (DescriptorSetAllocator &allocator : descriptor_set_allocators)
+			allocator.clear();
+
+		for (PerFrame *frame : per_frame)
+		{
+			// We have done WaitIdle, no need to wait for extra fences, it's also not safe.
+			frame->wait_fences.clear();
+			frame->begin();
+		}
+	}
+
+	void Device::next_frame_context()
+	{
+		// Flush the frame here as we might have pending staging command buffers from init stage.
 		end_frame_nolock();
 
-	if (device != VK_NULL_HANDLE)
-		vkDeviceWaitIdle(device);
+		framebuffer_allocator.begin_frame();
+		transient_allocator.begin_frame();
+		for (DescriptorSetAllocator &allocator : descriptor_set_allocators)
+			allocator.begin_frame();
 
-	clear_wait_semaphores();
+		VK_ASSERT(!per_frame.empty());
+		frame_context_index++;
+		if (frame_context_index >= per_frame.size())
+			frame_context_index = 0;
 
-	// Free memory for buffer pools.
-	managers.vbo.reset();
-	managers.ubo.reset();
-	for (PerFrame *frame : per_frame)
-	{
-		frame->vbo_blocks.clear();
-		frame->ubo_blocks.clear();
+		frame().begin();
 	}
 
-	framebuffer_allocator.clear();
-	transient_allocator.clear();
-	for (DescriptorSetAllocator &allocator : descriptor_set_allocators)
-		allocator.clear();
-
-	for (PerFrame *frame : per_frame)
+	void Device::PerFrame::begin()
 	{
-		// We have done WaitIdle, no need to wait for extra fences, it's also not safe.
-		frame->wait_fences.clear();
-		frame->begin();
-	}
-}
-
-void Device::next_frame_context()
-{
-	// Flush the frame here as we might have pending staging command buffers from init stage.
-	end_frame_nolock();
-
-	framebuffer_allocator.begin_frame();
-	transient_allocator.begin_frame();
-	for (DescriptorSetAllocator &allocator : descriptor_set_allocators)
-		allocator.begin_frame();
-
-	VK_ASSERT(!per_frame.empty());
-	frame_context_index++;
-	if (frame_context_index >= per_frame.size())
-		frame_context_index = 0;
-
-	frame().begin();
-}
-
-void Device::PerFrame::begin()
-{
-	if (!wait_fences.empty())
-	{
-		vkWaitForFences(device, wait_fences.size(), wait_fences.data(), VK_TRUE, UINT64_MAX);
-		wait_fences.clear();
-	}
-
-	if (!recycle_fences.empty())
-	{
-		vkResetFences(device, recycle_fences.size(), recycle_fences.data());
-		for (VkFence &fence : recycle_fences)
-			managers.fence.recycle_fence(fence);
-		recycle_fences.clear();
-	}
-
-	graphics_cmd_pool.begin();
-	compute_cmd_pool.begin();
-	transfer_cmd_pool.begin();
-
-	for (VkFramebuffer &framebuffer : destroyed_framebuffers)
-		vkDestroyFramebuffer(device, framebuffer, nullptr);
-	for (VkSampler &sampler : destroyed_samplers)
-		vkDestroySampler(device, sampler, nullptr);
-	for (VkPipeline &pipeline : destroyed_pipelines)
-		vkDestroyPipeline(device, pipeline, nullptr);
-	for (VkImageView &view : destroyed_image_views)
-		vkDestroyImageView(device, view, nullptr);
-	for (VkBufferView &view : destroyed_buffer_views)
-		vkDestroyBufferView(device, view, nullptr);
-	for (VkImage &image : destroyed_images)
-		vkDestroyImage(device, image, nullptr);
-	for (VkBuffer &buffer : destroyed_buffers)
-		vkDestroyBuffer(device, buffer, nullptr);
-	for (VkSemaphore &semaphore : destroyed_semaphores)
-		vkDestroySemaphore(device, semaphore, nullptr);
-	for (VkSemaphore &semaphore : recycled_semaphores)
-	{
-		managers.semaphore.recycle(semaphore);
-	}
-	for (DeviceAllocation &alloc : allocations)
-		alloc.free_immediate(managers.memory);
-
-	for (BufferBlock &block : vbo_blocks)
-		managers.vbo.recycle_block(std::move(block));
-	for (BufferBlock &block : ubo_blocks)
-		managers.ubo.recycle_block(std::move(block));
-	vbo_blocks.clear();
-	ubo_blocks.clear();
-
-	destroyed_framebuffers.clear();
-	destroyed_samplers.clear();
-	destroyed_pipelines.clear();
-	destroyed_image_views.clear();
-	destroyed_buffer_views.clear();
-	destroyed_images.clear();
-	destroyed_buffers.clear();
-	destroyed_semaphores.clear();
-	recycled_semaphores.clear();
-	allocations.clear();
-}
-
-Device::PerFrame::~PerFrame()
-{
-	begin();
-	/* Release the POD_VEC backing storage (begin() only resets the counts). */
-	wait_fences.free_storage();
-	recycle_fences.free_storage();
-	destroyed_framebuffers.free_storage();
-	destroyed_samplers.free_storage();
-	destroyed_pipelines.free_storage();
-	destroyed_image_views.free_storage();
-	destroyed_buffer_views.free_storage();
-	destroyed_images.free_storage();
-	destroyed_buffers.free_storage();
-	recycled_semaphores.free_storage();
-	destroyed_semaphores.free_storage();
-}
-
-uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
-{
-	uint32_t desired = 0, fallback = 0;
-	switch (domain)
-	{
-	case BufferDomain::Device:
-		desired = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		fallback = 0;
-		break;
-
-	case BufferDomain::Host:
-		desired = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		fallback = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-		break;
-
-	case BufferDomain::CachedHost:
-		desired = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-		fallback = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-		break;
-	}
-
-	for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
-	{
-		if ((1u << i) & mask)
+		if (!wait_fences.empty())
 		{
-			uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
-			if ((flags & desired) == desired)
-				return i;
-		}
-	}
-
-	for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
-	{
-		if ((1u << i) & mask)
-		{
-			uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
-			if ((flags & fallback) == fallback)
-				return i;
-		}
-	}
-
-	LOGE("Couldn't find memory type for buffer domain.\n");
-	return UINT32_MAX;
-}
-
-uint32_t Device::find_memory_type(ImageDomain domain, uint32_t mask)
-{
-	uint32_t desired = 0, fallback = 0;
-	switch (domain)
-	{
-	case ImageDomain::Physical:
-		desired = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		fallback = 0;
-		break;
-
-	case ImageDomain::Transient:
-		desired = VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
-		fallback = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		break;
-	}
-
-	for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
-	{
-		if ((1u << i) & mask)
-		{
-			uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
-			if ((flags & desired) == desired)
-				return i;
-		}
-	}
-
-	for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
-	{
-		if ((1u << i) & mask)
-		{
-			uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
-			if ((flags & fallback) == fallback)
-				return i;
-		}
-	}
-
-	LOGE("Couldn't find memory type for image domain.\n");
-	return UINT32_MAX;
-}
-
-static inline VkImageViewType get_image_view_type(const ImageCreateInfo &create_info, const ImageViewCreateInfo *view)
-{
-	unsigned layers = view ? view->layers : create_info.layers;
-	unsigned base_layer = view ? view->base_layer : 0;
-
-	if (layers == VK_REMAINING_ARRAY_LAYERS)
-		layers = create_info.layers - base_layer;
-
-	switch (create_info.type)
-	{
-	case VK_IMAGE_TYPE_1D:
-		VK_ASSERT(create_info.width >= 1);
-		VK_ASSERT(create_info.height == 1);
-		VK_ASSERT(create_info.depth == 1);
-		VK_ASSERT(create_info.samples == VK_SAMPLE_COUNT_1_BIT);
-
-		if (layers > 1)
-			return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
-		else
-			return VK_IMAGE_VIEW_TYPE_1D;
-
-	case VK_IMAGE_TYPE_2D:
-		VK_ASSERT(create_info.width >= 1);
-		VK_ASSERT(create_info.height >= 1);
-		VK_ASSERT(create_info.depth == 1);
-
-		if ((create_info.flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) && (layers % 6) == 0)
-		{
-			VK_ASSERT(create_info.width == create_info.height);
-
-			if (layers > 6)
-				return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
-			else
-				return VK_IMAGE_VIEW_TYPE_CUBE;
-		}
-		else
-		{
-			if (layers > 1)
-				return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			else
-				return VK_IMAGE_VIEW_TYPE_2D;
+			vkWaitForFences(device, wait_fences.size(), wait_fences.data(), VK_TRUE, UINT64_MAX);
+			wait_fences.clear();
 		}
 
-	case VK_IMAGE_TYPE_3D:
-		VK_ASSERT(create_info.width >= 1);
-		VK_ASSERT(create_info.height >= 1);
-		VK_ASSERT(create_info.depth >= 1);
-		return VK_IMAGE_VIEW_TYPE_3D;
-
-	default:
-		VK_ASSERT(0 && "bogus");
-		return VK_IMAGE_VIEW_TYPE_RANGE_SIZE;
-	}
-}
-
-BufferViewHandle Device::create_buffer_view(const BufferViewCreateInfo &view_info)
-{
-	VkBufferViewCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO };
-	info.buffer = view_info.buffer->get_buffer();
-	info.format = view_info.format;
-	info.offset = view_info.offset;
-	info.range = view_info.range;
-
-	VkBufferView view;
-	VkResult res = vkCreateBufferView(device, &info, nullptr, &view);
-	if (res != VK_SUCCESS)
-		return BufferViewHandle(nullptr);
-
-	return BufferViewHandle(handle_pool.buffer_views.allocate(this, view, view_info));
-}
-
-class ImageResourceHolder
-{
-public:
-	ImageResourceHolder(VkDevice device)
-		: device(device)
-	{
-	}
-
-	~ImageResourceHolder()
-	{
-		if (owned)
-			cleanup();
-	}
-
-	VkDevice device;
-
-	VkImage image = VK_NULL_HANDLE;
-	VkDeviceMemory memory = VK_NULL_HANDLE;
-	VkImageView image_view = VK_NULL_HANDLE;
-	VkImageView depth_view = VK_NULL_HANDLE;
-	VkImageView stencil_view = VK_NULL_HANDLE;
-	RenderTargetViewVec rt_views = { NULL, 0, 0 };
-	DeviceAllocation allocation;
-	DeviceAllocator *allocator = nullptr;
-	bool owned = true;
-
-	bool create_default_views(const ImageCreateInfo &create_info, const VkImageViewCreateInfo *view_info)
-	{
-		if ((create_info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-		                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) == 0)
+		if (!recycle_fences.empty())
 		{
-			LOGE("Cannot create image view unless certain usage flags are present.\n");
-			return false;
+			vkResetFences(device, recycle_fences.size(), recycle_fences.data());
+			for (VkFence &fence : recycle_fences)
+				managers.fence.recycle_fence(fence);
+			recycle_fences.clear();
 		}
 
-		VkImageViewCreateInfo default_view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-		if (!view_info)
-		{
-			default_view_info.image = image;
-			default_view_info.format = create_info.format;
-			default_view_info.components = create_info.swizzle;
-			default_view_info.subresourceRange.aspectMask = format_to_aspect_mask(default_view_info.format);
-			default_view_info.viewType = get_image_view_type(create_info, nullptr);
-			default_view_info.subresourceRange.baseMipLevel = 0;
-			default_view_info.subresourceRange.baseArrayLayer = 0;
-			default_view_info.subresourceRange.levelCount = create_info.levels;
-			default_view_info.subresourceRange.layerCount = create_info.layers;
-			view_info = &default_view_info;
-		}
+		graphics_cmd_pool.begin();
+		compute_cmd_pool.begin();
+		transfer_cmd_pool.begin();
 
-		if (!create_alt_views(create_info, *view_info))
-			return false;
-
-		if (!create_render_target_views(create_info, *view_info))
-			return false;
-
-		if (!create_default_view(*view_info))
-			return false;
-
-		return true;
-	}
-
-private:
-	bool create_render_target_views(const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info)
-	{
-
-		if (info.viewType == VK_IMAGE_VIEW_TYPE_3D)
-			return true;
-
-		// If we have a render target, and non-trivial case (layers = 1, levels = 1),
-		// create an array of render targets which correspond to each layer (mip 0).
-		if ((image_create_info.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0 &&
-		    ((info.subresourceRange.levelCount > 1) || (info.subresourceRange.layerCount > 1)))
-		{
-			VkImageViewCreateInfo view_info = info;
-			view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			view_info.subresourceRange.baseMipLevel = info.subresourceRange.baseMipLevel;
-			for (uint32_t layer = 0; layer < info.subresourceRange.layerCount; layer++)
-			{
-				view_info.subresourceRange.levelCount = 1;
-				view_info.subresourceRange.layerCount = 1;
-				view_info.subresourceRange.baseArrayLayer = layer + info.subresourceRange.baseArrayLayer;
-
-				VkImageView rt_view;
-				if (vkCreateImageView(device, &view_info, nullptr, &rt_view) != VK_SUCCESS)
-					return false;
-
-				rt_views.push(rt_view);
-			}
-		}
-
-		return true;
-	}
-
-	bool create_alt_views(const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info)
-	{
-		if (info.viewType == VK_IMAGE_VIEW_TYPE_CUBE ||
-		    info.viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY ||
-		    info.viewType == VK_IMAGE_VIEW_TYPE_3D)
-		{
-			return true;
-		}
-
-		if (info.subresourceRange.aspectMask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
-		{
-			if ((image_create_info.usage & ~VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
-			{
-				// Sanity check. Don't want to implement layered views for this.
-				if (info.subresourceRange.levelCount > 1)
-				{
-					LOGE("Cannot create depth stencil attachments with more than 1 mip level currently, and non-DS usage flags.\n");
-					return false;
-				}
-
-				if (info.subresourceRange.layerCount > 1)
-				{
-					LOGE("Cannot create layered depth stencil attachments with non-DS usage flags.\n");
-					return false;
-				}
-
-				VkImageViewCreateInfo view_info = info;
-
-				// We need this to be able to sample the texture, or otherwise use it as a non-pure DS attachment.
-				view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-				if (vkCreateImageView(device, &view_info, nullptr, &depth_view) != VK_SUCCESS)
-					return false;
-
-				view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
-				if (vkCreateImageView(device, &view_info, nullptr, &stencil_view) != VK_SUCCESS)
-					return false;
-			}
-		}
-
-		return true;
-	}
-
-	bool create_default_view(const VkImageViewCreateInfo &info)
-	{
-		// Create the normal image view. This one contains every subresource.
-		if (vkCreateImageView(device, &info, nullptr, &image_view) != VK_SUCCESS)
-			return false;
-
-		return true;
-	}
-
-	void cleanup()
-	{
-		if (image_view)
-			vkDestroyImageView(device, image_view, nullptr);
-		if (depth_view)
-			vkDestroyImageView(device, depth_view, nullptr);
-		if (stencil_view)
-			vkDestroyImageView(device, stencil_view, nullptr);
-		for (VkImageView &view : rt_views)
+		for (VkFramebuffer &framebuffer : destroyed_framebuffers)
+			vkDestroyFramebuffer(device, framebuffer, nullptr);
+		for (VkSampler &sampler : destroyed_samplers)
+			vkDestroySampler(device, sampler, nullptr);
+		for (VkPipeline &pipeline : destroyed_pipelines)
+			vkDestroyPipeline(device, pipeline, nullptr);
+		for (VkImageView &view : destroyed_image_views)
 			vkDestroyImageView(device, view, nullptr);
-		rt_views.free_storage();
-
-		if (image)
+		for (VkBufferView &view : destroyed_buffer_views)
+			vkDestroyBufferView(device, view, nullptr);
+		for (VkImage &image : destroyed_images)
 			vkDestroyImage(device, image, nullptr);
-		if (memory)
-			vkFreeMemory(device, memory, nullptr);
-		if (allocator)
-			allocation.free_immediate(*allocator);
-	}
-};
-
-ImageViewHandle Device::create_image_view(const ImageViewCreateInfo &create_info)
-{
-	ImageResourceHolder holder(device);
-	const ImageCreateInfo &image_create_info = create_info.image->get_create_info();
-
-	VkFormat format = create_info.format != VK_FORMAT_UNDEFINED ? create_info.format : image_create_info.format;
-
-	VkImageViewCreateInfo view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-	view_info.image = create_info.image->get_image();
-	view_info.format = format;
-	view_info.components = create_info.swizzle;
-	view_info.subresourceRange.aspectMask = format_to_aspect_mask(format);
-	view_info.subresourceRange.baseMipLevel = create_info.base_level;
-	view_info.subresourceRange.baseArrayLayer = create_info.base_layer;
-	view_info.subresourceRange.levelCount = create_info.levels;
-	view_info.subresourceRange.layerCount = create_info.layers;
-	view_info.viewType = get_image_view_type(image_create_info, &create_info);
-
-	unsigned num_levels;
-	if (view_info.subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS)
-		num_levels = create_info.image->get_create_info().levels - view_info.subresourceRange.baseMipLevel;
-	else
-		num_levels = view_info.subresourceRange.levelCount;
-
-	unsigned num_layers;
-	if (view_info.subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS)
-		num_layers = create_info.image->get_create_info().layers - view_info.subresourceRange.baseArrayLayer;
-	else
-		num_layers = view_info.subresourceRange.layerCount;
-
-	view_info.subresourceRange.levelCount = num_levels;
-	view_info.subresourceRange.layerCount = num_layers;
-
-	if (!holder.create_default_views(image_create_info, &view_info))
-		return ImageViewHandle(nullptr);
-
-	ImageViewCreateInfo tmp = create_info;
-	tmp.format = format;
-	ImageViewHandle ret(handle_pool.image_views.allocate(this, holder.image_view, tmp));
-	if (ret)
-	{
-		holder.owned = false;
-		ret->set_alt_views(holder.depth_view, holder.stencil_view);
-		ret->set_render_target_views(holder.rt_views);
-		holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
-		return ret;
-	}
-	else
-		return ImageViewHandle(nullptr);
-}
-
-InitialImageBuffer Device::create_image_staging_buffer(const ImageCreateInfo &info, const ImageInitialData *initial)
-{
-	InitialImageBuffer result;
-
-	bool generate_mips = (info.misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
-	TextureFormatLayout layout;
-
-	unsigned copy_levels;
-	if (generate_mips)
-		copy_levels = 1;
-	else if (info.levels == 0)
-		copy_levels = TextureFormatLayout::num_miplevels(info.width, info.height, info.depth);
-	else
-		copy_levels = info.levels;
-
-	switch (info.type)
-	{
-	case VK_IMAGE_TYPE_1D:
-		layout.set_1d(info.format, info.width, info.layers, copy_levels);
-		break;
-	case VK_IMAGE_TYPE_2D:
-		layout.set_2d(info.format, info.width, info.height, info.layers, copy_levels);
-		break;
-	case VK_IMAGE_TYPE_3D:
-		layout.set_3d(info.format, info.width, info.height, info.depth, copy_levels);
-		break;
-	default:
-		return {};
-	}
-
-	BufferCreateInfo buffer_info = {};
-	buffer_info.domain = BufferDomain::Host;
-	buffer_info.size = layout.get_required_size();
-	buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	result.buffer = create_buffer(buffer_info, nullptr);
-	set_name(*result.buffer, "image-upload-staging-buffer");
-
-	// And now, do the actual copy.
-	uint8_t *mapped = static_cast<uint8_t *>(map_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT));
-	unsigned index = 0;
-
-	layout.set_buffer(mapped, layout.get_required_size());
-
-	for (unsigned level = 0; level < copy_levels; level++)
-	{
-		const TextureFormatLayout::MipInfo &mip_info = layout.get_mip_info(level);
-		uint32_t dst_height_stride = layout.get_layer_size(level);
-		size_t row_size = layout.get_row_size(level);
-
-		for (unsigned layer = 0; layer < info.layers; layer++, index++)
+		for (VkBuffer &buffer : destroyed_buffers)
+			vkDestroyBuffer(device, buffer, nullptr);
+		for (VkSemaphore &semaphore : destroyed_semaphores)
+			vkDestroySemaphore(device, semaphore, nullptr);
+		for (VkSemaphore &semaphore : recycled_semaphores)
 		{
-			uint32_t src_row_length =
+			managers.semaphore.recycle(semaphore);
+		}
+		for (DeviceAllocation &alloc : allocations)
+			alloc.free_immediate(managers.memory);
+
+		for (BufferBlock &block : vbo_blocks)
+			managers.vbo.recycle_block(std::move(block));
+		for (BufferBlock &block : ubo_blocks)
+			managers.ubo.recycle_block(std::move(block));
+		vbo_blocks.clear();
+		ubo_blocks.clear();
+
+		destroyed_framebuffers.clear();
+		destroyed_samplers.clear();
+		destroyed_pipelines.clear();
+		destroyed_image_views.clear();
+		destroyed_buffer_views.clear();
+		destroyed_images.clear();
+		destroyed_buffers.clear();
+		destroyed_semaphores.clear();
+		recycled_semaphores.clear();
+		allocations.clear();
+	}
+
+	Device::PerFrame::~PerFrame()
+	{
+		begin();
+		/* Release the POD_VEC backing storage (begin() only resets the counts). */
+		wait_fences.free_storage();
+		recycle_fences.free_storage();
+		destroyed_framebuffers.free_storage();
+		destroyed_samplers.free_storage();
+		destroyed_pipelines.free_storage();
+		destroyed_image_views.free_storage();
+		destroyed_buffer_views.free_storage();
+		destroyed_images.free_storage();
+		destroyed_buffers.free_storage();
+		recycled_semaphores.free_storage();
+		destroyed_semaphores.free_storage();
+	}
+
+	uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
+	{
+		uint32_t desired = 0, fallback = 0;
+		switch (domain)
+		{
+			case BufferDomain::Device:
+				desired = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+				fallback = 0;
+				break;
+
+			case BufferDomain::Host:
+				desired = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+				fallback = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+				break;
+
+			case BufferDomain::CachedHost:
+				desired = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+				fallback = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+				break;
+		}
+
+		for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
+		{
+			if ((1u << i) & mask)
+			{
+				uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
+				if ((flags & desired) == desired)
+					return i;
+			}
+		}
+
+		for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
+		{
+			if ((1u << i) & mask)
+			{
+				uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
+				if ((flags & fallback) == fallback)
+					return i;
+			}
+		}
+
+		LOGE("Couldn't find memory type for buffer domain.\n");
+		return UINT32_MAX;
+	}
+
+	uint32_t Device::find_memory_type(ImageDomain domain, uint32_t mask)
+	{
+		uint32_t desired = 0, fallback = 0;
+		switch (domain)
+		{
+			case ImageDomain::Physical:
+				desired = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+				fallback = 0;
+				break;
+
+			case ImageDomain::Transient:
+				desired = VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
+				fallback = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+				break;
+		}
+
+		for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
+		{
+			if ((1u << i) & mask)
+			{
+				uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
+				if ((flags & desired) == desired)
+					return i;
+			}
+		}
+
+		for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
+		{
+			if ((1u << i) & mask)
+			{
+				uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
+				if ((flags & fallback) == fallback)
+					return i;
+			}
+		}
+
+		LOGE("Couldn't find memory type for image domain.\n");
+		return UINT32_MAX;
+	}
+
+	static inline VkImageViewType get_image_view_type(const ImageCreateInfo &create_info, const ImageViewCreateInfo *view)
+	{
+		unsigned layers = view ? view->layers : create_info.layers;
+		unsigned base_layer = view ? view->base_layer : 0;
+
+		if (layers == VK_REMAINING_ARRAY_LAYERS)
+			layers = create_info.layers - base_layer;
+
+		switch (create_info.type)
+		{
+			case VK_IMAGE_TYPE_1D:
+				VK_ASSERT(create_info.width >= 1);
+				VK_ASSERT(create_info.height == 1);
+				VK_ASSERT(create_info.depth == 1);
+				VK_ASSERT(create_info.samples == VK_SAMPLE_COUNT_1_BIT);
+
+				if (layers > 1)
+					return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
+				else
+					return VK_IMAGE_VIEW_TYPE_1D;
+
+			case VK_IMAGE_TYPE_2D:
+				VK_ASSERT(create_info.width >= 1);
+				VK_ASSERT(create_info.height >= 1);
+				VK_ASSERT(create_info.depth == 1);
+
+				if ((create_info.flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) && (layers % 6) == 0)
+				{
+					VK_ASSERT(create_info.width == create_info.height);
+
+					if (layers > 6)
+						return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+					else
+						return VK_IMAGE_VIEW_TYPE_CUBE;
+				}
+				else
+				{
+					if (layers > 1)
+						return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+					else
+						return VK_IMAGE_VIEW_TYPE_2D;
+				}
+
+			case VK_IMAGE_TYPE_3D:
+				VK_ASSERT(create_info.width >= 1);
+				VK_ASSERT(create_info.height >= 1);
+				VK_ASSERT(create_info.depth >= 1);
+				return VK_IMAGE_VIEW_TYPE_3D;
+
+			default:
+				VK_ASSERT(0 && "bogus");
+				return VK_IMAGE_VIEW_TYPE_RANGE_SIZE;
+		}
+	}
+
+	BufferViewHandle Device::create_buffer_view(const BufferViewCreateInfo &view_info)
+	{
+		VkBufferViewCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO };
+		info.buffer = view_info.buffer->get_buffer();
+		info.format = view_info.format;
+		info.offset = view_info.offset;
+		info.range = view_info.range;
+
+		VkBufferView view;
+		VkResult res = vkCreateBufferView(device, &info, nullptr, &view);
+		if (res != VK_SUCCESS)
+			return BufferViewHandle(nullptr);
+
+		return BufferViewHandle(handle_pool.buffer_views.allocate(this, view, view_info));
+	}
+
+	class ImageResourceHolder
+	{
+		public:
+			ImageResourceHolder(VkDevice device)
+				: device(device)
+			{
+			}
+
+			~ImageResourceHolder()
+			{
+				if (owned)
+					cleanup();
+			}
+
+			VkDevice device;
+
+			VkImage image = VK_NULL_HANDLE;
+			VkDeviceMemory memory = VK_NULL_HANDLE;
+			VkImageView image_view = VK_NULL_HANDLE;
+			VkImageView depth_view = VK_NULL_HANDLE;
+			VkImageView stencil_view = VK_NULL_HANDLE;
+			RenderTargetViewVec rt_views = { NULL, 0, 0 };
+			DeviceAllocation allocation;
+			DeviceAllocator *allocator = nullptr;
+			bool owned = true;
+
+			bool create_default_views(const ImageCreateInfo &create_info, const VkImageViewCreateInfo *view_info)
+			{
+				if ((create_info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+								VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) == 0)
+				{
+					LOGE("Cannot create image view unless certain usage flags are present.\n");
+					return false;
+				}
+
+				VkImageViewCreateInfo default_view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+				if (!view_info)
+				{
+					default_view_info.image = image;
+					default_view_info.format = create_info.format;
+					default_view_info.components = create_info.swizzle;
+					default_view_info.subresourceRange.aspectMask = format_to_aspect_mask(default_view_info.format);
+					default_view_info.viewType = get_image_view_type(create_info, nullptr);
+					default_view_info.subresourceRange.baseMipLevel = 0;
+					default_view_info.subresourceRange.baseArrayLayer = 0;
+					default_view_info.subresourceRange.levelCount = create_info.levels;
+					default_view_info.subresourceRange.layerCount = create_info.layers;
+					view_info = &default_view_info;
+				}
+
+				if (!create_alt_views(create_info, *view_info))
+					return false;
+
+				if (!create_render_target_views(create_info, *view_info))
+					return false;
+
+				if (!create_default_view(*view_info))
+					return false;
+
+				return true;
+			}
+
+		private:
+			bool create_render_target_views(const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info)
+			{
+
+				if (info.viewType == VK_IMAGE_VIEW_TYPE_3D)
+					return true;
+
+				// If we have a render target, and non-trivial case (layers = 1, levels = 1),
+				// create an array of render targets which correspond to each layer (mip 0).
+				if ((image_create_info.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0 &&
+						((info.subresourceRange.levelCount > 1) || (info.subresourceRange.layerCount > 1)))
+				{
+					VkImageViewCreateInfo view_info = info;
+					view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+					view_info.subresourceRange.baseMipLevel = info.subresourceRange.baseMipLevel;
+					for (uint32_t layer = 0; layer < info.subresourceRange.layerCount; layer++)
+					{
+						view_info.subresourceRange.levelCount = 1;
+						view_info.subresourceRange.layerCount = 1;
+						view_info.subresourceRange.baseArrayLayer = layer + info.subresourceRange.baseArrayLayer;
+
+						VkImageView rt_view;
+						if (vkCreateImageView(device, &view_info, nullptr, &rt_view) != VK_SUCCESS)
+							return false;
+
+						rt_views.push(rt_view);
+					}
+				}
+
+				return true;
+			}
+
+			bool create_alt_views(const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info)
+			{
+				if (info.viewType == VK_IMAGE_VIEW_TYPE_CUBE ||
+						info.viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY ||
+						info.viewType == VK_IMAGE_VIEW_TYPE_3D)
+				{
+					return true;
+				}
+
+				if (info.subresourceRange.aspectMask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
+				{
+					if ((image_create_info.usage & ~VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
+					{
+						// Sanity check. Don't want to implement layered views for this.
+						if (info.subresourceRange.levelCount > 1)
+						{
+							LOGE("Cannot create depth stencil attachments with more than 1 mip level currently, and non-DS usage flags.\n");
+							return false;
+						}
+
+						if (info.subresourceRange.layerCount > 1)
+						{
+							LOGE("Cannot create layered depth stencil attachments with non-DS usage flags.\n");
+							return false;
+						}
+
+						VkImageViewCreateInfo view_info = info;
+
+						// We need this to be able to sample the texture, or otherwise use it as a non-pure DS attachment.
+						view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+						if (vkCreateImageView(device, &view_info, nullptr, &depth_view) != VK_SUCCESS)
+							return false;
+
+						view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+						if (vkCreateImageView(device, &view_info, nullptr, &stencil_view) != VK_SUCCESS)
+							return false;
+					}
+				}
+
+				return true;
+			}
+
+			bool create_default_view(const VkImageViewCreateInfo &info)
+			{
+				// Create the normal image view. This one contains every subresource.
+				if (vkCreateImageView(device, &info, nullptr, &image_view) != VK_SUCCESS)
+					return false;
+
+				return true;
+			}
+
+			void cleanup()
+			{
+				if (image_view)
+					vkDestroyImageView(device, image_view, nullptr);
+				if (depth_view)
+					vkDestroyImageView(device, depth_view, nullptr);
+				if (stencil_view)
+					vkDestroyImageView(device, stencil_view, nullptr);
+				for (VkImageView &view : rt_views)
+					vkDestroyImageView(device, view, nullptr);
+				rt_views.free_storage();
+
+				if (image)
+					vkDestroyImage(device, image, nullptr);
+				if (memory)
+					vkFreeMemory(device, memory, nullptr);
+				if (allocator)
+					allocation.free_immediate(*allocator);
+			}
+	};
+
+	ImageViewHandle Device::create_image_view(const ImageViewCreateInfo &create_info)
+	{
+		ImageResourceHolder holder(device);
+		const ImageCreateInfo &image_create_info = create_info.image->get_create_info();
+
+		VkFormat format = create_info.format != VK_FORMAT_UNDEFINED ? create_info.format : image_create_info.format;
+
+		VkImageViewCreateInfo view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+		view_info.image = create_info.image->get_image();
+		view_info.format = format;
+		view_info.components = create_info.swizzle;
+		view_info.subresourceRange.aspectMask = format_to_aspect_mask(format);
+		view_info.subresourceRange.baseMipLevel = create_info.base_level;
+		view_info.subresourceRange.baseArrayLayer = create_info.base_layer;
+		view_info.subresourceRange.levelCount = create_info.levels;
+		view_info.subresourceRange.layerCount = create_info.layers;
+		view_info.viewType = get_image_view_type(image_create_info, &create_info);
+
+		unsigned num_levels;
+		if (view_info.subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS)
+			num_levels = create_info.image->get_create_info().levels - view_info.subresourceRange.baseMipLevel;
+		else
+			num_levels = view_info.subresourceRange.levelCount;
+
+		unsigned num_layers;
+		if (view_info.subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS)
+			num_layers = create_info.image->get_create_info().layers - view_info.subresourceRange.baseArrayLayer;
+		else
+			num_layers = view_info.subresourceRange.layerCount;
+
+		view_info.subresourceRange.levelCount = num_levels;
+		view_info.subresourceRange.layerCount = num_layers;
+
+		if (!holder.create_default_views(image_create_info, &view_info))
+			return ImageViewHandle(nullptr);
+
+		ImageViewCreateInfo tmp = create_info;
+		tmp.format = format;
+		ImageViewHandle ret(handle_pool.image_views.allocate(this, holder.image_view, tmp));
+		if (ret)
+		{
+			holder.owned = false;
+			ret->set_alt_views(holder.depth_view, holder.stencil_view);
+			ret->set_render_target_views(holder.rt_views);
+			holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
+			return ret;
+		}
+		else
+			return ImageViewHandle(nullptr);
+	}
+
+	InitialImageBuffer Device::create_image_staging_buffer(const ImageCreateInfo &info, const ImageInitialData *initial)
+	{
+		InitialImageBuffer result;
+
+		bool generate_mips = (info.misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
+		TextureFormatLayout layout;
+
+		unsigned copy_levels;
+		if (generate_mips)
+			copy_levels = 1;
+		else if (info.levels == 0)
+			copy_levels = TextureFormatLayout::num_miplevels(info.width, info.height, info.depth);
+		else
+			copy_levels = info.levels;
+
+		switch (info.type)
+		{
+			case VK_IMAGE_TYPE_1D:
+				layout.set_1d(info.format, info.width, info.layers, copy_levels);
+				break;
+			case VK_IMAGE_TYPE_2D:
+				layout.set_2d(info.format, info.width, info.height, info.layers, copy_levels);
+				break;
+			case VK_IMAGE_TYPE_3D:
+				layout.set_3d(info.format, info.width, info.height, info.depth, copy_levels);
+				break;
+			default:
+				return {};
+		}
+
+		BufferCreateInfo buffer_info = {};
+		buffer_info.domain = BufferDomain::Host;
+		buffer_info.size = layout.get_required_size();
+		buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		result.buffer = create_buffer(buffer_info, nullptr);
+		set_name(*result.buffer, "image-upload-staging-buffer");
+
+		// And now, do the actual copy.
+		uint8_t *mapped = static_cast<uint8_t *>(map_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT));
+		unsigned index = 0;
+
+		layout.set_buffer(mapped, layout.get_required_size());
+
+		for (unsigned level = 0; level < copy_levels; level++)
+		{
+			const TextureFormatLayout::MipInfo &mip_info = layout.get_mip_info(level);
+			uint32_t dst_height_stride = layout.get_layer_size(level);
+			size_t row_size = layout.get_row_size(level);
+
+			for (unsigned layer = 0; layer < info.layers; layer++, index++)
+			{
+				uint32_t src_row_length =
 					initial[index].row_length ? initial[index].row_length : mip_info.row_length;
-			uint32_t src_array_height =
+				uint32_t src_array_height =
 					initial[index].image_height ? initial[index].image_height : mip_info.image_height;
 
-			uint32_t src_row_stride = layout.row_byte_stride(src_row_length);
-			uint32_t src_height_stride = layout.layer_byte_stride(src_array_height, src_row_stride);
+				uint32_t src_row_stride = layout.row_byte_stride(src_row_length);
+				uint32_t src_height_stride = layout.layer_byte_stride(src_array_height, src_row_stride);
 
-			uint8_t *dst = static_cast<uint8_t *>(layout.data(layer, level));
-			const uint8_t *src = static_cast<const uint8_t *>(initial[index].data);
+				uint8_t *dst = static_cast<uint8_t *>(layout.data(layer, level));
+				const uint8_t *src = static_cast<const uint8_t *>(initial[index].data);
 
-			for (uint32_t z = 0; z < mip_info.depth; z++)
-				for (uint32_t y = 0; y < mip_info.block_image_height; y++)
-					memcpy(dst + z * dst_height_stride + y * row_size, src + z * src_height_stride + y * src_row_stride, row_size);
+				for (uint32_t z = 0; z < mip_info.depth; z++)
+					for (uint32_t y = 0; y < mip_info.block_image_height; y++)
+						memcpy(dst + z * dst_height_stride + y * row_size, src + z * src_height_stride + y * src_row_stride, row_size);
+			}
 		}
+
+		unmap_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT);
+		layout.build_buffer_image_copies(result.blits, result.num_blits);
+		return result;
 	}
 
-	unmap_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT);
-	layout.build_buffer_image_copies(result.blits, result.num_blits);
-	return result;
-}
-
-ImageHandle Device::create_image(const ImageCreateInfo &create_info, const ImageInitialData *initial)
-{
-	if (initial)
+	ImageHandle Device::create_image(const ImageCreateInfo &create_info, const ImageInitialData *initial)
 	{
-		InitialImageBuffer staging_buffer = create_image_staging_buffer(create_info, initial);
-		return create_image_from_staging_buffer(create_info, &staging_buffer);
-	}
-	else
-		return create_image_from_staging_buffer(create_info, nullptr);
-}
-
-ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &create_info,
-                                                     const InitialImageBuffer *staging_buffer)
-{
-	ImageResourceHolder holder(device);
-	VkMemoryRequirements reqs;
-
-	VkImageCreateInfo info = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-	info.format = create_info.format;
-	info.extent.width = create_info.width;
-	info.extent.height = create_info.height;
-	info.extent.depth = create_info.depth;
-	info.imageType = create_info.type;
-	info.mipLevels = create_info.levels;
-	info.arrayLayers = create_info.layers;
-	info.samples = create_info.samples;
-
-	info.tiling = VK_IMAGE_TILING_OPTIMAL;
-	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-	info.usage = create_info.usage;
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	if (create_info.domain == ImageDomain::Transient)
-		info.usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
-	if (staging_buffer)
-		info.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-	info.flags = create_info.flags;
-
-	if (info.mipLevels == 0)
-		info.mipLevels = image_num_miplevels(info.extent);
-
-	if (create_info.usage & VK_IMAGE_USAGE_STORAGE_BIT)
-		info.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
-
-	if (!image_format_is_supported(create_info.format, image_usage_to_features(info.usage), info.tiling))
-	{
-		LOGE("Format %u is not supported for usage flags!\n", unsigned(create_info.format));
-		return ImageHandle(nullptr);
+		if (initial)
+		{
+			InitialImageBuffer staging_buffer = create_image_staging_buffer(create_info, initial);
+			return create_image_from_staging_buffer(create_info, &staging_buffer);
+		}
+		else
+			return create_image_from_staging_buffer(create_info, nullptr);
 	}
 
-	if (vkCreateImage(device, &info, nullptr, &holder.image) != VK_SUCCESS)
+	ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &create_info,
+			const InitialImageBuffer *staging_buffer)
 	{
-		LOGE("Failed to create image in vkCreateImage.\n");
-		return ImageHandle(nullptr);
-	}
+		ImageResourceHolder holder(device);
+		VkMemoryRequirements reqs;
 
-	vkGetImageMemoryRequirements(device, holder.image, &reqs);
-	uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
-	if (memory_type == UINT32_MAX)
-		return ImageHandle(nullptr);
+		VkImageCreateInfo info = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+		info.format = create_info.format;
+		info.extent.width = create_info.width;
+		info.extent.height = create_info.height;
+		info.extent.depth = create_info.depth;
+		info.imageType = create_info.type;
+		info.mipLevels = create_info.levels;
+		info.arrayLayers = create_info.layers;
+		info.samples = create_info.samples;
 
-	if (!managers.memory.allocate_image_memory(reqs.size, reqs.alignment, memory_type,
-	                                           ALLOCATION_TILING_OPTIMAL,
-	                                           &holder.allocation, holder.image))
-	{
-		LOGE("Failed to allocate image memory (type %u, size: %u).\n", unsigned(memory_type), unsigned(reqs.size));
-		return ImageHandle(nullptr);
-	}
+		info.tiling = VK_IMAGE_TILING_OPTIMAL;
+		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-	if (vkBindImageMemory(device, holder.image, holder.allocation.get_memory(), holder.allocation.get_offset()) != VK_SUCCESS)
-	{
-		LOGE("Failed to bind image memory.\n");
-		return ImageHandle(nullptr);
-	}
+		info.usage = create_info.usage;
+		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		if (create_info.domain == ImageDomain::Transient)
+			info.usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+		if (staging_buffer)
+			info.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-	ImageCreateInfo tmpinfo = create_info;
-	tmpinfo.usage = info.usage;
-	tmpinfo.levels = info.mipLevels;
+		info.flags = create_info.flags;
 
-	bool has_view = (info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-	                               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) != 0;
-	if (has_view)
-	{
-		if (!holder.create_default_views(tmpinfo, nullptr))
+		if (info.mipLevels == 0)
+			info.mipLevels = image_num_miplevels(info.extent);
+
+		if (create_info.usage & VK_IMAGE_USAGE_STORAGE_BIT)
+			info.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+
+		if (!image_format_is_supported(create_info.format, image_usage_to_features(info.usage), info.tiling))
+		{
+			LOGE("Format %u is not supported for usage flags!\n", unsigned(create_info.format));
 			return ImageHandle(nullptr);
-	}
+		}
 
-	ImageHandle handle(handle_pool.images.allocate(this, holder.image, holder.image_view, holder.allocation, tmpinfo));
-	if (handle)
-	{
-		holder.owned = false;
+		if (vkCreateImage(device, &info, nullptr, &holder.image) != VK_SUCCESS)
+		{
+			LOGE("Failed to create image in vkCreateImage.\n");
+			return ImageHandle(nullptr);
+		}
+
+		vkGetImageMemoryRequirements(device, holder.image, &reqs);
+		uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+		if (memory_type == UINT32_MAX)
+			return ImageHandle(nullptr);
+
+		if (!managers.memory.allocate_image_memory(reqs.size, reqs.alignment, memory_type,
+					ALLOCATION_TILING_OPTIMAL,
+					&holder.allocation, holder.image))
+		{
+			LOGE("Failed to allocate image memory (type %u, size: %u).\n", unsigned(memory_type), unsigned(reqs.size));
+			return ImageHandle(nullptr);
+		}
+
+		if (vkBindImageMemory(device, holder.image, holder.allocation.get_memory(), holder.allocation.get_offset()) != VK_SUCCESS)
+		{
+			LOGE("Failed to bind image memory.\n");
+			return ImageHandle(nullptr);
+		}
+
+		ImageCreateInfo tmpinfo = create_info;
+		tmpinfo.usage = info.usage;
+		tmpinfo.levels = info.mipLevels;
+
+		bool has_view = (info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) != 0;
 		if (has_view)
 		{
-			handle->get_view().set_alt_views(holder.depth_view, holder.stencil_view);
-			handle->get_view().set_render_target_views(holder.rt_views);
-			holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
+			if (!holder.create_default_views(tmpinfo, nullptr))
+				return ImageHandle(nullptr);
 		}
 
-		// Set possible dstStage and dstAccess.
-		handle->set_stage_flags(image_usage_to_possible_stages(info.usage));
-		handle->set_access_flags(image_usage_to_possible_access(info.usage));
-	}
-
-	// Copy initial data to texture.
-	if (staging_buffer)
-	{
-		VK_ASSERT(create_info.domain != ImageDomain::Transient);
-		VK_ASSERT(create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED);
-		bool generate_mips = (create_info.misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
-
-		// If graphics_queue != transfer_queue, we will use a semaphore, so no srcAccess mask is necessary.
-		VkAccessFlags final_transition_src_access = 0;
-		if (generate_mips)
-			final_transition_src_access = VK_ACCESS_TRANSFER_READ_BIT; // Validation complains otherwise.
-		else if (graphics_queue == transfer_queue)
-			final_transition_src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-		VkAccessFlags prepare_src_access = graphics_queue == transfer_queue ? VK_ACCESS_TRANSFER_WRITE_BIT : 0;
-		bool need_mipmap_barrier = true;
-		bool need_initial_barrier = true;
-
-		// Now we've used the TRANSFER queue to copy data over to the GPU.
-		// For mipmapping, we're now moving over to graphics,
-		// the transfer queue is designed for CPU <-> GPU and that's it.
-
-		// For concurrent queue mode, we just need to inject a semaphore.
-		// For non-concurrent queue mode, we will have to inject ownership transfer barrier if the queue families do not match.
-
-		CommandBufferHandle graphics_cmd = request_command_buffer(CommandBuffer::Type::Generic);
-		CommandBufferHandle transfer_cmd;
-
-		// Don't split the upload into multiple command buffers unless we have to.
-		if (transfer_queue != graphics_queue)
-			transfer_cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
-		else
-			transfer_cmd = graphics_cmd;
-
-		transfer_cmd->image_barrier(*handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		                            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT,
-		                            VK_ACCESS_TRANSFER_WRITE_BIT);
-
-		transfer_cmd->begin_region("copy-image-to-gpu");
-		transfer_cmd->copy_buffer_to_image(*handle, *staging_buffer->buffer, staging_buffer->num_blits, staging_buffer->blits);
-		transfer_cmd->end_region();
-
-		if (transfer_queue != graphics_queue)
+		ImageHandle handle(handle_pool.images.allocate(this, holder.image, holder.image_view, holder.allocation, tmpinfo));
+		if (handle)
 		{
-			VkPipelineStageFlags dst_stages =
-					generate_mips ? VkPipelineStageFlags(VK_PIPELINE_STAGE_TRANSFER_BIT) : handle->get_stage_flags();
-
-			// We can't just use semaphores, we will also need a release + acquire barrier to marshal ownership from
-			// transfer queue over to graphics ...
-			if (transfer_queue_family_index != graphics_queue_family_index)
+			holder.owned = false;
+			if (has_view)
 			{
-				need_mipmap_barrier = false;
-
-				VkImageMemoryBarrier release = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-				release.image = handle->get_image();
-				release.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-				release.dstAccessMask = 0;
-				release.srcQueueFamilyIndex = transfer_queue_family_index;
-				release.dstQueueFamilyIndex = graphics_queue_family_index;
-				release.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-
-				if (generate_mips)
-				{
-					release.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-					release.subresourceRange.levelCount = 1;
-				}
-				else
-				{
-					release.newLayout = create_info.initial_layout;
-					release.subresourceRange.levelCount = info.mipLevels;
-					need_initial_barrier = false;
-				}
-
-				release.subresourceRange.aspectMask = format_to_aspect_mask(info.format);
-				release.subresourceRange.layerCount = info.arrayLayers;
-
-				VkImageMemoryBarrier acquire = release;
-				acquire.srcAccessMask = 0;
-
-				if (generate_mips)
-					acquire.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-				else
-					acquire.dstAccessMask = handle->get_access_flags() & image_layout_to_possible_access(create_info.initial_layout);
-
-				transfer_cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
-				                      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-				                      0, nullptr, 0, nullptr, 1, &release);
-
-				graphics_cmd->barrier(dst_stages,
-				                      dst_stages,
-				                      0, nullptr, 0, nullptr, 1, &acquire);
+				handle->get_view().set_alt_views(holder.depth_view, holder.stencil_view);
+				handle->get_view().set_render_target_views(holder.rt_views);
+				holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
 			}
 
-			Semaphore sem;
-			submit(transfer_cmd, nullptr, 1, &sem);
-			add_wait_semaphore(CommandBuffer::Type::Generic, sem, dst_stages, true);
+			// Set possible dstStage and dstAccess.
+			handle->set_stage_flags(image_usage_to_possible_stages(info.usage));
+			handle->set_access_flags(image_usage_to_possible_access(info.usage));
 		}
 
-		if (generate_mips)
+		// Copy initial data to texture.
+		if (staging_buffer)
 		{
-			graphics_cmd->begin_region("mipgen");
-			graphics_cmd->barrier_prepare_generate_mipmap(*handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			                                              VK_PIPELINE_STAGE_TRANSFER_BIT,
-			                                              prepare_src_access, need_mipmap_barrier);
-			graphics_cmd->generate_mipmap(*handle);
-			graphics_cmd->end_region();
+			VK_ASSERT(create_info.domain != ImageDomain::Transient);
+			VK_ASSERT(create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED);
+			bool generate_mips = (create_info.misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
+
+			// If graphics_queue != transfer_queue, we will use a semaphore, so no srcAccess mask is necessary.
+			VkAccessFlags final_transition_src_access = 0;
+			if (generate_mips)
+				final_transition_src_access = VK_ACCESS_TRANSFER_READ_BIT; // Validation complains otherwise.
+			else if (graphics_queue == transfer_queue)
+				final_transition_src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+			VkAccessFlags prepare_src_access = graphics_queue == transfer_queue ? VK_ACCESS_TRANSFER_WRITE_BIT : 0;
+			bool need_mipmap_barrier = true;
+			bool need_initial_barrier = true;
+
+			// Now we've used the TRANSFER queue to copy data over to the GPU.
+			// For mipmapping, we're now moving over to graphics,
+			// the transfer queue is designed for CPU <-> GPU and that's it.
+
+			// For concurrent queue mode, we just need to inject a semaphore.
+			// For non-concurrent queue mode, we will have to inject ownership transfer barrier if the queue families do not match.
+
+			CommandBufferHandle graphics_cmd = request_command_buffer(CommandBuffer::Type::Generic);
+			CommandBufferHandle transfer_cmd;
+
+			// Don't split the upload into multiple command buffers unless we have to.
+			if (transfer_queue != graphics_queue)
+				transfer_cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
+			else
+				transfer_cmd = graphics_cmd;
+
+			transfer_cmd->image_barrier(*handle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT,
+					VK_ACCESS_TRANSFER_WRITE_BIT);
+
+			transfer_cmd->begin_region("copy-image-to-gpu");
+			transfer_cmd->copy_buffer_to_image(*handle, *staging_buffer->buffer, staging_buffer->num_blits, staging_buffer->blits);
+			transfer_cmd->end_region();
+
+			if (transfer_queue != graphics_queue)
+			{
+				VkPipelineStageFlags dst_stages =
+					generate_mips ? VkPipelineStageFlags(VK_PIPELINE_STAGE_TRANSFER_BIT) : handle->get_stage_flags();
+
+				// We can't just use semaphores, we will also need a release + acquire barrier to marshal ownership from
+				// transfer queue over to graphics ...
+				if (transfer_queue_family_index != graphics_queue_family_index)
+				{
+					need_mipmap_barrier = false;
+
+					VkImageMemoryBarrier release = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+					release.image = handle->get_image();
+					release.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+					release.dstAccessMask = 0;
+					release.srcQueueFamilyIndex = transfer_queue_family_index;
+					release.dstQueueFamilyIndex = graphics_queue_family_index;
+					release.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+					if (generate_mips)
+					{
+						release.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+						release.subresourceRange.levelCount = 1;
+					}
+					else
+					{
+						release.newLayout = create_info.initial_layout;
+						release.subresourceRange.levelCount = info.mipLevels;
+						need_initial_barrier = false;
+					}
+
+					release.subresourceRange.aspectMask = format_to_aspect_mask(info.format);
+					release.subresourceRange.layerCount = info.arrayLayers;
+
+					VkImageMemoryBarrier acquire = release;
+					acquire.srcAccessMask = 0;
+
+					if (generate_mips)
+						acquire.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+					else
+						acquire.dstAccessMask = handle->get_access_flags() & image_layout_to_possible_access(create_info.initial_layout);
+
+					transfer_cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
+							VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+							0, nullptr, 0, nullptr, 1, &release);
+
+					graphics_cmd->barrier(dst_stages,
+							dst_stages,
+							0, nullptr, 0, nullptr, 1, &acquire);
+				}
+
+				Semaphore sem;
+				submit(transfer_cmd, nullptr, 1, &sem);
+				add_wait_semaphore(CommandBuffer::Type::Generic, sem, dst_stages, true);
+			}
+
+			if (generate_mips)
+			{
+				graphics_cmd->begin_region("mipgen");
+				graphics_cmd->barrier_prepare_generate_mipmap(*handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+						VK_PIPELINE_STAGE_TRANSFER_BIT,
+						prepare_src_access, need_mipmap_barrier);
+				graphics_cmd->generate_mipmap(*handle);
+				graphics_cmd->end_region();
+			}
+
+			if (need_initial_barrier)
+			{
+				graphics_cmd->image_barrier(
+						*handle, generate_mips ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+						create_info.initial_layout,
+						VK_PIPELINE_STAGE_TRANSFER_BIT, final_transition_src_access,
+						handle->get_stage_flags(),
+						handle->get_access_flags() & image_layout_to_possible_access(create_info.initial_layout));
+			}
+
+			bool share_async_graphics = get_physical_queue_type(CommandBuffer::Type::AsyncGraphics) == CommandBuffer::Type::AsyncCompute;
+
+			// Add semaphore if the compute queue can be used for async graphics as well.
+			if (share_async_graphics)
+			{
+				Semaphore sem;
+				submit(graphics_cmd, nullptr, 1, &sem);
+
+				VkPipelineStageFlags dst_stages = handle->get_stage_flags();
+				if (graphics_queue_family_index != compute_queue_family_index)
+					dst_stages &= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
+				add_wait_semaphore(CommandBuffer::Type::AsyncCompute, sem, dst_stages, true);
+			}
+			else
+				submit(graphics_cmd);
+		}
+		else if (create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
+		{
+			VK_ASSERT(create_info.domain != ImageDomain::Transient);
+			CommandBufferHandle cmd = request_command_buffer(CommandBuffer::Type::Generic);
+			cmd->image_barrier(*handle, info.initialLayout, create_info.initial_layout,
+					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, handle->get_stage_flags(),
+					handle->get_access_flags() &
+					image_layout_to_possible_access(create_info.initial_layout));
+
+			submit(cmd);
 		}
 
-		if (need_initial_barrier)
+		return handle;
+	}
+
+	static VkSamplerCreateInfo fill_vk_sampler_info(const SamplerCreateInfo &sampler_info)
+	{
+		VkSamplerCreateInfo info = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+
+		info.magFilter = sampler_info.mag_filter;
+		info.minFilter = sampler_info.min_filter;
+		info.mipmapMode = sampler_info.mipmap_mode;
+		info.addressModeU = sampler_info.address_mode_u;
+		info.addressModeV = sampler_info.address_mode_v;
+		info.addressModeW = sampler_info.address_mode_w;
+		info.mipLodBias = sampler_info.mip_lod_bias;
+		info.anisotropyEnable = sampler_info.anisotropy_enable;
+		info.maxAnisotropy = sampler_info.max_anisotropy;
+		info.compareEnable = sampler_info.compare_enable;
+		info.compareOp = sampler_info.compare_op;
+		info.minLod = sampler_info.min_lod;
+		info.maxLod = sampler_info.max_lod;
+		info.borderColor = sampler_info.border_color;
+		info.unnormalizedCoordinates = sampler_info.unnormalized_coordinates;
+		return info;
+	}
+
+	SamplerHandle Device::create_sampler(const SamplerCreateInfo &sampler_info, StockSampler stock_sampler)
+	{
+		VkSamplerCreateInfo info = fill_vk_sampler_info(sampler_info);
+		VkSampler sampler;
+
+		(void)stock_sampler;
+		if (vkCreateSampler(device, &info, nullptr, &sampler) != VK_SUCCESS)
+			return SamplerHandle(nullptr);
+
+		return SamplerHandle(handle_pool.samplers.allocate(this, sampler));
+	}
+
+	BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const void *initial)
+	{
+		VkBuffer buffer;
+		VkMemoryRequirements reqs;
+		DeviceAllocation allocation;
+
+		VkBufferCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+		info.size = create_info.size;
+		info.usage = create_info.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		uint32_t sharing_indices[3];
+		if (graphics_queue_family_index != compute_queue_family_index ||
+				graphics_queue_family_index != transfer_queue_family_index)
 		{
-			graphics_cmd->image_barrier(
-					*handle, generate_mips ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					create_info.initial_layout,
-					VK_PIPELINE_STAGE_TRANSFER_BIT, final_transition_src_access,
-					handle->get_stage_flags(),
-					handle->get_access_flags() & image_layout_to_possible_access(create_info.initial_layout));
-		}
+			// For buffers, always just use CONCURRENT access modes,
+			// so we don't have to deal with acquire/release barriers in async compute.
+			info.sharingMode = VK_SHARING_MODE_CONCURRENT;
 
-		bool share_async_graphics = get_physical_queue_type(CommandBuffer::Type::AsyncGraphics) == CommandBuffer::Type::AsyncCompute;
+			sharing_indices[info.queueFamilyIndexCount++] = graphics_queue_family_index;
 
-		// Add semaphore if the compute queue can be used for async graphics as well.
-		if (share_async_graphics)
-		{
-			Semaphore sem;
-			submit(graphics_cmd, nullptr, 1, &sem);
-
-			VkPipelineStageFlags dst_stages = handle->get_stage_flags();
 			if (graphics_queue_family_index != compute_queue_family_index)
-				dst_stages &= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
-			add_wait_semaphore(CommandBuffer::Type::AsyncCompute, sem, dst_stages, true);
-		}
-		else
-			submit(graphics_cmd);
-	}
-	else if (create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
-	{
-		VK_ASSERT(create_info.domain != ImageDomain::Transient);
-		CommandBufferHandle cmd = request_command_buffer(CommandBuffer::Type::Generic);
-		cmd->image_barrier(*handle, info.initialLayout, create_info.initial_layout,
-		                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, handle->get_stage_flags(),
-		                   handle->get_access_flags() &
-		                   image_layout_to_possible_access(create_info.initial_layout));
+				sharing_indices[info.queueFamilyIndexCount++] = compute_queue_family_index;
 
-		submit(cmd);
-	}
+			if (graphics_queue_family_index != transfer_queue_family_index &&
+					compute_queue_family_index != transfer_queue_family_index)
+			{
+				sharing_indices[info.queueFamilyIndexCount++] = transfer_queue_family_index;
+			}
 
-	return handle;
-}
-
-static VkSamplerCreateInfo fill_vk_sampler_info(const SamplerCreateInfo &sampler_info)
-{
-	VkSamplerCreateInfo info = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-
-	info.magFilter = sampler_info.mag_filter;
-	info.minFilter = sampler_info.min_filter;
-	info.mipmapMode = sampler_info.mipmap_mode;
-	info.addressModeU = sampler_info.address_mode_u;
-	info.addressModeV = sampler_info.address_mode_v;
-	info.addressModeW = sampler_info.address_mode_w;
-	info.mipLodBias = sampler_info.mip_lod_bias;
-	info.anisotropyEnable = sampler_info.anisotropy_enable;
-	info.maxAnisotropy = sampler_info.max_anisotropy;
-	info.compareEnable = sampler_info.compare_enable;
-	info.compareOp = sampler_info.compare_op;
-	info.minLod = sampler_info.min_lod;
-	info.maxLod = sampler_info.max_lod;
-	info.borderColor = sampler_info.border_color;
-	info.unnormalizedCoordinates = sampler_info.unnormalized_coordinates;
-	return info;
-}
-
-SamplerHandle Device::create_sampler(const SamplerCreateInfo &sampler_info, StockSampler stock_sampler)
-{
-	VkSamplerCreateInfo info = fill_vk_sampler_info(sampler_info);
-	VkSampler sampler;
-
-	(void)stock_sampler;
-	if (vkCreateSampler(device, &info, nullptr, &sampler) != VK_SUCCESS)
-		return SamplerHandle(nullptr);
-
-	return SamplerHandle(handle_pool.samplers.allocate(this, sampler));
-}
-
-BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const void *initial)
-{
-	VkBuffer buffer;
-	VkMemoryRequirements reqs;
-	DeviceAllocation allocation;
-
-	VkBufferCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-	info.size = create_info.size;
-	info.usage = create_info.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	uint32_t sharing_indices[3];
-	if (graphics_queue_family_index != compute_queue_family_index ||
-	    graphics_queue_family_index != transfer_queue_family_index)
-	{
-		// For buffers, always just use CONCURRENT access modes,
-		// so we don't have to deal with acquire/release barriers in async compute.
-		info.sharingMode = VK_SHARING_MODE_CONCURRENT;
-
-		sharing_indices[info.queueFamilyIndexCount++] = graphics_queue_family_index;
-
-		if (graphics_queue_family_index != compute_queue_family_index)
-			sharing_indices[info.queueFamilyIndexCount++] = compute_queue_family_index;
-
-		if (graphics_queue_family_index != transfer_queue_family_index &&
-		    compute_queue_family_index != transfer_queue_family_index)
-		{
-			sharing_indices[info.queueFamilyIndexCount++] = transfer_queue_family_index;
+			info.pQueueFamilyIndices = sharing_indices;
 		}
 
-		info.pQueueFamilyIndices = sharing_indices;
-	}
-
-	if (vkCreateBuffer(device, &info, nullptr, &buffer) != VK_SUCCESS)
-		return BufferHandle(nullptr);
-
-	vkGetBufferMemoryRequirements(device, buffer, &reqs);
-
-	uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
-	if (memory_type == UINT32_MAX)
-	{
-		vkDestroyBuffer(device, buffer, nullptr);
-		return BufferHandle(nullptr);
-	}
-
-	if (!managers.memory.allocate(reqs.size, reqs.alignment, memory_type, ALLOCATION_TILING_LINEAR, &allocation))
-	{
-		vkDestroyBuffer(device, buffer, nullptr);
-		return BufferHandle(nullptr);
-	}
-
-	if (vkBindBufferMemory(device, buffer, allocation.get_memory(), allocation.get_offset()) != VK_SUCCESS)
-	{
-		allocation.free_immediate(managers.memory);
-		vkDestroyBuffer(device, buffer, nullptr);
-		return BufferHandle(nullptr);
-	}
-
-	BufferCreateInfo tmpinfo = create_info;
-	tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	BufferHandle handle(handle_pool.buffers.allocate(this, buffer, allocation, tmpinfo));
-
-	if (create_info.domain == BufferDomain::Device && initial && !memory_type_is_host_visible(memory_type))
-	{
-		CommandBufferHandle cmd;
-		BufferCreateInfo staging_info = create_info;
-		staging_info.domain = BufferDomain::Host;
-		BufferHandle staging_buffer = create_buffer(staging_info, initial);
-		set_name(*staging_buffer, "buffer-upload-staging-buffer");
-
-		cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
-		cmd->begin_region("copy-buffer-staging");
-		cmd->copy_buffer(*handle, *staging_buffer);
-		cmd->end_region();
-
-		submit_staging(cmd, info.usage, true);
-	}
-	else if (initial)
-	{
-		void *ptr = managers.memory.map_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
-		if (!ptr)
+		if (vkCreateBuffer(device, &info, nullptr, &buffer) != VK_SUCCESS)
 			return BufferHandle(nullptr);
 
-		memcpy(ptr, initial, create_info.size);
-		managers.memory.unmap_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
+		vkGetBufferMemoryRequirements(device, buffer, &reqs);
+
+		uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+		if (memory_type == UINT32_MAX)
+		{
+			vkDestroyBuffer(device, buffer, nullptr);
+			return BufferHandle(nullptr);
+		}
+
+		if (!managers.memory.allocate(reqs.size, reqs.alignment, memory_type, ALLOCATION_TILING_LINEAR, &allocation))
+		{
+			vkDestroyBuffer(device, buffer, nullptr);
+			return BufferHandle(nullptr);
+		}
+
+		if (vkBindBufferMemory(device, buffer, allocation.get_memory(), allocation.get_offset()) != VK_SUCCESS)
+		{
+			allocation.free_immediate(managers.memory);
+			vkDestroyBuffer(device, buffer, nullptr);
+			return BufferHandle(nullptr);
+		}
+
+		BufferCreateInfo tmpinfo = create_info;
+		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		BufferHandle handle(handle_pool.buffers.allocate(this, buffer, allocation, tmpinfo));
+
+		if (create_info.domain == BufferDomain::Device && initial && !memory_type_is_host_visible(memory_type))
+		{
+			CommandBufferHandle cmd;
+			BufferCreateInfo staging_info = create_info;
+			staging_info.domain = BufferDomain::Host;
+			BufferHandle staging_buffer = create_buffer(staging_info, initial);
+			set_name(*staging_buffer, "buffer-upload-staging-buffer");
+
+			cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
+			cmd->begin_region("copy-buffer-staging");
+			cmd->copy_buffer(*handle, *staging_buffer);
+			cmd->end_region();
+
+			submit_staging(cmd, info.usage, true);
+		}
+		else if (initial)
+		{
+			void *ptr = managers.memory.map_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
+			if (!ptr)
+				return BufferHandle(nullptr);
+
+			memcpy(ptr, initial, create_info.size);
+			managers.memory.unmap_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
+		}
+		return handle;
 	}
-	return handle;
-}
 
-bool Device::get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling,
-                                         VkImageUsageFlags usage, VkImageCreateFlags flags,
-                                         VkImageFormatProperties *properties)
-{
-	VkResult res = vkGetPhysicalDeviceImageFormatProperties(gpu, format, type, tiling, usage, flags,
-	                                                    properties);
-	return res == VK_SUCCESS;
-}
-
-bool Device::image_format_is_supported(VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling) const
-{
-	VkFormatProperties props;
-	vkGetPhysicalDeviceFormatProperties(gpu, format, &props);
-	VkFormatFeatureFlags flags = tiling == VK_IMAGE_TILING_OPTIMAL ? props.optimalTilingFeatures : props.linearTilingFeatures;
-	return (flags & required) == required;
-}
-
-VkFormat Device::get_default_depth_format() const
-{
-	if (image_format_is_supported(VK_FORMAT_D32_SFLOAT, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
-		return VK_FORMAT_D32_SFLOAT;
-	if (image_format_is_supported(VK_FORMAT_X8_D24_UNORM_PACK32, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
-		return VK_FORMAT_X8_D24_UNORM_PACK32;
-	if (image_format_is_supported(VK_FORMAT_D16_UNORM, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
-		return VK_FORMAT_D16_UNORM;
-
-	return VK_FORMAT_UNDEFINED;
-}
-
-const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool compatible)
-{
-	Hasher h;
-	VkFormat formats[VULKAN_NUM_ATTACHMENTS];
-	VkFormat depth_stencil;
-	uint32_t lazy = 0;
-	uint32_t optimal = 0;
-
-	for (unsigned i = 0; i < info.num_color_attachments; i++)
+	bool Device::get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling,
+			VkImageUsageFlags usage, VkImageCreateFlags flags,
+			VkImageFormatProperties *properties)
 	{
-		VK_ASSERT(info.color_attachments[i]);
-		formats[i] = info.color_attachments[i]->get_format();
-		if (info.color_attachments[i]->get_image().get_create_info().domain == ImageDomain::Transient)
-			lazy |= 1u << i;
-		if (info.color_attachments[i]->get_image().get_layout_type() == Layout::Optimal)
-			optimal |= 1u << i;
+		VkResult res = vkGetPhysicalDeviceImageFormatProperties(gpu, format, type, tiling, usage, flags,
+				properties);
+		return res == VK_SUCCESS;
 	}
 
-	if (info.depth_stencil)
+	bool Device::image_format_is_supported(VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling) const
 	{
-		if (info.depth_stencil->get_image().get_create_info().domain == ImageDomain::Transient)
-			lazy |= 1u << info.num_color_attachments;
-		if (info.depth_stencil->get_image().get_layout_type() == Layout::Optimal)
-			optimal |= 1u << info.num_color_attachments;
+		VkFormatProperties props;
+		vkGetPhysicalDeviceFormatProperties(gpu, format, &props);
+		VkFormatFeatureFlags flags = tiling == VK_IMAGE_TILING_OPTIMAL ? props.optimalTilingFeatures : props.linearTilingFeatures;
+		return (flags & required) == required;
 	}
 
-	h.u32(info.num_subpasses);
-	for (unsigned i = 0; i < info.num_subpasses; i++)
+	VkFormat Device::get_default_depth_format() const
 	{
-		h.u32(info.subpasses[i].num_color_attachments);
-		h.u32(info.subpasses[i].num_input_attachments);
-		h.u32(info.subpasses[i].num_resolve_attachments);
-		h.u32(static_cast<uint32_t>(info.subpasses[i].depth_stencil_mode));
-		for (unsigned j = 0; j < info.subpasses[i].num_color_attachments; j++)
-			h.u32(info.subpasses[i].color_attachments[j]);
-		for (unsigned j = 0; j < info.subpasses[i].num_input_attachments; j++)
-			h.u32(info.subpasses[i].input_attachments[j]);
-		for (unsigned j = 0; j < info.subpasses[i].num_resolve_attachments; j++)
-			h.u32(info.subpasses[i].resolve_attachments[j]);
+		if (image_format_is_supported(VK_FORMAT_D32_SFLOAT, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
+			return VK_FORMAT_D32_SFLOAT;
+		if (image_format_is_supported(VK_FORMAT_X8_D24_UNORM_PACK32, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
+			return VK_FORMAT_X8_D24_UNORM_PACK32;
+		if (image_format_is_supported(VK_FORMAT_D16_UNORM, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
+			return VK_FORMAT_D16_UNORM;
+
+		return VK_FORMAT_UNDEFINED;
 	}
 
-	depth_stencil = info.depth_stencil ? info.depth_stencil->get_format() : VK_FORMAT_UNDEFINED;
-	h.data(reinterpret_cast<const uint32_t *>(formats), info.num_color_attachments * sizeof(VkFormat));
-	h.u32(info.num_color_attachments);
-	h.u32(depth_stencil);
-
-	// Compatible render passes do not care about load/store, or image layouts.
-	if (!compatible)
+	const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool compatible)
 	{
-		h.u32(info.op_flags);
-		h.u32(info.clear_attachments);
-		h.u32(info.load_attachments);
-		h.u32(info.store_attachments);
-		h.u32(optimal);
+		Hasher h;
+		VkFormat formats[VULKAN_NUM_ATTACHMENTS];
+		VkFormat depth_stencil;
+		uint32_t lazy = 0;
+		uint32_t optimal = 0;
+
+		for (unsigned i = 0; i < info.num_color_attachments; i++)
+		{
+			VK_ASSERT(info.color_attachments[i]);
+			formats[i] = info.color_attachments[i]->get_format();
+			if (info.color_attachments[i]->get_image().get_create_info().domain == ImageDomain::Transient)
+				lazy |= 1u << i;
+			if (info.color_attachments[i]->get_image().get_layout_type() == Layout::Optimal)
+				optimal |= 1u << i;
+		}
+
+		if (info.depth_stencil)
+		{
+			if (info.depth_stencil->get_image().get_create_info().domain == ImageDomain::Transient)
+				lazy |= 1u << info.num_color_attachments;
+			if (info.depth_stencil->get_image().get_layout_type() == Layout::Optimal)
+				optimal |= 1u << info.num_color_attachments;
+		}
+
+		h.u32(info.num_subpasses);
+		for (unsigned i = 0; i < info.num_subpasses; i++)
+		{
+			h.u32(info.subpasses[i].num_color_attachments);
+			h.u32(info.subpasses[i].num_input_attachments);
+			h.u32(info.subpasses[i].num_resolve_attachments);
+			h.u32(static_cast<uint32_t>(info.subpasses[i].depth_stencil_mode));
+			for (unsigned j = 0; j < info.subpasses[i].num_color_attachments; j++)
+				h.u32(info.subpasses[i].color_attachments[j]);
+			for (unsigned j = 0; j < info.subpasses[i].num_input_attachments; j++)
+				h.u32(info.subpasses[i].input_attachments[j]);
+			for (unsigned j = 0; j < info.subpasses[i].num_resolve_attachments; j++)
+				h.u32(info.subpasses[i].resolve_attachments[j]);
+		}
+
+		depth_stencil = info.depth_stencil ? info.depth_stencil->get_format() : VK_FORMAT_UNDEFINED;
+		h.data(reinterpret_cast<const uint32_t *>(formats), info.num_color_attachments * sizeof(VkFormat));
+		h.u32(info.num_color_attachments);
+		h.u32(depth_stencil);
+
+		// Compatible render passes do not care about load/store, or image layouts.
+		if (!compatible)
+		{
+			h.u32(info.op_flags);
+			h.u32(info.clear_attachments);
+			h.u32(info.load_attachments);
+			h.u32(info.store_attachments);
+			h.u32(optimal);
+		}
+
+		// Lazy flag can change external subpass dependencies, which is not compatible.
+		h.u32(lazy);
+
+		Hash hash = h.get();
+
+		RenderPass *ret = render_passes.find(hash);
+		if (!ret)
+			ret = render_passes.emplace_yield(hash, hash, this, info);
+		return *ret;
 	}
 
-	// Lazy flag can change external subpass dependencies, which is not compatible.
-	h.u32(lazy);
-
-	Hash hash = h.get();
-
-	RenderPass *ret = render_passes.find(hash);
-	if (!ret)
-		ret = render_passes.emplace_yield(hash, hash, this, info);
-	return *ret;
-}
-
-void Device::set_name(const Buffer &buffer, const char *name)
-{
-	if (ext.supports_debug_marker)
+	void Device::set_name(const Buffer &buffer, const char *name)
 	{
-		VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
-		info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT;
-		info.object = (uint64_t)buffer.get_buffer();
-		info.pObjectName = name;
-		vkDebugMarkerSetObjectNameEXT(device, &info);
+		if (ext.supports_debug_marker)
+		{
+			VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
+			info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT;
+			info.object = (uint64_t)buffer.get_buffer();
+			info.pObjectName = name;
+			vkDebugMarkerSetObjectNameEXT(device, &info);
+		}
 	}
-}
 
-void Device::set_name(const Image &image, const char *name)
-{
-	if (ext.supports_debug_marker)
+	void Device::set_name(const Image &image, const char *name)
 	{
-		VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
-		info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT;
-		info.object = (uint64_t)image.get_image();
-		info.pObjectName = name;
-		vkDebugMarkerSetObjectNameEXT(device, &info);
+		if (ext.supports_debug_marker)
+		{
+			VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
+			info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT;
+			info.object = (uint64_t)image.get_image();
+			info.pObjectName = name;
+			vkDebugMarkerSetObjectNameEXT(device, &info);
+		}
 	}
-}
 
 }
 
@@ -18292,544 +18278,544 @@ using namespace std;
 namespace PSX
 {
 
-FBAtlas::FBAtlas()
-{
-	for (StatusFlags &f : fb_info)
-		f = STATUS_FB_PREFER;
-}
+	FBAtlas::FBAtlas()
+	{
+		for (StatusFlags &f : fb_info)
+			f = STATUS_FB_PREFER;
+	}
 
-void FBAtlas::load_image(const Rect &rect)
-{
-	if (rect.width == 0 || rect.height == 0)
-		return;
+	void FBAtlas::load_image(const Rect &rect)
+	{
+		if (rect.width == 0 || rect.height == 0)
+			return;
 
-	write_compute(Domain::Unscaled, rect);
+		write_compute(Domain::Unscaled, rect);
 
-	unsigned xbegin = rect.x / BLOCK_WIDTH;
-	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
-	unsigned ybegin = rect.y / BLOCK_HEIGHT;
-	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-	for (unsigned y = ybegin; y <= yend; y++)
-		for (unsigned x = xbegin; x <= xend; x++)
-			info(x, y) &= ~STATUS_TEXTURE_RENDERED;
-}
+		unsigned xbegin = rect.x / BLOCK_WIDTH;
+		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+		unsigned ybegin = rect.y / BLOCK_HEIGHT;
+		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
+		for (unsigned y = ybegin; y <= yend; y++)
+			for (unsigned x = xbegin; x <= xend; x++)
+				info(x, y) &= ~STATUS_TEXTURE_RENDERED;
+	}
 
-bool FBAtlas::texture_rendered(const Rect &rect)
-{
-	if (rect.width == 0 || rect.height == 0)
+	bool FBAtlas::texture_rendered(const Rect &rect)
+	{
+		if (rect.width == 0 || rect.height == 0)
+			return false;
+
+		unsigned xbegin = rect.x / BLOCK_WIDTH;
+		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+		unsigned ybegin = rect.y / BLOCK_HEIGHT;
+		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
+		for (unsigned y = ybegin; y <= yend; y++)
+			for (unsigned x = xbegin; x <= xend; x++)
+				if (info(x, y) & STATUS_TEXTURE_RENDERED)
+					return true;
 		return false;
-
-	unsigned xbegin = rect.x / BLOCK_WIDTH;
-	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
-	unsigned ybegin = rect.y / BLOCK_HEIGHT;
-	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-	for (unsigned y = ybegin; y <= yend; y++)
-		for (unsigned x = xbegin; x <= xend; x++)
-			if (info(x, y) & STATUS_TEXTURE_RENDERED)
-				return true;
-	return false;
-}
-
-Domain FBAtlas::blit_vram(const Rect &dst, const Rect &src)
-{
-	Domain domain = find_suitable_domain(src);
-
-	sync_domain(domain, src);
-	sync_domain(domain, dst);
-	read_domain(domain, Stage::Compute, src);
-	write_domain(domain, Stage::Compute, dst);
-
-	unsigned dst_xbegin = dst.x / BLOCK_WIDTH;
-	unsigned dst_xend = (dst.x + dst.width - 1) / BLOCK_WIDTH;
-	unsigned dst_ybegin = dst.y / BLOCK_HEIGHT;
-	unsigned dst_yend = (dst.y + dst.height - 1) / BLOCK_HEIGHT;
-
-	unsigned src_xbegin = src.x / BLOCK_WIDTH;
-	unsigned src_xend = (src.x + src.width - 1) / BLOCK_WIDTH;
-	unsigned src_ybegin = src.y / BLOCK_HEIGHT;
-	unsigned src_yend = (src.y + src.height - 1) / BLOCK_HEIGHT;
-
-	{
-		unsigned j_max = (dst_yend - dst_ybegin) < (src_yend - src_ybegin)
-		               ? (dst_yend - dst_ybegin) : (src_yend - src_ybegin);
-		unsigned i_max = (dst_xend - dst_xbegin) < (src_xend - src_xbegin)
-		               ? (dst_xend - dst_xbegin) : (src_xend - src_xbegin);
-		for (unsigned j = 0; j <= j_max; j++)
-			for (unsigned i = 0; i <= i_max; i++)
-			{
-				bool rendered = info(src_xbegin + i, src_ybegin + j) & STATUS_TEXTURE_RENDERED;
-				if (rendered)
-					info(dst_xbegin + i, dst_ybegin + j) |= STATUS_TEXTURE_RENDERED;
-				else
-					info(dst_xbegin + i, dst_ybegin + j) &= ~STATUS_TEXTURE_RENDERED;
-			}
 	}
 
-	return domain;
-}
-
-void FBAtlas::read_fragment(Domain domain, const Rect &rect)
-{
-	sync_domain(domain, rect);
-	read_domain(domain, Stage::Fragment, rect);
-}
-
-void FBAtlas::read_texture(Domain domain)
-{
-	Rect shifted = renderpass.texture_window;
-	bool palette;
-	switch (renderpass.texture_mode)
+	Domain FBAtlas::blit_vram(const Rect &dst, const Rect &src)
 	{
-	case TextureMode::Palette4bpp:
-	case TextureMode::Palette8bpp:
-		palette = true;
-		break;
+		Domain domain = find_suitable_domain(src);
 
-	default:
-		palette = false;
-		break;
-	}
-	shifted.x += renderpass.texture_offset_x;
-	shifted.y += renderpass.texture_offset_y;
+		sync_domain(domain, src);
+		sync_domain(domain, dst);
+		read_domain(domain, Stage::Compute, src);
+		write_domain(domain, Stage::Compute, dst);
 
-	//Domain domain = palette ? Domain::Unscaled : find_suitable_domain(shifted);
-	sync_domain(domain, shifted);
+		unsigned dst_xbegin = dst.x / BLOCK_WIDTH;
+		unsigned dst_xend = (dst.x + dst.width - 1) / BLOCK_WIDTH;
+		unsigned dst_ybegin = dst.y / BLOCK_HEIGHT;
+		unsigned dst_yend = (dst.y + dst.height - 1) / BLOCK_HEIGHT;
 
-	Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
-		                  renderpass.texture_mode == TextureMode::Palette8bpp ? 256u : 16u, 1 };
+		unsigned src_xbegin = src.x / BLOCK_WIDTH;
+		unsigned src_xend = (src.x + src.width - 1) / BLOCK_WIDTH;
+		unsigned src_ybegin = src.y / BLOCK_HEIGHT;
+		unsigned src_yend = (src.y + src.height - 1) / BLOCK_HEIGHT;
 
-	if (palette)
-		sync_domain(domain, palette_rect);
-
-	read_domain(domain, Stage::FragmentTexture, shifted);
-	if (palette)
-		read_domain(domain, Stage::FragmentTexture, palette_rect);
-}
-
-bool FBAtlas::write_domain(Domain domain, Stage stage, const Rect &rect)
-{
-	if (inside_render_pass(rect))
-		flush_render_pass();
-
-	unsigned xbegin = rect.x / BLOCK_WIDTH;
-	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
-	unsigned ybegin = rect.y / BLOCK_HEIGHT;
-	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-
-	unsigned write_domains = 0;
-	unsigned hazard_domains = 0;
-	unsigned resolve_domains = 0;
-	if (domain == Domain::Unscaled)
-	{
-		hazard_domains = STATUS_FB_WRITE | STATUS_FB_READ | STATUS_TEXTURE_READ;
-		if (stage == Stage::Compute)
-			resolve_domains = STATUS_COMPUTE_FB_WRITE;
-		else if (stage == Stage::Transfer)
-			resolve_domains = STATUS_TRANSFER_FB_WRITE;
-		else if (stage == Stage::Fragment)
 		{
-			// Write-after-write in fragment is handled implicitly.
-			// Write-after-read means rendering to a block after reading it as a texture.
-			// This is a hazard we must handle.
-			hazard_domains &= ~STATUS_FRAGMENT_FB_WRITE;
-			resolve_domains = STATUS_FRAGMENT_FB_WRITE;
-		}
-		resolve_domains |= STATUS_FB_ONLY;
-	}
-	else
-	{
-		hazard_domains = STATUS_SFB_WRITE | STATUS_SFB_READ | STATUS_TEXTURE_READ;
-		if (stage == Stage::Compute)
-			resolve_domains = STATUS_COMPUTE_SFB_WRITE;
-		else if (stage == Stage::Fragment)
-		{
-			// Write-after-write in fragment is handled implicitly.
-			// Write-after-read means rendering to a block after reading it as a texture.
-			// This is a hazard we must handle.
-			hazard_domains &= ~STATUS_FRAGMENT_SFB_WRITE;
-			resolve_domains = STATUS_FRAGMENT_SFB_WRITE;
-		}
-		else if (stage == Stage::Transfer)
-			resolve_domains = STATUS_TRANSFER_SFB_WRITE;
-		resolve_domains |= STATUS_SFB_ONLY;
-	}
-
-	for (unsigned y = ybegin; y <= yend; y++)
-		for (unsigned x = xbegin; x <= xend; x++)
-			write_domains |= info(x, y) & hazard_domains;
-
-	// Trying to update VRAM before fragment is done reading it.
-	// We could use copy-on-write here to avoid flushing, but this scenario is very rare.
-	if (write_domains & STATUS_TEXTURE_READ)
-		flush_render_pass();
-
-	if (write_domains)
-		pipeline_barrier(write_domains);
-
-	for (unsigned y = ybegin; y <= yend; y++)
-		for (unsigned x = xbegin; x <= xend; x++)
-			info(x, y) = (info(x, y) & ~STATUS_OWNERSHIP_MASK) | resolve_domains;
-
-	return (write_domains & STATUS_FRAGMENT_SFB_READ) != 0;
-}
-
-void FBAtlas::read_domain(Domain domain, Stage stage, const Rect &rect)
-{
-	if (inside_render_pass(rect))
-		flush_render_pass();
-
-	unsigned xbegin = rect.x / BLOCK_WIDTH;
-	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
-	unsigned ybegin = rect.y / BLOCK_HEIGHT;
-	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-
-	unsigned write_domains = 0;
-	unsigned hazard_domains = 0;
-	unsigned resolve_domains = 0;
-	if (domain == Domain::Unscaled)
-	{
-		hazard_domains = STATUS_FB_WRITE;
-		if (stage == Stage::Compute)
-			resolve_domains = STATUS_COMPUTE_FB_READ;
-		else if (stage == Stage::Transfer)
-			resolve_domains = STATUS_TRANSFER_FB_READ;
-		else if (stage == Stage::Fragment)
-		{
-			hazard_domains &= ~STATUS_FRAGMENT_FB_READ;
-			resolve_domains = STATUS_FRAGMENT_FB_READ;
-		}
-		else if (stage == Stage::FragmentTexture)
-		{
-			hazard_domains &= ~(STATUS_FRAGMENT_FB_READ | STATUS_TEXTURE_READ);
-			resolve_domains = STATUS_FRAGMENT_FB_READ | STATUS_TEXTURE_READ;
-		}
-	}
-	else
-	{
-		hazard_domains = STATUS_SFB_WRITE;
-		if (stage == Stage::Compute)
-			resolve_domains = STATUS_COMPUTE_SFB_READ;
-		else if (stage == Stage::Transfer)
-			resolve_domains = STATUS_TRANSFER_SFB_READ;
-		else if (stage == Stage::Fragment)
-		{
-			hazard_domains &= ~STATUS_FRAGMENT_SFB_READ;
-			resolve_domains = STATUS_FRAGMENT_SFB_READ;
-		}
-		else if (stage == Stage::FragmentTexture)
-		{
-			hazard_domains &= ~(STATUS_FRAGMENT_SFB_READ | STATUS_TEXTURE_READ);
-			resolve_domains = STATUS_FRAGMENT_SFB_READ | STATUS_TEXTURE_READ;
-		}
-	}
-
-	for (unsigned y = ybegin; y <= yend; y++)
-		for (unsigned x = xbegin; x <= xend; x++)
-			write_domains |= info(x, y) & hazard_domains;
-
-	if (write_domains)
-		pipeline_barrier(write_domains);
-
-	for (unsigned y = ybegin; y <= yend; y++)
-		for (unsigned x = xbegin; x <= xend; x++)
-			info(x, y) |= resolve_domains;
-}
-
-void FBAtlas::sync_domain(Domain domain, const Rect &rect)
-{
-	if (inside_render_pass(rect))
-		flush_render_pass();
-
-	unsigned xbegin = rect.x / BLOCK_WIDTH;
-	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
-	unsigned ybegin = rect.y / BLOCK_HEIGHT;
-	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-
-	// If we need to see a "clean" version
-	// of a framebuffer domain, we need to see
-	// anything other than this flag.
-	unsigned dirty_bits = 1u << (domain == Domain::Unscaled ? STATUS_SFB_ONLY : STATUS_FB_ONLY);
-	unsigned bits = 0;
-
-	for (unsigned y = ybegin; y <= yend; y++)
-		for (unsigned x = xbegin; x <= xend; x++)
-			bits |= 1u << (info(x, y) & STATUS_OWNERSHIP_MASK);
-
-	unsigned write_domains = 0;
-
-	// We're asserting that a region is up to date, but it's
-	// not, so we have to resolve it.
-	if ((bits & dirty_bits) == 0)
-		return;
-
-	// For scaled domain,
-	// we need to blit from unscaled domain to scaled.
-	unsigned ownership;
-	unsigned hazard_domains;
-	unsigned resolve_domains;
-	if (domain == Domain::Scaled)
-	{
-		ownership = STATUS_FB_ONLY;
-		hazard_domains = STATUS_FB_WRITE | STATUS_SFB_WRITE | STATUS_SFB_READ;
-
-		//resolve_domains = STATUS_TRANSFER_FB_READ | STATUS_FB_PREFER | STATUS_TRANSFER_SFB_WRITE;
-		resolve_domains = STATUS_COMPUTE_FB_READ | STATUS_FB_PREFER | STATUS_COMPUTE_SFB_WRITE;
-	}
-	else
-	{
-		ownership = STATUS_SFB_ONLY;
-		hazard_domains = STATUS_FB_WRITE | STATUS_SFB_WRITE | STATUS_FB_READ;
-
-		//resolve_domains = STATUS_TRANSFER_SFB_READ | STATUS_SFB_PREFER | STATUS_TRANSFER_FB_WRITE;
-		resolve_domains = STATUS_COMPUTE_SFB_READ | STATUS_SFB_PREFER | STATUS_COMPUTE_FB_WRITE;
-	}
-
-	for (unsigned y = ybegin; y <= yend; y++)
-	{
-		for (unsigned x = xbegin; x <= xend; x++)
-		{
-			StatusFlags &mask = info(x, y);
-			// If our block isn't in the ownership class we want,
-			// we need to read from one block and write to the other.
-			// We might have to wait for writers on read,
-			// and add hazard masks for our writes
-			// so other readers can wait for us.
-			if ((mask & STATUS_OWNERSHIP_MASK) == ownership)
-				write_domains |= mask & hazard_domains;
-		}
-	}
-
-	// If we hit any hazard, resolve it.
-	if (write_domains)
-		pipeline_barrier(write_domains);
-
-	for (unsigned y = ybegin; y <= yend; y++)
-	{
-		for (unsigned x = xbegin; x <= xend; x++)
-		{
-			StatusFlags &mask = info(x, y);
-			if ((mask & STATUS_OWNERSHIP_MASK) == ownership)
-			{
-				mask &= ~STATUS_OWNERSHIP_MASK;
-				mask |= resolve_domains;
-				listener->resolve(domain, (BLOCK_WIDTH * x) & (FB_WIDTH - 1), (BLOCK_HEIGHT * y) & (FB_HEIGHT - 1));
-			}
-		}
-	}
-}
-
-Domain FBAtlas::find_suitable_domain(const Rect &rect)
-{
-	if (inside_render_pass(rect))
-		return Domain::Scaled;
-
-	unsigned xbegin = rect.x / BLOCK_WIDTH;
-	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
-	unsigned ybegin = rect.y / BLOCK_HEIGHT;
-	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-
-	for (unsigned y = ybegin; y <= yend; y++)
-	{
-		for (unsigned x = xbegin; x <= xend; x++)
-		{
-			unsigned i = info(x, y) & STATUS_OWNERSHIP_MASK;
-			if (i == STATUS_FB_ONLY || i == STATUS_FB_PREFER)
-				return Domain::Unscaled;
-		}
-	}
-	return Domain::Scaled;
-}
-
-bool FBAtlas::inside_render_pass(const Rect &rect)
-{
-	if (!renderpass.inside)
-		return false;
-
-	unsigned xbegin = rect.x & ~(BLOCK_WIDTH - 1);
-	unsigned ybegin = rect.y & ~(BLOCK_HEIGHT - 1);
-	unsigned xend = ((rect.x + rect.width - 1) | (BLOCK_WIDTH - 1)) + 1;
-	unsigned yend = ((rect.y + rect.height - 1) | (BLOCK_HEIGHT - 1)) + 1;
-
-	unsigned rpx2 = renderpass.rect.x + renderpass.rect.width;
-	unsigned rpy2 = renderpass.rect.y + renderpass.rect.height;
-	unsigned x0 = (renderpass.rect.x > xbegin) ? renderpass.rect.x : xbegin;
-	unsigned x1 = (rpx2 < xend) ? rpx2 : xend;
-	unsigned y0 = (renderpass.rect.y > ybegin) ? renderpass.rect.y : ybegin;
-	unsigned y1 = (rpy2 < yend) ? rpy2 : yend;
-
-	return x1 > x0 && y1 > y0;
-}
-
-void FBAtlas::flush_render_pass()
-{
-	if (!renderpass.inside)
-		return;
-
-	// Clear out the "shadow" stage.
-	for (StatusFlags &f : fb_info)
-		f &= ~STATUS_TEXTURE_READ;
-
-	renderpass.inside = false;
-	const Rect &rect = renderpass.rect;
-	if (rect.width == 0 || rect.height == 0)
-		return;
-
-	write_domain(Domain::Scaled, Stage::Fragment, rect);
-	listener->flush_render_pass(rect);
-
-	unsigned xbegin = rect.x / BLOCK_WIDTH;
-	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
-	unsigned ybegin = rect.y / BLOCK_HEIGHT;
-	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-	for (unsigned y = ybegin; y <= yend; y++)
-		for (unsigned x = xbegin; x <= xend; x++)
-			info(x, y) |= STATUS_TEXTURE_RENDERED;
-}
-
-void FBAtlas::extend_render_pass(const Rect &rect, bool scissor)
-{
-	bool scissor_invariant = !scissor || renderpass.scissor.contains(rect);
-	listener->set_scissored_invariant(scissor_invariant);
-	Rect scissored_rect = !scissor_invariant ? rect.scissor(renderpass.scissor) : rect;
-
-	if (!scissored_rect.width || !scissored_rect.height)
-		return;
-
-	if (!renderpass.inside)
-	{
-		renderpass.rect = scissored_rect;
-		sync_domain(Domain::Scaled, renderpass.rect);
-		write_domain(Domain::Scaled, Stage::Fragment, renderpass.rect);
-		renderpass.inside = true;
-	}
-	else if (!renderpass.rect.contains(scissored_rect))
-	{
-		renderpass.rect.extend_bounding_box(scissored_rect);
-
-		// Avoid sync/write domain flushing our own render pass.
-		renderpass.inside = false;
-
-		// If we cleared the screen and we created a clear candidate,
-		// everything inside this render pass can be safely discarded.
-		if (!scissor && scissored_rect == renderpass.rect)
-			discard_render_pass();
-
-		sync_domain(Domain::Scaled, renderpass.rect);
-		if (write_domain(Domain::Scaled, Stage::Fragment, renderpass.rect))
-		{
-			// If render pass was flushed here due to write-after-read hazards, set rect to
-			// our new scissored_rect instead.
-			renderpass.inside = true;
-			flush_render_pass();
-			renderpass.rect = scissored_rect;
+			unsigned j_max = (dst_yend - dst_ybegin) < (src_yend - src_ybegin)
+				? (dst_yend - dst_ybegin) : (src_yend - src_ybegin);
+			unsigned i_max = (dst_xend - dst_xbegin) < (src_xend - src_xbegin)
+				? (dst_xend - dst_xbegin) : (src_xend - src_xbegin);
+			for (unsigned j = 0; j <= j_max; j++)
+				for (unsigned i = 0; i <= i_max; i++)
+				{
+					bool rendered = info(src_xbegin + i, src_ybegin + j) & STATUS_TEXTURE_RENDERED;
+					if (rendered)
+						info(dst_xbegin + i, dst_ybegin + j) |= STATUS_TEXTURE_RENDERED;
+					else
+						info(dst_xbegin + i, dst_ybegin + j) &= ~STATUS_TEXTURE_RENDERED;
+				}
 		}
 
-		renderpass.inside = true;
+		return domain;
 	}
-}
 
-void FBAtlas::write_fragment(Domain domain, const Rect &rect)
-{
-	bool reads_window = renderpass.texture_mode != TextureMode::None;
-	if (reads_window)
+	void FBAtlas::read_fragment(Domain domain, const Rect &rect)
+	{
+		sync_domain(domain, rect);
+		read_domain(domain, Stage::Fragment, rect);
+	}
+
+	void FBAtlas::read_texture(Domain domain)
 	{
 		Rect shifted = renderpass.texture_window;
-		bool reads_palette;
+		bool palette;
 		switch (renderpass.texture_mode)
 		{
-		case TextureMode::Palette4bpp:
-		case TextureMode::Palette8bpp:
-			reads_palette = true;
-			break;
+			case TextureMode::Palette4bpp:
+			case TextureMode::Palette8bpp:
+				palette = true;
+				break;
 
-		default:
-			reads_palette = false;
-			break;
+			default:
+				palette = false;
+				break;
 		}
 		shifted.x += renderpass.texture_offset_x;
 		shifted.y += renderpass.texture_offset_y;
 
-		const Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
-			                        renderpass.texture_mode == TextureMode::Palette8bpp ? 256u : 16u, 1 };
+		//Domain domain = palette ? Domain::Unscaled : find_suitable_domain(shifted);
+		sync_domain(domain, shifted);
 
-		if (reads_palette)
-		{
-			if (inside_render_pass(shifted) || inside_render_pass(palette_rect))
-				flush_render_pass();
-		}
-		else if (inside_render_pass(shifted))
-			flush_render_pass();
+		Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
+			renderpass.texture_mode == TextureMode::Palette8bpp ? 256u : 16u, 1 };
 
-		read_texture(domain);
+		if (palette)
+			sync_domain(domain, palette_rect);
+
+		read_domain(domain, Stage::FragmentTexture, shifted);
+		if (palette)
+			read_domain(domain, Stage::FragmentTexture, palette_rect);
 	}
 
-	extend_render_pass(rect, true);
-}
+	bool FBAtlas::write_domain(Domain domain, Stage stage, const Rect &rect)
+	{
+		if (inside_render_pass(rect))
+			flush_render_pass();
 
-void FBAtlas::clear_rect(const Rect &rect, uint32_t fb_color)
-{
-	if (rect.width == 0 || rect.height == 0)
-		return;
+		unsigned xbegin = rect.x / BLOCK_WIDTH;
+		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+		unsigned ybegin = rect.y / BLOCK_HEIGHT;
+		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 
-	// If we're clearing completely outside the renderpass, we're probably doing another render pass
-	// somewhere else, so end the current one and start a new one instead.
-	if (renderpass.inside && !renderpass.rect.intersects(rect))
-		flush_render_pass();
+		unsigned write_domains = 0;
+		unsigned hazard_domains = 0;
+		unsigned resolve_domains = 0;
+		if (domain == Domain::Unscaled)
+		{
+			hazard_domains = STATUS_FB_WRITE | STATUS_FB_READ | STATUS_TEXTURE_READ;
+			if (stage == Stage::Compute)
+				resolve_domains = STATUS_COMPUTE_FB_WRITE;
+			else if (stage == Stage::Transfer)
+				resolve_domains = STATUS_TRANSFER_FB_WRITE;
+			else if (stage == Stage::Fragment)
+			{
+				// Write-after-write in fragment is handled implicitly.
+				// Write-after-read means rendering to a block after reading it as a texture.
+				// This is a hazard we must handle.
+				hazard_domains &= ~STATUS_FRAGMENT_FB_WRITE;
+				resolve_domains = STATUS_FRAGMENT_FB_WRITE;
+			}
+			resolve_domains |= STATUS_FB_ONLY;
+		}
+		else
+		{
+			hazard_domains = STATUS_SFB_WRITE | STATUS_SFB_READ | STATUS_TEXTURE_READ;
+			if (stage == Stage::Compute)
+				resolve_domains = STATUS_COMPUTE_SFB_WRITE;
+			else if (stage == Stage::Fragment)
+			{
+				// Write-after-write in fragment is handled implicitly.
+				// Write-after-read means rendering to a block after reading it as a texture.
+				// This is a hazard we must handle.
+				hazard_domains &= ~STATUS_FRAGMENT_SFB_WRITE;
+				resolve_domains = STATUS_FRAGMENT_SFB_WRITE;
+			}
+			else if (stage == Stage::Transfer)
+				resolve_domains = STATUS_TRANSFER_SFB_WRITE;
+			resolve_domains |= STATUS_SFB_ONLY;
+		}
 
-	extend_render_pass(rect, false);
+		for (unsigned y = ybegin; y <= yend; y++)
+			for (unsigned x = xbegin; x <= xend; x++)
+				write_domains |= info(x, y) & hazard_domains;
 
-	// If the render pass area doesn't increase later, we can use loadOp == CLEAR instead of LOAD,
-	// which helps a lot on mobile GPUs.
-	listener->clear_quad(rect, fb_color, renderpass.rect == rect);
+		// Trying to update VRAM before fragment is done reading it.
+		// We could use copy-on-write here to avoid flushing, but this scenario is very rare.
+		if (write_domains & STATUS_TEXTURE_READ)
+			flush_render_pass();
 
-	unsigned xbegin = rect.x / BLOCK_WIDTH;
-	unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
-	unsigned ybegin = rect.y / BLOCK_HEIGHT;
-	unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-	for (unsigned y = ybegin; y <= yend; y++)
-		for (unsigned x = xbegin; x <= xend; x++)
-			info(x, y) &= ~STATUS_TEXTURE_RENDERED;
-}
+		if (write_domains)
+			pipeline_barrier(write_domains);
 
-void FBAtlas::discard_render_pass()
-{
-	renderpass.inside = false;
-	listener->discard_render_pass();
-}
+		for (unsigned y = ybegin; y <= yend; y++)
+			for (unsigned x = xbegin; x <= xend; x++)
+				info(x, y) = (info(x, y) & ~STATUS_OWNERSHIP_MASK) | resolve_domains;
 
-void FBAtlas::notify_external_barrier(StatusFlags domains)
-{
-	static const StatusFlags compute_read_stages = STATUS_COMPUTE_FB_READ | STATUS_COMPUTE_SFB_READ;
-	static const StatusFlags compute_write_stages = STATUS_COMPUTE_FB_WRITE | STATUS_COMPUTE_SFB_WRITE;
-	static const StatusFlags transfer_read_stages = STATUS_TRANSFER_FB_READ | STATUS_TRANSFER_SFB_READ;
-	static const StatusFlags transfer_write_stages = STATUS_TRANSFER_FB_WRITE | STATUS_TRANSFER_SFB_WRITE;
-	static const StatusFlags fragment_write_stages = STATUS_FRAGMENT_SFB_WRITE | STATUS_FRAGMENT_FB_WRITE;
-	static const StatusFlags fragment_read_stages = STATUS_FRAGMENT_SFB_READ | STATUS_FRAGMENT_FB_READ;
+		return (write_domains & STATUS_FRAGMENT_SFB_READ) != 0;
+	}
 
-	if (domains & compute_write_stages)
-		domains |= compute_write_stages | compute_read_stages;
-	if (domains & compute_read_stages)
-		domains |= compute_read_stages;
-	if (domains & transfer_write_stages)
-		domains |= transfer_write_stages | transfer_read_stages;
-	if (domains & transfer_read_stages)
-		domains |= transfer_read_stages;
-	if (domains & fragment_write_stages)
-		domains |= fragment_write_stages | fragment_read_stages;
-	if (domains & fragment_read_stages)
-		domains |= fragment_read_stages;
+	void FBAtlas::read_domain(Domain domain, Stage stage, const Rect &rect)
+	{
+		if (inside_render_pass(rect))
+			flush_render_pass();
 
-	for (StatusFlags &f : fb_info)
-		f &= ~domains;
-}
+		unsigned xbegin = rect.x / BLOCK_WIDTH;
+		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+		unsigned ybegin = rect.y / BLOCK_HEIGHT;
+		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 
-void FBAtlas::pipeline_barrier(StatusFlags domains)
-{
-	if (domains & (STATUS_FRAGMENT_SFB_WRITE | STATUS_FRAGMENT_SFB_READ))
-		flush_render_pass();
-	listener->hazard(domains);
-	notify_external_barrier(domains);
-}
+		unsigned write_domains = 0;
+		unsigned hazard_domains = 0;
+		unsigned resolve_domains = 0;
+		if (domain == Domain::Unscaled)
+		{
+			hazard_domains = STATUS_FB_WRITE;
+			if (stage == Stage::Compute)
+				resolve_domains = STATUS_COMPUTE_FB_READ;
+			else if (stage == Stage::Transfer)
+				resolve_domains = STATUS_TRANSFER_FB_READ;
+			else if (stage == Stage::Fragment)
+			{
+				hazard_domains &= ~STATUS_FRAGMENT_FB_READ;
+				resolve_domains = STATUS_FRAGMENT_FB_READ;
+			}
+			else if (stage == Stage::FragmentTexture)
+			{
+				hazard_domains &= ~(STATUS_FRAGMENT_FB_READ | STATUS_TEXTURE_READ);
+				resolve_domains = STATUS_FRAGMENT_FB_READ | STATUS_TEXTURE_READ;
+			}
+		}
+		else
+		{
+			hazard_domains = STATUS_SFB_WRITE;
+			if (stage == Stage::Compute)
+				resolve_domains = STATUS_COMPUTE_SFB_READ;
+			else if (stage == Stage::Transfer)
+				resolve_domains = STATUS_TRANSFER_SFB_READ;
+			else if (stage == Stage::Fragment)
+			{
+				hazard_domains &= ~STATUS_FRAGMENT_SFB_READ;
+				resolve_domains = STATUS_FRAGMENT_SFB_READ;
+			}
+			else if (stage == Stage::FragmentTexture)
+			{
+				hazard_domains &= ~(STATUS_FRAGMENT_SFB_READ | STATUS_TEXTURE_READ);
+				resolve_domains = STATUS_FRAGMENT_SFB_READ | STATUS_TEXTURE_READ;
+			}
+		}
+
+		for (unsigned y = ybegin; y <= yend; y++)
+			for (unsigned x = xbegin; x <= xend; x++)
+				write_domains |= info(x, y) & hazard_domains;
+
+		if (write_domains)
+			pipeline_barrier(write_domains);
+
+		for (unsigned y = ybegin; y <= yend; y++)
+			for (unsigned x = xbegin; x <= xend; x++)
+				info(x, y) |= resolve_domains;
+	}
+
+	void FBAtlas::sync_domain(Domain domain, const Rect &rect)
+	{
+		if (inside_render_pass(rect))
+			flush_render_pass();
+
+		unsigned xbegin = rect.x / BLOCK_WIDTH;
+		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+		unsigned ybegin = rect.y / BLOCK_HEIGHT;
+		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
+
+		// If we need to see a "clean" version
+		// of a framebuffer domain, we need to see
+		// anything other than this flag.
+		unsigned dirty_bits = 1u << (domain == Domain::Unscaled ? STATUS_SFB_ONLY : STATUS_FB_ONLY);
+		unsigned bits = 0;
+
+		for (unsigned y = ybegin; y <= yend; y++)
+			for (unsigned x = xbegin; x <= xend; x++)
+				bits |= 1u << (info(x, y) & STATUS_OWNERSHIP_MASK);
+
+		unsigned write_domains = 0;
+
+		// We're asserting that a region is up to date, but it's
+		// not, so we have to resolve it.
+		if ((bits & dirty_bits) == 0)
+			return;
+
+		// For scaled domain,
+		// we need to blit from unscaled domain to scaled.
+		unsigned ownership;
+		unsigned hazard_domains;
+		unsigned resolve_domains;
+		if (domain == Domain::Scaled)
+		{
+			ownership = STATUS_FB_ONLY;
+			hazard_domains = STATUS_FB_WRITE | STATUS_SFB_WRITE | STATUS_SFB_READ;
+
+			//resolve_domains = STATUS_TRANSFER_FB_READ | STATUS_FB_PREFER | STATUS_TRANSFER_SFB_WRITE;
+			resolve_domains = STATUS_COMPUTE_FB_READ | STATUS_FB_PREFER | STATUS_COMPUTE_SFB_WRITE;
+		}
+		else
+		{
+			ownership = STATUS_SFB_ONLY;
+			hazard_domains = STATUS_FB_WRITE | STATUS_SFB_WRITE | STATUS_FB_READ;
+
+			//resolve_domains = STATUS_TRANSFER_SFB_READ | STATUS_SFB_PREFER | STATUS_TRANSFER_FB_WRITE;
+			resolve_domains = STATUS_COMPUTE_SFB_READ | STATUS_SFB_PREFER | STATUS_COMPUTE_FB_WRITE;
+		}
+
+		for (unsigned y = ybegin; y <= yend; y++)
+		{
+			for (unsigned x = xbegin; x <= xend; x++)
+			{
+				StatusFlags &mask = info(x, y);
+				// If our block isn't in the ownership class we want,
+				// we need to read from one block and write to the other.
+				// We might have to wait for writers on read,
+				// and add hazard masks for our writes
+				// so other readers can wait for us.
+				if ((mask & STATUS_OWNERSHIP_MASK) == ownership)
+					write_domains |= mask & hazard_domains;
+			}
+		}
+
+		// If we hit any hazard, resolve it.
+		if (write_domains)
+			pipeline_barrier(write_domains);
+
+		for (unsigned y = ybegin; y <= yend; y++)
+		{
+			for (unsigned x = xbegin; x <= xend; x++)
+			{
+				StatusFlags &mask = info(x, y);
+				if ((mask & STATUS_OWNERSHIP_MASK) == ownership)
+				{
+					mask &= ~STATUS_OWNERSHIP_MASK;
+					mask |= resolve_domains;
+					listener->resolve(domain, (BLOCK_WIDTH * x) & (FB_WIDTH - 1), (BLOCK_HEIGHT * y) & (FB_HEIGHT - 1));
+				}
+			}
+		}
+	}
+
+	Domain FBAtlas::find_suitable_domain(const Rect &rect)
+	{
+		if (inside_render_pass(rect))
+			return Domain::Scaled;
+
+		unsigned xbegin = rect.x / BLOCK_WIDTH;
+		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+		unsigned ybegin = rect.y / BLOCK_HEIGHT;
+		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
+
+		for (unsigned y = ybegin; y <= yend; y++)
+		{
+			for (unsigned x = xbegin; x <= xend; x++)
+			{
+				unsigned i = info(x, y) & STATUS_OWNERSHIP_MASK;
+				if (i == STATUS_FB_ONLY || i == STATUS_FB_PREFER)
+					return Domain::Unscaled;
+			}
+		}
+		return Domain::Scaled;
+	}
+
+	bool FBAtlas::inside_render_pass(const Rect &rect)
+	{
+		if (!renderpass.inside)
+			return false;
+
+		unsigned xbegin = rect.x & ~(BLOCK_WIDTH - 1);
+		unsigned ybegin = rect.y & ~(BLOCK_HEIGHT - 1);
+		unsigned xend = ((rect.x + rect.width - 1) | (BLOCK_WIDTH - 1)) + 1;
+		unsigned yend = ((rect.y + rect.height - 1) | (BLOCK_HEIGHT - 1)) + 1;
+
+		unsigned rpx2 = renderpass.rect.x + renderpass.rect.width;
+		unsigned rpy2 = renderpass.rect.y + renderpass.rect.height;
+		unsigned x0 = (renderpass.rect.x > xbegin) ? renderpass.rect.x : xbegin;
+		unsigned x1 = (rpx2 < xend) ? rpx2 : xend;
+		unsigned y0 = (renderpass.rect.y > ybegin) ? renderpass.rect.y : ybegin;
+		unsigned y1 = (rpy2 < yend) ? rpy2 : yend;
+
+		return x1 > x0 && y1 > y0;
+	}
+
+	void FBAtlas::flush_render_pass()
+	{
+		if (!renderpass.inside)
+			return;
+
+		// Clear out the "shadow" stage.
+		for (StatusFlags &f : fb_info)
+			f &= ~STATUS_TEXTURE_READ;
+
+		renderpass.inside = false;
+		const Rect &rect = renderpass.rect;
+		if (rect.width == 0 || rect.height == 0)
+			return;
+
+		write_domain(Domain::Scaled, Stage::Fragment, rect);
+		listener->flush_render_pass(rect);
+
+		unsigned xbegin = rect.x / BLOCK_WIDTH;
+		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+		unsigned ybegin = rect.y / BLOCK_HEIGHT;
+		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
+		for (unsigned y = ybegin; y <= yend; y++)
+			for (unsigned x = xbegin; x <= xend; x++)
+				info(x, y) |= STATUS_TEXTURE_RENDERED;
+	}
+
+	void FBAtlas::extend_render_pass(const Rect &rect, bool scissor)
+	{
+		bool scissor_invariant = !scissor || renderpass.scissor.contains(rect);
+		listener->set_scissored_invariant(scissor_invariant);
+		Rect scissored_rect = !scissor_invariant ? rect.scissor(renderpass.scissor) : rect;
+
+		if (!scissored_rect.width || !scissored_rect.height)
+			return;
+
+		if (!renderpass.inside)
+		{
+			renderpass.rect = scissored_rect;
+			sync_domain(Domain::Scaled, renderpass.rect);
+			write_domain(Domain::Scaled, Stage::Fragment, renderpass.rect);
+			renderpass.inside = true;
+		}
+		else if (!renderpass.rect.contains(scissored_rect))
+		{
+			renderpass.rect.extend_bounding_box(scissored_rect);
+
+			// Avoid sync/write domain flushing our own render pass.
+			renderpass.inside = false;
+
+			// If we cleared the screen and we created a clear candidate,
+			// everything inside this render pass can be safely discarded.
+			if (!scissor && scissored_rect == renderpass.rect)
+				discard_render_pass();
+
+			sync_domain(Domain::Scaled, renderpass.rect);
+			if (write_domain(Domain::Scaled, Stage::Fragment, renderpass.rect))
+			{
+				// If render pass was flushed here due to write-after-read hazards, set rect to
+				// our new scissored_rect instead.
+				renderpass.inside = true;
+				flush_render_pass();
+				renderpass.rect = scissored_rect;
+			}
+
+			renderpass.inside = true;
+		}
+	}
+
+	void FBAtlas::write_fragment(Domain domain, const Rect &rect)
+	{
+		bool reads_window = renderpass.texture_mode != TextureMode::None;
+		if (reads_window)
+		{
+			Rect shifted = renderpass.texture_window;
+			bool reads_palette;
+			switch (renderpass.texture_mode)
+			{
+				case TextureMode::Palette4bpp:
+				case TextureMode::Palette8bpp:
+					reads_palette = true;
+					break;
+
+				default:
+					reads_palette = false;
+					break;
+			}
+			shifted.x += renderpass.texture_offset_x;
+			shifted.y += renderpass.texture_offset_y;
+
+			const Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
+				renderpass.texture_mode == TextureMode::Palette8bpp ? 256u : 16u, 1 };
+
+			if (reads_palette)
+			{
+				if (inside_render_pass(shifted) || inside_render_pass(palette_rect))
+					flush_render_pass();
+			}
+			else if (inside_render_pass(shifted))
+				flush_render_pass();
+
+			read_texture(domain);
+		}
+
+		extend_render_pass(rect, true);
+	}
+
+	void FBAtlas::clear_rect(const Rect &rect, uint32_t fb_color)
+	{
+		if (rect.width == 0 || rect.height == 0)
+			return;
+
+		// If we're clearing completely outside the renderpass, we're probably doing another render pass
+		// somewhere else, so end the current one and start a new one instead.
+		if (renderpass.inside && !renderpass.rect.intersects(rect))
+			flush_render_pass();
+
+		extend_render_pass(rect, false);
+
+		// If the render pass area doesn't increase later, we can use loadOp == CLEAR instead of LOAD,
+		// which helps a lot on mobile GPUs.
+		listener->clear_quad(rect, fb_color, renderpass.rect == rect);
+
+		unsigned xbegin = rect.x / BLOCK_WIDTH;
+		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
+		unsigned ybegin = rect.y / BLOCK_HEIGHT;
+		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
+		for (unsigned y = ybegin; y <= yend; y++)
+			for (unsigned x = xbegin; x <= xend; x++)
+				info(x, y) &= ~STATUS_TEXTURE_RENDERED;
+	}
+
+	void FBAtlas::discard_render_pass()
+	{
+		renderpass.inside = false;
+		listener->discard_render_pass();
+	}
+
+	void FBAtlas::notify_external_barrier(StatusFlags domains)
+	{
+		static const StatusFlags compute_read_stages = STATUS_COMPUTE_FB_READ | STATUS_COMPUTE_SFB_READ;
+		static const StatusFlags compute_write_stages = STATUS_COMPUTE_FB_WRITE | STATUS_COMPUTE_SFB_WRITE;
+		static const StatusFlags transfer_read_stages = STATUS_TRANSFER_FB_READ | STATUS_TRANSFER_SFB_READ;
+		static const StatusFlags transfer_write_stages = STATUS_TRANSFER_FB_WRITE | STATUS_TRANSFER_SFB_WRITE;
+		static const StatusFlags fragment_write_stages = STATUS_FRAGMENT_SFB_WRITE | STATUS_FRAGMENT_FB_WRITE;
+		static const StatusFlags fragment_read_stages = STATUS_FRAGMENT_SFB_READ | STATUS_FRAGMENT_FB_READ;
+
+		if (domains & compute_write_stages)
+			domains |= compute_write_stages | compute_read_stages;
+		if (domains & compute_read_stages)
+			domains |= compute_read_stages;
+		if (domains & transfer_write_stages)
+			domains |= transfer_write_stages | transfer_read_stages;
+		if (domains & transfer_read_stages)
+			domains |= transfer_read_stages;
+		if (domains & fragment_write_stages)
+			domains |= fragment_write_stages | fragment_read_stages;
+		if (domains & fragment_read_stages)
+			domains |= fragment_read_stages;
+
+		for (StatusFlags &f : fb_info)
+			f &= ~domains;
+	}
+
+	void FBAtlas::pipeline_barrier(StatusFlags domains)
+	{
+		if (domains & (STATUS_FRAGMENT_SFB_WRITE | STATUS_FRAGMENT_SFB_READ))
+			flush_render_pass();
+		listener->hazard(domains);
+		notify_external_barrier(domains);
+	}
 }
 
 /* ============================================================
@@ -18970,7 +18956,7 @@ extern retro_input_state_t dbg_input_state_cb;
 /* === texture_tracker.cpp === */
 #include "libretro-common/include/retro_dirent.h"
 
-// Actually using the implementation in deps/zlib/crc32.c I think
+/* Actually using the implementation in deps/zlib/crc32.c I think */
 #include "scrc32.h"
 
 extern char retro_cd_base_name[4096];
@@ -18981,8 +18967,8 @@ static char retro_slash = '\\';
 static char retro_slash = '/';
 #endif
 
-namespace PSX {
-
+namespace PSX
+{
 	// Path helpers write into a caller-provided buffer (PATH_MAX_TT bytes) and
 	// return it, C-style, instead of allocating a std::string.
 
@@ -20999,10 +20985,6 @@ static unsigned scaling = 4;
 
 extern enum rhi_renderer_type rhi_type;
 extern retro_log_printf_t log_cb;
-namespace Granite
-{
-retro_log_printf_t libretro_log;
-}
 
 static retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
@@ -21255,7 +21237,7 @@ static bool libretro_create_device(
 
 bool rhi_vulkan_open(bool is_pal)
 {
-   Granite::libretro_log = log_cb;
+   libretro_log   = log_cb;
    content_is_pal = is_pal;
 
    hw_render.context_type    = RETRO_HW_CONTEXT_VULKAN;
