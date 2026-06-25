@@ -1870,27 +1870,37 @@ static int lightrec_flag_io(struct lightrec_state *state, struct block *block)
 			}
 
 			if (!LIGHTREC_FLAGS_GET_IO_MODE(list->flags)
-			    && list->i.rs >= 28 && list->i.rs <= 29
+			    && list->i.rs == 29
 			    && !state->maps[PSX_MAP_KERNEL_USER_RAM].ops) {
 				/* When constant propagation cannot prove which map a
 				 * $sp/$gp-relative access targets, the address is not
-				 * actually known to hit RAM: $gp in particular routinely
-				 * points at the hardware-register window (0x1f801xxx).
+				 * actually known to hit RAM. The two registers differ
+				 * sharply in risk: $gp routinely points at the
+				 * hardware-register window (0x1f801xxx), so an unproven
+				 * $gp access frequently *is* I/O; $sp is the stack
+				 * pointer and in practice always points into RAM.
 				 *
 				 * The old heuristic assumed "RAM or bust" and emitted a
-				 * direct load (offset_ram + (addr & 0x1fffffff)). That
-				 * faults on any host that does not back the full 512 MiB
-				 * segment - e.g. a sub-par map where only the 2 MiB RAM
-				 * window is mapped - because an I/O address is offset past
-				 * the end of the RAM mapping into unmapped space.
+				 * direct load (offset_ram + (addr & 0x1fffffff)). For an
+				 * I/O address that is wrong two ways: on a sub-par map it
+				 * faults past the end of the RAM mapping, and on a
+				 * mirrors-mapped host the masked address lands inside the
+				 * RAM buffer and silently reads/writes RAM instead of
+				 * invoking the hardware register - so a $gp store meant to
+				 * program a DMA/GPU register scribbles into RAM and the
+				 * device is never told to act, hanging or crashing the
+				 * game downstream (observed in Tekken 3 entering a fight).
 				 *
-				 * Only take that shortcut when the user explicitly opts in
-				 * via LIGHTREC_OPT_SP_GP_HIT_RAM (and even then via the
-				 * masked IO_RAM path, which stays in bounds). Otherwise
-				 * leave the IO mode unset so the emitter falls back to the
-				 * generic C wrapper (rec_io), which dispatches on the real
-				 * map at runtime and handles hardware-register, scratchpad
-				 * and RAM targets correctly. */
+				 * So restrict the shortcut to $sp (reg 29) only, and even
+				 * then only when the user opts in via
+				 * LIGHTREC_OPT_SP_GP_HIT_RAM. $gp (reg 28) is always left
+				 * with its IO mode unset so the emitter falls back to the
+				 * generic C wrapper (rec_io), which resolves the real map
+				 * at runtime and dispatches hardware-register, scratchpad
+				 * and RAM targets correctly. (A $sp that points into the
+				 * 1 KiB scratchpad - the rare scratchpad-as-stack case -
+				 * would still be mis-read as RAM under this flag; that is
+				 * why the option stays opt-in and defaults off.) */
 				if (state->opt_flags & LIGHTREC_OPT_SP_GP_HIT_RAM)
 					list->flags |= LIGHTREC_IO_MODE(LIGHTREC_IO_RAM);
 			}
