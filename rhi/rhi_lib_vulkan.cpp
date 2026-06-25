@@ -6192,6 +6192,20 @@ namespace Vulkan
 					count = 0;
 				}
 
+				/* Raw-memory lifecycle, for a malloc'd owner (Device) where this
+				 * vector's constructor and destructor do not run. init_empty()
+				 * establishes the constructed empty state (NULL/0/0); deinit() runs
+				 * the destructor's teardown (delete the owned PerFrame entries and
+				 * free the array) via the explicit destructor. */
+				void init_empty() {
+					items = NULL;
+					count = 0;
+					cap   = 0;
+				}
+				void deinit() {
+					this->~PerFramePtrVec();
+				}
+
 			private:
 				void destroy() {
 					for (int i = 0; i < count; i++)
