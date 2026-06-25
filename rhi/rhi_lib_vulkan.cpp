@@ -2915,47 +2915,6 @@ static inline uint32_t util_ctz(uint32_t x)
 				return slice;
 			}
 
-			template <typename T>
-				inline T *data_generic(uint32_t x, uint32_t y, uint32_t slice_index, uint32_t mip = 0) const
-				{
-					const MipInfo &mip_info = mips[mip];
-					T *slice = reinterpret_cast<T *>(buffer + mip_info.offset);
-					slice += slice_index * mip_info.block_row_length * mip_info.block_image_height;
-					slice += y * mip_info.block_row_length;
-					slice += x;
-					return slice;
-				}
-
-			template <typename T>
-				inline T *data_1d(uint32_t x, uint32_t layer = 0, uint32_t mip = 0) const
-				{
-					assert(sizeof(T) == block_stride);
-					assert(buffer);
-					assert(image_type == VK_IMAGE_TYPE_1D);
-					assert(buffer_size == required_size);
-					return data_generic<T>(x, 0, layer, mip);
-				}
-
-			template <typename T>
-				inline T *data_2d(uint32_t x, uint32_t y, uint32_t layer = 0, uint32_t mip = 0) const
-				{
-					assert(sizeof(T) == block_stride);
-					assert(buffer);
-					assert(image_type == VK_IMAGE_TYPE_2D);
-					assert(buffer_size == required_size);
-					return data_generic<T>(x, y, layer, mip);
-				}
-
-			template <typename T>
-				inline T *data_3d(uint32_t x, uint32_t y, uint32_t z, uint32_t mip = 0) const
-				{
-					assert(sizeof(T) == block_stride);
-					assert(buffer);
-					assert(image_type == VK_IMAGE_TYPE_3D);
-					assert(buffer_size == required_size);
-					return data_generic<T>(x, y, z, mip);
-				}
-
 			void build_buffer_image_copies(VkBufferImageCopy *copies, unsigned &num_copies) const;
 
 		private:
