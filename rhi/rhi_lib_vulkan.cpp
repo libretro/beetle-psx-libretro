@@ -7167,32 +7167,37 @@ namespace PSX
 		s->count++;
 	}
 
-	class LookupGrid {
-		public:
-			LookupGrid();
-			~LookupGrid();
-			void insert(SRect r, RectIndex index);
-			void get(SRect r, RectIndexSet &results);
-			void clear();
-		private:
-			struct LookupEntry {
-				SRect rect;
-				RectIndex index;
-			};
-			/* Each cell is a psx texture page (64x256); was std::vector<LookupEntry>.
-			 * Now a malloc'd growable array per cell (POD entries). */
-			struct Cell {
-				LookupEntry *entries;
-				int count;
-				int cap;
-			};
-			Cell cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS];
+	/* Spatial lookup grid over psx texture pages. Formerly a class with a
+	 * constructor/destructor managing the per-cell malloc'd arrays; now a plain
+	 * struct driven by lookup_grid_init / lookup_grid_deinit. Each Cell is a
+	 * growable array of POD LookupEntry; insert/get/clear are unchanged methods.
+	 * RectTracker embeds one by value and drives its init/deinit. */
+	struct LookupGrid {
+		struct LookupEntry {
+			SRect rect;
+			RectIndex index;
+		};
+		/* Each cell is a psx texture page (64x256); was std::vector<LookupEntry>.
+		 * Now a malloc'd growable array per cell (POD entries). */
+		struct Cell {
+			LookupEntry *entries;
+			int count;
+			int cap;
+		};
+		Cell cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS];
+
+		void insert(SRect r, RectIndex index);
+		void get(SRect r, RectIndexSet &results);
+		void clear();
 	};
+
+	static void lookup_grid_init(LookupGrid *g);
+	static void lookup_grid_deinit(LookupGrid *g);
 
 	class RectTracker {
 		public:
-			RectTracker() { enduring_arr_init(&textures); }
-			~RectTracker() { enduring_arr_free(&textures); }
+			RectTracker() { enduring_arr_init(&textures); lookup_grid_init(&lookup_grid); }
+			~RectTracker() { enduring_arr_free(&textures); lookup_grid_deinit(&lookup_grid); }
 			void place(TextureRect texture);
 			void upload(SRect rect, TextureUpload *upload);
 			void blit(SRect dst, SRect src);
@@ -20431,19 +20436,19 @@ namespace PSX
 				});
 	}
 
-	LookupGrid::LookupGrid() {
+	void lookup_grid_init(LookupGrid *g) {
 		int i;
 		for (i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++) {
-			cells[i].entries = NULL;
-			cells[i].count = 0;
-			cells[i].cap = 0;
+			g->cells[i].entries = NULL;
+			g->cells[i].count = 0;
+			g->cells[i].cap = 0;
 		}
 	}
 
-	LookupGrid::~LookupGrid() {
+	void lookup_grid_deinit(LookupGrid *g) {
 		int i;
 		for (i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++)
-			free(cells[i].entries);
+			free(g->cells[i].entries);
 	}
 
 	void LookupGrid::insert(SRect r, RectIndex index)
