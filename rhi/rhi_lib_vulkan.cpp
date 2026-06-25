@@ -5486,12 +5486,6 @@ private:
 
 			void *allocate_constant_data(unsigned set, unsigned binding, VkDeviceSize size);
 
-			template <typename T>
-				T *allocate_typed_constant_data(unsigned set, unsigned binding, unsigned count)
-				{
-					return static_cast<T *>(allocate_constant_data(set, binding, count * sizeof(T)));
-				}
-
 			void *allocate_vertex_data(unsigned binding, VkDeviceSize size, VkDeviceSize stride,
 					VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
 
@@ -5611,11 +5605,9 @@ private:
 				SET_STATIC_STATE(spec_constant_mask);
 			}
 
-			template <typename T>
-				inline void set_specialization_constant(unsigned index, const T &value)
+			inline void set_specialization_constant(unsigned index, uint32_t value)
 				{
 					VK_ASSERT(index < VULKAN_NUM_SPEC_CONSTANTS);
-					static_assert(sizeof(value) == sizeof(uint32_t), "Spec constant data must be 32-bit.");
 					if (memcmp(&potential_static_state.spec_constants[index], &value, sizeof(value)))
 					{
 						memcpy(&potential_static_state.spec_constants[index], &value, sizeof(value));
@@ -10417,7 +10409,7 @@ ImageHandle Renderer::scanout_to_texture()
 			float dither_scale;
 			int32_t dither_shift;
 		};
-		DitherData *dither = cmd->allocate_typed_constant_data<DitherData>(0, 3, 1);
+		DitherData *dither = (DitherData *)cmd->allocate_constant_data(0, 3, 1 * sizeof(DitherData));
 		dither->range = 31.0f;
 		dither->inv_range = 1.0f / 31.0f;
 		dither->dither_scale = 1.0f;
