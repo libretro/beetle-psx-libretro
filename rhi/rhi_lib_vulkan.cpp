@@ -2000,23 +2000,41 @@ static inline uint32_t util_ctz(uint32_t x)
 	 * concrete node base as its first member instead of inheriting the old CRTP
 	 * IntrusiveHashMapEnabled base, so the concrete holder can treat it like every
 	 * other node. get() returns the payload, matching the previous interface. */
-	template <typename T>
-		struct IntrusivePODWrapper
+	/* Concrete POD-wrapper node types (the de-templated IntrusivePODWrapper<T>). Two
+	 * payloads are wrapped: a VkPipeline (the per-program pipeline cache) and a void*
+	 * iterator (the TemporaryHashmap recycle map). Each embeds the hash-map node base
+	 * first (offset 0) and exposes get() returning the payload, matching the previous
+	 * template interface so call sites are unchanged. */
+	struct IntrusivePODWrapperPipeline
 	{
 		struct IntrusiveHashMapNode node; /* must stay first (offset 0) */
-		T value;
+		VkPipeline value;
 
-		template <typename U>
-			explicit IntrusivePODWrapper(U&& value_)
-			: value(std::forward<U>(value_))
-			{
-			}
+		IntrusivePODWrapperPipeline(VkPipeline value_) : value(value_) {}
+		IntrusivePODWrapperPipeline() : value(VK_NULL_HANDLE) {}
 
-		IntrusivePODWrapper() : value() {}
-
-		T& get() { return value; }
-		const T& get() const { return value; }
+		VkPipeline &get() { return value; }
+		const VkPipeline &get() const { return value; }
 	};
+
+	struct IntrusivePODWrapperPtr
+	{
+		struct IntrusiveHashMapNode node; /* must stay first (offset 0) */
+		void *value;
+
+		IntrusivePODWrapperPtr(void *value_) : value(value_) {}
+		IntrusivePODWrapperPtr() : value(NULL) {}
+
+		void *&get() { return value; }
+		void *const &get() const { return value; }
+	};
+
+	/* The concrete hash map recovers each wrapper from an IntrusiveHashMapNode* by
+	 * casting, valid only if the node base is at offset 0. */
+	static_assert(offsetof(struct IntrusivePODWrapperPipeline, node) == 0,
+			"IntrusivePODWrapperPipeline.node must be first");
+	static_assert(offsetof(struct IntrusivePODWrapperPtr, node) == 0,
+			"IntrusivePODWrapperPtr.node must be first");
 
 	/* Concrete, type-erased open-addressing hash table (the de-templated form of
 	 * IntrusiveHashMapHolder<T>). It is non-owning: it only arranges a table and a
@@ -2497,7 +2515,7 @@ static inline uint32_t util_ctz(uint32_t x)
 
 				T *request(Hash hash)
 				{
-					IntrusivePODWrapper<void *> *v = hashmap.find(hash);
+					IntrusivePODWrapperPtr *v = hashmap.find(hash);
 					if (v)
 					{
 						T *node = (T *)v->get();
@@ -2572,7 +2590,7 @@ static inline uint32_t util_ctz(uint32_t x)
 				struct IntrusiveListC rings[RingSize];
 				struct ObjectPoolRaw object_pool;
 				unsigned index;
-				IntrusiveHashMap<IntrusivePODWrapper<void *> > hashmap;
+				IntrusiveHashMap<IntrusivePODWrapperPtr > hashmap;
 				VacantList vacants;
 		};
 
@@ -4759,7 +4777,7 @@ private:
 			Device *device;
 			Shader *shaders[(unsigned)ShaderStage_Count] = {};
 			PipelineLayout *layout = NULL;
-			VulkanCache<IntrusivePODWrapper<VkPipeline>> pipelines;
+			VulkanCache<IntrusivePODWrapperPipeline> pipelines;
 	};
 
 /* ============================================================
@@ -13351,7 +13369,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	VkPipeline Program::get_pipeline(Hash hash) const
 	{
-		IntrusivePODWrapper<VkPipeline> *ret = pipelines.find(hash);
+		IntrusivePODWrapperPipeline *ret = pipelines.find(hash);
 		return ret ? ret->get() : VK_NULL_HANDLE;
 	}
 
@@ -13362,7 +13380,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	Program::~Program()
 	{
-		for (IntrusivePODWrapper<VkPipeline> &pipe : pipelines)
+		for (IntrusivePODWrapperPipeline &pipe : pipelines)
 			device->destroy_pipeline_nolock(pipe.get());
 	}
 
