@@ -4205,11 +4205,23 @@ namespace Vulkan
 		General
 	};
 
-	class Image : public Util::IntrusivePtrEnabled<Image, ImageDeleter, HandleCounter>,
-	public Cookie
+	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
+	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
+	 * base, which provides the hash identity, is unrelated and stays. */
+	class Image : public Cookie
 	{
 		public:
 			friend struct ImageDeleter;
+
+			void release_reference()
+			{
+				if (reference_count.release())
+					ImageDeleter()(this);
+			}
+			void add_reference()
+			{
+				reference_count.add_ref();
+			}
 
 			~Image();
 
@@ -4317,6 +4329,7 @@ namespace Vulkan
 			Layout layout_type = Layout::Optimal;
 			VkPipelineStageFlags stage_flags = 0;
 			VkAccessFlags access_flags = 0;
+			HandleCounter reference_count;
 	};
 
 	using ImageHandle = Util::IntrusivePtr<Image>;
