@@ -4913,11 +4913,10 @@ namespace Vulkan
 		VkClearColorValue clear_color[VULKAN_NUM_ATTACHMENTS] = {};
 		VkClearDepthStencilValue clear_depth_stencil = { 1.0f, 0 };
 
-		enum class DepthStencil
-		{
-			None,
-			ReadOnly,
-			ReadWrite
+		enum DepthStencil {
+			DepthStencil_None,
+			DepthStencil_ReadOnly,
+			DepthStencil_ReadWrite
 		};
 
 		struct Subpass
@@ -4928,7 +4927,7 @@ namespace Vulkan
 			unsigned num_color_attachments = 0;
 			unsigned num_input_attachments = 0;
 			unsigned num_resolve_attachments = 0;
-			DepthStencil depth_stencil_mode = DepthStencil::ReadWrite;
+			DepthStencil depth_stencil_mode = DepthStencil_ReadWrite;
 		};
 		// If 0/nullptr, assume a default subpass.
 		const Subpass *subpasses = NULL;
@@ -5460,12 +5459,11 @@ namespace Vulkan
 				reference_count.add_ref();
 			}
 
-			enum class Type
-			{
-				Generic,
-				AsyncGraphics,
-				AsyncCompute,
-				AsyncTransfer
+			enum Type {
+				Type_Generic,
+				Type_AsyncGraphics,
+				Type_AsyncCompute,
+				Type_AsyncTransfer
 			};
 
 			~CommandBuffer()
@@ -5905,7 +5903,7 @@ namespace Vulkan
 			{
 				flush_frame_nolock();
 			}
-			CommandBufferHandle request_command_buffer(CommandBuffer::Type type = CommandBuffer::Type::Generic);
+			CommandBufferHandle request_command_buffer(CommandBuffer::Type type = CommandBuffer::Type_Generic);
 			void submit(CommandBufferHandle &cmd, Fence *fence = NULL,
 					unsigned semaphore_count = 0, Semaphore *semaphore = NULL);
 			CommandBuffer::Type get_physical_queue_type(CommandBuffer::Type queue_type) const;
@@ -6290,7 +6288,7 @@ namespace Vulkan
 
 			void flush_frame(CommandBuffer::Type type)
 			{
-				if (type == CommandBuffer::Type::AsyncTransfer)
+				if (type == CommandBuffer::Type_AsyncTransfer)
 					sync_buffer_blocks();
 				submit_queue(type, NULL, 0, NULL);
 			}
@@ -6316,7 +6314,7 @@ namespace Vulkan
 			void free_memory_nolock(const DeviceAllocation &alloc);
 
 			void flush_frame_nolock();
-			CommandBufferHandle request_command_buffer_nolock(CommandBuffer::Type type = CommandBuffer::Type::Generic);
+			CommandBufferHandle request_command_buffer_nolock(CommandBuffer::Type type = CommandBuffer::Type_Generic);
 			void submit_nolock(CommandBufferHandle cmd, Fence *fence,
 					unsigned semaphore_count, Semaphore *semaphore);
 			void add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages,
@@ -6373,12 +6371,11 @@ namespace PSX
 		FragmentTexture
 	};
 
-	enum class TextureMode
-	{
-		None,
-		Palette4bpp,
-		Palette8bpp,
-		ABGR1555
+	enum TextureMode {
+		TextureMode_None,
+		TextureMode_Palette4bpp,
+		TextureMode_Palette8bpp,
+		TextureMode_ABGR1555
 	};
 
 	struct Rect
@@ -6618,7 +6615,7 @@ namespace PSX
 		a->listener = NULL;
 		/* renderpass is POD (Rect is four unsigneds; the rest are unsigned/enum/
 		 * bool); zero-initialise it. This matches the former NSDMIs: the three
-		 * Rects become {0,0,0,0}, the offsets 0, texture_mode TextureMode::None
+		 * Rects become {0,0,0,0}, the offsets 0, texture_mode TextureMode_None
 		 * (value 0) and inside false. */
 		memset(&a->renderpass, 0, sizeof(a->renderpass));
 	}
@@ -8590,50 +8587,45 @@ namespace PSX
 		uint16_t min_u, min_v, max_u, max_v;
 	};
 
-	enum class SemiTransparentMode
-	{
-		None,
-		Average,
-		Add,
-		Sub,
-		AddQuarter
+	enum SemiTransparentMode {
+		SemiTransparentMode_None,
+		SemiTransparentMode_Average,
+		SemiTransparentMode_Add,
+		SemiTransparentMode_Sub,
+		SemiTransparentMode_AddQuarter
 	};
 
-	enum class PrimitiveType
-	{
-		Sprite,
-		Polygon,
-		May_Be_2D_Polygon
+	enum PrimitiveType {
+		PrimitiveType_Sprite,
+		PrimitiveType_Polygon,
+		PrimitiveType_May_Be_2D_Polygon
 	};
 
 	class Renderer
 	{
 		public:
-			enum class ScanoutMode
-			{
+			enum ScanoutMode {
 				// Use extra precision bits.
-				ABGR1555_555,
+				ScanoutMode_ABGR1555_555,
 				// Use extra precision bits to dither down to a native ABGR1555 image.
 				// The dither happens in the wrong place, but should be "good" enough to feel authentic.
-				ABGR1555_Dither,
+				ScanoutMode_ABGR1555_Dither,
 				// MDEC
-				BGR24
+				ScanoutMode_BGR24
 			};
 
-			enum class ScanoutFilter
-			{
-				None,
-				SSAA,
-				MDEC_YUV
+			enum ScanoutFilter {
+				ScanoutFilter_None,
+				ScanoutFilter_SSAA,
+				ScanoutFilter_MDEC_YUV
 			};
 
-			enum class WidthMode
-			{
-				WIDTH_MODE_256 = 0,
-				WIDTH_MODE_320 = 1,
-				WIDTH_MODE_512 = 2,
-				WIDTH_MODE_640 = 3,
-				WIDTH_MODE_368 = 4
+			enum WidthMode {
+				WidthMode_WIDTH_MODE_256 = 0,
+				WidthMode_WIDTH_MODE_320 = 1,
+				WidthMode_WIDTH_MODE_512 = 2,
+				WidthMode_WIDTH_MODE_640 = 3,
+				WidthMode_WIDTH_MODE_368 = 4
 			};
 
 			struct DisplayRect
@@ -8675,7 +8667,7 @@ namespace PSX
 
 				bool is_pal = false;
 				bool is_480i = false;
-				WidthMode width_mode = WidthMode::WIDTH_MODE_320;
+				WidthMode width_mode = WidthMode_WIDTH_MODE_320;
 				int crop_overscan = 0;
 				unsigned image_crop = 0;
 
@@ -8691,12 +8683,12 @@ namespace PSX
 				unsigned display_fb_xstart = 0;
 				unsigned display_fb_ystart = 0;
 
-				TextureMode texture_mode = TextureMode::None;
-				SemiTransparentMode semi_transparent = SemiTransparentMode::None;
-				PrimitiveType primitive_type = PrimitiveType::Polygon;
-				ScanoutMode scanout_mode = ScanoutMode::ABGR1555_555;
-				ScanoutFilter scanout_filter = ScanoutFilter::None;
-				ScanoutFilter scanout_mdec_filter = ScanoutFilter::None;
+				TextureMode texture_mode = TextureMode_None;
+				SemiTransparentMode semi_transparent = SemiTransparentMode_None;
+				PrimitiveType primitive_type = PrimitiveType_Polygon;
+				ScanoutMode scanout_mode = ScanoutMode_ABGR1555_555;
+				ScanoutFilter scanout_filter = ScanoutFilter_None;
+				ScanoutFilter scanout_mdec_filter = ScanoutFilter_None;
 				bool dither_native_resolution = false;
 				bool force_mask_bit = false;
 				bool texture_color_modulate = false;
@@ -9290,12 +9282,12 @@ namespace PSX
 			bool get_filer_exclude(FilterExclude exclude)
 			{
 				if (
-						render_state.primitive_type == PrimitiveType::Sprite &&
+						render_state.primitive_type == PrimitiveType_Sprite &&
 						sprite_filter_exclude >= exclude
 				   )
 					return true;
 				if (
-						render_state.primitive_type == PrimitiveType::May_Be_2D_Polygon &&
+						render_state.primitive_type == PrimitiveType_May_Be_2D_Polygon &&
 						polygon_2d_filter_exclude >= exclude
 				   )
 					return true;
@@ -10096,19 +10088,19 @@ Rect Renderer::compute_vram_framebuffer_rect()
 	unsigned clock_div;
 	switch (render_state.width_mode)
 	{
-	case WidthMode::WIDTH_MODE_256:
+	case WidthMode_WIDTH_MODE_256:
 		clock_div = 10;
 		break;
-	case WidthMode::WIDTH_MODE_320:
+	case WidthMode_WIDTH_MODE_320:
 		clock_div = 8;
 		break;
-	case WidthMode::WIDTH_MODE_512:
+	case WidthMode_WIDTH_MODE_512:
 		clock_div = 5;
 		break;
-	case WidthMode::WIDTH_MODE_640:
+	case WidthMode_WIDTH_MODE_640:
 		clock_div = 4;
 		break;
-	case WidthMode::WIDTH_MODE_368:
+	case WidthMode_WIDTH_MODE_368:
 		clock_div = 7;
 		break;
 	}
@@ -10131,19 +10123,19 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 	unsigned clock_div;
 	switch (render_state.width_mode)
 	{
-	case WidthMode::WIDTH_MODE_256:
+	case WidthMode_WIDTH_MODE_256:
 		clock_div = 10;
 		break;
-	case WidthMode::WIDTH_MODE_320:
+	case WidthMode_WIDTH_MODE_320:
 		clock_div = 8;
 		break;
-	case WidthMode::WIDTH_MODE_512:
+	case WidthMode_WIDTH_MODE_512:
 		clock_div = 5;
 		break;
-	case WidthMode::WIDTH_MODE_640:
+	case WidthMode_WIDTH_MODE_640:
 		clock_div = 4;
 		break;
-	case WidthMode::WIDTH_MODE_368:
+	case WidthMode_WIDTH_MODE_368:
 		clock_div = 7;
 		break;
 	}
@@ -10356,8 +10348,8 @@ ImageHandle Renderer::scanout_to_texture()
 		return reuseable_scanout;
 	}
 
-	bool bpp24 = render_state.scanout_mode == ScanoutMode::BGR24;
-	bool ssaa = render_state.scanout_filter == ScanoutFilter::SSAA && scaling != 1;
+	bool bpp24 = render_state.scanout_mode == ScanoutMode_BGR24;
+	bool ssaa = render_state.scanout_filter == ScanoutFilter_SSAA && scaling != 1;
 
 	Rect read_rect = rect;
 	if (rect.x + rect.width > FB_WIDTH)
@@ -10428,7 +10420,7 @@ ImageHandle Renderer::scanout_to_texture()
 	ImageCreateInfo info = ImageCreateInfo::render_target(
 			display_rect.width * render_scale,
 			display_rect.height * render_scale,
-			render_state.scanout_mode == ScanoutMode::ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM);
+			render_state.scanout_mode == ScanoutMode_ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM);
 
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -10460,11 +10452,11 @@ ImageHandle Renderer::scanout_to_texture()
 
 	cmd->set_viewport(new_vp);
 
-	bool dither = render_state.scanout_mode == ScanoutMode::ABGR1555_Dither;
+	bool dither = render_state.scanout_mode == ScanoutMode_ABGR1555_Dither;
 
 	if (bpp24)
 	{
-		if (render_state.scanout_mdec_filter == ScanoutFilter::MDEC_YUV)
+		if (render_state.scanout_mdec_filter == ScanoutFilter_MDEC_YUV)
 			cmd->set_program(*pipelines.bpp24_yuv_quad_blitter);
 		else
 			cmd->set_program(*pipelines.bpp24_quad_blitter);
@@ -10722,7 +10714,7 @@ HdTextureHandle Renderer::get_hd_texture_index(const Rect &vram_rect, bool &fast
 		render_state.palette_offset_x,
 		render_state.palette_offset_y
 	};
-	if (mode.mode == TextureMode::ABGR1555) {
+	if (mode.mode == TextureMode_ABGR1555) {
 		// HACK: This mode doesn't use a palette, so this a hack to make the palette irrelevant for equality purposes
 		mode.palette_offset_x = 0;
 		mode.palette_offset_y = 0;
@@ -10739,10 +10731,10 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 {
 	switch (render_state.texture_mode)
 	{
-	case TextureMode::Palette4bpp:
+	case TextureMode_Palette4bpp:
 		shift = 2;
 		break;
-	case TextureMode::Palette8bpp:
+	case TextureMode_Palette8bpp:
 		shift = 1;
 		break;
 	default:
@@ -10752,7 +10744,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 
 	Rect hd_texture_vram(0, 0, 0, 0);
 
-	if (render_state.texture_mode != TextureMode::None)
+	if (render_state.texture_mode != TextureMode_None)
 	{
 		if (render_state.texture_window.mask_x == 0xffu && render_state.texture_window.mask_y == 0xffu)
 		{
@@ -10829,7 +10821,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		x[i] = tmp_x;
 		y[i] = tmp_y;
 
-		if (render_state.texture_mode == TextureMode::ABGR1555)
+		if (render_state.texture_mode == TextureMode_ABGR1555)
 		{
 			unsigned tmp_u = vertices[i].u + render_state.texture_offset_x;
 			unsigned tmp_v = vertices[i].v + render_state.texture_offset_y;
@@ -10850,7 +10842,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		unsigned(min_x), unsigned(min_y), unsigned(max_x) - unsigned(min_x), unsigned(max_y) - unsigned(min_y),
 	};
 
-	if (render_state.texture_mode == TextureMode::ABGR1555)
+	if (render_state.texture_mode == TextureMode_ABGR1555)
 	{
 		if (render_state.draw_rect.intersects(rect))
 		{
@@ -10868,10 +10860,10 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 	}
 	else
 	{
-		filtering = render_state.texture_mode != TextureMode::None;
+		filtering = render_state.texture_mode != TextureMode_None;
 		scaled_read = false;
 	}
-	offset_uv = scaled_uv_offset && render_state.primitive_type == PrimitiveType::Polygon;
+	offset_uv = scaled_uv_offset && render_state.primitive_type == PrimitiveType_Polygon;
 
 	float z = allocate_depth(scaled_read ? Domain::Scaled : Domain::Unscaled, rect);
 
@@ -10923,7 +10915,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 			render_state.UVLimits.max_v,
 		};
 
-		if (render_state.texture_mode != TextureMode::None && !render_state.texture_color_modulate)
+		if (render_state.texture_mode != TextureMode_None && !render_state.texture_color_modulate)
 			output[i].color = 0x808080;
 
 		output[i].color |= render_state.force_mask_bit ? 0xff000000u : 0u;
@@ -10940,9 +10932,9 @@ Renderer::BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor
 	if (filtering)
 		filtering = !get_filer_exclude(FilterExcludeOpaque);
 
-	if (render_state.texture_mode != TextureMode::None)
+	if (render_state.texture_mode != TextureMode_None)
 	{
-		if (render_state.semi_transparent != SemiTransparentMode::None)
+		if (render_state.semi_transparent != SemiTransparentMode_None)
 		{
 			for (unsigned i = 0; i < prims; i++)
 				queue.semi_transparent_opaque_scissor.push(PrimitiveInfo(queue.semi_transparent_opaque_scissor.size(), scissor, hd_texture,
@@ -10957,7 +10949,7 @@ Renderer::BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor
 			return &queue.opaque_textured;
 		}
 	}
-	else if (render_state.semi_transparent != SemiTransparentMode::None)
+	else if (render_state.semi_transparent != SemiTransparentMode_None)
 		return NULL;
 	else
 	{
@@ -11109,7 +11101,7 @@ void Renderer::draw_triangle(const Vertex *vertices)
 			out->push(vert[i]);
 	}
 
-	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode::None)
+	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode_None)
 	{
 		if (filtering)
 			filtering = !get_filer_exclude(FilterExcludeOpaqueAndSemiTrans);
@@ -11117,7 +11109,7 @@ void Renderer::draw_triangle(const Vertex *vertices)
 		for (unsigned i = 0; i < 3; i++)
 			queue.semi_transparent.push(vert[i]);
 		queue.semi_transparent_state.push({ scissor_index, hd_texture_index, render_state.semi_transparent,
-		                                         render_state.texture_mode != TextureMode::None,
+		                                         render_state.texture_mode != TextureMode_None,
 		                                         render_state.mask_test,
 		                                         filtering,
 		                                         scaled_read,
@@ -11162,14 +11154,14 @@ void Renderer::draw_quad(const Vertex *vertices)
 		out->push(vert[1]);
 	}
 
-	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode::None)
+	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode_None)
 	{
 		if (filtering)
 			filtering = !get_filer_exclude(FilterExcludeOpaqueAndSemiTrans);
 
 		const SemiTransparentState state = {
 			scissor_index, hd_texture_index, render_state.semi_transparent,
-			render_state.texture_mode != TextureMode::None,
+			render_state.texture_mode != TextureMode_None,
 			render_state.mask_test,
 			filtering,
 			scaled_read,
@@ -11192,7 +11184,7 @@ void Renderer::draw_quad(const Vertex *vertices)
 void Renderer::clear_quad(const Rect &rect, uint32_t fb_color, bool candidate)
 {
 	last_scanout.reset();
-	TextureMode old = atlas.set_texture_mode(TextureMode::None);
+	TextureMode old = atlas.set_texture_mode(TextureMode_None);
 	float z = allocate_depth(Domain::Unscaled, rect);
 	atlas.set_texture_mode(old);
 
@@ -11492,7 +11484,7 @@ void Renderer::render_semi_transparent_primitives()
 	{
 		// If we need programmable shading, we can't batch as primitives may overlap.
 		// We could in theory do some fancy tests here, but probably overkill here.
-		if ((last_state.masked && last_state.semi_transparent != SemiTransparentMode::None) ||
+		if ((last_state.masked && last_state.semi_transparent != SemiTransparentMode_None) ||
 		    (last_state != queue.semi_transparent_state[i]))
 		{
 			unsigned to_draw = i - last_draw_offset;
@@ -11912,7 +11904,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 
 	switch (state.semi_transparent)
 	{
-	case SemiTransparentMode::None:
+	case SemiTransparentMode_None:
 	{
 		// For opaque primitives which are just masked, we can make use of fixed function blending.
 		cmd->set_blend_enable(true);
@@ -11923,7 +11915,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		                       VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_DST_ALPHA);
 		break;
 	}
-	case SemiTransparentMode::Add:
+	case SemiTransparentMode_Add:
 	{
 		if (state.masked)
 		{
@@ -11952,7 +11944,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		}
 		break;
 	}
-	case SemiTransparentMode::Average:
+	case SemiTransparentMode_Average:
 	{
 		if (state.masked)
 		{
@@ -11983,7 +11975,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		}
 		break;
 	}
-	case SemiTransparentMode::Sub:
+	case SemiTransparentMode_Sub:
 	{
 		if (state.masked)
 		{
@@ -12012,7 +12004,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		}
 		break;
 	}
-	case SemiTransparentMode::AddQuarter:
+	case SemiTransparentMode_AddQuarter:
 	{
 		if (state.masked)
 		{
@@ -13858,9 +13850,9 @@ namespace Vulkan
 		{
 			default_subpass_info.num_color_attachments = info.num_color_attachments;
 			if (info.op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT)
-				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil::ReadOnly;
+				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil_ReadOnly;
 			else
-				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil::ReadWrite;
+				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil_ReadWrite;
 
 			for (unsigned i = 0; i < info.num_color_attachments; i++)
 				default_subpass_info.color_attachments[i] = i;
@@ -14053,7 +14045,7 @@ namespace Vulkan
 				}
 			}
 
-			if (info.depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo::DepthStencil::None)
+			if (info.depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo::DepthStencil_None)
 			{
 				depth->attachment = info.num_color_attachments;
 				// Fill in later.
@@ -14205,8 +14197,8 @@ namespace Vulkan
 				}
 				else if (depth && input) // Depends on the depth mode
 				{
-					VK_ASSERT(subpass_infos[subpass].depth_stencil_mode != RenderPassInfo::DepthStencil::None);
-					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil::ReadWrite)
+					VK_ASSERT(subpass_infos[subpass].depth_stencil_mode != RenderPassInfo::DepthStencil_None);
+					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil_ReadWrite)
 					{
 						depth_self_dependencies |= 1u << subpass;
 						current_layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -14238,7 +14230,7 @@ namespace Vulkan
 				}
 				else if (depth)
 				{
-					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil::ReadWrite)
+					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil_ReadWrite)
 					{
 						depth_stencil_attachment_write |= 1u << subpass;
 						if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
@@ -16845,16 +16837,16 @@ namespace Vulkan
 
 	CommandBuffer::Type Device::get_physical_queue_type(CommandBuffer::Type queue_type) const
 	{
-		if (queue_type != CommandBuffer::Type::AsyncGraphics)
+		if (queue_type != CommandBuffer::Type_AsyncGraphics)
 		{
 			return queue_type;
 		}
 		else
 		{
 			if (graphics_queue_family_index == compute_queue_family_index && graphics_queue != compute_queue)
-				return CommandBuffer::Type::AsyncCompute;
+				return CommandBuffer::Type_AsyncCompute;
 			else
-				return CommandBuffer::Type::Generic;
+				return CommandBuffer::Type_Generic;
 		}
 	}
 
@@ -16930,13 +16922,13 @@ namespace Vulkan
 		switch (type)
 		{
 			default:
-			case CommandBuffer::Type::Generic:
+			case CommandBuffer::Type_Generic:
 				queue = graphics_queue;
 				break;
-			case CommandBuffer::Type::AsyncCompute:
+			case CommandBuffer::Type_AsyncCompute:
 				queue = compute_queue;
 				break;
-			case CommandBuffer::Type::AsyncTransfer:
+			case CommandBuffer::Type_AsyncTransfer:
 				queue = transfer_queue;
 				break;
 		}
@@ -16998,7 +16990,7 @@ namespace Vulkan
 				{
 					Semaphore sem;
 					submit_nolock(cmd, NULL, 1, &sem);
-					add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, sem, compute_stages, flush);
+					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, compute_stages, flush);
 				}
 				else
 					submit_nolock(cmd, NULL, 0, NULL);
@@ -17012,7 +17004,7 @@ namespace Vulkan
 				{
 					Semaphore sem;
 					submit_nolock(cmd, NULL, 1, &sem);
-					add_wait_semaphore_nolock(CommandBuffer::Type::Generic, sem, graphics_stages, flush);
+					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, graphics_stages, flush);
 				}
 				else
 					submit_nolock(cmd, NULL, 0, NULL);
@@ -17023,20 +17015,20 @@ namespace Vulkan
 				{
 					Semaphore semaphores[2];
 					submit_nolock(cmd, NULL, 2, semaphores);
-					add_wait_semaphore_nolock(CommandBuffer::Type::Generic, semaphores[0], graphics_stages, flush);
-					add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, semaphores[1], compute_stages, flush);
+					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, semaphores[0], graphics_stages, flush);
+					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, semaphores[1], compute_stages, flush);
 				}
 				else if (graphics_stages != 0)
 				{
 					Semaphore sem;
 					submit_nolock(cmd, NULL, 1, &sem);
-					add_wait_semaphore_nolock(CommandBuffer::Type::Generic, sem, graphics_stages, flush);
+					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, graphics_stages, flush);
 				}
 				else if (compute_stages != 0)
 				{
 					Semaphore sem;
 					submit_nolock(cmd, NULL, 1, &sem);
-					add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, sem, compute_stages, flush);
+					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, compute_stages, flush);
 				}
 				else
 					submit_nolock(cmd, NULL, 0, NULL);
@@ -17052,8 +17044,8 @@ namespace Vulkan
 		type = get_physical_queue_type(type);
 
 		// Always check if we need to flush pending transfers.
-		if (type != CommandBuffer::Type::AsyncTransfer)
-			flush_frame(CommandBuffer::Type::AsyncTransfer);
+		if (type != CommandBuffer::Type_AsyncTransfer)
+			flush_frame(CommandBuffer::Type_AsyncTransfer);
 
 		QueueData &data = get_queue_data(type);
 		CommandBufferHandleVec &submissions = get_queue_submissions(type);
@@ -17138,13 +17130,13 @@ namespace Vulkan
 		switch (type)
 		{
 			default:
-			case CommandBuffer::Type::Generic:
+			case CommandBuffer::Type_Generic:
 				queue = graphics_queue;
 				break;
-			case CommandBuffer::Type::AsyncCompute:
+			case CommandBuffer::Type_AsyncCompute:
 				queue = compute_queue;
 				break;
-			case CommandBuffer::Type::AsyncTransfer:
+			case CommandBuffer::Type_AsyncTransfer:
 				queue = transfer_queue;
 				break;
 		}
@@ -17177,7 +17169,7 @@ namespace Vulkan
 
 		VkBufferUsageFlags usage = 0;
 
-		CommandBufferHandle cmd = request_command_buffer_nolock(CommandBuffer::Type::AsyncTransfer);
+		CommandBufferHandle cmd = request_command_buffer_nolock(CommandBuffer::Type_AsyncTransfer);
 
 		cmd->begin_region("buffer-block-sync");
 
@@ -17212,21 +17204,21 @@ namespace Vulkan
 
 		if (transfer.need_fence || !frame().transfer_submissions.empty())
 		{
-			submit_queue(CommandBuffer::Type::AsyncTransfer, &fence, 0, NULL);
+			submit_queue(CommandBuffer::Type_AsyncTransfer, &fence, 0, NULL);
 			frame().recycle_fences.push(fence);
 			transfer.need_fence = false;
 		}
 
 		if (graphics.need_fence || !frame().graphics_submissions.empty())
 		{
-			submit_queue(CommandBuffer::Type::Generic, &fence, 0, NULL);
+			submit_queue(CommandBuffer::Type_Generic, &fence, 0, NULL);
 			frame().recycle_fences.push(fence);
 			graphics.need_fence = false;
 		}
 
 		if (compute.need_fence || !frame().compute_submissions.empty())
 		{
-			submit_queue(CommandBuffer::Type::AsyncCompute, &fence, 0, NULL);
+			submit_queue(CommandBuffer::Type_AsyncCompute, &fence, 0, NULL);
 			frame().recycle_fences.push(fence);
 			compute.need_fence = false;
 		}
@@ -17234,9 +17226,9 @@ namespace Vulkan
 
 	void Device::flush_frame_nolock()
 	{
-		flush_frame(CommandBuffer::Type::AsyncTransfer);
-		flush_frame(CommandBuffer::Type::Generic);
-		flush_frame(CommandBuffer::Type::AsyncCompute);
+		flush_frame(CommandBuffer::Type_AsyncTransfer);
+		flush_frame(CommandBuffer::Type_Generic);
+		flush_frame(CommandBuffer::Type_AsyncCompute);
 	}
 
 	Device::QueueData &Device::get_queue_data(CommandBuffer::Type type)
@@ -17244,11 +17236,11 @@ namespace Vulkan
 		switch (get_physical_queue_type(type))
 		{
 			default:
-			case CommandBuffer::Type::Generic:
+			case CommandBuffer::Type_Generic:
 				return graphics;
-			case CommandBuffer::Type::AsyncCompute:
+			case CommandBuffer::Type_AsyncCompute:
 				return compute;
-			case CommandBuffer::Type::AsyncTransfer:
+			case CommandBuffer::Type_AsyncTransfer:
 				return transfer;
 		}
 	}
@@ -17258,11 +17250,11 @@ namespace Vulkan
 		switch (get_physical_queue_type(type))
 		{
 			default:
-			case CommandBuffer::Type::Generic:
+			case CommandBuffer::Type_Generic:
 				return frame().graphics_cmd_pool;
-			case CommandBuffer::Type::AsyncCompute:
+			case CommandBuffer::Type_AsyncCompute:
 				return frame().compute_cmd_pool;
-			case CommandBuffer::Type::AsyncTransfer:
+			case CommandBuffer::Type_AsyncTransfer:
 				return frame().transfer_cmd_pool;
 		}
 	}
@@ -17272,11 +17264,11 @@ namespace Vulkan
 		switch (get_physical_queue_type(type))
 		{
 			default:
-			case CommandBuffer::Type::Generic:
+			case CommandBuffer::Type_Generic:
 				return frame().graphics_submissions;
-			case CommandBuffer::Type::AsyncCompute:
+			case CommandBuffer::Type_AsyncCompute:
 				return frame().compute_submissions;
-			case CommandBuffer::Type::AsyncTransfer:
+			case CommandBuffer::Type_AsyncTransfer:
 				return frame().transfer_submissions;
 		}
 	}
@@ -18137,12 +18129,12 @@ namespace Vulkan
 			// For concurrent queue mode, we just need to inject a semaphore.
 			// For non-concurrent queue mode, we will have to inject ownership transfer barrier if the queue families do not match.
 
-			CommandBufferHandle graphics_cmd = request_command_buffer(CommandBuffer::Type::Generic);
+			CommandBufferHandle graphics_cmd = request_command_buffer(CommandBuffer::Type_Generic);
 			CommandBufferHandle transfer_cmd;
 
 			// Don't split the upload into multiple command buffers unless we have to.
 			if (transfer_queue != graphics_queue)
-				transfer_cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
+				transfer_cmd = request_command_buffer(CommandBuffer::Type_AsyncTransfer);
 			else
 				transfer_cmd = graphics_cmd;
 
@@ -18207,7 +18199,7 @@ namespace Vulkan
 
 				Semaphore sem;
 				submit(transfer_cmd, NULL, 1, &sem);
-				add_wait_semaphore_nolock(CommandBuffer::Type::Generic, sem, dst_stages, true);
+				add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, dst_stages, true);
 			}
 
 			if (generate_mips)
@@ -18230,7 +18222,7 @@ namespace Vulkan
 						handle->get_access_flags() & image_layout_to_possible_access(create_info.initial_layout));
 			}
 
-			bool share_async_graphics = get_physical_queue_type(CommandBuffer::Type::AsyncGraphics) == CommandBuffer::Type::AsyncCompute;
+			bool share_async_graphics = get_physical_queue_type(CommandBuffer::Type_AsyncGraphics) == CommandBuffer::Type_AsyncCompute;
 
 			// Add semaphore if the compute queue can be used for async graphics as well.
 			if (share_async_graphics)
@@ -18241,7 +18233,7 @@ namespace Vulkan
 				VkPipelineStageFlags dst_stages = handle->get_stage_flags();
 				if (graphics_queue_family_index != compute_queue_family_index)
 					dst_stages &= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
-				add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, sem, dst_stages, true);
+				add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, dst_stages, true);
 			}
 			else
 				submit(graphics_cmd);
@@ -18249,7 +18241,7 @@ namespace Vulkan
 		else if (create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
 		{
 			VK_ASSERT(create_info.domain != ImageDomain_Transient);
-			CommandBufferHandle cmd = request_command_buffer(CommandBuffer::Type::Generic);
+			CommandBufferHandle cmd = request_command_buffer(CommandBuffer::Type_Generic);
 			cmd->image_barrier(*handle, info.initialLayout, create_info.initial_layout,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, handle->get_stage_flags(),
 					handle->get_access_flags() &
@@ -18365,7 +18357,7 @@ namespace Vulkan
 			BufferHandle staging_buffer = create_buffer(staging_info, initial);
 			set_name(*staging_buffer, "buffer-upload-staging-buffer");
 
-			cmd = request_command_buffer(CommandBuffer::Type::AsyncTransfer);
+			cmd = request_command_buffer(CommandBuffer::Type_AsyncTransfer);
 			cmd->begin_region("copy-buffer-staging");
 			cmd->copy_buffer(*handle, *staging_buffer);
 			cmd->end_region();
@@ -18594,8 +18586,8 @@ namespace PSX
 		bool palette;
 		switch (renderpass.texture_mode)
 		{
-			case TextureMode::Palette4bpp:
-			case TextureMode::Palette8bpp:
+			case TextureMode_Palette4bpp:
+			case TextureMode_Palette8bpp:
 				palette = true;
 				break;
 
@@ -18610,7 +18602,7 @@ namespace PSX
 		sync_domain(domain, shifted);
 
 		Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
-			renderpass.texture_mode == TextureMode::Palette8bpp ? 256u : 16u, 1 };
+			renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
 
 		if (palette)
 			sync_domain(domain, palette_rect);
@@ -18944,15 +18936,15 @@ namespace PSX
 
 	void FBAtlas::write_fragment(Domain domain, const Rect &rect)
 	{
-		bool reads_window = renderpass.texture_mode != TextureMode::None;
+		bool reads_window = renderpass.texture_mode != TextureMode_None;
 		if (reads_window)
 		{
 			Rect shifted = renderpass.texture_window;
 			bool reads_palette;
 			switch (renderpass.texture_mode)
 			{
-				case TextureMode::Palette4bpp:
-				case TextureMode::Palette8bpp:
+				case TextureMode_Palette4bpp:
+				case TextureMode_Palette8bpp:
 					reads_palette = true;
 					break;
 
@@ -18964,7 +18956,7 @@ namespace PSX
 			shifted.y += renderpass.texture_offset_y;
 
 			const Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
-				renderpass.texture_mode == TextureMode::Palette8bpp ? 256u : 16u, 1 };
+				renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
 
 			if (reads_palette)
 			{
@@ -19482,16 +19474,16 @@ namespace PSX
 		// from glsl/vram.h
 		int shift;
 		switch (mode.mode) {
-			case TextureMode::ABGR1555:
+			case TextureMode_ABGR1555:
 				shift = 0;
 				break;
-			case TextureMode::Palette8bpp:
+			case TextureMode_Palette8bpp:
 				shift = 1;
 				break;
-			case TextureMode::Palette4bpp:
+			case TextureMode_Palette4bpp:
 				shift = 2;
 				break;
-			case TextureMode::None:
+			case TextureMode_None:
 			default:
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Tried to dump unused texture %x.\n", hash);
 				return; // Early out
@@ -19504,8 +19496,8 @@ namespace PSX
 		snprintf(path + plen, sizeof(path) - plen, "%x", (unsigned)hash);
 
 		uint16_t *palette = NULL;
-		if (mode.mode == TextureMode::Palette4bpp || mode.mode == TextureMode::Palette8bpp) {
-			Rect palette_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode::Palette8bpp ? 256 : 16, 1);
+		if (mode.mode == TextureMode_Palette4bpp || mode.mode == TextureMode_Palette8bpp) {
+			Rect palette_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 			Palette p = get_palette(palette_rect);
 			if (p.data != NULL) {
 				palette = p.data;
@@ -19516,7 +19508,7 @@ namespace PSX
 
 		if (palette != NULL) {
 			TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping palette %i, %i.\n", mode.palette_offset_x, mode.palette_offset_y);
-		} else if (mode.mode != TextureMode::ABGR1555) {
+		} else if (mode.mode != TextureMode_ABGR1555) {
 			plen = strlen(path);
 			snprintf(path + plen, sizeof(path) - plen, "-missing");
 			TT_LOG_VERBOSE(RETRO_LOG_INFO, "MISSING palette %i, %i.\n", mode.palette_offset_x, mode.palette_offset_y);
@@ -19537,7 +19529,7 @@ namespace PSX
 				int p;
 				for (p = 0; p < ppp; p++) {
 					uint16_t subpixel = (pixel >> (p * bpp)) & mask;
-					if (mode.mode != TextureMode::ABGR1555 && palette == NULL) {
+					if (mode.mode != TextureMode_ABGR1555 && palette == NULL) {
 						// Missing palette, dump a grayscale version of the image data
 						bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
 						bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
@@ -19545,7 +19537,7 @@ namespace PSX
 						bytes[bi++] = (uint8_t)255;
 					} else {
 						uint16_t abgr1555;
-						if (mode.mode == TextureMode::ABGR1555) {
+						if (mode.mode == TextureMode_ABGR1555) {
 							abgr1555 = subpixel;
 						} else {
 							abgr1555 = palette[subpixel];
@@ -20123,14 +20115,14 @@ namespace PSX
 
 	HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
 		fastpath_capable_out = false;
-		Rect palette_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode::Palette8bpp ? 256 : 16, 1);
+		Rect palette_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 
-		// TODO: I'm pretty sure this doesn't handle TextureMode::ABGR1555
+		// TODO: I'm pretty sure this doesn't handle TextureMode_ABGR1555
 
 		uint32_t palette_hash = 0;
 		cache_hit = false;
 		if (hd_textures_enabled || dump_enabled) {
-			if (mode.mode == TextureMode::Palette8bpp || mode.mode == TextureMode::Palette4bpp) {
+			if (mode.mode == TextureMode_Palette8bpp || mode.mode == TextureMode_Palette4bpp) {
 				palette_hash = get_palette_hash(palette_rect);
 			}
 		}
@@ -20200,8 +20192,8 @@ namespace PSX
 				} else {
 					// Multiple overlap, must fuse
 					unsigned int width
-						= mode.mode == TextureMode::Palette4bpp ? 64
-						: mode.mode == TextureMode::Palette8bpp ? 128
+						= mode.mode == TextureMode_Palette4bpp ? 64
+						: mode.mode == TextureMode_Palette8bpp ? 128
 						: 256;
 					Rect page_rect = { page_x, page_y, width, 256 };
 					fastpath_capable_out = false;
@@ -21954,11 +21946,11 @@ void rhi_vulkan_prepare_frame(void)
 static Renderer::ScanoutMode get_scanout_mode(bool bpp24)
 {
    if (bpp24)
-      return Renderer::ScanoutMode::BGR24;
+      return Renderer::ScanoutMode_BGR24;
    else if (dither_mode != DITHER_OFF)
-      return Renderer::ScanoutMode::ABGR1555_Dither;
+      return Renderer::ScanoutMode_ABGR1555_Dither;
    else
-      return Renderer::ScanoutMode::ABGR1555_555;
+      return Renderer::ScanoutMode_ABGR1555_555;
 }
 
 void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
@@ -21995,11 +21987,11 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_visible_scanlines(initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
    renderer->set_horizontal_additional_cropping(image_crop);
 
-   renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter::SSAA : Renderer::ScanoutFilter::None);
-   if (renderer->get_scanout_mode() == Renderer::ScanoutMode::BGR24)
-      renderer->set_mdec_filter(mdec_yuv ? Renderer::ScanoutFilter::MDEC_YUV : Renderer::ScanoutFilter::None);
+   renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter_SSAA : Renderer::ScanoutFilter_None);
+   if (renderer->get_scanout_mode() == Renderer::ScanoutMode_BGR24)
+      renderer->set_mdec_filter(mdec_yuv ? Renderer::ScanoutFilter_MDEC_YUV : Renderer::ScanoutFilter_None);
    else
-      renderer->set_mdec_filter(Renderer::ScanoutFilter::None);
+      renderer->set_mdec_filter(Renderer::ScanoutFilter_None);
 
    auto scanout = show_vram ? renderer->scanout_vram_to_texture() : renderer->scanout_to_texture();
    unsigned index = vulkan->get_sync_index(vulkan->handle);
@@ -22166,40 +22158,40 @@ void rhi_vulkan_push_triangle(
       {
          default:
          case 0:
-            renderer->set_texture_mode(TextureMode::ABGR1555);
+            renderer->set_texture_mode(TextureMode_ABGR1555);
             break;
          case 1:
-            renderer->set_texture_mode(TextureMode::Palette8bpp);
+            renderer->set_texture_mode(TextureMode_Palette8bpp);
             break;
          case 2:
-            renderer->set_texture_mode(TextureMode::Palette4bpp);
+            renderer->set_texture_mode(TextureMode_Palette4bpp);
             break;
       }
    }
    else
-      renderer->set_texture_mode(TextureMode::None);
+      renderer->set_texture_mode(TextureMode_None);
 
    switch (blend_mode)
    {
       default:
-         renderer->set_semi_transparent(SemiTransparentMode::None);
+         renderer->set_semi_transparent(SemiTransparentMode_None);
          break;
 
       case 0:
-         renderer->set_semi_transparent(SemiTransparentMode::Average);
+         renderer->set_semi_transparent(SemiTransparentMode_Average);
          break;
       case 1:
-         renderer->set_semi_transparent(SemiTransparentMode::Add);
+         renderer->set_semi_transparent(SemiTransparentMode_Add);
          break;
       case 2:
-         renderer->set_semi_transparent(SemiTransparentMode::Sub);
+         renderer->set_semi_transparent(SemiTransparentMode_Sub);
          break;
       case 3:
-         renderer->set_semi_transparent(SemiTransparentMode::AddQuarter);
+         renderer->set_semi_transparent(SemiTransparentMode_AddQuarter);
          break;
    }
 
-   renderer->set_primitive_type(PrimitiveType::Polygon);
+   renderer->set_primitive_type(PrimitiveType_Polygon);
 
    Vertex vertices[3] = {
       { p0x, p0y, p0w, c0, t0x, t0y },
@@ -22246,45 +22238,45 @@ void rhi_vulkan_push_quad(
       {
          default:
          case 0:
-            renderer->set_texture_mode(TextureMode::ABGR1555);
+            renderer->set_texture_mode(TextureMode_ABGR1555);
             break;
          case 1:
-            renderer->set_texture_mode(TextureMode::Palette8bpp);
+            renderer->set_texture_mode(TextureMode_Palette8bpp);
             break;
          case 2:
-            renderer->set_texture_mode(TextureMode::Palette4bpp);
+            renderer->set_texture_mode(TextureMode_Palette4bpp);
             break;
       }
    }
    else
-      renderer->set_texture_mode(TextureMode::None);
+      renderer->set_texture_mode(TextureMode_None);
 
    switch (blend_mode)
    {
       default:
-         renderer->set_semi_transparent(SemiTransparentMode::None);
+         renderer->set_semi_transparent(SemiTransparentMode_None);
          break;
 
       case 0:
-         renderer->set_semi_transparent(SemiTransparentMode::Average);
+         renderer->set_semi_transparent(SemiTransparentMode_Average);
          break;
       case 1:
-         renderer->set_semi_transparent(SemiTransparentMode::Add);
+         renderer->set_semi_transparent(SemiTransparentMode_Add);
          break;
       case 2:
-         renderer->set_semi_transparent(SemiTransparentMode::Sub);
+         renderer->set_semi_transparent(SemiTransparentMode_Sub);
          break;
       case 3:
-         renderer->set_semi_transparent(SemiTransparentMode::AddQuarter);
+         renderer->set_semi_transparent(SemiTransparentMode_AddQuarter);
          break;
    }
 
    if (is_sprite)
-      renderer->set_primitive_type(PrimitiveType::Sprite);
+      renderer->set_primitive_type(PrimitiveType_Sprite);
    else if (may_be_2d)
-      renderer->set_primitive_type(PrimitiveType::May_Be_2D_Polygon);
+      renderer->set_primitive_type(PrimitiveType_May_Be_2D_Polygon);
    else
-      renderer->set_primitive_type(PrimitiveType::Polygon);
+      renderer->set_primitive_type(PrimitiveType_Polygon);
 
    Vertex vertices[4] = {
       { p0x, p0y, p0w, c0, t0x, t0y },
@@ -22308,26 +22300,26 @@ void rhi_vulkan_push_line(
    if (!renderer)
       return;
 
-   renderer->set_texture_mode(TextureMode::None);
+   renderer->set_texture_mode(TextureMode_None);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
    switch (blend_mode)
    {
       default:
-         renderer->set_semi_transparent(SemiTransparentMode::None);
+         renderer->set_semi_transparent(SemiTransparentMode_None);
          break;
 
       case 0:
-         renderer->set_semi_transparent(SemiTransparentMode::Average);
+         renderer->set_semi_transparent(SemiTransparentMode_Average);
          break;
       case 1:
-         renderer->set_semi_transparent(SemiTransparentMode::Add);
+         renderer->set_semi_transparent(SemiTransparentMode_Add);
          break;
       case 2:
-         renderer->set_semi_transparent(SemiTransparentMode::Sub);
+         renderer->set_semi_transparent(SemiTransparentMode_Sub);
          break;
       case 3:
-         renderer->set_semi_transparent(SemiTransparentMode::AddQuarter);
+         renderer->set_semi_transparent(SemiTransparentMode_AddQuarter);
          break;
    }
 
