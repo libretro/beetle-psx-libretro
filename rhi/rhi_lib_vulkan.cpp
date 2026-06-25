@@ -2469,6 +2469,23 @@ static inline uint32_t util_ctz(uint32_t x)
 					vacants.cap   = 0;
 				}
 
+				/* Raw-memory initialiser for an owner allocated with malloc (e.g. the
+				 * FramebufferAllocator/AttachmentAllocator embedded in a malloc'd Device,
+				 * whose constructors never run). Mirrors the constructor above and also
+				 * brings up the nested hashmap, which has no constructor to run here. */
+				void init_empty()
+				{
+					unsigned i;
+					for (i = 0; i < RingSize; i++)
+						ilist_clear(&rings[i]);
+					object_pool_raw_init(&object_pool, sizeof(T));
+					index = 0;
+					vacants.items = NULL;
+					vacants.count = 0;
+					vacants.cap   = 0;
+					hashmap.init_empty();
+				}
+
 				~TemporaryHashmap()
 				{
 					clear();
@@ -5005,6 +5022,7 @@ private:
 			void init(Device *device_)
 			{
 				device = device_;
+				framebuffers.init_empty();
 			}
 
 			void deinit()
@@ -5042,6 +5060,7 @@ private:
 			void init(Device *device_)
 			{
 				device = device_;
+				attachments.init_empty();
 			}
 
 			void deinit()
