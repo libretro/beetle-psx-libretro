@@ -2834,7 +2834,7 @@ static inline uint32_t util_ctz(uint32_t x)
 
 			void set_buffer(void *buffer, size_t size)
 			{
-				this->buffer = static_cast<uint8_t *>(buffer);
+				this->buffer = (uint8_t *)(buffer);
 				buffer_size = size;
 			}
 			inline void *get_buffer()
@@ -3400,7 +3400,7 @@ public:
 	bool allocate_dedicated(uint32_t size, DeviceAllocation *alloc, VkImage image);
 	inline ClassAllocator &get_class_allocator(MemoryClass clazz)
 	{
-		return classes[static_cast<unsigned>(clazz)];
+		return classes[(unsigned)(clazz)];
 	}
 
 	static void free(DeviceAllocation *alloc)
@@ -4663,7 +4663,7 @@ private:
 	static inline StockSampler get_immutable_sampler(const DescriptorSetLayout &layout, unsigned binding)
 	{
 		VK_ASSERT(has_immutable_sampler(layout, binding));
-		return static_cast<StockSampler>((layout.immutable_samplers >> (4 * binding)) & 0xf);
+		return (StockSampler)((layout.immutable_samplers >> (4 * binding)) & 0xf);
 	}
 
 	static inline void set_immutable_sampler(DescriptorSetLayout &layout, unsigned binding, StockSampler sampler)
@@ -5930,7 +5930,7 @@ private:
 
 			const Sampler &get_stock_sampler(StockSampler sampler) const
 			{
-				return *samplers[static_cast<unsigned>(sampler)];
+				return *samplers[(unsigned)(sampler)];
 			}
 
 
@@ -6235,7 +6235,7 @@ private:
 				return (mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 			}
 
-			SamplerHandle samplers[static_cast<unsigned>(StockSampler_Count)];
+			SamplerHandle samplers[(unsigned)(StockSampler_Count)];
 
 			VulkanCache<PipelineLayout> pipeline_layouts;
 			VulkanCache<DescriptorSetAllocator> descriptor_set_allocators;
@@ -8774,7 +8774,7 @@ extern retro_log_printf_t log_cb;
 			void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
 			uint16_t *begin_copy(BufferHandle handle)
 			{
-				return static_cast<uint16_t *>(device->map_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT));
+				return (uint16_t *)(device->map_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT));
 			}
 			void end_copy(BufferHandle handle)
 			{
@@ -9581,7 +9581,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	if (msaa > 1)
 	{
 		info.levels = 1;
-		info.samples = static_cast<VkSampleCountFlagBits>(msaa);
+		info.samples = (VkSampleCountFlagBits)(msaa);
 		scaled_framebuffer_msaa = device->create_image(info);
 		scaled_framebuffer_msaa->set_layout(Layout_General);
 		// General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
@@ -9644,7 +9644,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	flush();
 
 	device->wait_idle();
-	const uint32_t *src = static_cast<const uint32_t *>(
+	const uint32_t *src = (const uint32_t *)(
 			device->map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
 	/* Deep-copy the mapped VRAM straight into the owning buffer (no
 	 * default zero-fill), then move it into the returned SaveState. */
@@ -9862,7 +9862,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	Fence fence = flush_and_signal();
 	fence->wait();
 
-	const uint32_t *mapped = static_cast<const uint32_t *>(device->map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
+	const uint32_t *mapped = (const uint32_t *)(device->map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
 
 	if (!wrap)
 	{
@@ -11284,8 +11284,8 @@ bool Renderer::primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInf
 /* qsort comparator: descending order, matching primitive_info_sort_gt. */
 int Renderer::primitive_info_qsort_cmp(const void *pa, const void *pb)
 {
-	const PrimitiveInfo &a = *static_cast<const PrimitiveInfo *>(pa);
-	const PrimitiveInfo &b = *static_cast<const PrimitiveInfo *>(pb);
+	const PrimitiveInfo &a = *(const PrimitiveInfo *)(pa);
+	const PrimitiveInfo &b = *(const PrimitiveInfo *)(pb);
 	if (primitive_info_sort_gt(a, b))
 		return -1;
 	if (primitive_info_sort_gt(b, a))
@@ -11298,7 +11298,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 	qsort(scissors.data(), scissors.size(), sizeof(PrimitiveInfo), primitive_info_qsort_cmp);
 
 	// Render flat-shaded primitives.
-	BufferVertex *vert = static_cast<BufferVertex *>(
+	BufferVertex *vert = (BufferVertex *)(
 	    cmd->allocate_vertex_data(0, vertices.size() * sizeof(BufferVertex), sizeof(BufferVertex)));
 
 	int scissor = scissors.front().scissor_index;
@@ -12669,7 +12669,7 @@ BufferBlock BufferPool::allocate_block(VkDeviceSize size)
 	device->set_name(*block.gpu, "chain-allocated-block-gpu");
 
 	// Try to map it, will fail unless the memory is host visible.
-	block.mapped = static_cast<uint8_t *>(device->map_host_buffer(*block.gpu, MEMORY_ACCESS_WRITE_BIT));
+	block.mapped = (uint8_t *)(device->map_host_buffer(*block.gpu, MEMORY_ACCESS_WRITE_BIT));
 	if (!block.mapped)
 	{
 		// Fall back to host memory, and remember to sync to gpu on submission time using DMA queue. :)
@@ -12680,7 +12680,7 @@ BufferBlock BufferPool::allocate_block(VkDeviceSize size)
 
 		block.cpu = device->create_buffer(cpu_info, NULL);
 		device->set_name(*block.cpu, "chain-allocated-block-cpu");
-		block.mapped = static_cast<uint8_t *>(device->map_host_buffer(*block.cpu, MEMORY_ACCESS_WRITE_BIT));
+		block.mapped = (uint8_t *)(device->map_host_buffer(*block.cpu, MEMORY_ACCESS_WRITE_BIT));
 	}
 	else
 		block.cpu = block.gpu;
@@ -12703,7 +12703,7 @@ BufferBlock BufferPool::request_block(VkDeviceSize minimum_size)
 		BufferBlock back = static_cast<BufferBlock &&>(blocks.back());
 		blocks.pop_back();
 
-		back.mapped = static_cast<uint8_t *>(device->map_host_buffer(*back.cpu, MEMORY_ACCESS_WRITE_BIT));
+		back.mapped = (uint8_t *)(device->map_host_buffer(*back.cpu, MEMORY_ACCESS_WRITE_BIT));
 		back.offset = 0;
 		return back;
 	}
@@ -13277,7 +13277,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		if (host_visible)
 		{
-			if (vkMapMemory(device, device_memory, 0, size, 0, reinterpret_cast<void **>(host_memory)) != VK_SUCCESS)
+			if (vkMapMemory(device, device_memory, 0, size, 0, (void **)(host_memory)) != VK_SUCCESS)
 				return false;
 		}
 
@@ -13307,7 +13307,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 			if (host_visible)
 			{
-				if (vkMapMemory(device, device_memory, 0, size, 0, reinterpret_cast<void **>(host_memory)) !=
+				if (vkMapMemory(device, device_memory, 0, size, 0, (void **)(host_memory)) !=
 				    VK_SUCCESS)
 				{
 					vkFreeMemory(device, device_memory, NULL);
@@ -13695,7 +13695,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		const VkAttachmentReference *colors = subpasses[subpass].pColorAttachments;
 		for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
 			if (colors[i].attachment == attachment)
-				return const_cast<VkAttachmentReference *>(&colors[i]);
+				return (VkAttachmentReference *)(&colors[i]);
 		return NULL;
 	}
 
@@ -13708,7 +13708,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		const VkAttachmentReference *resolves = subpasses[subpass].pResolveAttachments;
 		for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
 			if (resolves[i].attachment == attachment)
-				return const_cast<VkAttachmentReference *>(&resolves[i]);
+				return (VkAttachmentReference *)(&resolves[i]);
 		return NULL;
 	}
 
@@ -13718,7 +13718,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		const VkAttachmentReference *inputs = subpasses[subpass].pInputAttachments;
 		for (unsigned i = 0; i < subpasses[subpass].inputAttachmentCount; i++)
 			if (inputs[i].attachment == attachment)
-				return const_cast<VkAttachmentReference *>(&inputs[i]);
+				return (VkAttachmentReference *)(&inputs[i]);
 		return NULL;
 	}
 
@@ -13726,7 +13726,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			unsigned subpass, unsigned attachment)
 	{
 		if (subpasses[subpass].pDepthStencilAttachment->attachment == attachment)
-			return const_cast<VkAttachmentReference *>(subpasses[subpass].pDepthStencilAttachment);
+			return (VkAttachmentReference *)(subpasses[subpass].pDepthStencilAttachment);
 		else
 			return NULL;
 	}
@@ -14533,7 +14533,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		ImageCreateInfo image_info = ImageCreateInfo::transient_render_target(width, height, format);
 
-		image_info.samples = static_cast<VkSampleCountFlagBits>(samples);
+		image_info.samples = (VkSampleCountFlagBits)(samples);
 		image_info.layers = layers;
 		node = attachments.emplace(hash, device->create_image(image_info, NULL));
 		device->set_name(*node->handle, "AttachmentAllocator");
@@ -14986,12 +14986,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				att.blendEnable = static_state.state.blend_enable;
 				if (att.blendEnable)
 				{
-					att.alphaBlendOp = static_cast<VkBlendOp>(static_state.state.alpha_blend_op);
-					att.colorBlendOp = static_cast<VkBlendOp>(static_state.state.color_blend_op);
-					att.dstAlphaBlendFactor = static_cast<VkBlendFactor>(static_state.state.dst_alpha_blend);
-					att.srcAlphaBlendFactor = static_cast<VkBlendFactor>(static_state.state.src_alpha_blend);
-					att.dstColorBlendFactor = static_cast<VkBlendFactor>(static_state.state.dst_color_blend);
-					att.srcColorBlendFactor = static_cast<VkBlendFactor>(static_state.state.src_color_blend);
+					att.alphaBlendOp = (VkBlendOp)(static_state.state.alpha_blend_op);
+					att.colorBlendOp = (VkBlendOp)(static_state.state.color_blend_op);
+					att.dstAlphaBlendFactor = (VkBlendFactor)(static_state.state.dst_alpha_blend);
+					att.srcAlphaBlendFactor = (VkBlendFactor)(static_state.state.src_alpha_blend);
+					att.dstColorBlendFactor = (VkBlendFactor)(static_state.state.dst_color_blend);
+					att.srcColorBlendFactor = (VkBlendFactor)(static_state.state.src_color_blend);
 				}
 			}
 		}
@@ -15003,7 +15003,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		ds.depthWriteEnable = compatible_render_pass->has_depth(current_subpass) && static_state.state.depth_write;
 
 		if (ds.depthTestEnable)
-			ds.depthCompareOp = static_cast<VkCompareOp>(static_state.state.depth_compare);
+			ds.depthCompareOp = (VkCompareOp)(static_state.state.depth_compare);
 
 		// Vertex input
 		VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
@@ -15033,11 +15033,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		// Input assembly
 		VkPipelineInputAssemblyStateCreateInfo ia = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-		ia.topology = static_cast<VkPrimitiveTopology>(static_state.state.topology);
+		ia.topology = (VkPrimitiveTopology)(static_state.state.topology);
 
 		// Multisample
 		VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-		ms.rasterizationSamples = static_cast<VkSampleCountFlagBits>(compatible_render_pass->get_sample_count(current_subpass));
+		ms.rasterizationSamples = (VkSampleCountFlagBits)(compatible_render_pass->get_sample_count(current_subpass));
 
 		if (compatible_render_pass->get_sample_count(current_subpass) > 1)
 		{
@@ -15049,21 +15049,21 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		// Raster
 		VkPipelineRasterizationStateCreateInfo raster = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-		raster.cullMode = static_cast<VkCullModeFlags>(static_state.state.cull_mode);
+		raster.cullMode = (VkCullModeFlags)(static_state.state.cull_mode);
 		raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		raster.lineWidth = 1.0f;
 		raster.polygonMode = VK_POLYGON_MODE_FILL;
 
 		// Stages
-		VkPipelineShaderStageCreateInfo stages[static_cast<unsigned>(ShaderStage_Count)];
+		VkPipelineShaderStageCreateInfo stages[(unsigned)(ShaderStage_Count)];
 		unsigned num_stages = 0;
 
 		VkSpecializationInfo spec_info[(unsigned)ShaderStage_Count] = {};
 		VkSpecializationMapEntry spec_entries[(unsigned)ShaderStage_Count][VULKAN_NUM_SPEC_CONSTANTS];
 
-		for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage_Count); i++)
+		for (unsigned i = 0; i < (unsigned)(ShaderStage_Count); i++)
 		{
-			ShaderStage stage = static_cast<ShaderStage>(i);
+			ShaderStage stage = (ShaderStage)(i);
 			if (current_program->get_shader(stage))
 			{
 				VkPipelineShaderStageCreateInfo &s = stages[num_stages++];
@@ -15075,7 +15075,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 						(to_string(current_program->get_shader(stage)->intrusive_hashmap_key) + ".spv").c_str());
 #endif
 				s.pName = "main";
-				s.stage = static_cast<VkShaderStageFlagBits>(1u << i);
+				s.stage = (VkShaderStageFlagBits)(1u << i);
 
 				uint32_t mask = current_layout->get_resource_layout().spec_constant_mask[i] &
 					static_state.state.spec_constant_mask;
@@ -15172,12 +15172,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		if (static_state.state.blend_enable)
 		{
-			bool b0 = COMBINER_NEEDS_BLEND_CONSTANT(static_cast<VkBlendFactor>(static_state.state.src_color_blend));
-			bool b1 = COMBINER_NEEDS_BLEND_CONSTANT(static_cast<VkBlendFactor>(static_state.state.src_alpha_blend));
-			bool b2 = COMBINER_NEEDS_BLEND_CONSTANT(static_cast<VkBlendFactor>(static_state.state.dst_color_blend));
-			bool b3 = COMBINER_NEEDS_BLEND_CONSTANT(static_cast<VkBlendFactor>(static_state.state.dst_alpha_blend));
+			bool b0 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(static_state.state.src_color_blend));
+			bool b1 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(static_state.state.src_alpha_blend));
+			bool b2 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(static_state.state.dst_color_blend));
+			bool b3 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(static_state.state.dst_alpha_blend));
 			if (b0 || b1 || b2 || b3)
-				h.data(reinterpret_cast<uint32_t *>(potential_static_state.blend_constants),
+				h.data((uint32_t *)(potential_static_state.blend_constants),
 						sizeof(potential_static_state.blend_constants));
 		}
 
@@ -15894,7 +15894,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					return false;
 			}
 
-			addr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(module, "vkGetInstanceProcAddr"));
+			addr = (PFN_vkGetInstanceProcAddr)(dlsym(module, "vkGetInstanceProcAddr"));
 			if (!addr)
 				return false;
 #else
@@ -15906,7 +15906,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					return false;
 			}
 
-			addr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(module, "vkGetInstanceProcAddr"));
+			addr = (PFN_vkGetInstanceProcAddr)(GetProcAddress(module, "vkGetInstanceProcAddr"));
 			if (!addr)
 				return false;
 #endif
@@ -16450,7 +16450,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	PipelineLayout *Device::request_pipeline_layout(const CombinedResourceLayout &layout)
 	{
 		Hasher h;
-		h.data(reinterpret_cast<const uint32_t *>(layout.sets), sizeof(layout.sets));
+		h.data((const uint32_t *)(layout.sets), sizeof(layout.sets));
 		h.data(&layout.stages_for_bindings[0][0], sizeof(layout.stages_for_bindings));
 		h.u32(layout.push_constant_range.stageFlags);
 		h.u32(layout.push_constant_range.size);
@@ -16468,7 +16468,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	DescriptorSetAllocator *Device::request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings)
 	{
 		Hasher h;
-		h.data(reinterpret_cast<const uint32_t *>(&layout), sizeof(layout));
+		h.data((const uint32_t *)(&layout), sizeof(layout));
 		h.data(stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
 		Hash hash = h.get();
 
@@ -16488,9 +16488,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		layout.descriptor_set_mask = 0;
 
-		for (unsigned i = 0; i < static_cast<unsigned>(ShaderStage_Count); i++)
+		for (unsigned i = 0; i < (unsigned)(ShaderStage_Count); i++)
 		{
-			const Shader *shader = program.get_shader(static_cast<ShaderStage>(i));
+			const Shader *shader = program.get_shader((ShaderStage)(i));
 			if (!shader)
 				continue;
 
@@ -16611,9 +16611,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		info.max_lod = VK_LOD_CLAMP_NONE;
 		info.max_anisotropy = 1.0f;
 
-		for (unsigned i = 0; i < static_cast<unsigned>(StockSampler_Count); i++)
+		for (unsigned i = 0; i < (unsigned)(StockSampler_Count); i++)
 		{
-			StockSampler mode = static_cast<StockSampler>(i);
+			StockSampler mode = (StockSampler)(i);
 
 			switch (mode)
 			{
@@ -17856,7 +17856,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		set_name(*result.buffer, "image-upload-staging-buffer");
 
 		// And now, do the actual copy.
-		uint8_t *mapped = static_cast<uint8_t *>(map_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT));
+		uint8_t *mapped = (uint8_t *)(map_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT));
 		unsigned index = 0;
 
 		layout.set_buffer(mapped, layout.get_required_size());
@@ -17877,8 +17877,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				uint32_t src_row_stride = layout.row_byte_stride(src_row_length);
 				uint32_t src_height_stride = layout.layer_byte_stride(src_array_height, src_row_stride);
 
-				uint8_t *dst = static_cast<uint8_t *>(layout.data(layer, level));
-				const uint8_t *src = static_cast<const uint8_t *>(initial[index].data);
+				uint8_t *dst = (uint8_t *)(layout.data(layer, level));
+				const uint8_t *src = (const uint8_t *)(initial[index].data);
 
 				for (uint32_t z = 0; z < mip_info.depth; z++)
 					for (uint32_t y = 0; y < mip_info.block_image_height; y++)
@@ -18328,7 +18328,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			h.u32(info.subpasses[i].num_color_attachments);
 			h.u32(info.subpasses[i].num_input_attachments);
 			h.u32(info.subpasses[i].num_resolve_attachments);
-			h.u32(static_cast<uint32_t>(info.subpasses[i].depth_stencil_mode));
+			h.u32((uint32_t)(info.subpasses[i].depth_stencil_mode));
 			for (unsigned j = 0; j < info.subpasses[i].num_color_attachments; j++)
 				h.u32(info.subpasses[i].color_attachments[j]);
 			for (unsigned j = 0; j < info.subpasses[i].num_input_attachments; j++)
@@ -18338,7 +18338,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		}
 
 		depth_stencil = info.depth_stencil ? info.depth_stencil->get_format() : VK_FORMAT_UNDEFINED;
-		h.data(reinterpret_cast<const uint32_t *>(formats), info.num_color_attachments * sizeof(VkFormat));
+		h.data((const uint32_t *)(formats), info.num_color_attachments * sizeof(VkFormat));
 		h.u32(info.num_color_attachments);
 		h.u32(depth_stencil);
 
@@ -20679,8 +20679,8 @@ static char retro_slash = '/';
 	 * unstable order among them does not affect the canonical-form comparison this
 	 * sort exists to enable. */
 	static int texture_rect_qsort_cmp(const void *pa, const void *pb) {
-		const TextureRect &a = *static_cast<const TextureRect *>(pa);
-		const TextureRect &b = *static_cast<const TextureRect *>(pb);
+		const TextureRect &a = *(const TextureRect *)(pa);
+		const TextureRect &b = *(const TextureRect *)(pb);
 		if (texture_rect_sort_gt(a, b))
 			return -1;
 		if (texture_rect_sort_gt(b, a))
@@ -21820,9 +21820,9 @@ void rhi_vulkan_prepare_frame(void)
    device->next_frame_context();
 
    renderer->set_scaled_uv_offset(scaled_uv_offset);
-   renderer->set_filter_mode(static_cast<Renderer::FilterMode>(filter_mode));
-   renderer->set_sprite_filter_exclude(static_cast<Renderer::FilterExclude>(filter_exclude_sprites));
-   renderer->set_polygon_2d_filter_exclude(static_cast<Renderer::FilterExclude>(filter_exclude_2d_polygons));
+   renderer->set_filter_mode((Renderer::FilterMode)(filter_mode));
+   renderer->set_sprite_filter_exclude((Renderer::FilterExclude)(filter_exclude_sprites));
+   renderer->set_polygon_2d_filter_exclude((Renderer::FilterExclude)(filter_exclude_2d_polygons));
 }
 
 static Renderer::ScanoutMode get_scanout_mode(bool bpp24)
@@ -21999,7 +21999,7 @@ void rhi_vulkan_set_display_mode(bool depth_24bpp,
 {
    if (renderer)
       renderer->set_display_mode(get_scanout_mode(depth_24bpp), is_pal,
-                                 is_480i, static_cast<Renderer::WidthMode>(width_mode));
+                                 is_480i, (Renderer::WidthMode)(width_mode));
    else
       rhi_defer_push_set_display_mode(&defer, depth_24bpp, is_pal,
                                       is_480i, width_mode);
