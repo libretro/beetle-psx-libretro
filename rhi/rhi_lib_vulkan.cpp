@@ -5627,7 +5627,6 @@ namespace Vulkan
 			CommandBufferHandle request_command_buffer(CommandBuffer::Type type = CommandBuffer::Type::Generic);
 			void submit(CommandBufferHandle &cmd, Fence *fence = nullptr,
 					unsigned semaphore_count = 0, Semaphore *semaphore = nullptr);
-			void add_wait_semaphore(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush);
 			CommandBuffer::Type get_physical_queue_type(CommandBuffer::Type queue_type) const;
 
 			// Request shaders and programs. These objects are owned by the Device.
@@ -16206,11 +16205,6 @@ namespace Vulkan
 	{
 	}
 
-	void Device::add_wait_semaphore(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush)
-	{
-		add_wait_semaphore_nolock(type, semaphore, stages, flush);
-	}
-
 	void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages,
 			bool flush)
 	{
@@ -17941,7 +17935,7 @@ namespace Vulkan
 
 				Semaphore sem;
 				submit(transfer_cmd, nullptr, 1, &sem);
-				add_wait_semaphore(CommandBuffer::Type::Generic, sem, dst_stages, true);
+				add_wait_semaphore_nolock(CommandBuffer::Type::Generic, sem, dst_stages, true);
 			}
 
 			if (generate_mips)
@@ -17975,7 +17969,7 @@ namespace Vulkan
 				VkPipelineStageFlags dst_stages = handle->get_stage_flags();
 				if (graphics_queue_family_index != compute_queue_family_index)
 					dst_stages &= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
-				add_wait_semaphore(CommandBuffer::Type::AsyncCompute, sem, dst_stages, true);
+				add_wait_semaphore_nolock(CommandBuffer::Type::AsyncCompute, sem, dst_stages, true);
 			}
 			else
 				submit(graphics_cmd);
