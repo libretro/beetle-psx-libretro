@@ -13634,43 +13634,71 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 /* === render_pass.cpp === */
 
 
-	template <typename T, size_t N>
-		class StackAllocator
+	/* Concrete stack allocators (de-templated StackAllocator<T, N>). Two
+	 * instantiations were used - VkAttachmentReference x1024 and uint32_t x1024 -
+	 * each a fixed buffer plus a bump offset. allocate returns NULL when the count
+	 * is zero or would overflow; allocate_cleared additionally zero-fills the
+	 * returned slots. offset must be zeroed at declaration (the template's default
+	 * member initialiser). */
+	struct StackAllocatorRef
+	{
+		VkAttachmentReference buffer[1024];
+		size_t offset;
+	};
+
+	static inline VkAttachmentReference *stackalloc_ref_allocate(struct StackAllocatorRef *a, size_t count)
+	{
+		VkAttachmentReference *ret;
+		if (count == 0)
+			return NULL;
+		if (a->offset + count > 1024)
+			return NULL;
+		ret = a->buffer + a->offset;
+		a->offset += count;
+		return ret;
+	}
+
+	static inline VkAttachmentReference *stackalloc_ref_allocate_cleared(struct StackAllocatorRef *a, size_t count)
+	{
+		VkAttachmentReference *ret = stackalloc_ref_allocate(a, count);
+		if (ret)
 		{
-			public:
-				T *allocate(size_t count)
-				{
-					if (count == 0)
-						return NULL;
-					if (offset + count > N)
-						return NULL;
+			size_t i;
+			for (i = 0; i < count; i++)
+				memset(&ret[i], 0, sizeof(ret[i]));
+		}
+		return ret;
+	}
 
-					T *ret = buffer + offset;
-					offset += count;
-					return ret;
-				}
+	struct StackAllocatorU32
+	{
+		uint32_t buffer[1024];
+		size_t offset;
+	};
 
-				T *allocate_cleared(size_t count)
-				{
-					T *ret = allocate(count);
-					if (ret)
-					{
-						T defval = T();
-						for (size_t i = 0; i < count; i++)
-							ret[i] = defval;
-					}
-					return ret;
-				}
+	static inline uint32_t *stackalloc_u32_allocate(struct StackAllocatorU32 *a, size_t count)
+	{
+		uint32_t *ret;
+		if (count == 0)
+			return NULL;
+		if (a->offset + count > 1024)
+			return NULL;
+		ret = a->buffer + a->offset;
+		a->offset += count;
+		return ret;
+	}
 
-				void reset()
-				{
-					offset = 0;
-				}
-
-			private:
-				T buffer[N];
-				size_t offset = 0;
-		};
+	static inline uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t count)
+	{
+		uint32_t *ret = stackalloc_u32_allocate(a, count);
+		if (ret)
+		{
+			size_t i;
+			for (i = 0; i < count; i++)
+				ret[i] = 0;
+		}
+		return ret;
+	}
 
 	static VkAttachmentLoadOp rp_color_load_op(const RenderPassInfo &info, unsigned index)
 	{
@@ -13889,8 +13917,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				att.initialLayout = depth_stencil_layout;
 		}
 
-		StackAllocator<VkAttachmentReference, 1024> reference_allocator;
-		StackAllocator<uint32_t, 1024> preserve_allocator;
+		struct StackAllocatorRef reference_allocator;
+		struct StackAllocatorU32 preserve_allocator;
+		reference_allocator.offset = 0;
+		preserve_allocator.offset = 0;
 
 		VkSubpassDescriptionVec subpasses = { NULL, 0, 0 };
 		{
@@ -13902,10 +13932,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VkSubpassDependencyVec external_dependencies = { NULL, 0, 0 };
 		for (unsigned i = 0; i < num_subpasses; i++)
 		{
-			VkAttachmentReference *colors = reference_allocator.allocate_cleared(subpass_infos[i].num_color_attachments);
-			VkAttachmentReference *inputs = reference_allocator.allocate_cleared(subpass_infos[i].num_input_attachments);
-			VkAttachmentReference *resolves = reference_allocator.allocate_cleared(subpass_infos[i].num_color_attachments);
-			VkAttachmentReference *depth = reference_allocator.allocate_cleared(1);
+			VkAttachmentReference *colors = stackalloc_ref_allocate_cleared(&reference_allocator, subpass_infos[i].num_color_attachments);
+			VkAttachmentReference *inputs = stackalloc_ref_allocate_cleared(&reference_allocator, subpass_infos[i].num_input_attachments);
+			VkAttachmentReference *resolves = stackalloc_ref_allocate_cleared(&reference_allocator, subpass_infos[i].num_color_attachments);
+			VkAttachmentReference *depth = stackalloc_ref_allocate_cleared(&reference_allocator, 1);
 
 			VkSubpassDescription &subpass = subpasses[i];
 			subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -14205,7 +14235,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				if (preserve_masks[attachment] & (1u << subpass))
 					preserve_count++;
 
-			uint32_t *preserve = preserve_allocator.allocate_cleared(preserve_count);
+			uint32_t *preserve = stackalloc_u32_allocate_cleared(&preserve_allocator, preserve_count);
 			pass.pPreserveAttachments = preserve;
 			pass.preserveAttachmentCount = preserve_count;
 			for (unsigned attachment = 0; attachment < num_attachments; attachment++)
