@@ -16356,6 +16356,20 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		 * defaulting to NULL, so a zero-fill is the empty state. */
 		memset(self->samplers, 0, sizeof(self->samplers));
 
+		/* Per-queue submission state. Each QueueData holds a SemaphoreHandleVec and
+		 * a VkPipelineStageVec (both { items=NULL, count=0, cap=0 } when empty) plus
+		 * a need_fence flag; none has its constructor run under malloc, so zero them
+		 * to their empty state. clear_wait_semaphores() iterates these during the
+		 * very first set_context()/init_frame_contexts(), so they must be valid here. */
+		memset(&self->graphics, 0, sizeof(self->graphics));
+		memset(&self->compute,  0, sizeof(self->compute));
+		memset(&self->transfer, 0, sizeof(self->transfer));
+
+		/* Pending CPU->GPU DMA staging lists (BufferBlockVec vbo/ubo): ctor-only,
+		 * empty state is { NULL, 0, 0 }; zero so the first submit/end-frame that
+		 * iterates or clears them is valid. */
+		memset(&self->dma, 0, sizeof(self->dma));
+
 		/* Owning members - establish each one's empty state via its raw-memory init. */
 		self->handle_pool.init();
 		self->managers.memory.init_empty();
