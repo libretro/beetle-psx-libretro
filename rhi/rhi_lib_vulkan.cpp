@@ -1672,9 +1672,10 @@ static inline int  NAME##_grow_by_one(struct NAME *v) {                        \
     }                                                                         \
     return 1;                                                                 \
 }                                                                             \
-static inline void NAME##_push(struct NAME *v, T val) {                        \
+static inline void NAME##_push(struct NAME *v, const T *valp) {                \
+    T tmp = *valp;  /* copy before grow: *valp may alias items[] (realloc) */ \
     if (NAME##_grow_by_one(v))                                                \
-        v->items[v->count++] = val;                                           \
+        v->items[v->count++] = tmp;                                           \
 }                                                                             \
 static inline void NAME##_pop_back(struct NAME *v) { if (v->count) v->count--; } \
 static inline void NAME##_free_storage(struct NAME *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; } \
@@ -9891,15 +9892,14 @@ void Renderer::set_draw_rect(const Rect &rect)
 	atlas.set_draw_rect(rect);
 	render_state.draw_rect = rect;
 
-	const VkRect2D &last = queue.scissors.back();
+	const VkRect2D &last = *Rect2DVec_back(&queue.scissors);
 	const int scaled_x = int(rect.x * scaling);
 	const int scaled_y = int(rect.y * scaling);
 	const unsigned scaled_w = rect.width * scaling;
 	const unsigned scaled_h = rect.height * scaling;
 	if (last.offset.x != scaled_x || last.offset.y != scaled_y ||
 	    last.extent.width != scaled_w || last.extent.height != scaled_h)
-		queue.scissors.push(
-		    { { scaled_x, scaled_y }, { scaled_w, scaled_h } });
+		{ VkRect2D _vpush = { { scaled_x, scaled_y }, { scaled_w, scaled_h } }; Rect2DVec_push(&queue.scissors, &_vpush); }
 }
 
 void Renderer::clear_rect(const Rect &rect, uint32_t fb_color)
@@ -10677,7 +10677,7 @@ void Renderer::flush_resolves()
 		uint32_t scale;
 	};
 
-	if (!queue.scaled_resolves.empty())
+	if (!Rect2DVec_empty(&queue.scaled_resolves))
 	{
 		ensure_command_buffer();
 		cmd->set_program(*pipelines.resolve_to_scaled);
@@ -10688,7 +10688,7 @@ void Renderer::flush_resolves()
 		else
 			cmd->set_storage_texture(0, 0, *scaled_views[0]);
 
-		unsigned size = queue.scaled_resolves.size();
+		unsigned size = Rect2DVec_size(&queue.scaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
 		{
 			unsigned to_run = min_(size - i, 1024u);
@@ -10696,12 +10696,12 @@ void Renderer::flush_resolves()
 			Push push = { { 1.0f / (scaling * FB_WIDTH), 1.0f / (scaling * FB_HEIGHT) }, scaling };
 			cmd->push_constants(&push, 0, sizeof(push));
 			void *ptr = cmd->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
-			memcpy(ptr, queue.scaled_resolves.data() + i, to_run * sizeof(VkRect2D));
+			memcpy(ptr, Rect2DVec_data(&queue.scaled_resolves) + i, to_run * sizeof(VkRect2D));
 			cmd->dispatch(scaling, scaling, to_run);
 		}
 	}
 
-	if (!queue.unscaled_resolves.empty())
+	if (!Rect2DVec_empty(&queue.unscaled_resolves))
 	{
 		ensure_command_buffer();
 		// Always use nearest neighbor downscaling to avoid filter artifact (e.g. unwanted black outlines in Vagrant Story)
@@ -10716,7 +10716,7 @@ void Renderer::flush_resolves()
 		else
 			cmd->set_texture(0, 1, *scaled_views[0], StockSampler_NearestClamp);
 
-		unsigned size = queue.unscaled_resolves.size();
+		unsigned size = Rect2DVec_size(&queue.unscaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
 		{
 			unsigned to_run = min_(size - i, 1024u);
@@ -10724,22 +10724,22 @@ void Renderer::flush_resolves()
 			Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 			cmd->push_constants(&push, 0, sizeof(push));
 			void *ptr = cmd->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
-			memcpy(ptr, queue.unscaled_resolves.data() + i, to_run * sizeof(VkRect2D));
+			memcpy(ptr, Rect2DVec_data(&queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
 			cmd->set_specialization_constant_mask(-1);
 			cmd->dispatch(1, 1, to_run);
 		}
 	}
 
-	queue.scaled_resolves.clear();
-	queue.unscaled_resolves.clear();
+	Rect2DVec_clear(&queue.scaled_resolves);
+	Rect2DVec_clear(&queue.unscaled_resolves);
 }
 
 void Renderer::resolve(Domain target_domain, unsigned x, unsigned y)
 {
 	if (target_domain == Domain_Scaled)
-		queue.scaled_resolves.push({ { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } });
+		{ VkRect2D _vpush = { { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } }; Rect2DVec_push(&queue.scaled_resolves, &_vpush); }
 	else
-		queue.unscaled_resolves.push({ { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } });
+		{ VkRect2D _vpush = { { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } }; Rect2DVec_push(&queue.unscaled_resolves, &_vpush); }
 }
 
 void Renderer::ensure_command_buffer()
@@ -10985,15 +10985,21 @@ Renderer::BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor
 		if (render_state.semi_transparent != SemiTransparentMode_None)
 		{
 			for (unsigned i = 0; i < prims; i++)
-				queue.semi_transparent_opaque_scissor.push(PrimitiveInfo(queue.semi_transparent_opaque_scissor.size(), scissor, hd_texture,
-					filtering, scaled_read, shift, offset_uv));
+			{
+				PrimitiveInfo _pi = PrimitiveInfo(PrimitiveInfoVec_size(&queue.semi_transparent_opaque_scissor), scissor, hd_texture,
+					filtering, scaled_read, shift, offset_uv);
+				PrimitiveInfoVec_push(&queue.semi_transparent_opaque_scissor, &_pi);
+			}
 			return &queue.semi_transparent_opaque;
 		}
 		else
 		{
 			for (unsigned i = 0; i < prims; i++)
-				queue.opaque_textured_scissor.push(PrimitiveInfo(queue.opaque_textured_scissor.size(), scissor, hd_texture,
-					filtering, scaled_read, shift, offset_uv));
+			{
+				PrimitiveInfo _pi = PrimitiveInfo(PrimitiveInfoVec_size(&queue.opaque_textured_scissor), scissor, hd_texture,
+					filtering, scaled_read, shift, offset_uv);
+				PrimitiveInfoVec_push(&queue.opaque_textured_scissor, &_pi);
+			}
 			return &queue.opaque_textured;
 		}
 	}
@@ -11002,8 +11008,11 @@ Renderer::BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor
 	else
 	{
 		for (unsigned i = 0; i < prims; i++)
-			queue.opaque_scissor.push(PrimitiveInfo(queue.opaque_scissor.size(), scissor, hd_texture,
-				filtering, scaled_read, shift, offset_uv));
+		{
+			PrimitiveInfo _pi = PrimitiveInfo(PrimitiveInfoVec_size(&queue.opaque_scissor), scissor, hd_texture,
+				filtering, scaled_read, shift, offset_uv);
+			PrimitiveInfoVec_push(&queue.opaque_scissor, &_pi);
+		}
 		return &queue.opaque;
 	}
 }
@@ -11141,7 +11150,7 @@ void Renderer::draw_triangle(const Vertex *vertices)
 	unsigned shift = 0;
 	bool offset_uv = false;
 	build_attribs(vert, vertices, 3, hd_texture_index, filtering, scaled_read, shift, offset_uv);
-	const int scissor_index = queue.scissor_invariant ? -1 : int(queue.scissors.size() - 1);
+	const int scissor_index = queue.scissor_invariant ? -1 : int(Rect2DVec_size(&queue.scissors) - 1);
 	BufferVertexVec *out = select_pipeline(1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	if (out)
 	{
@@ -11155,14 +11164,17 @@ void Renderer::draw_triangle(const Vertex *vertices)
 			filtering = !get_filer_exclude(FilterExcludeOpaqueAndSemiTrans);
 
 		for (unsigned i = 0; i < 3; i++)
-			queue.semi_transparent.push(vert[i]);
-		queue.semi_transparent_state.push({ scissor_index, hd_texture_index, render_state.semi_transparent,
+			BufferVertexVec_push(&queue.semi_transparent, &vert[i]);
+		{
+			SemiTransparentState _sts = { scissor_index, hd_texture_index, render_state.semi_transparent,
 		                                         render_state.texture_mode != TextureMode_None,
 		                                         render_state.mask_test,
 		                                         filtering,
 		                                         scaled_read,
 												 shift,
-												 offset_uv });
+												 offset_uv };
+			SemiTransparentStateVec_push(&queue.semi_transparent_state, &_sts);
+		}
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
 		// render_pass_is_feedback enables self dependency in renderpass which is necessary for barriers between draws.
@@ -11189,7 +11201,7 @@ void Renderer::draw_quad(const Vertex *vertices)
 	unsigned shift = 0;
 	bool offset_uv = false;
 	build_attribs(vert, vertices, 4, hd_texture_index, filtering, scaled_read, shift, offset_uv);
-	const int scissor_index = queue.scissor_invariant ? -1 : int(queue.scissors.size() - 1);
+	const int scissor_index = queue.scissor_invariant ? -1 : int(Rect2DVec_size(&queue.scissors) - 1);
 	BufferVertexVec *out = select_pipeline(2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 
 	if (out)
@@ -11215,14 +11227,14 @@ void Renderer::draw_quad(const Vertex *vertices)
 			scaled_read,
 			shift,
 			offset_uv };
-		queue.semi_transparent.push(vert[0]);
-		queue.semi_transparent.push(vert[1]);
-		queue.semi_transparent.push(vert[2]);
-		queue.semi_transparent.push(vert[3]);
-		queue.semi_transparent.push(vert[2]);
-		queue.semi_transparent.push(vert[1]);
-		queue.semi_transparent_state.push(state);
-		queue.semi_transparent_state.push(state);
+		BufferVertexVec_push(&queue.semi_transparent, &vert[0]);
+		BufferVertexVec_push(&queue.semi_transparent, &vert[1]);
+		BufferVertexVec_push(&queue.semi_transparent, &vert[2]);
+		BufferVertexVec_push(&queue.semi_transparent, &vert[3]);
+		BufferVertexVec_push(&queue.semi_transparent, &vert[2]);
+		BufferVertexVec_push(&queue.semi_transparent, &vert[1]);
+		SemiTransparentStateVec_push(&queue.semi_transparent_state, &state);
+		SemiTransparentStateVec_push(&queue.semi_transparent_state, &state);
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
 		render_pass_is_feedback = true;
@@ -11240,26 +11252,36 @@ void Renderer::clear_quad(const Rect &rect, uint32_t fb_color, bool candidate)
 	BufferVertex pos1 = { float(rect.x) + float(rect.width), float(rect.y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
 	BufferVertex pos2 = { float(rect.x), float(rect.y) + float(rect.height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
 	BufferVertex pos3 = { float(rect.x) + float(rect.width), float(rect.y) + float(rect.height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
-	queue.opaque.push(pos0);
-	queue.opaque.push(pos1);
-	queue.opaque.push(pos2);
-	queue.opaque.push(pos3);
-	queue.opaque.push(pos2);
-	queue.opaque.push(pos1);
-	queue.opaque_scissor.push(PrimitiveInfo(queue.opaque_scissor.size()));
-	queue.opaque_scissor.push(PrimitiveInfo(queue.opaque_scissor.size()));
+	BufferVertexVec_push(&queue.opaque, &pos0);
+	BufferVertexVec_push(&queue.opaque, &pos1);
+	BufferVertexVec_push(&queue.opaque, &pos2);
+	BufferVertexVec_push(&queue.opaque, &pos3);
+	BufferVertexVec_push(&queue.opaque, &pos2);
+	BufferVertexVec_push(&queue.opaque, &pos1);
+	{
+		PrimitiveInfo _pi0 = PrimitiveInfo(PrimitiveInfoVec_size(&queue.opaque_scissor));
+		PrimitiveInfoVec_push(&queue.opaque_scissor, &_pi0);
+	}
+	{
+		PrimitiveInfo _pi1 = PrimitiveInfo(PrimitiveInfoVec_size(&queue.opaque_scissor));
+		PrimitiveInfoVec_push(&queue.opaque_scissor, &_pi1);
+	}
 
 	if (candidate)
-		queue.clear_candidates.push({ rect, fb_color, z });
+		{ ClearCandidate _vpush = { rect, fb_color, z }; ClearCandidateVec_push(&queue.clear_candidates, &_vpush); }
 }
 
 const Renderer::ClearCandidate *Renderer::find_clear_candidate(const Rect &rect) const
 {
 	const ClearCandidate *ret = NULL;
-	for (const ClearCandidate &c : queue.clear_candidates)
 	{
-		if (c.rect == rect)
-			ret = &c;
+		int _i;
+		for (_i = 0; _i < ClearCandidateVec_size((struct ClearCandidateVec *)&queue.clear_candidates); _i++)
+		{
+			const ClearCandidate &c = *ClearCandidateVec_at((struct ClearCandidateVec *)&queue.clear_candidates, _i);
+			if (c.rect == rect)
+				ret = &c;
+		}
 	}
 	return ret;
 }
@@ -11407,7 +11429,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 	unsigned size = scissors.size();
 
 	hd_texture_uniforms(hd_texture);
-	cmd->set_scissor(scissor < 0 ? queue.default_scissor : queue.scissors[scissor]);
+	cmd->set_scissor(scissor < 0 ? queue.default_scissor : *Rect2DVec_at(&queue.scissors, scissor));
 	cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 	cmd->set_specialization_constant(SpecConstIndex_Shift, shift);
 	cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
@@ -11428,7 +11450,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 
 			if (scissors[i].scissor_index != scissor) {
 				scissor = scissors[i].scissor_index;
-				cmd->set_scissor(scissor < 0 ? queue.default_scissor : queue.scissors[scissor]);
+				cmd->set_scissor(scissor < 0 ? queue.default_scissor : *Rect2DVec_at(&queue.scissors, scissor));
 			}
 			if (scissors[i].hd_texture_index != hd_texture) {
 				hd_texture = scissors[i].hd_texture_index;
@@ -11500,7 +11522,7 @@ void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
 
 void Renderer::render_semi_transparent_primitives()
 {
-	unsigned prims = queue.semi_transparent_state.size();
+	unsigned prims = SemiTransparentStateVec_size(&queue.semi_transparent_state);
 	if (!prims)
 		return;
 
@@ -11518,11 +11540,11 @@ void Renderer::render_semi_transparent_primitives()
 	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-	size_t size = queue.semi_transparent.size() * sizeof(BufferVertex);
+	size_t size = BufferVertexVec_size(&queue.semi_transparent) * sizeof(BufferVertex);
 	void *verts = cmd->allocate_vertex_data(0, size, sizeof(BufferVertex));
-	memcpy(verts, queue.semi_transparent.data(), size);
+	memcpy(verts, BufferVertexVec_data(&queue.semi_transparent), size);
 
-	SemiTransparentState last_state = queue.semi_transparent_state[0];
+	SemiTransparentState last_state = *SemiTransparentStateVec_at(&queue.semi_transparent_state, 0);
 
 	semi_transparent_set_state(last_state);
 
@@ -11533,7 +11555,7 @@ void Renderer::render_semi_transparent_primitives()
 		// If we need programmable shading, we can't batch as primitives may overlap.
 		// We could in theory do some fancy tests here, but probably overkill here.
 		if ((last_state.masked && last_state.semi_transparent != SemiTransparentMode_None) ||
-		    (last_state != queue.semi_transparent_state[i]))
+		    (last_state != *SemiTransparentStateVec_at(&queue.semi_transparent_state, i)))
 		{
 			unsigned to_draw = i - last_draw_offset;
 			cmd->set_specialization_constant_mask(-1);
@@ -11554,7 +11576,7 @@ void Renderer::render_semi_transparent_primitives()
 				cmd->set_multisample_state(false);
 			last_draw_offset = i;
 
-			last_state = queue.semi_transparent_state[i];
+			last_state = *SemiTransparentStateVec_at(&queue.semi_transparent_state, i);
 			semi_transparent_set_state(last_state);
 		}
 	}
@@ -11619,10 +11641,10 @@ void Renderer::flush_blits()
 	flush_blit(queue.scaled_masked_blits, *pipelines.blit_vram_scaled_masked, true);
 	flush_blit(queue.unscaled_blits, *pipelines.blit_vram_unscaled, false);
 	flush_blit(queue.unscaled_masked_blits, *pipelines.blit_vram_unscaled_masked, false);
-	queue.scaled_blits.clear();
-	queue.scaled_masked_blits.clear();
-	queue.unscaled_blits.clear();
-	queue.unscaled_masked_blits.clear();
+	BlitInfoVec_clear(&queue.scaled_blits);
+	BlitInfoVec_clear(&queue.scaled_masked_blits);
+	BlitInfoVec_clear(&queue.unscaled_blits);
+	BlitInfoVec_clear(&queue.unscaled_masked_blits);
 }
 
 void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scaled)
@@ -11876,43 +11898,42 @@ Renderer::~Renderer()
 {
 	flush();
 	/* Free the per-frame draw-queue arrays (POD_VEC backing storage). */
-	queue.opaque.free_storage();
-	queue.opaque_scissor.free_storage();
-	queue.opaque_textured.free_storage();
-	queue.opaque_textured_scissor.free_storage();
-	queue.semi_transparent_opaque.free_storage();
-	queue.semi_transparent_opaque_scissor.free_storage();
-	queue.semi_transparent.free_storage();
-	queue.semi_transparent_state.free_storage();
-	queue.scaled_resolves.free_storage();
-	queue.unscaled_resolves.free_storage();
-	queue.scaled_blits.free_storage();
-	queue.scaled_masked_blits.free_storage();
-	queue.unscaled_blits.free_storage();
-	queue.unscaled_masked_blits.free_storage();
-	queue.scissors.free_storage();
-	queue.clear_candidates.free_storage();
+	BufferVertexVec_free_storage(&queue.opaque);
+	PrimitiveInfoVec_free_storage(&queue.opaque_scissor);
+	BufferVertexVec_free_storage(&queue.opaque_textured);
+	PrimitiveInfoVec_free_storage(&queue.opaque_textured_scissor);
+	BufferVertexVec_free_storage(&queue.semi_transparent_opaque);
+	PrimitiveInfoVec_free_storage(&queue.semi_transparent_opaque_scissor);
+	BufferVertexVec_free_storage(&queue.semi_transparent);
+	SemiTransparentStateVec_free_storage(&queue.semi_transparent_state);
+	Rect2DVec_free_storage(&queue.scaled_resolves);
+	Rect2DVec_free_storage(&queue.unscaled_resolves);
+	BlitInfoVec_free_storage(&queue.scaled_blits);
+	BlitInfoVec_free_storage(&queue.scaled_masked_blits);
+	BlitInfoVec_free_storage(&queue.unscaled_blits);
+	BlitInfoVec_free_storage(&queue.unscaled_masked_blits);
+	Rect2DVec_free_storage(&queue.scissors);
+	ClearCandidateVec_free_storage(&queue.clear_candidates);
 }
 
 void Renderer::reset_scissor_queue()
 {
-	queue.scissors.clear();
+	Rect2DVec_clear(&queue.scissors);
 	Rect &rect = render_state.draw_rect;
-	queue.scissors.push(
-	    { { int(rect.x * scaling), int(rect.y * scaling) }, { rect.width * scaling, rect.height * scaling } });
+	{ VkRect2D _vpush = { { int(rect.x * scaling), int(rect.y * scaling) }, { rect.width * scaling, rect.height * scaling } }; Rect2DVec_push(&queue.scissors, &_vpush); }
 }
 
 void Renderer::reset_queue()
 {
-	queue.opaque.clear();
-	queue.opaque_scissor.clear();
-	queue.opaque_textured.clear();
-	queue.opaque_textured_scissor.clear();
-	queue.semi_transparent.clear();
-	queue.semi_transparent_state.clear();
-	queue.semi_transparent_opaque.clear();
-	queue.semi_transparent_opaque_scissor.clear();
-	queue.clear_candidates.clear();
+	BufferVertexVec_clear(&queue.opaque);
+	PrimitiveInfoVec_clear(&queue.opaque_scissor);
+	BufferVertexVec_clear(&queue.opaque_textured);
+	PrimitiveInfoVec_clear(&queue.opaque_textured_scissor);
+	BufferVertexVec_clear(&queue.semi_transparent);
+	SemiTransparentStateVec_clear(&queue.semi_transparent_state);
+	BufferVertexVec_clear(&queue.semi_transparent_opaque);
+	PrimitiveInfoVec_clear(&queue.semi_transparent_opaque_scissor);
+	ClearCandidateVec_clear(&queue.clear_candidates);
 	primitive_index = 0;
 	render_pass_is_feedback = false;
 
@@ -11943,7 +11964,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	if (state.scissor_index < 0)
 		cmd->set_scissor(queue.default_scissor);
 	else
-		cmd->set_scissor(queue.scissors[state.scissor_index]);
+		cmd->set_scissor(*Rect2DVec_at(&queue.scissors, state.scissor_index));
 
 	Program &textured = state.textured ? state.scaled_read ?
 		*pipelines.textured_scaled : *pipelines.textured_unscaled : *pipelines.flat;
@@ -12685,7 +12706,7 @@ VkFence FenceManager::request_cleared_fence()
 
 void FenceManager::recycle_fence(VkFence fence)
 {
-	FenceVec_push(&fences, fence);
+	FenceVec_push(&fences, &fence);
 }
 
 void FenceManager::deinit()
@@ -12734,7 +12755,7 @@ void SemaphoreManager::deinit()
 void SemaphoreManager::recycle(VkSemaphore sem)
 {
 	if (sem != VK_NULL_HANDLE)
-		SemaphoreVec_push(&semaphores, sem);
+		SemaphoreVec_push(&semaphores, &sem);
 }
 
 VkSemaphore SemaphoreManager::request_cleared_semaphore()
@@ -12873,7 +12894,7 @@ VkCommandBuffer CommandPool::request_command_buffer()
 			for (int i = 0; i < in_flight.count; i++)
 				if (in_flight.items[i] == ret) { present = true; break; }
 			VK_ASSERT(!present);
-			CommandBufferVec_push(&in_flight, ret);
+			CommandBufferVec_push(&in_flight, &ret);
 		}
 #endif
 		return ret;
@@ -12893,10 +12914,10 @@ VkCommandBuffer CommandPool::request_command_buffer()
 			for (int i = 0; i < in_flight.count; i++)
 				if (in_flight.items[i] == cmd) { present = true; break; }
 			VK_ASSERT(!present);
-			CommandBufferVec_push(&in_flight, cmd);
+			CommandBufferVec_push(&in_flight, &cmd);
 		}
 #endif
-		CommandBufferVec_push(&buffers, cmd);
+		CommandBufferVec_push(&buffers, &cmd);
 		index++;
 		return cmd;
 	}
@@ -13611,50 +13632,50 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				if (has_immutable_sampler(layout, i))
 					immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
 
-				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL });
-				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
+				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.sampled_buffer_mask & (1u << i))
 			{
-				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, NULL });
-				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL });
+				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.storage_image_mask & (1u << i))
 			{
-				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, NULL });
-				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL });
+				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.uniform_buffer_mask & (1u << i))
 			{
-				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, NULL });
-				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL });
+				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.storage_buffer_mask & (1u << i))
 			{
-				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, NULL });
-				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL });
+				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.input_attachment_mask & (1u << i))
 			{
-				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, NULL });
-				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL });
+				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.separate_image_mask & (1u << i))
 			{
-				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, NULL });
-				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL });
+				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
 				types++;
 			}
 
@@ -13664,8 +13685,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				if (has_immutable_sampler(layout, i))
 					immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
 
-				DescriptorBindingVec_push(&bindings, { i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL });
-				DescriptorPoolSizeVec_push(&pool_size, { VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL });
+				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
 				types++;
 			}
 
@@ -13726,7 +13747,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		if (vkAllocateDescriptorSets(device->get_device(), &alloc, sets) != VK_SUCCESS)
 			LOGE("Failed to allocate descriptor sets.\n");
-		DescriptorPoolVec_push(&state.pools, pool);
+		DescriptorPoolVec_push(&state.pools, &pool);
 
 		for (VkDescriptorSet set : sets)
 			descriptor_set_thmap_make_vacant(&state.set_nodes, set);
@@ -16969,14 +16990,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			size_t ws;
 			for (ws = 0; ws < data.wait_stages.size(); ws++)
-				VkFlagsVec_push(&stages, data.wait_stages[ws]);
+				VkFlagsVec_push(&stages, &data.wait_stages[ws]);
 		}
 
 		for (Semaphore &semaphore : data.wait_semaphores)
 		{
 			VkSemaphore wait = semaphore->consume();
-			SemaphoreVec_push(&frame().recycled_semaphores, wait);
-			SemaphoreVec_push(&waits, wait);
+			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
+			SemaphoreVec_push(&waits, &wait);
 		}
 		data.wait_stages.clear();
 		data.wait_semaphores.clear();
@@ -16985,7 +17006,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (unsigned i = 0; i < semaphore_count; i++)
 		{
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
-			SemaphoreVec_push(&signals, cleared_semaphore);
+			SemaphoreVec_push(&signals, &cleared_semaphore);
 			VK_ASSERT(!semaphores[i]);
 			semaphores[i] = Semaphore(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
 		}
@@ -17031,7 +17052,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				/* See submit_queue(): never enqueue a fence that was handed to a
 				 * failed submit - it will never signal and would hang the frame's
 				 * vkWaitForFences. Recycle it and return a null fence instead. */
-				FenceVec_push(&frame().wait_fences, cleared_fence);
+				FenceVec_push(&frame().wait_fences, &cleared_fence);
 				*fence = cleared_fence;
 			}
 			else
@@ -17164,27 +17185,30 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			// Move the pending wait stages across (then the source is cleared below).
 			size_t ws;
 			for (ws = 0; ws < data.wait_stages.size(); ws++)
-				VkFlagsVec_push(&stages[0], data.wait_stages[ws]);
+				VkFlagsVec_push(&stages[0], &data.wait_stages[ws]);
 		}
 
 		for (Semaphore &semaphore : data.wait_semaphores)
 		{
 			VkSemaphore wait = semaphore->consume();
-			SemaphoreVec_push(&frame().recycled_semaphores, wait);
-			SemaphoreVec_push(&waits[0], wait);
+			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
+			SemaphoreVec_push(&waits[0], &wait);
 		}
 		data.wait_stages.clear();
 		data.wait_semaphores.clear();
 
 		for (CommandBufferHandle &cmd : submissions)
-			CommandBufferVec_push(&cmds, cmd->get_command_buffer());
+		{
+			VkCommandBuffer _cb = cmd->get_command_buffer();
+			CommandBufferVec_push(&cmds, &_cb);
+		}
 
 		if (CommandBufferVec_size(&cmds) > (int)last_cmd)
 		{
 			// Push all pending cmd buffers to their own submission.
 			VkSubmitInfo zero_submit;
 			memset(&zero_submit, 0, sizeof(zero_submit));
-			VkSubmitInfoVec_push(&submits, zero_submit);
+			VkSubmitInfoVec_push(&submits, &zero_submit);
 
 			VkSubmitInfo &submit = *VkSubmitInfoVec_back(&submits);
 			submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -17199,7 +17223,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (unsigned i = 0; i < semaphore_count; i++)
 		{
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
-			SemaphoreVec_push(&signals[VkSubmitInfoVec_size(&submits) - 1], cleared_semaphore);
+			SemaphoreVec_push(&signals[VkSubmitInfoVec_size(&submits) - 1], &cleared_semaphore);
 			VK_ASSERT(!semaphores[i]);
 			semaphores[i] = Semaphore(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
 		}
@@ -17254,7 +17278,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				 * enqueuing it for the next PerFrame::begin() would wedge that frame
 				 * in vkWaitForFences(UINT64_MAX) forever. Recycle it instead and hand
 				 * the caller a null fence. */
-				FenceVec_push(&frame().wait_fences, cleared_fence);
+				FenceVec_push(&frame().wait_fences, &cleared_fence);
 				*fence = cleared_fence;
 			}
 			else
@@ -17314,7 +17338,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			fence = VK_NULL_HANDLE;
 			submit_queue(CommandBuffer::Type_AsyncTransfer, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				FenceVec_push(&frame().recycle_fences, fence);
+				FenceVec_push(&frame().recycle_fences, &fence);
 			transfer.need_fence = false;
 		}
 
@@ -17323,7 +17347,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			fence = VK_NULL_HANDLE;
 			submit_queue(CommandBuffer::Type_Generic, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				FenceVec_push(&frame().recycle_fences, fence);
+				FenceVec_push(&frame().recycle_fences, &fence);
 			graphics.need_fence = false;
 		}
 
@@ -17332,7 +17356,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			fence = VK_NULL_HANDLE;
 			submit_queue(CommandBuffer::Type_AsyncCompute, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				FenceVec_push(&frame().recycle_fences, fence);
+				FenceVec_push(&frame().recycle_fences, &fence);
 			compute.need_fence = false;
 		}
 	}
@@ -17472,7 +17496,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void Device::reset_fence(VkFence fence)
 	{
-		FenceVec_push(&frame().recycle_fences, fence);
+		FenceVec_push(&frame().recycle_fences, &fence);
 	}
 
 	void Device::destroy_pipeline_nolock(VkPipeline pipeline)
@@ -17496,7 +17520,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	void Device::destroy_semaphore_nolock(VkSemaphore semaphore)
 	{
 		VK_ASSERT_NOT_IN_VEC(frame().destroyed_semaphores, semaphore);
-		SemaphoreVec_push(&frame().destroyed_semaphores, semaphore);
+		SemaphoreVec_push(&frame().destroyed_semaphores, &semaphore);
 	}
 
 	void Device::destroy_image_nolock(VkImage image)
@@ -17932,7 +17956,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 						if (vkCreateImageView(device, &view_info, NULL, &rt_view) != VK_SUCCESS)
 							return false;
 
-						RenderTargetViewVec_push(&rt_views, rt_view);
+						RenderTargetViewVec_push(&rt_views, &rt_view);
 					}
 				}
 
@@ -21315,7 +21339,7 @@ static char retro_slash = '/';
 			TextureUpload *ptr = texture_upload_new(); /* owns +1 */
 			texture_upload_copy_contents(ptr, state.uploads.items[e].val); /* deep-copy contents (refcount untouched) */
 			UploadPtrEntry pe = { state.uploads.items[e].key, ptr };
-			UploadPtrVec_push(&uploads, pe);
+			UploadPtrVec_push(&uploads, &pe);
 		}
 
 		clearRegion({ 0, 0, FB_WIDTH, FB_HEIGHT });
