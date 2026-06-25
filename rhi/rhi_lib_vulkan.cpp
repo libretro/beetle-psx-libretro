@@ -3435,60 +3435,49 @@ private:
 		Allocation *items;
 		int count;
 		int cap;
-
-		AllocationVec() : items(NULL), count(0), cap(0) {}
-		~AllocationVec() { ::free(items); }
-		AllocationVec(AllocationVec &&o) noexcept
-			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-		AllocationVec &operator=(AllocationVec &&o) noexcept {
-			if (this != &o) {
-				::free(items);
-				items = o.items; count = o.count; cap = o.cap;
-				o.items = NULL; o.count = 0; o.cap = 0;
-			}
-			return *this;
-		}
-		AllocationVec(const AllocationVec &) = delete;
-		AllocationVec &operator=(const AllocationVec &) = delete;
-
-		void push(const Allocation &v) {
-			if (count >= cap) {
-				int ncap = cap ? cap * 2 : 8;
-				Allocation *nitems = (Allocation *)::realloc(items, (size_t)ncap * sizeof(Allocation));
-				if (!nitems)
-					return;
-				items = nitems;
-				cap = ncap;
-			}
-			items[count++] = v;
-		}
-		int size() const { return count; }
-		bool empty() const { return count == 0; }
-		Allocation &operator[](int i) { return items[i]; }
-		const Allocation &operator[](int i) const { return items[i]; }
-		Allocation *begin() { return items; }
-		Allocation *end() { return items + count; }
-		const Allocation *begin() const { return items; }
-		const Allocation *end() const { return items + count; }
-
-		void erase_at(int i) {
-			memmove(&items[i], &items[i + 1], (size_t)(count - i - 1) * sizeof(Allocation));
-			count--;
-		}
-		void erase_front(int k) {
-			if (k <= 0)
-				return;
-			memmove(&items[0], &items[k], (size_t)(count - k) * sizeof(Allocation));
-			count -= k;
-		}
 	};
+	static inline void AllocationVec_init(struct AllocationVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+	static inline void AllocationVec_free_storage(struct AllocationVec *v) { ::free(v->items); v->items = NULL; v->count = 0; v->cap = 0; }
+	static inline int  AllocationVec_size(const struct AllocationVec *v) { return v->count; }
+	static inline int  AllocationVec_empty(const struct AllocationVec *v) { return v->count == 0; }
+	static inline Allocation *AllocationVec_at(struct AllocationVec *v, int i) { return &v->items[i]; }
+	static inline void AllocationVec_push(struct AllocationVec *v, const Allocation *valp) {
+		if (v->count >= v->cap) {
+			int ncap = v->cap ? v->cap * 2 : 8;
+			Allocation *nitems = (Allocation *)::realloc(v->items, (size_t)ncap * sizeof(Allocation));
+			if (!nitems)
+				return;
+			v->items = nitems;
+			v->cap = ncap;
+		}
+		v->items[v->count++] = *valp;
+	}
+	static inline void AllocationVec_erase_at(struct AllocationVec *v, int i) {
+		memmove(&v->items[i], &v->items[i + 1], (size_t)(v->count - i - 1) * sizeof(Allocation));
+		v->count--;
+	}
+	static inline void AllocationVec_erase_front(struct AllocationVec *v, int k) {
+		if (k <= 0)
+			return;
+		memmove(&v->items[0], &v->items[k], (size_t)(v->count - k) * sizeof(Allocation));
+		v->count -= k;
+	}
 
 	struct Heap
 	{
-		uint64_t size = 0;
+		uint64_t size;
 		AllocationVec blocks;
 		void garbage_collect(VkDevice device);
 	};
+	static inline void heap_init(struct Heap *h) { h->size = 0; AllocationVec_init(&h->blocks); }
+	static inline void heap_destroy(struct Heap *h) { AllocationVec_free_storage(&h->blocks); }
+	/* Move src into dst (steal blocks), leaving src empty - replaces the implicit
+	 * move-construct of Heap (which move-constructed its AllocationVec member). */
+	static inline void heap_move(struct Heap *dst, struct Heap *src) {
+		dst->size = src->size;
+		dst->blocks = src->blocks;
+		AllocationVec_init(&src->blocks);
+	}
 
 	/* Owning array of Heap. Replaces std::vector<Heap>. Heap owns a move-only
 	 * AllocationVec, so it is move-only too; growth move-constructs each Heap
@@ -3530,7 +3519,7 @@ private:
 
 		void clear() {
 			for (int i = 0; i < count; i++)
-				items[i].~Heap();
+				heap_destroy(&items[i]);
 			count = 0;
 		}
 		void resize(int n) {
@@ -3538,10 +3527,10 @@ private:
 				if (n > cap)
 					grow(n);
 				for (int i = count; i < n; i++)
-					new (&items[i]) Heap();
+					heap_init(&items[i]);
 			} else {
 				for (int i = n; i < count; i++)
-					items[i].~Heap();
+					heap_destroy(&items[i]);
 			}
 			count = n;
 		}
@@ -3550,8 +3539,8 @@ private:
 		void grow(int ncap) {
 			Heap *nitems = (Heap *)::malloc((size_t)ncap * sizeof(Heap));
 			for (int i = 0; i < count; i++) {
-				new (&nitems[i]) Heap(static_cast<Heap &&>(items[i]));
-				items[i].~Heap();
+				heap_move(&nitems[i], &items[i]);
+				heap_destroy(&items[i]);
 			}
 			::free(items);
 			items = nitems;
@@ -3559,7 +3548,7 @@ private:
 		}
 		void destroy() {
 			for (int i = 0; i < count; i++)
-				items[i].~Heap();
+				heap_destroy(&items[i]);
 			::free(items);
 			items = NULL; count = 0; cap = 0;
 		}
@@ -13244,8 +13233,10 @@ bool DeviceAllocator::allocate_image_memory(uint32_t size, uint32_t alignment, u
 
 void DeviceAllocator::Heap::garbage_collect(VkDevice device)
 {
-	for (Allocation &block : blocks)
+	int _i;
+	for (_i = 0; _i < AllocationVec_size(&blocks); _i++)
 	{
+		Allocation &block = *AllocationVec_at(&blocks, _i);
 		if (block.host_memory)
 			vkUnmapMemory(device, block.memory);
 		vkFreeMemory(device, block.memory, NULL);
@@ -13262,7 +13253,7 @@ DeviceAllocator::~DeviceAllocator()
 void DeviceAllocator::free(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
 {
 	Heap &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
-	{ Allocation a = { memory, host_memory, size, memory_type }; heap.blocks.push(a); }
+	{ Allocation a = { memory, host_memory, size, memory_type }; AllocationVec_push(&heap.blocks, &a); }
 }
 
 void DeviceAllocator::free_no_recycle(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
@@ -13328,10 +13319,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	Heap &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
 
 	// Naive searching is fine here as vkAllocate blocks are *huge* and we won't have many of them.
-	size_t found_idx = heap.blocks.size();
-	for (size_t i = 0; i < heap.blocks.size(); i++)
+	size_t found_idx = (size_t)AllocationVec_size(&heap.blocks);
+	for (size_t i = 0; i < (size_t)AllocationVec_size(&heap.blocks); i++)
 	{
-		if (heap.blocks[i].size == size && heap.blocks[i].type == memory_type)
+		if (AllocationVec_at(&heap.blocks, (int)i)->size == size && AllocationVec_at(&heap.blocks, (int)i)->type == memory_type)
 		{
 			found_idx = i;
 			break;
@@ -13341,12 +13332,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	bool host_visible = (mem_props.memoryTypes[memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 
 	// Found previously used block.
-	if (found_idx < heap.blocks.size())
+	if (found_idx < (size_t)AllocationVec_size(&heap.blocks))
 	{
-		Allocation &block = heap.blocks[found_idx];
+		Allocation &block = *AllocationVec_at(&heap.blocks, (int)found_idx);
 		*memory = block.memory;
 		*host_memory = block.host_memory;
-		heap.blocks.erase_at((int)found_idx);
+		AllocationVec_erase_at(&heap.blocks, (int)found_idx);
 		return true;
 	}
 
@@ -13378,9 +13369,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		// Look through our heap and see if there are blocks of other types we can free.
 		int freed = 0;
-		while (res != VK_SUCCESS && freed < heap.blocks.size())
+		while (res != VK_SUCCESS && freed < (size_t)AllocationVec_size(&heap.blocks))
 		{
-			Allocation &b = heap.blocks[freed];
+			Allocation &b = *AllocationVec_at(&heap.blocks, (int)freed);
 			if (b.host_memory)
 				vkUnmapMemory(device, b.memory);
 			vkFreeMemory(device, b.memory, NULL);
@@ -13389,7 +13380,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			++freed;
 		}
 
-		heap.blocks.erase_front(freed);
+		AllocationVec_erase_front(&heap.blocks, (int)freed);
 
 		if (res == VK_SUCCESS)
 		{
