@@ -3148,39 +3148,24 @@ struct DeviceAllocationVec
 	DeviceAllocation *items;
 	int count;
 	int cap;
-
-	DeviceAllocationVec() : items(NULL), count(0), cap(0) {}
-	~DeviceAllocationVec() { ::free(items); }
-	DeviceAllocationVec(DeviceAllocationVec &&o) noexcept
-		: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-	DeviceAllocationVec &operator=(DeviceAllocationVec &&o) noexcept {
-		if (this != &o) {
-			::free(items);
-			items = o.items; count = o.count; cap = o.cap;
-			o.items = NULL; o.count = 0; o.cap = 0;
-		}
-		return *this;
-	}
-	DeviceAllocationVec(const DeviceAllocationVec &) = delete;
-	DeviceAllocationVec &operator=(const DeviceAllocationVec &) = delete;
-
-	void push(const DeviceAllocation &v) {
-		if (count >= cap) {
-			int ncap = cap ? cap * 2 : 8;
-			DeviceAllocation *nitems = (DeviceAllocation *)::realloc(items, (size_t)ncap * sizeof(DeviceAllocation));
-			if (!nitems)
-				return;
-			items = nitems;
-			cap = ncap;
-		}
-		items[count++] = v;
-	}
-	int size() const { return count; }
-	bool empty() const { return count == 0; }
-	void clear() { count = 0; }
-	DeviceAllocation *begin() { return items; }
-	DeviceAllocation *end() { return items + count; }
 };
+static inline void DeviceAllocationVec_init(struct DeviceAllocationVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+static inline void DeviceAllocationVec_free_storage(struct DeviceAllocationVec *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; }
+static inline int  DeviceAllocationVec_size(const struct DeviceAllocationVec *v) { return v->count; }
+static inline int  DeviceAllocationVec_empty(const struct DeviceAllocationVec *v) { return v->count == 0; }
+static inline void DeviceAllocationVec_clear(struct DeviceAllocationVec *v) { v->count = 0; }
+static inline DeviceAllocation *DeviceAllocationVec_at(struct DeviceAllocationVec *v, int i) { return &v->items[i]; }
+static inline void DeviceAllocationVec_push(struct DeviceAllocationVec *v, const DeviceAllocation *valp) {
+	if (v->count >= v->cap) {
+		int ncap = v->cap ? v->cap * 2 : 8;
+		DeviceAllocation *nitems = (DeviceAllocation *)realloc(v->items, (size_t)ncap * sizeof(DeviceAllocation));
+		if (!nitems)
+			return;
+		v->items = nitems;
+		v->cap = ncap;
+	}
+	v->items[v->count++] = *valp;
+}
 
 struct MiniHeap
 {
@@ -17431,6 +17416,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		/* POD_VEC members have no constructor; zero-initialise them. */
 		memset(&wait_fences, 0, sizeof(wait_fences));
 		memset(&recycle_fences, 0, sizeof(recycle_fences));
+		memset(&allocations, 0, sizeof(allocations));
 		memset(&destroyed_framebuffers, 0, sizeof(destroyed_framebuffers));
 		memset(&destroyed_samplers, 0, sizeof(destroyed_samplers));
 		memset(&destroyed_pipelines, 0, sizeof(destroyed_pipelines));
@@ -17444,7 +17430,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void Device::free_memory_nolock(const DeviceAllocation &alloc)
 	{
-		frame().allocations.push(alloc);
+		DeviceAllocationVec_push(&frame().allocations, &alloc);
 	}
 
 #ifdef VULKAN_DEBUG
@@ -17648,8 +17634,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			for (_i = 0; _i < SemaphoreVec_size(&recycled_semaphores); _i++)
 				managers->semaphore.recycle(*SemaphoreVec_at(&recycled_semaphores, _i));
 		}
-		for (DeviceAllocation &alloc : allocations)
-			alloc.free_immediate(managers->memory);
+		{
+			int _i;
+			for (_i = 0; _i < DeviceAllocationVec_size(&allocations); _i++)
+				DeviceAllocationVec_at(&allocations, _i)->free_immediate(managers->memory);
+		}
 
 		for (BufferBlock &block : vbo_blocks)
 			managers->vbo.recycle_block(static_cast<BufferBlock &&>(block));
@@ -17667,7 +17656,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VkBufferVec_clear(&destroyed_buffers);
 		SemaphoreVec_clear(&destroyed_semaphores);
 		SemaphoreVec_clear(&recycled_semaphores);
-		allocations.clear();
+		DeviceAllocationVec_clear(&allocations);
 	}
 
 	Device::PerFrame::~PerFrame()
@@ -17682,6 +17671,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		/* Release the POD_VEC backing storage (begin() only resets the counts). */
 		FenceVec_free_storage(&wait_fences);
 		FenceVec_free_storage(&recycle_fences);
+		DeviceAllocationVec_free_storage(&allocations);
 		VkFramebufferVec_free_storage(&destroyed_framebuffers);
 		VkSamplerVec_free_storage(&destroyed_samplers);
 		VkPipelineVec_free_storage(&destroyed_pipelines);
