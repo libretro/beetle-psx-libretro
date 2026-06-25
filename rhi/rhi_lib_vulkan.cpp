@@ -1726,8 +1726,6 @@ static inline uint32_t util_ctz(uint32_t x)
 	     base_var = trailing_zeroes(_fe_v),                                        \
 	     range_var = (_fe_v ? trailing_ones(_fe_v >> base_var) : 0u))
 
-namespace Util
-{
 	using Hash = uint64_t;
 
 	class Hasher
@@ -2085,7 +2083,7 @@ namespace Util
 		struct IntrusiveHashMapEnabled : public IntrusiveListEnabled<T>
 	{
 		IntrusiveHashMapEnabled() = default;
-		IntrusiveHashMapEnabled(Util::Hash hash)
+		IntrusiveHashMapEnabled(Hash hash)
 			: intrusive_hashmap_key(hash)
 		{
 		}
@@ -2641,7 +2639,6 @@ namespace Util
 				VacantList vacants;
 		};
 
-}
 
 /* ============================================================
  * vulkan.hpp
@@ -2672,8 +2669,6 @@ namespace Util
 #define VK_ASSERT(x) ((void)0)
 #endif
 
-namespace Vulkan
-{
 	struct NoCopyNoMove
 	{
 		NoCopyNoMove() = default;
@@ -2806,12 +2801,12 @@ namespace Vulkan
 			const VkPhysicalDeviceFeatures *required_features);
 	static void context_deinit(Context *ctx);
 
-	using HandleCounter = Util::SingleThreadCounter;
+	using HandleCounter = SingleThreadCounter;
 
 	template <typename T>
-		using VulkanObjectPool = Util::ObjectPool<T>;
+		using VulkanObjectPool = ObjectPool<T>;
 	template <typename T>
-		using VulkanCache = Util::IntrusiveHashMap<T>;
+		using VulkanCache = IntrusiveHashMap<T>;
 
 	static const unsigned VULKAN_NUM_DESCRIPTOR_SETS = 4;
 	static const unsigned VULKAN_NUM_BINDINGS = 16;
@@ -2988,8 +2983,7 @@ namespace Vulkan
 	};
 
 	template <typename T>
-		using HashedObject = Util::IntrusiveHashMapEnabled<T>;
-}
+		using HashedObject = IntrusiveHashMapEnabled<T>;
 
 /* ============================================================
  * format.hpp
@@ -3068,8 +3062,6 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
  * sampler.hpp
  * ============================================================ */
 
-namespace Vulkan
-{
 	enum StockSampler {
 		StockSampler_NearestClamp,
 		StockSampler_LinearClamp,
@@ -3133,7 +3125,7 @@ namespace Vulkan
 			}
 
 		private:
-			friend class Util::ObjectPool<Sampler>;
+			friend class ObjectPool<Sampler>;
 			Sampler(Device *device, VkSampler sampler);
 
 			Device *device;
@@ -3141,7 +3133,6 @@ namespace Vulkan
 			HandleCounter reference_count;
 	};
 	INTRUSIVE_HANDLE_DECLARE(SamplerHandle, Sampler);
-}
 
 /* ============================================================
  * memory_allocator.hpp
@@ -3150,8 +3141,6 @@ namespace Vulkan
 #ifndef FRAMEWORK_MEMORY_ALLOCATOR_HPP
 #define FRAMEWORK_MEMORY_ALLOCATOR_HPP
 
-namespace Vulkan
-{
 static inline uint32_t log2_integer(uint32_t v)
 {
 	v--;
@@ -3279,7 +3268,7 @@ private:
 	VkDeviceMemory base = VK_NULL_HANDLE;
 	uint8_t *host_base = NULL;
 	ClassAllocator *alloc = NULL;
-	Util::IntrusiveList<MiniHeap>::Iterator heap = {};
+	IntrusiveList<MiniHeap>::Iterator heap = {};
 	uint32_t offset = 0;
 	uint32_t mask = 0;
 	uint32_t size = 0;
@@ -3334,7 +3323,7 @@ struct DeviceAllocationVec
 	DeviceAllocation *end() { return items + count; }
 };
 
-struct MiniHeap : Util::IntrusiveListEnabled<MiniHeap>
+struct MiniHeap : IntrusiveListEnabled<MiniHeap>
 {
 	DeviceAllocation allocation;
 	Block heap;
@@ -3366,13 +3355,13 @@ private:
 	ClassAllocator() = default;
 	struct AllocationTilingHeaps
 	{
-		Util::IntrusiveList<MiniHeap> heaps[Block::NumSubBlocks];
-		Util::IntrusiveList<MiniHeap> full_heaps;
+		IntrusiveList<MiniHeap> heaps[Block::NumSubBlocks];
+		IntrusiveList<MiniHeap> full_heaps;
 		uint32_t heap_availability_mask = 0;
 	};
 	ClassAllocator *parent = NULL;
 	AllocationTilingHeaps tiling_modes[ALLOCATION_TILING_COUNT];
-	Util::ObjectPool<MiniHeap> object_pool;
+	ObjectPool<MiniHeap> object_pool;
 
 	uint32_t sub_block_size = 1;
 	uint32_t sub_block_size_log2 = 0;
@@ -3722,12 +3711,9 @@ private:
 
 	HeapVec heaps;
 };
-}
 
 #endif
 
-namespace Vulkan
-{
 	class Device;
 
 	static inline VkPipelineStageFlags buffer_usage_to_possible_stages(VkBufferUsageFlags usage)
@@ -3829,7 +3815,7 @@ namespace Vulkan
 			}
 
 		private:
-			friend class Util::ObjectPool<Buffer>;
+			friend class ObjectPool<Buffer>;
 			Buffer(Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info);
 
 			Device *device;
@@ -3879,7 +3865,7 @@ namespace Vulkan
 			}
 
 		private:
-			friend class Util::ObjectPool<BufferView>;
+			friend class ObjectPool<BufferView>;
 			BufferView(Device *device, VkBufferView view, const BufferViewCreateInfo &info);
 
 			Device *device;
@@ -4401,7 +4387,7 @@ namespace Vulkan
 			}
 
 		private:
-			friend class Util::ObjectPool<Image>;
+			friend class ObjectPool<Image>;
 
 			Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
 					const ImageCreateInfo &info);
@@ -4450,7 +4436,7 @@ namespace Vulkan
 			void wait();
 
 		private:
-			friend class Util::ObjectPool<FenceHolder>;
+			friend class ObjectPool<FenceHolder>;
 			FenceHolder(Device *device, VkFence fence) : device(device), fence(fence)
 		{
 		}
@@ -4539,7 +4525,7 @@ namespace Vulkan
 			}
 
 		private:
-			friend class Util::ObjectPool<SemaphoreHolder>;
+			friend class ObjectPool<SemaphoreHolder>;
 			SemaphoreHolder(Device *device, VkSemaphore semaphore, bool signalled)
 				: device(device)
 				  , semaphore(semaphore)
@@ -4705,7 +4691,7 @@ namespace Vulkan
 	class DescriptorSetAllocator : public HashedObject<DescriptorSetAllocator>
 	{
 		public:
-			DescriptorSetAllocator(Util::Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
+			DescriptorSetAllocator(Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
 			~DescriptorSetAllocator();
 			void operator=(const DescriptorSetAllocator &) = delete;
 			DescriptorSetAllocator(const DescriptorSetAllocator &) = delete;
@@ -4714,7 +4700,7 @@ namespace Vulkan
 			{
 				per_thread.should_begin = true;
 			}
-			DescriptorSetAllocation find(Util::Hash hash);
+			DescriptorSetAllocation find(Hash hash);
 
 			VkDescriptorSetLayout get_layout() const
 			{
@@ -4724,7 +4710,7 @@ namespace Vulkan
 			void clear();
 
 		private:
-			struct DescriptorSetNode : Util::TemporaryHashmapEnabled<DescriptorSetNode>, Util::IntrusiveListEnabled<DescriptorSetNode>
+			struct DescriptorSetNode : TemporaryHashmapEnabled<DescriptorSetNode>, IntrusiveListEnabled<DescriptorSetNode>
 		{
 			DescriptorSetNode(VkDescriptorSet set)
 				: set(set)
@@ -4739,21 +4725,18 @@ namespace Vulkan
 
 			struct PerThread
 			{
-				Util::TemporaryHashmap<DescriptorSetNode, VULKAN_DESCRIPTOR_RING_SIZE, true> set_nodes;
+				TemporaryHashmap<DescriptorSetNode, VULKAN_DESCRIPTOR_RING_SIZE, true> set_nodes;
 				DescriptorPoolVec pools = { NULL, 0, 0 };
 				bool should_begin = true;
 			};
 			PerThread per_thread;
 			DescriptorPoolSizeVec pool_size = { NULL, 0, 0 };
 	};
-}
 
 /* ============================================================
  * shader.hpp
  * ============================================================ */
 
-namespace Vulkan
-{
 	class Device;
 
 	enum ShaderStage {
@@ -4786,13 +4769,13 @@ namespace Vulkan
 		uint32_t descriptor_set_mask = 0;
 		uint32_t spec_constant_mask[(unsigned)ShaderStage_Count] = {};
 		uint32_t combined_spec_constant_mask = 0;
-		Util::Hash push_constant_layout_hash = 0;
+		Hash push_constant_layout_hash = 0;
 	};
 
 	class PipelineLayout : public HashedObject<PipelineLayout>
 	{
 		public:
-			PipelineLayout(Util::Hash hash, Device *device, const CombinedResourceLayout &layout);
+			PipelineLayout(Hash hash, Device *device, const CombinedResourceLayout &layout);
 			~PipelineLayout();
 
 			const CombinedResourceLayout &get_resource_layout() const
@@ -4820,7 +4803,7 @@ namespace Vulkan
 	class Shader : public HashedObject<Shader>
 	{
 		public:
-			Shader(Util::Hash hash, Device *device, const uint32_t *data, size_t size);
+			Shader(Hash hash, Device *device, const uint32_t *data, size_t size);
 			~Shader();
 
 			const ResourceLayout &get_layout() const
@@ -4863,8 +4846,8 @@ namespace Vulkan
 				return layout;
 			}
 
-			VkPipeline get_pipeline(Util::Hash hash) const;
-			VkPipeline add_pipeline(Util::Hash hash, VkPipeline pipeline);
+			VkPipeline get_pipeline(Hash hash) const;
+			VkPipeline add_pipeline(Hash hash, VkPipeline pipeline);
 
 		private:
 			void set_shader(ShaderStage stage, Shader *handle)
@@ -4874,16 +4857,13 @@ namespace Vulkan
 			Device *device;
 			Shader *shaders[(unsigned)ShaderStage_Count] = {};
 			PipelineLayout *layout = NULL;
-			VulkanCache<Util::IntrusivePODWrapper<VkPipeline>> pipelines;
+			VulkanCache<IntrusivePODWrapper<VkPipeline>> pipelines;
 	};
-}
 
 /* ============================================================
  * render_pass.hpp
  * ============================================================ */
 
-namespace Vulkan
-{
 	enum RenderPassOp
 	{
 		RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT = 1 << 0,
@@ -4950,7 +4930,7 @@ namespace Vulkan
 
 			POD_VEC_DECLARE(SubpassInfoVec, SubpassInfo);
 
-			RenderPass(Util::Hash hash, Device *device, const RenderPassInfo &info);
+			RenderPass(Hash hash, Device *device, const RenderPassInfo &info);
 			~RenderPass();
 
 			VkRenderPass get_render_pass() const
@@ -5075,8 +5055,8 @@ namespace Vulkan
 			void clear();
 
 		private:
-			struct FramebufferNode : Util::TemporaryHashmapEnabled<FramebufferNode>,
-			Util::IntrusiveListEnabled<FramebufferNode>,
+			struct FramebufferNode : TemporaryHashmapEnabled<FramebufferNode>,
+			IntrusiveListEnabled<FramebufferNode>,
 			Framebuffer
 		{
 			FramebufferNode(Device *device, const RenderPass &rp, const RenderPassInfo &info)
@@ -5086,7 +5066,7 @@ namespace Vulkan
 		};
 
 			Device *device;
-			Util::TemporaryHashmap<FramebufferNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> framebuffers;
+			TemporaryHashmap<FramebufferNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> framebuffers;
 	};
 
 	class AttachmentAllocator
@@ -5114,7 +5094,7 @@ namespace Vulkan
 			void clear();
 
 		private:
-			struct TransientNode : Util::TemporaryHashmapEnabled<TransientNode>, Util::IntrusiveListEnabled<TransientNode>
+			struct TransientNode : TemporaryHashmapEnabled<TransientNode>, IntrusiveListEnabled<TransientNode>
 		{
 			TransientNode(ImageHandle handle)
 				: handle(handle)
@@ -5125,17 +5105,14 @@ namespace Vulkan
 		};
 
 			Device *device;
-			Util::TemporaryHashmap<TransientNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> attachments;
+			TemporaryHashmap<TransientNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> attachments;
 	};
 
-}
 
 /* ============================================================
  * buffer_pool.hpp
  * ============================================================ */
 
-namespace Vulkan
-{
 	class Device;
 	class Buffer;
 
@@ -5286,14 +5263,11 @@ namespace Vulkan
 			BufferBlockVec blocks;
 			BufferBlock allocate_block(VkDeviceSize size);
 	};
-}
 
 /* ============================================================
  * command_pool.hpp
  * ============================================================ */
 
-namespace Vulkan
-{
 	POD_VEC_DECLARE(CommandBufferVec, VkCommandBuffer);
 	/* Per-queue transient command pool. Formerly a class with a constructor,
 	 * destructor and (never-used) move ctor/assignment; now a plain struct driven
@@ -5332,7 +5306,6 @@ namespace Vulkan
 
 	static void command_pool_init(CommandPool *cp, VkDevice device, uint32_t queue_family_index);
 	static void command_pool_deinit(CommandPool *cp);
-}
 
 /* ============================================================
  * command_buffer.hpp
@@ -5343,8 +5316,6 @@ namespace Vulkan
 #define BLEND_OP_BITS 3
 #define CULL_MODE_BITS 2
 
-namespace Vulkan
-{
 	enum CommandBufferDirtyBits
 	{
 		COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT = 1 << 0,
@@ -5698,7 +5669,7 @@ namespace Vulkan
 			void end();
 
 		private:
-			friend class Util::ObjectPool<CommandBuffer>;
+			friend class ObjectPool<CommandBuffer>;
 			CommandBuffer(Device *device, VkCommandBuffer cmd, Type type);
 
 			Device *device;
@@ -5749,8 +5720,8 @@ namespace Vulkan
 #endif
 
 			void flush_render_state();
-			VkPipeline build_graphics_pipeline(Util::Hash hash);
-			VkPipeline build_compute_pipeline(Util::Hash hash);
+			VkPipeline build_graphics_pipeline(Hash hash);
+			VkPipeline build_compute_pipeline(Hash hash);
 			void flush_graphics_pipeline();
 			void flush_compute_pipeline();
 			void flush_descriptor_sets();
@@ -5783,14 +5754,11 @@ namespace Vulkan
 
 
 	INTRUSIVE_HANDLE_DECLARE(CommandBufferHandle, CommandBuffer);
-}
 
 /* ============================================================
  * device.hpp
  * ============================================================ */
 
-namespace Vulkan
-{
 	struct InitialImageBuffer
 	{
 		BufferHandle buffer;
@@ -6342,14 +6310,11 @@ namespace Vulkan
 				workarounds.optimize_all_graphics_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
 			}
 	};
-}
 
 /* ============================================================
  * atlas.hpp
  * ============================================================ */
 
-namespace PSX
-{
 	static const unsigned FB_WIDTH = 1024;
 	static const unsigned FB_HEIGHT = 512;
 	static const unsigned BLOCK_WIDTH = 8;
@@ -6631,7 +6596,6 @@ namespace PSX
 		return (m->x == -1 || m->x == r.x) && (m->y == -1 || m->y == r.y) &&
 			(m->w == -1 || m->w == (int)r.width) && (m->h == -1 || m->h == (int)r.height);
 	}
-}
 
 /* Maximum number of "ignore" rules read from dump.cfg. A fixed cap keeps the
  * list a plain inline array (no heap / no destructor); real dump configs have
@@ -6669,8 +6633,6 @@ extern retro_log_printf_t log_cb;
 
 #include <math.h>
 
-namespace PSX
-{
 	struct HdTextureId {
 		uint32_t hash;
 		uint32_t palette_hash;
@@ -6777,7 +6739,7 @@ namespace PSX
 	struct HdTexture {
 		SRect vram_rect;
 		SRect texel_rect; // hd texels
-		Vulkan::ImageHandle texture;
+		ImageHandle texture;
 	};
 
 	struct DumpedMode {
@@ -6806,7 +6768,7 @@ namespace PSX
 	 *
 	 * Replaces std::map<uint32_t, HdImageHandle> on TextureUpload. Backed by a
 	 * sorted, malloc'd array of POD entries keyed by palette hash (binary-search
-	 * lookup, insert keeps it sorted). The image is held as a raw Vulkan::Image*
+	 * lookup, insert keeps it sorted). The image is held as a raw Image*
 	 * (so the array can realloc) with the intrusive refcount managed by hand: a
 	 * reference is taken when an entry is stored and released on
 	 * replace/erase/clear/free - matching the raw-pointer scheme already used by
@@ -6815,7 +6777,7 @@ namespace PSX
 	 * ------------------------------------------------------------------------- */
 	struct HdTexEntry {
 		uint32_t       key;          /* palette hash */
-		Vulkan::Image *image;        /* owns one reference while stored */
+		Image *image;        /* owns one reference while stored */
 		int            alpha_flags;
 	};
 	struct HdTexMap {
@@ -6857,7 +6819,7 @@ namespace PSX
 	}
 	/* Insert or replace key -> (image, alpha). Takes a reference on `image`;
 	 * releases any image previously stored at this key. */
-	static void hd_tex_map_set(HdTexMap *m, uint32_t key, Vulkan::Image *image, int alpha_flags)
+	static void hd_tex_map_set(HdTexMap *m, uint32_t key, Image *image, int alpha_flags)
 	{
 		int i = hd_tex_map_lower_bound(m, key);
 		if (i < m->count && m->entries[i].key == key) {
@@ -7557,7 +7519,7 @@ namespace PSX
 	};
 
 	struct FusedPage {
-		Vulkan::ImageHandle texture;
+		ImageHandle texture;
 
 		uint32_t palette;
 		Rect full_page_rect;
@@ -7641,7 +7603,7 @@ namespace PSX
 	class FusedPages {
 		public:
 			HdTextureHandle get_or_make(Rect page_rect, uint32_t palette, RectTracker &tracker, Renderer *uploader);
-			HdTexture get_from_handle(HdTextureHandle handle, Vulkan::ImageHandle &default_hd_texture);
+			HdTexture get_from_handle(HdTextureHandle handle, ImageHandle &default_hd_texture);
 			void mark_dirty(Rect rect); // For blit dst, upload, and hd texture load
 			void mark_dead(Rect rect); // For clear
 			void rebuild_dirty(RectTracker &tracker, Renderer *uploader);
@@ -8332,12 +8294,12 @@ namespace PSX
 	/* --- VRAM cache: uploaded Vulkan images, keyed by (hash, palette) -------- *
 	 * Sits above the RAM cache. Re-attaching a combo to a recreated TextureUpload
 	 * becomes a ref-counted handle copy instead of a fresh upload_texture. The
-	 * image is held as a RAW Vulkan::Image* (trivially relocatable, so the malloc
+	 * image is held as a RAW Image* (trivially relocatable, so the malloc
 	 * arena can realloc it) with the refcount managed by hand: a reference is
 	 * taken on insert and released by the disposer on eviction/clear, freeing VRAM
 	 * once no live draw still holds the image. */
 	typedef struct CachedGpuImage {
-		Vulkan::Image *image; /* owns one reference while resident (NULL = empty) */
+		Image *image; /* owns one reference while resident (NULL = empty) */
 		int    alpha_flags;
 		size_t bytes;         /* approximate VRAM footprint (== decoded levels size) */
 	} CachedGpuImage;
@@ -8356,16 +8318,16 @@ namespace PSX
 		/* Take a counted reference to a cached image and return it as an ImageHandle
 		 * the caller can store/copy/destroy normally. IntrusivePtr(T*) adopts without
 		 * bumping, so add the reference explicitly first. */
-		static Vulkan::ImageHandle hd_gpu_image_handle(CachedGpuImage *g)
+		static ImageHandle hd_gpu_image_handle(CachedGpuImage *g)
 		{
 			g->image->add_reference();
-			return Vulkan::ImageHandle(g->image);
+			return ImageHandle(g->image);
 		}
 
 	/* Insert/replace a combo's GPU image. Adds a reference to `handle`'s image
 	 * (held until eviction); a prior image at this key is released first. */
 	static void hd_gpu_cache_put(HdGpuCache *c, HdTextureId id,
-			Vulkan::ImageHandle handle, int alpha_flags, size_t bytes)
+			ImageHandle handle, int alpha_flags, size_t bytes)
 	{
 		uint64_t key = hd_pack_key(id);
 		int created = 0;
@@ -8496,7 +8458,7 @@ namespace PSX
 			IOThread iothread;
 			Renderer *uploader;
 
-			Vulkan::ImageHandle default_hd_texture;
+			ImageHandle default_hd_texture;
 
 			Palette get_palette(Rect palette_rect);
 			uint32_t get_palette_hash(Rect palette_rect);
@@ -8748,7 +8710,7 @@ namespace PSX
 				TextureTrackerSaveState tracker_state;
 			};
 
-			Renderer(Vulkan::Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
+			Renderer(Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
 			~Renderer();
 
 			void set_track_textures(bool enable)
@@ -8808,15 +8770,15 @@ namespace PSX
 				render_state.palette_offset_y = y;
 			}
 
-			Vulkan::BufferHandle copy_cpu_to_vram(const Rect &rect);
+			BufferHandle copy_cpu_to_vram(const Rect &rect);
 			void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
-			uint16_t *begin_copy(Vulkan::BufferHandle handle)
+			uint16_t *begin_copy(BufferHandle handle)
 			{
-				return static_cast<uint16_t *>(device->map_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT));
+				return static_cast<uint16_t *>(device->map_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT));
 			}
-			void end_copy(Vulkan::BufferHandle handle)
+			void end_copy(BufferHandle handle)
 			{
-				device->unmap_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT);
+				device->unmap_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT);
 			}
 
 			void notify_texture_upload(Rect rect, uint16_t *vram)
@@ -8908,8 +8870,8 @@ namespace PSX
 				render_state.dither_native_resolution = enable;
 			}
 
-			Vulkan::ImageHandle scanout_vram_to_texture(bool scaled = true);
-			Vulkan::ImageHandle scanout_to_texture();
+			ImageHandle scanout_vram_to_texture(bool scaled = true);
+			ImageHandle scanout_to_texture();
 
 			inline void set_texture_mode(TextureMode mode)
 			{
@@ -8966,9 +8928,9 @@ namespace PSX
 				device->flush_frame();
 			}
 
-			Vulkan::Fence flush_and_signal()
+			Fence flush_and_signal()
 			{
-				Vulkan::Fence fence;
+				Fence fence;
 				if (cmd)
 					device->submit(cmd, &fence);
 				cmd.reset();
@@ -9047,7 +9009,7 @@ namespace PSX
 			bool is_valid() const { return valid; }
 
 		private:
-			Vulkan::Device *device;
+			Device *device;
 			unsigned scaling;
 			unsigned msaa;
 			bool scaled_uv_offset = false;
@@ -9055,17 +9017,17 @@ namespace PSX
 			FilterMode primitive_filter_mode = FilterMode_NearestNeighbor;
 			FilterExclude sprite_filter_exclude = FilterExcludeNone;
 			FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
-			Vulkan::ImageHandle scaled_framebuffer;
-			Vulkan::ImageHandle scaled_framebuffer_msaa;
-			Vulkan::ImageHandle bias_framebuffer;
-			Vulkan::ImageHandle framebuffer;
-			Vulkan::ImageHandle framebuffer_ssaa;
-			Vulkan::ImageViewHandleVec scaled_views;
+			ImageHandle scaled_framebuffer;
+			ImageHandle scaled_framebuffer_msaa;
+			ImageHandle bias_framebuffer;
+			ImageHandle framebuffer;
+			ImageHandle framebuffer_ssaa;
+			ImageViewHandleVec scaled_views;
 			FBAtlas atlas;
 			bool texture_tracking_enabled = false;
 			TextureTracker tracker;
 
-			Vulkan::CommandBufferHandle cmd;
+			CommandBufferHandle cmd;
 
 		public:
 			// Called by FBAtlas (formerly via HazardListener interface).
@@ -9079,9 +9041,9 @@ namespace PSX
 			void clear_quad(const Rect &rect, uint32_t fb_color, bool candidate);
 
 			// Called by TextureTracker (formerly via TextureUploader interface).
-			Vulkan::ImageHandle upload_texture(LoadedLevels &image);
-			Vulkan::ImageHandle create_texture(int width, int height, int levels);
-			Vulkan::CommandBufferHandle &command_buffer_hack_fixme()
+			ImageHandle upload_texture(LoadedLevels &image);
+			ImageHandle create_texture(int width, int height, int levels);
+			CommandBufferHandle &command_buffer_hack_fixme()
 			{
 				ensure_command_buffer();
 				return cmd;
@@ -9093,45 +9055,45 @@ namespace PSX
 
 			struct
 			{
-				Vulkan::Program *copy_to_vram;
-				Vulkan::Program *copy_to_vram_masked;
-				Vulkan::Program *unscaled_quad_blitter;
-				Vulkan::Program *scaled_quad_blitter;
-				Vulkan::Program *unscaled_dither_quad_blitter;
-				Vulkan::Program *scaled_dither_quad_blitter;
-				Vulkan::Program *bpp24_quad_blitter;
-				Vulkan::Program *bpp24_yuv_quad_blitter;
-				Vulkan::Program *resolve_to_scaled;
-				Vulkan::Program *resolve_to_unscaled;
+				Program *copy_to_vram;
+				Program *copy_to_vram_masked;
+				Program *unscaled_quad_blitter;
+				Program *scaled_quad_blitter;
+				Program *unscaled_dither_quad_blitter;
+				Program *scaled_dither_quad_blitter;
+				Program *bpp24_quad_blitter;
+				Program *bpp24_yuv_quad_blitter;
+				Program *resolve_to_scaled;
+				Program *resolve_to_unscaled;
 
-				Vulkan::Program *blit_vram_scaled;
-				Vulkan::Program *blit_vram_scaled_masked;
+				Program *blit_vram_scaled;
+				Program *blit_vram_scaled_masked;
 
-				Vulkan::Program *blit_vram_cached_scaled;
-				Vulkan::Program *blit_vram_cached_scaled_masked;
-				Vulkan::Program *blit_vram_msaa_cached_scaled;
-				Vulkan::Program *blit_vram_msaa_cached_scaled_masked;
+				Program *blit_vram_cached_scaled;
+				Program *blit_vram_cached_scaled_masked;
+				Program *blit_vram_msaa_cached_scaled;
+				Program *blit_vram_msaa_cached_scaled_masked;
 
-				Vulkan::Program *blit_vram_unscaled;
-				Vulkan::Program *blit_vram_unscaled_masked;
-				Vulkan::Program *blit_vram_cached_unscaled;
-				Vulkan::Program *blit_vram_cached_unscaled_masked;
+				Program *blit_vram_unscaled;
+				Program *blit_vram_unscaled_masked;
+				Program *blit_vram_cached_unscaled;
+				Program *blit_vram_cached_unscaled_masked;
 
-				Vulkan::Program *flat;
-				Vulkan::Program *textured_scaled;
-				Vulkan::Program *textured_unscaled;
-				Vulkan::Program *flat_masked;
-				Vulkan::Program *textured_masked_scaled;
-				Vulkan::Program *textured_masked_unscaled;
+				Program *flat;
+				Program *textured_scaled;
+				Program *textured_unscaled;
+				Program *flat_masked;
+				Program *textured_masked_scaled;
+				Program *textured_masked_unscaled;
 
-				Vulkan::Program *mipmap_resolve;
-				Vulkan::Program *mipmap_dither_resolve;
-				Vulkan::Program *mipmap_energy_first;
-				Vulkan::Program *mipmap_energy;
-				Vulkan::Program *mipmap_energy_blur;
+				Program *mipmap_resolve;
+				Program *mipmap_dither_resolve;
+				Program *mipmap_energy_first;
+				Program *mipmap_energy;
+				Program *mipmap_energy_blur;
 			} pipelines;
 
-			Vulkan::ImageHandle dither_lut;
+			ImageHandle dither_lut;
 
 			void init_pipelines();
 			void init_primitive_pipelines();
@@ -9291,21 +9253,21 @@ namespace PSX
 
 			void flush_resolves();
 			void flush_blits();
-			void flush_blit(const BlitInfoVec &infos, Vulkan::Program &program, bool scaled);
+			void flush_blit(const BlitInfoVec &infos, Program &program, bool scaled);
 			void reset_scissor_queue();
 			const ClearCandidate *find_clear_candidate(const Rect &rect) const;
 
 			Rect compute_window_rect(const TextureWindow &window);
 
-			Vulkan::ImageHandle last_scanout;
-			Vulkan::ImageHandle reuseable_scanout;
+			ImageHandle last_scanout;
+			ImageHandle reuseable_scanout;
 			DisplayRect compute_display_rect();
 
 			Rect compute_vram_framebuffer_rect();
 
 			void mipmap_framebuffer();
 			void ssaa_framebuffer();
-			Vulkan::BufferHandle quad;
+			BufferHandle quad;
 	};
 
 	static const uint32_t quad_vert[] =
@@ -9457,7 +9419,6 @@ namespace PSX
 	static const uint32_t mipmap_energy_blur_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.energy.blur.frag.inc"
 		;
-}
 
 // 3 LSBs are ignored.
 #define FBCOLOR_TO_RGBA8(color) ((color) & 0xfff8f8f8u)
@@ -9475,10 +9436,7 @@ static inline void fbcolor_to_rgba32f(float *v, uint32_t color)
 	v[3] = 0.0f;
 }
 
-using namespace Vulkan;
 
-namespace PSX
-{
 Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const SaveState *state)
     : device(&device_)
     , scaling(scaling_)
@@ -9901,7 +9859,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 	             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
 
-	Vulkan::Fence fence = flush_and_signal();
+	Fence fence = flush_and_signal();
 	fence->wait();
 
 	const uint32_t *mapped = static_cast<const uint32_t *>(device->map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
@@ -11716,7 +11674,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	}
 }
 
-Vulkan::ImageHandle Renderer::upload_texture(LoadedLevels &levels) {
+ImageHandle Renderer::upload_texture(LoadedLevels &levels) {
 	ImageCreateInfo info;
 	ImageInitialData initial[16]; /* Vulkan caps mip levels well under this */
 	int i;
@@ -11745,7 +11703,7 @@ Vulkan::ImageHandle Renderer::upload_texture(LoadedLevels &levels) {
 	ImageHandle image = device->create_image(info, initial);
 	return image;
 }
-Vulkan::ImageHandle Renderer::create_texture(int width, int height, int levels) {
+ImageHandle Renderer::create_texture(int width, int height, int levels) {
 	ImageCreateInfo info = ImageCreateInfo::immutable_2d_image(width, height, VK_FORMAT_R8G8B8A8_UNORM, false);
 	info.levels = levels;
 	info.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -12032,7 +11990,6 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	}
 	}
 }
-}
 
 /* ============================================================
  *
@@ -12045,19 +12002,14 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 /* === cookie.cpp === */
 
 
-namespace Vulkan
-{
 Cookie::Cookie(Device *device)
     : cookie(device->allocate_cookie())
 {
-}
 }
 
 /* === texture_format.cpp === */
 
 
-namespace Vulkan
-{
 uint32_t TextureFormatLayout::num_miplevels(uint32_t width, uint32_t height, uint32_t depth)
 {
 	uint32_t wh = width > height ? width : height;
@@ -12441,13 +12393,10 @@ void TextureFormatLayout::build_buffer_image_copies(VkBufferImageCopy *copies, u
 	}
 }
 
-}
 
 /* === sampler.cpp === */
 
 
-namespace Vulkan
-{
 Sampler::Sampler(Device *device, VkSampler sampler)
     : Cookie(device)
     , device(device)
@@ -12461,17 +12410,14 @@ Sampler::~Sampler()
 		device->destroy_sampler_nolock(sampler);
 }
 
-void SamplerDeleter::operator()(Vulkan::Sampler *sampler)
+void SamplerDeleter::operator()(Sampler *sampler)
 {
 	sampler->device->handle_pool.samplers.free(sampler);
-}
 }
 
 /* === buffer.cpp === */
 
 
-namespace Vulkan
-{
 Buffer::Buffer(Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info)
     : Cookie(device)
     , device(device)
@@ -12511,13 +12457,10 @@ void BufferViewDeleter::operator()(BufferView *view)
 	view->device->handle_pool.buffer_views.free(view);
 }
 
-}
 
 /* === image.cpp === */
 
 
-namespace Vulkan
-{
 
 ImageView::ImageView(Device *device, VkImageView view, const ImageViewCreateInfo &info)
     : Cookie(device)
@@ -12596,13 +12539,10 @@ void ImageDeleter::operator()(Image *image)
 {
 	image->device->handle_pool.images.free(image);
 }
-}
 
 /* === fence.cpp === */
 
 
-namespace Vulkan
-{
 FenceHolder::~FenceHolder()
 {
 	if (fence != VK_NULL_HANDLE)
@@ -12615,17 +12555,14 @@ void FenceHolder::wait()
 		LOGE("Failed to wait for fence!\n");
 }
 
-void FenceHolderDeleter::operator()(Vulkan::FenceHolder *fence)
+void FenceHolderDeleter::operator()(FenceHolder *fence)
 {
 	fence->device->handle_pool.fences.free(fence);
-}
 }
 
 /* === fence_manager.cpp === */
 
 
-namespace Vulkan
-{
 VkFence FenceManager::request_cleared_fence()
 {
 	if (!fences.empty())
@@ -12654,13 +12591,10 @@ void FenceManager::deinit()
 		vkDestroyFence(device, fence, NULL);
 	fences.free_storage();
 }
-}
 
 /* === semaphore.cpp === */
 
 
-namespace Vulkan
-{
 SemaphoreHolder::~SemaphoreHolder()
 {
 	if (semaphore)
@@ -12672,17 +12606,14 @@ SemaphoreHolder::~SemaphoreHolder()
 	}
 }
 
-void SemaphoreHolderDeleter::operator()(Vulkan::SemaphoreHolder *semaphore)
+void SemaphoreHolderDeleter::operator()(SemaphoreHolder *semaphore)
 {
 	semaphore->device->handle_pool.semaphores.free(semaphore);
-}
 }
 
 /* === semaphore_manager.cpp === */
 
 
-namespace Vulkan
-{
 void SemaphoreManager::deinit()
 {
 	for (VkSemaphore &sem : semaphores)
@@ -12712,13 +12643,10 @@ VkSemaphore SemaphoreManager::request_cleared_semaphore()
 		return sem;
 	}
 }
-}
 
 /* === buffer_pool.cpp === */
 
 
-namespace Vulkan
-{
 BufferBlock::~BufferBlock()
 {
 }
@@ -12792,13 +12720,10 @@ BufferPool::~BufferPool()
 	VK_ASSERT(blocks.empty());
 }
 
-}
 
 /* === command_pool.cpp === */
 
 
-namespace Vulkan
-{
 void command_pool_init(CommandPool *cp, VkDevice device, uint32_t queue_family_index)
 {
 	cp->device = device;
@@ -12876,12 +12801,9 @@ void CommandPool::begin()
 		vkResetCommandPool(device, pool, 0);
 	index = 0;
 }
-}
 
 /* === memory_allocator.cpp === */
 
-namespace Vulkan
-{
 
 void DeviceAllocation::free_immediate()
 {
@@ -12976,7 +12898,7 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 
 	if (index < Block::NumSubBlocks)
 	{
-		Util::IntrusiveList<MiniHeap>::Iterator itr = m.heaps[index].begin();
+		IntrusiveList<MiniHeap>::Iterator itr = m.heaps[index].begin();
 		VK_ASSERT(itr);
 		VK_ASSERT(index >= (num_blocks - 1));
 
@@ -12992,7 +12914,7 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 		}
 		else if (new_index != index)
 		{
-			Util::IntrusiveList<MiniHeap> &new_heap = m.heaps[new_index];
+			IntrusiveList<MiniHeap> &new_heap = m.heaps[new_index];
 			new_heap.move_to_front(m.heaps[index], itr);
 			m.heap_availability_mask |= 1u << new_index;
 			if (!m.heaps[index].begin())
@@ -13061,7 +12983,7 @@ ClassAllocator::~ClassAllocator()
 		if (m.full_heaps.begin())
 			error = true;
 
-		for (Util::IntrusiveList<MiniHeap> &h : m.heaps)
+		for (IntrusiveList<MiniHeap> &h : m.heaps)
 			if (h.begin())
 				error = true;
 	}
@@ -13399,7 +13321,6 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			return false;
 	}
 }
-}
 
 /* === shader.cpp === */
 
@@ -13409,10 +13330,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 #include "filesystem.hpp"
 #endif
 
-using namespace Util;
 
-namespace Vulkan
-{
 	PipelineLayout::PipelineLayout(Hash hash, Device *device, const CombinedResourceLayout &layout)
 		: IntrusiveHashMapEnabled<PipelineLayout>(hash)
 		  , device(device)
@@ -13537,14 +13455,10 @@ namespace Vulkan
 		for (IntrusivePODWrapper<VkPipeline> &pipe : pipelines)
 			device->destroy_pipeline_nolock(pipe.get());
 	}
-}
 
 /* === descriptor_set.cpp === */
 
-using namespace Util;
 
-namespace Vulkan
-{
 	DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_binds)
 		: IntrusiveHashMapEnabled<DescriptorSetAllocator>(hash)
 		  , device(device)
@@ -13712,14 +13626,10 @@ namespace Vulkan
 		per_thread.pools.free_storage();
 		pool_size.free_storage();
 	}
-}
 
 /* === render_pass.cpp === */
 
-using namespace Util;
 
-namespace Util
-{
 	template <typename T, size_t N>
 		class StackAllocator
 		{
@@ -13757,10 +13667,7 @@ namespace Util
 				T buffer[N];
 				size_t offset = 0;
 		};
-}
 
-namespace Vulkan
-{
 	static VkAttachmentLoadOp rp_color_load_op(const RenderPassInfo &info, unsigned index)
 	{
 		if ((info.clear_attachments & (1u << index)) != 0)
@@ -13978,8 +13885,8 @@ namespace Vulkan
 				att.initialLayout = depth_stencil_layout;
 		}
 
-		Util::StackAllocator<VkAttachmentReference, 1024> reference_allocator;
-		Util::StackAllocator<uint32_t, 1024> preserve_allocator;
+		StackAllocator<VkAttachmentReference, 1024> reference_allocator;
+		StackAllocator<uint32_t, 1024> preserve_allocator;
 
 		VkSubpassDescriptionVec subpasses = { NULL, 0, 0 };
 		{
@@ -14632,16 +14539,12 @@ namespace Vulkan
 		device->set_name(*node->handle, "AttachmentAllocator");
 		return node->handle->get_view();
 	}
-}
 
 /* === command_buffer.cpp === */
 
-using namespace Util;
 
 #define COMBINER_NEEDS_BLEND_CONSTANT(factor) ((factor) == VK_BLEND_FACTOR_CONSTANT_COLOR || (factor) == VK_BLEND_FACTOR_CONSTANT_ALPHA)
 
-namespace Vulkan
-{
 	static inline VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 	{
 		return { a.x + b.x, a.y + b.y, a.z + b.z };
@@ -15936,11 +15839,10 @@ namespace Vulkan
 	}
 
 
-	void CommandBufferDeleter::operator()(Vulkan::CommandBuffer *cmd)
+	void CommandBufferDeleter::operator()(CommandBuffer *cmd)
 	{
 		cmd->device->handle_pool.command_buffers.free(cmd);
 	}
-}
 
 /* === vulkan.cpp === */
 
@@ -15955,8 +15857,6 @@ namespace Vulkan
 //#undef VULKAN_DEBUG
 
 
-namespace Vulkan
-{
 	static bool has_vk_extension(const VkExtensionProperties *exts, uint32_t count, const char *name)
 	{
 		uint32_t i;
@@ -16388,12 +16288,8 @@ namespace Vulkan
 
 		return true;
 	}
-}
 
-using namespace Util;
 
-namespace Vulkan
-{
 	/* Establish a Device in raw (uninitialised) storage. This sets every member
 	 * that the members' constructors and NSDMIs would, so it is correct when called
 	 * on malloc'd memory where no constructor has run. No member allocates at this
@@ -16501,7 +16397,7 @@ namespace Vulkan
 
 	Shader *Device::request_shader(const uint32_t *data, size_t size)
 	{
-		Util::Hasher hasher;
+		Hasher hasher;
 		hasher.data(data, size);
 
 		Hash hash = hasher.get();
@@ -16511,9 +16407,9 @@ namespace Vulkan
 		return ret;
 	}
 
-	Program *Device::request_program(Vulkan::Shader *compute)
+	Program *Device::request_program(Shader *compute)
 	{
-		Util::Hasher hasher;
+		Hasher hasher;
 		hasher.u64(compute->intrusive_hashmap_key);
 
 		Hash hash = hasher.get();
@@ -16531,7 +16427,7 @@ namespace Vulkan
 
 	Program *Device::request_program(Shader *vertex, Shader *fragment)
 	{
-		Util::Hasher hasher;
+		Hasher hasher;
 		hasher.u64(vertex->intrusive_hashmap_key);
 		hasher.u64(fragment->intrusive_hashmap_key);
 
@@ -18491,13 +18387,10 @@ namespace Vulkan
 		}
 	}
 
-}
 
 /* === atlas.cpp === */
 
 
-namespace PSX
-{
 
 	void FBAtlas::load_image(const Rect &rect)
 	{
@@ -19031,7 +18924,6 @@ namespace PSX
 		listener->hazard(domains);
 		notify_external_barrier(domains);
 	}
-}
 
 /* ============================================================
  *
@@ -19081,7 +18973,7 @@ static int cfg_parse_field(const char **pp, int *out)
 /* Match one config line against:
  *   ^\s*ignore\s+(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*(?:#.*)?$
  * On match, fills *m and returns true. Hand-rolled replacement for std::regex. */
-static bool cfg_match_ignore(const char *line, PSX::RectMatch *m)
+static bool cfg_match_ignore(const char *line, RectMatch *m)
 {
     const char *p = cfg_skip_ws(line);
     int i;
@@ -19110,7 +19002,7 @@ static bool cfg_match_ignore(const char *line, PSX::RectMatch *m)
     return *p == '\0';
 }
 
-static int parse_config_file(const char *path, PSX::RectMatch *out, int max) {
+static int parse_config_file(const char *path, RectMatch *out, int max) {
     char line[1024];
     int count = 0;
     RFILE *in = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
@@ -19118,7 +19010,7 @@ static int parse_config_file(const char *path, PSX::RectMatch *out, int max) {
     if (!in)
         return 0;
     while (count < max && filestream_gets(in, line, sizeof(line))) {
-        PSX::RectMatch m;
+        RectMatch m;
         if (cfg_match_ignore(line, &m))
             out[count++] = m;
     }
@@ -19182,8 +19074,6 @@ static char retro_slash = '\\';
 static char retro_slash = '/';
 #endif
 
-namespace PSX
-{
 	// Path helpers write into a caller-provided buffer (PATH_MAX_TT bytes) and
 	// return it, C-style, instead of allocating a std::string.
 
@@ -19896,7 +19786,7 @@ namespace PSX
 				upload->dumpable = true;
 				// Don't dump uploads specified by dump.cfg
 				for (int ri = 0; ri < dump_ignore_count; ri++) {
-					if (PSX::rect_match_matches(&dump_ignore[ri], rect)) {
+					if (rect_match_matches(&dump_ignore[ri], rect)) {
 						upload->dumpable = false;
 						break;
 					}
@@ -20236,7 +20126,7 @@ namespace PSX
 			/* Reconstruct a counted handle from the stored raw image (add_reference
 			 * then adopt), matching hd_gpu_image_handle. */
 			iter->image->add_reference();
-			Vulkan::ImageHandle image(iter->image);
+			ImageHandle image(iter->image);
 			int scaleX = image->get_width() / upload.width;
 			int scaleY = image->get_height() / upload.height;
 			SRect texture_subrect = tex->texture_subrect();
@@ -20330,7 +20220,7 @@ namespace PSX
 				if (width  % upload->width  == 0 && is_power_of_two(width  / upload->width) &&
 						height % upload->height == 0 && is_power_of_two(height / upload->height))
 				{
-					Vulkan::ImageHandle texture = uploader->upload_texture(cached->levels);
+					ImageHandle texture = uploader->upload_texture(cached->levels);
 					hd_gpu_cache_put(&hd_gpu_cache, id, texture, cached->alpha_flags, cached->bytes);
 					hd_tex_map_set(&upload->textures, id.palette_hash, texture.get(), cached->alpha_flags);
 					dbg_gpu_uploads++;
@@ -20859,7 +20749,7 @@ namespace PSX
 			return;
 		}
 
-		Vulkan::CommandBufferHandle &cmd = uploader->command_buffer_hack_fixme();
+		CommandBufferHandle &cmd = uploader->command_buffer_hack_fixme();
 
 		int texture_width = page.fusion.vram_rect.width * page.fusion.scaleX;
 		int texture_height = page.fusion.vram_rect.height * page.fusion.scaleY;
@@ -20893,7 +20783,7 @@ namespace PSX
 			if (hd_texture == NULL)
 				continue;
 
-			Vulkan::Image *image = hd_texture->image;
+			Image *image = hd_texture->image;
 
 			int srcWidth = image->get_width();
 			int srcHeight = image->get_height();
@@ -20986,7 +20876,7 @@ namespace PSX
 			      );
 	}
 
-	HdTexture FusedPages::get_from_handle(HdTextureHandle handle, Vulkan::ImageHandle &default_hd_texture) {
+	HdTexture FusedPages::get_from_handle(HdTextureHandle handle, ImageHandle &default_hd_texture) {
 		if (handle.index < 0 || handle.index >= pages.size()) {
 			TT_LOG(RETRO_LOG_WARN, "BAD fused index!\n");
 			return {
@@ -21187,7 +21077,6 @@ namespace PSX
 		return just_pressed;
 	}
 
-}
 
 #include "libretro_vulkan.h"
 
@@ -21200,8 +21089,6 @@ namespace PSX
 #include "libretro_options.h"
 #include "beetle_psx_globals.h"
 
-using namespace Vulkan;
-using namespace PSX;
 
 static Context *context = NULL;
 static Device *device = NULL;
@@ -21422,8 +21309,8 @@ static void vk_context_reset(void)
    }
 
    assert(context);
-   device = (Vulkan::Device *)malloc(sizeof(Vulkan::Device));
-   Vulkan::Device::device_init(device);
+   device = (Device *)malloc(sizeof(Device));
+   Device::device_init(device);
    device->set_context(*context);
 
    renderer = (Renderer *)malloc(sizeof(Renderer));
@@ -21432,7 +21319,7 @@ static void vk_context_reset(void)
    {
       renderer->~Renderer();
       free(renderer);
-      Vulkan::Device::device_deinit(device);
+      Device::device_deinit(device);
       free(device);
       renderer = NULL;
       device = NULL;
@@ -21465,9 +21352,9 @@ static void vk_context_destroy(void)
 
    renderer->~Renderer();
    free(renderer);
-   Vulkan::Device::device_deinit(device);
+   Device::device_deinit(device);
    free(device);
-   Vulkan::context_deinit(context);
+   context_deinit(context);
    free(context);
    renderer = NULL;
    device = NULL;
@@ -21494,28 +21381,28 @@ static bool libretro_create_device(
       unsigned num_required_device_layers,
       const VkPhysicalDeviceFeatures *required_features)
 {
-   if (!Vulkan::Context::init_loader(get_instance_proc_addr))
+   if (!Context::init_loader(get_instance_proc_addr))
       return false;
 
    if (context)
    {
-      Vulkan::context_deinit(context);
+      context_deinit(context);
       free(context);
       context = NULL;
    }
 
-   /* parallel-psx's Vulkan::Context constructor used to throw on
+   /* parallel-psx's Context constructor used to throw on
     * failure; it now sets a valid=false flag instead. The
     * try/catch boundary is gone with it. */
-   context = (Vulkan::Context *)malloc(sizeof(Vulkan::Context));
+   context = (Context *)malloc(sizeof(Context));
    if (!context)
       return false;
-   Vulkan::context_init(context, instance, gpu, surface, required_device_extensions, num_required_device_extensions,
+   context_init(context, instance, gpu, surface, required_device_extensions, num_required_device_extensions,
                                  required_device_layers, num_required_device_layers,
                                  required_features);
    if (!context->is_valid())
    {
-      Vulkan::context_deinit(context);
+      context_deinit(context);
       free(context);
       context = NULL;
       return false;
@@ -22347,7 +22234,7 @@ void rhi_vulkan_load_image(
          (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h,
          (int)mask_test, (int)set_mask);
 
-   renderer->notify_texture_upload(PSX::Rect { x, y, w, h }, vram);
+   renderer->notify_texture_upload(Rect { x, y, w, h }, vram);
    renderer->set_mask_test(mask_test);
    renderer->set_force_mask_bit(set_mask);
    auto handle   = renderer->copy_cpu_to_vram({ x, y, w, h });
