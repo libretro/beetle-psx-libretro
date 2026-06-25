@@ -1595,11 +1595,14 @@ PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
 /* === end folded volk === */
 
 #include <assert.h>
-#include <memory>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#ifdef __cplusplus
+#include <new> /* placement new; removed when this TU finishes converting to C */
+#endif
 
 /* ------------------------------------------------------------------------- *
  * POD_VEC - a typed dynamic array of trivially-relocatable elements, MSVC C89.
@@ -1651,11 +1654,6 @@ struct NAME {                                                                 \
     void pop_back() { if (count) count--; }                                   \
     void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }  \
 }
-
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
 
 #include <rthreads/rthreads.h>
 #include <streams/file_stream.h>
@@ -13475,8 +13473,17 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		intrusive_node.key = hash;
 #ifdef GRANITE_SPIRV_DUMP
-		if (!Granite::Filesystem::get().write_buffer_to_file(std::string("cache://spirv/") + std::to_string(hash) + ".spv", data, size))
-			LOGE("Failed to dump shader to file.\n");
+		{
+			char spirv_dump_path[64];
+			FILE *spirv_dump_f;
+			snprintf(spirv_dump_path, sizeof(spirv_dump_path),
+					"cache_spirv_%016llx.spv", (unsigned long long)hash);
+			spirv_dump_f = fopen(spirv_dump_path, "wb");
+			if (!spirv_dump_f || fwrite(data, 1, size, spirv_dump_f) != size)
+				LOGE("Failed to dump shader to file.\n");
+			if (spirv_dump_f)
+				fclose(spirv_dump_f);
+		}
 #endif
 
 		VkShaderModuleCreateInfo info = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
