@@ -9037,8 +9037,6 @@ namespace PSX
 				BufferVertexVec semi_transparent{};
 				SemiTransparentStateVec semi_transparent_state{};
 
-				std::vector<Vulkan::ImageHandle> textures; // refcounted handles: std::vector is correct
-
 				Rect2DVec scaled_resolves{};
 				Rect2DVec unscaled_resolves{};
 				BlitInfoVec scaled_blits{};
@@ -11654,7 +11652,6 @@ void Renderer::reset_queue()
 	queue.opaque_scissor.clear();
 	queue.opaque_textured.clear();
 	queue.opaque_textured_scissor.clear();
-	queue.textures.clear();
 	queue.semi_transparent.clear();
 	queue.semi_transparent_state.clear();
 	queue.semi_transparent_opaque.clear();
