@@ -1653,12 +1653,16 @@ struct NAME {                                                                 \
 #include <streams/file_stream.h>
 
 /* Local single-evaluation min/max, so the file does not depend on std::min /
- * std::max from <algorithm>. Templated to cover the unsigned/int/float/
- * VkDeviceSize uses (and the one explicit-argument max_<VkDeviceSize>(...)
- * call), with the same semantics as std::min/std::max, including returning the
- * first argument on a tie. */
-template <typename T> static inline const T &min_(const T &a, const T &b) { return b < a ? b : a; }
-template <typename T> static inline const T &max_(const T &a, const T &b) { return a < b ? b : a; }
+ * std::max from <algorithm>. */
+/* min_/max_ as macros (C has no function templates). Arguments must be free of
+ * side effects: every call site passes pure expressions, and the two that used
+ * accessor calls (get_width()/get_height()) hoist them into locals first.
+ * Semantics match the previous templated form (and std::min/std::max),
+ * including returning the first argument on a tie; the one former
+ * max_<VkDeviceSize>(...) call casts its 32-bit literal to VkDeviceSize so the
+ * comparison and result stay 64-bit. */
+#define min_(a, b) ((b) < (a) ? (b) : (a))
+#define max_(a, b) ((a) < (b) ? (b) : (a))
 
 
 /* The remainder of this file is the consolidated parallel-psx
@@ -16601,7 +16605,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		managers.semaphore.init(device);
 		managers.fence.init(device);
 		managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-		managers.ubo.init(this, 256 * 1024, max_<VkDeviceSize>(16u, gpu_props.limits.minUniformBufferOffsetAlignment),
+		managers.ubo.init(this, 256 * 1024, max_((VkDeviceSize)16u, gpu_props.limits.minUniformBufferOffsetAlignment),
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 	}
 
@@ -20704,8 +20708,10 @@ static char retro_slash = '/';
 				if (hd_texture != NULL) {
 					// Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity)
 					TextureRect clipped = subTexture(e.texture_rect, intersection.rect);
-					f.scaleX = max_(f.scaleX, hd_texture->image->get_width() / upload.width);
-					f.scaleY = max_(f.scaleY, hd_texture->image->get_height() / upload.height);
+					unsigned hd_scale_x = hd_texture->image->get_width() / upload.width;
+					unsigned hd_scale_y = hd_texture->image->get_height() / upload.height;
+					f.scaleX = max_(f.scaleX, hd_scale_x);
+					f.scaleY = max_(f.scaleY, hd_scale_y);
 					Rect r = fromSRect(clipped.vram_rect);
 					if (f.vram_rect.width == 0)
 						f.vram_rect = r;
