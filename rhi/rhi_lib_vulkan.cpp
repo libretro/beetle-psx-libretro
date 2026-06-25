@@ -3718,7 +3718,18 @@ private:
 			BufferViewCreateInfo info;
 			HandleCounter reference_count;
 	};
-	INTRUSIVE_HANDLE_DECLARE(BufferViewHandle, BufferView);
+	/* Plain-C form of the BufferView intrusive handle (was
+	 * INTRUSIVE_HANDLE_DECLARE(BufferViewHandle, BufferView)). Same semantics:
+	 * construct from a raw BufferView* that already carries one reference, reset
+	 * releases one. The handle is only ever created, dereferenced and dropped at
+	 * the two call sites (never copied or stored), so only make/reset/get are
+	 * provided; lifecycle is driven explicitly by the bvh_* helpers. */
+	struct BufferViewHandle {
+		BufferView *data;
+	};
+	static inline struct BufferViewHandle bvh_make(BufferView *p) { struct BufferViewHandle h; h.data = p; return h; }
+	static inline void bvh_reset(struct BufferViewHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline BufferView *bvh_get(struct BufferViewHandle *h) { return h->data; }
 
 	class Device;
 
@@ -11820,10 +11831,11 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 
 			Rect small_rect = { rect.x, rect.y + y, rect.width, y_size };
 
-			cmd->set_buffer_view(0, 1, *view);
+			cmd->set_buffer_view(0, 1, *bvh_get(&view));
 			Push push = { small_rect, 0, render_state.force_mask_bit ? 0x8000u : 0u };
 			cmd->push_constants(&push, 0, sizeof(push));
 			cmd->dispatch((small_rect.width + 7) >> 3, (small_rect.height + 7) >> 3, 1);
+			bvh_reset(&view);
 		}
 	}
 	else
@@ -11833,13 +11845,14 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 		view_info.format = VK_FORMAT_R16_UINT;
 		BufferViewHandle view = device->create_buffer_view(view_info);
 
-		cmd->set_buffer_view(0, 1, *view);
+		cmd->set_buffer_view(0, 1, *bvh_get(&view));
 
 		Push push = { rect, 0, render_state.force_mask_bit ? 0x8000u : 0u };
 		cmd->push_constants(&push, 0, sizeof(push));
 
 		// TODO: Batch up work.
 		cmd->dispatch((rect.width + 7) >> 3, (rect.height + 7) >> 3, 1);
+		bvh_reset(&view);
 	}
 
 	return buffer;
@@ -17829,9 +17842,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VkBufferView view;
 		VkResult res = vkCreateBufferView(device, &info, NULL, &view);
 		if (res != VK_SUCCESS)
-			return BufferViewHandle(NULL);
+			return bvh_make(NULL);
 
-		return BufferViewHandle(new (object_pool_raw_allocate(&handle_pool.buffer_views)) BufferView(this, view, view_info));
+		return bvh_make(new (object_pool_raw_allocate(&handle_pool.buffer_views)) BufferView(this, view, view_info));
 	}
 
 	class ImageResourceHolder
