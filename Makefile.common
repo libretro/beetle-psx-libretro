@@ -13,7 +13,6 @@ LIBCHDR_INCFLAGS = \
 
 LIBCHDR_SOURCES_C = \
                      $(DEPS_DIR)/libchdr/deps/lzma-25.01/src/LzmaDec.c \
-                     $(DEPS_DIR)/libchdr/deps/miniz-3.1.1/miniz.c \
                      $(DEPS_DIR)/libchdr/deps/zstd-1.5.7/zstddeclib.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_bitstream.c \
                      $(DEPS_DIR)/libchdr/src/libchdr_cdrom.c \
@@ -125,7 +124,6 @@ ifeq ($(HAVE_CHD), 1)
       INCFLAGS += $(shell pkg-config --cflags libchdr)
       LIBS += $(shell pkg-config --libs libchdr)
    else
-      FLAGS += -DCHDR_SYSTEM_ZLIB
       INCFLAGS += $(LIBCHDR_INCFLAGS)
    endif
 endif

@@ -47,7 +47,6 @@ USAGE:
    where the callback is:
       void stbi_write_func(void *context, void *data, int size);
 
-   You can define STBI_WRITE_NO_STDIO to disable the file variant of these
    functions, so the library will not use stdio.h at all. However, this will
    also disable HDR writing, because it requires stdio for formatted output.
 
@@ -125,13 +124,6 @@ extern "C" {
 extern int stbi_write_tga_with_rle;
 #endif
 
-#ifndef STBI_WRITE_NO_STDIO
-STBIWDEF int stbi_write_png(char const *filename, int w, int h, int comp, const void  *data, int stride_in_bytes);
-STBIWDEF int stbi_write_bmp(char const *filename, int w, int h, int comp, const void  *data);
-STBIWDEF int stbi_write_tga(char const *filename, int w, int h, int comp, const void  *data);
-STBIWDEF int stbi_write_hdr(char const *filename, int w, int h, int comp, const float *data);
-#endif
-
 typedef void stbi_write_func(void *context, void *data, int size);
 
 STBIWDEF int stbi_write_png_to_func(stbi_write_func *func, void *context, int w, int h, int comp, const void  *data, int stride_in_bytes);
@@ -156,10 +148,7 @@ STBIWDEF int stbi_write_hdr_to_func(stbi_write_func *func, void *context, int w,
    #endif
 #endif
 
-#ifndef STBI_WRITE_NO_STDIO
 #include <stdio.h>
-#endif // STBI_WRITE_NO_STDIO
-
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -209,26 +198,6 @@ static void stbi__start_write_callbacks(stbi__write_context *s, stbi_write_func 
    s->context = context;
 }
 
-#ifndef STBI_WRITE_NO_STDIO
-
-static void stbi__stdio_write(void *context, void *data, int size)
-{
-   fwrite(data,1,size,(FILE*) context);
-}
-
-static int stbi__start_write_file(stbi__write_context *s, const char *filename)
-{
-   FILE *f = fopen(filename, "wb");
-   stbi__start_write_callbacks(s, stbi__stdio_write, (void *) f);
-   return f != NULL;
-}
-
-static void stbi__end_write_file(stbi__write_context *s)
-{
-   fclose((FILE *)s->context);
-}
-
-#endif // !STBI_WRITE_NO_STDIO
 
 typedef unsigned int stbiw_uint32;
 typedef int stb_image_write_test[sizeof(stbiw_uint32)==4 ? 1 : -1];
@@ -370,19 +339,6 @@ STBIWDEF int stbi_write_bmp_to_func(stbi_write_func *func, void *context, int x,
    return stbi_write_bmp_core(&s, x, y, comp, data);
 }
 
-#ifndef STBI_WRITE_NO_STDIO
-STBIWDEF int stbi_write_bmp(char const *filename, int x, int y, int comp, const void *data)
-{
-   stbi__write_context s;
-   if (stbi__start_write_file(&s,filename)) {
-      int r = stbi_write_bmp_core(&s, x, y, comp, data);
-      stbi__end_write_file(&s);
-      return r;
-   } else
-      return 0;
-}
-#endif //!STBI_WRITE_NO_STDIO
-
 static int stbi_write_tga_core(stbi__write_context *s, int x, int y, int comp, void *data)
 {
    int has_alpha = (comp == 2 || comp == 4);
@@ -458,23 +414,9 @@ int stbi_write_tga_to_func(stbi_write_func *func, void *context, int x, int y, i
    return stbi_write_tga_core(&s, x, y, comp, (void *) data);
 }
 
-#ifndef STBI_WRITE_NO_STDIO
-int stbi_write_tga(char const *filename, int x, int y, int comp, const void *data)
-{
-   stbi__write_context s;
-   if (stbi__start_write_file(&s,filename)) {
-      int r = stbi_write_tga_core(&s, x, y, comp, (void *) data);
-      stbi__end_write_file(&s);
-      return r;
-   } else
-      return 0;
-}
-#endif
-
 // *************************************************************************************************
 // Radiance RGBE HDR writer
 // by Baldur Karlsson
-#ifndef STBI_WRITE_NO_STDIO
 
 #define stbiw__max(a, b)  ((a) > (b) ? (a) : (b))
 
@@ -612,7 +554,7 @@ static int stbi_write_hdr_core(stbi__write_context *s, int x, int y, int comp, f
       char header[] = "#?RADIANCE\n# Written by stb_image_write.h\nFORMAT=32-bit_rle_rgbe\n";
       s->func(s->context, header, sizeof(header)-1);
 
-      len = sprintf(buffer, "EXPOSURE=          1.0000000000000\n\n-Y %d +X %d\n", y, x);
+      len = snprintf(buffer, sizeof(buffer), "EXPOSURE=          1.0000000000000\n\n-Y %d +X %d\n", y, x);
       s->func(s->context, buffer, len);
 
       for(i=0; i < y; i++)
@@ -628,18 +570,6 @@ int stbi_write_hdr_to_func(stbi_write_func *func, void *context, int x, int y, i
    stbi__start_write_callbacks(&s, func, context);
    return stbi_write_hdr_core(&s, x, y, comp, (float *) data);
 }
-
-int stbi_write_hdr(char const *filename, int x, int y, int comp, const float *data)
-{
-   stbi__write_context s;
-   if (stbi__start_write_file(&s,filename)) {
-      int r = stbi_write_hdr_core(&s, x, y, comp, (float *) data);
-      stbi__end_write_file(&s);
-      return r;
-   } else
-      return 0;
-}
-#endif // STBI_WRITE_NO_STDIO
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -986,21 +916,6 @@ unsigned char *stbi_write_png_to_mem(unsigned char *pixels, int stride_bytes, in
    return out;
 }
 
-#ifndef STBI_WRITE_NO_STDIO
-STBIWDEF int stbi_write_png(char const *filename, int x, int y, int comp, const void *data, int stride_bytes)
-{
-   FILE *f;
-   int len;
-   unsigned char *png = stbi_write_png_to_mem((unsigned char *) data, stride_bytes, x, y, comp, &len);
-   if (png == NULL) return 0;
-   f = fopen(filename, "wb");
-   if (!f) { STBIW_FREE(png); return 0; }
-   fwrite(png, 1, len, f);
-   fclose(f);
-   STBIW_FREE(png);
-   return 1;
-}
-#endif
 
 STBIWDEF int stbi_write_png_to_func(stbi_write_func *func, void *context, int x, int y, int comp, const void *data, int stride_bytes)
 {

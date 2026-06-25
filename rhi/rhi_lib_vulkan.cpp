@@ -19161,10 +19161,30 @@ void rgba_image_free(RGBAImage *img) {
 
 void load_image(const char *path, RGBAImage *img) {
     int channels;
-    img->data = stbi_load(path, &img->width, &img->height, &channels, 4);
+    int64_t size;
+    void *buf      = NULL;
+    img->data      = NULL;
+    if (filestream_read_file(path, &buf, &size) && buf) {
+        img->data = stbi_load_from_memory((const stbi_uc *) buf, (int) size,
+                                          &img->width, &img->height, &channels, 4);
+        free(buf);
+    }
 }
+
+static void rhi_stbi_vfs_write(void *context, void *data, int size) {
+    filestream_write((RFILE *) context, data, (int64_t) size);
+}
+
 bool write_image(const char *path, int width, int height, const void *data) {
-    return stbi_write_png(path, width, height, 4, data, 4 * width);
+    RFILE *f = filestream_open(path,
+            RETRO_VFS_FILE_ACCESS_WRITE,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
+    if (!f)
+        return false;
+    int ok = stbi_write_png_to_func(rhi_stbi_vfs_write, f,
+                                    width, height, 4, data, 4 * width);
+    filestream_close(f);
+    return ok != 0;
 }
 
 /* === dbg_input_callback.h (extern, defined in libretro.c) === */

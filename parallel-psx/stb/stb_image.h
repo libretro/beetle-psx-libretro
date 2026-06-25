@@ -35,7 +35,7 @@
       Animated GIF still needs a proper API, but here's one way to do it:
           http://gist.github.com/urraka/685d9a6340b26b830d49
 
-      - decode from memory or through FILE (define STBI_NO_STDIO to remove code)
+      - decode from memory or through libretro VFS callbacks
       - decode from arbitrary I/O callbacks
       - SIMD acceleration on x86/x64 (SSE2) and ARM (NEON)
 
@@ -388,9 +388,6 @@ distribute, and modify this file as you see fit.
 //
 
 
-#ifndef STBI_NO_STDIO
-#include <stdio.h>
-#endif // STBI_NO_STDIO
 
 #define STBI_VERSION 1
 
@@ -436,19 +433,12 @@ STBIDEF stbi_uc *stbi_load               (char              const *filename,    
 STBIDEF stbi_uc *stbi_load_from_memory   (stbi_uc           const *buffer, int len   , int *x, int *y, int *comp, int req_comp);
 STBIDEF stbi_uc *stbi_load_from_callbacks(stbi_io_callbacks const *clbk  , void *user, int *x, int *y, int *comp, int req_comp);
 
-#ifndef STBI_NO_STDIO
-STBIDEF stbi_uc *stbi_load_from_file  (FILE *f,                  int *x, int *y, int *comp, int req_comp);
-// for stbi_load_from_file, file pointer is left pointing immediately after image
-#endif
 
 #ifndef STBI_NO_LINEAR
    STBIDEF float *stbi_loadf                 (char const *filename,           int *x, int *y, int *comp, int req_comp);
    STBIDEF float *stbi_loadf_from_memory     (stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp);
    STBIDEF float *stbi_loadf_from_callbacks  (stbi_io_callbacks const *clbk, void *user, int *x, int *y, int *comp, int req_comp);
 
-   #ifndef STBI_NO_STDIO
-   STBIDEF float *stbi_loadf_from_file  (FILE *f,                int *x, int *y, int *comp, int req_comp);
-   #endif
 #endif
 
 #ifndef STBI_NO_HDR
@@ -464,10 +454,6 @@ STBIDEF stbi_uc *stbi_load_from_file  (FILE *f,                  int *x, int *y,
 // stbi_is_hdr is always defined, but always returns false if STBI_NO_HDR
 STBIDEF int    stbi_is_hdr_from_callbacks(stbi_io_callbacks const *clbk, void *user);
 STBIDEF int    stbi_is_hdr_from_memory(stbi_uc const *buffer, int len);
-#ifndef STBI_NO_STDIO
-STBIDEF int      stbi_is_hdr          (char const *filename);
-STBIDEF int      stbi_is_hdr_from_file(FILE *f);
-#endif // STBI_NO_STDIO
 
 
 // get a VERY brief reason for failure
@@ -481,11 +467,6 @@ STBIDEF void     stbi_image_free      (void *retval_from_stbi_load);
 STBIDEF int      stbi_info_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp);
 STBIDEF int      stbi_info_from_callbacks(stbi_io_callbacks const *clbk, void *user, int *x, int *y, int *comp);
 
-#ifndef STBI_NO_STDIO
-STBIDEF int      stbi_info            (char const *filename,     int *x, int *y, int *comp);
-STBIDEF int      stbi_info_from_file  (FILE *f,                  int *x, int *y, int *comp);
-
-#endif
 
 
 
@@ -570,9 +551,6 @@ STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const ch
 #include <math.h>  // ldexp
 #endif
 
-#ifndef STBI_NO_STDIO
-#include <stdio.h>
-#endif
 
 #ifndef STBI_ASSERT
 #include <assert.h>
@@ -784,38 +762,6 @@ static void stbi__start_callbacks(stbi__context *s, stbi_io_callbacks *c, void *
    s->img_buffer_original_end = s->img_buffer_end;
 }
 
-#ifndef STBI_NO_STDIO
-
-static int stbi__stdio_read(void *user, char *data, int size)
-{
-   return (int) fread(data,1,size,(FILE*) user);
-}
-
-static void stbi__stdio_skip(void *user, int n)
-{
-   fseek((FILE*) user, n, SEEK_CUR);
-}
-
-static int stbi__stdio_eof(void *user)
-{
-   return feof((FILE*) user);
-}
-
-static stbi_io_callbacks stbi__stdio_callbacks =
-{
-   stbi__stdio_read,
-   stbi__stdio_skip,
-   stbi__stdio_eof,
-};
-
-static void stbi__start_file(stbi__context *s, FILE *f)
-{
-   stbi__start_callbacks(s, &stbi__stdio_callbacks, (void *) f);
-}
-
-//static void stop_file(stbi__context *s) { }
-
-#endif // !STBI_NO_STDIO
 
 static void stbi__rewind(stbi__context *s)
 {
@@ -1022,44 +968,6 @@ static void stbi__float_postprocess(float *result, int *x, int *y, int *comp, in
 }
 #endif
 
-#ifndef STBI_NO_STDIO
-
-static FILE *stbi__fopen(char const *filename, char const *mode)
-{
-   FILE *f;
-#if defined(_MSC_VER) && _MSC_VER >= 1400
-   if (0 != fopen_s(&f, filename, mode))
-      f=0;
-#else
-   f = fopen(filename, mode);
-#endif
-   return f;
-}
-
-
-STBIDEF stbi_uc *stbi_load(char const *filename, int *x, int *y, int *comp, int req_comp)
-{
-   FILE *f = stbi__fopen(filename, "rb");
-   unsigned char *result;
-   if (!f) return stbi__errpuc("can't fopen", "Unable to open file");
-   result = stbi_load_from_file(f,x,y,comp,req_comp);
-   fclose(f);
-   return result;
-}
-
-STBIDEF stbi_uc *stbi_load_from_file(FILE *f, int *x, int *y, int *comp, int req_comp)
-{
-   unsigned char *result;
-   stbi__context s;
-   stbi__start_file(&s,f);
-   result = stbi__load_flip(&s,x,y,comp,req_comp);
-   if (result) {
-      // need to 'unget' all the characters in the IO buffer
-      fseek(f, - (int) (s.img_buffer_end - s.img_buffer), SEEK_CUR);
-   }
-   return result;
-}
-#endif //!STBI_NO_STDIO
 
 STBIDEF stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp)
 {
@@ -1107,24 +1015,6 @@ STBIDEF float *stbi_loadf_from_callbacks(stbi_io_callbacks const *clbk, void *us
    return stbi__loadf_main(&s,x,y,comp,req_comp);
 }
 
-#ifndef STBI_NO_STDIO
-STBIDEF float *stbi_loadf(char const *filename, int *x, int *y, int *comp, int req_comp)
-{
-   float *result;
-   FILE *f = stbi__fopen(filename, "rb");
-   if (!f) return stbi__errpf("can't fopen", "Unable to open file");
-   result = stbi_loadf_from_file(f,x,y,comp,req_comp);
-   fclose(f);
-   return result;
-}
-
-STBIDEF float *stbi_loadf_from_file(FILE *f, int *x, int *y, int *comp, int req_comp)
-{
-   stbi__context s;
-   stbi__start_file(&s,f);
-   return stbi__loadf_main(&s,x,y,comp,req_comp);
-}
-#endif // !STBI_NO_STDIO
 
 #endif // !STBI_NO_LINEAR
 
@@ -1145,30 +1035,6 @@ STBIDEF int stbi_is_hdr_from_memory(stbi_uc const *buffer, int len)
    #endif
 }
 
-#ifndef STBI_NO_STDIO
-STBIDEF int      stbi_is_hdr          (char const *filename)
-{
-   FILE *f = stbi__fopen(filename, "rb");
-   int result=0;
-   if (f) {
-      result = stbi_is_hdr_from_file(f);
-      fclose(f);
-   }
-   return result;
-}
-
-STBIDEF int      stbi_is_hdr_from_file(FILE *f)
-{
-   #ifndef STBI_NO_HDR
-   stbi__context s;
-   stbi__start_file(&s,f);
-   return stbi__hdr_test(&s);
-   #else
-   STBI_NOTUSED(f);
-   return 0;
-   #endif
-}
-#endif // !STBI_NO_STDIO
 
 STBIDEF int      stbi_is_hdr_from_callbacks(stbi_io_callbacks const *clbk, void *user)
 {
@@ -6418,28 +6284,6 @@ static int stbi__info_main(stbi__context *s, int *x, int *y, int *comp)
    return stbi__err("unknown image type", "Image not of any known type, or corrupt");
 }
 
-#ifndef STBI_NO_STDIO
-STBIDEF int stbi_info(char const *filename, int *x, int *y, int *comp)
-{
-    FILE *f = stbi__fopen(filename, "rb");
-    int result;
-    if (!f) return stbi__err("can't fopen", "Unable to open file");
-    result = stbi_info_from_file(f, x, y, comp);
-    fclose(f);
-    return result;
-}
-
-STBIDEF int stbi_info_from_file(FILE *f, int *x, int *y, int *comp)
-{
-   int r;
-   stbi__context s;
-   long pos = ftell(f);
-   stbi__start_file(&s, f);
-   r = stbi__info_main(&s,x,y,comp);
-   fseek(f,pos,SEEK_SET);
-   return r;
-}
-#endif // !STBI_NO_STDIO
 
 STBIDEF int stbi_info_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp)
 {
