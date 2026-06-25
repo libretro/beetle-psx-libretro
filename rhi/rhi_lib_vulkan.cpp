@@ -2248,311 +2248,279 @@ static inline uint32_t util_ctz(uint32_t x)
 				int mem_cap;
 		};
 
-	template <typename T>
-		struct IntrusiveHashMapEnabled : public IntrusiveListEnabled<T>
+	/* Concrete intrusive-hash-map node base (the de-templated form of
+	 * IntrusiveHashMapEnabled<T>). It carries the intrusive list links (for the
+	 * holder's value list) and the hash key. Every hash-map node type embeds this as
+	 * its first member (offset 0, static_assert'd), so the holder recovers the node
+	 * from an IntrusiveHashMapNode* by casting - exactly as the template did via
+	 * static_cast through the IntrusiveListEnabled/IntrusiveHashMapEnabled bases. */
+	struct IntrusiveHashMapNode
 	{
-		IntrusiveHashMapEnabled() = default;
-		IntrusiveHashMapEnabled(Hash hash)
-			: intrusive_hashmap_key(hash)
-		{
-		}
-
-		Hash intrusive_hashmap_key = 0;
+		struct IntrusiveListNode list_node; /* must stay first (offset 0) */
+		Hash key;
 	};
 
+	/* IntrusivePODWrapper stays a template (it wraps an arbitrary POD value for the
+	 * pipeline cache and the TemporaryHashmap recycle map), but it now embeds the
+	 * concrete node base as its first member instead of inheriting the old CRTP
+	 * IntrusiveHashMapEnabled base, so the concrete holder can treat it like every
+	 * other node. get() returns the payload, matching the previous interface. */
 	template <typename T>
-		struct IntrusivePODWrapper : public IntrusiveHashMapEnabled<IntrusivePODWrapper<T>>
+		struct IntrusivePODWrapper
 	{
+		struct IntrusiveHashMapNode node; /* must stay first (offset 0) */
+		T value;
+
 		template <typename U>
 			explicit IntrusivePODWrapper(U&& value_)
 			: value(std::forward<U>(value_))
 			{
 			}
 
-		IntrusivePODWrapper() = default;
+		IntrusivePODWrapper() : value() {}
 
-		T& get()
-		{
-			return value;
-		}
-
-		const T& get() const
-		{
-			return value;
-		}
-
-		T value = {};
+		T& get() { return value; }
+		const T& get() const { return value; }
 	};
 
-	// This HashMap is non-owning. It just arranges a list of pointers.
-	// It's kind of special purpose container used by the Vulkan backend.
-	// Dealing with memory ownership is done through composition by a different class.
-	// T must inherit from IntrusiveHashMapEnabled<T>.
-	// Each instance of T can only be part of one hashmap.
+	/* Concrete, type-erased open-addressing hash table (the de-templated form of
+	 * IntrusiveHashMapHolder<T>). It is non-owning: it only arranges a table and a
+	 * list of IntrusiveHashMapNode pointers; the nodes are owned by an object pool.
+	 * Callers cast their node type to IntrusiveHashMapNode* (offset 0). All the
+	 * probe / grow / LRU semantics match the template exactly (validated under
+	 * ASan). */
+	struct IntrusiveHashMapHolderC
+	{
+		struct IntrusiveHashMapNode **items;
+		size_t count;
+		size_t cap;
+		struct IntrusiveListC list;
+		unsigned load_count;
+	};
 
-	template <typename T>
-		class IntrusiveHashMapHolder
+	enum { HMHOLDER_InitialSize = 16, HMHOLDER_InitialLoadCount = 3 };
+
+	static inline Hash hmholder_get_hash(const struct IntrusiveHashMapNode *value)
+	{
+		return value->key;
+	}
+
+	static inline struct IntrusiveHashMapNode *hmholder_find(
+			const struct IntrusiveHashMapHolderC *h, Hash hash)
+	{
+		Hash hash_mask, masked;
+		unsigned i;
+		if (h->count == 0)
+			return NULL;
+		hash_mask = h->count - 1;
+		masked    = hash & hash_mask;
+		for (i = 0; i < h->load_count; i++)
 		{
-			public:
-				enum { InitialSize = 16, InitialLoadCount = 3 };
+			if (h->items[masked] && hmholder_get_hash(h->items[masked]) == hash)
+				return h->items[masked];
+			masked = (masked + 1) & hash_mask;
+		}
+		return NULL;
+	}
 
-				T *find(Hash hash) const
+	static inline bool hmholder_insert_inner(struct IntrusiveHashMapHolderC *h,
+			struct IntrusiveHashMapNode *value)
+	{
+		Hash hash_mask = h->count - 1;
+		Hash hash      = hmholder_get_hash(value);
+		Hash masked    = hash & hash_mask;
+		unsigned i;
+		for (i = 0; i < h->load_count; i++)
+		{
+			if (!h->items[masked])
+			{
+				h->items[masked] = value;
+				return true;
+			}
+			masked = (masked + 1) & hash_mask;
+		}
+		return false;
+	}
+
+	static inline void hmholder_resize_null(struct IntrusiveHashMapHolderC *h, size_t n)
+	{
+		size_t i;
+		if (n > h->cap)
+		{
+			h->items = (struct IntrusiveHashMapNode **)realloc(h->items,
+					n * sizeof(struct IntrusiveHashMapNode *));
+			h->cap   = n;
+		}
+		for (i = 0; i < n; i++)
+			h->items[i] = NULL;
+		h->count = n;
+	}
+
+	static inline void hmholder_grow(struct IntrusiveHashMapHolderC *h)
+	{
+		bool success;
+		do
+		{
+			{
+				size_t i, n = h->count;
+				for (i = 0; i < n; i++)
+					h->items[i] = NULL;
+			}
+
+			if (h->count == 0)
+			{
+				hmholder_resize_null(h, HMHOLDER_InitialSize);
+				h->load_count = HMHOLDER_InitialLoadCount;
+			}
+			else
+			{
+				hmholder_resize_null(h, h->count * 2);
+				h->load_count++;
+			}
+
+			success = true;
+			{
+				struct IntrusiveListNode *n;
+				for (n = ilist_begin(&h->list); n; n = n->next)
 				{
-					if (values.empty())
-						return NULL;
-
-					Hash hash_mask = values.size() - 1;
-					Hash masked = hash & hash_mask;
-					for (unsigned i = 0; i < load_count; i++)
+					if (!hmholder_insert_inner(h, (struct IntrusiveHashMapNode *)n))
 					{
-						if (values[masked] && get_hash(values[masked]) == hash)
-							return values[masked];
-						masked = (masked + 1) & hash_mask;
+						success = false;
+						break;
 					}
-
-					return NULL;
 				}
+			}
+		} while (!success);
+	}
 
-				// Inserts, if value already exists, insertion does not happen.
-				// Return value is the data which is not part of the hashmap.
-				// It should be deleted or similar.
-				// Returns nullptr if nothing was in the hashmap for this key.
-				T *insert_yield(T *&value)
-				{
-					if (values.empty())
-						grow();
+	static inline struct IntrusiveHashMapNode *hmholder_insert_yield(
+			struct IntrusiveHashMapHolderC *h, struct IntrusiveHashMapNode **value)
+	{
+		Hash hash_mask, hash, masked;
+		unsigned i;
+		if (h->count == 0)
+			hmholder_grow(h);
 
-					Hash hash_mask = values.size() - 1;
-					Hash hash = get_hash(value);
-					Hash masked = hash & hash_mask;
+		hash_mask = h->count - 1;
+		hash      = hmholder_get_hash(*value);
+		masked    = hash & hash_mask;
 
-					for (unsigned i = 0; i < load_count; i++)
-					{
-						if (values[masked] && get_hash(values[masked]) == hash)
-						{
-							T *ret = value;
-							value = values[masked];
-							return ret;
-						}
-						else if (!values[masked])
-						{
-							values[masked] = value;
-							list.insert_front(value);
-							return NULL;
-						}
-						masked = (masked + 1) & hash_mask;
-					}
+		for (i = 0; i < h->load_count; i++)
+		{
+			if (h->items[masked] && hmholder_get_hash(h->items[masked]) == hash)
+			{
+				struct IntrusiveHashMapNode *ret = *value;
+				*value = h->items[masked];
+				return ret;
+			}
+			else if (!h->items[masked])
+			{
+				h->items[masked] = *value;
+				ilist_insert_front(&h->list, &(*value)->list_node);
+				return NULL;
+			}
+			masked = (masked + 1) & hash_mask;
+		}
 
-					grow();
-					return insert_yield(value);
-				}
+		hmholder_grow(h);
+		return hmholder_insert_yield(h, value);
+	}
 
-				T *insert_replace(T *value)
-				{
-					if (values.empty())
-						grow();
+	static inline struct IntrusiveHashMapNode *hmholder_insert_replace(
+			struct IntrusiveHashMapHolderC *h, struct IntrusiveHashMapNode *value)
+	{
+		Hash hash_mask, hash, masked;
+		unsigned i;
+		if (h->count == 0)
+			hmholder_grow(h);
 
-					Hash hash_mask = values.size() - 1;
-					Hash hash = get_hash(value);
-					Hash masked = hash & hash_mask;
+		hash_mask = h->count - 1;
+		hash      = hmholder_get_hash(value);
+		masked    = hash & hash_mask;
 
-					for (unsigned i = 0; i < load_count; i++)
-					{
-						if (values[masked] && get_hash(values[masked]) == hash)
-						{
-							T *tmp = values[masked];
-							values[masked] = value;
-							value = tmp;
-							list.erase(value);
-							list.insert_front(values[masked]);
-							return value;
-						}
-						else if (!values[masked])
-						{
-							assert(!values[masked]);
-							values[masked] = value;
-							list.insert_front(value);
-							return NULL;
-						}
-						masked = (masked + 1) & hash_mask;
-					}
+		for (i = 0; i < h->load_count; i++)
+		{
+			if (h->items[masked] && hmholder_get_hash(h->items[masked]) == hash)
+			{
+				struct IntrusiveHashMapNode *tmp = h->items[masked];
+				h->items[masked] = value;
+				value = tmp;
+				ilist_erase(&h->list, &value->list_node);
+				ilist_insert_front(&h->list, &h->items[masked]->list_node);
+				return value;
+			}
+			else if (!h->items[masked])
+			{
+				h->items[masked] = value;
+				ilist_insert_front(&h->list, &value->list_node);
+				return NULL;
+			}
+			masked = (masked + 1) & hash_mask;
+		}
 
-					grow();
-					return insert_replace(value);
-				}
+		hmholder_grow(h);
+		return hmholder_insert_replace(h, value);
+	}
 
-				T *erase(Hash hash)
-				{
-					Hash hash_mask = values.size() - 1;
-					Hash masked = hash & hash_mask;
+	static inline struct IntrusiveHashMapNode *hmholder_erase(
+			struct IntrusiveHashMapHolderC *h, Hash hash)
+	{
+		Hash hash_mask = h->count - 1;
+		Hash masked    = hash & hash_mask;
+		unsigned i;
+		for (i = 0; i < h->load_count; i++)
+		{
+			if (h->items[masked] && hmholder_get_hash(h->items[masked]) == hash)
+			{
+				struct IntrusiveHashMapNode *value = h->items[masked];
+				ilist_erase(&h->list, &value->list_node);
+				h->items[masked] = NULL;
+				return value;
+			}
+			masked = (masked + 1) & hash_mask;
+		}
+		return NULL;
+	}
 
-					for (unsigned i = 0; i < load_count; i++)
-					{
-						if (values[masked] && get_hash(values[masked]) == hash)
-						{
-							T *value = values[masked];
-							list.erase(value);
-							values[masked] = NULL;
-							return value;
-						}
-						masked = (masked + 1) & hash_mask;
-					}
-					return NULL;
-				}
+	static inline void hmholder_clear(struct IntrusiveHashMapHolderC *h)
+	{
+		ilist_clear(&h->list);
+		::free(h->items);
+		h->items      = NULL;
+		h->count      = 0;
+		h->cap        = 0;
+		h->load_count = 0;
+	}
 
-				void clear()
-				{
-					list.clear();
-					values.clear();
-					load_count = 0;
-				}
+	static inline void hmholder_init_empty(struct IntrusiveHashMapHolderC *h)
+	{
+		h->items      = NULL;
+		h->count      = 0;
+		h->cap        = 0;
+		ilist_clear(&h->list);
+		h->load_count = 0;
+	}
 
-				/* Raw-memory lifecycle, for an owner allocated with malloc (so this
-				 * holder's and its members' constructors/destructors do not run).
-				 * init_empty() establishes the constructed empty state directly:
-				 * the value table NULL/0/0, the intrusive list head null, the load
-				 * count zero - without touching the (garbage) table storage the way
-				 * clear() would. deinit() drops the table's backing storage the
-				 * ValueTable destructor used to free (the nodes themselves are owned
-				 * by the object pool, freed separately). */
-				void init_empty()
-				{
-					values.items = NULL;
-					values.count = 0;
-					values.cap   = 0;
-					list.clear();
-					load_count = 0;
-				}
+	static inline void hmholder_deinit(struct IntrusiveHashMapHolderC *h)
+	{
+		::free(h->items);
+		h->items = NULL;
+		h->count = 0;
+		h->cap   = 0;
+	}
 
-				void deinit()
-				{
-					values.~ValueTable();
-				}
+	static inline struct IntrusiveListNode *hmholder_begin(struct IntrusiveHashMapHolderC *h)
+	{
+		return ilist_begin(&h->list);
+	}
 
-				typename IntrusiveList<T>::Iterator begin()
-				{
-					return list.begin();
-				}
 
-				typename IntrusiveList<T>::Iterator end()
-				{
-					return list.end();
-				}
 
-				IntrusiveList<T> &inner_list()
-				{
-					return list;
-				}
-
-			private:
-
-				inline Hash get_hash(const T *value) const
-				{
-					return static_cast<const IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key;
-				}
-
-				bool insert_inner(T *value)
-				{
-					Hash hash_mask = values.size() - 1;
-					Hash hash = get_hash(value);
-					Hash masked = hash & hash_mask;
-
-					for (unsigned i = 0; i < load_count; i++)
-					{
-						if (!values[masked])
-						{
-							values[masked] = value;
-							return true;
-						}
-						masked = (masked + 1) & hash_mask;
-					}
-					return false;
-				}
-
-				void grow()
-				{
-					bool success;
-					do
-					{
-						{
-							size_t i, n = values.size();
-							for (i = 0; i < n; i++)
-								values[i] = NULL;
-						}
-
-						if (values.empty())
-						{
-							values.resize_null(InitialSize);
-							load_count = InitialLoadCount;
-							//LOGI("Growing hashmap to %u elements.\n", InitialSize);
-						}
-						else
-						{
-							values.resize_null(values.size() * 2);
-							//LOGI("Growing hashmap to %u elements.\n", unsigned(values.size()));
-							load_count++;
-						}
-
-						// Re-insert.
-						success = true;
-						for (T &t : list)
-						{
-							if (!insert_inner(&t))
-							{
-								success = false;
-								break;
-							}
-						}
-					} while (!success);
-				}
-
-				/* POD open-addressing table backing, replacing std::vector<T *>.
-				 * Only the operations the holder uses are provided: empty/size,
-				 * indexing, clear, and resize_null which (re)allocates to n slots
-				 * and NULL-fills all of them - matching grow(), which nulls the
-				 * existing slots before resizing and relies on the new slots being
-				 * null. */
-				struct ValueTable
-				{
-					T **items;
-					size_t count;
-					size_t cap;
-
-					ValueTable() : items(NULL), count(0), cap(0) {}
-					~ValueTable() { ::free(items); items = NULL; count = 0; cap = 0; }
-
-					bool empty() const { return count == 0; }
-					size_t size() const { return count; }
-					T *&operator[](size_t i) { return items[i]; }
-					T *const &operator[](size_t i) const { return items[i]; }
-
-					void clear()
-					{
-						::free(items);
-						items = NULL;
-						count = 0;
-						cap   = 0;
-					}
-
-					void resize_null(size_t n)
-					{
-						size_t i;
-						if (n > cap)
-						{
-							items = (T **)realloc(items, n * sizeof(T *));
-							cap   = n;
-						}
-						for (i = 0; i < n; i++)
-							items[i] = NULL;
-						count = n;
-					}
-				};
-
-				ValueTable values;
-				IntrusiveList<T> list;
-				unsigned load_count = 0;
-		};
-
+	/* Thin per-type wrapper over the concrete ObjectPoolRaw + IntrusiveHashMapHolderC.
+	 * It stays a template only because allocate() must construct a specific T and the
+	 * pool needs sizeof(T); everything else is the concrete holder, with T* recovered
+	 * from IntrusiveHashMapNode* by casting (the node base is the first member of every
+	 * T, offset 0). */
 	template <typename T>
 		class IntrusiveHashMap
 		{
@@ -2560,55 +2528,58 @@ static inline uint32_t util_ctz(uint32_t x)
 				~IntrusiveHashMap()
 				{
 					clear();
+					hmholder_deinit(&hashmap);
+					object_pool_raw_deinit(&pool);
 				}
 
-				IntrusiveHashMap() = default;
+				IntrusiveHashMap()
+				{
+					hmholder_init_empty(&hashmap);
+					object_pool_raw_init(&pool, sizeof(T));
+				}
 				IntrusiveHashMap(const IntrusiveHashMap &) = delete;
 				void operator=(const IntrusiveHashMap &) = delete;
 
 				void clear()
 				{
-					IntrusiveList<T> &list = hashmap.inner_list();
-					typename IntrusiveList<T>::Iterator itr = list.begin();
-					while (itr != list.end())
+					struct IntrusiveListNode *itr = ilist_begin(&hashmap.list);
+					while (itr)
 					{
-						T *to_free = itr.get();
-						itr = list.erase(itr);
-						pool.free(to_free);
+						T *to_free = (T *)itr;
+						itr = itr->next;
+						to_free->~T();
+						object_pool_raw_free(&pool, to_free);
 					}
-
-					hashmap.clear();
+					hmholder_clear(&hashmap);
 				}
 
-				/* Raw-memory lifecycle, for an owner allocated with malloc. init_empty
-				 * establishes the empty state the default constructor would (the
-				 * holder empty and the object pool empty); deinit performs the
-				 * destructor's teardown (clear() frees the pooled nodes) plus the
-				 * teardown the holder's and pool's destructors did (free the table
-				 * storage and the pool slabs). */
+				/* Raw-memory lifecycle, for an owner allocated with malloc. */
 				void init_empty()
 				{
-					hashmap.init_empty();
-					pool.init();
+					hmholder_init_empty(&hashmap);
+					object_pool_raw_init(&pool, sizeof(T));
 				}
 
 				void deinit()
 				{
 					clear();
-					hashmap.deinit();
-					pool.deinit();
+					hmholder_deinit(&hashmap);
+					object_pool_raw_deinit(&pool);
 				}
 
 				T *find(Hash hash) const
 				{
-					return hashmap.find(hash);
+					return (T *)hmholder_find(&hashmap, hash);
 				}
 
 				void erase(Hash hash)
 				{
-					T *value = hashmap.erase(hash);
+					T *value = (T *)hmholder_erase(&hashmap, hash);
 					if (value)
-						pool.free(value);
+					{
+						value->~T();
+						object_pool_raw_free(&pool, value);
+					}
 				}
 
 				template <typename... P>
@@ -2628,40 +2599,69 @@ static inline uint32_t util_ctz(uint32_t x)
 				template <typename... P>
 					T *allocate(P&&... p)
 					{
-						return pool.allocate(std::forward<P>(p)...);
+						void *slot = object_pool_raw_allocate(&pool);
+						if (!slot)
+							return NULL;
+						return new (slot) T(std::forward<P>(p)...);
 					}
 
 				T *insert_replace(Hash hash, T *value)
 				{
-					static_cast<IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key = hash;
-					T *to_delete = hashmap.insert_replace(value);
+					((struct IntrusiveHashMapNode *)value)->key = hash;
+					T *to_delete = (T *)hmholder_insert_replace(&hashmap,
+							(struct IntrusiveHashMapNode *)value);
 					if (to_delete)
-						pool.free(to_delete);
+					{
+						to_delete->~T();
+						object_pool_raw_free(&pool, to_delete);
+					}
 					return value;
 				}
 
 				T *insert_yield(Hash hash, T *value)
 				{
-					static_cast<IntrusiveHashMapEnabled<T> *>(value)->intrusive_hashmap_key = hash;
-					T *to_delete = hashmap.insert_yield(value);
+					((struct IntrusiveHashMapNode *)value)->key = hash;
+					struct IntrusiveHashMapNode *node = (struct IntrusiveHashMapNode *)value;
+					T *to_delete = (T *)hmholder_insert_yield(&hashmap, &node);
 					if (to_delete)
-						pool.free(to_delete);
-					return value;
+					{
+						to_delete->~T();
+						object_pool_raw_free(&pool, to_delete);
+					}
+					return (T *)node;
 				}
 
-				typename IntrusiveList<T>::Iterator begin()
+				/* Minimal forward iterator over the holder's value list, yielding T&.
+				 * Recovers T* from the list node (offset 0). */
+				class Iterator
 				{
-					return hashmap.begin();
+					public:
+						Iterator(struct IntrusiveListNode *n) : node(n) {}
+						Iterator() : node(NULL) {}
+						explicit operator bool() const { return node != NULL; }
+						bool operator==(const Iterator &o) const { return node == o.node; }
+						bool operator!=(const Iterator &o) const { return node != o.node; }
+						T &operator*() { return *(T *)node; }
+						T *operator->() { return (T *)node; }
+						T *get() { return (T *)node; }
+						Iterator &operator++() { node = node->next; return *this; }
+					private:
+						struct IntrusiveListNode *node;
+				};
+
+				Iterator begin()
+				{
+					return Iterator(ilist_begin(&hashmap.list));
 				}
 
-				typename IntrusiveList<T>::Iterator end()
+				Iterator end()
 				{
-					return hashmap.end();
+					return Iterator();
 				}
 
 			private:
-				IntrusiveHashMapHolder<T> hashmap;
-				ObjectPool<T> pool;
+				struct IntrusiveHashMapHolderC hashmap;
+				struct ObjectPoolRaw pool;
 		};
 
 	template <typename T>
@@ -3109,9 +3109,6 @@ static inline uint32_t util_ctz(uint32_t x)
 
 		uint64_t cookie;
 	};
-
-	template <typename T>
-		using HashedObject = IntrusiveHashMapEnabled<T>;
 
 /* ============================================================
  * format.hpp
@@ -4822,9 +4819,10 @@ private:
 		bool cached;
 	};
 
-	class DescriptorSetAllocator : public HashedObject<DescriptorSetAllocator>
+	class DescriptorSetAllocator
 	{
 		public:
+			struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
 			DescriptorSetAllocator(Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
 			~DescriptorSetAllocator();
 			void operator=(const DescriptorSetAllocator &) = delete;
@@ -4906,9 +4904,10 @@ private:
 		Hash push_constant_layout_hash = 0;
 	};
 
-	class PipelineLayout : public HashedObject<PipelineLayout>
+	class PipelineLayout
 	{
 		public:
+			struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
 			PipelineLayout(Hash hash, Device *device, const CombinedResourceLayout &layout);
 			~PipelineLayout();
 
@@ -4934,9 +4933,10 @@ private:
 			DescriptorSetAllocator *set_allocators[VULKAN_NUM_DESCRIPTOR_SETS] = {};
 	};
 
-	class Shader : public HashedObject<Shader>
+	class Shader
 	{
 		public:
+			struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
 			Shader(Hash hash, Device *device, const uint32_t *data, size_t size);
 			~Shader();
 
@@ -4958,9 +4958,10 @@ private:
 			ResourceLayout layout;
 	};
 
-	class Program : public HashedObject<Program>
+	class Program
 	{
 		public:
+			struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
 			Program(Device *device, Shader *vertex, Shader *fragment);
 			Program(Device *device, Shader *compute);
 			~Program();
@@ -5048,9 +5049,10 @@ private:
 		unsigned num_subpasses = 0;
 	};
 
-	class RenderPass : public HashedObject<RenderPass>, public NoCopyNoMove
+	class RenderPass : public NoCopyNoMove
 	{
 		public:
+			struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
 			struct SubpassInfo
 			{
 				VkAttachmentReference color_attachments[VULKAN_NUM_ATTACHMENTS];
@@ -5121,6 +5123,19 @@ private:
 
 			void fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
 	};
+
+	/* The concrete hash map recovers each node type from an IntrusiveHashMapNode* by
+	 * casting, which is only valid if the node base is at offset 0 of every node. */
+	static_assert(offsetof(DescriptorSetAllocator, intrusive_node) == 0,
+			"DescriptorSetAllocator.intrusive_node must be first");
+	static_assert(offsetof(PipelineLayout, intrusive_node) == 0,
+			"PipelineLayout.intrusive_node must be first");
+	static_assert(offsetof(Shader, intrusive_node) == 0,
+			"Shader.intrusive_node must be first");
+	static_assert(offsetof(Program, intrusive_node) == 0,
+			"Program.intrusive_node must be first");
+	static_assert(offsetof(RenderPass, intrusive_node) == 0,
+			"RenderPass.intrusive_node must be first");
 
 	class Framebuffer : public Cookie, public NoCopyNoMove
 	{
@@ -13460,10 +13475,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 
 	PipelineLayout::PipelineLayout(Hash hash, Device *device, const CombinedResourceLayout &layout)
-		: IntrusiveHashMapEnabled<PipelineLayout>(hash)
-		  , device(device)
+		: device(device)
 		  , layout(layout)
 	{
+		intrusive_node.key = hash;
 		VkDescriptorSetLayout layouts[VULKAN_NUM_DESCRIPTOR_SETS] = {};
 		unsigned num_sets = 0;
 		for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
@@ -13520,9 +13535,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	}
 
 	Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
-		: IntrusiveHashMapEnabled<Shader>(hash)
-		  , device(device)
+		: device(device)
 	{
+		intrusive_node.key = hash;
 #ifdef GRANITE_SPIRV_DUMP
 		if (!Granite::Filesystem::get().write_buffer_to_file(std::string("cache://spirv/") + std::to_string(hash) + ".spv", data, size))
 			LOGE("Failed to dump shader to file.\n");
@@ -13588,9 +13603,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 
 	DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_binds)
-		: IntrusiveHashMapEnabled<DescriptorSetAllocator>(hash)
-		  , device(device)
+		: device(device)
 	{
+		intrusive_node.key = hash;
 		VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
 		DescriptorBindingVec bindings = { NULL, 0, 0 };
@@ -13888,9 +13903,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	}
 
 	RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
-		: IntrusiveHashMapEnabled<RenderPass>(hash)
-		  , device(device)
+		: device(device)
 	{
+		intrusive_node.key = hash;
 		for (unsigned att = 0; att < VULKAN_NUM_ATTACHMENTS; att++)
 			color_attachments[att] = VK_FORMAT_UNDEFINED;
 
@@ -14642,7 +14657,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		const RenderPass &rp = device->request_render_pass(info, true);
 		Hasher h;
-		h.u64(rp.intrusive_hashmap_key);
+		h.u64(rp.intrusive_node.key);
 
 		for (unsigned i = 0; i < info.num_color_attachments; i++)
 			if (info.color_attachments[i])
@@ -15079,7 +15094,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 #ifdef GRANITE_SPIRV_DUMP
 		LOGI("Compiling SPIR-V file: (%s) %s\n",
 				Shader::stage_to_name(ShaderStage_Compute),
-				(to_string(shader.intrusive_hashmap_key) + ".spv").c_str());
+				(to_string(shader.intrusive_node.key) + ".spv").c_str());
 #endif
 
 		VkSpecializationInfo spec_info = {};
@@ -15230,7 +15245,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 #ifdef GRANITE_SPIRV_DUMP
 				LOGI("Compiling SPIR-V file: (%s) %s\n",
 						Shader::stage_to_name(stage),
-						(to_string(current_program->get_shader(stage)->intrusive_hashmap_key) + ".spv").c_str());
+						(to_string(current_program->get_shader(stage)->intrusive_node.key) + ".spv").c_str());
 #endif
 				s.pName = "main";
 				s.stage = (VkShaderStageFlagBits)(1u << i);
@@ -15285,7 +15300,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	void CommandBuffer::flush_compute_pipeline()
 	{
 		Hasher h;
-		h.u64(current_program->intrusive_hashmap_key);
+		h.u64(current_program->intrusive_node.key);
 
 		// Spec constants.
 		const CombinedResourceLayout &layout = current_layout->get_resource_layout();
@@ -15323,9 +15338,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			h.u32(vbo.strides[bit]);
 		}
 
-		h.u64(compatible_render_pass->intrusive_hashmap_key);
+		h.u64(compatible_render_pass->intrusive_node.key);
 		h.u32(current_subpass);
-		h.u64(current_program->intrusive_hashmap_key);
+		h.u64(current_program->intrusive_node.key);
 		h.data(static_state.words, sizeof(static_state.words));
 
 		if (static_state.state.blend_enable)
@@ -15504,7 +15519,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			current_layout = program.get_pipeline_layout();
 			current_pipeline_layout = current_layout->get_layout();
 		}
-		else if (program.get_pipeline_layout()->intrusive_hashmap_key != current_layout->intrusive_hashmap_key)
+		else if (program.get_pipeline_layout()->intrusive_node.key != current_layout->intrusive_node.key)
 		{
 			const CombinedResourceLayout &new_layout = program.get_pipeline_layout()->get_resource_layout();
 			const CombinedResourceLayout &old_layout = current_layout->get_resource_layout();
@@ -16568,7 +16583,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	Program *Device::request_program(Shader *compute)
 	{
 		Hasher hasher;
-		hasher.u64(compute->intrusive_hashmap_key);
+		hasher.u64(compute->intrusive_node.key);
 
 		Hash hash = hasher.get();
 		Program *ret = programs.find(hash);
@@ -16586,8 +16601,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	Program *Device::request_program(Shader *vertex, Shader *fragment)
 	{
 		Hasher hasher;
-		hasher.u64(vertex->intrusive_hashmap_key);
-		hasher.u64(fragment->intrusive_hashmap_key);
+		hasher.u64(vertex->intrusive_node.key);
+		hasher.u64(fragment->intrusive_node.key);
 
 		Hash hash = hasher.get();
 		Program *ret = programs.find(hash);
