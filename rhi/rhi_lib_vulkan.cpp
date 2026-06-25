@@ -1632,14 +1632,22 @@ struct NAME {                                                                 \
     const T &back() const  { return items[count - 1]; }                       \
     T &front()             { return items[0]; }                               \
     const T &front() const { return items[0]; }                               \
-    void grow_by_one() {                                                      \
+    bool grow_by_one() {                                                      \
         if (count == cap) {                                                   \
             int ncap = cap ? cap * 2 : 64;                                    \
-            items = (T *)realloc(items, (size_t)ncap * sizeof(T));            \
+            T *nitems = (T *)realloc(items, (size_t)ncap * sizeof(T));        \
+            if (!nitems)                                                      \
+                return false;       /* keep old storage; caller must bail */  \
+            items = nitems;                                                   \
             cap = ncap;                                                       \
         }                                                                     \
+        return true;                                                          \
     }                                                                         \
-    void push(const T &v) { grow_by_one(); items[count++] = v; }              \
+    void push(const T &v) {                                                   \
+        T tmp = v;     /* copy before grow: v may alias items[] (realloc) */  \
+        if (grow_by_one())                                                    \
+            items[count++] = tmp;                                             \
+    }                                                                         \
     void pop_back() { if (count) count--; }                                   \
     void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }  \
 }
@@ -1922,7 +1930,10 @@ static inline uint32_t util_ctz(uint32_t x)
 		if (p->vac_count == p->vac_cap)
 		{
 			int ncap   = p->vac_cap ? p->vac_cap * 2 : 64;
-			p->vacants = (void **)realloc(p->vacants, (size_t)ncap * sizeof(void *));
+			void **nv = (void **)realloc(p->vacants, (size_t)ncap * sizeof(void *));
+			if (!nv)
+				return;
+			p->vacants = nv;
 			p->vac_cap = ncap;
 		}
 		p->vacants[p->vac_count++] = v;
@@ -1933,7 +1944,10 @@ static inline uint32_t util_ctz(uint32_t x)
 		if (p->mem_count == p->mem_cap)
 		{
 			int ncap   = p->mem_cap ? p->mem_cap * 2 : 8;
-			p->memory  = (void **)realloc(p->memory, (size_t)ncap * sizeof(void *));
+			void **nm = (void **)realloc(p->memory, (size_t)ncap * sizeof(void *));
+			if (!nm)
+				return;
+			p->memory  = nm;
 			p->mem_cap = ncap;
 		}
 		p->memory[p->mem_count++] = v;
@@ -2100,8 +2114,11 @@ static inline uint32_t util_ctz(uint32_t x)
 		size_t i;
 		if (n > h->cap)
 		{
-			h->items = (struct IntrusiveHashMapNode **)realloc(h->items,
+			struct IntrusiveHashMapNode **ni = (struct IntrusiveHashMapNode **)realloc(h->items,
 					n * sizeof(struct IntrusiveHashMapNode *));
+			if (!ni)
+				return;
+			h->items = ni;
 			h->cap   = n;
 		}
 		for (i = 0; i < n; i++)
@@ -2581,7 +2598,10 @@ static inline uint32_t util_ctz(uint32_t x)
 					if (vacants.count == vacants.cap)
 					{
 						size_t ncap   = vacants.cap ? vacants.cap * 2 : 16;
-						vacants.items = (T **)realloc(vacants.items, ncap * sizeof(T *));
+						T **nv = (T **)realloc(vacants.items, ncap * sizeof(T *));
+						if (!nv)
+							return;
+						vacants.items = nv;
 						vacants.cap   = ncap;
 					}
 					vacants.items[vacants.count++] = v;
@@ -3220,7 +3240,10 @@ struct DeviceAllocationVec
 	void push(const DeviceAllocation &v) {
 		if (count >= cap) {
 			int ncap = cap ? cap * 2 : 8;
-			items = (DeviceAllocation *)::realloc(items, (size_t)ncap * sizeof(DeviceAllocation));
+			DeviceAllocation *nitems = (DeviceAllocation *)::realloc(items, (size_t)ncap * sizeof(DeviceAllocation));
+			if (!nitems)
+				return;
+			items = nitems;
 			cap = ncap;
 		}
 		items[count++] = v;
@@ -3376,7 +3399,10 @@ struct AllocatorPtrVec
 	void push(Allocator *p) {
 		if (count >= cap) {
 			int ncap = cap ? cap * 2 : 8;
-			items = (Allocator **)::realloc(items, (size_t)ncap * sizeof(Allocator *));
+			Allocator **nitems = (Allocator **)::realloc(items, (size_t)ncap * sizeof(Allocator *));
+			if (!nitems)
+				return;
+			items = nitems;
 			cap = ncap;
 		}
 		items[count++] = p;
@@ -3516,7 +3542,10 @@ private:
 		void push(const Allocation &v) {
 			if (count >= cap) {
 				int ncap = cap ? cap * 2 : 8;
-				items = (Allocation *)::realloc(items, (size_t)ncap * sizeof(Allocation));
+				Allocation *nitems = (Allocation *)::realloc(items, (size_t)ncap * sizeof(Allocation));
+				if (!nitems)
+					return;
+				items = nitems;
 				cap = ncap;
 			}
 			items[count++] = v;
@@ -6071,7 +6100,10 @@ private:
 				void push(PerFrame *p) {
 					if (count >= cap) {
 						int ncap = cap ? cap * 2 : 8;
-						items = (PerFrame **)::realloc(items, (size_t)ncap * sizeof(PerFrame *));
+						PerFrame **nitems = (PerFrame **)::realloc(items, (size_t)ncap * sizeof(PerFrame *));
+						if (!nitems)
+							return;
+						items = nitems;
 						cap = ncap;
 					}
 					items[count++] = p;
@@ -6757,7 +6789,10 @@ extern retro_log_printf_t log_cb;
 		}
 		if (m->count == m->cap) {
 			int ncap = m->cap ? m->cap * 2 : 8;
-			m->entries = (HdTexEntry *)realloc(m->entries, (size_t)ncap * sizeof(HdTexEntry));
+			HdTexEntry *ne = (HdTexEntry *)realloc(m->entries, (size_t)ncap * sizeof(HdTexEntry));
+			if (!ne)
+				return;
+			m->entries = ne;
 			m->cap = ncap;
 		}
 		memmove(&m->entries[i + 1], &m->entries[i], (size_t)(m->count - i) * sizeof(HdTexEntry));
@@ -7240,7 +7275,10 @@ extern retro_log_printf_t log_cb;
 	static inline void enduring_arr_push(EnduringRectArr *v, TextureRect tr, bool alive) {
 		if (v->count == v->cap) {
 			int ncap = v->cap ? v->cap * 2 : 16;
-			v->a = (EnduringTextureRect *)realloc(v->a, (size_t)ncap * sizeof(EnduringTextureRect));
+			EnduringTextureRect *na = (EnduringTextureRect *)realloc(v->a, (size_t)ncap * sizeof(EnduringTextureRect));
+			if (!na)
+				return;
+			v->a = na;
 			v->cap = ncap;
 		}
 		texture_rect_retain(&tr);            /* the array now owns a reference */
@@ -7323,7 +7361,10 @@ extern retro_log_printf_t log_cb;
 				return;
 			size_t n = (size_t)src.count;
 			if (src.count > v.cap) {
-				v.items = (TextureRect *)realloc(v.items, n * sizeof(TextureRect));
+				TextureRect *ni = (TextureRect *)realloc(v.items, n * sizeof(TextureRect));
+				if (!ni)
+					return;
+				v.items = ni;
 				v.cap = src.count;
 			}
 			memcpy(v.items, src.items, n * sizeof(TextureRect));
@@ -7360,7 +7401,10 @@ extern retro_log_printf_t log_cb;
 		if (i < s->count && s->items[i] == v) return;
 		if (s->count == s->cap) {
 			int ncap = s->cap ? s->cap * 2 : 16;
-			s->items = (RectIndex *)realloc(s->items, (size_t)ncap * sizeof(RectIndex));
+			RectIndex *ni = (RectIndex *)realloc(s->items, (size_t)ncap * sizeof(RectIndex));
+			if (!ni)
+				return;
+			s->items = ni;
 			s->cap = ncap;
 		}
 		memmove(&s->items[i + 1], &s->items[i], (size_t)(s->count - i) * sizeof(RectIndex));
@@ -7742,7 +7786,10 @@ extern retro_log_printf_t log_cb;
 		void insert(uint32_t key, TextureUpload *val) {
 			if (count >= cap) {
 				int ncap = cap ? cap * 2 : 8;
-				items = (Entry *)realloc(items, (size_t)ncap * sizeof(Entry));
+				Entry *nitems = (Entry *)realloc(items, (size_t)ncap * sizeof(Entry));
+				if (!nitems)
+					return;
+				items = nitems;
 				cap = ncap;
 			}
 			items[count].key = key;
@@ -7793,7 +7840,10 @@ extern retro_log_printf_t log_cb;
 		void push(const TextureRectSaveState &v) {
 			if (count >= cap) {
 				int ncap = cap ? cap * 2 : 8;
-				items = (TextureRectSaveState *)realloc(items, (size_t)ncap * sizeof(TextureRectSaveState));
+				TextureRectSaveState *nitems = (TextureRectSaveState *)realloc(items, (size_t)ncap * sizeof(TextureRectSaveState));
+				if (!nitems)
+					return;
+				items = nitems;
 				cap = ncap;
 			}
 			items[count++] = v;
@@ -7997,7 +8047,12 @@ extern retro_log_printf_t log_cb;
 		need <<= 1;                                                            \
 		if (c->table_len != 0 && need <= c->table_len)                             \
 		return;                                                                \
-		c->table = (int *)realloc(c->table, need * sizeof(int));                   \
+		{                                                                          \
+			int *nt = (int *)realloc(c->table, need * sizeof(int));                \
+			if (!nt)                                                               \
+			return;                                                            \
+			c->table = nt;                                                         \
+		}                                                                          \
 		c->table_len = need;                                                       \
 		c->mask = need - 1;                                                        \
 		for (i = 0; i < need; i++)                                                 \
@@ -8330,7 +8385,10 @@ extern retro_log_printf_t log_cb;
 			return 0;
 		if (s->count == s->cap) {
 			int ncap = s->cap ? s->cap * 2 : 16;
-			s->keys = (uint64_t *)realloc(s->keys, (size_t)ncap * sizeof(uint64_t));
+			uint64_t *nk = (uint64_t *)realloc(s->keys, (size_t)ncap * sizeof(uint64_t));
+			if (!nk)
+				return 0;
+			s->keys = nk;
 			s->cap = ncap;
 		}
 		memmove(&s->keys[i + 1], &s->keys[i], (size_t)(s->count - i) * sizeof(uint64_t));
@@ -14292,13 +14350,31 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			const VkSubpassDescription &subpass = rp_info.pSubpasses[subpass_idx];
 
 			SubpassInfo subpass_info = {};
+			/* Defensive bounds: the internal RenderPassInfo builder always stays
+			 * within VULKAN_NUM_ATTACHMENTS and sets a non-NULL depth-stencil
+			 * pointer, but clamp and null-check here so a stray/large subpass can
+			 * never overrun the fixed-size arrays or deref NULL. */
 			subpass_info.num_color_attachments = subpass.colorAttachmentCount;
 			subpass_info.num_input_attachments = subpass.inputAttachmentCount;
-			subpass_info.depth_stencil_attachment = *subpass.pDepthStencilAttachment;
-			memcpy(subpass_info.color_attachments, subpass.pColorAttachments,
-					subpass.colorAttachmentCount * sizeof(*subpass.pColorAttachments));
-			memcpy(subpass_info.input_attachments, subpass.pInputAttachments,
-					subpass.inputAttachmentCount * sizeof(*subpass.pInputAttachments));
+			VK_ASSERT(subpass.colorAttachmentCount <= VULKAN_NUM_ATTACHMENTS);
+			VK_ASSERT(subpass.inputAttachmentCount <= VULKAN_NUM_ATTACHMENTS);
+			if (subpass_info.num_color_attachments > VULKAN_NUM_ATTACHMENTS)
+				subpass_info.num_color_attachments = VULKAN_NUM_ATTACHMENTS;
+			if (subpass_info.num_input_attachments > VULKAN_NUM_ATTACHMENTS)
+				subpass_info.num_input_attachments = VULKAN_NUM_ATTACHMENTS;
+			if (subpass.pDepthStencilAttachment)
+				subpass_info.depth_stencil_attachment = *subpass.pDepthStencilAttachment;
+			else
+			{
+				subpass_info.depth_stencil_attachment.attachment = VK_ATTACHMENT_UNUSED;
+				subpass_info.depth_stencil_attachment.layout     = VK_IMAGE_LAYOUT_UNDEFINED;
+			}
+			if (subpass_info.num_color_attachments)
+				memcpy(subpass_info.color_attachments, subpass.pColorAttachments,
+						subpass_info.num_color_attachments * sizeof(*subpass.pColorAttachments));
+			if (subpass_info.num_input_attachments)
+				memcpy(subpass_info.input_attachments, subpass.pInputAttachments,
+						subpass_info.num_input_attachments * sizeof(*subpass.pInputAttachments));
 
 			unsigned samples = 0;
 			for (unsigned i = 0; i < subpass_info.num_color_attachments; i++)
@@ -19555,8 +19631,11 @@ static char retro_slash = '/';
 		if (palette.data != NULL) {
 			if (cached_palette_hashes_count == cached_palette_hashes_cap) {
 				int ncap = cached_palette_hashes_cap ? cached_palette_hashes_cap * 2 : 16;
-				cached_palette_hashes = (CachedPaletteHash *)realloc(cached_palette_hashes,
+				CachedPaletteHash *nh = (CachedPaletteHash *)realloc(cached_palette_hashes,
 						(size_t)ncap * sizeof(CachedPaletteHash));
+				if (!nh)
+					return palette.hash;
+				cached_palette_hashes = nh;
 				cached_palette_hashes_cap = ncap;
 			}
 			cached_palette_hashes[cached_palette_hashes_count].rect = palette_rect;
@@ -19916,8 +19995,11 @@ static char retro_slash = '/';
 		if (!already_dumped) {
 			if (upload->dumped_modes_count == upload->dumped_modes_cap) {
 				int ncap = upload->dumped_modes_cap ? upload->dumped_modes_cap * 2 : 4;
-				upload->dumped_modes = (DumpedMode *)realloc(upload->dumped_modes,
+				DumpedMode *nm = (DumpedMode *)realloc(upload->dumped_modes,
 						(size_t)ncap * sizeof(DumpedMode));
+				if (!nm)
+					return;
+				upload->dumped_modes = nm;
 				upload->dumped_modes_cap = ncap;
 			}
 			upload->dumped_modes[upload->dumped_modes_count++] = dump_mode;
@@ -20573,7 +20655,10 @@ static char retro_slash = '/';
 				Cell *cell = &cells[y * LOOKUP_GRID_COLUMNS + x];
 				if (cell->count == cell->cap) {
 					int ncap = cell->cap ? cell->cap * 2 : 8;
-					cell->entries = (LookupEntry *)realloc(cell->entries, (size_t)ncap * sizeof(LookupEntry));
+					LookupEntry *ne = (LookupEntry *)realloc(cell->entries, (size_t)ncap * sizeof(LookupEntry));
+					if (!ne)
+						return;
+					cell->entries = ne;
 					cell->cap = ncap;
 				}
 				cell->entries[cell->count].rect = r;
@@ -21081,7 +21166,10 @@ struct SwapchainImageVec {
 	retro_vulkan_image &operator[](int i) { return items[i]; }
 	void resize(int n) {
 		if (n > cap) {
-			items = (retro_vulkan_image *)realloc(items, (size_t)n * sizeof(retro_vulkan_image));
+			retro_vulkan_image *ni = (retro_vulkan_image *)realloc(items, (size_t)n * sizeof(retro_vulkan_image));
+			if (!ni)
+				return;
+			items = ni;
 			cap = n;
 		}
 		if (n > count)
