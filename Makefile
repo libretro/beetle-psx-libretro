@@ -684,6 +684,7 @@ clean:
 	@echo rm -f "*.o"
 	@rm -f $(DEPS)
 	@echo rm -f "*.d"
+	find . \( -name '*.o' -o -name '*.d' \) -type f -delete
 	rm -f $(TARGET) $(TARGET_TMP)
 
 .PHONY: clean
