@@ -5062,45 +5062,43 @@ namespace Vulkan
 namespace Vulkan
 {
 	POD_VEC_DECLARE(CommandBufferVec, VkCommandBuffer);
-	class CommandPool
+	/* Per-queue transient command pool. Formerly a class with a constructor,
+	 * destructor and (never-used) move ctor/assignment; now a plain struct driven
+	 * by command_pool_init / command_pool_deinit. PerFrame embeds three of these
+	 * by value and never moves them, so the move machinery was dead and is gone.
+	 * signal_submitted stays inline (VULKAN_DEBUG-only bookkeeping). */
+	struct CommandPool
 	{
-		public:
-			CommandPool(VkDevice device, uint32_t queue_family_index);
-			~CommandPool();
+		VkDevice device = VK_NULL_HANDLE;
+		VkCommandPool pool = VK_NULL_HANDLE;
+		CommandBufferVec buffers = { NULL, 0, 0 };
+#ifdef VULKAN_DEBUG
+		CommandBufferVec in_flight = { NULL, 0, 0 };
+#endif
+		unsigned index = 0;
 
-			CommandPool(CommandPool &&) noexcept;
-			CommandPool &operator=(CommandPool &&) noexcept;
-			CommandPool(const CommandPool &) = delete;
-			void operator=(const CommandPool &) = delete;
-
-			void begin();
-			VkCommandBuffer request_command_buffer();
-			void signal_submitted(VkCommandBuffer cmd)
+		void begin();
+		VkCommandBuffer request_command_buffer();
+		void signal_submitted(VkCommandBuffer cmd)
+		{
+#ifdef VULKAN_DEBUG
+			int found = -1;
+			for (int i = 0; i < in_flight.count; i++)
+				if (in_flight.items[i] == cmd) { found = i; break; }
+			VK_ASSERT(found >= 0);
+			if (found >= 0)
 			{
-#ifdef VULKAN_DEBUG
-				int found = -1;
-				for (int i = 0; i < in_flight.count; i++)
-					if (in_flight.items[i] == cmd) { found = i; break; }
-				VK_ASSERT(found >= 0);
-				if (found >= 0)
-				{
-					in_flight.items[found] = in_flight.items[in_flight.count - 1];
-					in_flight.pop_back();
-				}
-#else
-				(void)cmd;
-#endif
+				in_flight.items[found] = in_flight.items[in_flight.count - 1];
+				in_flight.pop_back();
 			}
-
-		private:
-			VkDevice device = VK_NULL_HANDLE;
-			VkCommandPool pool = VK_NULL_HANDLE;
-			CommandBufferVec buffers = { NULL, 0, 0 };
-#ifdef VULKAN_DEBUG
-			CommandBufferVec in_flight = { NULL, 0, 0 };
+#else
+			(void)cmd;
 #endif
-			unsigned index = 0;
+		}
 	};
+
+	static void command_pool_init(CommandPool *cp, VkDevice device, uint32_t queue_family_index);
+	static void command_pool_deinit(CommandPool *cp);
 }
 
 /* ============================================================
@@ -12472,66 +12470,31 @@ BufferPool::~BufferPool()
 
 namespace Vulkan
 {
-CommandPool::CommandPool(VkDevice device, uint32_t queue_family_index)
-    : device(device)
+void command_pool_init(CommandPool *cp, VkDevice device, uint32_t queue_family_index)
 {
+	cp->device = device;
+	cp->pool = VK_NULL_HANDLE;
+	cp->buffers.items = NULL; cp->buffers.count = 0; cp->buffers.cap = 0;
+#ifdef VULKAN_DEBUG
+	cp->in_flight.items = NULL; cp->in_flight.count = 0; cp->in_flight.cap = 0;
+#endif
+	cp->index = 0;
+
 	VkCommandPoolCreateInfo info = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 	info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 	info.queueFamilyIndex = queue_family_index;
-	vkCreateCommandPool(device, &info, nullptr, &pool);
+	vkCreateCommandPool(device, &info, nullptr, &cp->pool);
 }
 
-CommandPool::CommandPool(CommandPool &&other) noexcept
+void command_pool_deinit(CommandPool *cp)
 {
-	*this = std::move(other);
-}
-
-CommandPool &CommandPool::operator=(CommandPool &&other) noexcept
-{
-	if (this != &other)
-	{
-		device = other.device;
-
-		// Free our owned resources first.
-		if (!buffers.empty())
-			vkFreeCommandBuffers(device, pool, buffers.size(), buffers.data());
-		if (pool != VK_NULL_HANDLE)
-			vkDestroyCommandPool(device, pool, nullptr);
-		buffers.free_storage();
-
-		// Adopt other's resources.
-		pool = other.pool;
-		buffers = other.buffers;          // POD_VEC: bitwise steal of the backing array
-		index = other.index;
+	if (!cp->buffers.empty())
+		vkFreeCommandBuffers(cp->device, cp->pool, cp->buffers.size(), cp->buffers.data());
+	if (cp->pool != VK_NULL_HANDLE)
+		vkDestroyCommandPool(cp->device, cp->pool, nullptr);
+	cp->buffers.free_storage();
 #ifdef VULKAN_DEBUG
-		in_flight.free_storage();         // free our own debug set first
-		in_flight = other.in_flight;      // POD_VEC: bitwise steal of the backing array
-#endif
-
-		// Leave other in a destructor-safe state (no double-free).
-		other.pool = VK_NULL_HANDLE;
-		other.index = 0;
-		other.buffers.items = NULL;       // source no longer owns the array
-		other.buffers.count = 0;
-		other.buffers.cap = 0;
-#ifdef VULKAN_DEBUG
-		other.in_flight.items = NULL;     // source no longer owns the array
-		other.in_flight.count = 0;
-		other.in_flight.cap = 0;
-#endif
-	}
-	return *this;
-}
-
-CommandPool::~CommandPool()
-{
-	if (!buffers.empty())
-		vkFreeCommandBuffers(device, pool, buffers.size(), buffers.data());
-	if (pool != VK_NULL_HANDLE)
-		vkDestroyCommandPool(device, pool, nullptr);
-	buffers.free_storage();
-#ifdef VULKAN_DEBUG
-	in_flight.free_storage();
+	cp->in_flight.free_storage();
 #endif
 }
 
@@ -17089,10 +17052,10 @@ namespace Vulkan
 	Device::PerFrame::PerFrame(Device *device)
 		: device(device->get_device())
 		  , managers(device->managers)
-		  , graphics_cmd_pool(device->get_device(), device->graphics_queue_family_index)
-		  , compute_cmd_pool(device->get_device(), device->compute_queue_family_index)
-		  , transfer_cmd_pool(device->get_device(), device->transfer_queue_family_index)
 	{
+		command_pool_init(&graphics_cmd_pool, device->get_device(), device->graphics_queue_family_index);
+		command_pool_init(&compute_cmd_pool, device->get_device(), device->compute_queue_family_index);
+		command_pool_init(&transfer_cmd_pool, device->get_device(), device->transfer_queue_family_index);
 		/* POD_VEC members have no constructor; zero-initialise them. */
 		memset(&wait_fences, 0, sizeof(wait_fences));
 		memset(&recycle_fences, 0, sizeof(recycle_fences));
@@ -17313,6 +17276,12 @@ namespace Vulkan
 	Device::PerFrame::~PerFrame()
 	{
 		begin();
+		/* The command pools no longer self-destruct (their dtor became
+		 * command_pool_deinit); tear them down explicitly, as the implicit member
+		 * destruction used to. */
+		command_pool_deinit(&graphics_cmd_pool);
+		command_pool_deinit(&compute_cmd_pool);
+		command_pool_deinit(&transfer_cmd_pool);
 		/* Release the POD_VEC backing storage (begin() only resets the counts). */
 		wait_fences.free_storage();
 		recycle_fences.free_storage();
