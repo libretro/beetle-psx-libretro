@@ -2664,71 +2664,115 @@ static inline uint32_t util_ctz(uint32_t x)
 				struct ObjectPoolRaw pool;
 		};
 
-	template <typename T>
-		struct TemporaryHashmapEnabled
-		{
-			Hash hash = 0;
-			unsigned index = 0;
-		};
+	/* Concrete temporary-hashmap node base (de-templated TemporaryHashmapEnabled<T>
+	 * plus the intrusive list links the node carried via IntrusiveListEnabled<T>).
+	 * Every TemporaryHashmap node type embeds this; because one of them
+	 * (FramebufferNode) also has a non-empty Framebuffer base, this base is NOT
+	 * necessarily at offset 0, so the ring lists recover the node with container-of
+	 * (TH_NODE_OF) rather than an offset-0 cast. */
+	struct TemporaryHashmapNode
+	{
+		struct IntrusiveListNode list_node;
+		Hash hash;
+		unsigned index;
+	};
+
+	/* Recover the owning node from a ring list-node pointer. NODE_TYPE names the
+	 * concrete node, MEMBER is its TemporaryHashmapNode member (always th_node). */
+	#define TH_NODE_OF(NODE_TYPE, ln) \
+		((NODE_TYPE *)((char *)(ln) - offsetof(NODE_TYPE, th_node) \
+			- offsetof(struct TemporaryHashmapNode, list_node)))
 
 	template <typename T, unsigned RingSize = 4, bool ReuseObjects = false>
 		class TemporaryHashmap
 		{
 			public:
+				TemporaryHashmap()
+				{
+					unsigned i;
+					for (i = 0; i < RingSize; i++)
+						ilist_clear(&rings[i]);
+					object_pool_raw_init(&object_pool, sizeof(T));
+					index = 0;
+					vacants.items = NULL;
+					vacants.count = 0;
+					vacants.cap   = 0;
+				}
+
 				~TemporaryHashmap()
 				{
 					clear();
+					object_pool_raw_deinit(&object_pool);
+					::free(vacants.items);
 				}
 
 				void clear()
 				{
-					for (IntrusiveList<T> &ring : rings)
+					unsigned r;
+					for (r = 0; r < RingSize; r++)
 					{
-						for (T &node : ring)
-							object_pool.free(static_cast<T *>(&node));
-						ring.clear();
+						struct IntrusiveListNode *n = ilist_begin(&rings[r]);
+						while (n)
+						{
+							T *node = TH_NODE_OF(T, n);
+							n = n->next;
+							node->~T();
+							object_pool_raw_free(&object_pool, node);
+						}
+						ilist_clear(&rings[r]);
 					}
 					hashmap.clear();
 
 					{
-						size_t i, n = vacants.size();
+						size_t i, n = vacants.count;
 						for (i = 0; i < n; i++)
-							object_pool.free(static_cast<T *>(&*vacants[i]));
+						{
+							T *node = vacants.items[i];
+							node->~T();
+							object_pool_raw_free(&object_pool, node);
+						}
 					}
-					vacants.clear();
-					object_pool.clear();
+					vacants.count = 0;
+					object_pool_raw_clear(&object_pool);
 				}
 
 				void begin_frame()
 				{
+					struct IntrusiveListNode *n;
 					index = (index + 1) & (RingSize - 1);
-					for (T &node : rings[index])
+					n = ilist_begin(&rings[index]);
+					while (n)
 					{
-						hashmap.erase(node.hash);
-						/* Folded free_object: ReuseObjects is a compile-time constant, so
-						 * the dead branch is eliminated - reuse keeps the node in the vacant
-						 * pool, otherwise it goes back to the object pool. */
+						T *node = TH_NODE_OF(T, n);
+						n = n->next;
+						hashmap.erase(node->th_node.hash);
+						/* ReuseObjects is a compile-time constant, so the dead branch is
+						 * eliminated - reuse keeps the node in the vacant pool, otherwise
+						 * it goes back to the object pool. */
 						if (ReuseObjects)
-							vacants.push(&node);
+							vacant_push(node);
 						else
-							object_pool.free(&node);
+						{
+							node->~T();
+							object_pool_raw_free(&object_pool, node);
+						}
 					}
-					rings[index].clear();
+					ilist_clear(&rings[index]);
 				}
 
 				T *request(Hash hash)
 				{
-					IntrusivePODWrapper<typename IntrusiveList<T>::Iterator> *v = hashmap.find(hash);
+					IntrusivePODWrapper<void *> *v = hashmap.find(hash);
 					if (v)
 					{
-						typename IntrusiveList<T>::Iterator node = v->get();
-						if (node->index != index)
+						T *node = (T *)v->get();
+						if (node->th_node.index != index)
 						{
-							rings[index].move_to_front(rings[node->index], node);
-							node->index = index;
+							ilist_move_to_front(&rings[index], &rings[node->th_node.index],
+									&node->th_node.list_node);
+							node->th_node.index = index;
 						}
-
-						return &*node;
+						return node;
 					}
 					else
 						return NULL;
@@ -2737,74 +2781,63 @@ static inline uint32_t util_ctz(uint32_t x)
 				template <typename... P>
 					void make_vacant(P &&... p)
 					{
-						vacants.push(object_pool.allocate(std::forward<P>(p)...));
+						void *slot = object_pool_raw_allocate(&object_pool);
+						T *node = new (slot) T(std::forward<P>(p)...);
+						vacant_push(node);
 					}
 
 				T *request_vacant(Hash hash)
 				{
-					if (vacants.empty())
+					T *top;
+					if (vacants.count == 0)
 						return NULL;
 
-					typename IntrusiveList<T>::Iterator top = vacants.back();
-					vacants.pop_back();
-					top->index = index;
-					top->hash = hash;
-					hashmap.emplace_replace(hash, top);
-					rings[index].insert_front(top);
-					return &*top;
+					top = vacants.items[--vacants.count];
+					top->th_node.index = index;
+					top->th_node.hash  = hash;
+					hashmap.emplace_replace(hash, (void *)top);
+					ilist_insert_front(&rings[index], &top->th_node.list_node);
+					return top;
 				}
 
 				template <typename... P>
 					T *emplace(Hash hash, P &&... p)
 					{
-						T *node = object_pool.allocate(std::forward<P>(p)...);
-						node->index = index;
-						node->hash = hash;
-						hashmap.emplace_replace(hash, node);
-						rings[index].insert_front(node);
+						void *slot = object_pool_raw_allocate(&object_pool);
+						T *node = new (slot) T(std::forward<P>(p)...);
+						node->th_node.index = index;
+						node->th_node.hash  = hash;
+						hashmap.emplace_replace(hash, (void *)node);
+						ilist_insert_front(&rings[index], &node->th_node.list_node);
 						return node;
 					}
 
 			private:
-				/* POD list of vacant-node iterators, replacing
-				 * std::vector<IntrusiveList<T>::Iterator>. The Iterator is a
-				 * single-pointer trivially-copyable wrapper, so a plain realloc'd
-				 * array suffices. Only empty/back/pop_back/clear/push and index
-				 * iteration are used. push takes an Iterator (the call sites pass a
-				 * node pointer, which converts implicitly as before). */
+				/* POD list of vacant node pointers, replacing
+				 * std::vector<IntrusiveList<T>::Iterator>. Only push and a
+				 * pop-from-the-back (in request_vacant) are needed. */
 				struct VacantList
 				{
-					typedef typename IntrusiveList<T>::Iterator Iter;
-					Iter *items;
+					T    **items;
 					size_t count;
 					size_t cap;
-
-					VacantList() : items(NULL), count(0), cap(0) {}
-					~VacantList() { ::free(items); items = NULL; count = 0; cap = 0; }
-
-					bool empty() const { return count == 0; }
-					size_t size() const { return count; }
-					Iter &operator[](size_t i) { return items[i]; }
-					Iter &back() { return items[count - 1]; }
-					void pop_back() { if (count) count--; }
-					void clear() { count = 0; }
-
-					void push(const Iter &v)
-					{
-						if (count == cap)
-						{
-							size_t ncap = cap ? cap * 2 : 16;
-							items = (Iter *)realloc(items, ncap * sizeof(Iter));
-							cap = ncap;
-						}
-						items[count++] = v;
-					}
 				};
 
-				IntrusiveList<T> rings[RingSize];
-				ObjectPool<T> object_pool;
-				unsigned index = 0;
-				IntrusiveHashMap<IntrusivePODWrapper<typename IntrusiveList<T>::Iterator>> hashmap;
+				void vacant_push(T *v)
+				{
+					if (vacants.count == vacants.cap)
+					{
+						size_t ncap   = vacants.cap ? vacants.cap * 2 : 16;
+						vacants.items = (T **)realloc(vacants.items, ncap * sizeof(T *));
+						vacants.cap   = ncap;
+					}
+					vacants.items[vacants.count++] = v;
+				}
+
+				struct IntrusiveListC rings[RingSize];
+				struct ObjectPoolRaw object_pool;
+				unsigned index;
+				IntrusiveHashMap<IntrusivePODWrapper<void *> > hashmap;
 				VacantList vacants;
 		};
 
@@ -4842,8 +4875,9 @@ private:
 			void clear();
 
 		private:
-			struct DescriptorSetNode : TemporaryHashmapEnabled<DescriptorSetNode>, IntrusiveListEnabled<DescriptorSetNode>
+			struct DescriptorSetNode
 		{
+			struct TemporaryHashmapNode th_node;
 			DescriptorSetNode(VkDescriptorSet set)
 				: set(set)
 			{
@@ -5204,10 +5238,9 @@ private:
 			void clear();
 
 		private:
-			struct FramebufferNode : TemporaryHashmapEnabled<FramebufferNode>,
-			IntrusiveListEnabled<FramebufferNode>,
-			Framebuffer
+			struct FramebufferNode : Framebuffer
 		{
+			struct TemporaryHashmapNode th_node;
 			FramebufferNode(Device *device, const RenderPass &rp, const RenderPassInfo &info)
 				: Framebuffer(device, rp, info)
 			{
@@ -5243,8 +5276,9 @@ private:
 			void clear();
 
 		private:
-			struct TransientNode : TemporaryHashmapEnabled<TransientNode>, IntrusiveListEnabled<TransientNode>
+			struct TransientNode
 		{
+			struct TemporaryHashmapNode th_node;
 			TransientNode(ImageHandle handle)
 				: handle(handle)
 			{
