@@ -7922,12 +7922,12 @@ namespace PSX
 
 		RestorableRectSaveState() : rect(), hash(0) {}
 		RestorableRectSaveState(RestorableRectSaveState &&o) noexcept
-			: rect(o.rect), hash(o.hash), to_restore(std::move(o.to_restore)) {}
+			: rect(o.rect), hash(o.hash), to_restore(static_cast<TextureRectSaveStateVec &&>(o.to_restore)) {}
 		RestorableRectSaveState &operator=(RestorableRectSaveState &&o) noexcept {
 			if (this != &o) {
 				rect = o.rect;
 				hash = o.hash;
-				to_restore = std::move(o.to_restore);
+				to_restore = static_cast<TextureRectSaveStateVec &&>(o.to_restore);
 			}
 			return *this;
 		}
@@ -9693,7 +9693,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	Renderer::OwnedU32Buf vram;
 	vram.assign(src, FB_WIDTH * FB_HEIGHT);
 	device->unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
-	return { std::move(vram), render_state, tracker.save_state() };
+	return { static_cast<Renderer::OwnedU32Buf &&>(vram), render_state, tracker.save_state() };
 }
 
 void Renderer::init_primitive_pipelines()
@@ -12772,7 +12772,7 @@ BufferBlock BufferPool::request_block(VkDeviceSize minimum_size)
 	}
 	else
 	{
-		BufferBlock back = std::move(blocks.back());
+		BufferBlock back = static_cast<BufferBlock &&>(blocks.back());
 		blocks.pop_back();
 
 		back.mapped = static_cast<uint8_t *>(device->map_host_buffer(*back.cpu, MEMORY_ACCESS_WRITE_BIT));
@@ -16795,7 +16795,7 @@ namespace Vulkan
 		if (block.offset == 0)
 		{
 			if (block.size == pool.get_block_size())
-				pool.recycle_block(std::move(block));
+				pool.recycle_block(static_cast<BufferBlock &&>(block));
 		}
 		else
 		{
@@ -16827,7 +16827,7 @@ namespace Vulkan
 
 	void Device::submit(CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 	{
-		submit_nolock(std::move(cmd), fence, semaphore_count, semaphores);
+		submit_nolock(static_cast<CommandBufferHandle &&>(cmd), fence, semaphore_count, semaphores);
 	}
 
 	CommandBuffer::Type Device::get_physical_queue_type(CommandBuffer::Type queue_type) const
@@ -16853,7 +16853,7 @@ namespace Vulkan
 
 		pool.signal_submitted(cmd->get_command_buffer());
 		cmd->end();
-		submissions.push(std::move(cmd));
+		submissions.push(static_cast<CommandBufferHandle &&>(cmd));
 
 		VkFence cleared_fence = VK_NULL_HANDLE;
 
@@ -17508,9 +17508,9 @@ namespace Vulkan
 			alloc.free_immediate(managers->memory);
 
 		for (BufferBlock &block : vbo_blocks)
-			managers->vbo.recycle_block(std::move(block));
+			managers->vbo.recycle_block(static_cast<BufferBlock &&>(block));
 		for (BufferBlock &block : ubo_blocks)
-			managers->ubo.recycle_block(std::move(block));
+			managers->ubo.recycle_block(static_cast<BufferBlock &&>(block));
 		vbo_blocks.clear();
 		ubo_blocks.clear();
 
@@ -19845,7 +19845,7 @@ namespace PSX
 		RestorableRect rr;
 		rr.rect = rect;
 		rr.hash = hash;
-		rr.to_restore = std::move(to_restore);
+		rr.to_restore = static_cast<OwnedRectVec &&>(to_restore);
 		restorable_rects.push(rr);
 	}
 
@@ -20849,7 +20849,7 @@ namespace PSX
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilt page: no change\n");
 				return;
 			}
-			page.fusion = std::move(fusion);
+			page.fusion = static_cast<FusionRects &&>(fusion);
 		}
 
 		if (page.fusion.rects.size() == 0) {
@@ -21136,7 +21136,7 @@ namespace PSX
 			saved.rect = r.rect;
 			for (TextureRect &t : r.to_restore)
 				saved.to_restore.push(to_save_state(t, state.uploads));
-			state.restorable.push(std::move(saved));
+			state.restorable.push(static_cast<RestorableRectSaveState &&>(saved));
 		}
 
 		return state;
