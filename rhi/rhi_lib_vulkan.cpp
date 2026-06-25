@@ -5945,7 +5945,7 @@ namespace Vulkan
 				void begin();
 
 				VkDevice device;
-				Managers &managers;
+				Managers *managers;
 				CommandPool graphics_cmd_pool;
 				CommandPool compute_cmd_pool;
 				CommandPool transfer_cmd_pool;
@@ -17212,7 +17212,7 @@ namespace Vulkan
 
 	Device::PerFrame::PerFrame(Device *device)
 		: device(device->get_device())
-		  , managers(device->managers)
+		  , managers(&device->managers)
 	{
 		command_pool_init(&graphics_cmd_pool, device->get_device(), device->graphics_queue_family_index);
 		command_pool_init(&compute_cmd_pool, device->get_device(), device->compute_queue_family_index);
@@ -17384,7 +17384,7 @@ namespace Vulkan
 		{
 			vkResetFences(device, recycle_fences.size(), recycle_fences.data());
 			for (VkFence &fence : recycle_fences)
-				managers.fence.recycle_fence(fence);
+				managers->fence.recycle_fence(fence);
 			recycle_fences.clear();
 		}
 
@@ -17410,15 +17410,15 @@ namespace Vulkan
 			vkDestroySemaphore(device, semaphore, nullptr);
 		for (VkSemaphore &semaphore : recycled_semaphores)
 		{
-			managers.semaphore.recycle(semaphore);
+			managers->semaphore.recycle(semaphore);
 		}
 		for (DeviceAllocation &alloc : allocations)
-			alloc.free_immediate(managers.memory);
+			alloc.free_immediate(managers->memory);
 
 		for (BufferBlock &block : vbo_blocks)
-			managers.vbo.recycle_block(std::move(block));
+			managers->vbo.recycle_block(std::move(block));
 		for (BufferBlock &block : ubo_blocks)
-			managers.ubo.recycle_block(std::move(block));
+			managers->ubo.recycle_block(std::move(block));
 		vbo_blocks.clear();
 		ubo_blocks.clear();
 
