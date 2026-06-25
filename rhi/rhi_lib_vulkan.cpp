@@ -1962,24 +1962,40 @@ namespace Util
 		class ObjectPool
 		{
 			public:
+				ObjectPool()
+					: vacants(NULL), vac_count(0), vac_cap(0),
+					  memory(NULL), mem_count(0), mem_cap(0)
+				{
+				}
+
+				~ObjectPool()
+				{
+					clear();
+					::free(vacants);
+					::free(memory);
+					vacants = NULL;
+					memory  = NULL;
+					vac_cap = 0;
+					mem_cap = 0;
+				}
+
 				template<typename... P>
 					T *allocate(P &&... p)
 					{
-						if (vacants.empty())
+						if (vac_count == 0)
 						{
-							unsigned num_objects = 64u << memory.size();
+							unsigned num_objects = 64u << (unsigned)mem_count;
 							T *ptr = static_cast<T *>(malloc(num_objects * sizeof(T)));
 							if (!ptr)
 								return nullptr;
 
 							for (unsigned i = 0; i < num_objects; i++)
-								vacants.push_back(&ptr[i]);
+								vac_push(&ptr[i]);
 
-							memory.emplace_back(ptr);
+							mem_push(ptr);
 						}
 
-						T *ptr = vacants.back();
-						vacants.pop_back();
+						T *ptr = vacants[--vac_count];
 						new(ptr) T(std::forward<P>(p)...);
 						return ptr;
 					}
@@ -1987,27 +2003,56 @@ namespace Util
 				void free(T *ptr)
 				{
 					ptr->~T();
-					vacants.push_back(ptr);
+					vac_push(ptr);
 				}
 
 				void clear()
 				{
-					vacants.clear();
-					memory.clear();
+					/* memory[] holds the malloc'd slab bases; free each
+					 * (the std::unique_ptr<T, MallocDeleter> members used to
+					 * do this on destruction). vacants[] just indexes into
+					 * those slabs, so it is only reset, not freed here. */
+					int i;
+					for (i = 0; i < mem_count; i++)
+						::free(memory[i]);
+					vac_count = 0;
+					mem_count = 0;
 				}
 
 			protected:
-				std::vector<T *> vacants;
-
-				struct MallocDeleter
+				/* POD owning pointer-arrays replacing std::vector<T *> vacants and
+				 * std::vector<std::unique_ptr<T, MallocDeleter>> memory, so the pool
+				 * has no STL dependency. vacants holds free object slots; memory
+				 * holds the slab base pointers to free. */
+				void vac_push(T *v)
 				{
-					void operator()(T *ptr)
+					if (vac_count == vac_cap)
 					{
-						::free(ptr);
+						int ncap = vac_cap ? vac_cap * 2 : 64;
+						vacants = (T **)realloc(vacants, (size_t)ncap * sizeof(T *));
+						vac_cap = ncap;
 					}
-				};
+					vacants[vac_count++] = v;
+				}
 
-				std::vector<std::unique_ptr<T, MallocDeleter>> memory;
+				void mem_push(T *v)
+				{
+					if (mem_count == mem_cap)
+					{
+						int ncap = mem_cap ? mem_cap * 2 : 8;
+						memory = (T **)realloc(memory, (size_t)ncap * sizeof(T *));
+						mem_cap = ncap;
+					}
+					memory[mem_count++] = v;
+				}
+
+				T **vacants;
+				int vac_count;
+				int vac_cap;
+
+				T **memory;
+				int mem_count;
+				int mem_cap;
 		};
 
 	template <typename T>
