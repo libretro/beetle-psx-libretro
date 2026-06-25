@@ -1878,15 +1878,14 @@ namespace Util
 
 				void reset()
 				{
-					using ReferenceBase = IntrusivePtrEnabled<
-						typename T::EnabledBase,
-							 typename T::EnabledDeleter,
-							 typename T::EnabledReferenceOp>;
-
-					// Static up-cast here to avoid potential issues with multiple intrusive inheritance.
-					// Also makes sure that the pointer type actually inherits from this type.
+					// Dispatch the refcount through T directly (ordinary member
+					// lookup) rather than an explicit up-cast to the CRTP base.
+					// These pointee types have a single IntrusivePtrEnabled base,
+					// so the lookup is unambiguous and the behaviour is identical;
+					// doing it this way lets a pointee provide release_reference/
+					// add_reference as plain members instead of via the base.
 					if (data)
-						static_cast<ReferenceBase *>(data)->release_reference();
+						data->release_reference();
 					data = nullptr;
 				}
 
@@ -1896,34 +1895,22 @@ namespace Util
 						static_assert(std::is_base_of<T, U>::value,
 								"Cannot safely assign downcasted intrusive pointers.");
 
-						using ReferenceBase = IntrusivePtrEnabled<
-							typename T::EnabledBase,
-								 typename T::EnabledDeleter,
-								 typename T::EnabledReferenceOp>;
-
 						reset();
 						data = static_cast<T *>(other.data);
 
-						// Static up-cast here to avoid potential issues with multiple intrusive inheritance.
-						// Also makes sure that the pointer type actually inherits from this type.
 						if (data)
-							static_cast<ReferenceBase *>(data)->add_reference();
+							data->add_reference();
 						return *this;
 					}
 
 				IntrusivePtr &operator=(const IntrusivePtr &other)
 				{
-					using ReferenceBase = IntrusivePtrEnabled<
-						typename T::EnabledBase,
-					typename T::EnabledDeleter,
-					typename T::EnabledReferenceOp>;
-
 					if (this != &other)
 					{
 						reset();
 						data = other.data;
 						if (data)
-							static_cast<ReferenceBase *>(data)->add_reference();
+							data->add_reference();
 					}
 					return *this;
 				}
