@@ -4274,10 +4274,23 @@ namespace Vulkan
 		void operator()(FenceHolder *fence);
 	};
 
-	class FenceHolder : public Util::IntrusivePtrEnabled<FenceHolder, FenceHolderDeleter, HandleCounter>
+	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
+	 * CRTP base (IntrusivePtr dispatches release_reference/add_reference through
+	 * the pointee directly). Mirrors the SemaphoreHolder conversion. */
+	class FenceHolder
 	{
 		public:
 			friend struct FenceHolderDeleter;
+
+			void release_reference()
+			{
+				if (reference_count.release())
+					FenceHolderDeleter()(this);
+			}
+			void add_reference()
+			{
+				reference_count.add_ref();
+			}
 
 			~FenceHolder();
 			void wait();
@@ -4290,6 +4303,7 @@ namespace Vulkan
 
 			Device *device;
 			VkFence fence;
+			HandleCounter reference_count;
 	};
 
 	using Fence = Util::IntrusivePtr<FenceHolder>;
