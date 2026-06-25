@@ -2259,18 +2259,21 @@ namespace Util
 					bool success;
 					do
 					{
-						for (T *&v : values)
-							v = nullptr;
+						{
+							size_t i, n = values.size();
+							for (i = 0; i < n; i++)
+								values[i] = nullptr;
+						}
 
 						if (values.empty())
 						{
-							values.resize(InitialSize);
+							values.resize_null(InitialSize);
 							load_count = InitialLoadCount;
 							//LOGI("Growing hashmap to %u elements.\n", InitialSize);
 						}
 						else
 						{
-							values.resize(values.size() * 2);
+							values.resize_null(values.size() * 2);
 							//LOGI("Growing hashmap to %u elements.\n", unsigned(values.size()));
 							load_count++;
 						}
@@ -2288,7 +2291,49 @@ namespace Util
 					} while (!success);
 				}
 
-				std::vector<T *> values;
+				/* POD open-addressing table backing, replacing std::vector<T *>.
+				 * Only the operations the holder uses are provided: empty/size,
+				 * indexing, clear, and resize_null which (re)allocates to n slots
+				 * and NULL-fills all of them - matching grow(), which nulls the
+				 * existing slots before resizing and relies on the new slots being
+				 * null. */
+				struct ValueTable
+				{
+					T **items;
+					size_t count;
+					size_t cap;
+
+					ValueTable() : items(NULL), count(0), cap(0) {}
+					~ValueTable() { ::free(items); items = NULL; count = 0; cap = 0; }
+
+					bool empty() const { return count == 0; }
+					size_t size() const { return count; }
+					T *&operator[](size_t i) { return items[i]; }
+					T *const &operator[](size_t i) const { return items[i]; }
+
+					void clear()
+					{
+						::free(items);
+						items = NULL;
+						count = 0;
+						cap   = 0;
+					}
+
+					void resize_null(size_t n)
+					{
+						size_t i;
+						if (n > cap)
+						{
+							items = (T **)realloc(items, n * sizeof(T *));
+							cap   = n;
+						}
+						for (i = 0; i < n; i++)
+							items[i] = NULL;
+						count = n;
+					}
+				};
+
+				ValueTable values;
 				IntrusiveList<T> list;
 				unsigned load_count = 0;
 		};
