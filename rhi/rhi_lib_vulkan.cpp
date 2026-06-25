@@ -4934,7 +4934,19 @@ namespace Vulkan
 	class FramebufferAllocator
 	{
 		public:
-			FramebufferAllocator(Device *device);
+			/* Default-constructible; Device supplied via init() instead of a
+			 * (Device *) constructor. deinit() performs the destructor's teardown
+			 * (clearing the framebuffer cache, freeing the pooled nodes). */
+			void init(Device *device_)
+			{
+				device = device_;
+			}
+
+			void deinit()
+			{
+				clear();
+			}
+
 			Framebuffer &request_framebuffer(const RenderPassInfo &info);
 
 			void begin_frame();
@@ -4958,9 +4970,19 @@ namespace Vulkan
 	class AttachmentAllocator
 	{
 		public:
-			AttachmentAllocator(Device *device)
-				: device(device)
+			/* Default-constructible now; the owning Device is supplied via init()
+			 * rather than a (Device *) constructor, so an embedding object does
+			 * not have to construct it in its initialiser list. deinit() performs
+			 * the teardown the destructor used to (clearing the transient cache,
+			 * which frees the pooled nodes). */
+			void init(Device *device_)
 			{
+				device = device_;
+			}
+
+			void deinit()
+			{
+				clear();
 			}
 
 			ImageView &request_attachment(unsigned width, unsigned height, VkFormat format,
@@ -14512,11 +14534,6 @@ namespace Vulkan
 			device->destroy_framebuffer_nolock(framebuffer);
 	}
 
-	FramebufferAllocator::FramebufferAllocator(Device *device)
-		: device(device)
-	{
-	}
-
 	void FramebufferAllocator::clear()
 	{
 		framebuffers.clear();
@@ -16350,9 +16367,9 @@ using namespace Util;
 namespace Vulkan
 {
 	Device::Device()
-		: framebuffer_allocator(this)
-		  , transient_allocator(this)
 	{
+		framebuffer_allocator.init(this);
+		transient_allocator.init(this);
 	}
 
 	void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages,
