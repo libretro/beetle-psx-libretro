@@ -12554,6 +12554,11 @@ FenceHolder::~FenceHolder()
 
 void FenceHolder::wait()
 {
+	/* A null fence means no work was ever submitted against it (e.g. a failed
+	 * vkQueueSubmit handed back VK_NULL_HANDLE); there is nothing to wait for and
+	 * waiting on a null handle is invalid, so treat it as already signalled. */
+	if (fence == VK_NULL_HANDLE)
+		return;
 	if (vkWaitForFences(device->get_device(), 1, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
 		LOGE("Failed to wait for fence!\n");
 }
@@ -16903,8 +16908,20 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		if (fence)
 		{
-			frame().wait_fences.push(cleared_fence);
-			*fence = cleared_fence;
+			if (result == VK_SUCCESS)
+			{
+				/* See submit_queue(): never enqueue a fence that was handed to a
+				 * failed submit - it will never signal and would hang the frame's
+				 * vkWaitForFences. Recycle it and return a null fence instead. */
+				frame().wait_fences.push(cleared_fence);
+				*fence = cleared_fence;
+			}
+			else
+			{
+				if (cleared_fence != VK_NULL_HANDLE)
+					managers.fence.recycle_fence(cleared_fence);
+				*fence = VK_NULL_HANDLE;
+			}
 			data.need_fence = false;
 		}
 		else
@@ -17112,8 +17129,22 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		if (fence)
 		{
-			frame().wait_fences.push(cleared_fence);
-			*fence = cleared_fence;
+			if (result == VK_SUCCESS)
+			{
+				/* Only wait on a fence that is actually associated with submitted
+				 * work. If the submit failed the fence will never be signalled, so
+				 * enqueuing it for the next PerFrame::begin() would wedge that frame
+				 * in vkWaitForFences(UINT64_MAX) forever. Recycle it instead and hand
+				 * the caller a null fence. */
+				frame().wait_fences.push(cleared_fence);
+				*fence = cleared_fence;
+			}
+			else
+			{
+				if (cleared_fence != VK_NULL_HANDLE)
+					managers.fence.recycle_fence(cleared_fence);
+				*fence = VK_NULL_HANDLE;
+			}
 			data.need_fence = false;
 		}
 		else
@@ -17162,22 +17193,28 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		if (transfer.need_fence || !frame().transfer_submissions.empty())
 		{
+			fence = VK_NULL_HANDLE;
 			submit_queue(CommandBuffer::Type_AsyncTransfer, &fence, 0, NULL);
-			frame().recycle_fences.push(fence);
+			if (fence != VK_NULL_HANDLE)
+				frame().recycle_fences.push(fence);
 			transfer.need_fence = false;
 		}
 
 		if (graphics.need_fence || !frame().graphics_submissions.empty())
 		{
+			fence = VK_NULL_HANDLE;
 			submit_queue(CommandBuffer::Type_Generic, &fence, 0, NULL);
-			frame().recycle_fences.push(fence);
+			if (fence != VK_NULL_HANDLE)
+				frame().recycle_fences.push(fence);
 			graphics.need_fence = false;
 		}
 
 		if (compute.need_fence || !frame().compute_submissions.empty())
 		{
+			fence = VK_NULL_HANDLE;
 			submit_queue(CommandBuffer::Type_AsyncCompute, &fence, 0, NULL);
-			frame().recycle_fences.push(fence);
+			if (fence != VK_NULL_HANDLE)
+				frame().recycle_fences.push(fence);
 			compute.need_fence = false;
 		}
 	}
