@@ -46,6 +46,30 @@ static bool rhi_soft_open(bool is_pal)
    return true;
 }
 
+/* Push the frontend callbacks into whatever backend rhi_type now names. The
+ * frontend sets video_cb / environ_cb (in libretro_cbs) once, conventionally
+ * before a backend is selected, so the rhi_type-gated forwarding in the setters
+ * below would otherwise drop them and leave the chosen backend's own copy NULL.
+ * These globals are the single source of truth, so re-push them straight from
+ * there the moment a backend is opened - no extra cached copies to drift. */
+static void rhi_intf_push_cbs(void)
+{
+   switch (rhi_type)
+   {
+      case RHI_SOFTWARE:
+      case RHI_OPENGL:
+         break;
+      case RHI_VULKAN:
+#if defined(HAVE_VULKAN)
+         if (environ_cb)
+            rhi_vulkan_set_environment(environ_cb);
+         if (video_cb)
+            rhi_vulkan_set_video_refresh(video_cb);
+#endif
+         break;
+   }
+}
+
 void rhi_intf_set_environment(retro_environment_t cb)
 {
    switch (rhi_type)
@@ -185,6 +209,7 @@ bool rhi_intf_open(bool is_pal, bool force_software)
             rhi_type = RHI_VULKAN;
             vk_initialized = true;
             rhi_intf_dump_init();
+            rhi_intf_push_cbs();
             return true;
          }
          osd_message(3, RETRO_LOG_ERROR,
@@ -235,6 +260,7 @@ bool rhi_intf_open(bool is_pal, bool force_software)
          rhi_type       = RHI_VULKAN;
          vk_initialized = true;
          rhi_intf_dump_init();
+         rhi_intf_push_cbs();
          return true;
       }
 #endif
