@@ -2657,21 +2657,14 @@ namespace Vulkan
 		VENDOR_ID_ARM = 0x13b5
 	};
 
-	class Context
+	/* The live Vulkan context (instance/device/queues). Formerly a class with a
+	 * multi-argument constructor (load loaders, create the device, mark valid) and
+	 * a destructor that called destroy(); now a plain struct driven by
+	 * context_init / context_deinit. All getters and the device-creation helpers
+	 * stay as struct methods. It is heap-allocated, not pooled or refcounted. */
+	struct Context
 	{
-		public:
-			Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
-					unsigned num_required_device_extensions, const char **required_device_layers,
-					unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
-
-			Context(const Context &) = delete;
-			void operator=(const Context &) = delete;
 			static bool init_loader(PFN_vkGetInstanceProcAddr addr);
-
-			~Context()
-			{
-				destroy();
-			}
 
 			VkInstance get_instance() const
 			{
@@ -2744,31 +2737,36 @@ namespace Vulkan
 			 * check is_valid() before doing anything else with it. */
 			bool is_valid() const { return valid; }
 
-		private:
-			VkDevice device = VK_NULL_HANDLE;
-			VkInstance instance = VK_NULL_HANDLE;
-			VkPhysicalDevice gpu = VK_NULL_HANDLE;
+			VkDevice device;
+			VkInstance instance;
+			VkPhysicalDevice gpu;
 
 			VkPhysicalDeviceProperties gpu_props;
 			VkPhysicalDeviceMemoryProperties mem_props;
 
-			VkQueue graphics_queue = VK_NULL_HANDLE;
-			VkQueue compute_queue = VK_NULL_HANDLE;
-			VkQueue transfer_queue = VK_NULL_HANDLE;
-			uint32_t graphics_queue_family = VK_QUEUE_FAMILY_IGNORED;
-			uint32_t compute_queue_family = VK_QUEUE_FAMILY_IGNORED;
-			uint32_t transfer_queue_family = VK_QUEUE_FAMILY_IGNORED;
+			VkQueue graphics_queue;
+			VkQueue compute_queue;
+			VkQueue transfer_queue;
+			uint32_t graphics_queue_family;
+			uint32_t compute_queue_family;
+			uint32_t transfer_queue_family;
 
 			bool create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
 					unsigned num_required_device_extensions, const char **required_device_layers,
 					unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
 
-			bool owned_device = false;
-			bool valid = false;
+			bool owned_device;
+			bool valid;
 			DeviceFeatures ext;
 
 			void destroy();
 	};
+
+	static bool context_init(Context *ctx, VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface,
+			const char **required_device_extensions, unsigned num_required_device_extensions,
+			const char **required_device_layers, unsigned num_required_device_layers,
+			const VkPhysicalDeviceFeatures *required_features);
+	static void context_deinit(Context *ctx);
 
 	using HandleCounter = Util::SingleThreadCounter;
 
@@ -15892,24 +15890,47 @@ namespace Vulkan
 		return true;
 	}
 
-	Context::Context(VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface,
+	bool context_init(Context *ctx, VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface,
 			const char **required_device_extensions, unsigned num_required_device_extensions,
 			const char **required_device_layers, unsigned num_required_device_layers,
 			const VkPhysicalDeviceFeatures *required_features)
-		: instance(instance)
-		  , owned_device(true)
 	{
+		/* Replicate the former default member initialisers explicitly (a malloc'd
+		 * Context has indeterminate members otherwise). gpu_props/mem_props/ext are
+		 * outputs of create_device, written before any read and guarded by
+		 * is_valid(); zero them defensively. */
+		ctx->device = VK_NULL_HANDLE;
+		ctx->instance = instance;
+		ctx->gpu = VK_NULL_HANDLE;
+		ctx->graphics_queue = VK_NULL_HANDLE;
+		ctx->compute_queue = VK_NULL_HANDLE;
+		ctx->transfer_queue = VK_NULL_HANDLE;
+		ctx->graphics_queue_family = VK_QUEUE_FAMILY_IGNORED;
+		ctx->compute_queue_family = VK_QUEUE_FAMILY_IGNORED;
+		ctx->transfer_queue_family = VK_QUEUE_FAMILY_IGNORED;
+		ctx->owned_device = true;
+		ctx->valid = false;
+		memset(&ctx->gpu_props, 0, sizeof(ctx->gpu_props));
+		memset(&ctx->mem_props, 0, sizeof(ctx->mem_props));
+		memset(&ctx->ext, 0, sizeof(ctx->ext));
+
 		/* Load global+instance function pointers using application-created VkInstance. */
 		volkGenLoadInstance(instance, vkGetInstanceProcAddrStub);
 		volkGenLoadDevice(instance, vkGetInstanceProcAddrStub);
-		if (!create_device(gpu, surface, required_device_extensions, num_required_device_extensions, required_device_layers,
+		if (!ctx->create_device(gpu, surface, required_device_extensions, num_required_device_extensions, required_device_layers,
 					num_required_device_layers, required_features))
 		{
 			LOGE("Failed to create Vulkan device.\n");
-			destroy();
-			return;
+			ctx->destroy();
+			return false;
 		}
-		valid = true;
+		ctx->valid = true;
+		return true;
+	}
+
+	void context_deinit(Context *ctx)
+	{
+		ctx->destroy();
 	}
 
 	void Context::destroy()
@@ -21192,7 +21213,8 @@ static void vk_context_destroy(void)
 
    delete renderer;
    delete device;
-   delete context;
+   Vulkan::context_deinit(context);
+   free(context);
    renderer = nullptr;
    device = nullptr;
    context = nullptr;
@@ -21223,19 +21245,24 @@ static bool libretro_create_device(
 
    if (context)
    {
-      delete context;
+      Vulkan::context_deinit(context);
+      free(context);
       context = nullptr;
    }
 
    /* parallel-psx's Vulkan::Context constructor used to throw on
     * failure; it now sets a valid=false flag instead. The
     * try/catch boundary is gone with it. */
-   context = new Vulkan::Context(instance, gpu, surface, required_device_extensions, num_required_device_extensions,
+   context = (Vulkan::Context *)malloc(sizeof(Vulkan::Context));
+   if (!context)
+      return false;
+   Vulkan::context_init(context, instance, gpu, surface, required_device_extensions, num_required_device_extensions,
                                  required_device_layers, num_required_device_layers,
                                  required_features);
    if (!context->is_valid())
    {
-      delete context;
+      Vulkan::context_deinit(context);
+      free(context);
       context = nullptr;
       return false;
    }
