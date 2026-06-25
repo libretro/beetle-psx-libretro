@@ -9,8 +9,6 @@ extern "C" {
 #endif
 
 //void rhi_gl_set_blend_mode(enum blending_modes mode);
-void rhi_gl_set_environment(retro_environment_t cb);
-void rhi_gl_set_video_refresh(retro_video_refresh_t cb);
 void rhi_gl_get_system_av_info(struct retro_system_av_info *info);
 
 bool rhi_gl_open(bool is_pal);
