@@ -1842,18 +1842,19 @@ static void rec_store(struct lightrec_cstate *state,
 		rec_store_scratch(state, block, offset, code, swap_code);
 		break;
 	case LIGHTREC_IO_DIRECT:
-		/* Likewise unsafe on a sub-par map (see above). */
-		if (!state->state->mirrors_mapped) {
-			rec_io(state, block, offset, true, false);
-			return;
-		}
-		if (no_invalidate) {
-			rec_store_direct_no_invalidate(state, block, offset,
-						       code, swap_code);
-		} else {
-			rec_store_direct(state, block, offset, code, swap_code);
-		}
-		break;
+		/* rec_store_direct has the same unbounded-direct problem as the
+		 * load side: its mirrors_mapped arm masks to 0x1fffffff and adds
+		 * offset_ram, assuming the full low segment is host-backed, and
+		 * its !mirrors_mapped arm can offset-store a strayed address
+		 * past the RAM window. When the host backs only RAM plus mirrors
+		 * and leaves the hardware-register window unmapped, an address
+		 * that resolves to I/O space stores into unmapped memory and
+		 * faults. The direct emitter cannot tell at compile time whether
+		 * the address stays inside the backed region, so never take the
+		 * direct path: route through the generic wrapper, which resolves
+		 * the real map at runtime on every execution. */
+		rec_io(state, block, offset, true, false);
+		return;
 	case LIGHTREC_IO_DIRECT_HW:
 		rec_store_io(state, block, offset, code, swap_code);
 		break;
@@ -2192,13 +2193,24 @@ static void rec_load(struct lightrec_cstate *state, const struct block *block,
 		rec_load_io(state, block, offset, code, swap_code, is_unsigned);
 		break;
 	case LIGHTREC_IO_DIRECT:
-		/* Likewise unsafe on a sub-par map (see above). */
-		if (!state->state->mirrors_mapped) {
-			rec_io(state, block, offset, false, true);
-			return;
-		}
-		rec_load_direct(state, block, offset, code, swap_code, is_unsigned);
-		break;
+		/* rec_load_direct masks the guest address with 0x1fffffff and
+		 * adds offset_ram with no runtime bounds check. On the
+		 * !mirrors_mapped path it would offset-load a strayed address
+		 * past the RAM window; on the mirrors_mapped path it masks to
+		 * the full 512 MiB low segment and assumes that whole segment
+		 * is host-backed. Neither holds when the host only reserves RAM
+		 * plus its mirrors (e.g. an 8 MiB contiguous block) but leaves
+		 * the hardware-register window (0x1f801xxx) and the rest of the
+		 * segment unmapped: an address that resolves to I/O space at
+		 * runtime computes offset_ram + 0x1f801xxx and faults in
+		 * unmapped host memory. Since the direct emitter cannot tell at
+		 * compile time whether the address will stay inside the backed
+		 * region, never take the direct path for it: route through the
+		 * generic wrapper, which resolves the real map at runtime on
+		 * every execution and dispatches RAM, BIOS, scratchpad and
+		 * hardware-register targets correctly. */
+		rec_io(state, block, offset, false, true);
+		return;
 	default:
 		rec_io(state, block, offset, false, true);
 		return;
