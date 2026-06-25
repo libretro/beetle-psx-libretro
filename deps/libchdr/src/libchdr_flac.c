@@ -13,7 +13,6 @@
 #include "../include/libchdr/flac.h"
 #include "../include/libchdr/macros.h"
 #define DR_FLAC_IMPLEMENTATION
-#define DR_FLAC_NO_STDIO
 #include "../include/dr_libs/dr_flac.h"
 
 /***************************************************************************

@@ -2,11 +2,7 @@
 #define __CORETYPES_H__
 
 #include <stdint.h>
-#include <stdio.h>
-
-#ifdef USE_LIBRETRO_VFS
-#include <streams/file_stream_transforms.h>
-#endif
+#include <streams/file_stream.h>
 
 #include "macros.h"
 
@@ -23,7 +19,7 @@ typedef struct chd_core_file_callbacks {
 
 	/*
 	 * should match the behavior of fread, except the FILE* argument at the end
-	 * will be replaced with a void*.
+	 * will be replaced with a void* (libretro VFS RFILE*).
 	 */
 	size_t(*fread)(void*,size_t,size_t,void*);
 

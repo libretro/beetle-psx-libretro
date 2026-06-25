@@ -1,9 +1,10 @@
-#include <stdio.h>
 #include <stddef.h>
+
+#include <streams/file_stream.h>
 
 #include "rhi_dump.h"
 
-static FILE *file;
+static RFILE *file;
 
 enum
 {
@@ -28,24 +29,24 @@ enum
 
 static void write_u32(uint32_t value)
 {
-   fwrite(&value, sizeof(value), 1, file);
+   filestream_write(file, &value, sizeof(value));
 }
 
 static void write_f32(float value)
 {
-   fwrite(&value, sizeof(value), 1, file);
+   filestream_write(file, &value, sizeof(value));
 }
 
 static void write_u16(const uint16_t *values, unsigned w, unsigned h)
 {
    unsigned y;
    for (y = 0; y < h; y++)
-      fwrite(values + y * 1024, sizeof(uint16_t), w, file);
+      filestream_write(file, values + y * 1024, sizeof(uint16_t) * w);
 }
 
 static void write_i32(int32_t value)
 {
-   fwrite(&value, sizeof(value), 1, file);
+   filestream_write(file, &value, sizeof(value));
 }
 
 static void rhi_dump_vertex_write(const rhi_dump_vertex *vertex)
@@ -77,9 +78,11 @@ void rhi_dump_init(const char *path)
    if (file)
       return;
 
-   file = fopen(path, "wb");
+   file = filestream_open(path,
+            RETRO_VFS_FILE_ACCESS_WRITE,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
    if (file)
-      fwrite("RHIDUMP3", 8, 1, file);
+      filestream_write(file, "RHIDUMP3", 8);
 }
 
 void rhi_dump_deinit(void)
@@ -87,7 +90,7 @@ void rhi_dump_deinit(void)
    if (!file)
       return;
    write_u32(RHI_END);
-   fclose(file);
+   filestream_close(file);
    file = NULL;
 }
 

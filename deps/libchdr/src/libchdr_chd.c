@@ -858,7 +858,7 @@ static const core_file_callbacks core_legacy = {
     chd_open_file - open a CHD file for access
 -------------------------------------------------*/
 
-CHD_EXPORT chd_error chd_open_file(FILE *file, int mode, chd_file *parent, chd_file **chd) {
+CHD_EXPORT chd_error chd_open_file(RFILE *file, int mode, chd_file *parent, chd_file **chd) {
 	return chd_open_core_file_callbacks(&core_stdio_nonowner, file, mode, parent, chd);
 }
 
@@ -2107,7 +2107,9 @@ static chd_error metadata_find_entry(chd_file *chd, uint32_t metatag, uint32_t m
 	core_stdio_fopen - core_file wrapper over fopen
 -------------------------------------------------*/
 static void *core_stdio_fopen(char const *path) {
-	return fopen(path, "rb");
+	return filestream_open(path,
+		RETRO_VFS_FILE_ACCESS_READ,
+		RETRO_VFS_FILE_ACCESS_HINT_NONE);
 }
 
 /*-------------------------------------------------
@@ -2115,45 +2117,28 @@ static void *core_stdio_fopen(char const *path) {
 	getting file size with stdio
 -------------------------------------------------*/
 static uint64_t core_stdio_fsize(void *file) {
-#if defined USE_LIBRETRO_VFS
-	#define core_stdio_fseek_impl fseek
-	#define core_stdio_ftell_impl ftell
-#elif defined(__WIN32__) || defined(_WIN32) || defined(WIN32) || defined(__WIN64__)
-	#define core_stdio_fseek_impl _fseeki64
-	#define core_stdio_ftell_impl _ftelli64
-#elif defined(_LARGEFILE_SOURCE) && defined(_FILE_OFFSET_BITS) && _FILE_OFFSET_BITS == 64
-	#define core_stdio_fseek_impl fseeko64
-	#define core_stdio_ftell_impl ftello64
-#elif defined(__PS3__) && !defined(__PSL1GHT__) || defined(__SWITCH__) || defined(__vita__)
-	#define core_stdio_fseek_impl(x,y,z) fseek(x,(off_t)y,z)
-	#define core_stdio_ftell_impl(x) (off_t)ftell(x)
-#else
-	#define core_stdio_fseek_impl fseeko
-	#define core_stdio_ftell_impl ftello
-#endif
-	FILE *fp;
-	uint64_t p, rv;
-	fp = (FILE*)file;
+	RFILE *fp = (RFILE*)file;
+	int64_t p, rv;
 
-	p = core_stdio_ftell_impl(fp);
-	core_stdio_fseek_impl(fp, 0, SEEK_END);
-	rv = core_stdio_ftell_impl(fp);
-	core_stdio_fseek_impl(fp, p, SEEK_SET);
-	return rv;
+	p = filestream_tell(fp);
+	filestream_seek(fp, 0, SEEK_END);
+	rv = filestream_tell(fp);
+	filestream_seek(fp, p, SEEK_SET);
+	return (uint64_t)rv;
 }
 
 /*-------------------------------------------------
 	core_stdio_fread - core_file wrapper over fread
 -------------------------------------------------*/
 static size_t core_stdio_fread(void *ptr, size_t size, size_t nmemb, void *file) {
-	return fread(ptr, size, nmemb, (FILE*)file);
+	return (size_t)filestream_read((RFILE*)file, ptr, size * nmemb) / (size ? size : 1);
 }
 
 /*-------------------------------------------------
 	core_stdio_fclose - core_file wrapper over fclose
 -------------------------------------------------*/
 static int core_stdio_fclose(void *file) {
-	return fclose((FILE*)file);
+	return filestream_close((RFILE*)file);
 }
 
 /*-------------------------------------------------
@@ -2169,7 +2154,7 @@ static int core_stdio_fclose_nonowner(void *file) {
 	core_stdio_fseek - core_file wrapper over fclose
 -------------------------------------------------*/
 static int core_stdio_fseek(void* file, int64_t offset, int whence) {
-	return core_stdio_fseek_impl((FILE*)file, offset, whence);
+	return (filestream_seek((RFILE*)file, offset, whence) < 0) ? -1 : 0;
 }
 
 /*-------------------------------------------------
