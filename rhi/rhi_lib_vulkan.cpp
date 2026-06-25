@@ -2286,153 +2286,124 @@ static inline uint32_t util_ctz(uint32_t x)
 
 
 
-	/* Thin per-type wrapper over the concrete ObjectPoolRaw + IntrusiveHashMapHolderC.
-	 * It stays a template only because allocate() must construct a specific T and the
-	 * pool needs sizeof(T); everything else is the concrete holder, with T* recovered
-	 * from IntrusiveHashMapNode* by casting (the node base is the first member of every
-	 * T, offset 0). */
-	template <typename T>
-		class IntrusiveHashMap
-		{
-			public:
-				~IntrusiveHashMap()
-				{
-					clear();
-					hmholder_deinit(&hashmap);
-					object_pool_raw_deinit(&pool);
-				}
 
-				IntrusiveHashMap()
-				{
-					hmholder_init_empty(&hashmap);
-					object_pool_raw_init(&pool, sizeof(T));
-				}
-				IntrusiveHashMap(const IntrusiveHashMap &) = delete;
-				void operator=(const IntrusiveHashMap &) = delete;
+	/* Concrete, per-type form of IntrusiveHashMap<T>. Stamps a struct that owns the
+	 * (already concrete) open-addressing holder plus an object pool, and the full
+	 * public API the template exposed. Everything here is T-independent except the
+	 * sizeof(T) handed to the pool and the per-type element destructor DESTROY_FN,
+	 * which clear()/erase() call through (the five node types have non-trivial
+	 * destructors that release Vk objects; pass a no-op for trivial POD elements).
+	 * The variadic emplace and allocate members are NOT stamped here: each element
+	 * type has a distinct constructor, so those are written per type next to each
+	 * map. The iterator is a bare list-node pointer; the iter_get helper recovers
+	 * the T pointer (node base is at offset 0). */
+	#define VK_HASHMAP_DECLARE(NAME, T, DESTROY_FN)                                 \
+		struct NAME                                                                 \
+		{                                                                           \
+			struct IntrusiveHashMapHolderC hashmap;                                 \
+			struct ObjectPoolRaw pool;                                              \
+		};                                                                          \
+		static inline void NAME##_init(struct NAME *m)                              \
+		{                                                                           \
+			hmholder_init_empty(&m->hashmap);                                       \
+			object_pool_raw_init(&m->pool, sizeof(T));                              \
+		}                                                                           \
+		static inline void NAME##_clear(struct NAME *m)                             \
+		{                                                                           \
+			struct IntrusiveListNode *itr = ilist_begin(&m->hashmap.list);          \
+			while (itr)                                                             \
+			{                                                                       \
+				T *to_free = (T *)itr;                                              \
+				itr = itr->next;                                                    \
+				DESTROY_FN(to_free);                                                \
+				object_pool_raw_free(&m->pool, to_free);                            \
+			}                                                                       \
+			hmholder_clear(&m->hashmap);                                            \
+		}                                                                           \
+		static inline void NAME##_deinit(struct NAME *m)                            \
+		{                                                                           \
+			NAME##_clear(m);                                                        \
+			hmholder_deinit(&m->hashmap);                                           \
+			object_pool_raw_deinit(&m->pool);                                       \
+		}                                                                           \
+		static inline T *NAME##_find(const struct NAME *m, Hash hash)               \
+		{                                                                           \
+			return (T *)hmholder_find(&m->hashmap, hash);                           \
+		}                                                                           \
+		static inline void NAME##_erase(struct NAME *m, Hash hash)                  \
+		{                                                                           \
+			T *value = (T *)hmholder_erase(&m->hashmap, hash);                      \
+			if (value)                                                              \
+			{                                                                       \
+				DESTROY_FN(value);                                                  \
+				object_pool_raw_free(&m->pool, value);                             \
+			}                                                                       \
+		}                                                                           \
+		static inline T *NAME##_insert_replace(struct NAME *m, Hash hash, T *value) \
+		{                                                                           \
+			T *to_delete;                                                           \
+			((struct IntrusiveHashMapNode *)value)->key = hash;                     \
+			to_delete = (T *)hmholder_insert_replace(&m->hashmap,                   \
+					(struct IntrusiveHashMapNode *)value);                          \
+			if (to_delete)                                                          \
+			{                                                                       \
+				DESTROY_FN(to_delete);                                              \
+				object_pool_raw_free(&m->pool, to_delete);                         \
+			}                                                                       \
+			return value;                                                           \
+		}                                                                           \
+		static inline T *NAME##_insert_yield(struct NAME *m, Hash hash, T *value)   \
+		{                                                                           \
+			struct IntrusiveHashMapNode *node = (struct IntrusiveHashMapNode *)value; \
+			T *to_delete;                                                           \
+			node->key = hash;                                                       \
+			to_delete = (T *)hmholder_insert_yield(&m->hashmap, &node);             \
+			if (to_delete)                                                          \
+			{                                                                       \
+				DESTROY_FN(to_delete);                                              \
+				object_pool_raw_free(&m->pool, to_delete);                         \
+			}                                                                       \
+			return (T *)node;                                                       \
+		}                                                                           \
+		static inline struct IntrusiveListNode *NAME##_begin(struct NAME *m)        \
+		{                                                                           \
+			return ilist_begin(&m->hashmap.list);                                   \
+		}                                                                           \
+		static inline T *NAME##_iter_get(struct IntrusiveListNode *it)              \
+		{                                                                           \
+			return (T *)it;                                                         \
+		}
 
-				void clear()
-				{
-					struct IntrusiveListNode *itr = ilist_begin(&hashmap.list);
-					while (itr)
-					{
-						T *to_free = (T *)itr;
-						itr = itr->next;
-						to_free->~T();
-						object_pool_raw_free(&pool, to_free);
-					}
-					hmholder_clear(&hashmap);
-				}
+	/* The two POD-payload maps. Elements are trivially destructible, so the destroy
+	 * hook is a no-op. The per-type emplace constructs the wrapper in the pool with
+	 * placement new, matching what the template's allocate()+insert did. */
+	static inline void vk_ptr_map_destroy(IntrusivePODWrapperPtr *p) { (void)p; }
+	static inline void vk_pipeline_map_destroy(IntrusivePODWrapperPipeline *p) { (void)p; }
 
-				/* Raw-memory lifecycle, for an owner allocated with malloc. */
-				void init_empty()
-				{
-					hmholder_init_empty(&hashmap);
-					object_pool_raw_init(&pool, sizeof(T));
-				}
+	VK_HASHMAP_DECLARE(vk_ptr_map, IntrusivePODWrapperPtr, vk_ptr_map_destroy)
+	VK_HASHMAP_DECLARE(vk_pipeline_map, IntrusivePODWrapperPipeline, vk_pipeline_map_destroy)
 
-				void deinit()
-				{
-					clear();
-					hmholder_deinit(&hashmap);
-					object_pool_raw_deinit(&pool);
-				}
+	static inline IntrusivePODWrapperPtr *vk_ptr_map_emplace_replace(struct vk_ptr_map *m,
+			Hash hash, void *value)
+	{
+		void *slot = object_pool_raw_allocate(&m->pool);
+		IntrusivePODWrapperPtr *t;
+		if (!slot)
+			return NULL;
+		t = new (slot) IntrusivePODWrapperPtr(value);
+		return vk_ptr_map_insert_replace(m, hash, t);
+	}
 
-				T *find(Hash hash) const
-				{
-					return (T *)hmholder_find(&hashmap, hash);
-				}
-
-				void erase(Hash hash)
-				{
-					T *value = (T *)hmholder_erase(&hashmap, hash);
-					if (value)
-					{
-						value->~T();
-						object_pool_raw_free(&pool, value);
-					}
-				}
-
-				template <typename... P>
-					T *emplace_replace(Hash hash, P&&... p)
-					{
-						T *t = allocate(std::forward<P>(p)...);
-						return insert_replace(hash, t);
-					}
-
-				template <typename... P>
-					T *emplace_yield(Hash hash, P&&... p)
-					{
-						T *t = allocate(std::forward<P>(p)...);
-						return insert_yield(hash, t);
-					}
-
-				template <typename... P>
-					T *allocate(P&&... p)
-					{
-						void *slot = object_pool_raw_allocate(&pool);
-						if (!slot)
-							return NULL;
-						return new (slot) T(std::forward<P>(p)...);
-					}
-
-				T *insert_replace(Hash hash, T *value)
-				{
-					((struct IntrusiveHashMapNode *)value)->key = hash;
-					T *to_delete = (T *)hmholder_insert_replace(&hashmap,
-							(struct IntrusiveHashMapNode *)value);
-					if (to_delete)
-					{
-						to_delete->~T();
-						object_pool_raw_free(&pool, to_delete);
-					}
-					return value;
-				}
-
-				T *insert_yield(Hash hash, T *value)
-				{
-					((struct IntrusiveHashMapNode *)value)->key = hash;
-					struct IntrusiveHashMapNode *node = (struct IntrusiveHashMapNode *)value;
-					T *to_delete = (T *)hmholder_insert_yield(&hashmap, &node);
-					if (to_delete)
-					{
-						to_delete->~T();
-						object_pool_raw_free(&pool, to_delete);
-					}
-					return (T *)node;
-				}
-
-				/* Minimal forward iterator over the holder's value list, yielding T&.
-				 * Recovers T* from the list node (offset 0). */
-				class Iterator
-				{
-					public:
-						Iterator(struct IntrusiveListNode *n) : node(n) {}
-						Iterator() : node(NULL) {}
-						explicit operator bool() const { return node != NULL; }
-						bool operator==(const Iterator &o) const { return node == o.node; }
-						bool operator!=(const Iterator &o) const { return node != o.node; }
-						T &operator*() { return *(T *)node; }
-						T *operator->() { return (T *)node; }
-						T *get() { return (T *)node; }
-						Iterator &operator++() { node = node->next; return *this; }
-					private:
-						struct IntrusiveListNode *node;
-				};
-
-				Iterator begin()
-				{
-					return Iterator(ilist_begin(&hashmap.list));
-				}
-
-				Iterator end()
-				{
-					return Iterator();
-				}
-
-			private:
-				struct IntrusiveHashMapHolderC hashmap;
-				struct ObjectPoolRaw pool;
-		};
+	static inline IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
+			struct vk_pipeline_map *m, Hash hash, VkPipeline value)
+	{
+		void *slot = object_pool_raw_allocate(&m->pool);
+		IntrusivePODWrapperPipeline *t;
+		if (!slot)
+			return NULL;
+		t = new (slot) IntrusivePODWrapperPipeline(value);
+		return vk_pipeline_map_insert_yield(m, hash, t);
+	}
 
 	/* Concrete temporary-hashmap node base (de-templated TemporaryHashmapEnabled<T>
 	 * plus the intrusive list links the node carried via IntrusiveListEnabled<T>).
@@ -2453,183 +2424,133 @@ static inline uint32_t util_ctz(uint32_t x)
 		((NODE_TYPE *)((char *)(ln) - offsetof(NODE_TYPE, th_node) \
 			- offsetof(struct TemporaryHashmapNode, list_node)))
 
-	template <typename T, unsigned RingSize = 4, bool ReuseObjects = false>
-		class TemporaryHashmap
-		{
-			public:
-				TemporaryHashmap()
-				{
-					unsigned i;
-					for (i = 0; i < RingSize; i++)
-						ilist_clear(&rings[i]);
-					object_pool_raw_init(&object_pool, sizeof(T));
-					index = 0;
-					vacants.items = NULL;
-					vacants.count = 0;
-					vacants.cap   = 0;
-				}
-
-				/* Raw-memory initialiser for an owner allocated with malloc (e.g. the
-				 * FramebufferAllocator/AttachmentAllocator embedded in a malloc'd Device,
-				 * whose constructors never run). Mirrors the constructor above and also
-				 * brings up the nested hashmap, which has no constructor to run here. */
-				void init_empty()
-				{
-					unsigned i;
-					for (i = 0; i < RingSize; i++)
-						ilist_clear(&rings[i]);
-					object_pool_raw_init(&object_pool, sizeof(T));
-					index = 0;
-					vacants.items = NULL;
-					vacants.count = 0;
-					vacants.cap   = 0;
-					hashmap.init_empty();
-				}
-
-				~TemporaryHashmap()
-				{
-					clear();
-					object_pool_raw_deinit(&object_pool);
-					::free(vacants.items);
-				}
-
-				void clear()
-				{
-					unsigned r;
-					for (r = 0; r < RingSize; r++)
-					{
-						struct IntrusiveListNode *n = ilist_begin(&rings[r]);
-						while (n)
-						{
-							T *node = TH_NODE_OF(T, n);
-							n = n->next;
-							node->~T();
-							object_pool_raw_free(&object_pool, node);
-						}
-						ilist_clear(&rings[r]);
-					}
-					hashmap.clear();
-
-					{
-						size_t i, n = vacants.count;
-						for (i = 0; i < n; i++)
-						{
-							T *node = vacants.items[i];
-							node->~T();
-							object_pool_raw_free(&object_pool, node);
-						}
-					}
-					vacants.count = 0;
-					object_pool_raw_clear(&object_pool);
-				}
-
-				void begin_frame()
-				{
-					struct IntrusiveListNode *n;
-					index = (index + 1) & (RingSize - 1);
-					n = ilist_begin(&rings[index]);
-					while (n)
-					{
-						T *node = TH_NODE_OF(T, n);
-						n = n->next;
-						hashmap.erase(node->th_node.hash);
-						/* ReuseObjects is a compile-time constant, so the dead branch is
-						 * eliminated - reuse keeps the node in the vacant pool, otherwise
-						 * it goes back to the object pool. */
-						if (ReuseObjects)
-							vacant_push(node);
-						else
-						{
-							node->~T();
-							object_pool_raw_free(&object_pool, node);
-						}
-					}
-					ilist_clear(&rings[index]);
-				}
-
-				T *request(Hash hash)
-				{
-					IntrusivePODWrapperPtr *v = hashmap.find(hash);
-					if (v)
-					{
-						T *node = (T *)v->get();
-						if (node->th_node.index != index)
-						{
-							ilist_move_to_front(&rings[index], &rings[node->th_node.index],
-									&node->th_node.list_node);
-							node->th_node.index = index;
-						}
-						return node;
-					}
-					else
-						return NULL;
-				}
-
-				template <typename... P>
-					void make_vacant(P &&... p)
-					{
-						void *slot = object_pool_raw_allocate(&object_pool);
-						T *node = new (slot) T(std::forward<P>(p)...);
-						vacant_push(node);
-					}
-
-				T *request_vacant(Hash hash)
-				{
-					T *top;
-					if (vacants.count == 0)
-						return NULL;
-
-					top = vacants.items[--vacants.count];
-					top->th_node.index = index;
-					top->th_node.hash  = hash;
-					hashmap.emplace_replace(hash, (void *)top);
-					ilist_insert_front(&rings[index], &top->th_node.list_node);
-					return top;
-				}
-
-				template <typename... P>
-					T *emplace(Hash hash, P &&... p)
-					{
-						void *slot = object_pool_raw_allocate(&object_pool);
-						T *node = new (slot) T(std::forward<P>(p)...);
-						node->th_node.index = index;
-						node->th_node.hash  = hash;
-						hashmap.emplace_replace(hash, (void *)node);
-						ilist_insert_front(&rings[index], &node->th_node.list_node);
-						return node;
-					}
-
-			private:
-				/* POD list of vacant node pointers, replacing
-				 * std::vector<IntrusiveList<T>::Iterator>. Only push and a
-				 * pop-from-the-back (in request_vacant) are needed. */
-				struct VacantList
-				{
-					T    **items;
-					size_t count;
-					size_t cap;
-				};
-
-				void vacant_push(T *v)
-				{
-					if (vacants.count == vacants.cap)
-					{
-						size_t ncap   = vacants.cap ? vacants.cap * 2 : 16;
-						T **nv = (T **)realloc(vacants.items, ncap * sizeof(T *));
-						if (!nv)
-							return;
-						vacants.items = nv;
-						vacants.cap   = ncap;
-					}
-					vacants.items[vacants.count++] = v;
-				}
-
-				struct IntrusiveListC rings[RingSize];
-				struct ObjectPoolRaw object_pool;
-				unsigned index;
-				IntrusiveHashMap<IntrusivePODWrapperPtr > hashmap;
-				VacantList vacants;
-		};
+	/* Concrete, per-type form of TemporaryHashmap<T,RingSize,ReuseObjects>. Stamps a
+	 * struct holding the ring of intrusive lists, the object pool, the recycle index
+	 * map (vk_ptr_map) and the vacant free-list, plus every method the template had
+	 * except the variadic emplace/make_vacant (each node type has a distinct
+	 * constructor, written per type next to each instance). RING and REUSE are the
+	 * former template non-type parameters; REUSE is a literal 0/1 so the compiler
+	 * folds the dead arm in begin_frame exactly as the template's bool constant did.
+	 * DESTROY(T*) runs the node destructor (kept until this TU moves to a C compiler).
+	 * Nodes are recovered from a ring list-node with TH_NODE_OF(T, ...). */
+	#define VK_TEMPHASH_DECLARE(NAME, T, RING, REUSE, DESTROY)                      \
+		struct NAME                                                                 \
+		{                                                                           \
+			struct IntrusiveListC rings[RING];                                      \
+			struct ObjectPoolRaw object_pool;                                       \
+			unsigned index;                                                         \
+			struct vk_ptr_map hashmap;                                              \
+			T **vacant_items;                                                       \
+			size_t vacant_count;                                                    \
+			size_t vacant_cap;                                                      \
+		};                                                                          \
+		static inline void NAME##_vacant_push(struct NAME *m, T *v)                 \
+		{                                                                           \
+			if (m->vacant_count == m->vacant_cap)                                   \
+			{                                                                       \
+				size_t ncap = m->vacant_cap ? m->vacant_cap * 2 : 16;               \
+				T **nv = (T **)realloc(m->vacant_items, ncap * sizeof(T *));         \
+				if (!nv)                                                            \
+					return;                                                         \
+				m->vacant_items = nv;                                               \
+				m->vacant_cap   = ncap;                                             \
+			}                                                                       \
+			m->vacant_items[m->vacant_count++] = v;                                 \
+		}                                                                           \
+		static inline void NAME##_init_empty(struct NAME *m)                        \
+		{                                                                           \
+			unsigned i;                                                             \
+			for (i = 0; i < (RING); i++)                                            \
+				ilist_clear(&m->rings[i]);                                          \
+			object_pool_raw_init(&m->object_pool, sizeof(T));                       \
+			m->index = 0;                                                           \
+			m->vacant_items = NULL;                                                 \
+			m->vacant_count = 0;                                                    \
+			m->vacant_cap   = 0;                                                    \
+			vk_ptr_map_init(&m->hashmap);                                           \
+		}                                                                           \
+		static inline void NAME##_clear(struct NAME *m)                             \
+		{                                                                           \
+			unsigned r;                                                             \
+			size_t i, n;                                                            \
+			for (r = 0; r < (RING); r++)                                            \
+			{                                                                       \
+				struct IntrusiveListNode *nd = ilist_begin(&m->rings[r]);           \
+				while (nd)                                                          \
+				{                                                                   \
+					T *node = TH_NODE_OF(T, nd);                                     \
+					nd = nd->next;                                                  \
+					DESTROY(node);                                                  \
+					object_pool_raw_free(&m->object_pool, node);                    \
+				}                                                                   \
+				ilist_clear(&m->rings[r]);                                          \
+			}                                                                       \
+			vk_ptr_map_clear(&m->hashmap);                                          \
+			n = m->vacant_count;                                                    \
+			for (i = 0; i < n; i++)                                                 \
+			{                                                                       \
+				T *node = m->vacant_items[i];                                       \
+				DESTROY(node);                                                      \
+				object_pool_raw_free(&m->object_pool, node);                        \
+			}                                                                       \
+			m->vacant_count = 0;                                                    \
+			object_pool_raw_clear(&m->object_pool);                                 \
+		}                                                                           \
+		static inline void NAME##_deinit(struct NAME *m)                            \
+		{                                                                           \
+			NAME##_clear(m);                                                        \
+			object_pool_raw_deinit(&m->object_pool);                                \
+			free(m->vacant_items);                                                  \
+		}                                                                           \
+		static inline void NAME##_begin_frame(struct NAME *m)                       \
+		{                                                                           \
+			struct IntrusiveListNode *nd;                                           \
+			m->index = (m->index + 1) & ((RING) - 1);                               \
+			nd = ilist_begin(&m->rings[m->index]);                                  \
+			while (nd)                                                              \
+			{                                                                       \
+				T *node = TH_NODE_OF(T, nd);                                         \
+				nd = nd->next;                                                      \
+				vk_ptr_map_erase(&m->hashmap, node->th_node.hash);                  \
+				if (REUSE)                                                          \
+					NAME##_vacant_push(m, node);                                    \
+				else                                                                \
+				{                                                                   \
+					DESTROY(node);                                                  \
+					object_pool_raw_free(&m->object_pool, node);                    \
+				}                                                                   \
+			}                                                                       \
+			ilist_clear(&m->rings[m->index]);                                       \
+		}                                                                           \
+		static inline T *NAME##_request(struct NAME *m, Hash hash)                  \
+		{                                                                           \
+			IntrusivePODWrapperPtr *v = vk_ptr_map_find(&m->hashmap, hash);         \
+			if (v)                                                                  \
+			{                                                                       \
+				T *node = (T *)v->get();                                            \
+				if (node->th_node.index != m->index)                               \
+				{                                                                   \
+					ilist_move_to_front(&m->rings[m->index],                        \
+							&m->rings[node->th_node.index],                         \
+							&node->th_node.list_node);                              \
+					node->th_node.index = m->index;                                 \
+				}                                                                   \
+				return node;                                                        \
+			}                                                                       \
+			return NULL;                                                            \
+		}                                                                           \
+		static inline T *NAME##_request_vacant(struct NAME *m, Hash hash)           \
+		{                                                                           \
+			T *top;                                                                 \
+			if (m->vacant_count == 0)                                               \
+				return NULL;                                                        \
+			top = m->vacant_items[--m->vacant_count];                              \
+			top->th_node.index = m->index;                                          \
+			top->th_node.hash  = hash;                                              \
+			vk_ptr_map_emplace_replace(&m->hashmap, hash, (void *)top);             \
+			ilist_insert_front(&m->rings[m->index], &top->th_node.list_node);       \
+			return top;                                                             \
+		}
 
 
 /* ============================================================
@@ -2795,8 +2716,6 @@ static inline uint32_t util_ctz(uint32_t x)
 
 	using HandleCounter = SingleThreadCounter;
 
-	template <typename T>
-		using VulkanCache = IntrusiveHashMap<T>;
 
 	static const unsigned VULKAN_NUM_DESCRIPTOR_SETS = 4;
 	static const unsigned VULKAN_NUM_BINDINGS = 16;
@@ -4649,6 +4568,34 @@ private:
 		bool cached;
 	};
 
+	/* Lifted to file scope (was nested in DescriptorSetAllocator) so the concrete
+	 * temp-map's free functions can be stamped at namespace scope. */
+	struct DescriptorSetNode
+	{
+		struct TemporaryHashmapNode th_node;
+		DescriptorSetNode(VkDescriptorSet set)
+			: set(set)
+		{
+		}
+
+		VkDescriptorSet set;
+	};
+
+	static inline void descriptor_set_node_destroy(DescriptorSetNode *t) { t->~DescriptorSetNode(); }
+	VK_TEMPHASH_DECLARE(descriptor_set_thmap, DescriptorSetNode, VULKAN_DESCRIPTOR_RING_SIZE, 1, descriptor_set_node_destroy)
+
+	/* make_vacant constructs a node in the pool and parks it on the vacant free-list
+	 * (the reuse path); mirrors the template's variadic make_vacant for this type. */
+	static inline void descriptor_set_thmap_make_vacant(struct descriptor_set_thmap *m, VkDescriptorSet set)
+	{
+		void *slot = object_pool_raw_allocate(&m->object_pool);
+		DescriptorSetNode *node;
+		if (!slot)
+			return;
+		node = new (slot) DescriptorSetNode(set);
+		descriptor_set_thmap_vacant_push(m, node);
+	}
+
 	class DescriptorSetAllocator
 	{
 		public:
@@ -4672,23 +4619,12 @@ private:
 			void clear();
 
 		private:
-			struct DescriptorSetNode
-		{
-			struct TemporaryHashmapNode th_node;
-			DescriptorSetNode(VkDescriptorSet set)
-				: set(set)
-			{
-			}
-
-			VkDescriptorSet set;
-		};
-
 			Device *device;
 			VkDescriptorSetLayout set_layout = VK_NULL_HANDLE;
 
 			struct PerThread
 			{
-				TemporaryHashmap<DescriptorSetNode, VULKAN_DESCRIPTOR_RING_SIZE, true> set_nodes;
+				struct descriptor_set_thmap set_nodes;
 				DescriptorPoolVec pools = { NULL, 0, 0 };
 				bool should_begin = true;
 			};
@@ -4823,7 +4759,7 @@ private:
 			Device *device;
 			Shader *shaders[(unsigned)ShaderStage_Count] = {};
 			PipelineLayout *layout = NULL;
-			VulkanCache<IntrusivePODWrapperPipeline> pipelines;
+			struct vk_pipeline_map pipelines;
 	};
 
 /* ============================================================
@@ -4968,6 +4904,96 @@ private:
 	static_assert(offsetof(RenderPass, intrusive_node) == 0,
 			"RenderPass.intrusive_node must be first");
 
+	/* Concrete per-type maps for the five Device-level cache node types. Each
+	 * destroy hook runs the type's (non-trivial) destructor before the slot returns
+	 * to the pool; the dtor call keeps this translation unit C++ for now (a later
+	 * milestone switches the file to a C compiler, at which point these become
+	 * explicit teardown calls). The per-type emplace_yield constructs the node in
+	 * the pool with the type's real constructor, then yields it into the holder. The
+	 * map key (hash) is passed to the constructor too for the four types whose
+	 * constructor records it; Program's constructor does not take a hash, so there
+	 * the hash is used only as the map key. */
+	static inline void pipeline_layout_map_destroy(PipelineLayout *t) { t->~PipelineLayout(); }
+	static inline void descriptor_set_allocator_map_destroy(DescriptorSetAllocator *t) { t->~DescriptorSetAllocator(); }
+	static inline void render_pass_map_destroy(RenderPass *t) { t->~RenderPass(); }
+	static inline void shader_map_destroy(Shader *t) { t->~Shader(); }
+	static inline void program_map_destroy(Program *t) { t->~Program(); }
+
+	VK_HASHMAP_DECLARE(pipeline_layout_map, PipelineLayout, pipeline_layout_map_destroy)
+	VK_HASHMAP_DECLARE(descriptor_set_allocator_map, DescriptorSetAllocator, descriptor_set_allocator_map_destroy)
+	VK_HASHMAP_DECLARE(render_pass_map, RenderPass, render_pass_map_destroy)
+	VK_HASHMAP_DECLARE(shader_map, Shader, shader_map_destroy)
+	VK_HASHMAP_DECLARE(program_map, Program, program_map_destroy)
+
+	static inline PipelineLayout *pipeline_layout_map_emplace_yield(struct pipeline_layout_map *m,
+			Hash hash, Device *device, const CombinedResourceLayout &layout)
+	{
+		void *slot = object_pool_raw_allocate(&m->pool);
+		PipelineLayout *t;
+		if (!slot)
+			return NULL;
+		t = new (slot) PipelineLayout(hash, device, layout);
+		return pipeline_layout_map_insert_yield(m, hash, t);
+	}
+
+	static inline DescriptorSetAllocator *descriptor_set_allocator_map_emplace_yield(
+			struct descriptor_set_allocator_map *m, Hash hash, Device *device,
+			const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings)
+	{
+		void *slot = object_pool_raw_allocate(&m->pool);
+		DescriptorSetAllocator *t;
+		if (!slot)
+			return NULL;
+		t = new (slot) DescriptorSetAllocator(hash, device, layout, stages_for_bindings);
+		return descriptor_set_allocator_map_insert_yield(m, hash, t);
+	}
+
+	static inline RenderPass *render_pass_map_emplace_yield(struct render_pass_map *m,
+			Hash hash, Device *device, const RenderPassInfo &info)
+	{
+		void *slot = object_pool_raw_allocate(&m->pool);
+		RenderPass *t;
+		if (!slot)
+			return NULL;
+		t = new (slot) RenderPass(hash, device, info);
+		return render_pass_map_insert_yield(m, hash, t);
+	}
+
+	static inline Shader *shader_map_emplace_yield(struct shader_map *m,
+			Hash hash, Device *device, const uint32_t *data, size_t size)
+	{
+		void *slot = object_pool_raw_allocate(&m->pool);
+		Shader *t;
+		if (!slot)
+			return NULL;
+		t = new (slot) Shader(hash, device, data, size);
+		return shader_map_insert_yield(m, hash, t);
+	}
+
+	/* Program has two constructors (graphics vertex+fragment, and compute); one
+	 * emplace helper per arity. Neither constructor takes the hash. */
+	static inline Program *program_map_emplace_yield_compute(struct program_map *m,
+			Hash hash, Device *device, Shader *compute)
+	{
+		void *slot = object_pool_raw_allocate(&m->pool);
+		Program *t;
+		if (!slot)
+			return NULL;
+		t = new (slot) Program(device, compute);
+		return program_map_insert_yield(m, hash, t);
+	}
+
+	static inline Program *program_map_emplace_yield_graphics(struct program_map *m,
+			Hash hash, Device *device, Shader *vertex, Shader *fragment)
+	{
+		void *slot = object_pool_raw_allocate(&m->pool);
+		Program *t;
+		if (!slot)
+			return NULL;
+		t = new (slot) Program(device, vertex, fragment);
+		return program_map_insert_yield(m, hash, t);
+	}
+
 	class Framebuffer : public Cookie, public NoCopyNoMove
 	{
 		public:
@@ -5013,6 +5039,39 @@ private:
 	};
 
 	static const unsigned VULKAN_FRAMEBUFFER_RING_SIZE = 8;
+	/* Lifted to file scope (was nested in FramebufferAllocator). Derives from
+	 * Framebuffer, so th_node is NOT at offset 0 - the ring lists recover the node
+	 * with TH_NODE_OF, which the temp-map macro already uses. */
+	struct FramebufferNode : Framebuffer
+	{
+		struct TemporaryHashmapNode th_node;
+		FramebufferNode(Device *device, const RenderPass &rp, const RenderPassInfo &info)
+			: Framebuffer(device, rp, info)
+		{
+		}
+	};
+
+	static inline void framebuffer_node_destroy(FramebufferNode *t) { t->~FramebufferNode(); }
+	VK_TEMPHASH_DECLARE(framebuffer_thmap, FramebufferNode, VULKAN_FRAMEBUFFER_RING_SIZE, 0, framebuffer_node_destroy)
+
+	/* emplace constructs the node in the pool, stamps its ring index + hash, registers
+	 * it in the recycle map and links it at the front of the current ring (mirrors the
+	 * template's variadic emplace for this type). */
+	static inline FramebufferNode *framebuffer_thmap_emplace(struct framebuffer_thmap *m,
+			Hash hash, Device *device, const RenderPass &rp, const RenderPassInfo &info)
+	{
+		void *slot = object_pool_raw_allocate(&m->object_pool);
+		FramebufferNode *node;
+		if (!slot)
+			return NULL;
+		node = new (slot) FramebufferNode(device, rp, info);
+		node->th_node.index = m->index;
+		node->th_node.hash  = hash;
+		vk_ptr_map_emplace_replace(&m->hashmap, hash, (void *)node);
+		ilist_insert_front(&m->rings[m->index], &node->th_node.list_node);
+		return node;
+	}
+
 	class FramebufferAllocator
 	{
 		public:
@@ -5022,12 +5081,12 @@ private:
 			void init(Device *device_)
 			{
 				device = device_;
-				framebuffers.init_empty();
+				framebuffer_thmap_init_empty(&framebuffers);
 			}
 
 			void deinit()
 			{
-				clear();
+				framebuffer_thmap_deinit(&framebuffers);
 			}
 
 			Framebuffer &request_framebuffer(const RenderPassInfo &info);
@@ -5036,18 +5095,39 @@ private:
 			void clear();
 
 		private:
-			struct FramebufferNode : Framebuffer
-		{
-			struct TemporaryHashmapNode th_node;
-			FramebufferNode(Device *device, const RenderPass &rp, const RenderPassInfo &info)
-				: Framebuffer(device, rp, info)
-			{
-			}
-		};
-
 			Device *device;
-			TemporaryHashmap<FramebufferNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> framebuffers;
+			struct framebuffer_thmap framebuffers;
 	};
+
+	/* Lifted to file scope (was nested in AttachmentAllocator). */
+	struct TransientNode
+	{
+		struct TemporaryHashmapNode th_node;
+		TransientNode(ImageHandle handle)
+			: handle(handle)
+		{
+		}
+
+		ImageHandle handle;
+	};
+
+	static inline void transient_node_destroy(TransientNode *t) { t->~TransientNode(); }
+	VK_TEMPHASH_DECLARE(transient_thmap, TransientNode, VULKAN_FRAMEBUFFER_RING_SIZE, 0, transient_node_destroy)
+
+	static inline TransientNode *transient_thmap_emplace(struct transient_thmap *m,
+			Hash hash, ImageHandle handle)
+	{
+		void *slot = object_pool_raw_allocate(&m->object_pool);
+		TransientNode *node;
+		if (!slot)
+			return NULL;
+		node = new (slot) TransientNode(handle);
+		node->th_node.index = m->index;
+		node->th_node.hash  = hash;
+		vk_ptr_map_emplace_replace(&m->hashmap, hash, (void *)node);
+		ilist_insert_front(&m->rings[m->index], &node->th_node.list_node);
+		return node;
+	}
 
 	class AttachmentAllocator
 	{
@@ -5060,12 +5140,12 @@ private:
 			void init(Device *device_)
 			{
 				device = device_;
-				attachments.init_empty();
+				transient_thmap_init_empty(&attachments);
 			}
 
 			void deinit()
 			{
-				clear();
+				transient_thmap_deinit(&attachments);
 			}
 
 			ImageView &request_attachment(unsigned width, unsigned height, VkFormat format,
@@ -5075,19 +5155,8 @@ private:
 			void clear();
 
 		private:
-			struct TransientNode
-		{
-			struct TemporaryHashmapNode th_node;
-			TransientNode(ImageHandle handle)
-				: handle(handle)
-			{
-			}
-
-			ImageHandle handle;
-		};
-
 			Device *device;
-			TemporaryHashmap<TransientNode, VULKAN_FRAMEBUFFER_RING_SIZE, false> attachments;
+			struct transient_thmap attachments;
 	};
 
 
@@ -6214,11 +6283,11 @@ private:
 
 			SamplerHandle samplers[(unsigned)(StockSampler_Count)];
 
-			VulkanCache<PipelineLayout> pipeline_layouts;
-			VulkanCache<DescriptorSetAllocator> descriptor_set_allocators;
-			VulkanCache<RenderPass> render_passes;
-			VulkanCache<Shader> shaders;
-			VulkanCache<Program> programs;
+			struct pipeline_layout_map pipeline_layouts;
+			struct descriptor_set_allocator_map descriptor_set_allocators;
+			struct render_pass_map render_passes;
+			struct shader_map shaders;
+			struct program_map programs;
 
 			FramebufferAllocator framebuffer_allocator;
 			AttachmentAllocator transient_allocator;
@@ -13437,6 +13506,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	Program::Program(Device *device, Shader *vertex, Shader *fragment)
 		: device(device)
 	{
+		vk_pipeline_map_init(&pipelines);
 		set_shader(ShaderStage_Vertex, vertex);
 		set_shader(ShaderStage_Fragment, fragment);
 		device->bake_program(*this);
@@ -13445,25 +13515,27 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	Program::Program(Device *device, Shader *compute)
 		: device(device)
 	{
+		vk_pipeline_map_init(&pipelines);
 		set_shader(ShaderStage_Compute, compute);
 		device->bake_program(*this);
 	}
 
 	VkPipeline Program::get_pipeline(Hash hash) const
 	{
-		IntrusivePODWrapperPipeline *ret = pipelines.find(hash);
+		IntrusivePODWrapperPipeline *ret = vk_pipeline_map_find(&pipelines, hash);
 		return ret ? ret->get() : VK_NULL_HANDLE;
 	}
 
 	VkPipeline Program::add_pipeline(Hash hash, VkPipeline pipeline)
 	{
-		return pipelines.emplace_yield(hash, pipeline)->get();
+		return vk_pipeline_map_emplace_yield(&pipelines, hash, pipeline)->get();
 	}
 
 	Program::~Program()
 	{
-		for (IntrusivePODWrapperPipeline &pipe : pipelines)
-			device->destroy_pipeline_nolock(pipe.get());
+		struct IntrusiveListNode *n;
+		for (n = vk_pipeline_map_begin(&pipelines); n; n = n->next)
+			device->destroy_pipeline_nolock(vk_pipeline_map_iter_get(n)->get());
 	}
 
 /* === descriptor_set.cpp === */
@@ -13473,6 +13545,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		: device(device)
 	{
 		intrusive_node.key = hash;
+		/* The set_nodes temp-map was previously brought up by the TemporaryHashmap
+		 * default constructor; as a concrete POD member it must be initialised here. */
+		descriptor_set_thmap_init_empty(&per_thread.set_nodes);
 		VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
 		DescriptorBindingVec bindings = { NULL, 0, 0 };
@@ -13573,15 +13648,15 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		PerThread &state = per_thread;
 		if (state.should_begin)
 		{
-			state.set_nodes.begin_frame();
+			descriptor_set_thmap_begin_frame(&state.set_nodes);
 			state.should_begin = false;
 		}
 
-		DescriptorSetNode *node = state.set_nodes.request(hash);
+		DescriptorSetNode *node = descriptor_set_thmap_request(&state.set_nodes, hash);
 		if (node)
 			return { node->set, true };
 
-		node = state.set_nodes.request_vacant(hash);
+		node = descriptor_set_thmap_request_vacant(&state.set_nodes, hash);
 		if (node)
 			return { node->set, false };
 
@@ -13612,14 +13687,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		state.pools.push(pool);
 
 		for (VkDescriptorSet set : sets)
-			state.set_nodes.make_vacant(set);
+			descriptor_set_thmap_make_vacant(&state.set_nodes, set);
 
-		return { state.set_nodes.request_vacant(hash)->set, false };
+		return { descriptor_set_thmap_request_vacant(&state.set_nodes, hash)->set, false };
 	}
 
 	void DescriptorSetAllocator::clear()
 	{
-		per_thread.set_nodes.clear();
+		descriptor_set_thmap_clear(&per_thread.set_nodes);
 		for (VkDescriptorPool &pool : per_thread.pools)
 		{
 			vkResetDescriptorPool(device->get_device(), pool, 0);
@@ -13633,6 +13708,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (set_layout != VK_NULL_HANDLE)
 			vkDestroyDescriptorSetLayout(device->get_device(), set_layout, NULL);
 		clear();
+		descriptor_set_thmap_deinit(&per_thread.set_nodes);
 		per_thread.pools.free_storage();
 		pool_size.free_storage();
 	}
@@ -14530,12 +14606,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void FramebufferAllocator::clear()
 	{
-		framebuffers.clear();
+		framebuffer_thmap_clear(&framebuffers);
 	}
 
 	void FramebufferAllocator::begin_frame()
 	{
-		framebuffers.begin_frame();
+		framebuffer_thmap_begin_frame(&framebuffers);
 	}
 
 	Framebuffer &FramebufferAllocator::request_framebuffer(const RenderPassInfo &info)
@@ -14555,21 +14631,21 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		Hash hash = h.get();
 
-		FramebufferNode *node = framebuffers.request(hash);
+		FramebufferNode *node = framebuffer_thmap_request(&framebuffers, hash);
 		if (node)
 			return *node;
 
-		return *framebuffers.emplace(hash, device, rp, info);
+		return *framebuffer_thmap_emplace(&framebuffers, hash, device, rp, info);
 	}
 
 	void AttachmentAllocator::clear()
 	{
-		attachments.clear();
+		transient_thmap_clear(&attachments);
 	}
 
 	void AttachmentAllocator::begin_frame()
 	{
-		attachments.begin_frame();
+		transient_thmap_begin_frame(&attachments);
 	}
 
 	ImageView &AttachmentAllocator::request_attachment(unsigned width, unsigned height, VkFormat format,
@@ -14585,7 +14661,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		Hash hash = h.get();
 
-		TransientNode *node = attachments.request(hash);
+		TransientNode *node = transient_thmap_request(&attachments, hash);
 		if (node)
 			return node->handle->get_view();
 
@@ -14593,7 +14669,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		image_info.samples = (VkSampleCountFlagBits)(samples);
 		image_info.layers = layers;
-		node = attachments.emplace(hash, device->create_image(image_info, NULL));
+		node = transient_thmap_emplace(&attachments, hash, device->create_image(image_info, NULL));
 		device->set_name(*node->handle, "AttachmentAllocator");
 		return node->handle->get_view();
 	}
@@ -16402,11 +16478,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		self->managers.vbo.init_empty();
 		self->managers.ubo.init_empty();
 		self->per_frame.init_empty();
-		self->pipeline_layouts.init_empty();
-		self->descriptor_set_allocators.init_empty();
-		self->render_passes.init_empty();
-		self->shaders.init_empty();
-		self->programs.init_empty();
+		pipeline_layout_map_init(&self->pipeline_layouts);
+		descriptor_set_allocator_map_init(&self->descriptor_set_allocators);
+		render_pass_map_init(&self->render_passes);
+		shader_map_init(&self->shaders);
+		program_map_init(&self->programs);
 		self->framebuffer_allocator.init(self);
 		self->transient_allocator.init(self);
 	}
@@ -16434,11 +16510,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		 * comment requires. */
 		self->framebuffer_allocator.deinit();
 		self->transient_allocator.deinit();
-		self->programs.deinit();
-		self->shaders.deinit();
-		self->render_passes.deinit();
-		self->descriptor_set_allocators.deinit();
-		self->pipeline_layouts.deinit();
+		program_map_deinit(&self->programs);
+		shader_map_deinit(&self->shaders);
+		render_pass_map_deinit(&self->render_passes);
+		descriptor_set_allocator_map_deinit(&self->descriptor_set_allocators);
+		pipeline_layout_map_deinit(&self->pipeline_layouts);
 		self->per_frame.deinit();
 		self->managers.vbo.deinit();
 		self->managers.ubo.deinit();
@@ -16473,9 +16549,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		hasher.data(data, size);
 
 		Hash hash = hasher.get();
-		Shader *ret = shaders.find(hash);
+		Shader *ret = shader_map_find(&shaders, hash);
 		if (!ret)
-			ret = shaders.emplace_yield(hash, hash, this, data, size);
+			ret = shader_map_emplace_yield(&shaders, hash, this, data, size);
 		return ret;
 	}
 
@@ -16485,9 +16561,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		hasher.u64(compute->intrusive_node.key);
 
 		Hash hash = hasher.get();
-		Program *ret = programs.find(hash);
+		Program *ret = program_map_find(&programs, hash);
 		if (!ret)
-			ret = programs.emplace_yield(hash, this, compute);
+			ret = program_map_emplace_yield_compute(&programs, hash, this, compute);
 		return ret;
 	}
 
@@ -16504,10 +16580,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		hasher.u64(fragment->intrusive_node.key);
 
 		Hash hash = hasher.get();
-		Program *ret = programs.find(hash);
+		Program *ret = program_map_find(&programs, hash);
 
 		if (!ret)
-			ret = programs.emplace_yield(hash, this, vertex, fragment);
+			ret = program_map_emplace_yield_graphics(&programs, hash, this, vertex, fragment);
 		return ret;
 	}
 
@@ -16531,9 +16607,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		h.u32(layout.render_target_mask);
 
 		Hash hash = h.get();
-		PipelineLayout *ret = pipeline_layouts.find(hash);
+		PipelineLayout *ret = pipeline_layout_map_find(&pipeline_layouts, hash);
 		if (!ret)
-			ret = pipeline_layouts.emplace_yield(hash, hash, this, layout);
+			ret = pipeline_layout_map_emplace_yield(&pipeline_layouts, hash, this, layout);
 		return ret;
 	}
 
@@ -16544,9 +16620,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		h.data(stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
 		Hash hash = h.get();
 
-		DescriptorSetAllocator *ret = descriptor_set_allocators.find(hash);
+		DescriptorSetAllocator *ret = descriptor_set_allocator_map_find(&descriptor_set_allocators, hash);
 		if (!ret)
-			ret = descriptor_set_allocators.emplace_yield(hash, hash, this, layout, stages_for_bindings);
+			ret = descriptor_set_allocator_map_emplace_yield(&descriptor_set_allocators, hash, this, layout, stages_for_bindings);
 		return ret;
 	}
 
@@ -17443,8 +17519,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		framebuffer_allocator.clear();
 		transient_allocator.clear();
-		for (DescriptorSetAllocator &allocator : descriptor_set_allocators)
-			allocator.clear();
+		{
+			struct IntrusiveListNode *n;
+			for (n = descriptor_set_allocator_map_begin(&descriptor_set_allocators); n; n = n->next)
+				descriptor_set_allocator_map_iter_get(n)->clear();
+		}
 
 		for (PerFrame *frame : per_frame)
 		{
@@ -17461,8 +17540,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		framebuffer_allocator.begin_frame();
 		transient_allocator.begin_frame();
-		for (DescriptorSetAllocator &allocator : descriptor_set_allocators)
-			allocator.begin_frame();
+		{
+			struct IntrusiveListNode *n;
+			for (n = descriptor_set_allocator_map_begin(&descriptor_set_allocators); n; n = n->next)
+				descriptor_set_allocator_map_iter_get(n)->begin_frame();
+		}
 
 		VK_ASSERT(!per_frame.empty());
 		frame_context_index++;
@@ -18469,9 +18551,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		Hash hash = h.get();
 
-		RenderPass *ret = render_passes.find(hash);
+		RenderPass *ret = render_pass_map_find(&render_passes, hash);
 		if (!ret)
-			ret = render_passes.emplace_yield(hash, hash, this, info);
+			ret = render_pass_map_emplace_yield(&render_passes, hash, this, info);
 		return *ret;
 	}
 
