@@ -21530,10 +21530,12 @@ static void vk_context_reset(void)
    Vulkan::Device::device_init(device);
    device->set_context(*context);
 
-   renderer = new Renderer(*device, scaling, msaa, save_state.vram.empty() ? nullptr : &save_state);
+   renderer = (Renderer *)malloc(sizeof(Renderer));
+   new (renderer) Renderer(*device, scaling, msaa, save_state.vram.empty() ? nullptr : &save_state);
    if (!renderer->is_valid())
    {
-      delete renderer;
+      renderer->~Renderer();
+      free(renderer);
       Vulkan::Device::device_deinit(device);
       free(device);
       renderer = nullptr;
@@ -21565,7 +21567,8 @@ static void vk_context_destroy(void)
    scanout_handles.clear();
    swapchain_images.clear();
 
-   delete renderer;
+   renderer->~Renderer();
+   free(renderer);
    Vulkan::Device::device_deinit(device);
    free(device);
    Vulkan::context_deinit(context);
