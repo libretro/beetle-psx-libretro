@@ -1979,6 +1979,32 @@ namespace Util
 					mem_cap = 0;
 				}
 
+				/* Explicit init/deinit mirroring the constructor/destructor, for
+				 * owners that are allocated with malloc (so the constructor and
+				 * destructor do not run). init() establishes the empty state;
+				 * deinit() performs the destructor's teardown. Embedding objects
+				 * that are normally constructed keep using the ctor/dtor. */
+				void init()
+				{
+					vacants   = NULL;
+					vac_count = 0;
+					vac_cap   = 0;
+					memory    = NULL;
+					mem_count = 0;
+					mem_cap   = 0;
+				}
+
+				void deinit()
+				{
+					clear();
+					::free(vacants);
+					::free(memory);
+					vacants = NULL;
+					memory  = NULL;
+					vac_cap = 0;
+					mem_cap = 0;
+				}
+
 				template<typename... P>
 					T *allocate(P &&... p)
 					{
@@ -5668,6 +5694,33 @@ namespace Vulkan
 		VulkanObjectPool<FenceHolder> fences;
 		VulkanObjectPool<SemaphoreHolder> semaphores;
 		VulkanObjectPool<CommandBuffer> command_buffers;
+
+		/* For a malloc'd owner (Device), where the pools' constructors and
+		 * destructors do not run: init() puts every pool in the empty state and
+		 * deinit() runs each pool's teardown (free pooled nodes and slabs). */
+		void init()
+		{
+			buffers.init();
+			images.init();
+			image_views.init();
+			buffer_views.init();
+			samplers.init();
+			fences.init();
+			semaphores.init();
+			command_buffers.init();
+		}
+
+		void deinit()
+		{
+			buffers.deinit();
+			images.deinit();
+			image_views.deinit();
+			buffer_views.deinit();
+			samplers.deinit();
+			fences.deinit();
+			semaphores.deinit();
+			command_buffers.deinit();
+		}
 	};
 
 	/* Thread-locking primitives used by the Device implementation
