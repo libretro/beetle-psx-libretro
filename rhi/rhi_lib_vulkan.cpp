@@ -1942,6 +1942,42 @@ namespace Util
 				T *data = nullptr;
 		};
 
+	/* Concrete per-type intrusive handle, replacing IntrusivePtr<T> for the
+	 * Vulkan pointee types. Each pointee carries its own HandleCounter and
+	 * provides release_reference/add_reference, so the handle is a plain struct
+	 * wrapping a raw pointer with the same copy=incref / move=steal / reset=decref
+	 * semantics IntrusivePtr had. The pointees are unrelated types (no pointee
+	 * derives from another), so only same-type operations are needed - none of
+	 * IntrusivePtr's cross-type template conversions were ever instantiated. T
+	 * must be complete at the point of declaration. */
+#define INTRUSIVE_HANDLE_DECLARE(HandleName, T)                                       \
+	struct HandleName {                                                              \
+		T *data;                                                                     \
+		HandleName() : data(NULL) {}                                                 \
+		explicit HandleName(T *handle) : data(handle) {}                             \
+		T &operator*() { return *data; }                                            \
+		const T &operator*() const { return *data; }                                \
+		T *operator->() { return data; }                                            \
+		const T *operator->() const { return data; }                                \
+		explicit operator bool() const { return data != NULL; }                     \
+		bool operator==(const HandleName &o) const { return data == o.data; }        \
+		bool operator!=(const HandleName &o) const { return data != o.data; }        \
+		T *get() { return data; }                                                   \
+		const T *get() const { return data; }                                       \
+		void reset() { if (data) data->release_reference(); data = NULL; }            \
+		HandleName(const HandleName &o) : data(o.data) { if (data) data->add_reference(); } \
+		HandleName &operator=(const HandleName &o) {                                 \
+			if (this != &o) { reset(); data = o.data; if (data) data->add_reference(); } \
+			return *this;                                                            \
+		}                                                                            \
+		HandleName(HandleName &&o) : data(o.data) { o.data = NULL; }                  \
+		HandleName &operator=(HandleName &&o) {                                      \
+			if (this != &o) { reset(); data = o.data; o.data = NULL; }                \
+			return *this;                                                            \
+		}                                                                            \
+		~HandleName() { reset(); }                                                   \
+	}
+
 	template <typename T>
 		struct IntrusiveListEnabled
 		{
@@ -3065,7 +3101,7 @@ namespace Vulkan
 			VkSampler sampler;
 			HandleCounter reference_count;
 	};
-	using SamplerHandle = Util::IntrusivePtr<Sampler>;
+	INTRUSIVE_HANDLE_DECLARE(SamplerHandle, Sampler);
 }
 
 /* ============================================================
@@ -3725,7 +3761,7 @@ namespace Vulkan
 			BufferCreateInfo info;
 			HandleCounter reference_count;
 	};
-	using BufferHandle = Util::IntrusivePtr<Buffer>;
+	INTRUSIVE_HANDLE_DECLARE(BufferHandle, Buffer);
 
 	struct BufferViewCreateInfo
 	{
@@ -3774,7 +3810,7 @@ namespace Vulkan
 			BufferViewCreateInfo info;
 			HandleCounter reference_count;
 	};
-	using BufferViewHandle = Util::IntrusivePtr<BufferView>;
+	INTRUSIVE_HANDLE_DECLARE(BufferViewHandle, BufferView);
 
 	class Device;
 
@@ -4018,7 +4054,7 @@ namespace Vulkan
 			HandleCounter reference_count;
 	};
 
-	using ImageViewHandle = Util::IntrusivePtr<ImageView>;
+	INTRUSIVE_HANDLE_DECLARE(ImageViewHandle, ImageView);
 
 	/* Owning array of ImageViewHandle (= IntrusivePtr<ImageView>). Replaces
 	 * std::vector<ImageViewHandle> for the renderer's scaled mip-view chain,
@@ -4307,7 +4343,7 @@ namespace Vulkan
 			HandleCounter reference_count;
 	};
 
-	using ImageHandle = Util::IntrusivePtr<Image>;
+	INTRUSIVE_HANDLE_DECLARE(ImageHandle, Image);
 
 	class Device;
 
@@ -4349,7 +4385,7 @@ namespace Vulkan
 			HandleCounter reference_count;
 	};
 
-	using Fence = Util::IntrusivePtr<FenceHolder>;
+	INTRUSIVE_HANDLE_DECLARE(Fence, FenceHolder);
 
 	POD_VEC_DECLARE(FenceVec, VkFence);
 	class FenceManager
@@ -4431,7 +4467,7 @@ namespace Vulkan
 			HandleCounter reference_count;
 	};
 
-	using Semaphore = Util::IntrusivePtr<SemaphoreHolder>;
+	INTRUSIVE_HANDLE_DECLARE(Semaphore, SemaphoreHolder);
 
 	/* Owning array of Semaphore (= IntrusivePtr<SemaphoreHolder>). Replaces
 	 * std::vector<Semaphore> for the per-queue wait-semaphore lists. The element
@@ -4995,8 +5031,8 @@ namespace Vulkan
 	struct BufferBlock
 	{
 		~BufferBlock();
-		Util::IntrusivePtr<Buffer> gpu;
-		Util::IntrusivePtr<Buffer> cpu;
+		BufferHandle gpu;
+		BufferHandle cpu;
 		VkDeviceSize offset = 0;
 		VkDeviceSize alignment = 0;
 		VkDeviceSize size = 0;
@@ -5608,7 +5644,7 @@ namespace Vulkan
 	};
 
 
-	using CommandBufferHandle = Util::IntrusivePtr<CommandBuffer>;
+	INTRUSIVE_HANDLE_DECLARE(CommandBufferHandle, CommandBuffer);
 }
 
 /* ============================================================
