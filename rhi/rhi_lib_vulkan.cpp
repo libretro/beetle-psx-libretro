@@ -1825,6 +1825,74 @@ static inline uint32_t util_ctz(uint32_t x)
 		~HandleName() { reset(); }                                                   \
 	}
 
+	/* Concrete intrusive doubly-linked list (the de-templated form of the
+	 * standalone IntrusiveList<T> instantiations). The template's links are already
+	 * type-erased - prev/next are just IntrusiveListEnabled<T>* - and T* is
+	 * recovered with static_cast because the list-enabled base sits at offset 0 of
+	 * each node. So a single concrete node base (IntrusiveListNode) and list
+	 * (IntrusiveListC) serve every standalone list; callers recover the node type by
+	 * casting, valid because the node base is the first member (offset 0).
+	 *
+	 * The template IntrusiveListEnabled<T>/IntrusiveList<T> below are still used
+	 * inside the intrusive hash maps and are converted with them in a later stage. */
+	struct IntrusiveListNode
+	{
+		struct IntrusiveListNode *prev;
+		struct IntrusiveListNode *next;
+	};
+
+	struct IntrusiveListC
+	{
+		struct IntrusiveListNode *head = NULL;
+	};
+
+	static inline void ilist_clear(struct IntrusiveListC *list)
+	{
+		list->head = NULL;
+	}
+
+	static inline bool ilist_empty(const struct IntrusiveListC *list)
+	{
+		return list->head == NULL;
+	}
+
+	static inline struct IntrusiveListNode *ilist_begin(const struct IntrusiveListC *list)
+	{
+		return list->head;
+	}
+
+	/* Unlink node and return the node that followed it. */
+	static inline struct IntrusiveListNode *ilist_erase(struct IntrusiveListC *list,
+			struct IntrusiveListNode *node)
+	{
+		struct IntrusiveListNode *next = node->next;
+		struct IntrusiveListNode *prev = node->prev;
+		if (prev)
+			prev->next = next;
+		else
+			list->head = next;
+		if (next)
+			next->prev = prev;
+		return next;
+	}
+
+	static inline void ilist_insert_front(struct IntrusiveListC *list,
+			struct IntrusiveListNode *node)
+	{
+		if (list->head)
+			list->head->prev = node;
+		node->next = list->head;
+		node->prev = NULL;
+		list->head = node;
+	}
+
+	static inline void ilist_move_to_front(struct IntrusiveListC *list,
+			struct IntrusiveListC *other, struct IntrusiveListNode *node)
+	{
+		ilist_erase(other, node);
+		ilist_insert_front(list, node);
+	}
+
 	template <typename T>
 		struct IntrusiveListEnabled
 		{
@@ -3328,7 +3396,7 @@ private:
 	VkDeviceMemory base = VK_NULL_HANDLE;
 	uint8_t *host_base = NULL;
 	ClassAllocator *alloc = NULL;
-	IntrusiveList<MiniHeap>::Iterator heap = {};
+	MiniHeap *heap = NULL;
 	uint32_t offset = 0;
 	uint32_t mask = 0;
 	uint32_t size = 0;
@@ -3383,11 +3451,17 @@ struct DeviceAllocationVec
 	DeviceAllocation *end() { return items + count; }
 };
 
-struct MiniHeap : IntrusiveListEnabled<MiniHeap>
+struct MiniHeap
 {
+	struct IntrusiveListNode list_node; /* must stay first (offset 0) */
 	DeviceAllocation allocation;
 	Block heap;
 };
+
+/* The concrete list recovers a MiniHeap* from an IntrusiveListNode* by casting,
+ * which is only valid if the node base is at offset 0. */
+static_assert(offsetof(MiniHeap, list_node) == 0,
+		"MiniHeap.list_node must be the first member for intrusive-list casts");
 
 class Allocator;
 
@@ -3415,8 +3489,8 @@ private:
 	ClassAllocator() { object_pool_raw_init(&object_pool, sizeof(MiniHeap)); }
 	struct AllocationTilingHeaps
 	{
-		IntrusiveList<MiniHeap> heaps[Block::NumSubBlocks];
-		IntrusiveList<MiniHeap> full_heaps;
+		struct IntrusiveListC heaps[Block::NumSubBlocks];
+		struct IntrusiveListC full_heaps;
 		uint32_t heap_availability_mask = 0;
 	};
 	ClassAllocator *parent = NULL;
@@ -12950,7 +13024,7 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 
 	if (index < Block::NumSubBlocks)
 	{
-		IntrusiveList<MiniHeap>::Iterator itr = m.heaps[index].begin();
+		MiniHeap *itr = (MiniHeap *)ilist_begin(&m.heaps[index]);
 		VK_ASSERT(itr);
 		VK_ASSERT(index >= (num_blocks - 1));
 
@@ -12960,16 +13034,16 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 
 		if (heap.heap.full())
 		{
-			m.full_heaps.move_to_front(m.heaps[index], itr);
-			if (!m.heaps[index].begin())
+			ilist_move_to_front(&m.full_heaps, &m.heaps[index], &itr->list_node);
+			if (!ilist_begin(&m.heaps[index]))
 				m.heap_availability_mask &= ~(1u << index);
 		}
 		else if (new_index != index)
 		{
-			IntrusiveList<MiniHeap> &new_heap = m.heaps[new_index];
-			new_heap.move_to_front(m.heaps[index], itr);
+			struct IntrusiveListC &new_heap = m.heaps[new_index];
+			ilist_move_to_front(&new_heap, &m.heaps[index], &itr->list_node);
 			m.heap_availability_mask |= 1u << new_index;
-			if (!m.heaps[index].begin())
+			if (!ilist_begin(&m.heaps[index]))
 				m.heap_availability_mask &= ~(1u << index);
 		}
 
@@ -13013,12 +13087,12 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 	alloc->heap = node;
 	if (heap.heap.full())
 	{
-		m.full_heaps.insert_front(node);
+		ilist_insert_front(&m.full_heaps, &node->list_node);
 	}
 	else
 	{
 		unsigned new_index = heap.heap.get_longest_run() - 1;
-		m.heaps[new_index].insert_front(node);
+		ilist_insert_front(&m.heaps[new_index], &node->list_node);
 		m.heap_availability_mask |= 1u << new_index;
 	}
 
@@ -13032,11 +13106,11 @@ ClassAllocator::~ClassAllocator()
 	bool error = false;
 	for (AllocationTilingHeaps &m : tiling_modes)
 	{
-		if (m.full_heaps.begin())
+		if (ilist_begin(&m.full_heaps))
 			error = true;
 
-		for (IntrusiveList<MiniHeap> &h : m.heaps)
-			if (h.begin())
+		for (struct IntrusiveListC &h : m.heaps)
+			if (ilist_begin(&h))
 				error = true;
 	}
 
@@ -13048,7 +13122,7 @@ ClassAllocator::~ClassAllocator()
 
 void ClassAllocator::free(DeviceAllocation *alloc)
 {
-	MiniHeap *heap = &*alloc->heap;
+	MiniHeap *heap = alloc->heap;
 	Block &block = heap->heap;
 	bool was_full = block.full();
 	AllocationTilingHeaps &m = tiling_modes[alloc->tiling];
@@ -13066,11 +13140,11 @@ void ClassAllocator::free(DeviceAllocation *alloc)
 			heap->allocation.free_global(*global_allocator, sub_block_size * Block::NumSubBlocks, memory_type);
 
 		if (was_full)
-			m.full_heaps.erase(heap);
+			ilist_erase(&m.full_heaps, &heap->list_node);
 		else
 		{
-			m.heaps[index].erase(heap);
-			if (!m.heaps[index].begin())
+			ilist_erase(&m.heaps[index], &heap->list_node);
+			if (!ilist_begin(&m.heaps[index]))
 				m.heap_availability_mask &= ~(1u << index);
 		}
 
@@ -13078,14 +13152,14 @@ void ClassAllocator::free(DeviceAllocation *alloc)
 	}
 	else if (was_full)
 	{
-		m.heaps[new_index].move_to_front(m.full_heaps, heap);
+		ilist_move_to_front(&m.heaps[new_index], &m.full_heaps, &heap->list_node);
 		m.heap_availability_mask |= 1u << new_index;
 	}
 	else if (index != new_index)
 	{
-		m.heaps[new_index].move_to_front(m.heaps[index], heap);
+		ilist_move_to_front(&m.heaps[new_index], &m.heaps[index], &heap->list_node);
 		m.heap_availability_mask |= 1u << new_index;
-		if (!m.heaps[index].begin())
+		if (!ilist_begin(&m.heaps[index]))
 			m.heap_availability_mask &= ~(1u << index);
 	}
 }
