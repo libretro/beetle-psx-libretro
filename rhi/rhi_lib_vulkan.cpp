@@ -8628,11 +8628,11 @@ namespace PSX
 			void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
 			uint16_t *begin_copy(Vulkan::BufferHandle handle)
 			{
-				return static_cast<uint16_t *>(device.map_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT));
+				return static_cast<uint16_t *>(device->map_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT));
 			}
 			void end_copy(Vulkan::BufferHandle handle)
 			{
-				device.unmap_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT);
+				device->unmap_host_buffer(*handle, Vulkan::MEMORY_ACCESS_WRITE_BIT);
 			}
 
 			void notify_texture_upload(Rect rect, uint16_t *vram)
@@ -8777,18 +8777,18 @@ namespace PSX
 			void flush()
 			{
 				if (cmd)
-					device.submit(cmd);
+					device->submit(cmd);
 				cmd.reset();
-				device.flush_frame();
+				device->flush_frame();
 			}
 
 			Vulkan::Fence flush_and_signal()
 			{
 				Vulkan::Fence fence;
 				if (cmd)
-					device.submit(cmd, &fence);
+					device->submit(cmd, &fence);
 				cmd.reset();
-				device.flush_frame();
+				device->flush_frame();
 				return fence;
 			}
 
@@ -8866,7 +8866,7 @@ namespace PSX
 			bool is_valid() const { return valid; }
 
 		private:
-			Vulkan::Device &device;
+			Vulkan::Device *device;
 			unsigned scaling;
 			unsigned msaa;
 			bool scaled_uv_offset = false;
@@ -9298,8 +9298,8 @@ using namespace Vulkan;
 
 namespace PSX
 {
-Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const SaveState *state)
-    : device(device)
+Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const SaveState *state)
+    : device(&device_)
     , scaling(scaling_)
     , msaa(msaa_)
 {
@@ -9319,7 +9319,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	// Verify we can actually render at our target scaling factor.
 	// Some devices only support 8K textures, which means max 8x scale.
 	VkImageFormatProperties props;
-	if (device.get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+	if (device->get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 				VK_IMAGE_USAGE_STORAGE_BIT |
 				VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
@@ -9364,16 +9364,16 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	ImageInitialData initial_vram = {
 		state ? state->vram.data() : nullptr, 0, 0,
 	};
-	framebuffer = device.create_image(info, state ? &initial_vram : nullptr);
+	framebuffer = device->create_image(info, state ? &initial_vram : nullptr);
 	framebuffer->set_layout(Layout::General);
-	framebuffer_ssaa = device.create_image(info);
+	framebuffer_ssaa = device->create_image(info);
 	framebuffer_ssaa->set_layout(Layout::General);
 
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.format = VK_FORMAT_R8_UNORM;
 	info.levels = 1;
-	bias_framebuffer = device.create_image(info, nullptr);
+	bias_framebuffer = device->create_image(info, nullptr);
 
 	info.width *= scaling;
 	info.height *= scaling;
@@ -9383,7 +9383,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 	             VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-	scaled_framebuffer = device.create_image(info);
+	scaled_framebuffer = device->create_image(info);
 	scaled_framebuffer->set_layout(Layout::General);
 
 	{
@@ -9392,24 +9392,24 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 		{
 			view_info.base_level = i;
 			view_info.levels = 1;
-			scaled_views.push(device.create_image_view(view_info));
+			scaled_views.push(device->create_image_view(view_info));
 		}
 	}
 
 	// Check for support.
 	if (msaa > 1)
 	{
-		if (!device.get_device_features().enabled_features.sampleRateShading)
+		if (!device->get_device_features().enabled_features.sampleRateShading)
 		{
 			msaa = 1;
 			LOGI("[Vulkan]: sampleRateShading is not supported by this implementation. Cannot use MSAA.\n");
 		}
-		else if (!device.get_device_features().enabled_features.shaderStorageImageMultisample)
+		else if (!device->get_device_features().enabled_features.shaderStorageImageMultisample)
 		{
 			msaa = 1;
 			LOGI("[Vulkan]: shaderStorageImageMultisample is not supported by this implementation. Cannot use MSAA.\n");
 		}
-		else if (!device.get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+		else if (!device->get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
 					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 					VK_IMAGE_USAGE_STORAGE_BIT |
 					VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
@@ -9443,7 +9443,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	{
 		info.levels = 1;
 		info.samples = static_cast<VkSampleCountFlagBits>(msaa);
-		scaled_framebuffer_msaa = device.create_image(info);
+		scaled_framebuffer_msaa = device->create_image(info);
 		scaled_framebuffer_msaa->set_layout(Layout::General);
 		// General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
 		// The expectation is that this will be used with a lower scaling factor to compensate.
@@ -9465,7 +9465,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	static const uint8_t dither_lut_data[16] = { 0, 4, 1, 5, 6, 2, 7, 3, 1, 5, 0, 4, 7, 3, 6, 2 };
 
 	ImageInitialData dither_initial = { dither_lut_data };
-	dither_lut = device.create_image(dither_info, &dither_initial);
+	dither_lut = device->create_image(dither_info, &dither_initial);
 
 	static const float quad_data[] = {
 		-128, -128, +127, -128, -128, +127, +127, +127,
@@ -9475,7 +9475,7 @@ Renderer::Renderer(Device &device, unsigned scaling_, unsigned msaa_, const Save
 	buffer_create_info.domain = BufferDomain::Device;
 	buffer_create_info.size = sizeof(quad_data);
 	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	quad = device.create_buffer(buffer_create_info, quad_data);
+	quad = device->create_buffer(buffer_create_info, quad_data);
 
 	flush();
 	reset_scissor_queue();
@@ -9494,7 +9494,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	BufferHandle buffer = device.create_buffer(buffer_create_info, nullptr);
+	BufferHandle buffer = device->create_buffer(buffer_create_info, nullptr);
 	atlas.read_transfer(Domain::Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	ensure_command_buffer();
 	cmd->copy_image_to_buffer(*buffer, *framebuffer, 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
@@ -9504,40 +9504,40 @@ Renderer::SaveState Renderer::save_vram_state()
 
 	flush();
 
-	device.wait_idle();
+	device->wait_idle();
 	const uint32_t *src = static_cast<const uint32_t *>(
-			device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
+			device->map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
 	/* Deep-copy the mapped VRAM straight into the owning buffer (no
 	 * default zero-fill), then move it into the returned SaveState. */
 	Renderer::OwnedU32Buf vram;
 	vram.assign(src, FB_WIDTH * FB_HEIGHT);
-	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
+	device->unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
 	return { std::move(vram), render_state, tracker.save_state() };
 }
 
 void Renderer::init_primitive_pipelines()
 {
 	if (msaa > 1 || scaling > 1)
-		pipelines.flat = device.request_program(flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
+		pipelines.flat = device->request_program(flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
 	else
-		pipelines.flat = device.request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_frag, sizeof(flat_frag));
+		pipelines.flat = device->request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_frag, sizeof(flat_frag));
 
 	if (msaa > 1)
 	{
-		pipelines.textured_scaled = device.request_program(textured_vert, sizeof(textured_vert), textured_msaa_frag, sizeof(textured_msaa_frag));
-		pipelines.textured_unscaled = device.request_program(textured_vert, sizeof(textured_vert), textured_msaa_unscaled_frag, sizeof(textured_msaa_unscaled_frag));
+		pipelines.textured_scaled = device->request_program(textured_vert, sizeof(textured_vert), textured_msaa_frag, sizeof(textured_msaa_frag));
+		pipelines.textured_unscaled = device->request_program(textured_vert, sizeof(textured_vert), textured_msaa_unscaled_frag, sizeof(textured_msaa_unscaled_frag));
 	}
 	else
 	{
 		if (scaling > 1)
 		{
-			pipelines.textured_scaled = device.request_program(textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
-			pipelines.textured_unscaled = device.request_program(textured_vert, sizeof(textured_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+			pipelines.textured_scaled = device->request_program(textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
+			pipelines.textured_unscaled = device->request_program(textured_vert, sizeof(textured_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
 		}
 		else
 		{
-			pipelines.textured_scaled = device.request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_frag, sizeof(textured_frag));
-			pipelines.textured_unscaled = device.request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+			pipelines.textured_scaled = device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_frag, sizeof(textured_frag));
+			pipelines.textured_unscaled = device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
 		}
 	}
 }
@@ -9547,31 +9547,31 @@ void Renderer::init_primitive_feedback_pipelines()
 	// TODO: The masked pipelines do not have filter options.
 	if (msaa > 1)
 	{
-		pipelines.textured_masked_scaled = device.request_program(textured_vert, sizeof(textured_vert),
+		pipelines.textured_masked_scaled = device->request_program(textured_vert, sizeof(textured_vert),
 				feedback_msaa_frag, sizeof(feedback_msaa_frag));
-		pipelines.textured_masked_unscaled = device.request_program(textured_vert, sizeof(textured_vert),
+		pipelines.textured_masked_unscaled = device->request_program(textured_vert, sizeof(textured_vert),
 				feedback_msaa_unscaled_frag, sizeof(feedback_msaa_unscaled_frag));
-		pipelines.flat_masked = device.request_program(flat_vert, sizeof(flat_vert),
+		pipelines.flat_masked = device->request_program(flat_vert, sizeof(flat_vert),
 				feedback_msaa_flat_frag, sizeof(feedback_msaa_flat_frag));
 	}
 	else
 	{
 		if (scaling > 1)
 		{
-			pipelines.flat_masked = device.request_program(flat_vert, sizeof(flat_vert),
+			pipelines.flat_masked = device->request_program(flat_vert, sizeof(flat_vert),
 					feedback_flat_frag, sizeof(feedback_flat_frag));
-			pipelines.textured_masked_scaled = device.request_program(textured_vert, sizeof(textured_vert),
+			pipelines.textured_masked_scaled = device->request_program(textured_vert, sizeof(textured_vert),
 					feedback_frag, sizeof(feedback_frag));
-			pipelines.textured_masked_unscaled = device.request_program(textured_vert, sizeof(textured_vert),
+			pipelines.textured_masked_unscaled = device->request_program(textured_vert, sizeof(textured_vert),
 					feedback_unscaled_frag, sizeof(feedback_unscaled_frag));
 		}
 		else
 		{
-			pipelines.flat_masked = device.request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert),
+			pipelines.flat_masked = device->request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert),
 					feedback_flat_frag, sizeof(feedback_flat_frag));
-			pipelines.textured_masked_scaled = device.request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
+			pipelines.textured_masked_scaled = device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
 					feedback_frag, sizeof(feedback_frag));
-			pipelines.textured_masked_unscaled = device.request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
+			pipelines.textured_masked_unscaled = device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
 					feedback_unscaled_frag, sizeof(feedback_unscaled_frag));
 		}
 	}
@@ -9580,72 +9580,72 @@ void Renderer::init_primitive_feedback_pipelines()
 void Renderer::init_pipelines()
 {
 	if (msaa > 1)
-		pipelines.resolve_to_unscaled = device.request_program(resolve_msaa_to_unscaled, sizeof(resolve_msaa_to_unscaled));
+		pipelines.resolve_to_unscaled = device->request_program(resolve_msaa_to_unscaled, sizeof(resolve_msaa_to_unscaled));
 	else
-		pipelines.resolve_to_unscaled = device.request_program(resolve_to_unscaled, sizeof(resolve_to_unscaled));
+		pipelines.resolve_to_unscaled = device->request_program(resolve_to_unscaled, sizeof(resolve_to_unscaled));
 
 	pipelines.scaled_quad_blitter =
-		device.request_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
+		device->request_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
 	pipelines.scaled_dither_quad_blitter =
-		device.request_program(quad_vert, sizeof(quad_vert), scaled_dither_quad_frag, sizeof(scaled_dither_quad_frag));
+		device->request_program(quad_vert, sizeof(quad_vert), scaled_dither_quad_frag, sizeof(scaled_dither_quad_frag));
 	pipelines.bpp24_quad_blitter =
-		device.request_program(quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
+		device->request_program(quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
 	pipelines.bpp24_yuv_quad_blitter =
-		device.request_program(quad_vert, sizeof(quad_vert), bpp24_yuv_quad_frag, sizeof(bpp24_yuv_quad_frag));
+		device->request_program(quad_vert, sizeof(quad_vert), bpp24_yuv_quad_frag, sizeof(bpp24_yuv_quad_frag));
 	pipelines.unscaled_quad_blitter =
-		device.request_program(quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
+		device->request_program(quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
 	pipelines.unscaled_dither_quad_blitter =
-		device.request_program(quad_vert, sizeof(quad_vert), unscaled_dither_quad_frag, sizeof(unscaled_dither_quad_frag));
+		device->request_program(quad_vert, sizeof(quad_vert), unscaled_dither_quad_frag, sizeof(unscaled_dither_quad_frag));
 
-	pipelines.copy_to_vram = device.request_program(copy_vram_comp, sizeof(copy_vram_comp));
-	pipelines.copy_to_vram_masked = device.request_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
+	pipelines.copy_to_vram = device->request_program(copy_vram_comp, sizeof(copy_vram_comp));
+	pipelines.copy_to_vram_masked = device->request_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
 
 	if (msaa > 1)
 	{
 		pipelines.resolve_to_scaled =
-			device.request_program(resolve_to_msaa_scaled, sizeof(resolve_to_msaa_scaled));
+			device->request_program(resolve_to_msaa_scaled, sizeof(resolve_to_msaa_scaled));
 
 		pipelines.blit_vram_scaled =
-			device.request_program(blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
+			device->request_program(blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
 		pipelines.blit_vram_scaled_masked =
-			device.request_program(blit_vram_msaa_scaled_masked_comp, sizeof(blit_vram_msaa_scaled_masked_comp));
+			device->request_program(blit_vram_msaa_scaled_masked_comp, sizeof(blit_vram_msaa_scaled_masked_comp));
 		pipelines.blit_vram_msaa_cached_scaled =
-			device.request_program(blit_vram_msaa_cached_scaled_comp, sizeof(blit_vram_msaa_cached_scaled_comp));
+			device->request_program(blit_vram_msaa_cached_scaled_comp, sizeof(blit_vram_msaa_cached_scaled_comp));
 		pipelines.blit_vram_msaa_cached_scaled_masked =
-			device.request_program(blit_vram_msaa_cached_scaled_masked_comp, sizeof(blit_vram_msaa_cached_scaled_masked_comp));
+			device->request_program(blit_vram_msaa_cached_scaled_masked_comp, sizeof(blit_vram_msaa_cached_scaled_masked_comp));
 	}
 	else
 	{
-		pipelines.resolve_to_scaled = device.request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
+		pipelines.resolve_to_scaled = device->request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
 
-		pipelines.blit_vram_scaled = device.request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
+		pipelines.blit_vram_scaled = device->request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
 		pipelines.blit_vram_scaled_masked =
-			device.request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
+			device->request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
 	}
 
 	pipelines.blit_vram_cached_scaled =
-		device.request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
+		device->request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
 	pipelines.blit_vram_cached_scaled_masked =
-		device.request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
+		device->request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
 
-	pipelines.blit_vram_unscaled = device.request_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
+	pipelines.blit_vram_unscaled = device->request_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
 	pipelines.blit_vram_unscaled_masked =
-		device.request_program(blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
+		device->request_program(blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
 	pipelines.blit_vram_cached_unscaled =
-		device.request_program(blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
+		device->request_program(blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
 	pipelines.blit_vram_cached_unscaled_masked =
-		device.request_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
+		device->request_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
 
 	pipelines.mipmap_resolve =
-		device.request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
+		device->request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
 	pipelines.mipmap_dither_resolve =
-		device.request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
+		device->request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
 
-	pipelines.mipmap_energy = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+	pipelines.mipmap_energy = device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_frag, sizeof(mipmap_energy_frag));
-	pipelines.mipmap_energy_first = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+	pipelines.mipmap_energy_first = device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_first_frag, sizeof(mipmap_energy_first_frag));
-	pipelines.mipmap_energy_blur = device.request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+	pipelines.mipmap_energy_blur = device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_blur_frag, sizeof(mipmap_energy_blur_frag));
 
 	init_primitive_pipelines();
@@ -9712,7 +9712,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	buffer_create_info.size = copy_rect.width * copy_rect.height * 4;
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	BufferHandle buffer = device.create_buffer(buffer_create_info, nullptr);
+	BufferHandle buffer = device->create_buffer(buffer_create_info, nullptr);
 	cmd->copy_image_to_buffer(*buffer, *framebuffer, 0, { int(copy_rect.x), int(copy_rect.y), 0 },
 	                          { copy_rect.width, copy_rect.height, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
@@ -9723,7 +9723,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	Vulkan::Fence fence = flush_and_signal();
 	fence->wait();
 
-	const uint32_t *mapped = static_cast<const uint32_t *>(device.map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
+	const uint32_t *mapped = static_cast<const uint32_t *>(device->map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
 
 	if (!wrap)
 	{
@@ -9747,7 +9747,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 		tracker.notifyReadback(rect, vram);
 	}
 
-	device.unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
+	device->unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
 }
 
 void Renderer::mipmap_framebuffer()
@@ -10052,7 +10052,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	reuseable_scanout = device.create_image(info);
+	reuseable_scanout = device->create_image(info);
 
 	RenderPassInfo rp;
 	rp.color_attachments[0] = &reuseable_scanout->get_view();
@@ -10138,7 +10138,7 @@ ImageHandle Renderer::scanout_to_texture()
 		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		info.usage =
 		    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-		reuseable_scanout = device.create_image(info);
+		reuseable_scanout = device->create_image(info);
 
 		RenderPassInfo rp;
 		rp.color_attachments[0] = &reuseable_scanout->get_view();
@@ -10238,7 +10238,7 @@ ImageHandle Renderer::scanout_to_texture()
 
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	reuseable_scanout = device.create_image(info);
+	reuseable_scanout = device->create_image(info);
 
 	RenderPassInfo rp;
 	rp.color_attachments[0] = &reuseable_scanout->get_view();
@@ -10511,7 +10511,7 @@ void Renderer::resolve(Domain target_domain, unsigned x, unsigned y)
 void Renderer::ensure_command_buffer()
 {
 	if (!cmd)
-		cmd = device.request_command_buffer();
+		cmd = device->request_command_buffer();
 }
 
 float Renderer::allocate_depth(Domain domain, const Rect &rect)
@@ -11043,8 +11043,8 @@ void Renderer::flush_render_pass(const Rect &rect)
 
 	info.clear_depth_stencil = { 1.0f, 0 };
 	info.depth_stencil =
-		&device.get_transient_attachment(FB_WIDTH * scaling, FB_HEIGHT * scaling,
-		                                 device.get_default_depth_format(), 0, msaa, 1);
+		&device->get_transient_attachment(FB_WIDTH * scaling, FB_HEIGHT * scaling,
+		                                 device->get_default_depth_format(), 0, msaa, 1);
 	info.num_color_attachments = 1;
 	info.store_attachments = 1 << 0;
 	info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
@@ -11561,7 +11561,7 @@ Vulkan::ImageHandle Renderer::upload_texture(LoadedLevels &levels) {
 		initial[i].image_height = 0;
 	}
 
-	ImageHandle image = device.create_image(info, initial);
+	ImageHandle image = device->create_image(info, initial);
 	return image;
 }
 Vulkan::ImageHandle Renderer::create_texture(int width, int height, int levels) {
@@ -11569,7 +11569,7 @@ Vulkan::ImageHandle Renderer::create_texture(int width, int height, int levels) 
 	info.levels = levels;
 	info.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	ImageHandle image = device.create_image(info, nullptr);
+	ImageHandle image = device->create_image(info, nullptr);
 	return image;
 }
 
@@ -11584,7 +11584,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 	buffer_create_info.domain = BufferDomain::Host;
 	buffer_create_info.size = size;
 	buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
-	BufferHandle buffer = device.create_buffer(buffer_create_info, nullptr);
+	BufferHandle buffer = device->create_buffer(buffer_create_info, nullptr);
 
 	BufferViewCreateInfo view_info = {};
 	view_info.buffer = buffer.get();
@@ -11601,7 +11601,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 	cmd->set_storage_texture(0, 0, framebuffer->get_view());
 
 	// Vulkan minimum limit, for large buffer views, split up the work.
-	if (rect.width * rect.height > device.get_gpu_properties().limits.maxTexelBufferElements)
+	if (rect.width * rect.height > device->get_gpu_properties().limits.maxTexelBufferElements)
 	{
 		for (unsigned y = 0; y < rect.height; y += BLOCK_HEIGHT)
 		{
@@ -11609,7 +11609,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 			view_info.offset = y * rect.width * sizeof(uint16_t);
 			view_info.range = y_size * rect.width * sizeof(uint16_t);
 			view_info.format = VK_FORMAT_R16_UINT;
-			BufferViewHandle view = device.create_buffer_view(view_info);
+			BufferViewHandle view = device->create_buffer_view(view_info);
 
 			Rect small_rect = { rect.x, rect.y + y, rect.width, y_size };
 
@@ -11624,7 +11624,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 		view_info.offset = 0;
 		view_info.range = size;
 		view_info.format = VK_FORMAT_R16_UINT;
-		BufferViewHandle view = device.create_buffer_view(view_info);
+		BufferViewHandle view = device->create_buffer_view(view_info);
 
 		cmd->set_buffer_view(0, 1, *view);
 
