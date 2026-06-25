@@ -7874,57 +7874,48 @@ extern retro_log_printf_t log_cb;
 		TextureRectSaveState *items;
 		int count;
 		int cap;
-
-		TextureRectSaveStateVec() : items(NULL), count(0), cap(0) {}
-		~TextureRectSaveStateVec() { free(items); }
-		TextureRectSaveStateVec(TextureRectSaveStateVec &&o) noexcept
-			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-		TextureRectSaveStateVec &operator=(TextureRectSaveStateVec &&o) noexcept {
-			if (this != &o) {
-				free(items);
-				items = o.items; count = o.count; cap = o.cap;
-				o.items = NULL; o.count = 0; o.cap = 0;
-			}
-			return *this;
-		}
-		TextureRectSaveStateVec(const TextureRectSaveStateVec &) = delete;
-		TextureRectSaveStateVec &operator=(const TextureRectSaveStateVec &) = delete;
-
-		void push(const TextureRectSaveState &v) {
-			if (count >= cap) {
-				int ncap = cap ? cap * 2 : 8;
-				TextureRectSaveState *nitems = (TextureRectSaveState *)realloc(items, (size_t)ncap * sizeof(TextureRectSaveState));
-				if (!nitems)
-					return;
-				items = nitems;
-				cap = ncap;
-			}
-			items[count++] = v;
-		}
-		int size() const { return count; }
-		const TextureRectSaveState *begin() const { return items; }
-		const TextureRectSaveState *end() const { return items + count; }
 	};
+	static inline void TextureRectSaveStateVec_init(struct TextureRectSaveStateVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+	static inline void TextureRectSaveStateVec_free_storage(struct TextureRectSaveStateVec *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; }
+	static inline int  TextureRectSaveStateVec_size(const struct TextureRectSaveStateVec *v) { return v->count; }
+	static inline TextureRectSaveState *TextureRectSaveStateVec_at(struct TextureRectSaveStateVec *v, int i) { return &v->items[i]; }
+	static inline void TextureRectSaveStateVec_push(struct TextureRectSaveStateVec *v, const TextureRectSaveState *valp) {
+		if (v->count >= v->cap) {
+			int ncap = v->cap ? v->cap * 2 : 8;
+			TextureRectSaveState *nitems = (TextureRectSaveState *)realloc(v->items, (size_t)ncap * sizeof(TextureRectSaveState));
+			if (!nitems)
+				return;
+			v->items = nitems;
+			v->cap = ncap;
+		}
+		v->items[v->count++] = *valp;
+	}
+	/* Move src into dst (steal buffer), leaving src empty - replaces the implicit
+	 * move of the former move-only container. */
+	static inline void TextureRectSaveStateVec_move(struct TextureRectSaveStateVec *dst, struct TextureRectSaveStateVec *src) {
+		dst->items = src->items; dst->count = src->count; dst->cap = src->cap;
+		src->items = NULL; src->count = 0; src->cap = 0;
+	}
 
 	struct RestorableRectSaveState {
 		Rect rect;
 		uint32_t hash;
 		TextureRectSaveStateVec to_restore;
-
-		RestorableRectSaveState() : rect(), hash(0) {}
-		RestorableRectSaveState(RestorableRectSaveState &&o) noexcept
-			: rect(o.rect), hash(o.hash), to_restore(static_cast<TextureRectSaveStateVec &&>(o.to_restore)) {}
-		RestorableRectSaveState &operator=(RestorableRectSaveState &&o) noexcept {
-			if (this != &o) {
-				rect = o.rect;
-				hash = o.hash;
-				to_restore = static_cast<TextureRectSaveStateVec &&>(o.to_restore);
-			}
-			return *this;
-		}
-		RestorableRectSaveState(const RestorableRectSaveState &) = delete;
-		RestorableRectSaveState &operator=(const RestorableRectSaveState &) = delete;
 	};
+	static inline void rrss_init(struct RestorableRectSaveState *r) {
+		memset(&r->rect, 0, sizeof(r->rect));
+		r->hash = 0;
+		TextureRectSaveStateVec_init(&r->to_restore);
+	}
+	static inline void rrss_destroy(struct RestorableRectSaveState *r) {
+		TextureRectSaveStateVec_free_storage(&r->to_restore);
+	}
+	/* Move src into dst (steal to_restore), leaving src empty. */
+	static inline void rrss_move(struct RestorableRectSaveState *dst, struct RestorableRectSaveState *src) {
+		dst->rect = src->rect;
+		dst->hash = src->hash;
+		TextureRectSaveStateVec_move(&dst->to_restore, &src->to_restore);
+	}
 
 	/* Owning array of (move-only) RestorableRectSaveState. Replaces
 	 * std::vector<RestorableRectSaveState>. The element owns a heap array
@@ -7936,56 +7927,69 @@ extern retro_log_printf_t log_cb;
 		RestorableRectSaveState *items;
 		int count;
 		int cap;
-
-		RestorableRectSaveStateVec() : items(NULL), count(0), cap(0) {}
-		~RestorableRectSaveStateVec() { destroy(); }
-		RestorableRectSaveStateVec(RestorableRectSaveStateVec &&o) noexcept
-			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-		RestorableRectSaveStateVec &operator=(RestorableRectSaveStateVec &&o) noexcept {
-			if (this != &o) {
-				destroy();
-				items = o.items; count = o.count; cap = o.cap;
-				o.items = NULL; o.count = 0; o.cap = 0;
-			}
-			return *this;
-		}
-		RestorableRectSaveStateVec(const RestorableRectSaveStateVec &) = delete;
-		RestorableRectSaveStateVec &operator=(const RestorableRectSaveStateVec &) = delete;
-
-		void push(RestorableRectSaveState &&v) {
-			if (count >= cap)
-				grow(cap ? cap * 2 : 8);
-			new (&items[count]) RestorableRectSaveState(static_cast<RestorableRectSaveState &&>(v));
-			count++;
-		}
-		int size() const { return count; }
-		const RestorableRectSaveState *begin() const { return items; }
-		const RestorableRectSaveState *end() const { return items + count; }
-
-	private:
-		void grow(int ncap) {
-			RestorableRectSaveState *nitems =
-				(RestorableRectSaveState *)malloc((size_t)ncap * sizeof(RestorableRectSaveState));
-			for (int i = 0; i < count; i++) {
-				new (&nitems[i]) RestorableRectSaveState(static_cast<RestorableRectSaveState &&>(items[i]));
-				items[i].~RestorableRectSaveState();
-			}
-			free(items);
-			items = nitems;
-			cap = ncap;
-		}
-		void destroy() {
-			for (int i = 0; i < count; i++)
-				items[i].~RestorableRectSaveState();
-			free(items);
-			items = NULL; count = 0; cap = 0;
-		}
 	};
+	static inline void RestorableRectSaveStateVec_init(struct RestorableRectSaveStateVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+	static inline int  RestorableRectSaveStateVec_size(const struct RestorableRectSaveStateVec *v) { return v->count; }
+	static inline RestorableRectSaveState *RestorableRectSaveStateVec_at(struct RestorableRectSaveStateVec *v, int i) { return &v->items[i]; }
+	static inline void RestorableRectSaveStateVec_grow(struct RestorableRectSaveStateVec *v, int ncap) {
+		RestorableRectSaveState *nitems =
+			(RestorableRectSaveState *)malloc((size_t)ncap * sizeof(RestorableRectSaveState));
+		int i;
+		for (i = 0; i < v->count; i++) {
+			rrss_move(&nitems[i], &v->items[i]);
+			rrss_destroy(&v->items[i]);
+		}
+		free(v->items);
+		v->items = nitems;
+		v->cap = ncap;
+	}
+	/* Takes ownership of *v's contents by move (src left empty). */
+	static inline void RestorableRectSaveStateVec_push_move(struct RestorableRectSaveStateVec *v, struct RestorableRectSaveState *src) {
+		if (v->count >= v->cap)
+			RestorableRectSaveStateVec_grow(v, v->cap ? v->cap * 2 : 8);
+		rrss_move(&v->items[v->count], src);
+		v->count++;
+	}
+	static inline void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveStateVec *v) {
+		int i;
+		for (i = 0; i < v->count; i++)
+			rrss_destroy(&v->items[i]);
+		free(v->items);
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
 
 	struct TextureTrackerSaveState {
 		TextureRectSaveStateVec rects;
 		RestorableRectSaveStateVec restorable;
 		UploadOwningMap uploads;
+
+		TextureTrackerSaveState() {
+			TextureRectSaveStateVec_init(&rects);
+			RestorableRectSaveStateVec_init(&restorable);
+		}
+		~TextureTrackerSaveState() {
+			TextureRectSaveStateVec_free_storage(&rects);
+			RestorableRectSaveStateVec_free_storage(&restorable);
+		}
+		TextureTrackerSaveState(TextureTrackerSaveState &&o) noexcept
+			: uploads(static_cast<UploadOwningMap &&>(o.uploads)) {
+			TextureRectSaveStateVec_move(&rects, &o.rects);
+			restorable = o.restorable;
+			RestorableRectSaveStateVec_init(&o.restorable);
+		}
+		TextureTrackerSaveState &operator=(TextureTrackerSaveState &&o) noexcept {
+			if (this != &o) {
+				TextureRectSaveStateVec_free_storage(&rects);
+				RestorableRectSaveStateVec_free_storage(&restorable);
+				TextureRectSaveStateVec_move(&rects, &o.rects);
+				restorable = o.restorable;
+				RestorableRectSaveStateVec_init(&o.restorable);
+				uploads = static_cast<UploadOwningMap &&>(o.uploads);
+			}
+			return *this;
+		}
+		TextureTrackerSaveState(const TextureTrackerSaveState &) = delete;
+		TextureTrackerSaveState &operator=(const TextureTrackerSaveState &) = delete;
 	};
 	// End of Save State
 	//========================================
@@ -21283,16 +21287,23 @@ static char retro_slash = '/';
 		for (EnduringTextureRect &r : tracker.textures)
 		{
 			if (r.alive)
-				state.rects.push(to_save_state(r.texture_rect, state.uploads));
+			{
+				TextureRectSaveState _ss = to_save_state(r.texture_rect, state.uploads);
+				TextureRectSaveStateVec_push(&state.rects, &_ss);
+			}
 		}
 		for (RestorableRect &r : restorable_rects)
 		{
 			RestorableRectSaveState saved;
+			rrss_init(&saved);
 			saved.hash = r.hash;
 			saved.rect = r.rect;
 			for (TextureRect &t : r.to_restore)
-				saved.to_restore.push(to_save_state(t, state.uploads));
-			state.restorable.push(static_cast<RestorableRectSaveState &&>(saved));
+			{
+				TextureRectSaveState _ss = to_save_state(t, state.uploads);
+				TextureRectSaveStateVec_push(&saved.to_restore, &_ss);
+			}
+			RestorableRectSaveStateVec_push_move(&state.restorable, &saved);
 		}
 
 		return state;
@@ -21311,17 +21322,25 @@ static char retro_slash = '/';
 
 		clearRegion({ 0, 0, FB_WIDTH, FB_HEIGHT });
 		enduring_arr_clear(&tracker.textures); // load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway
-		for (const TextureRectSaveState &r : state.rects)
-			tracker.place(from_save_state(r, uploads));
-		restorable_rects.clear();
-		for (const RestorableRectSaveState &r : state.restorable)
 		{
-			RestorableRect loaded;
-			loaded.hash = r.hash;
-			loaded.rect = r.rect;
-			for (const TextureRectSaveState &t : r.to_restore)
-				loaded.to_restore.push(from_save_state(t, uploads));
-			restorable_rects.push(loaded);
+			int _i;
+			for (_i = 0; _i < TextureRectSaveStateVec_size(&state.rects); _i++)
+				tracker.place(from_save_state(*TextureRectSaveStateVec_at((struct TextureRectSaveStateVec *)&state.rects, _i), uploads));
+		}
+		restorable_rects.clear();
+		{
+			int _i;
+			for (_i = 0; _i < RestorableRectSaveStateVec_size(&state.restorable); _i++)
+			{
+				RestorableRectSaveState *r = RestorableRectSaveStateVec_at((struct RestorableRectSaveStateVec *)&state.restorable, _i);
+				RestorableRect loaded;
+				loaded.hash = r->hash;
+				loaded.rect = r->rect;
+				int _j;
+				for (_j = 0; _j < TextureRectSaveStateVec_size(&r->to_restore); _j++)
+					loaded.to_restore.push(from_save_state(*TextureRectSaveStateVec_at(&r->to_restore, _j), uploads));
+				restorable_rects.push(loaded);
+			}
 		}
 		// Need to reload the hd textures, too
 		for (int e = 0; e < state.uploads.count; e++)
