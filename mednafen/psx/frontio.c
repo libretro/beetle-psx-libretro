@@ -1277,7 +1277,22 @@ void FrontIO_LoadMemcardFromPath(FrontIO *self_, unsigned int which, const char 
 
  if((self->DevicesMC[which])->vt->GetNVSize((self->DevicesMC[which])))
  {
-    RFILE *mf = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ, 
+    RFILE *mf;
+
+    /* Avoid a failed filestream_open() on an absent card, which makes
+     * the frontend VFS log a spurious "Error opening file" at startup
+     * for every unpopulated port. */
+    if (!filestream_exists(path))
+    {
+       if (force_load)
+       {
+          Device_Memcard_Power(self->DevicesMC[which]);
+          Device_Memcard_Format(self->DevicesMC[which]);
+       }
+       return;
+    }
+
+    mf = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
           RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
     if (!mf)
