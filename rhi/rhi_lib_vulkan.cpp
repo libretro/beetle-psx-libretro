@@ -5226,6 +5226,28 @@ namespace Vulkan
 				this->alignment = alignment;
 				this->usage = usage;
 			}
+
+			/* Raw-memory lifecycle, for an owner allocated with malloc. init_empty()
+			 * establishes the constructed empty state (the scalar defaults and the
+			 * block vector NULL/0/0); the real configuration still happens in
+			 * init(device, ...). deinit() mirrors ~BufferPool (the blocks must have
+			 * been drained) and frees the block vector's storage. */
+			void init_empty()
+			{
+				device      = nullptr;
+				block_size  = 0;
+				alignment   = 0;
+				usage       = 0;
+				blocks.items = NULL;
+				blocks.count = 0;
+				blocks.cap   = 0;
+			}
+
+			void deinit()
+			{
+				VK_ASSERT(blocks.empty());
+				blocks.~BufferBlockVec();
+			}
 			void reset();
 
 			VkDeviceSize get_block_size() const
