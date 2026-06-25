@@ -1653,7 +1653,32 @@ struct NAME {                                                                 \
     }                                                                         \
     void pop_back() { if (count) count--; }                                   \
     void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }  \
-}
+};                                                                            \
+static inline T   *NAME##_data(struct NAME *v)        { return v->items; }    \
+static inline int  NAME##_size(const struct NAME *v)  { return v->count; }    \
+static inline int  NAME##_empty(const struct NAME *v) { return v->count == 0; }\
+static inline void NAME##_clear(struct NAME *v)       { v->count = 0; }        \
+static inline T   *NAME##_at(struct NAME *v, int i)   { return &v->items[i]; } \
+static inline T   *NAME##_back(struct NAME *v)        { return &v->items[v->count - 1]; } \
+static inline T   *NAME##_front(struct NAME *v)       { return &v->items[0]; } \
+static inline int  NAME##_grow_by_one(struct NAME *v) {                        \
+    if (v->count == v->cap) {                                                 \
+        int ncap = v->cap ? v->cap * 2 : 64;                                  \
+        T *nitems = (T *)realloc(v->items, (size_t)ncap * sizeof(T));         \
+        if (!nitems)                                                          \
+            return 0;                                                         \
+        v->items = nitems;                                                    \
+        v->cap = ncap;                                                        \
+    }                                                                         \
+    return 1;                                                                 \
+}                                                                             \
+static inline void NAME##_push(struct NAME *v, T val) {                        \
+    if (NAME##_grow_by_one(v))                                                \
+        v->items[v->count++] = val;                                           \
+}                                                                             \
+static inline void NAME##_pop_back(struct NAME *v) { if (v->count) v->count--; } \
+static inline void NAME##_free_storage(struct NAME *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; } \
+struct NAME##_force_semicolon_
 
 #include <rthreads/rthreads.h>
 #include <streams/file_stream.h>
@@ -12640,10 +12665,10 @@ void FenceHolderDeleter::operator()(FenceHolder *fence)
 
 VkFence FenceManager::request_cleared_fence()
 {
-	if (!fences.empty())
+	if (!FenceVec_empty(&fences))
 	{
-		VkFence ret = fences.back();
-		fences.pop_back();
+		VkFence ret = *FenceVec_back(&fences);
+		FenceVec_pop_back(&fences);
 		return ret;
 	}
 	else
@@ -12657,14 +12682,18 @@ VkFence FenceManager::request_cleared_fence()
 
 void FenceManager::recycle_fence(VkFence fence)
 {
-	fences.push(fence);
+	FenceVec_push(&fences, fence);
 }
 
 void FenceManager::deinit()
 {
-	for (VkFence &fence : fences)
+	int _i;
+	for (_i = 0; _i < FenceVec_size(&fences); _i++)
+	{
+		VkFence &fence = *FenceVec_at(&fences, _i);
 		vkDestroyFence(device, fence, NULL);
-	fences.free_storage();
+	}
+	FenceVec_free_storage(&fences);
 }
 
 /* === semaphore.cpp === */
@@ -16996,7 +17025,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				/* See submit_queue(): never enqueue a fence that was handed to a
 				 * failed submit - it will never signal and would hang the frame's
 				 * vkWaitForFences. Recycle it and return a null fence instead. */
-				frame().wait_fences.push(cleared_fence);
+				FenceVec_push(&frame().wait_fences, cleared_fence);
 				*fence = cleared_fence;
 			}
 			else
@@ -17149,9 +17178,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			// Push all pending cmd buffers to their own submission.
 			VkSubmitInfo zero_submit;
 			memset(&zero_submit, 0, sizeof(zero_submit));
-			submits.push(zero_submit);
+			VkSubmitInfoVec_push(&submits, zero_submit);
 
-			VkSubmitInfo &submit = submits.back();
+			VkSubmitInfo &submit = *VkSubmitInfoVec_back(&submits);
 			submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submit.pNext = NULL;
 			submit.commandBufferCount = cmds.size() - last_cmd;
@@ -17164,14 +17193,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (unsigned i = 0; i < semaphore_count; i++)
 		{
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
-			signals[submits.size() - 1].push(cleared_semaphore);
+			signals[VkSubmitInfoVec_size(&submits) - 1].push(cleared_semaphore);
 			VK_ASSERT(!semaphores[i]);
 			semaphores[i] = Semaphore(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
 		}
 
-		for (int i = 0; i < submits.size(); i++)
+		for (int i = 0; i < VkSubmitInfoVec_size(&submits); i++)
 		{
-			VkSubmitInfo &submit = submits[i];
+			VkSubmitInfo &submit = *VkSubmitInfoVec_at(&submits, i);
 			submit.waitSemaphoreCount = waits[i].size();
 			if (!waits[i].empty())
 			{
@@ -17199,13 +17228,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				break;
 		}
 
-		VkResult result = vkQueueSubmit(queue, submits.size(), submits.data(), cleared_fence);
+		VkResult result = vkQueueSubmit(queue, VkSubmitInfoVec_size(&submits), VkSubmitInfoVec_data(&submits), cleared_fence);
 		if (result != VK_SUCCESS)
 			LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
 		submissions.clear();
 
 		cmds.free_storage();
-		submits.free_storage();
+		VkSubmitInfoVec_free_storage(&submits);
 		waits[0].free_storage();  waits[1].free_storage();
 		signals[0].free_storage(); signals[1].free_storage();
 		stages[0].free_storage();  stages[1].free_storage();
@@ -17219,7 +17248,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				 * enqueuing it for the next PerFrame::begin() would wedge that frame
 				 * in vkWaitForFences(UINT64_MAX) forever. Recycle it instead and hand
 				 * the caller a null fence. */
-				frame().wait_fences.push(cleared_fence);
+				FenceVec_push(&frame().wait_fences, cleared_fence);
 				*fence = cleared_fence;
 			}
 			else
@@ -17279,7 +17308,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			fence = VK_NULL_HANDLE;
 			submit_queue(CommandBuffer::Type_AsyncTransfer, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				frame().recycle_fences.push(fence);
+				FenceVec_push(&frame().recycle_fences, fence);
 			transfer.need_fence = false;
 		}
 
@@ -17288,7 +17317,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			fence = VK_NULL_HANDLE;
 			submit_queue(CommandBuffer::Type_Generic, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				frame().recycle_fences.push(fence);
+				FenceVec_push(&frame().recycle_fences, fence);
 			graphics.need_fence = false;
 		}
 
@@ -17297,7 +17326,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			fence = VK_NULL_HANDLE;
 			submit_queue(CommandBuffer::Type_AsyncCompute, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				frame().recycle_fences.push(fence);
+				FenceVec_push(&frame().recycle_fences, fence);
 			compute.need_fence = false;
 		}
 	}
@@ -17437,7 +17466,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void Device::reset_fence(VkFence fence)
 	{
-		frame().recycle_fences.push(fence);
+		FenceVec_push(&frame().recycle_fences, fence);
 	}
 
 	void Device::destroy_pipeline_nolock(VkPipeline pipeline)
@@ -17535,7 +17564,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (PerFrame *frame : per_frame)
 		{
 			// We have done WaitIdle, no need to wait for extra fences, it's also not safe.
-			frame->wait_fences.clear();
+			FenceVec_clear(&frame->wait_fences);
 			frame->begin();
 		}
 	}
@@ -17563,18 +17592,22 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void Device::PerFrame::begin()
 	{
-		if (!wait_fences.empty())
+		if (!FenceVec_empty(&wait_fences))
 		{
-			vkWaitForFences(device, wait_fences.size(), wait_fences.data(), VK_TRUE, UINT64_MAX);
-			wait_fences.clear();
+			vkWaitForFences(device, FenceVec_size(&wait_fences), FenceVec_data(&wait_fences), VK_TRUE, UINT64_MAX);
+			FenceVec_clear(&wait_fences);
 		}
 
-		if (!recycle_fences.empty())
+		if (!FenceVec_empty(&recycle_fences))
 		{
-			vkResetFences(device, recycle_fences.size(), recycle_fences.data());
-			for (VkFence &fence : recycle_fences)
+			int _i;
+			vkResetFences(device, FenceVec_size(&recycle_fences), FenceVec_data(&recycle_fences));
+			for (_i = 0; _i < FenceVec_size(&recycle_fences); _i++)
+			{
+				VkFence &fence = *FenceVec_at(&recycle_fences, _i);
 				managers->fence.recycle_fence(fence);
-			recycle_fences.clear();
+			}
+			FenceVec_clear(&recycle_fences);
 		}
 
 		graphics_cmd_pool.begin();
@@ -17633,8 +17666,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		command_pool_deinit(&compute_cmd_pool);
 		command_pool_deinit(&transfer_cmd_pool);
 		/* Release the POD_VEC backing storage (begin() only resets the counts). */
-		wait_fences.free_storage();
-		recycle_fences.free_storage();
+		FenceVec_free_storage(&wait_fences);
+		FenceVec_free_storage(&recycle_fences);
 		destroyed_framebuffers.free_storage();
 		destroyed_samplers.free_storage();
 		destroyed_pipelines.free_storage();
