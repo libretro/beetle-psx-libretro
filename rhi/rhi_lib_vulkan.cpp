@@ -3007,7 +3007,7 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 	};
 	/* Sampler handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(SamplerHandle,
 	 * Sampler) to a plain struct + explicit free functions, following the
-	 * sem_*/fence_*/bvh_* template. The pointee Sampler is unchanged. Stored in a
+	 * sem_ / fence_ / bvh_ template. The pointee Sampler is unchanged. Stored in a
 	 * fixed device-lifetime array (samplers[StockSampler_Count]); no growing
 	 * container, so no realloc accounting -- assignment into a slot is a plain
 	 * struct copy that transfers the producer's refcount-1, teardown is an
@@ -4446,7 +4446,7 @@ private:
 
 	/* Semaphore handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(Semaphore,
 	 * SemaphoreHolder) to a plain struct + explicit free functions, following the
-	 * fence_*/bvh_* template. The pointee SemaphoreHolder keeps its
+	 * fence_ / bvh_ template. The pointee SemaphoreHolder keeps its
 	 * add_reference/release_reference methods. sem_copy() performs the incref
 	 * that the macro's copy-ctor did; sem_reset() the decref the dtor did; a bare
 	 * struct copy with no incref is the move/steal. SemaphoreHandleVec below is
