@@ -5897,7 +5897,25 @@ private:
 	};
 
 
-	INTRUSIVE_HANDLE_DECLARE(CommandBufferHandle, CommandBuffer);
+	/* Command-buffer handle: de-RAII'd from
+	 * INTRUSIVE_HANDLE_DECLARE(CommandBufferHandle, CommandBuffer) to a plain
+	 * struct + explicit free functions, following the established template. The
+	 * pointee CommandBuffer is unchanged. Held as the Renderer's current-cmd
+	 * member, by-value locals, and a move-only CommandBufferHandleVec (the
+	 * per-queue submission list). cbh_steal implements the move the macro's
+	 * move-ctor did; cbh_reset the dtor decref; cbh_move a release-old/
+	 * take-produced member reassignment.
+	 * ASAN-GATE: per-frame command-buffer submission lifetime. */
+	struct CommandBufferHandle { CommandBuffer *data; };
+	static inline struct CommandBufferHandle cbh_make(CommandBuffer *p) { struct CommandBufferHandle h; h.data = p; return h; }
+	static inline void cbh_reset(struct CommandBufferHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline CommandBuffer *cbh_get(const struct CommandBufferHandle *h) { return h->data; }
+	static inline int cbh_is_valid(const struct CommandBufferHandle *h) { return h->data != NULL; }
+	static inline void cbh_steal(struct CommandBufferHandle *dst, struct CommandBufferHandle *src) { dst->data = src->data; src->data = NULL; }
+	static inline void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produced) {
+		if (dst->data) dst->data->release_reference();
+		dst->data = produced.data;
+	}
 
 /* ============================================================
  * device.hpp
@@ -6192,13 +6210,13 @@ private:
 				void push(CommandBufferHandle &&v) {
 					if (count >= cap)
 						grow(cap ? cap * 2 : 8);
-					new (&items[count]) CommandBufferHandle(static_cast<CommandBufferHandle &&>(v));
+					cbh_steal(&items[count], &v);
 					count++;
 				}
 				bool empty() const { return count == 0; }
 				void clear() {
 					for (int i = 0; i < count; i++)
-						items[i].~CommandBufferHandle();
+						cbh_reset(&items[i]);
 					count = 0;
 				}
 				CommandBufferHandle *begin() { return items; }
@@ -6209,8 +6227,7 @@ private:
 					CommandBufferHandle *nitems =
 						(CommandBufferHandle *)malloc((size_t)ncap * sizeof(CommandBufferHandle));
 					for (int i = 0; i < count; i++) {
-						new (&nitems[i]) CommandBufferHandle(static_cast<CommandBufferHandle &&>(items[i]));
-						items[i].~CommandBufferHandle();
+						cbh_steal(&nitems[i], &items[i]);
 					}
 					free(items);
 					items = nitems;
@@ -6218,7 +6235,7 @@ private:
 				}
 				void destroy() {
 					for (int i = 0; i < count; i++)
-						items[i].~CommandBufferHandle();
+						cbh_reset(&items[i]);
 					free(items);
 					items = NULL; count = 0; cap = 0;
 				}
@@ -9114,9 +9131,9 @@ extern retro_log_printf_t log_cb;
 
 			void flush()
 			{
-				if (cmd)
+				if (cbh_is_valid(&cmd))
 					device->submit(cmd);
-				cmd.reset();
+				cbh_reset(&cmd);
 				device->flush_frame();
 			}
 
@@ -9124,9 +9141,9 @@ extern retro_log_printf_t log_cb;
 			{
 				Fence fence;
 				fence.data = NULL;
-				if (cmd)
+				if (cbh_is_valid(&cmd))
 					device->submit(cmd, &fence);
-				cmd.reset();
+				cbh_reset(&cmd);
 				device->flush_frame();
 				/* Return by value transfers ownership to the caller; the
 				 * struct copy does not incref and this local must NOT reset
@@ -9641,6 +9658,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	/* ImageHandle is now a plain struct with no default member initializer;
 	 * null every handle member so conditional assignment and ~Renderer's
 	 * ih_reset are safe. */
+	cmd.data                     = NULL;
 	scaled_framebuffer.data      = NULL;
 	scaled_framebuffer_msaa.data = NULL;
 	bias_framebuffer.data        = NULL;
@@ -9801,10 +9819,10 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	init_pipelines();
 
 	ensure_command_buffer();
-	cmd->clear_image(*ih_get(&scaled_framebuffer), {});
+	cbh_get(&cmd)->clear_image(*ih_get(&scaled_framebuffer), {});
 	if (!state)
-		cmd->clear_image(*ih_get(&framebuffer), {});
-	cmd->full_barrier();
+		cbh_get(&cmd)->clear_image(*ih_get(&framebuffer), {});
+	cbh_get(&cmd)->full_barrier();
 
 	ImageCreateInfo dither_info = ImageCreateInfo::immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM);
 	// This lut is biased with 4 to be able to use UNORM easily.
@@ -9843,9 +9861,9 @@ Renderer::SaveState Renderer::save_vram_state()
 	BufferHandle buffer = device->create_buffer(buffer_create_info, NULL);
 	atlas.read_transfer(Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	ensure_command_buffer();
-	cmd->copy_image_to_buffer(*buffer, *ih_get(&framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
+	cbh_get(&cmd)->copy_image_to_buffer(*buffer, *ih_get(&framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
-	cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+	cbh_get(&cmd)->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
 	             VK_ACCESS_HOST_READ_BIT);
 
 	flush();
@@ -10058,11 +10076,11 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	BufferHandle buffer = device->create_buffer(buffer_create_info, NULL);
-	cmd->copy_image_to_buffer(*buffer, *ih_get(&framebuffer), 0, { int(copy_rect.x), int(copy_rect.y), 0 },
+	cbh_get(&cmd)->copy_image_to_buffer(*buffer, *ih_get(&framebuffer), 0, { int(copy_rect.x), int(copy_rect.y), 0 },
 	                          { copy_rect.width, copy_rect.height, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
 
-	cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+	cbh_get(&cmd)->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 	             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
 
 	Fence fence = flush_and_signal();
@@ -10133,24 +10151,24 @@ void Renderer::mipmap_framebuffer()
 
 		if (i == levels)
 		{
-			cmd->image_barrier(*ih_get(&bias_framebuffer), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			cbh_get(&cmd)->image_barrier(*ih_get(&bias_framebuffer), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 		}
 
-		cmd->begin_render_pass(rp);
+		cbh_get(&cmd)->begin_render_pass(rp);
 
 		if (i == levels)
-			cmd->set_program(*pipelines.mipmap_energy_blur);
+			cbh_get(&cmd)->set_program(*pipelines.mipmap_energy_blur);
 		else if (i == 1)
-			cmd->set_program(*pipelines.mipmap_energy_first);
+			cbh_get(&cmd)->set_program(*pipelines.mipmap_energy_first);
 		else
-			cmd->set_program(*pipelines.mipmap_energy);
+			cbh_get(&cmd)->set_program(*pipelines.mipmap_energy);
 
-		cmd->set_texture(0, 0, *iv_get(&scaled_views[i - 1]), StockSampler_LinearClamp);
+		cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[i - 1]), StockSampler_LinearClamp);
 
-		cmd->set_quad_state();
-		cmd->set_vertex_binding(0, *quad, 0, 8);
+		cbh_get(&cmd)->set_quad_state();
+		cbh_get(&cmd)->set_vertex_binding(0, *quad, 0, 8);
 		struct Push
 		{
 			float offset[2];
@@ -10166,23 +10184,23 @@ void Renderer::mipmap_framebuffer()
 			{ (rect.x + 0.5f) / FB_WIDTH, (rect.y + 0.5f) / FB_HEIGHT },
 			{ (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
 		};
-		cmd->push_constants(&push, 0, sizeof(push));
-		cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
-		cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-		cmd->draw(4);
+		cbh_get(&cmd)->push_constants(&push, 0, sizeof(push));
+		cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+		cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+		cbh_get(&cmd)->draw(4);
 
-		cmd->end_render_pass();
+		cbh_get(&cmd)->end_render_pass();
 
 		if (i == levels)
 		{
-			cmd->image_barrier(*ih_get(&bias_framebuffer), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			cbh_get(&cmd)->image_barrier(*ih_get(&bias_framebuffer), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
 		}
 		else
 		{
-			cmd->image_barrier(*ih_get(&scaled_framebuffer), VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+			cbh_get(&cmd)->image_barrier(*ih_get(&scaled_framebuffer), VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
@@ -10216,15 +10234,15 @@ void Renderer::ssaa_framebuffer()
 
 	ensure_command_buffer();
 
-	cmd->set_specialization_constant(SpecConstIndex_Samples, msaa);
-	cmd->set_specialization_constant(SpecConstIndex_FilterMode, 1);
-	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
-	cmd->set_program(*pipelines.resolve_to_unscaled);
-	cmd->set_storage_texture(0, 0, ih_get(&framebuffer_ssaa)->get_view());
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Samples, msaa);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, 1);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
+	cbh_get(&cmd)->set_program(*pipelines.resolve_to_unscaled);
+	cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&framebuffer_ssaa)->get_view());
 	if (msaa > 1)
-		cmd->set_texture(0, 1, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
+		cbh_get(&cmd)->set_texture(0, 1, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
 	else
-		cmd->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
+		cbh_get(&cmd)->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
 
 	struct Push
 	{
@@ -10237,11 +10255,11 @@ void Renderer::ssaa_framebuffer()
 		unsigned to_run = min_(size - i, 1024u);
 
 		Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
-		cmd->push_constants(&push, 0, sizeof(push));
-		void *ptr = cmd->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
+		cbh_get(&cmd)->push_constants(&push, 0, sizeof(push));
+		void *ptr = cbh_get(&cmd)->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
 		memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
-		cmd->set_specialization_constant_mask(-1);
-		cmd->dispatch(1, 1, to_run);
+		cbh_get(&cmd)->set_specialization_constant_mask(-1);
+		cbh_get(&cmd)->dispatch(1, 1, to_run);
 	}
 	free(resolves_ssaa);
 }
@@ -10382,12 +10400,12 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 		VkOffset3D offset = { 0, 0, 0 };
 		VkExtent3D extent = { FB_WIDTH * scaling, FB_HEIGHT * scaling, 1 };
 		VkImageResolve region = { subres, offset, subres, offset, extent };
-		vkCmdResolveImage(cmd->get_command_buffer(),
+		vkCmdResolveImage(cbh_get(&cmd)->get_command_buffer(),
 			ih_get(&scaled_framebuffer_msaa)->get_image(), VK_IMAGE_LAYOUT_GENERAL,
 			ih_get(&scaled_framebuffer)->get_image(), VK_IMAGE_LAYOUT_GENERAL,
 			1, &region);
 
-		cmd->barrier(
+		cbh_get(&cmd)->barrier(
 			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
@@ -10411,25 +10429,25 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	rp.clear_color[0] = {0, 0, 0, 0};
 	rp.clear_attachments = 1;
 
-	cmd->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	cbh_get(&cmd)->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
-	cmd->begin_render_pass(rp);
-	cmd->set_quad_state();
+	cbh_get(&cmd)->begin_render_pass(rp);
+	cbh_get(&cmd)->set_quad_state();
 
 	if (scaled)
 	{
-		cmd->set_program(*pipelines.scaled_quad_blitter);
-		cmd->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
+		cbh_get(&cmd)->set_program(*pipelines.scaled_quad_blitter);
+		cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
 	}
 	else
 	{
-		cmd->set_program(*pipelines.unscaled_quad_blitter);
-		cmd->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_LinearClamp);
+		cbh_get(&cmd)->set_program(*pipelines.unscaled_quad_blitter);
+		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_LinearClamp);
 	}
 
-	cmd->set_vertex_binding(0, *quad, 0, 8);
+	cbh_get(&cmd)->set_vertex_binding(0, *quad, 0, 8);
 	struct Push
 	{
 		float offset[2];
@@ -10445,14 +10463,14 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 		          { (vram_rect.x + vram_rect.width - 0.5f) / FB_WIDTH, (vram_rect.y + vram_rect.height - 0.5f) / FB_HEIGHT },
 		          float(scaled_views.size() - 1) };
 
-	cmd->push_constants(&push, 0, sizeof(push));
-	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
-	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-	cmd->draw(4);
+	cbh_get(&cmd)->push_constants(&push, 0, sizeof(push));
+	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+	cbh_get(&cmd)->draw(4);
 
-	cmd->end_render_pass();
+	cbh_get(&cmd)->end_render_pass();
 
-	cmd->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	cbh_get(&cmd)->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 	                   VK_ACCESS_SHADER_READ_BIT);
@@ -10495,14 +10513,14 @@ ImageHandle Renderer::scanout_to_texture()
 		rp.clear_attachments = 1;
 		rp.store_attachments = 1;
 
-		cmd->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		cbh_get(&cmd)->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
-		cmd->begin_render_pass(rp);
-		cmd->end_render_pass();
+		cbh_get(&cmd)->begin_render_pass(rp);
+		cbh_get(&cmd)->end_render_pass();
 
-		cmd->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		cbh_get(&cmd)->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
 		                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 		                   VK_ACCESS_SHADER_READ_BIT);
@@ -10559,12 +10577,12 @@ ImageHandle Renderer::scanout_to_texture()
 			extent.height = FB_HEIGHT * scaling;
 		}
 		VkImageResolve region = { subres, offset, subres, offset, extent };
-		vkCmdResolveImage(cmd->get_command_buffer(),
+		vkCmdResolveImage(cbh_get(&cmd)->get_command_buffer(),
 			ih_get(&scaled_framebuffer_msaa)->get_image(), VK_IMAGE_LAYOUT_GENERAL,
 			ih_get(&scaled_framebuffer)->get_image(), VK_IMAGE_LAYOUT_GENERAL,
 			1, &region);
 
-		cmd->barrier(
+		cbh_get(&cmd)->barrier(
 			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
@@ -10598,14 +10616,14 @@ ImageHandle Renderer::scanout_to_texture()
 	//rp.clear_color[0] = {60.0f/256.0f, 230.0f/256.0f, 60.0f/256.0f, 0};
 	rp.clear_attachments = 1;
 
-	cmd->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	cbh_get(&cmd)->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
-	cmd->begin_render_pass(rp);
-	cmd->set_quad_state();
+	cbh_get(&cmd)->begin_render_pass(rp);
+	cbh_get(&cmd)->set_quad_state();
 
-	VkViewport old_vp = cmd->get_viewport();
+	VkViewport old_vp = cbh_get(&cmd)->get_viewport();
 	VkViewport new_vp = {display_rect.x * (float) render_scale,
 	                     display_rect.y * (float) render_scale,
 	                     rect.width * (float) render_scale,
@@ -10613,50 +10631,50 @@ ImageHandle Renderer::scanout_to_texture()
 	                     old_vp.minDepth,
 	                     old_vp.maxDepth};
 
-	cmd->set_viewport(new_vp);
+	cbh_get(&cmd)->set_viewport(new_vp);
 
 	bool dither = render_state.scanout_mode == ScanoutMode_ABGR1555_Dither;
 
 	if (bpp24)
 	{
 		if (render_state.scanout_mdec_filter == ScanoutFilter_MDEC_YUV)
-			cmd->set_program(*pipelines.bpp24_yuv_quad_blitter);
+			cbh_get(&cmd)->set_program(*pipelines.bpp24_yuv_quad_blitter);
 		else
-			cmd->set_program(*pipelines.bpp24_quad_blitter);
-		cmd->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_NearestWrap);
+			cbh_get(&cmd)->set_program(*pipelines.bpp24_quad_blitter);
+		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_NearestWrap);
 	}
 	else if (ssaa)
 	{
 		if (dither)
-			cmd->set_program(*pipelines.unscaled_dither_quad_blitter);
+			cbh_get(&cmd)->set_program(*pipelines.unscaled_dither_quad_blitter);
 		else
-			cmd->set_program(*pipelines.unscaled_quad_blitter);
+			cbh_get(&cmd)->set_program(*pipelines.unscaled_quad_blitter);
 
-		cmd->set_texture(0, 0, ih_get(&framebuffer_ssaa)->get_view(), StockSampler_NearestWrap);
+		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer_ssaa)->get_view(), StockSampler_NearestWrap);
 	}
 	else if (!render_state.adaptive_smoothing || scaling == 1)
 	{
 		if (dither)
-			cmd->set_program(*pipelines.scaled_dither_quad_blitter);
+			cbh_get(&cmd)->set_program(*pipelines.scaled_dither_quad_blitter);
 		else
-			cmd->set_program(*pipelines.scaled_quad_blitter);
+			cbh_get(&cmd)->set_program(*pipelines.scaled_quad_blitter);
 
-		cmd->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_LinearWrap);
+		cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_LinearWrap);
 	}
 	else
 	{
 		if (dither)
-			cmd->set_program(*pipelines.mipmap_dither_resolve);
+			cbh_get(&cmd)->set_program(*pipelines.mipmap_dither_resolve);
 		else
-			cmd->set_program(*pipelines.mipmap_resolve);
+			cbh_get(&cmd)->set_program(*pipelines.mipmap_resolve);
 
-		cmd->set_texture(0, 0, ih_get(&scaled_framebuffer)->get_view(), StockSampler_TrilinearWrap);
-		cmd->set_texture(0, 1, ih_get(&bias_framebuffer)->get_view(), StockSampler_LinearWrap);
+		cbh_get(&cmd)->set_texture(0, 0, ih_get(&scaled_framebuffer)->get_view(), StockSampler_TrilinearWrap);
+		cbh_get(&cmd)->set_texture(0, 1, ih_get(&bias_framebuffer)->get_view(), StockSampler_LinearWrap);
 	}
 
 	if (dither)
 	{
-		cmd->set_texture(0, 2, ih_get(&dither_lut)->get_view(), StockSampler_NearestWrap);
+		cbh_get(&cmd)->set_texture(0, 2, ih_get(&dither_lut)->get_view(), StockSampler_NearestWrap);
 		struct DitherData
 		{
 			float range;
@@ -10664,7 +10682,7 @@ ImageHandle Renderer::scanout_to_texture()
 			float dither_scale;
 			int32_t dither_shift;
 		};
-		DitherData *dither = (DitherData *)cmd->allocate_constant_data(0, 3, 1 * sizeof(DitherData));
+		DitherData *dither = (DitherData *)cbh_get(&cmd)->allocate_constant_data(0, 3, 1 * sizeof(DitherData));
 		dither->range = 31.0f;
 		dither->inv_range = 1.0f / 31.0f;
 		dither->dither_scale = 1.0f;
@@ -10686,7 +10704,7 @@ ImageHandle Renderer::scanout_to_texture()
 		}
 	}
 
-	cmd->set_vertex_binding(0, *quad, 0, 8);
+	cbh_get(&cmd)->set_vertex_binding(0, *quad, 0, 8);
 	struct Push
 	{
 		float offset[2];
@@ -10701,14 +10719,14 @@ ImageHandle Renderer::scanout_to_texture()
 		          { (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
 		          float(scaled_views.size() - 1) };
 
-	cmd->push_constants(&push, 0, sizeof(push));
-	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
-	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-	cmd->draw(4);
+	cbh_get(&cmd)->push_constants(&push, 0, sizeof(push));
+	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+	cbh_get(&cmd)->draw(4);
 
-	cmd->end_render_pass();
+	cbh_get(&cmd)->end_render_pass();
 
-	cmd->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	cbh_get(&cmd)->image_barrier(*ih_get(&reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 	                   VK_ACCESS_SHADER_READ_BIT);
@@ -10781,7 +10799,7 @@ void Renderer::hazard(StatusFlags flags)
 	VK_ASSERT(src_stages);
 	VK_ASSERT(dst_stages);
 	ensure_command_buffer();
-	cmd->barrier(src_stages, src_access, dst_stages, dst_access);
+	cbh_get(&cmd)->barrier(src_stages, src_access, dst_stages, dst_access);
 }
 
 void Renderer::flush_resolves()
@@ -10795,13 +10813,13 @@ void Renderer::flush_resolves()
 	if (!Rect2DVec_empty(&queue.scaled_resolves))
 	{
 		ensure_command_buffer();
-		cmd->set_program(*pipelines.resolve_to_scaled);
+		cbh_get(&cmd)->set_program(*pipelines.resolve_to_scaled);
 
-		cmd->set_texture(0, 1, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
+		cbh_get(&cmd)->set_texture(0, 1, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
 		if (msaa > 1)
-			cmd->set_storage_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view());
+			cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view());
 		else
-			cmd->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
+			cbh_get(&cmd)->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
 
 		unsigned size = Rect2DVec_size(&queue.scaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
@@ -10809,10 +10827,10 @@ void Renderer::flush_resolves()
 			unsigned to_run = min_(size - i, 1024u);
 
 			Push push = { { 1.0f / (scaling * FB_WIDTH), 1.0f / (scaling * FB_HEIGHT) }, scaling };
-			cmd->push_constants(&push, 0, sizeof(push));
-			void *ptr = cmd->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
+			cbh_get(&cmd)->push_constants(&push, 0, sizeof(push));
+			void *ptr = cbh_get(&cmd)->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&queue.scaled_resolves) + i, to_run * sizeof(VkRect2D));
-			cmd->dispatch(scaling, scaling, to_run);
+			cbh_get(&cmd)->dispatch(scaling, scaling, to_run);
 		}
 	}
 
@@ -10821,15 +10839,15 @@ void Renderer::flush_resolves()
 		ensure_command_buffer();
 		// Always use nearest neighbor downscaling to avoid filter artifact (e.g. unwanted black outlines in Vagrant Story)
 		// Supersampling will use a separate pass for downsampling
-		cmd->set_specialization_constant(SpecConstIndex_Samples, msaa);
-		cmd->set_specialization_constant(SpecConstIndex_FilterMode, 0);
-		cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
-		cmd->set_program(*pipelines.resolve_to_unscaled);
-		cmd->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
+		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Samples, msaa);
+		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, 0);
+		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
+		cbh_get(&cmd)->set_program(*pipelines.resolve_to_unscaled);
+		cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
 		if (msaa > 1)
-			cmd->set_texture(0, 1, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_texture(0, 1, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
 		else
-			cmd->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 
 		unsigned size = Rect2DVec_size(&queue.unscaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
@@ -10837,11 +10855,11 @@ void Renderer::flush_resolves()
 			unsigned to_run = min_(size - i, 1024u);
 
 			Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
-			cmd->push_constants(&push, 0, sizeof(push));
-			void *ptr = cmd->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
+			cbh_get(&cmd)->push_constants(&push, 0, sizeof(push));
+			void *ptr = cbh_get(&cmd)->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
-			cmd->set_specialization_constant_mask(-1);
-			cmd->dispatch(1, 1, to_run);
+			cbh_get(&cmd)->set_specialization_constant_mask(-1);
+			cbh_get(&cmd)->dispatch(1, 1, to_run);
 		}
 	}
 
@@ -10859,7 +10877,7 @@ void Renderer::resolve(Domain target_domain, unsigned x, unsigned y)
 
 void Renderer::ensure_command_buffer()
 {
-	if (!cmd)
+	if (!cbh_is_valid(&cmd))
 		cmd = device->request_command_buffer();
 }
 
@@ -11449,20 +11467,20 @@ void Renderer::flush_render_pass(const Rect &rect)
 	info.render_area.offset = { int(rect.x * scaling), int(rect.y * scaling) };
 	info.render_area.extent = { rect.width * scaling, rect.height * scaling };
 
-	cmd->begin_render_pass(info);
-	cmd->set_scissor(info.render_area);
+	cbh_get(&cmd)->begin_render_pass(info);
+	cbh_get(&cmd)->set_scissor(info.render_area);
 	queue.default_scissor = info.render_area;
-	cmd->set_texture(0, 2, ih_get(&dither_lut)->get_view(), StockSampler_NearestWrap);
+	cbh_get(&cmd)->set_texture(0, 2, ih_get(&dither_lut)->get_view(), StockSampler_NearestWrap);
 
 	render_opaque_primitives();
 	render_opaque_texture_primitives();
 	render_semi_transparent_opaque_texture_primitives();
 	render_semi_transparent_primitives();
 
-	cmd->end_render_pass();
+	cbh_get(&cmd)->end_render_pass();
 
 	// Render passes are implicitly synchronized.
-	cmd->image_barrier(msaa > 1 ? *ih_get(&scaled_framebuffer_msaa) : *ih_get(&scaled_framebuffer),
+	cbh_get(&cmd)->image_barrier(msaa > 1 ? *ih_get(&scaled_framebuffer_msaa) : *ih_get(&scaled_framebuffer),
 			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
 			VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -11477,22 +11495,22 @@ void Renderer::dispatch_set_scaled_read_texture(bool scaled_read, bool textured)
 	if (scaled_read)
 	{
 		if (msaa > 1)
-			cmd->set_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
 		else
-			cmd->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 	}
 	else
-		cmd->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
+		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
 	if (textured)
 	{
 		if (scaled_read)
-			cmd->set_program(*pipelines.textured_scaled);
+			cbh_get(&cmd)->set_program(*pipelines.textured_scaled);
 		else
-			cmd->set_program(*pipelines.textured_unscaled);
+			cbh_get(&cmd)->set_program(*pipelines.textured_unscaled);
 	}
 	else
 	{
-		cmd->set_program(*pipelines.flat);
+		cbh_get(&cmd)->set_program(*pipelines.flat);
 	}
 }
 
@@ -11531,7 +11549,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 
 	// Render flat-shaded primitives.
 	BufferVertex *vert = (BufferVertex *)(
-	    cmd->allocate_vertex_data(0, BufferVertexVec_size((struct BufferVertexVec *)&vertices) * sizeof(BufferVertex), sizeof(BufferVertex)));
+	    cbh_get(&cmd)->allocate_vertex_data(0, BufferVertexVec_size((struct BufferVertexVec *)&vertices) * sizeof(BufferVertex), sizeof(BufferVertex)));
 
 	int scissor = (*PrimitiveInfoVec_front(&scissors)).scissor_index;
 	HdTextureHandle hd_texture = (*PrimitiveInfoVec_front(&scissors)).hd_texture_index;
@@ -11544,10 +11562,10 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 	unsigned size = PrimitiveInfoVec_size(&scissors);
 
 	hd_texture_uniforms(hd_texture);
-	cmd->set_scissor(scissor < 0 ? queue.default_scissor : *Rect2DVec_at(&queue.scissors, scissor));
-	cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
-	cmd->set_specialization_constant(SpecConstIndex_Shift, shift);
-	cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
+	cbh_get(&cmd)->set_scissor(scissor < 0 ? queue.default_scissor : *Rect2DVec_at(&queue.scissors, scissor));
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Shift, shift);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
 	dispatch_set_scaled_read_texture(scaled_read, textured);
 	memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_front(&scissors)).triangle_index, 3 * sizeof(BufferVertex));
 	vert += 3;
@@ -11559,13 +11577,13 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 			(*PrimitiveInfoVec_at(&scissors, i)).offset_uv != offset_uv)
 		{
 			unsigned to_draw = i - last_draw;
-			cmd->set_specialization_constant_mask(-1);
-			cmd->draw(3 * to_draw, 1, 3 * last_draw, 0);
+			cbh_get(&cmd)->set_specialization_constant_mask(-1);
+			cbh_get(&cmd)->draw(3 * to_draw, 1, 3 * last_draw, 0);
 			last_draw = i;
 
 			if ((*PrimitiveInfoVec_at(&scissors, i)).scissor_index != scissor) {
 				scissor = (*PrimitiveInfoVec_at(&scissors, i)).scissor_index;
-				cmd->set_scissor(scissor < 0 ? queue.default_scissor : *Rect2DVec_at(&queue.scissors, scissor));
+				cbh_get(&cmd)->set_scissor(scissor < 0 ? queue.default_scissor : *Rect2DVec_at(&queue.scissors, scissor));
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index != hd_texture) {
 				hd_texture = (*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index;
@@ -11573,7 +11591,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).filtering != filtering) {
 				filtering = (*PrimitiveInfoVec_at(&scissors, i)).filtering;
-				cmd->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
+				cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).scaled_read != scaled_read) {
 				scaled_read = (*PrimitiveInfoVec_at(&scissors, i)).scaled_read;
@@ -11581,19 +11599,19 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).shift != shift) {
 				shift = (*PrimitiveInfoVec_at(&scissors, i)).shift;
-				cmd->set_specialization_constant(SpecConstIndex_Shift, shift);
+				cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Shift, shift);
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).offset_uv != offset_uv) {
 				offset_uv = (*PrimitiveInfoVec_at(&scissors, i)).offset_uv;
-				cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
+				cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
 			}
 		}
 		memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_at(&scissors, i)).triangle_index, 3 * sizeof(BufferVertex));
 	}
 
 	unsigned to_draw = size - last_draw;
-	cmd->set_specialization_constant_mask(-1);
-	cmd->draw(3 * to_draw, 1, 3 * last_draw, 0);
+	cbh_get(&cmd)->set_specialization_constant_mask(-1);
+	cbh_get(&cmd)->draw(3 * to_draw, 1, 3 * last_draw, 0);
 }
 
 void Renderer::render_opaque_primitives()
@@ -11603,19 +11621,19 @@ void Renderer::render_opaque_primitives()
 	if (BufferVertexVec_empty(vertices))
 		return;
 
-	cmd->set_opaque_state();
-	cmd->set_cull_mode(VK_CULL_MODE_NONE);
-	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
-	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
-	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	cbh_get(&cmd)->set_opaque_state();
+	cbh_get(&cmd)->set_cull_mode(VK_CULL_MODE_NONE);
+	cbh_get(&cmd)->set_depth_compare(VK_COMPARE_OP_LESS);
+	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	cbh_get(&cmd)->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
 	dispatch(*vertices, *scissors);
 }
 
 void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
 	HdTexture hd = tracker.get_hd_texture(hd_texture_index);
-	cmd->set_texture(0, 4, ih_get(&hd.texture)->get_view(), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
+	cbh_get(&cmd)->set_texture(0, 4, ih_get(&hd.texture)->get_view(), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
 	// ivec4, ivec4
 	struct HDPush {
 		int32_t vram_rect_x;
@@ -11632,7 +11650,7 @@ void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
 		hd.vram_rect.x, hd.vram_rect.y, hd.vram_rect.width, hd.vram_rect.height,
 		hd.texel_rect.x, hd.texel_rect.y, hd.texel_rect.width, hd.texel_rect.height
 	};
-	cmd->push_constants(&push, 0, sizeof(push));
+	cbh_get(&cmd)->push_constants(&push, 0, sizeof(push));
 }
 
 void Renderer::render_semi_transparent_primitives()
@@ -11643,20 +11661,20 @@ void Renderer::render_semi_transparent_primitives()
 
 	unsigned last_draw_offset = 0;
 
-	cmd->set_opaque_state();
-	cmd->set_cull_mode(VK_CULL_MODE_NONE);
-	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
-	cmd->set_depth_test(true, false);
-	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
-	cmd->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
-	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
-	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+	cbh_get(&cmd)->set_opaque_state();
+	cbh_get(&cmd)->set_cull_mode(VK_CULL_MODE_NONE);
+	cbh_get(&cmd)->set_depth_compare(VK_COMPARE_OP_LESS);
+	cbh_get(&cmd)->set_depth_test(true, false);
+	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	cbh_get(&cmd)->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+	cbh_get(&cmd)->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
+	cbh_get(&cmd)->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
+	cbh_get(&cmd)->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
+	cbh_get(&cmd)->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
 	size_t size = BufferVertexVec_size(&queue.semi_transparent) * sizeof(BufferVertex);
-	void *verts = cmd->allocate_vertex_data(0, size, sizeof(BufferVertex));
+	void *verts = cbh_get(&cmd)->allocate_vertex_data(0, size, sizeof(BufferVertex));
 	memcpy(verts, BufferVertexVec_data(&queue.semi_transparent), size);
 
 	SemiTransparentState last_state = *SemiTransparentStateVec_at(&queue.semi_transparent_state, 0);
@@ -11673,22 +11691,22 @@ void Renderer::render_semi_transparent_primitives()
 		    (last_state != *SemiTransparentStateVec_at(&queue.semi_transparent_state, i)))
 		{
 			unsigned to_draw = i - last_draw_offset;
-			cmd->set_specialization_constant_mask(-1);
+			cbh_get(&cmd)->set_specialization_constant_mask(-1);
 
 			{
 				VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
 				barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 				barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-				vkCmdPipelineBarrier(cmd->get_command_buffer(),
+				vkCmdPipelineBarrier(cbh_get(&cmd)->get_command_buffer(),
 					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 					VK_DEPENDENCY_BY_REGION_BIT,
 					1, &barrier, 0, NULL, 0, NULL);
 			}
 
-			cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
+			cbh_get(&cmd)->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
 			if (msaa > 1)
-				cmd->set_multisample_state(false);
+				cbh_get(&cmd)->set_multisample_state(false);
 			last_draw_offset = i;
 
 			last_state = *SemiTransparentStateVec_at(&queue.semi_transparent_state, i);
@@ -11697,10 +11715,10 @@ void Renderer::render_semi_transparent_primitives()
 	}
 
 	unsigned to_draw = prims - last_draw_offset;
-	cmd->set_specialization_constant_mask(-1);
-	cmd->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
+	cbh_get(&cmd)->set_specialization_constant_mask(-1);
+	cbh_get(&cmd)->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
 	if (msaa > 1)
-		cmd->set_multisample_state(false);
+		cbh_get(&cmd)->set_multisample_state(false);
 }
 
 void Renderer::render_semi_transparent_opaque_texture_primitives()
@@ -11710,18 +11728,18 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 	if (BufferVertexVec_empty(vertices))
 		return;
 
-	cmd->set_opaque_state();
-	cmd->set_cull_mode(VK_CULL_MODE_NONE);
-	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
-	cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTransOpaque);
-	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
-	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
-	cmd->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
-	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
-	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+	cbh_get(&cmd)->set_opaque_state();
+	cbh_get(&cmd)->set_cull_mode(VK_CULL_MODE_NONE);
+	cbh_get(&cmd)->set_depth_compare(VK_COMPARE_OP_LESS);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTransOpaque);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
+	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	cbh_get(&cmd)->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+	cbh_get(&cmd)->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
+	cbh_get(&cmd)->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
+	cbh_get(&cmd)->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
+	cbh_get(&cmd)->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
 	dispatch(*vertices, *scissors, true);
 }
@@ -11733,18 +11751,18 @@ void Renderer::render_opaque_texture_primitives()
 	if (BufferVertexVec_empty(vertices))
 		return;
 
-	cmd->set_opaque_state();
-	cmd->set_cull_mode(VK_CULL_MODE_NONE);
-	cmd->set_depth_compare(VK_COMPARE_OP_LESS);
-	cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_Opaque);
-	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
-	cmd->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	cmd->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	cmd->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
-	cmd->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
-	cmd->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); // Pad to support AMD
-	cmd->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cmd->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+	cbh_get(&cmd)->set_opaque_state();
+	cbh_get(&cmd)->set_cull_mode(VK_CULL_MODE_NONE);
+	cbh_get(&cmd)->set_depth_compare(VK_COMPARE_OP_LESS);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_Opaque);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
+	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	cbh_get(&cmd)->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+	cbh_get(&cmd)->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
+	cbh_get(&cmd)->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); // Pad to support AMD
+	cbh_get(&cmd)->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
+	cbh_get(&cmd)->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
 	dispatch(*vertices, *scissors, true);
 }
@@ -11767,25 +11785,25 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 	if (BlitInfoVec_empty(&infos))
 		return;
 
-	cmd->set_program(program);
+	cbh_get(&cmd)->set_program(program);
 
 	if (scaled)
 	{
 		if (msaa > 1)
 		{
-			cmd->set_storage_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view());
-			cmd->set_texture(0, 1, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view());
+			cbh_get(&cmd)->set_texture(0, 1, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
 		}
 		else
 		{
-			cmd->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
-			cmd->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
+			cbh_get(&cmd)->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 		}
 	}
 	else
 	{
-		cmd->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
-		cmd->set_texture(0, 1, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
+		cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
+		cbh_get(&cmd)->set_texture(0, 1, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
 	}
 
 	unsigned size = BlitInfoVec_size(&infos);
@@ -11793,9 +11811,9 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 	for (unsigned i = 0; i < size; i += 512)
 	{
 		unsigned to_blit = min_(size - i, 512u);
-		void *ptr = cmd->allocate_constant_data(1, 0, to_blit * sizeof(BlitInfo));
+		void *ptr = cbh_get(&cmd)->allocate_constant_data(1, 0, to_blit * sizeof(BlitInfo));
 		memcpy(ptr, BlitInfoVec_data((struct BlitInfoVec *)&infos) + i, to_blit * sizeof(BlitInfo));
-		cmd->dispatch(scale, scale, to_blit);
+		cbh_get(&cmd)->dispatch(scale, scale, to_blit);
 	}
 }
 
@@ -11842,32 +11860,32 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		Push push = {
 			{ src.x, src.y }, { dst.x, dst.y }, { dst.width, dst.height }, int(factor),
 		};
-		cmd->push_constants(&push, 0, sizeof(push));
+		cbh_get(&cmd)->push_constants(&push, 0, sizeof(push));
 
 		if (domain == Domain_Scaled)
 		{
 			if (msaa > 1)
 			{
-				cmd->set_storage_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view());
-				cmd->set_program(render_state.mask_test ?
+				cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view());
+				cbh_get(&cmd)->set_program(render_state.mask_test ?
 						*pipelines.blit_vram_msaa_cached_scaled_masked :
 						*pipelines.blit_vram_msaa_cached_scaled);
-				cmd->dispatch(factor, factor, msaa);
+				cbh_get(&cmd)->dispatch(factor, factor, msaa);
 			}
 			else
 			{
-				cmd->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
-				cmd->set_program(render_state.mask_test ? *pipelines.blit_vram_cached_scaled_masked :
+				cbh_get(&cmd)->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
+				cbh_get(&cmd)->set_program(render_state.mask_test ? *pipelines.blit_vram_cached_scaled_masked :
 														*pipelines.blit_vram_cached_scaled);
-				cmd->dispatch(factor, factor, 1);
+				cbh_get(&cmd)->dispatch(factor, factor, 1);
 			}
 		}
 		else
 		{
-			cmd->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
-			cmd->set_program(render_state.mask_test ? *pipelines.blit_vram_cached_unscaled_masked :
+			cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
+			cbh_get(&cmd)->set_program(render_state.mask_test ? *pipelines.blit_vram_cached_unscaled_masked :
 													*pipelines.blit_vram_cached_unscaled);
-			cmd->dispatch(factor, factor, 1);
+			cbh_get(&cmd)->dispatch(factor, factor, 1);
 		}
 		//LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
 		//    dst.y, dst.width, dst.height);
@@ -11974,8 +11992,8 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 	};
 
 	ensure_command_buffer();
-	cmd->set_program(render_state.mask_test ? *pipelines.copy_to_vram_masked : *pipelines.copy_to_vram);
-	cmd->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
+	cbh_get(&cmd)->set_program(render_state.mask_test ? *pipelines.copy_to_vram_masked : *pipelines.copy_to_vram);
+	cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
 
 	// Vulkan minimum limit, for large buffer views, split up the work.
 	if (rect.width * rect.height > device->get_gpu_properties().limits.maxTexelBufferElements)
@@ -11990,10 +12008,10 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 
 			Rect small_rect = { rect.x, rect.y + y, rect.width, y_size };
 
-			cmd->set_buffer_view(0, 1, *bvh_get(&view));
+			cbh_get(&cmd)->set_buffer_view(0, 1, *bvh_get(&view));
 			Push push = { small_rect, 0, render_state.force_mask_bit ? 0x8000u : 0u };
-			cmd->push_constants(&push, 0, sizeof(push));
-			cmd->dispatch((small_rect.width + 7) >> 3, (small_rect.height + 7) >> 3, 1);
+			cbh_get(&cmd)->push_constants(&push, 0, sizeof(push));
+			cbh_get(&cmd)->dispatch((small_rect.width + 7) >> 3, (small_rect.height + 7) >> 3, 1);
 			bvh_reset(&view);
 		}
 	}
@@ -12004,13 +12022,13 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 		view_info.format = VK_FORMAT_R16_UINT;
 		BufferViewHandle view = device->create_buffer_view(view_info);
 
-		cmd->set_buffer_view(0, 1, *bvh_get(&view));
+		cbh_get(&cmd)->set_buffer_view(0, 1, *bvh_get(&view));
 
 		Push push = { rect, 0, render_state.force_mask_bit ? 0x8000u : 0u };
-		cmd->push_constants(&push, 0, sizeof(push));
+		cbh_get(&cmd)->push_constants(&push, 0, sizeof(push));
 
 		// TODO: Batch up work.
-		cmd->dispatch((rect.width + 7) >> 3, (rect.height + 7) >> 3, 1);
+		cbh_get(&cmd)->dispatch((rect.width + 7) >> 3, (rect.height + 7) >> 3, 1);
 		bvh_reset(&view);
 	}
 
@@ -12082,22 +12100,22 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	if (state.scaled_read)
 	{
 		if (msaa > 1)
-			cmd->set_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
 		else
-			cmd->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 	}
 	else
-		cmd->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
+		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
 	hd_texture_uniforms(state.hd_texture_index);
-	cmd->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
-	cmd->set_specialization_constant(SpecConstIndex_Scaling, scaling);
-	cmd->set_specialization_constant(SpecConstIndex_Shift, state.shift);
-	cmd->set_specialization_constant(SpecConstIndex_OffsetUV, (int)state.offset_uv);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Shift, state.shift);
+	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_OffsetUV, (int)state.offset_uv);
 
 	if (state.scissor_index < 0)
-		cmd->set_scissor(queue.default_scissor);
+		cbh_get(&cmd)->set_scissor(queue.default_scissor);
 	else
-		cmd->set_scissor(*Rect2DVec_at(&queue.scissors, state.scissor_index));
+		cbh_get(&cmd)->set_scissor(*Rect2DVec_at(&queue.scissors, state.scissor_index));
 
 	Program &textured = state.textured ? state.scaled_read ?
 		*pipelines.textured_scaled : *pipelines.textured_unscaled : *pipelines.flat;
@@ -12109,11 +12127,11 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	case SemiTransparentMode_None:
 	{
 		// For opaque primitives which are just masked, we can make use of fixed function blending.
-		cmd->set_blend_enable(true);
-		cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_Opaque);
-		cmd->set_program(textured);
-		cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-		cmd->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+		cbh_get(&cmd)->set_blend_enable(true);
+		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_Opaque);
+		cbh_get(&cmd)->set_program(textured);
+		cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+		cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
 		                       VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_DST_ALPHA);
 		break;
 	}
@@ -12121,27 +12139,27 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAdd);
-			cmd->set_program(textured_masked);
-			cmd->pixel_barrier();
-			cmd->set_input_attachments(0, 3);
-			cmd->set_blend_enable(false);
+			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAdd);
+			cbh_get(&cmd)->set_program(textured_masked);
+			cbh_get(&cmd)->pixel_barrier();
+			cbh_get(&cmd)->set_input_attachments(0, 3);
+			cbh_get(&cmd)->set_blend_enable(false);
 			if (msaa > 1)
 			{
 				// Need to blend per-sample.
-				cmd->set_multisample_state(false, false, true);
+				cbh_get(&cmd)->set_multisample_state(false, false, true);
 			}
-			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ONE);
 		}
 		else
 		{
-			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
-			cmd->set_program(textured);
-			cmd->set_blend_enable(true);
-			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
+			cbh_get(&cmd)->set_program(textured);
+			cbh_get(&cmd)->set_blend_enable(true);
+			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ZERO);
 		}
 		break;
@@ -12150,29 +12168,29 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAvg);
-			cmd->set_program(textured_masked);
-			cmd->set_input_attachments(0, 3);
-			cmd->pixel_barrier();
-			cmd->set_blend_enable(false);
+			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAvg);
+			cbh_get(&cmd)->set_program(textured_masked);
+			cbh_get(&cmd)->set_input_attachments(0, 3);
+			cbh_get(&cmd)->pixel_barrier();
+			cbh_get(&cmd)->set_blend_enable(false);
 			if (msaa > 1)
 			{
 				// Need to blend per-sample.
-				cmd->set_multisample_state(false, false, true);
+				cbh_get(&cmd)->set_multisample_state(false, false, true);
 			}
-			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ONE);
 		}
 		else
 		{
 			static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
-			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
-			cmd->set_program(textured);
-			cmd->set_blend_enable(true);
-			cmd->set_blend_constants(rgba);
-			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cmd->set_blend_factors(VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE,
+			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
+			cbh_get(&cmd)->set_program(textured);
+			cbh_get(&cmd)->set_blend_enable(true);
+			cbh_get(&cmd)->set_blend_constants(rgba);
+			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_CONSTANT_ALPHA, VK_BLEND_FACTOR_ZERO);
 		}
 		break;
@@ -12181,27 +12199,27 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendSub);
-			cmd->set_program(textured_masked);
-			cmd->set_input_attachments(0, 3);
-			cmd->pixel_barrier();
-			cmd->set_blend_enable(false);
+			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendSub);
+			cbh_get(&cmd)->set_program(textured_masked);
+			cbh_get(&cmd)->set_input_attachments(0, 3);
+			cbh_get(&cmd)->pixel_barrier();
+			cbh_get(&cmd)->set_blend_enable(false);
 			if (msaa > 1)
 			{
 				// Need to blend per-sample.
-				cmd->set_multisample_state(false, false, true);
+				cbh_get(&cmd)->set_multisample_state(false, false, true);
 			}
-			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ONE);
 		}
 		else
 		{
-			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
-			cmd->set_program(textured);
-			cmd->set_blend_enable(true);
-			cmd->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
-			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
+			cbh_get(&cmd)->set_program(textured);
+			cbh_get(&cmd)->set_blend_enable(true);
+			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
+			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ZERO);
 		}
 		break;
@@ -12210,29 +12228,29 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cmd->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAddQuarter);
-			cmd->set_program(textured_masked);
-			cmd->set_input_attachments(0, 3);
-			cmd->pixel_barrier();
-			cmd->set_blend_enable(false);
+			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAddQuarter);
+			cbh_get(&cmd)->set_program(textured_masked);
+			cbh_get(&cmd)->set_input_attachments(0, 3);
+			cbh_get(&cmd)->pixel_barrier();
+			cbh_get(&cmd)->set_blend_enable(false);
 			if (msaa > 1)
 			{
 				// Need to blend per-sample.
-				cmd->set_multisample_state(false, false, true);
+				cbh_get(&cmd)->set_multisample_state(false, false, true);
 			}
-			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cmd->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ONE);
 		}
 		else
 		{
 			static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-			cmd->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
-			cmd->set_program(textured);
-			cmd->set_blend_enable(true);
-			cmd->set_blend_constants(rgba);
-			cmd->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cmd->set_blend_factors(VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
+			cbh_get(&cmd)->set_program(textured);
+			cbh_get(&cmd)->set_blend_enable(true);
+			cbh_get(&cmd)->set_blend_constants(rgba);
+			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ZERO);
 		}
 		break;
@@ -17081,7 +17099,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void Device::submit(CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 	{
-		submit_nolock(static_cast<CommandBufferHandle &&>(cmd), fence, semaphore_count, semaphores);
+		/* Move ownership of cmd into submit_nolock's by-value parameter and null
+		 * the caller's handle, matching the old move-from semantics. A plain
+		 * struct copy would otherwise leave the caller's handle aliasing the
+		 * same pointee, so a later cbh_reset on it would double-release. */
+		CommandBufferHandle moved;
+		cbh_steal(&moved, &cmd);
+		submit_nolock(moved, fence, semaphore_count, semaphores);
 	}
 
 	CommandBuffer::Type Device::get_physical_queue_type(CommandBuffer::Type queue_type) const
@@ -17101,12 +17125,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 	{
-		CommandBuffer::Type type = cmd->get_command_buffer_type();
+		CommandBuffer::Type type = cbh_get(&cmd)->get_command_buffer_type();
 		CommandPool &pool = get_command_pool(type);
 		CommandBufferHandleVec &submissions = get_queue_submissions(type);
 
-		pool.signal_submitted(cmd->get_command_buffer());
-		cmd->end();
+		pool.signal_submitted(cbh_get(&cmd)->get_command_buffer());
+		cbh_get(&cmd)->end();
 		submissions.push(static_cast<CommandBufferHandle &&>(cmd));
 
 		VkFence cleared_fence = VK_NULL_HANDLE;
@@ -17222,8 +17246,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (transfer_queue == graphics_queue && transfer_queue == compute_queue)
 		{
 			// For single-queue systems, just use a pipeline barrier.
-			cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, stages, access);
-			submit_nolock(cmd, NULL, 0, NULL);
+			cbh_get(&cmd)->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, stages, access);
+			{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 0, NULL); }
 		}
 		else
 		{
@@ -17244,33 +17268,33 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 			if (transfer_queue == graphics_queue)
 			{
-				cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+				cbh_get(&cmd)->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 						graphics_stages, access);
 
 				if (compute_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					submit_nolock(cmd, NULL, 1, &sem);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
 					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, compute_stages, flush);
 					sem_reset(&sem);
 				}
 				else
-					submit_nolock(cmd, NULL, 0, NULL);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 0, NULL); }
 			}
 			else if (transfer_queue == compute_queue)
 			{
-				cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+				cbh_get(&cmd)->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 						compute_stages, compute_access);
 
 				if (graphics_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					submit_nolock(cmd, NULL, 1, &sem);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
 					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, graphics_stages, flush);
 					sem_reset(&sem);
 				}
 				else
-					submit_nolock(cmd, NULL, 0, NULL);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 0, NULL); }
 			}
 			else
 			{
@@ -17279,7 +17303,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					Semaphore semaphores[2];
 					semaphores[0].data = NULL;
 					semaphores[1].data = NULL;
-					submit_nolock(cmd, NULL, 2, semaphores);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 2, semaphores); }
 					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, semaphores[0], graphics_stages, flush);
 					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, semaphores[1], compute_stages, flush);
 					sem_reset(&semaphores[0]);
@@ -17288,19 +17312,19 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				else if (graphics_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					submit_nolock(cmd, NULL, 1, &sem);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
 					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, graphics_stages, flush);
 					sem_reset(&sem);
 				}
 				else if (compute_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					submit_nolock(cmd, NULL, 1, &sem);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
 					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, compute_stages, flush);
 					sem_reset(&sem);
 				}
 				else
-					submit_nolock(cmd, NULL, 0, NULL);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 0, NULL); }
 			}
 		}
 	}
@@ -17354,7 +17378,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		for (CommandBufferHandle &cmd : submissions)
 		{
-			VkCommandBuffer _cb = cmd->get_command_buffer();
+			VkCommandBuffer _cb = cbh_get(&cmd)->get_command_buffer();
 			CommandBufferVec_push(&cmds, &_cb);
 		}
 
@@ -17457,26 +17481,26 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		CommandBufferHandle cmd = request_command_buffer_nolock(CommandBuffer::Type_AsyncTransfer);
 
-		cmd->begin_region("buffer-block-sync");
+		cbh_get(&cmd)->begin_region("buffer-block-sync");
 
 		for (BufferBlock &block : dma.vbo)
 		{
 			VK_ASSERT(block.offset != 0);
-			cmd->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
+			cbh_get(&cmd)->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
 			usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 		}
 
 		for (BufferBlock &block : dma.ubo)
 		{
 			VK_ASSERT(block.offset != 0);
-			cmd->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
+			cbh_get(&cmd)->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
 			usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		}
 
 		dma.vbo.clear();
 		dma.ubo.clear();
 
-		cmd->end_region();
+		cbh_get(&cmd)->end_region();
 
 		// Do not flush graphics or compute in this context.
 		// We must be able to inject semaphores into all currently enqueued graphics / compute.
@@ -17578,7 +17602,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		vkBeginCommandBuffer(cmd, &info);
 		add_frame_counter_nolock();
-		CommandBufferHandle handle(new (object_pool_raw_allocate(&handle_pool.command_buffers)) CommandBuffer(this, cmd, type));
+		CommandBufferHandle handle = cbh_make(new (object_pool_raw_allocate(&handle_pool.command_buffers)) CommandBuffer(this, cmd, type));
 		return handle;
 	}
 
@@ -18455,7 +18479,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			// For non-concurrent queue mode, we will have to inject ownership transfer barrier if the queue families do not match.
 
 			CommandBufferHandle graphics_cmd = request_command_buffer(CommandBuffer::Type_Generic);
-			CommandBufferHandle transfer_cmd;
+			CommandBufferHandle transfer_cmd; transfer_cmd.data = NULL;
 
 			// Don't split the upload into multiple command buffers unless we have to.
 			if (transfer_queue != graphics_queue)
@@ -18463,13 +18487,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			else
 				transfer_cmd = graphics_cmd;
 
-			transfer_cmd->image_barrier(*ih_get(&handle), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			cbh_get(&transfer_cmd)->image_barrier(*ih_get(&handle), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					VK_ACCESS_TRANSFER_WRITE_BIT);
 
-			transfer_cmd->begin_region("copy-image-to-gpu");
-			transfer_cmd->copy_buffer_to_image(*ih_get(&handle), *staging_buffer->buffer, staging_buffer->num_blits, staging_buffer->blits);
-			transfer_cmd->end_region();
+			cbh_get(&transfer_cmd)->begin_region("copy-image-to-gpu");
+			cbh_get(&transfer_cmd)->copy_buffer_to_image(*ih_get(&handle), *staging_buffer->buffer, staging_buffer->num_blits, staging_buffer->blits);
+			cbh_get(&transfer_cmd)->end_region();
 
 			if (transfer_queue != graphics_queue)
 			{
@@ -18513,11 +18537,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					else
 						acquire.dstAccessMask = ih_get(&handle)->get_access_flags() & image_layout_to_possible_access(create_info.initial_layout);
 
-					transfer_cmd->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
+					cbh_get(&transfer_cmd)->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
 							VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 							0, NULL, 0, NULL, 1, &release);
 
-					graphics_cmd->barrier(dst_stages,
+					cbh_get(&graphics_cmd)->barrier(dst_stages,
 							dst_stages,
 							0, NULL, 0, NULL, 1, &acquire);
 				}
@@ -18530,17 +18554,17 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 			if (generate_mips)
 			{
-				graphics_cmd->begin_region("mipgen");
-				graphics_cmd->barrier_prepare_generate_mipmap(*ih_get(&handle), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				cbh_get(&graphics_cmd)->begin_region("mipgen");
+				cbh_get(&graphics_cmd)->barrier_prepare_generate_mipmap(*ih_get(&handle), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 						VK_PIPELINE_STAGE_TRANSFER_BIT,
 						prepare_src_access, need_mipmap_barrier);
-				graphics_cmd->generate_mipmap(*ih_get(&handle));
-				graphics_cmd->end_region();
+				cbh_get(&graphics_cmd)->generate_mipmap(*ih_get(&handle));
+				cbh_get(&graphics_cmd)->end_region();
 			}
 
 			if (need_initial_barrier)
 			{
-				graphics_cmd->image_barrier(
+				cbh_get(&graphics_cmd)->image_barrier(
 						*ih_get(&handle), generate_mips ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 						create_info.initial_layout,
 						VK_PIPELINE_STAGE_TRANSFER_BIT, final_transition_src_access,
@@ -18569,7 +18593,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			VK_ASSERT(create_info.domain != ImageDomain_Transient);
 			CommandBufferHandle cmd = request_command_buffer(CommandBuffer::Type_Generic);
-			cmd->image_barrier(*ih_get(&handle), info.initialLayout, create_info.initial_layout,
+			cbh_get(&cmd)->image_barrier(*ih_get(&handle), info.initialLayout, create_info.initial_layout,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, ih_get(&handle)->get_stage_flags(),
 					ih_get(&handle)->get_access_flags() &
 					image_layout_to_possible_access(create_info.initial_layout));
@@ -18678,16 +18702,16 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		if (create_info.domain == BufferDomain_Device && initial && !memory_type_is_host_visible(memory_type))
 		{
-			CommandBufferHandle cmd;
+			CommandBufferHandle cmd; cmd.data = NULL;
 			BufferCreateInfo staging_info = create_info;
 			staging_info.domain = BufferDomain_Host;
 			BufferHandle staging_buffer = create_buffer(staging_info, initial);
 			set_name(*staging_buffer, "buffer-upload-staging-buffer");
 
 			cmd = request_command_buffer(CommandBuffer::Type_AsyncTransfer);
-			cmd->begin_region("copy-buffer-staging");
-			cmd->copy_buffer(*handle, *staging_buffer);
-			cmd->end_region();
+			cbh_get(&cmd)->begin_region("copy-buffer-staging");
+			cbh_get(&cmd)->copy_buffer(*handle, *staging_buffer);
+			cbh_get(&cmd)->end_region();
 
 			submit_staging(cmd, info.usage, true);
 		}
@@ -21241,13 +21265,13 @@ static char retro_slash = '/';
 
 		if (ih_is_valid(&page.texture) && ih_get(&page.texture)->get_width() == texture_width && ih_get(&page.texture)->get_height() == texture_height)
 			// Switch back into transfer dst layout
-			cmd->image_barrier(*ih_get(&page.texture),
+			cbh_get(&cmd)->image_barrier(*ih_get(&page.texture),
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
 		else
 			ih_move(&page.texture, uploader->create_texture(texture_width, texture_height, mip_levels));
-		cmd->clear_image(*ih_get(&page.texture), fallthrough);
+		cbh_get(&cmd)->clear_image(*ih_get(&page.texture), fallthrough);
 
 		// Second pass to blit all the existing textures into the new texture
 		for (TextureRect &tex : page.fusion.rects) {
@@ -21284,7 +21308,7 @@ static char retro_slash = '/';
 
 			// Switch into transfer src
 			// what the fuck am I doing?
-			cmd->image_barrier(
+			cbh_get(&cmd)->image_barrier(
 					*image,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -21303,7 +21327,7 @@ static char retro_slash = '/';
 			for (int dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
 				int srcLevel = max_(0, dstLevel - full_res_levels);
 
-				cmd->blit_image(*ih_get(&page.texture), *image,
+				cbh_get(&cmd)->blit_image(*ih_get(&page.texture), *image,
 						dst_offset,
 						dst_extent,
 						{
@@ -21327,7 +21351,7 @@ static char retro_slash = '/';
 			}
 
 			// Change back to shader read
-			cmd->image_barrier(
+			cbh_get(&cmd)->image_barrier(
 					*image,
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -21340,7 +21364,7 @@ static char retro_slash = '/';
 
 		// I have no idea what the fuck I'm doing
 		// Make the fused texture readable by shaders
-		cmd->image_barrier(*ih_get(&page.texture),
+		cbh_get(&cmd)->image_barrier(*ih_get(&page.texture),
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
