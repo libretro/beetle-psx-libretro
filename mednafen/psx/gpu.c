@@ -289,6 +289,17 @@ static void GPU_set_upscale_shift(uint8_t factor)
    GPU.upscale_shift = factor;
 }
 
+/* HW polygon-subdivision (textured/Phong tessellation) is not present in this
+ * tree -- only the texpage-change flush call site (added alongside the feature
+ * upstream) landed here, without the buffer it would drain.  Provide a no-op so
+ * the call resolves; there is no pending subdivision buffer to flush, so the
+ * empty body is the correct behaviour for this build.  Replace with the real
+ * drain if/when the subdivision emitter is merged. */
+static INLINE void gpu_polygon_subdiv_flush(PS_GPU *gpu)
+{
+   (void)gpu;
+}
+
 static void SetTPage(PS_GPU *gpu, const uint32_t cmdw)
 {
    const unsigned NewTexPageX = (cmdw & 0xF) * 64;
