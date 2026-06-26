@@ -1192,17 +1192,29 @@ static INLINE void SPU_RunNoise(void)
 
          /* A voice whose envelope has fully released contributes zero
           * to every accumulator, so the decoder, the interpolation
-          * FIR, the envelope and the sweeps can be skipped wholesale.
-          * The skip is disabled while the SPU IRQ is enabled, because
-          * the decoder's address walk must keep testing against the
-          * IRQ address. What this freezes for the skipped voice is the
-          * register-visible decoder state (the loop address register
-          * and the block-end flag re-assertions of a looping silent
-          * voice, and the current sweep volume): all idempotent or
-          * inert in practice, and audio output is bit-identical. */
+          * FIR, the envelope and the sweeps can be skipped wholesale -
+          * BUT only when skipping it produces no observable side effect.
+          *
+          * A released voice that is still decoding a *looping* sample
+          * keeps reaching loop-end blocks, and each one re-asserts this
+          * voice's ENDX/block-end status bit (SPU_RunSample, BlockEnd |=
+          * 1 << voice).  Games poll ENDX to tell when a (possibly silent)
+          * streaming/looping voice has wrapped, to sequence the next
+          * chunk - e.g. "Shockwave Assault" hangs its in-game FMV /
+          * level-load forever waiting on an ENDX that never comes if the
+          * looping voice is skipped, with the last buffer looping as a
+          * loud locked tone (issue #965).  So require the voice to be
+          * non-looping (DecodeFlags bit1 clear): such a voice already
+          * consumed its single end block and will not assert ENDX again,
+          * making the skip truly inert.
+          *
+          * The skip is also disabled while the SPU IRQ is enabled,
+          * because the decoder's address walk must keep testing against
+          * the IRQ address. */
          if (voice->ADSR.EnvLevel == 0 &&
              voice->ADSR.Phase == ADSR_RELEASE &&
              psx_spu_silent_voice_opt &&
+             !(voice->DecodeFlags & 0x2) &&
              !voice->DecodePlayDelay &&
              !(SPUControl & 0x40) &&
              !(VoiceOn & (1U << voice_num)) &&
