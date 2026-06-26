@@ -13,6 +13,17 @@
 #include "rhi_defer.h"
 #include "tt_trace.h"
 
+/* Force-inline shim for converted accessors. Must resolve to a real
+ * always-inline so that primitives converted from C++ inline methods to C89
+ * free functions retain identical codegen (verified for the FNV-1a hasher). */
+#if defined(_MSC_VER)
+#  define RHI_INLINE static __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+#  define RHI_INLINE static __inline__ __attribute__((always_inline))
+#else
+#  define RHI_INLINE static
+#endif
+
 /* === folded parallel-psx/volk/volk.h + volk.c === */
 /* Folded from parallel-psx/volk/volk.h ((c) 2018 Arseny Kapoulkine, MIT). */
 
@@ -1729,44 +1740,46 @@ static inline uint32_t util_ctz(uint32_t x)
 	     base_var = trailing_zeroes(_fe_v),                                        \
 	     range_var = (_fe_v ? trailing_ones(_fe_v >> base_var) : 0u))
 
-	using Hash = uint64_t;
+	typedef uint64_t Hash;
 
-	class Hasher
+	/* FNV-1a hasher. Converted from a C++ class to a C89 struct + RHI_INLINE
+	 * free functions. Codegen verified byte-identical to the prior inline-method
+	 * form under GCC -O2/-O3 (see harness); RHI_INLINE must resolve to
+	 * always_inline/__forceinline to preserve that. A bare Hasher must be seeded
+	 * with hasher_init() before use (no in-struct default initializer in C89). */
+	struct Hasher
 	{
-		public:
-			Hasher(Hash h)
-				: h(h)
-			{
-			}
-
-			Hasher() = default;
-
-			inline void data(const uint32_t *p, size_t bytes)
-			{
-				size_t count = bytes / sizeof(uint32_t);
-				for (size_t i = 0; i < count; i++)
-					h = (h * 0x100000001b3ull) ^ p[i];
-			}
-
-			inline void u32(uint32_t value)
-			{
-				h = (h * 0x100000001b3ull) ^ value;
-			}
-
-			inline void u64(uint64_t value)
-			{
-				u32(value & 0xffffffffu);
-				u32(value >> 32);
-			}
-
-			inline Hash get() const
-			{
-				return h;
-			}
-
-		private:
-			Hash h = 0xcbf29ce484222325ull;
+		Hash h;
 	};
+
+	RHI_INLINE void hasher_init(struct Hasher *s)
+	{
+		s->h = 0xcbf29ce484222325ull;
+	}
+
+	RHI_INLINE void hasher_u32(struct Hasher *s, uint32_t value)
+	{
+		s->h = (s->h * 0x100000001b3ull) ^ value;
+	}
+
+	RHI_INLINE void hasher_u64(struct Hasher *s, uint64_t value)
+	{
+		hasher_u32(s, (uint32_t)(value & 0xffffffffu));
+		hasher_u32(s, (uint32_t)(value >> 32));
+	}
+
+	RHI_INLINE void hasher_data(struct Hasher *s, const uint32_t *p, size_t bytes)
+	{
+		size_t count = bytes / sizeof(uint32_t);
+		size_t i;
+		for (i = 0; i < count; i++)
+			s->h = (s->h * 0x100000001b3ull) ^ p[i];
+	}
+
+	RHI_INLINE Hash hasher_get(const struct Hasher *s)
+	{
+		return s->h;
+	}
 
 	class SingleThreadCounter
 	{
@@ -14650,19 +14663,19 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	Framebuffer &FramebufferAllocator::request_framebuffer(const RenderPassInfo &info)
 	{
 		const RenderPass &rp = device->request_render_pass(info, true);
-		Hasher h;
-		h.u64(rp.intrusive_node.key);
+		Hasher h; hasher_init(&h);
+		hasher_u64(&h, rp.intrusive_node.key);
 
 		for (unsigned i = 0; i < info.num_color_attachments; i++)
 			if (info.color_attachments[i])
-				h.u64(info.color_attachments[i]->cookie);
+				hasher_u64(&h, info.color_attachments[i]->cookie);
 
 		if (info.depth_stencil)
-			h.u64(info.depth_stencil->cookie);
+			hasher_u64(&h, info.depth_stencil->cookie);
 
-		h.u32(info.layer);
+		hasher_u32(&h, info.layer);
 
-		Hash hash = h.get();
+		Hash hash = hasher_get(&h);
 
 		FramebufferNode *node = framebuffer_thmap_request(&framebuffers, hash);
 		if (node)
@@ -14684,15 +14697,15 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	ImageView &AttachmentAllocator::request_attachment(unsigned width, unsigned height, VkFormat format,
 			unsigned index, unsigned samples, unsigned layers)
 	{
-		Hasher h;
-		h.u32(width);
-		h.u32(height);
-		h.u32(format);
-		h.u32(index);
-		h.u32(samples);
-		h.u32(layers);
+		Hasher h; hasher_init(&h);
+		hasher_u32(&h, width);
+		hasher_u32(&h, height);
+		hasher_u32(&h, format);
+		hasher_u32(&h, index);
+		hasher_u32(&h, samples);
+		hasher_u32(&h, layers);
 
-		Hash hash = h.get();
+		Hash hash = hasher_get(&h);
 
 		TransientNode *node = transient_thmap_request(&attachments, hash);
 		if (node)
@@ -15293,20 +15306,20 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void CommandBuffer::flush_compute_pipeline()
 	{
-		Hasher h;
-		h.u64(current_program->intrusive_node.key);
+		Hasher h; hasher_init(&h);
+		hasher_u64(&h, current_program->intrusive_node.key);
 
 		// Spec constants.
 		const CombinedResourceLayout &layout = current_layout->get_resource_layout();
 		uint32_t combined_spec_constant = layout.combined_spec_constant_mask;
 		combined_spec_constant &= static_state.state.spec_constant_mask;
-		h.u32(combined_spec_constant);
+		hasher_u32(&h, combined_spec_constant);
 		FOR_EACH_BIT(combined_spec_constant, bit)
 		{
-			h.u32(potential_static_state.spec_constants[bit]);
+			hasher_u32(&h, potential_static_state.spec_constants[bit]);
 		}
 
-		Hash hash = h.get();
+		Hash hash = hasher_get(&h);
 		current_pipeline = current_program->get_pipeline(hash);
 		if (current_pipeline == VK_NULL_HANDLE)
 			current_pipeline = build_compute_pipeline(hash);
@@ -15314,28 +15327,28 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void CommandBuffer::flush_graphics_pipeline()
 	{
-		Hasher h;
+		Hasher h; hasher_init(&h);
 		active_vbos = 0;
 		const CombinedResourceLayout &layout = current_layout->get_resource_layout();
 		FOR_EACH_BIT(layout.attribute_mask, bit)
 		{
-			h.u32(bit);
+			hasher_u32(&h, bit);
 			active_vbos |= 1u << attribs[bit].binding;
-			h.u32(attribs[bit].binding);
-			h.u32(attribs[bit].format);
-			h.u32(attribs[bit].offset);
+			hasher_u32(&h, attribs[bit].binding);
+			hasher_u32(&h, attribs[bit].format);
+			hasher_u32(&h, attribs[bit].offset);
 		}
 
 		FOR_EACH_BIT(active_vbos, bit)
 		{
-			h.u32(vbo.input_rates[bit]);
-			h.u32(vbo.strides[bit]);
+			hasher_u32(&h, vbo.input_rates[bit]);
+			hasher_u32(&h, vbo.strides[bit]);
 		}
 
-		h.u64(compatible_render_pass->intrusive_node.key);
-		h.u32(current_subpass);
-		h.u64(current_program->intrusive_node.key);
-		h.data(static_state.words, sizeof(static_state.words));
+		hasher_u64(&h, compatible_render_pass->intrusive_node.key);
+		hasher_u32(&h, current_subpass);
+		hasher_u64(&h, current_program->intrusive_node.key);
+		hasher_data(&h, static_state.words, sizeof(static_state.words));
 
 		if (static_state.state.blend_enable)
 		{
@@ -15344,20 +15357,20 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			bool b2 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(static_state.state.dst_color_blend));
 			bool b3 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(static_state.state.dst_alpha_blend));
 			if (b0 || b1 || b2 || b3)
-				h.data((uint32_t *)(potential_static_state.blend_constants),
+				hasher_data(&h, (uint32_t *)(potential_static_state.blend_constants),
 						sizeof(potential_static_state.blend_constants));
 		}
 
 		// Spec constants.
 		uint32_t combined_spec_constant = layout.combined_spec_constant_mask;
 		combined_spec_constant &= static_state.state.spec_constant_mask;
-		h.u32(combined_spec_constant);
+		hasher_u32(&h, combined_spec_constant);
 		FOR_EACH_BIT(combined_spec_constant, bit)
 		{
-			h.u32(potential_static_state.spec_constants[bit]);
+			hasher_u32(&h, potential_static_state.spec_constants[bit]);
 		}
 
-		Hash hash = h.get();
+		Hash hash = hasher_get(&h);
 		current_pipeline = current_program->get_pipeline(hash);
 		if (current_pipeline == VK_NULL_HANDLE)
 			current_pipeline = build_graphics_pipeline(hash);
@@ -15700,15 +15713,15 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		const DescriptorSetLayout &set_layout = layout.sets[set];
 		uint32_t num_dynamic_offsets = 0;
 		uint32_t dynamic_offsets[VULKAN_NUM_BINDINGS];
-		Hasher h;
+		Hasher h; hasher_init(&h);
 
-		h.u32(set_layout.fp_mask);
+		hasher_u32(&h, set_layout.fp_mask);
 
 		// UBOs
 		FOR_EACH_BIT(set_layout.uniform_buffer_mask, binding)
 		{
-			h.u64(bindings.cookies[set][binding]);
-			h.u32(bindings.bindings[set][binding].buffer.range);
+			hasher_u64(&h, bindings.cookies[set][binding]);
+			hasher_u32(&h, bindings.bindings[set][binding].buffer.range);
 			VK_ASSERT(bindings.bindings[set][binding].buffer.buffer != VK_NULL_HANDLE);
 
 			dynamic_offsets[num_dynamic_offsets++] = bindings.bindings[set][binding].buffer.offset;
@@ -15717,64 +15730,64 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		// SSBOs
 		FOR_EACH_BIT(set_layout.storage_buffer_mask, binding)
 		{
-			h.u64(bindings.cookies[set][binding]);
-			h.u32(bindings.bindings[set][binding].buffer.offset);
-			h.u32(bindings.bindings[set][binding].buffer.range);
+			hasher_u64(&h, bindings.cookies[set][binding]);
+			hasher_u32(&h, bindings.bindings[set][binding].buffer.offset);
+			hasher_u32(&h, bindings.bindings[set][binding].buffer.range);
 			VK_ASSERT(bindings.bindings[set][binding].buffer.buffer != VK_NULL_HANDLE);
 		}
 
 		// Sampled buffers
 		FOR_EACH_BIT(set_layout.sampled_buffer_mask, binding)
 		{
-			h.u64(bindings.cookies[set][binding]);
+			hasher_u64(&h, bindings.cookies[set][binding]);
 			VK_ASSERT(bindings.bindings[set][binding].buffer_view != VK_NULL_HANDLE);
 		}
 
 		// Sampled images
 		FOR_EACH_BIT(set_layout.sampled_image_mask, binding)
 		{
-			h.u64(bindings.cookies[set][binding]);
+			hasher_u64(&h, bindings.cookies[set][binding]);
 			if (!has_immutable_sampler(set_layout, binding))
 			{
-				h.u64(bindings.secondary_cookies[set][binding]);
+				hasher_u64(&h, bindings.secondary_cookies[set][binding]);
 				VK_ASSERT(bindings.bindings[set][binding].image.fp.sampler != VK_NULL_HANDLE);
 			}
-			h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
+			hasher_u32(&h, bindings.bindings[set][binding].image.fp.imageLayout);
 			VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
 		}
 
 		// Separate images
 		FOR_EACH_BIT(set_layout.separate_image_mask, binding)
 		{
-			h.u64(bindings.cookies[set][binding]);
-			h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
+			hasher_u64(&h, bindings.cookies[set][binding]);
+			hasher_u32(&h, bindings.bindings[set][binding].image.fp.imageLayout);
 			VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
 		}
 
 		// Separate samplers
 		FOR_EACH_BIT(set_layout.sampler_mask & ~set_layout.immutable_sampler_mask, binding)
 		{
-			h.u64(bindings.secondary_cookies[set][binding]);
+			hasher_u64(&h, bindings.secondary_cookies[set][binding]);
 			VK_ASSERT(bindings.bindings[set][binding].image.fp.sampler != VK_NULL_HANDLE);
 		}
 
 		// Storage images
 		FOR_EACH_BIT(set_layout.storage_image_mask, binding)
 		{
-			h.u64(bindings.cookies[set][binding]);
-			h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
+			hasher_u64(&h, bindings.cookies[set][binding]);
+			hasher_u32(&h, bindings.bindings[set][binding].image.fp.imageLayout);
 			VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
 		}
 
 		// Input attachments
 		FOR_EACH_BIT(set_layout.input_attachment_mask, binding)
 		{
-			h.u64(bindings.cookies[set][binding]);
-			h.u32(bindings.bindings[set][binding].image.fp.imageLayout);
+			hasher_u64(&h, bindings.cookies[set][binding]);
+			hasher_u32(&h, bindings.bindings[set][binding].image.fp.imageLayout);
 			VK_ASSERT(bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
 		}
 
-		Hash hash = h.get();
+		Hash hash = hasher_get(&h);
 		DescriptorSetAllocation allocated = current_layout->get_allocator(set)->find(hash);
 
 		// The descriptor set was not successfully cached, rebuild.
@@ -16578,10 +16591,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	Shader *Device::request_shader(const uint32_t *data, size_t size)
 	{
-		Hasher hasher;
-		hasher.data(data, size);
+		Hasher hasher; hasher_init(&hasher);
+		hasher_data(&hasher, data, size);
 
-		Hash hash = hasher.get();
+		Hash hash = hasher_get(&hasher);
 		Shader *ret = shader_map_find(&shaders, hash);
 		if (!ret)
 			ret = shader_map_emplace_yield(&shaders, hash, this, data, size);
@@ -16590,10 +16603,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	Program *Device::request_program(Shader *compute)
 	{
-		Hasher hasher;
-		hasher.u64(compute->intrusive_node.key);
+		Hasher hasher; hasher_init(&hasher);
+		hasher_u64(&hasher, compute->intrusive_node.key);
 
-		Hash hash = hasher.get();
+		Hash hash = hasher_get(&hasher);
 		Program *ret = program_map_find(&programs, hash);
 		if (!ret)
 			ret = program_map_emplace_yield_compute(&programs, hash, this, compute);
@@ -16608,11 +16621,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	Program *Device::request_program(Shader *vertex, Shader *fragment)
 	{
-		Hasher hasher;
-		hasher.u64(vertex->intrusive_node.key);
-		hasher.u64(fragment->intrusive_node.key);
+		Hasher hasher; hasher_init(&hasher);
+		hasher_u64(&hasher, vertex->intrusive_node.key);
+		hasher_u64(&hasher, fragment->intrusive_node.key);
 
-		Hash hash = hasher.get();
+		Hash hash = hasher_get(&hasher);
 		Program *ret = program_map_find(&programs, hash);
 
 		if (!ret)
@@ -16630,16 +16643,16 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	PipelineLayout *Device::request_pipeline_layout(const CombinedResourceLayout &layout)
 	{
-		Hasher h;
-		h.data((const uint32_t *)(layout.sets), sizeof(layout.sets));
-		h.data(&layout.stages_for_bindings[0][0], sizeof(layout.stages_for_bindings));
-		h.u32(layout.push_constant_range.stageFlags);
-		h.u32(layout.push_constant_range.size);
-		h.data(layout.spec_constant_mask, sizeof(layout.spec_constant_mask));
-		h.u32(layout.attribute_mask);
-		h.u32(layout.render_target_mask);
+		Hasher h; hasher_init(&h);
+		hasher_data(&h, (const uint32_t *)(layout.sets), sizeof(layout.sets));
+		hasher_data(&h, &layout.stages_for_bindings[0][0], sizeof(layout.stages_for_bindings));
+		hasher_u32(&h, layout.push_constant_range.stageFlags);
+		hasher_u32(&h, layout.push_constant_range.size);
+		hasher_data(&h, layout.spec_constant_mask, sizeof(layout.spec_constant_mask));
+		hasher_u32(&h, layout.attribute_mask);
+		hasher_u32(&h, layout.render_target_mask);
 
-		Hash hash = h.get();
+		Hash hash = hasher_get(&h);
 		PipelineLayout *ret = pipeline_layout_map_find(&pipeline_layouts, hash);
 		if (!ret)
 			ret = pipeline_layout_map_emplace_yield(&pipeline_layouts, hash, this, layout);
@@ -16648,10 +16661,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	DescriptorSetAllocator *Device::request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings)
 	{
-		Hasher h;
-		h.data((const uint32_t *)(&layout), sizeof(layout));
-		h.data(stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
-		Hash hash = h.get();
+		Hasher h; hasher_init(&h);
+		hasher_data(&h, (const uint32_t *)(&layout), sizeof(layout));
+		hasher_data(&h, stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
+		Hash hash = hasher_get(&h);
 
 		DescriptorSetAllocator *ret = descriptor_set_allocator_map_find(&descriptor_set_allocators, hash);
 		if (!ret)
@@ -16742,10 +16755,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				layout.descriptor_set_mask |= 1u << i;
 		}
 
-		Hasher h;
-		h.u32(layout.push_constant_range.stageFlags);
-		h.u32(layout.push_constant_range.size);
-		layout.push_constant_layout_hash = h.get();
+		Hasher h; hasher_init(&h);
+		hasher_u32(&h, layout.push_constant_range.stageFlags);
+		hasher_u32(&h, layout.push_constant_range.size);
+		layout.push_constant_layout_hash = hasher_get(&h);
 		program.set_pipeline_layout(request_pipeline_layout(layout));
 	}
 
@@ -18547,7 +18560,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool compatible)
 	{
-		Hasher h;
+		Hasher h; hasher_init(&h);
 		VkFormat formats[VULKAN_NUM_ATTACHMENTS];
 		VkFormat depth_stencil;
 		uint32_t lazy = 0;
@@ -18571,40 +18584,40 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				optimal |= 1u << info.num_color_attachments;
 		}
 
-		h.u32(info.num_subpasses);
+		hasher_u32(&h, info.num_subpasses);
 		for (unsigned i = 0; i < info.num_subpasses; i++)
 		{
-			h.u32(info.subpasses[i].num_color_attachments);
-			h.u32(info.subpasses[i].num_input_attachments);
-			h.u32(info.subpasses[i].num_resolve_attachments);
-			h.u32((uint32_t)(info.subpasses[i].depth_stencil_mode));
+			hasher_u32(&h, info.subpasses[i].num_color_attachments);
+			hasher_u32(&h, info.subpasses[i].num_input_attachments);
+			hasher_u32(&h, info.subpasses[i].num_resolve_attachments);
+			hasher_u32(&h, (uint32_t)(info.subpasses[i].depth_stencil_mode));
 			for (unsigned j = 0; j < info.subpasses[i].num_color_attachments; j++)
-				h.u32(info.subpasses[i].color_attachments[j]);
+				hasher_u32(&h, info.subpasses[i].color_attachments[j]);
 			for (unsigned j = 0; j < info.subpasses[i].num_input_attachments; j++)
-				h.u32(info.subpasses[i].input_attachments[j]);
+				hasher_u32(&h, info.subpasses[i].input_attachments[j]);
 			for (unsigned j = 0; j < info.subpasses[i].num_resolve_attachments; j++)
-				h.u32(info.subpasses[i].resolve_attachments[j]);
+				hasher_u32(&h, info.subpasses[i].resolve_attachments[j]);
 		}
 
 		depth_stencil = info.depth_stencil ? info.depth_stencil->get_format() : VK_FORMAT_UNDEFINED;
-		h.data((const uint32_t *)(formats), info.num_color_attachments * sizeof(VkFormat));
-		h.u32(info.num_color_attachments);
-		h.u32(depth_stencil);
+		hasher_data(&h, (const uint32_t *)(formats), info.num_color_attachments * sizeof(VkFormat));
+		hasher_u32(&h, info.num_color_attachments);
+		hasher_u32(&h, depth_stencil);
 
 		// Compatible render passes do not care about load/store, or image layouts.
 		if (!compatible)
 		{
-			h.u32(info.op_flags);
-			h.u32(info.clear_attachments);
-			h.u32(info.load_attachments);
-			h.u32(info.store_attachments);
-			h.u32(optimal);
+			hasher_u32(&h, info.op_flags);
+			hasher_u32(&h, info.clear_attachments);
+			hasher_u32(&h, info.load_attachments);
+			hasher_u32(&h, info.store_attachments);
+			hasher_u32(&h, optimal);
 		}
 
 		// Lazy flag can change external subpass dependencies, which is not compatible.
-		h.u32(lazy);
+		hasher_u32(&h, lazy);
 
-		Hash hash = h.get();
+		Hash hash = hasher_get(&h);
 
 		RenderPass *ret = render_pass_map_find(&render_passes, hash);
 		if (!ret)
