@@ -4003,7 +4003,22 @@ private:
 			HandleCounter reference_count;
 	};
 
-	INTRUSIVE_HANDLE_DECLARE(ImageViewHandle, ImageView);
+	/* Image-view handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(ImageViewHandle,
+	 * ImageView) to a plain struct + explicit free functions, following the
+	 * sem_ / fence_ / smh_ / bvh_ template. The pointee ImageView is unchanged.
+	 * The container below (ImageViewHandleVec) is move-only -- push() takes an
+	 * rvalue and steals, grow() moves -- so there is no incref anywhere in the
+	 * container; iv_reset() (one decref) is needed only at destroy()/clear() and
+	 * at value-member teardown. iv_steal() implements the move (copy pointer,
+	 * null the source) the macro's move-ctor did.
+	 * ASAN-GATE: scaled mip-view chain + per-image default view lifetime; verify
+	 * one decref per view (no leak / double-free). */
+	struct ImageViewHandle { ImageView *data; };
+	static inline struct ImageViewHandle iv_make(ImageView *p) { struct ImageViewHandle h; h.data = p; return h; }
+	static inline void iv_reset(struct ImageViewHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline ImageView *iv_get(const struct ImageViewHandle *h) { return h->data; }
+	static inline int iv_is_valid(const struct ImageViewHandle *h) { return h->data != NULL; }
+	static inline void iv_steal(struct ImageViewHandle *dst, struct ImageViewHandle *src) { dst->data = src->data; src->data = NULL; }
 
 	/* Owning array of ImageViewHandle (= IntrusivePtr<ImageView>). Replaces
 	 * std::vector<ImageViewHandle> for the renderer's scaled mip-view chain,
@@ -4014,7 +4029,7 @@ private:
 	 * destructor (dropping its ref). push() takes ownership by move (no incref),
 	 * matching push_back(device.create_image_view(...)) of a temporary. Move-
 	 * only at the container level; indexed access returns a mutable reference so
-	 * existing scaled_views[i].get() / *scaled_views[i] uses are unchanged. */
+	 * existing iv_get(&scaled_views[i]) / *iv_get(&scaled_views[i]) uses are unchanged. */
 	struct ImageViewHandleVec {
 		ImageViewHandle *items;
 		int count;
@@ -4038,7 +4053,7 @@ private:
 		void push(ImageViewHandle &&v) {
 			if (count >= cap)
 				grow(cap ? cap * 2 : 8);
-			new (&items[count]) ImageViewHandle(static_cast<ImageViewHandle &&>(v));
+			iv_steal(&items[count], &v);
 			count++;
 		}
 		int size() const { return count; }
@@ -4051,8 +4066,9 @@ private:
 		void grow(int ncap) {
 			ImageViewHandle *nitems = (ImageViewHandle *)malloc((size_t)ncap * sizeof(ImageViewHandle));
 			for (int i = 0; i < count; i++) {
-				new (&nitems[i]) ImageViewHandle(static_cast<ImageViewHandle &&>(items[i]));
-				items[i].~ImageViewHandle();
+				/* Move: iv_steal copies the pointer and nulls the old slot,
+				 * so no separate decref of the old slot is needed. */
+				iv_steal(&nitems[i], &items[i]);
 			}
 			free(items);
 			items = nitems;
@@ -4060,7 +4076,7 @@ private:
 		}
 		void destroy() {
 			for (int i = 0; i < count; i++)
-				items[i].~ImageViewHandle();
+				iv_reset(&items[i]);
 			free(items);
 			items = NULL; count = 0; cap = 0;
 		}
@@ -4189,14 +4205,14 @@ private:
 
 			const ImageView &get_view() const
 			{
-				VK_ASSERT(view);
-				return *view;
+				VK_ASSERT(iv_is_valid(&view));
+				return *iv_get(&view);
 			}
 
 			ImageView &get_view()
 			{
-				VK_ASSERT(view);
-				return *view;
+				VK_ASSERT(iv_is_valid(&view));
+				return *iv_get(&view);
 			}
 
 			VkImage get_image() const
@@ -10046,7 +10062,7 @@ void Renderer::mipmap_framebuffer()
 		if (i == levels)
 			rp.color_attachments[0] = &bias_framebuffer->get_view();
 		else
-			rp.color_attachments[0] = scaled_views[i].get();
+			rp.color_attachments[0] = iv_get(&scaled_views[i]);
 
 		rp.num_color_attachments = 1;
 		rp.store_attachments = 1;
@@ -10069,7 +10085,7 @@ void Renderer::mipmap_framebuffer()
 		else
 			cmd->set_program(*pipelines.mipmap_energy);
 
-		cmd->set_texture(0, 0, *scaled_views[i - 1], StockSampler_LinearClamp);
+		cmd->set_texture(0, 0, *iv_get(&scaled_views[i - 1]), StockSampler_LinearClamp);
 
 		cmd->set_quad_state();
 		cmd->set_vertex_binding(0, *quad, 0, 8);
@@ -10146,7 +10162,7 @@ void Renderer::ssaa_framebuffer()
 	if (msaa > 1)
 		cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler_NearestClamp);
 	else
-		cmd->set_texture(0, 1, *scaled_views[0], StockSampler_LinearClamp);
+		cmd->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
 
 	struct Push
 	{
@@ -10343,7 +10359,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	if (scaled)
 	{
 		cmd->set_program(*pipelines.scaled_quad_blitter);
-		cmd->set_texture(0, 0, *scaled_views[0], StockSampler_LinearClamp);
+		cmd->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
 	}
 	else
 	{
@@ -10563,7 +10579,7 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cmd->set_program(*pipelines.scaled_quad_blitter);
 
-		cmd->set_texture(0, 0, *scaled_views[0], StockSampler_LinearWrap);
+		cmd->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_LinearWrap);
 	}
 	else
 	{
@@ -10723,7 +10739,7 @@ void Renderer::flush_resolves()
 		if (msaa > 1)
 			cmd->set_storage_texture(0, 0, scaled_framebuffer_msaa->get_view());
 		else
-			cmd->set_storage_texture(0, 0, *scaled_views[0]);
+			cmd->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
 
 		unsigned size = Rect2DVec_size(&queue.scaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
@@ -10751,7 +10767,7 @@ void Renderer::flush_resolves()
 		if (msaa > 1)
 			cmd->set_texture(0, 1, scaled_framebuffer_msaa->get_view(), StockSampler_NearestClamp);
 		else
-			cmd->set_texture(0, 1, *scaled_views[0], StockSampler_NearestClamp);
+			cmd->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 
 		unsigned size = Rect2DVec_size(&queue.unscaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
@@ -11332,7 +11348,7 @@ void Renderer::flush_render_pass(const Rect &rect)
 	if (msaa > 1)
 		info.color_attachments[0] = &scaled_framebuffer_msaa->get_view();
 	else
-		info.color_attachments[0] = scaled_views.front().get();
+		info.color_attachments[0] = iv_get(&scaled_views.front());
 
 	info.clear_depth_stencil = { 1.0f, 0 };
 	info.depth_stencil =
@@ -11401,7 +11417,7 @@ void Renderer::dispatch_set_scaled_read_texture(bool scaled_read, bool textured)
 		if (msaa > 1)
 			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler_NearestClamp);
 		else
-			cmd->set_texture(0, 0, *scaled_views[0], StockSampler_NearestClamp);
+			cmd->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 	}
 	else
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler_NearestClamp);
@@ -11700,8 +11716,8 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 		}
 		else
 		{
-			cmd->set_storage_texture(0, 0, *scaled_views[0]);
-			cmd->set_texture(0, 1, *scaled_views[0], StockSampler_NearestClamp);
+			cmd->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
+			cmd->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 		}
 	}
 	else
@@ -11778,7 +11794,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 			}
 			else
 			{
-				cmd->set_storage_texture(0, 0, *scaled_views[0]);
+				cmd->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
 				cmd->set_program(render_state.mask_test ? *pipelines.blit_vram_cached_scaled_masked :
 														*pipelines.blit_vram_cached_scaled);
 				cmd->dispatch(factor, factor, 1);
@@ -11996,7 +12012,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		if (msaa > 1)
 			cmd->set_texture(0, 0, scaled_framebuffer_msaa->get_view(), StockSampler_NearestClamp);
 		else
-			cmd->set_texture(0, 0, *scaled_views[0], StockSampler_NearestClamp);
+			cmd->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 	}
 	else
 		cmd->set_texture(0, 0, framebuffer->get_view(), StockSampler_NearestClamp);
@@ -12672,6 +12688,10 @@ Image::Image(Device *device, VkImage image, VkImageView default_view, const Devi
     , create_info(create_info)
 {
 	cookie_init(this, device);
+	/* ImageViewHandle is now a plain struct with no default member
+	 * initializer; explicitly null the view so ~Image's iv_reset is safe on
+	 * the path where no default view is created. */
+	view.data = NULL;
 	if (default_view != VK_NULL_HANDLE)
 	{
 		ImageViewCreateInfo info;
@@ -12681,12 +12701,16 @@ Image::Image(Device *device, VkImage image, VkImageView default_view, const Devi
 		info.levels = create_info.levels;
 		info.base_layer = 0;
 		info.layers = create_info.layers;
-		view = ImageViewHandle(new (object_pool_raw_allocate(&device->handle_pool.image_views)) ImageView(device, default_view, info));
+		view = iv_make(new (object_pool_raw_allocate(&device->handle_pool.image_views)) ImageView(device, default_view, info));
 	}
 }
 
 Image::~Image()
 {
+	/* The default-view handle was previously released by the implicit
+	 * ImageViewHandle member destructor; now that it is a plain struct, drop
+	 * its reference explicitly. */
+	iv_reset(&view);
 	if (alloc.get_memory())
 	{
 		device->destroy_image_nolock(image);
@@ -18139,11 +18163,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		view_info.subresourceRange.layerCount = num_layers;
 
 		if (!holder.create_default_views(image_create_info, &view_info))
-			return ImageViewHandle(NULL);
+			return iv_make(NULL);
 
 		ImageViewCreateInfo tmp = create_info;
 		tmp.format = format;
-		ImageViewHandle ret(new (object_pool_raw_allocate(&handle_pool.image_views)) ImageView(this, holder.image_view, tmp));
+		ImageViewHandle ret = iv_make(new (object_pool_raw_allocate(&handle_pool.image_views)) ImageView(this, holder.image_view, tmp));
 		if (ret)
 		{
 			holder.owned = false;
@@ -18153,7 +18177,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			return ret;
 		}
 		else
-			return ImageViewHandle(NULL);
+			return iv_make(NULL);
 	}
 
 	InitialImageBuffer Device::create_image_staging_buffer(const ImageCreateInfo &info, const ImageInitialData *initial)
