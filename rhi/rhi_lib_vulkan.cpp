@@ -3895,7 +3895,7 @@ private:
 		};
 	};
 
-	class ImageView;
+	struct ImageView;
 
 	struct ImageViewDeleter
 	{
@@ -3907,95 +3907,47 @@ private:
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
 	 * base, which provides the hash identity, is unrelated and stays. */
-	class ImageView : public Cookie
+	/* ImageView: plain C struct + free functions (was a class deriving Cookie).
+	 * Cookie embedded as cookie_base. Pooled; refcount starts at 1. The setters
+	 * (set_alt_views / set_render_target_views) and the several view getters
+	 * become free functions; get_render_target_view stays out-of-line. */
+	struct ImageView
 	{
-		public:
-			friend struct ImageViewDeleter;
-
-			void release_reference()
-			{
-				if (counter_release(&reference_count))
-					ImageViewDeleter()(this);
-			}
-			void add_reference()
-			{
-				counter_add_ref(&reference_count);
-			}
-
-			ImageView(Device *device, VkImageView view, const ImageViewCreateInfo &info);
-
-			~ImageView();
-
-			void set_alt_views(VkImageView depth, VkImageView stencil)
-			{
-				VK_ASSERT(depth_view == VK_NULL_HANDLE);
-				VK_ASSERT(stencil_view == VK_NULL_HANDLE);
-				depth_view = depth;
-				stencil_view = stencil;
-			}
-
-			void set_render_target_views(RenderTargetViewVec views)
-			{
-				VK_ASSERT(RenderTargetViewVec_empty(&render_target_views));
-				// POD_VEC passed by value: adopt its backing array (the caller nulls its
-				// own copy so ownership transfers cleanly, mirroring the old move).
-				render_target_views = views;
-			}
-
-			// By default, gets a combined view which includes all aspects in the image.
-			// This would be used mostly for render targets.
-			VkImageView get_view() const
-			{
-				return view;
-			}
-
-			VkImageView get_render_target_view(unsigned layer) const;
-
-			// Gets an image view which only includes floating point domains.
-			// Takes effect when we want to sample from an image which is Depth/Stencil,
-			// but we only want to sample depth.
-			VkImageView get_float_view() const
-			{
-				return depth_view != VK_NULL_HANDLE ? depth_view : view;
-			}
-
-			// Gets an image view which only includes integer domains.
-			// Takes effect when we want to sample from an image which is Depth/Stencil,
-			// but we only want to sample stencil.
-			VkImageView get_integer_view() const
-			{
-				return stencil_view != VK_NULL_HANDLE ? stencil_view : view;
-			}
-
-			VkFormat get_format() const
-			{
-				return info.format;
-			}
-
-			const Image &get_image() const
-			{
-				return *info.image;
-			}
-
-			Image &get_image()
-			{
-				return *info.image;
-			}
-
-			const ImageViewCreateInfo &get_create_info() const
-			{
-				return info;
-			}
-
-		private:
-			Device *device;
-			VkImageView view;
-			RenderTargetViewVec render_target_views = { NULL, 0, 0 };
-			VkImageView depth_view = VK_NULL_HANDLE;
-			VkImageView stencil_view = VK_NULL_HANDLE;
-			ImageViewCreateInfo info;
-			HandleCounter reference_count;
+		struct Cookie cookie_base;
+		Device *device;
+		VkImageView view;
+		RenderTargetViewVec render_target_views;
+		VkImageView depth_view;
+		VkImageView stencil_view;
+		ImageViewCreateInfo info;
+		HandleCounter reference_count;
 	};
+	void imageview_init(struct ImageView *self, Device *device, VkImageView view, const ImageViewCreateInfo &info);
+	void imageview_fini(struct ImageView *self);
+	VkImageView imageview_get_render_target_view(const struct ImageView *self, unsigned layer);
+	static inline void imageview_set_alt_views(struct ImageView *self, VkImageView depth, VkImageView stencil)
+	{
+		VK_ASSERT(self->depth_view == VK_NULL_HANDLE);
+		VK_ASSERT(self->stencil_view == VK_NULL_HANDLE);
+		self->depth_view = depth;
+		self->stencil_view = stencil;
+	}
+	static inline void imageview_set_render_target_views(struct ImageView *self, RenderTargetViewVec views)
+	{
+		VK_ASSERT(RenderTargetViewVec_empty(&self->render_target_views));
+		/* POD_VEC passed by value: adopt its backing array (the caller nulls its
+		 * own copy so ownership transfers cleanly, mirroring the old move). */
+		self->render_target_views = views;
+	}
+	static inline VkImageView imageview_get_view(const struct ImageView *self) { return self->view; }
+	static inline VkImageView imageview_get_float_view(const struct ImageView *self) { return self->depth_view != VK_NULL_HANDLE ? self->depth_view : self->view; }
+	static inline VkImageView imageview_get_integer_view(const struct ImageView *self) { return self->stencil_view != VK_NULL_HANDLE ? self->stencil_view : self->view; }
+	static inline VkFormat imageview_get_format(const struct ImageView *self) { return self->info.format; }
+	static inline const Image &imageview_get_image_const(const struct ImageView *self) { return *self->info.image; }
+	static inline Image &imageview_get_image(struct ImageView *self) { return *self->info.image; }
+	static inline const ImageViewCreateInfo &imageview_get_create_info(const struct ImageView *self) { return self->info; }
+	static inline void imageview_add_reference(struct ImageView *self) { counter_add_ref(&self->reference_count); }
+	void imageview_release_reference(struct ImageView *self);
 
 	/* Image-view handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(ImageViewHandle,
 	 * ImageView) to a plain struct + explicit free functions, following the
@@ -4009,7 +3961,7 @@ private:
 	 * one decref per view (no leak / double-free). */
 	struct ImageViewHandle { ImageView *data; };
 	static inline struct ImageViewHandle iv_make(ImageView *p) { struct ImageViewHandle h; h.data = p; return h; }
-	static inline void iv_reset(struct ImageViewHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline void iv_reset(struct ImageViewHandle *h) { if (h->data) imageview_release_reference(h->data); h->data = NULL; }
 	static inline ImageView *iv_get(const struct ImageViewHandle *h) { return h->data; }
 	static inline int iv_is_valid(const struct ImageViewHandle *h) { return h->data != NULL; }
 	static inline void iv_steal(struct ImageViewHandle *dst, struct ImageViewHandle *src) { dst->data = src->data; src->data = NULL; }
@@ -4837,7 +4789,7 @@ private:
 	};
 	using RenderPassOpFlags = uint32_t;
 
-	class ImageView;
+	struct ImageView;
 	struct RenderPassInfo
 	{
 		ImageView *color_attachments[VULKAN_NUM_ATTACHMENTS];
@@ -5978,8 +5930,8 @@ private:
 			friend struct BufferDeleter;
 			friend struct BufferViewDeleter;
 			friend void bufferview_fini(struct BufferView *self);
-			friend class ImageView;
 			friend struct ImageViewDeleter;
+			friend void imageview_fini(struct ImageView *self);
 			friend class Image;
 			friend struct ImageDeleter;
 			friend class CommandBuffer;
@@ -9740,7 +9692,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	ih_get(&scaled_framebuffer)->set_layout(Layout_General);
 
 	{
-		ImageViewCreateInfo view_info = ih_get(&scaled_framebuffer)->get_view().get_create_info();
+		ImageViewCreateInfo view_info = imageview_get_create_info(&ih_get(&scaled_framebuffer)->get_view());
 		for (unsigned i = 0; i < info.levels; i++)
 		{
 			view_info.base_level = i;
@@ -12734,46 +12686,58 @@ void BufferViewDeleter::operator()(BufferView *view)
 
 
 
-ImageView::ImageView(Device *device, VkImageView view, const ImageViewCreateInfo &info)
-    : device(device)
-    , view(view)
-    , info(info)
+void imageview_init(struct ImageView *self, Device *device, VkImageView view, const ImageViewCreateInfo &info)
 {
-	counter_init(&reference_count); /* refcount starts at 1 */
-	cookie_init(this, device);
+	self->device       = device;
+	self->view         = view;
+	/* Members that previously had default initializers in the class body. */
+	self->render_target_views.items = NULL;
+	self->render_target_views.count = 0;
+	self->render_target_views.cap   = 0;
+	self->depth_view   = VK_NULL_HANDLE;
+	self->stencil_view = VK_NULL_HANDLE;
+	self->info         = info;
+	counter_init(&self->reference_count); /* refcount starts at 1 */
+	cookie_init(&self->cookie_base, device);
 }
 
-VkImageView ImageView::get_render_target_view(unsigned layer) const
+VkImageView imageview_get_render_target_view(const struct ImageView *self, unsigned layer)
 {
 	// Transient images just have one layer.
-	if (info.image->get_create_info().domain == ImageDomain_Transient)
-		return view;
+	if (self->info.image->get_create_info().domain == ImageDomain_Transient)
+		return self->view;
 
-	VK_ASSERT(layer < get_create_info().layers);
+	VK_ASSERT(layer < imageview_get_create_info(self).layers);
 
-	if (RenderTargetViewVec_empty(&render_target_views))
-		return view;
+	if (RenderTargetViewVec_empty(&self->render_target_views))
+		return self->view;
 	else
 	{
-		VK_ASSERT(layer < (unsigned)RenderTargetViewVec_size(&render_target_views));
-		return *RenderTargetViewVec_at((struct RenderTargetViewVec *)&render_target_views, layer);
+		VK_ASSERT(layer < (unsigned)RenderTargetViewVec_size(&self->render_target_views));
+		return *RenderTargetViewVec_at((struct RenderTargetViewVec *)&self->render_target_views, layer);
 	}
 }
 
-ImageView::~ImageView()
+void imageview_fini(struct ImageView *self)
 {
-	device->destroy_image_view_nolock(view);
-	if (depth_view != VK_NULL_HANDLE)
-		device->destroy_image_view_nolock(depth_view);
-	if (stencil_view != VK_NULL_HANDLE)
-		device->destroy_image_view_nolock(stencil_view);
+	self->device->destroy_image_view_nolock(self->view);
+	if (self->depth_view != VK_NULL_HANDLE)
+		self->device->destroy_image_view_nolock(self->depth_view);
+	if (self->stencil_view != VK_NULL_HANDLE)
+		self->device->destroy_image_view_nolock(self->stencil_view);
 
 	{
 		int _i;
-		for (_i = 0; _i < RenderTargetViewVec_size(&render_target_views); _i++)
-			device->destroy_image_view_nolock(*RenderTargetViewVec_at(&render_target_views, _i));
+		for (_i = 0; _i < RenderTargetViewVec_size(&self->render_target_views); _i++)
+			self->device->destroy_image_view_nolock(*RenderTargetViewVec_at(&self->render_target_views, _i));
 	}
-	RenderTargetViewVec_free_storage(&render_target_views);
+	RenderTargetViewVec_free_storage(&self->render_target_views);
+}
+
+void imageview_release_reference(struct ImageView *self)
+{
+	if (counter_release(&self->reference_count))
+		ImageViewDeleter()(self);
 }
 
 Image::Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
@@ -12798,7 +12762,7 @@ Image::Image(Device *device, VkImage image, VkImageView default_view, const Devi
 		info.levels = create_info.levels;
 		info.base_layer = 0;
 		info.layers = create_info.layers;
-		view = iv_make(new (object_pool_raw_allocate(&device->handle_pool.image_views)) ImageView(device, default_view, info));
+		{ struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&device->handle_pool.image_views); imageview_init(_iv, device, default_view, info); view = iv_make(_iv); }
 	}
 }
 
@@ -12817,7 +12781,7 @@ Image::~Image()
 
 void ImageViewDeleter::operator()(ImageView *view)
 {
-	{ struct ObjectPoolRaw *_pool = &view->device->handle_pool.image_views; view->~ImageView(); object_pool_raw_free(_pool, view); }
+	{ struct ObjectPoolRaw *_pool = &view->device->handle_pool.image_views; imageview_fini(view); object_pool_raw_free(_pool, view); }
 }
 
 void ImageDeleter::operator()(Image *image)
@@ -14164,7 +14128,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VkImageLayout depth_stencil_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		if (info.depth_stencil)
 		{
-			depth_stencil_layout = info.depth_stencil->get_image().get_layout(
+			depth_stencil_layout = imageview_get_image(info.depth_stencil).get_layout(
 					ds_read_only ?
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL :
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
@@ -14173,8 +14137,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (unsigned i = 0; i < info.num_color_attachments; i++)
 		{
 			VK_ASSERT(info.color_attachments[i]);
-			color_attachments[i] = info.color_attachments[i]->get_format();
-			Image &image = info.color_attachments[i]->get_image();
+			color_attachments[i] = imageview_get_format(info.color_attachments[i]);
+			Image &image = imageview_get_image(info.color_attachments[i]);
 			VkAttachmentDescription &att = attachments[i];
 			att.flags = 0;
 			att.format = color_attachments[i];
@@ -14192,7 +14156,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				if (enable_transient_load)
 				{
 					// The transient will behave like a normal image.
-					att.initialLayout = info.color_attachments[i]->get_image().get_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+					att.initialLayout = imageview_get_image(info.color_attachments[i]).get_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 				}
 				else
 				{
@@ -14207,13 +14171,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				implicit_transitions |= 1u << i;
 			}
 			else
-				att.initialLayout = info.color_attachments[i]->get_image().get_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+				att.initialLayout = imageview_get_image(info.color_attachments[i]).get_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		}
 
-		depth_stencil = info.depth_stencil ? info.depth_stencil->get_format() : VK_FORMAT_UNDEFINED;
+		depth_stencil = info.depth_stencil ? imageview_get_format(info.depth_stencil) : VK_FORMAT_UNDEFINED;
 		if (info.depth_stencil)
 		{
-			Image &image = info.depth_stencil->get_image();
+			Image &image = imageview_get_image(info.depth_stencil);
 			VkAttachmentDescription &att = attachments[info.num_color_attachments];
 			att.flags = 0;
 			att.format = depth_stencil;
@@ -14831,24 +14795,24 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			VK_ASSERT(info.color_attachments[i]);
 			auto *att = info.color_attachments[i];
-			unsigned lod = att->get_create_info().base_level;
-			unsigned aw  = att->get_image().get_width(lod);
-			unsigned ah  = att->get_image().get_height(lod);
+			unsigned lod = imageview_get_create_info(att).base_level;
+			unsigned aw  = imageview_get_image(att).get_width(lod);
+			unsigned ah  = imageview_get_image(att).get_height(lod);
 			if (aw < width)  width  = aw;
 			if (ah < height) height = ah;
-			views[num_views++] = att->get_render_target_view(info.layer);
+			views[num_views++] = imageview_get_render_target_view(att, info.layer);
 			attachments[num_attachments++] = att;
 		}
 
 		if (info.depth_stencil)
 		{
 			auto *att = info.depth_stencil;
-			unsigned lod = att->get_create_info().base_level;
-			unsigned aw  = att->get_image().get_width(lod);
-			unsigned ah  = att->get_image().get_height(lod);
+			unsigned lod = imageview_get_create_info(att).base_level;
+			unsigned aw  = imageview_get_image(att).get_width(lod);
+			unsigned ah  = imageview_get_image(att).get_height(lod);
 			if (aw < width)  width  = aw;
 			if (ah < height) height = ah;
-			views[num_views++] = att->get_render_target_view(info.layer);
+			views[num_views++] = imageview_get_render_target_view(att, info.layer);
 			attachments[num_attachments++] = att;
 		}
 
@@ -14888,10 +14852,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		for (unsigned i = 0; i < info.num_color_attachments; i++)
 			if (info.color_attachments[i])
-				hasher_u64(&h, info.color_attachments[i]->cookie);
+				hasher_u64(&h, info.color_attachments[i]->cookie_base.cookie);
 
 		if (info.depth_stencil)
-			hasher_u64(&h, info.depth_stencil->cookie);
+			hasher_u64(&h, info.depth_stencil->cookie_base.cookie);
 
 		hasher_u32(&h, info.layer);
 
@@ -15863,7 +15827,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VK_ASSERT(view);
 			VK_ASSERT(view->get_image().get_create_info().usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
 
-			if (view->cookie == bindings.cookies[set][start_binding + i] &&
+			if (view->cookie_base.cookie == bindings.cookies[set][start_binding + i] &&
 					bindings.bindings[set][start_binding + i].image.fp.imageLayout == ref.layout)
 			{
 				continue;
@@ -15872,9 +15836,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			ResourceBinding &b = bindings.bindings[set][start_binding + i];
 			b.image.fp.imageLayout = ref.layout;
 			b.image.integer.imageLayout = ref.layout;
-			b.image.fp.imageView = view->get_float_view();
-			b.image.integer.imageView = view->get_integer_view();
-			bindings.cookies[set][start_binding + i] = view->cookie;
+			b.image.fp.imageView = imageview_get_float_view(view);
+			b.image.integer.imageView = imageview_get_integer_view(view);
+			bindings.cookies[set][start_binding + i] = view->cookie_base.cookie;
 			dirty_sets |= 1u << set;
 		}
 	}
@@ -15902,8 +15866,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view)
 	{
 		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
-		set_texture(set, binding, view.get_float_view(), view.get_integer_view(),
-				view.get_image().get_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.cookie);
+		set_texture(set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
+				imageview_get_image_const(&view).get_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.cookie_base.cookie);
 	}
 
 	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler)
@@ -15924,8 +15888,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	void CommandBuffer::set_storage_texture(unsigned set, unsigned binding, const ImageView &view)
 	{
 		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_STORAGE_BIT);
-		set_texture(set, binding, view.get_float_view(), view.get_integer_view(),
-				view.get_image().get_layout(VK_IMAGE_LAYOUT_GENERAL), view.cookie);
+		set_texture(set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
+				imageview_get_image_const(&view).get_layout(VK_IMAGE_LAYOUT_GENERAL), view.cookie_base.cookie);
 	}
 
 	void CommandBuffer::flush_descriptor_set(uint32_t set)
@@ -18302,12 +18266,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		ImageViewCreateInfo tmp = create_info;
 		tmp.format = format;
-		ImageViewHandle ret = iv_make(new (object_pool_raw_allocate(&handle_pool.image_views)) ImageView(this, holder.image_view, tmp));
+		struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&handle_pool.image_views); imageview_init(_iv, this, holder.image_view, tmp); ImageViewHandle ret = iv_make(_iv);
 		if (iv_is_valid(&ret))
 		{
 			holder.owned = false;
-			iv_get(&ret)->set_alt_views(holder.depth_view, holder.stencil_view);
-			iv_get(&ret)->set_render_target_views(holder.rt_views);
+			imageview_set_alt_views(iv_get(&ret), holder.depth_view, holder.stencil_view);
+			imageview_set_render_target_views(iv_get(&ret), holder.rt_views);
 			holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
 			return ret;
 		}
@@ -18486,8 +18450,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			holder.owned = false;
 			if (has_view)
 			{
-				ih_get(&handle)->get_view().set_alt_views(holder.depth_view, holder.stencil_view);
-				ih_get(&handle)->get_view().set_render_target_views(holder.rt_views);
+				imageview_set_alt_views(&ih_get(&handle)->get_view(), holder.depth_view, holder.stencil_view);
+				imageview_set_render_target_views(&ih_get(&handle)->get_view(), holder.rt_views);
 				holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
 			}
 
@@ -18814,18 +18778,18 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (unsigned i = 0; i < info.num_color_attachments; i++)
 		{
 			VK_ASSERT(info.color_attachments[i]);
-			formats[i] = info.color_attachments[i]->get_format();
-			if (info.color_attachments[i]->get_image().get_create_info().domain == ImageDomain_Transient)
+			formats[i] = imageview_get_format(info.color_attachments[i]);
+			if (imageview_get_image(info.color_attachments[i]).get_create_info().domain == ImageDomain_Transient)
 				lazy |= 1u << i;
-			if (info.color_attachments[i]->get_image().get_layout_type() == Layout_Optimal)
+			if (imageview_get_image(info.color_attachments[i]).get_layout_type() == Layout_Optimal)
 				optimal |= 1u << i;
 		}
 
 		if (info.depth_stencil)
 		{
-			if (info.depth_stencil->get_image().get_create_info().domain == ImageDomain_Transient)
+			if (imageview_get_image(info.depth_stencil).get_create_info().domain == ImageDomain_Transient)
 				lazy |= 1u << info.num_color_attachments;
-			if (info.depth_stencil->get_image().get_layout_type() == Layout_Optimal)
+			if (imageview_get_image(info.depth_stencil).get_layout_type() == Layout_Optimal)
 				optimal |= 1u << info.num_color_attachments;
 		}
 
@@ -18844,7 +18808,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				hasher_u32(&h, info.subpasses[i].resolve_attachments[j]);
 		}
 
-		depth_stencil = info.depth_stencil ? info.depth_stencil->get_format() : VK_FORMAT_UNDEFINED;
+		depth_stencil = info.depth_stencil ? imageview_get_format(info.depth_stencil) : VK_FORMAT_UNDEFINED;
 		hasher_data(&h, (const uint32_t *)(formats), info.num_color_attachments * sizeof(VkFormat));
 		hasher_u32(&h, info.num_color_attachments);
 		hasher_u32(&h, depth_stencil);
@@ -22461,7 +22425,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    image->image_layout                                = 
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
    image->image_view                                  = 
-      ih_get(&scanout)->get_view().get_view();
+      imageview_get_view(&ih_get(&scanout)->get_view());
 
    vulkan->set_image(vulkan->handle, image, 0,
          NULL, VK_QUEUE_FAMILY_IGNORED);
