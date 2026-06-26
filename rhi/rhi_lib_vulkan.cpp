@@ -4319,7 +4319,26 @@ private:
 			HandleCounter reference_count;
 	};
 
-	INTRUSIVE_HANDLE_DECLARE(Fence, FenceHolder);
+	/* Fence handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(Fence, FenceHolder)
+	 * to a plain struct + explicit free functions, following the bvh_* template
+	 * used for BufferViewHandle. The pointee FenceHolder keeps its
+	 * add_reference/release_reference methods (the shared refcount interface is
+	 * converted later, all pointees at once). Ownership accounting is now manual:
+	 *   - fence_make() takes ownership of a freshly-constructed FenceHolder
+	 *     (refcount starts at 1), no incref.
+	 *   - fence_reset() drops one reference and nulls the handle.
+	 *   - struct copy / return-by-value does NOT incref (matches the old
+	 *     move-ctor steal); the source must be treated as moved-from and NOT
+	 *     reset. The single surviving owner calls fence_reset() at scope exit.
+	 * ASAN-GATE: every Fence scope-exit must map to exactly one fence_reset();
+	 * the producer (submit_nolock) and the two consumers (flush_and_signal,
+	 * read_buffer path) are the only lifetime sites. Verify no leak / no
+	 * double-free on a fence-heavy workload (VRAM readback / FMV). */
+	struct Fence { FenceHolder *data; };
+	static inline struct Fence fence_make(FenceHolder *p) { struct Fence h; h.data = p; return h; }
+	static inline void fence_reset(struct Fence *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline FenceHolder *fence_get(struct Fence *h) { return h->data; }
+	static inline int fence_is_valid(const struct Fence *h) { return h->data != NULL; }
 
 	POD_VEC_DECLARE(FenceVec, VkFence);
 	class FenceManager
@@ -9003,10 +9022,14 @@ extern retro_log_printf_t log_cb;
 			Fence flush_and_signal()
 			{
 				Fence fence;
+				fence.data = NULL;
 				if (cmd)
 					device->submit(cmd, &fence);
 				cmd.reset();
 				device->flush_frame();
+				/* Return by value transfers ownership to the caller; the
+				 * struct copy does not incref and this local must NOT reset
+				 * (moved-from). */
 				return fence;
 			}
 
@@ -9931,7 +9954,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
 
 	Fence fence = flush_and_signal();
-	fence->wait();
+	fence_get(&fence)->wait();
 
 	const uint32_t *mapped = (const uint32_t *)(device->map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
 
@@ -9958,6 +9981,10 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	}
 
 	device->unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
+
+	/* Single surviving owner of the fence handle (ownership moved out of
+	 * flush_and_signal); drop its reference at scope exit. */
+	fence_reset(&fence);
 }
 
 void Renderer::mipmap_framebuffer()
@@ -16959,8 +16986,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		if (fence)
 		{
-			VK_ASSERT(!*fence);
-			*fence = Fence(new (object_pool_raw_allocate(&handle_pool.fences)) FenceHolder(this, cleared_fence));
+			VK_ASSERT(!fence_is_valid(fence));
+			*fence = fence_make(new (object_pool_raw_allocate(&handle_pool.fences)) FenceHolder(this, cleared_fence));
 		}
 
 		decrement_frame_counter_nolock();
