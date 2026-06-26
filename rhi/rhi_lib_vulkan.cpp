@@ -3699,7 +3699,36 @@ private:
 			BufferCreateInfo info;
 			HandleCounter reference_count;
 	};
-	INTRUSIVE_HANDLE_DECLARE(BufferHandle, Buffer);
+	/* Buffer handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(BufferHandle, Buffer)
+	 * to a plain struct + explicit free functions, following the established
+	 * template. The pointee Buffer is unchanged. This is the last RAII handle and
+	 * the most pool-entangled: BufferBlock holds gpu/cpu handle members (with a
+	 * user-declared ~BufferBlock), the copy-insert BufferBlockVec, plus
+	 * InitialImageBuffer.buffer and Renderer.quad members. Helpers mirror the
+	 * ImageHandle set: bh_make (wrap produced ref), bh_reset (decref+null),
+	 * bh_get, bh_is_valid, bh_copy (retain), bh_assign (release-old/retain-new),
+	 * bh_move (release-old/take-produced), bh_steal (move).
+	 * ASAN-GATE: buffer-pool block recycle + per-frame staging buffer lifetime. */
+	struct BufferHandle { Buffer *data; };
+	static inline struct BufferHandle bh_make(Buffer *p) { struct BufferHandle h; h.data = p; return h; }
+	static inline void bh_reset(struct BufferHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline Buffer *bh_get(const struct BufferHandle *h) { return h->data; }
+	static inline int bh_is_valid(const struct BufferHandle *h) { return h->data != NULL; }
+	static inline void bh_copy(struct BufferHandle *dst, const struct BufferHandle *src) {
+		dst->data = src->data;
+		if (dst->data) dst->data->add_reference();
+	}
+	static inline void bh_assign(struct BufferHandle *dst, const struct BufferHandle *src) {
+		if (dst == src) return;
+		if (src->data) src->data->add_reference();
+		if (dst->data) dst->data->release_reference();
+		dst->data = src->data;
+	}
+	static inline void bh_move(struct BufferHandle *dst, struct BufferHandle produced) {
+		if (dst->data) dst->data->release_reference();
+		dst->data = produced.data;
+	}
+	static inline void bh_steal(struct BufferHandle *dst, struct BufferHandle *src) { dst->data = src->data; src->data = NULL; }
 
 	struct BufferViewCreateInfo
 	{
@@ -5277,12 +5306,38 @@ private:
 	struct BufferBlock
 	{
 		~BufferBlock();
-		BufferHandle gpu;
-		BufferHandle cpu;
+		BufferHandle gpu = { NULL };
+		BufferHandle cpu = { NULL };
 		VkDeviceSize offset = 0;
 		VkDeviceSize alignment = 0;
 		VkDeviceSize size = 0;
 		uint8_t *mapped = NULL;
+
+		BufferBlock() {}
+		/* gpu/cpu are now plain-struct handles with no copy-ctor incref. Provide
+		 * explicit copy semantics so the many by-value BufferBlock passes
+		 * (allocate_block/request_block returns, member assigns) retain the two
+		 * Buffer references, matching the old IntrusivePtr copy behaviour. The
+		 * user-declared ~BufferBlock releases them. */
+		BufferBlock(const BufferBlock &o)
+		{
+			gpu.data = o.gpu.data; if (gpu.data) gpu.data->add_reference();
+			cpu.data = o.cpu.data; if (cpu.data) cpu.data->add_reference();
+			offset = o.offset; alignment = o.alignment; size = o.size; mapped = o.mapped;
+		}
+		BufferBlock &operator=(const BufferBlock &o)
+		{
+			if (this != &o)
+			{
+				if (o.gpu.data) o.gpu.data->add_reference();
+				if (o.cpu.data) o.cpu.data->add_reference();
+				if (gpu.data) gpu.data->release_reference();
+				if (cpu.data) cpu.data->release_reference();
+				gpu.data = o.gpu.data; cpu.data = o.cpu.data;
+				offset = o.offset; alignment = o.alignment; size = o.size; mapped = o.mapped;
+			}
+			return *this;
+		}
 
 		BufferBlockAllocation allocate(VkDeviceSize allocate_size)
 		{
@@ -5923,7 +5978,7 @@ private:
 
 	struct InitialImageBuffer
 	{
-		BufferHandle buffer;
+		BufferHandle buffer = { NULL };
 		// Bound matches the implicit invariant in TextureFormatLayout::mips[16]:
 		// callers must pass <= 16 mip levels (no runtime check exists in
 		// fill_mipinfo). build_buffer_image_copies is the sole writer of these
@@ -8983,11 +9038,11 @@ extern retro_log_printf_t log_cb;
 			void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
 			uint16_t *begin_copy(BufferHandle handle)
 			{
-				return (uint16_t *)(device->map_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT));
+				return (uint16_t *)(device->map_host_buffer(*bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
 			}
 			void end_copy(BufferHandle handle)
 			{
-				device->unmap_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT);
+				device->unmap_host_buffer(*bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
 			}
 
 			void notify_texture_upload(Rect rect, uint16_t *vram)
@@ -9480,7 +9535,7 @@ extern retro_log_printf_t log_cb;
 
 			void mipmap_framebuffer();
 			void ssaa_framebuffer();
-			BufferHandle quad;
+			BufferHandle quad = { NULL };
 	};
 
 	static const uint32_t quad_vert[] =
@@ -9659,6 +9714,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	 * null every handle member so conditional assignment and ~Renderer's
 	 * ih_reset are safe. */
 	cmd.data                     = NULL;
+	quad.data                    = NULL;
 	scaled_framebuffer.data      = NULL;
 	scaled_framebuffer_msaa.data = NULL;
 	bias_framebuffer.data        = NULL;
@@ -9861,7 +9917,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	BufferHandle buffer = device->create_buffer(buffer_create_info, NULL);
 	atlas.read_transfer(Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	ensure_command_buffer();
-	cbh_get(&cmd)->copy_image_to_buffer(*buffer, *ih_get(&framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
+	cbh_get(&cmd)->copy_image_to_buffer(*bh_get(&buffer), *ih_get(&framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
 	cbh_get(&cmd)->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
 	             VK_ACCESS_HOST_READ_BIT);
@@ -9870,12 +9926,12 @@ Renderer::SaveState Renderer::save_vram_state()
 
 	device->wait_idle();
 	const uint32_t *src = (const uint32_t *)(
-			device->map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
+			device->map_host_buffer(*bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
 	/* Deep-copy the mapped VRAM straight into the owning buffer (no
 	 * default zero-fill), then move it into the returned SaveState. */
 	Renderer::OwnedU32Buf vram;
 	vram.assign(src, FB_WIDTH * FB_HEIGHT);
-	device->unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
+	device->unmap_host_buffer(*bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
 	return { static_cast<Renderer::OwnedU32Buf &&>(vram), render_state, tracker.save_state() };
 }
 
@@ -10076,7 +10132,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	BufferHandle buffer = device->create_buffer(buffer_create_info, NULL);
-	cbh_get(&cmd)->copy_image_to_buffer(*buffer, *ih_get(&framebuffer), 0, { int(copy_rect.x), int(copy_rect.y), 0 },
+	cbh_get(&cmd)->copy_image_to_buffer(*bh_get(&buffer), *ih_get(&framebuffer), 0, { int(copy_rect.x), int(copy_rect.y), 0 },
 	                          { copy_rect.width, copy_rect.height, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
 
@@ -10086,7 +10142,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	Fence fence = flush_and_signal();
 	fence_get(&fence)->wait();
 
-	const uint32_t *mapped = (const uint32_t *)(device->map_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT));
+	const uint32_t *mapped = (const uint32_t *)(device->map_host_buffer(*bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
 
 	if (!wrap)
 	{
@@ -10110,7 +10166,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 		tracker.notifyReadback(rect, vram);
 	}
 
-	device->unmap_host_buffer(*buffer, MEMORY_ACCESS_READ_BIT);
+	device->unmap_host_buffer(*bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
 
 	/* Single surviving owner of the fence handle (ownership moved out of
 	 * flush_and_signal); drop its reference at scope exit. */
@@ -10168,7 +10224,7 @@ void Renderer::mipmap_framebuffer()
 		cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[i - 1]), StockSampler_LinearClamp);
 
 		cbh_get(&cmd)->set_quad_state();
-		cbh_get(&cmd)->set_vertex_binding(0, *quad, 0, 8);
+		cbh_get(&cmd)->set_vertex_binding(0, *bh_get(&quad), 0, 8);
 		struct Push
 		{
 			float offset[2];
@@ -10447,7 +10503,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_LinearClamp);
 	}
 
-	cbh_get(&cmd)->set_vertex_binding(0, *quad, 0, 8);
+	cbh_get(&cmd)->set_vertex_binding(0, *bh_get(&quad), 0, 8);
 	struct Push
 	{
 		float offset[2];
@@ -10704,7 +10760,7 @@ ImageHandle Renderer::scanout_to_texture()
 		}
 	}
 
-	cbh_get(&cmd)->set_vertex_binding(0, *quad, 0, 8);
+	cbh_get(&cmd)->set_vertex_binding(0, *bh_get(&quad), 0, 8);
 	struct Push
 	{
 		float offset[2];
@@ -11982,7 +12038,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 	BufferHandle buffer = device->create_buffer(buffer_create_info, NULL);
 
 	BufferViewCreateInfo view_info = {};
-	view_info.buffer = buffer.get();
+	view_info.buffer = bh_get(&buffer);
 
 	struct Push
 	{
@@ -12048,6 +12104,7 @@ Renderer::~Renderer()
 	ih_reset(&dither_lut);
 	ih_reset(&last_scanout);
 	ih_reset(&reuseable_scanout);
+	bh_reset(&quad);
 	/* Free the per-frame draw-queue arrays (POD_VEC backing storage). */
 	BufferVertexVec_free_storage(&queue.opaque);
 	PrimitiveInfoVec_free_storage(&queue.opaque_scissor);
@@ -12939,6 +12996,10 @@ VkSemaphore SemaphoreManager::request_cleared_semaphore()
 
 BufferBlock::~BufferBlock()
 {
+	/* gpu/cpu were dropped by implicit member destruction under the old RAII
+	 * handle; a plain-struct handle requires explicit release. */
+	bh_reset(&gpu);
+	bh_reset(&cpu);
 }
 
 void BufferPool::reset()
@@ -12956,10 +13017,10 @@ BufferBlock BufferPool::allocate_block(VkDeviceSize size)
 	info.usage = usage;
 
 	block.gpu = device->create_buffer(info, NULL);
-	device->set_name(*block.gpu, "chain-allocated-block-gpu");
+	device->set_name(*bh_get(&block.gpu), "chain-allocated-block-gpu");
 
 	// Try to map it, will fail unless the memory is host visible.
-	block.mapped = (uint8_t *)(device->map_host_buffer(*block.gpu, MEMORY_ACCESS_WRITE_BIT));
+	block.mapped = (uint8_t *)(device->map_host_buffer(*bh_get(&block.gpu), MEMORY_ACCESS_WRITE_BIT));
 	if (!block.mapped)
 	{
 		// Fall back to host memory, and remember to sync to gpu on submission time using DMA queue. :)
@@ -12969,11 +13030,11 @@ BufferBlock BufferPool::allocate_block(VkDeviceSize size)
 		cpu_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
 		block.cpu = device->create_buffer(cpu_info, NULL);
-		device->set_name(*block.cpu, "chain-allocated-block-cpu");
-		block.mapped = (uint8_t *)(device->map_host_buffer(*block.cpu, MEMORY_ACCESS_WRITE_BIT));
+		device->set_name(*bh_get(&block.cpu), "chain-allocated-block-cpu");
+		block.mapped = (uint8_t *)(device->map_host_buffer(*bh_get(&block.cpu), MEMORY_ACCESS_WRITE_BIT));
 	}
 	else
-		block.cpu = block.gpu;
+		bh_assign(&block.cpu, &block.gpu);
 
 	block.offset = 0;
 	block.alignment = alignment;
@@ -12993,7 +13054,7 @@ BufferBlock BufferPool::request_block(VkDeviceSize minimum_size)
 		BufferBlock back = static_cast<BufferBlock &&>(blocks.back());
 		blocks.pop_back();
 
-		back.mapped = (uint8_t *)(device->map_host_buffer(*back.cpu, MEMORY_ACCESS_WRITE_BIT));
+		back.mapped = (uint8_t *)(device->map_host_buffer(*bh_get(&back.cpu), MEMORY_ACCESS_WRITE_BIT));
 		back.offset = 0;
 		return back;
 	}
@@ -15746,7 +15807,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			device->request_uniform_block(ubo_block, size);
 			data = ubo_block.allocate(size);
 		}
-		set_uniform_buffer(set, binding, *ubo_block.gpu, data.offset, size);
+		set_uniform_buffer(set, binding, *bh_get(&ubo_block.gpu), data.offset, size);
 		return data.host;
 	}
 
@@ -15760,7 +15821,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			data = vbo_block.allocate(size);
 		}
 
-		set_vertex_binding(binding, *vbo_block.gpu, data.offset, stride, step_rate);
+		set_vertex_binding(binding, *bh_get(&vbo_block.gpu), data.offset, stride, step_rate);
 		return data.host;
 	}
 
@@ -17062,7 +17123,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			BufferPool &pool, BufferBlockVec *dma, BufferBlockVec &recycle)
 	{
 		if (block.mapped)
-			device.unmap_host_buffer(*block.cpu, MEMORY_ACCESS_WRITE_BIT);
+			device.unmap_host_buffer(*bh_get(&block.cpu), MEMORY_ACCESS_WRITE_BIT);
 
 		if (block.offset == 0)
 		{
@@ -17071,7 +17132,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		}
 		else
 		{
-			if (block.cpu != block.gpu)
+			if (bh_get(&block.cpu) != bh_get(&block.gpu))
 			{
 				VK_ASSERT(dma);
 				dma->push(block);
@@ -17486,14 +17547,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (BufferBlock &block : dma.vbo)
 		{
 			VK_ASSERT(block.offset != 0);
-			cbh_get(&cmd)->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
+			cbh_get(&cmd)->copy_buffer(*bh_get(&block.gpu), 0, *bh_get(&block.cpu), 0, block.offset);
 			usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 		}
 
 		for (BufferBlock &block : dma.ubo)
 		{
 			VK_ASSERT(block.offset != 0);
-			cbh_get(&cmd)->copy_buffer(*block.gpu, 0, *block.cpu, 0, block.offset);
+			cbh_get(&cmd)->copy_buffer(*bh_get(&block.gpu), 0, *bh_get(&block.cpu), 0, block.offset);
 			usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		}
 
@@ -18311,10 +18372,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		buffer_info.size = layout.get_required_size();
 		buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		result.buffer = create_buffer(buffer_info, NULL);
-		set_name(*result.buffer, "image-upload-staging-buffer");
+		set_name(*bh_get(&result.buffer), "image-upload-staging-buffer");
 
 		// And now, do the actual copy.
-		uint8_t *mapped = (uint8_t *)(map_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT));
+		uint8_t *mapped = (uint8_t *)(map_host_buffer(*bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
 		unsigned index = 0;
 
 		layout.set_buffer(mapped, layout.get_required_size());
@@ -18344,7 +18405,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			}
 		}
 
-		unmap_host_buffer(*result.buffer, MEMORY_ACCESS_WRITE_BIT);
+		unmap_host_buffer(*bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT);
 		layout.build_buffer_image_copies(result.blits, result.num_blits);
 		return result;
 	}
@@ -18354,7 +18415,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (initial)
 		{
 			InitialImageBuffer staging_buffer = create_image_staging_buffer(create_info, initial);
-			return create_image_from_staging_buffer(create_info, &staging_buffer);
+			ImageHandle img = create_image_from_staging_buffer(create_info, &staging_buffer);
+			/* Drop the staging buffer's reference (previously released by the
+			 * InitialImageBuffer destructor at end of scope). */
+			bh_reset(&staging_buffer.buffer);
+			return img;
 		}
 		else
 			return create_image_from_staging_buffer(create_info, NULL);
@@ -18492,7 +18557,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					VK_ACCESS_TRANSFER_WRITE_BIT);
 
 			cbh_get(&transfer_cmd)->begin_region("copy-image-to-gpu");
-			cbh_get(&transfer_cmd)->copy_buffer_to_image(*ih_get(&handle), *staging_buffer->buffer, staging_buffer->num_blits, staging_buffer->blits);
+			cbh_get(&transfer_cmd)->copy_buffer_to_image(*ih_get(&handle), *bh_get(&staging_buffer->buffer), staging_buffer->num_blits, staging_buffer->blits);
 			cbh_get(&transfer_cmd)->end_region();
 
 			if (transfer_queue != graphics_queue)
@@ -18672,7 +18737,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		}
 
 		if (vkCreateBuffer(device, &info, NULL, &buffer) != VK_SUCCESS)
-			return BufferHandle(NULL);
+			return bh_make(NULL);
 
 		vkGetBufferMemoryRequirements(device, buffer, &reqs);
 
@@ -18680,25 +18745,25 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (memory_type == UINT32_MAX)
 		{
 			vkDestroyBuffer(device, buffer, NULL);
-			return BufferHandle(NULL);
+			return bh_make(NULL);
 		}
 
 		if (!managers.memory.allocate(reqs.size, reqs.alignment, memory_type, ALLOCATION_TILING_LINEAR, &allocation))
 		{
 			vkDestroyBuffer(device, buffer, NULL);
-			return BufferHandle(NULL);
+			return bh_make(NULL);
 		}
 
 		if (vkBindBufferMemory(device, buffer, allocation.get_memory(), allocation.get_offset()) != VK_SUCCESS)
 		{
 			allocation.free_immediate(managers.memory);
 			vkDestroyBuffer(device, buffer, NULL);
-			return BufferHandle(NULL);
+			return bh_make(NULL);
 		}
 
 		BufferCreateInfo tmpinfo = create_info;
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		BufferHandle handle(new (object_pool_raw_allocate(&handle_pool.buffers)) Buffer(this, buffer, allocation, tmpinfo));
+		BufferHandle handle = bh_make(new (object_pool_raw_allocate(&handle_pool.buffers)) Buffer(this, buffer, allocation, tmpinfo));
 
 		if (create_info.domain == BufferDomain_Device && initial && !memory_type_is_host_visible(memory_type))
 		{
@@ -18706,20 +18771,24 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			BufferCreateInfo staging_info = create_info;
 			staging_info.domain = BufferDomain_Host;
 			BufferHandle staging_buffer = create_buffer(staging_info, initial);
-			set_name(*staging_buffer, "buffer-upload-staging-buffer");
+			set_name(*bh_get(&staging_buffer), "buffer-upload-staging-buffer");
 
 			cmd = request_command_buffer(CommandBuffer::Type_AsyncTransfer);
 			cbh_get(&cmd)->begin_region("copy-buffer-staging");
-			cbh_get(&cmd)->copy_buffer(*handle, *staging_buffer);
+			cbh_get(&cmd)->copy_buffer(*bh_get(&handle), *bh_get(&staging_buffer));
 			cbh_get(&cmd)->end_region();
 
 			submit_staging(cmd, info.usage, true);
+			/* Drop the staging buffer's producer reference (the GPU copy is
+			 * submitted; the staging buffer's lifetime ends with this scope,
+			 * previously via the handle's destructor). */
+			bh_reset(&staging_buffer);
 		}
 		else if (initial)
 		{
 			void *ptr = managers.memory.map_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
 			if (!ptr)
-				return BufferHandle(NULL);
+				return bh_make(NULL);
 
 			memcpy(ptr, initial, create_info.size);
 			managers.memory.unmap_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
