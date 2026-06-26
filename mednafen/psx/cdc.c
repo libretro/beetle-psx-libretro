@@ -1437,17 +1437,21 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
    else if (!CDIF_ReadRawSector(cdc->Cur_CDIF, target, cdc->CurSector, cd_slow_timeout))
    {
       /* A false return is NOT necessarily slow media.  CDIF_ReadRawSector
-       * also returns false the moment CurSector reaches the lead-out
-       * (lba >= tracks[100].lba) or on an unrecoverable image error,
-       * both decided before any timed wait.  The DS_SEEKING_LOGICAL2
-       * header hunt added by the seek-state-machine rework reads
-       * sectors past SeekTarget and can step into the lead-out window
-       * on perfectly ordinary seeks, which made this branch fire a
-       * spurious "Slow CD" notification on essentially every game start
+       * takes an unsigned LBA, so the lead-in sectors the seek state
+       * machine steps through (CurSector in [-150, 0), e.g. the
+       * DS_SEEKING_LOGICAL2 header hunt and the post-seek back-step that
+       * clamps at -150) convert to ~4 billion, compare above
+       * tracks[100].lba and return false before any timed wait -- the
+       * very same return value used for a genuine read timeout.  It also
+       * returns false at/past the lead-out (lba >= tracks[100].lba) or on
+       * an unrecoverable image error.  Any of these made this branch fire
+       * a spurious "Slow CD" notification on essentially every game start
        * (issue #966).  Only treat the failure as slow media when the
-       * sector is actually inside the disc; a lead-out/error read is
-       * handled silently (buffer already zeroed). */
-      if (cdc->CurSector < (int32_t)cdc->toc.tracks[100].lba)
+       * sector is actually inside the disc, i.e. a valid in-range LBA
+       * [0, tracks[100].lba); lead-in/lead-out/error reads are handled
+       * silently (buffer already zeroed). */
+      if (cdc->CurSector >= 0 &&
+          cdc->CurSector < (int32_t)cdc->toc.tracks[100].lba)
       {
          if (cd_async)
             osd_message(3, RETRO_LOG_WARN,
