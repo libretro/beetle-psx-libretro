@@ -1958,6 +1958,15 @@ _andi(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1, jit_word_t i0)
 	movr(r0, r1);
     else if (r0 == r1 && can_sign_extend_int_p(i0))
         iandi(r0, i0);
+    /* When the mask fits a sign-extended 32-bit immediate, a reg-move plus
+     * AND-immediate is cheaper than the shift pair on x86: the move is
+     * register-renamer eliminated (zero latency, no execution port) and the
+     * AND is a single 1-cycle micro-op, versus two serially-dependent shift
+     * micro-ops contending for the shift port. */
+    else if (can_sign_extend_int_p(i0) && (is_low_mask(i0) || is_high_mask(i0))) {
+        movr(r0, r1);
+        iandi(r0, i0);
+    }
     else if (is_low_mask(i0)) {
         lshi(r0, r1, unmasked_bits_count(i0));
         rshi_u(r0, r0, unmasked_bits_count(i0));
