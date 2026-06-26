@@ -1998,6 +1998,82 @@ static void rec_load_ram(struct lightrec_cstate *cstate,
  * The cold path uses the same exit-early/regcache-snapshot structure as the
  * code-invalidation guard, so the hot path's register cache is unaffected and
  * there is no in-block join with the wrapper. */
+static void rec_load_direct(struct lightrec_cstate *cstate,
+			    const struct block *block, u16 offset,
+			    jit_code_t code, jit_code_t swap_code,
+			    bool is_unsigned);
+
+/* Guarded direct load for the general IO_DIRECT pool on a mirrors_mapped host.
+ * commit 749e0dfa removed the inline direct load/store entirely and routed every
+ * IO_DIRECT access through the runtime wrapper, because an IO_DIRECT op whose
+ * address resolves to the unbacked hardware-register window at runtime would fault
+ * on the inline path. That fixed the fault but cost ~20% (the dominant load class
+ * now does a JIT->C->JIT round-trip on every execution).
+ *
+ * Recover the fast path safely: at runtime, take the inline rec_load_direct path
+ * only when the address lands in a region rec_load_direct addresses correctly and
+ * that is host-backed - RAM + mirrors, scratchpad, or BIOS. Everything else
+ * (hardware registers, parallel port and mirror, cache control, unmapped gaps)
+ * branches to the wrapper cold path. The cold path is emitted under an
+ * enter/leave_branch cache snapshot so the wrapper's clean/call does not perturb
+ * the hot path, which is the fall-through and identical to a normal
+ * rec_load_direct. */
+static void rec_load_direct_guarded_io(struct lightrec_cstate *cstate,
+				       const struct block *block, u16 offset,
+				       jit_code_t code, jit_code_t swap_code,
+				       bool is_unsigned)
+{
+	struct regcache *reg_cache = cstate->reg_cache;
+	const union code c = block->opcode_list[offset].c;
+	jit_state_t *_jit = block->_jit;
+	struct native_register *regs_backup;
+	jit_node_t *to_ram, *to_scratch, *to_bios, *to_end;
+	u8 rs, tmp;
+
+	_jit_note(block->_jit, __FILE__, __LINE__);
+
+	rs  = lightrec_alloc_reg_in(reg_cache, _jit, c.i.rs, 0);
+	tmp = lightrec_alloc_reg_temp(reg_cache, _jit);
+	if (c.i.imm)
+		jit_addi(tmp, rs, (s16)c.i.imm);
+	else
+		jit_movr(tmp, rs);
+	lightrec_free_reg(reg_cache, rs);
+	jit_andi(tmp, tmp, 0x1fffffff);
+
+	/* rec_load_direct only computes correct host addresses for the regions
+	 * it knows: RAM + mirrors [0, 0x800000), scratchpad
+	 * [0x1f800000, 0x1f800400) and BIOS [0x1fc00000, 0x1fc80000). Every
+	 * other address an IO_DIRECT op can resolve to (hardware registers,
+	 * parallel port and its mirror, cache control, unmapped gaps) is either
+	 * unbacked or uses a different offset, so it must go through the wrapper.
+	 * Take the inline fast path only for the three backed ranges; branch to
+	 * the wrapper cold path otherwise. */
+	to_ram = jit_blti_u(tmp, RAM_SIZE << 2);	/* < 0x800000: RAM+mirrors */
+	/* scratchpad: 0x1f800000..0x1f800400 */
+	jit_subi(tmp, tmp, 0x1f800000);
+	to_scratch = jit_blti_u(tmp, 0x400);
+	/* BIOS: 0x1fc00000..0x1fc80000 -> (addr-0x1f800000) in [0x400000,0x480000) */
+	jit_subi(tmp, tmp, 0x400000);
+	to_bios = jit_blti_u(tmp, 0x80000);
+	lightrec_free_reg(reg_cache, tmp);
+
+	/* Cold path: not a backed/direct-handled region -> wrapper. Emitted under
+	 * a cache snapshot so its mutation does not perturb the hot path. */
+	regs_backup = lightrec_regcache_enter_branch(reg_cache);
+	rec_io(cstate, block, offset, false, true);
+	to_end = jit_jmpi();
+	lightrec_regcache_leave_branch(reg_cache, regs_backup);
+
+	jit_patch(to_ram);
+	jit_patch(to_scratch);
+	jit_patch(to_bios);
+	rec_load_direct(cstate, block, offset, code, swap_code, is_unsigned);
+
+	jit_patch(to_end);
+}
+
+
 static void rec_load_ram_guarded(struct lightrec_cstate *cstate,
 				 const struct block *block, u16 offset,
 				 jit_code_t code, jit_code_t swap_code,
@@ -2298,10 +2374,12 @@ static void rec_load(struct lightrec_cstate *state, const struct block *block,
 		 * runtime computes offset_ram + 0x1f801xxx and faults in
 		 * unmapped host memory. Since the direct emitter cannot tell at
 		 * compile time whether the address will stay inside the backed
-		 * region, never take the direct path for it: route through the
-		 * generic wrapper, which resolves the real map at runtime on
-		 * every execution and dispatches RAM, BIOS, scratchpad and
-		 * hardware-register targets correctly. */
+		 * region: on a mirrors_mapped host, recover the fast path with a
+		 * runtime HW-window guard. */
+		if (state->state->mirrors_mapped) {
+			rec_load_direct_guarded_io(state, block, offset, code, swap_code, is_unsigned);
+			break;
+		}
 		rec_io(state, block, offset, false, true);
 		return;
 	default:
