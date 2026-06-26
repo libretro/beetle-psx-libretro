@@ -3005,7 +3005,20 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 			VkSampler sampler;
 			HandleCounter reference_count;
 	};
-	INTRUSIVE_HANDLE_DECLARE(SamplerHandle, Sampler);
+	/* Sampler handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(SamplerHandle,
+	 * Sampler) to a plain struct + explicit free functions, following the
+	 * sem_*/fence_*/bvh_* template. The pointee Sampler is unchanged. Stored in a
+	 * fixed device-lifetime array (samplers[StockSampler_Count]); no growing
+	 * container, so no realloc accounting -- assignment into a slot is a plain
+	 * struct copy that transfers the producer's refcount-1, teardown is an
+	 * explicit smh_reset() per slot.
+	 * ASAN-GATE: stock samplers persist for the device lifetime; verify the per-
+	 * slot reset in deinit drops exactly one ref (no leak / no double-free). */
+	struct SamplerHandle { Sampler *data; };
+	static inline struct SamplerHandle smh_make(Sampler *p) { struct SamplerHandle h; h.data = p; return h; }
+	static inline void smh_reset(struct SamplerHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline Sampler *smh_get(const struct SamplerHandle *h) { return h->data; }
+	static inline int smh_is_valid(const struct SamplerHandle *h) { return h->data != NULL; }
 
 /* ============================================================
  * memory_allocator.hpp
@@ -6005,7 +6018,7 @@ private:
 
 			const Sampler &get_stock_sampler(StockSampler sampler) const
 			{
-				return *samplers[(unsigned)(sampler)];
+				return *smh_get(&samplers[(unsigned)(sampler)]);
 			}
 
 
@@ -16598,7 +16611,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		self->framebuffer_allocator.clear();
 		self->transient_allocator.clear();
 		for (unsigned i = 0; i < (unsigned)StockSampler_Count; i++)
-			self->samplers[i].reset();
+			smh_reset(&self->samplers[i]);
 
 		self->managers.fence.deinit();
 		self->managers.semaphore.deinit();
@@ -18500,9 +18513,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		(void)stock_sampler;
 		if (vkCreateSampler(device, &info, NULL, &sampler) != VK_SUCCESS)
-			return SamplerHandle(NULL);
+			return smh_make(NULL);
 
-		return SamplerHandle(new (object_pool_raw_allocate(&handle_pool.samplers)) Sampler(this, sampler));
+		return smh_make(new (object_pool_raw_allocate(&handle_pool.samplers)) Sampler(this, sampler));
 	}
 
 	BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const void *initial)
