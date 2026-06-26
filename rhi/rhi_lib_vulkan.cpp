@@ -2847,10 +2847,14 @@ static inline uint32_t util_ctz(uint32_t x)
 
 	class Device;
 
+	/* Hash-identity base. Converted from a class-with-ctor to a plain C89 struct;
+	 * derived pointees now call cookie_init() in their own constructor body
+	 * instead of inheriting the Cookie(Device*) ctor. The single uint64_t field
+	 * is still inherited, so the many obj.cookie / obj->cookie reads are
+	 * unchanged. cookie_init is defined out-of-line (below Device) because it
+	 * calls Device::allocate_cookie(). */
 	struct Cookie
 	{
-		Cookie(Device *device);
-
 		uint64_t cookie;
 	};
 
@@ -5867,7 +5871,6 @@ private:
 			friend class CommandBuffer;
 			friend struct CommandBufferDeleter;
 			friend class Program;
-			friend class Cookie;
 			friend class Framebuffer;
 			friend class PipelineLayout;
 			friend class FramebufferAllocator;
@@ -5986,12 +5989,16 @@ private:
 
 			uint64_t cookie = 0;
 
+		public:
+			/* Public so the C89 cookie_init() free function (replacing the
+			 * former Cookie(Device*) ctor + friendship) can reach it. */
 			uint64_t allocate_cookie()
 			{
 				// Reserve lower bits for "special purposes".
 				cookie += 16;
 				return cookie;
 			}
+		private:
 			void bake_program(Program &program);
 
 			void request_vertex_block(BufferBlock &block, VkDeviceSize size)
@@ -12095,9 +12102,9 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 /* === cookie.cpp === */
 
 
-Cookie::Cookie(Device *device)
-    : cookie(device->allocate_cookie())
+static void cookie_init(struct Cookie *self, Device *device)
 {
+	self->cookie = device->allocate_cookie();
 }
 
 /* === texture_format.cpp === */
@@ -12491,10 +12498,10 @@ void TextureFormatLayout::build_buffer_image_copies(VkBufferImageCopy *copies, u
 
 
 Sampler::Sampler(Device *device, VkSampler sampler)
-    : Cookie(device)
-    , device(device)
+    : device(device)
     , sampler(sampler)
 {
+	cookie_init(this, device);
 }
 
 Sampler::~Sampler()
@@ -12512,12 +12519,12 @@ void SamplerDeleter::operator()(Sampler *sampler)
 
 
 Buffer::Buffer(Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info)
-    : Cookie(device)
-    , device(device)
+    : device(device)
     , buffer(buffer)
     , alloc(alloc)
     , info(info)
 {
+	cookie_init(this, device);
 }
 
 Buffer::~Buffer()
@@ -12532,11 +12539,11 @@ void BufferDeleter::operator()(Buffer *buffer)
 }
 
 BufferView::BufferView(Device *device, VkBufferView view, const BufferViewCreateInfo &create_info)
-    : Cookie(device)
-    , device(device)
+    : device(device)
     , view(view)
     , info(create_info)
 {
+	cookie_init(this, device);
 }
 
 BufferView::~BufferView()
@@ -12556,11 +12563,11 @@ void BufferViewDeleter::operator()(BufferView *view)
 
 
 ImageView::ImageView(Device *device, VkImageView view, const ImageViewCreateInfo &info)
-    : Cookie(device)
-    , device(device)
+    : device(device)
     , view(view)
     , info(info)
 {
+	cookie_init(this, device);
 }
 
 VkImageView ImageView::get_render_target_view(unsigned layer) const
@@ -12598,12 +12605,12 @@ ImageView::~ImageView()
 
 Image::Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
              const ImageCreateInfo &create_info)
-    : Cookie(device)
-    , device(device)
+    : device(device)
     , image(image)
     , alloc(alloc)
     , create_info(create_info)
 {
+	cookie_init(this, device);
 	if (default_view != VK_NULL_HANDLE)
 	{
 		ImageViewCreateInfo info;
@@ -14595,11 +14602,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	}
 
 	Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info)
-		: Cookie(device)
-		  , device(device)
+		: device(device)
 		  , render_pass(rp)
 		  , info(info)
 	{
+		cookie_init(this, device);
 		width = UINT32_MAX;
 		height = UINT32_MAX;
 		VkImageView views[VULKAN_NUM_ATTACHMENTS + 1];
