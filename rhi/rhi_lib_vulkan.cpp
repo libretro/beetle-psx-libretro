@@ -3625,7 +3625,7 @@ private:
 		VkBufferUsageFlags usage = 0;
 	};
 
-	class Buffer;
+	struct Buffer;
 	struct BufferDeleter
 	{
 		void operator()(Buffer *buffer);
@@ -3640,48 +3640,24 @@ private:
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
 	 * base, which provides the hash identity, is unrelated and stays. */
-	class Buffer : public Cookie
+	/* Buffer: plain C struct + free functions (was a class deriving Cookie).
+	 * Cookie embedded as cookie_base. Pooled; refcount starts at 1. */
+	struct Buffer
 	{
-		public:
-			friend struct BufferDeleter;
-
-			void release_reference()
-			{
-				if (counter_release(&reference_count))
-					BufferDeleter()(this);
-			}
-			void add_reference()
-			{
-				counter_add_ref(&reference_count);
-			}
-
-			~Buffer();
-
-			VkBuffer get_buffer() const
-			{
-				return buffer;
-			}
-
-			const BufferCreateInfo &get_create_info() const
-			{
-				return info;
-			}
-
-			const DeviceAllocation &get_allocation() const
-			{
-				return alloc;
-			}
-
-		private:
-			friend class Device;
-			Buffer(Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info);
-
-			Device *device;
-			VkBuffer buffer;
-			DeviceAllocation alloc;
-			BufferCreateInfo info;
-			HandleCounter reference_count;
+		struct Cookie cookie_base;
+		Device *device;
+		VkBuffer buffer;
+		DeviceAllocation alloc;
+		BufferCreateInfo info;
+		HandleCounter reference_count;
 	};
+	void buffer_init(struct Buffer *self, Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info);
+	void buffer_fini(struct Buffer *self);
+	static inline VkBuffer buffer_get_buffer(const struct Buffer *self) { return self->buffer; }
+	static inline const BufferCreateInfo &buffer_get_create_info(const struct Buffer *self) { return self->info; }
+	static inline const DeviceAllocation &buffer_get_allocation(const struct Buffer *self) { return self->alloc; }
+	static inline void buffer_add_reference(struct Buffer *self) { counter_add_ref(&self->reference_count); }
+	void buffer_release_reference(struct Buffer *self);
 	/* Buffer handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(BufferHandle, Buffer)
 	 * to a plain struct + explicit free functions, following the established
 	 * template. The pointee Buffer is unchanged. This is the last RAII handle and
@@ -3694,21 +3670,21 @@ private:
 	 * ASAN-GATE: buffer-pool block recycle + per-frame staging buffer lifetime. */
 	struct BufferHandle { Buffer *data; };
 	static inline struct BufferHandle bh_make(Buffer *p) { struct BufferHandle h; h.data = p; return h; }
-	static inline void bh_reset(struct BufferHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline void bh_reset(struct BufferHandle *h) { if (h->data) buffer_release_reference(h->data); h->data = NULL; }
 	static inline Buffer *bh_get(const struct BufferHandle *h) { return h->data; }
 	static inline int bh_is_valid(const struct BufferHandle *h) { return h->data != NULL; }
 	static inline void bh_copy(struct BufferHandle *dst, const struct BufferHandle *src) {
 		dst->data = src->data;
-		if (dst->data) dst->data->add_reference();
+		if (dst->data) buffer_add_reference(dst->data);
 	}
 	static inline void bh_assign(struct BufferHandle *dst, const struct BufferHandle *src) {
 		if (dst == src) return;
-		if (src->data) src->data->add_reference();
-		if (dst->data) dst->data->release_reference();
+		if (src->data) buffer_add_reference(src->data);
+		if (dst->data) buffer_release_reference(dst->data);
 		dst->data = src->data;
 	}
 	static inline void bh_move(struct BufferHandle *dst, struct BufferHandle produced) {
-		if (dst->data) dst->data->release_reference();
+		if (dst->data) buffer_release_reference(dst->data);
 		dst->data = produced.data;
 	}
 	static inline void bh_steal(struct BufferHandle *dst, struct BufferHandle *src) { dst->data = src->data; src->data = NULL; }
@@ -5180,7 +5156,7 @@ private:
  * ============================================================ */
 
 	class Device;
-	class Buffer;
+	struct Buffer;
 
 	struct BufferBlockAllocation
 	{
@@ -5206,18 +5182,18 @@ private:
 		 * user-declared ~BufferBlock releases them. */
 		BufferBlock(const BufferBlock &o)
 		{
-			gpu.data = o.gpu.data; if (gpu.data) gpu.data->add_reference();
-			cpu.data = o.cpu.data; if (cpu.data) cpu.data->add_reference();
+			gpu.data = o.gpu.data; if (gpu.data) buffer_add_reference(gpu.data);
+			cpu.data = o.cpu.data; if (cpu.data) buffer_add_reference(cpu.data);
 			offset = o.offset; alignment = o.alignment; size = o.size; mapped = o.mapped;
 		}
 		BufferBlock &operator=(const BufferBlock &o)
 		{
 			if (this != &o)
 			{
-				if (o.gpu.data) o.gpu.data->add_reference();
-				if (o.cpu.data) o.cpu.data->add_reference();
-				if (gpu.data) gpu.data->release_reference();
-				if (cpu.data) cpu.data->release_reference();
+				if (o.gpu.data) buffer_add_reference(o.gpu.data);
+				if (o.cpu.data) buffer_add_reference(o.cpu.data);
+				if (gpu.data) buffer_release_reference(gpu.data);
+				if (cpu.data) buffer_release_reference(cpu.data);
 				gpu.data = o.gpu.data; cpu.data = o.cpu.data;
 				offset = o.offset; alignment = o.alignment; size = o.size; mapped = o.mapped;
 			}
@@ -5554,7 +5530,7 @@ private:
 			void copy_buffer(const Buffer &dst, const Buffer &src)
 			{
 				VK_ASSERT(dst.get_create_info().size == src.get_create_info().size);
-				copy_buffer(dst, 0, src, 0, dst.get_create_info().size);
+				copy_buffer(dst, 0, src, 0, buffer_get_create_info(&dst).size);
 			}
 
 			void copy_buffer_to_image(const Image &image, const Buffer &buffer, VkDeviceSize buffer_offset,
@@ -5926,8 +5902,8 @@ private:
 			friend void fenceholder_fini(struct FenceHolder *self);
 			friend struct SamplerDeleter;
 			friend void sampler_fini(struct Sampler *self);
-			friend class Buffer;
 			friend struct BufferDeleter;
+			friend void buffer_fini(struct Buffer *self);
 			friend struct BufferViewDeleter;
 			friend void bufferview_fini(struct BufferView *self);
 			friend struct ImageViewDeleter;
@@ -5988,11 +5964,11 @@ private:
 			// Map and unmap buffer objects.
 			void *map_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
 			{
-				return managers.memory.map_memory(buffer.get_allocation(), access);
+				return managers.memory.map_memory(buffer_get_allocation(&buffer), access);
 			}
 			void unmap_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
 			{
-				managers.memory.unmap_memory(buffer.get_allocation(), access);
+				managers.memory.unmap_memory(buffer_get_allocation(&buffer), access);
 			}
 
 			// Create buffers and images.
@@ -12634,25 +12610,31 @@ void SamplerDeleter::operator()(Sampler *sampler)
 /* === buffer.cpp === */
 
 
-Buffer::Buffer(Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info)
-    : device(device)
-    , buffer(buffer)
-    , alloc(alloc)
-    , info(info)
+void buffer_init(struct Buffer *self, Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info)
 {
-	counter_init(&reference_count); /* refcount starts at 1 */
-	cookie_init(this, device);
+	self->device = device;
+	self->buffer = buffer;
+	self->alloc  = alloc;
+	self->info   = info;
+	counter_init(&self->reference_count); /* refcount starts at 1 */
+	cookie_init(&self->cookie_base, device);
 }
 
-Buffer::~Buffer()
+void buffer_fini(struct Buffer *self)
 {
-	device->destroy_buffer_nolock(buffer);
-	device->free_memory_nolock(alloc);
+	self->device->destroy_buffer_nolock(self->buffer);
+	self->device->free_memory_nolock(self->alloc);
+}
+
+void buffer_release_reference(struct Buffer *self)
+{
+	if (counter_release(&self->reference_count))
+		BufferDeleter()(self);
 }
 
 void BufferDeleter::operator()(Buffer *buffer)
 {
-	{ struct ObjectPoolRaw *_pool = &buffer->device->handle_pool.buffers; buffer->~Buffer(); object_pool_raw_free(_pool, buffer); }
+	{ struct ObjectPoolRaw *_pool = &buffer->device->handle_pool.buffers; buffer_fini(buffer); object_pool_raw_free(_pool, buffer); }
 }
 
 void bufferview_init(struct BufferView *self, Device *device, VkBufferView view, const BufferViewCreateInfo &create_info)
@@ -14932,13 +14914,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		const VkBufferCopy region = {
 			src_offset, dst_offset, size,
 		};
-		vkCmdCopyBuffer(cmd, src.get_buffer(), dst.get_buffer(), 1, &region);
+		vkCmdCopyBuffer(cmd, buffer_get_buffer(&src), buffer_get_buffer(&dst), 1, &region);
 	}
 
 	void CommandBuffer::copy_buffer_to_image(const Image &image, const Buffer &buffer, unsigned num_blits,
 			const VkBufferImageCopy *blits)
 	{
-		vkCmdCopyBufferToImage(cmd, buffer.get_buffer(),
+		vkCmdCopyBufferToImage(cmd, buffer_get_buffer(&buffer),
 				image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), num_blits, blits);
 	}
 
@@ -14951,7 +14933,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
 			subresource, offset, extent,
 		};
-		vkCmdCopyBufferToImage(cmd, src.get_buffer(), image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+		vkCmdCopyBufferToImage(cmd, buffer_get_buffer(&src), image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 				1, &region);
 	}
 
@@ -14965,7 +14947,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			subresource, offset, extent,
 		};
 		vkCmdCopyImageToBuffer(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-				buffer.get_buffer(), 1, &region);
+				buffer_get_buffer(&buffer), 1, &region);
 	}
 
 	void CommandBuffer::clear_image(const Image &image, const VkClearValue &value)
@@ -15661,7 +15643,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
 		VK_ASSERT(framebuffer);
 
-		VkBuffer vkbuffer = buffer.get_buffer();
+		VkBuffer vkbuffer = buffer_get_buffer(&buffer);
 		if (vbo.buffers[binding] != vkbuffer || vbo.offsets[binding] != offset)
 			dirty_vbos |= 1u << binding;
 		if (vbo.strides[binding] != stride || vbo.input_rates[binding] != step_rate)
@@ -15775,11 +15757,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VK_ASSERT(buffer.get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		ResourceBinding &b = bindings.bindings[set][binding];
 
-		if (buffer.cookie == bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
+		if (buffer.cookie_base.cookie == bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
 			return;
 
-		b.buffer = { buffer.get_buffer(), offset, range };
-		bindings.cookies[set][binding] = buffer.cookie;
+		b.buffer = { buffer_get_buffer(&buffer), offset, range };
+		bindings.cookies[set][binding] = buffer.cookie_base.cookie;
 		bindings.secondary_cookies[set][binding] = 0;
 		dirty_sets |= 1u << set;
 	}
@@ -18046,7 +18028,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	BufferViewHandle Device::create_buffer_view(const BufferViewCreateInfo &view_info)
 	{
 		VkBufferViewCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO };
-		info.buffer = view_info.buffer->get_buffer();
+		info.buffer = buffer_get_buffer(view_info.buffer);
 		info.format = view_info.format;
 		info.offset = view_info.offset;
 		info.range = view_info.range;
@@ -18705,7 +18687,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		BufferCreateInfo tmpinfo = create_info;
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		BufferHandle handle = bh_make(new (object_pool_raw_allocate(&handle_pool.buffers)) Buffer(this, buffer, allocation, tmpinfo));
+		struct Buffer *_b = (struct Buffer *)object_pool_raw_allocate(&handle_pool.buffers); buffer_init(_b, this, buffer, allocation, tmpinfo); BufferHandle handle = bh_make(_b);
 
 		if (create_info.domain == BufferDomain_Device && initial && !memory_type_is_host_visible(memory_type))
 		{
@@ -18840,7 +18822,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
 			info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT;
-			info.object = (uint64_t)buffer.get_buffer();
+			info.object = (uint64_t)buffer_get_buffer(&buffer);
 			info.pObjectName = name;
 			vkDebugMarkerSetObjectNameEXT(device, &info);
 		}
