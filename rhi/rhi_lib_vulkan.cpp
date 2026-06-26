@@ -3631,7 +3631,7 @@ private:
 		void operator()(Buffer *buffer);
 	};
 
-	class BufferView;
+	struct BufferView;
 	struct BufferViewDeleter
 	{
 		void operator()(BufferView *view);
@@ -3724,42 +3724,24 @@ private:
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
 	 * base, which provides the hash identity, is unrelated and stays. */
-	class BufferView : public Cookie
+	/* BufferView: plain C struct + free functions (was a class deriving Cookie).
+	 * Cookie embedded as the first member (cookie_base). Pooled; refcount starts
+	 * at 1. info.buffer is a raw const Buffer* (not a handle), so get_buffer
+	 * returns it by reference unchanged. */
+	struct BufferView
 	{
-		public:
-			friend struct BufferViewDeleter;
-
-			void release_reference()
-			{
-				if (counter_release(&reference_count))
-					BufferViewDeleter()(this);
-			}
-			void add_reference()
-			{
-				counter_add_ref(&reference_count);
-			}
-
-			~BufferView();
-
-			VkBufferView get_view() const
-			{
-				return view;
-			}
-
-			const Buffer &get_buffer() const
-			{
-				return *info.buffer;
-			}
-
-		private:
-			friend class Device;
-			BufferView(Device *device, VkBufferView view, const BufferViewCreateInfo &info);
-
-			Device *device;
-			VkBufferView view;
-			BufferViewCreateInfo info;
-			HandleCounter reference_count;
+		struct Cookie cookie_base;
+		Device *device;
+		VkBufferView view;
+		BufferViewCreateInfo info;
+		HandleCounter reference_count;
 	};
+	void bufferview_init(struct BufferView *self, Device *device, VkBufferView view, const BufferViewCreateInfo &info);
+	void bufferview_fini(struct BufferView *self);
+	static inline VkBufferView bufferview_get_view(const struct BufferView *self) { return self->view; }
+	static inline const Buffer &bufferview_get_buffer(const struct BufferView *self) { return *self->info.buffer; }
+	static inline void bufferview_add_reference(struct BufferView *self) { counter_add_ref(&self->reference_count); }
+	void bufferview_release_reference(struct BufferView *self);
 	/* Plain-C form of the BufferView intrusive handle (was
 	 * INTRUSIVE_HANDLE_DECLARE(BufferViewHandle, BufferView)). Same semantics:
 	 * construct from a raw BufferView* that already carries one reference, reset
@@ -3770,7 +3752,7 @@ private:
 		BufferView *data;
 	};
 	static inline struct BufferViewHandle bvh_make(BufferView *p) { struct BufferViewHandle h; h.data = p; return h; }
-	static inline void bvh_reset(struct BufferViewHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline void bvh_reset(struct BufferViewHandle *h) { if (h->data) bufferview_release_reference(h->data); h->data = NULL; }
 	static inline BufferView *bvh_get(struct BufferViewHandle *h) { return h->data; }
 
 	class Device;
@@ -5994,8 +5976,8 @@ private:
 			friend void sampler_fini(struct Sampler *self);
 			friend class Buffer;
 			friend struct BufferDeleter;
-			friend class BufferView;
 			friend struct BufferViewDeleter;
+			friend void bufferview_fini(struct BufferView *self);
 			friend class ImageView;
 			friend struct ImageViewDeleter;
 			friend class Image;
@@ -12721,24 +12703,30 @@ void BufferDeleter::operator()(Buffer *buffer)
 	{ struct ObjectPoolRaw *_pool = &buffer->device->handle_pool.buffers; buffer->~Buffer(); object_pool_raw_free(_pool, buffer); }
 }
 
-BufferView::BufferView(Device *device, VkBufferView view, const BufferViewCreateInfo &create_info)
-    : device(device)
-    , view(view)
-    , info(create_info)
+void bufferview_init(struct BufferView *self, Device *device, VkBufferView view, const BufferViewCreateInfo &create_info)
 {
-	counter_init(&reference_count); /* refcount starts at 1 */
-	cookie_init(this, device);
+	self->device = device;
+	self->view   = view;
+	self->info   = create_info;
+	counter_init(&self->reference_count); /* refcount starts at 1 */
+	cookie_init(&self->cookie_base, device);
 }
 
-BufferView::~BufferView()
+void bufferview_fini(struct BufferView *self)
 {
-	if (view != VK_NULL_HANDLE)
-		device->destroy_buffer_view_nolock(view);
+	if (self->view != VK_NULL_HANDLE)
+		self->device->destroy_buffer_view_nolock(self->view);
+}
+
+void bufferview_release_reference(struct BufferView *self)
+{
+	if (counter_release(&self->reference_count))
+		BufferViewDeleter()(self);
 }
 
 void BufferViewDeleter::operator()(BufferView *view)
 {
-	{ struct ObjectPoolRaw *_pool = &view->device->handle_pool.buffer_views; view->~BufferView(); object_pool_raw_free(_pool, view); }
+	{ struct ObjectPoolRaw *_pool = &view->device->handle_pool.buffer_views; bufferview_fini(view); object_pool_raw_free(_pool, view); }
 }
 
 
@@ -15850,12 +15838,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		VK_ASSERT(view.get_buffer().get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-		if (view.cookie == bindings.cookies[set][binding])
+		VK_ASSERT(bufferview_get_buffer(&view).get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
+		if (view.cookie_base.cookie == bindings.cookies[set][binding])
 			return;
 		ResourceBinding &b = bindings.bindings[set][binding];
-		b.buffer_view = view.get_view();
-		bindings.cookies[set][binding] = view.cookie;
+		b.buffer_view = bufferview_get_view(&view);
+		bindings.cookies[set][binding] = view.cookie_base.cookie;
 		bindings.secondary_cookies[set][binding] = 0;
 		dirty_sets |= 1u << set;
 	}
@@ -18104,7 +18092,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (res != VK_SUCCESS)
 			return bvh_make(NULL);
 
-		return bvh_make(new (object_pool_raw_allocate(&handle_pool.buffer_views)) BufferView(this, view, view_info));
+		{ struct BufferView *_bv = (struct BufferView *)object_pool_raw_allocate(&handle_pool.buffer_views); bufferview_init(_bv, this, view, view_info); return bvh_make(_bv); }
 	}
 
 	class ImageResourceHolder
