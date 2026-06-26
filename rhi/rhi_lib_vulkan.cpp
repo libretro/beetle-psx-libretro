@@ -4372,7 +4372,7 @@ private:
 
 	class Device;
 
-	class FenceHolder;
+	struct FenceHolder;
 	struct FenceHolderDeleter
 	{
 		void operator()(FenceHolder *fence);
@@ -4381,35 +4381,22 @@ private:
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches release_reference/add_reference through
 	 * the pointee directly). Mirrors the SemaphoreHolder conversion. */
-	class FenceHolder
+	/* FenceHolder: plain C struct + free functions (was a class with refcount
+	 * methods + ctor/dtor). Pooled via object_pool_raw; fenceholder_init starts
+	 * the refcount at 1, fenceholder_fini runs the former destructor body, and
+	 * the FenceHolderDeleter (invoked when the refcount hits 0) calls fini then
+	 * returns the slot to the pool. */
+	struct FenceHolder
 	{
-		public:
-			friend struct FenceHolderDeleter;
-
-			void release_reference()
-			{
-				if (counter_release(&reference_count))
-					FenceHolderDeleter()(this);
-			}
-			void add_reference()
-			{
-				counter_add_ref(&reference_count);
-			}
-
-			~FenceHolder();
-			void wait();
-
-		private:
-			friend class Device;
-			FenceHolder(Device *device, VkFence fence) : device(device), fence(fence)
-		{
-			counter_init(&reference_count); /* refcount starts at 1 */
-		}
-
-			Device *device;
-			VkFence fence;
-			HandleCounter reference_count;
+		Device *device;
+		VkFence fence;
+		HandleCounter reference_count;
 	};
+	void fenceholder_init(struct FenceHolder *self, Device *device, VkFence fence);
+	void fenceholder_fini(struct FenceHolder *self);
+	void fenceholder_wait(struct FenceHolder *self);
+	static inline void fenceholder_add_reference(struct FenceHolder *self) { counter_add_ref(&self->reference_count); }
+	void fenceholder_release_reference(struct FenceHolder *self);
 
 	/* Fence handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(Fence, FenceHolder)
 	 * to a plain struct + explicit free functions, following the bvh_* template
@@ -4428,7 +4415,7 @@ private:
 	 * double-free on a fence-heavy workload (VRAM readback / FMV). */
 	struct Fence { FenceHolder *data; };
 	static inline struct Fence fence_make(FenceHolder *p) { struct Fence h; h.data = p; return h; }
-	static inline void fence_reset(struct Fence *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline void fence_reset(struct Fence *h) { if (h->data) fenceholder_release_reference(h->data); h->data = NULL; }
 	static inline FenceHolder *fence_get(struct Fence *h) { return h->data; }
 	static inline int fence_is_valid(const struct Fence *h) { return h->data != NULL; }
 
@@ -6036,8 +6023,8 @@ private:
 			// Don't want to expose a lot of internal guts to make this work.
 			friend class SemaphoreHolder;
 			friend struct SemaphoreHolderDeleter;
-			friend class FenceHolder;
 			friend struct FenceHolderDeleter;
+			friend void fenceholder_fini(struct FenceHolder *self);
 			friend class Sampler;
 			friend struct SamplerDeleter;
 			friend class Buffer;
@@ -10139,7 +10126,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
 
 	Fence fence = flush_and_signal();
-	fence_get(&fence)->wait();
+	fenceholder_wait(fence_get(&fence));
 
 	const uint32_t *mapped = (const uint32_t *)(device->map_host_buffer(*bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
 
@@ -12882,26 +12869,39 @@ void ImageDeleter::operator()(Image *image)
 /* === fence.cpp === */
 
 
-FenceHolder::~FenceHolder()
+void fenceholder_init(struct FenceHolder *self, Device *device, VkFence fence)
 {
-	if (fence != VK_NULL_HANDLE)
-		device->reset_fence(fence);
+	self->device = device;
+	self->fence  = fence;
+	counter_init(&self->reference_count); /* refcount starts at 1 */
 }
 
-void FenceHolder::wait()
+void fenceholder_fini(struct FenceHolder *self)
+{
+	if (self->fence != VK_NULL_HANDLE)
+		self->device->reset_fence(self->fence);
+}
+
+void fenceholder_wait(struct FenceHolder *self)
 {
 	/* A null fence means no work was ever submitted against it (e.g. a failed
 	 * vkQueueSubmit handed back VK_NULL_HANDLE); there is nothing to wait for and
 	 * waiting on a null handle is invalid, so treat it as already signalled. */
-	if (fence == VK_NULL_HANDLE)
+	if (self->fence == VK_NULL_HANDLE)
 		return;
-	if (vkWaitForFences(device->get_device(), 1, &fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
+	if (vkWaitForFences(self->device->get_device(), 1, &self->fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
 		LOGE("Failed to wait for fence!\n");
+}
+
+void fenceholder_release_reference(struct FenceHolder *self)
+{
+	if (counter_release(&self->reference_count))
+		FenceHolderDeleter()(self);
 }
 
 void FenceHolderDeleter::operator()(FenceHolder *fence)
 {
-	{ struct ObjectPoolRaw *_pool = &fence->device->handle_pool.fences; fence->~FenceHolder(); object_pool_raw_free(_pool, fence); }
+	{ struct ObjectPoolRaw *_pool = &fence->device->handle_pool.fences; fenceholder_fini(fence); object_pool_raw_free(_pool, fence); }
 }
 
 /* === fence_manager.cpp === */
@@ -17207,7 +17207,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (fence)
 		{
 			VK_ASSERT(!fence_is_valid(fence));
-			*fence = fence_make(new (object_pool_raw_allocate(&handle_pool.fences)) FenceHolder(this, cleared_fence));
+			{ struct FenceHolder *_fh = (struct FenceHolder *)object_pool_raw_allocate(&handle_pool.fences); fenceholder_init(_fh, this, cleared_fence); *fence = fence_make(_fh); }
 		}
 
 		decrement_frame_counter_nolock();
