@@ -4431,7 +4431,26 @@ private:
 			HandleCounter reference_count;
 	};
 
-	INTRUSIVE_HANDLE_DECLARE(Semaphore, SemaphoreHolder);
+	/* Semaphore handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(Semaphore,
+	 * SemaphoreHolder) to a plain struct + explicit free functions, following the
+	 * fence_*/bvh_* template. The pointee SemaphoreHolder keeps its
+	 * add_reference/release_reference methods. sem_copy() performs the incref
+	 * that the macro's copy-ctor did; sem_reset() the decref the dtor did; a bare
+	 * struct copy with no incref is the move/steal. SemaphoreHandleVec below is
+	 * updated to call these explicitly in place of placement-new-copy / ~dtor.
+	 * ASAN-GATE: GPU wait-semaphore lifetime; verify no leak / double-free on a
+	 * multi-queue (async-compute/transfer) workload. */
+	struct Semaphore { SemaphoreHolder *data; };
+	static inline struct Semaphore sem_make(SemaphoreHolder *p) { struct Semaphore h; h.data = p; return h; }
+	static inline void sem_reset(struct Semaphore *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline SemaphoreHolder *sem_get(const struct Semaphore *h) { return h->data; }
+	static inline int sem_is_valid(const struct Semaphore *h) { return h->data != NULL; }
+	/* Copy-with-incref: assign src into dst, taking a new reference (matches the
+	 * old copy-ctor used when a wait list is filled from a const Semaphore &). */
+	static inline void sem_copy(struct Semaphore *dst, const struct Semaphore *src) {
+		dst->data = src->data;
+		if (dst->data) dst->data->add_reference();
+	}
 
 	/* Owning array of Semaphore (= IntrusivePtr<SemaphoreHolder>). Replaces
 	 * std::vector<Semaphore> for the per-queue wait-semaphore lists. The element
@@ -4465,14 +4484,14 @@ private:
 		void push(const Semaphore &v) {
 			if (count >= cap)
 				grow(cap ? cap * 2 : 8);
-			new (&items[count]) Semaphore(v);
+			sem_copy(&items[count], &v);
 			count++;
 		}
 		int size() const { return count; }
 		bool empty() const { return count == 0; }
 		void clear() {
 			for (int i = 0; i < count; i++)
-				items[i].~Semaphore();
+				sem_reset(&items[i]);
 			count = 0;
 		}
 		Semaphore *begin() { return items; }
@@ -4482,8 +4501,10 @@ private:
 		void grow(int ncap) {
 			Semaphore *nitems = (Semaphore *)malloc((size_t)ncap * sizeof(Semaphore));
 			for (int i = 0; i < count; i++) {
-				new (&nitems[i]) Semaphore(items[i]);
-				items[i].~Semaphore();
+				/* Move the handle to new storage: plain struct copy with no
+				 * refcount change (old copy-ctor incref + old-slot dtor decref
+				 * cancelled out). The old slot is abandoned, not reset. */
+				nitems[i] = items[i];
 			}
 			free(items);
 			items = nitems;
@@ -4491,7 +4512,7 @@ private:
 		}
 		void destroy() {
 			for (int i = 0; i < count; i++)
-				items[i].~Semaphore();
+				sem_reset(&items[i]);
 			free(items);
 			items = NULL; count = 0; cap = 0;
 		}
@@ -16612,7 +16633,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 #ifdef VULKAN_DEBUG
 		for (Semaphore &sem : data.wait_semaphores)
-			VK_ASSERT(sem.get() != semaphore.get());
+			VK_ASSERT(sem_get(&sem) != sem_get(&semaphore));
 #endif
 
 		data.wait_semaphores.push(semaphore);
@@ -17012,7 +17033,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		for (Semaphore &semaphore : data.wait_semaphores)
 		{
-			VkSemaphore wait = semaphore->consume();
+			VkSemaphore wait = sem_get(&semaphore)->consume();
 			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits, &wait);
 		}
@@ -17024,8 +17045,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
 			SemaphoreVec_push(&signals, &cleared_semaphore);
-			VK_ASSERT(!semaphores[i]);
-			semaphores[i] = Semaphore(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
+			VK_ASSERT(!sem_is_valid(&semaphores[i]));
+			semaphores[i] = sem_make(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
 		}
 
 		submit.signalSemaphoreCount = SemaphoreVec_size(&signals);
@@ -17119,9 +17140,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 				if (compute_stages != 0)
 				{
-					Semaphore sem;
+					Semaphore sem; sem.data = NULL;
 					submit_nolock(cmd, NULL, 1, &sem);
 					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, compute_stages, flush);
+					sem_reset(&sem);
 				}
 				else
 					submit_nolock(cmd, NULL, 0, NULL);
@@ -17133,9 +17155,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 				if (graphics_stages != 0)
 				{
-					Semaphore sem;
+					Semaphore sem; sem.data = NULL;
 					submit_nolock(cmd, NULL, 1, &sem);
 					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, graphics_stages, flush);
+					sem_reset(&sem);
 				}
 				else
 					submit_nolock(cmd, NULL, 0, NULL);
@@ -17145,21 +17168,27 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				if (graphics_stages != 0 && compute_stages != 0)
 				{
 					Semaphore semaphores[2];
+					semaphores[0].data = NULL;
+					semaphores[1].data = NULL;
 					submit_nolock(cmd, NULL, 2, semaphores);
 					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, semaphores[0], graphics_stages, flush);
 					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, semaphores[1], compute_stages, flush);
+					sem_reset(&semaphores[0]);
+					sem_reset(&semaphores[1]);
 				}
 				else if (graphics_stages != 0)
 				{
-					Semaphore sem;
+					Semaphore sem; sem.data = NULL;
 					submit_nolock(cmd, NULL, 1, &sem);
 					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, graphics_stages, flush);
+					sem_reset(&sem);
 				}
 				else if (compute_stages != 0)
 				{
-					Semaphore sem;
+					Semaphore sem; sem.data = NULL;
 					submit_nolock(cmd, NULL, 1, &sem);
 					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, compute_stages, flush);
+					sem_reset(&sem);
 				}
 				else
 					submit_nolock(cmd, NULL, 0, NULL);
@@ -17207,7 +17236,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		for (Semaphore &semaphore : data.wait_semaphores)
 		{
-			VkSemaphore wait = semaphore->consume();
+			VkSemaphore wait = sem_get(&semaphore)->consume();
 			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits[0], &wait);
 		}
@@ -17241,8 +17270,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
 			SemaphoreVec_push(&signals[VkSubmitInfoVec_size(&submits) - 1], &cleared_semaphore);
-			VK_ASSERT(!semaphores[i]);
-			semaphores[i] = Semaphore(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
+			VK_ASSERT(!sem_is_valid(&semaphores[i]));
+			semaphores[i] = sem_make(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
 		}
 
 		for (int i = 0; i < VkSubmitInfoVec_size(&submits); i++)
@@ -17568,11 +17597,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	void Device::clear_wait_semaphores()
 	{
 		for (Semaphore &sem : graphics.wait_semaphores)
-			vkDestroySemaphore(device, sem->consume(), NULL);
+			vkDestroySemaphore(device, sem_get(&sem)->consume(), NULL);
 		for (Semaphore &sem : compute.wait_semaphores)
-			vkDestroySemaphore(device, sem->consume(), NULL);
+			vkDestroySemaphore(device, sem_get(&sem)->consume(), NULL);
 		for (Semaphore &sem : transfer.wait_semaphores)
-			vkDestroySemaphore(device, sem->consume(), NULL);
+			vkDestroySemaphore(device, sem_get(&sem)->consume(), NULL);
 
 		graphics.wait_semaphores.clear();
 		VkPipelineStageVec_clear(&graphics.wait_stages);
@@ -18384,9 +18413,10 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 							0, NULL, 0, NULL, 1, &acquire);
 				}
 
-				Semaphore sem;
+				Semaphore sem; sem.data = NULL;
 				submit(transfer_cmd, NULL, 1, &sem);
 				add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, dst_stages, true);
+				sem_reset(&sem);
 			}
 
 			if (generate_mips)
@@ -18414,13 +18444,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			// Add semaphore if the compute queue can be used for async graphics as well.
 			if (share_async_graphics)
 			{
-				Semaphore sem;
+				Semaphore sem; sem.data = NULL;
 				submit(graphics_cmd, NULL, 1, &sem);
 
 				VkPipelineStageFlags dst_stages = handle->get_stage_flags();
 				if (graphics_queue_family_index != compute_queue_family_index)
 					dst_stages &= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
 				add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, dst_stages, true);
+				sem_reset(&sem);
 			}
 			else
 				submit(graphics_cmd);
