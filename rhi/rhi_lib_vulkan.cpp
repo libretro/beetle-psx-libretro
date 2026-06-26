@@ -18168,11 +18168,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		ImageViewCreateInfo tmp = create_info;
 		tmp.format = format;
 		ImageViewHandle ret = iv_make(new (object_pool_raw_allocate(&handle_pool.image_views)) ImageView(this, holder.image_view, tmp));
-		if (ret)
+		if (iv_is_valid(&ret))
 		{
 			holder.owned = false;
-			ret->set_alt_views(holder.depth_view, holder.stencil_view);
-			ret->set_render_target_views(holder.rt_views);
+			iv_get(&ret)->set_alt_views(holder.depth_view, holder.stencil_view);
+			iv_get(&ret)->set_render_target_views(holder.rt_views);
 			holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
 			return ret;
 		}
