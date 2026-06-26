@@ -3856,7 +3856,7 @@ private:
 	};
 	using ImageMiscFlags = uint32_t;
 
-	class Image;
+	struct Image;
 
 	struct ImageViewCreateInfo
 	{
@@ -4089,7 +4089,7 @@ private:
 		}
 	};
 
-	class Image;
+	struct Image;
 
 	struct ImageDeleter
 	{
@@ -4104,129 +4104,43 @@ private:
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
 	 * base, which provides the hash identity, is unrelated and stays. */
-	class Image : public Cookie
+	/* Image: plain C struct + free functions (was a class deriving Cookie).
+	 * Cookie embedded as cookie_base. Pooled; refcount starts at 1. Holds the
+	 * default-view ImageViewHandle (already a plain struct). The deleted move
+	 * ctor/assign of the old class simply do not exist for a plain struct. */
+	struct Image
 	{
-		public:
-			friend struct ImageDeleter;
-
-			void release_reference()
-			{
-				if (counter_release(&reference_count))
-					ImageDeleter()(this);
-			}
-			void add_reference()
-			{
-				counter_add_ref(&reference_count);
-			}
-
-			~Image();
-
-			Image(Image &&) = delete;
-
-			Image &operator=(Image &&) = delete;
-
-			const ImageView &get_view() const
-			{
-				VK_ASSERT(iv_is_valid(&view));
-				return *iv_get(&view);
-			}
-
-			ImageView &get_view()
-			{
-				VK_ASSERT(iv_is_valid(&view));
-				return *iv_get(&view);
-			}
-
-			VkImage get_image() const
-			{
-				return image;
-			}
-
-			VkFormat get_format() const
-			{
-				return create_info.format;
-			}
-
-			uint32_t get_width(uint32_t lod = 0) const
-			{
-				uint32_t v = create_info.width >> lod;
-				return v > 1u ? v : 1u;
-			}
-
-			uint32_t get_height(uint32_t lod = 0) const
-			{
-				uint32_t v = create_info.height >> lod;
-				return v > 1u ? v : 1u;
-			}
-
-			uint32_t get_depth(uint32_t lod = 0) const
-			{
-				uint32_t v = create_info.depth >> lod;
-				return v > 1u ? v : 1u;
-			}
-
-			const ImageCreateInfo &get_create_info() const
-			{
-				return create_info;
-			}
-
-			VkImageLayout get_layout(VkImageLayout optimal) const
-			{
-				return layout_type == Layout_Optimal ? optimal : VK_IMAGE_LAYOUT_GENERAL;
-			}
-
-			Layout get_layout_type() const
-			{
-				return layout_type;
-			}
-
-			void set_layout(Layout layout)
-			{
-				layout_type = layout;
-			}
-
-			void set_stage_flags(VkPipelineStageFlags flags)
-			{
-				stage_flags = flags;
-			}
-
-			void set_access_flags(VkAccessFlags flags)
-			{
-				access_flags = flags;
-			}
-
-			VkPipelineStageFlags get_stage_flags() const
-			{
-				return stage_flags;
-			}
-
-			VkAccessFlags get_access_flags() const
-			{
-				return access_flags;
-			}
-
-			const DeviceAllocation &get_allocation() const
-			{
-				return alloc;
-			}
-
-		private:
-			friend class Device;
-
-			Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
-					const ImageCreateInfo &info);
-
-			Device *device;
-			VkImage image;
-			ImageViewHandle view;
-			DeviceAllocation alloc;
-			ImageCreateInfo create_info;
-
-			Layout layout_type = Layout_Optimal;
-			VkPipelineStageFlags stage_flags = 0;
-			VkAccessFlags access_flags = 0;
-			HandleCounter reference_count;
+		struct Cookie cookie_base;
+		Device *device;
+		VkImage image;
+		ImageViewHandle view;
+		DeviceAllocation alloc;
+		ImageCreateInfo create_info;
+		Layout layout_type;
+		VkPipelineStageFlags stage_flags;
+		VkAccessFlags access_flags;
+		HandleCounter reference_count;
 	};
+	void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc, const ImageCreateInfo &info);
+	void image_fini(struct Image *self);
+	static inline const ImageView &image_get_view_const(const struct Image *self) { VK_ASSERT(iv_is_valid(&self->view)); return *iv_get(&self->view); }
+	static inline ImageView &image_get_view(struct Image *self) { VK_ASSERT(iv_is_valid(&self->view)); return *iv_get(&self->view); }
+	static inline VkImage image_get_image(const struct Image *self) { return self->image; }
+	static inline VkFormat image_get_format(const struct Image *self) { return self->create_info.format; }
+	static inline uint32_t image_get_width(const struct Image *self, uint32_t lod) { uint32_t v = self->create_info.width >> lod; return v > 1u ? v : 1u; }
+	static inline uint32_t image_get_height(const struct Image *self, uint32_t lod) { uint32_t v = self->create_info.height >> lod; return v > 1u ? v : 1u; }
+	static inline uint32_t image_get_depth(const struct Image *self, uint32_t lod) { uint32_t v = self->create_info.depth >> lod; return v > 1u ? v : 1u; }
+	static inline const ImageCreateInfo &image_get_create_info(const struct Image *self) { return self->create_info; }
+	static inline VkImageLayout image_get_layout(const struct Image *self, VkImageLayout optimal) { return self->layout_type == Layout_Optimal ? optimal : VK_IMAGE_LAYOUT_GENERAL; }
+	static inline Layout image_get_layout_type(const struct Image *self) { return self->layout_type; }
+	static inline void image_set_layout(struct Image *self, Layout layout) { self->layout_type = layout; }
+	static inline void image_set_stage_flags(struct Image *self, VkPipelineStageFlags flags) { self->stage_flags = flags; }
+	static inline void image_set_access_flags(struct Image *self, VkAccessFlags flags) { self->access_flags = flags; }
+	static inline VkPipelineStageFlags image_get_stage_flags(const struct Image *self) { return self->stage_flags; }
+	static inline VkAccessFlags image_get_access_flags(const struct Image *self) { return self->access_flags; }
+	static inline const DeviceAllocation &image_get_allocation(const struct Image *self) { return self->alloc; }
+	static inline void image_add_reference(struct Image *self) { counter_add_ref(&self->reference_count); }
+	void image_release_reference(struct Image *self);
 
 	/* Image handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(ImageHandle, Image)
 	 * to a plain struct + explicit free functions, following the
@@ -4245,23 +4159,23 @@ private:
 	 * verify one decref per image (no leak / double-free). */
 	struct ImageHandle { Image *data; };
 	static inline struct ImageHandle ih_make(Image *p) { struct ImageHandle h; h.data = p; return h; }
-	static inline void ih_reset(struct ImageHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline void ih_reset(struct ImageHandle *h) { if (h->data) image_release_reference(h->data); h->data = NULL; }
 	static inline Image *ih_get(const struct ImageHandle *h) { return h->data; }
 	static inline int ih_is_valid(const struct ImageHandle *h) { return h->data != NULL; }
 	static inline void ih_copy(struct ImageHandle *dst, const struct ImageHandle *src) {
 		dst->data = src->data;
-		if (dst->data) dst->data->add_reference();
+		if (dst->data) image_add_reference(dst->data);
 	}
 	static inline void ih_assign(struct ImageHandle *dst, const struct ImageHandle *src) {
 		if (dst == src) return;
-		if (src->data) src->data->add_reference();
-		if (dst->data) dst->data->release_reference();
+		if (src->data) image_add_reference(src->data);
+		if (dst->data) image_release_reference(dst->data);
 		dst->data = src->data;
 	}
 	/* Assign a freshly-produced handle (already holding one reference) into a
 	 * member, releasing whatever the member held. */
 	static inline void ih_move(struct ImageHandle *dst, struct ImageHandle produced) {
-		if (dst->data) dst->data->release_reference();
+		if (dst->data) image_release_reference(dst->data);
 		dst->data = produced.data;
 	}
 	static inline void ih_steal(struct ImageHandle *dst, struct ImageHandle *src) { dst->data = src->data; src->data = NULL; }
@@ -5529,7 +5443,7 @@ private:
 					VkDeviceSize size);
 			void copy_buffer(const Buffer &dst, const Buffer &src)
 			{
-				VK_ASSERT(dst.get_create_info().size == src.get_create_info().size);
+				VK_ASSERT(image_get_create_info(&dst).size == image_get_create_info(&src).size);
 				copy_buffer(dst, 0, src, 0, buffer_get_create_info(&dst).size);
 			}
 
@@ -5908,8 +5822,9 @@ private:
 			friend void bufferview_fini(struct BufferView *self);
 			friend struct ImageViewDeleter;
 			friend void imageview_fini(struct ImageView *self);
-			friend class Image;
 			friend struct ImageDeleter;
+			friend void image_fini(struct Image *self);
+			friend void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc, const ImageCreateInfo &info);
 			friend class CommandBuffer;
 			friend struct CommandBufferDeleter;
 			friend class Program;
@@ -6906,8 +6821,8 @@ extern retro_log_printf_t log_cb;
 	{
 		int i = hd_tex_map_lower_bound(m, key);
 		if (i < m->count && m->entries[i].key == key) {
-			if (image) image->add_reference();
-			if (m->entries[i].image) m->entries[i].image->release_reference();
+			if (image) image_add_reference(image);
+			if (m->entries[i].image) image_release_reference(m->entries[i].image);
 			m->entries[i].image = image;
 			m->entries[i].alpha_flags = alpha_flags;
 			return;
@@ -6921,7 +6836,7 @@ extern retro_log_printf_t log_cb;
 			m->cap = ncap;
 		}
 		memmove(&m->entries[i + 1], &m->entries[i], (size_t)(m->count - i) * sizeof(HdTexEntry));
-		if (image) image->add_reference();
+		if (image) image_add_reference(image);
 		m->entries[i].key = key;
 		m->entries[i].image = image;
 		m->entries[i].alpha_flags = alpha_flags;
@@ -6933,7 +6848,7 @@ extern retro_log_printf_t log_cb;
 		int i;
 		for (i = 0; i < m->count; i++)
 			if (m->entries[i].image)
-				m->entries[i].image->release_reference();
+				image_release_reference(m->entries[i].image);
 		m->count = 0;
 	}
 	static void hd_tex_map_free(HdTexMap *m)
@@ -6955,7 +6870,7 @@ extern retro_log_printf_t log_cb;
 			for (i = 0; i < src->count; i++) {
 				dst->entries[i] = src->entries[i];
 				if (dst->entries[i].image)
-					dst->entries[i].image->add_reference();
+					image_add_reference(dst->entries[i].image);
 			}
 		}
 	}
@@ -7631,7 +7546,7 @@ extern retro_log_printf_t log_cb;
 	static inline void fp_copy(FusedPage *dst, const FusedPage *src) {
 		*dst = *src;                 /* bitwise copy of all fields */
 		dst->texture.data = src->texture.data;
-		if (dst->texture.data) dst->texture.data->add_reference();  /* retain */
+		if (dst->texture.data) image_add_reference(dst->texture.data);  /* retain */
 	}
 	static inline void fp_destroy(FusedPage *p) {
 		ih_reset(&p->texture);
@@ -8429,7 +8344,7 @@ extern retro_log_printf_t log_cb;
 	static void cached_gpu_image_dispose(CachedGpuImage *p)
 	{
 		if (p->image) {
-			p->image->release_reference();
+			image_release_reference(p->image);
 			p->image = NULL;
 		}
 	}
@@ -8442,7 +8357,7 @@ extern retro_log_printf_t log_cb;
 		 * bumping, so add the reference explicitly first. */
 		static ImageHandle hd_gpu_image_handle(CachedGpuImage *g)
 		{
-			g->image->add_reference();
+			image_add_reference(g->image);
 			return ih_make(g->image);
 		}
 
@@ -8456,10 +8371,10 @@ extern retro_log_printf_t log_cb;
 		CachedGpuImage *e = HdGpuCache_put_slot(c, key, &created);
 		size_t old_bytes = created ? 0 : e->bytes;
 		if (!created && e->image)
-			e->image->release_reference(); /* drop the image we're replacing */
+			image_release_reference(e->image); /* drop the image we're replacing */
 		e->image = ih_get(&handle);
 		if (e->image)
-			e->image->add_reference();      /* cache holds its own reference */
+			image_add_reference(e->image);      /* cache holds its own reference */
 		e->alpha_flags = alpha_flags;
 		e->bytes = bytes;
 		HdGpuCache_set_entry_bytes(c, key, bytes);
@@ -9646,9 +9561,9 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 		state ? state->vram.data() : NULL, 0, 0,
 	};
 	ih_move(&framebuffer, device->create_image(info, state ? &initial_vram : NULL));
-	ih_get(&framebuffer)->set_layout(Layout_General);
+	image_set_layout(ih_get(&framebuffer), Layout_General);
 	ih_move(&framebuffer_ssaa, device->create_image(info));
-	ih_get(&framebuffer_ssaa)->set_layout(Layout_General);
+	image_set_layout(ih_get(&framebuffer_ssaa), Layout_General);
 
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -9665,10 +9580,10 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	             VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 	ih_move(&scaled_framebuffer, device->create_image(info));
-	ih_get(&scaled_framebuffer)->set_layout(Layout_General);
+	image_set_layout(ih_get(&scaled_framebuffer), Layout_General);
 
 	{
-		ImageViewCreateInfo view_info = imageview_get_create_info(&ih_get(&scaled_framebuffer)->get_view());
+		ImageViewCreateInfo view_info = imageview_get_create_info(&image_get_view(ih_get(&scaled_framebuffer)));
 		for (unsigned i = 0; i < info.levels; i++)
 		{
 			view_info.base_level = i;
@@ -9725,7 +9640,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 		info.levels = 1;
 		info.samples = (VkSampleCountFlagBits)(msaa);
 		ih_move(&scaled_framebuffer_msaa, device->create_image(info));
-		ih_get(&scaled_framebuffer_msaa)->set_layout(Layout_General);
+		image_set_layout(ih_get(&scaled_framebuffer_msaa), Layout_General);
 		// General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
 		// The expectation is that this will be used with a lower scaling factor to compensate.
 	}
@@ -10057,7 +9972,7 @@ void Renderer::mipmap_framebuffer()
 		unsigned current_scale = max_(scaling >> i, 1u);
 
 		if (i == levels)
-			rp.color_attachments[0] = &ih_get(&bias_framebuffer)->get_view();
+			rp.color_attachments[0] = &image_get_view(ih_get(&bias_framebuffer));
 		else
 			rp.color_attachments[0] = iv_get(&scaled_views[i]);
 
@@ -10155,9 +10070,9 @@ void Renderer::ssaa_framebuffer()
 	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, 1);
 	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 	cbh_get(&cmd)->set_program(*pipelines.resolve_to_unscaled);
-	cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&framebuffer_ssaa)->get_view());
+	cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&framebuffer_ssaa)));
 	if (msaa > 1)
-		cbh_get(&cmd)->set_texture(0, 1, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
+		cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 	else
 		cbh_get(&cmd)->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
 
@@ -10318,8 +10233,8 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 		VkExtent3D extent = { FB_WIDTH * scaling, FB_HEIGHT * scaling, 1 };
 		VkImageResolve region = { subres, offset, subres, offset, extent };
 		vkCmdResolveImage(cbh_get(&cmd)->get_command_buffer(),
-			ih_get(&scaled_framebuffer_msaa)->get_image(), VK_IMAGE_LAYOUT_GENERAL,
-			ih_get(&scaled_framebuffer)->get_image(), VK_IMAGE_LAYOUT_GENERAL,
+			image_get_image(ih_get(&scaled_framebuffer_msaa)), VK_IMAGE_LAYOUT_GENERAL,
+			image_get_image(ih_get(&scaled_framebuffer)), VK_IMAGE_LAYOUT_GENERAL,
 			1, &region);
 
 		cbh_get(&cmd)->barrier(
@@ -10339,7 +10254,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	ih_move(&reuseable_scanout, device->create_image(info));
 
 	RenderPassInfo rp;
-	rp.color_attachments[0] = &ih_get(&reuseable_scanout)->get_view();
+	rp.color_attachments[0] = &image_get_view(ih_get(&reuseable_scanout));
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
 
@@ -10361,7 +10276,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	else
 	{
 		cbh_get(&cmd)->set_program(*pipelines.unscaled_quad_blitter);
-		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_LinearClamp);
+		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_LinearClamp);
 	}
 
 	cbh_get(&cmd)->set_vertex_binding(0, *bh_get(&quad), 0, 8);
@@ -10425,7 +10340,7 @@ ImageHandle Renderer::scanout_to_texture()
 		ih_move(&reuseable_scanout, device->create_image(info));
 
 		RenderPassInfo rp;
-		rp.color_attachments[0] = &ih_get(&reuseable_scanout)->get_view();
+		rp.color_attachments[0] = &image_get_view(ih_get(&reuseable_scanout));
 		rp.num_color_attachments = 1;
 		rp.clear_attachments = 1;
 		rp.store_attachments = 1;
@@ -10495,8 +10410,8 @@ ImageHandle Renderer::scanout_to_texture()
 		}
 		VkImageResolve region = { subres, offset, subres, offset, extent };
 		vkCmdResolveImage(cbh_get(&cmd)->get_command_buffer(),
-			ih_get(&scaled_framebuffer_msaa)->get_image(), VK_IMAGE_LAYOUT_GENERAL,
-			ih_get(&scaled_framebuffer)->get_image(), VK_IMAGE_LAYOUT_GENERAL,
+			image_get_image(ih_get(&scaled_framebuffer_msaa)), VK_IMAGE_LAYOUT_GENERAL,
+			image_get_image(ih_get(&scaled_framebuffer)), VK_IMAGE_LAYOUT_GENERAL,
 			1, &region);
 
 		cbh_get(&cmd)->barrier(
@@ -10525,7 +10440,7 @@ ImageHandle Renderer::scanout_to_texture()
 	ih_move(&reuseable_scanout, device->create_image(info));
 
 	RenderPassInfo rp;
-	rp.color_attachments[0] = &ih_get(&reuseable_scanout)->get_view();
+	rp.color_attachments[0] = &image_get_view(ih_get(&reuseable_scanout));
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
 
@@ -10558,7 +10473,7 @@ ImageHandle Renderer::scanout_to_texture()
 			cbh_get(&cmd)->set_program(*pipelines.bpp24_yuv_quad_blitter);
 		else
 			cbh_get(&cmd)->set_program(*pipelines.bpp24_quad_blitter);
-		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_NearestWrap);
+		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestWrap);
 	}
 	else if (ssaa)
 	{
@@ -10567,7 +10482,7 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cbh_get(&cmd)->set_program(*pipelines.unscaled_quad_blitter);
 
-		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer_ssaa)->get_view(), StockSampler_NearestWrap);
+		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&framebuffer_ssaa)), StockSampler_NearestWrap);
 	}
 	else if (!render_state.adaptive_smoothing || scaling == 1)
 	{
@@ -10585,13 +10500,13 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			cbh_get(&cmd)->set_program(*pipelines.mipmap_resolve);
 
-		cbh_get(&cmd)->set_texture(0, 0, ih_get(&scaled_framebuffer)->get_view(), StockSampler_TrilinearWrap);
-		cbh_get(&cmd)->set_texture(0, 1, ih_get(&bias_framebuffer)->get_view(), StockSampler_LinearWrap);
+		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer)), StockSampler_TrilinearWrap);
+		cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&bias_framebuffer)), StockSampler_LinearWrap);
 	}
 
 	if (dither)
 	{
-		cbh_get(&cmd)->set_texture(0, 2, ih_get(&dither_lut)->get_view(), StockSampler_NearestWrap);
+		cbh_get(&cmd)->set_texture(0, 2, image_get_view(ih_get(&dither_lut)), StockSampler_NearestWrap);
 		struct DitherData
 		{
 			float range;
@@ -10732,9 +10647,9 @@ void Renderer::flush_resolves()
 		ensure_command_buffer();
 		cbh_get(&cmd)->set_program(*pipelines.resolve_to_scaled);
 
-		cbh_get(&cmd)->set_texture(0, 1, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
+		cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
 		if (msaa > 1)
-			cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view());
+			cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
 		else
 			cbh_get(&cmd)->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
 
@@ -10760,9 +10675,9 @@ void Renderer::flush_resolves()
 		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, 0);
 		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 		cbh_get(&cmd)->set_program(*pipelines.resolve_to_unscaled);
-		cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
+		cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&framebuffer)));
 		if (msaa > 1)
-			cbh_get(&cmd)->set_texture(0, 1, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		else
 			cbh_get(&cmd)->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 
@@ -11343,7 +11258,7 @@ void Renderer::flush_render_pass(const Rect &rect)
 	RenderPassInfo info = {};
 
 	if (msaa > 1)
-		info.color_attachments[0] = &ih_get(&scaled_framebuffer_msaa)->get_view();
+		info.color_attachments[0] = &image_get_view(ih_get(&scaled_framebuffer_msaa));
 	else
 		info.color_attachments[0] = iv_get(&scaled_views.front());
 
@@ -11387,7 +11302,7 @@ void Renderer::flush_render_pass(const Rect &rect)
 	cbh_get(&cmd)->begin_render_pass(info);
 	cbh_get(&cmd)->set_scissor(info.render_area);
 	queue.default_scissor = info.render_area;
-	cbh_get(&cmd)->set_texture(0, 2, ih_get(&dither_lut)->get_view(), StockSampler_NearestWrap);
+	cbh_get(&cmd)->set_texture(0, 2, image_get_view(ih_get(&dither_lut)), StockSampler_NearestWrap);
 
 	render_opaque_primitives();
 	render_opaque_texture_primitives();
@@ -11412,12 +11327,12 @@ void Renderer::dispatch_set_scaled_read_texture(bool scaled_read, bool textured)
 	if (scaled_read)
 	{
 		if (msaa > 1)
-			cbh_get(&cmd)->set_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		else
 			cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 	}
 	else
-		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
+		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
 	if (textured)
 	{
 		if (scaled_read)
@@ -11550,7 +11465,7 @@ void Renderer::render_opaque_primitives()
 
 void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
 	HdTexture hd = tracker.get_hd_texture(hd_texture_index);
-	cbh_get(&cmd)->set_texture(0, 4, ih_get(&hd.texture)->get_view(), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
+	cbh_get(&cmd)->set_texture(0, 4, image_get_view(ih_get(&hd.texture)), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
 	// ivec4, ivec4
 	struct HDPush {
 		int32_t vram_rect_x;
@@ -11708,8 +11623,8 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 	{
 		if (msaa > 1)
 		{
-			cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view());
-			cbh_get(&cmd)->set_texture(0, 1, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
+			cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		}
 		else
 		{
@@ -11719,8 +11634,8 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 	}
 	else
 	{
-		cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
-		cbh_get(&cmd)->set_texture(0, 1, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
+		cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&framebuffer)));
+		cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
 	}
 
 	unsigned size = BlitInfoVec_size(&infos);
@@ -11783,7 +11698,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		{
 			if (msaa > 1)
 			{
-				cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view());
+				cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
 				cbh_get(&cmd)->set_program(render_state.mask_test ?
 						*pipelines.blit_vram_msaa_cached_scaled_masked :
 						*pipelines.blit_vram_msaa_cached_scaled);
@@ -11799,7 +11714,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		}
 		else
 		{
-			cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
+			cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&framebuffer)));
 			cbh_get(&cmd)->set_program(render_state.mask_test ? *pipelines.blit_vram_cached_unscaled_masked :
 													*pipelines.blit_vram_cached_unscaled);
 			cbh_get(&cmd)->dispatch(factor, factor, 1);
@@ -11910,7 +11825,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 
 	ensure_command_buffer();
 	cbh_get(&cmd)->set_program(render_state.mask_test ? *pipelines.copy_to_vram_masked : *pipelines.copy_to_vram);
-	cbh_get(&cmd)->set_storage_texture(0, 0, ih_get(&framebuffer)->get_view());
+	cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&framebuffer)));
 
 	// Vulkan minimum limit, for large buffer views, split up the work.
 	if (rect.width * rect.height > device->get_gpu_properties().limits.maxTexelBufferElements)
@@ -12018,12 +11933,12 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	if (state.scaled_read)
 	{
 		if (msaa > 1)
-			cbh_get(&cmd)->set_texture(0, 0, ih_get(&scaled_framebuffer_msaa)->get_view(), StockSampler_NearestClamp);
+			cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		else
 			cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 	}
 	else
-		cbh_get(&cmd)->set_texture(0, 0, ih_get(&framebuffer)->get_view(), StockSampler_NearestClamp);
+		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
 	hd_texture_uniforms(state.hd_texture_index);
 	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
@@ -12686,7 +12601,7 @@ void imageview_init(struct ImageView *self, Device *device, VkImageView view, co
 VkImageView imageview_get_render_target_view(const struct ImageView *self, unsigned layer)
 {
 	// Transient images just have one layer.
-	if (self->info.image->get_create_info().domain == ImageDomain_Transient)
+	if (image_get_create_info(self->info.image).domain == ImageDomain_Transient)
 		return self->view;
 
 	VK_ASSERT(layer < imageview_get_create_info(self).layers);
@@ -12722,43 +12637,53 @@ void imageview_release_reference(struct ImageView *self)
 		ImageViewDeleter()(self);
 }
 
-Image::Image(Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
+void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
              const ImageCreateInfo &create_info)
-    : device(device)
-    , image(image)
-    , alloc(alloc)
-    , create_info(create_info)
 {
-	counter_init(&reference_count); /* refcount starts at 1 */
-	cookie_init(this, device);
-	/* ImageViewHandle is now a plain struct with no default member
-	 * initializer; explicitly null the view so ~Image's iv_reset is safe on
-	 * the path where no default view is created. */
-	view.data = NULL;
+	self->device      = device;
+	self->image       = image;
+	self->alloc       = alloc;
+	self->create_info = create_info;
+	/* Members that previously had default initializers in the class body. */
+	self->layout_type  = Layout_Optimal;
+	self->stage_flags  = 0;
+	self->access_flags = 0;
+	counter_init(&self->reference_count); /* refcount starts at 1 */
+	cookie_init(&self->cookie_base, device);
+	/* ImageViewHandle is a plain struct with no default member initializer;
+	 * explicitly null the view so image_fini's iv_reset is safe on the path
+	 * where no default view is created. */
+	self->view.data = NULL;
 	if (default_view != VK_NULL_HANDLE)
 	{
 		ImageViewCreateInfo info;
-		info.image = this;
+		info.image = self;
 		info.format = create_info.format;
 		info.base_level = 0;
 		info.levels = create_info.levels;
 		info.base_layer = 0;
 		info.layers = create_info.layers;
-		{ struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&device->handle_pool.image_views); imageview_init(_iv, device, default_view, info); view = iv_make(_iv); }
+		{ struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&device->handle_pool.image_views); imageview_init(_iv, device, default_view, info); self->view = iv_make(_iv); }
 	}
 }
 
-Image::~Image()
+void image_fini(struct Image *self)
 {
 	/* The default-view handle was previously released by the implicit
 	 * ImageViewHandle member destructor; now that it is a plain struct, drop
 	 * its reference explicitly. */
-	iv_reset(&view);
-	if (alloc.get_memory())
+	iv_reset(&self->view);
+	if (self->alloc.get_memory())
 	{
-		device->destroy_image_nolock(image);
-		device->free_memory_nolock(alloc);
+		self->device->destroy_image_nolock(self->image);
+		self->device->free_memory_nolock(self->alloc);
 	}
+}
+
+void image_release_reference(struct Image *self)
+{
+	if (counter_release(&self->reference_count))
+		ImageDeleter()(self);
 }
 
 void ImageViewDeleter::operator()(ImageView *view)
@@ -12768,7 +12693,7 @@ void ImageViewDeleter::operator()(ImageView *view)
 
 void ImageDeleter::operator()(Image *image)
 {
-	{ struct ObjectPoolRaw *_pool = &image->device->handle_pool.images; image->~Image(); object_pool_raw_free(_pool, image); }
+	{ struct ObjectPoolRaw *_pool = &image->device->handle_pool.images; image_fini(image); object_pool_raw_free(_pool, image); }
 }
 
 /* === fence.cpp === */
@@ -14110,7 +14035,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VkImageLayout depth_stencil_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		if (info.depth_stencil)
 		{
-			depth_stencil_layout = imageview_get_image(info.depth_stencil).get_layout(
+			depth_stencil_layout = image_get_layout(&imageview_get_image(info.depth_stencil), 
 					ds_read_only ?
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL :
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
@@ -14124,7 +14049,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkAttachmentDescription &att = attachments[i];
 			att.flags = 0;
 			att.format = color_attachments[i];
-			att.samples = image.get_create_info().samples;
+			att.samples = image_get_create_info(&image).samples;
 			att.loadOp = rp_color_load_op(info, i);
 			att.storeOp = rp_color_store_op(info, i);
 			att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -14133,12 +14058,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			// subpass which uses this attachment to avoid any dummy transition at the end.
 			att.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-			if (image.get_create_info().domain == ImageDomain_Transient)
+			if (image_get_create_info(&image).domain == ImageDomain_Transient)
 			{
 				if (enable_transient_load)
 				{
 					// The transient will behave like a normal image.
-					att.initialLayout = imageview_get_image(info.color_attachments[i]).get_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+					att.initialLayout = image_get_layout(&imageview_get_image(info.color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 				}
 				else
 				{
@@ -14153,7 +14078,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				implicit_transitions |= 1u << i;
 			}
 			else
-				att.initialLayout = imageview_get_image(info.color_attachments[i]).get_layout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+				att.initialLayout = image_get_layout(&imageview_get_image(info.color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		}
 
 		depth_stencil = info.depth_stencil ? imageview_get_format(info.depth_stencil) : VK_FORMAT_UNDEFINED;
@@ -14163,7 +14088,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkAttachmentDescription &att = attachments[info.num_color_attachments];
 			att.flags = 0;
 			att.format = depth_stencil;
-			att.samples = image.get_create_info().samples;
+			att.samples = image_get_create_info(&image).samples;
 			att.loadOp = ds_load_op;
 			att.storeOp = ds_store_op;
 			// Undefined final layout here for now means that we will just use the layout of the last
@@ -14181,7 +14106,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
 
-			if (image.get_create_info().domain == ImageDomain_Transient)
+			if (image_get_create_info(&image).domain == ImageDomain_Transient)
 			{
 				if (enable_transient_load)
 				{
@@ -14778,8 +14703,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VK_ASSERT(info.color_attachments[i]);
 			auto *att = info.color_attachments[i];
 			unsigned lod = imageview_get_create_info(att).base_level;
-			unsigned aw  = imageview_get_image(att).get_width(lod);
-			unsigned ah  = imageview_get_image(att).get_height(lod);
+			unsigned aw  = image_get_width(&imageview_get_image(att), lod);
+			unsigned ah  = image_get_height(&imageview_get_image(att), lod);
 			if (aw < width)  width  = aw;
 			if (ah < height) height = ah;
 			views[num_views++] = imageview_get_render_target_view(att, info.layer);
@@ -14790,8 +14715,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			auto *att = info.depth_stencil;
 			unsigned lod = imageview_get_create_info(att).base_level;
-			unsigned aw  = imageview_get_image(att).get_width(lod);
-			unsigned ah  = imageview_get_image(att).get_height(lod);
+			unsigned aw  = image_get_width(&imageview_get_image(att), lod);
+			unsigned ah  = image_get_height(&imageview_get_image(att), lod);
 			if (aw < width)  width  = aw;
 			if (ah < height) height = ah;
 			views[num_views++] = imageview_get_render_target_view(att, info.layer);
@@ -14875,7 +14800,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		TransientNode *node = transient_thmap_request(&attachments, hash);
 		if (node)
-			return ih_get(&node->handle)->get_view();
+			return image_get_view(ih_get(&node->handle));
 
 		ImageCreateInfo image_info = ImageCreateInfo::transient_render_target(width, height, format);
 
@@ -14883,7 +14808,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		image_info.layers = layers;
 		node = transient_thmap_emplace(&attachments, hash, device->create_image(image_info, NULL));
 		device->set_name(*ih_get(&node->handle), "AttachmentAllocator");
-		return ih_get(&node->handle)->get_view();
+		return image_get_view(ih_get(&node->handle));
 	}
 
 /* === command_buffer.cpp === */
@@ -14921,7 +14846,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			const VkBufferImageCopy *blits)
 	{
 		vkCmdCopyBufferToImage(cmd, buffer_get_buffer(&buffer),
-				image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), num_blits, blits);
+				image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), num_blits, blits);
 	}
 
 	void CommandBuffer::copy_buffer_to_image(const Image &image, const Buffer &src, VkDeviceSize buffer_offset,
@@ -14933,7 +14858,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
 			subresource, offset, extent,
 		};
-		vkCmdCopyBufferToImage(cmd, buffer_get_buffer(&src), image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+		vkCmdCopyBufferToImage(cmd, buffer_get_buffer(&src), image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 				1, &region);
 	}
 
@@ -14946,7 +14871,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
 			subresource, offset, extent,
 		};
-		vkCmdCopyImageToBuffer(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+		vkCmdCopyImageToBuffer(cmd, image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
 				buffer_get_buffer(&buffer), 1, &region);
 	}
 
@@ -14955,21 +14880,21 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VK_ASSERT(!framebuffer);
 		VK_ASSERT(!actual_render_pass);
 
-		VkImageAspectFlags aspect = format_to_aspect_mask(image.get_format());
+		VkImageAspectFlags aspect = format_to_aspect_mask(image_get_format(&image));
 		VkImageSubresourceRange range = {};
 		range.aspectMask = aspect;
 		range.baseArrayLayer = 0;
 		range.baseMipLevel = 0;
-		range.levelCount = image.get_create_info().levels;
-		range.layerCount = image.get_create_info().layers;
+		range.levelCount = image_get_create_info(&image).levels;
+		range.layerCount = image_get_create_info(&image).layers;
 		if (aspect & VK_IMAGE_ASPECT_COLOR_BIT)
 		{
-			vkCmdClearColorImage(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			vkCmdClearColorImage(cmd, image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 					&value.color, 1, &range);
 		}
 		else
 		{
-			vkCmdClearDepthStencilImage(cmd, image.get_image(), image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			vkCmdClearDepthStencilImage(cmd, image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 					&value.depthStencil, 1, &range);
 		}
 	}
@@ -15042,17 +14967,17 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		VK_ASSERT(!actual_render_pass);
 		VK_ASSERT(!framebuffer);
-		VK_ASSERT(image.get_create_info().domain != ImageDomain_Transient);
+		VK_ASSERT(image_get_create_info(&image).domain != ImageDomain_Transient);
 
 		VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
 		barrier.srcAccessMask = src_access;
 		barrier.dstAccessMask = dst_access;
 		barrier.oldLayout = old_layout;
 		barrier.newLayout = new_layout;
-		barrier.image = image.get_image();
-		barrier.subresourceRange.aspectMask = format_to_aspect_mask(image.get_create_info().format);
-		barrier.subresourceRange.levelCount = image.get_create_info().levels;
-		barrier.subresourceRange.layerCount = image.get_create_info().layers;
+		barrier.image = image_get_image(&image);
+		barrier.subresourceRange.aspectMask = format_to_aspect_mask(image_get_create_info(&image).format);
+		barrier.subresourceRange.levelCount = image_get_create_info(&image).levels;
+		barrier.subresourceRange.layerCount = image_get_create_info(&image).layers;
 		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
@@ -15064,7 +14989,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkPipelineStageFlags src_stage, VkAccessFlags src_access,
 			bool need_top_level_barrier)
 	{
-		const ImageCreateInfo &create_info = image.get_create_info();
+		const ImageCreateInfo &create_info = image_get_create_info(&image);
 		VkImageMemoryBarrier barriers[2] = {};
 		VK_ASSERT(create_info.levels > 1);
 		(void)create_info;
@@ -15072,9 +14997,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (unsigned i = 0; i < 2; i++)
 		{
 			barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			barriers[i].image = image.get_image();
-			barriers[i].subresourceRange.aspectMask = format_to_aspect_mask(image.get_format());
-			barriers[i].subresourceRange.layerCount = image.get_create_info().layers;
+			barriers[i].image = image_get_image(&image);
+			barriers[i].subresourceRange.aspectMask = format_to_aspect_mask(image_get_format(&image));
+			barriers[i].subresourceRange.layerCount = image_get_create_info(&image).layers;
 			barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
@@ -15094,7 +15019,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				barriers[i].srcAccessMask = 0;
 				barriers[i].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 				barriers[i].subresourceRange.baseMipLevel = 1;
-				barriers[i].subresourceRange.levelCount = image.get_create_info().levels - 1;
+				barriers[i].subresourceRange.levelCount = image_get_create_info(&image).levels - 1;
 			}
 		}
 
@@ -15105,17 +15030,17 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void CommandBuffer::generate_mipmap(const Image &image)
 	{
-		const ImageCreateInfo &create_info = image.get_create_info();
+		const ImageCreateInfo &create_info = image_get_create_info(&image);
 		VkOffset3D size = { int(create_info.width), int(create_info.height), int(create_info.depth) };
 		const VkOffset3D origin = { 0, 0, 0 };
 
-		VK_ASSERT(image.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		VK_ASSERT(image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 		VkImageMemoryBarrier b = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-		b.image = image.get_image();
+		b.image = image_get_image(&image);
 		b.subresourceRange.levelCount = 1;
-		b.subresourceRange.layerCount = image.get_create_info().layers;
-		b.subresourceRange.aspectMask = format_to_aspect_mask(image.get_format());
+		b.subresourceRange.layerCount = image_get_create_info(&image).layers;
+		b.subresourceRange.aspectMask = format_to_aspect_mask(image_get_format(&image));
 		b.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 		b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 		b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -15152,15 +15077,15 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		for (unsigned i = 0; i < num_layers; i++)
 		{
 			const VkImageBlit blit = {
-				{ format_to_aspect_mask(src.get_create_info().format), src_level, src_base_layer + i, 1 },
+				{ format_to_aspect_mask(image_get_create_info(&src).format), src_level, src_base_layer + i, 1 },
 				{ src_offset,                                          cb_add_offset(src_offset, src_extent) },
-				{ format_to_aspect_mask(dst.get_create_info().format), dst_level, dst_base_layer + i, 1 },
+				{ format_to_aspect_mask(image_get_create_info(&dst).format), dst_level, dst_base_layer + i, 1 },
 				{ dst_offset,                                          cb_add_offset(dst_offset, dst_extent) },
 			};
 
 			vkCmdBlitImage(cmd,
-					src.get_image(), src.get_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-					dst.get_image(), dst.get_layout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+					image_get_image(&src), image_get_layout(&src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+					image_get_image(&dst), image_get_layout(&dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 					1, &blit, filter);
 		}
 	}
@@ -15849,7 +15774,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
 		set_texture(set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
-				imageview_get_image_const(&view).get_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.cookie_base.cookie);
+				image_get_layout(&imageview_get_image_const(&view), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.cookie_base.cookie);
 	}
 
 	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler)
@@ -15871,7 +15796,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_STORAGE_BIT);
 		set_texture(set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
-				imageview_get_image_const(&view).get_layout(VK_IMAGE_LAYOUT_GENERAL), view.cookie_base.cookie);
+				image_get_layout(&imageview_get_image_const(&view), VK_IMAGE_LAYOUT_GENERAL), view.cookie_base.cookie);
 	}
 
 	void CommandBuffer::flush_descriptor_set(uint32_t set)
@@ -18213,12 +18138,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	ImageViewHandle Device::create_image_view(const ImageViewCreateInfo &create_info)
 	{
 		ImageResourceHolder holder(device);
-		const ImageCreateInfo &image_create_info = create_info.image->get_create_info();
+		const ImageCreateInfo &image_create_info = image_get_create_info(create_info.image);
 
 		VkFormat format = create_info.format != VK_FORMAT_UNDEFINED ? create_info.format : image_create_info.format;
 
 		VkImageViewCreateInfo view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-		view_info.image = create_info.image->get_image();
+		view_info.image = image_get_image(create_info.image);
 		view_info.format = format;
 		view_info.components = create_info.swizzle;
 		view_info.subresourceRange.aspectMask = format_to_aspect_mask(format);
@@ -18230,13 +18155,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		unsigned num_levels;
 		if (view_info.subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS)
-			num_levels = create_info.image->get_create_info().levels - view_info.subresourceRange.baseMipLevel;
+			num_levels = image_get_create_info(create_info.image).levels - view_info.subresourceRange.baseMipLevel;
 		else
 			num_levels = view_info.subresourceRange.levelCount;
 
 		unsigned num_layers;
 		if (view_info.subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS)
-			num_layers = create_info.image->get_create_info().layers - view_info.subresourceRange.baseArrayLayer;
+			num_layers = image_get_create_info(create_info.image).layers - view_info.subresourceRange.baseArrayLayer;
 		else
 			num_layers = view_info.subresourceRange.layerCount;
 
@@ -18426,20 +18351,20 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				return ih_make(NULL);
 		}
 
-		ImageHandle handle = ih_make(new (object_pool_raw_allocate(&handle_pool.images)) Image(this, holder.image, holder.image_view, holder.allocation, tmpinfo));
+		struct Image *_im = (struct Image *)object_pool_raw_allocate(&handle_pool.images); image_init(_im, this, holder.image, holder.image_view, holder.allocation, tmpinfo); ImageHandle handle = ih_make(_im);
 		if (ih_is_valid(&handle))
 		{
 			holder.owned = false;
 			if (has_view)
 			{
-				imageview_set_alt_views(&ih_get(&handle)->get_view(), holder.depth_view, holder.stencil_view);
-				imageview_set_render_target_views(&ih_get(&handle)->get_view(), holder.rt_views);
+				imageview_set_alt_views(&image_get_view(ih_get(&handle)), holder.depth_view, holder.stencil_view);
+				imageview_set_render_target_views(&image_get_view(ih_get(&handle)), holder.rt_views);
 				holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
 			}
 
 			// Set possible dstStage and dstAccess.
-			ih_get(&handle)->set_stage_flags(image_usage_to_possible_stages(info.usage));
-			ih_get(&handle)->set_access_flags(image_usage_to_possible_access(info.usage));
+			image_set_stage_flags(ih_get(&handle), image_usage_to_possible_stages(info.usage));
+			image_set_access_flags(ih_get(&handle), image_usage_to_possible_access(info.usage));
 		}
 
 		// Copy initial data to texture.
@@ -18487,7 +18412,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			if (transfer_queue != graphics_queue)
 			{
 				VkPipelineStageFlags dst_stages =
-					generate_mips ? VkPipelineStageFlags(VK_PIPELINE_STAGE_TRANSFER_BIT) : ih_get(&handle)->get_stage_flags();
+					generate_mips ? VkPipelineStageFlags(VK_PIPELINE_STAGE_TRANSFER_BIT) : image_get_stage_flags(ih_get(&handle));
 
 				// We can't just use semaphores, we will also need a release + acquire barrier to marshal ownership from
 				// transfer queue over to graphics ...
@@ -18496,7 +18421,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					need_mipmap_barrier = false;
 
 					VkImageMemoryBarrier release = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-					release.image = ih_get(&handle)->get_image();
+					release.image = image_get_image(ih_get(&handle));
 					release.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 					release.dstAccessMask = 0;
 					release.srcQueueFamilyIndex = transfer_queue_family_index;
@@ -18524,7 +18449,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					if (generate_mips)
 						acquire.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 					else
-						acquire.dstAccessMask = ih_get(&handle)->get_access_flags() & image_layout_to_possible_access(create_info.initial_layout);
+						acquire.dstAccessMask = image_get_access_flags(ih_get(&handle)) & image_layout_to_possible_access(create_info.initial_layout);
 
 					cbh_get(&transfer_cmd)->barrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
 							VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
@@ -18557,8 +18482,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 						*ih_get(&handle), generate_mips ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 						create_info.initial_layout,
 						VK_PIPELINE_STAGE_TRANSFER_BIT, final_transition_src_access,
-						ih_get(&handle)->get_stage_flags(),
-						ih_get(&handle)->get_access_flags() & image_layout_to_possible_access(create_info.initial_layout));
+						image_get_stage_flags(ih_get(&handle)),
+						image_get_access_flags(ih_get(&handle)) & image_layout_to_possible_access(create_info.initial_layout));
 			}
 
 			bool share_async_graphics = get_physical_queue_type(CommandBuffer::Type_AsyncGraphics) == CommandBuffer::Type_AsyncCompute;
@@ -18569,7 +18494,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				Semaphore sem; sem.data = NULL;
 				submit(graphics_cmd, NULL, 1, &sem);
 
-				VkPipelineStageFlags dst_stages = ih_get(&handle)->get_stage_flags();
+				VkPipelineStageFlags dst_stages = image_get_stage_flags(ih_get(&handle));
 				if (graphics_queue_family_index != compute_queue_family_index)
 					dst_stages &= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
 				add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, dst_stages, true);
@@ -18583,8 +18508,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VK_ASSERT(create_info.domain != ImageDomain_Transient);
 			CommandBufferHandle cmd = request_command_buffer(CommandBuffer::Type_Generic);
 			cbh_get(&cmd)->image_barrier(*ih_get(&handle), info.initialLayout, create_info.initial_layout,
-					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, ih_get(&handle)->get_stage_flags(),
-					ih_get(&handle)->get_access_flags() &
+					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, image_get_stage_flags(ih_get(&handle)),
+					image_get_access_flags(ih_get(&handle)) &
 					image_layout_to_possible_access(create_info.initial_layout));
 
 			submit(cmd);
@@ -18761,17 +18686,17 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			VK_ASSERT(info.color_attachments[i]);
 			formats[i] = imageview_get_format(info.color_attachments[i]);
-			if (imageview_get_image(info.color_attachments[i]).get_create_info().domain == ImageDomain_Transient)
+			if (image_get_create_info(&imageview_get_image(info.color_attachments[i])).domain == ImageDomain_Transient)
 				lazy |= 1u << i;
-			if (imageview_get_image(info.color_attachments[i]).get_layout_type() == Layout_Optimal)
+			if (image_get_layout_type(&imageview_get_image(info.color_attachments[i])) == Layout_Optimal)
 				optimal |= 1u << i;
 		}
 
 		if (info.depth_stencil)
 		{
-			if (imageview_get_image(info.depth_stencil).get_create_info().domain == ImageDomain_Transient)
+			if (image_get_create_info(&imageview_get_image(info.depth_stencil)).domain == ImageDomain_Transient)
 				lazy |= 1u << info.num_color_attachments;
-			if (imageview_get_image(info.depth_stencil).get_layout_type() == Layout_Optimal)
+			if (image_get_layout_type(&imageview_get_image(info.depth_stencil)) == Layout_Optimal)
 				optimal |= 1u << info.num_color_attachments;
 		}
 
@@ -18834,7 +18759,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
 			info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT;
-			info.object = (uint64_t)image.get_image();
+			info.object = (uint64_t)image_get_image(&image);
 			info.pObjectName = name;
 			vkDebugMarkerSetObjectNameEXT(device, &info);
 		}
@@ -20588,7 +20513,7 @@ static char retro_slash = '/';
 				}
 				return {
 					{0, 0, 1, 1},
-					{0, 0, int(ih_get(&default_hd_texture)->get_width()), int(ih_get(&default_hd_texture)->get_height())},
+					{0, 0, int(image_get_width(ih_get(&default_hd_texture), 0)), int(image_get_height(ih_get(&default_hd_texture), 0))},
 					default_hd_texture
 				};
 			}
@@ -20600,16 +20525,16 @@ static char retro_slash = '/';
 				TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
 				return {
 					{0, 0, 1, 1},
-					{0, 0, int(ih_get(&default_hd_texture)->get_width()), int(ih_get(&default_hd_texture)->get_height())},
+					{0, 0, int(image_get_width(ih_get(&default_hd_texture), 0)), int(image_get_height(ih_get(&default_hd_texture), 0))},
 					default_hd_texture
 				};
 			}
 			/* Reconstruct a counted handle from the stored raw image (add_reference
 			 * then adopt), matching hd_gpu_image_handle. */
-			iter->image->add_reference();
+			image_add_reference(iter->image);
 			ImageHandle image = ih_make(iter->image);
-			int scaleX = ih_get(&image)->get_width() / upload.width;
-			int scaleY = ih_get(&image)->get_height() / upload.height;
+			int scaleX = image_get_width(ih_get(&image), 0) / upload.width;
+			int scaleY = image_get_height(ih_get(&image), 0) / upload.height;
 			SRect texture_subrect = tex->texture_subrect();
 			return {
 				tex->vram_rect,
@@ -21194,8 +21119,8 @@ static char retro_slash = '/';
 				if (hd_texture != NULL) {
 					// Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity)
 					TextureRect clipped = subTexture(e.texture_rect, intersection.rect);
-					unsigned hd_scale_x = hd_texture->image->get_width() / upload.width;
-					unsigned hd_scale_y = hd_texture->image->get_height() / upload.height;
+					unsigned hd_scale_x = image_get_width(hd_texture->image, 0) / upload.width;
+					unsigned hd_scale_y = image_get_height(hd_texture->image, 0) / upload.height;
 					f.scaleX = max_(f.scaleX, hd_scale_x);
 					f.scaleY = max_(f.scaleY, hd_scale_y);
 					Rect r = fromSRect(clipped.vram_rect);
@@ -21256,7 +21181,7 @@ static char retro_slash = '/';
 
 		int mip_levels = log2(min_(page.fusion.scaleX, page.fusion.scaleY)) + 1;
 
-		if (ih_is_valid(&page.texture) && ih_get(&page.texture)->get_width() == texture_width && ih_get(&page.texture)->get_height() == texture_height)
+		if (ih_is_valid(&page.texture) && image_get_width(ih_get(&page.texture), 0) == texture_width && image_get_height(ih_get(&page.texture), 0) == texture_height)
 			// Switch back into transfer dst layout
 			cbh_get(&cmd)->image_barrier(*ih_get(&page.texture),
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -21277,8 +21202,8 @@ static char retro_slash = '/';
 
 			Image *image = hd_texture->image;
 
-			int srcWidth = image->get_width();
-			int srcHeight = image->get_height();
+			int srcWidth = image_get_width(image, 0);
+			int srcHeight = image_get_height(image, 0);
 
 			int sx = srcWidth / upload.width;
 			int sy = srcHeight / upload.height;
@@ -21373,7 +21298,7 @@ static char retro_slash = '/';
 			TT_LOG(RETRO_LOG_WARN, "BAD fused index!\n");
 			return {
 				{0, 0, 1, 1},
-				{0, 0, int(ih_get(&default_hd_texture)->get_width()), int(ih_get(&default_hd_texture)->get_height())},
+				{0, 0, int(image_get_width(ih_get(&default_hd_texture), 0)), int(image_get_height(ih_get(&default_hd_texture), 0))},
 				default_hd_texture
 			};
 		}
@@ -21382,13 +21307,13 @@ static char retro_slash = '/';
 			TT_LOG(RETRO_LOG_WARN, "Missing fused texture!\n");
 			return {
 				{0, 0, 1, 1},
-				{0, 0, int(ih_get(&default_hd_texture)->get_width()), int(ih_get(&default_hd_texture)->get_height())},
+				{0, 0, int(image_get_width(ih_get(&default_hd_texture), 0)), int(image_get_height(ih_get(&default_hd_texture), 0))},
 				default_hd_texture
 			};
 		}
 		return {
 			toSRect(page.fusion.vram_rect),
-			{ 0, 0, int(ih_get(&page.texture)->get_width()), int(ih_get(&page.texture)->get_height()) },
+			{ 0, 0, int(image_get_width(ih_get(&page.texture), 0)), int(image_get_height(ih_get(&page.texture), 0)) },
 			page.texture
 		};
 	}
@@ -22393,7 +22318,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    image->create_info.sType                           = 
       VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
    image->create_info.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
-   image->create_info.format                          = ih_get(&scanout)->get_format();
+   image->create_info.format                          = image_get_format(ih_get(&scanout));
    image->create_info.subresourceRange.baseMipLevel   = 0;
    image->create_info.subresourceRange.baseArrayLayer = 0;
    image->create_info.subresourceRange.levelCount     = 1;
@@ -22403,22 +22328,22 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    image->create_info.components.g                    = VK_COMPONENT_SWIZZLE_G;
    image->create_info.components.b                    = VK_COMPONENT_SWIZZLE_B;
    image->create_info.components.a                    = VK_COMPONENT_SWIZZLE_A;
-   image->create_info.image                           = ih_get(&scanout)->get_image();
+   image->create_info.image                           = image_get_image(ih_get(&scanout));
    image->image_layout                                = 
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
    image->image_view                                  = 
-      imageview_get_view(&ih_get(&scanout)->get_view());
+      imageview_get_view(&image_get_view(ih_get(&scanout)));
 
    vulkan->set_image(vulkan->handle, image, 0,
          NULL, VK_QUEUE_FAMILY_IGNORED);
    renderer->flush();
 
    scanout_handles[index] = scanout;
-   video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, ih_get(&scanout)->get_width(), ih_get(&scanout)->get_height(), 0);
+   video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, image_get_width(ih_get(&scanout), 0), image_get_height(ih_get(&scanout), 0), 0);
    inside_frame = false;
 
-   prev_frame_width = ih_get(&scanout)->get_width();
-   prev_frame_height = ih_get(&scanout)->get_height();
+   prev_frame_width = image_get_width(ih_get(&scanout), 0);
+   prev_frame_height = image_get_height(ih_get(&scanout), 0);
 }
 
 /* Draw commands */
