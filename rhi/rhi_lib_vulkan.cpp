@@ -1813,7 +1813,7 @@ static inline uint32_t util_ctz(uint32_t x)
 	struct HandleName {                                                              \
 		T *data;                                                                     \
 		HandleName() : data(NULL) {}                                                 \
-		explicit HandleName(T *ih_get(&handle)) : data(handle) {}                             \
+		explicit HandleName(T *handle) : data(handle) {}                             \
 		T &operator*() { return *data; }                                            \
 		const T &operator*() const { return *data; }                                \
 		T *operator->() { return data; }                                            \
@@ -4850,7 +4850,7 @@ private:
 			VkPipeline add_pipeline(Hash hash, VkPipeline pipeline);
 
 		private:
-			void set_shader(ShaderStage stage, Shader *ih_get(&handle))
+			void set_shader(ShaderStage stage, Shader *handle)
 			{
 				shaders[(unsigned)stage] = handle;
 			}
@@ -8966,11 +8966,11 @@ extern retro_log_printf_t log_cb;
 			void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
 			uint16_t *begin_copy(BufferHandle handle)
 			{
-				return (uint16_t *)(device->map_host_buffer(*ih_get(&handle), MEMORY_ACCESS_WRITE_BIT));
+				return (uint16_t *)(device->map_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT));
 			}
 			void end_copy(BufferHandle handle)
 			{
-				device->unmap_host_buffer(*ih_get(&handle), MEMORY_ACCESS_WRITE_BIT);
+				device->unmap_host_buffer(*handle, MEMORY_ACCESS_WRITE_BIT);
 			}
 
 			void notify_texture_upload(Rect rect, uint16_t *vram)
@@ -18686,7 +18686,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 			cmd = request_command_buffer(CommandBuffer::Type_AsyncTransfer);
 			cmd->begin_region("copy-buffer-staging");
-			cmd->copy_buffer(*ih_get(&handle), *staging_buffer);
+			cmd->copy_buffer(*handle, *staging_buffer);
 			cmd->end_region();
 
 			submit_staging(cmd, info.usage, true);
@@ -20590,9 +20590,9 @@ static char retro_slash = '/';
 			/* Reconstruct a counted handle from the stored raw image (add_reference
 			 * then adopt), matching hd_gpu_image_handle. */
 			iter->image->add_reference();
-			ImageHandle image(iter->image);
-			int scaleX = image->get_width() / upload.width;
-			int scaleY = image->get_height() / upload.height;
+			ImageHandle image = ih_make(iter->image);
+			int scaleX = ih_get(&image)->get_width() / upload.width;
+			int scaleY = ih_get(&image)->get_height() / upload.height;
 			SRect texture_subrect = tex->texture_subrect();
 			return {
 				tex->vram_rect,
@@ -22400,8 +22400,8 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, ih_get(&scanout)->get_width(), ih_get(&scanout)->get_height(), 0);
    inside_frame = false;
 
-   prev_frame_width = scanout->get_width();
-   prev_frame_height = scanout ->get_height();
+   prev_frame_width = ih_get(&scanout)->get_width();
+   prev_frame_height = ih_get(&scanout)->get_height();
 }
 
 /* Draw commands */
