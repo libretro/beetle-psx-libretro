@@ -4438,7 +4438,7 @@ private:
 
 	class Device;
 
-	class SemaphoreHolder;
+	struct SemaphoreHolder;
 	struct SemaphoreHolderDeleter
 	{
 		void operator()(SemaphoreHolder *semaphore);
@@ -4449,53 +4449,32 @@ private:
 	 * through the pointee directly). release_reference frees through the same
 	 * deleter path on reaching zero. This is the first pointee taken off the
 	 * template base, toward concrete per-type handles. */
-	class SemaphoreHolder
+	/* SemaphoreHolder: plain C struct + free functions (was a class with refcount
+	 * methods + ctor/dtor). Pooled via object_pool_raw; the refcount starts at 1.
+	 * semaphoreholder_consume hands out the VkSemaphore and clears the holder;
+	 * the destructor (semaphoreholder_fini) either destroys or recycles the
+	 * semaphore depending on whether it is still signalled. */
+	struct SemaphoreHolder
 	{
-		public:
-			friend struct SemaphoreHolderDeleter;
-
-			void release_reference()
-			{
-				if (counter_release(&reference_count))
-					SemaphoreHolderDeleter()(this);
-			}
-			void add_reference()
-			{
-				counter_add_ref(&reference_count);
-			}
-
-			~SemaphoreHolder();
-
-			bool is_signalled() const
-			{
-				return signalled;
-			}
-
-			VkSemaphore consume()
-			{
-				VkSemaphore ret = semaphore;
-				VK_ASSERT(semaphore);
-				VK_ASSERT(signalled);
-				semaphore = VK_NULL_HANDLE;
-				signalled = false;
-				return ret;
-			}
-
-		private:
-			friend class Device;
-			SemaphoreHolder(Device *device, VkSemaphore semaphore, bool signalled)
-				: device(device)
-				  , semaphore(semaphore)
-				  , signalled(signalled)
-		{
-			counter_init(&reference_count); /* refcount starts at 1 */
-		}
-
-			Device *device;
-			VkSemaphore semaphore;
-			bool signalled = true;
-			HandleCounter reference_count;
+		Device *device;
+		VkSemaphore semaphore;
+		bool signalled;
+		HandleCounter reference_count;
 	};
+	void semaphoreholder_init(struct SemaphoreHolder *self, Device *device, VkSemaphore semaphore, bool signalled);
+	void semaphoreholder_fini(struct SemaphoreHolder *self);
+	static inline bool semaphoreholder_is_signalled(const struct SemaphoreHolder *self) { return self->signalled; }
+	static inline VkSemaphore semaphoreholder_consume(struct SemaphoreHolder *self)
+	{
+		VkSemaphore ret = self->semaphore;
+		VK_ASSERT(self->semaphore);
+		VK_ASSERT(self->signalled);
+		self->semaphore = VK_NULL_HANDLE;
+		self->signalled = false;
+		return ret;
+	}
+	static inline void semaphoreholder_add_reference(struct SemaphoreHolder *self) { counter_add_ref(&self->reference_count); }
+	void semaphoreholder_release_reference(struct SemaphoreHolder *self);
 
 	/* Semaphore handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(Semaphore,
 	 * SemaphoreHolder) to a plain struct + explicit free functions, following the
@@ -4508,14 +4487,14 @@ private:
 	 * multi-queue (async-compute/transfer) workload. */
 	struct Semaphore { SemaphoreHolder *data; };
 	static inline struct Semaphore sem_make(SemaphoreHolder *p) { struct Semaphore h; h.data = p; return h; }
-	static inline void sem_reset(struct Semaphore *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline void sem_reset(struct Semaphore *h) { if (h->data) semaphoreholder_release_reference(h->data); h->data = NULL; }
 	static inline SemaphoreHolder *sem_get(const struct Semaphore *h) { return h->data; }
 	static inline int sem_is_valid(const struct Semaphore *h) { return h->data != NULL; }
 	/* Copy-with-incref: assign src into dst, taking a new reference (matches the
 	 * old copy-ctor used when a wait list is filled from a const Semaphore &). */
 	static inline void sem_copy(struct Semaphore *dst, const struct Semaphore *src) {
 		dst->data = src->data;
-		if (dst->data) dst->data->add_reference();
+		if (dst->data) semaphoreholder_add_reference(dst->data);
 	}
 
 	/* Owning array of Semaphore (= IntrusivePtr<SemaphoreHolder>). Replaces
@@ -6007,8 +5986,8 @@ private:
 		public:
 			// Device-based objects which need to poke at internal data structures when their lifetimes end.
 			// Don't want to expose a lot of internal guts to make this work.
-			friend class SemaphoreHolder;
 			friend struct SemaphoreHolderDeleter;
+			friend void semaphoreholder_fini(struct SemaphoreHolder *self);
 			friend struct FenceHolderDeleter;
 			friend void fenceholder_fini(struct FenceHolder *self);
 			friend struct SamplerDeleter;
@@ -12935,20 +12914,34 @@ void FenceManager::deinit()
 /* === semaphore.cpp === */
 
 
-SemaphoreHolder::~SemaphoreHolder()
+void semaphoreholder_init(struct SemaphoreHolder *self, Device *device, VkSemaphore semaphore, bool signalled)
 {
-	if (semaphore)
+	self->device    = device;
+	self->semaphore = semaphore;
+	self->signalled = signalled;
+	counter_init(&self->reference_count); /* refcount starts at 1 */
+}
+
+void semaphoreholder_fini(struct SemaphoreHolder *self)
+{
+	if (self->semaphore)
 	{
-		if (is_signalled())
-			device->destroy_semaphore_nolock(semaphore);
+		if (semaphoreholder_is_signalled(self))
+			self->device->destroy_semaphore_nolock(self->semaphore);
 		else
-			device->recycle_semaphore_nolock(semaphore);
+			self->device->recycle_semaphore_nolock(self->semaphore);
 	}
+}
+
+void semaphoreholder_release_reference(struct SemaphoreHolder *self)
+{
+	if (counter_release(&self->reference_count))
+		SemaphoreHolderDeleter()(self);
 }
 
 void SemaphoreHolderDeleter::operator()(SemaphoreHolder *semaphore)
 {
-	{ struct ObjectPoolRaw *_pool = &semaphore->device->handle_pool.semaphores; semaphore->~SemaphoreHolder(); object_pool_raw_free(_pool, semaphore); }
+	{ struct ObjectPoolRaw *_pool = &semaphore->device->handle_pool.semaphores; semaphoreholder_fini(semaphore); object_pool_raw_free(_pool, semaphore); }
 }
 
 /* === semaphore_manager.cpp === */
@@ -17224,7 +17217,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		for (Semaphore &semaphore : data.wait_semaphores)
 		{
-			VkSemaphore wait = sem_get(&semaphore)->consume();
+			VkSemaphore wait = semaphoreholder_consume(sem_get(&semaphore));
 			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits, &wait);
 		}
@@ -17237,7 +17230,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
 			SemaphoreVec_push(&signals, &cleared_semaphore);
 			VK_ASSERT(!sem_is_valid(&semaphores[i]));
-			semaphores[i] = sem_make(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
+			{ struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&handle_pool.semaphores); semaphoreholder_init(_sh, this, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
 		}
 
 		submit.signalSemaphoreCount = SemaphoreVec_size(&signals);
@@ -17427,7 +17420,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		for (Semaphore &semaphore : data.wait_semaphores)
 		{
-			VkSemaphore wait = sem_get(&semaphore)->consume();
+			VkSemaphore wait = semaphoreholder_consume(sem_get(&semaphore));
 			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits[0], &wait);
 		}
@@ -17462,7 +17455,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
 			SemaphoreVec_push(&signals[VkSubmitInfoVec_size(&submits) - 1], &cleared_semaphore);
 			VK_ASSERT(!sem_is_valid(&semaphores[i]));
-			semaphores[i] = sem_make(new (object_pool_raw_allocate(&handle_pool.semaphores)) SemaphoreHolder(this, cleared_semaphore, true));
+			{ struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&handle_pool.semaphores); semaphoreholder_init(_sh, this, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
 		}
 
 		for (int i = 0; i < VkSubmitInfoVec_size(&submits); i++)
@@ -17788,11 +17781,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	void Device::clear_wait_semaphores()
 	{
 		for (Semaphore &sem : graphics.wait_semaphores)
-			vkDestroySemaphore(device, sem_get(&sem)->consume(), NULL);
+			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(&sem)), NULL);
 		for (Semaphore &sem : compute.wait_semaphores)
-			vkDestroySemaphore(device, sem_get(&sem)->consume(), NULL);
+			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(&sem)), NULL);
 		for (Semaphore &sem : transfer.wait_semaphores)
-			vkDestroySemaphore(device, sem_get(&sem)->consume(), NULL);
+			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(&sem)), NULL);
 
 		graphics.wait_semaphores.clear();
 		VkPipelineStageVec_clear(&graphics.wait_stages);
