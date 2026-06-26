@@ -1416,28 +1416,8 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
 
    /* Read the new sector directly into the target slot. The slot
     * is CDC_SECTOR_PIPE_BYTES wide (= 2448), with audio/data in
-    * the first 2352 and P-W subchannel in the trailing 96.
-    *
-    * The async non-blocking retry below (timeout 0, bail-and-retry
-    * when the read-ahead thread hasn't fetched the sector yet) must
-    * NOT run while a logical seek is still converging in
-    * DS_SEEKING_LOGICAL2.  In that state the seek only completes when
-    * a committed sector's header AMSF matches SeekTarget, and that
-    * check lives in the pipe-eviction block above, which runs only
-    * once the pipe is full.  The early "return" here skips the commit
-    * (SectorPipe_In++), so a run of async misses - exactly what
-    * happens right after a seek, when the read-ahead thread is still
-    * cold at the new LBA - keeps the pipe from ever filling, the
-    * header match never runs, the seek never finishes, DS_READING is
-    * never entered and DATA_READY stops.  The post-73487dc2 seek model
-    * re-arms SeekRetryCounter (=128) and re-enters this state on every
-    * Setloc+Read, so seek-heavy streaming titles ("Shockwave Assault",
-    * issue #965) hang after the first segment with the XA audio buffer
-    * looping (the loud-noise symptom).  Force a deterministic blocking
-    * read while seeking so the pipe fills and LOGICAL2 converges; the
-    * async retry still applies in steady-state DS_READING/DS_PLAYING. */
-   if (cd_async && cdc->SeekRetryCounter &&
-       cdc->DriveStatus != DS_SEEKING_LOGICAL2)
+    * the first 2352 and P-W subchannel in the trailing 96. */
+   if (cd_async && cdc->SeekRetryCounter)
    {
       if (!CDIF_ReadRawSector(cdc->Cur_CDIF, target, cdc->CurSector, 0))
       {
