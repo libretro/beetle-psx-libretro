@@ -2963,7 +2963,7 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 		VkBool32 unnormalized_coordinates;
 	};
 
-	class Sampler;
+	struct Sampler;
 	struct SamplerDeleter
 	{
 		void operator()(Sampler *sampler);
@@ -2972,36 +2972,22 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
 	 * base, which provides the hash identity, is unrelated and stays. */
-	class Sampler : public Cookie
+	/* Sampler: plain C struct + free functions (was a class deriving Cookie with
+	 * refcount methods + ctor/dtor). Cookie is embedded as the first member
+	 * (composition replacing inheritance); sampler_init seeds it via cookie_init.
+	 * Pooled via object_pool_raw; the refcount starts at 1. */
+	struct Sampler
 	{
-		public:
-			friend struct SamplerDeleter;
-
-			void release_reference()
-			{
-				if (counter_release(&reference_count))
-					SamplerDeleter()(this);
-			}
-			void add_reference()
-			{
-				counter_add_ref(&reference_count);
-			}
-
-			~Sampler();
-
-			VkSampler get_sampler() const
-			{
-				return sampler;
-			}
-
-		private:
-			friend class Device;
-			Sampler(Device *device, VkSampler sampler);
-
-			Device *device;
-			VkSampler sampler;
-			HandleCounter reference_count;
+		struct Cookie cookie_base; /* was: public Cookie base subobject */
+		Device *device;
+		VkSampler sampler;
+		HandleCounter reference_count;
 	};
+	void sampler_init(struct Sampler *self, Device *device, VkSampler sampler);
+	void sampler_fini(struct Sampler *self);
+	static inline VkSampler sampler_get_sampler(const struct Sampler *self) { return self->sampler; }
+	static inline void sampler_add_reference(struct Sampler *self) { counter_add_ref(&self->reference_count); }
+	void sampler_release_reference(struct Sampler *self);
 	/* Sampler handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(SamplerHandle,
 	 * Sampler) to a plain struct + explicit free functions, following the
 	 * sem_ / fence_ / bvh_ template. The pointee Sampler is unchanged. Stored in a
@@ -3013,7 +2999,7 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 	 * slot reset in deinit drops exactly one ref (no leak / no double-free). */
 	struct SamplerHandle { Sampler *data; };
 	static inline struct SamplerHandle smh_make(Sampler *p) { struct SamplerHandle h; h.data = p; return h; }
-	static inline void smh_reset(struct SamplerHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline void smh_reset(struct SamplerHandle *h) { if (h->data) sampler_release_reference(h->data); h->data = NULL; }
 	static inline Sampler *smh_get(const struct SamplerHandle *h) { return h->data; }
 	static inline int smh_is_valid(const struct SamplerHandle *h) { return h->data != NULL; }
 
@@ -6025,8 +6011,8 @@ private:
 			friend struct SemaphoreHolderDeleter;
 			friend struct FenceHolderDeleter;
 			friend void fenceholder_fini(struct FenceHolder *self);
-			friend class Sampler;
 			friend struct SamplerDeleter;
+			friend void sampler_fini(struct Sampler *self);
 			friend class Buffer;
 			friend struct BufferDeleter;
 			friend class BufferView;
@@ -12707,23 +12693,29 @@ void TextureFormatLayout::build_buffer_image_copies(VkBufferImageCopy *copies, u
 /* === sampler.cpp === */
 
 
-Sampler::Sampler(Device *device, VkSampler sampler)
-    : device(device)
-    , sampler(sampler)
+void sampler_init(struct Sampler *self, Device *device, VkSampler sampler)
 {
-	counter_init(&reference_count); /* refcount starts at 1 */
-	cookie_init(this, device);
+	self->device  = device;
+	self->sampler = sampler;
+	counter_init(&self->reference_count); /* refcount starts at 1 */
+	cookie_init(&self->cookie_base, device);
 }
 
-Sampler::~Sampler()
+void sampler_fini(struct Sampler *self)
 {
-	if (sampler)
-		device->destroy_sampler_nolock(sampler);
+	if (self->sampler)
+		self->device->destroy_sampler_nolock(self->sampler);
+}
+
+void sampler_release_reference(struct Sampler *self)
+{
+	if (counter_release(&self->reference_count))
+		SamplerDeleter()(self);
 }
 
 void SamplerDeleter::operator()(Sampler *sampler)
 {
-	{ struct ObjectPoolRaw *_pool = &sampler->device->handle_pool.samplers; sampler->~Sampler(); object_pool_raw_free(_pool, sampler); }
+	{ struct ObjectPoolRaw *_pool = &sampler->device->handle_pool.samplers; sampler_fini(sampler); object_pool_raw_free(_pool, sampler); }
 }
 
 /* === buffer.cpp === */
@@ -13856,7 +13848,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			{
 				immutable_samplers[i] = VK_NULL_HANDLE;
 				if (has_immutable_sampler(layout, i))
-					immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
+					immutable_samplers[i] = sampler_get_sampler(&device->get_stock_sampler(get_immutable_sampler(layout, i)));
 
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
 				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
@@ -13909,7 +13901,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			{
 				immutable_samplers[i] = VK_NULL_HANDLE;
 				if (has_immutable_sampler(layout, i))
-					immutable_samplers[i] = device->get_stock_sampler(get_immutable_sampler(layout, i)).get_sampler();
+					immutable_samplers[i] = sampler_get_sampler(&device->get_stock_sampler(get_immutable_sampler(layout, i)));
 
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
 				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
@@ -15851,14 +15843,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		if (sampler.cookie == bindings.secondary_cookies[set][binding])
+		if (sampler.cookie_base.cookie == bindings.secondary_cookies[set][binding])
 			return;
 
 		ResourceBinding &b = bindings.bindings[set][binding];
-		b.image.fp.sampler = sampler.get_sampler();
-		b.image.integer.sampler = sampler.get_sampler();
+		b.image.fp.sampler = sampler_get_sampler(&sampler);
+		b.image.integer.sampler = sampler_get_sampler(&sampler);
 		dirty_sets |= 1u << set;
-		bindings.secondary_cookies[set][binding] = sampler.cookie;
+		bindings.secondary_cookies[set][binding] = sampler.cookie_base.cookie;
 	}
 
 	void CommandBuffer::set_buffer_view(unsigned set, unsigned binding, const BufferView &view)
@@ -18705,7 +18697,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (vkCreateSampler(device, &info, NULL, &sampler) != VK_SUCCESS)
 			return smh_make(NULL);
 
-		return smh_make(new (object_pool_raw_allocate(&handle_pool.samplers)) Sampler(this, sampler));
+		{ struct Sampler *_s = (struct Sampler *)object_pool_raw_allocate(&handle_pool.samplers); sampler_init(_s, this, sampler); return smh_make(_s); }
 	}
 
 	BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const void *initial)
