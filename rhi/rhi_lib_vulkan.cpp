@@ -5007,36 +5007,36 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	 * signal_submitted stays inline (VULKAN_DEBUG-only bookkeeping). */
 	struct CommandPool
 	{
-		VkDevice device = VK_NULL_HANDLE;
-		VkCommandPool pool = VK_NULL_HANDLE;
-		CommandBufferVec buffers = { NULL, 0, 0 };
+		VkDevice device;
+		VkCommandPool pool;
+		CommandBufferVec buffers;
 #ifdef VULKAN_DEBUG
-		CommandBufferVec in_flight = { NULL, 0, 0 };
+		CommandBufferVec in_flight;
 #endif
-		unsigned index = 0;
-
-		void begin();
-		VkCommandBuffer request_command_buffer();
-		void signal_submitted(VkCommandBuffer cmd)
-		{
-#ifdef VULKAN_DEBUG
-			int found = -1;
-			for (int i = 0; i < in_flight.count; i++)
-				if (in_flight.items[i] == cmd) { found = i; break; }
-			VK_ASSERT(found >= 0);
-			if (found >= 0)
-			{
-				in_flight.items[found] = in_flight.items[in_flight.count - 1];
-				CommandBufferVec_pop_back(&in_flight);
-			}
-#else
-			(void)cmd;
-#endif
-		}
+		unsigned index;
 	};
 
 	static void command_pool_init(CommandPool *cp, VkDevice device, uint32_t queue_family_index);
 	static void command_pool_deinit(CommandPool *cp);
+	static void command_pool_begin(CommandPool *self);
+	static VkCommandBuffer command_pool_request_command_buffer(CommandPool *self);
+	static inline void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
+	{
+#ifdef VULKAN_DEBUG
+		int found = -1;
+		int i;
+		for (i = 0; i < self->in_flight.count; i++)
+			if (self->in_flight.items[i] == cmd) { found = i; break; }
+		VK_ASSERT(found >= 0);
+		if (found >= 0)
+		{
+			self->in_flight.items[found] = self->in_flight.items[self->in_flight.count - 1];
+			CommandBufferVec_pop_back(&self->in_flight);
+		}
+#else
+		(void)cmd;
+#endif
+	}
 
 /* ============================================================
  * command_buffer.hpp
@@ -5927,7 +5927,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 
 			SamplerHandle create_sampler(const SamplerCreateInfo &info, StockSampler sampler);
 
-			CommandPool &get_command_pool(CommandBufferType type);
+			CommandPool *get_command_pool(CommandBufferType type);
 			QueueData &get_queue_data(CommandBufferType type);
 			CommandBufferHandleVec *get_queue_submissions(CommandBufferType type);
 			void clear_wait_semaphores();
@@ -12711,18 +12711,19 @@ static void command_pool_deinit(CommandPool *cp)
 #endif
 }
 
-VkCommandBuffer CommandPool::request_command_buffer()
+VkCommandBuffer command_pool_request_command_buffer(CommandPool *self)
 {
-	if (index < CommandBufferVec_size(&buffers))
+	if (self->index < CommandBufferVec_size(&self->buffers))
 	{
-		VkCommandBuffer ret = *CommandBufferVec_at(&buffers, index++);
+		VkCommandBuffer ret = *CommandBufferVec_at(&self->buffers, self->index++);
 #ifdef VULKAN_DEBUG
 		{
 			bool present = false;
-			for (int i = 0; i < in_flight.count; i++)
-				if (in_flight.items[i] == ret) { present = true; break; }
+			int i;
+			for (i = 0; i < self->in_flight.count; i++)
+				if (self->in_flight.items[i] == ret) { present = true; break; }
 			VK_ASSERT(!present);
-			CommandBufferVec_push(&in_flight, &ret);
+			CommandBufferVec_push(&self->in_flight, &ret);
 		}
 #endif
 		return ret;
@@ -12731,34 +12732,35 @@ VkCommandBuffer CommandPool::request_command_buffer()
 	{
 		VkCommandBuffer cmd;
 		VkCommandBufferAllocateInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-		info.commandPool = pool;
+		info.commandPool = self->pool;
 		info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		info.commandBufferCount = 1;
 
-		vkAllocateCommandBuffers(device, &info, &cmd);
+		vkAllocateCommandBuffers(self->device, &info, &cmd);
 #ifdef VULKAN_DEBUG
 		{
 			bool present = false;
-			for (int i = 0; i < in_flight.count; i++)
-				if (in_flight.items[i] == cmd) { present = true; break; }
+			int i;
+			for (i = 0; i < self->in_flight.count; i++)
+				if (self->in_flight.items[i] == cmd) { present = true; break; }
 			VK_ASSERT(!present);
-			CommandBufferVec_push(&in_flight, &cmd);
+			CommandBufferVec_push(&self->in_flight, &cmd);
 		}
 #endif
-		CommandBufferVec_push(&buffers, &cmd);
-		index++;
+		CommandBufferVec_push(&self->buffers, &cmd);
+		self->index++;
 		return cmd;
 	}
 }
 
-void CommandPool::begin()
+void command_pool_begin(CommandPool *self)
 {
 #ifdef VULKAN_DEBUG
-	VK_ASSERT(CommandBufferVec_empty(&in_flight));
+	VK_ASSERT(CommandBufferVec_empty(&self->in_flight));
 #endif
-	if (index > 0)
-		vkResetCommandPool(device, pool, 0);
-	index = 0;
+	if (self->index > 0)
+		vkResetCommandPool(self->device, self->pool, 0);
+	self->index = 0;
 }
 
 /* === memory_allocator.cpp === */
@@ -16922,10 +16924,10 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 	{
 		CommandBufferType type = commandbuffer_get_command_buffer_type(cbh_get(&cmd));
-		CommandPool &pool = get_command_pool(type);
+		CommandPool *pool = get_command_pool(type);
 		CommandBufferHandleVec *submissions = get_queue_submissions(type);
 
-		pool.signal_submitted(commandbuffer_get_command_buffer(cbh_get(&cmd)));
+		command_pool_signal_submitted(pool, commandbuffer_get_command_buffer(cbh_get(&cmd)));
 		commandbuffer_end(cbh_get(&cmd));
 		cbhvec_push(submissions, &cmd);
 
@@ -17364,17 +17366,17 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 	}
 
-	CommandPool &Device::get_command_pool(CommandBufferType type)
+	CommandPool *Device::get_command_pool(CommandBufferType type)
 	{
 		switch (get_physical_queue_type(type))
 		{
 			default:
 			case Type_Generic:
-				return frame().graphics_cmd_pool;
+				return &frame().graphics_cmd_pool;
 			case Type_AsyncCompute:
-				return frame().compute_cmd_pool;
+				return &frame().compute_cmd_pool;
 			case Type_AsyncTransfer:
-				return frame().transfer_cmd_pool;
+				return &frame().transfer_cmd_pool;
 		}
 	}
 
@@ -17399,7 +17401,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	CommandBufferHandle Device::request_command_buffer_nolock(CommandBufferType type)
 	{
-		VkCommandBuffer cmd = get_command_pool(type).request_command_buffer();
+		VkCommandBuffer cmd = command_pool_request_command_buffer(get_command_pool(type));
 
 		VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 		info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -17633,9 +17635,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			FenceVec_clear(&self->recycle_fences);
 		}
 
-		self->graphics_cmd_pool.begin();
-		self->compute_cmd_pool.begin();
-		self->transfer_cmd_pool.begin();
+		command_pool_begin(&self->graphics_cmd_pool);
+		command_pool_begin(&self->compute_cmd_pool);
+		command_pool_begin(&self->transfer_cmd_pool);
 
 		{
 			int _i;
