@@ -3009,6 +3009,7 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 		StockSampler_LinearShadow,
 		StockSampler_Count
 	};
+	typedef enum StockSampler StockSampler;
 
 	struct SamplerCreateInfo
 	{
@@ -3587,6 +3588,7 @@ VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
 		BufferDomain_Host, // BufferDomain_Host-only, needs to be synced to GPU. Might be device local as well on iGPUs.
 		BufferDomain_CachedHost // BufferDomain_Host-only, used for readbacks.
 	};
+	typedef enum BufferDomain BufferDomain;
 
 	struct BufferCreateInfo
 	{
@@ -3965,6 +3967,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 		ImageDomain_Physical,
 		ImageDomain_Transient
 	};
+	typedef enum ImageDomain ImageDomain;
 
 	struct ImageCreateInfo
 	{
@@ -4057,6 +4060,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 		Layout_Optimal,
 		Layout_General
 	};
+	typedef enum Layout Layout;
 
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
@@ -4474,6 +4478,7 @@ VkDescriptorSetLayout descriptor_set_allocator_get_layout(const struct Descripto
 		ShaderStage_Compute = 5,
 		ShaderStage_Count
 	};
+	typedef enum ShaderStage ShaderStage;
 
 	struct ResourceLayout
 	{
@@ -4603,6 +4608,7 @@ PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return
 			DepthStencil_ReadOnly,
 			DepthStencil_ReadWrite
 		};
+		typedef enum DepthStencil DepthStencil;
 
 		struct Subpass
 		{
@@ -5272,6 +5278,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 		Type_AsyncCompute,
 		Type_AsyncTransfer
 	};
+	typedef enum CommandBufferType CommandBufferType;
 	struct CommandBufferDeleter
 	{
 		void operator()(CommandBuffer *cmd);
@@ -6155,6 +6162,7 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		Domain_Unscaled,
 		Domain_Scaled
 	};
+	typedef enum Domain Domain;
 
 	enum Stage {
 		Stage_Compute,
@@ -6162,6 +6170,7 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		Stage_Fragment,
 		Stage_FragmentTexture
 	};
+	typedef enum Stage Stage;
 
 	enum TextureMode {
 		TextureMode_None,
@@ -6169,6 +6178,7 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		TextureMode_Palette8bpp,
 		TextureMode_ABGR1555
 	};
+	typedef enum TextureMode TextureMode;
 
 	/* Rect: plain C struct (was a value type with ctors / operator==/!= /
 	 * contains / intersects / scissor / extend_bounding_box). The default ctor +
@@ -6903,6 +6913,7 @@ void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
 		IORequestKind_Load,
 		IORequestKind_Dump,
 	};
+	typedef enum IORequestKind IORequestKind;
 
 	struct IORequest {
 		struct IORequest *next;        /* intrusive FIFO link (queue-owned) */
@@ -8520,12 +8531,14 @@ void texture_tracker_clear_palette_cache(struct TextureTracker *self, Rect rect)
 		SemiTransparentMode_Sub,
 		SemiTransparentMode_AddQuarter
 	};
+	typedef enum SemiTransparentMode SemiTransparentMode;
 
 	enum PrimitiveType {
 		PrimitiveType_Sprite,
 		PrimitiveType_Polygon,
 		PrimitiveType_May_Be_2D_Polygon
 	};
+	typedef enum PrimitiveType PrimitiveType;
 
 	/* Display rectangle (signed origin, unlike Rect). Hoisted out of Renderer to
 	 * file scope and de-C++'d: the 4-arg constructor becomes display_rect_make and
@@ -8618,12 +8631,14 @@ bool semi_transparent_state_eq(const struct SemiTransparentState *a, const struc
 		// MDEC
 		ScanoutMode_BGR24
 	};
+	typedef enum ScanoutMode ScanoutMode;
 
 	enum ScanoutFilter {
 		ScanoutFilter_None,
 		ScanoutFilter_SSAA,
 		ScanoutFilter_MDEC_YUV
 	};
+	typedef enum ScanoutFilter ScanoutFilter;
 
 	enum WidthMode {
 		WidthMode_WIDTH_MODE_256 = 0,
@@ -8632,6 +8647,7 @@ bool semi_transparent_state_eq(const struct SemiTransparentState *a, const struc
 		WidthMode_WIDTH_MODE_640 = 3,
 		WidthMode_WIDTH_MODE_368 = 4
 	};
+	typedef enum WidthMode WidthMode;
 
 	enum FilterExclude
 	{
@@ -8648,12 +8664,14 @@ bool semi_transparent_state_eq(const struct SemiTransparentState *a, const struc
 	FilterMode_Bilinear3Point = 4,
 	FilterMode_JINC2 = 5
 };
+	typedef enum FilterMode FilterMode;
 
 	enum TransMode {
 	TransMode_Opaque = 0,
 	TransMode_SemiTrans = 1,
 	TransMode_SemiTransOpaque = 2
 };
+	typedef enum TransMode TransMode;
 
 	enum BlendMode {
 	BlendMode_BlendAdd = 0,
@@ -8661,6 +8679,7 @@ bool semi_transparent_state_eq(const struct SemiTransparentState *a, const struc
 	BlendMode_BlendSub = 2,
 	BlendMode_BlendAddQuarter = 3
 };
+	typedef enum BlendMode BlendMode;
 
 	/* Renderer per-draw POD payloads (vertex buffer entry, VRAM blit descriptor,
 	 * deferred clear candidate) and their POD_VEC arrays. Hoisted out of the
