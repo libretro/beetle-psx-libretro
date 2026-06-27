@@ -113,6 +113,13 @@ void PGXP_CPU_MTHI(uint32_t instr, uint32_t hiVal, uint32_t rdVal);
 void PGXP_CPU_MFLO(uint32_t instr, uint32_t rdVal, uint32_t loVal);
 void PGXP_CPU_MTLO(uint32_t instr, uint32_t loVal, uint32_t rdVal);
 
+/* Unified recompiler-facing dispatch (see pgxp_cpu.c for the contract). */
+int  PGXP_CPU_Tracks(uint32_t instr);
+void PGXP_CPU_Dispatch(uint32_t instr,
+                       uint32_t rdVal, uint32_t rsVal, uint32_t rtVal,
+                       uint32_t hiVal, uint32_t loVal, uint32_t addr);
+
+
 // CP0 Data transfer tracking
 void PGXP_CP0_MFC0(uint32_t instr, uint32_t rtVal, uint32_t rdVal);
 void PGXP_CP0_MTC0(uint32_t instr, uint32_t rdVal, uint32_t rtVal);
