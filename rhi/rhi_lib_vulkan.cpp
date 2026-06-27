@@ -7037,60 +7037,92 @@ void enduring_arr_free(EnduringRectArr *v) {
 	 * relocatable so the backing std::vector relocates cheaply, but ownership must
 	 * be explicit: this wrapper retains on push and on copy, and releases on
 	 * destroy/clear/assign. */
+	/* OwnedRectVec: plain C struct (was a copyable C++ class with retain-on-copy /
+	 * release-on-destroy refcount management). The element TextureRect is POD but
+	 * owns a refcounted upload, so ownership is explicit: ownedrects_push retains,
+	 * ownedrects_copy / ownedrects_assign deep-copy then retain each element, and
+	 * ownedrects_destroy releases each element then frees storage. ownedrects_move
+	 * steals storage (no refcount change). No implicit copy exists -- structs holding
+	 * one must call ownedrects_copy / ownedrects_destroy explicitly. */
 	struct OwnedRectVec {
 		TextureRectVec v;
-		OwnedRectVec() { v.items = NULL; v.count = 0; v.cap = 0; }
-		~OwnedRectVec() {
-			for (int i = 0; i < v.count; i++) texture_rect_release(&v.items[i]);
-			TextureRectVec_free_storage(&v);
-		}
-		OwnedRectVec(const OwnedRectVec &o) {
-			v.items = NULL; v.count = 0; v.cap = 0;
-			copy_from(o.v);
-			for (int i = 0; i < v.count; i++) texture_rect_retain(&v.items[i]);
-		}
-		OwnedRectVec &operator=(const OwnedRectVec &o) {
-			if (this != &o) {
-				for (int i = 0; i < v.count; i++) texture_rect_release(&v.items[i]);
-				copy_from(o.v);
-				for (int i = 0; i < v.count; i++) texture_rect_retain(&v.items[i]);
-			}
-			return *this;
-		}
-		void push(TextureRect t) { texture_rect_retain(&t); TextureRectVec_push(&v, &t); }
-		size_t size() const { return (size_t)v.count; }
-		TextureRect &operator[](size_t i) { return v.items[i]; }
-		const TextureRect &operator[](size_t i) const { return v.items[i]; }
-		bool operator==(const OwnedRectVec &o) const {
-			if (v.count != o.v.count) return false;
-			for (int i = 0; i < v.count; i++)
-				if (!(v.items[i] == o.v.items[i])) return false;
-			return true;
-		}
-		TextureRect *begin() { return v.items; }
-		TextureRect *end()   { return v.items + v.count; }
-		const TextureRect *begin() const { return v.items; }
-		const TextureRect *end()   const { return v.items + v.count; }
+	};
 
-	private:
-		/* Deep-copy the POD elements of src into v (replacing v's storage).
-		 * Refcounts are adjusted by the caller (retain after, release before). */
-		void copy_from(const TextureRectVec &src) {
-			v.count = 0;
-			if (src.count <= 0)
-				return;
-			size_t n = (size_t)src.count;
-			if (src.count > v.cap) {
-				TextureRect *ni = (TextureRect *)realloc(v.items, n * sizeof(TextureRect));
+	static inline void ownedrects_init(struct OwnedRectVec *r)
+	{
+		r->v.items = NULL; r->v.count = 0; r->v.cap = 0;
+	}
+
+	static inline void ownedrects_destroy(struct OwnedRectVec *r)
+	{
+		int i;
+		for (i = 0; i < r->v.count; i++) texture_rect_release(&r->v.items[i]);
+		TextureRectVec_free_storage(&r->v);
+	}
+
+	/* Deep-copy the POD elements of src->v into dst->v (replacing dst's storage).
+	 * Refcounts are adjusted by the caller (release before, retain after). */
+	static inline void ownedrects_copy_storage(struct OwnedRectVec *dst, const struct OwnedRectVec *src)
+	{
+		dst->v.count = 0;
+		if (src->v.count <= 0)
+			return;
+		{
+			size_t n = (size_t)src->v.count;
+			if (src->v.count > dst->v.cap) {
+				TextureRect *ni = (TextureRect *)realloc(dst->v.items, n * sizeof(TextureRect));
 				if (!ni)
 					return;
-				v.items = ni;
-				v.cap = src.count;
+				dst->v.items = ni;
+				dst->v.cap = src->v.count;
 			}
-			memcpy(v.items, src.items, n * sizeof(TextureRect));
-			v.count = src.count;
+			memcpy(dst->v.items, src->v.items, n * sizeof(TextureRect));
+			dst->v.count = src->v.count;
 		}
-	};
+	}
+
+	/* Copy-construct: dst must be uninitialized; deep-copy src and retain each element. */
+	static inline void ownedrects_copy(struct OwnedRectVec *dst, const struct OwnedRectVec *src)
+	{
+		int i;
+		ownedrects_init(dst);
+		ownedrects_copy_storage(dst, src);
+		for (i = 0; i < dst->v.count; i++) texture_rect_retain(&dst->v.items[i]);
+	}
+
+	/* Copy-assign: release dst's current elements, deep-copy src, retain each. */
+	static inline void ownedrects_assign(struct OwnedRectVec *dst, const struct OwnedRectVec *src)
+	{
+		int i;
+		if (dst == src) return;
+		for (i = 0; i < dst->v.count; i++) texture_rect_release(&dst->v.items[i]);
+		ownedrects_copy_storage(dst, src);
+		for (i = 0; i < dst->v.count; i++) texture_rect_retain(&dst->v.items[i]);
+	}
+
+	/* Move: steal src's storage into dst (dst must be empty/initialized), leave src empty. */
+	static inline void ownedrects_move(struct OwnedRectVec *dst, struct OwnedRectVec *src)
+	{
+		dst->v = src->v;
+		src->v.items = NULL; src->v.count = 0; src->v.cap = 0;
+	}
+
+	static inline void ownedrects_push(struct OwnedRectVec *r, TextureRect t)
+	{
+		texture_rect_retain(&t);
+		TextureRectVec_push(&r->v, &t);
+	}
+
+	static inline int ownedrects_size(const struct OwnedRectVec *r) { return r->v.count; }
+
+	static inline bool ownedrects_eq(const struct OwnedRectVec *a, const struct OwnedRectVec *b)
+	{
+		int i;
+		if (a->v.count != b->v.count) return false;
+		for (i = 0; i < a->v.count; i++)
+			if (!(a->v.items[i] == b->v.items[i])) return false;
+		return true;
+	}
 
 	const int LOOKUP_GRID_COLUMNS = 16;
 	const int LOOKUP_GRID_ROWS = 2;
@@ -7205,20 +7237,39 @@ void rect_tracker_clear(struct RectTracker *self, SRect rect)
 	// RectTracker
 	//============
 
+	/* FusionRects: plain C struct (was a C++ value type with NSDMIs + operator==).
+	 * Embeds an OwnedRectVec (refcounted), so init/destroy/move/eq are explicit
+	 * free functions; the scaleX/scaleY default-zero NSDMIs move into fusionrects_init. */
 	struct FusionRects {
 		OwnedRectVec rects;
 		Rect vram_rect;
-		unsigned int scaleX = 0;
-		unsigned int scaleY = 0;
-
-		bool operator==(const FusionRects &other) const {
-			return vram_rect == other.vram_rect && scaleX == other.scaleX && scaleY == other.scaleY && rects == other.rects;
-		}
-
-		bool operator!=(const FusionRects &other) const {
-			return !(*this == other);
-		}
+		unsigned int scaleX;
+		unsigned int scaleY;
 	};
+
+	static inline void fusionrects_init(struct FusionRects *f)
+	{
+		ownedrects_init(&f->rects);
+		f->vram_rect.x = 0; f->vram_rect.y = 0; f->vram_rect.width = 0; f->vram_rect.height = 0;
+		f->scaleX = 0;
+		f->scaleY = 0;
+	}
+	static inline void fusionrects_destroy(struct FusionRects *f)
+	{
+		ownedrects_destroy(&f->rects);
+	}
+	/* Move src into dst (dst must be initialized): steal rects, copy POD fields. */
+	static inline void fusionrects_move(struct FusionRects *dst, struct FusionRects *src)
+	{
+		ownedrects_move(&dst->rects, &src->rects);
+		dst->vram_rect = src->vram_rect;
+		dst->scaleX = src->scaleX;
+		dst->scaleY = src->scaleY;
+	}
+	static inline bool fusionrects_eq(const struct FusionRects *a, const struct FusionRects *b)
+	{
+		return a->vram_rect == b->vram_rect && a->scaleX == b->scaleX && a->scaleY == b->scaleY && ownedrects_eq(&a->rects, &b->rects);
+	}
 
 	struct FusedPage {
 		ImageHandle texture;
@@ -7236,23 +7287,35 @@ void rect_tracker_clear(struct RectTracker *self, SRect rect)
 	 * implicit copy-ctor incref / destructor decref the macro used to provide.
 	 * The remaining fields are trivially copyable. */
 void fp_copy(FusedPage *dst, const FusedPage *src) {
-		*dst = *src;                 /* bitwise copy of all fields */
+		/* Copy the trivially-copyable fields explicitly (NOT a blanket *dst=*src,
+		 * which would shallow-alias the OwnedRectVec inside fusion and break its
+		 * refcount). dst->fusion.rects must already be in a valid state -- empty
+		 * (fp_init_raw) for raw storage, or live for in-place compaction -- so
+		 * ownedrects_assign releases dst's current elements then deep-copies+retains
+		 * src's. */
+		dst->palette         = src->palette;
+		dst->full_page_rect  = src->full_page_rect;
+		dst->dirty           = src->dirty;
+		dst->dead            = src->dead;
+		dst->fusion.vram_rect = src->fusion.vram_rect;
+		dst->fusion.scaleX    = src->fusion.scaleX;
+		dst->fusion.scaleY    = src->fusion.scaleY;
+		ownedrects_assign(&dst->fusion.rects, &src->fusion.rects);
 		dst->texture.data = src->texture.data;
 		if (dst->texture.data) image_add_reference(dst->texture.data);  /* retain */
 	}
-	/* Seed a raw (uninitialised) FusedPage slot's only heap-owning C++ member --
+	/* Seed a raw (uninitialised) FusedPage slot's only heap-owning member --
 	 * fusion.rects (an OwnedRectVec) -- to the empty state, so the subsequent
-	 * fp_copy's *dst=*src (which runs OwnedRectVec::operator=) does not release
-	 * through the slot's indeterminate items/count. Required before fp_copy into
-	 * malloc'd storage (grow/push); the in-place compaction path already has a
-	 * live dst and must NOT use this. */
+	 * fp_copy's ownedrects_assign releases against a valid (empty) dst rather
+	 * than through the slot's indeterminate items/count. Required before fp_copy
+	 * into malloc'd storage (grow/push); the in-place compaction path already has
+	 * a live dst and must NOT use this. */
 void fp_init_raw(FusedPage *p) {
-		p->fusion.rects.v.items = NULL;
-		p->fusion.rects.v.count = 0;
-		p->fusion.rects.v.cap = 0;
+		ownedrects_init(&p->fusion.rects);
 	}
 void fp_destroy(FusedPage *p) {
 		ih_reset(&p->texture);
+		ownedrects_destroy(&p->fusion.rects);
 	}
 
 	/* Owning array of FusedPage. Replaces std::vector<FusedPage>. FusedPage owns
@@ -7339,6 +7402,39 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 		OwnedRectVec to_restore;
 	};
 
+	/* RestorableRect holds an OwnedRectVec, so its copy/destroy must run the
+	 * OwnedRectVec refcount logic explicitly (it is no longer a C++ class). */
+	static inline void restorablerect_init(struct RestorableRect *r)
+	{
+		ownedrects_init(&r->to_restore);
+	}
+	static inline void restorablerect_destroy(struct RestorableRect *r)
+	{
+		ownedrects_destroy(&r->to_restore);
+	}
+	/* Copy-construct dst (uninitialized) from src: POD fields bitwise, to_restore deep. */
+	static inline void restorablerect_copy(struct RestorableRect *dst, const struct RestorableRect *src)
+	{
+		dst->rect = src->rect;
+		dst->hash = src->hash;
+		ownedrects_copy(&dst->to_restore, &src->to_restore);
+	}
+	/* Copy-assign dst (initialized) from src. */
+	static inline void restorablerect_assign(struct RestorableRect *dst, const struct RestorableRect *src)
+	{
+		dst->rect = src->rect;
+		dst->hash = src->hash;
+		ownedrects_assign(&dst->to_restore, &src->to_restore);
+	}
+	/* Move src into dst (uninitialized): POD fields bitwise, steal to_restore. */
+	static inline void restorablerect_move(struct RestorableRect *dst, struct RestorableRect *src)
+	{
+		dst->rect = src->rect;
+		dst->hash = src->hash;
+		ownedrects_init(&dst->to_restore);
+		ownedrects_move(&dst->to_restore, &src->to_restore);
+	}
+
 	/* Owning array of RestorableRect. Replaces std::vector<RestorableRect>.
 	 * RestorableRect holds an OwnedRectVec (retain/release on copy, move
 	 * suppressed), so it is copyable but not movable - the same way std::vector
@@ -7349,70 +7445,77 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	 * clear()/the destructor run each element's destructor (releasing its rect
 	 * refs). erase_at(i) removes one element by copy-assigning the tail down and
 	 * destroying the now-duplicated last slot, matching std::vector::erase. */
+	/* RestorableRectVec: plain C struct (was a move-only C++ class). Its element
+	 * RestorableRect owns an OwnedRectVec (refcounted), so element relocation /
+	 * insertion / removal go through restorablerect_copy / _assign / _destroy / _move
+	 * rather than placement-new and explicit destructor calls. The container itself is
+	 * move-only (steal storage); no copy exists. */
 	struct RestorableRectVec {
 		RestorableRect *items;
 		int count;
 		int cap;
-
-		RestorableRectVec() : items(NULL), count(0), cap(0) {}
-		~RestorableRectVec() { destroy(); }
-		RestorableRectVec(RestorableRectVec &&o) noexcept
-			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-		RestorableRectVec &operator=(RestorableRectVec &&o) noexcept {
-			if (this != &o) {
-				destroy();
-				items = o.items; count = o.count; cap = o.cap;
-				o.items = NULL; o.count = 0; o.cap = 0;
-			}
-			return *this;
-		}
-		RestorableRectVec(const RestorableRectVec &) = delete;
-		RestorableRectVec &operator=(const RestorableRectVec &) = delete;
-
-		void push(const RestorableRect &v) {
-			if (count >= cap)
-				grow(cap ? cap * 2 : 8);
-			new (&items[count]) RestorableRect(v);
-			count++;
-		}
-		int size() const { return count; }
-		bool empty() const { return count == 0; }
-		RestorableRect &operator[](int i) { return items[i]; }
-		const RestorableRect &operator[](int i) const { return items[i]; }
-		RestorableRect *begin() { return items; }
-		RestorableRect *end() { return items + count; }
-		const RestorableRect *begin() const { return items; }
-		const RestorableRect *end() const { return items + count; }
-		void clear() {
-			for (int i = 0; i < count; i++)
-				items[i].~RestorableRect();
-			count = 0;
-		}
-		void erase_at(int i) {
-			for (int j = i; j + 1 < count; j++)
-				items[j] = items[j + 1];
-			items[count - 1].~RestorableRect();
-			count--;
-		}
-
-	private:
-		void grow(int ncap) {
-			RestorableRect *nitems = (RestorableRect *)malloc((size_t)ncap * sizeof(RestorableRect));
-			for (int i = 0; i < count; i++) {
-				new (&nitems[i]) RestorableRect(items[i]);
-				items[i].~RestorableRect();
-			}
-			free(items);
-			items = nitems;
-			cap = ncap;
-		}
-		void destroy() {
-			for (int i = 0; i < count; i++)
-				items[i].~RestorableRect();
-			free(items);
-			items = NULL; count = 0; cap = 0;
-		}
 	};
+
+	static inline void rrvec_init(struct RestorableRectVec *v)
+	{
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
+	static inline void rrvec_destroy(struct RestorableRectVec *v)
+	{
+		int i;
+		for (i = 0; i < v->count; i++)
+			restorablerect_destroy(&v->items[i]);
+		free(v->items);
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
+	/* Move o into v (v must be initialized): free v's elements, steal o's storage. */
+	static inline void rrvec_move(struct RestorableRectVec *v, struct RestorableRectVec *o)
+	{
+		if (v == o) return;
+		rrvec_destroy(v);
+		v->items = o->items; v->count = o->count; v->cap = o->cap;
+		o->items = NULL; o->count = 0; o->cap = 0;
+	}
+	static inline void rrvec_grow(struct RestorableRectVec *v, int ncap)
+	{
+		int i;
+		RestorableRect *nitems = (RestorableRect *)malloc((size_t)ncap * sizeof(RestorableRect));
+		for (i = 0; i < v->count; i++) {
+			restorablerect_copy(&nitems[i], &v->items[i]);
+			restorablerect_destroy(&v->items[i]);
+		}
+		free(v->items);
+		v->items = nitems;
+		v->cap = ncap;
+	}
+	/* Copy-insert v (matches the old push_back(std::move(rr)) which, move being
+	 * suppressed, was a copy). */
+	static inline void rrvec_push(struct RestorableRectVec *vec, const struct RestorableRect *val)
+	{
+		if (vec->count >= vec->cap)
+			rrvec_grow(vec, vec->cap ? vec->cap * 2 : 8);
+		restorablerect_copy(&vec->items[vec->count], val);
+		vec->count++;
+	}
+	static inline int rrvec_size(const struct RestorableRectVec *v) { return v->count; }
+	static inline bool rrvec_empty(const struct RestorableRectVec *v) { return v->count == 0; }
+	static inline void rrvec_clear(struct RestorableRectVec *v)
+	{
+		int i;
+		for (i = 0; i < v->count; i++)
+			restorablerect_destroy(&v->items[i]);
+		v->count = 0;
+	}
+	/* Remove element i by copy-assigning the tail down and destroying the duplicated
+	 * last slot (matches std::vector::erase). */
+	static inline void rrvec_erase_at(struct RestorableRectVec *v, int i)
+	{
+		int j;
+		for (j = i; j + 1 < v->count; j++)
+			restorablerect_assign(&v->items[j], &v->items[j + 1]);
+		restorablerect_destroy(&v->items[v->count - 1]);
+		v->count--;
+	}
 
 	/* Edge-triggered debug keyboard hotkey. Formerly a class with an int
 	 * constructor; now a plain struct driven by dbg_hotkey_init. query() does the
@@ -20209,10 +20312,10 @@ Rect fromSRect(SRect rect) {
 
 		uint32_t hash = texture_tracker_dbgHashVram(self, rect, vram);
 
-		for (int i = 0; i < self->restorable_rects.size(); )
+		for (int i = 0; i < rrvec_size(&self->restorable_rects); )
 		{
-			if (self->restorable_rects[i].rect.intersects(rect))
-				self->restorable_rects.erase_at(i);
+			if (self->restorable_rects.items[i].rect.intersects(rect))
+				rrvec_erase_at(&self->restorable_rects, i);
 			else
 				i++;
 		}
@@ -20229,16 +20332,18 @@ Rect fromSRect(SRect rect) {
 				TextureRectResult result = clip_texture_rect_to_vram(e.texture_rect, rect);
 				if (result.valid) {
 					// assert(rect.contains(fromSRect(result.rect.vram_rect)));
-					to_restore.push(result.rect);
+					ownedrects_push(&to_restore, result.rect);
 				}
 			}
 		}
 
 		RestorableRect rr;
+		restorablerect_init(&rr);
 		rr.rect = rect;
 		rr.hash = hash;
-		rr.to_restore = static_cast<OwnedRectVec &&>(to_restore);
-		self->restorable_rects.push(rr);
+		ownedrects_move(&rr.to_restore, &to_restore);
+		rrvec_push(&self->restorable_rects, &rr);
+		restorablerect_destroy(&rr);
 	}
 
 	void texture_tracker_upload(struct TextureTracker *self, Rect rect, uint16_t *vram) {
@@ -20301,15 +20406,21 @@ Rect fromSRect(SRect rect) {
 		}
 
 		RestorableRect *restore = NULL;
-		for (RestorableRect &other : self->restorable_rects) {
+		{
+		int _oi;
+		for (_oi = 0; _oi < rrvec_size(&self->restorable_rects); _oi++) {
+			RestorableRect &other = self->restorable_rects.items[_oi];
 			if (other.hash == upload->hash && other.rect == rect) {
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "RESTORATION: %x\n", other.hash);
 				restore = &other;
 				break;
 			}
 		}
+		}
 		if (restore != NULL) {
-			for (TextureRect &t : restore->to_restore) {
+			int _ri;
+			for (_ri = 0; _ri < ownedrects_size(&restore->to_restore); _ri++) {
+				TextureRect &t = restore->to_restore.v.items[_ri];
 				rect_tracker_place(&self->tracker, t); // TODO: clip to other.rect
 			}
 		} else {
@@ -20758,13 +20869,13 @@ bool is_power_of_two(int n) {
 			return upload;
 
 		// backup search, in case it's restorable but currently missing from the rect tracker
-		for (_ri = 0; _ri < self->restorable_rects.size(); _ri++)
+		for (_ri = 0; _ri < rrvec_size(&self->restorable_rects); _ri++)
 		{
-			RestorableRect &entry = self->restorable_rects[_ri];
+			RestorableRect &entry = self->restorable_rects.items[_ri];
 			size_t _ti;
-			for (_ti = 0; _ti < entry.to_restore.size(); _ti++)
+			for (_ti = 0; _ti < ownedrects_size(&entry.to_restore); _ti++)
 			{
-				TextureRect &t = entry.to_restore[_ti];
+				TextureRect &t = entry.to_restore.v.items[_ti];
 				if (hash == t.upload->hash)
 					return t.upload;
 			}
@@ -20882,10 +20993,19 @@ bool is_power_of_two(int n) {
 		hd_key_set_clear(&self->pending_attach);
 		for (EnduringTextureRect &texture : self->tracker.textures)
 			hd_tex_map_clear(&texture.texture_rect.upload->textures);
-		for (RestorableRect &restorable : self->restorable_rects)
 		{
-			for (TextureRect &tr : restorable.to_restore)
-				hd_tex_map_clear(&tr.upload->textures);
+		int _rri;
+		for (_rri = 0; _rri < rrvec_size(&self->restorable_rects); _rri++)
+		{
+			RestorableRect &restorable = self->restorable_rects.items[_rri];
+			{
+				int _tri;
+				for (_tri = 0; _tri < ownedrects_size(&restorable.to_restore); _tri++) {
+					TextureRect &tr = restorable.to_restore.v.items[_tri];
+					hd_tex_map_clear(&tr.upload->textures);
+				}
+			}
+		}
 		}
 
 		// Delete fused textures
@@ -21220,11 +21340,9 @@ int64_t page_bytes(FusionRects &fusion)
 		return 0;
 	}
 
-	FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, struct RectTracker *tracker) {
-		FusionRects f;
-		f.scaleX = 0;
-		f.scaleY = 0;
-		f.vram_rect = {0, 0, 0, 0};
+	void fusion_rects(struct FusionRects *out, Rect full_page_rect, uint32_t palette_hash, struct RectTracker *tracker) {
+		struct FusionRects *f = out;
+		fusionrects_init(f);
 
 		int _ei;
 		for (_ei = 0; _ei < tracker->textures.count; _ei++) {
@@ -21241,22 +21359,21 @@ int64_t page_bytes(FusionRects &fusion)
 					TextureRect clipped = subTexture(e->texture_rect, intersection.rect);
 					unsigned hd_scale_x = image_get_width(hd_texture->image, 0) / upload->width;
 					unsigned hd_scale_y = image_get_height(hd_texture->image, 0) / upload->height;
-					f.scaleX = max_(f.scaleX, hd_scale_x);
-					f.scaleY = max_(f.scaleY, hd_scale_y);
+					f->scaleX = max_(f->scaleX, hd_scale_x);
+					f->scaleY = max_(f->scaleY, hd_scale_y);
 					Rect r = fromSRect(clipped.vram_rect);
-					if (f.vram_rect.width == 0)
-						f.vram_rect = r;
+					if (f->vram_rect.width == 0)
+						f->vram_rect = r;
 					else
-						f.vram_rect.extend_bounding_box(r);
-					f.rects.push(clipped);
+						f->vram_rect.extend_bounding_box(r);
+					ownedrects_push(&f->rects, clipped);
 				}
 			}
 		}
 
 		// Sort rects so that the vector itself can be compared
-		qsort(TextureRectVec_data(&f.rects.v), TextureRectVec_size(&f.rects.v), sizeof(TextureRect), texture_rect_qsort_cmp);
+		qsort(TextureRectVec_data(&f->rects.v), TextureRectVec_size(&f->rects.v), sizeof(TextureRect), texture_rect_qsort_cmp);
 
-		return f;
 	}
 
 	void rebuild_page(FusedPage &page, struct RectTracker *tracker, Renderer *uploader) {
@@ -21271,15 +21388,18 @@ int64_t page_bytes(FusionRects &fusion)
 		page.dirty = false;
 
 		{
-			FusionRects fusion = fusion_rects(page.full_page_rect, page.palette, tracker);
-			if (page.fusion == fusion) {
+			FusionRects fusion;
+			fusion_rects(&fusion, page.full_page_rect, page.palette, tracker);
+			if (fusionrects_eq(&page.fusion, &fusion)) {
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilt page: no change\n");
+				fusionrects_destroy(&fusion);
 				return;
 			}
-			page.fusion = static_cast<FusionRects &&>(fusion);
+			fusionrects_move(&page.fusion, &fusion);
+			fusionrects_destroy(&fusion);
 		}
 
-		if (page.fusion.rects.size() == 0) {
+		if (ownedrects_size(&page.fusion.rects) == 0) {
 			page.dead = true;
 			ih_reset(&page.texture);
 			TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilt page: page is now dead\n");
@@ -21312,7 +21432,10 @@ int64_t page_bytes(FusionRects &fusion)
 		commandbuffer_clear_image(cbh_get(cmd), *ih_get(&page.texture), fallthrough);
 
 		// Second pass to blit all the existing textures into the new texture
-		for (TextureRect &tex : page.fusion.rects) {
+		{
+		int _fri;
+		for (_fri = 0; _fri < ownedrects_size(&page.fusion.rects); _fri++) {
+			TextureRect &tex = page.fusion.rects.v.items[_fri];
 			TextureUpload &upload = *tex.upload;
 
 			HdTexEntry *hd_texture = hd_tex_map_find(&upload.textures, page.palette);
@@ -21399,6 +21522,7 @@ int64_t page_bytes(FusionRects &fusion)
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 					0
 					);
+		}
 		}
 
 		// I have no idea what the fuck I'm doing
@@ -21577,18 +21701,26 @@ int64_t page_bytes(FusionRects &fusion)
 				TextureRectSaveStateVec_push(&state.rects, &_ss);
 			}
 		}
-		for (RestorableRect &r : self->restorable_rects)
 		{
+		int _sri;
+		for (_sri = 0; _sri < rrvec_size(&self->restorable_rects); _sri++)
+		{
+			RestorableRect &r = self->restorable_rects.items[_sri];
 			RestorableRectSaveState saved;
 			rrss_init(&saved);
 			saved.hash = r.hash;
 			saved.rect = r.rect;
-			for (TextureRect &t : r.to_restore)
 			{
+			int _rti;
+			for (_rti = 0; _rti < ownedrects_size(&r.to_restore); _rti++)
+			{
+				TextureRect &t = r.to_restore.v.items[_rti];
 				TextureRectSaveState _ss = to_save_state(t, state.uploads);
 				TextureRectSaveStateVec_push(&saved.to_restore, &_ss);
 			}
+			}
 			RestorableRectSaveStateVec_push_move(&state.restorable, &saved);
+		}
 		}
 
 		tts_move(out, &state);
@@ -21613,19 +21745,21 @@ int64_t page_bytes(FusionRects &fusion)
 			for (_i = 0; _i < TextureRectSaveStateVec_size(&state.rects); _i++)
 				rect_tracker_place(&self->tracker, from_save_state(*TextureRectSaveStateVec_at((struct TextureRectSaveStateVec *)&state.rects, _i), uploads));
 		}
-		self->restorable_rects.clear();
+		rrvec_clear(&self->restorable_rects);
 		{
 			int _i;
 			for (_i = 0; _i < RestorableRectSaveStateVec_size(&state.restorable); _i++)
 			{
 				RestorableRectSaveState *r = RestorableRectSaveStateVec_at((struct RestorableRectSaveStateVec *)&state.restorable, _i);
 				RestorableRect loaded;
+				restorablerect_init(&loaded);
 				loaded.hash = r->hash;
 				loaded.rect = r->rect;
 				int _j;
 				for (_j = 0; _j < TextureRectSaveStateVec_size(&r->to_restore); _j++)
-					loaded.to_restore.push(from_save_state(*TextureRectSaveStateVec_at(&r->to_restore, _j), uploads));
-				self->restorable_rects.push(loaded);
+					ownedrects_push(&loaded.to_restore, from_save_state(*TextureRectSaveStateVec_at(&r->to_restore, _j), uploads));
+				rrvec_push(&self->restorable_rects, &loaded);
+				restorablerect_destroy(&loaded);
 			}
 		}
 		// Need to reload the hd textures, too
