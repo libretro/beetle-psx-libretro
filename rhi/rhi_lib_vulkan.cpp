@@ -8254,114 +8254,103 @@ extern retro_log_printf_t log_cb;
 		s->count--;
 	}
 
-	class TextureTracker {
-		public:
-			TextureTracker();
-			~TextureTracker();
+	/* TextureTracker: the HD-texture replacement engine -- tracks VRAM rects,
+	 * resolves (hash,palette) combos to HD textures, and drives the disk/CPU/GPU
+	 * cache tiers and the IO worker thread. Converted from a C++ class to a plain C
+	 * struct + texture_tracker_* free functions. The ctor/dtor become
+	 * texture_tracker_init / texture_tracker_fini; the embedded RectTracker /
+	 * FusedPages are init'd/deinit'd there (already converted). Default member
+	 * initializers move into texture_tracker_init. */
+	struct TextureTracker {
+		bool dump_enabled;
+		bool hd_textures_enabled;
+		bool eager_textures; // true = prefetch all palettes of a hash on upload (master-consistent); false = lazy per-draw
 
-			TextureTrackerSaveState save_state();
-			void load_state(const TextureTrackerSaveState &state);
+		IOThread iothread;
+		Renderer *uploader;
 
-			// Put texture in highres vram
-			void upload(Rect rect, uint16_t *vram);
-			void blit(Rect dst, Rect src);
-			// Clear highres vram to fallback to lowres
-			void clearRegion(Rect rect);
-			// Monitor VRAM readback
-			void notifyReadback(Rect rect, uint16_t *vram);
-			uint32_t dbgHashVram(Rect rect, uint16_t *vram);
+		ImageHandle default_hd_texture;
 
-			HdTextureHandle get_hd_texture_index(Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable, bool &cache_hit);
-			HdTexture get_hd_texture(HdTextureHandle index);
-			void endFrame();
-			void on_queues_reset();
+		RectMatch dump_ignore[DUMP_IGNORE_MAX];
+		int       dump_ignore_count;
 
-			void set_texture_uploader(Renderer *t);
+		HdKeySet known_files;
+		// Palette-hash cache: a plain growable array (append-only until cleared,
+		// no eviction/order), replacing std::vector<CachedPaletteHash>.
+		CachedPaletteHash *cached_palette_hashes;
+		int cached_palette_hashes_count;
+		int cached_palette_hashes_cap;
+		RestorableRectVec restorable_rects;
+		FusedPages fused_pages;
+		uint64_t frame;
 
-			// Runtime cache budgets (bytes), driven by core options.
-			void set_cache_budgets(size_t ram_bytes, size_t vram_bytes) {
-				HdImageCache_set_budget(&hd_cache, ram_bytes);
-				HdGpuCache_set_budget(&hd_gpu_cache, vram_bytes);
-			}
+		RectTracker tracker;
+		HandleLRUCache handle_cache;
 
-			bool dump_enabled = false;
-			bool hd_textures_enabled = false;
-			bool eager_textures = true; // true = prefetch all palettes of a hash on upload (master-consistent); false = lazy per-draw
-		private:
-			IOThread iothread;
-			Renderer *uploader;
+		// HD image caches, independent of upload lifetime. Tier 1 = GPU (VRAM,
+		// ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier 3
+		// = disk. Initialised via HdGpuCache_init / HdImageCache_init.
+		HdGpuCache hd_gpu_cache;
+		HdImageCache hd_cache;
+		HdKeySet requested;        // disk load in flight, or known to have no file (negative cache)
+		HdKeySet pending_attach;   // cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset
 
-			ImageHandle default_hd_texture;
+		// Diagnostics (logged every 300 frames by endFrame).
+		uint64_t dbg_responses_received;
+		uint64_t dbg_responses_received_last;
+		uint64_t dbg_gpu_uploads;
+		uint64_t dbg_gpu_uploads_last;
+		uint64_t dbg_attaches;
+		uint64_t dbg_attaches_last;
 
-			Palette get_palette(Rect palette_rect);
-			uint32_t get_palette_hash(Rect palette_rect);
+		DbgHotkey frame_dump_key;
+		RFILE *frame_dump;
+		bool frame_dump_need_comma;
 
-			RectMatch dump_ignore[DUMP_IGNORE_MAX];
-			int       dump_ignore_count;
-
-			HdKeySet known_files;
-			// Palette-hash cache: a plain growable array (append-only until cleared,
-			// no eviction/order), replacing std::vector<CachedPaletteHash>.
-			CachedPaletteHash *cached_palette_hashes;
-			int cached_palette_hashes_count;
-			int cached_palette_hashes_cap;
-			RestorableRectVec restorable_rects;
-			FusedPages fused_pages;
-			uint64_t frame = 0;
-
-			RectTracker tracker;
-			HandleLRUCache handle_cache;
-
-			// HD image caches, independent of upload lifetime. Tier 1 = GPU (VRAM,
-			// ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier 3
-			// = disk. Re-attach prefers the GPU cache (handle copy), falls back to a
-			// GPU upload from the CPU cache, then to a disk load. Initialised in the
-			// TextureTracker constructor via HdGpuCache_init / HdImageCache_init.
-			HdGpuCache hd_gpu_cache;
-			HdImageCache hd_cache;
-			HdKeySet requested;        // disk load in flight, or known to have no file (negative cache)
-			HdKeySet pending_attach;   // cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset
-
-			// Queue a disk load for a combo unless it's already cached / in flight / fileless.
-			void want_combo(HdTextureId id);
-
-			// Diagnostics (logged every 300 frames by endFrame; non-verbose so they
-			// show in a normal RetroArch INFO log).
-			uint64_t dbg_responses_received = 0;       // disk decodes completed (should stay low with the cache)
-			uint64_t dbg_responses_received_last = 0;
-			uint64_t dbg_gpu_uploads = 0;              // upload_texture calls (CPU->GPU); should fall toward 0 once warm
-			uint64_t dbg_gpu_uploads_last = 0;
-			uint64_t dbg_attaches = 0;                 // combos bound to an upload (handle copy or fresh upload)
-			uint64_t dbg_attaches_last = 0;
-
-			void dump_texture(TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode);
-
-			DbgHotkey frame_dump_key;
-			RFILE *frame_dump = NULL;
-			bool frame_dump_need_comma = false;
-
-			DbgHotkey hd_toggle_key;
-
-			void load_hd_texture(uint32_t hash); // eager per-hash loader, still used by load_state (savestate)
-							     // Cache-backed lazy HD texture binding for a drawn (hash,palette); see definition.
-			void request_hd_texture(TextureUpload *upload, uint32_t palette_hash);
-
-			DbgHotkey reload_key;
-			void reload_textures_from_disk();
-
-			DbgHotkey fastpath_key;
-			bool fastpath_enabled = true;
-
-			void dump_image(TextureUpload &upload, UsedMode &mode);
-
-			void clear_palette_cache(Rect rect)
-			{
-				cached_palette_hashes_count = 0; /* keep allocation for reuse */
-			}
-
-			/** Returns NULL if no texture with the given hash can be found */
-			TextureUpload *find_upload(uint32_t hash);
+		DbgHotkey hd_toggle_key;
+		DbgHotkey reload_key;
+		DbgHotkey fastpath_key;
+		bool fastpath_enabled;
 	};
+
+	void texture_tracker_init(struct TextureTracker *self);
+	void texture_tracker_fini(struct TextureTracker *self);
+
+	TextureTrackerSaveState texture_tracker_save_state(struct TextureTracker *self);
+	void texture_tracker_load_state(struct TextureTracker *self, const TextureTrackerSaveState &state);
+
+	void texture_tracker_upload(struct TextureTracker *self, Rect rect, uint16_t *vram);
+	void texture_tracker_blit(struct TextureTracker *self, Rect dst, Rect src);
+	void texture_tracker_clearRegion(struct TextureTracker *self, Rect rect);
+	void texture_tracker_notifyReadback(struct TextureTracker *self, Rect rect, uint16_t *vram);
+	uint32_t texture_tracker_dbgHashVram(struct TextureTracker *self, Rect rect, uint16_t *vram);
+
+	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable, bool &cache_hit);
+	HdTexture texture_tracker_get_hd_texture(struct TextureTracker *self, HdTextureHandle index);
+	void texture_tracker_endFrame(struct TextureTracker *self);
+	void texture_tracker_on_queues_reset(struct TextureTracker *self);
+
+	void texture_tracker_set_texture_uploader(struct TextureTracker *self, Renderer *t);
+
+	static inline void texture_tracker_set_cache_budgets(struct TextureTracker *self, size_t ram_bytes, size_t vram_bytes)
+	{
+		HdImageCache_set_budget(&self->hd_cache, ram_bytes);
+		HdGpuCache_set_budget(&self->hd_gpu_cache, vram_bytes);
+	}
+
+	static Palette texture_tracker_get_palette(struct TextureTracker *self, Rect palette_rect);
+	static uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, Rect palette_rect);
+	static void texture_tracker_want_combo(struct TextureTracker *self, HdTextureId id);
+	static void texture_tracker_dump_texture(struct TextureTracker *self, TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode);
+	static void texture_tracker_load_hd_texture(struct TextureTracker *self, uint32_t hash);
+	static void texture_tracker_request_hd_texture(struct TextureTracker *self, TextureUpload *upload, uint32_t palette_hash);
+	static void texture_tracker_reload_textures_from_disk(struct TextureTracker *self);
+	static void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload &upload, UsedMode &mode);
+	static inline void texture_tracker_clear_palette_cache(struct TextureTracker *self, Rect rect)
+	{
+		self->cached_palette_hashes_count = 0; /* keep allocation for reuse */
+	}
+	static TextureUpload *texture_tracker_find_upload(struct TextureTracker *self, uint32_t hash);
 
 	struct Vertex
 	{
@@ -8560,7 +8549,7 @@ extern retro_log_printf_t log_cb;
 			}
 			void set_hd_cache_budgets(size_t ram_bytes, size_t vram_bytes)
 			{
-				tracker.set_cache_budgets(ram_bytes, vram_bytes);
+				texture_tracker_set_cache_budgets(&tracker, ram_bytes, vram_bytes);
 			}
 			void set_eager_hd_textures(bool enable)
 			{
@@ -8617,7 +8606,7 @@ extern retro_log_printf_t log_cb;
 			void notify_texture_upload(Rect rect, uint16_t *vram)
 			{
 				if (texture_tracking_enabled)
-					tracker.upload(rect, vram);
+					texture_tracker_upload(&tracker, rect, vram);
 			}
 
 			void blit_vram(const Rect &dst, const Rect &src);
@@ -9293,6 +9282,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	last_scanout.data            = NULL;
 	reuseable_scanout.data       = NULL;
 	fbatlas_init(&atlas);
+	texture_tracker_init(&tracker); /* embedded TextureTracker: explicit init (was default ctor) */
 	// Sanity check settings, 16x IR with 16x MSAA will exhaust most GPUs VRAM alone.
 	if (scaling == 16 && msaa > 1)
 	{
@@ -9439,7 +9429,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	}
 
 	atlas.set_hazard_listener(this);
-	tracker.set_texture_uploader(this);
+	texture_tracker_set_texture_uploader(&tracker, this);
 
 	init_pipelines();
 
@@ -9470,7 +9460,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	reset_scissor_queue();
 
 	if (state) {
-		tracker.load_state(state->tracker_state);
+		texture_tracker_load_state(&tracker, state->tracker_state);
 	}
 
 	valid = true;
@@ -9501,7 +9491,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	Renderer::OwnedU32Buf vram;
 	vram.assign(src, FB_WIDTH * FB_HEIGHT);
 	device->unmap_host_buffer(*bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
-	return { static_cast<Renderer::OwnedU32Buf &&>(vram), render_state, tracker.save_state() };
+	return { static_cast<Renderer::OwnedU32Buf &&>(vram), render_state, texture_tracker_save_state(&tracker) };
 }
 
 void Renderer::init_primitive_pipelines()
@@ -9659,7 +9649,7 @@ void Renderer::set_draw_rect(const Rect &rect)
 void Renderer::clear_rect(const Rect &rect, uint32_t fb_color)
 {
 	if (texture_tracking_enabled) {
-		tracker.clearRegion(rect);
+		texture_tracker_clearRegion(&tracker, rect);
 	}
 	ih_reset(&last_scanout);
 	atlas.clear_rect(rect, fb_color);
@@ -9732,7 +9722,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	}
 
 	if (texture_tracking_enabled) {
-		tracker.notifyReadback(rect, vram);
+		texture_tracker_notifyReadback(&tracker, rect, vram);
 	}
 
 	device->unmap_host_buffer(*bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
@@ -10112,7 +10102,7 @@ ImageHandle Renderer::scanout_to_texture()
 {
 	atlas.flush_render_pass();
 	if (texture_tracking_enabled) {
-		tracker.endFrame();
+		texture_tracker_endFrame(&tracker);
 	}
 
 	if (ih_is_valid(&last_scanout))
@@ -10529,7 +10519,7 @@ HdTextureHandle Renderer::get_hd_texture_index(const Rect &vram_rect, bool &fast
 		mode.palette_offset_y = 0;
 	}
 	if (texture_tracking_enabled) {
-		return tracker.get_hd_texture_index(vram_rect, mode, render_state.texture_offset_x, render_state.texture_offset_y, fastpath_capable_out, cache_hit_out);
+		return texture_tracker_get_hd_texture_index(&tracker, vram_rect, mode, render_state.texture_offset_x, render_state.texture_offset_y, fastpath_capable_out, cache_hit_out);
 	} else {
 		return HdTextureHandle::make_none();
 	}
@@ -11260,7 +11250,7 @@ void Renderer::render_opaque_primitives()
 }
 
 void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
-	HdTexture hd = tracker.get_hd_texture(hd_texture_index);
+	HdTexture hd = texture_tracker_get_hd_texture(&tracker, hd_texture_index);
 	commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 4, image_get_view(ih_get(&hd.texture)), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
 	// ivec4, ivec4
 	struct HDPush {
@@ -11466,7 +11456,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	Domain domain = atlas.blit_vram(dst, src);
 
 	if (texture_tracking_enabled) {
-		tracker.blit(dst, src);
+		texture_tracker_blit(&tracker, dst, src);
 	}
 
 	if (dst.intersects(src))
@@ -11666,6 +11656,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 Renderer::~Renderer()
 {
 	flush();
+	texture_tracker_fini(&tracker); /* embedded TextureTracker: explicit fini (was default dtor) */
 	/* Release the ImageHandle members (previously dropped by implicit member
 	 * destructors, which a plain struct no longer provides). */
 	ih_reset(&scaled_framebuffer);
@@ -11720,7 +11711,7 @@ void Renderer::reset_queue()
 	reset_scissor_queue();
 
 	if (texture_tracking_enabled) {
-		tracker.on_queues_reset();
+		texture_tracker_on_queues_reset(&tracker);
 	}
 }
 
@@ -19701,7 +19692,7 @@ static char retro_slash = '/';
 		t->channel = NULL;
 	}
 
-	void TextureTracker::dump_image(TextureUpload &upload, UsedMode &mode) {
+	void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload &upload, UsedMode &mode) {
 		uint32_t hash = upload.hash;
 
 		uint8_t *bytes;
@@ -19736,7 +19727,7 @@ static char retro_slash = '/';
 		uint16_t *palette = NULL;
 		if (mode.mode == TextureMode_Palette4bpp || mode.mode == TextureMode_Palette8bpp) {
 			Rect palette_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode_Palette8bpp ? 256 : 16, 1);
-			Palette p = get_palette(palette_rect);
+			Palette p = texture_tracker_get_palette(self, palette_rect);
 			if (p.data != NULL) {
 				palette = p.data;
 				plen = strlen(path);
@@ -19824,10 +19815,10 @@ static char retro_slash = '/';
 			dump->bytes = bytes;          /* transfer ownership to the request */
 			dump->bytes_len = bytes_len;
 
-			slock_lock(iothread.channel->lock);
-			io_channel_push_request(iothread.channel, dump);
-			slock_unlock(iothread.channel->lock);
-			scond_signal(iothread.channel->cond);
+			slock_lock(self->iothread.channel->lock);
+			io_channel_push_request(self->iothread.channel, dump);
+			slock_unlock(self->iothread.channel->lock);
+			scond_signal(self->iothread.channel->cond);
 		}
 	}
 
@@ -19855,56 +19846,72 @@ static char retro_slash = '/';
 		}
 	}
 
-	TextureTracker::TextureTracker()
+	void texture_tracker_init(struct TextureTracker *self)
 	{
 		char rpath[PATH_MAX_TT];
 		char cfg[PATH_MAX_TT];
-		default_hd_texture.data = NULL; /* plain-struct handle: explicit null */
-		rect_tracker_init(&tracker); /* embedded RectTracker: explicit init (was default ctor) */
-		fused_pages_init(&fused_pages); /* embedded FusedPages: explicit init (was default ctor) */
-		HdImageCache_init(&hd_cache, HD_CACHE_RAM_BUDGET);
-		HdGpuCache_init(&hd_gpu_cache, HD_CACHE_VRAM_BUDGET);
-		handle_lru_cache_init(&handle_cache, 4);
-		dbg_hotkey_init(&frame_dump_key, RETROK_LEFTBRACKET);
-		dbg_hotkey_init(&hd_toggle_key, RETROK_RIGHTBRACKET);
-		dbg_hotkey_init(&reload_key, RETROK_QUOTE);
-		dbg_hotkey_init(&fastpath_key, RETROK_SEMICOLON);
-		hd_key_set_init(&known_files);
-		hd_key_set_init(&requested);
-		hd_key_set_init(&pending_attach);
-		cached_palette_hashes = NULL;
-		cached_palette_hashes_count = 0;
-		cached_palette_hashes_cap = 0;
-		read_texture_directory(&known_files, replacements_path(rpath, sizeof(rpath)));
-		TT_LOG(RETRO_LOG_INFO, "num hd textures: %d\n", (int)known_files.count);
+		int mi;
+		/* former default member initializers */
+		self->dump_enabled = false;
+		self->hd_textures_enabled = false;
+		self->eager_textures = true;
+		self->uploader = NULL;
+		self->frame = 0;
+		self->dbg_responses_received = 0;
+		self->dbg_responses_received_last = 0;
+		self->dbg_gpu_uploads = 0;
+		self->dbg_gpu_uploads_last = 0;
+		self->dbg_attaches = 0;
+		self->dbg_attaches_last = 0;
+		self->frame_dump = NULL;
+		self->frame_dump_need_comma = false;
+		self->fastpath_enabled = true;
+		self->default_hd_texture.data = NULL; /* plain-struct handle: explicit null */
+		rect_tracker_init(&self->tracker); /* embedded RectTracker: explicit init (was default ctor) */
+		fused_pages_init(&self->fused_pages); /* embedded FusedPages: explicit init (was default ctor) */
+		HdImageCache_init(&self->hd_cache, HD_CACHE_RAM_BUDGET);
+		HdGpuCache_init(&self->hd_gpu_cache, HD_CACHE_VRAM_BUDGET);
+		handle_lru_cache_init(&self->handle_cache, 4);
+		dbg_hotkey_init(&self->frame_dump_key, RETROK_LEFTBRACKET);
+		dbg_hotkey_init(&self->hd_toggle_key, RETROK_RIGHTBRACKET);
+		dbg_hotkey_init(&self->reload_key, RETROK_QUOTE);
+		dbg_hotkey_init(&self->fastpath_key, RETROK_SEMICOLON);
+		hd_key_set_init(&self->known_files);
+		hd_key_set_init(&self->requested);
+		hd_key_set_init(&self->pending_attach);
+		self->cached_palette_hashes = NULL;
+		self->cached_palette_hashes_count = 0;
+		self->cached_palette_hashes_cap = 0;
+		read_texture_directory(&self->known_files, replacements_path(rpath, sizeof(rpath)));
+		TT_LOG(RETRO_LOG_INFO, "num hd textures: %d\n", (int)self->known_files.count);
 
 		// Read in the dump config file
 		dump_path(cfg, sizeof(cfg));
 		snprintf(cfg + strlen(cfg), sizeof(cfg) - strlen(cfg), "/dump.cfg");
-		dump_ignore_count = parse_config_file(cfg, dump_ignore, DUMP_IGNORE_MAX);
-		for (int mi = 0; mi < dump_ignore_count; mi++) {
-			RectMatch m = dump_ignore[mi];
+		self->dump_ignore_count = parse_config_file(cfg, self->dump_ignore, DUMP_IGNORE_MAX);
+		for (mi = 0; mi < self->dump_ignore_count; mi++) {
+			RectMatch m = self->dump_ignore[mi];
 			TT_LOG_VERBOSE(RETRO_LOG_INFO, "Ignoring %d,%d,%d,%d\n", m.x, m.y, m.w, m.h);
 		}
-		/* Spin up the IO worker pool last, once the tracker is fully built. */
-		io_thread_init(&iothread);
+		/* Spin up the IO worker pool last, once the self->tracker is fully built. */
+		io_thread_init(&self->iothread);
 	}
 
-	TextureTracker::~TextureTracker()
+	void texture_tracker_fini(struct TextureTracker *self)
 	{
-		ih_reset(&default_hd_texture); /* drop the default HD texture reference */
-		HdImageCache_clear(&hd_cache);   /* frees decoded levels + arena */
-		HdGpuCache_clear(&hd_gpu_cache); /* releases cached image refs + arena */
-		hd_key_set_free(&known_files);
-		hd_key_set_free(&requested);
-		hd_key_set_free(&pending_attach);
-		free(cached_palette_hashes);
-		fused_pages_deinit(&fused_pages); /* embedded FusedPages: explicit deinit (was default dtor) */
-		rect_tracker_deinit(&tracker); /* embedded RectTracker: explicit deinit (was default dtor) */
-		/* Signal and drop the IO worker pool last. Previously iothread was a
+		ih_reset(&self->default_hd_texture); /* drop the default HD texture reference */
+		HdImageCache_clear(&self->hd_cache);   /* frees decoded levels + arena */
+		HdGpuCache_clear(&self->hd_gpu_cache); /* releases cached image refs + arena */
+		hd_key_set_free(&self->known_files);
+		hd_key_set_free(&self->requested);
+		hd_key_set_free(&self->pending_attach);
+		free(self->cached_palette_hashes);
+		fused_pages_deinit(&self->fused_pages); /* embedded FusedPages: explicit deinit (was default dtor) */
+		rect_tracker_deinit(&self->tracker); /* embedded RectTracker: explicit deinit (was default dtor) */
+		/* Signal and drop the IO worker pool last. Previously self->iothread was a
 		 * by-value member, so its destructor ran after this body; preserve that
 		 * ordering by deinitialising it here at the end. */
-		io_thread_deinit(&iothread);
+		io_thread_deinit(&self->iothread);
 	}
 
 	static inline SRect toSRect(Rect rect) {
@@ -19914,14 +19921,14 @@ static char retro_slash = '/';
 		return Rect(rect.x, rect.y, rect.width, rect.height);
 	}
 
-	Palette TextureTracker::get_palette(Rect palette_rect) {
+	Palette texture_tracker_get_palette(struct TextureTracker *self, Rect palette_rect) {
 		assert(palette_rect.height == 1);
 
 		static RectIndexSet overlap = { NULL, 0, 0 };
-		rect_tracker_overlapping(&tracker, palette_rect, &overlap);
+		rect_tracker_overlapping(&self->tracker, palette_rect, &overlap);
 		for (int oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
-			EnduringTextureRect &other = tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because tracker.overlapping never returns dead indices
+			EnduringTextureRect &other = self->tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because self->tracker.overlapping never returns dead indices
 			if (fromSRect(other.texture_rect.vram_rect).contains(palette_rect) && other.alive) {
 				if (other.texture_rect.offset_x != 0 || other.texture_rect.offset_y != 0) {
 					continue; // TODO: handle offset subrects
@@ -19937,41 +19944,41 @@ static char retro_slash = '/';
 		return { NULL, 0 };
 	}
 
-	uint32_t TextureTracker::get_palette_hash(Rect palette_rect) {
+	uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, Rect palette_rect) {
 		int i;
-		for (i = 0; i < cached_palette_hashes_count; i++) {
-			if (cached_palette_hashes[i].rect == palette_rect) {
-				return cached_palette_hashes[i].hash;
+		for (i = 0; i < self->cached_palette_hashes_count; i++) {
+			if (self->cached_palette_hashes[i].rect == palette_rect) {
+				return self->cached_palette_hashes[i].hash;
 			}
 		}
-		Palette palette = get_palette(palette_rect);
+		Palette palette = texture_tracker_get_palette(self, palette_rect);
 		if (palette.data != NULL) {
-			if (cached_palette_hashes_count == cached_palette_hashes_cap) {
-				int ncap = cached_palette_hashes_cap ? cached_palette_hashes_cap * 2 : 16;
-				CachedPaletteHash *nh = (CachedPaletteHash *)realloc(cached_palette_hashes,
+			if (self->cached_palette_hashes_count == self->cached_palette_hashes_cap) {
+				int ncap = self->cached_palette_hashes_cap ? self->cached_palette_hashes_cap * 2 : 16;
+				CachedPaletteHash *nh = (CachedPaletteHash *)realloc(self->cached_palette_hashes,
 						(size_t)ncap * sizeof(CachedPaletteHash));
 				if (!nh)
 					return palette.hash;
-				cached_palette_hashes = nh;
-				cached_palette_hashes_cap = ncap;
+				self->cached_palette_hashes = nh;
+				self->cached_palette_hashes_cap = ncap;
 			}
-			cached_palette_hashes[cached_palette_hashes_count].rect = palette_rect;
-			cached_palette_hashes[cached_palette_hashes_count].hash = palette.hash;
-			cached_palette_hashes_count++;
+			self->cached_palette_hashes[self->cached_palette_hashes_count].rect = palette_rect;
+			self->cached_palette_hashes[self->cached_palette_hashes_count].hash = palette.hash;
+			self->cached_palette_hashes_count++;
 			return palette.hash;
 		}
 		return 0; // TODO: better way to indicate no palette found?
 	}
 
-	void TextureTracker::clearRegion(Rect rect) {
+	void texture_tracker_clearRegion(struct TextureTracker *self, Rect rect) {
 		if (rect.width == 0 || rect.height == 0) {
 			// Some games do this, apparently.
 			return;
 		}
-		rect_tracker_clear(&tracker, SRect(rect.x, rect.y, rect.width, rect.height));
-		fused_pages_mark_dead(&fused_pages, rect);
+		rect_tracker_clear(&self->tracker, SRect(rect.x, rect.y, rect.width, rect.height));
+		fused_pages_mark_dead(&self->fused_pages, rect);
 
-		clear_palette_cache(rect);
+		texture_tracker_clear_palette_cache(self, rect);
 	}
 
 	bool imageMatches(TextureUpload &upload, Rect rect, uint16_t *vram) {
@@ -19992,14 +19999,14 @@ static char retro_slash = '/';
 		return true;
 	}
 
-	void TextureTracker::blit(Rect dst, Rect src) {
-		rect_tracker_blit(&tracker, SRect(dst.x, dst.y, dst.width, dst.height), SRect(src.x, src.y, src.width, src.height));
-		fused_pages_mark_dirty(&fused_pages, dst);
-		fused_pages_rebuild_dirty(&fused_pages, &tracker, uploader);
-		clear_palette_cache(dst);
+	void texture_tracker_blit(struct TextureTracker *self, Rect dst, Rect src) {
+		rect_tracker_blit(&self->tracker, SRect(dst.x, dst.y, dst.width, dst.height), SRect(src.x, src.y, src.width, src.height));
+		fused_pages_mark_dirty(&self->fused_pages, dst);
+		fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self->uploader);
+		texture_tracker_clear_palette_cache(self, dst);
 	}
 
-	uint32_t TextureTracker::dbgHashVram(Rect rect, uint16_t *vram) {
+	uint32_t texture_tracker_dbgHashVram(struct TextureTracker *self, Rect rect, uint16_t *vram) {
 		unsigned x = rect.x,
 			 y = rect.y,
 			 w = rect.width,
@@ -20056,23 +20063,23 @@ static char retro_slash = '/';
 		return r;
 	}
 
-	void TextureTracker::notifyReadback(Rect rect, uint16_t *vram) {
-		// These hacks are my workaround for the dialog frame texture restorable getting evicted by FMVs
+	void texture_tracker_notifyReadback(struct TextureTracker *self, Rect rect, uint16_t *vram) {
+		// These hacks are my workaround for the dialog self->frame texture restorable getting evicted by FMVs
 		if (rect.width == 96 && rect.height == 224 && rect.y == 0 && (rect.x % 96) == 0) {
-			// HACK: Looks like final fmv frame readback for cross fade, ignore
+			// HACK: Looks like final fmv self->frame readback for cross fade, ignore
 			return;
 		}
 		if (rect.width == 64 && rect.height == 224 && rect.y == 0 && (rect.x % 64) == 0) {
-			// HACK: Looks like final fmv frame readback for cross fade, ignore
+			// HACK: Looks like final fmv self->frame readback for cross fade, ignore
 			return;
 		}
 
-		uint32_t hash = dbgHashVram(rect, vram);
+		uint32_t hash = texture_tracker_dbgHashVram(self, rect, vram);
 
-		for (int i = 0; i < restorable_rects.size(); )
+		for (int i = 0; i < self->restorable_rects.size(); )
 		{
-			if (restorable_rects[i].rect.intersects(rect))
-				restorable_rects.erase_at(i);
+			if (self->restorable_rects[i].rect.intersects(rect))
+				self->restorable_rects.erase_at(i);
 			else
 				i++;
 		}
@@ -20080,12 +20087,12 @@ static char retro_slash = '/';
 		static RectIndexSet overlap = { NULL, 0, 0 };
 
 		OwnedRectVec to_restore;
-		rect_tracker_overlapping(&tracker, rect, &overlap);
+		rect_tracker_overlapping(&self->tracker, rect, &overlap);
 		for (int oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
-			EnduringTextureRect &e = tracker.textures.a[index];
-			if (e.alive) { // TODO: This check is unnecessary because tracker.overlapping never returns dead indices
-				       // Clip to the requested rect
+			EnduringTextureRect &e = self->tracker.textures.a[index];
+			if (e.alive) { // TODO: This check is unnecessary because self->tracker.overlapping never returns dead indices
+				       // Clip to the self->requested rect
 				TextureRectResult result = clip_texture_rect_to_vram(e.texture_rect, rect);
 				if (result.valid) {
 					// assert(rect.contains(fromSRect(result.rect.vram_rect)));
@@ -20098,16 +20105,16 @@ static char retro_slash = '/';
 		rr.rect = rect;
 		rr.hash = hash;
 		rr.to_restore = static_cast<OwnedRectVec &&>(to_restore);
-		restorable_rects.push(rr);
+		self->restorable_rects.push(rr);
 	}
 
-	void TextureTracker::upload(Rect rect, uint16_t *vram) {
-		clear_palette_cache(rect);
+	void texture_tracker_upload(struct TextureTracker *self, Rect rect, uint16_t *vram) {
+		texture_tracker_clear_palette_cache(self, rect);
 
 		if (rect.width == FB_WIDTH && rect.height == FB_HEIGHT) {
 			// probably loading a save state, this is the entirety of vram
-			rect_tracker_clear(&tracker, toSRect(rect));
-			fused_pages_mark_dead(&fused_pages, rect);
+			rect_tracker_clear(&self->tracker, toSRect(rect));
+			fused_pages_mark_dead(&self->fused_pages, rect);
 			return;
 		}
 
@@ -20136,7 +20143,7 @@ static char retro_slash = '/';
 			// TODO: check for hash collision, by checking if existing upload has different dimensions. not sure how to recover if it does,
 			//       but the odds of a collision are probably much higher than the odds that both textures would be in play simultaneously,
 			//       so it'd probably be safe to simply ignore the newest upload and clear instead.
-			upload = find_upload(hash);    /* borrowed */
+			upload = texture_tracker_find_upload(self, hash);    /* borrowed */
 			if (upload == NULL) {
 				upload = texture_upload_new();  /* owns +1 */
 				upload->image = img;            /* transfer ownership */
@@ -20147,8 +20154,8 @@ static char retro_slash = '/';
 				upload->hash = hash;
 				upload->dumpable = true;
 				// Don't dump uploads specified by dump.cfg
-				for (int ri = 0; ri < dump_ignore_count; ri++) {
-					if (rect_match_matches(&dump_ignore[ri], rect)) {
+				for (int ri = 0; ri < self->dump_ignore_count; ri++) {
+					if (rect_match_matches(&self->dump_ignore[ri], rect)) {
 						upload->dumpable = false;
 						break;
 					}
@@ -20161,7 +20168,7 @@ static char retro_slash = '/';
 		}
 
 		RestorableRect *restore = NULL;
-		for (RestorableRect &other : restorable_rects) {
+		for (RestorableRect &other : self->restorable_rects) {
 			if (other.hash == upload->hash && other.rect == rect) {
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "RESTORATION: %x\n", other.hash);
 				restore = &other;
@@ -20170,44 +20177,44 @@ static char retro_slash = '/';
 		}
 		if (restore != NULL) {
 			for (TextureRect &t : restore->to_restore) {
-				rect_tracker_place(&tracker, t); // TODO: clip to other.rect
+				rect_tracker_place(&self->tracker, t); // TODO: clip to other.rect
 			}
 		} else {
-			rect_tracker_upload(&tracker, toSRect(rect), upload);
+			rect_tracker_upload(&self->tracker, toSRect(rect), upload);
 		}
-		fused_pages_mark_dirty(&fused_pages, rect);
-		fused_pages_rebuild_dirty(&fused_pages, &tracker, uploader);
+		fused_pages_mark_dirty(&self->fused_pages, rect);
+		fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self->uploader);
 
 		// HD texture caching method:
-		//  - Lazy (eager_textures=false): nothing is queued here; each (hash,palette)
+		//  - Lazy (self->eager_textures=false): nothing is queued here; each (hash,palette)
 		//    is loaded on demand when first drawn (request_hd_texture). Leanest.
-		//  - Eager (eager_textures=true, the master-consistent default): on the first
+		//  - Eager (self->eager_textures=true, the master-consistent default): on the first
 		//    upload of a hash, prefetch ALL of its known palette variants into the
 		//    cache. Routed through want_combo so it still respects the cache
 		//    (decode-once / dedup) and the VRAM/RAM budgets, unlike stock Beetle's
 		//    raw load_hd_texture.
-		if (eager_textures && hd_textures_enabled && !preexisting) {
-			int lo = hd_key_set_lower_bound(&known_files, (uint64_t)upload->hash << 32);
-			int hi = hd_key_set_lower_bound(&known_files, ((uint64_t)upload->hash + 1) << 32);
+		if (self->eager_textures && self->hd_textures_enabled && !preexisting) {
+			int lo = hd_key_set_lower_bound(&self->known_files, (uint64_t)upload->hash << 32);
+			int hi = hd_key_set_lower_bound(&self->known_files, ((uint64_t)upload->hash + 1) << 32);
 			int ki;
 			for (ki = lo; ki < hi; ki++) {
 				HdTextureId combo;
 				combo.hash = upload->hash;
-				combo.palette_hash = (uint32_t)known_files.keys[ki];
-				want_combo(combo);
+				combo.palette_hash = (uint32_t)self->known_files.keys[ki];
+				texture_tracker_want_combo(self, combo);
 			}
 		}
 		texture_upload_release(upload); /* drop the local ref; rects hold their own */
 	}
 
-	void TextureTracker::load_hd_texture(uint32_t hash) {
-		int lo = hd_key_set_lower_bound(&known_files, (uint64_t)hash << 32);
-		int hi = hd_key_set_lower_bound(&known_files, ((uint64_t)hash + 1) << 32);
+	void texture_tracker_load_hd_texture(struct TextureTracker *self, uint32_t hash) {
+		int lo = hd_key_set_lower_bound(&self->known_files, (uint64_t)hash << 32);
+		int hi = hd_key_set_lower_bound(&self->known_files, ((uint64_t)hash + 1) << 32);
 		if (lo != hi) {
 			int ki;
-			slock_lock(iothread.channel->lock);
+			slock_lock(self->iothread.channel->lock);
 			for (ki = lo; ki < hi; ki++) {
-				uint32_t palette_hash = (uint32_t)known_files.keys[ki];
+				uint32_t palette_hash = (uint32_t)self->known_files.keys[ki];
 				IORequest *load = (IORequest *)malloc(sizeof(IORequest));
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting texture: %x-%x\n", hash, palette_hash);
 				load->next = NULL;
@@ -20216,10 +20223,10 @@ static char retro_slash = '/';
 				load->palette_hash = palette_hash;
 				load->bytes = NULL;
 				load->bytes_len = 0;
-				io_channel_push_request(iothread.channel, load);
+				io_channel_push_request(self->iothread.channel, load);
 			}
-			slock_unlock(iothread.channel->lock);
-			scond_signal(iothread.channel->cond);
+			slock_unlock(self->iothread.channel->lock);
+			scond_signal(self->iothread.channel->cond);
 		}
 	}
 
@@ -20228,15 +20235,15 @@ static char retro_slash = '/';
 	// file are inserted into `requested` as a permanent negative cache. The IO
 	// thread only pushes a response on success, so a failed/missing load stays in
 	// `requested` and is never retried (until a reload clears it).
-	void TextureTracker::want_combo(HdTextureId id) {
-		if (HdGpuCache_contains(&hd_gpu_cache, hd_pack_key(id)) || HdImageCache_contains(&hd_cache, hd_pack_key(id)))
+	void texture_tracker_want_combo(struct TextureTracker *self, HdTextureId id) {
+		if (HdGpuCache_contains(&self->hd_gpu_cache, hd_pack_key(id)) || HdImageCache_contains(&self->hd_cache, hd_pack_key(id)))
 			return; // already resident in VRAM, or already decoded in RAM
-		if (!hd_key_set_insert(&requested, hd_pack_key(id)))
+		if (!hd_key_set_insert(&self->requested, hd_pack_key(id)))
 			return; // already in flight, or negatively cached
-		if (!hd_key_set_contains(&known_files, hd_pack_key(id)))
+		if (!hd_key_set_contains(&self->known_files, hd_pack_key(id)))
 			return; // no file on disk
 
-		slock_lock(iothread.channel->lock);
+		slock_lock(self->iothread.channel->lock);
 		{
 			IORequest *load = (IORequest *)malloc(sizeof(IORequest));
 			load->next = NULL;
@@ -20245,10 +20252,10 @@ static char retro_slash = '/';
 			load->palette_hash = id.palette_hash;
 			load->bytes = NULL;
 			load->bytes_len = 0;
-			io_channel_push_request(iothread.channel, load);
+			io_channel_push_request(self->iothread.channel, load);
 		}
-		slock_unlock(iothread.channel->lock);
-		scond_signal(iothread.channel->cond);
+		slock_unlock(self->iothread.channel->lock);
+		scond_signal(self->iothread.channel->cond);
 	}
 
 	// Cache-backed HD texture binding for a drawn (hash,palette): pure lazy.
@@ -20263,7 +20270,7 @@ static char retro_slash = '/';
 	// already free, so warming the whole palette hash-set up front mostly decoded
 	// combos that were never drawn - thrashing the RAM cache and clogging the IO
 	// queue ahead of the combos actually on screen, which made pop-in worse.)
-	void TextureTracker::request_hd_texture(TextureUpload *upload, uint32_t palette_hash) {
+	void texture_tracker_request_hd_texture(struct TextureTracker *self, TextureUpload *upload, uint32_t palette_hash) {
 		if (hd_tex_map_contains(&upload->textures, palette_hash))
 			return; // already attached to this upload
 
@@ -20271,23 +20278,23 @@ static char retro_slash = '/';
 
 		// GPU-cache hit: the Vulkan image already exists, so binding it is just a
 		// ref-counted handle copy (no Vulkan commands). Bind it IMMEDIATELY so the
-		// CURRENT frame's draw uses the HD texture. Deferring to on_queues_reset
-		// cost a 1-frame native flicker every time an animation frame's upload was
+		// CURRENT self->frame's draw uses the HD texture. Deferring to on_queues_reset
+		// cost a 1-self->frame native flicker every time an animation self->frame's upload was
 		// recreated (constant for sprites) - i.e. persistent pop-in even when the
 		// image was fully cached.
-		CachedGpuImage *gpu = HdGpuCache_get(&hd_gpu_cache, hd_pack_key(current));
+		CachedGpuImage *gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(current));
 		if (gpu != NULL) {
 			hd_tex_map_set(&upload->textures, palette_hash, gpu->image, gpu->alpha_flags);
-			dbg_attaches++;
+			self->dbg_attaches++;
 			return;
 		}
 
 		// CPU-cache hit (decoded but not in VRAM): needs a GPU upload, which we keep
 		// at the safe point - schedule it for on_queues_reset.
-		if (HdImageCache_contains(&hd_cache, hd_pack_key(current)))
-			hd_key_set_insert(&pending_attach, hd_pack_key(current));
+		if (HdImageCache_contains(&self->hd_cache, hd_pack_key(current)))
+			hd_key_set_insert(&self->pending_attach, hd_pack_key(current));
 		else
-			want_combo(current);            // queue a single disk load for the drawn combo
+			texture_tracker_want_combo(self, current);            // queue a single disk load for the drawn combo
 	}
 
 	void output_rect_json(RFILE *stream, Rect &rect) {
@@ -20296,7 +20303,7 @@ static char retro_slash = '/';
 				rect.x, rect.y, rect.width, rect.height);
 	}
 
-	void TextureTracker::dump_texture(TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode) {
+	void texture_tracker_dump_texture(struct TextureTracker *self, TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode) {
 		if (!upload->dumpable) {
 			return;
 		}
@@ -20320,9 +20327,9 @@ static char retro_slash = '/';
 				upload->dumped_modes_cap = ncap;
 			}
 			upload->dumped_modes[upload->dumped_modes_count++] = dump_mode;
-			if (dump_enabled) {
+			if (self->dump_enabled) {
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping %x\n", upload->hash);
-				dump_image(*upload, mode);
+				texture_tracker_dump_image(self, *upload, mode);
 			}
 		}
 	}
@@ -20363,7 +20370,7 @@ static char retro_slash = '/';
 		entries[0] = e;
 	}
 
-	HdTextureHandle TextureTracker::get_hd_texture_index(Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
+	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
 		fastpath_capable_out = false;
 		Rect palette_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 
@@ -20371,49 +20378,49 @@ static char retro_slash = '/';
 
 		uint32_t palette_hash = 0;
 		cache_hit = false;
-		if (hd_textures_enabled || dump_enabled) {
+		if (self->hd_textures_enabled || self->dump_enabled) {
 			if (mode.mode == TextureMode_Palette8bpp || mode.mode == TextureMode_Palette4bpp) {
-				palette_hash = get_palette_hash(palette_rect);
+				palette_hash = texture_tracker_get_palette_hash(self, palette_rect);
 			}
 		}
-		if (hd_textures_enabled) {
+		if (self->hd_textures_enabled) {
 			// Check if the same texture as last time is used.
-			HandleCacheResult cache_result = handle_cache.get(rect, palette_hash);
+			HandleCacheResult cache_result = self->handle_cache.get(rect, palette_hash);
 			cache_hit = cache_result.found;
 			if (cache_hit) {
 				// cache_result.handle is currently always a non-fused, non-none, index + palette_hash
 				// in the future it may be useful to cache none, but there's currently no way to check if such a containing rect is still alive (since HdTextureHandle's index would be -1)
-				EnduringTextureRect &tex = tracker.textures.a[cache_result.handle.index]; // Forgive me
+				EnduringTextureRect &tex = self->tracker.textures.a[cache_result.handle.index]; // Forgive me
 				if (tex.alive) {
-					fastpath_capable_out = fastpath_enabled && ((hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash) ? hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
+					fastpath_capable_out = self->fastpath_enabled && ((hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash) ? hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
 					return cache_result.handle;
 				}
 			}
 		}
 
 		static RectIndexSet overlap = { NULL, 0, 0 };
-		rect_tracker_overlapping(&tracker, rect, &overlap);
+		rect_tracker_overlapping(&self->tracker, rect, &overlap);
 
 		// Dump texture
 		for (int oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
-			TextureRect *tex = rect_tracker_get_index(&tracker, index);
-			dump_texture(tex->upload, mode, { mode.mode, palette_hash });
+			TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
+			texture_tracker_dump_texture(self, tex->upload, mode, { mode.mode, palette_hash });
 		}
-		if (frame_dump != NULL) {
-			if (frame_dump_need_comma) {
-				filestream_printf(frame_dump, ",");
+		if (self->frame_dump != NULL) {
+			if (self->frame_dump_need_comma) {
+				filestream_printf(self->frame_dump, ",");
 			} else {
-				frame_dump_need_comma = true;
+				self->frame_dump_need_comma = true;
 			}
-			filestream_printf(frame_dump, " { \"rect\": ");
-			output_rect_json(frame_dump, rect);
-			filestream_printf(frame_dump,
+			filestream_printf(self->frame_dump, " { \"rect\": ");
+			output_rect_json(self->frame_dump, rect);
+			filestream_printf(self->frame_dump,
 					", \"mode\": { \"mode\": %d, \"palette_x\": %u, \"palette_y\": %u} }\n",
 					(int)mode.mode, mode.palette_offset_x, mode.palette_offset_y);
 		}
 
-		if (!hd_textures_enabled) {
+		if (!self->hd_textures_enabled) {
 			fastpath_capable_out = false;
 			return HdTextureHandle::make_none();
 		}
@@ -20423,21 +20430,21 @@ static char retro_slash = '/';
 		Rect result_rect;
 		for (int oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
-			TextureRect *tex = rect_tracker_get_index(&tracker, index);
+			TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
 			HdTexEntry *overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
 			if (overlapped_image == NULL) {
 				// Not bound to this upload yet. Bind it now: a GPU-cache hit binds
-				// in-frame (handle copy, used by THIS draw - no 1-frame native
+				// in-frame (handle copy, used by THIS draw - no 1-self->frame native
 				// flicker), otherwise this schedules a decode / GPU upload that
-				// lands on a later frame.
-				request_hd_texture(tex->upload, palette_hash);
+				// lands on a later self->frame.
+				texture_tracker_request_hd_texture(self, tex->upload, palette_hash);
 				overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
 			}
 			if (overlapped_image != NULL) {
 				if (result == HdTextureHandle::make_none()) {
 					// note that if tex->vram_rect contains rect, then it will be the only entry in overlap, so an early out would be pointless
 					result_rect = fromSRect(tex->vram_rect);
-					fastpath_capable_out = fastpath_enabled && fromSRect(tex->vram_rect).contains(rect) && (overlapped_image->alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
+					fastpath_capable_out = self->fastpath_enabled && fromSRect(tex->vram_rect).contains(rect) && (overlapped_image->alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
 					result = HdTextureHandle::make(index, palette_hash);
 				} else {
 					// Multiple overlap, must fuse
@@ -20447,17 +20454,17 @@ static char retro_slash = '/';
 						: 256;
 					Rect page_rect = { page_x, page_y, width, 256 };
 					fastpath_capable_out = false;
-					return fused_pages_get_or_make(&fused_pages, page_rect, palette_hash, &tracker, uploader);
+					return fused_pages_get_or_make(&self->fused_pages, page_rect, palette_hash, &self->tracker, self->uploader);
 				}
 			}
 		}
 
 		if (result != HdTextureHandle::make_none())
-			handle_cache.insert(result_rect, palette_hash, result);
+			self->handle_cache.insert(result_rect, palette_hash, result);
 		return result;
 	}
 
-	HdTexture TextureTracker::get_hd_texture(HdTextureHandle handle)
+	HdTexture texture_tracker_get_hd_texture(struct TextureTracker *self, HdTextureHandle handle)
 	{
 		if (!handle.fused)
 		{
@@ -20465,15 +20472,15 @@ static char retro_slash = '/';
 			// created. So it would seem all you need to do is, in Renderer::reset_queue, call RectTracker::releaseDeadHandles. Except you have to be
 			// very very careful that no handles outside of the queues (ie. local) exist across a call to reset_queue.  That is, the handle must go into
 			// the queue as soon as possible, otherwise that hd texture might not work (previously it would segfault).
-			TextureRect *tex = rect_tracker_get_index(&tracker, handle.index);
+			TextureRect *tex = rect_tracker_get_index(&self->tracker, handle.index);
 			if (tex == NULL) {
 				if (handle.index != -1) {
 					TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
 				}
 				return {
 					{0, 0, 1, 1},
-					{0, 0, int(image_get_width(ih_get(&default_hd_texture), 0)), int(image_get_height(ih_get(&default_hd_texture), 0))},
-					default_hd_texture
+					{0, 0, int(image_get_width(ih_get(&self->default_hd_texture), 0)), int(image_get_height(ih_get(&self->default_hd_texture), 0))},
+					self->default_hd_texture
 				};
 			}
 			TextureUpload &upload = *tex->upload;
@@ -20484,8 +20491,8 @@ static char retro_slash = '/';
 				TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
 				return {
 					{0, 0, 1, 1},
-					{0, 0, int(image_get_width(ih_get(&default_hd_texture), 0)), int(image_get_height(ih_get(&default_hd_texture), 0))},
-					default_hd_texture
+					{0, 0, int(image_get_width(ih_get(&self->default_hd_texture), 0)), int(image_get_height(ih_get(&self->default_hd_texture), 0))},
+					self->default_hd_texture
 				};
 			}
 			/* Reconstruct a counted handle from the stored raw image (add_reference
@@ -20507,7 +20514,7 @@ static char retro_slash = '/';
 			};
 		}
 		else
-			return fused_pages_get_from_handle(&fused_pages, handle, &default_hd_texture);
+			return fused_pages_get_from_handle(&self->fused_pages, handle, &self->default_hd_texture);
 	}
 
 	static inline bool is_power_of_two(int n) {
@@ -20516,15 +20523,15 @@ static char retro_slash = '/';
 	}
 
 	// TEMPORARY:
-	void TextureTracker::on_queues_reset() {
-		handle_cache.clear();
-		rect_tracker_releaseDeadHandles(&tracker); // This is called from reset_queue, so as of now no HdTextureHandle's exist
+	void texture_tracker_on_queues_reset(struct TextureTracker *self) {
+		self->handle_cache.clear();
+		rect_tracker_releaseDeadHandles(&self->tracker); // This is called from reset_queue, so as of now no HdTextureHandle's exist
 
 		// Poll HD uploads
 
-		slock_lock(iothread.channel->lock);
-		IOResponse *responses = io_channel_take_responses(iothread.channel); // steal the list
-		slock_unlock(iothread.channel->lock);
+		slock_lock(self->iothread.channel->lock);
+		IOResponse *responses = io_channel_take_responses(self->iothread.channel); // steal the list
+		slock_unlock(self->iothread.channel->lock);
 
 		// Move freshly decoded images into the cache (decode-once); mark them for
 		// attach. The cache owns them regardless of whether their hash is resident.
@@ -20534,12 +20541,12 @@ static char retro_slash = '/';
 			while (response != NULL) {
 				IOResponse *rnext = response->next;
 				HdTextureId id;
-				dbg_responses_received++;
+				self->dbg_responses_received++;
 				id.hash = response->hash;
 				id.palette_hash = response->palette_hash;
-				hd_key_set_erase(&requested, hd_pack_key(id)); // no longer in flight; now cached
-				hd_image_cache_put(&hd_cache, id, &response->levels, response->alpha_flags);
-				hd_key_set_insert(&pending_attach, hd_pack_key(id));
+				hd_key_set_erase(&self->requested, hd_pack_key(id)); // no longer in flight; now cached
+				hd_image_cache_put(&self->hd_cache, id, &response->levels, response->alpha_flags);
+				hd_key_set_insert(&self->pending_attach, hd_pack_key(id));
 				io_response_free(response); // levels already moved out (now empty)
 				response = rnext;
 			}
@@ -20549,78 +20556,82 @@ static char retro_slash = '/';
 		// resident, bind an HD image to it. Prefer the GPU cache (a ref-counted
 		// handle copy - no upload); otherwise build the image from the CPU cache
 		// and store it in the GPU cache. Combos whose hash isn't resident yet stay
-		// cached (NOT discarded) and attach on a later frame.
+		// cached (NOT discarded) and attach on a later self->frame.
 		{
 			int pi;
-			for (pi = 0; pi < pending_attach.count; pi++) {
+			for (pi = 0; pi < self->pending_attach.count; pi++) {
 				HdTextureId id;
-				id.hash = (uint32_t)(pending_attach.keys[pi] >> 32);
-				id.palette_hash = (uint32_t)pending_attach.keys[pi];
-				TextureUpload *upload = find_upload(id.hash); /* borrowed */
+				id.hash = (uint32_t)(self->pending_attach.keys[pi] >> 32);
+				id.palette_hash = (uint32_t)self->pending_attach.keys[pi];
+				TextureUpload *upload = texture_tracker_find_upload(self, id.hash); /* borrowed */
 				if (upload == NULL)
 					continue; // not resident yet; kept in cache
 				if (hd_tex_map_contains(&upload->textures, id.palette_hash))
 					continue; // already attached
 
 				// Tier 1: ready-to-bind GPU image - just copy the handle.
-				CachedGpuImage *gpu = HdGpuCache_get(&hd_gpu_cache, hd_pack_key(id));
+				CachedGpuImage *gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(id));
 				if (gpu != NULL) {
 					hd_tex_map_set(&upload->textures, id.palette_hash, gpu->image, gpu->alpha_flags);
-					dbg_attaches++;
-					for (EnduringTextureRect &e : tracker.textures)
+					self->dbg_attaches++;
+					for (EnduringTextureRect &e : self->tracker.textures)
 					{
 						if (e.alive && e.texture_rect.upload == upload)
-							fused_pages_mark_dirty(&fused_pages, fromSRect(e.texture_rect.vram_rect));
+							fused_pages_mark_dirty(&self->fused_pages, fromSRect(e.texture_rect.vram_rect));
 					}
 					continue;
 				}
 
 				// Tier 2: decoded CPU levels - upload to GPU, then cache the image.
-				CachedHdImage *cached = HdImageCache_get(&hd_cache, hd_pack_key(id));
+				CachedHdImage *cached = HdImageCache_get(&self->hd_cache, hd_pack_key(id));
 				if (cached == NULL)
-					continue; // evicted from both caches; will be re-requested on draw
+					continue; // evicted from both caches; will be re-self->requested on draw
 
 				int width = cached->levels.levels[0].width;
 				int height = cached->levels.levels[0].height;
 				if (width  % upload->width  == 0 && is_power_of_two(width  / upload->width) &&
 						height % upload->height == 0 && is_power_of_two(height / upload->height))
 				{
-					ImageHandle texture = uploader->upload_texture(cached->levels);
-					hd_gpu_cache_put(&hd_gpu_cache, id, texture, cached->alpha_flags, cached->bytes);
+					ImageHandle texture = self->uploader->upload_texture(cached->levels);
+					hd_gpu_cache_put(&self->hd_gpu_cache, id, texture, cached->alpha_flags, cached->bytes);
 					hd_tex_map_set(&upload->textures, id.palette_hash, ih_get(&texture), cached->alpha_flags);
 					/* Both caches above retain their own reference; drop the
 					 * upload_texture producer reference held by this local. */
 					ih_reset(&texture);
-					dbg_gpu_uploads++;
-					dbg_attaches++;
-					for (EnduringTextureRect &e : tracker.textures) {
+					self->dbg_gpu_uploads++;
+					self->dbg_attaches++;
+					for (EnduringTextureRect &e : self->tracker.textures) {
 						if (e.alive && e.texture_rect.upload == upload)
-							fused_pages_mark_dirty(&fused_pages, fromSRect(e.texture_rect.vram_rect));
+							fused_pages_mark_dirty(&self->fused_pages, fromSRect(e.texture_rect.vram_rect));
 					}
 				} else {
 					TT_LOG(RETRO_LOG_WARN, "Dimension mismatch for %x-%x, original=%dx%d, replacement=%dx%d\n",
 							id.hash, id.palette_hash, upload->width, upload->height, width, height);
-					HdImageCache_erase(&hd_cache, hd_pack_key(id));    // don't keep a bad-sized image around
-					hd_key_set_insert(&requested, hd_pack_key(id));  // negatively cache so we don't reload + re-warn every frame
+					HdImageCache_erase(&self->hd_cache, hd_pack_key(id));    // don't keep a bad-sized image around
+					hd_key_set_insert(&self->requested, hd_pack_key(id));  // negatively cache so we don't reload + re-warn every self->frame
 				}
 			}
 		}
-		hd_key_set_clear(&pending_attach);
+		hd_key_set_clear(&self->pending_attach);
 
-		fused_pages_rebuild_dirty(&fused_pages, &tracker, uploader);
-		fused_pages_remove_dead(&fused_pages);
+		fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self->uploader);
+		fused_pages_remove_dead(&self->fused_pages);
 	}
-	TextureUpload *TextureTracker::find_upload(uint32_t hash) {
-		TextureUpload *upload = rect_tracker_find_upload(&tracker, hash); /* borrowed */
+	TextureUpload *texture_tracker_find_upload(struct TextureTracker *self, uint32_t hash) {
+		TextureUpload *upload = rect_tracker_find_upload(&self->tracker, hash); /* borrowed */
+		int _ri;
 
 		if (upload != NULL)
 			return upload;
 
 		// backup search, in case it's restorable but currently missing from the rect tracker
-		for (RestorableRect &entry : restorable_rects)
+		for (_ri = 0; _ri < self->restorable_rects.size(); _ri++)
 		{
-			for (TextureRect &t : entry.to_restore)
+			RestorableRect &entry = self->restorable_rects[_ri];
+			size_t _ti;
+			for (_ti = 0; _ti < entry.to_restore.size(); _ti++)
 			{
+				TextureRect &t = entry.to_restore[_ti];
 				if (hash == t.upload->hash)
 					return t.upload;
 			}
@@ -20629,85 +20640,88 @@ static char retro_slash = '/';
 		return NULL;
 	}
 
-	void TextureTracker::endFrame() {
-		frame += 1;
+	void texture_tracker_endFrame(struct TextureTracker *self) {
+		self->frame += 1;
 
-		if (frame % 300 == 0)
+		if (self->frame % 300 == 0)
 		{
-			TT_LOG_VERBOSE(RETRO_LOG_INFO, "hit ratio: %f (%ld, %ld)\n", double(handle_cache.dbg_hits) / (handle_cache.dbg_hits + handle_cache.dbg_misses), handle_cache.dbg_hits, handle_cache.dbg_misses);
-			handle_cache.dbg_hits = 0;
-			handle_cache.dbg_misses = 0;
+			TT_LOG_VERBOSE(RETRO_LOG_INFO, "hit ratio: %f (%ld, %ld)\n", double(self->handle_cache.dbg_hits) / (self->handle_cache.dbg_hits + self->handle_cache.dbg_misses), self->handle_cache.dbg_hits, self->handle_cache.dbg_misses);
+			self->handle_cache.dbg_hits = 0;
+			self->handle_cache.dbg_misses = 0;
 			TT_LOG(RETRO_LOG_INFO, "[hdcache] last 300f: %llu decodes, %llu gpu-uploads, %llu attaches\n",
-					(unsigned long long)(dbg_responses_received - dbg_responses_received_last),
-					(unsigned long long)(dbg_gpu_uploads - dbg_gpu_uploads_last),
-					(unsigned long long)(dbg_attaches - dbg_attaches_last));
+					(unsigned long long)(self->dbg_responses_received - self->dbg_responses_received_last),
+					(unsigned long long)(self->dbg_gpu_uploads - self->dbg_gpu_uploads_last),
+					(unsigned long long)(self->dbg_attaches - self->dbg_attaches_last));
 			TT_LOG(RETRO_LOG_INFO, "[hdcache] mode=%s ; ram %zu/%zu MB (%zu entries) ; vram %zu/%zu MB (%zu entries)\n",
-					eager_textures ? "eager" : "lazy",
-					HdImageCache_size_bytes(&hd_cache) / (1024 * 1024), HdImageCache_budget(&hd_cache) / (1024 * 1024), HdImageCache_count(&hd_cache),
-					HdGpuCache_size_bytes(&hd_gpu_cache) / (1024 * 1024), HdGpuCache_budget(&hd_gpu_cache) / (1024 * 1024), HdGpuCache_count(&hd_gpu_cache));
-			dbg_responses_received_last = dbg_responses_received;
-			dbg_gpu_uploads_last = dbg_gpu_uploads;
-			dbg_attaches_last = dbg_attaches;
+					self->eager_textures ? "eager" : "lazy",
+					HdImageCache_size_bytes(&self->hd_cache) / (1024 * 1024), HdImageCache_budget(&self->hd_cache) / (1024 * 1024), HdImageCache_count(&self->hd_cache),
+					HdGpuCache_size_bytes(&self->hd_gpu_cache) / (1024 * 1024), HdGpuCache_budget(&self->hd_gpu_cache) / (1024 * 1024), HdGpuCache_count(&self->hd_gpu_cache));
+			self->dbg_responses_received_last = self->dbg_responses_received;
+			self->dbg_gpu_uploads_last = self->dbg_gpu_uploads;
+			self->dbg_attaches_last = self->dbg_attaches;
 		}
 
-		if (frame_dump != NULL) {
-			filestream_printf(frame_dump, "]}\n");
-			filestream_close(frame_dump);
-			frame_dump = NULL;
+		if (self->frame_dump != NULL) {
+			filestream_printf(self->frame_dump, "]}\n");
+			filestream_close(self->frame_dump);
+			self->frame_dump = NULL;
 		}
 
 		if (dbg_input_state_cb != 0)
 		{
-			if (frame_dump_key.query())
+			if (self->frame_dump_key.query())
 			{
 				char fdpath[PATH_MAX_TT];
 				dump_path(fdpath, sizeof(fdpath));
 				snprintf(fdpath + strlen(fdpath), sizeof(fdpath) - strlen(fdpath), "test_dump.json");
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Left bracket!\n");
-				frame_dump = filestream_open(fdpath, RETRO_VFS_FILE_ACCESS_WRITE,
+				self->frame_dump = filestream_open(fdpath, RETRO_VFS_FILE_ACCESS_WRITE,
 						RETRO_VFS_FILE_ACCESS_HINT_NONE);
-				frame_dump_need_comma = false;
-				if (frame_dump != NULL)
+				self->frame_dump_need_comma = false;
+				if (self->frame_dump != NULL)
 				{
 					bool need_comma = false;
-					filestream_printf(frame_dump, "{ \"initial\": [\n");
-					for (EnduringTextureRect &etexture : tracker.textures)
+					int _eti;
+					filestream_printf(self->frame_dump, "{ \"initial\": [\n");
+					for (_eti = 0; _eti < self->tracker.textures.count; _eti++)
 					{
+						EnduringTextureRect *etexture = &self->tracker.textures.a[_eti];
 						Rect rect;
-						if (!etexture.alive) continue;
-						TextureRect &texture = etexture.texture_rect;
+						TextureRect *texture;
+						if (!etexture->alive) continue;
+						texture = &etexture->texture_rect;
 						if (need_comma)
-							filestream_printf(frame_dump, ",");
+							filestream_printf(self->frame_dump, ",");
 						else
 							need_comma = true;
-						filestream_printf(frame_dump, " { \"rect\": ");
-						rect = fromSRect(texture.vram_rect);
-						output_rect_json(frame_dump, rect);
-						filestream_printf(frame_dump, ", \"hash\": \"%x\" }\n", texture.upload->hash);
+						filestream_printf(self->frame_dump, " { \"rect\": ");
+						rect = fromSRect(texture->vram_rect);
+						output_rect_json(self->frame_dump, rect);
+						filestream_printf(self->frame_dump, ", \"hash\": \"%x\" }\n", texture->upload->hash);
 					}
-					filestream_printf(frame_dump, "], \"events\": [\n");
+					filestream_printf(self->frame_dump, "], \"events\": [\n");
 				}
 			}
 
-			if (hd_toggle_key.query()) {
-				hd_textures_enabled = !hd_textures_enabled;
-				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Toggling hd textures: %s\n", hd_textures_enabled ? "on" : "off");
+			if (self->hd_toggle_key.query()) {
+				self->hd_textures_enabled = !self->hd_textures_enabled;
+				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Toggling hd textures: %s\n", self->hd_textures_enabled ? "on" : "off");
 			}
 
-			if (reload_key.query()) {
+			if (self->reload_key.query()) {
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Reloading hd textures from disk\n");
-				reload_textures_from_disk();
+				texture_tracker_reload_textures_from_disk(self);
 			}
 
-			if (fastpath_key.query()) {
-				fastpath_enabled = !fastpath_enabled;
-				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Toggling fastpath %s\n", fastpath_enabled ? "ON" : "OFF");
+			if (self->fastpath_key.query()) {
+				self->fastpath_enabled = !self->fastpath_enabled;
+				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Toggling fastpath %s\n", self->fastpath_enabled ? "ON" : "OFF");
 			}
 		}
 	}
 
-	void TextureTracker::set_texture_uploader(Renderer *t) {
-		uploader = t;
+	void texture_tracker_set_texture_uploader(struct TextureTracker *self, Renderer *t) {
+		self->uploader = t;
 		LoadedLevels default_levels;
 		LoadedImage default_image;
 		loaded_levels_init(&default_levels);
@@ -20719,30 +20733,30 @@ static char retro_slash = '/';
 		default_image.owned_data[3] = 0;
 		loaded_levels_push_move(&default_levels, &default_image);
 
-		ih_move(&default_hd_texture, uploader->upload_texture(default_levels));
+		ih_move(&self->default_hd_texture, self->uploader->upload_texture(default_levels));
 	}
 
-	void TextureTracker::reload_textures_from_disk() {
+	void texture_tracker_reload_textures_from_disk(struct TextureTracker *self) {
 		char rpath[PATH_MAX_TT];
 		// Reload the directory listing
-		read_texture_directory(&known_files, replacements_path(rpath, sizeof(rpath)));
-		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Found %d hd textures\n", (int)known_files.count);
+		read_texture_directory(&self->known_files, replacements_path(rpath, sizeof(rpath)));
+		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Found %d hd textures\n", (int)self->known_files.count);
 
 		// Drop all cached / loaded HD state so edited files on disk take effect.
-		HdGpuCache_clear(&hd_gpu_cache);
-		HdImageCache_clear(&hd_cache);
-		hd_key_set_clear(&requested);
-		hd_key_set_clear(&pending_attach);
-		for (EnduringTextureRect &texture : tracker.textures)
+		HdGpuCache_clear(&self->hd_gpu_cache);
+		HdImageCache_clear(&self->hd_cache);
+		hd_key_set_clear(&self->requested);
+		hd_key_set_clear(&self->pending_attach);
+		for (EnduringTextureRect &texture : self->tracker.textures)
 			hd_tex_map_clear(&texture.texture_rect.upload->textures);
-		for (RestorableRect &restorable : restorable_rects)
+		for (RestorableRect &restorable : self->restorable_rects)
 		{
 			for (TextureRect &tr : restorable.to_restore)
 				hd_tex_map_clear(&tr.upload->textures);
 		}
 
 		// Delete fused textures
-		fused_pages_mark_dead(&fused_pages, {0, 0, FB_WIDTH, FB_HEIGHT});
+		fused_pages_mark_dead(&self->fused_pages, {0, 0, FB_WIDTH, FB_HEIGHT});
 
 		// Draws will lazily re-request and the cache repopulates.
 	}
@@ -21417,11 +21431,11 @@ static char retro_slash = '/';
 		};
 	}
 
-	TextureTrackerSaveState TextureTracker::save_state()
+	TextureTrackerSaveState texture_tracker_save_state(struct TextureTracker *self)
 	{
 		TextureTrackerSaveState state;
 
-		for (EnduringTextureRect &r : tracker.textures)
+		for (EnduringTextureRect &r : self->tracker.textures)
 		{
 			if (r.alive)
 			{
@@ -21429,7 +21443,7 @@ static char retro_slash = '/';
 				TextureRectSaveStateVec_push(&state.rects, &_ss);
 			}
 		}
-		for (RestorableRect &r : restorable_rects)
+		for (RestorableRect &r : self->restorable_rects)
 		{
 			RestorableRectSaveState saved;
 			rrss_init(&saved);
@@ -21447,7 +21461,7 @@ static char retro_slash = '/';
 	}
 
 
-	void TextureTracker::load_state(const TextureTrackerSaveState &state)
+	void texture_tracker_load_state(struct TextureTracker *self, const TextureTrackerSaveState &state)
 	{
 		UploadPtrVec uploads = { NULL, 0, 0 };
 		for (int e = 0; e < state.uploads.count; e++) {
@@ -21457,14 +21471,14 @@ static char retro_slash = '/';
 			UploadPtrVec_push(&uploads, &pe);
 		}
 
-		clearRegion({ 0, 0, FB_WIDTH, FB_HEIGHT });
-		enduring_arr_clear(&tracker.textures); // load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway
+		texture_tracker_clearRegion(self, { 0, 0, FB_WIDTH, FB_HEIGHT });
+		enduring_arr_clear(&self->tracker.textures); // load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway
 		{
 			int _i;
 			for (_i = 0; _i < TextureRectSaveStateVec_size(&state.rects); _i++)
-				rect_tracker_place(&tracker, from_save_state(*TextureRectSaveStateVec_at((struct TextureRectSaveStateVec *)&state.rects, _i), uploads));
+				rect_tracker_place(&self->tracker, from_save_state(*TextureRectSaveStateVec_at((struct TextureRectSaveStateVec *)&state.rects, _i), uploads));
 		}
-		restorable_rects.clear();
+		self->restorable_rects.clear();
 		{
 			int _i;
 			for (_i = 0; _i < RestorableRectSaveStateVec_size(&state.restorable); _i++)
@@ -21476,12 +21490,12 @@ static char retro_slash = '/';
 				int _j;
 				for (_j = 0; _j < TextureRectSaveStateVec_size(&r->to_restore); _j++)
 					loaded.to_restore.push(from_save_state(*TextureRectSaveStateVec_at(&r->to_restore, _j), uploads));
-				restorable_rects.push(loaded);
+				self->restorable_rects.push(loaded);
 			}
 		}
 		// Need to reload the hd textures, too
 		for (int e = 0; e < state.uploads.count; e++)
-			load_hd_texture(state.uploads.items[e].key);
+			texture_tracker_load_hd_texture(self, state.uploads.items[e].key);
 		// Drop the map's construction refs; the placed/restorable TextureRects now
 		// hold their own references to each upload.
 		for (int i = 0; i < uploads.count; i++)
