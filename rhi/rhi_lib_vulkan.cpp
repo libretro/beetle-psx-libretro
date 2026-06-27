@@ -5743,6 +5743,61 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	POD_VEC_DECLARE(VkBufferVec, VkBuffer);
 	POD_VEC_DECLARE(VkPipelineStageVec, VkPipelineStageFlags);
 
+	/* Hoisted out of struct Device (used by the hoisted PerFrame below). */
+	struct Managers
+	{
+		DeviceAllocator memory;
+		FenceManager fence;
+		SemaphoreManager semaphore;
+		BufferPool vbo, ubo;
+	};
+	/* Hoisted out of struct Device to file scope so the forward-typedef'd
+	 * names refer to complete types in C (no Outer::Inner qualification). */
+	struct CommandBufferHandleVec {
+		CommandBufferHandle *items;
+		int count;
+		int cap;
+	};
+	struct PerFrame
+	{
+		VkDevice device;
+		Managers *managers;
+		CommandPool graphics_cmd_pool;
+		CommandPool compute_cmd_pool;
+		CommandPool transfer_cmd_pool;
+
+		BufferBlockVec vbo_blocks;
+		BufferBlockVec ubo_blocks;
+
+		FenceVec wait_fences;
+		FenceVec recycle_fences;
+		DeviceAllocationVec allocations;
+		VkFramebufferVec destroyed_framebuffers;
+		VkSamplerVec destroyed_samplers;
+		VkPipelineVec destroyed_pipelines;
+		RenderTargetViewVec destroyed_image_views;
+		VkBufferViewVec destroyed_buffer_views;
+		VkImageVec destroyed_images;
+		VkBufferVec destroyed_buffers;
+		CommandBufferHandleVec graphics_submissions;
+		CommandBufferHandleVec compute_submissions;
+		CommandBufferHandleVec transfer_submissions;
+		SemaphoreVec recycled_semaphores;
+		SemaphoreVec destroyed_semaphores;
+	};
+
+	struct PerFramePtrVec {
+		PerFrame **items;
+		int count;
+		int cap;
+	};
+	struct QueueData
+	{
+		SemaphoreHandleVec wait_semaphores;
+		VkPipelineStageVec wait_stages;
+		bool need_fence;
+	};
+
 	struct Device
 	{
 			// Device-based objects which need to poke at internal data structures when their lifetimes end.
@@ -5802,13 +5857,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			// Make sure this is deleted last.
 			HandlePool handle_pool;
 
-			struct Managers
-			{
-				DeviceAllocator memory;
-				FenceManager fence;
-				SemaphoreManager semaphore;
-				BufferPool vbo, ubo;
-			};
 			Managers managers;
 
 			struct
@@ -5826,39 +5874,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			 * ref). push takes ownership by move (no incref), matching the old
 			 * push_back(std::move(cmd)). clear() keeps the capacity so the lists
 			 * are reused across frames without reallocating. */
-			struct CommandBufferHandleVec {
-				CommandBufferHandle *items;
-				int count;
-				int cap;
-			};
-
-			struct PerFrame
-			{
-				VkDevice device;
-				Managers *managers;
-				CommandPool graphics_cmd_pool;
-				CommandPool compute_cmd_pool;
-				CommandPool transfer_cmd_pool;
-
-				BufferBlockVec vbo_blocks;
-				BufferBlockVec ubo_blocks;
-
-				FenceVec wait_fences;
-				FenceVec recycle_fences;
-				DeviceAllocationVec allocations;
-				VkFramebufferVec destroyed_framebuffers;
-				VkSamplerVec destroyed_samplers;
-				VkPipelineVec destroyed_pipelines;
-				RenderTargetViewVec destroyed_image_views;
-				VkBufferViewVec destroyed_buffer_views;
-				VkImageVec destroyed_images;
-				VkBufferVec destroyed_buffers;
-				CommandBufferHandleVec graphics_submissions;
-				CommandBufferHandleVec compute_submissions;
-				CommandBufferHandleVec transfer_submissions;
-				SemaphoreVec recycled_semaphores;
-				SemaphoreVec destroyed_semaphores;
-			};
 			/* Owning array of PerFrame* (the frame-context ring). Replaces
 			 * std::vector<std::unique_ptr<PerFrame>>: the container owns each
 			 * heap-allocated PerFrame and deletes it on clear()/destruction, so
@@ -5869,21 +5884,11 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			 * null-asserts still work), and begin/end iterate the pointers. The
 			 * default constructor zero-initialises the members (it is not a bare
 			 * POD_VEC), so a default-constructed ring is valid before build(). */
-			struct PerFramePtrVec {
-				PerFrame **items;
-				int count;
-				int cap;
-			};
 			// The per frame structure must be destroyed after
 			// the hashmap data structures below, so it must be declared before.
 			PerFramePtrVec per_frame;
 
-			struct QueueData
-			{
-				SemaphoreHandleVec wait_semaphores;
-				VkPipelineStageVec wait_stages;
-				bool need_fence;
-			} graphics, compute, transfer;
+			QueueData graphics, compute, transfer;
 
 			// Pending buffers which need to be copied from CPU to GPU before submitting graphics or compute work.
 			struct
@@ -6033,22 +6038,22 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void program_init_compute(struct Program *self, Device *device, Shader *compute);
 	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
 	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
-	void cbhvec_init(struct Device::CommandBufferHandleVec *v);
-	void cbhvec_grow(struct Device::CommandBufferHandleVec *v, int ncap);
-	void cbhvec_push(struct Device::CommandBufferHandleVec *v, CommandBufferHandle *e);
-	bool cbhvec_empty(const struct Device::CommandBufferHandleVec *v);
-	void cbhvec_clear(struct Device::CommandBufferHandleVec *v);
-	void cbhvec_deinit(struct Device::CommandBufferHandleVec *v);
-	Device::CommandBufferHandleVec *device_get_queue_submissions(Device *self, CommandBufferType type);
-	void per_frame_init(struct Device::PerFrame *self, Device *device);
-	void per_frame_fini(struct Device::PerFrame *self);
-	void per_frame_begin(struct Device::PerFrame *self);
-	struct Device::PerFrame *device_frame(Device *self);
-	void per_frame_ptr_vec_init_empty(struct Device::PerFramePtrVec *v);
-	void per_frame_ptr_vec_deinit(struct Device::PerFramePtrVec *v);
-	void per_frame_ptr_vec_push(struct Device::PerFramePtrVec *v, struct Device::PerFrame *p);
-	void per_frame_ptr_vec_clear(struct Device::PerFramePtrVec *v);
-	Device::QueueData *device_get_queue_data(Device *self, CommandBufferType type);
+	void cbhvec_init(struct CommandBufferHandleVec *v);
+	void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap);
+	void cbhvec_push(struct CommandBufferHandleVec *v, CommandBufferHandle *e);
+	bool cbhvec_empty(const struct CommandBufferHandleVec *v);
+	void cbhvec_clear(struct CommandBufferHandleVec *v);
+	void cbhvec_deinit(struct CommandBufferHandleVec *v);
+	CommandBufferHandleVec *device_get_queue_submissions(Device *self, CommandBufferType type);
+	void per_frame_init(struct PerFrame *self, Device *device);
+	void per_frame_fini(struct PerFrame *self);
+	void per_frame_begin(struct PerFrame *self);
+	struct PerFrame *device_frame(Device *self);
+	void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v);
+	void per_frame_ptr_vec_deinit(struct PerFramePtrVec *v);
+	void per_frame_ptr_vec_push(struct PerFramePtrVec *v, struct PerFrame *p);
+	void per_frame_ptr_vec_clear(struct PerFramePtrVec *v);
+	QueueData *device_get_queue_data(Device *self, CommandBufferType type);
 	void program_fini(struct Program *self);
 	void framebuffer_fini(struct Framebuffer *self);
 
@@ -6101,16 +6106,16 @@ const Sampler *device_get_stock_sampler(Device *self, StockSampler sampler) { re
 const ImplementationWorkarounds *device_get_workarounds(Device *self) { return &self->workarounds; }
 const DeviceFeatures *device_get_device_features(Device *self) { return &self->ext; }
 
-	/* Free functions for Device::CommandBufferHandleVec (converted from the move-
+	/* Free functions for CommandBufferHandleVec (converted from the move-
 	 * only nested container's methods). The element is a refcounting CommandBuffer
 	 * handle, so growth/teardown go through cbh_steal/cbh_reset. push() takes
 	 * ownership by move (steal, no incref); clear() drops each handle's ref but
 	 * keeps capacity; deinit() frees the backing storage. */
-	inline void cbhvec_init(struct Device::CommandBufferHandleVec *v)
+	inline void cbhvec_init(struct CommandBufferHandleVec *v)
 	{
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
-	inline void cbhvec_grow(struct Device::CommandBufferHandleVec *v, int ncap)
+	inline void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap)
 	{
 		CommandBufferHandle *nitems = (CommandBufferHandle *)malloc((size_t)ncap * sizeof(CommandBufferHandle));
 		int i;
@@ -6120,22 +6125,22 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		v->items = nitems;
 		v->cap = ncap;
 	}
-	inline void cbhvec_push(struct Device::CommandBufferHandleVec *v, CommandBufferHandle *e)
+	inline void cbhvec_push(struct CommandBufferHandleVec *v, CommandBufferHandle *e)
 	{
 		if (v->count >= v->cap)
 			cbhvec_grow(v, v->cap ? v->cap * 2 : 8);
 		cbh_steal(&v->items[v->count], e);
 		v->count++;
 	}
-	inline bool cbhvec_empty(const struct Device::CommandBufferHandleVec *v) { return v->count == 0; }
-	inline void cbhvec_clear(struct Device::CommandBufferHandleVec *v)
+	inline bool cbhvec_empty(const struct CommandBufferHandleVec *v) { return v->count == 0; }
+	inline void cbhvec_clear(struct CommandBufferHandleVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++)
 			cbh_reset(&v->items[i]);
 		v->count = 0;
 	}
-	inline void cbhvec_deinit(struct Device::CommandBufferHandleVec *v)
+	inline void cbhvec_deinit(struct CommandBufferHandleVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++)
@@ -6144,16 +6149,16 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
 
-	/* Free functions for Device::PerFramePtrVec -- the owning frame-context ring
+	/* Free functions for PerFramePtrVec -- the owning frame-context ring
 	 * (was std::vector<unique_ptr<PerFrame>>, then a move-only nested container).
 	 * The vector owns each heap-allocated PerFrame and per_frame_fini+free's it on
 	 * clear()/teardown. Device is malloc'd so the container's own ctor/dtor never
 	 * run; init_empty establishes the empty state and deinit performs teardown. */
-	inline void per_frame_ptr_vec_init_empty(struct Device::PerFramePtrVec *v)
+	inline void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v)
 	{
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
-	inline void per_frame_ptr_vec_clear(struct Device::PerFramePtrVec *v)
+	inline void per_frame_ptr_vec_clear(struct PerFramePtrVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++) {
@@ -6162,18 +6167,18 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		}
 		v->count = 0;
 	}
-	inline void per_frame_ptr_vec_deinit(struct Device::PerFramePtrVec *v)
+	inline void per_frame_ptr_vec_deinit(struct PerFramePtrVec *v)
 	{
 		per_frame_ptr_vec_clear(v);
 		free(v->items);
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
 	/* Takes ownership of an already-allocated PerFrame. */
-	inline void per_frame_ptr_vec_push(struct Device::PerFramePtrVec *v, struct Device::PerFrame *p)
+	inline void per_frame_ptr_vec_push(struct PerFramePtrVec *v, struct PerFrame *p)
 	{
 		if (v->count >= v->cap) {
 			int ncap = v->cap ? v->cap * 2 : 8;
-			Device::PerFrame **nitems = (Device::PerFrame **)realloc(v->items, (size_t)ncap * sizeof(Device::PerFrame *));
+			PerFrame **nitems = (PerFrame **)realloc(v->items, (size_t)ncap * sizeof(PerFrame *));
 			if (!nitems)
 				return;
 			v->items = nitems;
@@ -16894,7 +16899,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	/* device_frame: was the inline Device::frame() accessor; returns the current
 	 * frame context (the ring slot selected by frame_context_index). Returns a pointer
 	 * now instead of a reference. */
-	struct Device::PerFrame *device_frame(Device *self)
+	struct PerFrame *device_frame(Device *self)
 	{
 		VK_ASSERT(self->frame_context_index < self->per_frame.count);
 		VK_ASSERT(self->per_frame.items[self->frame_context_index]);
@@ -17009,7 +17014,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VK_ASSERT(stages != 0);
 		if (flush)
 			device_flush_frame_queue(self, type);
-		Device::QueueData *data = device_get_queue_data(self, type);
+		QueueData *data = device_get_queue_data(self, type);
 
 #ifdef VULKAN_DEBUG
 		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data->wait_semaphores); _wi++)
@@ -17375,7 +17380,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	void device_submit_nolock(Device *self, CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores){
 		CommandBufferType type = commandbuffer_get_command_buffer_type(cbh_get(&cmd));
 		CommandPool *pool = device_get_command_pool(self, type);
-		Device::CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
+		CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
 
 		command_pool_signal_submitted(pool, commandbuffer_get_command_buffer(cbh_get(&cmd)));
 		commandbuffer_end(cbh_get(&cmd));
@@ -17398,7 +17403,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	POD_VEC_DECLARE(VkFlagsVec, VkFlags);
 	void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence,
 			unsigned semaphore_count, Semaphore *semaphores){
-		Device::QueueData *data = device_get_queue_data(self, type);
+		QueueData *data = device_get_queue_data(self, type);
 		VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
 		// Add external wait semaphores.
@@ -17586,8 +17591,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		if (type != Type_AsyncTransfer)
 			device_flush_frame_queue(self, Type_AsyncTransfer);
 
-		Device::QueueData *data = device_get_queue_data(self, type);
-		Device::CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
+		QueueData *data = device_get_queue_data(self, type);
+		CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
 
 		if (cbhvec_empty(submissions))
 		{
@@ -17796,7 +17801,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		device_flush_frame_queue(self, Type_AsyncCompute);
 	}
 
-	struct Device::QueueData *device_get_queue_data(Device *self, CommandBufferType type)
+	struct QueueData *device_get_queue_data(Device *self, CommandBufferType type)
 	{
 		switch (device_get_physical_queue_type(self, type))
 		{
@@ -17823,7 +17828,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 	}
 
-	Device::CommandBufferHandleVec * device_get_queue_submissions(Device *self, CommandBufferType type){
+	CommandBufferHandleVec * device_get_queue_submissions(Device *self, CommandBufferType type){
 		switch (device_get_physical_queue_type(self, type))
 		{
 			default:
@@ -17861,13 +17866,13 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		for (unsigned i = 0; i < count; i++)
 		{
-			Device::PerFrame *pf = (Device::PerFrame *)malloc(sizeof(Device::PerFrame));
+			PerFrame *pf = (PerFrame *)malloc(sizeof(PerFrame));
 			per_frame_init(pf, self);
 			per_frame_ptr_vec_push(&self->per_frame, pf);
 		}
 	}
 
-	void per_frame_init(struct Device::PerFrame *self, Device *device)
+	void per_frame_init(struct PerFrame *self, Device *device)
 	{
 		self->device = device_get_device(device);
 		self->managers = &device->managers;
@@ -17999,7 +18004,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		bufferpool_reset(&self->managers.ubo);
 		{ int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
 		{
-			Device::PerFrame *frame = self->per_frame.items[_pi];
+			PerFrame *frame = self->per_frame.items[_pi];
 			bufferblock_vec_clear(&frame->vbo_blocks);
 			bufferblock_vec_clear(&frame->ubo_blocks);
 		} }
@@ -18014,7 +18019,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		{ int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
 		{
-			Device::PerFrame *frame = self->per_frame.items[_pi];
+			PerFrame *frame = self->per_frame.items[_pi];
 			// We have done WaitIdle, no need to wait for extra fences, it's also not safe.
 			FenceVec_clear(&frame->wait_fences);
 			per_frame_begin(frame);
@@ -18041,7 +18046,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		per_frame_begin(device_frame(self));
 	}
 
-	void per_frame_begin(struct Device::PerFrame *self)
+	void per_frame_begin(struct PerFrame *self)
 	{
 		if (!FenceVec_empty(&self->wait_fences))
 		{
@@ -18122,7 +18127,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		DeviceAllocationVec_clear(&self->allocations);
 	}
 
-	void per_frame_fini(struct Device::PerFrame *self)
+	void per_frame_fini(struct PerFrame *self)
 	{
 		per_frame_begin(self);
 		/* The command pools no longer self-destruct (their dtor became
