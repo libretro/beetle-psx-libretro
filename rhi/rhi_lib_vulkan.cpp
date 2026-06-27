@@ -3783,10 +3783,10 @@ VkAccessFlags image_usage_to_possible_access(VkImageUsageFlags usage)
 		return flags;
 	}
 
-uint32_t image_num_miplevels(const VkExtent3D &extent)
+uint32_t image_num_miplevels(const VkExtent3D *extent)
 	{
-		uint32_t wh = (extent.width > extent.height) ? extent.width : extent.height;
-		uint32_t size = (wh > extent.depth) ? wh : extent.depth;
+		uint32_t wh = (extent->width > extent->height) ? extent->width : extent->height;
+		uint32_t size = (wh > extent->depth) ? wh : extent->depth;
 		uint32_t levels = 0;
 		while (size)
 		{
@@ -5445,7 +5445,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo *info, VkSubpassContents contents);
 	void commandbuffer_end_render_pass(struct CommandBuffer *self);
 	void commandbuffer_set_program(struct CommandBuffer *self, Program &program);
-	void commandbuffer_set_scissor(struct CommandBuffer *self, const VkRect2D &rect);
+	void commandbuffer_set_scissor(struct CommandBuffer *self, const VkRect2D *rect);
 	void commandbuffer_push_constants(struct CommandBuffer *self, const void *data, VkDeviceSize offset, VkDeviceSize range);
 	void commandbuffer_flush_render_state(struct CommandBuffer *self);
 	VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self, Hash hash);
@@ -5504,7 +5504,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 
 	inline VkCommandBuffer commandbuffer_get_command_buffer(const struct CommandBuffer *self) { return self->cmd; }
 	inline Device &commandbuffer_get_device(struct CommandBuffer *self) { return *self->device; }
-	inline const VkViewport &commandbuffer_get_viewport(const struct CommandBuffer *self) { return self->viewport; }
+	inline const VkViewport *commandbuffer_get_viewport(const struct CommandBuffer *self) { return &self->viewport; }
 	inline CommandBufferType commandbuffer_get_command_buffer_type(const struct CommandBuffer *self) { return self->type; }
 
 	/* Group E: draw / dispatch / debug-region / end free functions. */
@@ -5513,10 +5513,10 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color = NULL);
 	void commandbuffer_end_region(struct CommandBuffer *self);
 	void commandbuffer_end(struct CommandBuffer *self);
-	inline void commandbuffer_set_viewport(struct CommandBuffer *self, const VkViewport &viewport)
+	inline void commandbuffer_set_viewport(struct CommandBuffer *self, const VkViewport *viewport)
 	{
 		VK_ASSERT(self->framebuffer);
-		self->viewport = viewport;
+		self->viewport = *viewport;
 		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
 	}
 	inline void commandbuffer_set_depth_test(struct CommandBuffer *self, bool depth_test, bool depth_write)
@@ -5591,22 +5591,22 @@ void commandbuffer_set_blend_op_2(struct CommandBuffer *self, VkBlendOp blend_op
 
 	/* Group A: copy / clear / barrier free functions. Overloaded members are
 	 * split into distinctly-named free functions. */
-	void commandbuffer_clear_image(struct CommandBuffer *self, const Image *image, const VkClearValue &value);
+	void commandbuffer_clear_image(struct CommandBuffer *self, const Image *image, const VkClearValue *value);
 	void commandbuffer_copy_buffer(struct CommandBuffer *self, const Buffer *dst, VkDeviceSize dst_offset, const Buffer *src, VkDeviceSize src_offset, VkDeviceSize size);
 void commandbuffer_copy_buffer_whole(struct CommandBuffer *self, const Buffer *dst, const Buffer *src)
 	{
 		VK_ASSERT(buffer_get_create_info(dst)->size == buffer_get_create_info(src)->size);
 		commandbuffer_copy_buffer(self, dst, 0, src, 0, buffer_get_create_info(dst)->size);
 	}
-	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image *image, const Buffer *buffer, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
+	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image *image, const Buffer *buffer, VkDeviceSize buffer_offset, const VkOffset3D *offset, const VkExtent3D *extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers *subresrouce);
 	void commandbuffer_copy_buffer_to_image_blits(struct CommandBuffer *self, const Image *image, const Buffer *buffer, unsigned num_blits, const VkBufferImageCopy *blits);
-	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer *dst, const Image *src, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
+	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer *dst, const Image *src, VkDeviceSize buffer_offset, const VkOffset3D *offset, const VkExtent3D *extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers *subresrouce);
 	void commandbuffer_full_barrier(struct CommandBuffer *self);
 	void commandbuffer_pixel_barrier(struct CommandBuffer *self);
 	void commandbuffer_barrier_simple(struct CommandBuffer *self, VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage, VkAccessFlags dst_access);
 	void commandbuffer_barrier(struct CommandBuffer *self, VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages, unsigned barriers, const VkMemoryBarrier *globals, unsigned buffer_barriers, const VkBufferMemoryBarrier *buffers, unsigned image_barriers, const VkImageMemoryBarrier *images);
 	void commandbuffer_image_barrier(struct CommandBuffer *self, const Image *image, VkImageLayout old_layout, VkImageLayout new_layout, VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage, VkAccessFlags dst_access);
-	void commandbuffer_blit_image(struct CommandBuffer *self, const Image *dst, const Image *src, const VkOffset3D &dst_offset0, const VkOffset3D &dst_extent, const VkOffset3D &src_offset0, const VkOffset3D &src_extent, unsigned dst_level, unsigned src_level, unsigned dst_base_layer, uint32_t src_base_layer, unsigned num_layers, VkFilter filter);
+	void commandbuffer_blit_image(struct CommandBuffer *self, const Image *dst, const Image *src, const VkOffset3D *dst_offset0, const VkOffset3D *dst_extent, const VkOffset3D *src_offset0, const VkOffset3D *src_extent, unsigned dst_level, unsigned src_level, unsigned dst_base_layer, uint32_t src_base_layer, unsigned num_layers, VkFilter filter);
 	void commandbuffer_barrier_prepare_generate_mipmap(struct CommandBuffer *self, const Image *image, VkImageLayout base_level_layout, VkPipelineStageFlags src_stage, VkAccessFlags src_access, bool need_top_level_barrier);
 	void commandbuffer_generate_mipmap(struct CommandBuffer *self, const Image *image);
 
@@ -9854,8 +9854,8 @@ void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out){
 	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
 	{ Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &_r); }
 	renderer_ensure_command_buffer(self);
-	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), ih_get(&self->framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
-	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
+	{ VkOffset3D _o = { 0, 0, 0 }; VkExtent3D _e = { FB_WIDTH, FB_HEIGHT, 1 }; VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }; commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), ih_get(&self->framebuffer), 0, &_o, &_e, 0, 0,
+	                          &_s); }
 	commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
 	             VK_ACCESS_HOST_READ_BIT);
 
@@ -10018,13 +10018,13 @@ void renderer_set_draw_rect(Renderer *self, const Rect *rect)
 	fbatlas_set_draw_rect(&self->atlas, rect);
 	self->render_state.draw_rect = *rect;
 
-	const VkRect2D &last = *Rect2DVec_back(&self->queue.scissors);
+	const VkRect2D *last = Rect2DVec_back(&self->queue.scissors);
 	const int scaled_x = (int)(rect->x * self->scaling);
 	const int scaled_y = (int)(rect->y * self->scaling);
 	const unsigned scaled_w = rect->width * self->scaling;
 	const unsigned scaled_h = rect->height * self->scaling;
-	if (last.offset.x != scaled_x || last.offset.y != scaled_y ||
-	    last.extent.width != scaled_w || last.extent.height != scaled_h)
+	if (last->offset.x != scaled_x || last->offset.y != scaled_y ||
+	    last->extent.width != scaled_w || last->extent.height != scaled_h)
 		{ VkRect2D _vpush = { { scaled_x, scaled_y }, { scaled_w, scaled_h } }; Rect2DVec_push(&self->queue.scissors, &_vpush); }
 }
 
@@ -10073,9 +10073,12 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
-	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), ih_get(&self->framebuffer), 0, { (int)(copy_rect.x), (int)(copy_rect.y), 0 },
-	                          { copy_rect.width, copy_rect.height, 1 }, 0, 0,
-	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
+	{
+	VkOffset3D _o = { (int)(copy_rect.x), (int)(copy_rect.y), 0 };
+	VkExtent3D _e = { copy_rect.width, copy_rect.height, 1 };
+	VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), ih_get(&self->framebuffer), 0, &_o, &_e, 0, 0, &_s);
+	}
 
 	commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 	             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
@@ -10620,7 +10623,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
 	commandbuffer_set_quad_state(cbh_get(&self->cmd));
 
-	VkViewport old_vp = commandbuffer_get_viewport(cbh_get(&self->cmd));
+	VkViewport old_vp = *commandbuffer_get_viewport(cbh_get(&self->cmd));
 	VkViewport new_vp = {display_rect.x * (float) render_scale,
 	                     display_rect.y * (float) render_scale,
 	                     rect.width * (float) render_scale,
@@ -10628,7 +10631,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	                     old_vp.minDepth,
 	                     old_vp.maxDepth};
 
-	commandbuffer_set_viewport(cbh_get(&self->cmd), new_vp);
+	commandbuffer_set_viewport(cbh_get(&self->cmd), &new_vp);
 
 	bool dither = self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither;
 
@@ -11453,7 +11456,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 	info.render_area.extent = { rect->width * self->scaling, rect->height * self->scaling };
 
 	commandbuffer_begin_render_pass(cbh_get(&self->cmd), &info, VK_SUBPASS_CONTENTS_INLINE);
-	commandbuffer_set_scissor(cbh_get(&self->cmd), info.render_area);
+	commandbuffer_set_scissor(cbh_get(&self->cmd), &info.render_area);
 	self->queue.default_scissor = info.render_area;
 	commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 2, image_get_view(ih_get(&self->dither_lut)), StockSampler_NearestWrap);
 
@@ -11545,7 +11548,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec &vertices, Primitiv
 	unsigned size = PrimitiveInfoVec_size(&scissors);
 
 	renderer_hd_texture_uniforms(self, hd_texture);
-	commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? self->queue.default_scissor : *Rect2DVec_at(&self->queue.scissors, scissor));
+	commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? &self->queue.default_scissor : Rect2DVec_at(&self->queue.scissors, scissor));
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, filtering ? self->primitive_filter_mode : FilterMode_NearestNeighbor);
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, shift);
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
@@ -11566,7 +11569,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec &vertices, Primitiv
 
 			if ((*PrimitiveInfoVec_at(&scissors, i)).scissor_index != scissor) {
 				scissor = (*PrimitiveInfoVec_at(&scissors, i)).scissor_index;
-				commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? self->queue.default_scissor : *Rect2DVec_at(&self->queue.scissors, scissor));
+				commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? &self->queue.default_scissor : Rect2DVec_at(&self->queue.scissors, scissor));
 			}
 			if (hd_handle_ne(&(*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index, &hd_texture)) {
 				hd_texture = (*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index;
@@ -12087,9 +12090,9 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)state.offset_uv);
 
 	if (state.scissor_index < 0)
-		commandbuffer_set_scissor(cbh_get(&self->cmd), self->queue.default_scissor);
+		commandbuffer_set_scissor(cbh_get(&self->cmd), &self->queue.default_scissor);
 	else
-		commandbuffer_set_scissor(cbh_get(&self->cmd), *Rect2DVec_at(&self->queue.scissors, state.scissor_index));
+		commandbuffer_set_scissor(cbh_get(&self->cmd), Rect2DVec_at(&self->queue.scissors, state.scissor_index));
 
 	Program &textured = state.textured ? state.scaled_read ?
 		*self->pipelines.textured_scaled : *self->pipelines.textured_unscaled : *self->pipelines.flat;
@@ -15013,9 +15016,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 #define COMBINER_NEEDS_BLEND_CONSTANT(factor) ((factor) == VK_BLEND_FACTOR_CONSTANT_COLOR || (factor) == VK_BLEND_FACTOR_CONSTANT_ALPHA)
 
-VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
+VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
 	{
-		return { a.x + b.x, a.y + b.y, a.z + b.z };
+		return { a->x + b->x, a->y + b->y, a->z + b->z };
 	}
 
 	void commandbuffer_init(struct CommandBuffer *self, Device *device, VkCommandBuffer cmd, CommandBufferType type)
@@ -15094,32 +15097,32 @@ VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 	}
 
 	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image *image, const Buffer *src, VkDeviceSize buffer_offset,
-			const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
-			unsigned slice_height, const VkImageSubresourceLayers &subresource)
+			const VkOffset3D *offset, const VkExtent3D *extent, unsigned row_length,
+			unsigned slice_height, const VkImageSubresourceLayers *subresource)
 	{
 		const VkBufferImageCopy region = {
 			buffer_offset,
-			row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
-			subresource, offset, extent,
+			row_length != extent->width ? row_length : 0, slice_height != extent->height ? slice_height : 0,
+			*subresource, *offset, *extent,
 		};
 		vkCmdCopyBufferToImage(self->cmd, buffer_get_buffer(src), image_get_image(image), image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 				1, &region);
 	}
 
 	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer *buffer, const Image *image, VkDeviceSize buffer_offset,
-			const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
-			unsigned slice_height, const VkImageSubresourceLayers &subresource)
+			const VkOffset3D *offset, const VkExtent3D *extent, unsigned row_length,
+			unsigned slice_height, const VkImageSubresourceLayers *subresource)
 	{
 		const VkBufferImageCopy region = {
 			buffer_offset,
-			row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
-			subresource, offset, extent,
+			row_length != extent->width ? row_length : 0, slice_height != extent->height ? slice_height : 0,
+			*subresource, *offset, *extent,
 		};
 		vkCmdCopyImageToBuffer(self->cmd, image_get_image(image), image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
 				buffer_get_buffer(buffer), 1, &region);
 	}
 
-	void commandbuffer_clear_image(struct CommandBuffer *self, const Image *image, const VkClearValue &value)
+	void commandbuffer_clear_image(struct CommandBuffer *self, const Image *image, const VkClearValue *value)
 	{
 		VK_ASSERT(!self->framebuffer);
 		VK_ASSERT(!self->actual_render_pass);
@@ -15134,12 +15137,12 @@ VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 		if (aspect & VK_IMAGE_ASPECT_COLOR_BIT)
 		{
 			vkCmdClearColorImage(self->cmd, image_get_image(image), image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
-					&value.color, 1, &range);
+					&value->color, 1, &range);
 		}
 		else
 		{
 			vkCmdClearDepthStencilImage(self->cmd, image_get_image(image), image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
-					&value.depthStencil, 1, &range);
+					&value->depthStencil, 1, &range);
 		}
 	}
 
@@ -15301,7 +15304,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			if (size.z < 1) size.z = 1;
 
 			commandbuffer_blit_image(self, image, image,
-					origin, size, origin, src_size, i, i - 1, 0, 0, create_info->layers, VK_FILTER_LINEAR);
+					&origin, &size, &origin, &src_size, i, i - 1, 0, 0, create_info->layers, VK_FILTER_LINEAR);
 
 			b.subresourceRange.baseMipLevel = i;
 			commandbuffer_barrier(self, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -15310,8 +15313,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	}
 
 	void commandbuffer_blit_image(struct CommandBuffer *self, const Image *dst, const Image *src,
-			const VkOffset3D &dst_offset,
-			const VkOffset3D &dst_extent, const VkOffset3D &src_offset, const VkOffset3D &src_extent,
+			const VkOffset3D *dst_offset,
+			const VkOffset3D *dst_extent, const VkOffset3D *src_offset, const VkOffset3D *src_extent,
 			unsigned dst_level, unsigned src_level, unsigned dst_base_layer, unsigned src_base_layer,
 			unsigned num_layers, VkFilter filter)
 	{
@@ -15319,9 +15322,9 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		{ unsigned i; for (i = 0; i < num_layers; i++) {
 			const VkImageBlit blit = {
 				{ format_to_aspect_mask(image_get_create_info(src)->format), src_level, src_base_layer + i, 1 },
-				{ src_offset,                                          cb_add_offset(src_offset, src_extent) },
+				{ *src_offset,                                          cb_add_offset(src_offset, src_extent) },
 				{ format_to_aspect_mask(image_get_create_info(dst)->format), dst_level, dst_base_layer + i, 1 },
-				{ dst_offset,                                          cb_add_offset(dst_offset, dst_extent) },
+				{ *dst_offset,                                          cb_add_offset(dst_offset, dst_extent) },
 			};
 
 			vkCmdBlitImage(self->cmd,
@@ -15723,12 +15726,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		if (commandbuffer_get_and_clear(self, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
 		{
-			const VkPushConstantRange &range = pipeline_layout_get_resource_layout(self->current_layout)->push_constant_range;
-			if (range.stageFlags != 0)
+			const VkPushConstantRange *range = &pipeline_layout_get_resource_layout(self->current_layout)->push_constant_range;
+			if (range->stageFlags != 0)
 			{
-				VK_ASSERT(range.offset == 0);
-				vkCmdPushConstants(self->cmd, self->current_pipeline_layout, range.stageFlags,
-						0, range.size,
+				VK_ASSERT(range->offset == 0);
+				vkCmdPushConstants(self->cmd, self->current_pipeline_layout, range->stageFlags,
+						0, range->size,
 						self->bindings.push_constant_data);
 			}
 		}
@@ -15756,12 +15759,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		if (commandbuffer_get_and_clear(self, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
 		{
-			const VkPushConstantRange &range = pipeline_layout_get_resource_layout(self->current_layout)->push_constant_range;
-			if (range.stageFlags != 0)
+			const VkPushConstantRange *range = &pipeline_layout_get_resource_layout(self->current_layout)->push_constant_range;
+			if (range->stageFlags != 0)
 			{
-				VK_ASSERT(range.offset == 0);
-				vkCmdPushConstants(self->cmd, self->current_pipeline_layout, range.stageFlags,
-						0, range.size,
+				VK_ASSERT(range->offset == 0);
+				vkCmdPushConstants(self->cmd, self->current_pipeline_layout, range->stageFlags,
+						0, range->size,
 						self->bindings.push_constant_data);
 			}
 		}
@@ -15817,12 +15820,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		self->vbo.input_rates[binding] = step_rate;
 	}
 
-	void commandbuffer_set_scissor(struct CommandBuffer *self, const VkRect2D &rect)
+	void commandbuffer_set_scissor(struct CommandBuffer *self, const VkRect2D *rect)
 	{
 		VK_ASSERT(self->framebuffer);
-		VK_ASSERT(rect.offset.x >= 0);
-		VK_ASSERT(rect.offset.y >= 0);
-		self->scissor = rect;
+		VK_ASSERT(rect->offset.x >= 0);
+		VK_ASSERT(rect->offset.y >= 0);
+		self->scissor = *rect;
 		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_SCISSOR_BIT);
 	}
 
@@ -18557,7 +18560,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		info.flags = create_info->flags;
 
 		if (info.mipLevels == 0)
-			info.mipLevels = image_num_miplevels(info.extent);
+			info.mipLevels = image_num_miplevels(&info.extent);
 
 		if (create_info->usage & VK_IMAGE_USAGE_STORAGE_BIT)
 			info.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
@@ -21491,7 +21494,7 @@ int64_t page_bytes(FusionRects &fusion)
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
 		else
 			ih_move(&page.texture, renderer_create_texture(uploader, texture_width, texture_height, mip_levels));
-		commandbuffer_clear_image(cbh_get(cmd), ih_get(&page.texture), fallthrough);
+		commandbuffer_clear_image(cbh_get(cmd), ih_get(&page.texture), &fallthrough);
 
 		// Second pass to blit all the existing textures into the new texture
 		{
@@ -21550,23 +21553,13 @@ int64_t page_bytes(FusionRects &fusion)
 			{ int dstLevel; for (dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
 				int srcLevel = max_(0, dstLevel - full_res_levels);
 
+				{
+				VkOffset3D _so = { (sx * subrect.x) >> srcLevel, (sy * subrect.y) >> srcLevel, 0 };
+				VkOffset3D _se = { (sx * subrect.width) >> srcLevel, (sy * subrect.height) >> srcLevel, 1 };
 				commandbuffer_blit_image(cbh_get(cmd), ih_get(&page.texture), image,
-						dst_offset,
-						dst_extent,
-						{
-						(sx * subrect.x) >> srcLevel,
-						(sy * subrect.y) >> srcLevel,
-						0
-						},
-						{ 
-						(sx * subrect.width) >> srcLevel,
-						(sy * subrect.height) >> srcLevel,
-						1
-						},
-						dstLevel,
-						srcLevel,
-						0, 0, 1, VK_FILTER_LINEAR
-					       );
+						&dst_offset, &dst_extent, &_so, &_se,
+						dstLevel, srcLevel, 0, 0, 1, VK_FILTER_LINEAR);
+				}
 
 				dst_offset.x >>= 1;
 				dst_offset.y >>= 1;
