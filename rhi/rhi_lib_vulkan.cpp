@@ -5388,6 +5388,13 @@ private:
 	static_assert(VULKAN_NUM_DESCRIPTOR_SETS == 4, "Number of descriptor sets != 4.");
 
 	class CommandBuffer;
+	/* set_dirty / get_and_clear were small CommandBuffer member helpers used by
+	 * many methods (including in-struct inline setters). Declared here, before the
+	 * struct, so the still-inline member methods can call them during the staged
+	 * conversion; defined after the struct. */
+	struct CommandBuffer;
+	void commandbuffer_set_dirty(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
+	CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
 	/* Formerly CommandBufferType (a nested enum). Hoisted to file scope so the
 	 * forthcoming class -> C struct conversion of CommandBuffer does not have to
 	 * carry a nested type. The Type_* enumerator names are already prefixed, so
@@ -5418,6 +5425,8 @@ private:
 	{
 		public:
 			friend struct CommandBufferDeleter;
+			friend void commandbuffer_set_dirty(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
+			friend CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
 			friend void commandbuffer_init(struct CommandBuffer *self, Device *device, VkCommandBuffer cmd, CommandBufferType type);
 			friend void commandbuffer_fini(struct CommandBuffer *self);
 			friend void commandbuffer_add_reference(struct CommandBuffer *self);
@@ -5476,7 +5485,7 @@ private:
 			{
 				VK_ASSERT(framebuffer);
 				this->viewport = viewport;
-				set_dirty(COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
+				commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
 			}
 			const VkViewport &get_viewport() const
 			{
@@ -5502,7 +5511,7 @@ private:
 				if (static_state.state.value != value)                \
 				{                                                     \
 					static_state.state.value = value;                 \
-					set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
+					commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
 				}                                                     \
 			} while (0)
 
@@ -5512,7 +5521,7 @@ private:
 				if (potential_static_state.value != value)            \
 				{                                                     \
 					potential_static_state.value = value;             \
-					set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
+					commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
 				}                                                     \
 			} while (0)
 
@@ -5595,7 +5604,7 @@ private:
 					{
 						memcpy(&potential_static_state.spec_constants[index], &value, sizeof(value));
 						if (static_state.state.spec_constant_mask & (1u << index))
-							set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
+							commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 					}
 				}
 
@@ -5637,17 +5646,6 @@ private:
 			uint32_t active_vbos;
 			bool is_compute;
 
-			void set_dirty(CommandBufferDirtyFlags flags)
-			{
-				dirty |= flags;
-			}
-
-			CommandBufferDirtyFlags get_and_clear(CommandBufferDirtyFlags flags)
-			{
-				CommandBufferDirtyFlags mask = dirty & flags;
-				dirty &= ~flags;
-				return mask;
-			}
 
 			PipelineState static_state;
 			PotentialState potential_static_state;
@@ -5695,6 +5693,8 @@ private:
 	void commandbuffer_fini(struct CommandBuffer *self);
 	void commandbuffer_add_reference(struct CommandBuffer *self);
 	void commandbuffer_release_reference(struct CommandBuffer *self);
+	inline void commandbuffer_set_dirty(struct CommandBuffer *self, CommandBufferDirtyFlags flags) { self->dirty |= flags; }
+	inline CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self, CommandBufferDirtyFlags flags) { CommandBufferDirtyFlags mask = self->dirty & flags; self->dirty &= ~flags; return mask; }
 
 	/* Group A: copy / clear / barrier free functions. Overloaded members are
 	 * split into distinctly-named free functions. */
@@ -15505,7 +15505,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VK_ASSERT(current_layout);
 		VK_ASSERT(current_program);
 
-		if (get_and_clear(COMMAND_BUFFER_DIRTY_PIPELINE_BIT))
+		if (commandbuffer_get_and_clear(this, COMMAND_BUFFER_DIRTY_PIPELINE_BIT))
 		{
 			VkPipeline old_pipe = current_pipeline;
 			flush_compute_pipeline();
@@ -15515,7 +15515,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		flush_descriptor_sets();
 
-		if (get_and_clear(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
+		if (commandbuffer_get_and_clear(this, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
 		{
 			const VkPushConstantRange &range = current_layout->get_resource_layout().push_constant_range;
 			if (range.stageFlags != 0)
@@ -15534,7 +15534,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VK_ASSERT(current_program);
 
 		// We've invalidated pipeline state, update the VkPipeline.
-		if (get_and_clear(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT | COMMAND_BUFFER_DIRTY_PIPELINE_BIT |
+		if (commandbuffer_get_and_clear(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT | COMMAND_BUFFER_DIRTY_PIPELINE_BIT |
 					COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT))
 		{
 			VkPipeline old_pipe = current_pipeline;
@@ -15542,13 +15542,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			if (old_pipe != current_pipeline)
 			{
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, current_pipeline);
-				set_dirty(COMMAND_BUFFER_DYNAMIC_BITS);
+				commandbuffer_set_dirty(this, COMMAND_BUFFER_DYNAMIC_BITS);
 			}
 		}
 
 		flush_descriptor_sets();
 
-		if (get_and_clear(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
+		if (commandbuffer_get_and_clear(this, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
 		{
 			const VkPushConstantRange &range = current_layout->get_resource_layout().push_constant_range;
 			if (range.stageFlags != 0)
@@ -15560,9 +15560,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			}
 		}
 
-		if (get_and_clear(COMMAND_BUFFER_DIRTY_VIEWPORT_BIT))
+		if (commandbuffer_get_and_clear(this, COMMAND_BUFFER_DIRTY_VIEWPORT_BIT))
 			vkCmdSetViewport(cmd, 0, 1, &viewport);
-		if (get_and_clear(COMMAND_BUFFER_DIRTY_SCISSOR_BIT))
+		if (commandbuffer_get_and_clear(this, COMMAND_BUFFER_DIRTY_SCISSOR_BIT))
 			vkCmdSetScissor(cmd, 0, 1, &scissor);
 
 		uint32_t update_vbo_mask = dirty_vbos & active_vbos;
@@ -15585,7 +15585,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VertexAttribState &attr = attribs[attrib];
 
 		if (attr.binding != binding || attr.format != format || attr.offset != offset)
-			set_dirty(COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
+			commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
 
 		VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
 
@@ -15604,7 +15604,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (vbo.buffers[binding] != vkbuffer || vbo.offsets[binding] != offset)
 			dirty_vbos |= 1u << binding;
 		if (vbo.strides[binding] != stride || vbo.input_rates[binding] != step_rate)
-			set_dirty(COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
+			commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
 
 		vbo.buffers[binding] = vkbuffer;
 		vbo.offsets[binding] = offset;
@@ -15618,14 +15618,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VK_ASSERT(rect.offset.x >= 0);
 		VK_ASSERT(rect.offset.y >= 0);
 		scissor = rect;
-		set_dirty(COMMAND_BUFFER_DIRTY_SCISSOR_BIT);
+		commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_SCISSOR_BIT);
 	}
 
 	void CommandBuffer::push_constants(const void *data, VkDeviceSize offset, VkDeviceSize range)
 	{
 		VK_ASSERT(offset + range <= VULKAN_PUSH_CONSTANT_SIZE);
 		memcpy(bindings.push_constant_data + offset, data, range);
-		set_dirty(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
+		commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
 	}
 
 
@@ -15640,12 +15640,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VK_ASSERT((framebuffer && current_program->get_shader(ShaderStage_Vertex)) ||
 				(!framebuffer && current_program->get_shader(ShaderStage_Compute)));
 
-		set_dirty(COMMAND_BUFFER_DIRTY_PIPELINE_BIT | COMMAND_BUFFER_DYNAMIC_BITS);
+		commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_PIPELINE_BIT | COMMAND_BUFFER_DYNAMIC_BITS);
 
 		if (!current_layout)
 		{
 			dirty_sets = ~0u;
-			set_dirty(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
+			commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
 
 			current_layout = program.get_pipeline_layout();
 			current_pipeline_layout = current_layout->get_layout();
@@ -15660,7 +15660,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			if (new_layout.push_constant_layout_hash != old_layout.push_constant_layout_hash)
 			{
 				dirty_sets = ~0u;
-				set_dirty(COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
+				commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
 			}
 			else
 			{
@@ -16089,7 +16089,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		state.depth_write = true;
 		state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
-		set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
+		commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 	}
 
 	void CommandBuffer::set_quad_state()
@@ -16101,7 +16101,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		state.depth_test = false;
 		state.depth_write = false;
 		state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-		set_dirty(COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
+		commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 	}
 
 	void CommandBuffer::end()
