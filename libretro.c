@@ -1066,339 +1066,335 @@ void PSX_RequestMLExit(void)
 //
 
 
-/* Remember to update MemPeek<>() and MemPoke<>() when we change address decoding in MemRW() */
-static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned size, bool is_write, bool access24)
-{
-   if(!is_write)
-      *timestamp += DMACycleSteal;
-
-   if(A < 0x00800000)
-   {
-      if (!is_write)
-      {
-         // Overclock: get rid of memory access latency
-         if (!psx_gte_overclock)
-            *timestamp += 3;
-      }
-
-      if(access24)
-      {
-         if(is_write)
-            MASMEM_WriteU24(MainRAM, A & 0x1FFFFF, (*V_p));
-         else
-            (*V_p) = MASMEM_ReadU24(MainRAM, A & 0x1FFFFF);
-      }
-      else
-      {
-         if(is_write)
-            MASMEM_Write_size(MainRAM, A & 0x1FFFFF, (*V_p), size);
-         else
-            (*V_p) = MASMEM_Read_size(MainRAM, A & 0x1FFFFF, size);
-      }
-
-      return;
-   }
-
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
-   {
-      if(!is_write)
-      {
-         if(access24)
-            (*V_p) = MASMEM_ReadU24(BIOSROM, A & 0x7FFFF);
-         else
-            (*V_p) = MASMEM_Read_size(BIOSROM, A & 0x7FFFF, size);
-      }
-
-      return;
-   }
-
-   if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
-      PSX_EventHandler(*timestamp);
-
-   if(A >= 0x1F801000 && A <= 0x1F802FFF)
-   {
-      if(A >= 0x1F801C00 && A <= 0x1F801FFF) // SPU
-      {
-         if(size == 4 && !access24)
-         {
-            if(is_write)
-            {
-               SPU_Write(*timestamp, A | 0, (*V_p));
-               SPU_Write(*timestamp, A | 2, (*V_p) >> 16);
-            }
-            else
-            {
-               *timestamp += 36;
-
-               if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
-                  PSX_EventHandler(*timestamp);
-
-               (*V_p) = SPU_Read(*timestamp, A) | (SPU_Read(*timestamp, A | 2) << 16);
-            }
-         }
-         else
-         {
-            if(is_write)
-            {
-               SPU_Write(*timestamp, A & ~1, (*V_p));
-            }
-            else
-            {
-               *timestamp += 16; // Just a guess, need to test.
-
-               if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
-                  PSX_EventHandler(*timestamp);
-
-               (*V_p) = SPU_Read(*timestamp, A & ~1);
-            }
-         }
-         return;
-      }     // End SPU
-
-
-      // CDC: TODO - 8-bit access.
-      if(A >= 0x1f801800 && A <= 0x1f80180F)
-      {
-         if(!is_write)
-            *timestamp += 6 * size; //24;
-
-         if(is_write)
-            PS_CDC_Write(PSX_CDC, *timestamp, A & 0x3, (*V_p));
-         else
-            (*V_p) = PS_CDC_Read(PSX_CDC, *timestamp, A & 0x3);
-
-         return;
-      }
-
-      if(A >= 0x1F801810 && A <= 0x1F801817)
-      {
-         if(!is_write)
-	 {
-		 (*timestamp)++;
-		 (*V_p) = GPU_Read(*timestamp, A);
-	 }
-	 else
-            GPU_Write(*timestamp, A, (*V_p));
-
-         return;
-      }
-
-      if(A >= 0x1F801820 && A <= 0x1F801827)
-      {
-         if(!is_write)
-	 {
-		 (*timestamp)++;
-		 (*V_p) = MDEC_Read(*timestamp, A);
-	 }
-	 else
-            MDEC_Write(*timestamp, A, (*V_p));
-
-         return;
-      }
-
-      if(A >= 0x1F801000 && A <= 0x1F801023)
-      {
-         unsigned index = (A & 0x1F) >> 2;
-
-         if(is_write)
-         {
-            (*V_p) <<= (A & 3) * 8;
-            SysControl.Regs[index] = (*V_p) & SysControl_Mask[index];
-         }
-         else
-         {
-            (*timestamp)++;
-            (*V_p) = SysControl.Regs[index] | SysControl_OR[index];
-            (*V_p) >>= (A & 3) * 8;
-         }
-         return;
-      }
-
-      if(A >= 0x1F801040 && A <= 0x1F80104F)
-      {
-         if(is_write)
-            FrontIO_Write(PSX_FIO, *timestamp, A, (*V_p));
-         else
-	 {
-		 (*timestamp)++;
-		 (*V_p) = FrontIO_Read(PSX_FIO, *timestamp, A);
-	 }
-         return;
-      }
-
-      if(A >= 0x1F801050 && A <= 0x1F80105F)
-      {
-         if(!is_write)
-	 {
-		 (*timestamp)++;
-		 (*V_p) = SIO_Read(*timestamp, A);
-	 }
-	 else
-            SIO_Write(*timestamp, A, (*V_p));
-         return;
-      }
-
-
-      if(A >= 0x1F801070 && A <= 0x1F801077) // IRQ
-      {
-         if(!is_write)
-	 {
-		 (*timestamp)++;
-		 (*V_p) = IRQ_Read(A);
-	 }
-	 else
-            IRQ_Write(A, (*V_p));
-         return;
-      }
-
-      if(A >= 0x1F801080 && A <= 0x1F8010FF)    // DMA
-      {
-         if(!is_write)
-	 {
-		 (*timestamp)++;
-		 (*V_p) = DMA_Read(*timestamp, A);
-	 }
-	 else
-	 {
-            DMA_Write(*timestamp, A, (*V_p));
-	 }
-
-         return;
-      }
-
-      if(A >= 0x1F801100 && A <= 0x1F80113F) // Root counters
-      {
-         if(!is_write)
-	 {
-		 (*timestamp)++;
-		 (*V_p) = TIMER_Read(*timestamp, A);
-	 }
-	 else
-	 {
-		 TIMER_Write(*timestamp, A, (*V_p));
-	 }
-
-         return;
-      }
-   }
-
-
-   if(A >= 0x1F000000 && A <= 0x1F7FFFFF)
-   {
-      if(!is_write)
-      {
-         (*V_p) = ~0U; // A game this affects:  Tetris with Cardcaptor Sakura
-
-         if(PIOMem)
-         {
-            if((A & 0x7FFFFF) < 65536)
-            {
-               if(access24)
-                  (*V_p) = MASMEM_ReadU24(PIOMem, A & 0x7FFFFF);
-               else
-                  (*V_p) = MASMEM_Read_size(PIOMem, A & 0x7FFFFF, size);
-            }
-            else if((A & 0x7FFFFF) < (65536 + TextMem_size))
-            {
-               const uint8_t *_p = &TextMem[(A & 0x7FFFFF) - 65536];
-               if(access24)
-                  (*V_p) = ((uint32_t)_p[0])
-                         | ((uint32_t)_p[1] << 8)
-                         | ((uint32_t)_p[2] << 16);
-               else switch(size)
-               {
-                  case 1: (*V_p) = _p[0]; break;
-                  case 2:
-                  {
-                     uint16_t _v;
-#ifdef MSB_FIRST
-                     _v = (uint16_t)_p[0] | ((uint16_t)_p[1] << 8);
-#else
-                     memcpy(&_v, _p, 2);
-#endif
-                     (*V_p) = _v;
-                     break;
-                  }
-                  case 4:
-                  {
-                     uint32_t _v;
-#ifdef MSB_FIRST
-                     _v = (uint32_t)_p[0] | ((uint32_t)_p[1] << 8) | ((uint32_t)_p[2] << 16) | ((uint32_t)_p[3] << 24);
-#else
-                     memcpy(&_v, _p, 4);
-#endif
-                     (*V_p) = _v;
-                     break;
-                  }
-               }
-            }
-         }
-      }
-      return;
-   }
-
-   if(A == 0xFFFE0130) // Per tests on PS1, ignores the access(sort of, on reads the value is forced to 0 if not aligned) if not aligned to 4-bytes.
-   {
-      if(!is_write)
-         (*V_p) = CPU_GetBIU(PSX_CPU);
-      else
-         CPU_SetBIU(PSX_CPU, (*V_p));
-
-      return;
-   }
-
-   if(!is_write)
-      (*V_p) = 0;
-}
+/* Memory access entry points.
+ *
+ * These were previously thin wrappers around a single parameterised
+ * MemRW(timestamp, A, V_p, size, is_write, access24).  Because every
+ * caller passes size/is_write/access24 as compile-time constants, the
+ * body has been folded into each entry point with those constants
+ * propagated and the resulting dead branches removed - so each path is
+ * straight-line for its (direction, size, access24) case with no
+ * per-access dispatch, independent of whether the compiler chose to
+ * inline the old static-INLINE MemRW.
+ *
+ * The address decode is therefore replicated per entry point; it is
+ * verified bit-for-bit equivalent to the former MemRW over an
+ * exhaustive boundary sweep.  Remember to update MemPeek()/MemPoke()
+ * and keep these decodes in sync when address decoding changes. */
 
 void MDFN_FASTCALL PSX_MemWrite8(int32_t timestamp, uint32_t A, uint32_t V)
 {
-   MemRW(&timestamp, A, &V, 1, true, false);
+   if(A < 0x00800000)                       { MASMEM_WriteU8(MainRAM, A & 0x1FFFFF, V); return; }
+   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)   return;
+   if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+      PSX_EventHandler(timestamp);
+   if(A >= 0x1F801000 && A <= 0x1F802FFF)
+   {
+      if(A >= 0x1F801C00 && A <= 0x1F801FFF){ SPU_Write(timestamp, A & ~1, V); return; }
+      if(A >= 0x1f801800 && A <= 0x1f80180F){ PS_CDC_Write(PSX_CDC, timestamp, A & 0x3, V); return; }
+      if(A >= 0x1F801810 && A <= 0x1F801817){ GPU_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801820 && A <= 0x1F801827){ MDEC_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801000 && A <= 0x1F801023){ unsigned index = (A & 0x1F) >> 2; V <<= (A & 3) * 8; SysControl.Regs[index] = V & SysControl_Mask[index]; return; }
+      if(A >= 0x1F801040 && A <= 0x1F80104F){ FrontIO_Write(PSX_FIO, timestamp, A, V); return; }
+      if(A >= 0x1F801050 && A <= 0x1F80105F){ SIO_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801070 && A <= 0x1F801077){ IRQ_Write(A, V); return; }
+      if(A >= 0x1F801080 && A <= 0x1F8010FF){ DMA_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801100 && A <= 0x1F80113F){ TIMER_Write(timestamp, A, V); return; }
+   }
+   if(A >= 0x1F000000 && A <= 0x1F7FFFFF)   return;
+   if(A == 0xFFFE0130)                      CPU_SetBIU(PSX_CPU, V);
 }
 
 void MDFN_FASTCALL PSX_MemWrite16(int32_t timestamp, uint32_t A, uint32_t V)
 {
-   MemRW(&timestamp, A, &V, 2, true, false);
+   if(A < 0x00800000)                       { MASMEM_WriteU16(MainRAM, A & 0x1FFFFF, V); return; }
+   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)   return;
+   if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+      PSX_EventHandler(timestamp);
+   if(A >= 0x1F801000 && A <= 0x1F802FFF)
+   {
+      if(A >= 0x1F801C00 && A <= 0x1F801FFF){ SPU_Write(timestamp, A & ~1, V); return; }
+      if(A >= 0x1f801800 && A <= 0x1f80180F){ PS_CDC_Write(PSX_CDC, timestamp, A & 0x3, V); return; }
+      if(A >= 0x1F801810 && A <= 0x1F801817){ GPU_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801820 && A <= 0x1F801827){ MDEC_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801000 && A <= 0x1F801023){ unsigned index = (A & 0x1F) >> 2; V <<= (A & 3) * 8; SysControl.Regs[index] = V & SysControl_Mask[index]; return; }
+      if(A >= 0x1F801040 && A <= 0x1F80104F){ FrontIO_Write(PSX_FIO, timestamp, A, V); return; }
+      if(A >= 0x1F801050 && A <= 0x1F80105F){ SIO_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801070 && A <= 0x1F801077){ IRQ_Write(A, V); return; }
+      if(A >= 0x1F801080 && A <= 0x1F8010FF){ DMA_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801100 && A <= 0x1F80113F){ TIMER_Write(timestamp, A, V); return; }
+   }
+   if(A >= 0x1F000000 && A <= 0x1F7FFFFF)   return;
+   if(A == 0xFFFE0130)                      CPU_SetBIU(PSX_CPU, V);
 }
 
 void MDFN_FASTCALL PSX_MemWrite24(int32_t timestamp, uint32_t A, uint32_t V)
 {
-   MemRW(&timestamp, A, &V, 4, true, true);
+   if(A < 0x00800000)                       { MASMEM_WriteU24(MainRAM, A & 0x1FFFFF, V); return; }
+   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)   return;
+   if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+      PSX_EventHandler(timestamp);
+   if(A >= 0x1F801000 && A <= 0x1F802FFF)
+   {
+      if(A >= 0x1F801C00 && A <= 0x1F801FFF){ SPU_Write(timestamp, A & ~1, V); return; }
+      if(A >= 0x1f801800 && A <= 0x1f80180F){ PS_CDC_Write(PSX_CDC, timestamp, A & 0x3, V); return; }
+      if(A >= 0x1F801810 && A <= 0x1F801817){ GPU_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801820 && A <= 0x1F801827){ MDEC_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801000 && A <= 0x1F801023){ unsigned index = (A & 0x1F) >> 2; V <<= (A & 3) * 8; SysControl.Regs[index] = V & SysControl_Mask[index]; return; }
+      if(A >= 0x1F801040 && A <= 0x1F80104F){ FrontIO_Write(PSX_FIO, timestamp, A, V); return; }
+      if(A >= 0x1F801050 && A <= 0x1F80105F){ SIO_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801070 && A <= 0x1F801077){ IRQ_Write(A, V); return; }
+      if(A >= 0x1F801080 && A <= 0x1F8010FF){ DMA_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801100 && A <= 0x1F80113F){ TIMER_Write(timestamp, A, V); return; }
+   }
+   if(A >= 0x1F000000 && A <= 0x1F7FFFFF)   return;
+   if(A == 0xFFFE0130)                      CPU_SetBIU(PSX_CPU, V);
 }
 
 void MDFN_FASTCALL PSX_MemWrite32(int32_t timestamp, uint32_t A, uint32_t V)
 {
-   MemRW(&timestamp, A, &V, 4, true, false);
+   if(A < 0x00800000)                       { MASMEM_WriteU32(MainRAM, A & 0x1FFFFF, V); return; }
+   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)   return;
+   if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+      PSX_EventHandler(timestamp);
+   if(A >= 0x1F801000 && A <= 0x1F802FFF)
+   {
+      if(A >= 0x1F801C00 && A <= 0x1F801FFF){ SPU_Write(timestamp, A | 0, V); SPU_Write(timestamp, A | 2, V >> 16); return; }
+      if(A >= 0x1f801800 && A <= 0x1f80180F){ PS_CDC_Write(PSX_CDC, timestamp, A & 0x3, V); return; }
+      if(A >= 0x1F801810 && A <= 0x1F801817){ GPU_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801820 && A <= 0x1F801827){ MDEC_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801000 && A <= 0x1F801023){ unsigned index = (A & 0x1F) >> 2; V <<= (A & 3) * 8; SysControl.Regs[index] = V & SysControl_Mask[index]; return; }
+      if(A >= 0x1F801040 && A <= 0x1F80104F){ FrontIO_Write(PSX_FIO, timestamp, A, V); return; }
+      if(A >= 0x1F801050 && A <= 0x1F80105F){ SIO_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801070 && A <= 0x1F801077){ IRQ_Write(A, V); return; }
+      if(A >= 0x1F801080 && A <= 0x1F8010FF){ DMA_Write(timestamp, A, V); return; }
+      if(A >= 0x1F801100 && A <= 0x1F80113F){ TIMER_Write(timestamp, A, V); return; }
+   }
+   if(A >= 0x1F000000 && A <= 0x1F7FFFFF)   return;
+   if(A == 0xFFFE0130)                      CPU_SetBIU(PSX_CPU, V);
 }
 
 /* PSX_MemRead{8,16,24,32}: signatures take int32_t *timestamp;
  * cpu.c calls these from its ReadMemory_uN helpers. */
 uint8_t MDFN_FASTCALL PSX_MemRead8(int32_t *timestamp, uint32_t A)
 {
-   uint32_t V;
-   MemRW(timestamp, A, &V, 1, false, false);
-   return V;
+   uint32_t V = 0;
+   *timestamp += DMACycleSteal;
+   if(A < 0x00800000)
+   {
+      if (!psx_gte_overclock)
+         *timestamp += 3;
+      return MASMEM_ReadU8(MainRAM, A & 0x1FFFFF);
+   }
+   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
+      return MASMEM_ReadU8(BIOSROM, A & 0x7FFFF);
+   if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+      PSX_EventHandler(*timestamp);
+   if(A >= 0x1F801000 && A <= 0x1F802FFF)
+   {
+      if(A >= 0x1F801C00 && A <= 0x1F801FFF)
+      {
+         *timestamp += 16;
+         if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+            PSX_EventHandler(*timestamp);
+         return SPU_Read(*timestamp, A & ~1);
+      }
+      if(A >= 0x1f801800 && A <= 0x1f80180F){ *timestamp += 6;  return PS_CDC_Read(PSX_CDC, *timestamp, A & 0x3); }
+      if(A >= 0x1F801810 && A <= 0x1F801817){ (*timestamp)++;   return GPU_Read(*timestamp, A); }
+      if(A >= 0x1F801820 && A <= 0x1F801827){ (*timestamp)++;   return MDEC_Read(*timestamp, A); }
+      if(A >= 0x1F801000 && A <= 0x1F801023){ unsigned index = (A & 0x1F) >> 2; (*timestamp)++; V = SysControl.Regs[index] | SysControl_OR[index]; return V >> ((A & 3) * 8); }
+      if(A >= 0x1F801040 && A <= 0x1F80104F){ (*timestamp)++;   return FrontIO_Read(PSX_FIO, *timestamp, A); }
+      if(A >= 0x1F801050 && A <= 0x1F80105F){ (*timestamp)++;   return SIO_Read(*timestamp, A); }
+      if(A >= 0x1F801070 && A <= 0x1F801077){ (*timestamp)++;   return IRQ_Read(A); }
+      if(A >= 0x1F801080 && A <= 0x1F8010FF){ (*timestamp)++;   return DMA_Read(*timestamp, A); }
+      if(A >= 0x1F801100 && A <= 0x1F80113F){ (*timestamp)++;   return TIMER_Read(*timestamp, A); }
+   }
+   if(A >= 0x1F000000 && A <= 0x1F7FFFFF)
+   {
+      V = ~0U; /* A game this affects:  Tetris with Cardcaptor Sakura */
+      if(PIOMem)
+      {
+         if((A & 0x7FFFFF) < 65536)
+            V = MASMEM_ReadU8(PIOMem, A & 0x7FFFFF);
+         else if((A & 0x7FFFFF) < (65536 + TextMem_size))
+            V = TextMem[(A & 0x7FFFFF) - 65536];
+      }
+      return V;
+   }
+   if(A == 0xFFFE0130)
+      return CPU_GetBIU(PSX_CPU);
+   return 0;
 }
 
 uint16_t MDFN_FASTCALL PSX_MemRead16(int32_t *timestamp, uint32_t A)
 {
-   uint32_t V;
-   MemRW(timestamp, A, &V, 2, false, false);
-   return V;
+   uint32_t V = 0;
+   *timestamp += DMACycleSteal;
+   if(A < 0x00800000)
+   {
+      if (!psx_gte_overclock)
+         *timestamp += 3;
+      return MASMEM_ReadU16(MainRAM, A & 0x1FFFFF);
+   }
+   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
+      return MASMEM_ReadU16(BIOSROM, A & 0x7FFFF);
+   if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+      PSX_EventHandler(*timestamp);
+   if(A >= 0x1F801000 && A <= 0x1F802FFF)
+   {
+      if(A >= 0x1F801C00 && A <= 0x1F801FFF)
+      {
+         *timestamp += 16;
+         if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+            PSX_EventHandler(*timestamp);
+         return SPU_Read(*timestamp, A & ~1);
+      }
+      if(A >= 0x1f801800 && A <= 0x1f80180F){ *timestamp += 12; return PS_CDC_Read(PSX_CDC, *timestamp, A & 0x3); }
+      if(A >= 0x1F801810 && A <= 0x1F801817){ (*timestamp)++;   return GPU_Read(*timestamp, A); }
+      if(A >= 0x1F801820 && A <= 0x1F801827){ (*timestamp)++;   return MDEC_Read(*timestamp, A); }
+      if(A >= 0x1F801000 && A <= 0x1F801023){ unsigned index = (A & 0x1F) >> 2; (*timestamp)++; V = SysControl.Regs[index] | SysControl_OR[index]; return V >> ((A & 3) * 8); }
+      if(A >= 0x1F801040 && A <= 0x1F80104F){ (*timestamp)++;   return FrontIO_Read(PSX_FIO, *timestamp, A); }
+      if(A >= 0x1F801050 && A <= 0x1F80105F){ (*timestamp)++;   return SIO_Read(*timestamp, A); }
+      if(A >= 0x1F801070 && A <= 0x1F801077){ (*timestamp)++;   return IRQ_Read(A); }
+      if(A >= 0x1F801080 && A <= 0x1F8010FF){ (*timestamp)++;   return DMA_Read(*timestamp, A); }
+      if(A >= 0x1F801100 && A <= 0x1F80113F){ (*timestamp)++;   return TIMER_Read(*timestamp, A); }
+   }
+   if(A >= 0x1F000000 && A <= 0x1F7FFFFF)
+   {
+      V = ~0U;
+      if(PIOMem)
+      {
+         if((A & 0x7FFFFF) < 65536)
+            V = MASMEM_ReadU16(PIOMem, A & 0x7FFFFF);
+         else if((A & 0x7FFFFF) < (65536 + TextMem_size))
+         {
+            const uint8_t *_p = &TextMem[(A & 0x7FFFFF) - 65536];
+            uint16_t _v;
+#ifdef MSB_FIRST
+            _v = (uint16_t)_p[0] | ((uint16_t)_p[1] << 8);
+#else
+            memcpy(&_v, _p, 2);
+#endif
+            V = _v;
+         }
+      }
+      return V;
+   }
+   if(A == 0xFFFE0130)
+      return CPU_GetBIU(PSX_CPU);
+   return 0;
 }
 
 uint32_t MDFN_FASTCALL PSX_MemRead24(int32_t *timestamp, uint32_t A)
 {
-   uint32_t V;
-   MemRW(timestamp, A, &V, 4, false, true);
-   return V;
+   uint32_t V = 0;
+   *timestamp += DMACycleSteal;
+   if(A < 0x00800000)
+   {
+      if (!psx_gte_overclock)
+         *timestamp += 3;
+      return MASMEM_ReadU24(MainRAM, A & 0x1FFFFF);
+   }
+   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
+      return MASMEM_ReadU24(BIOSROM, A & 0x7FFFF);
+   if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+      PSX_EventHandler(*timestamp);
+   if(A >= 0x1F801000 && A <= 0x1F802FFF)
+   {
+      if(A >= 0x1F801C00 && A <= 0x1F801FFF)
+      {
+         *timestamp += 16;
+         if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+            PSX_EventHandler(*timestamp);
+         return SPU_Read(*timestamp, A & ~1);
+      }
+      if(A >= 0x1f801800 && A <= 0x1f80180F){ *timestamp += 24; return PS_CDC_Read(PSX_CDC, *timestamp, A & 0x3); }
+      if(A >= 0x1F801810 && A <= 0x1F801817){ (*timestamp)++;   return GPU_Read(*timestamp, A); }
+      if(A >= 0x1F801820 && A <= 0x1F801827){ (*timestamp)++;   return MDEC_Read(*timestamp, A); }
+      if(A >= 0x1F801000 && A <= 0x1F801023){ unsigned index = (A & 0x1F) >> 2; (*timestamp)++; V = SysControl.Regs[index] | SysControl_OR[index]; return V >> ((A & 3) * 8); }
+      if(A >= 0x1F801040 && A <= 0x1F80104F){ (*timestamp)++;   return FrontIO_Read(PSX_FIO, *timestamp, A); }
+      if(A >= 0x1F801050 && A <= 0x1F80105F){ (*timestamp)++;   return SIO_Read(*timestamp, A); }
+      if(A >= 0x1F801070 && A <= 0x1F801077){ (*timestamp)++;   return IRQ_Read(A); }
+      if(A >= 0x1F801080 && A <= 0x1F8010FF){ (*timestamp)++;   return DMA_Read(*timestamp, A); }
+      if(A >= 0x1F801100 && A <= 0x1F80113F){ (*timestamp)++;   return TIMER_Read(*timestamp, A); }
+   }
+   if(A >= 0x1F000000 && A <= 0x1F7FFFFF)
+   {
+      V = ~0U;
+      if(PIOMem)
+      {
+         if((A & 0x7FFFFF) < 65536)
+            V = MASMEM_ReadU24(PIOMem, A & 0x7FFFFF);
+         else if((A & 0x7FFFFF) < (65536 + TextMem_size))
+         {
+            const uint8_t *_p = &TextMem[(A & 0x7FFFFF) - 65536];
+            V = ((uint32_t)_p[0]) | ((uint32_t)_p[1] << 8) | ((uint32_t)_p[2] << 16);
+         }
+      }
+      return V;
+   }
+   if(A == 0xFFFE0130)
+      return CPU_GetBIU(PSX_CPU);
+   return 0;
 }
 
 uint32_t MDFN_FASTCALL PSX_MemRead32(int32_t *timestamp, uint32_t A)
 {
-   uint32_t V;
-   MemRW(timestamp, A, &V, 4, false, false);
-   return V;
+   uint32_t V = 0;
+   *timestamp += DMACycleSteal;
+   if(A < 0x00800000)
+   {
+      if (!psx_gte_overclock)
+         *timestamp += 3;
+      return MASMEM_ReadU32(MainRAM, A & 0x1FFFFF);
+   }
+   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
+      return MASMEM_ReadU32(BIOSROM, A & 0x7FFFF);
+   if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+      PSX_EventHandler(*timestamp);
+   if(A >= 0x1F801000 && A <= 0x1F802FFF)
+   {
+      if(A >= 0x1F801C00 && A <= 0x1F801FFF)
+      {
+         *timestamp += 36;
+         if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
+            PSX_EventHandler(*timestamp);
+         return SPU_Read(*timestamp, A) | (SPU_Read(*timestamp, A | 2) << 16);
+      }
+      if(A >= 0x1f801800 && A <= 0x1f80180F){ *timestamp += 24; return PS_CDC_Read(PSX_CDC, *timestamp, A & 0x3); }
+      if(A >= 0x1F801810 && A <= 0x1F801817){ (*timestamp)++;   return GPU_Read(*timestamp, A); }
+      if(A >= 0x1F801820 && A <= 0x1F801827){ (*timestamp)++;   return MDEC_Read(*timestamp, A); }
+      if(A >= 0x1F801000 && A <= 0x1F801023){ unsigned index = (A & 0x1F) >> 2; (*timestamp)++; V = SysControl.Regs[index] | SysControl_OR[index]; return V >> ((A & 3) * 8); }
+      if(A >= 0x1F801040 && A <= 0x1F80104F){ (*timestamp)++;   return FrontIO_Read(PSX_FIO, *timestamp, A); }
+      if(A >= 0x1F801050 && A <= 0x1F80105F){ (*timestamp)++;   return SIO_Read(*timestamp, A); }
+      if(A >= 0x1F801070 && A <= 0x1F801077){ (*timestamp)++;   return IRQ_Read(A); }
+      if(A >= 0x1F801080 && A <= 0x1F8010FF){ (*timestamp)++;   return DMA_Read(*timestamp, A); }
+      if(A >= 0x1F801100 && A <= 0x1F80113F){ (*timestamp)++;   return TIMER_Read(*timestamp, A); }
+   }
+   if(A >= 0x1F000000 && A <= 0x1F7FFFFF)
+   {
+      V = ~0U;
+      if(PIOMem)
+      {
+         if((A & 0x7FFFFF) < 65536)
+            V = MASMEM_ReadU32(PIOMem, A & 0x7FFFFF);
+         else if((A & 0x7FFFFF) < (65536 + TextMem_size))
+         {
+            const uint8_t *_p = &TextMem[(A & 0x7FFFFF) - 65536];
+            uint32_t _v;
+#ifdef MSB_FIRST
+            _v = (uint32_t)_p[0] | ((uint32_t)_p[1] << 8) | ((uint32_t)_p[2] << 16) | ((uint32_t)_p[3] << 24);
+#else
+            memcpy(&_v, _p, 4);
+#endif
+            V = _v;
+         }
+      }
+      return V;
+   }
+   if(A == 0xFFFE0130)
+      return CPU_GetBIU(PSX_CPU);
+   return 0;
 }
 
 static INLINE uint32_t MemPeek(int32_t timestamp, uint32_t A, unsigned size, bool access24)
