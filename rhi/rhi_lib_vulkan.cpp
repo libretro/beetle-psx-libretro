@@ -5573,6 +5573,17 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	 * out-of-line bodies further down the TU) so the Device class
 	 * declaration's inline methods can use them too. */
 
+	/* Per-frame deletion/recycle queues (plain Vulkan handles, POD). Hoisted to
+	 * file scope from inside Device so the per_frame_* free functions (and other
+	 * non-member code) can use the generated accessors. */
+	POD_VEC_DECLARE(VkFramebufferVec, VkFramebuffer);
+	POD_VEC_DECLARE(VkSamplerVec, VkSampler);
+	POD_VEC_DECLARE(VkPipelineVec, VkPipeline);
+	POD_VEC_DECLARE(VkBufferViewVec, VkBufferView);
+	POD_VEC_DECLARE(VkImageVec, VkImage);
+	POD_VEC_DECLARE(VkBufferVec, VkBuffer);
+	POD_VEC_DECLARE(VkPipelineStageVec, VkPipelineStageFlags);
+
 	class Device
 	{
 		public:
@@ -5787,16 +5798,6 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 				unsigned counter = 0;
 			} lock;
 
-			/* Per-frame deletion/recycle queues hold plain Vulkan handles (POD); use
-			 * POD_VEC instead of std::vector to avoid a heap allocation per frame for
-			 * each queue. */
-			POD_VEC_DECLARE(VkFramebufferVec, VkFramebuffer);
-			POD_VEC_DECLARE(VkSamplerVec, VkSampler);
-			POD_VEC_DECLARE(VkPipelineVec, VkPipeline);
-			POD_VEC_DECLARE(VkBufferViewVec, VkBufferView);
-			POD_VEC_DECLARE(VkImageVec, VkImage);
-			POD_VEC_DECLARE(VkBufferVec, VkBuffer);
-			POD_VEC_DECLARE(VkPipelineStageVec, VkPipelineStageFlags);
 
 			/* Owning array of CommandBufferHandle (= IntrusivePtr<CommandBuffer>).
 			 * Replaces std::vector<CommandBufferHandle> for the per-queue submission
@@ -5821,13 +5822,6 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 
 			struct PerFrame
 			{
-				PerFrame(Device *device);
-				~PerFrame();
-				void operator=(const PerFrame &) = delete;
-				PerFrame(const PerFrame &) = delete;
-
-				void begin();
-
 				VkDevice device;
 				Managers *managers;
 				CommandPool graphics_cmd_pool;
@@ -5853,6 +5847,9 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 				SemaphoreVec recycled_semaphores;
 				SemaphoreVec destroyed_semaphores;
 			};
+			friend void per_frame_init(struct Device::PerFrame *self, Device *device);
+			friend void per_frame_fini(struct Device::PerFrame *self);
+			friend void per_frame_begin(struct Device::PerFrame *self);
 			/* Owning array of PerFrame* (the frame-context ring). Replaces
 			 * std::vector<std::unique_ptr<PerFrame>>: the container owns each
 			 * heap-allocated PerFrame and deletes it on clear()/destruction, so
@@ -5867,71 +5864,11 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 				PerFrame **items;
 				int count;
 				int cap;
-
-				PerFramePtrVec() : items(NULL), count(0), cap(0) {}
-				~PerFramePtrVec() { destroy(); }
-				PerFramePtrVec(PerFramePtrVec &&o) noexcept
-					: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-				PerFramePtrVec &operator=(PerFramePtrVec &&o) noexcept {
-					if (this != &o) {
-						destroy();
-						items = o.items; count = o.count; cap = o.cap;
-						o.items = NULL; o.count = 0; o.cap = 0;
-					}
-					return *this;
-				}
-				PerFramePtrVec(const PerFramePtrVec &) = delete;
-				PerFramePtrVec &operator=(const PerFramePtrVec &) = delete;
-
-				/* Takes ownership of an already-allocated PerFrame. */
-				void push(PerFrame *p) {
-					if (count >= cap) {
-						int ncap = cap ? cap * 2 : 8;
-						PerFrame **nitems = (PerFrame **)::realloc(items, (size_t)ncap * sizeof(PerFrame *));
-						if (!nitems)
-							return;
-						items = nitems;
-						cap = ncap;
-					}
-					items[count++] = p;
-				}
-				int size() const { return count; }
-				bool empty() const { return count == 0; }
-				PerFrame *operator[](int i) const { return items[i]; }
-				PerFrame **begin() { return items; }
-				PerFrame **end() { return items + count; }
-				void clear() {
-					for (int i = 0; i < count; i++) {
-						items[i]->~PerFrame();
-						::free(items[i]);
-					}
-					count = 0;
-				}
-
-				/* Raw-memory lifecycle, for a malloc'd owner (Device) where this
-				 * vector's constructor and destructor do not run. init_empty()
-				 * establishes the constructed empty state (NULL/0/0); deinit() runs
-				 * the destructor's teardown (delete the owned PerFrame entries and
-				 * free the array) via the explicit destructor. */
-				void init_empty() {
-					items = NULL;
-					count = 0;
-					cap   = 0;
-				}
-				void deinit() {
-					this->~PerFramePtrVec();
-				}
-
-			private:
-				void destroy() {
-					for (int i = 0; i < count; i++) {
-						items[i]->~PerFrame();
-						::free(items[i]);
-					}
-					::free(items);
-					items = NULL; count = 0; cap = 0;
-				}
 			};
+			friend void per_frame_ptr_vec_init_empty(struct Device::PerFramePtrVec *v);
+			friend void per_frame_ptr_vec_deinit(struct Device::PerFramePtrVec *v);
+			friend void per_frame_ptr_vec_push(struct Device::PerFramePtrVec *v, struct Device::PerFrame *p);
+			friend void per_frame_ptr_vec_clear(struct Device::PerFramePtrVec *v);
 			// The per frame structure must be destroyed after
 			// the hashmap data structures below, so it must be declared before.
 			PerFramePtrVec per_frame;
@@ -5956,16 +5893,16 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 
 			PerFrame &frame()
 			{
-				VK_ASSERT(frame_context_index < per_frame.size());
-				VK_ASSERT(per_frame[frame_context_index]);
-				return *per_frame[frame_context_index];
+				VK_ASSERT(frame_context_index < per_frame.count);
+				VK_ASSERT(per_frame.items[frame_context_index]);
+				return *per_frame.items[frame_context_index];
 			}
 
 			const PerFrame &frame() const
 			{
-				VK_ASSERT(frame_context_index < per_frame.size());
-				VK_ASSERT(per_frame[frame_context_index]);
-				return *per_frame[frame_context_index];
+				VK_ASSERT(frame_context_index < per_frame.count);
+				VK_ASSERT(per_frame.items[frame_context_index]);
+				return *per_frame.items[frame_context_index];
 			}
 
 			unsigned frame_context_index = 0;
@@ -6100,6 +6037,45 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		free(v->items);
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
+
+	/* Free functions for Device::PerFramePtrVec -- the owning frame-context ring
+	 * (was std::vector<unique_ptr<PerFrame>>, then a move-only nested container).
+	 * The vector owns each heap-allocated PerFrame and per_frame_fini+free's it on
+	 * clear()/teardown. Device is malloc'd so the container's own ctor/dtor never
+	 * run; init_empty establishes the empty state and deinit performs teardown. */
+	inline void per_frame_ptr_vec_init_empty(struct Device::PerFramePtrVec *v)
+	{
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
+	inline void per_frame_ptr_vec_clear(struct Device::PerFramePtrVec *v)
+	{
+		int i;
+		for (i = 0; i < v->count; i++) {
+			per_frame_fini(v->items[i]);
+			free(v->items[i]);
+		}
+		v->count = 0;
+	}
+	inline void per_frame_ptr_vec_deinit(struct Device::PerFramePtrVec *v)
+	{
+		per_frame_ptr_vec_clear(v);
+		free(v->items);
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
+	/* Takes ownership of an already-allocated PerFrame. */
+	inline void per_frame_ptr_vec_push(struct Device::PerFramePtrVec *v, struct Device::PerFrame *p)
+	{
+		if (v->count >= v->cap) {
+			int ncap = v->cap ? v->cap * 2 : 8;
+			Device::PerFrame **nitems = (Device::PerFrame **)realloc(v->items, (size_t)ncap * sizeof(Device::PerFrame *));
+			if (!nitems)
+				return;
+			v->items = nitems;
+			v->cap = ncap;
+		}
+		v->items[v->count++] = p;
+	}
+
 
 /* ============================================================
  * atlas.hpp
@@ -16507,7 +16483,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		semaphoremanager_init_empty(&self->managers.semaphore);
 		bufferpool_init_empty(&self->managers.vbo);
 		bufferpool_init_empty(&self->managers.ubo);
-		self->per_frame.init_empty();
+		per_frame_ptr_vec_init_empty(&self->per_frame);
 		pipeline_layout_map_init(&self->pipeline_layouts);
 		descriptor_set_allocator_map_init(&self->descriptor_set_allocators);
 		render_pass_map_init(&self->render_passes);
@@ -16545,7 +16521,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		render_pass_map_deinit(&self->render_passes);
 		descriptor_set_allocator_map_deinit(&self->descriptor_set_allocators);
 		pipeline_layout_map_deinit(&self->pipeline_layouts);
-		self->per_frame.deinit();
+		per_frame_ptr_vec_deinit(&self->per_frame);
 		bufferpool_deinit(&self->managers.vbo);
 		bufferpool_deinit(&self->managers.ubo);
 		deviceallocator_deinit(&self->managers.memory);
@@ -17426,39 +17402,42 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		// Clear out caches which might contain stale data from now on.
 		framebuffer_allocator_clear(&framebuffer_allocator);
 		attachment_allocator_clear(&transient_allocator);
-		per_frame.clear();
+		per_frame_ptr_vec_clear(&per_frame);
 
 		for (unsigned i = 0; i < count; i++)
 		{
 			PerFrame *pf = (PerFrame *)malloc(sizeof(PerFrame));
-			new (pf) PerFrame(this);
-			per_frame.push(pf);
+			per_frame_init(pf, this);
+			per_frame_ptr_vec_push(&per_frame, pf);
 		}
 	}
 
-	Device::PerFrame::PerFrame(Device *device)
-		: device(device->get_device())
-		  , managers(&device->managers)
+	void per_frame_init(struct Device::PerFrame *self, Device *device)
 	{
-		command_pool_init(&graphics_cmd_pool, device->get_device(), device->graphics_queue_family_index);
-		command_pool_init(&compute_cmd_pool, device->get_device(), device->compute_queue_family_index);
-		command_pool_init(&transfer_cmd_pool, device->get_device(), device->transfer_queue_family_index);
+		self->device = device->get_device();
+		self->managers = &device->managers;
+		command_pool_init(&self->graphics_cmd_pool, device->get_device(), device->graphics_queue_family_index);
+		command_pool_init(&self->compute_cmd_pool, device->get_device(), device->compute_queue_family_index);
+		command_pool_init(&self->transfer_cmd_pool, device->get_device(), device->transfer_queue_family_index);
+		/* vbo/ubo block lists: plain structs, init explicitly. */
+		bufferblock_vec_init(&self->vbo_blocks);
+		bufferblock_vec_init(&self->ubo_blocks);
 		/* POD_VEC members have no constructor; zero-initialise them. */
-		memset(&wait_fences, 0, sizeof(wait_fences));
-		memset(&recycle_fences, 0, sizeof(recycle_fences));
-		memset(&allocations, 0, sizeof(allocations));
-		memset(&destroyed_framebuffers, 0, sizeof(destroyed_framebuffers));
-		memset(&destroyed_samplers, 0, sizeof(destroyed_samplers));
-		memset(&destroyed_pipelines, 0, sizeof(destroyed_pipelines));
-		memset(&destroyed_image_views, 0, sizeof(destroyed_image_views));
-		memset(&destroyed_buffer_views, 0, sizeof(destroyed_buffer_views));
-		memset(&destroyed_images, 0, sizeof(destroyed_images));
-		memset(&destroyed_buffers, 0, sizeof(destroyed_buffers));
-		memset(&recycled_semaphores, 0, sizeof(recycled_semaphores));
-		memset(&destroyed_semaphores, 0, sizeof(destroyed_semaphores));
-		cbhvec_init(&graphics_submissions);
-		cbhvec_init(&compute_submissions);
-		cbhvec_init(&transfer_submissions);
+		memset(&self->wait_fences, 0, sizeof(self->wait_fences));
+		memset(&self->recycle_fences, 0, sizeof(self->recycle_fences));
+		memset(&self->allocations, 0, sizeof(self->allocations));
+		memset(&self->destroyed_framebuffers, 0, sizeof(self->destroyed_framebuffers));
+		memset(&self->destroyed_samplers, 0, sizeof(self->destroyed_samplers));
+		memset(&self->destroyed_pipelines, 0, sizeof(self->destroyed_pipelines));
+		memset(&self->destroyed_image_views, 0, sizeof(self->destroyed_image_views));
+		memset(&self->destroyed_buffer_views, 0, sizeof(self->destroyed_buffer_views));
+		memset(&self->destroyed_images, 0, sizeof(self->destroyed_images));
+		memset(&self->destroyed_buffers, 0, sizeof(self->destroyed_buffers));
+		memset(&self->recycled_semaphores, 0, sizeof(self->recycled_semaphores));
+		memset(&self->destroyed_semaphores, 0, sizeof(self->destroyed_semaphores));
+		cbhvec_init(&self->graphics_submissions);
+		cbhvec_init(&self->compute_submissions);
+		cbhvec_init(&self->transfer_submissions);
 	}
 
 	void Device::free_memory_nolock(const DeviceAllocation &alloc)
@@ -17562,7 +17541,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void Device::wait_idle_nolock()
 	{
-		if (!per_frame.empty())
+		if (per_frame.count != 0)
 			end_frame_nolock();
 
 		if (device != VK_NULL_HANDLE)
@@ -17573,11 +17552,12 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		// Free memory for buffer pools.
 		bufferpool_reset(&managers.vbo);
 		bufferpool_reset(&managers.ubo);
-		for (PerFrame *frame : per_frame)
+		{ int _pi; for (_pi = 0; _pi < per_frame.count; _pi++)
 		{
+			PerFrame *frame = per_frame.items[_pi];
 			bufferblock_vec_clear(&frame->vbo_blocks);
 			bufferblock_vec_clear(&frame->ubo_blocks);
-		}
+		} }
 
 		framebuffer_allocator_clear(&framebuffer_allocator);
 		attachment_allocator_clear(&transient_allocator);
@@ -17587,12 +17567,13 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				descriptor_set_allocator_clear(descriptor_set_allocator_map_iter_get(n));
 		}
 
-		for (PerFrame *frame : per_frame)
+		{ int _pi; for (_pi = 0; _pi < per_frame.count; _pi++)
 		{
+			PerFrame *frame = per_frame.items[_pi];
 			// We have done WaitIdle, no need to wait for extra fences, it's also not safe.
 			FenceVec_clear(&frame->wait_fences);
-			frame->begin();
-		}
+			per_frame_begin(frame);
+		} }
 	}
 
 	void Device::next_frame_context()
@@ -17608,120 +17589,125 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				descriptor_set_allocator_begin_frame(descriptor_set_allocator_map_iter_get(n));
 		}
 
-		VK_ASSERT(!per_frame.empty());
+		VK_ASSERT(per_frame.count != 0);
 		frame_context_index++;
-		if (frame_context_index >= per_frame.size())
+		if (frame_context_index >= (unsigned)per_frame.count)
 			frame_context_index = 0;
 
-		frame().begin();
+		per_frame_begin(&frame());
 	}
 
-	void Device::PerFrame::begin()
+	void per_frame_begin(struct Device::PerFrame *self)
 	{
-		if (!FenceVec_empty(&wait_fences))
+		if (!FenceVec_empty(&self->wait_fences))
 		{
-			vkWaitForFences(device, FenceVec_size(&wait_fences), FenceVec_data(&wait_fences), VK_TRUE, UINT64_MAX);
-			FenceVec_clear(&wait_fences);
+			vkWaitForFences(self->device, FenceVec_size(&self->wait_fences), FenceVec_data(&self->wait_fences), VK_TRUE, UINT64_MAX);
+			FenceVec_clear(&self->wait_fences);
 		}
 
-		if (!FenceVec_empty(&recycle_fences))
+		if (!FenceVec_empty(&self->recycle_fences))
 		{
 			int _i;
-			vkResetFences(device, FenceVec_size(&recycle_fences), FenceVec_data(&recycle_fences));
-			for (_i = 0; _i < FenceVec_size(&recycle_fences); _i++)
+			vkResetFences(self->device, FenceVec_size(&self->recycle_fences), FenceVec_data(&self->recycle_fences));
+			for (_i = 0; _i < FenceVec_size(&self->recycle_fences); _i++)
 			{
-				VkFence &fence = *FenceVec_at(&recycle_fences, _i);
-				fencemanager_recycle_fence(&managers->fence, fence);
+				VkFence &fence = *FenceVec_at(&self->recycle_fences, _i);
+				fencemanager_recycle_fence(&self->managers->fence, fence);
 			}
-			FenceVec_clear(&recycle_fences);
+			FenceVec_clear(&self->recycle_fences);
 		}
 
-		graphics_cmd_pool.begin();
-		compute_cmd_pool.begin();
-		transfer_cmd_pool.begin();
+		self->graphics_cmd_pool.begin();
+		self->compute_cmd_pool.begin();
+		self->transfer_cmd_pool.begin();
 
 		{
 			int _i;
-			for (_i = 0; _i < VkFramebufferVec_size(&destroyed_framebuffers); _i++)
-				vkDestroyFramebuffer(device, *VkFramebufferVec_at(&destroyed_framebuffers, _i), NULL);
-			for (_i = 0; _i < VkSamplerVec_size(&destroyed_samplers); _i++)
-				vkDestroySampler(device, *VkSamplerVec_at(&destroyed_samplers, _i), NULL);
-			for (_i = 0; _i < VkPipelineVec_size(&destroyed_pipelines); _i++)
-				vkDestroyPipeline(device, *VkPipelineVec_at(&destroyed_pipelines, _i), NULL);
-			for (_i = 0; _i < RenderTargetViewVec_size(&destroyed_image_views); _i++)
-				vkDestroyImageView(device, *RenderTargetViewVec_at(&destroyed_image_views, _i), NULL);
-			for (_i = 0; _i < VkBufferViewVec_size(&destroyed_buffer_views); _i++)
-				vkDestroyBufferView(device, *VkBufferViewVec_at(&destroyed_buffer_views, _i), NULL);
-			for (_i = 0; _i < VkImageVec_size(&destroyed_images); _i++)
-				vkDestroyImage(device, *VkImageVec_at(&destroyed_images, _i), NULL);
-			for (_i = 0; _i < VkBufferVec_size(&destroyed_buffers); _i++)
-				vkDestroyBuffer(device, *VkBufferVec_at(&destroyed_buffers, _i), NULL);
+			for (_i = 0; _i < VkFramebufferVec_size(&self->destroyed_framebuffers); _i++)
+				vkDestroyFramebuffer(self->device, *VkFramebufferVec_at(&self->destroyed_framebuffers, _i), NULL);
+			for (_i = 0; _i < VkSamplerVec_size(&self->destroyed_samplers); _i++)
+				vkDestroySampler(self->device, *VkSamplerVec_at(&self->destroyed_samplers, _i), NULL);
+			for (_i = 0; _i < VkPipelineVec_size(&self->destroyed_pipelines); _i++)
+				vkDestroyPipeline(self->device, *VkPipelineVec_at(&self->destroyed_pipelines, _i), NULL);
+			for (_i = 0; _i < RenderTargetViewVec_size(&self->destroyed_image_views); _i++)
+				vkDestroyImageView(self->device, *RenderTargetViewVec_at(&self->destroyed_image_views, _i), NULL);
+			for (_i = 0; _i < VkBufferViewVec_size(&self->destroyed_buffer_views); _i++)
+				vkDestroyBufferView(self->device, *VkBufferViewVec_at(&self->destroyed_buffer_views, _i), NULL);
+			for (_i = 0; _i < VkImageVec_size(&self->destroyed_images); _i++)
+				vkDestroyImage(self->device, *VkImageVec_at(&self->destroyed_images, _i), NULL);
+			for (_i = 0; _i < VkBufferVec_size(&self->destroyed_buffers); _i++)
+				vkDestroyBuffer(self->device, *VkBufferVec_at(&self->destroyed_buffers, _i), NULL);
 		}
 		{
 			int _i;
-			for (_i = 0; _i < SemaphoreVec_size(&destroyed_semaphores); _i++)
-				vkDestroySemaphore(device, *SemaphoreVec_at(&destroyed_semaphores, _i), NULL);
+			for (_i = 0; _i < SemaphoreVec_size(&self->destroyed_semaphores); _i++)
+				vkDestroySemaphore(self->device, *SemaphoreVec_at(&self->destroyed_semaphores, _i), NULL);
 		}
 		{
 			int _i;
-			for (_i = 0; _i < SemaphoreVec_size(&recycled_semaphores); _i++)
-				semaphoremanager_recycle(&managers->semaphore, *SemaphoreVec_at(&recycled_semaphores, _i));
+			for (_i = 0; _i < SemaphoreVec_size(&self->recycled_semaphores); _i++)
+				semaphoremanager_recycle(&self->managers->semaphore, *SemaphoreVec_at(&self->recycled_semaphores, _i));
 		}
 		{
 			int _i;
-			for (_i = 0; _i < DeviceAllocationVec_size(&allocations); _i++)
-				deviceallocation_free_immediate_alloc(DeviceAllocationVec_at(&allocations, _i), &managers->memory);
+			for (_i = 0; _i < DeviceAllocationVec_size(&self->allocations); _i++)
+				deviceallocation_free_immediate_alloc(DeviceAllocationVec_at(&self->allocations, _i), &self->managers->memory);
 		}
 
 		{
 			int _bi;
-			for (_bi = 0; _bi < vbo_blocks.count; _bi++)
-				bufferpool_recycle_block(&managers->vbo, &vbo_blocks.items[_bi]);
-			for (_bi = 0; _bi < ubo_blocks.count; _bi++)
-				bufferpool_recycle_block(&managers->ubo, &ubo_blocks.items[_bi]);
+			for (_bi = 0; _bi < self->vbo_blocks.count; _bi++)
+				bufferpool_recycle_block(&self->managers->vbo, &self->vbo_blocks.items[_bi]);
+			for (_bi = 0; _bi < self->ubo_blocks.count; _bi++)
+				bufferpool_recycle_block(&self->managers->ubo, &self->ubo_blocks.items[_bi]);
 		}
 		/* recycle_block copy-retained each block; clear() finis the originals,
 		 * net-transferring the refs into the pools. */
-		bufferblock_vec_clear(&vbo_blocks);
-		bufferblock_vec_clear(&ubo_blocks);
+		bufferblock_vec_clear(&self->vbo_blocks);
+		bufferblock_vec_clear(&self->ubo_blocks);
 
-		VkFramebufferVec_clear(&destroyed_framebuffers);
-		VkSamplerVec_clear(&destroyed_samplers);
-		VkPipelineVec_clear(&destroyed_pipelines);
-		RenderTargetViewVec_clear(&destroyed_image_views);
-		VkBufferViewVec_clear(&destroyed_buffer_views);
-		VkImageVec_clear(&destroyed_images);
-		VkBufferVec_clear(&destroyed_buffers);
-		SemaphoreVec_clear(&destroyed_semaphores);
-		SemaphoreVec_clear(&recycled_semaphores);
-		DeviceAllocationVec_clear(&allocations);
+		VkFramebufferVec_clear(&self->destroyed_framebuffers);
+		VkSamplerVec_clear(&self->destroyed_samplers);
+		VkPipelineVec_clear(&self->destroyed_pipelines);
+		RenderTargetViewVec_clear(&self->destroyed_image_views);
+		VkBufferViewVec_clear(&self->destroyed_buffer_views);
+		VkImageVec_clear(&self->destroyed_images);
+		VkBufferVec_clear(&self->destroyed_buffers);
+		SemaphoreVec_clear(&self->destroyed_semaphores);
+		SemaphoreVec_clear(&self->recycled_semaphores);
+		DeviceAllocationVec_clear(&self->allocations);
 	}
 
-	Device::PerFrame::~PerFrame()
+	void per_frame_fini(struct Device::PerFrame *self)
 	{
-		begin();
+		per_frame_begin(self);
 		/* The command pools no longer self-destruct (their dtor became
 		 * command_pool_deinit); tear them down explicitly, as the implicit member
 		 * destruction used to. */
-		command_pool_deinit(&graphics_cmd_pool);
-		command_pool_deinit(&compute_cmd_pool);
-		command_pool_deinit(&transfer_cmd_pool);
+		command_pool_deinit(&self->graphics_cmd_pool);
+		command_pool_deinit(&self->compute_cmd_pool);
+		command_pool_deinit(&self->transfer_cmd_pool);
 		/* Release the POD_VEC backing storage (begin() only resets the counts). */
-		FenceVec_free_storage(&wait_fences);
-		FenceVec_free_storage(&recycle_fences);
-		DeviceAllocationVec_free_storage(&allocations);
-		VkFramebufferVec_free_storage(&destroyed_framebuffers);
-		VkSamplerVec_free_storage(&destroyed_samplers);
-		VkPipelineVec_free_storage(&destroyed_pipelines);
-		RenderTargetViewVec_free_storage(&destroyed_image_views);
-		VkBufferViewVec_free_storage(&destroyed_buffer_views);
-		VkImageVec_free_storage(&destroyed_images);
-		VkBufferVec_free_storage(&destroyed_buffers);
-		SemaphoreVec_free_storage(&recycled_semaphores);
-		SemaphoreVec_free_storage(&destroyed_semaphores);
-		cbhvec_deinit(&graphics_submissions);
-		cbhvec_deinit(&compute_submissions);
-		cbhvec_deinit(&transfer_submissions);
+		FenceVec_free_storage(&self->wait_fences);
+		FenceVec_free_storage(&self->recycle_fences);
+		DeviceAllocationVec_free_storage(&self->allocations);
+		VkFramebufferVec_free_storage(&self->destroyed_framebuffers);
+		VkSamplerVec_free_storage(&self->destroyed_samplers);
+		VkPipelineVec_free_storage(&self->destroyed_pipelines);
+		RenderTargetViewVec_free_storage(&self->destroyed_image_views);
+		VkBufferViewVec_free_storage(&self->destroyed_buffer_views);
+		VkImageVec_free_storage(&self->destroyed_images);
+		VkBufferVec_free_storage(&self->destroyed_buffers);
+		SemaphoreVec_free_storage(&self->recycled_semaphores);
+		SemaphoreVec_free_storage(&self->destroyed_semaphores);
+		cbhvec_deinit(&self->graphics_submissions);
+		cbhvec_deinit(&self->compute_submissions);
+		cbhvec_deinit(&self->transfer_submissions);
+		/* vbo/ubo block lists: free backing storage (begin() recycled+cleared the
+		 * blocks but kept the array; the old BufferBlockVec member destructor that
+		 * freed it is gone now they are plain structs). */
+		bufferblock_vec_free_storage(&self->vbo_blocks);
+		bufferblock_vec_free_storage(&self->ubo_blocks);
 	}
 
 	uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
