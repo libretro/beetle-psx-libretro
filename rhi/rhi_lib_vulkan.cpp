@@ -11560,7 +11560,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, Primitiv
 
 	// Render flat-shaded primitives.
 	BufferVertex *vert = (BufferVertex *)(
-	    commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, BufferVertexVec_size((struct BufferVertexVec *)&vertices) * sizeof(BufferVertex), sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX));
+	    commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, BufferVertexVec_size(vertices) * sizeof(BufferVertex), sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX));
 
 	int scissor = (*PrimitiveInfoVec_front(scissors)).scissor_index;
 	HdTextureHandle hd_texture = (*PrimitiveInfoVec_front(scissors)).hd_texture_index;
@@ -11578,7 +11578,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, Primitiv
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, shift);
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
 	renderer_dispatch_set_scaled_read_texture(self, scaled_read, textured);
-	memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_front(scissors)).triangle_index, 3 * sizeof(BufferVertex));
+	memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)vertices) + 3 * (*PrimitiveInfoVec_front(scissors)).triangle_index, 3 * sizeof(BufferVertex));
 	vert += 3;
 
 	for (; i < size; i++, vert += 3)
@@ -11617,7 +11617,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, Primitiv
 				commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
 			}
 		}
-		memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_at(scissors, i)).triangle_index, 3 * sizeof(BufferVertex));
+		memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)vertices) + 3 * (*PrimitiveInfoVec_at(scissors, i)).triangle_index, 3 * sizeof(BufferVertex));
 	}
 
 	unsigned to_draw = size - last_draw;
@@ -11817,7 +11817,7 @@ void renderer_flush_blit(Renderer *self, const BlitInfoVec *infos, Program *prog
 	{ unsigned i; for (i = 0; i < size; i += 512) {
 		unsigned to_blit = min_(size - i, 512u);
 		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_blit * sizeof(BlitInfo));
-		memcpy(ptr, BlitInfoVec_data((struct BlitInfoVec *)&infos) + i, to_blit * sizeof(BlitInfo));
+		memcpy(ptr, BlitInfoVec_data((struct BlitInfoVec *)infos) + i, to_blit * sizeof(BlitInfo));
 		commandbuffer_dispatch(cbh_get(&self->cmd), scale, scale, to_blit);
 	} }
 }
