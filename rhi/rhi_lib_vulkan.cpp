@@ -8353,6 +8353,29 @@ extern retro_log_printf_t log_cb;
 		PrimitiveType_May_Be_2D_Polygon
 	};
 
+	/* Display rectangle (signed origin, unlike Rect). Hoisted out of Renderer to
+	 * file scope and de-C++'d: the 4-arg constructor becomes display_rect_make and
+	 * the default-member-initialisers are dropped (every constructed DisplayRect is
+	 * fully assigned). */
+	struct DisplayRect
+	{
+		// Unlike Rect, the x-y coordinates for a DisplayRect can be negative
+		int x;
+		int y;
+		unsigned width;
+		unsigned height;
+	};
+
+	static inline struct DisplayRect display_rect_make(int x, int y, unsigned width, unsigned height)
+	{
+		struct DisplayRect r;
+		r.x = x;
+		r.y = y;
+		r.width = width;
+		r.height = height;
+		return r;
+	}
+
 	class Renderer
 	{
 		public:
@@ -8378,24 +8401,6 @@ extern retro_log_printf_t log_cb;
 				WidthMode_WIDTH_MODE_512 = 2,
 				WidthMode_WIDTH_MODE_640 = 3,
 				WidthMode_WIDTH_MODE_368 = 4
-			};
-
-			struct DisplayRect
-			{
-				// Unlike Rect, the x-y coordinates for a DisplayRect can be negative
-				int x = 0;
-				int y = 0;
-				unsigned width = 0;
-				unsigned height = 0;
-
-				DisplayRect() = default;
-				DisplayRect(int x, int y, unsigned width, unsigned height)
-					: x(x)
-					  , y(y)
-					  , width(width)
-					  , height(height)
-				{
-				}
 			};
 
 			struct RenderState
@@ -9884,7 +9889,7 @@ Rect Renderer::compute_vram_framebuffer_rect()
 	        fb_height};
 }
 
-Renderer::DisplayRect Renderer::compute_display_rect()
+DisplayRect Renderer::compute_display_rect()
 {
 	unsigned clock_div;
 	switch (render_state.width_mode)
@@ -9960,7 +9965,7 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 		upper_offset   *= 2;
 	}
 
-	return DisplayRect(left_offset, upper_offset, display_width, display_height);
+	return display_rect_make(left_offset, upper_offset, display_width, display_height);
 }
 
 ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
