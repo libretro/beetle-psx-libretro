@@ -5561,6 +5561,9 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	class Device
 	{
 		public:
+			friend CommandBufferType device_get_physical_queue_type(Device *self, CommandBufferType queue_type);
+			friend bool device_image_format_is_supported(Device *self, VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling);
+			friend VkFormat device_get_default_depth_format(Device *self);
 			// Device-based objects which need to poke at internal data structures when their lifetimes end.
 			// Don't want to expose a lot of internal guts to make this work.
 			friend struct SemaphoreHolderDeleter;
@@ -5636,7 +5639,6 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 			CommandBufferHandle request_command_buffer(CommandBufferType type = Type_Generic);
 			void submit(CommandBufferHandle &cmd, Fence *fence = NULL,
 					unsigned semaphore_count = 0, Semaphore *semaphore = NULL);
-			CommandBufferType get_physical_queue_type(CommandBufferType queue_type) const;
 
 			// Request shaders and programs. These objects are owned by the Device.
 			Shader *request_shader(const uint32_t *code, size_t size);
@@ -5669,11 +5671,9 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 			BufferViewHandle create_buffer_view(const BufferViewCreateInfo &view_info);
 
 			// Render pass helpers.
-			bool image_format_is_supported(VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL) const;
 			bool get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags,
 					VkImageFormatProperties *properties);
 
-			VkFormat get_default_depth_format() const;
 			ImageView &get_transient_attachment(unsigned width, unsigned height, VkFormat format,
 					unsigned index = 0, unsigned samples = 1, unsigned layers = 1)
 			{
@@ -11242,7 +11242,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect &rect)
 	info.clear_depth_stencil = { 1.0f, 0 };
 	info.depth_stencil =
 		&self->device->get_transient_attachment(FB_WIDTH * self->scaling, FB_HEIGHT * self->scaling,
-		                                 self->device->get_default_depth_format(), 0, self->msaa, 1);
+		                                 device_get_default_depth_format(self->device), 0, self->msaa, 1);
 	info.num_color_attachments = 1;
 	info.store_attachments = 1 << 0;
 	info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
@@ -17111,15 +17111,14 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		submit_nolock(moved, fence, semaphore_count, semaphores);
 	}
 
-	CommandBufferType Device::get_physical_queue_type(CommandBufferType queue_type) const
-	{
+	CommandBufferType device_get_physical_queue_type(Device *self, CommandBufferType queue_type){
 		if (queue_type != Type_AsyncGraphics)
 		{
 			return queue_type;
 		}
 		else
 		{
-			if (graphics_queue_family_index == compute_queue_family_index && graphics_queue != compute_queue)
+			if (self->graphics_queue_family_index == self->compute_queue_family_index && self->graphics_queue != self->compute_queue)
 				return Type_AsyncCompute;
 			else
 				return Type_Generic;
@@ -17338,7 +17337,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	void Device::submit_queue(CommandBufferType type, VkFence *fence,
 			unsigned semaphore_count, Semaphore *semaphores)
 	{
-		type = get_physical_queue_type(type);
+		type = device_get_physical_queue_type(this, type);
 
 		// Always check if we need to flush pending transfers.
 		if (type != Type_AsyncTransfer)
@@ -17559,7 +17558,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	Device::QueueData &Device::get_queue_data(CommandBufferType type)
 	{
-		switch (get_physical_queue_type(type))
+		switch (device_get_physical_queue_type(this, type))
 		{
 			default:
 			case Type_Generic:
@@ -17573,7 +17572,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	CommandPool *Device::get_command_pool(CommandBufferType type)
 	{
-		switch (get_physical_queue_type(type))
+		switch (device_get_physical_queue_type(this, type))
 		{
 			default:
 			case Type_Generic:
@@ -17587,7 +17586,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	Device::CommandBufferHandleVec *Device::get_queue_submissions(CommandBufferType type)
 	{
-		switch (get_physical_queue_type(type))
+		switch (device_get_physical_queue_type(this, type))
 		{
 			default:
 			case Type_Generic:
@@ -18461,7 +18460,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		if (create_info.usage & VK_IMAGE_USAGE_STORAGE_BIT)
 			info.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
 
-		if (!image_format_is_supported(create_info.format, image_usage_to_features(info.usage), info.tiling))
+		if (!device_image_format_is_supported(this, create_info.format, image_usage_to_features(info.usage), info.tiling))
 		{
 			LOGE("Format %u is not supported for usage flags!\n", unsigned(create_info.format));
 			image_resource_holder_fini(&holder);
@@ -18649,7 +18648,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 						image_get_access_flags(ih_get(&handle)) & image_layout_to_possible_access(create_info.initial_layout));
 			}
 
-			bool share_async_graphics = get_physical_queue_type(Type_AsyncGraphics) == Type_AsyncCompute;
+			bool share_async_graphics = device_get_physical_queue_type(this, Type_AsyncGraphics) == Type_AsyncCompute;
 
 			// Add semaphore if the compute queue can be used for async graphics as well.
 			if (share_async_graphics)
@@ -18817,21 +18816,19 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		return res == VK_SUCCESS;
 	}
 
-	bool Device::image_format_is_supported(VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling) const
-	{
+	bool device_image_format_is_supported(Device *self, VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling){
 		VkFormatProperties props;
-		vkGetPhysicalDeviceFormatProperties(gpu, format, &props);
+		vkGetPhysicalDeviceFormatProperties(self->gpu, format, &props);
 		VkFormatFeatureFlags flags = tiling == VK_IMAGE_TILING_OPTIMAL ? props.optimalTilingFeatures : props.linearTilingFeatures;
 		return (flags & required) == required;
 	}
 
-	VkFormat Device::get_default_depth_format() const
-	{
-		if (image_format_is_supported(VK_FORMAT_D32_SFLOAT, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
+	VkFormat device_get_default_depth_format(Device *self){
+		if (device_image_format_is_supported(self, VK_FORMAT_D32_SFLOAT, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
 			return VK_FORMAT_D32_SFLOAT;
-		if (image_format_is_supported(VK_FORMAT_X8_D24_UNORM_PACK32, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
+		if (device_image_format_is_supported(self, VK_FORMAT_X8_D24_UNORM_PACK32, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
 			return VK_FORMAT_X8_D24_UNORM_PACK32;
-		if (image_format_is_supported(VK_FORMAT_D16_UNORM, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
+		if (device_image_format_is_supported(self, VK_FORMAT_D16_UNORM, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL))
 			return VK_FORMAT_D16_UNORM;
 
 		return VK_FORMAT_UNDEFINED;
