@@ -3527,8 +3527,16 @@ static void rec_CP2(struct lightrec_cstate *state,
 	 * inline (gte_ts_done lives in lightrec_state).  This avoids the C-call
 	 * boundary and the register spill it forces.  Skipped when the GTE op
 	 * needs the C path for PGXP (cop2_notify installed), since NCLIP has a
-	 * PGXP variant handled in the C op. */
-	if (__WORDSIZE >= 64 && (c.opcode & 0x3f) == 0x06 &&
+	 * PGXP variant handled in the C op.
+	 *
+	 * Build with -DLIGHTREC_INLINE_GTE=0 to disable and route every GTE op
+	 * through the C wrapper, e.g. to A/B the inline path against the known
+	 * wrapper path during bring-up. */
+#ifndef LIGHTREC_INLINE_GTE
+#define LIGHTREC_INLINE_GTE 1
+#endif
+	if (LIGHTREC_INLINE_GTE && __WORDSIZE >= 64 &&
+	    (c.opcode & 0x3f) == 0x06 &&
 	    !state->state->ops.cop2_notify) {
 		rec_cp2_inline_NCLIP(state, block, offset);
 		return;
