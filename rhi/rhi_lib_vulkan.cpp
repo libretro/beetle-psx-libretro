@@ -4476,30 +4476,23 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	static inline VkPipelineLayout pipeline_layout_get_layout(const struct PipelineLayout *self) { return self->pipe_layout; }
 	static inline DescriptorSetAllocator *pipeline_layout_get_allocator(const struct PipelineLayout *self, unsigned set) { return self->set_allocators[set]; }
 
-	class Shader
+	/* Shader: cached VkShaderModule + its reflected ResourceLayout. Lives in an
+	 * IntrusiveHashMap (intrusive_node first). Converted from a C++ class to a
+	 * plain C struct + shader_* free functions; ctor -> shader_init (called by the
+	 * map's emplace), dtor -> shader_fini (the map's destroy callback). */
+	struct Shader
 	{
-		public:
-			struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
-			Shader(Hash hash, Device *device, const uint32_t *data, size_t size);
-			~Shader();
-
-			const ResourceLayout &get_layout() const
-			{
-				return layout;
-			}
-
-			VkShaderModule get_module() const
-			{
-				return module;
-			}
-
-			static const char *stage_to_name(ShaderStage stage);
-
-		private:
-			Device *device;
-			VkShaderModule module;
-			ResourceLayout layout;
+		struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
+		Device *device;
+		VkShaderModule module;
+		ResourceLayout layout;
 	};
+
+	void shader_init(struct Shader *self, Hash hash, Device *device, const uint32_t *data, size_t size);
+	void shader_fini(struct Shader *self);
+	static inline const ResourceLayout *shader_get_layout(const struct Shader *self) { return &self->layout; }
+	static inline VkShaderModule shader_get_module(const struct Shader *self) { return self->module; }
+	const char *shader_stage_to_name(ShaderStage stage);
 
 	class Program
 	{
@@ -4692,7 +4685,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	static inline void pipeline_layout_map_destroy(PipelineLayout *t) { pipeline_layout_fini(t); }
 	static inline void descriptor_set_allocator_map_destroy(DescriptorSetAllocator *t) { t->~DescriptorSetAllocator(); }
 	static inline void render_pass_map_destroy(RenderPass *t) { t->~RenderPass(); }
-	static inline void shader_map_destroy(Shader *t) { t->~Shader(); }
+	static inline void shader_map_destroy(Shader *t) { shader_fini(t); }
 	static inline void program_map_destroy(Program *t) { t->~Program(); }
 
 	VK_HASHMAP_DECLARE(pipeline_layout_map, PipelineLayout, pipeline_layout_map_destroy)
@@ -4743,7 +4736,8 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		Shader *t;
 		if (!slot)
 			return NULL;
-		t = new (slot) Shader(hash, device, data, size);
+		t = (Shader *)slot;
+		shader_init(t, hash, device, data, size);
 		return shader_map_insert_yield(m, hash, t);
 	}
 
@@ -13504,7 +13498,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			vkDestroyPipelineLayout(self->device->get_device(), self->pipe_layout, NULL);
 	}
 
-	const char *Shader::stage_to_name(ShaderStage stage)
+	const char *shader_stage_to_name(ShaderStage stage)
 	{
 		switch (stage)
 		{
@@ -13525,10 +13519,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 	}
 
-	Shader::Shader(Hash hash, Device *device, const uint32_t *data, size_t size)
-		: device(device)
+	void shader_init(struct Shader *self, Hash hash, Device *device, const uint32_t *data, size_t size)
 	{
-		intrusive_node.key = hash;
+		self->device = device;
+		self->module = VK_NULL_HANDLE;
+		self->intrusive_node.key = hash;
 #ifdef GRANITE_SPIRV_DUMP
 		{
 			char spirv_dump_path[64];
@@ -13548,7 +13543,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		info.pCode = data;
 
 		LOGI("Creating shader module.\n");
-		if (vkCreateShaderModule(device->get_device(), &info, NULL, &module) != VK_SUCCESS)
+		if (vkCreateShaderModule(device->get_device(), &info, NULL, &self->module) != VK_SUCCESS)
 			LOGE("Failed to create shader module.\n");
 
 		/* SPIR-V reflection is done in a separate C++ shim (rhi_spirv_reflect.cpp)
@@ -13556,15 +13551,15 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		 * a POD layout whose fields mirror ResourceLayout; copy it across. */
 		RhiSpirvResourceLayout reflected;
 		rhi_spirv_reflect(data, size / sizeof(uint32_t), &reflected);
-		static_assert(sizeof(reflected) == sizeof(layout),
+		static_assert(sizeof(reflected) == sizeof(self->layout),
 				"reflection layout mirror size mismatch");
-		memcpy(&layout, &reflected, sizeof(layout));
+		memcpy(&self->layout, &reflected, sizeof(self->layout));
 	}
 
-	Shader::~Shader()
+	void shader_fini(struct Shader *self)
 	{
-		if (module)
-			vkDestroyShaderModule(device->get_device(), module, NULL);
+		if (self->module)
+			vkDestroyShaderModule(self->device->get_device(), self->module, NULL);
 	}
 
 	Program::Program(Device *device, Shader *vertex, Shader *fragment)
@@ -15164,13 +15159,13 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
 		info.layout = pipeline_layout_get_layout(self->current_program->get_pipeline_layout());
 		info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		info.stage.module = shader.get_module();
+		info.stage.module = shader_get_module(&shader);
 		info.stage.pName = "main";
 		info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 
 #ifdef GRANITE_SPIRV_DUMP
 		LOGI("Compiling SPIR-V file: (%s) %s\n",
-				Shader::stage_to_name(ShaderStage_Compute),
+				shader_stage_to_name(ShaderStage_Compute),
 				(to_string(shader.intrusive_node.key) + ".spv").c_str());
 #endif
 
@@ -15318,10 +15313,10 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			{
 				VkPipelineShaderStageCreateInfo &s = stages[num_stages++];
 				s = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-				s.module = self->current_program->get_shader(stage)->get_module();
+				s.module = shader_get_module(self->current_program->get_shader(stage));
 #ifdef GRANITE_SPIRV_DUMP
 				LOGI("Compiling SPIR-V file: (%s) %s\n",
-						Shader::stage_to_name(stage),
+						shader_stage_to_name(stage),
 						(to_string(self->current_program->get_shader(stage)->intrusive_node.key) + ".spv").c_str());
 #endif
 				s.pName = "main";
@@ -16746,9 +16741,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	{
 		CombinedResourceLayout layout;
 		if (program.get_shader(ShaderStage_Vertex))
-			layout.attribute_mask = program.get_shader(ShaderStage_Vertex)->get_layout().input_mask;
+			layout.attribute_mask = shader_get_layout(program.get_shader(ShaderStage_Vertex))->input_mask;
 		if (program.get_shader(ShaderStage_Fragment))
-			layout.render_target_mask = program.get_shader(ShaderStage_Fragment)->get_layout().output_mask;
+			layout.render_target_mask = shader_get_layout(program.get_shader(ShaderStage_Fragment))->output_mask;
 
 		layout.descriptor_set_mask = 0;
 
@@ -16760,7 +16755,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 			uint32_t stage_mask = 1u << i;
 
-			const ResourceLayout &shader_layout = shader->get_layout();
+			const ResourceLayout &shader_layout = *shader_get_layout(shader);
 			for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
 			{
 				layout.sets[set].sampled_image_mask |= shader_layout.sets[set].sampled_image_mask;
