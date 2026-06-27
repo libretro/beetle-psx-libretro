@@ -5561,6 +5561,14 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	class Device
 	{
 		public:
+			friend uint64_t device_allocate_cookie(Device *self);
+			friend void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size);
+			friend void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size);
+			friend const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo &info);
+			friend void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore);
+			friend void device_add_frame_counter_nolock(Device *self);
+			friend void device_decrement_frame_counter_nolock(Device *self);
+			friend void device_init_workarounds(Device *self);
 			friend void device_wait_idle(Device *self);
 			friend void device_flush_frame(Device *self);
 			friend void *device_map_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access);
@@ -5697,33 +5705,15 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 		public:
 			/* Public so the C89 cookie_init() free function (replacing the
 			 * former Cookie(Device*) ctor + friendship) can reach it. */
-			uint64_t allocate_cookie()
-			{
-				// Reserve lower bits for "special purposes".
-				cookie += 16;
-				return cookie;
-			}
 		private:
 			void bake_program(Program &program);
 			friend void program_init_graphics(struct Program *self, Device *device, Shader *vertex, Shader *fragment);
 			friend void program_init_compute(struct Program *self, Device *device, Shader *compute);
 
-			void request_vertex_block(BufferBlock &block, VkDeviceSize size)
-			{
-				request_vertex_block_nolock(block, size);
-			}
-			void request_uniform_block(BufferBlock &block, VkDeviceSize size)
-			{
-				request_uniform_block_nolock(block, size);
-			}
 
 			PipelineLayout *request_pipeline_layout(const CombinedResourceLayout &layout);
 			DescriptorSetAllocator *request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_sets);
 			friend void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
-			const Framebuffer &request_framebuffer(const RenderPassInfo &info)
-			{
-				return *framebuffer_allocator_request_framebuffer(&framebuffer_allocator, info);
-			}
 			const RenderPass &request_render_pass(const RenderPassInfo &info, bool compatible);
 			friend struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
 
@@ -5891,10 +5881,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 			friend void program_fini(struct Program *self);
 			friend void framebuffer_fini(struct Framebuffer *self);
-			void recycle_semaphore_nolock(VkSemaphore semaphore)
-			{
-				semaphoremanager_recycle(&managers.semaphore, semaphore);
-			}
 			void free_memory_nolock(const DeviceAllocation &alloc);
 
 			void flush_frame_nolock();
@@ -5907,25 +5893,32 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			void request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size);
 			void request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size);
 
-			void add_frame_counter_nolock()
-			{
-				lock.counter++;
-			}
-			void decrement_frame_counter_nolock()
-			{
-				VK_ASSERT(lock.counter > 0);
-				lock.counter--;
-			}
 			void wait_idle_nolock();
 			void end_frame_nolock();
 
 			ImplementationWorkarounds workarounds;
-			void init_workarounds()
-			{
-				// srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only.
-				workarounds.optimize_all_graphics_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
-			}
 	};
+
+	/* Device inline helpers (batch 5) -> free functions taking Device *self. Plain
+	 * inline (not static) because they are friend-declared. request_vertex_block /
+	 * request_uniform_block still call their *_nolock members through self->. */
+	inline uint64_t device_allocate_cookie(Device *self)
+	{
+		/* Reserve lower bits for "special purposes". */
+		self->cookie += 16;
+		return self->cookie;
+	}
+	inline void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size) { self->request_vertex_block_nolock(block, size); }
+	inline void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size) { self->request_uniform_block_nolock(block, size); }
+	inline const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo &info) { return framebuffer_allocator_request_framebuffer(&self->framebuffer_allocator, info); }
+	inline void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore) { semaphoremanager_recycle(&self->managers.semaphore, semaphore); }
+	inline void device_add_frame_counter_nolock(Device *self) { self->lock.counter++; }
+	inline void device_decrement_frame_counter_nolock(Device *self) { VK_ASSERT(self->lock.counter > 0); self->lock.counter--; }
+	inline void device_init_workarounds(Device *self)
+	{
+		/* srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only. */
+		self->workarounds.optimize_all_graphics_barrier = self->gpu_props.vendorID == VENDOR_ID_ARM;
+	}
 
 	/* Device inline accessors (batch 4), converted from in-class member functions to
 	 * free functions taking Device *self. The reference-returning getters now return
@@ -12050,7 +12043,7 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 
 static void cookie_init(struct Cookie *self, Device *device)
 {
-	self->cookie = device->allocate_cookie();
+	self->cookie = device_allocate_cookie(device);
 }
 
 /* === texture_format.cpp === */
@@ -12734,7 +12727,7 @@ void semaphoreholder_fini(struct SemaphoreHolder *self)
 		if (semaphoreholder_is_signalled(self))
 			device_destroy_semaphore_nolock(self->device, self->semaphore);
 		else
-			self->device->recycle_semaphore_nolock(self->semaphore);
+			device_recycle_semaphore_nolock(self->device, self->semaphore);
 	}
 }
 
@@ -15180,7 +15173,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VK_ASSERT(!self->compatible_render_pass);
 		VK_ASSERT(!self->actual_render_pass);
 
-		self->framebuffer = &self->device->request_framebuffer(info);
+		self->framebuffer = device_request_framebuffer(self->device, info);
 		self->compatible_render_pass = framebuffer_get_compatible_render_pass(self->framebuffer);
 		self->actual_render_pass = &self->device->request_render_pass(info, false);
 
@@ -15705,7 +15698,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		BufferBlockAllocation data = bufferblock_allocate(&self->ubo_block, size);
 		if (!data.host)
 		{
-			self->device->request_uniform_block(self->ubo_block, size);
+			device_request_uniform_block(self->device, self->ubo_block, size);
 			data = bufferblock_allocate(&self->ubo_block, size);
 		}
 		commandbuffer_set_uniform_buffer(self, set, binding, *bh_get(&self->ubo_block.gpu), data.offset, size);
@@ -15718,7 +15711,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		BufferBlockAllocation data = bufferblock_allocate(&self->vbo_block, size);
 		if (!data.host)
 		{
-			self->device->request_vertex_block(self->vbo_block, size);
+			device_request_vertex_block(self->device, self->vbo_block, size);
 			data = bufferblock_allocate(&self->vbo_block, size);
 		}
 
@@ -16941,7 +16934,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		mem_props = *context_get_mem_props(&context);
 		gpu_props = *context_get_gpu_props(&context);
 
-		init_workarounds();
+		device_init_workarounds(this);
 
 		init_stock_samplers();
 
@@ -17130,7 +17123,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			{ struct FenceHolder *_fh = (struct FenceHolder *)object_pool_raw_allocate(&handle_pool.fences); fenceholder_init(_fh, this, cleared_fence); *fence = fence_make(_fh); }
 		}
 
-		decrement_frame_counter_nolock();
+		device_decrement_frame_counter_nolock(this);
 	}
 
 	POD_VEC_DECLARE(VkFlagsVec, VkFlags);
@@ -17594,7 +17587,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 		info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		vkBeginCommandBuffer(cmd, &info);
-		add_frame_counter_nolock();
+		device_add_frame_counter_nolock(this);
 		struct CommandBuffer *_cb = (struct CommandBuffer *)object_pool_raw_allocate(&handle_pool.command_buffers); commandbuffer_init(_cb, this, cmd, type); CommandBufferHandle handle = cbh_make(_cb);
 		return handle;
 	}
