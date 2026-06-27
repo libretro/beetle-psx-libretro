@@ -5561,6 +5561,13 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	class Device
 	{
 		public:
+			friend CommandPool *device_get_command_pool(Device *self, CommandBufferType type);
+			friend CommandBufferHandle device_request_command_buffer(Device *self, CommandBufferType type);
+			friend CommandBufferHandle device_request_command_buffer_nolock(Device *self, CommandBufferType type);
+			friend void device_request_vertex_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size);
+			friend void device_request_uniform_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size);
+			friend void device_free_memory_nolock(Device *self, const DeviceAllocation &alloc);
+			friend bool device_get_image_format_properties(Device *self, VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags, VkImageFormatProperties *properties);
 			friend uint32_t device_find_memory_type_buffer(Device *self, BufferDomain domain, uint32_t mask);
 			friend uint32_t device_find_memory_type_image(Device *self, ImageDomain domain, uint32_t mask);
 			friend void device_set_name_buffer(Device *self, const Buffer &buffer, const char *name);
@@ -5673,7 +5680,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			// Set names for objects for debuggers and profilers.
 
 			// Submission interface, may be called from any thread at any time.
-			CommandBufferHandle request_command_buffer(CommandBufferType type = Type_Generic);
 			void submit(CommandBufferHandle &cmd, Fence *fence = NULL,
 					unsigned semaphore_count = 0, Semaphore *semaphore = NULL);
 
@@ -5688,8 +5694,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			// Create image view, buffer views and samplers.
 
 			// Render pass helpers.
-			bool get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags,
-					VkImageFormatProperties *properties);
 
 
 
@@ -5764,6 +5768,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			friend bool cbhvec_empty(const struct Device::CommandBufferHandleVec *v);
 			friend void cbhvec_clear(struct Device::CommandBufferHandleVec *v);
 			friend void cbhvec_deinit(struct Device::CommandBufferHandleVec *v);
+			friend Device::CommandBufferHandleVec *device_get_queue_submissions(Device *self, CommandBufferType type);
 
 			struct PerFrame
 			{
@@ -5825,6 +5830,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 				VkPipelineStageVec wait_stages;
 				bool need_fence;
 			} graphics, compute, transfer;
+			friend Device::QueueData *device_get_queue_data(Device *self, CommandBufferType type);
 
 			// Pending buffers which need to be copied from CPU to GPU before submitting graphics or compute work.
 			struct
@@ -5857,9 +5863,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			AttachmentAllocator transient_allocator;
 
 
-			CommandPool *get_command_pool(CommandBufferType type);
-			QueueData &get_queue_data(CommandBufferType type);
-			CommandBufferHandleVec *get_queue_submissions(CommandBufferType type);
 			void clear_wait_semaphores();
 			void submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
 
@@ -5877,17 +5880,13 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 			friend void program_fini(struct Program *self);
 			friend void framebuffer_fini(struct Framebuffer *self);
-			void free_memory_nolock(const DeviceAllocation &alloc);
 
 			void flush_frame_nolock();
-			CommandBufferHandle request_command_buffer_nolock(CommandBufferType type = Type_Generic);
 			void submit_nolock(CommandBufferHandle cmd, Fence *fence,
 					unsigned semaphore_count, Semaphore *semaphore);
 			void add_wait_semaphore_nolock(CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages,
 					bool flush);
 
-			void request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size);
-			void request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size);
 
 			void wait_idle_nolock();
 			void end_frame_nolock();
@@ -5905,8 +5904,8 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 		self->cookie += 16;
 		return self->cookie;
 	}
-	inline void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size) { self->request_vertex_block_nolock(block, size); }
-	inline void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size) { self->request_uniform_block_nolock(block, size); }
+	inline void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size) { device_request_vertex_block_nolock(self, block, size); }
+	inline void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size) { device_request_uniform_block_nolock(self, block, size); }
 	inline const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo &info) { return framebuffer_allocator_request_framebuffer(&self->framebuffer_allocator, info); }
 	inline void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore) { semaphoremanager_recycle(&self->managers.semaphore, semaphore); }
 	inline void device_add_frame_counter_nolock(Device *self) { self->lock.counter++; }
@@ -9454,7 +9453,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	// Verify we can actually render at our target self->scaling factor.
 	// Some devices only support 8K textures, which means max 8x scale.
 	VkImageFormatProperties props;
-	if (self->device->get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+	if (device_get_image_format_properties(self->device, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 				VK_IMAGE_USAGE_STORAGE_BIT |
 				VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
@@ -9544,7 +9543,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 			self->msaa = 1;
 			LOGI("[Vulkan]: shaderStorageImageMultisample is not supported by self implementation. Cannot use MSAA.\n");
 		}
-		else if (!self->device->get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+		else if (!device_get_image_format_properties(self->device, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
 					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 					VK_IMAGE_USAGE_STORAGE_BIT |
 					VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
@@ -10655,7 +10654,7 @@ void renderer_resolve(Renderer *self, Domain target_domain, unsigned x, unsigned
 void renderer_ensure_command_buffer(Renderer *self)
 {
 	if (!cbh_is_valid(&self->cmd))
-		self->cmd = self->device->request_command_buffer();
+		self->cmd = device_request_command_buffer(self->device, Type_Generic);
 }
 
 float renderer_allocate_depth(Renderer *self, Domain domain, const Rect &rect)
@@ -12477,7 +12476,7 @@ static void buffer_init(struct Buffer *self, Device *device, VkBuffer buffer, co
 void buffer_fini(struct Buffer *self)
 {
 	device_destroy_buffer_nolock(self->device, self->buffer);
-	self->device->free_memory_nolock(self->alloc);
+	device_free_memory_nolock(self->device, self->alloc);
 }
 
 static void buffer_release_reference(struct Buffer *self)
@@ -12615,7 +12614,7 @@ void image_fini(struct Image *self)
 	if (deviceallocation_get_memory(&self->alloc))
 	{
 		device_destroy_image_nolock(self->device, self->image);
-		self->device->free_memory_nolock(self->alloc);
+		device_free_memory_nolock(self->device, self->alloc);
 	}
 }
 
@@ -16120,9 +16119,9 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			LOGE("Failed to end command buffer.\n");
 
 		if (self->vbo_block.mapped)
-			self->device->request_vertex_block_nolock(self->vbo_block, 0);
+			device_request_vertex_block_nolock(self->device, self->vbo_block, 0);
 		if (self->ubo_block.mapped)
-			self->device->request_uniform_block_nolock(self->ubo_block, 0);
+			device_request_uniform_block_nolock(self->device, self->ubo_block, 0);
 	}
 
 	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color)
@@ -16727,19 +16726,19 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VK_ASSERT(stages != 0);
 		if (flush)
 			flush_frame(type);
-		QueueData &data = get_queue_data(type);
+		Device::QueueData *data = device_get_queue_data(this, type);
 
 #ifdef VULKAN_DEBUG
-		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data.wait_semaphores); _wi++)
-			VK_ASSERT(sem_get(sem_handle_vec_at(&data.wait_semaphores, _wi)) != sem_get(&semaphore)); }
+		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data->wait_semaphores); _wi++)
+			VK_ASSERT(sem_get(sem_handle_vec_at(&data->wait_semaphores, _wi)) != sem_get(&semaphore)); }
 #endif
 
-		sem_handle_vec_push(&data.wait_semaphores, &semaphore);
-		VkPipelineStageVec_push(&data.wait_stages, &stages);
-		data.need_fence = true;
+		sem_handle_vec_push(&data->wait_semaphores, &semaphore);
+		VkPipelineStageVec_push(&data->wait_stages, &stages);
+		data->need_fence = true;
 
 		// Sanity check.
-		VK_ASSERT(sem_handle_vec_size(&data.wait_semaphores) < 16 * 1024);
+		VK_ASSERT(sem_handle_vec_size(&data->wait_semaphores) < 16 * 1024);
 	}
 
 	Shader * device_request_shader(Device *self, const uint32_t *data, size_t size){
@@ -17061,14 +17060,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			bufferblock_init(block);
 	}
 
-	void Device::request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size)
-	{
-		request_block(*this, &block, size, &managers.vbo, &dma.vbo, &device_frame(this)->vbo_blocks);
+	void device_request_vertex_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size){
+		request_block(*self, &block, size, &self->managers.vbo, &self->dma.vbo, &device_frame(self)->vbo_blocks);
 	}
 
-	void Device::request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size)
-	{
-		request_block(*this, &block, size, &managers.ubo, &dma.ubo, &device_frame(this)->ubo_blocks);
+	void device_request_uniform_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size){
+		request_block(*self, &block, size, &self->managers.ubo, &self->dma.ubo, &device_frame(self)->ubo_blocks);
 	}
 
 	void Device::submit(CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
@@ -17099,8 +17096,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 	{
 		CommandBufferType type = commandbuffer_get_command_buffer_type(cbh_get(&cmd));
-		CommandPool *pool = get_command_pool(type);
-		CommandBufferHandleVec *submissions = get_queue_submissions(type);
+		CommandPool *pool = device_get_command_pool(this, type);
+		CommandBufferHandleVec *submissions = device_get_queue_submissions(this, type);
 
 		command_pool_signal_submitted(pool, commandbuffer_get_command_buffer(cbh_get(&cmd)));
 		commandbuffer_end(cbh_get(&cmd));
@@ -17124,7 +17121,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	void Device::submit_empty_inner(CommandBufferType type, VkFence *fence,
 			unsigned semaphore_count, Semaphore *semaphores)
 	{
-		QueueData &data = get_queue_data(type);
+		Device::QueueData *data = device_get_queue_data(this, type);
 		VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
 		// Add external wait semaphores.
@@ -17133,19 +17130,19 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkFlagsVec stages      = { NULL, 0, 0 };
 		{
 			size_t ws;
-			for (ws = 0; ws < VkPipelineStageVec_size(&data.wait_stages); ws++)
-				VkFlagsVec_push(&stages, VkPipelineStageVec_at(&data.wait_stages, ws));
+			for (ws = 0; ws < VkPipelineStageVec_size(&data->wait_stages); ws++)
+				VkFlagsVec_push(&stages, VkPipelineStageVec_at(&data->wait_stages, ws));
 		}
 
-		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data.wait_semaphores); _wi++)
+		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data->wait_semaphores); _wi++)
 		{
-			Semaphore *semaphore = sem_handle_vec_at(&data.wait_semaphores, _wi);
+			Semaphore *semaphore = sem_handle_vec_at(&data->wait_semaphores, _wi);
 			VkSemaphore wait = semaphoreholder_consume(sem_get(semaphore));
 			SemaphoreVec_push(&device_frame(this)->recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits, &wait);
 		} }
-		VkPipelineStageVec_clear(&data.wait_stages);
-		sem_handle_vec_clear(&data.wait_semaphores);
+		VkPipelineStageVec_clear(&data->wait_stages);
+		sem_handle_vec_clear(&data->wait_semaphores);
 
 		// Add external signal semaphores.
 		for (unsigned i = 0; i < semaphore_count; i++)
@@ -17206,10 +17203,10 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					fencemanager_recycle_fence(&managers.fence, cleared_fence);
 				*fence = VK_NULL_HANDLE;
 			}
-			data.need_fence = false;
+			data->need_fence = false;
 		}
 		else
-			data.need_fence = true;
+			data->need_fence = true;
 	}
 
 	void Device::submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush)
@@ -17314,8 +17311,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		if (type != Type_AsyncTransfer)
 			flush_frame(Type_AsyncTransfer);
 
-		QueueData &data = get_queue_data(type);
-		CommandBufferHandleVec *submissions = get_queue_submissions(type);
+		Device::QueueData *data = device_get_queue_data(this, type);
+		CommandBufferHandleVec *submissions = device_get_queue_submissions(this, type);
 
 		if (cbhvec_empty(submissions))
 		{
@@ -17337,19 +17334,19 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		{
 			// Move the pending wait stages across (then the source is cleared below).
 			size_t ws;
-			for (ws = 0; ws < VkPipelineStageVec_size(&data.wait_stages); ws++)
-				VkFlagsVec_push(&stages[0], VkPipelineStageVec_at(&data.wait_stages, ws));
+			for (ws = 0; ws < VkPipelineStageVec_size(&data->wait_stages); ws++)
+				VkFlagsVec_push(&stages[0], VkPipelineStageVec_at(&data->wait_stages, ws));
 		}
 
-		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data.wait_semaphores); _wi++)
+		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data->wait_semaphores); _wi++)
 		{
-			Semaphore *semaphore = sem_handle_vec_at(&data.wait_semaphores, _wi);
+			Semaphore *semaphore = sem_handle_vec_at(&data->wait_semaphores, _wi);
 			VkSemaphore wait = semaphoreholder_consume(sem_get(semaphore));
 			SemaphoreVec_push(&device_frame(this)->recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits[0], &wait);
 		} }
-		VkPipelineStageVec_clear(&data.wait_stages);
-		sem_handle_vec_clear(&data.wait_semaphores);
+		VkPipelineStageVec_clear(&data->wait_stages);
+		sem_handle_vec_clear(&data->wait_semaphores);
 
 		{ int _si; for (_si = 0; _si < submissions->count; _si++)
 		{
@@ -17442,10 +17439,10 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					fencemanager_recycle_fence(&managers.fence, cleared_fence);
 				*fence = VK_NULL_HANDLE;
 			}
-			data.need_fence = false;
+			data->need_fence = false;
 		}
 		else
-			data.need_fence = true;
+			data->need_fence = true;
 	}
 
 	void Device::sync_buffer_blocks()
@@ -17455,7 +17452,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		VkBufferUsageFlags usage = 0;
 
-		CommandBufferHandle cmd = request_command_buffer_nolock(Type_AsyncTransfer);
+		CommandBufferHandle cmd = device_request_command_buffer_nolock(this, Type_AsyncTransfer);
 
 		commandbuffer_begin_region(cbh_get(&cmd), "buffer-block-sync");
 
@@ -17527,62 +17524,58 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		flush_frame(Type_AsyncCompute);
 	}
 
-	Device::QueueData &Device::get_queue_data(CommandBufferType type)
+	struct Device::QueueData *device_get_queue_data(Device *self, CommandBufferType type)
 	{
-		switch (device_get_physical_queue_type(this, type))
+		switch (device_get_physical_queue_type(self, type))
 		{
 			default:
 			case Type_Generic:
-				return graphics;
+				return &self->graphics;
 			case Type_AsyncCompute:
-				return compute;
+				return &self->compute;
 			case Type_AsyncTransfer:
-				return transfer;
+				return &self->transfer;
 		}
 	}
 
-	CommandPool *Device::get_command_pool(CommandBufferType type)
-	{
-		switch (device_get_physical_queue_type(this, type))
+	CommandPool * device_get_command_pool(Device *self, CommandBufferType type){
+		switch (device_get_physical_queue_type(self, type))
 		{
 			default:
 			case Type_Generic:
-				return &device_frame(this)->graphics_cmd_pool;
+				return &device_frame(self)->graphics_cmd_pool;
 			case Type_AsyncCompute:
-				return &device_frame(this)->compute_cmd_pool;
+				return &device_frame(self)->compute_cmd_pool;
 			case Type_AsyncTransfer:
-				return &device_frame(this)->transfer_cmd_pool;
+				return &device_frame(self)->transfer_cmd_pool;
 		}
 	}
 
-	Device::CommandBufferHandleVec *Device::get_queue_submissions(CommandBufferType type)
-	{
-		switch (device_get_physical_queue_type(this, type))
+	Device::CommandBufferHandleVec * device_get_queue_submissions(Device *self, CommandBufferType type){
+		switch (device_get_physical_queue_type(self, type))
 		{
 			default:
 			case Type_Generic:
-				return &device_frame(this)->graphics_submissions;
+				return &device_frame(self)->graphics_submissions;
 			case Type_AsyncCompute:
-				return &device_frame(this)->compute_submissions;
+				return &device_frame(self)->compute_submissions;
 			case Type_AsyncTransfer:
-				return &device_frame(this)->transfer_submissions;
+				return &device_frame(self)->transfer_submissions;
 		}
 	}
 
-	CommandBufferHandle Device::request_command_buffer(CommandBufferType type)
-	{
-		return request_command_buffer_nolock(type);
+	CommandBufferHandle device_request_command_buffer(Device *self, CommandBufferType type){
+		return device_request_command_buffer_nolock(self, type);
 	}
 
-	CommandBufferHandle Device::request_command_buffer_nolock(CommandBufferType type)
-	{
-		VkCommandBuffer cmd = command_pool_request_command_buffer(get_command_pool(type));
+	CommandBufferHandle device_request_command_buffer_nolock(Device *self, CommandBufferType type){
+		VkCommandBuffer cmd = command_pool_request_command_buffer(device_get_command_pool(self, type));
 
 		VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 		info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		vkBeginCommandBuffer(cmd, &info);
-		device_add_frame_counter_nolock(this);
-		struct CommandBuffer *_cb = (struct CommandBuffer *)object_pool_raw_allocate(&handle_pool.command_buffers); commandbuffer_init(_cb, this, cmd, type); CommandBufferHandle handle = cbh_make(_cb);
+		device_add_frame_counter_nolock(self);
+		struct CommandBuffer *_cb = (struct CommandBuffer *)object_pool_raw_allocate(&self->handle_pool.command_buffers); commandbuffer_init(_cb, self, cmd, type); CommandBufferHandle handle = cbh_make(_cb);
 		return handle;
 	}
 
@@ -17631,9 +17624,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		cbhvec_init(&self->transfer_submissions);
 	}
 
-	void Device::free_memory_nolock(const DeviceAllocation &alloc)
-	{
-		DeviceAllocationVec_push(&device_frame(this)->allocations, &alloc);
+	void device_free_memory_nolock(Device *self, const DeviceAllocation &alloc){
+		DeviceAllocationVec_push(&device_frame(self)->allocations, &alloc);
 	}
 
 #ifdef VULKAN_DEBUG
@@ -18511,12 +18503,12 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			// For concurrent queue mode, we just need to inject a semaphore.
 			// For non-concurrent queue mode, we will have to inject ownership self->transfer barrier if the queue families do not match.
 
-			CommandBufferHandle graphics_cmd = self->request_command_buffer(Type_Generic);
+			CommandBufferHandle graphics_cmd = device_request_command_buffer(self, Type_Generic);
 			CommandBufferHandle transfer_cmd; transfer_cmd.data = NULL;
 
 			// Don't split the upload into multiple command buffers unless we have to.
 			if (self->transfer_queue != self->graphics_queue)
-				transfer_cmd = self->request_command_buffer(Type_AsyncTransfer);
+				transfer_cmd = device_request_command_buffer(self, Type_AsyncTransfer);
 			else
 				transfer_cmd = graphics_cmd;
 
@@ -18625,7 +18617,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		else if (create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
 		{
 			VK_ASSERT(create_info.domain != ImageDomain_Transient);
-			CommandBufferHandle cmd = self->request_command_buffer(Type_Generic);
+			CommandBufferHandle cmd = device_request_command_buffer(self, Type_Generic);
 			commandbuffer_image_barrier(cbh_get(&cmd), *ih_get(&handle), info.initialLayout, create_info.initial_layout,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, image_get_stage_flags(ih_get(&handle)),
 					image_get_access_flags(ih_get(&handle)) &
@@ -18739,7 +18731,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			BufferHandle staging_buffer = device_create_buffer(self, staging_info, initial);
 			device_set_name_buffer(self, *bh_get(&staging_buffer), "buffer-upload-staging-buffer");
 
-			cmd = self->request_command_buffer(Type_AsyncTransfer);
+			cmd = device_request_command_buffer(self, Type_AsyncTransfer);
 			commandbuffer_begin_region(cbh_get(&cmd), "copy-buffer-staging");
 			commandbuffer_copy_buffer_whole(cbh_get(&cmd), *bh_get(&handle), *bh_get(&staging_buffer));
 			commandbuffer_end_region(cbh_get(&cmd));
@@ -18762,11 +18754,10 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		return handle;
 	}
 
-	bool Device::get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling,
+	bool device_get_image_format_properties(Device *self, VkFormat format, VkImageType type, VkImageTiling tiling,
 			VkImageUsageFlags usage, VkImageCreateFlags flags,
-			VkImageFormatProperties *properties)
-	{
-		VkResult res = vkGetPhysicalDeviceImageFormatProperties(gpu, format, type, tiling, usage, flags,
+			VkImageFormatProperties *properties){
+		VkResult res = vkGetPhysicalDeviceImageFormatProperties(self->gpu, format, type, tiling, usage, flags,
 				properties);
 		return res == VK_SUCCESS;
 	}
