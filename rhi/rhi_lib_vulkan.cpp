@@ -5472,19 +5472,31 @@ private:
 			friend void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize range);
 			friend void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
 			friend void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate);
+			friend VkCommandBuffer commandbuffer_get_command_buffer(const struct CommandBuffer *self);
+			friend Device &commandbuffer_get_device(struct CommandBuffer *self);
+			friend void commandbuffer_set_viewport(struct CommandBuffer *self, const VkViewport &viewport);
+			friend const VkViewport &commandbuffer_get_viewport(const struct CommandBuffer *self);
+			friend void commandbuffer_set_vertex_attrib(struct CommandBuffer *self, uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset);
+			friend void commandbuffer_set_vertex_binding(struct CommandBuffer *self, uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride, VkVertexInputRate step_rate);
+			friend void commandbuffer_set_opaque_state(struct CommandBuffer *self);
+			friend void commandbuffer_set_quad_state(struct CommandBuffer *self);
+			friend void commandbuffer_set_depth_test(struct CommandBuffer *self, bool depth_test, bool depth_write);
+			friend void commandbuffer_set_depth_compare(struct CommandBuffer *self, VkCompareOp depth_compare);
+			friend void commandbuffer_set_blend_enable(struct CommandBuffer *self, bool blend_enable);
+			friend void commandbuffer_set_blend_factors(struct CommandBuffer *self, VkBlendFactor src_color_blend, VkBlendFactor src_alpha_blend, VkBlendFactor dst_color_blend, VkBlendFactor dst_alpha_blend);
+			friend void commandbuffer_set_blend_op(struct CommandBuffer *self, VkBlendOp color_blend_op, VkBlendOp alpha_blend_op);
+			friend void commandbuffer_set_primitive_topology(struct CommandBuffer *self, VkPrimitiveTopology topology);
+			friend void commandbuffer_set_multisample_state(struct CommandBuffer *self, bool alpha_to_coverage, bool alpha_to_one, bool sample_shading);
+			friend void commandbuffer_set_cull_mode(struct CommandBuffer *self, VkCullModeFlags cull_mode);
+			friend void commandbuffer_set_blend_constants(struct CommandBuffer *self, const float blend_constants[4]);
+			friend void commandbuffer_set_specialization_constant_mask(struct CommandBuffer *self, uint32_t spec_constant_mask);
+			friend void commandbuffer_set_specialization_constant(struct CommandBuffer *self, unsigned index, uint32_t value);
+			friend CommandBufferType commandbuffer_get_command_buffer_type(const struct CommandBuffer *self);
 
-			VkCommandBuffer get_command_buffer() const
-			{
-				return cmd;
-			}
 
 			void begin_region(const char *name, const float *color = NULL);
 			void end_region();
 
-			Device &get_device()
-			{
-				return *device;
-			}
 
 			/* Group A (copy/clear/barrier) methods are now free functions. */
 
@@ -5493,136 +5505,15 @@ private:
 
 
 
-			void set_viewport(const VkViewport &viewport)
-			{
-				VK_ASSERT(framebuffer);
-				this->viewport = viewport;
-				commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
-			}
-			const VkViewport &get_viewport() const
-			{
-				return viewport;
-			}
 
-			void set_vertex_attrib(uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset);
-			void set_vertex_binding(uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride,
-					VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
 
 			void draw(uint32_t vertex_count, uint32_t instance_count = 1, uint32_t first_vertex = 0,
 					uint32_t first_instance = 0);
 
 			void dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
 
-			void set_opaque_state();
-			void set_quad_state();
 
-#define SET_STATIC_STATE(value)                               \
-			do                                                        \
-			{                                                         \
-				if (static_state.state.value != value)                \
-				{                                                     \
-					static_state.state.value = value;                 \
-					commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
-				}                                                     \
-			} while (0)
-
-#define SET_POTENTIALLY_STATIC_STATE(value)                   \
-			do                                                        \
-			{                                                         \
-				if (potential_static_state.value != value)            \
-				{                                                     \
-					potential_static_state.value = value;             \
-					commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
-				}                                                     \
-			} while (0)
-
-			inline void set_depth_test(bool depth_test, bool depth_write)
-			{
-				SET_STATIC_STATE(depth_test);
-				SET_STATIC_STATE(depth_write);
-			}
-
-			inline void set_depth_compare(VkCompareOp depth_compare)
-			{
-				SET_STATIC_STATE(depth_compare);
-			}
-
-			inline void set_blend_enable(bool blend_enable)
-			{
-				SET_STATIC_STATE(blend_enable);
-			}
-
-			inline void set_blend_factors(VkBlendFactor src_color_blend, VkBlendFactor src_alpha_blend,
-					VkBlendFactor dst_color_blend, VkBlendFactor dst_alpha_blend)
-			{
-				SET_STATIC_STATE(src_color_blend);
-				SET_STATIC_STATE(dst_color_blend);
-				SET_STATIC_STATE(src_alpha_blend);
-				SET_STATIC_STATE(dst_alpha_blend);
-			}
-
-			inline void set_blend_factors(VkBlendFactor src_blend, VkBlendFactor dst_blend)
-			{
-				set_blend_factors(src_blend, src_blend, dst_blend, dst_blend);
-			}
-
-			inline void set_blend_op(VkBlendOp color_blend_op, VkBlendOp alpha_blend_op)
-			{
-				SET_STATIC_STATE(color_blend_op);
-				SET_STATIC_STATE(alpha_blend_op);
-			}
-
-			inline void set_blend_op(VkBlendOp blend_op)
-			{
-				set_blend_op(blend_op, blend_op);
-			}
-
-			inline void set_primitive_topology(VkPrimitiveTopology topology)
-			{
-				SET_STATIC_STATE(topology);
-			}
-
-			inline void set_multisample_state(bool alpha_to_coverage, bool alpha_to_one = false, bool sample_shading = false)
-			{
-				SET_STATIC_STATE(alpha_to_coverage);
-				SET_STATIC_STATE(alpha_to_one);
-				SET_STATIC_STATE(sample_shading);
-			}
-
-			inline void set_cull_mode(VkCullModeFlags cull_mode)
-			{
-				SET_STATIC_STATE(cull_mode);
-			}
-
-			inline void set_blend_constants(const float blend_constants[4])
-			{
-				SET_POTENTIALLY_STATIC_STATE(blend_constants[0]);
-				SET_POTENTIALLY_STATIC_STATE(blend_constants[1]);
-				SET_POTENTIALLY_STATIC_STATE(blend_constants[2]);
-				SET_POTENTIALLY_STATIC_STATE(blend_constants[3]);
-			}
-
-			inline void set_specialization_constant_mask(uint32_t spec_constant_mask)
-			{
-				VK_ASSERT((spec_constant_mask & ~((1u << VULKAN_NUM_SPEC_CONSTANTS) - 1u)) == 0u);
-				SET_STATIC_STATE(spec_constant_mask);
-			}
-
-			inline void set_specialization_constant(unsigned index, uint32_t value)
-				{
-					VK_ASSERT(index < VULKAN_NUM_SPEC_CONSTANTS);
-					if (memcmp(&potential_static_state.spec_constants[index], &value, sizeof(value)))
-					{
-						memcpy(&potential_static_state.spec_constants[index], &value, sizeof(value));
-						if (static_state.state.spec_constant_mask & (1u << index))
-							commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
-					}
-				}
-
-			inline CommandBufferType get_command_buffer_type() const
-			{
-				return type;
-			}
+			/* Group D state setters (incl. SET_STATIC_STATE macros) are now free functions. */
 
 			void end();
 
@@ -5716,6 +5607,114 @@ private:
 	void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize range);
 	void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
 	void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
+
+	/* Group D: state-setter free functions. The SET_STATIC_STATE /
+	 * SET_POTENTIALLY_STATIC_STATE macros are redefined to operate on self. */
+#undef SET_STATIC_STATE
+#undef SET_POTENTIALLY_STATIC_STATE
+#define SET_STATIC_STATE(value)                               \
+	do                                                        \
+	{                                                         \
+		if (self->static_state.state.value != value)          \
+		{                                                     \
+			self->static_state.state.value = value;           \
+			commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
+		}                                                     \
+	} while (0)
+#define SET_POTENTIALLY_STATIC_STATE(value)                   \
+	do                                                        \
+	{                                                         \
+		if (self->potential_static_state.value != value)      \
+		{                                                     \
+			self->potential_static_state.value = value;       \
+			commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT); \
+		}                                                     \
+	} while (0)
+
+	void commandbuffer_set_vertex_attrib(struct CommandBuffer *self, uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset);
+	void commandbuffer_set_vertex_binding(struct CommandBuffer *self, uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride, VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
+	void commandbuffer_set_opaque_state(struct CommandBuffer *self);
+	void commandbuffer_set_quad_state(struct CommandBuffer *self);
+
+	inline VkCommandBuffer commandbuffer_get_command_buffer(const struct CommandBuffer *self) { return self->cmd; }
+	inline Device &commandbuffer_get_device(struct CommandBuffer *self) { return *self->device; }
+	inline const VkViewport &commandbuffer_get_viewport(const struct CommandBuffer *self) { return self->viewport; }
+	inline CommandBufferType commandbuffer_get_command_buffer_type(const struct CommandBuffer *self) { return self->type; }
+	inline void commandbuffer_set_viewport(struct CommandBuffer *self, const VkViewport &viewport)
+	{
+		VK_ASSERT(self->framebuffer);
+		self->viewport = viewport;
+		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
+	}
+	inline void commandbuffer_set_depth_test(struct CommandBuffer *self, bool depth_test, bool depth_write)
+	{
+		SET_STATIC_STATE(depth_test);
+		SET_STATIC_STATE(depth_write);
+	}
+	inline void commandbuffer_set_depth_compare(struct CommandBuffer *self, VkCompareOp depth_compare)
+	{
+		SET_STATIC_STATE(depth_compare);
+	}
+	inline void commandbuffer_set_blend_enable(struct CommandBuffer *self, bool blend_enable)
+	{
+		SET_STATIC_STATE(blend_enable);
+	}
+	inline void commandbuffer_set_blend_factors(struct CommandBuffer *self, VkBlendFactor src_color_blend, VkBlendFactor src_alpha_blend, VkBlendFactor dst_color_blend, VkBlendFactor dst_alpha_blend)
+	{
+		SET_STATIC_STATE(src_color_blend);
+		SET_STATIC_STATE(dst_color_blend);
+		SET_STATIC_STATE(src_alpha_blend);
+		SET_STATIC_STATE(dst_alpha_blend);
+	}
+	static inline void commandbuffer_set_blend_factors_2(struct CommandBuffer *self, VkBlendFactor src_blend, VkBlendFactor dst_blend)
+	{
+		commandbuffer_set_blend_factors(self, src_blend, src_blend, dst_blend, dst_blend);
+	}
+	inline void commandbuffer_set_blend_op(struct CommandBuffer *self, VkBlendOp color_blend_op, VkBlendOp alpha_blend_op)
+	{
+		SET_STATIC_STATE(color_blend_op);
+		SET_STATIC_STATE(alpha_blend_op);
+	}
+	static inline void commandbuffer_set_blend_op_2(struct CommandBuffer *self, VkBlendOp blend_op)
+	{
+		commandbuffer_set_blend_op(self, blend_op, blend_op);
+	}
+	inline void commandbuffer_set_primitive_topology(struct CommandBuffer *self, VkPrimitiveTopology topology)
+	{
+		SET_STATIC_STATE(topology);
+	}
+	inline void commandbuffer_set_multisample_state(struct CommandBuffer *self, bool alpha_to_coverage, bool alpha_to_one = false, bool sample_shading = false)
+	{
+		SET_STATIC_STATE(alpha_to_coverage);
+		SET_STATIC_STATE(alpha_to_one);
+		SET_STATIC_STATE(sample_shading);
+	}
+	inline void commandbuffer_set_cull_mode(struct CommandBuffer *self, VkCullModeFlags cull_mode)
+	{
+		SET_STATIC_STATE(cull_mode);
+	}
+	inline void commandbuffer_set_blend_constants(struct CommandBuffer *self, const float blend_constants[4])
+	{
+		SET_POTENTIALLY_STATIC_STATE(blend_constants[0]);
+		SET_POTENTIALLY_STATIC_STATE(blend_constants[1]);
+		SET_POTENTIALLY_STATIC_STATE(blend_constants[2]);
+		SET_POTENTIALLY_STATIC_STATE(blend_constants[3]);
+	}
+	inline void commandbuffer_set_specialization_constant_mask(struct CommandBuffer *self, uint32_t spec_constant_mask)
+	{
+		VK_ASSERT((spec_constant_mask & ~((1u << VULKAN_NUM_SPEC_CONSTANTS) - 1u)) == 0u);
+		SET_STATIC_STATE(spec_constant_mask);
+	}
+	inline void commandbuffer_set_specialization_constant(struct CommandBuffer *self, unsigned index, uint32_t value)
+	{
+		VK_ASSERT(index < VULKAN_NUM_SPEC_CONSTANTS);
+		if (memcmp(&self->potential_static_state.spec_constants[index], &value, sizeof(value)))
+		{
+			memcpy(&self->potential_static_state.spec_constants[index], &value, sizeof(value));
+			if (self->static_state.state.spec_constant_mask & (1u << index))
+				commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
+		}
+	}
 
 	/* Group A: copy / clear / barrier free functions. Overloaded members are
 	 * split into distinctly-named free functions. */
@@ -10026,8 +10025,8 @@ void Renderer::mipmap_framebuffer()
 
 		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[i - 1]), StockSampler_LinearClamp);
 
-		cbh_get(&cmd)->set_quad_state();
-		cbh_get(&cmd)->set_vertex_binding(0, *bh_get(&quad), 0, 8);
+		commandbuffer_set_quad_state(cbh_get(&cmd));
+		commandbuffer_set_vertex_binding(cbh_get(&cmd), 0, *bh_get(&quad), 0, 8);
 		struct Push
 		{
 			float offset[2];
@@ -10044,8 +10043,8 @@ void Renderer::mipmap_framebuffer()
 			{ (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
 		};
 		commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-		cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
-		cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+		commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+		commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 		cbh_get(&cmd)->draw(4);
 
 		commandbuffer_end_render_pass(cbh_get(&cmd));
@@ -10093,9 +10092,9 @@ void Renderer::ssaa_framebuffer()
 
 	ensure_command_buffer();
 
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Samples, msaa);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, 1);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Samples, msaa);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_FilterMode, 1);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Scaling, scaling);
 	commandbuffer_set_program(cbh_get(&cmd), *pipelines.resolve_to_unscaled);
 	commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer_ssaa)));
 	if (msaa > 1)
@@ -10117,7 +10116,7 @@ void Renderer::ssaa_framebuffer()
 		commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
 		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
 		memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
-		cbh_get(&cmd)->set_specialization_constant_mask(-1);
+		commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
 		cbh_get(&cmd)->dispatch(1, 1, to_run);
 	}
 	free(resolves_ssaa);
@@ -10262,7 +10261,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 		VkOffset3D offset = { 0, 0, 0 };
 		VkExtent3D extent = { FB_WIDTH * scaling, FB_HEIGHT * scaling, 1 };
 		VkImageResolve region = { subres, offset, subres, offset, extent };
-		vkCmdResolveImage(cbh_get(&cmd)->get_command_buffer(),
+		vkCmdResolveImage(commandbuffer_get_command_buffer(cbh_get(&cmd)),
 			image_get_image(ih_get(&scaled_framebuffer_msaa)), VK_IMAGE_LAYOUT_GENERAL,
 			image_get_image(ih_get(&scaled_framebuffer)), VK_IMAGE_LAYOUT_GENERAL,
 			1, &region);
@@ -10296,7 +10295,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
 	commandbuffer_begin_render_pass(cbh_get(&cmd), rp);
-	cbh_get(&cmd)->set_quad_state();
+	commandbuffer_set_quad_state(cbh_get(&cmd));
 
 	if (scaled)
 	{
@@ -10309,7 +10308,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_LinearClamp);
 	}
 
-	cbh_get(&cmd)->set_vertex_binding(0, *bh_get(&quad), 0, 8);
+	commandbuffer_set_vertex_binding(cbh_get(&cmd), 0, *bh_get(&quad), 0, 8);
 	struct Push
 	{
 		float offset[2];
@@ -10326,8 +10325,8 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 		          float(scaled_views.size() - 1) };
 
 	commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
-	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+	commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 	cbh_get(&cmd)->draw(4);
 
 	commandbuffer_end_render_pass(cbh_get(&cmd));
@@ -10439,7 +10438,7 @@ ImageHandle Renderer::scanout_to_texture()
 			extent.height = FB_HEIGHT * scaling;
 		}
 		VkImageResolve region = { subres, offset, subres, offset, extent };
-		vkCmdResolveImage(cbh_get(&cmd)->get_command_buffer(),
+		vkCmdResolveImage(commandbuffer_get_command_buffer(cbh_get(&cmd)),
 			image_get_image(ih_get(&scaled_framebuffer_msaa)), VK_IMAGE_LAYOUT_GENERAL,
 			image_get_image(ih_get(&scaled_framebuffer)), VK_IMAGE_LAYOUT_GENERAL,
 			1, &region);
@@ -10483,9 +10482,9 @@ ImageHandle Renderer::scanout_to_texture()
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
 	commandbuffer_begin_render_pass(cbh_get(&cmd), rp);
-	cbh_get(&cmd)->set_quad_state();
+	commandbuffer_set_quad_state(cbh_get(&cmd));
 
-	VkViewport old_vp = cbh_get(&cmd)->get_viewport();
+	VkViewport old_vp = commandbuffer_get_viewport(cbh_get(&cmd));
 	VkViewport new_vp = {display_rect.x * (float) render_scale,
 	                     display_rect.y * (float) render_scale,
 	                     rect.width * (float) render_scale,
@@ -10493,7 +10492,7 @@ ImageHandle Renderer::scanout_to_texture()
 	                     old_vp.minDepth,
 	                     old_vp.maxDepth};
 
-	cbh_get(&cmd)->set_viewport(new_vp);
+	commandbuffer_set_viewport(cbh_get(&cmd), new_vp);
 
 	bool dither = render_state.scanout_mode == ScanoutMode_ABGR1555_Dither;
 
@@ -10566,7 +10565,7 @@ ImageHandle Renderer::scanout_to_texture()
 		}
 	}
 
-	cbh_get(&cmd)->set_vertex_binding(0, *bh_get(&quad), 0, 8);
+	commandbuffer_set_vertex_binding(cbh_get(&cmd), 0, *bh_get(&quad), 0, 8);
 	struct Push
 	{
 		float offset[2];
@@ -10582,8 +10581,8 @@ ImageHandle Renderer::scanout_to_texture()
 		          float(scaled_views.size() - 1) };
 
 	commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
-	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+	commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 	cbh_get(&cmd)->draw(4);
 
 	commandbuffer_end_render_pass(cbh_get(&cmd));
@@ -10701,9 +10700,9 @@ void Renderer::flush_resolves()
 		ensure_command_buffer();
 		// Always use nearest neighbor downscaling to avoid filter artifact (e.g. unwanted black outlines in Vagrant Story)
 		// Supersampling will use a separate pass for downsampling
-		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Samples, msaa);
-		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, 0);
-		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
+		commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Samples, msaa);
+		commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_FilterMode, 0);
+		commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Scaling, scaling);
 		commandbuffer_set_program(cbh_get(&cmd), *pipelines.resolve_to_unscaled);
 		commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)));
 		if (msaa > 1)
@@ -10720,7 +10719,7 @@ void Renderer::flush_resolves()
 			commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
 			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
-			cbh_get(&cmd)->set_specialization_constant_mask(-1);
+			commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
 			cbh_get(&cmd)->dispatch(1, 1, to_run);
 		}
 	}
@@ -11425,9 +11424,9 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 
 	hd_texture_uniforms(hd_texture);
 	commandbuffer_set_scissor(cbh_get(&cmd), scissor < 0 ? queue.default_scissor : *Rect2DVec_at(&queue.scissors, scissor));
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Shift, shift);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Shift, shift);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
 	dispatch_set_scaled_read_texture(scaled_read, textured);
 	memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_front(&scissors)).triangle_index, 3 * sizeof(BufferVertex));
 	vert += 3;
@@ -11439,7 +11438,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 			(*PrimitiveInfoVec_at(&scissors, i)).offset_uv != offset_uv)
 		{
 			unsigned to_draw = i - last_draw;
-			cbh_get(&cmd)->set_specialization_constant_mask(-1);
+			commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
 			cbh_get(&cmd)->draw(3 * to_draw, 1, 3 * last_draw, 0);
 			last_draw = i;
 
@@ -11453,7 +11452,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).filtering != filtering) {
 				filtering = (*PrimitiveInfoVec_at(&scissors, i)).filtering;
-				cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
+				commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).scaled_read != scaled_read) {
 				scaled_read = (*PrimitiveInfoVec_at(&scissors, i)).scaled_read;
@@ -11461,18 +11460,18 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).shift != shift) {
 				shift = (*PrimitiveInfoVec_at(&scissors, i)).shift;
-				cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Shift, shift);
+				commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Shift, shift);
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).offset_uv != offset_uv) {
 				offset_uv = (*PrimitiveInfoVec_at(&scissors, i)).offset_uv;
-				cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_OffsetUV, (int)offset_uv);
+				commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
 			}
 		}
 		memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_at(&scissors, i)).triangle_index, 3 * sizeof(BufferVertex));
 	}
 
 	unsigned to_draw = size - last_draw;
-	cbh_get(&cmd)->set_specialization_constant_mask(-1);
+	commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
 	cbh_get(&cmd)->draw(3 * to_draw, 1, 3 * last_draw, 0);
 }
 
@@ -11483,12 +11482,12 @@ void Renderer::render_opaque_primitives()
 	if (BufferVertexVec_empty(vertices))
 		return;
 
-	cbh_get(&cmd)->set_opaque_state();
-	cbh_get(&cmd)->set_cull_mode(VK_CULL_MODE_NONE);
-	cbh_get(&cmd)->set_depth_compare(VK_COMPARE_OP_LESS);
-	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	cbh_get(&cmd)->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
-	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	commandbuffer_set_opaque_state(cbh_get(&cmd));
+	commandbuffer_set_cull_mode(cbh_get(&cmd), VK_CULL_MODE_NONE);
+	commandbuffer_set_depth_compare(cbh_get(&cmd), VK_COMPARE_OP_LESS);
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+	commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
 	dispatch(*vertices, *scissors);
 }
@@ -11523,17 +11522,17 @@ void Renderer::render_semi_transparent_primitives()
 
 	unsigned last_draw_offset = 0;
 
-	cbh_get(&cmd)->set_opaque_state();
-	cbh_get(&cmd)->set_cull_mode(VK_CULL_MODE_NONE);
-	cbh_get(&cmd)->set_depth_compare(VK_COMPARE_OP_LESS);
-	cbh_get(&cmd)->set_depth_test(true, false);
-	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	cbh_get(&cmd)->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
-	cbh_get(&cmd)->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
-	cbh_get(&cmd)->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
-	cbh_get(&cmd)->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cbh_get(&cmd)->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+	commandbuffer_set_opaque_state(cbh_get(&cmd));
+	commandbuffer_set_cull_mode(cbh_get(&cmd), VK_CULL_MODE_NONE);
+	commandbuffer_set_depth_compare(cbh_get(&cmd), VK_COMPARE_OP_LESS);
+	commandbuffer_set_depth_test(cbh_get(&cmd), true, false);
+	commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
 	size_t size = BufferVertexVec_size(&queue.semi_transparent) * sizeof(BufferVertex);
 	void *verts = commandbuffer_allocate_vertex_data(cbh_get(&cmd), 0, size, sizeof(BufferVertex));
@@ -11553,13 +11552,13 @@ void Renderer::render_semi_transparent_primitives()
 		    (last_state != *SemiTransparentStateVec_at(&queue.semi_transparent_state, i)))
 		{
 			unsigned to_draw = i - last_draw_offset;
-			cbh_get(&cmd)->set_specialization_constant_mask(-1);
+			commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
 
 			{
 				VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
 				barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 				barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-				vkCmdPipelineBarrier(cbh_get(&cmd)->get_command_buffer(),
+				vkCmdPipelineBarrier(commandbuffer_get_command_buffer(cbh_get(&cmd)),
 					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 					VK_DEPENDENCY_BY_REGION_BIT,
@@ -11568,7 +11567,7 @@ void Renderer::render_semi_transparent_primitives()
 
 			cbh_get(&cmd)->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
 			if (msaa > 1)
-				cbh_get(&cmd)->set_multisample_state(false);
+				commandbuffer_set_multisample_state(cbh_get(&cmd), false);
 			last_draw_offset = i;
 
 			last_state = *SemiTransparentStateVec_at(&queue.semi_transparent_state, i);
@@ -11577,10 +11576,10 @@ void Renderer::render_semi_transparent_primitives()
 	}
 
 	unsigned to_draw = prims - last_draw_offset;
-	cbh_get(&cmd)->set_specialization_constant_mask(-1);
+	commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
 	cbh_get(&cmd)->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
 	if (msaa > 1)
-		cbh_get(&cmd)->set_multisample_state(false);
+		commandbuffer_set_multisample_state(cbh_get(&cmd), false);
 }
 
 void Renderer::render_semi_transparent_opaque_texture_primitives()
@@ -11590,18 +11589,18 @@ void Renderer::render_semi_transparent_opaque_texture_primitives()
 	if (BufferVertexVec_empty(vertices))
 		return;
 
-	cbh_get(&cmd)->set_opaque_state();
-	cbh_get(&cmd)->set_cull_mode(VK_CULL_MODE_NONE);
-	cbh_get(&cmd)->set_depth_compare(VK_COMPARE_OP_LESS);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTransOpaque);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
-	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	cbh_get(&cmd)->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
-	cbh_get(&cmd)->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
-	cbh_get(&cmd)->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
-	cbh_get(&cmd)->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cbh_get(&cmd)->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+	commandbuffer_set_opaque_state(cbh_get(&cmd));
+	commandbuffer_set_cull_mode(cbh_get(&cmd), VK_CULL_MODE_NONE);
+	commandbuffer_set_depth_compare(cbh_get(&cmd), VK_COMPARE_OP_LESS);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_TransMode, TransMode_SemiTransOpaque);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Scaling, scaling);
+	commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
 	dispatch(*vertices, *scissors, true);
 }
@@ -11613,18 +11612,18 @@ void Renderer::render_opaque_texture_primitives()
 	if (BufferVertexVec_empty(vertices))
 		return;
 
-	cbh_get(&cmd)->set_opaque_state();
-	cbh_get(&cmd)->set_cull_mode(VK_CULL_MODE_NONE);
-	cbh_get(&cmd)->set_depth_compare(VK_COMPARE_OP_LESS);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_Opaque);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
-	cbh_get(&cmd)->set_primitive_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	cbh_get(&cmd)->set_vertex_attrib(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-	cbh_get(&cmd)->set_vertex_attrib(1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
-	cbh_get(&cmd)->set_vertex_attrib(2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
-	cbh_get(&cmd)->set_vertex_attrib(3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); // Pad to support AMD
-	cbh_get(&cmd)->set_vertex_attrib(4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-	cbh_get(&cmd)->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+	commandbuffer_set_opaque_state(cbh_get(&cmd));
+	commandbuffer_set_cull_mode(cbh_get(&cmd), VK_CULL_MODE_NONE);
+	commandbuffer_set_depth_compare(cbh_get(&cmd), VK_COMPARE_OP_LESS);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_TransMode, TransMode_Opaque);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Scaling, scaling);
+	commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); // Pad to support AMD
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
+	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
 	dispatch(*vertices, *scissors, true);
 }
@@ -11970,10 +11969,10 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	else
 		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
 	hd_texture_uniforms(state.hd_texture_index);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Shift, state.shift);
-	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_OffsetUV, (int)state.offset_uv);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Scaling, scaling);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Shift, state.shift);
+	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_OffsetUV, (int)state.offset_uv);
 
 	if (state.scissor_index < 0)
 		commandbuffer_set_scissor(cbh_get(&cmd), queue.default_scissor);
@@ -11990,11 +11989,11 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	case SemiTransparentMode_None:
 	{
 		// For opaque primitives which are just masked, we can make use of fixed function blending.
-		cbh_get(&cmd)->set_blend_enable(true);
-		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_Opaque);
+		commandbuffer_set_blend_enable(cbh_get(&cmd), true);
+		commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_TransMode, TransMode_Opaque);
 		commandbuffer_set_program(cbh_get(&cmd), textured);
-		cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-		cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+		commandbuffer_set_blend_op(cbh_get(&cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+		commandbuffer_set_blend_factors(cbh_get(&cmd), VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
 		                       VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_DST_ALPHA);
 		break;
 	}
@@ -12002,27 +12001,27 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAdd);
+			commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_BlendMode, BlendMode_BlendAdd);
 			commandbuffer_set_program(cbh_get(&cmd), textured_masked);
 			commandbuffer_pixel_barrier(cbh_get(&cmd));
 			commandbuffer_set_input_attachments(cbh_get(&cmd), 0, 3);
-			cbh_get(&cmd)->set_blend_enable(false);
+			commandbuffer_set_blend_enable(cbh_get(&cmd), false);
 			if (msaa > 1)
 			{
 				// Need to blend per-sample.
-				cbh_get(&cmd)->set_multisample_state(false, false, true);
+				commandbuffer_set_multisample_state(cbh_get(&cmd), false, false, true);
 			}
-			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			commandbuffer_set_blend_op(cbh_get(&cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			commandbuffer_set_blend_factors(cbh_get(&cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ONE);
 		}
 		else
 		{
-			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
+			commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_TransMode, TransMode_SemiTrans);
 			commandbuffer_set_program(cbh_get(&cmd), textured);
-			cbh_get(&cmd)->set_blend_enable(true);
-			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			commandbuffer_set_blend_enable(cbh_get(&cmd), true);
+			commandbuffer_set_blend_op(cbh_get(&cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			commandbuffer_set_blend_factors(cbh_get(&cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ZERO);
 		}
 		break;
@@ -12031,29 +12030,29 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAvg);
+			commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_BlendMode, BlendMode_BlendAvg);
 			commandbuffer_set_program(cbh_get(&cmd), textured_masked);
 			commandbuffer_set_input_attachments(cbh_get(&cmd), 0, 3);
 			commandbuffer_pixel_barrier(cbh_get(&cmd));
-			cbh_get(&cmd)->set_blend_enable(false);
+			commandbuffer_set_blend_enable(cbh_get(&cmd), false);
 			if (msaa > 1)
 			{
 				// Need to blend per-sample.
-				cbh_get(&cmd)->set_multisample_state(false, false, true);
+				commandbuffer_set_multisample_state(cbh_get(&cmd), false, false, true);
 			}
-			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			commandbuffer_set_blend_op(cbh_get(&cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			commandbuffer_set_blend_factors(cbh_get(&cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ONE);
 		}
 		else
 		{
 			static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
-			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
+			commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_TransMode, TransMode_SemiTrans);
 			commandbuffer_set_program(cbh_get(&cmd), textured);
-			cbh_get(&cmd)->set_blend_enable(true);
-			cbh_get(&cmd)->set_blend_constants(rgba);
-			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE,
+			commandbuffer_set_blend_enable(cbh_get(&cmd), true);
+			commandbuffer_set_blend_constants(cbh_get(&cmd), rgba);
+			commandbuffer_set_blend_op(cbh_get(&cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			commandbuffer_set_blend_factors(cbh_get(&cmd), VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_CONSTANT_ALPHA, VK_BLEND_FACTOR_ZERO);
 		}
 		break;
@@ -12062,27 +12061,27 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendSub);
+			commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_BlendMode, BlendMode_BlendSub);
 			commandbuffer_set_program(cbh_get(&cmd), textured_masked);
 			commandbuffer_set_input_attachments(cbh_get(&cmd), 0, 3);
 			commandbuffer_pixel_barrier(cbh_get(&cmd));
-			cbh_get(&cmd)->set_blend_enable(false);
+			commandbuffer_set_blend_enable(cbh_get(&cmd), false);
 			if (msaa > 1)
 			{
 				// Need to blend per-sample.
-				cbh_get(&cmd)->set_multisample_state(false, false, true);
+				commandbuffer_set_multisample_state(cbh_get(&cmd), false, false, true);
 			}
-			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			commandbuffer_set_blend_op(cbh_get(&cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			commandbuffer_set_blend_factors(cbh_get(&cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ONE);
 		}
 		else
 		{
-			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
+			commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_TransMode, TransMode_SemiTrans);
 			commandbuffer_set_program(cbh_get(&cmd), textured);
-			cbh_get(&cmd)->set_blend_enable(true);
-			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
-			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			commandbuffer_set_blend_enable(cbh_get(&cmd), true);
+			commandbuffer_set_blend_op(cbh_get(&cmd), VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
+			commandbuffer_set_blend_factors(cbh_get(&cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ZERO);
 		}
 		break;
@@ -12091,29 +12090,29 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	{
 		if (state.masked)
 		{
-			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAddQuarter);
+			commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_BlendMode, BlendMode_BlendAddQuarter);
 			commandbuffer_set_program(cbh_get(&cmd), textured_masked);
 			commandbuffer_set_input_attachments(cbh_get(&cmd), 0, 3);
 			commandbuffer_pixel_barrier(cbh_get(&cmd));
-			cbh_get(&cmd)->set_blend_enable(false);
+			commandbuffer_set_blend_enable(cbh_get(&cmd), false);
 			if (msaa > 1)
 			{
 				// Need to blend per-sample.
-				cbh_get(&cmd)->set_multisample_state(false, false, true);
+				commandbuffer_set_multisample_state(cbh_get(&cmd), false, false, true);
 			}
-			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			commandbuffer_set_blend_op(cbh_get(&cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			commandbuffer_set_blend_factors(cbh_get(&cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ONE);
 		}
 		else
 		{
 			static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_TransMode, TransMode_SemiTrans);
+			commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_TransMode, TransMode_SemiTrans);
 			commandbuffer_set_program(cbh_get(&cmd), textured);
-			cbh_get(&cmd)->set_blend_enable(true);
-			cbh_get(&cmd)->set_blend_constants(rgba);
-			cbh_get(&cmd)->set_blend_op(VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-			cbh_get(&cmd)->set_blend_factors(VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+			commandbuffer_set_blend_enable(cbh_get(&cmd), true);
+			commandbuffer_set_blend_constants(cbh_get(&cmd), rgba);
+			commandbuffer_set_blend_op(cbh_get(&cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+			commandbuffer_set_blend_factors(cbh_get(&cmd), VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
 			                       VK_BLEND_FACTOR_ZERO);
 		}
 		break;
@@ -14879,7 +14878,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		counter_init(&self->reference_count); /* refcount starts at 1 */
 		commandbuffer_begin_compute(self);
-		self->set_opaque_state();
+		commandbuffer_set_opaque_state(self);
 		memset(&self->static_state, 0, sizeof(self->static_state));
 		memset(&self->bindings, 0, sizeof(self->bindings));
 	}
@@ -15613,15 +15612,15 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		self->dirty_vbos &= ~update_vbo_mask;
 	}
 
-	void CommandBuffer::set_vertex_attrib(uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset)
+	void commandbuffer_set_vertex_attrib(struct CommandBuffer *self, uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset)
 	{
 		VK_ASSERT(attrib < VULKAN_NUM_VERTEX_ATTRIBS);
-		VK_ASSERT(framebuffer);
+		VK_ASSERT(self->framebuffer);
 
-		VertexAttribState &attr = attribs[attrib];
+		VertexAttribState &attr = self->attribs[attrib];
 
 		if (attr.binding != binding || attr.format != format || attr.offset != offset)
-			commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
+			commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
 
 		VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
 
@@ -15630,22 +15629,22 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		attr.offset = offset;
 	}
 
-	void CommandBuffer::set_vertex_binding(uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride,
+	void commandbuffer_set_vertex_binding(struct CommandBuffer *self, uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride,
 			VkVertexInputRate step_rate)
 	{
 		VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
-		VK_ASSERT(framebuffer);
+		VK_ASSERT(self->framebuffer);
 
 		VkBuffer vkbuffer = buffer_get_buffer(&buffer);
-		if (vbo.buffers[binding] != vkbuffer || vbo.offsets[binding] != offset)
-			dirty_vbos |= 1u << binding;
-		if (vbo.strides[binding] != stride || vbo.input_rates[binding] != step_rate)
-			commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
+		if (self->vbo.buffers[binding] != vkbuffer || self->vbo.offsets[binding] != offset)
+			self->dirty_vbos |= 1u << binding;
+		if (self->vbo.strides[binding] != stride || self->vbo.input_rates[binding] != step_rate)
+			commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
 
-		vbo.buffers[binding] = vkbuffer;
-		vbo.offsets[binding] = offset;
-		vbo.strides[binding] = stride;
-		vbo.input_rates[binding] = step_rate;
+		self->vbo.buffers[binding] = vkbuffer;
+		self->vbo.offsets[binding] = offset;
+		self->vbo.strides[binding] = stride;
+		self->vbo.input_rates[binding] = step_rate;
 	}
 
 	void commandbuffer_set_scissor(struct CommandBuffer *self, const VkRect2D &rect)
@@ -15738,7 +15737,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			data = self->vbo_block.allocate(size);
 		}
 
-		self->set_vertex_binding(binding, *bh_get(&self->vbo_block.gpu), data.offset, stride, step_rate);
+		commandbuffer_set_vertex_binding(self, binding, *bh_get(&self->vbo_block.gpu), data.offset, stride, step_rate);
 		return data.host;
 	}
 
@@ -16114,9 +16113,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		vkCmdDispatch(cmd, groups_x, groups_y, groups_z);
 	}
 
-	void CommandBuffer::set_opaque_state()
+	void commandbuffer_set_opaque_state(struct CommandBuffer *self)
 	{
-		PipelineState::State &state = static_state.state;
+		PipelineState::State &state = self->static_state.state;
 		memset(&state, 0, sizeof(state));
 		state.cull_mode = VK_CULL_MODE_BACK_BIT;
 		state.blend_enable = false;
@@ -16125,19 +16124,19 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		state.depth_write = true;
 		state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
-		commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
+		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 	}
 
-	void CommandBuffer::set_quad_state()
+	void commandbuffer_set_quad_state(struct CommandBuffer *self)
 	{
-		PipelineState::State &state = static_state.state;
+		PipelineState::State &state = self->static_state.state;
 		memset(&state, 0, sizeof(state));
 		state.cull_mode = VK_CULL_MODE_NONE;
 		state.blend_enable = false;
 		state.depth_test = false;
 		state.depth_write = false;
 		state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-		commandbuffer_set_dirty(this, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
+		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 	}
 
 	void CommandBuffer::end()
@@ -17103,11 +17102,11 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 	{
-		CommandBufferType type = cbh_get(&cmd)->get_command_buffer_type();
+		CommandBufferType type = commandbuffer_get_command_buffer_type(cbh_get(&cmd));
 		CommandPool &pool = get_command_pool(type);
 		CommandBufferHandleVec &submissions = get_queue_submissions(type);
 
-		pool.signal_submitted(cbh_get(&cmd)->get_command_buffer());
+		pool.signal_submitted(commandbuffer_get_command_buffer(cbh_get(&cmd)));
 		cbh_get(&cmd)->end();
 		submissions.push(static_cast<CommandBufferHandle &&>(cmd));
 
@@ -17356,7 +17355,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		for (CommandBufferHandle &cmd : submissions)
 		{
-			VkCommandBuffer _cb = cbh_get(&cmd)->get_command_buffer();
+			VkCommandBuffer _cb = commandbuffer_get_command_buffer(cbh_get(&cmd));
 			CommandBufferVec_push(&cmds, &_cb);
 		}
 
