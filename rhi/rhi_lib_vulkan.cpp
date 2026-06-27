@@ -5470,9 +5470,9 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	void commandbuffer_set_texture_view_stock(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view, StockSampler stock);
 	void commandbuffer_set_storage_texture(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view);
 	void commandbuffer_set_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const Sampler &sampler);
-	void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize range);
+	void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer *buffer, VkDeviceSize offset, VkDeviceSize range);
 	void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
-	void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
+	void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate);
 
 	/* Group D: state-setter free functions. The SET_STATIC_STATE /
 	 * SET_POTENTIALLY_STATIC_STATE macros are redefined to operate on self. */
@@ -5498,7 +5498,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	} while (0)
 
 	void commandbuffer_set_vertex_attrib(struct CommandBuffer *self, uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset);
-	void commandbuffer_set_vertex_binding(struct CommandBuffer *self, uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride, VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
+	void commandbuffer_set_vertex_binding(struct CommandBuffer *self, uint32_t binding, const Buffer *buffer, VkDeviceSize offset, VkDeviceSize stride, VkVertexInputRate step_rate);
 	void commandbuffer_set_opaque_state(struct CommandBuffer *self);
 	void commandbuffer_set_quad_state(struct CommandBuffer *self);
 
@@ -5592,15 +5592,15 @@ void commandbuffer_set_blend_op_2(struct CommandBuffer *self, VkBlendOp blend_op
 	/* Group A: copy / clear / barrier free functions. Overloaded members are
 	 * split into distinctly-named free functions. */
 	void commandbuffer_clear_image(struct CommandBuffer *self, const Image &image, const VkClearValue &value);
-	void commandbuffer_copy_buffer(struct CommandBuffer *self, const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset, VkDeviceSize size);
-void commandbuffer_copy_buffer_whole(struct CommandBuffer *self, const Buffer &dst, const Buffer &src)
+	void commandbuffer_copy_buffer(struct CommandBuffer *self, const Buffer *dst, VkDeviceSize dst_offset, const Buffer *src, VkDeviceSize src_offset, VkDeviceSize size);
+void commandbuffer_copy_buffer_whole(struct CommandBuffer *self, const Buffer *dst, const Buffer *src)
 	{
-		VK_ASSERT(buffer_get_create_info(&dst)->size == buffer_get_create_info(&src)->size);
-		commandbuffer_copy_buffer(self, dst, 0, src, 0, buffer_get_create_info(&dst)->size);
+		VK_ASSERT(buffer_get_create_info(dst)->size == buffer_get_create_info(src)->size);
+		commandbuffer_copy_buffer(self, dst, 0, src, 0, buffer_get_create_info(dst)->size);
 	}
-	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image &image, const Buffer &buffer, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
-	void commandbuffer_copy_buffer_to_image_blits(struct CommandBuffer *self, const Image &image, const Buffer &buffer, unsigned num_blits, const VkBufferImageCopy *blits);
-	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer &dst, const Image &src, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
+	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image &image, const Buffer *buffer, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
+	void commandbuffer_copy_buffer_to_image_blits(struct CommandBuffer *self, const Image &image, const Buffer *buffer, unsigned num_blits, const VkBufferImageCopy *blits);
+	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer *dst, const Image &src, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
 	void commandbuffer_full_barrier(struct CommandBuffer *self);
 	void commandbuffer_pixel_barrier(struct CommandBuffer *self);
 	void commandbuffer_barrier_simple(struct CommandBuffer *self, VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage, VkAccessFlags dst_access);
@@ -5910,7 +5910,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	bool device_get_image_format_properties(Device *self, VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags, VkImageFormatProperties *properties);
 	uint32_t device_find_memory_type_buffer(Device *self, BufferDomain domain, uint32_t mask);
 	uint32_t device_find_memory_type_image(Device *self, ImageDomain domain, uint32_t mask);
-	void device_set_name_buffer(Device *self, const Buffer &buffer, const char *name);
+	void device_set_name_buffer(Device *self, const Buffer *buffer, const char *name);
 	void device_set_name_image(Device *self, const Image &image, const char *name);
 	bool device_memory_type_is_host_visible(Device *self, uint32_t type);
 	BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo &view_info);
@@ -5938,8 +5938,8 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void device_init_workarounds(Device *self);
 	void device_wait_idle(Device *self);
 	void device_flush_frame(Device *self);
-	void *device_map_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access);
-	void device_unmap_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access);
+	void *device_map_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access);
+	void device_unmap_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access);
 	ImageView *device_get_transient_attachment(Device *self, unsigned width, unsigned height, VkFormat format, unsigned index, unsigned samples, unsigned layers);
 	VkDevice device_get_device(Device *self);
 	const VkPhysicalDeviceProperties *device_get_gpu_properties(Device *self);
@@ -6049,8 +6049,8 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	 * all callers; friend-declared inside the class for private-member access. */
 void device_wait_idle(Device *self) { device_wait_idle_nolock(self); }
 void device_flush_frame(Device *self) { device_flush_frame_nolock(self); }
-void *device_map_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access) { return deviceallocator_map_memory(&self->managers.memory, buffer_get_allocation(&buffer), access); }
-void device_unmap_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access) { deviceallocator_unmap_memory(&self->managers.memory, buffer_get_allocation(&buffer), access); }
+void *device_map_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access) { return deviceallocator_map_memory(&self->managers.memory, buffer_get_allocation(buffer), access); }
+void device_unmap_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access) { deviceallocator_unmap_memory(&self->managers.memory, buffer_get_allocation(buffer), access); }
 ImageView *device_get_transient_attachment(Device *self, unsigned width, unsigned height, VkFormat format, unsigned index, unsigned samples, unsigned layers) { return attachment_allocator_request_attachment(&self->transient_allocator, width, height, format, index, samples, layers); }
 VkDevice device_get_device(Device *self) { return self->device; }
 const VkPhysicalDeviceProperties *device_get_gpu_properties(Device *self) { return &self->gpu_props; }
@@ -9296,11 +9296,11 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	}
 	inline uint16_t *renderer_begin_copy(Renderer *self, BufferHandle handle)
 	{
-		return (uint16_t *)(device_map_host_buffer(self->device, *bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
+		return (uint16_t *)(device_map_host_buffer(self->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
 	}
 	inline void renderer_end_copy(Renderer *self, BufferHandle handle)
 	{
-		device_unmap_host_buffer(self->device, *bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
+		device_unmap_host_buffer(self->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
 	}
 	inline void renderer_notify_texture_upload(Renderer *self, Rect rect, uint16_t *vram)
 	{
@@ -9854,7 +9854,7 @@ void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out){
 	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
 	{ Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &_r); }
 	renderer_ensure_command_buffer(self);
-	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), *bh_get(&buffer), *ih_get(&self->framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
+	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), *ih_get(&self->framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
 	commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
 	             VK_ACCESS_HOST_READ_BIT);
@@ -9863,13 +9863,13 @@ void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out){
 
 	device_wait_idle(self->device);
 	const uint32_t *src = (const uint32_t *)(
-			device_map_host_buffer(self->device, *bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
+			device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
 	/* Deep-copy the mapped VRAM straight into the owning buffer (no
 	 * default zero-fill), then move it into the returned SaveState. */
 	OwnedU32Buf vram;
 	owned_u32_init(&vram);
 	owned_u32_assign(&vram, src, FB_WIDTH * FB_HEIGHT);
-	device_unmap_host_buffer(self->device, *bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
+	device_unmap_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
 	savestate_init(out);
 	owned_u32_move(&out->vram, &vram);
 	out->state = self->render_state;
@@ -10073,7 +10073,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
-	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), *bh_get(&buffer), *ih_get(&self->framebuffer), 0, { (int)(copy_rect.x), (int)(copy_rect.y), 0 },
+	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), *ih_get(&self->framebuffer), 0, { (int)(copy_rect.x), (int)(copy_rect.y), 0 },
 	                          { copy_rect.width, copy_rect.height, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
 
@@ -10083,7 +10083,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 	Fence fence = renderer_flush_and_signal(self);
 	fenceholder_wait(fence_get(&fence));
 
-	const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, *bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
+	const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
 
 	if (!wrap)
 	{
@@ -10104,7 +10104,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 		texture_tracker_notifyReadback(&self->tracker, *rect, vram);
 	}
 
-	device_unmap_host_buffer(self->device, *bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
+	device_unmap_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
 
 	/* Single surviving owner of the fence handle (ownership moved out of
 	 * flush_and_signal); drop its reference at scope exit. */
@@ -10162,7 +10162,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(imageview_vec_at(&self->scaled_views, i - 1)), StockSampler_LinearClamp);
 
 		commandbuffer_set_quad_state(cbh_get(&self->cmd));
-		commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, *bh_get(&self->quad), 0, 8);
+		commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
 		struct Push
 		{
 			float offset[2];
@@ -10442,7 +10442,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *image_get_view(ih_get(&self->framebuffer)), StockSampler_LinearClamp);
 	}
 
-	commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, *bh_get(&self->quad), 0, 8);
+	commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
 	struct Push
 	{
 		float offset[2];
@@ -10701,7 +10701,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		}
 	}
 
-	commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, *bh_get(&self->quad), 0, 8);
+	commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
 	struct Push
 	{
 		float offset[2];
@@ -11532,7 +11532,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec &vertices, Primitiv
 
 	// Render flat-shaded primitives.
 	BufferVertex *vert = (BufferVertex *)(
-	    commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, BufferVertexVec_size((struct BufferVertexVec *)&vertices) * sizeof(BufferVertex), sizeof(BufferVertex)));
+	    commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, BufferVertexVec_size((struct BufferVertexVec *)&vertices) * sizeof(BufferVertex), sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX));
 
 	int scissor = (*PrimitiveInfoVec_front(&scissors)).scissor_index;
 	HdTextureHandle hd_texture = (*PrimitiveInfoVec_front(&scissors)).hd_texture_index;
@@ -11655,7 +11655,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
 	size_t size = BufferVertexVec_size(&self->queue.semi_transparent) * sizeof(BufferVertex);
-	void *verts = commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, size, sizeof(BufferVertex));
+	void *verts = commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, size, sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX);
 	memcpy(verts, BufferVertexVec_data(&self->queue.semi_transparent), size);
 
 	SemiTransparentState last_state = *SemiTransparentStateVec_at(&self->queue.semi_transparent_state, 0);
@@ -13012,10 +13012,10 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 	info.usage = self->usage;
 
 	block.gpu = device_create_buffer(self->device, info, NULL);
-	device_set_name_buffer(self->device, *bh_get(&block.gpu), "chain-allocated-block-gpu");
+	device_set_name_buffer(self->device, bh_get(&block.gpu), "chain-allocated-block-gpu");
 
 	// Try to map it, will fail unless the memory is host visible.
-	block.mapped = (uint8_t *)(device_map_host_buffer(self->device, *bh_get(&block.gpu), MEMORY_ACCESS_WRITE_BIT));
+	block.mapped = (uint8_t *)(device_map_host_buffer(self->device, bh_get(&block.gpu), MEMORY_ACCESS_WRITE_BIT));
 	if (!block.mapped)
 	{
 		// Fall back to host memory, and remember to sync to gpu on submission time using DMA queue. :)
@@ -13025,8 +13025,8 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 		cpu_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
 		block.cpu = device_create_buffer(self->device, cpu_info, NULL);
-		device_set_name_buffer(self->device, *bh_get(&block.cpu), "chain-allocated-block-cpu");
-		block.mapped = (uint8_t *)(device_map_host_buffer(self->device, *bh_get(&block.cpu), MEMORY_ACCESS_WRITE_BIT));
+		device_set_name_buffer(self->device, bh_get(&block.cpu), "chain-allocated-block-cpu");
+		block.mapped = (uint8_t *)(device_map_host_buffer(self->device, bh_get(&block.cpu), MEMORY_ACCESS_WRITE_BIT));
 	}
 	else
 		bh_assign(&block.cpu, &block.gpu);
@@ -13053,7 +13053,7 @@ static struct BufferBlock bufferpool_request_block(struct BufferPool *self, VkDe
 		bufferblock_steal(&back, bufferblock_vec_back(&self->blocks));
 		bufferblock_vec_pop_back(&self->blocks);
 
-		back.mapped = (uint8_t *)(device_map_host_buffer(self->device, *bh_get(&back.cpu), MEMORY_ACCESS_WRITE_BIT));
+		back.mapped = (uint8_t *)(device_map_host_buffer(self->device, bh_get(&back.cpu), MEMORY_ACCESS_WRITE_BIT));
 		back.offset = 0;
 		return back;
 	}
@@ -15077,23 +15077,23 @@ VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 			command_buffer_deleter_call(self);
 	}
 
-	void commandbuffer_copy_buffer(struct CommandBuffer *self, const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
+	void commandbuffer_copy_buffer(struct CommandBuffer *self, const Buffer *dst, VkDeviceSize dst_offset, const Buffer *src, VkDeviceSize src_offset,
 			VkDeviceSize size)
 	{
 		const VkBufferCopy region = {
 			src_offset, dst_offset, size,
 		};
-		vkCmdCopyBuffer(self->cmd, buffer_get_buffer(&src), buffer_get_buffer(&dst), 1, &region);
+		vkCmdCopyBuffer(self->cmd, buffer_get_buffer(src), buffer_get_buffer(dst), 1, &region);
 	}
 
-	void commandbuffer_copy_buffer_to_image_blits(struct CommandBuffer *self, const Image &image, const Buffer &buffer, unsigned num_blits,
+	void commandbuffer_copy_buffer_to_image_blits(struct CommandBuffer *self, const Image &image, const Buffer *buffer, unsigned num_blits,
 			const VkBufferImageCopy *blits)
 	{
-		vkCmdCopyBufferToImage(self->cmd, buffer_get_buffer(&buffer),
+		vkCmdCopyBufferToImage(self->cmd, buffer_get_buffer(buffer),
 				image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), num_blits, blits);
 	}
 
-	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image &image, const Buffer &src, VkDeviceSize buffer_offset,
+	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image &image, const Buffer *src, VkDeviceSize buffer_offset,
 			const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
 			unsigned slice_height, const VkImageSubresourceLayers &subresource)
 	{
@@ -15102,11 +15102,11 @@ VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 			row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
 			subresource, offset, extent,
 		};
-		vkCmdCopyBufferToImage(self->cmd, buffer_get_buffer(&src), image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+		vkCmdCopyBufferToImage(self->cmd, buffer_get_buffer(src), image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 				1, &region);
 	}
 
-	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer &buffer, const Image &image, VkDeviceSize buffer_offset,
+	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer *buffer, const Image &image, VkDeviceSize buffer_offset,
 			const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
 			unsigned slice_height, const VkImageSubresourceLayers &subresource)
 	{
@@ -15116,7 +15116,7 @@ VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 			subresource, offset, extent,
 		};
 		vkCmdCopyImageToBuffer(self->cmd, image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-				buffer_get_buffer(&buffer), 1, &region);
+				buffer_get_buffer(buffer), 1, &region);
 	}
 
 	void commandbuffer_clear_image(struct CommandBuffer *self, const Image &image, const VkClearValue &value)
@@ -15799,13 +15799,13 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		attr.offset = offset;
 	}
 
-	void commandbuffer_set_vertex_binding(struct CommandBuffer *self, uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride,
+	void commandbuffer_set_vertex_binding(struct CommandBuffer *self, uint32_t binding, const Buffer *buffer, VkDeviceSize offset, VkDeviceSize stride,
 			VkVertexInputRate step_rate)
 	{
 		VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
 		VK_ASSERT(self->framebuffer);
 
-		VkBuffer vkbuffer = buffer_get_buffer(&buffer);
+		VkBuffer vkbuffer = buffer_get_buffer(buffer);
 		if (self->vbo.buffers[binding] != vkbuffer || self->vbo.offsets[binding] != offset)
 			self->dirty_vbos |= 1u << binding;
 		if (self->vbo.strides[binding] != stride || self->vbo.input_rates[binding] != step_rate)
@@ -15892,7 +15892,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			device_request_uniform_block(self->device, self->ubo_block, size);
 			data = bufferblock_allocate(&self->ubo_block, size);
 		}
-		commandbuffer_set_uniform_buffer(self, set, binding, *bh_get(&self->ubo_block.gpu), data.offset, size);
+		commandbuffer_set_uniform_buffer(self, set, binding, bh_get(&self->ubo_block.gpu), data.offset, size);
 		return data.host;
 	}
 
@@ -15906,23 +15906,23 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			data = bufferblock_allocate(&self->vbo_block, size);
 		}
 
-		commandbuffer_set_vertex_binding(self, binding, *bh_get(&self->vbo_block.gpu), data.offset, stride, step_rate);
+		commandbuffer_set_vertex_binding(self, binding, bh_get(&self->vbo_block.gpu), data.offset, stride, step_rate);
 		return data.host;
 	}
 
-	void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
+	void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer *buffer, VkDeviceSize offset,
 			VkDeviceSize range)
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		VK_ASSERT(buffer_get_create_info(&buffer)->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		VK_ASSERT(buffer_get_create_info(buffer)->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		ResourceBinding &b = self->bindings.bindings[set][binding];
 
-		if (buffer.cookie_base.cookie == self->bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
+		if (buffer->cookie_base.cookie == self->bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
 			return;
 
-		b.buffer = { buffer_get_buffer(&buffer), offset, range };
-		self->bindings.cookies[set][binding] = buffer.cookie_base.cookie;
+		b.buffer.buffer = buffer_get_buffer(buffer); b.buffer.offset = offset; b.buffer.range = range;
+		self->bindings.cookies[set][binding] = buffer->cookie_base.cookie;
 		self->bindings.secondary_cookies[set][binding] = 0;
 		self->dirty_sets |= 1u << set;
 	}
@@ -17206,7 +17206,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			struct BufferPool *pool, struct BufferBlockVec *dma, struct BufferBlockVec *recycle)
 	{
 		if (block->mapped)
-			device_unmap_host_buffer(&device, *bh_get(&block->cpu), MEMORY_ACCESS_WRITE_BIT);
+			device_unmap_host_buffer(&device, bh_get(&block->cpu), MEMORY_ACCESS_WRITE_BIT);
 
 		if (block->offset == 0)
 		{
@@ -17630,14 +17630,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			{
 				struct BufferBlock *block = &self->dma.vbo.items[_bi];
 				VK_ASSERT(block->offset != 0);
-				commandbuffer_copy_buffer(cbh_get(&cmd), *bh_get(&block->gpu), 0, *bh_get(&block->cpu), 0, block->offset);
+				commandbuffer_copy_buffer(cbh_get(&cmd), bh_get(&block->gpu), 0, bh_get(&block->cpu), 0, block->offset);
 				usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 			}
 			for (_bi = 0; _bi < self->dma.ubo.count; _bi++)
 			{
 				struct BufferBlock *block = &self->dma.ubo.items[_bi];
 				VK_ASSERT(block->offset != 0);
-				commandbuffer_copy_buffer(cbh_get(&cmd), *bh_get(&block->gpu), 0, *bh_get(&block->cpu), 0, block->offset);
+				commandbuffer_copy_buffer(cbh_get(&cmd), bh_get(&block->gpu), 0, bh_get(&block->cpu), 0, block->offset);
 				usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 			}
 		}
@@ -18479,10 +18479,10 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		buffer_info.size = tfl_get_required_size(&layout);
 		buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		result.buffer = device_create_buffer(self, buffer_info, NULL);
-		device_set_name_buffer(self, *bh_get(&result.buffer), "image-upload-staging-buffer");
+		device_set_name_buffer(self, bh_get(&result.buffer), "image-upload-staging-buffer");
 
 		// And now, do the actual copy.
-		uint8_t *mapped = (uint8_t *)(device_map_host_buffer(self, *bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
+		uint8_t *mapped = (uint8_t *)(device_map_host_buffer(self, bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
 		unsigned index = 0;
 
 		tfl_set_buffer(&layout, mapped, tfl_get_required_size(&layout));
@@ -18509,7 +18509,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			} }
 		} }
 
-		device_unmap_host_buffer(self, *bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT);
+		device_unmap_host_buffer(self, bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT);
 		tfl_build_buffer_image_copies(&layout, result.blits, &result.num_blits);
 		return result;
 	}
@@ -18670,7 +18670,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					VK_ACCESS_TRANSFER_WRITE_BIT);
 
 			commandbuffer_begin_region(cbh_get(&transfer_cmd), "copy-image-to-self->gpu");
-			commandbuffer_copy_buffer_to_image_blits(cbh_get(&transfer_cmd), *ih_get(&handle), *bh_get(&staging_buffer->buffer), staging_buffer->num_blits, staging_buffer->blits);
+			commandbuffer_copy_buffer_to_image_blits(cbh_get(&transfer_cmd), *ih_get(&handle), bh_get(&staging_buffer->buffer), staging_buffer->num_blits, staging_buffer->blits);
 			commandbuffer_end_region(cbh_get(&transfer_cmd));
 
 			if (self->transfer_queue != self->graphics_queue)
@@ -18882,11 +18882,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			BufferCreateInfo staging_info = create_info;
 			staging_info.domain = BufferDomain_Host;
 			BufferHandle staging_buffer = device_create_buffer(self, staging_info, initial);
-			device_set_name_buffer(self, *bh_get(&staging_buffer), "buffer-upload-staging-buffer");
+			device_set_name_buffer(self, bh_get(&staging_buffer), "buffer-upload-staging-buffer");
 
 			cmd = device_request_command_buffer(self, Type_AsyncTransfer);
 			commandbuffer_begin_region(cbh_get(&cmd), "copy-buffer-staging");
-			commandbuffer_copy_buffer_whole(cbh_get(&cmd), *bh_get(&handle), *bh_get(&staging_buffer));
+			commandbuffer_copy_buffer_whole(cbh_get(&cmd), bh_get(&handle), bh_get(&staging_buffer));
 			commandbuffer_end_region(cbh_get(&cmd));
 
 			device_submit_staging(self, cmd, info.usage, true);
@@ -18994,13 +18994,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		return ret;
 	}
 
-	void device_set_name_buffer(Device *self, const Buffer &buffer, const char *name)
+	void device_set_name_buffer(Device *self, const Buffer *buffer, const char *name)
 	{
 		if (self->ext.supports_debug_marker)
 		{
 			VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
 			info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT;
-			info.object = (uint64_t)buffer_get_buffer(&buffer);
+			info.object = (uint64_t)buffer_get_buffer(buffer);
 			info.pObjectName = name;
 			vkDebugMarkerSetObjectNameEXT(self->device, &info);
 		}
