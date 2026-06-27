@@ -2673,116 +2673,108 @@ static inline uint32_t util_ctz(uint32_t x)
 		bool optimize_all_graphics_barrier = false;
 	};
 
-	class TextureFormatLayout
+	/* TextureFormatLayout: computes mip/layer byte layout for a texture upload
+	 * staging buffer. Converted from a C++ class to a plain C struct + tfl_* free
+	 * functions. The nested MipInfo type is hoisted to file scope as
+	 * TextureFormatLayoutMipInfo. The three static helpers (format_block_size,
+	 * format_block_dim, num_miplevels) become tfl_* free functions taking no self. */
+	struct TextureFormatLayoutMipInfo
 	{
-		public:
-			void set_1d(VkFormat format, uint32_t width, uint32_t array_layers = 1, uint32_t mip_levels = 1);
-			void set_2d(VkFormat format, uint32_t width, uint32_t height, uint32_t array_layers = 1, uint32_t mip_levels = 1);
-			void set_3d(VkFormat format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels = 1);
+		size_t offset;
+		uint32_t width;
+		uint32_t height;
+		uint32_t depth;
 
-			static uint32_t format_block_size(VkFormat format);
-			static void format_block_dim(VkFormat format, uint32_t &width, uint32_t &height);
-			static uint32_t num_miplevels(uint32_t width, uint32_t height = 1, uint32_t depth = 1);
-
-			void set_buffer(void *buffer, size_t size)
-			{
-				this->buffer = (uint8_t *)(buffer);
-				buffer_size = size;
-			}
-			inline void *get_buffer()
-			{
-				return buffer;
-			}
-
-			uint32_t get_width(uint32_t mip = 0) const
-			{
-				return mips[mip].width;
-			}
-			uint32_t get_height(uint32_t mip = 0) const
-			{
-				return mips[mip].height;
-			}
-			uint32_t get_depth(uint32_t mip = 0) const
-			{
-				return mips[mip].depth;
-			}
-			VkFormat get_format() const
-			{
-				return format;
-			}
-
-			size_t get_required_size() const
-			{
-				return required_size;
-			}
-
-			size_t row_byte_stride(uint32_t row_length) const
-			{
-				return ((row_length + block_dim_x - 1) / block_dim_x) * block_stride;
-			}
-			size_t layer_byte_stride(uint32_t image_height, size_t row_byte_stride) const
-			{
-				return ((image_height + block_dim_y - 1) / block_dim_y) * row_byte_stride;
-			}
-
-			inline size_t get_row_size(uint32_t mip) const
-			{
-				return mips[mip].block_row_length * block_stride;
-			}
-
-			inline size_t get_layer_size(uint32_t mip) const
-			{
-				return mips[mip].block_image_height * get_row_size(mip);
-			}
-
-			struct MipInfo
-			{
-				size_t offset = 0;
-				uint32_t width = 1;
-				uint32_t height = 1;
-				uint32_t depth = 1;
-
-				uint32_t block_image_height = 0;
-				uint32_t block_row_length = 0;
-				uint32_t image_height = 0;
-				uint32_t row_length = 0;
-			};
-
-			const MipInfo &get_mip_info(uint32_t mip) const
-			{
-				return mips[mip];
-			}
-
-			inline void *data(uint32_t layer = 0, uint32_t mip = 0) const
-			{
-				assert(buffer);
-				assert(buffer_size == required_size);
-				const MipInfo &mip_info = mips[mip];
-				uint8_t *slice = buffer + mip_info.offset;
-				slice += block_stride * layer * mip_info.block_row_length * mip_info.block_image_height;
-				return slice;
-			}
-
-			void build_buffer_image_copies(VkBufferImageCopy *copies, unsigned &num_copies) const;
-
-		private:
-			uint8_t *buffer = NULL;
-			size_t buffer_size = 0;
-
-			VkImageType image_type = VK_IMAGE_TYPE_RANGE_SIZE;
-			VkFormat format = VK_FORMAT_UNDEFINED;
-			size_t required_size = 0;
-
-			uint32_t block_stride = 1;
-			uint32_t mip_levels = 1;
-			uint32_t array_layers = 1;
-			uint32_t block_dim_x = 1;
-			uint32_t block_dim_y = 1;
-
-			MipInfo mips[16];
-
-			void fill_mipinfo(uint32_t width, uint32_t height, uint32_t depth);
+		uint32_t block_image_height;
+		uint32_t block_row_length;
+		uint32_t image_height;
+		uint32_t row_length;
 	};
+
+	struct TextureFormatLayout
+	{
+		uint8_t *buffer;
+		size_t buffer_size;
+
+		VkImageType image_type;
+		VkFormat format;
+		size_t required_size;
+
+		uint32_t block_stride;
+		uint32_t mip_levels;
+		uint32_t array_layers;
+		uint32_t block_dim_x;
+		uint32_t block_dim_y;
+
+		TextureFormatLayoutMipInfo mips[16];
+	};
+
+	/* Establishes the default-constructed state (the former default member
+	 * initializers). Callers that declare a TextureFormatLayout must call this. */
+	static inline void tfl_init(struct TextureFormatLayout *self)
+	{
+		memset(self, 0, sizeof(*self));
+		self->image_type   = VK_IMAGE_TYPE_RANGE_SIZE;
+		self->format       = VK_FORMAT_UNDEFINED;
+		self->block_stride = 1;
+		self->mip_levels   = 1;
+		self->array_layers = 1;
+		self->block_dim_x  = 1;
+		self->block_dim_y  = 1;
+	}
+
+	void tfl_set_1d(struct TextureFormatLayout *self, VkFormat format, uint32_t width, uint32_t array_layers, uint32_t mip_levels);
+	void tfl_set_2d(struct TextureFormatLayout *self, VkFormat format, uint32_t width, uint32_t height, uint32_t array_layers, uint32_t mip_levels);
+	void tfl_set_3d(struct TextureFormatLayout *self, VkFormat format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels);
+
+	uint32_t tfl_format_block_size(VkFormat format);
+	void tfl_format_block_dim(VkFormat format, uint32_t *width, uint32_t *height);
+	uint32_t tfl_num_miplevels(uint32_t width, uint32_t height, uint32_t depth);
+
+	static inline void tfl_set_buffer(struct TextureFormatLayout *self, void *buffer, size_t size)
+	{
+		self->buffer = (uint8_t *)(buffer);
+		self->buffer_size = size;
+	}
+	static inline void *tfl_get_buffer(struct TextureFormatLayout *self) { return self->buffer; }
+	static inline uint32_t tfl_get_width(const struct TextureFormatLayout *self, uint32_t mip) { return self->mips[mip].width; }
+	static inline uint32_t tfl_get_height(const struct TextureFormatLayout *self, uint32_t mip) { return self->mips[mip].height; }
+	static inline uint32_t tfl_get_depth(const struct TextureFormatLayout *self, uint32_t mip) { return self->mips[mip].depth; }
+	static inline VkFormat tfl_get_format(const struct TextureFormatLayout *self) { return self->format; }
+	static inline size_t tfl_get_required_size(const struct TextureFormatLayout *self) { return self->required_size; }
+	static inline size_t tfl_row_byte_stride(const struct TextureFormatLayout *self, uint32_t row_length)
+	{
+		return ((row_length + self->block_dim_x - 1) / self->block_dim_x) * self->block_stride;
+	}
+	static inline size_t tfl_layer_byte_stride(const struct TextureFormatLayout *self, uint32_t image_height, size_t row_byte_stride)
+	{
+		return ((image_height + self->block_dim_y - 1) / self->block_dim_y) * row_byte_stride;
+	}
+	static inline size_t tfl_get_row_size(const struct TextureFormatLayout *self, uint32_t mip)
+	{
+		return self->mips[mip].block_row_length * self->block_stride;
+	}
+	static inline size_t tfl_get_layer_size(const struct TextureFormatLayout *self, uint32_t mip)
+	{
+		return self->mips[mip].block_image_height * tfl_get_row_size(self, mip);
+	}
+	static inline const TextureFormatLayoutMipInfo *tfl_get_mip_info(const struct TextureFormatLayout *self, uint32_t mip)
+	{
+		return &self->mips[mip];
+	}
+	static inline void *tfl_data(const struct TextureFormatLayout *self, uint32_t layer, uint32_t mip)
+	{
+		const TextureFormatLayoutMipInfo *mip_info;
+		uint8_t *slice;
+		assert(self->buffer);
+		assert(self->buffer_size == self->required_size);
+		mip_info = &self->mips[mip];
+		slice = self->buffer + mip_info->offset;
+		slice += self->block_stride * layer * mip_info->block_row_length * mip_info->block_image_height;
+		return slice;
+	}
+	void tfl_build_buffer_image_copies(const struct TextureFormatLayout *self, VkBufferImageCopy *copies, unsigned *num_copies);
+	void tfl_fill_mipinfo(struct TextureFormatLayout *self, uint32_t width, uint32_t height, uint32_t depth);
 
 	class Device;
 
@@ -6928,22 +6920,20 @@ extern retro_log_printf_t log_cb;
 		}
 	}
 
-	class IOChannel {
-		public:
-			slock_t *lock;
-			scond_t *cond;
-			/* Intrusive FIFO lists (protected by `lock`). Heads are popped/drained,
-			 * tails are where producers append. Replaces std::vector<IORequest> /
-			 * std::vector<IOResponse>. */
-			IORequest  *req_head,  *req_tail;
-			IOResponse *resp_head, *resp_tail;
-			bool done;
-			/* Cross-thread refcount (replaces std::shared_ptr<IOChannel>). The owning
-			 * IOThread holds one reference and each detached worker holds one; whichever
-			 * releases last frees the channel. Mutated only outside the lock, at
-			 * thread-spawn and thread-exit, so a plain int with no overlap is fine. */
-			int refcount;
-		private:
+	struct IOChannel {
+		slock_t *lock;
+		scond_t *cond;
+		/* Intrusive FIFO lists (protected by `lock`). Heads are popped/drained,
+		 * tails are where producers append. Replaces std::vector<IORequest> /
+		 * std::vector<IOResponse>. */
+		IORequest  *req_head,  *req_tail;
+		IOResponse *resp_head, *resp_tail;
+		bool done;
+		/* Cross-thread refcount (replaces std::shared_ptr<IOChannel>). The owning
+		 * IOThread holds one reference and each detached worker holds one; whichever
+		 * releases last frees the channel. Mutated only outside the lock, at
+		 * thread-spawn and thread-exit, so a plain int with no overlap is fine. */
+		int refcount;
 	};
 
 	static void io_channel_destroy(IOChannel *c);
@@ -11912,7 +11902,7 @@ static void cookie_init(struct Cookie *self, Device *device)
 /* === texture_format.cpp === */
 
 
-uint32_t TextureFormatLayout::num_miplevels(uint32_t width, uint32_t height, uint32_t depth)
+uint32_t tfl_num_miplevels(uint32_t width, uint32_t height, uint32_t depth)
 {
 	uint32_t wh = width > height ? width : height;
 	uint32_t size = wh > depth ? wh : depth;
@@ -11925,12 +11915,12 @@ uint32_t TextureFormatLayout::num_miplevels(uint32_t width, uint32_t height, uin
 	return levels;
 }
 
-void TextureFormatLayout::format_block_dim(VkFormat format, uint32_t &width, uint32_t &height)
+void tfl_format_block_dim(VkFormat format, uint32_t *width, uint32_t *height)
 {
 #define fmt(x, w, h)     \
     case VK_FORMAT_##x: \
-        width = w; \
-        height = h; \
+        *width = w; \
+        *height = h; \
         break
 
 	switch (format)
@@ -11993,15 +11983,15 @@ void TextureFormatLayout::format_block_dim(VkFormat format, uint32_t &width, uin
 	fmt(ASTC_12x12_UNORM_BLOCK, 12, 12);
 
 	default:
-		width = 1;
-		height = 1;
+		*width = 1;
+		*height = 1;
 		break;
 	}
 
 #undef fmt
 }
 
-uint32_t TextureFormatLayout::format_block_size(VkFormat format)
+uint32_t tfl_format_block_size(VkFormat format)
 {
 #define fmt(x, bpp)     \
     case VK_FORMAT_##x: \
@@ -12199,99 +12189,102 @@ uint32_t TextureFormatLayout::format_block_size(VkFormat format)
 #undef fmt
 }
 
-void TextureFormatLayout::fill_mipinfo(uint32_t width, uint32_t height, uint32_t depth)
+void tfl_fill_mipinfo(struct TextureFormatLayout *self, uint32_t width, uint32_t height, uint32_t depth)
 {
-	block_stride = format_block_size(format);
-	format_block_dim(format, block_dim_x, block_dim_y);
-
-	if (mip_levels == 0)
-		mip_levels = num_miplevels(width, height, depth);
-
+	uint32_t mip;
 	size_t offset = 0;
+	self->block_stride = tfl_format_block_size(self->format);
+	tfl_format_block_dim(self->format, &self->block_dim_x, &self->block_dim_y);
 
-	for (uint32_t mip = 0; mip < mip_levels; mip++)
+	if (self->mip_levels == 0)
+		self->mip_levels = tfl_num_miplevels(width, height, depth);
+
+	for (mip = 0; mip < self->mip_levels; mip++)
 	{
-		offset = (offset + 15) & ~15;
+		uint32_t blocks_x, blocks_y, next_w, next_h, next_d;
+		size_t mip_size;
+		offset = (offset + 15) & ~(size_t)15;
 
-		uint32_t blocks_x = (width + block_dim_x - 1) / block_dim_x;
-		uint32_t blocks_y = (height + block_dim_y - 1) / block_dim_y;
-		size_t mip_size = blocks_x * blocks_y * array_layers * depth * block_stride;
+		blocks_x = (width + self->block_dim_x - 1) / self->block_dim_x;
+		blocks_y = (height + self->block_dim_y - 1) / self->block_dim_y;
+		mip_size = blocks_x * blocks_y * self->array_layers * depth * self->block_stride;
 
-		mips[mip].offset = offset;
+		self->mips[mip].offset = offset;
 
-		mips[mip].block_row_length = blocks_x;
-		mips[mip].block_image_height = blocks_y;
+		self->mips[mip].block_row_length = blocks_x;
+		self->mips[mip].block_image_height = blocks_y;
 
-		mips[mip].row_length = blocks_x * block_dim_x;
-		mips[mip].image_height = blocks_y * block_dim_y;
+		self->mips[mip].row_length = blocks_x * self->block_dim_x;
+		self->mips[mip].image_height = blocks_y * self->block_dim_y;
 
-		mips[mip].width = width;
-		mips[mip].height = height;
-		mips[mip].depth = depth;
+		self->mips[mip].width = width;
+		self->mips[mip].height = height;
+		self->mips[mip].depth = depth;
 
 		offset += mip_size;
 
-		uint32_t next_w = width >> 1u;
-		uint32_t next_h = height >> 1u;
-		uint32_t next_d = depth >> 1u;
+		next_w = width >> 1u;
+		next_h = height >> 1u;
+		next_d = depth >> 1u;
 		width = next_w > 1u ? next_w : 1u;
 		height = next_h > 1u ? next_h : 1u;
 		depth = next_d > 1u ? next_d : 1u;
 	}
 
-	required_size = offset;
+	self->required_size = offset;
 }
 
-void TextureFormatLayout::set_1d(VkFormat format, uint32_t width, uint32_t array_layers, uint32_t mip_levels)
+void tfl_set_1d(struct TextureFormatLayout *self, VkFormat format, uint32_t width, uint32_t array_layers, uint32_t mip_levels)
 {
-	this->image_type = VK_IMAGE_TYPE_1D;
-	this->format = format;
-	this->array_layers = array_layers;
-	this->mip_levels = mip_levels;
+	self->image_type = VK_IMAGE_TYPE_1D;
+	self->format = format;
+	self->array_layers = array_layers;
+	self->mip_levels = mip_levels;
 
-	fill_mipinfo(width, 1, 1);
+	tfl_fill_mipinfo(self, width, 1, 1);
 }
 
-void TextureFormatLayout::set_2d(VkFormat format, uint32_t width, uint32_t height, uint32_t array_layers, uint32_t mip_levels)
+void tfl_set_2d(struct TextureFormatLayout *self, VkFormat format, uint32_t width, uint32_t height, uint32_t array_layers, uint32_t mip_levels)
 {
-	this->image_type = VK_IMAGE_TYPE_2D;
-	this->format = format;
-	this->array_layers = array_layers;
-	this->mip_levels = mip_levels;
+	self->image_type = VK_IMAGE_TYPE_2D;
+	self->format = format;
+	self->array_layers = array_layers;
+	self->mip_levels = mip_levels;
 
-	fill_mipinfo(width, height, 1);
+	tfl_fill_mipinfo(self, width, height, 1);
 }
 
-void TextureFormatLayout::set_3d(VkFormat format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels)
+void tfl_set_3d(struct TextureFormatLayout *self, VkFormat format, uint32_t width, uint32_t height, uint32_t depth, uint32_t mip_levels)
 {
-	this->image_type = VK_IMAGE_TYPE_3D;
-	this->format = format;
-	this->array_layers = 1;
-	this->mip_levels = mip_levels;
+	self->image_type = VK_IMAGE_TYPE_3D;
+	self->format = format;
+	self->array_layers = 1;
+	self->mip_levels = mip_levels;
 
-	fill_mipinfo(width, height, depth);
+	tfl_fill_mipinfo(self, width, height, depth);
 }
 
-void TextureFormatLayout::build_buffer_image_copies(VkBufferImageCopy *copies, unsigned &num_copies) const
+void tfl_build_buffer_image_copies(const struct TextureFormatLayout *self, VkBufferImageCopy *copies, unsigned *num_copies)
 {
-	assert(mip_levels <= 16);
-	num_copies = mip_levels;
-	for (unsigned level = 0; level < mip_levels; level++)
+	unsigned level;
+	assert(self->mip_levels <= 16);
+	*num_copies = self->mip_levels;
+	for (level = 0; level < self->mip_levels; level++)
 	{
-		const MipInfo &mip_info = mips[level];
+		const TextureFormatLayoutMipInfo *mip_info = &self->mips[level];
 
-		VkBufferImageCopy &blit = copies[level];
-		blit = {};
-		blit.bufferOffset = mip_info.offset;
-		blit.bufferRowLength = mip_info.row_length;
-		blit.bufferImageHeight = mip_info.image_height;
-		blit.imageSubresource.aspectMask = format_to_aspect_mask(format);
-		blit.imageSubresource.mipLevel = level;
-		blit.imageSubresource.baseArrayLayer = 0;
-		blit.imageSubresource.layerCount = array_layers;
-		blit.imageExtent.width = mip_info.width;
-		blit.imageExtent.height = mip_info.height;
-		blit.imageExtent.depth = mip_info.depth;
+		VkBufferImageCopy *blit = &copies[level];
+		memset(blit, 0, sizeof(*blit));
+		blit->bufferOffset = mip_info->offset;
+		blit->bufferRowLength = mip_info->row_length;
+		blit->bufferImageHeight = mip_info->image_height;
+		blit->imageSubresource.aspectMask = format_to_aspect_mask(self->format);
+		blit->imageSubresource.mipLevel = level;
+		blit->imageSubresource.baseArrayLayer = 0;
+		blit->imageSubresource.layerCount = self->array_layers;
+		blit->imageExtent.width = mip_info->width;
+		blit->imageExtent.height = mip_info->height;
+		blit->imageExtent.depth = mip_info->depth;
 	}
 }
 
@@ -18110,25 +18103,26 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		bool generate_mips = (info.misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
 		TextureFormatLayout layout;
+		tfl_init(&layout);
 
 		unsigned copy_levels;
 		if (generate_mips)
 			copy_levels = 1;
 		else if (info.levels == 0)
-			copy_levels = TextureFormatLayout::num_miplevels(info.width, info.height, info.depth);
+			copy_levels = tfl_num_miplevels(info.width, info.height, info.depth);
 		else
 			copy_levels = info.levels;
 
 		switch (info.type)
 		{
 			case VK_IMAGE_TYPE_1D:
-				layout.set_1d(info.format, info.width, info.layers, copy_levels);
+				tfl_set_1d(&layout, info.format, info.width, info.layers, copy_levels);
 				break;
 			case VK_IMAGE_TYPE_2D:
-				layout.set_2d(info.format, info.width, info.height, info.layers, copy_levels);
+				tfl_set_2d(&layout, info.format, info.width, info.height, info.layers, copy_levels);
 				break;
 			case VK_IMAGE_TYPE_3D:
-				layout.set_3d(info.format, info.width, info.height, info.depth, copy_levels);
+				tfl_set_3d(&layout, info.format, info.width, info.height, info.depth, copy_levels);
 				break;
 			default:
 				return {};
@@ -18136,7 +18130,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		BufferCreateInfo buffer_info = {};
 		buffer_info.domain = BufferDomain_Host;
-		buffer_info.size = layout.get_required_size();
+		buffer_info.size = tfl_get_required_size(&layout);
 		buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		result.buffer = create_buffer(buffer_info, NULL);
 		set_name(*bh_get(&result.buffer), "image-upload-staging-buffer");
@@ -18145,35 +18139,35 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		uint8_t *mapped = (uint8_t *)(map_host_buffer(*bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
 		unsigned index = 0;
 
-		layout.set_buffer(mapped, layout.get_required_size());
+		tfl_set_buffer(&layout, mapped, tfl_get_required_size(&layout));
 
 		for (unsigned level = 0; level < copy_levels; level++)
 		{
-			const TextureFormatLayout::MipInfo &mip_info = layout.get_mip_info(level);
-			uint32_t dst_height_stride = layout.get_layer_size(level);
-			size_t row_size = layout.get_row_size(level);
+			const TextureFormatLayoutMipInfo *mip_info = tfl_get_mip_info(&layout, level);
+			uint32_t dst_height_stride = tfl_get_layer_size(&layout, level);
+			size_t row_size = tfl_get_row_size(&layout, level);
 
 			for (unsigned layer = 0; layer < info.layers; layer++, index++)
 			{
 				uint32_t src_row_length =
-					initial[index].row_length ? initial[index].row_length : mip_info.row_length;
+					initial[index].row_length ? initial[index].row_length : mip_info->row_length;
 				uint32_t src_array_height =
-					initial[index].image_height ? initial[index].image_height : mip_info.image_height;
+					initial[index].image_height ? initial[index].image_height : mip_info->image_height;
 
-				uint32_t src_row_stride = layout.row_byte_stride(src_row_length);
-				uint32_t src_height_stride = layout.layer_byte_stride(src_array_height, src_row_stride);
+				uint32_t src_row_stride = tfl_row_byte_stride(&layout, src_row_length);
+				uint32_t src_height_stride = tfl_layer_byte_stride(&layout, src_array_height, src_row_stride);
 
-				uint8_t *dst = (uint8_t *)(layout.data(layer, level));
+				uint8_t *dst = (uint8_t *)(tfl_data(&layout, layer, level));
 				const uint8_t *src = (const uint8_t *)(initial[index].data);
 
-				for (uint32_t z = 0; z < mip_info.depth; z++)
-					for (uint32_t y = 0; y < mip_info.block_image_height; y++)
+				for (uint32_t z = 0; z < mip_info->depth; z++)
+					for (uint32_t y = 0; y < mip_info->block_image_height; y++)
 						memcpy(dst + z * dst_height_stride + y * row_size, src + z * src_height_stride + y * src_row_stride, row_size);
 			}
 		}
 
 		unmap_host_buffer(*bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT);
-		layout.build_buffer_image_copies(result.blits, result.num_blits);
+		tfl_build_buffer_image_copies(&layout, result.blits, &result.num_blits);
 		return result;
 	}
 
