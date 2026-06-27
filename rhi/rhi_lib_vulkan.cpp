@@ -5388,6 +5388,16 @@ private:
 	static_assert(VULKAN_NUM_DESCRIPTOR_SETS == 4, "Number of descriptor sets != 4.");
 
 	class CommandBuffer;
+	/* Formerly CommandBufferType (a nested enum). Hoisted to file scope so the
+	 * forthcoming class -> C struct conversion of CommandBuffer does not have to
+	 * carry a nested type. The Type_* enumerator names are already prefixed, so
+	 * there is no collision at file scope. */
+	enum CommandBufferType {
+		Type_Generic,
+		Type_AsyncGraphics,
+		Type_AsyncCompute,
+		Type_AsyncTransfer
+	};
 	struct CommandBufferDeleter
 	{
 		void operator()(CommandBuffer *cmd);
@@ -5411,13 +5421,6 @@ private:
 			{
 				counter_add_ref(&reference_count);
 			}
-
-			enum Type {
-				Type_Generic,
-				Type_AsyncGraphics,
-				Type_AsyncCompute,
-				Type_AsyncTransfer
-			};
 
 			~CommandBuffer()
 			{
@@ -5443,7 +5446,7 @@ private:
 					VkDeviceSize size);
 			void copy_buffer(const Buffer &dst, const Buffer &src)
 			{
-				VK_ASSERT(image_get_create_info(&dst).size == image_get_create_info(&src).size);
+				VK_ASSERT(buffer_get_create_info(&dst).size == buffer_get_create_info(&src).size);
 				copy_buffer(dst, 0, src, 0, buffer_get_create_info(&dst).size);
 			}
 
@@ -5635,7 +5638,7 @@ private:
 					}
 				}
 
-			inline Type get_command_buffer_type() const
+			inline CommandBufferType get_command_buffer_type() const
 			{
 				return type;
 			}
@@ -5644,11 +5647,11 @@ private:
 
 		private:
 			friend class Device;
-			CommandBuffer(Device *device, VkCommandBuffer cmd, Type type);
+			CommandBuffer(Device *device, VkCommandBuffer cmd, CommandBufferType type);
 
 			Device *device;
 			VkCommandBuffer cmd;
-			Type type;
+			CommandBufferType type;
 
 			const Framebuffer *framebuffer = NULL;
 			const RenderPass *actual_render_pass = NULL;
@@ -5863,10 +5866,10 @@ private:
 			{
 				flush_frame_nolock();
 			}
-			CommandBufferHandle request_command_buffer(CommandBuffer::Type type = CommandBuffer::Type_Generic);
+			CommandBufferHandle request_command_buffer(CommandBufferType type = Type_Generic);
 			void submit(CommandBufferHandle &cmd, Fence *fence = NULL,
 					unsigned semaphore_count = 0, Semaphore *semaphore = NULL);
-			CommandBuffer::Type get_physical_queue_type(CommandBuffer::Type queue_type) const;
+			CommandBufferType get_physical_queue_type(CommandBufferType queue_type) const;
 
 			// Request shaders and programs. These objects are owned by the Device.
 			Shader *request_shader(const uint32_t *code, size_t size);
@@ -6203,7 +6206,7 @@ private:
 				BufferBlockVec ubo;
 			} dma;
 
-			void submit_queue(CommandBuffer::Type type, VkFence *fence,
+			void submit_queue(CommandBufferType type, VkFence *fence,
 					unsigned semaphore_count = 0,
 					Semaphore *semaphore = NULL);
 
@@ -6246,20 +6249,20 @@ private:
 
 			SamplerHandle create_sampler(const SamplerCreateInfo &info, StockSampler sampler);
 
-			CommandPool &get_command_pool(CommandBuffer::Type type);
-			QueueData &get_queue_data(CommandBuffer::Type type);
-			CommandBufferHandleVec &get_queue_submissions(CommandBuffer::Type type);
+			CommandPool &get_command_pool(CommandBufferType type);
+			QueueData &get_queue_data(CommandBufferType type);
+			CommandBufferHandleVec &get_queue_submissions(CommandBufferType type);
 			void clear_wait_semaphores();
 			void submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
 
-			void flush_frame(CommandBuffer::Type type)
+			void flush_frame(CommandBufferType type)
 			{
-				if (type == CommandBuffer::Type_AsyncTransfer)
+				if (type == Type_AsyncTransfer)
 					sync_buffer_blocks();
 				submit_queue(type, NULL, 0, NULL);
 			}
 			void sync_buffer_blocks();
-			void submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
+			void submit_empty_inner(CommandBufferType type, VkFence *fence,
 					unsigned semaphore_count,
 					Semaphore *semaphore);
 
@@ -6280,10 +6283,10 @@ private:
 			void free_memory_nolock(const DeviceAllocation &alloc);
 
 			void flush_frame_nolock();
-			CommandBufferHandle request_command_buffer_nolock(CommandBuffer::Type type = CommandBuffer::Type_Generic);
+			CommandBufferHandle request_command_buffer_nolock(CommandBufferType type = Type_Generic);
 			void submit_nolock(CommandBufferHandle cmd, Fence *fence,
 					unsigned semaphore_count, Semaphore *semaphore);
-			void add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages,
+			void add_wait_semaphore_nolock(CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages,
 					bool flush);
 
 			void request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size);
@@ -14821,7 +14824,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		return { a.x + b.x, a.y + b.y, a.z + b.z };
 	}
 
-	CommandBuffer::CommandBuffer(Device *device, VkCommandBuffer cmd, Type type)
+	CommandBuffer::CommandBuffer(Device *device, VkCommandBuffer cmd, CommandBufferType type)
 		: device(device)
 		  , cmd(cmd)
 		  , type(type)
@@ -16660,7 +16663,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		self->handle_pool.deinit();
 	}
 
-	void Device::add_wait_semaphore_nolock(CommandBuffer::Type type, Semaphore semaphore, VkPipelineStageFlags stages,
+	void Device::add_wait_semaphore_nolock(CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages,
 			bool flush)
 	{
 		VK_ASSERT(stages != 0);
@@ -17018,24 +17021,24 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		submit_nolock(moved, fence, semaphore_count, semaphores);
 	}
 
-	CommandBuffer::Type Device::get_physical_queue_type(CommandBuffer::Type queue_type) const
+	CommandBufferType Device::get_physical_queue_type(CommandBufferType queue_type) const
 	{
-		if (queue_type != CommandBuffer::Type_AsyncGraphics)
+		if (queue_type != Type_AsyncGraphics)
 		{
 			return queue_type;
 		}
 		else
 		{
 			if (graphics_queue_family_index == compute_queue_family_index && graphics_queue != compute_queue)
-				return CommandBuffer::Type_AsyncCompute;
+				return Type_AsyncCompute;
 			else
-				return CommandBuffer::Type_Generic;
+				return Type_Generic;
 		}
 	}
 
 	void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
 	{
-		CommandBuffer::Type type = cbh_get(&cmd)->get_command_buffer_type();
+		CommandBufferType type = cbh_get(&cmd)->get_command_buffer_type();
 		CommandPool &pool = get_command_pool(type);
 		CommandBufferHandleVec &submissions = get_queue_submissions(type);
 
@@ -17058,7 +17061,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	}
 
 	POD_VEC_DECLARE(VkFlagsVec, VkFlags);
-	void Device::submit_empty_inner(CommandBuffer::Type type, VkFence *fence,
+	void Device::submit_empty_inner(CommandBufferType type, VkFence *fence,
 			unsigned semaphore_count, Semaphore *semaphores)
 	{
 		QueueData &data = get_queue_data(type);
@@ -17105,13 +17108,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		switch (type)
 		{
 			default:
-			case CommandBuffer::Type_Generic:
+			case Type_Generic:
 				queue = graphics_queue;
 				break;
-			case CommandBuffer::Type_AsyncCompute:
+			case Type_AsyncCompute:
 				queue = compute_queue;
 				break;
-			case CommandBuffer::Type_AsyncTransfer:
+			case Type_AsyncTransfer:
 				queue = transfer_queue;
 				break;
 		}
@@ -17185,7 +17188,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				{
 					Semaphore sem; sem.data = NULL;
 					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
-					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, compute_stages, flush);
+					add_wait_semaphore_nolock(Type_AsyncCompute, sem, compute_stages, flush);
 					sem_reset(&sem);
 				}
 				else
@@ -17200,7 +17203,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				{
 					Semaphore sem; sem.data = NULL;
 					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
-					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, graphics_stages, flush);
+					add_wait_semaphore_nolock(Type_Generic, sem, graphics_stages, flush);
 					sem_reset(&sem);
 				}
 				else
@@ -17214,8 +17217,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					semaphores[0].data = NULL;
 					semaphores[1].data = NULL;
 					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 2, semaphores); }
-					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, semaphores[0], graphics_stages, flush);
-					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, semaphores[1], compute_stages, flush);
+					add_wait_semaphore_nolock(Type_Generic, semaphores[0], graphics_stages, flush);
+					add_wait_semaphore_nolock(Type_AsyncCompute, semaphores[1], compute_stages, flush);
 					sem_reset(&semaphores[0]);
 					sem_reset(&semaphores[1]);
 				}
@@ -17223,14 +17226,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				{
 					Semaphore sem; sem.data = NULL;
 					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
-					add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, graphics_stages, flush);
+					add_wait_semaphore_nolock(Type_Generic, sem, graphics_stages, flush);
 					sem_reset(&sem);
 				}
 				else if (compute_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
 					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
-					add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, compute_stages, flush);
+					add_wait_semaphore_nolock(Type_AsyncCompute, sem, compute_stages, flush);
 					sem_reset(&sem);
 				}
 				else
@@ -17241,14 +17244,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	POD_VEC_DECLARE(VkSubmitInfoVec, VkSubmitInfo);
 
-	void Device::submit_queue(CommandBuffer::Type type, VkFence *fence,
+	void Device::submit_queue(CommandBufferType type, VkFence *fence,
 			unsigned semaphore_count, Semaphore *semaphores)
 	{
 		type = get_physical_queue_type(type);
 
 		// Always check if we need to flush pending transfers.
-		if (type != CommandBuffer::Type_AsyncTransfer)
-			flush_frame(CommandBuffer::Type_AsyncTransfer);
+		if (type != Type_AsyncTransfer)
+			flush_frame(Type_AsyncTransfer);
 
 		QueueData &data = get_queue_data(type);
 		CommandBufferHandleVec &submissions = get_queue_submissions(type);
@@ -17336,13 +17339,13 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		switch (type)
 		{
 			default:
-			case CommandBuffer::Type_Generic:
+			case Type_Generic:
 				queue = graphics_queue;
 				break;
-			case CommandBuffer::Type_AsyncCompute:
+			case Type_AsyncCompute:
 				queue = compute_queue;
 				break;
-			case CommandBuffer::Type_AsyncTransfer:
+			case Type_AsyncTransfer:
 				queue = transfer_queue;
 				break;
 		}
@@ -17389,7 +17392,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		VkBufferUsageFlags usage = 0;
 
-		CommandBufferHandle cmd = request_command_buffer_nolock(CommandBuffer::Type_AsyncTransfer);
+		CommandBufferHandle cmd = request_command_buffer_nolock(Type_AsyncTransfer);
 
 		cbh_get(&cmd)->begin_region("buffer-block-sync");
 
@@ -17425,7 +17428,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (transfer.need_fence || !frame().transfer_submissions.empty())
 		{
 			fence = VK_NULL_HANDLE;
-			submit_queue(CommandBuffer::Type_AsyncTransfer, &fence, 0, NULL);
+			submit_queue(Type_AsyncTransfer, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
 				FenceVec_push(&frame().recycle_fences, &fence);
 			transfer.need_fence = false;
@@ -17434,7 +17437,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (graphics.need_fence || !frame().graphics_submissions.empty())
 		{
 			fence = VK_NULL_HANDLE;
-			submit_queue(CommandBuffer::Type_Generic, &fence, 0, NULL);
+			submit_queue(Type_Generic, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
 				FenceVec_push(&frame().recycle_fences, &fence);
 			graphics.need_fence = false;
@@ -17443,7 +17446,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (compute.need_fence || !frame().compute_submissions.empty())
 		{
 			fence = VK_NULL_HANDLE;
-			submit_queue(CommandBuffer::Type_AsyncCompute, &fence, 0, NULL);
+			submit_queue(Type_AsyncCompute, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
 				FenceVec_push(&frame().recycle_fences, &fence);
 			compute.need_fence = false;
@@ -17452,59 +17455,59 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void Device::flush_frame_nolock()
 	{
-		flush_frame(CommandBuffer::Type_AsyncTransfer);
-		flush_frame(CommandBuffer::Type_Generic);
-		flush_frame(CommandBuffer::Type_AsyncCompute);
+		flush_frame(Type_AsyncTransfer);
+		flush_frame(Type_Generic);
+		flush_frame(Type_AsyncCompute);
 	}
 
-	Device::QueueData &Device::get_queue_data(CommandBuffer::Type type)
+	Device::QueueData &Device::get_queue_data(CommandBufferType type)
 	{
 		switch (get_physical_queue_type(type))
 		{
 			default:
-			case CommandBuffer::Type_Generic:
+			case Type_Generic:
 				return graphics;
-			case CommandBuffer::Type_AsyncCompute:
+			case Type_AsyncCompute:
 				return compute;
-			case CommandBuffer::Type_AsyncTransfer:
+			case Type_AsyncTransfer:
 				return transfer;
 		}
 	}
 
-	CommandPool &Device::get_command_pool(CommandBuffer::Type type)
+	CommandPool &Device::get_command_pool(CommandBufferType type)
 	{
 		switch (get_physical_queue_type(type))
 		{
 			default:
-			case CommandBuffer::Type_Generic:
+			case Type_Generic:
 				return frame().graphics_cmd_pool;
-			case CommandBuffer::Type_AsyncCompute:
+			case Type_AsyncCompute:
 				return frame().compute_cmd_pool;
-			case CommandBuffer::Type_AsyncTransfer:
+			case Type_AsyncTransfer:
 				return frame().transfer_cmd_pool;
 		}
 	}
 
-	Device::CommandBufferHandleVec &Device::get_queue_submissions(CommandBuffer::Type type)
+	Device::CommandBufferHandleVec &Device::get_queue_submissions(CommandBufferType type)
 	{
 		switch (get_physical_queue_type(type))
 		{
 			default:
-			case CommandBuffer::Type_Generic:
+			case Type_Generic:
 				return frame().graphics_submissions;
-			case CommandBuffer::Type_AsyncCompute:
+			case Type_AsyncCompute:
 				return frame().compute_submissions;
-			case CommandBuffer::Type_AsyncTransfer:
+			case Type_AsyncTransfer:
 				return frame().transfer_submissions;
 		}
 	}
 
-	CommandBufferHandle Device::request_command_buffer(CommandBuffer::Type type)
+	CommandBufferHandle Device::request_command_buffer(CommandBufferType type)
 	{
 		return request_command_buffer_nolock(type);
 	}
 
-	CommandBufferHandle Device::request_command_buffer_nolock(CommandBuffer::Type type)
+	CommandBufferHandle Device::request_command_buffer_nolock(CommandBufferType type)
 	{
 		VkCommandBuffer cmd = get_command_pool(type).request_command_buffer();
 
@@ -18392,12 +18395,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			// For concurrent queue mode, we just need to inject a semaphore.
 			// For non-concurrent queue mode, we will have to inject ownership transfer barrier if the queue families do not match.
 
-			CommandBufferHandle graphics_cmd = request_command_buffer(CommandBuffer::Type_Generic);
+			CommandBufferHandle graphics_cmd = request_command_buffer(Type_Generic);
 			CommandBufferHandle transfer_cmd; transfer_cmd.data = NULL;
 
 			// Don't split the upload into multiple command buffers unless we have to.
 			if (transfer_queue != graphics_queue)
-				transfer_cmd = request_command_buffer(CommandBuffer::Type_AsyncTransfer);
+				transfer_cmd = request_command_buffer(Type_AsyncTransfer);
 			else
 				transfer_cmd = graphics_cmd;
 
@@ -18462,7 +18465,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 				Semaphore sem; sem.data = NULL;
 				submit(transfer_cmd, NULL, 1, &sem);
-				add_wait_semaphore_nolock(CommandBuffer::Type_Generic, sem, dst_stages, true);
+				add_wait_semaphore_nolock(Type_Generic, sem, dst_stages, true);
 				sem_reset(&sem);
 			}
 
@@ -18486,7 +18489,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 						image_get_access_flags(ih_get(&handle)) & image_layout_to_possible_access(create_info.initial_layout));
 			}
 
-			bool share_async_graphics = get_physical_queue_type(CommandBuffer::Type_AsyncGraphics) == CommandBuffer::Type_AsyncCompute;
+			bool share_async_graphics = get_physical_queue_type(Type_AsyncGraphics) == Type_AsyncCompute;
 
 			// Add semaphore if the compute queue can be used for async graphics as well.
 			if (share_async_graphics)
@@ -18497,7 +18500,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				VkPipelineStageFlags dst_stages = image_get_stage_flags(ih_get(&handle));
 				if (graphics_queue_family_index != compute_queue_family_index)
 					dst_stages &= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
-				add_wait_semaphore_nolock(CommandBuffer::Type_AsyncCompute, sem, dst_stages, true);
+				add_wait_semaphore_nolock(Type_AsyncCompute, sem, dst_stages, true);
 				sem_reset(&sem);
 			}
 			else
@@ -18506,7 +18509,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		else if (create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
 		{
 			VK_ASSERT(create_info.domain != ImageDomain_Transient);
-			CommandBufferHandle cmd = request_command_buffer(CommandBuffer::Type_Generic);
+			CommandBufferHandle cmd = request_command_buffer(Type_Generic);
 			cbh_get(&cmd)->image_barrier(*ih_get(&handle), info.initialLayout, create_info.initial_layout,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, image_get_stage_flags(ih_get(&handle)),
 					image_get_access_flags(ih_get(&handle)) &
@@ -18622,7 +18625,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			BufferHandle staging_buffer = create_buffer(staging_info, initial);
 			set_name(*bh_get(&staging_buffer), "buffer-upload-staging-buffer");
 
-			cmd = request_command_buffer(CommandBuffer::Type_AsyncTransfer);
+			cmd = request_command_buffer(Type_AsyncTransfer);
 			cbh_get(&cmd)->begin_region("copy-buffer-staging");
 			cbh_get(&cmd)->copy_buffer(*bh_get(&handle), *bh_get(&staging_buffer));
 			cbh_get(&cmd)->end_region();
