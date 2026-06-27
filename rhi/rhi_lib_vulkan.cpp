@@ -5833,6 +5833,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 			friend void per_frame_init(struct Device::PerFrame *self, Device *device);
 			friend void per_frame_fini(struct Device::PerFrame *self);
 			friend void per_frame_begin(struct Device::PerFrame *self);
+			friend struct Device::PerFrame *device_frame(Device *self);
 			/* Owning array of PerFrame* (the frame-context ring). Replaces
 			 * std::vector<std::unique_ptr<PerFrame>>: the container owns each
 			 * heap-allocated PerFrame and deletes it on clear()/destruction, so
@@ -5874,19 +5875,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 					unsigned semaphore_count = 0,
 					Semaphore *semaphore = NULL);
 
-			PerFrame &frame()
-			{
-				VK_ASSERT(frame_context_index < per_frame.count);
-				VK_ASSERT(per_frame.items[frame_context_index]);
-				return *per_frame.items[frame_context_index];
-			}
 
-			const PerFrame &frame() const
-			{
-				VK_ASSERT(frame_context_index < per_frame.count);
-				VK_ASSERT(per_frame.items[frame_context_index]);
-				return *per_frame.items[frame_context_index];
-			}
 
 			unsigned frame_context_index = 0;
 			uint32_t graphics_queue_family_index = 0;
@@ -16644,6 +16633,16 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	 * that the members' constructors and NSDMIs would, so it is correct when called
 	 * on malloc'd memory where no constructor has run. No member allocates at this
 	 * point, so the established state is simply "empty". */
+	/* device_frame: was the inline Device::frame() accessor; returns the current
+	 * frame context (the ring slot selected by frame_context_index). Returns a pointer
+	 * now instead of a reference. */
+	struct Device::PerFrame *device_frame(Device *self)
+	{
+		VK_ASSERT(self->frame_context_index < self->per_frame.count);
+		VK_ASSERT(self->per_frame.items[self->frame_context_index]);
+		return self->per_frame.items[self->frame_context_index];
+	}
+
 	void Device::device_init(Device *self)
 	{
 		/* Scalar handles / ids (the VK_NULL_HANDLE and 0 NSDMIs). */
@@ -17092,12 +17091,12 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void Device::request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size)
 	{
-		request_block(*this, &block, size, &managers.vbo, &dma.vbo, &frame().vbo_blocks);
+		request_block(*this, &block, size, &managers.vbo, &dma.vbo, &device_frame(this)->vbo_blocks);
 	}
 
 	void Device::request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size)
 	{
-		request_block(*this, &block, size, &managers.ubo, &dma.ubo, &frame().ubo_blocks);
+		request_block(*this, &block, size, &managers.ubo, &dma.ubo, &device_frame(this)->ubo_blocks);
 	}
 
 	void Device::submit(CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
@@ -17170,7 +17169,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{
 			Semaphore *semaphore = sem_handle_vec_at(&data.wait_semaphores, _wi);
 			VkSemaphore wait = semaphoreholder_consume(sem_get(semaphore));
-			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
+			SemaphoreVec_push(&device_frame(this)->recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits, &wait);
 		} }
 		VkPipelineStageVec_clear(&data.wait_stages);
@@ -17226,7 +17225,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				/* See submit_queue(): never enqueue a fence that was handed to a
 				 * failed submit - it will never signal and would hang the frame's
 				 * vkWaitForFences. Recycle it and return a null fence instead. */
-				FenceVec_push(&frame().wait_fences, &cleared_fence);
+				FenceVec_push(&device_frame(this)->wait_fences, &cleared_fence);
 				*fence = cleared_fence;
 			}
 			else
@@ -17374,7 +17373,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{
 			Semaphore *semaphore = sem_handle_vec_at(&data.wait_semaphores, _wi);
 			VkSemaphore wait = semaphoreholder_consume(sem_get(semaphore));
-			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
+			SemaphoreVec_push(&device_frame(this)->recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits[0], &wait);
 		} }
 		VkPipelineStageVec_clear(&data.wait_stages);
@@ -17462,7 +17461,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				 * enqueuing it for the next PerFrame::begin() would wedge that frame
 				 * in vkWaitForFences(UINT64_MAX) forever. Recycle it instead and hand
 				 * the caller a null fence. */
-				FenceVec_push(&frame().wait_fences, &cleared_fence);
+				FenceVec_push(&device_frame(this)->wait_fences, &cleared_fence);
 				*fence = cleared_fence;
 			}
 			else
@@ -17521,30 +17520,30 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		// Make sure we have a fence which covers all submissions in the frame.
 		VkFence fence;
 
-		if (transfer.need_fence || !cbhvec_empty(&frame().transfer_submissions))
+		if (transfer.need_fence || !cbhvec_empty(&device_frame(this)->transfer_submissions))
 		{
 			fence = VK_NULL_HANDLE;
 			submit_queue(Type_AsyncTransfer, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				FenceVec_push(&frame().recycle_fences, &fence);
+				FenceVec_push(&device_frame(this)->recycle_fences, &fence);
 			transfer.need_fence = false;
 		}
 
-		if (graphics.need_fence || !cbhvec_empty(&frame().graphics_submissions))
+		if (graphics.need_fence || !cbhvec_empty(&device_frame(this)->graphics_submissions))
 		{
 			fence = VK_NULL_HANDLE;
 			submit_queue(Type_Generic, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				FenceVec_push(&frame().recycle_fences, &fence);
+				FenceVec_push(&device_frame(this)->recycle_fences, &fence);
 			graphics.need_fence = false;
 		}
 
-		if (compute.need_fence || !cbhvec_empty(&frame().compute_submissions))
+		if (compute.need_fence || !cbhvec_empty(&device_frame(this)->compute_submissions))
 		{
 			fence = VK_NULL_HANDLE;
 			submit_queue(Type_AsyncCompute, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				FenceVec_push(&frame().recycle_fences, &fence);
+				FenceVec_push(&device_frame(this)->recycle_fences, &fence);
 			compute.need_fence = false;
 		}
 	}
@@ -17576,11 +17575,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{
 			default:
 			case Type_Generic:
-				return &frame().graphics_cmd_pool;
+				return &device_frame(this)->graphics_cmd_pool;
 			case Type_AsyncCompute:
-				return &frame().compute_cmd_pool;
+				return &device_frame(this)->compute_cmd_pool;
 			case Type_AsyncTransfer:
-				return &frame().transfer_cmd_pool;
+				return &device_frame(this)->transfer_cmd_pool;
 		}
 	}
 
@@ -17590,11 +17589,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{
 			default:
 			case Type_Generic:
-				return &frame().graphics_submissions;
+				return &device_frame(this)->graphics_submissions;
 			case Type_AsyncCompute:
-				return &frame().compute_submissions;
+				return &device_frame(this)->compute_submissions;
 			case Type_AsyncTransfer:
-				return &frame().transfer_submissions;
+				return &device_frame(this)->transfer_submissions;
 		}
 	}
 
@@ -17662,7 +17661,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void Device::free_memory_nolock(const DeviceAllocation &alloc)
 	{
-		DeviceAllocationVec_push(&frame().allocations, &alloc);
+		DeviceAllocationVec_push(&device_frame(this)->allocations, &alloc);
 	}
 
 #ifdef VULKAN_DEBUG
@@ -17690,47 +17689,47 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 #endif
 
 	void device_reset_fence(Device *self, VkFence fence){
-		FenceVec_push(&self->frame().recycle_fences, &fence);
+		FenceVec_push(&device_frame(self)->recycle_fences, &fence);
 	}
 
 	void device_destroy_pipeline_nolock(Device *self, VkPipeline pipeline){
-		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_pipelines, pipeline);
-		VkPipelineVec_push(&self->frame().destroyed_pipelines, &pipeline);
+		VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_pipelines, pipeline);
+		VkPipelineVec_push(&device_frame(self)->destroyed_pipelines, &pipeline);
 	}
 
 	void device_destroy_image_view_nolock(Device *self, VkImageView view){
-		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_image_views, view);
-		RenderTargetViewVec_push(&self->frame().destroyed_image_views, &view);
+		VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_image_views, view);
+		RenderTargetViewVec_push(&device_frame(self)->destroyed_image_views, &view);
 	}
 
 	void device_destroy_buffer_view_nolock(Device *self, VkBufferView view){
-		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_buffer_views, view);
-		VkBufferViewVec_push(&self->frame().destroyed_buffer_views, &view);
+		VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_buffer_views, view);
+		VkBufferViewVec_push(&device_frame(self)->destroyed_buffer_views, &view);
 	}
 
 	void device_destroy_semaphore_nolock(Device *self, VkSemaphore semaphore){
-		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_semaphores, semaphore);
-		SemaphoreVec_push(&self->frame().destroyed_semaphores, &semaphore);
+		VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_semaphores, semaphore);
+		SemaphoreVec_push(&device_frame(self)->destroyed_semaphores, &semaphore);
 	}
 
 	void device_destroy_image_nolock(Device *self, VkImage image){
-		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_images, image);
-		VkImageVec_push(&self->frame().destroyed_images, &image);
+		VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_images, image);
+		VkImageVec_push(&device_frame(self)->destroyed_images, &image);
 	}
 
 	void device_destroy_buffer_nolock(Device *self, VkBuffer buffer){
-		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_buffers, buffer);
-		VkBufferVec_push(&self->frame().destroyed_buffers, &buffer);
+		VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_buffers, buffer);
+		VkBufferVec_push(&device_frame(self)->destroyed_buffers, &buffer);
 	}
 
 	void device_destroy_sampler_nolock(Device *self, VkSampler sampler){
-		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_samplers, sampler);
-		VkSamplerVec_push(&self->frame().destroyed_samplers, &sampler);
+		VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_samplers, sampler);
+		VkSamplerVec_push(&device_frame(self)->destroyed_samplers, &sampler);
 	}
 
 	void device_destroy_framebuffer_nolock(Device *self, VkFramebuffer framebuffer){
-		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_framebuffers, framebuffer);
-		VkFramebufferVec_push(&self->frame().destroyed_framebuffers, &framebuffer);
+		VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_framebuffers, framebuffer);
+		VkFramebufferVec_push(&device_frame(self)->destroyed_framebuffers, &framebuffer);
 	}
 
 	void Device::clear_wait_semaphores()
@@ -17807,7 +17806,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		if (frame_context_index >= (unsigned)per_frame.count)
 			frame_context_index = 0;
 
-		per_frame_begin(&frame());
+		per_frame_begin(device_frame(this));
 	}
 
 	void per_frame_begin(struct Device::PerFrame *self)
