@@ -6374,47 +6374,38 @@ extern retro_log_printf_t log_cb;
 		}
 	};
 
+	/* SRect: plain C struct (was a value type with ctors / accessors / operator==).
+	 * The validating 4-arg constructor becomes make_srect; the zero-init default
+	 * constructor becomes the brace-initialiser { 0, 0, 0, 0 } (a placeholder slot
+	 * to be overwritten before use). Accessors left/right/top/bottom and the
+	 * comparison become srect_* free functions. */
 	struct SRect {
 		int x;
 		int y;
 		int width;
 		int height;
-		// Default-constructed SRect zero-initializes all fields. The result is in
-		// an "invalid" state by the 4-arg constructor's invariant (width == 0 and
-		// height == 0 would fail its width > 0 / height > 0 check) and is intended
-		// only as a placeholder — array slot or struct field — to be overwritten
-		// before being read. The 4-arg constructor below is the validated path;
-		// use it for any SRect that is meant to be immediately usable.
-		SRect() : x(0), y(0), width(0), height(0) {}
-		SRect(int x, int y, int width, int height):
-			x(x), y(y), width(width), height(height) {
-				if (width <= 0 || height <= 0) {
-					printf("Illegally sized SRect: %d, %d\n", width, height);
-					exit(1);
-				}
-			}
-		inline int left() {
-			return x;
-		}
-		inline int right() {
-			return x + width;
-		}
-		inline int top() {
-			return y;
-		}
-		inline int bottom() {
-			return y + height;
-		}
-
-		inline bool operator==(const SRect &other) const
-		{
-			return x == other.x && y == other.y && width == other.width && height == other.height;
-		}
-		inline bool operator!=(const SRect &other) const
-		{
-			return !(*this == other);
-		}
 	};
+
+	/* Validated SRect builder (was the 4-arg constructor). width/height must be
+	 * positive; a zero/negative size is a hard error, matching the old ctor. */
+	static inline struct SRect make_srect(int x, int y, int width, int height)
+	{
+		struct SRect r;
+		if (width <= 0 || height <= 0) {
+			printf("Illegally sized SRect: %d, %d\n", width, height);
+			exit(1);
+		}
+		r.x = x; r.y = y; r.width = width; r.height = height;
+		return r;
+	}
+	static inline int srect_left(const struct SRect *s)   { return s->x; }
+	static inline int srect_right(const struct SRect *s)  { return s->x + s->width; }
+	static inline int srect_top(const struct SRect *s)    { return s->y; }
+	static inline int srect_bottom(const struct SRect *s) { return s->y + s->height; }
+	static inline bool srect_eq(const struct SRect *a, const struct SRect *b)
+	{
+		return a->x == b->x && a->y == b->y && a->width == b->width && a->height == b->height;
+	}
 
 	struct HdTexture {
 		SRect vram_rect;
@@ -6926,27 +6917,27 @@ void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
 	 * texture_rect_retain / texture_rect_release. Transient TextureRect values
 	 * (subTexture results, clip pairs, scratch arrays) are borrowing and need no
 	 * ref ops. */
+	/* TextureRect: plain C struct (was a value type with texture_subrect() /
+	 * operator== / operator!=). The accessor becomes texture_rect_subrect, the
+	 * comparison texture_rect_eq; operator!= was unused and is dropped. */
 	struct TextureRect {
 		TextureUpload *upload;
 		// the offset into the original upload rect (offset_x + vram_rect.width <= upload->width)
 		int offset_x;
 		int offset_y;
 		SRect vram_rect;
-
-		// in vram size (not hd), local to the uploaded data, different hd textures for different palettes could have different sizes anyway
-		SRect texture_subrect() const {
-			return SRect(offset_x, offset_y, vram_rect.width, vram_rect.height);
-		}
-
-		inline bool operator==(const TextureRect &other) const
-		{
-			return upload == other.upload && offset_x == other.offset_x && offset_y == other.offset_y && vram_rect == other.vram_rect;
-		}
-		inline bool operator!=(const TextureRect &other) const
-		{
-			return !(*this == other);
-		}
 	};
+
+	// in vram size (not hd), local to the uploaded data, different hd textures for
+	// different palettes could have different sizes anyway
+	static inline struct SRect texture_rect_subrect(const struct TextureRect *t)
+	{
+		return make_srect(t->offset_x, t->offset_y, t->vram_rect.width, t->vram_rect.height);
+	}
+	static inline bool texture_rect_eq(const struct TextureRect *a, const struct TextureRect *b)
+	{
+		return a->upload == b->upload && a->offset_x == b->offset_x && a->offset_y == b->offset_y && srect_eq(&a->vram_rect, &b->vram_rect);
+	}
 
 	/* Build a TextureRect (borrowing - does not take a reference). */
 TextureRect make_texture_rect(TextureUpload *upload, int offset_x, int offset_y, SRect vram_rect)
@@ -7118,7 +7109,7 @@ void enduring_arr_free(EnduringRectArr *v) {
 		int i;
 		if (a->v.count != b->v.count) return false;
 		for (i = 0; i < a->v.count; i++)
-			if (!(a->v.items[i] == b->v.items[i])) return false;
+			if (!texture_rect_eq(&a->v.items[i], &b->v.items[i])) return false;
 		return true;
 	}
 
@@ -20149,7 +20140,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 	}
 
 SRect toSRect(Rect rect) {
-		return SRect(rect.x, rect.y, rect.width, rect.height);
+		return make_srect(rect.x, rect.y, rect.width, rect.height);
 	}
 Rect fromSRect(SRect rect) {
 		return Rect(rect.x, rect.y, rect.width, rect.height);
@@ -20209,7 +20200,7 @@ Rect fromSRect(SRect rect) {
 			// Some games do this, apparently.
 			return;
 		}
-		rect_tracker_clear(&self->tracker, SRect(rect.x, rect.y, rect.width, rect.height));
+		rect_tracker_clear(&self->tracker, make_srect(rect.x, rect.y, rect.width, rect.height));
 		fused_pages_mark_dead(&self->fused_pages, rect);
 
 		texture_tracker_clear_palette_cache(self, rect);
@@ -20234,7 +20225,7 @@ Rect fromSRect(SRect rect) {
 	}
 
 	void texture_tracker_blit(struct TextureTracker *self, Rect dst, Rect src) {
-		rect_tracker_blit(&self->tracker, SRect(dst.x, dst.y, dst.width, dst.height), SRect(src.x, src.y, src.width, src.height));
+		rect_tracker_blit(&self->tracker, make_srect(dst.x, dst.y, dst.width, dst.height), make_srect(src.x, src.y, src.width, src.height));
 		fused_pages_mark_dirty(&self->fused_pages, dst);
 		fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self->uploader);
 		texture_tracker_clear_palette_cache(self, dst);
@@ -20265,8 +20256,8 @@ Rect fromSRect(SRect rect) {
 	struct TextureRectResult { TextureRect rect; bool valid; };
 
 	SRectResult intersect(SRect a, SRect b) {
-		int al     = a.left(),   ar = a.right(),  at = a.top(), ab = a.bottom();
-		int bl     = b.left(),   br = b.right(),  bt = b.top(), bb = b.bottom();
+		int al     = srect_left(&a),   ar = srect_right(&a),  at = srect_top(&a), ab = srect_bottom(&a);
+		int bl     = srect_left(&b),   br = srect_right(&b),  bt = srect_top(&b), bb = srect_bottom(&b);
 		int left   = (al > bl) ? al : bl;
 		int right  = (ar < br) ? ar : br;
 		int top    = (at > bt) ? at : bt;
@@ -20274,15 +20265,15 @@ Rect fromSRect(SRect rect) {
 		int width  = right - left;
 		int height = bottom - top;
 		if (width <= 0 || height <= 0)
-		{ SRectResult r = { SRect(0, 0, 1, 1), false }; return r; }
-		{ SRectResult r = { SRect(left, top, width, height), true }; return r; }
+		{ SRectResult r = { make_srect(0, 0, 1, 1), false }; return r; }
+		{ SRectResult r = { make_srect(left, top, width, height), true }; return r; }
 	}
 
 	TextureRect subTexture(TextureRect original, SRect sub_vram_rect) {
 		return make_texture_rect(
 				original.upload,
-				original.offset_x + sub_vram_rect.left() - original.vram_rect.left(),
-				original.offset_y + sub_vram_rect.top() - original.vram_rect.top(),
+				original.offset_x + srect_left(&sub_vram_rect) - srect_left(&original.vram_rect),
+				original.offset_y + srect_top(&sub_vram_rect) - srect_top(&original.vram_rect),
 				sub_vram_rect
 				);
 	}
@@ -20293,7 +20284,7 @@ Rect fromSRect(SRect rect) {
 			TextureRectResult r = { subTexture(t, intersection.rect), true };
 			return r;
 		}
-		TextureRectResult r = { make_texture_rect(NULL, 0, 0, SRect(0, 0, 1, 1)), false };
+		TextureRectResult r = { make_texture_rect(NULL, 0, 0, make_srect(0, 0, 1, 1)), false };
 		return r;
 	}
 
@@ -20743,7 +20734,7 @@ Rect fromSRect(SRect rect) {
 			ImageHandle image = ih_make(iter->image);
 			int scaleX = image_get_width(ih_get(&image), 0) / upload.width;
 			int scaleY = image_get_height(ih_get(&image), 0) / upload.height;
-			SRect texture_subrect = tex->texture_subrect();
+			SRect texture_subrect = texture_rect_subrect(tex);
 			return {
 				tex->vram_rect,
 				{
@@ -21016,15 +21007,15 @@ bool is_power_of_two(int n) {
 
 	bool intersects(SRect a, SRect b) {
 		return !(
-				a.left() >= b.right() ||
-				b.left() >= a.right() ||
-				a.top() >= b.bottom() ||
-				b.top() >= a.bottom()
+				srect_left(&a) >= srect_right(&b) ||
+				srect_left(&b) >= srect_right(&a) ||
+				srect_top(&a) >= srect_bottom(&b) ||
+				srect_top(&b) >= srect_bottom(&a)
 			);
 	}
 
 	SRect bounds(int left, int right, int top, int bottom) {
-		return SRect(left, top, right - left, bottom - top);
+		return make_srect(left, top, right - left, bottom - top);
 	}
 
 	static void split(SRect original, SRect remove, SRect *results, unsigned &count)
@@ -21039,42 +21030,42 @@ bool is_power_of_two(int n) {
 		SRect intersection = intersectionResult.rect;
 
 		// Top rect
-		if (intersection.top() > original.top()) {
+		if (srect_top(&intersection) > srect_top(&original)) {
 			results[count++] = bounds(
-					original.left(),
-					original.right(),
-					original.top(),
-					intersection.top()
+					srect_left(&original),
+					srect_right(&original),
+					srect_top(&original),
+					srect_top(&intersection)
 					);
 		}
 
 		// Bottom rect
-		if (intersection.bottom() < original.bottom()) {
+		if (srect_bottom(&intersection) < srect_bottom(&original)) {
 			results[count++] = bounds(
-					original.left(),
-					original.right(),
-					intersection.bottom(),
-					original.bottom()
+					srect_left(&original),
+					srect_right(&original),
+					srect_bottom(&intersection),
+					srect_bottom(&original)
 					);
 		}
 
 		// Left rect
-		if (intersection.left() > original.left()) {
+		if (srect_left(&intersection) > srect_left(&original)) {
 			results[count++] = bounds(
-					original.left(),
-					intersection.left(),
-					intersection.top(),
-					intersection.bottom()
+					srect_left(&original),
+					srect_left(&intersection),
+					srect_top(&intersection),
+					srect_bottom(&intersection)
 					);
 		}
 
 		// Right rect
-		if (intersection.right() < original.right()) {
+		if (srect_right(&intersection) < srect_right(&original)) {
 			results[count++] = bounds(
-					intersection.right(),
-					original.right(),
-					intersection.top(),
-					intersection.bottom()
+					srect_right(&intersection),
+					srect_right(&original),
+					srect_top(&intersection),
+					srect_bottom(&intersection)
 					);
 		}
 	}
@@ -21086,7 +21077,7 @@ bool is_power_of_two(int n) {
 	}
 
 	SRect moved(SRect rect, int dx, int dy) {
-		return SRect(rect.x + dx, rect.y + dy, rect.width, rect.height);
+		return make_srect(rect.x + dx, rect.y + dy, rect.width, rect.height);
 	}
 
 	void rect_tracker_blit(struct RectTracker *self, SRect dst, SRect src) {
@@ -21161,7 +21152,7 @@ bool is_power_of_two(int n) {
 				splits_count = 0;
 				split(old->vram_rect, *rect, splits, splits_count);
 				// The rect didn't split, do nothing
-				if (splits_count == 1 && splits[0] == old->vram_rect) { }
+				if (splits_count == 1 && srect_eq(&splits[0], &old->vram_rect)) { }
 				else
 				{
 					// The rect split, mark this texture as dead and push its splits to be added
@@ -21220,10 +21211,10 @@ int clamp(int x, int low, int high)
 
 	CellBounds cellBounds(SRect vram) {
 		return CellBounds({
-				clamp(vram.left() / LOOKUP_CELL_WIDTH, 0, LOOKUP_GRID_COLUMNS),
-				clamp(ceil(vram.right() / float(LOOKUP_CELL_WIDTH)), 0, LOOKUP_GRID_COLUMNS),
-				clamp(vram.top() / LOOKUP_CELL_HEIGHT, 0, LOOKUP_GRID_ROWS),
-				clamp(ceil(vram.bottom() / float(LOOKUP_CELL_HEIGHT)), 0, LOOKUP_GRID_ROWS)
+				clamp(srect_left(&vram) / LOOKUP_CELL_WIDTH, 0, LOOKUP_GRID_COLUMNS),
+				clamp(ceil(srect_right(&vram) / float(LOOKUP_CELL_WIDTH)), 0, LOOKUP_GRID_COLUMNS),
+				clamp(srect_top(&vram) / LOOKUP_CELL_HEIGHT, 0, LOOKUP_GRID_ROWS),
+				clamp(ceil(srect_bottom(&vram) / float(LOOKUP_CELL_HEIGHT)), 0, LOOKUP_GRID_ROWS)
 				});
 	}
 
@@ -21304,24 +21295,24 @@ int64_t page_bytes(FusionRects &fusion)
 		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Fused Pages: %lu, Bytes: %ld (%.1f MiB)\n", (unsigned long)fused_page_vec_size(&self->pages), num_bytes, num_bytes / 1048576.0);
 	}
 
-	static bool srect_gt(const SRect &a, const SRect &b)
+	static bool srect_gt(const struct SRect *a, const struct SRect *b)
 	{
-		if (a.x != b.x)
-			return a.x > b.x;
-		if (a.y != b.y)
-			return a.y > b.y;
-		if (a.width != b.width)
-			return a.width > b.width;
-		return a.height > b.height;
+		if (a->x != b->x)
+			return a->x > b->x;
+		if (a->y != b->y)
+			return a->y > b->y;
+		if (a->width != b->width)
+			return a->width > b->width;
+		return a->height > b->height;
 	}
 
-	static bool texture_rect_sort_gt(const TextureRect &a, const TextureRect &b) {
+	static bool texture_rect_sort_gt(const struct TextureRect *a, const struct TextureRect *b) {
 		// Compare .upload by pointer
-		if (a.upload != b.upload)
-			return a.upload > b.upload;
-		if (a.vram_rect != b.vram_rect)
-			return srect_gt(a.vram_rect, b.vram_rect);
-		return srect_gt(a.texture_subrect(), b.texture_subrect());
+		if (a->upload != b->upload)
+			return a->upload > b->upload;
+		if (!srect_eq(&a->vram_rect, &b->vram_rect))
+			return srect_gt(&a->vram_rect, &b->vram_rect);
+		{ SRect _sa = texture_rect_subrect(a); SRect _sb = texture_rect_subrect(b); return srect_gt(&_sa, &_sb); }
 	}
 
 	/* qsort comparator: descending order, matching texture_rect_sort_gt. Equal
@@ -21329,8 +21320,8 @@ int64_t page_bytes(FusionRects &fusion)
 	 * unstable order among them does not affect the canonical-form comparison this
 	 * sort exists to enable. */
 	static int texture_rect_qsort_cmp(const void *pa, const void *pb) {
-		const TextureRect &a = *(const TextureRect *)(pa);
-		const TextureRect &b = *(const TextureRect *)(pb);
+		const TextureRect *a = (const TextureRect *)(pa);
+		const TextureRect *b = (const TextureRect *)(pb);
 		if (texture_rect_sort_gt(a, b))
 			return -1;
 		if (texture_rect_sort_gt(b, a))
@@ -21452,7 +21443,7 @@ int64_t page_bytes(FusionRects &fusion)
 			int rx = page.fusion.scaleX / sx;
 			int ry = page.fusion.scaleY / sy;
 
-			SRect subrect = tex.texture_subrect();
+			SRect subrect = texture_rect_subrect(&tex);
 
 			VkOffset3D dst_offset = {
 				(tex.vram_rect.x - int(page.fusion.vram_rect.x)) * int(page.fusion.scaleX),
