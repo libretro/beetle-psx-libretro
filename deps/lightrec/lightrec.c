@@ -2398,16 +2398,6 @@ u32 lightrec_current_cycle_count(const struct lightrec_state *state)
 	return state->current_cycle;
 }
 
-u32 lightrec_get_gte_ts_done(const struct lightrec_state *state)
-{
-	return state->gte_ts_done;
-}
-
-void lightrec_set_gte_ts_done(struct lightrec_state *state, u32 value)
-{
-	state->gte_ts_done = value;
-}
-
 void lightrec_reset_cycle_count(struct lightrec_state *state, u32 cycles)
 {
 	state->current_cycle = cycles;

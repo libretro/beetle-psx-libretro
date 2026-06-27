@@ -179,13 +179,6 @@ struct lightrec_state {
 	u8 in_delay_slot_n;
 	u32 current_cycle;
 	u32 target_cycle;
-	/* GTE operation completion timestamp (cycle count).  Mirrors the
-	 * mednafen interpreter's gte_ts_done.  Kept in lightrec_state so that
-	 * recompiled code -- both the cop2 dispatch wrapper and any inline GTE
-	 * emission -- can update it with a state-relative store instead of a
-	 * call into host CPU state.  The host syncs it to/from its own copy at
-	 * the recompiler entry/exit boundary. */
-	u32 gte_ts_done;
 	u32 exit_flags;
 	u32 old_cycle_counter;
 	u32 cycles_per_op;
