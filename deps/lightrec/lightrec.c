@@ -810,6 +810,38 @@ static void lightrec_cp2_gte_cb(struct lightrec_state *state, u32 arg)
 	(*state->ops.cop2_op)(state, ((union code) arg).opcode);
 }
 
+/* Wrapper for PGXP CPU-mode tracking of non-memory ops.  arg encodes the
+ * block LUT entry and opcode offset exactly like C_WRAPPER_RW_GENERIC; the
+ * recompiler has stored the instruction's GPR fields back to
+ * state->regs.gpr[] before the call, so the post-execution values are read
+ * from there and handed to the host's pgxp_cpu hook.  HI/LO are read from
+ * their GPR-array slots (lightrec keeps them at gpr[32]/gpr[33]). */
+static void lightrec_pgxp_cpu_cb(struct lightrec_state *state, u32 arg)
+{
+	struct block *block;
+	struct opcode *op;
+	union code c;
+	u16 offset = (u16)arg;
+
+	if (!state->ops.pgxp_cpu)
+		return;
+
+	block = lightrec_find_block_from_lut(state->block_cache,
+					     arg >> 16, state->curr_pc);
+	if (unlikely(!block))
+		return;
+
+	op = &block->opcode_list[offset];
+	c = op->c;
+
+	(*state->ops.pgxp_cpu)(state, c.opcode,
+			       state->regs.gpr[c.r.rd],
+			       state->regs.gpr[c.r.rs],
+			       state->regs.gpr[c.r.rt],
+			       state->regs.gpr[REG_HI],
+			       state->regs.gpr[REG_LO]);
+}
+
 static struct block * lightrec_get_block(struct lightrec_state *state, u32 pc)
 {
 	struct block *block = lightrec_find_block(state->block_cache, pc);
@@ -2175,6 +2207,7 @@ struct lightrec_state * lightrec_init(char *argv0,
 	state->c_wrappers[C_WRAPPER_MTC] = lightrec_mtc_cb;
 	state->c_wrappers[C_WRAPPER_CP] = lightrec_cp_cb;
 	state->c_wrappers[C_WRAPPER_CP2_GTE] = lightrec_cp2_gte_cb;
+	state->c_wrappers[C_WRAPPER_PGXP_CPU] = lightrec_pgxp_cpu_cb;
 
 	map = &maps[PSX_MAP_BIOS];
 	state->offset_bios = (uintptr_t)map->address - map->pc;
