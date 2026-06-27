@@ -5811,55 +5811,13 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 				CommandBufferHandle *items;
 				int count;
 				int cap;
-
-				CommandBufferHandleVec() : items(NULL), count(0), cap(0) {}
-				~CommandBufferHandleVec() { destroy(); }
-				CommandBufferHandleVec(CommandBufferHandleVec &&o) noexcept
-					: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-				CommandBufferHandleVec &operator=(CommandBufferHandleVec &&o) noexcept {
-					if (this != &o) {
-						destroy();
-						items = o.items; count = o.count; cap = o.cap;
-						o.items = NULL; o.count = 0; o.cap = 0;
-					}
-					return *this;
-				}
-				CommandBufferHandleVec(const CommandBufferHandleVec &) = delete;
-				CommandBufferHandleVec &operator=(const CommandBufferHandleVec &) = delete;
-
-				void push(CommandBufferHandle &&v) {
-					if (count >= cap)
-						grow(cap ? cap * 2 : 8);
-					cbh_steal(&items[count], &v);
-					count++;
-				}
-				bool empty() const { return count == 0; }
-				void clear() {
-					for (int i = 0; i < count; i++)
-						cbh_reset(&items[i]);
-					count = 0;
-				}
-				CommandBufferHandle *begin() { return items; }
-				CommandBufferHandle *end() { return items + count; }
-
-			private:
-				void grow(int ncap) {
-					CommandBufferHandle *nitems =
-						(CommandBufferHandle *)malloc((size_t)ncap * sizeof(CommandBufferHandle));
-					for (int i = 0; i < count; i++) {
-						cbh_steal(&nitems[i], &items[i]);
-					}
-					free(items);
-					items = nitems;
-					cap = ncap;
-				}
-				void destroy() {
-					for (int i = 0; i < count; i++)
-						cbh_reset(&items[i]);
-					free(items);
-					items = NULL; count = 0; cap = 0;
-				}
 			};
+			friend void cbhvec_init(struct Device::CommandBufferHandleVec *v);
+			friend void cbhvec_grow(struct Device::CommandBufferHandleVec *v, int ncap);
+			friend void cbhvec_push(struct Device::CommandBufferHandleVec *v, CommandBufferHandle *e);
+			friend bool cbhvec_empty(const struct Device::CommandBufferHandleVec *v);
+			friend void cbhvec_clear(struct Device::CommandBufferHandleVec *v);
+			friend void cbhvec_deinit(struct Device::CommandBufferHandleVec *v);
 
 			struct PerFrame
 			{
@@ -6037,7 +5995,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 
 			CommandPool &get_command_pool(CommandBufferType type);
 			QueueData &get_queue_data(CommandBufferType type);
-			CommandBufferHandleVec &get_queue_submissions(CommandBufferType type);
+			CommandBufferHandleVec *get_queue_submissions(CommandBufferType type);
 			void clear_wait_semaphores();
 			void submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
 
@@ -6099,6 +6057,49 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 				workarounds.optimize_all_graphics_barrier = gpu_props.vendorID == VENDOR_ID_ARM;
 			}
 	};
+
+	/* Free functions for Device::CommandBufferHandleVec (converted from the move-
+	 * only nested container's methods). The element is a refcounting CommandBuffer
+	 * handle, so growth/teardown go through cbh_steal/cbh_reset. push() takes
+	 * ownership by move (steal, no incref); clear() drops each handle's ref but
+	 * keeps capacity; deinit() frees the backing storage. */
+	inline void cbhvec_init(struct Device::CommandBufferHandleVec *v)
+	{
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
+	inline void cbhvec_grow(struct Device::CommandBufferHandleVec *v, int ncap)
+	{
+		CommandBufferHandle *nitems = (CommandBufferHandle *)malloc((size_t)ncap * sizeof(CommandBufferHandle));
+		int i;
+		for (i = 0; i < v->count; i++)
+			cbh_steal(&nitems[i], &v->items[i]);
+		free(v->items);
+		v->items = nitems;
+		v->cap = ncap;
+	}
+	inline void cbhvec_push(struct Device::CommandBufferHandleVec *v, CommandBufferHandle *e)
+	{
+		if (v->count >= v->cap)
+			cbhvec_grow(v, v->cap ? v->cap * 2 : 8);
+		cbh_steal(&v->items[v->count], e);
+		v->count++;
+	}
+	inline bool cbhvec_empty(const struct Device::CommandBufferHandleVec *v) { return v->count == 0; }
+	inline void cbhvec_clear(struct Device::CommandBufferHandleVec *v)
+	{
+		int i;
+		for (i = 0; i < v->count; i++)
+			cbh_reset(&v->items[i]);
+		v->count = 0;
+	}
+	inline void cbhvec_deinit(struct Device::CommandBufferHandleVec *v)
+	{
+		int i;
+		for (i = 0; i < v->count; i++)
+			cbh_reset(&v->items[i]);
+		free(v->items);
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
 
 /* ============================================================
  * atlas.hpp
@@ -16934,11 +16935,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	{
 		CommandBufferType type = commandbuffer_get_command_buffer_type(cbh_get(&cmd));
 		CommandPool &pool = get_command_pool(type);
-		CommandBufferHandleVec &submissions = get_queue_submissions(type);
+		CommandBufferHandleVec *submissions = get_queue_submissions(type);
 
 		pool.signal_submitted(commandbuffer_get_command_buffer(cbh_get(&cmd)));
 		commandbuffer_end(cbh_get(&cmd));
-		submissions.push(static_cast<CommandBufferHandle &&>(cmd));
+		cbhvec_push(submissions, &cmd);
 
 		VkFence cleared_fence = VK_NULL_HANDLE;
 
@@ -17148,9 +17149,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			flush_frame(Type_AsyncTransfer);
 
 		QueueData &data = get_queue_data(type);
-		CommandBufferHandleVec &submissions = get_queue_submissions(type);
+		CommandBufferHandleVec *submissions = get_queue_submissions(type);
 
-		if (submissions.empty())
+		if (cbhvec_empty(submissions))
 		{
 			if (fence || semaphore_count)
 				submit_empty_inner(type, fence, semaphore_count, semaphores);
@@ -17183,11 +17184,12 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		VkPipelineStageVec_clear(&data.wait_stages);
 		data.wait_semaphores.clear();
 
-		for (CommandBufferHandle &cmd : submissions)
+		{ int _si; for (_si = 0; _si < submissions->count; _si++)
 		{
-			VkCommandBuffer _cb = commandbuffer_get_command_buffer(cbh_get(&cmd));
+			CommandBufferHandle *cmd = &submissions->items[_si];
+			VkCommandBuffer _cb = commandbuffer_get_command_buffer(cbh_get(cmd));
 			CommandBufferVec_push(&cmds, &_cb);
-		}
+		} }
 
 		if (CommandBufferVec_size(&cmds) > (int)last_cmd)
 		{
@@ -17247,7 +17249,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		VkResult result = vkQueueSubmit(queue, VkSubmitInfoVec_size(&submits), VkSubmitInfoVec_data(&submits), cleared_fence);
 		if (result != VK_SUCCESS)
 			LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
-		submissions.clear();
+		cbhvec_clear(submissions);
 
 		CommandBufferVec_free_storage(&cmds);
 		VkSubmitInfoVec_free_storage(&submits);
@@ -17323,7 +17325,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		// Make sure we have a fence which covers all submissions in the frame.
 		VkFence fence;
 
-		if (transfer.need_fence || !frame().transfer_submissions.empty())
+		if (transfer.need_fence || !cbhvec_empty(&frame().transfer_submissions))
 		{
 			fence = VK_NULL_HANDLE;
 			submit_queue(Type_AsyncTransfer, &fence, 0, NULL);
@@ -17332,7 +17334,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			transfer.need_fence = false;
 		}
 
-		if (graphics.need_fence || !frame().graphics_submissions.empty())
+		if (graphics.need_fence || !cbhvec_empty(&frame().graphics_submissions))
 		{
 			fence = VK_NULL_HANDLE;
 			submit_queue(Type_Generic, &fence, 0, NULL);
@@ -17341,7 +17343,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			graphics.need_fence = false;
 		}
 
-		if (compute.need_fence || !frame().compute_submissions.empty())
+		if (compute.need_fence || !cbhvec_empty(&frame().compute_submissions))
 		{
 			fence = VK_NULL_HANDLE;
 			submit_queue(Type_AsyncCompute, &fence, 0, NULL);
@@ -17386,17 +17388,17 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 	}
 
-	Device::CommandBufferHandleVec &Device::get_queue_submissions(CommandBufferType type)
+	Device::CommandBufferHandleVec *Device::get_queue_submissions(CommandBufferType type)
 	{
 		switch (get_physical_queue_type(type))
 		{
 			default:
 			case Type_Generic:
-				return frame().graphics_submissions;
+				return &frame().graphics_submissions;
 			case Type_AsyncCompute:
-				return frame().compute_submissions;
+				return &frame().compute_submissions;
 			case Type_AsyncTransfer:
-				return frame().transfer_submissions;
+				return &frame().transfer_submissions;
 		}
 	}
 
@@ -17454,6 +17456,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		memset(&destroyed_buffers, 0, sizeof(destroyed_buffers));
 		memset(&recycled_semaphores, 0, sizeof(recycled_semaphores));
 		memset(&destroyed_semaphores, 0, sizeof(destroyed_semaphores));
+		cbhvec_init(&graphics_submissions);
+		cbhvec_init(&compute_submissions);
+		cbhvec_init(&transfer_submissions);
 	}
 
 	void Device::free_memory_nolock(const DeviceAllocation &alloc)
@@ -17714,6 +17719,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		VkBufferVec_free_storage(&destroyed_buffers);
 		SemaphoreVec_free_storage(&recycled_semaphores);
 		SemaphoreVec_free_storage(&destroyed_semaphores);
+		cbhvec_deinit(&graphics_submissions);
+		cbhvec_deinit(&compute_submissions);
+		cbhvec_deinit(&transfer_submissions);
 	}
 
 	uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
