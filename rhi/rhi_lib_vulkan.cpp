@@ -2766,7 +2766,7 @@ void *tfl_data(const struct TextureFormatLayout *self, uint32_t layer, uint32_t 
 	static void tfl_build_buffer_image_copies(const struct TextureFormatLayout *self, VkBufferImageCopy *copies, unsigned *num_copies);
 	static void tfl_fill_mipinfo(struct TextureFormatLayout *self, uint32_t width, uint32_t height, uint32_t depth);
 
-	class Device;
+	struct Device;
 
 	/* Hash-identity base. Converted from a class-with-ctor to a plain C89 struct;
 	 * derived pointees now call cookie_init() in their own constructor body
@@ -3400,7 +3400,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 
 
 
-	class Device;
+	struct Device;
 
 VkPipelineStageFlags buffer_usage_to_possible_stages(VkBufferUsageFlags usage)
 	{
@@ -3559,7 +3559,7 @@ struct BufferViewHandle bvh_make(BufferView *p) { struct BufferViewHandle h; h.d
 void bvh_reset(struct BufferViewHandle *h) { if (h->data) bufferview_release_reference(h->data); h->data = NULL; }
 BufferView *bvh_get(struct BufferViewHandle *h) { return h->data; }
 
-	class Device;
+	struct Device;
 
 VkPipelineStageFlags image_usage_to_possible_stages(VkImageUsageFlags usage)
 	{
@@ -3995,7 +3995,7 @@ void ih_move(struct ImageHandle *dst, struct ImageHandle produced) {
 	}
 void ih_steal(struct ImageHandle *dst, struct ImageHandle *src) { dst->data = src->data; src->data = NULL; }
 
-	class Device;
+	struct Device;
 
 	struct FenceHolder;
 	struct FenceHolderDeleter
@@ -4065,7 +4065,7 @@ void fencemanager_init_empty(struct FenceManager *self)
 	static VkFence fencemanager_request_cleared_fence(struct FenceManager *self);
 	static void fencemanager_recycle_fence(struct FenceManager *self, VkFence fence);
 
-	class Device;
+	struct Device;
 
 	struct SemaphoreHolder;
 	struct SemaphoreHolderDeleter
@@ -4209,7 +4209,7 @@ void semaphoremanager_init_empty(struct SemaphoreManager *self)
 	static VkSemaphore semaphoremanager_request_cleared_semaphore(struct SemaphoreManager *self);
 	static void semaphoremanager_recycle(struct SemaphoreManager *self, VkSemaphore semaphore);
 
-	class Device;
+	struct Device;
 	struct DescriptorSetLayout
 	{
 		uint32_t sampled_image_mask = 0;
@@ -4321,7 +4321,7 @@ VkDescriptorSetLayout descriptor_set_allocator_get_layout(const struct Descripto
  * shader.hpp
  * ============================================================ */
 
-	class Device;
+	struct Device;
 
 	enum ShaderStage {
 		ShaderStage_Vertex = 0,
@@ -4796,7 +4796,7 @@ void attachment_allocator_deinit(struct AttachmentAllocator *self)
  * buffer_pool.hpp
  * ============================================================ */
 
-	class Device;
+	struct Device;
 	struct Buffer;
 
 	struct BufferBlockAllocation
@@ -5135,7 +5135,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 		void operator()(CommandBuffer *cmd);
 	};
 
-	class Device;
+	struct Device;
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches through the pointee directly). This is the
 	 * last of the eight pointees taken off the template base.
@@ -5242,7 +5242,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 
 
 		private:
-			friend class Device;
+			friend struct Device;
 
 			Device *device;
 			VkCommandBuffer cmd;
@@ -5558,129 +5558,15 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	POD_VEC_DECLARE(VkBufferVec, VkBuffer);
 	POD_VEC_DECLARE(VkPipelineStageVec, VkPipelineStageFlags);
 
-	class Device
+	struct Device
 	{
-		public:
-			friend void device_set_context(Device *self, const Context &context);
-			friend void device_end_frame_nolock(Device *self);
-			friend void device_init_frame_contexts(Device *self, unsigned count);
-			friend void device_wait_idle_nolock(Device *self);
-			friend void device_next_frame_context(Device *self);
-			friend void device_add_wait_semaphore_nolock(Device *self, CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush);
-			friend void device_submit(Device *self, CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
-			friend void device_submit_nolock(Device *self, CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
-			friend void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence, unsigned semaphore_count, Semaphore *semaphores);
-			friend void device_submit_staging(Device *self, CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
-			friend void device_submit_queue(Device *self, CommandBufferType type, VkFence *fence, unsigned semaphore_count, Semaphore *semaphores);
-			friend void device_sync_buffer_blocks(Device *self);
-			friend void device_bake_program(Device *self, Program &program);
-			friend void device_init_stock_samplers(Device *self);
-			friend void device_clear_wait_semaphores(Device *self);
-			friend void device_flush_frame_nolock(Device *self);
-			friend CommandPool *device_get_command_pool(Device *self, CommandBufferType type);
-			friend CommandBufferHandle device_request_command_buffer(Device *self, CommandBufferType type);
-			friend CommandBufferHandle device_request_command_buffer_nolock(Device *self, CommandBufferType type);
-			friend void device_request_vertex_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size);
-			friend void device_request_uniform_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size);
-			friend void device_free_memory_nolock(Device *self, const DeviceAllocation &alloc);
-			friend bool device_get_image_format_properties(Device *self, VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags, VkImageFormatProperties *properties);
-			friend uint32_t device_find_memory_type_buffer(Device *self, BufferDomain domain, uint32_t mask);
-			friend uint32_t device_find_memory_type_image(Device *self, ImageDomain domain, uint32_t mask);
-			friend void device_set_name_buffer(Device *self, const Buffer &buffer, const char *name);
-			friend void device_set_name_image(Device *self, const Image &image, const char *name);
-			friend bool device_memory_type_is_host_visible(Device *self, uint32_t type);
-			friend BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo &view_info);
-			friend ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo &create_info);
-			friend InitialImageBuffer device_create_image_staging_buffer(Device *self, const ImageCreateInfo &info, const ImageInitialData *initial);
-			friend ImageHandle device_create_image(Device *self, const ImageCreateInfo &create_info, const ImageInitialData *initial);
-			friend ImageHandle device_create_image_from_staging_buffer(Device *self, const ImageCreateInfo &create_info, const InitialImageBuffer *buffer);
-			friend SamplerHandle device_create_sampler(Device *self, const SamplerCreateInfo &sampler_info, StockSampler stock_sampler);
-			friend BufferHandle device_create_buffer(Device *self, const BufferCreateInfo &create_info, const void *initial);
-			friend Program *device_request_program_compute_shader(Device *self, Shader *compute);
-			friend Program *device_request_program_compute_code(Device *self, const uint32_t *compute_data, size_t compute_size);
-			friend Program *device_request_program_graphics_shaders(Device *self, Shader *vertex, Shader *fragment);
-			friend Program *device_request_program_graphics_code(Device *self, const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data, size_t fragment_size);
-			friend Shader *device_request_shader(Device *self, const uint32_t *data, size_t size);
-			friend PipelineLayout *device_request_pipeline_layout(Device *self, const CombinedResourceLayout &layout);
-			friend DescriptorSetAllocator *device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
-			friend const RenderPass *device_request_render_pass(Device *self, const RenderPassInfo &info, bool compatible);
-			friend uint64_t device_allocate_cookie(Device *self);
-			friend void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size);
-			friend void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size);
-			friend const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo &info);
-			friend void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore);
-			friend void device_add_frame_counter_nolock(Device *self);
-			friend void device_decrement_frame_counter_nolock(Device *self);
-			friend void device_init_workarounds(Device *self);
-			friend void device_wait_idle(Device *self);
-			friend void device_flush_frame(Device *self);
-			friend void *device_map_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access);
-			friend void device_unmap_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access);
-			friend ImageView *device_get_transient_attachment(Device *self, unsigned width, unsigned height, VkFormat format, unsigned index, unsigned samples, unsigned layers);
-			friend VkDevice device_get_device(Device *self);
-			friend const VkPhysicalDeviceProperties *device_get_gpu_properties(Device *self);
-			friend const Sampler *device_get_stock_sampler(Device *self, StockSampler sampler);
-			friend const ImplementationWorkarounds *device_get_workarounds(Device *self);
-			friend const DeviceFeatures *device_get_device_features(Device *self);
-			friend void device_reset_fence(Device *self, VkFence fence);
-			friend void device_destroy_pipeline_nolock(Device *self, VkPipeline pipeline);
-			friend void device_destroy_image_view_nolock(Device *self, VkImageView view);
-			friend void device_destroy_buffer_view_nolock(Device *self, VkBufferView view);
-			friend void device_destroy_semaphore_nolock(Device *self, VkSemaphore semaphore);
-			friend void device_destroy_image_nolock(Device *self, VkImage image);
-			friend void device_destroy_buffer_nolock(Device *self, VkBuffer buffer);
-			friend void device_destroy_sampler_nolock(Device *self, VkSampler sampler);
-			friend void device_destroy_framebuffer_nolock(Device *self, VkFramebuffer framebuffer);
-			friend CommandBufferType device_get_physical_queue_type(Device *self, CommandBufferType queue_type);
-			friend bool device_image_format_is_supported(Device *self, VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling);
-			friend VkFormat device_get_default_depth_format(Device *self);
 			// Device-based objects which need to poke at internal data structures when their lifetimes end.
 			// Don't want to expose a lot of internal guts to make this work.
-			friend struct SemaphoreHolderDeleter;
-			friend void semaphoreholder_fini(struct SemaphoreHolder *self);
-			friend struct FenceHolderDeleter;
-			friend void fenceholder_fini(struct FenceHolder *self);
-			friend struct SamplerDeleter;
-			friend void sampler_fini(struct Sampler *self);
-			friend struct BufferDeleter;
-			friend void buffer_fini(struct Buffer *self);
-			friend struct BufferViewDeleter;
-			friend void bufferview_fini(struct BufferView *self);
-			friend struct ImageViewDeleter;
-			friend void imageview_fini(struct ImageView *self);
-			friend struct ImageDeleter;
-			friend void image_fini(struct Image *self);
-			friend void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc, const ImageCreateInfo &info);
-			friend struct CommandBufferDeleter;
-			friend void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo &info, VkSubpassContents contents);
-			friend void commandbuffer_end_render_pass(struct CommandBuffer *self);
-			friend void commandbuffer_set_program(struct CommandBuffer *self, Program &program);
-			friend void commandbuffer_flush_render_state(struct CommandBuffer *self);
-			friend VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self, Hash hash);
-			friend VkPipeline commandbuffer_build_compute_pipeline(struct CommandBuffer *self, Hash hash);
-			friend void commandbuffer_flush_graphics_pipeline(struct CommandBuffer *self);
-			friend void commandbuffer_flush_compute_pipeline(struct CommandBuffer *self);
-			friend void commandbuffer_flush_descriptor_sets(struct CommandBuffer *self);
-			friend void commandbuffer_flush_descriptor_set(struct CommandBuffer *self, uint32_t set);
-			friend void commandbuffer_begin_context(struct CommandBuffer *self);
-			friend void commandbuffer_flush_compute_state(struct CommandBuffer *self);
-			friend void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer);
-			friend void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color);
-			friend void commandbuffer_end_region(struct CommandBuffer *self);
-			friend void commandbuffer_end(struct CommandBuffer *self);
-			friend void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
-			friend void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate);
-			friend class Program;
-			friend class Framebuffer;
-			friend class PipelineLayout;
-			friend class FramebufferAllocator;
 
 			/* Lifecycle for a malloc'd Device (no constructor/destructor runs).
 			 * device_init establishes every member's empty state; device_deinit
 			 * tears the device down so the storage can be freed. Static so they take
 			 * the raw Device* explicitly. */
-			static void device_init(Device *self);
-			static void device_deinit(Device *self);
 
 			// No move-copy.
 			void operator=(Device &&) = delete;
@@ -5713,7 +5599,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 
 
-		private:
 			VkInstance instance = VK_NULL_HANDLE;
 			VkPhysicalDevice gpu = VK_NULL_HANDLE;
 			VkDevice device = VK_NULL_HANDLE;
@@ -5723,16 +5608,10 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 			uint64_t cookie = 0;
 
-		public:
 			/* Public so the C89 cookie_init() free function (replacing the
 			 * former Cookie(Device*) ctor + friendship) can reach it. */
-		private:
-			friend void program_init_graphics(struct Program *self, Device *device, Shader *vertex, Shader *fragment);
-			friend void program_init_compute(struct Program *self, Device *device, Shader *compute);
 
 
-			friend void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
-			friend struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
 
 			VkPhysicalDeviceMemoryProperties mem_props;
 			VkPhysicalDeviceProperties gpu_props;
@@ -5771,13 +5650,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 				int count;
 				int cap;
 			};
-			friend void cbhvec_init(struct Device::CommandBufferHandleVec *v);
-			friend void cbhvec_grow(struct Device::CommandBufferHandleVec *v, int ncap);
-			friend void cbhvec_push(struct Device::CommandBufferHandleVec *v, CommandBufferHandle *e);
-			friend bool cbhvec_empty(const struct Device::CommandBufferHandleVec *v);
-			friend void cbhvec_clear(struct Device::CommandBufferHandleVec *v);
-			friend void cbhvec_deinit(struct Device::CommandBufferHandleVec *v);
-			friend Device::CommandBufferHandleVec *device_get_queue_submissions(Device *self, CommandBufferType type);
 
 			struct PerFrame
 			{
@@ -5806,10 +5678,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 				SemaphoreVec recycled_semaphores;
 				SemaphoreVec destroyed_semaphores;
 			};
-			friend void per_frame_init(struct Device::PerFrame *self, Device *device);
-			friend void per_frame_fini(struct Device::PerFrame *self);
-			friend void per_frame_begin(struct Device::PerFrame *self);
-			friend struct Device::PerFrame *device_frame(Device *self);
 			/* Owning array of PerFrame* (the frame-context ring). Replaces
 			 * std::vector<std::unique_ptr<PerFrame>>: the container owns each
 			 * heap-allocated PerFrame and deletes it on clear()/destruction, so
@@ -5825,10 +5693,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 				int count;
 				int cap;
 			};
-			friend void per_frame_ptr_vec_init_empty(struct Device::PerFramePtrVec *v);
-			friend void per_frame_ptr_vec_deinit(struct Device::PerFramePtrVec *v);
-			friend void per_frame_ptr_vec_push(struct Device::PerFramePtrVec *v, struct Device::PerFrame *p);
-			friend void per_frame_ptr_vec_clear(struct Device::PerFramePtrVec *v);
 			// The per frame structure must be destroyed after
 			// the hashmap data structures below, so it must be declared before.
 			PerFramePtrVec per_frame;
@@ -5839,7 +5703,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 				VkPipelineStageVec wait_stages;
 				bool need_fence;
 			} graphics, compute, transfer;
-			friend Device::QueueData *device_get_queue_data(Device *self, CommandBufferType type);
 
 			// Pending buffers which need to be copied from CPU to GPU before submitting graphics or compute work.
 			struct
@@ -5870,23 +5733,155 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 
 
-			void flush_frame(CommandBufferType type)
-			{
-				if (type == Type_AsyncTransfer)
-					device_sync_buffer_blocks(this);
-				device_submit_queue(this, type, NULL, 0, NULL);
-			}
 
 
-			friend void program_fini(struct Program *self);
-			friend void framebuffer_fini(struct Framebuffer *self);
 
 
 
 
 			ImplementationWorkarounds workarounds;
 	};
+
+	/* Forward declarations for the device_* (and related) free functions, formerly
+	 * friend declarations inside the Device class. The class is now a plain struct, so
+	 * the access-granting role is gone, but these forward declarations are still needed:
+	 * the inline device_* helpers defined just after the struct call functions whose
+	 * definitions appear much later in the file. */
+	void device_set_context(Device *self, const Context &context);
+	void device_end_frame_nolock(Device *self);
+	void device_init_frame_contexts(Device *self, unsigned count);
+	void device_wait_idle_nolock(Device *self);
+	void device_next_frame_context(Device *self);
+	void device_add_wait_semaphore_nolock(Device *self, CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush);
+	void device_submit(Device *self, CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
+	void device_submit_nolock(Device *self, CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
+	void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence, unsigned semaphore_count, Semaphore *semaphores);
+	void device_submit_staging(Device *self, CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
+	void device_submit_queue(Device *self, CommandBufferType type, VkFence *fence, unsigned semaphore_count, Semaphore *semaphores);
+	void device_sync_buffer_blocks(Device *self);
+	void device_bake_program(Device *self, Program &program);
+	void device_init_stock_samplers(Device *self);
+	void device_clear_wait_semaphores(Device *self);
+	void device_flush_frame_nolock(Device *self);
+	CommandPool *device_get_command_pool(Device *self, CommandBufferType type);
+	CommandBufferHandle device_request_command_buffer(Device *self, CommandBufferType type);
+	CommandBufferHandle device_request_command_buffer_nolock(Device *self, CommandBufferType type);
+	void device_request_vertex_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size);
+	void device_request_uniform_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size);
+	void device_free_memory_nolock(Device *self, const DeviceAllocation &alloc);
+	bool device_get_image_format_properties(Device *self, VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags, VkImageFormatProperties *properties);
+	uint32_t device_find_memory_type_buffer(Device *self, BufferDomain domain, uint32_t mask);
+	uint32_t device_find_memory_type_image(Device *self, ImageDomain domain, uint32_t mask);
+	void device_set_name_buffer(Device *self, const Buffer &buffer, const char *name);
+	void device_set_name_image(Device *self, const Image &image, const char *name);
+	bool device_memory_type_is_host_visible(Device *self, uint32_t type);
+	BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo &view_info);
+	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo &create_info);
+	InitialImageBuffer device_create_image_staging_buffer(Device *self, const ImageCreateInfo &info, const ImageInitialData *initial);
+	ImageHandle device_create_image(Device *self, const ImageCreateInfo &create_info, const ImageInitialData *initial);
+	ImageHandle device_create_image_from_staging_buffer(Device *self, const ImageCreateInfo &create_info, const InitialImageBuffer *buffer);
+	SamplerHandle device_create_sampler(Device *self, const SamplerCreateInfo &sampler_info, StockSampler stock_sampler);
+	BufferHandle device_create_buffer(Device *self, const BufferCreateInfo &create_info, const void *initial);
+	Program *device_request_program_compute_shader(Device *self, Shader *compute);
+	Program *device_request_program_compute_code(Device *self, const uint32_t *compute_data, size_t compute_size);
+	Program *device_request_program_graphics_shaders(Device *self, Shader *vertex, Shader *fragment);
+	Program *device_request_program_graphics_code(Device *self, const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data, size_t fragment_size);
+	Shader *device_request_shader(Device *self, const uint32_t *data, size_t size);
+	PipelineLayout *device_request_pipeline_layout(Device *self, const CombinedResourceLayout &layout);
+	DescriptorSetAllocator *device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
+	const RenderPass *device_request_render_pass(Device *self, const RenderPassInfo &info, bool compatible);
+	uint64_t device_allocate_cookie(Device *self);
+	void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size);
+	void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size);
+	const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo &info);
+	void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore);
+	void device_add_frame_counter_nolock(Device *self);
+	void device_decrement_frame_counter_nolock(Device *self);
+	void device_init_workarounds(Device *self);
+	void device_wait_idle(Device *self);
+	void device_flush_frame(Device *self);
+	void *device_map_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access);
+	void device_unmap_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access);
+	ImageView *device_get_transient_attachment(Device *self, unsigned width, unsigned height, VkFormat format, unsigned index, unsigned samples, unsigned layers);
+	VkDevice device_get_device(Device *self);
+	const VkPhysicalDeviceProperties *device_get_gpu_properties(Device *self);
+	const Sampler *device_get_stock_sampler(Device *self, StockSampler sampler);
+	const ImplementationWorkarounds *device_get_workarounds(Device *self);
+	const DeviceFeatures *device_get_device_features(Device *self);
+	void device_reset_fence(Device *self, VkFence fence);
+	void device_destroy_pipeline_nolock(Device *self, VkPipeline pipeline);
+	void device_destroy_image_view_nolock(Device *self, VkImageView view);
+	void device_destroy_buffer_view_nolock(Device *self, VkBufferView view);
+	void device_destroy_semaphore_nolock(Device *self, VkSemaphore semaphore);
+	void device_destroy_image_nolock(Device *self, VkImage image);
+	void device_destroy_buffer_nolock(Device *self, VkBuffer buffer);
+	void device_destroy_sampler_nolock(Device *self, VkSampler sampler);
+	void device_destroy_framebuffer_nolock(Device *self, VkFramebuffer framebuffer);
+	CommandBufferType device_get_physical_queue_type(Device *self, CommandBufferType queue_type);
+	bool device_image_format_is_supported(Device *self, VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling);
+	VkFormat device_get_default_depth_format(Device *self);
+	void semaphoreholder_fini(struct SemaphoreHolder *self);
+	void fenceholder_fini(struct FenceHolder *self);
+	void sampler_fini(struct Sampler *self);
+	void buffer_fini(struct Buffer *self);
+	void bufferview_fini(struct BufferView *self);
+	void imageview_fini(struct ImageView *self);
+	void image_fini(struct Image *self);
+	void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc, const ImageCreateInfo &info);
+	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo &info, VkSubpassContents contents);
+	void commandbuffer_end_render_pass(struct CommandBuffer *self);
+	void commandbuffer_set_program(struct CommandBuffer *self, Program &program);
+	void commandbuffer_flush_render_state(struct CommandBuffer *self);
+	VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self, Hash hash);
+	VkPipeline commandbuffer_build_compute_pipeline(struct CommandBuffer *self, Hash hash);
+	void commandbuffer_flush_graphics_pipeline(struct CommandBuffer *self);
+	void commandbuffer_flush_compute_pipeline(struct CommandBuffer *self);
+	void commandbuffer_flush_descriptor_sets(struct CommandBuffer *self);
+	void commandbuffer_flush_descriptor_set(struct CommandBuffer *self, uint32_t set);
+	void commandbuffer_begin_context(struct CommandBuffer *self);
+	void commandbuffer_flush_compute_state(struct CommandBuffer *self);
+	void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer);
+	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color);
+	void commandbuffer_end_region(struct CommandBuffer *self);
+	void commandbuffer_end(struct CommandBuffer *self);
+	void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
+	void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate);
+	void device_init(Device *self);
+	void device_deinit(Device *self);
+	void program_init_graphics(struct Program *self, Device *device, Shader *vertex, Shader *fragment);
+	void program_init_compute(struct Program *self, Device *device, Shader *compute);
+	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
+	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
+	void cbhvec_init(struct Device::CommandBufferHandleVec *v);
+	void cbhvec_grow(struct Device::CommandBufferHandleVec *v, int ncap);
+	void cbhvec_push(struct Device::CommandBufferHandleVec *v, CommandBufferHandle *e);
+	bool cbhvec_empty(const struct Device::CommandBufferHandleVec *v);
+	void cbhvec_clear(struct Device::CommandBufferHandleVec *v);
+	void cbhvec_deinit(struct Device::CommandBufferHandleVec *v);
+	Device::CommandBufferHandleVec *device_get_queue_submissions(Device *self, CommandBufferType type);
+	void per_frame_init(struct Device::PerFrame *self, Device *device);
+	void per_frame_fini(struct Device::PerFrame *self);
+	void per_frame_begin(struct Device::PerFrame *self);
+	struct Device::PerFrame *device_frame(Device *self);
+	void per_frame_ptr_vec_init_empty(struct Device::PerFramePtrVec *v);
+	void per_frame_ptr_vec_deinit(struct Device::PerFramePtrVec *v);
+	void per_frame_ptr_vec_push(struct Device::PerFramePtrVec *v, struct Device::PerFrame *p);
+	void per_frame_ptr_vec_clear(struct Device::PerFramePtrVec *v);
+	Device::QueueData *device_get_queue_data(Device *self, CommandBufferType type);
+	void program_fini(struct Program *self);
+	void framebuffer_fini(struct Framebuffer *self);
+
 	inline bool device_memory_type_is_host_visible(Device *self, uint32_t type) { return (self->mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0; }
+
+
+	/* device_flush_frame_queue: was the inline Device::flush_frame(CommandBufferType)
+	 * overload. Flushes pending transfers (if async-transfer) then submits the queue. */
+	inline void device_flush_frame_queue(Device *self, CommandBufferType type)
+	{
+		if (type == Type_AsyncTransfer)
+			device_sync_buffer_blocks(self);
+		device_submit_queue(self, type, NULL, 0, NULL);
+	}
 
 	/* Device inline helpers (batch 5) -> free functions taking Device *self. Plain
 	 * inline (not static) because they are friend-declared. request_vertex_block /
@@ -16610,7 +16605,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		return self->per_frame.items[self->frame_context_index];
 	}
 
-	void Device::device_init(Device *self)
+	void device_init(Device *self)
 	{
 		/* Scalar handles / ids (the VK_NULL_HANDLE and 0 NSDMIs). */
 		self->instance       = VK_NULL_HANDLE;
@@ -16672,7 +16667,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	/* Tear a Device down to the point where its storage can be freed. Runs the
 	 * former ~Device prologue first (in the same order), then the teardown the
 	 * implicit member destruction used to perform, deepest-owned last. */
-	void Device::device_deinit(Device *self)
+	void device_deinit(Device *self)
 	{
 		device_wait_idle(self);
 
@@ -16717,7 +16712,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			bool flush){
 		VK_ASSERT(stages != 0);
 		if (flush)
-			self->flush_frame(type);
+			device_flush_frame_queue(self, type);
 		Device::QueueData *data = device_get_queue_data(self, type);
 
 #ifdef VULKAN_DEBUG
@@ -17293,7 +17288,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		// Always check if we need to flush pending transfers.
 		if (type != Type_AsyncTransfer)
-			self->flush_frame(Type_AsyncTransfer);
+			device_flush_frame_queue(self, Type_AsyncTransfer);
 
 		Device::QueueData *data = device_get_queue_data(self, type);
 		Device::CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
@@ -17500,9 +17495,9 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	}
 
 	void device_flush_frame_nolock(Device *self){
-		self->flush_frame(Type_AsyncTransfer);
-		self->flush_frame(Type_Generic);
-		self->flush_frame(Type_AsyncCompute);
+		device_flush_frame_queue(self, Type_AsyncTransfer);
+		device_flush_frame_queue(self, Type_Generic);
+		device_flush_frame_queue(self, Type_AsyncCompute);
 	}
 
 	struct Device::QueueData *device_get_queue_data(Device *self, CommandBufferType type)
@@ -21885,7 +21880,7 @@ static void vk_context_reset(void)
 
    assert(context);
    device = (Device *)malloc(sizeof(Device));
-   Device::device_init(device);
+   device_init(device);
    device_set_context(device, *context);
 
    renderer = (Renderer *)malloc(sizeof(Renderer));
@@ -21894,7 +21889,7 @@ static void vk_context_reset(void)
    {
       renderer_fini(renderer);
       free(renderer);
-      Device::device_deinit(device);
+      device_deinit(device);
       free(device);
       renderer = NULL;
       device = NULL;
@@ -21927,7 +21922,7 @@ static void vk_context_destroy(void)
 
    renderer_fini(renderer);
    free(renderer);
-   Device::device_deinit(device);
+   device_deinit(device);
    free(device);
    context_deinit(context);
    free(context);
