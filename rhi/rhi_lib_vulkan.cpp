@@ -2736,6 +2736,7 @@ IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
 		VENDOR_ID_NVIDIA = 0x10de,
 		VENDOR_ID_ARM = 0x13b5
 	};
+	typedef enum VendorID VendorID;
 
 	/* The live Vulkan context (instance/device/queues). Formerly a class with a
 	 * multi-argument constructor (load loaders, create the device, mark valid) and
@@ -3092,6 +3093,7 @@ enum MemoryClass
 	MEMORY_CLASS_HUGE,
 	MEMORY_CLASS_COUNT
 };
+typedef enum MemoryClass MemoryClass;
 
 enum AllocationTiling
 {
@@ -3099,12 +3101,14 @@ enum AllocationTiling
 	ALLOCATION_TILING_OPTIMAL,
 	ALLOCATION_TILING_COUNT
 };
+typedef enum AllocationTiling AllocationTiling;
 
 enum MemoryAccessFlag
 {
 	MEMORY_ACCESS_WRITE_BIT = 1,
 	MEMORY_ACCESS_READ_BIT = 2
 };
+typedef enum MemoryAccessFlag MemoryAccessFlag;
 typedef uint32_t MemoryAccessFlags;
 
 struct DeviceAllocation;
@@ -3827,6 +3831,7 @@ VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
 	{
 		IMAGE_MISC_GENERATE_MIPS_BIT = 1 << 0
 	};
+	typedef enum ImageMiscFlagBits ImageMiscFlagBits;
 	typedef uint32_t ImageMiscFlags;
 
 	struct Image;
@@ -4584,6 +4589,7 @@ PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return
 		RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT = 1 << 4,
 		RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT = 1 << 5
 	};
+	typedef enum RenderPassOp RenderPassOp;
 	typedef uint32_t RenderPassOpFlags;
 
 	struct ImageView;
@@ -5187,6 +5193,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 
 		COMMAND_BUFFER_DYNAMIC_BITS = COMMAND_BUFFER_DIRTY_VIEWPORT_BIT | COMMAND_BUFFER_DIRTY_SCISSOR_BIT
 	};
+	typedef enum CommandBufferDirtyBits CommandBufferDirtyBits;
 	typedef uint32_t CommandBufferDirtyFlags;
 
 	union PipelineState {
@@ -6291,6 +6298,7 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		STATUS_SFB_READ = STATUS_COMPUTE_SFB_READ | STATUS_TRANSFER_SFB_READ | STATUS_FRAGMENT_SFB_READ,
 		STATUS_SFB_WRITE = STATUS_COMPUTE_SFB_WRITE | STATUS_TRANSFER_SFB_WRITE | STATUS_FRAGMENT_SFB_WRITE
 	};
+	typedef enum StatusFlag StatusFlag;
 	typedef uint16_t StatusFlags;
 
 	struct Renderer;
@@ -8656,6 +8664,7 @@ bool semi_transparent_state_eq(const struct SemiTransparentState *a, const struc
 		FilterExcludeOpaque = 1,
 		FilterExcludeOpaqueAndSemiTrans = 2,
 	};
+	typedef enum FilterExclude FilterExclude;
 
 	enum FilterMode {
 	FilterMode_NearestNeighbor = 0,
