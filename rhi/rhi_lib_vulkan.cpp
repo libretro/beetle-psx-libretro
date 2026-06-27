@@ -7431,8 +7431,8 @@ void rect_tracker_clear(struct RectTracker *self, SRect rect)
 		uint32_t palette;
 		Rect full_page_rect;
 
-		bool dirty = false;
-		bool dead = false;
+		bool dirty;
+		bool dead;
 
 		FusionRects fusion;
 	};
