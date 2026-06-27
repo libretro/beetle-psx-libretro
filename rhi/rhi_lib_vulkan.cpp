@@ -5660,13 +5660,13 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 	struct InitialImageBuffer
 	{
-		BufferHandle buffer = { NULL };
+		BufferHandle buffer;
 		// Bound matches the implicit invariant in TextureFormatLayout::mips[16]:
 		// callers must pass <= 16 mip levels (no runtime check exists in
 		// fill_mipinfo). build_buffer_image_copies is the sole writer of these
 		// fields; it asserts num_blits <= 16 before writing.
 		VkBufferImageCopy blits[16];
-		unsigned num_blits = 0;
+		unsigned num_blits;
 	};
 	struct HandlePool
 	{
@@ -21927,23 +21927,22 @@ struct SwapchainImageVec {
 	struct retro_vulkan_image *items;
 	int count;
 	int cap;
-	void clear() { count = 0; }
-	int size() const { return count; }
-	struct retro_vulkan_image &operator[](int i) { return items[i]; }
-	void resize(int n) {
-		if (n > cap) {
-			struct retro_vulkan_image *ni = (struct retro_vulkan_image *)realloc(items, (size_t)n * sizeof(struct retro_vulkan_image));
-			if (!ni)
-				return;
-			items = ni;
-			cap = n;
-		}
-		if (n > count)
-			memset(&items[count], 0, (size_t)(n - count) * sizeof(retro_vulkan_image));
-		count = n;
-	}
-	void free_storage() { free(items); items = NULL; count = 0; cap = 0; }
 };
+static void swapchainimagevec_clear(struct SwapchainImageVec *self) { self->count = 0; }
+static int swapchainimagevec_size(const struct SwapchainImageVec *self) { return self->count; }
+static void swapchainimagevec_resize(struct SwapchainImageVec *self, int n) {
+	if (n > self->cap) {
+		struct retro_vulkan_image *ni = (struct retro_vulkan_image *)realloc(self->items, (size_t)n * sizeof(struct retro_vulkan_image));
+		if (!ni)
+			return;
+		self->items = ni;
+		self->cap = n;
+	}
+	if (n > self->count)
+		memset(&self->items[self->count], 0, (size_t)(n - self->count) * sizeof(struct retro_vulkan_image));
+	self->count = n;
+}
+static void swapchainimagevec_free_storage(struct SwapchainImageVec *self) { free(self->items); self->items = NULL; self->count = 0; self->cap = 0; }
 
 /* Owning vector of ImageHandle (refcounted), replacing
  * std::vector<ImageHandle>. resize() default-constructs grown slots (NULL
@@ -21954,29 +21953,28 @@ struct ScanoutHandleVec {
 	ImageHandle *items;
 	int count;
 	int cap;
-	void clear() {
-		{ int i; for (i = 0; i < count; i++) ih_reset(&items[i]); }
-		count = 0;
-	}
-	int size() const { return count; }
-	ImageHandle &operator[](int i) { return items[i]; }
-	void resize(int n) {
-		{ int i; for (i = n; i < count; i++) ih_reset(&items[i]); }
-		if (n > cap) {
-			ImageHandle *nitems = (ImageHandle *)malloc((size_t)n * sizeof(ImageHandle));
-			{ int i; for (i = 0; i < count && i < n; i++) {
-				/* Move: ih_steal copies the pointer and nulls the old slot. */
-				ih_steal(&nitems[i], &items[i]);
-			} }
-			free(items);
-			items = nitems;
-			cap = n;
-		}
-		{ int i; for (i = count; i < n; i++) items[i].data = NULL; } /* default-construct grown slot to a null handle */
-		count = n;
-	}
-	void free_storage() { clear(); free(items); items = NULL; cap = 0; }
 };
+static void scanouthandlevec_clear(struct ScanoutHandleVec *self) {
+	{ int i; for (i = 0; i < self->count; i++) ih_reset(&self->items[i]); }
+	self->count = 0;
+}
+static int scanouthandlevec_size(const struct ScanoutHandleVec *self) { return self->count; }
+static void scanouthandlevec_resize(struct ScanoutHandleVec *self, int n) {
+	{ int i; for (i = n; i < self->count; i++) ih_reset(&self->items[i]); }
+	if (n > self->cap) {
+		ImageHandle *nitems = (ImageHandle *)malloc((size_t)n * sizeof(ImageHandle));
+		{ int i; for (i = 0; i < self->count && i < n; i++) {
+			/* Move: ih_steal copies the pointer and nulls the old slot. */
+			ih_steal(&nitems[i], &self->items[i]);
+		} }
+		free(self->items);
+		self->items = nitems;
+		self->cap = n;
+	}
+	{ int i; for (i = self->count; i < n; i++) self->items[i].data = NULL; } /* default-construct grown slot to a null handle */
+	self->count = n;
+}
+static void scanouthandlevec_free_storage(struct ScanoutHandleVec *self) { scanouthandlevec_clear(self); free(self->items); self->items = NULL; self->cap = 0; }
 
 static SwapchainImageVec swapchain_images;
 static ScanoutHandleVec scanout_handles;
@@ -22167,8 +22165,8 @@ static void vk_context_destroy(void)
    savestate_destroy(&save_state);
    renderer_save_vram_state(renderer, &save_state);
    vulkan     = NULL;
-   scanout_handles.clear();
-   swapchain_images.clear();
+   scanouthandlevec_clear(&scanout_handles);
+   swapchainimagevec_clear(&swapchain_images);
 
    renderer_fini(renderer);
    free(renderer);
@@ -22614,10 +22612,10 @@ static void ensure_sync_index_resources(void)
       if (mask & (1u << i))
          num_frames = i + 1; }
 
-   if (num_frames != swapchain_images.size())
+   if (num_frames != swapchainimagevec_size(&swapchain_images))
    {
-      swapchain_images.resize(num_frames);
-      scanout_handles.resize(num_frames);
+      swapchainimagevec_resize(&swapchain_images, num_frames);
+      scanouthandlevec_resize(&scanout_handles, num_frames);
    }
 }
 
@@ -22693,7 +22691,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    auto scanout = show_vram ? renderer_scanout_vram_to_texture(renderer, true) : renderer_scanout_to_texture(renderer);
    unsigned index = vulkan->get_sync_index(vulkan->handle);
 
-   struct retro_vulkan_image *image                          = &swapchain_images[index];
+   struct retro_vulkan_image *image                          = &swapchain_images.items[index];
 
    image->create_info.sType                           = 
       VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
