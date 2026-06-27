@@ -3399,6 +3399,114 @@ static void rec_CP0(struct lightrec_cstate *state,
 		(*f)(state, block, offset);
 }
 
+/* Inline emission of GTE NCLIP (function code 0x06).
+ *
+ * NCLIP (non-PGXP) computes
+ *   sum = x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1)
+ * over the XY FIFO (DR[12..14], two s16 per word), sets MAC0-overflow flags
+ * 15/16 on the s32 boundary, writes MAC0 (DR[24]) and the FLAG checksum
+ * (CR[31]).  The arithmetic here is the sequence validated bit-exact against
+ * mednafen (incl. the FLAG register) in the GTE emission test harness.
+ *
+ * The 64-bit-wide products/sum rely on a 64-bit host register; this inline
+ * path is only taken when __WORDSIZE >= 64 (see rec_CP2), otherwise the op
+ * falls back to the C wrapper.
+ *
+ * Latency: GTE_Instruction() returns NCLIP's (cycles - 1) = 7, and cop2_op
+ * records gte_ts_done = max(current_cycle, gte_ts_done) + 7.  Replicate that
+ * here, sourcing current_cycle from the live cycle register exactly as the
+ * exit path does (target_cycle - REG_CYCLE), since no C-wrapper dispatch
+ * runs to sync it. */
+static void rec_cp2_inline_NCLIP(struct lightrec_cstate *state,
+				 const struct block *block, u16 offset)
+{
+	struct regcache *reg_cache = state->reg_cache;
+	jit_state_t *_jit = block->_jit;
+	u8 acc, a, b;
+
+	_jit_name(block->_jit, __func__);
+	jit_note(__FILE__, __LINE__);
+
+	/* Register pressure is kept to three temps (NUM_TEMPS can be as low as
+	 * 2-3), so the six s16 inputs are reloaded from the FIFO words rather
+	 * than all held live.  A FIFO word's low half is x (sign-extend low
+	 * 16); high half is y (arithmetic >>16). */
+	acc = lightrec_alloc_reg_temp(reg_cache, _jit);
+	a   = lightrec_alloc_reg_temp(reg_cache, _jit);
+	b   = lightrec_alloc_reg_temp(reg_cache, _jit);
+
+	/* term 0: x0 * (y1 - y2) */
+	jit_ldxi_i(a, LIGHTREC_REG_STATE, cp2d_i_offset(13)); jit_rshi(a, a, 16); /* y1 */
+	jit_ldxi_i(b, LIGHTREC_REG_STATE, cp2d_i_offset(14)); jit_rshi(b, b, 16); /* y2 */
+	jit_subr(a, a, b);                                                        /* y1-y2 */
+	jit_ldxi_i(b, LIGHTREC_REG_STATE, cp2d_i_offset(12));
+	jit_lshi(b, b, __WORDSIZE-16); jit_rshi(b, b, __WORDSIZE-16);             /* x0 */
+	jit_mulr(acc, b, a);
+
+	/* term 1: x1 * (y2 - y0) */
+	jit_ldxi_i(a, LIGHTREC_REG_STATE, cp2d_i_offset(14)); jit_rshi(a, a, 16); /* y2 */
+	jit_ldxi_i(b, LIGHTREC_REG_STATE, cp2d_i_offset(12)); jit_rshi(b, b, 16); /* y0 */
+	jit_subr(a, a, b);                                                        /* y2-y0 */
+	jit_ldxi_i(b, LIGHTREC_REG_STATE, cp2d_i_offset(13));
+	jit_lshi(b, b, __WORDSIZE-16); jit_rshi(b, b, __WORDSIZE-16);             /* x1 */
+	jit_mulr(a, b, a);
+	jit_addr(acc, acc, a);
+
+	/* term 2: x2 * (y0 - y1) */
+	jit_ldxi_i(a, LIGHTREC_REG_STATE, cp2d_i_offset(12)); jit_rshi(a, a, 16); /* y0 */
+	jit_ldxi_i(b, LIGHTREC_REG_STATE, cp2d_i_offset(13)); jit_rshi(b, b, 16); /* y1 */
+	jit_subr(a, a, b);                                                        /* y0-y1 */
+	jit_ldxi_i(b, LIGHTREC_REG_STATE, cp2d_i_offset(14));
+	jit_lshi(b, b, __WORDSIZE-16); jit_rshi(b, b, __WORDSIZE-16);             /* x2 */
+	jit_mulr(a, b, a);
+	jit_addr(acc, acc, a);                   /* acc = full 64-bit sum */
+
+	/* FLAG (reuse a) = 0; bit15 if acc < -2^31, bit16 if acc > 2^31-1 */
+	jit_movi(a, 0);
+	{
+		jit_node_t *ge, *le;
+		jit_movi(b, (long)(-2147483648LL));
+		ge = jit_bger(acc, b);
+		jit_ori(a, a, 1u << 15);
+		jit_patch(ge);
+		jit_movi(b, (long)(2147483647LL));
+		le = jit_bler(acc, b);
+		jit_ori(a, a, 1u << 16);
+		jit_patch(le);
+	}
+
+	/* MAC0 = (s32)acc */
+	jit_stxi_i(cp2d_i_offset(24), LIGHTREC_REG_STATE, acc);
+
+	/* checksum: if (FLAG & 0x7f87e000) FLAG |= 1<<31 */
+	{
+		jit_node_t *no;
+		jit_andi(b, a, 0x7f87e000u);
+		no = jit_beqi(b, 0);
+		jit_ori(a, a, 1u << 31);
+		jit_patch(no);
+	}
+	jit_stxi_i(cp2c_i_offset(31), LIGHTREC_REG_STATE, a);
+
+	/* Latency: ts = current_cycle (target_cycle - REG_CYCLE);
+	 *          if ts < gte_ts_done ts = gte_ts_done; gte_ts_done = ts + 7. */
+	{
+		jit_node_t *no_stall;
+		jit_ldxi_i(acc, LIGHTREC_REG_STATE, lightrec_offset(target_cycle));
+		jit_subr(acc, acc, LIGHTREC_REG_CYCLE);          /* current_cycle */
+		jit_ldxi_i(b, LIGHTREC_REG_STATE, lightrec_offset(gte_ts_done));
+		no_stall = jit_bger(acc, b);
+		jit_movr(acc, b);
+		jit_patch(no_stall);
+		jit_addi(acc, acc, 7);                           /* NCLIP latency */
+		jit_stxi_i(lightrec_offset(gte_ts_done), LIGHTREC_REG_STATE, acc);
+	}
+
+	lightrec_free_reg(reg_cache, acc);
+	lightrec_free_reg(reg_cache, a);
+	lightrec_free_reg(reg_cache, b);
+}
+
 static void rec_CP2(struct lightrec_cstate *state,
 		    const struct block *block, u16 offset)
 {
@@ -3412,6 +3520,18 @@ static void rec_CP2(struct lightrec_cstate *state,
 			(*f)(state, block, offset);
 			return;
 		}
+	}
+
+	/* Inline-emit GTE NCLIP (function code 0x06) on 64-bit hosts: the
+	 * arithmetic is validated bit-exact and the latency update is emitted
+	 * inline (gte_ts_done lives in lightrec_state).  This avoids the C-call
+	 * boundary and the register spill it forces.  Skipped when the GTE op
+	 * needs the C path for PGXP (cop2_notify installed), since NCLIP has a
+	 * PGXP variant handled in the C op. */
+	if (__WORDSIZE >= 64 && (c.opcode & 0x3f) == 0x06 &&
+	    !state->state->ops.cop2_notify) {
+		rec_cp2_inline_NCLIP(state, block, offset);
+		return;
 	}
 
 	/* GTE compute opcode: emit a direct call to the specialised COP2
