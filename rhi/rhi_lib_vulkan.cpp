@@ -15682,7 +15682,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		VK_ASSERT(buffer.get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		VK_ASSERT(buffer_get_create_info(&buffer).usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		ResourceBinding &b = bindings.bindings[set][binding];
 
 		if (buffer.cookie_base.cookie == bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
@@ -15712,7 +15712,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		VK_ASSERT(bufferview_get_buffer(&view).get_create_info().usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
+		VK_ASSERT(buffer_get_create_info(&bufferview_get_buffer(&view)).usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 		if (view.cookie_base.cookie == bindings.cookies[set][binding])
 			return;
 		ResourceBinding &b = bindings.bindings[set][binding];
@@ -15735,7 +15735,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 			ImageView *view = framebuffer->get_attachment(ref.attachment);
 			VK_ASSERT(view);
-			VK_ASSERT(view->get_image().get_create_info().usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+			VK_ASSERT(image_get_create_info(&imageview_get_image(view)).usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
 
 			if (view->cookie_base.cookie == bindings.cookies[set][start_binding + i] &&
 					bindings.bindings[set][start_binding + i].image.fp.imageLayout == ref.layout)
@@ -15775,7 +15775,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view)
 	{
-		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
+		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view)).usage & VK_IMAGE_USAGE_SAMPLED_BIT);
 		set_texture(set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
 				image_get_layout(&imageview_get_image_const(&view), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.cookie_base.cookie);
 	}
@@ -15790,14 +15790,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_SAMPLED_BIT);
+		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view)).usage & VK_IMAGE_USAGE_SAMPLED_BIT);
 		const Sampler &sampler = device->get_stock_sampler(stock);
 		set_texture(set, binding, view, sampler);
 	}
 
 	void CommandBuffer::set_storage_texture(unsigned set, unsigned binding, const ImageView &view)
 	{
-		VK_ASSERT(view.get_image().get_create_info().usage & VK_IMAGE_USAGE_STORAGE_BIT);
+		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view)).usage & VK_IMAGE_USAGE_STORAGE_BIT);
 		set_texture(set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
 				image_get_layout(&imageview_get_image_const(&view), VK_IMAGE_LAYOUT_GENERAL), view.cookie_base.cookie);
 	}
