@@ -20840,11 +20840,13 @@ Rect fromSRect(SRect rect) {
 				if (handle.index != -1) {
 					TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
 				}
-				return {
-					{0, 0, 1, 1},
-					{0, 0, (int)(image_get_width(ih_get(&self->default_hd_texture), 0)), (int)(image_get_height(ih_get(&self->default_hd_texture), 0))},
-					self->default_hd_texture
-				};
+				{
+					HdTexture _r;
+					_r.vram_rect = (SRect){0, 0, 1, 1};
+					_r.texel_rect = (SRect){0, 0, (int)(image_get_width(ih_get(&self->default_hd_texture), 0)), (int)(image_get_height(ih_get(&self->default_hd_texture), 0))};
+					_r.texture = self->default_hd_texture;
+					return _r;
+				}
 			}
 			TextureUpload *upload = tex->upload;
 			// Use find rather than index, because if a stale HdTextureHandle was provided this could segfault
@@ -20852,11 +20854,13 @@ Rect fromSRect(SRect rect) {
 			HdTexEntry *iter = hd_tex_map_find(&upload->textures, handle.palette_hash);
 			if (iter == NULL) {
 				TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
-				return {
-					{0, 0, 1, 1},
-					{0, 0, (int)(image_get_width(ih_get(&self->default_hd_texture), 0)), (int)(image_get_height(ih_get(&self->default_hd_texture), 0))},
-					self->default_hd_texture
-				};
+				{
+					HdTexture _r;
+					_r.vram_rect = (SRect){0, 0, 1, 1};
+					_r.texel_rect = (SRect){0, 0, (int)(image_get_width(ih_get(&self->default_hd_texture), 0)), (int)(image_get_height(ih_get(&self->default_hd_texture), 0))};
+					_r.texture = self->default_hd_texture;
+					return _r;
+				}
 			}
 			/* Reconstruct a counted handle from the stored raw image (add_reference
 			 * then adopt), matching hd_gpu_image_handle. */
@@ -20865,16 +20869,22 @@ Rect fromSRect(SRect rect) {
 			int scaleX = image_get_width(ih_get(&image), 0) / upload->width;
 			int scaleY = image_get_height(ih_get(&image), 0) / upload->height;
 			SRect texture_subrect = texture_rect_subrect(tex);
-			return {
-				tex->vram_rect,
-				{
+			{
+				HdTexture _r;
+				_r.vram_rect = tex->vram_rect;
+				_r.texel_rect = (SRect){
 					texture_subrect.x * scaleX,
 					texture_subrect.y * scaleY,
 					texture_subrect.width * scaleX,
 					texture_subrect.height * scaleY
-				},
-				image
-			};
+				};
+				/* Move the owned reference built just above into the result; the
+				 * local 'image' is not ih_reset, so the +1 ref from
+				 * image_add_reference lives on in _r.texture exactly as the C++
+				 * copy-into-return / local-dtor pair netted out. */
+				_r.texture = image;
+				return _r;
+			}
 		}
 		else
 			return fused_pages_get_from_handle(&self->fused_pages, handle, &self->default_hd_texture);
