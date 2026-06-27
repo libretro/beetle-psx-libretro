@@ -5462,14 +5462,14 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 
 	/* Group C: descriptor / resource-bind free functions. The 4 set_texture
 	 * overloads become distinctly-named free functions. */
-	void commandbuffer_set_buffer_view(struct CommandBuffer *self, unsigned set, unsigned binding, const BufferView &view);
+	void commandbuffer_set_buffer_view(struct CommandBuffer *self, unsigned set, unsigned binding, const BufferView *view);
 	void commandbuffer_set_input_attachments(struct CommandBuffer *self, unsigned set, unsigned start_binding);
 	void commandbuffer_set_texture_raw(struct CommandBuffer *self, unsigned set, unsigned binding, VkImageView float_view, VkImageView integer_view, VkImageLayout layout, uint64_t cookie);
 	void commandbuffer_set_texture_view(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView *view);
-	void commandbuffer_set_texture_view_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView *view, const Sampler &sampler);
+	void commandbuffer_set_texture_view_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView *view, const Sampler *sampler);
 	void commandbuffer_set_texture_view_stock(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView *view, StockSampler stock);
 	void commandbuffer_set_storage_texture(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView *view);
-	void commandbuffer_set_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const Sampler &sampler);
+	void commandbuffer_set_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const Sampler *sampler);
 	void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer *buffer, VkDeviceSize offset, VkDeviceSize range);
 	void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
 	void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate);
@@ -5885,7 +5885,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	 * the access-granting role is gone, but these forward declarations are still needed:
 	 * the inline device_* helpers defined just after the struct call functions whose
 	 * definitions appear much later in the file. */
-	void device_set_context(Device *self, const Context &context);
+	void device_set_context(Device *self, const Context *context);
 	void device_end_frame_nolock(Device *self);
 	void device_init_frame_contexts(Device *self, unsigned count);
 	void device_wait_idle_nolock(Device *self);
@@ -5906,20 +5906,20 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	CommandBufferHandle device_request_command_buffer_nolock(Device *self, CommandBufferType type);
 	void device_request_vertex_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size);
 	void device_request_uniform_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size);
-	void device_free_memory_nolock(Device *self, const DeviceAllocation &alloc);
+	void device_free_memory_nolock(Device *self, const DeviceAllocation *alloc);
 	bool device_get_image_format_properties(Device *self, VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags, VkImageFormatProperties *properties);
 	uint32_t device_find_memory_type_buffer(Device *self, BufferDomain domain, uint32_t mask);
 	uint32_t device_find_memory_type_image(Device *self, ImageDomain domain, uint32_t mask);
 	void device_set_name_buffer(Device *self, const Buffer *buffer, const char *name);
 	void device_set_name_image(Device *self, const Image *image, const char *name);
 	bool device_memory_type_is_host_visible(Device *self, uint32_t type);
-	BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo &view_info);
-	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo &create_info);
+	BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo *view_info);
+	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo *create_info);
 	InitialImageBuffer device_create_image_staging_buffer(Device *self, const ImageCreateInfo *info, const ImageInitialData *initial);
 	ImageHandle device_create_image(Device *self, const ImageCreateInfo *create_info, const ImageInitialData *initial);
 	ImageHandle device_create_image_from_staging_buffer(Device *self, const ImageCreateInfo *create_info, const InitialImageBuffer *buffer);
-	SamplerHandle device_create_sampler(Device *self, const SamplerCreateInfo &sampler_info, StockSampler stock_sampler);
-	BufferHandle device_create_buffer(Device *self, const BufferCreateInfo &create_info, const void *initial);
+	SamplerHandle device_create_sampler(Device *self, const SamplerCreateInfo *sampler_info, StockSampler stock_sampler);
+	BufferHandle device_create_buffer(Device *self, const BufferCreateInfo *create_info, const void *initial);
 	Program *device_request_program_compute_shader(Device *self, Shader *compute);
 	Program *device_request_program_compute_code(Device *self, const uint32_t *compute_data, size_t compute_size);
 	Program *device_request_program_graphics_shaders(Device *self, Shader *vertex, Shader *fragment);
@@ -9751,7 +9751,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 		{ unsigned i; for (i = 0; i < info.levels; i++) {
 			view_info.base_level = i;
 			view_info.levels = 1;
-			imageview_vec_push(&self->scaled_views, device_create_image_view(self->device, view_info));
+			imageview_vec_push(&self->scaled_views, device_create_image_view(self->device, &view_info));
 		} }
 	}
 
@@ -9834,7 +9834,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	buffer_create_info.domain = BufferDomain_Device;
 	buffer_create_info.size = sizeof(quad_data);
 	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	self->quad = device_create_buffer(self->device, buffer_create_info, quad_data);
+	self->quad = device_create_buffer(self->device, &buffer_create_info, quad_data);
 
 	renderer_flush(self);
 	renderer_reset_scissor_queue(self);
@@ -9851,7 +9851,7 @@ void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out){
 	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
+	BufferHandle buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
 	{ Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &_r); }
 	renderer_ensure_command_buffer(self);
 	{ VkOffset3D _o = { 0, 0, 0 }; VkExtent3D _e = { FB_WIDTH, FB_HEIGHT, 1 }; VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }; commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), ih_get(&self->framebuffer), 0, &_o, &_e, 0, 0,
@@ -10072,7 +10072,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 	buffer_create_info.size = copy_rect.width * copy_rect.height * 4;
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
+	BufferHandle buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
 	{
 	VkOffset3D _o = { (int)(copy_rect.x), (int)(copy_rect.y), 0 };
 	VkExtent3D _e = { copy_rect.width, copy_rect.height, 1 };
@@ -11397,9 +11397,9 @@ const ClearCandidate * renderer_find_clear_candidate(Renderer *self, const Rect 
 		int _i;
 		for (_i = 0; _i < ClearCandidateVec_size((struct ClearCandidateVec *)&self->queue.clear_candidates); _i++)
 		{
-			const ClearCandidate &c = *ClearCandidateVec_at((struct ClearCandidateVec *)&self->queue.clear_candidates, _i);
-			if (rect_eq(&c.rect, rect))
-				ret = &c;
+			const ClearCandidate *c = ClearCandidateVec_at((struct ClearCandidateVec *)&self->queue.clear_candidates, _i);
+			if (rect_eq(&c->rect, rect))
+				ret = c;
 		}
 	}
 	return ret;
@@ -11953,7 +11953,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 	buffer_create_info.domain = BufferDomain_Host;
 	buffer_create_info.size = size;
 	buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
-	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
+	BufferHandle buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
 
 	BufferViewCreateInfo view_info = {};
 	view_info.buffer = bh_get(&buffer);
@@ -11977,11 +11977,11 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 			view_info.offset = y * rect->width * sizeof(uint16_t);
 			view_info.range = y_size * rect->width * sizeof(uint16_t);
 			view_info.format = VK_FORMAT_R16_UINT;
-			BufferViewHandle view = device_create_buffer_view(self->device, view_info);
+			BufferViewHandle view = device_create_buffer_view(self->device, &view_info);
 
 			Rect small_rect = { rect->x, rect->y + y, rect->width, y_size };
 
-			commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, *bvh_get(&view));
+			commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, bvh_get(&view));
 			Push push = { small_rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
 			commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 			commandbuffer_dispatch(cbh_get(&self->cmd), (small_rect.width + 7) >> 3, (small_rect.height + 7) >> 3, 1);
@@ -11993,9 +11993,9 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 		view_info.offset = 0;
 		view_info.range = size;
 		view_info.format = VK_FORMAT_R16_UINT;
-		BufferViewHandle view = device_create_buffer_view(self->device, view_info);
+		BufferViewHandle view = device_create_buffer_view(self->device, &view_info);
 
-		commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, *bvh_get(&view));
+		commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, bvh_get(&view));
 
 		Push push = { *rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
 		commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
@@ -12699,7 +12699,7 @@ static void buffer_init(struct Buffer *self, Device *device, VkBuffer buffer, co
 void buffer_fini(struct Buffer *self)
 {
 	device_destroy_buffer_nolock(self->device, self->buffer);
-	device_free_memory_nolock(self->device, self->alloc);
+	device_free_memory_nolock(self->device, &self->alloc);
 }
 
 static void buffer_release_reference(struct Buffer *self)
@@ -12838,7 +12838,7 @@ void image_fini(struct Image *self)
 	if (deviceallocation_get_memory(&self->alloc))
 	{
 		device_destroy_image_nolock(self->device, self->image);
-		device_free_memory_nolock(self->device, self->alloc);
+		device_free_memory_nolock(self->device, &self->alloc);
 	}
 }
 
@@ -13014,7 +13014,7 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 	info.size = size;
 	info.usage = self->usage;
 
-	block.gpu = device_create_buffer(self->device, info, NULL);
+	block.gpu = device_create_buffer(self->device, &info, NULL);
 	device_set_name_buffer(self->device, bh_get(&block.gpu), "chain-allocated-block-gpu");
 
 	// Try to map it, will fail unless the memory is host visible.
@@ -13027,7 +13027,7 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 		cpu_info.size = size;
 		cpu_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-		block.cpu = device_create_buffer(self->device, cpu_info, NULL);
+		block.cpu = device_create_buffer(self->device, &cpu_info, NULL);
 		device_set_name_buffer(self->device, bh_get(&block.cpu), "chain-allocated-block-cpu");
 		block.mapped = (uint8_t *)(device_map_host_buffer(self->device, bh_get(&block.cpu), MEMORY_ACCESS_WRITE_BIT));
 	}
@@ -14780,34 +14780,34 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		// Store the important subpass information for later.
 		{ uint32_t subpass_idx; for (subpass_idx = 0; subpass_idx < rp_info.subpassCount; subpass_idx++) {
-			const VkSubpassDescription &subpass = rp_info.pSubpasses[subpass_idx];
+			const VkSubpassDescription *subpass = &rp_info.pSubpasses[subpass_idx];
 
 			RenderPassSubpassInfo subpass_info = {};
 			/* Defensive bounds: the internal RenderPassInfo builder always stays
 			 * within VULKAN_NUM_ATTACHMENTS and sets a non-NULL depth-stencil
 			 * pointer, but clamp and null-check here so a stray/large subpass can
 			 * never overrun the fixed-size arrays or deref NULL. */
-			subpass_info.num_color_attachments = subpass.colorAttachmentCount;
-			subpass_info.num_input_attachments = subpass.inputAttachmentCount;
-			VK_ASSERT(subpass.colorAttachmentCount <= VULKAN_NUM_ATTACHMENTS);
-			VK_ASSERT(subpass.inputAttachmentCount <= VULKAN_NUM_ATTACHMENTS);
+			subpass_info.num_color_attachments = subpass->colorAttachmentCount;
+			subpass_info.num_input_attachments = subpass->inputAttachmentCount;
+			VK_ASSERT(subpass->colorAttachmentCount <= VULKAN_NUM_ATTACHMENTS);
+			VK_ASSERT(subpass->inputAttachmentCount <= VULKAN_NUM_ATTACHMENTS);
 			if (subpass_info.num_color_attachments > VULKAN_NUM_ATTACHMENTS)
 				subpass_info.num_color_attachments = VULKAN_NUM_ATTACHMENTS;
 			if (subpass_info.num_input_attachments > VULKAN_NUM_ATTACHMENTS)
 				subpass_info.num_input_attachments = VULKAN_NUM_ATTACHMENTS;
-			if (subpass.pDepthStencilAttachment)
-				subpass_info.depth_stencil_attachment = *subpass.pDepthStencilAttachment;
+			if (subpass->pDepthStencilAttachment)
+				subpass_info.depth_stencil_attachment = *subpass->pDepthStencilAttachment;
 			else
 			{
 				subpass_info.depth_stencil_attachment.attachment = VK_ATTACHMENT_UNUSED;
 				subpass_info.depth_stencil_attachment.layout     = VK_IMAGE_LAYOUT_UNDEFINED;
 			}
 			if (subpass_info.num_color_attachments)
-				memcpy(subpass_info.color_attachments, subpass.pColorAttachments,
-						subpass_info.num_color_attachments * sizeof(*subpass.pColorAttachments));
+				memcpy(subpass_info.color_attachments, subpass->pColorAttachments,
+						subpass_info.num_color_attachments * sizeof(*subpass->pColorAttachments));
 			if (subpass_info.num_input_attachments)
-				memcpy(subpass_info.input_attachments, subpass.pInputAttachments,
-						subpass_info.num_input_attachments * sizeof(*subpass.pInputAttachments));
+				memcpy(subpass_info.input_attachments, subpass->pInputAttachments,
+						subpass_info.num_input_attachments * sizeof(*subpass->pInputAttachments));
 
 			unsigned samples = 0;
 			{ unsigned i; for (i = 0; i < subpass_info.num_color_attachments; i++) {
@@ -15425,11 +15425,11 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 	VkPipeline commandbuffer_build_compute_pipeline(struct CommandBuffer *self, Hash hash)
 	{
-		const Shader &shader = *program_get_shader(self->current_program, ShaderStage_Compute);
+		const Shader *shader = program_get_shader(self->current_program, ShaderStage_Compute);
 		VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
 		info.layout = pipeline_layout_get_layout(program_get_pipeline_layout(self->current_program));
 		info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		info.stage.module = shader_get_module(&shader);
+		info.stage.module = shader_get_module(shader);
 		info.stage.pName = "main";
 		info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 
@@ -15930,30 +15930,30 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		self->dirty_sets |= 1u << set;
 	}
 
-	void commandbuffer_set_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const Sampler &sampler)
+	void commandbuffer_set_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const Sampler *sampler)
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		if (sampler.cookie_base.cookie == self->bindings.secondary_cookies[set][binding])
+		if (sampler->cookie_base.cookie == self->bindings.secondary_cookies[set][binding])
 			return;
 
 		ResourceBinding &b = self->bindings.bindings[set][binding];
-		b.image.fp.sampler = sampler_get_sampler(&sampler);
-		b.image.integer.sampler = sampler_get_sampler(&sampler);
+		b.image.fp.sampler = sampler_get_sampler(sampler);
+		b.image.integer.sampler = sampler_get_sampler(sampler);
 		self->dirty_sets |= 1u << set;
-		self->bindings.secondary_cookies[set][binding] = sampler.cookie_base.cookie;
+		self->bindings.secondary_cookies[set][binding] = sampler->cookie_base.cookie;
 	}
 
-	void commandbuffer_set_buffer_view(struct CommandBuffer *self, unsigned set, unsigned binding, const BufferView &view)
+	void commandbuffer_set_buffer_view(struct CommandBuffer *self, unsigned set, unsigned binding, const BufferView *view)
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		VK_ASSERT(buffer_get_create_info(bufferview_get_buffer(&view))->usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-		if (view.cookie_base.cookie == self->bindings.cookies[set][binding])
+		VK_ASSERT(buffer_get_create_info(bufferview_get_buffer(view))->usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
+		if (view->cookie_base.cookie == self->bindings.cookies[set][binding])
 			return;
 		ResourceBinding &b = self->bindings.bindings[set][binding];
-		b.buffer_view = bufferview_get_view(&view);
-		self->bindings.cookies[set][binding] = view.cookie_base.cookie;
+		b.buffer_view = bufferview_get_view(view);
+		self->bindings.cookies[set][binding] = view->cookie_base.cookie;
 		self->bindings.secondary_cookies[set][binding] = 0;
 		self->dirty_sets |= 1u << set;
 	}
@@ -15964,23 +15964,23 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VK_ASSERT(start_binding + render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass) <= VULKAN_NUM_BINDINGS);
 		unsigned num_input_attachments = render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass);
 		{ unsigned i; for (i = 0; i < num_input_attachments; i++) {
-			const VkAttachmentReference &ref = *render_pass_get_input_attachment(self->actual_render_pass, self->current_subpass, i);
-			if (ref.attachment == VK_ATTACHMENT_UNUSED)
+			const VkAttachmentReference *ref = render_pass_get_input_attachment(self->actual_render_pass, self->current_subpass, i);
+			if (ref->attachment == VK_ATTACHMENT_UNUSED)
 				continue;
 
-			ImageView *view = framebuffer_get_attachment(self->framebuffer, ref.attachment);
+			ImageView *view = framebuffer_get_attachment(self->framebuffer, ref->attachment);
 			VK_ASSERT(view);
 			VK_ASSERT(image_get_create_info(imageview_get_image(view))->usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
 
 			if (view->cookie_base.cookie == self->bindings.cookies[set][start_binding + i] &&
-					self->bindings.bindings[set][start_binding + i].image.fp.imageLayout == ref.layout)
+					self->bindings.bindings[set][start_binding + i].image.fp.imageLayout == ref->layout)
 			{
 				continue;
 			}
 
 			ResourceBinding &b = self->bindings.bindings[set][start_binding + i];
-			b.image.fp.imageLayout = ref.layout;
-			b.image.integer.imageLayout = ref.layout;
+			b.image.fp.imageLayout = ref->layout;
+			b.image.integer.imageLayout = ref->layout;
 			b.image.fp.imageView = imageview_get_float_view(view);
 			b.image.integer.imageView = imageview_get_integer_view(view);
 			self->bindings.cookies[set][start_binding + i] = view->cookie_base.cookie;
@@ -16015,7 +16015,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				image_get_layout(imageview_get_image_const(view), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view->cookie_base.cookie);
 	}
 
-	void commandbuffer_set_texture_view_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView *view, const Sampler &sampler)
+	void commandbuffer_set_texture_view_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView *view, const Sampler *sampler)
 	{
 		commandbuffer_set_sampler(self, set, binding, sampler);
 		commandbuffer_set_texture_view(self, set, binding, view);
@@ -16027,7 +16027,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 		VK_ASSERT(image_get_create_info(imageview_get_image_const(view))->usage & VK_IMAGE_USAGE_SAMPLED_BIT);
 		const Sampler *sampler = device_get_stock_sampler(self->device, stock);
-		commandbuffer_set_texture_view_sampler(self, set, binding, view, *sampler);
+		commandbuffer_set_texture_view_sampler(self, set, binding, view, sampler);
 	}
 
 	void commandbuffer_set_storage_texture(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView *view)
@@ -17024,21 +17024,21 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 			uint32_t stage_mask = 1u << i;
 
-			const ResourceLayout &shader_layout = *shader_get_layout(shader);
+			const ResourceLayout *shader_layout = shader_get_layout(shader);
 			{ unsigned set; for (set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++) {
-				layout.sets[set].sampled_image_mask |= shader_layout.sets[set].sampled_image_mask;
-				layout.sets[set].storage_image_mask |= shader_layout.sets[set].storage_image_mask;
-				layout.sets[set].uniform_buffer_mask |= shader_layout.sets[set].uniform_buffer_mask;
-				layout.sets[set].storage_buffer_mask |= shader_layout.sets[set].storage_buffer_mask;
-				layout.sets[set].sampled_buffer_mask |= shader_layout.sets[set].sampled_buffer_mask;
-				layout.sets[set].input_attachment_mask |= shader_layout.sets[set].input_attachment_mask;
-				layout.sets[set].sampler_mask |= shader_layout.sets[set].sampler_mask;
-				layout.sets[set].separate_image_mask |= shader_layout.sets[set].separate_image_mask;
-				layout.sets[set].fp_mask |= shader_layout.sets[set].fp_mask;
+				layout.sets[set].sampled_image_mask |= shader_layout->sets[set].sampled_image_mask;
+				layout.sets[set].storage_image_mask |= shader_layout->sets[set].storage_image_mask;
+				layout.sets[set].uniform_buffer_mask |= shader_layout->sets[set].uniform_buffer_mask;
+				layout.sets[set].storage_buffer_mask |= shader_layout->sets[set].storage_buffer_mask;
+				layout.sets[set].sampled_buffer_mask |= shader_layout->sets[set].sampled_buffer_mask;
+				layout.sets[set].input_attachment_mask |= shader_layout->sets[set].input_attachment_mask;
+				layout.sets[set].sampler_mask |= shader_layout->sets[set].sampler_mask;
+				layout.sets[set].separate_image_mask |= shader_layout->sets[set].separate_image_mask;
+				layout.sets[set].fp_mask |= shader_layout->sets[set].fp_mask;
 
-				FOR_EACH_BIT(shader_layout.sets[set].immutable_sampler_mask, binding)
+				FOR_EACH_BIT(shader_layout->sets[set].immutable_sampler_mask, binding)
 				{
-					StockSampler sampler = get_immutable_sampler(&shader_layout.sets[set], binding);
+					StockSampler sampler = get_immutable_sampler(&shader_layout->sets[set], binding);
 
 					// Do we already have an immutable sampler? Make sure it matches the layout.
 					if (has_immutable_sampler(&layout.sets[set], binding))
@@ -17051,14 +17051,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				}
 
 				uint32_t active_binds =
-					shader_layout.sets[set].sampled_image_mask |
-					shader_layout.sets[set].storage_image_mask |
-					shader_layout.sets[set].uniform_buffer_mask|
-					shader_layout.sets[set].storage_buffer_mask |
-					shader_layout.sets[set].sampled_buffer_mask |
-					shader_layout.sets[set].input_attachment_mask |
-					shader_layout.sets[set].sampler_mask |
-					shader_layout.sets[set].separate_image_mask;
+					shader_layout->sets[set].sampled_image_mask |
+					shader_layout->sets[set].storage_image_mask |
+					shader_layout->sets[set].uniform_buffer_mask|
+					shader_layout->sets[set].storage_buffer_mask |
+					shader_layout->sets[set].sampled_buffer_mask |
+					shader_layout->sets[set].input_attachment_mask |
+					shader_layout->sets[set].sampler_mask |
+					shader_layout->sets[set].separate_image_mask;
 
 				if (active_binds)
 					layout.stages_for_sets[set] |= stage_mask;
@@ -17071,15 +17071,15 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 			// Merge push constant ranges into one range.
 			// Do not try to split into multiple ranges as it just complicates things for no obvious gain.
-			if (shader_layout.push_constant_size != 0)
+			if (shader_layout->push_constant_size != 0)
 			{
 				layout.push_constant_range.stageFlags |= 1u << i;
 				layout.push_constant_range.size =
-					max_(layout.push_constant_range.size, shader_layout.push_constant_size);
+					max_(layout.push_constant_range.size, shader_layout->push_constant_size);
 			}
 
-			layout.spec_constant_mask[i] = shader_layout.spec_constant_mask;
-			layout.combined_spec_constant_mask |= shader_layout.spec_constant_mask;
+			layout.spec_constant_mask[i] = shader_layout->spec_constant_mask;
+			layout.combined_spec_constant_mask |= shader_layout->spec_constant_mask;
 		} }
 
 		{ unsigned i; for (i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++) {
@@ -17094,20 +17094,20 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		program_set_pipeline_layout(&program, device_request_pipeline_layout(self, &layout));
 	}
 
-	void device_set_context(Device *self, const Context &context){
-		self->instance = context_get_instance(&context);
-		self->gpu = context_get_gpu(&context);
-		self->device = context_get_device(&context);
+	void device_set_context(Device *self, const Context *context){
+		self->instance = context_get_instance(context);
+		self->gpu = context_get_gpu(context);
+		self->device = context_get_device(context);
 
-		self->graphics_queue_family_index = context_get_graphics_queue_family(&context);
-		self->graphics_queue = context_get_graphics_queue(&context);
-		self->compute_queue_family_index = context_get_compute_queue_family(&context);
-		self->compute_queue = context_get_compute_queue(&context);
-		self->transfer_queue_family_index = context_get_transfer_queue_family(&context);
-		self->transfer_queue = context_get_transfer_queue(&context);
+		self->graphics_queue_family_index = context_get_graphics_queue_family(context);
+		self->graphics_queue = context_get_graphics_queue(context);
+		self->compute_queue_family_index = context_get_compute_queue_family(context);
+		self->compute_queue = context_get_compute_queue(context);
+		self->transfer_queue_family_index = context_get_transfer_queue_family(context);
+		self->transfer_queue = context_get_transfer_queue(context);
 
-		self->mem_props = *context_get_mem_props(&context);
-		self->gpu_props = *context_get_gpu_props(&context);
+		self->mem_props = *context_get_mem_props(context);
+		self->gpu_props = *context_get_gpu_props(context);
 
 		device_init_workarounds(self);
 
@@ -17119,7 +17119,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		device_init_frame_contexts(self, 2); // By default, regular double buffer between CPU and GPU.
 #endif
 
-		self->ext = *context_get_enabled_device_features(&context);
+		self->ext = *context_get_enabled_device_features(context);
 
 		deviceallocator_init(&self->managers.memory, self->gpu, self->device);
 		deviceallocator_set_supports_dedicated_allocation(&self->managers.memory, self->ext.supports_dedicated);
@@ -17201,7 +17201,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					info.address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 					break;
 			}
-			self->samplers[i] = device_create_sampler(self, info, mode);
+			self->samplers[i] = device_create_sampler(self, &info, mode);
 		} }
 	}
 
@@ -17791,8 +17791,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		cbhvec_init(&self->transfer_submissions);
 	}
 
-	void device_free_memory_nolock(Device *self, const DeviceAllocation &alloc){
-		DeviceAllocationVec_push(&device_frame(self)->allocations, &alloc);
+	void device_free_memory_nolock(Device *self, const DeviceAllocation *alloc){
+		DeviceAllocationVec_push(&device_frame(self)->allocations, alloc);
 	}
 
 #ifdef VULKAN_DEBUG
@@ -18186,19 +18186,19 @@ VkImageViewType get_image_view_type(const ImageCreateInfo *create_info, const Im
 		}
 	}
 
-	BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo &view_info){
+	BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo *view_info){
 		VkBufferViewCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO };
-		info.buffer = buffer_get_buffer(view_info.buffer);
-		info.format = view_info.format;
-		info.offset = view_info.offset;
-		info.range = view_info.range;
+		info.buffer = buffer_get_buffer(view_info->buffer);
+		info.format = view_info->format;
+		info.offset = view_info->offset;
+		info.range = view_info->range;
 
 		VkBufferView view;
 		VkResult res = vkCreateBufferView(self->device, &info, NULL, &view);
 		if (res != VK_SUCCESS)
 			return bvh_make(NULL);
 
-		{ struct BufferView *_bv = (struct BufferView *)object_pool_raw_allocate(&self->handle_pool.buffer_views); bufferview_init(_bv, self, view, &view_info); return bvh_make(_bv); }
+		{ struct BufferView *_bv = (struct BufferView *)object_pool_raw_allocate(&self->handle_pool.buffer_views); bufferview_init(_bv, self, view, view_info); return bvh_make(_bv); }
 	}
 
 	/* ImageResourceHolder: a scoped owner of the Vulkan objects created while
@@ -18245,9 +18245,9 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	}
 
 	bool image_resource_holder_create_default_views(struct ImageResourceHolder *self, const ImageCreateInfo *create_info, const VkImageViewCreateInfo *view_info);
-	static bool image_resource_holder_create_render_target_views(struct ImageResourceHolder *self, const ImageCreateInfo *image_create_info, const VkImageViewCreateInfo &info);
-	static bool image_resource_holder_create_alt_views(struct ImageResourceHolder *self, const ImageCreateInfo *image_create_info, const VkImageViewCreateInfo &info);
-	static bool image_resource_holder_create_default_view(struct ImageResourceHolder *self, const VkImageViewCreateInfo &info);
+	static bool image_resource_holder_create_render_target_views(struct ImageResourceHolder *self, const ImageCreateInfo *image_create_info, const VkImageViewCreateInfo *info);
+	static bool image_resource_holder_create_alt_views(struct ImageResourceHolder *self, const ImageCreateInfo *image_create_info, const VkImageViewCreateInfo *info);
+	static bool image_resource_holder_create_default_view(struct ImageResourceHolder *self, const VkImageViewCreateInfo *info);
 
 	bool image_resource_holder_create_default_views(struct ImageResourceHolder *self, const ImageCreateInfo *create_info, const VkImageViewCreateInfo *view_info)
 	{
@@ -18273,36 +18273,36 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			view_info = &default_view_info;
 		}
 
-		if (!image_resource_holder_create_alt_views(self, create_info, *view_info))
+		if (!image_resource_holder_create_alt_views(self, create_info, view_info))
 			return false;
 
-		if (!image_resource_holder_create_render_target_views(self, create_info, *view_info))
+		if (!image_resource_holder_create_render_target_views(self, create_info, view_info))
 			return false;
 
-		if (!image_resource_holder_create_default_view(self, *view_info))
+		if (!image_resource_holder_create_default_view(self, view_info))
 			return false;
 
 		return true;
 	}
 
-	static bool image_resource_holder_create_render_target_views(struct ImageResourceHolder *self, const ImageCreateInfo *image_create_info, const VkImageViewCreateInfo &info)
+	static bool image_resource_holder_create_render_target_views(struct ImageResourceHolder *self, const ImageCreateInfo *image_create_info, const VkImageViewCreateInfo *info)
 	{
 
-		if (info.viewType == VK_IMAGE_VIEW_TYPE_3D)
+		if (info->viewType == VK_IMAGE_VIEW_TYPE_3D)
 			return true;
 
 		// If we have a render target, and non-trivial case (layers = 1, levels = 1),
 		// create an array of render targets which correspond to each layer (mip 0).
 		if ((image_create_info->usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0 &&
-				((info.subresourceRange.levelCount > 1) || (info.subresourceRange.layerCount > 1)))
+				((info->subresourceRange.levelCount > 1) || (info->subresourceRange.layerCount > 1)))
 		{
-			VkImageViewCreateInfo view_info = info;
+			VkImageViewCreateInfo view_info = *info;
 			view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			view_info.subresourceRange.baseMipLevel = info.subresourceRange.baseMipLevel;
-			{ uint32_t layer; for (layer = 0; layer < info.subresourceRange.layerCount; layer++) {
+			view_info.subresourceRange.baseMipLevel = info->subresourceRange.baseMipLevel;
+			{ uint32_t layer; for (layer = 0; layer < info->subresourceRange.layerCount; layer++) {
 				view_info.subresourceRange.levelCount = 1;
 				view_info.subresourceRange.layerCount = 1;
-				view_info.subresourceRange.baseArrayLayer = layer + info.subresourceRange.baseArrayLayer;
+				view_info.subresourceRange.baseArrayLayer = layer + info->subresourceRange.baseArrayLayer;
 
 				VkImageView rt_view;
 				if (vkCreateImageView(self->device, &view_info, NULL, &rt_view) != VK_SUCCESS)
@@ -18315,33 +18315,33 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		return true;
 	}
 
-	static bool image_resource_holder_create_alt_views(struct ImageResourceHolder *self, const ImageCreateInfo *image_create_info, const VkImageViewCreateInfo &info)
+	static bool image_resource_holder_create_alt_views(struct ImageResourceHolder *self, const ImageCreateInfo *image_create_info, const VkImageViewCreateInfo *info)
 	{
-		if (info.viewType == VK_IMAGE_VIEW_TYPE_CUBE ||
-				info.viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY ||
-				info.viewType == VK_IMAGE_VIEW_TYPE_3D)
+		if (info->viewType == VK_IMAGE_VIEW_TYPE_CUBE ||
+				info->viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY ||
+				info->viewType == VK_IMAGE_VIEW_TYPE_3D)
 		{
 			return true;
 		}
 
-		if (info.subresourceRange.aspectMask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
+		if (info->subresourceRange.aspectMask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
 		{
 			if ((image_create_info->usage & ~VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
 			{
 				// Sanity check. Don't want to implement layered views for this.
-				if (info.subresourceRange.levelCount > 1)
+				if (info->subresourceRange.levelCount > 1)
 				{
 					LOGE("Cannot create depth stencil attachments with more than 1 mip level currently, and non-DS usage flags.\n");
 					return false;
 				}
 
-				if (info.subresourceRange.layerCount > 1)
+				if (info->subresourceRange.layerCount > 1)
 				{
 					LOGE("Cannot create layered depth stencil attachments with non-DS usage flags.\n");
 					return false;
 				}
 
-				VkImageViewCreateInfo view_info = info;
+				VkImageViewCreateInfo view_info = *info;
 
 				// We need this to be able to sample the texture, or otherwise use it as a non-pure DS attachment.
 				view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -18357,10 +18357,10 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		return true;
 	}
 
-	static bool image_resource_holder_create_default_view(struct ImageResourceHolder *self, const VkImageViewCreateInfo &info)
+	static bool image_resource_holder_create_default_view(struct ImageResourceHolder *self, const VkImageViewCreateInfo *info)
 	{
 		// Create the normal image view. This one contains every subresource.
-		if (vkCreateImageView(self->device, &info, NULL, &self->image_view) != VK_SUCCESS)
+		if (vkCreateImageView(self->device, info, NULL, &self->image_view) != VK_SUCCESS)
 			return false;
 
 		return true;
@@ -18389,33 +18389,33 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			deviceallocation_free_immediate_alloc(&self->allocation, self->allocator);
 	}
 
-	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo &create_info){
+	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo *create_info){
 		ImageResourceHolder holder;
 		image_resource_holder_init(&holder, self->device);
-		const ImageCreateInfo *image_create_info = image_get_create_info(create_info.image);
+		const ImageCreateInfo *image_create_info = image_get_create_info(create_info->image);
 
-		VkFormat format = create_info.format != VK_FORMAT_UNDEFINED ? create_info.format : image_create_info->format;
+		VkFormat format = create_info->format != VK_FORMAT_UNDEFINED ? create_info->format : image_create_info->format;
 
 		VkImageViewCreateInfo view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-		view_info.image = image_get_image(create_info.image);
+		view_info.image = image_get_image(create_info->image);
 		view_info.format = format;
-		view_info.components = create_info.swizzle;
+		view_info.components = create_info->swizzle;
 		view_info.subresourceRange.aspectMask = format_to_aspect_mask(format);
-		view_info.subresourceRange.baseMipLevel = create_info.base_level;
-		view_info.subresourceRange.baseArrayLayer = create_info.base_layer;
-		view_info.subresourceRange.levelCount = create_info.levels;
-		view_info.subresourceRange.layerCount = create_info.layers;
-		view_info.viewType = get_image_view_type(image_create_info, &create_info);
+		view_info.subresourceRange.baseMipLevel = create_info->base_level;
+		view_info.subresourceRange.baseArrayLayer = create_info->base_layer;
+		view_info.subresourceRange.levelCount = create_info->levels;
+		view_info.subresourceRange.layerCount = create_info->layers;
+		view_info.viewType = get_image_view_type(image_create_info, create_info);
 
 		unsigned num_levels;
 		if (view_info.subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS)
-			num_levels = image_get_create_info(create_info.image)->levels - view_info.subresourceRange.baseMipLevel;
+			num_levels = image_get_create_info(create_info->image)->levels - view_info.subresourceRange.baseMipLevel;
 		else
 			num_levels = view_info.subresourceRange.levelCount;
 
 		unsigned num_layers;
 		if (view_info.subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS)
-			num_layers = image_get_create_info(create_info.image)->layers - view_info.subresourceRange.baseArrayLayer;
+			num_layers = image_get_create_info(create_info->image)->layers - view_info.subresourceRange.baseArrayLayer;
 		else
 			num_layers = view_info.subresourceRange.layerCount;
 
@@ -18428,7 +18428,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			return iv_make(NULL);
 		}
 
-		ImageViewCreateInfo tmp = create_info;
+		ImageViewCreateInfo tmp = *create_info;
 		tmp.format = format;
 		struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&self->handle_pool.image_views); imageview_init(_iv, self, holder.image_view, &tmp); ImageViewHandle ret = iv_make(_iv);
 		if (iv_is_valid(&ret))
@@ -18481,7 +18481,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		buffer_info.domain = BufferDomain_Host;
 		buffer_info.size = tfl_get_required_size(&layout);
 		buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		result.buffer = device_create_buffer(self, buffer_info, NULL);
+		result.buffer = device_create_buffer(self, &buffer_info, NULL);
 		device_set_name_buffer(self, bh_get(&result.buffer), "image-upload-staging-buffer");
 
 		// And now, do the actual copy.
@@ -18785,29 +18785,29 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		return handle;
 	}
 
-	static VkSamplerCreateInfo fill_vk_sampler_info(const SamplerCreateInfo &sampler_info)
+	static VkSamplerCreateInfo fill_vk_sampler_info(const SamplerCreateInfo *sampler_info)
 	{
 		VkSamplerCreateInfo info = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 
-		info.magFilter = sampler_info.mag_filter;
-		info.minFilter = sampler_info.min_filter;
-		info.mipmapMode = sampler_info.mipmap_mode;
-		info.addressModeU = sampler_info.address_mode_u;
-		info.addressModeV = sampler_info.address_mode_v;
-		info.addressModeW = sampler_info.address_mode_w;
-		info.mipLodBias = sampler_info.mip_lod_bias;
-		info.anisotropyEnable = sampler_info.anisotropy_enable;
-		info.maxAnisotropy = sampler_info.max_anisotropy;
-		info.compareEnable = sampler_info.compare_enable;
-		info.compareOp = sampler_info.compare_op;
-		info.minLod = sampler_info.min_lod;
-		info.maxLod = sampler_info.max_lod;
-		info.borderColor = sampler_info.border_color;
-		info.unnormalizedCoordinates = sampler_info.unnormalized_coordinates;
+		info.magFilter = sampler_info->mag_filter;
+		info.minFilter = sampler_info->min_filter;
+		info.mipmapMode = sampler_info->mipmap_mode;
+		info.addressModeU = sampler_info->address_mode_u;
+		info.addressModeV = sampler_info->address_mode_v;
+		info.addressModeW = sampler_info->address_mode_w;
+		info.mipLodBias = sampler_info->mip_lod_bias;
+		info.anisotropyEnable = sampler_info->anisotropy_enable;
+		info.maxAnisotropy = sampler_info->max_anisotropy;
+		info.compareEnable = sampler_info->compare_enable;
+		info.compareOp = sampler_info->compare_op;
+		info.minLod = sampler_info->min_lod;
+		info.maxLod = sampler_info->max_lod;
+		info.borderColor = sampler_info->border_color;
+		info.unnormalizedCoordinates = sampler_info->unnormalized_coordinates;
 		return info;
 	}
 
-	SamplerHandle device_create_sampler(Device *self, const SamplerCreateInfo &sampler_info, StockSampler stock_sampler){
+	SamplerHandle device_create_sampler(Device *self, const SamplerCreateInfo *sampler_info, StockSampler stock_sampler){
 		VkSamplerCreateInfo info = fill_vk_sampler_info(sampler_info);
 		VkSampler sampler;
 
@@ -18818,14 +18818,14 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		{ struct Sampler *_s = (struct Sampler *)object_pool_raw_allocate(&self->handle_pool.samplers); sampler_init(_s, self, sampler); return smh_make(_s); }
 	}
 
-	BufferHandle device_create_buffer(Device *self, const BufferCreateInfo &create_info, const void *initial){
+	BufferHandle device_create_buffer(Device *self, const BufferCreateInfo *create_info, const void *initial){
 		VkBuffer buffer;
 		VkMemoryRequirements reqs;
 		DeviceAllocation allocation;
 
 		VkBufferCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-		info.size = create_info.size;
-		info.usage = create_info.usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		info.size = create_info->size;
+		info.usage = create_info->usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		uint32_t sharing_indices[3];
@@ -18855,7 +18855,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		vkGetBufferMemoryRequirements(self->device, buffer, &reqs);
 
-		uint32_t memory_type = device_find_memory_type_buffer(self, create_info.domain, reqs.memoryTypeBits);
+		uint32_t memory_type = device_find_memory_type_buffer(self, create_info->domain, reqs.memoryTypeBits);
 		if (memory_type == UINT32_MAX)
 		{
 			vkDestroyBuffer(self->device, buffer, NULL);
@@ -18875,16 +18875,16 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			return bh_make(NULL);
 		}
 
-		BufferCreateInfo tmpinfo = create_info;
+		BufferCreateInfo tmpinfo = *create_info;
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		struct Buffer *_b = (struct Buffer *)object_pool_raw_allocate(&self->handle_pool.buffers); buffer_init(_b, self, buffer, &allocation, &tmpinfo); BufferHandle handle = bh_make(_b);
 
-		if (create_info.domain == BufferDomain_Device && initial && !device_memory_type_is_host_visible(self, memory_type))
+		if (create_info->domain == BufferDomain_Device && initial && !device_memory_type_is_host_visible(self, memory_type))
 		{
 			CommandBufferHandle cmd; cmd.data = NULL;
-			BufferCreateInfo staging_info = create_info;
+			BufferCreateInfo staging_info = *create_info;
 			staging_info.domain = BufferDomain_Host;
-			BufferHandle staging_buffer = device_create_buffer(self, staging_info, initial);
+			BufferHandle staging_buffer = device_create_buffer(self, &staging_info, initial);
 			device_set_name_buffer(self, bh_get(&staging_buffer), "buffer-upload-staging-buffer");
 
 			cmd = device_request_command_buffer(self, Type_AsyncTransfer);
@@ -18904,7 +18904,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			if (!ptr)
 				return bh_make(NULL);
 
-			memcpy(ptr, initial, create_info.size);
+			memcpy(ptr, initial, create_info->size);
 			deviceallocator_unmap_memory(&self->managers.memory, &allocation, MEMORY_ACCESS_WRITE_BIT);
 		}
 		return handle;
@@ -22069,7 +22069,7 @@ static void vk_context_reset(void)
    assert(context);
    device = (Device *)malloc(sizeof(Device));
    device_init(device);
-   device_set_context(device, *context);
+   device_set_context(device, *&context);
 
    renderer = (Renderer *)malloc(sizeof(Renderer));
    renderer_init(renderer, device, scaling, msaa, owned_u32_empty(&save_state.vram) ? NULL : &save_state);
