@@ -3998,7 +3998,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 			info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 			info.samples = VK_SAMPLE_COUNT_1_BIT;
 			info.flags = 0;
-			info.misc = mipmapped ? unsigned(IMAGE_MISC_GENERATE_MIPS_BIT) : 0u;
+			info.misc = mipmapped ? (unsigned)(IMAGE_MISC_GENERATE_MIPS_BIT) : 0u;
 			info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			return info;
 		}
@@ -4382,7 +4382,7 @@ StockSampler get_immutable_sampler(const DescriptorSetLayout &layout, unsigned b
 
 void set_immutable_sampler(DescriptorSetLayout &layout, unsigned binding, StockSampler sampler)
 	{
-		layout.immutable_samplers |= uint64_t(sampler) << (4 * binding);
+		layout.immutable_samplers |= (uint64_t)(sampler) << (4 * binding);
 		layout.immutable_sampler_mask |= 1u << binding;
 	}
 
@@ -10022,8 +10022,8 @@ void renderer_set_draw_rect(Renderer *self, const Rect &rect)
 	self->render_state.draw_rect = rect;
 
 	const VkRect2D &last = *Rect2DVec_back(&self->queue.scissors);
-	const int scaled_x = int(rect.x * self->scaling);
-	const int scaled_y = int(rect.y * self->scaling);
+	const int scaled_x = (int)(rect.x * self->scaling);
+	const int scaled_y = (int)(rect.y * self->scaling);
 	const unsigned scaled_w = rect.width * self->scaling;
 	const unsigned scaled_h = rect.height * self->scaling;
 	if (last.offset.x != scaled_x || last.offset.y != scaled_y ||
@@ -10076,7 +10076,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect &rect, uin
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
-	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), *bh_get(&buffer), *ih_get(&self->framebuffer), 0, { int(copy_rect.x), int(copy_rect.y), 0 },
+	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), *bh_get(&buffer), *ih_get(&self->framebuffer), 0, { (int)(copy_rect.x), (int)(copy_rect.y), 0 },
 	                          { copy_rect.width, copy_rect.height, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
 
@@ -10091,7 +10091,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect &rect, uin
 	if (!wrap)
 	{
 		{ uint16_t y; for (y = 0; y < rect.height; y++)
-			{ uint16_t x; for (x = 0; x < rect.width; x++) vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]); } }
+			{ uint16_t x; for (x = 0; x < rect.width; x++) vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = (uint16_t)(mapped[y * rect.width + x]); } }
 	}
 	else
 	{
@@ -10099,7 +10099,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect &rect, uin
 					uint32_t h = (x + rect.x) & (FB_WIDTH - 1);
 					uint32_t v = (y + rect.y) & (FB_HEIGHT - 1);
 					uint32_t p = v * FB_WIDTH + h;
-					vram[p] = uint16_t(mapped[p]);
+					vram[p] = (uint16_t)(mapped[p]);
 				} } }
 	}
 
@@ -10142,7 +10142,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 
 		rp.num_color_attachments = 1;
 		rp.store_attachments = 1;
-		rp.render_area = { { int(rect.x * current_scale), int(rect.y * current_scale) },
+		rp.render_area = { { (int)(rect.x * current_scale), (int)(rect.y * current_scale) },
 			               { rect.width * current_scale, rect.height * current_scale } };
 
 		if (i == levels)
@@ -10174,8 +10174,8 @@ void renderer_mipmap_framebuffer(Renderer *self)
 			float uv_max[2];
 		};
 		Push push = {
-			{ float(rect.x) / FB_WIDTH, float(rect.y) / FB_HEIGHT },
-			{ float(rect.width) / FB_WIDTH, float(rect.height) / FB_HEIGHT },
+			{ (float)(rect.x) / FB_WIDTH, (float)(rect.y) / FB_HEIGHT },
+			{ (float)(rect.width) / FB_WIDTH, (float)(rect.height) / FB_HEIGHT },
 			{ 1.0f / (FB_WIDTH * current_scale), 1.0f / (FB_HEIGHT * current_scale) },
 			{ (rect.x + 0.5f) / FB_WIDTH, (rect.y + 0.5f) / FB_HEIGHT },
 			{ (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
@@ -10220,7 +10220,7 @@ void renderer_ssaa_framebuffer(Renderer *self)
 	unsigned resolves_n = 0;
 	{ unsigned y; for (y = top; y < bottom; y++) { unsigned x; for (x = left; x < right; x++) {
 			VkRect2D r = {
-				{ int(x * BLOCK_WIDTH % FB_WIDTH), int(y * BLOCK_HEIGHT % FB_HEIGHT) },
+				{ (int)(x * BLOCK_WIDTH % FB_WIDTH), (int)(y * BLOCK_HEIGHT % FB_HEIGHT) },
 				{ BLOCK_WIDTH, BLOCK_HEIGHT }
 			};
 			resolves_ssaa[resolves_n++] = r;
@@ -10453,11 +10453,11 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 		float max_bias;
 	};
 
-	Push push = { { float(vram_rect.x) / FB_WIDTH, float(vram_rect.y) / FB_HEIGHT },
-		          { float(vram_rect.width) / FB_WIDTH, float(vram_rect.height) / FB_HEIGHT },
+	Push push = { { (float)(vram_rect.x) / FB_WIDTH, (float)(vram_rect.y) / FB_HEIGHT },
+		          { (float)(vram_rect.width) / FB_WIDTH, (float)(vram_rect.height) / FB_HEIGHT },
 		          { (vram_rect.x + 0.5f) / FB_WIDTH, (vram_rect.y + 0.5f) / FB_HEIGHT },
 		          { (vram_rect.x + vram_rect.width - 0.5f) / FB_WIDTH, (vram_rect.y + vram_rect.height - 0.5f) / FB_HEIGHT },
-		          float(imageview_vec_size(&self->scaled_views) - 1) };
+		          (float)(imageview_vec_size(&self->scaled_views) - 1) };
 
 	commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
@@ -10560,7 +10560,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	{
 		renderer_ensure_command_buffer(self);
 		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-		VkOffset3D offset = { int(rect.x * self->scaling), int(rect.y * self->scaling), 0 };
+		VkOffset3D offset = { (int)(rect.x * self->scaling), (int)(rect.y * self->scaling), 0 };
 		VkExtent3D extent = { rect.width * self->scaling, rect.height * self->scaling, 1 };
 		if (rect.x + rect.width > FB_WIDTH)
 		{
@@ -10709,11 +10709,11 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		float uv_max[2];
 		float max_bias;
 	};
-	Push push = { { float(rect.x) / FB_WIDTH, float(rect.y) / FB_HEIGHT },
-		          { float(rect.width) / FB_WIDTH, float(rect.height) / FB_HEIGHT },
+	Push push = { { (float)(rect.x) / FB_WIDTH, (float)(rect.y) / FB_HEIGHT },
+		          { (float)(rect.width) / FB_WIDTH, (float)(rect.height) / FB_HEIGHT },
 		          { (rect.x + 0.5f) / FB_WIDTH, (rect.y + 0.5f) / FB_HEIGHT },
 		          { (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
-		          float(imageview_vec_size(&self->scaled_views) - 1) };
+		          (float)(imageview_vec_size(&self->scaled_views) - 1) };
 
 	commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
@@ -10864,9 +10864,9 @@ void renderer_flush_resolves(Renderer *self)
 void renderer_resolve(Renderer *self, Domain target_domain, unsigned x, unsigned y)
 {
 	if (target_domain == Domain_Scaled)
-		{ VkRect2D _vpush = { { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } }; Rect2DVec_push(&self->queue.scaled_resolves, &_vpush); }
+		{ VkRect2D _vpush = { { (int)(x), (int)(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } }; Rect2DVec_push(&self->queue.scaled_resolves, &_vpush); }
 	else
-		{ VkRect2D _vpush = { { int(x), int(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } }; Rect2DVec_push(&self->queue.unscaled_resolves, &_vpush); }
+		{ VkRect2D _vpush = { { (int)(x), (int)(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } }; Rect2DVec_push(&self->queue.unscaled_resolves, &_vpush); }
 }
 
 void renderer_ensure_command_buffer(Renderer *self)
@@ -10975,8 +10975,8 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 	// Compute bounding box for the draw call.
 	float max_x = 0.0f;
 	float max_y = 0.0f;
-	float min_x = float(FB_WIDTH);
-	float min_y = float(FB_HEIGHT);
+	float min_x = (float)(FB_WIDTH);
+	float min_y = (float)(FB_HEIGHT);
 	float x[4];
 	float y[4];
 	// Bounding box for texture
@@ -11008,11 +11008,11 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 	// Clamp the rect.
 	min_x = floorf(max_(min_x, 0.0f));
 	min_y = floorf(max_(min_y, 0.0f));
-	max_x = ceilf(min_(max_x, float(FB_WIDTH)));
-	max_y = ceilf(min_(max_y, float(FB_HEIGHT)));
+	max_x = ceilf(min_(max_x, (float)(FB_WIDTH)));
+	max_y = ceilf(min_(max_y, (float)(FB_HEIGHT)));
 
 	const Rect rect = {
-		unsigned(min_x), unsigned(min_y), unsigned(max_x) - unsigned(min_x), unsigned(max_y) - unsigned(min_y),
+		(unsigned)(min_x), (unsigned)(min_y), (unsigned)(max_x) - (unsigned)(min_x), (unsigned)(max_y) - (unsigned)(min_y),
 	};
 
 	if (self->render_state.texture_mode == TextureMode_ABGR1555)
@@ -11269,7 +11269,7 @@ void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 	unsigned shift = 0;
 	bool offset_uv = false;
 	renderer_build_attribs(self, vert, vertices, 3, hd_texture_index, filtering, scaled_read, shift, offset_uv);
-	const int scissor_index = self->queue.scissor_invariant ? -1 : int(Rect2DVec_size(&self->queue.scissors) - 1);
+	const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
 	BufferVertexVec *out = renderer_select_pipeline(self, 1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	if (out)
 	{
@@ -11318,7 +11318,7 @@ void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 	unsigned shift = 0;
 	bool offset_uv = false;
 	renderer_build_attribs(self, vert, vertices, 4, hd_texture_index, filtering, scaled_read, shift, offset_uv);
-	const int scissor_index = self->queue.scissor_invariant ? -1 : int(Rect2DVec_size(&self->queue.scissors) - 1);
+	const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
 	BufferVertexVec *out = renderer_select_pipeline(self, 2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 
 	if (out)
@@ -11365,10 +11365,10 @@ void renderer_clear_quad(Renderer *self, const Rect &rect, uint32_t fb_color, bo
 	float z = renderer_allocate_depth(self, Domain_Unscaled, rect);
 	fbatlas_set_texture_mode(&self->atlas, old);
 
-	BufferVertex pos0 = { float(rect.x), float(rect.y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
-	BufferVertex pos1 = { float(rect.x) + float(rect.width), float(rect.y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
-	BufferVertex pos2 = { float(rect.x), float(rect.y) + float(rect.height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
-	BufferVertex pos3 = { float(rect.x) + float(rect.width), float(rect.y) + float(rect.height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
+	BufferVertex pos0 = { (float)(rect.x), (float)(rect.y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
+	BufferVertex pos1 = { (float)(rect.x) + (float)(rect.width), (float)(rect.y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
+	BufferVertex pos2 = { (float)(rect.x), (float)(rect.y) + (float)(rect.height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
+	BufferVertex pos3 = { (float)(rect.x) + (float)(rect.width), (float)(rect.y) + (float)(rect.height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
 	BufferVertexVec_push(&self->queue.opaque, &pos0);
 	BufferVertexVec_push(&self->queue.opaque, &pos1);
 	BufferVertexVec_push(&self->queue.opaque, &pos2);
@@ -11447,7 +11447,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect &rect)
 	}
 
 
-	info.render_area.offset = { int(rect.x * self->scaling), int(rect.y * self->scaling) };
+	info.render_area.offset = { (int)(rect.x * self->scaling), (int)(rect.y * self->scaling) };
 	info.render_area.extent = { rect.width * self->scaling, rect.height * self->scaling };
 
 	commandbuffer_begin_render_pass(cbh_get(&self->cmd), info);
@@ -11832,7 +11832,7 @@ void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src){
 			int32_t scaling;
 		};
 		Push push = {
-			{ src.x, src.y }, { dst.x, dst.y }, { dst.width, dst.height }, int(factor),
+			{ src.x, src.y }, { dst.x, dst.y }, { dst.width, dst.height }, (int)(factor),
 		};
 		commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 
@@ -12043,7 +12043,7 @@ void renderer_reset_scissor_queue(Renderer *self)
 {
 	Rect2DVec_clear(&self->queue.scissors);
 	Rect &rect = self->render_state.draw_rect;
-	{ VkRect2D _vpush = { { int(rect.x * self->scaling), int(rect.y * self->scaling) }, { rect.width * self->scaling, rect.height * self->scaling } }; Rect2DVec_push(&self->queue.scissors, &_vpush); }
+	{ VkRect2D _vpush = { { (int)(rect.x * self->scaling), (int)(rect.y * self->scaling) }, { rect.width * self->scaling, rect.height * self->scaling } }; Rect2DVec_push(&self->queue.scissors, &_vpush); }
 }
 
 void renderer_reset_queue(Renderer *self)
@@ -15254,7 +15254,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	void commandbuffer_generate_mipmap(struct CommandBuffer *self, const Image &image)
 	{
 		const ImageCreateInfo &create_info = image_get_create_info(&image);
-		VkOffset3D size = { int(create_info.width), int(create_info.height), int(create_info.depth) };
+		VkOffset3D size = { (int)(create_info.width), (int)(create_info.height), (int)(create_info.depth) };
 		const VkOffset3D origin = { 0, 0, 0 };
 
 		VK_ASSERT(image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -15330,16 +15330,16 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		const uint32_t fb_w = framebuffer_get_width(self->framebuffer);
 		const uint32_t fb_h = framebuffer_get_height(self->framebuffer);
 		VkRect2D rect = info.render_area;
-		if (uint32_t(rect.offset.x) > fb_w) rect.offset.x = int32_t(fb_w);
-		if (uint32_t(rect.offset.y) > fb_h) rect.offset.y = int32_t(fb_h);
+		if ((uint32_t)(rect.offset.x) > fb_w) rect.offset.x = (int32_t)(fb_w);
+		if ((uint32_t)(rect.offset.y) > fb_h) rect.offset.y = (int32_t)(fb_h);
 		{
-			uint32_t w_avail = fb_w - uint32_t(rect.offset.x);
-			uint32_t h_avail = fb_h - uint32_t(rect.offset.y);
+			uint32_t w_avail = fb_w - (uint32_t)(rect.offset.x);
+			uint32_t h_avail = fb_h - (uint32_t)(rect.offset.y);
 			if (w_avail < rect.extent.width)  rect.extent.width  = w_avail;
 			if (h_avail < rect.extent.height) rect.extent.height = h_avail;
 		}
 
-		self->viewport = { 0.0f, 0.0f, float(fb_w), float(fb_h), 0.0f, 1.0f };
+		self->viewport = { 0.0f, 0.0f, (float)(fb_w), (float)(fb_h), 0.0f, 1.0f };
 		self->scissor = rect;
 	}
 
@@ -17333,7 +17333,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkResult result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
 
 		if (result != VK_SUCCESS)
-			LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
+			LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
 
 		SemaphoreVec_free_storage(&waits);
 		SemaphoreVec_free_storage(&signals);
@@ -17560,7 +17560,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		VkResult result = vkQueueSubmit(queue, VkSubmitInfoVec_size(&submits), VkSubmitInfoVec_data(&submits), cleared_fence);
 		if (result != VK_SUCCESS)
-			LOGE("vkQueueSubmit failed (code: %d).\n", int(result));
+			LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
 		cbhvec_clear(submissions);
 
 		CommandBufferVec_free_storage(&cmds);
@@ -18543,7 +18543,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		if (!device_image_format_is_supported(self, create_info.format, image_usage_to_features(info.usage), info.tiling))
 		{
-			LOGE("Format %u is not supported for usage flags!\n", unsigned(create_info.format));
+			LOGE("Format %u is not supported for usage flags!\n", (unsigned)(create_info.format));
 			image_resource_holder_fini(&holder);
 			return ih_make(NULL);
 		}
@@ -18567,7 +18567,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					ALLOCATION_TILING_OPTIMAL,
 					&holder.allocation, holder.image))
 		{
-			LOGE("Failed to allocate image memory (type %u, size: %u).\n", unsigned(memory_type), unsigned(reqs.size));
+			LOGE("Failed to allocate image memory (type %u, size: %u).\n", (unsigned)(memory_type), (unsigned)(reqs.size));
 			image_resource_holder_fini(&holder);
 			return ih_make(NULL);
 		}
@@ -20763,7 +20763,7 @@ Rect fromSRect(SRect rect) {
 				}
 				return {
 					{0, 0, 1, 1},
-					{0, 0, int(image_get_width(ih_get(&self->default_hd_texture), 0)), int(image_get_height(ih_get(&self->default_hd_texture), 0))},
+					{0, 0, (int)(image_get_width(ih_get(&self->default_hd_texture), 0)), (int)(image_get_height(ih_get(&self->default_hd_texture), 0))},
 					self->default_hd_texture
 				};
 			}
@@ -20775,7 +20775,7 @@ Rect fromSRect(SRect rect) {
 				TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
 				return {
 					{0, 0, 1, 1},
-					{0, 0, int(image_get_width(ih_get(&self->default_hd_texture), 0)), int(image_get_height(ih_get(&self->default_hd_texture), 0))},
+					{0, 0, (int)(image_get_width(ih_get(&self->default_hd_texture), 0)), (int)(image_get_height(ih_get(&self->default_hd_texture), 0))},
 					self->default_hd_texture
 				};
 			}
@@ -20929,7 +20929,7 @@ bool is_power_of_two(int n) {
 
 		if (self->frame % 300 == 0)
 		{
-			TT_LOG_VERBOSE(RETRO_LOG_INFO, "hit ratio: %f (%ld, %ld)\n", double(self->handle_cache.dbg_hits) / (self->handle_cache.dbg_hits + self->handle_cache.dbg_misses), self->handle_cache.dbg_hits, self->handle_cache.dbg_misses);
+			TT_LOG_VERBOSE(RETRO_LOG_INFO, "hit ratio: %f (%ld, %ld)\n", (double)(self->handle_cache.dbg_hits) / (self->handle_cache.dbg_hits + self->handle_cache.dbg_misses), self->handle_cache.dbg_hits, self->handle_cache.dbg_misses);
 			self->handle_cache.dbg_hits = 0;
 			self->handle_cache.dbg_misses = 0;
 			TT_LOG(RETRO_LOG_INFO, "[hdcache] last 300f: %llu decodes, %llu gpu-uploads, %llu attaches\n",
@@ -21263,9 +21263,9 @@ int clamp(int x, int low, int high)
 	CellBounds cellBounds(SRect vram) {
 		return CellBounds({
 				clamp(srect_left(&vram) / LOOKUP_CELL_WIDTH, 0, LOOKUP_GRID_COLUMNS),
-				clamp(ceil(srect_right(&vram) / float(LOOKUP_CELL_WIDTH)), 0, LOOKUP_GRID_COLUMNS),
+				clamp(ceil(srect_right(&vram) / (float)(LOOKUP_CELL_WIDTH)), 0, LOOKUP_GRID_COLUMNS),
 				clamp(srect_top(&vram) / LOOKUP_CELL_HEIGHT, 0, LOOKUP_GRID_ROWS),
-				clamp(ceil(srect_bottom(&vram) / float(LOOKUP_CELL_HEIGHT)), 0, LOOKUP_GRID_ROWS)
+				clamp(ceil(srect_bottom(&vram) / (float)(LOOKUP_CELL_HEIGHT)), 0, LOOKUP_GRID_ROWS)
 				});
 	}
 
@@ -21497,13 +21497,13 @@ int64_t page_bytes(FusionRects &fusion)
 			SRect subrect = texture_rect_subrect(&tex);
 
 			VkOffset3D dst_offset = {
-				(tex.vram_rect.x - int(page.fusion.vram_rect.x)) * int(page.fusion.scaleX),
-				(tex.vram_rect.y - int(page.fusion.vram_rect.y)) * int(page.fusion.scaleY),
+				(tex.vram_rect.x - (int)(page.fusion.vram_rect.x)) * (int)(page.fusion.scaleX),
+				(tex.vram_rect.y - (int)(page.fusion.vram_rect.y)) * (int)(page.fusion.scaleY),
 				0
 			};
 			VkOffset3D dst_extent = {
-				tex.vram_rect.width * int(page.fusion.scaleX),
-				tex.vram_rect.height * int(page.fusion.scaleY),
+				tex.vram_rect.width * (int)(page.fusion.scaleX),
+				tex.vram_rect.height * (int)(page.fusion.scaleY),
 				1
 			};
 
@@ -21584,7 +21584,7 @@ int64_t page_bytes(FusionRects &fusion)
 			TT_LOG(RETRO_LOG_WARN, "BAD fused index!\n");
 			HdTexture _r;
 			_r.vram_rect = (SRect){0, 0, 1, 1};
-			_r.texel_rect = (SRect){0, 0, int(image_get_width(ih_get(default_hd_texture), 0)), int(image_get_height(ih_get(default_hd_texture), 0))};
+			_r.texel_rect = (SRect){0, 0, (int)(image_get_width(ih_get(default_hd_texture), 0)), (int)(image_get_height(ih_get(default_hd_texture), 0))};
 			_r.texture = *default_hd_texture;
 			return _r;
 		}
@@ -21593,14 +21593,14 @@ int64_t page_bytes(FusionRects &fusion)
 			HdTexture _r;
 			TT_LOG(RETRO_LOG_WARN, "Missing fused texture!\n");
 			_r.vram_rect = (SRect){0, 0, 1, 1};
-			_r.texel_rect = (SRect){0, 0, int(image_get_width(ih_get(default_hd_texture), 0)), int(image_get_height(ih_get(default_hd_texture), 0))};
+			_r.texel_rect = (SRect){0, 0, (int)(image_get_width(ih_get(default_hd_texture), 0)), (int)(image_get_height(ih_get(default_hd_texture), 0))};
 			_r.texture = *default_hd_texture;
 			return _r;
 		}
 		{
 			HdTexture _r;
 			_r.vram_rect = toSRect(page->fusion.vram_rect);
-			_r.texel_rect = (SRect){ 0, 0, int(image_get_width(ih_get(&page->texture), 0)), int(image_get_height(ih_get(&page->texture), 0)) };
+			_r.texel_rect = (SRect){ 0, 0, (int)(image_get_width(ih_get(&page->texture), 0)), (int)(image_get_height(ih_get(&page->texture), 0)) };
 			_r.texture = page->texture;
 			return _r;
 		}
@@ -22692,15 +22692,15 @@ void rhi_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
    if (height < 0) height = 0;
 
    {
-      int w_max = int(FB_WIDTH  - x0);
-      int h_max = int(FB_HEIGHT - y0);
+      int w_max = (int)(FB_WIDTH  - x0);
+      int h_max = (int)(FB_HEIGHT - y0);
       if (width  > w_max) width  = w_max;
       if (height > h_max) height = h_max;
    }
 
    if (renderer)
    {
-      renderer_set_draw_rect(renderer, { x0, y0, unsigned(width), unsigned(height) });
+      renderer_set_draw_rect(renderer, { x0, y0, (unsigned)(width), (unsigned)(height) });
       tt_log("vk set_draw_area top_left=(%u,%u) bot_right_inclusive=(%u,%u)\n",
             (unsigned)x0, (unsigned)y0, (unsigned)x1, (unsigned)y1);
    }
@@ -22950,8 +22950,8 @@ void rhi_vulkan_push_line(
    }
 
    Vertex vertices[2] = {
-      { float(p0x), float(p0y), 1.0f, c0, 0, 0 },
-      { float(p1x), float(p1y), 1.0f, c1, 0, 0 },
+      { (float)(p0x), (float)(p0y), 1.0f, c0, 0, 0 },
+      { (float)(p1x), (float)(p1y), 1.0f, c1, 0, 0 },
    };
    renderer_set_texture_color_modulate(renderer, false);
    renderer_draw_line(renderer, vertices);
