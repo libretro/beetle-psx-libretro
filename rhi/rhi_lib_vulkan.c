@@ -19768,21 +19768,28 @@ static char retro_slash = '/';
 	// return it, C-style, instead of allocating a std::string.
 
 	char *dump_path(char *out, size_t cap) {
-		snprintf(out, cap, "%s%c%s-texture-dump%c",
+		int n = snprintf(out, cap, "%s%c%s-texture-dump%c",
 				retro_cd_base_directory, retro_slash, retro_cd_base_name, retro_slash);
+		if (n < 0 || (size_t)n >= cap)
+			out[cap - 1] = '\0';
 		return out;
 	}
 
 	char *replacements_path(char *out, size_t cap) {
-		snprintf(out, cap, "%s%c%s-texture-replacements%c",
+		int n = snprintf(out, cap, "%s%c%s-texture-replacements%c",
 				retro_cd_base_directory, retro_slash, retro_cd_base_name, retro_slash);
+		if (n < 0 || (size_t)n >= cap)
+			out[cap - 1] = '\0';
 		return out;
 	}
 
 	char *replacement_filename_from_hash(char *out, size_t cap, uint32_t hash, uint32_t palette_hash) {
 		char base[PATH_MAX_TT];
+		int n;
 		replacements_path(base, sizeof(base));
-		snprintf(out, cap, "%s%x-%x.png", base, (unsigned)hash, (unsigned)palette_hash);
+		n = snprintf(out, cap, "%s%x-%x.png", base, (unsigned)hash, (unsigned)palette_hash);
+		if (n < 0 || (size_t)n >= cap)
+			out[cap - 1] = '\0';
 		return out;
 	}
 
