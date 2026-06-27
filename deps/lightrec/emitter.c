@@ -3404,11 +3404,11 @@ static void rec_META(struct lightrec_cstate *state,
 }
 
 /* Returns true if `c` is a non-memory CPU op that PGXP CPU mode tracks and
- * whose operands are all available from the GPR file (so the post-execution
+ * whose operands are available from the GPR file (so the post-execution
  * values can be read by the C wrapper after a regcache clean).  Loads and
  * stores are deliberately excluded here: their tracked value/address live in
  * the rec_io path and are handled separately. */
-static _Bool pgxp_cpu_tracked_nonmem(union code c)
+static _Bool pgxp_cpu_tracked(union code c)
 {
 	switch (c.i.op) {
 	case OP_SPECIAL:
@@ -3432,6 +3432,14 @@ static _Bool pgxp_cpu_tracked_nonmem(union code c)
 	case OP_SLTI:  case OP_SLTIU:
 	case OP_ANDI:  case OP_ORI:
 	case OP_XORI:  case OP_LUI:
+		return true;
+	/* Stores: tracked value (rt) and address base (rs) are both live in
+	 * the GPR file at this point and unmodified by the store, so they can
+	 * be read after a regcache clean.  Loads are not yet handled here:
+	 * their tracked result is subject to load-delay and is produced by the
+	 * rec_io path, so they need separate handling. */
+	case OP_SB:  case OP_SH:  case OP_SWL: case OP_SW:
+	case OP_SWR:
 		return true;
 	default:
 		return false;
@@ -3501,7 +3509,7 @@ void lightrec_rec_opcode(struct lightrec_cstate *state,
 		 * non-memory op so recompiled code maintains the same
 		 * per-register precision metadata the interpreter would. */
 		if (state->state->ops.pgxp_cpu &&
-		    pgxp_cpu_tracked_nonmem(op->c))
+		    pgxp_cpu_tracked(op->c))
 			rec_pgxp_cpu_track(state, block, offset);
 	}
 

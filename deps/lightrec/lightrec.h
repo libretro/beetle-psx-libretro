@@ -117,15 +117,16 @@ struct lightrec_ops {
 	_Bool (*hw_direct)(u32 kaddr, _Bool is_write, u8 size);
 	void (*code_inv)(void *addr, u32 len);
 	/* When non-NULL, the recompiler emits a call to this after each
-	 * tracked non-memory CPU op (ALU / shift / mult / div / immediate),
-	 * passing the instruction word and the post-execution GPR values, so
-	 * a host (e.g. beetle-psx PGXP CPU mode) can keep its per-register
-	 * precision metadata up to date under DYNAREC_EXECUTE.  rd/rs/rt are
-	 * the current state->regs.gpr[] values of the instruction's register
-	 * fields; hi/lo are the current HI/LO values.  Set this only while
-	 * PGXP CPU tracking is enabled; leaving it NULL keeps the fast path. */
+	 * tracked CPU op, passing the instruction word and the post-execution
+	 * GPR values, so a host (e.g. beetle-psx PGXP CPU mode) can keep its
+	 * per-register precision metadata up to date under DYNAREC_EXECUTE.
+	 * rd/rs/rt are the current state->regs.gpr[] values of the
+	 * instruction's register fields; hi/lo are the current HI/LO values;
+	 * addr is the effective memory address (rs + sign-extended imm) for
+	 * load/store ops and 0 otherwise.  Set this only while PGXP CPU
+	 * tracking is enabled; leaving it NULL keeps the fast path. */
 	void (*pgxp_cpu)(struct lightrec_state *state, u32 instr,
-			 u32 rd, u32 rs, u32 rt, u32 hi, u32 lo);
+			 u32 rd, u32 rs, u32 rt, u32 hi, u32 lo, u32 addr);
 };
 
 struct lightrec_registers {

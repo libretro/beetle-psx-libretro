@@ -821,6 +821,7 @@ static void lightrec_pgxp_cpu_cb(struct lightrec_state *state, u32 arg)
 	struct block *block;
 	struct opcode *op;
 	union code c;
+	u32 addr;
 	u16 offset = (u16)arg;
 
 	if (!state->ops.pgxp_cpu)
@@ -834,12 +835,27 @@ static void lightrec_pgxp_cpu_cb(struct lightrec_state *state, u32 arg)
 	op = &block->opcode_list[offset];
 	c = op->c;
 
+	/* Effective address for load/store ops: rs + sign-extended imm.
+	 * Harmless (unused) for non-memory ops, where it is passed as 0. */
+	switch (c.i.op) {
+	case OP_LB:  case OP_LH:  case OP_LWL: case OP_LW:
+	case OP_LBU: case OP_LHU: case OP_LWR:
+	case OP_SB:  case OP_SH:  case OP_SWL: case OP_SW:
+	case OP_SWR:
+		addr = state->regs.gpr[c.i.rs] + (u32)(s16)c.i.imm;
+		break;
+	default:
+		addr = 0;
+		break;
+	}
+
 	(*state->ops.pgxp_cpu)(state, c.opcode,
 			       state->regs.gpr[c.r.rd],
 			       state->regs.gpr[c.r.rs],
 			       state->regs.gpr[c.r.rt],
 			       state->regs.gpr[REG_HI],
-			       state->regs.gpr[REG_LO]);
+			       state->regs.gpr[REG_LO],
+			       addr);
 }
 
 static struct block * lightrec_get_block(struct lightrec_state *state, u32 pc)
