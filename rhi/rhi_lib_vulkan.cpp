@@ -5406,27 +5406,23 @@ private:
 	class Device;
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches through the pointee directly). This is the
-	 * last of the eight pointees taken off the template base. */
-	class CommandBuffer
+	 * last of the eight pointees taken off the template base.
+	 *
+	 * Stage 1 of the class -> C struct conversion: CommandBuffer is now a struct,
+	 * the refcount/ctor/dtor are free functions (commandbuffer_init / _fini /
+	 * _add_reference / _release_reference), and the formerly-default-initialized
+	 * members are seeded in commandbuffer_init. The remaining member functions are
+	 * still declared in-struct for now and are converted to free functions in
+	 * later stages. */
+	struct CommandBuffer
 	{
 		public:
 			friend struct CommandBufferDeleter;
+			friend void commandbuffer_init(struct CommandBuffer *self, Device *device, VkCommandBuffer cmd, CommandBufferType type);
+			friend void commandbuffer_fini(struct CommandBuffer *self);
+			friend void commandbuffer_add_reference(struct CommandBuffer *self);
+			friend void commandbuffer_release_reference(struct CommandBuffer *self);
 
-			void release_reference()
-			{
-				if (counter_release(&reference_count))
-					CommandBufferDeleter()(this);
-			}
-			void add_reference()
-			{
-				counter_add_ref(&reference_count);
-			}
-
-			~CommandBuffer()
-			{
-				VK_ASSERT(vbo_block.mapped == NULL);
-				VK_ASSERT(ubo_block.mapped == NULL);
-			}
 			VkCommandBuffer get_command_buffer() const
 			{
 				return cmd;
@@ -5647,35 +5643,34 @@ private:
 
 		private:
 			friend class Device;
-			CommandBuffer(Device *device, VkCommandBuffer cmd, CommandBufferType type);
 
 			Device *device;
 			VkCommandBuffer cmd;
 			CommandBufferType type;
 
-			const Framebuffer *framebuffer = NULL;
-			const RenderPass *actual_render_pass = NULL;
-			const RenderPass *compatible_render_pass = NULL;
+			const Framebuffer *framebuffer;
+			const RenderPass *actual_render_pass;
+			const RenderPass *compatible_render_pass;
 
-			VertexAttribState attribs[VULKAN_NUM_VERTEX_ATTRIBS] = {};
-			VertexBindingState vbo = {};
+			VertexAttribState attribs[VULKAN_NUM_VERTEX_ATTRIBS];
+			VertexBindingState vbo;
 			ResourceBindings bindings;
 
-			VkPipeline current_pipeline = VK_NULL_HANDLE;
-			VkPipelineLayout current_pipeline_layout = VK_NULL_HANDLE;
-			PipelineLayout *current_layout = NULL;
-			Program *current_program = NULL;
-			unsigned current_subpass = 0;
-			VkSubpassContents current_contents = VK_SUBPASS_CONTENTS_INLINE;
+			VkPipeline current_pipeline;
+			VkPipelineLayout current_pipeline_layout;
+			PipelineLayout *current_layout;
+			Program *current_program;
+			unsigned current_subpass;
+			VkSubpassContents current_contents;
 
-			VkViewport viewport = {};
-			VkRect2D scissor = {};
+			VkViewport viewport;
+			VkRect2D scissor;
 
-			CommandBufferDirtyFlags dirty = ~0u;
-			uint32_t dirty_sets = 0;
-			uint32_t dirty_vbos = 0;
-			uint32_t active_vbos = 0;
-			bool is_compute = true;
+			CommandBufferDirtyFlags dirty;
+			uint32_t dirty_sets;
+			uint32_t dirty_vbos;
+			uint32_t active_vbos;
+			bool is_compute;
 
 			void set_dirty(CommandBufferDirtyFlags flags)
 			{
@@ -5690,7 +5685,7 @@ private:
 			}
 
 			PipelineState static_state;
-			PotentialState potential_static_state = {};
+			PotentialState potential_static_state;
 #ifndef _MSC_VER
 			static_assert(sizeof(static_state.words) >= sizeof(static_state.state),
 					"Hashable pipeline state is not large enough!");
@@ -5729,6 +5724,13 @@ private:
 			HandleCounter reference_count;
 	};
 
+	/* Stage 1 free functions for the CommandBuffer pointee. The remaining member
+	 * functions still declared in the struct are converted in later stages. */
+	void commandbuffer_init(struct CommandBuffer *self, Device *device, VkCommandBuffer cmd, CommandBufferType type);
+	void commandbuffer_fini(struct CommandBuffer *self);
+	void commandbuffer_add_reference(struct CommandBuffer *self);
+	void commandbuffer_release_reference(struct CommandBuffer *self);
+
 
 	/* Command-buffer handle: de-RAII'd from
 	 * INTRUSIVE_HANDLE_DECLARE(CommandBufferHandle, CommandBuffer) to a plain
@@ -5741,12 +5743,12 @@ private:
 	 * ASAN-GATE: per-frame command-buffer submission lifetime. */
 	struct CommandBufferHandle { CommandBuffer *data; };
 	static inline struct CommandBufferHandle cbh_make(CommandBuffer *p) { struct CommandBufferHandle h; h.data = p; return h; }
-	static inline void cbh_reset(struct CommandBufferHandle *h) { if (h->data) h->data->release_reference(); h->data = NULL; }
+	static inline void cbh_reset(struct CommandBufferHandle *h) { if (h->data) commandbuffer_release_reference(h->data); h->data = NULL; }
 	static inline CommandBuffer *cbh_get(const struct CommandBufferHandle *h) { return h->data; }
 	static inline int cbh_is_valid(const struct CommandBufferHandle *h) { return h->data != NULL; }
 	static inline void cbh_steal(struct CommandBufferHandle *dst, struct CommandBufferHandle *src) { dst->data = src->data; src->data = NULL; }
 	static inline void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produced) {
-		if (dst->data) dst->data->release_reference();
+		if (dst->data) commandbuffer_release_reference(dst->data);
 		dst->data = produced.data;
 	}
 
@@ -14827,16 +14829,54 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		return { a.x + b.x, a.y + b.y, a.z + b.z };
 	}
 
-	CommandBuffer::CommandBuffer(Device *device, VkCommandBuffer cmd, CommandBufferType type)
-		: device(device)
-		  , cmd(cmd)
-		  , type(type)
+	void commandbuffer_init(struct CommandBuffer *self, Device *device, VkCommandBuffer cmd, CommandBufferType type)
 	{
-		counter_init(&reference_count); /* refcount starts at 1 */
-		begin_compute();
-		set_opaque_state();
-		memset(&static_state, 0, sizeof(static_state));
-		memset(&bindings, 0, sizeof(bindings));
+		self->device = device;
+		self->cmd    = cmd;
+		self->type   = type;
+		/* Members that previously had default initializers in the class body. */
+		self->framebuffer             = NULL;
+		self->actual_render_pass      = NULL;
+		self->compatible_render_pass  = NULL;
+		memset(self->attribs, 0, sizeof(self->attribs));
+		memset(&self->vbo, 0, sizeof(self->vbo));
+		self->current_pipeline        = VK_NULL_HANDLE;
+		self->current_pipeline_layout = VK_NULL_HANDLE;
+		self->current_layout          = NULL;
+		self->current_program         = NULL;
+		self->current_subpass         = 0;
+		self->current_contents        = VK_SUBPASS_CONTENTS_INLINE;
+		memset(&self->viewport, 0, sizeof(self->viewport));
+		memset(&self->scissor, 0, sizeof(self->scissor));
+		self->dirty       = ~0u;
+		self->dirty_sets  = 0;
+		self->dirty_vbos  = 0;
+		self->active_vbos = 0;
+		self->is_compute  = true;
+		memset(&self->potential_static_state, 0, sizeof(self->potential_static_state));
+
+		counter_init(&self->reference_count); /* refcount starts at 1 */
+		self->begin_compute();
+		self->set_opaque_state();
+		memset(&self->static_state, 0, sizeof(self->static_state));
+		memset(&self->bindings, 0, sizeof(self->bindings));
+	}
+
+	void commandbuffer_fini(struct CommandBuffer *self)
+	{
+		VK_ASSERT(self->vbo_block.mapped == NULL);
+		VK_ASSERT(self->ubo_block.mapped == NULL);
+	}
+
+	void commandbuffer_add_reference(struct CommandBuffer *self)
+	{
+		counter_add_ref(&self->reference_count);
+	}
+
+	void commandbuffer_release_reference(struct CommandBuffer *self)
+	{
+		if (counter_release(&self->reference_count))
+			CommandBufferDeleter()(self);
 	}
 
 	void CommandBuffer::copy_buffer(const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
@@ -16119,7 +16159,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 	void CommandBufferDeleter::operator()(CommandBuffer *cmd)
 	{
-		{ struct ObjectPoolRaw *_pool = &cmd->device->handle_pool.command_buffers; cmd->~CommandBuffer(); object_pool_raw_free(_pool, cmd); }
+		{ struct ObjectPoolRaw *_pool = &cmd->device->handle_pool.command_buffers; commandbuffer_fini(cmd); object_pool_raw_free(_pool, cmd); }
 	}
 
 /* === vulkan.cpp === */
@@ -17518,7 +17558,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		vkBeginCommandBuffer(cmd, &info);
 		add_frame_counter_nolock();
-		CommandBufferHandle handle = cbh_make(new (object_pool_raw_allocate(&handle_pool.command_buffers)) CommandBuffer(this, cmd, type));
+		struct CommandBuffer *_cb = (struct CommandBuffer *)object_pool_raw_allocate(&handle_pool.command_buffers); commandbuffer_init(_cb, this, cmd, type); CommandBufferHandle handle = cbh_make(_cb);
 		return handle;
 	}
 
