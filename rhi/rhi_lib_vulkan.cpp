@@ -8454,7 +8454,7 @@ void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveStateVec *
 	void texture_tracker_notifyReadback(struct TextureTracker *self, Rect rect, uint16_t *vram);
 	uint32_t texture_tracker_dbgHashVram(struct TextureTracker *self, Rect rect, uint16_t *vram);
 
-	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode *mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable, bool &cache_hit);
+	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode *mode, unsigned int page_x, unsigned int page_y, bool *fastpath_capable, bool *cache_hit);
 	HdTexture texture_tracker_get_hd_texture(struct TextureTracker *self, HdTextureHandle index);
 	void texture_tracker_endFrame(struct TextureTracker *self);
 	void texture_tracker_on_queues_reset(struct TextureTracker *self);
@@ -9129,7 +9129,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self);
 	void renderer_render_opaque_texture_primitives(Renderer *self);
 	void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src);
-	ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels);
+	ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels *levels);
 	ImageHandle renderer_create_texture(Renderer *self, int width, int height, int levels);
 	BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect);
 	void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentState *state);
@@ -10886,7 +10886,7 @@ HdTextureHandle renderer_get_hd_texture_index(Renderer *self, const Rect *vram_r
 		mode.palette_offset_y = 0;
 	}
 	if (self->texture_tracking_enabled) {
-		return texture_tracker_get_hd_texture_index(&self->tracker, *vram_rect, &mode, self->render_state.texture_offset_x, self->render_state.texture_offset_y, *fastpath_capable_out, *cache_hit_out);
+		return texture_tracker_get_hd_texture_index(&self->tracker, *vram_rect, &mode, self->render_state.texture_offset_x, self->render_state.texture_offset_y, fastpath_capable_out, cache_hit_out);
 	} else {
 		return hd_handle_make_none();
 	}
@@ -11893,16 +11893,16 @@ void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src){
 	}
 }
 
-ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels){
+ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels *levels){
 	ImageCreateInfo info;
 	ImageInitialData initial[16]; /* Vulkan caps mip levels well under this */
 	int i;
-	int n = levels.count;
+	int n = levels->count;
 	image_create_info_defaults(&info); /* sets swizzle + all fields; the per-field assignments below never set swizzle */
 	if (n > 16)
 		n = 16;
-	info.width = levels.levels[0].width;
-	info.height = levels.levels[0].height;
+	info.width = levels->levels[0].width;
+	info.height = levels->levels[0].height;
 	info.depth = 1;
 	info.levels = n;
 	info.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -11915,7 +11915,7 @@ ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels){
 	info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	for (i = 0; i < n; i++) {
-		initial[i].data = levels.levels[i].owned_data;
+		initial[i].data = levels->levels[i].owned_data;
 		initial[i].row_length = 0;
 		initial[i].image_height = 0;
 	}
@@ -19723,11 +19723,11 @@ static char retro_slash = '/';
 		return out;
 	}
 
-uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
-		return &image.owned_data[(y * image.width + x) * 4];
+uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
+		return &image->owned_data[(y * image->width + x) * 4];
 	}
 
-	LoadedImage generate_mip(LoadedImage &higher) {
+	LoadedImage generate_mip(LoadedImage *higher) {
 		// Generate custom mipmaps in order to avoid transparent (0, 0, 0, 0) and semi-transparent (r, g, b, a>=128)
 		// mixing to create some dark opaque value (r, g, b, a<128).
 
@@ -19735,7 +19735,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 		int x, y;
 		// Assumes higher.width and higher.height are both divisible by 2 (and also therefore > 1)
 		loaded_image_init(&result);
-		loaded_image_alloc(&result, higher.width / 2, higher.height / 2);
+		loaded_image_alloc(&result, higher->width / 2, higher->height / 2);
 		for (y = 0; y < result.height; y++) {
 			for (x = 0; x < result.width; x++) {
 				uint8_t *src00 = loaded_pixel(higher, x * 2 + 0, y * 2 + 0);
@@ -19749,7 +19749,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 				if (src01[0] == 0 && src01[1] == 0 && src01[2] == 0 && src01[3] == 0) numTransparent += 1;
 				if (src11[0] == 0 && src11[1] == 0 && src11[2] == 0 && src11[3] == 0) numTransparent += 1;
 
-				uint8_t *dst = loaded_pixel(result, x, y);
+				uint8_t *dst = loaded_pixel(&result, x, y);
 				if (numTransparent > 2) {
 					dst[0] = 0;
 					dst[1] = 0;
@@ -19772,24 +19772,24 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 		return result;
 	}
 
-	LoadedImage convert_tri_to_psx(uint8_t *image, int width, int height, int& alpha_flags) {
+	LoadedImage convert_tri_to_psx(uint8_t *image, int width, int height, int *alpha_flags) {
 		LoadedImage result;
 		size_t i;
 		loaded_image_init(&result);
 		loaded_image_alloc(&result, width, height);
-		alpha_flags = 0;
+		(*alpha_flags) = 0;
 		for (i = 0; i < result.owned_size; i += 4) {
 			uint8_t *src = &image[i];
 			uint8_t *dst = &result.owned_data[i];
 			if (src[3] == 0) {
 				// Transparent
-				alpha_flags |= ALPHA_FLAG_TRANSPARENT;
+				(*alpha_flags) |= ALPHA_FLAG_TRANSPARENT;
 				dst[0] = 0;
 				dst[1] = 0;
 				dst[2] = 0;
 				dst[3] = 0;
 			} else if (src[3] == 255) {
-				alpha_flags |= ALPHA_FLAG_OPAQUE;
+				(*alpha_flags) |= ALPHA_FLAG_OPAQUE;
 				if (src[0] == 0 && src[1] == 0 && src[2] == 0) {
 					// Opaque black
 					dst[0] = 1;
@@ -19804,7 +19804,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 					dst[3] = 0;
 				}
 			} else {
-				alpha_flags |= ALPHA_FLAG_SEMI_TRANSPARENT;
+				(*alpha_flags) |= ALPHA_FLAG_SEMI_TRANSPARENT;
 				if (src[0] == 0 && src[1] == 0 && src[2] == 0) {
 					// (0, 0, 0, 255) is a special reserved value
 					dst[0] = 1;
@@ -19823,16 +19823,16 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 		return result;
 	}
 
-	LoadedLevels prepare_texture(RGBAImage &image, int& alpha_flags) {
+	LoadedLevels prepare_texture(RGBAImage *image, int *alpha_flags) {
 		LoadedLevels levels;
-		int width = image.width;
-		int height = image.height;
+		int width = image->width;
+		int height = image->height;
 		LoadedImage base;
 		loaded_levels_init(&levels);
-		base = convert_tri_to_psx(image.data, width, height, alpha_flags);
+		base = convert_tri_to_psx(image->data, width, height, alpha_flags);
 		loaded_levels_push_move(&levels, &base);
 		while (width % 2 == 0 && height % 2 == 0) {
-			LoadedImage mip = generate_mip(levels.levels[levels.count - 1]);
+			LoadedImage mip = generate_mip(&levels.levels[levels.count - 1]);
 			loaded_levels_push_move(&levels, &mip);
 
 			width /= 2;
@@ -19906,7 +19906,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 				load_image(path, &image);
 				if (image.data != NULL) {
 					int alpha_flags_out = 0;
-					LoadedLevels levels = prepare_texture(image, alpha_flags_out);
+					LoadedLevels levels = prepare_texture(&image, &alpha_flags_out);
 					IOResponse *response = (IOResponse *)malloc(sizeof(IOResponse));
 					response->next         = NULL;
 					response->hash         = hash;
@@ -20668,14 +20668,14 @@ Rect fromSRect(SRect rect) {
 	}
 	static inline void handle_lru_cache_clear(struct HandleLRUCache *self) { self->count = 0; }
 
-	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode *mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
-		fastpath_capable_out = false;
+	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode *mode, unsigned int page_x, unsigned int page_y, bool *fastpath_capable_out, bool *cache_hit) {
+		(*fastpath_capable_out) = false;
 		Rect palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 
 		// TODO: I'm pretty sure this doesn't handle TextureMode_ABGR1555
 
 		uint32_t palette_hash = 0;
-		cache_hit = false;
+		(*cache_hit) = false;
 		if (self->hd_textures_enabled || self->dump_enabled) {
 			if (mode->mode == TextureMode_Palette8bpp || mode->mode == TextureMode_Palette4bpp) {
 				palette_hash = texture_tracker_get_palette_hash(self, palette_rect);
@@ -20684,13 +20684,13 @@ Rect fromSRect(SRect rect) {
 		if (self->hd_textures_enabled) {
 			// Check if the same texture as last time is used.
 			HandleCacheResult cache_result = handle_lru_cache_get(&self->handle_cache, rect, palette_hash);
-			cache_hit = cache_result.found;
-			if (cache_hit) {
+			(*cache_hit) = cache_result.found;
+			if ((*cache_hit)) {
 				// cache_result.handle is currently always a non-fused, non-none, index + palette_hash
 				// in the future it may be useful to cache none, but there's currently no way to check if such a containing rect is still alive (since HdTextureHandle's index would be -1)
 				EnduringTextureRect &tex = self->tracker.textures.a[cache_result.handle.index]; // Forgive me
 				if (tex.alive) {
-					fastpath_capable_out = self->fastpath_enabled && ((hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash) ? hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
+					(*fastpath_capable_out) = self->fastpath_enabled && ((hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash) ? hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
 					return cache_result.handle;
 				}
 			}
@@ -20719,7 +20719,7 @@ Rect fromSRect(SRect rect) {
 		}
 
 		if (!self->hd_textures_enabled) {
-			fastpath_capable_out = false;
+			(*fastpath_capable_out) = false;
 			return hd_handle_make_none();
 		}
 
@@ -20742,7 +20742,7 @@ Rect fromSRect(SRect rect) {
 				if (hd_handle_is_none(&result)) {
 					// note that if tex->vram_rect contains rect, then it will be the only entry in overlap, so an early out would be pointless
 					result_rect = fromSRect(tex->vram_rect);
-					fastpath_capable_out = self->fastpath_enabled && fromSRect_contains(tex->vram_rect, rect) && (overlapped_image->alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
+					(*fastpath_capable_out) = self->fastpath_enabled && fromSRect_contains(tex->vram_rect, rect) && (overlapped_image->alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
 					result = hd_handle_make(index, palette_hash);
 				} else {
 					// Multiple overlap, must fuse
@@ -20751,7 +20751,7 @@ Rect fromSRect(SRect rect) {
 						: mode->mode == TextureMode_Palette8bpp ? 128
 						: 256;
 					Rect page_rect = { page_x, page_y, width, 256 };
-					fastpath_capable_out = false;
+					(*fastpath_capable_out) = false;
 					return fused_pages_get_or_make(&self->fused_pages, page_rect, palette_hash, &self->tracker, self->uploader);
 				}
 			}
@@ -20890,7 +20890,7 @@ bool is_power_of_two(int n) {
 				if (width  % upload->width  == 0 && is_power_of_two(width  / upload->width) &&
 						height % upload->height == 0 && is_power_of_two(height / upload->height))
 				{
-					ImageHandle texture = renderer_upload_texture(self->uploader, cached->levels);
+					ImageHandle texture = renderer_upload_texture(self->uploader, &cached->levels);
 					hd_gpu_cache_put(&self->hd_gpu_cache, id, texture, cached->alpha_flags, cached->bytes);
 					hd_tex_map_set(&upload->textures, id.palette_hash, ih_get(&texture), cached->alpha_flags);
 					/* Both caches above retain their own reference; drop the
@@ -21031,7 +21031,7 @@ bool is_power_of_two(int n) {
 		default_image.owned_data[3] = 0;
 		loaded_levels_push_move(&default_levels, &default_image);
 
-		ih_move(&self->default_hd_texture, renderer_upload_texture(self->uploader, default_levels));
+		ih_move(&self->default_hd_texture, renderer_upload_texture(self->uploader, &default_levels));
 	}
 
 	void texture_tracker_reload_textures_from_disk(struct TextureTracker *self) {
@@ -21083,12 +21083,12 @@ bool is_power_of_two(int n) {
 		return make_srect(left, top, right - left, bottom - top);
 	}
 
-	static void split(SRect original, SRect remove, SRect *results, unsigned &count)
+	static void split(SRect original, SRect remove, SRect *results, unsigned *count)
 	{
 		SRectResult intersectionResult = intersect(original, remove);
 		if (!intersectionResult.valid)
 		{
-			results[count++] = original;
+			results[(*count)++] = original;
 			return;
 		}
 
@@ -21096,7 +21096,7 @@ bool is_power_of_two(int n) {
 
 		// Top rect
 		if (srect_top(&intersection) > srect_top(&original)) {
-			results[count++] = bounds(
+			results[(*count)++] = bounds(
 					srect_left(&original),
 					srect_right(&original),
 					srect_top(&original),
@@ -21106,7 +21106,7 @@ bool is_power_of_two(int n) {
 
 		// Bottom rect
 		if (srect_bottom(&intersection) < srect_bottom(&original)) {
-			results[count++] = bounds(
+			results[(*count)++] = bounds(
 					srect_left(&original),
 					srect_right(&original),
 					srect_bottom(&intersection),
@@ -21116,7 +21116,7 @@ bool is_power_of_two(int n) {
 
 		// Left rect
 		if (srect_left(&intersection) > srect_left(&original)) {
-			results[count++] = bounds(
+			results[(*count)++] = bounds(
 					srect_left(&original),
 					srect_left(&intersection),
 					srect_top(&intersection),
@@ -21126,7 +21126,7 @@ bool is_power_of_two(int n) {
 
 		// Right rect
 		if (srect_right(&intersection) < srect_right(&original)) {
-			results[count++] = bounds(
+			results[(*count)++] = bounds(
 					srect_right(&intersection),
 					srect_right(&original),
 					srect_top(&intersection),
@@ -21215,7 +21215,7 @@ bool is_power_of_two(int n) {
 				TextureRect *old = &eold->texture_rect;
 
 				splits_count = 0;
-				split(old->vram_rect, *rect, splits, splits_count);
+				split(old->vram_rect, *rect, splits, &splits_count);
 				// The rect didn't split, do nothing
 				if (splits_count == 1 && srect_eq(&splits[0], &old->vram_rect)) { }
 				else
@@ -21701,10 +21701,10 @@ int64_t page_bytes(FusionRects *fusion)
 	struct UploadPtrEntry { uint32_t key; TextureUpload *val; };
 	POD_VEC_DECLARE(UploadPtrVec, UploadPtrEntry);
 
-	TextureRectSaveState to_save_state(const TextureRect *t, UploadOwningMap &uploads) {
+	TextureRectSaveState to_save_state(const TextureRect *t, UploadOwningMap *uploads) {
 		uint32_t hash = t->upload->hash;
-		if (!uploadmap_contains(&uploads, hash))
-			uploadmap_insert(&uploads, hash, texture_upload_new_copy_without_handles(t->upload));
+		if (!uploadmap_contains(uploads, hash))
+			uploadmap_insert(uploads, hash, texture_upload_new_copy_without_handles(t->upload));
 		return {
 			t->upload->hash,
 			t->offset_x,
@@ -21713,11 +21713,11 @@ int64_t page_bytes(FusionRects *fusion)
 		};
 	}
 
-	TextureRect from_save_state(const TextureRectSaveState *t, UploadPtrVec &uploads) {
+	TextureRect from_save_state(const TextureRectSaveState *t, UploadPtrVec *uploads) {
 		TextureUpload *found = NULL;
-		{ int i; for (i = 0; i < uploads.count; i++) {
-			if (uploads.items[i].key == t->upload_hash) {
-				found = uploads.items[i].val;
+		{ int i; for (i = 0; i < uploads->count; i++) {
+			if (uploads->items[i].key == t->upload_hash) {
+				found = uploads->items[i].val;
 				break;
 			}
 		} }
@@ -21741,7 +21741,7 @@ int64_t page_bytes(FusionRects *fusion)
 		{
 			if (r.alive)
 			{
-				TextureRectSaveState _ss = to_save_state(&r.texture_rect, state.uploads);
+				TextureRectSaveState _ss = to_save_state(&r.texture_rect, &state.uploads);
 				TextureRectSaveStateVec_push(&state.rects, &_ss);
 			}
 		}
@@ -21759,7 +21759,7 @@ int64_t page_bytes(FusionRects *fusion)
 			for (_rti = 0; _rti < ownedrects_size(&r.to_restore); _rti++)
 			{
 				TextureRect *t = &r.to_restore.v.items[_rti];
-				TextureRectSaveState _ss = to_save_state(t, state.uploads);
+				TextureRectSaveState _ss = to_save_state(t, &state.uploads);
 				TextureRectSaveStateVec_push(&saved.to_restore, &_ss);
 			}
 			}
@@ -21787,7 +21787,7 @@ int64_t page_bytes(FusionRects *fusion)
 		{
 			int _i;
 			for (_i = 0; _i < TextureRectSaveStateVec_size(&state->rects); _i++)
-				rect_tracker_place(&self->tracker, from_save_state(TextureRectSaveStateVec_at((struct TextureRectSaveStateVec *)&state->rects, _i), uploads));
+				rect_tracker_place(&self->tracker, from_save_state(TextureRectSaveStateVec_at((struct TextureRectSaveStateVec *)&state->rects, _i), &uploads));
 		}
 		rrvec_clear(&self->restorable_rects);
 		{
@@ -21801,7 +21801,7 @@ int64_t page_bytes(FusionRects *fusion)
 				loaded.rect = r->rect;
 				int _j;
 				for (_j = 0; _j < TextureRectSaveStateVec_size(&r->to_restore); _j++)
-					ownedrects_push(&loaded.to_restore, from_save_state(TextureRectSaveStateVec_at(&r->to_restore, _j), uploads));
+					ownedrects_push(&loaded.to_restore, from_save_state(TextureRectSaveStateVec_at(&r->to_restore, _j), &uploads));
 				rrvec_push(&self->restorable_rects, &loaded);
 				restorablerect_destroy(&loaded);
 			}
