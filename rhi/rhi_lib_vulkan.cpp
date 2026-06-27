@@ -5387,7 +5387,6 @@ private:
 
 	static_assert(VULKAN_NUM_DESCRIPTOR_SETS == 4, "Number of descriptor sets != 4.");
 
-	class CommandBuffer;
 	/* set_dirty / get_and_clear were small CommandBuffer member helpers used by
 	 * many methods (including in-struct inline setters). Declared here, before the
 	 * struct, so the still-inline member methods can call them during the staged
@@ -5492,10 +5491,13 @@ private:
 			friend void commandbuffer_set_specialization_constant_mask(struct CommandBuffer *self, uint32_t spec_constant_mask);
 			friend void commandbuffer_set_specialization_constant(struct CommandBuffer *self, unsigned index, uint32_t value);
 			friend CommandBufferType commandbuffer_get_command_buffer_type(const struct CommandBuffer *self);
+			friend void commandbuffer_draw(struct CommandBuffer *self, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance);
+			friend void commandbuffer_dispatch(struct CommandBuffer *self, uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
+			friend void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color);
+			friend void commandbuffer_end_region(struct CommandBuffer *self);
+			friend void commandbuffer_end(struct CommandBuffer *self);
 
 
-			void begin_region(const char *name, const float *color = NULL);
-			void end_region();
 
 
 			/* Group A (copy/clear/barrier) methods are now free functions. */
@@ -5507,15 +5509,11 @@ private:
 
 
 
-			void draw(uint32_t vertex_count, uint32_t instance_count = 1, uint32_t first_vertex = 0,
-					uint32_t first_instance = 0);
 
-			void dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
 
 
 			/* Group D state setters (incl. SET_STATIC_STATE macros) are now free functions. */
 
-			void end();
 
 		private:
 			friend class Device;
@@ -5640,6 +5638,13 @@ private:
 	inline Device &commandbuffer_get_device(struct CommandBuffer *self) { return *self->device; }
 	inline const VkViewport &commandbuffer_get_viewport(const struct CommandBuffer *self) { return self->viewport; }
 	inline CommandBufferType commandbuffer_get_command_buffer_type(const struct CommandBuffer *self) { return self->type; }
+
+	/* Group E: draw / dispatch / debug-region / end free functions. */
+	void commandbuffer_draw(struct CommandBuffer *self, uint32_t vertex_count, uint32_t instance_count = 1, uint32_t first_vertex = 0, uint32_t first_instance = 0);
+	void commandbuffer_dispatch(struct CommandBuffer *self, uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
+	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color = NULL);
+	void commandbuffer_end_region(struct CommandBuffer *self);
+	void commandbuffer_end(struct CommandBuffer *self);
 	inline void commandbuffer_set_viewport(struct CommandBuffer *self, const VkViewport &viewport)
 	{
 		VK_ASSERT(self->framebuffer);
@@ -5836,7 +5841,6 @@ private:
 			friend struct ImageDeleter;
 			friend void image_fini(struct Image *self);
 			friend void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc, const ImageCreateInfo &info);
-			friend class CommandBuffer;
 			friend struct CommandBufferDeleter;
 			friend void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo &info, VkSubpassContents contents);
 			friend void commandbuffer_end_render_pass(struct CommandBuffer *self);
@@ -5851,6 +5855,9 @@ private:
 			friend void commandbuffer_begin_context(struct CommandBuffer *self);
 			friend void commandbuffer_flush_compute_state(struct CommandBuffer *self);
 			friend void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer);
+			friend void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color);
+			friend void commandbuffer_end_region(struct CommandBuffer *self);
+			friend void commandbuffer_end(struct CommandBuffer *self);
 			friend void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
 			friend void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate);
 			friend class Program;
@@ -10045,7 +10052,7 @@ void Renderer::mipmap_framebuffer()
 		commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
 		commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 		commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-		cbh_get(&cmd)->draw(4);
+		commandbuffer_draw(cbh_get(&cmd), 4);
 
 		commandbuffer_end_render_pass(cbh_get(&cmd));
 
@@ -10117,7 +10124,7 @@ void Renderer::ssaa_framebuffer()
 		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
 		memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
 		commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
-		cbh_get(&cmd)->dispatch(1, 1, to_run);
+		commandbuffer_dispatch(cbh_get(&cmd), 1, 1, to_run);
 	}
 	free(resolves_ssaa);
 }
@@ -10327,7 +10334,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
 	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 	commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-	cbh_get(&cmd)->draw(4);
+	commandbuffer_draw(cbh_get(&cmd), 4);
 
 	commandbuffer_end_render_pass(cbh_get(&cmd));
 
@@ -10583,7 +10590,7 @@ ImageHandle Renderer::scanout_to_texture()
 	commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
 	commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 	commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-	cbh_get(&cmd)->draw(4);
+	commandbuffer_draw(cbh_get(&cmd), 4);
 
 	commandbuffer_end_render_pass(cbh_get(&cmd));
 
@@ -10691,7 +10698,7 @@ void Renderer::flush_resolves()
 			commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
 			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&queue.scaled_resolves) + i, to_run * sizeof(VkRect2D));
-			cbh_get(&cmd)->dispatch(scaling, scaling, to_run);
+			commandbuffer_dispatch(cbh_get(&cmd), scaling, scaling, to_run);
 		}
 	}
 
@@ -10720,7 +10727,7 @@ void Renderer::flush_resolves()
 			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
 			commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
-			cbh_get(&cmd)->dispatch(1, 1, to_run);
+			commandbuffer_dispatch(cbh_get(&cmd), 1, 1, to_run);
 		}
 	}
 
@@ -11439,7 +11446,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 		{
 			unsigned to_draw = i - last_draw;
 			commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
-			cbh_get(&cmd)->draw(3 * to_draw, 1, 3 * last_draw, 0);
+			commandbuffer_draw(cbh_get(&cmd), 3 * to_draw, 1, 3 * last_draw, 0);
 			last_draw = i;
 
 			if ((*PrimitiveInfoVec_at(&scissors, i)).scissor_index != scissor) {
@@ -11472,7 +11479,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 
 	unsigned to_draw = size - last_draw;
 	commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
-	cbh_get(&cmd)->draw(3 * to_draw, 1, 3 * last_draw, 0);
+	commandbuffer_draw(cbh_get(&cmd), 3 * to_draw, 1, 3 * last_draw, 0);
 }
 
 void Renderer::render_opaque_primitives()
@@ -11565,7 +11572,7 @@ void Renderer::render_semi_transparent_primitives()
 					1, &barrier, 0, NULL, 0, NULL);
 			}
 
-			cbh_get(&cmd)->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
+			commandbuffer_draw(cbh_get(&cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
 			if (msaa > 1)
 				commandbuffer_set_multisample_state(cbh_get(&cmd), false);
 			last_draw_offset = i;
@@ -11577,7 +11584,7 @@ void Renderer::render_semi_transparent_primitives()
 
 	unsigned to_draw = prims - last_draw_offset;
 	commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
-	cbh_get(&cmd)->draw(to_draw * 3, 1, last_draw_offset * 3, 0);
+	commandbuffer_draw(cbh_get(&cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
 	if (msaa > 1)
 		commandbuffer_set_multisample_state(cbh_get(&cmd), false);
 }
@@ -11674,7 +11681,7 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 		unsigned to_blit = min_(size - i, 512u);
 		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_blit * sizeof(BlitInfo));
 		memcpy(ptr, BlitInfoVec_data((struct BlitInfoVec *)&infos) + i, to_blit * sizeof(BlitInfo));
-		cbh_get(&cmd)->dispatch(scale, scale, to_blit);
+		commandbuffer_dispatch(cbh_get(&cmd), scale, scale, to_blit);
 	}
 }
 
@@ -11731,14 +11738,14 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 				commandbuffer_set_program(cbh_get(&cmd), render_state.mask_test ?
 						*pipelines.blit_vram_msaa_cached_scaled_masked :
 						*pipelines.blit_vram_msaa_cached_scaled);
-				cbh_get(&cmd)->dispatch(factor, factor, msaa);
+				commandbuffer_dispatch(cbh_get(&cmd), factor, factor, msaa);
 			}
 			else
 			{
 				commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[0]));
 				commandbuffer_set_program(cbh_get(&cmd), render_state.mask_test ? *pipelines.blit_vram_cached_scaled_masked :
 														*pipelines.blit_vram_cached_scaled);
-				cbh_get(&cmd)->dispatch(factor, factor, 1);
+				commandbuffer_dispatch(cbh_get(&cmd), factor, factor, 1);
 			}
 		}
 		else
@@ -11746,7 +11753,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 			commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)));
 			commandbuffer_set_program(cbh_get(&cmd), render_state.mask_test ? *pipelines.blit_vram_cached_unscaled_masked :
 													*pipelines.blit_vram_cached_unscaled);
-			cbh_get(&cmd)->dispatch(factor, factor, 1);
+			commandbuffer_dispatch(cbh_get(&cmd), factor, factor, 1);
 		}
 		//LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
 		//    dst.y, dst.width, dst.height);
@@ -11872,7 +11879,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 			commandbuffer_set_buffer_view(cbh_get(&cmd), 0, 1, *bvh_get(&view));
 			Push push = { small_rect, 0, render_state.force_mask_bit ? 0x8000u : 0u };
 			commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-			cbh_get(&cmd)->dispatch((small_rect.width + 7) >> 3, (small_rect.height + 7) >> 3, 1);
+			commandbuffer_dispatch(cbh_get(&cmd), (small_rect.width + 7) >> 3, (small_rect.height + 7) >> 3, 1);
 			bvh_reset(&view);
 		}
 	}
@@ -11889,7 +11896,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 		commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
 
 		// TODO: Batch up work.
-		cbh_get(&cmd)->dispatch((rect.width + 7) >> 3, (rect.height + 7) >> 3, 1);
+		commandbuffer_dispatch(cbh_get(&cmd), (rect.width + 7) >> 3, (rect.height + 7) >> 3, 1);
 		bvh_reset(&view);
 	}
 
@@ -16097,20 +16104,20 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		self->dirty_sets &= ~set_update;
 	}
 
-	void CommandBuffer::draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance)
+	void commandbuffer_draw(struct CommandBuffer *self, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance)
 	{
-		VK_ASSERT(current_program);
-		VK_ASSERT(!is_compute);
-		commandbuffer_flush_render_state(this);
-		vkCmdDraw(cmd, vertex_count, instance_count, first_vertex, first_instance);
+		VK_ASSERT(self->current_program);
+		VK_ASSERT(!self->is_compute);
+		commandbuffer_flush_render_state(self);
+		vkCmdDraw(self->cmd, vertex_count, instance_count, first_vertex, first_instance);
 	}
 
-	void CommandBuffer::dispatch(uint32_t groups_x, uint32_t groups_y, uint32_t groups_z)
+	void commandbuffer_dispatch(struct CommandBuffer *self, uint32_t groups_x, uint32_t groups_y, uint32_t groups_z)
 	{
-		VK_ASSERT(current_program);
-		VK_ASSERT(is_compute);
-		commandbuffer_flush_compute_state(this);
-		vkCmdDispatch(cmd, groups_x, groups_y, groups_z);
+		VK_ASSERT(self->current_program);
+		VK_ASSERT(self->is_compute);
+		commandbuffer_flush_compute_state(self);
+		vkCmdDispatch(self->cmd, groups_x, groups_y, groups_z);
 	}
 
 	void commandbuffer_set_opaque_state(struct CommandBuffer *self)
@@ -16139,20 +16146,20 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 	}
 
-	void CommandBuffer::end()
+	void commandbuffer_end(struct CommandBuffer *self)
 	{
-		if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
+		if (vkEndCommandBuffer(self->cmd) != VK_SUCCESS)
 			LOGE("Failed to end command buffer.\n");
 
-		if (vbo_block.mapped)
-			device->request_vertex_block_nolock(vbo_block, 0);
-		if (ubo_block.mapped)
-			device->request_uniform_block_nolock(ubo_block, 0);
+		if (self->vbo_block.mapped)
+			self->device->request_vertex_block_nolock(self->vbo_block, 0);
+		if (self->ubo_block.mapped)
+			self->device->request_uniform_block_nolock(self->ubo_block, 0);
 	}
 
-	void CommandBuffer::begin_region(const char *name, const float *color)
+	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color)
 	{
-		if (device->ext.supports_debug_marker)
+		if (self->device->ext.supports_debug_marker)
 		{
 			VkDebugMarkerMarkerInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT };
 			if (color)
@@ -16167,14 +16174,14 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			}
 
 			info.pMarkerName = name;
-			vkCmdDebugMarkerBeginEXT(cmd, &info);
+			vkCmdDebugMarkerBeginEXT(self->cmd, &info);
 		}
 	}
 
-	void CommandBuffer::end_region()
+	void commandbuffer_end_region(struct CommandBuffer *self)
 	{
-		if (device->ext.supports_debug_marker)
-			vkCmdDebugMarkerEndEXT(cmd);
+		if (self->device->ext.supports_debug_marker)
+			vkCmdDebugMarkerEndEXT(self->cmd);
 	}
 
 
@@ -17107,7 +17114,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		CommandBufferHandleVec &submissions = get_queue_submissions(type);
 
 		pool.signal_submitted(commandbuffer_get_command_buffer(cbh_get(&cmd)));
-		cbh_get(&cmd)->end();
+		commandbuffer_end(cbh_get(&cmd));
 		submissions.push(static_cast<CommandBufferHandle &&>(cmd));
 
 		VkFence cleared_fence = VK_NULL_HANDLE;
@@ -17458,7 +17465,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		CommandBufferHandle cmd = request_command_buffer_nolock(Type_AsyncTransfer);
 
-		cbh_get(&cmd)->begin_region("buffer-block-sync");
+		commandbuffer_begin_region(cbh_get(&cmd), "buffer-block-sync");
 
 		for (BufferBlock &block : dma.vbo)
 		{
@@ -17477,7 +17484,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		dma.vbo.clear();
 		dma.ubo.clear();
 
-		cbh_get(&cmd)->end_region();
+		commandbuffer_end_region(cbh_get(&cmd));
 
 		// Do not flush graphics or compute in this context.
 		// We must be able to inject semaphores into all currently enqueued graphics / compute.
@@ -18472,9 +18479,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					VK_ACCESS_TRANSFER_WRITE_BIT);
 
-			cbh_get(&transfer_cmd)->begin_region("copy-image-to-gpu");
+			commandbuffer_begin_region(cbh_get(&transfer_cmd), "copy-image-to-gpu");
 			commandbuffer_copy_buffer_to_image_blits(cbh_get(&transfer_cmd), *ih_get(&handle), *bh_get(&staging_buffer->buffer), staging_buffer->num_blits, staging_buffer->blits);
-			cbh_get(&transfer_cmd)->end_region();
+			commandbuffer_end_region(cbh_get(&transfer_cmd));
 
 			if (transfer_queue != graphics_queue)
 			{
@@ -18535,12 +18542,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 			if (generate_mips)
 			{
-				cbh_get(&graphics_cmd)->begin_region("mipgen");
+				commandbuffer_begin_region(cbh_get(&graphics_cmd), "mipgen");
 				commandbuffer_barrier_prepare_generate_mipmap(cbh_get(&graphics_cmd), *ih_get(&handle), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 						VK_PIPELINE_STAGE_TRANSFER_BIT,
 						prepare_src_access, need_mipmap_barrier);
 				commandbuffer_generate_mipmap(cbh_get(&graphics_cmd), *ih_get(&handle));
-				cbh_get(&graphics_cmd)->end_region();
+				commandbuffer_end_region(cbh_get(&graphics_cmd));
 			}
 
 			if (need_initial_barrier)
@@ -18690,9 +18697,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			set_name(*bh_get(&staging_buffer), "buffer-upload-staging-buffer");
 
 			cmd = request_command_buffer(Type_AsyncTransfer);
-			cbh_get(&cmd)->begin_region("copy-buffer-staging");
+			commandbuffer_begin_region(cbh_get(&cmd), "copy-buffer-staging");
 			commandbuffer_copy_buffer_whole(cbh_get(&cmd), *bh_get(&handle), *bh_get(&staging_buffer));
-			cbh_get(&cmd)->end_region();
+			commandbuffer_end_region(cbh_get(&cmd));
 
 			submit_staging(cmd, info.usage, true);
 			/* Drop the staging buffer's producer reference (the GPU copy is
