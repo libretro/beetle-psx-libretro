@@ -4724,7 +4724,7 @@ PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return
 	};
 
 	static void render_pass_fixup_render_pass_nvidia(struct RenderPass *self, VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
-	void render_pass_init(struct RenderPass *self, Hash hash, Device *device, const RenderPassInfo &info);
+	void render_pass_init(struct RenderPass *self, Hash hash, Device *device, const RenderPassInfo *info);
 	void render_pass_fini(struct RenderPass *self);
 
 VkRenderPass render_pass_get_render_pass(const struct RenderPass *self) { return self->render_pass; }
@@ -4822,7 +4822,7 @@ DescriptorSetAllocator *descriptor_set_allocator_map_emplace_yield(
 	}
 
 RenderPass *render_pass_map_emplace_yield(struct render_pass_map *m,
-			Hash hash, Device *device, const RenderPassInfo &info)
+			Hash hash, Device *device, const RenderPassInfo *info)
 	{
 		void *slot = object_pool_raw_allocate(&m->pool);
 		RenderPass *t;
@@ -4890,7 +4890,7 @@ Program *program_map_emplace_yield_graphics(struct program_map *m,
 		unsigned num_attachments;
 	};
 
-	void framebuffer_init(struct Framebuffer *self, Device *device, const RenderPass *rp, const RenderPassInfo &info);
+	void framebuffer_init(struct Framebuffer *self, Device *device, const RenderPass *rp, const RenderPassInfo *info);
 	void framebuffer_fini(struct Framebuffer *self);
 VkFramebuffer framebuffer_get_framebuffer(const struct Framebuffer *self) { return self->framebuffer; }
 ImageView *framebuffer_get_attachment(const struct Framebuffer *self, unsigned index)
@@ -4919,7 +4919,7 @@ void framebuffer_node_destroy(FramebufferNode *t) { framebuffer_fini(&t->base); 
 	 * it in the recycle map and links it at the front of the current ring (mirrors the
 	 * template's variadic emplace for this type). */
 FramebufferNode *framebuffer_thmap_emplace(struct framebuffer_thmap *m,
-			Hash hash, Device *device, const RenderPass *rp, const RenderPassInfo &info)
+			Hash hash, Device *device, const RenderPass *rp, const RenderPassInfo *info)
 	{
 		void *slot = object_pool_raw_allocate(&m->object_pool);
 		FramebufferNode *node;
@@ -4951,7 +4951,7 @@ void framebuffer_allocator_deinit(struct FramebufferAllocator *self)
 	{
 		framebuffer_thmap_deinit(&self->framebuffers);
 	}
-	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
+	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo *info);
 	void framebuffer_allocator_begin_frame(struct FramebufferAllocator *self);
 	void framebuffer_allocator_clear(struct FramebufferAllocator *self);
 
@@ -5442,7 +5442,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	inline CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self, CommandBufferDirtyFlags flags) { CommandBufferDirtyFlags mask = self->dirty & flags; self->dirty &= ~flags; return mask; }
 
 	/* Group B: render-pass / pipeline / descriptor-flush free functions. */
-	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo &info, VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
+	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo *info, VkSubpassContents contents);
 	void commandbuffer_end_render_pass(struct CommandBuffer *self);
 	void commandbuffer_set_program(struct CommandBuffer *self, Program &program);
 	void commandbuffer_set_scissor(struct CommandBuffer *self, const VkRect2D &rect);
@@ -5456,7 +5456,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	void commandbuffer_flush_descriptor_set(struct CommandBuffer *self, uint32_t set);
 	void commandbuffer_begin_context(struct CommandBuffer *self);
 	void commandbuffer_flush_compute_state(struct CommandBuffer *self);
-	void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer);
+	void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo *info, const Framebuffer *framebuffer);
 	inline void commandbuffer_begin_graphics(struct CommandBuffer *self) { self->is_compute = false; commandbuffer_begin_context(self); }
 	inline void commandbuffer_begin_compute(struct CommandBuffer *self) { self->is_compute = true; commandbuffer_begin_context(self); }
 
@@ -5927,11 +5927,11 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	Shader *device_request_shader(Device *self, const uint32_t *data, size_t size);
 	PipelineLayout *device_request_pipeline_layout(Device *self, const CombinedResourceLayout *layout);
 	DescriptorSetAllocator *device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout *layout, const uint32_t *stages_for_bindings);
-	const RenderPass *device_request_render_pass(Device *self, const RenderPassInfo &info, bool compatible);
+	const RenderPass *device_request_render_pass(Device *self, const RenderPassInfo *info, bool compatible);
 	uint64_t device_allocate_cookie(Device *self);
 	void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size);
 	void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size);
-	const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo &info);
+	const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo *info);
 	void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore);
 	void device_add_frame_counter_nolock(Device *self);
 	void device_decrement_frame_counter_nolock(Device *self);
@@ -5966,7 +5966,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void imageview_fini(struct ImageView *self);
 	void image_fini(struct Image *self);
 	void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation *alloc, const ImageCreateInfo *info);
-	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo &info, VkSubpassContents contents);
+	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo *info, VkSubpassContents contents);
 	void commandbuffer_end_render_pass(struct CommandBuffer *self);
 	void commandbuffer_set_program(struct CommandBuffer *self, Program &program);
 	void commandbuffer_flush_render_state(struct CommandBuffer *self);
@@ -5978,7 +5978,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void commandbuffer_flush_descriptor_set(struct CommandBuffer *self, uint32_t set);
 	void commandbuffer_begin_context(struct CommandBuffer *self);
 	void commandbuffer_flush_compute_state(struct CommandBuffer *self);
-	void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer);
+	void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo *info, const Framebuffer *framebuffer);
 	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color);
 	void commandbuffer_end_region(struct CommandBuffer *self);
 	void commandbuffer_end(struct CommandBuffer *self);
@@ -5989,7 +5989,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void program_init_graphics(struct Program *self, Device *device, Shader *vertex, Shader *fragment);
 	void program_init_compute(struct Program *self, Device *device, Shader *compute);
 	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout *layout);
-	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
+	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo *info);
 	void cbhvec_init(struct Device::CommandBufferHandleVec *v);
 	void cbhvec_grow(struct Device::CommandBufferHandleVec *v, int ncap);
 	void cbhvec_push(struct Device::CommandBufferHandleVec *v, CommandBufferHandle *e);
@@ -6032,7 +6032,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	}
 	inline void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size) { device_request_vertex_block_nolock(self, block, size); }
 	inline void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size) { device_request_uniform_block_nolock(self, block, size); }
-	inline const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo &info) { return framebuffer_allocator_request_framebuffer(&self->framebuffer_allocator, info); }
+	inline const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo *info) { return framebuffer_allocator_request_framebuffer(&self->framebuffer_allocator, info); }
 	inline void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore) { semaphoremanager_recycle(&self->managers.semaphore, semaphore); }
 	inline void device_add_frame_counter_nolock(Device *self) { self->lock.counter++; }
 	inline void device_decrement_frame_counter_nolock(Device *self) { VK_ASSERT(self->lock.counter > 0); self->lock.counter--; }
@@ -10150,7 +10150,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 		}
 
-		commandbuffer_begin_render_pass(cbh_get(&self->cmd), rp);
+		commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
 
 		if (i == levels)
 			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.mipmap_energy_blur);
@@ -10428,7 +10428,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
-	commandbuffer_begin_render_pass(cbh_get(&self->cmd), rp);
+	commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
 	commandbuffer_set_quad_state(cbh_get(&self->cmd));
 
 	if (scaled)
@@ -10513,7 +10513,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
-		commandbuffer_begin_render_pass(cbh_get(&self->cmd), rp);
+		commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
 		commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
 		commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -10617,7 +10617,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
-	commandbuffer_begin_render_pass(cbh_get(&self->cmd), rp);
+	commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
 	commandbuffer_set_quad_state(cbh_get(&self->cmd));
 
 	VkViewport old_vp = commandbuffer_get_viewport(cbh_get(&self->cmd));
@@ -11453,7 +11453,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect &rect)
 	info.render_area.offset = { (int)(rect.x * self->scaling), (int)(rect.y * self->scaling) };
 	info.render_area.extent = { rect.width * self->scaling, rect.height * self->scaling };
 
-	commandbuffer_begin_render_pass(cbh_get(&self->cmd), info);
+	commandbuffer_begin_render_pass(cbh_get(&self->cmd), &info, VK_SUBPASS_CONTENTS_INLINE);
 	commandbuffer_set_scissor(cbh_get(&self->cmd), info.render_area);
 	self->queue.default_scissor = info.render_area;
 	commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 2, *image_get_view(ih_get(&self->dither_lut)), StockSampler_NearestWrap);
@@ -14123,19 +14123,19 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		return ret;
 	}
 
-	static VkAttachmentLoadOp rp_color_load_op(const RenderPassInfo &info, unsigned index)
+	static VkAttachmentLoadOp rp_color_load_op(const RenderPassInfo *info, unsigned index)
 	{
-		if ((info.clear_attachments & (1u << index)) != 0)
+		if ((info->clear_attachments & (1u << index)) != 0)
 			return VK_ATTACHMENT_LOAD_OP_CLEAR;
-		else if ((info.load_attachments & (1u << index)) != 0)
+		else if ((info->load_attachments & (1u << index)) != 0)
 			return VK_ATTACHMENT_LOAD_OP_LOAD;
 		else
 			return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	}
 
-	static VkAttachmentStoreOp rp_color_store_op(const RenderPassInfo &info, unsigned index)
+	static VkAttachmentStoreOp rp_color_store_op(const RenderPassInfo *info, unsigned index)
 	{
-		if ((info.store_attachments & (1u << index)) != 0)
+		if ((info->store_attachments & (1u << index)) != 0)
 			return VK_ATTACHMENT_STORE_OP_STORE;
 		else
 			return VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -14186,7 +14186,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			return NULL;
 	}
 
-	void render_pass_init(struct RenderPass *self, Hash hash, Device *device, const RenderPassInfo &info)
+	void render_pass_init(struct RenderPass *self, Hash hash, Device *device, const RenderPassInfo *info)
 	{
 		self->device = device;
 		self->render_pass = VK_NULL_HANDLE;
@@ -14195,62 +14195,62 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		self->intrusive_node.key = hash;
 		{ unsigned att; for (att = 0; att < VULKAN_NUM_ATTACHMENTS; att++) self->color_attachments[att] = VK_FORMAT_UNDEFINED; }
 
-		VK_ASSERT(info.num_color_attachments || info.depth_stencil);
+		VK_ASSERT(info->num_color_attachments || info->depth_stencil);
 
 		// Want to make load/store to transient a very explicit thing to do, since it will kill performance.
-		bool enable_transient_store = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT) != 0;
-		bool enable_transient_load = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT) != 0;
+		bool enable_transient_store = (info->op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT) != 0;
+		bool enable_transient_load = (info->op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT) != 0;
 
 		// Set up default subpass info structure if we don't have it.
-		const RenderPassInfo_Subpass *subpass_infos = info.subpasses;
-		unsigned num_subpasses = info.num_subpasses;
+		const RenderPassInfo_Subpass *subpass_infos = info->subpasses;
+		unsigned num_subpasses = info->num_subpasses;
 		RenderPassInfo_Subpass default_subpass_info;
 		render_pass_info_subpass_defaults(&default_subpass_info);
-		if (!info.subpasses)
+		if (!info->subpasses)
 		{
-			default_subpass_info.num_color_attachments = info.num_color_attachments;
-			if (info.op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT)
+			default_subpass_info.num_color_attachments = info->num_color_attachments;
+			if (info->op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT)
 				default_subpass_info.depth_stencil_mode = RenderPassInfo_DepthStencil_ReadOnly;
 			else
 				default_subpass_info.depth_stencil_mode = RenderPassInfo_DepthStencil_ReadWrite;
 
-			{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) default_subpass_info.color_attachments[i] = i; }
+			{ unsigned i; for (i = 0; i < info->num_color_attachments; i++) default_subpass_info.color_attachments[i] = i; }
 			num_subpasses = 1;
 			subpass_infos = &default_subpass_info;
 		}
 
 		// First, set up attachment descriptions.
-		const unsigned num_attachments = info.num_color_attachments + (info.depth_stencil ? 1 : 0);
+		const unsigned num_attachments = info->num_color_attachments + (info->depth_stencil ? 1 : 0);
 		VkAttachmentDescription attachments[VULKAN_NUM_ATTACHMENTS + 1];
 		uint32_t implicit_transitions = 0;
 
 		VkAttachmentLoadOp ds_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		VkAttachmentStoreOp ds_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
-		VK_ASSERT(!(info.clear_attachments & info.load_attachments));
+		VK_ASSERT(!(info->clear_attachments & info->load_attachments));
 
-		if (info.op_flags & RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT)
+		if (info->op_flags & RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT)
 			ds_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		else if (info.op_flags & RENDER_PASS_OP_LOAD_DEPTH_STENCIL_BIT)
+		else if (info->op_flags & RENDER_PASS_OP_LOAD_DEPTH_STENCIL_BIT)
 			ds_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
 
-		if (info.op_flags & RENDER_PASS_OP_STORE_DEPTH_STENCIL_BIT)
+		if (info->op_flags & RENDER_PASS_OP_STORE_DEPTH_STENCIL_BIT)
 			ds_store_op = VK_ATTACHMENT_STORE_OP_STORE;
 
-		bool ds_read_only = (info.op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT) != 0;
+		bool ds_read_only = (info->op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT) != 0;
 		VkImageLayout depth_stencil_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		if (info.depth_stencil)
+		if (info->depth_stencil)
 		{
-			depth_stencil_layout = image_get_layout(imageview_get_image(info.depth_stencil), 
+			depth_stencil_layout = image_get_layout(imageview_get_image(info->depth_stencil), 
 					ds_read_only ?
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL :
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 		}
 
-		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) {
-			VK_ASSERT(info.color_attachments[i]);
-			self->color_attachments[i] = imageview_get_format(info.color_attachments[i]);
-			Image *image = imageview_get_image(info.color_attachments[i]);
+		{ unsigned i; for (i = 0; i < info->num_color_attachments; i++) {
+			VK_ASSERT(info->color_attachments[i]);
+			self->color_attachments[i] = imageview_get_format(info->color_attachments[i]);
+			Image *image = imageview_get_image(info->color_attachments[i]);
 			VkAttachmentDescription &att = attachments[i];
 			att.flags = 0;
 			att.format = self->color_attachments[i];
@@ -14268,7 +14268,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				if (enable_transient_load)
 				{
 					// The transient will behave like a normal image.
-					att.initialLayout = image_get_layout(imageview_get_image(info.color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+					att.initialLayout = image_get_layout(imageview_get_image(info->color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 				}
 				else
 				{
@@ -14283,14 +14283,14 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				implicit_transitions |= 1u << i;
 			}
 			else
-				att.initialLayout = image_get_layout(imageview_get_image(info.color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+				att.initialLayout = image_get_layout(imageview_get_image(info->color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		} }
 
-		self->depth_stencil = info.depth_stencil ? imageview_get_format(info.depth_stencil) : VK_FORMAT_UNDEFINED;
-		if (info.depth_stencil)
+		self->depth_stencil = info->depth_stencil ? imageview_get_format(info->depth_stencil) : VK_FORMAT_UNDEFINED;
+		if (info->depth_stencil)
 		{
-			Image *image = imageview_get_image(info.depth_stencil);
-			VkAttachmentDescription &att = attachments[info.num_color_attachments];
+			Image *image = imageview_get_image(info->depth_stencil);
+			VkAttachmentDescription &att = attachments[info->num_color_attachments];
 			att.flags = 0;
 			att.format = self->depth_stencil;
 			att.samples = image_get_create_info(image)->samples;
@@ -14335,7 +14335,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 					att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 				}
 
-				implicit_transitions |= 1u << info.num_color_attachments;
+				implicit_transitions |= 1u << info->num_color_attachments;
 			}
 			else
 				att.initialLayout = depth_stencil_layout;
@@ -14400,9 +14400,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				} }
 			}
 
-			if (info.depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo_DepthStencil_None)
+			if (info->depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo_DepthStencil_None)
 			{
-				depth->attachment = info.num_color_attachments;
+				depth->attachment = info->num_color_attachments;
 				// Fill in later.
 				depth->layout = VK_IMAGE_LAYOUT_UNDEFINED;
 			}
@@ -14877,42 +14877,42 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		SubpassInfoVec_free_storage(&self->subpasses);
 	}
 
-	void framebuffer_init(struct Framebuffer *self, Device *device, const RenderPass *rp, const RenderPassInfo &info)
+	void framebuffer_init(struct Framebuffer *self, Device *device, const RenderPass *rp, const RenderPassInfo *info)
 	{
 		VkImageView views[VULKAN_NUM_ATTACHMENTS + 1];
 		unsigned num_views = 0;
 		self->device = device;
 		self->framebuffer = VK_NULL_HANDLE;
 		self->render_pass = rp;
-		self->info = info;
+		self->info = *info;
 		self->num_attachments = 0;
 		cookie_init(&self->cookie_base, device);
 		self->width = UINT32_MAX;
 		self->height = UINT32_MAX;
 
-		VK_ASSERT(info.num_color_attachments || info.depth_stencil);
+		VK_ASSERT(info->num_color_attachments || info->depth_stencil);
 
-		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) {
-			VK_ASSERT(info.color_attachments[i]);
-			auto *att = info.color_attachments[i];
+		{ unsigned i; for (i = 0; i < info->num_color_attachments; i++) {
+			VK_ASSERT(info->color_attachments[i]);
+			auto *att = info->color_attachments[i];
 			unsigned lod = imageview_get_create_info(att)->base_level;
 			unsigned aw  = image_get_width(imageview_get_image(att), lod);
 			unsigned ah  = image_get_height(imageview_get_image(att), lod);
 			if (aw < self->width)  self->width  = aw;
 			if (ah < self->height) self->height = ah;
-			views[num_views++] = imageview_get_render_target_view(att, info.layer);
+			views[num_views++] = imageview_get_render_target_view(att, info->layer);
 			self->attachments[self->num_attachments++] = att;
 		} }
 
-		if (info.depth_stencil)
+		if (info->depth_stencil)
 		{
-			auto *att = info.depth_stencil;
+			auto *att = info->depth_stencil;
 			unsigned lod = imageview_get_create_info(att)->base_level;
 			unsigned aw  = image_get_width(imageview_get_image(att), lod);
 			unsigned ah  = image_get_height(imageview_get_image(att), lod);
 			if (aw < self->width)  self->width  = aw;
 			if (ah < self->height) self->height = ah;
-			views[num_views++] = imageview_get_render_target_view(att, info.layer);
+			views[num_views++] = imageview_get_render_target_view(att, info->layer);
 			self->attachments[self->num_attachments++] = att;
 		}
 
@@ -14944,7 +14944,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		framebuffer_thmap_begin_frame(&self->framebuffers);
 	}
 
-	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info)
+	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo *info)
 	{
 		const RenderPass *rp = device_request_render_pass(self->device, info, true);
 		Hash hash;
@@ -14952,14 +14952,14 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		Hasher h; hasher_init(&h);
 		hasher_u64(&h, rp->intrusive_node.key);
 
-		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++)
-			if (info.color_attachments[i])
-				hasher_u64(&h, info.color_attachments[i]->cookie_base.cookie); }
+		{ unsigned i; for (i = 0; i < info->num_color_attachments; i++)
+			if (info->color_attachments[i])
+				hasher_u64(&h, info->color_attachments[i]->cookie_base.cookie); }
 
-		if (info.depth_stencil)
-			hasher_u64(&h, info.depth_stencil->cookie_base.cookie);
+		if (info->depth_stencil)
+			hasher_u64(&h, info->depth_stencil->cookie_base.cookie);
 
-		hasher_u32(&h, info.layer);
+		hasher_u32(&h, info->layer);
 
 		hash = hasher_get(&h);
 
@@ -15346,11 +15346,11 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		memset(self->vbo.buffers, 0, sizeof(self->vbo.buffers));
 	}
 
-	void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer)
+	void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo *info, const Framebuffer *framebuffer)
 	{
 		const uint32_t fb_w = framebuffer_get_width(self->framebuffer);
 		const uint32_t fb_h = framebuffer_get_height(self->framebuffer);
-		VkRect2D rect = info.render_area;
+		VkRect2D rect = info->render_area;
 		if ((uint32_t)(rect.offset.x) > fb_w) rect.offset.x = (int32_t)(fb_w);
 		if ((uint32_t)(rect.offset.y) > fb_h) rect.offset.y = (int32_t)(fb_h);
 		{
@@ -15364,7 +15364,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		self->scissor = rect;
 	}
 
-	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo &info, VkSubpassContents contents)
+	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo *info, VkSubpassContents contents)
 	{
 		VK_ASSERT(!self->framebuffer);
 		VK_ASSERT(!self->compatible_render_pass);
@@ -15379,19 +15379,19 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkClearValue clear_values[VULKAN_NUM_ATTACHMENTS + 1];
 		unsigned num_clear_values = 0;
 
-		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) {
-			VK_ASSERT(info.color_attachments[i]);
-			if (info.clear_attachments & (1u << i))
+		{ unsigned i; for (i = 0; i < info->num_color_attachments; i++) {
+			VK_ASSERT(info->color_attachments[i]);
+			if (info->clear_attachments & (1u << i))
 			{
-				clear_values[i].color = info.clear_color[i];
+				clear_values[i].color = info->clear_color[i];
 				num_clear_values = i + 1;
 			}
 		} }
 
-		if (info.depth_stencil && (info.op_flags & RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT) != 0)
+		if (info->depth_stencil && (info->op_flags & RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT) != 0)
 		{
-			clear_values[info.num_color_attachments].depthStencil = info.clear_depth_stencil;
-			num_clear_values = info.num_color_attachments + 1;
+			clear_values[info->num_color_attachments].depthStencil = info->clear_depth_stencil;
+			num_clear_values = info->num_color_attachments + 1;
 		}
 
 		VkRenderPassBeginInfo begin_info = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
@@ -18934,53 +18934,53 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		return VK_FORMAT_UNDEFINED;
 	}
 
-	const RenderPass * device_request_render_pass(Device *self, const RenderPassInfo &info, bool compatible){
+	const RenderPass * device_request_render_pass(Device *self, const RenderPassInfo *info, bool compatible){
 		Hasher h; hasher_init(&h);
 		VkFormat formats[VULKAN_NUM_ATTACHMENTS];
 		VkFormat depth_stencil;
 		uint32_t lazy = 0;
 		uint32_t optimal = 0;
 
-		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) {
-			VK_ASSERT(info.color_attachments[i]);
-			formats[i] = imageview_get_format(info.color_attachments[i]);
-			if (image_get_create_info(imageview_get_image(info.color_attachments[i]))->domain == ImageDomain_Transient)
+		{ unsigned i; for (i = 0; i < info->num_color_attachments; i++) {
+			VK_ASSERT(info->color_attachments[i]);
+			formats[i] = imageview_get_format(info->color_attachments[i]);
+			if (image_get_create_info(imageview_get_image(info->color_attachments[i]))->domain == ImageDomain_Transient)
 				lazy |= 1u << i;
-			if (image_get_layout_type(imageview_get_image(info.color_attachments[i])) == Layout_Optimal)
+			if (image_get_layout_type(imageview_get_image(info->color_attachments[i])) == Layout_Optimal)
 				optimal |= 1u << i;
 		} }
 
-		if (info.depth_stencil)
+		if (info->depth_stencil)
 		{
-			if (image_get_create_info(imageview_get_image(info.depth_stencil))->domain == ImageDomain_Transient)
-				lazy |= 1u << info.num_color_attachments;
-			if (image_get_layout_type(imageview_get_image(info.depth_stencil)) == Layout_Optimal)
-				optimal |= 1u << info.num_color_attachments;
+			if (image_get_create_info(imageview_get_image(info->depth_stencil))->domain == ImageDomain_Transient)
+				lazy |= 1u << info->num_color_attachments;
+			if (image_get_layout_type(imageview_get_image(info->depth_stencil)) == Layout_Optimal)
+				optimal |= 1u << info->num_color_attachments;
 		}
 
-		hasher_u32(&h, info.num_subpasses);
-		{ unsigned i; for (i = 0; i < info.num_subpasses; i++) {
-			hasher_u32(&h, info.subpasses[i].num_color_attachments);
-			hasher_u32(&h, info.subpasses[i].num_input_attachments);
-			hasher_u32(&h, info.subpasses[i].num_resolve_attachments);
-			hasher_u32(&h, (uint32_t)(info.subpasses[i].depth_stencil_mode));
-			{ unsigned j; for (j = 0; j < info.subpasses[i].num_color_attachments; j++) hasher_u32(&h, info.subpasses[i].color_attachments[j]); }
-			{ unsigned j; for (j = 0; j < info.subpasses[i].num_input_attachments; j++) hasher_u32(&h, info.subpasses[i].input_attachments[j]); }
-			{ unsigned j; for (j = 0; j < info.subpasses[i].num_resolve_attachments; j++) hasher_u32(&h, info.subpasses[i].resolve_attachments[j]); }
+		hasher_u32(&h, info->num_subpasses);
+		{ unsigned i; for (i = 0; i < info->num_subpasses; i++) {
+			hasher_u32(&h, info->subpasses[i].num_color_attachments);
+			hasher_u32(&h, info->subpasses[i].num_input_attachments);
+			hasher_u32(&h, info->subpasses[i].num_resolve_attachments);
+			hasher_u32(&h, (uint32_t)(info->subpasses[i].depth_stencil_mode));
+			{ unsigned j; for (j = 0; j < info->subpasses[i].num_color_attachments; j++) hasher_u32(&h, info->subpasses[i].color_attachments[j]); }
+			{ unsigned j; for (j = 0; j < info->subpasses[i].num_input_attachments; j++) hasher_u32(&h, info->subpasses[i].input_attachments[j]); }
+			{ unsigned j; for (j = 0; j < info->subpasses[i].num_resolve_attachments; j++) hasher_u32(&h, info->subpasses[i].resolve_attachments[j]); }
 		} }
 
-		depth_stencil = info.depth_stencil ? imageview_get_format(info.depth_stencil) : VK_FORMAT_UNDEFINED;
-		hasher_data(&h, (const uint32_t *)(formats), info.num_color_attachments * sizeof(VkFormat));
-		hasher_u32(&h, info.num_color_attachments);
+		depth_stencil = info->depth_stencil ? imageview_get_format(info->depth_stencil) : VK_FORMAT_UNDEFINED;
+		hasher_data(&h, (const uint32_t *)(formats), info->num_color_attachments * sizeof(VkFormat));
+		hasher_u32(&h, info->num_color_attachments);
 		hasher_u32(&h, depth_stencil);
 
 		// Compatible render passes do not care about load/store, or image layouts.
 		if (!compatible)
 		{
-			hasher_u32(&h, info.op_flags);
-			hasher_u32(&h, info.clear_attachments);
-			hasher_u32(&h, info.load_attachments);
-			hasher_u32(&h, info.store_attachments);
+			hasher_u32(&h, info->op_flags);
+			hasher_u32(&h, info->clear_attachments);
+			hasher_u32(&h, info->load_attachments);
+			hasher_u32(&h, info->store_attachments);
 			hasher_u32(&h, optimal);
 		}
 
