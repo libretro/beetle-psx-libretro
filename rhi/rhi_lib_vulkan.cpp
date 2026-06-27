@@ -4134,35 +4134,25 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	static inline int fence_is_valid(const struct Fence *h) { return h->data != NULL; }
 
 	POD_VEC_DECLARE(FenceVec, VkFence);
-	class FenceManager
+	/* FenceManager: recycles VkFence handles. Converted from a C++ class to a
+	 * plain C struct + fencemanager_* free functions. init/init_empty stay inline;
+	 * deinit/request_cleared_fence/recycle_fence are out-of-line. */
+	struct FenceManager
 	{
-		public:
-			void init(VkDevice device)
-			{
-				this->device = device;
-			}
-			/* Raw-memory empty state, for a malloc'd owner (so the constructor and
-			 * the fence-vector's aggregate initialiser do not run). The heavyweight
-			 * setup is still init(device); deinit() already tears down from any
-			 * state (destroy recycled fences, free the array). */
-			void init_empty()
-			{
-				device = VK_NULL_HANDLE;
-				fences.items = NULL;
-				fences.count = 0;
-				fences.cap   = 0;
-			}
-			/* Explicit teardown (formerly ~FenceManager): destroys the recycled
-			 * fences and frees the backing array. Called from Device's teardown. */
-			void deinit();
-
-			VkFence request_cleared_fence();
-			void recycle_fence(VkFence fence);
-
-		private:
-			VkDevice device = VK_NULL_HANDLE;
-			FenceVec fences = { NULL, 0, 0 };
+		VkDevice device;
+		FenceVec fences;
 	};
+	static inline void fencemanager_init(struct FenceManager *self, VkDevice device) { self->device = device; }
+	static inline void fencemanager_init_empty(struct FenceManager *self)
+	{
+		self->device = VK_NULL_HANDLE;
+		self->fences.items = NULL;
+		self->fences.count = 0;
+		self->fences.cap   = 0;
+	}
+	void fencemanager_deinit(struct FenceManager *self);
+	VkFence fencemanager_request_cleared_fence(struct FenceManager *self);
+	void fencemanager_recycle_fence(struct FenceManager *self, VkFence fence);
 
 	class Device;
 
@@ -4292,36 +4282,24 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	};
 
 	POD_VEC_DECLARE(SemaphoreVec, VkSemaphore);
-	class SemaphoreManager
+	/* SemaphoreManager: recycles VkSemaphore handles. Converted from a C++ class
+	 * to a plain C struct + semaphoremanager_* free functions. */
+	struct SemaphoreManager
 	{
-		public:
-			void init(VkDevice device)
-			{
-				this->device = device;
-			}
-			/* Raw-memory empty state, for a malloc'd owner (so the constructor and
-			 * the semaphore-vector's aggregate initialiser do not run). The
-			 * heavyweight setup is still init(device); deinit() already tears down
-			 * from any state (destroy recycled semaphores, free the array). */
-			void init_empty()
-			{
-				device = VK_NULL_HANDLE;
-				semaphores.items = NULL;
-				semaphores.count = 0;
-				semaphores.cap   = 0;
-			}
-			/* Explicit teardown (formerly ~SemaphoreManager): destroys the
-			 * recycled semaphores and frees the backing array. Called from
-			 * Device's teardown. */
-			void deinit();
-
-			VkSemaphore request_cleared_semaphore();
-			void recycle(VkSemaphore semaphore);
-
-		private:
-			VkDevice device = VK_NULL_HANDLE;
-			SemaphoreVec semaphores = { NULL, 0, 0 };
+		VkDevice device;
+		SemaphoreVec semaphores;
 	};
+	static inline void semaphoremanager_init(struct SemaphoreManager *self, VkDevice device) { self->device = device; }
+	static inline void semaphoremanager_init_empty(struct SemaphoreManager *self)
+	{
+		self->device = VK_NULL_HANDLE;
+		self->semaphores.items = NULL;
+		self->semaphores.count = 0;
+		self->semaphores.cap   = 0;
+	}
+	void semaphoremanager_deinit(struct SemaphoreManager *self);
+	VkSemaphore semaphoremanager_request_cleared_semaphore(struct SemaphoreManager *self);
+	void semaphoremanager_recycle(struct SemaphoreManager *self, VkSemaphore semaphore);
 
 	class Device;
 	struct DescriptorSetLayout
@@ -6212,7 +6190,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 			void destroy_semaphore_nolock(VkSemaphore semaphore);
 			void recycle_semaphore_nolock(VkSemaphore semaphore)
 			{
-				managers.semaphore.recycle(semaphore);
+				semaphoremanager_recycle(&managers.semaphore, semaphore);
 			}
 			void free_memory_nolock(const DeviceAllocation &alloc);
 
@@ -12677,37 +12655,34 @@ void FenceHolderDeleter::operator()(FenceHolder *fence)
 /* === fence_manager.cpp === */
 
 
-VkFence FenceManager::request_cleared_fence()
+VkFence fencemanager_request_cleared_fence(struct FenceManager *self)
 {
-	if (!FenceVec_empty(&fences))
+	if (!FenceVec_empty(&self->fences))
 	{
-		VkFence ret = *FenceVec_back(&fences);
-		FenceVec_pop_back(&fences);
+		VkFence ret = *FenceVec_back(&self->fences);
+		FenceVec_pop_back(&self->fences);
 		return ret;
 	}
 	else
 	{
 		VkFence fence;
 		VkFenceCreateInfo info = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-		vkCreateFence(device, &info, NULL, &fence);
+		vkCreateFence(self->device, &info, NULL, &fence);
 		return fence;
 	}
 }
 
-void FenceManager::recycle_fence(VkFence fence)
+void fencemanager_recycle_fence(struct FenceManager *self, VkFence fence)
 {
-	FenceVec_push(&fences, &fence);
+	FenceVec_push(&self->fences, &fence);
 }
 
-void FenceManager::deinit()
+void fencemanager_deinit(struct FenceManager *self)
 {
 	int _i;
-	for (_i = 0; _i < FenceVec_size(&fences); _i++)
-	{
-		VkFence &fence = *FenceVec_at(&fences, _i);
-		vkDestroyFence(device, fence, NULL);
-	}
-	FenceVec_free_storage(&fences);
+	for (_i = 0; _i < FenceVec_size(&self->fences); _i++)
+		vkDestroyFence(self->device, *FenceVec_at(&self->fences, _i), NULL);
+	FenceVec_free_storage(&self->fences);
 }
 
 /* === semaphore.cpp === */
@@ -12746,35 +12721,33 @@ void SemaphoreHolderDeleter::operator()(SemaphoreHolder *semaphore)
 /* === semaphore_manager.cpp === */
 
 
-void SemaphoreManager::deinit()
+void semaphoremanager_deinit(struct SemaphoreManager *self)
 {
-	{
-		int _i;
-		for (_i = 0; _i < SemaphoreVec_size(&semaphores); _i++)
-			vkDestroySemaphore(device, *SemaphoreVec_at(&semaphores, _i), NULL);
-	}
-	SemaphoreVec_free_storage(&semaphores);
+	int _i;
+	for (_i = 0; _i < SemaphoreVec_size(&self->semaphores); _i++)
+		vkDestroySemaphore(self->device, *SemaphoreVec_at(&self->semaphores, _i), NULL);
+	SemaphoreVec_free_storage(&self->semaphores);
 }
 
-void SemaphoreManager::recycle(VkSemaphore sem)
+void semaphoremanager_recycle(struct SemaphoreManager *self, VkSemaphore sem)
 {
 	if (sem != VK_NULL_HANDLE)
-		SemaphoreVec_push(&semaphores, &sem);
+		SemaphoreVec_push(&self->semaphores, &sem);
 }
 
-VkSemaphore SemaphoreManager::request_cleared_semaphore()
+VkSemaphore semaphoremanager_request_cleared_semaphore(struct SemaphoreManager *self)
 {
-	if (SemaphoreVec_empty(&semaphores))
+	if (SemaphoreVec_empty(&self->semaphores))
 	{
 		VkSemaphore semaphore;
 		VkSemaphoreCreateInfo info = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-		vkCreateSemaphore(device, &info, NULL, &semaphore);
+		vkCreateSemaphore(self->device, &info, NULL, &semaphore);
 		return semaphore;
 	}
 	else
 	{
-		VkSemaphore sem = *SemaphoreVec_back(&semaphores);
-		SemaphoreVec_pop_back(&semaphores);
+		VkSemaphore sem = *SemaphoreVec_back(&self->semaphores);
+		SemaphoreVec_pop_back(&self->semaphores);
 		return sem;
 	}
 }
@@ -16617,8 +16590,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		/* Owning members - establish each one's empty state via its raw-memory init. */
 		self->handle_pool.init();
 		deviceallocator_init_empty(&self->managers.memory);
-		self->managers.fence.init_empty();
-		self->managers.semaphore.init_empty();
+		fencemanager_init_empty(&self->managers.fence);
+		semaphoremanager_init_empty(&self->managers.semaphore);
 		self->managers.vbo.init_empty();
 		self->managers.ubo.init_empty();
 		self->per_frame.init_empty();
@@ -16643,8 +16616,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		for (unsigned i = 0; i < (unsigned)StockSampler_Count; i++)
 			smh_reset(&self->samplers[i]);
 
-		self->managers.fence.deinit();
-		self->managers.semaphore.deinit();
+		fencemanager_deinit(&self->managers.fence);
+		semaphoremanager_deinit(&self->managers.semaphore);
 
 		/* Remaining teardown in reverse member-declaration order, matching what the
 		 * implicit member destructors did. Declaration order is handle_pool,
@@ -16890,8 +16863,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		deviceallocator_init(&managers.memory, gpu, device);
 		deviceallocator_set_supports_dedicated_allocation(&managers.memory, ext.supports_dedicated);
-		managers.semaphore.init(device);
-		managers.fence.init(device);
+		semaphoremanager_init(&managers.semaphore, device);
+		fencemanager_init(&managers.fence, device);
 		managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 		managers.ubo.init(this, 256 * 1024, max_((VkDeviceSize)16u, gpu_props.limits.minUniformBufferOffsetAlignment),
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -17092,7 +17065,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		// Add external signal semaphores.
 		for (unsigned i = 0; i < semaphore_count; i++)
 		{
-			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
+			VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&managers.semaphore);
 			SemaphoreVec_push(&signals, &cleared_semaphore);
 			VK_ASSERT(!sem_is_valid(&semaphores[i]));
 			{ struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&handle_pool.semaphores); semaphoreholder_init(_sh, this, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
@@ -17122,7 +17095,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				break;
 		}
 
-		VkFence cleared_fence = fence ? managers.fence.request_cleared_fence() : VK_NULL_HANDLE;
+		VkFence cleared_fence = fence ? fencemanager_request_cleared_fence(&managers.fence) : VK_NULL_HANDLE;
 		VkResult result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
 
 		if (result != VK_SUCCESS)
@@ -17145,7 +17118,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			else
 			{
 				if (cleared_fence != VK_NULL_HANDLE)
-					managers.fence.recycle_fence(cleared_fence);
+					fencemanager_recycle_fence(&managers.fence, cleared_fence);
 				*fence = VK_NULL_HANDLE;
 			}
 			data.need_fence = false;
@@ -17313,11 +17286,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			last_cmd = CommandBufferVec_size(&cmds);
 		}
 
-		VkFence cleared_fence = fence ? managers.fence.request_cleared_fence() : VK_NULL_HANDLE;
+		VkFence cleared_fence = fence ? fencemanager_request_cleared_fence(&managers.fence) : VK_NULL_HANDLE;
 
 		for (unsigned i = 0; i < semaphore_count; i++)
 		{
-			VkSemaphore cleared_semaphore = managers.semaphore.request_cleared_semaphore();
+			VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&managers.semaphore);
 			SemaphoreVec_push(&signals[VkSubmitInfoVec_size(&submits) - 1], &cleared_semaphore);
 			VK_ASSERT(!sem_is_valid(&semaphores[i]));
 			{ struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&handle_pool.semaphores); semaphoreholder_init(_sh, this, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
@@ -17379,7 +17352,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			else
 			{
 				if (cleared_fence != VK_NULL_HANDLE)
-					managers.fence.recycle_fence(cleared_fence);
+					fencemanager_recycle_fence(&managers.fence, cleared_fence);
 				*fence = VK_NULL_HANDLE;
 			}
 			data.need_fence = false;
@@ -17731,7 +17704,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			for (_i = 0; _i < FenceVec_size(&recycle_fences); _i++)
 			{
 				VkFence &fence = *FenceVec_at(&recycle_fences, _i);
-				managers->fence.recycle_fence(fence);
+				fencemanager_recycle_fence(&managers->fence, fence);
 			}
 			FenceVec_clear(&recycle_fences);
 		}
@@ -17765,7 +17738,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{
 			int _i;
 			for (_i = 0; _i < SemaphoreVec_size(&recycled_semaphores); _i++)
-				managers->semaphore.recycle(*SemaphoreVec_at(&recycled_semaphores, _i));
+				semaphoremanager_recycle(&managers->semaphore, *SemaphoreVec_at(&recycled_semaphores, _i));
 		}
 		{
 			int _i;
