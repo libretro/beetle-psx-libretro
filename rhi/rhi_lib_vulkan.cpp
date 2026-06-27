@@ -10203,7 +10203,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 			float uv_min[2];
 			float uv_max[2];
 		};
-		Push push = {
+		struct Push push = {
 			{ (float)(rect.x) / FB_WIDTH, (float)(rect.y) / FB_HEIGHT },
 			{ (float)(rect.width) / FB_WIDTH, (float)(rect.height) / FB_HEIGHT },
 			{ 1.0f / (FB_WIDTH * current_scale), 1.0f / (FB_HEIGHT * current_scale) },
@@ -10277,7 +10277,7 @@ void renderer_ssaa_framebuffer(Renderer *self)
 	{ unsigned i; for (i = 0; i < size; i += 1024) {
 		unsigned to_run = min_(size - i, 1024u);
 
-		Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
+		struct Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 		commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
 		memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
@@ -10484,7 +10484,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 		float max_bias;
 	};
 
-	Push push = { { (float)(vram_rect.x) / FB_WIDTH, (float)(vram_rect.y) / FB_HEIGHT },
+	struct Push push = { { (float)(vram_rect.x) / FB_WIDTH, (float)(vram_rect.y) / FB_HEIGHT },
 		          { (float)(vram_rect.width) / FB_WIDTH, (float)(vram_rect.height) / FB_HEIGHT },
 		          { (vram_rect.x + 0.5f) / FB_WIDTH, (vram_rect.y + 0.5f) / FB_HEIGHT },
 		          { (vram_rect.x + vram_rect.width - 0.5f) / FB_WIDTH, (vram_rect.y + vram_rect.height - 0.5f) / FB_HEIGHT },
@@ -10742,7 +10742,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		float uv_max[2];
 		float max_bias;
 	};
-	Push push = { { (float)(rect->x) / FB_WIDTH, (float)(rect->y) / FB_HEIGHT },
+	struct Push push = { { (float)(rect->x) / FB_WIDTH, (float)(rect->y) / FB_HEIGHT },
 		          { (float)(rect->width) / FB_WIDTH, (float)(rect->height) / FB_HEIGHT },
 		          { (rect->x + 0.5f) / FB_WIDTH, (rect->y + 0.5f) / FB_HEIGHT },
 		          { (rect->x + rect->width - 0.5f) / FB_WIDTH, (rect->y + rect->height - 0.5f) / FB_HEIGHT },
@@ -10854,7 +10854,7 @@ void renderer_flush_resolves(Renderer *self)
 		{ unsigned i; for (i = 0; i < size; i += 1024) {
 			unsigned to_run = min_(size - i, 1024u);
 
-			Push push = { { 1.0f / (self->scaling * FB_WIDTH), 1.0f / (self->scaling * FB_HEIGHT) }, self->scaling };
+			struct Push push = { { 1.0f / (self->scaling * FB_WIDTH), 1.0f / (self->scaling * FB_HEIGHT) }, self->scaling };
 			commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&self->queue.scaled_resolves) + i, to_run * sizeof(VkRect2D));
@@ -10881,7 +10881,7 @@ void renderer_flush_resolves(Renderer *self)
 		{ unsigned i; for (i = 0; i < size; i += 1024) {
 			unsigned to_run = min_(size - i, 1024u);
 
-			Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
+			struct Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 			commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&self->queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
@@ -11662,7 +11662,7 @@ void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_ind
 		int32_t texel_rect_width;
 		int32_t texel_rect_height;
 	};
-	HDPush push = {
+	struct HDPush push = {
 		hd.vram_rect.x, hd.vram_rect.y, hd.vram_rect.width, hd.vram_rect.height,
 		hd.texel_rect.x, hd.texel_rect.y, hd.texel_rect.width, hd.texel_rect.height
 	};
@@ -11867,7 +11867,7 @@ void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src){
 			uint32_t extent[2];
 			int32_t scaling;
 		};
-		Push push = {
+		struct Push push = {
 			{ src->x, src->y }, { dst->x, dst->y }, { dst->width, dst->height }, (int)(factor),
 		};
 		commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
@@ -12013,7 +12013,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 			Rect small_rect = { rect->x, rect->y + y, rect->width, y_size };
 
 			commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, bvh_get(&view));
-			Push push = { small_rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
+			struct Push push = { small_rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
 			commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 			commandbuffer_dispatch(cbh_get(&self->cmd), (small_rect.width + 7) >> 3, (small_rect.height + 7) >> 3, 1);
 			bvh_reset(&view);
@@ -12028,7 +12028,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 
 		commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, bvh_get(&view));
 
-		Push push = { *rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
+		struct Push push = { *rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
 		commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 
 		// TODO: Batch up work.
