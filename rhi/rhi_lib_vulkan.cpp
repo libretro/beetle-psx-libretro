@@ -5561,6 +5561,13 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	class Device
 	{
 		public:
+			friend BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo &view_info);
+			friend ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo &create_info);
+			friend InitialImageBuffer device_create_image_staging_buffer(Device *self, const ImageCreateInfo &info, const ImageInitialData *initial);
+			friend ImageHandle device_create_image(Device *self, const ImageCreateInfo &create_info, const ImageInitialData *initial);
+			friend ImageHandle device_create_image_from_staging_buffer(Device *self, const ImageCreateInfo &create_info, const InitialImageBuffer *buffer);
+			friend SamplerHandle device_create_sampler(Device *self, const SamplerCreateInfo &sampler_info, StockSampler stock_sampler);
+			friend BufferHandle device_create_buffer(Device *self, const BufferCreateInfo &create_info, const void *initial);
 			friend Program *device_request_program_compute_shader(Device *self, Shader *compute);
 			friend Program *device_request_program_compute_code(Device *self, const uint32_t *compute_data, size_t compute_size);
 			friend Program *device_request_program_graphics_shaders(Device *self, Shader *vertex, Shader *fragment);
@@ -5672,16 +5679,10 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			// Map and unmap buffer objects.
 
 			// Create buffers and images.
-			BufferHandle create_buffer(const BufferCreateInfo &info, const void *initial = NULL);
-			ImageHandle create_image(const ImageCreateInfo &info, const ImageInitialData *initial = NULL);
-			ImageHandle create_image_from_staging_buffer(const ImageCreateInfo &info, const InitialImageBuffer *buffer);
 
 			// Create staging buffers for images.
-			InitialImageBuffer create_image_staging_buffer(const ImageCreateInfo &info, const ImageInitialData *initial);
 
 			// Create image view, buffer views and samplers.
-			ImageViewHandle create_image_view(const ImageViewCreateInfo &view_info);
-			BufferViewHandle create_buffer_view(const BufferViewCreateInfo &view_info);
 
 			// Render pass helpers.
 			bool get_image_format_properties(VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags,
@@ -5858,7 +5859,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			FramebufferAllocator framebuffer_allocator;
 			AttachmentAllocator transient_allocator;
 
-			SamplerHandle create_sampler(const SamplerCreateInfo &info, StockSampler sampler);
 
 			CommandPool *get_command_pool(CommandBufferType type);
 			QueueData &get_queue_data(CommandBufferType type);
@@ -9501,16 +9501,16 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	ImageInitialData initial_vram = {
 		state ? owned_u32_data(&state->vram) : NULL, 0, 0,
 	};
-	ih_move(&self->framebuffer, self->device->create_image(info, state ? &initial_vram : NULL));
+	ih_move(&self->framebuffer, device_create_image(self->device, info, state ? &initial_vram : NULL));
 	image_set_layout(ih_get(&self->framebuffer), Layout_General);
-	ih_move(&self->framebuffer_ssaa, self->device->create_image(info));
+	ih_move(&self->framebuffer_ssaa, device_create_image(self->device, info, NULL));
 	image_set_layout(ih_get(&self->framebuffer_ssaa), Layout_General);
 
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.format = VK_FORMAT_R8_UNORM;
 	info.levels = 1;
-	ih_move(&self->bias_framebuffer, self->device->create_image(info, NULL));
+	ih_move(&self->bias_framebuffer, device_create_image(self->device, info, NULL));
 
 	info.width *= self->scaling;
 	info.height *= self->scaling;
@@ -9520,7 +9520,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 	             VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-	ih_move(&self->scaled_framebuffer, self->device->create_image(info));
+	ih_move(&self->scaled_framebuffer, device_create_image(self->device, info, NULL));
 	image_set_layout(ih_get(&self->scaled_framebuffer), Layout_General);
 
 	{
@@ -9529,7 +9529,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 		{
 			view_info.base_level = i;
 			view_info.levels = 1;
-			imageview_vec_push(&self->scaled_views, self->device->create_image_view(view_info));
+			imageview_vec_push(&self->scaled_views, device_create_image_view(self->device, view_info));
 		}
 	}
 
@@ -9580,7 +9580,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	{
 		info.levels = 1;
 		info.samples = (VkSampleCountFlagBits)(self->msaa);
-		ih_move(&self->scaled_framebuffer_msaa, self->device->create_image(info));
+		ih_move(&self->scaled_framebuffer_msaa, device_create_image(self->device, info, NULL));
 		image_set_layout(ih_get(&self->scaled_framebuffer_msaa), Layout_General);
 		// General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
 		// The expectation is that self will be used with a lower self->scaling factor to compensate.
@@ -9602,7 +9602,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	static const uint8_t dither_lut_data[16] = { 0, 4, 1, 5, 6, 2, 7, 3, 1, 5, 0, 4, 7, 3, 6, 2 };
 
 	ImageInitialData dither_initial = { dither_lut_data };
-	ih_move(&self->dither_lut, self->device->create_image(dither_info, &dither_initial));
+	ih_move(&self->dither_lut, device_create_image(self->device, dither_info, &dither_initial));
 
 	static const float quad_data[] = {
 		-128, -128, +127, -128, -128, +127, +127, +127,
@@ -9612,7 +9612,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	buffer_create_info.domain = BufferDomain_Device;
 	buffer_create_info.size = sizeof(quad_data);
 	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	self->quad = self->device->create_buffer(buffer_create_info, quad_data);
+	self->quad = device_create_buffer(self->device, buffer_create_info, quad_data);
 
 	renderer_flush(self);
 	renderer_reset_scissor_queue(self);
@@ -9629,7 +9629,7 @@ Renderer::SaveState renderer_save_vram_state(Renderer *self){
 	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	BufferHandle buffer = self->device->create_buffer(buffer_create_info, NULL);
+	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
 	fbatlas_read_transfer(&self->atlas, Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	renderer_ensure_command_buffer(self);
 	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), *bh_get(&buffer), *ih_get(&self->framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
@@ -9851,7 +9851,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect &rect, uin
 	buffer_create_info.size = copy_rect.width * copy_rect.height * 4;
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	BufferHandle buffer = self->device->create_buffer(buffer_create_info, NULL);
+	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
 	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), *bh_get(&buffer), *ih_get(&self->framebuffer), 0, { int(copy_rect.x), int(copy_rect.y), 0 },
 	                          { copy_rect.width, copy_rect.height, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
@@ -10198,7 +10198,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	ih_move(&self->reuseable_scanout, self->device->create_image(info));
+	ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 	RenderPassInfo rp;
 	rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
@@ -10284,7 +10284,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		info.usage =
 		    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-		ih_move(&self->reuseable_scanout, self->device->create_image(info));
+		ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 		RenderPassInfo rp;
 		rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
@@ -10384,7 +10384,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	ih_move(&self->reuseable_scanout, self->device->create_image(info));
+	ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 	RenderPassInfo rp;
 	rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
@@ -11724,7 +11724,7 @@ ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels){
 		initial[i].image_height = 0;
 	}
 
-	ImageHandle image = self->device->create_image(info, initial);
+	ImageHandle image = device_create_image(self->device, info, initial);
 	return image;
 }
 ImageHandle renderer_create_texture(Renderer *self, int width, int height, int levels){
@@ -11732,7 +11732,7 @@ ImageHandle renderer_create_texture(Renderer *self, int width, int height, int l
 	info.levels = levels;
 	info.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	ImageHandle image = self->device->create_image(info, NULL);
+	ImageHandle image = device_create_image(self->device, info, NULL);
 	return image;
 }
 
@@ -11746,7 +11746,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect &rect){
 	buffer_create_info.domain = BufferDomain_Host;
 	buffer_create_info.size = size;
 	buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
-	BufferHandle buffer = self->device->create_buffer(buffer_create_info, NULL);
+	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
 
 	BufferViewCreateInfo view_info = {};
 	view_info.buffer = bh_get(&buffer);
@@ -11771,7 +11771,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect &rect){
 			view_info.offset = y * rect.width * sizeof(uint16_t);
 			view_info.range = y_size * rect.width * sizeof(uint16_t);
 			view_info.format = VK_FORMAT_R16_UINT;
-			BufferViewHandle view = self->device->create_buffer_view(view_info);
+			BufferViewHandle view = device_create_buffer_view(self->device, view_info);
 
 			Rect small_rect = { rect.x, rect.y + y, rect.width, y_size };
 
@@ -11787,7 +11787,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect &rect){
 		view_info.offset = 0;
 		view_info.range = size;
 		view_info.format = VK_FORMAT_R16_UINT;
-		BufferViewHandle view = self->device->create_buffer_view(view_info);
+		BufferViewHandle view = device_create_buffer_view(self->device, view_info);
 
 		commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, *bvh_get(&view));
 
@@ -12793,7 +12793,7 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 	info.size = size;
 	info.usage = self->usage;
 
-	block.gpu = self->device->create_buffer(info, NULL);
+	block.gpu = device_create_buffer(self->device, info, NULL);
 	self->device->set_name(*bh_get(&block.gpu), "chain-allocated-block-gpu");
 
 	// Try to map it, will fail unless the memory is host visible.
@@ -12806,7 +12806,7 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 		cpu_info.size = size;
 		cpu_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-		block.cpu = self->device->create_buffer(cpu_info, NULL);
+		block.cpu = device_create_buffer(self->device, cpu_info, NULL);
 		self->device->set_name(*bh_get(&block.cpu), "chain-allocated-block-cpu");
 		block.mapped = (uint8_t *)(device_map_host_buffer(self->device, *bh_get(&block.cpu), MEMORY_ACCESS_WRITE_BIT));
 	}
@@ -14803,7 +14803,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		image_info.samples = (VkSampleCountFlagBits)(samples);
 		image_info.layers = layers;
-		node = transient_thmap_emplace(&self->attachments, hash, self->device->create_image(image_info, NULL));
+		node = transient_thmap_emplace(&self->attachments, hash, device_create_image(self->device, image_info, NULL));
 		self->device->set_name(*ih_get(&node->handle), "AttachmentAllocator");
 		return &image_get_view(ih_get(&node->handle));
 	}
@@ -17024,7 +17024,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					info.address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 					break;
 			}
-			samplers[i] = create_sampler(info, mode);
+			samplers[i] = device_create_sampler(this, info, mode);
 		}
 	}
 
@@ -18036,8 +18036,7 @@ VkImageViewType get_image_view_type(const ImageCreateInfo &create_info, const Im
 		}
 	}
 
-	BufferViewHandle Device::create_buffer_view(const BufferViewCreateInfo &view_info)
-	{
+	BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo &view_info){
 		VkBufferViewCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO };
 		info.buffer = buffer_get_buffer(view_info.buffer);
 		info.format = view_info.format;
@@ -18045,11 +18044,11 @@ VkImageViewType get_image_view_type(const ImageCreateInfo &create_info, const Im
 		info.range = view_info.range;
 
 		VkBufferView view;
-		VkResult res = vkCreateBufferView(device, &info, NULL, &view);
+		VkResult res = vkCreateBufferView(self->device, &info, NULL, &view);
 		if (res != VK_SUCCESS)
 			return bvh_make(NULL);
 
-		{ struct BufferView *_bv = (struct BufferView *)object_pool_raw_allocate(&handle_pool.buffer_views); bufferview_init(_bv, this, view, view_info); return bvh_make(_bv); }
+		{ struct BufferView *_bv = (struct BufferView *)object_pool_raw_allocate(&self->handle_pool.buffer_views); bufferview_init(_bv, self, view, view_info); return bvh_make(_bv); }
 	}
 
 	/* ImageResourceHolder: a scoped owner of the Vulkan objects created while
@@ -18241,10 +18240,9 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			deviceallocation_free_immediate_alloc(&self->allocation, self->allocator);
 	}
 
-	ImageViewHandle Device::create_image_view(const ImageViewCreateInfo &create_info)
-	{
+	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo &create_info){
 		ImageResourceHolder holder;
-		image_resource_holder_init(&holder, device);
+		image_resource_holder_init(&holder, self->device);
 		const ImageCreateInfo &image_create_info = image_get_create_info(create_info.image);
 
 		VkFormat format = create_info.format != VK_FORMAT_UNDEFINED ? create_info.format : image_create_info.format;
@@ -18283,7 +18281,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		ImageViewCreateInfo tmp = create_info;
 		tmp.format = format;
-		struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&handle_pool.image_views); imageview_init(_iv, this, holder.image_view, tmp); ImageViewHandle ret = iv_make(_iv);
+		struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&self->handle_pool.image_views); imageview_init(_iv, self, holder.image_view, tmp); ImageViewHandle ret = iv_make(_iv);
 		if (iv_is_valid(&ret))
 		{
 			holder.owned = false;
@@ -18300,8 +18298,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		}
 	}
 
-	InitialImageBuffer Device::create_image_staging_buffer(const ImageCreateInfo &info, const ImageInitialData *initial)
-	{
+	InitialImageBuffer device_create_image_staging_buffer(Device *self, const ImageCreateInfo &info, const ImageInitialData *initial){
 		InitialImageBuffer result;
 
 		bool generate_mips = (info.misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
@@ -18335,11 +18332,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		buffer_info.domain = BufferDomain_Host;
 		buffer_info.size = tfl_get_required_size(&layout);
 		buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		result.buffer = create_buffer(buffer_info, NULL);
-		set_name(*bh_get(&result.buffer), "image-upload-staging-buffer");
+		result.buffer = device_create_buffer(self, buffer_info, NULL);
+		self->set_name(*bh_get(&result.buffer), "image-upload-staging-buffer");
 
 		// And now, do the actual copy.
-		uint8_t *mapped = (uint8_t *)(device_map_host_buffer(this, *bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
+		uint8_t *mapped = (uint8_t *)(device_map_host_buffer(self, *bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
 		unsigned index = 0;
 
 		tfl_set_buffer(&layout, mapped, tfl_get_required_size(&layout));
@@ -18369,32 +18366,30 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			}
 		}
 
-		device_unmap_host_buffer(this, *bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT);
+		device_unmap_host_buffer(self, *bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT);
 		tfl_build_buffer_image_copies(&layout, result.blits, &result.num_blits);
 		return result;
 	}
 
-	ImageHandle Device::create_image(const ImageCreateInfo &create_info, const ImageInitialData *initial)
-	{
+	ImageHandle device_create_image(Device *self, const ImageCreateInfo &create_info, const ImageInitialData *initial){
 		if (initial)
 		{
-			InitialImageBuffer staging_buffer = create_image_staging_buffer(create_info, initial);
-			ImageHandle img = create_image_from_staging_buffer(create_info, &staging_buffer);
+			InitialImageBuffer staging_buffer = device_create_image_staging_buffer(self, create_info, initial);
+			ImageHandle img = device_create_image_from_staging_buffer(self, create_info, &staging_buffer);
 			/* Drop the staging buffer's reference (previously released by the
 			 * InitialImageBuffer destructor at end of scope). */
 			bh_reset(&staging_buffer.buffer);
 			return img;
 		}
 		else
-			return create_image_from_staging_buffer(create_info, NULL);
+			return device_create_image_from_staging_buffer(self, create_info, NULL);
 	}
 
-	ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &create_info,
-			const InitialImageBuffer *staging_buffer)
-	{
+	ImageHandle device_create_image_from_staging_buffer(Device *self, const ImageCreateInfo &create_info,
+			const InitialImageBuffer *staging_buffer){
 		ImageResourceHolder holder;
 		VkMemoryRequirements reqs;
-		image_resource_holder_init(&holder, device);
+		image_resource_holder_init(&holder, self->device);
 
 		VkImageCreateInfo info = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 		info.format = create_info.format;
@@ -18424,29 +18419,29 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		if (create_info.usage & VK_IMAGE_USAGE_STORAGE_BIT)
 			info.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
 
-		if (!device_image_format_is_supported(this, create_info.format, image_usage_to_features(info.usage), info.tiling))
+		if (!device_image_format_is_supported(self, create_info.format, image_usage_to_features(info.usage), info.tiling))
 		{
 			LOGE("Format %u is not supported for usage flags!\n", unsigned(create_info.format));
 			image_resource_holder_fini(&holder);
 			return ih_make(NULL);
 		}
 
-		if (vkCreateImage(device, &info, NULL, &holder.image) != VK_SUCCESS)
+		if (vkCreateImage(self->device, &info, NULL, &holder.image) != VK_SUCCESS)
 		{
 			LOGE("Failed to create image in vkCreateImage.\n");
 			image_resource_holder_fini(&holder);
 			return ih_make(NULL);
 		}
 
-		vkGetImageMemoryRequirements(device, holder.image, &reqs);
-		uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+		vkGetImageMemoryRequirements(self->device, holder.image, &reqs);
+		uint32_t memory_type = self->find_memory_type(create_info.domain, reqs.memoryTypeBits);
 		if (memory_type == UINT32_MAX)
 		{
 			image_resource_holder_fini(&holder);
 			return ih_make(NULL);
 		}
 
-		if (!deviceallocator_allocate_image_memory(&managers.memory, reqs.size, reqs.alignment, memory_type,
+		if (!deviceallocator_allocate_image_memory(&self->managers.memory, reqs.size, reqs.alignment, memory_type,
 					ALLOCATION_TILING_OPTIMAL,
 					&holder.allocation, holder.image))
 		{
@@ -18455,7 +18450,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			return ih_make(NULL);
 		}
 
-		if (vkBindImageMemory(device, holder.image, deviceallocation_get_memory(&holder.allocation), deviceallocation_get_offset(&holder.allocation)) != VK_SUCCESS)
+		if (vkBindImageMemory(self->device, holder.image, deviceallocation_get_memory(&holder.allocation), deviceallocation_get_offset(&holder.allocation)) != VK_SUCCESS)
 		{
 			LOGE("Failed to bind image memory.\n");
 			image_resource_holder_fini(&holder);
@@ -18477,7 +18472,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			}
 		}
 
-		struct Image *_im = (struct Image *)object_pool_raw_allocate(&handle_pool.images); image_init(_im, this, holder.image, holder.image_view, holder.allocation, tmpinfo); ImageHandle handle = ih_make(_im);
+		struct Image *_im = (struct Image *)object_pool_raw_allocate(&self->handle_pool.images); image_init(_im, self, holder.image, holder.image_view, holder.allocation, tmpinfo); ImageHandle handle = ih_make(_im);
 		if (ih_is_valid(&handle))
 		{
 			holder.owned = false;
@@ -18500,30 +18495,30 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			VK_ASSERT(create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED);
 			bool generate_mips = (create_info.misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
 
-			// If graphics_queue != transfer_queue, we will use a semaphore, so no srcAccess mask is necessary.
+			// If self->graphics_queue != self->transfer_queue, we will use a semaphore, so no srcAccess mask is necessary.
 			VkAccessFlags final_transition_src_access = 0;
 			if (generate_mips)
 				final_transition_src_access = VK_ACCESS_TRANSFER_READ_BIT; // Validation complains otherwise.
-			else if (graphics_queue == transfer_queue)
+			else if (self->graphics_queue == self->transfer_queue)
 				final_transition_src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
 
-			VkAccessFlags prepare_src_access = graphics_queue == transfer_queue ? VK_ACCESS_TRANSFER_WRITE_BIT : 0;
+			VkAccessFlags prepare_src_access = self->graphics_queue == self->transfer_queue ? VK_ACCESS_TRANSFER_WRITE_BIT : 0;
 			bool need_mipmap_barrier = true;
 			bool need_initial_barrier = true;
 
 			// Now we've used the TRANSFER queue to copy data over to the GPU.
-			// For mipmapping, we're now moving over to graphics,
-			// the transfer queue is designed for CPU <-> GPU and that's it.
+			// For mipmapping, we're now moving over to self->graphics,
+			// the self->transfer queue is designed for CPU <-> GPU and that's it.
 
 			// For concurrent queue mode, we just need to inject a semaphore.
-			// For non-concurrent queue mode, we will have to inject ownership transfer barrier if the queue families do not match.
+			// For non-concurrent queue mode, we will have to inject ownership self->transfer barrier if the queue families do not match.
 
-			CommandBufferHandle graphics_cmd = request_command_buffer(Type_Generic);
+			CommandBufferHandle graphics_cmd = self->request_command_buffer(Type_Generic);
 			CommandBufferHandle transfer_cmd; transfer_cmd.data = NULL;
 
 			// Don't split the upload into multiple command buffers unless we have to.
-			if (transfer_queue != graphics_queue)
-				transfer_cmd = request_command_buffer(Type_AsyncTransfer);
+			if (self->transfer_queue != self->graphics_queue)
+				transfer_cmd = self->request_command_buffer(Type_AsyncTransfer);
 			else
 				transfer_cmd = graphics_cmd;
 
@@ -18531,18 +18526,18 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					VK_ACCESS_TRANSFER_WRITE_BIT);
 
-			commandbuffer_begin_region(cbh_get(&transfer_cmd), "copy-image-to-gpu");
+			commandbuffer_begin_region(cbh_get(&transfer_cmd), "copy-image-to-self->gpu");
 			commandbuffer_copy_buffer_to_image_blits(cbh_get(&transfer_cmd), *ih_get(&handle), *bh_get(&staging_buffer->buffer), staging_buffer->num_blits, staging_buffer->blits);
 			commandbuffer_end_region(cbh_get(&transfer_cmd));
 
-			if (transfer_queue != graphics_queue)
+			if (self->transfer_queue != self->graphics_queue)
 			{
 				VkPipelineStageFlags dst_stages =
 					generate_mips ? VkPipelineStageFlags(VK_PIPELINE_STAGE_TRANSFER_BIT) : image_get_stage_flags(ih_get(&handle));
 
 				// We can't just use semaphores, we will also need a release + acquire barrier to marshal ownership from
-				// transfer queue over to graphics ...
-				if (transfer_queue_family_index != graphics_queue_family_index)
+				// self->transfer queue over to self->graphics ...
+				if (self->transfer_queue_family_index != self->graphics_queue_family_index)
 				{
 					need_mipmap_barrier = false;
 
@@ -18550,8 +18545,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					release.image = image_get_image(ih_get(&handle));
 					release.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 					release.dstAccessMask = 0;
-					release.srcQueueFamilyIndex = transfer_queue_family_index;
-					release.dstQueueFamilyIndex = graphics_queue_family_index;
+					release.srcQueueFamilyIndex = self->transfer_queue_family_index;
+					release.dstQueueFamilyIndex = self->graphics_queue_family_index;
 					release.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
 					if (generate_mips)
@@ -18587,8 +18582,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				}
 
 				Semaphore sem; sem.data = NULL;
-				submit(transfer_cmd, NULL, 1, &sem);
-				add_wait_semaphore_nolock(Type_Generic, sem, dst_stages, true);
+				self->submit(transfer_cmd, NULL, 1, &sem);
+				self->add_wait_semaphore_nolock(Type_Generic, sem, dst_stages, true);
 				sem_reset(&sem);
 			}
 
@@ -18612,33 +18607,33 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 						image_get_access_flags(ih_get(&handle)) & image_layout_to_possible_access(create_info.initial_layout));
 			}
 
-			bool share_async_graphics = device_get_physical_queue_type(this, Type_AsyncGraphics) == Type_AsyncCompute;
+			bool share_async_graphics = device_get_physical_queue_type(self, Type_AsyncGraphics) == Type_AsyncCompute;
 
-			// Add semaphore if the compute queue can be used for async graphics as well.
+			// Add semaphore if the self->compute queue can be used for async self->graphics as well.
 			if (share_async_graphics)
 			{
 				Semaphore sem; sem.data = NULL;
-				submit(graphics_cmd, NULL, 1, &sem);
+				self->submit(graphics_cmd, NULL, 1, &sem);
 
 				VkPipelineStageFlags dst_stages = image_get_stage_flags(ih_get(&handle));
-				if (graphics_queue_family_index != compute_queue_family_index)
+				if (self->graphics_queue_family_index != self->compute_queue_family_index)
 					dst_stages &= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
-				add_wait_semaphore_nolock(Type_AsyncCompute, sem, dst_stages, true);
+				self->add_wait_semaphore_nolock(Type_AsyncCompute, sem, dst_stages, true);
 				sem_reset(&sem);
 			}
 			else
-				submit(graphics_cmd);
+				self->submit(graphics_cmd);
 		}
 		else if (create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
 		{
 			VK_ASSERT(create_info.domain != ImageDomain_Transient);
-			CommandBufferHandle cmd = request_command_buffer(Type_Generic);
+			CommandBufferHandle cmd = self->request_command_buffer(Type_Generic);
 			commandbuffer_image_barrier(cbh_get(&cmd), *ih_get(&handle), info.initialLayout, create_info.initial_layout,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, image_get_stage_flags(ih_get(&handle)),
 					image_get_access_flags(ih_get(&handle)) &
 					image_layout_to_possible_access(create_info.initial_layout));
 
-			submit(cmd);
+			self->submit(cmd);
 		}
 
 		return handle;
@@ -18666,20 +18661,18 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		return info;
 	}
 
-	SamplerHandle Device::create_sampler(const SamplerCreateInfo &sampler_info, StockSampler stock_sampler)
-	{
+	SamplerHandle device_create_sampler(Device *self, const SamplerCreateInfo &sampler_info, StockSampler stock_sampler){
 		VkSamplerCreateInfo info = fill_vk_sampler_info(sampler_info);
 		VkSampler sampler;
 
 		(void)stock_sampler;
-		if (vkCreateSampler(device, &info, NULL, &sampler) != VK_SUCCESS)
+		if (vkCreateSampler(self->device, &info, NULL, &sampler) != VK_SUCCESS)
 			return smh_make(NULL);
 
-		{ struct Sampler *_s = (struct Sampler *)object_pool_raw_allocate(&handle_pool.samplers); sampler_init(_s, this, sampler); return smh_make(_s); }
+		{ struct Sampler *_s = (struct Sampler *)object_pool_raw_allocate(&self->handle_pool.samplers); sampler_init(_s, self, sampler); return smh_make(_s); }
 	}
 
-	BufferHandle Device::create_buffer(const BufferCreateInfo &create_info, const void *initial)
-	{
+	BufferHandle device_create_buffer(Device *self, const BufferCreateInfo &create_info, const void *initial){
 		VkBuffer buffer;
 		VkMemoryRequirements reqs;
 		DeviceAllocation allocation;
@@ -18690,83 +18683,83 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		uint32_t sharing_indices[3];
-		if (graphics_queue_family_index != compute_queue_family_index ||
-				graphics_queue_family_index != transfer_queue_family_index)
+		if (self->graphics_queue_family_index != self->compute_queue_family_index ||
+				self->graphics_queue_family_index != self->transfer_queue_family_index)
 		{
 			// For buffers, always just use CONCURRENT access modes,
-			// so we don't have to deal with acquire/release barriers in async compute.
+			// so we don't have to deal with acquire/release barriers in async self->compute.
 			info.sharingMode = VK_SHARING_MODE_CONCURRENT;
 
-			sharing_indices[info.queueFamilyIndexCount++] = graphics_queue_family_index;
+			sharing_indices[info.queueFamilyIndexCount++] = self->graphics_queue_family_index;
 
-			if (graphics_queue_family_index != compute_queue_family_index)
-				sharing_indices[info.queueFamilyIndexCount++] = compute_queue_family_index;
+			if (self->graphics_queue_family_index != self->compute_queue_family_index)
+				sharing_indices[info.queueFamilyIndexCount++] = self->compute_queue_family_index;
 
-			if (graphics_queue_family_index != transfer_queue_family_index &&
-					compute_queue_family_index != transfer_queue_family_index)
+			if (self->graphics_queue_family_index != self->transfer_queue_family_index &&
+					self->compute_queue_family_index != self->transfer_queue_family_index)
 			{
-				sharing_indices[info.queueFamilyIndexCount++] = transfer_queue_family_index;
+				sharing_indices[info.queueFamilyIndexCount++] = self->transfer_queue_family_index;
 			}
 
 			info.pQueueFamilyIndices = sharing_indices;
 		}
 
-		if (vkCreateBuffer(device, &info, NULL, &buffer) != VK_SUCCESS)
+		if (vkCreateBuffer(self->device, &info, NULL, &buffer) != VK_SUCCESS)
 			return bh_make(NULL);
 
-		vkGetBufferMemoryRequirements(device, buffer, &reqs);
+		vkGetBufferMemoryRequirements(self->device, buffer, &reqs);
 
-		uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
+		uint32_t memory_type = self->find_memory_type(create_info.domain, reqs.memoryTypeBits);
 		if (memory_type == UINT32_MAX)
 		{
-			vkDestroyBuffer(device, buffer, NULL);
+			vkDestroyBuffer(self->device, buffer, NULL);
 			return bh_make(NULL);
 		}
 
-		if (!deviceallocator_allocate_typed(&managers.memory, reqs.size, reqs.alignment, memory_type, ALLOCATION_TILING_LINEAR, &allocation))
+		if (!deviceallocator_allocate_typed(&self->managers.memory, reqs.size, reqs.alignment, memory_type, ALLOCATION_TILING_LINEAR, &allocation))
 		{
-			vkDestroyBuffer(device, buffer, NULL);
+			vkDestroyBuffer(self->device, buffer, NULL);
 			return bh_make(NULL);
 		}
 
-		if (vkBindBufferMemory(device, buffer, deviceallocation_get_memory(&allocation), deviceallocation_get_offset(&allocation)) != VK_SUCCESS)
+		if (vkBindBufferMemory(self->device, buffer, deviceallocation_get_memory(&allocation), deviceallocation_get_offset(&allocation)) != VK_SUCCESS)
 		{
-			deviceallocation_free_immediate_alloc(&allocation, &managers.memory);
-			vkDestroyBuffer(device, buffer, NULL);
+			deviceallocation_free_immediate_alloc(&allocation, &self->managers.memory);
+			vkDestroyBuffer(self->device, buffer, NULL);
 			return bh_make(NULL);
 		}
 
 		BufferCreateInfo tmpinfo = create_info;
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		struct Buffer *_b = (struct Buffer *)object_pool_raw_allocate(&handle_pool.buffers); buffer_init(_b, this, buffer, allocation, tmpinfo); BufferHandle handle = bh_make(_b);
+		struct Buffer *_b = (struct Buffer *)object_pool_raw_allocate(&self->handle_pool.buffers); buffer_init(_b, self, buffer, allocation, tmpinfo); BufferHandle handle = bh_make(_b);
 
-		if (create_info.domain == BufferDomain_Device && initial && !memory_type_is_host_visible(memory_type))
+		if (create_info.domain == BufferDomain_Device && initial && !self->memory_type_is_host_visible(memory_type))
 		{
 			CommandBufferHandle cmd; cmd.data = NULL;
 			BufferCreateInfo staging_info = create_info;
 			staging_info.domain = BufferDomain_Host;
-			BufferHandle staging_buffer = create_buffer(staging_info, initial);
-			set_name(*bh_get(&staging_buffer), "buffer-upload-staging-buffer");
+			BufferHandle staging_buffer = device_create_buffer(self, staging_info, initial);
+			self->set_name(*bh_get(&staging_buffer), "buffer-upload-staging-buffer");
 
-			cmd = request_command_buffer(Type_AsyncTransfer);
+			cmd = self->request_command_buffer(Type_AsyncTransfer);
 			commandbuffer_begin_region(cbh_get(&cmd), "copy-buffer-staging");
 			commandbuffer_copy_buffer_whole(cbh_get(&cmd), *bh_get(&handle), *bh_get(&staging_buffer));
 			commandbuffer_end_region(cbh_get(&cmd));
 
-			submit_staging(cmd, info.usage, true);
+			self->submit_staging(cmd, info.usage, true);
 			/* Drop the staging buffer's producer reference (the GPU copy is
-			 * submitted; the staging buffer's lifetime ends with this scope,
+			 * submitted; the staging buffer's lifetime ends with self scope,
 			 * previously via the handle's destructor). */
 			bh_reset(&staging_buffer);
 		}
 		else if (initial)
 		{
-			void *ptr = deviceallocator_map_memory(&managers.memory, &allocation, MEMORY_ACCESS_WRITE_BIT);
+			void *ptr = deviceallocator_map_memory(&self->managers.memory, &allocation, MEMORY_ACCESS_WRITE_BIT);
 			if (!ptr)
 				return bh_make(NULL);
 
 			memcpy(ptr, initial, create_info.size);
-			deviceallocator_unmap_memory(&managers.memory, &allocation, MEMORY_ACCESS_WRITE_BIT);
+			deviceallocator_unmap_memory(&self->managers.memory, &allocation, MEMORY_ACCESS_WRITE_BIT);
 		}
 		return handle;
 	}
