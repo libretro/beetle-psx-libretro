@@ -7309,18 +7309,20 @@ void enduring_arr_free(EnduringRectArr *v) {
 	 * struct driven by lookup_grid_init / lookup_grid_deinit. Each Cell is a
 	 * growable array of POD LookupEntry; insert/get/clear are unchanged methods.
 	 * RectTracker embeds one by value and drives its init/deinit. */
+	struct LookupEntry {
+		SRect rect;
+		RectIndex index;
+	};
+	typedef struct LookupEntry LookupEntry;
+	struct Cell {
+		LookupEntry *entries;
+		int count;
+		int cap;
+	};
+	typedef struct Cell Cell;
 	struct LookupGrid {
-		struct LookupEntry {
-			SRect rect;
-			RectIndex index;
-		};
 		/* Each cell is a psx texture page (64x256); was std::vector<LookupEntry>.
 		 * Now a malloc'd growable array per cell (POD entries). */
-		struct Cell {
-			LookupEntry *entries;
-			int count;
-			int cap;
-		};
 		Cell cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS];
 	};
 
@@ -7735,8 +7737,9 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	 * owning pointers to heap-allocated TextureUploads; ownership moves via
 	 * uploadmap_move (steal, source emptied) and is released by uploadmap_destroy.
 	 * No copy operation exists -- callers must move, never copy. */
+	struct UploadOwningMapEntry { uint32_t key; TextureUpload *val; };
+	typedef struct UploadOwningMapEntry UploadOwningMapEntry;
 	struct UploadOwningMap {
-		struct UploadOwningMapEntry { uint32_t key; TextureUpload *val; };
 		struct UploadOwningMapEntry *items;
 		int count;
 		int cap;
@@ -7778,7 +7781,7 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	{
 		if (m->count >= m->cap) {
 			int ncap = m->cap ? m->cap * 2 : 8;
-			UploadOwningMap::UploadOwningMapEntry *nitems = (UploadOwningMap::UploadOwningMapEntry *)realloc(m->items, (size_t)ncap * sizeof(UploadOwningMap::UploadOwningMapEntry));
+			UploadOwningMapEntry *nitems = (UploadOwningMapEntry *)realloc(m->items, (size_t)ncap * sizeof(UploadOwningMapEntry));
 			if (!nitems)
 				return;
 			m->items = nitems;
@@ -8928,6 +8931,13 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 		SpecConstIndex_Samples = 0
 	};
 
+	struct SaveState
+	{
+		OwnedU32Buf vram;
+		RenderState state;
+		TextureTrackerSaveState tracker_state;
+	};
+	typedef struct SaveState SaveState;
 	struct Renderer
 	{
 			/* batch-7 out-of-line methods -> free functions. */
@@ -8958,12 +8968,6 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			 * Managed explicitly via savestate_init / savestate_destroy / savestate_move
 			 * (defined as free functions after the Renderer class, where OwnedU32Buf and
 			 * TextureTrackerSaveState are complete). No copy exists. */
-			struct SaveState
-			{
-				OwnedU32Buf vram;
-				RenderState state;
-				TextureTrackerSaveState tracker_state;
-			};
 
 
 
@@ -9106,13 +9110,13 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	/* SaveState lifecycle free functions (SaveState was a move-only C++ class; it is now
 	 * a plain struct). vram is an OwnedU32Buf and tracker_state a TextureTrackerSaveState,
 	 * both move-only plain structs managed through their own *_init / *_move / destroy. */
-	static inline void savestate_init(struct Renderer::SaveState *s)
+	static inline void savestate_init(struct SaveState *s)
 	{
 		owned_u32_init(&s->vram);
 		tts_init(&s->tracker_state);
 	}
 
-	static inline void savestate_destroy(struct Renderer::SaveState *s)
+	static inline void savestate_destroy(struct SaveState *s)
 	{
 		owned_u32_deinit(&s->vram);
 		tts_destroy(&s->tracker_state);
@@ -9120,7 +9124,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 	/* Move o into s (s must be initialized): steal o's owning members, copy the POD
 	 * RenderState, leave o empty/initialized. */
-	static inline void savestate_move(struct Renderer::SaveState *s, struct Renderer::SaveState *o)
+	static inline void savestate_move(struct SaveState *s, struct SaveState *o)
 	{
 		if (s == o)
 			return;
@@ -9222,8 +9226,8 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	void renderer_set_display_filter(Renderer *self, ScanoutFilter filter);
 	void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter);
 	void renderer_set_dither_native_resolution(Renderer *self, bool enable);
-	void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out);
-	void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const Renderer::SaveState *state);
+	void renderer_save_vram_state(Renderer *self, SaveState *out);
+	void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const SaveState *state);
 	void renderer_fini(Renderer *self);
 	bool renderer_is_valid(const Renderer *self);
 
@@ -9626,7 +9630,7 @@ static inline void fbcolor_to_rgba32f(float *v, uint32_t color)
 }
 
 
-void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const Renderer::SaveState *state)
+void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const SaveState *state)
 {
 	/* Former constructor init-list + remaining scalar default member initializers,
 	 * assigned explicitly now that Renderer is malloc'd and placement-initialised via
@@ -9845,7 +9849,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 
 	self->valid = true;}
 
-void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out){
+void renderer_save_vram_state(Renderer *self, SaveState *out){
 	BufferCreateInfo buffer_create_info;
 	buffer_create_info.domain = BufferDomain_CachedHost;
 	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
@@ -21317,10 +21321,10 @@ int clamp(int x, int low, int high)
 		int x, y;
 		for (x = c.lowX; x < c.highX; x++) {
 			for (y = c.lowY; y < c.highY; y++) {
-				LookupGrid::Cell *cell = &self->cells[y * LOOKUP_GRID_COLUMNS + x];
+				Cell *cell = &self->cells[y * LOOKUP_GRID_COLUMNS + x];
 				if (cell->count == cell->cap) {
 					int ncap = cell->cap ? cell->cap * 2 : 8;
-					LookupGrid::LookupEntry *ne = (LookupGrid::LookupEntry *)realloc(cell->entries, (size_t)ncap * sizeof(LookupGrid::LookupEntry));
+					LookupEntry *ne = (LookupEntry *)realloc(cell->entries, (size_t)ncap * sizeof(LookupEntry));
 					if (!ne)
 						return;
 					cell->entries = ne;
@@ -21341,7 +21345,7 @@ int clamp(int x, int low, int high)
 		{
 			for (y = c.lowY; y < c.highY; y++)
 			{
-				LookupGrid::Cell *cell = &self->cells[y * LOOKUP_GRID_COLUMNS + x];
+				Cell *cell = &self->cells[y * LOOKUP_GRID_COLUMNS + x];
 				int e;
 				for (e = 0; e < cell->count; e++)
 				{
@@ -21921,7 +21925,7 @@ struct ScanoutHandleVec {
 
 static SwapchainImageVec swapchain_images;
 static ScanoutHandleVec scanout_handles;
-static Renderer::SaveState save_state;
+static SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
 static bool scaled_uv_offset;
