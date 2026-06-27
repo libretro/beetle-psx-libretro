@@ -4576,80 +4576,71 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		unsigned num_subpasses = 0;
 	};
 
-	class RenderPass : public NoCopyNoMove
+	/* RenderPass: cached VkRenderPass + per-subpass attachment metadata. Lives in
+	 * an IntrusiveHashMap (intrusive_node first). Converted from a C++ class to a
+	 * plain C struct + render_pass_* free functions; ctor -> render_pass_init
+	 * (called by the map's emplace), dtor -> render_pass_fini (the map's destroy
+	 * callback). The nested SubpassInfo type and its POD vector stay as-is. */
+	struct RenderPassSubpassInfo
 	{
-		public:
-			struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
-			struct SubpassInfo
-			{
-				VkAttachmentReference color_attachments[VULKAN_NUM_ATTACHMENTS];
-				unsigned num_color_attachments;
-				VkAttachmentReference input_attachments[VULKAN_NUM_ATTACHMENTS];
-				unsigned num_input_attachments;
-				VkAttachmentReference depth_stencil_attachment;
+		VkAttachmentReference color_attachments[VULKAN_NUM_ATTACHMENTS];
+		unsigned num_color_attachments;
+		VkAttachmentReference input_attachments[VULKAN_NUM_ATTACHMENTS];
+		unsigned num_input_attachments;
+		VkAttachmentReference depth_stencil_attachment;
 
-				unsigned samples;
-			};
-
-			POD_VEC_DECLARE(SubpassInfoVec, SubpassInfo);
-
-			RenderPass(Hash hash, Device *device, const RenderPassInfo &info);
-			~RenderPass();
-
-			VkRenderPass get_render_pass() const
-			{
-				return render_pass;
-			}
-
-			uint32_t get_sample_count(unsigned subpass) const
-			{
-				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
-				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).samples;
-			}
-
-			unsigned get_num_color_attachments(unsigned subpass) const
-			{
-				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
-				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).num_color_attachments;
-			}
-
-			unsigned get_num_input_attachments(unsigned subpass) const
-			{
-				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
-				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).num_input_attachments;
-			}
-
-			const VkAttachmentReference &get_color_attachment(unsigned subpass, unsigned index) const
-			{
-				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
-				VK_ASSERT(index < (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).num_color_attachments);
-				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).color_attachments[index];
-			}
-
-			const VkAttachmentReference &get_input_attachment(unsigned subpass, unsigned index) const
-			{
-				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
-				VK_ASSERT(index < (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).num_input_attachments);
-				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).input_attachments[index];
-			}
-
-			bool has_depth(unsigned subpass) const
-			{
-				VK_ASSERT(subpass < SubpassInfoVec_size(&subpasses));
-				return (*SubpassInfoVec_at((struct SubpassInfoVec *)&subpasses, subpass)).depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
-					format_has_depth_aspect(depth_stencil);
-			}
-
-		private:
-			Device *device;
-			VkRenderPass render_pass = VK_NULL_HANDLE;
-
-			VkFormat color_attachments[VULKAN_NUM_ATTACHMENTS] = {};
-			VkFormat depth_stencil = VK_FORMAT_UNDEFINED;
-			SubpassInfoVec subpasses = { NULL, 0, 0 };
-
-			void fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
+		unsigned samples;
 	};
+	POD_VEC_DECLARE(SubpassInfoVec, RenderPassSubpassInfo);
+
+	struct RenderPass
+	{
+		struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
+		Device *device;
+		VkRenderPass render_pass;
+		VkFormat color_attachments[VULKAN_NUM_ATTACHMENTS];
+		VkFormat depth_stencil;
+		SubpassInfoVec subpasses;
+	};
+
+	static void render_pass_fixup_render_pass_nvidia(struct RenderPass *self, VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
+	void render_pass_init(struct RenderPass *self, Hash hash, Device *device, const RenderPassInfo &info);
+	void render_pass_fini(struct RenderPass *self);
+
+	static inline VkRenderPass render_pass_get_render_pass(const struct RenderPass *self) { return self->render_pass; }
+	static inline uint32_t render_pass_get_sample_count(const struct RenderPass *self, unsigned subpass)
+	{
+		VK_ASSERT(subpass < SubpassInfoVec_size(&self->subpasses));
+		return SubpassInfoVec_at((struct SubpassInfoVec *)&self->subpasses, subpass)->samples;
+	}
+	static inline unsigned render_pass_get_num_color_attachments(const struct RenderPass *self, unsigned subpass)
+	{
+		VK_ASSERT(subpass < SubpassInfoVec_size(&self->subpasses));
+		return SubpassInfoVec_at((struct SubpassInfoVec *)&self->subpasses, subpass)->num_color_attachments;
+	}
+	static inline unsigned render_pass_get_num_input_attachments(const struct RenderPass *self, unsigned subpass)
+	{
+		VK_ASSERT(subpass < SubpassInfoVec_size(&self->subpasses));
+		return SubpassInfoVec_at((struct SubpassInfoVec *)&self->subpasses, subpass)->num_input_attachments;
+	}
+	static inline const VkAttachmentReference *render_pass_get_color_attachment(const struct RenderPass *self, unsigned subpass, unsigned index)
+	{
+		VK_ASSERT(subpass < SubpassInfoVec_size(&self->subpasses));
+		VK_ASSERT(index < SubpassInfoVec_at((struct SubpassInfoVec *)&self->subpasses, subpass)->num_color_attachments);
+		return &SubpassInfoVec_at((struct SubpassInfoVec *)&self->subpasses, subpass)->color_attachments[index];
+	}
+	static inline const VkAttachmentReference *render_pass_get_input_attachment(const struct RenderPass *self, unsigned subpass, unsigned index)
+	{
+		VK_ASSERT(subpass < SubpassInfoVec_size(&self->subpasses));
+		VK_ASSERT(index < SubpassInfoVec_at((struct SubpassInfoVec *)&self->subpasses, subpass)->num_input_attachments);
+		return &SubpassInfoVec_at((struct SubpassInfoVec *)&self->subpasses, subpass)->input_attachments[index];
+	}
+	static inline bool render_pass_has_depth(const struct RenderPass *self, unsigned subpass)
+	{
+		VK_ASSERT(subpass < SubpassInfoVec_size(&self->subpasses));
+		return SubpassInfoVec_at((struct SubpassInfoVec *)&self->subpasses, subpass)->depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED &&
+			format_has_depth_aspect(self->depth_stencil);
+	}
 
 	/* The concrete hash map recovers each node type from an IntrusiveHashMapNode* by
 	 * casting, which is only valid if the node base is at offset 0 of every node. */
@@ -4675,7 +4666,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	 * the hash is used only as the map key. */
 	static inline void pipeline_layout_map_destroy(PipelineLayout *t) { pipeline_layout_fini(t); }
 	static inline void descriptor_set_allocator_map_destroy(DescriptorSetAllocator *t) { t->~DescriptorSetAllocator(); }
-	static inline void render_pass_map_destroy(RenderPass *t) { t->~RenderPass(); }
+	static inline void render_pass_map_destroy(RenderPass *t) { render_pass_fini(t); }
 	static inline void shader_map_destroy(Shader *t) { shader_fini(t); }
 	static inline void program_map_destroy(Program *t) { program_fini(t); }
 
@@ -4716,7 +4707,8 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		RenderPass *t;
 		if (!slot)
 			return NULL;
-		t = new (slot) RenderPass(hash, device, info);
+		t = (RenderPass *)slot;
+		render_pass_init(t, hash, device, info);
 		return render_pass_map_insert_yield(m, hash, t);
 	}
 
@@ -13912,12 +13904,15 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			return NULL;
 	}
 
-	RenderPass::RenderPass(Hash hash, Device *device, const RenderPassInfo &info)
-		: device(device)
+	void render_pass_init(struct RenderPass *self, Hash hash, Device *device, const RenderPassInfo &info)
 	{
-		intrusive_node.key = hash;
+		self->device = device;
+		self->render_pass = VK_NULL_HANDLE;
+		self->depth_stencil = VK_FORMAT_UNDEFINED;
+		self->subpasses.items = NULL; self->subpasses.count = 0; self->subpasses.cap = 0;
+		self->intrusive_node.key = hash;
 		for (unsigned att = 0; att < VULKAN_NUM_ATTACHMENTS; att++)
-			color_attachments[att] = VK_FORMAT_UNDEFINED;
+			self->color_attachments[att] = VK_FORMAT_UNDEFINED;
 
 		VK_ASSERT(info.num_color_attachments || info.depth_stencil);
 
@@ -13974,11 +13969,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		for (unsigned i = 0; i < info.num_color_attachments; i++)
 		{
 			VK_ASSERT(info.color_attachments[i]);
-			color_attachments[i] = imageview_get_format(info.color_attachments[i]);
+			self->color_attachments[i] = imageview_get_format(info.color_attachments[i]);
 			Image &image = imageview_get_image(info.color_attachments[i]);
 			VkAttachmentDescription &att = attachments[i];
 			att.flags = 0;
-			att.format = color_attachments[i];
+			att.format = self->color_attachments[i];
 			att.samples = image_get_create_info(&image).samples;
 			att.loadOp = rp_color_load_op(info, i);
 			att.storeOp = rp_color_store_op(info, i);
@@ -14011,13 +14006,13 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				att.initialLayout = image_get_layout(&imageview_get_image(info.color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		}
 
-		depth_stencil = info.depth_stencil ? imageview_get_format(info.depth_stencil) : VK_FORMAT_UNDEFINED;
+		self->depth_stencil = info.depth_stencil ? imageview_get_format(info.depth_stencil) : VK_FORMAT_UNDEFINED;
 		if (info.depth_stencil)
 		{
 			Image &image = imageview_get_image(info.depth_stencil);
 			VkAttachmentDescription &att = attachments[info.num_color_attachments];
 			att.flags = 0;
-			att.format = depth_stencil;
+			att.format = self->depth_stencil;
 			att.samples = image_get_create_info(&image).samples;
 			att.loadOp = ds_load_op;
 			att.storeOp = ds_store_op;
@@ -14025,7 +14020,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			// subpass which uses this attachment to avoid any dummy transition at the end.
 			att.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-			if (format_to_aspect_mask(depth_stencil) & VK_IMAGE_ASPECT_STENCIL_BIT)
+			if (format_to_aspect_mask(self->depth_stencil) & VK_IMAGE_ASPECT_STENCIL_BIT)
 			{
 				att.stencilLoadOp = ds_load_op;
 				att.stencilStoreOp = ds_store_op;
@@ -14516,7 +14511,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{
 			const VkSubpassDescription &subpass = rp_info.pSubpasses[subpass_idx];
 
-			SubpassInfo subpass_info = {};
+			RenderPassSubpassInfo subpass_info = {};
 			/* Defensive bounds: the internal RenderPassInfo builder always stays
 			 * within VULKAN_NUM_ATTACHMENTS and sets a non-NULL depth-stencil
 			 * pointer, but clamp and null-check here so a stray/large subpass can
@@ -14563,29 +14558,29 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 			VK_ASSERT(samples > 0);
 			subpass_info.samples = samples;
-			SubpassInfoVec_push(&this->subpasses, &subpass_info);
+			SubpassInfoVec_push(&self->subpasses, &subpass_info);
 		}
 
 
 		// Fixup after, we want the underlying render pass to be generic.
 		VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
-		fixup_render_pass_nvidia(rp_info, fixup_attachments);
+		render_pass_fixup_render_pass_nvidia(self, rp_info, fixup_attachments);
 
 		LOGI("Creating render pass.\n");
-		if (vkCreateRenderPass(device->get_device(), &rp_info, NULL, &render_pass) != VK_SUCCESS)
+		if (vkCreateRenderPass(device->get_device(), &rp_info, NULL, &self->render_pass) != VK_SUCCESS)
 			LOGE("Failed to create render pass.");
 
 		VkSubpassDescriptionVec_free_storage(&subpasses);
 		VkSubpassDependencyVec_free_storage(&external_dependencies);
 	}
 
-	void RenderPass::fixup_render_pass_nvidia(VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments)
+	static void render_pass_fixup_render_pass_nvidia(struct RenderPass *self, VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments)
 	{
-		if (device->get_gpu_properties().vendorID == VENDOR_ID_NVIDIA &&
+		if (self->device->get_gpu_properties().vendorID == VENDOR_ID_NVIDIA &&
 #ifdef _WIN32
-				VK_VERSION_MAJOR(device->get_gpu_properties().driverVersion) < 417)
+				VK_VERSION_MAJOR(self->device->get_gpu_properties().driverVersion) < 417)
 #else
-			VK_VERSION_MAJOR(device->get_gpu_properties().driverVersion) < 415)
+			VK_VERSION_MAJOR(self->device->get_gpu_properties().driverVersion) < 415)
 #endif
 			{
 				// Workaround a bug on NV where depth-stencil input attachments break if we have STORE_OP_DONT_CARE.
@@ -14608,11 +14603,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			}
 	}
 
-	RenderPass::~RenderPass()
+	void render_pass_fini(struct RenderPass *self)
 	{
-		if (render_pass != VK_NULL_HANDLE)
-			vkDestroyRenderPass(device->get_device(), render_pass, NULL);
-		SubpassInfoVec_free_storage(&subpasses);
+		if (self->render_pass != VK_NULL_HANDLE)
+			vkDestroyRenderPass(self->device->get_device(), self->render_pass, NULL);
+		SubpassInfoVec_free_storage(&self->subpasses);
 	}
 
 	Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info)
@@ -14654,7 +14649,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 
 		VkFramebufferCreateInfo fb_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-		fb_info.renderPass = rp.get_render_pass();
+		fb_info.renderPass = render_pass_get_render_pass(&rp);
 		fb_info.attachmentCount = num_views;
 		fb_info.pAttachments = views;
 		fb_info.width = width;
@@ -15131,7 +15126,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 
 		VkRenderPassBeginInfo begin_info = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-		begin_info.renderPass = self->actual_render_pass->get_render_pass();
+		begin_info.renderPass = render_pass_get_render_pass(self->actual_render_pass);
 		begin_info.framebuffer = self->framebuffer->get_framebuffer();
 		begin_info.renderArea = self->scissor;
 		begin_info.clearValueCount = num_clear_values;
@@ -15221,14 +15216,14 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		// Blend state
 		VkPipelineColorBlendAttachmentState blend_attachments[VULKAN_NUM_ATTACHMENTS];
 		VkPipelineColorBlendStateCreateInfo blend = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-		blend.attachmentCount = self->compatible_render_pass->get_num_color_attachments(self->current_subpass);
+		blend.attachmentCount = render_pass_get_num_color_attachments(self->compatible_render_pass, self->current_subpass);
 		blend.pAttachments = blend_attachments;
 		for (unsigned i = 0; i < blend.attachmentCount; i++)
 		{
 			VkPipelineColorBlendAttachmentState &att = blend_attachments[i];
 			att = {};
 
-			if (self->compatible_render_pass->get_color_attachment(self->current_subpass, i).attachment != VK_ATTACHMENT_UNUSED &&
+			if (render_pass_get_color_attachment(self->compatible_render_pass, self->current_subpass, i)->attachment != VK_ATTACHMENT_UNUSED &&
 					(pipeline_layout_get_resource_layout(self->current_layout)->render_target_mask & (1u << i)))
 			{
 				att.colorWriteMask = 0xf;
@@ -15248,8 +15243,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		// Depth state
 		VkPipelineDepthStencilStateCreateInfo ds = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-		ds.depthTestEnable = self->compatible_render_pass->has_depth(self->current_subpass) && self->static_state.state.depth_test;
-		ds.depthWriteEnable = self->compatible_render_pass->has_depth(self->current_subpass) && self->static_state.state.depth_write;
+		ds.depthTestEnable = render_pass_has_depth(self->compatible_render_pass, self->current_subpass) && self->static_state.state.depth_test;
+		ds.depthWriteEnable = render_pass_has_depth(self->compatible_render_pass, self->current_subpass) && self->static_state.state.depth_write;
 
 		if (ds.depthTestEnable)
 			ds.depthCompareOp = (VkCompareOp)(self->static_state.state.depth_compare);
@@ -15286,9 +15281,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		// Multisample
 		VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-		ms.rasterizationSamples = (VkSampleCountFlagBits)(self->compatible_render_pass->get_sample_count(self->current_subpass));
+		ms.rasterizationSamples = (VkSampleCountFlagBits)(render_pass_get_sample_count(self->compatible_render_pass, self->current_subpass));
 
-		if (self->compatible_render_pass->get_sample_count(self->current_subpass) > 1)
+		if (render_pass_get_sample_count(self->compatible_render_pass, self->current_subpass) > 1)
 		{
 			ms.alphaToCoverageEnable = self->static_state.state.alpha_to_coverage;
 			ms.alphaToOneEnable = self->static_state.state.alpha_to_one;
@@ -15349,7 +15344,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		VkGraphicsPipelineCreateInfo pipe = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
 		pipe.layout = self->current_pipeline_layout;
-		pipe.renderPass = self->compatible_render_pass->get_render_pass();
+		pipe.renderPass = render_pass_get_render_pass(self->compatible_render_pass);
 		pipe.subpass = self->current_subpass;
 
 		pipe.pViewportState = &vp;
@@ -15699,11 +15694,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	void commandbuffer_set_input_attachments(struct CommandBuffer *self, unsigned set, unsigned start_binding)
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
-		VK_ASSERT(start_binding + self->actual_render_pass->get_num_input_attachments(self->current_subpass) <= VULKAN_NUM_BINDINGS);
-		unsigned num_input_attachments = self->actual_render_pass->get_num_input_attachments(self->current_subpass);
+		VK_ASSERT(start_binding + render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass) <= VULKAN_NUM_BINDINGS);
+		unsigned num_input_attachments = render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass);
 		for (unsigned i = 0; i < num_input_attachments; i++)
 		{
-			const VkAttachmentReference &ref = self->actual_render_pass->get_input_attachment(self->current_subpass, i);
+			const VkAttachmentReference &ref = *render_pass_get_input_attachment(self->actual_render_pass, self->current_subpass, i);
 			if (ref.attachment == VK_ATTACHMENT_UNUSED)
 				continue;
 
