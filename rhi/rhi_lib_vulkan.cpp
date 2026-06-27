@@ -8488,6 +8488,41 @@ extern retro_log_printf_t log_cb;
 	BlendMode_BlendAddQuarter = 3
 };
 
+	/* Renderer per-draw POD payloads (vertex buffer entry, VRAM blit descriptor,
+	 * deferred clear candidate) and their POD_VEC arrays. Hoisted out of the
+	 * Renderer class to file scope so the class -> C struct conversion's free
+	 * functions can name them without a Renderer:: qualifier. All are plain POD. */
+	struct BufferVertex
+	{
+		float x, y, z, w;
+		uint32_t color;
+		TextureWindow window;
+		int16_t pal_x, pal_y, params;
+		int16_t u, v, base_uv_x, base_uv_y;
+		uint16_t min_u, min_v, max_u, max_v;
+	};
+
+	struct BlitInfo
+	{
+		uint32_t src_offset[2];
+		uint32_t dst_offset[2];
+		uint32_t extent[2];
+		uint32_t mask;
+		uint32_t sample;
+	};
+
+	struct ClearCandidate
+	{
+		Rect rect;
+		uint32_t color; /* fb_color */
+		float z;
+	};
+
+	POD_VEC_DECLARE(BufferVertexVec, BufferVertex);
+	POD_VEC_DECLARE(BlitInfoVec, BlitInfo);
+	POD_VEC_DECLARE(ClearCandidateVec, ClearCandidate);
+	POD_VEC_DECLARE(Rect2DVec, VkRect2D);
+
 	class Renderer
 	{
 		public:
@@ -8969,36 +9004,6 @@ extern retro_log_printf_t log_cb;
 
 			RenderState render_state;
 
-			struct BufferVertex
-			{
-				float x, y, z, w;
-				uint32_t color;
-				TextureWindow window;
-				int16_t pal_x, pal_y, params;
-				int16_t u, v, base_uv_x, base_uv_y;
-				uint16_t min_u, min_v, max_u, max_v;
-			};
-
-			struct BlitInfo
-			{
-				uint32_t src_offset[2];
-				uint32_t dst_offset[2];
-				uint32_t extent[2];
-				uint32_t mask;
-				uint32_t sample;
-			};
-
-			struct ClearCandidate
-			{
-				Rect rect;
-				uint32_t color; /* fb_color */
-				float z;
-			};
-
-			POD_VEC_DECLARE(BufferVertexVec, BufferVertex);
-			POD_VEC_DECLARE(BlitInfoVec, BlitInfo);
-			POD_VEC_DECLARE(ClearCandidateVec, ClearCandidate);
-			POD_VEC_DECLARE(Rect2DVec, VkRect2D);
 
 			struct OpaqueQueue
 			{
@@ -10710,7 +10715,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 	}
 }
 
-Renderer::BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
+BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
 	bool filtering, bool scaled_read, unsigned shift, bool offset_uv)
 {
 	// For mask testing, force primitives through the serialized blend path.
@@ -11011,7 +11016,7 @@ void Renderer::clear_quad(const Rect &rect, uint32_t fb_color, bool candidate)
 		{ ClearCandidate _vpush = { rect, fb_color, z }; ClearCandidateVec_push(&queue.clear_candidates, &_vpush); }
 }
 
-const Renderer::ClearCandidate *Renderer::find_clear_candidate(const Rect &rect) const
+const ClearCandidate *Renderer::find_clear_candidate(const Rect &rect) const
 {
 	const ClearCandidate *ret = NULL;
 	{
