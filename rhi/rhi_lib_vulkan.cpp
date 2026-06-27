@@ -5561,6 +5561,10 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	class Device
 	{
 		public:
+			friend Program *device_request_program_compute_shader(Device *self, Shader *compute);
+			friend Program *device_request_program_compute_code(Device *self, const uint32_t *compute_data, size_t compute_size);
+			friend Program *device_request_program_graphics_shaders(Device *self, Shader *vertex, Shader *fragment);
+			friend Program *device_request_program_graphics_code(Device *self, const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data, size_t fragment_size);
 			friend Shader *device_request_shader(Device *self, const uint32_t *data, size_t size);
 			friend PipelineLayout *device_request_pipeline_layout(Device *self, const CombinedResourceLayout &layout);
 			friend DescriptorSetAllocator *device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
@@ -5664,11 +5668,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 					unsigned semaphore_count = 0, Semaphore *semaphore = NULL);
 
 			// Request shaders and programs. These objects are owned by the Device.
-			Program *request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
-					size_t fragment_size);
-			Program *request_program(const uint32_t *compute_data, size_t compute_size);
-			Program *request_program(Shader *vertex, Shader *fragment);
-			Program *request_program(Shader *compute);
 
 			// Map and unmap buffer objects.
 
@@ -9659,26 +9658,26 @@ Renderer::SaveState renderer_save_vram_state(Renderer *self){
 void renderer_init_primitive_pipelines(Renderer *self)
 {
 	if (self->msaa > 1 || self->scaling > 1)
-		self->pipelines.flat = self->device->request_program(flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
+		self->pipelines.flat = device_request_program_graphics_code(self->device, flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
 	else
-		self->pipelines.flat = self->device->request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_frag, sizeof(flat_frag));
+		self->pipelines.flat = device_request_program_graphics_code(self->device, flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_frag, sizeof(flat_frag));
 
 	if (self->msaa > 1)
 	{
-		self->pipelines.textured_scaled = self->device->request_program(textured_vert, sizeof(textured_vert), textured_msaa_frag, sizeof(textured_msaa_frag));
-		self->pipelines.textured_unscaled = self->device->request_program(textured_vert, sizeof(textured_vert), textured_msaa_unscaled_frag, sizeof(textured_msaa_unscaled_frag));
+		self->pipelines.textured_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_msaa_frag, sizeof(textured_msaa_frag));
+		self->pipelines.textured_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_msaa_unscaled_frag, sizeof(textured_msaa_unscaled_frag));
 	}
 	else
 	{
 		if (self->scaling > 1)
 		{
-			self->pipelines.textured_scaled = self->device->request_program(textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
-			self->pipelines.textured_unscaled = self->device->request_program(textured_vert, sizeof(textured_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+			self->pipelines.textured_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
+			self->pipelines.textured_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
 		}
 		else
 		{
-			self->pipelines.textured_scaled = self->device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_frag, sizeof(textured_frag));
-			self->pipelines.textured_unscaled = self->device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+			self->pipelines.textured_scaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_frag, sizeof(textured_frag));
+			self->pipelines.textured_unscaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
 		}
 	}
 }
@@ -9688,31 +9687,31 @@ void renderer_init_primitive_feedback_pipelines(Renderer *self)
 	// TODO: The masked self->pipelines do not have filter options.
 	if (self->msaa > 1)
 	{
-		self->pipelines.textured_masked_scaled = self->device->request_program(textured_vert, sizeof(textured_vert),
+		self->pipelines.textured_masked_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert),
 				feedback_msaa_frag, sizeof(feedback_msaa_frag));
-		self->pipelines.textured_masked_unscaled = self->device->request_program(textured_vert, sizeof(textured_vert),
+		self->pipelines.textured_masked_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert),
 				feedback_msaa_unscaled_frag, sizeof(feedback_msaa_unscaled_frag));
-		self->pipelines.flat_masked = self->device->request_program(flat_vert, sizeof(flat_vert),
+		self->pipelines.flat_masked = device_request_program_graphics_code(self->device, flat_vert, sizeof(flat_vert),
 				feedback_msaa_flat_frag, sizeof(feedback_msaa_flat_frag));
 	}
 	else
 	{
 		if (self->scaling > 1)
 		{
-			self->pipelines.flat_masked = self->device->request_program(flat_vert, sizeof(flat_vert),
+			self->pipelines.flat_masked = device_request_program_graphics_code(self->device, flat_vert, sizeof(flat_vert),
 					feedback_flat_frag, sizeof(feedback_flat_frag));
-			self->pipelines.textured_masked_scaled = self->device->request_program(textured_vert, sizeof(textured_vert),
+			self->pipelines.textured_masked_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert),
 					feedback_frag, sizeof(feedback_frag));
-			self->pipelines.textured_masked_unscaled = self->device->request_program(textured_vert, sizeof(textured_vert),
+			self->pipelines.textured_masked_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert),
 					feedback_unscaled_frag, sizeof(feedback_unscaled_frag));
 		}
 		else
 		{
-			self->pipelines.flat_masked = self->device->request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert),
+			self->pipelines.flat_masked = device_request_program_graphics_code(self->device, flat_unscaled_vert, sizeof(flat_unscaled_vert),
 					feedback_flat_frag, sizeof(feedback_flat_frag));
-			self->pipelines.textured_masked_scaled = self->device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
+			self->pipelines.textured_masked_scaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert),
 					feedback_frag, sizeof(feedback_frag));
-			self->pipelines.textured_masked_unscaled = self->device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
+			self->pipelines.textured_masked_unscaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert),
 					feedback_unscaled_frag, sizeof(feedback_unscaled_frag));
 		}
 	}
@@ -9721,72 +9720,72 @@ void renderer_init_primitive_feedback_pipelines(Renderer *self)
 void renderer_init_pipelines(Renderer *self)
 {
 	if (self->msaa > 1)
-		self->pipelines.resolve_to_unscaled = self->device->request_program(resolve_msaa_to_unscaled, sizeof(resolve_msaa_to_unscaled));
+		self->pipelines.resolve_to_unscaled = device_request_program_compute_code(self->device, resolve_msaa_to_unscaled, sizeof(resolve_msaa_to_unscaled));
 	else
-		self->pipelines.resolve_to_unscaled = self->device->request_program(resolve_to_unscaled, sizeof(resolve_to_unscaled));
+		self->pipelines.resolve_to_unscaled = device_request_program_compute_code(self->device, resolve_to_unscaled, sizeof(resolve_to_unscaled));
 
 	self->pipelines.scaled_quad_blitter =
-		self->device->request_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
+		device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
 	self->pipelines.scaled_dither_quad_blitter =
-		self->device->request_program(quad_vert, sizeof(quad_vert), scaled_dither_quad_frag, sizeof(scaled_dither_quad_frag));
+		device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), scaled_dither_quad_frag, sizeof(scaled_dither_quad_frag));
 	self->pipelines.bpp24_quad_blitter =
-		self->device->request_program(quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
+		device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
 	self->pipelines.bpp24_yuv_quad_blitter =
-		self->device->request_program(quad_vert, sizeof(quad_vert), bpp24_yuv_quad_frag, sizeof(bpp24_yuv_quad_frag));
+		device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), bpp24_yuv_quad_frag, sizeof(bpp24_yuv_quad_frag));
 	self->pipelines.unscaled_quad_blitter =
-		self->device->request_program(quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
+		device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
 	self->pipelines.unscaled_dither_quad_blitter =
-		self->device->request_program(quad_vert, sizeof(quad_vert), unscaled_dither_quad_frag, sizeof(unscaled_dither_quad_frag));
+		device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), unscaled_dither_quad_frag, sizeof(unscaled_dither_quad_frag));
 
-	self->pipelines.copy_to_vram = self->device->request_program(copy_vram_comp, sizeof(copy_vram_comp));
-	self->pipelines.copy_to_vram_masked = self->device->request_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
+	self->pipelines.copy_to_vram = device_request_program_compute_code(self->device, copy_vram_comp, sizeof(copy_vram_comp));
+	self->pipelines.copy_to_vram_masked = device_request_program_compute_code(self->device, copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
 
 	if (self->msaa > 1)
 	{
 		self->pipelines.resolve_to_scaled =
-			self->device->request_program(resolve_to_msaa_scaled, sizeof(resolve_to_msaa_scaled));
+			device_request_program_compute_code(self->device, resolve_to_msaa_scaled, sizeof(resolve_to_msaa_scaled));
 
 		self->pipelines.blit_vram_scaled =
-			self->device->request_program(blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
+			device_request_program_compute_code(self->device, blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
 		self->pipelines.blit_vram_scaled_masked =
-			self->device->request_program(blit_vram_msaa_scaled_masked_comp, sizeof(blit_vram_msaa_scaled_masked_comp));
+			device_request_program_compute_code(self->device, blit_vram_msaa_scaled_masked_comp, sizeof(blit_vram_msaa_scaled_masked_comp));
 		self->pipelines.blit_vram_msaa_cached_scaled =
-			self->device->request_program(blit_vram_msaa_cached_scaled_comp, sizeof(blit_vram_msaa_cached_scaled_comp));
+			device_request_program_compute_code(self->device, blit_vram_msaa_cached_scaled_comp, sizeof(blit_vram_msaa_cached_scaled_comp));
 		self->pipelines.blit_vram_msaa_cached_scaled_masked =
-			self->device->request_program(blit_vram_msaa_cached_scaled_masked_comp, sizeof(blit_vram_msaa_cached_scaled_masked_comp));
+			device_request_program_compute_code(self->device, blit_vram_msaa_cached_scaled_masked_comp, sizeof(blit_vram_msaa_cached_scaled_masked_comp));
 	}
 	else
 	{
-		self->pipelines.resolve_to_scaled = self->device->request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
+		self->pipelines.resolve_to_scaled = device_request_program_compute_code(self->device, resolve_to_scaled, sizeof(resolve_to_scaled));
 
-		self->pipelines.blit_vram_scaled = self->device->request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
+		self->pipelines.blit_vram_scaled = device_request_program_compute_code(self->device, blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
 		self->pipelines.blit_vram_scaled_masked =
-			self->device->request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
+			device_request_program_compute_code(self->device, blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
 	}
 
 	self->pipelines.blit_vram_cached_scaled =
-		self->device->request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
+		device_request_program_compute_code(self->device, blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
 	self->pipelines.blit_vram_cached_scaled_masked =
-		self->device->request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
+		device_request_program_compute_code(self->device, blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
 
-	self->pipelines.blit_vram_unscaled = self->device->request_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
+	self->pipelines.blit_vram_unscaled = device_request_program_compute_code(self->device, blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
 	self->pipelines.blit_vram_unscaled_masked =
-		self->device->request_program(blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
+		device_request_program_compute_code(self->device, blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
 	self->pipelines.blit_vram_cached_unscaled =
-		self->device->request_program(blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
+		device_request_program_compute_code(self->device, blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
 	self->pipelines.blit_vram_cached_unscaled_masked =
-		self->device->request_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
+		device_request_program_compute_code(self->device, blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
 
 	self->pipelines.mipmap_resolve =
-		self->device->request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
+		device_request_program_graphics_code(self->device, mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
 	self->pipelines.mipmap_dither_resolve =
-		self->device->request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
+		device_request_program_graphics_code(self->device, mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
 
-	self->pipelines.mipmap_energy = self->device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+	self->pipelines.mipmap_energy = device_request_program_graphics_code(self->device, mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_frag, sizeof(mipmap_energy_frag));
-	self->pipelines.mipmap_energy_first = self->device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+	self->pipelines.mipmap_energy_first = device_request_program_graphics_code(self->device, mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_first_frag, sizeof(mipmap_energy_first_frag));
-	self->pipelines.mipmap_energy_blur = self->device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+	self->pipelines.mipmap_energy_blur = device_request_program_graphics_code(self->device, mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_blur_frag, sizeof(mipmap_energy_blur_frag));
 
 	renderer_init_primitive_pipelines(self);
@@ -16756,44 +16755,44 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		return ret;
 	}
 
-	Program *Device::request_program(Shader *compute)
+	Program *device_request_program_compute_shader(Device *self, Shader *compute)
 	{
 		Hasher hasher; hasher_init(&hasher);
 		hasher_u64(&hasher, compute->intrusive_node.key);
 
 		Hash hash = hasher_get(&hasher);
-		Program *ret = program_map_find(&programs, hash);
+		Program *ret = program_map_find(&self->programs, hash);
 		if (!ret)
-			ret = program_map_emplace_yield_compute(&programs, hash, this, compute);
+			ret = program_map_emplace_yield_compute(&self->programs, hash, self, compute);
 		return ret;
 	}
 
-	Program *Device::request_program(const uint32_t *compute_data, size_t compute_size)
+	Program *device_request_program_compute_code(Device *self, const uint32_t *compute_data, size_t compute_size)
 	{
-		Shader *compute = device_request_shader(this, compute_data, compute_size);
-		return request_program(compute);
+		Shader *compute = device_request_shader(self, compute_data, compute_size);
+		return device_request_program_compute_shader(self, compute);
 	}
 
-	Program *Device::request_program(Shader *vertex, Shader *fragment)
+	Program *device_request_program_graphics_shaders(Device *self, Shader *vertex, Shader *fragment)
 	{
 		Hasher hasher; hasher_init(&hasher);
 		hasher_u64(&hasher, vertex->intrusive_node.key);
 		hasher_u64(&hasher, fragment->intrusive_node.key);
 
 		Hash hash = hasher_get(&hasher);
-		Program *ret = program_map_find(&programs, hash);
+		Program *ret = program_map_find(&self->programs, hash);
 
 		if (!ret)
-			ret = program_map_emplace_yield_graphics(&programs, hash, this, vertex, fragment);
+			ret = program_map_emplace_yield_graphics(&self->programs, hash, self, vertex, fragment);
 		return ret;
 	}
 
-	Program *Device::request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
+	Program *device_request_program_graphics_code(Device *self, const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
 			size_t fragment_size)
 	{
-		Shader *vertex = device_request_shader(this, vertex_data, vertex_size);
-		Shader *fragment = device_request_shader(this, fragment_data, fragment_size);
-		return request_program(vertex, fragment);
+		Shader *vertex = device_request_shader(self, vertex_data, vertex_size);
+		Shader *fragment = device_request_shader(self, fragment_data, fragment_size);
+		return device_request_program_graphics_shaders(self, vertex, fragment);
 	}
 
 	PipelineLayout * device_request_pipeline_layout(Device *self, const CombinedResourceLayout &layout){
