@@ -7268,37 +7268,50 @@ extern retro_log_printf_t log_cb;
 	static void lookup_grid_init(LookupGrid *g);
 	static void lookup_grid_deinit(LookupGrid *g);
 
-	class RectTracker {
-		public:
-			RectTracker() { enduring_arr_init(&textures); lookup_grid_init(&lookup_grid); }
-			~RectTracker() { enduring_arr_free(&textures); lookup_grid_deinit(&lookup_grid); }
-			void place(TextureRect texture);
-			void upload(SRect rect, TextureUpload *upload);
-			void blit(SRect dst, SRect src);
-			void clear(SRect rect)
-			{
-				clear_rect(rect);
-				lookup_grid_dirty = true;
-			}
-			void releaseDeadHandles();
-			EnduringRectArr textures; // owning trivially-relocatable array
-			RectIndexSet& overlapping(Rect rect, RectIndexSet& results);
-
-			/**
-			 * This pointer will be valid until the next upload/blit/clear/endFrame, so use it immediately and don't try anything funny.
-			 * Returns NULL when index is out of range
-			 **/
-			TextureRect* get_index(RectIndex index);
-
-			/** Returns NULL if no texture with the given hash can be found */
-			TextureUpload *find_upload(uint32_t hash);
-		private:
-			LookupGrid lookup_grid;
-			bool lookup_grid_dirty = false;
-
-			void clear_rect(SRect &rect);
-			void rebuild_lookup_grid();
+	/* RectTracker: tracks placed/uploaded texture rects with a spatial lookup grid.
+	 * Converted from a C++ class to a plain C struct + rect_tracker_* free
+	 * functions. The ctor/dtor (which init/free the EnduringRectArr and LookupGrid)
+	 * become rect_tracker_init / rect_tracker_deinit, called by the embedding
+	 * TextureTracker's constructor/destructor. */
+	struct RectTracker {
+		EnduringRectArr textures; // owning trivially-relocatable array
+		LookupGrid lookup_grid;
+		bool lookup_grid_dirty;
 	};
+
+	static inline void rect_tracker_init(struct RectTracker *self)
+	{
+		enduring_arr_init(&self->textures);
+		lookup_grid_init(&self->lookup_grid);
+		self->lookup_grid_dirty = false;
+	}
+	static inline void rect_tracker_deinit(struct RectTracker *self)
+	{
+		enduring_arr_free(&self->textures);
+		lookup_grid_deinit(&self->lookup_grid);
+	}
+
+	void rect_tracker_place(struct RectTracker *self, TextureRect texture);
+	void rect_tracker_upload(struct RectTracker *self, SRect rect, TextureUpload *upload);
+	void rect_tracker_blit(struct RectTracker *self, SRect dst, SRect src);
+	static void rect_tracker_clear_rect(struct RectTracker *self, SRect *rect);
+	static inline void rect_tracker_clear(struct RectTracker *self, SRect rect)
+	{
+		rect_tracker_clear_rect(self, &rect);
+		self->lookup_grid_dirty = true;
+	}
+	void rect_tracker_releaseDeadHandles(struct RectTracker *self);
+	/* Returns results by pointer (was a reference). */
+	RectIndexSet *rect_tracker_overlapping(struct RectTracker *self, Rect rect, RectIndexSet *results);
+
+	/* This pointer will be valid until the next upload/blit/clear/endFrame, so use
+	 * it immediately. Returns NULL when index is out of range. */
+	TextureRect *rect_tracker_get_index(struct RectTracker *self, RectIndex index);
+
+	/* Returns NULL if no texture with the given hash can be found. */
+	TextureUpload *rect_tracker_find_upload(struct RectTracker *self, uint32_t hash);
+
+	static void rect_tracker_rebuild_lookup_grid(struct RectTracker *self);
 	// RectTracker
 	//============
 
@@ -19856,6 +19869,7 @@ static char retro_slash = '/';
 		char rpath[PATH_MAX_TT];
 		char cfg[PATH_MAX_TT];
 		default_hd_texture.data = NULL; /* plain-struct handle: explicit null */
+		rect_tracker_init(&tracker); /* embedded RectTracker: explicit init (was default ctor) */
 		HdImageCache_init(&hd_cache, HD_CACHE_RAM_BUDGET);
 		HdGpuCache_init(&hd_gpu_cache, HD_CACHE_VRAM_BUDGET);
 		handle_lru_cache_init(&handle_cache, 4);
@@ -19893,6 +19907,7 @@ static char retro_slash = '/';
 		hd_key_set_free(&requested);
 		hd_key_set_free(&pending_attach);
 		free(cached_palette_hashes);
+		rect_tracker_deinit(&tracker); /* embedded RectTracker: explicit deinit (was default dtor) */
 		/* Signal and drop the IO worker pool last. Previously iothread was a
 		 * by-value member, so its destructor ran after this body; preserve that
 		 * ordering by deinitialising it here at the end. */
@@ -19910,7 +19925,7 @@ static char retro_slash = '/';
 		assert(palette_rect.height == 1);
 
 		static RectIndexSet overlap = { NULL, 0, 0 };
-		tracker.overlapping(palette_rect, overlap);
+		rect_tracker_overlapping(&tracker, palette_rect, &overlap);
 		for (int oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
 			EnduringTextureRect &other = tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because tracker.overlapping never returns dead indices
@@ -19960,7 +19975,7 @@ static char retro_slash = '/';
 			// Some games do this, apparently.
 			return;
 		}
-		tracker.clear(SRect(rect.x, rect.y, rect.width, rect.height));
+		rect_tracker_clear(&tracker, SRect(rect.x, rect.y, rect.width, rect.height));
 		fused_pages.mark_dead(rect);
 
 		clear_palette_cache(rect);
@@ -19985,7 +20000,7 @@ static char retro_slash = '/';
 	}
 
 	void TextureTracker::blit(Rect dst, Rect src) {
-		tracker.blit(SRect(dst.x, dst.y, dst.width, dst.height), SRect(src.x, src.y, src.width, src.height));
+		rect_tracker_blit(&tracker, SRect(dst.x, dst.y, dst.width, dst.height), SRect(src.x, src.y, src.width, src.height));
 		fused_pages.mark_dirty(dst);
 		fused_pages.rebuild_dirty(tracker, uploader);
 		clear_palette_cache(dst);
@@ -20072,7 +20087,7 @@ static char retro_slash = '/';
 		static RectIndexSet overlap = { NULL, 0, 0 };
 
 		OwnedRectVec to_restore;
-		tracker.overlapping(rect, overlap);
+		rect_tracker_overlapping(&tracker, rect, &overlap);
 		for (int oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
 			EnduringTextureRect &e = tracker.textures.a[index];
@@ -20098,7 +20113,7 @@ static char retro_slash = '/';
 
 		if (rect.width == FB_WIDTH && rect.height == FB_HEIGHT) {
 			// probably loading a save state, this is the entirety of vram
-			tracker.clear(toSRect(rect));
+			rect_tracker_clear(&tracker, toSRect(rect));
 			fused_pages.mark_dead(rect);
 			return;
 		}
@@ -20162,10 +20177,10 @@ static char retro_slash = '/';
 		}
 		if (restore != NULL) {
 			for (TextureRect &t : restore->to_restore) {
-				tracker.place(t); // TODO: clip to other.rect
+				rect_tracker_place(&tracker, t); // TODO: clip to other.rect
 			}
 		} else {
-			tracker.upload(toSRect(rect), upload);
+			rect_tracker_upload(&tracker, toSRect(rect), upload);
 		}
 		fused_pages.mark_dirty(rect);
 		fused_pages.rebuild_dirty(tracker, uploader);
@@ -20384,12 +20399,12 @@ static char retro_slash = '/';
 		}
 
 		static RectIndexSet overlap = { NULL, 0, 0 };
-		tracker.overlapping(rect, overlap);
+		rect_tracker_overlapping(&tracker, rect, &overlap);
 
 		// Dump texture
 		for (int oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
-			TextureRect *tex = tracker.get_index(index);
+			TextureRect *tex = rect_tracker_get_index(&tracker, index);
 			dump_texture(tex->upload, mode, { mode.mode, palette_hash });
 		}
 		if (frame_dump != NULL) {
@@ -20415,7 +20430,7 @@ static char retro_slash = '/';
 		Rect result_rect;
 		for (int oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
-			TextureRect *tex = tracker.get_index(index);
+			TextureRect *tex = rect_tracker_get_index(&tracker, index);
 			HdTexEntry *overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
 			if (overlapped_image == NULL) {
 				// Not bound to this upload yet. Bind it now: a GPU-cache hit binds
@@ -20457,7 +20472,7 @@ static char retro_slash = '/';
 			// created. So it would seem all you need to do is, in Renderer::reset_queue, call RectTracker::releaseDeadHandles. Except you have to be
 			// very very careful that no handles outside of the queues (ie. local) exist across a call to reset_queue.  That is, the handle must go into
 			// the queue as soon as possible, otherwise that hd texture might not work (previously it would segfault).
-			TextureRect *tex = tracker.get_index(handle.index);
+			TextureRect *tex = rect_tracker_get_index(&tracker, handle.index);
 			if (tex == NULL) {
 				if (handle.index != -1) {
 					TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
@@ -20510,7 +20525,7 @@ static char retro_slash = '/';
 	// TEMPORARY:
 	void TextureTracker::on_queues_reset() {
 		handle_cache.clear();
-		tracker.releaseDeadHandles(); // This is called from reset_queue, so as of now no HdTextureHandle's exist
+		rect_tracker_releaseDeadHandles(&tracker); // This is called from reset_queue, so as of now no HdTextureHandle's exist
 
 		// Poll HD uploads
 
@@ -20603,7 +20618,7 @@ static char retro_slash = '/';
 		fused_pages.remove_dead();
 	}
 	TextureUpload *TextureTracker::find_upload(uint32_t hash) {
-		TextureUpload *upload = tracker.find_upload(hash); /* borrowed */
+		TextureUpload *upload = rect_tracker_find_upload(&tracker, hash); /* borrowed */
 
 		if (upload != NULL)
 			return upload;
@@ -20806,119 +20821,126 @@ static char retro_slash = '/';
 		}
 	}
 
-	void RectTracker::upload(SRect rect, TextureUpload *upload) {
+	void rect_tracker_upload(struct RectTracker *self, SRect rect, TextureUpload *upload) {
 		TextureRect texture = make_texture_rect(upload, 0, 0, rect);
-		place(texture);
-		lookup_grid_dirty = true;
+		rect_tracker_place(self, texture);
+		self->lookup_grid_dirty = true;
 	}
 
 	SRect moved(SRect rect, int dx, int dy) {
 		return SRect(rect.x + dx, rect.y + dy, rect.width, rect.height);
 	}
 
-	void RectTracker::blit(SRect dst, SRect src) {
+	void rect_tracker_blit(struct RectTracker *self, SRect dst, SRect src) {
 		TextureRectVec to_place = { NULL, 0, 0 };
 		int moveX = dst.x - src.x;
 		int moveY = dst.y - src.y;
-		for (EnduringTextureRect &eold : textures) {
-			if (eold.alive) {
-				TextureRect &old = eold.texture_rect;
-				SRectResult intersection = intersect(old.vram_rect, src);
+		int _ti;
+		for (_ti = 0; _ti < self->textures.count; _ti++) {
+			EnduringTextureRect *eold = &self->textures.a[_ti];
+			if (eold->alive) {
+				TextureRect *old = &eold->texture_rect;
+				SRectResult intersection = intersect(old->vram_rect, src);
 				if (intersection.valid) {
-					TextureRect sub = subTexture(old, intersection.rect);
+					TextureRect sub = subTexture(*old, intersection.rect);
 					TextureRect subMoved = make_texture_rect(sub.upload, sub.offset_x, sub.offset_y, moved(sub.vram_rect, moveX, moveY));
 					TextureRectVec_push(&to_place, &subMoved);
 				}
 			}
 		}
-		clear_rect(dst);
+		rect_tracker_clear_rect(self, &dst);
 		{
 			int _i;
 			for (_i = 0; _i < TextureRectVec_size(&to_place); _i++)
-				place(*TextureRectVec_at(&to_place, _i));
+				rect_tracker_place(self, *TextureRectVec_at(&to_place, _i));
 		}
 		TextureRectVec_free_storage(&to_place);
-		lookup_grid_dirty = true;
+		self->lookup_grid_dirty = true;
 	}
 
-	void RectTracker::releaseDeadHandles()
+	void rect_tracker_releaseDeadHandles(struct RectTracker *self)
 	{
-		enduring_arr_compact(&textures);
-		lookup_grid_dirty = true;
+		enduring_arr_compact(&self->textures);
+		self->lookup_grid_dirty = true;
 	}
 
-	RectIndexSet& RectTracker::overlapping(Rect uvrect, RectIndexSet &results)
+	RectIndexSet *rect_tracker_overlapping(struct RectTracker *self, Rect uvrect, RectIndexSet *results)
 	{
-		if (lookup_grid_dirty)
-			rebuild_lookup_grid();
+		SRect rect;
+		if (self->lookup_grid_dirty)
+			rect_tracker_rebuild_lookup_grid(self);
 
 		// TODO: remove this when renderer/build_attribs doesn't 
 		// have an unnecessary - 1
 		if (uvrect.width == 0)
 			uvrect.width = 1;
 
-		SRect rect = toSRect(uvrect);
+		rect = toSRect(uvrect);
 
-		rect_index_set_clear(&results);
-		lookup_grid.get(rect, results);
+		rect_index_set_clear(results);
+		self->lookup_grid.get(rect, *results);
 		return results;
 	}
 
-	TextureRect* RectTracker::get_index(RectIndex index)
+	TextureRect *rect_tracker_get_index(struct RectTracker *self, RectIndex index)
 	{
-		if (index < 0 || index >= textures.count)
+		if (index < 0 || index >= self->textures.count)
 			return NULL;
-		return &textures.a[index].texture_rect;
+		return &self->textures.a[index].texture_rect;
 	}
 
-	void RectTracker::clear_rect(SRect &rect) {
+	static void rect_tracker_clear_rect(struct RectTracker *self, SRect *rect) {
 		SRect splits[4];
 		unsigned splits_count = 0;
+		int ti, ni;
 
 		TextureRectVec newTextures = { NULL, 0, 0 };
-		for (int ti = 0; ti < textures.count; ti++) {
-			EnduringTextureRect &eold = textures.a[ti];
-			if (eold.alive) {
-				TextureRect &old = eold.texture_rect;
+		for (ti = 0; ti < self->textures.count; ti++) {
+			EnduringTextureRect *eold = &self->textures.a[ti];
+			if (eold->alive) {
+				TextureRect *old = &eold->texture_rect;
 
 				splits_count = 0;
-				split(old.vram_rect, rect, splits, splits_count);
+				split(old->vram_rect, *rect, splits, splits_count);
 				// The rect didn't split, do nothing
-				if (splits_count == 1 && splits[0] == old.vram_rect) { }
+				if (splits_count == 1 && splits[0] == old->vram_rect) { }
 				else
 				{
 					// The rect split, mark this texture as dead and push its splits to be added
-					eold.alive = false;
-					for (unsigned i = 0; i < splits_count; i++)
-						{ TextureRect _tr = subTexture(old, splits[i]); TextureRectVec_push(&newTextures, &_tr); }
+					unsigned i;
+					eold->alive = false;
+					for (i = 0; i < splits_count; i++)
+						{ TextureRect _tr = subTexture(*old, splits[i]); TextureRectVec_push(&newTextures, &_tr); }
 				}
 			}
 		}
-		for (int ni = 0; ni < newTextures.count; ni++)
-			enduring_arr_push(&textures, newTextures.items[ni], true);
+		for (ni = 0; ni < newTextures.count; ni++)
+			enduring_arr_push(&self->textures, newTextures.items[ni], true);
 		TextureRectVec_free_storage(&newTextures);
 	}
-	void RectTracker::place(TextureRect texture) {
-		clear_rect(texture.vram_rect);
-		enduring_arr_push(&textures, texture, true);
+	void rect_tracker_place(struct RectTracker *self, TextureRect texture) {
+		rect_tracker_clear_rect(self, &texture.vram_rect);
+		enduring_arr_push(&self->textures, texture, true);
 	}
 
-	void RectTracker::rebuild_lookup_grid() {
-		lookup_grid.clear();
-		for (int i = 0; i < textures.count; i++)
+	static void rect_tracker_rebuild_lookup_grid(struct RectTracker *self) {
+		int i;
+		self->lookup_grid.clear();
+		for (i = 0; i < self->textures.count; i++)
 		{
-			if (textures.a[i].alive)
-				lookup_grid.insert(textures.a[i].texture_rect.vram_rect, i);
+			if (self->textures.a[i].alive)
+				self->lookup_grid.insert(self->textures.a[i].texture_rect.vram_rect, i);
 		}
-		lookup_grid_dirty = false;
+		self->lookup_grid_dirty = false;
 	}
 
-	TextureUpload *RectTracker::find_upload(uint32_t hash) {
-		for (int i = 0; i < textures.count; i++)
+	TextureUpload *rect_tracker_find_upload(struct RectTracker *self, uint32_t hash) {
+		int i;
+		for (i = 0; i < self->textures.count; i++)
 		{
-			EnduringTextureRect &eold = textures.a[i];
-			if (eold.texture_rect.upload->hash == hash)
-				return eold.texture_rect.upload;
+			EnduringTextureRect *eold = &self->textures.a[i];
+			if (eold->texture_rect.upload->hash == hash)
+				return eold->texture_rect.upload;
 		}
 		return NULL;
 	}
@@ -21424,7 +21446,7 @@ static char retro_slash = '/';
 		{
 			int _i;
 			for (_i = 0; _i < TextureRectSaveStateVec_size(&state.rects); _i++)
-				tracker.place(from_save_state(*TextureRectSaveStateVec_at((struct TextureRectSaveStateVec *)&state.rects, _i), uploads));
+				rect_tracker_place(&tracker, from_save_state(*TextureRectSaveStateVec_at((struct TextureRectSaveStateVec *)&state.rects, _i), uploads));
 		}
 		restorable_rects.clear();
 		{
