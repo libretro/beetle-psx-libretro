@@ -10167,8 +10167,10 @@ void renderer_mipmap_framebuffer(Renderer *self)
 
 		rp.num_color_attachments = 1;
 		rp.store_attachments = 1;
-		rp.render_area = { { (int)(rect.x * current_scale), (int)(rect.y * current_scale) },
-			               { rect.width * current_scale, rect.height * current_scale } };
+		rp.render_area.offset.x = (int)(rect.x * current_scale);
+		rp.render_area.offset.y = (int)(rect.y * current_scale);
+		rp.render_area.extent.width = rect.width * current_scale;
+		rp.render_area.extent.height = rect.height * current_scale;
 
 		if (i == levels)
 		{
@@ -10448,7 +10450,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
 
-	rp.clear_color[0] = {0, 0, 0, 0};
+	memset(&rp.clear_color[0], 0, sizeof(rp.clear_color[0]));
 	rp.clear_attachments = 1;
 
 	commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -10636,7 +10638,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
 
-	rp.clear_color[0] = {0, 0, 0, 0};
+	memset(&rp.clear_color[0], 0, sizeof(rp.clear_color[0]));
 	//rp.clear_color[0] = {60.0f/256.0f, 230.0f/256.0f, 60.0f/256.0f, 0};
 	rp.clear_attachments = 1;
 
@@ -11443,7 +11445,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 	else
 		info.color_attachments[0] = iv_get(imageview_vec_front(&self->scaled_views));
 
-	info.clear_depth_stencil = { 1.0f, 0 };
+	info.clear_depth_stencil.depth = 1.0f; info.clear_depth_stencil.stencil = 0;
 	info.depth_stencil =
 		device_get_transient_attachment(self->device, FB_WIDTH * self->scaling, FB_HEIGHT * self->scaling,
 		                                 device_get_default_depth_format(self->device), 0, self->msaa, 1);
@@ -11478,8 +11480,8 @@ void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 	}
 
 
-	info.render_area.offset = { (int)(rect->x * self->scaling), (int)(rect->y * self->scaling) };
-	info.render_area.extent = { rect->width * self->scaling, rect->height * self->scaling };
+	info.render_area.offset.x = (int)(rect->x * self->scaling); info.render_area.offset.y = (int)(rect->y * self->scaling);
+	info.render_area.extent.width = rect->width * self->scaling; info.render_area.extent.height = rect->height * self->scaling;
 
 	commandbuffer_begin_render_pass(cbh_get(&self->cmd), &info, VK_SUBPASS_CONTENTS_INLINE);
 	commandbuffer_set_scissor(cbh_get(&self->cmd), &info.render_area);
@@ -15395,7 +15397,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			if (h_avail < rect.extent.height) rect.extent.height = h_avail;
 		}
 
-		self->viewport = { 0.0f, 0.0f, (float)(fb_w), (float)(fb_h), 0.0f, 1.0f };
+		self->viewport.x = 0.0f; self->viewport.y = 0.0f; self->viewport.width = (float)(fb_w); self->viewport.height = (float)(fb_h); self->viewport.minDepth = 0.0f; self->viewport.maxDepth = 1.0f;
 		self->scissor = rect;
 	}
 
@@ -20775,7 +20777,7 @@ Rect fromSRect(SRect rect) {
 		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
 			TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
-			texture_tracker_dump_texture(self, tex->upload, mode, { mode->mode, palette_hash });
+			{ DumpedMode _dm; _dm.mode = mode->mode; _dm.palette_hash = palette_hash; texture_tracker_dump_texture(self, tex->upload, mode, _dm); }
 		} }
 		if (self->frame_dump != NULL) {
 			if (self->frame_dump_need_comma) {
@@ -21139,7 +21141,7 @@ bool is_power_of_two(int n) {
 		}
 
 		// Delete fused textures
-		fused_pages_mark_dead(&self->fused_pages, {0, 0, FB_WIDTH, FB_HEIGHT});
+		{ Rect _mdr; _mdr.x = 0; _mdr.y = 0; _mdr.width = FB_WIDTH; _mdr.height = FB_HEIGHT; fused_pages_mark_dead(&self->fused_pages, _mdr); }
 
 		// Draws will lazily re-request and the cache repopulates.
 	}
@@ -21851,7 +21853,7 @@ int64_t page_bytes(FusionRects *fusion)
 			UploadPtrVec_push(&uploads, &pe);
 		} }
 
-		texture_tracker_clearRegion(self, { 0, 0, FB_WIDTH, FB_HEIGHT });
+		{ Rect _crr; _crr.x = 0; _crr.y = 0; _crr.width = FB_WIDTH; _crr.height = FB_HEIGHT; texture_tracker_clearRegion(self, _crr); }
 		enduring_arr_clear(&self->tracker.textures); // load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway
 		{
 			int _i;
