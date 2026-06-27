@@ -6182,8 +6182,8 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 	enum { FB_HEIGHT = 512 };
 	enum { BLOCK_WIDTH = 8 };
 	enum { BLOCK_HEIGHT = 8 };
-	static const unsigned NUM_BLOCKS_X = FB_WIDTH / BLOCK_WIDTH;
-	static const unsigned NUM_BLOCKS_Y = FB_HEIGHT / BLOCK_HEIGHT;
+	enum { NUM_BLOCKS_X = FB_WIDTH / BLOCK_WIDTH };
+	enum { NUM_BLOCKS_Y = FB_HEIGHT / BLOCK_HEIGHT };
 
 	enum Domain {
 		Domain_Unscaled,
@@ -7280,10 +7280,10 @@ void enduring_arr_free(EnduringRectArr *v) {
 		return true;
 	}
 
-	const int LOOKUP_GRID_COLUMNS = 16;
-	const int LOOKUP_GRID_ROWS = 2;
-	const int LOOKUP_CELL_WIDTH = 64;
-	const int LOOKUP_CELL_HEIGHT = 256;
+	enum { LOOKUP_GRID_COLUMNS = 16 };
+	enum { LOOKUP_GRID_ROWS = 2 };
+	enum { LOOKUP_CELL_WIDTH = 64 };
+	enum { LOOKUP_CELL_HEIGHT = 256 };
 
 	/* Sorted set of RectIndex (int), MSVC C89. Replaces std::unordered_set<RectIndex>
 	 * for the overlap-dedup scratch set: a malloc'd sorted int array with
@@ -7694,14 +7694,12 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	struct CacheEntry {
 		Rect rect;
 		HdTextureHandle handle;
-		CacheEntry() : rect(), handle(hd_handle_make_none()) {}
 	};
 
 	/* Result of a handle-cache lookup (replaces std::pair<HdTextureHandle,bool>). */
 	struct HandleCacheResult {
 		HdTextureHandle handle;
 		bool found;
-		HandleCacheResult() : handle(hd_handle_make_none()), found(false) {}
 	};
 
 	/* Small fixed-capacity move-to-front cache of recently-used HD texture
@@ -21354,12 +21352,14 @@ int clamp(int x, int low, int high)
 	};
 
 	CellBounds cellBounds(SRect vram) {
-		return CellBounds({
-				clamp(srect_left(&vram) / LOOKUP_CELL_WIDTH, 0, LOOKUP_GRID_COLUMNS),
-				clamp(ceil(srect_right(&vram) / (float)(LOOKUP_CELL_WIDTH)), 0, LOOKUP_GRID_COLUMNS),
-				clamp(srect_top(&vram) / LOOKUP_CELL_HEIGHT, 0, LOOKUP_GRID_ROWS),
-				clamp(ceil(srect_bottom(&vram) / (float)(LOOKUP_CELL_HEIGHT)), 0, LOOKUP_GRID_ROWS)
-				});
+		{
+			CellBounds _cb;
+			_cb.lowX  = clamp(srect_left(&vram) / LOOKUP_CELL_WIDTH, 0, LOOKUP_GRID_COLUMNS);
+			_cb.highX = clamp(ceil(srect_right(&vram) / (float)(LOOKUP_CELL_WIDTH)), 0, LOOKUP_GRID_COLUMNS);
+			_cb.lowY  = clamp(srect_top(&vram) / LOOKUP_CELL_HEIGHT, 0, LOOKUP_GRID_ROWS);
+			_cb.highY = clamp(ceil(srect_bottom(&vram) / (float)(LOOKUP_CELL_HEIGHT)), 0, LOOKUP_GRID_ROWS);
+			return _cb;
+		}
 	}
 
 	void lookup_grid_init(LookupGrid *g) {
@@ -22000,7 +22000,7 @@ static bool mdec_yuv;
  * rhi/rhi_defer.h for which ops are deferred and which are dropped.
  */
 static rhi_defer_queue_t defer = { NULL, 0, 0 };
-static dither_mode dither_mode = DITHER_NATIVE;
+static enum dither_mode dither_mode = DITHER_NATIVE;
 static bool dump_textures = false;
 static bool replace_textures = false;
 static bool track_textures = false;
