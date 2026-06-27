@@ -5561,6 +5561,15 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	class Device
 	{
 		public:
+			friend void device_reset_fence(Device *self, VkFence fence);
+			friend void device_destroy_pipeline_nolock(Device *self, VkPipeline pipeline);
+			friend void device_destroy_image_view_nolock(Device *self, VkImageView view);
+			friend void device_destroy_buffer_view_nolock(Device *self, VkBufferView view);
+			friend void device_destroy_semaphore_nolock(Device *self, VkSemaphore semaphore);
+			friend void device_destroy_image_nolock(Device *self, VkImage image);
+			friend void device_destroy_buffer_nolock(Device *self, VkBuffer buffer);
+			friend void device_destroy_sampler_nolock(Device *self, VkSampler sampler);
+			friend void device_destroy_framebuffer_nolock(Device *self, VkFramebuffer framebuffer);
 			friend CommandBufferType device_get_physical_queue_type(Device *self, CommandBufferType queue_type);
 			friend bool device_image_format_is_supported(Device *self, VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling);
 			friend VkFormat device_get_default_depth_format(Device *self);
@@ -5921,18 +5930,9 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 					unsigned semaphore_count,
 					Semaphore *semaphore);
 
-			void reset_fence(VkFence fence);
 
-			void destroy_buffer_nolock(VkBuffer buffer);
-			void destroy_image_nolock(VkImage image);
-			void destroy_image_view_nolock(VkImageView view);
-			void destroy_buffer_view_nolock(VkBufferView view);
-			void destroy_pipeline_nolock(VkPipeline pipeline);
 			friend void program_fini(struct Program *self);
-			void destroy_sampler_nolock(VkSampler sampler);
-			void destroy_framebuffer_nolock(VkFramebuffer framebuffer);
 			friend void framebuffer_fini(struct Framebuffer *self);
-			void destroy_semaphore_nolock(VkSemaphore semaphore);
 			void recycle_semaphore_nolock(VkSemaphore semaphore)
 			{
 				semaphoremanager_recycle(&managers.semaphore, semaphore);
@@ -12483,7 +12483,7 @@ static void sampler_init(struct Sampler *self, Device *device, VkSampler sampler
 void sampler_fini(struct Sampler *self)
 {
 	if (self->sampler)
-		self->device->destroy_sampler_nolock(self->sampler);
+		device_destroy_sampler_nolock(self->device, self->sampler);
 }
 
 static void sampler_release_reference(struct Sampler *self)
@@ -12512,7 +12512,7 @@ static void buffer_init(struct Buffer *self, Device *device, VkBuffer buffer, co
 
 void buffer_fini(struct Buffer *self)
 {
-	self->device->destroy_buffer_nolock(self->buffer);
+	device_destroy_buffer_nolock(self->device, self->buffer);
 	self->device->free_memory_nolock(self->alloc);
 }
 
@@ -12539,7 +12539,7 @@ static void bufferview_init(struct BufferView *self, Device *device, VkBufferVie
 void bufferview_fini(struct BufferView *self)
 {
 	if (self->view != VK_NULL_HANDLE)
-		self->device->destroy_buffer_view_nolock(self->view);
+		device_destroy_buffer_view_nolock(self->device, self->view);
 }
 
 static void bufferview_release_reference(struct BufferView *self)
@@ -12592,16 +12592,16 @@ static VkImageView imageview_get_render_target_view(const struct ImageView *self
 
 void imageview_fini(struct ImageView *self)
 {
-	self->device->destroy_image_view_nolock(self->view);
+	device_destroy_image_view_nolock(self->device, self->view);
 	if (self->depth_view != VK_NULL_HANDLE)
-		self->device->destroy_image_view_nolock(self->depth_view);
+		device_destroy_image_view_nolock(self->device, self->depth_view);
 	if (self->stencil_view != VK_NULL_HANDLE)
-		self->device->destroy_image_view_nolock(self->stencil_view);
+		device_destroy_image_view_nolock(self->device, self->stencil_view);
 
 	{
 		int _i;
 		for (_i = 0; _i < RenderTargetViewVec_size(&self->render_target_views); _i++)
-			self->device->destroy_image_view_nolock(*RenderTargetViewVec_at(&self->render_target_views, _i));
+			device_destroy_image_view_nolock(self->device, *RenderTargetViewVec_at(&self->render_target_views, _i));
 	}
 	RenderTargetViewVec_free_storage(&self->render_target_views);
 }
@@ -12650,7 +12650,7 @@ void image_fini(struct Image *self)
 	iv_reset(&self->view);
 	if (deviceallocation_get_memory(&self->alloc))
 	{
-		self->device->destroy_image_nolock(self->image);
+		device_destroy_image_nolock(self->device, self->image);
 		self->device->free_memory_nolock(self->alloc);
 	}
 }
@@ -12684,7 +12684,7 @@ static void fenceholder_init(struct FenceHolder *self, Device *device, VkFence f
 void fenceholder_fini(struct FenceHolder *self)
 {
 	if (self->fence != VK_NULL_HANDLE)
-		self->device->reset_fence(self->fence);
+		device_reset_fence(self->device, self->fence);
 }
 
 static void fenceholder_wait(struct FenceHolder *self)
@@ -12758,7 +12758,7 @@ void semaphoreholder_fini(struct SemaphoreHolder *self)
 	if (self->semaphore)
 	{
 		if (semaphoreholder_is_signalled(self))
-			self->device->destroy_semaphore_nolock(self->semaphore);
+			device_destroy_semaphore_nolock(self->device, self->semaphore);
 		else
 			self->device->recycle_semaphore_nolock(self->semaphore);
 	}
@@ -13674,7 +13674,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	{
 		struct IntrusiveListNode *n;
 		for (n = vk_pipeline_map_begin(&self->pipelines); n; n = n->next)
-			self->device->destroy_pipeline_nolock(vk_pipeline_map_iter_get(n)->value);
+			device_destroy_pipeline_nolock(self->device, vk_pipeline_map_iter_get(n)->value);
 	}
 
 /* === descriptor_set.cpp === */
@@ -14764,7 +14764,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	void framebuffer_fini(struct Framebuffer *self)
 	{
 		if (self->framebuffer != VK_NULL_HANDLE)
-			self->device->destroy_framebuffer_nolock(self->framebuffer);
+			device_destroy_framebuffer_nolock(self->device, self->framebuffer);
 	}
 
 	void framebuffer_allocator_clear(struct FramebufferAllocator *self)
@@ -17689,57 +17689,48 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 #define VK_ASSERT_NOT_IN_VEC(vec, value) ((void)0)
 #endif
 
-	void Device::reset_fence(VkFence fence)
-	{
-		FenceVec_push(&frame().recycle_fences, &fence);
+	void device_reset_fence(Device *self, VkFence fence){
+		FenceVec_push(&self->frame().recycle_fences, &fence);
 	}
 
-	void Device::destroy_pipeline_nolock(VkPipeline pipeline)
-	{
-		VK_ASSERT_NOT_IN_VEC(frame().destroyed_pipelines, pipeline);
-		VkPipelineVec_push(&frame().destroyed_pipelines, &pipeline);
+	void device_destroy_pipeline_nolock(Device *self, VkPipeline pipeline){
+		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_pipelines, pipeline);
+		VkPipelineVec_push(&self->frame().destroyed_pipelines, &pipeline);
 	}
 
-	void Device::destroy_image_view_nolock(VkImageView view)
-	{
-		VK_ASSERT_NOT_IN_VEC(frame().destroyed_image_views, view);
-		RenderTargetViewVec_push(&frame().destroyed_image_views, &view);
+	void device_destroy_image_view_nolock(Device *self, VkImageView view){
+		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_image_views, view);
+		RenderTargetViewVec_push(&self->frame().destroyed_image_views, &view);
 	}
 
-	void Device::destroy_buffer_view_nolock(VkBufferView view)
-	{
-		VK_ASSERT_NOT_IN_VEC(frame().destroyed_buffer_views, view);
-		VkBufferViewVec_push(&frame().destroyed_buffer_views, &view);
+	void device_destroy_buffer_view_nolock(Device *self, VkBufferView view){
+		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_buffer_views, view);
+		VkBufferViewVec_push(&self->frame().destroyed_buffer_views, &view);
 	}
 
-	void Device::destroy_semaphore_nolock(VkSemaphore semaphore)
-	{
-		VK_ASSERT_NOT_IN_VEC(frame().destroyed_semaphores, semaphore);
-		SemaphoreVec_push(&frame().destroyed_semaphores, &semaphore);
+	void device_destroy_semaphore_nolock(Device *self, VkSemaphore semaphore){
+		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_semaphores, semaphore);
+		SemaphoreVec_push(&self->frame().destroyed_semaphores, &semaphore);
 	}
 
-	void Device::destroy_image_nolock(VkImage image)
-	{
-		VK_ASSERT_NOT_IN_VEC(frame().destroyed_images, image);
-		VkImageVec_push(&frame().destroyed_images, &image);
+	void device_destroy_image_nolock(Device *self, VkImage image){
+		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_images, image);
+		VkImageVec_push(&self->frame().destroyed_images, &image);
 	}
 
-	void Device::destroy_buffer_nolock(VkBuffer buffer)
-	{
-		VK_ASSERT_NOT_IN_VEC(frame().destroyed_buffers, buffer);
-		VkBufferVec_push(&frame().destroyed_buffers, &buffer);
+	void device_destroy_buffer_nolock(Device *self, VkBuffer buffer){
+		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_buffers, buffer);
+		VkBufferVec_push(&self->frame().destroyed_buffers, &buffer);
 	}
 
-	void Device::destroy_sampler_nolock(VkSampler sampler)
-	{
-		VK_ASSERT_NOT_IN_VEC(frame().destroyed_samplers, sampler);
-		VkSamplerVec_push(&frame().destroyed_samplers, &sampler);
+	void device_destroy_sampler_nolock(Device *self, VkSampler sampler){
+		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_samplers, sampler);
+		VkSamplerVec_push(&self->frame().destroyed_samplers, &sampler);
 	}
 
-	void Device::destroy_framebuffer_nolock(VkFramebuffer framebuffer)
-	{
-		VK_ASSERT_NOT_IN_VEC(frame().destroyed_framebuffers, framebuffer);
-		VkFramebufferVec_push(&frame().destroyed_framebuffers, &framebuffer);
+	void device_destroy_framebuffer_nolock(Device *self, VkFramebuffer framebuffer){
+		VK_ASSERT_NOT_IN_VEC(self->frame().destroyed_framebuffers, framebuffer);
+		VkFramebufferVec_push(&self->frame().destroyed_framebuffers, &framebuffer);
 	}
 
 	void Device::clear_wait_semaphores()
