@@ -22687,7 +22687,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
          NULL, VK_QUEUE_FAMILY_IGNORED);
    renderer_flush(renderer);
 
-   scanout_handles[index] = scanout;
+   ih_assign(&scanout_handles.items[index], &scanout);
    video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, image_get_width(ih_get(&scanout), 0), image_get_height(ih_get(&scanout), 0), 0);
    inside_frame = false;
 
