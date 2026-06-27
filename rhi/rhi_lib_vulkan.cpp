@@ -9751,12 +9751,11 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 
 	{
 		ImageViewCreateInfo view_info = imageview_get_create_info(&image_get_view(ih_get(&self->scaled_framebuffer)));
-		for (unsigned i = 0; i < info.levels; i++)
-		{
+		{ unsigned i; for (i = 0; i < info.levels; i++) {
 			view_info.base_level = i;
 			view_info.levels = 1;
 			imageview_vec_push(&self->scaled_views, device_create_image_view(self->device, view_info));
-		}
+		} }
 	}
 
 	// Check for support.
@@ -10092,19 +10091,16 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect &rect, uin
 	if (!wrap)
 	{
 		for (uint16_t y = 0; y < rect.height; y++)
-			for (uint16_t x = 0; x < rect.width; x++)
-				vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]);
+			{ uint16_t x; for (x = 0; x < rect.width; x++) vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]); }
 	}
 	else
 	{
-		for (uint16_t y = 0; y < rect.height; y++)
-			for (uint16_t x = 0; x < rect.width; x++)
-				{
+		{ uint16_t y; for (y = 0; y < rect.height; y++) { uint16_t x; for (x = 0; x < rect.width; x++) {
 					uint32_t h = (x + rect.x) & (FB_WIDTH - 1);
 					uint32_t v = (y + rect.y) & (FB_HEIGHT - 1);
 					uint32_t p = v * FB_WIDTH + h;
 					vram[p] = uint16_t(mapped[p]);
-				}
+				} } }
 	}
 
 	if (self->texture_tracking_enabled) {
@@ -10135,8 +10131,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 	unsigned levels = imageview_vec_size(&self->scaled_views);
 
 	renderer_ensure_command_buffer(self);
-	for (unsigned i = 1; i <= levels; i++)
-	{
+	{ unsigned i; for (i = 1; i <= levels; i++) {
 		RenderPassInfo rp;
 		unsigned current_scale = max_(self->scaling >> i, 1u);
 
@@ -10206,7 +10201,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
 		}
-	}
+	} }
 }
 
 void renderer_ssaa_framebuffer(Renderer *self)
@@ -10223,15 +10218,13 @@ void renderer_ssaa_framebuffer(Renderer *self)
 	unsigned resolves_count = (bottom > top && right > left) ? (bottom - top) * (right - left) : 0;
 	VkRect2D *resolves_ssaa = (VkRect2D *)malloc((resolves_count ? resolves_count : 1) * sizeof(VkRect2D));
 	unsigned resolves_n = 0;
-	for (unsigned y = top; y < bottom; y++)
-		for (unsigned x = left; x < right; x++)
-		{
+	{ unsigned y; for (y = top; y < bottom; y++) { unsigned x; for (x = left; x < right; x++) {
 			VkRect2D r = {
 				{ int(x * BLOCK_WIDTH % FB_WIDTH), int(y * BLOCK_HEIGHT % FB_HEIGHT) },
 				{ BLOCK_WIDTH, BLOCK_HEIGHT }
 			};
 			resolves_ssaa[resolves_n++] = r;
-		}
+		} } }
 
 	renderer_ensure_command_buffer(self);
 
@@ -10251,8 +10244,7 @@ void renderer_ssaa_framebuffer(Renderer *self)
 		uint32_t scale;
 	};
 	unsigned size = resolves_n;
-	for (unsigned i = 0; i < size; i += 1024)
-	{
+	{ unsigned i; for (i = 0; i < size; i += 1024) {
 		unsigned to_run = min_(size - i, 1024u);
 
 		Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
@@ -10261,7 +10253,7 @@ void renderer_ssaa_framebuffer(Renderer *self)
 		memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
 		commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 		commandbuffer_dispatch(cbh_get(&self->cmd), 1, 1, to_run);
-	}
+	} }
 	free(resolves_ssaa);
 }
 
@@ -10826,8 +10818,7 @@ void renderer_flush_resolves(Renderer *self)
 			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, *iv_get(imageview_vec_at(&self->scaled_views, 0)));
 
 		unsigned size = Rect2DVec_size(&self->queue.scaled_resolves);
-		for (unsigned i = 0; i < size; i += 1024)
-		{
+		{ unsigned i; for (i = 0; i < size; i += 1024) {
 			unsigned to_run = min_(size - i, 1024u);
 
 			Push push = { { 1.0f / (self->scaling * FB_WIDTH), 1.0f / (self->scaling * FB_HEIGHT) }, self->scaling };
@@ -10835,7 +10826,7 @@ void renderer_flush_resolves(Renderer *self)
 			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&self->queue.scaled_resolves) + i, to_run * sizeof(VkRect2D));
 			commandbuffer_dispatch(cbh_get(&self->cmd), self->scaling, self->scaling, to_run);
-		}
+		} }
 	}
 
 	if (!Rect2DVec_empty(&self->queue.unscaled_resolves))
@@ -10854,8 +10845,7 @@ void renderer_flush_resolves(Renderer *self)
 			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, *iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_NearestClamp);
 
 		unsigned size = Rect2DVec_size(&self->queue.unscaled_resolves);
-		for (unsigned i = 0; i < size; i += 1024)
-		{
+		{ unsigned i; for (i = 0; i < size; i += 1024) {
 			unsigned to_run = min_(size - i, 1024u);
 
 			Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
@@ -10864,7 +10854,7 @@ void renderer_flush_resolves(Renderer *self)
 			memcpy(ptr, Rect2DVec_data(&self->queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
 			commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 			commandbuffer_dispatch(cbh_get(&self->cmd), 1, 1, to_run);
-		}
+		} }
 	}
 
 	Rect2DVec_clear(&self->queue.scaled_resolves);
@@ -10994,8 +10984,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 	unsigned max_v = 0.0f;
 	unsigned min_u = FB_WIDTH;
 	unsigned min_v = FB_HEIGHT;
-	for (unsigned i = 0; i < count; i++)
-	{
+	{ unsigned i; for (i = 0; i < count; i++) {
 		float tmp_x = vertices[i].x + self->render_state.draw_offset_x;
 		float tmp_y = vertices[i].y + self->render_state.draw_offset_y;
 		max_x = max_(max_x, tmp_x);
@@ -11014,7 +11003,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 			min_u = min_(min_u, tmp_u);
 			min_v = min_(min_v, tmp_v);
 		}
-	}
+	} }
 
 	// Clamp the rect.
 	min_x = floorf(max_(min_x, 0.0f));
@@ -11077,8 +11066,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 		param = param | 0x200;
 	}
 
-	for (unsigned i = 0; i < count; i++)
-	{
+	{ unsigned i; for (i = 0; i < count; i++) {
 		output[i] = {
 			x[i],
 			y[i],
@@ -11103,7 +11091,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 			output[i].color = 0x808080;
 
 		output[i].color |= self->render_state.force_mask_bit ? 0xff000000u : 0u;
-	}
+	} }
 }
 
 BufferVertexVec * renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture,
@@ -11119,22 +11107,20 @@ BufferVertexVec * renderer_select_pipeline(Renderer *self, unsigned prims, int s
 	{
 		if (self->render_state.semi_transparent != SemiTransparentMode_None)
 		{
-			for (unsigned i = 0; i < prims; i++)
-			{
+			{ unsigned i; for (i = 0; i < prims; i++) {
 				PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&self->queue.semi_transparent_opaque_scissor), scissor, hd_texture,
 					filtering, scaled_read, shift, offset_uv);
 				PrimitiveInfoVec_push(&self->queue.semi_transparent_opaque_scissor, &_pi);
-			}
+			} }
 			return &self->queue.semi_transparent_opaque;
 		}
 		else
 		{
-			for (unsigned i = 0; i < prims; i++)
-			{
+			{ unsigned i; for (i = 0; i < prims; i++) {
 				PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_textured_scissor), scissor, hd_texture,
 					filtering, scaled_read, shift, offset_uv);
 				PrimitiveInfoVec_push(&self->queue.opaque_textured_scissor, &_pi);
-			}
+			} }
 			return &self->queue.opaque_textured;
 		}
 	}
@@ -11142,12 +11128,11 @@ BufferVertexVec * renderer_select_pipeline(Renderer *self, unsigned prims, int s
 		return NULL;
 	else
 	{
-		for (unsigned i = 0; i < prims; i++)
-		{
+		{ unsigned i; for (i = 0; i < prims; i++) {
 			PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), scissor, hd_texture,
 				filtering, scaled_read, shift, offset_uv);
 			PrimitiveInfoVec_push(&self->queue.opaque_scissor, &_pi);
-		}
+		} }
 		return &self->queue.opaque;
 	}
 }
@@ -11288,8 +11273,7 @@ void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 	BufferVertexVec *out = renderer_select_pipeline(self, 1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	if (out)
 	{
-		for (unsigned i = 0; i < 3; i++)
-			BufferVertexVec_push(out, &vert[i]);
+		{ unsigned i; for (i = 0; i < 3; i++) BufferVertexVec_push(out, &vert[i]); }
 	}
 
 	if (self->render_state.mask_test || self->render_state.semi_transparent != SemiTransparentMode_None)
@@ -11297,8 +11281,7 @@ void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 		if (filtering)
 			filtering = !renderer_get_filer_exclude(self, FilterExcludeOpaqueAndSemiTrans);
 
-		for (unsigned i = 0; i < 3; i++)
-			BufferVertexVec_push(&self->queue.semi_transparent, &vert[i]);
+		{ unsigned i; for (i = 0; i < 3; i++) BufferVertexVec_push(&self->queue.semi_transparent, &vert[i]); }
 		{
 			SemiTransparentState _sts = { scissor_index, hd_texture_index, self->render_state.semi_transparent,
 		                                         self->render_state.texture_mode != TextureMode_None,
@@ -11679,8 +11662,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 
 	// These pixels are blended, so we have to render them in-order.
 	// Batch up as long as we can.
-	for (unsigned i = 1; i < prims; i++)
-	{
+	{ unsigned i; for (i = 1; i < prims; i++) {
 		// If we need programmable shading, we can't batch as primitives may overlap.
 		// We could in theory do some fancy tests here, but probably overkill here.
 		if ((last_state.masked && last_state.semi_transparent != SemiTransparentMode_None) ||
@@ -11708,7 +11690,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 			last_state = *SemiTransparentStateVec_at(&self->queue.semi_transparent_state, i);
 			renderer_semi_transparent_set_state(self, last_state);
 		}
-	}
+	} }
 
 	unsigned to_draw = prims - last_draw_offset;
 	commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
@@ -11802,13 +11784,12 @@ void renderer_flush_blit(Renderer *self, const BlitInfoVec &infos, Program &prog
 
 	unsigned size = BlitInfoVec_size(&infos);
 	unsigned scale = scaled ? self->scaling : 1u;
-	for (unsigned i = 0; i < size; i += 512)
-	{
+	{ unsigned i; for (i = 0; i < size; i += 512) {
 		unsigned to_blit = min_(size - i, 512u);
 		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_blit * sizeof(BlitInfo));
 		memcpy(ptr, BlitInfoVec_data((struct BlitInfoVec *)&infos) + i, to_blit * sizeof(BlitInfo));
 		commandbuffer_dispatch(cbh_get(&self->cmd), scale, scale, to_blit);
-	}
+	} }
 }
 
 void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src){
@@ -11890,10 +11871,7 @@ void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src){
 			BlitInfoVec *q = self->render_state.mask_test ? &self->queue.scaled_masked_blits : &self->queue.scaled_blits;
 			unsigned width = dst.width;
 			unsigned height = dst.height;
-			for (unsigned y = 0; y < height; y += BLOCK_HEIGHT)
-				for (unsigned x = 0; x < width; x += BLOCK_WIDTH)
-					for (unsigned s = 0; s < self->msaa; s++)
-						{
+			{ unsigned y; for (y = 0; y < height; y += BLOCK_HEIGHT) { unsigned x; for (x = 0; x < width; x += BLOCK_WIDTH) { unsigned s; for (s = 0; s < self->msaa; s++) {
 						BlitInfo _bi = {
 							{ (x + src.x) * self->scaling, (y + src.y) * self->scaling },
 							{ (x + dst.x) * self->scaling, (y + dst.y) * self->scaling },
@@ -11901,16 +11879,14 @@ void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src){
 							self->render_state.force_mask_bit ? 0x8000u : 0u, s,
 						};
 						BlitInfoVec_push(q, &_bi);
-					}
+					} } } }
 		}
 		else
 		{
 			BlitInfoVec *q = self->render_state.mask_test ? &self->queue.unscaled_masked_blits : &self->queue.unscaled_blits;
 			unsigned width = dst.width;
 			unsigned height = dst.height;
-			for (unsigned y = 0; y < height; y += BLOCK_HEIGHT)
-				for (unsigned x = 0; x < width; x += BLOCK_WIDTH)
-					{
+			{ unsigned y; for (y = 0; y < height; y += BLOCK_HEIGHT) { unsigned x; for (x = 0; x < width; x += BLOCK_WIDTH) {
 					BlitInfo _bi = {
 					    { x + src.x, y + src.y },
 					    { x + dst.x, y + dst.y },
@@ -11918,7 +11894,7 @@ void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src){
 						self->render_state.force_mask_bit ? 0x8000u : 0u, 0,
 					};
 					BlitInfoVec_push(q, &_bi);
-				}
+				} } }
 		}
 	}
 }
@@ -11990,8 +11966,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect &rect){
 	// Vulkan minimum limit, for large buffer views, split up the work.
 	if (rect.width * rect.height > device_get_gpu_properties(self->device)->limits.maxTexelBufferElements)
 	{
-		for (unsigned y = 0; y < rect.height; y += BLOCK_HEIGHT)
-		{
+		{ unsigned y; for (y = 0; y < rect.height; y += BLOCK_HEIGHT) {
 			unsigned y_size = min_(rect.height - y, BLOCK_HEIGHT);
 			view_info.offset = y * rect.width * sizeof(uint16_t);
 			view_info.range = y_size * rect.width * sizeof(uint16_t);
@@ -12005,7 +11980,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect &rect){
 			commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 			commandbuffer_dispatch(cbh_get(&self->cmd), (small_rect.width + 7) >> 3, (small_rect.height + 7) >> 3, 1);
 			bvh_reset(&view);
-		}
+		} }
 	}
 	else
 	{
@@ -13627,14 +13602,13 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	// Naive searching is fine here as vkAllocate blocks are *huge* and we won't have many of them.
 	size_t found_idx = (size_t)da_alloc_vec_size(&heap->blocks);
-	for (size_t i = 0; i < (size_t)da_alloc_vec_size(&heap->blocks); i++)
-	{
+	{ size_t i; for (i = 0; i < (size_t)da_alloc_vec_size(&heap->blocks); i++) {
 		if (da_alloc_vec_at(&heap->blocks, (int)i)->size == size && da_alloc_vec_at(&heap->blocks, (int)i)->type == memory_type)
 		{
 			found_idx = i;
 			break;
 		}
-	}
+	} }
 
 	bool host_visible = (self->mem_props.memoryTypes[memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 
@@ -13890,8 +13864,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		 * function scope rather than taking the address of a loop-body local (which
 		 * would dangle by the time the create call reads it). */
 		VkSampler immutable_samplers[VULKAN_NUM_BINDINGS];
-		for (unsigned i = 0; i < VULKAN_NUM_BINDINGS; i++)
-		{
+		{ unsigned i; for (i = 0; i < VULKAN_NUM_BINDINGS; i++) {
 			uint32_t stages = stages_for_binds[i];
 			if (stages == 0)
 				continue;
@@ -13963,7 +13936,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 			(void)types;
 			VK_ASSERT(types <= 1 && "Descriptor set aliasing!");
-		}
+		} }
 
 		if (!DescriptorBindingVec_empty(&bindings))
 		{
@@ -14013,8 +13986,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		VkDescriptorSet sets[VULKAN_NUM_SETS_PER_POOL];
 		VkDescriptorSetLayout layouts[VULKAN_NUM_SETS_PER_POOL];
-		for (unsigned i = 0; i < VULKAN_NUM_SETS_PER_POOL; i++)
-			layouts[i] = self->set_layout;
+		{ unsigned i; for (i = 0; i < VULKAN_NUM_SETS_PER_POOL; i++) layouts[i] = self->set_layout; }
 
 		VkDescriptorSetAllocateInfo alloc = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 		alloc.descriptorPool = pool;
@@ -14201,8 +14173,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		self->depth_stencil = VK_FORMAT_UNDEFINED;
 		self->subpasses.items = NULL; self->subpasses.count = 0; self->subpasses.cap = 0;
 		self->intrusive_node.key = hash;
-		for (unsigned att = 0; att < VULKAN_NUM_ATTACHMENTS; att++)
-			self->color_attachments[att] = VK_FORMAT_UNDEFINED;
+		{ unsigned att; for (att = 0; att < VULKAN_NUM_ATTACHMENTS; att++) self->color_attachments[att] = VK_FORMAT_UNDEFINED; }
 
 		VK_ASSERT(info.num_color_attachments || info.depth_stencil);
 
@@ -14222,8 +14193,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			else
 				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil_ReadWrite;
 
-			for (unsigned i = 0; i < info.num_color_attachments; i++)
-				default_subpass_info.color_attachments[i] = i;
+			{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) default_subpass_info.color_attachments[i] = i; }
 			num_subpasses = 1;
 			subpass_infos = &default_subpass_info;
 		}
@@ -14256,8 +14226,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 		}
 
-		for (unsigned i = 0; i < info.num_color_attachments; i++)
-		{
+		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) {
 			VK_ASSERT(info.color_attachments[i]);
 			self->color_attachments[i] = imageview_get_format(info.color_attachments[i]);
 			Image &image = imageview_get_image(info.color_attachments[i]);
@@ -14294,7 +14263,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			}
 			else
 				att.initialLayout = image_get_layout(&imageview_get_image(info.color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		}
+		} }
 
 		self->depth_stencil = info.depth_stencil ? imageview_get_format(info.depth_stencil) : VK_FORMAT_UNDEFINED;
 		if (info.depth_stencil)
@@ -14360,12 +14329,10 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		{
 			VkSubpassDescription zero_sp;
 			memset(&zero_sp, 0, sizeof(zero_sp));
-			for (unsigned sp = 0; sp < num_subpasses; sp++)
-				{ VkSubpassDescription _sp = zero_sp; VkSubpassDescriptionVec_push(&subpasses, &_sp); }
+			{ unsigned sp; for (sp = 0; sp < num_subpasses; sp++) { VkSubpassDescription _sp = zero_sp; VkSubpassDescriptionVec_push(&subpasses, &_sp); } }
 		}
 		VkSubpassDependencyVec external_dependencies = { NULL, 0, 0 };
-		for (unsigned i = 0; i < num_subpasses; i++)
-		{
+		{ unsigned i; for (i = 0; i < num_subpasses; i++) {
 			VkAttachmentReference *colors = stackalloc_ref_allocate_cleared(&reference_allocator, subpass_infos[i].num_color_attachments);
 			VkAttachmentReference *inputs = stackalloc_ref_allocate_cleared(&reference_allocator, subpass_infos[i].num_input_attachments);
 			VkAttachmentReference *resolves = stackalloc_ref_allocate_cleared(&reference_allocator, subpass_infos[i].num_color_attachments);
@@ -14385,34 +14352,31 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				subpass.pResolveAttachments = resolves;
 			}
 
-			for (unsigned j = 0; j < subpass.colorAttachmentCount; j++)
-			{
+			{ unsigned j; for (j = 0; j < subpass.colorAttachmentCount; j++) {
 				uint32_t att = subpass_infos[i].color_attachments[j];
 				VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
 				colors[j].attachment = att;
 				// Fill in later.
 				colors[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
-			}
+			} }
 
-			for (unsigned j = 0; j < subpass.inputAttachmentCount; j++)
-			{
+			{ unsigned j; for (j = 0; j < subpass.inputAttachmentCount; j++) {
 				uint32_t att = subpass_infos[i].input_attachments[j];
 				VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
 				inputs[j].attachment = att;
 				// Fill in later.
 				inputs[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
-			}
+			} }
 
 			if (subpass.pResolveAttachments)
 			{
-				for (unsigned j = 0; j < subpass.colorAttachmentCount; j++)
-				{
+				{ unsigned j; for (j = 0; j < subpass.colorAttachmentCount; j++) {
 					uint32_t att = subpass_infos[i].resolve_attachments[j];
 					VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
 					resolves[j].attachment = att;
 					// Fill in later.
 					resolves[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
-				}
+				} }
 			}
 
 			if (info.depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo::DepthStencil_None)
@@ -14426,7 +14390,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				depth->attachment = VK_ATTACHMENT_UNUSED;
 				depth->layout = VK_IMAGE_LAYOUT_UNDEFINED;
 			}
-		}
+		} }
 
 		// Now, figure out how each attachment is used throughout the subpasses.
 		// Either we don't care (inherit previous pass), or we need something specific.
@@ -14453,12 +14417,10 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		uint32_t external_depth_dependencies = 0;
 		uint32_t external_input_dependencies = 0;
 
-		for (unsigned attachment = 0; attachment < num_attachments; attachment++)
-		{
+		{ unsigned attachment; for (attachment = 0; attachment < num_attachments; attachment++) {
 			bool used = false;
 			VkImageLayout current_layout = attachments[attachment].initialLayout;
-			for (unsigned subpass = 0; subpass < num_subpasses; subpass++)
-			{
+			{ unsigned subpass; for (subpass = 0; subpass < num_subpasses; subpass++) {
 				VkAttachmentReference *color = rp_find_color(VkSubpassDescriptionVec_data(&subpasses), subpass, attachment);
 				VkAttachmentReference *resolve = rp_find_resolve(VkSubpassDescriptionVec_data(&subpasses), subpass, attachment);
 				VkAttachmentReference *input = rp_find_input(VkSubpassDescriptionVec_data(&subpasses), subpass, attachment);
@@ -14643,7 +14605,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				{
 					VK_ASSERT(0 && "Unhandled attachment usage.");
 				}
-			}
+			} }
 
 			// If we don't have a specific layout we need to end up in, just
 			// use the last one.
@@ -14654,15 +14616,13 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				VK_ASSERT(current_layout != VK_IMAGE_LAYOUT_UNDEFINED);
 				attachments[attachment].finalLayout = current_layout;
 			}
-		}
+		} }
 
 		// Only consider preserve masks before last subpass which uses an attachment.
-		for (unsigned attachment = 0; attachment < num_attachments; attachment++)
-			preserve_masks[attachment] &= (1u << last_subpass_for_attachment[attachment]) - 1;
+		{ unsigned attachment; for (attachment = 0; attachment < num_attachments; attachment++) preserve_masks[attachment] &= (1u << last_subpass_for_attachment[attachment]) - 1; }
 
 		// Add preserve attachments as needed.
-		for (unsigned subpass = 0; subpass < num_subpasses; subpass++)
-		{
+		{ unsigned subpass; for (subpass = 0; subpass < num_subpasses; subpass++) {
 			VkSubpassDescription &pass = *VkSubpassDescriptionVec_at(&subpasses, subpass);
 			unsigned preserve_count = 0;
 			for (unsigned attachment = 0; attachment < num_attachments; attachment++)
@@ -14675,7 +14635,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			for (unsigned attachment = 0; attachment < num_attachments; attachment++)
 				if (preserve_masks[attachment] & (1u << subpass))
 					*preserve++ = attachment;
-		}
+		} }
 
 		VK_ASSERT(num_subpasses > 0);
 		VkRenderPassCreateInfo rp_info = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
@@ -14745,8 +14705,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		}
 
 		// Flush and invalidate caches between each subpass.
-		for (unsigned subpass = 1; subpass < num_subpasses; subpass++)
-		{
+		{ unsigned subpass; for (subpass = 1; subpass < num_subpasses; subpass++) {
 			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
 			VkSubpassDependency &dep = *VkSubpassDependencyVec_back(&external_dependencies);
 			dep.srcSubpass = subpass - 1;
@@ -14788,7 +14747,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 				dep.dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 			}
-		}
+		} }
 
 		if (!VkSubpassDependencyVec_empty(&external_dependencies))
 		{
@@ -14797,8 +14756,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		}
 
 		// Store the important subpass information for later.
-		for (uint32_t subpass_idx = 0; subpass_idx < rp_info.subpassCount; subpass_idx++)
-		{
+		{ uint32_t subpass_idx; for (subpass_idx = 0; subpass_idx < rp_info.subpassCount; subpass_idx++) {
 			const VkSubpassDescription &subpass = rp_info.pSubpasses[subpass_idx];
 
 			RenderPassSubpassInfo subpass_info = {};
@@ -14829,15 +14787,14 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 						subpass_info.num_input_attachments * sizeof(*subpass.pInputAttachments));
 
 			unsigned samples = 0;
-			for (unsigned i = 0; i < subpass_info.num_color_attachments; i++)
-			{
+			{ unsigned i; for (i = 0; i < subpass_info.num_color_attachments; i++) {
 				if (subpass_info.color_attachments[i].attachment == VK_ATTACHMENT_UNUSED)
 					continue;
 
 				unsigned samp = attachments[subpass_info.color_attachments[i].attachment].samples;
 				VK_ASSERT(!samples || samp == samples);
 				samples = samp;
-			}
+			} }
 
 			if (subpass_info.depth_stencil_attachment.attachment != VK_ATTACHMENT_UNUSED)
 			{
@@ -14849,7 +14806,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			VK_ASSERT(samples > 0);
 			subpass_info.samples = samples;
 			SubpassInfoVec_push(&self->subpasses, &subpass_info);
-		}
+		} }
 
 
 		// Fixup after, we want the underlying render pass to be generic.
@@ -14881,15 +14838,14 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 					create_info.pAttachments = attachments;
 				}
 
-				for (uint32_t i = 0; i < create_info.attachmentCount; i++)
-				{
+				{ uint32_t i; for (i = 0; i < create_info.attachmentCount; i++) {
 					VkFormat format = attachments[i].format;
 					VkImageAspectFlags aspect = format_to_aspect_mask(format);
 					if ((aspect & (VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_DEPTH_BIT)) != 0)
 						attachments[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 					if ((aspect & VK_IMAGE_ASPECT_STENCIL_BIT) != 0)
 						attachments[i].stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-				}
+				} }
 			}
 	}
 
@@ -14915,8 +14871,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		VK_ASSERT(info.num_color_attachments || info.depth_stencil);
 
-		for (unsigned i = 0; i < info.num_color_attachments; i++)
-		{
+		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) {
 			VK_ASSERT(info.color_attachments[i]);
 			auto *att = info.color_attachments[i];
 			unsigned lod = imageview_get_create_info(att).base_level;
@@ -14926,7 +14881,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			if (ah < self->height) self->height = ah;
 			views[num_views++] = imageview_get_render_target_view(att, info.layer);
 			self->attachments[self->num_attachments++] = att;
-		}
+		} }
 
 		if (info.depth_stencil)
 		{
@@ -15263,8 +15218,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VK_ASSERT(create_info.levels > 1);
 		(void)create_info;
 
-		for (unsigned i = 0; i < 2; i++)
-		{
+		{ unsigned i; for (i = 0; i < 2; i++) {
 			barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			barriers[i].image = image_get_image(&image);
 			barriers[i].subresourceRange.aspectMask = format_to_aspect_mask(image_get_format(&image));
@@ -15290,7 +15244,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				barriers[i].subresourceRange.baseMipLevel = 1;
 				barriers[i].subresourceRange.levelCount = image_get_create_info(&image).levels - 1;
 			}
-		}
+		} }
 
 		commandbuffer_barrier(self, src_stage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, NULL, 0, NULL,
 				need_top_level_barrier ? 2 : 1,
@@ -15317,8 +15271,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
-		for (unsigned i = 1; i < create_info.levels; i++)
-		{
+		{ unsigned i; for (i = 1; i < create_info.levels; i++) {
 			VkOffset3D src_size = size;
 			size.x >>= 1;
 			size.y >>= 1;
@@ -15333,7 +15286,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			b.subresourceRange.baseMipLevel = i;
 			commandbuffer_barrier(self, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					0, NULL, 0, NULL, 1, &b);
-		}
+		} }
 	}
 
 	void commandbuffer_blit_image(struct CommandBuffer *self, const Image &dst, const Image &src,
@@ -15343,8 +15296,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			unsigned num_layers, VkFilter filter)
 	{
 		// RADV workaround: blit one layer at a time.
-		for (unsigned i = 0; i < num_layers; i++)
-		{
+		{ unsigned i; for (i = 0; i < num_layers; i++) {
 			const VkImageBlit blit = {
 				{ format_to_aspect_mask(image_get_create_info(&src).format), src_level, src_base_layer + i, 1 },
 				{ src_offset,                                          cb_add_offset(src_offset, src_extent) },
@@ -15356,7 +15308,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					image_get_image(&src), image_get_layout(&src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
 					image_get_image(&dst), image_get_layout(&dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 					1, &blit, filter);
-		}
+		} }
 	}
 
 	void commandbuffer_begin_context(struct CommandBuffer *self)
@@ -15406,15 +15358,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkClearValue clear_values[VULKAN_NUM_ATTACHMENTS + 1];
 		unsigned num_clear_values = 0;
 
-		for (unsigned i = 0; i < info.num_color_attachments; i++)
-		{
+		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) {
 			VK_ASSERT(info.color_attachments[i]);
 			if (info.clear_attachments & (1u << i))
 			{
 				clear_values[i].color = info.clear_color[i];
 				num_clear_values = i + 1;
 			}
-		}
+		} }
 
 		if (info.depth_stencil && (info.op_flags & RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT) != 0)
 		{
@@ -15515,8 +15466,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkPipelineColorBlendStateCreateInfo blend = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
 		blend.attachmentCount = render_pass_get_num_color_attachments(self->compatible_render_pass, self->current_subpass);
 		blend.pAttachments = blend_attachments;
-		for (unsigned i = 0; i < blend.attachmentCount; i++)
-		{
+		{ unsigned i; for (i = 0; i < blend.attachmentCount; i++) {
 			VkPipelineColorBlendAttachmentState &att = blend_attachments[i];
 			att = {};
 
@@ -15535,7 +15485,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					att.srcColorBlendFactor = (VkBlendFactor)(self->static_state.state.src_color_blend);
 				}
 			}
-		}
+		} }
 		memcpy(blend.blendConstants, self->potential_static_state.blend_constants, sizeof(blend.blendConstants));
 
 		// Depth state
@@ -15602,8 +15552,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkSpecializationInfo spec_info[(unsigned)ShaderStage_Count] = {};
 		VkSpecializationMapEntry spec_entries[(unsigned)ShaderStage_Count][VULKAN_NUM_SPEC_CONSTANTS];
 
-		for (unsigned i = 0; i < (unsigned)(ShaderStage_Count); i++)
-		{
+		{ unsigned i; for (i = 0; i < (unsigned)(ShaderStage_Count); i++) {
 			ShaderStage stage = (ShaderStage)(i);
 			if (program_get_shader(self->current_program, stage))
 			{
@@ -15637,7 +15586,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					}
 				}
 			}
-		}
+		} }
 
 		VkGraphicsPipelineCreateInfo pipe = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
 		pipe.layout = self->current_pipeline_layout;
@@ -15806,8 +15755,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		FOR_EACH_BIT_RANGE(update_vbo_mask, binding, binding_count)
 		{
 #ifdef VULKAN_DEBUG
-			for (unsigned i = binding; i < binding + binding_count; i++)
-				VK_ASSERT(self->vbo.buffers[i] != VK_NULL_HANDLE);
+			{ unsigned i; for (i = binding; i < binding + binding_count; i++) VK_ASSERT(self->vbo.buffers[i] != VK_NULL_HANDLE); }
 #endif
 			vkCmdBindVertexBuffers(self->cmd, binding, binding_count, self->vbo.buffers + binding, self->vbo.offsets + binding);
 		}
@@ -15903,14 +15851,13 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			{
 				// Find the first set whose descriptor set layout differs.
 				PipelineLayout *new_pipe_layout = program_get_pipeline_layout(&program);
-				for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
-				{
+				{ unsigned set; for (set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++) {
 					if (pipeline_layout_get_allocator(new_pipe_layout, set) != pipeline_layout_get_allocator(self->current_layout, set))
 					{
 						self->dirty_sets |= ~((1u << set) - 1);
 						break;
 					}
-				}
+				} }
 			}
 			self->current_layout = program_get_pipeline_layout(&program);
 			self->current_pipeline_layout = pipeline_layout_get_layout(self->current_layout);
@@ -15993,8 +15940,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(start_binding + render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass) <= VULKAN_NUM_BINDINGS);
 		unsigned num_input_attachments = render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass);
-		for (unsigned i = 0; i < num_input_attachments; i++)
-		{
+		{ unsigned i; for (i = 0; i < num_input_attachments; i++) {
 			const VkAttachmentReference &ref = *render_pass_get_input_attachment(self->actual_render_pass, self->current_subpass, i);
 			if (ref.attachment == VK_ATTACHMENT_UNUSED)
 				continue;
@@ -16016,7 +15962,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			b.image.integer.imageView = imageview_get_integer_view(view);
 			self->bindings.cookies[set][start_binding + i] = view->cookie_base.cookie;
 			self->dirty_sets |= 1u << set;
-		}
+		} }
 	}
 
 	void commandbuffer_set_texture_raw(struct CommandBuffer *self, unsigned set, unsigned binding,
@@ -16359,13 +16305,11 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			VkDebugMarkerMarkerInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT };
 			if (color)
 			{
-				for (unsigned i = 0; i < 4; i++)
-					info.color[i] = color[i];
+				{ unsigned i; for (i = 0; i < 4; i++) info.color[i] = color[i]; }
 			}
 			else
 			{
-				for (unsigned i = 0; i < 4; i++)
-					info.color[i] = 1.0f;
+				{ unsigned i; for (i = 0; i < 4; i++) info.color[i] = 1.0f; }
 			}
 
 			info.pMarkerName = name;
@@ -16534,8 +16478,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				return false;
 			}
 
-			for (uint32_t gi = 0; gi < gpu_count; gi++)
-			{
+			{ uint32_t gi; for (gi = 0; gi < gpu_count; gi++) {
 				VkPhysicalDevice cur = gpus[gi];
 				VkPhysicalDeviceProperties props;
 				vkGetPhysicalDeviceProperties(cur, &props);
@@ -16548,7 +16491,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 						VK_VERSION_MAJOR(props.driverVersion),
 						VK_VERSION_MINOR(props.driverVersion),
 						VK_VERSION_PATCH(props.driverVersion));
-			}
+			} }
 
 			const char *gpu_index = getenv("GRANITE_VULKAN_DEVICE_INDEX");
 			if (gpu_index)
@@ -16599,8 +16542,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkQueueFamilyProperties *queue_props = (VkQueueFamilyProperties *)malloc((queue_count ? queue_count : 1) * sizeof(VkQueueFamilyProperties));
 		vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, queue_props);
 
-		for (unsigned i = 0; i < queue_count; i++)
-		{
+		{ unsigned i; for (i = 0; i < queue_count; i++) {
 			VkBool32 supported = surface == VK_NULL_HANDLE;
 			if (surface != VK_NULL_HANDLE)
 				vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &supported);
@@ -16611,39 +16553,36 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				self->graphics_queue_family = i;
 				break;
 			}
-		}
+		} }
 
-		for (unsigned i = 0; i < queue_count; i++)
-		{
+		{ unsigned i; for (i = 0; i < queue_count; i++) {
 			static const VkQueueFlags required = VK_QUEUE_COMPUTE_BIT;
 			if (i != self->graphics_queue_family && (queue_props[i].queueFlags & required) == required)
 			{
 				self->compute_queue_family = i;
 				break;
 			}
-		}
+		} }
 
-		for (unsigned i = 0; i < queue_count; i++)
-		{
+		{ unsigned i; for (i = 0; i < queue_count; i++) {
 			static const VkQueueFlags required = VK_QUEUE_TRANSFER_BIT;
 			if (i != self->graphics_queue_family && i != self->compute_queue_family && (queue_props[i].queueFlags & required) == required)
 			{
 				self->transfer_queue_family = i;
 				break;
 			}
-		}
+		} }
 
 		if (self->transfer_queue_family == VK_QUEUE_FAMILY_IGNORED)
 		{
-			for (unsigned i = 0; i < queue_count; i++)
-			{
+			{ unsigned i; for (i = 0; i < queue_count; i++) {
 				static const VkQueueFlags required = VK_QUEUE_TRANSFER_BIT;
 				if (i != self->graphics_queue_family && (queue_props[i].queueFlags & required) == required)
 				{
 					self->transfer_queue_family = i;
 					break;
 				}
-			}
+			} }
 		}
 
 		if (self->graphics_queue_family == VK_QUEUE_FAMILY_IGNORED)
@@ -16716,10 +16655,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		const char **enabled_layers = (const char **)malloc((num_required_device_layers + 4) * sizeof(const char *));
 		unsigned enabled_layers_count = 0;
 
-		for (uint32_t i = 0; i < num_required_device_extensions; i++)
-			enabled_extensions[enabled_extensions_count++] = (required_device_extensions[i]);
-		for (uint32_t i = 0; i < num_required_device_layers; i++)
-			enabled_layers[enabled_layers_count++] = (required_device_layers[i]);
+		{ uint32_t i; for (i = 0; i < num_required_device_extensions; i++) enabled_extensions[enabled_extensions_count++] = (required_device_extensions[i]); }
+		{ uint32_t i; for (i = 0; i < num_required_device_layers; i++) enabled_layers[enabled_layers_count++] = (required_device_layers[i]); }
 
 		if (has_vk_extension(queried_extensions, ext_count, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) &&
 				has_vk_extension(queried_extensions, ext_count, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME))
@@ -16913,8 +16850,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		framebuffer_allocator_clear(&self->framebuffer_allocator);
 		attachment_allocator_clear(&self->transient_allocator);
-		for (unsigned i = 0; i < (unsigned)StockSampler_Count; i++)
-			smh_reset(&self->samplers[i]);
+		{ unsigned i; for (i = 0; i < (unsigned)StockSampler_Count; i++) smh_reset(&self->samplers[i]); }
 
 		fencemanager_deinit(&self->managers.fence);
 		semaphoremanager_deinit(&self->managers.semaphore);
@@ -17057,8 +16993,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		layout.descriptor_set_mask = 0;
 
-		for (unsigned i = 0; i < (unsigned)(ShaderStage_Count); i++)
-		{
+		{ unsigned i; for (i = 0; i < (unsigned)(ShaderStage_Count); i++) {
 			const Shader *shader = program_get_shader(&program, (ShaderStage)(i));
 			if (!shader)
 				continue;
@@ -17066,8 +17001,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			uint32_t stage_mask = 1u << i;
 
 			const ResourceLayout &shader_layout = *shader_get_layout(shader);
-			for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
-			{
+			{ unsigned set; for (set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++) {
 				layout.sets[set].sampled_image_mask |= shader_layout.sets[set].sampled_image_mask;
 				layout.sets[set].storage_image_mask |= shader_layout.sets[set].storage_image_mask;
 				layout.sets[set].uniform_buffer_mask |= shader_layout.sets[set].uniform_buffer_mask;
@@ -17109,7 +17043,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				{
 					layout.stages_for_bindings[set][bit] |= stage_mask;
 				}
-			}
+			} }
 
 			// Merge push constant ranges into one range.
 			// Do not try to split into multiple ranges as it just complicates things for no obvious gain.
@@ -17122,13 +17056,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 			layout.spec_constant_mask[i] = shader_layout.spec_constant_mask;
 			layout.combined_spec_constant_mask |= shader_layout.spec_constant_mask;
-		}
+		} }
 
-		for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
-		{
+		{ unsigned i; for (i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++) {
 			if (layout.stages_for_sets[i] != 0)
 				layout.descriptor_set_mask |= 1u << i;
-		}
+		} }
 
 		Hasher h; hasher_init(&h);
 		hasher_u32(&h, layout.push_constant_range.stageFlags);
@@ -17178,8 +17111,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		info.max_lod = VK_LOD_CLAMP_NONE;
 		info.max_anisotropy = 1.0f;
 
-		for (unsigned i = 0; i < (unsigned)(StockSampler_Count); i++)
-		{
+		{ unsigned i; for (i = 0; i < (unsigned)(StockSampler_Count); i++) {
 			StockSampler mode = (StockSampler)(i);
 
 			switch (mode)
@@ -17246,7 +17178,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					break;
 			}
 			self->samplers[i] = device_create_sampler(self, info, mode);
-		}
+		} }
 	}
 
 	static void request_block(Device &device, struct BufferBlock *block, VkDeviceSize size,
@@ -17366,13 +17298,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		sem_handle_vec_clear(&data->wait_semaphores);
 
 		// Add external signal semaphores.
-		for (unsigned i = 0; i < semaphore_count; i++)
-		{
+		{ unsigned i; for (i = 0; i < semaphore_count; i++) {
 			VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&self->managers.semaphore);
 			SemaphoreVec_push(&signals, &cleared_semaphore);
 			VK_ASSERT(!sem_is_valid(&semaphores[i]));
 			{ struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&self->handle_pool.semaphores); semaphoreholder_init(_sh, self, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
-		}
+		} }
 
 		submit.signalSemaphoreCount = SemaphoreVec_size(&signals);
 		submit.waitSemaphoreCount = SemaphoreVec_size(&waits);
@@ -17591,16 +17522,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		VkFence cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
 
-		for (unsigned i = 0; i < semaphore_count; i++)
-		{
+		{ unsigned i; for (i = 0; i < semaphore_count; i++) {
 			VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&self->managers.semaphore);
 			SemaphoreVec_push(&signals[VkSubmitInfoVec_size(&submits) - 1], &cleared_semaphore);
 			VK_ASSERT(!sem_is_valid(&semaphores[i]));
 			{ struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&self->handle_pool.semaphores); semaphoreholder_init(_sh, self, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
-		}
+		} }
 
-		for (int i = 0; i < VkSubmitInfoVec_size(&submits); i++)
-		{
+		{ int i; for (i = 0; i < VkSubmitInfoVec_size(&submits); i++) {
 			VkSubmitInfo &submit = *VkSubmitInfoVec_at(&submits, i);
 			submit.waitSemaphoreCount = SemaphoreVec_size(&waits[i]);
 			if (!SemaphoreVec_empty(&waits[i]))
@@ -17612,7 +17541,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			submit.signalSemaphoreCount = SemaphoreVec_size(&signals[i]);
 			if (!SemaphoreVec_empty(&signals[i]))
 				submit.pSignalSemaphores = SemaphoreVec_data(&signals[i]);
-		}
+		} }
 
 		VkQueue queue;
 		switch (type)
@@ -17803,12 +17732,11 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		attachment_allocator_clear(&self->transient_allocator);
 		per_frame_ptr_vec_clear(&self->per_frame);
 
-		for (unsigned i = 0; i < count; i++)
-		{
+		{ unsigned i; for (i = 0; i < count; i++) {
 			Device::PerFrame *pf = (Device::PerFrame *)malloc(sizeof(Device::PerFrame));
 			per_frame_init(pf, self);
 			per_frame_ptr_vec_push(&self->per_frame, pf);
-		}
+		} }
 	}
 
 	void per_frame_init(struct Device::PerFrame *self, Device *device)
@@ -18119,25 +18047,23 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				break;
 		}
 
-		for (uint32_t i = 0; i < self->mem_props.memoryTypeCount; i++)
-		{
+		{ uint32_t i; for (i = 0; i < self->mem_props.memoryTypeCount; i++) {
 			if ((1u << i) & mask)
 			{
 				uint32_t flags = self->mem_props.memoryTypes[i].propertyFlags;
 				if ((flags & desired) == desired)
 					return i;
 			}
-		}
+		} }
 
-		for (uint32_t i = 0; i < self->mem_props.memoryTypeCount; i++)
-		{
+		{ uint32_t i; for (i = 0; i < self->mem_props.memoryTypeCount; i++) {
 			if ((1u << i) & mask)
 			{
 				uint32_t flags = self->mem_props.memoryTypes[i].propertyFlags;
 				if ((flags & fallback) == fallback)
 					return i;
 			}
-		}
+		} }
 
 		LOGE("Couldn't find memory type for buffer domain.\n");
 		return UINT32_MAX;
@@ -18159,25 +18085,23 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				break;
 		}
 
-		for (uint32_t i = 0; i < self->mem_props.memoryTypeCount; i++)
-		{
+		{ uint32_t i; for (i = 0; i < self->mem_props.memoryTypeCount; i++) {
 			if ((1u << i) & mask)
 			{
 				uint32_t flags = self->mem_props.memoryTypes[i].propertyFlags;
 				if ((flags & desired) == desired)
 					return i;
 			}
-		}
+		} }
 
-		for (uint32_t i = 0; i < self->mem_props.memoryTypeCount; i++)
-		{
+		{ uint32_t i; for (i = 0; i < self->mem_props.memoryTypeCount; i++) {
 			if ((1u << i) & mask)
 			{
 				uint32_t flags = self->mem_props.memoryTypes[i].propertyFlags;
 				if ((flags & fallback) == fallback)
 					return i;
 			}
-		}
+		} }
 
 		LOGE("Couldn't find memory type for image domain.\n");
 		return UINT32_MAX;
@@ -18351,8 +18275,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			VkImageViewCreateInfo view_info = info;
 			view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 			view_info.subresourceRange.baseMipLevel = info.subresourceRange.baseMipLevel;
-			for (uint32_t layer = 0; layer < info.subresourceRange.layerCount; layer++)
-			{
+			{ uint32_t layer; for (layer = 0; layer < info.subresourceRange.layerCount; layer++) {
 				view_info.subresourceRange.levelCount = 1;
 				view_info.subresourceRange.layerCount = 1;
 				view_info.subresourceRange.baseArrayLayer = layer + info.subresourceRange.baseArrayLayer;
@@ -18362,7 +18285,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					return false;
 
 				RenderTargetViewVec_push(&self->rt_views, &rt_view);
-			}
+			} }
 		}
 
 		return true;
@@ -18543,14 +18466,12 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		tfl_set_buffer(&layout, mapped, tfl_get_required_size(&layout));
 
-		for (unsigned level = 0; level < copy_levels; level++)
-		{
+		{ unsigned level; for (level = 0; level < copy_levels; level++) {
 			const TextureFormatLayoutMipInfo *mip_info = tfl_get_mip_info(&layout, level);
 			uint32_t dst_height_stride = tfl_get_layer_size(&layout, level);
 			size_t row_size = tfl_get_row_size(&layout, level);
 
-			for (unsigned layer = 0; layer < info.layers; layer++, index++)
-			{
+			{ unsigned layer; for (layer = 0; layer < info.layers; layer++, index++) {
 				uint32_t src_row_length =
 					initial[index].row_length ? initial[index].row_length : mip_info->row_length;
 				uint32_t src_array_height =
@@ -18563,10 +18484,9 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				const uint8_t *src = (const uint8_t *)(initial[index].data);
 
 				for (uint32_t z = 0; z < mip_info->depth; z++)
-					for (uint32_t y = 0; y < mip_info->block_image_height; y++)
-						memcpy(dst + z * dst_height_stride + y * row_size, src + z * src_height_stride + y * src_row_stride, row_size);
-			}
-		}
+					{ uint32_t y; for (y = 0; y < mip_info->block_image_height; y++) memcpy(dst + z * dst_height_stride + y * row_size, src + z * src_height_stride + y * src_row_stride, row_size); }
+			} }
+		} }
 
 		device_unmap_host_buffer(self, *bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT);
 		tfl_build_buffer_image_copies(&layout, result.blits, &result.num_blits);
@@ -18999,15 +18919,14 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		uint32_t lazy = 0;
 		uint32_t optimal = 0;
 
-		for (unsigned i = 0; i < info.num_color_attachments; i++)
-		{
+		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) {
 			VK_ASSERT(info.color_attachments[i]);
 			formats[i] = imageview_get_format(info.color_attachments[i]);
 			if (image_get_create_info(&imageview_get_image(info.color_attachments[i])).domain == ImageDomain_Transient)
 				lazy |= 1u << i;
 			if (image_get_layout_type(&imageview_get_image(info.color_attachments[i])) == Layout_Optimal)
 				optimal |= 1u << i;
-		}
+		} }
 
 		if (info.depth_stencil)
 		{
@@ -19018,19 +18937,15 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		}
 
 		hasher_u32(&h, info.num_subpasses);
-		for (unsigned i = 0; i < info.num_subpasses; i++)
-		{
+		{ unsigned i; for (i = 0; i < info.num_subpasses; i++) {
 			hasher_u32(&h, info.subpasses[i].num_color_attachments);
 			hasher_u32(&h, info.subpasses[i].num_input_attachments);
 			hasher_u32(&h, info.subpasses[i].num_resolve_attachments);
 			hasher_u32(&h, (uint32_t)(info.subpasses[i].depth_stencil_mode));
-			for (unsigned j = 0; j < info.subpasses[i].num_color_attachments; j++)
-				hasher_u32(&h, info.subpasses[i].color_attachments[j]);
-			for (unsigned j = 0; j < info.subpasses[i].num_input_attachments; j++)
-				hasher_u32(&h, info.subpasses[i].input_attachments[j]);
-			for (unsigned j = 0; j < info.subpasses[i].num_resolve_attachments; j++)
-				hasher_u32(&h, info.subpasses[i].resolve_attachments[j]);
-		}
+			{ unsigned j; for (j = 0; j < info.subpasses[i].num_color_attachments; j++) hasher_u32(&h, info.subpasses[i].color_attachments[j]); }
+			{ unsigned j; for (j = 0; j < info.subpasses[i].num_input_attachments; j++) hasher_u32(&h, info.subpasses[i].input_attachments[j]); }
+			{ unsigned j; for (j = 0; j < info.subpasses[i].num_resolve_attachments; j++) hasher_u32(&h, info.subpasses[i].resolve_attachments[j]); }
+		} }
 
 		depth_stencil = info.depth_stencil ? imageview_get_format(info.depth_stencil) : VK_FORMAT_UNDEFINED;
 		hasher_data(&h, (const uint32_t *)(formats), info.num_color_attachments * sizeof(VkFormat));
@@ -19099,8 +19014,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned ybegin = rect.y / BLOCK_HEIGHT;
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 		for (unsigned y = ybegin; y <= yend; y++)
-			for (unsigned x = xbegin; x <= xend; x++)
-				(*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED;
+			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED; }
 	}
 
 	static bool fbatlas_texture_rendered(FBAtlas *self, const Rect &rect)
@@ -19143,15 +19057,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				? (dst_yend - dst_ybegin) : (src_yend - src_ybegin);
 			unsigned i_max = (dst_xend - dst_xbegin) < (src_xend - src_xbegin)
 				? (dst_xend - dst_xbegin) : (src_xend - src_xbegin);
-			for (unsigned j = 0; j <= j_max; j++)
-				for (unsigned i = 0; i <= i_max; i++)
-				{
+			{ unsigned j; for (j = 0; j <= j_max; j++) { unsigned i; for (i = 0; i <= i_max; i++) {
 					bool rendered = (*fbatlas_info(self, src_xbegin + i, src_ybegin + j)) & STATUS_TEXTURE_RENDERED;
 					if (rendered)
 						(*fbatlas_info(self, dst_xbegin + i, dst_ybegin + j)) |= STATUS_TEXTURE_RENDERED;
 					else
 						(*fbatlas_info(self, dst_xbegin + i, dst_ybegin + j)) &= ~STATUS_TEXTURE_RENDERED;
-				}
+				} } }
 		}
 
 		return domain;
@@ -19244,8 +19156,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		}
 
 		for (unsigned y = ybegin; y <= yend; y++)
-			for (unsigned x = xbegin; x <= xend; x++)
-				write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains;
+			{ unsigned x; for (x = xbegin; x <= xend; x++) write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains; }
 
 		// Trying to update VRAM before fragment is done reading it.
 		// We could use copy-on-write here to avoid flushing, but this scenario is very rare.
@@ -19256,8 +19167,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			fbatlas_pipeline_barrier(self, write_domains);
 
 		for (unsigned y = ybegin; y <= yend; y++)
-			for (unsigned x = xbegin; x <= xend; x++)
-				(*fbatlas_info(self, x, y)) = ((*fbatlas_info(self, x, y)) & ~STATUS_OWNERSHIP_MASK) | resolve_domains;
+			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) = ((*fbatlas_info(self, x, y)) & ~STATUS_OWNERSHIP_MASK) | resolve_domains; }
 
 		return (write_domains & STATUS_FRAGMENT_SFB_READ) != 0;
 	}
@@ -19313,15 +19223,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		}
 
 		for (unsigned y = ybegin; y <= yend; y++)
-			for (unsigned x = xbegin; x <= xend; x++)
-				write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains;
+			{ unsigned x; for (x = xbegin; x <= xend; x++) write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains; }
 
 		if (write_domains)
 			fbatlas_pipeline_barrier(self, write_domains);
 
 		for (unsigned y = ybegin; y <= yend; y++)
-			for (unsigned x = xbegin; x <= xend; x++)
-				(*fbatlas_info(self, x, y)) |= resolve_domains;
+			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) |= resolve_domains; }
 	}
 
 	static void fbatlas_sync_domain(FBAtlas *self, Domain domain, const Rect &rect)
@@ -19341,8 +19249,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned bits = 0;
 
 		for (unsigned y = ybegin; y <= yend; y++)
-			for (unsigned x = xbegin; x <= xend; x++)
-				bits |= 1u << ((*fbatlas_info(self, x, y)) & STATUS_OWNERSHIP_MASK);
+			{ unsigned x; for (x = xbegin; x <= xend; x++) bits |= 1u << ((*fbatlas_info(self, x, y)) & STATUS_OWNERSHIP_MASK); }
 
 		unsigned write_domains = 0;
 
@@ -19373,10 +19280,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			resolve_domains = STATUS_COMPUTE_SFB_READ | STATUS_SFB_PREFER | STATUS_COMPUTE_FB_WRITE;
 		}
 
-		for (unsigned y = ybegin; y <= yend; y++)
-		{
-			for (unsigned x = xbegin; x <= xend; x++)
-			{
+		{ unsigned y; for (y = ybegin; y <= yend; y++) {
+			{ unsigned x; for (x = xbegin; x <= xend; x++) {
 				StatusFlags *mask = fbatlas_info(self, x, y);
 				// If our block isn't in the ownership class we want,
 				// we need to read from one block and write to the other.
@@ -19385,17 +19290,15 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				// so other readers can wait for us.
 				if (((*mask) & STATUS_OWNERSHIP_MASK) == ownership)
 					write_domains |= (*mask) & hazard_domains;
-			}
-		}
+			} }
+		} }
 
 		// If we hit any hazard, resolve it.
 		if (write_domains)
 			fbatlas_pipeline_barrier(self, write_domains);
 
-		for (unsigned y = ybegin; y <= yend; y++)
-		{
-			for (unsigned x = xbegin; x <= xend; x++)
-			{
+		{ unsigned y; for (y = ybegin; y <= yend; y++) {
+			{ unsigned x; for (x = xbegin; x <= xend; x++) {
 				StatusFlags *mask = fbatlas_info(self, x, y);
 				if (((*mask) & STATUS_OWNERSHIP_MASK) == ownership)
 				{
@@ -19403,8 +19306,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					(*mask) |= resolve_domains;
 					renderer_resolve(self->listener, domain, (BLOCK_WIDTH * x) & (FB_WIDTH - 1), (BLOCK_HEIGHT * y) & (FB_HEIGHT - 1));
 				}
-			}
-		}
+			} }
+		} }
 	}
 
 	static Domain fbatlas_find_suitable_domain(FBAtlas *self, const Rect &rect)
@@ -19417,15 +19320,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned ybegin = rect.y / BLOCK_HEIGHT;
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 
-		for (unsigned y = ybegin; y <= yend; y++)
-		{
-			for (unsigned x = xbegin; x <= xend; x++)
-			{
+		{ unsigned y; for (y = ybegin; y <= yend; y++) {
+			{ unsigned x; for (x = xbegin; x <= xend; x++) {
 				unsigned i = (*fbatlas_info(self, x, y)) & STATUS_OWNERSHIP_MASK;
 				if (i == STATUS_FB_ONLY || i == STATUS_FB_PREFER)
 					return Domain_Unscaled;
-			}
-		}
+			} }
+		} }
 		return Domain_Scaled;
 	}
 
@@ -19471,8 +19372,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned ybegin = rect.y / BLOCK_HEIGHT;
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 		for (unsigned y = ybegin; y <= yend; y++)
-			for (unsigned x = xbegin; x <= xend; x++)
-				(*fbatlas_info(self, x, y)) |= STATUS_TEXTURE_RENDERED;
+			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) |= STATUS_TEXTURE_RENDERED; }
 	}
 
 	static void fbatlas_extend_render_pass(FBAtlas *self, const Rect &rect, bool scissor)
@@ -19576,8 +19476,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned ybegin = rect.y / BLOCK_HEIGHT;
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 		for (unsigned y = ybegin; y <= yend; y++)
-			for (unsigned x = xbegin; x <= xend; x++)
-				(*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED;
+			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED; }
 	}
 
 	static void fbatlas_discard_render_pass(FBAtlas *self)
@@ -19931,7 +19830,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 
 	/*
 	   void convert_psx_to_tri(uint8_t *image, int width, int height) {
-	   for (int i = 0; i < width * height * 4; i += 4) {
+	   { int i; for (i = 0; i < width * height * 4; i += 4) {
 	   uint8_t *pixel = &image[i];
 	   if (pixel[3] == 0) {
 	   if (pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0) {
@@ -19945,7 +19844,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 	// Semi-transparent
 	pixel[3] = 127;
 	}
-	}
+	} }
 	}
 	 */
 
@@ -20041,7 +19940,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 	void io_thread_init(IOThread *t) {
 		io_channel_rc_lock_init();
 		t->channel = io_channel_new(); /* this IOThread holds one reference */
-		for (int i = 0; i < NUM_IO_THREADS; i++) {
+		{ int i; for (i = 0; i < NUM_IO_THREADS; i++) {
 			// Take a reference on the worker's behalf BEFORE it starts, so the
 			// channel can't be freed out from under it; the worker releases on exit.
 			io_channel_acquire(t->channel);
@@ -20051,7 +19950,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 			} else {
 				io_channel_release(t->channel); // thread failed to start; undo its ref
 			}
-		}
+		} }
 	}
 	void io_thread_deinit(IOThread *t) {
 		slock_lock(t->channel->lock);
@@ -20304,7 +20203,7 @@ Rect fromSRect(SRect rect) {
 
 		static RectIndexSet overlap = { NULL, 0, 0 };
 		rect_tracker_overlapping(&self->tracker, palette_rect, &overlap);
-		for (int oi = 0; oi < overlap.count; oi++) {
+		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
 			EnduringTextureRect &other = self->tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because self->tracker.overlapping never returns dead indices
 			if (fromSRect_contains(other.texture_rect.vram_rect, palette_rect) && other.alive) {
@@ -20318,7 +20217,7 @@ Rect fromSRect(SRect rect) {
 				uint32_t hash = crc32(0, (unsigned char*)data, palette_rect.width * sizeof(uint16_t));
 				return { data, hash };
 			}
-		}
+		} }
 		return { NULL, 0 };
 	}
 
@@ -20393,11 +20292,11 @@ Rect fromSRect(SRect rect) {
 		uint16_t *buf = (uint16_t *)malloc(n * sizeof(uint16_t));
 		size_t bi = 0;
 		uint32_t hash;
-		for (int j = y; j < (int)(y + h); j++) {
-			for (int i = x; i < (int)(x + w); i++) {
+		{ int j; for (j = y; j < (int)(y + h); j++) {
+			{ int i; for (i = x; i < (int)(x + w); i++) {
 				buf[bi++] = vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))];
-			}
-		}
+			} }
+		} }
 		hash = crc32(0, (unsigned char*)buf, rect.width * rect.height * sizeof(uint16_t));
 		free(buf);
 		return hash;
@@ -20454,19 +20353,18 @@ Rect fromSRect(SRect rect) {
 
 		uint32_t hash = texture_tracker_dbgHashVram(self, rect, vram);
 
-		for (int i = 0; i < rrvec_size(&self->restorable_rects); )
-		{
+		{ int i; for (i = 0; i < rrvec_size(&self->restorable_rects); ) {
 			if (rect_intersects(&self->restorable_rects.items[i].rect, &rect))
 				rrvec_erase_at(&self->restorable_rects, i);
 			else
 				i++;
-		}
+		} }
 
 		static RectIndexSet overlap = { NULL, 0, 0 };
 
 		OwnedRectVec to_restore;
 		rect_tracker_overlapping(&self->tracker, rect, &overlap);
-		for (int oi = 0; oi < overlap.count; oi++) {
+		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
 			EnduringTextureRect &e = self->tracker.textures.a[index];
 			if (e.alive) { // TODO: This check is unnecessary because self->tracker.overlapping never returns dead indices
@@ -20477,7 +20375,7 @@ Rect fromSRect(SRect rect) {
 					ownedrects_push(&to_restore, result.rect);
 				}
 			}
-		}
+		} }
 
 		RestorableRect rr;
 		restorablerect_init(&rr);
@@ -20534,12 +20432,12 @@ Rect fromSRect(SRect rect) {
 				upload->hash = hash;
 				upload->dumpable = true;
 				// Don't dump uploads specified by dump.cfg
-				for (int ri = 0; ri < self->dump_ignore_count; ri++) {
+				{ int ri; for (ri = 0; ri < self->dump_ignore_count; ri++) {
 					if (rect_match_matches(&self->dump_ignore[ri], rect)) {
 						upload->dumpable = false;
 						break;
 					}
-				}
+				} }
 			} else {
 				preexisting = true;
 				texture_upload_acquire(upload); /* take our own ref on the borrowed result */
@@ -20788,11 +20686,11 @@ Rect fromSRect(SRect rect) {
 		rect_tracker_overlapping(&self->tracker, rect, &overlap);
 
 		// Dump texture
-		for (int oi = 0; oi < overlap.count; oi++) {
+		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
 			TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
 			texture_tracker_dump_texture(self, tex->upload, mode, { mode.mode, palette_hash });
-		}
+		} }
 		if (self->frame_dump != NULL) {
 			if (self->frame_dump_need_comma) {
 				filestream_printf(self->frame_dump, ",");
@@ -20814,7 +20712,7 @@ Rect fromSRect(SRect rect) {
 		HdTextureHandle result = hd_handle_make_none();
 
 		Rect result_rect;
-		for (int oi = 0; oi < overlap.count; oi++) {
+		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
 			TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
 			HdTexEntry *overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
@@ -20843,7 +20741,7 @@ Rect fromSRect(SRect rect) {
 					return fused_pages_get_or_make(&self->fused_pages, page_rect, palette_hash, &self->tracker, self->uploader);
 				}
 			}
-		}
+		} }
 
 		if (!hd_handle_is_none(&result))
 			self->handle_cache.insert(result_rect, palette_hash, result);
@@ -21627,7 +21525,7 @@ int64_t page_bytes(FusionRects &fusion)
 			int full_res_levels = log2(max_(rx, ry)) + 1;
 			// assert(max_level >= 0 && max_level <= 6);
 			// TODO: this is incredibly finicky, and one bad (out of bounds) blit can bork everything
-			for (int dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
+			{ int dstLevel; for (dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
 				int srcLevel = max_(0, dstLevel - full_res_levels);
 
 				commandbuffer_blit_image(cbh_get(cmd), *ih_get(&page.texture), *image,
@@ -21652,7 +21550,7 @@ int64_t page_bytes(FusionRects &fusion)
 				dst_offset.y >>= 1;
 				dst_extent.x = max_(dst_extent.x >> 1, 1);
 				dst_extent.y = max_(dst_extent.y >> 1, 1);
-			}
+			} }
 
 			// Change back to shader read
 			commandbuffer_image_barrier(cbh_get(cmd), 
@@ -21813,12 +21711,12 @@ int64_t page_bytes(FusionRects &fusion)
 
 	TextureRect from_save_state(const TextureRectSaveState &t, UploadPtrVec &uploads) {
 		TextureUpload *found = NULL;
-		for (int i = 0; i < uploads.count; i++) {
+		{ int i; for (i = 0; i < uploads.count; i++) {
 			if (uploads.items[i].key == t.upload_hash) {
 				found = uploads.items[i].val;
 				break;
 			}
-		}
+		} }
 		if (!found) {
 			TT_LOG(RETRO_LOG_ERROR, "SaveState upload missing!\n");
 		}
@@ -21873,12 +21771,12 @@ int64_t page_bytes(FusionRects &fusion)
 	void texture_tracker_load_state(struct TextureTracker *self, const TextureTrackerSaveState &state)
 	{
 		UploadPtrVec uploads = { NULL, 0, 0 };
-		for (int e = 0; e < state.uploads.count; e++) {
+		{ int e; for (e = 0; e < state.uploads.count; e++) {
 			TextureUpload *ptr = texture_upload_new(); /* owns +1 */
 			texture_upload_copy_contents(ptr, state.uploads.items[e].val); /* deep-copy contents (refcount untouched) */
 			UploadPtrEntry pe = { state.uploads.items[e].key, ptr };
 			UploadPtrVec_push(&uploads, &pe);
-		}
+		} }
 
 		texture_tracker_clearRegion(self, { 0, 0, FB_WIDTH, FB_HEIGHT });
 		enduring_arr_clear(&self->tracker.textures); // load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway
@@ -21905,12 +21803,10 @@ int64_t page_bytes(FusionRects &fusion)
 			}
 		}
 		// Need to reload the hd textures, too
-		for (int e = 0; e < state.uploads.count; e++)
-			texture_tracker_load_hd_texture(self, state.uploads.items[e].key);
+		{ int e; for (e = 0; e < state.uploads.count; e++) texture_tracker_load_hd_texture(self, state.uploads.items[e].key); }
 		// Drop the map's construction refs; the placed/restorable TextureRects now
 		// hold their own references to each upload.
-		for (int i = 0; i < uploads.count; i++)
-			texture_upload_release(uploads.items[i].val);
+		{ int i; for (i = 0; i < uploads.count; i++) texture_upload_release(uploads.items[i].val); }
 		UploadPtrVec_free_storage(&uploads);
 	}
 	// End of Save State
@@ -21983,27 +21879,24 @@ struct ScanoutHandleVec {
 	int count;
 	int cap;
 	void clear() {
-		for (int i = 0; i < count; i++)
-			ih_reset(&items[i]);
+		{ int i; for (i = 0; i < count; i++) ih_reset(&items[i]); }
 		count = 0;
 	}
 	int size() const { return count; }
 	ImageHandle &operator[](int i) { return items[i]; }
 	void resize(int n) {
-		for (int i = n; i < count; i++)
-			ih_reset(&items[i]);
+		{ int i; for (i = n; i < count; i++) ih_reset(&items[i]); }
 		if (n > cap) {
 			ImageHandle *nitems = (ImageHandle *)malloc((size_t)n * sizeof(ImageHandle));
-			for (int i = 0; i < count && i < n; i++) {
+			{ int i; for (i = 0; i < count && i < n; i++) {
 				/* Move: ih_steal copies the pointer and nulls the old slot. */
 				ih_steal(&nitems[i], &items[i]);
-			}
+			} }
 			::free(items);
 			items = nitems;
 			cap = n;
 		}
-		for (int i = count; i < n; i++)
-			items[i].data = NULL; /* default-construct grown slot to a null handle */
+		{ int i; for (i = count; i < n; i++) items[i].data = NULL; } /* default-construct grown slot to a null handle */
 		count = n;
 	}
 	void free_storage() { clear(); ::free(items); items = NULL; cap = 0; }
@@ -23111,38 +23004,34 @@ void rhi_vulkan_load_image(
       const unsigned second = w - first;
       if (y_wrap)
       {
-         for (unsigned off_y = 0; off_y < h; off_y++)
-         {
+         { unsigned off_y; for (off_y = 0; off_y < h; off_y++) {
             const uint16_t *row = vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH;
             memcpy(tmp + off_y * w,         row + x, first  * sizeof(uint16_t));
             memcpy(tmp + off_y * w + first, row,     second * sizeof(uint16_t));
-         }
+         } }
       }
       else
       {
-         for (unsigned off_y = 0; off_y < h; off_y++)
-         {
+         { unsigned off_y; for (off_y = 0; off_y < h; off_y++) {
             const uint16_t *row = vram + (y + off_y) * FB_WIDTH;
             memcpy(tmp + off_y * w,         row + x, first  * sizeof(uint16_t));
             memcpy(tmp + off_y * w + first, row,     second * sizeof(uint16_t));
-         }
+         } }
       }
    }
    else
    {
       if (y_wrap)
       {
-         for (unsigned off_y = 0; off_y < h; off_y++)
-            memcpy(tmp + off_y * w,
+         { unsigned off_y; for (off_y = 0; off_y < h; off_y++) memcpy(tmp + off_y * w,
                   vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH + x,
-                  w * sizeof(uint16_t));
+                  w * sizeof(uint16_t)); }
       }
       else
       {
-         for (unsigned off_y = 0; off_y < h; off_y++)
-            memcpy(tmp + off_y * w,
+         { unsigned off_y; for (off_y = 0; off_y < h; off_y++) memcpy(tmp + off_y * w,
                   vram + (y + off_y) * FB_WIDTH + x,
-                  w * sizeof(uint16_t));
+                  w * sizeof(uint16_t)); }
       }
    }
    renderer_end_copy(renderer, handle);
