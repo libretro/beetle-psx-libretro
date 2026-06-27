@@ -4723,7 +4723,7 @@ PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return
 		SubpassInfoVec subpasses;
 	};
 
-	static void render_pass_fixup_render_pass_nvidia(struct RenderPass *self, VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments);
+	static void render_pass_fixup_render_pass_nvidia(struct RenderPass *self, VkRenderPassCreateInfo *create_info, VkAttachmentDescription *attachments);
 	void render_pass_init(struct RenderPass *self, Hash hash, Device *device, const RenderPassInfo *info);
 	void render_pass_fini(struct RenderPass *self);
 
@@ -5444,7 +5444,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	/* Group B: render-pass / pipeline / descriptor-flush free functions. */
 	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo *info, VkSubpassContents contents);
 	void commandbuffer_end_render_pass(struct CommandBuffer *self);
-	void commandbuffer_set_program(struct CommandBuffer *self, Program &program);
+	void commandbuffer_set_program(struct CommandBuffer *self, Program *program);
 	void commandbuffer_set_scissor(struct CommandBuffer *self, const VkRect2D *rect);
 	void commandbuffer_push_constants(struct CommandBuffer *self, const void *data, VkDeviceSize offset, VkDeviceSize range);
 	void commandbuffer_flush_render_state(struct CommandBuffer *self);
@@ -5891,21 +5891,21 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void device_wait_idle_nolock(Device *self);
 	void device_next_frame_context(Device *self);
 	void device_add_wait_semaphore_nolock(Device *self, CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush);
-	void device_submit(Device *self, CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
+	void device_submit(Device *self, CommandBufferHandle *cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
 	void device_submit_nolock(Device *self, CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
 	void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence, unsigned semaphore_count, Semaphore *semaphores);
-	void device_submit_staging(Device *self, CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
+	void device_submit_staging(Device *self, CommandBufferHandle *cmd, VkBufferUsageFlags usage, bool flush);
 	void device_submit_queue(Device *self, CommandBufferType type, VkFence *fence, unsigned semaphore_count, Semaphore *semaphores);
 	void device_sync_buffer_blocks(Device *self);
-	void device_bake_program(Device *self, Program &program);
+	void device_bake_program(Device *self, Program *program);
 	void device_init_stock_samplers(Device *self);
 	void device_clear_wait_semaphores(Device *self);
 	void device_flush_frame_nolock(Device *self);
 	CommandPool *device_get_command_pool(Device *self, CommandBufferType type);
 	CommandBufferHandle device_request_command_buffer(Device *self, CommandBufferType type);
 	CommandBufferHandle device_request_command_buffer_nolock(Device *self, CommandBufferType type);
-	void device_request_vertex_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size);
-	void device_request_uniform_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size);
+	void device_request_vertex_block_nolock(Device *self, BufferBlock *block, VkDeviceSize size);
+	void device_request_uniform_block_nolock(Device *self, BufferBlock *block, VkDeviceSize size);
 	void device_free_memory_nolock(Device *self, const DeviceAllocation *alloc);
 	bool device_get_image_format_properties(Device *self, VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags, VkImageFormatProperties *properties);
 	uint32_t device_find_memory_type_buffer(Device *self, BufferDomain domain, uint32_t mask);
@@ -5929,8 +5929,8 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	DescriptorSetAllocator *device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout *layout, const uint32_t *stages_for_bindings);
 	const RenderPass *device_request_render_pass(Device *self, const RenderPassInfo *info, bool compatible);
 	uint64_t device_allocate_cookie(Device *self);
-	void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size);
-	void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size);
+	void device_request_vertex_block(Device *self, BufferBlock *block, VkDeviceSize size);
+	void device_request_uniform_block(Device *self, BufferBlock *block, VkDeviceSize size);
 	const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo *info);
 	void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore);
 	void device_add_frame_counter_nolock(Device *self);
@@ -5968,7 +5968,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation *alloc, const ImageCreateInfo *info);
 	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo *info, VkSubpassContents contents);
 	void commandbuffer_end_render_pass(struct CommandBuffer *self);
-	void commandbuffer_set_program(struct CommandBuffer *self, Program &program);
+	void commandbuffer_set_program(struct CommandBuffer *self, Program *program);
 	void commandbuffer_flush_render_state(struct CommandBuffer *self);
 	VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self, Hash hash);
 	VkPipeline commandbuffer_build_compute_pipeline(struct CommandBuffer *self, Hash hash);
@@ -6030,8 +6030,8 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 		self->cookie += 16;
 		return self->cookie;
 	}
-	inline void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size) { device_request_vertex_block_nolock(self, block, size); }
-	inline void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size) { device_request_uniform_block_nolock(self, block, size); }
+	inline void device_request_vertex_block(Device *self, BufferBlock *block, VkDeviceSize size) { device_request_vertex_block_nolock(self, block, size); }
+	inline void device_request_uniform_block(Device *self, BufferBlock *block, VkDeviceSize size) { device_request_uniform_block_nolock(self, block, size); }
 	inline const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo *info) { return framebuffer_allocator_request_framebuffer(&self->framebuffer_allocator, info); }
 	inline void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore) { semaphoremanager_recycle(&self->managers.semaphore, semaphore); }
 	inline void device_add_frame_counter_nolock(Device *self) { self->lock.counter++; }
@@ -9122,7 +9122,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	 * definitions appear later in the file. */
 	void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index, bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv);
 	void renderer_build_line_quad(Renderer *self, Vertex *output, const Vertex *input);
-	void renderer_dispatch(Renderer *self, const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured);
+	void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, PrimitiveInfoVec &scissors, bool textured);
 	int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb);
 	void renderer_render_opaque_primitives(Renderer *self);
 	void renderer_render_semi_transparent_primitives(Renderer *self);
@@ -9157,7 +9157,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	bool renderer_primitive_info_sort_gt(const PrimitiveInfo *a, const PrimitiveInfo *b);
 	void renderer_flush_resolves(Renderer *self);
 	void renderer_flush_blits(Renderer *self);
-	void renderer_flush_blit(Renderer *self, const BlitInfoVec &infos, Program &program, bool scaled);
+	void renderer_flush_blit(Renderer *self, const BlitInfoVec *infos, Program *program, bool scaled);
 	void renderer_set_draw_rect(Renderer *self, const Rect *rect);
 	void renderer_clear_rect(Renderer *self, const Rect *rect, uint32_t fb_color);
 	Rect renderer_compute_window_rect(Renderer *self, const TextureWindow *window);
@@ -9222,7 +9222,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	inline void renderer_flush(Renderer *self)
 	{
 		if (cbh_is_valid(&self->cmd))
-			device_submit(self->device, self->cmd, NULL, 0, NULL);
+			device_submit(self->device, &self->cmd, NULL, 0, NULL);
 		cbh_reset(&self->cmd);
 		device_flush_frame(self->device);
 	}
@@ -9231,7 +9231,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 		Fence fence;
 		fence.data = NULL;
 		if (cbh_is_valid(&self->cmd))
-			device_submit(self->device, self->cmd, &fence, 0, NULL);
+			device_submit(self->device, &self->cmd, &fence, 0, NULL);
 		cbh_reset(&self->cmd);
 		device_flush_frame(self->device);
 		/* Return by value transfers ownership to the caller; the struct copy does
@@ -10143,11 +10143,11 @@ void renderer_mipmap_framebuffer(Renderer *self)
 		commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
 
 		if (i == levels)
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.mipmap_energy_blur);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.mipmap_energy_blur);
 		else if (i == 1)
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.mipmap_energy_first);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.mipmap_energy_first);
 		else
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.mipmap_energy);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.mipmap_energy);
 
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, i - 1)), StockSampler_LinearClamp);
 
@@ -10219,7 +10219,7 @@ void renderer_ssaa_framebuffer(Renderer *self)
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, 1);
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
-	commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.resolve_to_unscaled);
+	commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.resolve_to_unscaled);
 	commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer_ssaa)));
 	if (self->msaa > 1)
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
@@ -10423,12 +10423,12 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
 	if (scaled)
 	{
-		commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.scaled_quad_blitter);
+		commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.scaled_quad_blitter);
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearClamp);
 	}
 	else
 	{
-		commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.unscaled_quad_blitter);
+		commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.unscaled_quad_blitter);
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_LinearClamp);
 	}
 
@@ -10625,35 +10625,35 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	if (bpp24)
 	{
 		if (self->render_state.scanout_mdec_filter == ScanoutFilter_MDEC_YUV)
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.bpp24_yuv_quad_blitter);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.bpp24_yuv_quad_blitter);
 		else
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.bpp24_quad_blitter);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.bpp24_quad_blitter);
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestWrap);
 	}
 	else if (ssaa)
 	{
 		if (dither)
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.unscaled_dither_quad_blitter);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.unscaled_dither_quad_blitter);
 		else
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.unscaled_quad_blitter);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.unscaled_quad_blitter);
 
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer_ssaa)), StockSampler_NearestWrap);
 	}
 	else if (!self->render_state.adaptive_smoothing || self->scaling == 1)
 	{
 		if (dither)
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.scaled_dither_quad_blitter);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.scaled_dither_quad_blitter);
 		else
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.scaled_quad_blitter);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.scaled_quad_blitter);
 
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearWrap);
 	}
 	else
 	{
 		if (dither)
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.mipmap_dither_resolve);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.mipmap_dither_resolve);
 		else
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.mipmap_resolve);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.mipmap_resolve);
 
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer)), StockSampler_TrilinearWrap);
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->bias_framebuffer)), StockSampler_LinearWrap);
@@ -10800,7 +10800,7 @@ void renderer_flush_resolves(Renderer *self)
 	if (!Rect2DVec_empty(&self->queue.scaled_resolves))
 	{
 		renderer_ensure_command_buffer(self);
-		commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.resolve_to_scaled);
+		commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.resolve_to_scaled);
 
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
 		if (self->msaa > 1)
@@ -10828,7 +10828,7 @@ void renderer_flush_resolves(Renderer *self)
 		commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
 		commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, 0);
 		commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
-		commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.resolve_to_unscaled);
+		commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.resolve_to_unscaled);
 		commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
 		if (self->msaa > 1)
 			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
@@ -11479,13 +11479,13 @@ void renderer_dispatch_set_scaled_read_texture(Renderer *self, bool scaled_read,
 	if (textured)
 	{
 		if (scaled_read)
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.textured_scaled);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.textured_scaled);
 		else
-			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.textured_unscaled);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.textured_unscaled);
 	}
 	else
 	{
-		commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.flat);
+		commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.flat);
 	}
 }
 
@@ -11517,7 +11517,7 @@ int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb){
 	return 0;
 }
 
-void renderer_dispatch(Renderer *self, const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured){
+void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, PrimitiveInfoVec &scissors, bool textured){
 	qsort(PrimitiveInfoVec_data(&scissors), PrimitiveInfoVec_size(&scissors), sizeof(PrimitiveInfo), renderer_primitive_info_qsort_cmp);
 
 	// Render flat-shaded primitives.
@@ -11600,7 +11600,7 @@ void renderer_render_opaque_primitives(Renderer *self){
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
 	commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-	renderer_dispatch(self, *vertices, *scissors, false);
+	renderer_dispatch(self, vertices, *scissors, false);
 }
 
 void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_index) {
@@ -11710,7 +11710,7 @@ void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-	renderer_dispatch(self, *vertices, *scissors, true);
+	renderer_dispatch(self, vertices, *scissors, true);
 }
 
 void renderer_render_opaque_texture_primitives(Renderer *self){
@@ -11732,25 +11732,25 @@ void renderer_render_opaque_texture_primitives(Renderer *self){
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-	renderer_dispatch(self, *vertices, *scissors, true);
+	renderer_dispatch(self, vertices, *scissors, true);
 }
 
 void renderer_flush_blits(Renderer *self)
 {
 	renderer_ensure_command_buffer(self);
-	renderer_flush_blit(self, self->queue.scaled_blits, *self->pipelines.blit_vram_scaled, true);
-	renderer_flush_blit(self, self->queue.scaled_masked_blits, *self->pipelines.blit_vram_scaled_masked, true);
-	renderer_flush_blit(self, self->queue.unscaled_blits, *self->pipelines.blit_vram_unscaled, false);
-	renderer_flush_blit(self, self->queue.unscaled_masked_blits, *self->pipelines.blit_vram_unscaled_masked, false);
+	renderer_flush_blit(self, &self->queue.scaled_blits, self->pipelines.blit_vram_scaled, true);
+	renderer_flush_blit(self, &self->queue.scaled_masked_blits, self->pipelines.blit_vram_scaled_masked, true);
+	renderer_flush_blit(self, &self->queue.unscaled_blits, self->pipelines.blit_vram_unscaled, false);
+	renderer_flush_blit(self, &self->queue.unscaled_masked_blits, self->pipelines.blit_vram_unscaled_masked, false);
 	BlitInfoVec_clear(&self->queue.scaled_blits);
 	BlitInfoVec_clear(&self->queue.scaled_masked_blits);
 	BlitInfoVec_clear(&self->queue.unscaled_blits);
 	BlitInfoVec_clear(&self->queue.unscaled_masked_blits);
 }
 
-void renderer_flush_blit(Renderer *self, const BlitInfoVec &infos, Program &program, bool scaled)
+void renderer_flush_blit(Renderer *self, const BlitInfoVec *infos, Program *program, bool scaled)
 {
-	if (BlitInfoVec_empty(&infos))
+	if (BlitInfoVec_empty(infos))
 		return;
 
 	commandbuffer_set_program(cbh_get(&self->cmd), program);
@@ -11774,7 +11774,7 @@ void renderer_flush_blit(Renderer *self, const BlitInfoVec &infos, Program &prog
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
 	}
 
-	unsigned size = BlitInfoVec_size(&infos);
+	unsigned size = BlitInfoVec_size(infos);
 	unsigned scale = scaled ? self->scaling : 1u;
 	{ unsigned i; for (i = 0; i < size; i += 512) {
 		unsigned to_blit = min_(size - i, 512u);
@@ -11834,23 +11834,23 @@ void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src){
 			{
 				commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer_msaa)));
 				commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ?
-						*self->pipelines.blit_vram_msaa_cached_scaled_masked :
-						*self->pipelines.blit_vram_msaa_cached_scaled);
+						self->pipelines.blit_vram_msaa_cached_scaled_masked :
+						self->pipelines.blit_vram_msaa_cached_scaled);
 				commandbuffer_dispatch(cbh_get(&self->cmd), factor, factor, self->msaa);
 			}
 			else
 			{
 				commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)));
-				commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ? *self->pipelines.blit_vram_cached_scaled_masked :
-														*self->pipelines.blit_vram_cached_scaled);
+				commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ? self->pipelines.blit_vram_cached_scaled_masked :
+														self->pipelines.blit_vram_cached_scaled);
 				commandbuffer_dispatch(cbh_get(&self->cmd), factor, factor, 1);
 			}
 		}
 		else
 		{
 			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
-			commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ? *self->pipelines.blit_vram_cached_unscaled_masked :
-													*self->pipelines.blit_vram_cached_unscaled);
+			commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ? self->pipelines.blit_vram_cached_unscaled_masked :
+													self->pipelines.blit_vram_cached_unscaled);
 			commandbuffer_dispatch(cbh_get(&self->cmd), factor, factor, 1);
 		}
 		//LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
@@ -11953,7 +11953,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 	};
 
 	renderer_ensure_command_buffer(self);
-	commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ? *self->pipelines.copy_to_vram_masked : *self->pipelines.copy_to_vram);
+	commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ? self->pipelines.copy_to_vram_masked : self->pipelines.copy_to_vram);
 	commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
 
 	// Vulkan minimum limit, for large buffer views, split up the work.
@@ -12081,10 +12081,10 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 	else
 		commandbuffer_set_scissor(cbh_get(&self->cmd), Rect2DVec_at(&self->queue.scissors, state->scissor_index));
 
-	Program &textured = state->textured ? state->scaled_read ?
-		*self->pipelines.textured_scaled : *self->pipelines.textured_unscaled : *self->pipelines.flat;
-	Program &textured_masked = state->textured ? state->scaled_read ?
-		*self->pipelines.textured_masked_scaled : *self->pipelines.textured_masked_unscaled : *self->pipelines.flat_masked;
+	Program *textured = state->textured ? state->scaled_read ?
+		self->pipelines.textured_scaled : self->pipelines.textured_unscaled : self->pipelines.flat;
+	Program *textured_masked = state->textured ? state->scaled_read ?
+		self->pipelines.textured_masked_scaled : self->pipelines.textured_masked_unscaled : self->pipelines.flat_masked;
 
 	switch (state->semi_transparent)
 	{
@@ -13818,7 +13818,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		vk_pipeline_map_init(&self->pipelines);
 		program_set_shader(self, ShaderStage_Vertex, vertex);
 		program_set_shader(self, ShaderStage_Fragment, fragment);
-		device_bake_program(device, *self);
+		device_bake_program(device, self);
 	}
 
 	void program_init_compute(struct Program *self, Device *device, Shader *compute)
@@ -13830,7 +13830,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			self->shaders[i] = NULL;
 		vk_pipeline_map_init(&self->pipelines);
 		program_set_shader(self, ShaderStage_Compute, compute);
-		device_bake_program(device, *self);
+		device_bake_program(device, self);
 	}
 
 	VkPipeline program_get_pipeline(const struct Program *self, Hash hash)
@@ -14821,7 +14821,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		// Fixup after, we want the underlying render pass to be generic.
 		VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
-		render_pass_fixup_render_pass_nvidia(self, rp_info, fixup_attachments);
+		render_pass_fixup_render_pass_nvidia(self, &rp_info, fixup_attachments);
 
 		LOGI("Creating render pass.\n");
 		if (vkCreateRenderPass(device_get_device(device), &rp_info, NULL, &self->render_pass) != VK_SUCCESS)
@@ -14831,7 +14831,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		VkSubpassDependencyVec_free_storage(&external_dependencies);
 	}
 
-	static void render_pass_fixup_render_pass_nvidia(struct RenderPass *self, VkRenderPassCreateInfo &create_info, VkAttachmentDescription *attachments)
+	static void render_pass_fixup_render_pass_nvidia(struct RenderPass *self, VkRenderPassCreateInfo *create_info, VkAttachmentDescription *attachments)
 	{
 		if (device_get_gpu_properties(self->device)->vendorID == VENDOR_ID_NVIDIA &&
 #ifdef _WIN32
@@ -14842,13 +14842,13 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			{
 				// Workaround a bug on NV where depth-stencil input attachments break if we have STORE_OP_DONT_CARE.
 				// Force STORE_OP_STORE for all attachments.
-				if (attachments != create_info.pAttachments)
+				if (attachments != create_info->pAttachments)
 				{
-					memcpy(attachments, create_info.pAttachments, create_info.attachmentCount * sizeof(attachments[0]));
-					create_info.pAttachments = attachments;
+					memcpy(attachments, create_info->pAttachments, create_info->attachmentCount * sizeof(attachments[0]));
+					create_info->pAttachments = attachments;
 				}
 
-				{ uint32_t i; for (i = 0; i < create_info.attachmentCount; i++) {
+				{ uint32_t i; for (i = 0; i < create_info->attachmentCount; i++) {
 					VkFormat format = attachments[i].format;
 					VkImageAspectFlags aspect = format_to_aspect_mask(format);
 					if ((aspect & (VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_DEPTH_BIT)) != 0)
@@ -15157,16 +15157,16 @@ VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
 				VK_DEPENDENCY_BY_REGION_BIT, 1, &barrier, 0, NULL, 0, NULL);
 	}
 
-void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
+void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	{
 		// ALL_GRAPHICS_BIT waits for vertex as well which causes performance issues on some drivers.
 		// It shouldn't matter, but hey.
 		//
 		// We aren't using vertex with side-effects on relevant hardware so dropping VERTEX_SHADER_BIT is fine.
-		if ((src_stages & VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT) != 0 && fixup)
+		if (((*src_stages) & VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT) != 0 && fixup)
 		{
-			src_stages &= ~VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-			src_stages |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+			*src_stages &= ~VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+			*src_stages |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
 				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
 				VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
 		}
@@ -15180,7 +15180,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
 		barrier.srcAccessMask = src_access;
 		barrier.dstAccessMask = dst_access;
-		fixup_src_stage(src_stages, device_get_workarounds(self->device)->optimize_all_graphics_barrier);
+		fixup_src_stage(&src_stages, device_get_workarounds(self->device)->optimize_all_graphics_barrier);
 		vkCmdPipelineBarrier(self->cmd, src_stages, dst_stages, 0, 1, &barrier, 0, NULL, 0, NULL);
 	}
 
@@ -15191,7 +15191,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	{
 		VK_ASSERT(!self->actual_render_pass);
 		VK_ASSERT(!self->framebuffer);
-		fixup_src_stage(src_stages, device_get_workarounds(self->device)->optimize_all_graphics_barrier);
+		fixup_src_stage(&src_stages, device_get_workarounds(self->device)->optimize_all_graphics_barrier);
 		vkCmdPipelineBarrier(self->cmd, src_stages, dst_stages, 0, barriers, globals, buffer_barriers, buffers, image_barriers, images);
 	}
 
@@ -15215,7 +15215,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
-		fixup_src_stage(src_stages, device_get_workarounds(self->device)->optimize_all_graphics_barrier);
+		fixup_src_stage(&src_stages, device_get_workarounds(self->device)->optimize_all_graphics_barrier);
 		vkCmdPipelineBarrier(self->cmd, src_stages, dst_stages, 0, 0, NULL, 0, NULL, 1, &barrier);
 	}
 
@@ -15824,12 +15824,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	}
 
 
-	void commandbuffer_set_program(struct CommandBuffer *self, Program &program)
+	void commandbuffer_set_program(struct CommandBuffer *self, Program *program)
 	{
-		if (self->current_program == &program)
+		if (self->current_program == program)
 			return;
 
-		self->current_program = &program;
+		self->current_program = program;
 		self->current_pipeline = VK_NULL_HANDLE;
 
 		VK_ASSERT((self->framebuffer && program_get_shader(self->current_program, ShaderStage_Vertex)) ||
@@ -15842,12 +15842,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			self->dirty_sets = ~0u;
 			commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
 
-			self->current_layout = program_get_pipeline_layout(&program);
+			self->current_layout = program_get_pipeline_layout(program);
 			self->current_pipeline_layout = pipeline_layout_get_layout(self->current_layout);
 		}
-		else if (program_get_pipeline_layout(&program)->intrusive_node.key != self->current_layout->intrusive_node.key)
+		else if (program_get_pipeline_layout(program)->intrusive_node.key != self->current_layout->intrusive_node.key)
 		{
-			const CombinedResourceLayout *new_layout = pipeline_layout_get_resource_layout(program_get_pipeline_layout(&program));
+			const CombinedResourceLayout *new_layout = pipeline_layout_get_resource_layout(program_get_pipeline_layout(program));
 			const CombinedResourceLayout *old_layout = pipeline_layout_get_resource_layout(self->current_layout);
 
 			// If the push constant layout changes, all descriptor sets
@@ -15860,7 +15860,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			else
 			{
 				// Find the first set whose descriptor set layout differs.
-				PipelineLayout *new_pipe_layout = program_get_pipeline_layout(&program);
+				PipelineLayout *new_pipe_layout = program_get_pipeline_layout(program);
 				{ unsigned set; for (set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++) {
 					if (pipeline_layout_get_allocator(new_pipe_layout, set) != pipeline_layout_get_allocator(self->current_layout, set))
 					{
@@ -15869,7 +15869,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					}
 				} }
 			}
-			self->current_layout = program_get_pipeline_layout(&program);
+			self->current_layout = program_get_pipeline_layout(program);
 			self->current_pipeline_layout = pipeline_layout_get_layout(self->current_layout);
 		}
 	}
@@ -15879,7 +15879,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		BufferBlockAllocation data = bufferblock_allocate(&self->ubo_block, size);
 		if (!data.host)
 		{
-			device_request_uniform_block(self->device, self->ubo_block, size);
+			device_request_uniform_block(self->device, &self->ubo_block, size);
 			data = bufferblock_allocate(&self->ubo_block, size);
 		}
 		commandbuffer_set_uniform_buffer(self, set, binding, bh_get(&self->ubo_block.gpu), data.offset, size);
@@ -15892,7 +15892,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		BufferBlockAllocation data = bufferblock_allocate(&self->vbo_block, size);
 		if (!data.host)
 		{
-			device_request_vertex_block(self->device, self->vbo_block, size);
+			device_request_vertex_block(self->device, &self->vbo_block, size);
 			data = bufferblock_allocate(&self->vbo_block, size);
 		}
 
@@ -16303,9 +16303,9 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			LOGE("Failed to end command buffer.\n");
 
 		if (self->vbo_block.mapped)
-			device_request_vertex_block_nolock(self->device, self->vbo_block, 0);
+			device_request_vertex_block_nolock(self->device, &self->vbo_block, 0);
 		if (self->ubo_block.mapped)
-			device_request_uniform_block_nolock(self->device, self->ubo_block, 0);
+			device_request_uniform_block_nolock(self->device, &self->ubo_block, 0);
 	}
 
 	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color)
@@ -16994,18 +16994,18 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		return ret;
 	}
 
-	void device_bake_program(Device *self, Program &program){
+	void device_bake_program(Device *self, Program *program){
 		CombinedResourceLayout layout;
 		combined_resource_layout_defaults(&layout); /* zero before partial per-stage fill + hash */
-		if (program_get_shader(&program, ShaderStage_Vertex))
-			layout.attribute_mask = shader_get_layout(program_get_shader(&program, ShaderStage_Vertex))->input_mask;
-		if (program_get_shader(&program, ShaderStage_Fragment))
-			layout.render_target_mask = shader_get_layout(program_get_shader(&program, ShaderStage_Fragment))->output_mask;
+		if (program_get_shader(program, ShaderStage_Vertex))
+			layout.attribute_mask = shader_get_layout(program_get_shader(program, ShaderStage_Vertex))->input_mask;
+		if (program_get_shader(program, ShaderStage_Fragment))
+			layout.render_target_mask = shader_get_layout(program_get_shader(program, ShaderStage_Fragment))->output_mask;
 
 		layout.descriptor_set_mask = 0;
 
 		{ unsigned i; for (i = 0; i < (unsigned)(ShaderStage_Count); i++) {
-			const Shader *shader = program_get_shader(&program, (ShaderStage)(i));
+			const Shader *shader = program_get_shader(program, (ShaderStage)(i));
 			if (!shader)
 				continue;
 
@@ -17078,7 +17078,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		hasher_u32(&h, layout.push_constant_range.stageFlags);
 		hasher_u32(&h, layout.push_constant_range.size);
 		layout.push_constant_layout_hash = hasher_get(&h);
-		program_set_pipeline_layout(&program, device_request_pipeline_layout(self, &layout));
+		program_set_pipeline_layout(program, device_request_pipeline_layout(self, &layout));
 	}
 
 	void device_set_context(Device *self, const Context *context){
@@ -17192,11 +17192,11 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		} }
 	}
 
-	static void request_block(Device &device, struct BufferBlock *block, VkDeviceSize size,
+	static void request_block(Device *device, struct BufferBlock *block, VkDeviceSize size,
 			struct BufferPool *pool, struct BufferBlockVec *dma, struct BufferBlockVec *recycle)
 	{
 		if (block->mapped)
-			device_unmap_host_buffer(&device, bh_get(&block->cpu), MEMORY_ACCESS_WRITE_BIT);
+			device_unmap_host_buffer(device, bh_get(&block->cpu), MEMORY_ACCESS_WRITE_BIT);
 
 		if (block->offset == 0)
 		{
@@ -17227,21 +17227,21 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			bufferblock_init(block);
 	}
 
-	void device_request_vertex_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size){
-		request_block(*self, &block, size, &self->managers.vbo, &self->dma.vbo, &device_frame(self)->vbo_blocks);
+	void device_request_vertex_block_nolock(Device *self, BufferBlock *block, VkDeviceSize size){
+		request_block(self, block, size, &self->managers.vbo, &self->dma.vbo, &device_frame(self)->vbo_blocks);
 	}
 
-	void device_request_uniform_block_nolock(Device *self, BufferBlock &block, VkDeviceSize size){
-		request_block(*self, &block, size, &self->managers.ubo, &self->dma.ubo, &device_frame(self)->ubo_blocks);
+	void device_request_uniform_block_nolock(Device *self, BufferBlock *block, VkDeviceSize size){
+		request_block(self, block, size, &self->managers.ubo, &self->dma.ubo, &device_frame(self)->ubo_blocks);
 	}
 
-	void device_submit(Device *self, CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores){
+	void device_submit(Device *self, CommandBufferHandle *cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores){
 		/* Move ownership of cmd into submit_nolock's by-value parameter and null
 		 * the caller's handle, matching the old move-from semantics. A plain
 		 * struct copy would otherwise leave the caller's handle aliasing the
 		 * same pointee, so a later cbh_reset on it would double-release. */
 		CommandBufferHandle moved;
-		cbh_steal(&moved, &cmd);
+		cbh_steal(&moved, cmd);
 		device_submit_nolock(self, moved, fence, semaphore_count, semaphores);
 	}
 
@@ -17372,15 +17372,15 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			data->need_fence = true;
 	}
 
-	void device_submit_staging(Device *self, CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush){
+	void device_submit_staging(Device *self, CommandBufferHandle *cmd, VkBufferUsageFlags usage, bool flush){
 		VkAccessFlags access = buffer_usage_to_possible_access(usage);
 		VkPipelineStageFlags stages = buffer_usage_to_possible_stages(usage);
 
 		if (self->transfer_queue == self->graphics_queue && self->transfer_queue == self->compute_queue)
 		{
 			// For single-queue systems, just use a pipeline barrier.
-			commandbuffer_barrier_simple(cbh_get(&cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, stages, access);
-			{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
+			commandbuffer_barrier_simple(cbh_get(cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, stages, access);
+			{ CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
 		}
 		else
 		{
@@ -17401,33 +17401,33 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 			if (self->transfer_queue == self->graphics_queue)
 			{
-				commandbuffer_barrier_simple(cbh_get(&cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+				commandbuffer_barrier_simple(cbh_get(cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 						graphics_stages, access);
 
 				if (compute_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
 					device_add_wait_semaphore_nolock(self, Type_AsyncCompute, sem, compute_stages, flush);
 					sem_reset(&sem);
 				}
 				else
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
 			}
 			else if (self->transfer_queue == self->compute_queue)
 			{
-				commandbuffer_barrier_simple(cbh_get(&cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+				commandbuffer_barrier_simple(cbh_get(cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 						compute_stages, compute_access);
 
 				if (graphics_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
 					device_add_wait_semaphore_nolock(self, Type_Generic, sem, graphics_stages, flush);
 					sem_reset(&sem);
 				}
 				else
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
 			}
 			else
 			{
@@ -17436,7 +17436,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					Semaphore semaphores[2];
 					semaphores[0].data = NULL;
 					semaphores[1].data = NULL;
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 2, semaphores); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 2, semaphores); }
 					device_add_wait_semaphore_nolock(self, Type_Generic, semaphores[0], graphics_stages, flush);
 					device_add_wait_semaphore_nolock(self, Type_AsyncCompute, semaphores[1], compute_stages, flush);
 					sem_reset(&semaphores[0]);
@@ -17445,19 +17445,19 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				else if (graphics_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
 					device_add_wait_semaphore_nolock(self, Type_Generic, sem, graphics_stages, flush);
 					sem_reset(&sem);
 				}
 				else if (compute_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
 					device_add_wait_semaphore_nolock(self, Type_AsyncCompute, sem, compute_stages, flush);
 					sem_reset(&sem);
 				}
 				else
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
 			}
 		}
 	}
@@ -17639,7 +17639,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		// Do not flush self->graphics or self->compute in self context.
 		// We must be able to inject semaphores into all currently enqueued self->graphics / self->compute.
-		device_submit_staging(self, cmd, usage, false);
+		device_submit_staging(self, &cmd, usage, false);
 	}
 
 	void device_end_frame_nolock(Device *self){
@@ -18715,7 +18715,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				}
 
 				Semaphore sem; sem.data = NULL;
-				device_submit(self, transfer_cmd, NULL, 1, &sem);
+				device_submit(self, &transfer_cmd, NULL, 1, &sem);
 				device_add_wait_semaphore_nolock(self, Type_Generic, sem, dst_stages, true);
 				sem_reset(&sem);
 			}
@@ -18746,7 +18746,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			if (share_async_graphics)
 			{
 				Semaphore sem; sem.data = NULL;
-				device_submit(self, graphics_cmd, NULL, 1, &sem);
+				device_submit(self, &graphics_cmd, NULL, 1, &sem);
 
 				VkPipelineStageFlags dst_stages = image_get_stage_flags(ih_get(&handle));
 				if (self->graphics_queue_family_index != self->compute_queue_family_index)
@@ -18755,7 +18755,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				sem_reset(&sem);
 			}
 			else
-				device_submit(self, graphics_cmd, NULL, 0, NULL);
+				device_submit(self, &graphics_cmd, NULL, 0, NULL);
 		}
 		else if (create_info->initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
 		{
@@ -18766,7 +18766,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					image_get_access_flags(ih_get(&handle)) &
 					image_layout_to_possible_access(create_info->initial_layout));
 
-			device_submit(self, cmd, NULL, 0, NULL);
+			device_submit(self, &cmd, NULL, 0, NULL);
 		}
 
 		return handle;
@@ -18879,7 +18879,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			commandbuffer_copy_buffer_whole(cbh_get(&cmd), bh_get(&handle), bh_get(&staging_buffer));
 			commandbuffer_end_region(cbh_get(&cmd));
 
-			device_submit_staging(self, cmd, info.usage, true);
+			device_submit_staging(self, &cmd, info.usage, true);
 			/* Drop the staging buffer's producer reference (the GPU copy is
 			 * submitted; the staging buffer's lifetime ends with self scope,
 			 * previously via the handle's destructor). */
