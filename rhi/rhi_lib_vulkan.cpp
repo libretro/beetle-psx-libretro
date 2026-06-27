@@ -8376,6 +8376,35 @@ extern retro_log_printf_t log_cb;
 		return r;
 	}
 
+	/* Per-primitive scissor / HD-texture metadata. Hoisted out of Renderer to
+	 * file scope and de-C++'d: the constructor (with its default arguments)
+	 * becomes primitive_info_make, with the defaults moved to the call sites that
+	 * relied on them. POD, so PrimitiveInfoVec is a plain POD_VEC. */
+	struct PrimitiveInfo {
+		unsigned triangle_index;
+		int scissor_index;
+		HdTextureHandle hd_texture_index;
+		bool filtering;
+		bool scaled_read;
+		unsigned shift;
+		bool offset_uv;
+	};
+	POD_VEC_DECLARE(PrimitiveInfoVec, PrimitiveInfo);
+
+	static inline struct PrimitiveInfo primitive_info_make(
+			unsigned triangle_index,
+			int scissor_index,
+			HdTextureHandle hd_texture_index,
+			bool filtering,
+			bool scaled_read,
+			unsigned shift,
+			bool offset_uv)
+	{
+		struct PrimitiveInfo p = { triangle_index, scissor_index, hd_texture_index,
+			filtering, scaled_read, shift, offset_uv };
+		return p;
+	}
+
 	class Renderer
 	{
 		public:
@@ -8955,32 +8984,7 @@ extern retro_log_printf_t log_cb;
 				float z;
 			};
 
-			struct PrimitiveInfo {
-				unsigned triangle_index;
-				int scissor_index;
-				HdTextureHandle hd_texture_index;
-				bool filtering;
-				bool scaled_read;
-				unsigned shift;
-				bool offset_uv;
-
-				// needed for emplace_back
-				PrimitiveInfo(
-						unsigned triangle_index,
-						int scissor_index = -1,
-						HdTextureHandle hd_texture_index = HdTextureHandle::make_none(),
-						bool filtering = false,
-						bool scaled_read = false,
-						unsigned shift = 0,
-						bool offset_uv = false
-					     )
-					: triangle_index(triangle_index), scissor_index(scissor_index), hd_texture_index(hd_texture_index),
-					filtering(filtering), scaled_read(scaled_read), shift(shift), offset_uv(offset_uv)
-				{}
-			};
-
 			POD_VEC_DECLARE(BufferVertexVec, BufferVertex);
-			POD_VEC_DECLARE(PrimitiveInfoVec, PrimitiveInfo);
 			POD_VEC_DECLARE(SemiTransparentStateVec, SemiTransparentState);
 			POD_VEC_DECLARE(BlitInfoVec, BlitInfo);
 			POD_VEC_DECLARE(ClearCandidateVec, ClearCandidate);
@@ -10712,7 +10716,7 @@ Renderer::BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor
 		{
 			for (unsigned i = 0; i < prims; i++)
 			{
-				PrimitiveInfo _pi = PrimitiveInfo(PrimitiveInfoVec_size(&queue.semi_transparent_opaque_scissor), scissor, hd_texture,
+				PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&queue.semi_transparent_opaque_scissor), scissor, hd_texture,
 					filtering, scaled_read, shift, offset_uv);
 				PrimitiveInfoVec_push(&queue.semi_transparent_opaque_scissor, &_pi);
 			}
@@ -10722,7 +10726,7 @@ Renderer::BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor
 		{
 			for (unsigned i = 0; i < prims; i++)
 			{
-				PrimitiveInfo _pi = PrimitiveInfo(PrimitiveInfoVec_size(&queue.opaque_textured_scissor), scissor, hd_texture,
+				PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&queue.opaque_textured_scissor), scissor, hd_texture,
 					filtering, scaled_read, shift, offset_uv);
 				PrimitiveInfoVec_push(&queue.opaque_textured_scissor, &_pi);
 			}
@@ -10735,7 +10739,7 @@ Renderer::BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor
 	{
 		for (unsigned i = 0; i < prims; i++)
 		{
-			PrimitiveInfo _pi = PrimitiveInfo(PrimitiveInfoVec_size(&queue.opaque_scissor), scissor, hd_texture,
+			PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&queue.opaque_scissor), scissor, hd_texture,
 				filtering, scaled_read, shift, offset_uv);
 			PrimitiveInfoVec_push(&queue.opaque_scissor, &_pi);
 		}
@@ -10985,11 +10989,11 @@ void Renderer::clear_quad(const Rect &rect, uint32_t fb_color, bool candidate)
 	BufferVertexVec_push(&queue.opaque, &pos2);
 	BufferVertexVec_push(&queue.opaque, &pos1);
 	{
-		PrimitiveInfo _pi0 = PrimitiveInfo(PrimitiveInfoVec_size(&queue.opaque_scissor));
+		PrimitiveInfo _pi0 = primitive_info_make(PrimitiveInfoVec_size(&queue.opaque_scissor), -1, HdTextureHandle::make_none(), false, false, 0, false);
 		PrimitiveInfoVec_push(&queue.opaque_scissor, &_pi0);
 	}
 	{
-		PrimitiveInfo _pi1 = PrimitiveInfo(PrimitiveInfoVec_size(&queue.opaque_scissor));
+		PrimitiveInfo _pi1 = primitive_info_make(PrimitiveInfoVec_size(&queue.opaque_scissor), -1, HdTextureHandle::make_none(), false, false, 0, false);
 		PrimitiveInfoVec_push(&queue.opaque_scissor, &_pi1);
 	}
 
