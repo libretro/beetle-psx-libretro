@@ -2804,7 +2804,7 @@ bool context_is_valid(const struct Context *self) { return self->valid; }
 
 	struct ImplementationWorkarounds
 	{
-		bool optimize_all_graphics_barrier = false;
+		bool optimize_all_graphics_barrier;
 	};
 
 	/* TextureFormatLayout: computes mip/layer byte layout for a texture upload
@@ -4392,17 +4392,17 @@ void semaphoremanager_init_empty(struct SemaphoreManager *self)
 	struct Device;
 	struct DescriptorSetLayout
 	{
-		uint32_t sampled_image_mask = 0;
-		uint32_t storage_image_mask = 0;
-		uint32_t uniform_buffer_mask = 0;
-		uint32_t storage_buffer_mask = 0;
-		uint32_t sampled_buffer_mask = 0;
-		uint32_t input_attachment_mask = 0;
-		uint32_t sampler_mask = 0;
-		uint32_t separate_image_mask = 0;
-		uint32_t fp_mask = 0;
-		uint32_t immutable_sampler_mask = 0;
-		uint64_t immutable_samplers = 0;
+		uint32_t sampled_image_mask;
+		uint32_t storage_image_mask;
+		uint32_t uniform_buffer_mask;
+		uint32_t storage_buffer_mask;
+		uint32_t sampled_buffer_mask;
+		uint32_t input_attachment_mask;
+		uint32_t sampler_mask;
+		uint32_t separate_image_mask;
+		uint32_t fp_mask;
+		uint32_t immutable_sampler_mask;
+		uint64_t immutable_samplers;
 	};
 
 	// Avoid -Wclass-memaccess warnings since we hash DescriptorSetLayout.
@@ -4516,26 +4516,36 @@ VkDescriptorSetLayout descriptor_set_allocator_get_layout(const struct Descripto
 
 	struct ResourceLayout
 	{
-		uint32_t input_mask = 0;
-		uint32_t output_mask = 0;
-		uint32_t push_constant_size = 0;
-		uint32_t spec_constant_mask = 0;
+		uint32_t input_mask;
+		uint32_t output_mask;
+		uint32_t push_constant_size;
+		uint32_t spec_constant_mask;
 		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS];
 	};
 
 	struct CombinedResourceLayout
 	{
-		uint32_t attribute_mask = 0;
-		uint32_t render_target_mask = 0;
-		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
-		uint32_t stages_for_bindings[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS] = {};
-		uint32_t stages_for_sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
-		VkPushConstantRange push_constant_range = {};
-		uint32_t descriptor_set_mask = 0;
-		uint32_t spec_constant_mask[(unsigned)ShaderStage_Count] = {};
-		uint32_t combined_spec_constant_mask = 0;
-		Hash push_constant_layout_hash = 0;
+		uint32_t attribute_mask;
+		uint32_t render_target_mask;
+		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS];
+		uint32_t stages_for_bindings[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS];
+		uint32_t stages_for_sets[VULKAN_NUM_DESCRIPTOR_SETS];
+		VkPushConstantRange push_constant_range;
+		uint32_t descriptor_set_mask;
+		uint32_t spec_constant_mask[(unsigned)ShaderStage_Count];
+		uint32_t combined_spec_constant_mask;
+		Hash push_constant_layout_hash;
 	};
+
+	/* Establishes the former `= {}` zero-state. This is load-bearing: the local
+	 * in device_bake_program fills sets[]/stages_for_bindings[]/... only for the
+	 * shader stages that exist, then HASHES the whole struct -- the unfilled
+	 * slots must be zero or the pipeline-layout cache key is garbage. Every bare
+	 * declaration MUST call this first. */
+	static inline void combined_resource_layout_defaults(struct CombinedResourceLayout *self)
+	{
+		memset(self, 0, sizeof(*self));
+	}
 
 	/* PipelineLayout: cached VkPipelineLayout + its resource layout and per-set
 	 * allocators. Lives in an IntrusiveHashMap (intrusive_node first). Converted
@@ -16951,6 +16961,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 	void device_bake_program(Device *self, Program &program){
 		CombinedResourceLayout layout;
+		combined_resource_layout_defaults(&layout); /* zero before partial per-stage fill + hash */
 		if (program_get_shader(&program, ShaderStage_Vertex))
 			layout.attribute_mask = shader_get_layout(program_get_shader(&program, ShaderStage_Vertex))->input_mask;
 		if (program_get_shader(&program, ShaderStage_Fragment))
