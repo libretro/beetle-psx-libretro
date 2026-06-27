@@ -5561,6 +5561,13 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	class Device
 	{
 		public:
+			friend void device_add_wait_semaphore_nolock(Device *self, CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush);
+			friend void device_submit(Device *self, CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
+			friend void device_submit_nolock(Device *self, CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
+			friend void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence, unsigned semaphore_count, Semaphore *semaphores);
+			friend void device_submit_staging(Device *self, CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
+			friend void device_submit_queue(Device *self, CommandBufferType type, VkFence *fence, unsigned semaphore_count, Semaphore *semaphores);
+			friend void device_sync_buffer_blocks(Device *self);
 			friend void device_bake_program(Device *self, Program &program);
 			friend void device_init_stock_samplers(Device *self);
 			friend void device_clear_wait_semaphores(Device *self);
@@ -5684,8 +5691,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			// Set names for objects for debuggers and profilers.
 
 			// Submission interface, may be called from any thread at any time.
-			void submit(CommandBufferHandle &cmd, Fence *fence = NULL,
-					unsigned semaphore_count = 0, Semaphore *semaphore = NULL);
 
 			// Request shaders and programs. These objects are owned by the Device.
 
@@ -5841,9 +5846,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 				BufferBlockVec ubo;
 			} dma;
 
-			void submit_queue(CommandBufferType type, VkFence *fence,
-					unsigned semaphore_count = 0,
-					Semaphore *semaphore = NULL);
 
 
 
@@ -5865,27 +5867,18 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			AttachmentAllocator transient_allocator;
 
 
-			void submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
 
 			void flush_frame(CommandBufferType type)
 			{
 				if (type == Type_AsyncTransfer)
-					sync_buffer_blocks();
-				submit_queue(type, NULL, 0, NULL);
+					device_sync_buffer_blocks(this);
+				device_submit_queue(this, type, NULL, 0, NULL);
 			}
-			void sync_buffer_blocks();
-			void submit_empty_inner(CommandBufferType type, VkFence *fence,
-					unsigned semaphore_count,
-					Semaphore *semaphore);
 
 
 			friend void program_fini(struct Program *self);
 			friend void framebuffer_fini(struct Framebuffer *self);
 
-			void submit_nolock(CommandBufferHandle cmd, Fence *fence,
-					unsigned semaphore_count, Semaphore *semaphore);
-			void add_wait_semaphore_nolock(CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages,
-					bool flush);
 
 
 			void wait_idle_nolock();
@@ -9009,7 +9002,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	inline void renderer_flush(Renderer *self)
 	{
 		if (cbh_is_valid(&self->cmd))
-			self->device->submit(self->cmd);
+			device_submit(self->device, self->cmd, NULL, 0, NULL);
 		cbh_reset(&self->cmd);
 		device_flush_frame(self->device);
 	}
@@ -9018,7 +9011,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 		Fence fence;
 		fence.data = NULL;
 		if (cbh_is_valid(&self->cmd))
-			self->device->submit(self->cmd, &fence);
+			device_submit(self->device, self->cmd, &fence, 0, NULL);
 		cbh_reset(&self->cmd);
 		device_flush_frame(self->device);
 		/* Return by value transfers ownership to the caller; the struct copy does
@@ -16720,13 +16713,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		self->handle_pool.deinit();
 	}
 
-	void Device::add_wait_semaphore_nolock(CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages,
-			bool flush)
-	{
+	void device_add_wait_semaphore_nolock(Device *self, CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages,
+			bool flush){
 		VK_ASSERT(stages != 0);
 		if (flush)
-			flush_frame(type);
-		Device::QueueData *data = device_get_queue_data(this, type);
+			self->flush_frame(type);
+		Device::QueueData *data = device_get_queue_data(self, type);
 
 #ifdef VULKAN_DEBUG
 		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data->wait_semaphores); _wi++)
@@ -17066,15 +17058,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		request_block(*self, &block, size, &self->managers.ubo, &self->dma.ubo, &device_frame(self)->ubo_blocks);
 	}
 
-	void Device::submit(CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
-	{
+	void device_submit(Device *self, CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores){
 		/* Move ownership of cmd into submit_nolock's by-value parameter and null
 		 * the caller's handle, matching the old move-from semantics. A plain
 		 * struct copy would otherwise leave the caller's handle aliasing the
 		 * same pointee, so a later cbh_reset on it would double-release. */
 		CommandBufferHandle moved;
 		cbh_steal(&moved, &cmd);
-		submit_nolock(moved, fence, semaphore_count, semaphores);
+		device_submit_nolock(self, moved, fence, semaphore_count, semaphores);
 	}
 
 	CommandBufferType device_get_physical_queue_type(Device *self, CommandBufferType queue_type){
@@ -17091,11 +17082,10 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 	}
 
-	void Device::submit_nolock(CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
-	{
+	void device_submit_nolock(Device *self, CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores){
 		CommandBufferType type = commandbuffer_get_command_buffer_type(cbh_get(&cmd));
-		CommandPool *pool = device_get_command_pool(this, type);
-		CommandBufferHandleVec *submissions = device_get_queue_submissions(this, type);
+		CommandPool *pool = device_get_command_pool(self, type);
+		Device::CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
 
 		command_pool_signal_submitted(pool, commandbuffer_get_command_buffer(cbh_get(&cmd)));
 		commandbuffer_end(cbh_get(&cmd));
@@ -17104,22 +17094,21 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkFence cleared_fence = VK_NULL_HANDLE;
 
 		if (fence || semaphore_count)
-			submit_queue(type, fence ? &cleared_fence : NULL, semaphore_count, semaphores);
+			device_submit_queue(self, type, fence ? &cleared_fence : NULL, semaphore_count, semaphores);
 
 		if (fence)
 		{
 			VK_ASSERT(!fence_is_valid(fence));
-			{ struct FenceHolder *_fh = (struct FenceHolder *)object_pool_raw_allocate(&handle_pool.fences); fenceholder_init(_fh, this, cleared_fence); *fence = fence_make(_fh); }
+			{ struct FenceHolder *_fh = (struct FenceHolder *)object_pool_raw_allocate(&self->handle_pool.fences); fenceholder_init(_fh, self, cleared_fence); *fence = fence_make(_fh); }
 		}
 
-		device_decrement_frame_counter_nolock(this);
+		device_decrement_frame_counter_nolock(self);
 	}
 
 	POD_VEC_DECLARE(VkFlagsVec, VkFlags);
-	void Device::submit_empty_inner(CommandBufferType type, VkFence *fence,
-			unsigned semaphore_count, Semaphore *semaphores)
-	{
-		Device::QueueData *data = device_get_queue_data(this, type);
+	void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence,
+			unsigned semaphore_count, Semaphore *semaphores){
+		Device::QueueData *data = device_get_queue_data(self, type);
 		VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
 		// Add external wait semaphores.
@@ -17136,7 +17125,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		{
 			Semaphore *semaphore = sem_handle_vec_at(&data->wait_semaphores, _wi);
 			VkSemaphore wait = semaphoreholder_consume(sem_get(semaphore));
-			SemaphoreVec_push(&device_frame(this)->recycled_semaphores, &wait);
+			SemaphoreVec_push(&device_frame(self)->recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits, &wait);
 		} }
 		VkPipelineStageVec_clear(&data->wait_stages);
@@ -17145,10 +17134,10 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		// Add external signal semaphores.
 		for (unsigned i = 0; i < semaphore_count; i++)
 		{
-			VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&managers.semaphore);
+			VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&self->managers.semaphore);
 			SemaphoreVec_push(&signals, &cleared_semaphore);
 			VK_ASSERT(!sem_is_valid(&semaphores[i]));
-			{ struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&handle_pool.semaphores); semaphoreholder_init(_sh, this, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
+			{ struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&self->handle_pool.semaphores); semaphoreholder_init(_sh, self, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
 		}
 
 		submit.signalSemaphoreCount = SemaphoreVec_size(&signals);
@@ -17165,17 +17154,17 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		{
 			default:
 			case Type_Generic:
-				queue = graphics_queue;
+				queue = self->graphics_queue;
 				break;
 			case Type_AsyncCompute:
-				queue = compute_queue;
+				queue = self->compute_queue;
 				break;
 			case Type_AsyncTransfer:
-				queue = transfer_queue;
+				queue = self->transfer_queue;
 				break;
 		}
 
-		VkFence cleared_fence = fence ? fencemanager_request_cleared_fence(&managers.fence) : VK_NULL_HANDLE;
+		VkFence cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
 		VkResult result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
 
 		if (result != VK_SUCCESS)
@@ -17189,16 +17178,16 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		{
 			if (result == VK_SUCCESS)
 			{
-				/* See submit_queue(): never enqueue a fence that was handed to a
+				/* See device_submit_queue(self): never enqueue a fence that was handed to a
 				 * failed submit - it will never signal and would hang the frame's
 				 * vkWaitForFences. Recycle it and return a null fence instead. */
-				FenceVec_push(&device_frame(this)->wait_fences, &cleared_fence);
+				FenceVec_push(&device_frame(self)->wait_fences, &cleared_fence);
 				*fence = cleared_fence;
 			}
 			else
 			{
 				if (cleared_fence != VK_NULL_HANDLE)
-					fencemanager_recycle_fence(&managers.fence, cleared_fence);
+					fencemanager_recycle_fence(&self->managers.fence, cleared_fence);
 				*fence = VK_NULL_HANDLE;
 			}
 			data->need_fence = false;
@@ -17207,16 +17196,15 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			data->need_fence = true;
 	}
 
-	void Device::submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush)
-	{
+	void device_submit_staging(Device *self, CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush){
 		VkAccessFlags access = buffer_usage_to_possible_access(usage);
 		VkPipelineStageFlags stages = buffer_usage_to_possible_stages(usage);
 
-		if (transfer_queue == graphics_queue && transfer_queue == compute_queue)
+		if (self->transfer_queue == self->graphics_queue && self->transfer_queue == self->compute_queue)
 		{
 			// For single-queue systems, just use a pipeline barrier.
 			commandbuffer_barrier_simple(cbh_get(&cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, stages, access);
-			{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 0, NULL); }
+			{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
 		}
 		else
 		{
@@ -17235,7 +17223,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 			VkPipelineStageFlags graphics_stages = stages;
 
-			if (transfer_queue == graphics_queue)
+			if (self->transfer_queue == self->graphics_queue)
 			{
 				commandbuffer_barrier_simple(cbh_get(&cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 						graphics_stages, access);
@@ -17243,14 +17231,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				if (compute_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
-					add_wait_semaphore_nolock(Type_AsyncCompute, sem, compute_stages, flush);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+					device_add_wait_semaphore_nolock(self, Type_AsyncCompute, sem, compute_stages, flush);
 					sem_reset(&sem);
 				}
 				else
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 0, NULL); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
 			}
-			else if (transfer_queue == compute_queue)
+			else if (self->transfer_queue == self->compute_queue)
 			{
 				commandbuffer_barrier_simple(cbh_get(&cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 						compute_stages, compute_access);
@@ -17258,12 +17246,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				if (graphics_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
-					add_wait_semaphore_nolock(Type_Generic, sem, graphics_stages, flush);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+					device_add_wait_semaphore_nolock(self, Type_Generic, sem, graphics_stages, flush);
 					sem_reset(&sem);
 				}
 				else
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 0, NULL); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
 			}
 			else
 			{
@@ -17272,50 +17260,49 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					Semaphore semaphores[2];
 					semaphores[0].data = NULL;
 					semaphores[1].data = NULL;
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 2, semaphores); }
-					add_wait_semaphore_nolock(Type_Generic, semaphores[0], graphics_stages, flush);
-					add_wait_semaphore_nolock(Type_AsyncCompute, semaphores[1], compute_stages, flush);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 2, semaphores); }
+					device_add_wait_semaphore_nolock(self, Type_Generic, semaphores[0], graphics_stages, flush);
+					device_add_wait_semaphore_nolock(self, Type_AsyncCompute, semaphores[1], compute_stages, flush);
 					sem_reset(&semaphores[0]);
 					sem_reset(&semaphores[1]);
 				}
 				else if (graphics_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
-					add_wait_semaphore_nolock(Type_Generic, sem, graphics_stages, flush);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+					device_add_wait_semaphore_nolock(self, Type_Generic, sem, graphics_stages, flush);
 					sem_reset(&sem);
 				}
 				else if (compute_stages != 0)
 				{
 					Semaphore sem; sem.data = NULL;
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 1, &sem); }
-					add_wait_semaphore_nolock(Type_AsyncCompute, sem, compute_stages, flush);
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+					device_add_wait_semaphore_nolock(self, Type_AsyncCompute, sem, compute_stages, flush);
 					sem_reset(&sem);
 				}
 				else
-					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); submit_nolock(_m, NULL, 0, NULL); }
+					{ CommandBufferHandle _m; cbh_steal(&_m, &cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
 			}
 		}
 	}
 
 	POD_VEC_DECLARE(VkSubmitInfoVec, VkSubmitInfo);
 
-	void Device::submit_queue(CommandBufferType type, VkFence *fence,
-			unsigned semaphore_count, Semaphore *semaphores)
-	{
-		type = device_get_physical_queue_type(this, type);
+	void device_submit_queue(Device *self, CommandBufferType type, VkFence *fence,
+			unsigned semaphore_count, Semaphore *semaphores){
+		type = device_get_physical_queue_type(self, type);
 
 		// Always check if we need to flush pending transfers.
 		if (type != Type_AsyncTransfer)
-			flush_frame(Type_AsyncTransfer);
+			self->flush_frame(Type_AsyncTransfer);
 
-		Device::QueueData *data = device_get_queue_data(this, type);
-		CommandBufferHandleVec *submissions = device_get_queue_submissions(this, type);
+		Device::QueueData *data = device_get_queue_data(self, type);
+		Device::CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
 
 		if (cbhvec_empty(submissions))
 		{
 			if (fence || semaphore_count)
-				submit_empty_inner(type, fence, semaphore_count, semaphores);
+				device_submit_empty_inner(self, type, fence, semaphore_count, semaphores);
 			return;
 		}
 
@@ -17340,7 +17327,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		{
 			Semaphore *semaphore = sem_handle_vec_at(&data->wait_semaphores, _wi);
 			VkSemaphore wait = semaphoreholder_consume(sem_get(semaphore));
-			SemaphoreVec_push(&device_frame(this)->recycled_semaphores, &wait);
+			SemaphoreVec_push(&device_frame(self)->recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits[0], &wait);
 		} }
 		VkPipelineStageVec_clear(&data->wait_stages);
@@ -17368,14 +17355,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			last_cmd = CommandBufferVec_size(&cmds);
 		}
 
-		VkFence cleared_fence = fence ? fencemanager_request_cleared_fence(&managers.fence) : VK_NULL_HANDLE;
+		VkFence cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
 
 		for (unsigned i = 0; i < semaphore_count; i++)
 		{
-			VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&managers.semaphore);
+			VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&self->managers.semaphore);
 			SemaphoreVec_push(&signals[VkSubmitInfoVec_size(&submits) - 1], &cleared_semaphore);
 			VK_ASSERT(!sem_is_valid(&semaphores[i]));
-			{ struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&handle_pool.semaphores); semaphoreholder_init(_sh, this, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
+			{ struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&self->handle_pool.semaphores); semaphoreholder_init(_sh, self, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
 		}
 
 		for (int i = 0; i < VkSubmitInfoVec_size(&submits); i++)
@@ -17398,13 +17385,13 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		{
 			default:
 			case Type_Generic:
-				queue = graphics_queue;
+				queue = self->graphics_queue;
 				break;
 			case Type_AsyncCompute:
-				queue = compute_queue;
+				queue = self->compute_queue;
 				break;
 			case Type_AsyncTransfer:
-				queue = transfer_queue;
+				queue = self->transfer_queue;
 				break;
 		}
 
@@ -17428,13 +17415,13 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				 * enqueuing it for the next PerFrame::begin() would wedge that frame
 				 * in vkWaitForFences(UINT64_MAX) forever. Recycle it instead and hand
 				 * the caller a null fence. */
-				FenceVec_push(&device_frame(this)->wait_fences, &cleared_fence);
+				FenceVec_push(&device_frame(self)->wait_fences, &cleared_fence);
 				*fence = cleared_fence;
 			}
 			else
 			{
 				if (cleared_fence != VK_NULL_HANDLE)
-					fencemanager_recycle_fence(&managers.fence, cleared_fence);
+					fencemanager_recycle_fence(&self->managers.fence, cleared_fence);
 				*fence = VK_NULL_HANDLE;
 			}
 			data->need_fence = false;
@@ -17443,43 +17430,42 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			data->need_fence = true;
 	}
 
-	void Device::sync_buffer_blocks()
-	{
-		if (bufferblock_vec_empty(&dma.vbo) && bufferblock_vec_empty(&dma.ubo))
+	void device_sync_buffer_blocks(Device *self){
+		if (bufferblock_vec_empty(&self->dma.vbo) && bufferblock_vec_empty(&self->dma.ubo))
 			return;
 
 		VkBufferUsageFlags usage = 0;
 
-		CommandBufferHandle cmd = device_request_command_buffer_nolock(this, Type_AsyncTransfer);
+		CommandBufferHandle cmd = device_request_command_buffer_nolock(self, Type_AsyncTransfer);
 
 		commandbuffer_begin_region(cbh_get(&cmd), "buffer-block-sync");
 
 		{
 			int _bi;
-			for (_bi = 0; _bi < dma.vbo.count; _bi++)
+			for (_bi = 0; _bi < self->dma.vbo.count; _bi++)
 			{
-				struct BufferBlock *block = &dma.vbo.items[_bi];
+				struct BufferBlock *block = &self->dma.vbo.items[_bi];
 				VK_ASSERT(block->offset != 0);
 				commandbuffer_copy_buffer(cbh_get(&cmd), *bh_get(&block->gpu), 0, *bh_get(&block->cpu), 0, block->offset);
 				usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 			}
-			for (_bi = 0; _bi < dma.ubo.count; _bi++)
+			for (_bi = 0; _bi < self->dma.ubo.count; _bi++)
 			{
-				struct BufferBlock *block = &dma.ubo.items[_bi];
+				struct BufferBlock *block = &self->dma.ubo.items[_bi];
 				VK_ASSERT(block->offset != 0);
 				commandbuffer_copy_buffer(cbh_get(&cmd), *bh_get(&block->gpu), 0, *bh_get(&block->cpu), 0, block->offset);
 				usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 			}
 		}
 
-		bufferblock_vec_clear(&dma.vbo);
-		bufferblock_vec_clear(&dma.ubo);
+		bufferblock_vec_clear(&self->dma.vbo);
+		bufferblock_vec_clear(&self->dma.ubo);
 
 		commandbuffer_end_region(cbh_get(&cmd));
 
-		// Do not flush graphics or compute in this context.
-		// We must be able to inject semaphores into all currently enqueued graphics / compute.
-		submit_staging(cmd, usage, false);
+		// Do not flush self->graphics or self->compute in self context.
+		// We must be able to inject semaphores into all currently enqueued self->graphics / self->compute.
+		device_submit_staging(self, cmd, usage, false);
 	}
 
 	void Device::end_frame_nolock()
@@ -17490,7 +17476,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		if (transfer.need_fence || !cbhvec_empty(&device_frame(this)->transfer_submissions))
 		{
 			fence = VK_NULL_HANDLE;
-			submit_queue(Type_AsyncTransfer, &fence, 0, NULL);
+			device_submit_queue(this, Type_AsyncTransfer, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
 				FenceVec_push(&device_frame(this)->recycle_fences, &fence);
 			transfer.need_fence = false;
@@ -17499,7 +17485,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		if (graphics.need_fence || !cbhvec_empty(&device_frame(this)->graphics_submissions))
 		{
 			fence = VK_NULL_HANDLE;
-			submit_queue(Type_Generic, &fence, 0, NULL);
+			device_submit_queue(this, Type_Generic, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
 				FenceVec_push(&device_frame(this)->recycle_fences, &fence);
 			graphics.need_fence = false;
@@ -17508,7 +17494,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		if (compute.need_fence || !cbhvec_empty(&device_frame(this)->compute_submissions))
 		{
 			fence = VK_NULL_HANDLE;
-			submit_queue(Type_AsyncCompute, &fence, 0, NULL);
+			device_submit_queue(this, Type_AsyncCompute, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
 				FenceVec_push(&device_frame(this)->recycle_fences, &fence);
 			compute.need_fence = false;
@@ -18568,8 +18554,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				}
 
 				Semaphore sem; sem.data = NULL;
-				self->submit(transfer_cmd, NULL, 1, &sem);
-				self->add_wait_semaphore_nolock(Type_Generic, sem, dst_stages, true);
+				device_submit(self, transfer_cmd, NULL, 1, &sem);
+				device_add_wait_semaphore_nolock(self, Type_Generic, sem, dst_stages, true);
 				sem_reset(&sem);
 			}
 
@@ -18599,16 +18585,16 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			if (share_async_graphics)
 			{
 				Semaphore sem; sem.data = NULL;
-				self->submit(graphics_cmd, NULL, 1, &sem);
+				device_submit(self, graphics_cmd, NULL, 1, &sem);
 
 				VkPipelineStageFlags dst_stages = image_get_stage_flags(ih_get(&handle));
 				if (self->graphics_queue_family_index != self->compute_queue_family_index)
 					dst_stages &= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
-				self->add_wait_semaphore_nolock(Type_AsyncCompute, sem, dst_stages, true);
+				device_add_wait_semaphore_nolock(self, Type_AsyncCompute, sem, dst_stages, true);
 				sem_reset(&sem);
 			}
 			else
-				self->submit(graphics_cmd);
+				device_submit(self, graphics_cmd, NULL, 0, NULL);
 		}
 		else if (create_info.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
 		{
@@ -18619,7 +18605,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					image_get_access_flags(ih_get(&handle)) &
 					image_layout_to_possible_access(create_info.initial_layout));
 
-			self->submit(cmd);
+			device_submit(self, cmd, NULL, 0, NULL);
 		}
 
 		return handle;
@@ -18732,7 +18718,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			commandbuffer_copy_buffer_whole(cbh_get(&cmd), *bh_get(&handle), *bh_get(&staging_buffer));
 			commandbuffer_end_region(cbh_get(&cmd));
 
-			self->submit_staging(cmd, info.usage, true);
+			device_submit_staging(self, cmd, info.usage, true);
 			/* Drop the staging buffer's producer reference (the GPU copy is
 			 * submitted; the staging buffer's lifetime ends with self scope,
 			 * previously via the handle's destructor). */
