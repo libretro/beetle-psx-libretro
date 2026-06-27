@@ -10090,8 +10090,8 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect &rect, uin
 
 	if (!wrap)
 	{
-		for (uint16_t y = 0; y < rect.height; y++)
-			{ uint16_t x; for (x = 0; x < rect.width; x++) vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]); }
+		{ uint16_t y; for (y = 0; y < rect.height; y++)
+			{ uint16_t x; for (x = 0; x < rect.width; x++) vram[(y + rect.y) * FB_WIDTH + (x + rect.x)] = uint16_t(mapped[y * rect.width + x]); } }
 	}
 	else
 	{
@@ -14128,9 +14128,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			unsigned subpass, unsigned attachment)
 	{
 		const VkAttachmentReference *colors = subpasses[subpass].pColorAttachments;
-		for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
+		{ unsigned i; for (i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
 			if (colors[i].attachment == attachment)
-				return (VkAttachmentReference *)(&colors[i]);
+				return (VkAttachmentReference *)(&colors[i]); }
 		return NULL;
 	}
 
@@ -14141,9 +14141,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			return NULL;
 
 		const VkAttachmentReference *resolves = subpasses[subpass].pResolveAttachments;
-		for (unsigned i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
+		{ unsigned i; for (i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
 			if (resolves[i].attachment == attachment)
-				return (VkAttachmentReference *)(&resolves[i]);
+				return (VkAttachmentReference *)(&resolves[i]); }
 		return NULL;
 	}
 
@@ -14151,9 +14151,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			unsigned subpass, unsigned attachment)
 	{
 		const VkAttachmentReference *inputs = subpasses[subpass].pInputAttachments;
-		for (unsigned i = 0; i < subpasses[subpass].inputAttachmentCount; i++)
+		{ unsigned i; for (i = 0; i < subpasses[subpass].inputAttachmentCount; i++)
 			if (inputs[i].attachment == attachment)
-				return (VkAttachmentReference *)(&inputs[i]);
+				return (VkAttachmentReference *)(&inputs[i]); }
 		return NULL;
 	}
 
@@ -14625,16 +14625,16 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		{ unsigned subpass; for (subpass = 0; subpass < num_subpasses; subpass++) {
 			VkSubpassDescription &pass = *VkSubpassDescriptionVec_at(&subpasses, subpass);
 			unsigned preserve_count = 0;
-			for (unsigned attachment = 0; attachment < num_attachments; attachment++)
+			{ unsigned attachment; for (attachment = 0; attachment < num_attachments; attachment++)
 				if (preserve_masks[attachment] & (1u << subpass))
-					preserve_count++;
+					preserve_count++; }
 
 			uint32_t *preserve = stackalloc_u32_allocate_cleared(&preserve_allocator, preserve_count);
 			pass.pPreserveAttachments = preserve;
 			pass.preserveAttachmentCount = preserve_count;
-			for (unsigned attachment = 0; attachment < num_attachments; attachment++)
+			{ unsigned attachment; for (attachment = 0; attachment < num_attachments; attachment++)
 				if (preserve_masks[attachment] & (1u << subpass))
-					*preserve++ = attachment;
+					*preserve++ = attachment; }
 		} }
 
 		VK_ASSERT(num_subpasses > 0);
@@ -14931,9 +14931,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		Hasher h; hasher_init(&h);
 		hasher_u64(&h, rp->intrusive_node.key);
 
-		for (unsigned i = 0; i < info.num_color_attachments; i++)
+		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++)
 			if (info.color_attachments[i])
-				hasher_u64(&h, info.color_attachments[i]->cookie_base.cookie);
+				hasher_u64(&h, info.color_attachments[i]->cookie_base.cookie); }
 
 		if (info.depth_stencil)
 			hasher_u64(&h, info.depth_stencil->cookie_base.cookie);
@@ -16518,13 +16518,13 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		if (layer_count)
 			vkEnumerateDeviceLayerProperties(gpu, &layer_count, queried_layers);
 
-		for (uint32_t i = 0; i < num_required_device_extensions; i++)
+		{ uint32_t i; for (i = 0; i < num_required_device_extensions; i++)
 			if (!has_vk_extension(queried_extensions, ext_count, required_device_extensions[i]))
-			{ free(queried_extensions); free(queried_layers); return false; }
+			{ free(queried_extensions); free(queried_layers); return false; } }
 
-		for (uint32_t i = 0; i < num_required_device_layers; i++)
+		{ uint32_t i; for (i = 0; i < num_required_device_layers; i++)
 			if (!has_vk_layer(queried_layers, layer_count, required_device_layers[i]))
-			{ free(queried_extensions); free(queried_layers); return false; }
+			{ free(queried_extensions); free(queried_layers); return false; } }
 
 		self->gpu = gpu;
 		vkGetPhysicalDeviceProperties(gpu, &self->gpu_props);
@@ -18483,8 +18483,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				uint8_t *dst = (uint8_t *)(tfl_data(&layout, layer, level));
 				const uint8_t *src = (const uint8_t *)(initial[index].data);
 
-				for (uint32_t z = 0; z < mip_info->depth; z++)
-					{ uint32_t y; for (y = 0; y < mip_info->block_image_height; y++) memcpy(dst + z * dst_height_stride + y * row_size, src + z * src_height_stride + y * src_row_stride, row_size); }
+				{ uint32_t z; for (z = 0; z < mip_info->depth; z++)
+					{ uint32_t y; for (y = 0; y < mip_info->block_image_height; y++) memcpy(dst + z * dst_height_stride + y * row_size, src + z * src_height_stride + y * src_row_stride, row_size); } }
 			} }
 		} }
 
@@ -19013,8 +19013,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect.y / BLOCK_HEIGHT;
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-		for (unsigned y = ybegin; y <= yend; y++)
-			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED; }
+		{ unsigned y; for (y = ybegin; y <= yend; y++)
+			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED; } }
 	}
 
 	static bool fbatlas_texture_rendered(FBAtlas *self, const Rect &rect)
@@ -19026,10 +19026,10 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect.y / BLOCK_HEIGHT;
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-		for (unsigned y = ybegin; y <= yend; y++)
-			for (unsigned x = xbegin; x <= xend; x++)
+		{ unsigned y; for (y = ybegin; y <= yend; y++)
+			{ unsigned x; for (x = xbegin; x <= xend; x++)
 				if ((*fbatlas_info(self, x, y)) & STATUS_TEXTURE_RENDERED)
-					return true;
+					return true; } }
 		return false;
 	}
 
@@ -19155,8 +19155,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			resolve_domains |= STATUS_SFB_ONLY;
 		}
 
-		for (unsigned y = ybegin; y <= yend; y++)
-			{ unsigned x; for (x = xbegin; x <= xend; x++) write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains; }
+		{ unsigned y; for (y = ybegin; y <= yend; y++)
+			{ unsigned x; for (x = xbegin; x <= xend; x++) write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains; } }
 
 		// Trying to update VRAM before fragment is done reading it.
 		// We could use copy-on-write here to avoid flushing, but this scenario is very rare.
@@ -19166,8 +19166,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		if (write_domains)
 			fbatlas_pipeline_barrier(self, write_domains);
 
-		for (unsigned y = ybegin; y <= yend; y++)
-			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) = ((*fbatlas_info(self, x, y)) & ~STATUS_OWNERSHIP_MASK) | resolve_domains; }
+		{ unsigned y; for (y = ybegin; y <= yend; y++)
+			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) = ((*fbatlas_info(self, x, y)) & ~STATUS_OWNERSHIP_MASK) | resolve_domains; } }
 
 		return (write_domains & STATUS_FRAGMENT_SFB_READ) != 0;
 	}
@@ -19222,14 +19222,14 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			}
 		}
 
-		for (unsigned y = ybegin; y <= yend; y++)
-			{ unsigned x; for (x = xbegin; x <= xend; x++) write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains; }
+		{ unsigned y; for (y = ybegin; y <= yend; y++)
+			{ unsigned x; for (x = xbegin; x <= xend; x++) write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains; } }
 
 		if (write_domains)
 			fbatlas_pipeline_barrier(self, write_domains);
 
-		for (unsigned y = ybegin; y <= yend; y++)
-			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) |= resolve_domains; }
+		{ unsigned y; for (y = ybegin; y <= yend; y++)
+			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) |= resolve_domains; } }
 	}
 
 	static void fbatlas_sync_domain(FBAtlas *self, Domain domain, const Rect &rect)
@@ -19248,8 +19248,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned dirty_bits = 1u << (domain == Domain_Unscaled ? STATUS_SFB_ONLY : STATUS_FB_ONLY);
 		unsigned bits = 0;
 
-		for (unsigned y = ybegin; y <= yend; y++)
-			{ unsigned x; for (x = xbegin; x <= xend; x++) bits |= 1u << ((*fbatlas_info(self, x, y)) & STATUS_OWNERSHIP_MASK); }
+		{ unsigned y; for (y = ybegin; y <= yend; y++)
+			{ unsigned x; for (x = xbegin; x <= xend; x++) bits |= 1u << ((*fbatlas_info(self, x, y)) & STATUS_OWNERSHIP_MASK); } }
 
 		unsigned write_domains = 0;
 
@@ -19371,8 +19371,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect.y / BLOCK_HEIGHT;
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-		for (unsigned y = ybegin; y <= yend; y++)
-			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) |= STATUS_TEXTURE_RENDERED; }
+		{ unsigned y; for (y = ybegin; y <= yend; y++)
+			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) |= STATUS_TEXTURE_RENDERED; } }
 	}
 
 	static void fbatlas_extend_render_pass(FBAtlas *self, const Rect &rect, bool scissor)
@@ -19475,8 +19475,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect.y / BLOCK_HEIGHT;
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
-		for (unsigned y = ybegin; y <= yend; y++)
-			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED; }
+		{ unsigned y; for (y = ybegin; y <= yend; y++)
+			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED; } }
 	}
 
 	static void fbatlas_discard_render_pass(FBAtlas *self)
@@ -22537,9 +22537,9 @@ static void ensure_sync_index_resources(void)
 {
    unsigned mask = vulkan->get_sync_index_mask(vulkan->handle);
    unsigned num_frames = 0;
-   for (unsigned i = 0; i < 32; i++)
+   { unsigned i; for (i = 0; i < 32; i++)
       if (mask & (1u << i))
-         num_frames = i + 1;
+         num_frames = i + 1; }
 
    if (num_frames != swapchain_images.size())
    {
