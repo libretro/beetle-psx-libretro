@@ -7306,6 +7306,17 @@ extern retro_log_printf_t log_cb;
 		dst->texture.data = src->texture.data;
 		if (dst->texture.data) image_add_reference(dst->texture.data);  /* retain */
 	}
+	/* Seed a raw (uninitialised) FusedPage slot's only heap-owning C++ member --
+	 * fusion.rects (an OwnedRectVec) -- to the empty state, so the subsequent
+	 * fp_copy's *dst=*src (which runs OwnedRectVec::operator=) does not release
+	 * through the slot's indeterminate items/count. Required before fp_copy into
+	 * malloc'd storage (grow/push); the in-place compaction path already has a
+	 * live dst and must NOT use this. */
+	static inline void fp_init_raw(FusedPage *p) {
+		p->fusion.rects.v.items = NULL;
+		p->fusion.rects.v.count = 0;
+		p->fusion.rects.v.cap = 0;
+	}
 	static inline void fp_destroy(FusedPage *p) {
 		ih_reset(&p->texture);
 	}
@@ -7335,6 +7346,7 @@ extern retro_log_printf_t log_cb;
 		FusedPage *nitems = (FusedPage *)malloc((size_t)ncap * sizeof(FusedPage));
 		int i;
 		for (i = 0; i < v->count; i++) {
+			fp_init_raw(&nitems[i]);
 			fp_copy(&nitems[i], &v->items[i]);
 			fp_destroy(&v->items[i]);
 		}
@@ -7358,6 +7370,7 @@ extern retro_log_printf_t log_cb;
 	{
 		if (v->count >= v->cap)
 			fused_page_vec_grow(v, v->cap ? v->cap * 2 : 8);
+		fp_init_raw(&v->items[v->count]);
 		fp_copy(&v->items[v->count], e);
 		v->count++;
 	}
