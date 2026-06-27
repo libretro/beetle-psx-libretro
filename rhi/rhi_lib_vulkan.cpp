@@ -8697,6 +8697,41 @@ extern retro_log_printf_t log_cb;
 		q->scissor_invariant = false;
 	}
 
+	/* Owning uint32_t buffer (the VRAM snapshot in a SaveState). De-C++'d from a
+	 * move-only class to a plain struct + owned_u32_* free functions: init nulls it,
+	 * deinit frees, assign deep-copies, move steals (source left empty). */
+	struct OwnedU32Buf
+	{
+		uint32_t *items;
+		size_t    n;
+	};
+
+	static inline void owned_u32_init(struct OwnedU32Buf *b) { b->items = NULL; b->n = 0; }
+	static inline void owned_u32_deinit(struct OwnedU32Buf *b) { free(b->items); b->items = NULL; b->n = 0; }
+	static inline void owned_u32_assign(struct OwnedU32Buf *b, const uint32_t *src, size_t count)
+	{
+		free(b->items);
+		b->items = NULL; b->n = 0;
+		if (count)
+		{
+			b->items = (uint32_t *)malloc(count * sizeof(uint32_t));
+			memcpy(b->items, src, count * sizeof(uint32_t));
+			b->n = count;
+		}
+	}
+	/* Steal src into dst (dst's prior contents freed); src left empty. */
+	static inline void owned_u32_move(struct OwnedU32Buf *dst, struct OwnedU32Buf *src)
+	{
+		if (dst != src)
+		{
+			free(dst->items);
+			dst->items = src->items; dst->n = src->n;
+			src->items = NULL; src->n = 0;
+		}
+	}
+	static inline const uint32_t *owned_u32_data(const struct OwnedU32Buf *b) { return b->items; }
+	static inline bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
+
 	class Renderer
 	{
 		public:
@@ -8709,50 +8744,38 @@ extern retro_log_printf_t log_cb;
 			 * in a file-static that is move-assigned across renderer
 			 * recreations, so it is move-only with a free-existing move-assign
 			 * and a destructor, and copying is deleted. */
-			struct OwnedU32Buf
-			{
-				uint32_t *items;
-				size_t    n;
-
-				OwnedU32Buf() : items(NULL), n(0) {}
-				~OwnedU32Buf() { free(items); }
-
-				OwnedU32Buf(OwnedU32Buf &&o) : items(o.items), n(o.n) { o.items = NULL; o.n = 0; }
-				OwnedU32Buf &operator=(OwnedU32Buf &&o)
-				{
-					if (this != &o)
-					{
-						free(items);
-						items = o.items; n = o.n;
-						o.items = NULL; o.n = 0;
-					}
-					return *this;
-				}
-				OwnedU32Buf(const OwnedU32Buf &) = delete;
-				OwnedU32Buf &operator=(const OwnedU32Buf &) = delete;
-
-				/* Deep-copy n elements from src into a fresh buffer. */
-				void assign(const uint32_t *src, size_t count)
-				{
-					free(items);
-					items = NULL; n = 0;
-					if (count)
-					{
-						items = (uint32_t *)malloc(count * sizeof(uint32_t));
-						memcpy(items, src, count * sizeof(uint32_t));
-						n = count;
-					}
-				}
-
-				const uint32_t *data() const { return items; }
-				bool empty() const { return n == 0; }
-			};
 
 			struct SaveState
 			{
 				OwnedU32Buf vram;
 				RenderState state;
 				TextureTrackerSaveState tracker_state;
+
+				/* vram is now a plain struct (no ctor/dtor/move of its own), so
+				 * SaveState manages it explicitly via owned_u32_*; state is POD and
+				 * tracker_state keeps its own (still C++) move-only semantics. */
+				SaveState() { owned_u32_init(&vram); }
+				~SaveState() { owned_u32_deinit(&vram); }
+
+				SaveState(SaveState &&o) noexcept
+					: state(o.state),
+					  tracker_state(static_cast<TextureTrackerSaveState &&>(o.tracker_state))
+				{
+					owned_u32_init(&vram);
+					owned_u32_move(&vram, &o.vram);
+				}
+				SaveState &operator=(SaveState &&o) noexcept
+				{
+					if (this != &o)
+					{
+						owned_u32_move(&vram, &o.vram);
+						state = o.state;
+						tracker_state = static_cast<TextureTrackerSaveState &&>(o.tracker_state);
+					}
+					return *this;
+				}
+				SaveState(const SaveState &) = delete;
+				SaveState &operator=(const SaveState &) = delete;
 			};
 
 			Renderer(Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
@@ -9433,7 +9456,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	}
 
 	ImageInitialData initial_vram = {
-		state ? state->vram.data() : NULL, 0, 0,
+		state ? owned_u32_data(&state->vram) : NULL, 0, 0,
 	};
 	ih_move(&framebuffer, device->create_image(info, state ? &initial_vram : NULL));
 	image_set_layout(ih_get(&framebuffer), Layout_General);
@@ -9580,10 +9603,15 @@ Renderer::SaveState Renderer::save_vram_state()
 			device->map_host_buffer(*bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
 	/* Deep-copy the mapped VRAM straight into the owning buffer (no
 	 * default zero-fill), then move it into the returned SaveState. */
-	Renderer::OwnedU32Buf vram;
-	vram.assign(src, FB_WIDTH * FB_HEIGHT);
+	OwnedU32Buf vram;
+	owned_u32_init(&vram);
+	owned_u32_assign(&vram, src, FB_WIDTH * FB_HEIGHT);
 	device->unmap_host_buffer(*bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
-	return { static_cast<Renderer::OwnedU32Buf &&>(vram), render_state, texture_tracker_save_state(&tracker) };
+	Renderer::SaveState out;
+	owned_u32_move(&out.vram, &vram);
+	out.state = render_state;
+	out.tracker_state = texture_tracker_save_state(&tracker);
+	return out;
 }
 
 void Renderer::init_primitive_pipelines()
@@ -21877,7 +21905,7 @@ static void vk_context_reset(void)
    device->set_context(*context);
 
    renderer = (Renderer *)malloc(sizeof(Renderer));
-   new (renderer) Renderer(*device, scaling, msaa, save_state.vram.empty() ? NULL : &save_state);
+   new (renderer) Renderer(*device, scaling, msaa, owned_u32_empty(&save_state.vram) ? NULL : &save_state);
    if (!renderer->is_valid())
    {
       renderer->~Renderer();
