@@ -4005,83 +4005,113 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 
 	struct ImageCreateInfo
 	{
-		ImageDomain domain = ImageDomain_Physical;
-		unsigned width = 0;
-		unsigned height = 0;
-		unsigned depth = 1;
-		unsigned levels = 1;
-		VkFormat format = VK_FORMAT_UNDEFINED;
-		VkImageType type = VK_IMAGE_TYPE_2D;
-		unsigned layers = 1;
-		VkImageUsageFlags usage = 0;
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-		VkImageCreateFlags flags = 0;
-		ImageMiscFlags misc = 0;
-		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-		VkComponentMapping swizzle = {
-			VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
-		};
-
-		static ImageCreateInfo immutable_2d_image(unsigned width, unsigned height, VkFormat format, bool mipmapped = false)
-		{
-			ImageCreateInfo info;
-			info.width = width;
-			info.height = height;
-			info.depth = 1;
-			info.levels = mipmapped ? 0u : 1u;
-			info.format = format;
-			info.type = VK_IMAGE_TYPE_2D;
-			info.layers = 1;
-			info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-			info.samples = VK_SAMPLE_COUNT_1_BIT;
-			info.flags = 0;
-			info.misc = mipmapped ? (unsigned)(IMAGE_MISC_GENERATE_MIPS_BIT) : 0u;
-			info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			return info;
-		}
-
-		static ImageCreateInfo render_target(unsigned width, unsigned height, VkFormat format)
-		{
-			ImageCreateInfo info;
-			info.width = width;
-			info.height = height;
-			info.depth = 1;
-			info.levels = 1;
-			info.format = format;
-			info.type = VK_IMAGE_TYPE_2D;
-			info.layers = 1;
-			info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
-					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
-				VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-			info.samples = VK_SAMPLE_COUNT_1_BIT;
-			info.flags = 0;
-			info.misc = 0;
-			info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-			return info;
-		}
-
-		static ImageCreateInfo transient_render_target(unsigned width, unsigned height, VkFormat format)
-		{
-			ImageCreateInfo info;
-			info.domain = ImageDomain_Transient;
-			info.width = width;
-			info.height = height;
-			info.depth = 1;
-			info.levels = 1;
-			info.format = format;
-			info.type = VK_IMAGE_TYPE_2D;
-			info.layers = 1;
-			info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
-					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
-				VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-			info.samples = VK_SAMPLE_COUNT_1_BIT;
-			info.flags = 0;
-			info.misc = 0;
-			info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-			return info;
-		}
+		ImageDomain domain;
+		unsigned width;
+		unsigned height;
+		unsigned depth;
+		unsigned levels;
+		VkFormat format;
+		VkImageType type;
+		unsigned layers;
+		VkImageUsageFlags usage;
+		VkSampleCountFlagBits samples;
+		VkImageCreateFlags flags;
+		ImageMiscFlags misc;
+		VkImageLayout initial_layout;
+		VkComponentMapping swizzle;
 	};
+
+	/* Establishes the former NSDMI defaults. CRITICAL: sets swizzle to the RGBA
+	 * identity. The three factory helpers and the custom-texture upload path all
+	 * set the scalar fields by hand but NOT swizzle -- leaving it uninitialised
+	 * here feeds a garbage VkComponentMapping to vkCreateImageView, which is the
+	 * exact swizzle SIGSEGV this campaign already hit once (commit d078f49).
+	 * Every bare ImageCreateInfo declaration MUST call this first. */
+	static inline void image_create_info_defaults(struct ImageCreateInfo *self)
+	{
+		self->domain         = ImageDomain_Physical;
+		self->width          = 0;
+		self->height         = 0;
+		self->depth          = 1;
+		self->levels         = 1;
+		self->format         = VK_FORMAT_UNDEFINED;
+		self->type           = VK_IMAGE_TYPE_2D;
+		self->layers         = 1;
+		self->usage          = 0;
+		self->samples        = VK_SAMPLE_COUNT_1_BIT;
+		self->flags          = 0;
+		self->misc           = 0;
+		self->initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+		self->swizzle.r      = VK_COMPONENT_SWIZZLE_R;
+		self->swizzle.g      = VK_COMPONENT_SWIZZLE_G;
+		self->swizzle.b      = VK_COMPONENT_SWIZZLE_B;
+		self->swizzle.a      = VK_COMPONENT_SWIZZLE_A;
+	}
+
+	/* The three former static factory methods, as free functions. Each calls
+	 * defaults() first (so swizzle + every unset field is correct) then sets the
+	 * fields it cares about, matching the old method bodies exactly. */
+	static inline struct ImageCreateInfo image_create_info_immutable_2d_image(unsigned width, unsigned height, VkFormat format, bool mipmapped)
+	{
+		struct ImageCreateInfo info;
+		image_create_info_defaults(&info);
+		info.width = width;
+		info.height = height;
+		info.depth = 1;
+		info.levels = mipmapped ? 0u : 1u;
+		info.format = format;
+		info.type = VK_IMAGE_TYPE_2D;
+		info.layers = 1;
+		info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+		info.samples = VK_SAMPLE_COUNT_1_BIT;
+		info.flags = 0;
+		info.misc = mipmapped ? (unsigned)(IMAGE_MISC_GENERATE_MIPS_BIT) : 0u;
+		info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		return info;
+	}
+
+	static inline struct ImageCreateInfo image_create_info_render_target(unsigned width, unsigned height, VkFormat format)
+	{
+		struct ImageCreateInfo info;
+		image_create_info_defaults(&info);
+		info.width = width;
+		info.height = height;
+		info.depth = 1;
+		info.levels = 1;
+		info.format = format;
+		info.type = VK_IMAGE_TYPE_2D;
+		info.layers = 1;
+		info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+			VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		info.samples = VK_SAMPLE_COUNT_1_BIT;
+		info.flags = 0;
+		info.misc = 0;
+		info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+		return info;
+	}
+
+	static inline struct ImageCreateInfo image_create_info_transient_render_target(unsigned width, unsigned height, VkFormat format)
+	{
+		struct ImageCreateInfo info;
+		image_create_info_defaults(&info);
+		info.domain = ImageDomain_Transient;
+		info.width = width;
+		info.height = height;
+		info.depth = 1;
+		info.levels = 1;
+		info.format = format;
+		info.type = VK_IMAGE_TYPE_2D;
+		info.layers = 1;
+		info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+			VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		info.samples = VK_SAMPLE_COUNT_1_BIT;
+		info.flags = 0;
+		info.misc = 0;
+		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		return info;
+	}
 
 	struct Image;
 
@@ -9712,7 +9742,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 		return;
 	}
 
-	ImageCreateInfo info = ImageCreateInfo::render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
+	ImageCreateInfo info = image_create_info_render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 	info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 	             VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -9826,7 +9856,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 		commandbuffer_clear_image(cbh_get(&self->cmd), *ih_get(&self->framebuffer), {});
 	commandbuffer_full_barrier(cbh_get(&self->cmd));
 
-	ImageCreateInfo dither_info = ImageCreateInfo::immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM);
+	ImageCreateInfo dither_info = image_create_info_immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM, false);
 	// This lut is biased with 4 to be able to use UNORM easily.
 	static const uint8_t dither_lut_data[16] = { 0, 4, 1, 5, 6, 2, 7, 3, 1, 5, 0, 4, 7, 3, 6, 2 };
 
@@ -10413,7 +10443,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
 	unsigned render_scale = scaled ? self->scaling : 1;
 
-	ImageCreateInfo info = ImageCreateInfo::render_target(
+	ImageCreateInfo info = image_create_info_render_target(
 			FB_WIDTH * render_scale,
 			FB_HEIGHT * render_scale,
 			VK_FORMAT_A1R5G5B5_UNORM_PACK16); // Default to 15bit color for now
@@ -10502,7 +10532,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 
 		renderer_ensure_command_buffer(self);
 
-		ImageCreateInfo info = ImageCreateInfo::render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
+		ImageCreateInfo info = image_create_info_render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
 
 		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		info.usage =
@@ -10601,7 +10631,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 
 	DisplayRect display_rect = renderer_compute_display_rect(self);
 
-	ImageCreateInfo info = ImageCreateInfo::render_target(
+	ImageCreateInfo info = image_create_info_render_target(
 			display_rect.width * render_scale,
 			display_rect.height * render_scale,
 			self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM);
@@ -11914,6 +11944,7 @@ ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels){
 	ImageInitialData initial[16]; /* Vulkan caps mip levels well under this */
 	int i;
 	int n = levels.count;
+	image_create_info_defaults(&info); /* sets swizzle + all fields; the per-field assignments below never set swizzle */
 	if (n > 16)
 		n = 16;
 	info.width = levels.levels[0].width;
@@ -11939,7 +11970,7 @@ ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels){
 	return image;
 }
 ImageHandle renderer_create_texture(Renderer *self, int width, int height, int levels){
-	ImageCreateInfo info = ImageCreateInfo::immutable_2d_image(width, height, VK_FORMAT_R8G8B8A8_UNORM, false);
+	ImageCreateInfo info = image_create_info_immutable_2d_image(width, height, VK_FORMAT_R8G8B8A8_UNORM, false);
 	info.levels = levels;
 	info.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -14991,7 +15022,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		if (node)
 			return &image_get_view(ih_get(&node->handle));
 
-		image_info = ImageCreateInfo::transient_render_target(width, height, format);
+		image_info = image_create_info_transient_render_target(width, height, format);
 
 		image_info.samples = (VkSampleCountFlagBits)(samples);
 		image_info.layers = layers;
