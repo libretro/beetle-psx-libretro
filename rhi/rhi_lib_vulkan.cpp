@@ -3103,51 +3103,37 @@ void block_allocate(struct Block *self, uint32_t num_blocks, DeviceAllocation *b
 void block_free(struct Block *self, uint32_t mask);
 
 struct MiniHeap;
-class ClassAllocator;
+struct ClassAllocator;
 class DeviceAllocator;
-class Allocator;
+struct Allocator;
 
+/* DeviceAllocation: plain bookkeeping value. Converted from a struct-with-methods
+ * to a plain C struct + deviceallocation_* free functions. It is always brace-
+ * initialized to {} at its allocation sites, so the former default member
+ * initializers (all NULL/0/false) are unnecessary. The two free_immediate
+ * overloads split by name: the 0-arg recycle path is deviceallocation_free_immediate,
+ * the DeviceAllocator* variant is deviceallocation_free_immediate_alloc. */
 struct DeviceAllocation
 {
-	friend class ClassAllocator;
-	friend class Allocator;
-	friend void block_allocate(struct Block *self, uint32_t num_blocks, DeviceAllocation *block);
-	friend class DeviceAllocator;
+	VkDeviceMemory base;
+	uint8_t *host_base;
+	struct ClassAllocator *alloc;
+	struct MiniHeap *heap;
+	uint32_t offset;
+	uint32_t mask;
+	uint32_t size;
 
-public:
-	inline VkDeviceMemory get_memory() const
-	{
-		return base;
-	}
-
-	inline uint32_t get_offset() const
-	{
-		return offset;
-	}
-
-	inline uint32_t get_size() const
-	{
-		return size;
-	}
-
-	void free_immediate();
-	void free_immediate(DeviceAllocator &allocator);
-
-private:
-	VkDeviceMemory base = VK_NULL_HANDLE;
-	uint8_t *host_base = NULL;
-	ClassAllocator *alloc = NULL;
-	MiniHeap *heap = NULL;
-	uint32_t offset = 0;
-	uint32_t mask = 0;
-	uint32_t size = 0;
-
-	uint8_t tiling = 0;
-	uint8_t memory_type = 0;
-	bool hierarchical = false;
-
-	void free_global(DeviceAllocator &allocator, uint32_t size, uint32_t memory_type);
+	uint8_t tiling;
+	uint8_t memory_type;
+	bool hierarchical;
 };
+
+static inline VkDeviceMemory deviceallocation_get_memory(const struct DeviceAllocation *self) { return self->base; }
+static inline uint32_t deviceallocation_get_offset(const struct DeviceAllocation *self) { return self->offset; }
+static inline uint32_t deviceallocation_get_size(const struct DeviceAllocation *self) { return self->size; }
+void deviceallocation_free_immediate(struct DeviceAllocation *self);
+void deviceallocation_free_immediate_alloc(struct DeviceAllocation *self, DeviceAllocator *allocator);
+void deviceallocation_free_global(struct DeviceAllocation *self, DeviceAllocator *allocator, uint32_t size, uint32_t memory_type);
 
 /* Owning array of (trivially copyable) DeviceAllocation. Replaces
  * std::vector<DeviceAllocation> for a frame's deferred-free list. DeviceAllocation
@@ -3192,104 +3178,86 @@ struct MiniHeap
 static_assert(offsetof(MiniHeap, list_node) == 0,
 		"MiniHeap.list_node must be the first member for intrusive-list casts");
 
-class Allocator;
+struct Allocator;
 
-class ClassAllocator
+/* AllocationTilingHeaps hoisted out of ClassAllocator (was a nested type) to file
+ * scope as ClassAllocatorTilingHeaps. */
+struct ClassAllocatorTilingHeaps
 {
-public:
-	friend class Allocator;
-	~ClassAllocator();
+	struct IntrusiveListC heaps[BLOCK_NUM_SUB_BLOCKS];
+	struct IntrusiveListC full_heaps;
+	uint32_t heap_availability_mask;
+};
 
-	inline void set_tiling_mask(uint32_t mask)
-	{
-		tiling_mask = mask;
-	}
-
-	inline void set_sub_block_size(uint32_t size)
-	{
-		sub_block_size_log2 = log2_integer(size);
-		sub_block_size = size;
-	}
-
-	bool allocate(uint32_t size, AllocationTiling tiling, DeviceAllocation *alloc, bool hierarchical);
-	void free(DeviceAllocation *alloc);
-
-private:
-	ClassAllocator() { object_pool_raw_init(&object_pool, sizeof(MiniHeap)); }
-	struct AllocationTilingHeaps
-	{
-		struct IntrusiveListC heaps[BLOCK_NUM_SUB_BLOCKS];
-		struct IntrusiveListC full_heaps;
-		uint32_t heap_availability_mask = 0;
-	};
-	ClassAllocator *parent = NULL;
-	AllocationTilingHeaps tiling_modes[ALLOCATION_TILING_COUNT];
+/* ClassAllocator: per-size-class sub-allocator. Converted from a C++ class to a
+ * plain C struct + classallocator_* free functions. The private default ctor
+ * (init the MiniHeap pool) becomes classallocator_init; the dtor (leak check +
+ * pool deinit) becomes classallocator_fini. heap_availability_mask and the
+ * scalar fields are seeded in classallocator_init (no in-struct initializers in
+ * a plain C struct). */
+struct ClassAllocator
+{
+	struct ClassAllocator *parent;
+	struct ClassAllocatorTilingHeaps tiling_modes[ALLOCATION_TILING_COUNT];
 	struct ObjectPoolRaw object_pool;
 
-	uint32_t sub_block_size = 1;
-	uint32_t sub_block_size_log2 = 0;
-	uint32_t tiling_mask = ~0u;
-	uint32_t memory_type = 0;
-	DeviceAllocator *global_allocator = NULL;
-
-	void set_global_allocator(DeviceAllocator *allocator)
-	{
-		global_allocator = allocator;
-	}
-
-	void set_memory_type(uint32_t type)
-	{
-		memory_type = type;
-	}
-
-	void suballocate(uint32_t num_blocks, uint32_t tiling, uint32_t memory_type, MiniHeap &heap,
-	                 DeviceAllocation *alloc);
-
-	inline void set_parent(ClassAllocator *allocator)
-	{
-		parent = allocator;
-	}
+	uint32_t sub_block_size;
+	uint32_t sub_block_size_log2;
+	uint32_t tiling_mask;
+	uint32_t memory_type;
+	DeviceAllocator *global_allocator;
 };
 
-class Allocator
+void classallocator_init(struct ClassAllocator *self);
+void classallocator_fini(struct ClassAllocator *self);
+bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, AllocationTiling tiling, struct DeviceAllocation *alloc, bool hierarchical);
+void classallocator_free(struct ClassAllocator *self, struct DeviceAllocation *alloc);
+void classallocator_suballocate(struct ClassAllocator *self, uint32_t num_blocks, uint32_t tiling, uint32_t memory_type, struct MiniHeap *heap, struct DeviceAllocation *alloc);
+
+static inline void classallocator_set_tiling_mask(struct ClassAllocator *self, uint32_t mask) { self->tiling_mask = mask; }
+static inline void classallocator_set_sub_block_size(struct ClassAllocator *self, uint32_t size)
 {
-public:
-	Allocator();
-	void operator=(const Allocator &) = delete;
-	Allocator(const Allocator &) = delete;
+	self->sub_block_size_log2 = log2_integer(size);
+	self->sub_block_size = size;
+}
+static inline void classallocator_set_global_allocator(struct ClassAllocator *self, DeviceAllocator *allocator) { self->global_allocator = allocator; }
+static inline void classallocator_set_memory_type(struct ClassAllocator *self, uint32_t type) { self->memory_type = type; }
+static inline void classallocator_set_parent(struct ClassAllocator *self, struct ClassAllocator *allocator) { self->parent = allocator; }
 
-	bool allocate(uint32_t size, uint32_t alignment, AllocationTiling tiling, DeviceAllocation *alloc);
-	bool allocate_global(uint32_t size, DeviceAllocation *alloc);
-	bool allocate_dedicated(uint32_t size, DeviceAllocation *alloc, VkImage image);
-	inline ClassAllocator &get_class_allocator(MemoryClass clazz)
-	{
-		return classes[(unsigned)(clazz)];
-	}
-
-	static void free(DeviceAllocation *alloc)
-	{
-		alloc->free_immediate();
-	}
-
-	void set_memory_type(uint32_t memory_type)
-	{
-		for (ClassAllocator &sub : classes)
-			sub.set_memory_type(memory_type);
-		this->memory_type = memory_type;
-	}
-
-	void set_global_allocator(DeviceAllocator *allocator)
-	{
-		for (ClassAllocator &sub : classes)
-			sub.set_global_allocator(allocator);
-		global_allocator = allocator;
-	}
-
-private:
-	ClassAllocator classes[MEMORY_CLASS_COUNT];
-	DeviceAllocator *global_allocator = NULL;
-	uint32_t memory_type = 0;
+/* Allocator: per-memory-type front end owning one ClassAllocator per size class.
+ * Converted from a C++ class to a plain C struct + alloc_* free functions. The
+ * range-for loops over the by-value classes[] array become index loops. The
+ * former static free() (which just forwarded to DeviceAllocation::free_immediate)
+ * becomes alloc_free. ClassAllocator must be a complete type above this point
+ * because classes[] is by value. */
+struct Allocator
+{
+	struct ClassAllocator classes[MEMORY_CLASS_COUNT];
+	DeviceAllocator *global_allocator;
+	uint32_t memory_type;
 };
+
+void alloc_init(struct Allocator *self);
+bool alloc_allocate(struct Allocator *self, uint32_t size, uint32_t alignment, AllocationTiling tiling, struct DeviceAllocation *alloc);
+bool alloc_allocate_global(struct Allocator *self, uint32_t size, struct DeviceAllocation *alloc);
+bool alloc_allocate_dedicated(struct Allocator *self, uint32_t size, struct DeviceAllocation *alloc, VkImage image);
+
+static inline struct ClassAllocator *alloc_get_class_allocator(struct Allocator *self, MemoryClass clazz) { return &self->classes[(unsigned)(clazz)]; }
+static inline void alloc_free(struct DeviceAllocation *alloc) { deviceallocation_free_immediate(alloc); }
+static inline void alloc_set_memory_type(struct Allocator *self, uint32_t memory_type)
+{
+	unsigned i;
+	for (i = 0; i < MEMORY_CLASS_COUNT; i++)
+		classallocator_set_memory_type(&self->classes[i], memory_type);
+	self->memory_type = memory_type;
+}
+static inline void alloc_set_global_allocator(struct Allocator *self, DeviceAllocator *allocator)
+{
+	unsigned i;
+	for (i = 0; i < MEMORY_CLASS_COUNT; i++)
+		classallocator_set_global_allocator(&self->classes[i], allocator);
+	self->global_allocator = allocator;
+}
 
 /* Owning array of Allocator* (one per memory type). Replaces
  * std::vector<std::unique_ptr<Allocator>>: the container owns each heap-allocated
@@ -3404,14 +3372,14 @@ public:
 	bool allocate(uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling,
 	              DeviceAllocation *alloc)
 	{
-		return allocators[memory_type]->allocate(size, alignment, tiling, alloc);
+		return alloc_allocate(allocators[memory_type], size, alignment, tiling, alloc);
 	}
 	bool allocate_image_memory(uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling,
 	                           DeviceAllocation *alloc, VkImage image);
 
 	bool allocate_global(uint32_t size, uint32_t memory_type, DeviceAllocation *alloc)
 	{
-		return allocators[memory_type]->allocate_global(size, alloc);
+		return alloc_allocate_global(allocators[memory_type], size, alloc);
 	}
 
 	void garbage_collect();
@@ -3571,6 +3539,25 @@ private:
 };
 
 #endif
+
+/* Free-function bridge to the still-class DeviceAllocator. The allocator cluster
+ * (DeviceAllocation / ClassAllocator / Allocator) was converted to C structs +
+ * free functions and calls these names; DeviceAllocator itself is converted in a
+ * follow-up (it carries its own HeapVec/AllocationVec C++ container subsystem).
+ * Until then these thin wrappers forward to the methods so the converted code
+ * links. */
+static inline bool deviceallocator_allocate(DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory, VkImage dedicated_image)
+{
+	return self->allocate(size, memory_type, memory, host_memory, dedicated_image);
+}
+static inline void deviceallocator_free(DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
+{
+	self->free(size, memory_type, memory, host_memory);
+}
+static inline void deviceallocator_free_no_recycle(DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
+{
+	self->free_no_recycle(size, memory_type, memory, host_memory);
+}
 
 	class Device;
 
@@ -12709,7 +12696,7 @@ void image_fini(struct Image *self)
 	 * ImageViewHandle member destructor; now that it is a plain struct, drop
 	 * its reference explicitly. */
 	iv_reset(&self->view);
-	if (self->alloc.get_memory())
+	if (deviceallocation_get_memory(&self->alloc))
 	{
 		self->device->destroy_image_nolock(self->image);
 		self->device->free_memory_nolock(self->alloc);
@@ -13040,37 +13027,37 @@ void CommandPool::begin()
 /* === memory_allocator.cpp === */
 
 
-void DeviceAllocation::free_immediate()
+void deviceallocation_free_immediate(struct DeviceAllocation *self)
 {
-	if (!alloc)
+	if (!self->alloc)
 		return;
 
-	alloc->free(this);
-	alloc = NULL;
-	base = VK_NULL_HANDLE;
-	mask = 0;
-	offset = 0;
+	classallocator_free(self->alloc, self);
+	self->alloc = NULL;
+	self->base = VK_NULL_HANDLE;
+	self->mask = 0;
+	self->offset = 0;
 }
 
-void DeviceAllocation::free_immediate(DeviceAllocator &allocator)
+void deviceallocation_free_immediate_alloc(struct DeviceAllocation *self, DeviceAllocator *allocator)
 {
-	if (alloc)
-		free_immediate();
-	else if (base)
+	if (self->alloc)
+		deviceallocation_free_immediate(self);
+	else if (self->base)
 	{
-		allocator.free_no_recycle(size, memory_type, base, host_base);
-		base = VK_NULL_HANDLE;
+		deviceallocator_free_no_recycle(allocator, self->size, self->memory_type, self->base, self->host_base);
+		self->base = VK_NULL_HANDLE;
 	}
 }
 
-void DeviceAllocation::free_global(DeviceAllocator &allocator, uint32_t size, uint32_t memory_type)
+void deviceallocation_free_global(struct DeviceAllocation *self, DeviceAllocator *allocator, uint32_t size, uint32_t memory_type)
 {
-	if (base)
+	if (self->base)
 	{
-		allocator.free(size, memory_type, base, host_base);
-		base = VK_NULL_HANDLE;
-		mask = 0;
-		offset = 0;
+		deviceallocator_free(allocator, size, memory_type, self->base, self->host_base);
+		self->base = VK_NULL_HANDLE;
+		self->mask = 0;
+		self->offset = 0;
 	}
 }
 
@@ -13105,55 +13092,55 @@ void block_free(struct Block *self, uint32_t mask)
 	block_update_longest_run(self);
 }
 
-void ClassAllocator::suballocate(uint32_t num_blocks, uint32_t tiling, uint32_t memory_type, MiniHeap &heap,
-                                 DeviceAllocation *alloc)
+void classallocator_suballocate(struct ClassAllocator *self, uint32_t num_blocks, uint32_t tiling, uint32_t memory_type, struct MiniHeap *heap,
+                                 struct DeviceAllocation *alloc)
 {
-	block_allocate(&heap.heap, num_blocks, alloc);
-	alloc->base = heap.allocation.base;
-	alloc->offset <<= sub_block_size_log2;
+	block_allocate(&heap->heap, num_blocks, alloc);
+	alloc->base = heap->allocation.base;
+	alloc->offset <<= self->sub_block_size_log2;
 
-	if (heap.allocation.host_base)
-		alloc->host_base = heap.allocation.host_base + alloc->offset;
+	if (heap->allocation.host_base)
+		alloc->host_base = heap->allocation.host_base + alloc->offset;
 
-	alloc->offset += heap.allocation.offset;
+	alloc->offset += heap->allocation.offset;
 	alloc->tiling = tiling;
 	alloc->memory_type = memory_type;
-	alloc->alloc = this;
-	alloc->size = num_blocks << sub_block_size_log2;
+	alloc->alloc = self;
+	alloc->size = num_blocks << self->sub_block_size_log2;
 }
 
-bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllocation *alloc, bool hierarchical)
+bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, AllocationTiling tiling, struct DeviceAllocation *alloc, bool hierarchical)
 {
-	unsigned num_blocks = (size + sub_block_size - 1) >> sub_block_size_log2;
+	unsigned num_blocks = (size + self->sub_block_size - 1) >> self->sub_block_size_log2;
 	uint32_t size_mask = (1u << (num_blocks - 1)) - 1;
-	uint32_t masked_tiling_mode = tiling_mask & tiling;
-	AllocationTilingHeaps &m = tiling_modes[masked_tiling_mode];
+	uint32_t masked_tiling_mode = self->tiling_mask & tiling;
+	struct ClassAllocatorTilingHeaps *m = &self->tiling_modes[masked_tiling_mode];
 
-	uint32_t index = trailing_zeroes(m.heap_availability_mask & ~size_mask);
+	uint32_t index = trailing_zeroes(m->heap_availability_mask & ~size_mask);
 
 	if (index < BLOCK_NUM_SUB_BLOCKS)
 	{
-		MiniHeap *itr = (MiniHeap *)ilist_begin(&m.heaps[index]);
+		MiniHeap *itr = (MiniHeap *)ilist_begin(&m->heaps[index]);
 		VK_ASSERT(itr);
 		VK_ASSERT(index >= (num_blocks - 1));
 
 		MiniHeap &heap = *itr;
-		suballocate(num_blocks, masked_tiling_mode, memory_type, heap, alloc);
+		classallocator_suballocate(self, num_blocks, masked_tiling_mode, self->memory_type, &heap, alloc);
 		unsigned new_index = block_get_longest_run(&heap.heap) - 1;
 
 		if (block_full(&heap.heap))
 		{
-			ilist_move_to_front(&m.full_heaps, &m.heaps[index], &itr->list_node);
-			if (!ilist_begin(&m.heaps[index]))
-				m.heap_availability_mask &= ~(1u << index);
+			ilist_move_to_front(&m->full_heaps, &m->heaps[index], &itr->list_node);
+			if (!ilist_begin(&m->heaps[index]))
+				m->heap_availability_mask &= ~(1u << index);
 		}
 		else if (new_index != index)
 		{
-			struct IntrusiveListC &new_heap = m.heaps[new_index];
-			ilist_move_to_front(&new_heap, &m.heaps[index], &itr->list_node);
-			m.heap_availability_mask |= 1u << new_index;
-			if (!ilist_begin(&m.heaps[index]))
-				m.heap_availability_mask &= ~(1u << index);
+			struct IntrusiveListC &new_heap = m->heaps[new_index];
+			ilist_move_to_front(&new_heap, &m->heaps[index], &itr->list_node);
+			m->heap_availability_mask |= 1u << new_index;
+			if (!ilist_begin(&m->heaps[index]))
+				m->heap_availability_mask &= ~(1u << index);
 		}
 
 		alloc->heap = itr;
@@ -13163,7 +13150,7 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 	}
 
 	// We didn't find a vacant heap, make a new one.
-	MiniHeap *node = new (object_pool_raw_allocate(&object_pool)) MiniHeap();
+	MiniHeap *node = new (object_pool_raw_allocate(&self->object_pool)) MiniHeap();
 	if (!node)
 		return false;
 	/* Block is a plain struct now; its former default ctor (fill the free
@@ -13171,41 +13158,41 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 	block_init(&node->heap);
 
 	MiniHeap &heap = *node;
-	uint32_t alloc_size = sub_block_size * BLOCK_NUM_SUB_BLOCKS;
+	uint32_t alloc_size = self->sub_block_size * BLOCK_NUM_SUB_BLOCKS;
 
-	if (parent)
+	if (self->parent)
 	{
 		// We cannot allocate a new block from parent ... This is fatal.
-		if (!parent->allocate(alloc_size, tiling, &heap.allocation, true))
+		if (!classallocator_allocate(self->parent, alloc_size, tiling, &heap.allocation, true))
 		{
-			block_fini(&node->heap); node->~MiniHeap(); object_pool_raw_free(&object_pool, node);
+			block_fini(&node->heap); node->~MiniHeap(); object_pool_raw_free(&self->object_pool, node);
 			return false;
 		}
 	}
 	else
 	{
 		heap.allocation.offset = 0;
-		if (!global_allocator->allocate(alloc_size, memory_type, &heap.allocation.base, &heap.allocation.host_base,
+		if (!deviceallocator_allocate(self->global_allocator, alloc_size, self->memory_type, &heap.allocation.base, &heap.allocation.host_base,
 		                                VK_NULL_HANDLE))
 		{
-			block_fini(&node->heap); node->~MiniHeap(); object_pool_raw_free(&object_pool, node);
+			block_fini(&node->heap); node->~MiniHeap(); object_pool_raw_free(&self->object_pool, node);
 			return false;
 		}
 	}
 
 	// This cannot fail.
-	suballocate(num_blocks, masked_tiling_mode, memory_type, heap, alloc);
+	classallocator_suballocate(self, num_blocks, masked_tiling_mode, self->memory_type, &heap, alloc);
 
 	alloc->heap = node;
 	if (block_full(&heap.heap))
 	{
-		ilist_insert_front(&m.full_heaps, &node->list_node);
+		ilist_insert_front(&m->full_heaps, &node->list_node);
 	}
 	else
 	{
 		unsigned new_index = block_get_longest_run(&heap.heap) - 1;
-		ilist_insert_front(&m.heaps[new_index], &node->list_node);
-		m.heap_availability_mask |= 1u << new_index;
+		ilist_insert_front(&m->heaps[new_index], &node->list_node);
+		m->heap_availability_mask |= 1u << new_index;
 	}
 
 	alloc->hierarchical = hierarchical;
@@ -13213,108 +13200,131 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 	return true;
 }
 
-ClassAllocator::~ClassAllocator()
+void classallocator_init(struct ClassAllocator *self)
+{
+	unsigned t, i;
+	self->parent = NULL;
+	for (t = 0; t < ALLOCATION_TILING_COUNT; t++)
+	{
+		for (i = 0; i < BLOCK_NUM_SUB_BLOCKS; i++)
+			ilist_clear(&self->tiling_modes[t].heaps[i]);
+		ilist_clear(&self->tiling_modes[t].full_heaps);
+		self->tiling_modes[t].heap_availability_mask = 0;
+	}
+	self->sub_block_size = 1;
+	self->sub_block_size_log2 = 0;
+	self->tiling_mask = ~0u;
+	self->memory_type = 0;
+	self->global_allocator = NULL;
+	object_pool_raw_init(&self->object_pool, sizeof(struct MiniHeap));
+}
+
+void classallocator_fini(struct ClassAllocator *self)
 {
 	bool error = false;
-	for (AllocationTilingHeaps &m : tiling_modes)
+	unsigned t, i;
+	for (t = 0; t < ALLOCATION_TILING_COUNT; t++)
 	{
-		if (ilist_begin(&m.full_heaps))
+		struct ClassAllocatorTilingHeaps *m = &self->tiling_modes[t];
+		if (ilist_begin(&m->full_heaps))
 			error = true;
 
-		for (struct IntrusiveListC &h : m.heaps)
-			if (ilist_begin(&h))
+		for (i = 0; i < BLOCK_NUM_SUB_BLOCKS; i++)
+			if (ilist_begin(&m->heaps[i]))
 				error = true;
 	}
 
 	if (error)
 		LOGE("Memory leaked in class allocator!\n");
 
-	object_pool_raw_deinit(&object_pool);
+	object_pool_raw_deinit(&self->object_pool);
 }
 
-void ClassAllocator::free(DeviceAllocation *alloc)
+void classallocator_free(struct ClassAllocator *self, struct DeviceAllocation *alloc)
 {
-	MiniHeap *heap = alloc->heap;
-	Block &block = heap->heap;
-	bool was_full = block_full(&block);
-	AllocationTilingHeaps &m = tiling_modes[alloc->tiling];
+	struct MiniHeap *heap = alloc->heap;
+	struct Block *block = &heap->heap;
+	bool was_full = block_full(block);
+	struct ClassAllocatorTilingHeaps *m = &self->tiling_modes[alloc->tiling];
 
-	unsigned index = block_get_longest_run(&block) - 1;
-	block_free(&block, alloc->mask);
-	unsigned new_index = block_get_longest_run(&block) - 1;
+	unsigned index = block_get_longest_run(block) - 1;
+	block_free(block, alloc->mask);
+	unsigned new_index = block_get_longest_run(block) - 1;
 
-	if (block_empty(&block))
+	if (block_empty(block))
 	{
 		// Our mini-heap is completely freed, free to higher level allocator.
-		if (parent)
-			heap->allocation.free_immediate();
+		if (self->parent)
+			deviceallocation_free_immediate(&heap->allocation);
 		else
-			heap->allocation.free_global(*global_allocator, sub_block_size * BLOCK_NUM_SUB_BLOCKS, memory_type);
+			deviceallocation_free_global(&heap->allocation, self->global_allocator, self->sub_block_size * BLOCK_NUM_SUB_BLOCKS, self->memory_type);
 
 		if (was_full)
-			ilist_erase(&m.full_heaps, &heap->list_node);
+			ilist_erase(&m->full_heaps, &heap->list_node);
 		else
 		{
-			ilist_erase(&m.heaps[index], &heap->list_node);
-			if (!ilist_begin(&m.heaps[index]))
-				m.heap_availability_mask &= ~(1u << index);
+			ilist_erase(&m->heaps[index], &heap->list_node);
+			if (!ilist_begin(&m->heaps[index]))
+				m->heap_availability_mask &= ~(1u << index);
 		}
 
-		block_fini(&heap->heap); heap->~MiniHeap(); object_pool_raw_free(&object_pool, heap);
+		block_fini(&heap->heap); heap->~MiniHeap(); object_pool_raw_free(&self->object_pool, heap);
 	}
 	else if (was_full)
 	{
-		ilist_move_to_front(&m.heaps[new_index], &m.full_heaps, &heap->list_node);
-		m.heap_availability_mask |= 1u << new_index;
+		ilist_move_to_front(&m->heaps[new_index], &m->full_heaps, &heap->list_node);
+		m->heap_availability_mask |= 1u << new_index;
 	}
 	else if (index != new_index)
 	{
-		ilist_move_to_front(&m.heaps[new_index], &m.heaps[index], &heap->list_node);
-		m.heap_availability_mask |= 1u << new_index;
-		if (!ilist_begin(&m.heaps[index]))
-			m.heap_availability_mask &= ~(1u << index);
+		ilist_move_to_front(&m->heaps[new_index], &m->heaps[index], &heap->list_node);
+		m->heap_availability_mask |= 1u << new_index;
+		if (!ilist_begin(&m->heaps[index]))
+			m->heap_availability_mask &= ~(1u << index);
 	}
 }
 
-bool Allocator::allocate_global(uint32_t size, DeviceAllocation *alloc)
+bool alloc_allocate_global(struct Allocator *self, uint32_t size, struct DeviceAllocation *alloc)
 {
 	// Fall back to global allocation, do not recycle.
-	if (!global_allocator->allocate(size, memory_type, &alloc->base, &alloc->host_base, VK_NULL_HANDLE))
+	if (!deviceallocator_allocate(self->global_allocator, size, self->memory_type, &alloc->base, &alloc->host_base, VK_NULL_HANDLE))
 		return false;
 	alloc->alloc = NULL;
-	alloc->memory_type = memory_type;
+	alloc->memory_type = self->memory_type;
 	alloc->size = size;
 	return true;
 }
 
-bool Allocator::allocate_dedicated(uint32_t size, DeviceAllocation *alloc, VkImage dedicated_image)
+bool alloc_allocate_dedicated(struct Allocator *self, uint32_t size, struct DeviceAllocation *alloc, VkImage dedicated_image)
 {
 	// Fall back to global allocation, do not recycle.
-	if (!global_allocator->allocate(size, memory_type, &alloc->base, &alloc->host_base, dedicated_image))
+	if (!deviceallocator_allocate(self->global_allocator, size, self->memory_type, &alloc->base, &alloc->host_base, dedicated_image))
 		return false;
 	alloc->alloc = NULL;
-	alloc->memory_type = memory_type;
+	alloc->memory_type = self->memory_type;
 	alloc->size = size;
 	return true;
 }
 
-bool Allocator::allocate(uint32_t size, uint32_t alignment, AllocationTiling mode, DeviceAllocation *alloc)
+bool alloc_allocate(struct Allocator *self, uint32_t size, uint32_t alignment, AllocationTiling mode, struct DeviceAllocation *alloc)
 {
-	for (ClassAllocator &c : classes)
+	unsigned ci;
+	for (ci = 0; ci < MEMORY_CLASS_COUNT; ci++)
 	{
+		struct ClassAllocator *c = &self->classes[ci];
 		// Find a suitable class to allocate from.
-		if (size <= c.sub_block_size * BLOCK_NUM_SUB_BLOCKS)
+		if (size <= c->sub_block_size * BLOCK_NUM_SUB_BLOCKS)
 		{
-			if (alignment > c.sub_block_size)
+			if (alignment > c->sub_block_size)
 			{
-				size_t padded_size = size + (alignment - c.sub_block_size);
-				if (padded_size <= c.sub_block_size * BLOCK_NUM_SUB_BLOCKS)
+				size_t padded_size = size + (alignment - c->sub_block_size);
+				if (padded_size <= c->sub_block_size * BLOCK_NUM_SUB_BLOCKS)
 					size = padded_size;
 				else
 					continue;
 			}
 
-			bool ret = c.allocate(size, mode, alloc, false);
+			bool ret = classallocator_allocate(c, size, mode, alloc, false);
 			if (ret)
 			{
 				uint32_t aligned_offset = (alloc->offset + alignment - 1) & ~(alignment - 1);
@@ -13326,26 +13336,32 @@ bool Allocator::allocate(uint32_t size, uint32_t alignment, AllocationTiling mod
 		}
 	}
 
-	return allocate_global(size, alloc);
+	return alloc_allocate_global(self, size, alloc);
 }
 
-Allocator::Allocator()
+void alloc_init(struct Allocator *self)
 {
-	for (unsigned i = 0; i < MEMORY_CLASS_COUNT - 1; i++)
-		classes[i].set_parent(&classes[i + 1]);
+	unsigned i;
+	for (i = 0; i < MEMORY_CLASS_COUNT; i++)
+		classallocator_init(&self->classes[i]);
+	self->global_allocator = NULL;
+	self->memory_type = 0;
 
-	get_class_allocator(MEMORY_CLASS_SMALL).set_tiling_mask(~0u);
-	get_class_allocator(MEMORY_CLASS_MEDIUM).set_tiling_mask(~0u);
-	get_class_allocator(MEMORY_CLASS_LARGE).set_tiling_mask(0);
-	get_class_allocator(MEMORY_CLASS_HUGE).set_tiling_mask(0);
+	for (i = 0; i < MEMORY_CLASS_COUNT - 1; i++)
+		classallocator_set_parent(&self->classes[i], &self->classes[i + 1]);
 
-	get_class_allocator(MEMORY_CLASS_SMALL).set_sub_block_size(128);
-	get_class_allocator(MEMORY_CLASS_MEDIUM).set_sub_block_size(128 * BLOCK_NUM_SUB_BLOCKS); // 4K
+	classallocator_set_tiling_mask(alloc_get_class_allocator(self, MEMORY_CLASS_SMALL), ~0u);
+	classallocator_set_tiling_mask(alloc_get_class_allocator(self, MEMORY_CLASS_MEDIUM), ~0u);
+	classallocator_set_tiling_mask(alloc_get_class_allocator(self, MEMORY_CLASS_LARGE), 0);
+	classallocator_set_tiling_mask(alloc_get_class_allocator(self, MEMORY_CLASS_HUGE), 0);
+
+	classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_SMALL), 128);
+	classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_MEDIUM), 128 * BLOCK_NUM_SUB_BLOCKS); // 4K
 
 	// 128K, this is the largest bufferImageGranularity a Vulkan implementation may have.
-	get_class_allocator(MEMORY_CLASS_LARGE).set_sub_block_size(128 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS);
-	get_class_allocator(MEMORY_CLASS_HUGE)
-	    .set_sub_block_size(64 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS); // 2M
+	classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_LARGE), 128 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS);
+	classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_HUGE),
+	    64 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS); // 2M
 }
 
 void DeviceAllocator::init(VkPhysicalDevice gpu, VkDevice vkdevice)
@@ -13364,10 +13380,10 @@ void DeviceAllocator::init(VkPhysicalDevice gpu, VkDevice vkdevice)
 	for (unsigned i = 0; i < mem_props.memoryTypeCount; i++)
 	{
 		Allocator *a = (Allocator *)malloc(sizeof(Allocator));
-		new (a) Allocator();
+		alloc_init(a);
 		allocators.push(a);
-		allocators.back()->set_memory_type(i);
-		allocators.back()->set_global_allocator(this);
+		alloc_set_memory_type(allocators.back(), i);
+		alloc_set_global_allocator(allocators.back(), this);
 	}
 }
 
@@ -13386,7 +13402,7 @@ bool DeviceAllocator::allocate_image_memory(uint32_t size, uint32_t alignment, u
 	vkGetImageMemoryRequirements2KHR(device, &info, &mem_req);
 
 	if (dedicated_req.prefersDedicatedAllocation || dedicated_req.requiresDedicatedAllocation)
-		return allocators[memory_type]->allocate_dedicated(size, alloc, image);
+		return alloc_allocate_dedicated(allocators[memory_type], size, alloc, image);
 	else
 		return allocate(size, alignment, memory_type, tiling, alloc);
 }
@@ -13441,7 +13457,7 @@ void *DeviceAllocator::map_memory(const DeviceAllocation &alloc, MemoryAccessFla
 	    !(mem_props.memoryTypes[alloc.memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
 	{
 		VkDeviceSize offset = alloc.offset & ~(atom_alignment - 1);
-		VkDeviceSize size = (alloc.offset + alloc.get_size() - offset + atom_alignment - 1) & ~(atom_alignment - 1);
+		VkDeviceSize size = (alloc.offset + deviceallocation_get_size(&alloc) - offset + atom_alignment - 1) & ~(atom_alignment - 1);
 
 		// Have to invalidate cache here.
 		const VkMappedMemoryRange range = {
@@ -13463,7 +13479,7 @@ void DeviceAllocator::unmap_memory(const DeviceAllocation &alloc, MemoryAccessFl
 	    !(mem_props.memoryTypes[alloc.memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
 	{
 		VkDeviceSize offset = alloc.offset & ~(atom_alignment - 1);
-		VkDeviceSize size = (alloc.offset + alloc.get_size() - offset + atom_alignment - 1) & ~(atom_alignment - 1);
+		VkDeviceSize size = (alloc.offset + deviceallocation_get_size(&alloc) - offset + atom_alignment - 1) & ~(atom_alignment - 1);
 
 		// Have to flush caches here.
 		const VkMappedMemoryRange range = {
@@ -17841,7 +17857,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		{
 			int _i;
 			for (_i = 0; _i < DeviceAllocationVec_size(&allocations); _i++)
-				DeviceAllocationVec_at(&allocations, _i)->free_immediate(managers->memory);
+				deviceallocation_free_immediate_alloc(DeviceAllocationVec_at(&allocations, _i), &managers->memory);
 		}
 
 		for (BufferBlock &block : vbo_blocks)
@@ -18208,7 +18224,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 				if (memory)
 					vkFreeMemory(device, memory, NULL);
 				if (allocator)
-					allocation.free_immediate(*allocator);
+					deviceallocation_free_immediate_alloc(&allocation, allocator);
 			}
 	};
 
@@ -18410,7 +18426,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			return ih_make(NULL);
 		}
 
-		if (vkBindImageMemory(device, holder.image, holder.allocation.get_memory(), holder.allocation.get_offset()) != VK_SUCCESS)
+		if (vkBindImageMemory(device, holder.image, deviceallocation_get_memory(&holder.allocation), deviceallocation_get_offset(&holder.allocation)) != VK_SUCCESS)
 		{
 			LOGE("Failed to bind image memory.\n");
 			return ih_make(NULL);
@@ -18680,9 +18696,9 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			return bh_make(NULL);
 		}
 
-		if (vkBindBufferMemory(device, buffer, allocation.get_memory(), allocation.get_offset()) != VK_SUCCESS)
+		if (vkBindBufferMemory(device, buffer, deviceallocation_get_memory(&allocation), deviceallocation_get_offset(&allocation)) != VK_SUCCESS)
 		{
-			allocation.free_immediate(managers.memory);
+			deviceallocation_free_immediate_alloc(&allocation, &managers.memory);
 			vkDestroyBuffer(device, buffer, NULL);
 			return bh_make(NULL);
 		}
