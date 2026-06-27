@@ -353,23 +353,32 @@ static INLINE uint16_t GetTexel_##SUFFIX(PS_GPU *g, int32_t u_arg, int32_t v_arg
    uint32_t fbtex_x = ((u_ext >> (2 - (TM_VAL)))) & 1023; \
    uint32_t fbtex_y = (v_arg & g->SUCV.TWY_AND) + g->SUCV.TWY_ADD; \
    uint32_t gro     = fbtex_y * 1024U + fbtex_x; \
-   PS_GPU_TexCache_t *TexCache = &g->TexCache[0]; \
-   PS_GPU_TexCache_t *c = NULL; \
-   switch (TM_VAL) \
-   { \
-      case 0: c = &TexCache[((gro >> 2) & 0x3) | ((gro >> 8) & 0xFC)]; break; \
-      case 1: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break; \
-      case 2: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break; \
-   } \
-   if (MDFN_UNLIKELY(c->Tag != (gro &~ 0x3))) \
-   { \
-      uint32_t cache_x = fbtex_x & ~3; \
-      g->DrawTimeAvail -= 4; \
-      c->Data[0] = texel_fetch(g, cache_x + 0, fbtex_y); \
-      c->Data[1] = texel_fetch(g, cache_x + 1, fbtex_y); \
-      c->Data[2] = texel_fetch(g, cache_x + 2, fbtex_y); \
-      c->Data[3] = texel_fetch(g, cache_x + 3, fbtex_y); \
-      c->Tag     = (gro &~ 0x3); \
+   uint32_t gro_line = gro & ~0x3U; \
+   PS_GPU_TexCache_t *c; \
+   if (g->last_tex_line == gro_line && g->last_tex_c) { \
+      /* same cache line as previous pixel: skip index shuffle + tag check */ \
+      c = (PS_GPU_TexCache_t *)g->last_tex_c; \
+   } else { \
+      PS_GPU_TexCache_t *TexCache = &g->TexCache[0]; \
+      c = NULL; \
+      switch (TM_VAL) \
+      { \
+         case 0: c = &TexCache[((gro >> 2) & 0x3) | ((gro >> 8) & 0xFC)]; break; \
+         case 1: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break; \
+         case 2: c = &TexCache[((gro >> 2) & 0x7) | ((gro >> 7) & 0xF8)]; break; \
+      } \
+      if (MDFN_UNLIKELY(c->Tag != gro_line)) \
+      { \
+         uint32_t cache_x = fbtex_x & ~3; \
+         g->DrawTimeAvail -= 4; \
+         c->Data[0] = texel_fetch(g, cache_x + 0, fbtex_y); \
+         c->Data[1] = texel_fetch(g, cache_x + 1, fbtex_y); \
+         c->Data[2] = texel_fetch(g, cache_x + 2, fbtex_y); \
+         c->Data[3] = texel_fetch(g, cache_x + 3, fbtex_y); \
+         c->Tag     = gro_line; \
+      } \
+      g->last_tex_line = gro_line; \
+      g->last_tex_c = c; \
    } \
    fbw = c->Data[gro & 0x3]; \
    if ((TM_VAL) != 2) \

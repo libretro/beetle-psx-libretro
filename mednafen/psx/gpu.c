@@ -254,6 +254,11 @@ static INLINE void InvalidateTexCache(PS_GPU *gpu)
    unsigned i;
    for (i = 0; i < 256; i++)
       gpu->TexCache[i].Tag = ~0U;
+   /* The same-cache-line shortcut caches a resolved TexCache pointer across
+    * consecutive pixels; drop it whenever the cache is invalidated so it can
+    * never serve a stale line. */
+   gpu->last_tex_line = ~0U;
+   gpu->last_tex_c    = NULL;
 }
 
 static INLINE void InvalidateCache(PS_GPU *gpu)
@@ -2597,6 +2602,10 @@ void GPU_RestoreStateP3(void)
       for(unsigned j = 0; j < 4; j++)
          GPU.TexCache[i].Data[j] = TexCache_Data[i][j];
    }
+   /* TexCache was rewritten directly; drop the same-line shortcut so it
+    * cannot reference a pre-restore line. */
+   GPU.last_tex_line = ~0U;
+   GPU.last_tex_c    = NULL;
    RecalcTexWindowStuff(&GPU);
    rhi_intf_set_tex_window(GPU.tww, GPU.twh, GPU.twx, GPU.twy);
 

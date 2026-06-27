@@ -77,6 +77,14 @@ struct PS_GPU
       uint32_t Tag;
    } TexCache[256];
 
+   /* Same-cache-line fast path for the textured-span inner loop: when a
+    * pixel maps to the same texel cache line as the previous one (the common
+    * case along a span), reuse the resolved cache pointer and skip the index
+    * shuffle + tag compare. last_tex_c is void* to avoid the nested-struct
+    * type in the header; reset (line=~0, c=NULL) before each draw command. */
+   uint32_t last_tex_line;
+   void    *last_tex_c;
+
    uint32_t DMAControl;
 
    /* Beetle-psx upscaling vars */
