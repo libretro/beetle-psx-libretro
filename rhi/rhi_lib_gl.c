@@ -1841,9 +1841,7 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
 
    var.key = BEETLE_OPT(image_offset_cycles);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
       image_offset_cycles = atoi(var.value);
-   }
 
    var.key = BEETLE_OPT(image_crop);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -1856,21 +1854,15 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
 
    var.key = BEETLE_OPT(initial_scanline);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
       initial_scanline = atoi(var.value);
-   }
 
    var.key = BEETLE_OPT(last_scanline);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
       last_scanline = atoi(var.value);
-   }
 
    var.key = BEETLE_OPT(initial_scanline_pal);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
       initial_scanline_pal = atoi(var.value);
-   }
 
    var.key = BEETLE_OPT(last_scanline_pal);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -2418,9 +2410,6 @@ static bool retro_refresh_variables(gl_renderer *renderer)
       /* If 'BEETLE_OPT(renderer_software_fb)' option is not found, then
        * we are running in software mode */
       has_software_fb = true;
-
-   tt_log_startup("rhi_gl_refresh_variables: has_software_fb=%d\n",
-         (int)has_software_fb);
 
    get_variables(&upscaling, &display_vram);
 
@@ -3540,8 +3529,6 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
    if (!renderer)
       return;
 
-   tt_log("gl finalize_frame display=%ux%u\n",
-         (unsigned)width, (unsigned)height);
    tt_frame_advance();
 
    /* Draw pending commands */
@@ -3698,9 +3685,6 @@ void rhi_gl_set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx, uint8_t twy)
    renderer->tex_x_or   = (twx & tww) << 3;
    renderer->tex_y_mask = ~(twh << 3);
    renderer->tex_y_or   = (twy & twh) << 3;
-
-   tt_log("gl set_tex_window tww=%u twh=%u twx=%u twy=%u\n",
-         (unsigned)tww, (unsigned)twh, (unsigned)twx, (unsigned)twy);
 }
 
 void rhi_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
@@ -3748,7 +3732,6 @@ void rhi_gl_set_draw_offset(int16_t x, int16_t y)
 
 void rhi_gl_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
-
    gl_renderer *renderer;
 
    if (static_renderer.state == GL_STATE_INVALID)
@@ -3764,9 +3747,6 @@ void rhi_gl_set_draw_area(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
    /* Finish drawing anything in the current area */
    if (!gl_draw_buffer_is_empty(renderer->command_buffer))
       gl_renderer_draw(renderer);
-
-   tt_log("gl set_draw_area top_left=(%u,%u) bot_right_inclusive=(%u,%u)\n",
-         (unsigned)x0, (unsigned)y0, (unsigned)x1, (unsigned)y1);
 
    renderer->config.draw_area_top_left[0] = x0;
    renderer->config.draw_area_top_left[1] = y0;
@@ -4253,10 +4233,6 @@ void rhi_gl_load_image(
    renderer->set_mask     = set_mask;
    renderer->mask_test    = mask_test;
 
-   tt_log("gl load_image rect=(%u,%u %ux%u) mask_test=%d set_mask=%d\n",
-         (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h,
-         (int)mask_test, (int)set_mask);
-
    top_left[0]            = x;
    top_left[1]            = y;
    dimensions[0]          = w;
@@ -4401,12 +4377,8 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
    if (w == 0 || h == 0)
       return true;
 
-   tt_log("gl read_vram rect=(%u,%u %ux%u)\n",
-         (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h);
-
    is_32bpp = (renderer->internal_color_depth == 32);
-
-   upscale = renderer->internal_upscaling;
+   upscale  = renderer->internal_upscaling;
    if (upscale == 0)
       upscale = 1;
    if (upscale > 1 && !gl_caps.fp_glBlitFramebuffer)
@@ -4848,7 +4820,6 @@ void rhi_gl_fill_rect(
       uint16_t x, uint16_t y,
       uint16_t w, uint16_t h)
 {
-
    gl_renderer *renderer;
    uint16_t top_left[2];
    uint16_t dimensions[2];
@@ -4862,10 +4833,6 @@ void rhi_gl_fill_rect(
    renderer = static_renderer.state_data;
    if (!renderer)
       return;
-
-   tt_log("gl fill_rect rect=(%u,%u %ux%u) color=0x%06x\n",
-         (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h,
-         (unsigned)(color & 0xFFFFFFu));
 
    top_left[0]   = x;
    top_left[1]   = y;
@@ -4975,12 +4942,6 @@ void rhi_gl_copy_rect(
 
    if (src_x == dst_x && src_y == dst_y)
      return;
-
-   tt_log("gl copy_rect src=(%u,%u) dst=(%u,%u) %ux%u mask_test=%d set_mask=%d\n",
-         (unsigned)src_x, (unsigned)src_y,
-         (unsigned)dst_x, (unsigned)dst_y,
-         (unsigned)w, (unsigned)h,
-         (int)mask_test, (int)set_mask);
 
    renderer->set_mask          = set_mask;
    renderer->mask_test         = mask_test;

@@ -22261,9 +22261,6 @@ void rhi_vulkan_refresh_variables(void)
        * we are running in software mode */
       has_software_fb = true;
 
-   tt_log_startup("rhi_vulkan_refresh_variables: has_software_fb=%d\n",
-         (int)has_software_fb);
-
    unsigned old_scaling = scaling;
    unsigned old_msaa = msaa;
    bool old_super_sampling = super_sampling;
@@ -22608,8 +22605,6 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    if (device == NULL)
       return;
 
-   tt_log("vk finalize_frame display=%ux%u\n",
-         (unsigned)width, (unsigned)height);
    tt_frame_advance();
 
    if (frame_duping_enabled && !GPU_get_display_change_count())
@@ -22689,11 +22684,7 @@ void rhi_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
    uint8_t tex_y_or   = (twy & twh) << 3;
 
    if (renderer)
-   {
       renderer_set_texture_window(renderer, { tex_x_mask, tex_y_mask, tex_x_or, tex_y_or });
-      tt_log("vk set_tex_window tww=%u twh=%u twx=%u twy=%u\n",
-            (unsigned)tww, (unsigned)twh, (unsigned)twx, (unsigned)twy);
-   }
    else
       rhi_defer_push_set_tex_window(&defer, tww, twh, twx, twy);
 }
@@ -22722,11 +22713,7 @@ void rhi_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
    }
 
    if (renderer)
-   {
       renderer_set_draw_rect(renderer, { x0, y0, (unsigned)(width), (unsigned)(height) });
-      tt_log("vk set_draw_area top_left=(%u,%u) bot_right_inclusive=(%u,%u)\n",
-            (unsigned)x0, (unsigned)y0, (unsigned)x1, (unsigned)y1);
-   }
    else
       /* Defer the raw inputs (x0,y0,x1,y1); the dispatcher re-enters
        * this entry point which redoes the width/height clamp on top of
@@ -22997,10 +22984,6 @@ void rhi_vulkan_load_image(
       return;
    }
 
-   tt_log("vk load_image rect=(%u,%u %ux%u) mask_test=%d set_mask=%d\n",
-         (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h,
-         (int)mask_test, (int)set_mask);
-
    renderer_notify_texture_upload(renderer, Rect { x, y, w, h }, vram);
    renderer_set_mask_test(renderer, mask_test);
    renderer_set_force_mask_bit(renderer, set_mask);
@@ -23070,10 +23053,6 @@ bool rhi_vulkan_read_vram(uint16_t x, uint16_t y,
 {
    if (!renderer)
       return false;
-
-   tt_log("vk read_vram rect=(%u,%u %ux%u)\n",
-         (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h);
-
    renderer_copy_vram_to_cpu_synchronous(renderer, { x, y, w, h }, vram);
    return true;
 }
@@ -23083,12 +23062,7 @@ void rhi_vulkan_fill_rect(uint32_t color,
                           uint16_t w, uint16_t h)
 {
    if (renderer)
-   {
-      tt_log("vk fill_rect rect=(%u,%u %ux%u) color=0x%06x\n",
-            (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h,
-            (unsigned)(color & 0xFFFFFFu));
       renderer_clear_rect(renderer, { x, y, w, h }, color);
-   }
 }
 
 void rhi_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
@@ -23098,13 +23072,6 @@ void rhi_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
 {
    if (!renderer)
       return;
-
-   tt_log("vk copy_rect src=(%u,%u) dst=(%u,%u) %ux%u mask_test=%d set_mask=%d\n",
-         (unsigned)src_x, (unsigned)src_y,
-         (unsigned)dst_x, (unsigned)dst_y,
-         (unsigned)w, (unsigned)h,
-         (int)mask_test, (int)set_mask);
-
    renderer_set_mask_test(renderer, mask_test);
    renderer_set_force_mask_bit(renderer, set_mask);
    renderer_blit_vram(renderer, { dst_x, dst_y, w, h }, { src_x, src_y, w, h });

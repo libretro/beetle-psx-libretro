@@ -314,22 +314,28 @@ void rhi_intf_close(void)
    rhi_dump_deinit();
 #endif
 
-#if defined(HAVE_VULKAN)
-   if (rhi_type != RHI_SOFTWARE && vk_initialized)
-      return;
-#endif
-
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-   if (rhi_type != RHI_SOFTWARE && gl_initialized)
+   if (rhi_type != RHI_SOFTWARE)
    {
-      rhi_gl_close();
-      return;
-   }
+#if defined(HAVE_VULKAN)
+	   if (vk_initialized)
+		   return;
 #endif
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+	   if (gl_initialized)
+	   {
+		   rhi_gl_close();
+		   return;
+	   }
+#endif
+   }
 }
 
 void rhi_intf_refresh_variables(void)
 {
+#ifdef DEBUG
+   tt_log_startup("vulkan_refresh_variables: has_software_fb=%d\n",
+         (int)has_software_fb);
+#endif
    switch (rhi_type)
    {
       case RHI_SOFTWARE:
@@ -376,6 +382,10 @@ void rhi_intf_finalize_frame(const void *fb, unsigned width,
 #ifdef RHI_DUMP
    rhi_dump_finalize_frame();
 #endif
+#ifdef DEBUG
+   tt_log("finalize_frame display=%ux%u\n",
+         (unsigned)width, (unsigned)height);
+#endif
 
    switch (rhi_type)
    {
@@ -400,6 +410,10 @@ void rhi_intf_set_tex_window(uint8_t tww, uint8_t twh,
 {
 #ifdef RHI_DUMP
    rhi_dump_set_tex_window(tww, twh, twx, twy);
+#endif
+#ifdef DEBUG
+   tt_log("set_tex_window tww=%u twh=%u twx=%u twy=%u\n",
+		   (unsigned)tww, (unsigned)twh, (unsigned)twx, (unsigned)twy);
 #endif
 
    switch (rhi_type)
@@ -461,6 +475,10 @@ void rhi_intf_set_draw_area(uint16_t x0, uint16_t y0,
 {
 #ifdef RHI_DUMP
    rhi_dump_set_draw_area(x0, y0, x1, y1);
+#endif
+#ifdef DEBUG
+   tt_log("set_draw_area top_left=(%u,%u) bot_right_inclusive=(%u,%u)\n",
+         (unsigned)x0, (unsigned)y0, (unsigned)x1, (unsigned)y1);
 #endif
 
    switch (rhi_type)
@@ -784,6 +802,10 @@ void rhi_intf_push_line(int16_t p0x, int16_t p0y,
 
 bool rhi_intf_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *vram)
 {
+#ifdef DEBUG
+   tt_log("read_vram rect=(%u,%u %ux%u)\n",
+         (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h);
+#endif
    switch (rhi_type)
    {
       case RHI_VULKAN:
@@ -810,6 +832,11 @@ void rhi_intf_load_image(uint16_t x, uint16_t y,
 #ifdef RHI_DUMP
    rhi_dump_load_image(x, y, w, h, vram, mask_test, set_mask);
 #endif
+#ifdef DEBUG
+   tt_log("load_image rect=(%u,%u %ux%u) mask_test=%d set_mask=%d\n",
+         (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h,
+         (int)mask_test, (int)set_mask);
+#endif
 
    switch (rhi_type)
    {
@@ -834,6 +861,11 @@ void rhi_intf_fill_rect(uint32_t color,
 {
 #ifdef RHI_DUMP
    rhi_dump_fill_rect(color, x, y, w, h);
+#endif
+#ifdef DEBUG
+   tt_log("fill_rect rect=(%u,%u %ux%u) color=0x%06x\n",
+		   (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h,
+		   (unsigned)(color & 0xFFFFFFu));
 #endif
 
    switch (rhi_type)
@@ -860,6 +892,13 @@ void rhi_intf_copy_rect(uint16_t src_x, uint16_t src_y,
 {
 #ifdef RHI_DUMP
    rhi_dump_copy_rect(src_x, src_y, dst_x, dst_y, w, h, mask_test, set_mask);
+#endif
+#ifdef DEBUG
+   tt_log("copy_rect src=(%u,%u) dst=(%u,%u) %ux%u mask_test=%d set_mask=%d\n",
+         (unsigned)src_x, (unsigned)src_y,
+         (unsigned)dst_x, (unsigned)dst_y,
+         (unsigned)w, (unsigned)h,
+         (int)mask_test, (int)set_mask);
 #endif
 
    switch (rhi_type)
