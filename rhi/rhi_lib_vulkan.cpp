@@ -4744,77 +4744,62 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		return program_map_insert_yield(m, hash, t);
 	}
 
-	class Framebuffer : public Cookie, public NoCopyNoMove
+	/* Framebuffer: cached VkFramebuffer + its attachments. Converted from a C++
+	 * class to a plain C struct + framebuffer_* free functions. The Cookie base is
+	 * embedded as the first member (composition, seeded by cookie_init); the former
+	 * const RenderPass& reference member becomes a pointer (plain structs cannot
+	 * hold references). FramebufferNode embeds a Framebuffer by value as its base.
+	 * ctor -> framebuffer_init, dtor -> framebuffer_fini. */
+	struct Framebuffer
 	{
-		public:
-			Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info);
-			~Framebuffer();
-
-			VkFramebuffer get_framebuffer() const
-			{
-				return framebuffer;
-			}
-
-			ImageView *get_attachment(unsigned index) const
-			{
-				assert(index < num_attachments);
-				return attachments[index];
-			}
-
-			uint32_t get_width() const
-			{
-				return width;
-			}
-
-			uint32_t get_height() const
-			{
-				return height;
-			}
-
-			const RenderPass &get_compatible_render_pass() const
-			{
-				return render_pass;
-			}
-
-		private:
-			Device *device;
-			VkFramebuffer framebuffer = VK_NULL_HANDLE;
-			const RenderPass &render_pass;
-			RenderPassInfo info;
-			uint32_t width = 0;
-			uint32_t height = 0;
-
-			ImageView *attachments[VULKAN_NUM_ATTACHMENTS + 1] = {};
-			unsigned num_attachments = 0;
+		struct Cookie cookie_base; /* was: public Cookie base subobject */
+		Device *device;
+		VkFramebuffer framebuffer;
+		const RenderPass *render_pass;
+		RenderPassInfo info;
+		uint32_t width;
+		uint32_t height;
+		ImageView *attachments[VULKAN_NUM_ATTACHMENTS + 1];
+		unsigned num_attachments;
 	};
+
+	void framebuffer_init(struct Framebuffer *self, Device *device, const RenderPass *rp, const RenderPassInfo &info);
+	void framebuffer_fini(struct Framebuffer *self);
+	static inline VkFramebuffer framebuffer_get_framebuffer(const struct Framebuffer *self) { return self->framebuffer; }
+	static inline ImageView *framebuffer_get_attachment(const struct Framebuffer *self, unsigned index)
+	{
+		assert(index < self->num_attachments);
+		return self->attachments[index];
+	}
+	static inline uint32_t framebuffer_get_width(const struct Framebuffer *self) { return self->width; }
+	static inline uint32_t framebuffer_get_height(const struct Framebuffer *self) { return self->height; }
+	static inline const RenderPass *framebuffer_get_compatible_render_pass(const struct Framebuffer *self) { return self->render_pass; }
 
 	static const unsigned VULKAN_FRAMEBUFFER_RING_SIZE = 8;
 	/* Lifted to file scope (was nested in FramebufferAllocator). Derives from
 	 * Framebuffer, so th_node is NOT at offset 0 - the ring lists recover the node
 	 * with TH_NODE_OF, which the temp-map macro already uses. */
-	struct FramebufferNode : Framebuffer
+	struct FramebufferNode
 	{
+		struct Framebuffer base; /* was: inherit Framebuffer */
 		struct TemporaryHashmapNode th_node;
-		FramebufferNode(Device *device, const RenderPass &rp, const RenderPassInfo &info)
-			: Framebuffer(device, rp, info)
-		{
-		}
 	};
 
-	static inline void framebuffer_node_destroy(FramebufferNode *t) { t->~FramebufferNode(); }
+	static inline void framebuffer_node_destroy(FramebufferNode *t) { framebuffer_fini(&t->base); }
 	VK_TEMPHASH_DECLARE(framebuffer_thmap, FramebufferNode, VULKAN_FRAMEBUFFER_RING_SIZE, 0, framebuffer_node_destroy)
 
 	/* emplace constructs the node in the pool, stamps its ring index + hash, registers
 	 * it in the recycle map and links it at the front of the current ring (mirrors the
 	 * template's variadic emplace for this type). */
 	static inline FramebufferNode *framebuffer_thmap_emplace(struct framebuffer_thmap *m,
-			Hash hash, Device *device, const RenderPass &rp, const RenderPassInfo &info)
+			Hash hash, Device *device, const RenderPass *rp, const RenderPassInfo &info)
 	{
 		void *slot = object_pool_raw_allocate(&m->object_pool);
 		FramebufferNode *node;
 		if (!slot)
 			return NULL;
-		node = new (slot) FramebufferNode(device, rp, info);
+		node = (FramebufferNode *)slot;
+		framebuffer_init(&node->base, device, rp, info);
 		node->th_node.index = m->index;
 		node->th_node.hash  = hash;
 		vk_ptr_map_emplace_replace(&m->hashmap, hash, (void *)node);
@@ -4822,32 +4807,26 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		return node;
 	}
 
-	class FramebufferAllocator
+	/* FramebufferAllocator: per-frame framebuffer cache (a ring TempHashmap of
+	 * FramebufferNodes). Converted from a C++ class to a plain C struct +
+	 * framebuffer_allocator_* free functions. */
+	struct FramebufferAllocator
 	{
-		public:
-			/* Default-constructible; Device supplied via init() instead of a
-			 * (Device *) constructor. deinit() performs the destructor's teardown
-			 * (clearing the framebuffer cache, freeing the pooled nodes). */
-			void init(Device *device_)
-			{
-				device = device_;
-				framebuffer_thmap_init_empty(&framebuffers);
-			}
-
-			void deinit()
-			{
-				framebuffer_thmap_deinit(&framebuffers);
-			}
-
-			Framebuffer &request_framebuffer(const RenderPassInfo &info);
-
-			void begin_frame();
-			void clear();
-
-		private:
-			Device *device;
-			struct framebuffer_thmap framebuffers;
+		Device *device;
+		struct framebuffer_thmap framebuffers;
 	};
+	static inline void framebuffer_allocator_init(struct FramebufferAllocator *self, Device *device_)
+	{
+		self->device = device_;
+		framebuffer_thmap_init_empty(&self->framebuffers);
+	}
+	static inline void framebuffer_allocator_deinit(struct FramebufferAllocator *self)
+	{
+		framebuffer_thmap_deinit(&self->framebuffers);
+	}
+	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
+	void framebuffer_allocator_begin_frame(struct FramebufferAllocator *self);
+	void framebuffer_allocator_clear(struct FramebufferAllocator *self);
 
 	/* Lifted to file scope (was nested in AttachmentAllocator). */
 	struct TransientNode
@@ -4882,35 +4861,27 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		return node;
 	}
 
-	class AttachmentAllocator
+	/* AttachmentAllocator: per-frame transient-attachment cache (a ring TempHashmap
+	 * of transient ImageView nodes). Converted from a C++ class to a plain C struct
+	 * + attachment_allocator_* free functions. */
+	struct AttachmentAllocator
 	{
-		public:
-			/* Default-constructible now; the owning Device is supplied via init()
-			 * rather than a (Device *) constructor, so an embedding object does
-			 * not have to construct it in its initialiser list. deinit() performs
-			 * the teardown the destructor used to (clearing the transient cache,
-			 * which frees the pooled nodes). */
-			void init(Device *device_)
-			{
-				device = device_;
-				transient_thmap_init_empty(&attachments);
-			}
-
-			void deinit()
-			{
-				transient_thmap_deinit(&attachments);
-			}
-
-			ImageView &request_attachment(unsigned width, unsigned height, VkFormat format,
-					unsigned index = 0, unsigned samples = 1, unsigned layers = 1);
-
-			void begin_frame();
-			void clear();
-
-		private:
-			Device *device;
-			struct transient_thmap attachments;
+		Device *device;
+		struct transient_thmap attachments;
 	};
+	static inline void attachment_allocator_init(struct AttachmentAllocator *self, Device *device_)
+	{
+		self->device = device_;
+		transient_thmap_init_empty(&self->attachments);
+	}
+	static inline void attachment_allocator_deinit(struct AttachmentAllocator *self)
+	{
+		transient_thmap_deinit(&self->attachments);
+	}
+	struct ImageView *attachment_allocator_request_attachment(struct AttachmentAllocator *self, unsigned width, unsigned height, VkFormat format,
+			unsigned index, unsigned samples, unsigned layers);
+	void attachment_allocator_begin_frame(struct AttachmentAllocator *self);
+	void attachment_allocator_clear(struct AttachmentAllocator *self);
 
 
 /* ============================================================
@@ -5787,7 +5758,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 			ImageView &get_transient_attachment(unsigned width, unsigned height, VkFormat format,
 					unsigned index = 0, unsigned samples = 1, unsigned layers = 1)
 			{
-				return transient_allocator.request_attachment(width, height, format, index, samples, layers);
+				return *attachment_allocator_request_attachment(&transient_allocator, width, height, format, index, samples, layers);
 			}
 
 			VkDevice get_device()
@@ -5854,9 +5825,10 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 			friend void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
 			const Framebuffer &request_framebuffer(const RenderPassInfo &info)
 			{
-				return framebuffer_allocator.request_framebuffer(info);
+				return *framebuffer_allocator_request_framebuffer(&framebuffer_allocator, info);
 			}
 			const RenderPass &request_render_pass(const RenderPassInfo &info, bool compatible);
+			friend struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
 
 			VkPhysicalDeviceMemoryProperties mem_props;
 			VkPhysicalDeviceProperties gpu_props;
@@ -6156,6 +6128,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 			friend void program_fini(struct Program *self);
 			void destroy_sampler_nolock(VkSampler sampler);
 			void destroy_framebuffer_nolock(VkFramebuffer framebuffer);
+			friend void framebuffer_fini(struct Framebuffer *self);
 			void destroy_semaphore_nolock(VkSemaphore semaphore);
 			void recycle_semaphore_nolock(VkSemaphore semaphore)
 			{
@@ -14619,16 +14592,18 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		SubpassInfoVec_free_storage(&self->subpasses);
 	}
 
-	Framebuffer::Framebuffer(Device *device, const RenderPass &rp, const RenderPassInfo &info)
-		: device(device)
-		  , render_pass(rp)
-		  , info(info)
+	void framebuffer_init(struct Framebuffer *self, Device *device, const RenderPass *rp, const RenderPassInfo &info)
 	{
-		cookie_init(this, device);
-		width = UINT32_MAX;
-		height = UINT32_MAX;
 		VkImageView views[VULKAN_NUM_ATTACHMENTS + 1];
 		unsigned num_views = 0;
+		self->device = device;
+		self->framebuffer = VK_NULL_HANDLE;
+		self->render_pass = rp;
+		self->info = info;
+		self->num_attachments = 0;
+		cookie_init(&self->cookie_base, device);
+		self->width = UINT32_MAX;
+		self->height = UINT32_MAX;
 
 		VK_ASSERT(info.num_color_attachments || info.depth_stencil);
 
@@ -14639,10 +14614,10 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			unsigned lod = imageview_get_create_info(att).base_level;
 			unsigned aw  = image_get_width(&imageview_get_image(att), lod);
 			unsigned ah  = image_get_height(&imageview_get_image(att), lod);
-			if (aw < width)  width  = aw;
-			if (ah < height) height = ah;
+			if (aw < self->width)  self->width  = aw;
+			if (ah < self->height) self->height = ah;
 			views[num_views++] = imageview_get_render_target_view(att, info.layer);
-			attachments[num_attachments++] = att;
+			self->attachments[self->num_attachments++] = att;
 		}
 
 		if (info.depth_stencil)
@@ -14651,43 +14626,45 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			unsigned lod = imageview_get_create_info(att).base_level;
 			unsigned aw  = image_get_width(&imageview_get_image(att), lod);
 			unsigned ah  = image_get_height(&imageview_get_image(att), lod);
-			if (aw < width)  width  = aw;
-			if (ah < height) height = ah;
+			if (aw < self->width)  self->width  = aw;
+			if (ah < self->height) self->height = ah;
 			views[num_views++] = imageview_get_render_target_view(att, info.layer);
-			attachments[num_attachments++] = att;
+			self->attachments[self->num_attachments++] = att;
 		}
 
 		VkFramebufferCreateInfo fb_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-		fb_info.renderPass = render_pass_get_render_pass(&rp);
+		fb_info.renderPass = render_pass_get_render_pass(rp);
 		fb_info.attachmentCount = num_views;
 		fb_info.pAttachments = views;
-		fb_info.width = width;
-		fb_info.height = height;
+		fb_info.width = self->width;
+		fb_info.height = self->height;
 		fb_info.layers = 1;
 
-		if (vkCreateFramebuffer(device->get_device(), &fb_info, NULL, &framebuffer) != VK_SUCCESS)
+		if (vkCreateFramebuffer(device->get_device(), &fb_info, NULL, &self->framebuffer) != VK_SUCCESS)
 			LOGE("Failed to create framebuffer.");
 	}
 
-	Framebuffer::~Framebuffer()
+	void framebuffer_fini(struct Framebuffer *self)
 	{
-		if (framebuffer != VK_NULL_HANDLE)
-			device->destroy_framebuffer_nolock(framebuffer);
+		if (self->framebuffer != VK_NULL_HANDLE)
+			self->device->destroy_framebuffer_nolock(self->framebuffer);
 	}
 
-	void FramebufferAllocator::clear()
+	void framebuffer_allocator_clear(struct FramebufferAllocator *self)
 	{
-		framebuffer_thmap_clear(&framebuffers);
+		framebuffer_thmap_clear(&self->framebuffers);
 	}
 
-	void FramebufferAllocator::begin_frame()
+	void framebuffer_allocator_begin_frame(struct FramebufferAllocator *self)
 	{
-		framebuffer_thmap_begin_frame(&framebuffers);
+		framebuffer_thmap_begin_frame(&self->framebuffers);
 	}
 
-	Framebuffer &FramebufferAllocator::request_framebuffer(const RenderPassInfo &info)
+	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info)
 	{
-		const RenderPass &rp = device->request_render_pass(info, true);
+		const RenderPass &rp = self->device->request_render_pass(info, true);
+		Hash hash;
+		FramebufferNode *node;
 		Hasher h; hasher_init(&h);
 		hasher_u64(&h, rp.intrusive_node.key);
 
@@ -14700,28 +14677,31 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		hasher_u32(&h, info.layer);
 
-		Hash hash = hasher_get(&h);
+		hash = hasher_get(&h);
 
-		FramebufferNode *node = framebuffer_thmap_request(&framebuffers, hash);
+		node = framebuffer_thmap_request(&self->framebuffers, hash);
 		if (node)
-			return *node;
+			return &node->base;
 
-		return *framebuffer_thmap_emplace(&framebuffers, hash, device, rp, info);
+		return &framebuffer_thmap_emplace(&self->framebuffers, hash, self->device, &rp, info)->base;
 	}
 
-	void AttachmentAllocator::clear()
+	void attachment_allocator_clear(struct AttachmentAllocator *self)
 	{
-		transient_thmap_clear(&attachments);
+		transient_thmap_clear(&self->attachments);
 	}
 
-	void AttachmentAllocator::begin_frame()
+	void attachment_allocator_begin_frame(struct AttachmentAllocator *self)
 	{
-		transient_thmap_begin_frame(&attachments);
+		transient_thmap_begin_frame(&self->attachments);
 	}
 
-	ImageView &AttachmentAllocator::request_attachment(unsigned width, unsigned height, VkFormat format,
+	struct ImageView *attachment_allocator_request_attachment(struct AttachmentAllocator *self, unsigned width, unsigned height, VkFormat format,
 			unsigned index, unsigned samples, unsigned layers)
 	{
+		Hash hash;
+		TransientNode *node;
+		ImageCreateInfo image_info;
 		Hasher h; hasher_init(&h);
 		hasher_u32(&h, width);
 		hasher_u32(&h, height);
@@ -14730,19 +14710,19 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		hasher_u32(&h, samples);
 		hasher_u32(&h, layers);
 
-		Hash hash = hasher_get(&h);
+		hash = hasher_get(&h);
 
-		TransientNode *node = transient_thmap_request(&attachments, hash);
+		node = transient_thmap_request(&self->attachments, hash);
 		if (node)
-			return image_get_view(ih_get(&node->handle));
+			return &image_get_view(ih_get(&node->handle));
 
-		ImageCreateInfo image_info = ImageCreateInfo::transient_render_target(width, height, format);
+		image_info = ImageCreateInfo::transient_render_target(width, height, format);
 
 		image_info.samples = (VkSampleCountFlagBits)(samples);
 		image_info.layers = layers;
-		node = transient_thmap_emplace(&attachments, hash, device->create_image(image_info, NULL));
-		device->set_name(*ih_get(&node->handle), "AttachmentAllocator");
-		return image_get_view(ih_get(&node->handle));
+		node = transient_thmap_emplace(&self->attachments, hash, self->device->create_image(image_info, NULL));
+		self->device->set_name(*ih_get(&node->handle), "AttachmentAllocator");
+		return &image_get_view(ih_get(&node->handle));
 	}
 
 /* === command_buffer.cpp === */
@@ -15087,8 +15067,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer)
 	{
-		const uint32_t fb_w = self->framebuffer->get_width();
-		const uint32_t fb_h = self->framebuffer->get_height();
+		const uint32_t fb_w = framebuffer_get_width(self->framebuffer);
+		const uint32_t fb_h = framebuffer_get_height(self->framebuffer);
 		VkRect2D rect = info.render_area;
 		if (uint32_t(rect.offset.x) > fb_w) rect.offset.x = int32_t(fb_w);
 		if (uint32_t(rect.offset.y) > fb_h) rect.offset.y = int32_t(fb_h);
@@ -15110,7 +15090,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		VK_ASSERT(!self->actual_render_pass);
 
 		self->framebuffer = &self->device->request_framebuffer(info);
-		self->compatible_render_pass = &self->framebuffer->get_compatible_render_pass();
+		self->compatible_render_pass = framebuffer_get_compatible_render_pass(self->framebuffer);
 		self->actual_render_pass = &self->device->request_render_pass(info, false);
 
 		commandbuffer_init_viewport_scissor(self, info, self->framebuffer);
@@ -15136,7 +15116,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		VkRenderPassBeginInfo begin_info = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 		begin_info.renderPass = render_pass_get_render_pass(self->actual_render_pass);
-		begin_info.framebuffer = self->framebuffer->get_framebuffer();
+		begin_info.framebuffer = framebuffer_get_framebuffer(self->framebuffer);
 		begin_info.renderArea = self->scissor;
 		begin_info.clearValueCount = num_clear_values;
 		begin_info.pClearValues = clear_values;
@@ -15711,7 +15691,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			if (ref.attachment == VK_ATTACHMENT_UNUSED)
 				continue;
 
-			ImageView *view = self->framebuffer->get_attachment(ref.attachment);
+			ImageView *view = framebuffer_get_attachment(self->framebuffer, ref.attachment);
 			VK_ASSERT(view);
 			VK_ASSERT(image_get_create_info(&imageview_get_image(view)).usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
 
@@ -16602,8 +16582,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		render_pass_map_init(&self->render_passes);
 		shader_map_init(&self->shaders);
 		program_map_init(&self->programs);
-		self->framebuffer_allocator.init(self);
-		self->transient_allocator.init(self);
+		framebuffer_allocator_init(&self->framebuffer_allocator, self);
+		attachment_allocator_init(&self->transient_allocator, self);
 	}
 
 	/* Tear a Device down to the point where its storage can be freed. Runs the
@@ -16613,8 +16593,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	{
 		self->wait_idle();
 
-		self->framebuffer_allocator.clear();
-		self->transient_allocator.clear();
+		framebuffer_allocator_clear(&self->framebuffer_allocator);
+		attachment_allocator_clear(&self->transient_allocator);
 		for (unsigned i = 0; i < (unsigned)StockSampler_Count; i++)
 			smh_reset(&self->samplers[i]);
 
@@ -16627,8 +16607,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		 * destruction order is allocators, caches, per_frame, managers, handle_pool.
 		 * In particular per_frame is destroyed AFTER the caches, as its declaration
 		 * comment requires. */
-		self->framebuffer_allocator.deinit();
-		self->transient_allocator.deinit();
+		framebuffer_allocator_deinit(&self->framebuffer_allocator);
+		attachment_allocator_deinit(&self->transient_allocator);
 		program_map_deinit(&self->programs);
 		shader_map_deinit(&self->shaders);
 		render_pass_map_deinit(&self->render_passes);
@@ -17512,8 +17492,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		wait_idle_nolock();
 
 		// Clear out caches which might contain stale data from now on.
-		framebuffer_allocator.clear();
-		transient_allocator.clear();
+		framebuffer_allocator_clear(&framebuffer_allocator);
+		attachment_allocator_clear(&transient_allocator);
 		per_frame.clear();
 
 		for (unsigned i = 0; i < count; i++)
@@ -17664,8 +17644,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			bufferblock_vec_clear(&frame->ubo_blocks);
 		}
 
-		framebuffer_allocator.clear();
-		transient_allocator.clear();
+		framebuffer_allocator_clear(&framebuffer_allocator);
+		attachment_allocator_clear(&transient_allocator);
 		{
 			struct IntrusiveListNode *n;
 			for (n = descriptor_set_allocator_map_begin(&descriptor_set_allocators); n; n = n->next)
@@ -17685,8 +17665,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		// Flush the frame here as we might have pending staging command buffers from init stage.
 		end_frame_nolock();
 
-		framebuffer_allocator.begin_frame();
-		transient_allocator.begin_frame();
+		framebuffer_allocator_begin_frame(&framebuffer_allocator);
+		attachment_allocator_begin_frame(&transient_allocator);
 		{
 			struct IntrusiveListNode *n;
 			for (n = descriptor_set_allocator_map_begin(&descriptor_set_allocators); n; n = n->next)
