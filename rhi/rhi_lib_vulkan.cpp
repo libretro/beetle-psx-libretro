@@ -3042,65 +3042,65 @@ using MemoryAccessFlags = uint32_t;
 struct DeviceAllocation;
 class DeviceAllocator;
 
-class Block
+/* Block sub-allocator constants, hoisted from the former Block:: anonymous enum
+ * to file scope so the class->struct conversion carries no nested type. */
+enum { BLOCK_NUM_SUB_BLOCKS = 32u };
+#define BLOCK_ALL_FREE (~0u)
+
+/* Block: 32-way sub-block bitmap allocator. Converted from a C++ class (deleted
+ * copy, default ctor that fills the free bitmap, dtor that leak-checks) to a
+ * plain C struct + free functions. Embedded by value in MiniHeap; block_init
+ * seeds it (was the default ctor), block_fini runs the leak check (was the
+ * dtor). */
+struct Block
 {
-public:
-	enum
-	{
-		NumSubBlocks = 32u,
-		AllFree = ~0u
-	};
-
-	Block(const Block &) = delete;
-	void operator=(const Block &) = delete;
-
-	Block()
-	{
-		for (uint32_t &v : free_blocks)
-			v = AllFree;
-		longest_run = 32;
-	}
-
-	~Block()
-	{
-		if (free_blocks[0] != AllFree)
-			LOGE("Memory leak in block detected.\n");
-	}
-
-	inline bool full() const
-	{
-		return free_blocks[0] == 0;
-	}
-
-	inline bool empty() const
-	{
-		return free_blocks[0] == AllFree;
-	}
-
-	inline uint32_t get_longest_run() const
-	{
-		return longest_run;
-	}
-
-	void allocate(uint32_t num_blocks, DeviceAllocation *block);
-	void free(uint32_t mask);
-
-private:
-	uint32_t free_blocks[NumSubBlocks];
-	uint32_t longest_run = 0;
-
-	inline void update_longest_run()
-	{
-		uint32_t f = free_blocks[0];
-		longest_run = 0;
-
-		while (f)
-		{
-			free_blocks[longest_run++] = f;
-			f &= f >> 1;
-		}
-	}
+	uint32_t free_blocks[BLOCK_NUM_SUB_BLOCKS];
+	uint32_t longest_run;
 };
+
+static inline void block_init(struct Block *self)
+{
+	unsigned i;
+	for (i = 0; i < BLOCK_NUM_SUB_BLOCKS; i++)
+		self->free_blocks[i] = BLOCK_ALL_FREE;
+	self->longest_run = 32;
+}
+
+static inline void block_fini(struct Block *self)
+{
+	if (self->free_blocks[0] != BLOCK_ALL_FREE)
+		LOGE("Memory leak in block detected.\n");
+}
+
+static inline bool block_full(const struct Block *self)
+{
+	return self->free_blocks[0] == 0;
+}
+
+static inline bool block_empty(const struct Block *self)
+{
+	return self->free_blocks[0] == BLOCK_ALL_FREE;
+}
+
+static inline uint32_t block_get_longest_run(const struct Block *self)
+{
+	return self->longest_run;
+}
+
+static inline void block_update_longest_run(struct Block *self)
+{
+	uint32_t f = self->free_blocks[0];
+	self->longest_run = 0;
+
+	while (f)
+	{
+		self->free_blocks[self->longest_run++] = f;
+		f &= f >> 1;
+	}
+}
+
+void block_allocate(struct Block *self, uint32_t num_blocks, DeviceAllocation *block);
+void block_free(struct Block *self, uint32_t mask);
 
 struct MiniHeap;
 class ClassAllocator;
@@ -3111,7 +3111,7 @@ struct DeviceAllocation
 {
 	friend class ClassAllocator;
 	friend class Allocator;
-	friend class Block;
+	friend void block_allocate(struct Block *self, uint32_t num_blocks, DeviceAllocation *block);
 	friend class DeviceAllocator;
 
 public:
@@ -3218,7 +3218,7 @@ private:
 	ClassAllocator() { object_pool_raw_init(&object_pool, sizeof(MiniHeap)); }
 	struct AllocationTilingHeaps
 	{
-		struct IntrusiveListC heaps[Block::NumSubBlocks];
+		struct IntrusiveListC heaps[BLOCK_NUM_SUB_BLOCKS];
 		struct IntrusiveListC full_heaps;
 		uint32_t heap_availability_mask = 0;
 	};
@@ -13074,41 +13074,41 @@ void DeviceAllocation::free_global(DeviceAllocator &allocator, uint32_t size, ui
 	}
 }
 
-void Block::allocate(uint32_t num_blocks, DeviceAllocation *block)
+void block_allocate(struct Block *self, uint32_t num_blocks, DeviceAllocation *block)
 {
-	VK_ASSERT(NumSubBlocks >= num_blocks);
+	VK_ASSERT(BLOCK_NUM_SUB_BLOCKS >= num_blocks);
 	VK_ASSERT(num_blocks != 0);
 
 	uint32_t block_mask;
-	if (num_blocks == NumSubBlocks)
+	if (num_blocks == BLOCK_NUM_SUB_BLOCKS)
 		block_mask = ~0u;
 	else
 		block_mask = ((1u << num_blocks) - 1u);
 
-	uint32_t mask = free_blocks[num_blocks - 1];
+	uint32_t mask = self->free_blocks[num_blocks - 1];
 	uint32_t b = trailing_zeroes(mask);
 
-	VK_ASSERT(((free_blocks[0] >> b) & block_mask) == block_mask);
+	VK_ASSERT(((self->free_blocks[0] >> b) & block_mask) == block_mask);
 
 	uint32_t sb = block_mask << b;
-	free_blocks[0] &= ~sb;
-	update_longest_run();
+	self->free_blocks[0] &= ~sb;
+	block_update_longest_run(self);
 
 	block->mask = sb;
 	block->offset = b;
 }
 
-void Block::free(uint32_t mask)
+void block_free(struct Block *self, uint32_t mask)
 {
-	VK_ASSERT((free_blocks[0] & mask) == 0);
-	free_blocks[0] |= mask;
-	update_longest_run();
+	VK_ASSERT((self->free_blocks[0] & mask) == 0);
+	self->free_blocks[0] |= mask;
+	block_update_longest_run(self);
 }
 
 void ClassAllocator::suballocate(uint32_t num_blocks, uint32_t tiling, uint32_t memory_type, MiniHeap &heap,
                                  DeviceAllocation *alloc)
 {
-	heap.heap.allocate(num_blocks, alloc);
+	block_allocate(&heap.heap, num_blocks, alloc);
 	alloc->base = heap.allocation.base;
 	alloc->offset <<= sub_block_size_log2;
 
@@ -13131,7 +13131,7 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 
 	uint32_t index = trailing_zeroes(m.heap_availability_mask & ~size_mask);
 
-	if (index < Block::NumSubBlocks)
+	if (index < BLOCK_NUM_SUB_BLOCKS)
 	{
 		MiniHeap *itr = (MiniHeap *)ilist_begin(&m.heaps[index]);
 		VK_ASSERT(itr);
@@ -13139,9 +13139,9 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 
 		MiniHeap &heap = *itr;
 		suballocate(num_blocks, masked_tiling_mode, memory_type, heap, alloc);
-		unsigned new_index = heap.heap.get_longest_run() - 1;
+		unsigned new_index = block_get_longest_run(&heap.heap) - 1;
 
-		if (heap.heap.full())
+		if (block_full(&heap.heap))
 		{
 			ilist_move_to_front(&m.full_heaps, &m.heaps[index], &itr->list_node);
 			if (!ilist_begin(&m.heaps[index]))
@@ -13166,16 +13166,19 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 	MiniHeap *node = new (object_pool_raw_allocate(&object_pool)) MiniHeap();
 	if (!node)
 		return false;
+	/* Block is a plain struct now; its former default ctor (fill the free
+	 * bitmap) runs explicitly via block_init. */
+	block_init(&node->heap);
 
 	MiniHeap &heap = *node;
-	uint32_t alloc_size = sub_block_size * Block::NumSubBlocks;
+	uint32_t alloc_size = sub_block_size * BLOCK_NUM_SUB_BLOCKS;
 
 	if (parent)
 	{
 		// We cannot allocate a new block from parent ... This is fatal.
 		if (!parent->allocate(alloc_size, tiling, &heap.allocation, true))
 		{
-			node->~MiniHeap(); object_pool_raw_free(&object_pool, node);
+			block_fini(&node->heap); node->~MiniHeap(); object_pool_raw_free(&object_pool, node);
 			return false;
 		}
 	}
@@ -13185,7 +13188,7 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 		if (!global_allocator->allocate(alloc_size, memory_type, &heap.allocation.base, &heap.allocation.host_base,
 		                                VK_NULL_HANDLE))
 		{
-			node->~MiniHeap(); object_pool_raw_free(&object_pool, node);
+			block_fini(&node->heap); node->~MiniHeap(); object_pool_raw_free(&object_pool, node);
 			return false;
 		}
 	}
@@ -13194,13 +13197,13 @@ bool ClassAllocator::allocate(uint32_t size, AllocationTiling tiling, DeviceAllo
 	suballocate(num_blocks, masked_tiling_mode, memory_type, heap, alloc);
 
 	alloc->heap = node;
-	if (heap.heap.full())
+	if (block_full(&heap.heap))
 	{
 		ilist_insert_front(&m.full_heaps, &node->list_node);
 	}
 	else
 	{
-		unsigned new_index = heap.heap.get_longest_run() - 1;
+		unsigned new_index = block_get_longest_run(&heap.heap) - 1;
 		ilist_insert_front(&m.heaps[new_index], &node->list_node);
 		m.heap_availability_mask |= 1u << new_index;
 	}
@@ -13233,20 +13236,20 @@ void ClassAllocator::free(DeviceAllocation *alloc)
 {
 	MiniHeap *heap = alloc->heap;
 	Block &block = heap->heap;
-	bool was_full = block.full();
+	bool was_full = block_full(&block);
 	AllocationTilingHeaps &m = tiling_modes[alloc->tiling];
 
-	unsigned index = block.get_longest_run() - 1;
-	block.free(alloc->mask);
-	unsigned new_index = block.get_longest_run() - 1;
+	unsigned index = block_get_longest_run(&block) - 1;
+	block_free(&block, alloc->mask);
+	unsigned new_index = block_get_longest_run(&block) - 1;
 
-	if (block.empty())
+	if (block_empty(&block))
 	{
 		// Our mini-heap is completely freed, free to higher level allocator.
 		if (parent)
 			heap->allocation.free_immediate();
 		else
-			heap->allocation.free_global(*global_allocator, sub_block_size * Block::NumSubBlocks, memory_type);
+			heap->allocation.free_global(*global_allocator, sub_block_size * BLOCK_NUM_SUB_BLOCKS, memory_type);
 
 		if (was_full)
 			ilist_erase(&m.full_heaps, &heap->list_node);
@@ -13257,7 +13260,7 @@ void ClassAllocator::free(DeviceAllocation *alloc)
 				m.heap_availability_mask &= ~(1u << index);
 		}
 
-		heap->~MiniHeap(); object_pool_raw_free(&object_pool, heap);
+		block_fini(&heap->heap); heap->~MiniHeap(); object_pool_raw_free(&object_pool, heap);
 	}
 	else if (was_full)
 	{
@@ -13300,12 +13303,12 @@ bool Allocator::allocate(uint32_t size, uint32_t alignment, AllocationTiling mod
 	for (ClassAllocator &c : classes)
 	{
 		// Find a suitable class to allocate from.
-		if (size <= c.sub_block_size * Block::NumSubBlocks)
+		if (size <= c.sub_block_size * BLOCK_NUM_SUB_BLOCKS)
 		{
 			if (alignment > c.sub_block_size)
 			{
 				size_t padded_size = size + (alignment - c.sub_block_size);
-				if (padded_size <= c.sub_block_size * Block::NumSubBlocks)
+				if (padded_size <= c.sub_block_size * BLOCK_NUM_SUB_BLOCKS)
 					size = padded_size;
 				else
 					continue;
@@ -13337,12 +13340,12 @@ Allocator::Allocator()
 	get_class_allocator(MEMORY_CLASS_HUGE).set_tiling_mask(0);
 
 	get_class_allocator(MEMORY_CLASS_SMALL).set_sub_block_size(128);
-	get_class_allocator(MEMORY_CLASS_MEDIUM).set_sub_block_size(128 * Block::NumSubBlocks); // 4K
+	get_class_allocator(MEMORY_CLASS_MEDIUM).set_sub_block_size(128 * BLOCK_NUM_SUB_BLOCKS); // 4K
 
 	// 128K, this is the largest bufferImageGranularity a Vulkan implementation may have.
-	get_class_allocator(MEMORY_CLASS_LARGE).set_sub_block_size(128 * Block::NumSubBlocks * Block::NumSubBlocks);
+	get_class_allocator(MEMORY_CLASS_LARGE).set_sub_block_size(128 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS);
 	get_class_allocator(MEMORY_CLASS_HUGE)
-	    .set_sub_block_size(64 * Block::NumSubBlocks * Block::NumSubBlocks * Block::NumSubBlocks); // 2M
+	    .set_sub_block_size(64 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS); // 2M
 }
 
 void DeviceAllocator::init(VkPhysicalDevice gpu, VkDevice vkdevice)
