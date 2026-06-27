@@ -8431,32 +8431,68 @@ extern retro_log_printf_t log_cb;
 			a->offset_uv == b->offset_uv;
 	}
 
+	/* Renderer scanout / filter / blend enums. Hoisted out of the Renderer class to
+	 * file scope so the forthcoming class -> C struct conversion's free functions can
+	 * name them without a Renderer:: qualifier. The enumerator names are already
+	 * prefixed, so there is no collision at file scope. */
+	enum ScanoutMode {
+		// Use extra precision bits.
+		ScanoutMode_ABGR1555_555,
+		// Use extra precision bits to dither down to a native ABGR1555 image.
+		// The dither happens in the wrong place, but should be "good" enough to feel authentic.
+		ScanoutMode_ABGR1555_Dither,
+		// MDEC
+		ScanoutMode_BGR24
+	};
+
+	enum ScanoutFilter {
+		ScanoutFilter_None,
+		ScanoutFilter_SSAA,
+		ScanoutFilter_MDEC_YUV
+	};
+
+	enum WidthMode {
+		WidthMode_WIDTH_MODE_256 = 0,
+		WidthMode_WIDTH_MODE_320 = 1,
+		WidthMode_WIDTH_MODE_512 = 2,
+		WidthMode_WIDTH_MODE_640 = 3,
+		WidthMode_WIDTH_MODE_368 = 4
+	};
+
+	enum FilterExclude
+	{
+		FilterExcludeNone = 0,
+		FilterExcludeOpaque = 1,
+		FilterExcludeOpaqueAndSemiTrans = 2,
+	};
+
+	enum FilterMode {
+	FilterMode_NearestNeighbor = 0,
+	FilterMode_XBR = 1,
+	FilterMode_SABR = 2,
+	FilterMode_Bilinear = 3,
+	FilterMode_Bilinear3Point = 4,
+	FilterMode_JINC2 = 5
+};
+
+	enum TransMode {
+	TransMode_Opaque = 0,
+	TransMode_SemiTrans = 1,
+	TransMode_SemiTransOpaque = 2
+};
+
+	enum BlendMode {
+	BlendMode_BlendAdd = 0,
+	BlendMode_BlendAvg = 1,
+	BlendMode_BlendSub = 2,
+	BlendMode_BlendAddQuarter = 3
+};
+
 	class Renderer
 	{
 		public:
-			enum ScanoutMode {
-				// Use extra precision bits.
-				ScanoutMode_ABGR1555_555,
-				// Use extra precision bits to dither down to a native ABGR1555 image.
-				// The dither happens in the wrong place, but should be "good" enough to feel authentic.
-				ScanoutMode_ABGR1555_Dither,
-				// MDEC
-				ScanoutMode_BGR24
-			};
 
-			enum ScanoutFilter {
-				ScanoutFilter_None,
-				ScanoutFilter_SSAA,
-				ScanoutFilter_MDEC_YUV
-			};
 
-			enum WidthMode {
-				WidthMode_WIDTH_MODE_256 = 0,
-				WidthMode_WIDTH_MODE_320 = 1,
-				WidthMode_WIDTH_MODE_512 = 2,
-				WidthMode_WIDTH_MODE_640 = 3,
-				WidthMode_WIDTH_MODE_368 = 4
-			};
 
 			struct RenderState
 			{
@@ -8805,34 +8841,9 @@ extern retro_log_printf_t log_cb;
 				SpecConstIndex_Samples = 0,
 			};
 
-			enum FilterExclude
-			{
-				FilterExcludeNone = 0,
-				FilterExcludeOpaque = 1,
-				FilterExcludeOpaqueAndSemiTrans = 2,
-			};
 
-			enum FilterMode {
-			FilterMode_NearestNeighbor = 0,
-			FilterMode_XBR = 1,
-			FilterMode_SABR = 2,
-			FilterMode_Bilinear = 3,
-			FilterMode_Bilinear3Point = 4,
-			FilterMode_JINC2 = 5
-		};
 
-			enum TransMode {
-			TransMode_Opaque = 0,
-			TransMode_SemiTrans = 1,
-			TransMode_SemiTransOpaque = 2
-		};
 
-			enum BlendMode {
-			BlendMode_BlendAdd = 0,
-			BlendMode_BlendAvg = 1,
-			BlendMode_BlendSub = 2,
-			BlendMode_BlendAddQuarter = 3
-		};
 
 			void set_filter_mode(FilterMode mode)
 			{
@@ -22269,19 +22280,19 @@ void rhi_vulkan_prepare_frame(void)
    device->next_frame_context();
 
    renderer->set_scaled_uv_offset(scaled_uv_offset);
-   renderer->set_filter_mode((Renderer::FilterMode)(filter_mode));
-   renderer->set_sprite_filter_exclude((Renderer::FilterExclude)(filter_exclude_sprites));
-   renderer->set_polygon_2d_filter_exclude((Renderer::FilterExclude)(filter_exclude_2d_polygons));
+   renderer->set_filter_mode((FilterMode)(filter_mode));
+   renderer->set_sprite_filter_exclude((FilterExclude)(filter_exclude_sprites));
+   renderer->set_polygon_2d_filter_exclude((FilterExclude)(filter_exclude_2d_polygons));
 }
 
-static Renderer::ScanoutMode get_scanout_mode(bool bpp24)
+static ScanoutMode get_scanout_mode(bool bpp24)
 {
    if (bpp24)
-      return Renderer::ScanoutMode_BGR24;
+      return ScanoutMode_BGR24;
    else if (dither_mode != DITHER_OFF)
-      return Renderer::ScanoutMode_ABGR1555_Dither;
+      return ScanoutMode_ABGR1555_Dither;
    else
-      return Renderer::ScanoutMode_ABGR1555_555;
+      return ScanoutMode_ABGR1555_555;
 }
 
 void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
@@ -22318,11 +22329,11 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->set_visible_scanlines(initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
    renderer->set_horizontal_additional_cropping(image_crop);
 
-   renderer->set_display_filter(super_sampling ? Renderer::ScanoutFilter_SSAA : Renderer::ScanoutFilter_None);
-   if (renderer->get_scanout_mode() == Renderer::ScanoutMode_BGR24)
-      renderer->set_mdec_filter(mdec_yuv ? Renderer::ScanoutFilter_MDEC_YUV : Renderer::ScanoutFilter_None);
+   renderer->set_display_filter(super_sampling ? ScanoutFilter_SSAA : ScanoutFilter_None);
+   if (renderer->get_scanout_mode() == ScanoutMode_BGR24)
+      renderer->set_mdec_filter(mdec_yuv ? ScanoutFilter_MDEC_YUV : ScanoutFilter_None);
    else
-      renderer->set_mdec_filter(Renderer::ScanoutFilter_None);
+      renderer->set_mdec_filter(ScanoutFilter_None);
 
    auto scanout = show_vram ? renderer->scanout_vram_to_texture() : renderer->scanout_to_texture();
    unsigned index = vulkan->get_sync_index(vulkan->handle);
@@ -22448,7 +22459,7 @@ void rhi_vulkan_set_display_mode(bool depth_24bpp,
 {
    if (renderer)
       renderer->set_display_mode(get_scanout_mode(depth_24bpp), is_pal,
-                                 is_480i, (Renderer::WidthMode)(width_mode));
+                                 is_480i, (WidthMode)(width_mode));
    else
       rhi_defer_push_set_display_mode(&defer, depth_24bpp, is_pal,
                                       is_480i, width_mode);
