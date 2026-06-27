@@ -9120,9 +9120,9 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	 * declarations inside the Renderer class, now redundant since Renderer is a plain
 	 * struct). Needed because the inline renderer_* functions below call ones whose
 	 * definitions appear later in the file. */
-	void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index, bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv);
+	void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle *hd_texture_index_out, bool *filtering_out, bool *scaled_read_out, unsigned *shift_out, bool *offset_uv_out);
 	void renderer_build_line_quad(Renderer *self, Vertex *output, const Vertex *input);
-	void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, PrimitiveInfoVec &scissors, bool textured);
+	void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, PrimitiveInfoVec *scissors, bool textured);
 	int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb);
 	void renderer_render_opaque_primitives(Renderer *self);
 	void renderer_render_semi_transparent_primitives(Renderer *self);
@@ -10892,8 +10892,9 @@ HdTextureHandle renderer_get_hd_texture_index(Renderer *self, const Rect *vram_r
 	}
 }
 
-void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index,
-	bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv){
+void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle *hd_texture_index_out,
+	bool *filtering_out, bool *scaled_read_out, unsigned *shift_out, bool *offset_uv_out){
+	unsigned shift; bool filtering, scaled_read, offset_uv; HdTextureHandle hd_texture_index; /* local working copies; written back to *_out at function end */
 	switch (self->render_state.texture_mode)
 	{
 	case TextureMode_Palette4bpp:
@@ -11082,6 +11083,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 
 		output[i].color |= self->render_state.force_mask_bit ? 0xff000000u : 0u;
 	} }
+	*hd_texture_index_out = hd_texture_index; *filtering_out = filtering; *scaled_read_out = scaled_read; *shift_out = shift; *offset_uv_out = offset_uv;
 }
 
 BufferVertexVec * renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture,
@@ -11258,7 +11260,7 @@ void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 	bool scaled_read = false;
 	unsigned shift = 0;
 	bool offset_uv = false;
-	renderer_build_attribs(self, vert, vertices, 3, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+	renderer_build_attribs(self, vert, vertices, 3, &hd_texture_index, &filtering, &scaled_read, &shift, &offset_uv);
 	const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
 	BufferVertexVec *out = renderer_select_pipeline(self, 1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	if (out)
@@ -11307,7 +11309,7 @@ void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 	bool scaled_read = false;
 	unsigned shift = 0;
 	bool offset_uv = false;
-	renderer_build_attribs(self, vert, vertices, 4, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+	renderer_build_attribs(self, vert, vertices, 4, &hd_texture_index, &filtering, &scaled_read, &shift, &offset_uv);
 	const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
 	BufferVertexVec *out = renderer_select_pipeline(self, 2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 
@@ -11517,22 +11519,22 @@ int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb){
 	return 0;
 }
 
-void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, PrimitiveInfoVec &scissors, bool textured){
-	qsort(PrimitiveInfoVec_data(&scissors), PrimitiveInfoVec_size(&scissors), sizeof(PrimitiveInfo), renderer_primitive_info_qsort_cmp);
+void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, PrimitiveInfoVec *scissors, bool textured){
+	qsort(PrimitiveInfoVec_data(scissors), PrimitiveInfoVec_size(scissors), sizeof(PrimitiveInfo), renderer_primitive_info_qsort_cmp);
 
 	// Render flat-shaded primitives.
 	BufferVertex *vert = (BufferVertex *)(
 	    commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, BufferVertexVec_size((struct BufferVertexVec *)&vertices) * sizeof(BufferVertex), sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX));
 
-	int scissor = (*PrimitiveInfoVec_front(&scissors)).scissor_index;
-	HdTextureHandle hd_texture = (*PrimitiveInfoVec_front(&scissors)).hd_texture_index;
-	bool filtering = (*PrimitiveInfoVec_front(&scissors)).filtering;
-	bool scaled_read = (*PrimitiveInfoVec_front(&scissors)).scaled_read;
-	unsigned shift = (*PrimitiveInfoVec_front(&scissors)).shift;
-	bool offset_uv = (*PrimitiveInfoVec_front(&scissors)).offset_uv;
+	int scissor = (*PrimitiveInfoVec_front(scissors)).scissor_index;
+	HdTextureHandle hd_texture = (*PrimitiveInfoVec_front(scissors)).hd_texture_index;
+	bool filtering = (*PrimitiveInfoVec_front(scissors)).filtering;
+	bool scaled_read = (*PrimitiveInfoVec_front(scissors)).scaled_read;
+	unsigned shift = (*PrimitiveInfoVec_front(scissors)).shift;
+	bool offset_uv = (*PrimitiveInfoVec_front(scissors)).offset_uv;
 	unsigned last_draw = 0;
 	unsigned i = 1;
-	unsigned size = PrimitiveInfoVec_size(&scissors);
+	unsigned size = PrimitiveInfoVec_size(scissors);
 
 	renderer_hd_texture_uniforms(self, hd_texture);
 	commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? &self->queue.default_scissor : Rect2DVec_at(&self->queue.scissors, scissor));
@@ -11540,46 +11542,46 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, Primitiv
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, shift);
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
 	renderer_dispatch_set_scaled_read_texture(self, scaled_read, textured);
-	memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_front(&scissors)).triangle_index, 3 * sizeof(BufferVertex));
+	memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_front(scissors)).triangle_index, 3 * sizeof(BufferVertex));
 	vert += 3;
 
 	for (; i < size; i++, vert += 3)
 	{
-		if ((*PrimitiveInfoVec_at(&scissors, i)).scissor_index != scissor || hd_handle_ne(&(*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index, &hd_texture) ||
-			(*PrimitiveInfoVec_at(&scissors, i)).filtering != filtering || (*PrimitiveInfoVec_at(&scissors, i)).scaled_read != scaled_read || (*PrimitiveInfoVec_at(&scissors, i)).shift != shift ||
-			(*PrimitiveInfoVec_at(&scissors, i)).offset_uv != offset_uv)
+		if ((*PrimitiveInfoVec_at(scissors, i)).scissor_index != scissor || hd_handle_ne(&(*PrimitiveInfoVec_at(scissors, i)).hd_texture_index, &hd_texture) ||
+			(*PrimitiveInfoVec_at(scissors, i)).filtering != filtering || (*PrimitiveInfoVec_at(scissors, i)).scaled_read != scaled_read || (*PrimitiveInfoVec_at(scissors, i)).shift != shift ||
+			(*PrimitiveInfoVec_at(scissors, i)).offset_uv != offset_uv)
 		{
 			unsigned to_draw = i - last_draw;
 			commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 			commandbuffer_draw(cbh_get(&self->cmd), 3 * to_draw, 1, 3 * last_draw, 0);
 			last_draw = i;
 
-			if ((*PrimitiveInfoVec_at(&scissors, i)).scissor_index != scissor) {
-				scissor = (*PrimitiveInfoVec_at(&scissors, i)).scissor_index;
+			if ((*PrimitiveInfoVec_at(scissors, i)).scissor_index != scissor) {
+				scissor = (*PrimitiveInfoVec_at(scissors, i)).scissor_index;
 				commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? &self->queue.default_scissor : Rect2DVec_at(&self->queue.scissors, scissor));
 			}
-			if (hd_handle_ne(&(*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index, &hd_texture)) {
-				hd_texture = (*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index;
+			if (hd_handle_ne(&(*PrimitiveInfoVec_at(scissors, i)).hd_texture_index, &hd_texture)) {
+				hd_texture = (*PrimitiveInfoVec_at(scissors, i)).hd_texture_index;
 				renderer_hd_texture_uniforms(self, hd_texture);
 			}
-			if ((*PrimitiveInfoVec_at(&scissors, i)).filtering != filtering) {
-				filtering = (*PrimitiveInfoVec_at(&scissors, i)).filtering;
+			if ((*PrimitiveInfoVec_at(scissors, i)).filtering != filtering) {
+				filtering = (*PrimitiveInfoVec_at(scissors, i)).filtering;
 				commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, filtering ? self->primitive_filter_mode : FilterMode_NearestNeighbor);
 			}
-			if ((*PrimitiveInfoVec_at(&scissors, i)).scaled_read != scaled_read) {
-				scaled_read = (*PrimitiveInfoVec_at(&scissors, i)).scaled_read;
+			if ((*PrimitiveInfoVec_at(scissors, i)).scaled_read != scaled_read) {
+				scaled_read = (*PrimitiveInfoVec_at(scissors, i)).scaled_read;
 				renderer_dispatch_set_scaled_read_texture(self, scaled_read, textured);
 			}
-			if ((*PrimitiveInfoVec_at(&scissors, i)).shift != shift) {
-				shift = (*PrimitiveInfoVec_at(&scissors, i)).shift;
+			if ((*PrimitiveInfoVec_at(scissors, i)).shift != shift) {
+				shift = (*PrimitiveInfoVec_at(scissors, i)).shift;
 				commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, shift);
 			}
-			if ((*PrimitiveInfoVec_at(&scissors, i)).offset_uv != offset_uv) {
-				offset_uv = (*PrimitiveInfoVec_at(&scissors, i)).offset_uv;
+			if ((*PrimitiveInfoVec_at(scissors, i)).offset_uv != offset_uv) {
+				offset_uv = (*PrimitiveInfoVec_at(scissors, i)).offset_uv;
 				commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
 			}
 		}
-		memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_at(&scissors, i)).triangle_index, 3 * sizeof(BufferVertex));
+		memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)&vertices) + 3 * (*PrimitiveInfoVec_at(scissors, i)).triangle_index, 3 * sizeof(BufferVertex));
 	}
 
 	unsigned to_draw = size - last_draw;
@@ -11600,7 +11602,7 @@ void renderer_render_opaque_primitives(Renderer *self){
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
 	commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-	renderer_dispatch(self, vertices, *scissors, false);
+	renderer_dispatch(self, vertices, scissors, false);
 }
 
 void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_index) {
@@ -11710,7 +11712,7 @@ void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-	renderer_dispatch(self, vertices, *scissors, true);
+	renderer_dispatch(self, vertices, scissors, true);
 }
 
 void renderer_render_opaque_texture_primitives(Renderer *self){
@@ -11732,7 +11734,7 @@ void renderer_render_opaque_texture_primitives(Renderer *self){
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-	renderer_dispatch(self, vertices, *scissors, true);
+	renderer_dispatch(self, vertices, scissors, true);
 }
 
 void renderer_flush_blits(Renderer *self)
