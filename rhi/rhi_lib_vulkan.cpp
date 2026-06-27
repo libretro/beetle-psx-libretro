@@ -2611,103 +2611,45 @@ static inline uint32_t util_ctz(uint32_t x)
 	 * stay as struct methods. It is heap-allocated, not pooled or refcounted. */
 	struct Context
 	{
-			static bool init_loader(PFN_vkGetInstanceProcAddr addr);
+		VkDevice device;
+		VkInstance instance;
+		VkPhysicalDevice gpu;
 
-			VkInstance get_instance() const
-			{
-				return instance;
-			}
+		VkPhysicalDeviceProperties gpu_props;
+		VkPhysicalDeviceMemoryProperties mem_props;
 
-			VkPhysicalDevice get_gpu() const
-			{
-				return gpu;
-			}
+		VkQueue graphics_queue;
+		VkQueue compute_queue;
+		VkQueue transfer_queue;
+		uint32_t graphics_queue_family;
+		uint32_t compute_queue_family;
+		uint32_t transfer_queue_family;
 
-			VkDevice get_device() const
-			{
-				return device;
-			}
-
-			VkQueue get_graphics_queue() const
-			{
-				return graphics_queue;
-			}
-
-			VkQueue get_compute_queue() const
-			{
-				return compute_queue;
-			}
-
-			VkQueue get_transfer_queue() const
-			{
-				return transfer_queue;
-			}
-
-			const VkPhysicalDeviceProperties &get_gpu_props() const
-			{
-				return gpu_props;
-			}
-
-			const VkPhysicalDeviceMemoryProperties &get_mem_props() const
-			{
-				return mem_props;
-			}
-
-			uint32_t get_graphics_queue_family() const
-			{
-				return graphics_queue_family;
-			}
-
-			uint32_t get_compute_queue_family() const
-			{
-				return compute_queue_family;
-			}
-
-			uint32_t get_transfer_queue_family() const
-			{
-				return transfer_queue_family;
-			}
-
-			void release_device()
-			{
-				owned_device = false;
-			}
-
-			const DeviceFeatures &get_enabled_device_features() const
-			{
-				return ext;
-			}
-
-			/* True iff the constructor finished successfully. The Context
-			 * constructors do not throw; on failure they leave the object in
-			 * a destroyable but otherwise unusable state, and the caller must
-			 * check is_valid() before doing anything else with it. */
-			bool is_valid() const { return valid; }
-
-			VkDevice device;
-			VkInstance instance;
-			VkPhysicalDevice gpu;
-
-			VkPhysicalDeviceProperties gpu_props;
-			VkPhysicalDeviceMemoryProperties mem_props;
-
-			VkQueue graphics_queue;
-			VkQueue compute_queue;
-			VkQueue transfer_queue;
-			uint32_t graphics_queue_family;
-			uint32_t compute_queue_family;
-			uint32_t transfer_queue_family;
-
-			bool create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
-					unsigned num_required_device_extensions, const char **required_device_layers,
-					unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
-
-			bool owned_device;
-			bool valid;
-			DeviceFeatures ext;
-
-			void destroy();
+		bool owned_device;
+		bool valid;
+		DeviceFeatures ext;
 	};
+
+	bool context_init_loader(PFN_vkGetInstanceProcAddr addr);
+	bool context_create_device(struct Context *self, VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
+			unsigned num_required_device_extensions, const char **required_device_layers,
+			unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
+	void context_destroy(struct Context *self);
+
+	static inline VkInstance context_get_instance(const struct Context *self) { return self->instance; }
+	static inline VkPhysicalDevice context_get_gpu(const struct Context *self) { return self->gpu; }
+	static inline VkDevice context_get_device(const struct Context *self) { return self->device; }
+	static inline VkQueue context_get_graphics_queue(const struct Context *self) { return self->graphics_queue; }
+	static inline VkQueue context_get_compute_queue(const struct Context *self) { return self->compute_queue; }
+	static inline VkQueue context_get_transfer_queue(const struct Context *self) { return self->transfer_queue; }
+	static inline const VkPhysicalDeviceProperties *context_get_gpu_props(const struct Context *self) { return &self->gpu_props; }
+	static inline const VkPhysicalDeviceMemoryProperties *context_get_mem_props(const struct Context *self) { return &self->mem_props; }
+	static inline uint32_t context_get_graphics_queue_family(const struct Context *self) { return self->graphics_queue_family; }
+	static inline uint32_t context_get_compute_queue_family(const struct Context *self) { return self->compute_queue_family; }
+	static inline uint32_t context_get_transfer_queue_family(const struct Context *self) { return self->transfer_queue_family; }
+	static inline void context_release_device(struct Context *self) { self->owned_device = false; }
+	static inline const DeviceFeatures *context_get_enabled_device_features(const struct Context *self) { return &self->ext; }
+	static inline bool context_is_valid(const struct Context *self) { return self->valid; }
 
 	static bool context_init(Context *ctx, VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface,
 			const char **required_device_extensions, unsigned num_required_device_extensions,
@@ -16108,7 +16050,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		return false;
 	}
 
-	bool Context::init_loader(PFN_vkGetInstanceProcAddr addr)
+	bool context_init_loader(PFN_vkGetInstanceProcAddr addr)
 	{
 		if (!addr)
 		{
@@ -16177,11 +16119,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		/* Load global+instance function pointers using application-created VkInstance. */
 		volkGenLoadInstance(instance, vkGetInstanceProcAddrStub);
 		volkGenLoadDevice(instance, vkGetInstanceProcAddrStub);
-		if (!ctx->create_device(gpu, surface, required_device_extensions, num_required_device_extensions, required_device_layers,
+		if (!context_create_device(ctx, gpu, surface, required_device_extensions, num_required_device_extensions, required_device_layers,
 					num_required_device_layers, required_features))
 		{
 			LOGE("Failed to create Vulkan device.\n");
-			ctx->destroy();
+			context_destroy(ctx);
 			return false;
 		}
 		ctx->valid = true;
@@ -16190,26 +16132,26 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void context_deinit(Context *ctx)
 	{
-		ctx->destroy();
+		context_destroy(ctx);
 	}
 
-	void Context::destroy()
+	void context_destroy(struct Context *self)
 	{
-		if (device != VK_NULL_HANDLE)
-			vkDeviceWaitIdle(device);
+		if (self->device != VK_NULL_HANDLE)
+			vkDeviceWaitIdle(self->device);
 
-		if (owned_device && device != VK_NULL_HANDLE)
-			vkDestroyDevice(device, NULL);
+		if (self->owned_device && self->device != VK_NULL_HANDLE)
+			vkDestroyDevice(self->device, NULL);
 	}
 
-	bool Context::create_device(VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
+	bool context_create_device(struct Context *self, VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
 			unsigned num_required_device_extensions, const char **required_device_layers,
 			unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features)
 	{
 		if (gpu == VK_NULL_HANDLE)
 		{
 			uint32_t gpu_count = 0;
-			if (vkEnumeratePhysicalDevices(instance, &gpu_count, NULL) != VK_SUCCESS)
+			if (vkEnumeratePhysicalDevices(self->instance, &gpu_count, NULL) != VK_SUCCESS)
 			{
 				LOGE("vkEnumeratePhysicalDevices failed.\n");
 				return false;
@@ -16219,7 +16161,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				return false;
 
 			VkPhysicalDevice *gpus = (VkPhysicalDevice *)malloc(gpu_count * sizeof(VkPhysicalDevice));
-			if (vkEnumeratePhysicalDevices(instance, &gpu_count, gpus) != VK_SUCCESS)
+			if (vkEnumeratePhysicalDevices(self->instance, &gpu_count, gpus) != VK_SUCCESS)
 			{
 				LOGE("vkEnumeratePhysicalDevices failed.\n");
 				free(gpus);
@@ -16275,15 +16217,15 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			if (!has_vk_layer(queried_layers, layer_count, required_device_layers[i]))
 			{ free(queried_extensions); free(queried_layers); return false; }
 
-		this->gpu = gpu;
-		vkGetPhysicalDeviceProperties(gpu, &gpu_props);
-		vkGetPhysicalDeviceMemoryProperties(gpu, &mem_props);
+		self->gpu = gpu;
+		vkGetPhysicalDeviceProperties(gpu, &self->gpu_props);
+		vkGetPhysicalDeviceMemoryProperties(gpu, &self->mem_props);
 
-		LOGI("Selected Vulkan GPU: %s\n", gpu_props.deviceName);
+		LOGI("Selected Vulkan GPU: %s\n", self->gpu_props.deviceName);
 
-		if (gpu_props.apiVersion >= VK_API_VERSION_1_1)
+		if (self->gpu_props.apiVersion >= VK_API_VERSION_1_1)
 			LOGI("GPU supports Vulkan 1.1.\n");
-		else if (gpu_props.apiVersion >= VK_API_VERSION_1_0)
+		else if (self->gpu_props.apiVersion >= VK_API_VERSION_1_0)
 			LOGI("GPU supports Vulkan 1.0.\n");
 
 		uint32_t queue_count;
@@ -16300,7 +16242,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			static const VkQueueFlags required = VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT;
 			if (supported && ((queue_props[i].queueFlags & required) == required))
 			{
-				graphics_queue_family = i;
+				self->graphics_queue_family = i;
 				break;
 			}
 		}
@@ -16308,9 +16250,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		for (unsigned i = 0; i < queue_count; i++)
 		{
 			static const VkQueueFlags required = VK_QUEUE_COMPUTE_BIT;
-			if (i != graphics_queue_family && (queue_props[i].queueFlags & required) == required)
+			if (i != self->graphics_queue_family && (queue_props[i].queueFlags & required) == required)
 			{
-				compute_queue_family = i;
+				self->compute_queue_family = i;
 				break;
 			}
 		}
@@ -16318,27 +16260,27 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		for (unsigned i = 0; i < queue_count; i++)
 		{
 			static const VkQueueFlags required = VK_QUEUE_TRANSFER_BIT;
-			if (i != graphics_queue_family && i != compute_queue_family && (queue_props[i].queueFlags & required) == required)
+			if (i != self->graphics_queue_family && i != self->compute_queue_family && (queue_props[i].queueFlags & required) == required)
 			{
-				transfer_queue_family = i;
+				self->transfer_queue_family = i;
 				break;
 			}
 		}
 
-		if (transfer_queue_family == VK_QUEUE_FAMILY_IGNORED)
+		if (self->transfer_queue_family == VK_QUEUE_FAMILY_IGNORED)
 		{
 			for (unsigned i = 0; i < queue_count; i++)
 			{
 				static const VkQueueFlags required = VK_QUEUE_TRANSFER_BIT;
-				if (i != graphics_queue_family && (queue_props[i].queueFlags & required) == required)
+				if (i != self->graphics_queue_family && (queue_props[i].queueFlags & required) == required)
 				{
-					transfer_queue_family = i;
+					self->transfer_queue_family = i;
 					break;
 				}
 			}
 		}
 
-		if (graphics_queue_family == VK_QUEUE_FAMILY_IGNORED)
+		if (self->graphics_queue_family == VK_QUEUE_FAMILY_IGNORED)
 		{ free(queried_extensions); free(queried_layers); free(queue_props); return false; }
 
 		unsigned universal_queue_index = 1;
@@ -16346,21 +16288,21 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		uint32_t compute_queue_index = 0;
 		uint32_t transfer_queue_index = 0;
 
-		if (compute_queue_family == VK_QUEUE_FAMILY_IGNORED)
+		if (self->compute_queue_family == VK_QUEUE_FAMILY_IGNORED)
 		{
-			compute_queue_family = graphics_queue_family;
-			compute_queue_index = min_(queue_props[graphics_queue_family].queueCount - 1, universal_queue_index);
+			self->compute_queue_family = self->graphics_queue_family;
+			compute_queue_index = min_(queue_props[self->graphics_queue_family].queueCount - 1, universal_queue_index);
 			universal_queue_index++;
 		}
 
-		if (transfer_queue_family == VK_QUEUE_FAMILY_IGNORED)
+		if (self->transfer_queue_family == VK_QUEUE_FAMILY_IGNORED)
 		{
-			transfer_queue_family = graphics_queue_family;
-			transfer_queue_index = min_(queue_props[graphics_queue_family].queueCount - 1, universal_queue_index);
+			self->transfer_queue_family = self->graphics_queue_family;
+			transfer_queue_index = min_(queue_props[self->graphics_queue_family].queueCount - 1, universal_queue_index);
 			universal_queue_index++;
 		}
-		else if (transfer_queue_family == compute_queue_family)
-			transfer_queue_index = min_(queue_props[compute_queue_family].queueCount - 1, 1u);
+		else if (self->transfer_queue_family == self->compute_queue_family)
+			transfer_queue_index = min_(queue_props[self->compute_queue_family].queueCount - 1, 1u);
 
 		static const float graphics_queue_prio = 0.5f;
 		static const float compute_queue_prio = 1.0f;
@@ -16374,26 +16316,26 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		device_info.pQueueCreateInfos = queue_info;
 
 		queue_info[queue_family_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queue_info[queue_family_count].queueFamilyIndex = graphics_queue_family;
+		queue_info[queue_family_count].queueFamilyIndex = self->graphics_queue_family;
 		queue_info[queue_family_count].queueCount = min_(universal_queue_index,
-				queue_props[graphics_queue_family].queueCount);
+				queue_props[self->graphics_queue_family].queueCount);
 		queue_info[queue_family_count].pQueuePriorities = prio;
 		queue_family_count++;
 
-		if (compute_queue_family != graphics_queue_family)
+		if (self->compute_queue_family != self->graphics_queue_family)
 		{
 			queue_info[queue_family_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-			queue_info[queue_family_count].queueFamilyIndex = compute_queue_family;
-			queue_info[queue_family_count].queueCount = min_(transfer_queue_family == compute_queue_family ? 2u : 1u,
-					queue_props[compute_queue_family].queueCount);
+			queue_info[queue_family_count].queueFamilyIndex = self->compute_queue_family;
+			queue_info[queue_family_count].queueCount = min_(self->transfer_queue_family == self->compute_queue_family ? 2u : 1u,
+					queue_props[self->compute_queue_family].queueCount);
 			queue_info[queue_family_count].pQueuePriorities = prio + 1;
 			queue_family_count++;
 		}
 
-		if (transfer_queue_family != graphics_queue_family && transfer_queue_family != compute_queue_family)
+		if (self->transfer_queue_family != self->graphics_queue_family && self->transfer_queue_family != self->compute_queue_family)
 		{
 			queue_info[queue_family_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-			queue_info[queue_family_count].queueFamilyIndex = transfer_queue_family;
+			queue_info[queue_family_count].queueFamilyIndex = self->transfer_queue_family;
 			queue_info[queue_family_count].queueCount = 1;
 			queue_info[queue_family_count].pQueuePriorities = prio + 2;
 			queue_family_count++;
@@ -16416,34 +16358,34 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		if (has_vk_extension(queried_extensions, ext_count, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) &&
 				has_vk_extension(queried_extensions, ext_count, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME))
 		{
-			ext.supports_dedicated = true;
+			self->ext.supports_dedicated = true;
 			enabled_extensions[enabled_extensions_count++] = (VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
 			enabled_extensions[enabled_extensions_count++] = (VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
 		}
 
 		if (has_vk_extension(queried_extensions, ext_count, VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
 		{
-			ext.supports_debug_marker = true;
+			self->ext.supports_debug_marker = true;
 			enabled_extensions[enabled_extensions_count++] = (VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
 		}
 
 #ifdef _WIN32
-		ext.supports_external = false;
+		self->ext.supports_external = false;
 #else
-		if (ext.supports_external && ext.supports_dedicated &&
+		if (self->ext.supports_external && self->ext.supports_dedicated &&
 				has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME) &&
 				has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) &&
 				has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME) &&
 				has_vk_extension(queried_extensions, ext_count, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME))
 		{
-			ext.supports_external = true;
+			self->ext.supports_external = true;
 			enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
 			enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
 			enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
 			enabled_extensions[enabled_extensions_count++] = (VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
 		}
 		else
-			ext.supports_external = false;
+			self->ext.supports_external = false;
 #endif
 
 		VkPhysicalDeviceFeatures2KHR features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR };
@@ -16482,7 +16424,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				enabled_features.largePoints = VK_TRUE;
 
 			features.features = enabled_features;
-			ext.enabled_features = enabled_features;
+			self->ext.enabled_features = enabled_features;
 		}
 
 		device_info.pEnabledFeatures = &features.features;
@@ -16507,17 +16449,17 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		free(queried_layers);
 		free(queue_props);
 
-		VkResult dev_res = vkCreateDevice(gpu, &device_info, NULL, &device);
+		VkResult dev_res = vkCreateDevice(gpu, &device_info, NULL, &self->device);
 		free(enabled_extensions);
 		free(enabled_layers);
 		if (dev_res != VK_SUCCESS)
 			return false;
 
 		/* Load global function pointers using application-created VkDevice. */
-		volkGenLoadDevice(device, vkGetDeviceProcAddrStub);
-		vkGetDeviceQueue(device, graphics_queue_family, graphics_queue_index, &graphics_queue);
-		vkGetDeviceQueue(device, compute_queue_family, compute_queue_index, &compute_queue);
-		vkGetDeviceQueue(device, transfer_queue_family, transfer_queue_index, &transfer_queue);
+		volkGenLoadDevice(self->device, vkGetDeviceProcAddrStub);
+		vkGetDeviceQueue(self->device, self->graphics_queue_family, graphics_queue_index, &self->graphics_queue);
+		vkGetDeviceQueue(self->device, self->compute_queue_family, compute_queue_index, &self->compute_queue);
+		vkGetDeviceQueue(self->device, self->transfer_queue_family, transfer_queue_index, &self->transfer_queue);
 
 		return true;
 	}
@@ -16817,19 +16759,19 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void Device::set_context(const Context &context)
 	{
-		instance = context.get_instance();
-		gpu = context.get_gpu();
-		device = context.get_device();
+		instance = context_get_instance(&context);
+		gpu = context_get_gpu(&context);
+		device = context_get_device(&context);
 
-		graphics_queue_family_index = context.get_graphics_queue_family();
-		graphics_queue = context.get_graphics_queue();
-		compute_queue_family_index = context.get_compute_queue_family();
-		compute_queue = context.get_compute_queue();
-		transfer_queue_family_index = context.get_transfer_queue_family();
-		transfer_queue = context.get_transfer_queue();
+		graphics_queue_family_index = context_get_graphics_queue_family(&context);
+		graphics_queue = context_get_graphics_queue(&context);
+		compute_queue_family_index = context_get_compute_queue_family(&context);
+		compute_queue = context_get_compute_queue(&context);
+		transfer_queue_family_index = context_get_transfer_queue_family(&context);
+		transfer_queue = context_get_transfer_queue(&context);
 
-		mem_props = context.get_mem_props();
-		gpu_props = context.get_gpu_props();
+		mem_props = *context_get_mem_props(&context);
+		gpu_props = *context_get_gpu_props(&context);
 
 		init_workarounds();
 
@@ -16841,7 +16783,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		init_frame_contexts(2); // By default, regular double buffer between CPU and GPU.
 #endif
 
-		ext = context.get_enabled_device_features();
+		ext = *context_get_enabled_device_features(&context);
 
 		deviceallocator_init(&managers.memory, gpu, device);
 		deviceallocator_set_supports_dedicated_allocation(&managers.memory, ext.supports_dedicated);
@@ -21793,7 +21735,7 @@ static bool libretro_create_device(
       unsigned num_required_device_layers,
       const VkPhysicalDeviceFeatures *required_features)
 {
-   if (!Context::init_loader(get_instance_proc_addr))
+   if (!context_init_loader(get_instance_proc_addr))
       return false;
 
    if (context)
@@ -21812,7 +21754,7 @@ static bool libretro_create_device(
    context_init(context, instance, gpu, surface, required_device_extensions, num_required_device_extensions,
                                  required_device_layers, num_required_device_layers,
                                  required_features);
-   if (!context->is_valid())
+   if (!context_is_valid(context))
    {
       context_deinit(context);
       free(context);
@@ -21820,13 +21762,13 @@ static bool libretro_create_device(
       return false;
    }
 
-   context->release_device();
-   libretro_context->gpu = context->get_gpu();
-   libretro_context->device = context->get_device();
-   libretro_context->presentation_queue = context->get_graphics_queue();
-   libretro_context->presentation_queue_family_index = context->get_graphics_queue_family();
-   libretro_context->queue = context->get_graphics_queue();
-   libretro_context->queue_family_index = context->get_graphics_queue_family();
+   context_release_device(context);
+   libretro_context->gpu = context_get_gpu(context);
+   libretro_context->device = context_get_device(context);
+   libretro_context->presentation_queue = context_get_graphics_queue(context);
+   libretro_context->presentation_queue_family_index = context_get_graphics_queue_family(context);
+   libretro_context->queue = context_get_graphics_queue(context);
+   libretro_context->queue_family_index = context_get_graphics_queue_family(context);
    return true;
 }
 
