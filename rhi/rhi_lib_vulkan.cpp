@@ -4401,21 +4401,21 @@ void semaphoremanager_init_empty(struct SemaphoreManager *self)
 
 	// Avoid -Wclass-memaccess warnings since we hash DescriptorSetLayout.
 
-bool has_immutable_sampler(const DescriptorSetLayout &layout, unsigned binding)
+bool has_immutable_sampler(const DescriptorSetLayout *layout, unsigned binding)
 	{
-		return (layout.immutable_sampler_mask & (1u << binding)) != 0;
+		return (layout->immutable_sampler_mask & (1u << binding)) != 0;
 	}
 
-StockSampler get_immutable_sampler(const DescriptorSetLayout &layout, unsigned binding)
+StockSampler get_immutable_sampler(const DescriptorSetLayout *layout, unsigned binding)
 	{
 		VK_ASSERT(has_immutable_sampler(layout, binding));
-		return (StockSampler)((layout.immutable_samplers >> (4 * binding)) & 0xf);
+		return (StockSampler)((layout->immutable_samplers >> (4 * binding)) & 0xf);
 	}
 
-void set_immutable_sampler(DescriptorSetLayout &layout, unsigned binding, StockSampler sampler)
+void set_immutable_sampler(DescriptorSetLayout *layout, unsigned binding, StockSampler sampler)
 	{
-		layout.immutable_samplers |= (uint64_t)(sampler) << (4 * binding);
-		layout.immutable_sampler_mask |= 1u << binding;
+		layout->immutable_samplers |= (uint64_t)(sampler) << (4 * binding);
+		layout->immutable_sampler_mask |= 1u << binding;
 	}
 
 	enum { VULKAN_NUM_SETS_PER_POOL = 16 };
@@ -4486,7 +4486,7 @@ void descriptor_set_thmap_make_vacant(struct descriptor_set_thmap *m, VkDescript
 		DescriptorPoolSizeVec pool_size;
 	};
 
-	void descriptor_set_allocator_init(struct DescriptorSetAllocator *self, Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
+	void descriptor_set_allocator_init(struct DescriptorSetAllocator *self, Hash hash, Device *device, const DescriptorSetLayout *layout, const uint32_t *stages_for_bindings);
 	void descriptor_set_allocator_fini(struct DescriptorSetAllocator *self);
 	DescriptorSetAllocation descriptor_set_allocator_find(struct DescriptorSetAllocator *self, Hash hash);
 	void descriptor_set_allocator_clear(struct DescriptorSetAllocator *self);
@@ -4558,7 +4558,7 @@ VkDescriptorSetLayout descriptor_set_allocator_get_layout(const struct Descripto
 		DescriptorSetAllocator *set_allocators[VULKAN_NUM_DESCRIPTOR_SETS];
 	};
 
-	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
+	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout *layout);
 	void pipeline_layout_fini(struct PipelineLayout *self);
 const CombinedResourceLayout *pipeline_layout_get_resource_layout(const struct PipelineLayout *self) { return &self->layout; }
 VkPipelineLayout pipeline_layout_get_layout(const struct PipelineLayout *self) { return self->pipe_layout; }
@@ -4797,7 +4797,7 @@ void program_map_destroy(Program *t) { program_fini(t); }
 	VK_HASHMAP_DECLARE(program_map, Program, program_map_destroy)
 
 PipelineLayout *pipeline_layout_map_emplace_yield(struct pipeline_layout_map *m,
-			Hash hash, Device *device, const CombinedResourceLayout &layout)
+			Hash hash, Device *device, const CombinedResourceLayout *layout)
 	{
 		void *slot = object_pool_raw_allocate(&m->pool);
 		PipelineLayout *t;
@@ -4810,7 +4810,7 @@ PipelineLayout *pipeline_layout_map_emplace_yield(struct pipeline_layout_map *m,
 
 DescriptorSetAllocator *descriptor_set_allocator_map_emplace_yield(
 			struct descriptor_set_allocator_map *m, Hash hash, Device *device,
-			const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings)
+			const DescriptorSetLayout *layout, const uint32_t *stages_for_bindings)
 	{
 		void *slot = object_pool_raw_allocate(&m->pool);
 		DescriptorSetAllocator *t;
@@ -5925,8 +5925,8 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	Program *device_request_program_graphics_shaders(Device *self, Shader *vertex, Shader *fragment);
 	Program *device_request_program_graphics_code(Device *self, const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data, size_t fragment_size);
 	Shader *device_request_shader(Device *self, const uint32_t *data, size_t size);
-	PipelineLayout *device_request_pipeline_layout(Device *self, const CombinedResourceLayout &layout);
-	DescriptorSetAllocator *device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
+	PipelineLayout *device_request_pipeline_layout(Device *self, const CombinedResourceLayout *layout);
+	DescriptorSetAllocator *device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout *layout, const uint32_t *stages_for_bindings);
 	const RenderPass *device_request_render_pass(Device *self, const RenderPassInfo &info, bool compatible);
 	uint64_t device_allocate_cookie(Device *self);
 	void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size);
@@ -5988,7 +5988,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void device_deinit(Device *self);
 	void program_init_graphics(struct Program *self, Device *device, Shader *vertex, Shader *fragment);
 	void program_init_compute(struct Program *self, Device *device, Shader *compute);
-	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
+	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout *layout);
 	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
 	void cbhvec_init(struct Device::CommandBufferHandleVec *v);
 	void cbhvec_grow(struct Device::CommandBufferHandleVec *v, int ncap);
@@ -13714,20 +13714,20 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 #endif
 
 
-	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout)
+	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout *layout)
 	{
 		unsigned i;
 		VkDescriptorSetLayout layouts[VULKAN_NUM_DESCRIPTOR_SETS] = {};
 		unsigned num_sets = 0;
 		self->device = device;
-		self->layout = layout;
+		self->layout = *layout;
 		self->pipe_layout = VK_NULL_HANDLE;
 		self->intrusive_node.key = hash;
 		for (i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
 		{
-			self->set_allocators[i] = device_request_descriptor_set_allocator(device, layout.sets[i], layout.stages_for_bindings[i]);
+			self->set_allocators[i] = device_request_descriptor_set_allocator(device, &layout->sets[i], layout->stages_for_bindings[i]);
 			layouts[i] = descriptor_set_allocator_get_layout(self->set_allocators[i]);
-			if (layout.descriptor_set_mask & (1u << i))
+			if (layout->descriptor_set_mask & (1u << i))
 				num_sets = i + 1;
 		}
 
@@ -13738,10 +13738,10 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			info.pSetLayouts = layouts;
 		}
 
-		if (layout.push_constant_range.stageFlags != 0)
+		if (layout->push_constant_range.stageFlags != 0)
 		{
 			info.pushConstantRangeCount = 1;
-			info.pPushConstantRanges = &layout.push_constant_range;
+			info.pPushConstantRanges = &layout->push_constant_range;
 		}
 
 		LOGI("Creating pipeline layout.\n");
@@ -13865,7 +13865,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 /* === descriptor_set.cpp === */
 
 
-	void descriptor_set_allocator_init(struct DescriptorSetAllocator *self, Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_binds)
+	void descriptor_set_allocator_init(struct DescriptorSetAllocator *self, Hash hash, Device *device, const DescriptorSetLayout *layout, const uint32_t *stages_for_binds)
 	{
 		self->device = device;
 		self->set_layout = VK_NULL_HANDLE;
@@ -13890,7 +13890,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				continue;
 
 			unsigned types = 0;
-			if (layout.sampled_image_mask & (1u << i))
+			if (layout->sampled_image_mask & (1u << i))
 			{
 				immutable_samplers[i] = VK_NULL_HANDLE;
 				if (has_immutable_sampler(layout, i))
@@ -13901,49 +13901,49 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				types++;
 			}
 
-			if (layout.sampled_buffer_mask & (1u << i))
+			if (layout->sampled_buffer_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
 				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
-			if (layout.storage_image_mask & (1u << i))
+			if (layout->storage_image_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
 				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
-			if (layout.uniform_buffer_mask & (1u << i))
+			if (layout->uniform_buffer_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
 				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
-			if (layout.storage_buffer_mask & (1u << i))
+			if (layout->storage_buffer_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
 				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
-			if (layout.input_attachment_mask & (1u << i))
+			if (layout->input_attachment_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
 				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
-			if (layout.separate_image_mask & (1u << i))
+			if (layout->separate_image_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
 				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
-			if (layout.sampler_mask & (1u << i))
+			if (layout->sampler_mask & (1u << i))
 			{
 				immutable_samplers[i] = VK_NULL_HANDLE;
 				if (has_immutable_sampler(layout, i))
@@ -15641,8 +15641,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		hasher_u64(&h, self->current_program->intrusive_node.key);
 
 		// Spec constants.
-		const CombinedResourceLayout &layout = *pipeline_layout_get_resource_layout(self->current_layout);
-		uint32_t combined_spec_constant = layout.combined_spec_constant_mask;
+		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
+		uint32_t combined_spec_constant = layout->combined_spec_constant_mask;
 		combined_spec_constant &= self->static_state.state.spec_constant_mask;
 		hasher_u32(&h, combined_spec_constant);
 		FOR_EACH_BIT(combined_spec_constant, bit)
@@ -15660,8 +15660,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	{
 		Hasher h; hasher_init(&h);
 		self->active_vbos = 0;
-		const CombinedResourceLayout &layout = *pipeline_layout_get_resource_layout(self->current_layout);
-		FOR_EACH_BIT(layout.attribute_mask, bit)
+		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
+		FOR_EACH_BIT(layout->attribute_mask, bit)
 		{
 			hasher_u32(&h, bit);
 			self->active_vbos |= 1u << self->attribs[bit].binding;
@@ -15693,7 +15693,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 
 		// Spec constants.
-		uint32_t combined_spec_constant = layout.combined_spec_constant_mask;
+		uint32_t combined_spec_constant = layout->combined_spec_constant_mask;
 		combined_spec_constant &= self->static_state.state.spec_constant_mask;
 		hasher_u32(&h, combined_spec_constant);
 		FOR_EACH_BIT(combined_spec_constant, bit)
@@ -15858,12 +15858,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 		else if (program_get_pipeline_layout(&program)->intrusive_node.key != self->current_layout->intrusive_node.key)
 		{
-			const CombinedResourceLayout &new_layout = *pipeline_layout_get_resource_layout(program_get_pipeline_layout(&program));
-			const CombinedResourceLayout &old_layout = *pipeline_layout_get_resource_layout(self->current_layout);
+			const CombinedResourceLayout *new_layout = pipeline_layout_get_resource_layout(program_get_pipeline_layout(&program));
+			const CombinedResourceLayout *old_layout = pipeline_layout_get_resource_layout(self->current_layout);
 
 			// If the push constant layout changes, all descriptor sets
 			// are invalidated.
-			if (new_layout.push_constant_layout_hash != old_layout.push_constant_layout_hash)
+			if (new_layout->push_constant_layout_hash != old_layout->push_constant_layout_hash)
 			{
 				self->dirty_sets = ~0u;
 				commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
@@ -16037,16 +16037,16 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 	void commandbuffer_flush_descriptor_set(struct CommandBuffer *self, uint32_t set)
 	{
-		const CombinedResourceLayout &layout = *pipeline_layout_get_resource_layout(self->current_layout);
-		const DescriptorSetLayout &set_layout = layout.sets[set];
+		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
+		const DescriptorSetLayout *set_layout = &layout->sets[set];
 		uint32_t num_dynamic_offsets = 0;
 		uint32_t dynamic_offsets[VULKAN_NUM_BINDINGS];
 		Hasher h; hasher_init(&h);
 
-		hasher_u32(&h, set_layout.fp_mask);
+		hasher_u32(&h, set_layout->fp_mask);
 
 		// UBOs
-		FOR_EACH_BIT(set_layout.uniform_buffer_mask, binding)
+		FOR_EACH_BIT(set_layout->uniform_buffer_mask, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			hasher_u32(&h, self->bindings.bindings[set][binding].buffer.range);
@@ -16056,7 +16056,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 
 		// SSBOs
-		FOR_EACH_BIT(set_layout.storage_buffer_mask, binding)
+		FOR_EACH_BIT(set_layout->storage_buffer_mask, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			hasher_u32(&h, self->bindings.bindings[set][binding].buffer.offset);
@@ -16065,14 +16065,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 
 		// Sampled buffers
-		FOR_EACH_BIT(set_layout.sampled_buffer_mask, binding)
+		FOR_EACH_BIT(set_layout->sampled_buffer_mask, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			VK_ASSERT(self->bindings.bindings[set][binding].buffer_view != VK_NULL_HANDLE);
 		}
 
 		// Sampled images
-		FOR_EACH_BIT(set_layout.sampled_image_mask, binding)
+		FOR_EACH_BIT(set_layout->sampled_image_mask, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			if (!has_immutable_sampler(set_layout, binding))
@@ -16085,7 +16085,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 
 		// Separate images
-		FOR_EACH_BIT(set_layout.separate_image_mask, binding)
+		FOR_EACH_BIT(set_layout->separate_image_mask, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			hasher_u32(&h, self->bindings.bindings[set][binding].image.fp.imageLayout);
@@ -16093,14 +16093,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 
 		// Separate samplers
-		FOR_EACH_BIT(set_layout.sampler_mask & ~set_layout.immutable_sampler_mask, binding)
+		FOR_EACH_BIT(set_layout->sampler_mask & ~set_layout->immutable_sampler_mask, binding)
 		{
 			hasher_u64(&h, self->bindings.secondary_cookies[set][binding]);
 			VK_ASSERT(self->bindings.bindings[set][binding].image.fp.sampler != VK_NULL_HANDLE);
 		}
 
 		// Storage images
-		FOR_EACH_BIT(set_layout.storage_image_mask, binding)
+		FOR_EACH_BIT(set_layout->storage_image_mask, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			hasher_u32(&h, self->bindings.bindings[set][binding].image.fp.imageLayout);
@@ -16108,7 +16108,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 
 		// Input attachments
-		FOR_EACH_BIT(set_layout.input_attachment_mask, binding)
+		FOR_EACH_BIT(set_layout->input_attachment_mask, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			hasher_u32(&h, self->bindings.bindings[set][binding].image.fp.imageLayout);
@@ -16126,7 +16126,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			VkWriteDescriptorSet writes[VULKAN_NUM_BINDINGS];
 			VkDescriptorBufferInfo buffer_info[VULKAN_NUM_BINDINGS];
 
-			FOR_EACH_BIT(set_layout.uniform_buffer_mask, binding)
+			FOR_EACH_BIT(set_layout->uniform_buffer_mask, binding)
 			{
 				VkWriteDescriptorSet &write = writes[write_count++];
 				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16144,7 +16144,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				write.pBufferInfo = &buffer;
 			}
 
-			FOR_EACH_BIT(set_layout.storage_buffer_mask, binding)
+			FOR_EACH_BIT(set_layout->storage_buffer_mask, binding)
 			{
 				VkWriteDescriptorSet &write = writes[write_count++];
 				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16157,7 +16157,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				write.pBufferInfo = &self->bindings.bindings[set][binding].buffer;
 			}
 
-			FOR_EACH_BIT(set_layout.sampled_buffer_mask, binding)
+			FOR_EACH_BIT(set_layout->sampled_buffer_mask, binding)
 			{
 				VkWriteDescriptorSet &write = writes[write_count++];
 				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16170,7 +16170,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				write.pTexelBufferView = &self->bindings.bindings[set][binding].buffer_view;
 			}
 
-			FOR_EACH_BIT(set_layout.sampled_image_mask, binding)
+			FOR_EACH_BIT(set_layout->sampled_image_mask, binding)
 			{
 				VkWriteDescriptorSet &write = writes[write_count++];
 				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16181,13 +16181,13 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				write.dstBinding = binding;
 				write.dstSet = allocated.set;
 
-				if (set_layout.fp_mask & (1u << binding))
+				if (set_layout->fp_mask & (1u << binding))
 					write.pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 				else
 					write.pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
 
-			FOR_EACH_BIT(set_layout.separate_image_mask, binding)
+			FOR_EACH_BIT(set_layout->separate_image_mask, binding)
 			{
 				VkWriteDescriptorSet &write = writes[write_count++];
 				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16198,13 +16198,13 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				write.dstBinding = binding;
 				write.dstSet = allocated.set;
 
-				if (set_layout.fp_mask & (1u << binding))
+				if (set_layout->fp_mask & (1u << binding))
 					write.pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 				else
 					write.pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
 
-			FOR_EACH_BIT(set_layout.sampler_mask & ~set_layout.immutable_sampler_mask, binding)
+			FOR_EACH_BIT(set_layout->sampler_mask & ~set_layout->immutable_sampler_mask, binding)
 			{
 				VkWriteDescriptorSet &write = writes[write_count++];
 				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16217,7 +16217,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				write.pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 			}
 
-			FOR_EACH_BIT(set_layout.storage_image_mask, binding)
+			FOR_EACH_BIT(set_layout->storage_image_mask, binding)
 			{
 				VkWriteDescriptorSet &write = writes[write_count++];
 				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16228,13 +16228,13 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				write.dstBinding = binding;
 				write.dstSet = allocated.set;
 
-				if (set_layout.fp_mask & (1u << binding))
+				if (set_layout->fp_mask & (1u << binding))
 					write.pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 				else
 					write.pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
 
-			FOR_EACH_BIT(set_layout.input_attachment_mask, binding)
+			FOR_EACH_BIT(set_layout->input_attachment_mask, binding)
 			{
 				VkWriteDescriptorSet &write = writes[write_count++];
 				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16244,7 +16244,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				write.dstArrayElement = 0;
 				write.dstBinding = binding;
 				write.dstSet = allocated.set;
-				if (set_layout.fp_mask & (1u << binding))
+				if (set_layout->fp_mask & (1u << binding))
 					write.pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 				else
 					write.pImageInfo = &self->bindings.bindings[set][binding].image.integer;
@@ -16259,8 +16259,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 	void commandbuffer_flush_descriptor_sets(struct CommandBuffer *self)
 	{
-		const CombinedResourceLayout &layout = *pipeline_layout_get_resource_layout(self->current_layout);
-		uint32_t set_update = layout.descriptor_set_mask & self->dirty_sets;
+		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
+		uint32_t set_update = layout->descriptor_set_mask & self->dirty_sets;
 		FOR_EACH_BIT(set_update, set)
 		{ commandbuffer_flush_descriptor_set(self, set); 	}
 		self->dirty_sets &= ~set_update;
@@ -16976,15 +16976,15 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		return device_request_program_graphics_shaders(self, vertex, fragment);
 	}
 
-	PipelineLayout * device_request_pipeline_layout(Device *self, const CombinedResourceLayout &layout){
+	PipelineLayout * device_request_pipeline_layout(Device *self, const CombinedResourceLayout *layout){
 		Hasher h; hasher_init(&h);
-		hasher_data(&h, (const uint32_t *)(layout.sets), sizeof(layout.sets));
-		hasher_data(&h, &layout.stages_for_bindings[0][0], sizeof(layout.stages_for_bindings));
-		hasher_u32(&h, layout.push_constant_range.stageFlags);
-		hasher_u32(&h, layout.push_constant_range.size);
-		hasher_data(&h, layout.spec_constant_mask, sizeof(layout.spec_constant_mask));
-		hasher_u32(&h, layout.attribute_mask);
-		hasher_u32(&h, layout.render_target_mask);
+		hasher_data(&h, (const uint32_t *)(layout->sets), sizeof(layout->sets));
+		hasher_data(&h, &layout->stages_for_bindings[0][0], sizeof(layout->stages_for_bindings));
+		hasher_u32(&h, layout->push_constant_range.stageFlags);
+		hasher_u32(&h, layout->push_constant_range.size);
+		hasher_data(&h, layout->spec_constant_mask, sizeof(layout->spec_constant_mask));
+		hasher_u32(&h, layout->attribute_mask);
+		hasher_u32(&h, layout->render_target_mask);
 
 		Hash hash = hasher_get(&h);
 		PipelineLayout *ret = pipeline_layout_map_find(&self->pipeline_layouts, hash);
@@ -16993,7 +16993,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		return ret;
 	}
 
-	DescriptorSetAllocator * device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings){
+	DescriptorSetAllocator * device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout *layout, const uint32_t *stages_for_bindings){
 		Hasher h; hasher_init(&h);
 		hasher_data(&h, (const uint32_t *)(&layout), sizeof(layout));
 		hasher_data(&h, stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
@@ -17036,16 +17036,16 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 				FOR_EACH_BIT(shader_layout.sets[set].immutable_sampler_mask, binding)
 				{
-					StockSampler sampler = get_immutable_sampler(shader_layout.sets[set], binding);
+					StockSampler sampler = get_immutable_sampler(&shader_layout.sets[set], binding);
 
 					// Do we already have an immutable sampler? Make sure it matches the layout.
-					if (has_immutable_sampler(layout.sets[set], binding))
+					if (has_immutable_sampler(&layout.sets[set], binding))
 					{
-						if (sampler != get_immutable_sampler(layout.sets[set], binding))
+						if (sampler != get_immutable_sampler(&layout.sets[set], binding))
 							LOGE("Immutable sampler mismatch detected!\n");
 					}
 
-					set_immutable_sampler(layout.sets[set], binding, sampler);
+					set_immutable_sampler(&layout.sets[set], binding, sampler);
 				}
 
 				uint32_t active_binds =
@@ -17089,7 +17089,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		hasher_u32(&h, layout.push_constant_range.stageFlags);
 		hasher_u32(&h, layout.push_constant_range.size);
 		layout.push_constant_layout_hash = hasher_get(&h);
-		program_set_pipeline_layout(&program, device_request_pipeline_layout(self, layout));
+		program_set_pipeline_layout(&program, device_request_pipeline_layout(self, &layout));
 	}
 
 	void device_set_context(Device *self, const Context &context){
