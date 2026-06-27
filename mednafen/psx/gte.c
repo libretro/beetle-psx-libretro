@@ -1245,34 +1245,33 @@ static INLINE void check_mac_overflow(int64_t value)
 static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float precise_z)
 {
 
-   float widescreen_hack_aspect_ratio = 0.75f; /* 16:9 default for unrecognized settings */
-   switch(widescreen_hack_aspect_ratio_setting)
+   /* Widescreen-hack horizontal aspect scale, as Q16 fixed point
+    * (round(ratio * 65536)).  Holding the multiplier in fixed point
+    * keeps the GTE screen-X output - which is machine state a game
+    * can read back via MFC2 - computed entirely in integer math, so
+    * it is bit-identical across every build, arch and FPU mode
+    * (no x87-vs-SSE precision split, no FMA-contraction divergence).
+    * Index by widescreen_hack_aspect_ratio_setting; out-of-range
+    * falls through to the 16:9 default, matching the old switch. */
+   static const int32_t ws_aspect_q16[7] =
    {
-      case 0: /* 16:10 */
-         widescreen_hack_aspect_ratio = 0.80f;
-         break;
-      case 1: /* 16:9 (default) */
-         widescreen_hack_aspect_ratio = 0.75f;
-         break;
-      case 2: /* 18:9 (smartphone) */
-         widescreen_hack_aspect_ratio = 0.66f;
-         break;
-      case 3: /* 19:9 (smartphone) */
-         widescreen_hack_aspect_ratio = 0.63f;
-         break;
-      case 4: /* 20:9 (smartphone) */
-         widescreen_hack_aspect_ratio = 0.6f;
-         break;
-      case 5: /* 21:9 (ultrawide, 64:27) */
-         widescreen_hack_aspect_ratio = 0.55f;
-         break;
-      case 6: /* 32:9 (superwide) */
-         widescreen_hack_aspect_ratio = 0.37f;
-         break;
-   }
+      52429, /* 0: 16:10  (0.80) */
+      49152, /* 1: 16:9   (0.75, default) */
+      43254, /* 2: 18:9   (0.66) */
+      41288, /* 3: 19:9   (0.63) */
+      39322, /* 4: 20:9   (0.60) */
+      36045, /* 5: 21:9   (0.55) */
+      24249  /* 6: 32:9   (0.37) */
+   };
+   unsigned ws_idx     = (unsigned)widescreen_hack_aspect_ratio_setting;
+   int32_t  aspect_q16 = ws_aspect_q16[(ws_idx < 7) ? ws_idx : 1];
+   int16_t  tmp;
 
-   SET_MAC(0, F((int64_t)OFX + IR1 * h_div_sz * ((widescreen_hack) ? widescreen_hack_aspect_ratio : 1.00)) >> 16);
-   int16_t tmp = Lm_G(0, MAC(0));
+   if (widescreen_hack)
+      SET_MAC(0, F((int64_t)OFX + ((IR1 * h_div_sz * aspect_q16) >> 16)) >> 16);
+   else
+      SET_MAC(0, F((int64_t)OFX + IR1 * h_div_sz) >> 16);
+   tmp = Lm_G(0, MAC(0));
 
    SET_MAC(0, F((int64_t)OFY + IR2 * h_div_sz) >> 16);
 
@@ -1286,9 +1285,14 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float p
    {
       float fofx       = ((float)OFX / (float)(1 << 16));
       float fofy       = ((float)OFY / (float)(1 << 16));
+      /* Same ratio as the integer path above, recovered from the Q16
+       * constant (exact: aspect_q16 * 2^-16).  The PGXP shadow stays
+       * float because precise_h_div_sz is float; only the ratio source
+       * is shared so the two paths cannot drift apart. */
+      float aspect     = widescreen_hack ? (float)aspect_q16 / 65536.0f : 1.0f;
 
       /* Increased precision calculation (sub-pixel precision) */
-      float precise_x  = fofx + ((float)IR1 * precise_h_div_sz) * ((widescreen_hack) ? widescreen_hack_aspect_ratio : 1.00);
+      float precise_x  = fofx + ((float)IR1 * precise_h_div_sz) * aspect;
       float precise_y  = fofy + ((float)IR2 * precise_h_div_sz);
 
       /* Pack the freshly-written XY_FIFO[3] into a u32 for PGXP. The
