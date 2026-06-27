@@ -2819,7 +2819,15 @@ int32_t CPU_Run(PS_CPU *self, int32_t timestamp_in)
       /* Init lightrec when changing dynarec, invalidate, or PGXP option;
        * cleans entire state if already running. */
       if (psx_dynarec == DYNAREC_DISABLED)
-         GTE_SwitchRegisters(false,lightrec_regs->cp2d);
+      {
+         /* Switching to (or already on) the interpreter. Only copy the GTE
+          * register bank back out of lightrec if lightrec was actually
+          * running - otherwise lightrec_regs is NULL (it's only set up by
+          * lightrec_plugin_init), and an option toggle while the interpreter
+          * has been the backend since boot would dereference NULL here (#968). */
+         if (lightrec_state)
+            GTE_SwitchRegisters(false,lightrec_regs->cp2d);
+      }
       else
          lightrec_plugin_init(self);
       prev_dynarec    = psx_dynarec;
