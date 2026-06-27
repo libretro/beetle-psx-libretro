@@ -2975,6 +2975,19 @@ static void pgxp_cop2_notify(struct lightrec_state *state, uint32_t op, uint32_t
 	}
 }
 
+/* PGXP CPU-mode tracking hook for the lightrec recompiler.  Installed in
+ * pgxp_ops.pgxp_cpu only while PGXP_MODE_CPU is active.  The recompiler calls
+ * this after each tracked op with the post-execution register values; route
+ * them to the unified PGXP_CPU dispatcher, which keeps CPU_reg[] precision
+ * metadata up to date just as the interpreter's per-instruction hooks do. */
+static void pgxp_cpu_track(struct lightrec_state *state, uint32_t instr,
+                           uint32_t rd, uint32_t rs, uint32_t rt,
+                           uint32_t hi, uint32_t lo, uint32_t addr)
+{
+	(void)state;
+	PGXP_CPU_Dispatch(instr, rd, rs, rt, hi, lo, addr);
+}
+
 static bool cp2_ops[0x40] = {0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,
                              1,1,1,1,1,0,1,0,0,0,0,1,1,0,1,0,
                              1,0,0,0,0,0,0,0,1,1,1,0,0,1,1,0,
@@ -3534,6 +3547,13 @@ static int lightrec_plugin_init(PS_CPU *self)
       lightrec_map[PSX_MAP_KERNEL_USER_RAM].ops = &pgxp_nonhw_regs_ops;
       lightrec_map[PSX_MAP_BIOS].ops            = &pgxp_nonhw_regs_ops;
       lightrec_map[PSX_MAP_SCRATCH_PAD].ops     = &pgxp_nonhw_regs_ops;
+
+      /* Drive PGXP CPU-mode tracking from recompiled code only when CPU
+       * mode is actually selected.  pgxp_ops is static and reused across
+       * re-inits, so clear the hook when CPU mode is off to keep the fast
+       * path after a mode change. */
+      pgxp_ops.pgxp_cpu = (PGXP_GetModes() & PGXP_MODE_CPU)
+                          ? pgxp_cpu_track : NULL;
 
       cop_ops = &pgxp_ops;
    }
