@@ -1996,7 +1996,7 @@ bool counter_release(struct SingleThreadCounter *c) { return --c->count == 0; }
 
 	struct IntrusiveListC
 	{
-		struct IntrusiveListNode *head;
+		struct IntrusiveListNode *head = NULL;
 	};
 
 void ilist_clear(struct IntrusiveListC *list)
@@ -2724,10 +2724,10 @@ IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
 
 	struct DeviceFeatures
 	{
-		bool supports_external;
-		bool supports_dedicated;
-		bool supports_debug_marker;
-		VkPhysicalDeviceFeatures enabled_features;
+		bool supports_external = false;
+		bool supports_dedicated = false;
+		bool supports_debug_marker = false;
+		VkPhysicalDeviceFeatures enabled_features = {};
 	};
 
 	enum VendorID
@@ -2802,7 +2802,7 @@ bool context_is_valid(const struct Context *self) { return self->valid; }
 
 	struct ImplementationWorkarounds
 	{
-		bool optimize_all_graphics_barrier;
+		bool optimize_all_graphics_barrier = false;
 	};
 
 	/* TextureFormatLayout: computes mip/layer byte layout for a texture upload
@@ -3590,16 +3590,10 @@ VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
 
 	struct BufferCreateInfo
 	{
-		BufferDomain domain;
-		VkDeviceSize size;
-		VkBufferUsageFlags usage;
+		BufferDomain domain = BufferDomain_Device;
+		VkDeviceSize size = 0;
+		VkBufferUsageFlags usage = 0;
 	};
-	static inline void buffer_create_info_defaults(struct BufferCreateInfo *self)
-	{
-		self->domain = BufferDomain_Device;
-		self->size = 0;
-		self->usage = 0;
-	}
 
 	struct Buffer;
 	struct BufferDeleter
@@ -3836,25 +3830,16 @@ VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
 
 	struct ImageViewCreateInfo
 	{
-		Image *image;
-		VkFormat format;
-		unsigned base_level;
-		unsigned levels;
-		unsigned base_layer;
-		unsigned layers;
-		VkComponentMapping swizzle;
+		Image *image = NULL;
+		VkFormat format = VK_FORMAT_UNDEFINED;
+		unsigned base_level = 0;
+		unsigned levels = VK_REMAINING_MIP_LEVELS;
+		unsigned base_layer = 0;
+		unsigned layers = VK_REMAINING_ARRAY_LAYERS;
+		VkComponentMapping swizzle = {
+			VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
+		};
 	};
-	static inline void image_view_create_info_defaults(struct ImageViewCreateInfo *self)
-	{
-		VkComponentMapping sw = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
-		self->image = NULL;
-		self->format = VK_FORMAT_UNDEFINED;
-		self->base_level = 0;
-		self->levels = VK_REMAINING_MIP_LEVELS;
-		self->base_layer = 0;
-		self->layers = VK_REMAINING_ARRAY_LAYERS;
-		self->swizzle = sw;
-	}
 
 	struct ImageView;
 
@@ -3983,106 +3968,83 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 
 	struct ImageCreateInfo
 	{
-		ImageDomain domain;
-		unsigned width;
-		unsigned height;
-		unsigned depth;
-		unsigned levels;
-		VkFormat format;
-		VkImageType type;
-		unsigned layers;
-		VkImageUsageFlags usage;
-		VkSampleCountFlagBits samples;
-		VkImageCreateFlags flags;
-		ImageMiscFlags misc;
-		VkImageLayout initial_layout;
-		VkComponentMapping swizzle;
+		ImageDomain domain = ImageDomain_Physical;
+		unsigned width = 0;
+		unsigned height = 0;
+		unsigned depth = 1;
+		unsigned levels = 1;
+		VkFormat format = VK_FORMAT_UNDEFINED;
+		VkImageType type = VK_IMAGE_TYPE_2D;
+		unsigned layers = 1;
+		VkImageUsageFlags usage = 0;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+		VkImageCreateFlags flags = 0;
+		ImageMiscFlags misc = 0;
+		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+		VkComponentMapping swizzle = {
+			VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
+		};
 
+		static ImageCreateInfo immutable_2d_image(unsigned width, unsigned height, VkFormat format, bool mipmapped = false)
+		{
+			ImageCreateInfo info;
+			info.width = width;
+			info.height = height;
+			info.depth = 1;
+			info.levels = mipmapped ? 0u : 1u;
+			info.format = format;
+			info.type = VK_IMAGE_TYPE_2D;
+			info.layers = 1;
+			info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+			info.samples = VK_SAMPLE_COUNT_1_BIT;
+			info.flags = 0;
+			info.misc = mipmapped ? unsigned(IMAGE_MISC_GENERATE_MIPS_BIT) : 0u;
+			info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			return info;
+		}
+
+		static ImageCreateInfo render_target(unsigned width, unsigned height, VkFormat format)
+		{
+			ImageCreateInfo info;
+			info.width = width;
+			info.height = height;
+			info.depth = 1;
+			info.levels = 1;
+			info.format = format;
+			info.type = VK_IMAGE_TYPE_2D;
+			info.layers = 1;
+			info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
+					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+				VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+			info.samples = VK_SAMPLE_COUNT_1_BIT;
+			info.flags = 0;
+			info.misc = 0;
+			info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+			return info;
+		}
+
+		static ImageCreateInfo transient_render_target(unsigned width, unsigned height, VkFormat format)
+		{
+			ImageCreateInfo info;
+			info.domain = ImageDomain_Transient;
+			info.width = width;
+			info.height = height;
+			info.depth = 1;
+			info.levels = 1;
+			info.format = format;
+			info.type = VK_IMAGE_TYPE_2D;
+			info.layers = 1;
+			info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
+					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+				VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+			info.samples = VK_SAMPLE_COUNT_1_BIT;
+			info.flags = 0;
+			info.misc = 0;
+			info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+			return info;
+		}
 	};
-
-	static inline struct ImageCreateInfo image_create_info_immutable_2d(unsigned width, unsigned height, VkFormat format, bool mipmapped)
-	{
-		struct ImageCreateInfo info;
-		info.domain = ImageDomain_Physical;
-		info.width = width;
-		info.height = height;
-		info.depth = 1;
-		info.levels = mipmapped ? 0u : 1u;
-		info.format = format;
-		info.type = VK_IMAGE_TYPE_2D;
-		info.layers = 1;
-		info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-		info.samples = VK_SAMPLE_COUNT_1_BIT;
-		info.flags = 0;
-		info.misc = mipmapped ? (unsigned)(IMAGE_MISC_GENERATE_MIPS_BIT) : 0u;
-		info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		{ VkComponentMapping _sw = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A }; info.swizzle = _sw; }
-		return info;
-	}
-
-	static inline struct ImageCreateInfo image_create_info_render_target(unsigned width, unsigned height, VkFormat format)
-	{
-		struct ImageCreateInfo info;
-		info.domain = ImageDomain_Physical;
-		info.width = width;
-		info.height = height;
-		info.depth = 1;
-		info.levels = 1;
-		info.format = format;
-		info.type = VK_IMAGE_TYPE_2D;
-		info.layers = 1;
-		info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
-				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
-			VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-		info.samples = VK_SAMPLE_COUNT_1_BIT;
-		info.flags = 0;
-		info.misc = 0;
-		info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-		{ VkComponentMapping _sw = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A }; info.swizzle = _sw; }
-		return info;
-	}
-
-	static inline struct ImageCreateInfo image_create_info_transient_render_target(unsigned width, unsigned height, VkFormat format)
-	{
-		struct ImageCreateInfo info;
-		info.domain = ImageDomain_Transient;
-		info.width = width;
-		info.height = height;
-		info.depth = 1;
-		info.levels = 1;
-		info.format = format;
-		info.type = VK_IMAGE_TYPE_2D;
-		info.layers = 1;
-		info.usage = (format_has_depth_or_stencil_aspect(format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT :
-				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
-			VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-		info.samples = VK_SAMPLE_COUNT_1_BIT;
-		info.flags = 0;
-		info.misc = 0;
-		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		{ VkComponentMapping _sw = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A }; info.swizzle = _sw; }
-		return info;
-	}
-
-	static inline void image_create_info_defaults(struct ImageCreateInfo *self)
-	{
-		VkComponentMapping sw = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
-		self->domain = ImageDomain_Physical;
-		self->width = 0;
-		self->height = 0;
-		self->depth = 1;
-		self->levels = 1;
-		self->format = VK_FORMAT_UNDEFINED;
-		self->type = VK_IMAGE_TYPE_2D;
-		self->layers = 1;
-		self->usage = 0;
-		self->samples = VK_SAMPLE_COUNT_1_BIT;
-		self->flags = 0;
-		self->misc = 0;
-		self->initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-		self->swizzle = sw;
-	}
 
 	struct Image;
 
@@ -4392,17 +4354,17 @@ void semaphoremanager_init_empty(struct SemaphoreManager *self)
 	struct Device;
 	struct DescriptorSetLayout
 	{
-		uint32_t sampled_image_mask;
-		uint32_t storage_image_mask;
-		uint32_t uniform_buffer_mask;
-		uint32_t storage_buffer_mask;
-		uint32_t sampled_buffer_mask;
-		uint32_t input_attachment_mask;
-		uint32_t sampler_mask;
-		uint32_t separate_image_mask;
-		uint32_t fp_mask;
-		uint32_t immutable_sampler_mask;
-		uint64_t immutable_samplers;
+		uint32_t sampled_image_mask = 0;
+		uint32_t storage_image_mask = 0;
+		uint32_t uniform_buffer_mask = 0;
+		uint32_t storage_buffer_mask = 0;
+		uint32_t sampled_buffer_mask = 0;
+		uint32_t input_attachment_mask = 0;
+		uint32_t sampler_mask = 0;
+		uint32_t separate_image_mask = 0;
+		uint32_t fp_mask = 0;
+		uint32_t immutable_sampler_mask = 0;
+		uint64_t immutable_samplers = 0;
 	};
 
 	// Avoid -Wclass-memaccess warnings since we hash DescriptorSetLayout.
@@ -4515,25 +4477,25 @@ VkDescriptorSetLayout descriptor_set_allocator_get_layout(const struct Descripto
 
 	struct ResourceLayout
 	{
-		uint32_t input_mask;
-		uint32_t output_mask;
-		uint32_t push_constant_size;
-		uint32_t spec_constant_mask;
+		uint32_t input_mask = 0;
+		uint32_t output_mask = 0;
+		uint32_t push_constant_size = 0;
+		uint32_t spec_constant_mask = 0;
 		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS];
 	};
 
 	struct CombinedResourceLayout
 	{
-		uint32_t attribute_mask;
-		uint32_t render_target_mask;
-		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS];
-		uint32_t stages_for_bindings[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS];
-		uint32_t stages_for_sets[VULKAN_NUM_DESCRIPTOR_SETS];
-		VkPushConstantRange push_constant_range;
-		uint32_t descriptor_set_mask;
-		uint32_t spec_constant_mask[(unsigned)ShaderStage_Count];
-		uint32_t combined_spec_constant_mask;
-		Hash push_constant_layout_hash;
+		uint32_t attribute_mask = 0;
+		uint32_t render_target_mask = 0;
+		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
+		uint32_t stages_for_bindings[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS] = {};
+		uint32_t stages_for_sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
+		VkPushConstantRange push_constant_range = {};
+		uint32_t descriptor_set_mask = 0;
+		uint32_t spec_constant_mask[(unsigned)ShaderStage_Count] = {};
+		uint32_t combined_spec_constant_mask = 0;
+		Hash push_constant_layout_hash = 0;
 	};
 
 	/* PipelineLayout: cached VkPipelineLayout + its resource layout and per-set
@@ -4619,54 +4581,43 @@ PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return
 	typedef uint32_t RenderPassOpFlags;
 
 	struct ImageView;
-	/* Hoisted out of struct RenderPassInfo to file scope (C: no nested types). */
-	enum DepthStencil {
-		DepthStencil_None,
-		DepthStencil_ReadOnly,
-		DepthStencil_ReadWrite
-	};
-	struct Subpass
-	{
-		uint32_t color_attachments[VULKAN_NUM_ATTACHMENTS];
-		uint32_t input_attachments[VULKAN_NUM_ATTACHMENTS];
-		uint32_t resolve_attachments[VULKAN_NUM_ATTACHMENTS];
-		unsigned num_color_attachments;
-		unsigned num_input_attachments;
-		unsigned num_resolve_attachments;
-		enum DepthStencil depth_stencil_mode;
-	};
 	struct RenderPassInfo
 	{
 		ImageView *color_attachments[VULKAN_NUM_ATTACHMENTS];
-		ImageView *depth_stencil;
-		unsigned num_color_attachments;
-		RenderPassOpFlags op_flags;
-		uint32_t clear_attachments;
-		uint32_t load_attachments;
-		uint32_t store_attachments;
-		uint32_t layer;
+		ImageView *depth_stencil = NULL;
+		unsigned num_color_attachments = 0;
+		RenderPassOpFlags op_flags = 0;
+		uint32_t clear_attachments = 0;
+		uint32_t load_attachments = 0;
+		uint32_t store_attachments = 0;
+		uint32_t layer = 0;
 
 		// Render area will be clipped to the actual framebuffer.
-		VkRect2D render_area;
+		VkRect2D render_area = { { 0, 0 }, { UINT32_MAX, UINT32_MAX } };
 
-		VkClearColorValue clear_color[VULKAN_NUM_ATTACHMENTS];
-		VkClearDepthStencilValue clear_depth_stencil;
+		VkClearColorValue clear_color[VULKAN_NUM_ATTACHMENTS] = {};
+		VkClearDepthStencilValue clear_depth_stencil = { 1.0f, 0 };
 
+		enum DepthStencil {
+			DepthStencil_None,
+			DepthStencil_ReadOnly,
+			DepthStencil_ReadWrite
+		};
+
+		struct Subpass
+		{
+			uint32_t color_attachments[VULKAN_NUM_ATTACHMENTS];
+			uint32_t input_attachments[VULKAN_NUM_ATTACHMENTS];
+			uint32_t resolve_attachments[VULKAN_NUM_ATTACHMENTS];
+			unsigned num_color_attachments = 0;
+			unsigned num_input_attachments = 0;
+			unsigned num_resolve_attachments = 0;
+			DepthStencil depth_stencil_mode = DepthStencil_ReadWrite;
+		};
 		// If 0/nullptr, assume a default subpass.
-		const Subpass *subpasses;
-		unsigned num_subpasses;
+		const Subpass *subpasses = NULL;
+		unsigned num_subpasses = 0;
 	};
-	static inline void render_pass_info_defaults(struct RenderPassInfo *self)
-	{
-		memset(self, 0, sizeof(*self));
-		self->render_area.offset.x = 0;
-		self->render_area.offset.y = 0;
-		self->render_area.extent.width = UINT32_MAX;
-		self->render_area.extent.height = UINT32_MAX;
-		self->clear_depth_stencil.depth = 1.0f;
-		self->clear_depth_stencil.stencil = 0;
-		self->subpasses = NULL;
-	}
 
 	/* RenderPass: cached VkRenderPass + per-subpass attachment metadata. Lives in
 	 * an IntrusiveHashMap (intrusive_node first). Converted from a C++ class to a
@@ -5231,35 +5182,32 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	};
 	typedef uint32_t CommandBufferDirtyFlags;
 
-	/* Hoisted out of union PipelineState (C: no nested types). */
-struct PipelineStateBits
-	{
-		// Depth state.
-		unsigned depth_write : 1;
-		unsigned depth_test : 1;
-		unsigned blend_enable : 1;
-
-		unsigned cull_mode : CULL_MODE_BITS;
-
-		unsigned depth_compare : COMPARE_OP_BITS;
-
-		unsigned alpha_to_coverage : 1;
-		unsigned alpha_to_one : 1;
-		unsigned sample_shading : 1;
-
-		unsigned src_color_blend : BLEND_FACTOR_BITS;
-		unsigned dst_color_blend : BLEND_FACTOR_BITS;
-		unsigned color_blend_op : BLEND_OP_BITS;
-		unsigned src_alpha_blend : BLEND_FACTOR_BITS;
-		unsigned dst_alpha_blend : BLEND_FACTOR_BITS;
-		unsigned alpha_blend_op : BLEND_OP_BITS;
-		unsigned topology : 4;
-
-		unsigned spec_constant_mask : 8;
-};
-
 	union PipelineState {
-		struct PipelineStateBits state;
+		struct State
+		{
+			// Depth state.
+			unsigned depth_write : 1;
+			unsigned depth_test : 1;
+			unsigned blend_enable : 1;
+
+			unsigned cull_mode : CULL_MODE_BITS;
+
+			unsigned depth_compare : COMPARE_OP_BITS;
+
+			unsigned alpha_to_coverage : 1;
+			unsigned alpha_to_one : 1;
+			unsigned sample_shading : 1;
+
+			unsigned src_color_blend : BLEND_FACTOR_BITS;
+			unsigned dst_color_blend : BLEND_FACTOR_BITS;
+			unsigned color_blend_op : BLEND_OP_BITS;
+			unsigned src_alpha_blend : BLEND_FACTOR_BITS;
+			unsigned dst_alpha_blend : BLEND_FACTOR_BITS;
+			unsigned alpha_blend_op : BLEND_OP_BITS;
+			unsigned topology : 4;
+
+			unsigned spec_constant_mask : 8;
+		} state;
 		uint32_t words[4];
 	};
 
@@ -5689,13 +5637,13 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 	struct InitialImageBuffer
 	{
-		BufferHandle buffer;
+		BufferHandle buffer = { NULL };
 		// Bound matches the implicit invariant in TextureFormatLayout::mips[16]:
 		// callers must pass <= 16 mip levels (no runtime check exists in
 		// fill_mipinfo). build_buffer_image_copies is the sole writer of these
 		// fields; it asserts num_blits <= 16 before writing.
 		VkBufferImageCopy blits[16];
-		unsigned num_blits;
+		unsigned num_blits = 0;
 	};
 	struct HandlePool
 	{
@@ -5752,61 +5700,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	POD_VEC_DECLARE(VkBufferVec, VkBuffer);
 	POD_VEC_DECLARE(VkPipelineStageVec, VkPipelineStageFlags);
 
-	/* Hoisted out of struct Device (used by the hoisted PerFrame below). */
-	struct Managers
-	{
-		DeviceAllocator memory;
-		FenceManager fence;
-		SemaphoreManager semaphore;
-		BufferPool vbo, ubo;
-	};
-	/* Hoisted out of struct Device to file scope so the forward-typedef'd
-	 * names refer to complete types in C (no Outer::Inner qualification). */
-	struct CommandBufferHandleVec {
-		CommandBufferHandle *items;
-		int count;
-		int cap;
-	};
-	struct PerFrame
-	{
-		VkDevice device;
-		Managers *managers;
-		CommandPool graphics_cmd_pool;
-		CommandPool compute_cmd_pool;
-		CommandPool transfer_cmd_pool;
-
-		BufferBlockVec vbo_blocks;
-		BufferBlockVec ubo_blocks;
-
-		FenceVec wait_fences;
-		FenceVec recycle_fences;
-		DeviceAllocationVec allocations;
-		VkFramebufferVec destroyed_framebuffers;
-		VkSamplerVec destroyed_samplers;
-		VkPipelineVec destroyed_pipelines;
-		RenderTargetViewVec destroyed_image_views;
-		VkBufferViewVec destroyed_buffer_views;
-		VkImageVec destroyed_images;
-		VkBufferVec destroyed_buffers;
-		CommandBufferHandleVec graphics_submissions;
-		CommandBufferHandleVec compute_submissions;
-		CommandBufferHandleVec transfer_submissions;
-		SemaphoreVec recycled_semaphores;
-		SemaphoreVec destroyed_semaphores;
-	};
-
-	struct PerFramePtrVec {
-		PerFrame **items;
-		int count;
-		int cap;
-	};
-	struct QueueData
-	{
-		SemaphoreHandleVec wait_semaphores;
-		VkPipelineStageVec wait_stages;
-		bool need_fence;
-	};
-
 	struct Device
 	{
 			// Device-based objects which need to poke at internal data structures when their lifetimes end.
@@ -5844,14 +5737,14 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 
 
-			VkInstance instance;
-			VkPhysicalDevice gpu;
-			VkDevice device;
-			VkQueue graphics_queue;
-			VkQueue compute_queue;
-			VkQueue transfer_queue;
+			VkInstance instance = VK_NULL_HANDLE;
+			VkPhysicalDevice gpu = VK_NULL_HANDLE;
+			VkDevice device = VK_NULL_HANDLE;
+			VkQueue graphics_queue = VK_NULL_HANDLE;
+			VkQueue compute_queue = VK_NULL_HANDLE;
+			VkQueue transfer_queue = VK_NULL_HANDLE;
 
-			uint64_t cookie;
+			uint64_t cookie = 0;
 
 			/* Public so the C89 cookie_init() free function (replacing the
 			 * former Cookie(Device*) ctor + friendship) can reach it. */
@@ -5866,6 +5759,13 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			// Make sure this is deleted last.
 			HandlePool handle_pool;
 
+			struct Managers
+			{
+				DeviceAllocator memory;
+				FenceManager fence;
+				SemaphoreManager semaphore;
+				BufferPool vbo, ubo;
+			};
 			Managers managers;
 
 			struct
@@ -5883,6 +5783,39 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			 * ref). push takes ownership by move (no incref), matching the old
 			 * push_back(std::move(cmd)). clear() keeps the capacity so the lists
 			 * are reused across frames without reallocating. */
+			struct CommandBufferHandleVec {
+				CommandBufferHandle *items;
+				int count;
+				int cap;
+			};
+
+			struct PerFrame
+			{
+				VkDevice device;
+				Managers *managers;
+				CommandPool graphics_cmd_pool;
+				CommandPool compute_cmd_pool;
+				CommandPool transfer_cmd_pool;
+
+				BufferBlockVec vbo_blocks;
+				BufferBlockVec ubo_blocks;
+
+				FenceVec wait_fences;
+				FenceVec recycle_fences;
+				DeviceAllocationVec allocations;
+				VkFramebufferVec destroyed_framebuffers;
+				VkSamplerVec destroyed_samplers;
+				VkPipelineVec destroyed_pipelines;
+				RenderTargetViewVec destroyed_image_views;
+				VkBufferViewVec destroyed_buffer_views;
+				VkImageVec destroyed_images;
+				VkBufferVec destroyed_buffers;
+				CommandBufferHandleVec graphics_submissions;
+				CommandBufferHandleVec compute_submissions;
+				CommandBufferHandleVec transfer_submissions;
+				SemaphoreVec recycled_semaphores;
+				SemaphoreVec destroyed_semaphores;
+			};
 			/* Owning array of PerFrame* (the frame-context ring). Replaces
 			 * std::vector<std::unique_ptr<PerFrame>>: the container owns each
 			 * heap-allocated PerFrame and deletes it on clear()/destruction, so
@@ -5893,11 +5826,21 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			 * null-asserts still work), and begin/end iterate the pointers. The
 			 * default constructor zero-initialises the members (it is not a bare
 			 * POD_VEC), so a default-constructed ring is valid before build(). */
+			struct PerFramePtrVec {
+				PerFrame **items;
+				int count;
+				int cap;
+			};
 			// The per frame structure must be destroyed after
 			// the hashmap data structures below, so it must be declared before.
 			PerFramePtrVec per_frame;
 
-			QueueData graphics, compute, transfer;
+			struct QueueData
+			{
+				SemaphoreHandleVec wait_semaphores;
+				VkPipelineStageVec wait_stages;
+				bool need_fence;
+			} graphics, compute, transfer;
 
 			// Pending buffers which need to be copied from CPU to GPU before submitting graphics or compute work.
 			struct
@@ -5909,10 +5852,10 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 
 
-			unsigned frame_context_index;
-			uint32_t graphics_queue_family_index;
-			uint32_t compute_queue_family_index;
-			uint32_t transfer_queue_family_index;
+			unsigned frame_context_index = 0;
+			uint32_t graphics_queue_family_index = 0;
+			uint32_t compute_queue_family_index = 0;
+			uint32_t transfer_queue_family_index = 0;
 
 
 			SamplerHandle samplers[(unsigned)(StockSampler_Count)];
@@ -6047,22 +5990,22 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void program_init_compute(struct Program *self, Device *device, Shader *compute);
 	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
 	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
-	void cbhvec_init(struct CommandBufferHandleVec *v);
-	void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap);
-	void cbhvec_push(struct CommandBufferHandleVec *v, CommandBufferHandle *e);
-	bool cbhvec_empty(const struct CommandBufferHandleVec *v);
-	void cbhvec_clear(struct CommandBufferHandleVec *v);
-	void cbhvec_deinit(struct CommandBufferHandleVec *v);
-	CommandBufferHandleVec *device_get_queue_submissions(Device *self, CommandBufferType type);
-	void per_frame_init(struct PerFrame *self, Device *device);
-	void per_frame_fini(struct PerFrame *self);
-	void per_frame_begin(struct PerFrame *self);
-	struct PerFrame *device_frame(Device *self);
-	void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v);
-	void per_frame_ptr_vec_deinit(struct PerFramePtrVec *v);
-	void per_frame_ptr_vec_push(struct PerFramePtrVec *v, struct PerFrame *p);
-	void per_frame_ptr_vec_clear(struct PerFramePtrVec *v);
-	QueueData *device_get_queue_data(Device *self, CommandBufferType type);
+	void cbhvec_init(struct Device::CommandBufferHandleVec *v);
+	void cbhvec_grow(struct Device::CommandBufferHandleVec *v, int ncap);
+	void cbhvec_push(struct Device::CommandBufferHandleVec *v, CommandBufferHandle *e);
+	bool cbhvec_empty(const struct Device::CommandBufferHandleVec *v);
+	void cbhvec_clear(struct Device::CommandBufferHandleVec *v);
+	void cbhvec_deinit(struct Device::CommandBufferHandleVec *v);
+	Device::CommandBufferHandleVec *device_get_queue_submissions(Device *self, CommandBufferType type);
+	void per_frame_init(struct Device::PerFrame *self, Device *device);
+	void per_frame_fini(struct Device::PerFrame *self);
+	void per_frame_begin(struct Device::PerFrame *self);
+	struct Device::PerFrame *device_frame(Device *self);
+	void per_frame_ptr_vec_init_empty(struct Device::PerFramePtrVec *v);
+	void per_frame_ptr_vec_deinit(struct Device::PerFramePtrVec *v);
+	void per_frame_ptr_vec_push(struct Device::PerFramePtrVec *v, struct Device::PerFrame *p);
+	void per_frame_ptr_vec_clear(struct Device::PerFramePtrVec *v);
+	Device::QueueData *device_get_queue_data(Device *self, CommandBufferType type);
 	void program_fini(struct Program *self);
 	void framebuffer_fini(struct Framebuffer *self);
 
@@ -6115,16 +6058,16 @@ const Sampler *device_get_stock_sampler(Device *self, StockSampler sampler) { re
 const ImplementationWorkarounds *device_get_workarounds(Device *self) { return &self->workarounds; }
 const DeviceFeatures *device_get_device_features(Device *self) { return &self->ext; }
 
-	/* Free functions for CommandBufferHandleVec (converted from the move-
+	/* Free functions for Device::CommandBufferHandleVec (converted from the move-
 	 * only nested container's methods). The element is a refcounting CommandBuffer
 	 * handle, so growth/teardown go through cbh_steal/cbh_reset. push() takes
 	 * ownership by move (steal, no incref); clear() drops each handle's ref but
 	 * keeps capacity; deinit() frees the backing storage. */
-	inline void cbhvec_init(struct CommandBufferHandleVec *v)
+	inline void cbhvec_init(struct Device::CommandBufferHandleVec *v)
 	{
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
-	inline void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap)
+	inline void cbhvec_grow(struct Device::CommandBufferHandleVec *v, int ncap)
 	{
 		CommandBufferHandle *nitems = (CommandBufferHandle *)malloc((size_t)ncap * sizeof(CommandBufferHandle));
 		int i;
@@ -6134,22 +6077,22 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		v->items = nitems;
 		v->cap = ncap;
 	}
-	inline void cbhvec_push(struct CommandBufferHandleVec *v, CommandBufferHandle *e)
+	inline void cbhvec_push(struct Device::CommandBufferHandleVec *v, CommandBufferHandle *e)
 	{
 		if (v->count >= v->cap)
 			cbhvec_grow(v, v->cap ? v->cap * 2 : 8);
 		cbh_steal(&v->items[v->count], e);
 		v->count++;
 	}
-	inline bool cbhvec_empty(const struct CommandBufferHandleVec *v) { return v->count == 0; }
-	inline void cbhvec_clear(struct CommandBufferHandleVec *v)
+	inline bool cbhvec_empty(const struct Device::CommandBufferHandleVec *v) { return v->count == 0; }
+	inline void cbhvec_clear(struct Device::CommandBufferHandleVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++)
 			cbh_reset(&v->items[i]);
 		v->count = 0;
 	}
-	inline void cbhvec_deinit(struct CommandBufferHandleVec *v)
+	inline void cbhvec_deinit(struct Device::CommandBufferHandleVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++)
@@ -6158,16 +6101,16 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
 
-	/* Free functions for PerFramePtrVec -- the owning frame-context ring
+	/* Free functions for Device::PerFramePtrVec -- the owning frame-context ring
 	 * (was std::vector<unique_ptr<PerFrame>>, then a move-only nested container).
 	 * The vector owns each heap-allocated PerFrame and per_frame_fini+free's it on
 	 * clear()/teardown. Device is malloc'd so the container's own ctor/dtor never
 	 * run; init_empty establishes the empty state and deinit performs teardown. */
-	inline void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v)
+	inline void per_frame_ptr_vec_init_empty(struct Device::PerFramePtrVec *v)
 	{
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
-	inline void per_frame_ptr_vec_clear(struct PerFramePtrVec *v)
+	inline void per_frame_ptr_vec_clear(struct Device::PerFramePtrVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++) {
@@ -6176,18 +6119,18 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		}
 		v->count = 0;
 	}
-	inline void per_frame_ptr_vec_deinit(struct PerFramePtrVec *v)
+	inline void per_frame_ptr_vec_deinit(struct Device::PerFramePtrVec *v)
 	{
 		per_frame_ptr_vec_clear(v);
 		free(v->items);
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
 	/* Takes ownership of an already-allocated PerFrame. */
-	inline void per_frame_ptr_vec_push(struct PerFramePtrVec *v, struct PerFrame *p)
+	inline void per_frame_ptr_vec_push(struct Device::PerFramePtrVec *v, struct Device::PerFrame *p)
 	{
 		if (v->count >= v->cap) {
 			int ncap = v->cap ? v->cap * 2 : 8;
-			PerFrame **nitems = (PerFrame **)realloc(v->items, (size_t)ncap * sizeof(PerFrame *));
+			Device::PerFrame **nitems = (Device::PerFrame **)realloc(v->items, (size_t)ncap * sizeof(Device::PerFrame *));
 			if (!nitems)
 				return;
 			v->items = nitems;
@@ -7361,17 +7304,18 @@ void enduring_arr_free(EnduringRectArr *v) {
 	 * struct driven by lookup_grid_init / lookup_grid_deinit. Each Cell is a
 	 * growable array of POD LookupEntry; insert/get/clear are unchanged methods.
 	 * RectTracker embeds one by value and drives its init/deinit. */
-	/* Hoisted out of struct LookupGrid to file scope (C: no nested types). */
-	struct LookupEntry {
-		SRect rect;
-		RectIndex index;
-	};
-	struct Cell {
-		LookupEntry *entries;
-		int count;
-		int cap;
-	};
 	struct LookupGrid {
+		struct LookupEntry {
+			SRect rect;
+			RectIndex index;
+		};
+		/* Each cell is a psx texture page (64x256); was std::vector<LookupEntry>.
+		 * Now a malloc'd growable array per cell (POD entries). */
+		struct Cell {
+			LookupEntry *entries;
+			int count;
+			int cap;
+		};
 		Cell cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS];
 	};
 
@@ -7468,8 +7412,8 @@ void rect_tracker_clear(struct RectTracker *self, SRect rect)
 		uint32_t palette;
 		Rect full_page_rect;
 
-		bool dirty;
-		bool dead;
+		bool dirty = false;
+		bool dead = false;
 
 		FusionRects fusion;
 	};
@@ -7715,9 +7659,10 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	struct DbgHotkey {
 		retro_key key;
 		bool was_key_down;
+
+		bool query();
 	};
 
-	static bool dbg_hotkey_query(struct DbgHotkey *self);
 	static void dbg_hotkey_init(DbgHotkey *h, retro_key key)
 	{
 		h->key = key;
@@ -7755,8 +7700,13 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 		int count;
 		CacheEntry entries[HANDLE_LRU_MAX];
 
+		HandleCacheResult get(Rect rect, uint32_t palette_hash);
+		void insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle);
+		void clear()
+		{
+			count = 0;
+		}
 	};
-	static inline void handle_lru_cache_clear(struct HandleLRUCache *self) { self->count = 0; }
 
 	static void handle_lru_cache_init(HandleLRUCache *c, int max_size)
 	{
@@ -7787,9 +7737,8 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	 * owning pointers to heap-allocated TextureUploads; ownership moves via
 	 * uploadmap_move (steal, source emptied) and is released by uploadmap_destroy.
 	 * No copy operation exists -- callers must move, never copy. */
-	/* Hoisted out of struct UploadOwningMap (C: no nested types). */
-	struct UploadOwningMapEntry { uint32_t key; TextureUpload *val; };
 	struct UploadOwningMap {
+		struct UploadOwningMapEntry { uint32_t key; TextureUpload *val; };
 		struct UploadOwningMapEntry *items;
 		int count;
 		int cap;
@@ -7831,7 +7780,7 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	{
 		if (m->count >= m->cap) {
 			int ncap = m->cap ? m->cap * 2 : 8;
-			UploadOwningMapEntry *nitems = (UploadOwningMapEntry *)realloc(m->items, (size_t)ncap * sizeof(UploadOwningMapEntry));
+			UploadOwningMap::UploadOwningMapEntry *nitems = (UploadOwningMap::UploadOwningMapEntry *)realloc(m->items, (size_t)ncap * sizeof(UploadOwningMap::UploadOwningMapEntry));
 			if (!nitems)
 				return;
 			m->items = nitems;
@@ -8972,13 +8921,6 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 		SpecConstIndex_Samples = 0
 	};
 
-	/* Hoisted out of struct Renderer to file scope (C: no nested types). */
-	struct SaveState
-	{
-		OwnedU32Buf vram;
-		RenderState state;
-		TextureTrackerSaveState tracker_state;
-	};
 	struct Renderer
 	{
 			/* batch-7 out-of-line methods -> free functions. */
@@ -9009,8 +8951,16 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			 * Managed explicitly via savestate_init / savestate_destroy / savestate_move
 			 * (defined as free functions after the Renderer class, where OwnedU32Buf and
 			 * TextureTrackerSaveState are complete). No copy exists. */
+			struct SaveState
+			{
+				OwnedU32Buf vram;
+				RenderState state;
+				TextureTrackerSaveState tracker_state;
+			};
 
 
+			Renderer(Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
+			~Renderer();
 
 
 
@@ -9065,11 +9015,11 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			Device *device;
 			unsigned scaling;
 			unsigned msaa;
-			bool scaled_uv_offset;
-			bool valid;
-			FilterMode primitive_filter_mode;
-			FilterExclude sprite_filter_exclude;
-			FilterExclude polygon_2d_filter_exclude;
+			bool scaled_uv_offset = false;
+			bool valid = false;
+			FilterMode primitive_filter_mode = FilterMode_NearestNeighbor;
+			FilterExclude sprite_filter_exclude = FilterExcludeNone;
+			FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
 			ImageHandle scaled_framebuffer;
 			ImageHandle scaled_framebuffer_msaa;
 			ImageHandle bias_framebuffer;
@@ -9077,7 +9027,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			ImageHandle framebuffer_ssaa;
 			ImageViewHandleVec scaled_views;
 			FBAtlas atlas;
-			bool texture_tracking_enabled;
+			bool texture_tracking_enabled = false;
 			TextureTracker tracker;
 
 			CommandBufferHandle cmd;
@@ -9136,8 +9086,8 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 
 			OpaqueQueue queue;
-			unsigned primitive_index;
-			bool render_pass_is_feedback;
+			unsigned primitive_index = 0;
+			bool render_pass_is_feedback = false;
 			float last_uv_scale_x, last_uv_scale_y;
 
 			void reset_queue();
@@ -9153,19 +9103,19 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			ImageHandle reuseable_scanout;
 
 
-			BufferHandle quad;
+			BufferHandle quad = { NULL };
 	};
 
 	/* SaveState lifecycle free functions (SaveState was a move-only C++ class; it is now
 	 * a plain struct). vram is an OwnedU32Buf and tracker_state a TextureTrackerSaveState,
 	 * both move-only plain structs managed through their own *_init / *_move / destroy. */
-	static inline void savestate_init(struct SaveState *s)
+	static inline void savestate_init(struct Renderer::SaveState *s)
 	{
 		owned_u32_init(&s->vram);
 		tts_init(&s->tracker_state);
 	}
 
-	static inline void savestate_destroy(struct SaveState *s)
+	static inline void savestate_destroy(struct Renderer::SaveState *s)
 	{
 		owned_u32_deinit(&s->vram);
 		tts_destroy(&s->tracker_state);
@@ -9173,7 +9123,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 	/* Move o into s (s must be initialized): steal o's owning members, copy the POD
 	 * RenderState, leave o empty/initialized. */
-	static inline void savestate_move(struct SaveState *s, struct SaveState *o)
+	static inline void savestate_move(struct Renderer::SaveState *s, struct Renderer::SaveState *o)
 	{
 		if (s == o)
 			return;
@@ -9275,8 +9225,8 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	void renderer_set_display_filter(Renderer *self, ScanoutFilter filter);
 	void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter);
 	void renderer_set_dither_native_resolution(Renderer *self, bool enable);
-	void renderer_save_vram_state(Renderer *self, SaveState *out);
-	void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const SaveState *state);
+	void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out);
+	void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const Renderer::SaveState *state);
 	void renderer_fini(Renderer *self);
 	bool renderer_is_valid(const Renderer *self);
 
@@ -9679,7 +9629,7 @@ static inline void fbcolor_to_rgba32f(float *v, uint32_t color)
 }
 
 
-void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const SaveState *state)
+void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const Renderer::SaveState *state)
 {
 	/* Former constructor init-list + remaining scalar default member initializers,
 	 * assigned explicitly now that Renderer is malloc'd and placement-initialised via
@@ -9758,7 +9708,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 		return;
 	}
 
-	ImageCreateInfo info = image_create_info_render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
+	ImageCreateInfo info = ImageCreateInfo::render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 	info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 	             VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -9873,7 +9823,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 		commandbuffer_clear_image(cbh_get(&self->cmd), *ih_get(&self->framebuffer), {});
 	commandbuffer_full_barrier(cbh_get(&self->cmd));
 
-	ImageCreateInfo dither_info = image_create_info_immutable_2d(4, 4, VK_FORMAT_R8_UNORM, false);
+	ImageCreateInfo dither_info = ImageCreateInfo::immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM);
 	// This lut is biased with 4 to be able to use UNORM easily.
 	static const uint8_t dither_lut_data[16] = { 0, 4, 1, 5, 6, 2, 7, 3, 1, 5, 0, 4, 7, 3, 6, 2 };
 
@@ -9885,7 +9835,6 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	};
 
 	BufferCreateInfo buffer_create_info;
-	buffer_create_info_defaults(&buffer_create_info);
 	buffer_create_info.domain = BufferDomain_Device;
 	buffer_create_info.size = sizeof(quad_data);
 	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -9900,9 +9849,8 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 
 	self->valid = true;}
 
-void renderer_save_vram_state(Renderer *self, SaveState *out){
+void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out){
 	BufferCreateInfo buffer_create_info;
-	buffer_create_info_defaults(&buffer_create_info);
 	buffer_create_info.domain = BufferDomain_CachedHost;
 	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -10124,7 +10072,6 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect &rect, uin
 	renderer_ensure_command_buffer(self);
 
 	BufferCreateInfo buffer_create_info;
-	buffer_create_info_defaults(&buffer_create_info);
 	buffer_create_info.domain = BufferDomain_CachedHost;
 	buffer_create_info.size = copy_rect.width * copy_rect.height * 4;
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -10191,7 +10138,6 @@ void renderer_mipmap_framebuffer(Renderer *self)
 	for (unsigned i = 1; i <= levels; i++)
 	{
 		RenderPassInfo rp;
-		render_pass_info_defaults(&rp);
 		unsigned current_scale = max_(self->scaling >> i, 1u);
 
 		if (i == levels)
@@ -10470,7 +10416,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
 	unsigned render_scale = scaled ? self->scaling : 1;
 
-	ImageCreateInfo info = image_create_info_render_target(
+	ImageCreateInfo info = ImageCreateInfo::render_target(
 			FB_WIDTH * render_scale,
 			FB_HEIGHT * render_scale,
 			VK_FORMAT_A1R5G5B5_UNORM_PACK16); // Default to 15bit color for now
@@ -10480,7 +10426,6 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 	RenderPassInfo rp;
-	render_pass_info_defaults(&rp);
 	rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
@@ -10559,7 +10504,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 
 		renderer_ensure_command_buffer(self);
 
-		ImageCreateInfo info = image_create_info_render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
+		ImageCreateInfo info = ImageCreateInfo::render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
 
 		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		info.usage =
@@ -10567,7 +10512,6 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 		RenderPassInfo rp;
-		render_pass_info_defaults(&rp);
 		rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
 		rp.num_color_attachments = 1;
 		rp.clear_attachments = 1;
@@ -10658,7 +10602,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 
 	DisplayRect display_rect = renderer_compute_display_rect(self);
 
-	ImageCreateInfo info = image_create_info_render_target(
+	ImageCreateInfo info = ImageCreateInfo::render_target(
 			display_rect.width * render_scale,
 			display_rect.height * render_scale,
 			self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM);
@@ -10668,7 +10612,6 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 	RenderPassInfo rp;
-	render_pass_info_defaults(&rp);
 	rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
@@ -11495,7 +11438,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect &rect)
 	info.store_attachments = 1 << 0;
 	info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
 
-	Subpass subpass;
+	RenderPassInfo::Subpass subpass;
 	info.num_subpasses = 1;
 	info.subpasses = &subpass;
 	subpass.num_color_attachments = 1;
@@ -11982,7 +11925,6 @@ void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src){
 
 ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels){
 	ImageCreateInfo info;
-	image_create_info_defaults(&info);
 	ImageInitialData initial[16]; /* Vulkan caps mip levels well under this */
 	int i;
 	int n = levels.count;
@@ -12011,7 +11953,7 @@ ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels){
 	return image;
 }
 ImageHandle renderer_create_texture(Renderer *self, int width, int height, int levels){
-	ImageCreateInfo info = image_create_info_immutable_2d(width, height, VK_FORMAT_R8G8B8A8_UNORM, false);
+	ImageCreateInfo info = ImageCreateInfo::immutable_2d_image(width, height, VK_FORMAT_R8G8B8A8_UNORM, false);
 	info.levels = levels;
 	info.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -12026,7 +11968,6 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect &rect){
 
 	// TODO: Chain allocate this.
 	BufferCreateInfo buffer_create_info;
-	buffer_create_info_defaults(&buffer_create_info);
 	buffer_create_info.domain = BufferDomain_Host;
 	buffer_create_info.size = size;
 	buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
@@ -12882,7 +12823,6 @@ void image_init(struct Image *self, Device *device, VkImage image, VkImageView d
 	if (default_view != VK_NULL_HANDLE)
 	{
 		ImageViewCreateInfo info;
-		image_view_create_info_defaults(&info);
 		info.image = self;
 		info.format = create_info.format;
 		info.base_level = 0;
@@ -13072,7 +13012,6 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 {
 	struct BufferBlock block;
 	BufferCreateInfo info;
-	buffer_create_info_defaults(&info);
 	bufferblock_init(&block);
 
 	info.domain = BufferDomain_Host;
@@ -13088,7 +13027,6 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 	{
 		// Fall back to host memory, and remember to sync to gpu on submission time using DMA queue. :)
 		BufferCreateInfo cpu_info;
-		buffer_create_info_defaults(&cpu_info);
 		cpu_info.domain = BufferDomain_Host;
 		cpu_info.size = size;
 		cpu_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
@@ -14273,16 +14211,16 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		bool enable_transient_load = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT) != 0;
 
 		// Set up default subpass info structure if we don't have it.
-		const Subpass *subpass_infos = info.subpasses;
+		const RenderPassInfo::Subpass *subpass_infos = info.subpasses;
 		unsigned num_subpasses = info.num_subpasses;
-		Subpass default_subpass_info;
+		RenderPassInfo::Subpass default_subpass_info;
 		if (!info.subpasses)
 		{
 			default_subpass_info.num_color_attachments = info.num_color_attachments;
 			if (info.op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT)
-				default_subpass_info.depth_stencil_mode = DepthStencil_ReadOnly;
+				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil_ReadOnly;
 			else
-				default_subpass_info.depth_stencil_mode = DepthStencil_ReadWrite;
+				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil_ReadWrite;
 
 			for (unsigned i = 0; i < info.num_color_attachments; i++)
 				default_subpass_info.color_attachments[i] = i;
@@ -14477,7 +14415,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				}
 			}
 
-			if (info.depth_stencil && subpass_infos[i].depth_stencil_mode != DepthStencil_None)
+			if (info.depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo::DepthStencil_None)
 			{
 				depth->attachment = info.num_color_attachments;
 				// Fill in later.
@@ -14629,8 +14567,8 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				}
 				else if (depth && input) // Depends on the depth mode
 				{
-					VK_ASSERT(subpass_infos[subpass].depth_stencil_mode != DepthStencil_None);
-					if (subpass_infos[subpass].depth_stencil_mode == DepthStencil_ReadWrite)
+					VK_ASSERT(subpass_infos[subpass].depth_stencil_mode != RenderPassInfo::DepthStencil_None);
+					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil_ReadWrite)
 					{
 						depth_self_dependencies |= 1u << subpass;
 						current_layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -14662,7 +14600,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				}
 				else if (depth)
 				{
-					if (subpass_infos[subpass].depth_stencil_mode == DepthStencil_ReadWrite)
+					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil_ReadWrite)
 					{
 						depth_stencil_attachment_write |= 1u << subpass;
 						if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
@@ -15072,7 +15010,6 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		Hash hash;
 		TransientNode *node;
 		ImageCreateInfo image_info;
-		image_create_info_defaults(&image_info);
 		Hasher h; hasher_init(&h);
 		hasher_u32(&h, width);
 		hasher_u32(&h, height);
@@ -15087,7 +15024,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		if (node)
 			return &image_get_view(ih_get(&node->handle));
 
-		image_info = image_create_info_transient_render_target(width, height, format);
+		image_info = ImageCreateInfo::transient_render_target(width, height, format);
 
 		image_info.samples = (VkSampleCountFlagBits)(samples);
 		image_info.layers = layers;
@@ -16380,27 +16317,27 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 	void commandbuffer_set_opaque_state(struct CommandBuffer *self)
 	{
-		struct PipelineStateBits *state = &self->static_state.state;
-		memset(state, 0, sizeof(*state));
-		state->cull_mode = VK_CULL_MODE_BACK_BIT;
-		state->blend_enable = false;
-		state->depth_test = true;
-		state->depth_compare = VK_COMPARE_OP_LESS_OR_EQUAL;
-		state->depth_write = true;
-		state->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		PipelineState::State &state = self->static_state.state;
+		memset(&state, 0, sizeof(state));
+		state.cull_mode = VK_CULL_MODE_BACK_BIT;
+		state.blend_enable = false;
+		state.depth_test = true;
+		state.depth_compare = VK_COMPARE_OP_LESS_OR_EQUAL;
+		state.depth_write = true;
+		state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
 		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 	}
 
 	void commandbuffer_set_quad_state(struct CommandBuffer *self)
 	{
-		struct PipelineStateBits *state = &self->static_state.state;
-		memset(state, 0, sizeof(*state));
-		state->cull_mode = VK_CULL_MODE_NONE;
-		state->blend_enable = false;
-		state->depth_test = false;
-		state->depth_write = false;
-		state->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+		PipelineState::State &state = self->static_state.state;
+		memset(&state, 0, sizeof(state));
+		state.cull_mode = VK_CULL_MODE_NONE;
+		state.blend_enable = false;
+		state.depth_test = false;
+		state.depth_write = false;
+		state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 	}
 
@@ -16901,7 +16838,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	/* device_frame: was the inline Device::frame() accessor; returns the current
 	 * frame context (the ring slot selected by frame_context_index). Returns a pointer
 	 * now instead of a reference. */
-	struct PerFrame *device_frame(Device *self)
+	struct Device::PerFrame *device_frame(Device *self)
 	{
 		VK_ASSERT(self->frame_context_index < self->per_frame.count);
 		VK_ASSERT(self->per_frame.items[self->frame_context_index]);
@@ -17016,7 +16953,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VK_ASSERT(stages != 0);
 		if (flush)
 			device_flush_frame_queue(self, type);
-		QueueData *data = device_get_queue_data(self, type);
+		Device::QueueData *data = device_get_queue_data(self, type);
 
 #ifdef VULKAN_DEBUG
 		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data->wait_semaphores); _wi++)
@@ -17382,7 +17319,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	void device_submit_nolock(Device *self, CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores){
 		CommandBufferType type = commandbuffer_get_command_buffer_type(cbh_get(&cmd));
 		CommandPool *pool = device_get_command_pool(self, type);
-		CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
+		Device::CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
 
 		command_pool_signal_submitted(pool, commandbuffer_get_command_buffer(cbh_get(&cmd)));
 		commandbuffer_end(cbh_get(&cmd));
@@ -17405,7 +17342,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	POD_VEC_DECLARE(VkFlagsVec, VkFlags);
 	void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence,
 			unsigned semaphore_count, Semaphore *semaphores){
-		QueueData *data = device_get_queue_data(self, type);
+		Device::QueueData *data = device_get_queue_data(self, type);
 		VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
 		// Add external wait semaphores.
@@ -17593,8 +17530,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		if (type != Type_AsyncTransfer)
 			device_flush_frame_queue(self, Type_AsyncTransfer);
 
-		QueueData *data = device_get_queue_data(self, type);
-		CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
+		Device::QueueData *data = device_get_queue_data(self, type);
+		Device::CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
 
 		if (cbhvec_empty(submissions))
 		{
@@ -17803,7 +17740,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		device_flush_frame_queue(self, Type_AsyncCompute);
 	}
 
-	struct QueueData *device_get_queue_data(Device *self, CommandBufferType type)
+	struct Device::QueueData *device_get_queue_data(Device *self, CommandBufferType type)
 	{
 		switch (device_get_physical_queue_type(self, type))
 		{
@@ -17830,7 +17767,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 	}
 
-	CommandBufferHandleVec * device_get_queue_submissions(Device *self, CommandBufferType type){
+	Device::CommandBufferHandleVec * device_get_queue_submissions(Device *self, CommandBufferType type){
 		switch (device_get_physical_queue_type(self, type))
 		{
 			default:
@@ -17868,13 +17805,13 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		for (unsigned i = 0; i < count; i++)
 		{
-			PerFrame *pf = (PerFrame *)malloc(sizeof(PerFrame));
+			Device::PerFrame *pf = (Device::PerFrame *)malloc(sizeof(Device::PerFrame));
 			per_frame_init(pf, self);
 			per_frame_ptr_vec_push(&self->per_frame, pf);
 		}
 	}
 
-	void per_frame_init(struct PerFrame *self, Device *device)
+	void per_frame_init(struct Device::PerFrame *self, Device *device)
 	{
 		self->device = device_get_device(device);
 		self->managers = &device->managers;
@@ -18006,7 +17943,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		bufferpool_reset(&self->managers.ubo);
 		{ int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
 		{
-			PerFrame *frame = self->per_frame.items[_pi];
+			Device::PerFrame *frame = self->per_frame.items[_pi];
 			bufferblock_vec_clear(&frame->vbo_blocks);
 			bufferblock_vec_clear(&frame->ubo_blocks);
 		} }
@@ -18021,7 +17958,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		{ int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
 		{
-			PerFrame *frame = self->per_frame.items[_pi];
+			Device::PerFrame *frame = self->per_frame.items[_pi];
 			// We have done WaitIdle, no need to wait for extra fences, it's also not safe.
 			FenceVec_clear(&frame->wait_fences);
 			per_frame_begin(frame);
@@ -18048,7 +17985,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		per_frame_begin(device_frame(self));
 	}
 
-	void per_frame_begin(struct PerFrame *self)
+	void per_frame_begin(struct Device::PerFrame *self)
 	{
 		if (!FenceVec_empty(&self->wait_fences))
 		{
@@ -18129,7 +18066,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		DeviceAllocationVec_clear(&self->allocations);
 	}
 
-	void per_frame_fini(struct PerFrame *self)
+	void per_frame_fini(struct Device::PerFrame *self)
 	{
 		per_frame_begin(self);
 		/* The command pools no longer self-destruct (their dtor became
@@ -20783,40 +20720,40 @@ Rect fromSRect(SRect rect) {
 		}
 	}
 
-	HandleCacheResult handle_lru_cache_get(struct HandleLRUCache *self, Rect rect, uint32_t palette_hash) {
+	HandleCacheResult HandleLRUCache::get(Rect rect, uint32_t palette_hash) {
 		HandleCacheResult res;
 		int i, j;
-		for (i = 0; i < self->count; i++) {
-			CacheEntry *entry = &self->entries[i];
-			if (entry->handle.palette_hash == palette_hash && rect_contains(&entry->rect, &rect)) {
-				CacheEntry hit = *entry;
+		for (i = 0; i < count; i++) {
+			CacheEntry &entry = entries[i];
+			if (entry.handle.palette_hash == palette_hash && rect_contains(&entry.rect, &rect)) {
+				CacheEntry hit = entry;
 				for (j = i; j > 0; j--) {
-					self->entries[j] = self->entries[j - 1];
+					entries[j] = entries[j - 1];
 				}
-				self->entries[0] = hit;
-				self->dbg_hits += 1;
+				entries[0] = hit;
+				dbg_hits += 1;
 				res.handle = hit.handle;
 				res.found = true;
 				return res;
 			}
 		}
-		self->dbg_misses += 1;
+		dbg_misses += 1;
 		res.handle = hd_handle_make_none();
 		res.found = false;
 		return res;
 	}
-	void handle_lru_cache_insert(struct HandleLRUCache *self, Rect rect, uint32_t palette_hash, HdTextureHandle handle) {
+	void HandleLRUCache::insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle) {
 		int j;
 		CacheEntry e;
 		e.rect = rect;
 		e.handle = handle;
-		/* If full, the entry at index self->max_size-1 (the LRU) is dropped by the shift
+		/* If full, the entry at index max_size-1 (the LRU) is dropped by the shift
 		 * below not preserving it. Otherwise grow by one. */
-		if (self->count < self->max_size)
-			self->count++;
-		for (j = self->count - 1; j > 0; j--)
-			self->entries[j] = self->entries[j - 1];
-		self->entries[0] = e;
+		if (count < max_size)
+			count++;
+		for (j = count - 1; j > 0; j--)
+			entries[j] = entries[j - 1];
+		entries[0] = e;
 	}
 
 	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
@@ -20834,7 +20771,7 @@ Rect fromSRect(SRect rect) {
 		}
 		if (self->hd_textures_enabled) {
 			// Check if the same texture as last time is used.
-			HandleCacheResult cache_result = handle_lru_cache_get(&self->handle_cache, rect, palette_hash);
+			HandleCacheResult cache_result = self->handle_cache.get(rect, palette_hash);
 			cache_hit = cache_result.found;
 			if (cache_hit) {
 				// cache_result.handle is currently always a non-fused, non-none, index + palette_hash
@@ -20909,7 +20846,7 @@ Rect fromSRect(SRect rect) {
 		}
 
 		if (!hd_handle_is_none(&result))
-			handle_lru_cache_insert(&self->handle_cache, result_rect, palette_hash, result);
+			self->handle_cache.insert(result_rect, palette_hash, result);
 		return result;
 	}
 
@@ -20973,7 +20910,7 @@ bool is_power_of_two(int n) {
 
 	// TEMPORARY:
 	void texture_tracker_on_queues_reset(struct TextureTracker *self) {
-		handle_lru_cache_clear(&self->handle_cache);
+		self->handle_cache.clear();
 		rect_tracker_releaseDeadHandles(&self->tracker); // This is called from reset_queue, so as of now no HdTextureHandle's exist
 
 		// Poll HD uploads
@@ -21118,7 +21055,7 @@ bool is_power_of_two(int n) {
 
 		if (dbg_input_state_cb != 0)
 		{
-			if (dbg_hotkey_query(&self->frame_dump_key))
+			if (self->frame_dump_key.query())
 			{
 				char fdpath[PATH_MAX_TT];
 				dump_path(fdpath, sizeof(fdpath));
@@ -21152,17 +21089,17 @@ bool is_power_of_two(int n) {
 				}
 			}
 
-			if (dbg_hotkey_query(&self->hd_toggle_key)) {
+			if (self->hd_toggle_key.query()) {
 				self->hd_textures_enabled = !self->hd_textures_enabled;
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Toggling hd textures: %s\n", self->hd_textures_enabled ? "on" : "off");
 			}
 
-			if (dbg_hotkey_query(&self->reload_key)) {
+			if (self->reload_key.query()) {
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Reloading hd textures from disk\n");
 				texture_tracker_reload_textures_from_disk(self);
 			}
 
-			if (dbg_hotkey_query(&self->fastpath_key)) {
+			if (self->fastpath_key.query()) {
 				self->fastpath_enabled = !self->fastpath_enabled;
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Toggling fastpath %s\n", self->fastpath_enabled ? "ON" : "OFF");
 			}
@@ -21455,10 +21392,10 @@ int clamp(int x, int low, int high)
 		int x, y;
 		for (x = c.lowX; x < c.highX; x++) {
 			for (y = c.lowY; y < c.highY; y++) {
-				Cell *cell = &self->cells[y * LOOKUP_GRID_COLUMNS + x];
+				LookupGrid::Cell *cell = &self->cells[y * LOOKUP_GRID_COLUMNS + x];
 				if (cell->count == cell->cap) {
 					int ncap = cell->cap ? cell->cap * 2 : 8;
-					LookupEntry *ne = (LookupEntry *)realloc(cell->entries, (size_t)ncap * sizeof(LookupEntry));
+					LookupGrid::LookupEntry *ne = (LookupGrid::LookupEntry *)realloc(cell->entries, (size_t)ncap * sizeof(LookupGrid::LookupEntry));
 					if (!ne)
 						return;
 					cell->entries = ne;
@@ -21479,7 +21416,7 @@ int clamp(int x, int low, int high)
 		{
 			for (y = c.lowY; y < c.highY; y++)
 			{
-				Cell *cell = &self->cells[y * LOOKUP_GRID_COLUMNS + x];
+				LookupGrid::Cell *cell = &self->cells[y * LOOKUP_GRID_COLUMNS + x];
 				int e;
 				for (e = 0; e < cell->count; e++)
 				{
@@ -21978,12 +21915,12 @@ int64_t page_bytes(FusionRects &fusion)
 	}
 	// End of Save State
 	//========================================
-	static bool dbg_hotkey_query(struct DbgHotkey *self)
+	bool DbgHotkey::query()
 	{
-		uint16_t state = dbg_input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, self->key);
+		uint16_t state = dbg_input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, key);
 		bool is_key_down = state != 0;
-		bool just_pressed = is_key_down && !self->was_key_down;
-		self->was_key_down = is_key_down;
+		bool just_pressed = is_key_down && !was_key_down;
+		was_key_down = is_key_down;
 		return just_pressed;
 	}
 
@@ -22074,7 +22011,7 @@ struct ScanoutHandleVec {
 
 static SwapchainImageVec swapchain_images;
 static ScanoutHandleVec scanout_handles;
-static SaveState save_state;
+static Renderer::SaveState save_state;
 static bool inside_frame;
 static bool has_software_fb;
 static bool scaled_uv_offset;
