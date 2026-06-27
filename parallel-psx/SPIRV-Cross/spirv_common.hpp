@@ -268,10 +268,10 @@ inline std::string convert_to_string(float t)
 	// std::to_string for floating point values is broken.
 	// Fallback to something more sane.
 	char buf[64];
-	sprintf(buf, SPIRV_CROSS_FLT_FMT, t);
+	snprintf(buf, sizeof(buf), SPIRV_CROSS_FLT_FMT, t);
 	// Ensure that the literal is float.
 	if (!strchr(buf, '.') && !strchr(buf, 'e'))
-		strcat(buf, ".0");
+		strncat(buf, ".0", sizeof(buf) - strlen(buf) - 1);
 	return buf;
 }
 
@@ -280,10 +280,10 @@ inline std::string convert_to_string(double t)
 	// std::to_string for floating point values is broken.
 	// Fallback to something more sane.
 	char buf[64];
-	sprintf(buf, SPIRV_CROSS_FLT_FMT, t);
+	snprintf(buf, sizeof(buf), SPIRV_CROSS_FLT_FMT, t);
 	// Ensure that the literal is float.
 	if (!strchr(buf, '.') && !strchr(buf, 'e'))
-		strcat(buf, ".0");
+		strncat(buf, ".0", sizeof(buf) - strlen(buf) - 1);
 	return buf;
 }
 
