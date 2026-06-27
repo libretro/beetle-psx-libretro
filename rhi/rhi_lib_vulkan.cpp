@@ -4380,41 +4380,34 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		descriptor_set_thmap_vacant_push(m, node);
 	}
 
-	class DescriptorSetAllocator
+	/* DescriptorSetAllocator: cached VkDescriptorSetLayout + per-thread descriptor
+	 * pool/set recycling. Lives in an IntrusiveHashMap (intrusive_node first).
+	 * Converted from a C++ class to a plain C struct + descriptor_set_allocator_*
+	 * free functions. The nested PerThread struct is hoisted to file scope as
+	 * DescriptorSetAllocatorPerThread; ctor -> _init (called by the map emplace),
+	 * dtor -> _fini (the map destroy callback). */
+	struct DescriptorSetAllocatorPerThread
 	{
-		public:
-			struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
-			DescriptorSetAllocator(Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
-			~DescriptorSetAllocator();
-			void operator=(const DescriptorSetAllocator &) = delete;
-			DescriptorSetAllocator(const DescriptorSetAllocator &) = delete;
-
-			void begin_frame()
-			{
-				per_thread.should_begin = true;
-			}
-			DescriptorSetAllocation find(Hash hash);
-
-			VkDescriptorSetLayout get_layout() const
-			{
-				return set_layout;
-			}
-
-			void clear();
-
-		private:
-			Device *device;
-			VkDescriptorSetLayout set_layout = VK_NULL_HANDLE;
-
-			struct PerThread
-			{
-				struct descriptor_set_thmap set_nodes;
-				DescriptorPoolVec pools = { NULL, 0, 0 };
-				bool should_begin = true;
-			};
-			PerThread per_thread;
-			DescriptorPoolSizeVec pool_size = { NULL, 0, 0 };
+		struct descriptor_set_thmap set_nodes;
+		DescriptorPoolVec pools;
+		bool should_begin;
 	};
+
+	struct DescriptorSetAllocator
+	{
+		struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
+		Device *device;
+		VkDescriptorSetLayout set_layout;
+		struct DescriptorSetAllocatorPerThread per_thread;
+		DescriptorPoolSizeVec pool_size;
+	};
+
+	void descriptor_set_allocator_init(struct DescriptorSetAllocator *self, Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
+	void descriptor_set_allocator_fini(struct DescriptorSetAllocator *self);
+	DescriptorSetAllocation descriptor_set_allocator_find(struct DescriptorSetAllocator *self, Hash hash);
+	void descriptor_set_allocator_clear(struct DescriptorSetAllocator *self);
+	static inline void descriptor_set_allocator_begin_frame(struct DescriptorSetAllocator *self) { self->per_thread.should_begin = true; }
+	static inline VkDescriptorSetLayout descriptor_set_allocator_get_layout(const struct DescriptorSetAllocator *self) { return self->set_layout; }
 
 /* ============================================================
  * shader.hpp
@@ -4665,7 +4658,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	 * constructor records it; Program's constructor does not take a hash, so there
 	 * the hash is used only as the map key. */
 	static inline void pipeline_layout_map_destroy(PipelineLayout *t) { pipeline_layout_fini(t); }
-	static inline void descriptor_set_allocator_map_destroy(DescriptorSetAllocator *t) { t->~DescriptorSetAllocator(); }
+	static inline void descriptor_set_allocator_map_destroy(DescriptorSetAllocator *t) { descriptor_set_allocator_fini(t); }
 	static inline void render_pass_map_destroy(RenderPass *t) { render_pass_fini(t); }
 	static inline void shader_map_destroy(Shader *t) { shader_fini(t); }
 	static inline void program_map_destroy(Program *t) { program_fini(t); }
@@ -4696,7 +4689,8 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		DescriptorSetAllocator *t;
 		if (!slot)
 			return NULL;
-		t = new (slot) DescriptorSetAllocator(hash, device, layout, stages_for_bindings);
+		t = (DescriptorSetAllocator *)slot;
+		descriptor_set_allocator_init(t, hash, device, layout, stages_for_bindings);
 		return descriptor_set_allocator_map_insert_yield(m, hash, t);
 	}
 
@@ -13457,7 +13451,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		for (i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
 		{
 			self->set_allocators[i] = device->request_descriptor_set_allocator(layout.sets[i], layout.stages_for_bindings[i]);
-			layouts[i] = self->set_allocators[i]->get_layout();
+			layouts[i] = descriptor_set_allocator_get_layout(self->set_allocators[i]);
 			if (layout.descriptor_set_mask & (1u << i))
 				num_sets = i + 1;
 		}
@@ -13596,13 +13590,17 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 /* === descriptor_set.cpp === */
 
 
-	DescriptorSetAllocator::DescriptorSetAllocator(Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_binds)
-		: device(device)
+	void descriptor_set_allocator_init(struct DescriptorSetAllocator *self, Hash hash, Device *device, const DescriptorSetLayout &layout, const uint32_t *stages_for_binds)
 	{
-		intrusive_node.key = hash;
+		self->device = device;
+		self->set_layout = VK_NULL_HANDLE;
+		self->per_thread.pools.items = NULL; self->per_thread.pools.count = 0; self->per_thread.pools.cap = 0;
+		self->per_thread.should_begin = true;
+		self->pool_size.items = NULL; self->pool_size.count = 0; self->pool_size.cap = 0;
+		self->intrusive_node.key = hash;
 		/* The set_nodes temp-map was previously brought up by the TemporaryHashmap
 		 * default constructor; as a concrete POD member it must be initialised here. */
-		descriptor_set_thmap_init_empty(&per_thread.set_nodes);
+		descriptor_set_thmap_init_empty(&self->per_thread.set_nodes);
 		VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
 		DescriptorBindingVec bindings = { NULL, 0, 0 };
@@ -13625,49 +13623,49 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 					immutable_samplers[i] = sampler_get_sampler(&device->get_stock_sampler(get_immutable_sampler(layout, i)));
 
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.sampled_buffer_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.storage_image_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.uniform_buffer_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.storage_buffer_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.input_attachment_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
 			if (layout.separate_image_mask & (1u << i))
 			{
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
@@ -13678,7 +13676,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 					immutable_samplers[i] = sampler_get_sampler(&device->get_stock_sampler(get_immutable_sampler(layout, i)));
 
 				{ VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&pool_size, &_vpush); }
+				{ VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
 				types++;
 			}
 
@@ -13693,83 +13691,94 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 
 		LOGI("Creating descriptor set layout.\n");
-		if (vkCreateDescriptorSetLayout(device->get_device(), &info, NULL, &set_layout) != VK_SUCCESS)
+		if (vkCreateDescriptorSetLayout(self->device->get_device(), &info, NULL, &self->set_layout) != VK_SUCCESS)
 			LOGE("Failed to create descriptor set layout.");
 		DescriptorBindingVec_free_storage(&bindings);
 	}
 
-	DescriptorSetAllocation DescriptorSetAllocator::find(Hash hash)
+	DescriptorSetAllocation descriptor_set_allocator_find(struct DescriptorSetAllocator *self, Hash hash)
 	{
-		PerThread &state = per_thread;
-		if (state.should_begin)
+		struct DescriptorSetAllocatorPerThread *state = &self->per_thread;
+		DescriptorSetNode *node;
+		if (state->should_begin)
 		{
-			descriptor_set_thmap_begin_frame(&state.set_nodes);
-			state.should_begin = false;
+			descriptor_set_thmap_begin_frame(&state->set_nodes);
+			state->should_begin = false;
 		}
 
-		DescriptorSetNode *node = descriptor_set_thmap_request(&state.set_nodes, hash);
+		node = descriptor_set_thmap_request(&state->set_nodes, hash);
 		if (node)
-			return { node->set, true };
+		{
+			DescriptorSetAllocation r; r.set = node->set; r.cached = true; return r;
+		}
 
-		node = descriptor_set_thmap_request_vacant(&state.set_nodes, hash);
+		node = descriptor_set_thmap_request_vacant(&state->set_nodes, hash);
 		if (node)
-			return { node->set, false };
+		{
+			DescriptorSetAllocation r; r.set = node->set; r.cached = false; return r;
+		}
 
 		VkDescriptorPool pool;
 		VkDescriptorPoolCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
 		info.maxSets = VULKAN_NUM_SETS_PER_POOL;
-		if (!DescriptorPoolSizeVec_empty(&pool_size))
+		if (!DescriptorPoolSizeVec_empty(&self->pool_size))
 		{
-			info.poolSizeCount = DescriptorPoolSizeVec_size(&pool_size);
-			info.pPoolSizes = DescriptorPoolSizeVec_data(&pool_size);
+			info.poolSizeCount = DescriptorPoolSizeVec_size(&self->pool_size);
+			info.pPoolSizes = DescriptorPoolSizeVec_data(&self->pool_size);
 		}
 
-		if (vkCreateDescriptorPool(device->get_device(), &info, NULL, &pool) != VK_SUCCESS)
+		if (vkCreateDescriptorPool(self->device->get_device(), &info, NULL, &pool) != VK_SUCCESS)
 			LOGE("Failed to create descriptor pool.\n");
 
 		VkDescriptorSet sets[VULKAN_NUM_SETS_PER_POOL];
 		VkDescriptorSetLayout layouts[VULKAN_NUM_SETS_PER_POOL];
 		for (unsigned i = 0; i < VULKAN_NUM_SETS_PER_POOL; i++)
-			layouts[i] = set_layout;
+			layouts[i] = self->set_layout;
 
 		VkDescriptorSetAllocateInfo alloc = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 		alloc.descriptorPool = pool;
 		alloc.descriptorSetCount = VULKAN_NUM_SETS_PER_POOL;
 		alloc.pSetLayouts = layouts;
 
-		if (vkAllocateDescriptorSets(device->get_device(), &alloc, sets) != VK_SUCCESS)
+		if (vkAllocateDescriptorSets(self->device->get_device(), &alloc, sets) != VK_SUCCESS)
 			LOGE("Failed to allocate descriptor sets.\n");
-		DescriptorPoolVec_push(&state.pools, &pool);
+		DescriptorPoolVec_push(&state->pools, &pool);
 
-		for (VkDescriptorSet set : sets)
-			descriptor_set_thmap_make_vacant(&state.set_nodes, set);
-
-		return { descriptor_set_thmap_request_vacant(&state.set_nodes, hash)->set, false };
-	}
-
-	void DescriptorSetAllocator::clear()
-	{
-		descriptor_set_thmap_clear(&per_thread.set_nodes);
 		{
-		int _i;
-		for (_i = 0; _i < DescriptorPoolVec_size(&per_thread.pools); _i++)
-		{
-			VkDescriptorPool &pool = *DescriptorPoolVec_at(&per_thread.pools, _i);
-			vkResetDescriptorPool(device->get_device(), pool, 0);
-			vkDestroyDescriptorPool(device->get_device(), pool, NULL);
+			unsigned _si;
+			for (_si = 0; _si < VULKAN_NUM_SETS_PER_POOL; _si++)
+				descriptor_set_thmap_make_vacant(&state->set_nodes, sets[_si]);
 		}
-		DescriptorPoolVec_clear(&per_thread.pools);
-	}
+
+		{
+			DescriptorSetAllocation r;
+			r.set = descriptor_set_thmap_request_vacant(&state->set_nodes, hash)->set;
+			r.cached = false;
+			return r;
+		}
 	}
 
-	DescriptorSetAllocator::~DescriptorSetAllocator()
+	void descriptor_set_allocator_clear(struct DescriptorSetAllocator *self)
 	{
-		if (set_layout != VK_NULL_HANDLE)
-			vkDestroyDescriptorSetLayout(device->get_device(), set_layout, NULL);
-		clear();
-		descriptor_set_thmap_deinit(&per_thread.set_nodes);
-		DescriptorPoolVec_free_storage(&per_thread.pools);
-		DescriptorPoolSizeVec_free_storage(&pool_size);
+		int _i;
+		descriptor_set_thmap_clear(&self->per_thread.set_nodes);
+		for (_i = 0; _i < DescriptorPoolVec_size(&self->per_thread.pools); _i++)
+		{
+			VkDescriptorPool pool = *DescriptorPoolVec_at(&self->per_thread.pools, _i);
+			vkResetDescriptorPool(self->device->get_device(), pool, 0);
+			vkDestroyDescriptorPool(self->device->get_device(), pool, NULL);
+		}
+		DescriptorPoolVec_clear(&self->per_thread.pools);
+	}
+
+	void descriptor_set_allocator_fini(struct DescriptorSetAllocator *self)
+	{
+		if (self->set_layout != VK_NULL_HANDLE)
+			vkDestroyDescriptorSetLayout(self->device->get_device(), self->set_layout, NULL);
+		descriptor_set_allocator_clear(self);
+		descriptor_set_thmap_deinit(&self->per_thread.set_nodes);
+		DescriptorPoolVec_free_storage(&self->per_thread.pools);
+		DescriptorPoolSizeVec_free_storage(&self->pool_size);
 	}
 
 /* === render_pass.cpp === */
@@ -15852,7 +15861,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 
 		Hash hash = hasher_get(&h);
-		DescriptorSetAllocation allocated = pipeline_layout_get_allocator(self->current_layout, set)->find(hash);
+		DescriptorSetAllocation allocated = descriptor_set_allocator_find(pipeline_layout_get_allocator(self->current_layout, set), hash);
 
 		// The descriptor set was not successfully cached, rebuild.
 		if (!allocated.cached)
@@ -17660,7 +17669,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{
 			struct IntrusiveListNode *n;
 			for (n = descriptor_set_allocator_map_begin(&descriptor_set_allocators); n; n = n->next)
-				descriptor_set_allocator_map_iter_get(n)->clear();
+				descriptor_set_allocator_clear(descriptor_set_allocator_map_iter_get(n));
 		}
 
 		for (PerFrame *frame : per_frame)
@@ -17681,7 +17690,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{
 			struct IntrusiveListNode *n;
 			for (n = descriptor_set_allocator_map_begin(&descriptor_set_allocators); n; n = n->next)
-				descriptor_set_allocator_map_iter_get(n)->begin_frame();
+				descriptor_set_allocator_begin_frame(descriptor_set_allocator_map_iter_get(n));
 		}
 
 		VK_ASSERT(!per_frame.empty());
