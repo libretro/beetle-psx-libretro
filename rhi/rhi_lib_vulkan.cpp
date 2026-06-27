@@ -4494,42 +4494,33 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	static inline VkShaderModule shader_get_module(const struct Shader *self) { return self->module; }
 	const char *shader_stage_to_name(ShaderStage stage);
 
-	class Program
+	/* Program: cached shader set + pipeline layout + per-program VkPipeline cache.
+	 * Lives in an IntrusiveHashMap (intrusive_node first). Converted from a C++
+	 * class to a plain C struct + program_* free functions. The two ctors
+	 * (graphics: vertex+fragment / compute) become program_init_graphics /
+	 * program_init_compute (called by the two map emplace variants); the dtor
+	 * becomes program_fini (the map's destroy callback). */
+	struct Program
 	{
-		public:
-			struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
-			Program(Device *device, Shader *vertex, Shader *fragment);
-			Program(Device *device, Shader *compute);
-			~Program();
-
-			inline const Shader *get_shader(ShaderStage stage) const
-			{
-				return shaders[(unsigned)stage];
-			}
-
-			void set_pipeline_layout(PipelineLayout *new_layout)
-			{
-				layout = new_layout;
-			}
-
-			PipelineLayout *get_pipeline_layout() const
-			{
-				return layout;
-			}
-
-			VkPipeline get_pipeline(Hash hash) const;
-			VkPipeline add_pipeline(Hash hash, VkPipeline pipeline);
-
-		private:
-			void set_shader(ShaderStage stage, Shader *handle)
-			{
-				shaders[(unsigned)stage] = handle;
-			}
-			Device *device;
-			Shader *shaders[(unsigned)ShaderStage_Count] = {};
-			PipelineLayout *layout = NULL;
-			struct vk_pipeline_map pipelines;
+		struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
+		Device *device;
+		Shader *shaders[(unsigned)ShaderStage_Count];
+		PipelineLayout *layout;
+		struct vk_pipeline_map pipelines;
 	};
+
+	static inline void program_set_shader(struct Program *self, ShaderStage stage, Shader *handle)
+	{
+		self->shaders[(unsigned)stage] = handle;
+	}
+	void program_init_graphics(struct Program *self, Device *device, Shader *vertex, Shader *fragment);
+	void program_init_compute(struct Program *self, Device *device, Shader *compute);
+	void program_fini(struct Program *self);
+	static inline const Shader *program_get_shader(const struct Program *self, ShaderStage stage) { return self->shaders[(unsigned)stage]; }
+	static inline void program_set_pipeline_layout(struct Program *self, PipelineLayout *new_layout) { self->layout = new_layout; }
+	static inline PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return self->layout; }
+	VkPipeline program_get_pipeline(const struct Program *self, Hash hash);
+	VkPipeline program_add_pipeline(struct Program *self, Hash hash, VkPipeline pipeline);
 
 /* ============================================================
  * render_pass.hpp
@@ -4686,7 +4677,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	static inline void descriptor_set_allocator_map_destroy(DescriptorSetAllocator *t) { t->~DescriptorSetAllocator(); }
 	static inline void render_pass_map_destroy(RenderPass *t) { t->~RenderPass(); }
 	static inline void shader_map_destroy(Shader *t) { shader_fini(t); }
-	static inline void program_map_destroy(Program *t) { t->~Program(); }
+	static inline void program_map_destroy(Program *t) { program_fini(t); }
 
 	VK_HASHMAP_DECLARE(pipeline_layout_map, PipelineLayout, pipeline_layout_map_destroy)
 	VK_HASHMAP_DECLARE(descriptor_set_allocator_map, DescriptorSetAllocator, descriptor_set_allocator_map_destroy)
@@ -4750,7 +4741,8 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		Program *t;
 		if (!slot)
 			return NULL;
-		t = new (slot) Program(device, compute);
+		t = (Program *)slot;
+		program_init_compute(t, device, compute);
 		return program_map_insert_yield(m, hash, t);
 	}
 
@@ -4761,7 +4753,8 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		Program *t;
 		if (!slot)
 			return NULL;
-		t = new (slot) Program(device, vertex, fragment);
+		t = (Program *)slot;
+		program_init_graphics(t, device, vertex, fragment);
 		return program_map_insert_yield(m, hash, t);
 	}
 
@@ -5858,6 +5851,8 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 			}
 		private:
 			void bake_program(Program &program);
+			friend void program_init_graphics(struct Program *self, Device *device, Shader *vertex, Shader *fragment);
+			friend void program_init_compute(struct Program *self, Device *device, Shader *compute);
 
 			void request_vertex_block(BufferBlock &block, VkDeviceSize size)
 			{
@@ -6172,6 +6167,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 			void destroy_image_view_nolock(VkImageView view);
 			void destroy_buffer_view_nolock(VkBufferView view);
 			void destroy_pipeline_nolock(VkPipeline pipeline);
+			friend void program_fini(struct Program *self);
 			void destroy_sampler_nolock(VkSampler sampler);
 			void destroy_framebuffer_nolock(VkFramebuffer framebuffer);
 			void destroy_semaphore_nolock(VkSemaphore semaphore);
@@ -13562,39 +13558,47 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			vkDestroyShaderModule(self->device->get_device(), self->module, NULL);
 	}
 
-	Program::Program(Device *device, Shader *vertex, Shader *fragment)
-		: device(device)
+	void program_init_graphics(struct Program *self, Device *device, Shader *vertex, Shader *fragment)
 	{
-		vk_pipeline_map_init(&pipelines);
-		set_shader(ShaderStage_Vertex, vertex);
-		set_shader(ShaderStage_Fragment, fragment);
-		device->bake_program(*this);
+		unsigned i;
+		self->device = device;
+		self->layout = NULL;
+		for (i = 0; i < (unsigned)ShaderStage_Count; i++)
+			self->shaders[i] = NULL;
+		vk_pipeline_map_init(&self->pipelines);
+		program_set_shader(self, ShaderStage_Vertex, vertex);
+		program_set_shader(self, ShaderStage_Fragment, fragment);
+		device->bake_program(*self);
 	}
 
-	Program::Program(Device *device, Shader *compute)
-		: device(device)
+	void program_init_compute(struct Program *self, Device *device, Shader *compute)
 	{
-		vk_pipeline_map_init(&pipelines);
-		set_shader(ShaderStage_Compute, compute);
-		device->bake_program(*this);
+		unsigned i;
+		self->device = device;
+		self->layout = NULL;
+		for (i = 0; i < (unsigned)ShaderStage_Count; i++)
+			self->shaders[i] = NULL;
+		vk_pipeline_map_init(&self->pipelines);
+		program_set_shader(self, ShaderStage_Compute, compute);
+		device->bake_program(*self);
 	}
 
-	VkPipeline Program::get_pipeline(Hash hash) const
+	VkPipeline program_get_pipeline(const struct Program *self, Hash hash)
 	{
-		IntrusivePODWrapperPipeline *ret = vk_pipeline_map_find(&pipelines, hash);
+		IntrusivePODWrapperPipeline *ret = vk_pipeline_map_find((struct vk_pipeline_map *)&self->pipelines, hash);
 		return ret ? ret->get() : VK_NULL_HANDLE;
 	}
 
-	VkPipeline Program::add_pipeline(Hash hash, VkPipeline pipeline)
+	VkPipeline program_add_pipeline(struct Program *self, Hash hash, VkPipeline pipeline)
 	{
-		return vk_pipeline_map_emplace_yield(&pipelines, hash, pipeline)->get();
+		return vk_pipeline_map_emplace_yield(&self->pipelines, hash, pipeline)->get();
 	}
 
-	Program::~Program()
+	void program_fini(struct Program *self)
 	{
 		struct IntrusiveListNode *n;
-		for (n = vk_pipeline_map_begin(&pipelines); n; n = n->next)
-			device->destroy_pipeline_nolock(vk_pipeline_map_iter_get(n)->get());
+		for (n = vk_pipeline_map_begin(&self->pipelines); n; n = n->next)
+			self->device->destroy_pipeline_nolock(vk_pipeline_map_iter_get(n)->get());
 	}
 
 /* === descriptor_set.cpp === */
@@ -15155,9 +15159,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	VkPipeline commandbuffer_build_compute_pipeline(struct CommandBuffer *self, Hash hash)
 	{
-		const Shader &shader = *self->current_program->get_shader(ShaderStage_Compute);
+		const Shader &shader = *program_get_shader(self->current_program, ShaderStage_Compute);
 		VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-		info.layout = pipeline_layout_get_layout(self->current_program->get_pipeline_layout());
+		info.layout = pipeline_layout_get_layout(program_get_pipeline_layout(self->current_program));
 		info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		info.stage.module = shader_get_module(&shader);
 		info.stage.pName = "main";
@@ -15196,7 +15200,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		if (vkCreateComputePipelines(self->device->get_device(), VK_NULL_HANDLE, 1, &info, NULL, &compute_pipeline) != VK_SUCCESS)
 			LOGE("Failed to create compute pipeline!\n");
 
-		return self->current_program->add_pipeline(hash, compute_pipeline);
+		return program_add_pipeline(self->current_program, hash, compute_pipeline);
 	}
 
 	VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self, Hash hash)
@@ -15309,15 +15313,15 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		for (unsigned i = 0; i < (unsigned)(ShaderStage_Count); i++)
 		{
 			ShaderStage stage = (ShaderStage)(i);
-			if (self->current_program->get_shader(stage))
+			if (program_get_shader(self->current_program, stage))
 			{
 				VkPipelineShaderStageCreateInfo &s = stages[num_stages++];
 				s = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-				s.module = shader_get_module(self->current_program->get_shader(stage));
+				s.module = shader_get_module(program_get_shader(self->current_program, stage));
 #ifdef GRANITE_SPIRV_DUMP
 				LOGI("Compiling SPIR-V file: (%s) %s\n",
 						shader_stage_to_name(stage),
-						(to_string(self->current_program->get_shader(stage)->intrusive_node.key) + ".spv").c_str());
+						(to_string(program_get_shader(self->current_program, stage)->intrusive_node.key) + ".spv").c_str());
 #endif
 				s.pName = "main";
 				s.stage = (VkShaderStageFlagBits)(1u << i);
@@ -15366,7 +15370,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		if (res != VK_SUCCESS)
 			LOGE("Failed to create graphics pipeline!\n");
 
-		return self->current_program->add_pipeline(hash, pipeline);
+		return program_add_pipeline(self->current_program, hash, pipeline);
 	}
 
 	void commandbuffer_flush_compute_pipeline(struct CommandBuffer *self)
@@ -15385,7 +15389,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 
 		Hash hash = hasher_get(&h);
-		self->current_pipeline = self->current_program->get_pipeline(hash);
+		self->current_pipeline = program_get_pipeline(self->current_program, hash);
 		if (self->current_pipeline == VK_NULL_HANDLE)
 			self->current_pipeline = commandbuffer_build_compute_pipeline(self, hash);
 	}
@@ -15436,7 +15440,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 
 		Hash hash = hasher_get(&h);
-		self->current_pipeline = self->current_program->get_pipeline(hash);
+		self->current_pipeline = program_get_pipeline(self->current_program, hash);
 		if (self->current_pipeline == VK_NULL_HANDLE)
 			self->current_pipeline = commandbuffer_build_graphics_pipeline(self, hash);
 	}
@@ -15578,8 +15582,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		self->current_program = &program;
 		self->current_pipeline = VK_NULL_HANDLE;
 
-		VK_ASSERT((self->framebuffer && self->current_program->get_shader(ShaderStage_Vertex)) ||
-				(!self->framebuffer && self->current_program->get_shader(ShaderStage_Compute)));
+		VK_ASSERT((self->framebuffer && program_get_shader(self->current_program, ShaderStage_Vertex)) ||
+				(!self->framebuffer && program_get_shader(self->current_program, ShaderStage_Compute)));
 
 		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_PIPELINE_BIT | COMMAND_BUFFER_DYNAMIC_BITS);
 
@@ -15588,12 +15592,12 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			self->dirty_sets = ~0u;
 			commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
 
-			self->current_layout = program.get_pipeline_layout();
+			self->current_layout = program_get_pipeline_layout(&program);
 			self->current_pipeline_layout = pipeline_layout_get_layout(self->current_layout);
 		}
-		else if (program.get_pipeline_layout()->intrusive_node.key != self->current_layout->intrusive_node.key)
+		else if (program_get_pipeline_layout(&program)->intrusive_node.key != self->current_layout->intrusive_node.key)
 		{
-			const CombinedResourceLayout &new_layout = *pipeline_layout_get_resource_layout(program.get_pipeline_layout());
+			const CombinedResourceLayout &new_layout = *pipeline_layout_get_resource_layout(program_get_pipeline_layout(&program));
 			const CombinedResourceLayout &old_layout = *pipeline_layout_get_resource_layout(self->current_layout);
 
 			// If the push constant layout changes, all descriptor sets
@@ -15606,7 +15610,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			else
 			{
 				// Find the first set whose descriptor set layout differs.
-				PipelineLayout *new_pipe_layout = program.get_pipeline_layout();
+				PipelineLayout *new_pipe_layout = program_get_pipeline_layout(&program);
 				for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
 				{
 					if (pipeline_layout_get_allocator(new_pipe_layout, set) != pipeline_layout_get_allocator(self->current_layout, set))
@@ -15616,7 +15620,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 					}
 				}
 			}
-			self->current_layout = program.get_pipeline_layout();
+			self->current_layout = program_get_pipeline_layout(&program);
 			self->current_pipeline_layout = pipeline_layout_get_layout(self->current_layout);
 		}
 	}
@@ -16740,16 +16744,16 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	void Device::bake_program(Program &program)
 	{
 		CombinedResourceLayout layout;
-		if (program.get_shader(ShaderStage_Vertex))
-			layout.attribute_mask = shader_get_layout(program.get_shader(ShaderStage_Vertex))->input_mask;
-		if (program.get_shader(ShaderStage_Fragment))
-			layout.render_target_mask = shader_get_layout(program.get_shader(ShaderStage_Fragment))->output_mask;
+		if (program_get_shader(&program, ShaderStage_Vertex))
+			layout.attribute_mask = shader_get_layout(program_get_shader(&program, ShaderStage_Vertex))->input_mask;
+		if (program_get_shader(&program, ShaderStage_Fragment))
+			layout.render_target_mask = shader_get_layout(program_get_shader(&program, ShaderStage_Fragment))->output_mask;
 
 		layout.descriptor_set_mask = 0;
 
 		for (unsigned i = 0; i < (unsigned)(ShaderStage_Count); i++)
 		{
-			const Shader *shader = program.get_shader((ShaderStage)(i));
+			const Shader *shader = program_get_shader(&program, (ShaderStage)(i));
 			if (!shader)
 				continue;
 
@@ -16824,7 +16828,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		hasher_u32(&h, layout.push_constant_range.stageFlags);
 		hasher_u32(&h, layout.push_constant_range.size);
 		layout.push_constant_layout_hash = hasher_get(&h);
-		program.set_pipeline_layout(request_pipeline_layout(layout));
+		program_set_pipeline_layout(&program, request_pipeline_layout(layout));
 	}
 
 	void Device::set_context(const Context &context)
