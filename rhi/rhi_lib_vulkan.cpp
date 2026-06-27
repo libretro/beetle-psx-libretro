@@ -3597,10 +3597,21 @@ VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
 
 	struct BufferCreateInfo
 	{
-		BufferDomain domain = BufferDomain_Device;
-		VkDeviceSize size = 0;
-		VkBufferUsageFlags usage = 0;
+		BufferDomain domain;
+		VkDeviceSize size;
+		VkBufferUsageFlags usage;
 	};
+
+	/* Establishes the former NSDMI defaults (Device domain, zero size/usage).
+	 * All seven current construction sites set every field they need explicitly
+	 * (audited), so none depends on this; it is provided for correctness and any
+	 * future bare declaration that wants the zero-state. */
+	static inline void buffer_create_info_defaults(struct BufferCreateInfo *self)
+	{
+		self->domain = BufferDomain_Device;
+		self->size   = 0;
+		self->usage  = 0;
+	}
 
 	struct Buffer;
 	struct BufferDeleter
