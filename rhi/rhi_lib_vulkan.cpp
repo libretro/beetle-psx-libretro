@@ -2725,10 +2725,10 @@ IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
 
 	struct DeviceFeatures
 	{
-		bool supports_external = false;
-		bool supports_dedicated = false;
-		bool supports_debug_marker = false;
-		VkPhysicalDeviceFeatures enabled_features = {};
+		bool supports_external;
+		bool supports_dedicated;
+		bool supports_debug_marker;
+		VkPhysicalDeviceFeatures enabled_features;
 	};
 
 	enum VendorID
