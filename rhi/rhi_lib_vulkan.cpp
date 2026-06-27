@@ -5533,7 +5533,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	/* Group E: draw / dispatch / debug-region / end free functions. */
 	void commandbuffer_draw(struct CommandBuffer *self, uint32_t vertex_count, uint32_t instance_count = 1, uint32_t first_vertex = 0, uint32_t first_instance = 0);
 	void commandbuffer_dispatch(struct CommandBuffer *self, uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
-	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color = NULL);
+	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color);
 	void commandbuffer_end_region(struct CommandBuffer *self);
 	void commandbuffer_end(struct CommandBuffer *self);
 	inline void commandbuffer_set_viewport(struct CommandBuffer *self, const VkViewport *viewport)
@@ -17686,7 +17686,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 		CommandBufferHandle cmd = device_request_command_buffer_nolock(self, Type_AsyncTransfer);
 
-		commandbuffer_begin_region(cbh_get(&cmd), "buffer-block-sync");
+		commandbuffer_begin_region(cbh_get(&cmd), "buffer-block-sync", NULL);
 
 		{
 			int _bi;
@@ -18733,7 +18733,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					VK_ACCESS_TRANSFER_WRITE_BIT);
 
-			commandbuffer_begin_region(cbh_get(&transfer_cmd), "copy-image-to-self->gpu");
+			commandbuffer_begin_region(cbh_get(&transfer_cmd), "copy-image-to-self->gpu", NULL);
 			commandbuffer_copy_buffer_to_image_blits(cbh_get(&transfer_cmd), ih_get(&handle), bh_get(&staging_buffer->buffer), staging_buffer->num_blits, staging_buffer->blits);
 			commandbuffer_end_region(cbh_get(&transfer_cmd));
 
@@ -18796,7 +18796,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 			if (generate_mips)
 			{
-				commandbuffer_begin_region(cbh_get(&graphics_cmd), "mipgen");
+				commandbuffer_begin_region(cbh_get(&graphics_cmd), "mipgen", NULL);
 				commandbuffer_barrier_prepare_generate_mipmap(cbh_get(&graphics_cmd), ih_get(&handle), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 						VK_PIPELINE_STAGE_TRANSFER_BIT,
 						prepare_src_access, need_mipmap_barrier);
@@ -18949,7 +18949,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			device_set_name_buffer(self, bh_get(&staging_buffer), "buffer-upload-staging-buffer");
 
 			cmd = device_request_command_buffer(self, Type_AsyncTransfer);
-			commandbuffer_begin_region(cbh_get(&cmd), "copy-buffer-staging");
+			commandbuffer_begin_region(cbh_get(&cmd), "copy-buffer-staging", NULL);
 			commandbuffer_copy_buffer_whole(cbh_get(&cmd), bh_get(&handle), bh_get(&staging_buffer));
 			commandbuffer_end_region(cbh_get(&cmd));
 
@@ -23042,7 +23042,8 @@ void rhi_vulkan_load_image(
       return;
    }
 
-   renderer_notify_texture_upload(renderer, Rect { x, y, w, h }, vram);
+   { Rect _ntu_rect; _ntu_rect.x = x; _ntu_rect.y = y; _ntu_rect.width = w; _ntu_rect.height = h;
+     renderer_notify_texture_upload(renderer, _ntu_rect, vram); }
    renderer_set_mask_test(renderer, mask_test);
    renderer_set_force_mask_bit(renderer, set_mask);
    Rect _r = { x, y, w, h }; auto handle = renderer_copy_cpu_to_vram(renderer, &_r);
