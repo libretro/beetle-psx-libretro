@@ -1419,67 +1419,10 @@ static INLINE uint32_t MemPeek(int32_t timestamp, uint32_t A, unsigned size, boo
 
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
    {
-      if(A >= 0x1F801C00 && A <= 0x1F801FFF) // SPU
-      {
-         // TODO
-
-      }     // End SPU
-
-
-      // CDC: TODO - 8-bit access.
-      if(A >= 0x1f801800 && A <= 0x1f80180F)
-      {
-         // TODO
-
-      }
-
-      if(A >= 0x1F801810 && A <= 0x1F801817)
-      {
-         // TODO
-
-      }
-
-      if(A >= 0x1F801820 && A <= 0x1F801827)
-      {
-         // TODO
-
-      }
-
       if(A >= 0x1F801000 && A <= 0x1F801023)
       {
          unsigned index = (A & 0x1F) >> 2;
          return((SysControl.Regs[index] | SysControl_OR[index]) >> ((A & 3) * 8));
-      }
-
-      if(A >= 0x1F801040 && A <= 0x1F80104F)
-      {
-         // TODO
-
-      }
-
-      if(A >= 0x1F801050 && A <= 0x1F80105F)
-      {
-         // TODO
-
-      }
-
-
-      if(A >= 0x1F801070 && A <= 0x1F801077) // IRQ
-      {
-         // TODO
-
-      }
-
-      if(A >= 0x1F801080 && A <= 0x1F8010FF)    // DMA
-      {
-         // TODO
-
-      }
-
-      if(A >= 0x1F801100 && A <= 0x1F80113F) // Root counters
-      {
-         // TODO
-
       }
    }
 
