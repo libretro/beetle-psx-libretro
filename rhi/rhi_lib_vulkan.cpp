@@ -10070,7 +10070,7 @@ Rect renderer_compute_window_rect(Renderer *self, const TextureWindow *window)
 	unsigned mask_bits_y = 32 - leading_zeroes(window->mask_y);
 	unsigned x = window->or_x & ~((1u << mask_bits_x) - 1);
 	unsigned y = window->or_y & ~((1u << mask_bits_y) - 1);
-	return { x, y, 1u << mask_bits_x, 1u << mask_bits_y };
+	{ Rect _wr; _wr.x = x; _wr.y = y; _wr.width = 1u << mask_bits_x; _wr.height = 1u << mask_bits_y; return _wr; }
 }
 
 void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uint16_t *vram)
@@ -10311,10 +10311,10 @@ Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
 	unsigned fb_height = (unsigned) (self->render_state.vert_end - self->render_state.vert_start);
 	fb_height *= self->render_state.is_480i ? 2 : 1;
 
-	return {self->render_state.display_fb_xstart,
-	        self->render_state.display_fb_ystart,
-	        fb_width,
-	        fb_height};
+	{ Rect _dr; _dr.x = self->render_state.display_fb_xstart;
+	        _dr.y = self->render_state.display_fb_ystart;
+	        _dr.width = fb_width;
+	        _dr.height = fb_height; return _dr; }
 }
 
 DisplayRect renderer_compute_display_rect(Renderer *self)
@@ -15046,7 +15046,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
 	{
-		return { a->x + b->x, a->y + b->y, a->z + b->z };
+		{ VkOffset3D _o; _o.x = a->x + b->x; _o.y = a->y + b->y; _o.z = a->z + b->z; return _o; }
 	}
 
 	void commandbuffer_init(struct CommandBuffer *self, Device *device, VkCommandBuffer cmd, CommandBufferType type)
@@ -18535,7 +18535,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				tfl_set_3d(&layout, info->format, info->width, info->height, info->depth, copy_levels);
 				break;
 			default:
-				return {};
+				{ InitialImageBuffer _empty; memset(&_empty, 0, sizeof(_empty)); return _empty; }
 		}
 
 		BufferCreateInfo buffer_info = {};
@@ -20300,10 +20300,10 @@ Rect fromSRect(SRect rect) {
 				int offset = y * other->texture_rect.vram_rect.width + x;
 				uint16_t *data = other->texture_rect.upload->image + offset;
 				uint32_t hash = crc32(0, (unsigned char*)data, palette_rect.width * sizeof(uint16_t));
-				return { data, hash };
+				{ Palette _p; _p.data = data; _p.hash = hash; return _p; }
 			}
 		} }
-		return { NULL, 0 };
+		{ Palette _p; _p.data = NULL; _p.hash = 0; return _p; }
 	}
 
 	uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, Rect palette_rect) {
@@ -21781,12 +21781,8 @@ int64_t page_bytes(FusionRects *fusion)
 		uint32_t hash = t->upload->hash;
 		if (!uploadmap_contains(uploads, hash))
 			uploadmap_insert(uploads, hash, texture_upload_new_copy_without_handles(t->upload));
-		return {
-			t->upload->hash,
-			t->offset_x,
-			t->offset_y,
-			t->vram_rect
-		};
+		{ TextureRectSaveState _ss; _ss.upload_hash = t->upload->hash; _ss.offset_x = t->offset_x;
+		  _ss.offset_y = t->offset_y; _ss.vram_rect = t->vram_rect; return _ss; }
 	}
 
 	TextureRect from_save_state(const TextureRectSaveState *t, UploadPtrVec *uploads) {
@@ -21800,12 +21796,8 @@ int64_t page_bytes(FusionRects *fusion)
 		if (!found) {
 			TT_LOG(RETRO_LOG_ERROR, "SaveState upload missing!\n");
 		}
-		return {
-			found,    /* TextureRect ctor acquires its own ref */
-			t->offset_x,
-			t->offset_y,
-			t->vram_rect
-		};
+		{ TextureRect _tr; _tr.upload = found; _tr.offset_x = t->offset_x; _tr.offset_y = t->offset_y;
+		  _tr.vram_rect = t->vram_rect; return _tr; }
 	}
 
 	void texture_tracker_save_state(struct TextureTracker *self, TextureTrackerSaveState *out)
