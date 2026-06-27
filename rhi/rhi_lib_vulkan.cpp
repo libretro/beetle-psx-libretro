@@ -9833,9 +9833,13 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	renderer_init_pipelines(self);
 
 	renderer_ensure_command_buffer(self);
-	commandbuffer_clear_image(cbh_get(&self->cmd), ih_get(&self->scaled_framebuffer), {});
-	if (!state)
-		commandbuffer_clear_image(cbh_get(&self->cmd), ih_get(&self->framebuffer), {});
+	{
+		VkClearValue _clear_zero;
+		memset(&_clear_zero, 0, sizeof(_clear_zero));
+		commandbuffer_clear_image(cbh_get(&self->cmd), ih_get(&self->scaled_framebuffer), &_clear_zero);
+		if (!state)
+			commandbuffer_clear_image(cbh_get(&self->cmd), ih_get(&self->framebuffer), &_clear_zero);
+	}
 	commandbuffer_full_barrier(cbh_get(&self->cmd));
 
 	ImageCreateInfo dither_info = image_create_info_immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM, false);
@@ -15517,7 +15521,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		blend.pAttachments = blend_attachments;
 		{ unsigned i; for (i = 0; i < blend.attachmentCount; i++) {
 			VkPipelineColorBlendAttachmentState *att = &blend_attachments[i];
-			att = {};
+			memset(att, 0, sizeof(*att));
 
 			if (render_pass_get_color_attachment(self->compatible_render_pass, self->current_subpass, i)->attachment != VK_ATTACHMENT_UNUSED &&
 					(pipeline_layout_get_resource_layout(self->current_layout)->render_target_mask & (1u << i)))
