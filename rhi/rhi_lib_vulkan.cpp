@@ -1996,7 +1996,7 @@ bool counter_release(struct SingleThreadCounter *c) { return --c->count == 0; }
 
 	struct IntrusiveListC
 	{
-		struct IntrusiveListNode *head = NULL;
+		struct IntrusiveListNode *head;
 	};
 
 void ilist_clear(struct IntrusiveListC *list)
@@ -2724,10 +2724,10 @@ IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
 
 	struct DeviceFeatures
 	{
-		bool supports_external = false;
-		bool supports_dedicated = false;
-		bool supports_debug_marker = false;
-		VkPhysicalDeviceFeatures enabled_features = {};
+		bool supports_external;
+		bool supports_dedicated;
+		bool supports_debug_marker;
+		VkPhysicalDeviceFeatures enabled_features;
 	};
 
 	enum VendorID
@@ -2802,7 +2802,7 @@ bool context_is_valid(const struct Context *self) { return self->valid; }
 
 	struct ImplementationWorkarounds
 	{
-		bool optimize_all_graphics_barrier = false;
+		bool optimize_all_graphics_barrier;
 	};
 
 	/* TextureFormatLayout: computes mip/layer byte layout for a texture upload
@@ -3590,10 +3590,16 @@ VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
 
 	struct BufferCreateInfo
 	{
-		BufferDomain domain = BufferDomain_Device;
-		VkDeviceSize size = 0;
-		VkBufferUsageFlags usage = 0;
+		BufferDomain domain;
+		VkDeviceSize size;
+		VkBufferUsageFlags usage;
 	};
+	static inline void buffer_create_info_defaults(struct BufferCreateInfo *self)
+	{
+		self->domain = BufferDomain_Device;
+		self->size = 0;
+		self->usage = 0;
+	}
 
 	struct Buffer;
 	struct BufferDeleter
@@ -3830,16 +3836,25 @@ VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
 
 	struct ImageViewCreateInfo
 	{
-		Image *image = NULL;
-		VkFormat format = VK_FORMAT_UNDEFINED;
-		unsigned base_level = 0;
-		unsigned levels = VK_REMAINING_MIP_LEVELS;
-		unsigned base_layer = 0;
-		unsigned layers = VK_REMAINING_ARRAY_LAYERS;
-		VkComponentMapping swizzle = {
-			VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
-		};
+		Image *image;
+		VkFormat format;
+		unsigned base_level;
+		unsigned levels;
+		unsigned base_layer;
+		unsigned layers;
+		VkComponentMapping swizzle;
 	};
+	static inline void image_view_create_info_defaults(struct ImageViewCreateInfo *self)
+	{
+		VkComponentMapping sw = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
+		self->image = NULL;
+		self->format = VK_FORMAT_UNDEFINED;
+		self->base_level = 0;
+		self->levels = VK_REMAINING_MIP_LEVELS;
+		self->base_layer = 0;
+		self->layers = VK_REMAINING_ARRAY_LAYERS;
+		self->swizzle = sw;
+	}
 
 	struct ImageView;
 
@@ -3968,22 +3983,20 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 
 	struct ImageCreateInfo
 	{
-		ImageDomain domain = ImageDomain_Physical;
-		unsigned width = 0;
-		unsigned height = 0;
-		unsigned depth = 1;
-		unsigned levels = 1;
-		VkFormat format = VK_FORMAT_UNDEFINED;
-		VkImageType type = VK_IMAGE_TYPE_2D;
-		unsigned layers = 1;
-		VkImageUsageFlags usage = 0;
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-		VkImageCreateFlags flags = 0;
-		ImageMiscFlags misc = 0;
-		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-		VkComponentMapping swizzle = {
-			VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
-		};
+		ImageDomain domain;
+		unsigned width;
+		unsigned height;
+		unsigned depth;
+		unsigned levels;
+		VkFormat format;
+		VkImageType type;
+		unsigned layers;
+		VkImageUsageFlags usage;
+		VkSampleCountFlagBits samples;
+		VkImageCreateFlags flags;
+		ImageMiscFlags misc;
+		VkImageLayout initial_layout;
+		VkComponentMapping swizzle;
 
 		static ImageCreateInfo immutable_2d_image(unsigned width, unsigned height, VkFormat format, bool mipmapped = false)
 		{
@@ -4045,6 +4058,25 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 			return info;
 		}
 	};
+
+	static inline void image_create_info_defaults(struct ImageCreateInfo *self)
+	{
+		VkComponentMapping sw = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
+		self->domain = ImageDomain_Physical;
+		self->width = 0;
+		self->height = 0;
+		self->depth = 1;
+		self->levels = 1;
+		self->format = VK_FORMAT_UNDEFINED;
+		self->type = VK_IMAGE_TYPE_2D;
+		self->layers = 1;
+		self->usage = 0;
+		self->samples = VK_SAMPLE_COUNT_1_BIT;
+		self->flags = 0;
+		self->misc = 0;
+		self->initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+		self->swizzle = sw;
+	}
 
 	struct Image;
 
@@ -4354,17 +4386,17 @@ void semaphoremanager_init_empty(struct SemaphoreManager *self)
 	struct Device;
 	struct DescriptorSetLayout
 	{
-		uint32_t sampled_image_mask = 0;
-		uint32_t storage_image_mask = 0;
-		uint32_t uniform_buffer_mask = 0;
-		uint32_t storage_buffer_mask = 0;
-		uint32_t sampled_buffer_mask = 0;
-		uint32_t input_attachment_mask = 0;
-		uint32_t sampler_mask = 0;
-		uint32_t separate_image_mask = 0;
-		uint32_t fp_mask = 0;
-		uint32_t immutable_sampler_mask = 0;
-		uint64_t immutable_samplers = 0;
+		uint32_t sampled_image_mask;
+		uint32_t storage_image_mask;
+		uint32_t uniform_buffer_mask;
+		uint32_t storage_buffer_mask;
+		uint32_t sampled_buffer_mask;
+		uint32_t input_attachment_mask;
+		uint32_t sampler_mask;
+		uint32_t separate_image_mask;
+		uint32_t fp_mask;
+		uint32_t immutable_sampler_mask;
+		uint64_t immutable_samplers;
 	};
 
 	// Avoid -Wclass-memaccess warnings since we hash DescriptorSetLayout.
@@ -4477,25 +4509,25 @@ VkDescriptorSetLayout descriptor_set_allocator_get_layout(const struct Descripto
 
 	struct ResourceLayout
 	{
-		uint32_t input_mask = 0;
-		uint32_t output_mask = 0;
-		uint32_t push_constant_size = 0;
-		uint32_t spec_constant_mask = 0;
+		uint32_t input_mask;
+		uint32_t output_mask;
+		uint32_t push_constant_size;
+		uint32_t spec_constant_mask;
 		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS];
 	};
 
 	struct CombinedResourceLayout
 	{
-		uint32_t attribute_mask = 0;
-		uint32_t render_target_mask = 0;
-		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
-		uint32_t stages_for_bindings[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS] = {};
-		uint32_t stages_for_sets[VULKAN_NUM_DESCRIPTOR_SETS] = {};
-		VkPushConstantRange push_constant_range = {};
-		uint32_t descriptor_set_mask = 0;
-		uint32_t spec_constant_mask[(unsigned)ShaderStage_Count] = {};
-		uint32_t combined_spec_constant_mask = 0;
-		Hash push_constant_layout_hash = 0;
+		uint32_t attribute_mask;
+		uint32_t render_target_mask;
+		DescriptorSetLayout sets[VULKAN_NUM_DESCRIPTOR_SETS];
+		uint32_t stages_for_bindings[VULKAN_NUM_DESCRIPTOR_SETS][VULKAN_NUM_BINDINGS];
+		uint32_t stages_for_sets[VULKAN_NUM_DESCRIPTOR_SETS];
+		VkPushConstantRange push_constant_range;
+		uint32_t descriptor_set_mask;
+		uint32_t spec_constant_mask[(unsigned)ShaderStage_Count];
+		uint32_t combined_spec_constant_mask;
+		Hash push_constant_layout_hash;
 	};
 
 	/* PipelineLayout: cached VkPipelineLayout + its resource layout and per-set
@@ -4584,19 +4616,19 @@ PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return
 	struct RenderPassInfo
 	{
 		ImageView *color_attachments[VULKAN_NUM_ATTACHMENTS];
-		ImageView *depth_stencil = NULL;
-		unsigned num_color_attachments = 0;
-		RenderPassOpFlags op_flags = 0;
-		uint32_t clear_attachments = 0;
-		uint32_t load_attachments = 0;
-		uint32_t store_attachments = 0;
-		uint32_t layer = 0;
+		ImageView *depth_stencil;
+		unsigned num_color_attachments;
+		RenderPassOpFlags op_flags;
+		uint32_t clear_attachments;
+		uint32_t load_attachments;
+		uint32_t store_attachments;
+		uint32_t layer;
 
 		// Render area will be clipped to the actual framebuffer.
-		VkRect2D render_area = { { 0, 0 }, { UINT32_MAX, UINT32_MAX } };
+		VkRect2D render_area;
 
-		VkClearColorValue clear_color[VULKAN_NUM_ATTACHMENTS] = {};
-		VkClearDepthStencilValue clear_depth_stencil = { 1.0f, 0 };
+		VkClearColorValue clear_color[VULKAN_NUM_ATTACHMENTS];
+		VkClearDepthStencilValue clear_depth_stencil;
 
 		enum DepthStencil {
 			DepthStencil_None,
@@ -4609,15 +4641,26 @@ PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return
 			uint32_t color_attachments[VULKAN_NUM_ATTACHMENTS];
 			uint32_t input_attachments[VULKAN_NUM_ATTACHMENTS];
 			uint32_t resolve_attachments[VULKAN_NUM_ATTACHMENTS];
-			unsigned num_color_attachments = 0;
-			unsigned num_input_attachments = 0;
-			unsigned num_resolve_attachments = 0;
-			DepthStencil depth_stencil_mode = DepthStencil_ReadWrite;
+			unsigned num_color_attachments;
+			unsigned num_input_attachments;
+			unsigned num_resolve_attachments;
+			DepthStencil depth_stencil_mode;
 		};
 		// If 0/nullptr, assume a default subpass.
-		const Subpass *subpasses = NULL;
-		unsigned num_subpasses = 0;
+		const Subpass *subpasses;
+		unsigned num_subpasses;
 	};
+	static inline void render_pass_info_defaults(struct RenderPassInfo *self)
+	{
+		memset(self, 0, sizeof(*self));
+		self->render_area.offset.x = 0;
+		self->render_area.offset.y = 0;
+		self->render_area.extent.width = UINT32_MAX;
+		self->render_area.extent.height = UINT32_MAX;
+		self->clear_depth_stencil.depth = 1.0f;
+		self->clear_depth_stencil.stencil = 0;
+		self->subpasses = NULL;
+	}
 
 	/* RenderPass: cached VkRenderPass + per-subpass attachment metadata. Lives in
 	 * an IntrusiveHashMap (intrusive_node first). Converted from a C++ class to a
@@ -5637,13 +5680,13 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 	struct InitialImageBuffer
 	{
-		BufferHandle buffer = { NULL };
+		BufferHandle buffer;
 		// Bound matches the implicit invariant in TextureFormatLayout::mips[16]:
 		// callers must pass <= 16 mip levels (no runtime check exists in
 		// fill_mipinfo). build_buffer_image_copies is the sole writer of these
 		// fields; it asserts num_blits <= 16 before writing.
 		VkBufferImageCopy blits[16];
-		unsigned num_blits = 0;
+		unsigned num_blits;
 	};
 	struct HandlePool
 	{
@@ -5737,14 +5780,14 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 
 
-			VkInstance instance = VK_NULL_HANDLE;
-			VkPhysicalDevice gpu = VK_NULL_HANDLE;
-			VkDevice device = VK_NULL_HANDLE;
-			VkQueue graphics_queue = VK_NULL_HANDLE;
-			VkQueue compute_queue = VK_NULL_HANDLE;
-			VkQueue transfer_queue = VK_NULL_HANDLE;
+			VkInstance instance;
+			VkPhysicalDevice gpu;
+			VkDevice device;
+			VkQueue graphics_queue;
+			VkQueue compute_queue;
+			VkQueue transfer_queue;
 
-			uint64_t cookie = 0;
+			uint64_t cookie;
 
 			/* Public so the C89 cookie_init() free function (replacing the
 			 * former Cookie(Device*) ctor + friendship) can reach it. */
@@ -5852,10 +5895,10 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 
 
-			unsigned frame_context_index = 0;
-			uint32_t graphics_queue_family_index = 0;
-			uint32_t compute_queue_family_index = 0;
-			uint32_t transfer_queue_family_index = 0;
+			unsigned frame_context_index;
+			uint32_t graphics_queue_family_index;
+			uint32_t compute_queue_family_index;
+			uint32_t transfer_queue_family_index;
 
 
 			SamplerHandle samplers[(unsigned)(StockSampler_Count)];
@@ -7412,8 +7455,8 @@ void rect_tracker_clear(struct RectTracker *self, SRect rect)
 		uint32_t palette;
 		Rect full_page_rect;
 
-		bool dirty = false;
-		bool dead = false;
+		bool dirty;
+		bool dead;
 
 		FusionRects fusion;
 	};
@@ -9015,11 +9058,11 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			Device *device;
 			unsigned scaling;
 			unsigned msaa;
-			bool scaled_uv_offset = false;
-			bool valid = false;
-			FilterMode primitive_filter_mode = FilterMode_NearestNeighbor;
-			FilterExclude sprite_filter_exclude = FilterExcludeNone;
-			FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
+			bool scaled_uv_offset;
+			bool valid;
+			FilterMode primitive_filter_mode;
+			FilterExclude sprite_filter_exclude;
+			FilterExclude polygon_2d_filter_exclude;
 			ImageHandle scaled_framebuffer;
 			ImageHandle scaled_framebuffer_msaa;
 			ImageHandle bias_framebuffer;
@@ -9027,7 +9070,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			ImageHandle framebuffer_ssaa;
 			ImageViewHandleVec scaled_views;
 			FBAtlas atlas;
-			bool texture_tracking_enabled = false;
+			bool texture_tracking_enabled;
 			TextureTracker tracker;
 
 			CommandBufferHandle cmd;
@@ -9086,8 +9129,8 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 
 			OpaqueQueue queue;
-			unsigned primitive_index = 0;
-			bool render_pass_is_feedback = false;
+			unsigned primitive_index;
+			bool render_pass_is_feedback;
 			float last_uv_scale_x, last_uv_scale_y;
 
 			void reset_queue();
@@ -9103,7 +9146,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			ImageHandle reuseable_scanout;
 
 
-			BufferHandle quad = { NULL };
+			BufferHandle quad;
 	};
 
 	/* SaveState lifecycle free functions (SaveState was a move-only C++ class; it is now
@@ -9835,6 +9878,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	};
 
 	BufferCreateInfo buffer_create_info;
+	buffer_create_info_defaults(&buffer_create_info);
 	buffer_create_info.domain = BufferDomain_Device;
 	buffer_create_info.size = sizeof(quad_data);
 	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -9851,6 +9895,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 
 void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out){
 	BufferCreateInfo buffer_create_info;
+	buffer_create_info_defaults(&buffer_create_info);
 	buffer_create_info.domain = BufferDomain_CachedHost;
 	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -10072,6 +10117,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect &rect, uin
 	renderer_ensure_command_buffer(self);
 
 	BufferCreateInfo buffer_create_info;
+	buffer_create_info_defaults(&buffer_create_info);
 	buffer_create_info.domain = BufferDomain_CachedHost;
 	buffer_create_info.size = copy_rect.width * copy_rect.height * 4;
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -10138,6 +10184,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 	for (unsigned i = 1; i <= levels; i++)
 	{
 		RenderPassInfo rp;
+		render_pass_info_defaults(&rp);
 		unsigned current_scale = max_(self->scaling >> i, 1u);
 
 		if (i == levels)
@@ -10426,6 +10473,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 	RenderPassInfo rp;
+	render_pass_info_defaults(&rp);
 	rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
@@ -10512,6 +10560,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 		RenderPassInfo rp;
+		render_pass_info_defaults(&rp);
 		rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
 		rp.num_color_attachments = 1;
 		rp.clear_attachments = 1;
@@ -10612,6 +10661,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 	RenderPassInfo rp;
+	render_pass_info_defaults(&rp);
 	rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
@@ -11925,6 +11975,7 @@ void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src){
 
 ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels){
 	ImageCreateInfo info;
+	image_create_info_defaults(&info);
 	ImageInitialData initial[16]; /* Vulkan caps mip levels well under this */
 	int i;
 	int n = levels.count;
@@ -11968,6 +12019,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect &rect){
 
 	// TODO: Chain allocate this.
 	BufferCreateInfo buffer_create_info;
+	buffer_create_info_defaults(&buffer_create_info);
 	buffer_create_info.domain = BufferDomain_Host;
 	buffer_create_info.size = size;
 	buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
@@ -12823,6 +12875,7 @@ void image_init(struct Image *self, Device *device, VkImage image, VkImageView d
 	if (default_view != VK_NULL_HANDLE)
 	{
 		ImageViewCreateInfo info;
+		image_view_create_info_defaults(&info);
 		info.image = self;
 		info.format = create_info.format;
 		info.base_level = 0;
@@ -13012,6 +13065,7 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 {
 	struct BufferBlock block;
 	BufferCreateInfo info;
+	buffer_create_info_defaults(&info);
 	bufferblock_init(&block);
 
 	info.domain = BufferDomain_Host;
@@ -13027,6 +13081,7 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 	{
 		// Fall back to host memory, and remember to sync to gpu on submission time using DMA queue. :)
 		BufferCreateInfo cpu_info;
+		buffer_create_info_defaults(&cpu_info);
 		cpu_info.domain = BufferDomain_Host;
 		cpu_info.size = size;
 		cpu_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
@@ -15010,6 +15065,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		Hash hash;
 		TransientNode *node;
 		ImageCreateInfo image_info;
+		image_create_info_defaults(&image_info);
 		Hasher h; hasher_init(&h);
 		hasher_u32(&h, width);
 		hasher_u32(&h, height);
