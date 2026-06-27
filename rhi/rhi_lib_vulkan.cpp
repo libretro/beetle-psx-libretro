@@ -7644,12 +7644,6 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 		int count;
 		CacheEntry entries[HANDLE_LRU_MAX];
 
-		HandleCacheResult get(Rect rect, uint32_t palette_hash);
-		void insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle);
-		void clear()
-		{
-			count = 0;
-		}
 	};
 
 	static void handle_lru_cache_init(HandleLRUCache *c, int max_size)
@@ -20561,41 +20555,42 @@ Rect fromSRect(SRect rect) {
 		}
 	}
 
-	HandleCacheResult HandleLRUCache::get(Rect rect, uint32_t palette_hash) {
+	static HandleCacheResult handle_lru_cache_get(struct HandleLRUCache *self, Rect rect, uint32_t palette_hash) {
 		HandleCacheResult res;
 		int i, j;
-		for (i = 0; i < count; i++) {
-			CacheEntry &entry = entries[i];
-			if (entry.handle.palette_hash == palette_hash && rect_contains(&entry.rect, &rect)) {
-				CacheEntry hit = entry;
+		for (i = 0; i < self->count; i++) {
+			CacheEntry *entry = &self->entries[i];
+			if (entry->handle.palette_hash == palette_hash && rect_contains(&entry->rect, &rect)) {
+				CacheEntry hit = *entry;
 				for (j = i; j > 0; j--) {
-					entries[j] = entries[j - 1];
+					self->entries[j] = self->entries[j - 1];
 				}
-				entries[0] = hit;
-				dbg_hits += 1;
+				self->entries[0] = hit;
+				self->dbg_hits += 1;
 				res.handle = hit.handle;
 				res.found = true;
 				return res;
 			}
 		}
-		dbg_misses += 1;
+		self->dbg_misses += 1;
 		res.handle = hd_handle_make_none();
 		res.found = false;
 		return res;
 	}
-	void HandleLRUCache::insert(Rect rect, uint32_t palette_hash, HdTextureHandle handle) {
+	static void handle_lru_cache_insert(struct HandleLRUCache *self, Rect rect, uint32_t palette_hash, HdTextureHandle handle) {
 		int j;
 		CacheEntry e;
 		e.rect = rect;
 		e.handle = handle;
 		/* If full, the entry at index max_size-1 (the LRU) is dropped by the shift
 		 * below not preserving it. Otherwise grow by one. */
-		if (count < max_size)
-			count++;
-		for (j = count - 1; j > 0; j--)
-			entries[j] = entries[j - 1];
-		entries[0] = e;
+		if (self->count < self->max_size)
+			self->count++;
+		for (j = self->count - 1; j > 0; j--)
+			self->entries[j] = self->entries[j - 1];
+		self->entries[0] = e;
 	}
+	static inline void handle_lru_cache_clear(struct HandleLRUCache *self) { self->count = 0; }
 
 	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
 		fastpath_capable_out = false;
@@ -20612,7 +20607,7 @@ Rect fromSRect(SRect rect) {
 		}
 		if (self->hd_textures_enabled) {
 			// Check if the same texture as last time is used.
-			HandleCacheResult cache_result = self->handle_cache.get(rect, palette_hash);
+			HandleCacheResult cache_result = handle_lru_cache_get(&self->handle_cache, rect, palette_hash);
 			cache_hit = cache_result.found;
 			if (cache_hit) {
 				// cache_result.handle is currently always a non-fused, non-none, index + palette_hash
@@ -20687,7 +20682,7 @@ Rect fromSRect(SRect rect) {
 		} }
 
 		if (!hd_handle_is_none(&result))
-			self->handle_cache.insert(result_rect, palette_hash, result);
+			handle_lru_cache_insert(&self->handle_cache, result_rect, palette_hash, result);
 		return result;
 	}
 
@@ -20751,7 +20746,7 @@ bool is_power_of_two(int n) {
 
 	// TEMPORARY:
 	void texture_tracker_on_queues_reset(struct TextureTracker *self) {
-		self->handle_cache.clear();
+		handle_lru_cache_clear(&self->handle_cache);
 		rect_tracker_releaseDeadHandles(&self->tracker); // This is called from reset_queue, so as of now no HdTextureHandle's exist
 
 		// Poll HD uploads
