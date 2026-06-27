@@ -798,6 +798,18 @@ static void lightrec_cp_cb(struct lightrec_state *state, u32 arg)
 	lightrec_cp(state, (union code) arg);
 }
 
+/* Specialised wrapper for GTE (COP2) compute opcodes.  rec_CP2 only emits a
+ * call to this for opcodes it has already identified at compile time as
+ * non-OP_CP2_BASIC coprocessor-2 functions, so the OP_CP0 test that
+ * lightrec_cp() performs is provably false here and is skipped.  cop2_op()
+ * itself still runs unchanged (including its own validity test and the
+ * gte_ts_done latency bookkeeping), so results and timing are identical to
+ * the generic C_WRAPPER_CP path. */
+static void lightrec_cp2_gte_cb(struct lightrec_state *state, u32 arg)
+{
+	(*state->ops.cop2_op)(state, ((union code) arg).opcode);
+}
+
 static struct block * lightrec_get_block(struct lightrec_state *state, u32 pc)
 {
 	struct block *block = lightrec_find_block(state->block_cache, pc);
@@ -2162,6 +2174,7 @@ struct lightrec_state * lightrec_init(char *argv0,
 	state->c_wrappers[C_WRAPPER_MFC] = lightrec_mfc_cb;
 	state->c_wrappers[C_WRAPPER_MTC] = lightrec_mtc_cb;
 	state->c_wrappers[C_WRAPPER_CP] = lightrec_cp_cb;
+	state->c_wrappers[C_WRAPPER_CP2_GTE] = lightrec_cp2_gte_cb;
 
 	map = &maps[PSX_MAP_BIOS];
 	state->offset_bios = (uintptr_t)map->address - map->pc;

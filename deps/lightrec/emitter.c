@@ -3371,6 +3371,7 @@ static void rec_CP2(struct lightrec_cstate *state,
 		    const struct block *block, u16 offset)
 {
 	union code c = block->opcode_list[offset].c;
+	jit_state_t *_jit = block->_jit;
 
 	if (c.r.op == OP_CP2_BASIC) {
 		lightrec_rec_func_t f = rec_cp2_basic[c.r.rs];
@@ -3381,7 +3382,13 @@ static void rec_CP2(struct lightrec_cstate *state,
 		}
 	}
 
-	rec_CP(state, block, offset);
+	/* GTE compute opcode: emit a direct call to the specialised COP2
+	 * wrapper.  Functionally identical to the generic rec_CP() path
+	 * (same cop2_op, same latency accounting) but skips lightrec_cp()'s
+	 * OP_CP0 dispatch test, which is constant-false for these opcodes. */
+	jit_name(__func__);
+	jit_note(__FILE__, __LINE__);
+	call_to_c_wrapper(state, block, c.opcode, C_WRAPPER_CP2_GTE);
 }
 
 static void rec_META(struct lightrec_cstate *state,
