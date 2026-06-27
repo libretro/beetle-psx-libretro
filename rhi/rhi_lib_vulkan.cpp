@@ -5561,6 +5561,11 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	class Device
 	{
 		public:
+			friend uint32_t device_find_memory_type_buffer(Device *self, BufferDomain domain, uint32_t mask);
+			friend uint32_t device_find_memory_type_image(Device *self, ImageDomain domain, uint32_t mask);
+			friend void device_set_name_buffer(Device *self, const Buffer &buffer, const char *name);
+			friend void device_set_name_image(Device *self, const Image &image, const char *name);
+			friend bool device_memory_type_is_host_visible(Device *self, uint32_t type);
 			friend BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo &view_info);
 			friend ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo &create_info);
 			friend InitialImageBuffer device_create_image_staging_buffer(Device *self, const ImageCreateInfo &info, const ImageInitialData *initial);
@@ -5666,8 +5671,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			void next_frame_context();
 
 			// Set names for objects for debuggers and profilers.
-			void set_name(const Buffer &buffer, const char *name);
-			void set_name(const Image &image, const char *name);
 
 			// Submission interface, may be called from any thread at any time.
 			CommandBufferHandle request_command_buffer(CommandBufferType type = Type_Generic);
@@ -5841,12 +5844,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			uint32_t compute_queue_family_index = 0;
 			uint32_t transfer_queue_family_index = 0;
 
-			uint32_t find_memory_type(BufferDomain domain, uint32_t mask);
-			uint32_t find_memory_type(ImageDomain domain, uint32_t mask);
-			bool memory_type_is_host_visible(uint32_t type) const
-			{
-				return (mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
-			}
 
 			SamplerHandle samplers[(unsigned)(StockSampler_Count)];
 
@@ -5897,6 +5894,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 			ImplementationWorkarounds workarounds;
 	};
+	inline bool device_memory_type_is_host_visible(Device *self, uint32_t type) { return (self->mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0; }
 
 	/* Device inline helpers (batch 5) -> free functions taking Device *self. Plain
 	 * inline (not static) because they are friend-declared. request_vertex_block /
@@ -12794,7 +12792,7 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 	info.usage = self->usage;
 
 	block.gpu = device_create_buffer(self->device, info, NULL);
-	self->device->set_name(*bh_get(&block.gpu), "chain-allocated-block-gpu");
+	device_set_name_buffer(self->device, *bh_get(&block.gpu), "chain-allocated-block-gpu");
 
 	// Try to map it, will fail unless the memory is host visible.
 	block.mapped = (uint8_t *)(device_map_host_buffer(self->device, *bh_get(&block.gpu), MEMORY_ACCESS_WRITE_BIT));
@@ -12807,7 +12805,7 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
 		cpu_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
 		block.cpu = device_create_buffer(self->device, cpu_info, NULL);
-		self->device->set_name(*bh_get(&block.cpu), "chain-allocated-block-cpu");
+		device_set_name_buffer(self->device, *bh_get(&block.cpu), "chain-allocated-block-cpu");
 		block.mapped = (uint8_t *)(device_map_host_buffer(self->device, *bh_get(&block.cpu), MEMORY_ACCESS_WRITE_BIT));
 	}
 	else
@@ -14804,7 +14802,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		image_info.samples = (VkSampleCountFlagBits)(samples);
 		image_info.layers = layers;
 		node = transient_thmap_emplace(&self->attachments, hash, device_create_image(self->device, image_info, NULL));
-		self->device->set_name(*ih_get(&node->handle), "AttachmentAllocator");
+		device_set_name_image(self->device, *ih_get(&node->handle), "AttachmentAllocator");
 		return &image_get_view(ih_get(&node->handle));
 	}
 
@@ -17896,7 +17894,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		bufferblock_vec_free_storage(&self->ubo_blocks);
 	}
 
-	uint32_t Device::find_memory_type(BufferDomain domain, uint32_t mask)
+	uint32_t device_find_memory_type_buffer(Device *self, BufferDomain domain, uint32_t mask)
 	{
 		uint32_t desired = 0, fallback = 0;
 		switch (domain)
@@ -17917,21 +17915,21 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				break;
 		}
 
-		for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
+		for (uint32_t i = 0; i < self->mem_props.memoryTypeCount; i++)
 		{
 			if ((1u << i) & mask)
 			{
-				uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
+				uint32_t flags = self->mem_props.memoryTypes[i].propertyFlags;
 				if ((flags & desired) == desired)
 					return i;
 			}
 		}
 
-		for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
+		for (uint32_t i = 0; i < self->mem_props.memoryTypeCount; i++)
 		{
 			if ((1u << i) & mask)
 			{
-				uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
+				uint32_t flags = self->mem_props.memoryTypes[i].propertyFlags;
 				if ((flags & fallback) == fallback)
 					return i;
 			}
@@ -17941,7 +17939,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		return UINT32_MAX;
 	}
 
-	uint32_t Device::find_memory_type(ImageDomain domain, uint32_t mask)
+	uint32_t device_find_memory_type_image(Device *self, ImageDomain domain, uint32_t mask)
 	{
 		uint32_t desired = 0, fallback = 0;
 		switch (domain)
@@ -17957,21 +17955,21 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				break;
 		}
 
-		for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
+		for (uint32_t i = 0; i < self->mem_props.memoryTypeCount; i++)
 		{
 			if ((1u << i) & mask)
 			{
-				uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
+				uint32_t flags = self->mem_props.memoryTypes[i].propertyFlags;
 				if ((flags & desired) == desired)
 					return i;
 			}
 		}
 
-		for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
+		for (uint32_t i = 0; i < self->mem_props.memoryTypeCount; i++)
 		{
 			if ((1u << i) & mask)
 			{
-				uint32_t flags = mem_props.memoryTypes[i].propertyFlags;
+				uint32_t flags = self->mem_props.memoryTypes[i].propertyFlags;
 				if ((flags & fallback) == fallback)
 					return i;
 			}
@@ -18333,7 +18331,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		buffer_info.size = tfl_get_required_size(&layout);
 		buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		result.buffer = device_create_buffer(self, buffer_info, NULL);
-		self->set_name(*bh_get(&result.buffer), "image-upload-staging-buffer");
+		device_set_name_buffer(self, *bh_get(&result.buffer), "image-upload-staging-buffer");
 
 		// And now, do the actual copy.
 		uint8_t *mapped = (uint8_t *)(device_map_host_buffer(self, *bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
@@ -18434,7 +18432,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		}
 
 		vkGetImageMemoryRequirements(self->device, holder.image, &reqs);
-		uint32_t memory_type = self->find_memory_type(create_info.domain, reqs.memoryTypeBits);
+		uint32_t memory_type = device_find_memory_type_image(self, create_info.domain, reqs.memoryTypeBits);
 		if (memory_type == UINT32_MAX)
 		{
 			image_resource_holder_fini(&holder);
@@ -18709,7 +18707,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		vkGetBufferMemoryRequirements(self->device, buffer, &reqs);
 
-		uint32_t memory_type = self->find_memory_type(create_info.domain, reqs.memoryTypeBits);
+		uint32_t memory_type = device_find_memory_type_buffer(self, create_info.domain, reqs.memoryTypeBits);
 		if (memory_type == UINT32_MAX)
 		{
 			vkDestroyBuffer(self->device, buffer, NULL);
@@ -18733,13 +18731,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		struct Buffer *_b = (struct Buffer *)object_pool_raw_allocate(&self->handle_pool.buffers); buffer_init(_b, self, buffer, allocation, tmpinfo); BufferHandle handle = bh_make(_b);
 
-		if (create_info.domain == BufferDomain_Device && initial && !self->memory_type_is_host_visible(memory_type))
+		if (create_info.domain == BufferDomain_Device && initial && !device_memory_type_is_host_visible(self, memory_type))
 		{
 			CommandBufferHandle cmd; cmd.data = NULL;
 			BufferCreateInfo staging_info = create_info;
 			staging_info.domain = BufferDomain_Host;
 			BufferHandle staging_buffer = device_create_buffer(self, staging_info, initial);
-			self->set_name(*bh_get(&staging_buffer), "buffer-upload-staging-buffer");
+			device_set_name_buffer(self, *bh_get(&staging_buffer), "buffer-upload-staging-buffer");
 
 			cmd = self->request_command_buffer(Type_AsyncTransfer);
 			commandbuffer_begin_region(cbh_get(&cmd), "copy-buffer-staging");
@@ -18857,27 +18855,27 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		return ret;
 	}
 
-	void Device::set_name(const Buffer &buffer, const char *name)
+	void device_set_name_buffer(Device *self, const Buffer &buffer, const char *name)
 	{
-		if (ext.supports_debug_marker)
+		if (self->ext.supports_debug_marker)
 		{
 			VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
 			info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT;
 			info.object = (uint64_t)buffer_get_buffer(&buffer);
 			info.pObjectName = name;
-			vkDebugMarkerSetObjectNameEXT(device, &info);
+			vkDebugMarkerSetObjectNameEXT(self->device, &info);
 		}
 	}
 
-	void Device::set_name(const Image &image, const char *name)
+	void device_set_name_image(Device *self, const Image &image, const char *name)
 	{
-		if (ext.supports_debug_marker)
+		if (self->ext.supports_debug_marker)
 		{
 			VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
 			info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT;
 			info.object = (uint64_t)image_get_image(&image);
 			info.pObjectName = name;
-			vkDebugMarkerSetObjectNameEXT(device, &info);
+			vkDebugMarkerSetObjectNameEXT(self->device, &info);
 		}
 	}
 
