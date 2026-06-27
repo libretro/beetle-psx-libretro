@@ -5561,6 +5561,10 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	class Device
 	{
 		public:
+			friend void device_bake_program(Device *self, Program &program);
+			friend void device_init_stock_samplers(Device *self);
+			friend void device_clear_wait_semaphores(Device *self);
+			friend void device_flush_frame_nolock(Device *self);
 			friend CommandPool *device_get_command_pool(Device *self, CommandBufferType type);
 			friend CommandBufferHandle device_request_command_buffer(Device *self, CommandBufferType type);
 			friend CommandBufferHandle device_request_command_buffer_nolock(Device *self, CommandBufferType type);
@@ -5716,7 +5720,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			/* Public so the C89 cookie_init() free function (replacing the
 			 * former Cookie(Device*) ctor + friendship) can reach it. */
 		private:
-			void bake_program(Program &program);
 			friend void program_init_graphics(struct Program *self, Device *device, Shader *vertex, Shader *fragment);
 			friend void program_init_compute(struct Program *self, Device *device, Shader *compute);
 
@@ -5728,7 +5731,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			VkPhysicalDeviceProperties gpu_props;
 
 			DeviceFeatures ext;
-			void init_stock_samplers();
 
 			// Make sure this is deleted last.
 			HandlePool handle_pool;
@@ -5863,7 +5865,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			AttachmentAllocator transient_allocator;
 
 
-			void clear_wait_semaphores();
 			void submit_staging(CommandBufferHandle &cmd, VkBufferUsageFlags usage, bool flush);
 
 			void flush_frame(CommandBufferType type)
@@ -5881,7 +5882,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			friend void program_fini(struct Program *self);
 			friend void framebuffer_fini(struct Framebuffer *self);
 
-			void flush_frame_nolock();
 			void submit_nolock(CommandBufferHandle cmd, Fence *fence,
 					unsigned semaphore_count, Semaphore *semaphore);
 			void add_wait_semaphore_nolock(CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages,
@@ -5922,7 +5922,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	 * converted) through self->. Defined here, right after the class, so they precede
 	 * all callers; friend-declared inside the class for private-member access. */
 void device_wait_idle(Device *self) { self->wait_idle_nolock(); }
-void device_flush_frame(Device *self) { self->flush_frame_nolock(); }
+void device_flush_frame(Device *self) { device_flush_frame_nolock(self); }
 void *device_map_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access) { return deviceallocator_map_memory(&self->managers.memory, &buffer_get_allocation(&buffer), access); }
 void device_unmap_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access) { deviceallocator_unmap_memory(&self->managers.memory, &buffer_get_allocation(&buffer), access); }
 ImageView *device_get_transient_attachment(Device *self, unsigned width, unsigned height, VkFormat format, unsigned index, unsigned samples, unsigned layers) { return attachment_allocator_request_attachment(&self->transient_allocator, width, height, format, index, samples, layers); }
@@ -13607,7 +13607,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		vk_pipeline_map_init(&self->pipelines);
 		program_set_shader(self, ShaderStage_Vertex, vertex);
 		program_set_shader(self, ShaderStage_Fragment, fragment);
-		device->bake_program(*self);
+		device_bake_program(device, *self);
 	}
 
 	void program_init_compute(struct Program *self, Device *device, Shader *compute)
@@ -13619,7 +13619,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			self->shaders[i] = NULL;
 		vk_pipeline_map_init(&self->pipelines);
 		program_set_shader(self, ShaderStage_Compute, compute);
-		device->bake_program(*self);
+		device_bake_program(device, *self);
 	}
 
 	VkPipeline program_get_pipeline(const struct Program *self, Hash hash)
@@ -16821,8 +16821,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		return ret;
 	}
 
-	void Device::bake_program(Program &program)
-	{
+	void device_bake_program(Device *self, Program &program){
 		CombinedResourceLayout layout;
 		if (program_get_shader(&program, ShaderStage_Vertex))
 			layout.attribute_mask = shader_get_layout(program_get_shader(&program, ShaderStage_Vertex))->input_mask;
@@ -16908,7 +16907,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		hasher_u32(&h, layout.push_constant_range.stageFlags);
 		hasher_u32(&h, layout.push_constant_range.size);
 		layout.push_constant_layout_hash = hasher_get(&h);
-		program_set_pipeline_layout(&program, device_request_pipeline_layout(this, layout));
+		program_set_pipeline_layout(&program, device_request_pipeline_layout(self, layout));
 	}
 
 	void Device::set_context(const Context &context)
@@ -16929,7 +16928,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		device_init_workarounds(this);
 
-		init_stock_samplers();
+		device_init_stock_samplers(this);
 
 #ifdef ANDROID
 		init_frame_contexts(3); // Android needs a bit more ... ;)
@@ -16948,8 +16947,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 	}
 
-	void Device::init_stock_samplers()
-	{
+	void device_init_stock_samplers(Device *self){
 		SamplerCreateInfo info = {};
 		info.max_lod = VK_LOD_CLAMP_NONE;
 		info.max_anisotropy = 1.0f;
@@ -17021,7 +17019,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 					info.address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 					break;
 			}
-			samplers[i] = device_create_sampler(this, info, mode);
+			self->samplers[i] = device_create_sampler(self, info, mode);
 		}
 	}
 
@@ -17517,11 +17515,10 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		}
 	}
 
-	void Device::flush_frame_nolock()
-	{
-		flush_frame(Type_AsyncTransfer);
-		flush_frame(Type_Generic);
-		flush_frame(Type_AsyncCompute);
+	void device_flush_frame_nolock(Device *self){
+		self->flush_frame(Type_AsyncTransfer);
+		self->flush_frame(Type_Generic);
+		self->flush_frame(Type_AsyncCompute);
 	}
 
 	struct Device::QueueData *device_get_queue_data(Device *self, CommandBufferType type)
@@ -17696,23 +17693,22 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkFramebufferVec_push(&device_frame(self)->destroyed_framebuffers, &framebuffer);
 	}
 
-	void Device::clear_wait_semaphores()
-	{
+	void device_clear_wait_semaphores(Device *self){
 		{ int _wi;
-		for (_wi = 0; _wi < sem_handle_vec_size(&graphics.wait_semaphores); _wi++)
-			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&graphics.wait_semaphores, _wi))), NULL);
-		for (_wi = 0; _wi < sem_handle_vec_size(&compute.wait_semaphores); _wi++)
-			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&compute.wait_semaphores, _wi))), NULL);
-		for (_wi = 0; _wi < sem_handle_vec_size(&transfer.wait_semaphores); _wi++)
-			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&transfer.wait_semaphores, _wi))), NULL);
+		for (_wi = 0; _wi < sem_handle_vec_size(&self->graphics.wait_semaphores); _wi++)
+			vkDestroySemaphore(self->device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&self->graphics.wait_semaphores, _wi))), NULL);
+		for (_wi = 0; _wi < sem_handle_vec_size(&self->compute.wait_semaphores); _wi++)
+			vkDestroySemaphore(self->device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&self->compute.wait_semaphores, _wi))), NULL);
+		for (_wi = 0; _wi < sem_handle_vec_size(&self->transfer.wait_semaphores); _wi++)
+			vkDestroySemaphore(self->device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&self->transfer.wait_semaphores, _wi))), NULL);
 		}
 
-		sem_handle_vec_clear(&graphics.wait_semaphores);
-		VkPipelineStageVec_clear(&graphics.wait_stages);
-		sem_handle_vec_clear(&compute.wait_semaphores);
-		VkPipelineStageVec_clear(&compute.wait_stages);
-		sem_handle_vec_clear(&transfer.wait_semaphores);
-		VkPipelineStageVec_clear(&transfer.wait_stages);
+		sem_handle_vec_clear(&self->graphics.wait_semaphores);
+		VkPipelineStageVec_clear(&self->graphics.wait_stages);
+		sem_handle_vec_clear(&self->compute.wait_semaphores);
+		VkPipelineStageVec_clear(&self->compute.wait_stages);
+		sem_handle_vec_clear(&self->transfer.wait_semaphores);
+		VkPipelineStageVec_clear(&self->transfer.wait_stages);
 	}
 
 	void Device::wait_idle_nolock()
@@ -17723,7 +17719,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		if (device != VK_NULL_HANDLE)
 			vkDeviceWaitIdle(device);
 
-		clear_wait_semaphores();
+		device_clear_wait_semaphores(this);
 
 		// Free memory for buffer pools.
 		bufferpool_reset(&managers.vbo);
