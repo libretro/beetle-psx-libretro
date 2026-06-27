@@ -2024,24 +2024,12 @@ static inline uint32_t util_ctz(uint32_t x)
 	{
 		struct IntrusiveHashMapNode node; /* must stay first (offset 0) */
 		VkPipeline value;
-
-		IntrusivePODWrapperPipeline(VkPipeline value_) : value(value_) {}
-		IntrusivePODWrapperPipeline() : value(VK_NULL_HANDLE) {}
-
-		VkPipeline &get() { return value; }
-		const VkPipeline &get() const { return value; }
 	};
 
 	struct IntrusivePODWrapperPtr
 	{
 		struct IntrusiveHashMapNode node; /* must stay first (offset 0) */
 		void *value;
-
-		IntrusivePODWrapperPtr(void *value_) : value(value_) {}
-		IntrusivePODWrapperPtr() : value(NULL) {}
-
-		void *&get() { return value; }
-		void *const &get() const { return value; }
 	};
 
 	/* The concrete hash map recovers each wrapper from an IntrusiveHashMapNode* by
@@ -2391,7 +2379,8 @@ static inline uint32_t util_ctz(uint32_t x)
 		IntrusivePODWrapperPtr *t;
 		if (!slot)
 			return NULL;
-		t = new (slot) IntrusivePODWrapperPtr(value);
+		t = (IntrusivePODWrapperPtr *)slot;
+		t->value = value;
 		return vk_ptr_map_insert_replace(m, hash, t);
 	}
 
@@ -2402,7 +2391,8 @@ static inline uint32_t util_ctz(uint32_t x)
 		IntrusivePODWrapperPipeline *t;
 		if (!slot)
 			return NULL;
-		t = new (slot) IntrusivePODWrapperPipeline(value);
+		t = (IntrusivePODWrapperPipeline *)slot;
+		t->value = value;
 		return vk_pipeline_map_insert_yield(m, hash, t);
 	}
 
@@ -2528,7 +2518,7 @@ static inline uint32_t util_ctz(uint32_t x)
 			IntrusivePODWrapperPtr *v = vk_ptr_map_find(&m->hashmap, hash);         \
 			if (v)                                                                  \
 			{                                                                       \
-				T *node = (T *)v->get();                                            \
+				T *node = (T *)v->value;                                            \
 				if (node->th_node.index != m->index)                               \
 				{                                                                   \
 					ilist_move_to_front(&m->rings[m->index],                        \
@@ -13457,19 +13447,19 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	VkPipeline program_get_pipeline(const struct Program *self, Hash hash)
 	{
 		IntrusivePODWrapperPipeline *ret = vk_pipeline_map_find((struct vk_pipeline_map *)&self->pipelines, hash);
-		return ret ? ret->get() : VK_NULL_HANDLE;
+		return ret ? ret->value : VK_NULL_HANDLE;
 	}
 
 	VkPipeline program_add_pipeline(struct Program *self, Hash hash, VkPipeline pipeline)
 	{
-		return vk_pipeline_map_emplace_yield(&self->pipelines, hash, pipeline)->get();
+		return vk_pipeline_map_emplace_yield(&self->pipelines, hash, pipeline)->value;
 	}
 
 	void program_fini(struct Program *self)
 	{
 		struct IntrusiveListNode *n;
 		for (n = vk_pipeline_map_begin(&self->pipelines); n; n = n->next)
-			self->device->destroy_pipeline_nolock(vk_pipeline_map_iter_get(n)->get());
+			self->device->destroy_pipeline_nolock(vk_pipeline_map_iter_get(n)->value);
 	}
 
 /* === descriptor_set.cpp === */
