@@ -5591,24 +5591,24 @@ void commandbuffer_set_blend_op_2(struct CommandBuffer *self, VkBlendOp blend_op
 
 	/* Group A: copy / clear / barrier free functions. Overloaded members are
 	 * split into distinctly-named free functions. */
-	void commandbuffer_clear_image(struct CommandBuffer *self, const Image &image, const VkClearValue &value);
+	void commandbuffer_clear_image(struct CommandBuffer *self, const Image *image, const VkClearValue &value);
 	void commandbuffer_copy_buffer(struct CommandBuffer *self, const Buffer *dst, VkDeviceSize dst_offset, const Buffer *src, VkDeviceSize src_offset, VkDeviceSize size);
 void commandbuffer_copy_buffer_whole(struct CommandBuffer *self, const Buffer *dst, const Buffer *src)
 	{
 		VK_ASSERT(buffer_get_create_info(dst)->size == buffer_get_create_info(src)->size);
 		commandbuffer_copy_buffer(self, dst, 0, src, 0, buffer_get_create_info(dst)->size);
 	}
-	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image &image, const Buffer *buffer, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
-	void commandbuffer_copy_buffer_to_image_blits(struct CommandBuffer *self, const Image &image, const Buffer *buffer, unsigned num_blits, const VkBufferImageCopy *blits);
-	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer *dst, const Image &src, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
+	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image *image, const Buffer *buffer, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
+	void commandbuffer_copy_buffer_to_image_blits(struct CommandBuffer *self, const Image *image, const Buffer *buffer, unsigned num_blits, const VkBufferImageCopy *blits);
+	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer *dst, const Image *src, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
 	void commandbuffer_full_barrier(struct CommandBuffer *self);
 	void commandbuffer_pixel_barrier(struct CommandBuffer *self);
 	void commandbuffer_barrier_simple(struct CommandBuffer *self, VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage, VkAccessFlags dst_access);
 	void commandbuffer_barrier(struct CommandBuffer *self, VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages, unsigned barriers, const VkMemoryBarrier *globals, unsigned buffer_barriers, const VkBufferMemoryBarrier *buffers, unsigned image_barriers, const VkImageMemoryBarrier *images);
-	void commandbuffer_image_barrier(struct CommandBuffer *self, const Image &image, VkImageLayout old_layout, VkImageLayout new_layout, VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage, VkAccessFlags dst_access);
-	void commandbuffer_blit_image(struct CommandBuffer *self, const Image &dst, const Image &src, const VkOffset3D &dst_offset0, const VkOffset3D &dst_extent, const VkOffset3D &src_offset0, const VkOffset3D &src_extent, unsigned dst_level, unsigned src_level, unsigned dst_base_layer, uint32_t src_base_layer, unsigned num_layers, VkFilter filter);
-	void commandbuffer_barrier_prepare_generate_mipmap(struct CommandBuffer *self, const Image &image, VkImageLayout base_level_layout, VkPipelineStageFlags src_stage, VkAccessFlags src_access, bool need_top_level_barrier);
-	void commandbuffer_generate_mipmap(struct CommandBuffer *self, const Image &image);
+	void commandbuffer_image_barrier(struct CommandBuffer *self, const Image *image, VkImageLayout old_layout, VkImageLayout new_layout, VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage, VkAccessFlags dst_access);
+	void commandbuffer_blit_image(struct CommandBuffer *self, const Image *dst, const Image *src, const VkOffset3D &dst_offset0, const VkOffset3D &dst_extent, const VkOffset3D &src_offset0, const VkOffset3D &src_extent, unsigned dst_level, unsigned src_level, unsigned dst_base_layer, uint32_t src_base_layer, unsigned num_layers, VkFilter filter);
+	void commandbuffer_barrier_prepare_generate_mipmap(struct CommandBuffer *self, const Image *image, VkImageLayout base_level_layout, VkPipelineStageFlags src_stage, VkAccessFlags src_access, bool need_top_level_barrier);
+	void commandbuffer_generate_mipmap(struct CommandBuffer *self, const Image *image);
 
 
 	/* Command-buffer handle: de-RAII'd from
@@ -5911,7 +5911,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	uint32_t device_find_memory_type_buffer(Device *self, BufferDomain domain, uint32_t mask);
 	uint32_t device_find_memory_type_image(Device *self, ImageDomain domain, uint32_t mask);
 	void device_set_name_buffer(Device *self, const Buffer *buffer, const char *name);
-	void device_set_name_image(Device *self, const Image &image, const char *name);
+	void device_set_name_image(Device *self, const Image *image, const char *name);
 	bool device_memory_type_is_host_visible(Device *self, uint32_t type);
 	BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo &view_info);
 	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo &create_info);
@@ -9814,9 +9814,9 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	renderer_init_pipelines(self);
 
 	renderer_ensure_command_buffer(self);
-	commandbuffer_clear_image(cbh_get(&self->cmd), *ih_get(&self->scaled_framebuffer), {});
+	commandbuffer_clear_image(cbh_get(&self->cmd), ih_get(&self->scaled_framebuffer), {});
 	if (!state)
-		commandbuffer_clear_image(cbh_get(&self->cmd), *ih_get(&self->framebuffer), {});
+		commandbuffer_clear_image(cbh_get(&self->cmd), ih_get(&self->framebuffer), {});
 	commandbuffer_full_barrier(cbh_get(&self->cmd));
 
 	ImageCreateInfo dither_info = image_create_info_immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM, false);
@@ -9854,7 +9854,7 @@ void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out){
 	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
 	{ Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &_r); }
 	renderer_ensure_command_buffer(self);
-	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), *ih_get(&self->framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
+	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), ih_get(&self->framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
 	commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
 	             VK_ACCESS_HOST_READ_BIT);
@@ -10073,7 +10073,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	BufferHandle buffer = device_create_buffer(self->device, buffer_create_info, NULL);
-	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), *ih_get(&self->framebuffer), 0, { (int)(copy_rect.x), (int)(copy_rect.y), 0 },
+	commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), ih_get(&self->framebuffer), 0, { (int)(copy_rect.x), (int)(copy_rect.y), 0 },
 	                          { copy_rect.width, copy_rect.height, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
 
@@ -10145,7 +10145,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 
 		if (i == levels)
 		{
-			commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->bias_framebuffer), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->bias_framebuffer), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 		}
@@ -10187,14 +10187,14 @@ void renderer_mipmap_framebuffer(Renderer *self)
 
 		if (i == levels)
 		{
-			commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->bias_framebuffer), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->bias_framebuffer), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
 		}
 		else
 		{
-			commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->scaled_framebuffer), VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+			commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->scaled_framebuffer), VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
@@ -10424,7 +10424,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	rp.clear_color[0] = {0, 0, 0, 0};
 	rp.clear_attachments = 1;
 
-	commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
@@ -10465,7 +10465,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
 	commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
-	commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 	                   VK_ACCESS_SHADER_READ_BIT);
@@ -10509,14 +10509,14 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		rp.clear_attachments = 1;
 		rp.store_attachments = 1;
 
-		commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
 		commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
 		commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
-		commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
 		                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 		                   VK_ACCESS_SHADER_READ_BIT);
@@ -10613,7 +10613,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	//rp.clear_color[0] = {60.0f/256.0f, 230.0f/256.0f, 60.0f/256.0f, 0};
 	rp.clear_attachments = 1;
 
-	commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
@@ -10723,7 +10723,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 
 	commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
-	commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 	                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
 	                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 	                   VK_ACCESS_SHADER_READ_BIT);
@@ -11465,7 +11465,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 	commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
 	// Render passes are implicitly synchronized.
-	commandbuffer_image_barrier(cbh_get(&self->cmd), self->msaa > 1 ? *ih_get(&self->scaled_framebuffer_msaa) : *ih_get(&self->scaled_framebuffer),
+	commandbuffer_image_barrier(cbh_get(&self->cmd), self->msaa > 1 ? ih_get(&self->scaled_framebuffer_msaa) : ih_get(&self->scaled_framebuffer),
 			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
 			VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -15004,7 +15004,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		image_info.samples = (VkSampleCountFlagBits)(samples);
 		image_info.layers = layers;
 		node = transient_thmap_emplace(&self->attachments, hash, device_create_image(self->device, image_info, NULL));
-		device_set_name_image(self->device, *ih_get(&node->handle), "AttachmentAllocator");
+		device_set_name_image(self->device, ih_get(&node->handle), "AttachmentAllocator");
 		return image_get_view(ih_get(&node->handle));
 	}
 
@@ -15086,14 +15086,14 @@ VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 		vkCmdCopyBuffer(self->cmd, buffer_get_buffer(src), buffer_get_buffer(dst), 1, &region);
 	}
 
-	void commandbuffer_copy_buffer_to_image_blits(struct CommandBuffer *self, const Image &image, const Buffer *buffer, unsigned num_blits,
+	void commandbuffer_copy_buffer_to_image_blits(struct CommandBuffer *self, const Image *image, const Buffer *buffer, unsigned num_blits,
 			const VkBufferImageCopy *blits)
 	{
 		vkCmdCopyBufferToImage(self->cmd, buffer_get_buffer(buffer),
-				image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), num_blits, blits);
+				image_get_image(image), image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), num_blits, blits);
 	}
 
-	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image &image, const Buffer *src, VkDeviceSize buffer_offset,
+	void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image *image, const Buffer *src, VkDeviceSize buffer_offset,
 			const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
 			unsigned slice_height, const VkImageSubresourceLayers &subresource)
 	{
@@ -15102,11 +15102,11 @@ VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 			row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
 			subresource, offset, extent,
 		};
-		vkCmdCopyBufferToImage(self->cmd, buffer_get_buffer(src), image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+		vkCmdCopyBufferToImage(self->cmd, buffer_get_buffer(src), image_get_image(image), image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 				1, &region);
 	}
 
-	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer *buffer, const Image &image, VkDeviceSize buffer_offset,
+	void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer *buffer, const Image *image, VkDeviceSize buffer_offset,
 			const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length,
 			unsigned slice_height, const VkImageSubresourceLayers &subresource)
 	{
@@ -15115,30 +15115,30 @@ VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 			row_length != extent.width ? row_length : 0, slice_height != extent.height ? slice_height : 0,
 			subresource, offset, extent,
 		};
-		vkCmdCopyImageToBuffer(self->cmd, image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+		vkCmdCopyImageToBuffer(self->cmd, image_get_image(image), image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
 				buffer_get_buffer(buffer), 1, &region);
 	}
 
-	void commandbuffer_clear_image(struct CommandBuffer *self, const Image &image, const VkClearValue &value)
+	void commandbuffer_clear_image(struct CommandBuffer *self, const Image *image, const VkClearValue &value)
 	{
 		VK_ASSERT(!self->framebuffer);
 		VK_ASSERT(!self->actual_render_pass);
 
-		VkImageAspectFlags aspect = format_to_aspect_mask(image_get_format(&image));
+		VkImageAspectFlags aspect = format_to_aspect_mask(image_get_format(image));
 		VkImageSubresourceRange range = {};
 		range.aspectMask = aspect;
 		range.baseArrayLayer = 0;
 		range.baseMipLevel = 0;
-		range.levelCount = image_get_create_info(&image)->levels;
-		range.layerCount = image_get_create_info(&image)->layers;
+		range.levelCount = image_get_create_info(image)->levels;
+		range.layerCount = image_get_create_info(image)->layers;
 		if (aspect & VK_IMAGE_ASPECT_COLOR_BIT)
 		{
-			vkCmdClearColorImage(self->cmd, image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			vkCmdClearColorImage(self->cmd, image_get_image(image), image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 					&value.color, 1, &range);
 		}
 		else
 		{
-			vkCmdClearDepthStencilImage(self->cmd, image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+			vkCmdClearDepthStencilImage(self->cmd, image_get_image(image), image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 					&value.depthStencil, 1, &range);
 		}
 	}
@@ -15205,23 +15205,23 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		vkCmdPipelineBarrier(self->cmd, src_stages, dst_stages, 0, barriers, globals, buffer_barriers, buffers, image_barriers, images);
 	}
 
-	void commandbuffer_image_barrier(struct CommandBuffer *self, const Image &image, VkImageLayout old_layout, VkImageLayout new_layout,
+	void commandbuffer_image_barrier(struct CommandBuffer *self, const Image *image, VkImageLayout old_layout, VkImageLayout new_layout,
 			VkPipelineStageFlags src_stages, VkAccessFlags src_access,
 			VkPipelineStageFlags dst_stages, VkAccessFlags dst_access)
 	{
 		VK_ASSERT(!self->actual_render_pass);
 		VK_ASSERT(!self->framebuffer);
-		VK_ASSERT(image_get_create_info(&image)->domain != ImageDomain_Transient);
+		VK_ASSERT(image_get_create_info(image)->domain != ImageDomain_Transient);
 
 		VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
 		barrier.srcAccessMask = src_access;
 		barrier.dstAccessMask = dst_access;
 		barrier.oldLayout = old_layout;
 		barrier.newLayout = new_layout;
-		barrier.image = image_get_image(&image);
-		barrier.subresourceRange.aspectMask = format_to_aspect_mask(image_get_create_info(&image)->format);
-		barrier.subresourceRange.levelCount = image_get_create_info(&image)->levels;
-		barrier.subresourceRange.layerCount = image_get_create_info(&image)->layers;
+		barrier.image = image_get_image(image);
+		barrier.subresourceRange.aspectMask = format_to_aspect_mask(image_get_create_info(image)->format);
+		barrier.subresourceRange.levelCount = image_get_create_info(image)->levels;
+		barrier.subresourceRange.layerCount = image_get_create_info(image)->layers;
 		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
@@ -15229,20 +15229,20 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		vkCmdPipelineBarrier(self->cmd, src_stages, dst_stages, 0, 0, NULL, 0, NULL, 1, &barrier);
 	}
 
-	void commandbuffer_barrier_prepare_generate_mipmap(struct CommandBuffer *self, const Image &image, VkImageLayout base_level_layout,
+	void commandbuffer_barrier_prepare_generate_mipmap(struct CommandBuffer *self, const Image *image, VkImageLayout base_level_layout,
 			VkPipelineStageFlags src_stage, VkAccessFlags src_access,
 			bool need_top_level_barrier)
 	{
-		const ImageCreateInfo *create_info = image_get_create_info(&image);
+		const ImageCreateInfo *create_info = image_get_create_info(image);
 		VkImageMemoryBarrier barriers[2] = {};
 		VK_ASSERT(create_info->levels > 1);
 		(void)create_info;
 
 		{ unsigned i; for (i = 0; i < 2; i++) {
 			barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			barriers[i].image = image_get_image(&image);
-			barriers[i].subresourceRange.aspectMask = format_to_aspect_mask(image_get_format(&image));
-			barriers[i].subresourceRange.layerCount = image_get_create_info(&image)->layers;
+			barriers[i].image = image_get_image(image);
+			barriers[i].subresourceRange.aspectMask = format_to_aspect_mask(image_get_format(image));
+			barriers[i].subresourceRange.layerCount = image_get_create_info(image)->layers;
 			barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
@@ -15262,7 +15262,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				barriers[i].srcAccessMask = 0;
 				barriers[i].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 				barriers[i].subresourceRange.baseMipLevel = 1;
-				barriers[i].subresourceRange.levelCount = image_get_create_info(&image)->levels - 1;
+				barriers[i].subresourceRange.levelCount = image_get_create_info(image)->levels - 1;
 			}
 		} }
 
@@ -15271,19 +15271,19 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				need_top_level_barrier ? barriers : barriers + 1);
 	}
 
-	void commandbuffer_generate_mipmap(struct CommandBuffer *self, const Image &image)
+	void commandbuffer_generate_mipmap(struct CommandBuffer *self, const Image *image)
 	{
-		const ImageCreateInfo *create_info = image_get_create_info(&image);
+		const ImageCreateInfo *create_info = image_get_create_info(image);
 		VkOffset3D size = { (int)(create_info->width), (int)(create_info->height), (int)(create_info->depth) };
 		const VkOffset3D origin = { 0, 0, 0 };
 
-		VK_ASSERT(image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		VK_ASSERT(image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 		VkImageMemoryBarrier b = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-		b.image = image_get_image(&image);
+		b.image = image_get_image(image);
 		b.subresourceRange.levelCount = 1;
-		b.subresourceRange.layerCount = image_get_create_info(&image)->layers;
-		b.subresourceRange.aspectMask = format_to_aspect_mask(image_get_format(&image));
+		b.subresourceRange.layerCount = image_get_create_info(image)->layers;
+		b.subresourceRange.aspectMask = format_to_aspect_mask(image_get_format(image));
 		b.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 		b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 		b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -15309,7 +15309,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		} }
 	}
 
-	void commandbuffer_blit_image(struct CommandBuffer *self, const Image &dst, const Image &src,
+	void commandbuffer_blit_image(struct CommandBuffer *self, const Image *dst, const Image *src,
 			const VkOffset3D &dst_offset,
 			const VkOffset3D &dst_extent, const VkOffset3D &src_offset, const VkOffset3D &src_extent,
 			unsigned dst_level, unsigned src_level, unsigned dst_base_layer, unsigned src_base_layer,
@@ -15318,15 +15318,15 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		// RADV workaround: blit one layer at a time.
 		{ unsigned i; for (i = 0; i < num_layers; i++) {
 			const VkImageBlit blit = {
-				{ format_to_aspect_mask(image_get_create_info(&src)->format), src_level, src_base_layer + i, 1 },
+				{ format_to_aspect_mask(image_get_create_info(src)->format), src_level, src_base_layer + i, 1 },
 				{ src_offset,                                          cb_add_offset(src_offset, src_extent) },
-				{ format_to_aspect_mask(image_get_create_info(&dst)->format), dst_level, dst_base_layer + i, 1 },
+				{ format_to_aspect_mask(image_get_create_info(dst)->format), dst_level, dst_base_layer + i, 1 },
 				{ dst_offset,                                          cb_add_offset(dst_offset, dst_extent) },
 			};
 
 			vkCmdBlitImage(self->cmd,
-					image_get_image(&src), image_get_layout(&src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-					image_get_image(&dst), image_get_layout(&dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+					image_get_image(src), image_get_layout(src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+					image_get_image(dst), image_get_layout(dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 					1, &blit, filter);
 		} }
 	}
@@ -18665,12 +18665,12 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			else
 				transfer_cmd = graphics_cmd;
 
-			commandbuffer_image_barrier(cbh_get(&transfer_cmd), *ih_get(&handle), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			commandbuffer_image_barrier(cbh_get(&transfer_cmd), ih_get(&handle), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					VK_ACCESS_TRANSFER_WRITE_BIT);
 
 			commandbuffer_begin_region(cbh_get(&transfer_cmd), "copy-image-to-self->gpu");
-			commandbuffer_copy_buffer_to_image_blits(cbh_get(&transfer_cmd), *ih_get(&handle), bh_get(&staging_buffer->buffer), staging_buffer->num_blits, staging_buffer->blits);
+			commandbuffer_copy_buffer_to_image_blits(cbh_get(&transfer_cmd), ih_get(&handle), bh_get(&staging_buffer->buffer), staging_buffer->num_blits, staging_buffer->blits);
 			commandbuffer_end_region(cbh_get(&transfer_cmd));
 
 			if (self->transfer_queue != self->graphics_queue)
@@ -18733,17 +18733,17 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			if (generate_mips)
 			{
 				commandbuffer_begin_region(cbh_get(&graphics_cmd), "mipgen");
-				commandbuffer_barrier_prepare_generate_mipmap(cbh_get(&graphics_cmd), *ih_get(&handle), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				commandbuffer_barrier_prepare_generate_mipmap(cbh_get(&graphics_cmd), ih_get(&handle), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 						VK_PIPELINE_STAGE_TRANSFER_BIT,
 						prepare_src_access, need_mipmap_barrier);
-				commandbuffer_generate_mipmap(cbh_get(&graphics_cmd), *ih_get(&handle));
+				commandbuffer_generate_mipmap(cbh_get(&graphics_cmd), ih_get(&handle));
 				commandbuffer_end_region(cbh_get(&graphics_cmd));
 			}
 
 			if (need_initial_barrier)
 			{
 				commandbuffer_image_barrier(cbh_get(&graphics_cmd), 
-						*ih_get(&handle), generate_mips ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+						ih_get(&handle), generate_mips ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 						create_info.initial_layout,
 						VK_PIPELINE_STAGE_TRANSFER_BIT, final_transition_src_access,
 						image_get_stage_flags(ih_get(&handle)),
@@ -18771,7 +18771,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		{
 			VK_ASSERT(create_info.domain != ImageDomain_Transient);
 			CommandBufferHandle cmd = device_request_command_buffer(self, Type_Generic);
-			commandbuffer_image_barrier(cbh_get(&cmd), *ih_get(&handle), info.initialLayout, create_info.initial_layout,
+			commandbuffer_image_barrier(cbh_get(&cmd), ih_get(&handle), info.initialLayout, create_info.initial_layout,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, image_get_stage_flags(ih_get(&handle)),
 					image_get_access_flags(ih_get(&handle)) &
 					image_layout_to_possible_access(create_info.initial_layout));
@@ -19006,13 +19006,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		}
 	}
 
-	void device_set_name_image(Device *self, const Image &image, const char *name)
+	void device_set_name_image(Device *self, const Image *image, const char *name)
 	{
 		if (self->ext.supports_debug_marker)
 		{
 			VkDebugMarkerObjectNameInfoEXT info = { VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT };
 			info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT;
-			info.object = (uint64_t)image_get_image(&image);
+			info.object = (uint64_t)image_get_image(image);
 			info.pObjectName = name;
 			vkDebugMarkerSetObjectNameEXT(self->device, &info);
 		}
@@ -21485,13 +21485,13 @@ int64_t page_bytes(FusionRects &fusion)
 
 		if (ih_is_valid(&page.texture) && image_get_width(ih_get(&page.texture), 0) == texture_width && image_get_height(ih_get(&page.texture), 0) == texture_height)
 			// Switch back into transfer dst layout
-			commandbuffer_image_barrier(cbh_get(cmd), *ih_get(&page.texture),
+			commandbuffer_image_barrier(cbh_get(cmd), ih_get(&page.texture),
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
 		else
 			ih_move(&page.texture, renderer_create_texture(uploader, texture_width, texture_height, mip_levels));
-		commandbuffer_clear_image(cbh_get(cmd), *ih_get(&page.texture), fallthrough);
+		commandbuffer_clear_image(cbh_get(cmd), ih_get(&page.texture), fallthrough);
 
 		// Second pass to blit all the existing textures into the new texture
 		{
@@ -21532,7 +21532,7 @@ int64_t page_bytes(FusionRects &fusion)
 			// Switch into transfer src
 			// what the fuck am I doing?
 			commandbuffer_image_barrier(cbh_get(cmd), 
-					*image,
+					image,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 					VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
@@ -21550,7 +21550,7 @@ int64_t page_bytes(FusionRects &fusion)
 			{ int dstLevel; for (dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
 				int srcLevel = max_(0, dstLevel - full_res_levels);
 
-				commandbuffer_blit_image(cbh_get(cmd), *ih_get(&page.texture), *image,
+				commandbuffer_blit_image(cbh_get(cmd), ih_get(&page.texture), image,
 						dst_offset,
 						dst_extent,
 						{
@@ -21576,7 +21576,7 @@ int64_t page_bytes(FusionRects &fusion)
 
 			// Change back to shader read
 			commandbuffer_image_barrier(cbh_get(cmd), 
-					*image,
+					image,
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
@@ -21589,7 +21589,7 @@ int64_t page_bytes(FusionRects &fusion)
 
 		// I have no idea what the fuck I'm doing
 		// Make the fused texture readable by shaders
-		commandbuffer_image_barrier(cbh_get(cmd), *ih_get(&page.texture),
+		commandbuffer_image_barrier(cbh_get(cmd), ih_get(&page.texture),
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
