@@ -8636,6 +8636,67 @@ extern retro_log_printf_t log_cb;
 		s->UVLimits.max_u = 0; s->UVLimits.max_v = 0;
 	}
 
+	/* Renderer per-frame draw queues. Hoisted out of the Renderer class to file
+	 * scope and de-C++'d: the {}-zeroed POD_VEC members and scissor_invariant = false
+	 * default move into opaque_queue_init, which the Renderer constructor calls. The
+	 * backing storage is freed in ~Renderer (already explicit). */
+	struct OpaqueQueue
+	{
+		// Non-textured primitives.
+		BufferVertexVec opaque;
+		PrimitiveInfoVec opaque_scissor;
+
+		// Textured primitives, no semi-transparency.
+		BufferVertexVec opaque_textured;
+		PrimitiveInfoVec opaque_textured_scissor;
+
+		// Textured primitives, semi-transparency enabled.
+		BufferVertexVec semi_transparent_opaque;
+		PrimitiveInfoVec semi_transparent_opaque_scissor;
+
+		BufferVertexVec semi_transparent;
+		SemiTransparentStateVec semi_transparent_state;
+
+		Rect2DVec scaled_resolves;
+		Rect2DVec unscaled_resolves;
+		BlitInfoVec scaled_blits;
+		BlitInfoVec scaled_masked_blits;
+		BlitInfoVec unscaled_blits;
+		BlitInfoVec unscaled_masked_blits;
+
+		Rect2DVec scissors;
+		ClearCandidateVec clear_candidates;
+		VkRect2D default_scissor;
+		bool scissor_invariant;
+	};
+
+	static inline void opaque_queue_init(struct OpaqueQueue *q)
+	{
+		/* Each POD_VEC's empty state is { items=NULL, count=0, cap=0 }; the macro
+		 * provides no _init, so zero the three fields directly. */
+#define OQ_VEC_ZERO(v) do { (v).items = NULL; (v).count = 0; (v).cap = 0; } while (0)
+		OQ_VEC_ZERO(q->opaque);
+		OQ_VEC_ZERO(q->opaque_scissor);
+		OQ_VEC_ZERO(q->opaque_textured);
+		OQ_VEC_ZERO(q->opaque_textured_scissor);
+		OQ_VEC_ZERO(q->semi_transparent_opaque);
+		OQ_VEC_ZERO(q->semi_transparent_opaque_scissor);
+		OQ_VEC_ZERO(q->semi_transparent);
+		OQ_VEC_ZERO(q->semi_transparent_state);
+		OQ_VEC_ZERO(q->scaled_resolves);
+		OQ_VEC_ZERO(q->unscaled_resolves);
+		OQ_VEC_ZERO(q->scaled_blits);
+		OQ_VEC_ZERO(q->scaled_masked_blits);
+		OQ_VEC_ZERO(q->unscaled_blits);
+		OQ_VEC_ZERO(q->unscaled_masked_blits);
+		OQ_VEC_ZERO(q->scissors);
+		OQ_VEC_ZERO(q->clear_candidates);
+#undef OQ_VEC_ZERO
+		q->default_scissor.offset.x = 0; q->default_scissor.offset.y = 0;
+		q->default_scissor.extent.width = 0; q->default_scissor.extent.height = 0;
+		q->scissor_invariant = false;
+	}
+
 	class Renderer
 	{
 		public:
@@ -9066,35 +9127,7 @@ extern retro_log_printf_t log_cb;
 			RenderState render_state;
 
 
-			struct OpaqueQueue
-			{
-				// Non-textured primitives.
-				BufferVertexVec opaque{};
-				PrimitiveInfoVec opaque_scissor{};
-
-				// Textured primitives, no semi-transparency.
-				BufferVertexVec opaque_textured{};
-				PrimitiveInfoVec opaque_textured_scissor{};
-
-				// Textured primitives, semi-transparency enabled.
-				BufferVertexVec semi_transparent_opaque{};
-				PrimitiveInfoVec semi_transparent_opaque_scissor{};
-
-				BufferVertexVec semi_transparent{};
-				SemiTransparentStateVec semi_transparent_state{};
-
-				Rect2DVec scaled_resolves{};
-				Rect2DVec unscaled_resolves{};
-				BlitInfoVec scaled_blits{};
-				BlitInfoVec scaled_masked_blits{};
-				BlitInfoVec unscaled_blits{};
-				BlitInfoVec unscaled_masked_blits{};
-
-				Rect2DVec scissors{};
-				ClearCandidateVec clear_candidates{};
-				VkRect2D default_scissor;
-				bool scissor_invariant = false;
-			} queue;
+			OpaqueQueue queue;
 			unsigned primitive_index = 0;
 			bool render_pass_is_feedback = false;
 			float last_uv_scale_x, last_uv_scale_y;
@@ -9337,6 +9370,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	/* render_state's default member initializers were moved out when RenderState
 	 * was de-C++'d; seed them here (was implicit at construction). */
 	render_state_init(&render_state);
+	opaque_queue_init(&queue);
 	last_scanout.data            = NULL;
 	reuseable_scanout.data       = NULL;
 	fbatlas_init(&atlas);
