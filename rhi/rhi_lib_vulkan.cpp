@@ -6331,47 +6331,52 @@ extern retro_log_printf_t log_cb;
 	};
 
 	typedef int RectIndex; // I wanted a newtype but it's too much work in C++, so maybe TODO that later
+	/* HdTextureHandle: plain C struct (was a value type with operator==/!=/>,
+	 * a private 3-arg ctor and static factories). The factories become
+	 * hd_handle_make / _make_fused / _make_none; the comparisons become
+	 * hd_handle_eq / _ne / _gt free functions. */
 	struct HdTextureHandle {
 		RectIndex index;
 		uint32_t palette_hash;
 		bool fused;
-
-		bool operator==(const HdTextureHandle &other) const
-		{
-			return index == other.index && palette_hash == other.palette_hash && fused == other.fused;
-		}
-
-		bool operator!=(const HdTextureHandle &other) const
-		{
-			return !(*this == other);
-		}
-
-		bool operator>(const HdTextureHandle &other) const
-		{
-			if (index != other.index)
-				return index > other.index;
-			if (palette_hash != other.palette_hash)
-				return palette_hash > other.palette_hash;
-			return fused > other.fused;
-		}
-
-		static HdTextureHandle make(RectIndex index, uint32_t palette_hash) {
-			return HdTextureHandle(index, palette_hash, false);
-		}
-		static HdTextureHandle make_fused(RectIndex index) {
-			return HdTextureHandle(index, 0, true);
-		}
-		static HdTextureHandle make_none() {
-			return HdTextureHandle::make(-1, 0);
-		}
-
-		private:
-		HdTextureHandle(RectIndex index, uint32_t palette_hash, bool fused)
-			: index(index), palette_hash(palette_hash), fused(fused)
-		{
-
-		}
 	};
+
+	static inline struct HdTextureHandle hd_handle_make(RectIndex index, uint32_t palette_hash)
+	{
+		struct HdTextureHandle h;
+		h.index = index; h.palette_hash = palette_hash; h.fused = false;
+		return h;
+	}
+	static inline struct HdTextureHandle hd_handle_make_fused(RectIndex index)
+	{
+		struct HdTextureHandle h;
+		h.index = index; h.palette_hash = 0; h.fused = true;
+		return h;
+	}
+	static inline struct HdTextureHandle hd_handle_make_none(void)
+	{
+		return hd_handle_make(-1, 0);
+	}
+	static inline bool hd_handle_is_none(const struct HdTextureHandle *h)
+	{
+		return h->index == (RectIndex)-1 && h->palette_hash == 0 && h->fused == false;
+	}
+	static inline bool hd_handle_eq(const struct HdTextureHandle *a, const struct HdTextureHandle *b)
+	{
+		return a->index == b->index && a->palette_hash == b->palette_hash && a->fused == b->fused;
+	}
+	static inline bool hd_handle_ne(const struct HdTextureHandle *a, const struct HdTextureHandle *b)
+	{
+		return !hd_handle_eq(a, b);
+	}
+	static inline bool hd_handle_gt(const struct HdTextureHandle *a, const struct HdTextureHandle *b)
+	{
+		if (a->index != b->index)
+			return a->index > b->index;
+		if (a->palette_hash != b->palette_hash)
+			return a->palette_hash > b->palette_hash;
+		return a->fused > b->fused;
+	}
 
 	/* SRect: plain C struct (was a value type with ctors / accessors / operator==).
 	 * The validating 4-arg constructor becomes make_srect; the zero-init default
@@ -7525,14 +7530,14 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	struct CacheEntry {
 		Rect rect;
 		HdTextureHandle handle;
-		CacheEntry() : rect(), handle(HdTextureHandle::make_none()) {}
+		CacheEntry() : rect(), handle(hd_handle_make_none()) {}
 	};
 
 	/* Result of a handle-cache lookup (replaces std::pair<HdTextureHandle,bool>). */
 	struct HandleCacheResult {
 		HdTextureHandle handle;
 		bool found;
-		HandleCacheResult() : handle(HdTextureHandle::make_none()), found(false) {}
+		HandleCacheResult() : handle(hd_handle_make_none()), found(false) {}
 	};
 
 	/* Small fixed-capacity move-to-front cache of recently-used HD texture
@@ -8452,7 +8457,7 @@ struct PrimitiveInfo primitive_info_make(
 
 bool semi_transparent_state_eq(const struct SemiTransparentState *a, const struct SemiTransparentState *b)
 	{
-		return a->scissor_index == b->scissor_index && a->hd_texture_index == b->hd_texture_index &&
+		return a->scissor_index == b->scissor_index && hd_handle_eq(&a->hd_texture_index, &b->hd_texture_index) &&
 			a->semi_transparent == b->semi_transparent && a->textured == b->textured && a->masked == b->masked &&
 			a->filtering == b->filtering && a->scaled_read == b->scaled_read && a->shift == b->shift &&
 			a->offset_uv == b->offset_uv;
@@ -10760,7 +10765,7 @@ HdTextureHandle renderer_get_hd_texture_index(Renderer *self, const Rect &vram_r
 	if (self->texture_tracking_enabled) {
 		return texture_tracker_get_hd_texture_index(&self->tracker, vram_rect, mode, self->render_state.texture_offset_x, self->render_state.texture_offset_y, fastpath_capable_out, cache_hit_out);
 	} else {
-		return HdTextureHandle::make_none();
+		return hd_handle_make_none();
 	}
 }
 
@@ -10925,7 +10930,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 			param = param | 0x400; // dbg cache hit
 		}
 	}
-	if (hd_texture_index == HdTextureHandle::make_none()) {
+	if (hd_handle_is_none(&hd_texture_index)) {
 		// This flag says skip hd textures
 		param = param | 0x200;
 	}
@@ -11131,7 +11136,7 @@ void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 	ih_reset(&self->last_scanout);
 
 	BufferVertex vert[3];
-	HdTextureHandle hd_texture_index = HdTextureHandle::make_none();
+	HdTextureHandle hd_texture_index = hd_handle_make_none();
 	bool filtering = false;
 	bool scaled_read = false;
 	unsigned shift = 0;
@@ -11182,7 +11187,7 @@ void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 	// If in the future one were tempted to try to cache or reuse the last used HdTextureHandle here, they would have
 	// to be very careful not to let it get invalidated by build_attribs; so any such logic should happen within
 	// build_attribs itself, and not out here.
-	HdTextureHandle hd_texture_index = HdTextureHandle::make_none();
+	HdTextureHandle hd_texture_index = hd_handle_make_none();
 	bool filtering = false;
 	bool scaled_read = false;
 	unsigned shift = 0;
@@ -11246,11 +11251,11 @@ void renderer_clear_quad(Renderer *self, const Rect &rect, uint32_t fb_color, bo
 	BufferVertexVec_push(&self->queue.opaque, &pos2);
 	BufferVertexVec_push(&self->queue.opaque, &pos1);
 	{
-		PrimitiveInfo _pi0 = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), -1, HdTextureHandle::make_none(), false, false, 0, false);
+		PrimitiveInfo _pi0 = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), -1, hd_handle_make_none(), false, false, 0, false);
 		PrimitiveInfoVec_push(&self->queue.opaque_scissor, &_pi0);
 	}
 	{
-		PrimitiveInfo _pi1 = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), -1, HdTextureHandle::make_none(), false, false, 0, false);
+		PrimitiveInfo _pi1 = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), -1, hd_handle_make_none(), false, false, 0, false);
 		PrimitiveInfoVec_push(&self->queue.opaque_scissor, &_pi1);
 	}
 
@@ -11377,8 +11382,8 @@ bool renderer_primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo
 		return a.scaled_read > b.scaled_read;
 	if (a.filtering != b.filtering)
 		return a.filtering > b.filtering;
-	if (a.hd_texture_index != b.hd_texture_index)
-		return a.hd_texture_index > b.hd_texture_index;
+	if (hd_handle_ne(&a.hd_texture_index, &b.hd_texture_index))
+		return hd_handle_gt(&a.hd_texture_index, &b.hd_texture_index);
 	if (a.scissor_index != b.scissor_index)
 		return a.scissor_index > b.scissor_index;
 	return a.triangle_index > b.triangle_index;
@@ -11423,7 +11428,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec &vertices, Primitiv
 
 	for (; i < size; i++, vert += 3)
 	{
-		if ((*PrimitiveInfoVec_at(&scissors, i)).scissor_index != scissor || (*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index != hd_texture ||
+		if ((*PrimitiveInfoVec_at(&scissors, i)).scissor_index != scissor || hd_handle_ne(&(*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index, &hd_texture) ||
 			(*PrimitiveInfoVec_at(&scissors, i)).filtering != filtering || (*PrimitiveInfoVec_at(&scissors, i)).scaled_read != scaled_read || (*PrimitiveInfoVec_at(&scissors, i)).shift != shift ||
 			(*PrimitiveInfoVec_at(&scissors, i)).offset_uv != offset_uv)
 		{
@@ -11436,7 +11441,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec &vertices, Primitiv
 				scissor = (*PrimitiveInfoVec_at(&scissors, i)).scissor_index;
 				commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? self->queue.default_scissor : *Rect2DVec_at(&self->queue.scissors, scissor));
 			}
-			if ((*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index != hd_texture) {
+			if (hd_handle_ne(&(*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index, &hd_texture)) {
 				hd_texture = (*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index;
 				renderer_hd_texture_uniforms(self, hd_texture);
 			}
@@ -20591,7 +20596,7 @@ Rect fromSRect(SRect rect) {
 			}
 		}
 		dbg_misses += 1;
-		res.handle = HdTextureHandle::make_none();
+		res.handle = hd_handle_make_none();
 		res.found = false;
 		return res;
 	}
@@ -20661,10 +20666,10 @@ Rect fromSRect(SRect rect) {
 
 		if (!self->hd_textures_enabled) {
 			fastpath_capable_out = false;
-			return HdTextureHandle::make_none();
+			return hd_handle_make_none();
 		}
 
-		HdTextureHandle result = HdTextureHandle::make_none();
+		HdTextureHandle result = hd_handle_make_none();
 
 		Rect result_rect;
 		for (int oi = 0; oi < overlap.count; oi++) {
@@ -20680,11 +20685,11 @@ Rect fromSRect(SRect rect) {
 				overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
 			}
 			if (overlapped_image != NULL) {
-				if (result == HdTextureHandle::make_none()) {
+				if (hd_handle_is_none(&result)) {
 					// note that if tex->vram_rect contains rect, then it will be the only entry in overlap, so an early out would be pointless
 					result_rect = fromSRect(tex->vram_rect);
 					fastpath_capable_out = self->fastpath_enabled && fromSRect_contains(tex->vram_rect, rect) && (overlapped_image->alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
-					result = HdTextureHandle::make(index, palette_hash);
+					result = hd_handle_make(index, palette_hash);
 				} else {
 					// Multiple overlap, must fuse
 					unsigned int width
@@ -20698,7 +20703,7 @@ Rect fromSRect(SRect rect) {
 			}
 		}
 
-		if (result != HdTextureHandle::make_none())
+		if (!hd_handle_is_none(&result))
 			self->handle_cache.insert(result_rect, palette_hash, result);
 		return result;
 	}
@@ -21569,7 +21574,7 @@ int64_t page_bytes(FusionRects &fusion)
 			FusedPage *p = fused_page_vec_at(&self->pages, x);
 			// return page
 			if (!p->dead && p->palette == palette && rect_eq(&p->full_page_rect, &page_rect))
-				return HdTextureHandle::make_fused(x);
+				return hd_handle_make_fused(x);
 		}
 
 		// Make a new fused page
@@ -21581,7 +21586,7 @@ int64_t page_bytes(FusionRects &fusion)
 		page.palette = palette;
 		rebuild_page(page, tracker, uploader);
 		fused_page_vec_push(&self->pages, &page);
-		return HdTextureHandle::make_fused(fused_page_vec_size(&self->pages) - 1);
+		return hd_handle_make_fused(fused_page_vec_size(&self->pages) - 1);
 	}
 	void fused_pages_mark_dirty(struct FusedPages *self, Rect rect) {
 		int _i;
