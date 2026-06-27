@@ -7603,8 +7603,6 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	struct DbgHotkey {
 		retro_key key;
 		bool was_key_down;
-
-		bool query();
 	};
 
 	static void dbg_hotkey_init(DbgHotkey *h, retro_key key)
@@ -7612,6 +7610,7 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 		h->key = key;
 		h->was_key_down = false;
 	}
+	static bool dbg_hotkey_query(struct DbgHotkey *self);
 
 	struct CacheEntry {
 		Rect rect;
@@ -20891,7 +20890,7 @@ bool is_power_of_two(int n) {
 
 		if (dbg_input_state_cb != 0)
 		{
-			if (self->frame_dump_key.query())
+			if (dbg_hotkey_query(&self->frame_dump_key))
 			{
 				char fdpath[PATH_MAX_TT];
 				dump_path(fdpath, sizeof(fdpath));
@@ -20925,17 +20924,17 @@ bool is_power_of_two(int n) {
 				}
 			}
 
-			if (self->hd_toggle_key.query()) {
+			if (dbg_hotkey_query(&self->hd_toggle_key)) {
 				self->hd_textures_enabled = !self->hd_textures_enabled;
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Toggling hd textures: %s\n", self->hd_textures_enabled ? "on" : "off");
 			}
 
-			if (self->reload_key.query()) {
+			if (dbg_hotkey_query(&self->reload_key)) {
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Reloading hd textures from disk\n");
 				texture_tracker_reload_textures_from_disk(self);
 			}
 
-			if (self->fastpath_key.query()) {
+			if (dbg_hotkey_query(&self->fastpath_key)) {
 				self->fastpath_enabled = !self->fastpath_enabled;
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Toggling fastpath %s\n", self->fastpath_enabled ? "ON" : "OFF");
 			}
@@ -21749,12 +21748,12 @@ int64_t page_bytes(FusionRects &fusion)
 	}
 	// End of Save State
 	//========================================
-	bool DbgHotkey::query()
+	static bool dbg_hotkey_query(struct DbgHotkey *self)
 	{
-		uint16_t state = dbg_input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, key);
+		uint16_t state = dbg_input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, self->key);
 		bool is_key_down = state != 0;
-		bool just_pressed = is_key_down && !was_key_down;
-		was_key_down = is_key_down;
+		bool just_pressed = is_key_down && !self->was_key_down;
+		self->was_key_down = is_key_down;
 		return just_pressed;
 	}
 
