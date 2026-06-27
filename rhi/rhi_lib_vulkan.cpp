@@ -13244,11 +13244,11 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 		VK_ASSERT(itr);
 		VK_ASSERT(index >= (num_blocks - 1));
 
-		MiniHeap &heap = *itr;
-		classallocator_suballocate(self, num_blocks, masked_tiling_mode, self->memory_type, &heap, alloc);
-		unsigned new_index = block_get_longest_run(&heap.heap) - 1;
+		MiniHeap *heap = itr;
+		classallocator_suballocate(self, num_blocks, masked_tiling_mode, self->memory_type, heap, alloc);
+		unsigned new_index = block_get_longest_run(&heap->heap) - 1;
 
-		if (block_full(&heap.heap))
+		if (block_full(&heap->heap))
 		{
 			ilist_move_to_front(&m->full_heaps, &m->heaps[index], &itr->list_node);
 			if (!ilist_begin(&m->heaps[index]))
@@ -13256,8 +13256,8 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 		}
 		else if (new_index != index)
 		{
-			struct IntrusiveListC &new_heap = m->heaps[new_index];
-			ilist_move_to_front(&new_heap, &m->heaps[index], &itr->list_node);
+			struct IntrusiveListC *new_heap = &m->heaps[new_index];
+			ilist_move_to_front(new_heap, &m->heaps[index], &itr->list_node);
 			m->heap_availability_mask |= 1u << new_index;
 			if (!ilist_begin(&m->heaps[index]))
 				m->heap_availability_mask &= ~(1u << index);
@@ -13278,13 +13278,13 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 	 * bitmap) runs explicitly via block_init. */
 	block_init(&node->heap);
 
-	MiniHeap &heap = *node;
+	MiniHeap *heap = node;
 	uint32_t alloc_size = self->sub_block_size * BLOCK_NUM_SUB_BLOCKS;
 
 	if (self->parent)
 	{
 		// We cannot allocate a new block from parent ... This is fatal.
-		if (!classallocator_allocate(self->parent, alloc_size, tiling, &heap.allocation, true))
+		if (!classallocator_allocate(self->parent, alloc_size, tiling, &heap->allocation, true))
 		{
 			block_fini(&node->heap); object_pool_raw_free(&self->object_pool, node);
 			return false;
@@ -13292,8 +13292,8 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 	}
 	else
 	{
-		heap.allocation.offset = 0;
-		if (!deviceallocator_allocate(self->global_allocator, alloc_size, self->memory_type, &heap.allocation.base, &heap.allocation.host_base,
+		heap->allocation.offset = 0;
+		if (!deviceallocator_allocate(self->global_allocator, alloc_size, self->memory_type, &heap->allocation.base, &heap->allocation.host_base,
 		                                VK_NULL_HANDLE))
 		{
 			block_fini(&node->heap); object_pool_raw_free(&self->object_pool, node);
@@ -13302,16 +13302,16 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 	}
 
 	// This cannot fail.
-	classallocator_suballocate(self, num_blocks, masked_tiling_mode, self->memory_type, &heap, alloc);
+	classallocator_suballocate(self, num_blocks, masked_tiling_mode, self->memory_type, heap, alloc);
 
 	alloc->heap = node;
-	if (block_full(&heap.heap))
+	if (block_full(&heap->heap))
 	{
 		ilist_insert_front(&m->full_heaps, &node->list_node);
 	}
 	else
 	{
-		unsigned new_index = block_get_longest_run(&heap.heap) - 1;
+		unsigned new_index = block_get_longest_run(&heap->heap) - 1;
 		ilist_insert_front(&m->heaps[new_index], &node->list_node);
 		m->heap_availability_mask |= 1u << new_index;
 	}
@@ -14242,64 +14242,64 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			VK_ASSERT(info->color_attachments[i]);
 			self->color_attachments[i] = imageview_get_format(info->color_attachments[i]);
 			Image *image = imageview_get_image(info->color_attachments[i]);
-			VkAttachmentDescription &att = attachments[i];
-			att.flags = 0;
-			att.format = self->color_attachments[i];
-			att.samples = image_get_create_info(image)->samples;
-			att.loadOp = rp_color_load_op(info, i);
-			att.storeOp = rp_color_store_op(info, i);
-			att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			VkAttachmentDescription *att = &attachments[i];
+			att->flags = 0;
+			att->format = self->color_attachments[i];
+			att->samples = image_get_create_info(image)->samples;
+			att->loadOp = rp_color_load_op(info, i);
+			att->storeOp = rp_color_store_op(info, i);
+			att->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			att->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			// Undefined final layout here for now means that we will just use the layout of the last
 			// subpass which uses this attachment to avoid any dummy transition at the end.
-			att.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			att->finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 			if (image_get_create_info(image)->domain == ImageDomain_Transient)
 			{
 				if (enable_transient_load)
 				{
 					// The transient will behave like a normal image.
-					att.initialLayout = image_get_layout(imageview_get_image(info->color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+					att->initialLayout = image_get_layout(imageview_get_image(info->color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 				}
 				else
 				{
 					// Force a clean discard.
-					VK_ASSERT(att.loadOp != VK_ATTACHMENT_LOAD_OP_LOAD);
-					att.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+					VK_ASSERT(att->loadOp != VK_ATTACHMENT_LOAD_OP_LOAD);
+					att->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 				}
 
 				if (!enable_transient_store)
-					att.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+					att->storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
 				implicit_transitions |= 1u << i;
 			}
 			else
-				att.initialLayout = image_get_layout(imageview_get_image(info->color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+				att->initialLayout = image_get_layout(imageview_get_image(info->color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		} }
 
 		self->depth_stencil = info->depth_stencil ? imageview_get_format(info->depth_stencil) : VK_FORMAT_UNDEFINED;
 		if (info->depth_stencil)
 		{
 			Image *image = imageview_get_image(info->depth_stencil);
-			VkAttachmentDescription &att = attachments[info->num_color_attachments];
-			att.flags = 0;
-			att.format = self->depth_stencil;
-			att.samples = image_get_create_info(image)->samples;
-			att.loadOp = ds_load_op;
-			att.storeOp = ds_store_op;
+			VkAttachmentDescription *att = &attachments[info->num_color_attachments];
+			att->flags = 0;
+			att->format = self->depth_stencil;
+			att->samples = image_get_create_info(image)->samples;
+			att->loadOp = ds_load_op;
+			att->storeOp = ds_store_op;
 			// Undefined final layout here for now means that we will just use the layout of the last
 			// subpass which uses this attachment to avoid any dummy transition at the end.
-			att.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			att->finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 			if (format_to_aspect_mask(self->depth_stencil) & VK_IMAGE_ASPECT_STENCIL_BIT)
 			{
-				att.stencilLoadOp = ds_load_op;
-				att.stencilStoreOp = ds_store_op;
+				att->stencilLoadOp = ds_load_op;
+				att->stencilStoreOp = ds_store_op;
 			}
 			else
 			{
-				att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-				att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+				att->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+				att->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
 
 			if (image_get_create_info(image)->domain == ImageDomain_Transient)
@@ -14307,29 +14307,29 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				if (enable_transient_load)
 				{
 					// The transient will behave like a normal image.
-					att.initialLayout = depth_stencil_layout;
+					att->initialLayout = depth_stencil_layout;
 				}
 				else
 				{
-					if (att.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
-						att.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-					if (att.stencilLoadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
-						att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+					if (att->loadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
+						att->loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+					if (att->stencilLoadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
+						att->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 
 					// For transient attachments we force the layouts.
-					att.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+					att->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 				}
 
 				if (!enable_transient_store)
 				{
-					att.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-					att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+					att->storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+					att->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 				}
 
 				implicit_transitions |= 1u << info->num_color_attachments;
 			}
 			else
-				att.initialLayout = depth_stencil_layout;
+				att->initialLayout = depth_stencil_layout;
 		}
 
 		struct StackAllocatorRef reference_allocator;
@@ -14350,21 +14350,21 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			VkAttachmentReference *resolves = stackalloc_ref_allocate_cleared(&reference_allocator, subpass_infos[i].num_color_attachments);
 			VkAttachmentReference *depth = stackalloc_ref_allocate_cleared(&reference_allocator, 1);
 
-			VkSubpassDescription &subpass = *VkSubpassDescriptionVec_at(&subpasses, i);
-			subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-			subpass.colorAttachmentCount = subpass_infos[i].num_color_attachments;
-			subpass.pColorAttachments = colors;
-			subpass.inputAttachmentCount = subpass_infos[i].num_input_attachments;
-			subpass.pInputAttachments = inputs;
-			subpass.pDepthStencilAttachment = depth;
+			VkSubpassDescription *subpass = VkSubpassDescriptionVec_at(&subpasses, i);
+			subpass->pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+			subpass->colorAttachmentCount = subpass_infos[i].num_color_attachments;
+			subpass->pColorAttachments = colors;
+			subpass->inputAttachmentCount = subpass_infos[i].num_input_attachments;
+			subpass->pInputAttachments = inputs;
+			subpass->pDepthStencilAttachment = depth;
 
 			if (subpass_infos[i].num_resolve_attachments)
 			{
 				VK_ASSERT(subpass_infos[i].num_color_attachments == subpass_infos[i].num_resolve_attachments);
-				subpass.pResolveAttachments = resolves;
+				subpass->pResolveAttachments = resolves;
 			}
 
-			{ unsigned j; for (j = 0; j < subpass.colorAttachmentCount; j++) {
+			{ unsigned j; for (j = 0; j < subpass->colorAttachmentCount; j++) {
 				uint32_t att = subpass_infos[i].color_attachments[j];
 				VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
 				colors[j].attachment = att;
@@ -14372,7 +14372,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				colors[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
 			} }
 
-			{ unsigned j; for (j = 0; j < subpass.inputAttachmentCount; j++) {
+			{ unsigned j; for (j = 0; j < subpass->inputAttachmentCount; j++) {
 				uint32_t att = subpass_infos[i].input_attachments[j];
 				VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
 				inputs[j].attachment = att;
@@ -14380,9 +14380,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				inputs[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
 			} }
 
-			if (subpass.pResolveAttachments)
+			if (subpass->pResolveAttachments)
 			{
-				{ unsigned j; for (j = 0; j < subpass.colorAttachmentCount; j++) {
+				{ unsigned j; for (j = 0; j < subpass->colorAttachmentCount; j++) {
 					uint32_t att = subpass_infos[i].resolve_attachments[j];
 					VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
 					resolves[j].attachment = att;
@@ -14635,15 +14635,15 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		// Add preserve attachments as needed.
 		{ unsigned subpass; for (subpass = 0; subpass < num_subpasses; subpass++) {
-			VkSubpassDescription &pass = *VkSubpassDescriptionVec_at(&subpasses, subpass);
+			VkSubpassDescription *pass = VkSubpassDescriptionVec_at(&subpasses, subpass);
 			unsigned preserve_count = 0;
 			{ unsigned attachment; for (attachment = 0; attachment < num_attachments; attachment++)
 				if (preserve_masks[attachment] & (1u << subpass))
 					preserve_count++; }
 
 			uint32_t *preserve = stackalloc_u32_allocate_cleared(&preserve_allocator, preserve_count);
-			pass.pPreserveAttachments = preserve;
-			pass.preserveAttachmentCount = preserve_count;
+			pass->pPreserveAttachments = preserve;
+			pass->preserveAttachmentCount = preserve_count;
 			{ unsigned attachment; for (attachment = 0; attachment < num_attachments; attachment++)
 				if (preserve_masks[attachment] & (1u << subpass))
 					*preserve++ = attachment; }
@@ -14660,34 +14660,34 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		FOR_EACH_BIT(external_color_dependencies | external_depth_dependencies | external_input_dependencies, subpass)
 		{
 			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
-			VkSubpassDependency &dep = *VkSubpassDependencyVec_back(&external_dependencies);
-			dep.srcSubpass = VK_SUBPASS_EXTERNAL;
-			dep.dstSubpass = subpass;
+			VkSubpassDependency *dep = VkSubpassDependencyVec_back(&external_dependencies);
+			dep->srcSubpass = VK_SUBPASS_EXTERNAL;
+			dep->dstSubpass = subpass;
 
 			if (external_color_dependencies & (1u << subpass))
 			{
-				dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-				dep.dstStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-				dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-				dep.dstAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				dep->srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				dep->dstStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				dep->srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				dep->dstAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			}
 
 			if (external_depth_dependencies & (1u << subpass))
 			{
-				dep.srcStageMask |= VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-				dep.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-				dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-				dep.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+				dep->srcStageMask |= VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep->dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep->srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				dep->dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
 			}
 
 			if (external_input_dependencies & (1u << subpass))
 			{
-				dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+				dep->srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
 					VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-				dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-				dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+				dep->dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				dep->srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
 					VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-				dep.dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+				dep->dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 			}
 		}
 
@@ -14695,69 +14695,69 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		FOR_EACH_BIT(color_self_dependencies | depth_self_dependencies, subpass)
 		{
 			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
-			VkSubpassDependency &dep = *VkSubpassDependencyVec_back(&external_dependencies);
-			dep.srcSubpass = subpass;
-			dep.dstSubpass = subpass;
-			dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+			VkSubpassDependency *dep = VkSubpassDependencyVec_back(&external_dependencies);
+			dep->srcSubpass = subpass;
+			dep->dstSubpass = subpass;
+			dep->dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
 			if (color_self_dependencies & (1u << subpass))
 			{
-				dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-				dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				dep->srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				dep->srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			}
 
 			if (depth_self_dependencies & (1u << subpass))
 			{
-				dep.srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-				dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				dep->srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep->srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			}
 
-			dep.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			dep.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			dep->dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			dep->dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 		}
 
 		// Flush and invalidate caches between each subpass.
 		{ unsigned subpass; for (subpass = 1; subpass < num_subpasses; subpass++) {
 			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
-			VkSubpassDependency &dep = *VkSubpassDependencyVec_back(&external_dependencies);
-			dep.srcSubpass = subpass - 1;
-			dep.dstSubpass = subpass;
-			dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+			VkSubpassDependency *dep = VkSubpassDependencyVec_back(&external_dependencies);
+			dep->srcSubpass = subpass - 1;
+			dep->dstSubpass = subpass;
+			dep->dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
 			if (color_attachment_read_write & (1u << (subpass - 1)))
 			{
-				dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-				dep.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				dep->srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				dep->srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			}
 
 			if (depth_stencil_attachment_write & (1u << (subpass - 1)))
 			{
-				dep.srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-				dep.srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				dep->srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep->srcAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			}
 
 			if (color_attachment_read_write & (1u << subpass))
 			{
-				dep.dstStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-				dep.dstAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+				dep->dstStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				dep->dstAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
 			}
 
 			if (depth_stencil_attachment_read & (1u << subpass))
 			{
-				dep.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-				dep.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+				dep->dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep->dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
 			}
 
 			if (depth_stencil_attachment_write & (1u << subpass))
 			{
-				dep.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-				dep.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+				dep->dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+				dep->dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
 			}
 
 			if (input_attachment_read & (1u << subpass))
 			{
-				dep.dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-				dep.dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+				dep->dstStageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				dep->dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 			}
 		} }
 
@@ -15442,10 +15442,10 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 			FOR_EACH_BIT(mask, bit)
 			{
-				VkSpecializationMapEntry &entry = spec_entries[spec_info.mapEntryCount++];
-				entry.offset = sizeof(uint32_t) * bit;
-				entry.size = sizeof(uint32_t);
-				entry.constantID = bit;
+				VkSpecializationMapEntry *entry = &spec_entries[spec_info.mapEntryCount++];
+				entry->offset = sizeof(uint32_t) * bit;
+				entry->size = sizeof(uint32_t);
+				entry->constantID = bit;
 			}
 		}
 
@@ -15479,22 +15479,22 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		blend.attachmentCount = render_pass_get_num_color_attachments(self->compatible_render_pass, self->current_subpass);
 		blend.pAttachments = blend_attachments;
 		{ unsigned i; for (i = 0; i < blend.attachmentCount; i++) {
-			VkPipelineColorBlendAttachmentState &att = blend_attachments[i];
+			VkPipelineColorBlendAttachmentState *att = &blend_attachments[i];
 			att = {};
 
 			if (render_pass_get_color_attachment(self->compatible_render_pass, self->current_subpass, i)->attachment != VK_ATTACHMENT_UNUSED &&
 					(pipeline_layout_get_resource_layout(self->current_layout)->render_target_mask & (1u << i)))
 			{
-				att.colorWriteMask = 0xf;
-				att.blendEnable = self->static_state.state.blend_enable;
-				if (att.blendEnable)
+				att->colorWriteMask = 0xf;
+				att->blendEnable = self->static_state.state.blend_enable;
+				if (att->blendEnable)
 				{
-					att.alphaBlendOp = (VkBlendOp)(self->static_state.state.alpha_blend_op);
-					att.colorBlendOp = (VkBlendOp)(self->static_state.state.color_blend_op);
-					att.dstAlphaBlendFactor = (VkBlendFactor)(self->static_state.state.dst_alpha_blend);
-					att.srcAlphaBlendFactor = (VkBlendFactor)(self->static_state.state.src_alpha_blend);
-					att.dstColorBlendFactor = (VkBlendFactor)(self->static_state.state.dst_color_blend);
-					att.srcColorBlendFactor = (VkBlendFactor)(self->static_state.state.src_color_blend);
+					att->alphaBlendOp = (VkBlendOp)(self->static_state.state.alpha_blend_op);
+					att->colorBlendOp = (VkBlendOp)(self->static_state.state.color_blend_op);
+					att->dstAlphaBlendFactor = (VkBlendFactor)(self->static_state.state.dst_alpha_blend);
+					att->srcAlphaBlendFactor = (VkBlendFactor)(self->static_state.state.src_alpha_blend);
+					att->dstColorBlendFactor = (VkBlendFactor)(self->static_state.state.dst_color_blend);
+					att->srcColorBlendFactor = (VkBlendFactor)(self->static_state.state.src_color_blend);
 				}
 			}
 		} }
@@ -15516,22 +15516,22 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		uint32_t binding_mask = 0;
 		FOR_EACH_BIT(attr_mask, bit)
 		{
-			VkVertexInputAttributeDescription &attr = vi_attribs[vi.vertexAttributeDescriptionCount++];
-			attr.location = bit;
-			attr.binding = self->attribs[bit].binding;
-			attr.format = self->attribs[bit].format;
-			attr.offset = self->attribs[bit].offset;
-			binding_mask |= 1u << attr.binding;
+			VkVertexInputAttributeDescription *attr = &vi_attribs[vi.vertexAttributeDescriptionCount++];
+			attr->location = bit;
+			attr->binding = self->attribs[bit].binding;
+			attr->format = self->attribs[bit].format;
+			attr->offset = self->attribs[bit].offset;
+			binding_mask |= 1u << attr->binding;
 		}
 
 		VkVertexInputBindingDescription vi_bindings[VULKAN_NUM_VERTEX_BUFFERS];
 		vi.pVertexBindingDescriptions = vi_bindings;
 		FOR_EACH_BIT(binding_mask, bit)
 		{
-			VkVertexInputBindingDescription &bind = vi_bindings[vi.vertexBindingDescriptionCount++];
-			bind.binding = bit;
-			bind.inputRate = self->vbo.input_rates[bit];
-			bind.stride = self->vbo.strides[bit];
+			VkVertexInputBindingDescription *bind = &vi_bindings[vi.vertexBindingDescriptionCount++];
+			bind->binding = bit;
+			bind->inputRate = self->vbo.input_rates[bit];
+			bind->stride = self->vbo.strides[bit];
 		}
 
 		// Input assembly
@@ -15568,33 +15568,33 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			ShaderStage stage = (ShaderStage)(i);
 			if (program_get_shader(self->current_program, stage))
 			{
-				VkPipelineShaderStageCreateInfo &s = stages[num_stages++];
-				s = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-				s.module = shader_get_module(program_get_shader(self->current_program, stage));
+				VkPipelineShaderStageCreateInfo *s = &stages[num_stages++];
+				memset(s, 0, sizeof(*s)); s->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+				s->module = shader_get_module(program_get_shader(self->current_program, stage));
 #ifdef GRANITE_SPIRV_DUMP
 				LOGI("Compiling SPIR-V file: (%s) %s\n",
 						shader_stage_to_name(stage),
 						(to_string(program_get_shader(self->current_program, stage)->intrusive_node.key) + ".spv").c_str());
 #endif
-				s.pName = "main";
-				s.stage = (VkShaderStageFlagBits)(1u << i);
+				s->pName = "main";
+				s->stage = (VkShaderStageFlagBits)(1u << i);
 
 				uint32_t mask = pipeline_layout_get_resource_layout(self->current_layout)->spec_constant_mask[i] &
 					self->static_state.state.spec_constant_mask;
 
 				if (mask)
 				{
-					s.pSpecializationInfo = &spec_info[i];
+					s->pSpecializationInfo = &spec_info[i];
 					spec_info[i].pData = self->potential_static_state.spec_constants;
 					spec_info[i].dataSize = sizeof(self->potential_static_state.spec_constants);
 					spec_info[i].pMapEntries = spec_entries[i];
 
 					FOR_EACH_BIT(mask, bit)
 					{
-						VkSpecializationMapEntry &entry = spec_entries[i][spec_info[i].mapEntryCount++];
-						entry.offset = sizeof(uint32_t) * bit;
-						entry.size = sizeof(uint32_t);
-						entry.constantID = bit;
+						VkSpecializationMapEntry *entry = &spec_entries[i][spec_info[i].mapEntryCount++];
+						entry->offset = sizeof(uint32_t) * bit;
+						entry->size = sizeof(uint32_t);
+						entry->constantID = bit;
 					}
 				}
 			}
@@ -15779,16 +15779,16 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		VK_ASSERT(attrib < VULKAN_NUM_VERTEX_ATTRIBS);
 		VK_ASSERT(self->framebuffer);
 
-		VertexAttribState &attr = self->attribs[attrib];
+		VertexAttribState *attr = &self->attribs[attrib];
 
-		if (attr.binding != binding || attr.format != format || attr.offset != offset)
+		if (attr->binding != binding || attr->format != format || attr->offset != offset)
 			commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
 
 		VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
 
-		attr.binding = binding;
-		attr.format = format;
-		attr.offset = offset;
+		attr->binding = binding;
+		attr->format = format;
+		attr->offset = offset;
 	}
 
 	void commandbuffer_set_vertex_binding(struct CommandBuffer *self, uint32_t binding, const Buffer *buffer, VkDeviceSize offset, VkDeviceSize stride,
@@ -15908,12 +15908,12 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 		VK_ASSERT(buffer_get_create_info(buffer)->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		ResourceBinding &b = self->bindings.bindings[set][binding];
+		ResourceBinding *b = &self->bindings.bindings[set][binding];
 
-		if (buffer->cookie_base.cookie == self->bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
+		if (buffer->cookie_base.cookie == self->bindings.cookies[set][binding] && b->buffer.offset == offset && b->buffer.range == range)
 			return;
 
-		b.buffer.buffer = buffer_get_buffer(buffer); b.buffer.offset = offset; b.buffer.range = range;
+		b->buffer.buffer = buffer_get_buffer(buffer); b->buffer.offset = offset; b->buffer.range = range;
 		self->bindings.cookies[set][binding] = buffer->cookie_base.cookie;
 		self->bindings.secondary_cookies[set][binding] = 0;
 		self->dirty_sets |= 1u << set;
@@ -15926,9 +15926,9 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		if (sampler->cookie_base.cookie == self->bindings.secondary_cookies[set][binding])
 			return;
 
-		ResourceBinding &b = self->bindings.bindings[set][binding];
-		b.image.fp.sampler = sampler_get_sampler(sampler);
-		b.image.integer.sampler = sampler_get_sampler(sampler);
+		ResourceBinding *b = &self->bindings.bindings[set][binding];
+		b->image.fp.sampler = sampler_get_sampler(sampler);
+		b->image.integer.sampler = sampler_get_sampler(sampler);
 		self->dirty_sets |= 1u << set;
 		self->bindings.secondary_cookies[set][binding] = sampler->cookie_base.cookie;
 	}
@@ -15940,8 +15940,8 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		VK_ASSERT(buffer_get_create_info(bufferview_get_buffer(view))->usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 		if (view->cookie_base.cookie == self->bindings.cookies[set][binding])
 			return;
-		ResourceBinding &b = self->bindings.bindings[set][binding];
-		b.buffer_view = bufferview_get_view(view);
+		ResourceBinding *b = &self->bindings.bindings[set][binding];
+		b->buffer_view = bufferview_get_view(view);
 		self->bindings.cookies[set][binding] = view->cookie_base.cookie;
 		self->bindings.secondary_cookies[set][binding] = 0;
 		self->dirty_sets |= 1u << set;
@@ -15967,11 +15967,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				continue;
 			}
 
-			ResourceBinding &b = self->bindings.bindings[set][start_binding + i];
-			b.image.fp.imageLayout = ref->layout;
-			b.image.integer.imageLayout = ref->layout;
-			b.image.fp.imageView = imageview_get_float_view(view);
-			b.image.integer.imageView = imageview_get_integer_view(view);
+			ResourceBinding *b = &self->bindings.bindings[set][start_binding + i];
+			b->image.fp.imageLayout = ref->layout;
+			b->image.integer.imageLayout = ref->layout;
+			b->image.fp.imageView = imageview_get_float_view(view);
+			b->image.integer.imageView = imageview_get_integer_view(view);
 			self->bindings.cookies[set][start_binding + i] = view->cookie_base.cookie;
 			self->dirty_sets |= 1u << set;
 		} }
@@ -15988,11 +15988,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		if (cookie == self->bindings.cookies[set][binding] && self->bindings.bindings[set][binding].image.fp.imageLayout == layout)
 			return;
 
-		ResourceBinding &b = self->bindings.bindings[set][binding];
-		b.image.fp.imageLayout = layout;
-		b.image.fp.imageView = float_view;
-		b.image.integer.imageLayout = layout;
-		b.image.integer.imageView = integer_view;
+		ResourceBinding *b = &self->bindings.bindings[set][binding];
+		b->image.fp.imageLayout = layout;
+		b->image.fp.imageView = float_view;
+		b->image.integer.imageLayout = layout;
+		b->image.integer.imageView = integer_view;
 		self->bindings.cookies[set][binding] = cookie;
 		self->dirty_sets |= 1u << set;
 	}
@@ -16119,126 +16119,126 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 			FOR_EACH_BIT(set_layout->uniform_buffer_mask, binding)
 			{
-				VkWriteDescriptorSet &write = writes[write_count++];
-				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				write.pNext = NULL;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-				write.dstArrayElement = 0;
-				write.dstBinding = binding;
-				write.dstSet = allocated.set;
+				VkWriteDescriptorSet *write = &writes[write_count++];
+				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write->pNext = NULL;
+				write->descriptorCount = 1;
+				write->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+				write->dstArrayElement = 0;
+				write->dstBinding = binding;
+				write->dstSet = allocated.set;
 
 				// Offsets are applied dynamically.
-				VkDescriptorBufferInfo &buffer = buffer_info[buffer_info_count++];
-				buffer = self->bindings.bindings[set][binding].buffer;
-				buffer.offset = 0;
-				write.pBufferInfo = &buffer;
+				VkDescriptorBufferInfo *buffer = &buffer_info[buffer_info_count++];
+				*buffer = self->bindings.bindings[set][binding].buffer;
+				buffer->offset = 0;
+				write->pBufferInfo = buffer;
 			}
 
 			FOR_EACH_BIT(set_layout->storage_buffer_mask, binding)
 			{
-				VkWriteDescriptorSet &write = writes[write_count++];
-				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				write.pNext = NULL;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-				write.dstArrayElement = 0;
-				write.dstBinding = binding;
-				write.dstSet = allocated.set;
-				write.pBufferInfo = &self->bindings.bindings[set][binding].buffer;
+				VkWriteDescriptorSet *write = &writes[write_count++];
+				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write->pNext = NULL;
+				write->descriptorCount = 1;
+				write->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				write->dstArrayElement = 0;
+				write->dstBinding = binding;
+				write->dstSet = allocated.set;
+				write->pBufferInfo = &self->bindings.bindings[set][binding].buffer;
 			}
 
 			FOR_EACH_BIT(set_layout->sampled_buffer_mask, binding)
 			{
-				VkWriteDescriptorSet &write = writes[write_count++];
-				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				write.pNext = NULL;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-				write.dstArrayElement = 0;
-				write.dstBinding = binding;
-				write.dstSet = allocated.set;
-				write.pTexelBufferView = &self->bindings.bindings[set][binding].buffer_view;
+				VkWriteDescriptorSet *write = &writes[write_count++];
+				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write->pNext = NULL;
+				write->descriptorCount = 1;
+				write->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+				write->dstArrayElement = 0;
+				write->dstBinding = binding;
+				write->dstSet = allocated.set;
+				write->pTexelBufferView = &self->bindings.bindings[set][binding].buffer_view;
 			}
 
 			FOR_EACH_BIT(set_layout->sampled_image_mask, binding)
 			{
-				VkWriteDescriptorSet &write = writes[write_count++];
-				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				write.pNext = NULL;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				write.dstArrayElement = 0;
-				write.dstBinding = binding;
-				write.dstSet = allocated.set;
+				VkWriteDescriptorSet *write = &writes[write_count++];
+				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write->pNext = NULL;
+				write->descriptorCount = 1;
+				write->descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				write->dstArrayElement = 0;
+				write->dstBinding = binding;
+				write->dstSet = allocated.set;
 
 				if (set_layout->fp_mask & (1u << binding))
-					write.pImageInfo = &self->bindings.bindings[set][binding].image.fp;
+					write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 				else
-					write.pImageInfo = &self->bindings.bindings[set][binding].image.integer;
+					write->pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
 
 			FOR_EACH_BIT(set_layout->separate_image_mask, binding)
 			{
-				VkWriteDescriptorSet &write = writes[write_count++];
-				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				write.pNext = NULL;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-				write.dstArrayElement = 0;
-				write.dstBinding = binding;
-				write.dstSet = allocated.set;
+				VkWriteDescriptorSet *write = &writes[write_count++];
+				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write->pNext = NULL;
+				write->descriptorCount = 1;
+				write->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+				write->dstArrayElement = 0;
+				write->dstBinding = binding;
+				write->dstSet = allocated.set;
 
 				if (set_layout->fp_mask & (1u << binding))
-					write.pImageInfo = &self->bindings.bindings[set][binding].image.fp;
+					write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 				else
-					write.pImageInfo = &self->bindings.bindings[set][binding].image.integer;
+					write->pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
 
 			FOR_EACH_BIT(set_layout->sampler_mask & ~set_layout->immutable_sampler_mask, binding)
 			{
-				VkWriteDescriptorSet &write = writes[write_count++];
-				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				write.pNext = NULL;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-				write.dstArrayElement = 0;
-				write.dstBinding = binding;
-				write.dstSet = allocated.set;
-				write.pImageInfo = &self->bindings.bindings[set][binding].image.fp;
+				VkWriteDescriptorSet *write = &writes[write_count++];
+				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write->pNext = NULL;
+				write->descriptorCount = 1;
+				write->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+				write->dstArrayElement = 0;
+				write->dstBinding = binding;
+				write->dstSet = allocated.set;
+				write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 			}
 
 			FOR_EACH_BIT(set_layout->storage_image_mask, binding)
 			{
-				VkWriteDescriptorSet &write = writes[write_count++];
-				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				write.pNext = NULL;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-				write.dstArrayElement = 0;
-				write.dstBinding = binding;
-				write.dstSet = allocated.set;
+				VkWriteDescriptorSet *write = &writes[write_count++];
+				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write->pNext = NULL;
+				write->descriptorCount = 1;
+				write->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				write->dstArrayElement = 0;
+				write->dstBinding = binding;
+				write->dstSet = allocated.set;
 
 				if (set_layout->fp_mask & (1u << binding))
-					write.pImageInfo = &self->bindings.bindings[set][binding].image.fp;
+					write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 				else
-					write.pImageInfo = &self->bindings.bindings[set][binding].image.integer;
+					write->pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
 
 			FOR_EACH_BIT(set_layout->input_attachment_mask, binding)
 			{
-				VkWriteDescriptorSet &write = writes[write_count++];
-				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				write.pNext = NULL;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-				write.dstArrayElement = 0;
-				write.dstBinding = binding;
-				write.dstSet = allocated.set;
+				VkWriteDescriptorSet *write = &writes[write_count++];
+				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write->pNext = NULL;
+				write->descriptorCount = 1;
+				write->descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+				write->dstArrayElement = 0;
+				write->dstBinding = binding;
+				write->dstSet = allocated.set;
 				if (set_layout->fp_mask & (1u << binding))
-					write.pImageInfo = &self->bindings.bindings[set][binding].image.fp;
+					write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 				else
-					write.pImageInfo = &self->bindings.bindings[set][binding].image.integer;
+					write->pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
 
 			vkUpdateDescriptorSets(device_get_device(self->device), write_count, writes, 0, NULL);
@@ -16275,27 +16275,27 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_set_opaque_state(struct CommandBuffer *self)
 	{
-		PipelineState::State &state = self->static_state.state;
+		PipelineState::State *state = &self->static_state.state;
 		memset(&state, 0, sizeof(state));
-		state.cull_mode = VK_CULL_MODE_BACK_BIT;
-		state.blend_enable = false;
-		state.depth_test = true;
-		state.depth_compare = VK_COMPARE_OP_LESS_OR_EQUAL;
-		state.depth_write = true;
-		state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		state->cull_mode = VK_CULL_MODE_BACK_BIT;
+		state->blend_enable = false;
+		state->depth_test = true;
+		state->depth_compare = VK_COMPARE_OP_LESS_OR_EQUAL;
+		state->depth_write = true;
+		state->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
 		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 	}
 
 	void commandbuffer_set_quad_state(struct CommandBuffer *self)
 	{
-		PipelineState::State &state = self->static_state.state;
+		PipelineState::State *state = &self->static_state.state;
 		memset(&state, 0, sizeof(state));
-		state.cull_mode = VK_CULL_MODE_NONE;
-		state.blend_enable = false;
-		state.depth_test = false;
-		state.depth_write = false;
-		state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+		state->cull_mode = VK_CULL_MODE_NONE;
+		state->blend_enable = false;
+		state->depth_test = false;
+		state->depth_write = false;
+		state->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT);
 	}
 
@@ -17525,11 +17525,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			memset(&zero_submit, 0, sizeof(zero_submit));
 			VkSubmitInfoVec_push(&submits, &zero_submit);
 
-			VkSubmitInfo &submit = *VkSubmitInfoVec_back(&submits);
-			submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			submit.pNext = NULL;
-			submit.commandBufferCount = CommandBufferVec_size(&cmds) - last_cmd;
-			submit.pCommandBuffers = CommandBufferVec_data(&cmds) + last_cmd;
+			VkSubmitInfo *submit = VkSubmitInfoVec_back(&submits);
+			submit->sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submit->pNext = NULL;
+			submit->commandBufferCount = CommandBufferVec_size(&cmds) - last_cmd;
+			submit->pCommandBuffers = CommandBufferVec_data(&cmds) + last_cmd;
 			last_cmd = CommandBufferVec_size(&cmds);
 		}
 
@@ -17543,17 +17543,17 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		} }
 
 		{ int i; for (i = 0; i < VkSubmitInfoVec_size(&submits); i++) {
-			VkSubmitInfo &submit = *VkSubmitInfoVec_at(&submits, i);
-			submit.waitSemaphoreCount = SemaphoreVec_size(&waits[i]);
+			VkSubmitInfo *submit = VkSubmitInfoVec_at(&submits, i);
+			submit->waitSemaphoreCount = SemaphoreVec_size(&waits[i]);
 			if (!SemaphoreVec_empty(&waits[i]))
 			{
-				submit.pWaitSemaphores = SemaphoreVec_data(&waits[i]);
-				submit.pWaitDstStageMask = VkFlagsVec_data(&stages[i]);
+				submit->pWaitSemaphores = SemaphoreVec_data(&waits[i]);
+				submit->pWaitDstStageMask = VkFlagsVec_data(&stages[i]);
 			}
 
-			submit.signalSemaphoreCount = SemaphoreVec_size(&signals[i]);
+			submit->signalSemaphoreCount = SemaphoreVec_size(&signals[i]);
 			if (!SemaphoreVec_empty(&signals[i]))
-				submit.pSignalSemaphores = SemaphoreVec_data(&signals[i]);
+				submit->pSignalSemaphores = SemaphoreVec_data(&signals[i]);
 		} }
 
 		VkQueue queue;
@@ -17940,8 +17940,8 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			vkResetFences(self->device, FenceVec_size(&self->recycle_fences), FenceVec_data(&self->recycle_fences));
 			for (_i = 0; _i < FenceVec_size(&self->recycle_fences); _i++)
 			{
-				VkFence &fence = *FenceVec_at(&self->recycle_fences, _i);
-				fencemanager_recycle_fence(&self->managers->fence, fence);
+				VkFence *fence = FenceVec_at(&self->recycle_fences, _i);
+				fencemanager_recycle_fence(&self->managers->fence, *fence);
 			}
 			FenceVec_clear(&self->recycle_fences);
 		}
@@ -20218,15 +20218,15 @@ Rect fromSRect(SRect rect) {
 		rect_tracker_overlapping(&self->tracker, palette_rect, &overlap);
 		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
-			EnduringTextureRect &other = self->tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because self->tracker.overlapping never returns dead indices
-			if (fromSRect_contains(other.texture_rect.vram_rect, palette_rect) && other.alive) {
-				if (other.texture_rect.offset_x != 0 || other.texture_rect.offset_y != 0) {
+			EnduringTextureRect *other = &self->tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because self->tracker.overlapping never returns dead indices
+			if (fromSRect_contains(other->texture_rect.vram_rect, palette_rect) && other->alive) {
+				if (other->texture_rect.offset_x != 0 || other->texture_rect.offset_y != 0) {
 					continue; // TODO: handle offset subrects
 				}
-				int x = palette_rect.x - other.texture_rect.vram_rect.x;
-				int y = palette_rect.y - other.texture_rect.vram_rect.y;
-				int offset = y * other.texture_rect.vram_rect.width + x;
-				uint16_t *data = other.texture_rect.upload->image + offset;
+				int x = palette_rect.x - other->texture_rect.vram_rect.x;
+				int y = palette_rect.y - other->texture_rect.vram_rect.y;
+				int offset = y * other->texture_rect.vram_rect.width + x;
+				uint16_t *data = other->texture_rect.upload->image + offset;
 				uint32_t hash = crc32(0, (unsigned char*)data, palette_rect.width * sizeof(uint16_t));
 				return { data, hash };
 			}
@@ -20379,10 +20379,10 @@ Rect fromSRect(SRect rect) {
 		rect_tracker_overlapping(&self->tracker, rect, &overlap);
 		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
-			EnduringTextureRect &e = self->tracker.textures.a[index];
-			if (e.alive) { // TODO: This check is unnecessary because self->tracker.overlapping never returns dead indices
+			EnduringTextureRect *e = &self->tracker.textures.a[index];
+			if (e->alive) { // TODO: This check is unnecessary because self->tracker.overlapping never returns dead indices
 				       // Clip to the self->requested rect
-				TextureRectResult result = clip_texture_rect_to_vram(&e.texture_rect, rect);
+				TextureRectResult result = clip_texture_rect_to_vram(&e->texture_rect, rect);
 				if (result.valid) {
 					// assert(rect.contains(fromSRect(result.rect.vram_rect)));
 					ownedrects_push(&to_restore, result.rect);
@@ -20462,10 +20462,10 @@ Rect fromSRect(SRect rect) {
 		{
 		int _oi;
 		for (_oi = 0; _oi < rrvec_size(&self->restorable_rects); _oi++) {
-			RestorableRect &other = self->restorable_rects.items[_oi];
-			if (other.hash == upload->hash && rect_eq(&other.rect, &rect)) {
-				TT_LOG_VERBOSE(RETRO_LOG_INFO, "RESTORATION: %x\n", other.hash);
-				restore = &other;
+			RestorableRect *other = &self->restorable_rects.items[_oi];
+			if (other->hash == upload->hash && rect_eq(&other->rect, &rect)) {
+				TT_LOG_VERBOSE(RETRO_LOG_INFO, "RESTORATION: %x\n", other->hash);
+				restore = other;
 				break;
 			}
 		}
@@ -20688,9 +20688,9 @@ Rect fromSRect(SRect rect) {
 			if ((*cache_hit)) {
 				// cache_result.handle is currently always a non-fused, non-none, index + palette_hash
 				// in the future it may be useful to cache none, but there's currently no way to check if such a containing rect is still alive (since HdTextureHandle's index would be -1)
-				EnduringTextureRect &tex = self->tracker.textures.a[cache_result.handle.index]; // Forgive me
-				if (tex.alive) {
-					(*fastpath_capable_out) = self->fastpath_enabled && ((hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash) ? hd_tex_map_find(&tex.texture_rect.upload->textures, palette_hash)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
+				EnduringTextureRect *tex = &self->tracker.textures.a[cache_result.handle.index]; // Forgive me
+				if (tex->alive) {
+					(*fastpath_capable_out) = self->fastpath_enabled && ((hd_tex_map_find(&tex->texture_rect.upload->textures, palette_hash) ? hd_tex_map_find(&tex->texture_rect.upload->textures, palette_hash)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
 					return cache_result.handle;
 				}
 			}
@@ -20925,11 +20925,11 @@ bool is_power_of_two(int n) {
 		// backup search, in case it's restorable but currently missing from the rect tracker
 		for (_ri = 0; _ri < rrvec_size(&self->restorable_rects); _ri++)
 		{
-			RestorableRect &entry = self->restorable_rects.items[_ri];
+			RestorableRect *entry = &self->restorable_rects.items[_ri];
 			size_t _ti;
-			for (_ti = 0; _ti < ownedrects_size(&entry.to_restore); _ti++)
+			for (_ti = 0; _ti < ownedrects_size(&entry->to_restore); _ti++)
 			{
-				TextureRect *t = &entry.to_restore.v.items[_ti];
+				TextureRect *t = &entry->to_restore.v.items[_ti];
 				if (hash == t->upload->hash)
 					return t->upload;
 			}
@@ -21051,11 +21051,11 @@ bool is_power_of_two(int n) {
 		int _rri;
 		for (_rri = 0; _rri < rrvec_size(&self->restorable_rects); _rri++)
 		{
-			RestorableRect &restorable = self->restorable_rects.items[_rri];
+			RestorableRect *restorable = &self->restorable_rects.items[_rri];
 			{
 				int _tri;
-				for (_tri = 0; _tri < ownedrects_size(&restorable.to_restore); _tri++) {
-					TextureRect *tr = &restorable.to_restore.v.items[_tri];
+				for (_tri = 0; _tri < ownedrects_size(&restorable->to_restore); _tri++) {
+					TextureRect *tr = &restorable->to_restore.v.items[_tri];
 					hd_tex_map_clear(&tr->upload->textures);
 				}
 			}
@@ -21749,16 +21749,16 @@ int64_t page_bytes(FusionRects *fusion)
 		int _sri;
 		for (_sri = 0; _sri < rrvec_size(&self->restorable_rects); _sri++)
 		{
-			RestorableRect &r = self->restorable_rects.items[_sri];
+			RestorableRect *r = &self->restorable_rects.items[_sri];
 			RestorableRectSaveState saved;
 			rrss_init(&saved);
-			saved.hash = r.hash;
-			saved.rect = r.rect;
+			saved.hash = r->hash;
+			saved.rect = r->rect;
 			{
 			int _rti;
-			for (_rti = 0; _rti < ownedrects_size(&r.to_restore); _rti++)
+			for (_rti = 0; _rti < ownedrects_size(&r->to_restore); _rti++)
 			{
-				TextureRect *t = &r.to_restore.v.items[_rti];
+				TextureRect *t = &r->to_restore.v.items[_rti];
 				TextureRectSaveState _ss = to_save_state(t, &state.uploads);
 				TextureRectSaveStateVec_push(&saved.to_restore, &_ss);
 			}
