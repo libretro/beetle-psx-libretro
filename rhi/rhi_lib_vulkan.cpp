@@ -10204,8 +10204,11 @@ Renderer::DisplayRect Renderer::compute_display_rect()
 			upper_offset = render_state.vert_start - 16 - render_state.slstart;
 		}
 	}
-	display_height *= (render_state.is_480i ? 2 : 1);
-	upper_offset *= (render_state.is_480i ? 2 : 1);
+	if (render_state.is_480i)
+	{
+		display_height *= 2;
+		upper_offset   *= 2;
+	}
 
 	return DisplayRect(left_offset, upper_offset, display_width, display_height);
 }
