@@ -1069,26 +1069,12 @@ void PSX_RequestMLExit(void)
 /* Remember to update MemPeek<>() and MemPoke<>() when we change address decoding in MemRW() */
 static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned size, bool is_write, bool access24)
 {
-#if 0
-   if(is_write)
-      printf("Write%d: %08x(orig=%08x), %08x\n", (int)(size * 8), A & mask[A >> 29], A, (*V_p));
-   else
-      printf("Read%d: %08x(orig=%08x)\n", (int)(size * 8), A & mask[A >> 29], A);
-#endif
-
    if(!is_write)
       *timestamp += DMACycleSteal;
 
-   //if(A == 0xa0 && is_write)
-   // DBG_Break();
-
    if(A < 0x00800000)
    {
-      if(is_write)
-      {
-         //(*timestamp)++; // Best-case timing.
-      }
-      else
+      if (!is_write)
       {
          // Overclock: get rid of memory access latency
          if (!psx_gte_overclock)
@@ -1131,23 +1117,12 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
 
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
    {
-
-      //if(is_write)
-      // printf("HW Write%d: %08x %08x\n", (unsigned int)(size*8), (unsigned int)A, (unsigned int)V);
-      //else
-      // printf("HW Read%d: %08x\n", (unsigned int)(size*8), (unsigned int)A);
-
       if(A >= 0x1F801C00 && A <= 0x1F801FFF) // SPU
       {
          if(size == 4 && !access24)
          {
             if(is_write)
             {
-               //*timestamp += 15;
-
-               //if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
-               // PSX_EventHandler(*timestamp);
-
                SPU_Write(*timestamp, A | 0, (*V_p));
                SPU_Write(*timestamp, A | 2, (*V_p) >> 16);
             }
@@ -1165,11 +1140,6 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
          {
             if(is_write)
             {
-               //*timestamp += 8;
-
-               //if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
-               // PSX_EventHandler(*timestamp);
-
                SPU_Write(*timestamp, A & ~1, (*V_p));
             }
             else
@@ -1190,9 +1160,7 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
       if(A >= 0x1f801800 && A <= 0x1f80180F)
       {
          if(!is_write)
-         {
             *timestamp += 6 * size; //24;
-         }
 
          if(is_write)
             PS_CDC_Write(PSX_CDC, *timestamp, A & 0x3, (*V_p));
@@ -1205,12 +1173,12 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
       if(A >= 0x1F801810 && A <= 0x1F801817)
       {
          if(!is_write)
-            (*timestamp)++;
-
-         if(is_write)
+	 {
+		 (*timestamp)++;
+		 (*V_p) = GPU_Read(*timestamp, A);
+	 }
+	 else
             GPU_Write(*timestamp, A, (*V_p));
-         else
-            (*V_p) = GPU_Read(*timestamp, A);
 
          return;
       }
@@ -1218,12 +1186,12 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
       if(A >= 0x1F801820 && A <= 0x1F801827)
       {
          if(!is_write)
-            (*timestamp)++;
-
-         if(is_write)
+	 {
+		 (*timestamp)++;
+		 (*V_p) = MDEC_Read(*timestamp, A);
+	 }
+	 else
             MDEC_Write(*timestamp, A, (*V_p));
-         else
-            (*V_p) = MDEC_Read(*timestamp, A);
 
          return;
       }
@@ -1232,12 +1200,6 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
       {
          unsigned index = (A & 0x1F) >> 2;
 
-         if(!is_write)
-            (*timestamp)++;
-
-         //if(A == 0x1F801014 && is_write)
-         // fprintf(stderr, "%08x %08x\n",A,V);
-
          if(is_write)
          {
             (*V_p) <<= (A & 3) * 8;
@@ -1245,6 +1207,7 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
          }
          else
          {
+            (*timestamp)++;
             (*V_p) = SysControl.Regs[index] | SysControl_OR[index];
             (*V_p) >>= (A & 3) * 8;
          }
@@ -1253,25 +1216,25 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
 
       if(A >= 0x1F801040 && A <= 0x1F80104F)
       {
-         if(!is_write)
-            (*timestamp)++;
-
          if(is_write)
             FrontIO_Write(PSX_FIO, *timestamp, A, (*V_p));
          else
-            (*V_p) = FrontIO_Read(PSX_FIO, *timestamp, A);
+	 {
+		 (*timestamp)++;
+		 (*V_p) = FrontIO_Read(PSX_FIO, *timestamp, A);
+	 }
          return;
       }
 
       if(A >= 0x1F801050 && A <= 0x1F80105F)
       {
          if(!is_write)
-            (*timestamp)++;
-
-         if(is_write)
+	 {
+		 (*timestamp)++;
+		 (*V_p) = SIO_Read(*timestamp, A);
+	 }
+	 else
             SIO_Write(*timestamp, A, (*V_p));
-         else
-            (*V_p) = SIO_Read(*timestamp, A);
          return;
       }
 
@@ -1279,24 +1242,26 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
       if(A >= 0x1F801070 && A <= 0x1F801077) // IRQ
       {
          if(!is_write)
-            (*timestamp)++;
-
-         if(is_write)
+	 {
+		 (*timestamp)++;
+		 (*V_p) = IRQ_Read(A);
+	 }
+	 else
             IRQ_Write(A, (*V_p));
-         else
-            (*V_p) = IRQ_Read(A);
          return;
       }
 
       if(A >= 0x1F801080 && A <= 0x1F8010FF)    // DMA
       {
          if(!is_write)
-            (*timestamp)++;
-
-         if(is_write)
+	 {
+		 (*timestamp)++;
+		 (*V_p) = DMA_Read(*timestamp, A);
+	 }
+	 else
+	 {
             DMA_Write(*timestamp, A, (*V_p));
-         else
-            (*V_p) = DMA_Read(*timestamp, A);
+	 }
 
          return;
       }
@@ -1304,12 +1269,14 @@ static INLINE void MemRW(int32_t *timestamp, uint32_t A, uint32_t *V_p, unsigned
       if(A >= 0x1F801100 && A <= 0x1F80113F) // Root counters
       {
          if(!is_write)
-            (*timestamp)++;
-
-         if(is_write)
-            TIMER_Write(*timestamp, A, (*V_p));
-         else
-            (*V_p) = TIMER_Read(*timestamp, A);
+	 {
+		 (*timestamp)++;
+		 (*V_p) = TIMER_Read(*timestamp, A);
+	 }
+	 else
+	 {
+		 TIMER_Write(*timestamp, A, (*V_p));
+	 }
 
          return;
       }
