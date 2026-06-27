@@ -17877,178 +17877,199 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{ struct BufferView *_bv = (struct BufferView *)object_pool_raw_allocate(&handle_pool.buffer_views); bufferview_init(_bv, this, view, view_info); return bvh_make(_bv); }
 	}
 
-	class ImageResourceHolder
+	/* ImageResourceHolder: a scoped owner of the Vulkan objects created while
+	 * building an Image (the image, its memory/allocation, and the various image
+	 * views). Converted from a C++ RAII class to a plain C struct +
+	 * image_resource_holder_* free functions. The destructor (cleanup() if still
+	 * owned) becomes image_resource_holder_fini, which the two using functions
+	 * (create_image_view / create_image) call explicitly before every return.
+	 * Ownership is released by setting owned=false once the objects are handed off. */
+	struct ImageResourceHolder
 	{
-		public:
-			ImageResourceHolder(VkDevice device)
-				: device(device)
-			{
-			}
+		VkDevice device;
 
-			~ImageResourceHolder()
-			{
-				if (owned)
-					cleanup();
-			}
-
-			VkDevice device;
-
-			VkImage image = VK_NULL_HANDLE;
-			VkDeviceMemory memory = VK_NULL_HANDLE;
-			VkImageView image_view = VK_NULL_HANDLE;
-			VkImageView depth_view = VK_NULL_HANDLE;
-			VkImageView stencil_view = VK_NULL_HANDLE;
-			RenderTargetViewVec rt_views = { NULL, 0, 0 };
-			DeviceAllocation allocation;
-			DeviceAllocator *allocator = NULL;
-			bool owned = true;
-
-			bool create_default_views(const ImageCreateInfo &create_info, const VkImageViewCreateInfo *view_info)
-			{
-				if ((create_info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-								VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) == 0)
-				{
-					LOGE("Cannot create image view unless certain usage flags are present.\n");
-					return false;
-				}
-
-				VkImageViewCreateInfo default_view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-				if (!view_info)
-				{
-					default_view_info.image = image;
-					default_view_info.format = create_info.format;
-					default_view_info.components = create_info.swizzle;
-					default_view_info.subresourceRange.aspectMask = format_to_aspect_mask(default_view_info.format);
-					default_view_info.viewType = get_image_view_type(create_info, NULL);
-					default_view_info.subresourceRange.baseMipLevel = 0;
-					default_view_info.subresourceRange.baseArrayLayer = 0;
-					default_view_info.subresourceRange.levelCount = create_info.levels;
-					default_view_info.subresourceRange.layerCount = create_info.layers;
-					view_info = &default_view_info;
-				}
-
-				if (!create_alt_views(create_info, *view_info))
-					return false;
-
-				if (!create_render_target_views(create_info, *view_info))
-					return false;
-
-				if (!create_default_view(*view_info))
-					return false;
-
-				return true;
-			}
-
-		private:
-			bool create_render_target_views(const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info)
-			{
-
-				if (info.viewType == VK_IMAGE_VIEW_TYPE_3D)
-					return true;
-
-				// If we have a render target, and non-trivial case (layers = 1, levels = 1),
-				// create an array of render targets which correspond to each layer (mip 0).
-				if ((image_create_info.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0 &&
-						((info.subresourceRange.levelCount > 1) || (info.subresourceRange.layerCount > 1)))
-				{
-					VkImageViewCreateInfo view_info = info;
-					view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-					view_info.subresourceRange.baseMipLevel = info.subresourceRange.baseMipLevel;
-					for (uint32_t layer = 0; layer < info.subresourceRange.layerCount; layer++)
-					{
-						view_info.subresourceRange.levelCount = 1;
-						view_info.subresourceRange.layerCount = 1;
-						view_info.subresourceRange.baseArrayLayer = layer + info.subresourceRange.baseArrayLayer;
-
-						VkImageView rt_view;
-						if (vkCreateImageView(device, &view_info, NULL, &rt_view) != VK_SUCCESS)
-							return false;
-
-						RenderTargetViewVec_push(&rt_views, &rt_view);
-					}
-				}
-
-				return true;
-			}
-
-			bool create_alt_views(const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info)
-			{
-				if (info.viewType == VK_IMAGE_VIEW_TYPE_CUBE ||
-						info.viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY ||
-						info.viewType == VK_IMAGE_VIEW_TYPE_3D)
-				{
-					return true;
-				}
-
-				if (info.subresourceRange.aspectMask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
-				{
-					if ((image_create_info.usage & ~VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
-					{
-						// Sanity check. Don't want to implement layered views for this.
-						if (info.subresourceRange.levelCount > 1)
-						{
-							LOGE("Cannot create depth stencil attachments with more than 1 mip level currently, and non-DS usage flags.\n");
-							return false;
-						}
-
-						if (info.subresourceRange.layerCount > 1)
-						{
-							LOGE("Cannot create layered depth stencil attachments with non-DS usage flags.\n");
-							return false;
-						}
-
-						VkImageViewCreateInfo view_info = info;
-
-						// We need this to be able to sample the texture, or otherwise use it as a non-pure DS attachment.
-						view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-						if (vkCreateImageView(device, &view_info, NULL, &depth_view) != VK_SUCCESS)
-							return false;
-
-						view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
-						if (vkCreateImageView(device, &view_info, NULL, &stencil_view) != VK_SUCCESS)
-							return false;
-					}
-				}
-
-				return true;
-			}
-
-			bool create_default_view(const VkImageViewCreateInfo &info)
-			{
-				// Create the normal image view. This one contains every subresource.
-				if (vkCreateImageView(device, &info, NULL, &image_view) != VK_SUCCESS)
-					return false;
-
-				return true;
-			}
-
-			void cleanup()
-			{
-				if (image_view)
-					vkDestroyImageView(device, image_view, NULL);
-				if (depth_view)
-					vkDestroyImageView(device, depth_view, NULL);
-				if (stencil_view)
-					vkDestroyImageView(device, stencil_view, NULL);
-				{
-					int _i;
-					for (_i = 0; _i < RenderTargetViewVec_size(&rt_views); _i++)
-						vkDestroyImageView(device, *RenderTargetViewVec_at(&rt_views, _i), NULL);
-				}
-				RenderTargetViewVec_free_storage(&rt_views);
-
-				if (image)
-					vkDestroyImage(device, image, NULL);
-				if (memory)
-					vkFreeMemory(device, memory, NULL);
-				if (allocator)
-					deviceallocation_free_immediate_alloc(&allocation, allocator);
-			}
+		VkImage image;
+		VkDeviceMemory memory;
+		VkImageView image_view;
+		VkImageView depth_view;
+		VkImageView stencil_view;
+		RenderTargetViewVec rt_views;
+		DeviceAllocation allocation;
+		DeviceAllocator *allocator;
+		bool owned;
 	};
+
+	static inline void image_resource_holder_init(struct ImageResourceHolder *self, VkDevice device)
+	{
+		self->device = device;
+		self->image = VK_NULL_HANDLE;
+		self->memory = VK_NULL_HANDLE;
+		self->image_view = VK_NULL_HANDLE;
+		self->depth_view = VK_NULL_HANDLE;
+		self->stencil_view = VK_NULL_HANDLE;
+		self->rt_views.items = NULL; self->rt_views.count = 0; self->rt_views.cap = 0;
+		memset(&self->allocation, 0, sizeof(self->allocation));
+		self->allocator = NULL;
+		self->owned = true;
+	}
+
+	static void image_resource_holder_cleanup(struct ImageResourceHolder *self);
+	static inline void image_resource_holder_fini(struct ImageResourceHolder *self)
+	{
+		if (self->owned)
+			image_resource_holder_cleanup(self);
+	}
+
+	bool image_resource_holder_create_default_views(struct ImageResourceHolder *self, const ImageCreateInfo &create_info, const VkImageViewCreateInfo *view_info);
+	static bool image_resource_holder_create_render_target_views(struct ImageResourceHolder *self, const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info);
+	static bool image_resource_holder_create_alt_views(struct ImageResourceHolder *self, const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info);
+	static bool image_resource_holder_create_default_view(struct ImageResourceHolder *self, const VkImageViewCreateInfo &info);
+
+	bool image_resource_holder_create_default_views(struct ImageResourceHolder *self, const ImageCreateInfo &create_info, const VkImageViewCreateInfo *view_info)
+	{
+		if ((create_info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+						VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) == 0)
+		{
+			LOGE("Cannot create image view unless certain usage flags are present.\n");
+			return false;
+		}
+
+		VkImageViewCreateInfo default_view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+		if (!view_info)
+		{
+			default_view_info.image = self->image;
+			default_view_info.format = create_info.format;
+			default_view_info.components = create_info.swizzle;
+			default_view_info.subresourceRange.aspectMask = format_to_aspect_mask(default_view_info.format);
+			default_view_info.viewType = get_image_view_type(create_info, NULL);
+			default_view_info.subresourceRange.baseMipLevel = 0;
+			default_view_info.subresourceRange.baseArrayLayer = 0;
+			default_view_info.subresourceRange.levelCount = create_info.levels;
+			default_view_info.subresourceRange.layerCount = create_info.layers;
+			view_info = &default_view_info;
+		}
+
+		if (!image_resource_holder_create_alt_views(self, create_info, *view_info))
+			return false;
+
+		if (!image_resource_holder_create_render_target_views(self, create_info, *view_info))
+			return false;
+
+		if (!image_resource_holder_create_default_view(self, *view_info))
+			return false;
+
+		return true;
+	}
+
+	static bool image_resource_holder_create_render_target_views(struct ImageResourceHolder *self, const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info)
+	{
+
+		if (info.viewType == VK_IMAGE_VIEW_TYPE_3D)
+			return true;
+
+		// If we have a render target, and non-trivial case (layers = 1, levels = 1),
+		// create an array of render targets which correspond to each layer (mip 0).
+		if ((image_create_info.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0 &&
+				((info.subresourceRange.levelCount > 1) || (info.subresourceRange.layerCount > 1)))
+		{
+			VkImageViewCreateInfo view_info = info;
+			view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			view_info.subresourceRange.baseMipLevel = info.subresourceRange.baseMipLevel;
+			for (uint32_t layer = 0; layer < info.subresourceRange.layerCount; layer++)
+			{
+				view_info.subresourceRange.levelCount = 1;
+				view_info.subresourceRange.layerCount = 1;
+				view_info.subresourceRange.baseArrayLayer = layer + info.subresourceRange.baseArrayLayer;
+
+				VkImageView rt_view;
+				if (vkCreateImageView(self->device, &view_info, NULL, &rt_view) != VK_SUCCESS)
+					return false;
+
+				RenderTargetViewVec_push(&self->rt_views, &rt_view);
+			}
+		}
+
+		return true;
+	}
+
+	static bool image_resource_holder_create_alt_views(struct ImageResourceHolder *self, const ImageCreateInfo &image_create_info, const VkImageViewCreateInfo &info)
+	{
+		if (info.viewType == VK_IMAGE_VIEW_TYPE_CUBE ||
+				info.viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY ||
+				info.viewType == VK_IMAGE_VIEW_TYPE_3D)
+		{
+			return true;
+		}
+
+		if (info.subresourceRange.aspectMask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
+		{
+			if ((image_create_info.usage & ~VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
+			{
+				// Sanity check. Don't want to implement layered views for this.
+				if (info.subresourceRange.levelCount > 1)
+				{
+					LOGE("Cannot create depth stencil attachments with more than 1 mip level currently, and non-DS usage flags.\n");
+					return false;
+				}
+
+				if (info.subresourceRange.layerCount > 1)
+				{
+					LOGE("Cannot create layered depth stencil attachments with non-DS usage flags.\n");
+					return false;
+				}
+
+				VkImageViewCreateInfo view_info = info;
+
+				// We need this to be able to sample the texture, or otherwise use it as a non-pure DS attachment.
+				view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+				if (vkCreateImageView(self->device, &view_info, NULL, &self->depth_view) != VK_SUCCESS)
+					return false;
+
+				view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+				if (vkCreateImageView(self->device, &view_info, NULL, &self->stencil_view) != VK_SUCCESS)
+					return false;
+			}
+		}
+
+		return true;
+	}
+
+	static bool image_resource_holder_create_default_view(struct ImageResourceHolder *self, const VkImageViewCreateInfo &info)
+	{
+		// Create the normal image view. This one contains every subresource.
+		if (vkCreateImageView(self->device, &info, NULL, &self->image_view) != VK_SUCCESS)
+			return false;
+
+		return true;
+	}
+
+	static void image_resource_holder_cleanup(struct ImageResourceHolder *self)
+	{
+		if (self->image_view)
+			vkDestroyImageView(self->device, self->image_view, NULL);
+		if (self->depth_view)
+			vkDestroyImageView(self->device, self->depth_view, NULL);
+		if (self->stencil_view)
+			vkDestroyImageView(self->device, self->stencil_view, NULL);
+		{
+			int _i;
+			for (_i = 0; _i < RenderTargetViewVec_size(&self->rt_views); _i++)
+				vkDestroyImageView(self->device, *RenderTargetViewVec_at(&self->rt_views, _i), NULL);
+		}
+		RenderTargetViewVec_free_storage(&self->rt_views);
+
+		if (self->image)
+			vkDestroyImage(self->device, self->image, NULL);
+		if (self->memory)
+			vkFreeMemory(self->device, self->memory, NULL);
+		if (self->allocator)
+			deviceallocation_free_immediate_alloc(&self->allocation, self->allocator);
+	}
 
 	ImageViewHandle Device::create_image_view(const ImageViewCreateInfo &create_info)
 	{
-		ImageResourceHolder holder(device);
+		ImageResourceHolder holder;
+		image_resource_holder_init(&holder, device);
 		const ImageCreateInfo &image_create_info = image_get_create_info(create_info.image);
 
 		VkFormat format = create_info.format != VK_FORMAT_UNDEFINED ? create_info.format : image_create_info.format;
@@ -18079,8 +18100,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		view_info.subresourceRange.levelCount = num_levels;
 		view_info.subresourceRange.layerCount = num_layers;
 
-		if (!holder.create_default_views(image_create_info, &view_info))
+		if (!image_resource_holder_create_default_views(&holder, image_create_info, &view_info))
+		{
+			image_resource_holder_fini(&holder);
 			return iv_make(NULL);
+		}
 
 		ImageViewCreateInfo tmp = create_info;
 		tmp.format = format;
@@ -18091,10 +18115,14 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			imageview_set_alt_views(iv_get(&ret), holder.depth_view, holder.stencil_view);
 			imageview_set_render_target_views(iv_get(&ret), holder.rt_views);
 			holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
+			image_resource_holder_fini(&holder);
 			return ret;
 		}
 		else
+		{
+			image_resource_holder_fini(&holder);
 			return iv_make(NULL);
+		}
 	}
 
 	InitialImageBuffer Device::create_image_staging_buffer(const ImageCreateInfo &info, const ImageInitialData *initial)
@@ -18189,8 +18217,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	ImageHandle Device::create_image_from_staging_buffer(const ImageCreateInfo &create_info,
 			const InitialImageBuffer *staging_buffer)
 	{
-		ImageResourceHolder holder(device);
+		ImageResourceHolder holder;
 		VkMemoryRequirements reqs;
+		image_resource_holder_init(&holder, device);
 
 		VkImageCreateInfo info = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 		info.format = create_info.format;
@@ -18223,31 +18252,38 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		if (!image_format_is_supported(create_info.format, image_usage_to_features(info.usage), info.tiling))
 		{
 			LOGE("Format %u is not supported for usage flags!\n", unsigned(create_info.format));
+			image_resource_holder_fini(&holder);
 			return ih_make(NULL);
 		}
 
 		if (vkCreateImage(device, &info, NULL, &holder.image) != VK_SUCCESS)
 		{
 			LOGE("Failed to create image in vkCreateImage.\n");
+			image_resource_holder_fini(&holder);
 			return ih_make(NULL);
 		}
 
 		vkGetImageMemoryRequirements(device, holder.image, &reqs);
 		uint32_t memory_type = find_memory_type(create_info.domain, reqs.memoryTypeBits);
 		if (memory_type == UINT32_MAX)
+		{
+			image_resource_holder_fini(&holder);
 			return ih_make(NULL);
+		}
 
 		if (!deviceallocator_allocate_image_memory(&managers.memory, reqs.size, reqs.alignment, memory_type,
 					ALLOCATION_TILING_OPTIMAL,
 					&holder.allocation, holder.image))
 		{
 			LOGE("Failed to allocate image memory (type %u, size: %u).\n", unsigned(memory_type), unsigned(reqs.size));
+			image_resource_holder_fini(&holder);
 			return ih_make(NULL);
 		}
 
 		if (vkBindImageMemory(device, holder.image, deviceallocation_get_memory(&holder.allocation), deviceallocation_get_offset(&holder.allocation)) != VK_SUCCESS)
 		{
 			LOGE("Failed to bind image memory.\n");
+			image_resource_holder_fini(&holder);
 			return ih_make(NULL);
 		}
 
@@ -18259,8 +18295,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) != 0;
 		if (has_view)
 		{
-			if (!holder.create_default_views(tmpinfo, NULL))
+			if (!image_resource_holder_create_default_views(&holder, tmpinfo, NULL))
+			{
+				image_resource_holder_fini(&holder);
 				return ih_make(NULL);
+			}
 		}
 
 		struct Image *_im = (struct Image *)object_pool_raw_allocate(&handle_pool.images); image_init(_im, this, holder.image, holder.image_view, holder.allocation, tmpinfo); ImageHandle handle = ih_make(_im);
