@@ -8405,6 +8405,32 @@ extern retro_log_printf_t log_cb;
 		return p;
 	}
 
+	/* Per-batch semi-transparent draw state. Hoisted out of Renderer to file scope
+	 * and de-C++'d: the operator==/operator!= become semi_transparent_state_eq.
+	 * POD otherwise (its hd_texture_index HdTextureHandle compares field-wise via
+	 * the handle's own equality). */
+	struct SemiTransparentState
+	{
+		int scissor_index;
+		HdTextureHandle hd_texture_index;
+		SemiTransparentMode semi_transparent;
+		bool textured;
+		bool masked;
+		bool filtering;
+		bool scaled_read;
+		unsigned shift;
+		bool offset_uv;
+	};
+	POD_VEC_DECLARE(SemiTransparentStateVec, SemiTransparentState);
+
+	static inline bool semi_transparent_state_eq(const struct SemiTransparentState *a, const struct SemiTransparentState *b)
+	{
+		return a->scissor_index == b->scissor_index && a->hd_texture_index == b->hd_texture_index &&
+			a->semi_transparent == b->semi_transparent && a->textured == b->textured && a->masked == b->masked &&
+			a->filtering == b->filtering && a->scaled_read == b->scaled_read && a->shift == b->shift &&
+			a->offset_uv == b->offset_uv;
+	}
+
 	class Renderer
 	{
 		public:
@@ -8951,32 +8977,6 @@ extern retro_log_printf_t log_cb;
 				uint32_t sample;
 			};
 
-			struct SemiTransparentState
-			{
-				int scissor_index;
-				HdTextureHandle hd_texture_index;
-				SemiTransparentMode semi_transparent;
-				bool textured;
-				bool masked;
-				bool filtering;
-				bool scaled_read;
-				unsigned shift;
-				bool offset_uv;
-
-				bool operator==(const SemiTransparentState &other) const
-				{
-					return scissor_index == other.scissor_index && hd_texture_index == other.hd_texture_index &&
-						semi_transparent == other.semi_transparent && textured == other.textured && masked == other.masked &&
-						filtering == other.filtering && scaled_read == other.scaled_read && shift == other.shift &&
-						offset_uv == other.offset_uv;
-				}
-
-				bool operator!=(const SemiTransparentState &other) const
-				{
-					return !(*this == other);
-				}
-			};
-
 			struct ClearCandidate
 			{
 				Rect rect;
@@ -8985,7 +8985,6 @@ extern retro_log_printf_t log_cb;
 			};
 
 			POD_VEC_DECLARE(BufferVertexVec, BufferVertex);
-			POD_VEC_DECLARE(SemiTransparentStateVec, SemiTransparentState);
 			POD_VEC_DECLARE(BlitInfoVec, BlitInfo);
 			POD_VEC_DECLARE(ClearCandidateVec, ClearCandidate);
 			POD_VEC_DECLARE(Rect2DVec, VkRect2D);
@@ -11285,7 +11284,7 @@ void Renderer::render_semi_transparent_primitives()
 		// If we need programmable shading, we can't batch as primitives may overlap.
 		// We could in theory do some fancy tests here, but probably overkill here.
 		if ((last_state.masked && last_state.semi_transparent != SemiTransparentMode_None) ||
-		    (last_state != *SemiTransparentStateVec_at(&queue.semi_transparent_state, i)))
+		    !semi_transparent_state_eq(&last_state, SemiTransparentStateVec_at(&queue.semi_transparent_state, i)))
 		{
 			unsigned to_draw = i - last_draw_offset;
 			commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
