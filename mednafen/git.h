@@ -1,23 +1,6 @@
 #ifndef _GIT_H
 #define _GIT_H
 
-/* Mednafen "Game Information" header - originally a sprawling collection
- * of types describing emulated systems, video modes, input devices, and
- * cheat formats for Mednafen's own GUI. This libretro core re-uses only
- * a small fraction:
- *
- *   - MDFN_MSC_*                  : DoSimpleCommand opcodes
- *   - EmulateSpecStruct           : per-frame emulation state passed to
- *                                   GPU/SPU/etc.
- *   - CheatFormatStruct           : decoder vtable for retro_cheat_set
- *   - struct MemoryPatch (fwd)    : referenced by CheatFormatStruct
- *
- * Everything else (MDFNGI, InputInfoStruct, VideoSystems, ModPrio,
- * GameMediumTypes, MDFN_ROTATE*) was metadata for Mednafen's standalone
- * UI and never read by the libretro driver, so it was removed during
- * the dead-code audit.
- */
-
 #include <libretro.h>
 
 #include "video/surface.h"
@@ -79,9 +62,6 @@ typedef struct
 
    /* Skip rendering this frame if true. Set by the driver code. */
    int skip;
-
-   /* Sound rate. Set by driver side. */
-   double SoundRate;
 
    /* Number of frames currently in internal sound buffer. Set by the
     * system emulation code, to be read by the driver code. */

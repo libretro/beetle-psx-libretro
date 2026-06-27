@@ -51,9 +51,6 @@ void MDFN_trim_c(char *str);
 /* MDFN_strtoupper_c: in-place lowercase->uppercase ASCII conversion. */
 void MDFN_strtoupper_c(char *str);
 
-/* The full Mednafen enum had eleven entries covering save states,
- * snapshots, cheat lists, IPS patches, palette files, etc.; the
- * libretro core only needs two file-naming categories. */
 typedef enum
 {
    MDFNMKF_SAV,

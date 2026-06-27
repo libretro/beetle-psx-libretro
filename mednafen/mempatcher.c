@@ -186,11 +186,6 @@ void MDFNMP_AddRAM(uint32_t size, uint32_t A, uint8_t *RAM)
    }
 }
 
-void MDFNMP_RegSearchable(uint32_t addr, uint32_t size)
-{
-   MDFNMP_AddRAM(size, addr, NULL);
-}
-
 /* These are placeholders for read-side cheat patches that PSX doesn't
  * actually wire up - the emulator core uses MDFN_MemRead* directly
  * rather than going through a per-address callback. The functions are
@@ -199,9 +194,8 @@ void MDFNMP_RegSearchable(uint32_t addr, uint32_t size)
 void MDFNMP_InstallReadPatches(void) { }
 void MDFNMP_RemoveReadPatches(void)  { }
 
-void MDFN_LoadGameCheats(void *override_ptr)
+void MDFN_LoadGameCheats(void)
 {
-   (void)override_ptr;
    RebuildSubCheats();
 }
 

@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 
-void MDFN_LoadGameCheats(void *override);
+void MDFN_LoadGameCheats(void);
 void MDFN_FlushGameCheats(int nosave);
 
 #ifdef __cplusplus

@@ -61,9 +61,7 @@ typedef struct CDRFILE_TRACK_INFO
    struct AudioReader *AReader;
 } CDRFILE_TRACK_INFO;
 
-/* 12-byte SBI replace map value.  The legacy name preserves the
- * original "C++11 wants a class type as std::map value, can't take
- * a raw array" workaround comment from upstream Mednafen. */
+/* 12-byte SBI replace map value. */
 typedef struct cpp11_array_doodad
 {
    uint8_t data[12];

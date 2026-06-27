@@ -34,8 +34,7 @@ enum
    DEINT_WEAVE,
    DEINT_OFF,            /* SW renderer matches HW: bypass dfe and
                           * use deferred end-of-frame scanout */
-   DEINT_FASTMAD         /* CPU motion-adaptive deinterlace, port
-                          * of PCSX2's FastMAD shader */
+   DEINT_FASTMAD         /* CPU motion-adaptive deinterlace */
 };
 
 /*

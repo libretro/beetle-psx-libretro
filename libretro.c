@@ -5106,9 +5106,7 @@ static bool MDFNI_LoadCD(const char *devicename)
       return false;
    }
 
-   //MDFNI_SetLayerEnableMask(~0ULL);
-
-   MDFN_LoadGameCheats(NULL);
+   MDFN_LoadGameCheats();
    MDFNMP_InstallReadPatches();
 
    return true;
@@ -5197,7 +5195,7 @@ bool retro_load_game(const struct retro_game_info *info)
    if (!MDFNI_LoadGame(retro_cd_path))
       return false;
 
-   MDFN_LoadGameCheats(NULL);
+   MDFN_LoadGameCheats();
    MDFNMP_InstallReadPatches();
 
    // Determine content_is_pal before calling alloc_surface()
@@ -5230,9 +5228,9 @@ bool retro_load_game(const struct retro_game_info *info)
    frame_count = 0;
    internal_frame_count = 0;
 
-   // MDFNI_LoadGame() has been called, we can now perform firmware
-   // check and pick a renderer.  alloc_surface follows the renderer
-   // choice so it can be skipped on the HW paths.
+   /* MDFNI_LoadGame() has been called, we can now perform firmware
+    * check and pick a renderer.  alloc_surface follows the renderer
+    * choice so it can be skipped on the HW paths. */
    force_software_renderer = false;
    ret = rhi_intf_open(content_is_pal, force_software_renderer);
 
@@ -5623,9 +5621,8 @@ void retro_run(void)
 
    rects[0] = ~0;
 
-   spec.surface = surf;
-   spec.SoundRate = 44100;
-   spec.LineWidths = rects;
+   spec.surface      = surf;
+   spec.LineWidths   = rects;
    spec.SoundBufSize = 0;
 
    espec = (EmulateSpecStruct*)&spec;

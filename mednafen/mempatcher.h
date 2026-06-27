@@ -25,7 +25,6 @@ void MDFNMP_InstallReadPatches(void);
 void MDFNMP_RemoveReadPatches(void);
 
 void MDFNMP_ApplyPeriodicCheats(void);
-void MDFNMP_RegSearchable(uint32_t addr, uint32_t size);
 
 #ifdef __cplusplus
 }
