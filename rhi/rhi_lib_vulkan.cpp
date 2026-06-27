@@ -22198,8 +22198,11 @@ static void vk_context_destroy(void)
    savestate_destroy(&save_state);
    renderer_save_vram_state(renderer, &save_state);
    vulkan     = NULL;
-   scanout_handles.clear();
-   swapchain_images.clear();
+   /* free_storage(), not clear(): clear() releases the handles/resets the count
+    * but leaks the backing array. On every content load->close cycle that
+    * orphaned both items[] allocations. */
+   scanout_handles.free_storage();
+   swapchain_images.free_storage();
 
    renderer_fini(renderer);
    free(renderer);
