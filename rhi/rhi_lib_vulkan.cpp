@@ -6217,111 +6217,98 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	 * top of its constructor. All methods stay as struct methods. */
 	struct FBAtlas
 	{
-			void set_hazard_listener(Renderer *hazard)
-			{
-				listener = hazard;
-			}
+		StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
+		Renderer *listener;
 
-			void read_compute(Domain domain, const Rect &rect)
-			{
-				sync_domain(domain, rect);
-				read_domain(domain, Stage_Compute, rect);
-			}
-			void write_compute(Domain domain, const Rect &rect)
-			{
-				sync_domain(domain, rect);
-				write_domain(domain, Stage_Compute, rect);
-			}
-			void read_transfer(Domain domain, const Rect &rect)
-			{
-				sync_domain(domain, rect);
-				read_domain(domain, Stage_Transfer, rect);
-			}
-			void write_transfer(Domain domain, const Rect &rect)
-			{
-				sync_domain(domain, rect);
-				write_domain(domain, Stage_Transfer, rect);
-			}
-			void read_fragment(Domain domain, const Rect &rect);
-			Domain blit_vram(const Rect &dst, const Rect &src);
-			void load_image(const Rect &rect);
-			bool texture_rendered(const Rect &rect);
-
-			void write_fragment(Domain domain, const Rect &rect);
-			void clear_rect(const Rect &rect, uint32_t color);
-
-			void set_draw_rect(const Rect &rect)
-			{
-				renderpass.scissor = rect;
-			}
-
-			void set_texture_window(const Rect &rect)
-			{
-				renderpass.texture_window = rect;
-			}
-
-			TextureMode set_texture_mode(TextureMode mode)
-			{
-				TextureMode old = renderpass.texture_mode;
-				renderpass.texture_mode = mode;
-				return old;
-			}
-
-			void set_texture_offset(unsigned x, unsigned y)
-			{
-				renderpass.texture_offset_x = x;
-				renderpass.texture_offset_y = y;
-			}
-
-			void set_palette_offset(unsigned x, unsigned y)
-			{
-				renderpass.palette_offset_x = x;
-				renderpass.palette_offset_y = y;
-			}
-
-			void pipeline_barrier(StatusFlags domains);
-			void notify_external_barrier(StatusFlags domains);
-			void flush_render_pass();
-
-			StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
-			Renderer *listener;
-
-			void read_domain(Domain domain, Stage stage, const Rect &rect);
-			bool write_domain(Domain domain, Stage stage, const Rect &rect);
-			void sync_domain(Domain domain, const Rect &rect);
-			void read_texture(Domain domain);
-			Domain find_suitable_domain(const Rect &rect);
-
-			struct RenderPassState
-			{
-				Rect rect;
-				Rect scissor;
-				Rect texture_window;
-				unsigned texture_offset_x, texture_offset_y;
-				unsigned palette_offset_x, palette_offset_y;
-				TextureMode texture_mode;
-				bool inside;
-			} renderpass;
-
-			void extend_render_pass(const Rect &rect, bool scissor);
-
-			StatusFlags &info(unsigned block_x, unsigned block_y)
-			{
-				block_x &= NUM_BLOCKS_X - 1;
-				block_y &= NUM_BLOCKS_Y - 1;
-				return fb_info[NUM_BLOCKS_X * block_y + block_x];
-			}
-
-			const StatusFlags &info(unsigned block_x, unsigned block_y) const
-			{
-				block_x &= NUM_BLOCKS_X - 1;
-				block_y &= NUM_BLOCKS_Y - 1;
-				return fb_info[NUM_BLOCKS_X * block_y + block_x];
-			}
-
-			void discard_render_pass();
-			bool inside_render_pass(const Rect &rect);
+		struct RenderPassState
+		{
+			Rect rect;
+			Rect scissor;
+			Rect texture_window;
+			unsigned texture_offset_x, texture_offset_y;
+			unsigned palette_offset_x, palette_offset_y;
+			TextureMode texture_mode;
+			bool inside;
+		} renderpass;
 	};
+
+	/* FBAtlas free functions (converted from struct methods). The hazard atlas is
+	 * embedded by value in Renderer and driven via fbatlas_*; the read/write/sync
+	 * helpers and the render-pass bookkeeping all take FBAtlas *self. info()
+	 * returned a StatusFlags& and now returns a StatusFlags* (its const overload
+	 * folds into the same accessor). */
+	static void fbatlas_read_fragment(FBAtlas *self, Domain domain, const Rect &rect);
+	static Domain fbatlas_blit_vram(FBAtlas *self, const Rect &dst, const Rect &src);
+	static void fbatlas_load_image(FBAtlas *self, const Rect &rect);
+	static bool fbatlas_texture_rendered(FBAtlas *self, const Rect &rect);
+	static void fbatlas_write_fragment(FBAtlas *self, Domain domain, const Rect &rect);
+	static void fbatlas_clear_rect(FBAtlas *self, const Rect &rect, uint32_t color);
+	static void fbatlas_pipeline_barrier(FBAtlas *self, StatusFlags domains);
+	static void fbatlas_notify_external_barrier(FBAtlas *self, StatusFlags domains);
+	static void fbatlas_flush_render_pass(FBAtlas *self);
+	static void fbatlas_read_domain(FBAtlas *self, Domain domain, Stage stage, const Rect &rect);
+	static bool fbatlas_write_domain(FBAtlas *self, Domain domain, Stage stage, const Rect &rect);
+	static void fbatlas_sync_domain(FBAtlas *self, Domain domain, const Rect &rect);
+	static void fbatlas_read_texture(FBAtlas *self, Domain domain);
+	static Domain fbatlas_find_suitable_domain(FBAtlas *self, const Rect &rect);
+	static void fbatlas_extend_render_pass(FBAtlas *self, const Rect &rect, bool scissor);
+	static void fbatlas_discard_render_pass(FBAtlas *self);
+	static bool fbatlas_inside_render_pass(FBAtlas *self, const Rect &rect);
+
+	static inline void fbatlas_set_hazard_listener(FBAtlas *self, Renderer *hazard)
+	{
+		self->listener = hazard;
+	}
+	static inline void fbatlas_read_compute(FBAtlas *self, Domain domain, const Rect &rect)
+	{
+		fbatlas_sync_domain(self, domain, rect);
+		fbatlas_read_domain(self, domain, Stage_Compute, rect);
+	}
+	static inline void fbatlas_write_compute(FBAtlas *self, Domain domain, const Rect &rect)
+	{
+		fbatlas_sync_domain(self, domain, rect);
+		fbatlas_write_domain(self, domain, Stage_Compute, rect);
+	}
+	static inline void fbatlas_read_transfer(FBAtlas *self, Domain domain, const Rect &rect)
+	{
+		fbatlas_sync_domain(self, domain, rect);
+		fbatlas_read_domain(self, domain, Stage_Transfer, rect);
+	}
+	static inline void fbatlas_write_transfer(FBAtlas *self, Domain domain, const Rect &rect)
+	{
+		fbatlas_sync_domain(self, domain, rect);
+		fbatlas_write_domain(self, domain, Stage_Transfer, rect);
+	}
+	static inline void fbatlas_set_draw_rect(FBAtlas *self, const Rect &rect)
+	{
+		self->renderpass.scissor = rect;
+	}
+	static inline void fbatlas_set_texture_window(FBAtlas *self, const Rect &rect)
+	{
+		self->renderpass.texture_window = rect;
+	}
+	static inline TextureMode fbatlas_set_texture_mode(FBAtlas *self, TextureMode mode)
+	{
+		TextureMode old = self->renderpass.texture_mode;
+		self->renderpass.texture_mode = mode;
+		return old;
+	}
+	static inline void fbatlas_set_texture_offset(FBAtlas *self, unsigned x, unsigned y)
+	{
+		self->renderpass.texture_offset_x = x;
+		self->renderpass.texture_offset_y = y;
+	}
+	static inline void fbatlas_set_palette_offset(FBAtlas *self, unsigned x, unsigned y)
+	{
+		self->renderpass.palette_offset_x = x;
+		self->renderpass.palette_offset_y = y;
+	}
+	static inline StatusFlags *fbatlas_info(FBAtlas *self, unsigned block_x, unsigned block_y)
+	{
+		block_x &= NUM_BLOCKS_X - 1;
+		block_y &= NUM_BLOCKS_Y - 1;
+		return &self->fb_info[NUM_BLOCKS_X * block_y + block_x];
+	}
 
 	static void fbatlas_init(FBAtlas *a)
 	{
@@ -8550,14 +8537,14 @@ extern retro_log_printf_t log_cb;
 			}
 			inline void set_texture_offset(unsigned x, unsigned y)
 			{
-				atlas.set_texture_offset(x, y);
+				fbatlas_set_texture_offset(&atlas, x, y);
 				render_state.texture_offset_x = x;
 				render_state.texture_offset_y = y;
 			}
 
 			inline void set_palette_offset(unsigned x, unsigned y)
 			{
-				atlas.set_palette_offset(x, y);
+				fbatlas_set_palette_offset(&atlas, x, y);
 				render_state.palette_offset_x = x;
 				render_state.palette_offset_y = y;
 			}
@@ -8668,7 +8655,7 @@ extern retro_log_printf_t log_cb;
 			inline void set_texture_mode(TextureMode mode)
 			{
 				render_state.texture_mode = mode;
-				atlas.set_texture_mode(mode);
+				fbatlas_set_texture_mode(&atlas, mode);
 			}
 
 			inline void set_semi_transparent(SemiTransparentMode state)
@@ -9302,12 +9289,12 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	if (state)
 	{
 		render_state = state->state;
-		atlas.set_texture_offset(render_state.texture_offset_x, render_state.texture_offset_y);
-		atlas.set_texture_mode(render_state.texture_mode);
-		atlas.set_draw_rect(render_state.draw_rect);
-		atlas.set_palette_offset(render_state.palette_offset_x, render_state.palette_offset_y);
-		atlas.set_texture_window(render_state.cached_window_rect);
-		atlas.write_transfer(Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
+		fbatlas_set_texture_offset(&atlas, render_state.texture_offset_x, render_state.texture_offset_y);
+		fbatlas_set_texture_mode(&atlas, render_state.texture_mode);
+		fbatlas_set_draw_rect(&atlas, render_state.draw_rect);
+		fbatlas_set_palette_offset(&atlas, render_state.palette_offset_x, render_state.palette_offset_y);
+		fbatlas_set_texture_window(&atlas, render_state.cached_window_rect);
+		fbatlas_write_transfer(&atlas, Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	}
 
 	ImageInitialData initial_vram = {
@@ -9398,7 +9385,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 		// The expectation is that this will be used with a lower scaling factor to compensate.
 	}
 
-	atlas.set_hazard_listener(this);
+	fbatlas_set_hazard_listener(&atlas, this);
 	texture_tracker_set_texture_uploader(&tracker, this);
 
 	init_pipelines();
@@ -9444,7 +9431,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	BufferHandle buffer = device->create_buffer(buffer_create_info, NULL);
-	atlas.read_transfer(Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
+	fbatlas_read_transfer(&atlas, Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	ensure_command_buffer();
 	commandbuffer_copy_image_to_buffer(cbh_get(&cmd), *bh_get(&buffer), *ih_get(&framebuffer), 0, { 0, 0, 0 }, { FB_WIDTH, FB_HEIGHT, 1 }, 0, 0,
 	                          { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 });
@@ -9603,7 +9590,7 @@ void Renderer::init_pipelines()
 
 void Renderer::set_draw_rect(const Rect &rect)
 {
-	atlas.set_draw_rect(rect);
+	fbatlas_set_draw_rect(&atlas, rect);
 	render_state.draw_rect = rect;
 
 	const VkRect2D &last = *Rect2DVec_back(&queue.scissors);
@@ -9622,7 +9609,7 @@ void Renderer::clear_rect(const Rect &rect, uint32_t fb_color)
 		texture_tracker_clearRegion(&tracker, rect);
 	}
 	ih_reset(&last_scanout);
-	atlas.clear_rect(rect, fb_color);
+	fbatlas_clear_rect(&atlas, rect, fb_color);
 
 	VK_ASSERT(rect.x + rect.width <= FB_WIDTH);
 	VK_ASSERT(rect.y + rect.height <= FB_HEIGHT);
@@ -9652,7 +9639,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 		copy_rect.height = FB_HEIGHT;
 	}
 
-	atlas.read_transfer(Domain_Unscaled, copy_rect);
+	fbatlas_read_transfer(&atlas, Domain_Unscaled, copy_rect);
 	ensure_command_buffer();
 
 	BufferCreateInfo buffer_create_info;
@@ -9971,14 +9958,14 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	// color depth. Current implementation does not reuse
 	// prior scanouts.
 
-	atlas.flush_render_pass();
+	fbatlas_flush_render_pass(&atlas);
 
 	Rect vram_rect = {0, 0, FB_WIDTH, FB_HEIGHT};
 
 	if (scaled)
-		atlas.read_fragment(Domain_Scaled, vram_rect);
+		fbatlas_read_fragment(&atlas, Domain_Scaled, vram_rect);
 	else
-		atlas.read_fragment(Domain_Unscaled, vram_rect);
+		fbatlas_read_fragment(&atlas, Domain_Unscaled, vram_rect);
 
 	ensure_command_buffer();
 
@@ -10070,7 +10057,7 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 
 ImageHandle Renderer::scanout_to_texture()
 {
-	atlas.flush_render_pass();
+	fbatlas_flush_render_pass(&atlas);
 	if (texture_tracking_enabled) {
 		texture_tracker_endFrame(&tracker);
 	}
@@ -10084,7 +10071,7 @@ ImageHandle Renderer::scanout_to_texture()
 	if (rect.width == 0 || rect.height == 0 || !render_state.display_on)
 	{
 		// Black screen, just flush out everything.
-		atlas.read_fragment(Domain_Scaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
+		fbatlas_read_fragment(&atlas, Domain_Scaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 
 		ensure_command_buffer();
 
@@ -10139,12 +10126,12 @@ ImageHandle Renderer::scanout_to_texture()
 			tmp.width = (tmp.width * 3 + 1) / 2;
 			tmp.width = min_(tmp.width, FB_WIDTH - tmp.x);
 		}
-		atlas.read_fragment(Domain_Unscaled, tmp);
+		fbatlas_read_fragment(&atlas, Domain_Unscaled, tmp);
 	}
 	else if (ssaa)
-		atlas.read_compute(Domain_Scaled, read_rect);
+		fbatlas_read_compute(&atlas, Domain_Scaled, read_rect);
 	else
-		atlas.read_fragment(Domain_Scaled, read_rect);
+		fbatlas_read_fragment(&atlas, Domain_Scaled, read_rect);
 
 	if (!bpp24 && ssaa)
 		ssaa_framebuffer();
@@ -10471,7 +10458,7 @@ void Renderer::ensure_command_buffer()
 
 float Renderer::allocate_depth(Domain domain, const Rect &rect)
 {
-	atlas.write_fragment(domain, rect);
+	fbatlas_write_fragment(&atlas, domain, rect);
 	primitive_index++;
 	return 1.0f - primitive_index * (4.0f / 0xffffff); // Double the epsilon to be safe(r) when w is used.
 	//iCB: Doubled again for added safety, otherwise we get Z-fighting when drawing multi-pass blended primitives.
@@ -10526,7 +10513,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 
 			if (max_u > 255 || max_v > 255) // Wraparound behavior, assume the whole page is hit.
 			{
-				atlas.set_texture_window({ 0, 0, 256u >> shift, 256 });
+				fbatlas_set_texture_window(&atlas, { 0, 0, 256u >> shift, 256 });
 				hd_texture_vram = {
 					render_state.texture_offset_x,
 					render_state.texture_offset_y,
@@ -10539,7 +10526,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 				min_u >>= shift;
 				max_u = (max_u + (1 << shift) - 1) >> shift;
 				width = max_u - min_u + 1;
-				atlas.set_texture_window({ min_u, min_v, width, height });
+				fbatlas_set_texture_window(&atlas, { min_u, min_v, width, height });
 
 				hd_texture_vram = {
 					render_state.texture_offset_x + min_u,
@@ -10556,7 +10543,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		{
 			// If we have a masked texture window, assume this is the true rect we should use.
 			Rect effective_rect = render_state.cached_window_rect;
-			atlas.set_texture_window(
+			fbatlas_set_texture_window(&atlas, 
 			    { effective_rect.x >> shift, effective_rect.y, effective_rect.width >> shift, effective_rect.height });
 			hd_texture_vram = {
 				render_state.texture_offset_x + (effective_rect.x >> shift),
@@ -10617,7 +10604,7 @@ void Renderer::build_attribs(BufferVertex *output, const Vertex *vertices, unsig
 		{
 			// HACK hd_texture_vram should contains the texture we are reading from in vram coordinate
 			// avoid texture filtering and enable scaled read if the texture is rendered content
-			bool texture_rendered = atlas.texture_rendered(hd_texture_vram);
+			bool texture_rendered = fbatlas_texture_rendered(&atlas, hd_texture_vram);
 			filtering = !texture_rendered;
 			scaled_read = texture_rendered;
 		}
@@ -10965,9 +10952,9 @@ void Renderer::draw_quad(const Vertex *vertices)
 void Renderer::clear_quad(const Rect &rect, uint32_t fb_color, bool candidate)
 {
 	ih_reset(&last_scanout);
-	TextureMode old = atlas.set_texture_mode(TextureMode_None);
+	TextureMode old = fbatlas_set_texture_mode(&atlas, TextureMode_None);
 	float z = allocate_depth(Domain_Unscaled, rect);
-	atlas.set_texture_mode(old);
+	fbatlas_set_texture_mode(&atlas, old);
 
 	BufferVertex pos0 = { float(rect.x), float(rect.y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
 	BufferVertex pos1 = { float(rect.x) + float(rect.width), float(rect.y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
@@ -11423,7 +11410,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 	);
 #endif
 	ih_reset(&last_scanout);
-	Domain domain = atlas.blit_vram(dst, src);
+	Domain domain = fbatlas_blit_vram(&atlas, dst, src);
 
 	if (texture_tracking_enabled) {
 		texture_tracker_blit(&tracker, dst, src);
@@ -11559,7 +11546,7 @@ ImageHandle Renderer::create_texture(int width, int height, int levels) {
 BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 {
 	ih_reset(&last_scanout);
-	atlas.load_image(rect);
+	fbatlas_load_image(&atlas, rect);
 	VkDeviceSize size = rect.width * rect.height * sizeof(uint16_t);
 
 	// TODO: Chain allocate this.
@@ -18718,12 +18705,12 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 
 
-	void FBAtlas::load_image(const Rect &rect)
+	static void fbatlas_load_image(FBAtlas *self, const Rect &rect)
 	{
 		if (rect.width == 0 || rect.height == 0)
 			return;
 
-		write_compute(Domain_Unscaled, rect);
+		fbatlas_write_compute(self, Domain_Unscaled, rect);
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -18731,10 +18718,10 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 		for (unsigned y = ybegin; y <= yend; y++)
 			for (unsigned x = xbegin; x <= xend; x++)
-				info(x, y) &= ~STATUS_TEXTURE_RENDERED;
+				(*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED;
 	}
 
-	bool FBAtlas::texture_rendered(const Rect &rect)
+	static bool fbatlas_texture_rendered(FBAtlas *self, const Rect &rect)
 	{
 		if (rect.width == 0 || rect.height == 0)
 			return false;
@@ -18745,19 +18732,19 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 		for (unsigned y = ybegin; y <= yend; y++)
 			for (unsigned x = xbegin; x <= xend; x++)
-				if (info(x, y) & STATUS_TEXTURE_RENDERED)
+				if ((*fbatlas_info(self, x, y)) & STATUS_TEXTURE_RENDERED)
 					return true;
 		return false;
 	}
 
-	Domain FBAtlas::blit_vram(const Rect &dst, const Rect &src)
+	static Domain fbatlas_blit_vram(FBAtlas *self, const Rect &dst, const Rect &src)
 	{
-		Domain domain = find_suitable_domain(src);
+		Domain domain = fbatlas_find_suitable_domain(self, src);
 
-		sync_domain(domain, src);
-		sync_domain(domain, dst);
-		read_domain(domain, Stage_Compute, src);
-		write_domain(domain, Stage_Compute, dst);
+		fbatlas_sync_domain(self, domain, src);
+		fbatlas_sync_domain(self, domain, dst);
+		fbatlas_read_domain(self, domain, Stage_Compute, src);
+		fbatlas_write_domain(self, domain, Stage_Compute, dst);
 
 		unsigned dst_xbegin = dst.x / BLOCK_WIDTH;
 		unsigned dst_xend = (dst.x + dst.width - 1) / BLOCK_WIDTH;
@@ -18777,28 +18764,28 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			for (unsigned j = 0; j <= j_max; j++)
 				for (unsigned i = 0; i <= i_max; i++)
 				{
-					bool rendered = info(src_xbegin + i, src_ybegin + j) & STATUS_TEXTURE_RENDERED;
+					bool rendered = (*fbatlas_info(self, src_xbegin + i, src_ybegin + j)) & STATUS_TEXTURE_RENDERED;
 					if (rendered)
-						info(dst_xbegin + i, dst_ybegin + j) |= STATUS_TEXTURE_RENDERED;
+						(*fbatlas_info(self, dst_xbegin + i, dst_ybegin + j)) |= STATUS_TEXTURE_RENDERED;
 					else
-						info(dst_xbegin + i, dst_ybegin + j) &= ~STATUS_TEXTURE_RENDERED;
+						(*fbatlas_info(self, dst_xbegin + i, dst_ybegin + j)) &= ~STATUS_TEXTURE_RENDERED;
 				}
 		}
 
 		return domain;
 	}
 
-	void FBAtlas::read_fragment(Domain domain, const Rect &rect)
+	static void fbatlas_read_fragment(FBAtlas *self, Domain domain, const Rect &rect)
 	{
-		sync_domain(domain, rect);
-		read_domain(domain, Stage_Fragment, rect);
+		fbatlas_sync_domain(self, domain, rect);
+		fbatlas_read_domain(self, domain, Stage_Fragment, rect);
 	}
 
-	void FBAtlas::read_texture(Domain domain)
+	static void fbatlas_read_texture(FBAtlas *self, Domain domain)
 	{
-		Rect shifted = renderpass.texture_window;
+		Rect shifted = self->renderpass.texture_window;
 		bool palette;
-		switch (renderpass.texture_mode)
+		switch (self->renderpass.texture_mode)
 		{
 			case TextureMode_Palette4bpp:
 			case TextureMode_Palette8bpp:
@@ -18809,27 +18796,27 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				palette = false;
 				break;
 		}
-		shifted.x += renderpass.texture_offset_x;
-		shifted.y += renderpass.texture_offset_y;
+		shifted.x += self->renderpass.texture_offset_x;
+		shifted.y += self->renderpass.texture_offset_y;
 
-		//Domain domain = palette ? Domain_Unscaled : find_suitable_domain(shifted);
-		sync_domain(domain, shifted);
+		//Domain domain = palette ? Domain_Unscaled : fbatlas_find_suitable_domain(self, shifted);
+		fbatlas_sync_domain(self, domain, shifted);
 
-		Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
-			renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
+		Rect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
+			self->renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
 
 		if (palette)
-			sync_domain(domain, palette_rect);
+			fbatlas_sync_domain(self, domain, palette_rect);
 
-		read_domain(domain, Stage_FragmentTexture, shifted);
+		fbatlas_read_domain(self, domain, Stage_FragmentTexture, shifted);
 		if (palette)
-			read_domain(domain, Stage_FragmentTexture, palette_rect);
+			fbatlas_read_domain(self, domain, Stage_FragmentTexture, palette_rect);
 	}
 
-	bool FBAtlas::write_domain(Domain domain, Stage stage, const Rect &rect)
+	static bool fbatlas_write_domain(FBAtlas *self, Domain domain, Stage stage, const Rect &rect)
 	{
-		if (inside_render_pass(rect))
-			flush_render_pass();
+		if (fbatlas_inside_render_pass(self, rect))
+			fbatlas_flush_render_pass(self);
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -18876,27 +18863,27 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		for (unsigned y = ybegin; y <= yend; y++)
 			for (unsigned x = xbegin; x <= xend; x++)
-				write_domains |= info(x, y) & hazard_domains;
+				write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains;
 
 		// Trying to update VRAM before fragment is done reading it.
 		// We could use copy-on-write here to avoid flushing, but this scenario is very rare.
 		if (write_domains & STATUS_TEXTURE_READ)
-			flush_render_pass();
+			fbatlas_flush_render_pass(self);
 
 		if (write_domains)
-			pipeline_barrier(write_domains);
+			fbatlas_pipeline_barrier(self, write_domains);
 
 		for (unsigned y = ybegin; y <= yend; y++)
 			for (unsigned x = xbegin; x <= xend; x++)
-				info(x, y) = (info(x, y) & ~STATUS_OWNERSHIP_MASK) | resolve_domains;
+				(*fbatlas_info(self, x, y)) = ((*fbatlas_info(self, x, y)) & ~STATUS_OWNERSHIP_MASK) | resolve_domains;
 
 		return (write_domains & STATUS_FRAGMENT_SFB_READ) != 0;
 	}
 
-	void FBAtlas::read_domain(Domain domain, Stage stage, const Rect &rect)
+	static void fbatlas_read_domain(FBAtlas *self, Domain domain, Stage stage, const Rect &rect)
 	{
-		if (inside_render_pass(rect))
-			flush_render_pass();
+		if (fbatlas_inside_render_pass(self, rect))
+			fbatlas_flush_render_pass(self);
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -18945,20 +18932,20 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		for (unsigned y = ybegin; y <= yend; y++)
 			for (unsigned x = xbegin; x <= xend; x++)
-				write_domains |= info(x, y) & hazard_domains;
+				write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains;
 
 		if (write_domains)
-			pipeline_barrier(write_domains);
+			fbatlas_pipeline_barrier(self, write_domains);
 
 		for (unsigned y = ybegin; y <= yend; y++)
 			for (unsigned x = xbegin; x <= xend; x++)
-				info(x, y) |= resolve_domains;
+				(*fbatlas_info(self, x, y)) |= resolve_domains;
 	}
 
-	void FBAtlas::sync_domain(Domain domain, const Rect &rect)
+	static void fbatlas_sync_domain(FBAtlas *self, Domain domain, const Rect &rect)
 	{
-		if (inside_render_pass(rect))
-			flush_render_pass();
+		if (fbatlas_inside_render_pass(self, rect))
+			fbatlas_flush_render_pass(self);
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -18973,7 +18960,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		for (unsigned y = ybegin; y <= yend; y++)
 			for (unsigned x = xbegin; x <= xend; x++)
-				bits |= 1u << (info(x, y) & STATUS_OWNERSHIP_MASK);
+				bits |= 1u << ((*fbatlas_info(self, x, y)) & STATUS_OWNERSHIP_MASK);
 
 		unsigned write_domains = 0;
 
@@ -19008,39 +18995,39 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{
 			for (unsigned x = xbegin; x <= xend; x++)
 			{
-				StatusFlags &mask = info(x, y);
+				StatusFlags *mask = fbatlas_info(self, x, y);
 				// If our block isn't in the ownership class we want,
 				// we need to read from one block and write to the other.
 				// We might have to wait for writers on read,
 				// and add hazard masks for our writes
 				// so other readers can wait for us.
-				if ((mask & STATUS_OWNERSHIP_MASK) == ownership)
-					write_domains |= mask & hazard_domains;
+				if (((*mask) & STATUS_OWNERSHIP_MASK) == ownership)
+					write_domains |= (*mask) & hazard_domains;
 			}
 		}
 
 		// If we hit any hazard, resolve it.
 		if (write_domains)
-			pipeline_barrier(write_domains);
+			fbatlas_pipeline_barrier(self, write_domains);
 
 		for (unsigned y = ybegin; y <= yend; y++)
 		{
 			for (unsigned x = xbegin; x <= xend; x++)
 			{
-				StatusFlags &mask = info(x, y);
-				if ((mask & STATUS_OWNERSHIP_MASK) == ownership)
+				StatusFlags *mask = fbatlas_info(self, x, y);
+				if (((*mask) & STATUS_OWNERSHIP_MASK) == ownership)
 				{
-					mask &= ~STATUS_OWNERSHIP_MASK;
-					mask |= resolve_domains;
-					listener->resolve(domain, (BLOCK_WIDTH * x) & (FB_WIDTH - 1), (BLOCK_HEIGHT * y) & (FB_HEIGHT - 1));
+					(*mask) &= ~STATUS_OWNERSHIP_MASK;
+					(*mask) |= resolve_domains;
+					self->listener->resolve(domain, (BLOCK_WIDTH * x) & (FB_WIDTH - 1), (BLOCK_HEIGHT * y) & (FB_HEIGHT - 1));
 				}
 			}
 		}
 	}
 
-	Domain FBAtlas::find_suitable_domain(const Rect &rect)
+	static Domain fbatlas_find_suitable_domain(FBAtlas *self, const Rect &rect)
 	{
-		if (inside_render_pass(rect))
+		if (fbatlas_inside_render_pass(self, rect))
 			return Domain_Scaled;
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
@@ -19052,7 +19039,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		{
 			for (unsigned x = xbegin; x <= xend; x++)
 			{
-				unsigned i = info(x, y) & STATUS_OWNERSHIP_MASK;
+				unsigned i = (*fbatlas_info(self, x, y)) & STATUS_OWNERSHIP_MASK;
 				if (i == STATUS_FB_ONLY || i == STATUS_FB_PREFER)
 					return Domain_Unscaled;
 			}
@@ -19060,9 +19047,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		return Domain_Scaled;
 	}
 
-	bool FBAtlas::inside_render_pass(const Rect &rect)
+	static bool fbatlas_inside_render_pass(FBAtlas *self, const Rect &rect)
 	{
-		if (!renderpass.inside)
+		if (!self->renderpass.inside)
 			return false;
 
 		unsigned xbegin = rect.x & ~(BLOCK_WIDTH - 1);
@@ -19070,32 +19057,32 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		unsigned xend = ((rect.x + rect.width - 1) | (BLOCK_WIDTH - 1)) + 1;
 		unsigned yend = ((rect.y + rect.height - 1) | (BLOCK_HEIGHT - 1)) + 1;
 
-		unsigned rpx2 = renderpass.rect.x + renderpass.rect.width;
-		unsigned rpy2 = renderpass.rect.y + renderpass.rect.height;
-		unsigned x0 = (renderpass.rect.x > xbegin) ? renderpass.rect.x : xbegin;
+		unsigned rpx2 = self->renderpass.rect.x + self->renderpass.rect.width;
+		unsigned rpy2 = self->renderpass.rect.y + self->renderpass.rect.height;
+		unsigned x0 = (self->renderpass.rect.x > xbegin) ? self->renderpass.rect.x : xbegin;
 		unsigned x1 = (rpx2 < xend) ? rpx2 : xend;
-		unsigned y0 = (renderpass.rect.y > ybegin) ? renderpass.rect.y : ybegin;
+		unsigned y0 = (self->renderpass.rect.y > ybegin) ? self->renderpass.rect.y : ybegin;
 		unsigned y1 = (rpy2 < yend) ? rpy2 : yend;
 
 		return x1 > x0 && y1 > y0;
 	}
 
-	void FBAtlas::flush_render_pass()
+	static void fbatlas_flush_render_pass(FBAtlas *self)
 	{
-		if (!renderpass.inside)
+		if (!self->renderpass.inside)
 			return;
 
 		// Clear out the "shadow" stage.
-		for (StatusFlags &f : fb_info)
-			f &= ~STATUS_TEXTURE_READ;
+		{ unsigned _i; for (_i = 0; _i < NUM_BLOCKS_X * NUM_BLOCKS_Y; _i++)
+			self->fb_info[_i] &= ~STATUS_TEXTURE_READ; }
 
-		renderpass.inside = false;
-		const Rect &rect = renderpass.rect;
+		self->renderpass.inside = false;
+		const Rect &rect = self->renderpass.rect;
 		if (rect.width == 0 || rect.height == 0)
 			return;
 
-		write_domain(Domain_Scaled, Stage_Fragment, rect);
-		listener->flush_render_pass(rect);
+		fbatlas_write_domain(self, Domain_Scaled, Stage_Fragment, rect);
+		self->listener->flush_render_pass(rect);
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -19103,59 +19090,59 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 		for (unsigned y = ybegin; y <= yend; y++)
 			for (unsigned x = xbegin; x <= xend; x++)
-				info(x, y) |= STATUS_TEXTURE_RENDERED;
+				(*fbatlas_info(self, x, y)) |= STATUS_TEXTURE_RENDERED;
 	}
 
-	void FBAtlas::extend_render_pass(const Rect &rect, bool scissor)
+	static void fbatlas_extend_render_pass(FBAtlas *self, const Rect &rect, bool scissor)
 	{
-		bool scissor_invariant = !scissor || renderpass.scissor.contains(rect);
-		listener->set_scissored_invariant(scissor_invariant);
-		Rect scissored_rect = !scissor_invariant ? rect.scissor(renderpass.scissor) : rect;
+		bool scissor_invariant = !scissor || self->renderpass.scissor.contains(rect);
+		self->listener->set_scissored_invariant(scissor_invariant);
+		Rect scissored_rect = !scissor_invariant ? rect.scissor(self->renderpass.scissor) : rect;
 
 		if (!scissored_rect.width || !scissored_rect.height)
 			return;
 
-		if (!renderpass.inside)
+		if (!self->renderpass.inside)
 		{
-			renderpass.rect = scissored_rect;
-			sync_domain(Domain_Scaled, renderpass.rect);
-			write_domain(Domain_Scaled, Stage_Fragment, renderpass.rect);
-			renderpass.inside = true;
+			self->renderpass.rect = scissored_rect;
+			fbatlas_sync_domain(self, Domain_Scaled, self->renderpass.rect);
+			fbatlas_write_domain(self, Domain_Scaled, Stage_Fragment, self->renderpass.rect);
+			self->renderpass.inside = true;
 		}
-		else if (!renderpass.rect.contains(scissored_rect))
+		else if (!self->renderpass.rect.contains(scissored_rect))
 		{
-			renderpass.rect.extend_bounding_box(scissored_rect);
+			self->renderpass.rect.extend_bounding_box(scissored_rect);
 
 			// Avoid sync/write domain flushing our own render pass.
-			renderpass.inside = false;
+			self->renderpass.inside = false;
 
 			// If we cleared the screen and we created a clear candidate,
 			// everything inside this render pass can be safely discarded.
-			if (!scissor && scissored_rect == renderpass.rect)
-				discard_render_pass();
+			if (!scissor && scissored_rect == self->renderpass.rect)
+				fbatlas_discard_render_pass(self);
 
-			sync_domain(Domain_Scaled, renderpass.rect);
-			if (write_domain(Domain_Scaled, Stage_Fragment, renderpass.rect))
+			fbatlas_sync_domain(self, Domain_Scaled, self->renderpass.rect);
+			if (fbatlas_write_domain(self, Domain_Scaled, Stage_Fragment, self->renderpass.rect))
 			{
 				// If render pass was flushed here due to write-after-read hazards, set rect to
 				// our new scissored_rect instead.
-				renderpass.inside = true;
-				flush_render_pass();
-				renderpass.rect = scissored_rect;
+				self->renderpass.inside = true;
+				fbatlas_flush_render_pass(self);
+				self->renderpass.rect = scissored_rect;
 			}
 
-			renderpass.inside = true;
+			self->renderpass.inside = true;
 		}
 	}
 
-	void FBAtlas::write_fragment(Domain domain, const Rect &rect)
+	static void fbatlas_write_fragment(FBAtlas *self, Domain domain, const Rect &rect)
 	{
-		bool reads_window = renderpass.texture_mode != TextureMode_None;
+		bool reads_window = self->renderpass.texture_mode != TextureMode_None;
 		if (reads_window)
 		{
-			Rect shifted = renderpass.texture_window;
+			Rect shifted = self->renderpass.texture_window;
 			bool reads_palette;
-			switch (renderpass.texture_mode)
+			switch (self->renderpass.texture_mode)
 			{
 				case TextureMode_Palette4bpp:
 				case TextureMode_Palette8bpp:
@@ -19166,41 +19153,41 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 					reads_palette = false;
 					break;
 			}
-			shifted.x += renderpass.texture_offset_x;
-			shifted.y += renderpass.texture_offset_y;
+			shifted.x += self->renderpass.texture_offset_x;
+			shifted.y += self->renderpass.texture_offset_y;
 
-			const Rect palette_rect = { renderpass.palette_offset_x, renderpass.palette_offset_y,
-				renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
+			const Rect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
+				self->renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
 
 			if (reads_palette)
 			{
-				if (inside_render_pass(shifted) || inside_render_pass(palette_rect))
-					flush_render_pass();
+				if (fbatlas_inside_render_pass(self, shifted) || fbatlas_inside_render_pass(self, palette_rect))
+					fbatlas_flush_render_pass(self);
 			}
-			else if (inside_render_pass(shifted))
-				flush_render_pass();
+			else if (fbatlas_inside_render_pass(self, shifted))
+				fbatlas_flush_render_pass(self);
 
-			read_texture(domain);
+			fbatlas_read_texture(self, domain);
 		}
 
-		extend_render_pass(rect, true);
+		fbatlas_extend_render_pass(self, rect, true);
 	}
 
-	void FBAtlas::clear_rect(const Rect &rect, uint32_t fb_color)
+	static void fbatlas_clear_rect(FBAtlas *self, const Rect &rect, uint32_t fb_color)
 	{
 		if (rect.width == 0 || rect.height == 0)
 			return;
 
-		// If we're clearing completely outside the renderpass, we're probably doing another render pass
+		// If we're clearing completely outside the self->renderpass, we're probably doing another render pass
 		// somewhere else, so end the current one and start a new one instead.
-		if (renderpass.inside && !renderpass.rect.intersects(rect))
-			flush_render_pass();
+		if (self->renderpass.inside && !self->renderpass.rect.intersects(rect))
+			fbatlas_flush_render_pass(self);
 
-		extend_render_pass(rect, false);
+		fbatlas_extend_render_pass(self, rect, false);
 
 		// If the render pass area doesn't increase later, we can use loadOp == CLEAR instead of LOAD,
 		// which helps a lot on mobile GPUs.
-		listener->clear_quad(rect, fb_color, renderpass.rect == rect);
+		self->listener->clear_quad(rect, fb_color, self->renderpass.rect == rect);
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -19208,16 +19195,16 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		unsigned yend = (rect.y + rect.height - 1) / BLOCK_HEIGHT;
 		for (unsigned y = ybegin; y <= yend; y++)
 			for (unsigned x = xbegin; x <= xend; x++)
-				info(x, y) &= ~STATUS_TEXTURE_RENDERED;
+				(*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED;
 	}
 
-	void FBAtlas::discard_render_pass()
+	static void fbatlas_discard_render_pass(FBAtlas *self)
 	{
-		renderpass.inside = false;
-		listener->discard_render_pass();
+		self->renderpass.inside = false;
+		self->listener->discard_render_pass();
 	}
 
-	void FBAtlas::notify_external_barrier(StatusFlags domains)
+	static void fbatlas_notify_external_barrier(FBAtlas *self, StatusFlags domains)
 	{
 		static const StatusFlags compute_read_stages = STATUS_COMPUTE_FB_READ | STATUS_COMPUTE_SFB_READ;
 		static const StatusFlags compute_write_stages = STATUS_COMPUTE_FB_WRITE | STATUS_COMPUTE_SFB_WRITE;
@@ -19239,16 +19226,16 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		if (domains & fragment_read_stages)
 			domains |= fragment_read_stages;
 
-		for (StatusFlags &f : fb_info)
-			f &= ~domains;
+		{ unsigned _i; for (_i = 0; _i < NUM_BLOCKS_X * NUM_BLOCKS_Y; _i++)
+			self->fb_info[_i] &= ~domains; }
 	}
 
-	void FBAtlas::pipeline_barrier(StatusFlags domains)
+	static void fbatlas_pipeline_barrier(FBAtlas *self, StatusFlags domains)
 	{
 		if (domains & (STATUS_FRAGMENT_SFB_WRITE | STATUS_FRAGMENT_SFB_READ))
-			flush_render_pass();
-		listener->hazard(domains);
-		notify_external_barrier(domains);
+			fbatlas_flush_render_pass(self);
+		self->listener->hazard(domains);
+		fbatlas_notify_external_barrier(self, domains);
 	}
 
 /* ============================================================
