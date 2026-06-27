@@ -239,8 +239,8 @@ endif
       CFLAGS      += -DTEXTURE_DUMPING_ENABLED
       CXXFLAGS    += -DTEXTURE_DUMPING_ENABLED
       SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
-                     $(CORE_DIR)/rhi/rhi_lib_vulkan.cpp \
                      $(CORE_DIR)/rhi/rhi_spirv_reflect.cpp
+      SOURCES_C   += $(CORE_DIR)/rhi/rhi_lib_vulkan.c
 
       EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/SPIRV-Cross \
                         -I$(CORE_DIR)/parallel-psx/khronos/include
