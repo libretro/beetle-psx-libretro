@@ -16381,7 +16381,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	void commandbuffer_set_opaque_state(struct CommandBuffer *self)
 	{
 		struct PipelineStateBits *state = &self->static_state.state;
-		memset(&state, 0, sizeof(state));
+		memset(state, 0, sizeof(*state));
 		state->cull_mode = VK_CULL_MODE_BACK_BIT;
 		state->blend_enable = false;
 		state->depth_test = true;
@@ -16395,7 +16395,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	void commandbuffer_set_quad_state(struct CommandBuffer *self)
 	{
 		struct PipelineStateBits *state = &self->static_state.state;
-		memset(&state, 0, sizeof(state));
+		memset(state, 0, sizeof(*state));
 		state->cull_mode = VK_CULL_MODE_NONE;
 		state->blend_enable = false;
 		state->depth_test = false;
