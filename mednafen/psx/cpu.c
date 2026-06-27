@@ -3016,6 +3016,10 @@ static void cop2_op(struct lightrec_state *state, uint32_t func)
       if (timestamp < gte_ts_done)
          timestamp = gte_ts_done;
       gte_ts_done = timestamp + latency;
+      /* Keep the recompiler-visible copy in sync so that inline GTE
+       * emission and any subsequent recompiled reader observe the same
+       * completion timestamp this wrapper computed. */
+      lightrec_set_gte_ts_done(state, gte_ts_done);
    }
 }
 
@@ -3626,6 +3630,11 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
     * that exit often (the default event quantum is 128 cycles). */
    memcpy(lightrec_regs->cp0,&CP0,32*sizeof(uint32_t));
 
+   /* Load the GTE completion timestamp into the recompiler so that the
+    * cop2 wrapper (and any inline GTE emission) updates the same copy the
+    * recompiled code can see; it is written back to s_cpu on loop exit. */
+   lightrec_set_gte_ts_done(lightrec_state, gte_ts_done);
+
    do
    {
 #ifdef LIGHTREC_DEBUG
@@ -3676,6 +3685,10 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
    /* Write the COP0 file back once on exit, so savestates and engine
     * switches see the current state. */
    memcpy(&CP0,lightrec_regs->cp0,32*sizeof(uint32_t));
+
+   /* Write the GTE completion timestamp back so the interpreter and
+    * savestates observe whatever the recompiler advanced it to. */
+   gte_ts_done = lightrec_get_gte_ts_done(lightrec_state);
 
    memcpy(&s_cpu.GPR_full,lightrec_regs->gpr,sizeof(lightrec_regs->gpr));
 

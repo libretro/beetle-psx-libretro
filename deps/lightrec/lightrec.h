@@ -161,6 +161,14 @@ lightrec_get_registers(struct lightrec_state *state);
 
 __api u32 lightrec_current_cycle_count(const struct lightrec_state *state);
 __api void lightrec_reset_cycle_count(struct lightrec_state *state, u32 cycles);
+
+/* Accessors for the GTE op completion timestamp, kept in lightrec_state so
+ * recompiled GTE code can update it without a host call.  The host should
+ * load its own gte_ts_done into the recompiler before running (set) and read
+ * it back after (get) so the value stays authoritative across the
+ * recompiler/interpreter boundary. */
+__api u32 lightrec_get_gte_ts_done(const struct lightrec_state *state);
+__api void lightrec_set_gte_ts_done(struct lightrec_state *state, u32 value);
 __api void lightrec_set_target_cycle_count(struct lightrec_state *state,
 					   u32 cycles);
 __api void lightrec_set_cycles_per_opcode(struct lightrec_state *state, u32 cycles);
