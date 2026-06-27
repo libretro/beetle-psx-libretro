@@ -6195,7 +6195,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	};
 	typedef uint16_t StatusFlags;
 
-	class Renderer;
+	struct Renderer;
 
 	/* VRAM framebuffer atlas / hazard tracker. Formerly a class whose only
 	 * C++-ism was a constructor that filled fb_info[] (relying on NSDMIs for the
@@ -6811,7 +6811,7 @@ extern retro_log_printf_t log_cb;
 		src->count  = 0;
 	}
 
-	class Renderer;
+	struct Renderer;
 
 	/* Max length for HD texture file paths built by the path helpers below.
 	 * Defined here so both IORequest and the path helpers can use it. */
@@ -8734,111 +8734,21 @@ extern retro_log_printf_t log_cb;
 		SpecConstIndex_Samples = 0
 	};
 
-	class Renderer
+	struct Renderer
 	{
-		public:
 			/* batch-7 out-of-line methods -> free functions. */
-			friend void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index, bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv);
-			friend void renderer_build_line_quad(Renderer *self, Vertex *output, const Vertex *input);
-			friend void renderer_dispatch(Renderer *self, const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured);
-			friend int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb);
-			friend void renderer_render_opaque_primitives(Renderer *self);
-			friend void renderer_render_semi_transparent_primitives(Renderer *self);
-			friend void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self);
-			friend void renderer_render_opaque_texture_primitives(Renderer *self);
-			friend void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src);
-			friend ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels);
-			friend ImageHandle renderer_create_texture(Renderer *self, int width, int height, int levels);
-			friend BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect &rect);
-			friend void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentState &state);
-			friend BufferVertexVec *renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture, bool filtering, bool scaled_read, unsigned shift, bool offset_uv);
-			friend const ClearCandidate *renderer_find_clear_candidate(Renderer *self, const Rect &rect);
 			/* batch out-of-line methods -> free functions (need private access). */
-			friend void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect &rect, uint16_t *vram);
-			friend ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled);
-			friend ImageHandle renderer_scanout_to_texture(Renderer *self);
-			friend void renderer_hazard(Renderer *self, StatusFlags flags);
-			friend HdTextureHandle renderer_get_hd_texture_index(Renderer *self, const Rect &vram_rect, bool &fastpath_capable_out, bool &cache_hit_out);
-			friend void renderer_draw_line(Renderer *self, const Vertex *vertices);
-			friend void renderer_draw_triangle(Renderer *self, const Vertex *vertices);
-			friend void renderer_draw_quad(Renderer *self, const Vertex *vertices);
-			friend void renderer_clear_quad(Renderer *self, const Rect &rect, uint32_t fb_color, bool candidate);
-			friend void renderer_flush_render_pass(Renderer *self, const Rect &rect);
-			friend void renderer_dispatch_set_scaled_read_texture(Renderer *self, bool scaled_read, bool textured);
 			/* batch out-of-line methods -> free functions (need private access). */
-			friend void renderer_init_primitive_pipelines(Renderer *self);
-			friend void renderer_init_primitive_feedback_pipelines(Renderer *self);
-			friend void renderer_init_pipelines(Renderer *self);
-			friend void renderer_mipmap_framebuffer(Renderer *self);
-			friend void renderer_ssaa_framebuffer(Renderer *self);
-			friend Rect renderer_compute_vram_framebuffer_rect(Renderer *self);
-			friend DisplayRect renderer_compute_display_rect(Renderer *self);
-			friend void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_index);
-			friend bool renderer_primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b);
-			friend void renderer_flush_resolves(Renderer *self);
-			friend void renderer_flush_blits(Renderer *self);
-			friend void renderer_flush_blit(Renderer *self, const BlitInfoVec &infos, Program &program, bool scaled);
 			/* batch-4 out-of-line methods -> free functions (need private access). */
-			friend void renderer_set_draw_rect(Renderer *self, const Rect &rect);
-			friend void renderer_clear_rect(Renderer *self, const Rect &rect, uint32_t fb_color);
-			friend Rect renderer_compute_window_rect(Renderer *self, const TextureWindow &window);
-			friend void renderer_resolve(Renderer *self, Domain target_domain, unsigned x, unsigned y);
-			friend void renderer_ensure_command_buffer(Renderer *self);
-			friend float renderer_allocate_depth(Renderer *self, Domain domain, const Rect &rect);
-			friend void renderer_reset_scissor_queue(Renderer *self);
-			friend void renderer_reset_queue(Renderer *self);
 
 			/* batch-3 free functions (defined after the class): flush family,
 			 * scanout-mode getter, render-pass discard, the command-buffer
 			 * accessor (ref -> ptr), and the filter-exclude predicate. */
-			friend void renderer_flush(Renderer *self);
-			friend Fence renderer_flush_and_signal(Renderer *self);
-			friend ScanoutMode renderer_get_scanout_mode(const Renderer *self);
-			friend void renderer_discard_render_pass(Renderer *self);
-			friend CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self);
-			friend bool renderer_get_filer_exclude(Renderer *self, FilterExclude exclude);
 
 			/* batch-2 setter/accessor free functions (defined after the class). */
-			friend void renderer_set_texture_window(Renderer *self, const TextureWindow &window);
-			friend void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y);
-			friend void renderer_set_palette_offset(Renderer *self, unsigned x, unsigned y);
-			friend uint16_t * renderer_begin_copy(Renderer *self, BufferHandle handle);
-			friend void renderer_end_copy(Renderer *self, BufferHandle handle);
-			friend void renderer_notify_texture_upload(Renderer *self, Rect rect, uint16_t *vram);
-			friend void renderer_set_vram_framebuffer_coords(Renderer *self, unsigned xstart, unsigned ystart);
-			friend void renderer_set_display_mode(Renderer *self, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode);
-			friend void renderer_toggle_display(Renderer *self, bool enable);
-			friend void renderer_set_texture_mode(Renderer *self, TextureMode mode);
-			friend void renderer_set_semi_transparent(Renderer *self, SemiTransparentMode state);
-			friend void renderer_set_primitive_type(Renderer *self, PrimitiveType primitive_type);
-			friend void renderer_set_force_mask_bit(Renderer *self, bool enable);
-			friend void renderer_set_mask_test(Renderer *self, bool enable);
-			friend void renderer_set_texture_color_modulate(Renderer *self, bool enable);
-			friend void renderer_set_UV_limits(Renderer *self, uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v);
-			friend void renderer_set_filter_mode(Renderer *self, FilterMode mode);
-			friend void renderer_set_sprite_filter_exclude(Renderer *self, FilterExclude exclude);
-			friend void renderer_set_polygon_2d_filter_exclude(Renderer *self, FilterExclude exclude);
-			friend void renderer_set_scaled_uv_offset(Renderer *self, bool offset);
 
 			/* batch-1 setter free functions (defined after the class) need access
 			 * to the private tracker/atlas/queue members. */
-			friend void renderer_set_track_textures(Renderer *self, bool enable);
-			friend void renderer_set_dump_textures(Renderer *self, bool enable);
-			friend void renderer_set_replace_textures(Renderer *self, bool enable);
-			friend void renderer_set_hd_cache_budgets(Renderer *self, size_t ram_bytes, size_t vram_bytes);
-			friend void renderer_set_eager_hd_textures(Renderer *self, bool enable);
-			friend void renderer_set_adaptive_smoothing(Renderer *self, bool enable);
-			friend void renderer_set_draw_offset(Renderer *self, int x, int y);
-			friend void renderer_set_scissored_invariant(Renderer *self, bool invariant);
-			friend void renderer_set_horizontal_display_range(Renderer *self, int x1, int x2);
-			friend void renderer_set_vertical_display_range(Renderer *self, int y1, int y2);
-			friend void renderer_set_horizontal_overscan_cropping(Renderer *self, int crop_overscan);
-			friend void renderer_set_horizontal_offset_cycles(Renderer *self, int offset_cycles);
-			friend void renderer_set_horizontal_additional_cropping(Renderer *self, unsigned image_crop);
-			friend void renderer_set_visible_scanlines(Renderer *self, int slstart, int slend, int slstart_pal, int slend_pal);
-			friend void renderer_set_display_filter(Renderer *self, ScanoutFilter filter);
-			friend void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter);
-			friend void renderer_set_dither_native_resolution(Renderer *self, bool enable);
 
 
 
@@ -8882,7 +8792,6 @@ extern retro_log_printf_t log_cb;
 				SaveState &operator=(const SaveState &) = delete;
 			};
 
-			friend Renderer::SaveState renderer_save_vram_state(Renderer *self);
 
 			Renderer(Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
 			~Renderer();
@@ -8936,9 +8845,7 @@ extern retro_log_printf_t log_cb;
 			 * constructor does not throw; on failure (e.g. RGBA8_UNORM not
 			 * supported) it leaves the object in a destroyable but otherwise
 			 * unusable state. Callers must check is_valid() before use. */
-			bool is_valid() const { return valid; }
 
-		private:
 			Device *device;
 			unsigned scaling;
 			unsigned msaa;
@@ -8959,13 +8866,11 @@ extern retro_log_printf_t log_cb;
 
 			CommandBufferHandle cmd;
 
-		public:
 			// Called by FBAtlas (formerly via HazardListener interface).
 			void resolve(Domain target_domain, unsigned x, unsigned y);
 
 			// Called by TextureTracker (formerly via TextureUploader interface).
 
-		private:
 
 			struct
 			{
@@ -9034,6 +8939,105 @@ extern retro_log_printf_t log_cb;
 
 			BufferHandle quad = { NULL };
 	};
+
+	/* Forward declarations for the renderer_* free functions (formerly friend
+	 * declarations inside the Renderer class, now redundant since Renderer is a plain
+	 * struct). Needed because the inline renderer_* functions below call ones whose
+	 * definitions appear later in the file. */
+	void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle &hd_texture_index, bool &filtering, bool &scaled_read, unsigned &shift, bool &offset_uv);
+	void renderer_build_line_quad(Renderer *self, Vertex *output, const Vertex *input);
+	void renderer_dispatch(Renderer *self, const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured);
+	int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb);
+	void renderer_render_opaque_primitives(Renderer *self);
+	void renderer_render_semi_transparent_primitives(Renderer *self);
+	void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self);
+	void renderer_render_opaque_texture_primitives(Renderer *self);
+	void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src);
+	ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels);
+	ImageHandle renderer_create_texture(Renderer *self, int width, int height, int levels);
+	BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect &rect);
+	void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentState &state);
+	BufferVertexVec *renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture, bool filtering, bool scaled_read, unsigned shift, bool offset_uv);
+	const ClearCandidate *renderer_find_clear_candidate(Renderer *self, const Rect &rect);
+	void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect &rect, uint16_t *vram);
+	ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled);
+	ImageHandle renderer_scanout_to_texture(Renderer *self);
+	void renderer_hazard(Renderer *self, StatusFlags flags);
+	HdTextureHandle renderer_get_hd_texture_index(Renderer *self, const Rect &vram_rect, bool &fastpath_capable_out, bool &cache_hit_out);
+	void renderer_draw_line(Renderer *self, const Vertex *vertices);
+	void renderer_draw_triangle(Renderer *self, const Vertex *vertices);
+	void renderer_draw_quad(Renderer *self, const Vertex *vertices);
+	void renderer_clear_quad(Renderer *self, const Rect &rect, uint32_t fb_color, bool candidate);
+	void renderer_flush_render_pass(Renderer *self, const Rect &rect);
+	void renderer_dispatch_set_scaled_read_texture(Renderer *self, bool scaled_read, bool textured);
+	void renderer_init_primitive_pipelines(Renderer *self);
+	void renderer_init_primitive_feedback_pipelines(Renderer *self);
+	void renderer_init_pipelines(Renderer *self);
+	void renderer_mipmap_framebuffer(Renderer *self);
+	void renderer_ssaa_framebuffer(Renderer *self);
+	Rect renderer_compute_vram_framebuffer_rect(Renderer *self);
+	DisplayRect renderer_compute_display_rect(Renderer *self);
+	void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_index);
+	bool renderer_primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b);
+	void renderer_flush_resolves(Renderer *self);
+	void renderer_flush_blits(Renderer *self);
+	void renderer_flush_blit(Renderer *self, const BlitInfoVec &infos, Program &program, bool scaled);
+	void renderer_set_draw_rect(Renderer *self, const Rect &rect);
+	void renderer_clear_rect(Renderer *self, const Rect &rect, uint32_t fb_color);
+	Rect renderer_compute_window_rect(Renderer *self, const TextureWindow &window);
+	void renderer_resolve(Renderer *self, Domain target_domain, unsigned x, unsigned y);
+	void renderer_ensure_command_buffer(Renderer *self);
+	float renderer_allocate_depth(Renderer *self, Domain domain, const Rect &rect);
+	void renderer_reset_scissor_queue(Renderer *self);
+	void renderer_reset_queue(Renderer *self);
+	void renderer_flush(Renderer *self);
+	Fence renderer_flush_and_signal(Renderer *self);
+	ScanoutMode renderer_get_scanout_mode(const Renderer *self);
+	void renderer_discard_render_pass(Renderer *self);
+	CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self);
+	bool renderer_get_filer_exclude(Renderer *self, FilterExclude exclude);
+	void renderer_set_texture_window(Renderer *self, const TextureWindow &window);
+	void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y);
+	void renderer_set_palette_offset(Renderer *self, unsigned x, unsigned y);
+	uint16_t * renderer_begin_copy(Renderer *self, BufferHandle handle);
+	void renderer_end_copy(Renderer *self, BufferHandle handle);
+	void renderer_notify_texture_upload(Renderer *self, Rect rect, uint16_t *vram);
+	void renderer_set_vram_framebuffer_coords(Renderer *self, unsigned xstart, unsigned ystart);
+	void renderer_set_display_mode(Renderer *self, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode);
+	void renderer_toggle_display(Renderer *self, bool enable);
+	void renderer_set_texture_mode(Renderer *self, TextureMode mode);
+	void renderer_set_semi_transparent(Renderer *self, SemiTransparentMode state);
+	void renderer_set_primitive_type(Renderer *self, PrimitiveType primitive_type);
+	void renderer_set_force_mask_bit(Renderer *self, bool enable);
+	void renderer_set_mask_test(Renderer *self, bool enable);
+	void renderer_set_texture_color_modulate(Renderer *self, bool enable);
+	void renderer_set_UV_limits(Renderer *self, uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v);
+	void renderer_set_filter_mode(Renderer *self, FilterMode mode);
+	void renderer_set_sprite_filter_exclude(Renderer *self, FilterExclude exclude);
+	void renderer_set_polygon_2d_filter_exclude(Renderer *self, FilterExclude exclude);
+	void renderer_set_scaled_uv_offset(Renderer *self, bool offset);
+	void renderer_set_track_textures(Renderer *self, bool enable);
+	void renderer_set_dump_textures(Renderer *self, bool enable);
+	void renderer_set_replace_textures(Renderer *self, bool enable);
+	void renderer_set_hd_cache_budgets(Renderer *self, size_t ram_bytes, size_t vram_bytes);
+	void renderer_set_eager_hd_textures(Renderer *self, bool enable);
+	void renderer_set_adaptive_smoothing(Renderer *self, bool enable);
+	void renderer_set_draw_offset(Renderer *self, int x, int y);
+	void renderer_set_scissored_invariant(Renderer *self, bool invariant);
+	void renderer_set_horizontal_display_range(Renderer *self, int x1, int x2);
+	void renderer_set_vertical_display_range(Renderer *self, int y1, int y2);
+	void renderer_set_horizontal_overscan_cropping(Renderer *self, int crop_overscan);
+	void renderer_set_horizontal_offset_cycles(Renderer *self, int offset_cycles);
+	void renderer_set_horizontal_additional_cropping(Renderer *self, unsigned image_crop);
+	void renderer_set_visible_scanlines(Renderer *self, int slstart, int slend, int slstart_pal, int slend_pal);
+	void renderer_set_display_filter(Renderer *self, ScanoutFilter filter);
+	void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter);
+	void renderer_set_dither_native_resolution(Renderer *self, bool enable);
+	Renderer::SaveState renderer_save_vram_state(Renderer *self);
+	void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const Renderer::SaveState *state);
+	void renderer_fini(Renderer *self);
+	bool renderer_is_valid(const Renderer *self);
+
 
 	/* ---- Renderer flush/accessor methods (batch 3) -> free functions. These have
 	 * internal callers (other still-class methods call them via this), rewired to
@@ -9433,47 +9437,60 @@ static inline void fbcolor_to_rgba32f(float *v, uint32_t color)
 }
 
 
-Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const SaveState *state)
-    : device(&device_)
-    , scaling(scaling_)
-    , msaa(msaa_)
+void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const Renderer::SaveState *state)
 {
+	/* Former constructor init-list + remaining scalar default member initializers,
+	 * assigned explicitly now that Renderer is malloc'd and placement-initialised via
+	 * renderer_init rather than a C++ constructor. */
+	self->device = device_;
+	self->scaling = scaling_;
+	self->msaa = msaa_;
+	self->scaled_uv_offset = false;
+	self->valid = false;
+	self->primitive_filter_mode = FilterMode_NearestNeighbor;
+	self->sprite_filter_exclude = FilterExcludeNone;
+	self->polygon_2d_filter_exclude = FilterExcludeNone;
+	self->texture_tracking_enabled = false;
+	self->primitive_index = 0;
+	self->render_pass_is_feedback = false;
+	self->quad.data = NULL;
+
 	/* ImageHandle is now a plain struct with no default member initializer;
 	 * null every handle member so conditional assignment and ~Renderer's
 	 * ih_reset are safe. */
-	cmd.data                     = NULL;
-	quad.data                    = NULL;
-	scaled_framebuffer.data      = NULL;
-	scaled_framebuffer_msaa.data = NULL;
-	bias_framebuffer.data        = NULL;
-	framebuffer.data             = NULL;
-	framebuffer_ssaa.data        = NULL;
-	dither_lut.data              = NULL;
-	/* render_state's default member initializers were moved out when RenderState
+	self->cmd.data                     = NULL;
+	self->quad.data                    = NULL;
+	self->scaled_framebuffer.data      = NULL;
+	self->scaled_framebuffer_msaa.data = NULL;
+	self->bias_framebuffer.data        = NULL;
+	self->framebuffer.data             = NULL;
+	self->framebuffer_ssaa.data        = NULL;
+	self->dither_lut.data              = NULL;
+	/* self->render_state's default member initializers were moved out when RenderState
 	 * was de-C++'d; seed them here (was implicit at construction). */
-	render_state_init(&render_state);
-	opaque_queue_init(&queue);
-	imageview_vec_init(&scaled_views); /* was default-constructed; now a plain struct */
-	last_scanout.data            = NULL;
-	reuseable_scanout.data       = NULL;
-	fbatlas_init(&atlas);
-	texture_tracker_init(&tracker); /* embedded TextureTracker: explicit init (was default ctor) */
+	render_state_init(&self->render_state);
+	opaque_queue_init(&self->queue);
+	imageview_vec_init(&self->scaled_views); /* was default-constructed; now a plain struct */
+	self->last_scanout.data            = NULL;
+	self->reuseable_scanout.data       = NULL;
+	fbatlas_init(&self->atlas);
+	texture_tracker_init(&self->tracker); /* embedded TextureTracker: explicit init (was default ctor) */
 	// Sanity check settings, 16x IR with 16x MSAA will exhaust most GPUs VRAM alone.
-	if (scaling == 16 && msaa > 1)
+	if (self->scaling == 16 && self->msaa > 1)
 	{
 		LOGI("[Vulkan]: Internal resolution scale of 16x is used, limiting MSAA to 1x for memory reasons.\n");
-		msaa = 1;
+		self->msaa = 1;
 	}
-	else if (scaling == 8 && msaa > 4)
+	else if (self->scaling == 8 && self->msaa > 4)
 	{
 		LOGI("[Vulkan]: Internal resolution scale of 8x is used, limiting MSAA to 4x for memory reasons.\n");
-		msaa = 4;
+		self->msaa = 4;
 	}
 
-	// Verify we can actually render at our target scaling factor.
+	// Verify we can actually render at our target self->scaling factor.
 	// Some devices only support 8K textures, which means max 8x scale.
 	VkImageFormatProperties props;
-	if (device->get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+	if (self->device->get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 				VK_IMAGE_USAGE_STORAGE_BIT |
 				VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
@@ -9482,15 +9499,15 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 				&props))
 	{
 		unsigned max_scaling = min_(props.maxExtent.width / FB_WIDTH, props.maxExtent.height / FB_HEIGHT);
-		unsigned new_scale = scaling;
+		unsigned new_scale = self->scaling;
 		while (new_scale > max_scaling)
 			new_scale >>= 1;
 
-		if (new_scale != scaling)
+		if (new_scale != self->scaling)
 		{
-			LOGI("[Vulkan]: Internal resolution scale of %ux was chosen, but this is not supported, using %ux instead.\n",
-					scaling, new_scale);
-			scaling = new_scale;
+			LOGI("[Vulkan]: Internal resolution scale of %ux was chosen, but self is not supported, using %ux instead.\n",
+					self->scaling, new_scale);
+			self->scaling = new_scale;
 		}
 	}
 	else
@@ -9506,64 +9523,64 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 
 	if (state)
 	{
-		render_state = state->state;
-		fbatlas_set_texture_offset(&atlas, render_state.texture_offset_x, render_state.texture_offset_y);
-		fbatlas_set_texture_mode(&atlas, render_state.texture_mode);
-		fbatlas_set_draw_rect(&atlas, render_state.draw_rect);
-		fbatlas_set_palette_offset(&atlas, render_state.palette_offset_x, render_state.palette_offset_y);
-		fbatlas_set_texture_window(&atlas, render_state.cached_window_rect);
-		fbatlas_write_transfer(&atlas, Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
+		self->render_state = state->state;
+		fbatlas_set_texture_offset(&self->atlas, self->render_state.texture_offset_x, self->render_state.texture_offset_y);
+		fbatlas_set_texture_mode(&self->atlas, self->render_state.texture_mode);
+		fbatlas_set_draw_rect(&self->atlas, self->render_state.draw_rect);
+		fbatlas_set_palette_offset(&self->atlas, self->render_state.palette_offset_x, self->render_state.palette_offset_y);
+		fbatlas_set_texture_window(&self->atlas, self->render_state.cached_window_rect);
+		fbatlas_write_transfer(&self->atlas, Domain_Unscaled, { 0, 0, FB_WIDTH, FB_HEIGHT });
 	}
 
 	ImageInitialData initial_vram = {
 		state ? owned_u32_data(&state->vram) : NULL, 0, 0,
 	};
-	ih_move(&framebuffer, device->create_image(info, state ? &initial_vram : NULL));
-	image_set_layout(ih_get(&framebuffer), Layout_General);
-	ih_move(&framebuffer_ssaa, device->create_image(info));
-	image_set_layout(ih_get(&framebuffer_ssaa), Layout_General);
+	ih_move(&self->framebuffer, self->device->create_image(info, state ? &initial_vram : NULL));
+	image_set_layout(ih_get(&self->framebuffer), Layout_General);
+	ih_move(&self->framebuffer_ssaa, self->device->create_image(info));
+	image_set_layout(ih_get(&self->framebuffer_ssaa), Layout_General);
 
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	info.format = VK_FORMAT_R8_UNORM;
 	info.levels = 1;
-	ih_move(&bias_framebuffer, device->create_image(info, NULL));
+	ih_move(&self->bias_framebuffer, self->device->create_image(info, NULL));
 
-	info.width *= scaling;
-	info.height *= scaling;
+	info.width *= self->scaling;
+	info.height *= self->scaling;
 	info.format = VK_FORMAT_R8G8B8A8_UNORM;
-	info.levels = trailing_zeroes(scaling) + 1;
+	info.levels = trailing_zeroes(self->scaling) + 1;
 	info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 	             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 	             VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-	ih_move(&scaled_framebuffer, device->create_image(info));
-	image_set_layout(ih_get(&scaled_framebuffer), Layout_General);
+	ih_move(&self->scaled_framebuffer, self->device->create_image(info));
+	image_set_layout(ih_get(&self->scaled_framebuffer), Layout_General);
 
 	{
-		ImageViewCreateInfo view_info = imageview_get_create_info(&image_get_view(ih_get(&scaled_framebuffer)));
+		ImageViewCreateInfo view_info = imageview_get_create_info(&image_get_view(ih_get(&self->scaled_framebuffer)));
 		for (unsigned i = 0; i < info.levels; i++)
 		{
 			view_info.base_level = i;
 			view_info.levels = 1;
-			imageview_vec_push(&scaled_views, device->create_image_view(view_info));
+			imageview_vec_push(&self->scaled_views, self->device->create_image_view(view_info));
 		}
 	}
 
 	// Check for support.
-	if (msaa > 1)
+	if (self->msaa > 1)
 	{
-		if (!device->get_device_features().enabled_features.sampleRateShading)
+		if (!self->device->get_device_features().enabled_features.sampleRateShading)
 		{
-			msaa = 1;
-			LOGI("[Vulkan]: sampleRateShading is not supported by this implementation. Cannot use MSAA.\n");
+			self->msaa = 1;
+			LOGI("[Vulkan]: sampleRateShading is not supported by self implementation. Cannot use MSAA.\n");
 		}
-		else if (!device->get_device_features().enabled_features.shaderStorageImageMultisample)
+		else if (!self->device->get_device_features().enabled_features.shaderStorageImageMultisample)
 		{
-			msaa = 1;
-			LOGI("[Vulkan]: shaderStorageImageMultisample is not supported by this implementation. Cannot use MSAA.\n");
+			self->msaa = 1;
+			LOGI("[Vulkan]: shaderStorageImageMultisample is not supported by self implementation. Cannot use MSAA.\n");
 		}
-		else if (!device->get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+		else if (!self->device->get_image_format_properties(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
 					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 					VK_IMAGE_USAGE_STORAGE_BIT |
 					VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
@@ -9571,55 +9588,55 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 					0,
 					&props))
 		{
-			LOGI("[Vulkan]: Cannot use multisampling with this device.\n");
-			msaa = 1;
+			LOGI("[Vulkan]: Cannot use multisampling with self self->device.\n");
+			self->msaa = 1;
 		}
-		else if ((msaa & props.sampleCounts) == 0)
+		else if ((self->msaa & props.sampleCounts) == 0)
 		{
-			unsigned new_msaa = msaa >> 1;
+			unsigned new_msaa = self->msaa >> 1;
 			while (new_msaa)
 			{
 				if (new_msaa & props.sampleCounts)
 				{
 					LOGI("[Vulkan]: MSAA sample count of %u is not supported, falling back to %u.\n",
-							msaa, new_msaa);
-					msaa = new_msaa;
+							self->msaa, new_msaa);
+					self->msaa = new_msaa;
 					break;
 				}
 			}
 
-			if (msaa == 0)
-				msaa = 1;
+			if (self->msaa == 0)
+				self->msaa = 1;
 		}
 	}
 
-	if (msaa > 1)
+	if (self->msaa > 1)
 	{
 		info.levels = 1;
-		info.samples = (VkSampleCountFlagBits)(msaa);
-		ih_move(&scaled_framebuffer_msaa, device->create_image(info));
-		image_set_layout(ih_get(&scaled_framebuffer_msaa), Layout_General);
+		info.samples = (VkSampleCountFlagBits)(self->msaa);
+		ih_move(&self->scaled_framebuffer_msaa, self->device->create_image(info));
+		image_set_layout(ih_get(&self->scaled_framebuffer_msaa), Layout_General);
 		// General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
-		// The expectation is that this will be used with a lower scaling factor to compensate.
+		// The expectation is that self will be used with a lower self->scaling factor to compensate.
 	}
 
-	fbatlas_set_hazard_listener(&atlas, this);
-	texture_tracker_set_texture_uploader(&tracker, this);
+	fbatlas_set_hazard_listener(&self->atlas, self);
+	texture_tracker_set_texture_uploader(&self->tracker, self);
 
-	renderer_init_pipelines(this);
+	renderer_init_pipelines(self);
 
-	renderer_ensure_command_buffer(this);
-	commandbuffer_clear_image(cbh_get(&cmd), *ih_get(&scaled_framebuffer), {});
+	renderer_ensure_command_buffer(self);
+	commandbuffer_clear_image(cbh_get(&self->cmd), *ih_get(&self->scaled_framebuffer), {});
 	if (!state)
-		commandbuffer_clear_image(cbh_get(&cmd), *ih_get(&framebuffer), {});
-	commandbuffer_full_barrier(cbh_get(&cmd));
+		commandbuffer_clear_image(cbh_get(&self->cmd), *ih_get(&self->framebuffer), {});
+	commandbuffer_full_barrier(cbh_get(&self->cmd));
 
 	ImageCreateInfo dither_info = ImageCreateInfo::immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM);
 	// This lut is biased with 4 to be able to use UNORM easily.
 	static const uint8_t dither_lut_data[16] = { 0, 4, 1, 5, 6, 2, 7, 3, 1, 5, 0, 4, 7, 3, 6, 2 };
 
 	ImageInitialData dither_initial = { dither_lut_data };
-	ih_move(&dither_lut, device->create_image(dither_info, &dither_initial));
+	ih_move(&self->dither_lut, self->device->create_image(dither_info, &dither_initial));
 
 	static const float quad_data[] = {
 		-128, -128, +127, -128, -128, +127, +127, +127,
@@ -9629,17 +9646,16 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	buffer_create_info.domain = BufferDomain_Device;
 	buffer_create_info.size = sizeof(quad_data);
 	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	quad = device->create_buffer(buffer_create_info, quad_data);
+	self->quad = self->device->create_buffer(buffer_create_info, quad_data);
 
-	renderer_flush(this);
-	renderer_reset_scissor_queue(this);
+	renderer_flush(self);
+	renderer_reset_scissor_queue(self);
 
 	if (state) {
-		texture_tracker_load_state(&tracker, state->tracker_state);
+		texture_tracker_load_state(&self->tracker, state->tracker_state);
 	}
 
-	valid = true;
-}
+	self->valid = true;}
 
 Renderer::SaveState renderer_save_vram_state(Renderer *self){
 	BufferCreateInfo buffer_create_info;
@@ -11820,40 +11836,42 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect &rect){
 	return buffer;
 }
 
-Renderer::~Renderer()
+void renderer_fini(Renderer *self)
 {
-	renderer_flush(this);
-	texture_tracker_fini(&tracker); /* embedded TextureTracker: explicit fini (was default dtor) */
+	renderer_flush(self);
+	texture_tracker_fini(&self->tracker); /* embedded TextureTracker: explicit fini (was default dtor) */
 	/* Release the ImageHandle members (previously dropped by implicit member
 	 * destructors, which a plain struct no longer provides). */
-	ih_reset(&scaled_framebuffer);
-	ih_reset(&scaled_framebuffer_msaa);
-	ih_reset(&bias_framebuffer);
-	ih_reset(&framebuffer);
-	ih_reset(&framebuffer_ssaa);
-	ih_reset(&dither_lut);
-	ih_reset(&last_scanout);
-	ih_reset(&reuseable_scanout);
-	bh_reset(&quad);
-	imageview_vec_destroy(&scaled_views); /* release scaled image views (was member dtor) */
-	/* Free the per-frame draw-queue arrays (POD_VEC backing storage). */
-	BufferVertexVec_free_storage(&queue.opaque);
-	PrimitiveInfoVec_free_storage(&queue.opaque_scissor);
-	BufferVertexVec_free_storage(&queue.opaque_textured);
-	PrimitiveInfoVec_free_storage(&queue.opaque_textured_scissor);
-	BufferVertexVec_free_storage(&queue.semi_transparent_opaque);
-	PrimitiveInfoVec_free_storage(&queue.semi_transparent_opaque_scissor);
-	BufferVertexVec_free_storage(&queue.semi_transparent);
-	SemiTransparentStateVec_free_storage(&queue.semi_transparent_state);
-	Rect2DVec_free_storage(&queue.scaled_resolves);
-	Rect2DVec_free_storage(&queue.unscaled_resolves);
-	BlitInfoVec_free_storage(&queue.scaled_blits);
-	BlitInfoVec_free_storage(&queue.scaled_masked_blits);
-	BlitInfoVec_free_storage(&queue.unscaled_blits);
-	BlitInfoVec_free_storage(&queue.unscaled_masked_blits);
-	Rect2DVec_free_storage(&queue.scissors);
-	ClearCandidateVec_free_storage(&queue.clear_candidates);
+	ih_reset(&self->scaled_framebuffer);
+	ih_reset(&self->scaled_framebuffer_msaa);
+	ih_reset(&self->bias_framebuffer);
+	ih_reset(&self->framebuffer);
+	ih_reset(&self->framebuffer_ssaa);
+	ih_reset(&self->dither_lut);
+	ih_reset(&self->last_scanout);
+	ih_reset(&self->reuseable_scanout);
+	bh_reset(&self->quad);
+	imageview_vec_destroy(&self->scaled_views); /* release scaled image views (was member dtor) */
+	/* Free the per-frame draw-self->queue arrays (POD_VEC backing storage). */
+	BufferVertexVec_free_storage(&self->queue.opaque);
+	PrimitiveInfoVec_free_storage(&self->queue.opaque_scissor);
+	BufferVertexVec_free_storage(&self->queue.opaque_textured);
+	PrimitiveInfoVec_free_storage(&self->queue.opaque_textured_scissor);
+	BufferVertexVec_free_storage(&self->queue.semi_transparent_opaque);
+	PrimitiveInfoVec_free_storage(&self->queue.semi_transparent_opaque_scissor);
+	BufferVertexVec_free_storage(&self->queue.semi_transparent);
+	SemiTransparentStateVec_free_storage(&self->queue.semi_transparent_state);
+	Rect2DVec_free_storage(&self->queue.scaled_resolves);
+	Rect2DVec_free_storage(&self->queue.unscaled_resolves);
+	BlitInfoVec_free_storage(&self->queue.scaled_blits);
+	BlitInfoVec_free_storage(&self->queue.scaled_masked_blits);
+	BlitInfoVec_free_storage(&self->queue.unscaled_blits);
+	BlitInfoVec_free_storage(&self->queue.unscaled_masked_blits);
+	Rect2DVec_free_storage(&self->queue.scissors);
+	ClearCandidateVec_free_storage(&self->queue.clear_candidates);
 }
+
+bool renderer_is_valid(const Renderer *self) { return self->valid; }
 
 void renderer_reset_scissor_queue(Renderer *self)
 {
@@ -21952,10 +21970,10 @@ static void vk_context_reset(void)
    device->set_context(*context);
 
    renderer = (Renderer *)malloc(sizeof(Renderer));
-   new (renderer) Renderer(*device, scaling, msaa, owned_u32_empty(&save_state.vram) ? NULL : &save_state);
-   if (!renderer->is_valid())
+   renderer_init(renderer, device, scaling, msaa, owned_u32_empty(&save_state.vram) ? NULL : &save_state);
+   if (!renderer_is_valid(renderer))
    {
-      renderer->~Renderer();
+      renderer_fini(renderer);
       free(renderer);
       Device::device_deinit(device);
       free(device);
@@ -21988,7 +22006,7 @@ static void vk_context_destroy(void)
    scanout_handles.clear();
    swapchain_images.clear();
 
-   renderer->~Renderer();
+   renderer_fini(renderer);
    free(renderer);
    Device::device_deinit(device);
    free(device);
