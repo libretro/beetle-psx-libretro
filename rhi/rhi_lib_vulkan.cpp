@@ -1761,7 +1761,6 @@ static inline uint32_t util_ctz(uint32_t x)
 	typedef struct TextureFormatLayout TextureFormatLayout;
 	typedef struct Cookie Cookie;
 	typedef struct SamplerCreateInfo SamplerCreateInfo;
-	typedef struct SamplerDeleter SamplerDeleter;
 	typedef struct Sampler Sampler;
 	typedef struct SamplerHandle SamplerHandle;
 	typedef struct Block Block;
@@ -1778,8 +1777,6 @@ static inline uint32_t util_ctz(uint32_t x)
 	typedef struct DeviceAllocatorHeapVec DeviceAllocatorHeapVec;
 	typedef struct DeviceAllocator DeviceAllocator;
 	typedef struct BufferCreateInfo BufferCreateInfo;
-	typedef struct BufferDeleter BufferDeleter;
-	typedef struct BufferViewDeleter BufferViewDeleter;
 	typedef struct Buffer Buffer;
 	typedef struct BufferHandle BufferHandle;
 	typedef struct BufferViewCreateInfo BufferViewCreateInfo;
@@ -1787,19 +1784,15 @@ static inline uint32_t util_ctz(uint32_t x)
 	typedef struct BufferViewHandle BufferViewHandle;
 	typedef struct ImageInitialData ImageInitialData;
 	typedef struct ImageViewCreateInfo ImageViewCreateInfo;
-	typedef struct ImageViewDeleter ImageViewDeleter;
 	typedef struct ImageView ImageView;
 	typedef struct ImageViewHandle ImageViewHandle;
 	typedef struct ImageViewHandleVec ImageViewHandleVec;
 	typedef struct ImageCreateInfo ImageCreateInfo;
-	typedef struct ImageDeleter ImageDeleter;
 	typedef struct Image Image;
 	typedef struct ImageHandle ImageHandle;
-	typedef struct FenceHolderDeleter FenceHolderDeleter;
 	typedef struct FenceHolder FenceHolder;
 	typedef struct Fence Fence;
 	typedef struct FenceManager FenceManager;
-	typedef struct SemaphoreHolderDeleter SemaphoreHolderDeleter;
 	typedef struct SemaphoreHolder SemaphoreHolder;
 	typedef struct Semaphore Semaphore;
 	typedef struct SemaphoreHandleVec SemaphoreHandleVec;
@@ -1834,7 +1827,6 @@ static inline uint32_t util_ctz(uint32_t x)
 	typedef struct VertexBindingState VertexBindingState;
 	typedef struct ResourceBinding ResourceBinding;
 	typedef struct ResourceBindings ResourceBindings;
-	typedef struct CommandBufferDeleter CommandBufferDeleter;
 	typedef struct CommandBuffer CommandBuffer;
 	typedef struct CommandBufferHandle CommandBufferHandle;
 	typedef struct InitialImageBuffer InitialImageBuffer;
@@ -3033,10 +3025,6 @@ static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 	};
 
 	struct Sampler;
-	struct SamplerDeleter
-	{
-		void operator()(Sampler *sampler);
-	};
 
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
@@ -3614,16 +3602,8 @@ VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
 	}
 
 	struct Buffer;
-	struct BufferDeleter
-	{
-		void operator()(Buffer *buffer);
-	};
 
 	struct BufferView;
-	struct BufferViewDeleter
-	{
-		void operator()(BufferView *view);
-	};
 
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
@@ -3879,10 +3859,6 @@ VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
 
 	struct ImageView;
 
-	struct ImageViewDeleter
-	{
-		void operator()(ImageView *view);
-	};
 
 	POD_VEC_DECLARE(RenderTargetViewVec, VkImageView);
 
@@ -4115,10 +4091,6 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 
 	struct Image;
 
-	struct ImageDeleter
-	{
-		void operator()(Image *image);
-	};
 
 	enum Layout {
 		Layout_Optimal,
@@ -4208,10 +4180,6 @@ void ih_steal(struct ImageHandle *dst, struct ImageHandle *src) { dst->data = sr
 	struct Device;
 
 	struct FenceHolder;
-	struct FenceHolderDeleter
-	{
-		void operator()(FenceHolder *fence);
-	};
 
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr dispatches release_reference/add_reference through
@@ -4278,10 +4246,6 @@ void fencemanager_init_empty(struct FenceManager *self)
 	struct Device;
 
 	struct SemaphoreHolder;
-	struct SemaphoreHolderDeleter
-	{
-		void operator()(SemaphoreHolder *semaphore);
-	};
 
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
 	 * CRTP base (IntrusivePtr now dispatches release_reference/add_reference
@@ -5385,10 +5349,6 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 		Type_AsyncTransfer
 	};
 	typedef enum CommandBufferType CommandBufferType;
-	struct CommandBufferDeleter
-	{
-		void operator()(CommandBuffer *cmd);
-	};
 
 	struct Device;
 	/* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
@@ -12693,13 +12653,27 @@ void sampler_fini(struct Sampler *self)
 		device_destroy_sampler_nolock(self->device, self->sampler);
 }
 
+/* Forward declarations for the 8 pointee deleter free functions (formerly
+ * XDeleter::operator()). Each *_release_reference below calls its deleter, but
+ * the deleter bodies are defined further down (they need the pool/fini helpers
+ * in scope), so they must be declared first now that they are plain static
+ * functions rather than inline functor operator()s. */
+static void sampler_deleter_call(Sampler *sampler);
+static void buffer_deleter_call(Buffer *buffer);
+static void buffer_view_deleter_call(BufferView *view);
+static void image_view_deleter_call(ImageView *view);
+static void image_deleter_call(Image *image);
+static void fence_holder_deleter_call(FenceHolder *fence);
+static void semaphore_holder_deleter_call(SemaphoreHolder *semaphore);
+static void command_buffer_deleter_call(CommandBuffer *cmd);
+
 static void sampler_release_reference(struct Sampler *self)
 {
 	if (counter_release(&self->reference_count))
-		SamplerDeleter()(self);
+		sampler_deleter_call(self);
 }
 
-void SamplerDeleter::operator()(Sampler *sampler)
+static void sampler_deleter_call(Sampler *sampler)
 {
 	{ struct ObjectPoolRaw *_pool = &sampler->device->handle_pool.samplers; sampler_fini(sampler); object_pool_raw_free(_pool, sampler); }
 }
@@ -12726,10 +12700,10 @@ void buffer_fini(struct Buffer *self)
 static void buffer_release_reference(struct Buffer *self)
 {
 	if (counter_release(&self->reference_count))
-		BufferDeleter()(self);
+		buffer_deleter_call(self);
 }
 
-void BufferDeleter::operator()(Buffer *buffer)
+static void buffer_deleter_call(Buffer *buffer)
 {
 	{ struct ObjectPoolRaw *_pool = &buffer->device->handle_pool.buffers; buffer_fini(buffer); object_pool_raw_free(_pool, buffer); }
 }
@@ -12752,10 +12726,10 @@ void bufferview_fini(struct BufferView *self)
 static void bufferview_release_reference(struct BufferView *self)
 {
 	if (counter_release(&self->reference_count))
-		BufferViewDeleter()(self);
+		buffer_view_deleter_call(self);
 }
 
-void BufferViewDeleter::operator()(BufferView *view)
+static void buffer_view_deleter_call(BufferView *view)
 {
 	{ struct ObjectPoolRaw *_pool = &view->device->handle_pool.buffer_views; bufferview_fini(view); object_pool_raw_free(_pool, view); }
 }
@@ -12816,7 +12790,7 @@ void imageview_fini(struct ImageView *self)
 static void imageview_release_reference(struct ImageView *self)
 {
 	if (counter_release(&self->reference_count))
-		ImageViewDeleter()(self);
+		image_view_deleter_call(self);
 }
 
 void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
@@ -12866,15 +12840,15 @@ void image_fini(struct Image *self)
 static void image_release_reference(struct Image *self)
 {
 	if (counter_release(&self->reference_count))
-		ImageDeleter()(self);
+		image_deleter_call(self);
 }
 
-void ImageViewDeleter::operator()(ImageView *view)
+static void image_view_deleter_call(ImageView *view)
 {
 	{ struct ObjectPoolRaw *_pool = &view->device->handle_pool.image_views; imageview_fini(view); object_pool_raw_free(_pool, view); }
 }
 
-void ImageDeleter::operator()(Image *image)
+static void image_deleter_call(Image *image)
 {
 	{ struct ObjectPoolRaw *_pool = &image->device->handle_pool.images; image_fini(image); object_pool_raw_free(_pool, image); }
 }
@@ -12909,10 +12883,10 @@ static void fenceholder_wait(struct FenceHolder *self)
 static void fenceholder_release_reference(struct FenceHolder *self)
 {
 	if (counter_release(&self->reference_count))
-		FenceHolderDeleter()(self);
+		fence_holder_deleter_call(self);
 }
 
-void FenceHolderDeleter::operator()(FenceHolder *fence)
+static void fence_holder_deleter_call(FenceHolder *fence)
 {
 	{ struct ObjectPoolRaw *_pool = &fence->device->handle_pool.fences; fenceholder_fini(fence); object_pool_raw_free(_pool, fence); }
 }
@@ -12975,10 +12949,10 @@ void semaphoreholder_fini(struct SemaphoreHolder *self)
 static void semaphoreholder_release_reference(struct SemaphoreHolder *self)
 {
 	if (counter_release(&self->reference_count))
-		SemaphoreHolderDeleter()(self);
+		semaphore_holder_deleter_call(self);
 }
 
-void SemaphoreHolderDeleter::operator()(SemaphoreHolder *semaphore)
+static void semaphore_holder_deleter_call(SemaphoreHolder *semaphore)
 {
 	{ struct ObjectPoolRaw *_pool = &semaphore->device->handle_pool.semaphores; semaphoreholder_fini(semaphore); object_pool_raw_free(_pool, semaphore); }
 }
@@ -15097,7 +15071,7 @@ VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 	void commandbuffer_release_reference(struct CommandBuffer *self)
 	{
 		if (counter_release(&self->reference_count))
-			CommandBufferDeleter()(self);
+			command_buffer_deleter_call(self);
 	}
 
 	void commandbuffer_copy_buffer(struct CommandBuffer *self, const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset,
@@ -16367,7 +16341,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	}
 
 
-	void CommandBufferDeleter::operator()(CommandBuffer *cmd)
+	static void command_buffer_deleter_call(CommandBuffer *cmd)
 	{
 		{ struct ObjectPoolRaw *_pool = &cmd->device->handle_pool.command_buffers; commandbuffer_fini(cmd); object_pool_raw_free(_pool, cmd); }
 	}
