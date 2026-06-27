@@ -1997,7 +1997,7 @@ bool counter_release(struct SingleThreadCounter *c) { return --c->count == 0; }
 
 	struct IntrusiveListC
 	{
-		struct IntrusiveListNode *head = NULL;
+		struct IntrusiveListNode *head;
 	};
 
 void ilist_clear(struct IntrusiveListC *list)
