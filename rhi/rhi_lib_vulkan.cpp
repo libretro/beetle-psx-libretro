@@ -6422,25 +6422,23 @@ extern retro_log_printf_t log_cb;
 		ImageHandle texture;
 	};
 
+	/* DumpedMode: plain POD (was a value type whose only method was operator==,
+	 * now the free function dumpedmode_eq). */
 	struct DumpedMode {
 		TextureMode mode;
 		uint32_t palette_hash;
-
-		inline bool operator==(const DumpedMode &other) const
-		{
-			return mode == other.mode && palette_hash == other.palette_hash;
-		}
 	};
 
+	static inline bool dumpedmode_eq(const struct DumpedMode *a, const struct DumpedMode *b)
+	{
+		return a->mode == b->mode && a->palette_hash == b->palette_hash;
+	}
+
+	/* UsedMode: plain POD (its operator== was unused and has been dropped). */
 	struct UsedMode {
 		TextureMode mode;
 		unsigned int palette_offset_x;
 		unsigned int palette_offset_y;
-
-		inline bool operator==(const UsedMode &other) const
-		{
-			return mode == other.mode && palette_offset_x == other.palette_offset_x && palette_offset_y == other.palette_offset_y;
-		}
 	};
 
 	/* ------------------------------------------------------------------------- *
@@ -20555,7 +20553,7 @@ Rect fromSRect(SRect rect) {
 		bool already_dumped = false;
 		int dmi;
 		for (dmi = 0; dmi < upload->dumped_modes_count; dmi++) {
-			if (upload->dumped_modes[dmi] == dump_mode) {
+			if (dumpedmode_eq(&upload->dumped_modes[dmi], &dump_mode)) {
 				already_dumped = true;
 				break;
 			}
