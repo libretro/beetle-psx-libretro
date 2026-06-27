@@ -3619,7 +3619,7 @@ VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
 		BufferCreateInfo info;
 		HandleCounter reference_count;
 	};
-	static void buffer_init(struct Buffer *self, Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info);
+	static void buffer_init(struct Buffer *self, Device *device, VkBuffer buffer, const DeviceAllocation *alloc, const BufferCreateInfo *info);
 	void buffer_fini(struct Buffer *self);
 VkBuffer buffer_get_buffer(const struct Buffer *self) { return self->buffer; }
 const BufferCreateInfo *buffer_get_create_info(const struct Buffer *self) { return &self->info; }
@@ -3680,7 +3680,7 @@ void bh_steal(struct BufferHandle *dst, struct BufferHandle *src) { dst->data = 
 		BufferViewCreateInfo info;
 		HandleCounter reference_count;
 	};
-	static void bufferview_init(struct BufferView *self, Device *device, VkBufferView view, const BufferViewCreateInfo &info);
+	static void bufferview_init(struct BufferView *self, Device *device, VkBufferView view, const BufferViewCreateInfo *info);
 	void bufferview_fini(struct BufferView *self);
 VkBufferView bufferview_get_view(const struct BufferView *self) { return self->view; }
 const Buffer *bufferview_get_buffer(const struct BufferView *self) { return self->info.buffer; }
@@ -3880,7 +3880,7 @@ VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
 		ImageViewCreateInfo info; /* seeded via imageview_init's `info` arg */
 		HandleCounter reference_count;
 	};
-	static void imageview_init(struct ImageView *self, Device *device, VkImageView view, const ImageViewCreateInfo &info);
+	static void imageview_init(struct ImageView *self, Device *device, VkImageView view, const ImageViewCreateInfo *info);
 	void imageview_fini(struct ImageView *self);
 	static VkImageView imageview_get_render_target_view(const struct ImageView *self, unsigned layer);
 void imageview_set_alt_views(struct ImageView *self, VkImageView depth, VkImageView stencil)
@@ -4118,7 +4118,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 		VkAccessFlags access_flags;
 		HandleCounter reference_count;
 	};
-	void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc, const ImageCreateInfo &info);
+	void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation *alloc, const ImageCreateInfo *info);
 	void image_fini(struct Image *self);
 const ImageView *image_get_view_const(const struct Image *self) { VK_ASSERT(iv_is_valid(&self->view)); return iv_get(&self->view); }
 ImageView *image_get_view(struct Image *self) { VK_ASSERT(iv_is_valid(&self->view)); return iv_get(&self->view); }
@@ -5965,7 +5965,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void bufferview_fini(struct BufferView *self);
 	void imageview_fini(struct ImageView *self);
 	void image_fini(struct Image *self);
-	void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc, const ImageCreateInfo &info);
+	void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation *alloc, const ImageCreateInfo *info);
 	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo &info, VkSubpassContents contents);
 	void commandbuffer_end_render_pass(struct CommandBuffer *self);
 	void commandbuffer_set_program(struct CommandBuffer *self, Program &program);
@@ -12684,12 +12684,12 @@ static void sampler_deleter_call(Sampler *sampler)
 /* === buffer.cpp === */
 
 
-static void buffer_init(struct Buffer *self, Device *device, VkBuffer buffer, const DeviceAllocation &alloc, const BufferCreateInfo &info)
+static void buffer_init(struct Buffer *self, Device *device, VkBuffer buffer, const DeviceAllocation *alloc, const BufferCreateInfo *info)
 {
 	self->device = device;
 	self->buffer = buffer;
-	self->alloc  = alloc;
-	self->info   = info;
+	self->alloc  = *alloc;
+	self->info   = *info;
 	counter_init(&self->reference_count); /* refcount starts at 1 */
 	cookie_init(&self->cookie_base, device);
 }
@@ -12711,11 +12711,11 @@ static void buffer_deleter_call(Buffer *buffer)
 	{ struct ObjectPoolRaw *_pool = &buffer->device->handle_pool.buffers; buffer_fini(buffer); object_pool_raw_free(_pool, buffer); }
 }
 
-static void bufferview_init(struct BufferView *self, Device *device, VkBufferView view, const BufferViewCreateInfo &create_info)
+static void bufferview_init(struct BufferView *self, Device *device, VkBufferView view, const BufferViewCreateInfo *create_info)
 {
 	self->device = device;
 	self->view   = view;
-	self->info   = create_info;
+	self->info   = *create_info;
 	counter_init(&self->reference_count); /* refcount starts at 1 */
 	cookie_init(&self->cookie_base, device);
 }
@@ -12742,7 +12742,7 @@ static void buffer_view_deleter_call(BufferView *view)
 
 
 
-static void imageview_init(struct ImageView *self, Device *device, VkImageView view, const ImageViewCreateInfo &info)
+static void imageview_init(struct ImageView *self, Device *device, VkImageView view, const ImageViewCreateInfo *info)
 {
 	self->device       = device;
 	self->view         = view;
@@ -12752,7 +12752,7 @@ static void imageview_init(struct ImageView *self, Device *device, VkImageView v
 	self->render_target_views.cap   = 0;
 	self->depth_view   = VK_NULL_HANDLE;
 	self->stencil_view = VK_NULL_HANDLE;
-	self->info         = info;
+	self->info         = *info;
 	counter_init(&self->reference_count); /* refcount starts at 1 */
 	cookie_init(&self->cookie_base, device);
 }
@@ -12796,13 +12796,13 @@ static void imageview_release_reference(struct ImageView *self)
 		image_view_deleter_call(self);
 }
 
-void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation &alloc,
-             const ImageCreateInfo &create_info)
+void image_init(struct Image *self, Device *device, VkImage image, VkImageView default_view, const DeviceAllocation *alloc,
+             const ImageCreateInfo *create_info)
 {
 	self->device      = device;
 	self->image       = image;
-	self->alloc       = alloc;
-	self->create_info = create_info;
+	self->alloc       = *alloc;
+	self->create_info = *create_info;
 	/* Members that previously had default initializers in the class body. */
 	self->layout_type  = Layout_Optimal;
 	self->stage_flags  = 0;
@@ -12818,12 +12818,12 @@ void image_init(struct Image *self, Device *device, VkImage image, VkImageView d
 		ImageViewCreateInfo info;
 		image_view_create_info_defaults(&info); /* sets swizzle + all fields; the assignments below override only 6 of 7 */
 		info.image = self;
-		info.format = create_info.format;
+		info.format = create_info->format;
 		info.base_level = 0;
-		info.levels = create_info.levels;
+		info.levels = create_info->levels;
 		info.base_layer = 0;
-		info.layers = create_info.layers;
-		{ struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&device->handle_pool.image_views); imageview_init(_iv, device, default_view, info); self->view = iv_make(_iv); }
+		info.layers = create_info->layers;
+		{ struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&device->handle_pool.image_views); imageview_init(_iv, device, default_view, &info); self->view = iv_make(_iv); }
 	}
 }
 
@@ -18196,7 +18196,7 @@ VkImageViewType get_image_view_type(const ImageCreateInfo &create_info, const Im
 		if (res != VK_SUCCESS)
 			return bvh_make(NULL);
 
-		{ struct BufferView *_bv = (struct BufferView *)object_pool_raw_allocate(&self->handle_pool.buffer_views); bufferview_init(_bv, self, view, view_info); return bvh_make(_bv); }
+		{ struct BufferView *_bv = (struct BufferView *)object_pool_raw_allocate(&self->handle_pool.buffer_views); bufferview_init(_bv, self, view, &view_info); return bvh_make(_bv); }
 	}
 
 	/* ImageResourceHolder: a scoped owner of the Vulkan objects created while
@@ -18428,7 +18428,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		ImageViewCreateInfo tmp = create_info;
 		tmp.format = format;
-		struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&self->handle_pool.image_views); imageview_init(_iv, self, holder.image_view, tmp); ImageViewHandle ret = iv_make(_iv);
+		struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&self->handle_pool.image_views); imageview_init(_iv, self, holder.image_view, &tmp); ImageViewHandle ret = iv_make(_iv);
 		if (iv_is_valid(&ret))
 		{
 			holder.owned = false;
@@ -18616,7 +18616,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			}
 		}
 
-		struct Image *_im = (struct Image *)object_pool_raw_allocate(&self->handle_pool.images); image_init(_im, self, holder.image, holder.image_view, holder.allocation, tmpinfo); ImageHandle handle = ih_make(_im);
+		struct Image *_im = (struct Image *)object_pool_raw_allocate(&self->handle_pool.images); image_init(_im, self, holder.image, holder.image_view, &holder.allocation, &tmpinfo); ImageHandle handle = ih_make(_im);
 		if (ih_is_valid(&handle))
 		{
 			holder.owned = false;
@@ -18875,7 +18875,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		BufferCreateInfo tmpinfo = create_info;
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		struct Buffer *_b = (struct Buffer *)object_pool_raw_allocate(&self->handle_pool.buffers); buffer_init(_b, self, buffer, allocation, tmpinfo); BufferHandle handle = bh_make(_b);
+		struct Buffer *_b = (struct Buffer *)object_pool_raw_allocate(&self->handle_pool.buffers); buffer_init(_b, self, buffer, &allocation, &tmpinfo); BufferHandle handle = bh_make(_b);
 
 		if (create_info.domain == BufferDomain_Device && initial && !device_memory_type_is_host_visible(self, memory_type))
 		{
