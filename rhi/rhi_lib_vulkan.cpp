@@ -7259,14 +7259,13 @@ extern retro_log_printf_t log_cb;
 			int cap;
 		};
 		Cell cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS];
-
-		void insert(SRect r, RectIndex index);
-		void get(SRect r, RectIndexSet &results);
-		void clear();
 	};
 
 	static void lookup_grid_init(LookupGrid *g);
 	static void lookup_grid_deinit(LookupGrid *g);
+	static void lookup_grid_insert(LookupGrid *self, SRect r, RectIndex index);
+	static void lookup_grid_get(LookupGrid *self, SRect r, RectIndexSet *results);
+	static void lookup_grid_clear(LookupGrid *self);
 
 	/* RectTracker: tracks placed/uploaded texture rects with a spatial lookup grid.
 	 * Converted from a C++ class to a plain C struct + rect_tracker_* free
@@ -7364,79 +7363,71 @@ extern retro_log_printf_t log_cb;
 	 * operator[]/range-for uses. truncate(n) destroys the tail [n, count) and is
 	 * how remove_dead() drops compacted-out entries (replacing erase(it, end())).
 	 * Move-only at the container level. */
+	/* FusedPageVec: owning growable array of FusedPage (each holds a refcounted
+	 * ImageHandle, so growth/teardown go through fp_copy/fp_destroy). Converted from
+	 * a move-only C++ container to a plain C struct + fused_page_vec_* free
+	 * functions; the embedding FusedPages drives init_empty/deinit. */
 	struct FusedPageVec {
 		FusedPage *items;
 		int count;
 		int cap;
-
-		FusedPageVec() : items(NULL), count(0), cap(0) {}
-		~FusedPageVec() { destroy(); }
-		FusedPageVec(FusedPageVec &&o) noexcept
-			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-		FusedPageVec &operator=(FusedPageVec &&o) noexcept {
-			if (this != &o) {
-				destroy();
-				items = o.items; count = o.count; cap = o.cap;
-				o.items = NULL; o.count = 0; o.cap = 0;
-			}
-			return *this;
-		}
-		FusedPageVec(const FusedPageVec &) = delete;
-		FusedPageVec &operator=(const FusedPageVec &) = delete;
-
-		void push(const FusedPage &v) {
-			if (count >= cap)
-				grow(cap ? cap * 2 : 8);
-			fp_copy(&items[count], &v);
-			count++;
-		}
-		int size() const { return count; }
-		bool empty() const { return count == 0; }
-		FusedPage &operator[](int i) { return items[i]; }
-		const FusedPage &operator[](int i) const { return items[i]; }
-		FusedPage *begin() { return items; }
-		FusedPage *end() { return items + count; }
-		const FusedPage *begin() const { return items; }
-		const FusedPage *end() const { return items + count; }
-		/* Destroy elements [n, count); used to drop the compacted-out tail. */
-		void truncate(int n) {
-			for (int i = n; i < count; i++)
-				fp_destroy(&items[i]);
-			count = n;
-		}
-
-	private:
-		void grow(int ncap) {
-			FusedPage *nitems = (FusedPage *)malloc((size_t)ncap * sizeof(FusedPage));
-			for (int i = 0; i < count; i++) {
-				fp_copy(&nitems[i], &items[i]);
-				fp_destroy(&items[i]);
-			}
-			free(items);
-			items = nitems;
-			cap = ncap;
-		}
-		void destroy() {
-			for (int i = 0; i < count; i++)
-				fp_destroy(&items[i]);
-			free(items);
-			items = NULL; count = 0; cap = 0;
-		}
 	};
 
-	class FusedPages {
-		public:
-			HdTextureHandle get_or_make(Rect page_rect, uint32_t palette, RectTracker &tracker, Renderer *uploader);
-			HdTexture get_from_handle(HdTextureHandle handle, ImageHandle &default_hd_texture);
-			void mark_dirty(Rect rect); // For blit dst, upload, and hd texture load
-			void mark_dead(Rect rect); // For clear
-			void rebuild_dirty(RectTracker &tracker, Renderer *uploader);
-			void remove_dead();
+	static void fused_page_vec_grow(struct FusedPageVec *v, int ncap)
+	{
+		FusedPage *nitems = (FusedPage *)malloc((size_t)ncap * sizeof(FusedPage));
+		int i;
+		for (i = 0; i < v->count; i++) {
+			fp_copy(&nitems[i], &v->items[i]);
+			fp_destroy(&v->items[i]);
+		}
+		free(v->items);
+		v->items = nitems;
+		v->cap = ncap;
+	}
+	static inline void fused_page_vec_init_empty(struct FusedPageVec *v)
+	{
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
+	static inline void fused_page_vec_deinit(struct FusedPageVec *v)
+	{
+		int i;
+		for (i = 0; i < v->count; i++)
+			fp_destroy(&v->items[i]);
+		free(v->items);
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
+	static inline void fused_page_vec_push(struct FusedPageVec *v, const FusedPage *e)
+	{
+		if (v->count >= v->cap)
+			fused_page_vec_grow(v, v->cap ? v->cap * 2 : 8);
+		fp_copy(&v->items[v->count], e);
+		v->count++;
+	}
+	static inline int fused_page_vec_size(const struct FusedPageVec *v) { return v->count; }
+	static inline FusedPage *fused_page_vec_at(struct FusedPageVec *v, int i) { return &v->items[i]; }
+	/* Destroy elements [n, count); used to drop the compacted-out tail. */
+	static inline void fused_page_vec_truncate(struct FusedPageVec *v, int n)
+	{
+		int i;
+		for (i = n; i < v->count; i++)
+			fp_destroy(&v->items[i]);
+		v->count = n;
+	}
 
-			void dbg_print_info();
-		private:
-			FusedPageVec pages;
+	struct FusedPages {
+		FusedPageVec pages;
 	};
+
+	static inline void fused_pages_init(struct FusedPages *self) { fused_page_vec_init_empty(&self->pages); }
+	static inline void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->pages); }
+	HdTextureHandle fused_pages_get_or_make(struct FusedPages *self, Rect page_rect, uint32_t palette, struct RectTracker *tracker, Renderer *uploader);
+	HdTexture fused_pages_get_from_handle(struct FusedPages *self, HdTextureHandle handle, ImageHandle *default_hd_texture);
+	void fused_pages_mark_dirty(struct FusedPages *self, Rect rect); // For blit dst, upload, and hd texture load
+	void fused_pages_mark_dead(struct FusedPages *self, Rect rect); // For clear
+	void fused_pages_rebuild_dirty(struct FusedPages *self, struct RectTracker *tracker, Renderer *uploader);
+	void fused_pages_remove_dead(struct FusedPages *self);
+	void fused_pages_dbg_print_info(struct FusedPages *self);
 
 	struct RestorableRect {
 		Rect rect;
@@ -19870,6 +19861,7 @@ static char retro_slash = '/';
 		char cfg[PATH_MAX_TT];
 		default_hd_texture.data = NULL; /* plain-struct handle: explicit null */
 		rect_tracker_init(&tracker); /* embedded RectTracker: explicit init (was default ctor) */
+		fused_pages_init(&fused_pages); /* embedded FusedPages: explicit init (was default ctor) */
 		HdImageCache_init(&hd_cache, HD_CACHE_RAM_BUDGET);
 		HdGpuCache_init(&hd_gpu_cache, HD_CACHE_VRAM_BUDGET);
 		handle_lru_cache_init(&handle_cache, 4);
@@ -19907,6 +19899,7 @@ static char retro_slash = '/';
 		hd_key_set_free(&requested);
 		hd_key_set_free(&pending_attach);
 		free(cached_palette_hashes);
+		fused_pages_deinit(&fused_pages); /* embedded FusedPages: explicit deinit (was default dtor) */
 		rect_tracker_deinit(&tracker); /* embedded RectTracker: explicit deinit (was default dtor) */
 		/* Signal and drop the IO worker pool last. Previously iothread was a
 		 * by-value member, so its destructor ran after this body; preserve that
@@ -19976,7 +19969,7 @@ static char retro_slash = '/';
 			return;
 		}
 		rect_tracker_clear(&tracker, SRect(rect.x, rect.y, rect.width, rect.height));
-		fused_pages.mark_dead(rect);
+		fused_pages_mark_dead(&fused_pages, rect);
 
 		clear_palette_cache(rect);
 	}
@@ -20001,8 +19994,8 @@ static char retro_slash = '/';
 
 	void TextureTracker::blit(Rect dst, Rect src) {
 		rect_tracker_blit(&tracker, SRect(dst.x, dst.y, dst.width, dst.height), SRect(src.x, src.y, src.width, src.height));
-		fused_pages.mark_dirty(dst);
-		fused_pages.rebuild_dirty(tracker, uploader);
+		fused_pages_mark_dirty(&fused_pages, dst);
+		fused_pages_rebuild_dirty(&fused_pages, &tracker, uploader);
 		clear_palette_cache(dst);
 	}
 
@@ -20114,7 +20107,7 @@ static char retro_slash = '/';
 		if (rect.width == FB_WIDTH && rect.height == FB_HEIGHT) {
 			// probably loading a save state, this is the entirety of vram
 			rect_tracker_clear(&tracker, toSRect(rect));
-			fused_pages.mark_dead(rect);
+			fused_pages_mark_dead(&fused_pages, rect);
 			return;
 		}
 
@@ -20182,8 +20175,8 @@ static char retro_slash = '/';
 		} else {
 			rect_tracker_upload(&tracker, toSRect(rect), upload);
 		}
-		fused_pages.mark_dirty(rect);
-		fused_pages.rebuild_dirty(tracker, uploader);
+		fused_pages_mark_dirty(&fused_pages, rect);
+		fused_pages_rebuild_dirty(&fused_pages, &tracker, uploader);
 
 		// HD texture caching method:
 		//  - Lazy (eager_textures=false): nothing is queued here; each (hash,palette)
@@ -20454,7 +20447,7 @@ static char retro_slash = '/';
 						: 256;
 					Rect page_rect = { page_x, page_y, width, 256 };
 					fastpath_capable_out = false;
-					return fused_pages.get_or_make(page_rect, palette_hash, tracker, uploader);
+					return fused_pages_get_or_make(&fused_pages, page_rect, palette_hash, &tracker, uploader);
 				}
 			}
 		}
@@ -20514,7 +20507,7 @@ static char retro_slash = '/';
 			};
 		}
 		else
-			return fused_pages.get_from_handle(handle, default_hd_texture);
+			return fused_pages_get_from_handle(&fused_pages, handle, &default_hd_texture);
 	}
 
 	static inline bool is_power_of_two(int n) {
@@ -20577,7 +20570,7 @@ static char retro_slash = '/';
 					for (EnduringTextureRect &e : tracker.textures)
 					{
 						if (e.alive && e.texture_rect.upload == upload)
-							fused_pages.mark_dirty(fromSRect(e.texture_rect.vram_rect));
+							fused_pages_mark_dirty(&fused_pages, fromSRect(e.texture_rect.vram_rect));
 					}
 					continue;
 				}
@@ -20602,7 +20595,7 @@ static char retro_slash = '/';
 					dbg_attaches++;
 					for (EnduringTextureRect &e : tracker.textures) {
 						if (e.alive && e.texture_rect.upload == upload)
-							fused_pages.mark_dirty(fromSRect(e.texture_rect.vram_rect));
+							fused_pages_mark_dirty(&fused_pages, fromSRect(e.texture_rect.vram_rect));
 					}
 				} else {
 					TT_LOG(RETRO_LOG_WARN, "Dimension mismatch for %x-%x, original=%dx%d, replacement=%dx%d\n",
@@ -20614,8 +20607,8 @@ static char retro_slash = '/';
 		}
 		hd_key_set_clear(&pending_attach);
 
-		fused_pages.rebuild_dirty(tracker, uploader);
-		fused_pages.remove_dead();
+		fused_pages_rebuild_dirty(&fused_pages, &tracker, uploader);
+		fused_pages_remove_dead(&fused_pages);
 	}
 	TextureUpload *TextureTracker::find_upload(uint32_t hash) {
 		TextureUpload *upload = rect_tracker_find_upload(&tracker, hash); /* borrowed */
@@ -20749,7 +20742,7 @@ static char retro_slash = '/';
 		}
 
 		// Delete fused textures
-		fused_pages.mark_dead({0, 0, FB_WIDTH, FB_HEIGHT});
+		fused_pages_mark_dead(&fused_pages, {0, 0, FB_WIDTH, FB_HEIGHT});
 
 		// Draws will lazily re-request and the cache repopulates.
 	}
@@ -20878,7 +20871,7 @@ static char retro_slash = '/';
 		rect = toSRect(uvrect);
 
 		rect_index_set_clear(results);
-		self->lookup_grid.get(rect, *results);
+		lookup_grid_get(&self->lookup_grid, rect, results);
 		return results;
 	}
 
@@ -20925,11 +20918,11 @@ static char retro_slash = '/';
 
 	static void rect_tracker_rebuild_lookup_grid(struct RectTracker *self) {
 		int i;
-		self->lookup_grid.clear();
+		lookup_grid_clear(&self->lookup_grid);
 		for (i = 0; i < self->textures.count; i++)
 		{
 			if (self->textures.a[i].alive)
-				self->lookup_grid.insert(self->textures.a[i].texture_rect.vram_rect, i);
+				lookup_grid_insert(&self->lookup_grid, self->textures.a[i].texture_rect.vram_rect, i);
 		}
 		self->lookup_grid_dirty = false;
 	}
@@ -20984,15 +20977,16 @@ static char retro_slash = '/';
 			free(g->cells[i].entries);
 	}
 
-	void LookupGrid::insert(SRect r, RectIndex index)
+	void lookup_grid_insert(LookupGrid *self, SRect r, RectIndex index)
 	{
 		CellBounds c = cellBounds(r);
-		for (int x = c.lowX; x < c.highX; x++) {
-			for (int y = c.lowY; y < c.highY; y++) {
-				Cell *cell = &cells[y * LOOKUP_GRID_COLUMNS + x];
+		int x, y;
+		for (x = c.lowX; x < c.highX; x++) {
+			for (y = c.lowY; y < c.highY; y++) {
+				LookupGrid::Cell *cell = &self->cells[y * LOOKUP_GRID_COLUMNS + x];
 				if (cell->count == cell->cap) {
 					int ncap = cell->cap ? cell->cap * 2 : 8;
-					LookupEntry *ne = (LookupEntry *)realloc(cell->entries, (size_t)ncap * sizeof(LookupEntry));
+					LookupGrid::LookupEntry *ne = (LookupGrid::LookupEntry *)realloc(cell->entries, (size_t)ncap * sizeof(LookupGrid::LookupEntry));
 					if (!ne)
 						return;
 					cell->entries = ne;
@@ -21005,27 +20999,29 @@ static char retro_slash = '/';
 		}
 	}
 
-	void LookupGrid::get(SRect r, RectIndexSet &results)
+	void lookup_grid_get(LookupGrid *self, SRect r, RectIndexSet *results)
 	{
 		CellBounds c = cellBounds(r);
-		for (int x = c.lowX; x < c.highX; x++)
+		int x, y;
+		for (x = c.lowX; x < c.highX; x++)
 		{
-			for (int y = c.lowY; y < c.highY; y++)
+			for (y = c.lowY; y < c.highY; y++)
 			{
-				Cell *cell = &cells[y * LOOKUP_GRID_COLUMNS + x];
+				LookupGrid::Cell *cell = &self->cells[y * LOOKUP_GRID_COLUMNS + x];
 				int e;
 				for (e = 0; e < cell->count; e++)
 				{
 					if (intersects(cell->entries[e].rect, r))
-						rect_index_set_insert(&results, cell->entries[e].index);
+						rect_index_set_insert(results, cell->entries[e].index);
 				}
 			}
 		}
 	}
-	void LookupGrid::clear()
+	void lookup_grid_clear(LookupGrid *self)
 	{
-		for (int i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++)
-			cells[i].count = 0; /* keep allocation for reuse */
+		int i;
+		for (i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++)
+			self->cells[i].count = 0; /* keep allocation for reuse */
 	}
 
 	// FusedPages
@@ -21035,11 +21031,12 @@ static char retro_slash = '/';
 		return fusion.scaleX * fusion.scaleY * fusion.vram_rect.width * fusion.vram_rect.height * 4;
 	}
 
-	void FusedPages::dbg_print_info() {
+	void fused_pages_dbg_print_info(struct FusedPages *self) {
 		int64_t num_bytes = 0;
-		for (FusedPage &page : pages)
-			num_bytes += page_bytes(page.fusion);
-		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Fused Pages: %lu, Bytes: %ld (%.1f MiB)\n", pages.size(), num_bytes, num_bytes / 1048576.0);
+		int _i;
+		for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++)
+			num_bytes += page_bytes(fused_page_vec_at(&self->pages, _i)->fusion);
+		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Fused Pages: %lu, Bytes: %ld (%.1f MiB)\n", (unsigned long)fused_page_vec_size(&self->pages), num_bytes, num_bytes / 1048576.0);
 	}
 
 	static bool srect_gt(const SRect &a, const SRect &b)
@@ -21076,24 +21073,27 @@ static char retro_slash = '/';
 		return 0;
 	}
 
-	FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, RectTracker &tracker) {
+	FusionRects fusion_rects(Rect full_page_rect, uint32_t palette_hash, struct RectTracker *tracker) {
 		FusionRects f;
 		f.scaleX = 0;
 		f.scaleY = 0;
 		f.vram_rect = {0, 0, 0, 0};
 
-		for (EnduringTextureRect &e : tracker.textures) {
-			if (!e.alive)
+		int _ei;
+		for (_ei = 0; _ei < tracker->textures.count; _ei++) {
+			EnduringTextureRect *e = &tracker->textures.a[_ei];
+			SRectResult intersection;
+			if (!e->alive)
 				continue;
-			SRectResult intersection = intersect(toSRect(full_page_rect), e.texture_rect.vram_rect);
+			intersection = intersect(toSRect(full_page_rect), e->texture_rect.vram_rect);
 			if (intersection.valid) {
-				TextureUpload &upload = *e.texture_rect.upload;
-				HdTexEntry *hd_texture = hd_tex_map_find(&upload.textures, palette_hash);
+				TextureUpload *upload = e->texture_rect.upload;
+				HdTexEntry *hd_texture = hd_tex_map_find(&upload->textures, palette_hash);
 				if (hd_texture != NULL) {
 					// Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity)
-					TextureRect clipped = subTexture(e.texture_rect, intersection.rect);
-					unsigned hd_scale_x = image_get_width(hd_texture->image, 0) / upload.width;
-					unsigned hd_scale_y = image_get_height(hd_texture->image, 0) / upload.height;
+					TextureRect clipped = subTexture(e->texture_rect, intersection.rect);
+					unsigned hd_scale_x = image_get_width(hd_texture->image, 0) / upload->width;
+					unsigned hd_scale_y = image_get_height(hd_texture->image, 0) / upload->height;
 					f.scaleX = max_(f.scaleX, hd_scale_x);
 					f.scaleY = max_(f.scaleY, hd_scale_y);
 					Rect r = fromSRect(clipped.vram_rect);
@@ -21112,7 +21112,7 @@ static char retro_slash = '/';
 		return f;
 	}
 
-	void rebuild_page(FusedPage &page, RectTracker &tracker, Renderer *uploader) {
+	void rebuild_page(FusedPage &page, struct RectTracker *tracker, Renderer *uploader) {
 		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilding page for %x, %d,%d %dx%d\n",
 				page.palette,
 				page.fusion.vram_rect.x,
@@ -21267,86 +21267,102 @@ static char retro_slash = '/';
 			      );
 	}
 
-	HdTexture FusedPages::get_from_handle(HdTextureHandle handle, ImageHandle &default_hd_texture) {
-		if (handle.index < 0 || handle.index >= pages.size()) {
+	HdTexture fused_pages_get_from_handle(struct FusedPages *self, HdTextureHandle handle, ImageHandle *default_hd_texture) {
+		FusedPage *page;
+		if (handle.index < 0 || handle.index >= fused_page_vec_size(&self->pages)) {
 			TT_LOG(RETRO_LOG_WARN, "BAD fused index!\n");
-			return {
-				{0, 0, 1, 1},
-				{0, 0, int(image_get_width(ih_get(&default_hd_texture), 0)), int(image_get_height(ih_get(&default_hd_texture), 0))},
-				default_hd_texture
-			};
+			HdTexture _r;
+			_r.vram_rect = (SRect){0, 0, 1, 1};
+			_r.texel_rect = (SRect){0, 0, int(image_get_width(ih_get(default_hd_texture), 0)), int(image_get_height(ih_get(default_hd_texture), 0))};
+			_r.texture = *default_hd_texture;
+			return _r;
 		}
-		FusedPage &page = pages[handle.index];
-		if (!ih_is_valid(&page.texture)) {
+		page = fused_page_vec_at(&self->pages, handle.index);
+		if (!ih_is_valid(&page->texture)) {
+			HdTexture _r;
 			TT_LOG(RETRO_LOG_WARN, "Missing fused texture!\n");
-			return {
-				{0, 0, 1, 1},
-				{0, 0, int(image_get_width(ih_get(&default_hd_texture), 0)), int(image_get_height(ih_get(&default_hd_texture), 0))},
-				default_hd_texture
-			};
+			_r.vram_rect = (SRect){0, 0, 1, 1};
+			_r.texel_rect = (SRect){0, 0, int(image_get_width(ih_get(default_hd_texture), 0)), int(image_get_height(ih_get(default_hd_texture), 0))};
+			_r.texture = *default_hd_texture;
+			return _r;
 		}
-		return {
-			toSRect(page.fusion.vram_rect),
-			{ 0, 0, int(image_get_width(ih_get(&page.texture), 0)), int(image_get_height(ih_get(&page.texture), 0)) },
-			page.texture
-		};
+		{
+			HdTexture _r;
+			_r.vram_rect = toSRect(page->fusion.vram_rect);
+			_r.texel_rect = (SRect){ 0, 0, int(image_get_width(ih_get(&page->texture), 0)), int(image_get_height(ih_get(&page->texture), 0)) };
+			_r.texture = page->texture;
+			return _r;
+		}
 	}
 
-	HdTextureHandle FusedPages::get_or_make(Rect page_rect, uint32_t palette, RectTracker &tracker, Renderer *uploader) {
-		for (int x = 0; x < pages.size(); x++)
+	HdTextureHandle fused_pages_get_or_make(struct FusedPages *self, Rect page_rect, uint32_t palette, struct RectTracker *tracker, Renderer *uploader) {
+		int x;
+		FusedPage page;
+		for (x = 0; x < fused_page_vec_size(&self->pages); x++)
 		{
-			FusedPage &page = pages[x];
+			FusedPage *p = fused_page_vec_at(&self->pages, x);
 			// return page
-			if (!page.dead && page.palette == palette && page.full_page_rect == page_rect)
+			if (!p->dead && p->palette == palette && p->full_page_rect == page_rect)
 				return HdTextureHandle::make_fused(x);
 		}
 
 		// Make a new fused page
 		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Creating new fused page for palette %x\n", palette);
-		FusedPage page;
+
 		page.dead = false;
 		page.dirty = false;
 		page.full_page_rect = page_rect;
 		page.palette = palette;
 		rebuild_page(page, tracker, uploader);
-		pages.push(page);
-		return HdTextureHandle::make_fused(pages.size() - 1);
+		fused_page_vec_push(&self->pages, &page);
+		return HdTextureHandle::make_fused(fused_page_vec_size(&self->pages) - 1);
 	}
-	void FusedPages::mark_dirty(Rect rect) {
-		for (FusedPage &page : pages)
+	void fused_pages_mark_dirty(struct FusedPages *self, Rect rect) {
+		int _i;
+		for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++)
 		{
-			if (!page.dead && page.full_page_rect.intersects(rect))
-				page.dirty = true;
+			FusedPage *page = fused_page_vec_at(&self->pages, _i);
+			if (!page->dead && page->full_page_rect.intersects(rect))
+				page->dirty = true;
 		}
 	}
-	void FusedPages::mark_dead(Rect rect) {
-		for (FusedPage &page : pages)
+	void fused_pages_mark_dead(struct FusedPages *self, Rect rect) {
+		int _i;
+		for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++)
 		{
-			if (!page.dead && page.full_page_rect.intersects(rect))
-				page.dead = true;
+			FusedPage *page = fused_page_vec_at(&self->pages, _i);
+			if (!page->dead && page->full_page_rect.intersects(rect))
+				page->dead = true;
 		}
 	}
-	void FusedPages::rebuild_dirty(RectTracker &tracker, Renderer *uploader) {
+	void fused_pages_rebuild_dirty(struct FusedPages *self, struct RectTracker *tracker, Renderer *uploader) {
 		bool changed = false;
-		for (FusedPage &page : pages) {
-			if (!page.dead && page.dirty) {
-				rebuild_page(page, tracker, uploader);
+		int _i;
+		for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++) {
+			FusedPage *page = fused_page_vec_at(&self->pages, _i);
+			if (!page->dead && page->dirty) {
+				rebuild_page(*page, tracker, uploader);
 				changed = true;
 			}
 		}
 		if (changed)
-			dbg_print_info();
+			fused_pages_dbg_print_info(self);
 	}
-	void FusedPages::remove_dead() {
+	void fused_pages_remove_dead(struct FusedPages *self) {
 		int retained = 0;
-		for (int i = 0; i < pages.size(); i++) {
-			if (!pages[i].dead) {
-				if (retained != i)
-					pages[retained] = pages[i];
+		int i;
+		for (i = 0; i < fused_page_vec_size(&self->pages); i++) {
+			if (!fused_page_vec_at(&self->pages, i)->dead) {
+				if (retained != i) {
+					FusedPage *dst = fused_page_vec_at(&self->pages, retained);
+					FusedPage *src = fused_page_vec_at(&self->pages, i);
+					fp_destroy(dst);
+					fp_copy(dst, src);
+				}
 				retained++;
 			}
 		}
-		pages.truncate(retained);
+		fused_page_vec_truncate(&self->pages, retained);
 	}
 
 
