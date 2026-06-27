@@ -6028,82 +6028,80 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		TextureMode_ABGR1555
 	};
 
+	/* Rect: plain C struct (was a value type with ctors / operator==/!= /
+	 * contains / intersects / scissor / extend_bounding_box). The default ctor +
+	 * zero NSDMIs become brace-initialisation { 0, 0, 0, 0 }; the 4-arg ctor
+	 * becomes make_rect. The methods become rect_* free functions taking
+	 * const struct Rect * (extend_bounding_box mutates, so its first arg is
+	 * non-const). Most Rects are already built by brace-init, which a plain
+	 * struct supports unchanged. */
 	struct Rect
 	{
-		unsigned x = 0;
-		unsigned y = 0;
-		unsigned width = 0;
-		unsigned height = 0;
-
-		Rect() = default;
-		Rect(unsigned x, unsigned y, unsigned width, unsigned height)
-			: x(x)
-			  , y(y)
-			  , width(width)
-			  , height(height)
-		{
-		}
-
-		inline bool operator==(const Rect &rect) const
-		{
-			return x == rect.x && y == rect.y && width == rect.width && height == rect.height;
-		}
-
-		inline bool operator!=(const Rect &rect) const
-		{
-			return x != rect.x || y != rect.y || width != rect.width || height != rect.height;
-		}
-
-		inline bool contains(const Rect &rect) const
-		{
-			return x <= rect.x && y <= rect.y && (x + width) >= (rect.x + rect.width) &&
-				(y + height) >= (rect.y + rect.height);
-		}
-
-		inline bool intersects(const Rect &rect) const
-		{
-			unsigned x_end_self = x + width;
-			unsigned x_end_other = rect.x + rect.width;
-			unsigned y_end_self = y + height;
-			unsigned y_end_other = rect.y + rect.height;
-			unsigned xend = (x_end_self < x_end_other) ? x_end_self : x_end_other;
-			unsigned xbegin = (x > rect.x) ? x : rect.x;
-			unsigned yend = (y_end_self < y_end_other) ? y_end_self : y_end_other;
-			unsigned ybegin = (y > rect.y) ? y : rect.y;
-			return xbegin < xend && ybegin < yend;
-		}
-
-		inline Rect scissor(const Rect &rect) const
-		{
-			unsigned x_end_self = x + width;
-			unsigned x_end_other = rect.x + rect.width;
-			unsigned y_end_self = y + height;
-			unsigned y_end_other = rect.y + rect.height;
-			unsigned x0 = (x > rect.x) ? x : rect.x;
-			unsigned y0 = (y > rect.y) ? y : rect.y;
-			unsigned x1 = (x_end_self < x_end_other) ? x_end_self : x_end_other;
-			unsigned y1 = (y_end_self < y_end_other) ? y_end_self : y_end_other;
-			unsigned width = (x1 > x0) ? (x1 - x0) : 0u;
-			unsigned height = (y1 > y0) ? (y1 - y0) : 0u;
-			return { x0, y0, width, height };
-		}
-
-		inline void extend_bounding_box(const Rect &rect)
-		{
-			unsigned x_end_self = x + width;
-			unsigned x_end_other = rect.x + rect.width;
-			unsigned y_end_self = y + height;
-			unsigned y_end_other = rect.y + rect.height;
-			unsigned x0 = (x < rect.x) ? x : rect.x;
-			unsigned y0 = (y < rect.y) ? y : rect.y;
-			unsigned x1 = (x_end_self > x_end_other) ? x_end_self : x_end_other;
-			unsigned y1 = (y_end_self > y_end_other) ? y_end_self : y_end_other;
-			x = x0;
-			y = y0;
-			width = x1 - x0;
-			height = y1 - y0;
-		}
+		unsigned x;
+		unsigned y;
+		unsigned width;
+		unsigned height;
 	};
+
+	static inline struct Rect make_rect(unsigned x, unsigned y, unsigned width, unsigned height)
+	{
+		struct Rect r;
+		r.x = x; r.y = y; r.width = width; r.height = height;
+		return r;
+	}
+	static inline bool rect_eq(const struct Rect *a, const struct Rect *b)
+	{
+		return a->x == b->x && a->y == b->y && a->width == b->width && a->height == b->height;
+	}
+	static inline bool rect_contains(const struct Rect *self, const struct Rect *rect)
+	{
+		return self->x <= rect->x && self->y <= rect->y &&
+			(self->x + self->width) >= (rect->x + rect->width) &&
+			(self->y + self->height) >= (rect->y + rect->height);
+	}
+	static inline bool rect_intersects(const struct Rect *self, const struct Rect *rect)
+	{
+		unsigned x_end_self = self->x + self->width;
+		unsigned x_end_other = rect->x + rect->width;
+		unsigned y_end_self = self->y + self->height;
+		unsigned y_end_other = rect->y + rect->height;
+		unsigned xend = (x_end_self < x_end_other) ? x_end_self : x_end_other;
+		unsigned xbegin = (self->x > rect->x) ? self->x : rect->x;
+		unsigned yend = (y_end_self < y_end_other) ? y_end_self : y_end_other;
+		unsigned ybegin = (self->y > rect->y) ? self->y : rect->y;
+		return xbegin < xend && ybegin < yend;
+	}
+	static inline struct Rect rect_scissor(const struct Rect *self, const struct Rect *rect)
+	{
+		unsigned x_end_self = self->x + self->width;
+		unsigned x_end_other = rect->x + rect->width;
+		unsigned y_end_self = self->y + self->height;
+		unsigned y_end_other = rect->y + rect->height;
+		unsigned x0 = (self->x > rect->x) ? self->x : rect->x;
+		unsigned y0 = (self->y > rect->y) ? self->y : rect->y;
+		unsigned x1 = (x_end_self < x_end_other) ? x_end_self : x_end_other;
+		unsigned y1 = (y_end_self < y_end_other) ? y_end_self : y_end_other;
+		unsigned w = (x1 > x0) ? (x1 - x0) : 0u;
+		unsigned h = (y1 > y0) ? (y1 - y0) : 0u;
+		struct Rect out;
+		out.x = x0; out.y = y0; out.width = w; out.height = h;
+		return out;
+	}
+	static inline void rect_extend_bounding_box(struct Rect *self, const struct Rect *rect)
+	{
+		unsigned x_end_self = self->x + self->width;
+		unsigned x_end_other = rect->x + rect->width;
+		unsigned y_end_self = self->y + self->height;
+		unsigned y_end_other = rect->y + rect->height;
+		unsigned x0 = (self->x < rect->x) ? self->x : rect->x;
+		unsigned y0 = (self->y < rect->y) ? self->y : rect->y;
+		unsigned x1 = (x_end_self > x_end_other) ? x_end_self : x_end_other;
+		unsigned y1 = (y_end_self > y_end_other) ? y_end_self : y_end_other;
+		self->x = x0;
+		self->y = y0;
+		self->width = x1 - x0;
+		self->height = y1 - y0;
+	}
 
 	enum StatusFlag
 	{
@@ -6250,10 +6248,11 @@ StatusFlags *fbatlas_info(FBAtlas *self, unsigned block_x, unsigned block_y)
 		for (i = 0; i < NUM_BLOCKS_X * NUM_BLOCKS_Y; i++)
 			a->fb_info[i] = STATUS_FB_PREFER;
 		a->listener = NULL;
-		/* renderpass: Rect is non-trivial (user ctor/operators), so memset would be
-		 * UB (-Wclass-memaccess). Zero each field explicitly. This matches the
-		 * former NSDMIs: the three Rects become {0,0,0,0}, the offsets 0,
-		 * texture_mode TextureMode_None (value 0) and inside false. */
+		/* Zero each renderpass field explicitly. (Rect is now a plain POD, so a
+		 * memset would be fine, but the explicit form is kept for clarity and to
+		 * cover the non-Rect fields below.) This matches the former NSDMIs: the
+		 * three Rects become {0,0,0,0}, the offsets 0, texture_mode
+		 * TextureMode_None (value 0) and inside false. */
 		a->renderpass.rect.x = 0; a->renderpass.rect.y = 0; a->renderpass.rect.width = 0; a->renderpass.rect.height = 0;
 		a->renderpass.scissor.x = 0; a->renderpass.scissor.y = 0; a->renderpass.scissor.width = 0; a->renderpass.scissor.height = 0;
 		a->renderpass.texture_window.x = 0; a->renderpass.texture_window.y = 0; a->renderpass.texture_window.width = 0; a->renderpass.texture_window.height = 0;
@@ -7257,7 +7256,7 @@ void rect_tracker_clear(struct RectTracker *self, SRect rect)
 	}
 	static inline bool fusionrects_eq(const struct FusionRects *a, const struct FusionRects *b)
 	{
-		return a->vram_rect == b->vram_rect && a->scaleX == b->scaleX && a->scaleY == b->scaleY && ownedrects_eq(&a->rects, &b->rects);
+		return rect_eq(&a->vram_rect, &b->vram_rect) && a->scaleX == b->scaleX && a->scaleY == b->scaleY && ownedrects_eq(&a->rects, &b->rects);
 	}
 
 	struct FusedPage {
@@ -10780,7 +10779,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 		break;
 	}
 
-	Rect hd_texture_vram(0, 0, 0, 0);
+	Rect hd_texture_vram = make_rect(0, 0, 0, 0);
 
 	if (self->render_state.texture_mode != TextureMode_None)
 	{
@@ -10882,7 +10881,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 
 	if (self->render_state.texture_mode == TextureMode_ABGR1555)
 	{
-		if (self->render_state.draw_rect.intersects(rect))
+		if (rect_intersects(&self->render_state.draw_rect, &rect))
 		{
 			// HACK hd_texture_vram should contains the texture we are reading from in vram coordinate
 			// avoid texture filtering and enable scaled read if the texture is rendered content
@@ -11266,7 +11265,7 @@ const ClearCandidate * renderer_find_clear_candidate(Renderer *self, const Rect 
 		for (_i = 0; _i < ClearCandidateVec_size((struct ClearCandidateVec *)&self->queue.clear_candidates); _i++)
 		{
 			const ClearCandidate &c = *ClearCandidateVec_at((struct ClearCandidateVec *)&self->queue.clear_candidates, _i);
-			if (c.rect == rect)
+			if (rect_eq(&c.rect, &rect))
 				ret = &c;
 		}
 	}
@@ -11670,7 +11669,7 @@ void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src){
 	VK_ASSERT(dst.height == src.height);
 
 	// Happens a lot in Square games for some reason.
-	if (dst == src)
+	if (rect_eq(&dst, &src))
 		return;
 
 	if (dst.width == 0 || dst.height == 0)
@@ -11688,7 +11687,7 @@ void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src){
 		texture_tracker_blit(&self->tracker, dst, src);
 	}
 
-	if (dst.intersects(src))
+	if (rect_intersects(&dst, &src))
 	{
 		// The software implementation takes texture cache into account by copying 128 horizontal pixels at a time ...
 		// We can do it with compute.
@@ -19331,9 +19330,9 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_extend_render_pass(FBAtlas *self, const Rect &rect, bool scissor)
 	{
-		bool scissor_invariant = !scissor || self->renderpass.scissor.contains(rect);
+		bool scissor_invariant = !scissor || rect_contains(&self->renderpass.scissor, &rect);
 		renderer_set_scissored_invariant(self->listener, scissor_invariant);
-		Rect scissored_rect = !scissor_invariant ? rect.scissor(self->renderpass.scissor) : rect;
+		Rect scissored_rect = !scissor_invariant ? rect_scissor(&rect, &self->renderpass.scissor) : rect;
 
 		if (!scissored_rect.width || !scissored_rect.height)
 			return;
@@ -19345,16 +19344,16 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			fbatlas_write_domain(self, Domain_Scaled, Stage_Fragment, self->renderpass.rect);
 			self->renderpass.inside = true;
 		}
-		else if (!self->renderpass.rect.contains(scissored_rect))
+		else if (!rect_contains(&self->renderpass.rect, &scissored_rect))
 		{
-			self->renderpass.rect.extend_bounding_box(scissored_rect);
+			rect_extend_bounding_box(&self->renderpass.rect, &scissored_rect);
 
 			// Avoid sync/write domain flushing our own render pass.
 			self->renderpass.inside = false;
 
 			// If we cleared the screen and we created a clear candidate,
 			// everything inside this render pass can be safely discarded.
-			if (!scissor && scissored_rect == self->renderpass.rect)
+			if (!scissor && rect_eq(&scissored_rect, &self->renderpass.rect))
 				fbatlas_discard_render_pass(self);
 
 			fbatlas_sync_domain(self, Domain_Scaled, self->renderpass.rect);
@@ -19416,14 +19415,14 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		// If we're clearing completely outside the self->renderpass, we're probably doing another render pass
 		// somewhere else, so end the current one and start a new one instead.
-		if (self->renderpass.inside && !self->renderpass.rect.intersects(rect))
+		if (self->renderpass.inside && !rect_intersects(&self->renderpass.rect, &rect))
 			fbatlas_flush_render_pass(self);
 
 		fbatlas_extend_render_pass(self, rect, false);
 
 		// If the render pass area doesn't increase later, we can use loadOp == CLEAR instead of LOAD,
 		// which helps a lot on mobile GPUs.
-		renderer_clear_quad(self->listener, rect, fb_color, self->renderpass.rect == rect);
+		renderer_clear_quad(self->listener, rect, fb_color, rect_eq(&self->renderpass.rect, &rect));
 
 		unsigned xbegin = rect.x / BLOCK_WIDTH;
 		unsigned xend = (rect.x + rect.width - 1) / BLOCK_WIDTH;
@@ -19951,7 +19950,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 
 		uint16_t *palette = NULL;
 		if (mode.mode == TextureMode_Palette4bpp || mode.mode == TextureMode_Palette8bpp) {
-			Rect palette_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode_Palette8bpp ? 256 : 16, 1);
+			Rect palette_rect = make_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 			Palette p = texture_tracker_get_palette(self, palette_rect);
 			if (p.data != NULL) {
 				palette = p.data;
@@ -20143,7 +20142,14 @@ SRect toSRect(Rect rect) {
 		return make_srect(rect.x, rect.y, rect.width, rect.height);
 	}
 Rect fromSRect(SRect rect) {
-		return Rect(rect.x, rect.y, rect.width, rect.height);
+		return make_rect(rect.x, rect.y, rect.width, rect.height);
+	}
+
+	/* fromSRect(s).contains(r) in one shot, so the by-value temporary the old
+	 * chained call relied on has a stable address for rect_contains. */
+	static inline bool fromSRect_contains(SRect s, Rect r) {
+		struct Rect fr = fromSRect(s);
+		return rect_contains(&fr, &r);
 	}
 
 	Palette texture_tracker_get_palette(struct TextureTracker *self, Rect palette_rect) {
@@ -20154,7 +20160,7 @@ Rect fromSRect(SRect rect) {
 		for (int oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
 			EnduringTextureRect &other = self->tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because self->tracker.overlapping never returns dead indices
-			if (fromSRect(other.texture_rect.vram_rect).contains(palette_rect) && other.alive) {
+			if (fromSRect_contains(other.texture_rect.vram_rect, palette_rect) && other.alive) {
 				if (other.texture_rect.offset_x != 0 || other.texture_rect.offset_y != 0) {
 					continue; // TODO: handle offset subrects
 				}
@@ -20172,7 +20178,7 @@ Rect fromSRect(SRect rect) {
 	uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, Rect palette_rect) {
 		int i;
 		for (i = 0; i < self->cached_palette_hashes_count; i++) {
-			if (self->cached_palette_hashes[i].rect == palette_rect) {
+			if (rect_eq(&self->cached_palette_hashes[i].rect, &palette_rect)) {
 				return self->cached_palette_hashes[i].hash;
 			}
 		}
@@ -20303,7 +20309,7 @@ Rect fromSRect(SRect rect) {
 
 		for (int i = 0; i < rrvec_size(&self->restorable_rects); )
 		{
-			if (self->restorable_rects.items[i].rect.intersects(rect))
+			if (rect_intersects(&self->restorable_rects.items[i].rect, &rect))
 				rrvec_erase_at(&self->restorable_rects, i);
 			else
 				i++;
@@ -20399,7 +20405,7 @@ Rect fromSRect(SRect rect) {
 		int _oi;
 		for (_oi = 0; _oi < rrvec_size(&self->restorable_rects); _oi++) {
 			RestorableRect &other = self->restorable_rects.items[_oi];
-			if (other.hash == upload->hash && other.rect == rect) {
+			if (other.hash == upload->hash && rect_eq(&other.rect, &rect)) {
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "RESTORATION: %x\n", other.hash);
 				restore = &other;
 				break;
@@ -20572,7 +20578,7 @@ Rect fromSRect(SRect rect) {
 		int i, j;
 		for (i = 0; i < count; i++) {
 			CacheEntry &entry = entries[i];
-			if (entry.handle.palette_hash == palette_hash && entry.rect.contains(rect)) {
+			if (entry.handle.palette_hash == palette_hash && rect_contains(&entry.rect, &rect)) {
 				CacheEntry hit = entry;
 				for (j = i; j > 0; j--) {
 					entries[j] = entries[j - 1];
@@ -20605,7 +20611,7 @@ Rect fromSRect(SRect rect) {
 
 	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
 		fastpath_capable_out = false;
-		Rect palette_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode_Palette8bpp ? 256 : 16, 1);
+		Rect palette_rect = make_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 
 		// TODO: I'm pretty sure this doesn't handle TextureMode_ABGR1555
 
@@ -20677,7 +20683,7 @@ Rect fromSRect(SRect rect) {
 				if (result == HdTextureHandle::make_none()) {
 					// note that if tex->vram_rect contains rect, then it will be the only entry in overlap, so an early out would be pointless
 					result_rect = fromSRect(tex->vram_rect);
-					fastpath_capable_out = self->fastpath_enabled && fromSRect(tex->vram_rect).contains(rect) && (overlapped_image->alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
+					fastpath_capable_out = self->fastpath_enabled && fromSRect_contains(tex->vram_rect, rect) && (overlapped_image->alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
 					result = HdTextureHandle::make(index, palette_hash);
 				} else {
 					// Multiple overlap, must fuse
@@ -21354,7 +21360,7 @@ int64_t page_bytes(FusionRects &fusion)
 					if (f->vram_rect.width == 0)
 						f->vram_rect = r;
 					else
-						f->vram_rect.extend_bounding_box(r);
+						rect_extend_bounding_box(&f->vram_rect, &r);
 					ownedrects_push(&f->rects, clipped);
 				}
 			}
@@ -21562,7 +21568,7 @@ int64_t page_bytes(FusionRects &fusion)
 		{
 			FusedPage *p = fused_page_vec_at(&self->pages, x);
 			// return page
-			if (!p->dead && p->palette == palette && p->full_page_rect == page_rect)
+			if (!p->dead && p->palette == palette && rect_eq(&p->full_page_rect, &page_rect))
 				return HdTextureHandle::make_fused(x);
 		}
 
@@ -21582,7 +21588,7 @@ int64_t page_bytes(FusionRects &fusion)
 		for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++)
 		{
 			FusedPage *page = fused_page_vec_at(&self->pages, _i);
-			if (!page->dead && page->full_page_rect.intersects(rect))
+			if (!page->dead && rect_intersects(&page->full_page_rect, &rect))
 				page->dirty = true;
 		}
 	}
@@ -21591,7 +21597,7 @@ int64_t page_bytes(FusionRects &fusion)
 		for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++)
 		{
 			FusedPage *page = fused_page_vec_at(&self->pages, _i);
-			if (!page->dead && page->full_page_rect.intersects(rect))
+			if (!page->dead && rect_intersects(&page->full_page_rect, &rect))
 				page->dead = true;
 		}
 	}
