@@ -1313,7 +1313,7 @@ static INLINE void TransformDQ(int64_t h_div_sz)
    SET_IR(0, Lm_H(((int64_t)DQB + DQA * h_div_sz) >> 12));
 }
 
-static INLINE int32_t RTPS(uint32_t instr)
+static int32_t RTPS(uint32_t instr)
 {
  int64_t h_div_sz;
  float precise_z;
@@ -1332,7 +1332,7 @@ static INLINE int32_t RTPS(uint32_t instr)
  return(15);
 }
 
-static INLINE int32_t RTPT(uint32_t instr)
+static int32_t RTPT(uint32_t instr)
 {
  int i;
  DECODE_FIELDS;
@@ -1764,250 +1764,55 @@ static int32_t GPL(uint32_t instr)
  opcode = operation code 
 */
 
+/* GTE opcode dispatch table.  One entry per 6-bit GTE function code; NULL
+ * entries are the "no active operation" cases (the historically commented-out
+ * / unstable opcodes), which leave ret at its default of 1.  The aliases that
+ * the original switch encoded by case fall-through are reproduced explicitly:
+ *   0x00 -> RTPS (alternate of 0x01)
+ *   0x1A -> DCPL (alternate of 0x29)
+ * This table is the single source of truth for both GTE_Instruction() and the
+ * recompiler entry point GTE_ExecuteOp(); keeping the mapping in data rather
+ * than a switch lets the dynarec resolve a GTE function to a direct handler at
+ * block-compile time instead of re-dispatching the 6-bit code at run time. */
+typedef int32_t (*gte_op_func)(uint32_t instr);
+
+static const gte_op_func gte_op_table[0x40] =
+{
+   /* 0x00 */ RTPS,  RTPS,  NULL,  NULL,  NULL,  NULL,  NCLIP, NULL,
+   /* 0x08 */ NULL,  NULL,  NULL,  NULL,  OP,    NULL,  NULL,  NULL,
+   /* 0x10 */ DPCS,  INTPL, MVMVA, NCDS,  CDP,   NULL,  NCDT,  NULL,
+   /* 0x18 */ NULL,  NULL,  DCPL,  NCCS,  CC,    NULL,  NCS,   NULL,
+   /* 0x20 */ NCT,   NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,
+   /* 0x28 */ SQR,   DCPL,  DPCT,  NULL,  NULL,  AVSZ3, AVSZ4, NULL,
+   /* 0x30 */ RTPT,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,
+   /* 0x38 */ NULL,  NULL,  NULL,  NULL,  NULL,  GPF,   GPL,   NCCT
+};
+
+/* Execute a single GTE operation by 6-bit function code.  Returns the op's
+ * raw latency value (the "cycles" figure, before the -1 adjustment and before
+ * the psx_gte_overclock override that GTE_Instruction applies).  Does NOT
+ * touch the FLAGS checksum / CR[31] writeback or reset FLAGS: callers that
+ * need full GTE_Instruction semantics must do that themselves (GTE_Instruction
+ * does; the recompiler emits the equivalent epilogue inline).  A code with no
+ * active operation returns 1, matching the original switch's default. */
+int32_t GTE_ExecuteOp(unsigned code, uint32_t instr)
+{
+   gte_op_func f = gte_op_table[code & 0x3f];
+
+   if (f)
+      return (*f)(instr);
+
+   return 1;
+}
+
 int32_t GTE_Instruction(uint32_t instr)
 {
    const unsigned code = instr & 0x3F;
-   int32_t ret = 1;
+   int32_t ret;
 
    FLAGS = 0;
 
-   switch(code)
-   {
-      default: 
-         break;
-      case 0x00:	/* alternate? */
-      case 0x01:
-         ret = RTPS(instr);
-         break;
-
-         /*
-            case 0x02:	// UNSTABLE?
-            break;
-
-            case 0x03:	// UNSTABLE?
-            break;
-
-            case 0x04:	// Probably simple with v,cv,sf,mx,lm ignored.  Same calculation as 0x3B?
-            break;
-
-            case 0x05:	// UNSTABLE?
-            break;
-            */
-
-      case 0x06:
-         ret = NCLIP(instr);
-         break;
-
-         /*
-            case 0x07:	// UNSTABLE?
-            break;
-
-            case 0x08:	// UNSTABLE?
-            break;
-
-            case 0x09:	// UNSTABLE?
-            break;
-
-            case 0x0A:	// UNSTABLE?
-            break;
-
-            case 0x0B:	// UNSTABLE?
-            break;
-
-*/
-
-      case 0x0C:
-         ret = OP(instr);
-         break;
-
-         /*
-            case 0x0D:	// UNSTABLE?
-            break;
-
-            case 0x0E:	// UNSTABLE?
-            break;
-
-            case 0x0F:	// UNSTABLE?
-            break;
-            */
-
-      case 0x10:
-         ret = DPCS(instr);
-         break;
-
-      case 0x11:
-         ret = INTPL(instr);
-         break;
-
-      case 0x12:
-         ret = MVMVA(instr);
-         break;
-
-      case 0x13:
-         ret = NCDS(instr);
-         break;
-
-      case 0x14:
-         ret = CDP(instr);
-         break;
-
-
-         /*
-            case 0x15:	// does one push on RGB FIFO, what else...
-            break;
-            */
-
-      case 0x16:
-         ret = NCDT(instr);
-         break;
-
-         /*
-            case 0x17:	// PARTIALLY UNSTABLE(depending on sf or v or cv or mx or lm), similar behavior under some conditions to 0x16?
-            break;
-
-            case 0x18:
-            break;
-
-            case 0x19:
-            break;
-            */
-
-      case 0x1B:
-         ret = NCCS(instr);
-         break;
-
-      case 0x1C:
-         ret = CC(instr);
-         break;
-
-         /*
-            case 0x1D:
-            break;
-            */
-
-      case 0x1E:
-         ret = NCS(instr);
-         break;
-
-         /*
-            case 0x1F:
-            break;
-            */
-
-      case 0x20:
-         ret = NCT(instr);
-         break;
-         /*
-            case 0x21:
-            break;
-
-            case 0x22:	// UNSTABLE?
-            break;
-
-            case 0x23:
-            break;
-
-            case 0x24:
-            break;
-
-            case 0x25:
-            break;
-
-            case 0x26:
-            break;
-
-            case 0x27:
-            break;
-            */
-
-      case 0x28:
-         ret = SQR(instr);
-         break;
-
-	  case 0x1A:	/* Alternate for 0x29? */
-      case 0x29:
-         ret = DCPL(instr);
-         break;
-
-      case 0x2A:
-         ret = DPCT(instr);
-         break;
-
-         /*
-            case 0x2B:
-            break;
-
-            case 0x2C:
-            break;
-            */
-
-      case 0x2D:
-         ret = AVSZ3(instr);
-         break;
-
-      case 0x2E:
-         ret = AVSZ4(instr);
-         break;
-
-         /*
-            case 0x2F:	// UNSTABLE?
-            break;
-            */
-
-      case 0x30:
-         ret = RTPT(instr);
-         break;
-
-         /*
-            case 0x31:	// UNSTABLE?
-            break;
-
-            case 0x32:	// UNSTABLE?
-            break;
-
-            case 0x33:	// UNSTABLE?
-            break;
-
-            case 0x34:	// UNSTABLE?
-            break;
-
-            case 0x35:	// UNSTABLE?
-            break;
-
-            case 0x36:	// UNSTABLE?
-            break;
-
-            case 0x37:	// UNSTABLE?
-            break;
-
-            case 0x38:
-            break;
-
-            case 0x39:	// Probably simple with v,cv,sf,mx,lm ignored.
-            break;
-
-            case 0x3A:	// Probably simple with v,cv,sf,mx,lm ignored.
-            break;
-
-            case 0x3B:	// Probably simple with v,cv,sf,mx,lm ignored.  Same calculation as 0x04?
-            break;
-
-            case 0x3C:	// UNSTABLE?
-            break;
-            */
-
-      case 0x3D:
-         ret = GPF(instr);
-         break;
-
-      case 0x3E:
-         ret = GPL(instr);
-         break;
-
-      case 0x3F:
-         ret = NCCT(instr);
-         break;
-   }
+   ret = GTE_ExecuteOp(code, instr);
 
    /* Overclock: force all GTE instruction to have 1 cycle latency */
    if (psx_gte_overclock)
