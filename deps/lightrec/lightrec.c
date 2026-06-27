@@ -442,6 +442,22 @@ static void lightrec_rw_helper(struct lightrec_state *state,
 		} else if (op.i.rt) {
 			state->regs.gpr[op.i.rt] = ret;
 		}
+
+		/* PGXP CPU-mode load tracking.  `ret` is the loaded value
+		 * regardless of whether it was committed to gpr[rt] or held
+		 * in temp_reg for the load delay, so it is the correct value
+		 * to track here.  OP_META_LWU is a lightrec-internal unaligned
+		 * helper with no PGXP tracker, so skip it. */
+		if (state->ops.pgxp_cpu && op.i.op != OP_META_LWU) {
+			u32 addr = state->regs.gpr[op.i.rs] + (u32)(s16)op.i.imm;
+
+			(*state->ops.pgxp_cpu)(state, op.opcode,
+					       ret, state->regs.gpr[op.i.rs],
+					       state->regs.gpr[op.i.rt],
+					       state->regs.gpr[REG_HI],
+					       state->regs.gpr[REG_LO],
+					       addr);
+		}
 		fallthrough;
 	default:
 		break;
@@ -839,7 +855,26 @@ static void lightrec_pgxp_cpu_cb(struct lightrec_state *state, u32 arg)
 	 * Harmless (unused) for non-memory ops, where it is passed as 0. */
 	switch (c.i.op) {
 	case OP_LB:  case OP_LH:  case OP_LWL: case OP_LW:
-	case OP_LBU: case OP_LHU: case OP_LWR:
+	case OP_LBU: case OP_LHU: case OP_LWR: {
+		/* Load: the tracked value is the loaded result.  For a load
+		 * in a delay slot lightrec keeps it in temp_reg until the
+		 * delay resolves; otherwise it is already in gpr[rt].  Pass
+		 * the value in the rd slot, which is where PGXP_CPU_Dispatch
+		 * reads the load result from. */
+		u32 rtval = (OPT_HANDLE_LOAD_DELAYS &&
+			     state->in_delay_slot_n == 0xff)
+			    ? state->temp_reg : state->regs.gpr[c.i.rt];
+
+		addr = state->regs.gpr[c.i.rs] + (u32)(s16)c.i.imm;
+
+		(*state->ops.pgxp_cpu)(state, c.opcode,
+				       rtval, state->regs.gpr[c.i.rs],
+				       state->regs.gpr[c.i.rt],
+				       state->regs.gpr[REG_HI],
+				       state->regs.gpr[REG_LO],
+				       addr);
+		return;
+	}
 	case OP_SB:  case OP_SH:  case OP_SWL: case OP_SW:
 	case OP_SWR:
 		addr = state->regs.gpr[c.i.rs] + (u32)(s16)c.i.imm;
