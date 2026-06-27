@@ -7146,11 +7146,6 @@ void texture_rect_release(const TextureRect *t) { texture_upload_release(t->uplo
 		EnduringTextureRect *a;
 		int count;
 		int cap;
-		/* Pointer-range iteration so existing range-for loops work unchanged. */
-		EnduringTextureRect *begin() { return a; }
-		EnduringTextureRect *end()   { return a + count; }
-		const EnduringTextureRect *begin() const { return a; }
-		const EnduringTextureRect *end()   const { return a + count; }
 	};
 void enduring_arr_init(EnduringRectArr *v) { v->a = NULL; v->count = 0; v->cap = 0; }
 void enduring_arr_push(EnduringRectArr *v, TextureRect tr, bool alive) {
@@ -20949,11 +20944,12 @@ bool is_power_of_two(int n) {
 				if (gpu != NULL) {
 					hd_tex_map_set(&upload->textures, id.palette_hash, gpu->image, gpu->alpha_flags);
 					self->dbg_attaches++;
-					for (EnduringTextureRect &e : self->tracker.textures)
+					{ int _ti; for (_ti = 0; _ti < self->tracker.textures.count; _ti++)
 					{
-						if (e.alive && e.texture_rect.upload == upload)
-							fused_pages_mark_dirty(&self->fused_pages, fromSRect(e.texture_rect.vram_rect));
-					}
+						EnduringTextureRect *e = &self->tracker.textures.a[_ti];
+						if (e->alive && e->texture_rect.upload == upload)
+							fused_pages_mark_dirty(&self->fused_pages, fromSRect(e->texture_rect.vram_rect));
+					} }
 					continue;
 				}
 
@@ -20975,10 +20971,11 @@ bool is_power_of_two(int n) {
 					ih_reset(&texture);
 					self->dbg_gpu_uploads++;
 					self->dbg_attaches++;
-					for (EnduringTextureRect &e : self->tracker.textures) {
-						if (e.alive && e.texture_rect.upload == upload)
-							fused_pages_mark_dirty(&self->fused_pages, fromSRect(e.texture_rect.vram_rect));
-					}
+					{ int _ti; for (_ti = 0; _ti < self->tracker.textures.count; _ti++) {
+						EnduringTextureRect *e = &self->tracker.textures.a[_ti];
+						if (e->alive && e->texture_rect.upload == upload)
+							fused_pages_mark_dirty(&self->fused_pages, fromSRect(e->texture_rect.vram_rect));
+					} }
 				} else {
 					TT_LOG(RETRO_LOG_WARN, "Dimension mismatch for %x-%x, original=%dx%d, replacement=%dx%d\n",
 							id.hash, id.palette_hash, upload->width, upload->height, width, height);
@@ -21122,8 +21119,10 @@ bool is_power_of_two(int n) {
 		HdImageCache_clear(&self->hd_cache);
 		hd_key_set_clear(&self->requested);
 		hd_key_set_clear(&self->pending_attach);
-		for (EnduringTextureRect &texture : self->tracker.textures)
-			hd_tex_map_clear(&texture.texture_rect.upload->textures);
+		{ int _ti; for (_ti = 0; _ti < self->tracker.textures.count; _ti++) {
+			EnduringTextureRect *texture = &self->tracker.textures.a[_ti];
+			hd_tex_map_clear(&texture->texture_rect.upload->textures);
+		} }
 		{
 		int _rri;
 		for (_rri = 0; _rri < rrvec_size(&self->restorable_rects); _rri++)
@@ -21814,14 +21813,15 @@ int64_t page_bytes(FusionRects *fusion)
 		TextureTrackerSaveState state;
 		tts_init(&state);
 
-		for (EnduringTextureRect &r : self->tracker.textures)
+		{ int _ti; for (_ti = 0; _ti < self->tracker.textures.count; _ti++)
 		{
-			if (r.alive)
+			EnduringTextureRect *r = &self->tracker.textures.a[_ti];
+			if (r->alive)
 			{
-				TextureRectSaveState _ss = to_save_state(&r.texture_rect, &state.uploads);
+				TextureRectSaveState _ss = to_save_state(&r->texture_rect, &state.uploads);
 				TextureRectSaveStateVec_push(&state.rects, &_ss);
 			}
-		}
+		} }
 		{
 		int _sri;
 		for (_sri = 0; _sri < rrvec_size(&self->restorable_rects); _sri++)
