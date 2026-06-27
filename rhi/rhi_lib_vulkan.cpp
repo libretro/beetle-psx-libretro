@@ -8736,6 +8736,28 @@ extern retro_log_printf_t log_cb;
 	{
 		public:
 
+			/* batch-2 setter/accessor free functions (defined after the class). */
+			friend void renderer_set_texture_window(Renderer *self, const TextureWindow &window);
+			friend void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y);
+			friend void renderer_set_palette_offset(Renderer *self, unsigned x, unsigned y);
+			friend uint16_t * renderer_begin_copy(Renderer *self, BufferHandle handle);
+			friend void renderer_end_copy(Renderer *self, BufferHandle handle);
+			friend void renderer_notify_texture_upload(Renderer *self, Rect rect, uint16_t *vram);
+			friend void renderer_set_vram_framebuffer_coords(Renderer *self, unsigned xstart, unsigned ystart);
+			friend void renderer_set_display_mode(Renderer *self, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode);
+			friend void renderer_toggle_display(Renderer *self, bool enable);
+			friend void renderer_set_texture_mode(Renderer *self, TextureMode mode);
+			friend void renderer_set_semi_transparent(Renderer *self, SemiTransparentMode state);
+			friend void renderer_set_primitive_type(Renderer *self, PrimitiveType primitive_type);
+			friend void renderer_set_force_mask_bit(Renderer *self, bool enable);
+			friend void renderer_set_mask_test(Renderer *self, bool enable);
+			friend void renderer_set_texture_color_modulate(Renderer *self, bool enable);
+			friend void renderer_set_UV_limits(Renderer *self, uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v);
+			friend void renderer_set_filter_mode(Renderer *self, FilterMode mode);
+			friend void renderer_set_sprite_filter_exclude(Renderer *self, FilterExclude exclude);
+			friend void renderer_set_polygon_2d_filter_exclude(Renderer *self, FilterExclude exclude);
+			friend void renderer_set_scaled_uv_offset(Renderer *self, bool offset);
+
 			/* batch-1 setter free functions (defined after the class) need access
 			 * to the private tracker/atlas/queue members. */
 			friend void renderer_set_track_textures(Renderer *self, bool enable);
@@ -8806,67 +8828,14 @@ extern retro_log_printf_t log_cb;
 			void set_draw_rect(const Rect &rect);
 
 
-			void set_texture_window(const TextureWindow &window)
-			{
-				render_state.texture_window = window;
-				render_state.cached_window_rect = compute_window_rect(window);
-			}
-			inline void set_texture_offset(unsigned x, unsigned y)
-			{
-				fbatlas_set_texture_offset(&atlas, x, y);
-				render_state.texture_offset_x = x;
-				render_state.texture_offset_y = y;
-			}
 
-			inline void set_palette_offset(unsigned x, unsigned y)
-			{
-				fbatlas_set_palette_offset(&atlas, x, y);
-				render_state.palette_offset_x = x;
-				render_state.palette_offset_y = y;
-			}
 
 			BufferHandle copy_cpu_to_vram(const Rect &rect);
 			void copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram);
-			uint16_t *begin_copy(BufferHandle handle)
-			{
-				return (uint16_t *)(device->map_host_buffer(*bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
-			}
-			void end_copy(BufferHandle handle)
-			{
-				device->unmap_host_buffer(*bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
-			}
 
-			void notify_texture_upload(Rect rect, uint16_t *vram)
-			{
-				if (texture_tracking_enabled)
-					texture_tracker_upload(&tracker, rect, vram);
-			}
 
 			void blit_vram(const Rect &dst, const Rect &src);
 
-			void set_vram_framebuffer_coords(unsigned xstart, unsigned ystart)
-			{
-				ih_reset(&last_scanout);
-
-				render_state.display_fb_xstart = xstart;
-				render_state.display_fb_ystart = ystart;
-			}
-
-
-
-			void set_display_mode(ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
-			{
-				//if (rect != render_state.display_mode || render_state.scanout_mode != mode)
-				//	ih_reset(&last_scanout);
-				ih_reset(&last_scanout);
-
-				//render_state.display_mode = rect;
-				render_state.scanout_mode = mode;
-
-				render_state.is_pal = is_pal;
-				render_state.is_480i = is_480i;
-				render_state.width_mode = width_mode;
-			}
 
 
 
@@ -8874,56 +8843,20 @@ extern retro_log_printf_t log_cb;
 
 
 
-			void toggle_display(bool enable)
-			{
-				if (enable != render_state.display_on)
-					ih_reset(&last_scanout);
 
-				render_state.display_on = enable;
-			}
+
+
 
 
 			ImageHandle scanout_vram_to_texture(bool scaled = true);
 			ImageHandle scanout_to_texture();
 
-			inline void set_texture_mode(TextureMode mode)
-			{
-				render_state.texture_mode = mode;
-				fbatlas_set_texture_mode(&atlas, mode);
-			}
 
-			inline void set_semi_transparent(SemiTransparentMode state)
-			{
-				render_state.semi_transparent = state;
-			}
 
-			inline void set_primitive_type(PrimitiveType primitive_type)
-			{
-				render_state.primitive_type = primitive_type;
-			}
 
-			inline void set_force_mask_bit(bool enable)
-			{
-				render_state.force_mask_bit = enable;
-			}
 
-			inline void set_mask_test(bool enable)
-			{
-				render_state.mask_test = enable;
-			}
 
-			inline void set_texture_color_modulate(bool enable)
-			{
-				render_state.texture_color_modulate = enable;
-			}
 
-			inline void set_UV_limits(uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v)
-			{
-				render_state.UVLimits.min_u = min_u;
-				render_state.UVLimits.min_v = min_v;
-				render_state.UVLimits.max_u = max_u;
-				render_state.UVLimits.max_v = max_v;
-			}
 
 			// Draw commands
 			void clear_rect(const Rect &rect, uint32_t fb_color);
@@ -8970,29 +8903,13 @@ extern retro_log_printf_t log_cb;
 
 
 
-			void set_filter_mode(FilterMode mode)
-			{
-				primitive_filter_mode = mode;
-			}
 			ScanoutMode get_scanout_mode() const
 			{
 				return render_state.scanout_mode;
 			}
 
-			void set_sprite_filter_exclude(FilterExclude exclude)
-			{
-				sprite_filter_exclude = exclude;
-			}
 
-			void set_polygon_2d_filter_exclude(FilterExclude exclude)
-			{
-				polygon_2d_filter_exclude = exclude;
-			}
 
-			void set_scaled_uv_offset(bool offset)
-			{
-				scaled_uv_offset = offset;
-			}
 
 			/* True iff the constructor finished successfully. The Renderer
 			 * constructor does not throw; on failure (e.g. RGBA8_UNORM not
@@ -9151,6 +9068,111 @@ extern retro_log_printf_t log_cb;
 			void ssaa_framebuffer();
 			BufferHandle quad = { NULL };
 	};
+
+	/* ---- Renderer setters/accessors (batch 2): inline methods -> inline free
+	 * functions taking Renderer *self. ---- */
+	inline void renderer_set_texture_window(Renderer *self, const TextureWindow &window)
+	{
+		self->render_state.texture_window = window;
+		self->render_state.cached_window_rect = self->compute_window_rect(window);
+	}
+	inline void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y)
+	{
+		fbatlas_set_texture_offset(&self->atlas, x, y);
+		self->render_state.texture_offset_x = x;
+		self->render_state.texture_offset_y = y;
+	}
+	inline void renderer_set_palette_offset(Renderer *self, unsigned x, unsigned y)
+	{
+		fbatlas_set_palette_offset(&self->atlas, x, y);
+		self->render_state.palette_offset_x = x;
+		self->render_state.palette_offset_y = y;
+	}
+	inline uint16_t *renderer_begin_copy(Renderer *self, BufferHandle handle)
+	{
+		return (uint16_t *)(self->device->map_host_buffer(*bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
+	}
+	inline void renderer_end_copy(Renderer *self, BufferHandle handle)
+	{
+		self->device->unmap_host_buffer(*bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
+	}
+	inline void renderer_notify_texture_upload(Renderer *self, Rect rect, uint16_t *vram)
+	{
+		if (self->texture_tracking_enabled)
+			texture_tracker_upload(&self->tracker, rect, vram);
+	}
+	inline void renderer_set_vram_framebuffer_coords(Renderer *self, unsigned xstart, unsigned ystart)
+	{
+		ih_reset(&self->last_scanout);
+
+		self->render_state.display_fb_xstart = xstart;
+		self->render_state.display_fb_ystart = ystart;
+	}
+	inline void renderer_set_display_mode(Renderer *self, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
+	{
+		ih_reset(&self->last_scanout);
+
+		self->render_state.scanout_mode = mode;
+
+		self->render_state.is_pal = is_pal;
+		self->render_state.is_480i = is_480i;
+		self->render_state.width_mode = width_mode;
+	}
+	inline void renderer_toggle_display(Renderer *self, bool enable)
+	{
+		if (enable != self->render_state.display_on)
+			ih_reset(&self->last_scanout);
+
+		self->render_state.display_on = enable;
+	}
+	inline void renderer_set_texture_mode(Renderer *self, TextureMode mode)
+	{
+		self->render_state.texture_mode = mode;
+		fbatlas_set_texture_mode(&self->atlas, mode);
+	}
+	inline void renderer_set_semi_transparent(Renderer *self, SemiTransparentMode state)
+	{
+		self->render_state.semi_transparent = state;
+	}
+	inline void renderer_set_primitive_type(Renderer *self, PrimitiveType primitive_type)
+	{
+		self->render_state.primitive_type = primitive_type;
+	}
+	inline void renderer_set_force_mask_bit(Renderer *self, bool enable)
+	{
+		self->render_state.force_mask_bit = enable;
+	}
+	inline void renderer_set_mask_test(Renderer *self, bool enable)
+	{
+		self->render_state.mask_test = enable;
+	}
+	inline void renderer_set_texture_color_modulate(Renderer *self, bool enable)
+	{
+		self->render_state.texture_color_modulate = enable;
+	}
+	inline void renderer_set_UV_limits(Renderer *self, uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v)
+	{
+		self->render_state.UVLimits.min_u = min_u;
+		self->render_state.UVLimits.min_v = min_v;
+		self->render_state.UVLimits.max_u = max_u;
+		self->render_state.UVLimits.max_v = max_v;
+	}
+	inline void renderer_set_filter_mode(Renderer *self, FilterMode mode)
+	{
+		self->primitive_filter_mode = mode;
+	}
+	inline void renderer_set_sprite_filter_exclude(Renderer *self, FilterExclude exclude)
+	{
+		self->sprite_filter_exclude = exclude;
+	}
+	inline void renderer_set_polygon_2d_filter_exclude(Renderer *self, FilterExclude exclude)
+	{
+		self->polygon_2d_filter_exclude = exclude;
+	}
+	inline void renderer_set_scaled_uv_offset(Renderer *self, bool offset)
+	{
+		self->scaled_uv_offset = offset;
+	}
 
 	/* ---- Renderer state setters (batch 1): inline methods -> static inline free
 	 * functions taking Renderer *self, ahead of the full class -> struct conversion.
@@ -22434,10 +22456,10 @@ void rhi_vulkan_prepare_frame(void)
    unsigned index = vulkan->get_sync_index(vulkan->handle);
    device->next_frame_context();
 
-   renderer->set_scaled_uv_offset(scaled_uv_offset);
-   renderer->set_filter_mode((FilterMode)(filter_mode));
-   renderer->set_sprite_filter_exclude((FilterExclude)(filter_exclude_sprites));
-   renderer->set_polygon_2d_filter_exclude((FilterExclude)(filter_exclude_2d_polygons));
+   renderer_set_scaled_uv_offset(renderer, scaled_uv_offset);
+   renderer_set_filter_mode(renderer, (FilterMode)(filter_mode));
+   renderer_set_sprite_filter_exclude(renderer, (FilterExclude)(filter_exclude_sprites));
+   renderer_set_polygon_2d_filter_exclude(renderer, (FilterExclude)(filter_exclude_2d_polygons));
 }
 
 static ScanoutMode get_scanout_mode(bool bpp24)
@@ -22538,7 +22560,7 @@ void rhi_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
 
    if (renderer)
    {
-      renderer->set_texture_window({ tex_x_mask, tex_y_mask, tex_x_or, tex_y_or });
+      renderer_set_texture_window(renderer, { tex_x_mask, tex_y_mask, tex_x_or, tex_y_or });
       tt_log("vk set_tex_window tww=%u twh=%u twx=%u twy=%u\n",
             (unsigned)tww, (unsigned)twh, (unsigned)twx, (unsigned)twy);
    }
@@ -22586,7 +22608,7 @@ void rhi_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
 void rhi_vulkan_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
 {
    if (renderer)
-      renderer->set_vram_framebuffer_coords(xstart, ystart);
+      renderer_set_vram_framebuffer_coords(renderer, xstart, ystart);
    else
       rhi_defer_push_set_vram_framebuffer_coords(&defer, xstart, ystart);
 }
@@ -22613,7 +22635,7 @@ void rhi_vulkan_set_display_mode(bool depth_24bpp,
                                  int width_mode)
 {
    if (renderer)
-      renderer->set_display_mode(get_scanout_mode(depth_24bpp), is_pal,
+      renderer_set_display_mode(renderer, get_scanout_mode(depth_24bpp), is_pal,
                                  is_480i, (WidthMode)(width_mode));
    else
       rhi_defer_push_set_display_mode(&defer, depth_24bpp, is_pal,
@@ -22643,52 +22665,52 @@ void rhi_vulkan_push_triangle(
    if (!renderer)
       return;
 
-   renderer->set_texture_color_modulate(texture_blend_mode == 2);
-   renderer->set_palette_offset(clut_x, clut_y);
-   renderer->set_texture_offset(texpage_x, texpage_y);
-   renderer->set_mask_test(mask_test);
-   renderer->set_force_mask_bit(set_mask);
-   renderer->set_UV_limits(min_u, min_v, max_u, max_v);
+   renderer_set_texture_color_modulate(renderer, texture_blend_mode == 2);
+   renderer_set_palette_offset(renderer, clut_x, clut_y);
+   renderer_set_texture_offset(renderer, texpage_x, texpage_y);
+   renderer_set_mask_test(renderer, mask_test);
+   renderer_set_force_mask_bit(renderer, set_mask);
+   renderer_set_UV_limits(renderer, min_u, min_v, max_u, max_v);
    if (texture_blend_mode != 0)
    {
       switch (depth_shift)
       {
          default:
          case 0:
-            renderer->set_texture_mode(TextureMode_ABGR1555);
+            renderer_set_texture_mode(renderer, TextureMode_ABGR1555);
             break;
          case 1:
-            renderer->set_texture_mode(TextureMode_Palette8bpp);
+            renderer_set_texture_mode(renderer, TextureMode_Palette8bpp);
             break;
          case 2:
-            renderer->set_texture_mode(TextureMode_Palette4bpp);
+            renderer_set_texture_mode(renderer, TextureMode_Palette4bpp);
             break;
       }
    }
    else
-      renderer->set_texture_mode(TextureMode_None);
+      renderer_set_texture_mode(renderer, TextureMode_None);
 
    switch (blend_mode)
    {
       default:
-         renderer->set_semi_transparent(SemiTransparentMode_None);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_None);
          break;
 
       case 0:
-         renderer->set_semi_transparent(SemiTransparentMode_Average);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Average);
          break;
       case 1:
-         renderer->set_semi_transparent(SemiTransparentMode_Add);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Add);
          break;
       case 2:
-         renderer->set_semi_transparent(SemiTransparentMode_Sub);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Sub);
          break;
       case 3:
-         renderer->set_semi_transparent(SemiTransparentMode_AddQuarter);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_AddQuarter);
          break;
    }
 
-   renderer->set_primitive_type(PrimitiveType_Polygon);
+   renderer_set_primitive_type(renderer, PrimitiveType_Polygon);
 
    Vertex vertices[3] = {
       { p0x, p0y, p0w, c0, t0x, t0y },
@@ -22723,57 +22745,57 @@ void rhi_vulkan_push_quad(
    if (!renderer)
       return;
 
-   renderer->set_texture_color_modulate(texture_blend_mode == 2);
-   renderer->set_palette_offset(clut_x, clut_y);
-   renderer->set_texture_offset(texpage_x, texpage_y);
-   renderer->set_mask_test(mask_test);
-   renderer->set_force_mask_bit(set_mask);
-   renderer->set_UV_limits(min_u, min_v, max_u, max_v);
+   renderer_set_texture_color_modulate(renderer, texture_blend_mode == 2);
+   renderer_set_palette_offset(renderer, clut_x, clut_y);
+   renderer_set_texture_offset(renderer, texpage_x, texpage_y);
+   renderer_set_mask_test(renderer, mask_test);
+   renderer_set_force_mask_bit(renderer, set_mask);
+   renderer_set_UV_limits(renderer, min_u, min_v, max_u, max_v);
    if (texture_blend_mode != 0)
    {
       switch (depth_shift)
       {
          default:
          case 0:
-            renderer->set_texture_mode(TextureMode_ABGR1555);
+            renderer_set_texture_mode(renderer, TextureMode_ABGR1555);
             break;
          case 1:
-            renderer->set_texture_mode(TextureMode_Palette8bpp);
+            renderer_set_texture_mode(renderer, TextureMode_Palette8bpp);
             break;
          case 2:
-            renderer->set_texture_mode(TextureMode_Palette4bpp);
+            renderer_set_texture_mode(renderer, TextureMode_Palette4bpp);
             break;
       }
    }
    else
-      renderer->set_texture_mode(TextureMode_None);
+      renderer_set_texture_mode(renderer, TextureMode_None);
 
    switch (blend_mode)
    {
       default:
-         renderer->set_semi_transparent(SemiTransparentMode_None);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_None);
          break;
 
       case 0:
-         renderer->set_semi_transparent(SemiTransparentMode_Average);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Average);
          break;
       case 1:
-         renderer->set_semi_transparent(SemiTransparentMode_Add);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Add);
          break;
       case 2:
-         renderer->set_semi_transparent(SemiTransparentMode_Sub);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Sub);
          break;
       case 3:
-         renderer->set_semi_transparent(SemiTransparentMode_AddQuarter);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_AddQuarter);
          break;
    }
 
    if (is_sprite)
-      renderer->set_primitive_type(PrimitiveType_Sprite);
+      renderer_set_primitive_type(renderer, PrimitiveType_Sprite);
    else if (may_be_2d)
-      renderer->set_primitive_type(PrimitiveType_May_Be_2D_Polygon);
+      renderer_set_primitive_type(renderer, PrimitiveType_May_Be_2D_Polygon);
    else
-      renderer->set_primitive_type(PrimitiveType_Polygon);
+      renderer_set_primitive_type(renderer, PrimitiveType_Polygon);
 
    Vertex vertices[4] = {
       { p0x, p0y, p0w, c0, t0x, t0y },
@@ -22797,26 +22819,26 @@ void rhi_vulkan_push_line(
    if (!renderer)
       return;
 
-   renderer->set_texture_mode(TextureMode_None);
-   renderer->set_mask_test(mask_test);
-   renderer->set_force_mask_bit(set_mask);
+   renderer_set_texture_mode(renderer, TextureMode_None);
+   renderer_set_mask_test(renderer, mask_test);
+   renderer_set_force_mask_bit(renderer, set_mask);
    switch (blend_mode)
    {
       default:
-         renderer->set_semi_transparent(SemiTransparentMode_None);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_None);
          break;
 
       case 0:
-         renderer->set_semi_transparent(SemiTransparentMode_Average);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Average);
          break;
       case 1:
-         renderer->set_semi_transparent(SemiTransparentMode_Add);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Add);
          break;
       case 2:
-         renderer->set_semi_transparent(SemiTransparentMode_Sub);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Sub);
          break;
       case 3:
-         renderer->set_semi_transparent(SemiTransparentMode_AddQuarter);
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_AddQuarter);
          break;
    }
 
@@ -22824,7 +22846,7 @@ void rhi_vulkan_push_line(
       { float(p0x), float(p0y), 1.0f, c0, 0, 0 },
       { float(p1x), float(p1y), 1.0f, c1, 0, 0 },
    };
-   renderer->set_texture_color_modulate(false);
+   renderer_set_texture_color_modulate(renderer, false);
    renderer->draw_line(vertices);
 }
 
@@ -22849,11 +22871,11 @@ void rhi_vulkan_load_image(
          (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h,
          (int)mask_test, (int)set_mask);
 
-   renderer->notify_texture_upload(Rect { x, y, w, h }, vram);
-   renderer->set_mask_test(mask_test);
-   renderer->set_force_mask_bit(set_mask);
+   renderer_notify_texture_upload(renderer, Rect { x, y, w, h }, vram);
+   renderer_set_mask_test(renderer, mask_test);
+   renderer_set_force_mask_bit(renderer, set_mask);
    auto handle   = renderer->copy_cpu_to_vram({ x, y, w, h });
-   uint16_t *tmp = renderer->begin_copy(handle);
+   uint16_t *tmp = renderer_begin_copy(renderer, handle);
 
    /* The row loop has two independent invariants: x-wrap (dual_copy)
     * and y-wrap. Both are determined entirely by (x, y, w, h) before
@@ -22909,7 +22931,7 @@ void rhi_vulkan_load_image(
                   w * sizeof(uint16_t));
       }
    }
-   renderer->end_copy(handle);
+   renderer_end_copy(renderer, handle);
 
    // This is called on state loading. 
    if (!inside_frame)
@@ -22957,15 +22979,15 @@ void rhi_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
          (unsigned)w, (unsigned)h,
          (int)mask_test, (int)set_mask);
 
-   renderer->set_mask_test(mask_test);
-   renderer->set_force_mask_bit(set_mask);
+   renderer_set_mask_test(renderer, mask_test);
+   renderer_set_force_mask_bit(renderer, set_mask);
    renderer->blit_vram({ dst_x, dst_y, w, h }, { src_x, src_y, w, h });
 }
 
 void rhi_vulkan_toggle_display(bool status)
 {
    if (renderer)
-      renderer->toggle_display(status == 0);
+      renderer_toggle_display(renderer, status == 0);
    else
       rhi_defer_push_toggle_display(&defer, status);
 }
