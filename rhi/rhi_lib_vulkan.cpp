@@ -4127,7 +4127,7 @@ VkFormat image_get_format(const struct Image *self) { return self->create_info.f
 uint32_t image_get_width(const struct Image *self, uint32_t lod) { uint32_t v = self->create_info.width >> lod; return v > 1u ? v : 1u; }
 uint32_t image_get_height(const struct Image *self, uint32_t lod) { uint32_t v = self->create_info.height >> lod; return v > 1u ? v : 1u; }
 uint32_t image_get_depth(const struct Image *self, uint32_t lod) { uint32_t v = self->create_info.depth >> lod; return v > 1u ? v : 1u; }
-const ImageCreateInfo &image_get_create_info(const struct Image *self) { return self->create_info; }
+const ImageCreateInfo *image_get_create_info(const struct Image *self) { return &self->create_info; }
 VkImageLayout image_get_layout(const struct Image *self, VkImageLayout optimal) { return self->layout_type == Layout_Optimal ? optimal : VK_IMAGE_LAYOUT_GENERAL; }
 Layout image_get_layout_type(const struct Image *self) { return self->layout_type; }
 void image_set_layout(struct Image *self, Layout layout) { self->layout_type = layout; }
@@ -4135,7 +4135,7 @@ void image_set_stage_flags(struct Image *self, VkPipelineStageFlags flags) { sel
 void image_set_access_flags(struct Image *self, VkAccessFlags flags) { self->access_flags = flags; }
 VkPipelineStageFlags image_get_stage_flags(const struct Image *self) { return self->stage_flags; }
 VkAccessFlags image_get_access_flags(const struct Image *self) { return self->access_flags; }
-const DeviceAllocation &image_get_allocation(const struct Image *self) { return self->alloc; }
+const DeviceAllocation *image_get_allocation(const struct Image *self) { return &self->alloc; }
 void image_add_reference(struct Image *self) { counter_add_ref(&self->reference_count); }
 	static void image_release_reference(struct Image *self);
 
@@ -12760,7 +12760,7 @@ static void imageview_init(struct ImageView *self, Device *device, VkImageView v
 static VkImageView imageview_get_render_target_view(const struct ImageView *self, unsigned layer)
 {
 	// Transient images just have one layer.
-	if (image_get_create_info(self->info.image).domain == ImageDomain_Transient)
+	if (image_get_create_info(self->info.image)->domain == ImageDomain_Transient)
 		return self->view;
 
 	VK_ASSERT(layer < imageview_get_create_info(self).layers);
@@ -14254,7 +14254,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			VkAttachmentDescription &att = attachments[i];
 			att.flags = 0;
 			att.format = self->color_attachments[i];
-			att.samples = image_get_create_info(&image).samples;
+			att.samples = image_get_create_info(&image)->samples;
 			att.loadOp = rp_color_load_op(info, i);
 			att.storeOp = rp_color_store_op(info, i);
 			att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -14263,7 +14263,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			// subpass which uses this attachment to avoid any dummy transition at the end.
 			att.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-			if (image_get_create_info(&image).domain == ImageDomain_Transient)
+			if (image_get_create_info(&image)->domain == ImageDomain_Transient)
 			{
 				if (enable_transient_load)
 				{
@@ -14293,7 +14293,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			VkAttachmentDescription &att = attachments[info.num_color_attachments];
 			att.flags = 0;
 			att.format = self->depth_stencil;
-			att.samples = image_get_create_info(&image).samples;
+			att.samples = image_get_create_info(&image)->samples;
 			att.loadOp = ds_load_op;
 			att.storeOp = ds_store_op;
 			// Undefined final layout here for now means that we will just use the layout of the last
@@ -14311,7 +14311,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
 
-			if (image_get_create_info(&image).domain == ImageDomain_Transient)
+			if (image_get_create_info(&image)->domain == ImageDomain_Transient)
 			{
 				if (enable_transient_load)
 				{
@@ -15130,8 +15130,8 @@ VkOffset3D cb_add_offset(const VkOffset3D &a, const VkOffset3D &b)
 		range.aspectMask = aspect;
 		range.baseArrayLayer = 0;
 		range.baseMipLevel = 0;
-		range.levelCount = image_get_create_info(&image).levels;
-		range.layerCount = image_get_create_info(&image).layers;
+		range.levelCount = image_get_create_info(&image)->levels;
+		range.layerCount = image_get_create_info(&image)->layers;
 		if (aspect & VK_IMAGE_ASPECT_COLOR_BIT)
 		{
 			vkCmdClearColorImage(self->cmd, image_get_image(&image), image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
@@ -15212,7 +15212,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	{
 		VK_ASSERT(!self->actual_render_pass);
 		VK_ASSERT(!self->framebuffer);
-		VK_ASSERT(image_get_create_info(&image).domain != ImageDomain_Transient);
+		VK_ASSERT(image_get_create_info(&image)->domain != ImageDomain_Transient);
 
 		VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
 		barrier.srcAccessMask = src_access;
@@ -15220,9 +15220,9 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		barrier.oldLayout = old_layout;
 		barrier.newLayout = new_layout;
 		barrier.image = image_get_image(&image);
-		barrier.subresourceRange.aspectMask = format_to_aspect_mask(image_get_create_info(&image).format);
-		barrier.subresourceRange.levelCount = image_get_create_info(&image).levels;
-		barrier.subresourceRange.layerCount = image_get_create_info(&image).layers;
+		barrier.subresourceRange.aspectMask = format_to_aspect_mask(image_get_create_info(&image)->format);
+		barrier.subresourceRange.levelCount = image_get_create_info(&image)->levels;
+		barrier.subresourceRange.layerCount = image_get_create_info(&image)->layers;
 		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
@@ -15234,16 +15234,16 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			VkPipelineStageFlags src_stage, VkAccessFlags src_access,
 			bool need_top_level_barrier)
 	{
-		const ImageCreateInfo &create_info = image_get_create_info(&image);
+		const ImageCreateInfo *create_info = image_get_create_info(&image);
 		VkImageMemoryBarrier barriers[2] = {};
-		VK_ASSERT(create_info.levels > 1);
+		VK_ASSERT(create_info->levels > 1);
 		(void)create_info;
 
 		{ unsigned i; for (i = 0; i < 2; i++) {
 			barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			barriers[i].image = image_get_image(&image);
 			barriers[i].subresourceRange.aspectMask = format_to_aspect_mask(image_get_format(&image));
-			barriers[i].subresourceRange.layerCount = image_get_create_info(&image).layers;
+			barriers[i].subresourceRange.layerCount = image_get_create_info(&image)->layers;
 			barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
@@ -15263,7 +15263,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 				barriers[i].srcAccessMask = 0;
 				barriers[i].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 				barriers[i].subresourceRange.baseMipLevel = 1;
-				barriers[i].subresourceRange.levelCount = image_get_create_info(&image).levels - 1;
+				barriers[i].subresourceRange.levelCount = image_get_create_info(&image)->levels - 1;
 			}
 		} }
 
@@ -15274,8 +15274,8 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 	void commandbuffer_generate_mipmap(struct CommandBuffer *self, const Image &image)
 	{
-		const ImageCreateInfo &create_info = image_get_create_info(&image);
-		VkOffset3D size = { (int)(create_info.width), (int)(create_info.height), (int)(create_info.depth) };
+		const ImageCreateInfo *create_info = image_get_create_info(&image);
+		VkOffset3D size = { (int)(create_info->width), (int)(create_info->height), (int)(create_info->depth) };
 		const VkOffset3D origin = { 0, 0, 0 };
 
 		VK_ASSERT(image_get_layout(&image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -15283,7 +15283,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkImageMemoryBarrier b = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
 		b.image = image_get_image(&image);
 		b.subresourceRange.levelCount = 1;
-		b.subresourceRange.layerCount = image_get_create_info(&image).layers;
+		b.subresourceRange.layerCount = image_get_create_info(&image)->layers;
 		b.subresourceRange.aspectMask = format_to_aspect_mask(image_get_format(&image));
 		b.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 		b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
@@ -15292,7 +15292,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
-		{ unsigned i; for (i = 1; i < create_info.levels; i++) {
+		{ unsigned i; for (i = 1; i < create_info->levels; i++) {
 			VkOffset3D src_size = size;
 			size.x >>= 1;
 			size.y >>= 1;
@@ -15302,7 +15302,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 			if (size.z < 1) size.z = 1;
 
 			commandbuffer_blit_image(self, image, image,
-					origin, size, origin, src_size, i, i - 1, 0, 0, create_info.layers, VK_FILTER_LINEAR);
+					origin, size, origin, src_size, i, i - 1, 0, 0, create_info->layers, VK_FILTER_LINEAR);
 
 			b.subresourceRange.baseMipLevel = i;
 			commandbuffer_barrier(self, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -15319,9 +15319,9 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		// RADV workaround: blit one layer at a time.
 		{ unsigned i; for (i = 0; i < num_layers; i++) {
 			const VkImageBlit blit = {
-				{ format_to_aspect_mask(image_get_create_info(&src).format), src_level, src_base_layer + i, 1 },
+				{ format_to_aspect_mask(image_get_create_info(&src)->format), src_level, src_base_layer + i, 1 },
 				{ src_offset,                                          cb_add_offset(src_offset, src_extent) },
-				{ format_to_aspect_mask(image_get_create_info(&dst).format), dst_level, dst_base_layer + i, 1 },
+				{ format_to_aspect_mask(image_get_create_info(&dst)->format), dst_level, dst_base_layer + i, 1 },
 				{ dst_offset,                                          cb_add_offset(dst_offset, dst_extent) },
 			};
 
@@ -15968,7 +15968,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 			ImageView *view = framebuffer_get_attachment(self->framebuffer, ref.attachment);
 			VK_ASSERT(view);
-			VK_ASSERT(image_get_create_info(&imageview_get_image(view)).usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+			VK_ASSERT(image_get_create_info(&imageview_get_image(view))->usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
 
 			if (view->cookie_base.cookie == self->bindings.cookies[set][start_binding + i] &&
 					self->bindings.bindings[set][start_binding + i].image.fp.imageLayout == ref.layout)
@@ -16008,7 +16008,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 	void commandbuffer_set_texture_view(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view)
 	{
-		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view)).usage & VK_IMAGE_USAGE_SAMPLED_BIT);
+		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view))->usage & VK_IMAGE_USAGE_SAMPLED_BIT);
 		commandbuffer_set_texture_raw(self, set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
 				image_get_layout(&imageview_get_image_const(&view), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.cookie_base.cookie);
 	}
@@ -16023,14 +16023,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view)).usage & VK_IMAGE_USAGE_SAMPLED_BIT);
+		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view))->usage & VK_IMAGE_USAGE_SAMPLED_BIT);
 		const Sampler *sampler = device_get_stock_sampler(self->device, stock);
 		commandbuffer_set_texture_view_sampler(self, set, binding, view, *sampler);
 	}
 
 	void commandbuffer_set_storage_texture(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view)
 	{
-		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view)).usage & VK_IMAGE_USAGE_STORAGE_BIT);
+		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view))->usage & VK_IMAGE_USAGE_STORAGE_BIT);
 		commandbuffer_set_texture_raw(self, set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
 				image_get_layout(&imageview_get_image_const(&view), VK_IMAGE_LAYOUT_GENERAL), view.cookie_base.cookie);
 	}
@@ -18390,9 +18390,9 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo &create_info){
 		ImageResourceHolder holder;
 		image_resource_holder_init(&holder, self->device);
-		const ImageCreateInfo &image_create_info = image_get_create_info(create_info.image);
+		const ImageCreateInfo *image_create_info = image_get_create_info(create_info.image);
 
-		VkFormat format = create_info.format != VK_FORMAT_UNDEFINED ? create_info.format : image_create_info.format;
+		VkFormat format = create_info.format != VK_FORMAT_UNDEFINED ? create_info.format : image_create_info->format;
 
 		VkImageViewCreateInfo view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
 		view_info.image = image_get_image(create_info.image);
@@ -18403,24 +18403,24 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		view_info.subresourceRange.baseArrayLayer = create_info.base_layer;
 		view_info.subresourceRange.levelCount = create_info.levels;
 		view_info.subresourceRange.layerCount = create_info.layers;
-		view_info.viewType = get_image_view_type(image_create_info, &create_info);
+		view_info.viewType = get_image_view_type(*image_create_info, &create_info);
 
 		unsigned num_levels;
 		if (view_info.subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS)
-			num_levels = image_get_create_info(create_info.image).levels - view_info.subresourceRange.baseMipLevel;
+			num_levels = image_get_create_info(create_info.image)->levels - view_info.subresourceRange.baseMipLevel;
 		else
 			num_levels = view_info.subresourceRange.levelCount;
 
 		unsigned num_layers;
 		if (view_info.subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS)
-			num_layers = image_get_create_info(create_info.image).layers - view_info.subresourceRange.baseArrayLayer;
+			num_layers = image_get_create_info(create_info.image)->layers - view_info.subresourceRange.baseArrayLayer;
 		else
 			num_layers = view_info.subresourceRange.layerCount;
 
 		view_info.subresourceRange.levelCount = num_levels;
 		view_info.subresourceRange.layerCount = num_layers;
 
-		if (!image_resource_holder_create_default_views(&holder, image_create_info, &view_info))
+		if (!image_resource_holder_create_default_views(&holder, *image_create_info, &view_info))
 		{
 			image_resource_holder_fini(&holder);
 			return iv_make(NULL);
@@ -18944,7 +18944,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) {
 			VK_ASSERT(info.color_attachments[i]);
 			formats[i] = imageview_get_format(info.color_attachments[i]);
-			if (image_get_create_info(&imageview_get_image(info.color_attachments[i])).domain == ImageDomain_Transient)
+			if (image_get_create_info(&imageview_get_image(info.color_attachments[i]))->domain == ImageDomain_Transient)
 				lazy |= 1u << i;
 			if (image_get_layout_type(&imageview_get_image(info.color_attachments[i])) == Layout_Optimal)
 				optimal |= 1u << i;
@@ -18952,7 +18952,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		if (info.depth_stencil)
 		{
-			if (image_get_create_info(&imageview_get_image(info.depth_stencil)).domain == ImageDomain_Transient)
+			if (image_get_create_info(&imageview_get_image(info.depth_stencil))->domain == ImageDomain_Transient)
 				lazy |= 1u << info.num_color_attachments;
 			if (image_get_layout_type(&imageview_get_image(info.depth_stencil)) == Layout_Optimal)
 				optimal |= 1u << info.num_color_attachments;
