@@ -4455,34 +4455,26 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		Hash push_constant_layout_hash = 0;
 	};
 
-	class PipelineLayout
+	/* PipelineLayout: cached VkPipelineLayout + its resource layout and per-set
+	 * allocators. Lives in an IntrusiveHashMap (intrusive_node first). Converted
+	 * from a C++ class to a plain C struct + pipeline_layout_* free functions; the
+	 * ctor becomes pipeline_layout_init (called by the map's emplace after the slot
+	 * is allocated) and the dtor becomes pipeline_layout_fini (the map's destroy
+	 * callback). */
+	struct PipelineLayout
 	{
-		public:
-			struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
-			PipelineLayout(Hash hash, Device *device, const CombinedResourceLayout &layout);
-			~PipelineLayout();
-
-			const CombinedResourceLayout &get_resource_layout() const
-			{
-				return layout;
-			}
-
-			VkPipelineLayout get_layout() const
-			{
-				return pipe_layout;
-			}
-
-			DescriptorSetAllocator *get_allocator(unsigned set) const
-			{
-				return set_allocators[set];
-			}
-
-		private:
-			Device *device;
-			VkPipelineLayout pipe_layout = VK_NULL_HANDLE;
-			CombinedResourceLayout layout;
-			DescriptorSetAllocator *set_allocators[VULKAN_NUM_DESCRIPTOR_SETS] = {};
+		struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
+		Device *device;
+		VkPipelineLayout pipe_layout;
+		CombinedResourceLayout layout;
+		DescriptorSetAllocator *set_allocators[VULKAN_NUM_DESCRIPTOR_SETS];
 	};
+
+	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
+	void pipeline_layout_fini(struct PipelineLayout *self);
+	static inline const CombinedResourceLayout *pipeline_layout_get_resource_layout(const struct PipelineLayout *self) { return &self->layout; }
+	static inline VkPipelineLayout pipeline_layout_get_layout(const struct PipelineLayout *self) { return self->pipe_layout; }
+	static inline DescriptorSetAllocator *pipeline_layout_get_allocator(const struct PipelineLayout *self, unsigned set) { return self->set_allocators[set]; }
 
 	class Shader
 	{
@@ -4697,7 +4689,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	 * map key (hash) is passed to the constructor too for the four types whose
 	 * constructor records it; Program's constructor does not take a hash, so there
 	 * the hash is used only as the map key. */
-	static inline void pipeline_layout_map_destroy(PipelineLayout *t) { t->~PipelineLayout(); }
+	static inline void pipeline_layout_map_destroy(PipelineLayout *t) { pipeline_layout_fini(t); }
 	static inline void descriptor_set_allocator_map_destroy(DescriptorSetAllocator *t) { t->~DescriptorSetAllocator(); }
 	static inline void render_pass_map_destroy(RenderPass *t) { t->~RenderPass(); }
 	static inline void shader_map_destroy(Shader *t) { t->~Shader(); }
@@ -4716,7 +4708,8 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		PipelineLayout *t;
 		if (!slot)
 			return NULL;
-		t = new (slot) PipelineLayout(hash, device, layout);
+		t = (PipelineLayout *)slot;
+		pipeline_layout_init(t, hash, device, layout);
 		return pipeline_layout_map_insert_yield(m, hash, t);
 	}
 
@@ -5883,6 +5876,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 
 			PipelineLayout *request_pipeline_layout(const CombinedResourceLayout &layout);
 			DescriptorSetAllocator *request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_sets);
+			friend void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
 			const Framebuffer &request_framebuffer(const RenderPassInfo &info)
 			{
 				return framebuffer_allocator.request_framebuffer(info);
@@ -13469,17 +13463,19 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 #endif
 
 
-	PipelineLayout::PipelineLayout(Hash hash, Device *device, const CombinedResourceLayout &layout)
-		: device(device)
-		  , layout(layout)
+	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout)
 	{
-		intrusive_node.key = hash;
+		unsigned i;
 		VkDescriptorSetLayout layouts[VULKAN_NUM_DESCRIPTOR_SETS] = {};
 		unsigned num_sets = 0;
-		for (unsigned i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
+		self->device = device;
+		self->layout = layout;
+		self->pipe_layout = VK_NULL_HANDLE;
+		self->intrusive_node.key = hash;
+		for (i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
 		{
-			set_allocators[i] = device->request_descriptor_set_allocator(layout.sets[i], layout.stages_for_bindings[i]);
-			layouts[i] = set_allocators[i]->get_layout();
+			self->set_allocators[i] = device->request_descriptor_set_allocator(layout.sets[i], layout.stages_for_bindings[i]);
+			layouts[i] = self->set_allocators[i]->get_layout();
 			if (layout.descriptor_set_mask & (1u << i))
 				num_sets = i + 1;
 		}
@@ -13498,14 +13494,14 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 
 		LOGI("Creating pipeline layout.\n");
-		if (vkCreatePipelineLayout(device->get_device(), &info, NULL, &pipe_layout) != VK_SUCCESS)
+		if (vkCreatePipelineLayout(device->get_device(), &info, NULL, &self->pipe_layout) != VK_SUCCESS)
 			LOGE("Failed to create pipeline layout.\n");
 	}
 
-	PipelineLayout::~PipelineLayout()
+	void pipeline_layout_fini(struct PipelineLayout *self)
 	{
-		if (pipe_layout != VK_NULL_HANDLE)
-			vkDestroyPipelineLayout(device->get_device(), pipe_layout, NULL);
+		if (self->pipe_layout != VK_NULL_HANDLE)
+			vkDestroyPipelineLayout(self->device->get_device(), self->pipe_layout, NULL);
 	}
 
 	const char *Shader::stage_to_name(ShaderStage stage)
@@ -15166,7 +15162,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	{
 		const Shader &shader = *self->current_program->get_shader(ShaderStage_Compute);
 		VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-		info.layout = self->current_program->get_pipeline_layout()->get_layout();
+		info.layout = pipeline_layout_get_layout(self->current_program->get_pipeline_layout());
 		info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		info.stage.module = shader.get_module();
 		info.stage.pName = "main";
@@ -15180,7 +15176,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		VkSpecializationInfo spec_info = {};
 		VkSpecializationMapEntry spec_entries[VULKAN_NUM_SPEC_CONSTANTS];
-		uint32_t mask = self->current_layout->get_resource_layout().combined_spec_constant_mask &
+		uint32_t mask = pipeline_layout_get_resource_layout(self->current_layout)->combined_spec_constant_mask &
 			self->static_state.state.spec_constant_mask;
 
 		if (mask)
@@ -15234,7 +15230,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			att = {};
 
 			if (self->compatible_render_pass->get_color_attachment(self->current_subpass, i).attachment != VK_ATTACHMENT_UNUSED &&
-					(self->current_layout->get_resource_layout().render_target_mask & (1u << i)))
+					(pipeline_layout_get_resource_layout(self->current_layout)->render_target_mask & (1u << i)))
 			{
 				att.colorWriteMask = 0xf;
 				att.blendEnable = self->static_state.state.blend_enable;
@@ -15263,7 +15259,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 		VkVertexInputAttributeDescription vi_attribs[VULKAN_NUM_VERTEX_ATTRIBS];
 		vi.pVertexAttributeDescriptions = vi_attribs;
-		uint32_t attr_mask = self->current_layout->get_resource_layout().attribute_mask;
+		uint32_t attr_mask = pipeline_layout_get_resource_layout(self->current_layout)->attribute_mask;
 		uint32_t binding_mask = 0;
 		FOR_EACH_BIT(attr_mask, bit)
 		{
@@ -15331,7 +15327,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				s.pName = "main";
 				s.stage = (VkShaderStageFlagBits)(1u << i);
 
-				uint32_t mask = self->current_layout->get_resource_layout().spec_constant_mask[i] &
+				uint32_t mask = pipeline_layout_get_resource_layout(self->current_layout)->spec_constant_mask[i] &
 					self->static_state.state.spec_constant_mask;
 
 				if (mask)
@@ -15384,7 +15380,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		hasher_u64(&h, self->current_program->intrusive_node.key);
 
 		// Spec constants.
-		const CombinedResourceLayout &layout = self->current_layout->get_resource_layout();
+		const CombinedResourceLayout &layout = *pipeline_layout_get_resource_layout(self->current_layout);
 		uint32_t combined_spec_constant = layout.combined_spec_constant_mask;
 		combined_spec_constant &= self->static_state.state.spec_constant_mask;
 		hasher_u32(&h, combined_spec_constant);
@@ -15403,7 +15399,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	{
 		Hasher h; hasher_init(&h);
 		self->active_vbos = 0;
-		const CombinedResourceLayout &layout = self->current_layout->get_resource_layout();
+		const CombinedResourceLayout &layout = *pipeline_layout_get_resource_layout(self->current_layout);
 		FOR_EACH_BIT(layout.attribute_mask, bit)
 		{
 			hasher_u32(&h, bit);
@@ -15467,7 +15463,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		if (commandbuffer_get_and_clear(self, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
 		{
-			const VkPushConstantRange &range = self->current_layout->get_resource_layout().push_constant_range;
+			const VkPushConstantRange &range = pipeline_layout_get_resource_layout(self->current_layout)->push_constant_range;
 			if (range.stageFlags != 0)
 			{
 				VK_ASSERT(range.offset == 0);
@@ -15500,7 +15496,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		if (commandbuffer_get_and_clear(self, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT))
 		{
-			const VkPushConstantRange &range = self->current_layout->get_resource_layout().push_constant_range;
+			const VkPushConstantRange &range = pipeline_layout_get_resource_layout(self->current_layout)->push_constant_range;
 			if (range.stageFlags != 0)
 			{
 				VK_ASSERT(range.offset == 0);
@@ -15598,12 +15594,12 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_PUSH_CONSTANTS_BIT);
 
 			self->current_layout = program.get_pipeline_layout();
-			self->current_pipeline_layout = self->current_layout->get_layout();
+			self->current_pipeline_layout = pipeline_layout_get_layout(self->current_layout);
 		}
 		else if (program.get_pipeline_layout()->intrusive_node.key != self->current_layout->intrusive_node.key)
 		{
-			const CombinedResourceLayout &new_layout = program.get_pipeline_layout()->get_resource_layout();
-			const CombinedResourceLayout &old_layout = self->current_layout->get_resource_layout();
+			const CombinedResourceLayout &new_layout = *pipeline_layout_get_resource_layout(program.get_pipeline_layout());
+			const CombinedResourceLayout &old_layout = *pipeline_layout_get_resource_layout(self->current_layout);
 
 			// If the push constant layout changes, all descriptor sets
 			// are invalidated.
@@ -15618,7 +15614,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				PipelineLayout *new_pipe_layout = program.get_pipeline_layout();
 				for (unsigned set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++)
 				{
-					if (new_pipe_layout->get_allocator(set) != self->current_layout->get_allocator(set))
+					if (pipeline_layout_get_allocator(new_pipe_layout, set) != pipeline_layout_get_allocator(self->current_layout, set))
 					{
 						self->dirty_sets |= ~((1u << set) - 1);
 						break;
@@ -15626,7 +15622,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				}
 			}
 			self->current_layout = program.get_pipeline_layout();
-			self->current_pipeline_layout = self->current_layout->get_layout();
+			self->current_pipeline_layout = pipeline_layout_get_layout(self->current_layout);
 		}
 	}
 
@@ -15783,7 +15779,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void commandbuffer_flush_descriptor_set(struct CommandBuffer *self, uint32_t set)
 	{
-		const CombinedResourceLayout &layout = self->current_layout->get_resource_layout();
+		const CombinedResourceLayout &layout = *pipeline_layout_get_resource_layout(self->current_layout);
 		const DescriptorSetLayout &set_layout = layout.sets[set];
 		uint32_t num_dynamic_offsets = 0;
 		uint32_t dynamic_offsets[VULKAN_NUM_BINDINGS];
@@ -15862,7 +15858,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 
 		Hash hash = hasher_get(&h);
-		DescriptorSetAllocation allocated = self->current_layout->get_allocator(set)->find(hash);
+		DescriptorSetAllocation allocated = pipeline_layout_get_allocator(self->current_layout, set)->find(hash);
 
 		// The descriptor set was not successfully cached, rebuild.
 		if (!allocated.cached)
@@ -16005,7 +16001,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void commandbuffer_flush_descriptor_sets(struct CommandBuffer *self)
 	{
-		const CombinedResourceLayout &layout = self->current_layout->get_resource_layout();
+		const CombinedResourceLayout &layout = *pipeline_layout_get_resource_layout(self->current_layout);
 		uint32_t set_update = layout.descriptor_set_mask & self->dirty_sets;
 		FOR_EACH_BIT(set_update, set)
 		{ commandbuffer_flush_descriptor_set(self, set); 	}
