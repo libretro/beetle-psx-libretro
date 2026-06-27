@@ -5305,80 +5305,6 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	 * later stages. */
 	struct CommandBuffer
 	{
-		public:
-			friend struct CommandBufferDeleter;
-			friend void commandbuffer_set_dirty(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
-			friend CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
-			friend void commandbuffer_init(struct CommandBuffer *self, Device *device, VkCommandBuffer cmd, CommandBufferType type);
-			friend void commandbuffer_fini(struct CommandBuffer *self);
-			friend void commandbuffer_add_reference(struct CommandBuffer *self);
-			friend void commandbuffer_release_reference(struct CommandBuffer *self);
-			friend void commandbuffer_clear_image(struct CommandBuffer *self, const Image &image, const VkClearValue &value);
-			friend void commandbuffer_copy_buffer(struct CommandBuffer *self, const Buffer &dst, VkDeviceSize dst_offset, const Buffer &src, VkDeviceSize src_offset, VkDeviceSize size);
-			friend void commandbuffer_copy_buffer_to_image(struct CommandBuffer *self, const Image &image, const Buffer &buffer, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
-			friend void commandbuffer_copy_buffer_to_image_blits(struct CommandBuffer *self, const Image &image, const Buffer &buffer, unsigned num_blits, const VkBufferImageCopy *blits);
-			friend void commandbuffer_copy_image_to_buffer(struct CommandBuffer *self, const Buffer &dst, const Image &src, VkDeviceSize buffer_offset, const VkOffset3D &offset, const VkExtent3D &extent, unsigned row_length, unsigned slice_height, const VkImageSubresourceLayers &subresrouce);
-			friend void commandbuffer_full_barrier(struct CommandBuffer *self);
-			friend void commandbuffer_pixel_barrier(struct CommandBuffer *self);
-			friend void commandbuffer_barrier_simple(struct CommandBuffer *self, VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage, VkAccessFlags dst_access);
-			friend void commandbuffer_barrier(struct CommandBuffer *self, VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages, unsigned barriers, const VkMemoryBarrier *globals, unsigned buffer_barriers, const VkBufferMemoryBarrier *buffers, unsigned image_barriers, const VkImageMemoryBarrier *images);
-			friend void commandbuffer_image_barrier(struct CommandBuffer *self, const Image &image, VkImageLayout old_layout, VkImageLayout new_layout, VkPipelineStageFlags src_stage, VkAccessFlags src_access, VkPipelineStageFlags dst_stage, VkAccessFlags dst_access);
-			friend void commandbuffer_blit_image(struct CommandBuffer *self, const Image &dst, const Image &src, const VkOffset3D &dst_offset0, const VkOffset3D &dst_extent, const VkOffset3D &src_offset0, const VkOffset3D &src_extent, unsigned dst_level, unsigned src_level, unsigned dst_base_layer, uint32_t src_base_layer, unsigned num_layers, VkFilter filter);
-			friend void commandbuffer_barrier_prepare_generate_mipmap(struct CommandBuffer *self, const Image &image, VkImageLayout base_level_layout, VkPipelineStageFlags src_stage, VkAccessFlags src_access, bool need_top_level_barrier);
-			friend void commandbuffer_generate_mipmap(struct CommandBuffer *self, const Image &image);
-			friend void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo &info, VkSubpassContents contents);
-			friend void commandbuffer_end_render_pass(struct CommandBuffer *self);
-			friend void commandbuffer_set_program(struct CommandBuffer *self, Program &program);
-			friend void commandbuffer_set_scissor(struct CommandBuffer *self, const VkRect2D &rect);
-			friend void commandbuffer_push_constants(struct CommandBuffer *self, const void *data, VkDeviceSize offset, VkDeviceSize range);
-			friend void commandbuffer_flush_render_state(struct CommandBuffer *self);
-			friend VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self, Hash hash);
-			friend VkPipeline commandbuffer_build_compute_pipeline(struct CommandBuffer *self, Hash hash);
-			friend void commandbuffer_flush_graphics_pipeline(struct CommandBuffer *self);
-			friend void commandbuffer_flush_compute_pipeline(struct CommandBuffer *self);
-			friend void commandbuffer_flush_descriptor_sets(struct CommandBuffer *self);
-			friend void commandbuffer_flush_descriptor_set(struct CommandBuffer *self, uint32_t set);
-			friend void commandbuffer_begin_context(struct CommandBuffer *self);
-			friend void commandbuffer_begin_graphics(struct CommandBuffer *self);
-			friend void commandbuffer_begin_compute(struct CommandBuffer *self);
-			friend void commandbuffer_flush_compute_state(struct CommandBuffer *self);
-			friend void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer);
-			friend void commandbuffer_set_buffer_view(struct CommandBuffer *self, unsigned set, unsigned binding, const BufferView &view);
-			friend void commandbuffer_set_input_attachments(struct CommandBuffer *self, unsigned set, unsigned start_binding);
-			friend void commandbuffer_set_texture_raw(struct CommandBuffer *self, unsigned set, unsigned binding, VkImageView float_view, VkImageView integer_view, VkImageLayout layout, uint64_t cookie);
-			friend void commandbuffer_set_texture_view(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view);
-			friend void commandbuffer_set_texture_view_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler);
-			friend void commandbuffer_set_texture_view_stock(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view, StockSampler stock);
-			friend void commandbuffer_set_storage_texture(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view);
-			friend void commandbuffer_set_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const Sampler &sampler);
-			friend void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize range);
-			friend void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
-			friend void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate);
-			friend VkCommandBuffer commandbuffer_get_command_buffer(const struct CommandBuffer *self);
-			friend Device &commandbuffer_get_device(struct CommandBuffer *self);
-			friend void commandbuffer_set_viewport(struct CommandBuffer *self, const VkViewport &viewport);
-			friend const VkViewport &commandbuffer_get_viewport(const struct CommandBuffer *self);
-			friend void commandbuffer_set_vertex_attrib(struct CommandBuffer *self, uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset);
-			friend void commandbuffer_set_vertex_binding(struct CommandBuffer *self, uint32_t binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize stride, VkVertexInputRate step_rate);
-			friend void commandbuffer_set_opaque_state(struct CommandBuffer *self);
-			friend void commandbuffer_set_quad_state(struct CommandBuffer *self);
-			friend void commandbuffer_set_depth_test(struct CommandBuffer *self, bool depth_test, bool depth_write);
-			friend void commandbuffer_set_depth_compare(struct CommandBuffer *self, VkCompareOp depth_compare);
-			friend void commandbuffer_set_blend_enable(struct CommandBuffer *self, bool blend_enable);
-			friend void commandbuffer_set_blend_factors(struct CommandBuffer *self, VkBlendFactor src_color_blend, VkBlendFactor src_alpha_blend, VkBlendFactor dst_color_blend, VkBlendFactor dst_alpha_blend);
-			friend void commandbuffer_set_blend_op(struct CommandBuffer *self, VkBlendOp color_blend_op, VkBlendOp alpha_blend_op);
-			friend void commandbuffer_set_primitive_topology(struct CommandBuffer *self, VkPrimitiveTopology topology);
-			friend void commandbuffer_set_multisample_state(struct CommandBuffer *self, bool alpha_to_coverage, bool alpha_to_one, bool sample_shading);
-			friend void commandbuffer_set_cull_mode(struct CommandBuffer *self, VkCullModeFlags cull_mode);
-			friend void commandbuffer_set_blend_constants(struct CommandBuffer *self, const float blend_constants[4]);
-			friend void commandbuffer_set_specialization_constant_mask(struct CommandBuffer *self, uint32_t spec_constant_mask);
-			friend void commandbuffer_set_specialization_constant(struct CommandBuffer *self, unsigned index, uint32_t value);
-			friend CommandBufferType commandbuffer_get_command_buffer_type(const struct CommandBuffer *self);
-			friend void commandbuffer_draw(struct CommandBuffer *self, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance);
-			friend void commandbuffer_dispatch(struct CommandBuffer *self, uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
-			friend void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color);
-			friend void commandbuffer_end_region(struct CommandBuffer *self);
-			friend void commandbuffer_end(struct CommandBuffer *self);
 
 
 
@@ -5398,8 +5324,6 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 			/* Group D state setters (incl. SET_STATIC_STATE macros) are now free functions. */
 
 
-		private:
-			friend struct Device;
 
 			Device *device;
 			VkCommandBuffer cmd;
