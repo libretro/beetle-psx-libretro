@@ -2792,13 +2792,13 @@ bool context_is_valid(const struct Context *self) { return self->valid; }
 	typedef SingleThreadCounter HandleCounter;
 
 
-	static const unsigned VULKAN_NUM_DESCRIPTOR_SETS = 4;
-	static const unsigned VULKAN_NUM_BINDINGS = 16;
-	static const unsigned VULKAN_NUM_ATTACHMENTS = 8;
-	static const unsigned VULKAN_NUM_VERTEX_ATTRIBS = 16;
-	static const unsigned VULKAN_NUM_VERTEX_BUFFERS = 4;
-	static const unsigned VULKAN_PUSH_CONSTANT_SIZE = 128;
-	static const unsigned VULKAN_NUM_SPEC_CONSTANTS = 8;
+	enum { VULKAN_NUM_DESCRIPTOR_SETS = 4 };
+	enum { VULKAN_NUM_BINDINGS = 16 };
+	enum { VULKAN_NUM_ATTACHMENTS = 8 };
+	enum { VULKAN_NUM_VERTEX_ATTRIBS = 16 };
+	enum { VULKAN_NUM_VERTEX_BUFFERS = 4 };
+	enum { VULKAN_PUSH_CONSTANT_SIZE = 128 };
+	enum { VULKAN_NUM_SPEC_CONSTANTS = 8 };
 
 	struct ImplementationWorkarounds
 	{
@@ -4386,8 +4386,8 @@ void set_immutable_sampler(DescriptorSetLayout &layout, unsigned binding, StockS
 		layout.immutable_sampler_mask |= 1u << binding;
 	}
 
-	static const unsigned VULKAN_NUM_SETS_PER_POOL = 16;
-	static const unsigned VULKAN_DESCRIPTOR_RING_SIZE = 8;
+	enum { VULKAN_NUM_SETS_PER_POOL = 16 };
+	enum { VULKAN_DESCRIPTOR_RING_SIZE = 8 };
 
 	POD_VEC_DECLARE(DescriptorPoolVec, VkDescriptorPool);
 	POD_VEC_DECLARE(DescriptorPoolSizeVec, VkDescriptorPoolSize);
@@ -4825,7 +4825,7 @@ uint32_t framebuffer_get_width(const struct Framebuffer *self) { return self->wi
 uint32_t framebuffer_get_height(const struct Framebuffer *self) { return self->height; }
 const RenderPass *framebuffer_get_compatible_render_pass(const struct Framebuffer *self) { return self->render_pass; }
 
-	static const unsigned VULKAN_FRAMEBUFFER_RING_SIZE = 8;
+	enum { VULKAN_FRAMEBUFFER_RING_SIZE = 8 };
 	/* Lifted to file scope (was nested in FramebufferAllocator). Derives from
 	 * Framebuffer, so th_node is NOT at offset 0 - the ring lists recover the node
 	 * with TH_NODE_OF, which the temp-map macro already uses. */
@@ -6144,10 +6144,10 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
  * atlas.hpp
  * ============================================================ */
 
-	static const unsigned FB_WIDTH = 1024;
-	static const unsigned FB_HEIGHT = 512;
-	static const unsigned BLOCK_WIDTH = 8;
-	static const unsigned BLOCK_HEIGHT = 8;
+	enum { FB_WIDTH = 1024 };
+	enum { FB_HEIGHT = 512 };
+	enum { BLOCK_WIDTH = 8 };
+	enum { BLOCK_HEIGHT = 8 };
 	static const unsigned NUM_BLOCKS_X = FB_WIDTH / BLOCK_WIDTH;
 	static const unsigned NUM_BLOCKS_Y = FB_HEIGHT / BLOCK_HEIGHT;
 
@@ -19935,7 +19935,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 
 	// Number of parallel PNG-decode workers. Keeps first-appearance prefetch
 	// bursts short without starving the emulation/render threads.
-	static const int NUM_IO_THREADS = 4;
+	enum { NUM_IO_THREADS = 4 };
 
 	void io_thread_init(IOThread *t) {
 		io_channel_rc_lock_init();
