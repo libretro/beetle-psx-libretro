@@ -5594,34 +5594,34 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 		struct ObjectPoolRaw fences;
 		struct ObjectPoolRaw semaphores;
 		struct ObjectPoolRaw command_buffers;
-
-		/* For a malloc'd owner (Device), where the pools' constructors and
-		 * destructors do not run: init() puts every pool in the empty state and
-		 * deinit() runs each pool's teardown (free pooled nodes and slabs). */
-		void init()
-		{
-			object_pool_raw_init(&buffers,         sizeof(Buffer));
-			object_pool_raw_init(&images,          sizeof(Image));
-			object_pool_raw_init(&image_views,     sizeof(ImageView));
-			object_pool_raw_init(&buffer_views,    sizeof(BufferView));
-			object_pool_raw_init(&samplers,        sizeof(Sampler));
-			object_pool_raw_init(&fences,          sizeof(FenceHolder));
-			object_pool_raw_init(&semaphores,      sizeof(SemaphoreHolder));
-			object_pool_raw_init(&command_buffers, sizeof(CommandBuffer));
-		}
-
-		void deinit()
-		{
-			object_pool_raw_deinit(&buffers);
-			object_pool_raw_deinit(&images);
-			object_pool_raw_deinit(&image_views);
-			object_pool_raw_deinit(&buffer_views);
-			object_pool_raw_deinit(&samplers);
-			object_pool_raw_deinit(&fences);
-			object_pool_raw_deinit(&semaphores);
-			object_pool_raw_deinit(&command_buffers);
-		}
 	};
+
+	/* For a malloc'd owner (Device), where the pools' constructors and
+	 * destructors do not run: handle_pool_init() puts every pool in the empty
+	 * state and handle_pool_deinit() runs each pool's teardown. */
+	static inline void handle_pool_init(struct HandlePool *self)
+	{
+		object_pool_raw_init(&self->buffers,         sizeof(Buffer));
+		object_pool_raw_init(&self->images,          sizeof(Image));
+		object_pool_raw_init(&self->image_views,     sizeof(ImageView));
+		object_pool_raw_init(&self->buffer_views,    sizeof(BufferView));
+		object_pool_raw_init(&self->samplers,        sizeof(Sampler));
+		object_pool_raw_init(&self->fences,          sizeof(FenceHolder));
+		object_pool_raw_init(&self->semaphores,      sizeof(SemaphoreHolder));
+		object_pool_raw_init(&self->command_buffers, sizeof(CommandBuffer));
+	}
+
+	static inline void handle_pool_deinit(struct HandlePool *self)
+	{
+		object_pool_raw_deinit(&self->buffers);
+		object_pool_raw_deinit(&self->images);
+		object_pool_raw_deinit(&self->image_views);
+		object_pool_raw_deinit(&self->buffer_views);
+		object_pool_raw_deinit(&self->samplers);
+		object_pool_raw_deinit(&self->fences);
+		object_pool_raw_deinit(&self->semaphores);
+		object_pool_raw_deinit(&self->command_buffers);
+	}
 
 	/* Thread-locking primitives used by the Device implementation
 	 * below. Defined here (instead of just before device.cpp's
@@ -16768,7 +16768,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		memset(&self->dma, 0, sizeof(self->dma));
 
 		/* Owning members - establish each one's empty state via its raw-memory init. */
-		self->handle_pool.init();
+		handle_pool_init(&self->handle_pool);
 		deviceallocator_init_empty(&self->managers.memory);
 		fencemanager_init_empty(&self->managers.fence);
 		semaphoremanager_init_empty(&self->managers.semaphore);
@@ -16824,7 +16824,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkPipelineStageVec_free_storage(&self->graphics.wait_stages);
 		VkPipelineStageVec_free_storage(&self->compute.wait_stages);
 		VkPipelineStageVec_free_storage(&self->transfer.wait_stages);
-		self->handle_pool.deinit();
+		handle_pool_deinit(&self->handle_pool);
 	}
 
 	void device_add_wait_semaphore_nolock(Device *self, CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages,
