@@ -3784,53 +3784,40 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		ImageViewHandle *items;
 		int count;
 		int cap;
-
-		ImageViewHandleVec() : items(NULL), count(0), cap(0) {}
-		~ImageViewHandleVec() { destroy(); }
-		ImageViewHandleVec(ImageViewHandleVec &&o) noexcept
-			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-		ImageViewHandleVec &operator=(ImageViewHandleVec &&o) noexcept {
-			if (this != &o) {
-				destroy();
-				items = o.items; count = o.count; cap = o.cap;
-				o.items = NULL; o.count = 0; o.cap = 0;
-			}
-			return *this;
-		}
-		ImageViewHandleVec(const ImageViewHandleVec &) = delete;
-		ImageViewHandleVec &operator=(const ImageViewHandleVec &) = delete;
-
-		void push(ImageViewHandle &&v) {
-			if (count >= cap)
-				grow(cap ? cap * 2 : 8);
-			iv_steal(&items[count], &v);
-			count++;
-		}
-		int size() const { return count; }
-		bool empty() const { return count == 0; }
-		ImageViewHandle &operator[](int i) { return items[i]; }
-		const ImageViewHandle &operator[](int i) const { return items[i]; }
-		ImageViewHandle &front() { return items[0]; }
-
-	private:
-		void grow(int ncap) {
-			ImageViewHandle *nitems = (ImageViewHandle *)malloc((size_t)ncap * sizeof(ImageViewHandle));
-			for (int i = 0; i < count; i++) {
-				/* Move: iv_steal copies the pointer and nulls the old slot,
-				 * so no separate decref of the old slot is needed. */
-				iv_steal(&nitems[i], &items[i]);
-			}
-			free(items);
-			items = nitems;
-			cap = ncap;
-		}
-		void destroy() {
-			for (int i = 0; i < count; i++)
-				iv_reset(&items[i]);
-			free(items);
-			items = NULL; count = 0; cap = 0;
-		}
 	};
+
+	/* ImageViewHandleVec free functions (de-C++'d from a move-only class). init nulls,
+	 * destroy releases every view + frees storage, push moves a view in (growing as
+	 * needed), at/front return element pointers. */
+	static inline void imageview_vec_init(struct ImageViewHandleVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+	static inline void imageview_vec_destroy(struct ImageViewHandleVec *v) {
+		int i;
+		for (i = 0; i < v->count; i++)
+			iv_reset(&v->items[i]);
+		free(v->items);
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
+	static inline void imageview_vec_grow(struct ImageViewHandleVec *v, int ncap) {
+		ImageViewHandle *nitems = (ImageViewHandle *)malloc((size_t)ncap * sizeof(ImageViewHandle));
+		int i;
+		for (i = 0; i < v->count; i++) {
+			/* Move: iv_steal copies the pointer and nulls the old slot,
+			 * so no separate decref of the old slot is needed. */
+			iv_steal(&nitems[i], &v->items[i]);
+		}
+		free(v->items);
+		v->items = nitems;
+		v->cap = ncap;
+	}
+	static inline void imageview_vec_push(struct ImageViewHandleVec *v, ImageViewHandle iv) {
+		if (v->count >= v->cap)
+			imageview_vec_grow(v, v->cap ? v->cap * 2 : 8);
+		iv_steal(&v->items[v->count], &iv);
+		v->count++;
+	}
+	static inline int imageview_vec_size(const struct ImageViewHandleVec *v) { return v->count; }
+	static inline ImageViewHandle *imageview_vec_at(struct ImageViewHandleVec *v, int i) { return &v->items[i]; }
+	static inline ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->items[0]; }
 
 	enum ImageDomain {
 		ImageDomain_Physical,
@@ -9466,6 +9453,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	 * was de-C++'d; seed them here (was implicit at construction). */
 	render_state_init(&render_state);
 	opaque_queue_init(&queue);
+	imageview_vec_init(&scaled_views); /* was default-constructed; now a plain struct */
 	last_scanout.data            = NULL;
 	reuseable_scanout.data       = NULL;
 	fbatlas_init(&atlas);
@@ -9558,7 +9546,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 		{
 			view_info.base_level = i;
 			view_info.levels = 1;
-			scaled_views.push(device->create_image_view(view_info));
+			imageview_vec_push(&scaled_views, device->create_image_view(view_info));
 		}
 	}
 
@@ -9937,7 +9925,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 		rect.y = 0;
 		rect.height = FB_HEIGHT;
 	}
-	unsigned levels = self->scaled_views.size();
+	unsigned levels = imageview_vec_size(&self->scaled_views);
 
 	renderer_ensure_command_buffer(self);
 	for (unsigned i = 1; i <= levels; i++)
@@ -9948,7 +9936,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 		if (i == levels)
 			rp.color_attachments[0] = &image_get_view(ih_get(&self->bias_framebuffer));
 		else
-			rp.color_attachments[0] = iv_get(&self->scaled_views[i]);
+			rp.color_attachments[0] = iv_get(imageview_vec_at(&self->scaled_views, i));
 
 		rp.num_color_attachments = 1;
 		rp.store_attachments = 1;
@@ -9971,7 +9959,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 		else
 			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.mipmap_energy);
 
-		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[i - 1]), StockSampler_LinearClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(imageview_vec_at(&self->scaled_views, i - 1)), StockSampler_LinearClamp);
 
 		commandbuffer_set_quad_state(cbh_get(&self->cmd));
 		commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, *bh_get(&self->quad), 0, 8);
@@ -10048,7 +10036,7 @@ void renderer_ssaa_framebuffer(Renderer *self)
 	if (self->msaa > 1)
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 	else
-		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, *iv_get(&self->scaled_views[0]), StockSampler_LinearClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, *iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearClamp);
 
 	struct Push
 	{
@@ -10248,7 +10236,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	if (scaled)
 	{
 		commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.scaled_quad_blitter);
-		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[0]), StockSampler_LinearClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearClamp);
 	}
 	else
 	{
@@ -10270,7 +10258,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 		          { float(vram_rect.width) / FB_WIDTH, float(vram_rect.height) / FB_HEIGHT },
 		          { (vram_rect.x + 0.5f) / FB_WIDTH, (vram_rect.y + 0.5f) / FB_HEIGHT },
 		          { (vram_rect.x + vram_rect.width - 0.5f) / FB_WIDTH, (vram_rect.y + vram_rect.height - 0.5f) / FB_HEIGHT },
-		          float(self->scaled_views.size() - 1) };
+		          float(imageview_vec_size(&self->scaled_views) - 1) };
 
 	commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
@@ -10468,7 +10456,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		else
 			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.scaled_quad_blitter);
 
-		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[0]), StockSampler_LinearWrap);
+		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearWrap);
 	}
 	else
 	{
@@ -10526,7 +10514,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		          { float(rect.width) / FB_WIDTH, float(rect.height) / FB_HEIGHT },
 		          { (rect.x + 0.5f) / FB_WIDTH, (rect.y + 0.5f) / FB_HEIGHT },
 		          { (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
-		          float(self->scaled_views.size() - 1) };
+		          float(imageview_vec_size(&self->scaled_views) - 1) };
 
 	commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
@@ -10628,7 +10616,7 @@ void renderer_flush_resolves(Renderer *self)
 		if (self->msaa > 1)
 			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer_msaa)));
 		else
-			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[0]));
+			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, *iv_get(imageview_vec_at(&self->scaled_views, 0)));
 
 		unsigned size = Rect2DVec_size(&self->queue.scaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
@@ -10656,7 +10644,7 @@ void renderer_flush_resolves(Renderer *self)
 		if (self->msaa > 1)
 			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		else
-			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, *iv_get(&self->scaled_views[0]), StockSampler_NearestClamp);
+			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, *iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_NearestClamp);
 
 		unsigned size = Rect2DVec_size(&self->queue.unscaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
@@ -11233,7 +11221,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect &rect)
 	if (self->msaa > 1)
 		info.color_attachments[0] = &image_get_view(ih_get(&self->scaled_framebuffer_msaa));
 	else
-		info.color_attachments[0] = iv_get(&self->scaled_views.front());
+		info.color_attachments[0] = iv_get(imageview_vec_front(&self->scaled_views));
 
 	info.clear_depth_stencil = { 1.0f, 0 };
 	info.depth_stencil =
@@ -11302,7 +11290,7 @@ void renderer_dispatch_set_scaled_read_texture(Renderer *self, bool scaled_read,
 		if (self->msaa > 1)
 			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		else
-			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[0]), StockSampler_NearestClamp);
+			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_NearestClamp);
 	}
 	else
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
@@ -11595,8 +11583,8 @@ void renderer_flush_blit(Renderer *self, const BlitInfoVec &infos, Program &prog
 		}
 		else
 		{
-			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[0]));
-			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, *iv_get(&self->scaled_views[0]), StockSampler_NearestClamp);
+			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, *iv_get(imageview_vec_at(&self->scaled_views, 0)));
+			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, *iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_NearestClamp);
 		}
 	}
 	else
@@ -11672,7 +11660,7 @@ void renderer_blit_vram(Renderer *self, const Rect &dst, const Rect &src){
 			}
 			else
 			{
-				commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[0]));
+				commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, *iv_get(imageview_vec_at(&self->scaled_views, 0)));
 				commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ? *self->pipelines.blit_vram_cached_scaled_masked :
 														*self->pipelines.blit_vram_cached_scaled);
 				commandbuffer_dispatch(cbh_get(&self->cmd), factor, factor, 1);
@@ -11847,6 +11835,7 @@ Renderer::~Renderer()
 	ih_reset(&last_scanout);
 	ih_reset(&reuseable_scanout);
 	bh_reset(&quad);
+	imageview_vec_destroy(&scaled_views); /* release scaled image views (was member dtor) */
 	/* Free the per-frame draw-queue arrays (POD_VEC backing storage). */
 	BufferVertexVec_free_storage(&queue.opaque);
 	PrimitiveInfoVec_free_storage(&queue.opaque_scissor);
@@ -11900,7 +11889,7 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 		if (self->msaa > 1)
 			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		else
-			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[0]), StockSampler_NearestClamp);
+			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_NearestClamp);
 	}
 	else
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
