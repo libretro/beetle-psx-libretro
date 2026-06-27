@@ -5303,6 +5303,13 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 		uint32_t words[4];
 	};
 	typedef union PipelineState PipelineState;
+#ifndef _MSC_VER
+	/* The words[] overlay must cover the hashable State (moved here from inside
+	 * struct CommandBuffer: C can't evaluate sizeof on a member expression at
+	 * struct-definition scope, so the invariant is asserted on the union type). */
+	RHI_STATIC_ASSERT(sizeof(((union PipelineState *)0)->words) >= sizeof(((union PipelineState *)0)->state),
+			"Hashable pipeline state is not large enough!");
+#endif
 
 	struct PotentialState
 	{
@@ -5431,10 +5438,6 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 
 			PipelineState static_state;
 			PotentialState potential_static_state;
-#ifndef _MSC_VER
-			RHI_STATIC_ASSERT(sizeof(static_state.words) >= sizeof(static_state.state),
-					"Hashable pipeline state is not large enough!");
-#endif
 
 
 
