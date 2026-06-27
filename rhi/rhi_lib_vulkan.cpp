@@ -8732,9 +8732,37 @@ extern retro_log_printf_t log_cb;
 	static inline const uint32_t *owned_u32_data(const struct OwnedU32Buf *b) { return b->items; }
 	static inline bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
+	/* Specialization-constant slot indices for the Renderer pipelines. Hoisted out
+	 * of the Renderer class to file scope so the class -> C struct conversion's free
+	 * functions can name them. (TransMode and Samples share index 0 by design --
+	 * they are used in different pipeline stages.) */
+	enum
+	{
+		SpecConstIndex_TransMode = 0,
+		SpecConstIndex_FilterMode = 1,
+		SpecConstIndex_BlendMode = 2,
+		SpecConstIndex_Scaling = 3,
+		SpecConstIndex_Shift = 4,
+		SpecConstIndex_OffsetUV = 5,
+		SpecConstIndex_Samples = 0
+	};
+
 	class Renderer
 	{
 		public:
+			/* batch out-of-line methods -> free functions (need private access). */
+			friend void renderer_init_primitive_pipelines(Renderer *self);
+			friend void renderer_init_primitive_feedback_pipelines(Renderer *self);
+			friend void renderer_init_pipelines(Renderer *self);
+			friend void renderer_mipmap_framebuffer(Renderer *self);
+			friend void renderer_ssaa_framebuffer(Renderer *self);
+			friend Rect renderer_compute_vram_framebuffer_rect(Renderer *self);
+			friend DisplayRect renderer_compute_display_rect(Renderer *self);
+			friend void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_index);
+			friend bool renderer_primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b);
+			friend void renderer_flush_resolves(Renderer *self);
+			friend void renderer_flush_blits(Renderer *self);
+			friend void renderer_flush_blit(Renderer *self, const BlitInfoVec &infos, Program &program, bool scaled);
 			/* batch-4 out-of-line methods -> free functions (need private access). */
 			friend void renderer_set_draw_rect(Renderer *self, const Rect &rect);
 			friend void renderer_clear_rect(Renderer *self, const Rect &rect, uint32_t fb_color);
@@ -8887,16 +8915,6 @@ extern retro_log_printf_t log_cb;
 
 
 
-			enum
-			{
-				SpecConstIndex_TransMode = 0,
-				SpecConstIndex_FilterMode = 1,
-				SpecConstIndex_BlendMode = 2,
-				SpecConstIndex_Scaling = 3,
-				SpecConstIndex_Shift = 4,
-				SpecConstIndex_OffsetUV = 5,
-				SpecConstIndex_Samples = 0,
-			};
 
 
 
@@ -8945,7 +8963,6 @@ extern retro_log_printf_t log_cb;
 			ImageHandle create_texture(int width, int height, int levels);
 
 		private:
-			void hd_texture_uniforms(HdTextureHandle hd_texture_index);
 			HdTextureHandle get_hd_texture_index(const Rect &uvlimits, bool &fastpath_capable_out, bool &cache_hit_out);
 
 			struct
@@ -8990,9 +9007,6 @@ extern retro_log_printf_t log_cb;
 
 			ImageHandle dither_lut;
 
-			void init_pipelines();
-			void init_primitive_pipelines();
-			void init_primitive_feedback_pipelines();
 			void ensure_command_buffer();
 
 			RenderState render_state;
@@ -9004,7 +9018,6 @@ extern retro_log_printf_t log_cb;
 			float last_uv_scale_x, last_uv_scale_y;
 
 			void dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &scissors, bool textured = false);
-			static bool primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b);
 			static int primitive_info_qsort_cmp(const void *a, const void *b);
 			void render_opaque_primitives();
 			void render_opaque_texture_primitives();
@@ -9022,9 +9035,6 @@ extern retro_log_printf_t log_cb;
 			BufferVertexVec *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
 					bool filtering, bool scaled_read, unsigned shift, bool offset_uv);
 
-			void flush_resolves();
-			void flush_blits();
-			void flush_blit(const BlitInfoVec &infos, Program &program, bool scaled);
 			void reset_scissor_queue();
 			const ClearCandidate *find_clear_candidate(const Rect &rect) const;
 
@@ -9032,12 +9042,8 @@ extern retro_log_printf_t log_cb;
 
 			ImageHandle last_scanout;
 			ImageHandle reuseable_scanout;
-			DisplayRect compute_display_rect();
 
-			Rect compute_vram_framebuffer_rect();
 
-			void mipmap_framebuffer();
-			void ssaa_framebuffer();
 			BufferHandle quad = { NULL };
 	};
 
@@ -9611,7 +9617,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	fbatlas_set_hazard_listener(&atlas, this);
 	texture_tracker_set_texture_uploader(&tracker, this);
 
-	init_pipelines();
+	renderer_init_pipelines(this);
 
 	renderer_ensure_command_buffer(this);
 	commandbuffer_clear_image(cbh_get(&cmd), *ih_get(&scaled_framebuffer), {});
@@ -9679,141 +9685,141 @@ Renderer::SaveState Renderer::save_vram_state()
 	return out;
 }
 
-void Renderer::init_primitive_pipelines()
+void renderer_init_primitive_pipelines(Renderer *self)
 {
-	if (msaa > 1 || scaling > 1)
-		pipelines.flat = device->request_program(flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
+	if (self->msaa > 1 || self->scaling > 1)
+		self->pipelines.flat = self->device->request_program(flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
 	else
-		pipelines.flat = device->request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_frag, sizeof(flat_frag));
+		self->pipelines.flat = self->device->request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_frag, sizeof(flat_frag));
 
-	if (msaa > 1)
+	if (self->msaa > 1)
 	{
-		pipelines.textured_scaled = device->request_program(textured_vert, sizeof(textured_vert), textured_msaa_frag, sizeof(textured_msaa_frag));
-		pipelines.textured_unscaled = device->request_program(textured_vert, sizeof(textured_vert), textured_msaa_unscaled_frag, sizeof(textured_msaa_unscaled_frag));
+		self->pipelines.textured_scaled = self->device->request_program(textured_vert, sizeof(textured_vert), textured_msaa_frag, sizeof(textured_msaa_frag));
+		self->pipelines.textured_unscaled = self->device->request_program(textured_vert, sizeof(textured_vert), textured_msaa_unscaled_frag, sizeof(textured_msaa_unscaled_frag));
 	}
 	else
 	{
-		if (scaling > 1)
+		if (self->scaling > 1)
 		{
-			pipelines.textured_scaled = device->request_program(textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
-			pipelines.textured_unscaled = device->request_program(textured_vert, sizeof(textured_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+			self->pipelines.textured_scaled = self->device->request_program(textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
+			self->pipelines.textured_unscaled = self->device->request_program(textured_vert, sizeof(textured_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
 		}
 		else
 		{
-			pipelines.textured_scaled = device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_frag, sizeof(textured_frag));
-			pipelines.textured_unscaled = device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+			self->pipelines.textured_scaled = self->device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_frag, sizeof(textured_frag));
+			self->pipelines.textured_unscaled = self->device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
 		}
 	}
 }
 
-void Renderer::init_primitive_feedback_pipelines()
+void renderer_init_primitive_feedback_pipelines(Renderer *self)
 {
-	// TODO: The masked pipelines do not have filter options.
-	if (msaa > 1)
+	// TODO: The masked self->pipelines do not have filter options.
+	if (self->msaa > 1)
 	{
-		pipelines.textured_masked_scaled = device->request_program(textured_vert, sizeof(textured_vert),
+		self->pipelines.textured_masked_scaled = self->device->request_program(textured_vert, sizeof(textured_vert),
 				feedback_msaa_frag, sizeof(feedback_msaa_frag));
-		pipelines.textured_masked_unscaled = device->request_program(textured_vert, sizeof(textured_vert),
+		self->pipelines.textured_masked_unscaled = self->device->request_program(textured_vert, sizeof(textured_vert),
 				feedback_msaa_unscaled_frag, sizeof(feedback_msaa_unscaled_frag));
-		pipelines.flat_masked = device->request_program(flat_vert, sizeof(flat_vert),
+		self->pipelines.flat_masked = self->device->request_program(flat_vert, sizeof(flat_vert),
 				feedback_msaa_flat_frag, sizeof(feedback_msaa_flat_frag));
 	}
 	else
 	{
-		if (scaling > 1)
+		if (self->scaling > 1)
 		{
-			pipelines.flat_masked = device->request_program(flat_vert, sizeof(flat_vert),
+			self->pipelines.flat_masked = self->device->request_program(flat_vert, sizeof(flat_vert),
 					feedback_flat_frag, sizeof(feedback_flat_frag));
-			pipelines.textured_masked_scaled = device->request_program(textured_vert, sizeof(textured_vert),
+			self->pipelines.textured_masked_scaled = self->device->request_program(textured_vert, sizeof(textured_vert),
 					feedback_frag, sizeof(feedback_frag));
-			pipelines.textured_masked_unscaled = device->request_program(textured_vert, sizeof(textured_vert),
+			self->pipelines.textured_masked_unscaled = self->device->request_program(textured_vert, sizeof(textured_vert),
 					feedback_unscaled_frag, sizeof(feedback_unscaled_frag));
 		}
 		else
 		{
-			pipelines.flat_masked = device->request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert),
+			self->pipelines.flat_masked = self->device->request_program(flat_unscaled_vert, sizeof(flat_unscaled_vert),
 					feedback_flat_frag, sizeof(feedback_flat_frag));
-			pipelines.textured_masked_scaled = device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
+			self->pipelines.textured_masked_scaled = self->device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
 					feedback_frag, sizeof(feedback_frag));
-			pipelines.textured_masked_unscaled = device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
+			self->pipelines.textured_masked_unscaled = self->device->request_program(textured_unscaled_vert, sizeof(textured_unscaled_vert),
 					feedback_unscaled_frag, sizeof(feedback_unscaled_frag));
 		}
 	}
 }
 
-void Renderer::init_pipelines()
+void renderer_init_pipelines(Renderer *self)
 {
-	if (msaa > 1)
-		pipelines.resolve_to_unscaled = device->request_program(resolve_msaa_to_unscaled, sizeof(resolve_msaa_to_unscaled));
+	if (self->msaa > 1)
+		self->pipelines.resolve_to_unscaled = self->device->request_program(resolve_msaa_to_unscaled, sizeof(resolve_msaa_to_unscaled));
 	else
-		pipelines.resolve_to_unscaled = device->request_program(resolve_to_unscaled, sizeof(resolve_to_unscaled));
+		self->pipelines.resolve_to_unscaled = self->device->request_program(resolve_to_unscaled, sizeof(resolve_to_unscaled));
 
-	pipelines.scaled_quad_blitter =
-		device->request_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
-	pipelines.scaled_dither_quad_blitter =
-		device->request_program(quad_vert, sizeof(quad_vert), scaled_dither_quad_frag, sizeof(scaled_dither_quad_frag));
-	pipelines.bpp24_quad_blitter =
-		device->request_program(quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
-	pipelines.bpp24_yuv_quad_blitter =
-		device->request_program(quad_vert, sizeof(quad_vert), bpp24_yuv_quad_frag, sizeof(bpp24_yuv_quad_frag));
-	pipelines.unscaled_quad_blitter =
-		device->request_program(quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
-	pipelines.unscaled_dither_quad_blitter =
-		device->request_program(quad_vert, sizeof(quad_vert), unscaled_dither_quad_frag, sizeof(unscaled_dither_quad_frag));
+	self->pipelines.scaled_quad_blitter =
+		self->device->request_program(quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
+	self->pipelines.scaled_dither_quad_blitter =
+		self->device->request_program(quad_vert, sizeof(quad_vert), scaled_dither_quad_frag, sizeof(scaled_dither_quad_frag));
+	self->pipelines.bpp24_quad_blitter =
+		self->device->request_program(quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
+	self->pipelines.bpp24_yuv_quad_blitter =
+		self->device->request_program(quad_vert, sizeof(quad_vert), bpp24_yuv_quad_frag, sizeof(bpp24_yuv_quad_frag));
+	self->pipelines.unscaled_quad_blitter =
+		self->device->request_program(quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
+	self->pipelines.unscaled_dither_quad_blitter =
+		self->device->request_program(quad_vert, sizeof(quad_vert), unscaled_dither_quad_frag, sizeof(unscaled_dither_quad_frag));
 
-	pipelines.copy_to_vram = device->request_program(copy_vram_comp, sizeof(copy_vram_comp));
-	pipelines.copy_to_vram_masked = device->request_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
+	self->pipelines.copy_to_vram = self->device->request_program(copy_vram_comp, sizeof(copy_vram_comp));
+	self->pipelines.copy_to_vram_masked = self->device->request_program(copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
 
-	if (msaa > 1)
+	if (self->msaa > 1)
 	{
-		pipelines.resolve_to_scaled =
-			device->request_program(resolve_to_msaa_scaled, sizeof(resolve_to_msaa_scaled));
+		self->pipelines.resolve_to_scaled =
+			self->device->request_program(resolve_to_msaa_scaled, sizeof(resolve_to_msaa_scaled));
 
-		pipelines.blit_vram_scaled =
-			device->request_program(blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
-		pipelines.blit_vram_scaled_masked =
-			device->request_program(blit_vram_msaa_scaled_masked_comp, sizeof(blit_vram_msaa_scaled_masked_comp));
-		pipelines.blit_vram_msaa_cached_scaled =
-			device->request_program(blit_vram_msaa_cached_scaled_comp, sizeof(blit_vram_msaa_cached_scaled_comp));
-		pipelines.blit_vram_msaa_cached_scaled_masked =
-			device->request_program(blit_vram_msaa_cached_scaled_masked_comp, sizeof(blit_vram_msaa_cached_scaled_masked_comp));
+		self->pipelines.blit_vram_scaled =
+			self->device->request_program(blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
+		self->pipelines.blit_vram_scaled_masked =
+			self->device->request_program(blit_vram_msaa_scaled_masked_comp, sizeof(blit_vram_msaa_scaled_masked_comp));
+		self->pipelines.blit_vram_msaa_cached_scaled =
+			self->device->request_program(blit_vram_msaa_cached_scaled_comp, sizeof(blit_vram_msaa_cached_scaled_comp));
+		self->pipelines.blit_vram_msaa_cached_scaled_masked =
+			self->device->request_program(blit_vram_msaa_cached_scaled_masked_comp, sizeof(blit_vram_msaa_cached_scaled_masked_comp));
 	}
 	else
 	{
-		pipelines.resolve_to_scaled = device->request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
+		self->pipelines.resolve_to_scaled = self->device->request_program(resolve_to_scaled, sizeof(resolve_to_scaled));
 
-		pipelines.blit_vram_scaled = device->request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
-		pipelines.blit_vram_scaled_masked =
-			device->request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
+		self->pipelines.blit_vram_scaled = self->device->request_program(blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
+		self->pipelines.blit_vram_scaled_masked =
+			self->device->request_program(blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
 	}
 
-	pipelines.blit_vram_cached_scaled =
-		device->request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
-	pipelines.blit_vram_cached_scaled_masked =
-		device->request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
+	self->pipelines.blit_vram_cached_scaled =
+		self->device->request_program(blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
+	self->pipelines.blit_vram_cached_scaled_masked =
+		self->device->request_program(blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
 
-	pipelines.blit_vram_unscaled = device->request_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
-	pipelines.blit_vram_unscaled_masked =
-		device->request_program(blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
-	pipelines.blit_vram_cached_unscaled =
-		device->request_program(blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
-	pipelines.blit_vram_cached_unscaled_masked =
-		device->request_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
+	self->pipelines.blit_vram_unscaled = self->device->request_program(blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
+	self->pipelines.blit_vram_unscaled_masked =
+		self->device->request_program(blit_vram_unscaled_masked_comp, sizeof(blit_vram_unscaled_masked_comp));
+	self->pipelines.blit_vram_cached_unscaled =
+		self->device->request_program(blit_vram_cached_unscaled_comp, sizeof(blit_vram_cached_unscaled_comp));
+	self->pipelines.blit_vram_cached_unscaled_masked =
+		self->device->request_program(blit_vram_cached_unscaled_masked_comp, sizeof(blit_vram_cached_unscaled_masked_comp));
 
-	pipelines.mipmap_resolve =
-		device->request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
-	pipelines.mipmap_dither_resolve =
-		device->request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
+	self->pipelines.mipmap_resolve =
+		self->device->request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
+	self->pipelines.mipmap_dither_resolve =
+		self->device->request_program(mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
 
-	pipelines.mipmap_energy = device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+	self->pipelines.mipmap_energy = self->device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_frag, sizeof(mipmap_energy_frag));
-	pipelines.mipmap_energy_first = device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+	self->pipelines.mipmap_energy_first = self->device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_first_frag, sizeof(mipmap_energy_first_frag));
-	pipelines.mipmap_energy_blur = device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
+	self->pipelines.mipmap_energy_blur = self->device->request_program(mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
 			mipmap_energy_blur_frag, sizeof(mipmap_energy_blur_frag));
 
-	init_primitive_pipelines();
-	init_primitive_feedback_pipelines();
+	renderer_init_primitive_pipelines(self);
+	renderer_init_primitive_feedback_pipelines(self);
 }
 
 void renderer_set_draw_rect(Renderer *self, const Rect &rect)
@@ -9917,10 +9923,10 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	fence_reset(&fence);
 }
 
-void Renderer::mipmap_framebuffer()
+void renderer_mipmap_framebuffer(Renderer *self)
 {
-	// render_state.display_fb_rect = compute_vram_framebuffer_rect();
-	Rect rect = render_state.display_fb_rect;
+	// self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
+	Rect rect = self->render_state.display_fb_rect;
 	if (rect.x + rect.width > FB_WIDTH)
 	{
 		rect.x = 0;
@@ -9931,18 +9937,18 @@ void Renderer::mipmap_framebuffer()
 		rect.y = 0;
 		rect.height = FB_HEIGHT;
 	}
-	unsigned levels = scaled_views.size();
+	unsigned levels = self->scaled_views.size();
 
-	renderer_ensure_command_buffer(this);
+	renderer_ensure_command_buffer(self);
 	for (unsigned i = 1; i <= levels; i++)
 	{
 		RenderPassInfo rp;
-		unsigned current_scale = max_(scaling >> i, 1u);
+		unsigned current_scale = max_(self->scaling >> i, 1u);
 
 		if (i == levels)
-			rp.color_attachments[0] = &image_get_view(ih_get(&bias_framebuffer));
+			rp.color_attachments[0] = &image_get_view(ih_get(&self->bias_framebuffer));
 		else
-			rp.color_attachments[0] = iv_get(&scaled_views[i]);
+			rp.color_attachments[0] = iv_get(&self->scaled_views[i]);
 
 		rp.num_color_attachments = 1;
 		rp.store_attachments = 1;
@@ -9951,24 +9957,24 @@ void Renderer::mipmap_framebuffer()
 
 		if (i == levels)
 		{
-			commandbuffer_image_barrier(cbh_get(&cmd), *ih_get(&bias_framebuffer), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->bias_framebuffer), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 		}
 
-		commandbuffer_begin_render_pass(cbh_get(&cmd), rp);
+		commandbuffer_begin_render_pass(cbh_get(&self->cmd), rp);
 
 		if (i == levels)
-			commandbuffer_set_program(cbh_get(&cmd), *pipelines.mipmap_energy_blur);
+			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.mipmap_energy_blur);
 		else if (i == 1)
-			commandbuffer_set_program(cbh_get(&cmd), *pipelines.mipmap_energy_first);
+			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.mipmap_energy_first);
 		else
-			commandbuffer_set_program(cbh_get(&cmd), *pipelines.mipmap_energy);
+			commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.mipmap_energy);
 
-		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[i - 1]), StockSampler_LinearClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[i - 1]), StockSampler_LinearClamp);
 
-		commandbuffer_set_quad_state(cbh_get(&cmd));
-		commandbuffer_set_vertex_binding(cbh_get(&cmd), 0, *bh_get(&quad), 0, 8);
+		commandbuffer_set_quad_state(cbh_get(&self->cmd));
+		commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, *bh_get(&self->quad), 0, 8);
 		struct Push
 		{
 			float offset[2];
@@ -9984,23 +9990,23 @@ void Renderer::mipmap_framebuffer()
 			{ (rect.x + 0.5f) / FB_WIDTH, (rect.y + 0.5f) / FB_HEIGHT },
 			{ (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
 		};
-		commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-		commandbuffer_set_vertex_attrib(cbh_get(&cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
-		commandbuffer_set_primitive_topology(cbh_get(&cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-		commandbuffer_draw(cbh_get(&cmd), 4);
+		commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+		commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+		commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+		commandbuffer_draw(cbh_get(&self->cmd), 4);
 
-		commandbuffer_end_render_pass(cbh_get(&cmd));
+		commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
 		if (i == levels)
 		{
-			commandbuffer_image_barrier(cbh_get(&cmd), *ih_get(&bias_framebuffer), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->bias_framebuffer), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
 		}
 		else
 		{
-			commandbuffer_image_barrier(cbh_get(&cmd), *ih_get(&scaled_framebuffer), VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+			commandbuffer_image_barrier(cbh_get(&self->cmd), *ih_get(&self->scaled_framebuffer), VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
@@ -10008,10 +10014,10 @@ void Renderer::mipmap_framebuffer()
 	}
 }
 
-void Renderer::ssaa_framebuffer()
+void renderer_ssaa_framebuffer(Renderer *self)
 {
-	// render_state.display_fb_rect = compute_vram_framebuffer_rect();
-	Rect &rect = render_state.display_fb_rect;
+	// self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
+	Rect &rect = self->render_state.display_fb_rect;
 	unsigned left = rect.x / BLOCK_WIDTH;
 	unsigned top = rect.y / BLOCK_HEIGHT;
 	unsigned right = (rect.x + rect.width + BLOCK_WIDTH - 1) / BLOCK_WIDTH;
@@ -10032,17 +10038,17 @@ void Renderer::ssaa_framebuffer()
 			resolves_ssaa[resolves_n++] = r;
 		}
 
-	renderer_ensure_command_buffer(this);
+	renderer_ensure_command_buffer(self);
 
-	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Samples, msaa);
-	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_FilterMode, 1);
-	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Scaling, scaling);
-	commandbuffer_set_program(cbh_get(&cmd), *pipelines.resolve_to_unscaled);
-	commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer_ssaa)));
-	if (msaa > 1)
-		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
+	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
+	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, 1);
+	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
+	commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.resolve_to_unscaled);
+	commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer_ssaa)));
+	if (self->msaa > 1)
+		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 	else
-		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, *iv_get(&self->scaled_views[0]), StockSampler_LinearClamp);
 
 	struct Push
 	{
@@ -10055,19 +10061,19 @@ void Renderer::ssaa_framebuffer()
 		unsigned to_run = min_(size - i, 1024u);
 
 		Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
-		commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
+		commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
 		memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
-		commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
-		commandbuffer_dispatch(cbh_get(&cmd), 1, 1, to_run);
+		commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
+		commandbuffer_dispatch(cbh_get(&self->cmd), 1, 1, to_run);
 	}
 	free(resolves_ssaa);
 }
 
-Rect Renderer::compute_vram_framebuffer_rect()
+Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
 {
 	unsigned clock_div;
-	switch (render_state.width_mode)
+	switch (self->render_state.width_mode)
 	{
 	case WidthMode_WIDTH_MODE_256:
 		clock_div = 10;
@@ -10086,23 +10092,23 @@ Rect Renderer::compute_vram_framebuffer_rect()
 		break;
 	}
 
-	unsigned fb_width = (unsigned) (render_state.horiz_end - render_state.horiz_start);
+	unsigned fb_width = (unsigned) (self->render_state.horiz_end - self->render_state.horiz_start);
 	fb_width /= clock_div;
 	fb_width = (fb_width + 2) & ~3;
 
-	unsigned fb_height = (unsigned) (render_state.vert_end - render_state.vert_start);
-	fb_height *= render_state.is_480i ? 2 : 1;
+	unsigned fb_height = (unsigned) (self->render_state.vert_end - self->render_state.vert_start);
+	fb_height *= self->render_state.is_480i ? 2 : 1;
 
-	return {render_state.display_fb_xstart,
-	        render_state.display_fb_ystart,
+	return {self->render_state.display_fb_xstart,
+	        self->render_state.display_fb_ystart,
 	        fb_width,
 	        fb_height};
 }
 
-DisplayRect Renderer::compute_display_rect()
+DisplayRect renderer_compute_display_rect(Renderer *self)
 {
 	unsigned clock_div;
-	switch (render_state.width_mode)
+	switch (self->render_state.width_mode)
 	{
 	case WidthMode_WIDTH_MODE_256:
 		clock_div = 10;
@@ -10123,53 +10129,53 @@ DisplayRect Renderer::compute_display_rect()
 
 	unsigned display_width;
 	int left_offset;
-	if (render_state.crop_overscan)
+	if (self->render_state.crop_overscan)
 	{
 		// Horizontal crop amount is currently hardcoded. Future improvement could allow adjusting this.
-		// Restore old center behaviour is render_state.horiz_start is intentionally very high.
+		// Restore old center behaviour is self->render_state.horiz_start is intentionally very high.
 		// 938 fixes Gunbird (1008) and Mobile Light Force (EU release of Gunbird),
 		// but this value should be lowerer in the future if necessary.
-		display_width = (2560/clock_div) - render_state.image_crop;
-		if ((render_state.horiz_start < 938) && (render_state.crop_overscan == 2))
-			left_offset = floor((render_state.offset_cycles / (double) clock_div) - (render_state.image_crop / 2));
+		display_width = (2560/clock_div) - self->render_state.image_crop;
+		if ((self->render_state.horiz_start < 938) && (self->render_state.crop_overscan == 2))
+			left_offset = floor((self->render_state.offset_cycles / (double) clock_div) - (self->render_state.image_crop / 2));
 		else
-			left_offset = floor(((render_state.horiz_start + render_state.offset_cycles - 608) / (double) clock_div) - (render_state.image_crop / 2));
+			left_offset = floor(((self->render_state.horiz_start + self->render_state.offset_cycles - 608) / (double) clock_div) - (self->render_state.image_crop / 2));
 	}
 	else
 	{
 		display_width = 2800/clock_div;
-		left_offset = floor((render_state.horiz_start + render_state.offset_cycles - 488) / (double) clock_div);
+		left_offset = floor((self->render_state.horiz_start + self->render_state.offset_cycles - 488) / (double) clock_div);
 	}
 
 	unsigned display_height;
 	int upper_offset;
-	if (render_state.crop_overscan == 2)
+	if (self->render_state.crop_overscan == 2)
 	{
-		if (render_state.is_pal)
+		if (self->render_state.is_pal)
 		{
-			display_height = (render_state.vert_end - render_state.vert_start) - (287 - render_state.slend_pal) - render_state.slstart_pal;
-			upper_offset = 0 - render_state.slstart_pal;
+			display_height = (self->render_state.vert_end - self->render_state.vert_start) - (287 - self->render_state.slend_pal) - self->render_state.slstart_pal;
+			upper_offset = 0 - self->render_state.slstart_pal;
 		}
 		else
 		{
-			display_height = (render_state.vert_end - render_state.vert_start) - (239 - render_state.slend) - render_state.slstart;
-			upper_offset = 0 - render_state.slstart;
+			display_height = (self->render_state.vert_end - self->render_state.vert_start) - (239 - self->render_state.slend) - self->render_state.slstart;
+			upper_offset = 0 - self->render_state.slstart;
 		}
 	}
-	if (render_state.crop_overscan != 2 || display_height > (render_state.is_pal ? 288 : 240))
+	if (self->render_state.crop_overscan != 2 || display_height > (self->render_state.is_pal ? 288 : 240))
 	{
-		if (render_state.is_pal)
+		if (self->render_state.is_pal)
 		{
-			display_height = render_state.slend_pal - render_state.slstart_pal + 1;
-			upper_offset = render_state.vert_start - 20 - render_state.slstart_pal;
+			display_height = self->render_state.slend_pal - self->render_state.slstart_pal + 1;
+			upper_offset = self->render_state.vert_start - 20 - self->render_state.slstart_pal;
 		}
 		else
 		{
-			display_height = render_state.slend - render_state.slstart + 1;
-			upper_offset = render_state.vert_start - 16 - render_state.slstart;
+			display_height = self->render_state.slend - self->render_state.slstart + 1;
+			upper_offset = self->render_state.vert_start - 16 - self->render_state.slstart;
 		}
 	}
-	if (render_state.is_480i)
+	if (self->render_state.is_480i)
 	{
 		display_height *= 2;
 		upper_offset   *= 2;
@@ -10293,7 +10299,7 @@ ImageHandle Renderer::scanout_to_texture()
 	if (ih_is_valid(&last_scanout))
 		return last_scanout;
 
-	render_state.display_fb_rect = compute_vram_framebuffer_rect();
+	render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(this);
 	Rect &rect = render_state.display_fb_rect;
 
 	if (rect.width == 0 || rect.height == 0 || !render_state.display_on)
@@ -10362,7 +10368,7 @@ ImageHandle Renderer::scanout_to_texture()
 		fbatlas_read_fragment(&atlas, Domain_Scaled, read_rect);
 
 	if (!bpp24 && ssaa)
-		ssaa_framebuffer();
+		renderer_ssaa_framebuffer(this);
 	else if (msaa > 1)
 	{
 		renderer_ensure_command_buffer(this);
@@ -10391,7 +10397,7 @@ ImageHandle Renderer::scanout_to_texture()
 	}
 
 	if (render_state.adaptive_smoothing && !bpp24 && !ssaa && scaling != 1)
-		mipmap_framebuffer();
+		renderer_mipmap_framebuffer(this);
 
 	renderer_ensure_command_buffer(this);
 
@@ -10399,7 +10405,7 @@ ImageHandle Renderer::scanout_to_texture()
 
 	unsigned render_scale = scaled ? scaling : 1;
 
-	DisplayRect display_rect = compute_display_rect();
+	DisplayRect display_rect = renderer_compute_display_rect(this);
 
 	ImageCreateInfo info = ImageCreateInfo::render_target(
 			display_rect.width * render_scale,
@@ -10595,8 +10601,8 @@ void Renderer::hazard(StatusFlags flags)
 	// If we have out-standing jobs in the compute pipe, issue them into cmdbuffer before injecting the barrier.
 	if (flags & (STATUS_COMPUTE_FB_READ | STATUS_COMPUTE_FB_WRITE | STATUS_COMPUTE_SFB_READ | STATUS_COMPUTE_SFB_WRITE))
 	{
-		flush_blits();
-		flush_resolves();
+		renderer_flush_blits(this);
+		renderer_flush_resolves(this);
 	}
 
 	VK_ASSERT(src_stages);
@@ -10605,7 +10611,7 @@ void Renderer::hazard(StatusFlags flags)
 	commandbuffer_barrier_simple(cbh_get(&cmd), src_stages, src_access, dst_stages, dst_access);
 }
 
-void Renderer::flush_resolves()
+void renderer_flush_resolves(Renderer *self)
 {
 	struct Push
 	{
@@ -10613,61 +10619,61 @@ void Renderer::flush_resolves()
 		uint32_t scale;
 	};
 
-	if (!Rect2DVec_empty(&queue.scaled_resolves))
+	if (!Rect2DVec_empty(&self->queue.scaled_resolves))
 	{
-		renderer_ensure_command_buffer(this);
-		commandbuffer_set_program(cbh_get(&cmd), *pipelines.resolve_to_scaled);
+		renderer_ensure_command_buffer(self);
+		commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.resolve_to_scaled);
 
-		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
-		if (msaa > 1)
-			commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
+		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
+		if (self->msaa > 1)
+			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer_msaa)));
 		else
-			commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[0]));
+			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[0]));
 
-		unsigned size = Rect2DVec_size(&queue.scaled_resolves);
+		unsigned size = Rect2DVec_size(&self->queue.scaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
 		{
 			unsigned to_run = min_(size - i, 1024u);
 
-			Push push = { { 1.0f / (scaling * FB_WIDTH), 1.0f / (scaling * FB_HEIGHT) }, scaling };
-			commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
-			memcpy(ptr, Rect2DVec_data(&queue.scaled_resolves) + i, to_run * sizeof(VkRect2D));
-			commandbuffer_dispatch(cbh_get(&cmd), scaling, scaling, to_run);
+			Push push = { { 1.0f / (self->scaling * FB_WIDTH), 1.0f / (self->scaling * FB_HEIGHT) }, self->scaling };
+			commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
+			memcpy(ptr, Rect2DVec_data(&self->queue.scaled_resolves) + i, to_run * sizeof(VkRect2D));
+			commandbuffer_dispatch(cbh_get(&self->cmd), self->scaling, self->scaling, to_run);
 		}
 	}
 
-	if (!Rect2DVec_empty(&queue.unscaled_resolves))
+	if (!Rect2DVec_empty(&self->queue.unscaled_resolves))
 	{
-		renderer_ensure_command_buffer(this);
+		renderer_ensure_command_buffer(self);
 		// Always use nearest neighbor downscaling to avoid filter artifact (e.g. unwanted black outlines in Vagrant Story)
 		// Supersampling will use a separate pass for downsampling
-		commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Samples, msaa);
-		commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_FilterMode, 0);
-		commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Scaling, scaling);
-		commandbuffer_set_program(cbh_get(&cmd), *pipelines.resolve_to_unscaled);
-		commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)));
-		if (msaa > 1)
-			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
+		commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
+		commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, 0);
+		commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
+		commandbuffer_set_program(cbh_get(&self->cmd), *self->pipelines.resolve_to_unscaled);
+		commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
+		if (self->msaa > 1)
+			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		else
-			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
+			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, *iv_get(&self->scaled_views[0]), StockSampler_NearestClamp);
 
-		unsigned size = Rect2DVec_size(&queue.unscaled_resolves);
+		unsigned size = Rect2DVec_size(&self->queue.unscaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
 		{
 			unsigned to_run = min_(size - i, 1024u);
 
 			Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
-			commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
-			memcpy(ptr, Rect2DVec_data(&queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
-			commandbuffer_set_specialization_constant_mask(cbh_get(&cmd), -1);
-			commandbuffer_dispatch(cbh_get(&cmd), 1, 1, to_run);
+			commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
+			memcpy(ptr, Rect2DVec_data(&self->queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
+			commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
+			commandbuffer_dispatch(cbh_get(&self->cmd), 1, 1, to_run);
 		}
 	}
 
-	Rect2DVec_clear(&queue.scaled_resolves);
-	Rect2DVec_clear(&queue.unscaled_resolves);
+	Rect2DVec_clear(&self->queue.scaled_resolves);
+	Rect2DVec_clear(&self->queue.unscaled_resolves);
 }
 
 void renderer_resolve(Renderer *self, Domain target_domain, unsigned x, unsigned y)
@@ -11317,7 +11323,7 @@ void Renderer::dispatch_set_scaled_read_texture(bool scaled_read, bool textured)
 	}
 }
 
-bool Renderer::primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b)
+bool renderer_primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b)
 {
 	if (a.offset_uv != b.offset_uv)
 		return a.offset_uv > b.offset_uv;
@@ -11339,9 +11345,9 @@ int Renderer::primitive_info_qsort_cmp(const void *pa, const void *pb)
 {
 	const PrimitiveInfo &a = *(const PrimitiveInfo *)(pa);
 	const PrimitiveInfo &b = *(const PrimitiveInfo *)(pb);
-	if (primitive_info_sort_gt(a, b))
+	if (renderer_primitive_info_sort_gt(a, b))
 		return -1;
-	if (primitive_info_sort_gt(b, a))
+	if (renderer_primitive_info_sort_gt(b, a))
 		return 1;
 	return 0;
 }
@@ -11364,7 +11370,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 	unsigned i = 1;
 	unsigned size = PrimitiveInfoVec_size(&scissors);
 
-	hd_texture_uniforms(hd_texture);
+	renderer_hd_texture_uniforms(this, hd_texture);
 	commandbuffer_set_scissor(cbh_get(&cmd), scissor < 0 ? queue.default_scissor : *Rect2DVec_at(&queue.scissors, scissor));
 	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_FilterMode, filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Shift, shift);
@@ -11390,7 +11396,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index != hd_texture) {
 				hd_texture = (*PrimitiveInfoVec_at(&scissors, i)).hd_texture_index;
-				hd_texture_uniforms(hd_texture);
+				renderer_hd_texture_uniforms(this, hd_texture);
 			}
 			if ((*PrimitiveInfoVec_at(&scissors, i)).filtering != filtering) {
 				filtering = (*PrimitiveInfoVec_at(&scissors, i)).filtering;
@@ -11434,9 +11440,9 @@ void Renderer::render_opaque_primitives()
 	dispatch(*vertices, *scissors);
 }
 
-void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
-	HdTexture hd = texture_tracker_get_hd_texture(&tracker, hd_texture_index);
-	commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 4, image_get_view(ih_get(&hd.texture)), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
+void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_index) {
+	HdTexture hd = texture_tracker_get_hd_texture(&self->tracker, hd_texture_index);
+	commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 4, image_get_view(ih_get(&hd.texture)), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
 	// ivec4, ivec4
 	struct HDPush {
 		int32_t vram_rect_x;
@@ -11453,7 +11459,7 @@ void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
 		hd.vram_rect.x, hd.vram_rect.y, hd.vram_rect.width, hd.vram_rect.height,
 		hd.texel_rect.x, hd.texel_rect.y, hd.texel_rect.width, hd.texel_rect.height
 	};
-	commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
+	commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 }
 
 void Renderer::render_semi_transparent_primitives()
@@ -11570,53 +11576,53 @@ void Renderer::render_opaque_texture_primitives()
 	dispatch(*vertices, *scissors, true);
 }
 
-void Renderer::flush_blits()
+void renderer_flush_blits(Renderer *self)
 {
-	renderer_ensure_command_buffer(this);
-	flush_blit(queue.scaled_blits, *pipelines.blit_vram_scaled, true);
-	flush_blit(queue.scaled_masked_blits, *pipelines.blit_vram_scaled_masked, true);
-	flush_blit(queue.unscaled_blits, *pipelines.blit_vram_unscaled, false);
-	flush_blit(queue.unscaled_masked_blits, *pipelines.blit_vram_unscaled_masked, false);
-	BlitInfoVec_clear(&queue.scaled_blits);
-	BlitInfoVec_clear(&queue.scaled_masked_blits);
-	BlitInfoVec_clear(&queue.unscaled_blits);
-	BlitInfoVec_clear(&queue.unscaled_masked_blits);
+	renderer_ensure_command_buffer(self);
+	renderer_flush_blit(self, self->queue.scaled_blits, *self->pipelines.blit_vram_scaled, true);
+	renderer_flush_blit(self, self->queue.scaled_masked_blits, *self->pipelines.blit_vram_scaled_masked, true);
+	renderer_flush_blit(self, self->queue.unscaled_blits, *self->pipelines.blit_vram_unscaled, false);
+	renderer_flush_blit(self, self->queue.unscaled_masked_blits, *self->pipelines.blit_vram_unscaled_masked, false);
+	BlitInfoVec_clear(&self->queue.scaled_blits);
+	BlitInfoVec_clear(&self->queue.scaled_masked_blits);
+	BlitInfoVec_clear(&self->queue.unscaled_blits);
+	BlitInfoVec_clear(&self->queue.unscaled_masked_blits);
 }
 
-void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scaled)
+void renderer_flush_blit(Renderer *self, const BlitInfoVec &infos, Program &program, bool scaled)
 {
 	if (BlitInfoVec_empty(&infos))
 		return;
 
-	commandbuffer_set_program(cbh_get(&cmd), program);
+	commandbuffer_set_program(cbh_get(&self->cmd), program);
 
 	if (scaled)
 	{
-		if (msaa > 1)
+		if (self->msaa > 1)
 		{
-			commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
-			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
+			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer_msaa)));
+			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		}
 		else
 		{
-			commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[0]));
-			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
+			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, *iv_get(&self->scaled_views[0]));
+			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, *iv_get(&self->scaled_views[0]), StockSampler_NearestClamp);
 		}
 	}
 	else
 	{
-		commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)));
-		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
+		commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
+		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
 	}
 
 	unsigned size = BlitInfoVec_size(&infos);
-	unsigned scale = scaled ? scaling : 1u;
+	unsigned scale = scaled ? self->scaling : 1u;
 	for (unsigned i = 0; i < size; i += 512)
 	{
 		unsigned to_blit = min_(size - i, 512u);
-		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_blit * sizeof(BlitInfo));
+		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_blit * sizeof(BlitInfo));
 		memcpy(ptr, BlitInfoVec_data((struct BlitInfoVec *)&infos) + i, to_blit * sizeof(BlitInfo));
-		commandbuffer_dispatch(cbh_get(&cmd), scale, scale, to_blit);
+		commandbuffer_dispatch(cbh_get(&self->cmd), scale, scale, to_blit);
 	}
 }
 
@@ -11911,7 +11917,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	}
 	else
 		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
-	hd_texture_uniforms(state.hd_texture_index);
+	renderer_hd_texture_uniforms(this, state.hd_texture_index);
 	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Scaling, scaling);
 	commandbuffer_set_specialization_constant(cbh_get(&cmd), SpecConstIndex_Shift, state.shift);
