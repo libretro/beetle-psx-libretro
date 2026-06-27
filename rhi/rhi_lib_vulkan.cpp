@@ -4960,173 +4960,172 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		VkDeviceSize offset;
 	};
 
+	/* BufferBlock: a sub-allocatable mapped buffer pair (gpu/cpu). Converted from
+	 * a C++ struct (user copy ctor/assign/dtor managing the two refcounted handle
+	 * members) to a plain C struct + bufferblock_* free functions. Because the gpu
+	 * and cpu handles carry Buffer references, every former implicit copy/assign/
+	 * move/destroy is now an explicit call:
+	 *   bufferblock_init     - zero a fresh block
+	 *   bufferblock_fini     - release both handle refs (was ~BufferBlock)
+	 *   bufferblock_copy     - retain (was the copy ctor)
+	 *   bufferblock_assign   - release-old / retain-new (was operator=)
+	 *   bufferblock_steal    - move (copy fields, null the source; was the && move)
+	 *   bufferblock_allocate - the sub-allocation bump (unchanged logic). */
 	struct BufferBlock
 	{
-		~BufferBlock();
-		BufferHandle gpu = { NULL };
-		BufferHandle cpu = { NULL };
-		VkDeviceSize offset = 0;
-		VkDeviceSize alignment = 0;
-		VkDeviceSize size = 0;
-		uint8_t *mapped = NULL;
-
-		BufferBlock() {}
-		/* gpu/cpu are now plain-struct handles with no copy-ctor incref. Provide
-		 * explicit copy semantics so the many by-value BufferBlock passes
-		 * (allocate_block/request_block returns, member assigns) retain the two
-		 * Buffer references, matching the old IntrusivePtr copy behaviour. The
-		 * user-declared ~BufferBlock releases them. */
-		BufferBlock(const BufferBlock &o)
-		{
-			gpu.data = o.gpu.data; if (gpu.data) buffer_add_reference(gpu.data);
-			cpu.data = o.cpu.data; if (cpu.data) buffer_add_reference(cpu.data);
-			offset = o.offset; alignment = o.alignment; size = o.size; mapped = o.mapped;
-		}
-		BufferBlock &operator=(const BufferBlock &o)
-		{
-			if (this != &o)
-			{
-				if (o.gpu.data) buffer_add_reference(o.gpu.data);
-				if (o.cpu.data) buffer_add_reference(o.cpu.data);
-				if (gpu.data) buffer_release_reference(gpu.data);
-				if (cpu.data) buffer_release_reference(cpu.data);
-				gpu.data = o.gpu.data; cpu.data = o.cpu.data;
-				offset = o.offset; alignment = o.alignment; size = o.size; mapped = o.mapped;
-			}
-			return *this;
-		}
-
-		BufferBlockAllocation allocate(VkDeviceSize allocate_size)
-		{
-			VkDeviceSize aligned_offset = (offset + alignment - 1) & ~(alignment - 1);
-			if (aligned_offset + allocate_size <= size)
-			{
-				uint8_t *ret = mapped + aligned_offset;
-				offset = aligned_offset + allocate_size;
-				return { ret, aligned_offset };
-			}
-			else
-				return { NULL, 0 };
-		}
+		struct BufferHandle gpu;
+		struct BufferHandle cpu;
+		VkDeviceSize offset;
+		VkDeviceSize alignment;
+		VkDeviceSize size;
+		uint8_t *mapped;
 	};
 
-	/* Owning array of BufferBlock for the buffer pool's recycle list. Replaces
-	 * std::vector<BufferBlock>. BufferBlock has a user-declared destructor, so
-	 * its implicit move is suppressed and std::vector relocated it by copy
-	 * (incref/decref of its two IntrusivePtr<Buffer> handles); this container
-	 * preserves that exactly - growth copy-constructs each element into the new
-	 * storage and destroys the old one, and pop_back/clear/the destructor run
-	 * the element destructor (dropping the handle refs). Move-only at the
-	 * container level so it composes by ownership. */
+	static inline void bufferblock_init(struct BufferBlock *self)
+	{
+		self->gpu.data = NULL;
+		self->cpu.data = NULL;
+		self->offset = 0;
+		self->alignment = 0;
+		self->size = 0;
+		self->mapped = NULL;
+	}
+	static inline void bufferblock_fini(struct BufferBlock *self)
+	{
+		bh_reset(&self->gpu);
+		bh_reset(&self->cpu);
+	}
+	/* Retain-copy: dst takes its own references to o's two handles. */
+	static inline void bufferblock_copy(struct BufferBlock *dst, const struct BufferBlock *o)
+	{
+		dst->gpu.data = o->gpu.data; if (dst->gpu.data) buffer_add_reference(dst->gpu.data);
+		dst->cpu.data = o->cpu.data; if (dst->cpu.data) buffer_add_reference(dst->cpu.data);
+		dst->offset = o->offset; dst->alignment = o->alignment; dst->size = o->size; dst->mapped = o->mapped;
+	}
+	static inline void bufferblock_assign(struct BufferBlock *dst, const struct BufferBlock *o)
+	{
+		if (dst != o)
+		{
+			if (o->gpu.data) buffer_add_reference(o->gpu.data);
+			if (o->cpu.data) buffer_add_reference(o->cpu.data);
+			if (dst->gpu.data) buffer_release_reference(dst->gpu.data);
+			if (dst->cpu.data) buffer_release_reference(dst->cpu.data);
+			dst->gpu.data = o->gpu.data; dst->cpu.data = o->cpu.data;
+			dst->offset = o->offset; dst->alignment = o->alignment; dst->size = o->size; dst->mapped = o->mapped;
+		}
+	}
+	/* Move: dst steals src's handles (no refcount change), src left empty. */
+	static inline void bufferblock_steal(struct BufferBlock *dst, struct BufferBlock *src)
+	{
+		dst->gpu.data = src->gpu.data; dst->cpu.data = src->cpu.data;
+		dst->offset = src->offset; dst->alignment = src->alignment; dst->size = src->size; dst->mapped = src->mapped;
+		src->gpu.data = NULL; src->cpu.data = NULL;
+	}
+
+	static inline BufferBlockAllocation bufferblock_allocate(struct BufferBlock *self, VkDeviceSize allocate_size)
+	{
+		VkDeviceSize aligned_offset = (self->offset + self->alignment - 1) & ~(self->alignment - 1);
+		if (aligned_offset + allocate_size <= self->size)
+		{
+			BufferBlockAllocation r;
+			r.host = self->mapped + aligned_offset;
+			r.offset = aligned_offset;
+			self->offset = aligned_offset + allocate_size;
+			return r;
+		}
+		else
+		{
+			BufferBlockAllocation r;
+			r.host = NULL;
+			r.offset = 0;
+			return r;
+		}
+	}
+
+	/* Owning array of BufferBlock for the buffer pool's recycle list. Plain C
+	 * struct + bufferblock_vec_* free functions (was a move-only C++ container).
+	 * push copy-retains via bufferblock_copy; clear/pop_back/free_storage run
+	 * bufferblock_fini; grow steals each element into new storage. */
 	struct BufferBlockVec {
-		BufferBlock *items;
+		struct BufferBlock *items;
 		int count;
 		int cap;
-
-		BufferBlockVec() : items(NULL), count(0), cap(0) {}
-		~BufferBlockVec() { destroy(); }
-		BufferBlockVec(BufferBlockVec &&o) noexcept
-			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-		BufferBlockVec &operator=(BufferBlockVec &&o) noexcept {
-			if (this != &o) {
-				destroy();
-				items = o.items; count = o.count; cap = o.cap;
-				o.items = NULL; o.count = 0; o.cap = 0;
-			}
-			return *this;
-		}
-		BufferBlockVec(const BufferBlockVec &) = delete;
-		BufferBlockVec &operator=(const BufferBlockVec &) = delete;
-
-		/* Copy-insert, matching the old push_back(std::move(block)) which - with
-		 * BufferBlock's move suppressed - was itself a copy. */
-		void push(const BufferBlock &v) {
-			if (count >= cap)
-				grow(cap ? cap * 2 : 8);
-			new (&items[count]) BufferBlock(v);
-			count++;
-		}
-		bool empty() const { return count == 0; }
-		void clear() {
-			for (int i = 0; i < count; i++)
-				items[i].~BufferBlock();
-			count = 0;
-		}
-		BufferBlock &back() { return items[count - 1]; }
-		void pop_back() { if (count) { count--; items[count].~BufferBlock(); } }
-		BufferBlock *begin() { return items; }
-		BufferBlock *end() { return items + count; }
-
-	private:
-		void grow(int ncap) {
-			BufferBlock *nitems = (BufferBlock *)malloc((size_t)ncap * sizeof(BufferBlock));
-			for (int i = 0; i < count; i++) {
-				new (&nitems[i]) BufferBlock(items[i]);
-				items[i].~BufferBlock();
-			}
-			free(items);
-			items = nitems;
-			cap = ncap;
-		}
-		void destroy() {
-			for (int i = 0; i < count; i++)
-				items[i].~BufferBlock();
-			free(items);
-			items = NULL; count = 0; cap = 0;
-		}
 	};
+	static inline void bufferblock_vec_init(struct BufferBlockVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+	static inline void bufferblock_vec_grow(struct BufferBlockVec *v, int ncap) {
+		struct BufferBlock *nitems = (struct BufferBlock *)malloc((size_t)ncap * sizeof(struct BufferBlock));
+		int i;
+		for (i = 0; i < v->count; i++)
+			bufferblock_steal(&nitems[i], &v->items[i]);
+		free(v->items);
+		v->items = nitems;
+		v->cap = ncap;
+	}
+	/* Copy-insert (retain), matching the old push_back of a copy. */
+	static inline void bufferblock_vec_push(struct BufferBlockVec *v, const struct BufferBlock *b) {
+		if (v->count >= v->cap)
+			bufferblock_vec_grow(v, v->cap ? v->cap * 2 : 8);
+		bufferblock_copy(&v->items[v->count], b);
+		v->count++;
+	}
+	static inline int  bufferblock_vec_empty(const struct BufferBlockVec *v) { return v->count == 0; }
+	static inline void bufferblock_vec_clear(struct BufferBlockVec *v) {
+		int i;
+		for (i = 0; i < v->count; i++)
+			bufferblock_fini(&v->items[i]);
+		v->count = 0;
+	}
+	static inline struct BufferBlock *bufferblock_vec_back(struct BufferBlockVec *v) { return &v->items[v->count - 1]; }
+	static inline void bufferblock_vec_pop_back(struct BufferBlockVec *v) { if (v->count) { v->count--; bufferblock_fini(&v->items[v->count]); } }
+	static inline void bufferblock_vec_free_storage(struct BufferBlockVec *v) {
+		int i;
+		for (i = 0; i < v->count; i++)
+			bufferblock_fini(&v->items[i]);
+		free(v->items);
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
 
-	class BufferPool
+	/* BufferPool: pools sub-allocatable mapped BufferBlocks. Converted from a C++
+	 * class to a plain C struct + bufferpool_* free functions. request_block
+	 * returns a BufferBlock by value (the caller owns the returned refs);
+	 * recycle_block takes the block by pointer (was BufferBlock&&) and copy-
+	 * retains it into the recycle list, so the caller must still bufferblock_fini
+	 * its now-moved-from local. */
+	struct BufferPool
 	{
-		public:
-			~BufferPool();
-			void init(Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage)
-			{
-				this->device = device;
-				this->block_size = block_size;
-				this->alignment = alignment;
-				this->usage = usage;
-			}
-
-			/* Raw-memory lifecycle, for an owner allocated with malloc. init_empty()
-			 * establishes the constructed empty state (the scalar defaults and the
-			 * block vector NULL/0/0); the real configuration still happens in
-			 * init(device, ...). deinit() mirrors ~BufferPool (the blocks must have
-			 * been drained) and frees the block vector's storage. */
-			void init_empty()
-			{
-				device      = NULL;
-				block_size  = 0;
-				alignment   = 0;
-				usage       = 0;
-				blocks.items = NULL;
-				blocks.count = 0;
-				blocks.cap   = 0;
-			}
-
-			void deinit()
-			{
-				VK_ASSERT(blocks.empty());
-				blocks.~BufferBlockVec();
-			}
-			void reset();
-
-			VkDeviceSize get_block_size() const
-			{
-				return block_size;
-			}
-
-			BufferBlock request_block(VkDeviceSize minimum_size);
-			void recycle_block(BufferBlock &&block);
-
-		private:
-			Device *device = NULL;
-			VkDeviceSize block_size = 0;
-			VkDeviceSize alignment = 0;
-			VkBufferUsageFlags usage = 0;
-			BufferBlockVec blocks;
-			BufferBlock allocate_block(VkDeviceSize size);
+		Device *device;
+		VkDeviceSize block_size;
+		VkDeviceSize alignment;
+		VkBufferUsageFlags usage;
+		struct BufferBlockVec blocks;
 	};
+	static inline void bufferpool_init(struct BufferPool *self, Device *device, VkDeviceSize block_size, VkDeviceSize alignment, VkBufferUsageFlags usage)
+	{
+		self->device = device;
+		self->block_size = block_size;
+		self->alignment = alignment;
+		self->usage = usage;
+	}
+	/* Raw-memory empty state, for a malloc'd owner. */
+	static inline void bufferpool_init_empty(struct BufferPool *self)
+	{
+		self->device      = NULL;
+		self->block_size  = 0;
+		self->alignment   = 0;
+		self->usage       = 0;
+		self->blocks.items = NULL;
+		self->blocks.count = 0;
+		self->blocks.cap   = 0;
+	}
+	static inline void bufferpool_deinit(struct BufferPool *self)
+	{
+		VK_ASSERT(bufferblock_vec_empty(&self->blocks));
+		bufferblock_vec_free_storage(&self->blocks);
+	}
+	static inline VkDeviceSize bufferpool_get_block_size(const struct BufferPool *self) { return self->block_size; }
+	void bufferpool_reset(struct BufferPool *self);
+	struct BufferBlock bufferpool_request_block(struct BufferPool *self, VkDeviceSize minimum_size);
+	void bufferpool_recycle_block(struct BufferPool *self, struct BufferBlock *block);
 
 /* ============================================================
  * command_pool.hpp
@@ -12755,33 +12754,26 @@ VkSemaphore semaphoremanager_request_cleared_semaphore(struct SemaphoreManager *
 /* === buffer_pool.cpp === */
 
 
-BufferBlock::~BufferBlock()
+void bufferpool_reset(struct BufferPool *self)
 {
-	/* gpu/cpu were dropped by implicit member destruction under the old RAII
-	 * handle; a plain-struct handle requires explicit release. */
-	bh_reset(&gpu);
-	bh_reset(&cpu);
+	bufferblock_vec_clear(&self->blocks);
 }
 
-void BufferPool::reset()
+static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkDeviceSize size)
 {
-	blocks.clear();
-}
-
-BufferBlock BufferPool::allocate_block(VkDeviceSize size)
-{
-	BufferBlock block;
-
+	struct BufferBlock block;
 	BufferCreateInfo info;
+	bufferblock_init(&block);
+
 	info.domain = BufferDomain_Host;
 	info.size = size;
-	info.usage = usage;
+	info.usage = self->usage;
 
-	block.gpu = device->create_buffer(info, NULL);
-	device->set_name(*bh_get(&block.gpu), "chain-allocated-block-gpu");
+	block.gpu = self->device->create_buffer(info, NULL);
+	self->device->set_name(*bh_get(&block.gpu), "chain-allocated-block-gpu");
 
 	// Try to map it, will fail unless the memory is host visible.
-	block.mapped = (uint8_t *)(device->map_host_buffer(*bh_get(&block.gpu), MEMORY_ACCESS_WRITE_BIT));
+	block.mapped = (uint8_t *)(self->device->map_host_buffer(*bh_get(&block.gpu), MEMORY_ACCESS_WRITE_BIT));
 	if (!block.mapped)
 	{
 		// Fall back to host memory, and remember to sync to gpu on submission time using DMA queue. :)
@@ -12790,46 +12782,48 @@ BufferBlock BufferPool::allocate_block(VkDeviceSize size)
 		cpu_info.size = size;
 		cpu_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-		block.cpu = device->create_buffer(cpu_info, NULL);
-		device->set_name(*bh_get(&block.cpu), "chain-allocated-block-cpu");
-		block.mapped = (uint8_t *)(device->map_host_buffer(*bh_get(&block.cpu), MEMORY_ACCESS_WRITE_BIT));
+		block.cpu = self->device->create_buffer(cpu_info, NULL);
+		self->device->set_name(*bh_get(&block.cpu), "chain-allocated-block-cpu");
+		block.mapped = (uint8_t *)(self->device->map_host_buffer(*bh_get(&block.cpu), MEMORY_ACCESS_WRITE_BIT));
 	}
 	else
 		bh_assign(&block.cpu, &block.gpu);
 
 	block.offset = 0;
-	block.alignment = alignment;
+	block.alignment = self->alignment;
 	block.size = size;
 	return block;
 }
 
-BufferBlock BufferPool::request_block(VkDeviceSize minimum_size)
+struct BufferBlock bufferpool_request_block(struct BufferPool *self, VkDeviceSize minimum_size)
 {
-	if ((minimum_size > block_size) || blocks.empty())
+	if ((minimum_size > self->block_size) || bufferblock_vec_empty(&self->blocks))
 	{
-		VkDeviceSize alloc_size = block_size > minimum_size ? block_size : minimum_size;
-		return allocate_block(alloc_size);
+		VkDeviceSize alloc_size = self->block_size > minimum_size ? self->block_size : minimum_size;
+		return bufferpool_allocate_block(self, alloc_size);
 	}
 	else
 	{
-		BufferBlock back = static_cast<BufferBlock &&>(blocks.back());
-		blocks.pop_back();
+		struct BufferBlock back;
+		/* steal the last recycled block (no refcount change), then drop the now-
+		 * emptied slot from the vector (pop_back finis a null-handle block, a
+		 * no-op). */
+		bufferblock_steal(&back, bufferblock_vec_back(&self->blocks));
+		bufferblock_vec_pop_back(&self->blocks);
 
-		back.mapped = (uint8_t *)(device->map_host_buffer(*bh_get(&back.cpu), MEMORY_ACCESS_WRITE_BIT));
+		back.mapped = (uint8_t *)(self->device->map_host_buffer(*bh_get(&back.cpu), MEMORY_ACCESS_WRITE_BIT));
 		back.offset = 0;
 		return back;
 	}
 }
 
-void BufferPool::recycle_block(BufferBlock &&block)
+void bufferpool_recycle_block(struct BufferPool *self, struct BufferBlock *block)
 {
-	VK_ASSERT(block.size == block_size);
-	blocks.push(block);
-}
-
-BufferPool::~BufferPool()
-{
-	VK_ASSERT(blocks.empty());
+	VK_ASSERT(block->size == self->block_size);
+	/* copy-retain into the recycle list; the caller still owns *block and must
+	 * bufferblock_fini it (matching the old BufferBlock&& whose moved-from temp
+	 * was destroyed at the call site). */
+	bufferblock_vec_push(&self->blocks, block);
 }
 
 
@@ -14788,6 +14782,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		self->is_compute  = true;
 		memset(&self->potential_static_state, 0, sizeof(self->potential_static_state));
 
+		/* vbo_block/ubo_block are plain BufferBlock structs now; the old default
+		 * ctor zeroed them, so init explicitly. */
+		bufferblock_init(&self->vbo_block);
+		bufferblock_init(&self->ubo_block);
+
 		counter_init(&self->reference_count); /* refcount starts at 1 */
 		commandbuffer_begin_compute(self);
 		commandbuffer_set_opaque_state(self);
@@ -14799,6 +14798,10 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	{
 		VK_ASSERT(self->vbo_block.mapped == NULL);
 		VK_ASSERT(self->ubo_block.mapped == NULL);
+		/* The blocks are normally drained back to their pools (handles NULL) before
+		 * teardown; fini is a safe release either way (was ~BufferBlock). */
+		bufferblock_fini(&self->vbo_block);
+		bufferblock_fini(&self->ubo_block);
 	}
 
 	void commandbuffer_add_reference(struct CommandBuffer *self)
@@ -15629,11 +15632,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size)
 	{
-		BufferBlockAllocation data = self->ubo_block.allocate(size);
+		BufferBlockAllocation data = bufferblock_allocate(&self->ubo_block, size);
 		if (!data.host)
 		{
 			self->device->request_uniform_block(self->ubo_block, size);
-			data = self->ubo_block.allocate(size);
+			data = bufferblock_allocate(&self->ubo_block, size);
 		}
 		commandbuffer_set_uniform_buffer(self, set, binding, *bh_get(&self->ubo_block.gpu), data.offset, size);
 		return data.host;
@@ -15642,11 +15645,11 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride,
 			VkVertexInputRate step_rate)
 	{
-		BufferBlockAllocation data = self->vbo_block.allocate(size);
+		BufferBlockAllocation data = bufferblock_allocate(&self->vbo_block, size);
 		if (!data.host)
 		{
 			self->device->request_vertex_block(self->vbo_block, size);
-			data = self->vbo_block.allocate(size);
+			data = bufferblock_allocate(&self->vbo_block, size);
 		}
 
 		commandbuffer_set_vertex_binding(self, binding, *bh_get(&self->vbo_block.gpu), data.offset, stride, step_rate);
@@ -16592,8 +16595,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		deviceallocator_init_empty(&self->managers.memory);
 		fencemanager_init_empty(&self->managers.fence);
 		semaphoremanager_init_empty(&self->managers.semaphore);
-		self->managers.vbo.init_empty();
-		self->managers.ubo.init_empty();
+		bufferpool_init_empty(&self->managers.vbo);
+		bufferpool_init_empty(&self->managers.ubo);
 		self->per_frame.init_empty();
 		pipeline_layout_map_init(&self->pipeline_layouts);
 		descriptor_set_allocator_map_init(&self->descriptor_set_allocators);
@@ -16633,8 +16636,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		descriptor_set_allocator_map_deinit(&self->descriptor_set_allocators);
 		pipeline_layout_map_deinit(&self->pipeline_layouts);
 		self->per_frame.deinit();
-		self->managers.vbo.deinit();
-		self->managers.ubo.deinit();
+		bufferpool_deinit(&self->managers.vbo);
+		bufferpool_deinit(&self->managers.ubo);
 		deviceallocator_deinit(&self->managers.memory);
 		self->handle_pool.deinit();
 	}
@@ -16865,8 +16868,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		deviceallocator_set_supports_dedicated_allocation(&managers.memory, ext.supports_dedicated);
 		semaphoremanager_init(&managers.semaphore, device);
 		fencemanager_init(&managers.fence, device);
-		managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-		managers.ubo.init(this, 256 * 1024, max_((VkDeviceSize)16u, gpu_props.limits.minUniformBufferOffsetAlignment),
+		bufferpool_init(&managers.vbo, this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		bufferpool_init(&managers.ubo, this, 256 * 1024, max_((VkDeviceSize)16u, gpu_props.limits.minUniformBufferOffsetAlignment),
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 	}
 
@@ -16947,43 +16950,49 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 	}
 
-	static void request_block(Device &device, BufferBlock &block, VkDeviceSize size,
-			BufferPool &pool, BufferBlockVec *dma, BufferBlockVec &recycle)
+	static void request_block(Device &device, struct BufferBlock *block, VkDeviceSize size,
+			struct BufferPool *pool, struct BufferBlockVec *dma, struct BufferBlockVec *recycle)
 	{
-		if (block.mapped)
-			device.unmap_host_buffer(*bh_get(&block.cpu), MEMORY_ACCESS_WRITE_BIT);
+		if (block->mapped)
+			device.unmap_host_buffer(*bh_get(&block->cpu), MEMORY_ACCESS_WRITE_BIT);
 
-		if (block.offset == 0)
+		if (block->offset == 0)
 		{
-			if (block.size == pool.get_block_size())
-				pool.recycle_block(static_cast<BufferBlock &&>(block));
+			if (block->size == bufferpool_get_block_size(pool))
+				bufferpool_recycle_block(pool, block); /* copy-retains; we fini below */
 		}
 		else
 		{
-			if (bh_get(&block.cpu) != bh_get(&block.gpu))
+			if (bh_get(&block->cpu) != bh_get(&block->gpu))
 			{
 				VK_ASSERT(dma);
-				dma->push(block);
+				bufferblock_vec_push(dma, block);
 			}
 
-			if (block.size == pool.get_block_size())
-				recycle.push(block);
+			if (block->size == bufferpool_get_block_size(pool))
+				bufferblock_vec_push(recycle, block);
 		}
 
+		/* Drop this block's refs (it was recycled/staged by copy above) before
+		 * overwriting it with the next request or emptying it. */
+		bufferblock_fini(block);
 		if (size)
-			block = pool.request_block(size);
+		{
+			struct BufferBlock produced = bufferpool_request_block(pool, size);
+			bufferblock_steal(block, &produced);
+		}
 		else
-			block = {};
+			bufferblock_init(block);
 	}
 
 	void Device::request_vertex_block_nolock(BufferBlock &block, VkDeviceSize size)
 	{
-		request_block(*this, block, size, managers.vbo, &dma.vbo, frame().vbo_blocks);
+		request_block(*this, &block, size, &managers.vbo, &dma.vbo, &frame().vbo_blocks);
 	}
 
 	void Device::request_uniform_block_nolock(BufferBlock &block, VkDeviceSize size)
 	{
-		request_block(*this, block, size, managers.ubo, &dma.ubo, frame().ubo_blocks);
+		request_block(*this, &block, size, &managers.ubo, &dma.ubo, &frame().ubo_blocks);
 	}
 
 	void Device::submit(CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores)
@@ -17363,7 +17372,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void Device::sync_buffer_blocks()
 	{
-		if (dma.vbo.empty() && dma.ubo.empty())
+		if (bufferblock_vec_empty(&dma.vbo) && bufferblock_vec_empty(&dma.ubo))
 			return;
 
 		VkBufferUsageFlags usage = 0;
@@ -17372,22 +17381,26 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 		commandbuffer_begin_region(cbh_get(&cmd), "buffer-block-sync");
 
-		for (BufferBlock &block : dma.vbo)
 		{
-			VK_ASSERT(block.offset != 0);
-			commandbuffer_copy_buffer(cbh_get(&cmd), *bh_get(&block.gpu), 0, *bh_get(&block.cpu), 0, block.offset);
-			usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			int _bi;
+			for (_bi = 0; _bi < dma.vbo.count; _bi++)
+			{
+				struct BufferBlock *block = &dma.vbo.items[_bi];
+				VK_ASSERT(block->offset != 0);
+				commandbuffer_copy_buffer(cbh_get(&cmd), *bh_get(&block->gpu), 0, *bh_get(&block->cpu), 0, block->offset);
+				usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			}
+			for (_bi = 0; _bi < dma.ubo.count; _bi++)
+			{
+				struct BufferBlock *block = &dma.ubo.items[_bi];
+				VK_ASSERT(block->offset != 0);
+				commandbuffer_copy_buffer(cbh_get(&cmd), *bh_get(&block->gpu), 0, *bh_get(&block->cpu), 0, block->offset);
+				usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+			}
 		}
 
-		for (BufferBlock &block : dma.ubo)
-		{
-			VK_ASSERT(block.offset != 0);
-			commandbuffer_copy_buffer(cbh_get(&cmd), *bh_get(&block.gpu), 0, *bh_get(&block.cpu), 0, block.offset);
-			usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		}
-
-		dma.vbo.clear();
-		dma.ubo.clear();
+		bufferblock_vec_clear(&dma.vbo);
+		bufferblock_vec_clear(&dma.ubo);
 
 		commandbuffer_end_region(cbh_get(&cmd));
 
@@ -17644,12 +17657,12 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		clear_wait_semaphores();
 
 		// Free memory for buffer pools.
-		managers.vbo.reset();
-		managers.ubo.reset();
+		bufferpool_reset(&managers.vbo);
+		bufferpool_reset(&managers.ubo);
 		for (PerFrame *frame : per_frame)
 		{
-			frame->vbo_blocks.clear();
-			frame->ubo_blocks.clear();
+			bufferblock_vec_clear(&frame->vbo_blocks);
+			bufferblock_vec_clear(&frame->ubo_blocks);
 		}
 
 		framebuffer_allocator.clear();
@@ -17746,12 +17759,17 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				deviceallocation_free_immediate_alloc(DeviceAllocationVec_at(&allocations, _i), &managers->memory);
 		}
 
-		for (BufferBlock &block : vbo_blocks)
-			managers->vbo.recycle_block(static_cast<BufferBlock &&>(block));
-		for (BufferBlock &block : ubo_blocks)
-			managers->ubo.recycle_block(static_cast<BufferBlock &&>(block));
-		vbo_blocks.clear();
-		ubo_blocks.clear();
+		{
+			int _bi;
+			for (_bi = 0; _bi < vbo_blocks.count; _bi++)
+				bufferpool_recycle_block(&managers->vbo, &vbo_blocks.items[_bi]);
+			for (_bi = 0; _bi < ubo_blocks.count; _bi++)
+				bufferpool_recycle_block(&managers->ubo, &ubo_blocks.items[_bi]);
+		}
+		/* recycle_block copy-retained each block; clear() finis the originals,
+		 * net-transferring the refs into the pools. */
+		bufferblock_vec_clear(&vbo_blocks);
+		bufferblock_vec_clear(&ubo_blocks);
 
 		VkFramebufferVec_clear(&destroyed_framebuffers);
 		VkSamplerVec_clear(&destroyed_samplers);
