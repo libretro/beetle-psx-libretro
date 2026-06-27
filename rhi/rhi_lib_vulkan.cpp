@@ -1815,7 +1815,7 @@ static inline uint32_t util_ctz(uint32_t x)
 	typedef struct Shader Shader;
 	typedef struct Program Program;
 	typedef struct RenderPassInfo RenderPassInfo;
-	typedef struct Subpass Subpass;
+	typedef struct RenderPassInfo_Subpass RenderPassInfo_Subpass;
 	typedef struct RenderPassSubpassInfo RenderPassSubpassInfo;
 	typedef struct RenderPass RenderPass;
 	typedef struct Framebuffer Framebuffer;
@@ -4631,44 +4631,74 @@ PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return
 	typedef uint32_t RenderPassOpFlags;
 
 	struct ImageView;
+	enum RenderPassInfo_DepthStencil {
+		RenderPassInfo_DepthStencil_None,
+		RenderPassInfo_DepthStencil_ReadOnly,
+		RenderPassInfo_DepthStencil_ReadWrite
+	};
+	typedef enum RenderPassInfo_DepthStencil RenderPassInfo_DepthStencil;
+
+	struct RenderPassInfo_Subpass
+	{
+		uint32_t color_attachments[VULKAN_NUM_ATTACHMENTS];
+		uint32_t input_attachments[VULKAN_NUM_ATTACHMENTS];
+		uint32_t resolve_attachments[VULKAN_NUM_ATTACHMENTS];
+		unsigned num_color_attachments;
+		unsigned num_input_attachments;
+		unsigned num_resolve_attachments;
+		RenderPassInfo_DepthStencil depth_stencil_mode;
+	};
+
+	/* Former NSDMI defaults for the hoisted Subpass (counts 0, mode ReadWrite).
+	 * The attachment index arrays were uninitialised in the C++ form too (only
+	 * the first num_* entries are ever read), so they are left untouched. */
+	static inline void render_pass_info_subpass_defaults(struct RenderPassInfo_Subpass *self)
+	{
+		self->num_color_attachments   = 0;
+		self->num_input_attachments   = 0;
+		self->num_resolve_attachments = 0;
+		self->depth_stencil_mode      = RenderPassInfo_DepthStencil_ReadWrite;
+	}
+
 	struct RenderPassInfo
 	{
 		ImageView *color_attachments[VULKAN_NUM_ATTACHMENTS];
-		ImageView *depth_stencil = NULL;
-		unsigned num_color_attachments = 0;
-		RenderPassOpFlags op_flags = 0;
-		uint32_t clear_attachments = 0;
-		uint32_t load_attachments = 0;
-		uint32_t store_attachments = 0;
-		uint32_t layer = 0;
+		ImageView *depth_stencil;
+		unsigned num_color_attachments;
+		RenderPassOpFlags op_flags;
+		uint32_t clear_attachments;
+		uint32_t load_attachments;
+		uint32_t store_attachments;
+		uint32_t layer;
 
-		// Render area will be clipped to the actual framebuffer.
-		VkRect2D render_area = { { 0, 0 }, { UINT32_MAX, UINT32_MAX } };
+		/* Render area will be clipped to the actual framebuffer. */
+		VkRect2D render_area;
 
-		VkClearColorValue clear_color[VULKAN_NUM_ATTACHMENTS] = {};
-		VkClearDepthStencilValue clear_depth_stencil = { 1.0f, 0 };
+		VkClearColorValue clear_color[VULKAN_NUM_ATTACHMENTS];
+		VkClearDepthStencilValue clear_depth_stencil;
 
-		enum DepthStencil {
-			DepthStencil_None,
-			DepthStencil_ReadOnly,
-			DepthStencil_ReadWrite
-		};
-		typedef enum DepthStencil DepthStencil;
-
-		struct Subpass
-		{
-			uint32_t color_attachments[VULKAN_NUM_ATTACHMENTS];
-			uint32_t input_attachments[VULKAN_NUM_ATTACHMENTS];
-			uint32_t resolve_attachments[VULKAN_NUM_ATTACHMENTS];
-			unsigned num_color_attachments = 0;
-			unsigned num_input_attachments = 0;
-			unsigned num_resolve_attachments = 0;
-			DepthStencil depth_stencil_mode = DepthStencil_ReadWrite;
-		};
-		// If 0/nullptr, assume a default subpass.
-		const Subpass *subpasses = NULL;
-		unsigned num_subpasses = 0;
+		/* If 0/nullptr, assume a default subpass. */
+		const struct RenderPassInfo_Subpass *subpasses;
+		unsigned num_subpasses;
 	};
+
+	/* Establishes the former NSDMI defaults. Load-bearing: several bare
+	 * declarations set only num_color_attachments + the color attachment
+	 * pointers and rely on the rest being zero AND on render_area being the
+	 * full-frame sentinel {{0,0},{UINT32_MAX,UINT32_MAX}} (begin_render_pass
+	 * clips it to the framebuffer). Leaving render_area uninitialised feeds a
+	 * garbage VkRect2D to the scissor/render-area -- a GPU-side crash. Every
+	 * bare RenderPassInfo declaration MUST call this first. */
+	static inline void render_pass_info_defaults(struct RenderPassInfo *self)
+	{
+		memset(self, 0, sizeof(*self));
+		self->render_area.offset.x      = 0;
+		self->render_area.offset.y      = 0;
+		self->render_area.extent.width  = UINT32_MAX;
+		self->render_area.extent.height = UINT32_MAX;
+		self->clear_depth_stencil.depth   = 1.0f;
+		self->clear_depth_stencil.stencil = 0;
+	}
 
 	/* RenderPass: cached VkRenderPass + per-subpass attachment metadata. Lives in
 	 * an IntrusiveHashMap (intrusive_node first). Converted from a C++ class to a
@@ -10107,6 +10137,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 	renderer_ensure_command_buffer(self);
 	{ unsigned i; for (i = 1; i <= levels; i++) {
 		RenderPassInfo rp;
+		render_pass_info_defaults(&rp);
 		unsigned current_scale = max_(self->scaling >> i, 1u);
 
 		if (i == levels)
@@ -10392,6 +10423,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 	RenderPassInfo rp;
+	render_pass_info_defaults(&rp);
 	rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
@@ -10478,6 +10510,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 		RenderPassInfo rp;
+		render_pass_info_defaults(&rp);
 		rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
 		rp.num_color_attachments = 1;
 		rp.clear_attachments = 1;
@@ -10578,6 +10611,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	ih_move(&self->reuseable_scanout, device_create_image(self->device, info, NULL));
 
 	RenderPassInfo rp;
+	render_pass_info_defaults(&rp);
 	rp.color_attachments[0] = &image_get_view(ih_get(&self->reuseable_scanout));
 	rp.num_color_attachments = 1;
 	rp.store_attachments = 1;
@@ -11380,7 +11414,8 @@ void renderer_flush_render_pass(Renderer *self, const Rect &rect)
 {
 	renderer_ensure_command_buffer(self);
 
-	RenderPassInfo info = {};
+	RenderPassInfo info;
+	render_pass_info_defaults(&info);
 
 	if (self->msaa > 1)
 		info.color_attachments[0] = &image_get_view(ih_get(&self->scaled_framebuffer_msaa));
@@ -11395,7 +11430,8 @@ void renderer_flush_render_pass(Renderer *self, const Rect &rect)
 	info.store_attachments = 1 << 0;
 	info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
 
-	RenderPassInfo::Subpass subpass;
+	RenderPassInfo_Subpass subpass;
+	render_pass_info_subpass_defaults(&subpass);
 	info.num_subpasses = 1;
 	info.subpasses = &subpass;
 	subpass.num_color_attachments = 1;
@@ -14157,16 +14193,17 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		bool enable_transient_load = (info.op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT) != 0;
 
 		// Set up default subpass info structure if we don't have it.
-		const RenderPassInfo::Subpass *subpass_infos = info.subpasses;
+		const RenderPassInfo_Subpass *subpass_infos = info.subpasses;
 		unsigned num_subpasses = info.num_subpasses;
-		RenderPassInfo::Subpass default_subpass_info;
+		RenderPassInfo_Subpass default_subpass_info;
+		render_pass_info_subpass_defaults(&default_subpass_info);
 		if (!info.subpasses)
 		{
 			default_subpass_info.num_color_attachments = info.num_color_attachments;
 			if (info.op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT)
-				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil_ReadOnly;
+				default_subpass_info.depth_stencil_mode = RenderPassInfo_DepthStencil_ReadOnly;
 			else
-				default_subpass_info.depth_stencil_mode = RenderPassInfo::DepthStencil_ReadWrite;
+				default_subpass_info.depth_stencil_mode = RenderPassInfo_DepthStencil_ReadWrite;
 
 			{ unsigned i; for (i = 0; i < info.num_color_attachments; i++) default_subpass_info.color_attachments[i] = i; }
 			num_subpasses = 1;
@@ -14354,7 +14391,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				} }
 			}
 
-			if (info.depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo::DepthStencil_None)
+			if (info.depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo_DepthStencil_None)
 			{
 				depth->attachment = info.num_color_attachments;
 				// Fill in later.
@@ -14504,8 +14541,8 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				}
 				else if (depth && input) // Depends on the depth mode
 				{
-					VK_ASSERT(subpass_infos[subpass].depth_stencil_mode != RenderPassInfo::DepthStencil_None);
-					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil_ReadWrite)
+					VK_ASSERT(subpass_infos[subpass].depth_stencil_mode != RenderPassInfo_DepthStencil_None);
+					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo_DepthStencil_ReadWrite)
 					{
 						depth_self_dependencies |= 1u << subpass;
 						current_layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -14537,7 +14574,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				}
 				else if (depth)
 				{
-					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo::DepthStencil_ReadWrite)
+					if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo_DepthStencil_ReadWrite)
 					{
 						depth_stencil_attachment_write |= 1u << subpass;
 						if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
