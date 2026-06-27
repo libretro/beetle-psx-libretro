@@ -1632,6 +1632,7 @@ struct NAME {                                                                 \
     int count;                                                                \
     int cap;                                                                  \
 };                                                                            \
+typedef struct NAME NAME;                                                     \
 static inline T   *NAME##_data(struct NAME *v)        { return v->items; }    \
 static inline int  NAME##_size(const struct NAME *v)  { return v->count; }    \
 static inline int  NAME##_empty(const struct NAME *v) { return v->count == 0; }\
