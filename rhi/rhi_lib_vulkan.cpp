@@ -8912,12 +8912,9 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			};
 
 
-			Renderer(Device &device, unsigned scaling, unsigned msaa, const SaveState *save_state);
-			~Renderer();
 
 
 
-			void set_draw_rect(const Rect &rect);
 
 
 
@@ -8946,7 +8943,6 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 
 			// Draw commands
-			void clear_rect(const Rect &rect, uint32_t fb_color);
 
 
 
@@ -8968,11 +8964,11 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			Device *device;
 			unsigned scaling;
 			unsigned msaa;
-			bool scaled_uv_offset = false;
-			bool valid = false;
-			FilterMode primitive_filter_mode = FilterMode_NearestNeighbor;
-			FilterExclude sprite_filter_exclude = FilterExcludeNone;
-			FilterExclude polygon_2d_filter_exclude = FilterExcludeNone;
+			bool scaled_uv_offset;
+			bool valid;
+			FilterMode primitive_filter_mode;
+			FilterExclude sprite_filter_exclude;
+			FilterExclude polygon_2d_filter_exclude;
 			ImageHandle scaled_framebuffer;
 			ImageHandle scaled_framebuffer_msaa;
 			ImageHandle bias_framebuffer;
@@ -8980,13 +8976,12 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			ImageHandle framebuffer_ssaa;
 			ImageViewHandleVec scaled_views;
 			FBAtlas atlas;
-			bool texture_tracking_enabled = false;
+			bool texture_tracking_enabled;
 			TextureTracker tracker;
 
 			CommandBufferHandle cmd;
 
 			// Called by FBAtlas (formerly via HazardListener interface).
-			void resolve(Domain target_domain, unsigned x, unsigned y);
 
 			// Called by TextureTracker (formerly via TextureUploader interface).
 
@@ -9033,30 +9028,25 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 			ImageHandle dither_lut;
 
-			void ensure_command_buffer();
 
 			RenderState render_state;
 
 
 			OpaqueQueue queue;
-			unsigned primitive_index = 0;
-			bool render_pass_is_feedback = false;
+			unsigned primitive_index;
+			bool render_pass_is_feedback;
 			float last_uv_scale_x, last_uv_scale_y;
 
-			void reset_queue();
-
-			float allocate_depth(Domain domain, const Rect &rect);
 
 
-			void reset_scissor_queue();
 
-			Rect compute_window_rect(const TextureWindow &window);
+
 
 			ImageHandle last_scanout;
 			ImageHandle reuseable_scanout;
 
 
-			BufferHandle quad = { NULL };
+			BufferHandle quad;
 	};
 
 	/* SaveState lifecycle free functions (SaveState was a move-only C++ class; it is now
