@@ -8523,64 +8523,125 @@ extern retro_log_printf_t log_cb;
 	POD_VEC_DECLARE(ClearCandidateVec, ClearCandidate);
 	POD_VEC_DECLARE(Rect2DVec, VkRect2D);
 
+	/* Renderer top-level render state. Hoisted out of the Renderer class to file
+	 * scope (it is carried by value inside SaveState and named by many methods) and
+	 * de-C++'d: the default member initializers move into render_state_init, which
+	 * the Renderer constructor calls. The Rect / TextureWindow / UVRect members are
+	 * zeroed explicitly (Rect is non-trivial, so no memset). */
+	struct RenderState
+	{
+		//Rect display_mode;
+		Rect display_fb_rect;
+		TextureWindow texture_window;
+		Rect cached_window_rect;
+		Rect draw_rect;
+		int draw_offset_x;
+		int draw_offset_y;
+		unsigned palette_offset_x;
+		unsigned palette_offset_y;
+		unsigned texture_offset_x;
+		unsigned texture_offset_y;
+
+		int vert_start;
+		int vert_end;
+		int horiz_start;
+		int horiz_end;
+
+		bool is_pal;
+		bool is_480i;
+		WidthMode width_mode;
+		int crop_overscan;
+		unsigned image_crop;
+
+		// Experimental horizontal offset feature
+		int offset_cycles;
+
+		int slstart;
+		int slend;
+
+		int slstart_pal;
+		int slend_pal;
+
+		unsigned display_fb_xstart;
+		unsigned display_fb_ystart;
+
+		TextureMode texture_mode;
+		SemiTransparentMode semi_transparent;
+		PrimitiveType primitive_type;
+		ScanoutMode scanout_mode;
+		ScanoutFilter scanout_filter;
+		ScanoutFilter scanout_mdec_filter;
+		bool dither_native_resolution;
+		bool force_mask_bit;
+		bool texture_color_modulate;
+		bool mask_test;
+		bool display_on;
+		bool adaptive_smoothing;
+
+		UVRect UVLimits;
+	};
+
+	static inline void rect_zero(Rect *r) { r->x = 0; r->y = 0; r->width = 0; r->height = 0; }
+
+	static inline void render_state_init(struct RenderState *s)
+	{
+		rect_zero(&s->display_fb_rect);
+		s->texture_window.mask_x = 0; s->texture_window.mask_y = 0;
+		s->texture_window.or_x = 0; s->texture_window.or_y = 0;
+		rect_zero(&s->cached_window_rect);
+		rect_zero(&s->draw_rect);
+		s->draw_offset_x = 0;
+		s->draw_offset_y = 0;
+		s->palette_offset_x = 0;
+		s->palette_offset_y = 0;
+		s->texture_offset_x = 0;
+		s->texture_offset_y = 0;
+
+		s->vert_start = 0x10;
+		s->vert_end = 0x100;
+		s->horiz_start = 0x200;
+		s->horiz_end = 0xC00;
+
+		s->is_pal = false;
+		s->is_480i = false;
+		s->width_mode = WidthMode_WIDTH_MODE_320;
+		s->crop_overscan = 0;
+		s->image_crop = 0;
+
+		s->offset_cycles = 0;
+
+		s->slstart = 0;
+		s->slend = 239;
+
+		s->slstart_pal = 0;
+		s->slend_pal = 287;
+
+		s->display_fb_xstart = 0;
+		s->display_fb_ystart = 0;
+
+		s->texture_mode = TextureMode_None;
+		s->semi_transparent = SemiTransparentMode_None;
+		s->primitive_type = PrimitiveType_Polygon;
+		s->scanout_mode = ScanoutMode_ABGR1555_555;
+		s->scanout_filter = ScanoutFilter_None;
+		s->scanout_mdec_filter = ScanoutFilter_None;
+		s->dither_native_resolution = false;
+		s->force_mask_bit = false;
+		s->texture_color_modulate = false;
+		s->mask_test = false;
+		s->display_on = false;
+		s->adaptive_smoothing = true;
+
+		s->UVLimits.min_u = 0; s->UVLimits.min_v = 0;
+		s->UVLimits.max_u = 0; s->UVLimits.max_v = 0;
+	}
+
 	class Renderer
 	{
 		public:
 
 
 
-			struct RenderState
-			{
-				//Rect display_mode;
-				Rect display_fb_rect;
-				TextureWindow texture_window;
-				Rect cached_window_rect;
-				Rect draw_rect;
-				int draw_offset_x = 0;
-				int draw_offset_y = 0;
-				unsigned palette_offset_x = 0;
-				unsigned palette_offset_y = 0;
-				unsigned texture_offset_x = 0;
-				unsigned texture_offset_y = 0;
-
-				int vert_start = 0x10;
-				int vert_end = 0x100;
-				int horiz_start = 0x200;
-				int horiz_end = 0xC00;
-
-				bool is_pal = false;
-				bool is_480i = false;
-				WidthMode width_mode = WidthMode_WIDTH_MODE_320;
-				int crop_overscan = 0;
-				unsigned image_crop = 0;
-
-				// Experimental horizontal offset feature
-				int offset_cycles = 0;
-
-				int slstart = 0;
-				int slend = 239;
-
-				int slstart_pal = 0;
-				int slend_pal = 287;
-
-				unsigned display_fb_xstart = 0;
-				unsigned display_fb_ystart = 0;
-
-				TextureMode texture_mode = TextureMode_None;
-				SemiTransparentMode semi_transparent = SemiTransparentMode_None;
-				PrimitiveType primitive_type = PrimitiveType_Polygon;
-				ScanoutMode scanout_mode = ScanoutMode_ABGR1555_555;
-				ScanoutFilter scanout_filter = ScanoutFilter_None;
-				ScanoutFilter scanout_mdec_filter = ScanoutFilter_None;
-				bool dither_native_resolution = false;
-				bool force_mask_bit = false;
-				bool texture_color_modulate = false;
-				bool mask_test = false;
-				bool display_on = false;
-				bool adaptive_smoothing = true;
-
-				UVRect UVLimits;
-			};
 
 			/* Owning uint32_t buffer for the saved VRAM image. Replaces
 			 * std::vector<uint32_t>; like the other save-state members it lives
@@ -9273,6 +9334,9 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	framebuffer.data             = NULL;
 	framebuffer_ssaa.data        = NULL;
 	dither_lut.data              = NULL;
+	/* render_state's default member initializers were moved out when RenderState
+	 * was de-C++'d; seed them here (was implicit at construction). */
+	render_state_init(&render_state);
 	last_scanout.data            = NULL;
 	reuseable_scanout.data       = NULL;
 	fbatlas_init(&atlas);
