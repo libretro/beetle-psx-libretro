@@ -4158,62 +4158,59 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	 * const Semaphore &, an incref, as the std::vector was). clear() keeps the
 	 * capacity so the lists are reused across frames. Distinct from SemaphoreVec
 	 * above, which holds raw VkSemaphore handles (POD). */
+	/* SemaphoreHandleVec: owning growable array of Semaphore handles (refcounting
+	 * smart pointers; sem_copy retains, sem_reset releases). Converted from a
+	 * move-only C++ container to a plain C struct + sem_handle_vec_* free
+	 * functions; the embedding QueueData is zero-initialised (its empty state) and
+	 * torn down explicitly. */
 	struct SemaphoreHandleVec {
 		Semaphore *items;
 		int count;
 		int cap;
-
-		SemaphoreHandleVec() : items(NULL), count(0), cap(0) {}
-		~SemaphoreHandleVec() { destroy(); }
-		SemaphoreHandleVec(SemaphoreHandleVec &&o) noexcept
-			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-		SemaphoreHandleVec &operator=(SemaphoreHandleVec &&o) noexcept {
-			if (this != &o) {
-				destroy();
-				items = o.items; count = o.count; cap = o.cap;
-				o.items = NULL; o.count = 0; o.cap = 0;
-			}
-			return *this;
-		}
-		SemaphoreHandleVec(const SemaphoreHandleVec &) = delete;
-		SemaphoreHandleVec &operator=(const SemaphoreHandleVec &) = delete;
-
-		void push(const Semaphore &v) {
-			if (count >= cap)
-				grow(cap ? cap * 2 : 8);
-			sem_copy(&items[count], &v);
-			count++;
-		}
-		int size() const { return count; }
-		bool empty() const { return count == 0; }
-		void clear() {
-			for (int i = 0; i < count; i++)
-				sem_reset(&items[i]);
-			count = 0;
-		}
-		Semaphore *begin() { return items; }
-		Semaphore *end() { return items + count; }
-
-	private:
-		void grow(int ncap) {
-			Semaphore *nitems = (Semaphore *)malloc((size_t)ncap * sizeof(Semaphore));
-			for (int i = 0; i < count; i++) {
-				/* Move the handle to new storage: plain struct copy with no
-				 * refcount change (old copy-ctor incref + old-slot dtor decref
-				 * cancelled out). The old slot is abandoned, not reset. */
-				nitems[i] = items[i];
-			}
-			free(items);
-			items = nitems;
-			cap = ncap;
-		}
-		void destroy() {
-			for (int i = 0; i < count; i++)
-				sem_reset(&items[i]);
-			free(items);
-			items = NULL; count = 0; cap = 0;
-		}
 	};
+
+	static inline void sem_handle_vec_init(struct SemaphoreHandleVec *v)
+	{
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
+	static inline void sem_handle_vec_grow(struct SemaphoreHandleVec *v, int ncap)
+	{
+		Semaphore *nitems = (Semaphore *)malloc((size_t)ncap * sizeof(Semaphore));
+		int i;
+		for (i = 0; i < v->count; i++) {
+			/* Move the handle to new storage: plain struct copy with no refcount
+			 * change (old copy-ctor incref + old-slot dtor decref cancelled out).
+			 * The old slot is abandoned, not reset. */
+			nitems[i] = v->items[i];
+		}
+		free(v->items);
+		v->items = nitems;
+		v->cap = ncap;
+	}
+	static inline void sem_handle_vec_push(struct SemaphoreHandleVec *v, const Semaphore *e)
+	{
+		if (v->count >= v->cap)
+			sem_handle_vec_grow(v, v->cap ? v->cap * 2 : 8);
+		sem_copy(&v->items[v->count], e);
+		v->count++;
+	}
+	static inline int sem_handle_vec_size(const struct SemaphoreHandleVec *v) { return v->count; }
+	static inline Semaphore *sem_handle_vec_at(struct SemaphoreHandleVec *v, int i) { return &v->items[i]; }
+	static inline void sem_handle_vec_clear(struct SemaphoreHandleVec *v)
+	{
+		int i;
+		for (i = 0; i < v->count; i++)
+			sem_reset(&v->items[i]);
+		v->count = 0;
+	}
+	static inline void sem_handle_vec_deinit(struct SemaphoreHandleVec *v)
+	{
+		int i;
+		for (i = 0; i < v->count; i++)
+			sem_reset(&v->items[i]);
+		free(v->items);
+		v->items = NULL; v->count = 0; v->cap = 0;
+	}
 
 	POD_VEC_DECLARE(SemaphoreVec, VkSemaphore);
 	/* SemaphoreManager: recycles VkSemaphore handles. Converted from a C++ class
@@ -5876,8 +5873,8 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 			struct QueueData
 			{
 				SemaphoreHandleVec wait_semaphores;
-				VkPipelineStageVec wait_stages = { NULL, 0, 0 };
-				bool need_fence = false;
+				VkPipelineStageVec wait_stages;
+				bool need_fence;
 			} graphics, compute, transfer;
 
 			// Pending buffers which need to be copied from CPU to GPU before submitting graphics or compute work.
@@ -16525,6 +16522,15 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		bufferpool_deinit(&self->managers.vbo);
 		bufferpool_deinit(&self->managers.ubo);
 		deviceallocator_deinit(&self->managers.memory);
+		/* Free the per-queue wait lists' backing storage. These plain structs have
+		 * no destructor (Device is malloc'd, so no member dtor ran), and
+		 * clear_wait_semaphores only resets counts, so free them explicitly here. */
+		sem_handle_vec_deinit(&self->graphics.wait_semaphores);
+		sem_handle_vec_deinit(&self->compute.wait_semaphores);
+		sem_handle_vec_deinit(&self->transfer.wait_semaphores);
+		VkPipelineStageVec_free_storage(&self->graphics.wait_stages);
+		VkPipelineStageVec_free_storage(&self->compute.wait_stages);
+		VkPipelineStageVec_free_storage(&self->transfer.wait_stages);
 		self->handle_pool.deinit();
 	}
 
@@ -16537,16 +16543,16 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		QueueData &data = get_queue_data(type);
 
 #ifdef VULKAN_DEBUG
-		for (Semaphore &sem : data.wait_semaphores)
-			VK_ASSERT(sem_get(&sem) != sem_get(&semaphore));
+		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data.wait_semaphores); _wi++)
+			VK_ASSERT(sem_get(sem_handle_vec_at(&data.wait_semaphores, _wi)) != sem_get(&semaphore)); }
 #endif
 
-		data.wait_semaphores.push(semaphore);
+		sem_handle_vec_push(&data.wait_semaphores, &semaphore);
 		VkPipelineStageVec_push(&data.wait_stages, &stages);
 		data.need_fence = true;
 
 		// Sanity check.
-		VK_ASSERT(data.wait_semaphores.size() < 16 * 1024);
+		VK_ASSERT(sem_handle_vec_size(&data.wait_semaphores) < 16 * 1024);
 	}
 
 	Shader *Device::request_shader(const uint32_t *data, size_t size)
@@ -16948,14 +16954,15 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				VkFlagsVec_push(&stages, VkPipelineStageVec_at(&data.wait_stages, ws));
 		}
 
-		for (Semaphore &semaphore : data.wait_semaphores)
+		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data.wait_semaphores); _wi++)
 		{
-			VkSemaphore wait = semaphoreholder_consume(sem_get(&semaphore));
+			Semaphore *semaphore = sem_handle_vec_at(&data.wait_semaphores, _wi);
+			VkSemaphore wait = semaphoreholder_consume(sem_get(semaphore));
 			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits, &wait);
-		}
+		} }
 		VkPipelineStageVec_clear(&data.wait_stages);
-		data.wait_semaphores.clear();
+		sem_handle_vec_clear(&data.wait_semaphores);
 
 		// Add external signal semaphores.
 		for (unsigned i = 0; i < semaphore_count; i++)
@@ -17151,14 +17158,15 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				VkFlagsVec_push(&stages[0], VkPipelineStageVec_at(&data.wait_stages, ws));
 		}
 
-		for (Semaphore &semaphore : data.wait_semaphores)
+		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data.wait_semaphores); _wi++)
 		{
-			VkSemaphore wait = semaphoreholder_consume(sem_get(&semaphore));
+			Semaphore *semaphore = sem_handle_vec_at(&data.wait_semaphores, _wi);
+			VkSemaphore wait = semaphoreholder_consume(sem_get(semaphore));
 			SemaphoreVec_push(&frame().recycled_semaphores, &wait);
 			SemaphoreVec_push(&waits[0], &wait);
-		}
+		} }
 		VkPipelineStageVec_clear(&data.wait_stages);
-		data.wait_semaphores.clear();
+		sem_handle_vec_clear(&data.wait_semaphores);
 
 		{ int _si; for (_si = 0; _si < submissions->count; _si++)
 		{
@@ -17524,18 +17532,20 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void Device::clear_wait_semaphores()
 	{
-		for (Semaphore &sem : graphics.wait_semaphores)
-			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(&sem)), NULL);
-		for (Semaphore &sem : compute.wait_semaphores)
-			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(&sem)), NULL);
-		for (Semaphore &sem : transfer.wait_semaphores)
-			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(&sem)), NULL);
+		{ int _wi;
+		for (_wi = 0; _wi < sem_handle_vec_size(&graphics.wait_semaphores); _wi++)
+			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&graphics.wait_semaphores, _wi))), NULL);
+		for (_wi = 0; _wi < sem_handle_vec_size(&compute.wait_semaphores); _wi++)
+			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&compute.wait_semaphores, _wi))), NULL);
+		for (_wi = 0; _wi < sem_handle_vec_size(&transfer.wait_semaphores); _wi++)
+			vkDestroySemaphore(device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&transfer.wait_semaphores, _wi))), NULL);
+		}
 
-		graphics.wait_semaphores.clear();
+		sem_handle_vec_clear(&graphics.wait_semaphores);
 		VkPipelineStageVec_clear(&graphics.wait_stages);
-		compute.wait_semaphores.clear();
+		sem_handle_vec_clear(&compute.wait_semaphores);
 		VkPipelineStageVec_clear(&compute.wait_stages);
-		transfer.wait_semaphores.clear();
+		sem_handle_vec_clear(&transfer.wait_semaphores);
 		VkPipelineStageVec_clear(&transfer.wait_stages);
 	}
 
