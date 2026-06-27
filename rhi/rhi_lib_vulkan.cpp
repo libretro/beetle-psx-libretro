@@ -5676,14 +5676,14 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 
 
-			VkInstance instance = VK_NULL_HANDLE;
-			VkPhysicalDevice gpu = VK_NULL_HANDLE;
-			VkDevice device = VK_NULL_HANDLE;
-			VkQueue graphics_queue = VK_NULL_HANDLE;
-			VkQueue compute_queue = VK_NULL_HANDLE;
-			VkQueue transfer_queue = VK_NULL_HANDLE;
+			VkInstance instance;
+			VkPhysicalDevice gpu;
+			VkDevice device;
+			VkQueue graphics_queue;
+			VkQueue compute_queue;
+			VkQueue transfer_queue;
 
-			uint64_t cookie = 0;
+			uint64_t cookie;
 
 			/* Public so the C89 cookie_init() free function (replacing the
 			 * former Cookie(Device*) ctor + friendship) can reach it. */
@@ -5709,7 +5709,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 			struct
 			{
-				unsigned counter = 0;
+				unsigned counter;
 			} lock;
 
 
@@ -5791,10 +5791,10 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 
 
-			unsigned frame_context_index = 0;
-			uint32_t graphics_queue_family_index = 0;
-			uint32_t compute_queue_family_index = 0;
-			uint32_t transfer_queue_family_index = 0;
+			unsigned frame_context_index;
+			uint32_t graphics_queue_family_index;
+			uint32_t compute_queue_family_index;
+			uint32_t transfer_queue_family_index;
 
 
 			SamplerHandle samplers[(unsigned)(StockSampler_Count)];
