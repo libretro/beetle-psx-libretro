@@ -2647,7 +2647,7 @@ static inline uint32_t util_ctz(uint32_t x)
 			const VkPhysicalDeviceFeatures *required_features);
 	static void context_deinit(Context *ctx);
 
-	using HandleCounter = SingleThreadCounter;
+	typedef SingleThreadCounter HandleCounter;
 
 
 	static const unsigned VULKAN_NUM_DESCRIPTOR_SETS = 4;
@@ -2961,7 +2961,7 @@ enum MemoryAccessFlag
 	MEMORY_ACCESS_WRITE_BIT = 1,
 	MEMORY_ACCESS_READ_BIT = 2
 };
-using MemoryAccessFlags = uint32_t;
+typedef uint32_t MemoryAccessFlags;
 
 struct DeviceAllocation;
 struct DeviceAllocator;
@@ -3682,7 +3682,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 	{
 		IMAGE_MISC_GENERATE_MIPS_BIT = 1 << 0
 	};
-	using ImageMiscFlags = uint32_t;
+	typedef uint32_t ImageMiscFlags;
 
 	struct Image;
 
@@ -4449,7 +4449,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT = 1 << 4,
 		RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT = 1 << 5
 	};
-	using RenderPassOpFlags = uint32_t;
+	typedef uint32_t RenderPassOpFlags;
 
 	struct ImageView;
 	struct RenderPassInfo
@@ -5051,7 +5051,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 
 		COMMAND_BUFFER_DYNAMIC_BITS = COMMAND_BUFFER_DIRTY_VIEWPORT_BIT | COMMAND_BUFFER_DIRTY_SCISSOR_BIT
 	};
-	using CommandBufferDirtyFlags = uint32_t;
+	typedef uint32_t CommandBufferDirtyFlags;
 
 	union PipelineState {
 		struct State
@@ -6206,7 +6206,7 @@ static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self,
 		STATUS_SFB_READ = STATUS_COMPUTE_SFB_READ | STATUS_TRANSFER_SFB_READ | STATUS_FRAGMENT_SFB_READ,
 		STATUS_SFB_WRITE = STATUS_COMPUTE_SFB_WRITE | STATUS_TRANSFER_SFB_WRITE | STATUS_FRAGMENT_SFB_WRITE
 	};
-	using StatusFlags = uint16_t;
+	typedef uint16_t StatusFlags;
 
 	class Renderer;
 
