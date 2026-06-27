@@ -3040,7 +3040,7 @@ enum MemoryAccessFlag
 using MemoryAccessFlags = uint32_t;
 
 struct DeviceAllocation;
-class DeviceAllocator;
+struct DeviceAllocator;
 
 /* Block sub-allocator constants, hoisted from the former Block:: anonymous enum
  * to file scope so the class->struct conversion carries no nested type. */
@@ -3104,7 +3104,7 @@ void block_free(struct Block *self, uint32_t mask);
 
 struct MiniHeap;
 struct ClassAllocator;
-class DeviceAllocator;
+struct DeviceAllocator;
 struct Allocator;
 
 /* DeviceAllocation: plain bookkeeping value. Converted from a struct-with-methods
@@ -3272,292 +3272,209 @@ struct AllocatorPtrVec
 	Allocator **items;
 	int count;
 	int cap;
-
-	AllocatorPtrVec() : items(NULL), count(0), cap(0) {}
-	~AllocatorPtrVec() { destroy(); }
-	AllocatorPtrVec(AllocatorPtrVec &&o) noexcept
-		: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-	AllocatorPtrVec &operator=(AllocatorPtrVec &&o) noexcept {
-		if (this != &o) {
-			destroy();
-			items = o.items; count = o.count; cap = o.cap;
-			o.items = NULL; o.count = 0; o.cap = 0;
-		}
-		return *this;
-	}
-	AllocatorPtrVec(const AllocatorPtrVec &) = delete;
-	AllocatorPtrVec &operator=(const AllocatorPtrVec &) = delete;
-
-	/* Takes ownership of an already-allocated Allocator. */
-	void push(Allocator *p) {
-		if (count >= cap) {
-			int ncap = cap ? cap * 2 : 8;
-			Allocator **nitems = (Allocator **)::realloc(items, (size_t)ncap * sizeof(Allocator *));
-			if (!nitems)
-				return;
-			items = nitems;
-			cap = ncap;
-		}
-		items[count++] = p;
-	}
-	int size() const { return count; }
-	bool empty() const { return count == 0; }
-	Allocator *operator[](int i) const { return items[i]; }
-	Allocator *back() const { return items[count - 1]; }
-	void clear() {
-		for (int i = 0; i < count; i++) {
-			items[i]->~Allocator();
-			::free(items[i]);
-		}
-		count = 0;
-	}
-
-private:
-	void destroy() {
-		for (int i = 0; i < count; i++) {
-			items[i]->~Allocator();
-			::free(items[i]);
-		}
-		::free(items);
-		items = NULL; count = 0; cap = 0;
-	}
 };
-
-class DeviceAllocator
-{
-public:
-	void init(VkPhysicalDevice gpu, VkDevice device);
-
-	/* Raw-memory lifecycle, for an owner allocated with malloc (so this object's
-	 * constructor and destructor, and its members' constructors/destructors, do
-	 * not run). init_empty() establishes the same empty state the constructor and
-	 * the owning-vector constructors would (NULL/0/0 vectors and the scalar
-	 * defaults); the heavyweight setup still happens in init(gpu, device), which is
-	 * re-init-safe via the vectors' clear(). deinit() performs the teardown the
-	 * destructor and the vectors' destructors did (garbage-collect the heaps, then
-	 * free both vectors' storage). mem_props is left untouched, exactly as the
-	 * constructor leaves it - init(gpu, device) fills it before use. */
-	void init_empty()
-	{
-		allocators.items = NULL;
-		allocators.count = 0;
-		allocators.cap   = 0;
-		heaps.items = NULL;
-		heaps.count = 0;
-		heaps.cap   = 0;
-		device         = VK_NULL_HANDLE;
-		atom_alignment = 1;
-		use_dedicated  = false;
-	}
-
-	void deinit()
-	{
-		int i;
-		for (i = 0; i < heaps.count; i++)
-			heaps.items[i].garbage_collect(device);
-		/* Run the owning vectors' destructors explicitly (they free their storage
-		 * and delete owned entries) - the malloc'd-owner equivalent of the implicit
-		 * member destruction. */
-		allocators.~AllocatorPtrVec();
-		heaps.~HeapVec();
-	}
-
-	void set_supports_dedicated_allocation(bool enable)
-	{
-		use_dedicated = enable;
-	}
-
-	~DeviceAllocator();
-
-	bool allocate(uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling,
-	              DeviceAllocation *alloc)
-	{
-		return alloc_allocate(allocators[memory_type], size, alignment, tiling, alloc);
-	}
-	bool allocate_image_memory(uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling,
-	                           DeviceAllocation *alloc, VkImage image);
-
-	bool allocate_global(uint32_t size, uint32_t memory_type, DeviceAllocation *alloc)
-	{
-		return alloc_allocate_global(allocators[memory_type], size, alloc);
-	}
-
-	void garbage_collect();
-	void *map_memory(const DeviceAllocation &alloc, MemoryAccessFlags flags);
-	void unmap_memory(const DeviceAllocation &alloc, MemoryAccessFlags flags);
-
-	bool allocate(uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory, VkImage dedicated_image);
-	void free(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory);
-	void free_no_recycle(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory);
-
-private:
-	AllocatorPtrVec allocators;
-	VkDevice device = VK_NULL_HANDLE;
-	VkPhysicalDeviceMemoryProperties mem_props;
-	VkDeviceSize atom_alignment = 1;
-	bool use_dedicated = false;
-
-	struct Allocation
-	{
-		VkDeviceMemory memory;
-		uint8_t *host_memory;
-		uint32_t size;
-		uint32_t type;
-	};
-
-	/* Owning array of (POD) Allocation. Replaces std::vector<Allocation> for a
-	 * heap's block list. Allocation is trivially relocatable, so growth is a
-	 * realloc and erase is a memmove shift - no per-element construction or
-	 * destruction. push() appends; erase_at(i) removes one element (shifting the
-	 * tail down); erase_front(k) drops the first k elements (used when freeing a
-	 * run of blocks from the front). Move-only so Heap composes by ownership. */
-	struct AllocationVec
-	{
-		Allocation *items;
-		int count;
-		int cap;
-	};
-	static inline void AllocationVec_init(struct AllocationVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
-	static inline void AllocationVec_free_storage(struct AllocationVec *v) { ::free(v->items); v->items = NULL; v->count = 0; v->cap = 0; }
-	static inline int  AllocationVec_size(const struct AllocationVec *v) { return v->count; }
-	static inline int  AllocationVec_empty(const struct AllocationVec *v) { return v->count == 0; }
-	static inline Allocation *AllocationVec_at(struct AllocationVec *v, int i) { return &v->items[i]; }
-	static inline void AllocationVec_push(struct AllocationVec *v, const Allocation *valp) {
-		if (v->count >= v->cap) {
-			int ncap = v->cap ? v->cap * 2 : 8;
-			Allocation *nitems = (Allocation *)::realloc(v->items, (size_t)ncap * sizeof(Allocation));
-			if (!nitems)
-				return;
-			v->items = nitems;
-			v->cap = ncap;
-		}
-		v->items[v->count++] = *valp;
-	}
-	static inline void AllocationVec_erase_at(struct AllocationVec *v, int i) {
-		memmove(&v->items[i], &v->items[i + 1], (size_t)(v->count - i - 1) * sizeof(Allocation));
-		v->count--;
-	}
-	static inline void AllocationVec_erase_front(struct AllocationVec *v, int k) {
-		if (k <= 0)
+static inline void AllocatorPtrVec_init(struct AllocatorPtrVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+/* Takes ownership of an already-allocated Allocator. */
+static inline void AllocatorPtrVec_push(struct AllocatorPtrVec *v, Allocator *p) {
+	if (v->count >= v->cap) {
+		int ncap = v->cap ? v->cap * 2 : 8;
+		Allocator **nitems = (Allocator **)realloc(v->items, (size_t)ncap * sizeof(Allocator *));
+		if (!nitems)
 			return;
-		memmove(&v->items[0], &v->items[k], (size_t)(v->count - k) * sizeof(Allocation));
-		v->count -= k;
+		v->items = nitems;
+		v->cap = ncap;
 	}
+	v->items[v->count++] = p;
+}
+static inline int  AllocatorPtrVec_size(const struct AllocatorPtrVec *v) { return v->count; }
+static inline Allocator *AllocatorPtrVec_back(const struct AllocatorPtrVec *v) { return v->items[v->count - 1]; }
+static inline void AllocatorPtrVec_clear(struct AllocatorPtrVec *v) {
+	int i;
+	for (i = 0; i < v->count; i++)
+		free(v->items[i]);
+	v->count = 0;
+}
+static inline void AllocatorPtrVec_destroy(struct AllocatorPtrVec *v) {
+	int i;
+	for (i = 0; i < v->count; i++)
+		free(v->items[i]);
+	free(v->items);
+	v->items = NULL; v->count = 0; v->cap = 0;
+}
 
-	struct Heap
-	{
-		uint64_t size;
-		AllocationVec blocks;
-		void garbage_collect(VkDevice device);
-	};
-	static inline void heap_init(struct Heap *h) { h->size = 0; AllocationVec_init(&h->blocks); }
-	static inline void heap_destroy(struct Heap *h) { AllocationVec_free_storage(&h->blocks); }
-	/* Move src into dst (steal blocks), leaving src empty - replaces the implicit
-	 * move-construct of Heap (which move-constructed its AllocationVec member). */
-	static inline void heap_move(struct Heap *dst, struct Heap *src) {
-		dst->size = src->size;
-		dst->blocks = src->blocks;
-		AllocationVec_init(&src->blocks);
-	}
+/* --- DeviceAllocator's former nested types, hoisted to file scope --- */
 
-	/* Owning array of Heap. Replaces std::vector<Heap>. Heap owns a move-only
-	 * AllocationVec, so it is move-only too; growth move-constructs each Heap
-	 * into new storage with placement new and destroys the moved-from slot, and
-	 * resize(n) default-constructs new tail elements (growing) or destroys the
-	 * tail (shrinking). The allocator only ever clear()s then resize()s to the
-	 * memory-heap count and indexes/iterates after that. Uses ::operator
-	 * new/delete-free raw storage with explicit ctor/dtor; ::free/::realloc are
-	 * qualified because DeviceAllocator has its own free() members. */
-	struct HeapVec
-	{
-		Heap *items;
-		int count;
-		int cap;
-
-		HeapVec() : items(NULL), count(0), cap(0) {}
-		~HeapVec() { destroy(); }
-		HeapVec(HeapVec &&o) noexcept
-			: items(o.items), count(o.count), cap(o.cap) { o.items = NULL; o.count = 0; o.cap = 0; }
-		HeapVec &operator=(HeapVec &&o) noexcept {
-			if (this != &o) {
-				destroy();
-				items = o.items; count = o.count; cap = o.cap;
-				o.items = NULL; o.count = 0; o.cap = 0;
-			}
-			return *this;
-		}
-		HeapVec(const HeapVec &) = delete;
-		HeapVec &operator=(const HeapVec &) = delete;
-
-		int size() const { return count; }
-		bool empty() const { return count == 0; }
-		Heap &operator[](int i) { return items[i]; }
-		const Heap &operator[](int i) const { return items[i]; }
-		Heap *begin() { return items; }
-		Heap *end() { return items + count; }
-		const Heap *begin() const { return items; }
-		const Heap *end() const { return items + count; }
-
-		void clear() {
-			for (int i = 0; i < count; i++)
-				heap_destroy(&items[i]);
-			count = 0;
-		}
-		void resize(int n) {
-			if (n > count) {
-				if (n > cap)
-					grow(n);
-				for (int i = count; i < n; i++)
-					heap_init(&items[i]);
-			} else {
-				for (int i = n; i < count; i++)
-					heap_destroy(&items[i]);
-			}
-			count = n;
-		}
-
-	private:
-		void grow(int ncap) {
-			Heap *nitems = (Heap *)::malloc((size_t)ncap * sizeof(Heap));
-			for (int i = 0; i < count; i++) {
-				heap_move(&nitems[i], &items[i]);
-				heap_destroy(&items[i]);
-			}
-			::free(items);
-			items = nitems;
-			cap = ncap;
-		}
-		void destroy() {
-			for (int i = 0; i < count; i++)
-				heap_destroy(&items[i]);
-			::free(items);
-			items = NULL; count = 0; cap = 0;
-		}
-	};
-
-	HeapVec heaps;
+struct DeviceAllocatorAllocation
+{
+	VkDeviceMemory memory;
+	uint8_t *host_memory;
+	uint32_t size;
+	uint32_t type;
 };
+
+/* Owning array of (POD) DeviceAllocatorAllocation (was DeviceAllocator::Allocation).
+ * Trivially relocatable, so growth is a realloc and erase is a memmove shift. */
+struct DeviceAllocatorAllocationVec
+{
+	struct DeviceAllocatorAllocation *items;
+	int count;
+	int cap;
+};
+static inline void da_alloc_vec_init(struct DeviceAllocatorAllocationVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+static inline void da_alloc_vec_free_storage(struct DeviceAllocatorAllocationVec *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; }
+static inline int  da_alloc_vec_size(const struct DeviceAllocatorAllocationVec *v) { return v->count; }
+static inline int  da_alloc_vec_empty(const struct DeviceAllocatorAllocationVec *v) { return v->count == 0; }
+static inline struct DeviceAllocatorAllocation *da_alloc_vec_at(struct DeviceAllocatorAllocationVec *v, int i) { return &v->items[i]; }
+static inline void da_alloc_vec_push(struct DeviceAllocatorAllocationVec *v, const struct DeviceAllocatorAllocation *valp) {
+	if (v->count >= v->cap) {
+		int ncap = v->cap ? v->cap * 2 : 8;
+		struct DeviceAllocatorAllocation *nitems = (struct DeviceAllocatorAllocation *)realloc(v->items, (size_t)ncap * sizeof(struct DeviceAllocatorAllocation));
+		if (!nitems)
+			return;
+		v->items = nitems;
+		v->cap = ncap;
+	}
+	v->items[v->count++] = *valp;
+}
+static inline void da_alloc_vec_erase_at(struct DeviceAllocatorAllocationVec *v, int i) {
+	memmove(&v->items[i], &v->items[i + 1], (size_t)(v->count - i - 1) * sizeof(struct DeviceAllocatorAllocation));
+	v->count--;
+}
+static inline void da_alloc_vec_erase_front(struct DeviceAllocatorAllocationVec *v, int k) {
+	if (k <= 0)
+		return;
+	memmove(&v->items[0], &v->items[k], (size_t)(v->count - k) * sizeof(struct DeviceAllocatorAllocation));
+	v->count -= k;
+}
+
+struct DeviceAllocatorHeap
+{
+	uint64_t size;
+	struct DeviceAllocatorAllocationVec blocks;
+};
+static inline void da_heap_init(struct DeviceAllocatorHeap *h) { h->size = 0; da_alloc_vec_init(&h->blocks); }
+static inline void da_heap_destroy(struct DeviceAllocatorHeap *h) { da_alloc_vec_free_storage(&h->blocks); }
+/* Move src into dst (steal blocks), leaving src empty. */
+static inline void da_heap_move(struct DeviceAllocatorHeap *dst, struct DeviceAllocatorHeap *src) {
+	dst->size = src->size;
+	dst->blocks = src->blocks;
+	da_alloc_vec_init(&src->blocks);
+}
+void da_heap_garbage_collect(struct DeviceAllocatorHeap *self, VkDevice device);
+
+/* Owning array of DeviceAllocatorHeap (was DeviceAllocator::HeapVec). The C++
+ * move-only RAII container is now a plain struct + da_heap_vec_* free functions;
+ * growth da_heap_moves each element into new storage and destroys the moved-from
+ * slot, resize default-constructs new tail elements (growing) or destroys the
+ * tail (shrinking). */
+struct DeviceAllocatorHeapVec
+{
+	struct DeviceAllocatorHeap *items;
+	int count;
+	int cap;
+};
+static inline void da_heap_vec_init(struct DeviceAllocatorHeapVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+static inline int  da_heap_vec_size(const struct DeviceAllocatorHeapVec *v) { return v->count; }
+static inline struct DeviceAllocatorHeap *da_heap_vec_at(struct DeviceAllocatorHeapVec *v, int i) { return &v->items[i]; }
+static inline void da_heap_vec_clear(struct DeviceAllocatorHeapVec *v) {
+	int i;
+	for (i = 0; i < v->count; i++)
+		da_heap_destroy(&v->items[i]);
+	v->count = 0;
+}
+static inline void da_heap_vec_grow(struct DeviceAllocatorHeapVec *v, int ncap) {
+	struct DeviceAllocatorHeap *nitems = (struct DeviceAllocatorHeap *)malloc((size_t)ncap * sizeof(struct DeviceAllocatorHeap));
+	int i;
+	for (i = 0; i < v->count; i++) {
+		da_heap_move(&nitems[i], &v->items[i]);
+		da_heap_destroy(&v->items[i]);
+	}
+	free(v->items);
+	v->items = nitems;
+	v->cap = ncap;
+}
+static inline void da_heap_vec_resize(struct DeviceAllocatorHeapVec *v, int n) {
+	int i;
+	if (n > v->count) {
+		if (n > v->cap)
+			da_heap_vec_grow(v, n);
+		for (i = v->count; i < n; i++)
+			da_heap_init(&v->items[i]);
+	} else {
+		for (i = n; i < v->count; i++)
+			da_heap_destroy(&v->items[i]);
+	}
+	v->count = n;
+}
+static inline void da_heap_vec_free_storage(struct DeviceAllocatorHeapVec *v) {
+	da_heap_vec_clear(v);
+	free(v->items);
+	v->items = NULL; v->count = 0; v->cap = 0;
+}
+
+/* DeviceAllocator: top of the memory-allocator hierarchy. Converted from a C++
+ * class to a plain C struct + deviceallocator_* free functions. The malloc'd
+ * owner (Device) drives it via deviceallocator_init_empty / _deinit; the real
+ * setup is deviceallocator_init(gpu, device). */
+struct DeviceAllocator
+{
+	struct AllocatorPtrVec allocators;
+	VkDevice device;
+	VkPhysicalDeviceMemoryProperties mem_props;
+	VkDeviceSize atom_alignment;
+	bool use_dedicated;
+	struct DeviceAllocatorHeapVec heaps;
+};
+
+void deviceallocator_init(struct DeviceAllocator *self, VkPhysicalDevice gpu, VkDevice device);
+bool deviceallocator_allocate_image_memory(struct DeviceAllocator *self, uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling, struct DeviceAllocation *alloc, VkImage image);
+void deviceallocator_garbage_collect(struct DeviceAllocator *self);
+void *deviceallocator_map_memory(struct DeviceAllocator *self, const struct DeviceAllocation *alloc, MemoryAccessFlags flags);
+void deviceallocator_unmap_memory(struct DeviceAllocator *self, const struct DeviceAllocation *alloc, MemoryAccessFlags flags);
+bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory, VkImage dedicated_image);
+void deviceallocator_free(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory);
+void deviceallocator_free_no_recycle(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory);
+
+static inline void deviceallocator_init_empty(struct DeviceAllocator *self)
+{
+	self->allocators.items = NULL;
+	self->allocators.count = 0;
+	self->allocators.cap   = 0;
+	self->heaps.items = NULL;
+	self->heaps.count = 0;
+	self->heaps.cap   = 0;
+	self->device         = VK_NULL_HANDLE;
+	self->atom_alignment = 1;
+	self->use_dedicated  = false;
+}
+
+static inline void deviceallocator_deinit(struct DeviceAllocator *self)
+{
+	int i;
+	for (i = 0; i < self->heaps.count; i++)
+		da_heap_garbage_collect(&self->heaps.items[i], self->device);
+	AllocatorPtrVec_destroy(&self->allocators);
+	da_heap_vec_free_storage(&self->heaps);
+}
+
+static inline void deviceallocator_set_supports_dedicated_allocation(struct DeviceAllocator *self, bool enable)
+{
+	self->use_dedicated = enable;
+}
+
+static inline bool deviceallocator_allocate_typed(struct DeviceAllocator *self, uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling, struct DeviceAllocation *alloc)
+{
+	return alloc_allocate(self->allocators.items[memory_type], size, alignment, tiling, alloc);
+}
+
+static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, struct DeviceAllocation *alloc)
+{
+	return alloc_allocate_global(self->allocators.items[memory_type], size, alloc);
+}
 
 #endif
 
-/* Free-function bridge to the still-class DeviceAllocator. The allocator cluster
- * (DeviceAllocation / ClassAllocator / Allocator) was converted to C structs +
- * free functions and calls these names; DeviceAllocator itself is converted in a
- * follow-up (it carries its own HeapVec/AllocationVec C++ container subsystem).
- * Until then these thin wrappers forward to the methods so the converted code
- * links. */
-static inline bool deviceallocator_allocate(DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory, VkImage dedicated_image)
-{
-	return self->allocate(size, memory_type, memory, host_memory, dedicated_image);
-}
-static inline void deviceallocator_free(DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
-{
-	self->free(size, memory_type, memory, host_memory);
-}
-static inline void deviceallocator_free_no_recycle(DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
-{
-	self->free_no_recycle(size, memory_type, memory, host_memory);
-}
+
 
 	class Device;
 
@@ -5899,11 +5816,11 @@ static inline void deviceallocator_free_no_recycle(DeviceAllocator *self, uint32
 			// Map and unmap buffer objects.
 			void *map_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
 			{
-				return managers.memory.map_memory(buffer_get_allocation(&buffer), access);
+				return deviceallocator_map_memory(&managers.memory, &buffer_get_allocation(&buffer), access);
 			}
 			void unmap_host_buffer(const Buffer &buffer, MemoryAccessFlags access)
 			{
-				managers.memory.unmap_memory(buffer_get_allocation(&buffer), access);
+				deviceallocator_unmap_memory(&managers.memory, &buffer_get_allocation(&buffer), access);
 			}
 
 			// Create buffers and images.
@@ -13364,34 +13281,35 @@ void alloc_init(struct Allocator *self)
 	    64 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS); // 2M
 }
 
-void DeviceAllocator::init(VkPhysicalDevice gpu, VkDevice vkdevice)
+void deviceallocator_init(struct DeviceAllocator *self, VkPhysicalDevice gpu, VkDevice vkdevice)
 {
-	device = vkdevice;
-	vkGetPhysicalDeviceMemoryProperties(gpu, &mem_props);
-
+	unsigned i;
 	VkPhysicalDeviceProperties props;
+	self->device = vkdevice;
+	vkGetPhysicalDeviceMemoryProperties(gpu, &self->mem_props);
+
 	vkGetPhysicalDeviceProperties(gpu, &props);
-	atom_alignment = props.limits.nonCoherentAtomSize;
+	self->atom_alignment = props.limits.nonCoherentAtomSize;
 
-	heaps.clear();
-	allocators.clear();
+	da_heap_vec_clear(&self->heaps);
+	AllocatorPtrVec_clear(&self->allocators);
 
-	heaps.resize(mem_props.memoryHeapCount);
-	for (unsigned i = 0; i < mem_props.memoryTypeCount; i++)
+	da_heap_vec_resize(&self->heaps, (int)self->mem_props.memoryHeapCount);
+	for (i = 0; i < self->mem_props.memoryTypeCount; i++)
 	{
 		Allocator *a = (Allocator *)malloc(sizeof(Allocator));
 		alloc_init(a);
-		allocators.push(a);
-		alloc_set_memory_type(allocators.back(), i);
-		alloc_set_global_allocator(allocators.back(), this);
+		AllocatorPtrVec_push(&self->allocators, a);
+		alloc_set_memory_type(AllocatorPtrVec_back(&self->allocators), i);
+		alloc_set_global_allocator(AllocatorPtrVec_back(&self->allocators), self);
 	}
 }
 
-bool DeviceAllocator::allocate_image_memory(uint32_t size, uint32_t alignment, uint32_t memory_type,
-                                            AllocationTiling tiling, DeviceAllocation *alloc, VkImage image)
+bool deviceallocator_allocate_image_memory(struct DeviceAllocator *self, uint32_t size, uint32_t alignment, uint32_t memory_type,
+                                            AllocationTiling tiling, struct DeviceAllocation *alloc, VkImage image)
 {
-	if (!use_dedicated)
-		return allocate(size, alignment, memory_type, tiling, alloc);
+	if (!self->use_dedicated)
+		return deviceallocator_allocate_typed(self, size, alignment, memory_type, tiling, alloc);
 
 	VkImageMemoryRequirementsInfo2KHR info = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2_KHR };
 	info.image = image;
@@ -13399,121 +13317,116 @@ bool DeviceAllocator::allocate_image_memory(uint32_t size, uint32_t alignment, u
 	VkMemoryDedicatedRequirementsKHR dedicated_req = { VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS_KHR };
 	VkMemoryRequirements2KHR mem_req = { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2_KHR };
 	mem_req.pNext = &dedicated_req;
-	vkGetImageMemoryRequirements2KHR(device, &info, &mem_req);
+	vkGetImageMemoryRequirements2KHR(self->device, &info, &mem_req);
 
 	if (dedicated_req.prefersDedicatedAllocation || dedicated_req.requiresDedicatedAllocation)
-		return alloc_allocate_dedicated(allocators[memory_type], size, alloc, image);
+		return alloc_allocate_dedicated(self->allocators.items[memory_type], size, alloc, image);
 	else
-		return allocate(size, alignment, memory_type, tiling, alloc);
+		return deviceallocator_allocate_typed(self, size, alignment, memory_type, tiling, alloc);
 }
 
-void DeviceAllocator::Heap::garbage_collect(VkDevice device)
+void da_heap_garbage_collect(struct DeviceAllocatorHeap *self, VkDevice device)
 {
 	int _i;
-	for (_i = 0; _i < AllocationVec_size(&blocks); _i++)
+	for (_i = 0; _i < da_alloc_vec_size(&self->blocks); _i++)
 	{
-		Allocation &block = *AllocationVec_at(&blocks, _i);
-		if (block.host_memory)
-			vkUnmapMemory(device, block.memory);
-		vkFreeMemory(device, block.memory, NULL);
-		size -= block.size;
+		struct DeviceAllocatorAllocation *block = da_alloc_vec_at(&self->blocks, _i);
+		if (block->host_memory)
+			vkUnmapMemory(device, block->memory);
+		vkFreeMemory(device, block->memory, NULL);
+		self->size -= block->size;
 	}
 }
 
-DeviceAllocator::~DeviceAllocator()
+void deviceallocator_free(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
 {
-	for (Heap &heap : heaps)
-		heap.garbage_collect(device);
+	struct DeviceAllocatorHeap *heap = da_heap_vec_at(&self->heaps, self->mem_props.memoryTypes[memory_type].heapIndex);
+	{ struct DeviceAllocatorAllocation a = { memory, host_memory, size, memory_type }; da_alloc_vec_push(&heap->blocks, &a); }
 }
 
-void DeviceAllocator::free(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
+void deviceallocator_free_no_recycle(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
 {
-	Heap &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
-	{ Allocation a = { memory, host_memory, size, memory_type }; AllocationVec_push(&heap.blocks, &a); }
-}
-
-void DeviceAllocator::free_no_recycle(uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory)
-{
-	Heap &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
+	struct DeviceAllocatorHeap *heap = da_heap_vec_at(&self->heaps, self->mem_props.memoryTypes[memory_type].heapIndex);
 	if (host_memory)
-		vkUnmapMemory(device, memory);
-	vkFreeMemory(device, memory, NULL);
-	heap.size -= size;
+		vkUnmapMemory(self->device, memory);
+	vkFreeMemory(self->device, memory, NULL);
+	heap->size -= size;
 }
 
-void DeviceAllocator::garbage_collect()
+void deviceallocator_garbage_collect(struct DeviceAllocator *self)
 {
-	for (Heap &heap : heaps)
-		heap.garbage_collect(device);
+	int i;
+	for (i = 0; i < da_heap_vec_size(&self->heaps); i++)
+		da_heap_garbage_collect(da_heap_vec_at(&self->heaps, i), self->device);
 }
 
-void *DeviceAllocator::map_memory(const DeviceAllocation &alloc, MemoryAccessFlags flags)
+void *deviceallocator_map_memory(struct DeviceAllocator *self, const struct DeviceAllocation *alloc, MemoryAccessFlags flags)
 {
 	// This will only happen if the memory type is device local only, which we cannot possibly map.
-	if (!alloc.host_base)
+	if (!alloc->host_base)
 		return NULL;
 
 	if ((flags & MEMORY_ACCESS_READ_BIT) &&
-	    !(mem_props.memoryTypes[alloc.memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+	    !(self->mem_props.memoryTypes[alloc->memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
 	{
-		VkDeviceSize offset = alloc.offset & ~(atom_alignment - 1);
-		VkDeviceSize size = (alloc.offset + deviceallocation_get_size(&alloc) - offset + atom_alignment - 1) & ~(atom_alignment - 1);
+		VkDeviceSize offset = alloc->offset & ~(self->atom_alignment - 1);
+		VkDeviceSize size = (alloc->offset + deviceallocation_get_size(alloc) - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
 
 		// Have to invalidate cache here.
 		const VkMappedMemoryRange range = {
-			VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, NULL, alloc.base, offset, size,
+			VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, NULL, alloc->base, offset, size,
 		};
-		vkInvalidateMappedMemoryRanges(device, 1, &range);
+		vkInvalidateMappedMemoryRanges(self->device, 1, &range);
 	}
 
-	return alloc.host_base;
+	return alloc->host_base;
 }
 
-void DeviceAllocator::unmap_memory(const DeviceAllocation &alloc, MemoryAccessFlags flags)
+void deviceallocator_unmap_memory(struct DeviceAllocator *self, const struct DeviceAllocation *alloc, MemoryAccessFlags flags)
 {
 	// This will only happen if the memory type is device local only, which we cannot possibly map.
-	if (!alloc.host_base)
+	if (!alloc->host_base)
 		return;
 
 	if ((flags & MEMORY_ACCESS_WRITE_BIT) &&
-	    !(mem_props.memoryTypes[alloc.memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+	    !(self->mem_props.memoryTypes[alloc->memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
 	{
-		VkDeviceSize offset = alloc.offset & ~(atom_alignment - 1);
-		VkDeviceSize size = (alloc.offset + deviceallocation_get_size(&alloc) - offset + atom_alignment - 1) & ~(atom_alignment - 1);
+		VkDeviceSize offset = alloc->offset & ~(self->atom_alignment - 1);
+		VkDeviceSize size = (alloc->offset + deviceallocation_get_size(alloc) - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
 
 		// Have to flush caches here.
 		const VkMappedMemoryRange range = {
-			VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, NULL, alloc.base, offset, size,
+			VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, NULL, alloc->base, offset, size,
 		};
-		vkFlushMappedMemoryRanges(device, 1, &range);
+		vkFlushMappedMemoryRanges(self->device, 1, &range);
 	}
 }
 
-bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory,
+bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory,
                                VkImage dedicated_image)
 {
-	Heap &heap = heaps[mem_props.memoryTypes[memory_type].heapIndex];
+	struct DeviceAllocatorHeap *heap = da_heap_vec_at(&self->heaps, self->mem_props.memoryTypes[memory_type].heapIndex);
 
 	// Naive searching is fine here as vkAllocate blocks are *huge* and we won't have many of them.
-	size_t found_idx = (size_t)AllocationVec_size(&heap.blocks);
-	for (size_t i = 0; i < (size_t)AllocationVec_size(&heap.blocks); i++)
+	size_t found_idx = (size_t)da_alloc_vec_size(&heap->blocks);
+	for (size_t i = 0; i < (size_t)da_alloc_vec_size(&heap->blocks); i++)
 	{
-		if (AllocationVec_at(&heap.blocks, (int)i)->size == size && AllocationVec_at(&heap.blocks, (int)i)->type == memory_type)
+		if (da_alloc_vec_at(&heap->blocks, (int)i)->size == size && da_alloc_vec_at(&heap->blocks, (int)i)->type == memory_type)
 		{
 			found_idx = i;
 			break;
 		}
 	}
 
-	bool host_visible = (mem_props.memoryTypes[memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
+	bool host_visible = (self->mem_props.memoryTypes[memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 
 	// Found previously used block.
-	if (found_idx < (size_t)AllocationVec_size(&heap.blocks))
+	if (found_idx < (size_t)da_alloc_vec_size(&heap->blocks))
 	{
-		Allocation &block = *AllocationVec_at(&heap.blocks, (int)found_idx);
-		*memory = block.memory;
-		*host_memory = block.host_memory;
-		AllocationVec_erase_at(&heap.blocks, (int)found_idx);
+		struct DeviceAllocatorAllocation *block = da_alloc_vec_at(&heap->blocks, (int)found_idx);
+		*memory = block->memory;
+		*host_memory = block->host_memory;
+		da_alloc_vec_erase_at(&heap->blocks, (int)found_idx);
 		return true;
 	}
 
@@ -13526,16 +13439,16 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	}
 
 	VkDeviceMemory device_memory;
-	VkResult res = vkAllocateMemory(device, &info, NULL, &device_memory);
+	VkResult res = vkAllocateMemory(self->device, &info, NULL, &device_memory);
 
 	if (res == VK_SUCCESS)
 	{
-		heap.size += size;
+		heap->size += size;
 		*memory = device_memory;
 
 		if (host_visible)
 		{
-			if (vkMapMemory(device, device_memory, 0, size, 0, (void **)(host_memory)) != VK_SUCCESS)
+			if (vkMapMemory(self->device, device_memory, 0, size, 0, (void **)(host_memory)) != VK_SUCCESS)
 				return false;
 		}
 
@@ -13545,30 +13458,30 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 	{
 		// Look through our heap and see if there are blocks of other types we can free.
 		int freed = 0;
-		while (res != VK_SUCCESS && freed < (size_t)AllocationVec_size(&heap.blocks))
+		while (res != VK_SUCCESS && freed < (int)da_alloc_vec_size(&heap->blocks))
 		{
-			Allocation &b = *AllocationVec_at(&heap.blocks, (int)freed);
-			if (b.host_memory)
-				vkUnmapMemory(device, b.memory);
-			vkFreeMemory(device, b.memory, NULL);
-			heap.size -= b.size;
-			res = vkAllocateMemory(device, &info, NULL, &device_memory);
+			struct DeviceAllocatorAllocation *b = da_alloc_vec_at(&heap->blocks, (int)freed);
+			if (b->host_memory)
+				vkUnmapMemory(self->device, b->memory);
+			vkFreeMemory(self->device, b->memory, NULL);
+			heap->size -= b->size;
+			res = vkAllocateMemory(self->device, &info, NULL, &device_memory);
 			++freed;
 		}
 
-		AllocationVec_erase_front(&heap.blocks, (int)freed);
+		da_alloc_vec_erase_front(&heap->blocks, (int)freed);
 
 		if (res == VK_SUCCESS)
 		{
-			heap.size += size;
+			heap->size += size;
 			*memory = device_memory;
 
 			if (host_visible)
 			{
-				if (vkMapMemory(device, device_memory, 0, size, 0, (void **)(host_memory)) !=
+				if (vkMapMemory(self->device, device_memory, 0, size, 0, (void **)(host_memory)) !=
 				    VK_SUCCESS)
 				{
-					vkFreeMemory(device, device_memory, NULL);
+					vkFreeMemory(self->device, device_memory, NULL);
 					return false;
 				}
 			}
@@ -16703,7 +16616,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		/* Owning members - establish each one's empty state via its raw-memory init. */
 		self->handle_pool.init();
-		self->managers.memory.init_empty();
+		deviceallocator_init_empty(&self->managers.memory);
 		self->managers.fence.init_empty();
 		self->managers.semaphore.init_empty();
 		self->managers.vbo.init_empty();
@@ -16749,7 +16662,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		self->per_frame.deinit();
 		self->managers.vbo.deinit();
 		self->managers.ubo.deinit();
-		self->managers.memory.deinit();
+		deviceallocator_deinit(&self->managers.memory);
 		self->handle_pool.deinit();
 	}
 
@@ -16975,8 +16888,8 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 
 		ext = context.get_enabled_device_features();
 
-		managers.memory.init(gpu, device);
-		managers.memory.set_supports_dedicated_allocation(ext.supports_dedicated);
+		deviceallocator_init(&managers.memory, gpu, device);
+		deviceallocator_set_supports_dedicated_allocation(&managers.memory, ext.supports_dedicated);
 		managers.semaphore.init(device);
 		managers.fence.init(device);
 		managers.vbo.init(this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -18418,7 +18331,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		if (memory_type == UINT32_MAX)
 			return ih_make(NULL);
 
-		if (!managers.memory.allocate_image_memory(reqs.size, reqs.alignment, memory_type,
+		if (!deviceallocator_allocate_image_memory(&managers.memory, reqs.size, reqs.alignment, memory_type,
 					ALLOCATION_TILING_OPTIMAL,
 					&holder.allocation, holder.image))
 		{
@@ -18690,7 +18603,7 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 			return bh_make(NULL);
 		}
 
-		if (!managers.memory.allocate(reqs.size, reqs.alignment, memory_type, ALLOCATION_TILING_LINEAR, &allocation))
+		if (!deviceallocator_allocate_typed(&managers.memory, reqs.size, reqs.alignment, memory_type, ALLOCATION_TILING_LINEAR, &allocation))
 		{
 			vkDestroyBuffer(device, buffer, NULL);
 			return bh_make(NULL);
@@ -18728,12 +18641,12 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		}
 		else if (initial)
 		{
-			void *ptr = managers.memory.map_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
+			void *ptr = deviceallocator_map_memory(&managers.memory, &allocation, MEMORY_ACCESS_WRITE_BIT);
 			if (!ptr)
 				return bh_make(NULL);
 
 			memcpy(ptr, initial, create_info.size);
-			managers.memory.unmap_memory(allocation, MEMORY_ACCESS_WRITE_BIT);
+			deviceallocator_unmap_memory(&managers.memory, &allocation, MEMORY_ACCESS_WRITE_BIT);
 		}
 		return handle;
 	}
