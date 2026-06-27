@@ -5568,10 +5568,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			 * tears the device down so the storage can be freed. Static so they take
 			 * the raw Device* explicitly. */
 
-			// No move-copy.
-			void operator=(Device &&) = delete;
-			Device(Device &&) = delete;
-
 			// Only called by main thread, during setup phase.
 
 			// Frame-pushing interface.
@@ -7499,65 +7495,63 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	 * renderer recreations, so move-assign must free any entries it already
 	 * holds before adopting the source's. Copying is deleted to prevent any
 	 * accidental double-ownership. */
+	/* UploadOwningMap: plain C struct (was a move-only C++ class). The entries are
+	 * owning pointers to heap-allocated TextureUploads; ownership moves via
+	 * uploadmap_move (steal, source emptied) and is released by uploadmap_destroy.
+	 * No copy operation exists -- callers must move, never copy. */
 	struct UploadOwningMap {
-		struct Entry { uint32_t key; TextureUpload *val; };
-		Entry *items;
+		struct UploadOwningMapEntry { uint32_t key; TextureUpload *val; };
+		struct UploadOwningMapEntry *items;
 		int count;
 		int cap;
-
-		UploadOwningMap() : items(NULL), count(0), cap(0) {}
-
-		~UploadOwningMap() { destroy(); }
-
-		UploadOwningMap(UploadOwningMap &&o) : items(o.items), count(o.count), cap(o.cap) {
-			o.items = NULL; o.count = 0; o.cap = 0;
-		}
-
-		UploadOwningMap &operator=(UploadOwningMap &&o) {
-			if (this != &o) {
-				destroy();
-				items = o.items; count = o.count; cap = o.cap;
-				o.items = NULL; o.count = 0; o.cap = 0;
-			}
-			return *this;
-		}
-
-		/* No copies: the entries are owning pointers. */
-		UploadOwningMap(const UploadOwningMap &) = delete;
-		UploadOwningMap &operator=(const UploadOwningMap &) = delete;
-
-		bool contains(uint32_t key) const {
-			for (int i = 0; i < count; i++)
-				if (items[i].key == key)
-					return true;
-			return false;
-		}
-
-		/* Takes ownership of an already-heap-allocated upload under key. Caller
-		 * must have ensured the key is absent (mirrors the old map's insert-if-
-		 * absent guard). */
-		void insert(uint32_t key, TextureUpload *val) {
-			if (count >= cap) {
-				int ncap = cap ? cap * 2 : 8;
-				Entry *nitems = (Entry *)realloc(items, (size_t)ncap * sizeof(Entry));
-				if (!nitems)
-					return;
-				items = nitems;
-				cap = ncap;
-			}
-			items[count].key = key;
-			items[count].val = val;
-			count++;
-		}
-
-	private:
-		void destroy() {
-			for (int i = 0; i < count; i++)
-				texture_upload_destroy(items[i].val);
-			free(items);
-			items = NULL; count = 0; cap = 0;
-		}
 	};
+
+	static inline void uploadmap_init(struct UploadOwningMap *m)
+	{
+		m->items = NULL; m->count = 0; m->cap = 0;
+	}
+
+	static inline void uploadmap_destroy(struct UploadOwningMap *m)
+	{
+		int i;
+		for (i = 0; i < m->count; i++)
+			texture_upload_destroy(m->items[i].val);
+		free(m->items);
+		m->items = NULL; m->count = 0; m->cap = 0;
+	}
+
+	/* Move: steal o's storage into m (which must be empty/initialized), leave o empty. */
+	static inline void uploadmap_move(struct UploadOwningMap *m, struct UploadOwningMap *o)
+	{
+		m->items = o->items; m->count = o->count; m->cap = o->cap;
+		o->items = NULL; o->count = 0; o->cap = 0;
+	}
+
+	static inline bool uploadmap_contains(const struct UploadOwningMap *m, uint32_t key)
+	{
+		int i;
+		for (i = 0; i < m->count; i++)
+			if (m->items[i].key == key)
+				return true;
+		return false;
+	}
+
+	/* Takes ownership of an already-heap-allocated upload under key. Caller must have
+	 * ensured the key is absent (mirrors the old map's insert-if-absent guard). */
+	static inline void uploadmap_insert(struct UploadOwningMap *m, uint32_t key, TextureUpload *val)
+	{
+		if (m->count >= m->cap) {
+			int ncap = m->cap ? m->cap * 2 : 8;
+			UploadOwningMap::UploadOwningMapEntry *nitems = (UploadOwningMap::UploadOwningMapEntry *)realloc(m->items, (size_t)ncap * sizeof(UploadOwningMap::UploadOwningMapEntry));
+			if (!nitems)
+				return;
+			m->items = nitems;
+			m->cap = ncap;
+		}
+		m->items[m->count].key = key;
+		m->items[m->count].val = val;
+		m->count++;
+	}
 
 	struct TextureRectSaveState {
 		uint32_t upload_hash;
@@ -7658,39 +7652,43 @@ void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveStateVec *
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
 
+	/* TextureTrackerSaveState: plain C struct (was a move-only C++ class). Owns two
+	 * save-state vectors and an UploadOwningMap; managed explicitly through tts_init /
+	 * tts_destroy / tts_move. No copy exists -- callers must move (steal), never copy. */
 	struct TextureTrackerSaveState {
 		TextureRectSaveStateVec rects;
 		RestorableRectSaveStateVec restorable;
 		UploadOwningMap uploads;
-
-		TextureTrackerSaveState() {
-			TextureRectSaveStateVec_init(&rects);
-			RestorableRectSaveStateVec_init(&restorable);
-		}
-		~TextureTrackerSaveState() {
-			TextureRectSaveStateVec_free_storage(&rects);
-			RestorableRectSaveStateVec_free_storage(&restorable);
-		}
-		TextureTrackerSaveState(TextureTrackerSaveState &&o) noexcept
-			: uploads(static_cast<UploadOwningMap &&>(o.uploads)) {
-			TextureRectSaveStateVec_move(&rects, &o.rects);
-			restorable = o.restorable;
-			RestorableRectSaveStateVec_init(&o.restorable);
-		}
-		TextureTrackerSaveState &operator=(TextureTrackerSaveState &&o) noexcept {
-			if (this != &o) {
-				TextureRectSaveStateVec_free_storage(&rects);
-				RestorableRectSaveStateVec_free_storage(&restorable);
-				TextureRectSaveStateVec_move(&rects, &o.rects);
-				restorable = o.restorable;
-				RestorableRectSaveStateVec_init(&o.restorable);
-				uploads = static_cast<UploadOwningMap &&>(o.uploads);
-			}
-			return *this;
-		}
-		TextureTrackerSaveState(const TextureTrackerSaveState &) = delete;
-		TextureTrackerSaveState &operator=(const TextureTrackerSaveState &) = delete;
 	};
+
+	static inline void tts_init(struct TextureTrackerSaveState *s)
+	{
+		TextureRectSaveStateVec_init(&s->rects);
+		RestorableRectSaveStateVec_init(&s->restorable);
+		uploadmap_init(&s->uploads);
+	}
+
+	static inline void tts_destroy(struct TextureTrackerSaveState *s)
+	{
+		TextureRectSaveStateVec_free_storage(&s->rects);
+		RestorableRectSaveStateVec_free_storage(&s->restorable);
+		uploadmap_destroy(&s->uploads);
+	}
+
+	/* Move o into s (which must already be initialized): free s's current storage,
+	 * steal o's, and leave o empty/initialized. Mirrors the old move-assignment. */
+	static inline void tts_move(struct TextureTrackerSaveState *s, struct TextureTrackerSaveState *o)
+	{
+		if (s == o)
+			return;
+		TextureRectSaveStateVec_free_storage(&s->rects);
+		RestorableRectSaveStateVec_free_storage(&s->restorable);
+		uploadmap_destroy(&s->uploads);
+		TextureRectSaveStateVec_move(&s->rects, &o->rects);
+		s->restorable = o->restorable;
+		RestorableRectSaveStateVec_init(&o->restorable);
+		uploadmap_move(&s->uploads, &o->uploads);
+	}
 	// End of Save State
 	//========================================
 
@@ -8224,7 +8222,7 @@ void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveStateVec *
 	void texture_tracker_init(struct TextureTracker *self);
 	void texture_tracker_fini(struct TextureTracker *self);
 
-	TextureTrackerSaveState texture_tracker_save_state(struct TextureTracker *self);
+	void texture_tracker_save_state(struct TextureTracker *self, TextureTrackerSaveState *out);
 	void texture_tracker_load_state(struct TextureTracker *self, const TextureTrackerSaveState &state);
 
 	void texture_tracker_upload(struct TextureTracker *self, Rect rect, uint16_t *vram);
@@ -8710,37 +8708,16 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			 * recreations, so it is move-only with a free-existing move-assign
 			 * and a destructor, and copying is deleted. */
 
+			/* SaveState: plain C struct (was a move-only C++ class). Owns an OwnedU32Buf
+			 * VRAM snapshot, a POD RenderState, and a move-only TextureTrackerSaveState.
+			 * Managed explicitly via savestate_init / savestate_destroy / savestate_move
+			 * (defined as free functions after the Renderer class, where OwnedU32Buf and
+			 * TextureTrackerSaveState are complete). No copy exists. */
 			struct SaveState
 			{
 				OwnedU32Buf vram;
 				RenderState state;
 				TextureTrackerSaveState tracker_state;
-
-				/* vram is now a plain struct (no ctor/dtor/move of its own), so
-				 * SaveState manages it explicitly via owned_u32_*; state is POD and
-				 * tracker_state keeps its own (still C++) move-only semantics. */
-				SaveState() { owned_u32_init(&vram); }
-				~SaveState() { owned_u32_deinit(&vram); }
-
-				SaveState(SaveState &&o) noexcept
-					: state(o.state),
-					  tracker_state(static_cast<TextureTrackerSaveState &&>(o.tracker_state))
-				{
-					owned_u32_init(&vram);
-					owned_u32_move(&vram, &o.vram);
-				}
-				SaveState &operator=(SaveState &&o) noexcept
-				{
-					if (this != &o)
-					{
-						owned_u32_move(&vram, &o.vram);
-						state = o.state;
-						tracker_state = static_cast<TextureTrackerSaveState &&>(o.tracker_state);
-					}
-					return *this;
-				}
-				SaveState(const SaveState &) = delete;
-				SaveState &operator=(const SaveState &) = delete;
 			};
 
 
@@ -8891,6 +8868,32 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 			BufferHandle quad = { NULL };
 	};
 
+	/* SaveState lifecycle free functions (SaveState was a move-only C++ class; it is now
+	 * a plain struct). vram is an OwnedU32Buf and tracker_state a TextureTrackerSaveState,
+	 * both move-only plain structs managed through their own *_init / *_move / destroy. */
+	static inline void savestate_init(struct Renderer::SaveState *s)
+	{
+		owned_u32_init(&s->vram);
+		tts_init(&s->tracker_state);
+	}
+
+	static inline void savestate_destroy(struct Renderer::SaveState *s)
+	{
+		owned_u32_deinit(&s->vram);
+		tts_destroy(&s->tracker_state);
+	}
+
+	/* Move o into s (s must be initialized): steal o's owning members, copy the POD
+	 * RenderState, leave o empty/initialized. */
+	static inline void savestate_move(struct Renderer::SaveState *s, struct Renderer::SaveState *o)
+	{
+		if (s == o)
+			return;
+		owned_u32_move(&s->vram, &o->vram);
+		s->state = o->state;
+		tts_move(&s->tracker_state, &o->tracker_state);
+	}
+
 	/* Forward declarations for the renderer_* free functions (formerly friend
 	 * declarations inside the Renderer class, now redundant since Renderer is a plain
 	 * struct). Needed because the inline renderer_* functions below call ones whose
@@ -8984,7 +8987,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	void renderer_set_display_filter(Renderer *self, ScanoutFilter filter);
 	void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter);
 	void renderer_set_dither_native_resolution(Renderer *self, bool enable);
-	Renderer::SaveState renderer_save_vram_state(Renderer *self);
+	void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out);
 	void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const Renderer::SaveState *state);
 	void renderer_fini(Renderer *self);
 	bool renderer_is_valid(const Renderer *self);
@@ -9608,7 +9611,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 
 	self->valid = true;}
 
-Renderer::SaveState renderer_save_vram_state(Renderer *self){
+void renderer_save_vram_state(Renderer *self, Renderer::SaveState *out){
 	BufferCreateInfo buffer_create_info;
 	buffer_create_info.domain = BufferDomain_CachedHost;
 	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
@@ -9633,11 +9636,10 @@ Renderer::SaveState renderer_save_vram_state(Renderer *self){
 	owned_u32_init(&vram);
 	owned_u32_assign(&vram, src, FB_WIDTH * FB_HEIGHT);
 	device_unmap_host_buffer(self->device, *bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
-	Renderer::SaveState out;
-	owned_u32_move(&out.vram, &vram);
-	out.state = self->render_state;
-	out.tracker_state = texture_tracker_save_state(&self->tracker);
-	return out;
+	savestate_init(out);
+	owned_u32_move(&out->vram, &vram);
+	out->state = self->render_state;
+	texture_tracker_save_state(&self->tracker, &out->tracker_state);
 }
 
 void renderer_init_primitive_pipelines(Renderer *self)
@@ -21533,8 +21535,8 @@ int64_t page_bytes(FusionRects &fusion)
 
 	TextureRectSaveState to_save_state(const TextureRect &t, UploadOwningMap &uploads) {
 		uint32_t hash = t.upload->hash;
-		if (!uploads.contains(hash))
-			uploads.insert(hash, texture_upload_new_copy_without_handles(t.upload));
+		if (!uploadmap_contains(&uploads, hash))
+			uploadmap_insert(&uploads, hash, texture_upload_new_copy_without_handles(t.upload));
 		return {
 			t.upload->hash,
 			t.offset_x,
@@ -21562,9 +21564,10 @@ int64_t page_bytes(FusionRects &fusion)
 		};
 	}
 
-	TextureTrackerSaveState texture_tracker_save_state(struct TextureTracker *self)
+	void texture_tracker_save_state(struct TextureTracker *self, TextureTrackerSaveState *out)
 	{
 		TextureTrackerSaveState state;
+		tts_init(&state);
 
 		for (EnduringTextureRect &r : self->tracker.textures)
 		{
@@ -21588,7 +21591,8 @@ int64_t page_bytes(FusionRects &fusion)
 			RestorableRectSaveStateVec_push_move(&state.restorable, &saved);
 		}
 
-		return state;
+		tts_move(out, &state);
+		tts_destroy(&state);
 	}
 
 
@@ -21915,7 +21919,8 @@ static void vk_context_destroy(void)
    if (device == NULL)
       return;
 
-   save_state = renderer_save_vram_state(renderer);
+   savestate_destroy(&save_state);
+   renderer_save_vram_state(renderer, &save_state);
    vulkan     = NULL;
    scanout_handles.clear();
    swapchain_images.clear();
