@@ -3838,16 +3838,33 @@ VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
 
 	struct ImageViewCreateInfo
 	{
-		Image *image = NULL;
-		VkFormat format = VK_FORMAT_UNDEFINED;
-		unsigned base_level = 0;
-		unsigned levels = VK_REMAINING_MIP_LEVELS;
-		unsigned base_layer = 0;
-		unsigned layers = VK_REMAINING_ARRAY_LAYERS;
-		VkComponentMapping swizzle = {
-			VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
-		};
+		Image *image;
+		VkFormat format;
+		unsigned base_level;
+		unsigned levels;
+		unsigned base_layer;
+		unsigned layers;
+		VkComponentMapping swizzle;
 	};
+
+	/* Establishes the former NSDMI defaults. Every bare ImageViewCreateInfo
+	 * declaration MUST call this before use: in particular it sets `swizzle` to
+	 * the RGBA identity mapping, which not every construction site assigns
+	 * explicitly -- leaving it uninitialised is the swizzle SIGSEGV this whole
+	 * campaign already hit once. */
+	static inline void image_view_create_info_defaults(struct ImageViewCreateInfo *self)
+	{
+		self->image      = NULL;
+		self->format     = VK_FORMAT_UNDEFINED;
+		self->base_level = 0;
+		self->levels     = VK_REMAINING_MIP_LEVELS;
+		self->base_layer = 0;
+		self->layers     = VK_REMAINING_ARRAY_LAYERS;
+		self->swizzle.r  = VK_COMPONENT_SWIZZLE_R;
+		self->swizzle.g  = VK_COMPONENT_SWIZZLE_G;
+		self->swizzle.b  = VK_COMPONENT_SWIZZLE_B;
+		self->swizzle.a  = VK_COMPONENT_SWIZZLE_A;
+	}
 
 	struct ImageView;
 
@@ -3873,7 +3890,7 @@ VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
 		RenderTargetViewVec render_target_views;
 		VkImageView depth_view;
 		VkImageView stencil_view;
-		ImageViewCreateInfo info;
+		ImageViewCreateInfo info; /* seeded via imageview_init's `info` arg */
 		HandleCounter reference_count;
 	};
 	static void imageview_init(struct ImageView *self, Device *device, VkImageView view, const ImageViewCreateInfo &info);
@@ -12734,6 +12751,7 @@ void image_init(struct Image *self, Device *device, VkImage image, VkImageView d
 	if (default_view != VK_NULL_HANDLE)
 	{
 		ImageViewCreateInfo info;
+		image_view_create_info_defaults(&info); /* sets swizzle + all fields; the assignments below override only 6 of 7 */
 		info.image = self;
 		info.format = create_info.format;
 		info.base_level = 0;
