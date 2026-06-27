@@ -5561,6 +5561,11 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	class Device
 	{
 		public:
+			friend void device_set_context(Device *self, const Context &context);
+			friend void device_end_frame_nolock(Device *self);
+			friend void device_init_frame_contexts(Device *self, unsigned count);
+			friend void device_wait_idle_nolock(Device *self);
+			friend void device_next_frame_context(Device *self);
 			friend void device_add_wait_semaphore_nolock(Device *self, CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages, bool flush);
 			friend void device_submit(Device *self, CommandBufferHandle &cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
 			friend void device_submit_nolock(Device *self, CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores);
@@ -5682,11 +5687,8 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			Device(Device &&) = delete;
 
 			// Only called by main thread, during setup phase.
-			void set_context(const Context &context);
-			void init_frame_contexts(unsigned count);
 
 			// Frame-pushing interface.
-			void next_frame_context();
 
 			// Set names for objects for debuggers and profilers.
 
@@ -5881,8 +5883,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 
 
 
-			void wait_idle_nolock();
-			void end_frame_nolock();
 
 			ImplementationWorkarounds workarounds;
 	};
@@ -5914,7 +5914,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	 * pointers. wait_idle / flush_frame still call the *_nolock members (not yet
 	 * converted) through self->. Defined here, right after the class, so they precede
 	 * all callers; friend-declared inside the class for private-member access. */
-void device_wait_idle(Device *self) { self->wait_idle_nolock(); }
+void device_wait_idle(Device *self) { device_wait_idle_nolock(self); }
 void device_flush_frame(Device *self) { device_flush_frame_nolock(self); }
 void *device_map_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access) { return deviceallocator_map_memory(&self->managers.memory, &buffer_get_allocation(&buffer), access); }
 void device_unmap_host_buffer(Device *self, const Buffer &buffer, MemoryAccessFlags access) { deviceallocator_unmap_memory(&self->managers.memory, &buffer_get_allocation(&buffer), access); }
@@ -16902,40 +16902,39 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		program_set_pipeline_layout(&program, device_request_pipeline_layout(self, layout));
 	}
 
-	void Device::set_context(const Context &context)
-	{
-		instance = context_get_instance(&context);
-		gpu = context_get_gpu(&context);
-		device = context_get_device(&context);
+	void device_set_context(Device *self, const Context &context){
+		self->instance = context_get_instance(&context);
+		self->gpu = context_get_gpu(&context);
+		self->device = context_get_device(&context);
 
-		graphics_queue_family_index = context_get_graphics_queue_family(&context);
-		graphics_queue = context_get_graphics_queue(&context);
-		compute_queue_family_index = context_get_compute_queue_family(&context);
-		compute_queue = context_get_compute_queue(&context);
-		transfer_queue_family_index = context_get_transfer_queue_family(&context);
-		transfer_queue = context_get_transfer_queue(&context);
+		self->graphics_queue_family_index = context_get_graphics_queue_family(&context);
+		self->graphics_queue = context_get_graphics_queue(&context);
+		self->compute_queue_family_index = context_get_compute_queue_family(&context);
+		self->compute_queue = context_get_compute_queue(&context);
+		self->transfer_queue_family_index = context_get_transfer_queue_family(&context);
+		self->transfer_queue = context_get_transfer_queue(&context);
 
-		mem_props = *context_get_mem_props(&context);
-		gpu_props = *context_get_gpu_props(&context);
+		self->mem_props = *context_get_mem_props(&context);
+		self->gpu_props = *context_get_gpu_props(&context);
 
-		device_init_workarounds(this);
+		device_init_workarounds(self);
 
-		device_init_stock_samplers(this);
+		device_init_stock_samplers(self);
 
 #ifdef ANDROID
-		init_frame_contexts(3); // Android needs a bit more ... ;)
+		device_init_frame_contexts(self, 3); // Android needs a bit more ... ;)
 #else
-		init_frame_contexts(2); // By default, regular double buffer between CPU and GPU.
+		device_init_frame_contexts(self, 2); // By default, regular double buffer between CPU and GPU.
 #endif
 
-		ext = *context_get_enabled_device_features(&context);
+		self->ext = *context_get_enabled_device_features(&context);
 
-		deviceallocator_init(&managers.memory, gpu, device);
-		deviceallocator_set_supports_dedicated_allocation(&managers.memory, ext.supports_dedicated);
-		semaphoremanager_init(&managers.semaphore, device);
-		fencemanager_init(&managers.fence, device);
-		bufferpool_init(&managers.vbo, this, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-		bufferpool_init(&managers.ubo, this, 256 * 1024, max_((VkDeviceSize)16u, gpu_props.limits.minUniformBufferOffsetAlignment),
+		deviceallocator_init(&self->managers.memory, self->gpu, self->device);
+		deviceallocator_set_supports_dedicated_allocation(&self->managers.memory, self->ext.supports_dedicated);
+		semaphoremanager_init(&self->managers.semaphore, self->device);
+		fencemanager_init(&self->managers.fence, self->device);
+		bufferpool_init(&self->managers.vbo, self, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		bufferpool_init(&self->managers.ubo, self, 256 * 1024, max_((VkDeviceSize)16u, self->gpu_props.limits.minUniformBufferOffsetAlignment),
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 	}
 
@@ -17468,36 +17467,35 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		device_submit_staging(self, cmd, usage, false);
 	}
 
-	void Device::end_frame_nolock()
-	{
+	void device_end_frame_nolock(Device *self){
 		// Make sure we have a fence which covers all submissions in the frame.
 		VkFence fence;
 
-		if (transfer.need_fence || !cbhvec_empty(&device_frame(this)->transfer_submissions))
+		if (self->transfer.need_fence || !cbhvec_empty(&device_frame(self)->transfer_submissions))
 		{
 			fence = VK_NULL_HANDLE;
-			device_submit_queue(this, Type_AsyncTransfer, &fence, 0, NULL);
+			device_submit_queue(self, Type_AsyncTransfer, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				FenceVec_push(&device_frame(this)->recycle_fences, &fence);
-			transfer.need_fence = false;
+				FenceVec_push(&device_frame(self)->recycle_fences, &fence);
+			self->transfer.need_fence = false;
 		}
 
-		if (graphics.need_fence || !cbhvec_empty(&device_frame(this)->graphics_submissions))
+		if (self->graphics.need_fence || !cbhvec_empty(&device_frame(self)->graphics_submissions))
 		{
 			fence = VK_NULL_HANDLE;
-			device_submit_queue(this, Type_Generic, &fence, 0, NULL);
+			device_submit_queue(self, Type_Generic, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				FenceVec_push(&device_frame(this)->recycle_fences, &fence);
-			graphics.need_fence = false;
+				FenceVec_push(&device_frame(self)->recycle_fences, &fence);
+			self->graphics.need_fence = false;
 		}
 
-		if (compute.need_fence || !cbhvec_empty(&device_frame(this)->compute_submissions))
+		if (self->compute.need_fence || !cbhvec_empty(&device_frame(self)->compute_submissions))
 		{
 			fence = VK_NULL_HANDLE;
-			device_submit_queue(this, Type_AsyncCompute, &fence, 0, NULL);
+			device_submit_queue(self, Type_AsyncCompute, &fence, 0, NULL);
 			if (fence != VK_NULL_HANDLE)
-				FenceVec_push(&device_frame(this)->recycle_fences, &fence);
-			compute.need_fence = false;
+				FenceVec_push(&device_frame(self)->recycle_fences, &fence);
+			self->compute.need_fence = false;
 		}
 	}
 
@@ -17562,20 +17560,19 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		return handle;
 	}
 
-	void Device::init_frame_contexts(unsigned count)
-	{
-		wait_idle_nolock();
+	void device_init_frame_contexts(Device *self, unsigned count){
+		device_wait_idle_nolock(self);
 
 		// Clear out caches which might contain stale data from now on.
-		framebuffer_allocator_clear(&framebuffer_allocator);
-		attachment_allocator_clear(&transient_allocator);
-		per_frame_ptr_vec_clear(&per_frame);
+		framebuffer_allocator_clear(&self->framebuffer_allocator);
+		attachment_allocator_clear(&self->transient_allocator);
+		per_frame_ptr_vec_clear(&self->per_frame);
 
 		for (unsigned i = 0; i < count; i++)
 		{
-			PerFrame *pf = (PerFrame *)malloc(sizeof(PerFrame));
-			per_frame_init(pf, this);
-			per_frame_ptr_vec_push(&per_frame, pf);
+			Device::PerFrame *pf = (Device::PerFrame *)malloc(sizeof(Device::PerFrame));
+			per_frame_init(pf, self);
+			per_frame_ptr_vec_push(&self->per_frame, pf);
 		}
 	}
 
@@ -17697,62 +17694,60 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VkPipelineStageVec_clear(&self->transfer.wait_stages);
 	}
 
-	void Device::wait_idle_nolock()
-	{
-		if (per_frame.count != 0)
-			end_frame_nolock();
+	void device_wait_idle_nolock(Device *self){
+		if (self->per_frame.count != 0)
+			device_end_frame_nolock(self);
 
-		if (device != VK_NULL_HANDLE)
-			vkDeviceWaitIdle(device);
+		if (self->device != VK_NULL_HANDLE)
+			vkDeviceWaitIdle(self->device);
 
-		device_clear_wait_semaphores(this);
+		device_clear_wait_semaphores(self);
 
 		// Free memory for buffer pools.
-		bufferpool_reset(&managers.vbo);
-		bufferpool_reset(&managers.ubo);
-		{ int _pi; for (_pi = 0; _pi < per_frame.count; _pi++)
+		bufferpool_reset(&self->managers.vbo);
+		bufferpool_reset(&self->managers.ubo);
+		{ int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
 		{
-			PerFrame *frame = per_frame.items[_pi];
+			Device::PerFrame *frame = self->per_frame.items[_pi];
 			bufferblock_vec_clear(&frame->vbo_blocks);
 			bufferblock_vec_clear(&frame->ubo_blocks);
 		} }
 
-		framebuffer_allocator_clear(&framebuffer_allocator);
-		attachment_allocator_clear(&transient_allocator);
+		framebuffer_allocator_clear(&self->framebuffer_allocator);
+		attachment_allocator_clear(&self->transient_allocator);
 		{
 			struct IntrusiveListNode *n;
-			for (n = descriptor_set_allocator_map_begin(&descriptor_set_allocators); n; n = n->next)
+			for (n = descriptor_set_allocator_map_begin(&self->descriptor_set_allocators); n; n = n->next)
 				descriptor_set_allocator_clear(descriptor_set_allocator_map_iter_get(n));
 		}
 
-		{ int _pi; for (_pi = 0; _pi < per_frame.count; _pi++)
+		{ int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
 		{
-			PerFrame *frame = per_frame.items[_pi];
+			Device::PerFrame *frame = self->per_frame.items[_pi];
 			// We have done WaitIdle, no need to wait for extra fences, it's also not safe.
 			FenceVec_clear(&frame->wait_fences);
 			per_frame_begin(frame);
 		} }
 	}
 
-	void Device::next_frame_context()
-	{
+	void device_next_frame_context(Device *self){
 		// Flush the frame here as we might have pending staging command buffers from init stage.
-		end_frame_nolock();
+		device_end_frame_nolock(self);
 
-		framebuffer_allocator_begin_frame(&framebuffer_allocator);
-		attachment_allocator_begin_frame(&transient_allocator);
+		framebuffer_allocator_begin_frame(&self->framebuffer_allocator);
+		attachment_allocator_begin_frame(&self->transient_allocator);
 		{
 			struct IntrusiveListNode *n;
-			for (n = descriptor_set_allocator_map_begin(&descriptor_set_allocators); n; n = n->next)
+			for (n = descriptor_set_allocator_map_begin(&self->descriptor_set_allocators); n; n = n->next)
 				descriptor_set_allocator_begin_frame(descriptor_set_allocator_map_iter_get(n));
 		}
 
-		VK_ASSERT(per_frame.count != 0);
-		frame_context_index++;
-		if (frame_context_index >= (unsigned)per_frame.count)
-			frame_context_index = 0;
+		VK_ASSERT(self->per_frame.count != 0);
+		self->frame_context_index++;
+		if (self->frame_context_index >= (unsigned)self->per_frame.count)
+			self->frame_context_index = 0;
 
-		per_frame_begin(device_frame(this));
+		per_frame_begin(device_frame(self));
 	}
 
 	void per_frame_begin(struct Device::PerFrame *self)
@@ -21891,7 +21886,7 @@ static void vk_context_reset(void)
    assert(context);
    device = (Device *)malloc(sizeof(Device));
    Device::device_init(device);
-   device->set_context(*context);
+   device_set_context(device, *context);
 
    renderer = (Renderer *)malloc(sizeof(Renderer));
    renderer_init(renderer, device, scaling, msaa, owned_u32_empty(&save_state.vram) ? NULL : &save_state);
@@ -22397,7 +22392,7 @@ void rhi_vulkan_prepare_frame(void)
    vulkan->wait_sync_index(vulkan->handle);
    ensure_sync_index_resources();
    unsigned index = vulkan->get_sync_index(vulkan->handle);
-   device->next_frame_context();
+   device_next_frame_context(device);
 
    renderer_set_scaled_uv_offset(renderer, scaled_uv_offset);
    renderer_set_filter_mode(renderer, (FilterMode)(filter_mode));
