@@ -8454,7 +8454,7 @@ void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveStateVec *
 	void texture_tracker_notifyReadback(struct TextureTracker *self, Rect rect, uint16_t *vram);
 	uint32_t texture_tracker_dbgHashVram(struct TextureTracker *self, Rect rect, uint16_t *vram);
 
-	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable, bool &cache_hit);
+	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode *mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable, bool &cache_hit);
 	HdTexture texture_tracker_get_hd_texture(struct TextureTracker *self, HdTextureHandle index);
 	void texture_tracker_endFrame(struct TextureTracker *self);
 	void texture_tracker_on_queues_reset(struct TextureTracker *self);
@@ -8470,11 +8470,11 @@ void texture_tracker_set_cache_budgets(struct TextureTracker *self, size_t ram_b
 	static Palette texture_tracker_get_palette(struct TextureTracker *self, Rect palette_rect);
 	static uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, Rect palette_rect);
 	static void texture_tracker_want_combo(struct TextureTracker *self, HdTextureId id);
-	static void texture_tracker_dump_texture(struct TextureTracker *self, TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode);
+	static void texture_tracker_dump_texture(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode, DumpedMode dump_mode);
 	static void texture_tracker_load_hd_texture(struct TextureTracker *self, uint32_t hash);
 	static void texture_tracker_request_hd_texture(struct TextureTracker *self, TextureUpload *upload, uint32_t palette_hash);
 	static void texture_tracker_reload_textures_from_disk(struct TextureTracker *self);
-	static void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload &upload, UsedMode &mode);
+	static void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode);
 void texture_tracker_clear_palette_cache(struct TextureTracker *self, Rect rect)
 	{
 		self->cached_palette_hashes_count = 0; /* keep allocation for reuse */
@@ -10195,11 +10195,11 @@ void renderer_mipmap_framebuffer(Renderer *self)
 void renderer_ssaa_framebuffer(Renderer *self)
 {
 	// self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
-	Rect &rect = self->render_state.display_fb_rect;
-	unsigned left = rect.x / BLOCK_WIDTH;
-	unsigned top = rect.y / BLOCK_HEIGHT;
-	unsigned right = (rect.x + rect.width + BLOCK_WIDTH - 1) / BLOCK_WIDTH;
-	unsigned bottom = (rect.y + rect.height + BLOCK_HEIGHT - 1) / BLOCK_HEIGHT;
+	Rect *rect = &self->render_state.display_fb_rect;
+	unsigned left = rect->x / BLOCK_WIDTH;
+	unsigned top = rect->y / BLOCK_HEIGHT;
+	unsigned right = (rect->x + rect->width + BLOCK_WIDTH - 1) / BLOCK_WIDTH;
+	unsigned bottom = (rect->y + rect->height + BLOCK_HEIGHT - 1) / BLOCK_HEIGHT;
 
 	/* Exact element count is known up front (block grid), so use a single
 	 * malloc'd buffer filled by index rather than a growing std::vector. */
@@ -10476,9 +10476,9 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		return self->last_scanout;
 
 	self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
-	Rect &rect = self->render_state.display_fb_rect;
+	Rect *rect = &self->render_state.display_fb_rect;
 
-	if (rect.width == 0 || rect.height == 0 || !self->render_state.display_on)
+	if (rect->width == 0 || rect->height == 0 || !self->render_state.display_on)
 	{
 		// Black screen, just flush out everything.
 		{ Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_read_fragment(&self->atlas, Domain_Scaled, &_r); }
@@ -10518,13 +10518,13 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	bool bpp24 = self->render_state.scanout_mode == ScanoutMode_BGR24;
 	bool ssaa = self->render_state.scanout_filter == ScanoutFilter_SSAA && self->scaling != 1;
 
-	Rect read_rect = rect;
-	if (rect.x + rect.width > FB_WIDTH)
+	Rect read_rect = *rect;
+	if (rect->x + rect->width > FB_WIDTH)
 	{
 		read_rect.x = 0;
 		read_rect.width = FB_WIDTH;
 	}
-	if (rect.y + rect.height > FB_HEIGHT)
+	if (rect->y + rect->height > FB_HEIGHT)
 	{
 		read_rect.y = 0;
 		read_rect.height = FB_HEIGHT;
@@ -10550,14 +10550,14 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	{
 		renderer_ensure_command_buffer(self);
 		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-		VkOffset3D offset = { (int)(rect.x * self->scaling), (int)(rect.y * self->scaling), 0 };
-		VkExtent3D extent = { rect.width * self->scaling, rect.height * self->scaling, 1 };
-		if (rect.x + rect.width > FB_WIDTH)
+		VkOffset3D offset = { (int)(rect->x * self->scaling), (int)(rect->y * self->scaling), 0 };
+		VkExtent3D extent = { rect->width * self->scaling, rect->height * self->scaling, 1 };
+		if (rect->x + rect->width > FB_WIDTH)
 		{
 			offset.x = 0;
 			extent.width = FB_WIDTH * self->scaling;
 		}
-		if (rect.y + rect.height > FB_HEIGHT)
+		if (rect->y + rect->height > FB_HEIGHT)
 		{
 			offset.y = 0;
 			extent.height = FB_HEIGHT * self->scaling;
@@ -10613,8 +10613,8 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	VkViewport old_vp = *commandbuffer_get_viewport(cbh_get(&self->cmd));
 	VkViewport new_vp = {display_rect.x * (float) render_scale,
 	                     display_rect.y * (float) render_scale,
-	                     rect.width * (float) render_scale,
-	                     rect.height * (float) render_scale,
+	                     rect->width * (float) render_scale,
+	                     rect->height * (float) render_scale,
 	                     old_vp.minDepth,
 	                     old_vp.maxDepth};
 
@@ -10700,10 +10700,10 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		float uv_max[2];
 		float max_bias;
 	};
-	Push push = { { (float)(rect.x) / FB_WIDTH, (float)(rect.y) / FB_HEIGHT },
-		          { (float)(rect.width) / FB_WIDTH, (float)(rect.height) / FB_HEIGHT },
-		          { (rect.x + 0.5f) / FB_WIDTH, (rect.y + 0.5f) / FB_HEIGHT },
-		          { (rect.x + rect.width - 0.5f) / FB_WIDTH, (rect.y + rect.height - 0.5f) / FB_HEIGHT },
+	Push push = { { (float)(rect->x) / FB_WIDTH, (float)(rect->y) / FB_HEIGHT },
+		          { (float)(rect->width) / FB_WIDTH, (float)(rect->height) / FB_HEIGHT },
+		          { (rect->x + 0.5f) / FB_WIDTH, (rect->y + 0.5f) / FB_HEIGHT },
+		          { (rect->x + rect->width - 0.5f) / FB_WIDTH, (rect->y + rect->height - 0.5f) / FB_HEIGHT },
 		          (float)(imageview_vec_size(&self->scaled_views) - 1) };
 
 	commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
@@ -10886,7 +10886,7 @@ HdTextureHandle renderer_get_hd_texture_index(Renderer *self, const Rect *vram_r
 		mode.palette_offset_y = 0;
 	}
 	if (self->texture_tracking_enabled) {
-		return texture_tracker_get_hd_texture_index(&self->tracker, *vram_rect, mode, self->render_state.texture_offset_x, self->render_state.texture_offset_y, *fastpath_capable_out, *cache_hit_out);
+		return texture_tracker_get_hd_texture_index(&self->tracker, *vram_rect, &mode, self->render_state.texture_offset_x, self->render_state.texture_offset_y, *fastpath_capable_out, *cache_hit_out);
 	} else {
 		return hd_handle_make_none();
 	}
@@ -12037,8 +12037,8 @@ bool renderer_is_valid(const Renderer *self) { return self->valid; }
 void renderer_reset_scissor_queue(Renderer *self)
 {
 	Rect2DVec_clear(&self->queue.scissors);
-	Rect &rect = self->render_state.draw_rect;
-	{ VkRect2D _vpush = { { (int)(rect.x * self->scaling), (int)(rect.y * self->scaling) }, { rect.width * self->scaling, rect.height * self->scaling } }; Rect2DVec_push(&self->queue.scissors, &_vpush); }
+	Rect *rect = &self->render_state.draw_rect;
+	{ VkRect2D _vpush = { { (int)(rect->x * self->scaling), (int)(rect->y * self->scaling) }, { rect->width * self->scaling, rect->height * self->scaling } }; Rect2DVec_push(&self->queue.scissors, &_vpush); }
 }
 
 void renderer_reset_queue(Renderer *self)
@@ -19975,8 +19975,8 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 		t->channel = NULL;
 	}
 
-	void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload &upload, UsedMode &mode) {
-		uint32_t hash = upload.hash;
+	void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode) {
+		uint32_t hash = upload->hash;
 
 		uint8_t *bytes;
 		size_t   bytes_len;
@@ -19985,7 +19985,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 
 		// from glsl/vram.h
 		int shift;
-		switch (mode.mode) {
+		switch (mode->mode) {
 			case TextureMode_ABGR1555:
 				shift = 0;
 				break;
@@ -20008,8 +20008,8 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 		snprintf(path + plen, sizeof(path) - plen, "%x", (unsigned)hash);
 
 		uint16_t *palette = NULL;
-		if (mode.mode == TextureMode_Palette4bpp || mode.mode == TextureMode_Palette8bpp) {
-			Rect palette_rect = make_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode_Palette8bpp ? 256 : 16, 1);
+		if (mode->mode == TextureMode_Palette4bpp || mode->mode == TextureMode_Palette8bpp) {
+			Rect palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 			Palette p = texture_tracker_get_palette(self, palette_rect);
 			if (p.data != NULL) {
 				palette = p.data;
@@ -20019,29 +20019,29 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 		}
 
 		if (palette != NULL) {
-			TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping palette %i, %i.\n", mode.palette_offset_x, mode.palette_offset_y);
-		} else if (mode.mode != TextureMode_ABGR1555) {
+			TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping palette %i, %i.\n", mode->palette_offset_x, mode->palette_offset_y);
+		} else if (mode->mode != TextureMode_ABGR1555) {
 			plen = strlen(path);
 			snprintf(path + plen, sizeof(path) - plen, "-missing");
-			TT_LOG_VERBOSE(RETRO_LOG_INFO, "MISSING palette %i, %i.\n", mode.palette_offset_x, mode.palette_offset_y);
+			TT_LOG_VERBOSE(RETRO_LOG_INFO, "MISSING palette %i, %i.\n", mode->palette_offset_x, mode->palette_offset_y);
 		}
 
 		int ppp = 1 << shift;
 		int bpp = 16 >> shift;
 		int mask = (1 << bpp) - 1;
 		/* Output is exactly 4 bytes per (subpixel) = image.size() * ppp * 4. */
-		img_count = (size_t)upload.image_count;
+		img_count = (size_t)upload->image_count;
 		bytes_len = img_count * (size_t)ppp * 4u;
 		bytes = (uint8_t *)malloc(bytes_len ? bytes_len : 1);
 		bi = 0;
 		{
 			size_t ii;
 			for (ii = 0; ii < img_count; ii++) {
-				uint16_t pixel = upload.image[ii];
+				uint16_t pixel = upload->image[ii];
 				int p;
 				for (p = 0; p < ppp; p++) {
 					uint16_t subpixel = (pixel >> (p * bpp)) & mask;
-					if (mode.mode != TextureMode_ABGR1555 && palette == NULL) {
+					if (mode->mode != TextureMode_ABGR1555 && palette == NULL) {
 						// Missing palette, dump a grayscale version of the image data
 						bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
 						bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
@@ -20049,7 +20049,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 						bytes[bi++] = (uint8_t)255;
 					} else {
 						uint16_t abgr1555;
-						if (mode.mode == TextureMode_ABGR1555) {
+						if (mode->mode == TextureMode_ABGR1555) {
 							abgr1555 = subpixel;
 						} else {
 							abgr1555 = palette[subpixel];
@@ -20083,7 +20083,7 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 		plen = strlen(path);
 		snprintf(path + plen, sizeof(path) - plen, ".png");
 
-		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dump info: mode=%i, w=%i, h=%i, len=%i, bytesLen=%i\n", mode.mode, upload.width, upload.height, upload.image_count, (int)bytes_len);
+		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dump info: mode=%i, w=%i, h=%i, len=%i, bytesLen=%i\n", mode->mode, upload->width, upload->height, upload->image_count, (int)bytes_len);
 		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping to %s.\n", path);
 
 		//stbi_write_png(path, upload.width * ppp, upload.height, 4, bytes, 4 * upload.width * ppp);
@@ -20093,8 +20093,8 @@ uint8_t *loaded_pixel(LoadedImage &image, int x, int y) {
 			dump->next = NULL;
 			dump->kind = IORequestKind_Dump;
 			snprintf(dump->path, sizeof(dump->path), "%s", path);
-			dump->width = upload.width * ppp;
-			dump->height = upload.height;
+			dump->width = upload->width * ppp;
+			dump->height = upload->height;
 			dump->bytes = bytes;          /* transfer ownership to the request */
 			dump->bytes_len = bytes_len;
 
@@ -20271,7 +20271,7 @@ Rect fromSRect(SRect rect) {
 		texture_tracker_clear_palette_cache(self, rect);
 	}
 
-	bool imageMatches(TextureUpload &upload, Rect rect, uint16_t *vram) {
+	bool imageMatches(TextureUpload *upload, Rect rect, uint16_t *vram) {
 		unsigned x = rect.x,
 			 y = rect.y,
 			 w = rect.width,
@@ -20280,7 +20280,7 @@ Rect fromSRect(SRect rect) {
 		unsigned i, j;
 		for (j = y; j < y + h; j++) {
 			for (i = x; i < x + w; i++) {
-				if (upload.image[index] != vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))]) {
+				if (upload->image[index] != vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))]) {
 					return false;
 				}
 				index += 1;
@@ -20343,10 +20343,10 @@ Rect fromSRect(SRect rect) {
 				);
 	}
 
-	TextureRectResult clip_texture_rect_to_vram(TextureRect &t, Rect vram_rect) {
-		SRectResult intersection = intersect(t.vram_rect, toSRect(vram_rect));
+	TextureRectResult clip_texture_rect_to_vram(TextureRect *t, Rect vram_rect) {
+		SRectResult intersection = intersect(t->vram_rect, toSRect(vram_rect));
 		if (intersection.valid) {
-			TextureRectResult r = { subTexture(t, intersection.rect), true };
+			TextureRectResult r = { subTexture(*t, intersection.rect), true };
 			return r;
 		}
 		TextureRectResult r = { make_texture_rect(NULL, 0, 0, make_srect(0, 0, 1, 1)), false };
@@ -20382,7 +20382,7 @@ Rect fromSRect(SRect rect) {
 			EnduringTextureRect &e = self->tracker.textures.a[index];
 			if (e.alive) { // TODO: This check is unnecessary because self->tracker.overlapping never returns dead indices
 				       // Clip to the self->requested rect
-				TextureRectResult result = clip_texture_rect_to_vram(e.texture_rect, rect);
+				TextureRectResult result = clip_texture_rect_to_vram(&e.texture_rect, rect);
 				if (result.valid) {
 					// assert(rect.contains(fromSRect(result.rect.vram_rect)));
 					ownedrects_push(&to_restore, result.rect);
@@ -20473,8 +20473,8 @@ Rect fromSRect(SRect rect) {
 		if (restore != NULL) {
 			int _ri;
 			for (_ri = 0; _ri < ownedrects_size(&restore->to_restore); _ri++) {
-				TextureRect &t = restore->to_restore.v.items[_ri];
-				rect_tracker_place(&self->tracker, t); // TODO: clip to other.rect
+				TextureRect *t = &restore->to_restore.v.items[_ri];
+				rect_tracker_place(&self->tracker, *t); // TODO: clip to other.rect
 			}
 		} else {
 			rect_tracker_upload(&self->tracker, toSRect(rect), upload);
@@ -20594,13 +20594,13 @@ Rect fromSRect(SRect rect) {
 			texture_tracker_want_combo(self, current);            // queue a single disk load for the drawn combo
 	}
 
-	void output_rect_json(RFILE *stream, Rect &rect) {
+	void output_rect_json(RFILE *stream, Rect *rect) {
 		filestream_printf(stream,
 				"{ \"x\": %u,\"y\": %u,\"width\": %u,\"height\": %u}\n",
-				rect.x, rect.y, rect.width, rect.height);
+				rect->x, rect->y, rect->width, rect->height);
 	}
 
-	void texture_tracker_dump_texture(struct TextureTracker *self, TextureUpload *upload, UsedMode &mode, DumpedMode dump_mode) {
+	void texture_tracker_dump_texture(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode, DumpedMode dump_mode) {
 		if (!upload->dumpable) {
 			return;
 		}
@@ -20626,7 +20626,7 @@ Rect fromSRect(SRect rect) {
 			upload->dumped_modes[upload->dumped_modes_count++] = dump_mode;
 			if (self->dump_enabled) {
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping %x\n", upload->hash);
-				texture_tracker_dump_image(self, *upload, mode);
+				texture_tracker_dump_image(self, upload, mode);
 			}
 		}
 	}
@@ -20668,16 +20668,16 @@ Rect fromSRect(SRect rect) {
 	}
 	static inline void handle_lru_cache_clear(struct HandleLRUCache *self) { self->count = 0; }
 
-	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode &mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
+	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode *mode, unsigned int page_x, unsigned int page_y, bool &fastpath_capable_out, bool &cache_hit) {
 		fastpath_capable_out = false;
-		Rect palette_rect = make_rect(mode.palette_offset_x, mode.palette_offset_y, mode.mode == TextureMode_Palette8bpp ? 256 : 16, 1);
+		Rect palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 
 		// TODO: I'm pretty sure this doesn't handle TextureMode_ABGR1555
 
 		uint32_t palette_hash = 0;
 		cache_hit = false;
 		if (self->hd_textures_enabled || self->dump_enabled) {
-			if (mode.mode == TextureMode_Palette8bpp || mode.mode == TextureMode_Palette4bpp) {
+			if (mode->mode == TextureMode_Palette8bpp || mode->mode == TextureMode_Palette4bpp) {
 				palette_hash = texture_tracker_get_palette_hash(self, palette_rect);
 			}
 		}
@@ -20703,7 +20703,7 @@ Rect fromSRect(SRect rect) {
 		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
 			TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
-			texture_tracker_dump_texture(self, tex->upload, mode, { mode.mode, palette_hash });
+			texture_tracker_dump_texture(self, tex->upload, mode, { mode->mode, palette_hash });
 		} }
 		if (self->frame_dump != NULL) {
 			if (self->frame_dump_need_comma) {
@@ -20712,10 +20712,10 @@ Rect fromSRect(SRect rect) {
 				self->frame_dump_need_comma = true;
 			}
 			filestream_printf(self->frame_dump, " { \"rect\": ");
-			output_rect_json(self->frame_dump, rect);
+			output_rect_json(self->frame_dump, &rect);
 			filestream_printf(self->frame_dump,
 					", \"mode\": { \"mode\": %d, \"palette_x\": %u, \"palette_y\": %u} }\n",
-					(int)mode.mode, mode.palette_offset_x, mode.palette_offset_y);
+					(int)mode->mode, mode->palette_offset_x, mode->palette_offset_y);
 		}
 
 		if (!self->hd_textures_enabled) {
@@ -20747,8 +20747,8 @@ Rect fromSRect(SRect rect) {
 				} else {
 					// Multiple overlap, must fuse
 					unsigned int width
-						= mode.mode == TextureMode_Palette4bpp ? 64
-						: mode.mode == TextureMode_Palette8bpp ? 128
+						= mode->mode == TextureMode_Palette4bpp ? 64
+						: mode->mode == TextureMode_Palette8bpp ? 128
 						: 256;
 					Rect page_rect = { page_x, page_y, width, 256 };
 					fastpath_capable_out = false;
@@ -20781,10 +20781,10 @@ Rect fromSRect(SRect rect) {
 					self->default_hd_texture
 				};
 			}
-			TextureUpload &upload = *tex->upload;
+			TextureUpload *upload = tex->upload;
 			// Use find rather than index, because if a stale HdTextureHandle was provided this could segfault
 			// because indexing on a key that isn't present would initialize a new one with a null pointer
-			HdTexEntry *iter = hd_tex_map_find(&upload.textures, handle.palette_hash);
+			HdTexEntry *iter = hd_tex_map_find(&upload->textures, handle.palette_hash);
 			if (iter == NULL) {
 				TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
 				return {
@@ -20797,8 +20797,8 @@ Rect fromSRect(SRect rect) {
 			 * then adopt), matching hd_gpu_image_handle. */
 			image_add_reference(iter->image);
 			ImageHandle image = ih_make(iter->image);
-			int scaleX = image_get_width(ih_get(&image), 0) / upload.width;
-			int scaleY = image_get_height(ih_get(&image), 0) / upload.height;
+			int scaleX = image_get_width(ih_get(&image), 0) / upload->width;
+			int scaleY = image_get_height(ih_get(&image), 0) / upload->height;
 			SRect texture_subrect = texture_rect_subrect(tex);
 			return {
 				tex->vram_rect,
@@ -20929,9 +20929,9 @@ bool is_power_of_two(int n) {
 			size_t _ti;
 			for (_ti = 0; _ti < ownedrects_size(&entry.to_restore); _ti++)
 			{
-				TextureRect &t = entry.to_restore.v.items[_ti];
-				if (hash == t.upload->hash)
-					return t.upload;
+				TextureRect *t = &entry.to_restore.v.items[_ti];
+				if (hash == t->upload->hash)
+					return t->upload;
 			}
 		}
 
@@ -20994,7 +20994,7 @@ bool is_power_of_two(int n) {
 							need_comma = true;
 						filestream_printf(self->frame_dump, " { \"rect\": ");
 						rect = fromSRect(texture->vram_rect);
-						output_rect_json(self->frame_dump, rect);
+						output_rect_json(self->frame_dump, &rect);
 						filestream_printf(self->frame_dump, ", \"hash\": \"%x\" }\n", texture->upload->hash);
 					}
 					filestream_printf(self->frame_dump, "], \"events\": [\n");
@@ -21055,8 +21055,8 @@ bool is_power_of_two(int n) {
 			{
 				int _tri;
 				for (_tri = 0; _tri < ownedrects_size(&restorable.to_restore); _tri++) {
-					TextureRect &tr = restorable.to_restore.v.items[_tri];
-					hd_tex_map_clear(&tr.upload->textures);
+					TextureRect *tr = &restorable.to_restore.v.items[_tri];
+					hd_tex_map_clear(&tr->upload->textures);
 				}
 			}
 		}
@@ -21347,16 +21347,16 @@ int clamp(int x, int low, int high)
 
 	// FusedPages
 
-int64_t page_bytes(FusionRects &fusion)
+int64_t page_bytes(FusionRects *fusion)
 	{
-		return fusion.scaleX * fusion.scaleY * fusion.vram_rect.width * fusion.vram_rect.height * 4;
+		return fusion->scaleX * fusion->scaleY * fusion->vram_rect.width * fusion->vram_rect.height * 4;
 	}
 
 	void fused_pages_dbg_print_info(struct FusedPages *self) {
 		int64_t num_bytes = 0;
 		int _i;
 		for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++)
-			num_bytes += page_bytes(fused_page_vec_at(&self->pages, _i)->fusion);
+			num_bytes += page_bytes(&fused_page_vec_at(&self->pages, _i)->fusion);
 		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Fused Pages: %lu, Bytes: %ld (%.1f MiB)\n", (unsigned long)fused_page_vec_size(&self->pages), num_bytes, num_bytes / 1048576.0);
 	}
 
@@ -21430,40 +21430,40 @@ int64_t page_bytes(FusionRects &fusion)
 
 	}
 
-	void rebuild_page(FusedPage &page, struct RectTracker *tracker, Renderer *uploader) {
+	void rebuild_page(FusedPage *page, struct RectTracker *tracker, Renderer *uploader) {
 		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilding page for %x, %d,%d %dx%d\n",
-				page.palette,
-				page.fusion.vram_rect.x,
-				page.fusion.vram_rect.y,
-				page.fusion.vram_rect.width,
-				page.fusion.vram_rect.height
+				page->palette,
+				page->fusion.vram_rect.x,
+				page->fusion.vram_rect.y,
+				page->fusion.vram_rect.width,
+				page->fusion.vram_rect.height
 			      );
 
-		page.dirty = false;
+		page->dirty = false;
 
 		{
 			FusionRects fusion;
-			fusion_rects(&fusion, page.full_page_rect, page.palette, tracker);
-			if (fusionrects_eq(&page.fusion, &fusion)) {
+			fusion_rects(&fusion, page->full_page_rect, page->palette, tracker);
+			if (fusionrects_eq(&page->fusion, &fusion)) {
 				TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilt page: no change\n");
 				fusionrects_destroy(&fusion);
 				return;
 			}
-			fusionrects_move(&page.fusion, &fusion);
+			fusionrects_move(&page->fusion, &fusion);
 			fusionrects_destroy(&fusion);
 		}
 
-		if (ownedrects_size(&page.fusion.rects) == 0) {
-			page.dead = true;
-			ih_reset(&page.texture);
+		if (ownedrects_size(&page->fusion.rects) == 0) {
+			page->dead = true;
+			ih_reset(&page->texture);
 			TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilt page: page is now dead\n");
 			return;
 		}
 
 		CommandBufferHandle *cmd = renderer_command_buffer_hack_fixme(uploader);
 
-		int texture_width = page.fusion.vram_rect.width * page.fusion.scaleX;
-		int texture_height = page.fusion.vram_rect.height * page.fusion.scaleY;
+		int texture_width = page->fusion.vram_rect.width * page->fusion.scaleX;
+		int texture_height = page->fusion.vram_rect.height * page->fusion.scaleY;
 
 		// TODO: I don't know SHIT about barriers.
 
@@ -21473,26 +21473,26 @@ int64_t page_bytes(FusionRects &fusion)
 		// texels.
 		VkClearValue fallthrough = {0.0, 0.0, 0.0, 1.0};
 
-		int mip_levels = log2(min_(page.fusion.scaleX, page.fusion.scaleY)) + 1;
+		int mip_levels = log2(min_(page->fusion.scaleX, page->fusion.scaleY)) + 1;
 
-		if (ih_is_valid(&page.texture) && image_get_width(ih_get(&page.texture), 0) == texture_width && image_get_height(ih_get(&page.texture), 0) == texture_height)
+		if (ih_is_valid(&page->texture) && image_get_width(ih_get(&page->texture), 0) == texture_width && image_get_height(ih_get(&page->texture), 0) == texture_height)
 			// Switch back into transfer dst layout
-			commandbuffer_image_barrier(cbh_get(cmd), ih_get(&page.texture),
+			commandbuffer_image_barrier(cbh_get(cmd), ih_get(&page->texture),
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
 		else
-			ih_move(&page.texture, renderer_create_texture(uploader, texture_width, texture_height, mip_levels));
-		commandbuffer_clear_image(cbh_get(cmd), ih_get(&page.texture), &fallthrough);
+			ih_move(&page->texture, renderer_create_texture(uploader, texture_width, texture_height, mip_levels));
+		commandbuffer_clear_image(cbh_get(cmd), ih_get(&page->texture), &fallthrough);
 
 		// Second pass to blit all the existing textures into the new texture
 		{
 		int _fri;
-		for (_fri = 0; _fri < ownedrects_size(&page.fusion.rects); _fri++) {
-			TextureRect &tex = page.fusion.rects.v.items[_fri];
-			TextureUpload &upload = *tex.upload;
+		for (_fri = 0; _fri < ownedrects_size(&page->fusion.rects); _fri++) {
+			TextureRect *tex = &page->fusion.rects.v.items[_fri];
+			TextureUpload *upload = tex->upload;
 
-			HdTexEntry *hd_texture = hd_tex_map_find(&upload.textures, page.palette);
+			HdTexEntry *hd_texture = hd_tex_map_find(&upload->textures, page->palette);
 			// That's odd
 			if (hd_texture == NULL)
 				continue;
@@ -21502,22 +21502,22 @@ int64_t page_bytes(FusionRects &fusion)
 			int srcWidth = image_get_width(image, 0);
 			int srcHeight = image_get_height(image, 0);
 
-			int sx = srcWidth / upload.width;
-			int sy = srcHeight / upload.height;
+			int sx = srcWidth / upload->width;
+			int sy = srcHeight / upload->height;
 
-			int rx = page.fusion.scaleX / sx;
-			int ry = page.fusion.scaleY / sy;
+			int rx = page->fusion.scaleX / sx;
+			int ry = page->fusion.scaleY / sy;
 
-			SRect subrect = texture_rect_subrect(&tex);
+			SRect subrect = texture_rect_subrect(tex);
 
 			VkOffset3D dst_offset = {
-				(tex.vram_rect.x - (int)(page.fusion.vram_rect.x)) * (int)(page.fusion.scaleX),
-				(tex.vram_rect.y - (int)(page.fusion.vram_rect.y)) * (int)(page.fusion.scaleY),
+				(tex->vram_rect.x - (int)(page->fusion.vram_rect.x)) * (int)(page->fusion.scaleX),
+				(tex->vram_rect.y - (int)(page->fusion.vram_rect.y)) * (int)(page->fusion.scaleY),
 				0
 			};
 			VkOffset3D dst_extent = {
-				tex.vram_rect.width * (int)(page.fusion.scaleX),
-				tex.vram_rect.height * (int)(page.fusion.scaleY),
+				tex->vram_rect.width * (int)(page->fusion.scaleX),
+				tex->vram_rect.height * (int)(page->fusion.scaleY),
 				1
 			};
 
@@ -21545,7 +21545,7 @@ int64_t page_bytes(FusionRects &fusion)
 				{
 				VkOffset3D _so = { (sx * subrect.x) >> srcLevel, (sy * subrect.y) >> srcLevel, 0 };
 				VkOffset3D _se = { (sx * subrect.width) >> srcLevel, (sy * subrect.height) >> srcLevel, 1 };
-				commandbuffer_blit_image(cbh_get(cmd), ih_get(&page.texture), image,
+				commandbuffer_blit_image(cbh_get(cmd), ih_get(&page->texture), image,
 						&dst_offset, &dst_extent, &_so, &_se,
 						dstLevel, srcLevel, 0, 0, 1, VK_FILTER_LINEAR);
 				}
@@ -21571,14 +21571,14 @@ int64_t page_bytes(FusionRects &fusion)
 
 		// I have no idea what the fuck I'm doing
 		// Make the fused texture readable by shaders
-		commandbuffer_image_barrier(cbh_get(cmd), ih_get(&page.texture),
+		commandbuffer_image_barrier(cbh_get(cmd), ih_get(&page->texture),
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
 
 		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilt page: page now %ux%u, %ld bytes (%.1f MiB)\n",
-				page.fusion.vram_rect.width * page.fusion.scaleX, page.fusion.vram_rect.height * page.fusion.scaleY,
-				page_bytes(page.fusion), page_bytes(page.fusion) / 1048576.0
+				page->fusion.vram_rect.width * page->fusion.scaleX, page->fusion.vram_rect.height * page->fusion.scaleY,
+				page_bytes(&page->fusion), page_bytes(&page->fusion) / 1048576.0
 			      );
 	}
 
@@ -21628,7 +21628,7 @@ int64_t page_bytes(FusionRects &fusion)
 		page.dirty = false;
 		page.full_page_rect = page_rect;
 		page.palette = palette;
-		rebuild_page(page, tracker, uploader);
+		rebuild_page(&page, tracker, uploader);
 		fused_page_vec_push(&self->pages, &page);
 		return hd_handle_make_fused(fused_page_vec_size(&self->pages) - 1);
 	}
@@ -21656,7 +21656,7 @@ int64_t page_bytes(FusionRects &fusion)
 		for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++) {
 			FusedPage *page = fused_page_vec_at(&self->pages, _i);
 			if (!page->dead && page->dirty) {
-				rebuild_page(*page, tracker, uploader);
+				rebuild_page(page, tracker, uploader);
 				changed = true;
 			}
 		}
@@ -21758,8 +21758,8 @@ int64_t page_bytes(FusionRects &fusion)
 			int _rti;
 			for (_rti = 0; _rti < ownedrects_size(&r.to_restore); _rti++)
 			{
-				TextureRect &t = r.to_restore.v.items[_rti];
-				TextureRectSaveState _ss = to_save_state(&t, state.uploads);
+				TextureRect *t = &r.to_restore.v.items[_rti];
+				TextureRectSaveState _ss = to_save_state(t, state.uploads);
 				TextureRectSaveStateVec_push(&saved.to_restore, &_ss);
 			}
 			}
