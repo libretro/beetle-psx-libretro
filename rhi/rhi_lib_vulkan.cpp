@@ -1736,21 +1736,27 @@ static inline uint32_t util_ctz(uint32_t x)
 
 /* Iterate over each set bit in a uint32_t mask. Inside the body, BIT_VAR holds
  * the bit index. C-style: just expand into a for loop, no captures or lambdas. */
-#define FOR_EACH_BIT(value, bit_var)                                          \
-	for (uint32_t _fe_v = (uint32_t)(value), bit_var = trailing_zeroes(_fe_v); \
-	     _fe_v;                                                                \
-	     _fe_v &= _fe_v - 1u, bit_var = trailing_zeroes(_fe_v))
+/* C89 form: a for-loop initializer may not declare variables, and declaring the
+ * scratch inside the macro also collides when two FOR_EACH_BIT appear in one
+ * block. So the caller pre-declares every loop variable (proper C89, at block
+ * top) and passes them in: ITER is the uint32_t scratch holding the residual
+ * mask, BIT_VAR receives each set-bit index. Both must be plain uint32_t lvalues
+ * the caller owns. trailing_zeroes is a pure macro, so re-evaluation is safe. */
+#define FOR_EACH_BIT(value, iter, bit_var)                                     \
+	for ((iter) = (uint32_t)(value), (bit_var) = trailing_zeroes(iter);        \
+	     (iter);                                                               \
+	     (iter) &= (iter) - 1u, (bit_var) = trailing_zeroes(iter))
 
 /* Iterate over each contiguous run of 1-bits in a uint32_t mask. BASE_VAR is
  * the bit index of the run's first 1, RANGE_VAR is the run length. */
-#define FOR_EACH_BIT_RANGE(value, base_var, range_var)                            \
-	for (uint32_t _fe_v = (uint32_t)(value),                                       \
-	              base_var = trailing_zeroes(_fe_v),                               \
-	              range_var = (_fe_v ? trailing_ones(_fe_v >> base_var) : 0u);     \
-	     _fe_v;                                                                    \
-	     _fe_v &= ~((1u << (base_var + range_var)) - 1u),                          \
-	     base_var = trailing_zeroes(_fe_v),                                        \
-	     range_var = (_fe_v ? trailing_ones(_fe_v >> base_var) : 0u))
+#define FOR_EACH_BIT_RANGE(value, iter, base_var, range_var)                       \
+	for ((iter) = (uint32_t)(value),                                               \
+	              (base_var) = trailing_zeroes(iter),                              \
+	              (range_var) = ((iter) ? trailing_ones((iter) >> (base_var)) : 0u); \
+	     (iter);                                                                   \
+	     (iter) &= ~((1u << ((base_var) + (range_var))) - 1u),                     \
+	     (base_var) = trailing_zeroes(iter),                                       \
+	     (range_var) = ((iter) ? trailing_ones((iter) >> (base_var)) : 0u))
 
 	typedef uint64_t Hash;
 
@@ -14693,7 +14699,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		rp_info.attachmentCount = num_attachments;
 
 		// Add external subpass dependencies.
-		FOR_EACH_BIT(external_color_dependencies | external_depth_dependencies | external_input_dependencies, subpass)
+		{ uint32_t _feit, subpass; FOR_EACH_BIT(external_color_dependencies | external_depth_dependencies | external_input_dependencies, _feit, subpass)
 		{
 			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
 			VkSubpassDependency *dep = VkSubpassDependencyVec_back(&external_dependencies);
@@ -14726,9 +14732,10 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				dep->dstAccessMask |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 			}
 		}
+		}
 
 		// Queue up self-dependencies (COLOR | DEPTH) -> INPUT.
-		FOR_EACH_BIT(color_self_dependencies | depth_self_dependencies, subpass)
+		{ uint32_t _feit, subpass; FOR_EACH_BIT(color_self_dependencies | depth_self_dependencies, _feit, subpass)
 		{
 			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
 			VkSubpassDependency *dep = VkSubpassDependencyVec_back(&external_dependencies);
@@ -14750,6 +14757,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 			dep->dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			dep->dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+		}
 		}
 
 		// Flush and invalidate caches between each subpass.
@@ -15481,12 +15489,13 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			spec_info.dataSize = sizeof(self->potential_static_state.spec_constants);
 			spec_info.pMapEntries = spec_entries;
 
-			FOR_EACH_BIT(mask, bit)
+			{ uint32_t _feit, bit; FOR_EACH_BIT(mask, _feit, bit)
 			{
 				VkSpecializationMapEntry *entry = &spec_entries[spec_info.mapEntryCount++];
 				entry->offset = sizeof(uint32_t) * bit;
 				entry->size = sizeof(uint32_t);
 				entry->constantID = bit;
+			}
 			}
 		}
 
@@ -15555,7 +15564,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		vi.pVertexAttributeDescriptions = vi_attribs;
 		uint32_t attr_mask = pipeline_layout_get_resource_layout(self->current_layout)->attribute_mask;
 		uint32_t binding_mask = 0;
-		FOR_EACH_BIT(attr_mask, bit)
+		{ uint32_t _feit, bit; FOR_EACH_BIT(attr_mask, _feit, bit)
 		{
 			VkVertexInputAttributeDescription *attr = &vi_attribs[vi.vertexAttributeDescriptionCount++];
 			attr->location = bit;
@@ -15564,15 +15573,17 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			attr->offset = self->attribs[bit].offset;
 			binding_mask |= 1u << attr->binding;
 		}
+		}
 
 		VkVertexInputBindingDescription vi_bindings[VULKAN_NUM_VERTEX_BUFFERS];
 		vi.pVertexBindingDescriptions = vi_bindings;
-		FOR_EACH_BIT(binding_mask, bit)
+		{ uint32_t _feit, bit; FOR_EACH_BIT(binding_mask, _feit, bit)
 		{
 			VkVertexInputBindingDescription *bind = &vi_bindings[vi.vertexBindingDescriptionCount++];
 			bind->binding = bit;
 			bind->inputRate = self->vbo.input_rates[bit];
 			bind->stride = self->vbo.strides[bit];
+		}
 		}
 
 		// Input assembly
@@ -15630,12 +15641,13 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 					spec_info[i].dataSize = sizeof(self->potential_static_state.spec_constants);
 					spec_info[i].pMapEntries = spec_entries[i];
 
-					FOR_EACH_BIT(mask, bit)
+					{ uint32_t _feit, bit; FOR_EACH_BIT(mask, _feit, bit)
 					{
 						VkSpecializationMapEntry *entry = &spec_entries[i][spec_info[i].mapEntryCount++];
 						entry->offset = sizeof(uint32_t) * bit;
 						entry->size = sizeof(uint32_t);
 						entry->constantID = bit;
+					}
 					}
 				}
 			}
@@ -15677,9 +15689,10 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		uint32_t combined_spec_constant = layout->combined_spec_constant_mask;
 		combined_spec_constant &= self->static_state.state.spec_constant_mask;
 		hasher_u32(&h, combined_spec_constant);
-		FOR_EACH_BIT(combined_spec_constant, bit)
+		{ uint32_t _feit, bit; FOR_EACH_BIT(combined_spec_constant, _feit, bit)
 		{
 			hasher_u32(&h, self->potential_static_state.spec_constants[bit]);
+		}
 		}
 
 		Hash hash = hasher_get(&h);
@@ -15693,7 +15706,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		Hasher h; hasher_init(&h);
 		self->active_vbos = 0;
 		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
-		FOR_EACH_BIT(layout->attribute_mask, bit)
+		{ uint32_t _feit, bit; FOR_EACH_BIT(layout->attribute_mask, _feit, bit)
 		{
 			hasher_u32(&h, bit);
 			self->active_vbos |= 1u << self->attribs[bit].binding;
@@ -15701,11 +15714,13 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			hasher_u32(&h, self->attribs[bit].format);
 			hasher_u32(&h, self->attribs[bit].offset);
 		}
+		}
 
-		FOR_EACH_BIT(self->active_vbos, bit)
+		{ uint32_t _feit, bit; FOR_EACH_BIT(self->active_vbos, _feit, bit)
 		{
 			hasher_u32(&h, self->vbo.input_rates[bit]);
 			hasher_u32(&h, self->vbo.strides[bit]);
+		}
 		}
 
 		hasher_u64(&h, self->compatible_render_pass->intrusive_node.key);
@@ -15728,9 +15743,10 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		uint32_t combined_spec_constant = layout->combined_spec_constant_mask;
 		combined_spec_constant &= self->static_state.state.spec_constant_mask;
 		hasher_u32(&h, combined_spec_constant);
-		FOR_EACH_BIT(combined_spec_constant, bit)
+		{ uint32_t _feit, bit; FOR_EACH_BIT(combined_spec_constant, _feit, bit)
 		{
 			hasher_u32(&h, self->potential_static_state.spec_constants[bit]);
+		}
 		}
 
 		Hash hash = hasher_get(&h);
@@ -15805,12 +15821,13 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			vkCmdSetScissor(self->cmd, 0, 1, &self->scissor);
 
 		uint32_t update_vbo_mask = self->dirty_vbos & self->active_vbos;
-		FOR_EACH_BIT_RANGE(update_vbo_mask, binding, binding_count)
+		{ uint32_t _feit, binding, binding_count; FOR_EACH_BIT_RANGE(update_vbo_mask, _feit, binding, binding_count)
 		{
 #ifdef VULKAN_DEBUG
 			{ unsigned i; for (i = binding; i < binding + binding_count; i++) VK_ASSERT(self->vbo.buffers[i] != VK_NULL_HANDLE); }
 #endif
 			vkCmdBindVertexBuffers(self->cmd, binding, binding_count, self->vbo.buffers + binding, self->vbo.offsets + binding);
+		}
 		}
 		self->dirty_vbos &= ~update_vbo_mask;
 	}
@@ -16078,7 +16095,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		hasher_u32(&h, set_layout->fp_mask);
 
 		// UBOs
-		FOR_EACH_BIT(set_layout->uniform_buffer_mask, binding)
+		{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->uniform_buffer_mask, _feit, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			hasher_u32(&h, self->bindings.bindings[set][binding].buffer.range);
@@ -16086,25 +16103,28 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 			dynamic_offsets[num_dynamic_offsets++] = self->bindings.bindings[set][binding].buffer.offset;
 		}
+		}
 
 		// SSBOs
-		FOR_EACH_BIT(set_layout->storage_buffer_mask, binding)
+		{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->storage_buffer_mask, _feit, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			hasher_u32(&h, self->bindings.bindings[set][binding].buffer.offset);
 			hasher_u32(&h, self->bindings.bindings[set][binding].buffer.range);
 			VK_ASSERT(self->bindings.bindings[set][binding].buffer.buffer != VK_NULL_HANDLE);
 		}
+		}
 
 		// Sampled buffers
-		FOR_EACH_BIT(set_layout->sampled_buffer_mask, binding)
+		{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampled_buffer_mask, _feit, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			VK_ASSERT(self->bindings.bindings[set][binding].buffer_view != VK_NULL_HANDLE);
 		}
+		}
 
 		// Sampled images
-		FOR_EACH_BIT(set_layout->sampled_image_mask, binding)
+		{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampled_image_mask, _feit, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			if (!has_immutable_sampler(set_layout, binding))
@@ -16115,36 +16135,41 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			hasher_u32(&h, self->bindings.bindings[set][binding].image.fp.imageLayout);
 			VK_ASSERT(self->bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
 		}
+		}
 
 		// Separate images
-		FOR_EACH_BIT(set_layout->separate_image_mask, binding)
+		{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->separate_image_mask, _feit, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			hasher_u32(&h, self->bindings.bindings[set][binding].image.fp.imageLayout);
 			VK_ASSERT(self->bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
 		}
+		}
 
 		// Separate samplers
-		FOR_EACH_BIT(set_layout->sampler_mask & ~set_layout->immutable_sampler_mask, binding)
+		{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampler_mask & ~set_layout->immutable_sampler_mask, _feit, binding)
 		{
 			hasher_u64(&h, self->bindings.secondary_cookies[set][binding]);
 			VK_ASSERT(self->bindings.bindings[set][binding].image.fp.sampler != VK_NULL_HANDLE);
 		}
+		}
 
 		// Storage images
-		FOR_EACH_BIT(set_layout->storage_image_mask, binding)
+		{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->storage_image_mask, _feit, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			hasher_u32(&h, self->bindings.bindings[set][binding].image.fp.imageLayout);
 			VK_ASSERT(self->bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
 		}
+		}
 
 		// Input attachments
-		FOR_EACH_BIT(set_layout->input_attachment_mask, binding)
+		{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->input_attachment_mask, _feit, binding)
 		{
 			hasher_u64(&h, self->bindings.cookies[set][binding]);
 			hasher_u32(&h, self->bindings.bindings[set][binding].image.fp.imageLayout);
 			VK_ASSERT(self->bindings.bindings[set][binding].image.fp.imageView != VK_NULL_HANDLE);
+		}
 		}
 
 		Hash hash = hasher_get(&h);
@@ -16158,7 +16183,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			VkWriteDescriptorSet writes[VULKAN_NUM_BINDINGS];
 			VkDescriptorBufferInfo buffer_info[VULKAN_NUM_BINDINGS];
 
-			FOR_EACH_BIT(set_layout->uniform_buffer_mask, binding)
+			{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->uniform_buffer_mask, _feit, binding)
 			{
 				VkWriteDescriptorSet *write = &writes[write_count++];
 				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16175,8 +16200,9 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				buffer->offset = 0;
 				write->pBufferInfo = buffer;
 			}
+			}
 
-			FOR_EACH_BIT(set_layout->storage_buffer_mask, binding)
+			{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->storage_buffer_mask, _feit, binding)
 			{
 				VkWriteDescriptorSet *write = &writes[write_count++];
 				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16188,8 +16214,9 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				write->dstSet = allocated.set;
 				write->pBufferInfo = &self->bindings.bindings[set][binding].buffer;
 			}
+			}
 
-			FOR_EACH_BIT(set_layout->sampled_buffer_mask, binding)
+			{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampled_buffer_mask, _feit, binding)
 			{
 				VkWriteDescriptorSet *write = &writes[write_count++];
 				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16201,8 +16228,9 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				write->dstSet = allocated.set;
 				write->pTexelBufferView = &self->bindings.bindings[set][binding].buffer_view;
 			}
+			}
 
-			FOR_EACH_BIT(set_layout->sampled_image_mask, binding)
+			{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampled_image_mask, _feit, binding)
 			{
 				VkWriteDescriptorSet *write = &writes[write_count++];
 				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16218,8 +16246,9 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				else
 					write->pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
+			}
 
-			FOR_EACH_BIT(set_layout->separate_image_mask, binding)
+			{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->separate_image_mask, _feit, binding)
 			{
 				VkWriteDescriptorSet *write = &writes[write_count++];
 				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16235,8 +16264,9 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				else
 					write->pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
+			}
 
-			FOR_EACH_BIT(set_layout->sampler_mask & ~set_layout->immutable_sampler_mask, binding)
+			{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampler_mask & ~set_layout->immutable_sampler_mask, _feit, binding)
 			{
 				VkWriteDescriptorSet *write = &writes[write_count++];
 				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16248,8 +16278,9 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				write->dstSet = allocated.set;
 				write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
 			}
+			}
 
-			FOR_EACH_BIT(set_layout->storage_image_mask, binding)
+			{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->storage_image_mask, _feit, binding)
 			{
 				VkWriteDescriptorSet *write = &writes[write_count++];
 				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16265,8 +16296,9 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				else
 					write->pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
+			}
 
-			FOR_EACH_BIT(set_layout->input_attachment_mask, binding)
+			{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->input_attachment_mask, _feit, binding)
 			{
 				VkWriteDescriptorSet *write = &writes[write_count++];
 				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -16281,6 +16313,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				else
 					write->pImageInfo = &self->bindings.bindings[set][binding].image.integer;
 			}
+			}
 
 			vkUpdateDescriptorSets(device_get_device(self->device), write_count, writes, 0, NULL);
 		}
@@ -16293,8 +16326,9 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	{
 		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
 		uint32_t set_update = layout->descriptor_set_mask & self->dirty_sets;
-		FOR_EACH_BIT(set_update, set)
+		{ uint32_t _feit, set; FOR_EACH_BIT(set_update, _feit, set)
 		{ commandbuffer_flush_descriptor_set(self, set); 	}
+		}
 		self->dirty_sets &= ~set_update;
 	}
 
@@ -17066,7 +17100,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				layout.sets[set].separate_image_mask |= shader_layout->sets[set].separate_image_mask;
 				layout.sets[set].fp_mask |= shader_layout->sets[set].fp_mask;
 
-				FOR_EACH_BIT(shader_layout->sets[set].immutable_sampler_mask, binding)
+				{ uint32_t _feit, binding; FOR_EACH_BIT(shader_layout->sets[set].immutable_sampler_mask, _feit, binding)
 				{
 					StockSampler sampler = get_immutable_sampler(&shader_layout->sets[set], binding);
 
@@ -17078,6 +17112,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 					}
 
 					set_immutable_sampler(&layout.sets[set], binding, sampler);
+				}
 				}
 
 				uint32_t active_binds =
@@ -17093,9 +17128,10 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				if (active_binds)
 					layout.stages_for_sets[set] |= stage_mask;
 
-				FOR_EACH_BIT(active_binds, bit)
+				{ uint32_t _feit, bit; FOR_EACH_BIT(active_binds, _feit, bit)
 				{
 					layout.stages_for_bindings[set][bit] |= stage_mask;
+				}
 				}
 			} }
 
