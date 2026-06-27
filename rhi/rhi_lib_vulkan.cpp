@@ -6461,19 +6461,6 @@ extern retro_log_printf_t log_cb;
 	struct HdTextureId {
 		uint32_t hash;
 		uint32_t palette_hash;
-
-		bool operator>(const HdTextureId &other) const
-		{
-			if (hash != other.hash)
-				return hash > other.hash;
-			return palette_hash > other.palette_hash;
-		}
-		bool operator<(const HdTextureId &other) const
-		{
-			if (hash != other.hash)
-				return hash < other.hash;
-			return palette_hash < other.palette_hash;
-		}
 	};
 
 	typedef int RectIndex; // I wanted a newtype but it's too much work in C++, so maybe TODO that later
@@ -8459,7 +8446,7 @@ void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveStateVec *
 	void texture_tracker_fini(struct TextureTracker *self);
 
 	void texture_tracker_save_state(struct TextureTracker *self, TextureTrackerSaveState *out);
-	void texture_tracker_load_state(struct TextureTracker *self, const TextureTrackerSaveState &state);
+	void texture_tracker_load_state(struct TextureTracker *self, const TextureTrackerSaveState *state);
 
 	void texture_tracker_upload(struct TextureTracker *self, Rect rect, uint16_t *vram);
 	void texture_tracker_blit(struct TextureTracker *self, Rect dst, Rect src);
@@ -9145,7 +9132,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels &levels);
 	ImageHandle renderer_create_texture(Renderer *self, int width, int height, int levels);
 	BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect);
-	void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentState &state);
+	void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentState *state);
 	BufferVertexVec *renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture, bool filtering, bool scaled_read, unsigned shift, bool offset_uv);
 	const ClearCandidate *renderer_find_clear_candidate(Renderer *self, const Rect *rect);
 	void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uint16_t *vram);
@@ -9167,13 +9154,13 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	Rect renderer_compute_vram_framebuffer_rect(Renderer *self);
 	DisplayRect renderer_compute_display_rect(Renderer *self);
 	void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_index);
-	bool renderer_primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b);
+	bool renderer_primitive_info_sort_gt(const PrimitiveInfo *a, const PrimitiveInfo *b);
 	void renderer_flush_resolves(Renderer *self);
 	void renderer_flush_blits(Renderer *self);
 	void renderer_flush_blit(Renderer *self, const BlitInfoVec &infos, Program &program, bool scaled);
 	void renderer_set_draw_rect(Renderer *self, const Rect *rect);
 	void renderer_clear_rect(Renderer *self, const Rect *rect, uint32_t fb_color);
-	Rect renderer_compute_window_rect(Renderer *self, const TextureWindow &window);
+	Rect renderer_compute_window_rect(Renderer *self, const TextureWindow *window);
 	void renderer_resolve(Renderer *self, Domain target_domain, unsigned x, unsigned y);
 	void renderer_ensure_command_buffer(Renderer *self);
 	float renderer_allocate_depth(Renderer *self, Domain domain, const Rect *rect);
@@ -9185,7 +9172,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	void renderer_discard_render_pass(Renderer *self);
 	CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self);
 	bool renderer_get_filer_exclude(Renderer *self, FilterExclude exclude);
-	void renderer_set_texture_window(Renderer *self, const TextureWindow &window);
+	void renderer_set_texture_window(Renderer *self, const TextureWindow *window);
 	void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y);
 	void renderer_set_palette_offset(Renderer *self, unsigned x, unsigned y);
 	uint16_t * renderer_begin_copy(Renderer *self, BufferHandle handle);
@@ -9277,9 +9264,9 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 	/* ---- Renderer setters/accessors (batch 2): inline methods -> inline free
 	 * functions taking Renderer *self. ---- */
-	inline void renderer_set_texture_window(Renderer *self, const TextureWindow &window)
+	inline void renderer_set_texture_window(Renderer *self, const TextureWindow *window)
 	{
-		self->render_state.texture_window = window;
+		self->render_state.texture_window = *window;
 		self->render_state.cached_window_rect = renderer_compute_window_rect(self, window);
 	}
 	inline void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y)
@@ -9840,7 +9827,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	renderer_reset_scissor_queue(self);
 
 	if (state) {
-		texture_tracker_load_state(&self->tracker, state->tracker_state);
+		texture_tracker_load_state(&self->tracker, &state->tracker_state);
 	}
 
 	self->valid = true;}
@@ -10040,12 +10027,12 @@ void renderer_clear_rect(Renderer *self, const Rect *rect, uint32_t fb_color)
 	VK_ASSERT(rect->y + rect->height <= FB_HEIGHT);
 }
 
-Rect renderer_compute_window_rect(Renderer *self, const TextureWindow &window)
+Rect renderer_compute_window_rect(Renderer *self, const TextureWindow *window)
 {
-	unsigned mask_bits_x = 32 - leading_zeroes(window.mask_x);
-	unsigned mask_bits_y = 32 - leading_zeroes(window.mask_y);
-	unsigned x = window.or_x & ~((1u << mask_bits_x) - 1);
-	unsigned y = window.or_y & ~((1u << mask_bits_y) - 1);
+	unsigned mask_bits_x = 32 - leading_zeroes(window->mask_x);
+	unsigned mask_bits_y = 32 - leading_zeroes(window->mask_y);
+	unsigned x = window->or_x & ~((1u << mask_bits_x) - 1);
+	unsigned y = window->or_y & ~((1u << mask_bits_y) - 1);
 	return { x, y, 1u << mask_bits_x, 1u << mask_bits_y };
 }
 
@@ -11502,27 +11489,27 @@ void renderer_dispatch_set_scaled_read_texture(Renderer *self, bool scaled_read,
 	}
 }
 
-bool renderer_primitive_info_sort_gt(const PrimitiveInfo &a, const PrimitiveInfo &b)
+bool renderer_primitive_info_sort_gt(const PrimitiveInfo *a, const PrimitiveInfo *b)
 {
-	if (a.offset_uv != b.offset_uv)
-		return a.offset_uv > b.offset_uv;
-	if (a.shift != b.shift)
-		return a.shift > b.shift;
-	if (a.scaled_read != b.scaled_read)
-		return a.scaled_read > b.scaled_read;
-	if (a.filtering != b.filtering)
-		return a.filtering > b.filtering;
-	if (hd_handle_ne(&a.hd_texture_index, &b.hd_texture_index))
-		return hd_handle_gt(&a.hd_texture_index, &b.hd_texture_index);
-	if (a.scissor_index != b.scissor_index)
-		return a.scissor_index > b.scissor_index;
-	return a.triangle_index > b.triangle_index;
+	if (a->offset_uv != b->offset_uv)
+		return a->offset_uv > b->offset_uv;
+	if (a->shift != b->shift)
+		return a->shift > b->shift;
+	if (a->scaled_read != b->scaled_read)
+		return a->scaled_read > b->scaled_read;
+	if (a->filtering != b->filtering)
+		return a->filtering > b->filtering;
+	if (hd_handle_ne(&a->hd_texture_index, &b->hd_texture_index))
+		return hd_handle_gt(&a->hd_texture_index, &b->hd_texture_index);
+	if (a->scissor_index != b->scissor_index)
+		return a->scissor_index > b->scissor_index;
+	return a->triangle_index > b->triangle_index;
 }
 
 /* qsort comparator: descending order, matching primitive_info_sort_gt. */
 int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb){
-	const PrimitiveInfo &a = *(const PrimitiveInfo *)(pa);
-	const PrimitiveInfo &b = *(const PrimitiveInfo *)(pb);
+	const PrimitiveInfo *a = (const PrimitiveInfo *)(pa);
+	const PrimitiveInfo *b = (const PrimitiveInfo *)(pb);
 	if (renderer_primitive_info_sort_gt(a, b))
 		return -1;
 	if (renderer_primitive_info_sort_gt(b, a))
@@ -11663,7 +11650,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 
 	SemiTransparentState last_state = *SemiTransparentStateVec_at(&self->queue.semi_transparent_state, 0);
 
-	renderer_semi_transparent_set_state(self, last_state);
+	renderer_semi_transparent_set_state(self, &last_state);
 
 	// These pixels are blended, so we have to render them in-order.
 	// Batch up as long as we can.
@@ -11693,7 +11680,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 			last_draw_offset = i;
 
 			last_state = *SemiTransparentStateVec_at(&self->queue.semi_transparent_state, i);
-			renderer_semi_transparent_set_state(self, last_state);
+			renderer_semi_transparent_set_state(self, &last_state);
 		}
 	} }
 
@@ -12073,8 +12060,8 @@ void renderer_reset_queue(Renderer *self)
 	}
 }
 
-void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentState &state){
-	if (state.scaled_read)
+void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentState *state){
+	if (state->scaled_read)
 	{
 		if (self->msaa > 1)
 			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
@@ -12083,23 +12070,23 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 	}
 	else
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
-	renderer_hd_texture_uniforms(self, state.hd_texture_index);
-	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, state.filtering ? self->primitive_filter_mode : FilterMode_NearestNeighbor);
+	renderer_hd_texture_uniforms(self, state->hd_texture_index);
+	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, state->filtering ? self->primitive_filter_mode : FilterMode_NearestNeighbor);
 	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
-	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, state.shift);
-	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)state.offset_uv);
+	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, state->shift);
+	commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)state->offset_uv);
 
-	if (state.scissor_index < 0)
+	if (state->scissor_index < 0)
 		commandbuffer_set_scissor(cbh_get(&self->cmd), &self->queue.default_scissor);
 	else
-		commandbuffer_set_scissor(cbh_get(&self->cmd), Rect2DVec_at(&self->queue.scissors, state.scissor_index));
+		commandbuffer_set_scissor(cbh_get(&self->cmd), Rect2DVec_at(&self->queue.scissors, state->scissor_index));
 
-	Program &textured = state.textured ? state.scaled_read ?
+	Program &textured = state->textured ? state->scaled_read ?
 		*self->pipelines.textured_scaled : *self->pipelines.textured_unscaled : *self->pipelines.flat;
-	Program &textured_masked = state.textured ? state.scaled_read ?
+	Program &textured_masked = state->textured ? state->scaled_read ?
 		*self->pipelines.textured_masked_scaled : *self->pipelines.textured_masked_unscaled : *self->pipelines.flat_masked;
 
-	switch (state.semi_transparent)
+	switch (state->semi_transparent)
 	{
 	case SemiTransparentMode_None:
 	{
@@ -12114,7 +12101,7 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 	}
 	case SemiTransparentMode_Add:
 	{
-		if (state.masked)
+		if (state->masked)
 		{
 			commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAdd);
 			commandbuffer_set_program(cbh_get(&self->cmd), textured_masked);
@@ -12143,7 +12130,7 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 	}
 	case SemiTransparentMode_Average:
 	{
-		if (state.masked)
+		if (state->masked)
 		{
 			commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAvg);
 			commandbuffer_set_program(cbh_get(&self->cmd), textured_masked);
@@ -12174,7 +12161,7 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 	}
 	case SemiTransparentMode_Sub:
 	{
-		if (state.masked)
+		if (state->masked)
 		{
 			commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendSub);
 			commandbuffer_set_program(cbh_get(&self->cmd), textured_masked);
@@ -12203,7 +12190,7 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 	}
 	case SemiTransparentMode_AddQuarter:
 	{
-		if (state.masked)
+		if (state->masked)
 		{
 			commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAddQuarter);
 			commandbuffer_set_program(cbh_get(&self->cmd), textured_masked);
@@ -21712,22 +21699,22 @@ int64_t page_bytes(FusionRects &fusion)
 	struct UploadPtrEntry { uint32_t key; TextureUpload *val; };
 	POD_VEC_DECLARE(UploadPtrVec, UploadPtrEntry);
 
-	TextureRectSaveState to_save_state(const TextureRect &t, UploadOwningMap &uploads) {
-		uint32_t hash = t.upload->hash;
+	TextureRectSaveState to_save_state(const TextureRect *t, UploadOwningMap &uploads) {
+		uint32_t hash = t->upload->hash;
 		if (!uploadmap_contains(&uploads, hash))
-			uploadmap_insert(&uploads, hash, texture_upload_new_copy_without_handles(t.upload));
+			uploadmap_insert(&uploads, hash, texture_upload_new_copy_without_handles(t->upload));
 		return {
-			t.upload->hash,
-			t.offset_x,
-			t.offset_y,
-			t.vram_rect
+			t->upload->hash,
+			t->offset_x,
+			t->offset_y,
+			t->vram_rect
 		};
 	}
 
-	TextureRect from_save_state(const TextureRectSaveState &t, UploadPtrVec &uploads) {
+	TextureRect from_save_state(const TextureRectSaveState *t, UploadPtrVec &uploads) {
 		TextureUpload *found = NULL;
 		{ int i; for (i = 0; i < uploads.count; i++) {
-			if (uploads.items[i].key == t.upload_hash) {
+			if (uploads.items[i].key == t->upload_hash) {
 				found = uploads.items[i].val;
 				break;
 			}
@@ -21737,9 +21724,9 @@ int64_t page_bytes(FusionRects &fusion)
 		}
 		return {
 			found,    /* TextureRect ctor acquires its own ref */
-			t.offset_x,
-			t.offset_y,
-			t.vram_rect
+			t->offset_x,
+			t->offset_y,
+			t->vram_rect
 		};
 	}
 
@@ -21752,7 +21739,7 @@ int64_t page_bytes(FusionRects &fusion)
 		{
 			if (r.alive)
 			{
-				TextureRectSaveState _ss = to_save_state(r.texture_rect, state.uploads);
+				TextureRectSaveState _ss = to_save_state(&r.texture_rect, state.uploads);
 				TextureRectSaveStateVec_push(&state.rects, &_ss);
 			}
 		}
@@ -21770,7 +21757,7 @@ int64_t page_bytes(FusionRects &fusion)
 			for (_rti = 0; _rti < ownedrects_size(&r.to_restore); _rti++)
 			{
 				TextureRect &t = r.to_restore.v.items[_rti];
-				TextureRectSaveState _ss = to_save_state(t, state.uploads);
+				TextureRectSaveState _ss = to_save_state(&t, state.uploads);
 				TextureRectSaveStateVec_push(&saved.to_restore, &_ss);
 			}
 			}
@@ -21783,13 +21770,13 @@ int64_t page_bytes(FusionRects &fusion)
 	}
 
 
-	void texture_tracker_load_state(struct TextureTracker *self, const TextureTrackerSaveState &state)
+	void texture_tracker_load_state(struct TextureTracker *self, const TextureTrackerSaveState *state)
 	{
 		UploadPtrVec uploads = { NULL, 0, 0 };
-		{ int e; for (e = 0; e < state.uploads.count; e++) {
+		{ int e; for (e = 0; e < state->uploads.count; e++) {
 			TextureUpload *ptr = texture_upload_new(); /* owns +1 */
-			texture_upload_copy_contents(ptr, state.uploads.items[e].val); /* deep-copy contents (refcount untouched) */
-			UploadPtrEntry pe = { state.uploads.items[e].key, ptr };
+			texture_upload_copy_contents(ptr, state->uploads.items[e].val); /* deep-copy contents (refcount untouched) */
+			UploadPtrEntry pe = { state->uploads.items[e].key, ptr };
 			UploadPtrVec_push(&uploads, &pe);
 		} }
 
@@ -21797,28 +21784,28 @@ int64_t page_bytes(FusionRects &fusion)
 		enduring_arr_clear(&self->tracker.textures); // load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway
 		{
 			int _i;
-			for (_i = 0; _i < TextureRectSaveStateVec_size(&state.rects); _i++)
-				rect_tracker_place(&self->tracker, from_save_state(*TextureRectSaveStateVec_at((struct TextureRectSaveStateVec *)&state.rects, _i), uploads));
+			for (_i = 0; _i < TextureRectSaveStateVec_size(&state->rects); _i++)
+				rect_tracker_place(&self->tracker, from_save_state(TextureRectSaveStateVec_at((struct TextureRectSaveStateVec *)&state->rects, _i), uploads));
 		}
 		rrvec_clear(&self->restorable_rects);
 		{
 			int _i;
-			for (_i = 0; _i < RestorableRectSaveStateVec_size(&state.restorable); _i++)
+			for (_i = 0; _i < RestorableRectSaveStateVec_size(&state->restorable); _i++)
 			{
-				RestorableRectSaveState *r = RestorableRectSaveStateVec_at((struct RestorableRectSaveStateVec *)&state.restorable, _i);
+				RestorableRectSaveState *r = RestorableRectSaveStateVec_at((struct RestorableRectSaveStateVec *)&state->restorable, _i);
 				RestorableRect loaded;
 				restorablerect_init(&loaded);
 				loaded.hash = r->hash;
 				loaded.rect = r->rect;
 				int _j;
 				for (_j = 0; _j < TextureRectSaveStateVec_size(&r->to_restore); _j++)
-					ownedrects_push(&loaded.to_restore, from_save_state(*TextureRectSaveStateVec_at(&r->to_restore, _j), uploads));
+					ownedrects_push(&loaded.to_restore, from_save_state(TextureRectSaveStateVec_at(&r->to_restore, _j), uploads));
 				rrvec_push(&self->restorable_rects, &loaded);
 				restorablerect_destroy(&loaded);
 			}
 		}
 		// Need to reload the hd textures, too
-		{ int e; for (e = 0; e < state.uploads.count; e++) texture_tracker_load_hd_texture(self, state.uploads.items[e].key); }
+		{ int e; for (e = 0; e < state->uploads.count; e++) texture_tracker_load_hd_texture(self, state->uploads.items[e].key); }
 		// Drop the map's construction refs; the placed/restorable TextureRects now
 		// hold their own references to each upload.
 		{ int i; for (i = 0; i < uploads.count; i++) texture_upload_release(uploads.items[i].val); }
@@ -22676,7 +22663,7 @@ void rhi_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
    uint8_t tex_y_or   = (twy & twh) << 3;
 
    if (renderer)
-      renderer_set_texture_window(renderer, { tex_x_mask, tex_y_mask, tex_x_or, tex_y_or });
+      { TextureWindow _w = { tex_x_mask, tex_y_mask, tex_x_or, tex_y_or }; renderer_set_texture_window(renderer, &_w); }
    else
       rhi_defer_push_set_tex_window(&defer, tww, twh, twx, twy);
 }
