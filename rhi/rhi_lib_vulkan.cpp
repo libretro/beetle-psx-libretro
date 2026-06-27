@@ -5561,6 +5561,10 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	class Device
 	{
 		public:
+			friend Shader *device_request_shader(Device *self, const uint32_t *data, size_t size);
+			friend PipelineLayout *device_request_pipeline_layout(Device *self, const CombinedResourceLayout &layout);
+			friend DescriptorSetAllocator *device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings);
+			friend const RenderPass *device_request_render_pass(Device *self, const RenderPassInfo &info, bool compatible);
 			friend uint64_t device_allocate_cookie(Device *self);
 			friend void device_request_vertex_block(Device *self, BufferBlock &block, VkDeviceSize size);
 			friend void device_request_uniform_block(Device *self, BufferBlock &block, VkDeviceSize size);
@@ -5660,7 +5664,6 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 					unsigned semaphore_count = 0, Semaphore *semaphore = NULL);
 
 			// Request shaders and programs. These objects are owned by the Device.
-			Shader *request_shader(const uint32_t *code, size_t size);
 			Program *request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
 					size_t fragment_size);
 			Program *request_program(const uint32_t *compute_data, size_t compute_size);
@@ -5711,10 +5714,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 			friend void program_init_compute(struct Program *self, Device *device, Shader *compute);
 
 
-			PipelineLayout *request_pipeline_layout(const CombinedResourceLayout &layout);
-			DescriptorSetAllocator *request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_sets);
 			friend void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout &layout);
-			const RenderPass &request_render_pass(const RenderPassInfo &info, bool compatible);
 			friend struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info);
 
 			VkPhysicalDeviceMemoryProperties mem_props;
@@ -13507,7 +13507,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		self->intrusive_node.key = hash;
 		for (i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++)
 		{
-			self->set_allocators[i] = device->request_descriptor_set_allocator(layout.sets[i], layout.stages_for_bindings[i]);
+			self->set_allocators[i] = device_request_descriptor_set_allocator(device, layout.sets[i], layout.stages_for_bindings[i]);
 			layouts[i] = descriptor_set_allocator_get_layout(self->set_allocators[i]);
 			if (layout.descriptor_set_mask & (1u << i))
 				num_sets = i + 1;
@@ -14746,11 +14746,11 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo &info)
 	{
-		const RenderPass &rp = self->device->request_render_pass(info, true);
+		const RenderPass *rp = device_request_render_pass(self->device, info, true);
 		Hash hash;
 		FramebufferNode *node;
 		Hasher h; hasher_init(&h);
-		hasher_u64(&h, rp.intrusive_node.key);
+		hasher_u64(&h, rp->intrusive_node.key);
 
 		for (unsigned i = 0; i < info.num_color_attachments; i++)
 			if (info.color_attachments[i])
@@ -14767,7 +14767,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		if (node)
 			return &node->base;
 
-		return &framebuffer_thmap_emplace(&self->framebuffers, hash, self->device, &rp, info)->base;
+		return &framebuffer_thmap_emplace(&self->framebuffers, hash, self->device, rp, info)->base;
 	}
 
 	void attachment_allocator_clear(struct AttachmentAllocator *self)
@@ -15175,7 +15175,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 		self->framebuffer = device_request_framebuffer(self->device, info);
 		self->compatible_render_pass = framebuffer_get_compatible_render_pass(self->framebuffer);
-		self->actual_render_pass = &self->device->request_render_pass(info, false);
+		self->actual_render_pass = device_request_render_pass(self->device, info, false);
 
 		commandbuffer_init_viewport_scissor(self, info, self->framebuffer);
 
@@ -16745,15 +16745,14 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		VK_ASSERT(sem_handle_vec_size(&data.wait_semaphores) < 16 * 1024);
 	}
 
-	Shader *Device::request_shader(const uint32_t *data, size_t size)
-	{
+	Shader * device_request_shader(Device *self, const uint32_t *data, size_t size){
 		Hasher hasher; hasher_init(&hasher);
 		hasher_data(&hasher, data, size);
 
 		Hash hash = hasher_get(&hasher);
-		Shader *ret = shader_map_find(&shaders, hash);
+		Shader *ret = shader_map_find(&self->shaders, hash);
 		if (!ret)
-			ret = shader_map_emplace_yield(&shaders, hash, this, data, size);
+			ret = shader_map_emplace_yield(&self->shaders, hash, self, data, size);
 		return ret;
 	}
 
@@ -16771,7 +16770,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 
 	Program *Device::request_program(const uint32_t *compute_data, size_t compute_size)
 	{
-		Shader *compute = request_shader(compute_data, compute_size);
+		Shader *compute = device_request_shader(this, compute_data, compute_size);
 		return request_program(compute);
 	}
 
@@ -16792,13 +16791,12 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 	Program *Device::request_program(const uint32_t *vertex_data, size_t vertex_size, const uint32_t *fragment_data,
 			size_t fragment_size)
 	{
-		Shader *vertex = request_shader(vertex_data, vertex_size);
-		Shader *fragment = request_shader(fragment_data, fragment_size);
+		Shader *vertex = device_request_shader(this, vertex_data, vertex_size);
+		Shader *fragment = device_request_shader(this, fragment_data, fragment_size);
 		return request_program(vertex, fragment);
 	}
 
-	PipelineLayout *Device::request_pipeline_layout(const CombinedResourceLayout &layout)
-	{
+	PipelineLayout * device_request_pipeline_layout(Device *self, const CombinedResourceLayout &layout){
 		Hasher h; hasher_init(&h);
 		hasher_data(&h, (const uint32_t *)(layout.sets), sizeof(layout.sets));
 		hasher_data(&h, &layout.stages_for_bindings[0][0], sizeof(layout.stages_for_bindings));
@@ -16809,22 +16807,21 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		hasher_u32(&h, layout.render_target_mask);
 
 		Hash hash = hasher_get(&h);
-		PipelineLayout *ret = pipeline_layout_map_find(&pipeline_layouts, hash);
+		PipelineLayout *ret = pipeline_layout_map_find(&self->pipeline_layouts, hash);
 		if (!ret)
-			ret = pipeline_layout_map_emplace_yield(&pipeline_layouts, hash, this, layout);
+			ret = pipeline_layout_map_emplace_yield(&self->pipeline_layouts, hash, self, layout);
 		return ret;
 	}
 
-	DescriptorSetAllocator *Device::request_descriptor_set_allocator(const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings)
-	{
+	DescriptorSetAllocator * device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout &layout, const uint32_t *stages_for_bindings){
 		Hasher h; hasher_init(&h);
 		hasher_data(&h, (const uint32_t *)(&layout), sizeof(layout));
 		hasher_data(&h, stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
 		Hash hash = hasher_get(&h);
 
-		DescriptorSetAllocator *ret = descriptor_set_allocator_map_find(&descriptor_set_allocators, hash);
+		DescriptorSetAllocator *ret = descriptor_set_allocator_map_find(&self->descriptor_set_allocators, hash);
 		if (!ret)
-			ret = descriptor_set_allocator_map_emplace_yield(&descriptor_set_allocators, hash, this, layout, stages_for_bindings);
+			ret = descriptor_set_allocator_map_emplace_yield(&self->descriptor_set_allocators, hash, self, layout, stages_for_bindings);
 		return ret;
 	}
 
@@ -16915,7 +16912,7 @@ void fixup_src_stage(VkPipelineStageFlags &src_stages, bool fixup)
 		hasher_u32(&h, layout.push_constant_range.stageFlags);
 		hasher_u32(&h, layout.push_constant_range.size);
 		layout.push_constant_layout_hash = hasher_get(&h);
-		program_set_pipeline_layout(&program, request_pipeline_layout(layout));
+		program_set_pipeline_layout(&program, device_request_pipeline_layout(this, layout));
 	}
 
 	void Device::set_context(const Context &context)
@@ -18802,8 +18799,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		return VK_FORMAT_UNDEFINED;
 	}
 
-	const RenderPass &Device::request_render_pass(const RenderPassInfo &info, bool compatible)
-	{
+	const RenderPass * device_request_render_pass(Device *self, const RenderPassInfo &info, bool compatible){
 		Hasher h; hasher_init(&h);
 		VkFormat formats[VULKAN_NUM_ATTACHMENTS];
 		VkFormat depth_stencil;
@@ -18863,10 +18859,10 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		Hash hash = hasher_get(&h);
 
-		RenderPass *ret = render_pass_map_find(&render_passes, hash);
+		RenderPass *ret = render_pass_map_find(&self->render_passes, hash);
 		if (!ret)
-			ret = render_pass_map_emplace_yield(&render_passes, hash, this, info);
-		return *ret;
+			ret = render_pass_map_emplace_yield(&self->render_passes, hash, self, info);
+		return ret;
 	}
 
 	void Device::set_name(const Buffer &buffer, const char *name)
