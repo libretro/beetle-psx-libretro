@@ -8736,6 +8736,16 @@ extern retro_log_printf_t log_cb;
 	{
 		public:
 
+			/* batch-3 free functions (defined after the class): flush family,
+			 * scanout-mode getter, render-pass discard, the command-buffer
+			 * accessor (ref -> ptr), and the filter-exclude predicate. */
+			friend void renderer_flush(Renderer *self);
+			friend Fence renderer_flush_and_signal(Renderer *self);
+			friend ScanoutMode renderer_get_scanout_mode(const Renderer *self);
+			friend void renderer_discard_render_pass(Renderer *self);
+			friend CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self);
+			friend bool renderer_get_filer_exclude(Renderer *self, FilterExclude exclude);
+
 			/* batch-2 setter/accessor free functions (defined after the class). */
 			friend void renderer_set_texture_window(Renderer *self, const TextureWindow &window);
 			friend void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y);
@@ -8866,27 +8876,7 @@ extern retro_log_printf_t log_cb;
 
 			SaveState save_vram_state();
 
-			void flush()
-			{
-				if (cbh_is_valid(&cmd))
-					device->submit(cmd);
-				cbh_reset(&cmd);
-				device->flush_frame();
-			}
 
-			Fence flush_and_signal()
-			{
-				Fence fence;
-				fence.data = NULL;
-				if (cbh_is_valid(&cmd))
-					device->submit(cmd, &fence);
-				cbh_reset(&cmd);
-				device->flush_frame();
-				/* Return by value transfers ownership to the caller; the
-				 * struct copy does not incref and this local must NOT reset
-				 * (moved-from). */
-				return fence;
-			}
 
 			enum
 			{
@@ -8903,10 +8893,6 @@ extern retro_log_printf_t log_cb;
 
 
 
-			ScanoutMode get_scanout_mode() const
-			{
-				return render_state.scanout_mode;
-			}
 
 
 
@@ -8943,20 +8929,11 @@ extern retro_log_printf_t log_cb;
 			void hazard(StatusFlags flags);
 			void resolve(Domain target_domain, unsigned x, unsigned y);
 			void flush_render_pass(const Rect &rect);
-			void discard_render_pass()
-			{
-				reset_queue();
-			}
 			void clear_quad(const Rect &rect, uint32_t fb_color, bool candidate);
 
 			// Called by TextureTracker (formerly via TextureUploader interface).
 			ImageHandle upload_texture(LoadedLevels &image);
 			ImageHandle create_texture(int width, int height, int levels);
-			CommandBufferHandle &command_buffer_hack_fixme()
-			{
-				ensure_command_buffer();
-				return cmd;
-			}
 
 		private:
 			void hd_texture_uniforms(HdTextureHandle hd_texture_index);
@@ -9035,20 +9012,6 @@ extern retro_log_printf_t log_cb;
 			void build_line_quad(Vertex *quad, const Vertex *line);
 			BufferVertexVec *select_pipeline(unsigned prims, int scissor, HdTextureHandle hd_texture,
 					bool filtering, bool scaled_read, unsigned shift, bool offset_uv);
-			bool get_filer_exclude(FilterExclude exclude)
-			{
-				if (
-						render_state.primitive_type == PrimitiveType_Sprite &&
-						sprite_filter_exclude >= exclude
-				   )
-					return true;
-				if (
-						render_state.primitive_type == PrimitiveType_May_Be_2D_Polygon &&
-						polygon_2d_filter_exclude >= exclude
-				   )
-					return true;
-				return false;
-			}
 
 			void flush_resolves();
 			void flush_blits();
@@ -9068,6 +9031,53 @@ extern retro_log_printf_t log_cb;
 			void ssaa_framebuffer();
 			BufferHandle quad = { NULL };
 	};
+
+	/* ---- Renderer flush/accessor methods (batch 3) -> free functions. These have
+	 * internal callers (other still-class methods call them via this), rewired to
+	 * renderer_*(this, ...); command_buffer_hack_fixme returned a CommandBufferHandle&
+	 * and now returns a pointer. ---- */
+	inline void renderer_flush(Renderer *self)
+	{
+		if (cbh_is_valid(&self->cmd))
+			self->device->submit(self->cmd);
+		cbh_reset(&self->cmd);
+		self->device->flush_frame();
+	}
+	inline Fence renderer_flush_and_signal(Renderer *self)
+	{
+		Fence fence;
+		fence.data = NULL;
+		if (cbh_is_valid(&self->cmd))
+			self->device->submit(self->cmd, &fence);
+		cbh_reset(&self->cmd);
+		self->device->flush_frame();
+		/* Return by value transfers ownership to the caller; the struct copy does
+		 * not incref and this local must NOT reset (moved-from). */
+		return fence;
+	}
+	inline ScanoutMode renderer_get_scanout_mode(const Renderer *self)
+	{
+		return self->render_state.scanout_mode;
+	}
+	inline void renderer_discard_render_pass(Renderer *self)
+	{
+		self->reset_queue();
+	}
+	inline CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self)
+	{
+		self->ensure_command_buffer();
+		return &self->cmd;
+	}
+	inline bool renderer_get_filer_exclude(Renderer *self, FilterExclude exclude)
+	{
+		if (self->render_state.primitive_type == PrimitiveType_Sprite &&
+				self->sprite_filter_exclude >= exclude)
+			return true;
+		if (self->render_state.primitive_type == PrimitiveType_May_Be_2D_Polygon &&
+				self->polygon_2d_filter_exclude >= exclude)
+			return true;
+		return false;
+	}
 
 	/* ---- Renderer setters/accessors (batch 2): inline methods -> inline free
 	 * functions taking Renderer *self. ---- */
@@ -9617,7 +9627,7 @@ Renderer::Renderer(Device &device_, unsigned scaling_, unsigned msaa_, const Sav
 	buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	quad = device->create_buffer(buffer_create_info, quad_data);
 
-	flush();
+	renderer_flush(this);
 	reset_scissor_queue();
 
 	if (state) {
@@ -9642,7 +9652,7 @@ Renderer::SaveState Renderer::save_vram_state()
 	commandbuffer_barrier_simple(cbh_get(&cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
 	             VK_ACCESS_HOST_READ_BIT);
 
-	flush();
+	renderer_flush(this);
 
 	device->wait_idle();
 	const uint32_t *src = (const uint32_t *)(
@@ -9864,7 +9874,7 @@ void Renderer::copy_vram_to_cpu_synchronous(const Rect &rect, uint16_t *vram)
 	commandbuffer_barrier_simple(cbh_get(&cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 	             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
 
-	Fence fence = flush_and_signal();
+	Fence fence = renderer_flush_and_signal(this);
 	fenceholder_wait(fence_get(&fence));
 
 	const uint32_t *mapped = (const uint32_t *)(device->map_host_buffer(*bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
@@ -10895,7 +10905,7 @@ BufferVertexVec *Renderer::select_pipeline(unsigned prims, int scissor, HdTextur
 		return NULL;
 
 	if (filtering)
-		filtering = !get_filer_exclude(FilterExcludeOpaque);
+		filtering = !renderer_get_filer_exclude(this, FilterExcludeOpaque);
 
 	if (render_state.texture_mode != TextureMode_None)
 	{
@@ -11078,7 +11088,7 @@ void Renderer::draw_triangle(const Vertex *vertices)
 	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode_None)
 	{
 		if (filtering)
-			filtering = !get_filer_exclude(FilterExcludeOpaqueAndSemiTrans);
+			filtering = !renderer_get_filer_exclude(this, FilterExcludeOpaqueAndSemiTrans);
 
 		for (unsigned i = 0; i < 3; i++)
 			BufferVertexVec_push(&queue.semi_transparent, &vert[i]);
@@ -11134,7 +11144,7 @@ void Renderer::draw_quad(const Vertex *vertices)
 	if (render_state.mask_test || render_state.semi_transparent != SemiTransparentMode_None)
 	{
 		if (filtering)
-			filtering = !get_filer_exclude(FilterExcludeOpaqueAndSemiTrans);
+			filtering = !renderer_get_filer_exclude(this, FilterExcludeOpaqueAndSemiTrans);
 
 		const SemiTransparentState state = {
 			scissor_index, hd_texture_index, render_state.semi_transparent,
@@ -11821,7 +11831,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 
 Renderer::~Renderer()
 {
-	flush();
+	renderer_flush(this);
 	texture_tracker_fini(&tracker); /* embedded TextureTracker: explicit fini (was default dtor) */
 	/* Release the ImageHandle members (previously dropped by implicit member
 	 * destructors, which a plain struct no longer provides). */
@@ -19410,7 +19420,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	static void fbatlas_discard_render_pass(FBAtlas *self)
 	{
 		self->renderpass.inside = false;
-		self->listener->discard_render_pass();
+		renderer_discard_render_pass(self->listener);
 	}
 
 	static void fbatlas_notify_external_barrier(FBAtlas *self, StatusFlags domains)
@@ -21351,7 +21361,7 @@ static char retro_slash = '/';
 			return;
 		}
 
-		CommandBufferHandle &cmd = uploader->command_buffer_hack_fixme();
+		CommandBufferHandle *cmd = renderer_command_buffer_hack_fixme(uploader);
 
 		int texture_width = page.fusion.vram_rect.width * page.fusion.scaleX;
 		int texture_height = page.fusion.vram_rect.height * page.fusion.scaleY;
@@ -21368,13 +21378,13 @@ static char retro_slash = '/';
 
 		if (ih_is_valid(&page.texture) && image_get_width(ih_get(&page.texture), 0) == texture_width && image_get_height(ih_get(&page.texture), 0) == texture_height)
 			// Switch back into transfer dst layout
-			commandbuffer_image_barrier(cbh_get(&cmd), *ih_get(&page.texture),
+			commandbuffer_image_barrier(cbh_get(cmd), *ih_get(&page.texture),
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
 		else
 			ih_move(&page.texture, uploader->create_texture(texture_width, texture_height, mip_levels));
-		commandbuffer_clear_image(cbh_get(&cmd), *ih_get(&page.texture), fallthrough);
+		commandbuffer_clear_image(cbh_get(cmd), *ih_get(&page.texture), fallthrough);
 
 		// Second pass to blit all the existing textures into the new texture
 		for (TextureRect &tex : page.fusion.rects) {
@@ -21411,7 +21421,7 @@ static char retro_slash = '/';
 
 			// Switch into transfer src
 			// what the fuck am I doing?
-			commandbuffer_image_barrier(cbh_get(&cmd), 
+			commandbuffer_image_barrier(cbh_get(cmd), 
 					*image,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -21430,7 +21440,7 @@ static char retro_slash = '/';
 			for (int dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
 				int srcLevel = max_(0, dstLevel - full_res_levels);
 
-				commandbuffer_blit_image(cbh_get(&cmd), *ih_get(&page.texture), *image,
+				commandbuffer_blit_image(cbh_get(cmd), *ih_get(&page.texture), *image,
 						dst_offset,
 						dst_extent,
 						{
@@ -21455,7 +21465,7 @@ static char retro_slash = '/';
 			}
 
 			// Change back to shader read
-			commandbuffer_image_barrier(cbh_get(&cmd), 
+			commandbuffer_image_barrier(cbh_get(cmd), 
 					*image,
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -21468,7 +21478,7 @@ static char retro_slash = '/';
 
 		// I have no idea what the fuck I'm doing
 		// Make the fused texture readable by shaders
-		commandbuffer_image_barrier(cbh_get(&cmd), *ih_get(&page.texture),
+		commandbuffer_image_barrier(cbh_get(cmd), *ih_get(&page.texture),
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
@@ -21974,7 +21984,7 @@ static void vk_context_reset(void)
    if (rhi_defer_count(&defer) > 0)
       rhi_defer_drain(&defer, vk_defer_dispatch, NULL);
 
-   renderer->flush();
+   renderer_flush(renderer);
 }
 
 static void vk_context_destroy(void)
@@ -22487,7 +22497,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
       /* Any visual core option changes will be deferred to next non-duped frame */
 
       //printf("No PSX GPU display update; duping frame\n");
-      renderer->flush();
+      renderer_flush(renderer);
       video_refresh_cb(NULL, prev_frame_width, prev_frame_height, 0);
 
       inside_frame = false;
@@ -22507,7 +22517,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer_set_horizontal_additional_cropping(renderer, image_crop);
 
    renderer_set_display_filter(renderer, super_sampling ? ScanoutFilter_SSAA : ScanoutFilter_None);
-   if (renderer->get_scanout_mode() == ScanoutMode_BGR24)
+   if (renderer_get_scanout_mode(renderer) == ScanoutMode_BGR24)
       renderer_set_mdec_filter(renderer, mdec_yuv ? ScanoutFilter_MDEC_YUV : ScanoutFilter_None);
    else
       renderer_set_mdec_filter(renderer, ScanoutFilter_None);
@@ -22538,7 +22548,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
 
    vulkan->set_image(vulkan->handle, image, 0,
          NULL, VK_QUEUE_FAMILY_IGNORED);
-   renderer->flush();
+   renderer_flush(renderer);
 
    scanout_handles[index] = scanout;
    video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, image_get_width(ih_get(&scanout), 0), image_get_height(ih_get(&scanout), 0), 0);
@@ -22935,7 +22945,7 @@ void rhi_vulkan_load_image(
 
    // This is called on state loading. 
    if (!inside_frame)
-      renderer->flush();
+      renderer_flush(renderer);
 }
 
 bool rhi_vulkan_read_vram(uint16_t x, uint16_t y,
