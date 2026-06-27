@@ -5261,32 +5261,34 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	typedef enum CommandBufferDirtyBits CommandBufferDirtyBits;
 	typedef uint32_t CommandBufferDirtyFlags;
 
+	struct State
+	{
+		// Depth state.
+		unsigned depth_write : 1;
+		unsigned depth_test : 1;
+		unsigned blend_enable : 1;
+
+		unsigned cull_mode : CULL_MODE_BITS;
+
+		unsigned depth_compare : COMPARE_OP_BITS;
+
+		unsigned alpha_to_coverage : 1;
+		unsigned alpha_to_one : 1;
+		unsigned sample_shading : 1;
+
+		unsigned src_color_blend : BLEND_FACTOR_BITS;
+		unsigned dst_color_blend : BLEND_FACTOR_BITS;
+		unsigned color_blend_op : BLEND_OP_BITS;
+		unsigned src_alpha_blend : BLEND_FACTOR_BITS;
+		unsigned dst_alpha_blend : BLEND_FACTOR_BITS;
+		unsigned alpha_blend_op : BLEND_OP_BITS;
+		unsigned topology : 4;
+
+		unsigned spec_constant_mask : 8;
+	};
+
 	union PipelineState {
-		struct State
-		{
-			// Depth state.
-			unsigned depth_write : 1;
-			unsigned depth_test : 1;
-			unsigned blend_enable : 1;
-
-			unsigned cull_mode : CULL_MODE_BITS;
-
-			unsigned depth_compare : COMPARE_OP_BITS;
-
-			unsigned alpha_to_coverage : 1;
-			unsigned alpha_to_one : 1;
-			unsigned sample_shading : 1;
-
-			unsigned src_color_blend : BLEND_FACTOR_BITS;
-			unsigned dst_color_blend : BLEND_FACTOR_BITS;
-			unsigned color_blend_op : BLEND_OP_BITS;
-			unsigned src_alpha_blend : BLEND_FACTOR_BITS;
-			unsigned dst_alpha_blend : BLEND_FACTOR_BITS;
-			unsigned alpha_blend_op : BLEND_OP_BITS;
-			unsigned topology : 4;
-
-			unsigned spec_constant_mask : 8;
-		} state;
+		struct State state;
 		uint32_t words[4];
 	};
 
@@ -16275,7 +16277,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_set_opaque_state(struct CommandBuffer *self)
 	{
-		PipelineState::State *state = &self->static_state.state;
+		State *state = &self->static_state.state;
 		memset(&state, 0, sizeof(state));
 		state->cull_mode = VK_CULL_MODE_BACK_BIT;
 		state->blend_enable = false;
@@ -16289,7 +16291,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_set_quad_state(struct CommandBuffer *self)
 	{
-		PipelineState::State *state = &self->static_state.state;
+		State *state = &self->static_state.state;
 		memset(&state, 0, sizeof(state));
 		state->cull_mode = VK_CULL_MODE_NONE;
 		state->blend_enable = false;
