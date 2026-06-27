@@ -10963,12 +10963,10 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 			if (max_u > 255 || max_v > 255) // Wraparound behavior, assume the whole page is hit.
 			{
 				{ Rect _r = { 0, 0, 256u >> shift, 256 }; fbatlas_set_texture_window(&self->atlas, &_r); }
-				hd_texture_vram = {
-					self->render_state.texture_offset_x,
-					self->render_state.texture_offset_y,
-					256u >> shift,
-					256,
-				};
+				hd_texture_vram.x = self->render_state.texture_offset_x;
+				hd_texture_vram.y = self->render_state.texture_offset_y;
+				hd_texture_vram.width = 256u >> shift;
+				hd_texture_vram.height = 256;
 			}
 			else
 			{
@@ -10977,15 +10975,12 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 				width = max_u - min_u + 1;
 				{ Rect _r = { min_u, min_v, width, height }; fbatlas_set_texture_window(&self->atlas, &_r); }
 
-				hd_texture_vram = {
-					self->render_state.texture_offset_x + min_u,
-					self->render_state.texture_offset_y + min_v,
+				hd_texture_vram.x = self->render_state.texture_offset_x + min_u;
+				hd_texture_vram.y = self->render_state.texture_offset_y + min_v;
 
-					// HDTODO: this might be wrong because it can result in Rect's with 0 width, also notice that height has the same +1
-					width - 1, // This is -1 due to boundary shenanigans above (otherwise upload.rect.contains(snoop) would return false for the right-most tiles)
-					
-					height,
-				};
+				// HDTODO: this might be wrong because it can result in Rect's with 0 width, also notice that height has the same +1
+				hd_texture_vram.width = width - 1; // This is -1 due to boundary shenanigans above (otherwise upload.rect.contains(snoop) would return false for the right-most tiles)
+				hd_texture_vram.height = height;
 			}
 		}
 		else
@@ -10993,12 +10988,10 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 			// If we have a masked texture window, assume this is the true rect we should use.
 			Rect effective_rect = self->render_state.cached_window_rect;
 			{ Rect _r = { effective_rect.x >> shift, effective_rect.y, effective_rect.width >> shift, effective_rect.height }; fbatlas_set_texture_window(&self->atlas, &_r); }
-			hd_texture_vram = {
-				self->render_state.texture_offset_x + (effective_rect.x >> shift),
-				self->render_state.texture_offset_y + effective_rect.y,
-				effective_rect.width >> shift,
-				effective_rect.height,
-			};
+			hd_texture_vram.x = self->render_state.texture_offset_x + (effective_rect.x >> shift);
+			hd_texture_vram.y = self->render_state.texture_offset_y + effective_rect.y;
+			hd_texture_vram.width = effective_rect.width >> shift;
+			hd_texture_vram.height = effective_rect.height;
 		}
 	}
 
@@ -11097,25 +11090,23 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 	}
 
 	{ unsigned i; for (i = 0; i < count; i++) {
-		output[i] = {
-			x[i],
-			y[i],
-			z,
-			vertices[i].w,
-			vertices[i].color & 0xffffffu,
-			self->render_state.texture_window,
-			int16_t(self->render_state.palette_offset_x),
-			int16_t(self->render_state.palette_offset_y),
-			param,
-			int16_t(vertices[i].u),
-			int16_t(vertices[i].v),
-			int16_t(self->render_state.texture_offset_x),
-			int16_t(self->render_state.texture_offset_y),
-			self->render_state.UVLimits.min_u,
-			self->render_state.UVLimits.min_v,
-			self->render_state.UVLimits.max_u,
-			self->render_state.UVLimits.max_v,
-		};
+		output[i].x = x[i];
+		output[i].y = y[i];
+		output[i].z = z;
+		output[i].w = vertices[i].w;
+		output[i].color = vertices[i].color & 0xffffffu;
+		output[i].window = self->render_state.texture_window;
+		output[i].pal_x = (int16_t)(self->render_state.palette_offset_x);
+		output[i].pal_y = (int16_t)(self->render_state.palette_offset_y);
+		output[i].params = param;
+		output[i].u = (int16_t)(vertices[i].u);
+		output[i].v = (int16_t)(vertices[i].v);
+		output[i].base_uv_x = (int16_t)(self->render_state.texture_offset_x);
+		output[i].base_uv_y = (int16_t)(self->render_state.texture_offset_y);
+		output[i].min_u = self->render_state.UVLimits.min_u;
+		output[i].min_v = self->render_state.UVLimits.min_v;
+		output[i].max_u = self->render_state.UVLimits.max_u;
+		output[i].max_v = self->render_state.UVLimits.max_v;
 
 		if (self->render_state.texture_mode != TextureMode_None && !self->render_state.texture_color_modulate)
 			output[i].color = 0x808080;
