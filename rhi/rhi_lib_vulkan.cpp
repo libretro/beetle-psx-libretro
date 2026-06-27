@@ -4439,15 +4439,16 @@ void set_immutable_sampler(DescriptorSetLayout &layout, unsigned binding, StockS
 	struct DescriptorSetNode
 	{
 		struct TemporaryHashmapNode th_node;
-		DescriptorSetNode(VkDescriptorSet set)
-			: set(set)
-		{
-		}
-
 		VkDescriptorSet set;
 	};
 
-void descriptor_set_node_destroy(DescriptorSetNode *t) { t->~DescriptorSetNode(); }
+	/* Was the DescriptorSetNode(VkDescriptorSet) ctor. */
+	static inline void descriptor_set_node_init(struct DescriptorSetNode *self, VkDescriptorSet set)
+	{
+		self->set = set;
+	}
+
+void descriptor_set_node_destroy(DescriptorSetNode *t) { (void)t; /* trivial dtor */ }
 	VK_TEMPHASH_DECLARE(descriptor_set_thmap, DescriptorSetNode, VULKAN_DESCRIPTOR_RING_SIZE, 1, descriptor_set_node_destroy)
 
 	/* make_vacant constructs a node in the pool and parks it on the vacant free-list
@@ -4458,7 +4459,8 @@ void descriptor_set_thmap_make_vacant(struct descriptor_set_thmap *m, VkDescript
 		DescriptorSetNode *node;
 		if (!slot)
 			return;
-		node = new (slot) DescriptorSetNode(set);
+		node = (DescriptorSetNode *)slot;
+		descriptor_set_node_init(node, set);
 		descriptor_set_thmap_vacant_push(m, node);
 	}
 
@@ -4957,18 +4959,18 @@ void framebuffer_allocator_deinit(struct FramebufferAllocator *self)
 	struct TransientNode
 	{
 		struct TemporaryHashmapNode th_node;
-		TransientNode(ImageHandle handle_)
-		{
-			/* Plain struct copy: the produced handle (refcount 1) is passed
-			 * by value through emplace and moved into the member without an
-			 * incref; the node becomes the single owner. */
-			handle = handle_;
-		}
-
 		ImageHandle handle;
 	};
 
-void transient_node_destroy(TransientNode *t) { ih_reset(&t->handle); t->~TransientNode(); }
+	/* Was the TransientNode(ImageHandle) ctor. Plain struct copy: the produced
+	 * handle (refcount 1) is passed by value and moved into the member without
+	 * an incref; the node becomes the single owner. */
+	static inline void transient_node_init(struct TransientNode *self, ImageHandle handle_)
+	{
+		self->handle = handle_;
+	}
+
+void transient_node_destroy(TransientNode *t) { ih_reset(&t->handle); /* trivial dtor otherwise */ }
 	VK_TEMPHASH_DECLARE(transient_thmap, TransientNode, VULKAN_FRAMEBUFFER_RING_SIZE, 0, transient_node_destroy)
 
 TransientNode *transient_thmap_emplace(struct transient_thmap *m,
@@ -4978,7 +4980,8 @@ TransientNode *transient_thmap_emplace(struct transient_thmap *m,
 		TransientNode *node;
 		if (!slot)
 			return NULL;
-		node = new (slot) TransientNode(handle);
+		node = (TransientNode *)slot;
+		transient_node_init(node, handle);
 		node->th_node.index = m->index;
 		node->th_node.hash  = hash;
 		vk_ptr_map_emplace_replace(&m->hashmap, hash, (void *)node);
@@ -13276,9 +13279,10 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 	}
 
 	// We didn't find a vacant heap, make a new one.
-	MiniHeap *node = new (object_pool_raw_allocate(&self->object_pool)) MiniHeap();
+	MiniHeap *node = (MiniHeap *)object_pool_raw_allocate(&self->object_pool);
 	if (!node)
 		return false;
+	memset(node, 0, sizeof(*node)); /* was placement-new MiniHeap() value-init */
 	/* Block is a plain struct now; its former default ctor (fill the free
 	 * bitmap) runs explicitly via block_init. */
 	block_init(&node->heap);
@@ -13291,7 +13295,7 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 		// We cannot allocate a new block from parent ... This is fatal.
 		if (!classallocator_allocate(self->parent, alloc_size, tiling, &heap.allocation, true))
 		{
-			block_fini(&node->heap); node->~MiniHeap(); object_pool_raw_free(&self->object_pool, node);
+			block_fini(&node->heap); object_pool_raw_free(&self->object_pool, node);
 			return false;
 		}
 	}
@@ -13301,7 +13305,7 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 		if (!deviceallocator_allocate(self->global_allocator, alloc_size, self->memory_type, &heap.allocation.base, &heap.allocation.host_base,
 		                                VK_NULL_HANDLE))
 		{
-			block_fini(&node->heap); node->~MiniHeap(); object_pool_raw_free(&self->object_pool, node);
+			block_fini(&node->heap); object_pool_raw_free(&self->object_pool, node);
 			return false;
 		}
 	}
@@ -13394,7 +13398,7 @@ void classallocator_free(struct ClassAllocator *self, struct DeviceAllocation *a
 				m->heap_availability_mask &= ~(1u << index);
 		}
 
-		block_fini(&heap->heap); heap->~MiniHeap(); object_pool_raw_free(&self->object_pool, heap);
+		block_fini(&heap->heap); object_pool_raw_free(&self->object_pool, heap);
 	}
 	else if (was_full)
 	{
