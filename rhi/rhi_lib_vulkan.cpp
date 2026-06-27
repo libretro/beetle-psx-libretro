@@ -4003,6 +4003,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 	static inline struct ImageCreateInfo image_create_info_immutable_2d(unsigned width, unsigned height, VkFormat format, bool mipmapped)
 	{
 		struct ImageCreateInfo info;
+		info.domain = ImageDomain_Physical;
 		info.width = width;
 		info.height = height;
 		info.depth = 1;
@@ -4015,12 +4016,14 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 		info.flags = 0;
 		info.misc = mipmapped ? (unsigned)(IMAGE_MISC_GENERATE_MIPS_BIT) : 0u;
 		info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		{ VkComponentMapping _sw = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A }; info.swizzle = _sw; }
 		return info;
 	}
 
 	static inline struct ImageCreateInfo image_create_info_render_target(unsigned width, unsigned height, VkFormat format)
 	{
 		struct ImageCreateInfo info;
+		info.domain = ImageDomain_Physical;
 		info.width = width;
 		info.height = height;
 		info.depth = 1;
@@ -4036,6 +4039,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 		info.flags = 0;
 		info.misc = 0;
 		info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+		{ VkComponentMapping _sw = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A }; info.swizzle = _sw; }
 		return info;
 	}
 
@@ -4057,6 +4061,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 		info.flags = 0;
 		info.misc = 0;
 		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		{ VkComponentMapping _sw = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A }; info.swizzle = _sw; }
 		return info;
 	}
 
