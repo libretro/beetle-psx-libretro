@@ -5461,6 +5461,17 @@ private:
 			friend void commandbuffer_begin_compute(struct CommandBuffer *self);
 			friend void commandbuffer_flush_compute_state(struct CommandBuffer *self);
 			friend void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer);
+			friend void commandbuffer_set_buffer_view(struct CommandBuffer *self, unsigned set, unsigned binding, const BufferView &view);
+			friend void commandbuffer_set_input_attachments(struct CommandBuffer *self, unsigned set, unsigned start_binding);
+			friend void commandbuffer_set_texture_raw(struct CommandBuffer *self, unsigned set, unsigned binding, VkImageView float_view, VkImageView integer_view, VkImageLayout layout, uint64_t cookie);
+			friend void commandbuffer_set_texture_view(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view);
+			friend void commandbuffer_set_texture_view_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler);
+			friend void commandbuffer_set_texture_view_stock(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view, StockSampler stock);
+			friend void commandbuffer_set_storage_texture(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view);
+			friend void commandbuffer_set_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const Sampler &sampler);
+			friend void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize range);
+			friend void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
+			friend void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate);
 
 			VkCommandBuffer get_command_buffer() const
 			{
@@ -5479,20 +5490,8 @@ private:
 
 
 
-			void set_buffer_view(unsigned set, unsigned binding, const BufferView &view);
-			void set_input_attachments(unsigned set, unsigned start_binding);
-			void set_texture(unsigned set, unsigned binding, const ImageView &view);
-			void set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler);
-			void set_texture(unsigned set, unsigned binding, const ImageView &view, StockSampler sampler);
-			void set_storage_texture(unsigned set, unsigned binding, const ImageView &view);
-			void set_sampler(unsigned set, unsigned binding, const Sampler &sampler);
-			void set_uniform_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
-					VkDeviceSize range);
 
-			void *allocate_constant_data(unsigned set, unsigned binding, VkDeviceSize size);
 
-			void *allocate_vertex_data(unsigned binding, VkDeviceSize size, VkDeviceSize stride,
-					VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
 
 			void set_viewport(const VkViewport &viewport)
 			{
@@ -5671,9 +5670,6 @@ private:
 			BufferBlock vbo_block;
 			BufferBlock ubo_block;
 
-			void set_texture(unsigned set, unsigned binding, VkImageView float_view, VkImageView integer_view,
-					VkImageLayout layout,
-					uint64_t cookie);
 
 
 			HandleCounter reference_count;
@@ -5706,6 +5702,20 @@ private:
 	void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer);
 	inline void commandbuffer_begin_graphics(struct CommandBuffer *self) { self->is_compute = false; commandbuffer_begin_context(self); }
 	inline void commandbuffer_begin_compute(struct CommandBuffer *self) { self->is_compute = true; commandbuffer_begin_context(self); }
+
+	/* Group C: descriptor / resource-bind free functions. The 4 set_texture
+	 * overloads become distinctly-named free functions. */
+	void commandbuffer_set_buffer_view(struct CommandBuffer *self, unsigned set, unsigned binding, const BufferView &view);
+	void commandbuffer_set_input_attachments(struct CommandBuffer *self, unsigned set, unsigned start_binding);
+	void commandbuffer_set_texture_raw(struct CommandBuffer *self, unsigned set, unsigned binding, VkImageView float_view, VkImageView integer_view, VkImageLayout layout, uint64_t cookie);
+	void commandbuffer_set_texture_view(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view);
+	void commandbuffer_set_texture_view_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler);
+	void commandbuffer_set_texture_view_stock(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view, StockSampler stock);
+	void commandbuffer_set_storage_texture(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view);
+	void commandbuffer_set_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const Sampler &sampler);
+	void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset, VkDeviceSize range);
+	void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
+	void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate = VK_VERTEX_INPUT_RATE_VERTEX);
 
 	/* Group A: copy / clear / barrier free functions. Overloaded members are
 	 * split into distinctly-named free functions. */
@@ -5842,6 +5852,8 @@ private:
 			friend void commandbuffer_begin_context(struct CommandBuffer *self);
 			friend void commandbuffer_flush_compute_state(struct CommandBuffer *self);
 			friend void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo &info, const Framebuffer *framebuffer);
+			friend void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size);
+			friend void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride, VkVertexInputRate step_rate);
 			friend class Program;
 			friend class Framebuffer;
 			friend class PipelineLayout;
@@ -10012,7 +10024,7 @@ void Renderer::mipmap_framebuffer()
 		else
 			commandbuffer_set_program(cbh_get(&cmd), *pipelines.mipmap_energy);
 
-		cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[i - 1]), StockSampler_LinearClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[i - 1]), StockSampler_LinearClamp);
 
 		cbh_get(&cmd)->set_quad_state();
 		cbh_get(&cmd)->set_vertex_binding(0, *bh_get(&quad), 0, 8);
@@ -10085,11 +10097,11 @@ void Renderer::ssaa_framebuffer()
 	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, 1);
 	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 	commandbuffer_set_program(cbh_get(&cmd), *pipelines.resolve_to_unscaled);
-	cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&framebuffer_ssaa)));
+	commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer_ssaa)));
 	if (msaa > 1)
-		cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 	else
-		cbh_get(&cmd)->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
 
 	struct Push
 	{
@@ -10103,7 +10115,7 @@ void Renderer::ssaa_framebuffer()
 
 		Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 		commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-		void *ptr = cbh_get(&cmd)->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
+		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
 		memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
 		cbh_get(&cmd)->set_specialization_constant_mask(-1);
 		cbh_get(&cmd)->dispatch(1, 1, to_run);
@@ -10289,12 +10301,12 @@ ImageHandle Renderer::scanout_vram_to_texture(bool scaled)
 	if (scaled)
 	{
 		commandbuffer_set_program(cbh_get(&cmd), *pipelines.scaled_quad_blitter);
-		cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[0]), StockSampler_LinearClamp);
 	}
 	else
 	{
 		commandbuffer_set_program(cbh_get(&cmd), *pipelines.unscaled_quad_blitter);
-		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_LinearClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_LinearClamp);
 	}
 
 	cbh_get(&cmd)->set_vertex_binding(0, *bh_get(&quad), 0, 8);
@@ -10491,7 +10503,7 @@ ImageHandle Renderer::scanout_to_texture()
 			commandbuffer_set_program(cbh_get(&cmd), *pipelines.bpp24_yuv_quad_blitter);
 		else
 			commandbuffer_set_program(cbh_get(&cmd), *pipelines.bpp24_quad_blitter);
-		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestWrap);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestWrap);
 	}
 	else if (ssaa)
 	{
@@ -10500,7 +10512,7 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			commandbuffer_set_program(cbh_get(&cmd), *pipelines.unscaled_quad_blitter);
 
-		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&framebuffer_ssaa)), StockSampler_NearestWrap);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer_ssaa)), StockSampler_NearestWrap);
 	}
 	else if (!render_state.adaptive_smoothing || scaling == 1)
 	{
@@ -10509,7 +10521,7 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			commandbuffer_set_program(cbh_get(&cmd), *pipelines.scaled_quad_blitter);
 
-		cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_LinearWrap);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[0]), StockSampler_LinearWrap);
 	}
 	else
 	{
@@ -10518,13 +10530,13 @@ ImageHandle Renderer::scanout_to_texture()
 		else
 			commandbuffer_set_program(cbh_get(&cmd), *pipelines.mipmap_resolve);
 
-		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer)), StockSampler_TrilinearWrap);
-		cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&bias_framebuffer)), StockSampler_LinearWrap);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&scaled_framebuffer)), StockSampler_TrilinearWrap);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&bias_framebuffer)), StockSampler_LinearWrap);
 	}
 
 	if (dither)
 	{
-		cbh_get(&cmd)->set_texture(0, 2, image_get_view(ih_get(&dither_lut)), StockSampler_NearestWrap);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 2, image_get_view(ih_get(&dither_lut)), StockSampler_NearestWrap);
 		struct DitherData
 		{
 			float range;
@@ -10532,7 +10544,7 @@ ImageHandle Renderer::scanout_to_texture()
 			float dither_scale;
 			int32_t dither_shift;
 		};
-		DitherData *dither = (DitherData *)cbh_get(&cmd)->allocate_constant_data(0, 3, 1 * sizeof(DitherData));
+		DitherData *dither = (DitherData *)commandbuffer_allocate_constant_data(cbh_get(&cmd), 0, 3, 1 * sizeof(DitherData));
 		dither->range = 31.0f;
 		dither->inv_range = 1.0f / 31.0f;
 		dither->dither_scale = 1.0f;
@@ -10665,11 +10677,11 @@ void Renderer::flush_resolves()
 		ensure_command_buffer();
 		commandbuffer_set_program(cbh_get(&cmd), *pipelines.resolve_to_scaled);
 
-		cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
 		if (msaa > 1)
-			cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
+			commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
 		else
-			cbh_get(&cmd)->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
+			commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[0]));
 
 		unsigned size = Rect2DVec_size(&queue.scaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
@@ -10678,7 +10690,7 @@ void Renderer::flush_resolves()
 
 			Push push = { { 1.0f / (scaling * FB_WIDTH), 1.0f / (scaling * FB_HEIGHT) }, scaling };
 			commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-			void *ptr = cbh_get(&cmd)->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
+			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&queue.scaled_resolves) + i, to_run * sizeof(VkRect2D));
 			cbh_get(&cmd)->dispatch(scaling, scaling, to_run);
 		}
@@ -10693,11 +10705,11 @@ void Renderer::flush_resolves()
 		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, 0);
 		cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
 		commandbuffer_set_program(cbh_get(&cmd), *pipelines.resolve_to_unscaled);
-		cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&framebuffer)));
+		commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)));
 		if (msaa > 1)
-			cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
+			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		else
-			cbh_get(&cmd)->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
+			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 
 		unsigned size = Rect2DVec_size(&queue.unscaled_resolves);
 		for (unsigned i = 0; i < size; i += 1024)
@@ -10706,7 +10718,7 @@ void Renderer::flush_resolves()
 
 			Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 			commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
-			void *ptr = cbh_get(&cmd)->allocate_constant_data(1, 0, to_run * sizeof(VkRect2D));
+			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
 			cbh_get(&cmd)->set_specialization_constant_mask(-1);
 			cbh_get(&cmd)->dispatch(1, 1, to_run);
@@ -11320,7 +11332,7 @@ void Renderer::flush_render_pass(const Rect &rect)
 	commandbuffer_begin_render_pass(cbh_get(&cmd), info);
 	commandbuffer_set_scissor(cbh_get(&cmd), info.render_area);
 	queue.default_scissor = info.render_area;
-	cbh_get(&cmd)->set_texture(0, 2, image_get_view(ih_get(&dither_lut)), StockSampler_NearestWrap);
+	commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 2, image_get_view(ih_get(&dither_lut)), StockSampler_NearestWrap);
 
 	render_opaque_primitives();
 	render_opaque_texture_primitives();
@@ -11345,12 +11357,12 @@ void Renderer::dispatch_set_scaled_read_texture(bool scaled_read, bool textured)
 	if (scaled_read)
 	{
 		if (msaa > 1)
-			cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
+			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		else
-			cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
+			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 	}
 	else
-		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
 	if (textured)
 	{
 		if (scaled_read)
@@ -11399,7 +11411,7 @@ void Renderer::dispatch(const BufferVertexVec &vertices, PrimitiveInfoVec &sciss
 
 	// Render flat-shaded primitives.
 	BufferVertex *vert = (BufferVertex *)(
-	    cbh_get(&cmd)->allocate_vertex_data(0, BufferVertexVec_size((struct BufferVertexVec *)&vertices) * sizeof(BufferVertex), sizeof(BufferVertex)));
+	    commandbuffer_allocate_vertex_data(cbh_get(&cmd), 0, BufferVertexVec_size((struct BufferVertexVec *)&vertices) * sizeof(BufferVertex), sizeof(BufferVertex)));
 
 	int scissor = (*PrimitiveInfoVec_front(&scissors)).scissor_index;
 	HdTextureHandle hd_texture = (*PrimitiveInfoVec_front(&scissors)).hd_texture_index;
@@ -11483,7 +11495,7 @@ void Renderer::render_opaque_primitives()
 
 void Renderer::hd_texture_uniforms(HdTextureHandle hd_texture_index) {
 	HdTexture hd = tracker.get_hd_texture(hd_texture_index);
-	cbh_get(&cmd)->set_texture(0, 4, image_get_view(ih_get(&hd.texture)), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
+	commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 4, image_get_view(ih_get(&hd.texture)), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
 	// ivec4, ivec4
 	struct HDPush {
 		int32_t vram_rect_x;
@@ -11524,7 +11536,7 @@ void Renderer::render_semi_transparent_primitives()
 	cbh_get(&cmd)->set_vertex_attrib(5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
 	size_t size = BufferVertexVec_size(&queue.semi_transparent) * sizeof(BufferVertex);
-	void *verts = cbh_get(&cmd)->allocate_vertex_data(0, size, sizeof(BufferVertex));
+	void *verts = commandbuffer_allocate_vertex_data(cbh_get(&cmd), 0, size, sizeof(BufferVertex));
 	memcpy(verts, BufferVertexVec_data(&queue.semi_transparent), size);
 
 	SemiTransparentState last_state = *SemiTransparentStateVec_at(&queue.semi_transparent_state, 0);
@@ -11641,19 +11653,19 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 	{
 		if (msaa > 1)
 		{
-			cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
-			cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
+			commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
+			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		}
 		else
 		{
-			cbh_get(&cmd)->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
-			cbh_get(&cmd)->set_texture(0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
+			commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[0]));
+			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 		}
 	}
 	else
 	{
-		cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&framebuffer)));
-		cbh_get(&cmd)->set_texture(0, 1, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
+		commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)));
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 1, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
 	}
 
 	unsigned size = BlitInfoVec_size(&infos);
@@ -11661,7 +11673,7 @@ void Renderer::flush_blit(const BlitInfoVec &infos, Program &program, bool scale
 	for (unsigned i = 0; i < size; i += 512)
 	{
 		unsigned to_blit = min_(size - i, 512u);
-		void *ptr = cbh_get(&cmd)->allocate_constant_data(1, 0, to_blit * sizeof(BlitInfo));
+		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&cmd), 1, 0, to_blit * sizeof(BlitInfo));
 		memcpy(ptr, BlitInfoVec_data((struct BlitInfoVec *)&infos) + i, to_blit * sizeof(BlitInfo));
 		cbh_get(&cmd)->dispatch(scale, scale, to_blit);
 	}
@@ -11716,7 +11728,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		{
 			if (msaa > 1)
 			{
-				cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
+				commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)));
 				commandbuffer_set_program(cbh_get(&cmd), render_state.mask_test ?
 						*pipelines.blit_vram_msaa_cached_scaled_masked :
 						*pipelines.blit_vram_msaa_cached_scaled);
@@ -11724,7 +11736,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 			}
 			else
 			{
-				cbh_get(&cmd)->set_storage_texture(0, 0, *iv_get(&scaled_views[0]));
+				commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[0]));
 				commandbuffer_set_program(cbh_get(&cmd), render_state.mask_test ? *pipelines.blit_vram_cached_scaled_masked :
 														*pipelines.blit_vram_cached_scaled);
 				cbh_get(&cmd)->dispatch(factor, factor, 1);
@@ -11732,7 +11744,7 @@ void Renderer::blit_vram(const Rect &dst, const Rect &src)
 		}
 		else
 		{
-			cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&framebuffer)));
+			commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)));
 			commandbuffer_set_program(cbh_get(&cmd), render_state.mask_test ? *pipelines.blit_vram_cached_unscaled_masked :
 													*pipelines.blit_vram_cached_unscaled);
 			cbh_get(&cmd)->dispatch(factor, factor, 1);
@@ -11843,7 +11855,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 
 	ensure_command_buffer();
 	commandbuffer_set_program(cbh_get(&cmd), render_state.mask_test ? *pipelines.copy_to_vram_masked : *pipelines.copy_to_vram);
-	cbh_get(&cmd)->set_storage_texture(0, 0, image_get_view(ih_get(&framebuffer)));
+	commandbuffer_set_storage_texture(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)));
 
 	// Vulkan minimum limit, for large buffer views, split up the work.
 	if (rect.width * rect.height > device->get_gpu_properties().limits.maxTexelBufferElements)
@@ -11858,7 +11870,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 
 			Rect small_rect = { rect.x, rect.y + y, rect.width, y_size };
 
-			cbh_get(&cmd)->set_buffer_view(0, 1, *bvh_get(&view));
+			commandbuffer_set_buffer_view(cbh_get(&cmd), 0, 1, *bvh_get(&view));
 			Push push = { small_rect, 0, render_state.force_mask_bit ? 0x8000u : 0u };
 			commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
 			cbh_get(&cmd)->dispatch((small_rect.width + 7) >> 3, (small_rect.height + 7) >> 3, 1);
@@ -11872,7 +11884,7 @@ BufferHandle Renderer::copy_cpu_to_vram(const Rect &rect)
 		view_info.format = VK_FORMAT_R16_UINT;
 		BufferViewHandle view = device->create_buffer_view(view_info);
 
-		cbh_get(&cmd)->set_buffer_view(0, 1, *bvh_get(&view));
+		commandbuffer_set_buffer_view(cbh_get(&cmd), 0, 1, *bvh_get(&view));
 
 		Push push = { rect, 0, render_state.force_mask_bit ? 0x8000u : 0u };
 		commandbuffer_push_constants(cbh_get(&cmd), &push, 0, sizeof(push));
@@ -11951,12 +11963,12 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 	if (state.scaled_read)
 	{
 		if (msaa > 1)
-			cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
+			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&scaled_framebuffer_msaa)), StockSampler_NearestClamp);
 		else
-			cbh_get(&cmd)->set_texture(0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
+			commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, *iv_get(&scaled_views[0]), StockSampler_NearestClamp);
 	}
 	else
-		cbh_get(&cmd)->set_texture(0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
+		commandbuffer_set_texture_view_stock(cbh_get(&cmd), 0, 0, image_get_view(ih_get(&framebuffer)), StockSampler_NearestClamp);
 	hd_texture_uniforms(state.hd_texture_index);
 	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_FilterMode, state.filtering ? primitive_filter_mode : FilterMode_NearestNeighbor);
 	cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_Scaling, scaling);
@@ -11993,7 +12005,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAdd);
 			commandbuffer_set_program(cbh_get(&cmd), textured_masked);
 			commandbuffer_pixel_barrier(cbh_get(&cmd));
-			cbh_get(&cmd)->set_input_attachments(0, 3);
+			commandbuffer_set_input_attachments(cbh_get(&cmd), 0, 3);
 			cbh_get(&cmd)->set_blend_enable(false);
 			if (msaa > 1)
 			{
@@ -12021,7 +12033,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		{
 			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAvg);
 			commandbuffer_set_program(cbh_get(&cmd), textured_masked);
-			cbh_get(&cmd)->set_input_attachments(0, 3);
+			commandbuffer_set_input_attachments(cbh_get(&cmd), 0, 3);
 			commandbuffer_pixel_barrier(cbh_get(&cmd));
 			cbh_get(&cmd)->set_blend_enable(false);
 			if (msaa > 1)
@@ -12052,7 +12064,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		{
 			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendSub);
 			commandbuffer_set_program(cbh_get(&cmd), textured_masked);
-			cbh_get(&cmd)->set_input_attachments(0, 3);
+			commandbuffer_set_input_attachments(cbh_get(&cmd), 0, 3);
 			commandbuffer_pixel_barrier(cbh_get(&cmd));
 			cbh_get(&cmd)->set_blend_enable(false);
 			if (msaa > 1)
@@ -12081,7 +12093,7 @@ void Renderer::semi_transparent_set_state(const SemiTransparentState &state)
 		{
 			cbh_get(&cmd)->set_specialization_constant(SpecConstIndex_BlendMode, BlendMode_BlendAddQuarter);
 			commandbuffer_set_program(cbh_get(&cmd), textured_masked);
-			cbh_get(&cmd)->set_input_attachments(0, 3);
+			commandbuffer_set_input_attachments(cbh_get(&cmd), 0, 3);
 			commandbuffer_pixel_barrier(cbh_get(&cmd));
 			cbh_get(&cmd)->set_blend_enable(false);
 			if (msaa > 1)
@@ -15704,109 +15716,109 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		}
 	}
 
-	void *CommandBuffer::allocate_constant_data(unsigned set, unsigned binding, VkDeviceSize size)
+	void *commandbuffer_allocate_constant_data(struct CommandBuffer *self, unsigned set, unsigned binding, VkDeviceSize size)
 	{
-		BufferBlockAllocation data = ubo_block.allocate(size);
+		BufferBlockAllocation data = self->ubo_block.allocate(size);
 		if (!data.host)
 		{
-			device->request_uniform_block(ubo_block, size);
-			data = ubo_block.allocate(size);
+			self->device->request_uniform_block(self->ubo_block, size);
+			data = self->ubo_block.allocate(size);
 		}
-		set_uniform_buffer(set, binding, *bh_get(&ubo_block.gpu), data.offset, size);
+		commandbuffer_set_uniform_buffer(self, set, binding, *bh_get(&self->ubo_block.gpu), data.offset, size);
 		return data.host;
 	}
 
-	void *CommandBuffer::allocate_vertex_data(unsigned binding, VkDeviceSize size, VkDeviceSize stride,
+	void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self, unsigned binding, VkDeviceSize size, VkDeviceSize stride,
 			VkVertexInputRate step_rate)
 	{
-		BufferBlockAllocation data = vbo_block.allocate(size);
+		BufferBlockAllocation data = self->vbo_block.allocate(size);
 		if (!data.host)
 		{
-			device->request_vertex_block(vbo_block, size);
-			data = vbo_block.allocate(size);
+			self->device->request_vertex_block(self->vbo_block, size);
+			data = self->vbo_block.allocate(size);
 		}
 
-		set_vertex_binding(binding, *bh_get(&vbo_block.gpu), data.offset, stride, step_rate);
+		self->set_vertex_binding(binding, *bh_get(&self->vbo_block.gpu), data.offset, stride, step_rate);
 		return data.host;
 	}
 
-	void CommandBuffer::set_uniform_buffer(unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
+	void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer &buffer, VkDeviceSize offset,
 			VkDeviceSize range)
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 		VK_ASSERT(buffer_get_create_info(&buffer).usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		ResourceBinding &b = bindings.bindings[set][binding];
+		ResourceBinding &b = self->bindings.bindings[set][binding];
 
-		if (buffer.cookie_base.cookie == bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
+		if (buffer.cookie_base.cookie == self->bindings.cookies[set][binding] && b.buffer.offset == offset && b.buffer.range == range)
 			return;
 
 		b.buffer = { buffer_get_buffer(&buffer), offset, range };
-		bindings.cookies[set][binding] = buffer.cookie_base.cookie;
-		bindings.secondary_cookies[set][binding] = 0;
-		dirty_sets |= 1u << set;
+		self->bindings.cookies[set][binding] = buffer.cookie_base.cookie;
+		self->bindings.secondary_cookies[set][binding] = 0;
+		self->dirty_sets |= 1u << set;
 	}
 
-	void CommandBuffer::set_sampler(unsigned set, unsigned binding, const Sampler &sampler)
+	void commandbuffer_set_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const Sampler &sampler)
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
-		if (sampler.cookie_base.cookie == bindings.secondary_cookies[set][binding])
+		if (sampler.cookie_base.cookie == self->bindings.secondary_cookies[set][binding])
 			return;
 
-		ResourceBinding &b = bindings.bindings[set][binding];
+		ResourceBinding &b = self->bindings.bindings[set][binding];
 		b.image.fp.sampler = sampler_get_sampler(&sampler);
 		b.image.integer.sampler = sampler_get_sampler(&sampler);
-		dirty_sets |= 1u << set;
-		bindings.secondary_cookies[set][binding] = sampler.cookie_base.cookie;
+		self->dirty_sets |= 1u << set;
+		self->bindings.secondary_cookies[set][binding] = sampler.cookie_base.cookie;
 	}
 
-	void CommandBuffer::set_buffer_view(unsigned set, unsigned binding, const BufferView &view)
+	void commandbuffer_set_buffer_view(struct CommandBuffer *self, unsigned set, unsigned binding, const BufferView &view)
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 		VK_ASSERT(buffer_get_create_info(&bufferview_get_buffer(&view)).usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-		if (view.cookie_base.cookie == bindings.cookies[set][binding])
+		if (view.cookie_base.cookie == self->bindings.cookies[set][binding])
 			return;
-		ResourceBinding &b = bindings.bindings[set][binding];
+		ResourceBinding &b = self->bindings.bindings[set][binding];
 		b.buffer_view = bufferview_get_view(&view);
-		bindings.cookies[set][binding] = view.cookie_base.cookie;
-		bindings.secondary_cookies[set][binding] = 0;
-		dirty_sets |= 1u << set;
+		self->bindings.cookies[set][binding] = view.cookie_base.cookie;
+		self->bindings.secondary_cookies[set][binding] = 0;
+		self->dirty_sets |= 1u << set;
 	}
 
-	void CommandBuffer::set_input_attachments(unsigned set, unsigned start_binding)
+	void commandbuffer_set_input_attachments(struct CommandBuffer *self, unsigned set, unsigned start_binding)
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
-		VK_ASSERT(start_binding + actual_render_pass->get_num_input_attachments(current_subpass) <= VULKAN_NUM_BINDINGS);
-		unsigned num_input_attachments = actual_render_pass->get_num_input_attachments(current_subpass);
+		VK_ASSERT(start_binding + self->actual_render_pass->get_num_input_attachments(self->current_subpass) <= VULKAN_NUM_BINDINGS);
+		unsigned num_input_attachments = self->actual_render_pass->get_num_input_attachments(self->current_subpass);
 		for (unsigned i = 0; i < num_input_attachments; i++)
 		{
-			const VkAttachmentReference &ref = actual_render_pass->get_input_attachment(current_subpass, i);
+			const VkAttachmentReference &ref = self->actual_render_pass->get_input_attachment(self->current_subpass, i);
 			if (ref.attachment == VK_ATTACHMENT_UNUSED)
 				continue;
 
-			ImageView *view = framebuffer->get_attachment(ref.attachment);
+			ImageView *view = self->framebuffer->get_attachment(ref.attachment);
 			VK_ASSERT(view);
 			VK_ASSERT(image_get_create_info(&imageview_get_image(view)).usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
 
-			if (view->cookie_base.cookie == bindings.cookies[set][start_binding + i] &&
-					bindings.bindings[set][start_binding + i].image.fp.imageLayout == ref.layout)
+			if (view->cookie_base.cookie == self->bindings.cookies[set][start_binding + i] &&
+					self->bindings.bindings[set][start_binding + i].image.fp.imageLayout == ref.layout)
 			{
 				continue;
 			}
 
-			ResourceBinding &b = bindings.bindings[set][start_binding + i];
+			ResourceBinding &b = self->bindings.bindings[set][start_binding + i];
 			b.image.fp.imageLayout = ref.layout;
 			b.image.integer.imageLayout = ref.layout;
 			b.image.fp.imageView = imageview_get_float_view(view);
 			b.image.integer.imageView = imageview_get_integer_view(view);
-			bindings.cookies[set][start_binding + i] = view->cookie_base.cookie;
-			dirty_sets |= 1u << set;
+			self->bindings.cookies[set][start_binding + i] = view->cookie_base.cookie;
+			self->dirty_sets |= 1u << set;
 		}
 	}
 
-	void CommandBuffer::set_texture(unsigned set, unsigned binding,
+	void commandbuffer_set_texture_raw(struct CommandBuffer *self, unsigned set, unsigned binding,
 			VkImageView float_view, VkImageView integer_view,
 			VkImageLayout layout,
 			uint64_t cookie)
@@ -15814,44 +15826,44 @@ bool DeviceAllocator::allocate(uint32_t size, uint32_t memory_type, VkDeviceMemo
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 
-		if (cookie == bindings.cookies[set][binding] && bindings.bindings[set][binding].image.fp.imageLayout == layout)
+		if (cookie == self->bindings.cookies[set][binding] && self->bindings.bindings[set][binding].image.fp.imageLayout == layout)
 			return;
 
-		ResourceBinding &b = bindings.bindings[set][binding];
+		ResourceBinding &b = self->bindings.bindings[set][binding];
 		b.image.fp.imageLayout = layout;
 		b.image.fp.imageView = float_view;
 		b.image.integer.imageLayout = layout;
 		b.image.integer.imageView = integer_view;
-		bindings.cookies[set][binding] = cookie;
-		dirty_sets |= 1u << set;
+		self->bindings.cookies[set][binding] = cookie;
+		self->dirty_sets |= 1u << set;
 	}
 
-	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view)
+	void commandbuffer_set_texture_view(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view)
 	{
 		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view)).usage & VK_IMAGE_USAGE_SAMPLED_BIT);
-		set_texture(set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
+		commandbuffer_set_texture_raw(self, set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
 				image_get_layout(&imageview_get_image_const(&view), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), view.cookie_base.cookie);
 	}
 
-	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler)
+	void commandbuffer_set_texture_view_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view, const Sampler &sampler)
 	{
-		set_sampler(set, binding, sampler);
-		set_texture(set, binding, view);
+		commandbuffer_set_sampler(self, set, binding, sampler);
+		commandbuffer_set_texture_view(self, set, binding, view);
 	}
 
-	void CommandBuffer::set_texture(unsigned set, unsigned binding, const ImageView &view, StockSampler stock)
+	void commandbuffer_set_texture_view_stock(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view, StockSampler stock)
 	{
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view)).usage & VK_IMAGE_USAGE_SAMPLED_BIT);
-		const Sampler &sampler = device->get_stock_sampler(stock);
-		set_texture(set, binding, view, sampler);
+		const Sampler &sampler = self->device->get_stock_sampler(stock);
+		commandbuffer_set_texture_view_sampler(self, set, binding, view, sampler);
 	}
 
-	void CommandBuffer::set_storage_texture(unsigned set, unsigned binding, const ImageView &view)
+	void commandbuffer_set_storage_texture(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView &view)
 	{
 		VK_ASSERT(image_get_create_info(&imageview_get_image_const(&view)).usage & VK_IMAGE_USAGE_STORAGE_BIT);
-		set_texture(set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
+		commandbuffer_set_texture_raw(self, set, binding, imageview_get_float_view(&view), imageview_get_integer_view(&view),
 				image_get_layout(&imageview_get_image_const(&view), VK_IMAGE_LAYOUT_GENERAL), view.cookie_base.cookie);
 	}
 
