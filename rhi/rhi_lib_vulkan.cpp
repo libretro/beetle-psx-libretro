@@ -1663,6 +1663,17 @@ struct NAME##_force_semicolon_
 #include <rthreads/rthreads.h>
 #include <streams/file_stream.h>
 
+/* C89-compatible compile-time assertion. C89 has no static_assert / _Static_assert;
+ * emit a typedef whose array size is negative when the condition is false. The
+ * message argument is accepted for source compatibility but unused. __LINE__ keeps
+ * the typedef names unique within a translation unit. */
+#ifndef RHI_STATIC_ASSERT
+#define RHI_STATIC_ASSERT_CAT2(a, b) a##b
+#define RHI_STATIC_ASSERT_CAT(a, b) RHI_STATIC_ASSERT_CAT2(a, b)
+#define RHI_STATIC_ASSERT(cond, msg) \
+	typedef char RHI_STATIC_ASSERT_CAT(rhi_static_assert_, __LINE__)[(cond) ? 1 : -1]
+#endif
+
 /* Local single-evaluation min/max, so the file does not depend on std::min /
  * std::max from <algorithm>. */
 /* min_/max_ as macros (C has no function templates). Arguments must be free of
@@ -2124,7 +2135,7 @@ void object_pool_raw_clear(struct ObjectPoolRaw *p)
 	{
 		int i;
 		for (i = 0; i < p->mem_count; i++)
-			::free(p->memory[i]);
+			free(p->memory[i]);
 		p->vac_count = 0;
 		p->mem_count = 0;
 	}
@@ -2132,8 +2143,8 @@ void object_pool_raw_clear(struct ObjectPoolRaw *p)
 void object_pool_raw_deinit(struct ObjectPoolRaw *p)
 	{
 		object_pool_raw_clear(p);
-		::free(p->vacants);
-		::free(p->memory);
+		free(p->vacants);
+		free(p->memory);
 		p->vacants = NULL;
 		p->memory  = NULL;
 		p->vac_cap = 0;
@@ -2176,9 +2187,9 @@ void object_pool_raw_deinit(struct ObjectPoolRaw *p)
 
 	/* The concrete hash map recovers each wrapper from an IntrusiveHashMapNode* by
 	 * casting, valid only if the node base is at offset 0. */
-	static_assert(offsetof(struct IntrusivePODWrapperPipeline, node) == 0,
+	RHI_STATIC_ASSERT(offsetof(struct IntrusivePODWrapperPipeline, node) == 0,
 			"IntrusivePODWrapperPipeline.node must be first");
-	static_assert(offsetof(struct IntrusivePODWrapperPtr, node) == 0,
+	RHI_STATIC_ASSERT(offsetof(struct IntrusivePODWrapperPtr, node) == 0,
 			"IntrusivePODWrapperPtr.node must be first");
 
 	/* Concrete, type-erased open-addressing hash table (the de-templated form of
@@ -2386,7 +2397,7 @@ struct IntrusiveHashMapNode *hmholder_erase(
 void hmholder_clear(struct IntrusiveHashMapHolderC *h)
 	{
 		ilist_clear(&h->list);
-		::free(h->items);
+		free(h->items);
 		h->items      = NULL;
 		h->count      = 0;
 		h->cap        = 0;
@@ -2404,7 +2415,7 @@ void hmholder_init_empty(struct IntrusiveHashMapHolderC *h)
 
 void hmholder_deinit(struct IntrusiveHashMapHolderC *h)
 	{
-		::free(h->items);
+		free(h->items);
 		h->items = NULL;
 		h->count = 0;
 		h->cap   = 0;
@@ -3235,7 +3246,7 @@ struct MiniHeap
 
 /* The concrete list recovers a MiniHeap* from an IntrusiveListNode* by casting,
  * which is only valid if the node base is at offset 0. */
-static_assert(offsetof(MiniHeap, list_node) == 0,
+RHI_STATIC_ASSERT(offsetof(MiniHeap, list_node) == 0,
 		"MiniHeap.list_node must be the first member for intrusive-list casts");
 
 struct Allocator;
@@ -4764,15 +4775,15 @@ bool render_pass_has_depth(const struct RenderPass *self, unsigned subpass)
 
 	/* The concrete hash map recovers each node type from an IntrusiveHashMapNode* by
 	 * casting, which is only valid if the node base is at offset 0 of every node. */
-	static_assert(offsetof(DescriptorSetAllocator, intrusive_node) == 0,
+	RHI_STATIC_ASSERT(offsetof(DescriptorSetAllocator, intrusive_node) == 0,
 			"DescriptorSetAllocator.intrusive_node must be first");
-	static_assert(offsetof(PipelineLayout, intrusive_node) == 0,
+	RHI_STATIC_ASSERT(offsetof(PipelineLayout, intrusive_node) == 0,
 			"PipelineLayout.intrusive_node must be first");
-	static_assert(offsetof(Shader, intrusive_node) == 0,
+	RHI_STATIC_ASSERT(offsetof(Shader, intrusive_node) == 0,
 			"Shader.intrusive_node must be first");
-	static_assert(offsetof(Program, intrusive_node) == 0,
+	RHI_STATIC_ASSERT(offsetof(Program, intrusive_node) == 0,
 			"Program.intrusive_node must be first");
-	static_assert(offsetof(RenderPass, intrusive_node) == 0,
+	RHI_STATIC_ASSERT(offsetof(RenderPass, intrusive_node) == 0,
 			"RenderPass.intrusive_node must be first");
 
 	/* Concrete per-type maps for the five Device-level cache node types. Each
@@ -5291,6 +5302,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 		struct State state;
 		uint32_t words[4];
 	};
+	typedef union PipelineState PipelineState;
 
 	struct PotentialState
 	{
@@ -5334,7 +5346,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 		uint8_t push_constant_data[VULKAN_PUSH_CONSTANT_SIZE];
 	};
 
-	static_assert(VULKAN_NUM_DESCRIPTOR_SETS == 4, "Number of descriptor sets != 4.");
+	RHI_STATIC_ASSERT(VULKAN_NUM_DESCRIPTOR_SETS == 4, "Number of descriptor sets != 4.");
 
 	/* set_dirty / get_and_clear were small CommandBuffer member helpers used by
 	 * many methods (including in-struct inline setters). Declared here, before the
@@ -5420,7 +5432,7 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 			PipelineState static_state;
 			PotentialState potential_static_state;
 #ifndef _MSC_VER
-			static_assert(sizeof(static_state.words) >= sizeof(static_state.state),
+			RHI_STATIC_ASSERT(sizeof(static_state.words) >= sizeof(static_state.state),
 					"Hashable pipeline state is not large enough!");
 #endif
 
@@ -13816,7 +13828,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		 * a POD layout whose fields mirror ResourceLayout; copy it across. */
 		RhiSpirvResourceLayout reflected;
 		rhi_spirv_reflect(data, size / sizeof(uint32_t), &reflected);
-		static_assert(sizeof(reflected) == sizeof(self->layout),
+		RHI_STATIC_ASSERT(sizeof(reflected) == sizeof(self->layout),
 				"reflection layout mirror size mismatch");
 		memcpy(&self->layout, &reflected, sizeof(self->layout));
 	}
@@ -21887,7 +21899,7 @@ struct SwapchainImageVec {
 			memset(&items[count], 0, (size_t)(n - count) * sizeof(retro_vulkan_image));
 		count = n;
 	}
-	void free_storage() { ::free(items); items = NULL; count = 0; cap = 0; }
+	void free_storage() { free(items); items = NULL; count = 0; cap = 0; }
 };
 
 /* Owning vector of ImageHandle (refcounted), replacing
@@ -21913,14 +21925,14 @@ struct ScanoutHandleVec {
 				/* Move: ih_steal copies the pointer and nulls the old slot. */
 				ih_steal(&nitems[i], &items[i]);
 			} }
-			::free(items);
+			free(items);
 			items = nitems;
 			cap = n;
 		}
 		{ int i; for (i = count; i < n; i++) items[i].data = NULL; } /* default-construct grown slot to a null handle */
 		count = n;
 	}
-	void free_storage() { clear(); ::free(items); items = NULL; cap = 0; }
+	void free_storage() { clear(); free(items); items = NULL; cap = 0; }
 };
 
 static SwapchainImageVec swapchain_images;
