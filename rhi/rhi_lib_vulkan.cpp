@@ -7685,11 +7685,11 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	 * rising-edge detection. TextureTracker embeds three of these by value and
 	 * initialises them in its constructor. */
 	struct DbgHotkey {
-		retro_key key;
+		enum retro_key key;
 		bool was_key_down;
 	};
 
-	static void dbg_hotkey_init(DbgHotkey *h, retro_key key)
+	static void dbg_hotkey_init(DbgHotkey *h, enum retro_key key)
 	{
 		h->key = key;
 		h->was_key_down = false;
@@ -10711,7 +10711,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 			float dither_scale;
 			int32_t dither_shift;
 		};
-		DitherData *dither = (DitherData *)commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 0, 3, 1 * sizeof(DitherData));
+		struct DitherData *dither = (struct DitherData *)commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 0, 3, 1 * sizeof(struct DitherData));
 		dither->range = 31.0f;
 		dither->inv_range = 1.0f / 31.0f;
 		dither->dither_scale = 1.0f;
@@ -21922,22 +21922,22 @@ static unsigned scaling = 4;
 extern enum rhi_renderer_type rhi_type;
 extern retro_log_printf_t log_cb;
 
-static retro_hw_render_callback hw_render;
+static struct retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
 
 /* Owning vector of retro_vulkan_image (POD), replacing
  * std::vector<retro_vulkan_image>. resize() grows/shrinks the backing array;
  * grown slots are zero-initialised. */
 struct SwapchainImageVec {
-	retro_vulkan_image *items;
+	struct retro_vulkan_image *items;
 	int count;
 	int cap;
 	void clear() { count = 0; }
 	int size() const { return count; }
-	retro_vulkan_image &operator[](int i) { return items[i]; }
+	struct retro_vulkan_image &operator[](int i) { return items[i]; }
 	void resize(int n) {
 		if (n > cap) {
-			retro_vulkan_image *ni = (retro_vulkan_image *)realloc(items, (size_t)n * sizeof(retro_vulkan_image));
+			struct retro_vulkan_image *ni = (struct retro_vulkan_image *)realloc(items, (size_t)n * sizeof(struct retro_vulkan_image));
 			if (!ni)
 				return;
 			items = ni;
@@ -22600,7 +22600,7 @@ void rhi_vulkan_refresh_variables(void)
    {
       // Potential bad behavior from calling rhi_vulkan_get_system_av_info() from inside
       // rhi_vulkan_refresh_variables() since both functions call each other...
-      retro_system_av_info info;
+      struct retro_system_av_info info;
       rhi_vulkan_get_system_av_info(&info);
 
       if (!environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
@@ -22698,7 +22698,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    auto scanout = show_vram ? renderer_scanout_vram_to_texture(renderer, true) : renderer_scanout_to_texture(renderer);
    unsigned index = vulkan->get_sync_index(vulkan->handle);
 
-   retro_vulkan_image *image                          = &swapchain_images[index];
+   struct retro_vulkan_image *image                          = &swapchain_images[index];
 
    image->create_info.sType                           = 
       VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
