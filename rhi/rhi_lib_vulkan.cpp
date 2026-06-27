@@ -15074,10 +15074,15 @@ VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
 		bufferblock_init(&self->ubo_block);
 
 		counter_init(&self->reference_count); /* refcount starts at 1 */
-		commandbuffer_begin_compute(self);
-		commandbuffer_set_opaque_state(self);
+		/* Zero the hashable static_state (full 16-byte union, incl. the words[]
+		 * overlay) and the bindings BEFORE the calls that populate them. The old
+		 * C++ class zero-initialised these members before the constructor body
+		 * ran begin_compute()/set_opaque_state(); doing the memsets afterwards
+		 * wiped the state those calls had just written. */
 		memset(&self->static_state, 0, sizeof(self->static_state));
 		memset(&self->bindings, 0, sizeof(self->bindings));
+		commandbuffer_begin_compute(self);
+		commandbuffer_set_opaque_state(self);
 	}
 
 	void commandbuffer_fini(struct CommandBuffer *self)
@@ -16308,7 +16313,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	void commandbuffer_set_opaque_state(struct CommandBuffer *self)
 	{
 		State *state = &self->static_state.state;
-		memset(&state, 0, sizeof(state));
+		memset(state, 0, sizeof(*state));
 		state->cull_mode = VK_CULL_MODE_BACK_BIT;
 		state->blend_enable = false;
 		state->depth_test = true;
@@ -16322,7 +16327,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	void commandbuffer_set_quad_state(struct CommandBuffer *self)
 	{
 		State *state = &self->static_state.state;
-		memset(&state, 0, sizeof(state));
+		memset(state, 0, sizeof(*state));
 		state->cull_mode = VK_CULL_MODE_NONE;
 		state->blend_enable = false;
 		state->depth_test = false;
