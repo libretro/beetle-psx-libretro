@@ -5526,12 +5526,12 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	void commandbuffer_set_quad_state(struct CommandBuffer *self);
 
 	inline VkCommandBuffer commandbuffer_get_command_buffer(const struct CommandBuffer *self) { return self->cmd; }
-	inline Device &commandbuffer_get_device(struct CommandBuffer *self) { return *self->device; }
+	inline Device *commandbuffer_get_device(struct CommandBuffer *self) { return self->device; }
 	inline const VkViewport *commandbuffer_get_viewport(const struct CommandBuffer *self) { return &self->viewport; }
 	inline CommandBufferType commandbuffer_get_command_buffer_type(const struct CommandBuffer *self) { return self->type; }
 
 	/* Group E: draw / dispatch / debug-region / end free functions. */
-	void commandbuffer_draw(struct CommandBuffer *self, uint32_t vertex_count, uint32_t instance_count = 1, uint32_t first_vertex = 0, uint32_t first_instance = 0);
+	void commandbuffer_draw(struct CommandBuffer *self, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance);
 	void commandbuffer_dispatch(struct CommandBuffer *self, uint32_t groups_x, uint32_t groups_y, uint32_t groups_z);
 	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color);
 	void commandbuffer_end_region(struct CommandBuffer *self);
@@ -5579,7 +5579,7 @@ void commandbuffer_set_blend_op_2(struct CommandBuffer *self, VkBlendOp blend_op
 	{
 		SET_STATIC_STATE(topology);
 	}
-	inline void commandbuffer_set_multisample_state(struct CommandBuffer *self, bool alpha_to_coverage, bool alpha_to_one = false, bool sample_shading = false)
+	inline void commandbuffer_set_multisample_state(struct CommandBuffer *self, bool alpha_to_coverage, bool alpha_to_one, bool sample_shading)
 	{
 		SET_STATIC_STATE(alpha_to_coverage);
 		SET_STATIC_STATE(alpha_to_one);
@@ -10210,7 +10210,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 		commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 		commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 		commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-		commandbuffer_draw(cbh_get(&self->cmd), 4);
+		commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
 
 		commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
@@ -10490,7 +10490,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 	commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-	commandbuffer_draw(cbh_get(&self->cmd), 4);
+	commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
 
 	commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
@@ -10748,7 +10748,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
 	commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-	commandbuffer_draw(cbh_get(&self->cmd), 4);
+	commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
 
 	commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
@@ -11066,7 +11066,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 	// Look up the hd texture index
 	// This is done here at the end of the function because the `allocate_depth`
 	// call above can call `reset_queue` which would invalidate the HdTextureHandle
-	int16_t param = int16_t(shift);
+	int16_t param = (int16_t)(shift);
 	if (hd_texture_vram.height > 0) { // This condition is just a dumb way to check that the rect was actually set to something
 		bool fastpath_capable_out = false;
 		bool cache_hit = false;
@@ -11708,7 +11708,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 
 			commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
 			if (self->msaa > 1)
-				commandbuffer_set_multisample_state(cbh_get(&self->cmd), false);
+				commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
 			last_draw_offset = i;
 
 			last_state = *SemiTransparentStateVec_at(&self->queue.semi_transparent_state, i);
@@ -11720,7 +11720,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 	commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 	commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
 	if (self->msaa > 1)
-		commandbuffer_set_multisample_state(cbh_get(&self->cmd), false);
+		commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
 }
 
 void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
@@ -14917,7 +14917,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		{ unsigned i; for (i = 0; i < info->num_color_attachments; i++) {
 			VK_ASSERT(info->color_attachments[i]);
-			auto *att = info->color_attachments[i];
+			ImageView *att = info->color_attachments[i];
 			unsigned lod = imageview_get_create_info(att)->base_level;
 			unsigned aw  = image_get_width(imageview_get_image(att), lod);
 			unsigned ah  = image_get_height(imageview_get_image(att), lod);
@@ -14929,7 +14929,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		if (info->depth_stencil)
 		{
-			auto *att = info->depth_stencil;
+			ImageView *att = info->depth_stencil;
 			unsigned lod = imageview_get_create_info(att)->base_level;
 			unsigned aw  = image_get_width(imageview_get_image(att), lod);
 			unsigned ah  = image_get_height(imageview_get_image(att), lod);
@@ -18733,7 +18733,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			if (self->transfer_queue != self->graphics_queue)
 			{
 				VkPipelineStageFlags dst_stages =
-					generate_mips ? VkPipelineStageFlags(VK_PIPELINE_STAGE_TRANSFER_BIT) : image_get_stage_flags(ih_get(&handle));
+					generate_mips ? (VkPipelineStageFlags)(VK_PIPELINE_STAGE_TRANSFER_BIT) : image_get_stage_flags(ih_get(&handle));
 
 				// We can't just use semaphores, we will also need a release + acquire barrier to marshal ownership from
 				// self->transfer queue over to self->graphics ...
@@ -22688,7 +22688,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    else
       renderer_set_mdec_filter(renderer, ScanoutFilter_None);
 
-   auto scanout = show_vram ? renderer_scanout_vram_to_texture(renderer, true) : renderer_scanout_to_texture(renderer);
+   ImageHandle scanout = show_vram ? renderer_scanout_vram_to_texture(renderer, true) : renderer_scanout_to_texture(renderer);
    unsigned index = vulkan->get_sync_index(vulkan->handle);
 
    struct retro_vulkan_image *image                          = &swapchain_images.items[index];
@@ -23039,7 +23039,7 @@ void rhi_vulkan_load_image(
      renderer_notify_texture_upload(renderer, _ntu_rect, vram); }
    renderer_set_mask_test(renderer, mask_test);
    renderer_set_force_mask_bit(renderer, set_mask);
-   Rect _r = { x, y, w, h }; auto handle = renderer_copy_cpu_to_vram(renderer, &_r);
+   Rect _r = { x, y, w, h }; BufferHandle handle = renderer_copy_cpu_to_vram(renderer, &_r);
    uint16_t *tmp = renderer_begin_copy(renderer, handle);
 
    /* The row loop has two independent invariants: x-wrap (dual_copy)
@@ -23097,6 +23097,10 @@ void rhi_vulkan_load_image(
    // This is called on state loading. 
    if (!inside_frame)
       renderer_flush(renderer);
+   /* renderer_copy_cpu_to_vram produced an owning BufferHandle and renderer_end_copy
+    * only unmaps it; the old C++ 'handle' value released it via its destructor at
+    * scope end (after the flush above), so drop that reference here. */
+   bh_reset(&handle);
 }
 
 bool rhi_vulkan_read_vram(uint16_t x, uint16_t y,
