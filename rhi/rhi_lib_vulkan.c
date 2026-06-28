@@ -22872,21 +22872,34 @@ void rhi_vulkan_refresh_variables(void)
           * inside video_refresh. Rebuild the renderer here at the new scaling so
           * the scanout dimensions track the advertised max. Preserve VRAM across
           * the rebuild exactly as vk_context_reset does (save -> fini -> init
-          * with the saved state). The scratch sync-index vectors are sized from
-          * the frontend's mask in prepare_frame, so leave them alone. */
+          * with the saved state). */
          savestate_destroy(&save_state);
          renderer_save_vram_state(renderer, &save_state);
-         /* Wait for the GPU to finish any in-flight work before tearing the
-          * renderer down. renderer_fini only flushes the recorded command
-          * stream; it does not wait for the device to go idle (that wait lives
-          * in device_deinit, which the full vk_context_reset path runs after
-          * renderer_fini). Here we keep the device alive and rebuild only the
-          * renderer, so without an explicit wait the about-to-be-freed images,
-          * buffers and pipelines may still be referenced by command buffers the
-          * GPU is executing -- a use-after-free that manifests as a crash only
-          * outside a debugger (the timing window is widest at the largest scale,
-          * e.g. 16x -> 1x). */
+         /* Wait for the GPU to finish any in-flight work before touching any of
+          * the renderer's resources. renderer_fini only flushes the recorded
+          * command stream; it does not wait for the device to go idle (that wait
+          * lives in device_deinit, which the full vk_context_reset path runs
+          * after renderer_fini). Here we keep the device alive and rebuild only
+          * the renderer, so without an explicit wait the about-to-be-freed
+          * images, buffers and pipelines may still be referenced by command
+          * buffers the GPU is executing -- a use-after-free that manifests as a
+          * crash only outside a debugger (the timing window is widest at the
+          * largest scale, e.g. 16x -> 1x). */
          device_wait_idle_nolock(device);
+         /* Release the scanout image references held in scanout_handles before
+          * tearing the renderer down. finalize_frame stores the per-sync-index
+          * scanout into scanout_handles via ih_assign (which retains a reference
+          * to the renderer's scanout image). renderer_fini below frees those
+          * images, so leaving the handles in place would leave the vector
+          * pointing at freed images; the next finalize_frame's ih_assign into
+          * that slot calls image_release_reference on the dangling pointer -- a
+          * use-after-free / double-free that crashes intermittently and only
+          * outside a debugger. The full vk_context_destroy path frees this
+          * vector before renderer_fini for the same reason; clear (not free) it
+          * here so prepare_frame's ensure_sync_index_resources re-sizes it next
+          * frame. Done after the idle wait so releasing the last reference to an
+          * image never frees one the GPU is still using. */
+         scanouthandlevec_clear(&scanout_handles);
          renderer_fini(renderer);
          renderer_init(renderer, device, scaling, msaa,
                owned_u32_empty(&save_state.vram) ? NULL : &save_state);
