@@ -1099,17 +1099,7 @@ static INLINE void SPU_ReverbReflect(int32_t input, uint16_t m_addr, uint16_t d_
    const int32_t m_sample = SPU_RD_RVB(m_addr, -1);
    const int32_t d_sample = SPU_RD_RVB(d_addr,  0);
    const int32_t inner    = ReverbSat(input + RVB_MULVOL(d_sample, regs.s.reverb.s.IIR_COEF) - m_sample);
-   int32_t reflect        = m_sample + RVB_MULVOL(inner, regs.s.reverb.s.IIR_ALPHA);
-
-   /* Documented vIIR=-8000h bug (psx-spx "Reverb Formula", Bug note): vIIR works
-      only in -7FFFh..+7FFFh. At -8000h the *vIIR multiply is still performed
-      correctly, but the final result written to memory is negated - which, being
-      applied to the whole sum, also negates the re-added [m-2] term. This is the
-      literal documented behaviour, not the decomposition-specific form the old
-      IIASM path used, and it is not hardware-verified; the standard SDK reverb
-      presets never set vIIR to -8000h, so it is effectively an edge case. */
-   if(regs.s.reverb.s.IIR_ALPHA == -32768)
-      reflect = -reflect;
+   const int32_t reflect  = m_sample + RVB_MULVOL(inner, regs.s.reverb.s.IIR_ALPHA);
 
    SPU_WR_RVB(m_addr, ReverbSat(reflect));
 }
