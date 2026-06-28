@@ -28,17 +28,17 @@
    downsample window includes the most recent input sample), per no$psx ("spends one 44100h cycle on left calculations, and the next 44100h cycle on
    right calculations"). Both channels of a 22050Hz step share ReverbCur, which advances once per step after the Right calculation.
 
-	[DONE] Reverb now follows the psx-spx formula directly (input -> same/different-side reflection -> 4-tap comb
-   -> APF1 -> APF2), matching the hardware-informed reference in jsgroth's CoffeePSX (crates/ps1-core/src/spu/
-   reverb.rs). Saturation to signed 16bit is applied where the formula puts a value back into a 16bit home: the
-   reflection inner term (Lin + d*vWALL - [m-2]) before the *vIIR multiply, the reflection write-back, the 4-tap
-   comb-bank SUM before the all-pass stage, each all-pass write, and the final output. Individual products are
-   not clamped (only the (a*b)>>15 scaling). This replaced an older arithmetic decomposition (IIR_INPUT/IIR_A-B,
-   an unclamped int32 ACC folded into MDA/MDB/IVB with extra >>1 halvings) that clamped at non-corresponding
-   points and never clamped the bare comb sum; the two agree to within ~2 LSB at normal levels and diverge only
-   when intermediates overflow (loud transients). NOTE: this also drops the old IIASM/REVERB_NEG special-casing
-   of vIIR/vAPF = -8000h (CoffeePSX likewise does not model that quirk); -8000h is not used by the standard SDK
-   reverb presets.
+	Reverb saturation: psx-spx documents clamping only on values written to the reverb buffer plus the *8000h
+   multiply scaling, both of which this code already does. A hardware-informed reference (jsgroth's CoffeePSX,
+   crates/ps1-core/src/spu/reverb.rs, which implements the psx-spx formula literally) additionally clamps to
+   signed 16bit at: the input sum, the reflection inner term (Lin + d*vWALL - [m-2]) BEFORE the *vIIR multiply,
+   the 4-tap comb-bank SUM before the all-pass stage, each all-pass write, and the final output. Individual
+   products are NOT clamped. Our code uses a different arithmetic decomposition (IIR_INPUT/IIR_A-B, an unclamped
+   int32 ACC folded into MDA/MDB/IVB with extra >>1 halvings) over the SAME hardware registers, so it already
+   clamps several intermediates but not the bare comb sum, and the clamp points don't correspond 1:1. The
+   faithful fix is therefore to adopt the psx-spx formula (as CoffeePSX does), not to sprinkle more saturation
+   into the current decomposition; the audible difference is confined to overflow/loud-tail cases, and even the
+   reference author notes the exact clamp timing in overflow scenarios isn't fully hardware-verified.
 
 	See if sample flag & 0x8 does anything weird, like suppressing the program-readable block end flag setting.
 
@@ -931,6 +931,8 @@ static INLINE int16_t ReverbSat(int32_t samp)
  return(samp);
 }
 
+#define REVERB_NEG(samp) (((samp) == -32768) ? 0x7FFF : -(samp))
+
 static INLINE uint32_t SPU_Get_Reverb_Offset(uint32_t in_offset)
 {
  uint32_t offset = ReverbCur + (in_offset & 0x3FFFF);
@@ -1085,66 +1087,58 @@ static INLINE int32_t Reverb2244(const int16_t *src)
    return out;
 }
 
-/* Reverb volume multiply: signed 16bit sample by signed 16bit coefficient,
- * scaled by 1/0x8000 and kept in int32. Per the psx-spx formula, individual
- * products are not clamped here; clamping happens at the stage boundaries. */
-#define RVB_MULVOL(s, v) ((int32_t)(((int32_t)(s) * (int32_t)(v)) >> 15))
-
-/* One reflection arm. m_addr is the write target ([m]); d_addr is the input
-   tap ([d]). The previous step's write is read back as [m-2]. The inner term
-   (input + [d]*vWALL - [m-2]) is clamped to signed 16bit before the *vIIR
-   multiply, and the value written back to [m] is clamped as well. */
-static INLINE void SPU_ReverbReflect(int32_t input, uint16_t m_addr, uint16_t d_addr)
+static int32_t IIASM(const int16_t alpha, const int16_t insamp)
 {
-   const int32_t m_sample = SPU_RD_RVB(m_addr, -1);
-   const int32_t d_sample = SPU_RD_RVB(d_addr,  0);
-   const int32_t inner    = ReverbSat(input + RVB_MULVOL(d_sample, regs.s.reverb.s.IIR_COEF) - m_sample);
-   const int32_t reflect  = m_sample + RVB_MULVOL(inner, regs.s.reverb.s.IIR_ALPHA);
+   if(MDFN_UNLIKELY(alpha == -32768))
+   {
+      if(insamp == -32768)
+         return 0;
+      return insamp * -65536;
+   }
 
-   SPU_WR_RVB(m_addr, ReverbSat(reflect));
+   return insamp * (32768 - alpha);
 }
 
-/* One all-pass stage. Reads [m-d], clamps the new value written to [m], and
-   returns the stage output (clamped only at the final output by the caller). */
-static INLINE int32_t SPU_ReverbAPF(int32_t in_sample, uint16_t m_apf, uint16_t d_apf, int16_t v_apf)
-{
-   const int32_t apf_in  = SPU_RD_RVB(m_apf - d_apf, 0);
-   const int16_t new_apf = ReverbSat(in_sample - RVB_MULVOL(apf_in, v_apf));
-
-   SPU_WR_RVB(m_apf, new_apf);
-
-   return apf_in + RVB_MULVOL(new_apf, v_apf);
-}
-
-/* Run the reverb algorithm for a single channel (lr), given that channel's
-   22050Hz downsampled input sample. Writes the resulting wet sample into the
-   channel's upsample ring buffer at the current RvbResPos. Reads and writes the
-   reverb work area relative to the current ReverbCur, so the caller must keep
-   ReverbCur fixed across the Left and Right calls of one 22050Hz step and
-   advance it once afterwards. Implements the psx-spx reverb formula directly
-   (see the file-header note); saturation matches jsgroth's CoffeePSX. */
+/* Run the reverb comb-filter algorithm for a single channel (lr), given that
+   channel's 22050Hz downsampled input sample. Writes the resulting wet sample
+   into the channel's upsample ring buffer at the current RvbResPos. Reads and
+   writes the reverb work area relative to the current ReverbCur, so the caller
+   must keep ReverbCur fixed across the Left and Right calls of one 22050Hz step
+   and advance it once afterwards. */
 static INLINE void SPU_RunReverbChannel(unsigned lr, int32_t downsampled)
 {
-   const int32_t input = RVB_MULVOL(downsampled, regs.s.reverb.s.IN_COEF[lr]);
-   int32_t comb, apf1, apf2;
+   const int16_t IIR_INPUT_A = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_A[lr ^ 0], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
+   const int16_t IIR_INPUT_B = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_B[lr ^ 1], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
+   const int16_t IIR_A = ReverbSat((((IIR_INPUT_A * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_A[lr], -1)) >> 14)) >> 1);
+   const int16_t IIR_B = ReverbSat((((IIR_INPUT_B * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_B[lr], -1)) >> 14)) >> 1);
 
-   /* Same-side (L->L / R->R) and different-side (L->R / R->L) reflection; the
-      different-side input tap is the other channel's d address. */
-   SPU_ReverbReflect(input, regs.s.reverb.s.IIR_DEST_A[lr], regs.s.reverb.s.IIR_SRC_A[lr]);
-   SPU_ReverbReflect(input, regs.s.reverb.s.IIR_DEST_B[lr], regs.s.reverb.s.IIR_SRC_B[lr ^ 1]);
+   SPU_WR_RVB(regs.s.reverb.s.IIR_DEST_A[lr], IIR_A);
+   SPU_WR_RVB(regs.s.reverb.s.IIR_DEST_B[lr], IIR_B);
 
-   /* Early-echo comb bank: four taps, the SUM clamped to signed 16bit. */
-   comb = RVB_MULVOL(SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_A[lr], 0), regs.s.reverb.s.ACC_COEF_A)
-        + RVB_MULVOL(SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_B[lr], 0), regs.s.reverb.s.ACC_COEF_B)
-        + RVB_MULVOL(SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_C[lr], 0), regs.s.reverb.s.ACC_COEF_C)
-        + RVB_MULVOL(SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_D[lr], 0), regs.s.reverb.s.ACC_COEF_D);
-   comb = ReverbSat(comb);
+   {
+      const int32_t ACC = ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_A[lr], 0) * regs.s.reverb.s.ACC_COEF_A) >> 14) +
+         ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_B[lr], 0) * regs.s.reverb.s.ACC_COEF_B) >> 14) +
+         ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_C[lr], 0) * regs.s.reverb.s.ACC_COEF_C) >> 14) +
+         ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_D[lr], 0) * regs.s.reverb.s.ACC_COEF_D) >> 14);
 
-   /* Late reverb: two all-pass stages, then the final clamped output. */
-   apf1 = SPU_ReverbAPF(comb, regs.s.reverb.s.MIX_DEST_A[lr], regs.s.reverb.s.FB_SRC_A, regs.s.reverb.s.FB_ALPHA);
-   apf2 = SPU_ReverbAPF(apf1, regs.s.reverb.s.MIX_DEST_B[lr], regs.s.reverb.s.FB_SRC_B, regs.s.reverb.s.FB_X);
+      const int16_t FB_A = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_A[lr] - regs.s.reverb.s.FB_SRC_A, 0);
+      const int16_t FB_B = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_B[lr] - regs.s.reverb.s.FB_SRC_B, 0);
+      const int16_t MDA = ReverbSat((ACC + ((FB_A * REVERB_NEG(regs.s.reverb.s.FB_ALPHA)) >> 14)) >> 1);
+      const int16_t MDB = ReverbSat(FB_A + ((((MDA * regs.s.reverb.s.FB_ALPHA) >> 14) + ((FB_B * REVERB_NEG(regs.s.reverb.s.FB_X)) >> 14)) >> 1));
+      const int16_t IVB = ReverbSat(FB_B + ((MDB * regs.s.reverb.s.FB_X) >> 15));
 
-   RUSB[lr][(RvbResPos >> 1) | 0x20] = RUSB[lr][RvbResPos >> 1] = ReverbSat(apf2); /* Output sample */
+      SPU_WR_RVB(regs.s.reverb.s.MIX_DEST_A[lr], MDA);
+      SPU_WR_RVB(regs.s.reverb.s.MIX_DEST_B[lr], MDB);
+#if 0
+      {
+         static uint32_t sqcounter;
+         RUSB[lr][(RvbResPos >> 1) | 0x20] = RUSB[lr][RvbResPos >> 1] = ((sqcounter & 0xFF) == 0) ? 0x8000 : 0x0000; /* ((sqcounter & 0x80) ? 0x7000 : 0x9000); */
+         sqcounter += lr;
+      }
+#else
+      RUSB[lr][(RvbResPos >> 1) | 0x20] = RUSB[lr][RvbResPos >> 1] = IVB;	/* Output sample */
+#endif
+   }
 }
 
 /* Take care to thoroughly test the reverb resampling code when modifying anything that uses RvbResPos. */
