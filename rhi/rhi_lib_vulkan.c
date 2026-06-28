@@ -9732,6 +9732,7 @@ static Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
    case WidthMode_WIDTH_MODE_256:
       clock_div = 10;
       break;
+   default: /* out-of-range width_mode: fall back to the 320 default divider */
    case WidthMode_WIDTH_MODE_320:
       clock_div = 8;
       break;
@@ -9768,6 +9769,7 @@ static DisplayRect renderer_compute_display_rect(Renderer *self)
    case WidthMode_WIDTH_MODE_256:
       clock_div = 10;
       break;
+   default: /* out-of-range width_mode: fall back to the 320 default divider */
    case WidthMode_WIDTH_MODE_320:
       clock_div = 8;
       break;
