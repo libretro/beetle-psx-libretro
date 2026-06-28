@@ -21676,7 +21676,6 @@ static void ensure_sync_index_resources(void)
 
 void rhi_vulkan_prepare_frame(void)
 {
-	unsigned index;
    if (device == NULL)
    {
       rhi_type = RHI_SOFTWARE;
@@ -21687,7 +21686,6 @@ void rhi_vulkan_prepare_frame(void)
    device_flush_frame(device);
    vulkan->wait_sync_index(vulkan->handle);
    ensure_sync_index_resources();
-   index = vulkan->get_sync_index(vulkan->handle);
    device_next_frame_context(device);
 
    renderer->scaled_uv_offset = scaled_uv_offset;
