@@ -74,6 +74,34 @@ extern bool FastSaveStates;
 
 const int DEFAULT_STATE_SIZE = 16 * 1024 * 1024;
 
+/* Core-wide global state, formerly defined in beetle_psx_globals.c. Declared in
+ * beetle_psx_globals.h and consumed across the core and the mednafen PSX module;
+ * a single definition lives here. */
+bool content_is_pal = false;
+uint8_t widescreen_hack;
+uint8_t widescreen_hack_aspect_ratio_setting;
+uint8_t psx_gpu_upscale_shift;
+uint8_t psx_gpu_upscale_shift_hw;
+bool psx_gpu_rasterize_both_fields = false;
+int line_render_mode;
+int filter_mode;
+int crop_overscan = 0;
+
+enum core_timing_fps_modes core_timing_fps_mode = AUTO_TOGGLE_TIMING;
+bool currently_interlaced = true;
+bool interlace_setting_dirty = false;
+uint8_t startup_frame_count = 0;
+
+int aspect_ratio_setting = 0;
+bool aspect_ratio_dirty = false;
+bool is_monkey_hero = false;
+
+/* libretro callback pointers, formerly defined in libretro_cbs.c. Declared in
+ * libretro_cbs.h; assigned by retro_set_environment / retro_set_video_refresh
+ * below. */
+retro_video_refresh_t video_cb = NULL;
+retro_environment_t environ_cb = NULL;
+
 static bool libretro_supports_option_categories = false;
 static bool libretro_supports_bitmasks = false;
 static unsigned libretro_msg_interface_version = 0;
