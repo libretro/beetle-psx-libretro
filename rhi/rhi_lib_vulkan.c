@@ -22940,6 +22940,25 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    scanout = show_vram ? renderer_scanout_vram_to_texture(renderer, true) : renderer_scanout_to_texture(renderer);
    index = vulkan->get_sync_index(vulkan->handle);
 
+   /* The swapchain may have been recreated since prepare_frame ran this
+    * frame's ensure_sync_index_resources() -- changing the GPU scale factor (or
+    * any geometry change) routes through SET_SYSTEM_AV_INFO, which makes the
+    * frontend tear down and rebuild the Vulkan swapchain, and get_sync_index()
+    * then returns an index for the new swapchain while our scratch vectors are
+    * still sized for the old one. Re-sync to the current sync-index mask before
+    * indexing, then hard-guard the index: items[index] with index >= count is an
+    * out-of-bounds access (the observed SIGSEGV in this function on scale-factor
+    * change). */
+   ensure_sync_index_resources();
+   if ((int)index >= swapchainimagevec_size(&swapchain_images))
+   {
+      /* scanout is a borrowed handle (renderer_scanout_to_texture returns
+       * self->last_scanout without adding a reference), so it must not be
+       * released here -- match the normal path, which never resets it. */
+      inside_frame = false;
+      return;
+   }
+
    { struct retro_vulkan_image *image                          = &swapchain_images.items[index];
 
    image->create_info.sType                           = 
