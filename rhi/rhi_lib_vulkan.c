@@ -451,8 +451,17 @@ struct NAME##_force_semicolon_
 #ifndef RHI_STATIC_ASSERT
 #define RHI_STATIC_ASSERT_CAT2(a, b) a##b
 #define RHI_STATIC_ASSERT_CAT(a, b) RHI_STATIC_ASSERT_CAT2(a, b)
+/* Mark the assert typedef unused on compilers that warn about it (the typedef
+ * is only a vehicle for the negative-size error; it is never referenced). MSVC,
+ * the other target, neither warns nor understands the attribute. */
+#if defined(__GNUC__) || defined(__clang__)
+#define RHI_STATIC_ASSERT_UNUSED __attribute__((unused))
+#else
+#define RHI_STATIC_ASSERT_UNUSED
+#endif
 #define RHI_STATIC_ASSERT(cond, msg) \
-   typedef char RHI_STATIC_ASSERT_CAT(rhi_static_assert_, __LINE__)[(cond) ? 1 : -1]
+   typedef char RHI_STATIC_ASSERT_CAT(rhi_static_assert_, __LINE__)[(cond) ? 1 : -1] \
+      RHI_STATIC_ASSERT_UNUSED
 #endif
 
 /* Local single-evaluation min/max. */
@@ -5724,19 +5733,21 @@ extern retro_log_printf_t log_cb;
  *
  * The no-op variants must still consume their arguments at the syntactic level,
  * otherwise locals only used in a log statement trip -Wunused-but-set-variable.
- * The "(void)0," prefix lets sizeof accept a 1-arg invocation through the comma
- * operator (C); sizeof itself is unevaluated, so each arg is read by the type
- * system without generating runtime code. */
+ * A dead `if (0) log_cb(...)` call does this with the real callback's prototype:
+ * the branch is eliminated (no runtime code, no reference to log_cb emitted) yet
+ * the arguments are type-checked and counted as used. This replaced an earlier
+ * `(void)sizeof((void)0, __VA_ARGS__)` form, whose discarded comma operands
+ * tripped -Wunused-value on every call. */
 #ifdef DEBUG
 #define TT_LOG(...) log_cb(__VA_ARGS__)
 #else
-#define TT_LOG(...) ((void)sizeof(((void)0, __VA_ARGS__)))
+#define TT_LOG(...) do { if (0) log_cb(__VA_ARGS__); } while (0)
 #endif
 
 #if defined(DEBUG) && defined(VERBOSE_TEXTURE_TRACKING)
 #define TT_LOG_VERBOSE(...) TT_LOG(__VA_ARGS__)
 #else
-#define TT_LOG_VERBOSE(...) ((void)sizeof(((void)0, __VA_ARGS__)))
+#define TT_LOG_VERBOSE(...) do { if (0) log_cb(__VA_ARGS__); } while (0)
 #endif
 
 #include <math.h>
@@ -19829,7 +19840,18 @@ static bool write_image(const char *path,
 #include "../stb/stb_image_write.h"
 #define STB_IMAGE_STATIC
 #define STB_IMAGE_IMPLEMENTATION
+/* stb_image.h's CASE() macro puts each case's loop body and its break on one
+ * line (case ...: for(...) BODY; break;), which is correct but trips
+ * -Wmisleading-indentation (part of -Wall) on every case. Silence it for this
+ * vendored header only, leaving the warning active for our own code. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmisleading-indentation"
+#endif
 #include "../stb/stb_image.h"
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 static void rgba_image_free(RGBAImage *img) {
     if (img->data != NULL) {
