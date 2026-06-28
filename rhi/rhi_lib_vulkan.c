@@ -9256,6 +9256,14 @@ static void renderer_save_vram_state(Renderer *self, SaveState *out){
    out->state = self->render_state;
    texture_tracker_save_state(&self->tracker, &out->tracker_state);
    }
+
+   /* Release the readback buffer. In the pre-C++->C source BufferHandle was an
+    * owning RAII handle freed at scope exit; the plain-struct C handle has no
+    * implicit teardown, so without this the VkBuffer + VkDeviceMemory leak and
+    * remain alive at the following vkDestroyDevice (VUID-vkDestroyDevice-device-
+    * 05137), undefined behaviour that crashes strict drivers on a resolution
+    * (renderer-rebuild) change. */
+   bh_reset(&buffer);
 }
 
 static void renderer_init_primitive_pipelines(Renderer *self)
