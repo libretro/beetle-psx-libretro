@@ -22247,6 +22247,12 @@ static void scanouthandlevec_resize(struct ScanoutHandleVec *self, int n) {
    { int i; for (i = n; i < self->count; i++) ih_reset(&self->items[i]); }
    if (n > self->cap) {
       ImageHandle *nitems = (ImageHandle *)malloc((size_t)n * sizeof(ImageHandle));
+      if (!nitems)
+         return; /* OOM: leave the vector unchanged rather than installing a NULL
+                    items with a non-zero cap/count (which the grow loop below and
+                    later items[index] accesses would dereference). Matches
+                    swapchainimagevec_resize's allocation-failure handling. n > cap
+                    implies n > count, so the shrink-reset above was a no-op here. */
       { int i; for (i = 0; i < self->count && i < n; i++) {
          /* Move: ih_steal copies the pointer and nulls the old slot. */
          ih_steal(&nitems[i], &self->items[i]);
