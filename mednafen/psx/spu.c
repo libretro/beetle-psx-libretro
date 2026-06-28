@@ -29,16 +29,14 @@
    right calculations"). Both channels of a 22050Hz step share ReverbCur, which advances once per step after the Right calculation.
 
 	Reverb saturation: psx-spx documents clamping only on values written to the reverb buffer plus the *8000h
-   multiply scaling, both of which this code already does. A hardware-informed reference (jsgroth's CoffeePSX,
-   crates/ps1-core/src/spu/reverb.rs, which implements the psx-spx formula literally) additionally clamps to
-   signed 16bit at: the input sum, the reflection inner term (Lin + d*vWALL - [m-2]) BEFORE the *vIIR multiply,
-   the 4-tap comb-bank SUM before the all-pass stage, each all-pass write, and the final output. Individual
-   products are NOT clamped. Our code uses a different arithmetic decomposition (IIR_INPUT/IIR_A-B, an unclamped
-   int32 ACC folded into MDA/MDB/IVB with extra >>1 halvings) over the SAME hardware registers, so it already
-   clamps several intermediates but not the bare comb sum, and the clamp points don't correspond 1:1. The
-   faithful fix is therefore to adopt the psx-spx formula (as CoffeePSX does), not to sprinkle more saturation
-   into the current decomposition; the audible difference is confined to overflow/loud-tail cases, and even the
-   reference author notes the exact clamp timing in overflow scenarios isn't fully hardware-verified.
+   multiply scaling, both of which this code already does. jsgroth's CoffeePSX (crates/ps1-core/src/spu/reverb.rs)
+   additionally clamps several intermediates to signed 16bit (the input sum, the reflection inner term before the
+   *vIIR multiply, the 4-tap comb-bank sum, each all-pass write, the final output), but those extra clamps are
+   CoffeePSX's own inference and are NOT documented. The hardware-validated MiSTer FPGA core (Robert Peip,
+   rtl/spu.vhd) instead matches THIS code's decomposition (IIR_INPUT/IIR_A-B + IIASM, with an unclamped int32 ACC
+   folded into MDA/MDB/IVB) across all three overflow discriminators. A rewrite to the CoffeePSX/psx-spx formula
+   was tried and reverted as a likely regression -- do NOT re-attempt it without a real-hardware capture; the
+   audible difference is confined to overflow/loud-tail cases.
 
 	See if sample flag & 0x8 does anything weird, like suppressing the program-readable block end flag setting.
 
