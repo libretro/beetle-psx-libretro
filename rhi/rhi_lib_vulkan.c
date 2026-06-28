@@ -22856,6 +22856,41 @@ void rhi_vulkan_refresh_variables(void)
          /* Failed to change scale, just keep using the old one. */
          scaling = old_scaling;
       }
+      else if (device != NULL &&
+               (old_scaling != scaling ||
+                old_super_sampling != super_sampling ||
+                old_msaa != msaa))
+      {
+         /* The renderer's internal framebuffers and the scanout image are sized
+          * from renderer->scaling, which is fixed at renderer_init time. The
+          * frontend has now resized its swapchain to the new max we just
+          * advertised, but unless the frontend also tears down and rebuilds the
+          * HW context (it does not, for a plain SET_SYSTEM_AV_INFO geometry
+          * change), renderer->scaling stays at the old value and the scanout we
+          * hand to video_refresh_cb keeps the old (e.g. larger) dimensions --
+          * which overflows the frontend's freshly-resized swapchain and crashes
+          * inside video_refresh. Rebuild the renderer here at the new scaling so
+          * the scanout dimensions track the advertised max. Preserve VRAM across
+          * the rebuild exactly as vk_context_reset does (save -> fini -> init
+          * with the saved state). The scratch sync-index vectors are sized from
+          * the frontend's mask in prepare_frame, so leave them alone. */
+         savestate_destroy(&save_state);
+         renderer_save_vram_state(renderer, &save_state);
+         renderer_fini(renderer);
+         renderer_init(renderer, device, scaling, msaa,
+               owned_u32_empty(&save_state.vram) ? NULL : &save_state);
+         if (!renderer_is_valid(renderer))
+         {
+            /* Rebuild failed (e.g. the new scale exceeds device image limits).
+             * renderer_init leaves the object destroyable but unusable; tear it
+             * down and roll back to software so we never present from an invalid
+             * renderer. */
+            renderer_fini(renderer);
+            free(renderer);
+            renderer = NULL;
+            rhi_type = RHI_SOFTWARE;
+         }
+      }
    }
    }
 }
