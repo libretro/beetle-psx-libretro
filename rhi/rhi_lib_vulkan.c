@@ -22384,7 +22384,15 @@ static void vk_context_reset(void)
       return;
    }
 
-   assert(context);
+   /* context is created by libretro_create_device during HW-render
+    * negotiation, which the frontend runs before context_reset. Guard against
+    * a reset arriving without it anyway: device_set_context would otherwise
+    * dereference a NULL context (the assert is compiled out under NDEBUG). */
+   if (!context)
+   {
+      vulkan = NULL;
+      return;
+   }
    device = (Device *)malloc(sizeof(Device));
    device_init(device);
    device_set_context(device, *&context);
