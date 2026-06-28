@@ -8351,6 +8351,8 @@ static INLINE void fbcolor_to_rgba32f(float *v, uint32_t color)
 
 void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const SaveState *state)
 {
+	ImageCreateInfo info;
+	VkImageFormatProperties props;
 	ImageCreateInfo dither_info;
 	/* Former constructor init-list + remaining scalar default member initializers,
 	 * assigned explicitly now that Renderer is malloc'd and placement-initialised via
@@ -8402,7 +8404,6 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 
 	// Verify we can actually render at our target self->scaling factor.
 	// Some devices only support 8K textures, which means max 8x scale.
-	VkImageFormatProperties props;
 	if (device_get_image_format_properties(self->device, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 				VK_IMAGE_USAGE_STORAGE_BIT |
@@ -8429,7 +8430,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 		return;
 	}
 
-	ImageCreateInfo info = image_create_info_render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
+	info = image_create_info_render_target(FB_WIDTH, FB_HEIGHT, VK_FORMAT_R32_UINT);
 	info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 	info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 	             VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -8780,6 +8781,8 @@ Rect renderer_compute_window_rect(Renderer *self, const TextureWindow *window)
 
 void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uint16_t *vram)
 {
+	BufferHandle buffer;
+	BufferCreateInfo buffer_create_info;
 	Fence fence;
 	bool wrap_x = rect->x + rect->width > FB_WIDTH;
 	bool wrap_y = rect->y + rect->height > FB_HEIGHT;
@@ -8797,12 +8800,11 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 	fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &copy_rect);
 	renderer_ensure_command_buffer(self);
 
-	BufferCreateInfo buffer_create_info;
 	buffer_create_info.domain = BufferDomain_CachedHost;
 	buffer_create_info.size = copy_rect.width * copy_rect.height * 4;
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	BufferHandle buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
+	buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
 	{
 	VkOffset3D _o = { (int)(copy_rect.x), (int)(copy_rect.y), 0 };
 	VkExtent3D _e = { copy_rect.width, copy_rect.height, 1 };
@@ -8995,6 +8997,7 @@ void renderer_ssaa_framebuffer(Renderer *self)
 
 Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
 {
+	unsigned fb_width;
 	unsigned fb_height;
 	unsigned clock_div;
 	switch (self->render_state.width_mode)
@@ -9016,7 +9019,7 @@ Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
 		break;
 	}
 
-	unsigned fb_width = (unsigned) (self->render_state.horiz_end - self->render_state.horiz_start);
+	fb_width = (unsigned) (self->render_state.horiz_end - self->render_state.horiz_start);
 	fb_width /= clock_div;
 	fb_width = (fb_width + 2) & ~3;
 
@@ -9031,6 +9034,7 @@ Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
 
 DisplayRect renderer_compute_display_rect(Renderer *self)
 {
+	unsigned display_height;
 	unsigned clock_div;
 	switch (self->render_state.width_mode)
 	{
@@ -9071,7 +9075,6 @@ DisplayRect renderer_compute_display_rect(Renderer *self)
 		left_offset = floor((self->render_state.horiz_start + self->render_state.offset_cycles - 488) / (double) clock_div);
 	}
 
-	unsigned display_height;
 	int upper_offset;
 	if (self->render_state.crop_overscan == 2)
 	{
@@ -9110,6 +9113,7 @@ DisplayRect renderer_compute_display_rect(Renderer *self)
 
 ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 {
+	RenderPassInfo rp;
 	unsigned render_scale;
 	// Like renderer_scanout_to_texture(self), but synchronizes the entire
 	// VRAM self->framebuffer self->atlas before scanout. Does not apply
@@ -9155,7 +9159,6 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	ih_move(&self->reuseable_scanout, device_create_image(self->device, &info, NULL));
 
-	RenderPassInfo rp;
 	render_pass_info_defaults(&rp);
 	rp.color_attachments[0] = image_get_view(ih_get(&self->reuseable_scanout));
 	rp.num_color_attachments = 1;
@@ -9217,6 +9220,8 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
 ImageHandle renderer_scanout_to_texture(Renderer *self)
 {
+	VkViewport old_vp;
+	RenderPassInfo rp;
 	bool dither;
 	fbatlas_flush_render_pass(&self->atlas);
 	if (self->texture_tracking_enabled) {
@@ -9344,7 +9349,6 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	ih_move(&self->reuseable_scanout, device_create_image(self->device, &info, NULL));
 
-	RenderPassInfo rp;
 	render_pass_info_defaults(&rp);
 	rp.color_attachments[0] = image_get_view(ih_get(&self->reuseable_scanout));
 	rp.num_color_attachments = 1;
@@ -9361,7 +9365,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
 	commandbuffer_set_quad_state(cbh_get(&self->cmd));
 
-	VkViewport old_vp = *commandbuffer_get_viewport(cbh_get(&self->cmd));
+	old_vp = *commandbuffer_get_viewport(cbh_get(&self->cmd));
 	VkViewport new_vp = {display_rect.x * (float) render_scale,
 	                     display_rect.y * (float) render_scale,
 	                     rect->width * (float) render_scale,
@@ -9649,6 +9653,7 @@ HdTextureHandle renderer_get_hd_texture_index(Renderer *self, const Rect *vram_r
 
 void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle *hd_texture_index_out,
 	bool *filtering_out, bool *scaled_read_out, unsigned *shift_out, bool *offset_uv_out){
+		int16_t param;
 		float z;
 	unsigned shift; bool filtering, scaled_read, offset_uv; HdTextureHandle hd_texture_index; /* local working copies; written back to *_out at function end */
 	switch (self->render_state.texture_mode)
@@ -9783,7 +9788,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 	// Look up the hd texture index
 	// This is done here at the end of the function because the `allocate_depth`
 	// call above can call `reset_queue` which would invalidate the HdTextureHandle
-	int16_t param = (int16_t)(shift);
+	param = (int16_t)(shift);
 	if (hd_texture_vram.height > 0) { // This condition is just a dumb way to check that the rect was actually set to something
 		bool fastpath_capable_out = false;
 		bool cache_hit = false;
@@ -9997,13 +10002,14 @@ void renderer_draw_line(Renderer *self, const Vertex *vertices)
 
 void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 {
+	HdTextureHandle hd_texture_index;
+	BufferVertex vert[3];
 	if (!self->render_state.draw_rect.width || !self->render_state.draw_rect.height)
 		return;
 
 	ih_reset(&self->last_scanout);
 
-	BufferVertex vert[3];
-	HdTextureHandle hd_texture_index = hd_handle_make_none();
+	hd_texture_index = hd_handle_make_none();
 	bool filtering = false;
 	bool scaled_read = false;
 	unsigned shift = 0;
@@ -10041,18 +10047,19 @@ void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 
 void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 {
+	HdTextureHandle hd_texture_index;
+	BufferVertex vert[4];
 	if (!self->render_state.draw_rect.width || !self->render_state.draw_rect.height)
 		return;
 
 	ih_reset(&self->last_scanout);
 
-	BufferVertex vert[4];
 	// build_attribs may flush the queues, thus calling reset_queue and invalidating any pre-existing HdTextureHandle.
 	// self->tracker.no_hd_texture uses a special index (-1) that is the only one self->valid across such events.
 	// If in the future one were tempted to try to cache or reuse the last used HdTextureHandle here, they would have
 	// to be very careful not to let it get invalidated by build_attribs; so any such logic should happen within
 	// build_attribs itself, and not out here.
-	HdTextureHandle hd_texture_index = hd_handle_make_none();
+	hd_texture_index = hd_handle_make_none();
 	bool filtering = false;
 	bool scaled_read = false;
 	unsigned shift = 0;
@@ -10100,10 +10107,11 @@ void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 
 void renderer_clear_quad(Renderer *self, const Rect *rect, uint32_t fb_color, bool candidate)
 {
+	float z;
 	TextureMode old;
 	ih_reset(&self->last_scanout);
 	old = fbatlas_set_texture_mode(&self->atlas, TextureMode_None);
-	float z = renderer_allocate_depth(self, Domain_Unscaled, rect);
+	z = renderer_allocate_depth(self, Domain_Unscaled, rect);
 	fbatlas_set_texture_mode(&self->atlas, old);
 
 	BufferVertex pos0 = { (float)(rect->x), (float)(rect->y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
@@ -10145,6 +10153,7 @@ const ClearCandidate * renderer_find_clear_candidate(Renderer *self, const Rect 
 
 void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 {
+	RenderPassInfo_Subpass subpass;
 	renderer_ensure_command_buffer(self);
 
 	RenderPassInfo info;
@@ -10163,7 +10172,6 @@ void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 	info.store_attachments = 1 << 0;
 	info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
 
-	RenderPassInfo_Subpass subpass;
 	render_pass_info_subpass_defaults(&subpass);
 	info.num_subpasses = 1;
 	info.subpasses = &subpass;
@@ -10378,6 +10386,7 @@ void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_ind
 }
 
 void renderer_render_semi_transparent_primitives(Renderer *self){
+	SemiTransparentState last_state;
 	unsigned to_draw;
 	unsigned prims = SemiTransparentStateVec_size(&self->queue.semi_transparent_state);
 	if (!prims)
@@ -10401,7 +10410,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 	void *verts = commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, size, sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX);
 	memcpy(verts, BufferVertexVec_data(&self->queue.semi_transparent), size);
 
-	SemiTransparentState last_state = *SemiTransparentStateVec_at(&self->queue.semi_transparent_state, 0);
+	last_state = *SemiTransparentStateVec_at(&self->queue.semi_transparent_state, 0);
 
 	renderer_semi_transparent_set_state(self, &last_state);
 
@@ -10503,6 +10512,7 @@ void renderer_flush_blits(Renderer *self)
 
 void renderer_flush_blit(Renderer *self, const BlitInfoVec *infos, Program *program, bool scaled)
 {
+	unsigned scale;
 	unsigned size;
 	if (BlitInfoVec_empty(infos))
 		return;
@@ -10529,7 +10539,7 @@ void renderer_flush_blit(Renderer *self, const BlitInfoVec *infos, Program *prog
 	}
 
 	size = BlitInfoVec_size(infos);
-	unsigned scale = scaled ? self->scaling : 1u;
+	scale = scaled ? self->scaling : 1u;
 	{ unsigned i; for (i = 0; i < size; i += 512) {
 		unsigned to_blit = min_(size - i, 512u);
 		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_blit * sizeof(BlitInfo));
@@ -10689,10 +10699,11 @@ ImageHandle renderer_create_texture(Renderer *self, int width, int height, int l
 }
 
 BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
+	VkDeviceSize size;
 	BufferHandle buffer;
 	ih_reset(&self->last_scanout);
 	fbatlas_load_image(&self->atlas, rect);
-	VkDeviceSize size = rect->width * rect->height * sizeof(uint16_t);
+	size = rect->width * rect->height * sizeof(uint16_t);
 
 	// TODO: Chain allocate this.
 	BufferCreateInfo buffer_create_info;
@@ -11943,17 +11954,18 @@ void deviceallocation_free_global(struct DeviceAllocation *self, DeviceAllocator
 
 void block_allocate(struct Block *self, uint32_t num_blocks, DeviceAllocation *block)
 {
+	uint32_t mask;
+	uint32_t block_mask;
 	uint32_t sb;
 	VK_ASSERT(BLOCK_NUM_SUB_BLOCKS >= num_blocks);
 	VK_ASSERT(num_blocks != 0);
 
-	uint32_t block_mask;
 	if (num_blocks == BLOCK_NUM_SUB_BLOCKS)
 		block_mask = ~0u;
 	else
 		block_mask = ((1u << num_blocks) - 1u);
 
-	uint32_t mask = self->free_blocks[num_blocks - 1];
+	mask = self->free_blocks[num_blocks - 1];
 	uint32_t b = trailing_zeroes(mask);
 
 	VK_ASSERT(((self->free_blocks[0] >> b) & block_mask) == block_mask);
@@ -11992,6 +12004,7 @@ void classallocator_suballocate(struct ClassAllocator *self, uint32_t num_blocks
 
 bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, AllocationTiling tiling, struct DeviceAllocation *alloc, bool hierarchical)
 {
+	uint32_t alloc_size;
 	MiniHeap * heap;
 	unsigned num_blocks = (size + self->sub_block_size - 1) >> self->sub_block_size_log2;
 	uint32_t size_mask = (1u << (num_blocks - 1)) - 1;
@@ -12041,7 +12054,7 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 	block_init(&node->heap);
 
 	heap = node;
-	uint32_t alloc_size = self->sub_block_size * BLOCK_NUM_SUB_BLOCKS;
+	alloc_size = self->sub_block_size * BLOCK_NUM_SUB_BLOCKS;
 
 	if (self->parent)
 	{
@@ -12373,6 +12386,8 @@ void deviceallocator_unmap_memory(struct DeviceAllocator *self, const struct Dev
 bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory,
                                VkImage dedicated_image)
 {
+	VkResult res;
+	VkDeviceMemory device_memory;
 	bool host_visible;
 	struct DeviceAllocatorHeap *heap = da_heap_vec_at(&self->heaps, self->mem_props.memoryTypes[memory_type].heapIndex);
 
@@ -12406,8 +12421,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		info.pNext = &dedicated;
 	}
 
-	VkDeviceMemory device_memory;
-	VkResult res = vkAllocateMemory(self->device, &info, NULL, &device_memory);
+	res = vkAllocateMemory(self->device, &info, NULL, &device_memory);
 
 	if (res == VK_SUCCESS)
 	{
@@ -12534,6 +12548,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	void shader_init(struct Shader *self, Hash hash, Device *device, const uint32_t *data, size_t size)
 	{
+		RhiSpirvResourceLayout reflected;
 		self->device = device;
 		self->module = VK_NULL_HANDLE;
 		self->intrusive_node.key = hash;
@@ -12562,7 +12577,6 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		/* SPIR-V reflection is done in a separate C++ shim (rhi_spirv_reflect.cpp)
 		 * so this translation unit does not depend on SPIRV-Cross. The shim writes
 		 * a POD layout whose fields mirror ResourceLayout; copy it across. */
-		RhiSpirvResourceLayout reflected;
 		rhi_spirv_reflect(data, size / sizeof(uint32_t), &reflected);
 		RHI_STATIC_ASSERT(sizeof(reflected) == sizeof(self->layout),
 				"reflection layout mirror size mismatch");
@@ -12729,6 +12743,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 
 	DescriptorSetAllocation descriptor_set_allocator_find(struct DescriptorSetAllocator *self, Hash hash)
 	{
+		VkDescriptorSet sets[VULKAN_NUM_SETS_PER_POOL];
 		struct DescriptorSetAllocatorPerThread *state = &self->per_thread;
 		DescriptorSetNode *node;
 		if (state->should_begin)
@@ -12761,7 +12776,6 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		if (vkCreateDescriptorPool(device_get_device(self->device), &info, NULL, &pool) != VK_SUCCESS)
 			LOGE("Failed to create descriptor pool.\n");
 
-		VkDescriptorSet sets[VULKAN_NUM_SETS_PER_POOL];
 		VkDescriptorSetLayout layouts[VULKAN_NUM_SETS_PER_POOL];
 		{ unsigned i; for (i = 0; i < VULKAN_NUM_SETS_PER_POOL; i++) layouts[i] = self->set_layout; }
 
@@ -12945,6 +12959,8 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 	void render_pass_init(struct RenderPass *self, Hash hash, Device *device, const RenderPassInfo *info)
 	{
+		uint32_t depth_self_dependencies;
+		VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
 		uint32_t color_self_dependencies;
 		self->device = device;
 		self->render_pass = VK_NULL_HANDLE;
@@ -13184,7 +13200,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		// 1 << subpass bit set if there are color attachment self-dependencies in the subpass.
 		color_self_dependencies = 0;
 		// 1 << subpass bit set if there are depth-stencil attachment self-dependencies in the subpass.
-		uint32_t depth_self_dependencies = 0;
+		depth_self_dependencies = 0;
 
 		// 1 << subpass bit set if any input attachment is read in the subpass.
 		uint32_t input_attachment_read = 0;
@@ -13597,7 +13613,6 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 
 		// Fixup after, we want the underlying render pass to be generic.
-		VkAttachmentDescription fixup_attachments[VULKAN_NUM_ATTACHMENTS + 1];
 		render_pass_fixup_render_pass_nvidia(self, &rp_info, fixup_attachments);
 
 		LOGI("Creating render pass.\n");
@@ -13659,10 +13674,11 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		VK_ASSERT(info->num_color_attachments || info->depth_stencil);
 
 		{ unsigned i; for (i = 0; i < info->num_color_attachments; i++) {
+			unsigned lod;
 			ImageView * att;
 			VK_ASSERT(info->color_attachments[i]);
 			att = info->color_attachments[i];
-			unsigned lod = imageview_get_create_info(att)->base_level;
+			lod = imageview_get_create_info(att)->base_level;
 			unsigned aw  = image_get_width(imageview_get_image(att), lod);
 			unsigned ah  = image_get_height(imageview_get_image(att), lod);
 			if (aw < self->width)  self->width  = aw;
@@ -14139,6 +14155,8 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo *info, VkSubpassContents contents)
 	{
+		unsigned num_clear_values;
+		VkClearValue clear_values[VULKAN_NUM_ATTACHMENTS + 1];
 		VK_ASSERT(!self->framebuffer);
 		VK_ASSERT(!self->compatible_render_pass);
 		VK_ASSERT(!self->actual_render_pass);
@@ -14149,8 +14167,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 		commandbuffer_init_viewport_scissor(self, info, self->framebuffer);
 
-		VkClearValue clear_values[VULKAN_NUM_ATTACHMENTS + 1];
-		unsigned num_clear_values = 0;
+		num_clear_values = 0;
 
 		{ unsigned i; for (i = 0; i < info->num_color_attachments; i++) {
 			VK_ASSERT(info->color_attachments[i]);
@@ -14196,6 +14213,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	VkPipeline commandbuffer_build_compute_pipeline(struct CommandBuffer *self, Hash hash)
 	{
+		VkPipeline compute_pipeline;
 		const Shader *shader = program_get_shader(self->current_program, ShaderStage_Compute);
 		VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
 		info.layout = pipeline_layout_get_layout(program_get_pipeline_layout(self->current_program));
@@ -14232,7 +14250,6 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			}
 		}
 
-		VkPipeline compute_pipeline;
 
 		LOGI("Creating compute pipeline.\n");
 		if (vkCreateComputePipelines(device_get_device(self->device), VK_NULL_HANDLE, 1, &info, NULL, &compute_pipeline) != VK_SUCCESS)
@@ -14243,6 +14260,8 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self, Hash hash)
 	{
+		uint32_t attr_mask;
+		VkPipeline pipeline;
 		VkResult res;
 		// Viewport state
 		VkPipelineViewportStateCreateInfo vp = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
@@ -14296,7 +14315,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 		VkVertexInputAttributeDescription vi_attribs[VULKAN_NUM_VERTEX_ATTRIBS];
 		vi.pVertexAttributeDescriptions = vi_attribs;
-		uint32_t attr_mask = pipeline_layout_get_resource_layout(self->current_layout)->attribute_mask;
+		attr_mask = pipeline_layout_get_resource_layout(self->current_layout)->attribute_mask;
 		uint32_t binding_mask = 0;
 		{ uint32_t _feit, bit; FOR_EACH_BIT(attr_mask, _feit, bit)
 		{
@@ -14403,7 +14422,6 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		pipe.pStages = stages;
 		pipe.stageCount = num_stages;
 
-		VkPipeline pipeline;
 
 		LOGI("Creating graphics pipeline.\n");
 		res = vkCreateGraphicsPipelines(device_get_device(self->device), VK_NULL_HANDLE, 1, &pipe, NULL, &pipeline);
@@ -14438,6 +14456,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_flush_graphics_pipeline(struct CommandBuffer *self)
 	{
+		uint32_t combined_spec_constant;
 		Hash hash;
 		Hasher h; hasher_init(&h);
 		self->active_vbos = 0;
@@ -14476,7 +14495,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		}
 
 		// Spec constants.
-		uint32_t combined_spec_constant = layout->combined_spec_constant_mask;
+		combined_spec_constant = layout->combined_spec_constant_mask;
 		combined_spec_constant &= self->static_state.state.spec_constant_mask;
 		hasher_u32(&h, combined_spec_constant);
 		{ uint32_t _feit, bit; FOR_EACH_BIT(combined_spec_constant, _feit, bit)
@@ -14754,12 +14773,13 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		VK_ASSERT(start_binding + render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass) <= VULKAN_NUM_BINDINGS);
 		num_input_attachments = render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass);
 		{ unsigned i; for (i = 0; i < num_input_attachments; i++) {
+			ImageView * view;
 			ResourceBinding * b;
 			const VkAttachmentReference *ref = render_pass_get_input_attachment(self->actual_render_pass, self->current_subpass, i);
 			if (ref->attachment == VK_ATTACHMENT_UNUSED)
 				continue;
 
-			ImageView *view = framebuffer_get_attachment(self->framebuffer, ref->attachment);
+			view = framebuffer_get_attachment(self->framebuffer, ref->attachment);
 			VK_ASSERT(view);
 			VK_ASSERT(image_get_create_info(imageview_get_image(view))->usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
 
@@ -14831,6 +14851,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_flush_descriptor_set(struct CommandBuffer *self, uint32_t set)
 	{
+		DescriptorSetAllocation allocated;
 		Hash hash;
 		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
 		const DescriptorSetLayout *set_layout = &layout->sets[set];
@@ -14919,7 +14940,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		}
 
 		hash = hasher_get(&h);
-		DescriptorSetAllocation allocated = descriptor_set_allocator_find(pipeline_layout_get_allocator(self->current_layout, set), hash);
+		allocated = descriptor_set_allocator_find(pipeline_layout_get_allocator(self->current_layout, set), hash);
 
 		// The descriptor set was not successfully cached, rebuild.
 		if (!allocated.cached)
@@ -15292,6 +15313,8 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			unsigned num_required_device_extensions, const char **required_device_layers,
 			unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features)
 	{
+		unsigned universal_queue_index;
+		uint32_t queue_count;
 		VkResult dev_res;
 		if (gpu == VK_NULL_HANDLE)
 		{
@@ -15372,7 +15395,6 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		else if (self->gpu_props.apiVersion >= VK_API_VERSION_1_0)
 			LOGI("GPU supports Vulkan 1.0.\n");
 
-		uint32_t queue_count;
 		vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, NULL);
 		VkQueueFamilyProperties *queue_props = (VkQueueFamilyProperties *)malloc((queue_count ? queue_count : 1) * sizeof(VkQueueFamilyProperties));
 		vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, queue_props);
@@ -15423,7 +15445,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		if (self->graphics_queue_family == VK_QUEUE_FAMILY_IGNORED)
 		{ free(queried_extensions); free(queried_layers); free(queue_props); return false; }
 
-		unsigned universal_queue_index = 1;
+		universal_queue_index = 1;
 		uint32_t graphics_queue_index = 0;
 		uint32_t compute_queue_index = 0;
 		uint32_t transfer_queue_index = 0;
@@ -15741,12 +15763,13 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	}
 
 	Shader * device_request_shader(Device *self, const uint32_t *data, size_t size){
+		Shader * ret;
 		Hash hash;
 		Hasher hasher; hasher_init(&hasher);
 		hasher_data(&hasher, data, size);
 
 		hash = hasher_get(&hasher);
-		Shader *ret = shader_map_find(&self->shaders, hash);
+		ret = shader_map_find(&self->shaders, hash);
 		if (!ret)
 			ret = shader_map_emplace_yield(&self->shaders, hash, self, data, size);
 		return ret;
@@ -15754,12 +15777,13 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	Program *device_request_program_compute_shader(Device *self, Shader *compute)
 	{
+		Program * ret;
 		Hash hash;
 		Hasher hasher; hasher_init(&hasher);
 		hasher_u64(&hasher, compute->intrusive_node.key);
 
 		hash = hasher_get(&hasher);
-		Program *ret = program_map_find(&self->programs, hash);
+		ret = program_map_find(&self->programs, hash);
 		if (!ret)
 			ret = program_map_emplace_yield_compute(&self->programs, hash, self, compute);
 		return ret;
@@ -15773,13 +15797,14 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	Program *device_request_program_graphics_shaders(Device *self, Shader *vertex, Shader *fragment)
 	{
+		Program * ret;
 		Hash hash;
 		Hasher hasher; hasher_init(&hasher);
 		hasher_u64(&hasher, vertex->intrusive_node.key);
 		hasher_u64(&hasher, fragment->intrusive_node.key);
 
 		hash = hasher_get(&hasher);
-		Program *ret = program_map_find(&self->programs, hash);
+		ret = program_map_find(&self->programs, hash);
 
 		if (!ret)
 			ret = program_map_emplace_yield_graphics(&self->programs, hash, self, vertex, fragment);
@@ -15795,6 +15820,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	}
 
 	PipelineLayout * device_request_pipeline_layout(Device *self, const CombinedResourceLayout *layout){
+		PipelineLayout * ret;
 		Hash hash;
 		Hasher h; hasher_init(&h);
 		hasher_data(&h, (const uint32_t *)(layout->sets), sizeof(layout->sets));
@@ -15806,20 +15832,21 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		hasher_u32(&h, layout->render_target_mask);
 
 		hash = hasher_get(&h);
-		PipelineLayout *ret = pipeline_layout_map_find(&self->pipeline_layouts, hash);
+		ret = pipeline_layout_map_find(&self->pipeline_layouts, hash);
 		if (!ret)
 			ret = pipeline_layout_map_emplace_yield(&self->pipeline_layouts, hash, self, layout);
 		return ret;
 	}
 
 	DescriptorSetAllocator * device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout *layout, const uint32_t *stages_for_bindings){
+		DescriptorSetAllocator * ret;
 		Hash hash;
 		Hasher h; hasher_init(&h);
 		hasher_data(&h, (const uint32_t *)(&layout), sizeof(layout));
 		hasher_data(&h, stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
 		hash = hasher_get(&h);
 
-		DescriptorSetAllocator *ret = descriptor_set_allocator_map_find(&self->descriptor_set_allocators, hash);
+		ret = descriptor_set_allocator_map_find(&self->descriptor_set_allocators, hash);
 		if (!ret)
 			ret = descriptor_set_allocator_map_emplace_yield(&self->descriptor_set_allocators, hash, self, layout, stages_for_bindings);
 		return ret;
@@ -16120,6 +16147,8 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	POD_VEC_DECLARE(VkFlagsVec, VkFlags);
 	void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence,
 			unsigned semaphore_count, Semaphore *semaphores){
+				VkResult result;
+				VkQueue queue;
 				VkFence cleared_fence;
 		QueueData *data = device_get_queue_data(self, type);
 		VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
@@ -16161,7 +16190,6 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		if (!SemaphoreVec_empty(&waits))
 			submit.pWaitSemaphores = SemaphoreVec_data(&waits);
 
-		VkQueue queue;
 		switch (type)
 		{
 			default:
@@ -16177,7 +16205,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		}
 
 		cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
-		VkResult result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
+		result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
 
 		if (result != VK_SUCCESS)
 			LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
@@ -16302,6 +16330,8 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void device_submit_queue(Device *self, CommandBufferType type, VkFence *fence,
 			unsigned semaphore_count, Semaphore *semaphores){
+				VkFence cleared_fence;
+				VkQueue queue;
 				VkResult result;
 		type = device_get_physical_queue_type(self, type);
 
@@ -16368,7 +16398,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			last_cmd = CommandBufferVec_size(&cmds);
 		}
 
-		VkFence cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
+		cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
 
 		{ unsigned i; for (i = 0; i < semaphore_count; i++) {
 			VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&self->managers.semaphore);
@@ -16391,7 +16421,6 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				submit->pSignalSemaphores = SemaphoreVec_data(&signals[i]);
 		} }
 
-		VkQueue queue;
 		switch (type)
 		{
 			default:
@@ -16442,13 +16471,14 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	}
 
 	void device_sync_buffer_blocks(Device *self){
+		CommandBufferHandle cmd;
 		VkBufferUsageFlags usage;
 		if (bufferblock_vec_empty(&self->dma.vbo) && bufferblock_vec_empty(&self->dma.ubo))
 			return;
 
 		usage = 0;
 
-		CommandBufferHandle cmd = device_request_command_buffer_nolock(self, Type_AsyncTransfer);
+		cmd = device_request_command_buffer_nolock(self, Type_AsyncTransfer);
 
 		commandbuffer_begin_region(cbh_get(&cmd), "buffer-block-sync", NULL);
 
@@ -17013,14 +17043,15 @@ VkImageViewType get_image_view_type(const ImageCreateInfo *create_info, const Im
 	}
 
 	BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo *view_info){
+		VkResult res;
+		VkBufferView view;
 		VkBufferViewCreateInfo info = { VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO };
 		info.buffer = buffer_get_buffer(view_info->buffer);
 		info.format = view_info->format;
 		info.offset = view_info->offset;
 		info.range = view_info->range;
 
-		VkBufferView view;
-		VkResult res = vkCreateBufferView(self->device, &info, NULL, &view);
+		res = vkCreateBufferView(self->device, &info, NULL, &view);
 		if (res != VK_SUCCESS)
 			return bvh_make(NULL);
 
@@ -17126,11 +17157,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 			view_info.subresourceRange.baseMipLevel = info->subresourceRange.baseMipLevel;
 			{ uint32_t layer; for (layer = 0; layer < info->subresourceRange.layerCount; layer++) {
+				VkImageView rt_view;
 				view_info.subresourceRange.levelCount = 1;
 				view_info.subresourceRange.layerCount = 1;
 				view_info.subresourceRange.baseArrayLayer = layer + info->subresourceRange.baseArrayLayer;
 
-				VkImageView rt_view;
 				if (vkCreateImageView(self->device, &view_info, NULL, &rt_view) != VK_SUCCESS)
 					return false;
 
@@ -17217,6 +17248,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	}
 
 	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo *create_info){
+		ImageViewCreateInfo tmp;
+		unsigned num_layers;
 		struct ImageView * _iv;
 		ImageResourceHolder holder;
 		image_resource_holder_init(&holder, self->device);
@@ -17241,7 +17274,6 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		else
 			num_levels = view_info.subresourceRange.levelCount;
 
-		unsigned num_layers;
 		if (view_info.subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS)
 			num_layers = image_get_create_info(create_info->image)->layers - view_info.subresourceRange.baseArrayLayer;
 		else
@@ -17256,7 +17288,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			return iv_make(NULL);
 		}
 
-		ImageViewCreateInfo tmp = *create_info;
+		tmp = *create_info;
 		tmp.format = format;
 		_iv = (struct ImageView *)object_pool_raw_allocate(&self->handle_pool.image_views); imageview_init(_iv, self, holder.image_view, &tmp); ImageViewHandle ret = iv_make(_iv);
 		if (iv_is_valid(&ret))
@@ -17276,6 +17308,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	}
 
 	InitialImageBuffer device_create_image_staging_buffer(Device *self, const ImageCreateInfo *info, const ImageInitialData *initial){
+		unsigned index;
+		unsigned copy_levels;
 		uint8_t * mapped;
 		InitialImageBuffer result;
 
@@ -17283,7 +17317,6 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		TextureFormatLayout layout;
 		tfl_init(&layout);
 
-		unsigned copy_levels;
 		if (generate_mips)
 			copy_levels = 1;
 		else if (info->levels == 0)
@@ -17315,7 +17348,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		// And now, do the actual copy.
 		mapped = (uint8_t *)(device_map_host_buffer(self, bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
-		unsigned index = 0;
+		index = 0;
 
 		tfl_set_buffer(&layout, mapped, tfl_get_required_size(&layout));
 
@@ -17362,6 +17395,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	ImageHandle device_create_image_from_staging_buffer(Device *self, const ImageCreateInfo *create_info,
 			const InitialImageBuffer *staging_buffer){
+				ImageCreateInfo tmpinfo;
 				struct Image * _im;
 		ImageResourceHolder holder;
 		VkMemoryRequirements reqs;
@@ -17433,7 +17467,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			return ih_make(NULL);
 		}
 
-		ImageCreateInfo tmpinfo = *create_info;
+		tmpinfo = *create_info;
 		tmpinfo.usage = info.usage;
 		tmpinfo.levels = info.mipLevels;
 
@@ -17467,6 +17501,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		// Copy initial data to texture.
 		if (staging_buffer)
 		{
+			VkAccessFlags prepare_src_access;
 			bool share_async_graphics;
 			VK_ASSERT(create_info->domain != ImageDomain_Transient);
 			VK_ASSERT(create_info->initial_layout != VK_IMAGE_LAYOUT_UNDEFINED);
@@ -17479,7 +17514,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			else if (self->graphics_queue == self->transfer_queue)
 				final_transition_src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
 
-			VkAccessFlags prepare_src_access = self->graphics_queue == self->transfer_queue ? VK_ACCESS_TRANSFER_WRITE_BIT : 0;
+			prepare_src_access = self->graphics_queue == self->transfer_queue ? VK_ACCESS_TRANSFER_WRITE_BIT : 0;
 			bool need_mipmap_barrier = true;
 			bool need_initial_barrier = true;
 
@@ -17516,6 +17551,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				// self->transfer queue over to self->graphics ...
 				if (self->transfer_queue_family_index != self->graphics_queue_family_index)
 				{
+					VkImageMemoryBarrier acquire;
 					need_mipmap_barrier = false;
 
 					VkImageMemoryBarrier release = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
@@ -17541,7 +17577,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					release.subresourceRange.aspectMask = format_to_aspect_mask(info.format);
 					release.subresourceRange.layerCount = info.arrayLayers;
 
-					VkImageMemoryBarrier acquire = release;
+					acquire = release;
 					acquire.srcAccessMask = 0;
 
 					if (generate_mips)
@@ -17652,6 +17688,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	}
 
 	BufferHandle device_create_buffer(Device *self, const BufferCreateInfo *create_info, const void *initial){
+		BufferCreateInfo tmpinfo;
+		uint32_t sharing_indices[3];
 		struct Buffer * _b;
 		VkBuffer buffer;
 		VkMemoryRequirements reqs;
@@ -17662,7 +17700,6 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		info.usage = create_info->usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		uint32_t sharing_indices[3];
 		if (self->graphics_queue_family_index != self->compute_queue_family_index ||
 				self->graphics_queue_family_index != self->transfer_queue_family_index)
 		{
@@ -17709,15 +17746,16 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			return bh_make(NULL);
 		}
 
-		BufferCreateInfo tmpinfo = *create_info;
+		tmpinfo = *create_info;
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		_b = (struct Buffer *)object_pool_raw_allocate(&self->handle_pool.buffers); buffer_init(_b, self, buffer, &allocation, &tmpinfo); BufferHandle handle = bh_make(_b);
 
 		if (create_info->domain == BufferDomain_Device && initial && !device_memory_type_is_host_visible(self, memory_type))
 		{
+			BufferCreateInfo staging_info;
 			BufferHandle staging_buffer;
 			CommandBufferHandle cmd; cmd.data = NULL;
-			BufferCreateInfo staging_info = *create_info;
+			staging_info = *create_info;
 			staging_info.domain = BufferDomain_Host;
 			staging_buffer = device_create_buffer(self, &staging_info, initial);
 			device_set_name_buffer(self, bh_get(&staging_buffer), "buffer-upload-staging-buffer");
@@ -17773,9 +17811,10 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	}
 
 	const RenderPass * device_request_render_pass(Device *self, const RenderPassInfo *info, bool compatible){
+		RenderPass * ret;
+		VkFormat formats[VULKAN_NUM_ATTACHMENTS];
 		Hash hash;
 		Hasher h; hasher_init(&h);
-		VkFormat formats[VULKAN_NUM_ATTACHMENTS];
 		VkFormat depth_stencil;
 		uint32_t lazy = 0;
 		uint32_t optimal = 0;
@@ -17828,7 +17867,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		hash = hasher_get(&h);
 
-		RenderPass *ret = render_pass_map_find(&self->render_passes, hash);
+		ret = render_pass_map_find(&self->render_passes, hash);
 		if (!ret)
 			ret = render_pass_map_emplace_yield(&self->render_passes, hash, self, info);
 		return ret;
@@ -17865,6 +17904,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_load_image(FBAtlas *self, const Rect *rect)
 	{
+		unsigned xend;
 		unsigned xbegin;
 		if (rect->width == 0 || rect->height == 0)
 			return;
@@ -17872,7 +17912,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		fbatlas_write_compute(self, Domain_Unscaled, rect);
 
 		xbegin = rect->x / BLOCK_WIDTH;
-		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
+		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
@@ -17881,12 +17921,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static bool fbatlas_texture_rendered(FBAtlas *self, const Rect *rect)
 	{
+		unsigned xend;
 		unsigned xbegin;
 		if (rect->width == 0 || rect->height == 0)
 			return false;
 
 		xbegin = rect->x / BLOCK_WIDTH;
-		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
+		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
@@ -17898,6 +17939,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static Domain fbatlas_blit_vram(FBAtlas *self, const Rect *dst, const Rect *src)
 	{
+		unsigned dst_xend;
 		unsigned dst_xbegin;
 		Domain domain = fbatlas_find_suitable_domain(self, src);
 
@@ -17907,7 +17949,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		fbatlas_write_domain(self, domain, Stage_Compute, dst);
 
 		dst_xbegin = dst->x / BLOCK_WIDTH;
-		unsigned dst_xend = (dst->x + dst->width - 1) / BLOCK_WIDTH;
+		dst_xend = (dst->x + dst->width - 1) / BLOCK_WIDTH;
 		unsigned dst_ybegin = dst->y / BLOCK_HEIGHT;
 		unsigned dst_yend = (dst->y + dst->height - 1) / BLOCK_HEIGHT;
 
@@ -17973,12 +18015,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static bool fbatlas_write_domain(FBAtlas *self, Domain domain, Stage stage, const Rect *rect)
 	{
+		unsigned xend;
 		unsigned xbegin;
 		if (fbatlas_inside_render_pass(self, rect))
 			fbatlas_flush_render_pass(self);
 
 		xbegin = rect->x / BLOCK_WIDTH;
-		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
+		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 
@@ -18039,12 +18082,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_read_domain(FBAtlas *self, Domain domain, Stage stage, const Rect *rect)
 	{
+		unsigned xend;
 		unsigned xbegin;
 		if (fbatlas_inside_render_pass(self, rect))
 			fbatlas_flush_render_pass(self);
 
 		xbegin = rect->x / BLOCK_WIDTH;
-		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
+		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 
@@ -18100,11 +18144,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_sync_domain(FBAtlas *self, Domain domain, const Rect *rect)
 	{
+		unsigned xbegin;
+		unsigned ownership;
 		unsigned write_domains;
 		if (fbatlas_inside_render_pass(self, rect))
 			fbatlas_flush_render_pass(self);
 
-		unsigned xbegin = rect->x / BLOCK_WIDTH;
+		xbegin = rect->x / BLOCK_WIDTH;
 		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
@@ -18127,7 +18173,6 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		// For scaled domain,
 		// we need to blit from unscaled domain to scaled.
-		unsigned ownership;
 		unsigned hazard_domains;
 		unsigned resolve_domains;
 		if (domain == Domain_Scaled)
@@ -18179,12 +18224,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static Domain fbatlas_find_suitable_domain(FBAtlas *self, const Rect *rect)
 	{
+		unsigned xend;
 		unsigned xbegin;
 		if (fbatlas_inside_render_pass(self, rect))
 			return Domain_Scaled;
 
 		xbegin = rect->x / BLOCK_WIDTH;
-		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
+		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 
@@ -18200,12 +18246,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static bool fbatlas_inside_render_pass(FBAtlas *self, const Rect *rect)
 	{
+		unsigned ybegin;
 		unsigned xbegin;
 		if (!self->renderpass.inside)
 			return false;
 
 		xbegin = rect->x & ~(BLOCK_WIDTH - 1);
-		unsigned ybegin = rect->y & ~(BLOCK_HEIGHT - 1);
+		ybegin = rect->y & ~(BLOCK_HEIGHT - 1);
 		unsigned xend = ((rect->x + rect->width - 1) | (BLOCK_WIDTH - 1)) + 1;
 		unsigned yend = ((rect->y + rect->height - 1) | (BLOCK_HEIGHT - 1)) + 1;
 
@@ -18221,6 +18268,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_flush_render_pass(FBAtlas *self)
 	{
+		unsigned xend;
 		unsigned xbegin;
 		if (!self->renderpass.inside)
 			return;
@@ -18238,7 +18286,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		renderer_flush_render_pass(self->listener, rect);
 
 		xbegin = rect->x / BLOCK_WIDTH;
-		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
+		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
@@ -18328,6 +18376,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_clear_rect(FBAtlas *self, const Rect *rect, uint32_t fb_color)
 	{
+		unsigned xend;
 		unsigned xbegin;
 		if (rect->width == 0 || rect->height == 0)
 			return;
@@ -18344,7 +18393,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		renderer_clear_quad(self->listener, rect, fb_color, rect_eq(&self->renderpass.rect, rect));
 
 		xbegin = rect->x / BLOCK_WIDTH;
-		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
+		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
@@ -18844,6 +18893,8 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 	}
 
 	void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode) {
+		int bpp;
+		char path[PATH_MAX_TT];
 		int ppp;
 		uint32_t hash = upload->hash;
 
@@ -18870,7 +18921,6 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 				return; // Early out
 		}
 
-		char path[PATH_MAX_TT];
 		size_t plen;
 		dump_path(path, sizeof(path));
 		plen = strlen(path);
@@ -18896,7 +18946,7 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 		}
 
 		ppp = 1 << shift;
-		int bpp = 16 >> shift;
+		bpp = 16 >> shift;
 		int mask = (1 << bpp) - 1;
 		/* Output is exactly 4 bytes per (subpixel) = image.size() * ppp * 4. */
 		img_count = (size_t)upload->image_count;
@@ -18917,6 +18967,7 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 						bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
 						bytes[bi++] = (uint8_t)255;
 					} else {
+						int g;
 						int r;
 						uint16_t abgr1555;
 						if (mode->mode == TextureMode_ABGR1555) {
@@ -18925,7 +18976,7 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 							abgr1555 = palette[subpixel];
 						}
 						r = ((abgr1555 >> 0) & 0x1f) * 255.0 / 31.0;
-						int g = ((abgr1555 >> 5) & 0x1f) * 255.0 / 31.0;
+						g = ((abgr1555 >> 5) & 0x1f) * 255.0 / 31.0;
 						int b = ((abgr1555 >> 10) & 0x1f) * 255.0 / 31.0;
 						int a = (abgr1555 >> 15) * 255.0;
 						// Convert psx to tri
@@ -19090,12 +19141,13 @@ Rect fromSRect(SRect rect) {
 			RectIndex index = overlap.items[oi];
 			EnduringTextureRect *other = &self->tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because self->tracker.overlapping never returns dead indices
 			if (fromSRect_contains(other->texture_rect.vram_rect, palette_rect) && other->alive) {
+				int y;
 				int x;
 				if (other->texture_rect.offset_x != 0 || other->texture_rect.offset_y != 0) {
 					continue; // TODO: handle offset subrects
 				}
 				x = palette_rect.x - other->texture_rect.vram_rect.x;
-				int y = palette_rect.y - other->texture_rect.vram_rect.y;
+				y = palette_rect.y - other->texture_rect.vram_rect.y;
 				int offset = y * other->texture_rect.vram_rect.width + x;
 				uint16_t *data = other->texture_rect.upload->image + offset;
 				uint32_t hash = crc32(0, (unsigned char*)data, palette_rect.width * sizeof(uint16_t));
@@ -19226,6 +19278,7 @@ Rect fromSRect(SRect rect) {
 	}
 
 	void texture_tracker_notifyReadback(struct TextureTracker *self, Rect rect, uint16_t *vram) {
+		RestorableRect rr;
 		uint32_t hash;
 		// These hacks are my workaround for the dialog self->frame texture restorable getting evicted by FMVs
 		if (rect.width == 96 && rect.height == 224 && rect.y == 0 && (rect.x % 96) == 0) {
@@ -19263,7 +19316,6 @@ Rect fromSRect(SRect rect) {
 			}
 		} }
 
-		RestorableRect rr;
 		restorablerect_init(&rr);
 		rr.rect = rect;
 		rr.hash = hash;
@@ -19273,6 +19325,7 @@ Rect fromSRect(SRect rect) {
 	}
 
 	void texture_tracker_upload(struct TextureTracker *self, Rect rect, uint16_t *vram) {
+		TextureUpload * upload;
 		RestorableRect * restore;
 		texture_tracker_clear_palette_cache(self, rect);
 
@@ -19288,9 +19341,10 @@ Rect fromSRect(SRect rect) {
 			return;
 		}
 
-		TextureUpload *upload = NULL;
+		upload = NULL;
 		bool preexisting = false;
 		{
+			uint32_t hash;
 			unsigned x = rect.x,
 				 y = rect.y,
 				 w = rect.width,
@@ -19304,7 +19358,7 @@ Rect fromSRect(SRect rect) {
 					img[vi++] = vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))];
 				}
 			}
-			uint32_t hash = crc32(0, (unsigned char*)img, rect.width * rect.height * sizeof(uint16_t));
+			hash = crc32(0, (unsigned char*)img, rect.width * rect.height * sizeof(uint16_t));
 			// TODO: check for hash collision, by checking if existing upload has different dimensions. not sure how to recover if it does,
 			//       but the odds of a collision are probably much higher than the odds that both textures would be in play simultaneously,
 			//       so it'd probably be safe to simply ignore the newest upload and clear instead.
@@ -19475,13 +19529,13 @@ Rect fromSRect(SRect rect) {
 	}
 
 	void texture_tracker_dump_texture(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode, DumpedMode dump_mode) {
+		int dmi;
 		bool already_dumped;
 		if (!upload->dumpable) {
 			return;
 		}
 
 		already_dumped = false;
-		int dmi;
 		for (dmi = 0; dmi < upload->dumped_modes_count; dmi++) {
 			if (dumpedmode_eq(&upload->dumped_modes[dmi], &dump_mode)) {
 				already_dumped = true;
@@ -19544,9 +19598,11 @@ Rect fromSRect(SRect rect) {
 	static INLINE void handle_lru_cache_clear(struct HandleLRUCache *self) { self->count = 0; }
 
 	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode *mode, unsigned int page_x, unsigned int page_y, bool *fastpath_capable_out, bool *cache_hit) {
+		Rect palette_rect;
+		Rect result_rect;
 		HdTextureHandle result;
 		(*fastpath_capable_out) = false;
-		Rect palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
+		palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 
 		// TODO: I'm pretty sure this doesn't handle TextureMode_ABGR1555
 
@@ -19601,7 +19657,6 @@ Rect fromSRect(SRect rect) {
 
 		result = hd_handle_make_none();
 
-		Rect result_rect;
 		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
 			TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
@@ -19642,6 +19697,7 @@ Rect fromSRect(SRect rect) {
 	{
 		if (!handle.fused)
 		{
+			int scaleX;
 			ImageHandle image;
 			// HdTextureHandle's are perhaps too tricky.  They assume that the RectTracker's textures vector hasn't removed anything since the handle was
 			// created. So it would seem all you need to do is, in Renderer::reset_queue, call RectTracker::releaseDeadHandles. Except you have to be
@@ -19678,7 +19734,7 @@ Rect fromSRect(SRect rect) {
 			 * then adopt), matching hd_gpu_image_handle. */
 			image_add_reference(iter->image);
 			image = ih_make(iter->image);
-			int scaleX = image_get_width(ih_get(&image), 0) / upload->width;
+			scaleX = image_get_width(ih_get(&image), 0) / upload->width;
 			int scaleY = image_get_height(ih_get(&image), 0) / upload->height;
 			SRect texture_subrect = texture_rect_subrect(tex);
 			{
@@ -19745,6 +19801,7 @@ bool is_power_of_two(int n) {
 		{
 			int pi;
 			for (pi = 0; pi < self->pending_attach.count; pi++) {
+				int height;
 				int width;
 				HdTextureId id;
 				id.hash = (uint32_t)(self->pending_attach.keys[pi] >> 32);
@@ -19775,7 +19832,7 @@ bool is_power_of_two(int n) {
 					continue; // evicted from both caches; will be re-self->requested on draw
 
 				width = cached->levels.levels[0].width;
-				int height = cached->levels.levels[0].height;
+				height = cached->levels.levels[0].height;
 				if (width  % upload->width  == 0 && is_power_of_two(width  / upload->width) &&
 						height % upload->height == 0 && is_power_of_two(height / upload->height))
 				{
@@ -19909,8 +19966,8 @@ bool is_power_of_two(int n) {
 	}
 
 	void texture_tracker_set_texture_uploader(struct TextureTracker *self, Renderer *t) {
-		self->uploader = t;
 		LoadedLevels default_levels;
+		self->uploader = t;
 		LoadedImage default_image;
 		loaded_levels_init(&default_levels);
 		loaded_image_init(&default_image);
@@ -20290,10 +20347,10 @@ int64_t page_bytes(FusionRects *fusion)
 	}
 
 	void fusion_rects(struct FusionRects *out, Rect full_page_rect, uint32_t palette_hash, struct RectTracker *tracker) {
+		int _ei;
 		struct FusionRects *f = out;
 		fusionrects_init(f);
 
-		int _ei;
 		for (_ei = 0; _ei < tracker->textures.count; _ei++) {
 			EnduringTextureRect *e = &tracker->textures.a[_ei];
 			SRectResult intersection;
@@ -20327,6 +20384,7 @@ int64_t page_bytes(FusionRects *fusion)
 	}
 
 	void rebuild_page(FusedPage *page, struct RectTracker *tracker, Renderer *uploader) {
+		int texture_width;
 		CommandBufferHandle * cmd;
 		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilding page for %x, %d,%d %dx%d\n",
 				page->palette,
@@ -20359,7 +20417,7 @@ int64_t page_bytes(FusionRects *fusion)
 
 		cmd = renderer_command_buffer_hack_fixme(uploader);
 
-		int texture_width = page->fusion.vram_rect.width * page->fusion.scaleX;
+		texture_width = page->fusion.vram_rect.width * page->fusion.scaleX;
 		int texture_height = page->fusion.vram_rect.height * page->fusion.scaleY;
 
 		// TODO: I don't know SHIT about barriers.
@@ -20386,6 +20444,7 @@ int64_t page_bytes(FusionRects *fusion)
 		{
 		int _fri;
 		for (_fri = 0; _fri < ownedrects_size(&page->fusion.rects); _fri++) {
+			Image * image;
 			int full_res_levels;
 			TextureRect *tex = &page->fusion.rects.v.items[_fri];
 			TextureUpload *upload = tex->upload;
@@ -20395,7 +20454,7 @@ int64_t page_bytes(FusionRects *fusion)
 			if (hd_texture == NULL)
 				continue;
 
-			Image *image = hd_texture->image;
+			image = hd_texture->image;
 
 			int srcWidth = image_get_width(image, 0);
 			int srcHeight = image_get_height(image, 0);
@@ -20483,8 +20542,8 @@ int64_t page_bytes(FusionRects *fusion)
 	HdTexture fused_pages_get_from_handle(struct FusedPages *self, HdTextureHandle handle, ImageHandle *default_hd_texture) {
 		FusedPage *page;
 		if (handle.index < 0 || handle.index >= fused_page_vec_size(&self->pages)) {
-			TT_LOG(RETRO_LOG_WARN, "BAD fused index!\n");
 			HdTexture _r;
+			TT_LOG(RETRO_LOG_WARN, "BAD fused index!\n");
 			_r.vram_rect = (SRect){0, 0, 1, 1};
 			_r.texel_rect = (SRect){0, 0, (int)(image_get_width(ih_get(default_hd_texture), 0)), (int)(image_get_height(ih_get(default_hd_texture), 0))};
 			_r.texture = *default_hd_texture;
@@ -20685,12 +20744,12 @@ int64_t page_bytes(FusionRects *fusion)
 			int _i;
 			for (_i = 0; _i < RestorableRectSaveStateVec_size(&state->restorable); _i++)
 			{
+				int _j;
 				RestorableRectSaveState *r = RestorableRectSaveStateVec_at((struct RestorableRectSaveStateVec *)&state->restorable, _i);
 				RestorableRect loaded;
 				restorablerect_init(&loaded);
 				loaded.hash = r->hash;
 				loaded.rect = r->rect;
-				int _j;
 				for (_j = 0; _j < TextureRectSaveStateVec_size(&r->to_restore); _j++)
 					ownedrects_push(&loaded.to_restore, from_save_state(TextureRectSaveStateVec_at(&r->to_restore, _j), &uploads));
 				rrvec_push(&self->restorable_rects, &loaded);
@@ -21116,6 +21175,8 @@ void rhi_vulkan_get_system_av_info(struct retro_system_av_info *info)
 
 void rhi_vulkan_refresh_variables(void)
 {
+	unsigned old_msaa;
+	struct retro_core_option_display option_display;
 	unsigned old_scaling;
    struct retro_variable var = {0};
 
@@ -21133,7 +21194,7 @@ void rhi_vulkan_refresh_variables(void)
       has_software_fb = true;
 
    old_scaling = scaling;
-   unsigned old_msaa = msaa;
+   old_msaa = msaa;
    bool old_super_sampling = super_sampling;
    bool old_show_vram = show_vram;
    int old_crop_overscan = vulkan_crop_overscan;
@@ -21365,7 +21426,6 @@ void rhi_vulkan_refresh_variables(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       eager_hd_textures = (strcmp(var.value, "lazy") != 0); // "eager" (default) or "lazy"
 
-   struct retro_core_option_display option_display;
    option_display.visible = track_textures;
 
    option_display.key = BEETLE_OPT(dump_textures);
@@ -21474,6 +21534,7 @@ static ScanoutMode get_scanout_mode(bool bpp24)
 void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
                                unsigned height, unsigned pitch)
 {
+	unsigned index;
 	ImageHandle scanout;
    if (device == NULL)
       return;
@@ -21511,7 +21572,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
       renderer_set_mdec_filter(renderer, ScanoutFilter_None);
 
    scanout = show_vram ? renderer_scanout_vram_to_texture(renderer, true) : renderer_scanout_to_texture(renderer);
-   unsigned index = vulkan->get_sync_index(vulkan->handle);
+   index = vulkan->get_sync_index(vulkan->handle);
 
    struct retro_vulkan_image *image                          = &swapchain_images.items[index];
 
