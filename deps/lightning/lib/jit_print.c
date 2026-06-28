@@ -25,6 +25,12 @@
 #  define INT_FMT		"%d"
 #  define DEC_FMT		"%d"
 #  define HEX_FMT		"0x%x"
+#elif (_WIN32 && !__CYGWIN__)
+/* LLP64: jit_word_t is long long (see lightning.h), so long is too narrow. */
+#  define MININT                0x8000000000000000
+#  define INT_FMT		"%d"
+#  define DEC_FMT		"%lld"
+#  define HEX_FMT		"0x%llx"
 #else
 #  define MININT                0x8000000000000000
 #  define INT_FMT		"%d"
