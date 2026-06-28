@@ -747,30 +747,6 @@ MultiAccessSizeMem *PIOMem = NULL;
 MultiAccessSizeMem *MainRAM = NULL;
 MultiAccessSizeMem *ScratchRAM = NULL;
 
-/* Helper inline funcs that dispatch reads/writes to a
- * MultiAccessSizeMem instance by size at runtime.  Replaces the
- * Read<T> / Write<T> templated member functions; size is always
- * a literal constant at the call site so the optimizer folds the
- * switch away. */
-static INLINE uint32_t MASMEM_Read_size(MultiAccessSizeMem *mem, uint32_t address, unsigned size)
-{
-   if (size == 4)
-      return MASMEM_ReadU32(mem, address);
-   if (size == 2)
-      return MASMEM_ReadU16(mem, address);
-   return MASMEM_ReadU8(mem, address);
-}
-
-static INLINE void MASMEM_Write_size(MultiAccessSizeMem *mem, uint32_t address, uint32_t value, unsigned size)
-{
-   if (size == 4)
-      MASMEM_WriteU32(mem, address, value);
-   else if (size == 2)
-      MASMEM_WriteU16(mem, address, value);
-   else
-      MASMEM_WriteU8(mem, address, value);
-}
-
 /*
  * C-linkage accessors for MainRAM declared in mednafen/psx/psx_mem.h.
  * MainRAM itself is a MultiAccessSizeMem<> template instance and so
@@ -780,16 +756,6 @@ static INLINE void MASMEM_Write_size(MultiAccessSizeMem *mem, uint32_t address, 
  *
  * Inline away to a single load/store under -O2 / LTO.
  */
-uint32_t MainRAM_ReadU32(uint32_t address)
-{
-   return MASMEM_ReadU32(MainRAM, address);
-}
-
-void MainRAM_WriteU32(uint32_t address, uint32_t value)
-{
-   MASMEM_WriteU32(MainRAM, address, value);
-}
-
 uint8_t  ScratchRAM_ReadU8 (uint32_t address) { return MASMEM_ReadU8(ScratchRAM, address); }
 uint16_t ScratchRAM_ReadU16(uint32_t address) { return MASMEM_ReadU16(ScratchRAM, address); }
 uint32_t ScratchRAM_ReadU24(uint32_t address) { return MASMEM_ReadU24(ScratchRAM, address); }
@@ -913,9 +879,7 @@ void PSX_SetDMACycleSteal(unsigned stealage)
    DMACycleSteal = stealage;
 }
 
-//
-// Event stuff
-//
+/* Event stuff */
 
 static int32_t Running; // Set to -1 when not desiring exit, and 0 when we are.
 
@@ -1081,18 +1045,13 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
    return(Running);
 }
 
-
 void PSX_RequestMLExit(void)
 {
    Running = 0;
    CPU_SetEventNT(0);
 }
 
-
-//
-// End event stuff
-//
-
+/* End event stuff */
 
 /* Memory access entry points.
  *
@@ -1431,14 +1390,22 @@ static INLINE uint32_t MemPeek(int32_t timestamp, uint32_t A, unsigned size, boo
    {
       if(access24)
          return(MASMEM_ReadU24(MainRAM, A & 0x1FFFFF));
-      return(MASMEM_Read_size(MainRAM, A & 0x1FFFFF, size));
+      if (size == 4)
+         return MASMEM_ReadU32(MainRAM, A & 0x1FFFFF);
+      if (size == 2)
+         return MASMEM_ReadU16(MainRAM, A & 0x1FFFFF);
+      return MASMEM_ReadU8(MainRAM, A & 0x1FFFFF);
    }
 
    if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
    {
       if(access24)
          return(MASMEM_ReadU24(BIOSROM, A & 0x7FFFF));
-      return(MASMEM_Read_size(BIOSROM, A & 0x7FFFF, size));
+      if (size == 4)
+         return MASMEM_ReadU32(BIOSROM, A & 0x7FFFF);
+      if (size == 2)
+         return MASMEM_ReadU16(BIOSROM, A & 0x7FFFF);
+      return MASMEM_ReadU8(BIOSROM, A & 0x7FFFF);
    }
 
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
@@ -1459,7 +1426,11 @@ static INLINE uint32_t MemPeek(int32_t timestamp, uint32_t A, unsigned size, boo
          {
             if(access24)
                return(MASMEM_ReadU24(PIOMem, A & 0x7FFFFF));
-            return(MASMEM_Read_size(PIOMem, A & 0x7FFFFF, size));
+            if (size == 4)
+               return MASMEM_ReadU32(PIOMem, A & 0x7FFFFF);
+            if (size == 2)
+               return MASMEM_ReadU16(PIOMem, A & 0x7FFFFF);
+            return MASMEM_ReadU8(PIOMem, A & 0x7FFFFF);
          }
          else if((A & 0x7FFFFF) < (65536 + TextMem_size))
          {
@@ -1519,7 +1490,8 @@ uint32_t PSX_MemPeek32(uint32_t A)
    return MemPeek(0, A, 4, false);
 }
 
-// FIXME: Add PSX_Reset() and Reset() so that emulated input devices don't get power-reset on reset-button reset.
+/* FIXME: Add PSX_Reset() and Reset() so that emulated input devices don't get
+ * power-reset on reset-button reset. */
 static void PSX_Power(void)
 {
    unsigned i;
@@ -1551,7 +1523,6 @@ static void PSX_Power(void)
    MDEC_Power();
    PS_CDC_Power(PSX_CDC);
    GPU_Power();
-   //SPU->Power();   // Called from CDC->Power()
    IRQ_Power();
 
    ForceEventUpdates(0);
@@ -1565,7 +1536,14 @@ static INLINE void MemPoke(int32_t timestamp, uint32_t A, uint32_t V, unsigned s
       if(access24)
          MASMEM_WriteU24(MainRAM, A & 0x1FFFFF, V);
       else
-         MASMEM_Write_size(MainRAM, A & 0x1FFFFF, V, size);
+      {
+         if (size == 4)
+            MASMEM_WriteU32(MainRAM, A & 0x1FFFFF, V);
+         else if (size == 2)
+            MASMEM_WriteU16(MainRAM, A & 0x1FFFFF, V);
+         else
+            MASMEM_WriteU8(MainRAM, A & 0x1FFFFF, V);
+      }
 
       return;
    }
@@ -1575,7 +1553,14 @@ static INLINE void MemPoke(int32_t timestamp, uint32_t A, uint32_t V, unsigned s
       if(access24)
          MASMEM_WriteU24(BIOSROM, A & 0x7FFFF, V);
       else
-         MASMEM_Write_size(BIOSROM, A & 0x7FFFF, V, size);
+      {
+         if (size == 4)
+            MASMEM_WriteU32(BIOSROM, A & 0x7FFFFF, V);
+         else if (size == 2)
+            MASMEM_WriteU16(BIOSROM, A & 0x7FFFFF, V);
+         else
+            MASMEM_WriteU8(BIOSROM, A & 0x7FFFFF, V);
+      }
 
       return;
    }
@@ -1908,7 +1893,7 @@ static unsigned CalcDiscSCEx(void)
                }
                else if (strstr((char *)fbuf, "japan"))
                {
-                  id = "SCEI";   // ?
+                  id = "SCEI";
                   if(!i)
                      ret_region = REGION_JP;
                }
@@ -1918,13 +1903,13 @@ static unsigned CalcDiscSCEx(void)
                   if(!i)
                      ret_region = REGION_JP;
                }
-               else  // Failure case
+               else  /* Failure case */
                {
                   if (prev_valid_id)
                      id = prev_valid_id;
                   else
                   {
-                     switch(ret_region)   // Less than correct, but meh, what can we do.
+                     switch(ret_region)   /* Less than correct, but it cant be helped. */
                      {
                         case REGION_JP:
                            id = "SCEI";
@@ -2134,7 +2119,7 @@ int lightrec_try_map(MEMFDTYPE memfd, int i, uintptr_t inc_io_base, uintptr_t ma
 				break;
 			else if (map != (void *)(io_base + nmaps * RAM_SIZE))
 			{
-				//not at expected address, reject it
+				/* not at expected address, reject it */
 				UNMAP(map, RAM_SIZE);
 				break;
 			}
@@ -2621,7 +2606,7 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
       SetDiscWrapper(CD_TrayOpen);
 
 #ifdef HAVE_LIGHTREC
-   //try hugetlb then fallback if mmap fails
+   /* try hugetlb then fallback if mmap fails */
    hugetlb = true;
    psx_mmap = lightrec_init_mmap();
 
@@ -2827,8 +2812,6 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
    {
       uint32_t old_size = TextMem_size;
 
-      //printf("RESIZE: 0x%08x\n", TextMem_Start - TextStart);
-
       TextMem_resize(old_size + TextMem_Start - TextStart);
       memmove(&TextMem[TextMem_Start - TextStart], &TextMem[0], old_size);
 
@@ -2840,45 +2823,49 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
 
    memcpy(&TextMem[TextStart - TextMem_Start], data + 0x800, TextSize);
 
-   // BIOS patch
+   /* BIOS patch */
    MASMEM_WriteU32(BIOSROM, 0x6990, (3 << 26) | ((0xBF001000 >> 2) & ((1 << 26) - 1)));
 
    po = &PIOMem->data8[0x0800];
 
-   { uint32_t _ev = (uint32_t)((0x0 << 26) | (31 << 21) | (0x8 << 0)); // JR
-   #ifdef MSB_FIRST
+   {
+      uint32_t _ev = (uint32_t)((0x0 << 26) | (31 << 21) | (0x8 << 0)); /* JR */
+#ifdef MSB_FIRST
       po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-   #else
+#else
       memcpy(po, &_ev, 4);
-   #endif
+#endif
    }
    po += 4;
-   { uint32_t _ev = (uint32_t)(0); // NOP(kinda)
-   #ifdef MSB_FIRST
+   {
+      uint32_t _ev = (uint32_t)(0); /* NOP (kinda) */
+#ifdef MSB_FIRST
       po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-   #else
+#else
       memcpy(po, &_ev, 4);
-   #endif
+#endif
    }
    po += 4;
 
    po = &PIOMem->data8[0x1000];
 
-   // Load cacheable-region target PC into r2
-   { uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16) | (0x9F001010 >> 16));      // LUI
-   #ifdef MSB_FIRST
+   /* Load cacheable-region target PC into r2 */
+   {
+      uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16) | (0x9F001010 >> 16)); /* LUI */
+#ifdef MSB_FIRST
       po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-   #else
+#else
       memcpy(po, &_ev, 4);
-   #endif
+#endif
    }
    po += 4;
-   { uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (2 << 16) | (0x9F001010 & 0xFFFF));   // ORI
-   #ifdef MSB_FIRST
+   {
+      uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (2 << 16) | (0x9F001010 & 0xFFFF)); /* ORI */
+#ifdef MSB_FIRST
       po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-   #else
+#else
       memcpy(po, &_ev, 4);
-   #endif
+#endif
    }
    po += 4;
 
@@ -2900,11 +2887,9 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
    }
    po += 4;
 
-   //
-   // 0x9F001010:
-   //
+   /* 0x9F001010: */
 
-   // Load source address into r8
+   /* Load source address into r8 */
    sa = 0x9F000000 + 65536;
    { uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16) | (sa >> 16));  // LUI
    #ifdef MSB_FIRST
@@ -2959,9 +2944,7 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
    }
    po += 4;
 
-   //
-   // Loop begin
-   //
+   /* Loop begin */
 
    { uint32_t _ev = (uint32_t)((0x24 << 26) | (8 << 21) | (1 << 16));  // LBU to r1
    #ifdef MSB_FIRST
@@ -3016,83 +2999,84 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
    }
    po += 4;
 
-   //
-   // Loop end
-   //
+   /* Loop end */
 
-   // Load SP into r29
+   /* Load SP into r29 */
    if(ignore_pcsp)
-   {
       po += 16;
-   }
    else
    {
-      { uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16)  | (SP >> 16)); // LUI
-      #ifdef MSB_FIRST
+      {
+         uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16)  | (SP >> 16)); // LUI
+#ifdef MSB_FIRST
          po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-      #else
+#else
          memcpy(po, &_ev, 4);
-      #endif
+#endif
       }
       po += 4;
-      { uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (29 << 16) | (SP & 0xFFFF));    // ORI
-      #ifdef MSB_FIRST
+      {
+         uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (29 << 16) | (SP & 0xFFFF));    // ORI
+#ifdef MSB_FIRST
          po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-      #else
+#else
          memcpy(po, &_ev, 4);
-      #endif
+#endif
       }
       po += 4;
 
-      // Load PC into r2
-      { uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16)  | ((PC >> 16) | 0x8000));      // LUI
-      #ifdef MSB_FIRST
+      /* Load PC into r2 */
+      {
+         uint32_t _ev = (uint32_t)((0xF << 26) | (0 << 21) | (1 << 16)  | ((PC >> 16) | 0x8000));      // LUI
+#ifdef MSB_FIRST
          po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-      #else
+#else
          memcpy(po, &_ev, 4);
-      #endif
+#endif
       }
       po += 4;
-      { uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (2 << 16) | (PC & 0xFFFF));   // ORI
-      #ifdef MSB_FIRST
+      {
+         uint32_t _ev = (uint32_t)((0xD << 26) | (1 << 21) | (2 << 16) | (PC & 0xFFFF));   // ORI
+#ifdef MSB_FIRST
          po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-      #else
+#else
          memcpy(po, &_ev, 4);
-      #endif
+#endif
       }
       po += 4;
    }
 
-   // Half-assed instruction cache flush. ;)
+   /* Half-assed instruction cache flush. ;) */
    for(unsigned i = 0; i < 1024; i++)
    {
-      { uint32_t _ev = (uint32_t)(0);
-      #ifdef MSB_FIRST
+      {
+         uint32_t _ev = (uint32_t)(0);
+#ifdef MSB_FIRST
          po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-      #else
+#else
          memcpy(po, &_ev, 4);
-      #endif
+#endif
       }
       po += 4;
    }
 
-
-
-   // Jump to r2
-   { uint32_t _ev = (uint32_t)((0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
-   #ifdef MSB_FIRST
+   /* Jump to r2 */
+   {
+      uint32_t _ev = (uint32_t)((0x0 << 26) | (2 << 21) | (0x8 << 0));  // JR
+#ifdef MSB_FIRST
       po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-   #else
+#else
       memcpy(po, &_ev, 4);
-   #endif
+#endif
    }
    po += 4;
-   { uint32_t _ev = (uint32_t)(0); // NOP(kinda)
-   #ifdef MSB_FIRST
+   {
+      uint32_t _ev = (uint32_t)(0); // NOP(kinda)
+#ifdef MSB_FIRST
       po[0] = _ev; po[1] = _ev >> 8; po[2] = _ev >> 16; po[3] = _ev >> 24;
-   #else
+#else
       memcpy(po, &_ev, 4);
-   #endif
+#endif
    }
    po += 4;
 
@@ -3239,7 +3223,8 @@ int StateAction(StateMem *sm, int load, int data_only)
 
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "MAIN");
 
-   // Call SetDisc() BEFORE we load CDC state, since SetDisc() has emulation side effects.  We might want to clean this up in the future.
+   /* Call SetDisc() BEFORE we load CDC state, since SetDisc() has emulation side effects.
+    * We might want to clean this up in the future. */
    if(load)
    {
       if(CD_IsPBP)
@@ -3249,7 +3234,9 @@ int StateAction(StateMem *sm, int load, int data_only)
 
          CDEject();
          CDInsertEject();
-      } else {
+      }
+      else
+      {
          if(!cdifs_loaded || CD_SelectedDisc >= (int)cdifs.count)
             CD_SelectedDisc = -1;
 
@@ -3257,7 +3244,7 @@ int StateAction(StateMem *sm, int load, int data_only)
       }
    }
 
-   // TODO: Remember to increment dirty count in memory card state loading routine.
+   /* TODO: Remember to increment dirty count in memory card state loading routine. */
 
    ret &= CPU_StateAction(PSX_CPU, sm, load, data_only);
    ret &= DMA_StateAction(sm, load, data_only);
@@ -3535,7 +3522,7 @@ static void alloc_surface(void)
 
 static void check_system_specs(void)
 {
-   // Hints that we need a fairly powerful system to run this.
+   /* Hints that we need a fairly powerful system to run this. */
    unsigned level = 15;
    environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
 }
