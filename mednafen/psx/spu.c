@@ -944,22 +944,90 @@ static void NO_INLINE SPU_WR_RVB(uint16_t raw_offs, int16_t sample)
       SPU_WriteSPURAM(SPU_Get_Reverb_Offset(raw_offs << 2), sample);
 }
 
+/* The reverb resamplers are 20-tap int16xint16->int32 dot products, which map
+ * cleanly onto a SIMD multiply-add reduction. The SIMD paths are bit-exact with
+ * the scalar fallback (verified by fuzzing over the full int16 range): the sum
+ * of |coefficient| times the maximum sample magnitude stays below INT32_MAX, so
+ * no partial sum can overflow regardless of accumulation order, and integer
+ * addition is associative absent overflow. The shift and saturation tail is kept
+ * scalar so rounding/clamping is identical to the original. */
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#define SPU_REVERB_SSE2 1
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+#include <arm_neon.h>
+#define SPU_REVERB_NEON 1
+#endif
+
 /* Zeroes optimized out; middle removed too(it's 16384) */
+#if !defined(SPU_REVERB_SSE2) && !defined(SPU_REVERB_NEON)
 static const int16_t ResampTable[20] =
 {
  -1, 2, -10, 35, -103, 266, -616, 1332, -2960, 10246, 10246, -2960, 1332, -616, 266, -103, 35, -10, 2, -1,
 };
+#endif
+
+#if defined(SPU_REVERB_SSE2) || defined(SPU_REVERB_NEON)
+/* Zero-padded coefficient tables for the SIMD dot products. The 2244 table is
+ * ResampTable padded to a multiple of 8 with zeroes. The 4422 table places each
+ * coefficient at the even index of the sample it multiplies (src[i*2]) with
+ * zeroes between, and folds the 0x4000 (16384) middle tap into the otherwise
+ * unused odd index 19, so a single contiguous dot product reproduces both the
+ * stride-2 sum and the middle tap of the scalar Reverb4422. */
+static const int16_t ResampTable_2244[24] = {
+ -1, 2, -10, 35, -103, 266, -616, 1332, -2960, 10246, 10246, -2960, 1332, -616, 266, -103, 35, -10, 2, -1, 0, 0, 0, 0
+};
+static const int16_t ResampTable_4422[40] = {
+ -1, 0, 2, 0, -10, 0, 35, 0, -103, 0, 266, 0, -616, 0, 1332, 0, -2960, 0, 10246, 16384, 10246, 0, -2960, 0, 1332, 0, -616, 0, 266, 0, -103, 0, 35, 0, -10, 0, 2, 0, -1, 0
+};
+#endif
+
+#if defined(SPU_REVERB_NEON)
+static INLINE int32_t spu_reverb_neon_hadd(int32x4_t v)
+{
+   int32x2_t s = vadd_s32(vget_low_s32(v), vget_high_s32(v));
+   s = vpadd_s32(s, s);
+   return vget_lane_s32(s, 0);
+}
+#define SPU_REVERB_NEON_MAC8(acc, sp, cp) \
+   do { \
+      int16x8_t s_ = vld1q_s16(sp); \
+      int16x8_t c_ = vld1q_s16(cp); \
+      acc = vmlal_s16(acc, vget_low_s16(s_),  vget_low_s16(c_)); \
+      acc = vmlal_s16(acc, vget_high_s16(s_), vget_high_s16(c_)); \
+   } while (0)
+#endif
 
 static INLINE int32_t Reverb4422(const int16_t *src)
 {
-   int32_t out = 0; /* 32-bits is adequate (it won't overflow). */
+   int32_t out; /* 32-bits is adequate (it won't overflow). */
+#if defined(SPU_REVERB_SSE2)
+   __m128i acc = _mm_setzero_si128();
+   acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_loadu_si128((const __m128i*)(src +  0)), _mm_loadu_si128((const __m128i*)(ResampTable_4422 +  0))));
+   acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_loadu_si128((const __m128i*)(src +  8)), _mm_loadu_si128((const __m128i*)(ResampTable_4422 +  8))));
+   acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_loadu_si128((const __m128i*)(src + 16)), _mm_loadu_si128((const __m128i*)(ResampTable_4422 + 16))));
+   acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_loadu_si128((const __m128i*)(src + 24)), _mm_loadu_si128((const __m128i*)(ResampTable_4422 + 24))));
+   acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_loadu_si128((const __m128i*)(src + 32)), _mm_loadu_si128((const __m128i*)(ResampTable_4422 + 32))));
+   acc = _mm_add_epi32(acc, _mm_shuffle_epi32(acc, _MM_SHUFFLE(1, 0, 3, 2)));
+   acc = _mm_add_epi32(acc, _mm_shuffle_epi32(acc, _MM_SHUFFLE(2, 3, 0, 1)));
+   out = _mm_cvtsi128_si32(acc);
+#elif defined(SPU_REVERB_NEON)
+   int32x4_t acc = vdupq_n_s32(0);
+   SPU_REVERB_NEON_MAC8(acc, src +  0, ResampTable_4422 +  0);
+   SPU_REVERB_NEON_MAC8(acc, src +  8, ResampTable_4422 +  8);
+   SPU_REVERB_NEON_MAC8(acc, src + 16, ResampTable_4422 + 16);
+   SPU_REVERB_NEON_MAC8(acc, src + 24, ResampTable_4422 + 24);
+   SPU_REVERB_NEON_MAC8(acc, src + 32, ResampTable_4422 + 32);
+   out = spu_reverb_neon_hadd(acc);
+#else
    unsigned i;
-
+   out = 0;
    for (i = 0; i < 20; i++)
       out += ResampTable[i] * src[i * 2];
 
    /* Middle non-zero. */
    out += 0x4000 * src[19];
+#endif
 
    out >>= 15;
 
@@ -973,11 +1041,27 @@ static INLINE int32_t Reverb4422(const int16_t *src)
 
 static INLINE int32_t Reverb2244(const int16_t *src)
 {
+   int32_t out; /* 32-bits is adequate (it won't overflow). */
+#if defined(SPU_REVERB_SSE2)
+   __m128i acc = _mm_setzero_si128();
+   acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_loadu_si128((const __m128i*)(src +  0)), _mm_loadu_si128((const __m128i*)(ResampTable_2244 +  0))));
+   acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_loadu_si128((const __m128i*)(src +  8)), _mm_loadu_si128((const __m128i*)(ResampTable_2244 +  8))));
+   acc = _mm_add_epi32(acc, _mm_madd_epi16(_mm_loadu_si128((const __m128i*)(src + 16)), _mm_loadu_si128((const __m128i*)(ResampTable_2244 + 16))));
+   acc = _mm_add_epi32(acc, _mm_shuffle_epi32(acc, _MM_SHUFFLE(1, 0, 3, 2)));
+   acc = _mm_add_epi32(acc, _mm_shuffle_epi32(acc, _MM_SHUFFLE(2, 3, 0, 1)));
+   out = _mm_cvtsi128_si32(acc);
+#elif defined(SPU_REVERB_NEON)
+   int32x4_t acc = vdupq_n_s32(0);
+   SPU_REVERB_NEON_MAC8(acc, src +  0, ResampTable_2244 +  0);
+   SPU_REVERB_NEON_MAC8(acc, src +  8, ResampTable_2244 +  8);
+   SPU_REVERB_NEON_MAC8(acc, src + 16, ResampTable_2244 + 16);
+   out = spu_reverb_neon_hadd(acc);
+#else
    unsigned i;
-   int32_t out = 0; /* 32-bits is adequate (it won't overflow). */
-
+   out = 0;
    for (i = 0; i < 20; i++)
       out += ResampTable[i] * src[i];
+#endif
 
    out >>= 14;
 
