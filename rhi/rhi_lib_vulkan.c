@@ -22191,6 +22191,14 @@ static void scanouthandlevec_resize(struct ScanoutHandleVec *self, int n) {
 static SwapchainImageVec swapchain_images;
 static ScanoutHandleVec scanout_handles;
 static SaveState save_state;
+/* Set by rhi_vulkan_refresh_variables when a renderer-affecting option
+ * (scaling / super_sampling / msaa) changes. The actual renderer rebuild is
+ * deferred to the top of the next prepare_frame, BEFORE that frame is begun on
+ * the device, so we never tear the renderer down in the middle of a frame that
+ * prepare_frame already started (which submitted partial work the driver's
+ * worker threads then ran against freed resources -- a crash only outside a
+ * debugger). See vk_apply_pending_scale_rebuild. */
+static bool scale_rebuild_pending;
 static bool inside_frame;
 static bool has_software_fb;
 static bool scaled_uv_offset;
@@ -22869,51 +22877,17 @@ void rhi_vulkan_refresh_variables(void)
           * change), renderer->scaling stays at the old value and the scanout we
           * hand to video_refresh_cb keeps the old (e.g. larger) dimensions --
           * which overflows the frontend's freshly-resized swapchain and crashes
-          * inside video_refresh. Rebuild the renderer here at the new scaling so
-          * the scanout dimensions track the advertised max. Preserve VRAM across
-          * the rebuild exactly as vk_context_reset does (save -> fini -> init
-          * with the saved state). */
-         savestate_destroy(&save_state);
-         renderer_save_vram_state(renderer, &save_state);
-         /* Wait for the GPU to finish any in-flight work before touching any of
-          * the renderer's resources. renderer_fini only flushes the recorded
-          * command stream; it does not wait for the device to go idle (that wait
-          * lives in device_deinit, which the full vk_context_reset path runs
-          * after renderer_fini). Here we keep the device alive and rebuild only
-          * the renderer, so without an explicit wait the about-to-be-freed
-          * images, buffers and pipelines may still be referenced by command
-          * buffers the GPU is executing -- a use-after-free that manifests as a
-          * crash only outside a debugger (the timing window is widest at the
-          * largest scale, e.g. 16x -> 1x). */
-         device_wait_idle_nolock(device);
-         /* Release the scanout image references held in scanout_handles before
-          * tearing the renderer down. finalize_frame stores the per-sync-index
-          * scanout into scanout_handles via ih_assign (which retains a reference
-          * to the renderer's scanout image). renderer_fini below frees those
-          * images, so leaving the handles in place would leave the vector
-          * pointing at freed images; the next finalize_frame's ih_assign into
-          * that slot calls image_release_reference on the dangling pointer -- a
-          * use-after-free / double-free that crashes intermittently and only
-          * outside a debugger. The full vk_context_destroy path frees this
-          * vector before renderer_fini for the same reason; clear (not free) it
-          * here so prepare_frame's ensure_sync_index_resources re-sizes it next
-          * frame. Done after the idle wait so releasing the last reference to an
-          * image never frees one the GPU is still using. */
-         scanouthandlevec_clear(&scanout_handles);
-         renderer_fini(renderer);
-         renderer_init(renderer, device, scaling, msaa,
-               owned_u32_empty(&save_state.vram) ? NULL : &save_state);
-         if (!renderer_is_valid(renderer))
-         {
-            /* Rebuild failed (e.g. the new scale exceeds device image limits).
-             * renderer_init leaves the object destroyable but unusable; tear it
-             * down and roll back to software so we never present from an invalid
-             * renderer. */
-            renderer_fini(renderer);
-            free(renderer);
-            renderer = NULL;
-            rhi_type = RHI_SOFTWARE;
-         }
+          * inside video_refresh. The renderer must be rebuilt at the new
+          * scaling so the scanout dimensions track the advertised max.
+          *
+          * refresh_variables runs from check_variables, which retro_run calls
+          * AFTER prepare_frame has already begun this frame on the device.
+          * Rebuilding the renderer here would tear it down mid-frame, under work
+          * prepare_frame already submitted -- the driver's worker threads then
+          * run against freed resources, crashing only outside a debugger. So
+          * just flag the rebuild; vk_apply_pending_scale_rebuild performs it at
+          * the top of the next prepare_frame, before that frame is begun. */
+         scale_rebuild_pending = true;
       }
    }
    }
@@ -22934,8 +22908,51 @@ static void ensure_sync_index_resources(void)
    }
 }
 
+/* Perform a renderer rebuild that rhi_vulkan_refresh_variables deferred (a
+ * scaling / super_sampling / msaa change). Called from the top of prepare_frame
+ * BEFORE the frame is begun on the device, so the renderer is torn down and
+ * rebuilt between frames -- never under work already submitted for an in-flight
+ * frame. Preserves VRAM across the rebuild exactly as vk_context_reset does
+ * (save -> idle -> release scanout handles -> fini -> init with the saved
+ * state). */
+static void vk_apply_pending_scale_rebuild(void)
+{
+   if (!scale_rebuild_pending)
+      return;
+   scale_rebuild_pending = false;
+
+   if (device == NULL || renderer == NULL)
+      return;
+
+   savestate_destroy(&save_state);
+   renderer_save_vram_state(renderer, &save_state);
+   /* Drain in-flight GPU work before freeing the renderer's resources. */
+   device_wait_idle_nolock(device);
+   /* Release scanout image references before renderer_fini frees those images,
+    * so the next finalize_frame's ih_assign does not release a dangling
+    * pointer. The vector is re-sized by ensure_sync_index_resources. */
+   scanouthandlevec_clear(&scanout_handles);
+   renderer_fini(renderer);
+   renderer_init(renderer, device, scaling, msaa,
+         owned_u32_empty(&save_state.vram) ? NULL : &save_state);
+   if (!renderer_is_valid(renderer))
+   {
+      /* Rebuild failed (e.g. the new scale exceeds device image limits); tear
+       * the renderer down and fall back to software rather than presenting from
+       * an invalid renderer. */
+      renderer_fini(renderer);
+      free(renderer);
+      renderer = NULL;
+      rhi_type = RHI_SOFTWARE;
+   }
+}
+
 void rhi_vulkan_prepare_frame(void)
 {
+   /* Apply any renderer rebuild deferred from refresh_variables, before this
+    * frame is begun on the device. */
+   vk_apply_pending_scale_rebuild();
+
    if (device == NULL)
    {
       /* The HW context is down (between context_destroy and the next
@@ -22957,6 +22974,11 @@ void rhi_vulkan_prepare_frame(void)
    vulkan->wait_sync_index(vulkan->handle);
    ensure_sync_index_resources();
    device_next_frame_context(device);
+
+   /* A failed deferred rebuild leaves device non-NULL but renderer NULL (rolled
+    * back to software); nothing further here may touch the renderer. */
+   if (renderer == NULL)
+      return;
 
    renderer->scaled_uv_offset = scaled_uv_offset;
    renderer->primitive_filter_mode = (FilterMode)(filter_mode);
