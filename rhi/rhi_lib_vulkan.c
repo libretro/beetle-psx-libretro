@@ -36,10 +36,6 @@
 #include <vulkan/vulkan.h>
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* VOLK_GENERATE_PROTOTYPES_H */
 #if defined(VK_VERSION_1_0)
 extern PFN_vkAllocateCommandBuffers vkAllocateCommandBuffers;
@@ -280,15 +276,9 @@ static PFN_vkVoidFunction vkGetDeviceProcAddrStub(void* context, const char* nam
 	return vkGetDeviceProcAddr((VkDevice)context, name);
 }
 
-#ifdef __cplusplus
-}
-#endif
 
 /* Folded from parallel-psx/volk/volk.c. */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /* VOLK_GENERATE_PROTOTYPES_C */
 #if defined(VK_VERSION_1_0)
@@ -396,9 +386,6 @@ PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 #endif /* defined(VK_KHR_surface) */
 /* VOLK_GENERATE_PROTOTYPES_C */
 
-#ifdef __cplusplus
-}
-#endif
 /* === end folded volk === */
 
 #include <assert.h>
@@ -407,9 +394,6 @@ PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#ifdef __cplusplus
-#include <new> /* placement new; removed when this TU finishes converting to C */
-#endif
 
 /* ------------------------------------------------------------------------- *
  * POD_VEC - a typed dynamic array of trivially-relocatable elements, MSVC C89.
