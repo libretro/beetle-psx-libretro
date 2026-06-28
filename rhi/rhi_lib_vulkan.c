@@ -23078,6 +23078,31 @@ void rhi_vulkan_set_display_mode(bool depth_24bpp,
                                       is_480i, width_mode);
 }
 
+/* Map a PSX blend-mode index (0..3, anything else = opaque) to the renderer's
+   semi-transparent mode. Shared by the push_* entry points. */
+static void renderer_apply_blend_mode(Renderer *renderer, int blend_mode)
+{
+   switch (blend_mode)
+   {
+      default:
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_None);
+         break;
+
+      case 0:
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Average);
+         break;
+      case 1:
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Add);
+         break;
+      case 2:
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_Sub);
+         break;
+      case 3:
+         renderer_set_semi_transparent(renderer, SemiTransparentMode_AddQuarter);
+         break;
+   }
+}
+
 void rhi_vulkan_push_triangle(
       float p0x, float p0y, float p0w,
       float p1x, float p1y, float p1w,
@@ -23126,25 +23151,7 @@ void rhi_vulkan_push_triangle(
    else
       renderer_set_texture_mode(renderer, TextureMode_None);
 
-   switch (blend_mode)
-   {
-      default:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_None);
-         break;
-
-      case 0:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Average);
-         break;
-      case 1:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Add);
-         break;
-      case 2:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Sub);
-         break;
-      case 3:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_AddQuarter);
-         break;
-   }
+   renderer_apply_blend_mode(renderer, blend_mode);
 
    renderer_set_primitive_type(renderer, PrimitiveType_Polygon);
 
@@ -23207,25 +23214,7 @@ void rhi_vulkan_push_quad(
    else
       renderer_set_texture_mode(renderer, TextureMode_None);
 
-   switch (blend_mode)
-   {
-      default:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_None);
-         break;
-
-      case 0:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Average);
-         break;
-      case 1:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Add);
-         break;
-      case 2:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Sub);
-         break;
-      case 3:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_AddQuarter);
-         break;
-   }
+   renderer_apply_blend_mode(renderer, blend_mode);
 
    if (is_sprite)
       renderer_set_primitive_type(renderer, PrimitiveType_Sprite);
@@ -23260,25 +23249,7 @@ void rhi_vulkan_push_line(
    renderer_set_texture_mode(renderer, TextureMode_None);
    renderer_set_mask_test(renderer, mask_test);
    renderer_set_force_mask_bit(renderer, set_mask);
-   switch (blend_mode)
-   {
-      default:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_None);
-         break;
-
-      case 0:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Average);
-         break;
-      case 1:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Add);
-         break;
-      case 2:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Sub);
-         break;
-      case 3:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_AddQuarter);
-         break;
-   }
+   renderer_apply_blend_mode(renderer, blend_mode);
 
    { Vertex vertices[2] = {
       { (float)(p0x), (float)(p0y), 1.0f, c0, 0, 0 },
