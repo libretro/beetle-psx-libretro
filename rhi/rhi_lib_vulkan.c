@@ -438,10 +438,11 @@ struct NAME##_force_semicolon_
 #include <rthreads/rthreads.h>
 #include <streams/file_stream.h>
 
-/* C89-compatible compile-time assertion. C89 has no static_assert / _Static_assert;
- * emit a typedef whose array size is negative when the condition is false. The
- * message argument is accepted for source compatibility but unused. __LINE__ keeps
- * the typedef names unique within a translation unit. */
+/* C89-compatible compile-time assertion. C89 has no static_assert /
+ * _Static_assert; emit a typedef whose array size is negative when the
+ * condition is false. The message argument is accepted for source compatibility
+ * but unused. __LINE__ keeps the typedef names unique within a translation
+ * unit. */
 #ifndef RHI_STATIC_ASSERT
 #define RHI_STATIC_ASSERT_CAT2(a, b) a##b
 #define RHI_STATIC_ASSERT_CAT(a, b) RHI_STATIC_ASSERT_CAT2(a, b)
@@ -512,8 +513,9 @@ static INLINE uint32_t util_ctz(uint32_t x)
  * scratch inside the macro also collides when two FOR_EACH_BIT appear in one
  * block. So the caller pre-declares every loop variable (proper C89, at block
  * top) and passes them in: ITER is the uint32_t scratch holding the residual
- * mask, BIT_VAR receives each set-bit index. Both must be plain uint32_t lvalues
- * the caller owns. trailing_zeroes is a pure macro, so re-evaluation is safe. */
+ * mask, BIT_VAR receives each set-bit index. Both must be plain uint32_t
+ * lvalues the caller owns. trailing_zeroes is a pure macro, so re-evaluation is
+ * safe. */
 #define FOR_EACH_BIT(value, iter, bit_var)                                     \
    for ((iter) = (uint32_t)(value), (bit_var) = trailing_zeroes(iter);        \
         (iter);                                                               \
@@ -532,8 +534,9 @@ static INLINE uint32_t util_ctz(uint32_t x)
 
    typedef uint64_t Hash;
 
-   /* C-compatibility: forward typedef every struct tag so bare (struct-less) type
-    * names resolve when this TU is compiled as C. Emitted before first use. */
+   /* C-compatibility: forward typedef every struct tag so bare (struct-less)
+    * type names resolve when this TU is compiled as C. Emitted before first
+    * use. */
    typedef struct Hasher Hasher;
    typedef struct IntrusiveListNode IntrusiveListNode;
    typedef struct IntrusiveListC IntrusiveListC;
@@ -756,20 +759,19 @@ static void counter_add_ref(struct SingleThreadCounter *c) { c->count++; }
 static bool counter_release(struct SingleThreadCounter *c) { return --c->count == 0; }
    typedef struct SingleThreadCounter SingleThreadCounter;
 
-   /* the refcounted-handle pattern and its INTRUSIVE_HANDLE_DECLARE(HandleName, T) stamping
-    * macro have both been removed: all eight Vulkan pointee handle types
-    * (SamplerHandle, BufferHandle, BufferViewHandle, ImageViewHandle,
+   /* the refcounted-handle pattern and its INTRUSIVE_HANDLE_DECLARE(HandleName,
+    * T) stamping macro have both been removed: all eight Vulkan pointee handle
+    * types (SamplerHandle, BufferHandle, BufferViewHandle, ImageViewHandle,
     * ImageHandle, Fence, Semaphore, CommandBufferHandle) are now plain structs
     * with explicit *_make / _reset / _get / _copy / _assign / _move / _steal
     * free functions. The generic deref / arrow / bool / equality / copy / move
-    * / teardown that this macro generated is no longer needed
-    * anywhere. */
+    * / teardown that this macro generated is no longer needed anywhere. */
 
-   /* Concrete intrusive doubly-linked list. Links are type-erased - prev/next are
-    * plain IntrusiveListNode pointers - and a node's owning type is recovered by
-    * casting, valid because the node base is the first member (offset 0). A single
-    * concrete node base (IntrusiveListNode) and list (IntrusiveListC) serve every
-    * intrusive list in the file. */
+   /* Concrete intrusive doubly-linked list. Links are type-erased - prev/next
+    * are plain IntrusiveListNode pointers - and a node's owning type is
+    * recovered by casting, valid because the node base is the first member
+    * (offset 0). A single concrete node base (IntrusiveListNode) and list
+    * (IntrusiveListC) serve every intrusive list in the file. */
    struct IntrusiveListNode
    {
       struct IntrusiveListNode *prev;
@@ -825,12 +827,12 @@ static void ilist_move_to_front(struct IntrusiveListC *list,
    }
 
    /* Concrete, element-size-driven object pool (the concrete form of the
-    * standalone per-type object pools). Same slab + vacant-stack design,
-    * but type-erased: allocate_raw() returns an uninitialised slot
-    * of element_size bytes and free_raw() returns one to the free list, so a single
-    * concrete type serves every pooled object. Construction/destruction is done by
-    * the caller initialises and tears down explicitly (matching the
-    * malloc + placement-new idiom used for Device/Renderer). */
+    * standalone per-type object pools). Same slab + vacant-stack design, but
+    * type-erased: allocate_raw() returns an uninitialised slot of element_size
+    * bytes and free_raw() returns one to the free list, so a single concrete
+    * type serves every pooled object. Construction/destruction is done by the
+    * caller initialises and tears down explicitly (matching the malloc +
+    * placement-new idiom used for Device/Renderer). */
    struct ObjectPoolRaw
    {
       void **vacants;
@@ -925,28 +927,30 @@ static void object_pool_raw_deinit(struct ObjectPoolRaw *p)
       p->mem_cap = 0;
    }
 
-   /* Concrete intrusive-hash-map node base (the concrete form of
-    * the intrusive-hash-map node base). It carries the intrusive list links (for the
-    * holder's value list) and the hash key. Every hash-map node type embeds this as
-    * its first member (offset 0, static_assert'd), so the holder recovers the node
-    * from an IntrusiveHashMapNode* by casting - by
-    * static_cast through the IntrusiveListEnabled/IntrusiveHashMapEnabled bases. */
+   /* Concrete intrusive-hash-map node base (the concrete form of the
+    * intrusive-hash-map node base). It carries the intrusive list links (for
+    * the holder's value list) and the hash key. Every hash-map node type embeds
+    * this as its first member (offset 0, static_assert'd), so the holder
+    * recovers the node from an IntrusiveHashMapNode* by casting - by
+    * static_cast through the IntrusiveListEnabled/IntrusiveHashMapEnabled
+    * bases. */
    struct IntrusiveHashMapNode
    {
       struct IntrusiveListNode list_node; /* must stay first (offset 0) */
       Hash key;
    };
 
-   /* IntrusivePODWrapper wraps an arbitrary POD value (for the
-    * pipeline cache and the TemporaryHashmap recycle map), but it now embeds the
-    * concrete node base as its first member instead of inheriting the old CRTP
-    * IntrusiveHashMapEnabled base, so the concrete holder can treat it like every
-    * other node. get() returns the payload, matching the previous interface. */
-   /* Concrete POD-wrapper node types (the concrete POD-wrapper). Two
-    * payloads are wrapped: a VkPipeline (the per-program pipeline cache) and a void*
-    * iterator (the TemporaryHashmap recycle map). Each embeds the hash-map node base
-    * first (offset 0) and exposes get() returning the payload, matching the previous
-    * interface so call sites are unchanged. */
+   /* IntrusivePODWrapper wraps an arbitrary POD value (for the pipeline cache
+    * and the TemporaryHashmap recycle map), but it now embeds the concrete node
+    * base as its first member instead of inheriting the old CRTP
+    * IntrusiveHashMapEnabled base, so the concrete holder can treat it like
+    * every other node. get() returns the payload, matching the previous
+    * interface. */
+   /* Concrete POD-wrapper node types (the concrete POD-wrapper). Two payloads
+    * are wrapped: a VkPipeline (the per-program pipeline cache) and a void*
+    * iterator (the TemporaryHashmap recycle map). Each embeds the hash-map node
+    * base first (offset 0) and exposes get() returning the payload, matching
+    * the previous interface so call sites are unchanged. */
    struct IntrusivePODWrapperPipeline
    {
       struct IntrusiveHashMapNode node; /* must stay first (offset 0) */
@@ -959,19 +963,18 @@ static void object_pool_raw_deinit(struct ObjectPoolRaw *p)
       void *value;
    };
 
-   /* The concrete hash map recovers each wrapper from an IntrusiveHashMapNode* by
-    * casting, valid only if the node base is at offset 0. */
+   /* The concrete hash map recovers each wrapper from an IntrusiveHashMapNode*
+    * by casting, valid only if the node base is at offset 0. */
    RHI_STATIC_ASSERT(offsetof(struct IntrusivePODWrapperPipeline, node) == 0,
          "IntrusivePODWrapperPipeline.node must be first");
    RHI_STATIC_ASSERT(offsetof(struct IntrusivePODWrapperPtr, node) == 0,
          "IntrusivePODWrapperPtr.node must be first");
 
-   /* Concrete, type-erased open-addressing hash table (the concrete form of
-    * the intrusive-hash-map holder). It is non-owning: it only arranges a table and a
-    * list of IntrusiveHashMapNode pointers; the nodes are owned by an object pool.
-    * Callers cast their node type to IntrusiveHashMapNode* (offset 0). All the
-    * probe / grow / LRU semantics validated under
-    * ASan). */
+   /* Concrete, type-erased open-addressing hash table (the concrete form of the
+    * intrusive-hash-map holder). It is non-owning: it only arranges a table and
+    * a list of IntrusiveHashMapNode pointers; the nodes are owned by an object
+    * pool. Callers cast their node type to IntrusiveHashMapNode* (offset 0).
+    * All the probe / grow / LRU semantics validated under ASan). */
    struct IntrusiveHashMapHolderC
    {
       struct IntrusiveHashMapNode **items;
@@ -1199,16 +1202,16 @@ static void hmholder_deinit(struct IntrusiveHashMapHolderC *h)
 
 
 
-   /* Concrete, per-type form of the intrusive hash map. Stamps a struct that owns the
-    * (already concrete) open-addressing holder plus an object pool, and the full
-    * public API. Everything here is T-independent except the
+   /* Concrete, per-type form of the intrusive hash map. Stamps a struct that
+    * owns the (already concrete) open-addressing holder plus an object pool,
+    * and the full public API. Everything here is T-independent except the
     * sizeof(T) handed to the pool and the per-type element teardown DESTROY_FN,
     * which clear()/erase() call through (the five node types have non-trivial
-    * teardown callbacks that release Vk objects; pass a no-op for trivial POD elements).
-    * The variadic emplace and allocate members are NOT stamped here: each element
-    * type has a distinct initialiser, so those are written per type next to each
-    * map. The iterator is a bare list-node pointer; the iter_get helper recovers
-    * the T pointer (node base is at offset 0). */
+    * teardown callbacks that release Vk objects; pass a no-op for trivial POD
+    * elements). The variadic emplace and allocate members are NOT stamped here:
+    * each element type has a distinct initialiser, so those are written per
+    * type next to each map. The iterator is a bare list-node pointer; the
+    * iter_get helper recovers the T pointer (node base is at offset 0). */
    #define VK_HASHMAP_DECLARE(NAME, T, DESTROY_FN)                                 \
       struct NAME                                                                 \
       {                                                                           \
@@ -1286,9 +1289,9 @@ static void hmholder_deinit(struct IntrusiveHashMapHolderC *h)
          return (T *)it;                                                         \
       }
 
-   /* The two POD-payload maps. Elements are trivially destructible, so the destroy
-    * hook is a no-op. The per-type emplace constructs the wrapper in the pool with
-    * explicit init, matching the previous allocate()+insert path. */
+   /* The two POD-payload maps. Elements are trivially destructible, so the
+    * destroy hook is a no-op. The per-type emplace constructs the wrapper in
+    * the pool with explicit init, matching the previous allocate()+insert path. */
 static void vk_ptr_map_destroy(IntrusivePODWrapperPtr *p) { (void)p; }
 static void vk_pipeline_map_destroy(IntrusivePODWrapperPipeline *p) { (void)p; }
 
@@ -1320,11 +1323,11 @@ static IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
    }
 
    /* Concrete temporary-hashmap node base (the temporary-hashmap node base,
-    * plus the intrusive list links the node carries).
-    * Every TemporaryHashmap node type embeds this; because one of them
-    * (FramebufferNode) also has a non-empty Framebuffer base, this base is NOT
-    * necessarily at offset 0, so the ring lists recover the node with container-of
-    * (TH_NODE_OF) rather than an offset-0 cast. */
+    * plus the intrusive list links the node carries). Every TemporaryHashmap
+    * node type embeds this; because one of them (FramebufferNode) also has a
+    * non-empty Framebuffer base, this base is NOT necessarily at offset 0, so
+    * the ring lists recover the node with container-of (TH_NODE_OF) rather than
+    * an offset-0 cast. */
    struct TemporaryHashmapNode
    {
       struct IntrusiveListNode list_node;
@@ -1338,15 +1341,15 @@ static IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
       ((NODE_TYPE *)((char *)(ln) - offsetof(NODE_TYPE, th_node) \
          - offsetof(struct TemporaryHashmapNode, list_node)))
 
-   /* Concrete, per-type form of TemporaryHashmap<T,RingSize,ReuseObjects>. Stamps a
-    * struct holding the ring of intrusive lists, the object pool, the recycle index
-    * map (vk_ptr_map) and the vacant free-list, plus every method
+   /* Concrete, per-type form of TemporaryHashmap<T,RingSize,ReuseObjects>.
+    * Stamps a struct holding the ring of intrusive lists, the object pool, the
+    * recycle index map (vk_ptr_map) and the vacant free-list, plus every method
     * except the variadic emplace/make_vacant (each node type has a distinct
-    * initialiser, written per type next to each instance). RING and REUSE are the
-    * compile-time parameters; REUSE is a literal 0/1 so the compiler
-    * folds the dead arm in begin_frame as a compile-time constant.
-    * DESTROY(T*) runs the node teardown (kept until this TU moves to a C compiler).
-    * Nodes are recovered from a ring list-node with TH_NODE_OF(T, ...). */
+    * initialiser, written per type next to each instance). RING and REUSE are
+    * the compile-time parameters; REUSE is a literal 0/1 so the compiler folds
+    * the dead arm in begin_frame as a compile-time constant. DESTROY(T*) runs
+    * the node teardown (kept until this TU moves to a C compiler). Nodes are
+    * recovered from a ring list-node with TH_NODE_OF(T, ...). */
    #define VK_TEMPHASH_DECLARE(NAME, T, RING, REUSE, DESTROY)                      \
       struct NAME                                                                 \
       {                                                                           \
@@ -1512,8 +1515,8 @@ static IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
    typedef enum VendorID VendorID;
 
    /* The live Vulkan context (instance/device/queues). Formerly a class with a
-    * multi-argument initialiser (load loaders, create the device, mark valid) and
-    * a teardown that called destroy(); now a plain struct driven by
+    * multi-argument initialiser (load loaders, create the device, mark valid)
+    * and a teardown that called destroy(); now a plain struct driven by
     * context_init / context_deinit. All getters and the device-creation helpers
     * stay as struct methods. It is heap-allocated, not pooled or refcounted. */
    struct Context
@@ -1581,10 +1584,11 @@ static bool context_is_valid(const struct Context *self) { return self->valid; }
    };
 
    /* TextureFormatLayout: computes mip/layer byte layout for a texture upload
-    * staging buffer. Converted from a C++ class to a plain C struct + tfl_* free
-    * functions. The nested MipInfo type is hoisted to file scope as
+    * staging buffer. Converted from a C++ class to a plain C struct + tfl_*
+    * free functions. The nested MipInfo type is hoisted to file scope as
     * TextureFormatLayoutMipInfo. The three static helpers (format_block_size,
-    * format_block_dim, num_miplevels) become tfl_* free functions taking no self. */
+    * format_block_dim, num_miplevels) become tfl_* free functions taking no
+    * self. */
    struct TextureFormatLayoutMipInfo
    {
       size_t offset;
@@ -1680,10 +1684,10 @@ static void *tfl_data(const struct TextureFormatLayout *self, uint32_t layer, ui
 
    struct Device;
 
-   /* Hash-identity base. Converted from a class-with-initialiser to a plain C89 struct;
-    * derived pointees now call cookie_init() in their own init body
-    * instead of inheriting the Cookie(Device*) initialiser. The single uint64_t field
-    * is still inherited, so the many obj.cookie / obj->cookie reads are
+   /* Hash-identity base. Converted from a class-with-initialiser to a plain C89
+    * struct; derived pointees now call cookie_init() in their own init body
+    * instead of inheriting the Cookie(Device*) initialiser. The single uint64_t
+    * field is still inherited, so the many obj.cookie / obj->cookie reads are
     * unchanged. cookie_init is defined out-of-line (below Device) because it
     * calls device_allocate_cookie(). */
    struct Cookie
@@ -1803,12 +1807,12 @@ static INLINE VkImageAspectFlags format_to_aspect_mask(VkFormat format)
    struct Sampler;
 
    /* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
-    * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
-    * base, which provides the hash identity, is unrelated and stays. */
+    * CRTP base (IntrusivePtr dispatches through the pointee directly). The
+    * Cookie base, which provides the hash identity, is unrelated and stays. */
    /* Sampler: plain C struct + free functions (was a class deriving Cookie with
     * refcount methods + init/teardown). Cookie is embedded as the first member
-    * (composition replacing inheritance); sampler_init seeds it via cookie_init.
-    * Pooled via object_pool_raw; the refcount starts at 1. */
+    * (composition replacing inheritance); sampler_init seeds it via
+    * cookie_init. Pooled via object_pool_raw; the refcount starts at 1. */
    struct Sampler
    {
       struct Cookie cookie_base; /* was: public Cookie base subobject */
@@ -1820,15 +1824,15 @@ static INLINE VkImageAspectFlags format_to_aspect_mask(VkFormat format)
    static void sampler_fini(struct Sampler *self);
 static VkSampler sampler_get_sampler(const struct Sampler *self) { return self->sampler; }
    static void sampler_release_reference(struct Sampler *self);
-   /* Sampler handle: a plain struct (SamplerHandle wrapping Sampler *)
-    *  to a plain struct + explicit free functions, following the
-    * sem_ / fence_ / bvh_ helpers. The pointee Sampler is unchanged. Stored in a
-    * fixed device-lifetime array (samplers[StockSampler_Count]); no growing
+   /* Sampler handle: a plain struct (SamplerHandle wrapping Sampler *) to a
+    * plain struct + explicit free functions, following the sem_ / fence_ / bvh_
+    * helpers. The pointee Sampler is unchanged. Stored in a fixed
+    * device-lifetime array (samplers[StockSampler_Count]); no growing
     * container, so no realloc accounting -- assignment into a slot is a plain
     * struct copy that transfers the producer's refcount-1, teardown is an
-    * explicit smh_reset() per slot.
-    * ASAN-GATE: stock samplers persist for the device lifetime; verify the per-
-    * slot reset in deinit drops exactly one ref (no leak / no double-free). */
+    * explicit smh_reset() per slot. ASAN-GATE: stock samplers persist for the
+    * device lifetime; verify the per- slot reset in deinit drops exactly one
+    * ref (no leak / no double-free). */
    struct SamplerHandle { Sampler *data; };
 static struct SamplerHandle smh_make(Sampler *p) { struct SamplerHandle h; h.data = p; return h; }
 static void smh_reset(struct SamplerHandle *h) { if (h->data) sampler_release_reference(h->data); h->data = NULL; }
@@ -1882,10 +1886,10 @@ enum { BLOCK_NUM_SUB_BLOCKS = 32u };
 #define BLOCK_ALL_FREE (~0u)
 
 /* Block: 32-way sub-block bitmap allocator. Converted from a C++ class (deleted
- * copy, default initialiser that fills the free bitmap, teardown that leak-checks) to a
- * plain C struct + free functions. Embedded by value in MiniHeap; block_init
- * seeds it (was the default initialiser), block_fini runs the leak check (was the
- * teardown). */
+ * copy, default initialiser that fills the free bitmap, teardown that
+ * leak-checks) to a plain C struct + free functions. Embedded by value in
+ * MiniHeap; block_init seeds it (was the default initialiser), block_fini runs
+ * the leak check (was the teardown). */
 struct Block
 {
    uint32_t free_blocks[BLOCK_NUM_SUB_BLOCKS];
@@ -1941,12 +1945,13 @@ struct ClassAllocator;
 struct DeviceAllocator;
 struct Allocator;
 
-/* DeviceAllocation: plain bookkeeping value. Converted from a struct-with-methods
- * to a plain C struct + deviceallocation_* free functions. It is always brace-
- * initialized to {} at its allocation sites, so the former default member
- * initializers (all NULL/0/false) are unnecessary. The two free_immediate
- * overloads split by name: the 0-arg recycle path is deviceallocation_free_immediate,
- * the DeviceAllocator* variant is deviceallocation_free_immediate_alloc. */
+/* DeviceAllocation: plain bookkeeping value. Converted from a
+ * struct-with-methods to a plain C struct + deviceallocation_* free functions.
+ * It is always brace- initialized to {} at its allocation sites, so the former
+ * default member initializers (all NULL/0/false) are unnecessary. The two
+ * free_immediate overloads split by name: the 0-arg recycle path is
+ * deviceallocation_free_immediate, the DeviceAllocator* variant is
+ * deviceallocation_free_immediate_alloc. */
 struct DeviceAllocation
 {
    VkDeviceMemory base;
@@ -1969,8 +1974,8 @@ static void deviceallocation_free_immediate(struct DeviceAllocation *self);
 static void deviceallocation_free_immediate_alloc(struct DeviceAllocation *self, DeviceAllocator *allocator);
 static void deviceallocation_free_global(struct DeviceAllocation *self, DeviceAllocator *allocator, uint32_t size, uint32_t memory_type);
 
-/* Owning array of (trivially copyable) DeviceAllocation. Replaces
- * a dynamic array of DeviceAllocation for a frame's deferred-free list. DeviceAllocation
+/* Owning array of (trivially copyable) DeviceAllocation. Replaces a dynamic
+ * array of DeviceAllocation for a frame's deferred-free list. DeviceAllocation
  * is a trivially relocatable bookkeeping value (handles, an intrusive-list
  * iterator, and PODs - it frees its backing memory only via an explicit
  * free_immediate(), not a teardown), so growth is a realloc and clear() just
@@ -2012,8 +2017,8 @@ RHI_STATIC_ASSERT(offsetof(MiniHeap, list_node) == 0,
 
 struct Allocator;
 
-/* AllocationTilingHeaps hoisted out of ClassAllocator (was a nested type) to file
- * scope as ClassAllocatorTilingHeaps. */
+/* AllocationTilingHeaps hoisted out of ClassAllocator (was a nested type) to
+ * file scope as ClassAllocatorTilingHeaps. */
 struct ClassAllocatorTilingHeaps
 {
    struct IntrusiveListC heaps[BLOCK_NUM_SUB_BLOCKS];
@@ -2022,11 +2027,11 @@ struct ClassAllocatorTilingHeaps
 };
 
 /* ClassAllocator: per-size-class sub-allocator. Converted from a C++ class to a
- * plain C struct + classallocator_* free functions. The private default initialiser
- * (init the MiniHeap pool) becomes classallocator_init; the teardown (leak check +
- * pool deinit) becomes classallocator_fini. heap_availability_mask and the
- * scalar fields are seeded in classallocator_init (no in-struct initializers in
- * a plain C struct). */
+ * plain C struct + classallocator_* free functions. The private default
+ * initialiser (init the MiniHeap pool) becomes classallocator_init; the
+ * teardown (leak check + pool deinit) becomes classallocator_fini.
+ * heap_availability_mask and the scalar fields are seeded in
+ * classallocator_init (no in-struct initializers in a plain C struct). */
 struct ClassAllocator
 {
    struct ClassAllocator *parent;
@@ -2056,12 +2061,12 @@ static INLINE void classallocator_set_global_allocator(struct ClassAllocator *se
 static INLINE void classallocator_set_memory_type(struct ClassAllocator *self, uint32_t type) { self->memory_type = type; }
 static INLINE void classallocator_set_parent(struct ClassAllocator *self, struct ClassAllocator *allocator) { self->parent = allocator; }
 
-/* Allocator: per-memory-type front end owning one ClassAllocator per size class.
- * Converted from a C++ class to a plain C struct + alloc_* free functions. The
- * range-for loops over the by-value classes[] array become index loops. The
- * former free path (which forwarded to deviceallocation_free_immediate)
- * becomes alloc_free. ClassAllocator must be a complete type above this point
- * because classes[] is by value. */
+/* Allocator: per-memory-type front end owning one ClassAllocator per size
+ * class. Converted from a C++ class to a plain C struct + alloc_* free
+ * functions. The range-for loops over the by-value classes[] array become index
+ * loops. The former free path (which forwarded to
+ * deviceallocation_free_immediate) becomes alloc_free. ClassAllocator must be a
+ * complete type above this point because classes[] is by value. */
 struct Allocator
 {
    struct ClassAllocator classes[MEMORY_CLASS_COUNT];
@@ -2091,14 +2096,14 @@ static INLINE void alloc_set_global_allocator(struct Allocator *self, DeviceAllo
    self->global_allocator = allocator;
 }
 
-/* Owning array of Allocator* (one per memory type). Replaces
- * an owning array of Allocator pointers: the container owns each heap-allocated
- * Allocator and deletes it on clear()/destruction, so ownership is explicit
- * new/delete instead of unique_ptr. The pointers themselves are trivially
- * relocatable, so the backing array grows by realloc. push() takes ownership of
- * an already-new'd Allocator; indexing/back() return the raw pointer for the
- * ->allocate() calls. ::malloc/::free are qualified because the surrounding code
- * has free() members in scope. */
+/* Owning array of Allocator* (one per memory type). Replaces an owning array of
+ * Allocator pointers: the container owns each heap-allocated Allocator and
+ * deletes it on clear()/destruction, so ownership is explicit new/delete
+ * instead of unique_ptr. The pointers themselves are trivially relocatable, so
+ * the backing array grows by realloc. push() takes ownership of an
+ * already-new'd Allocator; indexing/back() return the raw pointer for the
+ * ->allocate() calls. ::malloc/::free are qualified because the surrounding
+ * code has free() members in scope. */
 struct AllocatorPtrVec
 {
    Allocator **items;
@@ -2362,8 +2367,8 @@ static VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
    struct BufferView;
 
    /* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
-    * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
-    * base, which provides the hash identity, is unrelated and stays. */
+    * CRTP base (IntrusivePtr dispatches through the pointee directly). The
+    * Cookie base, which provides the hash identity, is unrelated and stays. */
    /* Buffer: plain C struct + free functions (was a class deriving Cookie).
     * Cookie embedded as cookie_base. Pooled; refcount starts at 1. */
    struct Buffer
@@ -2382,15 +2387,16 @@ static const BufferCreateInfo *buffer_get_create_info(const struct Buffer *self)
 static const DeviceAllocation *buffer_get_allocation(const struct Buffer *self) { return &self->alloc; }
 static void buffer_add_reference(struct Buffer *self) { counter_add_ref(&self->reference_count); }
    static void buffer_release_reference(struct Buffer *self);
-   /* Buffer handle: a plain struct (BufferHandle wrapping Buffer *) plus explicit free functions.
-    *  The pointee Buffer is unchanged. This is the most lifetime-sensitive handle and
-    * the most pool-entangled: BufferBlock holds gpu/cpu handle members (with a
-    * user-declared ~BufferBlock), the copy-insert BufferBlockVec, plus
-    * InitialImageBuffer.buffer and Renderer.quad members. Helpers mirror the
-    * ImageHandle set: bh_make (wrap produced ref), bh_reset (decref+null),
-    * bh_get, bh_is_valid, bh_copy (retain), bh_assign (release-old/retain-new),
-    * bh_move (release-old/take-produced), bh_steal (move).
-    * ASAN-GATE: buffer-pool block recycle + per-frame staging buffer lifetime. */
+   /* Buffer handle: a plain struct (BufferHandle wrapping Buffer *) plus
+    * explicit free functions. The pointee Buffer is unchanged. This is the most
+    * lifetime-sensitive handle and the most pool-entangled: BufferBlock holds
+    * gpu/cpu handle members (with a user-declared ~BufferBlock), the
+    * copy-insert BufferBlockVec, plus InitialImageBuffer.buffer and
+    * Renderer.quad members. Helpers mirror the ImageHandle set: bh_make (wrap
+    * produced ref), bh_reset (decref+null), bh_get, bh_is_valid, bh_copy
+    * (retain), bh_assign (release-old/retain-new), bh_move
+    * (release-old/take-produced), bh_steal (move). ASAN-GATE: buffer-pool block
+    * recycle + per-frame staging buffer lifetime. */
    struct BufferHandle { Buffer *data; };
 static struct BufferHandle bh_make(Buffer *p) { struct BufferHandle h; h.data = p; return h; }
 static void bh_reset(struct BufferHandle *h) { if (h->data) buffer_release_reference(h->data); h->data = NULL; }
@@ -2421,8 +2427,8 @@ static void bh_steal(struct BufferHandle *dst, struct BufferHandle *src) { dst->
    };
 
    /* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
-    * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
-    * base, which provides the hash identity, is unrelated and stays. */
+    * CRTP base (IntrusivePtr dispatches through the pointee directly). The
+    * Cookie base, which provides the hash identity, is unrelated and stays. */
    /* BufferView: plain C struct + free functions (was a class deriving Cookie).
     * Cookie embedded as the first member (cookie_base). Pooled; refcount starts
     * at 1. info.buffer is a raw const Buffer* (not a handle), so get_buffer
@@ -2617,8 +2623,8 @@ static VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
    POD_VEC_DECLARE(RenderTargetViewVec, VkImageView);
 
    /* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
-    * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
-    * base, which provides the hash identity, is unrelated and stays. */
+    * CRTP base (IntrusivePtr dispatches through the pointee directly). The
+    * Cookie base, which provides the hash identity, is unrelated and stays. */
    /* ImageView: plain C struct + free functions (was a class deriving Cookie).
     * Cookie embedded as cookie_base. Pooled; refcount starts at 1. The setters
     * (set_alt_views / set_render_target_views) and the several view getters
@@ -2661,15 +2667,15 @@ static const ImageViewCreateInfo *imageview_get_create_info(const struct ImageVi
    static void imageview_release_reference(struct ImageView *self);
 
    /* Image-view handle: a plain struct (ImageViewHandle wrapping ImageView *)
-    *  to a plain struct + explicit free functions, following the
-    * sem_ / fence_ / smh_ / bvh_ helpers. The pointee ImageView is unchanged.
-    * The container below (ImageViewHandleVec) takes ownership in push() and moves on grow(), so there is no incref anywhere in the
-    * 
+    * to a plain struct + explicit free functions, following the sem_ / fence_ /
+    * smh_ / bvh_ helpers. The pointee ImageView is unchanged. The container
+    * below (ImageViewHandleVec) takes ownership in push() and moves on grow(),
+    * so there is no incref anywhere in the
+    *
     * container; iv_reset() (one decref) is needed only at destroy()/clear() and
     * at value-member teardown. iv_steal() implements the move (copy pointer,
-    * null the source).
-    * ASAN-GATE: scaled mip-view chain + per-image default view lifetime; verify
-    * one decref per view (no leak / double-free). */
+    * null the source). ASAN-GATE: scaled mip-view chain + per-image default
+    * view lifetime; verify one decref per view (no leak / double-free). */
    struct ImageViewHandle { ImageView *data; };
 static struct ImageViewHandle iv_make(ImageView *p) { struct ImageViewHandle h; h.data = p; return h; }
 static void iv_reset(struct ImageViewHandle *h) { if (h->data) imageview_release_reference(h->data); h->data = NULL; }
@@ -2678,22 +2684,22 @@ static int iv_is_valid(const struct ImageViewHandle *h) { return h->data != NULL
 static void iv_steal(struct ImageViewHandle *dst, struct ImageViewHandle *src) { dst->data = src->data; src->data = NULL; }
 
    /* Owning array of ImageViewHandle (a refcounted ImageView handle), for the
-    * renderer's scaled mip-view chain,
-    * which is built once (push during init) and then only indexed/read. The
-    * element is a refcounting handle, so growth moves each handle into new
-    * storage (copy pointer, null source) and teardown drops each handle's ref.
-    * push() takes ownership of a freshly created view (no incref). Ownership
-    * lives at the container level; indexed access returns a mutable pointer so
-    * existing iv_get(&scaled_views[i]) / *iv_get(&scaled_views[i]) uses are unchanged. */
+    * renderer's scaled mip-view chain, which is built once (push during init)
+    * and then only indexed/read. The element is a refcounting handle, so growth
+    * moves each handle into new storage (copy pointer, null source) and
+    * teardown drops each handle's ref. push() takes ownership of a freshly
+    * created view (no incref). Ownership lives at the container level; indexed
+    * access returns a mutable pointer so existing iv_get(&scaled_views[i]) /
+    * *iv_get(&scaled_views[i]) uses are unchanged. */
    struct ImageViewHandleVec {
       ImageViewHandle *items;
       int count;
       int cap;
    };
 
-   /* ImageViewHandleVec free functions . init nulls,
-    * destroy releases every view + frees storage, push moves a view in (growing as
-    * needed), at/front return element pointers. */
+   /* ImageViewHandleVec free functions . init nulls, destroy releases every
+    * view + frees storage, push moves a view in (growing as needed), at/front
+    * return element pointers. */
 static void imageview_vec_init(struct ImageViewHandleVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
 static void imageview_vec_destroy(struct ImageViewHandleVec *v) {
       int i;
@@ -2850,8 +2856,8 @@ static ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { retu
    typedef enum Layout Layout;
 
    /* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
-    * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
-    * base, which provides the hash identity, is unrelated and stays. */
+    * CRTP base (IntrusivePtr dispatches through the pointee directly). The
+    * Cookie base, which provides the hash identity, is unrelated and stays. */
    /* Image: plain C struct + free functions (was a class deriving Cookie).
     * Cookie embedded as cookie_base. Pooled; refcount starts at 1. Holds the
     * default-view ImageViewHandle (already a plain struct). The deleted move
@@ -2933,10 +2939,10 @@ static void ih_steal(struct ImageHandle *dst, struct ImageHandle *src) { dst->da
     * CRTP base (IntrusivePtr dispatches release_reference/add_reference through
     * the pointee directly). Mirrors the SemaphoreHolder conversion. */
    /* FenceHolder: plain C struct + free functions (was a class with refcount
-    * methods + init/teardown). Pooled via object_pool_raw; fenceholder_init starts
-    * the refcount at 1, fenceholder_fini runs the former teardown body, and
-    * the FenceHolderDeleter (invoked when the refcount hits 0) calls fini then
-    * returns the slot to the pool. */
+    * methods + init/teardown). Pooled via object_pool_raw; fenceholder_init
+    * starts the refcount at 1, fenceholder_fini runs the former teardown body,
+    * and the FenceHolderDeleter (invoked when the refcount hits 0) calls fini
+    * then returns the slot to the pool. */
    struct FenceHolder
    {
       Device *device;
@@ -2948,21 +2954,20 @@ static void ih_steal(struct ImageHandle *dst, struct ImageHandle *src) { dst->da
    static void fenceholder_wait(struct FenceHolder *self);
    static void fenceholder_release_reference(struct FenceHolder *self);
 
-   /* Fence handle: a plain struct (Fence wrapping FenceHolder *)
-    * to a plain struct + explicit free functions, following the bvh_* helpers
-    * used for BufferViewHandle. The pointee FenceHolder keeps its
+   /* Fence handle: a plain struct (Fence wrapping FenceHolder *) to a plain
+    * struct + explicit free functions, following the bvh_* helpers used for
+    * BufferViewHandle. The pointee FenceHolder keeps its
     * add_reference/release_reference methods (the shared refcount interface is
-    * converted later, all pointees at once). Ownership accounting is now manual:
-    *   - fence_make() takes ownership of a freshly-constructed FenceHolder
-    *     (refcount starts at 1), no incref.
-    *   - fence_reset() drops one reference and nulls the handle.
-    *   - struct copy / return-by-value does NOT incref (matches the old
-    *     move/steal); the source must be treated as emptied and NOT
-    *     reset. The single surviving owner calls fence_reset() at scope exit.
-    * ASAN-GATE: every Fence scope-exit must map to exactly one fence_reset();
-    * the producer (submit_nolock) and the two consumers (flush_and_signal,
-    * read_buffer path) are the only lifetime sites. Verify no leak / no
-    * double-free on a fence-heavy workload (VRAM readback / FMV). */
+    * converted later, all pointees at once). Ownership accounting is now
+    * manual: - fence_make() takes ownership of a freshly-constructed
+    * FenceHolder (refcount starts at 1), no incref. - fence_reset() drops one
+    * reference and nulls the handle. - struct copy / return-by-value does NOT
+    * incref (matches the old move/steal); the source must be treated as emptied
+    * and NOT reset. The single surviving owner calls fence_reset() at scope
+    * exit. ASAN-GATE: every Fence scope-exit must map to exactly one
+    * fence_reset(); the producer (submit_nolock) and the two consumers
+    * (flush_and_signal, read_buffer path) are the only lifetime sites. Verify
+    * no leak / no double-free on a fence-heavy workload (VRAM readback / FMV). */
    struct Fence { FenceHolder *data; };
 static struct Fence fence_make(FenceHolder *p) { struct Fence h; h.data = p; return h; }
 static void fence_reset(struct Fence *h) { if (h->data) fenceholder_release_reference(h->data); h->data = NULL; }
@@ -2971,8 +2976,8 @@ static int fence_is_valid(const struct Fence *h) { return h->data != NULL; }
 
    POD_VEC_DECLARE(FenceVec, VkFence);
    /* FenceManager: recycles VkFence handles. Converted from a C++ class to a
-    * plain C struct + fencemanager_* free functions. init/init_empty stay inline;
-    * deinit/request_cleared_fence/recycle_fence are out-of-line. */
+    * plain C struct + fencemanager_* free functions. init/init_empty stay
+    * inline; deinit/request_cleared_fence/recycle_fence are out-of-line. */
    struct FenceManager
    {
       VkDevice device;
@@ -2999,11 +3004,11 @@ static void fencemanager_init_empty(struct FenceManager *self)
     * through the pointee directly). release_reference frees through the same
     * deleter path on reaching zero. This is the first pointee taken off the
     * shared base, toward concrete per-type handles. */
-   /* SemaphoreHolder: plain C struct + free functions (was a class with refcount
-    * methods + init/teardown). Pooled via object_pool_raw; the refcount starts at 1.
-    * semaphoreholder_consume hands out the VkSemaphore and clears the holder;
-    * the teardown (semaphoreholder_fini) either destroys or recycles the
-    * semaphore depending on whether it is still signalled. */
+   /* SemaphoreHolder: plain C struct + free functions (was a class with
+    * refcount methods + init/teardown). Pooled via object_pool_raw; the
+    * refcount starts at 1. semaphoreholder_consume hands out the VkSemaphore
+    * and clears the holder; the teardown (semaphoreholder_fini) either destroys
+    * or recycles the semaphore depending on whether it is still signalled. */
    struct SemaphoreHolder
    {
       Device *device;
@@ -3026,13 +3031,13 @@ static VkSemaphore semaphoreholder_consume(struct SemaphoreHolder *self)
 static void semaphoreholder_add_reference(struct SemaphoreHolder *self) { counter_add_ref(&self->reference_count); }
    static void semaphoreholder_release_reference(struct SemaphoreHolder *self);
 
-   /* Semaphore handle: a plain struct (Semaphore wrapping SemaphoreHolder *)
-    *  to a plain struct + explicit free functions, following the
-    * fence_ / bvh_ helpers. The pointee SemaphoreHolder keeps its
+   /* Semaphore handle: a plain struct (Semaphore wrapping SemaphoreHolder *) to
+    * a plain struct + explicit free functions, following the fence_ / bvh_
+    * helpers. The pointee SemaphoreHolder keeps its
     * add_reference/release_reference methods. sem_copy() performs the incref
-    * that the macro's copy step did; sem_reset() the decref the teardown did; a bare
-    * struct copy with no incref is the move/steal. SemaphoreHandleVec below is
-    * updated to call these explicitly in place of copy-in / teardown.
+    * that the macro's copy step did; sem_reset() the decref the teardown did; a
+    * bare struct copy with no incref is the move/steal. SemaphoreHandleVec
+    * below is updated to call these explicitly in place of copy-in / teardown.
     * ASAN-GATE: GPU wait-semaphore lifetime; verify no leak / double-free on a
     * multi-queue (async-compute/transfer) workload. */
    struct Semaphore { SemaphoreHolder *data; };
@@ -3047,20 +3052,20 @@ static void sem_copy(struct Semaphore *dst, const struct Semaphore *src) {
       if (dst->data) semaphoreholder_add_reference(dst->data);
    }
 
-   /* Owning array of Semaphore (a refcounted SemaphoreHolder handle).
-    * a dynamic array of Semaphore for the per-queue wait-semaphore lists. The element
-    * is a refcounting handle with a non-trivial teardown, so growth copy-
-    * moves each handle into new storage and clears
-    * the old slot, and clear()/the teardown run each handle's teardown
-    * (dropping its ref). push() copy-inserts (the wait list is filled from a
-    * const Semaphore *, an incref). clear() keeps the
-    * capacity so the lists are reused across frames. Distinct from SemaphoreVec
-    * above, which holds raw VkSemaphore handles (POD). */
-   /* SemaphoreHandleVec: owning growable array of Semaphore handles (refcounting
-    * smart pointers; sem_copy retains, sem_reset releases). Converted from a
-    * container is a plain struct with + sem_handle_vec_* free
-    * functions; the embedding QueueData is zero-initialised (its empty state) and
-    * torn down explicitly. */
+   /* Owning array of Semaphore (a refcounted SemaphoreHolder handle). a dynamic
+    * array of Semaphore for the per-queue wait-semaphore lists. The element is
+    * a refcounting handle with a non-trivial teardown, so growth copy- moves
+    * each handle into new storage and clears the old slot, and clear()/the
+    * teardown run each handle's teardown (dropping its ref). push()
+    * copy-inserts (the wait list is filled from a const Semaphore *, an
+    * incref). clear() keeps the capacity so the lists are reused across frames.
+    * Distinct from SemaphoreVec above, which holds raw VkSemaphore handles
+    * (POD). */
+   /* SemaphoreHandleVec: owning growable array of Semaphore handles
+    * (refcounting smart pointers; sem_copy retains, sem_reset releases).
+    * Converted from a container is a plain struct with + sem_handle_vec_* free
+    * functions; the embedding QueueData is zero-initialised (its empty state)
+    * and torn down explicitly. */
    struct SemaphoreHandleVec {
       Semaphore *items;
       int count;
@@ -3073,8 +3078,8 @@ static void sem_handle_vec_grow(struct SemaphoreHandleVec *v, int ncap)
       int i;
       for (i = 0; i < v->count; i++) {
          /* Move the handle to new storage: plain struct copy with no refcount
-          * change (old copy step incref + old-slot teardown decref cancelled out).
-          * The old slot is abandoned, not reset. */
+          * change (old copy step incref + old-slot teardown decref cancelled
+          * out). The old slot is abandoned, not reset. */
          nitems[i] = v->items[i];
       }
       free(v->items);
@@ -3177,8 +3182,8 @@ static void set_immutable_sampler(DescriptorSetLayout *layout, unsigned binding,
       bool cached;
    };
 
-   /* Lifted to file scope (was nested in DescriptorSetAllocator) so the concrete
-    * temp-map's free functions can be stamped at namespace scope. */
+   /* Lifted to file scope (was nested in DescriptorSetAllocator) so the
+    * concrete temp-map's free functions can be stamped at namespace scope. */
    struct DescriptorSetNode
    {
       struct TemporaryHashmapNode th_node;
@@ -3194,8 +3199,8 @@ static void set_immutable_sampler(DescriptorSetLayout *layout, unsigned binding,
 static void descriptor_set_node_destroy(DescriptorSetNode *t) { (void)t; /* trivial teardown */ }
    VK_TEMPHASH_DECLARE(descriptor_set_thmap, DescriptorSetNode, VULKAN_DESCRIPTOR_RING_SIZE, 1, descriptor_set_node_destroy)
 
-   /* make_vacant constructs a node in the pool and parks it on the vacant free-list
-    * (the reuse path); for the reuse path. */
+   /* make_vacant constructs a node in the pool and parks it on the vacant
+    * free-list (the reuse path); for the reuse path. */
 static void descriptor_set_thmap_make_vacant(struct descriptor_set_thmap *m, VkDescriptorSet set)
    {
       void *slot = object_pool_raw_allocate(&m->object_pool);
@@ -3207,12 +3212,12 @@ static void descriptor_set_thmap_make_vacant(struct descriptor_set_thmap *m, VkD
       descriptor_set_thmap_vacant_push(m, node);
    }
 
-   /* DescriptorSetAllocator: cached VkDescriptorSetLayout + per-thread descriptor
-    * pool/set recycling. Lives in an IntrusiveHashMap (intrusive_node first).
-    * Converted from a C++ class to a plain C struct + descriptor_set_allocator_*
-    * free functions. The nested PerThread struct is hoisted to file scope as
-    * DescriptorSetAllocatorPerThread; init -> _init (called by the map emplace),
-    * teardown -> _fini (the map destroy callback). */
+   /* DescriptorSetAllocator: cached VkDescriptorSetLayout + per-thread
+    * descriptor pool/set recycling. Lives in an IntrusiveHashMap
+    * (intrusive_node first). Converted from a C++ class to a plain C struct +
+    * descriptor_set_allocator_* free functions. The nested PerThread struct is
+    * hoisted to file scope as DescriptorSetAllocatorPerThread; init -> _init
+    * (called by the map emplace), teardown -> _fini (the map destroy callback). */
    struct DescriptorSetAllocatorPerThread
    {
       struct descriptor_set_thmap set_nodes;
@@ -3288,10 +3293,10 @@ static VkDescriptorSetLayout descriptor_set_allocator_get_layout(const struct De
 
    /* PipelineLayout: cached VkPipelineLayout + its resource layout and per-set
     * allocators. Lives in an IntrusiveHashMap (intrusive_node first). Converted
-    * from a C++ class to a plain C struct + pipeline_layout_* free functions; the
-    * initialiser becomes pipeline_layout_init (called by the map's emplace after the slot
-    * is allocated) and the teardown becomes pipeline_layout_fini (the map's destroy
-    * callback). */
+    * from a C++ class to a plain C struct + pipeline_layout_* free functions;
+    * the initialiser becomes pipeline_layout_init (called by the map's emplace
+    * after the slot is allocated) and the teardown becomes pipeline_layout_fini
+    * (the map's destroy callback). */
    struct PipelineLayout
    {
       struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
@@ -3309,8 +3314,8 @@ static DescriptorSetAllocator *pipeline_layout_get_allocator(const struct Pipeli
 
    /* Shader: cached VkShaderModule + its reflected ResourceLayout. Lives in an
     * IntrusiveHashMap (intrusive_node first). Converted from a C++ class to a
-    * plain C struct + shader_* free functions; init -> shader_init (called by the
-    * map's emplace), teardown -> shader_fini (the map's destroy callback). */
+    * plain C struct + shader_* free functions; init -> shader_init (called by
+    * the map's emplace), teardown -> shader_fini (the map's destroy callback). */
    struct Shader
    {
       struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
@@ -3325,12 +3330,12 @@ static const ResourceLayout *shader_get_layout(const struct Shader *self) { retu
 static VkShaderModule shader_get_module(const struct Shader *self) { return self->module; }
    static const char *shader_stage_to_name(ShaderStage stage);
 
-   /* Program: cached shader set + pipeline layout + per-program VkPipeline cache.
-    * Lives in an IntrusiveHashMap (intrusive_node first). Converted from a C++
-    * class to a plain C struct + program_* free functions. The two ctors
+   /* Program: cached shader set + pipeline layout + per-program VkPipeline
+    * cache. Lives in an IntrusiveHashMap (intrusive_node first). Converted from
+    * a C++ class to a plain C struct + program_* free functions. The two ctors
     * (graphics: vertex+fragment / compute) become program_init_graphics /
-    * program_init_compute (called by the two map emplace variants); the teardown
-    * becomes program_fini (the map's destroy callback). */
+    * program_init_compute (called by the two map emplace variants); the
+    * teardown becomes program_fini (the map's destroy callback). */
    struct Program
    {
       struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
@@ -3439,11 +3444,12 @@ static PipelineLayout *program_get_pipeline_layout(const struct Program *self) {
       self->clear_depth_stencil.stencil = 0;
    }
 
-   /* RenderPass: cached VkRenderPass + per-subpass attachment metadata. Lives in
-    * an IntrusiveHashMap (intrusive_node first). Converted from a C++ class to a
-    * plain C struct + render_pass_* free functions; init -> render_pass_init
-    * (called by the map's emplace), teardown -> render_pass_fini (the map's destroy
-    * callback). The nested SubpassInfo type and its POD vector stay as-is. */
+   /* RenderPass: cached VkRenderPass + per-subpass attachment metadata. Lives
+    * in an IntrusiveHashMap (intrusive_node first). Converted from a C++ class
+    * to a plain C struct + render_pass_* free functions; init ->
+    * render_pass_init (called by the map's emplace), teardown ->
+    * render_pass_fini (the map's destroy callback). The nested SubpassInfo type
+    * and its POD vector stay as-is. */
    struct RenderPassSubpassInfo
    {
       VkAttachmentReference color_attachments[VULKAN_NUM_ATTACHMENTS];
@@ -3505,8 +3511,9 @@ static bool render_pass_has_depth(const struct RenderPass *self, unsigned subpas
          format_has_depth_aspect(self->depth_stencil);
    }
 
-   /* The concrete hash map recovers each node type from an IntrusiveHashMapNode* by
-    * casting, which is only valid if the node base is at offset 0 of every node. */
+   /* The concrete hash map recovers each node type from an
+    * IntrusiveHashMapNode* by casting, which is only valid if the node base is
+    * at offset 0 of every node. */
    RHI_STATIC_ASSERT(offsetof(DescriptorSetAllocator, intrusive_node) == 0,
          "DescriptorSetAllocator.intrusive_node must be first");
    RHI_STATIC_ASSERT(offsetof(PipelineLayout, intrusive_node) == 0,
@@ -3519,14 +3526,14 @@ static bool render_pass_has_depth(const struct RenderPass *self, unsigned subpas
          "RenderPass.intrusive_node must be first");
 
    /* Concrete per-type maps for the five Device-level cache node types. Each
-    * destroy hook runs the type's (non-trivial) teardown before the slot returns
-    * to the pool; the teardown call keeps this translation unit C++ for now (a later
-    * milestone switches the file to a C compiler, at which point these become
-    * explicit teardown calls). The per-type emplace_yield constructs the node in
-    * the pool with the type's real initialiser, then yields it into the holder. The
-    * map key (hash) is passed to the initialiser too for the four types whose
-    * initialiser records it; Program's initialiser does not take a hash, so there
-    * the hash is used only as the map key. */
+    * destroy hook runs the type's (non-trivial) teardown before the slot
+    * returns to the pool; the teardown call keeps this translation unit C++ for
+    * now (a later milestone switches the file to a C compiler, at which point
+    * these become explicit teardown calls). The per-type emplace_yield
+    * constructs the node in the pool with the type's real initialiser, then
+    * yields it into the holder. The map key (hash) is passed to the initialiser
+    * too for the four types whose initialiser records it; Program's initialiser
+    * does not take a hash, so there the hash is used only as the map key. */
 static void pipeline_layout_map_destroy(PipelineLayout *t) { pipeline_layout_fini(t); }
 static void descriptor_set_allocator_map_destroy(DescriptorSetAllocator *t) { descriptor_set_allocator_fini(t); }
 static void render_pass_map_destroy(RenderPass *t) { render_pass_fini(t); }
@@ -3615,11 +3622,11 @@ static Program *program_map_emplace_yield_graphics(struct program_map *m,
    }
 
    /* Framebuffer: cached VkFramebuffer + its attachments. Converted from a C++
-    * class to a plain C struct + framebuffer_* free functions. The Cookie base is
-    * embedded as the first member (composition, seeded by cookie_init); the former
-    * const RenderPass& reference member becomes a pointer (plain structs cannot
-    * hold references). FramebufferNode embeds a Framebuffer by value as its base.
-    * init -> framebuffer_init, teardown -> framebuffer_fini. */
+    * class to a plain C struct + framebuffer_* free functions. The Cookie base
+    * is embedded as the first member (composition, seeded by cookie_init); the
+    * former const RenderPass& reference member becomes a pointer (plain structs
+    * cannot hold references). FramebufferNode embeds a Framebuffer by value as
+    * its base. init -> framebuffer_init, teardown -> framebuffer_fini. */
    struct Framebuffer
    {
       struct Cookie cookie_base; /* was: public Cookie base subobject */
@@ -3647,8 +3654,8 @@ static const RenderPass *framebuffer_get_compatible_render_pass(const struct Fra
 
    enum { VULKAN_FRAMEBUFFER_RING_SIZE = 8 };
    /* Lifted to file scope (was nested in FramebufferAllocator). Derives from
-    * Framebuffer, so th_node is NOT at offset 0 - the ring lists recover the node
-    * with TH_NODE_OF, which the temp-map macro already uses. */
+    * Framebuffer, so th_node is NOT at offset 0 - the ring lists recover the
+    * node with TH_NODE_OF, which the temp-map macro already uses. */
    struct FramebufferNode
    {
       struct Framebuffer base; /* was: inherit Framebuffer */
@@ -3658,9 +3665,9 @@ static const RenderPass *framebuffer_get_compatible_render_pass(const struct Fra
 static void framebuffer_node_destroy(FramebufferNode *t) { framebuffer_fini(&t->base); }
    VK_TEMPHASH_DECLARE(framebuffer_thmap, FramebufferNode, VULKAN_FRAMEBUFFER_RING_SIZE, 0, framebuffer_node_destroy)
 
-   /* emplace constructs the node in the pool, stamps its ring index + hash, registers
-    * it in the recycle map and links it at the front of the current ring (mirrors the
-    * in-place construction for this type). */
+   /* emplace constructs the node in the pool, stamps its ring index + hash,
+    * registers it in the recycle map and links it at the front of the current
+    * ring (mirrors the in-place construction for this type). */
 static FramebufferNode *framebuffer_thmap_emplace(struct framebuffer_thmap *m,
          Hash hash, Device *device, const RenderPass *rp, const RenderPassInfo *info)
    {
@@ -3705,9 +3712,9 @@ static void framebuffer_allocator_deinit(struct FramebufferAllocator *self)
       ImageHandle handle;
    };
 
-   /* Was the TransientNode(ImageHandle) initialiser. Plain struct copy: the produced
-    * handle (refcount 1) is passed by value and moved into the member without
-    * an incref; the node becomes the single owner. */
+   /* Was the TransientNode(ImageHandle) initialiser. Plain struct copy: the
+    * produced handle (refcount 1) is passed by value and moved into the member
+    * without an incref; the node becomes the single owner. */
    static INLINE void transient_node_init(struct TransientNode *self, ImageHandle handle_)
    {
       self->handle = handle_;
@@ -3732,9 +3739,9 @@ static TransientNode *transient_thmap_emplace(struct transient_thmap *m,
       return node;
    }
 
-   /* AttachmentAllocator: per-frame transient-attachment cache (a ring TempHashmap
-    * of transient ImageView nodes). Converted from a C++ class to a plain C struct
-    * + attachment_allocator_* free functions. */
+   /* AttachmentAllocator: per-frame transient-attachment cache (a ring
+    * TempHashmap of transient ImageView nodes). Converted from a C++ class to a
+    * plain C struct + attachment_allocator_* free functions. */
    struct AttachmentAllocator
    {
       Device *device;
@@ -3768,17 +3775,17 @@ static void attachment_allocator_deinit(struct AttachmentAllocator *self)
       VkDeviceSize offset;
    };
 
-   /* BufferBlock: a sub-allocatable mapped buffer pair (gpu/cpu). Converted from
-    * a C++ struct (user copy init/assign/teardown managing the two refcounted handle
-    * members) to a plain C struct + bufferblock_* free functions. Because the gpu
-    * and cpu handles carry Buffer references, every former implicit copy/assign/
-    * move/destroy is now an explicit call:
-    *   bufferblock_init     - zero a fresh block
-    *   bufferblock_fini     - release both handle refs (was ~BufferBlock)
-    *   bufferblock_copy     - retain (was the copy initialiser)
-    *   bufferblock_assign   - release-old / retain-new (assignment)
-    *   bufferblock_steal    - move (copy fields, null the source; was the && move)
-    *   bufferblock_allocate - the sub-allocation bump (unchanged logic). */
+   /* BufferBlock: a sub-allocatable mapped buffer pair (gpu/cpu). Converted
+    * from a C++ struct (user copy init/assign/teardown managing the two
+    * refcounted handle members) to a plain C struct + bufferblock_* free
+    * functions. Because the gpu and cpu handles carry Buffer references, every
+    * former implicit copy/assign/ move/destroy is now an explicit call:
+    * bufferblock_init     - zero a fresh block bufferblock_fini     - release
+    * both handle refs (was ~BufferBlock) bufferblock_copy     - retain (was the
+    * copy initialiser) bufferblock_assign   - release-old / retain-new
+    * (assignment) bufferblock_steal    - move (copy fields, null the source;
+    * was the && move) bufferblock_allocate - the sub-allocation bump (unchanged
+    * logic). */
    struct BufferBlock
    {
       struct BufferHandle gpu;
@@ -3893,12 +3900,12 @@ static void bufferblock_vec_free_storage(struct BufferBlockVec *v) {
       v->items = NULL; v->count = 0; v->cap = 0;
    }
 
-   /* BufferPool: pools sub-allocatable mapped BufferBlocks. Converted from a C++
-    * class to a plain C struct + bufferpool_* free functions. request_block
+   /* BufferPool: pools sub-allocatable mapped BufferBlocks. Converted from a
+    * C++ class to a plain C struct + bufferpool_* free functions. request_block
     * returns a BufferBlock by value (the caller owns the returned refs);
     * recycle_block takes the block by pointer (was BufferBlock&&) and copy-
-    * retains it into the recycle list, so the caller must still bufferblock_fini
-    * its now-emptied local. */
+    * retains it into the recycle list, so the caller must still
+    * bufferblock_fini its now-emptied local. */
    struct BufferPool
    {
       Device *device;
@@ -4088,9 +4095,9 @@ static void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd
    RHI_STATIC_ASSERT(VULKAN_NUM_DESCRIPTOR_SETS == 4, "Number of descriptor sets != 4.");
 
    /* set_dirty / get_and_clear were small CommandBuffer member helpers used by
-    * many methods (including in-struct inline setters). Declared here, before the
-    * struct, so the still-inline member methods can call them during the staged
-    * conversion; defined after the struct. */
+    * many methods (including in-struct inline setters). Declared here, before
+    * the struct, so the still-inline member methods can call them during the
+    * staged conversion; defined after the struct. */
    struct CommandBuffer;
    static void commandbuffer_set_dirty(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
    static CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
@@ -4108,15 +4115,15 @@ static void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd
 
    struct Device;
    /* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
-    * CRTP base (IntrusivePtr dispatches through the pointee directly). This is the
-    * last of the eight pointees given a concrete per-type handle.
+    * CRTP base (IntrusivePtr dispatches through the pointee directly). This is
+    * the last of the eight pointees given a concrete per-type handle.
     *
-    * Stage 1 of the class -> C struct conversion: CommandBuffer is now a struct,
-    * the refcount/init/teardown are free functions (commandbuffer_init / _fini /
-    * _add_reference / _release_reference), and the formerly-default-initialized
-    * members are seeded in commandbuffer_init. The remaining member functions are
-    * still declared in-struct for now and are converted to free functions in
-    * later stages. */
+    * Stage 1 of the class -> C struct conversion: CommandBuffer is now a
+    * struct, the refcount/init/teardown are free functions (commandbuffer_init
+    * / _fini / _add_reference / _release_reference), and the
+    * formerly-default-initialized members are seeded in commandbuffer_init. The
+    * remaining member functions are still declared in-struct for now and are
+    * converted to free functions in later stages. */
    struct CommandBuffer
    {
 
@@ -4395,9 +4402,9 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
       struct ObjectPoolRaw command_buffers;
    };
 
-   /* For a malloc'd owner (Device), where the pools' init and
-    * teardown do not run automatically: handle_pool_init() puts every pool in the empty
-    * state and handle_pool_deinit() runs each pool's teardown. */
+   /* For a malloc'd owner (Device), where the pools' init and teardown do not
+    * run automatically: handle_pool_init() puts every pool in the empty state
+    * and handle_pool_deinit() runs each pool's teardown. */
    static INLINE void handle_pool_init(struct HandlePool *self)
    {
       object_pool_raw_init(&self->buffers,         sizeof(Buffer));
@@ -4500,13 +4507,14 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
 
    struct Device
    {
-         /* Device-based objects which need to poke at internal data structures when their lifetimes end.
-          * Don't want to expose a lot of internal guts to make this work. */
+         /* Device-based objects which need to poke at internal data structures
+          * when their lifetimes end. Don't want to expose a lot of internal
+          * guts to make this work. */
 
          /* Lifecycle for a malloc'd Device (no initialiser/teardown runs).
           * device_init establishes every member's empty state; device_deinit
-          * tears the device down so the storage can be freed. Static so they take
-          * the raw Device* explicitly. */
+          * tears the device down so the storage can be freed. Static so they
+          * take the raw Device* explicitly. */
 
          /* Only called by main thread, during setup phase. */
 
@@ -4565,15 +4573,15 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
          } lock;
 
 
-         /* Owning array of CommandBufferHandle (a refcounted CommandBuffer handle).
-          * A dynamic array of CommandBufferHandle for the per-queue submission
-          * lists. The element is a refcounting smart pointer with a non-trivial
-          * teardown (decref), so growth moves each handle into new
-          * storage (copy pointer, null source) and
-          * clear()/the teardown run each handle's teardown (dropping its
-          * ref). push takes ownership by move (no incref), matching the old
-          * an ownership transfer. clear() keeps the capacity so the lists
-          * are reused across frames without reallocating. */
+         /* Owning array of CommandBufferHandle (a refcounted CommandBuffer
+          * handle). A dynamic array of CommandBufferHandle for the per-queue
+          * submission lists. The element is a refcounting smart pointer with a
+          * non-trivial teardown (decref), so growth moves each handle into new
+          * storage (copy pointer, null source) and clear()/the teardown run
+          * each handle's teardown (dropping its ref). push takes ownership by
+          * move (no incref), matching the old an ownership transfer. clear()
+          * keeps the capacity so the lists are reused across frames without
+          * reallocating. */
 
          /* Owning array of PerFrame* (the frame-context ring). Replaces
           * an owning array of PerFrame pointers: the container owns each
@@ -4629,11 +4637,12 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
          ImplementationWorkarounds workarounds;
    };
 
-   /* Forward declarations for the device_* (and related) free functions, formerly
-    * friend declarations inside the Device class. The class is now a plain struct, so
-    * the access-granting role is gone, but these forward declarations are still needed:
-    * the inline device_* helpers defined just after the struct call functions whose
-    * definitions appear much later in the file. */
+   /* Forward declarations for the device_* (and related) free functions,
+    * formerly friend declarations inside the Device class. The class is now a
+    * plain struct, so the access-granting role is gone, but these forward
+    * declarations are still needed: the inline device_* helpers defined just
+    * after the struct call functions whose definitions appear much later in the
+    * file. */
    static void device_set_context(Device *self, const Context *context);
    static void device_end_frame_nolock(Device *self);
    static void device_init_frame_contexts(Device *self, unsigned count);
@@ -4761,8 +4770,9 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
    static INLINE bool device_memory_type_is_host_visible(Device *self, uint32_t type) { return (self->mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0; }
 
 
-   /* device_flush_frame_queue: was the inline device flush_frame(CommandBufferType)
-    * overload. Flushes pending transfers (if async-transfer) then submits the queue. */
+   /* device_flush_frame_queue: was the inline device
+    * flush_frame(CommandBufferType) overload. Flushes pending transfers (if
+    * async-transfer) then submits the queue. */
    static INLINE void device_flush_frame_queue(Device *self, CommandBufferType type)
    {
       if (type == Type_AsyncTransfer)
@@ -4770,9 +4780,10 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
       device_submit_queue(self, type, NULL, 0, NULL);
    }
 
-   /* Device inline helpers (batch 5) -> free functions taking Device *self. Plain
-    * inline (not static) because they are friend-declared. request_vertex_block /
-    * request_uniform_block still call their *_nolock members through self->. */
+   /* Device inline helpers (batch 5) -> free functions taking Device *self.
+    * Plain inline (not static) because they are friend-declared.
+    * request_vertex_block / request_uniform_block still call their *_nolock
+    * members through self->. */
    static INLINE uint64_t device_allocate_cookie(Device *self)
    {
       /* Reserve lower bits for "special purposes". */
@@ -4791,11 +4802,12 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
       self->workarounds.optimize_all_graphics_barrier = self->gpu_props.vendorID == VENDOR_ID_ARM;
    }
 
-   /* Device inline accessors (batch 4), converted from in-class member functions to
-    * free functions taking Device *self. The reference-returning getters now return
-    * pointers. wait_idle / flush_frame still call the *_nolock members (not yet
-    * converted) through self->. Defined here, right after the class, so they precede
-    * all callers; friend-declared inside the class for private-member access. */
+   /* Device inline accessors (batch 4), converted from in-class member
+    * functions to free functions taking Device *self. The reference-returning
+    * getters now return pointers. wait_idle / flush_frame still call the
+    * *_nolock members (not yet converted) through self->. Defined here, right
+    * after the class, so they precede all callers; friend-declared inside the
+    * class for private-member access. */
 static void device_wait_idle(Device *self) { device_wait_idle_nolock(self); }
 static void device_flush_frame(Device *self) { device_flush_frame_nolock(self); }
 static void *device_map_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access) { return deviceallocator_map_memory(&self->managers.memory, buffer_get_allocation(buffer), access); }
@@ -4807,8 +4819,8 @@ static const Sampler *device_get_stock_sampler(Device *self, StockSampler sample
 static const ImplementationWorkarounds *device_get_workarounds(Device *self) { return &self->workarounds; }
 static const DeviceFeatures *device_get_device_features(Device *self) { return &self->ext; }
 
-   /* Free functions for CommandBufferHandleVec (converted from the move-
-    * only nested container's methods). The element is a refcounting CommandBuffer
+   /* Free functions for CommandBufferHandleVec (converted from the move- only
+    * nested container's methods). The element is a refcounting CommandBuffer
     * handle, so growth/teardown go through cbh_steal/cbh_reset. push() takes
     * ownership by move (steal, no incref); clear() drops each handle's ref but
     * keeps capacity; deinit() frees the backing storage. */
@@ -4850,11 +4862,11 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
       v->items = NULL; v->count = 0; v->cap = 0;
    }
 
-   /* Free functions for PerFramePtrVec -- the owning frame-context ring
-    * (an owning array of PerFrame pointers).
-    * The vector owns each heap-allocated PerFrame and per_frame_fini+free's it on
-    * clear()/teardown. Device is malloc'd so the container's own init/teardown never
-    * run; init_empty establishes the empty state and deinit performs teardown. */
+   /* Free functions for PerFramePtrVec -- the owning frame-context ring (an
+    * owning array of PerFrame pointers). The vector owns each heap-allocated
+    * PerFrame and per_frame_fini+free's it on clear()/teardown. Device is
+    * malloc'd so the container's own init/teardown never run; init_empty
+    * establishes the empty state and deinit performs teardown. */
    static INLINE void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v)
    {
       v->items = NULL; v->count = 0; v->cap = 0;
@@ -4923,12 +4935,12 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
    typedef enum TextureMode TextureMode;
 
    /* Rect: plain C struct (was a value type with ctors / equality helper/!= /
-    * contains / intersects / scissor / extend_bounding_box). The default initialiser +
-    * zero NSDMIs become brace-initialisation { 0, 0, 0, 0 }; the 4-arg initialiser
-    * becomes make_rect. The methods become rect_* free functions taking
-    * const struct Rect * (extend_bounding_box mutates, so its first arg is
-    * non-const). Most Rects are already built by brace-init, which a plain
-    * struct supports unchanged. */
+    * contains / intersects / scissor / extend_bounding_box). The default
+    * initialiser + zero NSDMIs become brace-initialisation { 0, 0, 0, 0 }; the
+    * 4-arg initialiser becomes make_rect. The methods become rect_* free
+    * functions taking const struct Rect * (extend_bounding_box mutates, so its
+    * first arg is non-const). Most Rects are already built by brace-init, which
+    * a plain struct supports unchanged. */
    struct Rect
    {
       unsigned x;
@@ -5020,8 +5032,9 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
       STATUS_FRAGMENT_FB_READ = 1 << 12,
       STATUS_FRAGMENT_FB_WRITE = 1 << 13,
 
-      /* A special stage to allow fragment to detect when it's causing a feedback loop with texture read -> fragment write.
-       * This flag is added in combination with FRAGMENT_FB_READ. */
+      /* A special stage to allow fragment to detect when it's causing a
+       * feedback loop with texture read -> fragment write. This flag is added
+       * in combination with FRAGMENT_FB_READ. */
       STATUS_TEXTURE_READ = 1 << 14,
 
       /* For determining if a texture read is from a loaded image or previous rendered content */
@@ -5040,8 +5053,8 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
    /* VRAM framebuffer atlas / hazard tracker. Formerly a class whose only
     * C++-ism was a initialiser that filled fb_info[] (relying on NSDMIs for the
     * listener pointer and the renderpass sub-struct); now a plain struct driven
-    * by fbatlas_init. Renderer embeds one by value and calls fbatlas_init at the
-    * top of its initialiser. All methods stay as struct methods. */
+    * by fbatlas_init. Renderer embeds one by value and calls fbatlas_init at
+    * the top of its initialiser. All methods stay as struct methods. */
    struct FBAtlas
    {
       StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
@@ -5059,11 +5072,11 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
       } renderpass;
    };
 
-   /* FBAtlas free functions (converted from struct methods). The hazard atlas is
-    * embedded by value in Renderer and driven via fbatlas_*; the read/write/sync
-    * helpers and the render-pass bookkeeping all take FBAtlas *self. info()
-    * returned a StatusFlags& and now returns a StatusFlags* (its const overload
-    * folds into the same accessor). */
+   /* FBAtlas free functions (converted from struct methods). The hazard atlas
+    * is embedded by value in Renderer and driven via fbatlas_*; the
+    * read/write/sync helpers and the render-pass bookkeeping all take FBAtlas
+    * *self. info() returned a StatusFlags& and now returns a StatusFlags* (its
+    * const overload folds into the same accessor). */
    static void fbatlas_read_fragment(FBAtlas *self, Domain domain, const Rect *rect);
    static Domain fbatlas_blit_vram(FBAtlas *self, const Rect *dst, const Rect *src);
    static void fbatlas_load_image(FBAtlas *self, const Rect *rect);
@@ -5157,8 +5170,8 @@ static StatusFlags *fbatlas_info(FBAtlas *self, unsigned block_x, unsigned block
       a->renderpass.inside = false;
    }
 
-   /* POD match rule from dump.cfg: a value of -1 means "wildcard" (matches
-    * any) for that field. Was a class with a initialiser + NSDMI + matches() method. */
+   /* POD match rule from dump.cfg: a value of -1 means "wildcard" (matches any)
+    * for that field. Was a class with a initialiser + NSDMI + matches() method. */
    struct RectMatch {
       int x;
       int y;
@@ -5184,15 +5197,15 @@ extern retro_log_printf_t log_cb;
 
 /* #define VERBOSE_TEXTURE_TRACKING */
 
-/* Texture-tracker logging is debug-only: it compiles to real log_cb calls
- * in DEBUG builds (the build system passes -DDEBUG when DEBUG=1) and to a
- * no-op everywhere else, so release cores carry no logging overhead.
+/* Texture-tracker logging is debug-only: it compiles to real log_cb calls in
+ * DEBUG builds (the build system passes -DDEBUG when DEBUG=1) and to a no-op
+ * everywhere else, so release cores carry no logging overhead.
  *
- * The no-op variants must still consume their arguments at the syntactic
- * level, otherwise locals only used in a log statement trip
- * -Wunused-but-set-variable.  The "(void)0," prefix lets sizeof accept a
- * 1-arg invocation through the comma operator (C); sizeof itself is unevaluated,
- * so each arg is read by the type system without generating runtime code. */
+ * The no-op variants must still consume their arguments at the syntactic level,
+ * otherwise locals only used in a log statement trip -Wunused-but-set-variable.
+ * The "(void)0," prefix lets sizeof accept a 1-arg invocation through the comma
+ * operator (C); sizeof itself is unevaluated, so each arg is read by the type
+ * system without generating runtime code. */
 #ifdef DEBUG
 #define TT_LOG(...) log_cb(__VA_ARGS__)
 #else
@@ -5213,10 +5226,10 @@ extern retro_log_printf_t log_cb;
    };
 
    typedef int RectIndex; /* I wanted a newtype but it's too much work in C++, so maybe TODO that later */
-   /* HdTextureHandle: plain C struct (was a value type with equality helper/!=/>,
-    * a private 3-arg initialiser and static factories). The factories become
-    * hd_handle_make / _make_fused / _make_none; the comparisons become
-    * hd_handle_eq / _ne / _gt free functions. */
+   /* HdTextureHandle: plain C struct (was a value type with equality
+    * helper/!=/>, a private 3-arg initialiser and static factories). The
+    * factories become hd_handle_make / _make_fused / _make_none; the
+    * comparisons become hd_handle_eq / _ne / _gt free functions. */
    struct HdTextureHandle {
       RectIndex index;
       uint32_t palette_hash;
@@ -5260,11 +5273,11 @@ extern retro_log_printf_t log_cb;
       return a->fused > b->fused;
    }
 
-   /* SRect: plain C struct (was a value type with ctors / accessors / equality helper).
-    * The validating 4-arg initialiser becomes make_srect; the zero-init default
-    * initialiser becomes the brace-initialiser { 0, 0, 0, 0 } (a placeholder slot
-    * to be overwritten before use). Accessors left/right/top/bottom and the
-    * comparison become srect_* free functions. */
+   /* SRect: plain C struct (was a value type with ctors / accessors / equality
+    * helper). The validating 4-arg initialiser becomes make_srect; the
+    * zero-init default initialiser becomes the brace-initialiser { 0, 0, 0, 0 }
+    * (a placeholder slot to be overwritten before use). Accessors
+    * left/right/top/bottom and the comparison become srect_* free functions. */
    struct SRect {
       int x;
       int y;
@@ -5273,7 +5286,8 @@ extern retro_log_printf_t log_cb;
    };
 
    /* Validated SRect builder (was the 4-arg initialiser). width/height must be
-    * positive; a zero/negative size is a hard error, matching the old initialiser. */
+    * positive; a zero/negative size is a hard error, matching the old
+    * initialiser. */
    static INLINE struct SRect make_srect(int x, int y, int width, int height)
    {
       struct SRect r;
@@ -5299,8 +5313,8 @@ extern retro_log_printf_t log_cb;
       ImageHandle texture;
    };
 
-   /* DumpedMode: plain POD (was a value type whose only method was equality helper,
-    * now the free function dumpedmode_eq). */
+   /* DumpedMode: plain POD (was a value type whose only method was equality
+    * helper, now the free function dumpedmode_eq). */
    struct DumpedMode {
       TextureMode mode;
       uint32_t palette_hash;
@@ -5318,17 +5332,17 @@ extern retro_log_printf_t log_cb;
       unsigned int palette_offset_y;
    };
 
-   /* ------------------------------------------------------------------------- *
-    * HdTexMap - palette_hash -> (Vulkan image, alpha flags), MSVC C89.
+   /* -------------------------------------------------------------------------
+    * * HdTexMap - palette_hash -> (Vulkan image, alpha flags), MSVC C89.
     *
-    * A uint32_t -> HdImageHandle map on TextureUpload. Backed by a
-    * sorted, malloc'd array of POD entries keyed by palette hash (binary-search
-    * lookup, insert keeps it sorted). The image is held as a raw Image*
-    * (so the array can realloc) with the intrusive refcount managed by hand: a
-    * reference is taken when an entry is stored and released on
-    * replace/erase/clear/free - matching the raw-pointer scheme already used by
-    * the GPU image cache. Entries are POD, so TextureUpload can be a plain
-    * malloc-backed value once this and the other members are converted.
+    * A uint32_t -> HdImageHandle map on TextureUpload. Backed by a sorted,
+    * malloc'd array of POD entries keyed by palette hash (binary-search lookup,
+    * insert keeps it sorted). The image is held as a raw Image* (so the array
+    * can realloc) with the intrusive refcount managed by hand: a reference is
+    * taken when an entry is stored and released on replace/erase/clear/free -
+    * matching the raw-pointer scheme already used by the GPU image cache.
+    * Entries are POD, so TextureUpload can be a plain malloc-backed value once
+    * this and the other members are converted.
     * ------------------------------------------------------------------------- */
    struct HdTexEntry {
       uint32_t       key;          /* palette hash */
@@ -5433,11 +5447,11 @@ extern retro_log_printf_t log_cb;
    }
 
    struct TextureUpload {
-      /* Intrusive refcount for shared ownership across TextureRects (replaces
-       * a refcounted TextureUpload). A freshly created upload starts at
-       * 0; texture_upload_new() bumps it to 1. Copies (deep-copy initialiser/assignment,
-       * used by the by-value save-state map) get their OWN fresh count - the
-       * refcount is deliberately not copied. */
+      /* Intrusive refcount for shared ownership across TextureRects (replaces a
+       * refcounted TextureUpload). A freshly created upload starts at 0;
+       * texture_upload_new() bumps it to 1. Copies (deep-copy
+       * initialiser/assignment, used by the by-value save-state map) get their
+       * OWN fresh count - the refcount is deliberately not copied. */
       int refcount;
       /* VRAM source pixels (owned). Owned uint16_t array; filled once at
        * creation and thereafter read-only. */
@@ -5453,9 +5467,10 @@ extern retro_log_printf_t log_cb;
       int         dumped_modes_count;
       int         dumped_modes_cap;
       HdTexMap textures; /* palette hash -> (image, alpha) */
-               /* (HD load bookkeeping lives on the TextureTracker: hd_gpu_cache / hd_cache /
-                * requested / pending_attach, keyed by (hash,palette) so it survives this
-                * upload being recreated as the sprite animation churns VRAM.) */
+               /* (HD load bookkeeping lives on the TextureTracker: hd_gpu_cache
+                * / hd_cache / requested / pending_attach, keyed by
+                * (hash,palette) so it survives this upload being recreated as
+                * the sprite animation churns VRAM.) */
    };
 
    /* TextureUpload owns malloc'd buffers (image, dumped_modes) and an HdTexMap,
@@ -5534,12 +5549,13 @@ extern retro_log_printf_t log_cb;
          texture_upload_destroy(u); /* frees image/dumped_modes and releases the texmap refs */
    }
 
-   /* byte buffer plus its size, rather than a managed byte vector. This is a POD
-    * (trivially copyable) struct - copying it copies the pointer, NOT the bytes,
-    * so ownership is by convention: exactly one LoadedLevels owns each buffer and
-    * frees it. Ownership transfers are explicit pointer-steals (push_move /
-    * move-assign helpers below); there is no implicit deep copy and no
-    * teardown. This keeps it storable in plain arrays and realloc-movable. */
+   /* byte buffer plus its size, rather than a managed byte vector. This is a
+    * POD (trivially copyable) struct - copying it copies the pointer, NOT the
+    * bytes, so ownership is by convention: exactly one LoadedLevels owns each
+    * buffer and frees it. Ownership transfers are explicit pointer-steals
+    * (push_move / move-assign helpers below); there is no implicit deep copy
+    * and no teardown. This keeps it storable in plain arrays and
+    * realloc-movable. */
    struct LoadedImage {
       uint8_t *owned_data; /* RGBA, owned_size bytes (NULL if empty) */
       size_t   owned_size;
@@ -5570,11 +5586,11 @@ static void loaded_image_init(LoadedImage *img)
    }
 
    /* A decoded texture as a set of mip levels. C-style dynamic array: `levels`
-    * is a malloc'd array of `count` LoadedImage, owning all buffers. Replaces
-    * a dynamic array of LoadedImage. POD/trivially-copyable: a copy aliases the same
-    * buffers, so callers move ownership explicitly (loaded_levels_move) and free
-    * explicitly (loaded_levels_reset). Initialise with loaded_levels_init or
-    * zero-init before first use. */
+    * is a malloc'd array of `count` LoadedImage, owning all buffers. Replaces a
+    * dynamic array of LoadedImage. POD/trivially-copyable: a copy aliases the
+    * same buffers, so callers move ownership explicitly (loaded_levels_move)
+    * and free explicitly (loaded_levels_reset). Initialise with
+    * loaded_levels_init or zero-init before first use. */
    struct LoadedLevels {
       LoadedImage *levels;
       int          count;
@@ -5696,10 +5712,10 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       IORequest  *req_head,  *req_tail;
       IOResponse *resp_head, *resp_tail;
       bool done;
-      /* Cross-thread refcount. The owning
-       * IOThread holds one reference and each detached worker holds one; whichever
-       * releases last frees the channel. Mutated only outside the lock, at
-       * thread-spawn and thread-exit, so a plain int with no overlap is fine. */
+      /* Cross-thread refcount. The owning IOThread holds one reference and each
+       * detached worker holds one; whichever releases last frees the channel.
+       * Mutated only outside the lock, at thread-spawn and thread-exit, so a
+       * plain int with no overlap is fine. */
       int refcount;
    };
 
@@ -5714,11 +5730,11 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       c->refcount = 1;
       return c;
    }
-   /* The refcount is touched from the owning thread (spawn/teardown) and from the
-    * detached workers (exit), so the increment/decrement must be serialised. A
-    * single process-wide lock guards every transition; the actual free happens
-    * after the lock is dropped so we never reference the channel's own lock once
-    * it may be gone. */
+   /* The refcount is touched from the owning thread (spawn/teardown) and from
+    * the detached workers (exit), so the increment/decrement must be
+    * serialised. A single process-wide lock guards every transition; the actual
+    * free happens after the lock is dropped so we never reference the channel's
+    * own lock once it may be gone. */
    static slock_t *io_channel_rc_lock = NULL;
    static void io_channel_rc_lock_init() {
       if (!io_channel_rc_lock)
@@ -5771,9 +5787,9 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
    }
 
    /* Owns the IO worker thread pool. Formerly a class with a initialiser
-    * (create the channel, spin up NUM_IO_THREADS detached workers each holding a
-    * channel reference) and teardown (signal done, wake the workers, drop this
-    * thread's reference); now a plain struct driven by io_thread_init /
+    * (create the channel, spin up NUM_IO_THREADS detached workers each holding
+    * a channel reference) and teardown (signal done, wake the workers, drop
+    * this thread's reference); now a plain struct driven by io_thread_init /
     * io_thread_deinit. The single member is the refcounted channel pointer.
     * TextureTracker embeds one by value and drives its init/deinit. */
    struct IOThread {
@@ -5796,17 +5812,18 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
    /* ============
     * RectTracker */
 
-   /* TextureRect is a trivially-copyable POD: a borrowed view of an upload plus a
-    * subrect. It does NOT manage the refcount in special members (so it relocates
-    * with a bitwise move - no per-copy acquire/release, no exception scaffolding in
-    * the containers that hold it). Ownership lives at container boundaries instead:
-    * a container retains on insert and releases on erase/clear/destroy via
-    * texture_rect_retain / texture_rect_release. Transient TextureRect values
-    * (subTexture results, clip pairs, scratch arrays) are borrowing and need no
-    * ref ops. */
+   /* TextureRect is a trivially-copyable POD: a borrowed view of an upload plus
+    * a subrect. It does NOT manage the refcount in special members (so it
+    * relocates with a bitwise move - no per-copy acquire/release, no exception
+    * scaffolding in the containers that hold it). Ownership lives at container
+    * boundaries instead: a container retains on insert and releases on
+    * erase/clear/destroy via texture_rect_retain / texture_rect_release.
+    * Transient TextureRect values (subTexture results, clip pairs, scratch
+    * arrays) are borrowing and need no ref ops. */
    /* TextureRect: plain C struct (was a value type with texture_subrect() /
-    * equality helper / inequality helper). The accessor becomes texture_rect_subrect, the
-    * comparison texture_rect_eq; inequality helper was unused and is dropped. */
+    * equality helper / inequality helper). The accessor becomes
+    * texture_rect_subrect, the comparison texture_rect_eq; inequality helper
+    * was unused and is dropped. */
    struct TextureRect {
       TextureUpload *upload;
       /* the offset into the original upload rect (offset_x + vram_rect.width <= upload->width) */
@@ -5815,8 +5832,8 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       SRect vram_rect;
    };
 
-   /* in vram size (not hd), local to the uploaded data, different hd textures for
-    * different palettes could have different sizes anyway */
+   /* in vram size (not hd), local to the uploaded data, different hd textures
+    * for different palettes could have different sizes anyway */
    static INLINE struct SRect texture_rect_subrect(const struct TextureRect *t)
    {
       return make_srect(t->offset_x, t->offset_y, t->vram_rect.width, t->vram_rect.height);
@@ -5852,9 +5869,9 @@ static void texture_rect_release(const TextureRect *t) { texture_upload_release(
       bool alive;
    };
 
-   /* Owning, trivially-relocatable array of EnduringTextureRect (replaces
-    * a dynamic array of EnduringTextureRect). Because TextureRect is POD, growth is a
-    * realloc (bitwise relocation, no per-element move step or exception
+   /* Owning, trivially-relocatable array of EnduringTextureRect (replaces a
+    * dynamic array of EnduringTextureRect). Because TextureRect is POD, growth
+    * is a realloc (bitwise relocation, no per-element move step or exception
     * scaffolding). Ownership is explicit: push retains the upload, and any slot
     * that leaves the array (compaction drop, clear, free) releases it. */
    struct EnduringRectArr {
@@ -5904,17 +5921,18 @@ static void enduring_arr_free(EnduringRectArr *v) {
    }
 
    /* Owning vector of (POD) TextureRects, used where the rect list is itself
-    * value-copied/compared (FusionRects, RestorableRect). The element is trivially
-    * relocatable so the backing array relocates cheaply, but ownership must
-    * be explicit: this wrapper retains on push and on copy, and releases on
-    * destroy/clear/assign. */
-   /* OwnedRectVec: plain C struct (was a copyable C++ class with retain-on-copy /
-    * release-on-destroy refcount management). The element TextureRect is POD but
-    * owns a refcounted upload, so ownership is explicit: ownedrects_push retains,
-    * ownedrects_copy / ownedrects_assign deep-copy then retain each element, and
-    * ownedrects_destroy releases each element then frees storage. ownedrects_move
-    * steals storage (no refcount change). No implicit copy exists -- structs holding
-    * one must call ownedrects_copy / ownedrects_destroy explicitly. */
+    * value-copied/compared (FusionRects, RestorableRect). The element is
+    * trivially relocatable so the backing array relocates cheaply, but
+    * ownership must be explicit: this wrapper retains on push and on copy, and
+    * releases on destroy/clear/assign. */
+   /* OwnedRectVec: plain C struct (was a copyable C++ class with retain-on-copy
+    * / release-on-destroy refcount management). The element TextureRect is POD
+    * but owns a refcounted upload, so ownership is explicit: ownedrects_push
+    * retains, ownedrects_copy / ownedrects_assign deep-copy then retain each
+    * element, and ownedrects_destroy releases each element then frees storage.
+    * ownedrects_move steals storage (no refcount change). No implicit copy
+    * exists -- structs holding one must call ownedrects_copy /
+    * ownedrects_destroy explicitly. */
    struct OwnedRectVec {
       TextureRectVec v;
    };
@@ -5931,8 +5949,9 @@ static void enduring_arr_free(EnduringRectArr *v) {
       TextureRectVec_free_storage(&r->v);
    }
 
-   /* Deep-copy the POD elements of src->v into dst->v (replacing dst's storage).
-    * Refcounts are adjusted by the caller (release before, retain after). */
+   /* Deep-copy the POD elements of src->v into dst->v (replacing dst's
+    * storage). Refcounts are adjusted by the caller (release before, retain
+    * after). */
    static INLINE void ownedrects_copy_storage(struct OwnedRectVec *dst, const struct OwnedRectVec *src)
    {
       dst->v.count = 0;
@@ -6000,11 +6019,11 @@ static void enduring_arr_free(EnduringRectArr *v) {
    enum { LOOKUP_CELL_WIDTH = 64 };
    enum { LOOKUP_CELL_HEIGHT = 256 };
 
-   /* Sorted set of RectIndex (int), MSVC C89. A sorted set of RectIndex
-    * for the overlap-dedup scratch set: a malloc'd sorted int array with
-    * binary-search insert (dedups), cleared and refilled each query, then iterated
-    * in order. Order differs from the old unordered_set (now ascending by index),
-    * which only affects iteration order of overlapping rects - the consumers don't
+   /* Sorted set of RectIndex (int), MSVC C89. A sorted set of RectIndex for the
+    * overlap-dedup scratch set: a malloc'd sorted int array with binary-search
+    * insert (dedups), cleared and refilled each query, then iterated in order.
+    * Order differs from the old unordered_set (now ascending by index), which
+    * only affects iteration order of overlapping rects - the consumers don't
     * depend on it. */
    struct RectIndexSet {
       RectIndex *items;
@@ -6050,8 +6069,8 @@ static void enduring_arr_free(EnduringRectArr *v) {
    };
    typedef struct Cell Cell;
    struct LookupGrid {
-      /* Each cell is a psx texture page (64x256); a dynamic array of LookupEntry.
-       * Now a malloc'd growable array per cell (POD entries). */
+      /* Each cell is a psx texture page (64x256); a dynamic array of
+       * LookupEntry. Now a malloc'd growable array per cell (POD entries). */
       Cell cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS];
    };
 
@@ -6061,11 +6080,11 @@ static void enduring_arr_free(EnduringRectArr *v) {
    static void lookup_grid_get(LookupGrid *self, SRect r, RectIndexSet *results);
    static void lookup_grid_clear(LookupGrid *self);
 
-   /* RectTracker: tracks placed/uploaded texture rects with a spatial lookup grid.
-    * Converted from a C++ class to a plain C struct + rect_tracker_* free
-    * functions. The init/teardown (which init/free the EnduringRectArr and LookupGrid)
-    * become rect_tracker_init / rect_tracker_deinit, called by the embedding
-    * TextureTracker's initialiser/teardown. */
+   /* RectTracker: tracks placed/uploaded texture rects with a spatial lookup
+    * grid. Converted from a C++ class to a plain C struct + rect_tracker_* free
+    * functions. The init/teardown (which init/free the EnduringRectArr and
+    * LookupGrid) become rect_tracker_init / rect_tracker_deinit, called by the
+    * embedding TextureTracker's initialiser/teardown. */
    struct RectTracker {
       EnduringRectArr textures; /* owning trivially-relocatable array */
       LookupGrid lookup_grid;
@@ -6097,8 +6116,8 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
    /* Returns results by pointer (was a reference). */
    static RectIndexSet *rect_tracker_overlapping(struct RectTracker *self, Rect rect, RectIndexSet *results);
 
-   /* This pointer will be valid until the next upload/blit/clear/endFrame, so use
-    * it immediately. Returns NULL when index is out of range. */
+   /* This pointer will be valid until the next upload/blit/clear/endFrame, so
+    * use it immediately. Returns NULL when index is out of range. */
    static TextureRect *rect_tracker_get_index(struct RectTracker *self, RectIndex index);
 
    /* Returns NULL if no texture with the given hash can be found. */
@@ -6108,9 +6127,10 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
    /* RectTracker
     * ============ */
 
-   /* FusionRects: plain C struct (was a C++ value type with NSDMIs + equality helper).
-    * Embeds an OwnedRectVec (refcounted), so init/destroy/move/eq are explicit
-    * free functions; the scaleX/scaleY default-zero NSDMIs move into fusionrects_init. */
+   /* FusionRects: plain C struct (was a C++ value type with NSDMIs + equality
+    * helper). Embeds an OwnedRectVec (refcounted), so init/destroy/move/eq are
+    * explicit free functions; the scaleX/scaleY default-zero NSDMIs move into
+    * fusionrects_init. */
    struct FusionRects {
       OwnedRectVec rects;
       Rect vram_rect;
@@ -6162,8 +6182,8 @@ static void fp_copy(FusedPage *dst, const FusedPage *src) {
        * which would shallow-alias the OwnedRectVec inside fusion and break its
        * refcount). dst->fusion.rects must already be in a valid state -- empty
        * (fp_init_raw) for raw storage, or live for in-place compaction -- so
-       * ownedrects_assign releases dst's current elements then deep-copies+retains
-       * src's. */
+       * ownedrects_assign releases dst's current elements then
+       * deep-copies+retains src's. */
       dst->palette         = src->palette;
       dst->full_page_rect  = src->full_page_rect;
       dst->dirty           = src->dirty;
@@ -6179,8 +6199,8 @@ static void fp_copy(FusedPage *dst, const FusedPage *src) {
     * fusion.rects (an OwnedRectVec) -- to the empty state, so the subsequent
     * fp_copy's ownedrects_assign releases against a valid (empty) dst rather
     * than through the slot's indeterminate items/count. Required before fp_copy
-    * into malloc'd storage (grow/push); the in-place compaction path already has
-    * a live dst and must NOT use this. */
+    * into malloc'd storage (grow/push); the in-place compaction path already
+    * has a live dst and must NOT use this. */
 static void fp_init_raw(FusedPage *p) {
       ownedrects_init(&p->fusion.rects);
    }
@@ -6189,20 +6209,20 @@ static void fp_destroy(FusedPage *p) {
       ownedrects_destroy(&p->fusion.rects);
    }
 
-   /* Owning array of FusedPage. A dynamic array of FusedPage. FusedPage owns
-    * an ImageHandle and a FusionRects (whose OwnedRectVec retains/releases its
+   /* Owning array of FusedPage. A dynamic array of FusedPage. FusedPage owns an
+    * ImageHandle and a FusionRects (whose OwnedRectVec retains/releases its
     * TextureRects), and is used by copy (append page, and the compaction's
-    * element copy-assign), so this container copies/-assigns elements
-    * rather than moving: growth copies each element into new storage
-    * into new storage and clears the old slot. push() copy-inserts;
-    * indexed access and pointer-range iteration keep the existing size()/
-    * indexing and iteration uses. truncate(n) clears the tail [n, count) and is
-    * how remove_dead() drops compacted-out entries (replacing erase(it, end())).
-    * Ownership lives at the container level. */
+    * element copy-assign), so this container copies/-assigns elements rather
+    * than moving: growth copies each element into new storage into new storage
+    * and clears the old slot. push() copy-inserts; indexed access and
+    * pointer-range iteration keep the existing size()/ indexing and iteration
+    * uses. truncate(n) clears the tail [n, count) and is how remove_dead()
+    * drops compacted-out entries (replacing erase(it, end())). Ownership lives
+    * at the container level. */
    /* FusedPageVec: owning growable array of FusedPage (each holds a refcounted
-    * ImageHandle, so growth/teardown go through fp_copy/fp_destroy). Converted from
-    * a container is a plain struct with + fused_page_vec_* free
-    * functions; the embedding FusedPages drives init_empty/deinit. */
+    * ImageHandle, so growth/teardown go through fp_copy/fp_destroy). Converted
+    * from a container is a plain struct with + fused_page_vec_* free functions;
+    * the embedding FusedPages drives init_empty/deinit. */
    struct FusedPageVec {
       FusedPage *items;
       int count;
@@ -6309,11 +6329,11 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
     * clear()/the teardown run each element's teardown (releasing its rect
     * refs). erase_at(i) removes one element by copy-assigning the tail down and
     * destroying the now-duplicated last slot. */
-   /* RestorableRectVec: plain C struct. Its element
-    * RestorableRect owns an OwnedRectVec (refcounted), so element relocation /
-    * insertion / removal go through restorablerect_copy / _assign / _destroy / _move
-    * rather than placement-new and explicit teardown calls. The container itself is
-    * moved by stealing storage; no copy exists. */
+   /* RestorableRectVec: plain C struct. Its element RestorableRect owns an
+    * OwnedRectVec (refcounted), so element relocation / insertion / removal go
+    * through restorablerect_copy / _assign / _destroy / _move rather than
+    * placement-new and explicit teardown calls. The container itself is moved
+    * by stealing storage; no copy exists. */
    struct RestorableRectVec {
       RestorableRect *items;
       int count;
@@ -6350,8 +6370,8 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
          restorablerect_destroy(&v->items[i]);
       v->count = 0;
    }
-   /* Remove element i by copy-assigning the tail down and destroying the duplicated
-    * last slot. */
+   /* Remove element i by copy-assigning the tail down and destroying the
+    * duplicated last slot. */
    static INLINE void rrvec_erase_at(struct RestorableRectVec *v, int i)
    {
       int j;
@@ -6362,9 +6382,9 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
    }
 
    /* Edge-triggered debug keyboard hotkey. Formerly a class with an int
-    * initialiser; now a plain struct driven by dbg_hotkey_init. query() does the
-    * rising-edge detection. TextureTracker embeds three of these by value and
-    * initialises them in its initialiser. */
+    * initialiser; now a plain struct driven by dbg_hotkey_init. query() does
+    * the rising-edge detection. TextureTracker embeds three of these by value
+    * and initialises them in its initialiser. */
    struct DbgHotkey {
       enum retro_key key;
       bool was_key_down;
@@ -6389,16 +6409,17 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
    };
 
    /* Small fixed-capacity move-to-front cache of recently-used HD texture
-    * handles. CacheEntry is POD, so the entries live in an inline array (capacity
-    * HANDLE_LRU_MAX) with a count - no dynamic array, no heap. */
+    * handles. CacheEntry is POD, so the entries live in an inline array
+    * (capacity HANDLE_LRU_MAX) with a count - no dynamic array, no heap. */
    enum { HANDLE_LRU_MAX = 4 };
 
    /* Small fixed-capacity move-to-front cache of recently-used HD texture
     * handles. Formerly a class with a initialiser; now a plain struct driven by
-    * handle_lru_cache_init. CacheEntry is POD (its defensive default-init is never
-    * read before being written - get only scans entries[0..count) and insert
-    * writes entries[0] within that range), so the entries live in an inline array
-    * (capacity HANDLE_LRU_MAX) with a count - no dynamic array, no heap. */
+    * handle_lru_cache_init. CacheEntry is POD (its defensive default-init is
+    * never read before being written - get only scans entries[0..count) and
+    * insert writes entries[0] within that range), so the entries live in an
+    * inline array (capacity HANDLE_LRU_MAX) with a count - no dynamic array, no
+    * heap. */
    struct HandleLRUCache {
       int64_t dbg_hits;
       int64_t dbg_misses;
@@ -6415,8 +6436,8 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
       c->max_size = max_size;
       c->count = 0;
       /* The former initialiser left these uninitialised (they were only ever
-       * zeroed inside a TT_LOG_VERBOSE block after first use); zero them here so
-       * the hit/miss counters start from a defined value. */
+       * zeroed inside a TT_LOG_VERBOSE block after first use); zero them here
+       * so the hit/miss counters start from a defined value. */
       c->dbg_hits = 0;
       c->dbg_misses = 0;
    }
@@ -6433,10 +6454,10 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
     * renderer recreations, so move-assign must free any entries it already
     * holds before adopting the source's. Copying is deleted to prevent any
     * accidental double-ownership. */
-   /* UploadOwningMap: plain C struct. The entries are
-    * owning pointers to heap-allocated TextureUploads; ownership moves via
-    * uploadmap_move (steal, source emptied) and is released by uploadmap_destroy.
-    * No copy operation exists -- callers must move, never copy. */
+   /* UploadOwningMap: plain C struct. The entries are owning pointers to
+    * heap-allocated TextureUploads; ownership moves via uploadmap_move (steal,
+    * source emptied) and is released by uploadmap_destroy. No copy operation
+    * exists -- callers must move, never copy. */
    struct UploadOwningMapEntry { uint32_t key; TextureUpload *val; };
    typedef struct UploadOwningMapEntry UploadOwningMapEntry;
    struct UploadOwningMap {
@@ -6475,8 +6496,9 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
       return false;
    }
 
-   /* Takes ownership of an already-heap-allocated upload under key. Caller must have
-    * ensured the key is absent (mirrors the old map's insert-if-absent guard). */
+   /* Takes ownership of an already-heap-allocated upload under key. Caller must
+    * have ensured the key is absent (mirrors the old map's insert-if-absent
+    * guard). */
    static INLINE void uploadmap_insert(struct UploadOwningMap *m, uint32_t key, TextureUpload *val)
    {
       if (m->count >= m->cap) {
@@ -6499,10 +6521,10 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
       SRect vram_rect;
    };
 
-   /* Owning array of (POD) TextureRectSaveState. Replaces
-    * A dynamic array of TextureRectSaveState. Elements are trivially relocatable, so
-    * grow is a plain realloc; the type owns its buffer (free on destroy) and is
-    * moved (not copied) so it can live inside the save-state structs. */
+   /* Owning array of (POD) TextureRectSaveState. Replaces A dynamic array of
+    * TextureRectSaveState. Elements are trivially relocatable, so grow is a
+    * plain realloc; the type owns its buffer (free on destroy) and is moved
+    * (not copied) so it can live inside the save-state structs. */
    struct TextureRectSaveStateVec {
       TextureRectSaveState *items;
       int count;
@@ -6523,8 +6545,8 @@ static void TextureRectSaveStateVec_push(struct TextureRectSaveStateVec *v, cons
       }
       v->items[v->count++] = *valp;
    }
-   /* Move src into dst (steal buffer), leaving src empty - replaces the implicit
-    * move of the container. */
+   /* Move src into dst (steal buffer), leaving src empty - replaces the
+    * implicit move of the container. */
 static void TextureRectSaveStateVec_move(struct TextureRectSaveStateVec *dst, struct TextureRectSaveStateVec *src) {
       dst->items = src->items; dst->count = src->count; dst->cap = src->cap;
       src->items = NULL; src->count = 0; src->cap = 0;
@@ -6590,9 +6612,9 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       v->items = NULL; v->count = 0; v->cap = 0;
    }
 
-   /* TextureTrackerSaveState: plain C struct. Owns two
-    * save-state vectors and an UploadOwningMap; managed explicitly through tts_init /
-    * tts_destroy / tts_move. No copy exists -- callers must move (steal), never copy. */
+   /* TextureTrackerSaveState: plain C struct. Owns two save-state vectors and
+    * an UploadOwningMap; managed explicitly through tts_init / tts_destroy /
+    * tts_move. No copy exists -- callers must move (steal), never copy. */
    struct TextureTrackerSaveState {
       TextureRectSaveStateVec rects;
       RestorableRectSaveStateVec restorable;
@@ -6613,8 +6635,9 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       uploadmap_destroy(&s->uploads);
    }
 
-   /* Move o into s (which must already be initialized): free s's current storage,
-    * steal o's, and leave o empty/initialized. Mirrors the old move-assignment. */
+   /* Move o into s (which must already be initialized): free s's current
+    * storage, steal o's, and leave o empty/initialized. Mirrors the old
+    * move-assignment. */
    static INLINE void tts_move(struct TextureTrackerSaveState *s, struct TextureTrackerSaveState *o)
    {
       if (s == o)
@@ -6630,36 +6653,36 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
    /* End of Save State
     * ======================================== */
 
-   /* Tunable HD-texture cache budgets. hd_cache = system RAM (decoded CPU levels);
-    * hd_gpu_cache = VRAM (uploaded Vulkan images). The VRAM budget targets 8 GB
-    * cards - lower it if you see VRAM-pressure "QueuePresent failed" / swapchain
-    * churn, raise it on larger cards. */
+   /* Tunable HD-texture cache budgets. hd_cache = system RAM (decoded CPU
+    * levels); hd_gpu_cache = VRAM (uploaded Vulkan images). The VRAM budget
+    * targets 8 GB cards - lower it if you see VRAM-pressure "QueuePresent
+    * failed" / swapchain churn, raise it on larger cards. */
    static const size_t HD_CACHE_RAM_BUDGET  = (size_t)2 * 1024 * 1024 * 1024; /* 2 GB */
    static const size_t HD_CACHE_VRAM_BUDGET = (size_t)3 * 1024 * 1024 * 1024; /* 3 GB */
 
-   /* (hash, palette_hash) packed into one 64-bit key. The caches below are keyed
-    * by this single integer instead of HdTextureId, so lookups compare one int
-    * with no comparator / tree descent. */
+   /* (hash, palette_hash) packed into one 64-bit key. The caches below are
+    * keyed by this single integer instead of HdTextureId, so lookups compare
+    * one int with no comparator / tree descent. */
    static uint64_t hd_pack_key(HdTextureId id)
    {
       return ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash;
    }
 
-   /* ------------------------------------------------------------------------- *
-    * Byte-budgeted LRU cache, MSVC C89.
+   /* -------------------------------------------------------------------------
+    * * Byte-budgeted LRU cache, MSVC C89.
     *
-    * Built from an intrusive list of entries plus an id -> entry map
-    * design - two heap node allocations per insert and an O(log n) red-black
-    * descent per lookup - with a contiguous index-LRU + open-addressed
-    * (linear-probe) flat hash table, all held in malloc'd arrays. No generics,
-    * no classes, no virtual, no STL. The two cache variants (RAM levels, VRAM
-    * images) are produced by macro instantiation: HD_LRU_DECLARE emits the struct
-    * and prototypes, HD_LRU_DEFINE emits the bodies, with a DISPOSE callback that
+    * Built from an intrusive list of entries plus an id -> entry map design -
+    * two heap node allocations per insert and an O(log n) red-black descent per
+    * lookup - with a contiguous index-LRU + open-addressed (linear-probe) flat
+    * hash table, all held in malloc'd arrays. No generics, no classes, no
+    * virtual, no STL. The two cache variants (RAM levels, VRAM images) are
+    * produced by macro instantiation: HD_LRU_DECLARE emits the struct and
+    * prototypes, HD_LRU_DEFINE emits the bodies, with a DISPOSE callback that
     * frees payload-owned resources when a live entry leaves the cache.
     * ------------------------------------------------------------------------- */
 
-   /* fmix64 - cheap, strong avalanche for integer keys. The multipliers are built
-    * from 32-bit halves so no C99 long-long (ULL) literals appear. */
+   /* fmix64 - cheap, strong avalanche for integer keys. The multipliers are
+    * built from 32-bit halves so no C99 long-long (ULL) literals appear. */
    static uint64_t hd_lru_mix(uint64_t x)
    {
       uint64_t k1 = ((uint64_t)0xff51afd7u << 32) | (uint64_t)0xed558ccdu;
@@ -6927,12 +6950,12 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
    static size_t NAME##_count(const NAME *c)      { return (size_t)c->live; }     \
    static size_t NAME##_budget(const NAME *c)     { return c->budget_bytes; }
 
-   /* --- RAM cache: decoded CPU levels, keyed by (hash, palette) ------------- *
-    * Lives independent of TextureUpload lifetime, so images survive the rapid
-    * VRAM upload churn of animated sprites. Decode-once: a combo is read+decoded
-    * from disk at most once until evicted. CPU-side only - the GPU upload happens
-    * on attach via renderer_upload_texture, so it survives device/swapchain
-    * resets. The disposer frees the decoded levels. */
+   /* --- RAM cache: decoded CPU levels, keyed by (hash, palette) -------------
+    * * Lives independent of TextureUpload lifetime, so images survive the rapid
+    * VRAM upload churn of animated sprites. Decode-once: a combo is
+    * read+decoded from disk at most once until evicted. CPU-side only - the GPU
+    * upload happens on attach via renderer_upload_texture, so it survives
+    * device/swapchain resets. The disposer frees the decoded levels. */
    typedef struct CachedHdImage {
       LoadedLevels levels; /* decoded RGBA + mips (CPU side) */
       int    alpha_flags;
@@ -6947,8 +6970,8 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
    HD_LRU_DECLARE(HdImageCache, CachedHdImage);
    HD_LRU_DEFINE(HdImageCache, CachedHdImage, cached_hd_image_dispose)
 
-      /* Insert/replace a combo's decoded levels; takes ownership of *levels (left
-       * empty on return). */
+      /* Insert/replace a combo's decoded levels; takes ownership of *levels
+       * (left empty on return). */
       static void hd_image_cache_put(HdImageCache *c, HdTextureId id,
             LoadedLevels *levels, int alpha_flags)
       {
@@ -6965,13 +6988,13 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
          HdImageCache_account(c, old_bytes, e->bytes);
       }
 
-   /* --- VRAM cache: uploaded Vulkan images, keyed by (hash, palette) -------- *
-    * Sits above the RAM cache. Re-attaching a combo to a recreated TextureUpload
-    * becomes a ref-counted handle copy instead of a fresh upload_texture. The
-    * image is held as a RAW Image* (trivially relocatable, so the malloc
-    * arena can realloc it) with the refcount managed by hand: a reference is
-    * taken on insert and released by the disposer on eviction/clear, freeing VRAM
-    * once no live draw still holds the image. */
+   /* --- VRAM cache: uploaded Vulkan images, keyed by (hash, palette) --------
+    * * Sits above the RAM cache. Re-attaching a combo to a recreated
+    * TextureUpload becomes a ref-counted handle copy instead of a fresh
+    * upload_texture. The image is held as a RAW Image* (trivially relocatable,
+    * so the malloc arena can realloc it) with the refcount managed by hand: a
+    * reference is taken on insert and released by the disposer on
+    * eviction/clear, freeing VRAM once no live draw still holds the image. */
    typedef struct CachedGpuImage {
       Image *image; /* owns one reference while resident (NULL = empty) */
       int    alpha_flags;
@@ -6989,9 +7012,10 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
    HD_LRU_DECLARE(HdGpuCache, CachedGpuImage);
    HD_LRU_DEFINE(HdGpuCache, CachedGpuImage, cached_gpu_image_dispose)
 
-      /* Take a counted reference to a cached image and return it as an ImageHandle
-       * the caller can store/copy/destroy normally. IntrusivePtr(T*) adopts without
-       * bumping, so add the reference explicitly first. */
+      /* Take a counted reference to a cached image and return it as an
+       * ImageHandle the caller can store/copy/destroy normally.
+       * IntrusivePtr(T*) adopts without bumping, so add the reference
+       * explicitly first. */
       static ImageHandle hd_gpu_image_handle(CachedGpuImage *g)
       {
          image_add_reference(g->image);
@@ -7018,16 +7042,17 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       HdGpuCache_account(c, old_bytes, bytes);
    }
 
-   /* ------------------------------------------------------------------------- *
-    * HdKeySet - an ordered set of packed (hash, palette) uint64_t keys, MSVC C89.
+   /* -------------------------------------------------------------------------
+    * * HdKeySet - an ordered set of packed (hash, palette) uint64_t keys, MSVC
+    * C89.
     *
-    * A set of HdTextureId. Backed by a single sorted, malloc'd
-    * uint64_t array: membership is O(log n) binary search, insert/erase keep it
-    * sorted (O(n) shift, fine for these small sets). Because the key packs
-    * (hash << 32) | palette, the array is ordered by hash then palette, so all
-    * combos of one hash form a contiguous run - found with lower_bound over the
-    * half-open key range [hash<<32, (hash+1)<<32), which is exactly what the old
-    * a range query over [{hash,0}, {hash,0xFFFFFFFF}] gives.
+    * A set of HdTextureId. Backed by a single sorted, malloc'd uint64_t array:
+    * membership is O(log n) binary search, insert/erase keep it sorted (O(n)
+    * shift, fine for these small sets). Because the key packs (hash << 32) |
+    * palette, the array is ordered by hash then palette, so all combos of one
+    * hash form a contiguous run - found with lower_bound over the half-open key
+    * range [hash<<32, (hash+1)<<32), which is exactly what the old a range
+    * query over [{hash,0}, {hash,0xFFFFFFFF}] gives.
     * ------------------------------------------------------------------------- */
    typedef struct HdKeySet {
       uint64_t *keys;
@@ -7100,11 +7125,11 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
 
    /* TextureTracker: the HD-texture replacement engine -- tracks VRAM rects,
     * resolves (hash,palette) combos to HD textures, and drives the disk/CPU/GPU
-    * cache tiers and the IO worker thread. Converted from a C++ class to a plain C
-    * struct + texture_tracker_* free functions. The init/teardown become
-    * texture_tracker_init / texture_tracker_fini; the embedded RectTracker /
-    * FusedPages are init'd/deinit'd there (already converted). Default member
-    * initializers move into texture_tracker_init. */
+    * cache tiers and the IO worker thread. Converted from a C++ class to a
+    * plain C struct + texture_tracker_* free functions. The init/teardown
+    * become texture_tracker_init / texture_tracker_fini; the embedded
+    * RectTracker / FusedPages are init'd/deinit'd there (already converted).
+    * Default member initializers move into texture_tracker_init. */
    struct TextureTracker {
       bool dump_enabled;
       bool hd_textures_enabled;
@@ -7132,8 +7157,8 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       HandleLRUCache handle_cache;
 
       /* HD image caches, independent of upload lifetime. Tier 1 = GPU (VRAM,
-       * ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier 3
-       * = disk. Initialised via HdGpuCache_init / HdImageCache_init. */
+       * ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier
+       * 3 = disk. Initialised via HdGpuCache_init / HdImageCache_init. */
       HdGpuCache hd_gpu_cache;
       HdImageCache hd_cache;
       HdKeySet requested; /* disk load in flight, or known to have no file (negative cache) */
@@ -7230,8 +7255,8 @@ static void texture_tracker_clear_palette_cache(struct TextureTracker *self, Rec
    typedef enum PrimitiveType PrimitiveType;
 
    /* Display rectangle (signed origin, unlike Rect). Hoisted out of Renderer to
-    * file scope: the 4-arg initialiser becomes display_rect_make and
-    * the default-member-initialisers are dropped (every constructed DisplayRect is
+    * file scope: the 4-arg initialiser becomes display_rect_make and the
+    * default-member-initialisers are dropped (every constructed DisplayRect is
     * fully assigned). */
    struct DisplayRect
    {
@@ -7253,9 +7278,9 @@ static struct DisplayRect display_rect_make(int x, int y, unsigned width, unsign
    }
 
    /* Per-primitive scissor / HD-texture metadata. Hoisted out of Renderer to
-    * file scope: the initialiser (with its default arguments)
-    * becomes primitive_info_make, with the defaults moved to the call sites that
-    * relied on them. POD, so PrimitiveInfoVec is a plain POD_VEC. */
+    * file scope: the initialiser (with its default arguments) becomes
+    * primitive_info_make, with the defaults moved to the call sites that relied
+    * on them. POD, so PrimitiveInfoVec is a plain POD_VEC. */
    struct PrimitiveInfo {
       unsigned triangle_index;
       int scissor_index;
@@ -7281,9 +7306,9 @@ static struct PrimitiveInfo primitive_info_make(
       return p;
    }
 
-   /* Per-batch semi-transparent draw state. Hoisted out of Renderer to file scope
-    * the equality/inequality checks become semi_transparent_state_eq.
-    * POD otherwise (its hd_texture_index HdTextureHandle compares field-wise via
+   /* Per-batch semi-transparent draw state. Hoisted out of Renderer to file
+    * scope the equality/inequality checks become semi_transparent_state_eq. POD
+    * otherwise (its hd_texture_index HdTextureHandle compares field-wise via
     * the handle's own equality). */
    struct SemiTransparentState
    {
@@ -7307,15 +7332,16 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a, cons
          a->offset_uv == b->offset_uv;
    }
 
-   /* Renderer scanout / filter / blend enums. Hoisted out of the Renderer class to
-    * file scope so the forthcoming class -> C struct conversion's free functions can
-    * name them without a Renderer:: qualifier. The enumerator names are already
-    * prefixed, so there is no collision at file scope. */
+   /* Renderer scanout / filter / blend enums. Hoisted out of the Renderer class
+    * to file scope so the forthcoming class -> C struct conversion's free
+    * functions can name them without a Renderer:: qualifier. The enumerator
+    * names are already prefixed, so there is no collision at file scope. */
    enum ScanoutMode {
       /* Use extra precision bits. */
       ScanoutMode_ABGR1555_555,
-      /* Use extra precision bits to dither down to a native ABGR1555 image.
-       * The dither happens in the wrong place, but should be "good" enough to feel authentic. */
+      /* Use extra precision bits to dither down to a native ABGR1555 image. The
+       * dither happens in the wrong place, but should be "good" enough to feel
+       * authentic. */
       ScanoutMode_ABGR1555_Dither,
       /* MDEC */
       ScanoutMode_BGR24
@@ -7407,9 +7433,9 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a, cons
    POD_VEC_DECLARE(Rect2DVec, VkRect2D);
 
    /* Renderer top-level render state. Hoisted out of the Renderer class to file
-    * scope (it is carried by value inside SaveState and named by many methods) and
-    * the default member initialisers move into render_state_init, which
-    * the Renderer initialiser calls. The Rect / TextureWindow / UVRect members are
+    * scope (it is carried by value inside SaveState and named by many methods)
+    * and the default member initialisers move into render_state_init, which the
+    * Renderer initialiser calls. The Rect / TextureWindow / UVRect members are
     * zeroed explicitly (Rect is non-trivial, so no memset). */
    struct RenderState
    {
@@ -7520,8 +7546,8 @@ static void render_state_init(struct RenderState *s)
    }
 
    /* Renderer per-frame draw queues. Hoisted out of the Renderer class to file
-    * scope: the {}-zeroed POD_VEC members and scissor_invariant = false
-    * default move into opaque_queue_init, which the Renderer initialiser calls. The
+    * scope: the {}-zeroed POD_VEC members and scissor_invariant = false default
+    * move into opaque_queue_init, which the Renderer initialiser calls. The
     * backing storage is freed in ~Renderer (already explicit). */
    struct OpaqueQueue
    {
@@ -7615,10 +7641,10 @@ static void owned_u32_move(struct OwnedU32Buf *dst, struct OwnedU32Buf *src)
 static const uint32_t *owned_u32_data(const struct OwnedU32Buf *b) { return b->items; }
 static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
-   /* Specialization-constant slot indices for the Renderer pipelines. Hoisted out
-    * of the Renderer class to file scope so the class -> C struct conversion's free
-    * functions can name them. (TransMode and Samples share index 0 by design --
-    * they are used in different pipeline stages.) */
+   /* Specialization-constant slot indices for the Renderer pipelines. Hoisted
+    * out of the Renderer class to file scope so the class -> C struct
+    * conversion's free functions can name them. (TransMode and Samples share
+    * index 0 by design -- they are used in different pipeline stages.) */
    enum
    {
       SpecConstIndex_TransMode = 0,
@@ -7662,10 +7688,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
           * recreations, so it is moved with a free-existing move-assign
           * and a teardown, and copying is deleted. */
 
-         /* SaveState: plain C struct. Owns an OwnedU32Buf
-          * VRAM snapshot, a POD RenderState, and a TextureTrackerSaveState.
-          * Managed explicitly via savestate_init / savestate_destroy / savestate_move
-          * (defined as free functions after the Renderer class, where OwnedU32Buf and
+         /* SaveState: plain C struct. Owns an OwnedU32Buf VRAM snapshot, a POD
+          * RenderState, and a TextureTrackerSaveState. Managed explicitly via
+          * savestate_init / savestate_destroy / savestate_move (defined as free
+          * functions after the Renderer class, where OwnedU32Buf and
           * TextureTrackerSaveState are complete). No copy exists. */
 
 
@@ -7806,9 +7832,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          BufferHandle quad;
    };
 
-   /* SaveState lifecycle free functions (SaveState is
-    * a plain struct). vram is an OwnedU32Buf and tracker_state a TextureTrackerSaveState,
-    * both plain structs managed through their own *_init / *_move / destroy. */
+   /* SaveState lifecycle free functions (SaveState is a plain struct). vram is
+    * an OwnedU32Buf and tracker_state a TextureTrackerSaveState, both plain
+    * structs managed through their own *_init / *_move / destroy. */
    static INLINE void savestate_init(struct SaveState *s)
    {
       owned_u32_init(&s->vram);
@@ -7821,8 +7847,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       tts_destroy(&s->tracker_state);
    }
 
-   /* Move o into s (s must be initialized): steal o's owning members, copy the POD
-    * RenderState, leave o empty/initialized. */
+   /* Move o into s (s must be initialized): steal o's owning members, copy the
+    * POD RenderState, leave o empty/initialized. */
    static INLINE void savestate_move(struct SaveState *s, struct SaveState *o)
    {
       if (s == o)
@@ -7833,9 +7859,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    }
 
    /* Forward declarations for the renderer_* free functions (formerly friend
-    * declarations inside the Renderer class, now redundant since Renderer is a plain
-    * struct). Needed because the inline renderer_* functions below call ones whose
-    * definitions appear later in the file. */
+    * declarations inside the Renderer class, now redundant since Renderer is a
+    * plain struct). Needed because the inline renderer_* functions below call
+    * ones whose definitions appear later in the file. */
    static void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle *hd_texture_index_out, bool *filtering_out, bool *scaled_read_out, unsigned *shift_out, bool *offset_uv_out);
    static void renderer_build_line_quad(Renderer *self, Vertex *output, const Vertex *input);
    static void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, PrimitiveInfoVec *scissors, bool textured);
@@ -7916,10 +7942,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static bool renderer_is_valid(const Renderer *self);
 
 
-   /* ---- Renderer flush/accessor methods (batch 3) -> free functions. These have
-    * internal callers (other still-class methods call them via this), rewired to
-    * renderer_*(this, ...); command_buffer_hack_fixme returned a CommandBufferHandle&
-    * and now returns a pointer. ---- */
+   /* ---- Renderer flush/accessor methods (batch 3) -> free functions. These
+    * have internal callers (other still-class methods call them via this),
+    * rewired to renderer_*(this, ...); command_buffer_hack_fixme returned a
+    * CommandBufferHandle& and now returns a pointer. ---- */
    static INLINE void renderer_flush(Renderer *self)
    {
       if (cbh_is_valid(&self->cmd))
@@ -8052,9 +8078,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       self->render_state.UVLimits.max_v = max_v;
    }
 
-   /* ---- Renderer state setters (batch 1): inline methods -> static INLINE free
-    * functions taking Renderer *self, ahead of the full class -> struct conversion.
-    * Defined here (after the class) so Renderer is complete; friend-declared inside. ---- */
+   /* ---- Renderer state setters (batch 1): inline methods -> static INLINE
+    * free functions taking Renderer *self, ahead of the full class -> struct
+    * conversion. Defined here (after the class) so Renderer is complete;
+    * friend-declared inside. ---- */
    static INLINE void renderer_set_hd_cache_budgets(Renderer *self, size_t ram_bytes, size_t vram_bytes)
    {
       texture_tracker_set_cache_budgets(&self->tracker, ram_bytes, vram_bytes);
@@ -8259,9 +8286,9 @@ static void renderer_init(Renderer *self, Device *device_, unsigned scaling_, un
    ImageCreateInfo info;
    VkImageFormatProperties props;
    ImageCreateInfo dither_info;
-   /* Former initialiser init-list + remaining scalar default member initializers,
-    * assigned explicitly now that Renderer is malloc'd and placement-initialised via
-    * renderer_init rather than a C++ initialiser. */
+   /* Former initialiser init-list + remaining scalar default member
+    * initializers, assigned explicitly now that Renderer is malloc'd and
+    * placement-initialised via renderer_init rather than a C++ initialiser. */
    self->device = device_;
    self->scaling = scaling_;
    self->msaa = msaa_;
@@ -8286,8 +8313,8 @@ static void renderer_init(Renderer *self, Device *device_, unsigned scaling_, un
    self->framebuffer.data             = NULL;
    self->framebuffer_ssaa.data        = NULL;
    self->dither_lut.data              = NULL;
-   /* self->render_state's default member initializers were moved out when RenderState
-    * seed them here (was implicit at construction). */
+   /* self->render_state's default member initializers were moved out when
+    * RenderState seed them here (was implicit at construction). */
    render_state_init(&self->render_state);
    opaque_queue_init(&self->queue);
    imageview_vec_init(&self->scaled_views); /* was default-constructed; now a plain struct */
@@ -8434,8 +8461,9 @@ static void renderer_init(Renderer *self, Device *device_, unsigned scaling_, un
       info.samples = (VkSampleCountFlagBits)(self->msaa);
       ih_move(&self->scaled_framebuffer_msaa, device_create_image(self->device, &info, NULL));
       image_set_layout(ih_get(&self->scaled_framebuffer_msaa), Layout_General);
-      /* General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
-       * The expectation is that self will be used with a lower self->scaling factor to compensate. */
+      /* General layout for MSAA is going to be brutal bandwidth-wise, but we
+       * have no real choice. The expectation is that self will be used with a
+       * lower self->scaling factor to compensate. */
    }
 
    fbatlas_set_hazard_listener(&self->atlas, self);
@@ -8972,10 +9000,11 @@ static DisplayRect renderer_compute_display_rect(Renderer *self)
    int left_offset;
    if (self->render_state.crop_overscan)
    {
-      /* Horizontal crop amount is currently hardcoded. Future improvement could allow adjusting this.
-       * Restore old center behaviour is self->render_state.horiz_start is intentionally very high.
-       * 938 fixes Gunbird (1008) and Mobile Light Force (EU release of Gunbird),
-       * but this value should be lowerer in the future if necessary. */
+      /* Horizontal crop amount is currently hardcoded. Future improvement could
+       * allow adjusting this. Restore old center behaviour is
+       * self->render_state.horiz_start is intentionally very high. 938 fixes
+       * Gunbird (1008) and Mobile Light Force (EU release of Gunbird), but this
+       * value should be lowerer in the future if necessary. */
       display_width = (2560/clock_div) - self->render_state.image_crop;
       if ((self->render_state.horiz_start < 938) && (self->render_state.crop_overscan == 2))
          left_offset = floor((self->render_state.offset_cycles / (double) clock_div) - (self->render_state.image_crop / 2));
@@ -9509,8 +9538,9 @@ static void renderer_flush_resolves(Renderer *self)
    {
       unsigned size;
       renderer_ensure_command_buffer(self);
-      /* Always use nearest neighbor downscaling to avoid filter artifact (e.g. unwanted black outlines in Vagrant Story)
-       * Supersampling will use a separate pass for downsampling */
+      /* Always use nearest neighbor downscaling to avoid filter artifact (e.g.
+       * unwanted black outlines in Vagrant Story) Supersampling will use a
+       * separate pass for downsampling */
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, 0);
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
@@ -9692,8 +9722,9 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    {
       if (rect_intersects(&self->render_state.draw_rect, &rect))
       {
-         /* HACK hd_texture_vram should contains the texture we are reading from in vram coordinate
-          * avoid texture filtering and enable scaled read if the texture is rendered content */
+         /* HACK hd_texture_vram should contains the texture we are reading from
+          * in vram coordinate avoid texture filtering and enable scaled read if
+          * the texture is rendered content */
          bool texture_rendered = fbatlas_texture_rendered(&self->atlas, &hd_texture_vram);
          filtering = !texture_rendered;
          scaled_read = texture_rendered;
@@ -9713,9 +9744,9 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
 
    z = renderer_allocate_depth(self, scaled_read ? Domain_Scaled : Domain_Unscaled, &rect);
 
-   /* Look up the hd texture index
-    * This is done here at the end of the function because the `allocate_depth`
-    * call above can call `reset_queue` which would invalidate the HdTextureHandle */
+   /* Look up the hd texture index This is done here at the end of the function
+    * because the `allocate_depth` call above can call `reset_queue` which would
+    * invalidate the HdTextureHandle */
    param = (int16_t)(shift);
    if (hd_texture_vram.height > 0) { /* This condition is just a dumb way to check that the rect was actually set to something */
       bool fastpath_capable_out = false;
@@ -9850,10 +9881,9 @@ static void renderer_build_line_quad(Renderer *self, Vertex *output, const Verte
    float pad_y0 = 0.0f;
    float pad_y1 = 0.0f;
 
-   /* Check for vertical or horizontal major lines.
-    * When expanding to a rect, do so in the appropriate direction.
-    * FIXME: This scheme seems to kinda work, but it seems very hard to find a method
-    * that looks perfect on every game.
+   /* Check for vertical or horizontal major lines. When expanding to a rect, do
+    * so in the appropriate direction. FIXME: This scheme seems to kinda work,
+    * but it seems very hard to find a method that looks perfect on every game.
     * Vagrant Story speech bubbles are a very good test case here! */
    if (abs_dx > abs_dy)
    {
@@ -9926,8 +9956,9 @@ static void renderer_build_line_quad(Renderer *self, Vertex *output, const Verte
 
 static void renderer_draw_line(Renderer *self, const Vertex *vertices)
 {
-   /* We can move this to GPU, but means more draw calls and more pipeline swapping.
-    * This should be plenty fast for the quite small amount of lines games render. */
+   /* We can move this to GPU, but means more draw calls and more pipeline
+    * swapping. This should be plenty fast for the quite small amount of lines
+    * games render. */
    Vertex vert[4];
    renderer_build_line_quad(self, vert, vertices);
    renderer_draw_quad(self, vert);
@@ -9972,8 +10003,9 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
          SemiTransparentStateVec_push(&self->queue.semi_transparent_state, &_sts);
       }
 
-      /* We've hit the dragon path, we'll need programmable blending for this render pass.
-       * self->render_pass_is_feedback enables self dependency in renderpass which is necessary for barriers between draws. */
+      /* We've hit the dragon path, we'll need programmable blending for this
+       * render pass. self->render_pass_is_feedback enables self dependency in
+       * renderpass which is necessary for barriers between draws. */
       self->render_pass_is_feedback = true;
    }
    }
@@ -9989,11 +10021,13 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 
    ih_reset(&self->last_scanout);
 
-   /* build_attribs may flush the queues, thus calling reset_queue and invalidating any pre-existing HdTextureHandle.
-    * self->tracker.no_hd_texture uses a special index (-1) that is the only one self->valid across such events.
-    * If in the future one were tempted to try to cache or reuse the last used HdTextureHandle here, they would have
-    * to be very careful not to let it get invalidated by build_attribs; so any such logic should happen within
-    * build_attribs itself, and not out here. */
+   /* build_attribs may flush the queues, thus calling reset_queue and
+    * invalidating any pre-existing HdTextureHandle. self->tracker.no_hd_texture
+    * uses a special index (-1) that is the only one self->valid across such
+    * events. If in the future one were tempted to try to cache or reuse the
+    * last used HdTextureHandle here, they would have to be very careful not to
+    * let it get invalidated by build_attribs; so any such logic should happen
+    * within build_attribs itself, and not out here. */
    hd_texture_index = hd_handle_make_none();
    { bool filtering = false;
    bool scaled_read = false;
@@ -10359,8 +10393,9 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
    /* These pixels are blended, so we have to render them in-order.
     * Batch up as long as we can. */
    { unsigned i; for (i = 1; i < prims; i++) {
-      /* If we need programmable shading, we can't batch as primitives may overlap.
-       * We could in theory do some fancy tests here, but probably overkill here. */
+      /* If we need programmable shading, we can't batch as primitives may
+       * overlap. We could in theory do some fancy tests here, but probably
+       * overkill here. */
       if ((last_state.masked && last_state.semi_transparent != SemiTransparentMode_None) ||
           !semi_transparent_state_eq(&last_state, SemiTransparentStateVec_at(&self->queue.semi_transparent_state, i)))
       {
@@ -10519,8 +10554,8 @@ static void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src)
    if (rect_intersects(dst, src))
    {
       unsigned factor;
-      /* The software implementation takes texture cache into account by copying 128 horizontal pixels at a time ...
-       * We can do it with compute. */
+      /* The software implementation takes texture cache into account by copying
+       * 128 horizontal pixels at a time ... We can do it with compute. */
       renderer_ensure_command_buffer(self);
 
       factor = domain == Domain_Scaled ? self->scaling : 1u;
@@ -10563,8 +10598,9 @@ static void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src)
                                        self->pipelines.blit_vram_cached_unscaled);
          commandbuffer_dispatch(cbh_get(&self->cmd), factor, factor, 1);
       }
-      /* LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
-       * dst.y, dst.width, dst.height); */
+      /* LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u,
+       * %u, size: %u, %u)\n", src.x, src.y, dst.x, dst.y, dst.width,
+       * dst.height); */
       }
    }
    else
@@ -11567,8 +11603,8 @@ static void fenceholder_fini(struct FenceHolder *self)
 static void fenceholder_wait(struct FenceHolder *self)
 {
    /* A null fence means no work was ever submitted against it (e.g. a failed
-    * vkQueueSubmit handed back VK_NULL_HANDLE); there is nothing to wait for and
-    * waiting on a null handle is invalid, so treat it as already signalled. */
+    * vkQueueSubmit handed back VK_NULL_HANDLE); there is nothing to wait for
+    * and waiting on a null handle is invalid, so treat it as already signalled. */
    if (self->fence == VK_NULL_HANDLE)
       return;
    if (vkWaitForFences(device_get_device(self->device), 1, &self->fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS)
@@ -12487,9 +12523,10 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
       if (vkCreateShaderModule(device_get_device(device), &info, NULL, &self->module) != VK_SUCCESS)
          LOGE("Failed to create shader module.\n");
 
-      /* SPIR-V reflection is done in a separate C++ shim (rhi_spirv_reflect.cpp)
-       * so this translation unit does not depend on SPIRV-Cross. The shim writes
-       * a POD layout whose fields mirror ResourceLayout; copy it across. */
+      /* SPIR-V reflection is done in a separate C++ shim
+       * (rhi_spirv_reflect.cpp) so this translation unit does not depend on
+       * SPIRV-Cross. The shim writes a POD layout whose fields mirror
+       * ResourceLayout; copy it across. */
       rhi_spirv_reflect(data, size / sizeof(uint32_t), &reflected);
       memcpy(&self->layout, &reflected, sizeof(self->layout));
       }
@@ -12552,16 +12589,18 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
       self->per_thread.should_begin = true;
       self->pool_size.items = NULL; self->pool_size.count = 0; self->pool_size.cap = 0;
       self->intrusive_node.key = hash;
-      /* The set_nodes temp-map was previously brought up by the TemporaryHashmap
-       * default initialiser; as a concrete POD member it must be initialised here. */
+      /* The set_nodes temp-map was previously brought up by the
+       * TemporaryHashmap default initialiser; as a concrete POD member it must
+       * be initialised here. */
       descriptor_set_thmap_init_empty(&self->per_thread.set_nodes);
       { VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
       DescriptorBindingVec bindings = { NULL, 0, 0 };
-      /* Immutable-sampler handles referenced by pImmutableSamplers must stay alive
-       * until vkCreateDescriptorSetLayout below; keep one slot per binding index in
-       * function scope rather than taking the address of a loop-body local (which
-       * would dangle by the time the create call reads it). */
+      /* Immutable-sampler handles referenced by pImmutableSamplers must stay
+       * alive until vkCreateDescriptorSetLayout below; keep one slot per
+       * binding index in function scope rather than taking the address of a
+       * loop-body local (which would dangle by the time the create call reads
+       * it). */
       VkSampler immutable_samplers[VULKAN_NUM_BINDINGS];
       { unsigned i; for (i = 0; i < VULKAN_NUM_BINDINGS; i++) {
          unsigned types;
@@ -12739,11 +12778,11 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
    }
 
    /* Concrete stack allocators (concrete StackAllocator<T, N>). Two
-    * instantiations were used - VkAttachmentReference x1024 and uint32_t x1024 -
-    * each a fixed buffer plus a bump offset. allocate returns NULL when the count
-    * is zero or would overflow; allocate_cleared additionally zero-fills the
-    * returned slots. offset must be zeroed at declaration (the previous default
-    * member initialiser). */
+    * instantiations were used - VkAttachmentReference x1024 and uint32_t x1024
+    * - each a fixed buffer plus a bump offset. allocate returns NULL when the
+    * count is zero or would overflow; allocate_cleared additionally zero-fills
+    * the returned slots. offset must be zeroed at declaration (the previous
+    * default member initialiser). */
    struct StackAllocatorRef
    {
       VkAttachmentReference buffer[1024];
@@ -12944,8 +12983,9 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          att->storeOp = rp_color_store_op(info, i);
          att->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
          att->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-         /* Undefined final layout here for now means that we will just use the layout of the last
-          * subpass which uses this attachment to avoid any dummy transition at the end. */
+         /* Undefined final layout here for now means that we will just use the
+          * layout of the last subpass which uses this attachment to avoid any
+          * dummy transition at the end. */
          att->finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
          if (image_get_create_info(image)->domain == ImageDomain_Transient)
@@ -12982,8 +13022,9 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          att->samples = image_get_create_info(image)->samples;
          att->loadOp = ds_load_op;
          att->storeOp = ds_store_op;
-         /* Undefined final layout here for now means that we will just use the layout of the last
-          * subpass which uses this attachment to avoid any dummy transition at the end. */
+         /* Undefined final layout here for now means that we will just use the
+          * layout of the last subpass which uses this attachment to avoid any
+          * dummy transition at the end. */
          att->finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
          if (format_to_aspect_mask(self->depth_stencil) & VK_IMAGE_ASPECT_STENCIL_BIT)
@@ -13100,8 +13141,8 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
       } }
 
       /* Now, figure out how each attachment is used throughout the subpasses.
-       * Either we don't care (inherit previous pass), or we need something specific.
-       * Start with initial layouts. */
+       * Either we don't care (inherit previous pass), or we need something
+       * specific. Start with initial layouts. */
       { uint32_t preserve_masks[VULKAN_NUM_ATTACHMENTS + 1] = {};
 
       /* Last subpass which makes use of an attachment. */
@@ -13295,8 +13336,8 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
                   current_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-               /* If the attachment is first used as an input attachment, the initial layout should actually be
-                * SHADER_READ_ONLY_OPTIMAL. */
+               /* If the attachment is first used as an input attachment, the
+                * initial layout should actually be SHADER_READ_ONLY_OPTIMAL. */
                if (!used && attachments[attachment].initialLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
                   attachments[attachment].initialLayout = current_layout;
 
@@ -13553,8 +13594,9 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          VK_VERSION_MAJOR(device_get_gpu_properties(self->device)->driverVersion) < 415)
 #endif
          {
-            /* Workaround a bug on NV where depth-stencil input attachments break if we have STORE_OP_DONT_CARE.
-             * Force STORE_OP_STORE for all attachments. */
+            /* Workaround a bug on NV where depth-stencil input attachments
+             * break if we have STORE_OP_DONT_CARE. Force STORE_OP_STORE for all
+             * attachments. */
             if (attachments != create_info->pAttachments)
             {
                memcpy(attachments, create_info->pAttachments, create_info->attachmentCount * sizeof(attachments[0]));
@@ -13769,8 +13811,8 @@ static VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
    {
       VK_ASSERT(self->vbo_block.mapped == NULL);
       VK_ASSERT(self->ubo_block.mapped == NULL);
-      /* The blocks are normally drained back to their pools (handles NULL) before
-       * teardown; fini is a safe release either way (was ~BufferBlock). */
+      /* The blocks are normally drained back to their pools (handles NULL)
+       * before teardown; fini is a safe release either way (was ~BufferBlock). */
       bufferblock_fini(&self->vbo_block);
       bufferblock_fini(&self->ubo_block);
    }
@@ -13865,10 +13907,11 @@ static VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
 
 static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
    {
-      /* ALL_GRAPHICS_BIT waits for vertex as well which causes performance issues on some drivers.
-       * It shouldn't matter, but hey.
-       * 
-       * We aren't using vertex with side-effects on relevant hardware so dropping VERTEX_SHADER_BIT is fine. */
+      /* ALL_GRAPHICS_BIT waits for vertex as well which causes performance
+       * issues on some drivers. It shouldn't matter, but hey.
+       *
+       * We aren't using vertex with side-effects on relevant hardware so
+       * dropping VERTEX_SHADER_BIT is fine. */
       if (((*src_stages) & VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT) != 0 && fixup)
       {
          *src_stages &= ~VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
@@ -15187,8 +15230,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          const VkPhysicalDeviceFeatures *required_features)
    {
       /* Replicate the former default member initialisers explicitly (a malloc'd
-       * Context has indeterminate members otherwise). gpu_props/mem_props/ext are
-       * outputs of create_device, written before any read and guarded by
+       * Context has indeterminate members otherwise). gpu_props/mem_props/ext
+       * are outputs of create_device, written before any read and guarded by
        * is_valid(); zero them defensively. */
       ctx->device = VK_NULL_HANDLE;
       ctx->instance = instance;
@@ -15432,8 +15475,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       device_info.queueCreateInfoCount = queue_family_count;
 
-      /* At most the caller-required extensions plus a fixed set of optional ones
-       * added below; size to that bound exactly. */
+      /* At most the caller-required extensions plus a fixed set of optional
+       * ones added below; size to that bound exactly. */
       { const char **enabled_extensions = (const char **)malloc((num_required_device_extensions + 16) * sizeof(const char *));
       unsigned enabled_extensions_count = 0;
       const char **enabled_layers = (const char **)malloc((num_required_device_layers + 4) * sizeof(const char *));
@@ -15562,12 +15605,12 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 
    /* Establish a Device in raw (uninitialised) storage. This sets every member
-    * that per-member initialisation would, so it is correct when called
-    * on malloc'd memory where no initialiser has run. No member allocates at this
+    * that per-member initialisation would, so it is correct when called on
+    * malloc'd memory where no initialiser has run. No member allocates at this
     * point, so the established state is simply "empty". */
    /* device_frame: was the inline device frame() accessor; returns the current
-    * frame context (the ring slot selected by frame_context_index). Returns a pointer
-    * now instead of a reference. */
+    * frame context (the ring slot selected by frame_context_index). Returns a
+    * pointer now instead of a reference. */
    static struct PerFrame *device_frame(Device *self)
    {
       VK_ASSERT(self->frame_context_index < self->per_frame.count);
@@ -15591,30 +15634,31 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       self->transfer_queue_family_index = 0;
       self->lock.counter   = 0;
 
-      /* POD aggregates with no NSDMI - the initialiser leaves them indeterminate
-       * and set_context()/init() fill them before use; zero them so a malloc'd
-       * Device starts from a defined state. */
+      /* POD aggregates with no NSDMI - the initialiser leaves them
+       * indeterminate and set_context()/init() fill them before use; zero them
+       * so a malloc'd Device starts from a defined state. */
       memset(&self->mem_props,   0, sizeof(self->mem_props));
       memset(&self->gpu_props,   0, sizeof(self->gpu_props));
       memset(&self->ext,         0, sizeof(self->ext));
       memset(&self->workarounds, 0, sizeof(self->workarounds));
 
-      /* Fixed stock-sampler handle array: each SamplerHandle is a single pointer
-       * defaulting to NULL, so a zero-fill is the empty state. */
+      /* Fixed stock-sampler handle array: each SamplerHandle is a single
+       * pointer defaulting to NULL, so a zero-fill is the empty state. */
       memset(self->samplers, 0, sizeof(self->samplers));
 
-      /* Per-queue submission state. Each QueueData holds a SemaphoreHandleVec and
-       * a VkPipelineStageVec (both { items=NULL, count=0, cap=0 } when empty) plus
-       * a need_fence flag; none has its initialiser run under malloc, so zero them
-       * to their empty state. clear_wait_semaphores() iterates these during the
-       * very first set_context()/init_frame_contexts(), so they must be valid here. */
+      /* Per-queue submission state. Each QueueData holds a SemaphoreHandleVec
+       * and a VkPipelineStageVec (both { items=NULL, count=0, cap=0 } when
+       * empty) plus a need_fence flag; none has its initialiser run under
+       * malloc, so zero them to their empty state. clear_wait_semaphores()
+       * iterates these during the very first
+       * set_context()/init_frame_contexts(), so they must be valid here. */
       memset(&self->graphics, 0, sizeof(self->graphics));
       memset(&self->compute,  0, sizeof(self->compute));
       memset(&self->transfer, 0, sizeof(self->transfer));
 
-      /* Pending CPU->GPU DMA staging lists (BufferBlockVec vbo/ubo): initialiser-only,
-       * empty state is { NULL, 0, 0 }; zero so the first submit/end-frame that
-       * iterates or clears them is valid. */
+      /* Pending CPU->GPU DMA staging lists (BufferBlockVec vbo/ubo):
+       * initialiser-only, empty state is { NULL, 0, 0 }; zero so the first
+       * submit/end-frame that iterates or clears them is valid. */
       memset(&self->dma, 0, sizeof(self->dma));
 
       /* Owning members - establish each one's empty state via its raw-memory init. */
@@ -15648,12 +15692,12 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       fencemanager_deinit(&self->managers.fence);
       semaphoremanager_deinit(&self->managers.semaphore);
 
-      /* Remaining teardown in reverse member-declaration order, matching what the
-       * implicit member teardown did. Declaration order is handle_pool,
-       * managers, per_frame, the five VulkanCache, then the two allocators; so the
-       * destruction order is allocators, caches, per_frame, managers, handle_pool.
-       * In particular per_frame is destroyed AFTER the caches, as its declaration
-       * comment requires. */
+      /* Remaining teardown in reverse member-declaration order, matching what
+       * the implicit member teardown did. Declaration order is handle_pool,
+       * managers, per_frame, the five VulkanCache, then the two allocators; so
+       * the destruction order is allocators, caches, per_frame, managers,
+       * handle_pool. In particular per_frame is destroyed AFTER the caches, as
+       * its declaration comment requires. */
       framebuffer_allocator_deinit(&self->framebuffer_allocator);
       attachment_allocator_deinit(&self->transient_allocator);
       program_map_deinit(&self->programs);
@@ -15665,8 +15709,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       bufferpool_deinit(&self->managers.vbo);
       bufferpool_deinit(&self->managers.ubo);
       deviceallocator_deinit(&self->managers.memory);
-      /* Free the per-queue wait lists' backing storage. These plain structs have
-       * no teardown (Device is malloc'd, so no member teardown ran), and
+      /* Free the per-queue wait lists' backing storage. These plain structs
+       * have no teardown (Device is malloc'd, so no member teardown ran), and
        * clear_wait_semaphores only resets counts, so free them explicitly here. */
       sem_handle_vec_deinit(&self->graphics.wait_semaphores);
       sem_handle_vec_deinit(&self->compute.wait_semaphores);
@@ -15854,8 +15898,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             }
          } }
 
-         /* Merge push constant ranges into one range.
-          * Do not try to split into multiple ranges as it just complicates things for no obvious gain. */
+         /* Merge push constant ranges into one range. Do not try to split into
+          * multiple ranges as it just complicates things for no obvious gain. */
          if (shader_layout->push_constant_size != 0)
          {
             layout.push_constant_range.stageFlags |= 1u << i;
@@ -16157,9 +16201,10 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       {
          if (result == VK_SUCCESS)
          {
-            /* See device_submit_queue(self): never enqueue a fence that was handed to a
-             * failed submit - it will never signal and would hang the frame's
-             * vkWaitForFences. Recycle it and return a null fence instead. */
+            /* See device_submit_queue(self): never enqueue a fence that was
+             * handed to a failed submit - it will never signal and would hang
+             * the frame's vkWaitForFences. Recycle it and return a null fence
+             * instead. */
             FenceVec_push(&device_frame(self)->wait_fences, &cleared_fence);
             *fence = cleared_fence;
          }
@@ -16392,9 +16437,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          {
             /* Only wait on a fence that is actually associated with submitted
              * work. If the submit failed the fence will never be signalled, so
-             * enqueuing it for the next per-frame begin() would wedge that frame
-             * in vkWaitForFences(UINT64_MAX) forever. Recycle it instead and hand
-             * the caller a null fence. */
+             * enqueuing it for the next per-frame begin() would wedge that
+             * frame in vkWaitForFences(UINT64_MAX) forever. Recycle it instead
+             * and hand the caller a null fence. */
             FenceVec_push(&device_frame(self)->wait_fences, &cleared_fence);
             *fence = cleared_fence;
          }
@@ -16447,8 +16492,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       commandbuffer_end_region(cbh_get(&cmd));
 
-      /* Do not flush self->graphics or self->compute in self context.
-       * We must be able to inject semaphores into all currently enqueued self->graphics / self->compute. */
+      /* Do not flush self->graphics or self->compute in self context. We must
+       * be able to inject semaphores into all currently enqueued self->graphics
+       * / self->compute. */
       device_submit_staging(self, &cmd, usage, false);
    }
 
@@ -16596,8 +16642,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 #ifdef VULKAN_DEBUG
 
    /* Debug-only check that a value is not already queued in a POD_VEC (the
-    * double-destroy guard). This is a macro doing the linear scan inline over the vec's
-    * items/count; it works for any element type comparable with ==. */
+    * double-destroy guard). This is a macro doing the linear scan inline over
+    * the vec's items/count; it works for any element type comparable with ==. */
 #define VK_ASSERT_NOT_IN_VEC(vec, value)                                       \
    do                                                                         \
    {                                                                          \
@@ -17001,11 +17047,11 @@ static VkImageViewType get_image_view_type(const ImageCreateInfo *create_info, c
 
    /* ImageResourceHolder: a scoped owner of the Vulkan objects created while
     * building an Image (the image, its memory/allocation, and the various image
-    * views). A plain C struct plus
-    * image_resource_holder_* free functions. The teardown (cleanup() if still
-    * owned) becomes image_resource_holder_fini, which the two using functions
-    * (create_image_view / create_image) call explicitly before every return.
-    * Ownership is released by setting owned=false once the objects are handed off. */
+    * views). A plain C struct plus image_resource_holder_* free functions. The
+    * teardown (cleanup() if still owned) becomes image_resource_holder_fini,
+    * which the two using functions (create_image_view / create_image) call
+    * explicitly before every return. Ownership is released by setting
+    * owned=false once the objects are handed off. */
    struct ImageResourceHolder
    {
       VkDevice device;
@@ -17090,8 +17136,9 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       if (info->viewType == VK_IMAGE_VIEW_TYPE_3D)
          return true;
 
-      /* If we have a render target, and non-trivial case (layers = 1, levels = 1),
-       * create an array of render targets which correspond to each layer (mip 0). */
+      /* If we have a render target, and non-trivial case (layers = 1, levels =
+       * 1), create an array of render targets which correspond to each layer
+       * (mip 0). */
       if ((image_create_info->usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0 &&
             ((info->subresourceRange.levelCount > 1) || (info->subresourceRange.layerCount > 1)))
       {
@@ -17467,12 +17514,13 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          { bool need_mipmap_barrier = true;
          bool need_initial_barrier = true;
 
-         /* Now we've used the TRANSFER queue to copy data over to the GPU.
-          * For mipmapping, we're now moving over to self->graphics,
-          * the self->transfer queue is designed for CPU <-> GPU and that's it. */
+         /* Now we've used the TRANSFER queue to copy data over to the GPU. For
+          * mipmapping, we're now moving over to self->graphics, the
+          * self->transfer queue is designed for CPU <-> GPU and that's it. */
 
-         /* For concurrent queue mode, we just need to inject a semaphore.
-          * For non-concurrent queue mode, we will have to inject ownership self->transfer barrier if the queue families do not match. */
+         /* For concurrent queue mode, we just need to inject a semaphore. For
+          * non-concurrent queue mode, we will have to inject ownership
+          * self->transfer barrier if the queue families do not match. */
 
          CommandBufferHandle graphics_cmd = device_request_command_buffer(self, Type_Generic);
          CommandBufferHandle transfer_cmd; transfer_cmd.data = NULL;
@@ -17496,8 +17544,9 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
             VkPipelineStageFlags dst_stages =
                generate_mips ? (VkPipelineStageFlags)(VK_PIPELINE_STAGE_TRANSFER_BIT) : image_get_stage_flags(ih_get(&handle));
 
-            /* We can't just use semaphores, we will also need a release + acquire barrier to marshal ownership from
-             * self->transfer queue over to self->graphics ... */
+            /* We can't just use semaphores, we will also need a release +
+             * acquire barrier to marshal ownership from self->transfer queue
+             * over to self->graphics ... */
             if (self->transfer_queue_family_index != self->graphics_queue_family_index)
             {
                VkImageMemoryBarrier acquire;
@@ -17660,8 +17709,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       if (self->graphics_queue_family_index != self->compute_queue_family_index ||
             self->graphics_queue_family_index != self->transfer_queue_family_index)
       {
-         /* For buffers, always just use CONCURRENT access modes,
-          * so we don't have to deal with acquire/release barriers in async self->compute. */
+         /* For buffers, always just use CONCURRENT access modes, so we don't
+          * have to deal with acquire/release barriers in async self->compute. */
          info.sharingMode = VK_SHARING_MODE_CONCURRENT;
 
          sharing_indices[info.queueFamilyIndexCount++] = self->graphics_queue_family_index;
@@ -17997,8 +18046,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          else if (stage == Stage_Fragment)
          {
             /* Write-after-write in fragment is handled implicitly.
-             * Write-after-read means rendering to a block after reading it as a texture.
-             * This is a hazard we must handle. */
+             * Write-after-read means rendering to a block after reading it as a
+             * texture. This is a hazard we must handle. */
             hazard_domains &= ~STATUS_FRAGMENT_FB_WRITE;
             resolve_domains = STATUS_FRAGMENT_FB_WRITE;
          }
@@ -18012,8 +18061,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          else if (stage == Stage_Fragment)
          {
             /* Write-after-write in fragment is handled implicitly.
-             * Write-after-read means rendering to a block after reading it as a texture.
-             * This is a hazard we must handle. */
+             * Write-after-read means rendering to a block after reading it as a
+             * texture. This is a hazard we must handle. */
             hazard_domains &= ~STATUS_FRAGMENT_SFB_WRITE;
             resolve_domains = STATUS_FRAGMENT_SFB_WRITE;
          }
@@ -18025,8 +18074,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       { unsigned y; for (y = ybegin; y <= yend; y++)
          { unsigned x; for (x = xbegin; x <= xend; x++) write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains; } }
 
-      /* Trying to update VRAM before fragment is done reading it.
-       * We could use copy-on-write here to avoid flushing, but this scenario is very rare. */
+      /* Trying to update VRAM before fragment is done reading it. We could use
+       * copy-on-write here to avoid flushing, but this scenario is very rare. */
       if (write_domains & STATUS_TEXTURE_READ)
          fbatlas_flush_render_pass(self);
 
@@ -18292,8 +18341,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          fbatlas_sync_domain(self, Domain_Scaled, &self->renderpass.rect);
          if (fbatlas_write_domain(self, Domain_Scaled, Stage_Fragment, &self->renderpass.rect))
          {
-            /* If render pass was flushed here due to write-after-read hazards, set rect to
-             * our new scissored_rect instead. */
+            /* If render pass was flushed here due to write-after-read hazards,
+             * set rect to our new scissored_rect instead. */
             self->renderpass.inside = true;
             fbatlas_flush_render_pass(self);
             self->renderpass.rect = scissored_rect;
@@ -18349,15 +18398,16 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       if (rect->width == 0 || rect->height == 0)
          return;
 
-      /* If we're clearing completely outside the self->renderpass, we're probably doing another render pass
-       * somewhere else, so end the current one and start a new one instead. */
+      /* If we're clearing completely outside the self->renderpass, we're
+       * probably doing another render pass somewhere else, so end the current
+       * one and start a new one instead. */
       if (self->renderpass.inside && !rect_intersects(&self->renderpass.rect, rect))
          fbatlas_flush_render_pass(self);
 
       fbatlas_extend_render_pass(self, rect, false);
 
-      /* If the render pass area doesn't increase later, we can use loadOp == CLEAR instead of LOAD,
-       * which helps a lot on mobile GPUs. */
+      /* If the render pass area doesn't increase later, we can use loadOp ==
+       * CLEAR instead of LOAD, which helps a lot on mobile GPUs. */
       renderer_clear_quad(self->listener, rect, fb_color, rect_eq(&self->renderpass.rect, rect));
 
       xbegin = rect->x / BLOCK_WIDTH;
@@ -18453,7 +18503,7 @@ static int cfg_parse_field(const char **pp, int *out)
 }
 
 /* Match one config line against:
- *   ^\s*ignore\s+(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*(?:#.*)?$
+ * ^\s*ignore\s+(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*(?:#.*)?$
  * On match, fills *m and returns true. Hand-rolled matcher. */
 static bool cfg_match_ignore(const char *line, RectMatch *m)
 {
@@ -18604,8 +18654,9 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
    }
 
    static LoadedImage generate_mip(LoadedImage *higher) {
-      /* Generate custom mipmaps in order to avoid transparent (0, 0, 0, 0) and semi-transparent (r, g, b, a>=128)
-       * mixing to create some dark opaque value (r, g, b, a<128). */
+      /* Generate custom mipmaps in order to avoid transparent (0, 0, 0, 0) and
+       * semi-transparent (r, g, b, a>=128) mixing to create some dark opaque
+       * value (r, g, b, a<128). */
 
       LoadedImage result;
       int x, y;
@@ -18740,8 +18791,8 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 
    static void io_thread(void *user_data) {
       /* Pool worker. Each worker is handed the channel pointer with a reference
-       * already taken on its behalf (at spawn); it releases that reference on the
-       * way out. Whichever holder releases last frees the channel. */
+       * already taken on its behalf (at spawn); it releases that reference on
+       * the way out. Whichever holder releases last frees the channel. */
       IOChannel *channel = (IOChannel *)user_data;
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread starting\n");
 
@@ -18833,7 +18884,8 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       { int i; for (i = 0; i < NUM_IO_THREADS; i++) {
          sthread_t * thread;
          /* Take a reference on the worker's behalf BEFORE it starts, so the
-          * channel can't be freed out from under it; the worker releases on exit. */
+          * channel can't be freed out from under it; the worker releases on
+          * exit. */
          io_channel_acquire(t->channel);
          thread = sthread_create(io_thread, t->channel);
          if (thread) {
@@ -19077,8 +19129,8 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       free(self->cached_palette_hashes);
       fused_pages_deinit(&self->fused_pages); /* embedded FusedPages: explicit deinit (was default teardown) */
       rect_tracker_deinit(&self->tracker); /* embedded RectTracker: explicit deinit (was default teardown) */
-      /* Signal and drop the IO worker pool last. Previously self->iothread was a
-       * by-value member, so its teardown ran after this body; preserve that
+      /* Signal and drop the IO worker pool last. Previously self->iothread was
+       * a by-value member, so its teardown ran after this body; preserve that
        * ordering by deinitialising it here at the end. */
       io_thread_deinit(&self->iothread);
    }
@@ -19311,9 +19363,11 @@ static Rect fromSRect(SRect rect) {
             }
          }
          hash = crc32(0, (unsigned char*)img, rect.width * rect.height * sizeof(uint16_t));
-         /* TODO: check for hash collision, by checking if existing upload has different dimensions. not sure how to recover if it does,
-          * but the odds of a collision are probably much higher than the odds that both textures would be in play simultaneously,
-          * so it'd probably be safe to simply ignore the newest upload and clear instead. */
+         /* TODO: check for hash collision, by checking if existing upload has
+          * different dimensions. not sure how to recover if it does, but the
+          * odds of a collision are probably much higher than the odds that both
+          * textures would be in play simultaneously, so it'd probably be safe
+          * to simply ignore the newest upload and clear instead. */
          upload = texture_tracker_find_upload(self, hash);    /* borrowed */
          if (upload == NULL) {
             upload = texture_upload_new();  /* owns +1 */
@@ -19362,12 +19416,12 @@ static Rect fromSRect(SRect rect) {
       fused_pages_mark_dirty(&self->fused_pages, rect);
       fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self->uploader);
 
-      /* HD texture caching method:
-       * - Lazy (self->eager_textures=false): nothing is queued here; each (hash,palette)
-       * is loaded on demand when first drawn (request_hd_texture). Leanest.
-       * - Eager (self->eager_textures=true, the master-consistent default): on the first
-       * upload of a hash, prefetch ALL of its known palette variants into the
-       * cache. Routed through want_combo so it still respects the cache
+      /* HD texture caching method: - Lazy (self->eager_textures=false): nothing
+       * is queued here; each (hash,palette) is loaded on demand when first
+       * drawn (request_hd_texture). Leanest. - Eager
+       * (self->eager_textures=true, the master-consistent default): on the
+       * first upload of a hash, prefetch ALL of its known palette variants into
+       * the cache. Routed through want_combo so it still respects the cache
        * (decode-once / dedup) and the VRAM/RAM budgets, unlike stock Beetle's
        * raw load_hd_texture. */
       if (self->eager_textures && self->hd_textures_enabled && !preexisting) {
@@ -19408,11 +19462,12 @@ static Rect fromSRect(SRect rect) {
       }
    }
 
-   /* Queue a disk load for one (hash,palette) combo, unless it's already decoded
-    * (in the cache), already in flight, or known to have no file. Combos with no
-    * file are inserted into `requested` as a permanent negative cache. The IO
-    * thread only pushes a response on success, so a failed/missing load stays in
-    * `requested` and is never retried (until a reload clears it). */
+   /* Queue a disk load for one (hash,palette) combo, unless it's already
+    * decoded (in the cache), already in flight, or known to have no file.
+    * Combos with no file are inserted into `requested` as a permanent negative
+    * cache. The IO thread only pushes a response on success, so a
+    * failed/missing load stays in `requested` and is never retried (until a
+    * reload clears it). */
    void texture_tracker_want_combo(struct TextureTracker *self, HdTextureId id) {
       if (HdGpuCache_contains(&self->hd_gpu_cache, hd_pack_key(id)) || HdImageCache_contains(&self->hd_cache, hd_pack_key(id)))
          return; /* already resident in VRAM, or already decoded in RAM */
@@ -19437,17 +19492,18 @@ static Rect fromSRect(SRect rect) {
    }
 
    /* Cache-backed HD texture binding for a drawn (hash,palette): pure lazy.
-    * 
-    * If the combo is in the GPU cache, bind it immediately (handle copy, used this
-    * frame). If it's decoded in the CPU cache, schedule a GPU upload for the next
-    * safe point (on_queues_reset). Otherwise queue a single disk load for it. The
-    * 3-tier cache makes every re-draw free, so each combo costs at most one decode
-    * on its very first appearance.
-    * 
+    *
+    * If the combo is in the GPU cache, bind it immediately (handle copy, used
+    * this frame). If it's decoded in the CPU cache, schedule a GPU upload for
+    * the next safe point (on_queues_reset). Otherwise queue a single disk load
+    * for it. The 3-tier cache makes every re-draw free, so each combo costs at
+    * most one decode on its very first appearance.
+    *
     * (Cross-hash prefetch was tried and removed: with the cache, re-draws are
-    * already free, so warming the whole palette hash-set up front mostly decoded
-    * combos that were never drawn - thrashing the RAM cache and clogging the IO
-    * queue ahead of the combos actually on screen, which made pop-in worse.) */
+    * already free, so warming the whole palette hash-set up front mostly
+    * decoded combos that were never drawn - thrashing the RAM cache and
+    * clogging the IO queue ahead of the combos actually on screen, which made
+    * pop-in worse.) */
    void texture_tracker_request_hd_texture(struct TextureTracker *self, TextureUpload *upload, uint32_t palette_hash) {
       if (hd_tex_map_contains(&upload->textures, palette_hash))
          return; /* already attached to this upload */
@@ -19455,11 +19511,11 @@ static Rect fromSRect(SRect rect) {
       { HdTextureId current = { upload->hash, palette_hash };
 
       /* GPU-cache hit: the Vulkan image already exists, so binding it is just a
-       * ref-counted handle copy (no Vulkan commands). Bind it IMMEDIATELY so the
-       * CURRENT self->frame's draw uses the HD texture. Deferring to on_queues_reset
-       * cost a 1-self->frame native flicker every time an animation self->frame's upload was
-       * recreated (constant for sprites) - i.e. persistent pop-in even when the
-       * image was fully cached. */
+       * ref-counted handle copy (no Vulkan commands). Bind it IMMEDIATELY so
+       * the CURRENT self->frame's draw uses the HD texture. Deferring to
+       * on_queues_reset cost a 1-self->frame native flicker every time an
+       * animation self->frame's upload was recreated (constant for sprites) -
+       * i.e. persistent pop-in even when the image was fully cached. */
       CachedGpuImage *gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(current));
       if (gpu != NULL) {
          hd_tex_map_set(&upload->textures, palette_hash, gpu->image, gpu->alpha_flags);
@@ -19467,8 +19523,8 @@ static Rect fromSRect(SRect rect) {
          return;
       }
 
-      /* CPU-cache hit (decoded but not in VRAM): needs a GPU upload, which we keep
-       * at the safe point - schedule it for on_queues_reset. */
+      /* CPU-cache hit (decoded but not in VRAM): needs a GPU upload, which we
+       * keep at the safe point - schedule it for on_queues_reset. */
       if (HdImageCache_contains(&self->hd_cache, hd_pack_key(current)))
          hd_key_set_insert(&self->pending_attach, hd_pack_key(current));
       else
@@ -19541,8 +19597,8 @@ static Rect fromSRect(SRect rect) {
       CacheEntry e;
       e.rect = rect;
       e.handle = handle;
-      /* If full, the entry at index max_size-1 (the LRU) is dropped by the shift
-       * below not preserving it. Otherwise grow by one. */
+      /* If full, the entry at index max_size-1 (the LRU) is dropped by the
+       * shift below not preserving it. Otherwise grow by one. */
       if (self->count < self->max_size)
          self->count++;
       for (j = self->count - 1; j > 0; j--)
@@ -19572,8 +19628,10 @@ static Rect fromSRect(SRect rect) {
          HandleCacheResult cache_result = handle_lru_cache_get(&self->handle_cache, rect, palette_hash);
          (*cache_hit) = cache_result.found;
          if ((*cache_hit)) {
-            /* cache_result.handle is currently always a non-fused, non-none, index + palette_hash
-             * in the future it may be useful to cache none, but there's currently no way to check if such a containing rect is still alive (since HdTextureHandle's index would be -1) */
+            /* cache_result.handle is currently always a non-fused, non-none,
+             * index + palette_hash in the future it may be useful to cache
+             * none, but there's currently no way to check if such a containing
+             * rect is still alive (since HdTextureHandle's index would be -1) */
             EnduringTextureRect *tex = &self->tracker.textures.a[cache_result.handle.index]; /* Forgive me */
             if (tex->alive) {
                (*fastpath_capable_out) = self->fastpath_enabled && ((hd_tex_map_find(&tex->texture_rect.upload->textures, palette_hash) ? hd_tex_map_find(&tex->texture_rect.upload->textures, palette_hash)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
@@ -19617,9 +19675,9 @@ static Rect fromSRect(SRect rect) {
          HdTexEntry *overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
          if (overlapped_image == NULL) {
             /* Not bound to this upload yet. Bind it now: a GPU-cache hit binds
-             * in-frame (handle copy, used by THIS draw - no 1-self->frame native
-             * flicker), otherwise this schedules a decode / GPU upload that
-             * lands on a later self->frame. */
+             * in-frame (handle copy, used by THIS draw - no 1-self->frame
+             * native flicker), otherwise this schedules a decode / GPU upload
+             * that lands on a later self->frame. */
             texture_tracker_request_hd_texture(self, tex->upload, palette_hash);
             overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
          }
@@ -19655,10 +19713,14 @@ static Rect fromSRect(SRect rect) {
       {
          int scaleX;
          ImageHandle image;
-         /* HdTextureHandle's are perhaps too tricky.  They assume that the RectTracker's textures vector hasn't removed anything since the handle was
-          * created. So it would seem all you need to do is, in renderer reset_queue, call the rect-tracker dead-handle release. Except you have to be
-          * very very careful that no handles outside of the queues (ie. local) exist across a call to reset_queue.  That is, the handle must go into
-          * the queue as soon as possible, otherwise that hd texture might not work (previously it would segfault). */
+         /* HdTextureHandle's are perhaps too tricky.  They assume that the
+          * RectTracker's textures vector hasn't removed anything since the
+          * handle was created. So it would seem all you need to do is, in
+          * renderer reset_queue, call the rect-tracker dead-handle release.
+          * Except you have to be very very careful that no handles outside of
+          * the queues (ie. local) exist across a call to reset_queue.  That is,
+          * the handle must go into the queue as soon as possible, otherwise
+          * that hd texture might not work (previously it would segfault). */
          TextureRect *tex = rect_tracker_get_index(&self->tracker, handle.index);
          if (tex == NULL) {
             if (handle.index != -1) {
@@ -19673,8 +19735,9 @@ static Rect fromSRect(SRect rect) {
             }
          }
          { TextureUpload *upload = tex->upload;
-         /* Use find rather than index, because if a stale HdTextureHandle was provided this could segfault
-          * because indexing on a key that isn't present would initialize a new one with a null pointer */
+         /* Use find rather than index, because if a stale HdTextureHandle was
+          * provided this could segfault because indexing on a key that isn't
+          * present would initialize a new one with a null pointer */
          HdTexEntry *iter = hd_tex_map_find(&upload->textures, handle.palette_hash);
          if (iter == NULL) {
             TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
@@ -19686,8 +19749,8 @@ static Rect fromSRect(SRect rect) {
                return _r;
             }
          }
-         /* Reconstruct a counted handle from the stored raw image (add_reference
-          * then adopt), matching hd_gpu_image_handle. */
+         /* Reconstruct a counted handle from the stored raw image
+          * (add_reference then adopt), matching hd_gpu_image_handle. */
          image_add_reference(iter->image);
          image = ih_make(iter->image);
          scaleX = image_get_width(ih_get(&image), 0) / upload->width;
@@ -19733,8 +19796,9 @@ static bool is_power_of_two(int n) {
       slock_unlock(self->iothread.channel->lock);
 
       /* Move freshly decoded images into the cache (decode-once); mark them for
-       * attach. The cache owns them regardless of whether their hash is resident.
-       * Each response node is freed after its levels are moved into the cache. */
+       * attach. The cache owns them regardless of whether their hash is
+       * resident. Each response node is freed after its levels are moved into
+       * the cache. */
       {
          IOResponse *response = responses;
          while (response != NULL) {
@@ -19754,8 +19818,8 @@ static bool is_power_of_two(int n) {
       /* Attach pass: for every wanted combo whose base hash is currently
        * resident, bind an HD image to it. Prefer the GPU cache (a ref-counted
        * handle copy - no upload); otherwise build the image from the CPU cache
-       * and store it in the GPU cache. Combos whose hash isn't resident yet stay
-       * cached (NOT discarded) and attach on a later self->frame. */
+       * and store it in the GPU cache. Combos whose hash isn't resident yet
+       * stay cached (NOT discarded) and attach on a later self->frame. */
       {
          int pi;
          for (pi = 0; pi < self->pending_attach.count; pi++) {
@@ -20297,8 +20361,8 @@ static int64_t page_bytes(FusionRects *fusion)
 
    /* qsort comparator: descending order, matching texture_rect_sort_gt. Equal
     * elements (fully identical under the predicate) are interchangeable, so the
-    * unstable order among them does not affect the canonical-form comparison this
-    * sort exists to enable. */
+    * unstable order among them does not affect the canonical-form comparison
+    * this sort exists to enable. */
    static int texture_rect_qsort_cmp(const void *pa, const void *pb) {
       const TextureRect *a = (const TextureRect *)(pa);
       const TextureRect *b = (const TextureRect *)(pb);
@@ -20385,9 +20449,10 @@ static int64_t page_bytes(FusionRects *fusion)
 
       /* TODO: I don't know SHIT about barriers. */
 
-      /* special sentinel value
-       * Note that due to the way textures are put into a page, these special values will not bleed into neighbors in the mipmaps,
-       * because the mipmaps are only used down to the original resolution, and hd textures are aligned to that original resolution's
+      /* special sentinel value Note that due to the way textures are put into a
+       * page, these special values will not bleed into neighbors in the
+       * mipmaps, because the mipmaps are only used down to the original
+       * resolution, and hd textures are aligned to that original resolution's
        * texels. */
       VkClearValue fallthrough = {0.0, 0.0, 0.0, 1.0};
 
@@ -20453,12 +20518,13 @@ static int64_t page_bytes(FusionRects *fusion)
                0
                );
 
-         /* Blit into every mipmap level down to base vram
-          * TODO: this isn't a great way to do this, will probably be blurrier than it could be if src and dst aspect ratios are different
-          * TODO: is this line even right? it sure doesn't look right */
+         /* Blit into every mipmap level down to base vram TODO: this isn't a
+          * great way to do this, will probably be blurrier than it could be if
+          * src and dst aspect ratios are different TODO: is this line even
+          * right? it sure doesn't look right */
          full_res_levels = log2(max_(rx, ry)) + 1;
-         /* assert(max_level >= 0 && max_level <= 6);
-          * TODO: this is incredibly finicky, and one bad (out of bounds) blit can bork everything */
+         /* assert(max_level >= 0 && max_level <= 6); TODO: this is incredibly
+          * finicky, and one bad (out of bounds) blit can bork everything */
          { int dstLevel; for (dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
             int srcLevel = max_(0, dstLevel - full_res_levels);
 
@@ -20724,8 +20790,8 @@ static int64_t page_bytes(FusionRects *fusion)
       }
       /* Need to reload the hd textures, too */
       { int e; for (e = 0; e < state->uploads.count; e++) texture_tracker_load_hd_texture(self, state->uploads.items[e].key); }
-      /* Drop the map's construction refs; the placed/restorable TextureRects now
-       * hold their own references to each upload. */
+      /* Drop the map's construction refs; the placed/restorable TextureRects
+       * now hold their own references to each upload. */
       { int i; for (i = 0; i < uploads.count; i++) texture_upload_release(uploads.items[i].val); }
       UploadPtrVec_free_storage(&uploads);
    }
@@ -20764,9 +20830,9 @@ extern retro_log_printf_t log_cb;
 static struct retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
 
-/* Owning vector of retro_vulkan_image (POD), replacing
- * A dynamic array of retro_vulkan_image. resize() grows/shrinks the backing array;
- * grown slots are zero-initialised. */
+/* Owning vector of retro_vulkan_image (POD), replacing A dynamic array of
+ * retro_vulkan_image. resize() grows/shrinks the backing array; grown slots are
+ * zero-initialised. */
 struct SwapchainImageVec {
    struct retro_vulkan_image *items;
    int count;
@@ -21435,8 +21501,9 @@ void rhi_vulkan_refresh_variables(void)
         visible_scanlines_changed)
        && renderer)
    {
-      /* Potential bad behavior from calling rhi_vulkan_get_system_av_info() from inside
-       * rhi_vulkan_refresh_variables() since both functions call each other... */
+      /* Potential bad behavior from calling rhi_vulkan_get_system_av_info()
+       * from inside rhi_vulkan_refresh_variables() since both functions call
+       * each other... */
       struct retro_system_av_info info;
       rhi_vulkan_get_system_av_info(&info);
 
@@ -21947,9 +22014,10 @@ void rhi_vulkan_load_image(
    /* This is called on state loading. */
    if (!inside_frame)
       renderer_flush(renderer);
-   /* renderer_copy_cpu_to_vram produced an owning BufferHandle and renderer_end_copy
-    * only unmaps it; the old C++ 'handle' value released it via its teardown at
-    * scope end (after the flush above), so drop that reference here. */
+   /* renderer_copy_cpu_to_vram produced an owning BufferHandle and
+    * renderer_end_copy only unmaps it; the old C++ 'handle' value released it
+    * via its teardown at scope end (after the flush above), so drop that
+    * reference here. */
    bh_reset(&handle);
    }
 }
