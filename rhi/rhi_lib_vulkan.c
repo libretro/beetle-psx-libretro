@@ -3169,7 +3169,6 @@ static VkSemaphore semaphoreholder_consume(struct SemaphoreHolder *self)
       self->signalled = false;
       return ret;
    }
-static void semaphoreholder_add_reference(struct SemaphoreHolder *self) { counter_add_ref(&self->reference_count); }
    static void semaphoreholder_release_reference(struct SemaphoreHolder *self);
 
    /* Semaphore handle: a plain struct (Semaphore wrapping SemaphoreHolder *) to
@@ -3190,7 +3189,7 @@ static int sem_is_valid(const struct Semaphore *h) { return h->data != NULL; }
     * old copy step used when a wait list is filled from a const Semaphore &). */
 static void sem_copy(struct Semaphore *dst, const struct Semaphore *src) {
       dst->data = src->data;
-      if (dst->data) semaphoreholder_add_reference(dst->data);
+      if (dst->data) counter_add_ref(&dst->data->reference_count);
    }
 
    /* Owning array of Semaphore (a refcounted SemaphoreHolder handle). a dynamic
