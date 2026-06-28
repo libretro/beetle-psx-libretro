@@ -15913,6 +15913,25 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             image_get_layout(imageview_get_image_const(view), VK_IMAGE_LAYOUT_GENERAL), view->cookie_base.cookie);
    }
 
+   /* Fill the fields every descriptor write shares (sType/pNext, count 1, array
+    * element 0) plus the per-write type, binding and set. The caller then sets
+    * exactly one of pBufferInfo / pImageInfo / pTexelBufferView. Returns the
+    * slot so the caller can fill that resource pointer. */
+   static VkWriteDescriptorSet *descriptor_write_begin(
+         VkWriteDescriptorSet *writes, uint32_t *write_count,
+         VkDescriptorType type, uint32_t binding, VkDescriptorSet set)
+   {
+      VkWriteDescriptorSet *write = &writes[(*write_count)++];
+      write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      write->pNext           = NULL;
+      write->descriptorCount = 1;
+      write->descriptorType  = type;
+      write->dstArrayElement = 0;
+      write->dstBinding      = binding;
+      write->dstSet          = set;
+      return write;
+   }
+
    static void commandbuffer_flush_descriptor_set(struct CommandBuffer *self,
          uint32_t set)
    {
@@ -16018,14 +16037,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->uniform_buffer_mask, _feit, binding)
          {
             VkDescriptorBufferInfo * buffer;
-            VkWriteDescriptorSet *write = &writes[write_count++];
-            write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write->pNext = NULL;
-            write->descriptorCount = 1;
-            write->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-            write->dstArrayElement = 0;
-            write->dstBinding = binding;
-            write->dstSet = allocated.set;
+            VkWriteDescriptorSet *write = descriptor_write_begin(writes, &write_count,
+                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, binding, allocated.set);
 
             /* Offsets are applied dynamically. */
             buffer = &buffer_info[buffer_info_count++];
@@ -16037,42 +16050,24 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
          { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->storage_buffer_mask, _feit, binding)
          {
-            VkWriteDescriptorSet *write = &writes[write_count++];
-            write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write->pNext = NULL;
-            write->descriptorCount = 1;
-            write->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            write->dstArrayElement = 0;
-            write->dstBinding = binding;
-            write->dstSet = allocated.set;
+            VkWriteDescriptorSet *write = descriptor_write_begin(writes, &write_count,
+                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, binding, allocated.set);
             write->pBufferInfo = &self->bindings.bindings[set][binding].buffer;
          }
          }
 
          { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampled_buffer_mask, _feit, binding)
          {
-            VkWriteDescriptorSet *write = &writes[write_count++];
-            write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write->pNext = NULL;
-            write->descriptorCount = 1;
-            write->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-            write->dstArrayElement = 0;
-            write->dstBinding = binding;
-            write->dstSet = allocated.set;
+            VkWriteDescriptorSet *write = descriptor_write_begin(writes, &write_count,
+                  VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, binding, allocated.set);
             write->pTexelBufferView = &self->bindings.bindings[set][binding].buffer_view;
          }
          }
 
          { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampled_image_mask, _feit, binding)
          {
-            VkWriteDescriptorSet *write = &writes[write_count++];
-            write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write->pNext = NULL;
-            write->descriptorCount = 1;
-            write->descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            write->dstArrayElement = 0;
-            write->dstBinding = binding;
-            write->dstSet = allocated.set;
+            VkWriteDescriptorSet *write = descriptor_write_begin(writes, &write_count,
+                  VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, binding, allocated.set);
 
             if (set_layout->fp_mask & (1u << binding))
                write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
@@ -16083,14 +16078,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
          { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->separate_image_mask, _feit, binding)
          {
-            VkWriteDescriptorSet *write = &writes[write_count++];
-            write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write->pNext = NULL;
-            write->descriptorCount = 1;
-            write->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-            write->dstArrayElement = 0;
-            write->dstBinding = binding;
-            write->dstSet = allocated.set;
+            VkWriteDescriptorSet *write = descriptor_write_begin(writes, &write_count,
+                  VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, binding, allocated.set);
 
             if (set_layout->fp_mask & (1u << binding))
                write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
@@ -16101,28 +16090,16 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
          { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampler_mask & ~set_layout->immutable_sampler_mask, _feit, binding)
          {
-            VkWriteDescriptorSet *write = &writes[write_count++];
-            write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write->pNext = NULL;
-            write->descriptorCount = 1;
-            write->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-            write->dstArrayElement = 0;
-            write->dstBinding = binding;
-            write->dstSet = allocated.set;
+            VkWriteDescriptorSet *write = descriptor_write_begin(writes, &write_count,
+                  VK_DESCRIPTOR_TYPE_SAMPLER, binding, allocated.set);
             write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
          }
          }
 
          { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->storage_image_mask, _feit, binding)
          {
-            VkWriteDescriptorSet *write = &writes[write_count++];
-            write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write->pNext = NULL;
-            write->descriptorCount = 1;
-            write->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            write->dstArrayElement = 0;
-            write->dstBinding = binding;
-            write->dstSet = allocated.set;
+            VkWriteDescriptorSet *write = descriptor_write_begin(writes, &write_count,
+                  VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, binding, allocated.set);
 
             if (set_layout->fp_mask & (1u << binding))
                write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
@@ -16133,14 +16110,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
          { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->input_attachment_mask, _feit, binding)
          {
-            VkWriteDescriptorSet *write = &writes[write_count++];
-            write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write->pNext = NULL;
-            write->descriptorCount = 1;
-            write->descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-            write->dstArrayElement = 0;
-            write->dstBinding = binding;
-            write->dstSet = allocated.set;
+            VkWriteDescriptorSet *write = descriptor_write_begin(writes, &write_count,
+                  VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, binding, allocated.set);
             if (set_layout->fp_mask & (1u << binding))
                write->pImageInfo = &self->bindings.bindings[set][binding].image.fp;
             else
