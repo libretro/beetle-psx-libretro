@@ -22577,13 +22577,13 @@ void rhi_vulkan_set_video_refresh(retro_video_refresh_t cb)
    video_refresh_cb = cb;
 }
 
-void rhi_vulkan_get_system_av_info(struct retro_system_av_info *info)
+/* Populate the av_info from the current (already-refreshed) globals. This does
+ * NOT call rhi_vulkan_refresh_variables, so it is safe to call from inside
+ * refresh_variables itself without re-entering it. */
+static void rhi_vulkan_fill_av_info(struct retro_system_av_info *info)
 {
-   rhi_vulkan_refresh_variables();
-
    memset(info, 0, sizeof(*info));
 
-   /* Set retro_game_geometry */
    info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
    info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
@@ -22593,9 +22593,14 @@ void rhi_vulkan_get_system_av_info(struct retro_system_av_info *info)
                                        content_is_pal ? last_scanline_pal : last_scanline,
                                        aspect_ratio_setting, show_vram, widescreen_hack, widescreen_hack_aspect_ratio_setting);
 
-   /* Set retro_system_timing */
    info->timing.fps = rhi_common_get_timing_fps();
    info->timing.sample_rate = SOUND_FREQUENCY;
+}
+
+void rhi_vulkan_get_system_av_info(struct retro_system_av_info *info)
+{
+   rhi_vulkan_refresh_variables();
+   rhi_vulkan_fill_av_info(info);
 }
 
 void rhi_vulkan_refresh_variables(void)
@@ -22896,11 +22901,17 @@ void rhi_vulkan_refresh_variables(void)
         visible_scanlines_changed)
        && renderer)
    {
-      /* Potential bad behavior from calling rhi_vulkan_get_system_av_info()
-       * from inside rhi_vulkan_refresh_variables() since both functions call
-       * each other... */
+      /* Build the av_info WITHOUT recursing through
+       * rhi_vulkan_get_system_av_info, which would re-run this function. The
+       * frontend's SET_SYSTEM_AV_INFO handler can synchronously reinitialize the
+       * video driver (context_destroy/context_reset) and call
+       * retro_get_system_av_info again; if that re-entered refresh_variables
+       * while this call were still on the stack it would tear down and rebuild
+       * the renderer mid-refresh, and -- when the reported scale keeps differing
+       * from the live one -- recurse until the stack overflows. fill_av_info
+       * reads the already-updated globals and does not refresh. */
       struct retro_system_av_info info;
-      rhi_vulkan_get_system_av_info(&info);
+      rhi_vulkan_fill_av_info(&info);
 
       if (!environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
       {
