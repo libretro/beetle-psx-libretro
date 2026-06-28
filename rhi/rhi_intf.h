@@ -61,6 +61,7 @@ bool rhi_intf_open(bool is_pal, bool force_software);
 void rhi_intf_close(void);
 void rhi_intf_refresh_variables(void);
 void rhi_intf_prepare_frame(void);
+void rhi_intf_apply_pending_geometry(void);
 void rhi_intf_finalize_frame(const void *fb, unsigned width,
                              unsigned height, unsigned pitch);
 

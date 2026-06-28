@@ -16,6 +16,7 @@ void rhi_vulkan_get_system_av_info(struct retro_system_av_info *info);
 bool rhi_vulkan_open(bool is_pal);
 void rhi_vulkan_refresh_variables(void);
 void rhi_vulkan_prepare_frame(void);
+void rhi_vulkan_apply_pending_geometry(void);
 void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
                                unsigned height, unsigned pitch);
 

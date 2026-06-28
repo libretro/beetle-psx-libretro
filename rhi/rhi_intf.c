@@ -373,6 +373,14 @@ void rhi_intf_prepare_frame(void)
    }
 }
 
+void rhi_intf_apply_pending_geometry(void)
+{
+#if defined(HAVE_VULKAN)
+   if (rhi_type == RHI_VULKAN)
+      rhi_vulkan_apply_pending_geometry();
+#endif
+}
+
 void rhi_intf_finalize_frame(const void *fb, unsigned width, 
                              unsigned height, unsigned pitch)
 {

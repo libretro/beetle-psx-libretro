@@ -22170,6 +22170,16 @@ static Context *context = NULL;
 static Device *device = NULL;
 static Renderer *renderer = NULL;
 static unsigned scaling = 4;
+/* Deferred geometry-change state. refresh_variables must not call
+ * SET_SYSTEM_AV_INFO inline: the frontend handles it synchronously, tearing down
+ * and rebuilding the device/renderer while a frame started by prepare_frame is
+ * still in flight and refresh_variables is still on the retro_run call stack -- a
+ * use-after-free that crashes (non-deterministically) on strict drivers. Instead
+ * record the new av_info here and let rhi_vulkan_apply_pending_geometry fire
+ * SET_SYSTEM_AV_INFO from the top of retro_run, before prepare_frame begins a
+ * frame, so the reinit happens cleanly between frames. */
+static bool geometry_change_pending = false;
+static struct retro_system_av_info pending_av_info;
 
 extern enum rhi_renderer_type rhi_type;
 extern retro_log_printf_t log_cb;
@@ -22918,14 +22928,12 @@ void rhi_vulkan_refresh_variables(void)
        * the renderer mid-refresh, and -- when the reported scale keeps differing
        * from the live one -- recurse until the stack overflows. fill_av_info
        * reads the already-updated globals and does not refresh. */
-      struct retro_system_av_info info;
-      rhi_vulkan_fill_av_info(&info);
-
-      if (!environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
-      {
-         /* Failed to change scale, just keep using the old one. */
-         scaling = old_scaling;
-      }
+      /* Record the new geometry and defer the SET_SYSTEM_AV_INFO call to the
+       * next retro_run boundary (see geometry_change_pending). Calling it here
+       * would reinitialise the device/renderer synchronously, mid-frame and mid
+       * retro_run, which is a use-after-free. */
+      rhi_vulkan_fill_av_info(&pending_av_info);
+      geometry_change_pending = true;
    }
    }
 }
@@ -22952,6 +22960,20 @@ static void ensure_sync_index_resources(void)
  * frame. Preserves VRAM across the rebuild exactly as vk_context_reset does
  * (save -> idle -> release scanout handles -> fini -> init with the saved
  * state). */
+void rhi_vulkan_apply_pending_geometry(void)
+{
+   /* Fire a deferred geometry change recorded by refresh_variables. Called from
+    * the top of retro_run BEFORE prepare_frame begins a frame, so the frontend's
+    * synchronous video-driver reinit (context_destroy/context_reset) runs with
+    * no frame in flight and nothing from this core on the call stack below it. */
+   if (geometry_change_pending)
+   {
+      struct retro_system_av_info info = pending_av_info;
+      geometry_change_pending = false;
+      environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
+   }
+}
+
 void rhi_vulkan_prepare_frame(void)
 {
    if (device == NULL)

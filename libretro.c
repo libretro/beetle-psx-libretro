@@ -5360,6 +5360,11 @@ void retro_run(void)
    if (!PSX_CPU || !PSX_FIO || !PSX_CDC)
       return;
 
+   /* Apply any geometry change deferred from a previous frame's
+    * check_variables before beginning this frame, so the frontend's
+    * synchronous video-driver reinit runs between frames. */
+   rhi_intf_apply_pending_geometry();
+
    rhi_intf_prepare_frame();
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
