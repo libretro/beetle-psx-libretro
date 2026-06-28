@@ -8351,6 +8351,7 @@ static INLINE void fbcolor_to_rgba32f(float *v, uint32_t color)
 
 void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const SaveState *state)
 {
+	ImageCreateInfo dither_info;
 	/* Former constructor init-list + remaining scalar default member initializers,
 	 * assigned explicitly now that Renderer is malloc'd and placement-initialised via
 	 * renderer_init rather than a C++ constructor. */
@@ -8546,7 +8547,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	}
 	commandbuffer_full_barrier(cbh_get(&self->cmd));
 
-	ImageCreateInfo dither_info = image_create_info_immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM, false);
+	dither_info = image_create_info_immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM, false);
 	// This lut is biased with 4 to be able to use UNORM easily.
 	static const uint8_t dither_lut_data[16] = { 0, 4, 1, 5, 6, 2, 7, 3, 1, 5, 0, 4, 7, 3, 6, 2 };
 
@@ -8573,12 +8574,13 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 	self->valid = true;}
 
 void renderer_save_vram_state(Renderer *self, SaveState *out){
+	BufferHandle buffer;
 	BufferCreateInfo buffer_create_info;
 	buffer_create_info.domain = BufferDomain_CachedHost;
 	buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
 	buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	BufferHandle buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
+	buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
 	{ Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &_r); }
 	renderer_ensure_command_buffer(self);
 	{ VkOffset3D _o = { 0, 0, 0 }; VkExtent3D _e = { FB_WIDTH, FB_HEIGHT, 1 }; VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }; commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), ih_get(&self->framebuffer), 0, &_o, &_e, 0, 0,
@@ -8778,6 +8780,7 @@ Rect renderer_compute_window_rect(Renderer *self, const TextureWindow *window)
 
 void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uint16_t *vram)
 {
+	Fence fence;
 	bool wrap_x = rect->x + rect->width > FB_WIDTH;
 	bool wrap_y = rect->y + rect->height > FB_HEIGHT;
 	Rect copy_rect = *rect;
@@ -8810,7 +8813,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 	commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 	             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
 
-	Fence fence = renderer_flush_and_signal(self);
+	fence = renderer_flush_and_signal(self);
 	fenceholder_wait(fence_get(&fence));
 
 	const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
@@ -8843,6 +8846,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 
 void renderer_mipmap_framebuffer(Renderer *self)
 {
+	unsigned levels;
 	// self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
 	Rect rect = self->render_state.display_fb_rect;
 	if (rect.x + rect.width > FB_WIDTH)
@@ -8855,13 +8859,14 @@ void renderer_mipmap_framebuffer(Renderer *self)
 		rect.y = 0;
 		rect.height = FB_HEIGHT;
 	}
-	unsigned levels = imageview_vec_size(&self->scaled_views);
+	levels = imageview_vec_size(&self->scaled_views);
 
 	renderer_ensure_command_buffer(self);
 	{ unsigned i; for (i = 1; i <= levels; i++) {
+		unsigned current_scale;
 		RenderPassInfo rp;
 		render_pass_info_defaults(&rp);
-		unsigned current_scale = max_(self->scaling >> i, 1u);
+		current_scale = max_(self->scaling >> i, 1u);
 
 		if (i == levels)
 			rp.color_attachments[0] = image_get_view(ih_get(&self->bias_framebuffer));
@@ -8975,11 +8980,12 @@ void renderer_ssaa_framebuffer(Renderer *self)
 	};
 	unsigned size = resolves_n;
 	{ unsigned i; for (i = 0; i < size; i += 1024) {
+		void * ptr;
 		unsigned to_run = min_(size - i, 1024u);
 
 		struct Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 		commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
-		void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
+		ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
 		memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
 		commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 		commandbuffer_dispatch(cbh_get(&self->cmd), 1, 1, to_run);
@@ -8989,6 +8995,7 @@ void renderer_ssaa_framebuffer(Renderer *self)
 
 Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
 {
+	unsigned fb_height;
 	unsigned clock_div;
 	switch (self->render_state.width_mode)
 	{
@@ -9013,7 +9020,7 @@ Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
 	fb_width /= clock_div;
 	fb_width = (fb_width + 2) & ~3;
 
-	unsigned fb_height = (unsigned) (self->render_state.vert_end - self->render_state.vert_start);
+	fb_height = (unsigned) (self->render_state.vert_end - self->render_state.vert_start);
 	fb_height *= self->render_state.is_480i ? 2 : 1;
 
 	{ Rect _dr; _dr.x = self->render_state.display_fb_xstart;
@@ -9103,6 +9110,7 @@ DisplayRect renderer_compute_display_rect(Renderer *self)
 
 ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 {
+	unsigned render_scale;
 	// Like renderer_scanout_to_texture(self), but synchronizes the entire
 	// VRAM self->framebuffer self->atlas before scanout. Does not apply
 	// any scanout filters and currently outputs at 15-bit
@@ -9136,7 +9144,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
 
-	unsigned render_scale = scaled ? self->scaling : 1;
+	render_scale = scaled ? self->scaling : 1;
 
 	ImageCreateInfo info = image_create_info_render_target(
 			FB_WIDTH * render_scale,
@@ -9209,6 +9217,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
 ImageHandle renderer_scanout_to_texture(Renderer *self)
 {
+	bool dither;
 	fbatlas_flush_render_pass(&self->atlas);
 	if (self->texture_tracking_enabled) {
 		texture_tracker_endFrame(&self->tracker);
@@ -9362,7 +9371,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 
 	commandbuffer_set_viewport(cbh_get(&self->cmd), &new_vp);
 
-	bool dither = self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither;
+	dither = self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither;
 
 	if (bpp24)
 	{
@@ -9541,6 +9550,7 @@ void renderer_flush_resolves(Renderer *self)
 
 	if (!Rect2DVec_empty(&self->queue.scaled_resolves))
 	{
+		unsigned size;
 		renderer_ensure_command_buffer(self);
 		commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.resolve_to_scaled);
 
@@ -9550,13 +9560,14 @@ void renderer_flush_resolves(Renderer *self)
 		else
 			commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)));
 
-		unsigned size = Rect2DVec_size(&self->queue.scaled_resolves);
+		size = Rect2DVec_size(&self->queue.scaled_resolves);
 		{ unsigned i; for (i = 0; i < size; i += 1024) {
+			void * ptr;
 			unsigned to_run = min_(size - i, 1024u);
 
 			struct Push push = { { 1.0f / (self->scaling * FB_WIDTH), 1.0f / (self->scaling * FB_HEIGHT) }, self->scaling };
 			commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
-			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
+			ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&self->queue.scaled_resolves) + i, to_run * sizeof(VkRect2D));
 			commandbuffer_dispatch(cbh_get(&self->cmd), self->scaling, self->scaling, to_run);
 		} }
@@ -9564,6 +9575,7 @@ void renderer_flush_resolves(Renderer *self)
 
 	if (!Rect2DVec_empty(&self->queue.unscaled_resolves))
 	{
+		unsigned size;
 		renderer_ensure_command_buffer(self);
 		// Always use nearest neighbor downscaling to avoid filter artifact (e.g. unwanted black outlines in Vagrant Story)
 		// Supersampling will use a separate pass for downsampling
@@ -9577,13 +9589,14 @@ void renderer_flush_resolves(Renderer *self)
 		else
 			commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_NearestClamp);
 
-		unsigned size = Rect2DVec_size(&self->queue.unscaled_resolves);
+		size = Rect2DVec_size(&self->queue.unscaled_resolves);
 		{ unsigned i; for (i = 0; i < size; i += 1024) {
+			void * ptr;
 			unsigned to_run = min_(size - i, 1024u);
 
 			struct Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
 			commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
-			void *ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
+			ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
 			memcpy(ptr, Rect2DVec_data(&self->queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
 			commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 			commandbuffer_dispatch(cbh_get(&self->cmd), 1, 1, to_run);
@@ -9636,6 +9649,7 @@ HdTextureHandle renderer_get_hd_texture_index(Renderer *self, const Rect *vram_r
 
 void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle *hd_texture_index_out,
 	bool *filtering_out, bool *scaled_read_out, unsigned *shift_out, bool *offset_uv_out){
+		float z;
 	unsigned shift; bool filtering, scaled_read, offset_uv; HdTextureHandle hd_texture_index; /* local working copies; written back to *_out at function end */
 	switch (self->render_state.texture_mode)
 	{
@@ -9764,7 +9778,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 	}
 	offset_uv = self->scaled_uv_offset && self->render_state.primitive_type == PrimitiveType_Polygon;
 
-	float z = renderer_allocate_depth(self, scaled_read ? Domain_Scaled : Domain_Unscaled, &rect);
+	z = renderer_allocate_depth(self, scaled_read ? Domain_Scaled : Domain_Unscaled, &rect);
 
 	// Look up the hd texture index
 	// This is done here at the end of the function because the `allocate_depth`
@@ -9867,6 +9881,7 @@ void renderer_build_line_quad(Renderer *self, Vertex *output, const Vertex *inpu
 	const float dy = input[1].y - input[0].y;
 	if (dx == 0.0f && dy == 0.0f)
 	{
+		uint32_t c;
 		// Degenerate, render a point.
 		output[0].x = input[0].x;
 		output[0].y = input[0].y;
@@ -9877,7 +9892,7 @@ void renderer_build_line_quad(Renderer *self, Vertex *output, const Vertex *inpu
 		output[3].x = input[1].x + 1.0f;
 		output[3].y = input[1].y + 1.0f;
 
-		uint32_t c = input[0].color;
+		c = input[0].color;
 		output[0].w = 1.0f;
 		output[0].color = c;
 		output[1].w = 1.0f;
@@ -10085,8 +10100,9 @@ void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 
 void renderer_clear_quad(Renderer *self, const Rect *rect, uint32_t fb_color, bool candidate)
 {
+	TextureMode old;
 	ih_reset(&self->last_scanout);
-	TextureMode old = fbatlas_set_texture_mode(&self->atlas, TextureMode_None);
+	old = fbatlas_set_texture_mode(&self->atlas, TextureMode_None);
 	float z = renderer_allocate_depth(self, Domain_Unscaled, rect);
 	fbatlas_set_texture_mode(&self->atlas, old);
 
@@ -10253,6 +10269,7 @@ int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb){
 }
 
 void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, PrimitiveInfoVec *scissors, bool textured){
+	unsigned to_draw;
 	qsort(PrimitiveInfoVec_data(scissors), PrimitiveInfoVec_size(scissors), sizeof(PrimitiveInfo), renderer_primitive_info_qsort_cmp);
 
 	// Render flat-shaded primitives.
@@ -10317,7 +10334,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, Primitiv
 		memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)vertices) + 3 * (*PrimitiveInfoVec_at(scissors, i)).triangle_index, 3 * sizeof(BufferVertex));
 	}
 
-	unsigned to_draw = size - last_draw;
+	to_draw = size - last_draw;
 	commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 	commandbuffer_draw(cbh_get(&self->cmd), 3 * to_draw, 1, 3 * last_draw, 0);
 }
@@ -10361,6 +10378,7 @@ void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_ind
 }
 
 void renderer_render_semi_transparent_primitives(Renderer *self){
+	unsigned to_draw;
 	unsigned prims = SemiTransparentStateVec_size(&self->queue.semi_transparent_state);
 	if (!prims)
 		return;
@@ -10419,7 +10437,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 		}
 	} }
 
-	unsigned to_draw = prims - last_draw_offset;
+	to_draw = prims - last_draw_offset;
 	commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 	commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
 	if (self->msaa > 1)
@@ -10485,6 +10503,7 @@ void renderer_flush_blits(Renderer *self)
 
 void renderer_flush_blit(Renderer *self, const BlitInfoVec *infos, Program *program, bool scaled)
 {
+	unsigned size;
 	if (BlitInfoVec_empty(infos))
 		return;
 
@@ -10509,7 +10528,7 @@ void renderer_flush_blit(Renderer *self, const BlitInfoVec *infos, Program *prog
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
 	}
 
-	unsigned size = BlitInfoVec_size(infos);
+	size = BlitInfoVec_size(infos);
 	unsigned scale = scaled ? self->scaling : 1u;
 	{ unsigned i; for (i = 0; i < size; i += 512) {
 		unsigned to_blit = min_(size - i, 512u);
@@ -10520,6 +10539,7 @@ void renderer_flush_blit(Renderer *self, const BlitInfoVec *infos, Program *prog
 }
 
 void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src){
+	Domain domain;
 	VK_ASSERT(dst->width == src->width);
 	VK_ASSERT(dst->height == src->height);
 
@@ -10536,7 +10556,7 @@ void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src){
 	);
 #endif
 	ih_reset(&self->last_scanout);
-	Domain domain = fbatlas_blit_vram(&self->atlas, dst, src);
+	domain = fbatlas_blit_vram(&self->atlas, dst, src);
 
 	if (self->texture_tracking_enabled) {
 		texture_tracker_blit(&self->tracker, *dst, *src);
@@ -10544,11 +10564,12 @@ void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src){
 
 	if (rect_intersects(dst, src))
 	{
+		unsigned factor;
 		// The software implementation takes texture cache into account by copying 128 horizontal pixels at a time ...
 		// We can do it with compute.
 		renderer_ensure_command_buffer(self);
 
-		unsigned factor = domain == Domain_Scaled ? self->scaling : 1u;
+		factor = domain == Domain_Scaled ? self->scaling : 1u;
 
 		// Slower path where we do this in a single workgroup which steps through line by line, just like the software version.
 		struct Push
@@ -10627,6 +10648,7 @@ void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src){
 }
 
 ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels *levels){
+	ImageHandle image;
 	ImageCreateInfo info;
 	ImageInitialData initial[16]; /* Vulkan caps mip levels well under this */
 	int i;
@@ -10653,19 +10675,21 @@ ImageHandle renderer_upload_texture(Renderer *self, LoadedLevels *levels){
 		initial[i].image_height = 0;
 	}
 
-	ImageHandle image = device_create_image(self->device, &info, initial);
+	image = device_create_image(self->device, &info, initial);
 	return image;
 }
 ImageHandle renderer_create_texture(Renderer *self, int width, int height, int levels){
+	ImageHandle image;
 	ImageCreateInfo info = image_create_info_immutable_2d_image(width, height, VK_FORMAT_R8G8B8A8_UNORM, false);
 	info.levels = levels;
 	info.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	info.initial_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	ImageHandle image = device_create_image(self->device, &info, NULL);
+	image = device_create_image(self->device, &info, NULL);
 	return image;
 }
 
 BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
+	BufferHandle buffer;
 	ih_reset(&self->last_scanout);
 	fbatlas_load_image(&self->atlas, rect);
 	VkDeviceSize size = rect->width * rect->height * sizeof(uint16_t);
@@ -10675,7 +10699,7 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 	buffer_create_info.domain = BufferDomain_Host;
 	buffer_create_info.size = size;
 	buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
-	BufferHandle buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
+	buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
 
 	BufferViewCreateInfo view_info = {};
 	view_info.buffer = bh_get(&buffer);
@@ -10695,11 +10719,12 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 	if (rect->width * rect->height > device_get_gpu_properties(self->device)->limits.maxTexelBufferElements)
 	{
 		{ unsigned y; for (y = 0; y < rect->height; y += BLOCK_HEIGHT) {
+			BufferViewHandle view;
 			unsigned y_size = min_(rect->height - y, BLOCK_HEIGHT);
 			view_info.offset = y * rect->width * sizeof(uint16_t);
 			view_info.range = y_size * rect->width * sizeof(uint16_t);
 			view_info.format = VK_FORMAT_R16_UINT;
-			BufferViewHandle view = device_create_buffer_view(self->device, &view_info);
+			view = device_create_buffer_view(self->device, &view_info);
 
 			Rect small_rect = { rect->x, rect->y + y, rect->width, y_size };
 
@@ -10712,10 +10737,11 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 	}
 	else
 	{
+		BufferViewHandle view;
 		view_info.offset = 0;
 		view_info.range = size;
 		view_info.format = VK_FORMAT_R16_UINT;
-		BufferViewHandle view = device_create_buffer_view(self->device, &view_info);
+		view = device_create_buffer_view(self->device, &view_info);
 
 		commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, bvh_get(&view));
 
@@ -10769,8 +10795,9 @@ bool renderer_is_valid(const Renderer *self) { return self->valid; }
 
 void renderer_reset_scissor_queue(Renderer *self)
 {
+	Rect * rect;
 	Rect2DVec_clear(&self->queue.scissors);
-	Rect *rect = &self->render_state.draw_rect;
+	rect = &self->render_state.draw_rect;
 	{ VkRect2D _vpush = { { (int)(rect->x * self->scaling), (int)(rect->y * self->scaling) }, { rect->width * self->scaling, rect->height * self->scaling } }; Rect2DVec_push(&self->queue.scissors, &_vpush); }
 }
 
@@ -11916,6 +11943,7 @@ void deviceallocation_free_global(struct DeviceAllocation *self, DeviceAllocator
 
 void block_allocate(struct Block *self, uint32_t num_blocks, DeviceAllocation *block)
 {
+	uint32_t sb;
 	VK_ASSERT(BLOCK_NUM_SUB_BLOCKS >= num_blocks);
 	VK_ASSERT(num_blocks != 0);
 
@@ -11930,7 +11958,7 @@ void block_allocate(struct Block *self, uint32_t num_blocks, DeviceAllocation *b
 
 	VK_ASSERT(((self->free_blocks[0] >> b) & block_mask) == block_mask);
 
-	uint32_t sb = block_mask << b;
+	sb = block_mask << b;
 	self->free_blocks[0] &= ~sb;
 	block_update_longest_run(self);
 
@@ -11964,6 +11992,7 @@ void classallocator_suballocate(struct ClassAllocator *self, uint32_t num_blocks
 
 bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, AllocationTiling tiling, struct DeviceAllocation *alloc, bool hierarchical)
 {
+	MiniHeap * heap;
 	unsigned num_blocks = (size + self->sub_block_size - 1) >> self->sub_block_size_log2;
 	uint32_t size_mask = (1u << (num_blocks - 1)) - 1;
 	uint32_t masked_tiling_mode = self->tiling_mask & tiling;
@@ -12011,7 +12040,7 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 	 * bitmap) runs explicitly via block_init. */
 	block_init(&node->heap);
 
-	MiniHeap *heap = node;
+	heap = node;
 	uint32_t alloc_size = self->sub_block_size * BLOCK_NUM_SUB_BLOCKS;
 
 	if (self->parent)
@@ -12096,6 +12125,7 @@ void classallocator_fini(struct ClassAllocator *self)
 
 void classallocator_free(struct ClassAllocator *self, struct DeviceAllocation *alloc)
 {
+	unsigned new_index;
 	struct MiniHeap *heap = alloc->heap;
 	struct Block *block = &heap->heap;
 	bool was_full = block_full(block);
@@ -12103,7 +12133,7 @@ void classallocator_free(struct ClassAllocator *self, struct DeviceAllocation *a
 
 	unsigned index = block_get_longest_run(block) - 1;
 	block_free(block, alloc->mask);
-	unsigned new_index = block_get_longest_run(block) - 1;
+	new_index = block_get_longest_run(block) - 1;
 
 	if (block_empty(block))
 	{
@@ -12169,6 +12199,7 @@ bool alloc_allocate(struct Allocator *self, uint32_t size, uint32_t alignment, A
 		// Find a suitable class to allocate from.
 		if (size <= c->sub_block_size * BLOCK_NUM_SUB_BLOCKS)
 		{
+			bool ret;
 			if (alignment > c->sub_block_size)
 			{
 				size_t padded_size = size + (alignment - c->sub_block_size);
@@ -12178,7 +12209,7 @@ bool alloc_allocate(struct Allocator *self, uint32_t size, uint32_t alignment, A
 					continue;
 			}
 
-			bool ret = classallocator_allocate(c, size, mode, alloc, false);
+			ret = classallocator_allocate(c, size, mode, alloc, false);
 			if (ret)
 			{
 				uint32_t aligned_offset = (alloc->offset + alignment - 1) & ~(alignment - 1);
@@ -12342,6 +12373,7 @@ void deviceallocator_unmap_memory(struct DeviceAllocator *self, const struct Dev
 bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory *memory, uint8_t **host_memory,
                                VkImage dedicated_image)
 {
+	bool host_visible;
 	struct DeviceAllocatorHeap *heap = da_heap_vec_at(&self->heaps, self->mem_props.memoryTypes[memory_type].heapIndex);
 
 	// Naive searching is fine here as vkAllocate blocks are *huge* and we won't have many of them.
@@ -12354,7 +12386,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 	} }
 
-	bool host_visible = (self->mem_props.memoryTypes[memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
+	host_visible = (self->mem_props.memoryTypes[memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 
 	// Found previously used block.
 	if (found_idx < (size_t)da_alloc_vec_size(&heap->blocks))
@@ -12609,11 +12641,12 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		 * would dangle by the time the create call reads it). */
 		VkSampler immutable_samplers[VULKAN_NUM_BINDINGS];
 		{ unsigned i; for (i = 0; i < VULKAN_NUM_BINDINGS; i++) {
+			unsigned types;
 			uint32_t stages = stages_for_binds[i];
 			if (stages == 0)
 				continue;
 
-			unsigned types = 0;
+			types = 0;
 			if (layout->sampled_image_mask & (1u << i))
 			{
 				immutable_samplers[i] = VK_NULL_HANDLE;
@@ -12912,6 +12945,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 	void render_pass_init(struct RenderPass *self, Hash hash, Device *device, const RenderPassInfo *info)
 	{
+		uint32_t color_self_dependencies;
 		self->device = device;
 		self->render_pass = VK_NULL_HANDLE;
 		self->depth_stencil = VK_FORMAT_UNDEFINED;
@@ -13148,7 +13182,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		VK_ASSERT(num_subpasses <= 32);
 
 		// 1 << subpass bit set if there are color attachment self-dependencies in the subpass.
-		uint32_t color_self_dependencies = 0;
+		color_self_dependencies = 0;
 		// 1 << subpass bit set if there are depth-stencil attachment self-dependencies in the subpass.
 		uint32_t depth_self_dependencies = 0;
 
@@ -13368,13 +13402,14 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		// Add preserve attachments as needed.
 		{ unsigned subpass; for (subpass = 0; subpass < num_subpasses; subpass++) {
+			uint32_t * preserve;
 			VkSubpassDescription *pass = VkSubpassDescriptionVec_at(&subpasses, subpass);
 			unsigned preserve_count = 0;
 			{ unsigned attachment; for (attachment = 0; attachment < num_attachments; attachment++)
 				if (preserve_masks[attachment] & (1u << subpass))
 					preserve_count++; }
 
-			uint32_t *preserve = stackalloc_u32_allocate_cleared(&preserve_allocator, preserve_count);
+			preserve = stackalloc_u32_allocate_cleared(&preserve_allocator, preserve_count);
 			pass->pPreserveAttachments = preserve;
 			pass->preserveAttachmentCount = preserve_count;
 			{ unsigned attachment; for (attachment = 0; attachment < num_attachments; attachment++)
@@ -13392,8 +13427,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		// Add external subpass dependencies.
 		{ uint32_t _feit, subpass; FOR_EACH_BIT(external_color_dependencies | external_depth_dependencies | external_input_dependencies, _feit, subpass)
 		{
+			VkSubpassDependency * dep;
 			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
-			VkSubpassDependency *dep = VkSubpassDependencyVec_back(&external_dependencies);
+			dep = VkSubpassDependencyVec_back(&external_dependencies);
 			dep->srcSubpass = VK_SUBPASS_EXTERNAL;
 			dep->dstSubpass = subpass;
 
@@ -13428,8 +13464,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		// Queue up self-dependencies (COLOR | DEPTH) -> INPUT.
 		{ uint32_t _feit, subpass; FOR_EACH_BIT(color_self_dependencies | depth_self_dependencies, _feit, subpass)
 		{
+			VkSubpassDependency * dep;
 			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
-			VkSubpassDependency *dep = VkSubpassDependencyVec_back(&external_dependencies);
+			dep = VkSubpassDependencyVec_back(&external_dependencies);
 			dep->srcSubpass = subpass;
 			dep->dstSubpass = subpass;
 			dep->dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
@@ -13453,8 +13490,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		// Flush and invalidate caches between each subpass.
 		{ unsigned subpass; for (subpass = 1; subpass < num_subpasses; subpass++) {
+			VkSubpassDependency * dep;
 			{ VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
-			VkSubpassDependency *dep = VkSubpassDependencyVec_back(&external_dependencies);
+			dep = VkSubpassDependencyVec_back(&external_dependencies);
 			dep->srcSubpass = subpass - 1;
 			dep->dstSubpass = subpass;
 			dep->dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
@@ -13504,6 +13542,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		// Store the important subpass information for later.
 		{ uint32_t subpass_idx; for (subpass_idx = 0; subpass_idx < rp_info.subpassCount; subpass_idx++) {
+			unsigned samples;
 			const VkSubpassDescription *subpass = &rp_info.pSubpasses[subpass_idx];
 
 			RenderPassSubpassInfo subpass_info = {};
@@ -13533,12 +13572,13 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				memcpy(subpass_info.input_attachments, subpass->pInputAttachments,
 						subpass_info.num_input_attachments * sizeof(*subpass->pInputAttachments));
 
-			unsigned samples = 0;
+			samples = 0;
 			{ unsigned i; for (i = 0; i < subpass_info.num_color_attachments; i++) {
+				unsigned samp;
 				if (subpass_info.color_attachments[i].attachment == VK_ATTACHMENT_UNUSED)
 					continue;
 
-				unsigned samp = attachments[subpass_info.color_attachments[i].attachment].samples;
+				samp = attachments[subpass_info.color_attachments[i].attachment].samples;
 				VK_ASSERT(!samples || samp == samples);
 				samples = samp;
 			} }
@@ -13619,8 +13659,9 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		VK_ASSERT(info->num_color_attachments || info->depth_stencil);
 
 		{ unsigned i; for (i = 0; i < info->num_color_attachments; i++) {
+			ImageView * att;
 			VK_ASSERT(info->color_attachments[i]);
-			ImageView *att = info->color_attachments[i];
+			att = info->color_attachments[i];
 			unsigned lod = imageview_get_create_info(att)->base_level;
 			unsigned aw  = image_get_width(imageview_get_image(att), lod);
 			unsigned ah  = image_get_height(imageview_get_image(att), lod);
@@ -13853,10 +13894,11 @@ VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
 
 	void commandbuffer_clear_image(struct CommandBuffer *self, const Image *image, const VkClearValue *value)
 	{
+		VkImageAspectFlags aspect;
 		VK_ASSERT(!self->framebuffer);
 		VK_ASSERT(!self->actual_render_pass);
 
-		VkImageAspectFlags aspect = format_to_aspect_mask(image_get_format(image));
+		aspect = format_to_aspect_mask(image_get_format(image));
 		VkImageSubresourceRange range = {};
 		range.aspectMask = aspect;
 		range.baseArrayLayer = 0;
@@ -14201,6 +14243,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self, Hash hash)
 	{
+		VkResult res;
 		// Viewport state
 		VkPipelineViewportStateCreateInfo vp = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
 		vp.viewportCount = 1;
@@ -14363,7 +14406,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		VkPipeline pipeline;
 
 		LOGI("Creating graphics pipeline.\n");
-		VkResult res = vkCreateGraphicsPipelines(device_get_device(self->device), VK_NULL_HANDLE, 1, &pipe, NULL, &pipeline);
+		res = vkCreateGraphicsPipelines(device_get_device(self->device), VK_NULL_HANDLE, 1, &pipe, NULL, &pipeline);
 		if (res != VK_SUCCESS)
 			LOGE("Failed to create graphics pipeline!\n");
 
@@ -14372,6 +14415,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_flush_compute_pipeline(struct CommandBuffer *self)
 	{
+		Hash hash;
 		Hasher h; hasher_init(&h);
 		hasher_u64(&h, self->current_program->intrusive_node.key);
 
@@ -14386,7 +14430,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		}
 		}
 
-		Hash hash = hasher_get(&h);
+		hash = hasher_get(&h);
 		self->current_pipeline = program_get_pipeline(self->current_program, hash);
 		if (self->current_pipeline == VK_NULL_HANDLE)
 			self->current_pipeline = commandbuffer_build_compute_pipeline(self, hash);
@@ -14394,6 +14438,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_flush_graphics_pipeline(struct CommandBuffer *self)
 	{
+		Hash hash;
 		Hasher h; hasher_init(&h);
 		self->active_vbos = 0;
 		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
@@ -14440,7 +14485,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		}
 		}
 
-		Hash hash = hasher_get(&h);
+		hash = hasher_get(&h);
 		self->current_pipeline = program_get_pipeline(self->current_program, hash);
 		if (self->current_pipeline == VK_NULL_HANDLE)
 			self->current_pipeline = commandbuffer_build_graphics_pipeline(self, hash);
@@ -14476,6 +14521,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_flush_render_state(struct CommandBuffer *self)
 	{
+		uint32_t update_vbo_mask;
 		VK_ASSERT(self->current_layout);
 		VK_ASSERT(self->current_program);
 
@@ -14511,7 +14557,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		if (commandbuffer_get_and_clear(self, COMMAND_BUFFER_DIRTY_SCISSOR_BIT))
 			vkCmdSetScissor(self->cmd, 0, 1, &self->scissor);
 
-		uint32_t update_vbo_mask = self->dirty_vbos & self->active_vbos;
+		update_vbo_mask = self->dirty_vbos & self->active_vbos;
 		{ uint32_t _feit, binding, binding_count; FOR_EACH_BIT_RANGE(update_vbo_mask, _feit, binding, binding_count)
 		{
 #ifdef VULKAN_DEBUG
@@ -14525,10 +14571,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_set_vertex_attrib(struct CommandBuffer *self, uint32_t attrib, uint32_t binding, VkFormat format, VkDeviceSize offset)
 	{
+		VertexAttribState * attr;
 		VK_ASSERT(attrib < VULKAN_NUM_VERTEX_ATTRIBS);
 		VK_ASSERT(self->framebuffer);
 
-		VertexAttribState *attr = &self->attribs[attrib];
+		attr = &self->attribs[attrib];
 
 		if (attr->binding != binding || attr->format != format || attr->offset != offset)
 			commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT);
@@ -14543,10 +14590,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	void commandbuffer_set_vertex_binding(struct CommandBuffer *self, uint32_t binding, const Buffer *buffer, VkDeviceSize offset, VkDeviceSize stride,
 			VkVertexInputRate step_rate)
 	{
+		VkBuffer vkbuffer;
 		VK_ASSERT(binding < VULKAN_NUM_VERTEX_BUFFERS);
 		VK_ASSERT(self->framebuffer);
 
-		VkBuffer vkbuffer = buffer_get_buffer(buffer);
+		vkbuffer = buffer_get_buffer(buffer);
 		if (self->vbo.buffers[binding] != vkbuffer || self->vbo.offsets[binding] != offset)
 			self->dirty_vbos |= 1u << binding;
 		if (self->vbo.strides[binding] != stride || self->vbo.input_rates[binding] != step_rate)
@@ -14654,10 +14702,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer *buffer, VkDeviceSize offset,
 			VkDeviceSize range)
 	{
+		ResourceBinding * b;
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 		VK_ASSERT(buffer_get_create_info(buffer)->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		ResourceBinding *b = &self->bindings.bindings[set][binding];
+		b = &self->bindings.bindings[set][binding];
 
 		if (buffer->cookie_base.cookie == self->bindings.cookies[set][binding] && b->buffer.offset == offset && b->buffer.range == range)
 			return;
@@ -14670,12 +14719,13 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_set_sampler(struct CommandBuffer *self, unsigned set, unsigned binding, const Sampler *sampler)
 	{
+		ResourceBinding * b;
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 		if (sampler->cookie_base.cookie == self->bindings.secondary_cookies[set][binding])
 			return;
 
-		ResourceBinding *b = &self->bindings.bindings[set][binding];
+		b = &self->bindings.bindings[set][binding];
 		b->image.fp.sampler = sampler_get_sampler(sampler);
 		b->image.integer.sampler = sampler_get_sampler(sampler);
 		self->dirty_sets |= 1u << set;
@@ -14684,12 +14734,13 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_set_buffer_view(struct CommandBuffer *self, unsigned set, unsigned binding, const BufferView *view)
 	{
+		ResourceBinding * b;
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 		VK_ASSERT(buffer_get_create_info(bufferview_get_buffer(view))->usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 		if (view->cookie_base.cookie == self->bindings.cookies[set][binding])
 			return;
-		ResourceBinding *b = &self->bindings.bindings[set][binding];
+		b = &self->bindings.bindings[set][binding];
 		b->buffer_view = bufferview_get_view(view);
 		self->bindings.cookies[set][binding] = view->cookie_base.cookie;
 		self->bindings.secondary_cookies[set][binding] = 0;
@@ -14698,10 +14749,12 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_set_input_attachments(struct CommandBuffer *self, unsigned set, unsigned start_binding)
 	{
+		unsigned num_input_attachments;
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(start_binding + render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass) <= VULKAN_NUM_BINDINGS);
-		unsigned num_input_attachments = render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass);
+		num_input_attachments = render_pass_get_num_input_attachments(self->actual_render_pass, self->current_subpass);
 		{ unsigned i; for (i = 0; i < num_input_attachments; i++) {
+			ResourceBinding * b;
 			const VkAttachmentReference *ref = render_pass_get_input_attachment(self->actual_render_pass, self->current_subpass, i);
 			if (ref->attachment == VK_ATTACHMENT_UNUSED)
 				continue;
@@ -14716,7 +14769,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				continue;
 			}
 
-			ResourceBinding *b = &self->bindings.bindings[set][start_binding + i];
+			b = &self->bindings.bindings[set][start_binding + i];
 			b->image.fp.imageLayout = ref->layout;
 			b->image.integer.imageLayout = ref->layout;
 			b->image.fp.imageView = imageview_get_float_view(view);
@@ -14778,6 +14831,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void commandbuffer_flush_descriptor_set(struct CommandBuffer *self, uint32_t set)
 	{
+		Hash hash;
 		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
 		const DescriptorSetLayout *set_layout = &layout->sets[set];
 		uint32_t num_dynamic_offsets = 0;
@@ -14864,7 +14918,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		}
 		}
 
-		Hash hash = hasher_get(&h);
+		hash = hasher_get(&h);
 		DescriptorSetAllocation allocated = descriptor_set_allocator_find(pipeline_layout_get_allocator(self->current_layout, set), hash);
 
 		// The descriptor set was not successfully cached, rebuild.
@@ -14877,6 +14931,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 			{ uint32_t _feit, binding; FOR_EACH_BIT(set_layout->uniform_buffer_mask, _feit, binding)
 			{
+				VkDescriptorBufferInfo * buffer;
 				VkWriteDescriptorSet *write = &writes[write_count++];
 				write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				write->pNext = NULL;
@@ -14887,7 +14942,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				write->dstSet = allocated.set;
 
 				// Offsets are applied dynamically.
-				VkDescriptorBufferInfo *buffer = &buffer_info[buffer_info_count++];
+				buffer = &buffer_info[buffer_info_count++];
 				*buffer = self->bindings.bindings[set][binding].buffer;
 				buffer->offset = 0;
 				write->pBufferInfo = buffer;
@@ -15237,6 +15292,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			unsigned num_required_device_extensions, const char **required_device_layers,
 			unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features)
 	{
+		VkResult dev_res;
 		if (gpu == VK_NULL_HANDLE)
 		{
 			uint32_t gpu_count = 0;
@@ -15531,7 +15587,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		free(queried_layers);
 		free(queue_props);
 
-		VkResult dev_res = vkCreateDevice(gpu, &device_info, NULL, &self->device);
+		dev_res = vkCreateDevice(gpu, &device_info, NULL, &self->device);
 		free(enabled_extensions);
 		free(enabled_layers);
 		if (dev_res != VK_SUCCESS)
@@ -15665,10 +15721,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void device_add_wait_semaphore_nolock(Device *self, CommandBufferType type, Semaphore semaphore, VkPipelineStageFlags stages,
 			bool flush){
+				QueueData * data;
 		VK_ASSERT(stages != 0);
 		if (flush)
 			device_flush_frame_queue(self, type);
-		QueueData *data = device_get_queue_data(self, type);
+		data = device_get_queue_data(self, type);
 
 #ifdef VULKAN_DEBUG
 		{ int _wi; for (_wi = 0; _wi < sem_handle_vec_size(&data->wait_semaphores); _wi++)
@@ -15684,10 +15741,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	}
 
 	Shader * device_request_shader(Device *self, const uint32_t *data, size_t size){
+		Hash hash;
 		Hasher hasher; hasher_init(&hasher);
 		hasher_data(&hasher, data, size);
 
-		Hash hash = hasher_get(&hasher);
+		hash = hasher_get(&hasher);
 		Shader *ret = shader_map_find(&self->shaders, hash);
 		if (!ret)
 			ret = shader_map_emplace_yield(&self->shaders, hash, self, data, size);
@@ -15696,10 +15754,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	Program *device_request_program_compute_shader(Device *self, Shader *compute)
 	{
+		Hash hash;
 		Hasher hasher; hasher_init(&hasher);
 		hasher_u64(&hasher, compute->intrusive_node.key);
 
-		Hash hash = hasher_get(&hasher);
+		hash = hasher_get(&hasher);
 		Program *ret = program_map_find(&self->programs, hash);
 		if (!ret)
 			ret = program_map_emplace_yield_compute(&self->programs, hash, self, compute);
@@ -15714,11 +15773,12 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	Program *device_request_program_graphics_shaders(Device *self, Shader *vertex, Shader *fragment)
 	{
+		Hash hash;
 		Hasher hasher; hasher_init(&hasher);
 		hasher_u64(&hasher, vertex->intrusive_node.key);
 		hasher_u64(&hasher, fragment->intrusive_node.key);
 
-		Hash hash = hasher_get(&hasher);
+		hash = hasher_get(&hasher);
 		Program *ret = program_map_find(&self->programs, hash);
 
 		if (!ret)
@@ -15735,6 +15795,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	}
 
 	PipelineLayout * device_request_pipeline_layout(Device *self, const CombinedResourceLayout *layout){
+		Hash hash;
 		Hasher h; hasher_init(&h);
 		hasher_data(&h, (const uint32_t *)(layout->sets), sizeof(layout->sets));
 		hasher_data(&h, &layout->stages_for_bindings[0][0], sizeof(layout->stages_for_bindings));
@@ -15744,7 +15805,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		hasher_u32(&h, layout->attribute_mask);
 		hasher_u32(&h, layout->render_target_mask);
 
-		Hash hash = hasher_get(&h);
+		hash = hasher_get(&h);
 		PipelineLayout *ret = pipeline_layout_map_find(&self->pipeline_layouts, hash);
 		if (!ret)
 			ret = pipeline_layout_map_emplace_yield(&self->pipeline_layouts, hash, self, layout);
@@ -15752,10 +15813,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	}
 
 	DescriptorSetAllocator * device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout *layout, const uint32_t *stages_for_bindings){
+		Hash hash;
 		Hasher h; hasher_init(&h);
 		hasher_data(&h, (const uint32_t *)(&layout), sizeof(layout));
 		hasher_data(&h, stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
-		Hash hash = hasher_get(&h);
+		hash = hasher_get(&h);
 
 		DescriptorSetAllocator *ret = descriptor_set_allocator_map_find(&self->descriptor_set_allocators, hash);
 		if (!ret)
@@ -15774,11 +15836,12 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		layout.descriptor_set_mask = 0;
 
 		{ unsigned i; for (i = 0; i < (unsigned)(ShaderStage_Count); i++) {
+			uint32_t stage_mask;
 			const Shader *shader = program_get_shader(program, (ShaderStage)(i));
 			if (!shader)
 				continue;
 
-			uint32_t stage_mask = 1u << i;
+			stage_mask = 1u << i;
 
 			const ResourceLayout *shader_layout = shader_get_layout(shader);
 			{ unsigned set; for (set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++) {
@@ -16031,6 +16094,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	}
 
 	void device_submit_nolock(Device *self, CommandBufferHandle cmd, Fence *fence, unsigned semaphore_count, Semaphore *semaphores){
+		VkFence cleared_fence;
 		CommandBufferType type = commandbuffer_get_command_buffer_type(cbh_get(&cmd));
 		CommandPool *pool = device_get_command_pool(self, type);
 		CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
@@ -16039,7 +16103,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		commandbuffer_end(cbh_get(&cmd));
 		cbhvec_push(submissions, &cmd);
 
-		VkFence cleared_fence = VK_NULL_HANDLE;
+		cleared_fence = VK_NULL_HANDLE;
 
 		if (fence || semaphore_count)
 			device_submit_queue(self, type, fence ? &cleared_fence : NULL, semaphore_count, semaphores);
@@ -16056,6 +16120,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	POD_VEC_DECLARE(VkFlagsVec, VkFlags);
 	void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence,
 			unsigned semaphore_count, Semaphore *semaphores){
+				VkFence cleared_fence;
 		QueueData *data = device_get_queue_data(self, type);
 		VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
@@ -16111,7 +16176,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				break;
 		}
 
-		VkFence cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
+		cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
 		VkResult result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
 
 		if (result != VK_SUCCESS)
@@ -16237,6 +16302,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 	void device_submit_queue(Device *self, CommandBufferType type, VkFence *fence,
 			unsigned semaphore_count, Semaphore *semaphores){
+				VkResult result;
 		type = device_get_physical_queue_type(self, type);
 
 		// Always check if we need to flush pending transfers.
@@ -16340,7 +16406,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				break;
 		}
 
-		VkResult result = vkQueueSubmit(queue, VkSubmitInfoVec_size(&submits), VkSubmitInfoVec_data(&submits), cleared_fence);
+		result = vkQueueSubmit(queue, VkSubmitInfoVec_size(&submits), VkSubmitInfoVec_data(&submits), cleared_fence);
 		if (result != VK_SUCCESS)
 			LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
 		cbhvec_clear(submissions);
@@ -16376,10 +16442,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	}
 
 	void device_sync_buffer_blocks(Device *self){
+		VkBufferUsageFlags usage;
 		if (bufferblock_vec_empty(&self->dma.vbo) && bufferblock_vec_empty(&self->dma.ubo))
 			return;
 
-		VkBufferUsageFlags usage = 0;
+		usage = 0;
 
 		CommandBufferHandle cmd = device_request_command_buffer_nolock(self, Type_AsyncTransfer);
 
@@ -16496,13 +16563,14 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	}
 
 	CommandBufferHandle device_request_command_buffer_nolock(Device *self, CommandBufferType type){
+		struct CommandBuffer * _cb;
 		VkCommandBuffer cmd = command_pool_request_command_buffer(device_get_command_pool(self, type));
 
 		VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 		info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		vkBeginCommandBuffer(cmd, &info);
 		device_add_frame_counter_nolock(self);
-		struct CommandBuffer *_cb = (struct CommandBuffer *)object_pool_raw_allocate(&self->handle_pool.command_buffers); commandbuffer_init(_cb, self, cmd, type); CommandBufferHandle handle = cbh_make(_cb);
+		_cb = (struct CommandBuffer *)object_pool_raw_allocate(&self->handle_pool.command_buffers); commandbuffer_init(_cb, self, cmd, type); CommandBufferHandle handle = cbh_make(_cb);
 		return handle;
 	}
 
@@ -17086,6 +17154,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		{
 			if ((image_create_info->usage & ~VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
 			{
+				VkImageViewCreateInfo view_info;
 				// Sanity check. Don't want to implement layered views for this.
 				if (info->subresourceRange.levelCount > 1)
 				{
@@ -17099,7 +17168,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					return false;
 				}
 
-				VkImageViewCreateInfo view_info = *info;
+				view_info = *info;
 
 				// We need this to be able to sample the texture, or otherwise use it as a non-pure DS attachment.
 				view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -17148,6 +17217,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	}
 
 	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo *create_info){
+		struct ImageView * _iv;
 		ImageResourceHolder holder;
 		image_resource_holder_init(&holder, self->device);
 		const ImageCreateInfo *image_create_info = image_get_create_info(create_info->image);
@@ -17188,7 +17258,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		ImageViewCreateInfo tmp = *create_info;
 		tmp.format = format;
-		struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&self->handle_pool.image_views); imageview_init(_iv, self, holder.image_view, &tmp); ImageViewHandle ret = iv_make(_iv);
+		_iv = (struct ImageView *)object_pool_raw_allocate(&self->handle_pool.image_views); imageview_init(_iv, self, holder.image_view, &tmp); ImageViewHandle ret = iv_make(_iv);
 		if (iv_is_valid(&ret))
 		{
 			holder.owned = false;
@@ -17206,6 +17276,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	}
 
 	InitialImageBuffer device_create_image_staging_buffer(Device *self, const ImageCreateInfo *info, const ImageInitialData *initial){
+		uint8_t * mapped;
 		InitialImageBuffer result;
 
 		bool generate_mips = (info->misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
@@ -17243,7 +17314,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		device_set_name_buffer(self, bh_get(&result.buffer), "image-upload-staging-buffer");
 
 		// And now, do the actual copy.
-		uint8_t *mapped = (uint8_t *)(device_map_host_buffer(self, bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
+		mapped = (uint8_t *)(device_map_host_buffer(self, bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
 		unsigned index = 0;
 
 		tfl_set_buffer(&layout, mapped, tfl_get_required_size(&layout));
@@ -17291,6 +17362,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	ImageHandle device_create_image_from_staging_buffer(Device *self, const ImageCreateInfo *create_info,
 			const InitialImageBuffer *staging_buffer){
+				struct Image * _im;
 		ImageResourceHolder holder;
 		VkMemoryRequirements reqs;
 		image_resource_holder_init(&holder, self->device);
@@ -17376,7 +17448,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			}
 		}
 
-		struct Image *_im = (struct Image *)object_pool_raw_allocate(&self->handle_pool.images); image_init(_im, self, holder.image, holder.image_view, &holder.allocation, &tmpinfo); ImageHandle handle = ih_make(_im);
+		_im = (struct Image *)object_pool_raw_allocate(&self->handle_pool.images); image_init(_im, self, holder.image, holder.image_view, &holder.allocation, &tmpinfo); ImageHandle handle = ih_make(_im);
 		if (ih_is_valid(&handle))
 		{
 			holder.owned = false;
@@ -17395,6 +17467,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		// Copy initial data to texture.
 		if (staging_buffer)
 		{
+			bool share_async_graphics;
 			VK_ASSERT(create_info->domain != ImageDomain_Transient);
 			VK_ASSERT(create_info->initial_layout != VK_IMAGE_LAYOUT_UNDEFINED);
 			bool generate_mips = (create_info->misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
@@ -17511,15 +17584,16 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 						image_get_access_flags(ih_get(&handle)) & image_layout_to_possible_access(create_info->initial_layout));
 			}
 
-			bool share_async_graphics = device_get_physical_queue_type(self, Type_AsyncGraphics) == Type_AsyncCompute;
+			share_async_graphics = device_get_physical_queue_type(self, Type_AsyncGraphics) == Type_AsyncCompute;
 
 			// Add semaphore if the self->compute queue can be used for async self->graphics as well.
 			if (share_async_graphics)
 			{
+				VkPipelineStageFlags dst_stages;
 				Semaphore sem; sem.data = NULL;
 				device_submit(self, &graphics_cmd, NULL, 1, &sem);
 
-				VkPipelineStageFlags dst_stages = image_get_stage_flags(ih_get(&handle));
+				dst_stages = image_get_stage_flags(ih_get(&handle));
 				if (self->graphics_queue_family_index != self->compute_queue_family_index)
 					dst_stages &= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
 				device_add_wait_semaphore_nolock(self, Type_AsyncCompute, sem, dst_stages, true);
@@ -17530,8 +17604,9 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		}
 		else if (create_info->initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
 		{
+			CommandBufferHandle cmd;
 			VK_ASSERT(create_info->domain != ImageDomain_Transient);
-			CommandBufferHandle cmd = device_request_command_buffer(self, Type_Generic);
+			cmd = device_request_command_buffer(self, Type_Generic);
 			commandbuffer_image_barrier(cbh_get(&cmd), ih_get(&handle), info.initialLayout, create_info->initial_layout,
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, image_get_stage_flags(ih_get(&handle)),
 					image_get_access_flags(ih_get(&handle)) &
@@ -17577,6 +17652,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	}
 
 	BufferHandle device_create_buffer(Device *self, const BufferCreateInfo *create_info, const void *initial){
+		struct Buffer * _b;
 		VkBuffer buffer;
 		VkMemoryRequirements reqs;
 		DeviceAllocation allocation;
@@ -17635,14 +17711,15 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		BufferCreateInfo tmpinfo = *create_info;
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		struct Buffer *_b = (struct Buffer *)object_pool_raw_allocate(&self->handle_pool.buffers); buffer_init(_b, self, buffer, &allocation, &tmpinfo); BufferHandle handle = bh_make(_b);
+		_b = (struct Buffer *)object_pool_raw_allocate(&self->handle_pool.buffers); buffer_init(_b, self, buffer, &allocation, &tmpinfo); BufferHandle handle = bh_make(_b);
 
 		if (create_info->domain == BufferDomain_Device && initial && !device_memory_type_is_host_visible(self, memory_type))
 		{
+			BufferHandle staging_buffer;
 			CommandBufferHandle cmd; cmd.data = NULL;
 			BufferCreateInfo staging_info = *create_info;
 			staging_info.domain = BufferDomain_Host;
-			BufferHandle staging_buffer = device_create_buffer(self, &staging_info, initial);
+			staging_buffer = device_create_buffer(self, &staging_info, initial);
 			device_set_name_buffer(self, bh_get(&staging_buffer), "buffer-upload-staging-buffer");
 
 			cmd = device_request_command_buffer(self, Type_AsyncTransfer);
@@ -17677,9 +17754,10 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	}
 
 	bool device_image_format_is_supported(Device *self, VkFormat format, VkFormatFeatureFlags required, VkImageTiling tiling){
+		VkFormatFeatureFlags flags;
 		VkFormatProperties props;
 		vkGetPhysicalDeviceFormatProperties(self->gpu, format, &props);
-		VkFormatFeatureFlags flags = tiling == VK_IMAGE_TILING_OPTIMAL ? props.optimalTilingFeatures : props.linearTilingFeatures;
+		flags = tiling == VK_IMAGE_TILING_OPTIMAL ? props.optimalTilingFeatures : props.linearTilingFeatures;
 		return (flags & required) == required;
 	}
 
@@ -17695,6 +17773,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	}
 
 	const RenderPass * device_request_render_pass(Device *self, const RenderPassInfo *info, bool compatible){
+		Hash hash;
 		Hasher h; hasher_init(&h);
 		VkFormat formats[VULKAN_NUM_ATTACHMENTS];
 		VkFormat depth_stencil;
@@ -17747,7 +17826,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		// Lazy flag can change external subpass dependencies, which is not compatible.
 		hasher_u32(&h, lazy);
 
-		Hash hash = hasher_get(&h);
+		hash = hasher_get(&h);
 
 		RenderPass *ret = render_pass_map_find(&self->render_passes, hash);
 		if (!ret)
@@ -17786,12 +17865,13 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_load_image(FBAtlas *self, const Rect *rect)
 	{
+		unsigned xbegin;
 		if (rect->width == 0 || rect->height == 0)
 			return;
 
 		fbatlas_write_compute(self, Domain_Unscaled, rect);
 
-		unsigned xbegin = rect->x / BLOCK_WIDTH;
+		xbegin = rect->x / BLOCK_WIDTH;
 		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
@@ -17801,10 +17881,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static bool fbatlas_texture_rendered(FBAtlas *self, const Rect *rect)
 	{
+		unsigned xbegin;
 		if (rect->width == 0 || rect->height == 0)
 			return false;
 
-		unsigned xbegin = rect->x / BLOCK_WIDTH;
+		xbegin = rect->x / BLOCK_WIDTH;
 		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
@@ -17817,6 +17898,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static Domain fbatlas_blit_vram(FBAtlas *self, const Rect *dst, const Rect *src)
 	{
+		unsigned dst_xbegin;
 		Domain domain = fbatlas_find_suitable_domain(self, src);
 
 		fbatlas_sync_domain(self, domain, src);
@@ -17824,7 +17906,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		fbatlas_read_domain(self, domain, Stage_Compute, src);
 		fbatlas_write_domain(self, domain, Stage_Compute, dst);
 
-		unsigned dst_xbegin = dst->x / BLOCK_WIDTH;
+		dst_xbegin = dst->x / BLOCK_WIDTH;
 		unsigned dst_xend = (dst->x + dst->width - 1) / BLOCK_WIDTH;
 		unsigned dst_ybegin = dst->y / BLOCK_HEIGHT;
 		unsigned dst_yend = (dst->y + dst->height - 1) / BLOCK_HEIGHT;
@@ -17891,10 +17973,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static bool fbatlas_write_domain(FBAtlas *self, Domain domain, Stage stage, const Rect *rect)
 	{
+		unsigned xbegin;
 		if (fbatlas_inside_render_pass(self, rect))
 			fbatlas_flush_render_pass(self);
 
-		unsigned xbegin = rect->x / BLOCK_WIDTH;
+		xbegin = rect->x / BLOCK_WIDTH;
 		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
@@ -17956,10 +18039,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_read_domain(FBAtlas *self, Domain domain, Stage stage, const Rect *rect)
 	{
+		unsigned xbegin;
 		if (fbatlas_inside_render_pass(self, rect))
 			fbatlas_flush_render_pass(self);
 
-		unsigned xbegin = rect->x / BLOCK_WIDTH;
+		xbegin = rect->x / BLOCK_WIDTH;
 		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
@@ -18016,6 +18100,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_sync_domain(FBAtlas *self, Domain domain, const Rect *rect)
 	{
+		unsigned write_domains;
 		if (fbatlas_inside_render_pass(self, rect))
 			fbatlas_flush_render_pass(self);
 
@@ -18033,7 +18118,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
 			{ unsigned x; for (x = xbegin; x <= xend; x++) bits |= 1u << ((*fbatlas_info(self, x, y)) & STATUS_OWNERSHIP_MASK); } }
 
-		unsigned write_domains = 0;
+		write_domains = 0;
 
 		// We're asserting that a region is up to date, but it's
 		// not, so we have to resolve it.
@@ -18094,10 +18179,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static Domain fbatlas_find_suitable_domain(FBAtlas *self, const Rect *rect)
 	{
+		unsigned xbegin;
 		if (fbatlas_inside_render_pass(self, rect))
 			return Domain_Scaled;
 
-		unsigned xbegin = rect->x / BLOCK_WIDTH;
+		xbegin = rect->x / BLOCK_WIDTH;
 		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
@@ -18114,10 +18200,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static bool fbatlas_inside_render_pass(FBAtlas *self, const Rect *rect)
 	{
+		unsigned xbegin;
 		if (!self->renderpass.inside)
 			return false;
 
-		unsigned xbegin = rect->x & ~(BLOCK_WIDTH - 1);
+		xbegin = rect->x & ~(BLOCK_WIDTH - 1);
 		unsigned ybegin = rect->y & ~(BLOCK_HEIGHT - 1);
 		unsigned xend = ((rect->x + rect->width - 1) | (BLOCK_WIDTH - 1)) + 1;
 		unsigned yend = ((rect->y + rect->height - 1) | (BLOCK_HEIGHT - 1)) + 1;
@@ -18134,6 +18221,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_flush_render_pass(FBAtlas *self)
 	{
+		unsigned xbegin;
 		if (!self->renderpass.inside)
 			return;
 
@@ -18149,7 +18237,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		fbatlas_write_domain(self, Domain_Scaled, Stage_Fragment, rect);
 		renderer_flush_render_pass(self->listener, rect);
 
-		unsigned xbegin = rect->x / BLOCK_WIDTH;
+		xbegin = rect->x / BLOCK_WIDTH;
 		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
@@ -18159,9 +18247,10 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_extend_render_pass(FBAtlas *self, const Rect *rect, bool scissor)
 	{
+		Rect scissored_rect;
 		bool scissor_invariant = !scissor || rect_contains(&self->renderpass.scissor, rect);
 		self->listener->queue.scissor_invariant = scissor_invariant;
-		Rect scissored_rect = !scissor_invariant ? rect_scissor(rect, &self->renderpass.scissor) : *rect;
+		scissored_rect = !scissor_invariant ? rect_scissor(rect, &self->renderpass.scissor) : *rect;
 
 		if (!scissored_rect.width || !scissored_rect.height)
 			return;
@@ -18239,6 +18328,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 	static void fbatlas_clear_rect(FBAtlas *self, const Rect *rect, uint32_t fb_color)
 	{
+		unsigned xbegin;
 		if (rect->width == 0 || rect->height == 0)
 			return;
 
@@ -18253,7 +18343,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		// which helps a lot on mobile GPUs.
 		renderer_clear_quad(self->listener, rect, fb_color, rect_eq(&self->renderpass.rect, rect));
 
-		unsigned xbegin = rect->x / BLOCK_WIDTH;
+		xbegin = rect->x / BLOCK_WIDTH;
 		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
@@ -18514,6 +18604,7 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 		loaded_image_alloc(&result, higher->width / 2, higher->height / 2);
 		for (y = 0; y < result.height; y++) {
 			for (x = 0; x < result.width; x++) {
+				uint8_t * dst;
 				uint8_t *src00 = loaded_pixel(higher, x * 2 + 0, y * 2 + 0);
 				uint8_t *src10 = loaded_pixel(higher, x * 2 + 1, y * 2 + 0);
 				uint8_t *src01 = loaded_pixel(higher, x * 2 + 0, y * 2 + 1);
@@ -18525,7 +18616,7 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 				if (src01[0] == 0 && src01[1] == 0 && src01[2] == 0 && src01[3] == 0) numTransparent += 1;
 				if (src11[0] == 0 && src11[1] == 0 && src11[2] == 0 && src11[3] == 0) numTransparent += 1;
 
-				uint8_t *dst = loaded_pixel(&result, x, y);
+				dst = loaded_pixel(&result, x, y);
 				if (numTransparent > 2) {
 					dst[0] = 0;
 					dst[1] = 0;
@@ -18730,10 +18821,11 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 		io_channel_rc_lock_init();
 		t->channel = io_channel_new(); /* this IOThread holds one reference */
 		{ int i; for (i = 0; i < NUM_IO_THREADS; i++) {
+			sthread_t * thread;
 			// Take a reference on the worker's behalf BEFORE it starts, so the
 			// channel can't be freed out from under it; the worker releases on exit.
 			io_channel_acquire(t->channel);
-			sthread_t *thread = sthread_create(io_thread, t->channel);
+			thread = sthread_create(io_thread, t->channel);
 			if (thread) {
 				sthread_detach(thread);
 			} else {
@@ -18752,6 +18844,7 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 	}
 
 	void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode) {
+		int ppp;
 		uint32_t hash = upload->hash;
 
 		uint8_t *bytes;
@@ -18802,7 +18895,7 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 			TT_LOG_VERBOSE(RETRO_LOG_INFO, "MISSING palette %i, %i.\n", mode->palette_offset_x, mode->palette_offset_y);
 		}
 
-		int ppp = 1 << shift;
+		ppp = 1 << shift;
 		int bpp = 16 >> shift;
 		int mask = (1 << bpp) - 1;
 		/* Output is exactly 4 bytes per (subpixel) = image.size() * ppp * 4. */
@@ -18824,13 +18917,14 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 						bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
 						bytes[bi++] = (uint8_t)255;
 					} else {
+						int r;
 						uint16_t abgr1555;
 						if (mode->mode == TextureMode_ABGR1555) {
 							abgr1555 = subpixel;
 						} else {
 							abgr1555 = palette[subpixel];
 						}
-						int r = ((abgr1555 >> 0) & 0x1f) * 255.0 / 31.0;
+						r = ((abgr1555 >> 0) & 0x1f) * 255.0 / 31.0;
 						int g = ((abgr1555 >> 5) & 0x1f) * 255.0 / 31.0;
 						int b = ((abgr1555 >> 10) & 0x1f) * 255.0 / 31.0;
 						int a = (abgr1555 >> 15) * 255.0;
@@ -18996,10 +19090,11 @@ Rect fromSRect(SRect rect) {
 			RectIndex index = overlap.items[oi];
 			EnduringTextureRect *other = &self->tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because self->tracker.overlapping never returns dead indices
 			if (fromSRect_contains(other->texture_rect.vram_rect, palette_rect) && other->alive) {
+				int x;
 				if (other->texture_rect.offset_x != 0 || other->texture_rect.offset_y != 0) {
 					continue; // TODO: handle offset subrects
 				}
-				int x = palette_rect.x - other->texture_rect.vram_rect.x;
+				x = palette_rect.x - other->texture_rect.vram_rect.x;
 				int y = palette_rect.y - other->texture_rect.vram_rect.y;
 				int offset = y * other->texture_rect.vram_rect.width + x;
 				uint16_t *data = other->texture_rect.upload->image + offset;
@@ -19011,13 +19106,14 @@ Rect fromSRect(SRect rect) {
 	}
 
 	uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, Rect palette_rect) {
+		Palette palette;
 		int i;
 		for (i = 0; i < self->cached_palette_hashes_count; i++) {
 			if (rect_eq(&self->cached_palette_hashes[i].rect, &palette_rect)) {
 				return self->cached_palette_hashes[i].hash;
 			}
 		}
-		Palette palette = texture_tracker_get_palette(self, palette_rect);
+		palette = texture_tracker_get_palette(self, palette_rect);
 		if (palette.data != NULL) {
 			if (self->cached_palette_hashes_count == self->cached_palette_hashes_cap) {
 				int ncap = self->cached_palette_hashes_cap ? self->cached_palette_hashes_cap * 2 : 16;
@@ -19130,6 +19226,7 @@ Rect fromSRect(SRect rect) {
 	}
 
 	void texture_tracker_notifyReadback(struct TextureTracker *self, Rect rect, uint16_t *vram) {
+		uint32_t hash;
 		// These hacks are my workaround for the dialog self->frame texture restorable getting evicted by FMVs
 		if (rect.width == 96 && rect.height == 224 && rect.y == 0 && (rect.x % 96) == 0) {
 			// HACK: Looks like final fmv self->frame readback for cross fade, ignore
@@ -19140,7 +19237,7 @@ Rect fromSRect(SRect rect) {
 			return;
 		}
 
-		uint32_t hash = texture_tracker_dbgHashVram(self, rect, vram);
+		hash = texture_tracker_dbgHashVram(self, rect, vram);
 
 		{ int i; for (i = 0; i < rrvec_size(&self->restorable_rects); ) {
 			if (rect_intersects(&self->restorable_rects.items[i].rect, &rect))
@@ -19176,6 +19273,7 @@ Rect fromSRect(SRect rect) {
 	}
 
 	void texture_tracker_upload(struct TextureTracker *self, Rect rect, uint16_t *vram) {
+		RestorableRect * restore;
 		texture_tracker_clear_palette_cache(self, rect);
 
 		if (rect.width == FB_WIDTH && rect.height == FB_HEIGHT) {
@@ -19234,7 +19332,7 @@ Rect fromSRect(SRect rect) {
 			free(img); /* NULL if ownership was transferred */
 		}
 
-		RestorableRect *restore = NULL;
+		restore = NULL;
 		{
 		int _oi;
 		for (_oi = 0; _oi < rrvec_size(&self->restorable_rects); _oi++) {
@@ -19377,11 +19475,12 @@ Rect fromSRect(SRect rect) {
 	}
 
 	void texture_tracker_dump_texture(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode, DumpedMode dump_mode) {
+		bool already_dumped;
 		if (!upload->dumpable) {
 			return;
 		}
 
-		bool already_dumped = false;
+		already_dumped = false;
 		int dmi;
 		for (dmi = 0; dmi < upload->dumped_modes_count; dmi++) {
 			if (dumpedmode_eq(&upload->dumped_modes[dmi], &dump_mode)) {
@@ -19445,6 +19544,7 @@ Rect fromSRect(SRect rect) {
 	static INLINE void handle_lru_cache_clear(struct HandleLRUCache *self) { self->count = 0; }
 
 	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode *mode, unsigned int page_x, unsigned int page_y, bool *fastpath_capable_out, bool *cache_hit) {
+		HdTextureHandle result;
 		(*fastpath_capable_out) = false;
 		Rect palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 
@@ -19499,7 +19599,7 @@ Rect fromSRect(SRect rect) {
 			return hd_handle_make_none();
 		}
 
-		HdTextureHandle result = hd_handle_make_none();
+		result = hd_handle_make_none();
 
 		Rect result_rect;
 		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
@@ -19542,6 +19642,7 @@ Rect fromSRect(SRect rect) {
 	{
 		if (!handle.fused)
 		{
+			ImageHandle image;
 			// HdTextureHandle's are perhaps too tricky.  They assume that the RectTracker's textures vector hasn't removed anything since the handle was
 			// created. So it would seem all you need to do is, in Renderer::reset_queue, call RectTracker::releaseDeadHandles. Except you have to be
 			// very very careful that no handles outside of the queues (ie. local) exist across a call to reset_queue.  That is, the handle must go into
@@ -19576,7 +19677,7 @@ Rect fromSRect(SRect rect) {
 			/* Reconstruct a counted handle from the stored raw image (add_reference
 			 * then adopt), matching hd_gpu_image_handle. */
 			image_add_reference(iter->image);
-			ImageHandle image = ih_make(iter->image);
+			image = ih_make(iter->image);
 			int scaleX = image_get_width(ih_get(&image), 0) / upload->width;
 			int scaleY = image_get_height(ih_get(&image), 0) / upload->height;
 			SRect texture_subrect = texture_rect_subrect(tex);
@@ -19644,6 +19745,7 @@ bool is_power_of_two(int n) {
 		{
 			int pi;
 			for (pi = 0; pi < self->pending_attach.count; pi++) {
+				int width;
 				HdTextureId id;
 				id.hash = (uint32_t)(self->pending_attach.keys[pi] >> 32);
 				id.palette_hash = (uint32_t)self->pending_attach.keys[pi];
@@ -19672,7 +19774,7 @@ bool is_power_of_two(int n) {
 				if (cached == NULL)
 					continue; // evicted from both caches; will be re-self->requested on draw
 
-				int width = cached->levels.levels[0].width;
+				width = cached->levels.levels[0].width;
 				int height = cached->levels.levels[0].height;
 				if (width  % upload->width  == 0 && is_power_of_two(width  / upload->width) &&
 						height % upload->height == 0 && is_power_of_two(height / upload->height))
@@ -19875,6 +19977,7 @@ bool is_power_of_two(int n) {
 
 	static void split(SRect original, SRect remove, SRect *results, unsigned *count)
 	{
+		SRect intersection;
 		SRectResult intersectionResult = intersect(original, remove);
 		if (!intersectionResult.valid)
 		{
@@ -19882,7 +19985,7 @@ bool is_power_of_two(int n) {
 			return;
 		}
 
-		SRect intersection = intersectionResult.rect;
+		intersection = intersectionResult.rect;
 
 		// Top rect
 		if (srect_top(&intersection) > srect_top(&original)) {
@@ -20201,13 +20304,14 @@ int64_t page_bytes(FusionRects *fusion)
 				TextureUpload *upload = e->texture_rect.upload;
 				HdTexEntry *hd_texture = hd_tex_map_find(&upload->textures, palette_hash);
 				if (hd_texture != NULL) {
+					Rect r;
 					// Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity)
 					TextureRect clipped = subTexture(e->texture_rect, intersection.rect);
 					unsigned hd_scale_x = image_get_width(hd_texture->image, 0) / upload->width;
 					unsigned hd_scale_y = image_get_height(hd_texture->image, 0) / upload->height;
 					f->scaleX = max_(f->scaleX, hd_scale_x);
 					f->scaleY = max_(f->scaleY, hd_scale_y);
-					Rect r = fromSRect(clipped.vram_rect);
+					r = fromSRect(clipped.vram_rect);
 					if (f->vram_rect.width == 0)
 						f->vram_rect = r;
 					else
@@ -20223,6 +20327,7 @@ int64_t page_bytes(FusionRects *fusion)
 	}
 
 	void rebuild_page(FusedPage *page, struct RectTracker *tracker, Renderer *uploader) {
+		CommandBufferHandle * cmd;
 		TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilding page for %x, %d,%d %dx%d\n",
 				page->palette,
 				page->fusion.vram_rect.x,
@@ -20252,7 +20357,7 @@ int64_t page_bytes(FusionRects *fusion)
 			return;
 		}
 
-		CommandBufferHandle *cmd = renderer_command_buffer_hack_fixme(uploader);
+		cmd = renderer_command_buffer_hack_fixme(uploader);
 
 		int texture_width = page->fusion.vram_rect.width * page->fusion.scaleX;
 		int texture_height = page->fusion.vram_rect.height * page->fusion.scaleY;
@@ -20281,6 +20386,7 @@ int64_t page_bytes(FusionRects *fusion)
 		{
 		int _fri;
 		for (_fri = 0; _fri < ownedrects_size(&page->fusion.rects); _fri++) {
+			int full_res_levels;
 			TextureRect *tex = &page->fusion.rects.v.items[_fri];
 			TextureUpload *upload = tex->upload;
 
@@ -20328,7 +20434,7 @@ int64_t page_bytes(FusionRects *fusion)
 			// Blit into every mipmap level down to base vram
 			// TODO: this isn't a great way to do this, will probably be blurrier than it could be if src and dst aspect ratios are different
 			// TODO: is this line even right? it sure doesn't look right
-			int full_res_levels = log2(max_(rx, ry)) + 1;
+			full_res_levels = log2(max_(rx, ry)) + 1;
 			// assert(max_level >= 0 && max_level <= 6);
 			// TODO: this is incredibly finicky, and one bad (out of bounds) blit can bork everything
 			{ int dstLevel; for (dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
@@ -21010,6 +21116,7 @@ void rhi_vulkan_get_system_av_info(struct retro_system_av_info *info)
 
 void rhi_vulkan_refresh_variables(void)
 {
+	unsigned old_scaling;
    struct retro_variable var = {0};
 
    var.key = BEETLE_OPT(renderer_software_fb);
@@ -21025,7 +21132,7 @@ void rhi_vulkan_refresh_variables(void)
        * we are running in software mode */
       has_software_fb = true;
 
-   unsigned old_scaling = scaling;
+   old_scaling = scaling;
    unsigned old_msaa = msaa;
    bool old_super_sampling = super_sampling;
    bool old_show_vram = show_vram;
@@ -21334,6 +21441,7 @@ static void ensure_sync_index_resources(void)
 
 void rhi_vulkan_prepare_frame(void)
 {
+	unsigned index;
    if (device == NULL)
    {
       rhi_type = RHI_SOFTWARE;
@@ -21344,7 +21452,7 @@ void rhi_vulkan_prepare_frame(void)
    device_flush_frame(device);
    vulkan->wait_sync_index(vulkan->handle);
    ensure_sync_index_resources();
-   unsigned index = vulkan->get_sync_index(vulkan->handle);
+   index = vulkan->get_sync_index(vulkan->handle);
    device_next_frame_context(device);
 
    renderer->scaled_uv_offset = scaled_uv_offset;
@@ -21366,6 +21474,7 @@ static ScanoutMode get_scanout_mode(bool bpp24)
 void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
                                unsigned height, unsigned pitch)
 {
+	ImageHandle scanout;
    if (device == NULL)
       return;
 
@@ -21401,7 +21510,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    else
       renderer_set_mdec_filter(renderer, ScanoutFilter_None);
 
-   ImageHandle scanout = show_vram ? renderer_scanout_vram_to_texture(renderer, true) : renderer_scanout_to_texture(renderer);
+   scanout = show_vram ? renderer_scanout_vram_to_texture(renderer, true) : renderer_scanout_to_texture(renderer);
    unsigned index = vulkan->get_sync_index(vulkan->handle);
 
    struct retro_vulkan_image *image                          = &swapchain_images.items[index];
