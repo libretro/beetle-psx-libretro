@@ -2228,7 +2228,10 @@ static gl_display_rect compute_gl_display_rect(gl_renderer *renderer)
          clock_div = 7;
          break;
 
-      default: /* should never be here -- if we're here, something is terribly wrong */
+      default: /* out-of-range width mode: use the 320 divider so clock_div is
+                  never left uninitialised (the divisions below would otherwise
+                  be undefined / a divide-by-zero) */
+         clock_div = 8;
          break;
    }
 
@@ -2387,8 +2390,8 @@ static bool retro_refresh_variables(gl_renderer *renderer)
    bool display_vram         = false;
    struct retro_variable var = {0};
    int crop_overscan         = 1;
-   int32_t image_offset_cycles;
-   unsigned image_crop;
+   int32_t image_offset_cycles = 0;
+   unsigned image_crop         = 0;
    int32_t initial_scanline       = 0;
    int32_t last_scanline          = 239;
    int32_t initial_scanline_pal   = 0;
@@ -3500,7 +3503,10 @@ static void compute_vram_framebuffer_dimensions(gl_renderer *renderer)
          clock_div = 7;
          break;
 
-      default: /* Should not be here, if we ever get here then log and crash? */
+      default: /* out-of-range width mode: use the 320 divider so clock_div is
+                  never left uninitialised (the divisions below would otherwise
+                  be undefined / a divide-by-zero) */
+         clock_div = 8;
          break;
    } /* First we get the horizontal range in number of pixel clock period */
    fb_width = (renderer->config.display_area_hrange[1] - renderer->config.display_area_hrange[0]); /* Then we apply the divider */
