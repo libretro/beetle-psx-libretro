@@ -9122,7 +9122,10 @@ static void renderer_init(Renderer *self,
       fbatlas_set_draw_rect(&self->atlas, &self->render_state.draw_rect);
       fbatlas_set_palette_offset(&self->atlas, self->render_state.palette_offset_x, self->render_state.palette_offset_y);
       fbatlas_set_texture_window(&self->atlas, &self->render_state.cached_window_rect);
-      { Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_write_transfer(&self->atlas, Domain_Unscaled, &_r); }
+      {
+         Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT };
+         fbatlas_write_transfer(&self->atlas, Domain_Unscaled, &_r);
+      }
    }
 
    { ImageInitialData initial_vram = {
@@ -9265,7 +9268,10 @@ static void renderer_save_vram_state(Renderer *self, SaveState *out){
    buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
    buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
-   { Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &_r); }
+   {
+      Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT };
+      fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &_r);
+   }
    renderer_ensure_command_buffer(self);
    { VkOffset3D _o = { 0, 0, 0 }; VkExtent3D _e = { FB_WIDTH, FB_HEIGHT, 1 }; VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }; commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), ih_get(&self->framebuffer), 0, &_o, &_e, 0, 0,
                              &_s); }
@@ -9439,7 +9445,10 @@ static void renderer_set_draw_rect(Renderer *self, const Rect *rect)
    const unsigned scaled_h = rect->height * self->scaling;
    if (last->offset.x != scaled_x || last->offset.y != scaled_y ||
        last->extent.width != scaled_w || last->extent.height != scaled_h)
-      { VkRect2D _vpush = { { scaled_x, scaled_y }, { scaled_w, scaled_h } }; Rect2DVec_push(&self->queue.scissors, &_vpush); }
+      {
+         VkRect2D _vpush = { { scaled_x, scaled_y }, { scaled_w, scaled_h } };
+         Rect2DVec_push(&self->queue.scissors, &_vpush);
+      }
    }
 }
 
@@ -9464,7 +9473,14 @@ static Rect renderer_compute_window_rect(Renderer *self,
    unsigned mask_bits_y = 32 - leading_zeroes(window->mask_y);
    unsigned x = window->or_x & ~((1u << mask_bits_x) - 1);
    unsigned y = window->or_y & ~((1u << mask_bits_y) - 1);
-   { Rect _wr; _wr.x = x; _wr.y = y; _wr.width = 1u << mask_bits_x; _wr.height = 1u << mask_bits_y; return _wr; }
+   {
+      Rect _wr;
+      _wr.x = x;
+      _wr.y = y;
+      _wr.width = 1u << mask_bits_x;
+      _wr.height = 1u << mask_bits_y;
+      return _wr;
+   }
 }
 
 static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
@@ -9936,7 +9952,10 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    if (rect->width == 0 || rect->height == 0 || !self->render_state.display_on)
    {
       /* Black screen, just flush out everything. */
-      { Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_read_fragment(&self->atlas, Domain_Scaled, &_r); }
+      {
+         Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT };
+         fbatlas_read_fragment(&self->atlas, Domain_Scaled, &_r);
+      }
 
       renderer_ensure_command_buffer(self);
 
@@ -10327,9 +10346,15 @@ static void renderer_resolve(Renderer *self,
       unsigned y)
 {
    if (target_domain == Domain_Scaled)
-      { VkRect2D _vpush = { { (int)(x), (int)(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } }; Rect2DVec_push(&self->queue.scaled_resolves, &_vpush); }
+      {
+         VkRect2D _vpush = { { (int)(x), (int)(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } };
+         Rect2DVec_push(&self->queue.scaled_resolves, &_vpush);
+      }
    else
-      { VkRect2D _vpush = { { (int)(x), (int)(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } }; Rect2DVec_push(&self->queue.unscaled_resolves, &_vpush); }
+      {
+         VkRect2D _vpush = { { (int)(x), (int)(y) }, { BLOCK_WIDTH, BLOCK_HEIGHT } };
+         Rect2DVec_push(&self->queue.unscaled_resolves, &_vpush);
+      }
 }
 
 static void renderer_ensure_command_buffer(Renderer *self)
@@ -10402,7 +10427,10 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
 
          if (max_u > 255 || max_v > 255) /* Wraparound behavior, assume the whole page is hit. */
          {
-            { Rect _r = { 0, 0, 256u >> shift, 256 }; fbatlas_set_texture_window(&self->atlas, &_r); }
+            {
+               Rect _r = { 0, 0, 256u >> shift, 256 };
+               fbatlas_set_texture_window(&self->atlas, &_r);
+            }
             hd_texture_vram.x = self->render_state.texture_offset_x;
             hd_texture_vram.y = self->render_state.texture_offset_y;
             hd_texture_vram.width = 256u >> shift;
@@ -10413,7 +10441,10 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
             min_u >>= shift;
             max_u = (max_u + (1 << shift) - 1) >> shift;
             width = max_u - min_u + 1;
-            { Rect _r = { min_u, min_v, width, height }; fbatlas_set_texture_window(&self->atlas, &_r); }
+            {
+               Rect _r = { min_u, min_v, width, height };
+               fbatlas_set_texture_window(&self->atlas, &_r);
+            }
 
             hd_texture_vram.x = self->render_state.texture_offset_x + min_u;
             hd_texture_vram.y = self->render_state.texture_offset_y + min_v;
@@ -10427,7 +10458,10 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       {
          /* If we have a masked texture window, assume this is the true rect we should use. */
          Rect effective_rect = self->render_state.cached_window_rect;
-         { Rect _r = { effective_rect.x >> shift, effective_rect.y, effective_rect.width >> shift, effective_rect.height }; fbatlas_set_texture_window(&self->atlas, &_r); }
+         {
+            Rect _r = { effective_rect.x >> shift, effective_rect.y, effective_rect.width >> shift, effective_rect.height };
+            fbatlas_set_texture_window(&self->atlas, &_r);
+         }
          hd_texture_vram.x = self->render_state.texture_offset_x + (effective_rect.x >> shift);
          hd_texture_vram.y = self->render_state.texture_offset_y + effective_rect.y;
          hd_texture_vram.width = effective_rect.width >> shift;
@@ -10745,7 +10779,10 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
    BufferVertexVec *out = renderer_select_pipeline(self, 1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
    if (out)
    {
-      { unsigned i; for (i = 0; i < 3; i++) BufferVertexVec_push(out, &vert[i]); }
+      {
+         unsigned i;
+         for (i = 0; i < 3; i++) BufferVertexVec_push(out, &vert[i]);
+      }
    }
 
    if (self->render_state.mask_test || self->render_state.semi_transparent != SemiTransparentMode_None)
@@ -10753,7 +10790,11 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
       if (filtering)
          filtering = !renderer_get_filer_exclude(self, FilterExcludeOpaqueAndSemiTrans);
 
-      { unsigned i; for (i = 0; i < 3; i++) BufferVertexVec_push(&self->queue.semi_transparent, &vert[i]); }
+      {
+         unsigned i;
+         for (i = 0; i < 3; i++)
+            BufferVertexVec_push(&self->queue.semi_transparent, &vert[i]);
+      }
       {
          SemiTransparentState _sts = { scissor_index, hd_texture_index, self->render_state.semi_transparent,
                                                self->render_state.texture_mode != TextureMode_None,
@@ -10871,7 +10912,10 @@ static void renderer_clear_quad(Renderer *self,
    }
 
    if (candidate)
-      { ClearCandidate _vpush = { *rect, fb_color, z }; ClearCandidateVec_push(&self->queue.clear_candidates, &_vpush); }
+      {
+         ClearCandidate _vpush = { *rect, fb_color, z };
+         ClearCandidateVec_push(&self->queue.clear_candidates, &_vpush);
+      }
    }
 }
 
@@ -11578,7 +11622,10 @@ static void renderer_reset_scissor_queue(Renderer *self)
    Rect * rect;
    Rect2DVec_clear(&self->queue.scissors);
    rect = &self->render_state.draw_rect;
-   { VkRect2D _vpush = { { (int)(rect->x * self->scaling), (int)(rect->y * self->scaling) }, { rect->width * self->scaling, rect->height * self->scaling } }; Rect2DVec_push(&self->queue.scissors, &_vpush); }
+   {
+      VkRect2D _vpush = { { (int)(rect->x * self->scaling), (int)(rect->y * self->scaling) }, { rect->width * self->scaling, rect->height * self->scaling } };
+      Rect2DVec_push(&self->queue.scissors, &_vpush);
+   }
 }
 
 static void renderer_reset_queue(Renderer *self)
@@ -12225,7 +12272,11 @@ static void sampler_release_reference(struct Sampler *self)
 
 static void sampler_deleter_call(Sampler *sampler)
 {
-   { struct ObjectPoolRaw *_pool = &sampler->device->handle_pool.samplers; sampler_fini(sampler); object_pool_raw_free(_pool, sampler); }
+   {
+      struct ObjectPoolRaw *_pool = &sampler->device->handle_pool.samplers;
+      sampler_fini(sampler);
+      object_pool_raw_free(_pool, sampler);
+   }
 }
 
 static void buffer_init(struct Buffer *self,
@@ -12256,7 +12307,11 @@ static void buffer_release_reference(struct Buffer *self)
 
 static void buffer_deleter_call(Buffer *buffer)
 {
-   { struct ObjectPoolRaw *_pool = &buffer->device->handle_pool.buffers; buffer_fini(buffer); object_pool_raw_free(_pool, buffer); }
+   {
+      struct ObjectPoolRaw *_pool = &buffer->device->handle_pool.buffers;
+      buffer_fini(buffer);
+      object_pool_raw_free(_pool, buffer);
+   }
 }
 
 static void bufferview_init(struct BufferView *self,
@@ -12285,7 +12340,11 @@ static void bufferview_release_reference(struct BufferView *self)
 
 static void buffer_view_deleter_call(BufferView *view)
 {
-   { struct ObjectPoolRaw *_pool = &view->device->handle_pool.buffer_views; bufferview_fini(view); object_pool_raw_free(_pool, view); }
+   {
+      struct ObjectPoolRaw *_pool = &view->device->handle_pool.buffer_views;
+      bufferview_fini(view);
+      object_pool_raw_free(_pool, view);
+   }
 }
 
 static void imageview_init(struct ImageView *self,
@@ -12373,7 +12432,11 @@ static void image_init(struct Image *self, Device *device, VkImage image, VkImag
       info.levels = create_info->levels;
       info.base_layer = 0;
       info.layers = create_info->layers;
-      { struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&device->handle_pool.image_views); imageview_init(_iv, device, default_view, &info); self->view = iv_make(_iv); }
+      {
+         struct ImageView *_iv = (struct ImageView *)object_pool_raw_allocate(&device->handle_pool.image_views);
+         imageview_init(_iv, device, default_view, &info);
+         self->view = iv_make(_iv);
+      }
    }
 }
 
@@ -12398,12 +12461,20 @@ static void image_release_reference(struct Image *self)
 
 static void image_view_deleter_call(ImageView *view)
 {
-   { struct ObjectPoolRaw *_pool = &view->device->handle_pool.image_views; imageview_fini(view); object_pool_raw_free(_pool, view); }
+   {
+      struct ObjectPoolRaw *_pool = &view->device->handle_pool.image_views;
+      imageview_fini(view);
+      object_pool_raw_free(_pool, view);
+   }
 }
 
 static void image_deleter_call(Image *image)
 {
-   { struct ObjectPoolRaw *_pool = &image->device->handle_pool.images; image_fini(image); object_pool_raw_free(_pool, image); }
+   {
+      struct ObjectPoolRaw *_pool = &image->device->handle_pool.images;
+      image_fini(image);
+      object_pool_raw_free(_pool, image);
+   }
 }
 
 static void fenceholder_init(struct FenceHolder *self,
@@ -12440,7 +12511,11 @@ static void fenceholder_release_reference(struct FenceHolder *self)
 
 static void fence_holder_deleter_call(FenceHolder *fence)
 {
-   { struct ObjectPoolRaw *_pool = &fence->device->handle_pool.fences; fenceholder_fini(fence); object_pool_raw_free(_pool, fence); }
+   {
+      struct ObjectPoolRaw *_pool = &fence->device->handle_pool.fences;
+      fenceholder_fini(fence);
+      object_pool_raw_free(_pool, fence);
+   }
 }
 
 static VkFence fencemanager_request_cleared_fence(struct FenceManager *self)
@@ -12503,7 +12578,11 @@ static void semaphoreholder_release_reference(struct SemaphoreHolder *self)
 
 static void semaphore_holder_deleter_call(SemaphoreHolder *semaphore)
 {
-   { struct ObjectPoolRaw *_pool = &semaphore->device->handle_pool.semaphores; semaphoreholder_fini(semaphore); object_pool_raw_free(_pool, semaphore); }
+   {
+      struct ObjectPoolRaw *_pool = &semaphore->device->handle_pool.semaphores;
+      semaphoreholder_fini(semaphore);
+      object_pool_raw_free(_pool, semaphore);
+   }
 }
 
 static void semaphoremanager_deinit(struct SemaphoreManager *self)
@@ -13133,7 +13212,10 @@ static void deviceallocator_free(struct DeviceAllocator *self,
       uint8_t *host_memory)
 {
    struct DeviceAllocatorHeap *heap = da_heap_vec_at(&self->heaps, self->mem_props.memoryTypes[memory_type].heapIndex);
-   { struct DeviceAllocatorAllocation a = { memory, host_memory, size, memory_type }; da_alloc_vec_push(&heap->blocks, &a); }
+   {
+      struct DeviceAllocatorAllocation a = { memory, host_memory, size, memory_type };
+      da_alloc_vec_push(&heap->blocks, &a);
+   }
 }
 
 static void deviceallocator_free_no_recycle(struct DeviceAllocator *self,
@@ -13498,50 +13580,92 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
             if (has_immutable_sampler(layout, i))
                immutable_samplers[i] = sampler_get_sampler(device_get_stock_sampler(device, get_immutable_sampler(layout, i)));
 
-            { VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-            { VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
+            {
+               VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL };
+               DescriptorBindingVec_push(&bindings, &_vpush);
+            }
+            {
+               VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VULKAN_NUM_SETS_PER_POOL };
+               DescriptorPoolSizeVec_push(&self->pool_size, &_vpush);
+            }
             types++;
          }
 
          if (layout->sampled_buffer_mask & (1u << i))
          {
-            { VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-            { VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
+            {
+               VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, stages, NULL };
+               DescriptorBindingVec_push(&bindings, &_vpush);
+            }
+            {
+               VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VULKAN_NUM_SETS_PER_POOL };
+               DescriptorPoolSizeVec_push(&self->pool_size, &_vpush);
+            }
             types++;
          }
 
          if (layout->storage_image_mask & (1u << i))
          {
-            { VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-            { VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
+            {
+               VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, NULL };
+               DescriptorBindingVec_push(&bindings, &_vpush);
+            }
+            {
+               VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VULKAN_NUM_SETS_PER_POOL };
+               DescriptorPoolSizeVec_push(&self->pool_size, &_vpush);
+            }
             types++;
          }
 
          if (layout->uniform_buffer_mask & (1u << i))
          {
-            { VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-            { VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
+            {
+               VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, stages, NULL };
+               DescriptorBindingVec_push(&bindings, &_vpush);
+            }
+            {
+               VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VULKAN_NUM_SETS_PER_POOL };
+               DescriptorPoolSizeVec_push(&self->pool_size, &_vpush);
+            }
             types++;
          }
 
          if (layout->storage_buffer_mask & (1u << i))
          {
-            { VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-            { VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
+            {
+               VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, NULL };
+               DescriptorBindingVec_push(&bindings, &_vpush);
+            }
+            {
+               VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VULKAN_NUM_SETS_PER_POOL };
+               DescriptorPoolSizeVec_push(&self->pool_size, &_vpush);
+            }
             types++;
          }
 
          if (layout->input_attachment_mask & (1u << i))
          {
-            { VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-            { VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
+            {
+               VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, stages, NULL };
+               DescriptorBindingVec_push(&bindings, &_vpush);
+            }
+            {
+               VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VULKAN_NUM_SETS_PER_POOL };
+               DescriptorPoolSizeVec_push(&self->pool_size, &_vpush);
+            }
             types++;
          }
 
          if (layout->separate_image_mask & (1u << i))
          {
-            { VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-            { VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
+            {
+               VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, stages, NULL };
+               DescriptorBindingVec_push(&bindings, &_vpush);
+            }
+            {
+               VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VULKAN_NUM_SETS_PER_POOL };
+               DescriptorPoolSizeVec_push(&self->pool_size, &_vpush);
+            }
             types++;
          }
 
@@ -13551,8 +13675,14 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
             if (has_immutable_sampler(layout, i))
                immutable_samplers[i] = sampler_get_sampler(device_get_stock_sampler(device, get_immutable_sampler(layout, i)));
 
-            { VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL }; DescriptorBindingVec_push(&bindings, &_vpush); }
-            { VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL }; DescriptorPoolSizeVec_push(&self->pool_size, &_vpush); }
+            {
+               VkDescriptorSetLayoutBinding _vpush = { i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, stages, immutable_samplers[i] != VK_NULL_HANDLE ? &immutable_samplers[i] : NULL };
+               DescriptorBindingVec_push(&bindings, &_vpush);
+            }
+            {
+               VkDescriptorPoolSize _vpush = { VK_DESCRIPTOR_TYPE_SAMPLER, VULKAN_NUM_SETS_PER_POOL };
+               DescriptorPoolSizeVec_push(&self->pool_size, &_vpush);
+            }
             types++;
          }
 
@@ -13610,7 +13740,11 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
          LOGE("Failed to create descriptor pool.\n");
 
       { VkDescriptorSetLayout layouts[VULKAN_NUM_SETS_PER_POOL];
-      { unsigned i; for (i = 0; i < VULKAN_NUM_SETS_PER_POOL; i++) layouts[i] = self->set_layout; }
+      {
+         unsigned i;
+         for (i = 0; i < VULKAN_NUM_SETS_PER_POOL; i++)
+            layouts[i] = self->set_layout;
+      }
 
       { VkDescriptorSetAllocateInfo alloc = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
       alloc.descriptorPool = pool;
@@ -13810,7 +13944,11 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a,
       self->depth_stencil = VK_FORMAT_UNDEFINED;
       self->subpasses.items = NULL; self->subpasses.count = 0; self->subpasses.cap = 0;
       self->intrusive_node.key = hash;
-      { unsigned att; for (att = 0; att < VULKAN_NUM_ATTACHMENTS; att++) self->color_attachments[att] = VK_FORMAT_UNDEFINED; }
+      {
+         unsigned att;
+         for (att = 0; att < VULKAN_NUM_ATTACHMENTS; att++)
+            self->color_attachments[att] = VK_FORMAT_UNDEFINED;
+      }
 
       VK_ASSERT(info->num_color_attachments || info->depth_stencil);
 
@@ -13831,7 +13969,11 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a,
          else
             default_subpass_info.depth_stencil_mode = RenderPassInfo_DepthStencil_ReadWrite;
 
-         { unsigned i; for (i = 0; i < info->num_color_attachments; i++) default_subpass_info.color_attachments[i] = i; }
+         {
+            unsigned i;
+            for (i = 0; i < info->num_color_attachments; i++)
+               default_subpass_info.color_attachments[i] = i;
+         }
          num_subpasses = 1;
          subpass_infos = &default_subpass_info;
       }
@@ -14260,7 +14402,11 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a,
       } }
 
       /* Only consider preserve masks before last subpass which uses an attachment. */
-      { unsigned attachment; for (attachment = 0; attachment < num_attachments; attachment++) preserve_masks[attachment] &= (1u << last_subpass_for_attachment[attachment]) - 1; }
+      {
+         unsigned attachment;
+         for (attachment = 0; attachment < num_attachments; attachment++)
+            preserve_masks[attachment] &= (1u << last_subpass_for_attachment[attachment]) - 1;
+      }
 
       /* Add preserve attachments as needed. */
       { unsigned subpass; for (subpass = 0; subpass < num_subpasses; subpass++) {
@@ -14660,7 +14806,13 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a,
 
 static VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
    {
-      { VkOffset3D _o; _o.x = a->x + b->x; _o.y = a->y + b->y; _o.z = a->z + b->z; return _o; }
+      {
+         VkOffset3D _o;
+         _o.x = a->x + b->x;
+         _o.y = a->y + b->y;
+         _o.z = a->z + b->z;
+         return _o;
+      }
    }
 
    static void commandbuffer_init(struct CommandBuffer *self,
@@ -15460,7 +15612,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       { uint32_t _feit, binding, binding_count; FOR_EACH_BIT_RANGE(update_vbo_mask, _feit, binding, binding_count)
       {
 #ifdef VULKAN_DEBUG
-         { unsigned i; for (i = binding; i < binding + binding_count; i++) VK_ASSERT(self->vbo.buffers[i] != VK_NULL_HANDLE); }
+         {
+            unsigned i;
+            for (i = binding; i < binding + binding_count; i++)
+               VK_ASSERT(self->vbo.buffers[i] != VK_NULL_HANDLE);
+         }
 #endif
          vkCmdBindVertexBuffers(self->cmd, binding, binding_count, self->vbo.buffers + binding, self->vbo.offsets + binding);
       }
@@ -16106,7 +16262,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
    static void command_buffer_deleter_call(CommandBuffer *cmd)
    {
-      { struct ObjectPoolRaw *_pool = &cmd->device->handle_pool.command_buffers; commandbuffer_fini(cmd); object_pool_raw_free(_pool, cmd); }
+      {
+         struct ObjectPoolRaw *_pool = &cmd->device->handle_pool.command_buffers;
+         commandbuffer_fini(cmd);
+         object_pool_raw_free(_pool, cmd);
+      }
    }
 
 #ifndef _WIN32
@@ -16372,7 +16532,12 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
 
       if (self->graphics_queue_family == VK_QUEUE_FAMILY_IGNORED)
-      { free(queried_extensions); free(queried_layers); free(queue_props); return false; }
+      {
+         free(queried_extensions);
+         free(queried_layers);
+         free(queue_props);
+         return false;
+      }
 
       universal_queue_index = 1;
       { uint32_t graphics_queue_index = 0;
@@ -16441,8 +16606,16 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       const char **enabled_layers = (const char **)malloc((num_required_device_layers + 4) * sizeof(const char *));
       unsigned enabled_layers_count = 0;
 
-      { uint32_t i; for (i = 0; i < num_required_device_extensions; i++) enabled_extensions[enabled_extensions_count++] = (required_device_extensions[i]); }
-      { uint32_t i; for (i = 0; i < num_required_device_layers; i++) enabled_layers[enabled_layers_count++] = (required_device_layers[i]); }
+      {
+         uint32_t i;
+         for (i = 0; i < num_required_device_extensions; i++)
+            enabled_extensions[enabled_extensions_count++] = (required_device_extensions[i]);
+      }
+      {
+         uint32_t i;
+         for (i = 0; i < num_required_device_layers; i++)
+            enabled_layers[enabled_layers_count++] = (required_device_layers[i]);
+      }
 
       if (has_vk_extension(queried_extensions, ext_count, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) &&
             has_vk_extension(queried_extensions, ext_count, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME))
@@ -16646,7 +16819,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       framebuffer_allocator_clear(&self->framebuffer_allocator);
       attachment_allocator_clear(&self->transient_allocator);
-      { unsigned i; for (i = 0; i < (unsigned)StockSampler_Count; i++) smh_reset(&self->samplers[i]); }
+      {
+         unsigned i;
+         for (i = 0; i < (unsigned)StockSampler_Count; i++)
+            smh_reset(&self->samplers[i]);
+      }
 
       fencemanager_deinit(&self->managers.fence);
       semaphoremanager_deinit(&self->managers.semaphore);
@@ -17103,7 +17280,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       if (fence)
       {
          VK_ASSERT(!fence_is_valid(fence));
-         { struct FenceHolder *_fh = (struct FenceHolder *)object_pool_raw_allocate(&self->handle_pool.fences); fenceholder_init(_fh, self, cleared_fence); *fence = fence_make(_fh); }
+         {
+            struct FenceHolder *_fh = (struct FenceHolder *)object_pool_raw_allocate(&self->handle_pool.fences);
+            fenceholder_init(_fh, self, cleared_fence);
+            *fence = fence_make(_fh);
+         }
       }
 
       device_decrement_frame_counter_nolock(self);
@@ -17143,7 +17324,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&self->managers.semaphore);
          SemaphoreVec_push(&signals, &cleared_semaphore);
          VK_ASSERT(!sem_is_valid(&semaphores[i]));
-         { struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&self->handle_pool.semaphores); semaphoreholder_init(_sh, self, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
+         {
+            struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&self->handle_pool.semaphores);
+            semaphoreholder_init(_sh, self, cleared_semaphore, true);
+            semaphores[i] = sem_make(_sh);
+         }
       } }
 
       submit.signalSemaphoreCount = SemaphoreVec_size(&signals);
@@ -17213,7 +17398,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       {
          /* For single-queue systems, just use a pipeline barrier. */
          commandbuffer_barrier_simple(cbh_get(cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, stages, access);
-         { CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
+         {
+            CommandBufferHandle _m;
+            cbh_steal(&_m, cmd);
+            device_submit_nolock(self, _m, NULL, 0, NULL);
+         }
       }
       else
       {
@@ -17240,12 +17429,20 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             if (compute_stages != 0)
             {
                Semaphore sem; sem.data = NULL;
-               { CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+               {
+                  CommandBufferHandle _m;
+                  cbh_steal(&_m, cmd);
+                  device_submit_nolock(self, _m, NULL, 1, &sem);
+               }
                device_add_wait_semaphore_nolock(self, Type_AsyncCompute, sem, compute_stages, flush);
                sem_reset(&sem);
             }
             else
-               { CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
+               {
+                  CommandBufferHandle _m;
+                  cbh_steal(&_m, cmd);
+                  device_submit_nolock(self, _m, NULL, 0, NULL);
+               }
          }
          else if (self->transfer_queue == self->compute_queue)
          {
@@ -17255,12 +17452,20 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             if (graphics_stages != 0)
             {
                Semaphore sem; sem.data = NULL;
-               { CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+               {
+                  CommandBufferHandle _m;
+                  cbh_steal(&_m, cmd);
+                  device_submit_nolock(self, _m, NULL, 1, &sem);
+               }
                device_add_wait_semaphore_nolock(self, Type_Generic, sem, graphics_stages, flush);
                sem_reset(&sem);
             }
             else
-               { CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
+               {
+                  CommandBufferHandle _m;
+                  cbh_steal(&_m, cmd);
+                  device_submit_nolock(self, _m, NULL, 0, NULL);
+               }
          }
          else
          {
@@ -17269,7 +17474,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
                Semaphore semaphores[2];
                semaphores[0].data = NULL;
                semaphores[1].data = NULL;
-               { CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 2, semaphores); }
+               {
+                  CommandBufferHandle _m;
+                  cbh_steal(&_m, cmd);
+                  device_submit_nolock(self, _m, NULL, 2, semaphores);
+               }
                device_add_wait_semaphore_nolock(self, Type_Generic, semaphores[0], graphics_stages, flush);
                device_add_wait_semaphore_nolock(self, Type_AsyncCompute, semaphores[1], compute_stages, flush);
                sem_reset(&semaphores[0]);
@@ -17278,19 +17487,31 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             else if (graphics_stages != 0)
             {
                Semaphore sem; sem.data = NULL;
-               { CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+               {
+                  CommandBufferHandle _m;
+                  cbh_steal(&_m, cmd);
+                  device_submit_nolock(self, _m, NULL, 1, &sem);
+               }
                device_add_wait_semaphore_nolock(self, Type_Generic, sem, graphics_stages, flush);
                sem_reset(&sem);
             }
             else if (compute_stages != 0)
             {
                Semaphore sem; sem.data = NULL;
-               { CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 1, &sem); }
+               {
+                  CommandBufferHandle _m;
+                  cbh_steal(&_m, cmd);
+                  device_submit_nolock(self, _m, NULL, 1, &sem);
+               }
                device_add_wait_semaphore_nolock(self, Type_AsyncCompute, sem, compute_stages, flush);
                sem_reset(&sem);
             }
             else
-               { CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
+               {
+                  CommandBufferHandle _m;
+                  cbh_steal(&_m, cmd);
+                  device_submit_nolock(self, _m, NULL, 0, NULL);
+               }
          }
       }
    }
@@ -17374,7 +17595,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&self->managers.semaphore);
          SemaphoreVec_push(&signals[VkSubmitInfoVec_size(&submits) - 1], &cleared_semaphore);
          VK_ASSERT(!sem_is_valid(&semaphores[i]));
-         { struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&self->handle_pool.semaphores); semaphoreholder_init(_sh, self, cleared_semaphore, true); semaphores[i] = sem_make(_sh); }
+         {
+            struct SemaphoreHolder *_sh = (struct SemaphoreHolder *)object_pool_raw_allocate(&self->handle_pool.semaphores);
+            semaphoreholder_init(_sh, self, cleared_semaphore, true);
+            semaphores[i] = sem_make(_sh);
+         }
       } }
 
       { int i; for (i = 0; i < VkSubmitInfoVec_size(&submits); i++) {
@@ -18043,7 +18268,11 @@ static VkImageViewType get_image_view_type(const ImageCreateInfo *create_info,
       if (res != VK_SUCCESS)
          return bvh_make(NULL);
 
-      { struct BufferView *_bv = (struct BufferView *)object_pool_raw_allocate(&self->handle_pool.buffer_views); bufferview_init(_bv, self, view, view_info); return bvh_make(_bv); }
+      {
+         struct BufferView *_bv = (struct BufferView *)object_pool_raw_allocate(&self->handle_pool.buffer_views);
+         bufferview_init(_bv, self, view, view_info);
+         return bvh_make(_bv);
+      }
    }
 
    /* ImageResourceHolder: a scoped owner of the Vulkan objects created while
@@ -18348,7 +18577,11 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
             tfl_set_3d(&layout, info->format, info->width, info->height, info->depth, copy_levels);
             break;
          default:
-            { InitialImageBuffer _empty; memset(&_empty, 0, sizeof(_empty)); return _empty; }
+            {
+               InitialImageBuffer _empty;
+               memset(&_empty, 0, sizeof(_empty));
+               return _empty;
+            }
       }
 
       { BufferCreateInfo buffer_info = {};
@@ -18712,7 +18945,11 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       if (vkCreateSampler(self->device, &info, NULL, &sampler) != VK_SUCCESS)
          return smh_make(NULL);
 
-      { struct Sampler *_s = (struct Sampler *)object_pool_raw_allocate(&self->handle_pool.samplers); sampler_init(_s, self, sampler); return smh_make(_s); }
+      {
+         struct Sampler *_s = (struct Sampler *)object_pool_raw_allocate(&self->handle_pool.samplers);
+         sampler_init(_s, self, sampler);
+         return smh_make(_s);
+      }
    }
 
    static BufferHandle device_create_buffer(Device *self,
@@ -18880,9 +19117,21 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          hasher_u32(&h, info->subpasses[i].num_input_attachments);
          hasher_u32(&h, info->subpasses[i].num_resolve_attachments);
          hasher_u32(&h, (uint32_t)(info->subpasses[i].depth_stencil_mode));
-         { unsigned j; for (j = 0; j < info->subpasses[i].num_color_attachments; j++) hasher_u32(&h, info->subpasses[i].color_attachments[j]); }
-         { unsigned j; for (j = 0; j < info->subpasses[i].num_input_attachments; j++) hasher_u32(&h, info->subpasses[i].input_attachments[j]); }
-         { unsigned j; for (j = 0; j < info->subpasses[i].num_resolve_attachments; j++) hasher_u32(&h, info->subpasses[i].resolve_attachments[j]); }
+         {
+            unsigned j;
+            for (j = 0; j < info->subpasses[i].num_color_attachments; j++)
+               hasher_u32(&h, info->subpasses[i].color_attachments[j]);
+         }
+         {
+            unsigned j;
+            for (j = 0; j < info->subpasses[i].num_input_attachments; j++)
+               hasher_u32(&h, info->subpasses[i].input_attachments[j]);
+         }
+         {
+            unsigned j;
+            for (j = 0; j < info->subpasses[i].num_resolve_attachments; j++)
+               hasher_u32(&h, info->subpasses[i].resolve_attachments[j]);
+         }
       } }
 
       depth_stencil = info->depth_stencil ? imageview_get_format(info->depth_stencil) : VK_FORMAT_UNDEFINED;
@@ -20327,7 +20576,10 @@ static Rect fromSRect(SRect rect) {
       int height = bottom - top;
       if (width <= 0 || height <= 0)
       { SRectResult r = { make_srect(0, 0, 1, 1), false }; return r; }
-      { SRectResult r = { make_srect(left, top, width, height), true }; return r; }
+      {
+         SRectResult r = { make_srect(left, top, width, height), true };
+         return r;
+      }
    }
 
    static TextureRect subTexture(TextureRect original, SRect sub_vram_rect) {
@@ -20733,7 +20985,12 @@ static Rect fromSRect(SRect rect) {
       { int oi; for (oi = 0; oi < overlap.count; oi++) {
          RectIndex index = overlap.items[oi];
          TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
-         { DumpedMode _dm; _dm.mode = mode->mode; _dm.palette_hash = palette_hash; texture_tracker_dump_texture(self, tex->upload, mode, _dm); }
+         {
+            DumpedMode _dm;
+            _dm.mode = mode->mode;
+            _dm.palette_hash = palette_hash;
+            texture_tracker_dump_texture(self, tex->upload, mode, _dm);
+         }
       } }
       if (self->frame_dump != NULL) {
          if (self->frame_dump_need_comma) {
@@ -21127,7 +21384,14 @@ static bool is_power_of_two(int n) {
       }
 
       /* Delete fused textures */
-      { Rect _mdr; _mdr.x = 0; _mdr.y = 0; _mdr.width = FB_WIDTH; _mdr.height = FB_HEIGHT; fused_pages_mark_dead(&self->fused_pages, _mdr); }
+      {
+         Rect _mdr;
+         _mdr.x = 0;
+         _mdr.y = 0;
+         _mdr.width = FB_WIDTH;
+         _mdr.height = FB_HEIGHT;
+         fused_pages_mark_dead(&self->fused_pages, _mdr);
+      }
 
       /* Draws will lazily re-request and the cache repopulates. */
    }
@@ -21299,7 +21563,10 @@ static bool is_power_of_two(int n) {
                unsigned i;
                eold->alive = false;
                for (i = 0; i < splits_count; i++)
-                  { TextureRect _tr = subTexture(*old, splits[i]); TextureRectVec_push(&newTextures, &_tr); }
+                  {
+                     TextureRect _tr = subTexture(*old, splits[i]);
+                     TextureRectVec_push(&newTextures, &_tr);
+                  }
             }
          }
       }
@@ -21457,7 +21724,11 @@ static int64_t page_bytes(FusionRects *fusion)
          return a->upload > b->upload;
       if (!srect_eq(&a->vram_rect, &b->vram_rect))
          return srect_gt(&a->vram_rect, &b->vram_rect);
-      { SRect _sa = texture_rect_subrect(a); SRect _sb = texture_rect_subrect(b); return srect_gt(&_sa, &_sb); }
+      {
+         SRect _sa = texture_rect_subrect(a);
+         SRect _sb = texture_rect_subrect(b);
+         return srect_gt(&_sa, &_sb);
+      }
    }
 
    /* qsort comparator: descending order, matching texture_rect_sort_gt. Equal
@@ -21882,7 +22153,14 @@ static int64_t page_bytes(FusionRects *fusion)
          }
       } }
 
-      { Rect _crr; _crr.x = 0; _crr.y = 0; _crr.width = FB_WIDTH; _crr.height = FB_HEIGHT; texture_tracker_clearRegion(self, _crr); }
+      {
+         Rect _crr;
+         _crr.x = 0;
+         _crr.y = 0;
+         _crr.width = FB_WIDTH;
+         _crr.height = FB_HEIGHT;
+         texture_tracker_clearRegion(self, _crr);
+      }
       enduring_arr_clear(&self->tracker.textures); /* load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway */
       {
          int _i;
@@ -21907,10 +22185,18 @@ static int64_t page_bytes(FusionRects *fusion)
          }
       }
       /* Need to reload the hd textures, too */
-      { int e; for (e = 0; e < state->uploads.count; e++) texture_tracker_load_hd_texture(self, state->uploads.items[e].key); }
+      {
+         int e;
+         for (e = 0; e < state->uploads.count; e++)
+            texture_tracker_load_hd_texture(self, state->uploads.items[e].key);
+      }
       /* Drop the map's construction refs; the placed/restorable TextureRects
        * now hold their own references to each upload. */
-      { int i; for (i = 0; i < uploads.count; i++) texture_upload_release(uploads.items[i].val); }
+      {
+         int i;
+         for (i = 0; i < uploads.count; i++)
+            texture_upload_release(uploads.items[i].val);
+      }
       UploadPtrVec_free_storage(&uploads);
    }
    /* End of Save State
@@ -22767,7 +23053,10 @@ void rhi_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
    uint8_t tex_y_or   = (twy & twh) << 3;
 
    if (renderer)
-      { TextureWindow _w = { tex_x_mask, tex_y_mask, tex_x_or, tex_y_or }; renderer_set_texture_window(renderer, &_w); }
+      {
+         TextureWindow _w = { tex_x_mask, tex_y_mask, tex_x_or, tex_y_or };
+         renderer_set_texture_window(renderer, &_w);
+      }
    else
       rhi_defer_push_set_tex_window(&defer, tww, twh, twx, twy);
 }
@@ -22796,7 +23085,10 @@ void rhi_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
    }
 
    if (renderer)
-      { Rect _r = { x0, y0, (unsigned)(width), (unsigned)(height) }; renderer_set_draw_rect(renderer, &_r); }
+      {
+         Rect _r = { x0, y0, (unsigned)(width), (unsigned)(height) };
+         renderer_set_draw_rect(renderer, &_r);
+      }
    else
       /* Defer the raw inputs (x0,y0,x1,y1); the dispatcher re-enters
        * this entry point which redoes the width/height clamp on top of
@@ -23146,7 +23438,10 @@ bool rhi_vulkan_read_vram(uint16_t x, uint16_t y,
 {
    if (!renderer)
       return false;
-   { Rect _r = { x, y, w, h }; renderer_copy_vram_to_cpu_synchronous(renderer, &_r, vram); }
+   {
+      Rect _r = { x, y, w, h };
+      renderer_copy_vram_to_cpu_synchronous(renderer, &_r, vram);
+   }
    return true;
 }
 
@@ -23167,7 +23462,11 @@ void rhi_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
       return;
    renderer_set_mask_test(renderer, mask_test);
    renderer_set_force_mask_bit(renderer, set_mask);
-   { Rect _d = { dst_x, dst_y, w, h }; Rect _s = { src_x, src_y, w, h }; renderer_blit_vram(renderer, &_d, &_s); }
+   {
+      Rect _d = { dst_x, dst_y, w, h };
+      Rect _s = { src_x, src_y, w, h };
+      renderer_blit_vram(renderer, &_d, &_s);
+   }
 }
 
 void rhi_vulkan_toggle_display(bool status)
