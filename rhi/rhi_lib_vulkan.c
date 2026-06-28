@@ -16859,7 +16859,20 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       DescriptorSetAllocator * ret;
       Hash hash;
       Hasher h; hasher_init(&h);
-      hasher_data(&h, (const uint32_t *)(&layout), sizeof(layout));
+      /* Hash the layout CONTENTS, not the pointer. In the pre-C++->C original
+       * `layout` was a reference, so `&layout` was the address of the referenced
+       * DescriptorSetLayout and `sizeof(layout)` its full struct size -- i.e. the
+       * hash keyed the allocator on the layout's descriptor masks. After the
+       * conversion to a pointer parameter, `&layout` became the address of the
+       * local pointer variable and `sizeof(layout)` became the pointer size (8),
+       * so the dedup hash keyed on the pointer's value instead of the layout
+       * contents. That makes distinct layouts with identical masks miss the
+       * cache, and -- worse -- lets the allocator identity stop tracking the
+       * actual descriptor types, so a set built for one binding type (e.g. the
+       * copy_vram texel buffer at set 0 binding 1) can be confused with a
+       * differently-typed binding (the blit_vram combined image sampler at the
+       * same slot): a descriptor-type mismatch that strict drivers reject. */
+      hasher_data(&h, (const uint32_t *)layout, sizeof(*layout));
       hasher_data(&h, stages_for_bindings, sizeof(uint32_t) * VULKAN_NUM_BINDINGS);
       hash = hasher_get(&h);
 
