@@ -10904,6 +10904,22 @@ static void renderer_flush_render_pass(Renderer *self, const Rect *rect)
    info.render_area.offset.x = (int)(rect->x * self->scaling); info.render_area.offset.y = (int)(rect->y * self->scaling);
    info.render_area.extent.width = rect->width * self->scaling; info.render_area.extent.height = rect->height * self->scaling;
 
+   /* The primitives in this pass may sample the scaled framebuffer as a texture
+    * (scaled_read: a primitive that textures from previously-rendered content),
+    * while the blit/resolve compute dispatches write that same image in GENERAL
+    * layout. Those compute storage writes are not otherwise ordered before this
+    * pass's fragment sampled-reads, which is a read-after-write hazard on the
+    * scaled framebuffer image (seen under synchronization validation as a
+    * fragment SAMPLED_READ with write_barriers: 0 against a prior compute
+    * STORAGE_WRITE). Order the compute writes before the pass reads them. One
+    * memory barrier per render-pass flush; the GENERAL->GENERAL layout is
+    * unchanged so no decompress/transition cost is incurred. */
+   commandbuffer_barrier_simple(cbh_get(&self->cmd),
+         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+         VK_ACCESS_SHADER_WRITE_BIT,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+         VK_ACCESS_SHADER_READ_BIT);
+
    commandbuffer_begin_render_pass(cbh_get(&self->cmd), &info, VK_SUBPASS_CONTENTS_INLINE);
    commandbuffer_set_scissor(cbh_get(&self->cmd), &info.render_area);
    self->queue.default_scissor = info.render_area;
