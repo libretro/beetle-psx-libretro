@@ -8995,9 +8995,15 @@ static void renderer_init(Renderer *self,
    ImageCreateInfo info;
    VkImageFormatProperties props;
    ImageCreateInfo dither_info;
-   /* Former initialiser init-list + remaining scalar default member
-    * initializers, assigned explicitly now that Renderer is malloc'd and
-    * initialised via renderer_init. */
+   /* The Renderer is malloc'd with uninitialised storage. In the pre-C++->C
+    * source it was new'd, so every member was zero/default-initialised before
+    * the constructor body ran; the explicit field assignments below replaced
+    * that, but any member not assigned here would be left as heap garbage --
+    * which is benign at -O0 (freshly-mapped pages read as zero) but a real
+    * uninitialised read at -O3, manifesting as a release-only crash. Zero the
+    * whole struct first to restore the C++ default-init guarantee; the explicit
+    * assignments and embedded *_init() calls below then set the live values. */
+   memset(self, 0, sizeof(*self));
    self->device = device_;
    self->scaling = scaling_;
    self->msaa = msaa_;
@@ -16288,7 +16294,10 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       /* Replicate the former default member initialisers explicitly (a malloc'd
        * Context has indeterminate members otherwise). gpu_props/mem_props/ext
        * are outputs of create_device, written before any read and guarded by
-       * is_valid(); zero them defensively. */
+       * is_valid(); zero them defensively. Zero the whole struct first so any
+       * member not assigned below is zero rather than heap garbage (a
+       * release-only / -O3 uninitialised-read hazard). */
+      memset(ctx, 0, sizeof(*ctx));
       ctx->device = VK_NULL_HANDLE;
       ctx->instance = instance;
       ctx->gpu = VK_NULL_HANDLE;
@@ -16689,6 +16698,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
    static void device_init(Device *self)
    {
+      /* Device is malloc'd with uninitialised storage; in the C++ source it was
+       * new'd and every member default-initialised first. Zero it to restore
+       * that guarantee so any member not explicitly assigned below is not heap
+       * garbage (a release-only / -O3 uninitialised-read hazard). */
+      memset(self, 0, sizeof(*self));
       /* Scalar handles / ids (the VK_NULL_HANDLE and 0 NSDMIs). */
       self->instance       = VK_NULL_HANDLE;
       self->gpu            = VK_NULL_HANDLE;
@@ -17774,6 +17788,12 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
    static void per_frame_init(struct PerFrame *self, Device *device)
    {
+      /* malloc'd PerFrame has indeterminate storage. Zero the whole struct first
+       * to match the C++ new'd default-init guarantee, so any POD member not set
+       * explicitly below is zero rather than heap garbage (a release-only / -O3
+       * uninitialised-read hazard). The init/_vec_init calls below then set their
+       * members to valid states on top. */
+      memset(self, 0, sizeof(*self));
       self->device = device_get_device(device);
       self->managers = &device->managers;
       command_pool_init(&self->graphics_cmd_pool, device_get_device(device), device->graphics_queue_family_index);
@@ -17782,19 +17802,6 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       /* vbo/ubo block lists: plain structs, init explicitly. */
       bufferblock_vec_init(&self->vbo_blocks);
       bufferblock_vec_init(&self->ubo_blocks);
-      /* POD_VEC members have no initialiser; zero-initialise them. */
-      memset(&self->wait_fences, 0, sizeof(self->wait_fences));
-      memset(&self->recycle_fences, 0, sizeof(self->recycle_fences));
-      memset(&self->allocations, 0, sizeof(self->allocations));
-      memset(&self->destroyed_framebuffers, 0, sizeof(self->destroyed_framebuffers));
-      memset(&self->destroyed_samplers, 0, sizeof(self->destroyed_samplers));
-      memset(&self->destroyed_pipelines, 0, sizeof(self->destroyed_pipelines));
-      memset(&self->destroyed_image_views, 0, sizeof(self->destroyed_image_views));
-      memset(&self->destroyed_buffer_views, 0, sizeof(self->destroyed_buffer_views));
-      memset(&self->destroyed_images, 0, sizeof(self->destroyed_images));
-      memset(&self->destroyed_buffers, 0, sizeof(self->destroyed_buffers));
-      memset(&self->recycled_semaphores, 0, sizeof(self->recycled_semaphores));
-      memset(&self->destroyed_semaphores, 0, sizeof(self->destroyed_semaphores));
       cbhvec_init(&self->graphics_submissions);
       cbhvec_init(&self->compute_submissions);
       cbhvec_init(&self->transfer_submissions);
