@@ -12,6 +12,7 @@
 #include "rhi_intf.h" /* FPS and audio sample rate macros */
 #include "rhi_defer.h"
 #include "tt_trace.h"
+#include <retro_inline.h>
 
 /* Force-inline shim for converted accessors. Must resolve to a real
  * always-inline so that primitives converted from C++ inline methods to C89
@@ -1633,14 +1634,14 @@ struct NAME {                                                                 \
     int cap;                                                                  \
 };                                                                            \
 typedef struct NAME NAME;                                                     \
-static inline T   *NAME##_data(struct NAME *v)        { return v->items; }    \
-static inline int  NAME##_size(const struct NAME *v)  { return v->count; }    \
-static inline int  NAME##_empty(const struct NAME *v) { return v->count == 0; }\
-static inline void NAME##_clear(struct NAME *v)       { v->count = 0; }        \
-static inline T   *NAME##_at(struct NAME *v, int i)   { return &v->items[i]; } \
-static inline T   *NAME##_back(struct NAME *v)        { return &v->items[v->count - 1]; } \
-static inline T   *NAME##_front(struct NAME *v)       { return &v->items[0]; } \
-static inline int  NAME##_grow_by_one(struct NAME *v) {                        \
+static INLINE T   *NAME##_data(struct NAME *v)        { return v->items; }    \
+static INLINE int  NAME##_size(const struct NAME *v)  { return v->count; }    \
+static INLINE int  NAME##_empty(const struct NAME *v) { return v->count == 0; }\
+static INLINE void NAME##_clear(struct NAME *v)       { v->count = 0; }        \
+static INLINE T   *NAME##_at(struct NAME *v, int i)   { return &v->items[i]; } \
+static INLINE T   *NAME##_back(struct NAME *v)        { return &v->items[v->count - 1]; } \
+static INLINE T   *NAME##_front(struct NAME *v)       { return &v->items[0]; } \
+static INLINE int  NAME##_grow_by_one(struct NAME *v) {                        \
     if (v->count == v->cap) {                                                 \
         int ncap = v->cap ? v->cap * 2 : 64;                                  \
         T *nitems = (T *)realloc(v->items, (size_t)ncap * sizeof(T));         \
@@ -1651,13 +1652,13 @@ static inline int  NAME##_grow_by_one(struct NAME *v) {                        \
     }                                                                         \
     return 1;                                                                 \
 }                                                                             \
-static inline void NAME##_push(struct NAME *v, const T *valp) {                \
+static INLINE void NAME##_push(struct NAME *v, const T *valp) {                \
     T tmp = *valp;  /* copy before grow: *valp may alias items[] (realloc) */ \
     if (NAME##_grow_by_one(v))                                                \
         v->items[v->count++] = tmp;                                           \
 }                                                                             \
-static inline void NAME##_pop_back(struct NAME *v) { if (v->count) v->count--; } \
-static inline void NAME##_free_storage(struct NAME *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; } \
+static INLINE void NAME##_pop_back(struct NAME *v) { if (v->count) v->count--; } \
+static INLINE void NAME##_free_storage(struct NAME *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; } \
 struct NAME##_force_semicolon_
 
 #include <rthreads/rthreads.h>
@@ -1711,7 +1712,7 @@ retro_log_printf_t libretro_log;
 #define trailing_zeroes(x) ((x) == 0 ? 32 : __builtin_ctz(x))
 #define trailing_ones(x) __builtin_ctz(~(x))
 #elif defined(_MSC_VER)
-static inline uint32_t util_clz(uint32_t x)
+static INLINE uint32_t util_clz(uint32_t x)
 {
 	unsigned long result;
 	if (_BitScanReverse(&result, x))
@@ -1719,7 +1720,7 @@ static inline uint32_t util_clz(uint32_t x)
 	return 32;
 }
 
-static inline uint32_t util_ctz(uint32_t x)
+static INLINE uint32_t util_ctz(uint32_t x)
 {
 	unsigned long result;
 	if (_BitScanForward(&result, x))
@@ -2940,7 +2941,7 @@ void *tfl_data(const struct TextureFormatLayout *self, uint32_t layer, uint32_t 
  * switch statements; they have no C++ dependencies and could be lowered to C
  * verbatim after a future namespace-removal pass. The TextureFormatLayout-
  * dependent helpers below are kept separate and remain C++-only. */
-static inline bool format_has_depth_aspect(VkFormat format)
+static INLINE bool format_has_depth_aspect(VkFormat format)
 {
 	switch (format)
 	{
@@ -2958,7 +2959,7 @@ static inline bool format_has_depth_aspect(VkFormat format)
 	return false;
 }
 
-static inline bool format_has_stencil_aspect(VkFormat format)
+static INLINE bool format_has_stencil_aspect(VkFormat format)
 {
 	switch (format)
 	{
@@ -2974,12 +2975,12 @@ static inline bool format_has_stencil_aspect(VkFormat format)
 	return false;
 }
 
-static inline bool format_has_depth_or_stencil_aspect(VkFormat format)
+static INLINE bool format_has_depth_or_stencil_aspect(VkFormat format)
 {
 	return format_has_depth_aspect(format) || format_has_stencil_aspect(format);
 }
 
-static inline VkImageAspectFlags format_to_aspect_mask(VkFormat format)
+static INLINE VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 {
 	switch (format)
 	{
@@ -3084,7 +3085,7 @@ int smh_is_valid(const struct SamplerHandle *h) { return h->data != NULL; }
 #ifndef FRAMEWORK_MEMORY_ALLOCATOR_HPP
 #define FRAMEWORK_MEMORY_ALLOCATOR_HPP
 
-static inline uint32_t log2_integer(uint32_t v)
+static INLINE uint32_t log2_integer(uint32_t v)
 {
 	v--;
 	return 32 - leading_zeroes(v);
@@ -3135,7 +3136,7 @@ struct Block
 	uint32_t longest_run;
 };
 
-static inline void block_init(struct Block *self)
+static INLINE void block_init(struct Block *self)
 {
 	unsigned i;
 	for (i = 0; i < BLOCK_NUM_SUB_BLOCKS; i++)
@@ -3143,28 +3144,28 @@ static inline void block_init(struct Block *self)
 	self->longest_run = 32;
 }
 
-static inline void block_fini(struct Block *self)
+static INLINE void block_fini(struct Block *self)
 {
 	if (self->free_blocks[0] != BLOCK_ALL_FREE)
 		LOGE("Memory leak in block detected.\n");
 }
 
-static inline bool block_full(const struct Block *self)
+static INLINE bool block_full(const struct Block *self)
 {
 	return self->free_blocks[0] == 0;
 }
 
-static inline bool block_empty(const struct Block *self)
+static INLINE bool block_empty(const struct Block *self)
 {
 	return self->free_blocks[0] == BLOCK_ALL_FREE;
 }
 
-static inline uint32_t block_get_longest_run(const struct Block *self)
+static INLINE uint32_t block_get_longest_run(const struct Block *self)
 {
 	return self->longest_run;
 }
 
-static inline void block_update_longest_run(struct Block *self)
+static INLINE void block_update_longest_run(struct Block *self)
 {
 	uint32_t f = self->free_blocks[0];
 	self->longest_run = 0;
@@ -3205,9 +3206,9 @@ struct DeviceAllocation
 	bool hierarchical;
 };
 
-static inline VkDeviceMemory deviceallocation_get_memory(const struct DeviceAllocation *self) { return self->base; }
-static inline uint32_t deviceallocation_get_offset(const struct DeviceAllocation *self) { return self->offset; }
-static inline uint32_t deviceallocation_get_size(const struct DeviceAllocation *self) { return self->size; }
+static INLINE VkDeviceMemory deviceallocation_get_memory(const struct DeviceAllocation *self) { return self->base; }
+static INLINE uint32_t deviceallocation_get_offset(const struct DeviceAllocation *self) { return self->offset; }
+static INLINE uint32_t deviceallocation_get_size(const struct DeviceAllocation *self) { return self->size; }
 void deviceallocation_free_immediate(struct DeviceAllocation *self);
 void deviceallocation_free_immediate_alloc(struct DeviceAllocation *self, DeviceAllocator *allocator);
 void deviceallocation_free_global(struct DeviceAllocation *self, DeviceAllocator *allocator, uint32_t size, uint32_t memory_type);
@@ -3225,13 +3226,13 @@ struct DeviceAllocationVec
 	int count;
 	int cap;
 };
-static inline void DeviceAllocationVec_init(struct DeviceAllocationVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
-static inline void DeviceAllocationVec_free_storage(struct DeviceAllocationVec *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; }
-static inline int  DeviceAllocationVec_size(const struct DeviceAllocationVec *v) { return v->count; }
-static inline int  DeviceAllocationVec_empty(const struct DeviceAllocationVec *v) { return v->count == 0; }
-static inline void DeviceAllocationVec_clear(struct DeviceAllocationVec *v) { v->count = 0; }
-static inline DeviceAllocation *DeviceAllocationVec_at(struct DeviceAllocationVec *v, int i) { return &v->items[i]; }
-static inline void DeviceAllocationVec_push(struct DeviceAllocationVec *v, const DeviceAllocation *valp) {
+static INLINE void DeviceAllocationVec_init(struct DeviceAllocationVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+static INLINE void DeviceAllocationVec_free_storage(struct DeviceAllocationVec *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; }
+static INLINE int  DeviceAllocationVec_size(const struct DeviceAllocationVec *v) { return v->count; }
+static INLINE int  DeviceAllocationVec_empty(const struct DeviceAllocationVec *v) { return v->count == 0; }
+static INLINE void DeviceAllocationVec_clear(struct DeviceAllocationVec *v) { v->count = 0; }
+static INLINE DeviceAllocation *DeviceAllocationVec_at(struct DeviceAllocationVec *v, int i) { return &v->items[i]; }
+static INLINE void DeviceAllocationVec_push(struct DeviceAllocationVec *v, const DeviceAllocation *valp) {
 	if (v->count >= v->cap) {
 		int ncap = v->cap ? v->cap * 2 : 8;
 		DeviceAllocation *nitems = (DeviceAllocation *)realloc(v->items, (size_t)ncap * sizeof(DeviceAllocation));
@@ -3291,15 +3292,15 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 void classallocator_free(struct ClassAllocator *self, struct DeviceAllocation *alloc);
 void classallocator_suballocate(struct ClassAllocator *self, uint32_t num_blocks, uint32_t tiling, uint32_t memory_type, struct MiniHeap *heap, struct DeviceAllocation *alloc);
 
-static inline void classallocator_set_tiling_mask(struct ClassAllocator *self, uint32_t mask) { self->tiling_mask = mask; }
-static inline void classallocator_set_sub_block_size(struct ClassAllocator *self, uint32_t size)
+static INLINE void classallocator_set_tiling_mask(struct ClassAllocator *self, uint32_t mask) { self->tiling_mask = mask; }
+static INLINE void classallocator_set_sub_block_size(struct ClassAllocator *self, uint32_t size)
 {
 	self->sub_block_size_log2 = log2_integer(size);
 	self->sub_block_size = size;
 }
-static inline void classallocator_set_global_allocator(struct ClassAllocator *self, DeviceAllocator *allocator) { self->global_allocator = allocator; }
-static inline void classallocator_set_memory_type(struct ClassAllocator *self, uint32_t type) { self->memory_type = type; }
-static inline void classallocator_set_parent(struct ClassAllocator *self, struct ClassAllocator *allocator) { self->parent = allocator; }
+static INLINE void classallocator_set_global_allocator(struct ClassAllocator *self, DeviceAllocator *allocator) { self->global_allocator = allocator; }
+static INLINE void classallocator_set_memory_type(struct ClassAllocator *self, uint32_t type) { self->memory_type = type; }
+static INLINE void classallocator_set_parent(struct ClassAllocator *self, struct ClassAllocator *allocator) { self->parent = allocator; }
 
 /* Allocator: per-memory-type front end owning one ClassAllocator per size class.
  * Converted from a C++ class to a plain C struct + alloc_* free functions. The
@@ -3319,16 +3320,16 @@ bool alloc_allocate(struct Allocator *self, uint32_t size, uint32_t alignment, A
 bool alloc_allocate_global(struct Allocator *self, uint32_t size, struct DeviceAllocation *alloc);
 bool alloc_allocate_dedicated(struct Allocator *self, uint32_t size, struct DeviceAllocation *alloc, VkImage image);
 
-static inline struct ClassAllocator *alloc_get_class_allocator(struct Allocator *self, MemoryClass clazz) { return &self->classes[(unsigned)(clazz)]; }
-static inline void alloc_free(struct DeviceAllocation *alloc) { deviceallocation_free_immediate(alloc); }
-static inline void alloc_set_memory_type(struct Allocator *self, uint32_t memory_type)
+static INLINE struct ClassAllocator *alloc_get_class_allocator(struct Allocator *self, MemoryClass clazz) { return &self->classes[(unsigned)(clazz)]; }
+static INLINE void alloc_free(struct DeviceAllocation *alloc) { deviceallocation_free_immediate(alloc); }
+static INLINE void alloc_set_memory_type(struct Allocator *self, uint32_t memory_type)
 {
 	unsigned i;
 	for (i = 0; i < MEMORY_CLASS_COUNT; i++)
 		classallocator_set_memory_type(&self->classes[i], memory_type);
 	self->memory_type = memory_type;
 }
-static inline void alloc_set_global_allocator(struct Allocator *self, DeviceAllocator *allocator)
+static INLINE void alloc_set_global_allocator(struct Allocator *self, DeviceAllocator *allocator)
 {
 	unsigned i;
 	for (i = 0; i < MEMORY_CLASS_COUNT; i++)
@@ -3350,9 +3351,9 @@ struct AllocatorPtrVec
 	int count;
 	int cap;
 };
-static inline void AllocatorPtrVec_init(struct AllocatorPtrVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+static INLINE void AllocatorPtrVec_init(struct AllocatorPtrVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
 /* Takes ownership of an already-allocated Allocator. */
-static inline void AllocatorPtrVec_push(struct AllocatorPtrVec *v, Allocator *p) {
+static INLINE void AllocatorPtrVec_push(struct AllocatorPtrVec *v, Allocator *p) {
 	if (v->count >= v->cap) {
 		int ncap = v->cap ? v->cap * 2 : 8;
 		Allocator **nitems = (Allocator **)realloc(v->items, (size_t)ncap * sizeof(Allocator *));
@@ -3363,15 +3364,15 @@ static inline void AllocatorPtrVec_push(struct AllocatorPtrVec *v, Allocator *p)
 	}
 	v->items[v->count++] = p;
 }
-static inline int  AllocatorPtrVec_size(const struct AllocatorPtrVec *v) { return v->count; }
-static inline Allocator *AllocatorPtrVec_back(const struct AllocatorPtrVec *v) { return v->items[v->count - 1]; }
-static inline void AllocatorPtrVec_clear(struct AllocatorPtrVec *v) {
+static INLINE int  AllocatorPtrVec_size(const struct AllocatorPtrVec *v) { return v->count; }
+static INLINE Allocator *AllocatorPtrVec_back(const struct AllocatorPtrVec *v) { return v->items[v->count - 1]; }
+static INLINE void AllocatorPtrVec_clear(struct AllocatorPtrVec *v) {
 	int i;
 	for (i = 0; i < v->count; i++)
 		free(v->items[i]);
 	v->count = 0;
 }
-static inline void AllocatorPtrVec_destroy(struct AllocatorPtrVec *v) {
+static INLINE void AllocatorPtrVec_destroy(struct AllocatorPtrVec *v) {
 	int i;
 	for (i = 0; i < v->count; i++)
 		free(v->items[i]);
@@ -3397,12 +3398,12 @@ struct DeviceAllocatorAllocationVec
 	int count;
 	int cap;
 };
-static inline void da_alloc_vec_init(struct DeviceAllocatorAllocationVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
-static inline void da_alloc_vec_free_storage(struct DeviceAllocatorAllocationVec *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; }
-static inline int  da_alloc_vec_size(const struct DeviceAllocatorAllocationVec *v) { return v->count; }
-static inline int  da_alloc_vec_empty(const struct DeviceAllocatorAllocationVec *v) { return v->count == 0; }
-static inline struct DeviceAllocatorAllocation *da_alloc_vec_at(struct DeviceAllocatorAllocationVec *v, int i) { return &v->items[i]; }
-static inline void da_alloc_vec_push(struct DeviceAllocatorAllocationVec *v, const struct DeviceAllocatorAllocation *valp) {
+static INLINE void da_alloc_vec_init(struct DeviceAllocatorAllocationVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+static INLINE void da_alloc_vec_free_storage(struct DeviceAllocatorAllocationVec *v) { free(v->items); v->items = NULL; v->count = 0; v->cap = 0; }
+static INLINE int  da_alloc_vec_size(const struct DeviceAllocatorAllocationVec *v) { return v->count; }
+static INLINE int  da_alloc_vec_empty(const struct DeviceAllocatorAllocationVec *v) { return v->count == 0; }
+static INLINE struct DeviceAllocatorAllocation *da_alloc_vec_at(struct DeviceAllocatorAllocationVec *v, int i) { return &v->items[i]; }
+static INLINE void da_alloc_vec_push(struct DeviceAllocatorAllocationVec *v, const struct DeviceAllocatorAllocation *valp) {
 	if (v->count >= v->cap) {
 		int ncap = v->cap ? v->cap * 2 : 8;
 		struct DeviceAllocatorAllocation *nitems = (struct DeviceAllocatorAllocation *)realloc(v->items, (size_t)ncap * sizeof(struct DeviceAllocatorAllocation));
@@ -3413,11 +3414,11 @@ static inline void da_alloc_vec_push(struct DeviceAllocatorAllocationVec *v, con
 	}
 	v->items[v->count++] = *valp;
 }
-static inline void da_alloc_vec_erase_at(struct DeviceAllocatorAllocationVec *v, int i) {
+static INLINE void da_alloc_vec_erase_at(struct DeviceAllocatorAllocationVec *v, int i) {
 	memmove(&v->items[i], &v->items[i + 1], (size_t)(v->count - i - 1) * sizeof(struct DeviceAllocatorAllocation));
 	v->count--;
 }
-static inline void da_alloc_vec_erase_front(struct DeviceAllocatorAllocationVec *v, int k) {
+static INLINE void da_alloc_vec_erase_front(struct DeviceAllocatorAllocationVec *v, int k) {
 	if (k <= 0)
 		return;
 	memmove(&v->items[0], &v->items[k], (size_t)(v->count - k) * sizeof(struct DeviceAllocatorAllocation));
@@ -3429,10 +3430,10 @@ struct DeviceAllocatorHeap
 	uint64_t size;
 	struct DeviceAllocatorAllocationVec blocks;
 };
-static inline void da_heap_init(struct DeviceAllocatorHeap *h) { h->size = 0; da_alloc_vec_init(&h->blocks); }
-static inline void da_heap_destroy(struct DeviceAllocatorHeap *h) { da_alloc_vec_free_storage(&h->blocks); }
+static INLINE void da_heap_init(struct DeviceAllocatorHeap *h) { h->size = 0; da_alloc_vec_init(&h->blocks); }
+static INLINE void da_heap_destroy(struct DeviceAllocatorHeap *h) { da_alloc_vec_free_storage(&h->blocks); }
 /* Move src into dst (steal blocks), leaving src empty. */
-static inline void da_heap_move(struct DeviceAllocatorHeap *dst, struct DeviceAllocatorHeap *src) {
+static INLINE void da_heap_move(struct DeviceAllocatorHeap *dst, struct DeviceAllocatorHeap *src) {
 	dst->size = src->size;
 	dst->blocks = src->blocks;
 	da_alloc_vec_init(&src->blocks);
@@ -3450,16 +3451,16 @@ struct DeviceAllocatorHeapVec
 	int count;
 	int cap;
 };
-static inline void da_heap_vec_init(struct DeviceAllocatorHeapVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
-static inline int  da_heap_vec_size(const struct DeviceAllocatorHeapVec *v) { return v->count; }
-static inline struct DeviceAllocatorHeap *da_heap_vec_at(struct DeviceAllocatorHeapVec *v, int i) { return &v->items[i]; }
-static inline void da_heap_vec_clear(struct DeviceAllocatorHeapVec *v) {
+static INLINE void da_heap_vec_init(struct DeviceAllocatorHeapVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
+static INLINE int  da_heap_vec_size(const struct DeviceAllocatorHeapVec *v) { return v->count; }
+static INLINE struct DeviceAllocatorHeap *da_heap_vec_at(struct DeviceAllocatorHeapVec *v, int i) { return &v->items[i]; }
+static INLINE void da_heap_vec_clear(struct DeviceAllocatorHeapVec *v) {
 	int i;
 	for (i = 0; i < v->count; i++)
 		da_heap_destroy(&v->items[i]);
 	v->count = 0;
 }
-static inline void da_heap_vec_grow(struct DeviceAllocatorHeapVec *v, int ncap) {
+static INLINE void da_heap_vec_grow(struct DeviceAllocatorHeapVec *v, int ncap) {
 	struct DeviceAllocatorHeap *nitems = (struct DeviceAllocatorHeap *)malloc((size_t)ncap * sizeof(struct DeviceAllocatorHeap));
 	int i;
 	for (i = 0; i < v->count; i++) {
@@ -3470,7 +3471,7 @@ static inline void da_heap_vec_grow(struct DeviceAllocatorHeapVec *v, int ncap) 
 	v->items = nitems;
 	v->cap = ncap;
 }
-static inline void da_heap_vec_resize(struct DeviceAllocatorHeapVec *v, int n) {
+static INLINE void da_heap_vec_resize(struct DeviceAllocatorHeapVec *v, int n) {
 	int i;
 	if (n > v->count) {
 		if (n > v->cap)
@@ -3483,7 +3484,7 @@ static inline void da_heap_vec_resize(struct DeviceAllocatorHeapVec *v, int n) {
 	}
 	v->count = n;
 }
-static inline void da_heap_vec_free_storage(struct DeviceAllocatorHeapVec *v) {
+static INLINE void da_heap_vec_free_storage(struct DeviceAllocatorHeapVec *v) {
 	da_heap_vec_clear(v);
 	free(v->items);
 	v->items = NULL; v->count = 0; v->cap = 0;
@@ -3512,7 +3513,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 void deviceallocator_free(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory);
 void deviceallocator_free_no_recycle(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, VkDeviceMemory memory, uint8_t *host_memory);
 
-static inline void deviceallocator_init_empty(struct DeviceAllocator *self)
+static INLINE void deviceallocator_init_empty(struct DeviceAllocator *self)
 {
 	self->allocators.items = NULL;
 	self->allocators.count = 0;
@@ -3525,7 +3526,7 @@ static inline void deviceallocator_init_empty(struct DeviceAllocator *self)
 	self->use_dedicated  = false;
 }
 
-static inline void deviceallocator_deinit(struct DeviceAllocator *self)
+static INLINE void deviceallocator_deinit(struct DeviceAllocator *self)
 {
 	int i;
 	for (i = 0; i < self->heaps.count; i++)
@@ -3534,17 +3535,17 @@ static inline void deviceallocator_deinit(struct DeviceAllocator *self)
 	da_heap_vec_free_storage(&self->heaps);
 }
 
-static inline void deviceallocator_set_supports_dedicated_allocation(struct DeviceAllocator *self, bool enable)
+static INLINE void deviceallocator_set_supports_dedicated_allocation(struct DeviceAllocator *self, bool enable)
 {
 	self->use_dedicated = enable;
 }
 
-static inline bool deviceallocator_allocate_typed(struct DeviceAllocator *self, uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling, struct DeviceAllocation *alloc)
+static INLINE bool deviceallocator_allocate_typed(struct DeviceAllocator *self, uint32_t size, uint32_t alignment, uint32_t memory_type, AllocationTiling tiling, struct DeviceAllocation *alloc)
 {
 	return alloc_allocate(self->allocators.items[memory_type], size, alignment, tiling, alloc);
 }
 
-static inline bool deviceallocator_allocate_global(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, struct DeviceAllocation *alloc)
+static INLINE bool deviceallocator_allocate_global(struct DeviceAllocator *self, uint32_t size, uint32_t memory_type, struct DeviceAllocation *alloc)
 {
 	return alloc_allocate_global(self->allocators.items[memory_type], size, alloc);
 }
@@ -3611,7 +3612,7 @@ VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
 	 * All seven current construction sites set every field they need explicitly
 	 * (audited), so none depends on this; it is provided for correctness and any
 	 * future bare declaration that wants the zero-state. */
-	static inline void buffer_create_info_defaults(struct BufferCreateInfo *self)
+	static INLINE void buffer_create_info_defaults(struct BufferCreateInfo *self)
 	{
 		self->domain = BufferDomain_Device;
 		self->size   = 0;
@@ -3860,7 +3861,7 @@ VkFormatFeatureFlags image_usage_to_features(VkImageUsageFlags usage)
 	 * the RGBA identity mapping, which not every construction site assigns
 	 * explicitly -- leaving it uninitialised is the swizzle SIGSEGV this whole
 	 * campaign already hit once. */
-	static inline void image_view_create_info_defaults(struct ImageViewCreateInfo *self)
+	static INLINE void image_view_create_info_defaults(struct ImageViewCreateInfo *self)
 	{
 		self->image      = NULL;
 		self->format     = VK_FORMAT_UNDEFINED;
@@ -4020,7 +4021,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 	 * here feeds a garbage VkComponentMapping to vkCreateImageView, which is the
 	 * exact swizzle SIGSEGV this campaign already hit once (commit d078f49).
 	 * Every bare ImageCreateInfo declaration MUST call this first. */
-	static inline void image_create_info_defaults(struct ImageCreateInfo *self)
+	static INLINE void image_create_info_defaults(struct ImageCreateInfo *self)
 	{
 		self->domain         = ImageDomain_Physical;
 		self->width          = 0;
@@ -4044,7 +4045,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 	/* The three former static factory methods, as free functions. Each calls
 	 * defaults() first (so swizzle + every unset field is correct) then sets the
 	 * fields it cares about, matching the old method bodies exactly. */
-	static inline struct ImageCreateInfo image_create_info_immutable_2d_image(unsigned width, unsigned height, VkFormat format, bool mipmapped)
+	static INLINE struct ImageCreateInfo image_create_info_immutable_2d_image(unsigned width, unsigned height, VkFormat format, bool mipmapped)
 	{
 		struct ImageCreateInfo info;
 		image_create_info_defaults(&info);
@@ -4063,7 +4064,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 		return info;
 	}
 
-	static inline struct ImageCreateInfo image_create_info_render_target(unsigned width, unsigned height, VkFormat format)
+	static INLINE struct ImageCreateInfo image_create_info_render_target(unsigned width, unsigned height, VkFormat format)
 	{
 		struct ImageCreateInfo info;
 		image_create_info_defaults(&info);
@@ -4084,7 +4085,7 @@ ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { return &v->
 		return info;
 	}
 
-	static inline struct ImageCreateInfo image_create_info_transient_render_target(unsigned width, unsigned height, VkFormat format)
+	static INLINE struct ImageCreateInfo image_create_info_transient_render_target(unsigned width, unsigned height, VkFormat format)
 	{
 		struct ImageCreateInfo info;
 		image_create_info_defaults(&info);
@@ -4460,7 +4461,7 @@ void set_immutable_sampler(DescriptorSetLayout *layout, unsigned binding, StockS
 	};
 
 	/* Was the DescriptorSetNode(VkDescriptorSet) ctor. */
-	static inline void descriptor_set_node_init(struct DescriptorSetNode *self, VkDescriptorSet set)
+	static INLINE void descriptor_set_node_init(struct DescriptorSetNode *self, VkDescriptorSet set)
 	{
 		self->set = set;
 	}
@@ -4555,7 +4556,7 @@ VkDescriptorSetLayout descriptor_set_allocator_get_layout(const struct Descripto
 	 * shader stages that exist, then HASHES the whole struct -- the unfilled
 	 * slots must be zero or the pipeline-layout cache key is garbage. Every bare
 	 * declaration MUST call this first. */
-	static inline void combined_resource_layout_defaults(struct CombinedResourceLayout *self)
+	static INLINE void combined_resource_layout_defaults(struct CombinedResourceLayout *self)
 	{
 		memset(self, 0, sizeof(*self));
 	}
@@ -4665,7 +4666,7 @@ PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return
 	/* Former NSDMI defaults for the hoisted Subpass (counts 0, mode ReadWrite).
 	 * The attachment index arrays were uninitialised in the C++ form too (only
 	 * the first num_* entries are ever read), so they are left untouched. */
-	static inline void render_pass_info_subpass_defaults(struct RenderPassInfo_Subpass *self)
+	static INLINE void render_pass_info_subpass_defaults(struct RenderPassInfo_Subpass *self)
 	{
 		self->num_color_attachments   = 0;
 		self->num_input_attachments   = 0;
@@ -4702,7 +4703,7 @@ PipelineLayout *program_get_pipeline_layout(const struct Program *self) { return
 	 * clips it to the framebuffer). Leaving render_area uninitialised feeds a
 	 * garbage VkRect2D to the scissor/render-area -- a GPU-side crash. Every
 	 * bare RenderPassInfo declaration MUST call this first. */
-	static inline void render_pass_info_defaults(struct RenderPassInfo *self)
+	static INLINE void render_pass_info_defaults(struct RenderPassInfo *self)
 	{
 		memset(self, 0, sizeof(*self));
 		self->render_area.offset.x      = 0;
@@ -4982,7 +4983,7 @@ void framebuffer_allocator_deinit(struct FramebufferAllocator *self)
 	/* Was the TransientNode(ImageHandle) ctor. Plain struct copy: the produced
 	 * handle (refcount 1) is passed by value and moved into the member without
 	 * an incref; the node becomes the single owner. */
-	static inline void transient_node_init(struct TransientNode *self, ImageHandle handle_)
+	static INLINE void transient_node_init(struct TransientNode *self, ImageHandle handle_)
 	{
 		self->handle = handle_;
 	}
@@ -5366,8 +5367,8 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	 * struct, so the still-inline member methods can call them during the staged
 	 * conversion; defined after the struct. */
 	struct CommandBuffer;
-	void commandbuffer_set_dirty(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
-	CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
+	static void commandbuffer_set_dirty(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
+	static CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self, CommandBufferDirtyFlags flags);
 	/* Formerly CommandBufferType (a nested enum). Hoisted to file scope so the
 	 * forthcoming class -> C struct conversion of CommandBuffer does not have to
 	 * carry a nested type. The Type_* enumerator names are already prefixed, so
@@ -5461,8 +5462,8 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	void commandbuffer_fini(struct CommandBuffer *self);
 	void commandbuffer_add_reference(struct CommandBuffer *self);
 	void commandbuffer_release_reference(struct CommandBuffer *self);
-	inline void commandbuffer_set_dirty(struct CommandBuffer *self, CommandBufferDirtyFlags flags) { self->dirty |= flags; }
-	inline CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self, CommandBufferDirtyFlags flags) { CommandBufferDirtyFlags mask = self->dirty & flags; self->dirty &= ~flags; return mask; }
+	static INLINE void commandbuffer_set_dirty(struct CommandBuffer *self, CommandBufferDirtyFlags flags) { self->dirty |= flags; }
+	static INLINE CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self, CommandBufferDirtyFlags flags) { CommandBufferDirtyFlags mask = self->dirty & flags; self->dirty &= ~flags; return mask; }
 
 	/* Group B: render-pass / pipeline / descriptor-flush free functions. */
 	void commandbuffer_begin_render_pass(struct CommandBuffer *self, const RenderPassInfo *info, VkSubpassContents contents);
@@ -5480,8 +5481,8 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	void commandbuffer_begin_context(struct CommandBuffer *self);
 	void commandbuffer_flush_compute_state(struct CommandBuffer *self);
 	void commandbuffer_init_viewport_scissor(struct CommandBuffer *self, const RenderPassInfo *info, const Framebuffer *framebuffer);
-	inline void commandbuffer_begin_graphics(struct CommandBuffer *self) { self->is_compute = false; commandbuffer_begin_context(self); }
-	inline void commandbuffer_begin_compute(struct CommandBuffer *self) { self->is_compute = true; commandbuffer_begin_context(self); }
+	static INLINE void commandbuffer_begin_graphics(struct CommandBuffer *self) { self->is_compute = false; commandbuffer_begin_context(self); }
+	static INLINE void commandbuffer_begin_compute(struct CommandBuffer *self) { self->is_compute = true; commandbuffer_begin_context(self); }
 
 	/* Group C: descriptor / resource-bind free functions. The 4 set_texture
 	 * overloads become distinctly-named free functions. */
@@ -5525,10 +5526,10 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	void commandbuffer_set_opaque_state(struct CommandBuffer *self);
 	void commandbuffer_set_quad_state(struct CommandBuffer *self);
 
-	inline VkCommandBuffer commandbuffer_get_command_buffer(const struct CommandBuffer *self) { return self->cmd; }
-	inline Device *commandbuffer_get_device(struct CommandBuffer *self) { return self->device; }
-	inline const VkViewport *commandbuffer_get_viewport(const struct CommandBuffer *self) { return &self->viewport; }
-	inline CommandBufferType commandbuffer_get_command_buffer_type(const struct CommandBuffer *self) { return self->type; }
+	static INLINE VkCommandBuffer commandbuffer_get_command_buffer(const struct CommandBuffer *self) { return self->cmd; }
+	static INLINE Device *commandbuffer_get_device(struct CommandBuffer *self) { return self->device; }
+	static INLINE const VkViewport *commandbuffer_get_viewport(const struct CommandBuffer *self) { return &self->viewport; }
+	static INLINE CommandBufferType commandbuffer_get_command_buffer_type(const struct CommandBuffer *self) { return self->type; }
 
 	/* Group E: draw / dispatch / debug-region / end free functions. */
 	void commandbuffer_draw(struct CommandBuffer *self, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance);
@@ -5536,26 +5537,26 @@ void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd)
 	void commandbuffer_begin_region(struct CommandBuffer *self, const char *name, const float *color);
 	void commandbuffer_end_region(struct CommandBuffer *self);
 	void commandbuffer_end(struct CommandBuffer *self);
-	inline void commandbuffer_set_viewport(struct CommandBuffer *self, const VkViewport *viewport)
+	static INLINE void commandbuffer_set_viewport(struct CommandBuffer *self, const VkViewport *viewport)
 	{
 		VK_ASSERT(self->framebuffer);
 		self->viewport = *viewport;
 		commandbuffer_set_dirty(self, COMMAND_BUFFER_DIRTY_VIEWPORT_BIT);
 	}
-	inline void commandbuffer_set_depth_test(struct CommandBuffer *self, bool depth_test, bool depth_write)
+	static INLINE void commandbuffer_set_depth_test(struct CommandBuffer *self, bool depth_test, bool depth_write)
 	{
 		SET_STATIC_STATE(depth_test);
 		SET_STATIC_STATE(depth_write);
 	}
-	inline void commandbuffer_set_depth_compare(struct CommandBuffer *self, VkCompareOp depth_compare)
+	static INLINE void commandbuffer_set_depth_compare(struct CommandBuffer *self, VkCompareOp depth_compare)
 	{
 		SET_STATIC_STATE(depth_compare);
 	}
-	inline void commandbuffer_set_blend_enable(struct CommandBuffer *self, bool blend_enable)
+	static INLINE void commandbuffer_set_blend_enable(struct CommandBuffer *self, bool blend_enable)
 	{
 		SET_STATIC_STATE(blend_enable);
 	}
-	inline void commandbuffer_set_blend_factors(struct CommandBuffer *self, VkBlendFactor src_color_blend, VkBlendFactor src_alpha_blend, VkBlendFactor dst_color_blend, VkBlendFactor dst_alpha_blend)
+	static INLINE void commandbuffer_set_blend_factors(struct CommandBuffer *self, VkBlendFactor src_color_blend, VkBlendFactor src_alpha_blend, VkBlendFactor dst_color_blend, VkBlendFactor dst_alpha_blend)
 	{
 		SET_STATIC_STATE(src_color_blend);
 		SET_STATIC_STATE(dst_color_blend);
@@ -5566,7 +5567,7 @@ void commandbuffer_set_blend_factors_2(struct CommandBuffer *self, VkBlendFactor
 	{
 		commandbuffer_set_blend_factors(self, src_blend, src_blend, dst_blend, dst_blend);
 	}
-	inline void commandbuffer_set_blend_op(struct CommandBuffer *self, VkBlendOp color_blend_op, VkBlendOp alpha_blend_op)
+	static INLINE void commandbuffer_set_blend_op(struct CommandBuffer *self, VkBlendOp color_blend_op, VkBlendOp alpha_blend_op)
 	{
 		SET_STATIC_STATE(color_blend_op);
 		SET_STATIC_STATE(alpha_blend_op);
@@ -5575,33 +5576,33 @@ void commandbuffer_set_blend_op_2(struct CommandBuffer *self, VkBlendOp blend_op
 	{
 		commandbuffer_set_blend_op(self, blend_op, blend_op);
 	}
-	inline void commandbuffer_set_primitive_topology(struct CommandBuffer *self, VkPrimitiveTopology topology)
+	static INLINE void commandbuffer_set_primitive_topology(struct CommandBuffer *self, VkPrimitiveTopology topology)
 	{
 		SET_STATIC_STATE(topology);
 	}
-	inline void commandbuffer_set_multisample_state(struct CommandBuffer *self, bool alpha_to_coverage, bool alpha_to_one, bool sample_shading)
+	static INLINE void commandbuffer_set_multisample_state(struct CommandBuffer *self, bool alpha_to_coverage, bool alpha_to_one, bool sample_shading)
 	{
 		SET_STATIC_STATE(alpha_to_coverage);
 		SET_STATIC_STATE(alpha_to_one);
 		SET_STATIC_STATE(sample_shading);
 	}
-	inline void commandbuffer_set_cull_mode(struct CommandBuffer *self, VkCullModeFlags cull_mode)
+	static INLINE void commandbuffer_set_cull_mode(struct CommandBuffer *self, VkCullModeFlags cull_mode)
 	{
 		SET_STATIC_STATE(cull_mode);
 	}
-	inline void commandbuffer_set_blend_constants(struct CommandBuffer *self, const float blend_constants[4])
+	static INLINE void commandbuffer_set_blend_constants(struct CommandBuffer *self, const float blend_constants[4])
 	{
 		SET_POTENTIALLY_STATIC_STATE(blend_constants[0]);
 		SET_POTENTIALLY_STATIC_STATE(blend_constants[1]);
 		SET_POTENTIALLY_STATIC_STATE(blend_constants[2]);
 		SET_POTENTIALLY_STATIC_STATE(blend_constants[3]);
 	}
-	inline void commandbuffer_set_specialization_constant_mask(struct CommandBuffer *self, uint32_t spec_constant_mask)
+	static INLINE void commandbuffer_set_specialization_constant_mask(struct CommandBuffer *self, uint32_t spec_constant_mask)
 	{
 		VK_ASSERT((spec_constant_mask & ~((1u << VULKAN_NUM_SPEC_CONSTANTS) - 1u)) == 0u);
 		SET_STATIC_STATE(spec_constant_mask);
 	}
-	inline void commandbuffer_set_specialization_constant(struct CommandBuffer *self, unsigned index, uint32_t value)
+	static INLINE void commandbuffer_set_specialization_constant(struct CommandBuffer *self, unsigned index, uint32_t value)
 	{
 		VK_ASSERT(index < VULKAN_NUM_SPEC_CONSTANTS);
 		if (memcmp(&self->potential_static_state.spec_constants[index], &value, sizeof(value)))
@@ -5683,7 +5684,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	/* For a malloc'd owner (Device), where the pools' constructors and
 	 * destructors do not run: handle_pool_init() puts every pool in the empty
 	 * state and handle_pool_deinit() runs each pool's teardown. */
-	static inline void handle_pool_init(struct HandlePool *self)
+	static INLINE void handle_pool_init(struct HandlePool *self)
 	{
 		object_pool_raw_init(&self->buffers,         sizeof(Buffer));
 		object_pool_raw_init(&self->images,          sizeof(Image));
@@ -5695,7 +5696,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 		object_pool_raw_init(&self->command_buffers, sizeof(CommandBuffer));
 	}
 
-	static inline void handle_pool_deinit(struct HandlePool *self)
+	static INLINE void handle_pool_deinit(struct HandlePool *self)
 	{
 		object_pool_raw_deinit(&self->buffers);
 		object_pool_raw_deinit(&self->images);
@@ -5946,7 +5947,7 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	uint32_t device_find_memory_type_image(Device *self, ImageDomain domain, uint32_t mask);
 	void device_set_name_buffer(Device *self, const Buffer *buffer, const char *name);
 	void device_set_name_image(Device *self, const Image *image, const char *name);
-	bool device_memory_type_is_host_visible(Device *self, uint32_t type);
+	static bool device_memory_type_is_host_visible(Device *self, uint32_t type);
 	BufferViewHandle device_create_buffer_view(Device *self, const BufferViewCreateInfo *view_info);
 	ImageViewHandle device_create_image_view(Device *self, const ImageViewCreateInfo *create_info);
 	InitialImageBuffer device_create_image_staging_buffer(Device *self, const ImageCreateInfo *info, const ImageInitialData *initial);
@@ -5962,14 +5963,14 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	PipelineLayout *device_request_pipeline_layout(Device *self, const CombinedResourceLayout *layout);
 	DescriptorSetAllocator *device_request_descriptor_set_allocator(Device *self, const DescriptorSetLayout *layout, const uint32_t *stages_for_bindings);
 	const RenderPass *device_request_render_pass(Device *self, const RenderPassInfo *info, bool compatible);
-	uint64_t device_allocate_cookie(Device *self);
-	void device_request_vertex_block(Device *self, BufferBlock *block, VkDeviceSize size);
-	void device_request_uniform_block(Device *self, BufferBlock *block, VkDeviceSize size);
-	const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo *info);
-	void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore);
-	void device_add_frame_counter_nolock(Device *self);
-	void device_decrement_frame_counter_nolock(Device *self);
-	void device_init_workarounds(Device *self);
+	static uint64_t device_allocate_cookie(Device *self);
+	static void device_request_vertex_block(Device *self, BufferBlock *block, VkDeviceSize size);
+	static void device_request_uniform_block(Device *self, BufferBlock *block, VkDeviceSize size);
+	static const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo *info);
+	static void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore);
+	static void device_add_frame_counter_nolock(Device *self);
+	static void device_decrement_frame_counter_nolock(Device *self);
+	static void device_init_workarounds(Device *self);
 	void device_wait_idle(Device *self);
 	void device_flush_frame(Device *self);
 	void *device_map_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access);
@@ -6024,31 +6025,31 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	void program_init_compute(struct Program *self, Device *device, Shader *compute);
 	void pipeline_layout_init(struct PipelineLayout *self, Hash hash, Device *device, const CombinedResourceLayout *layout);
 	struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self, const RenderPassInfo *info);
-	void cbhvec_init(struct CommandBufferHandleVec *v);
-	void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap);
-	void cbhvec_push(struct CommandBufferHandleVec *v, CommandBufferHandle *e);
-	bool cbhvec_empty(const struct CommandBufferHandleVec *v);
-	void cbhvec_clear(struct CommandBufferHandleVec *v);
-	void cbhvec_deinit(struct CommandBufferHandleVec *v);
+	static void cbhvec_init(struct CommandBufferHandleVec *v);
+	static void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap);
+	static void cbhvec_push(struct CommandBufferHandleVec *v, CommandBufferHandle *e);
+	static bool cbhvec_empty(const struct CommandBufferHandleVec *v);
+	static void cbhvec_clear(struct CommandBufferHandleVec *v);
+	static void cbhvec_deinit(struct CommandBufferHandleVec *v);
 	CommandBufferHandleVec *device_get_queue_submissions(Device *self, CommandBufferType type);
 	void per_frame_init(struct PerFrame *self, Device *device);
 	void per_frame_fini(struct PerFrame *self);
 	void per_frame_begin(struct PerFrame *self);
 	struct PerFrame *device_frame(Device *self);
-	void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v);
-	void per_frame_ptr_vec_deinit(struct PerFramePtrVec *v);
-	void per_frame_ptr_vec_push(struct PerFramePtrVec *v, struct PerFrame *p);
-	void per_frame_ptr_vec_clear(struct PerFramePtrVec *v);
+	static void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v);
+	static void per_frame_ptr_vec_deinit(struct PerFramePtrVec *v);
+	static void per_frame_ptr_vec_push(struct PerFramePtrVec *v, struct PerFrame *p);
+	static void per_frame_ptr_vec_clear(struct PerFramePtrVec *v);
 	QueueData *device_get_queue_data(Device *self, CommandBufferType type);
 	void program_fini(struct Program *self);
 	void framebuffer_fini(struct Framebuffer *self);
 
-	inline bool device_memory_type_is_host_visible(Device *self, uint32_t type) { return (self->mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0; }
+	static INLINE bool device_memory_type_is_host_visible(Device *self, uint32_t type) { return (self->mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0; }
 
 
 	/* device_flush_frame_queue: was the inline Device::flush_frame(CommandBufferType)
 	 * overload. Flushes pending transfers (if async-transfer) then submits the queue. */
-	inline void device_flush_frame_queue(Device *self, CommandBufferType type)
+	static INLINE void device_flush_frame_queue(Device *self, CommandBufferType type)
 	{
 		if (type == Type_AsyncTransfer)
 			device_sync_buffer_blocks(self);
@@ -6058,19 +6059,19 @@ void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle produc
 	/* Device inline helpers (batch 5) -> free functions taking Device *self. Plain
 	 * inline (not static) because they are friend-declared. request_vertex_block /
 	 * request_uniform_block still call their *_nolock members through self->. */
-	inline uint64_t device_allocate_cookie(Device *self)
+	static INLINE uint64_t device_allocate_cookie(Device *self)
 	{
 		/* Reserve lower bits for "special purposes". */
 		self->cookie += 16;
 		return self->cookie;
 	}
-	inline void device_request_vertex_block(Device *self, BufferBlock *block, VkDeviceSize size) { device_request_vertex_block_nolock(self, block, size); }
-	inline void device_request_uniform_block(Device *self, BufferBlock *block, VkDeviceSize size) { device_request_uniform_block_nolock(self, block, size); }
-	inline const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo *info) { return framebuffer_allocator_request_framebuffer(&self->framebuffer_allocator, info); }
-	inline void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore) { semaphoremanager_recycle(&self->managers.semaphore, semaphore); }
-	inline void device_add_frame_counter_nolock(Device *self) { self->lock.counter++; }
-	inline void device_decrement_frame_counter_nolock(Device *self) { VK_ASSERT(self->lock.counter > 0); self->lock.counter--; }
-	inline void device_init_workarounds(Device *self)
+	static INLINE void device_request_vertex_block(Device *self, BufferBlock *block, VkDeviceSize size) { device_request_vertex_block_nolock(self, block, size); }
+	static INLINE void device_request_uniform_block(Device *self, BufferBlock *block, VkDeviceSize size) { device_request_uniform_block_nolock(self, block, size); }
+	static INLINE const Framebuffer *device_request_framebuffer(Device *self, const RenderPassInfo *info) { return framebuffer_allocator_request_framebuffer(&self->framebuffer_allocator, info); }
+	static INLINE void device_recycle_semaphore_nolock(Device *self, VkSemaphore semaphore) { semaphoremanager_recycle(&self->managers.semaphore, semaphore); }
+	static INLINE void device_add_frame_counter_nolock(Device *self) { self->lock.counter++; }
+	static INLINE void device_decrement_frame_counter_nolock(Device *self) { VK_ASSERT(self->lock.counter > 0); self->lock.counter--; }
+	static INLINE void device_init_workarounds(Device *self)
 	{
 		/* srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only. */
 		self->workarounds.optimize_all_graphics_barrier = self->gpu_props.vendorID == VENDOR_ID_ARM;
@@ -6097,11 +6098,11 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 	 * handle, so growth/teardown go through cbh_steal/cbh_reset. push() takes
 	 * ownership by move (steal, no incref); clear() drops each handle's ref but
 	 * keeps capacity; deinit() frees the backing storage. */
-	inline void cbhvec_init(struct CommandBufferHandleVec *v)
+	static INLINE void cbhvec_init(struct CommandBufferHandleVec *v)
 	{
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
-	inline void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap)
+	static INLINE void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap)
 	{
 		CommandBufferHandle *nitems = (CommandBufferHandle *)malloc((size_t)ncap * sizeof(CommandBufferHandle));
 		int i;
@@ -6111,22 +6112,22 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		v->items = nitems;
 		v->cap = ncap;
 	}
-	inline void cbhvec_push(struct CommandBufferHandleVec *v, CommandBufferHandle *e)
+	static INLINE void cbhvec_push(struct CommandBufferHandleVec *v, CommandBufferHandle *e)
 	{
 		if (v->count >= v->cap)
 			cbhvec_grow(v, v->cap ? v->cap * 2 : 8);
 		cbh_steal(&v->items[v->count], e);
 		v->count++;
 	}
-	inline bool cbhvec_empty(const struct CommandBufferHandleVec *v) { return v->count == 0; }
-	inline void cbhvec_clear(struct CommandBufferHandleVec *v)
+	static INLINE bool cbhvec_empty(const struct CommandBufferHandleVec *v) { return v->count == 0; }
+	static INLINE void cbhvec_clear(struct CommandBufferHandleVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++)
 			cbh_reset(&v->items[i]);
 		v->count = 0;
 	}
-	inline void cbhvec_deinit(struct CommandBufferHandleVec *v)
+	static INLINE void cbhvec_deinit(struct CommandBufferHandleVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++)
@@ -6140,11 +6141,11 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 	 * The vector owns each heap-allocated PerFrame and per_frame_fini+free's it on
 	 * clear()/teardown. Device is malloc'd so the container's own ctor/dtor never
 	 * run; init_empty establishes the empty state and deinit performs teardown. */
-	inline void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v)
+	static INLINE void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v)
 	{
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
-	inline void per_frame_ptr_vec_clear(struct PerFramePtrVec *v)
+	static INLINE void per_frame_ptr_vec_clear(struct PerFramePtrVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++) {
@@ -6153,14 +6154,14 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		}
 		v->count = 0;
 	}
-	inline void per_frame_ptr_vec_deinit(struct PerFramePtrVec *v)
+	static INLINE void per_frame_ptr_vec_deinit(struct PerFramePtrVec *v)
 	{
 		per_frame_ptr_vec_clear(v);
 		free(v->items);
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
 	/* Takes ownership of an already-allocated PerFrame. */
-	inline void per_frame_ptr_vec_push(struct PerFramePtrVec *v, struct PerFrame *p)
+	static INLINE void per_frame_ptr_vec_push(struct PerFramePtrVec *v, struct PerFrame *p)
 	{
 		if (v->count >= v->cap) {
 			int ncap = v->cap ? v->cap * 2 : 8;
@@ -6222,23 +6223,23 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		unsigned height;
 	};
 
-	static inline struct Rect make_rect(unsigned x, unsigned y, unsigned width, unsigned height)
+	static INLINE struct Rect make_rect(unsigned x, unsigned y, unsigned width, unsigned height)
 	{
 		struct Rect r;
 		r.x = x; r.y = y; r.width = width; r.height = height;
 		return r;
 	}
-	static inline bool rect_eq(const struct Rect *a, const struct Rect *b)
+	static INLINE bool rect_eq(const struct Rect *a, const struct Rect *b)
 	{
 		return a->x == b->x && a->y == b->y && a->width == b->width && a->height == b->height;
 	}
-	static inline bool rect_contains(const struct Rect *self, const struct Rect *rect)
+	static INLINE bool rect_contains(const struct Rect *self, const struct Rect *rect)
 	{
 		return self->x <= rect->x && self->y <= rect->y &&
 			(self->x + self->width) >= (rect->x + rect->width) &&
 			(self->y + self->height) >= (rect->y + rect->height);
 	}
-	static inline bool rect_intersects(const struct Rect *self, const struct Rect *rect)
+	static INLINE bool rect_intersects(const struct Rect *self, const struct Rect *rect)
 	{
 		unsigned x_end_self = self->x + self->width;
 		unsigned x_end_other = rect->x + rect->width;
@@ -6250,7 +6251,7 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		unsigned ybegin = (self->y > rect->y) ? self->y : rect->y;
 		return xbegin < xend && ybegin < yend;
 	}
-	static inline struct Rect rect_scissor(const struct Rect *self, const struct Rect *rect)
+	static INLINE struct Rect rect_scissor(const struct Rect *self, const struct Rect *rect)
 	{
 		unsigned x_end_self = self->x + self->width;
 		unsigned x_end_other = rect->x + rect->width;
@@ -6266,7 +6267,7 @@ const DeviceFeatures *device_get_device_features(Device *self) { return &self->e
 		out.x = x0; out.y = y0; out.width = w; out.height = h;
 		return out;
 	}
-	static inline void rect_extend_bounding_box(struct Rect *self, const struct Rect *rect)
+	static INLINE void rect_extend_bounding_box(struct Rect *self, const struct Rect *rect)
 	{
 		unsigned x_end_self = self->x + self->width;
 		unsigned x_end_other = rect->x + rect->width;
@@ -6508,35 +6509,35 @@ extern retro_log_printf_t log_cb;
 		bool fused;
 	};
 
-	static inline struct HdTextureHandle hd_handle_make(RectIndex index, uint32_t palette_hash)
+	static INLINE struct HdTextureHandle hd_handle_make(RectIndex index, uint32_t palette_hash)
 	{
 		struct HdTextureHandle h;
 		h.index = index; h.palette_hash = palette_hash; h.fused = false;
 		return h;
 	}
-	static inline struct HdTextureHandle hd_handle_make_fused(RectIndex index)
+	static INLINE struct HdTextureHandle hd_handle_make_fused(RectIndex index)
 	{
 		struct HdTextureHandle h;
 		h.index = index; h.palette_hash = 0; h.fused = true;
 		return h;
 	}
-	static inline struct HdTextureHandle hd_handle_make_none(void)
+	static INLINE struct HdTextureHandle hd_handle_make_none(void)
 	{
 		return hd_handle_make(-1, 0);
 	}
-	static inline bool hd_handle_is_none(const struct HdTextureHandle *h)
+	static INLINE bool hd_handle_is_none(const struct HdTextureHandle *h)
 	{
 		return h->index == (RectIndex)-1 && h->palette_hash == 0 && h->fused == false;
 	}
-	static inline bool hd_handle_eq(const struct HdTextureHandle *a, const struct HdTextureHandle *b)
+	static INLINE bool hd_handle_eq(const struct HdTextureHandle *a, const struct HdTextureHandle *b)
 	{
 		return a->index == b->index && a->palette_hash == b->palette_hash && a->fused == b->fused;
 	}
-	static inline bool hd_handle_ne(const struct HdTextureHandle *a, const struct HdTextureHandle *b)
+	static INLINE bool hd_handle_ne(const struct HdTextureHandle *a, const struct HdTextureHandle *b)
 	{
 		return !hd_handle_eq(a, b);
 	}
-	static inline bool hd_handle_gt(const struct HdTextureHandle *a, const struct HdTextureHandle *b)
+	static INLINE bool hd_handle_gt(const struct HdTextureHandle *a, const struct HdTextureHandle *b)
 	{
 		if (a->index != b->index)
 			return a->index > b->index;
@@ -6559,7 +6560,7 @@ extern retro_log_printf_t log_cb;
 
 	/* Validated SRect builder (was the 4-arg constructor). width/height must be
 	 * positive; a zero/negative size is a hard error, matching the old ctor. */
-	static inline struct SRect make_srect(int x, int y, int width, int height)
+	static INLINE struct SRect make_srect(int x, int y, int width, int height)
 	{
 		struct SRect r;
 		if (width <= 0 || height <= 0) {
@@ -6569,11 +6570,11 @@ extern retro_log_printf_t log_cb;
 		r.x = x; r.y = y; r.width = width; r.height = height;
 		return r;
 	}
-	static inline int srect_left(const struct SRect *s)   { return s->x; }
-	static inline int srect_right(const struct SRect *s)  { return s->x + s->width; }
-	static inline int srect_top(const struct SRect *s)    { return s->y; }
-	static inline int srect_bottom(const struct SRect *s) { return s->y + s->height; }
-	static inline bool srect_eq(const struct SRect *a, const struct SRect *b)
+	static INLINE int srect_left(const struct SRect *s)   { return s->x; }
+	static INLINE int srect_right(const struct SRect *s)  { return s->x + s->width; }
+	static INLINE int srect_top(const struct SRect *s)    { return s->y; }
+	static INLINE int srect_bottom(const struct SRect *s) { return s->y + s->height; }
+	static INLINE bool srect_eq(const struct SRect *a, const struct SRect *b)
 	{
 		return a->x == b->x && a->y == b->y && a->width == b->width && a->height == b->height;
 	}
@@ -6591,7 +6592,7 @@ extern retro_log_printf_t log_cb;
 		uint32_t palette_hash;
 	};
 
-	static inline bool dumpedmode_eq(const struct DumpedMode *a, const struct DumpedMode *b)
+	static INLINE bool dumpedmode_eq(const struct DumpedMode *a, const struct DumpedMode *b)
 	{
 		return a->mode == b->mode && a->palette_hash == b->palette_hash;
 	}
@@ -7102,11 +7103,11 @@ void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
 
 	// in vram size (not hd), local to the uploaded data, different hd textures for
 	// different palettes could have different sizes anyway
-	static inline struct SRect texture_rect_subrect(const struct TextureRect *t)
+	static INLINE struct SRect texture_rect_subrect(const struct TextureRect *t)
 	{
 		return make_srect(t->offset_x, t->offset_y, t->vram_rect.width, t->vram_rect.height);
 	}
-	static inline bool texture_rect_eq(const struct TextureRect *a, const struct TextureRect *b)
+	static INLINE bool texture_rect_eq(const struct TextureRect *a, const struct TextureRect *b)
 	{
 		return a->upload == b->upload && a->offset_x == b->offset_x && a->offset_y == b->offset_y && srect_eq(&a->vram_rect, &b->vram_rect);
 	}
@@ -7204,12 +7205,12 @@ void enduring_arr_free(EnduringRectArr *v) {
 		TextureRectVec v;
 	};
 
-	static inline void ownedrects_init(struct OwnedRectVec *r)
+	static INLINE void ownedrects_init(struct OwnedRectVec *r)
 	{
 		r->v.items = NULL; r->v.count = 0; r->v.cap = 0;
 	}
 
-	static inline void ownedrects_destroy(struct OwnedRectVec *r)
+	static INLINE void ownedrects_destroy(struct OwnedRectVec *r)
 	{
 		int i;
 		for (i = 0; i < r->v.count; i++) texture_rect_release(&r->v.items[i]);
@@ -7218,7 +7219,7 @@ void enduring_arr_free(EnduringRectArr *v) {
 
 	/* Deep-copy the POD elements of src->v into dst->v (replacing dst's storage).
 	 * Refcounts are adjusted by the caller (release before, retain after). */
-	static inline void ownedrects_copy_storage(struct OwnedRectVec *dst, const struct OwnedRectVec *src)
+	static INLINE void ownedrects_copy_storage(struct OwnedRectVec *dst, const struct OwnedRectVec *src)
 	{
 		dst->v.count = 0;
 		if (src->v.count <= 0)
@@ -7238,7 +7239,7 @@ void enduring_arr_free(EnduringRectArr *v) {
 	}
 
 	/* Copy-construct: dst must be uninitialized; deep-copy src and retain each element. */
-	static inline void ownedrects_copy(struct OwnedRectVec *dst, const struct OwnedRectVec *src)
+	static INLINE void ownedrects_copy(struct OwnedRectVec *dst, const struct OwnedRectVec *src)
 	{
 		int i;
 		ownedrects_init(dst);
@@ -7247,7 +7248,7 @@ void enduring_arr_free(EnduringRectArr *v) {
 	}
 
 	/* Copy-assign: release dst's current elements, deep-copy src, retain each. */
-	static inline void ownedrects_assign(struct OwnedRectVec *dst, const struct OwnedRectVec *src)
+	static INLINE void ownedrects_assign(struct OwnedRectVec *dst, const struct OwnedRectVec *src)
 	{
 		int i;
 		if (dst == src) return;
@@ -7257,21 +7258,21 @@ void enduring_arr_free(EnduringRectArr *v) {
 	}
 
 	/* Move: steal src's storage into dst (dst must be empty/initialized), leave src empty. */
-	static inline void ownedrects_move(struct OwnedRectVec *dst, struct OwnedRectVec *src)
+	static INLINE void ownedrects_move(struct OwnedRectVec *dst, struct OwnedRectVec *src)
 	{
 		dst->v = src->v;
 		src->v.items = NULL; src->v.count = 0; src->v.cap = 0;
 	}
 
-	static inline void ownedrects_push(struct OwnedRectVec *r, TextureRect t)
+	static INLINE void ownedrects_push(struct OwnedRectVec *r, TextureRect t)
 	{
 		texture_rect_retain(&t);
 		TextureRectVec_push(&r->v, &t);
 	}
 
-	static inline int ownedrects_size(const struct OwnedRectVec *r) { return r->v.count; }
+	static INLINE int ownedrects_size(const struct OwnedRectVec *r) { return r->v.count; }
 
-	static inline bool ownedrects_eq(const struct OwnedRectVec *a, const struct OwnedRectVec *b)
+	static INLINE bool ownedrects_eq(const struct OwnedRectVec *a, const struct OwnedRectVec *b)
 	{
 		int i;
 		if (a->v.count != b->v.count) return false;
@@ -7405,26 +7406,26 @@ void rect_tracker_clear(struct RectTracker *self, SRect rect)
 		unsigned int scaleY;
 	};
 
-	static inline void fusionrects_init(struct FusionRects *f)
+	static INLINE void fusionrects_init(struct FusionRects *f)
 	{
 		ownedrects_init(&f->rects);
 		f->vram_rect.x = 0; f->vram_rect.y = 0; f->vram_rect.width = 0; f->vram_rect.height = 0;
 		f->scaleX = 0;
 		f->scaleY = 0;
 	}
-	static inline void fusionrects_destroy(struct FusionRects *f)
+	static INLINE void fusionrects_destroy(struct FusionRects *f)
 	{
 		ownedrects_destroy(&f->rects);
 	}
 	/* Move src into dst (dst must be initialized): steal rects, copy POD fields. */
-	static inline void fusionrects_move(struct FusionRects *dst, struct FusionRects *src)
+	static INLINE void fusionrects_move(struct FusionRects *dst, struct FusionRects *src)
 	{
 		ownedrects_move(&dst->rects, &src->rects);
 		dst->vram_rect = src->vram_rect;
 		dst->scaleX = src->scaleX;
 		dst->scaleY = src->scaleY;
 	}
-	static inline bool fusionrects_eq(const struct FusionRects *a, const struct FusionRects *b)
+	static INLINE bool fusionrects_eq(const struct FusionRects *a, const struct FusionRects *b)
 	{
 		return rect_eq(&a->vram_rect, &b->vram_rect) && a->scaleX == b->scaleX && a->scaleY == b->scaleY && ownedrects_eq(&a->rects, &b->rects);
 	}
@@ -7562,30 +7563,30 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 
 	/* RestorableRect holds an OwnedRectVec, so its copy/destroy must run the
 	 * OwnedRectVec refcount logic explicitly (it is no longer a C++ class). */
-	static inline void restorablerect_init(struct RestorableRect *r)
+	static INLINE void restorablerect_init(struct RestorableRect *r)
 	{
 		ownedrects_init(&r->to_restore);
 	}
-	static inline void restorablerect_destroy(struct RestorableRect *r)
+	static INLINE void restorablerect_destroy(struct RestorableRect *r)
 	{
 		ownedrects_destroy(&r->to_restore);
 	}
 	/* Copy-construct dst (uninitialized) from src: POD fields bitwise, to_restore deep. */
-	static inline void restorablerect_copy(struct RestorableRect *dst, const struct RestorableRect *src)
+	static INLINE void restorablerect_copy(struct RestorableRect *dst, const struct RestorableRect *src)
 	{
 		dst->rect = src->rect;
 		dst->hash = src->hash;
 		ownedrects_copy(&dst->to_restore, &src->to_restore);
 	}
 	/* Copy-assign dst (initialized) from src. */
-	static inline void restorablerect_assign(struct RestorableRect *dst, const struct RestorableRect *src)
+	static INLINE void restorablerect_assign(struct RestorableRect *dst, const struct RestorableRect *src)
 	{
 		dst->rect = src->rect;
 		dst->hash = src->hash;
 		ownedrects_assign(&dst->to_restore, &src->to_restore);
 	}
 	/* Move src into dst (uninitialized): POD fields bitwise, steal to_restore. */
-	static inline void restorablerect_move(struct RestorableRect *dst, struct RestorableRect *src)
+	static INLINE void restorablerect_move(struct RestorableRect *dst, struct RestorableRect *src)
 	{
 		dst->rect = src->rect;
 		dst->hash = src->hash;
@@ -7614,11 +7615,11 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 		int cap;
 	};
 
-	static inline void rrvec_init(struct RestorableRectVec *v)
+	static INLINE void rrvec_init(struct RestorableRectVec *v)
 	{
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
-	static inline void rrvec_destroy(struct RestorableRectVec *v)
+	static INLINE void rrvec_destroy(struct RestorableRectVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++)
@@ -7627,14 +7628,14 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 		v->items = NULL; v->count = 0; v->cap = 0;
 	}
 	/* Move o into v (v must be initialized): free v's elements, steal o's storage. */
-	static inline void rrvec_move(struct RestorableRectVec *v, struct RestorableRectVec *o)
+	static INLINE void rrvec_move(struct RestorableRectVec *v, struct RestorableRectVec *o)
 	{
 		if (v == o) return;
 		rrvec_destroy(v);
 		v->items = o->items; v->count = o->count; v->cap = o->cap;
 		o->items = NULL; o->count = 0; o->cap = 0;
 	}
-	static inline void rrvec_grow(struct RestorableRectVec *v, int ncap)
+	static INLINE void rrvec_grow(struct RestorableRectVec *v, int ncap)
 	{
 		int i;
 		RestorableRect *nitems = (RestorableRect *)malloc((size_t)ncap * sizeof(RestorableRect));
@@ -7648,16 +7649,16 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	}
 	/* Copy-insert v (matches the old push_back(std::move(rr)) which, move being
 	 * suppressed, was a copy). */
-	static inline void rrvec_push(struct RestorableRectVec *vec, const struct RestorableRect *val)
+	static INLINE void rrvec_push(struct RestorableRectVec *vec, const struct RestorableRect *val)
 	{
 		if (vec->count >= vec->cap)
 			rrvec_grow(vec, vec->cap ? vec->cap * 2 : 8);
 		restorablerect_copy(&vec->items[vec->count], val);
 		vec->count++;
 	}
-	static inline int rrvec_size(const struct RestorableRectVec *v) { return v->count; }
-	static inline bool rrvec_empty(const struct RestorableRectVec *v) { return v->count == 0; }
-	static inline void rrvec_clear(struct RestorableRectVec *v)
+	static INLINE int rrvec_size(const struct RestorableRectVec *v) { return v->count; }
+	static INLINE bool rrvec_empty(const struct RestorableRectVec *v) { return v->count == 0; }
+	static INLINE void rrvec_clear(struct RestorableRectVec *v)
 	{
 		int i;
 		for (i = 0; i < v->count; i++)
@@ -7666,7 +7667,7 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	}
 	/* Remove element i by copy-assigning the tail down and destroying the duplicated
 	 * last slot (matches std::vector::erase). */
-	static inline void rrvec_erase_at(struct RestorableRectVec *v, int i)
+	static INLINE void rrvec_erase_at(struct RestorableRectVec *v, int i)
 	{
 		int j;
 		for (j = i; j + 1 < v->count; j++)
@@ -7759,12 +7760,12 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 		int cap;
 	};
 
-	static inline void uploadmap_init(struct UploadOwningMap *m)
+	static INLINE void uploadmap_init(struct UploadOwningMap *m)
 	{
 		m->items = NULL; m->count = 0; m->cap = 0;
 	}
 
-	static inline void uploadmap_destroy(struct UploadOwningMap *m)
+	static INLINE void uploadmap_destroy(struct UploadOwningMap *m)
 	{
 		int i;
 		for (i = 0; i < m->count; i++)
@@ -7774,13 +7775,13 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 	}
 
 	/* Move: steal o's storage into m (which must be empty/initialized), leave o empty. */
-	static inline void uploadmap_move(struct UploadOwningMap *m, struct UploadOwningMap *o)
+	static INLINE void uploadmap_move(struct UploadOwningMap *m, struct UploadOwningMap *o)
 	{
 		m->items = o->items; m->count = o->count; m->cap = o->cap;
 		o->items = NULL; o->count = 0; o->cap = 0;
 	}
 
-	static inline bool uploadmap_contains(const struct UploadOwningMap *m, uint32_t key)
+	static INLINE bool uploadmap_contains(const struct UploadOwningMap *m, uint32_t key)
 	{
 		int i;
 		for (i = 0; i < m->count; i++)
@@ -7791,7 +7792,7 @@ void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->
 
 	/* Takes ownership of an already-heap-allocated upload under key. Caller must have
 	 * ensured the key is absent (mirrors the old map's insert-if-absent guard). */
-	static inline void uploadmap_insert(struct UploadOwningMap *m, uint32_t key, TextureUpload *val)
+	static INLINE void uploadmap_insert(struct UploadOwningMap *m, uint32_t key, TextureUpload *val)
 	{
 		if (m->count >= m->cap) {
 			int ncap = m->cap ? m->cap * 2 : 8;
@@ -7914,14 +7915,14 @@ void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveStateVec *
 		UploadOwningMap uploads;
 	};
 
-	static inline void tts_init(struct TextureTrackerSaveState *s)
+	static INLINE void tts_init(struct TextureTrackerSaveState *s)
 	{
 		TextureRectSaveStateVec_init(&s->rects);
 		RestorableRectSaveStateVec_init(&s->restorable);
 		uploadmap_init(&s->uploads);
 	}
 
-	static inline void tts_destroy(struct TextureTrackerSaveState *s)
+	static INLINE void tts_destroy(struct TextureTrackerSaveState *s)
 	{
 		TextureRectSaveStateVec_free_storage(&s->rects);
 		RestorableRectSaveStateVec_free_storage(&s->restorable);
@@ -7930,7 +7931,7 @@ void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveStateVec *
 
 	/* Move o into s (which must already be initialized): free s's current storage,
 	 * steal o's, and leave o empty/initialized. Mirrors the old move-assignment. */
-	static inline void tts_move(struct TextureTrackerSaveState *s, struct TextureTrackerSaveState *o)
+	static INLINE void tts_move(struct TextureTrackerSaveState *s, struct TextureTrackerSaveState *o)
 	{
 		if (s == o)
 			return;
@@ -9124,13 +9125,13 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	/* SaveState lifecycle free functions (SaveState was a move-only C++ class; it is now
 	 * a plain struct). vram is an OwnedU32Buf and tracker_state a TextureTrackerSaveState,
 	 * both move-only plain structs managed through their own *_init / *_move / destroy. */
-	static inline void savestate_init(struct SaveState *s)
+	static INLINE void savestate_init(struct SaveState *s)
 	{
 		owned_u32_init(&s->vram);
 		tts_init(&s->tracker_state);
 	}
 
-	static inline void savestate_destroy(struct SaveState *s)
+	static INLINE void savestate_destroy(struct SaveState *s)
 	{
 		owned_u32_deinit(&s->vram);
 		tts_destroy(&s->tracker_state);
@@ -9138,7 +9139,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 	/* Move o into s (s must be initialized): steal o's owning members, copy the POD
 	 * RenderState, leave o empty/initialized. */
-	static inline void savestate_move(struct SaveState *s, struct SaveState *o)
+	static INLINE void savestate_move(struct SaveState *s, struct SaveState *o)
 	{
 		if (s == o)
 			return;
@@ -9197,49 +9198,49 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	float renderer_allocate_depth(Renderer *self, Domain domain, const Rect *rect);
 	void renderer_reset_scissor_queue(Renderer *self);
 	void renderer_reset_queue(Renderer *self);
-	void renderer_flush(Renderer *self);
-	Fence renderer_flush_and_signal(Renderer *self);
-	ScanoutMode renderer_get_scanout_mode(const Renderer *self);
-	void renderer_discard_render_pass(Renderer *self);
-	CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self);
-	bool renderer_get_filer_exclude(Renderer *self, FilterExclude exclude);
-	void renderer_set_texture_window(Renderer *self, const TextureWindow *window);
-	void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y);
-	void renderer_set_palette_offset(Renderer *self, unsigned x, unsigned y);
-	uint16_t * renderer_begin_copy(Renderer *self, BufferHandle handle);
-	void renderer_end_copy(Renderer *self, BufferHandle handle);
-	void renderer_notify_texture_upload(Renderer *self, Rect rect, uint16_t *vram);
-	void renderer_set_vram_framebuffer_coords(Renderer *self, unsigned xstart, unsigned ystart);
-	void renderer_set_display_mode(Renderer *self, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode);
-	void renderer_toggle_display(Renderer *self, bool enable);
-	void renderer_set_texture_mode(Renderer *self, TextureMode mode);
-	void renderer_set_semi_transparent(Renderer *self, SemiTransparentMode state);
-	void renderer_set_primitive_type(Renderer *self, PrimitiveType primitive_type);
-	void renderer_set_force_mask_bit(Renderer *self, bool enable);
-	void renderer_set_mask_test(Renderer *self, bool enable);
-	void renderer_set_texture_color_modulate(Renderer *self, bool enable);
-	void renderer_set_UV_limits(Renderer *self, uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v);
-	void renderer_set_filter_mode(Renderer *self, FilterMode mode);
-	void renderer_set_sprite_filter_exclude(Renderer *self, FilterExclude exclude);
-	void renderer_set_polygon_2d_filter_exclude(Renderer *self, FilterExclude exclude);
-	void renderer_set_scaled_uv_offset(Renderer *self, bool offset);
-	void renderer_set_track_textures(Renderer *self, bool enable);
-	void renderer_set_dump_textures(Renderer *self, bool enable);
-	void renderer_set_replace_textures(Renderer *self, bool enable);
-	void renderer_set_hd_cache_budgets(Renderer *self, size_t ram_bytes, size_t vram_bytes);
-	void renderer_set_eager_hd_textures(Renderer *self, bool enable);
-	void renderer_set_adaptive_smoothing(Renderer *self, bool enable);
-	void renderer_set_draw_offset(Renderer *self, int x, int y);
-	void renderer_set_scissored_invariant(Renderer *self, bool invariant);
-	void renderer_set_horizontal_display_range(Renderer *self, int x1, int x2);
-	void renderer_set_vertical_display_range(Renderer *self, int y1, int y2);
-	void renderer_set_horizontal_overscan_cropping(Renderer *self, int crop_overscan);
-	void renderer_set_horizontal_offset_cycles(Renderer *self, int offset_cycles);
-	void renderer_set_horizontal_additional_cropping(Renderer *self, unsigned image_crop);
-	void renderer_set_visible_scanlines(Renderer *self, int slstart, int slend, int slstart_pal, int slend_pal);
-	void renderer_set_display_filter(Renderer *self, ScanoutFilter filter);
-	void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter);
-	void renderer_set_dither_native_resolution(Renderer *self, bool enable);
+	static void renderer_flush(Renderer *self);
+	static Fence renderer_flush_and_signal(Renderer *self);
+	static ScanoutMode renderer_get_scanout_mode(const Renderer *self);
+	static void renderer_discard_render_pass(Renderer *self);
+	static CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self);
+	static bool renderer_get_filer_exclude(Renderer *self, FilterExclude exclude);
+	static void renderer_set_texture_window(Renderer *self, const TextureWindow *window);
+	static void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y);
+	static void renderer_set_palette_offset(Renderer *self, unsigned x, unsigned y);
+	static uint16_t * renderer_begin_copy(Renderer *self, BufferHandle handle);
+	static void renderer_end_copy(Renderer *self, BufferHandle handle);
+	static void renderer_notify_texture_upload(Renderer *self, Rect rect, uint16_t *vram);
+	static void renderer_set_vram_framebuffer_coords(Renderer *self, unsigned xstart, unsigned ystart);
+	static void renderer_set_display_mode(Renderer *self, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode);
+	static void renderer_toggle_display(Renderer *self, bool enable);
+	static void renderer_set_texture_mode(Renderer *self, TextureMode mode);
+	static void renderer_set_semi_transparent(Renderer *self, SemiTransparentMode state);
+	static void renderer_set_primitive_type(Renderer *self, PrimitiveType primitive_type);
+	static void renderer_set_force_mask_bit(Renderer *self, bool enable);
+	static void renderer_set_mask_test(Renderer *self, bool enable);
+	static void renderer_set_texture_color_modulate(Renderer *self, bool enable);
+	static void renderer_set_UV_limits(Renderer *self, uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v);
+	static void renderer_set_filter_mode(Renderer *self, FilterMode mode);
+	static void renderer_set_sprite_filter_exclude(Renderer *self, FilterExclude exclude);
+	static void renderer_set_polygon_2d_filter_exclude(Renderer *self, FilterExclude exclude);
+	static void renderer_set_scaled_uv_offset(Renderer *self, bool offset);
+	static void renderer_set_track_textures(Renderer *self, bool enable);
+	static void renderer_set_dump_textures(Renderer *self, bool enable);
+	static void renderer_set_replace_textures(Renderer *self, bool enable);
+	static void renderer_set_hd_cache_budgets(Renderer *self, size_t ram_bytes, size_t vram_bytes);
+	static void renderer_set_eager_hd_textures(Renderer *self, bool enable);
+	static void renderer_set_adaptive_smoothing(Renderer *self, bool enable);
+	static void renderer_set_draw_offset(Renderer *self, int x, int y);
+	static void renderer_set_scissored_invariant(Renderer *self, bool invariant);
+	static void renderer_set_horizontal_display_range(Renderer *self, int x1, int x2);
+	static void renderer_set_vertical_display_range(Renderer *self, int y1, int y2);
+	static void renderer_set_horizontal_overscan_cropping(Renderer *self, int crop_overscan);
+	static void renderer_set_horizontal_offset_cycles(Renderer *self, int offset_cycles);
+	static void renderer_set_horizontal_additional_cropping(Renderer *self, unsigned image_crop);
+	static void renderer_set_visible_scanlines(Renderer *self, int slstart, int slend, int slstart_pal, int slend_pal);
+	static void renderer_set_display_filter(Renderer *self, ScanoutFilter filter);
+	static void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter);
+	static void renderer_set_dither_native_resolution(Renderer *self, bool enable);
 	void renderer_save_vram_state(Renderer *self, SaveState *out);
 	void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const SaveState *state);
 	void renderer_fini(Renderer *self);
@@ -9250,14 +9251,14 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	 * internal callers (other still-class methods call them via this), rewired to
 	 * renderer_*(this, ...); command_buffer_hack_fixme returned a CommandBufferHandle&
 	 * and now returns a pointer. ---- */
-	inline void renderer_flush(Renderer *self)
+	static INLINE void renderer_flush(Renderer *self)
 	{
 		if (cbh_is_valid(&self->cmd))
 			device_submit(self->device, &self->cmd, NULL, 0, NULL);
 		cbh_reset(&self->cmd);
 		device_flush_frame(self->device);
 	}
-	inline Fence renderer_flush_and_signal(Renderer *self)
+	static INLINE Fence renderer_flush_and_signal(Renderer *self)
 	{
 		Fence fence;
 		fence.data = NULL;
@@ -9269,20 +9270,20 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 		 * not incref and this local must NOT reset (moved-from). */
 		return fence;
 	}
-	inline ScanoutMode renderer_get_scanout_mode(const Renderer *self)
+	static INLINE ScanoutMode renderer_get_scanout_mode(const Renderer *self)
 	{
 		return self->render_state.scanout_mode;
 	}
-	inline void renderer_discard_render_pass(Renderer *self)
+	static INLINE void renderer_discard_render_pass(Renderer *self)
 	{
 		renderer_reset_queue(self);
 	}
-	inline CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self)
+	static INLINE CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self)
 	{
 		renderer_ensure_command_buffer(self);
 		return &self->cmd;
 	}
-	inline bool renderer_get_filer_exclude(Renderer *self, FilterExclude exclude)
+	static INLINE bool renderer_get_filer_exclude(Renderer *self, FilterExclude exclude)
 	{
 		if (self->render_state.primitive_type == PrimitiveType_Sprite &&
 				self->sprite_filter_exclude >= exclude)
@@ -9295,44 +9296,44 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 	/* ---- Renderer setters/accessors (batch 2): inline methods -> inline free
 	 * functions taking Renderer *self. ---- */
-	inline void renderer_set_texture_window(Renderer *self, const TextureWindow *window)
+	static INLINE void renderer_set_texture_window(Renderer *self, const TextureWindow *window)
 	{
 		self->render_state.texture_window = *window;
 		self->render_state.cached_window_rect = renderer_compute_window_rect(self, window);
 	}
-	inline void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y)
+	static INLINE void renderer_set_texture_offset(Renderer *self, unsigned x, unsigned y)
 	{
 		fbatlas_set_texture_offset(&self->atlas, x, y);
 		self->render_state.texture_offset_x = x;
 		self->render_state.texture_offset_y = y;
 	}
-	inline void renderer_set_palette_offset(Renderer *self, unsigned x, unsigned y)
+	static INLINE void renderer_set_palette_offset(Renderer *self, unsigned x, unsigned y)
 	{
 		fbatlas_set_palette_offset(&self->atlas, x, y);
 		self->render_state.palette_offset_x = x;
 		self->render_state.palette_offset_y = y;
 	}
-	inline uint16_t *renderer_begin_copy(Renderer *self, BufferHandle handle)
+	static INLINE uint16_t *renderer_begin_copy(Renderer *self, BufferHandle handle)
 	{
 		return (uint16_t *)(device_map_host_buffer(self->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
 	}
-	inline void renderer_end_copy(Renderer *self, BufferHandle handle)
+	static INLINE void renderer_end_copy(Renderer *self, BufferHandle handle)
 	{
 		device_unmap_host_buffer(self->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
 	}
-	inline void renderer_notify_texture_upload(Renderer *self, Rect rect, uint16_t *vram)
+	static INLINE void renderer_notify_texture_upload(Renderer *self, Rect rect, uint16_t *vram)
 	{
 		if (self->texture_tracking_enabled)
 			texture_tracker_upload(&self->tracker, rect, vram);
 	}
-	inline void renderer_set_vram_framebuffer_coords(Renderer *self, unsigned xstart, unsigned ystart)
+	static INLINE void renderer_set_vram_framebuffer_coords(Renderer *self, unsigned xstart, unsigned ystart)
 	{
 		ih_reset(&self->last_scanout);
 
 		self->render_state.display_fb_xstart = xstart;
 		self->render_state.display_fb_ystart = ystart;
 	}
-	inline void renderer_set_display_mode(Renderer *self, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
+	static INLINE void renderer_set_display_mode(Renderer *self, ScanoutMode mode, bool is_pal, bool is_480i, WidthMode width_mode)
 	{
 		ih_reset(&self->last_scanout);
 
@@ -9342,121 +9343,121 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 		self->render_state.is_480i = is_480i;
 		self->render_state.width_mode = width_mode;
 	}
-	inline void renderer_toggle_display(Renderer *self, bool enable)
+	static INLINE void renderer_toggle_display(Renderer *self, bool enable)
 	{
 		if (enable != self->render_state.display_on)
 			ih_reset(&self->last_scanout);
 
 		self->render_state.display_on = enable;
 	}
-	inline void renderer_set_texture_mode(Renderer *self, TextureMode mode)
+	static INLINE void renderer_set_texture_mode(Renderer *self, TextureMode mode)
 	{
 		self->render_state.texture_mode = mode;
 		fbatlas_set_texture_mode(&self->atlas, mode);
 	}
-	inline void renderer_set_semi_transparent(Renderer *self, SemiTransparentMode state)
+	static INLINE void renderer_set_semi_transparent(Renderer *self, SemiTransparentMode state)
 	{
 		self->render_state.semi_transparent = state;
 	}
-	inline void renderer_set_primitive_type(Renderer *self, PrimitiveType primitive_type)
+	static INLINE void renderer_set_primitive_type(Renderer *self, PrimitiveType primitive_type)
 	{
 		self->render_state.primitive_type = primitive_type;
 	}
-	inline void renderer_set_force_mask_bit(Renderer *self, bool enable)
+	static INLINE void renderer_set_force_mask_bit(Renderer *self, bool enable)
 	{
 		self->render_state.force_mask_bit = enable;
 	}
-	inline void renderer_set_mask_test(Renderer *self, bool enable)
+	static INLINE void renderer_set_mask_test(Renderer *self, bool enable)
 	{
 		self->render_state.mask_test = enable;
 	}
-	inline void renderer_set_texture_color_modulate(Renderer *self, bool enable)
+	static INLINE void renderer_set_texture_color_modulate(Renderer *self, bool enable)
 	{
 		self->render_state.texture_color_modulate = enable;
 	}
-	inline void renderer_set_UV_limits(Renderer *self, uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v)
+	static INLINE void renderer_set_UV_limits(Renderer *self, uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v)
 	{
 		self->render_state.UVLimits.min_u = min_u;
 		self->render_state.UVLimits.min_v = min_v;
 		self->render_state.UVLimits.max_u = max_u;
 		self->render_state.UVLimits.max_v = max_v;
 	}
-	inline void renderer_set_filter_mode(Renderer *self, FilterMode mode)
+	static INLINE void renderer_set_filter_mode(Renderer *self, FilterMode mode)
 	{
 		self->primitive_filter_mode = mode;
 	}
-	inline void renderer_set_sprite_filter_exclude(Renderer *self, FilterExclude exclude)
+	static INLINE void renderer_set_sprite_filter_exclude(Renderer *self, FilterExclude exclude)
 	{
 		self->sprite_filter_exclude = exclude;
 	}
-	inline void renderer_set_polygon_2d_filter_exclude(Renderer *self, FilterExclude exclude)
+	static INLINE void renderer_set_polygon_2d_filter_exclude(Renderer *self, FilterExclude exclude)
 	{
 		self->polygon_2d_filter_exclude = exclude;
 	}
-	inline void renderer_set_scaled_uv_offset(Renderer *self, bool offset)
+	static INLINE void renderer_set_scaled_uv_offset(Renderer *self, bool offset)
 	{
 		self->scaled_uv_offset = offset;
 	}
 
-	/* ---- Renderer state setters (batch 1): inline methods -> static inline free
+	/* ---- Renderer state setters (batch 1): inline methods -> static INLINE free
 	 * functions taking Renderer *self, ahead of the full class -> struct conversion.
 	 * Defined here (after the class) so Renderer is complete; friend-declared inside. ---- */
-	inline void renderer_set_track_textures(Renderer *self, bool enable)
+	static INLINE void renderer_set_track_textures(Renderer *self, bool enable)
 	{
 		self->texture_tracking_enabled = enable;
 	}
-	inline void renderer_set_dump_textures(Renderer *self, bool enable)
+	static INLINE void renderer_set_dump_textures(Renderer *self, bool enable)
 	{
 		self->tracker.dump_enabled = enable;
 	}
-	inline void renderer_set_replace_textures(Renderer *self, bool enable)
+	static INLINE void renderer_set_replace_textures(Renderer *self, bool enable)
 	{
 		self->tracker.hd_textures_enabled = enable;
 	}
-	inline void renderer_set_hd_cache_budgets(Renderer *self, size_t ram_bytes, size_t vram_bytes)
+	static INLINE void renderer_set_hd_cache_budgets(Renderer *self, size_t ram_bytes, size_t vram_bytes)
 	{
 		texture_tracker_set_cache_budgets(&self->tracker, ram_bytes, vram_bytes);
 	}
-	inline void renderer_set_eager_hd_textures(Renderer *self, bool enable)
+	static INLINE void renderer_set_eager_hd_textures(Renderer *self, bool enable)
 	{
 		self->tracker.eager_textures = enable;
 	}
-	inline void renderer_set_adaptive_smoothing(Renderer *self, bool enable)
+	static INLINE void renderer_set_adaptive_smoothing(Renderer *self, bool enable)
 	{
 		self->render_state.adaptive_smoothing = enable;
 	}
-	inline void renderer_set_draw_offset(Renderer *self, int x, int y)
+	static INLINE void renderer_set_draw_offset(Renderer *self, int x, int y)
 	{
 		self->render_state.draw_offset_x = x;
 		self->render_state.draw_offset_y = y;
 	}
-	inline void renderer_set_scissored_invariant(Renderer *self, bool invariant)
+	static INLINE void renderer_set_scissored_invariant(Renderer *self, bool invariant)
 	{
 		self->queue.scissor_invariant = invariant;
 	}
-	inline void renderer_set_horizontal_display_range(Renderer *self, int x1, int x2)
+	static INLINE void renderer_set_horizontal_display_range(Renderer *self, int x1, int x2)
 	{
 		self->render_state.horiz_start = x1;
 		self->render_state.horiz_end = x2;
 	}
-	inline void renderer_set_vertical_display_range(Renderer *self, int y1, int y2)
+	static INLINE void renderer_set_vertical_display_range(Renderer *self, int y1, int y2)
 	{
 		self->render_state.vert_start = y1;
 		self->render_state.vert_end = y2;
 	}
-	inline void renderer_set_horizontal_overscan_cropping(Renderer *self, int crop_overscan)
+	static INLINE void renderer_set_horizontal_overscan_cropping(Renderer *self, int crop_overscan)
 	{
 		self->render_state.crop_overscan = crop_overscan;
 	}
-	inline void renderer_set_horizontal_offset_cycles(Renderer *self, int offset_cycles)
+	static INLINE void renderer_set_horizontal_offset_cycles(Renderer *self, int offset_cycles)
 	{
 		self->render_state.offset_cycles = offset_cycles;
 	}
-	inline void renderer_set_horizontal_additional_cropping(Renderer *self, unsigned image_crop)
+	static INLINE void renderer_set_horizontal_additional_cropping(Renderer *self, unsigned image_crop)
 	{
 		self->render_state.image_crop = image_crop;
 	}
-	inline void renderer_set_visible_scanlines(Renderer *self, int slstart, int slend, int slstart_pal, int slend_pal)
+	static INLINE void renderer_set_visible_scanlines(Renderer *self, int slstart, int slend, int slstart_pal, int slend_pal)
 	{
 		// May need bounds checking to reject bad inputs. Currently assume all inputs are valid.
 		self->render_state.slstart = slstart;
@@ -9464,15 +9465,15 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 		self->render_state.slstart_pal = slstart_pal;
 		self->render_state.slend_pal = slend_pal;
 	}
-	inline void renderer_set_display_filter(Renderer *self, ScanoutFilter filter)
+	static INLINE void renderer_set_display_filter(Renderer *self, ScanoutFilter filter)
 	{
 		self->render_state.scanout_filter = filter;
 	}
-	inline void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter)
+	static INLINE void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter)
 	{
 		self->render_state.scanout_mdec_filter = mdec_filter;
 	}
-	inline void renderer_set_dither_native_resolution(Renderer *self, bool enable)
+	static INLINE void renderer_set_dither_native_resolution(Renderer *self, bool enable)
 	{
 		self->render_state.dither_native_resolution = enable;
 	}
@@ -9630,7 +9631,7 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 // 3 LSBs are ignored.
 #define FBCOLOR_TO_RGBA8(color) ((color) & 0xfff8f8f8u)
 
-static inline void fbcolor_to_rgba32f(float *v, uint32_t color)
+static INLINE void fbcolor_to_rgba32f(float *v, uint32_t color)
 {
 	// 3 LSBs are ignored.
 	unsigned r = (color >> 0) & 0xf8;
@@ -19606,12 +19607,12 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 /* === config_parser.cpp === */
 
 /* Whitespace per std::regex ECMAScript \s: space, tab, newline, CR, FF, VT. */
-static inline int cfg_is_space(int c)
+static INLINE int cfg_is_space(int c)
 {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v';
 }
 
-static inline const char *cfg_skip_ws(const char *p)
+static INLINE const char *cfg_skip_ws(const char *p)
 {
     while (*p && cfg_is_space((unsigned char)*p)) p++;
     return p;
@@ -20276,7 +20277,7 @@ Rect fromSRect(SRect rect) {
 
 	/* fromSRect(s).contains(r) in one shot, so the by-value temporary the old
 	 * chained call relied on has a stable address for rect_contains. */
-	static inline bool fromSRect_contains(SRect s, Rect r) {
+	static INLINE bool fromSRect_contains(SRect s, Rect r) {
 		struct Rect fr = fromSRect(s);
 		return rect_contains(&fr, &r);
 	}
@@ -20736,7 +20737,7 @@ Rect fromSRect(SRect rect) {
 			self->entries[j] = self->entries[j - 1];
 		self->entries[0] = e;
 	}
-	static inline void handle_lru_cache_clear(struct HandleLRUCache *self) { self->count = 0; }
+	static INLINE void handle_lru_cache_clear(struct HandleLRUCache *self) { self->count = 0; }
 
 	HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self, Rect rect, UsedMode *mode, unsigned int page_x, unsigned int page_y, bool *fastpath_capable_out, bool *cache_hit) {
 		(*fastpath_capable_out) = false;
