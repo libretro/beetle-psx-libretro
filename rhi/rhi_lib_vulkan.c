@@ -8592,7 +8592,7 @@ void renderer_save_vram_state(Renderer *self, SaveState *out){
 	renderer_flush(self);
 
 	device_wait_idle(self->device);
-	const uint32_t *src = (const uint32_t *)(
+	{ const uint32_t *src = (const uint32_t *)(
 			device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
 	/* Deep-copy the mapped VRAM straight into the owning buffer (no
 	 * default zero-fill), then move it into the returned SaveState. */
@@ -8604,6 +8604,7 @@ void renderer_save_vram_state(Renderer *self, SaveState *out){
 	owned_u32_move(&out->vram, &vram);
 	out->state = self->render_state;
 	texture_tracker_save_state(&self->tracker, &out->tracker_state);
+	}
 }
 
 void renderer_init_primitive_pipelines(Renderer *self)
@@ -8748,7 +8749,7 @@ void renderer_set_draw_rect(Renderer *self, const Rect *rect)
 	fbatlas_set_draw_rect(&self->atlas, rect);
 	self->render_state.draw_rect = *rect;
 
-	const VkRect2D *last = Rect2DVec_back(&self->queue.scissors);
+	{ const VkRect2D *last = Rect2DVec_back(&self->queue.scissors);
 	const int scaled_x = (int)(rect->x * self->scaling);
 	const int scaled_y = (int)(rect->y * self->scaling);
 	const unsigned scaled_w = rect->width * self->scaling;
@@ -8756,6 +8757,7 @@ void renderer_set_draw_rect(Renderer *self, const Rect *rect)
 	if (last->offset.x != scaled_x || last->offset.y != scaled_y ||
 	    last->extent.width != scaled_w || last->extent.height != scaled_h)
 		{ VkRect2D _vpush = { { scaled_x, scaled_y }, { scaled_w, scaled_h } }; Rect2DVec_push(&self->queue.scissors, &_vpush); }
+	}
 }
 
 void renderer_clear_rect(Renderer *self, const Rect *rect, uint32_t fb_color)
@@ -8818,7 +8820,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 	fence = renderer_flush_and_signal(self);
 	fenceholder_wait(fence_get(&fence));
 
-	const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
+	{ const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
 
 	if (!wrap)
 	{
@@ -8844,6 +8846,7 @@ void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *rect, uin
 	/* Single surviving owner of the fence handle (ownership moved out of
 	 * flush_and_signal); drop its reference at scope exit. */
 	fence_reset(&fence);
+	}
 }
 
 void renderer_mipmap_framebuffer(Renderer *self)
@@ -9756,7 +9759,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 	max_x = ceilf(min_(max_x, (float)(FB_WIDTH)));
 	max_y = ceilf(min_(max_y, (float)(FB_HEIGHT)));
 
-	const Rect rect = {
+	{ const Rect rect = {
 		(unsigned)(min_x), (unsigned)(min_y), (unsigned)(max_x) - (unsigned)(min_x), (unsigned)(max_y) - (unsigned)(min_y),
 	};
 
@@ -9836,6 +9839,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 		output[i].color |= self->render_state.force_mask_bit ? 0xff000000u : 0u;
 	} }
 	*hd_texture_index_out = hd_texture_index; *filtering_out = filtering; *scaled_read_out = scaled_read; *shift_out = shift; *offset_uv_out = offset_uv;
+	}
 }
 
 BufferVertexVec * renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture,
@@ -9909,7 +9913,7 @@ void renderer_build_line_quad(Renderer *self, Vertex *output, const Vertex *inpu
 		return;
 	}
 
-	const float abs_dx = fabsf(dx);
+	{ const float abs_dx = fabsf(dx);
 	const float abs_dy = fabsf(dy);
 	float fill_dx, fill_dy;
 	float dxdk, dydk;
@@ -9965,7 +9969,7 @@ void renderer_build_line_quad(Renderer *self, Vertex *output, const Vertex *inpu
 		}
 	}
 
-	const float x0 = input[0].x + pad_x0;
+	{ const float x0 = input[0].x + pad_x0;
 	const float y0 = input[0].y + pad_y0;
 	const float c0 = input[0].color;
 	const float x1 = input[1].x + pad_x1;
@@ -9989,6 +9993,8 @@ void renderer_build_line_quad(Renderer *self, Vertex *output, const Vertex *inpu
 	output[2].color = c1;
 	output[3].w = 1.0f;
 	output[3].color = c1;
+	}
+	}
 }
 
 void renderer_draw_line(Renderer *self, const Vertex *vertices)
@@ -10015,7 +10021,7 @@ void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 	unsigned shift = 0;
 	bool offset_uv = false;
 	renderer_build_attribs(self, vert, vertices, 3, &hd_texture_index, &filtering, &scaled_read, &shift, &offset_uv);
-	const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
+	{ const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
 	BufferVertexVec *out = renderer_select_pipeline(self, 1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 	if (out)
 	{
@@ -10043,6 +10049,7 @@ void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 		// self->render_pass_is_feedback enables self dependency in renderpass which is necessary for barriers between draws.
 		self->render_pass_is_feedback = true;
 	}
+	}
 }
 
 void renderer_draw_quad(Renderer *self, const Vertex *vertices)
@@ -10065,7 +10072,7 @@ void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 	unsigned shift = 0;
 	bool offset_uv = false;
 	renderer_build_attribs(self, vert, vertices, 4, &hd_texture_index, &filtering, &scaled_read, &shift, &offset_uv);
-	const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
+	{ const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
 	BufferVertexVec *out = renderer_select_pipeline(self, 2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
 
 	if (out)
@@ -10083,7 +10090,7 @@ void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 		if (filtering)
 			filtering = !renderer_get_filer_exclude(self, FilterExcludeOpaqueAndSemiTrans);
 
-		const SemiTransparentState state = {
+		{ const SemiTransparentState state = {
 			scissor_index, hd_texture_index, self->render_state.semi_transparent,
 			self->render_state.texture_mode != TextureMode_None,
 			self->render_state.mask_test,
@@ -10102,6 +10109,8 @@ void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 
 		// We've hit the dragon path, we'll need programmable blending for this render pass.
 		self->render_pass_is_feedback = true;
+		}
+	}
 	}
 }
 
@@ -10177,7 +10186,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 	info.subpasses = &subpass;
 	subpass.num_color_attachments = 1;
 
-	const ClearCandidate *clear_candidate = renderer_find_clear_candidate(self, rect);
+	{ const ClearCandidate *clear_candidate = renderer_find_clear_candidate(self, rect);
 
 	subpass.color_attachments[0] = 0;
 	if (self->render_pass_is_feedback)
@@ -10222,6 +10231,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT);
 
 	renderer_reset_queue(self);
+	}
 }
 
 void renderer_dispatch_set_scaled_read_texture(Renderer *self, bool scaled_read, bool textured)
@@ -12931,11 +12941,12 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		if (!subpasses[subpass].pResolveAttachments)
 			return NULL;
 
-		const VkAttachmentReference *resolves = subpasses[subpass].pResolveAttachments;
+		{ const VkAttachmentReference *resolves = subpasses[subpass].pResolveAttachments;
 		{ unsigned i; for (i = 0; i < subpasses[subpass].colorAttachmentCount; i++)
 			if (resolves[i].attachment == attachment)
 				return (VkAttachmentReference *)(&resolves[i]); }
 		return NULL;
+		}
 	}
 
 	static VkAttachmentReference *rp_find_input(VkSubpassDescription *subpasses,
@@ -12994,7 +13005,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		}
 
 		// First, set up attachment descriptions.
-		const unsigned num_attachments = info->num_color_attachments + (info->depth_stencil ? 1 : 0);
+		{ const unsigned num_attachments = info->num_color_attachments + (info->depth_stencil ? 1 : 0);
 		VkAttachmentDescription attachments[VULKAN_NUM_ATTACHMENTS + 1];
 		uint32_t implicit_transitions = 0;
 
@@ -13621,6 +13632,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		VkSubpassDescriptionVec_free_storage(&subpasses);
 		VkSubpassDependencyVec_free_storage(&external_dependencies);
+		}
 	}
 
 	static void render_pass_fixup_render_pass_nvidia(struct RenderPass *self, VkRenderPassCreateInfo *create_info, VkAttachmentDescription *attachments)
@@ -14438,7 +14450,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		hasher_u64(&h, self->current_program->intrusive_node.key);
 
 		// Spec constants.
-		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
+		{ const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
 		uint32_t combined_spec_constant = layout->combined_spec_constant_mask;
 		combined_spec_constant &= self->static_state.state.spec_constant_mask;
 		hasher_u32(&h, combined_spec_constant);
@@ -14452,6 +14464,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		self->current_pipeline = program_get_pipeline(self->current_program, hash);
 		if (self->current_pipeline == VK_NULL_HANDLE)
 			self->current_pipeline = commandbuffer_build_compute_pipeline(self, hash);
+		}
 	}
 
 	void commandbuffer_flush_graphics_pipeline(struct CommandBuffer *self)
@@ -14460,7 +14473,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		Hash hash;
 		Hasher h; hasher_init(&h);
 		self->active_vbos = 0;
-		const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
+		{ const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
 		{ uint32_t _feit, bit; FOR_EACH_BIT(layout->attribute_mask, _feit, bit)
 		{
 			hasher_u32(&h, bit);
@@ -14508,6 +14521,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		self->current_pipeline = program_get_pipeline(self->current_program, hash);
 		if (self->current_pipeline == VK_NULL_HANDLE)
 			self->current_pipeline = commandbuffer_build_graphics_pipeline(self, hash);
+		}
 	}
 
 	void commandbuffer_flush_compute_state(struct CommandBuffer *self)
@@ -14838,8 +14852,9 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 		VK_ASSERT(image_get_create_info(imageview_get_image_const(view))->usage & VK_IMAGE_USAGE_SAMPLED_BIT);
-		const Sampler *sampler = device_get_stock_sampler(self->device, stock);
+		{ const Sampler *sampler = device_get_stock_sampler(self->device, stock);
 		commandbuffer_set_texture_view_sampler(self, set, binding, view, sampler);
+		}
 	}
 
 	void commandbuffer_set_storage_texture(struct CommandBuffer *self, unsigned set, unsigned binding, const ImageView *view)
@@ -15351,7 +15366,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 						VK_VERSION_PATCH(props.driverVersion));
 			} }
 
-			const char *gpu_index = getenv("GRANITE_VULKAN_DEVICE_INDEX");
+			{ const char *gpu_index = getenv("GRANITE_VULKAN_DEVICE_INDEX");
 			if (gpu_index)
 			{
 				unsigned index = strtoul(gpu_index, NULL, 0);
@@ -15362,6 +15377,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			if (gpu == VK_NULL_HANDLE)
 				gpu = gpus[0];
 			free(gpus);
+			}
 		}
 
 		uint32_t ext_count = 0;
@@ -15507,7 +15523,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 		/* At most the caller-required extensions plus a fixed set of optional ones
 		 * added below; size to that bound exactly. */
-		const char **enabled_extensions = (const char **)malloc((num_required_device_extensions + 16) * sizeof(const char *));
+		{ const char **enabled_extensions = (const char **)malloc((num_required_device_extensions + 16) * sizeof(const char *));
 		unsigned enabled_extensions_count = 0;
 		const char **enabled_layers = (const char **)malloc((num_required_device_layers + 4) * sizeof(const char *));
 		unsigned enabled_layers_count = 0;
@@ -15622,6 +15638,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		vkGetDeviceQueue(self->device, self->transfer_queue_family, transfer_queue_index, &self->transfer_queue);
 
 		return true;
+		}
 	}
 
 
@@ -15870,7 +15887,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 			stage_mask = 1u << i;
 
-			const ResourceLayout *shader_layout = shader_get_layout(shader);
+			{ const ResourceLayout *shader_layout = shader_get_layout(shader);
 			{ unsigned set; for (set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++) {
 				layout.sets[set].sampled_image_mask |= shader_layout->sets[set].sampled_image_mask;
 				layout.sets[set].storage_image_mask |= shader_layout->sets[set].storage_image_mask;
@@ -15928,6 +15945,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 			layout.spec_constant_mask[i] = shader_layout->spec_constant_mask;
 			layout.combined_spec_constant_mask |= shader_layout->spec_constant_mask;
+			}
 		} }
 
 		{ unsigned i; for (i = 0; i < VULKAN_NUM_DESCRIPTOR_SETS; i++) {
@@ -17253,7 +17271,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		struct ImageView * _iv;
 		ImageResourceHolder holder;
 		image_resource_holder_init(&holder, self->device);
-		const ImageCreateInfo *image_create_info = image_get_create_info(create_info->image);
+		{ const ImageCreateInfo *image_create_info = image_get_create_info(create_info->image);
 
 		VkFormat format = create_info->format != VK_FORMAT_UNDEFINED ? create_info->format : image_create_info->format;
 
@@ -17304,6 +17322,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		{
 			image_resource_holder_fini(&holder);
 			return iv_make(NULL);
+		}
 		}
 	}
 
@@ -18278,7 +18297,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			self->fb_info[_i] &= ~STATUS_TEXTURE_READ; }
 
 		self->renderpass.inside = false;
-		const Rect *rect = &self->renderpass.rect;
+		{ const Rect *rect = &self->renderpass.rect;
 		if (rect->width == 0 || rect->height == 0)
 			return;
 
@@ -18291,6 +18310,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
 			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) |= STATUS_TEXTURE_RENDERED; } }
+		}
 	}
 
 	static void fbatlas_extend_render_pass(FBAtlas *self, const Rect *rect, bool scissor)
@@ -18357,7 +18377,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			shifted.x += self->renderpass.texture_offset_x;
 			shifted.y += self->renderpass.texture_offset_y;
 
-			const Rect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
+			{ const Rect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
 				self->renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
 
 			if (reads_palette)
@@ -18369,6 +18389,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				fbatlas_flush_render_pass(self);
 
 			fbatlas_read_texture(self, domain);
+			}
 		}
 
 		fbatlas_extend_render_pass(self, rect, true);
