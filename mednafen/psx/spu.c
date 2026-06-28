@@ -46,7 +46,12 @@
 
 	For ADSR and volume sweep, should the divider be reset to 0 on &0x8000 == true, or should the upper bit be cleared?
 
-	Should shift occur on all stages of ADPCM sample decoding, or only at the end?
+	[RESOLVED] Shift applies to the 4-bit nibble only, not to all stages: the nibble is expanded to 16bit (<<12)
+   and right-shifted by the block 'shift', then the IIR filter prediction is added (fixed /64) and the sum clamped
+   to 16bit -- the accumulated/filtered value is never shifted. Matches psx-spx (which defers SPU ADPCM shift/filter
+   to CD-XA: "expanded to 16bit by left-shifting by 12, then right-shifted by 'shift'"), jsgroth's CoffeePSX, and the
+   MiSTer FPGA core (rtl/spu.vhd); SPU_RunDecoder() already does this. One illegal-input corner (shift>12) differs
+   from psx-spx -- see the note at that branch in SPU_RunDecoder().
 
 	On the real thing, there's some kind of weirdness with ADSR when you voice on when attack_rate(raw) = 0x7F; the envelope level register is repeatedly
 	reset to 0, which you can see by manual writes to the envelope level register.  Normally in the attack phase when attack_rate = 0x7F, enveloping is 		effectively stuck/paused such that the value you write is sticky and won't be replaced or reset.  Note that after you voice on, you can write a new 		attack_rate < 0x7F, and enveloping will work "normally" again shortly afterwards.  You can even write an attack_rate of 0x7F at that point to pause 		enveloping 		clocking.  I doubt any games rely on this, but it's something to keep in mind if we ever need greater insight as to how the SPU 	functions at a low-level in 		order to emulate it at cycle granularity rather than sample granularity, and it may not be a bad idea to 		investigate this oddity further and emulate it in 		the future regardless.
@@ -755,6 +760,13 @@ static void SPU_RunDecoder(SPU_Voice *voice)
       CV = SPURAM[voice->CurAddr];
       shift = voice->DecodeShift;
 
+      /* shift > 12 is an illegal/reserved value that no real encoder emits (shift is 0..12, usually
+       * 0..9). psx-spx documents 13..15 as "same as shift=9", and both jsgroth's CoffeePSX and the
+       * MiSTer FPGA core (rtl/spu.vhd) follow that. We instead clamp to 8 and mask each nibble down to
+       * its sign bit (CV &= 0x8888), which produces entirely different values for this corner. The mask
+       * is too specific to be a guess and is likely a hardware observation (psx-spx itself only states
+       * SPU ADPCM shift/filter is "reportedly same as CD-XA"). Kept deliberately: do NOT "correct" this
+       * toward the documented "=9" without a real-hardware capture. */
       if(MDFN_UNLIKELY(shift > 12))
       {
          shift = 8;
