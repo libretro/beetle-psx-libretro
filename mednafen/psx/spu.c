@@ -461,8 +461,8 @@ static INLINE void SPU_Sweep_WriteVolume(SPU_Sweep *sweep, int16_t value);
 static void SPU_Sweep_Clock(SPU_Sweep *sweep);
 
 /* Forward declarations for the static reverb helpers. */
-static int16_t SPU_RD_RVB(uint16_t raw_offs, int32_t extra_offs);
-static void SPU_WR_RVB(uint16_t raw_offs, int16_t sample);
+static INLINE int16_t SPU_RD_RVB(uint16_t raw_offs, int32_t extra_offs);
+static INLINE void SPU_WR_RVB(uint16_t raw_offs, int16_t sample);
 
   void SPU_Power(void)
 {
@@ -933,12 +933,17 @@ static INLINE uint32_t SPU_Get_Reverb_Offset(uint32_t in_offset)
  return(offset);
 }
 
-static int16_t NO_INLINE SPU_RD_RVB(uint16_t raw_offs, int32_t extra_offs)
+/* These are called only from the comb-filter body (SPU_RunReverbChannel), 14
+ * times per channel step, all sharing the same ReverbCur/ReverbWA/SPUControl.
+ * Inlining lets the compiler hoist those invariants and fold the address
+ * computation, which roughly halves the comb-step cost versus the out-of-line
+ * form inherited from the C++ -> C conversion. Behaviour is unchanged. */
+static INLINE int16_t SPU_RD_RVB(uint16_t raw_offs, int32_t extra_offs)
 {
  return SPU_ReadSPURAM(SPU_Get_Reverb_Offset((raw_offs << 2) + extra_offs));
 }
 
-static void NO_INLINE SPU_WR_RVB(uint16_t raw_offs, int16_t sample)
+static INLINE void SPU_WR_RVB(uint16_t raw_offs, int16_t sample)
 {
    if(SPUControl & 0x80)
       SPU_WriteSPURAM(SPU_Get_Reverb_Offset(raw_offs << 2), sample);
