@@ -24,8 +24,9 @@
 
 	Test reverb upsampler on the real thing.
 
-	Alter reverb algorithm to process in the pattern of L,R,L,R,L,R on each input sample, instead of doing both L and R on every 2 input samples(make
-   sure the real thing does it this way too, I think it at least runs the downsampler this way).
+	[DONE] Reverb now processes in the pattern of L,R,L,R,L,R: Left on odd 44100Hz cycles, Right on the following even cycle (one cycle later, so its
+   downsample window includes the most recent input sample), per no$psx ("spends one 44100h cycle on left calculations, and the next 44100h cycle on
+   right calculations"). Both channels of a 22050Hz step share ReverbCur, which advances once per step after the Right calculation.
 
 	Alter reverb algorithm to perform saturation more often, as occurs on the real thing.
 
@@ -999,87 +1000,109 @@ static int32_t IIASM(const int16_t alpha, const int16_t insamp)
    return insamp * (32768 - alpha);
 }
 
+/* Run the reverb comb-filter algorithm for a single channel (lr), given that
+   channel's 22050Hz downsampled input sample. Writes the resulting wet sample
+   into the channel's upsample ring buffer at the current RvbResPos. Reads and
+   writes the reverb work area relative to the current ReverbCur, so the caller
+   must keep ReverbCur fixed across the Left and Right calls of one 22050Hz step
+   and advance it once afterwards. */
+static INLINE void SPU_RunReverbChannel(unsigned lr, int32_t downsampled)
+{
+   const int16_t IIR_INPUT_A = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_A[lr ^ 0], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
+   const int16_t IIR_INPUT_B = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_B[lr ^ 1], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
+   const int16_t IIR_A = ReverbSat((((IIR_INPUT_A * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_A[lr], -1)) >> 14)) >> 1);
+   const int16_t IIR_B = ReverbSat((((IIR_INPUT_B * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_B[lr], -1)) >> 14)) >> 1);
+
+   SPU_WR_RVB(regs.s.reverb.s.IIR_DEST_A[lr], IIR_A);
+   SPU_WR_RVB(regs.s.reverb.s.IIR_DEST_B[lr], IIR_B);
+
+   {
+      const int32_t ACC = ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_A[lr], 0) * regs.s.reverb.s.ACC_COEF_A) >> 14) +
+         ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_B[lr], 0) * regs.s.reverb.s.ACC_COEF_B) >> 14) +
+         ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_C[lr], 0) * regs.s.reverb.s.ACC_COEF_C) >> 14) +
+         ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_D[lr], 0) * regs.s.reverb.s.ACC_COEF_D) >> 14);
+
+      const int16_t FB_A = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_A[lr] - regs.s.reverb.s.FB_SRC_A, 0);
+      const int16_t FB_B = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_B[lr] - regs.s.reverb.s.FB_SRC_B, 0);
+      const int16_t MDA = ReverbSat((ACC + ((FB_A * REVERB_NEG(regs.s.reverb.s.FB_ALPHA)) >> 14)) >> 1);
+      const int16_t MDB = ReverbSat(FB_A + ((((MDA * regs.s.reverb.s.FB_ALPHA) >> 14) + ((FB_B * REVERB_NEG(regs.s.reverb.s.FB_X)) >> 14)) >> 1));
+      const int16_t IVB = ReverbSat(FB_B + ((MDB * regs.s.reverb.s.FB_X) >> 15));
+
+      SPU_WR_RVB(regs.s.reverb.s.MIX_DEST_A[lr], MDA);
+      SPU_WR_RVB(regs.s.reverb.s.MIX_DEST_B[lr], MDB);
+#if 0
+      {
+         static uint32_t sqcounter;
+         RUSB[lr][(RvbResPos >> 1) | 0x20] = RUSB[lr][RvbResPos >> 1] = ((sqcounter & 0xFF) == 0) ? 0x8000 : 0x0000; /* ((sqcounter & 0x80) ? 0x7000 : 0x9000); */
+         sqcounter += lr;
+      }
+#else
+      RUSB[lr][(RvbResPos >> 1) | 0x20] = RUSB[lr][RvbResPos >> 1] = IVB;	/* Output sample */
+#endif
+   }
+}
+
 /* Take care to thoroughly test the reverb resampling code when modifying anything that uses RvbResPos. */
 static void SPU_RunReverb(const int32_t* in, int32_t* out)
 {
    unsigned lr;
- int32_t upsampled[2];
+   int32_t upsampled[2];
 
- upsampled[0] = upsampled[1] = 0;
+   upsampled[0] = upsampled[1] = 0;
 
- for(lr = 0; lr < 2; lr++)
- {
-  RDSB[lr][RvbResPos | 0x00] = in[lr];
-  RDSB[lr][RvbResPos | 0x40] = in[lr];	/* So we don't have to &/bounds check in our MAC loop */
- }
+   /* The reverb input is sampled at 44100Hz for both channels, so feed both
+      downsample ring buffers every cycle regardless of which channel is being
+      processed this cycle. */
+   for(lr = 0; lr < 2; lr++)
+   {
+      RDSB[lr][RvbResPos | 0x00] = in[lr];
+      RDSB[lr][RvbResPos | 0x40] = in[lr];	/* So we don't have to &/bounds check in our MAC loop */
+   }
 
- if(RvbResPos & 1)
- {
-  int32_t downsampled[2];
+   /* The reverb engine spends one 44100Hz cycle on the Left calculation and the
+      next on the Right (L,R,L,R,...), rather than doing both at 22050Hz. Left is
+      processed on odd cycles; Right on the following even cycle, so the Right
+      downsample window includes the most recent input sample (a one-cycle
+      inter-channel offset, as on hardware). Both channels of a 22050Hz step
+      share ReverbCur, which advances once per step, after the Right calculation. */
+   if(RvbResPos & 1)
+   {
+      int32_t downsampled = Reverb4422(&RDSB[0][(RvbResPos - 38) & 0x3F]);
+      SPU_RunReverbChannel(0, downsampled);
+   }
+   else
+   {
+      int32_t downsampled = Reverb4422(&RDSB[1][(RvbResPos - 38) & 0x3F]);
+      SPU_RunReverbChannel(1, downsampled);
 
-  for(lr = 0; lr < 2; lr++)
-   downsampled[lr] = Reverb4422(&RDSB[lr][(RvbResPos - 38) & 0x3F]);
+      ReverbCur = (ReverbCur + 1) & 0x3FFFF;
+      if(!ReverbCur)
+         ReverbCur = ReverbWA;
+   }
 
-  /* Run algorithm */
-  for(lr = 0; lr < 2; lr++)
-  {
-     const int16_t IIR_INPUT_A = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_A[lr ^ 0], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled[lr] * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
-     const int16_t IIR_INPUT_B = ReverbSat((((SPU_RD_RVB(regs.s.reverb.s.IIR_SRC_B[lr ^ 1], 0) * regs.s.reverb.s.IIR_COEF) >> 14) + ((downsampled[lr] * regs.s.reverb.s.IN_COEF[lr]) >> 14)) >> 1);
-     const int16_t IIR_A = ReverbSat((((IIR_INPUT_A * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_A[lr], -1)) >> 14)) >> 1);
-     const int16_t IIR_B = ReverbSat((((IIR_INPUT_B * regs.s.reverb.s.IIR_ALPHA) >> 14) + (IIASM(regs.s.reverb.s.IIR_ALPHA, SPU_RD_RVB(regs.s.reverb.s.IIR_DEST_B[lr], -1)) >> 14)) >> 1);
+   /* Upsample both channels back to 44100Hz every cycle. A channel runs the
+      interpolating FIR on its own fresh cycle and a middle-tap hold on the
+      other channel's cycle (Left fresh on odd, Right fresh on even). */
+   {
+      const int16_t *srcL = &RUSB[0][((RvbResPos >> 1) - 19) & 0x1F];
+      const int16_t *srcR = &RUSB[1][((RvbResPos >> 1) - 19) & 0x1F];
 
-     SPU_WR_RVB(regs.s.reverb.s.IIR_DEST_A[lr], IIR_A);
-     SPU_WR_RVB(regs.s.reverb.s.IIR_DEST_B[lr], IIR_B);
+      if(RvbResPos & 1)
+      {
+         upsampled[0] = Reverb2244(srcL);
+         upsampled[1] = srcR[9];		/* Reverb 2244 (Middle non-zero) */
+      }
+      else
+      {
+         upsampled[0] = srcL[9];		/* Reverb 2244 (Middle non-zero) */
+         upsampled[1] = Reverb2244(srcR);
+      }
+   }
 
-     {
-        const int32_t ACC = ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_A[lr], 0) * regs.s.reverb.s.ACC_COEF_A) >> 14) +
-           ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_B[lr], 0) * regs.s.reverb.s.ACC_COEF_B) >> 14) +
-           ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_C[lr], 0) * regs.s.reverb.s.ACC_COEF_C) >> 14) +
-           ((SPU_RD_RVB(regs.s.reverb.s.ACC_SRC_D[lr], 0) * regs.s.reverb.s.ACC_COEF_D) >> 14);
+   RvbResPos = (RvbResPos + 1) & 0x3F;
 
-        const int16_t FB_A = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_A[lr] - regs.s.reverb.s.FB_SRC_A, 0);
-        const int16_t FB_B = SPU_RD_RVB(regs.s.reverb.s.MIX_DEST_B[lr] - regs.s.reverb.s.FB_SRC_B, 0);
-        const int16_t MDA = ReverbSat((ACC + ((FB_A * REVERB_NEG(regs.s.reverb.s.FB_ALPHA)) >> 14)) >> 1);
-        const int16_t MDB = ReverbSat(FB_A + ((((MDA * regs.s.reverb.s.FB_ALPHA) >> 14) + ((FB_B * REVERB_NEG(regs.s.reverb.s.FB_X)) >> 14)) >> 1));
-        const int16_t IVB = ReverbSat(FB_B + ((MDB * regs.s.reverb.s.FB_X) >> 15));
-
-        SPU_WR_RVB(regs.s.reverb.s.MIX_DEST_A[lr], MDA);
-        SPU_WR_RVB(regs.s.reverb.s.MIX_DEST_B[lr], MDB);
-#if 0
-        {
-           static uint32_t sqcounter;
-           RUSB[lr][(RvbResPos >> 1) | 0x20] = RUSB[lr][RvbResPos >> 1] = ((sqcounter & 0xFF) == 0) ? 0x8000 : 0x0000; /* ((sqcounter & 0x80) ? 0x7000 : 0x9000); */
-           sqcounter += lr;
-        }
-#else
-        RUSB[lr][(RvbResPos >> 1) | 0x20] = RUSB[lr][RvbResPos >> 1] = IVB;	/* Output sample */
-#endif
-     }
-  }
-
-  ReverbCur = (ReverbCur + 1) & 0x3FFFF;
-  if(!ReverbCur)
-   ReverbCur = ReverbWA;
-
-  for(lr = 0; lr < 2; lr++)
-  {
-     const int16_t *src = &RUSB[lr][((RvbResPos >> 1) - 19) & 0x1F];
-     upsampled[lr] = Reverb2244(src);
-  }
- }
- else
- {
-  for(lr = 0; lr < 2; lr++)
-  {
-     const int16_t *src = &RUSB[lr][((RvbResPos >> 1) - 19) & 0x1F];
-     upsampled[lr] = src[9]; /* Reverb 2244 (Middle non-zero */
-  }
- }
-
- RvbResPos = (RvbResPos + 1) & 0x3F;
-
- for(lr = 0; lr < 2; lr++)
-  out[lr] = upsampled[lr];
+   out[0] = upsampled[0];
+   out[1] = upsampled[1];
 }
 
 
