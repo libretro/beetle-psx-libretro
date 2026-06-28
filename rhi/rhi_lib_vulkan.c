@@ -22417,6 +22417,29 @@ static void vk_context_reset(void)
       vulkan = NULL;
       return;
    }
+
+   /* A context_reset may arrive while a device/renderer from a previous reset
+    * are still live (some frontends fire context_reset on surface/window
+    * recreation without an intervening context_destroy). Re-allocating over the
+    * existing globals would orphan the old device, renderer and all their GPU
+    * resources -- a leak, and a use-after-free hazard since the stale objects
+    * still reference the old context/command buffers. Tear them down first so
+    * reset is idempotent, mirroring the GL backend (gl_context_destroy fully
+    * resets state before gl_context_reset rebuilds). The context itself is
+    * owned by libretro_create_device, not by reset, so it is preserved. */
+   if (renderer)
+   {
+      renderer_fini(renderer);
+      free(renderer);
+      renderer = NULL;
+   }
+   if (device)
+   {
+      device_deinit(device);
+      free(device);
+      device = NULL;
+   }
+
    device = (Device *)malloc(sizeof(Device));
    device_init(device);
    device_set_context(device, *&context);
