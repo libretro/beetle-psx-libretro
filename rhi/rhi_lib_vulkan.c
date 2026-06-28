@@ -21768,7 +21768,7 @@ static int64_t page_bytes(FusionRects *fusion)
        * mipmaps, because the mipmaps are only used down to the original
        * resolution, and hd textures are aligned to that original resolution's
        * texels. */
-      VkClearValue fallthrough = {0.0, 0.0, 0.0, 1.0};
+      VkClearValue fallthrough = { { { 0.0f, 0.0f, 0.0f, 1.0f } } };
 
       int mip_levels = log2(min_(page->fusion.scaleX, page->fusion.scaleY)) + 1;
 
