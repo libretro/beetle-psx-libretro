@@ -2301,6 +2301,8 @@ static INLINE void da_heap_vec_grow(struct DeviceAllocatorHeapVec *v,
       int ncap){
    struct DeviceAllocatorHeap *nitems = (struct DeviceAllocatorHeap *)malloc((size_t)ncap * sizeof(struct DeviceAllocatorHeap));
    int i;
+   if (!nitems)
+      return; /* OOM: leave the vector unchanged */
    for (i = 0; i < v->count; i++) {
       da_heap_move(&nitems[i], &v->items[i]);
       da_heap_destroy(&v->items[i]);
@@ -2840,6 +2842,8 @@ static void imageview_vec_destroy(struct ImageViewHandleVec *v) {
 static void imageview_vec_grow(struct ImageViewHandleVec *v, int ncap) {
       ImageViewHandle *nitems = (ImageViewHandle *)malloc((size_t)ncap * sizeof(ImageViewHandle));
       int i;
+      if (!nitems)
+         return; /* OOM: leave the vector unchanged (see scanouthandlevec_resize) */
       for (i = 0; i < v->count; i++) {
          /* Move: iv_steal copies the pointer and nulls the old slot,
           * so no separate decref of the old slot is needed. */
@@ -3223,6 +3227,8 @@ static void sem_handle_vec_grow(struct SemaphoreHandleVec *v, int ncap)
    {
       Semaphore *nitems = (Semaphore *)malloc((size_t)ncap * sizeof(Semaphore));
       int i;
+      if (!nitems)
+         return; /* OOM: leave the vector unchanged */
       for (i = 0; i < v->count; i++) {
          /* Move the handle to new storage: plain struct copy with no refcount
           * change (old copy step incref + old-slot teardown decref cancelled
@@ -4066,6 +4072,8 @@ static void bufferblock_vec_init(struct BufferBlockVec *v) { v->items = NULL; v-
 static void bufferblock_vec_grow(struct BufferBlockVec *v, int ncap) {
       struct BufferBlock *nitems = (struct BufferBlock *)malloc((size_t)ncap * sizeof(struct BufferBlock));
       int i;
+      if (!nitems)
+         return; /* OOM: leave the vector unchanged */
       for (i = 0; i < v->count; i++)
          bufferblock_steal(&nitems[i], &v->items[i]);
       free(v->items);
@@ -6797,6 +6805,8 @@ static void fp_destroy(FusedPage *p) {
    {
       FusedPage *nitems = (FusedPage *)malloc((size_t)ncap * sizeof(FusedPage));
       int i;
+      if (!nitems)
+         return; /* OOM: leave the vector unchanged */
       for (i = 0; i < v->count; i++) {
          fp_init_raw(&nitems[i]);
          fp_copy(&nitems[i], &v->items[i]);
@@ -6919,6 +6929,8 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
    {
       int i;
       RestorableRect *nitems = (RestorableRect *)malloc((size_t)ncap * sizeof(RestorableRect));
+      if (!nitems)
+         return; /* OOM: leave the vector unchanged */
       for (i = 0; i < v->count; i++) {
          restorablerect_copy(&nitems[i], &v->items[i]);
          restorablerect_destroy(&v->items[i]);
@@ -7172,6 +7184,8 @@ static void RestorableRectSaveStateVec_grow(struct RestorableRectSaveStateVec *v
       RestorableRectSaveState *nitems =
          (RestorableRectSaveState *)malloc((size_t)ncap * sizeof(RestorableRectSaveState));
       int i;
+      if (!nitems)
+         return; /* OOM: leave the vector unchanged */
       for (i = 0; i < v->count; i++) {
          rrss_move(&nitems[i], &v->items[i]);
          rrss_destroy(&v->items[i]);
