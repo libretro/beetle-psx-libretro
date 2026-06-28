@@ -7999,27 +7999,12 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 	static void renderer_set_mask_test(Renderer *self, bool enable);
 	static void renderer_set_texture_color_modulate(Renderer *self, bool enable);
 	static void renderer_set_UV_limits(Renderer *self, uint16_t min_u, uint16_t min_v, uint16_t max_u, uint16_t max_v);
-	static void renderer_set_filter_mode(Renderer *self, FilterMode mode);
-	static void renderer_set_sprite_filter_exclude(Renderer *self, FilterExclude exclude);
-	static void renderer_set_polygon_2d_filter_exclude(Renderer *self, FilterExclude exclude);
-	static void renderer_set_scaled_uv_offset(Renderer *self, bool offset);
-	static void renderer_set_track_textures(Renderer *self, bool enable);
-	static void renderer_set_dump_textures(Renderer *self, bool enable);
-	static void renderer_set_replace_textures(Renderer *self, bool enable);
 	static void renderer_set_hd_cache_budgets(Renderer *self, size_t ram_bytes, size_t vram_bytes);
-	static void renderer_set_eager_hd_textures(Renderer *self, bool enable);
-	static void renderer_set_adaptive_smoothing(Renderer *self, bool enable);
 	static void renderer_set_draw_offset(Renderer *self, int x, int y);
-	static void renderer_set_scissored_invariant(Renderer *self, bool invariant);
 	static void renderer_set_horizontal_display_range(Renderer *self, int x1, int x2);
 	static void renderer_set_vertical_display_range(Renderer *self, int y1, int y2);
-	static void renderer_set_horizontal_overscan_cropping(Renderer *self, int crop_overscan);
-	static void renderer_set_horizontal_offset_cycles(Renderer *self, int offset_cycles);
-	static void renderer_set_horizontal_additional_cropping(Renderer *self, unsigned image_crop);
 	static void renderer_set_visible_scanlines(Renderer *self, int slstart, int slend, int slstart_pal, int slend_pal);
-	static void renderer_set_display_filter(Renderer *self, ScanoutFilter filter);
 	static void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter);
-	static void renderer_set_dither_native_resolution(Renderer *self, bool enable);
 	void renderer_save_vram_state(Renderer *self, SaveState *out);
 	void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned msaa_, const SaveState *state);
 	void renderer_fini(Renderer *self);
@@ -8161,58 +8146,18 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 		self->render_state.UVLimits.max_u = max_u;
 		self->render_state.UVLimits.max_v = max_v;
 	}
-	static INLINE void renderer_set_filter_mode(Renderer *self, FilterMode mode)
-	{
-		self->primitive_filter_mode = mode;
-	}
-	static INLINE void renderer_set_sprite_filter_exclude(Renderer *self, FilterExclude exclude)
-	{
-		self->sprite_filter_exclude = exclude;
-	}
-	static INLINE void renderer_set_polygon_2d_filter_exclude(Renderer *self, FilterExclude exclude)
-	{
-		self->polygon_2d_filter_exclude = exclude;
-	}
-	static INLINE void renderer_set_scaled_uv_offset(Renderer *self, bool offset)
-	{
-		self->scaled_uv_offset = offset;
-	}
 
 	/* ---- Renderer state setters (batch 1): inline methods -> static INLINE free
 	 * functions taking Renderer *self, ahead of the full class -> struct conversion.
 	 * Defined here (after the class) so Renderer is complete; friend-declared inside. ---- */
-	static INLINE void renderer_set_track_textures(Renderer *self, bool enable)
-	{
-		self->texture_tracking_enabled = enable;
-	}
-	static INLINE void renderer_set_dump_textures(Renderer *self, bool enable)
-	{
-		self->tracker.dump_enabled = enable;
-	}
-	static INLINE void renderer_set_replace_textures(Renderer *self, bool enable)
-	{
-		self->tracker.hd_textures_enabled = enable;
-	}
 	static INLINE void renderer_set_hd_cache_budgets(Renderer *self, size_t ram_bytes, size_t vram_bytes)
 	{
 		texture_tracker_set_cache_budgets(&self->tracker, ram_bytes, vram_bytes);
-	}
-	static INLINE void renderer_set_eager_hd_textures(Renderer *self, bool enable)
-	{
-		self->tracker.eager_textures = enable;
-	}
-	static INLINE void renderer_set_adaptive_smoothing(Renderer *self, bool enable)
-	{
-		self->render_state.adaptive_smoothing = enable;
 	}
 	static INLINE void renderer_set_draw_offset(Renderer *self, int x, int y)
 	{
 		self->render_state.draw_offset_x = x;
 		self->render_state.draw_offset_y = y;
-	}
-	static INLINE void renderer_set_scissored_invariant(Renderer *self, bool invariant)
-	{
-		self->queue.scissor_invariant = invariant;
 	}
 	static INLINE void renderer_set_horizontal_display_range(Renderer *self, int x1, int x2)
 	{
@@ -8224,18 +8169,6 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 		self->render_state.vert_start = y1;
 		self->render_state.vert_end = y2;
 	}
-	static INLINE void renderer_set_horizontal_overscan_cropping(Renderer *self, int crop_overscan)
-	{
-		self->render_state.crop_overscan = crop_overscan;
-	}
-	static INLINE void renderer_set_horizontal_offset_cycles(Renderer *self, int offset_cycles)
-	{
-		self->render_state.offset_cycles = offset_cycles;
-	}
-	static INLINE void renderer_set_horizontal_additional_cropping(Renderer *self, unsigned image_crop)
-	{
-		self->render_state.image_crop = image_crop;
-	}
 	static INLINE void renderer_set_visible_scanlines(Renderer *self, int slstart, int slend, int slstart_pal, int slend_pal)
 	{
 		// May need bounds checking to reject bad inputs. Currently assume all inputs are valid.
@@ -8244,17 +8177,9 @@ bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 		self->render_state.slstart_pal = slstart_pal;
 		self->render_state.slend_pal = slend_pal;
 	}
-	static INLINE void renderer_set_display_filter(Renderer *self, ScanoutFilter filter)
-	{
-		self->render_state.scanout_filter = filter;
-	}
 	static INLINE void renderer_set_mdec_filter(Renderer *self, ScanoutFilter mdec_filter)
 	{
 		self->render_state.scanout_mdec_filter = mdec_filter;
-	}
-	static INLINE void renderer_set_dither_native_resolution(Renderer *self, bool enable)
-	{
-		self->render_state.dither_native_resolution = enable;
 	}
 
 	static const uint32_t quad_vert[] =
@@ -18235,7 +18160,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 	static void fbatlas_extend_render_pass(FBAtlas *self, const Rect *rect, bool scissor)
 	{
 		bool scissor_invariant = !scissor || rect_contains(&self->renderpass.scissor, rect);
-		renderer_set_scissored_invariant(self->listener, scissor_invariant);
+		self->listener->queue.scissor_invariant = scissor_invariant;
 		Rect scissored_rect = !scissor_invariant ? rect_scissor(rect, &self->renderpass.scissor) : *rect;
 
 		if (!scissored_rect.width || !scissored_rect.height)
@@ -21422,10 +21347,10 @@ void rhi_vulkan_prepare_frame(void)
    unsigned index = vulkan->get_sync_index(vulkan->handle);
    device_next_frame_context(device);
 
-   renderer_set_scaled_uv_offset(renderer, scaled_uv_offset);
-   renderer_set_filter_mode(renderer, (FilterMode)(filter_mode));
-   renderer_set_sprite_filter_exclude(renderer, (FilterExclude)(filter_exclude_sprites));
-   renderer_set_polygon_2d_filter_exclude(renderer, (FilterExclude)(filter_exclude_2d_polygons));
+   renderer->scaled_uv_offset = scaled_uv_offset;
+   renderer->primitive_filter_mode = (FilterMode)(filter_mode);
+   renderer->sprite_filter_exclude = (FilterExclude)(filter_exclude_sprites);
+   renderer->polygon_2d_filter_exclude = (FilterExclude)(filter_exclude_2d_polygons);
 }
 
 static ScanoutMode get_scanout_mode(bool bpp24)
@@ -21458,19 +21383,19 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
       return;
    }
 
-   renderer_set_track_textures(renderer, track_textures);
-   renderer_set_dump_textures(renderer, dump_textures);
-   renderer_set_replace_textures(renderer, replace_textures);
+   renderer->texture_tracking_enabled = track_textures;
+   renderer->tracker.dump_enabled = dump_textures;
+   renderer->tracker.hd_textures_enabled = replace_textures;
    renderer_set_hd_cache_budgets(renderer, hd_cache_ram_bytes, hd_cache_vram_bytes);
-   renderer_set_eager_hd_textures(renderer, eager_hd_textures);
-   renderer_set_adaptive_smoothing(renderer, adaptive_smoothing);
-   renderer_set_dither_native_resolution(renderer, dither_mode == DITHER_NATIVE);
-   renderer_set_horizontal_overscan_cropping(renderer, vulkan_crop_overscan);
-   renderer_set_horizontal_offset_cycles(renderer, image_offset_cycles);
+   renderer->tracker.eager_textures = eager_hd_textures;
+   renderer->render_state.adaptive_smoothing = adaptive_smoothing;
+   renderer->render_state.dither_native_resolution = dither_mode == DITHER_NATIVE;
+   renderer->render_state.crop_overscan = vulkan_crop_overscan;
+   renderer->render_state.offset_cycles = image_offset_cycles;
    renderer_set_visible_scanlines(renderer, initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
-   renderer_set_horizontal_additional_cropping(renderer, image_crop);
+   renderer->render_state.image_crop = image_crop;
 
-   renderer_set_display_filter(renderer, super_sampling ? ScanoutFilter_SSAA : ScanoutFilter_None);
+   renderer->render_state.scanout_filter = super_sampling ? ScanoutFilter_SSAA : ScanoutFilter_None;
    if (renderer_get_scanout_mode(renderer) == ScanoutMode_BGR24)
       renderer_set_mdec_filter(renderer, mdec_yuv ? ScanoutFilter_MDEC_YUV : ScanoutFilter_None);
    else
