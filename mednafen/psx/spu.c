@@ -28,7 +28,17 @@
    downsample window includes the most recent input sample), per no$psx ("spends one 44100h cycle on left calculations, and the next 44100h cycle on
    right calculations"). Both channels of a 22050Hz step share ReverbCur, which advances once per step after the Right calculation.
 
-	Alter reverb algorithm to perform saturation more often, as occurs on the real thing.
+	Reverb saturation: psx-spx documents clamping only on values written to the reverb buffer plus the *8000h
+   multiply scaling, both of which this code already does. A hardware-informed reference (jsgroth's CoffeePSX,
+   crates/ps1-core/src/spu/reverb.rs, which implements the psx-spx formula literally) additionally clamps to
+   signed 16bit at: the input sum, the reflection inner term (Lin + d*vWALL - [m-2]) BEFORE the *vIIR multiply,
+   the 4-tap comb-bank SUM before the all-pass stage, each all-pass write, and the final output. Individual
+   products are NOT clamped. Our code uses a different arithmetic decomposition (IIR_INPUT/IIR_A-B, an unclamped
+   int32 ACC folded into MDA/MDB/IVB with extra >>1 halvings) over the SAME hardware registers, so it already
+   clamps several intermediates but not the bare comb sum, and the clamp points don't correspond 1:1. The
+   faithful fix is therefore to adopt the psx-spx formula (as CoffeePSX does), not to sprinkle more saturation
+   into the current decomposition; the audible difference is confined to overflow/loud-tail cases, and even the
+   reference author notes the exact clamp timing in overflow scenarios isn't fully hardware-verified.
 
 	See if sample flag & 0x8 does anything weird, like suppressing the program-readable block end flag setting.
 
