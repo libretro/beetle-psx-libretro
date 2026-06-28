@@ -14806,13 +14806,14 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			VkImageLayout layout,
 			uint64_t cookie)
 	{
+		ResourceBinding *b;
 		VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
 		VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
 
 		if (cookie == self->bindings.cookies[set][binding] && self->bindings.bindings[set][binding].image.fp.imageLayout == layout)
 			return;
 
-		ResourceBinding *b = &self->bindings.bindings[set][binding];
+		b = &self->bindings.bindings[set][binding];
 		b->image.fp.imageLayout = layout;
 		b->image.fp.imageView = float_view;
 		b->image.integer.imageLayout = layout;
