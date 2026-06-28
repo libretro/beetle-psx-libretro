@@ -23080,6 +23080,33 @@ void rhi_vulkan_set_display_mode(bool depth_24bpp,
 
 /* Map a PSX blend-mode index (0..3, anything else = opaque) to the renderer's
    semi-transparent mode. Shared by the push_* entry points. */
+/* Select the renderer texture mode for a primitive. When the primitive is
+   textured (texture_blend_mode != 0) the bit depth (depth_shift) picks the
+   palette/direct format; an untextured primitive uses TextureMode_None. Shared
+   by the textured push_* entry points. */
+static void renderer_apply_texture_mode(Renderer *renderer,
+      uint8_t texture_blend_mode, uint8_t depth_shift)
+{
+   if (texture_blend_mode != 0)
+   {
+      switch (depth_shift)
+      {
+         default:
+         case 0:
+            renderer_set_texture_mode(renderer, TextureMode_ABGR1555);
+            break;
+         case 1:
+            renderer_set_texture_mode(renderer, TextureMode_Palette8bpp);
+            break;
+         case 2:
+            renderer_set_texture_mode(renderer, TextureMode_Palette4bpp);
+            break;
+      }
+   }
+   else
+      renderer_set_texture_mode(renderer, TextureMode_None);
+}
+
 static void renderer_apply_blend_mode(Renderer *renderer, int blend_mode)
 {
    switch (blend_mode)
@@ -23132,24 +23159,7 @@ void rhi_vulkan_push_triangle(
    renderer_set_mask_test(renderer, mask_test);
    renderer_set_force_mask_bit(renderer, set_mask);
    renderer_set_UV_limits(renderer, min_u, min_v, max_u, max_v);
-   if (texture_blend_mode != 0)
-   {
-      switch (depth_shift)
-      {
-         default:
-         case 0:
-            renderer_set_texture_mode(renderer, TextureMode_ABGR1555);
-            break;
-         case 1:
-            renderer_set_texture_mode(renderer, TextureMode_Palette8bpp);
-            break;
-         case 2:
-            renderer_set_texture_mode(renderer, TextureMode_Palette4bpp);
-            break;
-      }
-   }
-   else
-      renderer_set_texture_mode(renderer, TextureMode_None);
+   renderer_apply_texture_mode(renderer, texture_blend_mode, depth_shift);
 
    renderer_apply_blend_mode(renderer, blend_mode);
 
@@ -23195,24 +23205,7 @@ void rhi_vulkan_push_quad(
    renderer_set_mask_test(renderer, mask_test);
    renderer_set_force_mask_bit(renderer, set_mask);
    renderer_set_UV_limits(renderer, min_u, min_v, max_u, max_v);
-   if (texture_blend_mode != 0)
-   {
-      switch (depth_shift)
-      {
-         default:
-         case 0:
-            renderer_set_texture_mode(renderer, TextureMode_ABGR1555);
-            break;
-         case 1:
-            renderer_set_texture_mode(renderer, TextureMode_Palette8bpp);
-            break;
-         case 2:
-            renderer_set_texture_mode(renderer, TextureMode_Palette4bpp);
-            break;
-      }
-   }
-   else
-      renderer_set_texture_mode(renderer, TextureMode_None);
+   renderer_apply_texture_mode(renderer, texture_blend_mode, depth_shift);
 
    renderer_apply_blend_mode(renderer, blend_mode);
 
