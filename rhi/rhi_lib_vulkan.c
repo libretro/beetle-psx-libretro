@@ -398,14 +398,12 @@ PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 /* ------------------------------------------------------------------------- *
  * POD_VEC - a typed dynamic array of trivially-relocatable elements, MSVC C89.
  *
- * Replaces std::vector<T> for the renderer's per-frame draw queues, whose
- * elements (BufferVertex, PrimitiveInfo, BlitInfo, VkRect2D, ...) are all POD /
- * trivially relocatable. Growth is a realloc (bitwise relocation - no
- * per-element move-ctor and no exception scaffolding), which is what the hot
- * per-vertex push path wants; the std::vector equivalent emitted an
- * out-of-line _M_realloc_insert plus EH tables on every push. clear keeps the
- * allocation for reuse (these are refilled every frame). The struct is brace-
- * initialisable to { NULL, 0, 0 } so it needs no constructor. */
+ * Used for the renderer's per-frame draw queues, whose elements (BufferVertex,
+ * PrimitiveInfo, BlitInfo, VkRect2D, ...) are all POD / trivially relocatable.
+ * Growth is a realloc (bitwise relocation - no per-element copy step), which is
+ * what the hot per-vertex push path wants. clear keeps the allocation for reuse
+ * (these are refilled every frame). The struct is brace-initialisable to
+ * { NULL, 0, 0 } so it needs no separate initialiser. */
 #define POD_VEC_DECLARE(NAME, T)                                              \
 struct NAME {                                                                 \
     T  *items;                                                                \
@@ -454,15 +452,12 @@ struct NAME##_force_semicolon_
    typedef char RHI_STATIC_ASSERT_CAT(rhi_static_assert_, __LINE__)[(cond) ? 1 : -1]
 #endif
 
-/* Local single-evaluation min/max, so the file does not depend on std::min /
- * std::max from <algorithm>. */
-/* min_/max_ as macros (C has no function templates). Arguments must be free of
- * side effects: every call site passes pure expressions, and the two that used
- * accessor calls (get_width()/get_height()) hoist them into locals first.
- * Semantics match the previous templated form (and std::min/std::max),
- * including returning the first argument on a tie; the one former
- * max_<VkDeviceSize>(...) call casts its 32-bit literal to VkDeviceSize so the
- * comparison and result stay 64-bit. */
+/* Local single-evaluation min/max. */
+/* min_/max_ as macros. Arguments must be free of side effects: every call site
+ * passes pure expressions, and the two that used accessor calls
+ * (get_width()/get_height()) hoist them into locals first. Returns the first
+ * argument on a tie; the one max_(...) call on a VkDeviceSize casts its 32-bit
+ * literal to VkDeviceSize so the comparison and result stay 64-bit. */
 #define min_(a, b) ((b) < (a) ? (b) : (a))
 #define max_(a, b) ((a) < (b) ? (b) : (a))
 
@@ -764,13 +759,13 @@ static void counter_add_ref(struct SingleThreadCounter *c) { c->count++; }
 static bool counter_release(struct SingleThreadCounter *c) { return --c->count == 0; }
    typedef struct SingleThreadCounter SingleThreadCounter;
 
-   /* IntrusivePtr<T> and its INTRUSIVE_HANDLE_DECLARE(HandleName, T) stamping
+   /* the refcounted-handle pattern and its INTRUSIVE_HANDLE_DECLARE(HandleName, T) stamping
     * macro have both been removed: all eight Vulkan pointee handle types
     * (SamplerHandle, BufferHandle, BufferViewHandle, ImageViewHandle,
     * ImageHandle, Fence, Semaphore, CommandBufferHandle) are now plain structs
     * with explicit *_make / _reset / _get / _copy / _assign / _move / _steal
     * free functions. The generic deref / arrow / bool / equality / copy / move
-    * / destructor template that this macro generated is no longer instantiated
+    * / teardown that this macro generated is no longer needed
     * anywhere. */
 
    /* Concrete intrusive doubly-linked list. Links are type-erased - prev/next are
@@ -836,12 +831,12 @@ static void ilist_move_to_front(struct IntrusiveListC *list,
       ilist_insert_front(list, node);
    }
 
-   /* Concrete, element-size-driven object pool (the de-templated form of the
-    * standalone ObjectPool<T> instantiations). Same slab + vacant-stack design as
-    * ObjectPool<T>, but type-erased: allocate_raw() returns an uninitialised slot
+   /* Concrete, element-size-driven object pool (the concrete form of the
+    * standalone per-type object pools). Same slab + vacant-stack design,
+    * but type-erased: allocate_raw() returns an uninitialised slot
     * of element_size bytes and free_raw() returns one to the free list, so a single
     * concrete type serves every pooled object. Construction/destruction is done by
-    * the caller via placement new / explicit destructor (matching the
+    * the caller initialises and tears down explicitly (matching the
     * malloc + placement-new idiom used for Device/Renderer). */
    struct ObjectPoolRaw
    {
@@ -937,11 +932,11 @@ static void object_pool_raw_deinit(struct ObjectPoolRaw *p)
       p->mem_cap = 0;
    }
 
-   /* Concrete intrusive-hash-map node base (the de-templated form of
-    * IntrusiveHashMapEnabled<T>). It carries the intrusive list links (for the
+   /* Concrete intrusive-hash-map node base (the concrete form of
+    * the intrusive-hash-map node base). It carries the intrusive list links (for the
     * holder's value list) and the hash key. Every hash-map node type embeds this as
     * its first member (offset 0, static_assert'd), so the holder recovers the node
-    * from an IntrusiveHashMapNode* by casting - exactly as the template did via
+    * from an IntrusiveHashMapNode* by casting - by
     * static_cast through the IntrusiveListEnabled/IntrusiveHashMapEnabled bases. */
    struct IntrusiveHashMapNode
    {
@@ -949,16 +944,16 @@ static void object_pool_raw_deinit(struct ObjectPoolRaw *p)
       Hash key;
    };
 
-   /* IntrusivePODWrapper stays a template (it wraps an arbitrary POD value for the
+   /* IntrusivePODWrapper wraps an arbitrary POD value (for the
     * pipeline cache and the TemporaryHashmap recycle map), but it now embeds the
     * concrete node base as its first member instead of inheriting the old CRTP
     * IntrusiveHashMapEnabled base, so the concrete holder can treat it like every
     * other node. get() returns the payload, matching the previous interface. */
-   /* Concrete POD-wrapper node types (the de-templated IntrusivePODWrapper<T>). Two
+   /* Concrete POD-wrapper node types (the concrete POD-wrapper). Two
     * payloads are wrapped: a VkPipeline (the per-program pipeline cache) and a void*
     * iterator (the TemporaryHashmap recycle map). Each embeds the hash-map node base
     * first (offset 0) and exposes get() returning the payload, matching the previous
-    * template interface so call sites are unchanged. */
+    * interface so call sites are unchanged. */
    struct IntrusivePODWrapperPipeline
    {
       struct IntrusiveHashMapNode node; /* must stay first (offset 0) */
@@ -978,11 +973,11 @@ static void object_pool_raw_deinit(struct ObjectPoolRaw *p)
    RHI_STATIC_ASSERT(offsetof(struct IntrusivePODWrapperPtr, node) == 0,
          "IntrusivePODWrapperPtr.node must be first");
 
-   /* Concrete, type-erased open-addressing hash table (the de-templated form of
-    * IntrusiveHashMapHolder<T>). It is non-owning: it only arranges a table and a
+   /* Concrete, type-erased open-addressing hash table (the concrete form of
+    * the intrusive-hash-map holder). It is non-owning: it only arranges a table and a
     * list of IntrusiveHashMapNode pointers; the nodes are owned by an object pool.
     * Callers cast their node type to IntrusiveHashMapNode* (offset 0). All the
-    * probe / grow / LRU semantics match the template exactly (validated under
+    * probe / grow / LRU semantics validated under
     * ASan). */
    struct IntrusiveHashMapHolderC
    {
@@ -1215,14 +1210,14 @@ static struct IntrusiveListNode *hmholder_begin(struct IntrusiveHashMapHolderC *
 
 
 
-   /* Concrete, per-type form of IntrusiveHashMap<T>. Stamps a struct that owns the
+   /* Concrete, per-type form of the intrusive hash map. Stamps a struct that owns the
     * (already concrete) open-addressing holder plus an object pool, and the full
-    * public API the template exposed. Everything here is T-independent except the
-    * sizeof(T) handed to the pool and the per-type element destructor DESTROY_FN,
+    * public API. Everything here is T-independent except the
+    * sizeof(T) handed to the pool and the per-type element teardown DESTROY_FN,
     * which clear()/erase() call through (the five node types have non-trivial
-    * destructors that release Vk objects; pass a no-op for trivial POD elements).
+    * teardown callbacks that release Vk objects; pass a no-op for trivial POD elements).
     * The variadic emplace and allocate members are NOT stamped here: each element
-    * type has a distinct constructor, so those are written per type next to each
+    * type has a distinct initialiser, so those are written per type next to each
     * map. The iterator is a bare list-node pointer; the iter_get helper recovers
     * the T pointer (node base is at offset 0). */
    #define VK_HASHMAP_DECLARE(NAME, T, DESTROY_FN)                                 \
@@ -1304,7 +1299,7 @@ static struct IntrusiveListNode *hmholder_begin(struct IntrusiveHashMapHolderC *
 
    /* The two POD-payload maps. Elements are trivially destructible, so the destroy
     * hook is a no-op. The per-type emplace constructs the wrapper in the pool with
-    * placement new, matching what the template's allocate()+insert did. */
+    * explicit init, matching the previous allocate()+insert path. */
 static void vk_ptr_map_destroy(IntrusivePODWrapperPtr *p) { (void)p; }
 static void vk_pipeline_map_destroy(IntrusivePODWrapperPipeline *p) { (void)p; }
 
@@ -1335,8 +1330,8 @@ static IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
       return vk_pipeline_map_insert_yield(m, hash, t);
    }
 
-   /* Concrete temporary-hashmap node base (de-templated TemporaryHashmapEnabled<T>
-    * plus the intrusive list links the node carried via IntrusiveListEnabled<T>).
+   /* Concrete temporary-hashmap node base (the temporary-hashmap node base,
+    * plus the intrusive list links the node carries).
     * Every TemporaryHashmap node type embeds this; because one of them
     * (FramebufferNode) also has a non-empty Framebuffer base, this base is NOT
     * necessarily at offset 0, so the ring lists recover the node with container-of
@@ -1356,12 +1351,12 @@ static IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
 
    /* Concrete, per-type form of TemporaryHashmap<T,RingSize,ReuseObjects>. Stamps a
     * struct holding the ring of intrusive lists, the object pool, the recycle index
-    * map (vk_ptr_map) and the vacant free-list, plus every method the template had
+    * map (vk_ptr_map) and the vacant free-list, plus every method
     * except the variadic emplace/make_vacant (each node type has a distinct
-    * constructor, written per type next to each instance). RING and REUSE are the
-    * former template non-type parameters; REUSE is a literal 0/1 so the compiler
-    * folds the dead arm in begin_frame exactly as the template's bool constant did.
-    * DESTROY(T*) runs the node destructor (kept until this TU moves to a C compiler).
+    * initialiser, written per type next to each instance). RING and REUSE are the
+    * compile-time parameters; REUSE is a literal 0/1 so the compiler
+    * folds the dead arm in begin_frame as a compile-time constant.
+    * DESTROY(T*) runs the node teardown (kept until this TU moves to a C compiler).
     * Nodes are recovered from a ring list-node with TH_NODE_OF(T, ...). */
    #define VK_TEMPHASH_DECLARE(NAME, T, RING, REUSE, DESTROY)                      \
       struct NAME                                                                 \
@@ -1528,8 +1523,8 @@ static IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
    typedef enum VendorID VendorID;
 
    /* The live Vulkan context (instance/device/queues). Formerly a class with a
-    * multi-argument constructor (load loaders, create the device, mark valid) and
-    * a destructor that called destroy(); now a plain struct driven by
+    * multi-argument initialiser (load loaders, create the device, mark valid) and
+    * a teardown that called destroy(); now a plain struct driven by
     * context_init / context_deinit. All getters and the device-creation helpers
     * stay as struct methods. It is heap-allocated, not pooled or refcounted. */
    struct Context
@@ -1701,12 +1696,12 @@ static void *tfl_data(const struct TextureFormatLayout *self, uint32_t layer, ui
 
    struct Device;
 
-   /* Hash-identity base. Converted from a class-with-ctor to a plain C89 struct;
-    * derived pointees now call cookie_init() in their own constructor body
-    * instead of inheriting the Cookie(Device*) ctor. The single uint64_t field
+   /* Hash-identity base. Converted from a class-with-initialiser to a plain C89 struct;
+    * derived pointees now call cookie_init() in their own init body
+    * instead of inheriting the Cookie(Device*) initialiser. The single uint64_t field
     * is still inherited, so the many obj.cookie / obj->cookie reads are
     * unchanged. cookie_init is defined out-of-line (below Device) because it
-    * calls Device::allocate_cookie(). */
+    * calls device_allocate_cookie(). */
    struct Cookie
    {
       uint64_t cookie;
@@ -1827,7 +1822,7 @@ static INLINE VkImageAspectFlags format_to_aspect_mask(VkFormat format)
     * CRTP base (IntrusivePtr dispatches through the pointee directly). The Cookie
     * base, which provides the hash identity, is unrelated and stays. */
    /* Sampler: plain C struct + free functions (was a class deriving Cookie with
-    * refcount methods + ctor/dtor). Cookie is embedded as the first member
+    * refcount methods + init/teardown). Cookie is embedded as the first member
     * (composition replacing inheritance); sampler_init seeds it via cookie_init.
     * Pooled via object_pool_raw; the refcount starts at 1. */
    struct Sampler
@@ -1842,9 +1837,9 @@ static INLINE VkImageAspectFlags format_to_aspect_mask(VkFormat format)
 static VkSampler sampler_get_sampler(const struct Sampler *self) { return self->sampler; }
 static void sampler_add_reference(struct Sampler *self) { counter_add_ref(&self->reference_count); }
    static void sampler_release_reference(struct Sampler *self);
-   /* Sampler handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(SamplerHandle,
-    * Sampler) to a plain struct + explicit free functions, following the
-    * sem_ / fence_ / bvh_ template. The pointee Sampler is unchanged. Stored in a
+   /* Sampler handle: a plain struct (SamplerHandle wrapping Sampler *)
+    *  to a plain struct + explicit free functions, following the
+    * sem_ / fence_ / bvh_ helpers. The pointee Sampler is unchanged. Stored in a
     * fixed device-lifetime array (samplers[StockSampler_Count]); no growing
     * container, so no realloc accounting -- assignment into a slot is a plain
     * struct copy that transfers the producer's refcount-1, teardown is an
@@ -1905,10 +1900,10 @@ enum { BLOCK_NUM_SUB_BLOCKS = 32u };
 #define BLOCK_ALL_FREE (~0u)
 
 /* Block: 32-way sub-block bitmap allocator. Converted from a C++ class (deleted
- * copy, default ctor that fills the free bitmap, dtor that leak-checks) to a
+ * copy, default initialiser that fills the free bitmap, teardown that leak-checks) to a
  * plain C struct + free functions. Embedded by value in MiniHeap; block_init
- * seeds it (was the default ctor), block_fini runs the leak check (was the
- * dtor). */
+ * seeds it (was the default initialiser), block_fini runs the leak check (was the
+ * teardown). */
 struct Block
 {
    uint32_t free_blocks[BLOCK_NUM_SUB_BLOCKS];
@@ -1993,10 +1988,10 @@ static void deviceallocation_free_immediate_alloc(struct DeviceAllocation *self,
 static void deviceallocation_free_global(struct DeviceAllocation *self, DeviceAllocator *allocator, uint32_t size, uint32_t memory_type);
 
 /* Owning array of (trivially copyable) DeviceAllocation. Replaces
- * std::vector<DeviceAllocation> for a frame's deferred-free list. DeviceAllocation
+ * a dynamic array of DeviceAllocation for a frame's deferred-free list. DeviceAllocation
  * is a trivially relocatable bookkeeping value (handles, an intrusive-list
  * iterator, and PODs - it frees its backing memory only via an explicit
- * free_immediate(), not a destructor), so growth is a realloc and clear() just
+ * free_immediate(), not a teardown), so growth is a realloc and clear() just
  * resets the count; no per-element construction or destruction. push() copy-
  * appends; the frame drains the list with a range-for then clear(). */
 struct DeviceAllocationVec
@@ -2047,8 +2042,8 @@ struct ClassAllocatorTilingHeaps
 };
 
 /* ClassAllocator: per-size-class sub-allocator. Converted from a C++ class to a
- * plain C struct + classallocator_* free functions. The private default ctor
- * (init the MiniHeap pool) becomes classallocator_init; the dtor (leak check +
+ * plain C struct + classallocator_* free functions. The private default initialiser
+ * (init the MiniHeap pool) becomes classallocator_init; the teardown (leak check +
  * pool deinit) becomes classallocator_fini. heap_availability_mask and the
  * scalar fields are seeded in classallocator_init (no in-struct initializers in
  * a plain C struct). */
@@ -2084,7 +2079,7 @@ static INLINE void classallocator_set_parent(struct ClassAllocator *self, struct
 /* Allocator: per-memory-type front end owning one ClassAllocator per size class.
  * Converted from a C++ class to a plain C struct + alloc_* free functions. The
  * range-for loops over the by-value classes[] array become index loops. The
- * former static free() (which just forwarded to DeviceAllocation::free_immediate)
+ * former free path (which forwarded to deviceallocation_free_immediate)
  * becomes alloc_free. ClassAllocator must be a complete type above this point
  * because classes[] is by value. */
 struct Allocator
@@ -2117,11 +2112,11 @@ static INLINE void alloc_set_global_allocator(struct Allocator *self, DeviceAllo
 }
 
 /* Owning array of Allocator* (one per memory type). Replaces
- * std::vector<std::unique_ptr<Allocator>>: the container owns each heap-allocated
+ * an owning array of Allocator pointers: the container owns each heap-allocated
  * Allocator and deletes it on clear()/destruction, so ownership is explicit
  * new/delete instead of unique_ptr. The pointers themselves are trivially
  * relocatable, so the backing array grows by realloc. push() takes ownership of
- * an already-new'd Allocator; operator[]/back() return the raw pointer for the
+ * an already-new'd Allocator; indexing/back() return the raw pointer for the
  * ->allocate() calls. ::malloc/::free are qualified because the surrounding code
  * has free() members in scope. */
 struct AllocatorPtrVec
@@ -2169,7 +2164,7 @@ struct DeviceAllocatorAllocation
    uint32_t type;
 };
 
-/* Owning array of (POD) DeviceAllocatorAllocation (was DeviceAllocator::Allocation).
+/* Owning array of (POD) DeviceAllocatorAllocation (the per-allocation record).
  * Trivially relocatable, so growth is a realloc and erase is a memmove shift. */
 struct DeviceAllocatorAllocationVec
 {
@@ -2219,9 +2214,9 @@ static INLINE void da_heap_move(struct DeviceAllocatorHeap *dst, struct DeviceAl
 }
 static void da_heap_garbage_collect(struct DeviceAllocatorHeap *self, VkDevice device);
 
-/* Owning array of DeviceAllocatorHeap (was DeviceAllocator::HeapVec). The C++
- * move-only RAII container is now a plain struct + da_heap_vec_* free functions;
- * growth da_heap_moves each element into new storage and destroys the moved-from
+/* Owning array of DeviceAllocatorHeap (the heap list). The original
+ * container is a plain struct + da_heap_vec_* free functions;
+ * growth da_heap_moves each element into new storage and clears the source
  * slot, resize default-constructs new tail elements (growing) or destroys the
  * tail (shrinking). */
 struct DeviceAllocatorHeapVec
@@ -2374,9 +2369,9 @@ static VkAccessFlags buffer_usage_to_possible_access(VkBufferUsageFlags usage)
    }
 
    enum BufferDomain {
-      BufferDomain_Device, // BufferDomain_Device local. Probably not visible from CPU.
-      BufferDomain_Host, // BufferDomain_Host-only, needs to be synced to GPU. Might be device local as well on iGPUs.
-      BufferDomain_CachedHost // BufferDomain_Host-only, used for readbacks.
+      BufferDomain_Device, /* BufferDomain_Device local. Probably not visible from CPU. */
+      BufferDomain_Host, /* BufferDomain_Host-only, needs to be synced to GPU. Might be device local as well on iGPUs. */
+      BufferDomain_CachedHost /* BufferDomain_Host-only, used for readbacks. */
    };
    typedef enum BufferDomain BufferDomain;
 
@@ -2423,9 +2418,8 @@ static const BufferCreateInfo *buffer_get_create_info(const struct Buffer *self)
 static const DeviceAllocation *buffer_get_allocation(const struct Buffer *self) { return &self->alloc; }
 static void buffer_add_reference(struct Buffer *self) { counter_add_ref(&self->reference_count); }
    static void buffer_release_reference(struct Buffer *self);
-   /* Buffer handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(BufferHandle, Buffer)
-    * to a plain struct + explicit free functions, following the established
-    * template. The pointee Buffer is unchanged. This is the last RAII handle and
+   /* Buffer handle: a plain struct (BufferHandle wrapping Buffer *) plus explicit free functions.
+    *  The pointee Buffer is unchanged. This is the most lifetime-sensitive handle and
     * the most pool-entangled: BufferBlock holds gpu/cpu handle members (with a
     * user-declared ~BufferBlock), the copy-insert BufferBlockVec, plus
     * InitialImageBuffer.buffer and Renderer.quad members. Helpers mirror the
@@ -2569,7 +2563,7 @@ static VkAccessFlags image_usage_to_possible_access(VkImageUsageFlags usage)
       if (usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
          flags |= VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 
-      // Transient attachments can only be attachments, and never other resources.
+      /* Transient attachments can only be attachments, and never other resources. */
       if (usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT)
       {
          flags &= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
@@ -2704,14 +2698,14 @@ static const ImageViewCreateInfo *imageview_get_create_info(const struct ImageVi
 static void imageview_add_reference(struct ImageView *self) { counter_add_ref(&self->reference_count); }
    static void imageview_release_reference(struct ImageView *self);
 
-   /* Image-view handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(ImageViewHandle,
-    * ImageView) to a plain struct + explicit free functions, following the
-    * sem_ / fence_ / smh_ / bvh_ template. The pointee ImageView is unchanged.
-    * The container below (ImageViewHandleVec) is move-only -- push() takes an
-    * rvalue and steals, grow() moves -- so there is no incref anywhere in the
+   /* Image-view handle: a plain struct (ImageViewHandle wrapping ImageView *)
+    *  to a plain struct + explicit free functions, following the
+    * sem_ / fence_ / smh_ / bvh_ helpers. The pointee ImageView is unchanged.
+    * The container below (ImageViewHandleVec) takes ownership in push() and moves on grow(), so there is no incref anywhere in the
+    * 
     * container; iv_reset() (one decref) is needed only at destroy()/clear() and
     * at value-member teardown. iv_steal() implements the move (copy pointer,
-    * null the source) the macro's move-ctor did.
+    * null the source).
     * ASAN-GATE: scaled mip-view chain + per-image default view lifetime; verify
     * one decref per view (no leak / double-free). */
    struct ImageViewHandle { ImageView *data; };
@@ -2721,15 +2715,13 @@ static ImageView *iv_get(const struct ImageViewHandle *h) { return h->data; }
 static int iv_is_valid(const struct ImageViewHandle *h) { return h->data != NULL; }
 static void iv_steal(struct ImageViewHandle *dst, struct ImageViewHandle *src) { dst->data = src->data; src->data = NULL; }
 
-   /* Owning array of ImageViewHandle (= IntrusivePtr<ImageView>). Replaces
-    * std::vector<ImageViewHandle> for the renderer's scaled mip-view chain,
+   /* Owning array of ImageViewHandle (a refcounted ImageView handle), for the
+    * renderer's scaled mip-view chain,
     * which is built once (push during init) and then only indexed/read. The
-    * element is a refcounting handle with a non-trivial destructor, so growth
-    * move-constructs each handle into new storage with placement new and
-    * destroys the moved-from slot, and the destructor runs each handle's
-    * destructor (dropping its ref). push() takes ownership by move (no incref),
-    * matching push_back(device.create_image_view(...)) of a temporary. Move-
-    * only at the container level; indexed access returns a mutable reference so
+    * element is a refcounting handle, so growth moves each handle into new
+    * storage (copy pointer, null source) and teardown drops each handle's ref.
+    * push() takes ownership of a freshly created view (no incref). Ownership
+    * lives at the container level; indexed access returns a mutable pointer so
     * existing iv_get(&scaled_views[i]) / *iv_get(&scaled_views[i]) uses are unchanged. */
    struct ImageViewHandleVec {
       ImageViewHandle *items;
@@ -2737,7 +2729,7 @@ static void iv_steal(struct ImageViewHandle *dst, struct ImageViewHandle *src) {
       int cap;
    };
 
-   /* ImageViewHandleVec free functions (de-C++'d from a move-only class). init nulls,
+   /* ImageViewHandleVec free functions . init nulls,
     * destroy releases every view + frees storage, push moves a view in (growing as
     * needed), at/front return element pointers. */
 static void imageview_vec_init(struct ImageViewHandleVec *v) { v->items = NULL; v->count = 0; v->cap = 0; }
@@ -2901,7 +2893,7 @@ static ImageViewHandle *imageview_vec_front(struct ImageViewHandleVec *v) { retu
    /* Image: plain C struct + free functions (was a class deriving Cookie).
     * Cookie embedded as cookie_base. Pooled; refcount starts at 1. Holds the
     * default-view ImageViewHandle (already a plain struct). The deleted move
-    * ctor/assign of the old class simply do not exist for a plain struct. */
+    * init/assign of the old class simply do not exist for a plain struct. */
    struct Image
    {
       struct Cookie cookie_base;
@@ -2936,9 +2928,9 @@ static const DeviceAllocation *image_get_allocation(const struct Image *self) { 
 static void image_add_reference(struct Image *self) { counter_add_ref(&self->reference_count); }
    static void image_release_reference(struct Image *self);
 
-   /* Image handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(ImageHandle, Image)
+   /* Image handle: a plain struct (ImageHandle wrapping Image *)
     * to a plain struct + explicit free functions, following the
-    * sem_ / fence_ / smh_ / bvh_ / iv_ template. The pointee Image is unchanged.
+    * sem_ / fence_ / smh_ / bvh_ / iv_ helpers. The pointee Image is unchanged.
     * NOTE: the HD-texture caches (HdTexEntry.image, CachedGpuImage.image) store
     * raw Image* with their own manual add_reference/release_reference and are
     * NOT ImageHandle -- left untouched. Only ImageHandle value members and the
@@ -2982,8 +2974,8 @@ static void ih_steal(struct ImageHandle *dst, struct ImageHandle *src) { dst->da
     * CRTP base (IntrusivePtr dispatches release_reference/add_reference through
     * the pointee directly). Mirrors the SemaphoreHolder conversion. */
    /* FenceHolder: plain C struct + free functions (was a class with refcount
-    * methods + ctor/dtor). Pooled via object_pool_raw; fenceholder_init starts
-    * the refcount at 1, fenceholder_fini runs the former destructor body, and
+    * methods + init/teardown). Pooled via object_pool_raw; fenceholder_init starts
+    * the refcount at 1, fenceholder_fini runs the former teardown body, and
     * the FenceHolderDeleter (invoked when the refcount hits 0) calls fini then
     * returns the slot to the pool. */
    struct FenceHolder
@@ -2998,8 +2990,8 @@ static void ih_steal(struct ImageHandle *dst, struct ImageHandle *src) { dst->da
 static void fenceholder_add_reference(struct FenceHolder *self) { counter_add_ref(&self->reference_count); }
    static void fenceholder_release_reference(struct FenceHolder *self);
 
-   /* Fence handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(Fence, FenceHolder)
-    * to a plain struct + explicit free functions, following the bvh_* template
+   /* Fence handle: a plain struct (Fence wrapping FenceHolder *)
+    * to a plain struct + explicit free functions, following the bvh_* helpers
     * used for BufferViewHandle. The pointee FenceHolder keeps its
     * add_reference/release_reference methods (the shared refcount interface is
     * converted later, all pointees at once). Ownership accounting is now manual:
@@ -3007,7 +2999,7 @@ static void fenceholder_add_reference(struct FenceHolder *self) { counter_add_re
     *     (refcount starts at 1), no incref.
     *   - fence_reset() drops one reference and nulls the handle.
     *   - struct copy / return-by-value does NOT incref (matches the old
-    *     move-ctor steal); the source must be treated as moved-from and NOT
+    *     move/steal); the source must be treated as emptied and NOT
     *     reset. The single surviving owner calls fence_reset() at scope exit.
     * ASAN-GATE: every Fence scope-exit must map to exactly one fence_reset();
     * the producer (submit_nolock) and the two consumers (flush_and_signal,
@@ -3048,11 +3040,11 @@ static void fencemanager_init_empty(struct FenceManager *self)
     * CRTP base (IntrusivePtr now dispatches release_reference/add_reference
     * through the pointee directly). release_reference frees through the same
     * deleter path on reaching zero. This is the first pointee taken off the
-    * template base, toward concrete per-type handles. */
+    * shared base, toward concrete per-type handles. */
    /* SemaphoreHolder: plain C struct + free functions (was a class with refcount
-    * methods + ctor/dtor). Pooled via object_pool_raw; the refcount starts at 1.
+    * methods + init/teardown). Pooled via object_pool_raw; the refcount starts at 1.
     * semaphoreholder_consume hands out the VkSemaphore and clears the holder;
-    * the destructor (semaphoreholder_fini) either destroys or recycles the
+    * the teardown (semaphoreholder_fini) either destroys or recycles the
     * semaphore depending on whether it is still signalled. */
    struct SemaphoreHolder
    {
@@ -3076,13 +3068,13 @@ static VkSemaphore semaphoreholder_consume(struct SemaphoreHolder *self)
 static void semaphoreholder_add_reference(struct SemaphoreHolder *self) { counter_add_ref(&self->reference_count); }
    static void semaphoreholder_release_reference(struct SemaphoreHolder *self);
 
-   /* Semaphore handle: de-RAII'd from INTRUSIVE_HANDLE_DECLARE(Semaphore,
-    * SemaphoreHolder) to a plain struct + explicit free functions, following the
-    * fence_ / bvh_ template. The pointee SemaphoreHolder keeps its
+   /* Semaphore handle: a plain struct (Semaphore wrapping SemaphoreHolder *)
+    *  to a plain struct + explicit free functions, following the
+    * fence_ / bvh_ helpers. The pointee SemaphoreHolder keeps its
     * add_reference/release_reference methods. sem_copy() performs the incref
-    * that the macro's copy-ctor did; sem_reset() the decref the dtor did; a bare
+    * that the macro's copy step did; sem_reset() the decref the teardown did; a bare
     * struct copy with no incref is the move/steal. SemaphoreHandleVec below is
-    * updated to call these explicitly in place of placement-new-copy / ~dtor.
+    * updated to call these explicitly in place of copy-in / teardown.
     * ASAN-GATE: GPU wait-semaphore lifetime; verify no leak / double-free on a
     * multi-queue (async-compute/transfer) workload. */
    struct Semaphore { SemaphoreHolder *data; };
@@ -3091,24 +3083,24 @@ static void sem_reset(struct Semaphore *h) { if (h->data) semaphoreholder_releas
 static SemaphoreHolder *sem_get(const struct Semaphore *h) { return h->data; }
 static int sem_is_valid(const struct Semaphore *h) { return h->data != NULL; }
    /* Copy-with-incref: assign src into dst, taking a new reference (matches the
-    * old copy-ctor used when a wait list is filled from a const Semaphore &). */
+    * old copy step used when a wait list is filled from a const Semaphore &). */
 static void sem_copy(struct Semaphore *dst, const struct Semaphore *src) {
       dst->data = src->data;
       if (dst->data) semaphoreholder_add_reference(dst->data);
    }
 
-   /* Owning array of Semaphore (= IntrusivePtr<SemaphoreHolder>). Replaces
-    * std::vector<Semaphore> for the per-queue wait-semaphore lists. The element
-    * is a refcounting handle with a non-trivial destructor, so growth copy-
-    * constructs each handle into new storage with placement new and destroys
-    * the old slot, and clear()/the destructor run each handle's destructor
+   /* Owning array of Semaphore (a refcounted SemaphoreHolder handle).
+    * a dynamic array of Semaphore for the per-queue wait-semaphore lists. The element
+    * is a refcounting handle with a non-trivial teardown, so growth copy-
+    * moves each handle into new storage and clears
+    * the old slot, and clear()/the teardown run each handle's teardown
     * (dropping its ref). push() copy-inserts (the wait list is filled from a
-    * const Semaphore &, an incref, as the std::vector was). clear() keeps the
+    * const Semaphore *, an incref). clear() keeps the
     * capacity so the lists are reused across frames. Distinct from SemaphoreVec
     * above, which holds raw VkSemaphore handles (POD). */
    /* SemaphoreHandleVec: owning growable array of Semaphore handles (refcounting
     * smart pointers; sem_copy retains, sem_reset releases). Converted from a
-    * move-only C++ container to a plain C struct + sem_handle_vec_* free
+    * container is a plain struct with + sem_handle_vec_* free
     * functions; the embedding QueueData is zero-initialised (its empty state) and
     * torn down explicitly. */
    struct SemaphoreHandleVec {
@@ -3127,7 +3119,7 @@ static void sem_handle_vec_grow(struct SemaphoreHandleVec *v, int ncap)
       int i;
       for (i = 0; i < v->count; i++) {
          /* Move the handle to new storage: plain struct copy with no refcount
-          * change (old copy-ctor incref + old-slot dtor decref cancelled out).
+          * change (old copy step incref + old-slot teardown decref cancelled out).
           * The old slot is abandoned, not reset. */
          nitems[i] = v->items[i];
       }
@@ -3196,7 +3188,7 @@ static void semaphoremanager_init_empty(struct SemaphoreManager *self)
       uint64_t immutable_samplers;
    };
 
-   // Avoid -Wclass-memaccess warnings since we hash DescriptorSetLayout.
+   /* Avoid -Wclass-memaccess warnings since we hash DescriptorSetLayout. */
 
 static bool has_immutable_sampler(const DescriptorSetLayout *layout, unsigned binding)
    {
@@ -3222,8 +3214,8 @@ static void set_immutable_sampler(DescriptorSetLayout *layout, unsigned binding,
    POD_VEC_DECLARE(DescriptorPoolSizeVec, VkDescriptorPoolSize);
    POD_VEC_DECLARE(DescriptorBindingVec, VkDescriptorSetLayoutBinding);
 
-   /* Result of DescriptorSetAllocator::find: the set plus whether it was an
-    * existing (already-populated) entry. Replaces std::pair<VkDescriptorSet,
+   /* Result of descriptor_set_allocator_find: the set plus whether it was an
+    * existing (already-populated) entry. Replaces a (VkDescriptorSet,
     * bool>; 'cached' is the old .second. */
    struct DescriptorSetAllocation
    {
@@ -3239,17 +3231,17 @@ static void set_immutable_sampler(DescriptorSetLayout *layout, unsigned binding,
       VkDescriptorSet set;
    };
 
-   /* Was the DescriptorSetNode(VkDescriptorSet) ctor. */
+   /* Was the DescriptorSetNode(VkDescriptorSet) initialiser. */
    static INLINE void descriptor_set_node_init(struct DescriptorSetNode *self, VkDescriptorSet set)
    {
       self->set = set;
    }
 
-static void descriptor_set_node_destroy(DescriptorSetNode *t) { (void)t; /* trivial dtor */ }
+static void descriptor_set_node_destroy(DescriptorSetNode *t) { (void)t; /* trivial teardown */ }
    VK_TEMPHASH_DECLARE(descriptor_set_thmap, DescriptorSetNode, VULKAN_DESCRIPTOR_RING_SIZE, 1, descriptor_set_node_destroy)
 
    /* make_vacant constructs a node in the pool and parks it on the vacant free-list
-    * (the reuse path); mirrors the template's variadic make_vacant for this type. */
+    * (the reuse path); for the reuse path. */
 static void descriptor_set_thmap_make_vacant(struct descriptor_set_thmap *m, VkDescriptorSet set)
    {
       void *slot = object_pool_raw_allocate(&m->object_pool);
@@ -3265,8 +3257,8 @@ static void descriptor_set_thmap_make_vacant(struct descriptor_set_thmap *m, VkD
     * pool/set recycling. Lives in an IntrusiveHashMap (intrusive_node first).
     * Converted from a C++ class to a plain C struct + descriptor_set_allocator_*
     * free functions. The nested PerThread struct is hoisted to file scope as
-    * DescriptorSetAllocatorPerThread; ctor -> _init (called by the map emplace),
-    * dtor -> _fini (the map destroy callback). */
+    * DescriptorSetAllocatorPerThread; init -> _init (called by the map emplace),
+    * teardown -> _fini (the map destroy callback). */
    struct DescriptorSetAllocatorPerThread
    {
       struct descriptor_set_thmap set_nodes;
@@ -3343,8 +3335,8 @@ static VkDescriptorSetLayout descriptor_set_allocator_get_layout(const struct De
    /* PipelineLayout: cached VkPipelineLayout + its resource layout and per-set
     * allocators. Lives in an IntrusiveHashMap (intrusive_node first). Converted
     * from a C++ class to a plain C struct + pipeline_layout_* free functions; the
-    * ctor becomes pipeline_layout_init (called by the map's emplace after the slot
-    * is allocated) and the dtor becomes pipeline_layout_fini (the map's destroy
+    * initialiser becomes pipeline_layout_init (called by the map's emplace after the slot
+    * is allocated) and the teardown becomes pipeline_layout_fini (the map's destroy
     * callback). */
    struct PipelineLayout
    {
@@ -3363,8 +3355,8 @@ static DescriptorSetAllocator *pipeline_layout_get_allocator(const struct Pipeli
 
    /* Shader: cached VkShaderModule + its reflected ResourceLayout. Lives in an
     * IntrusiveHashMap (intrusive_node first). Converted from a C++ class to a
-    * plain C struct + shader_* free functions; ctor -> shader_init (called by the
-    * map's emplace), dtor -> shader_fini (the map's destroy callback). */
+    * plain C struct + shader_* free functions; init -> shader_init (called by the
+    * map's emplace), teardown -> shader_fini (the map's destroy callback). */
    struct Shader
    {
       struct IntrusiveHashMapNode intrusive_node; /* must stay first (offset 0) */
@@ -3383,7 +3375,7 @@ static VkShaderModule shader_get_module(const struct Shader *self) { return self
     * Lives in an IntrusiveHashMap (intrusive_node first). Converted from a C++
     * class to a plain C struct + program_* free functions. The two ctors
     * (graphics: vertex+fragment / compute) become program_init_graphics /
-    * program_init_compute (called by the two map emplace variants); the dtor
+    * program_init_compute (called by the two map emplace variants); the teardown
     * becomes program_fini (the map's destroy callback). */
    struct Program
    {
@@ -3495,8 +3487,8 @@ static PipelineLayout *program_get_pipeline_layout(const struct Program *self) {
 
    /* RenderPass: cached VkRenderPass + per-subpass attachment metadata. Lives in
     * an IntrusiveHashMap (intrusive_node first). Converted from a C++ class to a
-    * plain C struct + render_pass_* free functions; ctor -> render_pass_init
-    * (called by the map's emplace), dtor -> render_pass_fini (the map's destroy
+    * plain C struct + render_pass_* free functions; init -> render_pass_init
+    * (called by the map's emplace), teardown -> render_pass_fini (the map's destroy
     * callback). The nested SubpassInfo type and its POD vector stay as-is. */
    struct RenderPassSubpassInfo
    {
@@ -3573,13 +3565,13 @@ static bool render_pass_has_depth(const struct RenderPass *self, unsigned subpas
          "RenderPass.intrusive_node must be first");
 
    /* Concrete per-type maps for the five Device-level cache node types. Each
-    * destroy hook runs the type's (non-trivial) destructor before the slot returns
-    * to the pool; the dtor call keeps this translation unit C++ for now (a later
+    * destroy hook runs the type's (non-trivial) teardown before the slot returns
+    * to the pool; the teardown call keeps this translation unit C++ for now (a later
     * milestone switches the file to a C compiler, at which point these become
     * explicit teardown calls). The per-type emplace_yield constructs the node in
-    * the pool with the type's real constructor, then yields it into the holder. The
-    * map key (hash) is passed to the constructor too for the four types whose
-    * constructor records it; Program's constructor does not take a hash, so there
+    * the pool with the type's real initialiser, then yields it into the holder. The
+    * map key (hash) is passed to the initialiser too for the four types whose
+    * initialiser records it; Program's initialiser does not take a hash, so there
     * the hash is used only as the map key. */
 static void pipeline_layout_map_destroy(PipelineLayout *t) { pipeline_layout_fini(t); }
 static void descriptor_set_allocator_map_destroy(DescriptorSetAllocator *t) { descriptor_set_allocator_fini(t); }
@@ -3642,8 +3634,8 @@ static Shader *shader_map_emplace_yield(struct shader_map *m,
       return shader_map_insert_yield(m, hash, t);
    }
 
-   /* Program has two constructors (graphics vertex+fragment, and compute); one
-    * emplace helper per arity. Neither constructor takes the hash. */
+   /* Program has two init paths (graphics vertex+fragment, and compute); one
+    * emplace helper per arity. Neither initialiser takes the hash. */
 static Program *program_map_emplace_yield_compute(struct program_map *m,
          Hash hash, Device *device, Shader *compute)
    {
@@ -3673,7 +3665,7 @@ static Program *program_map_emplace_yield_graphics(struct program_map *m,
     * embedded as the first member (composition, seeded by cookie_init); the former
     * const RenderPass& reference member becomes a pointer (plain structs cannot
     * hold references). FramebufferNode embeds a Framebuffer by value as its base.
-    * ctor -> framebuffer_init, dtor -> framebuffer_fini. */
+    * init -> framebuffer_init, teardown -> framebuffer_fini. */
    struct Framebuffer
    {
       struct Cookie cookie_base; /* was: public Cookie base subobject */
@@ -3714,7 +3706,7 @@ static void framebuffer_node_destroy(FramebufferNode *t) { framebuffer_fini(&t->
 
    /* emplace constructs the node in the pool, stamps its ring index + hash, registers
     * it in the recycle map and links it at the front of the current ring (mirrors the
-    * template's variadic emplace for this type). */
+    * in-place construction for this type). */
 static FramebufferNode *framebuffer_thmap_emplace(struct framebuffer_thmap *m,
          Hash hash, Device *device, const RenderPass *rp, const RenderPassInfo *info)
    {
@@ -3759,7 +3751,7 @@ static void framebuffer_allocator_deinit(struct FramebufferAllocator *self)
       ImageHandle handle;
    };
 
-   /* Was the TransientNode(ImageHandle) ctor. Plain struct copy: the produced
+   /* Was the TransientNode(ImageHandle) initialiser. Plain struct copy: the produced
     * handle (refcount 1) is passed by value and moved into the member without
     * an incref; the node becomes the single owner. */
    static INLINE void transient_node_init(struct TransientNode *self, ImageHandle handle_)
@@ -3767,7 +3759,7 @@ static void framebuffer_allocator_deinit(struct FramebufferAllocator *self)
       self->handle = handle_;
    }
 
-static void transient_node_destroy(TransientNode *t) { ih_reset(&t->handle); /* trivial dtor otherwise */ }
+static void transient_node_destroy(TransientNode *t) { ih_reset(&t->handle); /* trivial teardown otherwise */ }
    VK_TEMPHASH_DECLARE(transient_thmap, TransientNode, VULKAN_FRAMEBUFFER_RING_SIZE, 0, transient_node_destroy)
 
 static TransientNode *transient_thmap_emplace(struct transient_thmap *m,
@@ -3823,14 +3815,14 @@ static void attachment_allocator_deinit(struct AttachmentAllocator *self)
    };
 
    /* BufferBlock: a sub-allocatable mapped buffer pair (gpu/cpu). Converted from
-    * a C++ struct (user copy ctor/assign/dtor managing the two refcounted handle
+    * a C++ struct (user copy init/assign/teardown managing the two refcounted handle
     * members) to a plain C struct + bufferblock_* free functions. Because the gpu
     * and cpu handles carry Buffer references, every former implicit copy/assign/
     * move/destroy is now an explicit call:
     *   bufferblock_init     - zero a fresh block
     *   bufferblock_fini     - release both handle refs (was ~BufferBlock)
-    *   bufferblock_copy     - retain (was the copy ctor)
-    *   bufferblock_assign   - release-old / retain-new (was operator=)
+    *   bufferblock_copy     - retain (was the copy initialiser)
+    *   bufferblock_assign   - release-old / retain-new (assignment)
     *   bufferblock_steal    - move (copy fields, null the source; was the && move)
     *   bufferblock_allocate - the sub-allocation bump (unchanged logic). */
    struct BufferBlock
@@ -3905,7 +3897,7 @@ static BufferBlockAllocation bufferblock_allocate(struct BufferBlock *self, VkDe
    }
 
    /* Owning array of BufferBlock for the buffer pool's recycle list. Plain C
-    * struct + bufferblock_vec_* free functions (was a move-only C++ container).
+    * struct + bufferblock_vec_* free functions .
     * push copy-retains via bufferblock_copy; clear/pop_back/free_storage run
     * bufferblock_fini; grow steals each element into new storage. */
    struct BufferBlockVec {
@@ -3923,7 +3915,7 @@ static void bufferblock_vec_grow(struct BufferBlockVec *v, int ncap) {
       v->items = nitems;
       v->cap = ncap;
    }
-   /* Copy-insert (retain), matching the old push_back of a copy. */
+   /* Copy-insert (retain). */
 static void bufferblock_vec_push(struct BufferBlockVec *v, const struct BufferBlock *b) {
       if (v->count >= v->cap)
          bufferblock_vec_grow(v, v->cap ? v->cap * 2 : 8);
@@ -3952,7 +3944,7 @@ static void bufferblock_vec_free_storage(struct BufferBlockVec *v) {
     * returns a BufferBlock by value (the caller owns the returned refs);
     * recycle_block takes the block by pointer (was BufferBlock&&) and copy-
     * retains it into the recycle list, so the caller must still bufferblock_fini
-    * its now-moved-from local. */
+    * its now-emptied local. */
    struct BufferPool
    {
       Device *device;
@@ -3994,8 +3986,8 @@ static VkDeviceSize bufferpool_get_block_size(const struct BufferPool *self) { r
  * ============================================================ */
 
    POD_VEC_DECLARE(CommandBufferVec, VkCommandBuffer);
-   /* Per-queue transient command pool. Formerly a class with a constructor,
-    * destructor and (never-used) move ctor/assignment; now a plain struct driven
+   /* Per-queue transient command pool. Formerly a class with a initialiser,
+    * teardown and (never-used) move helpers; now a plain struct driven
     * by command_pool_init / command_pool_deinit. PerFrame embeds three of these
     * by value and never moves them, so the move machinery was dead and is gone.
     * signal_submitted stays inline (VULKAN_DEBUG-only bookkeeping). */
@@ -4060,7 +4052,7 @@ static void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd
 
    struct State
    {
-      // Depth state.
+      /* Depth state. */
       unsigned depth_write : 1;
       unsigned depth_test : 1;
       unsigned blend_enable : 1;
@@ -4163,10 +4155,10 @@ static void command_pool_signal_submitted(CommandPool *self, VkCommandBuffer cmd
    struct Device;
    /* Refcount carried as a plain member instead of via the IntrusivePtrEnabled
     * CRTP base (IntrusivePtr dispatches through the pointee directly). This is the
-    * last of the eight pointees taken off the template base.
+    * last of the eight pointees given a concrete per-type handle.
     *
     * Stage 1 of the class -> C struct conversion: CommandBuffer is now a struct,
-    * the refcount/ctor/dtor are free functions (commandbuffer_init / _fini /
+    * the refcount/init/teardown are free functions (commandbuffer_init / _fini /
     * _add_reference / _release_reference), and the formerly-default-initialized
     * members are seeded in commandbuffer_init. The remaining member functions are
     * still declared in-struct for now and are converted to free functions in
@@ -4414,13 +4406,13 @@ static void commandbuffer_copy_buffer_whole(struct CommandBuffer *self, const Bu
    static void commandbuffer_generate_mipmap(struct CommandBuffer *self, const Image *image);
 
 
-   /* Command-buffer handle: de-RAII'd from
+   /* Command-buffer handle: a plain struct from
     * INTRUSIVE_HANDLE_DECLARE(CommandBufferHandle, CommandBuffer) to a plain
-    * struct + explicit free functions, following the established template. The
+    * struct + explicit free functions, following the established helpers. The
     * pointee CommandBuffer is unchanged. Held as the Renderer's current-cmd
-    * member, by-value locals, and a move-only CommandBufferHandleVec (the
+    * member, by-value locals, and a CommandBufferHandleVec (the
     * per-queue submission list). cbh_steal implements the move the macro's
-    * move-ctor did; cbh_reset the dtor decref; cbh_move a release-old/
+    * move did; cbh_reset the decref; cbh_move a release-old/
     * take-produced member reassignment.
     * ASAN-GATE: per-frame command-buffer submission lifetime. */
    struct CommandBufferHandle { CommandBuffer *data; };
@@ -4441,10 +4433,10 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
    struct InitialImageBuffer
    {
       BufferHandle buffer;
-      // Bound matches the implicit invariant in TextureFormatLayout::mips[16]:
-      // callers must pass <= 16 mip levels (no runtime check exists in
-      // fill_mipinfo). build_buffer_image_copies is the sole writer of these
-      // fields; it asserts num_blits <= 16 before writing.
+      /* Bound matches the implicit invariant in TextureFormatLayout.mips[16]:
+       * callers must pass <= 16 mip levels (no runtime check exists in
+       * fill_mipinfo). build_buffer_image_copies is the sole writer of these
+       * fields; it asserts num_blits <= 16 before writing. */
       VkBufferImageCopy blits[16];
       unsigned num_blits;
    };
@@ -4460,8 +4452,8 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
       struct ObjectPoolRaw command_buffers;
    };
 
-   /* For a malloc'd owner (Device), where the pools' constructors and
-    * destructors do not run: handle_pool_init() puts every pool in the empty
+   /* For a malloc'd owner (Device), where the pools' init and
+    * teardown do not run automatically: handle_pool_init() puts every pool in the empty
     * state and handle_pool_deinit() runs each pool's teardown. */
    static INLINE void handle_pool_init(struct HandlePool *self)
    {
@@ -4565,33 +4557,33 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
 
    struct Device
    {
-         // Device-based objects which need to poke at internal data structures when their lifetimes end.
-         // Don't want to expose a lot of internal guts to make this work.
+         /* Device-based objects which need to poke at internal data structures when their lifetimes end.
+          * Don't want to expose a lot of internal guts to make this work. */
 
-         /* Lifecycle for a malloc'd Device (no constructor/destructor runs).
+         /* Lifecycle for a malloc'd Device (no initialiser/teardown runs).
           * device_init establishes every member's empty state; device_deinit
           * tears the device down so the storage can be freed. Static so they take
           * the raw Device* explicitly. */
 
-         // Only called by main thread, during setup phase.
+         /* Only called by main thread, during setup phase. */
 
-         // Frame-pushing interface.
+         /* Frame-pushing interface. */
 
-         // Set names for objects for debuggers and profilers.
+         /* Set names for objects for debuggers and profilers. */
 
-         // Submission interface, may be called from any thread at any time.
+         /* Submission interface, may be called from any thread at any time. */
 
-         // Request shaders and programs. These objects are owned by the Device.
+         /* Request shaders and programs. These objects are owned by the Device. */
 
-         // Map and unmap buffer objects.
+         /* Map and unmap buffer objects. */
 
-         // Create buffers and images.
+         /* Create buffers and images. */
 
-         // Create staging buffers for images.
+         /* Create staging buffers for images. */
 
-         // Create image view, buffer views and samplers.
+         /* Create image view, buffer views and samplers. */
 
-         // Render pass helpers.
+         /* Render pass helpers. */
 
 
 
@@ -4610,7 +4602,7 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
          uint64_t cookie;
 
          /* Public so the C89 cookie_init() free function (replacing the
-          * former Cookie(Device*) ctor + friendship) can reach it. */
+          * former Cookie(Device*) initialiser + friendship) can reach it. */
 
 
 
@@ -4619,7 +4611,7 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
 
          DeviceFeatures ext;
 
-         // Make sure this is deleted last.
+         /* Make sure this is deleted last. */
          HandlePool handle_pool;
 
          Managers managers;
@@ -4630,33 +4622,33 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
          } lock;
 
 
-         /* Owning array of CommandBufferHandle (= IntrusivePtr<CommandBuffer>).
-          * Replaces std::vector<CommandBufferHandle> for the per-queue submission
+         /* Owning array of CommandBufferHandle (a refcounted CommandBuffer handle).
+          * A dynamic array of CommandBufferHandle for the per-queue submission
           * lists. The element is a refcounting smart pointer with a non-trivial
-          * destructor (decref), so growth move-constructs each handle into new
-          * storage with placement new and destroys the moved-from slot, and
-          * clear()/the destructor run each handle's destructor (dropping its
+          * teardown (decref), so growth moves each handle into new
+          * storage (copy pointer, null source) and
+          * clear()/the teardown run each handle's teardown (dropping its
           * ref). push takes ownership by move (no incref), matching the old
-          * push_back(std::move(cmd)). clear() keeps the capacity so the lists
+          * an ownership transfer. clear() keeps the capacity so the lists
           * are reused across frames without reallocating. */
 
          /* Owning array of PerFrame* (the frame-context ring). Replaces
-          * std::vector<std::unique_ptr<PerFrame>>: the container owns each
+          * an owning array of PerFrame pointers: the container owns each
           * heap-allocated PerFrame and deletes it on clear()/destruction, so
           * ownership is explicit new/delete instead of unique_ptr. Pointers are
           * trivially relocatable, so the backing array grows by realloc.
-          * push() takes ownership of an already-new'd PerFrame; operator[]
+          * push() takes ownership of an already-allocated PerFrame; indexing
           * returns the raw pointer (so frame() can dereference it and the
           * null-asserts still work), and begin/end iterate the pointers. The
-          * default constructor zero-initialises the members (it is not a bare
+          * default initialiser zero-initialises the members (it is not a bare
           * POD_VEC), so a default-constructed ring is valid before build(). */
-         // The per frame structure must be destroyed after
-         // the hashmap data structures below, so it must be declared before.
+         /* The per frame structure must be destroyed after
+          * the hashmap data structures below, so it must be declared before. */
          PerFramePtrVec per_frame;
 
          struct QueueData graphics, compute, transfer;
 
-         // Pending buffers which need to be copied from CPU to GPU before submitting graphics or compute work.
+         /* Pending buffers which need to be copied from CPU to GPU before submitting graphics or compute work. */
          struct
          {
             BufferBlockVec vbo;
@@ -4826,7 +4818,7 @@ static void cbh_move(struct CommandBufferHandle *dst, struct CommandBufferHandle
    static INLINE bool device_memory_type_is_host_visible(Device *self, uint32_t type) { return (self->mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0; }
 
 
-   /* device_flush_frame_queue: was the inline Device::flush_frame(CommandBufferType)
+   /* device_flush_frame_queue: was the inline device flush_frame(CommandBufferType)
     * overload. Flushes pending transfers (if async-transfer) then submits the queue. */
    static INLINE void device_flush_frame_queue(Device *self, CommandBufferType type)
    {
@@ -4916,9 +4908,9 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
    }
 
    /* Free functions for PerFramePtrVec -- the owning frame-context ring
-    * (was std::vector<unique_ptr<PerFrame>>, then a move-only nested container).
+    * (an owning array of PerFrame pointers).
     * The vector owns each heap-allocated PerFrame and per_frame_fini+free's it on
-    * clear()/teardown. Device is malloc'd so the container's own ctor/dtor never
+    * clear()/teardown. Device is malloc'd so the container's own init/teardown never
     * run; init_empty establishes the empty state and deinit performs teardown. */
    static INLINE void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v)
    {
@@ -4987,9 +4979,9 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
    };
    typedef enum TextureMode TextureMode;
 
-   /* Rect: plain C struct (was a value type with ctors / operator==/!= /
-    * contains / intersects / scissor / extend_bounding_box). The default ctor +
-    * zero NSDMIs become brace-initialisation { 0, 0, 0, 0 }; the 4-arg ctor
+   /* Rect: plain C struct (was a value type with ctors / equality helper/!= /
+    * contains / intersects / scissor / extend_bounding_box). The default initialiser +
+    * zero NSDMIs become brace-initialisation { 0, 0, 0, 0 }; the 4-arg initialiser
     * becomes make_rect. The methods become rect_* free functions taking
     * const struct Rect * (extend_bounding_box mutates, so its first arg is
     * non-const). Most Rects are already built by brace-init, which a plain
@@ -5085,11 +5077,11 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
       STATUS_FRAGMENT_FB_READ = 1 << 12,
       STATUS_FRAGMENT_FB_WRITE = 1 << 13,
 
-      // A special stage to allow fragment to detect when it's causing a feedback loop with texture read -> fragment write.
-      // This flag is added in combination with FRAGMENT_FB_READ.
+      /* A special stage to allow fragment to detect when it's causing a feedback loop with texture read -> fragment write.
+       * This flag is added in combination with FRAGMENT_FB_READ. */
       STATUS_TEXTURE_READ = 1 << 14,
 
-      // For determining if a texture read is from a loaded image or previous rendered content
+      /* For determining if a texture read is from a loaded image or previous rendered content */
       STATUS_TEXTURE_RENDERED = 1 << 15,
 
       STATUS_FB_READ = STATUS_COMPUTE_FB_READ | STATUS_TRANSFER_FB_READ | STATUS_FRAGMENT_FB_READ,
@@ -5103,10 +5095,10 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
    struct Renderer;
 
    /* VRAM framebuffer atlas / hazard tracker. Formerly a class whose only
-    * C++-ism was a constructor that filled fb_info[] (relying on NSDMIs for the
+    * C++-ism was a initialiser that filled fb_info[] (relying on NSDMIs for the
     * listener pointer and the renderpass sub-struct); now a plain struct driven
     * by fbatlas_init. Renderer embeds one by value and calls fbatlas_init at the
-    * top of its constructor. All methods stay as struct methods. */
+    * top of its initialiser. All methods stay as struct methods. */
    struct FBAtlas
    {
       StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
@@ -5223,7 +5215,7 @@ static StatusFlags *fbatlas_info(FBAtlas *self, unsigned block_x, unsigned block
    }
 
    /* POD match rule from dump.cfg: a value of -1 means "wildcard" (matches
-    * any) for that field. Was a class with a ctor + NSDMI + matches() method. */
+    * any) for that field. Was a class with a initialiser + NSDMI + matches() method. */
    struct RectMatch {
       int x;
       int y;
@@ -5237,7 +5229,7 @@ static bool rect_match_matches(const RectMatch *m, Rect r) {
    }
 
 /* Maximum number of "ignore" rules read from dump.cfg. A fixed cap keeps the
- * list a plain inline array (no heap / no destructor); real dump configs have
+ * list a plain inline array (no heap / no teardown); real dump configs have
  * a handful of entries, so this is never approached. */
 #define DUMP_IGNORE_MAX 256
 
@@ -5247,7 +5239,7 @@ static bool rect_match_matches(const RectMatch *m, Rect r) {
 
 extern retro_log_printf_t log_cb;
 
-//#define VERBOSE_TEXTURE_TRACKING
+/* #define VERBOSE_TEXTURE_TRACKING */
 
 /* Texture-tracker logging is debug-only: it compiles to real log_cb calls
  * in DEBUG builds (the build system passes -DDEBUG when DEBUG=1) and to a
@@ -5256,7 +5248,7 @@ extern retro_log_printf_t log_cb;
  * The no-op variants must still consume their arguments at the syntactic
  * level, otherwise locals only used in a log statement trip
  * -Wunused-but-set-variable.  The "(void)0," prefix lets sizeof accept a
- * 1-arg invocation through the comma operator; sizeof itself is unevaluated,
+ * 1-arg invocation through the comma operator (C); sizeof itself is unevaluated,
  * so each arg is read by the type system without generating runtime code. */
 #ifdef DEBUG
 #define TT_LOG(...) log_cb(__VA_ARGS__)
@@ -5277,9 +5269,9 @@ extern retro_log_printf_t log_cb;
       uint32_t palette_hash;
    };
 
-   typedef int RectIndex; // I wanted a newtype but it's too much work in C++, so maybe TODO that later
-   /* HdTextureHandle: plain C struct (was a value type with operator==/!=/>,
-    * a private 3-arg ctor and static factories). The factories become
+   typedef int RectIndex; /* I wanted a newtype but it's too much work in C++, so maybe TODO that later */
+   /* HdTextureHandle: plain C struct (was a value type with equality helper/!=/>,
+    * a private 3-arg initialiser and static factories). The factories become
     * hd_handle_make / _make_fused / _make_none; the comparisons become
     * hd_handle_eq / _ne / _gt free functions. */
    struct HdTextureHandle {
@@ -5325,9 +5317,9 @@ extern retro_log_printf_t log_cb;
       return a->fused > b->fused;
    }
 
-   /* SRect: plain C struct (was a value type with ctors / accessors / operator==).
-    * The validating 4-arg constructor becomes make_srect; the zero-init default
-    * constructor becomes the brace-initialiser { 0, 0, 0, 0 } (a placeholder slot
+   /* SRect: plain C struct (was a value type with ctors / accessors / equality helper).
+    * The validating 4-arg initialiser becomes make_srect; the zero-init default
+    * initialiser becomes the brace-initialiser { 0, 0, 0, 0 } (a placeholder slot
     * to be overwritten before use). Accessors left/right/top/bottom and the
     * comparison become srect_* free functions. */
    struct SRect {
@@ -5337,8 +5329,8 @@ extern retro_log_printf_t log_cb;
       int height;
    };
 
-   /* Validated SRect builder (was the 4-arg constructor). width/height must be
-    * positive; a zero/negative size is a hard error, matching the old ctor. */
+   /* Validated SRect builder (was the 4-arg initialiser). width/height must be
+    * positive; a zero/negative size is a hard error, matching the old initialiser. */
    static INLINE struct SRect make_srect(int x, int y, int width, int height)
    {
       struct SRect r;
@@ -5360,11 +5352,11 @@ extern retro_log_printf_t log_cb;
 
    struct HdTexture {
       SRect vram_rect;
-      SRect texel_rect; // hd texels
+      SRect texel_rect; /* hd texels */
       ImageHandle texture;
    };
 
-   /* DumpedMode: plain POD (was a value type whose only method was operator==,
+   /* DumpedMode: plain POD (was a value type whose only method was equality helper,
     * now the free function dumpedmode_eq). */
    struct DumpedMode {
       TextureMode mode;
@@ -5376,7 +5368,7 @@ extern retro_log_printf_t log_cb;
       return a->mode == b->mode && a->palette_hash == b->palette_hash;
    }
 
-   /* UsedMode: plain POD (its operator== was unused and has been dropped). */
+   /* UsedMode: plain POD (its equality helper was unused and has been dropped). */
    struct UsedMode {
       TextureMode mode;
       unsigned int palette_offset_x;
@@ -5386,7 +5378,7 @@ extern retro_log_printf_t log_cb;
    /* ------------------------------------------------------------------------- *
     * HdTexMap - palette_hash -> (Vulkan image, alpha flags), MSVC C89.
     *
-    * Replaces std::map<uint32_t, HdImageHandle> on TextureUpload. Backed by a
+    * A uint32_t -> HdImageHandle map on TextureUpload. Backed by a
     * sorted, malloc'd array of POD entries keyed by palette hash (binary-search
     * lookup, insert keeps it sorted). The image is held as a raw Image*
     * (so the array can realloc) with the intrusive refcount managed by hand: a
@@ -5499,12 +5491,12 @@ extern retro_log_printf_t log_cb;
 
    struct TextureUpload {
       /* Intrusive refcount for shared ownership across TextureRects (replaces
-       * std::shared_ptr<TextureUpload>). A freshly constructed upload starts at
-       * 0; texture_upload_new() bumps it to 1. Copies (deep-copy ctor/assignment,
+       * a refcounted TextureUpload). A freshly created upload starts at
+       * 0; texture_upload_new() bumps it to 1. Copies (deep-copy initialiser/assignment,
        * used by the by-value save-state map) get their OWN fresh count - the
        * refcount is deliberately not copied. */
       int refcount;
-      /* VRAM source pixels (owned). Was std::vector<uint16_t>; filled once at
+      /* VRAM source pixels (owned). Owned uint16_t array; filled once at
        * creation and thereafter read-only. */
       uint16_t *image;
       int       image_count;
@@ -5513,21 +5505,21 @@ extern retro_log_printf_t log_cb;
       int height;
       uint32_t hash;
       /* Modes already dumped to disk (owned growable array, append-only).
-       * Was std::vector<DumpedMode>. */
+       * Owned DumpedMode array. */
       DumpedMode *dumped_modes;
       int         dumped_modes_count;
       int         dumped_modes_cap;
-      HdTexMap textures; // palette hash -> (image, alpha)
-               // (HD load bookkeeping lives on the TextureTracker: hd_gpu_cache / hd_cache /
-               //  requested / pending_attach, keyed by (hash,palette) so it survives this
-               //  upload being recreated as the sprite animation churns VRAM.)
+      HdTexMap textures; /* palette hash -> (image, alpha) */
+               /* (HD load bookkeeping lives on the TextureTracker: hd_gpu_cache / hd_cache /
+                * requested / pending_attach, keyed by (hash,palette) so it survives this
+                * upload being recreated as the sprite animation churns VRAM.) */
    };
 
    /* TextureUpload owns malloc'd buffers (image, dumped_modes) and an HdTexMap,
     * but is a plain struct with no C++ special members: it is created, copied
     * and destroyed only through the explicit helpers below. texture_upload_init
-    * mirrors the former default constructor, texture_upload_destroy the former
-    * destructor, and texture_upload_copy_contents the former deep copy (a fresh
+    * mirrors the former default initialiser, texture_upload_destroy the former
+    * teardown, and texture_upload_copy_contents the former deep copy (a fresh
     * refcount is NOT taken from the source - the destination keeps its own). */
    static void texture_upload_init(TextureUpload *u)
    {
@@ -5599,21 +5591,21 @@ extern retro_log_printf_t log_cb;
          texture_upload_destroy(u); /* frees image/dumped_modes and releases the texmap refs */
    }
 
-   // byte buffer plus its size, rather than std::vector<uint8_t>. This is a POD
-   // (trivially copyable) struct - copying it copies the pointer, NOT the bytes,
-   // so ownership is by convention: exactly one LoadedLevels owns each buffer and
-   // frees it. Ownership transfers are explicit pointer-steals (push_move /
-   // move-assign helpers below); there is no implicit deep copy and no
-   // destructor. This keeps it storable in plain arrays and realloc-movable.
+   /* byte buffer plus its size, rather than a managed byte vector. This is a POD
+    * (trivially copyable) struct - copying it copies the pointer, NOT the bytes,
+    * so ownership is by convention: exactly one LoadedLevels owns each buffer and
+    * frees it. Ownership transfers are explicit pointer-steals (push_move /
+    * move-assign helpers below); there is no implicit deep copy and no
+    * teardown. This keeps it storable in plain arrays and realloc-movable. */
    struct LoadedImage {
-      uint8_t *owned_data; // RGBA, owned_size bytes (NULL if empty)
+      uint8_t *owned_data; /* RGBA, owned_size bytes (NULL if empty) */
       size_t   owned_size;
       int width;
       int height;
    };
 
-   // Allocate the RGBA buffer for a level (width*height*4). Frees any prior
-   // buffer. Returns 0 on success, -1 on allocation failure (buffer left NULL).
+   /* Allocate the RGBA buffer for a level (width*height*4). Frees any prior
+    * buffer. Returns 0 on success, -1 on allocation failure (buffer left NULL). */
 static int loaded_image_alloc(LoadedImage *img, int width, int height)
    {
       size_t bytes = (size_t)width * (size_t)height * 4u;
@@ -5625,7 +5617,7 @@ static int loaded_image_alloc(LoadedImage *img, int width, int height)
       return img->owned_data ? 0 : -1;
    }
 
-   // Zero-initialise a level (no buffer). Use before loaded_image_alloc.
+   /* Zero-initialise a level (no buffer). Use before loaded_image_alloc. */
 static void loaded_image_init(LoadedImage *img)
    {
       img->owned_data = NULL;
@@ -5634,12 +5626,12 @@ static void loaded_image_init(LoadedImage *img)
       img->height     = 0;
    }
 
-   // A decoded texture as a set of mip levels. C-style dynamic array: `levels`
-   // is a malloc'd array of `count` LoadedImage, owning all buffers. Replaces
-   // std::vector<LoadedImage>. POD/trivially-copyable: a copy aliases the same
-   // buffers, so callers move ownership explicitly (loaded_levels_move) and free
-   // explicitly (loaded_levels_reset). Initialise with loaded_levels_init or
-   // zero-init before first use.
+   /* A decoded texture as a set of mip levels. C-style dynamic array: `levels`
+    * is a malloc'd array of `count` LoadedImage, owning all buffers. Replaces
+    * a dynamic array of LoadedImage. POD/trivially-copyable: a copy aliases the same
+    * buffers, so callers move ownership explicitly (loaded_levels_move) and free
+    * explicitly (loaded_levels_reset). Initialise with loaded_levels_init or
+    * zero-init before first use. */
    struct LoadedLevels {
       LoadedImage *levels;
       int          count;
@@ -5679,14 +5671,14 @@ static void loaded_image_init(LoadedImage *img)
       l->count  = 0;
    }
 
-   // Zero-initialise (no allocation).
+   /* Zero-initialise (no allocation). */
 static void loaded_levels_init(LoadedLevels *l)
    {
       l->levels = NULL;
       l->count  = 0;
    }
 
-   // Move ownership src -> dst (dst's prior contents freed; src left empty).
+   /* Move ownership src -> dst (dst's prior contents freed; src left empty). */
 static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
    {
       if (dst == src)
@@ -5713,10 +5705,10 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
    struct IORequest {
       struct IORequest *next;        /* intrusive FIFO link (queue-owned) */
       IORequestKind kind;
-      // Load payload (valid when kind == Load):
+      /* Load payload (valid when kind == Load): */
       uint32_t hash;
       uint32_t palette_hash;
-      // Dump payload (valid when kind == Dump):
+      /* Dump payload (valid when kind == Dump): */
       char     path[PATH_MAX_TT];
       int      width;
       int      height;
@@ -5756,12 +5748,12 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       slock_t *lock;
       scond_t *cond;
       /* Intrusive FIFO lists (protected by `lock`). Heads are popped/drained,
-       * tails are where producers append. Replaces std::vector<IORequest> /
-       * std::vector<IOResponse>. */
+       * tails are where producers append. Dynamic arrays of IORequest /
+       * IOResponse. */
       IORequest  *req_head,  *req_tail;
       IOResponse *resp_head, *resp_tail;
       bool done;
-      /* Cross-thread refcount (replaces std::shared_ptr<IOChannel>). The owning
+      /* Cross-thread refcount. The owning
        * IOThread holds one reference and each detached worker holds one; whichever
        * releases last frees the channel. Mutated only outside the lock, at
        * thread-spawn and thread-exit, so a plain int with no overlap is fine. */
@@ -5835,9 +5827,9 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       return head;
    }
 
-   /* Owns the IO worker thread pool. Formerly a class with a constructor
+   /* Owns the IO worker thread pool. Formerly a class with a initialiser
     * (create the channel, spin up NUM_IO_THREADS detached workers each holding a
-    * channel reference) and destructor (signal done, wake the workers, drop this
+    * channel reference) and teardown (signal done, wake the workers, drop this
     * thread's reference); now a plain struct driven by io_thread_init /
     * io_thread_deinit. The single member is the refcounted channel pointer.
     * TextureTracker embeds one by value and drives its init/deinit. */
@@ -5858,8 +5850,8 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       uint32_t hash;
    };
 
-   //============
-   // RectTracker
+   /* ============
+    * RectTracker */
 
    /* TextureRect is a trivially-copyable POD: a borrowed view of an upload plus a
     * subrect. It does NOT manage the refcount in special members (so it relocates
@@ -5870,18 +5862,18 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
     * (subTexture results, clip pairs, scratch arrays) are borrowing and need no
     * ref ops. */
    /* TextureRect: plain C struct (was a value type with texture_subrect() /
-    * operator== / operator!=). The accessor becomes texture_rect_subrect, the
-    * comparison texture_rect_eq; operator!= was unused and is dropped. */
+    * equality helper / inequality helper). The accessor becomes texture_rect_subrect, the
+    * comparison texture_rect_eq; inequality helper was unused and is dropped. */
    struct TextureRect {
       TextureUpload *upload;
-      // the offset into the original upload rect (offset_x + vram_rect.width <= upload->width)
+      /* the offset into the original upload rect (offset_x + vram_rect.width <= upload->width) */
       int offset_x;
       int offset_y;
       SRect vram_rect;
    };
 
-   // in vram size (not hd), local to the uploaded data, different hd textures for
-   // different palettes could have different sizes anyway
+   /* in vram size (not hd), local to the uploaded data, different hd textures for
+    * different palettes could have different sizes anyway */
    static INLINE struct SRect texture_rect_subrect(const struct TextureRect *t)
    {
       return make_srect(t->offset_x, t->offset_y, t->vram_rect.width, t->vram_rect.height);
@@ -5911,15 +5903,15 @@ static void texture_rect_release(const TextureRect *t) { texture_upload_release(
    POD_VEC_DECLARE(TextureRectVec, TextureRect);
 
 
-   // TODO: better name
+   /* TODO: better name */
    struct EnduringTextureRect {
       TextureRect texture_rect;
       bool alive;
    };
 
    /* Owning, trivially-relocatable array of EnduringTextureRect (replaces
-    * std::vector<EnduringTextureRect>). Because TextureRect is now POD, growth is a
-    * realloc (bitwise relocation, no per-element move-ctor or exception
+    * a dynamic array of EnduringTextureRect). Because TextureRect is POD, growth is a
+    * realloc (bitwise relocation, no per-element move step or exception
     * scaffolding). Ownership is explicit: push retains the upload, and any slot
     * that leaves the array (compaction drop, clear, free) releases it. */
    struct EnduringRectArr {
@@ -5970,7 +5962,7 @@ static void enduring_arr_free(EnduringRectArr *v) {
 
    /* Owning vector of (POD) TextureRects, used where the rect list is itself
     * value-copied/compared (FusionRects, RestorableRect). The element is trivially
-    * relocatable so the backing std::vector relocates cheaply, but ownership must
+    * relocatable so the backing array relocates cheaply, but ownership must
     * be explicit: this wrapper retains on push and on copy, and releases on
     * destroy/clear/assign. */
    /* OwnedRectVec: plain C struct (was a copyable C++ class with retain-on-copy /
@@ -6065,7 +6057,7 @@ static void enduring_arr_free(EnduringRectArr *v) {
    enum { LOOKUP_CELL_WIDTH = 64 };
    enum { LOOKUP_CELL_HEIGHT = 256 };
 
-   /* Sorted set of RectIndex (int), MSVC C89. Replaces std::unordered_set<RectIndex>
+   /* Sorted set of RectIndex (int), MSVC C89. A sorted set of RectIndex
     * for the overlap-dedup scratch set: a malloc'd sorted int array with
     * binary-search insert (dedups), cleared and refilled each query, then iterated
     * in order. Order differs from the old unordered_set (now ascending by index),
@@ -6101,7 +6093,7 @@ static void enduring_arr_free(EnduringRectArr *v) {
    }
 
    /* Spatial lookup grid over psx texture pages. Formerly a class with a
-    * constructor/destructor managing the per-cell malloc'd arrays; now a plain
+    * initialiser/teardown managing the per-cell malloc'd arrays; now a plain
     * struct driven by lookup_grid_init / lookup_grid_deinit. Each Cell is a
     * growable array of POD LookupEntry; insert/get/clear are unchanged methods.
     * RectTracker embeds one by value and drives its init/deinit. */
@@ -6117,7 +6109,7 @@ static void enduring_arr_free(EnduringRectArr *v) {
    };
    typedef struct Cell Cell;
    struct LookupGrid {
-      /* Each cell is a psx texture page (64x256); was std::vector<LookupEntry>.
+      /* Each cell is a psx texture page (64x256); a dynamic array of LookupEntry.
        * Now a malloc'd growable array per cell (POD entries). */
       Cell cells[LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS];
    };
@@ -6130,11 +6122,11 @@ static void enduring_arr_free(EnduringRectArr *v) {
 
    /* RectTracker: tracks placed/uploaded texture rects with a spatial lookup grid.
     * Converted from a C++ class to a plain C struct + rect_tracker_* free
-    * functions. The ctor/dtor (which init/free the EnduringRectArr and LookupGrid)
+    * functions. The init/teardown (which init/free the EnduringRectArr and LookupGrid)
     * become rect_tracker_init / rect_tracker_deinit, called by the embedding
-    * TextureTracker's constructor/destructor. */
+    * TextureTracker's initialiser/teardown. */
    struct RectTracker {
-      EnduringRectArr textures; // owning trivially-relocatable array
+      EnduringRectArr textures; /* owning trivially-relocatable array */
       LookupGrid lookup_grid;
       bool lookup_grid_dirty;
    };
@@ -6172,10 +6164,10 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
    static TextureUpload *rect_tracker_find_upload(struct RectTracker *self, uint32_t hash);
 
    static void rect_tracker_rebuild_lookup_grid(struct RectTracker *self);
-   // RectTracker
-   //============
+   /* RectTracker
+    * ============ */
 
-   /* FusionRects: plain C struct (was a C++ value type with NSDMIs + operator==).
+   /* FusionRects: plain C struct (was a C++ value type with NSDMIs + equality helper).
     * Embeds an OwnedRectVec (refcounted), so init/destroy/move/eq are explicit
     * free functions; the scaleX/scaleY default-zero NSDMIs move into fusionrects_init. */
    struct FusionRects {
@@ -6222,7 +6214,7 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
    };
 
    /* Copy/destroy helpers for FusedPage's ImageHandle member, replacing the
-    * implicit copy-ctor incref / destructor decref the macro used to provide.
+    * implicit copy step incref / teardown decref the macro used to provide.
     * The remaining fields are trivially copyable. */
 static void fp_copy(FusedPage *dst, const FusedPage *src) {
       /* Copy the trivially-copyable fields explicitly (NOT a blanket *dst=*src,
@@ -6256,19 +6248,19 @@ static void fp_destroy(FusedPage *p) {
       ownedrects_destroy(&p->fusion.rects);
    }
 
-   /* Owning array of FusedPage. Replaces std::vector<FusedPage>. FusedPage owns
+   /* Owning array of FusedPage. A dynamic array of FusedPage. FusedPage owns
     * an ImageHandle and a FusionRects (whose OwnedRectVec retains/releases its
-    * TextureRects), and is used by copy (push_back(page) and the compaction's
-    * element copy-assign), so this container copy-constructs/-assigns elements
-    * rather than moving: growth copy-constructs each element into new storage
-    * with placement new and destroys the old slot. push() copy-inserts;
+    * TextureRects), and is used by copy (append page, and the compaction's
+    * element copy-assign), so this container copies/-assigns elements
+    * rather than moving: growth copies each element into new storage
+    * into new storage and clears the old slot. push() copy-inserts;
     * indexed access and pointer-range iteration keep the existing size()/
-    * operator[]/range-for uses. truncate(n) destroys the tail [n, count) and is
+    * indexing and iteration uses. truncate(n) clears the tail [n, count) and is
     * how remove_dead() drops compacted-out entries (replacing erase(it, end())).
-    * Move-only at the container level. */
+    * Ownership lives at the container level. */
    /* FusedPageVec: owning growable array of FusedPage (each holds a refcounted
     * ImageHandle, so growth/teardown go through fp_copy/fp_destroy). Converted from
-    * a move-only C++ container to a plain C struct + fused_page_vec_* free
+    * a container is a plain struct with + fused_page_vec_* free
     * functions; the embedding FusedPages drives init_empty/deinit. */
    struct FusedPageVec {
       FusedPage *items;
@@ -6328,8 +6320,8 @@ static void fused_pages_init(struct FusedPages *self) { fused_page_vec_init_empt
 static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->pages); }
    static HdTextureHandle fused_pages_get_or_make(struct FusedPages *self, Rect page_rect, uint32_t palette, struct RectTracker *tracker, Renderer *uploader);
    static HdTexture fused_pages_get_from_handle(struct FusedPages *self, HdTextureHandle handle, ImageHandle *default_hd_texture);
-   static void fused_pages_mark_dirty(struct FusedPages *self, Rect rect); // For blit dst, upload, and hd texture load
-   static void fused_pages_mark_dead(struct FusedPages *self, Rect rect); // For clear
+   static void fused_pages_mark_dirty(struct FusedPages *self, Rect rect); /* For blit dst, upload, and hd texture load */
+   static void fused_pages_mark_dead(struct FusedPages *self, Rect rect); /* For clear */
    static void fused_pages_rebuild_dirty(struct FusedPages *self, struct RectTracker *tracker, Renderer *uploader);
    static void fused_pages_remove_dead(struct FusedPages *self);
    static void fused_pages_dbg_print_info(struct FusedPages *self);
@@ -6373,21 +6365,21 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
       ownedrects_move(&dst->to_restore, &src->to_restore);
    }
 
-   /* Owning array of RestorableRect. Replaces std::vector<RestorableRect>.
+   /* Owning array of RestorableRect. A dynamic array of RestorableRect.
     * RestorableRect holds an OwnedRectVec (retain/release on copy, move
-    * suppressed), so it is copyable but not movable - the same way std::vector
-    * relocated it by copy. This container therefore copy-constructs/-assigns
-    * elements: growth copy-constructs each into new storage with placement new
+    * suppressed), so it is copyable but not movable - the backing array
+    * relocated it by copy. This container therefore copies/-assigns
+    * elements: growth copies each into new storage
     * and destroys the old slot; push() copy-inserts (matching the old
-    * push_back(std::move(rr)), which - move being suppressed - was a copy);
-    * clear()/the destructor run each element's destructor (releasing its rect
+    * an append, which is a copy);
+    * clear()/the teardown run each element's teardown (releasing its rect
     * refs). erase_at(i) removes one element by copy-assigning the tail down and
-    * destroying the now-duplicated last slot, matching std::vector::erase. */
-   /* RestorableRectVec: plain C struct (was a move-only C++ class). Its element
+    * destroying the now-duplicated last slot. */
+   /* RestorableRectVec: plain C struct. Its element
     * RestorableRect owns an OwnedRectVec (refcounted), so element relocation /
     * insertion / removal go through restorablerect_copy / _assign / _destroy / _move
-    * rather than placement-new and explicit destructor calls. The container itself is
-    * move-only (steal storage); no copy exists. */
+    * rather than placement-new and explicit teardown calls. The container itself is
+    * moved by stealing storage; no copy exists. */
    struct RestorableRectVec {
       RestorableRect *items;
       int count;
@@ -6426,7 +6418,7 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
       v->items = nitems;
       v->cap = ncap;
    }
-   /* Copy-insert v (matches the old push_back(std::move(rr)) which, move being
+   /* Copy-insert v (which, move being
     * suppressed, was a copy). */
    static INLINE void rrvec_push(struct RestorableRectVec *vec, const struct RestorableRect *val)
    {
@@ -6445,7 +6437,7 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
       v->count = 0;
    }
    /* Remove element i by copy-assigning the tail down and destroying the duplicated
-    * last slot (matches std::vector::erase). */
+    * last slot. */
    static INLINE void rrvec_erase_at(struct RestorableRectVec *v, int i)
    {
       int j;
@@ -6456,9 +6448,9 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
    }
 
    /* Edge-triggered debug keyboard hotkey. Formerly a class with an int
-    * constructor; now a plain struct driven by dbg_hotkey_init. query() does the
+    * initialiser; now a plain struct driven by dbg_hotkey_init. query() does the
     * rising-edge detection. TextureTracker embeds three of these by value and
-    * initialises them in its constructor. */
+    * initialises them in its initialiser. */
    struct DbgHotkey {
       enum retro_key key;
       bool was_key_down;
@@ -6476,7 +6468,7 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
       HdTextureHandle handle;
    };
 
-   /* Result of a handle-cache lookup (replaces std::pair<HdTextureHandle,bool>). */
+   /* Result of a handle-cache lookup (handle plus a found flag). */
    struct HandleCacheResult {
       HdTextureHandle handle;
       bool found;
@@ -6484,15 +6476,15 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
 
    /* Small fixed-capacity move-to-front cache of recently-used HD texture
     * handles. CacheEntry is POD, so the entries live in an inline array (capacity
-    * HANDLE_LRU_MAX) with a count - no std::vector, no heap. */
+    * HANDLE_LRU_MAX) with a count - no dynamic array, no heap. */
    enum { HANDLE_LRU_MAX = 4 };
 
    /* Small fixed-capacity move-to-front cache of recently-used HD texture
-    * handles. Formerly a class with a constructor; now a plain struct driven by
+    * handles. Formerly a class with a initialiser; now a plain struct driven by
     * handle_lru_cache_init. CacheEntry is POD (its defensive default-init is never
     * read before being written - get only scans entries[0..count) and insert
     * writes entries[0] within that range), so the entries live in an inline array
-    * (capacity HANDLE_LRU_MAX) with a count - no std::vector, no heap. */
+    * (capacity HANDLE_LRU_MAX) with a count - no dynamic array, no heap. */
    struct HandleLRUCache {
       int64_t dbg_hits;
       int64_t dbg_misses;
@@ -6508,26 +6500,26 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
          max_size = HANDLE_LRU_MAX;
       c->max_size = max_size;
       c->count = 0;
-      /* The former constructor left these uninitialised (they were only ever
+      /* The former initialiser left these uninitialised (they were only ever
        * zeroed inside a TT_LOG_VERBOSE block after first use); zero them here so
        * the hit/miss counters start from a defined value. */
       c->dbg_hits = 0;
       c->dbg_misses = 0;
    }
 
-   //========================================
-   // Save State
+   /* ========================================
+    * Save State */
    /* Owning hash -> TextureUpload map for the texture-tracker save state.
-    * Replaces std::map<uint32_t, TextureUpload>: each entry owns a heap
+    * A uint32_t -> TextureUpload map: each entry owns a heap
     * TextureUpload (deep-copied in on insert, deleted on destroy). The values
     * are non-trivially-copyable (owned image/dumped_modes/textures), so the
     * backing array holds pointers - trivially relocatable - and ownership is
-    * explicit new/delete. The type is move-only: it is move-constructed up out
+    * explicit alloc/free. The type is moved (not copied): it is moved up out
     * of save_state() and move-assigned into the file-static save_state across
     * renderer recreations, so move-assign must free any entries it already
     * holds before adopting the source's. Copying is deleted to prevent any
     * accidental double-ownership. */
-   /* UploadOwningMap: plain C struct (was a move-only C++ class). The entries are
+   /* UploadOwningMap: plain C struct. The entries are
     * owning pointers to heap-allocated TextureUploads; ownership moves via
     * uploadmap_move (steal, source emptied) and is released by uploadmap_destroy.
     * No copy operation exists -- callers must move, never copy. */
@@ -6594,9 +6586,9 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
    };
 
    /* Owning array of (POD) TextureRectSaveState. Replaces
-    * std::vector<TextureRectSaveState>. Elements are trivially relocatable, so
+    * A dynamic array of TextureRectSaveState. Elements are trivially relocatable, so
     * grow is a plain realloc; the type owns its buffer (free on destroy) and is
-    * move-only so it can live inside the move-assigned save-state structs. */
+    * moved (not copied) so it can live inside the save-state structs. */
    struct TextureRectSaveStateVec {
       TextureRectSaveState *items;
       int count;
@@ -6618,7 +6610,7 @@ static void TextureRectSaveStateVec_push(struct TextureRectSaveStateVec *v, cons
       v->items[v->count++] = *valp;
    }
    /* Move src into dst (steal buffer), leaving src empty - replaces the implicit
-    * move of the former move-only container. */
+    * move of the container. */
 static void TextureRectSaveStateVec_move(struct TextureRectSaveStateVec *dst, struct TextureRectSaveStateVec *src) {
       dst->items = src->items; dst->count = src->count; dst->cap = src->cap;
       src->items = NULL; src->count = 0; src->cap = 0;
@@ -6644,11 +6636,10 @@ static void rrss_move(struct RestorableRectSaveState *dst, struct RestorableRect
       TextureRectSaveStateVec_move(&dst->to_restore, &src->to_restore);
    }
 
-   /* Owning array of (move-only) RestorableRectSaveState. Replaces
-    * std::vector<RestorableRectSaveState>. The element owns a heap array
-    * (to_restore) and is not trivially relocatable, so growth move-constructs
-    * each element into the new storage via placement new and destroys the old
-    * one, rather than memcpy. Move-only so it composes inside the move-assigned
+   /* Owning array of RestorableRectSaveState. The element owns a heap array
+    * (to_restore) and is not trivially relocatable, so growth moves
+    * each element into the new storage and clears the old
+    * one, rather than memcpy. Moved (not copied) so it composes inside the
     * save-state structs. */
    struct RestorableRectSaveStateVec {
       RestorableRectSaveState *items;
@@ -6685,7 +6676,7 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       v->items = NULL; v->count = 0; v->cap = 0;
    }
 
-   /* TextureTrackerSaveState: plain C struct (was a move-only C++ class). Owns two
+   /* TextureTrackerSaveState: plain C struct. Owns two
     * save-state vectors and an UploadOwningMap; managed explicitly through tts_init /
     * tts_destroy / tts_move. No copy exists -- callers must move (steal), never copy. */
    struct TextureTrackerSaveState {
@@ -6722,8 +6713,8 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       RestorableRectSaveStateVec_init(&o->restorable);
       uploadmap_move(&s->uploads, &o->uploads);
    }
-   // End of Save State
-   //========================================
+   /* End of Save State
+    * ======================================== */
 
    /* Tunable HD-texture cache budgets. hd_cache = system RAM (decoded CPU levels);
     * hd_gpu_cache = VRAM (uploaded Vulkan images). The VRAM budget targets 8 GB
@@ -6734,7 +6725,7 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
 
    /* (hash, palette_hash) packed into one 64-bit key. The caches below are keyed
     * by this single integer instead of HdTextureId, so lookups compare one int
-    * with no struct operator< / tree descent. */
+    * with no comparator / tree descent. */
    static uint64_t hd_pack_key(HdTextureId id)
    {
       return ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash;
@@ -6743,10 +6734,10 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
    /* ------------------------------------------------------------------------- *
     * Byte-budgeted LRU cache, MSVC C89.
     *
-    * Replaces the original std::list<Entry> + std::map<id, list::iterator>
+    * Built from an intrusive list of entries plus an id -> entry map
     * design - two heap node allocations per insert and an O(log n) red-black
     * descent per lookup - with a contiguous index-LRU + open-addressed
-    * (linear-probe) flat hash table, all held in malloc'd arrays. No templates,
+    * (linear-probe) flat hash table, all held in malloc'd arrays. No generics,
     * no classes, no virtual, no STL. The two cache variants (RAM levels, VRAM
     * images) are produced by macro instantiation: HD_LRU_DECLARE emits the struct
     * and prototypes, HD_LRU_DEFINE emits the bodies, with a DISPOSE callback that
@@ -7026,7 +7017,7 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
     * Lives independent of TextureUpload lifetime, so images survive the rapid
     * VRAM upload churn of animated sprites. Decode-once: a combo is read+decoded
     * from disk at most once until evicted. CPU-side only - the GPU upload happens
-    * on attach via Renderer::upload_texture, so it survives device/swapchain
+    * on attach via renderer_upload_texture, so it survives device/swapchain
     * resets. The disposer frees the decoded levels. */
    typedef struct CachedHdImage {
       LoadedLevels levels; /* decoded RGBA + mips (CPU side) */
@@ -7116,13 +7107,13 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
    /* ------------------------------------------------------------------------- *
     * HdKeySet - an ordered set of packed (hash, palette) uint64_t keys, MSVC C89.
     *
-    * Replaces std::set<HdTextureId>. Backed by a single sorted, malloc'd
+    * A set of HdTextureId. Backed by a single sorted, malloc'd
     * uint64_t array: membership is O(log n) binary search, insert/erase keep it
     * sorted (O(n) shift, fine for these small sets). Because the key packs
     * (hash << 32) | palette, the array is ordered by hash then palette, so all
     * combos of one hash form a contiguous run - found with lower_bound over the
     * half-open key range [hash<<32, (hash+1)<<32), which is exactly what the old
-    * std::set lower_bound/upper_bound({hash,0})/({hash,0xFFFFFFFF}) gave.
+    * a range query over [{hash,0}, {hash,0xFFFFFFFF}] gives.
     * ------------------------------------------------------------------------- */
    typedef struct HdKeySet {
       uint64_t *keys;
@@ -7147,7 +7138,7 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
    {
       s->count = 0; /* keep the allocation for reuse */
    }
-   /* First index with keys[i] >= key (i.e. std::lower_bound). */
+   /* First index with keys[i] >= key (lower bound). */
    static int hd_key_set_lower_bound(const HdKeySet *s, uint64_t key)
    {
       int lo = 0, hi = s->count;
@@ -7196,14 +7187,14 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
    /* TextureTracker: the HD-texture replacement engine -- tracks VRAM rects,
     * resolves (hash,palette) combos to HD textures, and drives the disk/CPU/GPU
     * cache tiers and the IO worker thread. Converted from a C++ class to a plain C
-    * struct + texture_tracker_* free functions. The ctor/dtor become
+    * struct + texture_tracker_* free functions. The init/teardown become
     * texture_tracker_init / texture_tracker_fini; the embedded RectTracker /
     * FusedPages are init'd/deinit'd there (already converted). Default member
     * initializers move into texture_tracker_init. */
    struct TextureTracker {
       bool dump_enabled;
       bool hd_textures_enabled;
-      bool eager_textures; // true = prefetch all palettes of a hash on upload (master-consistent); false = lazy per-draw
+      bool eager_textures; /* true = prefetch all palettes of a hash on upload (master-consistent); false = lazy per-draw */
 
       IOThread iothread;
       Renderer *uploader;
@@ -7214,8 +7205,8 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       int       dump_ignore_count;
 
       HdKeySet known_files;
-      // Palette-hash cache: a plain growable array (append-only until cleared,
-      // no eviction/order), replacing std::vector<CachedPaletteHash>.
+      /* Palette-hash cache: a plain growable array (append-only until cleared,
+       * no eviction/order). */
       CachedPaletteHash *cached_palette_hashes;
       int cached_palette_hashes_count;
       int cached_palette_hashes_cap;
@@ -7226,15 +7217,15 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       RectTracker tracker;
       HandleLRUCache handle_cache;
 
-      // HD image caches, independent of upload lifetime. Tier 1 = GPU (VRAM,
-      // ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier 3
-      // = disk. Initialised via HdGpuCache_init / HdImageCache_init.
+      /* HD image caches, independent of upload lifetime. Tier 1 = GPU (VRAM,
+       * ready-to-bind Vulkan images); tier 2 = CPU (RAM, decoded levels); tier 3
+       * = disk. Initialised via HdGpuCache_init / HdImageCache_init. */
       HdGpuCache hd_gpu_cache;
       HdImageCache hd_cache;
-      HdKeySet requested;        // disk load in flight, or known to have no file (negative cache)
-      HdKeySet pending_attach;   // cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset
+      HdKeySet requested; /* disk load in flight, or known to have no file (negative cache) */
+      HdKeySet pending_attach; /* cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset */
 
-      // Diagnostics (logged every 300 frames by endFrame).
+      /* Diagnostics (logged every 300 frames by endFrame). */
       uint64_t dbg_responses_received;
       uint64_t dbg_responses_received_last;
       uint64_t dbg_gpu_uploads;
@@ -7325,12 +7316,12 @@ static void texture_tracker_clear_palette_cache(struct TextureTracker *self, Rec
    typedef enum PrimitiveType PrimitiveType;
 
    /* Display rectangle (signed origin, unlike Rect). Hoisted out of Renderer to
-    * file scope and de-C++'d: the 4-arg constructor becomes display_rect_make and
+    * file scope: the 4-arg initialiser becomes display_rect_make and
     * the default-member-initialisers are dropped (every constructed DisplayRect is
     * fully assigned). */
    struct DisplayRect
    {
-      // Unlike Rect, the x-y coordinates for a DisplayRect can be negative
+      /* Unlike Rect, the x-y coordinates for a DisplayRect can be negative */
       int x;
       int y;
       unsigned width;
@@ -7348,7 +7339,7 @@ static struct DisplayRect display_rect_make(int x, int y, unsigned width, unsign
    }
 
    /* Per-primitive scissor / HD-texture metadata. Hoisted out of Renderer to
-    * file scope and de-C++'d: the constructor (with its default arguments)
+    * file scope: the initialiser (with its default arguments)
     * becomes primitive_info_make, with the defaults moved to the call sites that
     * relied on them. POD, so PrimitiveInfoVec is a plain POD_VEC. */
    struct PrimitiveInfo {
@@ -7377,7 +7368,7 @@ static struct PrimitiveInfo primitive_info_make(
    }
 
    /* Per-batch semi-transparent draw state. Hoisted out of Renderer to file scope
-    * and de-C++'d: the operator==/operator!= become semi_transparent_state_eq.
+    * the equality/inequality checks become semi_transparent_state_eq.
     * POD otherwise (its hd_texture_index HdTextureHandle compares field-wise via
     * the handle's own equality). */
    struct SemiTransparentState
@@ -7407,12 +7398,12 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a, cons
     * name them without a Renderer:: qualifier. The enumerator names are already
     * prefixed, so there is no collision at file scope. */
    enum ScanoutMode {
-      // Use extra precision bits.
+      /* Use extra precision bits. */
       ScanoutMode_ABGR1555_555,
-      // Use extra precision bits to dither down to a native ABGR1555 image.
-      // The dither happens in the wrong place, but should be "good" enough to feel authentic.
+      /* Use extra precision bits to dither down to a native ABGR1555 image.
+       * The dither happens in the wrong place, but should be "good" enough to feel authentic. */
       ScanoutMode_ABGR1555_Dither,
-      // MDEC
+      /* MDEC */
       ScanoutMode_BGR24
    };
    typedef enum ScanoutMode ScanoutMode;
@@ -7503,12 +7494,12 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a, cons
 
    /* Renderer top-level render state. Hoisted out of the Renderer class to file
     * scope (it is carried by value inside SaveState and named by many methods) and
-    * de-C++'d: the default member initializers move into render_state_init, which
-    * the Renderer constructor calls. The Rect / TextureWindow / UVRect members are
+    * the default member initialisers move into render_state_init, which
+    * the Renderer initialiser calls. The Rect / TextureWindow / UVRect members are
     * zeroed explicitly (Rect is non-trivial, so no memset). */
    struct RenderState
    {
-      //Rect display_mode;
+      /* Rect display_mode; */
       Rect display_fb_rect;
       TextureWindow texture_window;
       Rect cached_window_rect;
@@ -7531,7 +7522,7 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a, cons
       int crop_overscan;
       unsigned image_crop;
 
-      // Experimental horizontal offset feature
+      /* Experimental horizontal offset feature */
       int offset_cycles;
 
       int slstart;
@@ -7615,20 +7606,20 @@ static void render_state_init(struct RenderState *s)
    }
 
    /* Renderer per-frame draw queues. Hoisted out of the Renderer class to file
-    * scope and de-C++'d: the {}-zeroed POD_VEC members and scissor_invariant = false
-    * default move into opaque_queue_init, which the Renderer constructor calls. The
+    * scope: the {}-zeroed POD_VEC members and scissor_invariant = false
+    * default move into opaque_queue_init, which the Renderer initialiser calls. The
     * backing storage is freed in ~Renderer (already explicit). */
    struct OpaqueQueue
    {
-      // Non-textured primitives.
+      /* Non-textured primitives. */
       BufferVertexVec opaque;
       PrimitiveInfoVec opaque_scissor;
 
-      // Textured primitives, no semi-transparency.
+      /* Textured primitives, no semi-transparency. */
       BufferVertexVec opaque_textured;
       PrimitiveInfoVec opaque_textured_scissor;
 
-      // Textured primitives, semi-transparency enabled.
+      /* Textured primitives, semi-transparency enabled. */
       BufferVertexVec semi_transparent_opaque;
       PrimitiveInfoVec semi_transparent_opaque_scissor;
 
@@ -7675,8 +7666,8 @@ static void opaque_queue_init(struct OpaqueQueue *q)
       q->scissor_invariant = false;
    }
 
-   /* Owning uint32_t buffer (the VRAM snapshot in a SaveState). De-C++'d from a
-    * move-only class to a plain struct + owned_u32_* free functions: init nulls it,
+   /* Owning uint32_t buffer (the VRAM snapshot in a SaveState). A plain struct
+    * plus owned_u32_* free functions: init nulls it,
     * deinit frees, assign deep-copies, move steals (source left empty). */
    struct OwnedU32Buf
    {
@@ -7752,13 +7743,13 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 
          /* Owning uint32_t buffer for the saved VRAM image. Replaces
-          * std::vector<uint32_t>; like the other save-state members it lives
+          * an owned uint32_t array; like the other save-state members it lives
           * in a file-static that is move-assigned across renderer
-          * recreations, so it is move-only with a free-existing move-assign
-          * and a destructor, and copying is deleted. */
+          * recreations, so it is moved with a free-existing move-assign
+          * and a teardown, and copying is deleted. */
 
-         /* SaveState: plain C struct (was a move-only C++ class). Owns an OwnedU32Buf
-          * VRAM snapshot, a POD RenderState, and a move-only TextureTrackerSaveState.
+         /* SaveState: plain C struct. Owns an OwnedU32Buf
+          * VRAM snapshot, a POD RenderState, and a TextureTrackerSaveState.
           * Managed explicitly via savestate_init / savestate_destroy / savestate_move
           * (defined as free functions after the Renderer class, where OwnedU32Buf and
           * TextureTrackerSaveState are complete). No copy exists. */
@@ -7794,7 +7785,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 
 
-         // Draw commands
+         /* Draw commands */
 
 
 
@@ -7808,8 +7799,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 
 
-         /* True iff the constructor finished successfully. The Renderer
-          * constructor does not throw; on failure (e.g. RGBA8_UNORM not
+         /* True iff the initialiser finished successfully. The Renderer
+          * initialiser does not throw; on failure (e.g. RGBA8_UNORM not
           * supported) it leaves the object in a destroyable but otherwise
           * unusable state. Callers must check is_valid() before use. */
 
@@ -7833,9 +7824,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
          CommandBufferHandle cmd;
 
-         // Called by FBAtlas (formerly via HazardListener interface).
+         /* Called by FBAtlas (formerly via HazardListener interface). */
 
-         // Called by TextureTracker (formerly via TextureUploader interface).
+         /* Called by TextureTracker (formerly via TextureUploader interface). */
 
 
          struct
@@ -7901,9 +7892,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          BufferHandle quad;
    };
 
-   /* SaveState lifecycle free functions (SaveState was a move-only C++ class; it is now
+   /* SaveState lifecycle free functions (SaveState is
     * a plain struct). vram is an OwnedU32Buf and tracker_state a TextureTrackerSaveState,
-    * both move-only plain structs managed through their own *_init / *_move / destroy. */
+    * both plain structs managed through their own *_init / *_move / destroy. */
    static INLINE void savestate_init(struct SaveState *s)
    {
       owned_u32_init(&s->vram);
@@ -8031,7 +8022,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       cbh_reset(&self->cmd);
       device_flush_frame(self->device);
       /* Return by value transfers ownership to the caller; the struct copy does
-       * not incref and this local must NOT reset (moved-from). */
+       * not incref and this local must NOT reset (emptied). */
       return fence;
    }
    static INLINE ScanoutMode renderer_get_scanout_mode(const Renderer *self)
@@ -8171,7 +8162,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    }
    static INLINE void renderer_set_visible_scanlines(Renderer *self, int slstart, int slend, int slstart_pal, int slend_pal)
    {
-      // May need bounds checking to reject bad inputs. Currently assume all inputs are valid.
+      /* May need bounds checking to reject bad inputs. Currently assume all inputs are valid. */
       self->render_state.slstart = slstart;
       self->render_state.slend = slend;
       self->render_state.slstart_pal = slstart_pal;
@@ -8332,19 +8323,19 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 #include "shaders_vulkan/prebuilt/mipmap.energy.blur.frag.inc"
       ;
 
-// 3 LSBs are ignored.
+/* 3 LSBs are ignored. */
 #define FBCOLOR_TO_RGBA8(color) ((color) & 0xfff8f8f8u)
 
 static INLINE void fbcolor_to_rgba32f(float *v, uint32_t color)
 {
-   // 3 LSBs are ignored.
+   /* 3 LSBs are ignored. */
    unsigned r = (color >> 0) & 0xf8;
    unsigned g = (color >> 8) & 0xf8;
    unsigned b = (color >> 16) & 0xf8;
    v[0] = r * (1.0f / 255.0f);
    v[1] = g * (1.0f / 255.0f);
    v[2] = b * (1.0f / 255.0f);
-   // Mask bit is always cleared.
+   /* Mask bit is always cleared. */
    v[3] = 0.0f;
 }
 
@@ -8354,9 +8345,9 @@ static void renderer_init(Renderer *self, Device *device_, unsigned scaling_, un
    ImageCreateInfo info;
    VkImageFormatProperties props;
    ImageCreateInfo dither_info;
-   /* Former constructor init-list + remaining scalar default member initializers,
+   /* Former initialiser init-list + remaining scalar default member initializers,
     * assigned explicitly now that Renderer is malloc'd and placement-initialised via
-    * renderer_init rather than a C++ constructor. */
+    * renderer_init rather than a C++ initialiser. */
    self->device = device_;
    self->scaling = scaling_;
    self->msaa = msaa_;
@@ -8382,15 +8373,15 @@ static void renderer_init(Renderer *self, Device *device_, unsigned scaling_, un
    self->framebuffer_ssaa.data        = NULL;
    self->dither_lut.data              = NULL;
    /* self->render_state's default member initializers were moved out when RenderState
-    * was de-C++'d; seed them here (was implicit at construction). */
+    * seed them here (was implicit at construction). */
    render_state_init(&self->render_state);
    opaque_queue_init(&self->queue);
    imageview_vec_init(&self->scaled_views); /* was default-constructed; now a plain struct */
    self->last_scanout.data            = NULL;
    self->reuseable_scanout.data       = NULL;
    fbatlas_init(&self->atlas);
-   texture_tracker_init(&self->tracker); /* embedded TextureTracker: explicit init (was default ctor) */
-   // Sanity check settings, 16x IR with 16x MSAA will exhaust most GPUs VRAM alone.
+   texture_tracker_init(&self->tracker); /* embedded TextureTracker: explicit init (was default initialiser) */
+   /* Sanity check settings, 16x IR with 16x MSAA will exhaust most GPUs VRAM alone. */
    if (self->scaling == 16 && self->msaa > 1)
    {
       LOGI("[Vulkan]: Internal resolution scale of 16x is used, limiting MSAA to 1x for memory reasons.\n");
@@ -8402,8 +8393,8 @@ static void renderer_init(Renderer *self, Device *device_, unsigned scaling_, un
       self->msaa = 4;
    }
 
-   // Verify we can actually render at our target self->scaling factor.
-   // Some devices only support 8K textures, which means max 8x scale.
+   /* Verify we can actually render at our target self->scaling factor.
+    * Some devices only support 8K textures, which means max 8x scale. */
    if (device_get_image_format_properties(self->device, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
             VK_IMAGE_USAGE_STORAGE_BIT |
@@ -8480,7 +8471,7 @@ static void renderer_init(Renderer *self, Device *device_, unsigned scaling_, un
       } }
    }
 
-   // Check for support.
+   /* Check for support. */
    if (self->msaa > 1)
    {
       if (!device_get_device_features(self->device)->enabled_features.sampleRateShading)
@@ -8529,8 +8520,8 @@ static void renderer_init(Renderer *self, Device *device_, unsigned scaling_, un
       info.samples = (VkSampleCountFlagBits)(self->msaa);
       ih_move(&self->scaled_framebuffer_msaa, device_create_image(self->device, &info, NULL));
       image_set_layout(ih_get(&self->scaled_framebuffer_msaa), Layout_General);
-      // General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
-      // The expectation is that self will be used with a lower self->scaling factor to compensate.
+      /* General layout for MSAA is going to be brutal bandwidth-wise, but we have no real choice.
+       * The expectation is that self will be used with a lower self->scaling factor to compensate. */
    }
 
    fbatlas_set_hazard_listener(&self->atlas, self);
@@ -8549,7 +8540,7 @@ static void renderer_init(Renderer *self, Device *device_, unsigned scaling_, un
    commandbuffer_full_barrier(cbh_get(&self->cmd));
 
    dither_info = image_create_info_immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM, false);
-   // This lut is biased with 4 to be able to use UNORM easily.
+   /* This lut is biased with 4 to be able to use UNORM easily. */
    { static const uint8_t dither_lut_data[16] = { 0, 4, 1, 5, 6, 2, 7, 3, 1, 5, 0, 4, 7, 3, 6, 2 };
 
    ImageInitialData dither_initial = { dither_lut_data };
@@ -8639,7 +8630,7 @@ static void renderer_init_primitive_pipelines(Renderer *self)
 
 static void renderer_init_primitive_feedback_pipelines(Renderer *self)
 {
-   // TODO: The masked self->pipelines do not have filter options.
+   /* TODO: The masked self->pipelines do not have filter options. */
    if (self->msaa > 1)
    {
       self->pipelines.textured_masked_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert),
@@ -8793,7 +8784,7 @@ static void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *re
    bool wrap_y = rect->y + rect->height > FB_HEIGHT;
    Rect copy_rect = *rect;
    bool wrap = wrap_x || wrap_y;
-   // We could do four separate reads but this is eaiser
+   /* We could do four separate reads but this is eaiser */
    if (wrap)
    {
       copy_rect.x = 0;
@@ -8855,7 +8846,7 @@ static void renderer_copy_vram_to_cpu_synchronous(Renderer *self, const Rect *re
 static void renderer_mipmap_framebuffer(Renderer *self)
 {
    unsigned levels;
-   // self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
+   /* self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self); */
    Rect rect = self->render_state.display_fb_rect;
    if (rect.x + rect.width > FB_WIDTH)
    {
@@ -8950,7 +8941,7 @@ static void renderer_mipmap_framebuffer(Renderer *self)
 
 static void renderer_ssaa_framebuffer(Renderer *self)
 {
-   // self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
+   /* self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self); */
    Rect *rect = &self->render_state.display_fb_rect;
    unsigned left = rect->x / BLOCK_WIDTH;
    unsigned top = rect->y / BLOCK_HEIGHT;
@@ -8958,7 +8949,7 @@ static void renderer_ssaa_framebuffer(Renderer *self)
    unsigned bottom = (rect->y + rect->height + BLOCK_HEIGHT - 1) / BLOCK_HEIGHT;
 
    /* Exact element count is known up front (block grid), so use a single
-    * malloc'd buffer filled by index rather than a growing std::vector. */
+    * malloc'd buffer filled by index rather than a growing array. */
    unsigned resolves_count = (bottom > top && right > left) ? (bottom - top) * (right - left) : 0;
    VkRect2D *resolves_ssaa = (VkRect2D *)malloc((resolves_count ? resolves_count : 1) * sizeof(VkRect2D));
    unsigned resolves_n = 0;
@@ -9067,10 +9058,10 @@ static DisplayRect renderer_compute_display_rect(Renderer *self)
    int left_offset;
    if (self->render_state.crop_overscan)
    {
-      // Horizontal crop amount is currently hardcoded. Future improvement could allow adjusting this.
-      // Restore old center behaviour is self->render_state.horiz_start is intentionally very high.
-      // 938 fixes Gunbird (1008) and Mobile Light Force (EU release of Gunbird),
-      // but this value should be lowerer in the future if necessary.
+      /* Horizontal crop amount is currently hardcoded. Future improvement could allow adjusting this.
+       * Restore old center behaviour is self->render_state.horiz_start is intentionally very high.
+       * 938 fixes Gunbird (1008) and Mobile Light Force (EU release of Gunbird),
+       * but this value should be lowerer in the future if necessary. */
       display_width = (2560/clock_div) - self->render_state.image_crop;
       if ((self->render_state.horiz_start < 938) && (self->render_state.crop_overscan == 2))
          left_offset = floor((self->render_state.offset_cycles / (double) clock_div) - (self->render_state.image_crop / 2));
@@ -9125,11 +9116,11 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 {
    RenderPassInfo rp;
    unsigned render_scale;
-   // Like renderer_scanout_to_texture(self), but synchronizes the entire
-   // VRAM self->framebuffer self->atlas before scanout. Does not apply
-   // any scanout filters and currently outputs at 15-bit
-   // color depth. Current implementation does not reuse
-   // prior scanouts.
+   /* Like renderer_scanout_to_texture(self), but synchronizes the entire
+    * VRAM self->framebuffer self->atlas before scanout. Does not apply
+    * any scanout filters and currently outputs at 15-bit
+    * color depth. Current implementation does not reuse
+    * prior scanouts. */
 
    fbatlas_flush_render_pass(&self->atlas);
 
@@ -9163,7 +9154,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
    { ImageCreateInfo info = image_create_info_render_target(
          FB_WIDTH * render_scale,
          FB_HEIGHT * render_scale,
-         VK_FORMAT_A1R5G5B5_UNORM_PACK16); // Default to 15bit color for now
+         VK_FORMAT_A1R5G5B5_UNORM_PACK16); /* Default to 15bit color for now */
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -9249,7 +9240,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
 
    if (rect->width == 0 || rect->height == 0 || !self->render_state.display_on)
    {
-      // Black screen, just flush out everything.
+      /* Black screen, just flush out everything. */
       { Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_read_fragment(&self->atlas, Domain_Scaled, &_r); }
 
       renderer_ensure_command_buffer(self);
@@ -9372,7 +9363,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    rp.store_attachments = 1;
 
    memset(&rp.clear_color[0], 0, sizeof(rp.clear_color[0]));
-   //rp.clear_color[0] = {60.0f/256.0f, 230.0f/256.0f, 60.0f/256.0f, 0};
+   /* rp.clear_color[0] = {60.0f/256.0f, 230.0f/256.0f, 60.0f/256.0f, 0}; */
    rp.clear_attachments = 1;
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -9537,7 +9528,7 @@ static void renderer_hazard(Renderer *self, StatusFlags flags)
                     VK_ACCESS_TRANSFER_WRITE_BIT;
    }
 
-   // Invalidate render target caches.
+   /* Invalidate render target caches. */
    if (flags & (STATUS_TRANSFER_SFB_WRITE | STATUS_COMPUTE_SFB_WRITE | STATUS_FRAGMENT_SFB_WRITE))
    {
       dst_stages |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -9545,7 +9536,7 @@ static void renderer_hazard(Renderer *self, StatusFlags flags)
                     VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
    }
 
-   // 24-bpp scanout hazard
+   /* 24-bpp scanout hazard */
    if (flags & STATUS_COMPUTE_FB_WRITE)
    {
       dst_stages |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
@@ -9554,7 +9545,7 @@ static void renderer_hazard(Renderer *self, StatusFlags flags)
 
    dst_stages |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
 
-   // If we have out-standing jobs in the compute pipe, issue them into cmdbuffer before injecting the barrier.
+   /* If we have out-standing jobs in the compute pipe, issue them into cmdbuffer before injecting the barrier. */
    if (flags & (STATUS_COMPUTE_FB_READ | STATUS_COMPUTE_FB_WRITE | STATUS_COMPUTE_SFB_READ | STATUS_COMPUTE_SFB_WRITE))
    {
       renderer_flush_blits(self);
@@ -9604,8 +9595,8 @@ static void renderer_flush_resolves(Renderer *self)
    {
       unsigned size;
       renderer_ensure_command_buffer(self);
-      // Always use nearest neighbor downscaling to avoid filter artifact (e.g. unwanted black outlines in Vagrant Story)
-      // Supersampling will use a separate pass for downsampling
+      /* Always use nearest neighbor downscaling to avoid filter artifact (e.g. unwanted black outlines in Vagrant Story)
+       * Supersampling will use a separate pass for downsampling */
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, 0);
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
@@ -9652,8 +9643,8 @@ static float renderer_allocate_depth(Renderer *self, Domain domain, const Rect *
 {
    fbatlas_write_fragment(&self->atlas, domain, rect);
    self->primitive_index++;
-   return 1.0f - self->primitive_index * (4.0f / 0xffffff); // Double the epsilon to be safe(r) when w is used.
-   //iCB: Doubled again for added safety, otherwise we get Z-fighting when drawing multi-pass blended primitives.
+   return 1.0f - self->primitive_index * (4.0f / 0xffffff); /* Double the epsilon to be safe(r) when w is used. */
+   /* iCB: Doubled again for added safety, otherwise we get Z-fighting when drawing multi-pass blended primitives. */
 }
 
 static HdTextureHandle renderer_get_hd_texture_index(Renderer *self, const Rect *vram_rect, bool *fastpath_capable_out, bool *cache_hit_out) {
@@ -9663,7 +9654,7 @@ static HdTextureHandle renderer_get_hd_texture_index(Renderer *self, const Rect 
       self->render_state.palette_offset_y
    };
    if (mode.mode == TextureMode_ABGR1555) {
-      // HACK: This mode doesn't use a palette, so this a hack to make the palette irrelevant for equality purposes
+      /* HACK: This mode doesn't use a palette, so this a hack to make the palette irrelevant for equality purposes */
       mode.palette_offset_x = 0;
       mode.palette_offset_y = 0;
    }
@@ -9705,7 +9696,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
          unsigned width = max_u - min_u + 1;
          unsigned height = max_v - min_v + 1;
 
-         if (max_u > 255 || max_v > 255) // Wraparound behavior, assume the whole page is hit.
+         if (max_u > 255 || max_v > 255) /* Wraparound behavior, assume the whole page is hit. */
          {
             { Rect _r = { 0, 0, 256u >> shift, 256 }; fbatlas_set_texture_window(&self->atlas, &_r); }
             hd_texture_vram.x = self->render_state.texture_offset_x;
@@ -9723,14 +9714,14 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
             hd_texture_vram.x = self->render_state.texture_offset_x + min_u;
             hd_texture_vram.y = self->render_state.texture_offset_y + min_v;
 
-            // HDTODO: this might be wrong because it can result in Rect's with 0 width, also notice that height has the same +1
-            hd_texture_vram.width = width - 1; // This is -1 due to boundary shenanigans above (otherwise upload.rect.contains(snoop) would return false for the right-most tiles)
+            /* HDTODO: this might be wrong because it can result in Rect's with 0 width, also notice that height has the same +1 */
+            hd_texture_vram.width = width - 1; /* This is -1 due to boundary shenanigans above (otherwise upload.rect.contains(snoop) would return false for the right-most tiles) */
             hd_texture_vram.height = height;
          }
       }
       else
       {
-         // If we have a masked texture window, assume this is the true rect we should use.
+         /* If we have a masked texture window, assume this is the true rect we should use. */
          Rect effective_rect = self->render_state.cached_window_rect;
          { Rect _r = { effective_rect.x >> shift, effective_rect.y, effective_rect.width >> shift, effective_rect.height }; fbatlas_set_texture_window(&self->atlas, &_r); }
          hd_texture_vram.x = self->render_state.texture_offset_x + (effective_rect.x >> shift);
@@ -9740,14 +9731,14 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       }
    }
 
-   // Compute bounding box for the draw call.
+   /* Compute bounding box for the draw call. */
    { float max_x = 0.0f;
    float max_y = 0.0f;
    float min_x = (float)(FB_WIDTH);
    float min_y = (float)(FB_HEIGHT);
    float x[4];
    float y[4];
-   // Bounding box for texture
+   /* Bounding box for texture */
    unsigned max_u = 0.0f;
    unsigned max_v = 0.0f;
    unsigned min_u = FB_WIDTH;
@@ -9773,7 +9764,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       }
    } }
 
-   // Clamp the rect.
+   /* Clamp the rect. */
    min_x = floorf(max_(min_x, 0.0f));
    min_y = floorf(max_(min_y, 0.0f));
    max_x = ceilf(min_(max_x, (float)(FB_WIDTH)));
@@ -9787,8 +9778,8 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    {
       if (rect_intersects(&self->render_state.draw_rect, &rect))
       {
-         // HACK hd_texture_vram should contains the texture we are reading from in vram coordinate
-         // avoid texture filtering and enable scaled read if the texture is rendered content
+         /* HACK hd_texture_vram should contains the texture we are reading from in vram coordinate
+          * avoid texture filtering and enable scaled read if the texture is rendered content */
          bool texture_rendered = fbatlas_texture_rendered(&self->atlas, &hd_texture_vram);
          filtering = !texture_rendered;
          scaled_read = texture_rendered;
@@ -9808,11 +9799,11 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
 
    z = renderer_allocate_depth(self, scaled_read ? Domain_Scaled : Domain_Unscaled, &rect);
 
-   // Look up the hd texture index
-   // This is done here at the end of the function because the `allocate_depth`
-   // call above can call `reset_queue` which would invalidate the HdTextureHandle
+   /* Look up the hd texture index
+    * This is done here at the end of the function because the `allocate_depth`
+    * call above can call `reset_queue` which would invalidate the HdTextureHandle */
    param = (int16_t)(shift);
-   if (hd_texture_vram.height > 0) { // This condition is just a dumb way to check that the rect was actually set to something
+   if (hd_texture_vram.height > 0) { /* This condition is just a dumb way to check that the rect was actually set to something */
       bool fastpath_capable_out = false;
       bool cache_hit = false;
       hd_texture_index = renderer_get_hd_texture_index(self, &hd_texture_vram, &fastpath_capable_out, &cache_hit);
@@ -9822,15 +9813,15 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
          self->render_state.texture_window.mask_x == 0xff && self->render_state.texture_window.mask_y == 0xff &&
          self->render_state.texture_window.or_x == 0x00 && self->render_state.texture_window.or_y == 0x00
       ) {
-         // All UVs are within a single hd texture, and there are no & or | shenanigans. Tell the shader to use the fast path.
+         /* All UVs are within a single hd texture, and there are no & or | shenanigans. Tell the shader to use the fast path. */
          param = param | 0x100;
       }
       if (cache_hit) {
-         param = param | 0x400; // dbg cache hit
+         param = param | 0x400; /* dbg cache hit */
       }
    }
    if (hd_handle_is_none(&hd_texture_index)) {
-      // This flag says skip hd textures
+      /* This flag says skip hd textures */
       param = param | 0x200;
    }
 
@@ -9866,7 +9857,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
 
 static BufferVertexVec * renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture,
    bool filtering, bool scaled_read, unsigned shift, bool offset_uv){
-   // For mask testing, force primitives through the serialized blend path.
+   /* For mask testing, force primitives through the serialized blend path. */
    if (self->render_state.mask_test)
       return NULL;
 
@@ -9913,7 +9904,7 @@ static void renderer_build_line_quad(Renderer *self, Vertex *output, const Verte
    if (dx == 0.0f && dy == 0.0f)
    {
       uint32_t c;
-      // Degenerate, render a point.
+      /* Degenerate, render a point. */
       output[0].x = input[0].x;
       output[0].y = input[0].y;
       output[1].x = input[0].x + 1.0f;
@@ -9945,11 +9936,11 @@ static void renderer_build_line_quad(Renderer *self, Vertex *output, const Verte
    float pad_y0 = 0.0f;
    float pad_y1 = 0.0f;
 
-   // Check for vertical or horizontal major lines.
-   // When expanding to a rect, do so in the appropriate direction.
-   // FIXME: This scheme seems to kinda work, but it seems very hard to find a method
-   // that looks perfect on every game.
-   // Vagrant Story speech bubbles are a very good test case here!
+   /* Check for vertical or horizontal major lines.
+    * When expanding to a rect, do so in the appropriate direction.
+    * FIXME: This scheme seems to kinda work, but it seems very hard to find a method
+    * that looks perfect on every game.
+    * Vagrant Story speech bubbles are a very good test case here! */
    if (abs_dx > abs_dy)
    {
       fill_dx = 0.0f;
@@ -9959,13 +9950,13 @@ static void renderer_build_line_quad(Renderer *self, Vertex *output, const Verte
 
       if (dx > 0.0f)
       {
-         // Right
+         /* Right */
          pad_x1 = 1.0f;
          pad_y1 = dydk;
       }
       else
       {
-         // Left
+         /* Left */
          pad_x0 = 1.0f;
          pad_y0 = -dydk;
       }
@@ -9979,13 +9970,13 @@ static void renderer_build_line_quad(Renderer *self, Vertex *output, const Verte
 
       if (dy > 0.0f)
       {
-         // Down
+         /* Down */
          pad_y1 = 1.0f;
          pad_x1 = dxdk;
       }
       else
       {
-         // Up
+         /* Up */
          pad_y0 = 1.0f;
          pad_x0 = -dxdk;
       }
@@ -10021,8 +10012,8 @@ static void renderer_build_line_quad(Renderer *self, Vertex *output, const Verte
 
 static void renderer_draw_line(Renderer *self, const Vertex *vertices)
 {
-   // We can move this to GPU, but means more draw calls and more pipeline swapping.
-   // This should be plenty fast for the quite small amount of lines games render.
+   /* We can move this to GPU, but means more draw calls and more pipeline swapping.
+    * This should be plenty fast for the quite small amount of lines games render. */
    Vertex vert[4];
    renderer_build_line_quad(self, vert, vertices);
    renderer_draw_quad(self, vert);
@@ -10067,8 +10058,8 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
          SemiTransparentStateVec_push(&self->queue.semi_transparent_state, &_sts);
       }
 
-      // We've hit the dragon path, we'll need programmable blending for this render pass.
-      // self->render_pass_is_feedback enables self dependency in renderpass which is necessary for barriers between draws.
+      /* We've hit the dragon path, we'll need programmable blending for this render pass.
+       * self->render_pass_is_feedback enables self dependency in renderpass which is necessary for barriers between draws. */
       self->render_pass_is_feedback = true;
    }
    }
@@ -10084,11 +10075,11 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 
    ih_reset(&self->last_scanout);
 
-   // build_attribs may flush the queues, thus calling reset_queue and invalidating any pre-existing HdTextureHandle.
-   // self->tracker.no_hd_texture uses a special index (-1) that is the only one self->valid across such events.
-   // If in the future one were tempted to try to cache or reuse the last used HdTextureHandle here, they would have
-   // to be very careful not to let it get invalidated by build_attribs; so any such logic should happen within
-   // build_attribs itself, and not out here.
+   /* build_attribs may flush the queues, thus calling reset_queue and invalidating any pre-existing HdTextureHandle.
+    * self->tracker.no_hd_texture uses a special index (-1) that is the only one self->valid across such events.
+    * If in the future one were tempted to try to cache or reuse the last used HdTextureHandle here, they would have
+    * to be very careful not to let it get invalidated by build_attribs; so any such logic should happen within
+    * build_attribs itself, and not out here. */
    hd_texture_index = hd_handle_make_none();
    { bool filtering = false;
    bool scaled_read = false;
@@ -10130,7 +10121,7 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices)
       SemiTransparentStateVec_push(&self->queue.semi_transparent_state, &state);
       SemiTransparentStateVec_push(&self->queue.semi_transparent_state, &state);
 
-      // We've hit the dragon path, we'll need programmable blending for this render pass.
+      /* We've hit the dragon path, we'll need programmable blending for this render pass. */
       self->render_pass_is_feedback = true;
       }
    }
@@ -10247,7 +10238,7 @@ static void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 
    commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
-   // Render passes are implicitly synchronized.
+   /* Render passes are implicitly synchronized. */
    commandbuffer_image_barrier(cbh_get(&self->cmd), self->msaa > 1 ? ih_get(&self->scaled_framebuffer_msaa) : ih_get(&self->scaled_framebuffer),
          VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
          VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
@@ -10316,7 +10307,7 @@ static void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, P
    unsigned to_draw;
    qsort(PrimitiveInfoVec_data(scissors), PrimitiveInfoVec_size(scissors), sizeof(PrimitiveInfo), renderer_primitive_info_qsort_cmp);
 
-   // Render flat-shaded primitives.
+   /* Render flat-shaded primitives. */
    { BufferVertex *vert = (BufferVertex *)(
        commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, BufferVertexVec_size(vertices) * sizeof(BufferVertex), sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX));
 
@@ -10401,7 +10392,7 @@ static void renderer_render_opaque_primitives(Renderer *self){
 }
 
 static void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_index) {
-   // ivec4, ivec4
+   /* ivec4, ivec4 */
    struct HDPush {
       int32_t vram_rect_x;
       int32_t vram_rect_y;
@@ -10414,7 +10405,7 @@ static void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_text
       int32_t texel_rect_height;
    };
    HdTexture hd = texture_tracker_get_hd_texture(&self->tracker, hd_texture_index);
-   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 4, image_get_view(ih_get(&hd.texture)), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 4, image_get_view(ih_get(&hd.texture)), StockSampler_TrilinearClamp); /* Type of sampler only matters for the fast path */
    { struct HDPush push = {
       hd.vram_rect.x, hd.vram_rect.y, hd.vram_rect.width, hd.vram_rect.height,
       hd.texel_rect.x, hd.texel_rect.y, hd.texel_rect.width, hd.texel_rect.height
@@ -10451,11 +10442,11 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
 
    renderer_semi_transparent_set_state(self, &last_state);
 
-   // These pixels are blended, so we have to render them in-order.
-   // Batch up as long as we can.
+   /* These pixels are blended, so we have to render them in-order.
+    * Batch up as long as we can. */
    { unsigned i; for (i = 1; i < prims; i++) {
-      // If we need programmable shading, we can't batch as primitives may overlap.
-      // We could in theory do some fancy tests here, but probably overkill here.
+      /* If we need programmable shading, we can't batch as primitives may overlap.
+       * We could in theory do some fancy tests here, but probably overkill here. */
       if ((last_state.masked && last_state.semi_transparent != SemiTransparentMode_None) ||
           !semi_transparent_state_eq(&last_state, SemiTransparentStateVec_at(&self->queue.semi_transparent_state, i)))
       {
@@ -10529,7 +10520,7 @@ static void renderer_render_opaque_texture_primitives(Renderer *self){
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); // Pad to support AMD
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); /* Pad to support AMD */
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
@@ -10592,7 +10583,7 @@ static void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src)
    VK_ASSERT(dst->width == src->width);
    VK_ASSERT(dst->height == src->height);
 
-   // Happens a lot in Square games for some reason.
+   /* Happens a lot in Square games for some reason. */
    if (rect_eq(dst, src))
       return;
 
@@ -10614,13 +10605,13 @@ static void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src)
    if (rect_intersects(dst, src))
    {
       unsigned factor;
-      // The software implementation takes texture cache into account by copying 128 horizontal pixels at a time ...
-      // We can do it with compute.
+      /* The software implementation takes texture cache into account by copying 128 horizontal pixels at a time ...
+       * We can do it with compute. */
       renderer_ensure_command_buffer(self);
 
       factor = domain == Domain_Scaled ? self->scaling : 1u;
 
-      // Slower path where we do this in a single workgroup which steps through line by line, just like the software version.
+      /* Slower path where we do this in a single workgroup which steps through line by line, just like the software version. */
       { struct Push
       {
          uint32_t src_offset[2];
@@ -10658,8 +10649,8 @@ static void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src)
                                        self->pipelines.blit_vram_cached_unscaled);
          commandbuffer_dispatch(cbh_get(&self->cmd), factor, factor, 1);
       }
-      //LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
-      //    dst.y, dst.width, dst.height);
+      /* LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
+       * dst.y, dst.width, dst.height); */
       }
    }
    else
@@ -10745,7 +10736,7 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
    fbatlas_load_image(&self->atlas, rect);
    size = rect->width * rect->height * sizeof(uint16_t);
 
-   // TODO: Chain allocate this.
+   /* TODO: Chain allocate this. */
    { BufferCreateInfo buffer_create_info;
    buffer_create_info.domain = BufferDomain_Host;
    buffer_create_info.size = size;
@@ -10766,7 +10757,7 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
    commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ? self->pipelines.copy_to_vram_masked : self->pipelines.copy_to_vram);
    commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
 
-   // Vulkan minimum limit, for large buffer views, split up the work.
+   /* Vulkan minimum limit, for large buffer views, split up the work. */
    if (rect->width * rect->height > device_get_gpu_properties(self->device)->limits.maxTexelBufferElements)
    {
       { unsigned y; for (y = 0; y < rect->height; y += BLOCK_HEIGHT) {
@@ -10801,7 +10792,7 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
       { struct Push push = { *rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
       commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 
-      // TODO: Batch up work.
+      /* TODO: Batch up work. */
       commandbuffer_dispatch(cbh_get(&self->cmd), (rect->width + 7) >> 3, (rect->height + 7) >> 3, 1);
       bvh_reset(&view);
       }
@@ -10816,9 +10807,9 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 static void renderer_fini(Renderer *self)
 {
    renderer_flush(self);
-   texture_tracker_fini(&self->tracker); /* embedded TextureTracker: explicit fini (was default dtor) */
+   texture_tracker_fini(&self->tracker); /* embedded TextureTracker: explicit fini (was default teardown) */
    /* Release the ImageHandle members (previously dropped by implicit member
-    * destructors, which a plain struct no longer provides). */
+    * teardown, which a plain struct no longer provides). */
    ih_reset(&self->scaled_framebuffer);
    ih_reset(&self->scaled_framebuffer_msaa);
    ih_reset(&self->bias_framebuffer);
@@ -10828,7 +10819,7 @@ static void renderer_fini(Renderer *self)
    ih_reset(&self->last_scanout);
    ih_reset(&self->reuseable_scanout);
    bh_reset(&self->quad);
-   imageview_vec_destroy(&self->scaled_views); /* release scaled image views (was member dtor) */
+   imageview_vec_destroy(&self->scaled_views); /* release scaled image views (was member teardown) */
    /* Free the per-frame draw-self->queue arrays (POD_VEC backing storage). */
    BufferVertexVec_free_storage(&self->queue.opaque);
    PrimitiveInfoVec_free_storage(&self->queue.opaque_scissor);
@@ -10909,7 +10900,7 @@ static void renderer_semi_transparent_set_state(Renderer *self, const SemiTransp
    {
    case SemiTransparentMode_None:
    {
-      // For opaque primitives which are just masked, we can make use of fixed function blending.
+      /* For opaque primitives which are just masked, we can make use of fixed function blending. */
       commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_Opaque);
       commandbuffer_set_program(cbh_get(&self->cmd), textured);
@@ -10929,7 +10920,7 @@ static void renderer_semi_transparent_set_state(Renderer *self, const SemiTransp
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), false);
          if (self->msaa > 1)
          {
-            // Need to blend per-sample.
+            /* Need to blend per-sample. */
             commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, true);
          }
          commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -10958,7 +10949,7 @@ static void renderer_semi_transparent_set_state(Renderer *self, const SemiTransp
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), false);
          if (self->msaa > 1)
          {
-            // Need to blend per-sample.
+            /* Need to blend per-sample. */
             commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, true);
          }
          commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -10989,7 +10980,7 @@ static void renderer_semi_transparent_set_state(Renderer *self, const SemiTransp
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), false);
          if (self->msaa > 1)
          {
-            // Need to blend per-sample.
+            /* Need to blend per-sample. */
             commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, true);
          }
          commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -11018,7 +11009,7 @@ static void renderer_semi_transparent_set_state(Renderer *self, const SemiTransp
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), false);
          if (self->msaa > 1)
          {
-            // Need to blend per-sample.
+            /* Need to blend per-sample. */
             commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, true);
          }
          commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -11277,11 +11268,11 @@ static uint32_t tfl_format_block_size(VkFormat format)
    fmt(X8_D24_UNORM_PACK32, 4);
    fmt(D32_SFLOAT, 4);
    fmt(S8_UINT, 1);
-   fmt(D16_UNORM_S8_UINT, 3); // Doesn't make sense.
+   fmt(D16_UNORM_S8_UINT, 3); /* Doesn't make sense. */
    fmt(D24_UNORM_S8_UINT, 4);
-   fmt(D32_SFLOAT_S8_UINT, 5); // Doesn't make sense.
+   fmt(D32_SFLOAT_S8_UINT, 5); /* Doesn't make sense. */
 
-      // ETC2
+      /* ETC2 */
    fmt(ETC2_R8G8B8A8_UNORM_BLOCK, 16);
    fmt(ETC2_R8G8B8A8_SRGB_BLOCK, 16);
    fmt(ETC2_R8G8B8A1_UNORM_BLOCK, 8);
@@ -11293,7 +11284,7 @@ static uint32_t tfl_format_block_size(VkFormat format)
    fmt(EAC_R11G11_UNORM_BLOCK, 16);
    fmt(EAC_R11G11_SNORM_BLOCK, 16);
 
-      // BC
+      /* BC */
    fmt(BC1_RGB_UNORM_BLOCK, 8);
    fmt(BC1_RGB_SRGB_BLOCK, 8);
    fmt(BC1_RGBA_UNORM_BLOCK, 8);
@@ -11311,7 +11302,7 @@ static uint32_t tfl_format_block_size(VkFormat format)
    fmt(BC7_SRGB_BLOCK, 16);
    fmt(BC7_UNORM_BLOCK, 16);
 
-      // ASTC
+      /* ASTC */
    fmt(ASTC_4x4_SRGB_BLOCK, 16);
    fmt(ASTC_5x4_SRGB_BLOCK, 16);
    fmt(ASTC_5x5_SRGB_BLOCK, 16);
@@ -11466,10 +11457,10 @@ static void sampler_fini(struct Sampler *self)
 }
 
 /* Forward declarations for the 8 pointee deleter free functions (formerly
- * XDeleter::operator()). Each *_release_reference below calls its deleter, but
+ * the per-type deleter). Each *_release_reference below calls its deleter, but
  * the deleter bodies are defined further down (they need the pool/fini helpers
  * in scope), so they must be declared first now that they are plain static
- * functions rather than inline functor operator()s. */
+ * functions rather than inline functor calls. */
 static void sampler_deleter_call(Sampler *sampler);
 static void buffer_deleter_call(Buffer *buffer);
 static void buffer_view_deleter_call(BufferView *view);
@@ -11568,7 +11559,7 @@ static void imageview_init(struct ImageView *self, Device *device, VkImageView v
 
 static VkImageView imageview_get_render_target_view(const struct ImageView *self, unsigned layer)
 {
-   // Transient images just have one layer.
+   /* Transient images just have one layer. */
    if (image_get_create_info(self->info.image)->domain == ImageDomain_Transient)
       return self->view;
 
@@ -11639,7 +11630,7 @@ static void image_init(struct Image *self, Device *device, VkImage image, VkImag
 static void image_fini(struct Image *self)
 {
    /* The default-view handle was previously released by the implicit
-    * ImageViewHandle member destructor; now that it is a plain struct, drop
+    * ImageViewHandle member teardown; now that it is a plain struct, drop
     * its reference explicitly. */
    iv_reset(&self->view);
    if (deviceallocation_get_memory(&self->alloc))
@@ -11824,11 +11815,11 @@ static struct BufferBlock bufferpool_allocate_block(struct BufferPool *self, VkD
    block.gpu = device_create_buffer(self->device, &info, NULL);
    device_set_name_buffer(self->device, bh_get(&block.gpu), "chain-allocated-block-gpu");
 
-   // Try to map it, will fail unless the memory is host visible.
+   /* Try to map it, will fail unless the memory is host visible. */
    block.mapped = (uint8_t *)(device_map_host_buffer(self->device, bh_get(&block.gpu), MEMORY_ACCESS_WRITE_BIT));
    if (!block.mapped)
    {
-      // Fall back to host memory, and remember to sync to gpu on submission time using DMA queue. :)
+      /* Fall back to host memory, and remember to sync to gpu on submission time using DMA queue. :) */
       BufferCreateInfo cpu_info;
       cpu_info.domain = BufferDomain_Host;
       cpu_info.size = size;
@@ -11873,7 +11864,7 @@ static void bufferpool_recycle_block(struct BufferPool *self, struct BufferBlock
 {
    VK_ASSERT(block->size == self->block_size);
    /* copy-retain into the recycle list; the caller still owns *block and must
-    * bufferblock_fini it (matching the old BufferBlock&& whose moved-from temp
+    * bufferblock_fini it (matching the old BufferBlock&& whose emptied temp
     * was destroyed at the call site). */
    bufferblock_vec_push(&self->blocks, block);
 }
@@ -12095,12 +12086,12 @@ static bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, 
       }
    }
 
-   // We didn't find a vacant heap, make a new one.
+   /* We didn't find a vacant heap, make a new one. */
    { MiniHeap *node = (MiniHeap *)object_pool_raw_allocate(&self->object_pool);
    if (!node)
       return false;
    memset(node, 0, sizeof(*node)); /* was placement-new MiniHeap() value-init */
-   /* Block is a plain struct now; its former default ctor (fill the free
+   /* Block is a plain struct now; its former default initialiser (fill the free
     * bitmap) runs explicitly via block_init. */
    block_init(&node->heap);
 
@@ -12109,7 +12100,7 @@ static bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, 
 
    if (self->parent)
    {
-      // We cannot allocate a new block from parent ... This is fatal.
+      /* We cannot allocate a new block from parent ... This is fatal. */
       if (!classallocator_allocate(self->parent, alloc_size, tiling, &heap->allocation, true))
       {
          block_fini(&node->heap); object_pool_raw_free(&self->object_pool, node);
@@ -12127,7 +12118,7 @@ static bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, 
       }
    }
 
-   // This cannot fail.
+   /* This cannot fail. */
    classallocator_suballocate(self, num_blocks, masked_tiling_mode, self->memory_type, heap, alloc);
 
    alloc->heap = node;
@@ -12202,7 +12193,7 @@ static void classallocator_free(struct ClassAllocator *self, struct DeviceAlloca
 
    if (block_empty(block))
    {
-      // Our mini-heap is completely freed, free to higher level allocator.
+      /* Our mini-heap is completely freed, free to higher level allocator. */
       if (self->parent)
          deviceallocation_free_immediate(&heap->allocation);
       else
@@ -12235,7 +12226,7 @@ static void classallocator_free(struct ClassAllocator *self, struct DeviceAlloca
 
 static bool alloc_allocate_global(struct Allocator *self, uint32_t size, struct DeviceAllocation *alloc)
 {
-   // Fall back to global allocation, do not recycle.
+   /* Fall back to global allocation, do not recycle. */
    if (!deviceallocator_allocate(self->global_allocator, size, self->memory_type, &alloc->base, &alloc->host_base, VK_NULL_HANDLE))
       return false;
    alloc->alloc = NULL;
@@ -12246,7 +12237,7 @@ static bool alloc_allocate_global(struct Allocator *self, uint32_t size, struct 
 
 static bool alloc_allocate_dedicated(struct Allocator *self, uint32_t size, struct DeviceAllocation *alloc, VkImage dedicated_image)
 {
-   // Fall back to global allocation, do not recycle.
+   /* Fall back to global allocation, do not recycle. */
    if (!deviceallocator_allocate(self->global_allocator, size, self->memory_type, &alloc->base, &alloc->host_base, dedicated_image))
       return false;
    alloc->alloc = NULL;
@@ -12261,7 +12252,7 @@ static bool alloc_allocate(struct Allocator *self, uint32_t size, uint32_t align
    for (ci = 0; ci < MEMORY_CLASS_COUNT; ci++)
    {
       struct ClassAllocator *c = &self->classes[ci];
-      // Find a suitable class to allocate from.
+      /* Find a suitable class to allocate from. */
       if (size <= c->sub_block_size * BLOCK_NUM_SUB_BLOCKS)
       {
          bool ret;
@@ -12306,12 +12297,12 @@ static void alloc_init(struct Allocator *self)
    classallocator_set_tiling_mask(alloc_get_class_allocator(self, MEMORY_CLASS_HUGE), 0);
 
    classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_SMALL), 128);
-   classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_MEDIUM), 128 * BLOCK_NUM_SUB_BLOCKS); // 4K
+   classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_MEDIUM), 128 * BLOCK_NUM_SUB_BLOCKS); /* 4K */
 
-   // 128K, this is the largest bufferImageGranularity a Vulkan implementation may have.
+   /* 128K, this is the largest bufferImageGranularity a Vulkan implementation may have. */
    classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_LARGE), 128 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS);
    classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_HUGE),
-       64 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS); // 2M
+       64 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS); /* 2M */
 }
 
 static void deviceallocator_init(struct DeviceAllocator *self, VkPhysicalDevice gpu, VkDevice vkdevice)
@@ -12397,7 +12388,7 @@ static void deviceallocator_garbage_collect(struct DeviceAllocator *self)
 
 static void *deviceallocator_map_memory(struct DeviceAllocator *self, const struct DeviceAllocation *alloc, MemoryAccessFlags flags)
 {
-   // This will only happen if the memory type is device local only, which we cannot possibly map.
+   /* This will only happen if the memory type is device local only, which we cannot possibly map. */
    if (!alloc->host_base)
       return NULL;
 
@@ -12407,7 +12398,7 @@ static void *deviceallocator_map_memory(struct DeviceAllocator *self, const stru
       VkDeviceSize offset = alloc->offset & ~(self->atom_alignment - 1);
       VkDeviceSize size = (alloc->offset + deviceallocation_get_size(alloc) - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
 
-      // Have to invalidate cache here.
+      /* Have to invalidate cache here. */
       const VkMappedMemoryRange range = {
          VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, NULL, alloc->base, offset, size,
       };
@@ -12419,7 +12410,7 @@ static void *deviceallocator_map_memory(struct DeviceAllocator *self, const stru
 
 static void deviceallocator_unmap_memory(struct DeviceAllocator *self, const struct DeviceAllocation *alloc, MemoryAccessFlags flags)
 {
-   // This will only happen if the memory type is device local only, which we cannot possibly map.
+   /* This will only happen if the memory type is device local only, which we cannot possibly map. */
    if (!alloc->host_base)
       return;
 
@@ -12429,7 +12420,7 @@ static void deviceallocator_unmap_memory(struct DeviceAllocator *self, const str
       VkDeviceSize offset = alloc->offset & ~(self->atom_alignment - 1);
       VkDeviceSize size = (alloc->offset + deviceallocation_get_size(alloc) - offset + self->atom_alignment - 1) & ~(self->atom_alignment - 1);
 
-      // Have to flush caches here.
+      /* Have to flush caches here. */
       const VkMappedMemoryRange range = {
          VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, NULL, alloc->base, offset, size,
       };
@@ -12445,7 +12436,7 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
    bool host_visible;
    struct DeviceAllocatorHeap *heap = da_heap_vec_at(&self->heaps, self->mem_props.memoryTypes[memory_type].heapIndex);
 
-   // Naive searching is fine here as vkAllocate blocks are *huge* and we won't have many of them.
+   /* Naive searching is fine here as vkAllocate blocks are *huge* and we won't have many of them. */
    size_t found_idx = (size_t)da_alloc_vec_size(&heap->blocks);
    { size_t i; for (i = 0; i < (size_t)da_alloc_vec_size(&heap->blocks); i++) {
       if (da_alloc_vec_at(&heap->blocks, (int)i)->size == size && da_alloc_vec_at(&heap->blocks, (int)i)->type == memory_type)
@@ -12457,7 +12448,7 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
 
    host_visible = (self->mem_props.memoryTypes[memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 
-   // Found previously used block.
+   /* Found previously used block. */
    if (found_idx < (size_t)da_alloc_vec_size(&heap->blocks))
    {
       struct DeviceAllocatorAllocation *block = da_alloc_vec_at(&heap->blocks, (int)found_idx);
@@ -12492,7 +12483,7 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
    }
    else
    {
-      // Look through our heap and see if there are blocks of other types we can free.
+      /* Look through our heap and see if there are blocks of other types we can free. */
       int freed = 0;
       while (res != VK_SUCCESS && freed < (int)da_alloc_vec_size(&heap->blocks))
       {
@@ -12701,7 +12692,7 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
       self->pool_size.items = NULL; self->pool_size.count = 0; self->pool_size.cap = 0;
       self->intrusive_node.key = hash;
       /* The set_nodes temp-map was previously brought up by the TemporaryHashmap
-       * default constructor; as a concrete POD member it must be initialised here. */
+       * default initialiser; as a concrete POD member it must be initialised here. */
       descriptor_set_thmap_init_empty(&self->per_thread.set_nodes);
       { VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
@@ -12889,11 +12880,11 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
 /* === render_pass.cpp === */
 
 
-   /* Concrete stack allocators (de-templated StackAllocator<T, N>). Two
+   /* Concrete stack allocators (concrete StackAllocator<T, N>). Two
     * instantiations were used - VkAttachmentReference x1024 and uint32_t x1024 -
     * each a fixed buffer plus a bump offset. allocate returns NULL when the count
     * is zero or would overflow; allocate_cleared additionally zero-fills the
-    * returned slots. offset must be zeroed at declaration (the template's default
+    * returned slots. offset must be zeroed at declaration (the previous default
     * member initialiser). */
    struct StackAllocatorRef
    {
@@ -13033,11 +13024,11 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
 
       VK_ASSERT(info->num_color_attachments || info->depth_stencil);
 
-      // Want to make load/store to transient a very explicit thing to do, since it will kill performance.
+      /* Want to make load/store to transient a very explicit thing to do, since it will kill performance. */
       { bool enable_transient_store = (info->op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT) != 0;
       bool enable_transient_load = (info->op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT) != 0;
 
-      // Set up default subpass info structure if we don't have it.
+      /* Set up default subpass info structure if we don't have it. */
       const RenderPassInfo_Subpass *subpass_infos = info->subpasses;
       unsigned num_subpasses = info->num_subpasses;
       RenderPassInfo_Subpass default_subpass_info;
@@ -13055,7 +13046,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          subpass_infos = &default_subpass_info;
       }
 
-      // First, set up attachment descriptions.
+      /* First, set up attachment descriptions. */
       { const unsigned num_attachments = info->num_color_attachments + (info->depth_stencil ? 1 : 0);
       VkAttachmentDescription attachments[VULKAN_NUM_ATTACHMENTS + 1];
       uint32_t implicit_transitions = 0;
@@ -13095,20 +13086,20 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          att->storeOp = rp_color_store_op(info, i);
          att->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
          att->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-         // Undefined final layout here for now means that we will just use the layout of the last
-         // subpass which uses this attachment to avoid any dummy transition at the end.
+         /* Undefined final layout here for now means that we will just use the layout of the last
+          * subpass which uses this attachment to avoid any dummy transition at the end. */
          att->finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
          if (image_get_create_info(image)->domain == ImageDomain_Transient)
          {
             if (enable_transient_load)
             {
-               // The transient will behave like a normal image.
+               /* The transient will behave like a normal image. */
                att->initialLayout = image_get_layout(imageview_get_image(info->color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
             }
             else
             {
-               // Force a clean discard.
+               /* Force a clean discard. */
                VK_ASSERT(att->loadOp != VK_ATTACHMENT_LOAD_OP_LOAD);
                att->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             }
@@ -13133,8 +13124,8 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          att->samples = image_get_create_info(image)->samples;
          att->loadOp = ds_load_op;
          att->storeOp = ds_store_op;
-         // Undefined final layout here for now means that we will just use the layout of the last
-         // subpass which uses this attachment to avoid any dummy transition at the end.
+         /* Undefined final layout here for now means that we will just use the layout of the last
+          * subpass which uses this attachment to avoid any dummy transition at the end. */
          att->finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
          if (format_to_aspect_mask(self->depth_stencil) & VK_IMAGE_ASPECT_STENCIL_BIT)
@@ -13152,7 +13143,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          {
             if (enable_transient_load)
             {
-               // The transient will behave like a normal image.
+               /* The transient will behave like a normal image. */
                att->initialLayout = depth_stencil_layout;
             }
             else
@@ -13162,7 +13153,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                if (att->stencilLoadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
                   att->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 
-               // For transient attachments we force the layouts.
+               /* For transient attachments we force the layouts. */
                att->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             }
 
@@ -13214,7 +13205,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
             uint32_t att = subpass_infos[i].color_attachments[j];
             VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
             colors[j].attachment = att;
-            // Fill in later.
+            /* Fill in later. */
             colors[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
          } }
 
@@ -13222,7 +13213,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
             uint32_t att = subpass_infos[i].input_attachments[j];
             VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
             inputs[j].attachment = att;
-            // Fill in later.
+            /* Fill in later. */
             inputs[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
          } }
 
@@ -13232,7 +13223,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                uint32_t att = subpass_infos[i].resolve_attachments[j];
                VK_ASSERT(att == VK_ATTACHMENT_UNUSED || (att < num_attachments));
                resolves[j].attachment = att;
-               // Fill in later.
+               /* Fill in later. */
                resolves[j].layout = VK_IMAGE_LAYOUT_UNDEFINED;
             } }
          }
@@ -13240,7 +13231,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          if (info->depth_stencil && subpass_infos[i].depth_stencil_mode != RenderPassInfo_DepthStencil_None)
          {
             depth->attachment = info->num_color_attachments;
-            // Fill in later.
+            /* Fill in later. */
             depth->layout = VK_IMAGE_LAYOUT_UNDEFINED;
          }
          else
@@ -13250,22 +13241,22 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          }
       } }
 
-      // Now, figure out how each attachment is used throughout the subpasses.
-      // Either we don't care (inherit previous pass), or we need something specific.
-      // Start with initial layouts.
+      /* Now, figure out how each attachment is used throughout the subpasses.
+       * Either we don't care (inherit previous pass), or we need something specific.
+       * Start with initial layouts. */
       { uint32_t preserve_masks[VULKAN_NUM_ATTACHMENTS + 1] = {};
 
-      // Last subpass which makes use of an attachment.
+      /* Last subpass which makes use of an attachment. */
       unsigned last_subpass_for_attachment[VULKAN_NUM_ATTACHMENTS + 1] = {};
 
       VK_ASSERT(num_subpasses <= 32);
 
-      // 1 << subpass bit set if there are color attachment self-dependencies in the subpass.
+      /* 1 << subpass bit set if there are color attachment self-dependencies in the subpass. */
       color_self_dependencies = 0;
-      // 1 << subpass bit set if there are depth-stencil attachment self-dependencies in the subpass.
+      /* 1 << subpass bit set if there are depth-stencil attachment self-dependencies in the subpass. */
       depth_self_dependencies = 0;
 
-      // 1 << subpass bit set if any input attachment is read in the subpass.
+      /* 1 << subpass bit set if any input attachment is read in the subpass. */
       { uint32_t input_attachment_read = 0;
       uint32_t color_attachment_read_write = 0;
       uint32_t depth_stencil_attachment_write = 0;
@@ -13284,7 +13275,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
             VkAttachmentReference *input = rp_find_input(VkSubpassDescriptionVec_data(&subpasses), subpass, attachment);
             VkAttachmentReference *depth = rp_find_depth_stencil(VkSubpassDescriptionVec_data(&subpasses), subpass, attachment);
 
-            // Sanity check.
+            /* Sanity check. */
             if (color || resolve)
                VK_ASSERT(!depth);
             if (depth)
@@ -13301,7 +13292,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
 
             if (!used && (implicit_transitions & (1u << attachment)))
             {
-               // This is the first subpass we need implicit transitions.
+               /* This is the first subpass we need implicit transitions. */
                if (color)
                   external_color_dependencies |= 1u << subpass;
                if (depth)
@@ -13310,17 +13301,17 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                   external_input_dependencies |= 1u << subpass;
             }
 
-            if (resolve && input) // If used as both resolve attachment and input attachment in same subpass, need GENERAL.
+            if (resolve && input) /* If used as both resolve attachment and input attachment in same subpass, need GENERAL. */
             {
                current_layout = VK_IMAGE_LAYOUT_GENERAL;
                resolve->layout = current_layout;
                input->layout = current_layout;
 
-               // If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL.
+               /* If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL. */
                if (!used && attachments[attachment].initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
                   attachments[attachment].initialLayout = current_layout;
 
-               // If first subpass changes the layout, we'll need to inject an external subpass dependency.
+               /* If first subpass changes the layout, we'll need to inject an external subpass dependency. */
                if (!used && attachments[attachment].initialLayout != current_layout)
                {
                   external_color_dependencies |= 1u << subpass;
@@ -13338,7 +13329,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
                   current_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-               // If first subpass changes the layout, we'll need to inject an external subpass dependency.
+               /* If first subpass changes the layout, we'll need to inject an external subpass dependency. */
                if (!used && attachments[attachment].initialLayout != current_layout)
                   external_color_dependencies |= 1u << subpass;
 
@@ -13347,17 +13338,17 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                last_subpass_for_attachment[attachment] = subpass;
                color_attachment_read_write |= 1u << subpass;
             }
-            else if (color && input) // If used as both input attachment and color attachment in same subpass, need GENERAL.
+            else if (color && input) /* If used as both input attachment and color attachment in same subpass, need GENERAL. */
             {
                current_layout = VK_IMAGE_LAYOUT_GENERAL;
                color->layout = current_layout;
                input->layout = current_layout;
 
-               // If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL.
+               /* If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL. */
                if (!used && attachments[attachment].initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
                   attachments[attachment].initialLayout = current_layout;
 
-               // If first subpass changes the layout, we'll need to inject an external subpass dependency.
+               /* If first subpass changes the layout, we'll need to inject an external subpass dependency. */
                if (!used && attachments[attachment].initialLayout != current_layout)
                {
                   external_color_dependencies |= 1u << subpass;
@@ -13371,13 +13362,13 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                color_attachment_read_write |= 1u << subpass;
                input_attachment_read |= 1u << subpass;
             }
-            else if (color) // No particular preference
+            else if (color) /* No particular preference */
             {
                if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
                   current_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                color->layout = current_layout;
 
-               // If first subpass changes the layout, we'll need to inject an external subpass dependency.
+               /* If first subpass changes the layout, we'll need to inject an external subpass dependency. */
                if (!used && attachments[attachment].initialLayout != current_layout)
                   external_color_dependencies |= 1u << subpass;
 
@@ -13385,7 +13376,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                last_subpass_for_attachment[attachment] = subpass;
                color_attachment_read_write |= 1u << subpass;
             }
-            else if (depth && input) // Depends on the depth mode
+            else if (depth && input) /* Depends on the depth mode */
             {
                VK_ASSERT(subpass_infos[subpass].depth_stencil_mode != RenderPassInfo_DepthStencil_None);
                if (subpass_infos[subpass].depth_stencil_mode == RenderPassInfo_DepthStencil_ReadWrite)
@@ -13394,7 +13385,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                   current_layout = VK_IMAGE_LAYOUT_GENERAL;
                   depth_stencil_attachment_write |= 1u << subpass;
 
-                  // If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL.
+                  /* If the attachment is first used as a feedback attachment, the initial layout should actually be GENERAL. */
                   if (!used && attachments[attachment].initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
                      attachments[attachment].initialLayout = current_layout;
                }
@@ -13404,7 +13395,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                      current_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
                }
 
-               // If first subpass changes the layout, we'll need to inject an external subpass dependency.
+               /* If first subpass changes the layout, we'll need to inject an external subpass dependency. */
                if (!used && attachments[attachment].initialLayout != current_layout)
                {
                   external_input_dependencies |= 1u << subpass;
@@ -13432,7 +13423,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                      current_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
                }
 
-               // If first subpass changes the layout, we'll need to inject an external subpass dependency.
+               /* If first subpass changes the layout, we'll need to inject an external subpass dependency. */
                if (!used && attachments[attachment].initialLayout != current_layout)
                   external_depth_dependencies |= 1u << subpass;
 
@@ -13446,12 +13437,12 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
                if (current_layout != VK_IMAGE_LAYOUT_GENERAL)
                   current_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-               // If the attachment is first used as an input attachment, the initial layout should actually be
-               // SHADER_READ_ONLY_OPTIMAL.
+               /* If the attachment is first used as an input attachment, the initial layout should actually be
+                * SHADER_READ_ONLY_OPTIMAL. */
                if (!used && attachments[attachment].initialLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
                   attachments[attachment].initialLayout = current_layout;
 
-               // If first subpass changes the layout, we'll need to inject an external subpass dependency.
+               /* If first subpass changes the layout, we'll need to inject an external subpass dependency. */
                if (!used && attachments[attachment].initialLayout != current_layout)
                   external_input_dependencies |= 1u << subpass;
 
@@ -13465,9 +13456,9 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
             }
          } }
 
-         // If we don't have a specific layout we need to end up in, just
-         // use the last one.
-         // Assert that we actually use all the attachments we have ...
+         /* If we don't have a specific layout we need to end up in, just
+          * use the last one.
+          * Assert that we actually use all the attachments we have ... */
          VK_ASSERT(used);
          if (attachments[attachment].finalLayout == VK_IMAGE_LAYOUT_UNDEFINED)
          {
@@ -13476,10 +13467,10 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          }
       } }
 
-      // Only consider preserve masks before last subpass which uses an attachment.
+      /* Only consider preserve masks before last subpass which uses an attachment. */
       { unsigned attachment; for (attachment = 0; attachment < num_attachments; attachment++) preserve_masks[attachment] &= (1u << last_subpass_for_attachment[attachment]) - 1; }
 
-      // Add preserve attachments as needed.
+      /* Add preserve attachments as needed. */
       { unsigned subpass; for (subpass = 0; subpass < num_subpasses; subpass++) {
          uint32_t * preserve;
          VkSubpassDescription *pass = VkSubpassDescriptionVec_at(&subpasses, subpass);
@@ -13503,7 +13494,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
       rp_info.pAttachments = attachments;
       rp_info.attachmentCount = num_attachments;
 
-      // Add external subpass dependencies.
+      /* Add external subpass dependencies. */
       { uint32_t _feit, subpass; FOR_EACH_BIT(external_color_dependencies | external_depth_dependencies | external_input_dependencies, _feit, subpass)
       {
          VkSubpassDependency * dep;
@@ -13540,7 +13531,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
       }
       }
 
-      // Queue up self-dependencies (COLOR | DEPTH) -> INPUT.
+      /* Queue up self-dependencies (COLOR | DEPTH) -> INPUT. */
       { uint32_t _feit, subpass; FOR_EACH_BIT(color_self_dependencies | depth_self_dependencies, _feit, subpass)
       {
          VkSubpassDependency * dep;
@@ -13567,7 +13558,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
       }
       }
 
-      // Flush and invalidate caches between each subpass.
+      /* Flush and invalidate caches between each subpass. */
       { unsigned subpass; for (subpass = 1; subpass < num_subpasses; subpass++) {
          VkSubpassDependency * dep;
          { VkSubpassDependency zero_dep; memset(&zero_dep, 0, sizeof(zero_dep)); { VkSubpassDependency _d = zero_dep; VkSubpassDependencyVec_push(&external_dependencies, &_d); } }
@@ -13619,7 +13610,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          rp_info.pDependencies = VkSubpassDependencyVec_data(&external_dependencies);
       }
 
-      // Store the important subpass information for later.
+      /* Store the important subpass information for later. */
       { uint32_t subpass_idx; for (subpass_idx = 0; subpass_idx < rp_info.subpassCount; subpass_idx++) {
          unsigned samples;
          const VkSubpassDescription *subpass = &rp_info.pSubpasses[subpass_idx];
@@ -13675,7 +13666,7 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
       } }
 
 
-      // Fixup after, we want the underlying render pass to be generic.
+      /* Fixup after, we want the underlying render pass to be generic. */
       render_pass_fixup_render_pass_nvidia(self, &rp_info, fixup_attachments);
 
       LOGI("Creating render pass.\n");
@@ -13704,8 +13695,8 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, si
          VK_VERSION_MAJOR(device_get_gpu_properties(self->device)->driverVersion) < 415)
 #endif
          {
-            // Workaround a bug on NV where depth-stencil input attachments break if we have STORE_OP_DONT_CARE.
-            // Force STORE_OP_STORE for all attachments.
+            /* Workaround a bug on NV where depth-stencil input attachments break if we have STORE_OP_DONT_CARE.
+             * Force STORE_OP_STORE for all attachments. */
             if (attachments != create_info->pAttachments)
             {
                memcpy(attachments, create_info->pAttachments, create_info->attachmentCount * sizeof(attachments[0]));
@@ -13903,14 +13894,14 @@ static VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
       memset(&self->potential_static_state, 0, sizeof(self->potential_static_state));
 
       /* vbo_block/ubo_block are plain BufferBlock structs now; the old default
-       * ctor zeroed them, so init explicitly. */
+       * initialiser zeroed them, so init explicitly. */
       bufferblock_init(&self->vbo_block);
       bufferblock_init(&self->ubo_block);
 
       counter_init(&self->reference_count); /* refcount starts at 1 */
       /* Zero the hashable static_state (full 16-byte union, incl. the words[]
        * overlay) and the bindings BEFORE the calls that populate them. The old
-       * C++ class zero-initialised these members before the constructor body
+       * C++ class zero-initialised these members before the init body
        * ran begin_compute()/set_opaque_state(); doing the memsets afterwards
        * wiped the state those calls had just written. */
       memset(&self->static_state, 0, sizeof(self->static_state));
@@ -14035,10 +14026,10 @@ static VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
 
 static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
    {
-      // ALL_GRAPHICS_BIT waits for vertex as well which causes performance issues on some drivers.
-      // It shouldn't matter, but hey.
-      //
-      // We aren't using vertex with side-effects on relevant hardware so dropping VERTEX_SHADER_BIT is fine.
+      /* ALL_GRAPHICS_BIT waits for vertex as well which causes performance issues on some drivers.
+       * It shouldn't matter, but hey.
+       * 
+       * We aren't using vertex with side-effects on relevant hardware so dropping VERTEX_SHADER_BIT is fine. */
       if (((*src_stages) & VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT) != 0 && fixup)
       {
          *src_stages &= ~VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
@@ -14184,7 +14175,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          unsigned dst_level, unsigned src_level, unsigned dst_base_layer, unsigned src_base_layer,
          unsigned num_layers, VkFilter filter)
    {
-      // RADV workaround: blit one layer at a time.
+      /* RADV workaround: blit one layer at a time. */
       { unsigned i; for (i = 0; i < num_layers; i++) {
          const VkImageBlit blit = {
             { format_to_aspect_mask(image_get_create_info(src)->format), src_level, src_base_layer + i, 1 },
@@ -14344,12 +14335,12 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       uint32_t attr_mask;
       VkPipeline pipeline;
       VkResult res;
-      // Viewport state
+      /* Viewport state */
       VkPipelineViewportStateCreateInfo vp = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
       vp.viewportCount = 1;
       vp.scissorCount = 1;
 
-      // Dynamic state
+      /* Dynamic state */
       { VkPipelineDynamicStateCreateInfo dyn = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
       dyn.dynamicStateCount = 2;
       { static const VkDynamicState states[2] = {
@@ -14357,7 +14348,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       };
       dyn.pDynamicStates = states;
 
-      // Blend state
+      /* Blend state */
       { VkPipelineColorBlendAttachmentState blend_attachments[VULKAN_NUM_ATTACHMENTS];
       VkPipelineColorBlendStateCreateInfo blend = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
       blend.attachmentCount = render_pass_get_num_color_attachments(self->compatible_render_pass, self->current_subpass);
@@ -14384,7 +14375,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       } }
       memcpy(blend.blendConstants, self->potential_static_state.blend_constants, sizeof(blend.blendConstants));
 
-      // Depth state
+      /* Depth state */
       { VkPipelineDepthStencilStateCreateInfo ds = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
       ds.depthTestEnable = render_pass_has_depth(self->compatible_render_pass, self->current_subpass) && self->static_state.state.depth_test;
       ds.depthWriteEnable = render_pass_has_depth(self->compatible_render_pass, self->current_subpass) && self->static_state.state.depth_write;
@@ -14392,7 +14383,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       if (ds.depthTestEnable)
          ds.depthCompareOp = (VkCompareOp)(self->static_state.state.depth_compare);
 
-      // Vertex input
+      /* Vertex input */
       { VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
       VkVertexInputAttributeDescription vi_attribs[VULKAN_NUM_VERTEX_ATTRIBS];
       vi.pVertexAttributeDescriptions = vi_attribs;
@@ -14420,11 +14411,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
       }
 
-      // Input assembly
+      /* Input assembly */
       { VkPipelineInputAssemblyStateCreateInfo ia = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
       ia.topology = (VkPrimitiveTopology)(self->static_state.state.topology);
 
-      // Multisample
+      /* Multisample */
       { VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
       ms.rasterizationSamples = (VkSampleCountFlagBits)(render_pass_get_sample_count(self->compatible_render_pass, self->current_subpass));
 
@@ -14436,14 +14427,14 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          ms.minSampleShading = 1.0f;
       }
 
-      // Raster
+      /* Raster */
       { VkPipelineRasterizationStateCreateInfo raster = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
       raster.cullMode = (VkCullModeFlags)(self->static_state.state.cull_mode);
       raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
       raster.lineWidth = 1.0f;
       raster.polygonMode = VK_POLYGON_MODE_FILL;
 
-      // Stages
+      /* Stages */
       { VkPipelineShaderStageCreateInfo stages[(unsigned)(ShaderStage_Count)];
       unsigned num_stages = 0;
 
@@ -14531,7 +14522,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       Hasher h; hasher_init(&h);
       hasher_u64(&h, self->current_program->intrusive_node.key);
 
-      // Spec constants.
+      /* Spec constants. */
       { const CombinedResourceLayout *layout = pipeline_layout_get_resource_layout(self->current_layout);
       uint32_t combined_spec_constant = layout->combined_spec_constant_mask;
       combined_spec_constant &= self->static_state.state.spec_constant_mask;
@@ -14589,7 +14580,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
                   sizeof(self->potential_static_state.blend_constants));
       }
 
-      // Spec constants.
+      /* Spec constants. */
       combined_spec_constant = layout->combined_spec_constant_mask;
       combined_spec_constant &= self->static_state.state.spec_constant_mask;
       hasher_u32(&h, combined_spec_constant);
@@ -14640,7 +14631,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       VK_ASSERT(self->current_layout);
       VK_ASSERT(self->current_program);
 
-      // We've invalidated pipeline state, update the VkPipeline.
+      /* We've invalidated pipeline state, update the VkPipeline. */
       if (commandbuffer_get_and_clear(self, COMMAND_BUFFER_DIRTY_STATIC_STATE_BIT | COMMAND_BUFFER_DIRTY_PIPELINE_BIT |
                COMMAND_BUFFER_DIRTY_STATIC_VERTEX_BIT))
       {
@@ -14764,8 +14755,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          const CombinedResourceLayout *new_layout = pipeline_layout_get_resource_layout(program_get_pipeline_layout(program));
          const CombinedResourceLayout *old_layout = pipeline_layout_get_resource_layout(self->current_layout);
 
-         // If the push constant layout changes, all descriptor sets
-         // are invalidated.
+         /* If the push constant layout changes, all descriptor sets
+          * are invalidated. */
          if (new_layout->push_constant_layout_hash != old_layout->push_constant_layout_hash)
          {
             self->dirty_sets = ~0u;
@@ -14773,7 +14764,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          }
          else
          {
-            // Find the first set whose descriptor set layout differs.
+            /* Find the first set whose descriptor set layout differs. */
             PipelineLayout *new_pipe_layout = program_get_pipeline_layout(program);
             { unsigned set; for (set = 0; set < VULKAN_NUM_DESCRIPTOR_SETS; set++) {
                if (pipeline_layout_get_allocator(new_pipe_layout, set) != pipeline_layout_get_allocator(self->current_layout, set))
@@ -14958,7 +14949,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       hasher_u32(&h, set_layout->fp_mask);
 
-      // UBOs
+      /* UBOs */
       { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->uniform_buffer_mask, _feit, binding)
       {
          hasher_u64(&h, self->bindings.cookies[set][binding]);
@@ -14969,7 +14960,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
       }
 
-      // SSBOs
+      /* SSBOs */
       { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->storage_buffer_mask, _feit, binding)
       {
          hasher_u64(&h, self->bindings.cookies[set][binding]);
@@ -14979,7 +14970,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
       }
 
-      // Sampled buffers
+      /* Sampled buffers */
       { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampled_buffer_mask, _feit, binding)
       {
          hasher_u64(&h, self->bindings.cookies[set][binding]);
@@ -14987,7 +14978,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
       }
 
-      // Sampled images
+      /* Sampled images */
       { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampled_image_mask, _feit, binding)
       {
          hasher_u64(&h, self->bindings.cookies[set][binding]);
@@ -15001,7 +14992,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
       }
 
-      // Separate images
+      /* Separate images */
       { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->separate_image_mask, _feit, binding)
       {
          hasher_u64(&h, self->bindings.cookies[set][binding]);
@@ -15010,7 +15001,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
       }
 
-      // Separate samplers
+      /* Separate samplers */
       { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->sampler_mask & ~set_layout->immutable_sampler_mask, _feit, binding)
       {
          hasher_u64(&h, self->bindings.secondary_cookies[set][binding]);
@@ -15018,7 +15009,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
       }
 
-      // Storage images
+      /* Storage images */
       { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->storage_image_mask, _feit, binding)
       {
          hasher_u64(&h, self->bindings.cookies[set][binding]);
@@ -15027,7 +15018,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
       }
 
-      // Input attachments
+      /* Input attachments */
       { uint32_t _feit, binding; FOR_EACH_BIT(set_layout->input_attachment_mask, _feit, binding)
       {
          hasher_u64(&h, self->bindings.cookies[set][binding]);
@@ -15039,7 +15030,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       hash = hasher_get(&h);
       allocated = descriptor_set_allocator_find(pipeline_layout_get_allocator(self->current_layout, set), hash);
 
-      // The descriptor set was not successfully cached, rebuild.
+      /* The descriptor set was not successfully cached, rebuild. */
       if (!allocated.cached)
       {
          uint32_t write_count = 0;
@@ -15059,7 +15050,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             write->dstBinding = binding;
             write->dstSet = allocated.set;
 
-            // Offsets are applied dynamically.
+            /* Offsets are applied dynamically. */
             buffer = &buffer_info[buffer_info_count++];
             *buffer = self->bindings.bindings[set][binding].buffer;
             buffer->offset = 0;
@@ -15291,7 +15282,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 #include <windows.h>
 #endif
 
-//#undef VULKAN_DEBUG
+/* #undef VULKAN_DEBUG */
 
 
    static bool has_vk_extension(const VkExtensionProperties *exts, uint32_t count, const char *name)
@@ -15655,7 +15646,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       vkGetPhysicalDeviceFeatures(gpu, &features.features);
 
-      // Enable device features we might care about.
+      /* Enable device features we might care about. */
       {
          VkPhysicalDeviceFeatures enabled_features = *required_features;
          if (features.features.textureCompressionETC2)
@@ -15735,10 +15726,10 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 
    /* Establish a Device in raw (uninitialised) storage. This sets every member
-    * that the members' constructors and NSDMIs would, so it is correct when called
-    * on malloc'd memory where no constructor has run. No member allocates at this
+    * that per-member initialisation would, so it is correct when called
+    * on malloc'd memory where no initialiser has run. No member allocates at this
     * point, so the established state is simply "empty". */
-   /* device_frame: was the inline Device::frame() accessor; returns the current
+   /* device_frame: was the inline device frame() accessor; returns the current
     * frame context (the ring slot selected by frame_context_index). Returns a pointer
     * now instead of a reference. */
    static struct PerFrame *device_frame(Device *self)
@@ -15764,7 +15755,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       self->transfer_queue_family_index = 0;
       self->lock.counter   = 0;
 
-      /* POD aggregates with no NSDMI - the constructor leaves them indeterminate
+      /* POD aggregates with no NSDMI - the initialiser leaves them indeterminate
        * and set_context()/init() fill them before use; zero them so a malloc'd
        * Device starts from a defined state. */
       memset(&self->mem_props,   0, sizeof(self->mem_props));
@@ -15778,14 +15769,14 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       /* Per-queue submission state. Each QueueData holds a SemaphoreHandleVec and
        * a VkPipelineStageVec (both { items=NULL, count=0, cap=0 } when empty) plus
-       * a need_fence flag; none has its constructor run under malloc, so zero them
+       * a need_fence flag; none has its initialiser run under malloc, so zero them
        * to their empty state. clear_wait_semaphores() iterates these during the
        * very first set_context()/init_frame_contexts(), so they must be valid here. */
       memset(&self->graphics, 0, sizeof(self->graphics));
       memset(&self->compute,  0, sizeof(self->compute));
       memset(&self->transfer, 0, sizeof(self->transfer));
 
-      /* Pending CPU->GPU DMA staging lists (BufferBlockVec vbo/ubo): ctor-only,
+      /* Pending CPU->GPU DMA staging lists (BufferBlockVec vbo/ubo): initialiser-only,
        * empty state is { NULL, 0, 0 }; zero so the first submit/end-frame that
        * iterates or clears them is valid. */
       memset(&self->dma, 0, sizeof(self->dma));
@@ -15822,7 +15813,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       semaphoremanager_deinit(&self->managers.semaphore);
 
       /* Remaining teardown in reverse member-declaration order, matching what the
-       * implicit member destructors did. Declaration order is handle_pool,
+       * implicit member teardown did. Declaration order is handle_pool,
        * managers, per_frame, the five VulkanCache, then the two allocators; so the
        * destruction order is allocators, caches, per_frame, managers, handle_pool.
        * In particular per_frame is destroyed AFTER the caches, as its declaration
@@ -15839,7 +15830,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       bufferpool_deinit(&self->managers.ubo);
       deviceallocator_deinit(&self->managers.memory);
       /* Free the per-queue wait lists' backing storage. These plain structs have
-       * no destructor (Device is malloc'd, so no member dtor ran), and
+       * no teardown (Device is malloc'd, so no member teardown ran), and
        * clear_wait_semaphores only resets counts, so free them explicitly here. */
       sem_handle_vec_deinit(&self->graphics.wait_semaphores);
       sem_handle_vec_deinit(&self->compute.wait_semaphores);
@@ -15867,7 +15858,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       VkPipelineStageVec_push(&data->wait_stages, &stages);
       data->need_fence = true;
 
-      // Sanity check.
+      /* Sanity check. */
       VK_ASSERT(sem_handle_vec_size(&data->wait_semaphores) < 16 * 1024);
    }
 
@@ -15995,7 +15986,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             {
                StockSampler sampler = get_immutable_sampler(&shader_layout->sets[set], binding);
 
-               // Do we already have an immutable sampler? Make sure it matches the layout.
+               /* Do we already have an immutable sampler? Make sure it matches the layout. */
                if (has_immutable_sampler(&layout.sets[set], binding))
                {
                   if (sampler != get_immutable_sampler(&layout.sets[set], binding))
@@ -16027,8 +16018,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             }
          } }
 
-         // Merge push constant ranges into one range.
-         // Do not try to split into multiple ranges as it just complicates things for no obvious gain.
+         /* Merge push constant ranges into one range.
+          * Do not try to split into multiple ranges as it just complicates things for no obvious gain. */
          if (shader_layout->push_constant_size != 0)
          {
             layout.push_constant_range.stageFlags |= 1u << i;
@@ -16074,9 +16065,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       device_init_stock_samplers(self);
 
 #ifdef ANDROID
-      device_init_frame_contexts(self, 3); // Android needs a bit more ... ;)
+      device_init_frame_contexts(self, 3); /* Android needs a bit more ... ;) */
 #else
-      device_init_frame_contexts(self, 2); // By default, regular double buffer between CPU and GPU.
+      device_init_frame_contexts(self, 2); /* By default, regular double buffer between CPU and GPU. */
 #endif
 
       self->ext = *context_get_enabled_device_features(context);
@@ -16265,7 +16256,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       QueueData *data = device_get_queue_data(self, type);
       VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 
-      // Add external wait semaphores.
+      /* Add external wait semaphores. */
       SemaphoreVec waits   = { NULL, 0, 0 };
       SemaphoreVec signals = { NULL, 0, 0 };
       VkFlagsVec stages      = { NULL, 0, 0 };
@@ -16285,7 +16276,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       VkPipelineStageVec_clear(&data->wait_stages);
       sem_handle_vec_clear(&data->wait_semaphores);
 
-      // Add external signal semaphores.
+      /* Add external signal semaphores. */
       { unsigned i; for (i = 0; i < semaphore_count; i++) {
          VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&self->managers.semaphore);
          SemaphoreVec_push(&signals, &cleared_semaphore);
@@ -16354,7 +16345,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       if (self->transfer_queue == self->graphics_queue && self->transfer_queue == self->compute_queue)
       {
-         // For single-queue systems, just use a pipeline barrier.
+         /* For single-queue systems, just use a pipeline barrier. */
          commandbuffer_barrier_simple(cbh_get(cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, stages, access);
          { CommandBufferHandle _m; cbh_steal(&_m, cmd); device_submit_nolock(self, _m, NULL, 0, NULL); }
       }
@@ -16447,7 +16438,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             VkResult result;
       type = device_get_physical_queue_type(self, type);
 
-      // Always check if we need to flush pending transfers.
+      /* Always check if we need to flush pending transfers. */
       if (type != Type_AsyncTransfer)
          device_flush_frame_queue(self, Type_AsyncTransfer);
 
@@ -16470,9 +16461,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       SemaphoreVec signals[2] = { { NULL, 0, 0 }, { NULL, 0, 0 } };
       VkFlagsVec stages[2]      = { { NULL, 0, 0 }, { NULL, 0, 0 } };
 
-      // Add external wait semaphores.
+      /* Add external wait semaphores. */
       {
-         // Move the pending wait stages across (then the source is cleared below).
+         /* Move the pending wait stages across (then the source is cleared below). */
          size_t ws;
          for (ws = 0; ws < VkPipelineStageVec_size(&data->wait_stages); ws++)
             VkFlagsVec_push(&stages[0], VkPipelineStageVec_at(&data->wait_stages, ws));
@@ -16497,7 +16488,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       if (CommandBufferVec_size(&cmds) > (int)last_cmd)
       {
-         // Push all pending cmd buffers to their own submission.
+         /* Push all pending cmd buffers to their own submission. */
          VkSubmitInfo zero_submit;
          memset(&zero_submit, 0, sizeof(zero_submit));
          VkSubmitInfoVec_push(&submits, &zero_submit);
@@ -16565,7 +16556,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          {
             /* Only wait on a fence that is actually associated with submitted
              * work. If the submit failed the fence will never be signalled, so
-             * enqueuing it for the next PerFrame::begin() would wedge that frame
+             * enqueuing it for the next per-frame begin() would wedge that frame
              * in vkWaitForFences(UINT64_MAX) forever. Recycle it instead and hand
              * the caller a null fence. */
             FenceVec_push(&device_frame(self)->wait_fences, &cleared_fence);
@@ -16620,13 +16611,13 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       commandbuffer_end_region(cbh_get(&cmd));
 
-      // Do not flush self->graphics or self->compute in self context.
-      // We must be able to inject semaphores into all currently enqueued self->graphics / self->compute.
+      /* Do not flush self->graphics or self->compute in self context.
+       * We must be able to inject semaphores into all currently enqueued self->graphics / self->compute. */
       device_submit_staging(self, &cmd, usage, false);
    }
 
    static void device_end_frame_nolock(Device *self){
-      // Make sure we have a fence which covers all submissions in the frame.
+      /* Make sure we have a fence which covers all submissions in the frame. */
       VkFence fence;
 
       if (self->transfer.need_fence || !cbhvec_empty(&device_frame(self)->transfer_submissions))
@@ -16722,7 +16713,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
    static void device_init_frame_contexts(Device *self, unsigned count){
       device_wait_idle_nolock(self);
 
-      // Clear out caches which might contain stale data from now on.
+      /* Clear out caches which might contain stale data from now on. */
       framebuffer_allocator_clear(&self->framebuffer_allocator);
       attachment_allocator_clear(&self->transient_allocator);
       per_frame_ptr_vec_clear(&self->per_frame);
@@ -16744,7 +16735,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       /* vbo/ubo block lists: plain structs, init explicitly. */
       bufferblock_vec_init(&self->vbo_blocks);
       bufferblock_vec_init(&self->ubo_blocks);
-      /* POD_VEC members have no constructor; zero-initialise them. */
+      /* POD_VEC members have no initialiser; zero-initialise them. */
       memset(&self->wait_fences, 0, sizeof(self->wait_fences));
       memset(&self->recycle_fences, 0, sizeof(self->recycle_fences));
       memset(&self->allocations, 0, sizeof(self->allocations));
@@ -16769,8 +16760,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 #ifdef VULKAN_DEBUG
 
    /* Debug-only check that a value is not already queued in a POD_VEC (the
-    * double-destroy guard that used the exists<>() template). C has no function
-    * templates, so this is a macro doing the linear scan inline over the vec's
+    * double-destroy guard). This is a macro doing the linear scan inline over the vec's
     * items/count; it works for any element type comparable with ==. */
 #define VK_ASSERT_NOT_IN_VEC(vec, value)                                       \
    do                                                                         \
@@ -16861,7 +16851,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       device_clear_wait_semaphores(self);
 
-      // Free memory for buffer pools.
+      /* Free memory for buffer pools. */
       bufferpool_reset(&self->managers.vbo);
       bufferpool_reset(&self->managers.ubo);
       { int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
@@ -16882,14 +16872,14 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       { int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
       {
          PerFrame *frame = self->per_frame.items[_pi];
-         // We have done WaitIdle, no need to wait for extra fences, it's also not safe.
+         /* We have done WaitIdle, no need to wait for extra fences, it's also not safe. */
          FenceVec_clear(&frame->wait_fences);
          per_frame_begin(frame);
       } }
    }
 
    static void device_next_frame_context(Device *self){
-      // Flush the frame here as we might have pending staging command buffers from init stage.
+      /* Flush the frame here as we might have pending staging command buffers from init stage. */
       device_end_frame_nolock(self);
 
       framebuffer_allocator_begin_frame(&self->framebuffer_allocator);
@@ -16992,7 +16982,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
    static void per_frame_fini(struct PerFrame *self)
    {
       per_frame_begin(self);
-      /* The command pools no longer self-destruct (their dtor became
+      /* The command pools no longer self-destruct (their teardown became
        * command_pool_deinit); tear them down explicitly, as the implicit member
        * destruction used to. */
       command_pool_deinit(&self->graphics_cmd_pool);
@@ -17015,7 +17005,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       cbhvec_deinit(&self->compute_submissions);
       cbhvec_deinit(&self->transfer_submissions);
       /* vbo/ubo block lists: free backing storage (begin() recycled+cleared the
-       * blocks but kept the array; the old BufferBlockVec member destructor that
+       * blocks but kept the array; the old BufferBlockVec member teardown that
        * freed it is gone now they are plain structs). */
       bufferblock_vec_free_storage(&self->vbo_blocks);
       bufferblock_vec_free_storage(&self->ubo_blocks);
@@ -17175,8 +17165,8 @@ static VkImageViewType get_image_view_type(const ImageCreateInfo *create_info, c
 
    /* ImageResourceHolder: a scoped owner of the Vulkan objects created while
     * building an Image (the image, its memory/allocation, and the various image
-    * views). Converted from a C++ RAII class to a plain C struct +
-    * image_resource_holder_* free functions. The destructor (cleanup() if still
+    * views). A plain C struct plus
+    * image_resource_holder_* free functions. The teardown (cleanup() if still
     * owned) becomes image_resource_holder_fini, which the two using functions
     * (create_image_view / create_image) call explicitly before every return.
     * Ownership is released by setting owned=false once the objects are handed off. */
@@ -17264,8 +17254,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       if (info->viewType == VK_IMAGE_VIEW_TYPE_3D)
          return true;
 
-      // If we have a render target, and non-trivial case (layers = 1, levels = 1),
-      // create an array of render targets which correspond to each layer (mip 0).
+      /* If we have a render target, and non-trivial case (layers = 1, levels = 1),
+       * create an array of render targets which correspond to each layer (mip 0). */
       if ((image_create_info->usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0 &&
             ((info->subresourceRange.levelCount > 1) || (info->subresourceRange.layerCount > 1)))
       {
@@ -17302,7 +17292,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          if ((image_create_info->usage & ~VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
          {
             VkImageViewCreateInfo view_info;
-            // Sanity check. Don't want to implement layered views for this.
+            /* Sanity check. Don't want to implement layered views for this. */
             if (info->subresourceRange.levelCount > 1)
             {
                LOGE("Cannot create depth stencil attachments with more than 1 mip level currently, and non-DS usage flags.\n");
@@ -17317,7 +17307,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
             view_info = *info;
 
-            // We need this to be able to sample the texture, or otherwise use it as a non-pure DS attachment.
+            /* We need this to be able to sample the texture, or otherwise use it as a non-pure DS attachment. */
             view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
             if (vkCreateImageView(self->device, &view_info, NULL, &self->depth_view) != VK_SUCCESS)
                return false;
@@ -17333,7 +17323,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
    static bool image_resource_holder_create_default_view(struct ImageResourceHolder *self, const VkImageViewCreateInfo *info)
    {
-      // Create the normal image view. This one contains every subresource.
+      /* Create the normal image view. This one contains every subresource. */
       if (vkCreateImageView(self->device, info, NULL, &self->image_view) != VK_SUCCESS)
          return false;
 
@@ -17466,7 +17456,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       result.buffer = device_create_buffer(self, &buffer_info, NULL);
       device_set_name_buffer(self, bh_get(&result.buffer), "image-upload-staging-buffer");
 
-      // And now, do the actual copy.
+      /* And now, do the actual copy. */
       mapped = (uint8_t *)(device_map_host_buffer(self, bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT));
       index = 0;
 
@@ -17506,7 +17496,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          InitialImageBuffer staging_buffer = device_create_image_staging_buffer(self, create_info, initial);
          ImageHandle img = device_create_image_from_staging_buffer(self, create_info, &staging_buffer);
          /* Drop the staging buffer's reference (previously released by the
-          * InitialImageBuffer destructor at end of scope). */
+          * InitialImageBuffer teardown at end of scope). */
          bh_reset(&staging_buffer.buffer);
          return img;
       }
@@ -17616,12 +17606,12 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
             holder.rt_views.items = NULL; holder.rt_views.count = 0; holder.rt_views.cap = 0;
          }
 
-         // Set possible dstStage and dstAccess.
+         /* Set possible dstStage and dstAccess. */
          image_set_stage_flags(ih_get(&handle), image_usage_to_possible_stages(info.usage));
          image_set_access_flags(ih_get(&handle), image_usage_to_possible_access(info.usage));
       }
 
-      // Copy initial data to texture.
+      /* Copy initial data to texture. */
       if (staging_buffer)
       {
          VkAccessFlags prepare_src_access;
@@ -17630,10 +17620,10 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          VK_ASSERT(create_info->initial_layout != VK_IMAGE_LAYOUT_UNDEFINED);
          { bool generate_mips = (create_info->misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
 
-         // If self->graphics_queue != self->transfer_queue, we will use a semaphore, so no srcAccess mask is necessary.
+         /* If self->graphics_queue != self->transfer_queue, we will use a semaphore, so no srcAccess mask is necessary. */
          VkAccessFlags final_transition_src_access = 0;
          if (generate_mips)
-            final_transition_src_access = VK_ACCESS_TRANSFER_READ_BIT; // Validation complains otherwise.
+            final_transition_src_access = VK_ACCESS_TRANSFER_READ_BIT; /* Validation complains otherwise. */
          else if (self->graphics_queue == self->transfer_queue)
             final_transition_src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
 
@@ -17641,17 +17631,17 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          { bool need_mipmap_barrier = true;
          bool need_initial_barrier = true;
 
-         // Now we've used the TRANSFER queue to copy data over to the GPU.
-         // For mipmapping, we're now moving over to self->graphics,
-         // the self->transfer queue is designed for CPU <-> GPU and that's it.
+         /* Now we've used the TRANSFER queue to copy data over to the GPU.
+          * For mipmapping, we're now moving over to self->graphics,
+          * the self->transfer queue is designed for CPU <-> GPU and that's it. */
 
-         // For concurrent queue mode, we just need to inject a semaphore.
-         // For non-concurrent queue mode, we will have to inject ownership self->transfer barrier if the queue families do not match.
+         /* For concurrent queue mode, we just need to inject a semaphore.
+          * For non-concurrent queue mode, we will have to inject ownership self->transfer barrier if the queue families do not match. */
 
          CommandBufferHandle graphics_cmd = device_request_command_buffer(self, Type_Generic);
          CommandBufferHandle transfer_cmd; transfer_cmd.data = NULL;
 
-         // Don't split the upload into multiple command buffers unless we have to.
+         /* Don't split the upload into multiple command buffers unless we have to. */
          if (self->transfer_queue != self->graphics_queue)
             transfer_cmd = device_request_command_buffer(self, Type_AsyncTransfer);
          else
@@ -17670,8 +17660,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
             VkPipelineStageFlags dst_stages =
                generate_mips ? (VkPipelineStageFlags)(VK_PIPELINE_STAGE_TRANSFER_BIT) : image_get_stage_flags(ih_get(&handle));
 
-            // We can't just use semaphores, we will also need a release + acquire barrier to marshal ownership from
-            // self->transfer queue over to self->graphics ...
+            /* We can't just use semaphores, we will also need a release + acquire barrier to marshal ownership from
+             * self->transfer queue over to self->graphics ... */
             if (self->transfer_queue_family_index != self->graphics_queue_family_index)
             {
                VkImageMemoryBarrier acquire;
@@ -17747,7 +17737,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
          share_async_graphics = device_get_physical_queue_type(self, Type_AsyncGraphics) == Type_AsyncCompute;
 
-         // Add semaphore if the self->compute queue can be used for async self->graphics as well.
+         /* Add semaphore if the self->compute queue can be used for async self->graphics as well. */
          if (share_async_graphics)
          {
             VkPipelineStageFlags dst_stages;
@@ -17834,8 +17824,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       if (self->graphics_queue_family_index != self->compute_queue_family_index ||
             self->graphics_queue_family_index != self->transfer_queue_family_index)
       {
-         // For buffers, always just use CONCURRENT access modes,
-         // so we don't have to deal with acquire/release barriers in async self->compute.
+         /* For buffers, always just use CONCURRENT access modes,
+          * so we don't have to deal with acquire/release barriers in async self->compute. */
          info.sharingMode = VK_SHARING_MODE_CONCURRENT;
 
          sharing_indices[info.queueFamilyIndexCount++] = self->graphics_queue_family_index;
@@ -17900,7 +17890,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          device_submit_staging(self, &cmd, info.usage, true);
          /* Drop the staging buffer's producer reference (the GPU copy is
           * submitted; the staging buffer's lifetime ends with self scope,
-          * previously via the handle's destructor). */
+          * previously via the handle's teardown). */
          bh_reset(&staging_buffer);
       }
       else if (initial)
@@ -17985,7 +17975,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       hasher_u32(&h, info->num_color_attachments);
       hasher_u32(&h, depth_stencil);
 
-      // Compatible render passes do not care about load/store, or image layouts.
+      /* Compatible render passes do not care about load/store, or image layouts. */
       if (!compatible)
       {
          hasher_u32(&h, info->op_flags);
@@ -17995,7 +17985,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          hasher_u32(&h, optimal);
       }
 
-      // Lazy flag can change external subpass dependencies, which is not compatible.
+      /* Lazy flag can change external subpass dependencies, which is not compatible. */
       hasher_u32(&h, lazy);
 
       hash = hasher_get(&h);
@@ -18136,7 +18126,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       shifted.x += self->renderpass.texture_offset_x;
       shifted.y += self->renderpass.texture_offset_y;
 
-      //Domain domain = palette ? Domain_Unscaled : fbatlas_find_suitable_domain(self, shifted);
+      /* Domain domain = palette ? Domain_Unscaled : fbatlas_find_suitable_domain(self, shifted); */
       fbatlas_sync_domain(self, domain, &shifted);
 
       { Rect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
@@ -18175,9 +18165,9 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
             resolve_domains = STATUS_TRANSFER_FB_WRITE;
          else if (stage == Stage_Fragment)
          {
-            // Write-after-write in fragment is handled implicitly.
-            // Write-after-read means rendering to a block after reading it as a texture.
-            // This is a hazard we must handle.
+            /* Write-after-write in fragment is handled implicitly.
+             * Write-after-read means rendering to a block after reading it as a texture.
+             * This is a hazard we must handle. */
             hazard_domains &= ~STATUS_FRAGMENT_FB_WRITE;
             resolve_domains = STATUS_FRAGMENT_FB_WRITE;
          }
@@ -18190,9 +18180,9 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
             resolve_domains = STATUS_COMPUTE_SFB_WRITE;
          else if (stage == Stage_Fragment)
          {
-            // Write-after-write in fragment is handled implicitly.
-            // Write-after-read means rendering to a block after reading it as a texture.
-            // This is a hazard we must handle.
+            /* Write-after-write in fragment is handled implicitly.
+             * Write-after-read means rendering to a block after reading it as a texture.
+             * This is a hazard we must handle. */
             hazard_domains &= ~STATUS_FRAGMENT_SFB_WRITE;
             resolve_domains = STATUS_FRAGMENT_SFB_WRITE;
          }
@@ -18204,8 +18194,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       { unsigned y; for (y = ybegin; y <= yend; y++)
          { unsigned x; for (x = xbegin; x <= xend; x++) write_domains |= (*fbatlas_info(self, x, y)) & hazard_domains; } }
 
-      // Trying to update VRAM before fragment is done reading it.
-      // We could use copy-on-write here to avoid flushing, but this scenario is very rare.
+      /* Trying to update VRAM before fragment is done reading it.
+       * We could use copy-on-write here to avoid flushing, but this scenario is very rare. */
       if (write_domains & STATUS_TEXTURE_READ)
          fbatlas_flush_render_pass(self);
 
@@ -18295,9 +18285,9 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       unsigned ybegin = rect->y / BLOCK_HEIGHT;
       unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 
-      // If we need to see a "clean" version
-      // of a framebuffer domain, we need to see
-      // anything other than this flag.
+      /* If we need to see a "clean" version
+       * of a framebuffer domain, we need to see
+       * anything other than this flag. */
       unsigned dirty_bits = 1u << (domain == Domain_Unscaled ? STATUS_SFB_ONLY : STATUS_FB_ONLY);
       unsigned bits = 0;
 
@@ -18306,13 +18296,13 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
       write_domains = 0;
 
-      // We're asserting that a region is up to date, but it's
-      // not, so we have to resolve it.
+      /* We're asserting that a region is up to date, but it's
+       * not, so we have to resolve it. */
       if ((bits & dirty_bits) == 0)
          return;
 
-      // For scaled domain,
-      // we need to blit from unscaled domain to scaled.
+      /* For scaled domain,
+       * we need to blit from unscaled domain to scaled. */
       { unsigned hazard_domains;
       unsigned resolve_domains;
       if (domain == Domain_Scaled)
@@ -18320,7 +18310,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          ownership = STATUS_FB_ONLY;
          hazard_domains = STATUS_FB_WRITE | STATUS_SFB_WRITE | STATUS_SFB_READ;
 
-         //resolve_domains = STATUS_TRANSFER_FB_READ | STATUS_FB_PREFER | STATUS_TRANSFER_SFB_WRITE;
+         /* resolve_domains = STATUS_TRANSFER_FB_READ | STATUS_FB_PREFER | STATUS_TRANSFER_SFB_WRITE; */
          resolve_domains = STATUS_COMPUTE_FB_READ | STATUS_FB_PREFER | STATUS_COMPUTE_SFB_WRITE;
       }
       else
@@ -18328,24 +18318,24 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          ownership = STATUS_SFB_ONLY;
          hazard_domains = STATUS_FB_WRITE | STATUS_SFB_WRITE | STATUS_FB_READ;
 
-         //resolve_domains = STATUS_TRANSFER_SFB_READ | STATUS_SFB_PREFER | STATUS_TRANSFER_FB_WRITE;
+         /* resolve_domains = STATUS_TRANSFER_SFB_READ | STATUS_SFB_PREFER | STATUS_TRANSFER_FB_WRITE; */
          resolve_domains = STATUS_COMPUTE_SFB_READ | STATUS_SFB_PREFER | STATUS_COMPUTE_FB_WRITE;
       }
 
       { unsigned y; for (y = ybegin; y <= yend; y++) {
          { unsigned x; for (x = xbegin; x <= xend; x++) {
             StatusFlags *mask = fbatlas_info(self, x, y);
-            // If our block isn't in the ownership class we want,
-            // we need to read from one block and write to the other.
-            // We might have to wait for writers on read,
-            // and add hazard masks for our writes
-            // so other readers can wait for us.
+            /* If our block isn't in the ownership class we want,
+             * we need to read from one block and write to the other.
+             * We might have to wait for writers on read,
+             * and add hazard masks for our writes
+             * so other readers can wait for us. */
             if (((*mask) & STATUS_OWNERSHIP_MASK) == ownership)
                write_domains |= (*mask) & hazard_domains;
          } }
       } }
 
-      // If we hit any hazard, resolve it.
+      /* If we hit any hazard, resolve it. */
       if (write_domains)
          fbatlas_pipeline_barrier(self, write_domains);
 
@@ -18417,7 +18407,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       if (!self->renderpass.inside)
          return;
 
-      // Clear out the "shadow" stage.
+      /* Clear out the "shadow" stage. */
       { unsigned _i; for (_i = 0; _i < NUM_BLOCKS_X * NUM_BLOCKS_Y; _i++)
          self->fb_info[_i] &= ~STATUS_TEXTURE_READ; }
 
@@ -18460,19 +18450,19 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       {
          rect_extend_bounding_box(&self->renderpass.rect, &scissored_rect);
 
-         // Avoid sync/write domain flushing our own render pass.
+         /* Avoid sync/write domain flushing our own render pass. */
          self->renderpass.inside = false;
 
-         // If we cleared the screen and we created a clear candidate,
-         // everything inside this render pass can be safely discarded.
+         /* If we cleared the screen and we created a clear candidate,
+          * everything inside this render pass can be safely discarded. */
          if (!scissor && rect_eq(&scissored_rect, &self->renderpass.rect))
             fbatlas_discard_render_pass(self);
 
          fbatlas_sync_domain(self, Domain_Scaled, &self->renderpass.rect);
          if (fbatlas_write_domain(self, Domain_Scaled, Stage_Fragment, &self->renderpass.rect))
          {
-            // If render pass was flushed here due to write-after-read hazards, set rect to
-            // our new scissored_rect instead.
+            /* If render pass was flushed here due to write-after-read hazards, set rect to
+             * our new scissored_rect instead. */
             self->renderpass.inside = true;
             fbatlas_flush_render_pass(self);
             self->renderpass.rect = scissored_rect;
@@ -18528,15 +18518,15 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       if (rect->width == 0 || rect->height == 0)
          return;
 
-      // If we're clearing completely outside the self->renderpass, we're probably doing another render pass
-      // somewhere else, so end the current one and start a new one instead.
+      /* If we're clearing completely outside the self->renderpass, we're probably doing another render pass
+       * somewhere else, so end the current one and start a new one instead. */
       if (self->renderpass.inside && !rect_intersects(&self->renderpass.rect, rect))
          fbatlas_flush_render_pass(self);
 
       fbatlas_extend_render_pass(self, rect, false);
 
-      // If the render pass area doesn't increase later, we can use loadOp == CLEAR instead of LOAD,
-      // which helps a lot on mobile GPUs.
+      /* If the render pass area doesn't increase later, we can use loadOp == CLEAR instead of LOAD,
+       * which helps a lot on mobile GPUs. */
       renderer_clear_quad(self->listener, rect, fb_color, rect_eq(&self->renderpass.rect, rect));
 
       xbegin = rect->x / BLOCK_WIDTH;
@@ -18598,7 +18588,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 /* === config_parser.cpp === */
 
-/* Whitespace per std::regex ECMAScript \s: space, tab, newline, CR, FF, VT. */
+/* Whitespace (ECMAScript whitespace): space, tab, newline, CR, FF, VT. */
 static INLINE int cfg_is_space(int c)
 {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v';
@@ -18635,7 +18625,7 @@ static int cfg_parse_field(const char **pp, int *out)
 
 /* Match one config line against:
  *   ^\s*ignore\s+(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*,\s*(\d+|\*)\s*(?:#.*)?$
- * On match, fills *m and returns true. Hand-rolled replacement for std::regex. */
+ * On match, fills *m and returns true. Hand-rolled matcher. */
 static bool cfg_match_ignore(const char *line, RectMatch *m)
 {
     const char *p = cfg_skip_ws(line);
@@ -18690,8 +18680,8 @@ struct RGBAImage {
     int height;
 };
 
-// Decode an image from disk into *img (RGBA, 4 channels). On failure img->data
-// is NULL. The caller owns img->data and must release it with rgba_image_free.
+/* Decode an image from disk into *img (RGBA, 4 channels). On failure img->data
+ * is NULL. The caller owns img->data and must release it with rgba_image_free. */
 static void load_image(const char *path, RGBAImage *img);
 static void rgba_image_free(RGBAImage *img);
 static bool write_image(const char *path, int width, int height, const void *data);
@@ -18760,8 +18750,8 @@ static char retro_slash = '\\';
 static char retro_slash = '/';
 #endif
 
-   // Path helpers write into a caller-provided buffer (PATH_MAX_TT bytes) and
-   // return it, C-style, instead of allocating a std::string.
+   /* Path helpers write into a caller-provided buffer (PATH_MAX_TT bytes) and
+    * return it C-style, no allocation. */
 
    static char *dump_path(char *out, size_t cap) {
       int n = snprintf(out, cap, "%s%c%s-texture-dump%c",
@@ -18794,12 +18784,12 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
    }
 
    static LoadedImage generate_mip(LoadedImage *higher) {
-      // Generate custom mipmaps in order to avoid transparent (0, 0, 0, 0) and semi-transparent (r, g, b, a>=128)
-      // mixing to create some dark opaque value (r, g, b, a<128).
+      /* Generate custom mipmaps in order to avoid transparent (0, 0, 0, 0) and semi-transparent (r, g, b, a>=128)
+       * mixing to create some dark opaque value (r, g, b, a<128). */
 
       LoadedImage result;
       int x, y;
-      // Assumes higher.width and higher.height are both divisible by 2 (and also therefore > 1)
+      /* Assumes higher.width and higher.height are both divisible by 2 (and also therefore > 1) */
       loaded_image_init(&result);
       loaded_image_alloc(&result, higher->width / 2, higher->height / 2);
       for (y = 0; y < result.height; y++) {
@@ -18849,7 +18839,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
          uint8_t *src = &image[i];
          uint8_t *dst = &result.owned_data[i];
          if (src[3] == 0) {
-            // Transparent
+            /* Transparent */
             (*alpha_flags) |= ALPHA_FLAG_TRANSPARENT;
             dst[0] = 0;
             dst[1] = 0;
@@ -18858,13 +18848,13 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
          } else if (src[3] == 255) {
             (*alpha_flags) |= ALPHA_FLAG_OPAQUE;
             if (src[0] == 0 && src[1] == 0 && src[2] == 0) {
-               // Opaque black
+               /* Opaque black */
                dst[0] = 1;
                dst[1] = 1;
                dst[2] = 1;
                dst[3] = 0;
             } else {
-               // Opaque
+               /* Opaque */
                dst[0] = src[0];
                dst[1] = src[1];
                dst[2] = src[2];
@@ -18873,13 +18863,13 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
          } else {
             (*alpha_flags) |= ALPHA_FLAG_SEMI_TRANSPARENT;
             if (src[0] == 0 && src[1] == 0 && src[2] == 0) {
-               // (0, 0, 0, 255) is a special reserved value
+               /* (0, 0, 0, 255) is a special reserved value */
                dst[0] = 1;
                dst[1] = 1;
                dst[2] = 1;
                dst[3] = 255;
             } else {
-               // Semi-transparent
+               /* Semi-transparent */
                dst[0] = src[0];
                dst[1] = src[1];
                dst[2] = src[2];
@@ -18929,9 +18919,9 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
     */
 
    static void io_thread(void *user_data) {
-      // Pool worker. Each worker is handed the channel pointer with a reference
-      // already taken on its behalf (at spawn); it releases that reference on the
-      // way out. Whichever holder releases last frees the channel.
+      /* Pool worker. Each worker is handed the channel pointer with a reference
+       * already taken on its behalf (at spawn); it releases that reference on the
+       * way out. Whichever holder releases last frees the channel. */
       IOChannel *channel = (IOChannel *)user_data;
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread starting\n");
 
@@ -18943,15 +18933,15 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
                scond_wait(channel->cond, channel->lock);
             }
             if (channel->done) {
-               // Prompt shutdown; drop any unprocessed requests (matches the
-               // previous single-thread behaviour). The channel destructor
-               // frees whatever is still queued.
+               /* Prompt shutdown; drop any unprocessed requests (matches the
+                * previous single-thread behaviour). The channel teardown
+                * frees whatever is still queued. */
                slock_unlock(channel->lock);
                break;
             }
-            // Take ONE request from the front so work spreads across the pool
-            // and the producer's priority order (visible palette first) is
-            // preserved. Wake another worker if more remain.
+            /* Take ONE request from the front so work spreads across the pool
+             * and the producer's priority order (visible palette first) is
+             * preserved. Wake another worker if more remain. */
             request = io_channel_pop_request(channel);
             if (channel->req_head != NULL) {
                scond_signal(channel->cond);
@@ -18959,9 +18949,9 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             slock_unlock(channel->lock);
          }
 
-         // The expensive part (PNG decode + mipmaps, or PNG write) runs WITHOUT
-         // the lock so workers process in parallel; only the queue access and
-         // the response push are serialised.
+         /* The expensive part (PNG decode + mipmaps, or PNG write) runs WITHOUT
+          * the lock so workers process in parallel; only the queue access and
+          * the response push are serialised. */
          if (request->kind == IORequestKind_Load) {
             uint32_t hash = request->hash;
             uint32_t palette_hash = request->palette_hash;
@@ -19013,8 +19003,8 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       free(c);
    }
 
-   // Number of parallel PNG-decode workers. Keeps first-appearance prefetch
-   // bursts short without starving the emulation/render threads.
+   /* Number of parallel PNG-decode workers. Keeps first-appearance prefetch
+    * bursts short without starving the emulation/render threads. */
    enum { NUM_IO_THREADS = 4 };
 
    void io_thread_init(IOThread *t) {
@@ -19022,14 +19012,14 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       t->channel = io_channel_new(); /* this IOThread holds one reference */
       { int i; for (i = 0; i < NUM_IO_THREADS; i++) {
          sthread_t * thread;
-         // Take a reference on the worker's behalf BEFORE it starts, so the
-         // channel can't be freed out from under it; the worker releases on exit.
+         /* Take a reference on the worker's behalf BEFORE it starts, so the
+          * channel can't be freed out from under it; the worker releases on exit. */
          io_channel_acquire(t->channel);
          thread = sthread_create(io_thread, t->channel);
          if (thread) {
             sthread_detach(thread);
          } else {
-            io_channel_release(t->channel); // thread failed to start; undo its ref
+            io_channel_release(t->channel); /* thread failed to start; undo its ref */
          }
       } }
    }
@@ -19037,9 +19027,9 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       slock_lock(t->channel->lock);
       t->channel->done = true;
       slock_unlock(t->channel->lock);
-      scond_broadcast(t->channel->cond); // wake ALL workers so they can exit
-      io_channel_release(t->channel);    // drop this IOThread's reference; the last
-                  // worker to exit frees the channel
+      scond_broadcast(t->channel->cond); /* wake ALL workers so they can exit */
+      io_channel_release(t->channel); /* drop this IOThread's reference; the last */
+                  /* worker to exit frees the channel */
       t->channel = NULL;
    }
 
@@ -19054,7 +19044,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       size_t   bi;
       size_t   img_count;
 
-      // from glsl/vram.h
+      /* from glsl/vram.h */
       int shift;
       switch (mode->mode) {
          case TextureMode_ABGR1555:
@@ -19069,7 +19059,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
          case TextureMode_None:
          default:
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "Tried to dump unused texture %x.\n", hash);
-            return; // Early out
+            return; /* Early out */
       }
 
       { size_t plen;
@@ -19112,7 +19102,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             for (p = 0; p < ppp; p++) {
                uint16_t subpixel = (pixel >> (p * bpp)) & mask;
                if (mode->mode != TextureMode_ABGR1555 && palette == NULL) {
-                  // Missing palette, dump a grayscale version of the image data
+                  /* Missing palette, dump a grayscale version of the image data */
                   bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
                   bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
                   bytes[bi++] = (uint8_t)(255.0 * subpixel / mask);
@@ -19130,17 +19120,17 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
                   g = ((abgr1555 >> 5) & 0x1f) * 255.0 / 31.0;
                   { int b = ((abgr1555 >> 10) & 0x1f) * 255.0 / 31.0;
                   int a = (abgr1555 >> 15) * 255.0;
-                  // Convert psx to tri
+                  /* Convert psx to tri */
                   if (a == 0) {
                      if (r == 0 && g == 0 && b == 0) {
-                        // Transparent
-                        // do nothing, pixel is already in the correct format
+                        /* Transparent
+                         * do nothing, pixel is already in the correct format */
                      } else {
-                        // Opaque
+                        /* Opaque */
                         a = 255;
                      }
                   } else {
-                     // Semi-transparent
+                     /* Semi-transparent */
                      a = 127;
                   }
                   bytes[bi++] = (uint8_t)r;
@@ -19159,7 +19149,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dump info: mode=%i, w=%i, h=%i, len=%i, bytesLen=%i\n", mode->mode, upload->width, upload->height, upload->image_count, (int)bytes_len);
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "Dumping to %s.\n", path);
 
-      //stbi_write_png(path, upload.width * ppp, upload.height, 4, bytes, 4 * upload.width * ppp);
+      /* stbi_write_png(path, upload.width * ppp, upload.height, 4, bytes, 4 * upload.width * ppp); */
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting dump: %s\n", path);
       {
          IORequest *dump = (IORequest *)malloc(sizeof(IORequest));
@@ -19187,7 +19177,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       dir = retro_opendir(path);
       if (dir != NULL) {
          while (retro_readdir(dir)) {
-            // https://stackoverflow.com/questions/13701657/control-whole-string-with-sscanf
+            /* https://stackoverflow.com/questions/13701657/control-whole-string-with-sscanf */
             uint32_t hash;
             uint32_t palette_hash;
             int chars_read;
@@ -19226,8 +19216,8 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       self->frame_dump_need_comma = false;
       self->fastpath_enabled = true;
       self->default_hd_texture.data = NULL; /* plain-struct handle: explicit null */
-      rect_tracker_init(&self->tracker); /* embedded RectTracker: explicit init (was default ctor) */
-      fused_pages_init(&self->fused_pages); /* embedded FusedPages: explicit init (was default ctor) */
+      rect_tracker_init(&self->tracker); /* embedded RectTracker: explicit init (was default initialiser) */
+      fused_pages_init(&self->fused_pages); /* embedded FusedPages: explicit init (was default initialiser) */
       HdImageCache_init(&self->hd_cache, HD_CACHE_RAM_BUDGET);
       HdGpuCache_init(&self->hd_gpu_cache, HD_CACHE_VRAM_BUDGET);
       handle_lru_cache_init(&self->handle_cache, 4);
@@ -19244,7 +19234,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       read_texture_directory(&self->known_files, replacements_path(rpath, sizeof(rpath)));
       TT_LOG(RETRO_LOG_INFO, "num hd textures: %d\n", (int)self->known_files.count);
 
-      // Read in the dump config file
+      /* Read in the dump config file */
       dump_path(cfg, sizeof(cfg));
       snprintf(cfg + strlen(cfg), sizeof(cfg) - strlen(cfg), "/dump.cfg");
       self->dump_ignore_count = parse_config_file(cfg, self->dump_ignore, DUMP_IGNORE_MAX);
@@ -19265,10 +19255,10 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       hd_key_set_free(&self->requested);
       hd_key_set_free(&self->pending_attach);
       free(self->cached_palette_hashes);
-      fused_pages_deinit(&self->fused_pages); /* embedded FusedPages: explicit deinit (was default dtor) */
-      rect_tracker_deinit(&self->tracker); /* embedded RectTracker: explicit deinit (was default dtor) */
+      fused_pages_deinit(&self->fused_pages); /* embedded FusedPages: explicit deinit (was default teardown) */
+      rect_tracker_deinit(&self->tracker); /* embedded RectTracker: explicit deinit (was default teardown) */
       /* Signal and drop the IO worker pool last. Previously self->iothread was a
-       * by-value member, so its destructor ran after this body; preserve that
+       * by-value member, so its teardown ran after this body; preserve that
        * ordering by deinitialising it here at the end. */
       io_thread_deinit(&self->iothread);
    }
@@ -19294,12 +19284,12 @@ static Rect fromSRect(SRect rect) {
       rect_tracker_overlapping(&self->tracker, palette_rect, &overlap);
       { int oi; for (oi = 0; oi < overlap.count; oi++) {
          RectIndex index = overlap.items[oi];
-         EnduringTextureRect *other = &self->tracker.textures.a[index]; // TODO: The `other.alive` check is unnecessary because self->tracker.overlapping never returns dead indices
+         EnduringTextureRect *other = &self->tracker.textures.a[index]; /* TODO: The `other.alive` check is unnecessary because self->tracker.overlapping never returns dead indices */
          if (fromSRect_contains(other->texture_rect.vram_rect, palette_rect) && other->alive) {
             int y;
             int x;
             if (other->texture_rect.offset_x != 0 || other->texture_rect.offset_y != 0) {
-               continue; // TODO: handle offset subrects
+               continue; /* TODO: handle offset subrects */
             }
             x = palette_rect.x - other->texture_rect.vram_rect.x;
             y = palette_rect.y - other->texture_rect.vram_rect.y;
@@ -19338,12 +19328,12 @@ static Rect fromSRect(SRect rect) {
          self->cached_palette_hashes_count++;
          return palette.hash;
       }
-      return 0; // TODO: better way to indicate no palette found?
+      return 0; /* TODO: better way to indicate no palette found? */
    }
 
    static void texture_tracker_clearRegion(struct TextureTracker *self, Rect rect) {
       if (rect.width == 0 || rect.height == 0) {
-         // Some games do this, apparently.
+         /* Some games do this, apparently. */
          return;
       }
       rect_tracker_clear(&self->tracker, make_srect(rect.x, rect.y, rect.width, rect.height));
@@ -19396,8 +19386,8 @@ static Rect fromSRect(SRect rect) {
       return hash;
    }
 
-   /* Geometry helpers used to return std::pair<...,bool> (result + validity).
-    * Named structs make the boolean's meaning explicit and drop std::pair. */
+   /* Geometry helpers return a result plus a validity flag.
+    * Named structs make the boolean's meaning explicit. */
    struct SRectResult { SRect rect; bool valid; };
    struct TextureRectResult { TextureRect rect; bool valid; };
 
@@ -19438,13 +19428,13 @@ static Rect fromSRect(SRect rect) {
    static void texture_tracker_notifyReadback(struct TextureTracker *self, Rect rect, uint16_t *vram) {
       RestorableRect rr;
       uint32_t hash;
-      // These hacks are my workaround for the dialog self->frame texture restorable getting evicted by FMVs
+      /* These hacks are my workaround for the dialog self->frame texture restorable getting evicted by FMVs */
       if (rect.width == 96 && rect.height == 224 && rect.y == 0 && (rect.x % 96) == 0) {
-         // HACK: Looks like final fmv self->frame readback for cross fade, ignore
+         /* HACK: Looks like final fmv self->frame readback for cross fade, ignore */
          return;
       }
       if (rect.width == 64 && rect.height == 224 && rect.y == 0 && (rect.x % 64) == 0) {
-         // HACK: Looks like final fmv self->frame readback for cross fade, ignore
+         /* HACK: Looks like final fmv self->frame readback for cross fade, ignore */
          return;
       }
 
@@ -19464,11 +19454,11 @@ static Rect fromSRect(SRect rect) {
       { int oi; for (oi = 0; oi < overlap.count; oi++) {
          RectIndex index = overlap.items[oi];
          EnduringTextureRect *e = &self->tracker.textures.a[index];
-         if (e->alive) { // TODO: This check is unnecessary because self->tracker.overlapping never returns dead indices
-                   // Clip to the self->requested rect
+         if (e->alive) { /* TODO: This check is unnecessary because self->tracker.overlapping never returns dead indices */
+                   /* Clip to the self->requested rect */
             TextureRectResult result = clip_texture_rect_to_vram(&e->texture_rect, rect);
             if (result.valid) {
-               // assert(rect.contains(fromSRect(result.rect.vram_rect)));
+               /* assert(rect.contains(fromSRect(result.rect.vram_rect))); */
                ownedrects_push(&to_restore, result.rect);
             }
          }
@@ -19489,13 +19479,13 @@ static Rect fromSRect(SRect rect) {
       texture_tracker_clear_palette_cache(self, rect);
 
       if (rect.width == FB_WIDTH && rect.height == FB_HEIGHT) {
-         // probably loading a save state, this is the entirety of vram
+         /* probably loading a save state, this is the entirety of vram */
          rect_tracker_clear(&self->tracker, toSRect(rect));
          fused_pages_mark_dead(&self->fused_pages, rect);
          return;
       }
 
-      // Would this ever happen?
+      /* Would this ever happen? */
       if (rect.width == 0 || rect.height == 0) {
          return;
       }
@@ -19518,9 +19508,9 @@ static Rect fromSRect(SRect rect) {
             }
          }
          hash = crc32(0, (unsigned char*)img, rect.width * rect.height * sizeof(uint16_t));
-         // TODO: check for hash collision, by checking if existing upload has different dimensions. not sure how to recover if it does,
-         //       but the odds of a collision are probably much higher than the odds that both textures would be in play simultaneously,
-         //       so it'd probably be safe to simply ignore the newest upload and clear instead.
+         /* TODO: check for hash collision, by checking if existing upload has different dimensions. not sure how to recover if it does,
+          * but the odds of a collision are probably much higher than the odds that both textures would be in play simultaneously,
+          * so it'd probably be safe to simply ignore the newest upload and clear instead. */
          upload = texture_tracker_find_upload(self, hash);    /* borrowed */
          if (upload == NULL) {
             upload = texture_upload_new();  /* owns +1 */
@@ -19531,7 +19521,7 @@ static Rect fromSRect(SRect rect) {
             upload->height = rect.height;
             upload->hash = hash;
             upload->dumpable = true;
-            // Don't dump uploads specified by dump.cfg
+            /* Don't dump uploads specified by dump.cfg */
             { int ri; for (ri = 0; ri < self->dump_ignore_count; ri++) {
                if (rect_match_matches(&self->dump_ignore[ri], rect)) {
                   upload->dumpable = false;
@@ -19561,7 +19551,7 @@ static Rect fromSRect(SRect rect) {
          int _ri;
          for (_ri = 0; _ri < ownedrects_size(&restore->to_restore); _ri++) {
             TextureRect *t = &restore->to_restore.v.items[_ri];
-            rect_tracker_place(&self->tracker, *t); // TODO: clip to other.rect
+            rect_tracker_place(&self->tracker, *t); /* TODO: clip to other.rect */
          }
       } else {
          rect_tracker_upload(&self->tracker, toSRect(rect), upload);
@@ -19569,14 +19559,14 @@ static Rect fromSRect(SRect rect) {
       fused_pages_mark_dirty(&self->fused_pages, rect);
       fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self->uploader);
 
-      // HD texture caching method:
-      //  - Lazy (self->eager_textures=false): nothing is queued here; each (hash,palette)
-      //    is loaded on demand when first drawn (request_hd_texture). Leanest.
-      //  - Eager (self->eager_textures=true, the master-consistent default): on the first
-      //    upload of a hash, prefetch ALL of its known palette variants into the
-      //    cache. Routed through want_combo so it still respects the cache
-      //    (decode-once / dedup) and the VRAM/RAM budgets, unlike stock Beetle's
-      //    raw load_hd_texture.
+      /* HD texture caching method:
+       * - Lazy (self->eager_textures=false): nothing is queued here; each (hash,palette)
+       * is loaded on demand when first drawn (request_hd_texture). Leanest.
+       * - Eager (self->eager_textures=true, the master-consistent default): on the first
+       * upload of a hash, prefetch ALL of its known palette variants into the
+       * cache. Routed through want_combo so it still respects the cache
+       * (decode-once / dedup) and the VRAM/RAM budgets, unlike stock Beetle's
+       * raw load_hd_texture. */
       if (self->eager_textures && self->hd_textures_enabled && !preexisting) {
          int lo = hd_key_set_lower_bound(&self->known_files, (uint64_t)upload->hash << 32);
          int hi = hd_key_set_lower_bound(&self->known_files, ((uint64_t)upload->hash + 1) << 32);
@@ -19615,18 +19605,18 @@ static Rect fromSRect(SRect rect) {
       }
    }
 
-   // Queue a disk load for one (hash,palette) combo, unless it's already decoded
-   // (in the cache), already in flight, or known to have no file. Combos with no
-   // file are inserted into `requested` as a permanent negative cache. The IO
-   // thread only pushes a response on success, so a failed/missing load stays in
-   // `requested` and is never retried (until a reload clears it).
+   /* Queue a disk load for one (hash,palette) combo, unless it's already decoded
+    * (in the cache), already in flight, or known to have no file. Combos with no
+    * file are inserted into `requested` as a permanent negative cache. The IO
+    * thread only pushes a response on success, so a failed/missing load stays in
+    * `requested` and is never retried (until a reload clears it). */
    void texture_tracker_want_combo(struct TextureTracker *self, HdTextureId id) {
       if (HdGpuCache_contains(&self->hd_gpu_cache, hd_pack_key(id)) || HdImageCache_contains(&self->hd_cache, hd_pack_key(id)))
-         return; // already resident in VRAM, or already decoded in RAM
+         return; /* already resident in VRAM, or already decoded in RAM */
       if (!hd_key_set_insert(&self->requested, hd_pack_key(id)))
-         return; // already in flight, or negatively cached
+         return; /* already in flight, or negatively cached */
       if (!hd_key_set_contains(&self->known_files, hd_pack_key(id)))
-         return; // no file on disk
+         return; /* no file on disk */
 
       slock_lock(self->iothread.channel->lock);
       {
@@ -19643,30 +19633,30 @@ static Rect fromSRect(SRect rect) {
       scond_signal(self->iothread.channel->cond);
    }
 
-   // Cache-backed HD texture binding for a drawn (hash,palette): pure lazy.
-   //
-   // If the combo is in the GPU cache, bind it immediately (handle copy, used this
-   // frame). If it's decoded in the CPU cache, schedule a GPU upload for the next
-   // safe point (on_queues_reset). Otherwise queue a single disk load for it. The
-   // 3-tier cache makes every re-draw free, so each combo costs at most one decode
-   // on its very first appearance.
-   //
-   // (Cross-hash prefetch was tried and removed: with the cache, re-draws are
-   // already free, so warming the whole palette hash-set up front mostly decoded
-   // combos that were never drawn - thrashing the RAM cache and clogging the IO
-   // queue ahead of the combos actually on screen, which made pop-in worse.)
+   /* Cache-backed HD texture binding for a drawn (hash,palette): pure lazy.
+    * 
+    * If the combo is in the GPU cache, bind it immediately (handle copy, used this
+    * frame). If it's decoded in the CPU cache, schedule a GPU upload for the next
+    * safe point (on_queues_reset). Otherwise queue a single disk load for it. The
+    * 3-tier cache makes every re-draw free, so each combo costs at most one decode
+    * on its very first appearance.
+    * 
+    * (Cross-hash prefetch was tried and removed: with the cache, re-draws are
+    * already free, so warming the whole palette hash-set up front mostly decoded
+    * combos that were never drawn - thrashing the RAM cache and clogging the IO
+    * queue ahead of the combos actually on screen, which made pop-in worse.) */
    void texture_tracker_request_hd_texture(struct TextureTracker *self, TextureUpload *upload, uint32_t palette_hash) {
       if (hd_tex_map_contains(&upload->textures, palette_hash))
-         return; // already attached to this upload
+         return; /* already attached to this upload */
 
       { HdTextureId current = { upload->hash, palette_hash };
 
-      // GPU-cache hit: the Vulkan image already exists, so binding it is just a
-      // ref-counted handle copy (no Vulkan commands). Bind it IMMEDIATELY so the
-      // CURRENT self->frame's draw uses the HD texture. Deferring to on_queues_reset
-      // cost a 1-self->frame native flicker every time an animation self->frame's upload was
-      // recreated (constant for sprites) - i.e. persistent pop-in even when the
-      // image was fully cached.
+      /* GPU-cache hit: the Vulkan image already exists, so binding it is just a
+       * ref-counted handle copy (no Vulkan commands). Bind it IMMEDIATELY so the
+       * CURRENT self->frame's draw uses the HD texture. Deferring to on_queues_reset
+       * cost a 1-self->frame native flicker every time an animation self->frame's upload was
+       * recreated (constant for sprites) - i.e. persistent pop-in even when the
+       * image was fully cached. */
       CachedGpuImage *gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(current));
       if (gpu != NULL) {
          hd_tex_map_set(&upload->textures, palette_hash, gpu->image, gpu->alpha_flags);
@@ -19674,12 +19664,12 @@ static Rect fromSRect(SRect rect) {
          return;
       }
 
-      // CPU-cache hit (decoded but not in VRAM): needs a GPU upload, which we keep
-      // at the safe point - schedule it for on_queues_reset.
+      /* CPU-cache hit (decoded but not in VRAM): needs a GPU upload, which we keep
+       * at the safe point - schedule it for on_queues_reset. */
       if (HdImageCache_contains(&self->hd_cache, hd_pack_key(current)))
          hd_key_set_insert(&self->pending_attach, hd_pack_key(current));
       else
-         texture_tracker_want_combo(self, current);            // queue a single disk load for the drawn combo
+         texture_tracker_want_combo(self, current); /* queue a single disk load for the drawn combo */
       }
    }
 
@@ -19765,7 +19755,7 @@ static Rect fromSRect(SRect rect) {
       (*fastpath_capable_out) = false;
       palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 
-      // TODO: I'm pretty sure this doesn't handle TextureMode_ABGR1555
+      /* TODO: I'm pretty sure this doesn't handle TextureMode_ABGR1555 */
 
       { uint32_t palette_hash = 0;
       (*cache_hit) = false;
@@ -19775,13 +19765,13 @@ static Rect fromSRect(SRect rect) {
          }
       }
       if (self->hd_textures_enabled) {
-         // Check if the same texture as last time is used.
+         /* Check if the same texture as last time is used. */
          HandleCacheResult cache_result = handle_lru_cache_get(&self->handle_cache, rect, palette_hash);
          (*cache_hit) = cache_result.found;
          if ((*cache_hit)) {
-            // cache_result.handle is currently always a non-fused, non-none, index + palette_hash
-            // in the future it may be useful to cache none, but there's currently no way to check if such a containing rect is still alive (since HdTextureHandle's index would be -1)
-            EnduringTextureRect *tex = &self->tracker.textures.a[cache_result.handle.index]; // Forgive me
+            /* cache_result.handle is currently always a non-fused, non-none, index + palette_hash
+             * in the future it may be useful to cache none, but there's currently no way to check if such a containing rect is still alive (since HdTextureHandle's index would be -1) */
+            EnduringTextureRect *tex = &self->tracker.textures.a[cache_result.handle.index]; /* Forgive me */
             if (tex->alive) {
                (*fastpath_capable_out) = self->fastpath_enabled && ((hd_tex_map_find(&tex->texture_rect.upload->textures, palette_hash) ? hd_tex_map_find(&tex->texture_rect.upload->textures, palette_hash)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
                return cache_result.handle;
@@ -19792,7 +19782,7 @@ static Rect fromSRect(SRect rect) {
       { static RectIndexSet overlap = { NULL, 0, 0 };
       rect_tracker_overlapping(&self->tracker, rect, &overlap);
 
-      // Dump texture
+      /* Dump texture */
       { int oi; for (oi = 0; oi < overlap.count; oi++) {
          RectIndex index = overlap.items[oi];
          TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
@@ -19823,21 +19813,21 @@ static Rect fromSRect(SRect rect) {
          TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
          HdTexEntry *overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
          if (overlapped_image == NULL) {
-            // Not bound to this upload yet. Bind it now: a GPU-cache hit binds
-            // in-frame (handle copy, used by THIS draw - no 1-self->frame native
-            // flicker), otherwise this schedules a decode / GPU upload that
-            // lands on a later self->frame.
+            /* Not bound to this upload yet. Bind it now: a GPU-cache hit binds
+             * in-frame (handle copy, used by THIS draw - no 1-self->frame native
+             * flicker), otherwise this schedules a decode / GPU upload that
+             * lands on a later self->frame. */
             texture_tracker_request_hd_texture(self, tex->upload, palette_hash);
             overlapped_image = hd_tex_map_find(&tex->upload->textures, palette_hash);
          }
          if (overlapped_image != NULL) {
             if (hd_handle_is_none(&result)) {
-               // note that if tex->vram_rect contains rect, then it will be the only entry in overlap, so an early out would be pointless
+               /* note that if tex->vram_rect contains rect, then it will be the only entry in overlap, so an early out would be pointless */
                result_rect = fromSRect(tex->vram_rect);
                (*fastpath_capable_out) = self->fastpath_enabled && fromSRect_contains(tex->vram_rect, rect) && (overlapped_image->alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
                result = hd_handle_make(index, palette_hash);
             } else {
-               // Multiple overlap, must fuse
+               /* Multiple overlap, must fuse */
                unsigned int width
                   = mode->mode == TextureMode_Palette4bpp ? 64
                   : mode->mode == TextureMode_Palette8bpp ? 128
@@ -19862,10 +19852,10 @@ static Rect fromSRect(SRect rect) {
       {
          int scaleX;
          ImageHandle image;
-         // HdTextureHandle's are perhaps too tricky.  They assume that the RectTracker's textures vector hasn't removed anything since the handle was
-         // created. So it would seem all you need to do is, in Renderer::reset_queue, call RectTracker::releaseDeadHandles. Except you have to be
-         // very very careful that no handles outside of the queues (ie. local) exist across a call to reset_queue.  That is, the handle must go into
-         // the queue as soon as possible, otherwise that hd texture might not work (previously it would segfault).
+         /* HdTextureHandle's are perhaps too tricky.  They assume that the RectTracker's textures vector hasn't removed anything since the handle was
+          * created. So it would seem all you need to do is, in renderer reset_queue, call the rect-tracker dead-handle release. Except you have to be
+          * very very careful that no handles outside of the queues (ie. local) exist across a call to reset_queue.  That is, the handle must go into
+          * the queue as soon as possible, otherwise that hd texture might not work (previously it would segfault). */
          TextureRect *tex = rect_tracker_get_index(&self->tracker, handle.index);
          if (tex == NULL) {
             if (handle.index != -1) {
@@ -19880,8 +19870,8 @@ static Rect fromSRect(SRect rect) {
             }
          }
          { TextureUpload *upload = tex->upload;
-         // Use find rather than index, because if a stale HdTextureHandle was provided this could segfault
-         // because indexing on a key that isn't present would initialize a new one with a null pointer
+         /* Use find rather than index, because if a stale HdTextureHandle was provided this could segfault
+          * because indexing on a key that isn't present would initialize a new one with a null pointer */
          HdTexEntry *iter = hd_tex_map_find(&upload->textures, handle.palette_hash);
          if (iter == NULL) {
             TT_LOG(RETRO_LOG_WARN, "stale HdTextureHandle: %d, %x\n", handle.index, handle.palette_hash);
@@ -19912,7 +19902,7 @@ static Rect fromSRect(SRect rect) {
             /* Move the owned reference built just above into the result; the
              * local 'image' is not ih_reset, so the +1 ref from
              * image_add_reference lives on in _r.texture exactly as the C++
-             * copy-into-return / local-dtor pair netted out. */
+             * copy-into-return / local-teardown pair netted out. */
             _r.texture = image;
             return _r;
          }
@@ -19924,24 +19914,24 @@ static Rect fromSRect(SRect rect) {
    }
 
 static bool is_power_of_two(int n) {
-      // https://stackoverflow.com/questions/108318/whats-the-simplest-way-to-test-whether-a-number-is-a-power-of-2-in-c
+      /* https://stackoverflow.com/questions/108318/whats-the-simplest-way-to-test-whether-a-number-is-a-power-of-2-in-c */
       return n != 0 && (n & (n - 1)) == 0;
    }
 
-   // TEMPORARY:
+   /* TEMPORARY: */
    static void texture_tracker_on_queues_reset(struct TextureTracker *self) {
       handle_lru_cache_clear(&self->handle_cache);
-      rect_tracker_releaseDeadHandles(&self->tracker); // This is called from reset_queue, so as of now no HdTextureHandle's exist
+      rect_tracker_releaseDeadHandles(&self->tracker); /* This is called from reset_queue, so as of now no HdTextureHandle's exist */
 
-      // Poll HD uploads
+      /* Poll HD uploads */
 
       slock_lock(self->iothread.channel->lock);
-      { IOResponse *responses = io_channel_take_responses(self->iothread.channel); // steal the list
+      { IOResponse *responses = io_channel_take_responses(self->iothread.channel); /* steal the list */
       slock_unlock(self->iothread.channel->lock);
 
-      // Move freshly decoded images into the cache (decode-once); mark them for
-      // attach. The cache owns them regardless of whether their hash is resident.
-      // Each response node is freed after its levels are moved into the cache.
+      /* Move freshly decoded images into the cache (decode-once); mark them for
+       * attach. The cache owns them regardless of whether their hash is resident.
+       * Each response node is freed after its levels are moved into the cache. */
       {
          IOResponse *response = responses;
          while (response != NULL) {
@@ -19950,19 +19940,19 @@ static bool is_power_of_two(int n) {
             self->dbg_responses_received++;
             id.hash = response->hash;
             id.palette_hash = response->palette_hash;
-            hd_key_set_erase(&self->requested, hd_pack_key(id)); // no longer in flight; now cached
+            hd_key_set_erase(&self->requested, hd_pack_key(id)); /* no longer in flight; now cached */
             hd_image_cache_put(&self->hd_cache, id, &response->levels, response->alpha_flags);
             hd_key_set_insert(&self->pending_attach, hd_pack_key(id));
-            io_response_free(response); // levels already moved out (now empty)
+            io_response_free(response); /* levels already moved out (now empty) */
             response = rnext;
          }
       }
 
-      // Attach pass: for every wanted combo whose base hash is currently
-      // resident, bind an HD image to it. Prefer the GPU cache (a ref-counted
-      // handle copy - no upload); otherwise build the image from the CPU cache
-      // and store it in the GPU cache. Combos whose hash isn't resident yet stay
-      // cached (NOT discarded) and attach on a later self->frame.
+      /* Attach pass: for every wanted combo whose base hash is currently
+       * resident, bind an HD image to it. Prefer the GPU cache (a ref-counted
+       * handle copy - no upload); otherwise build the image from the CPU cache
+       * and store it in the GPU cache. Combos whose hash isn't resident yet stay
+       * cached (NOT discarded) and attach on a later self->frame. */
       {
          int pi;
          for (pi = 0; pi < self->pending_attach.count; pi++) {
@@ -19973,11 +19963,11 @@ static bool is_power_of_two(int n) {
             id.palette_hash = (uint32_t)self->pending_attach.keys[pi];
             { TextureUpload *upload = texture_tracker_find_upload(self, id.hash); /* borrowed */
             if (upload == NULL)
-               continue; // not resident yet; kept in cache
+               continue; /* not resident yet; kept in cache */
             if (hd_tex_map_contains(&upload->textures, id.palette_hash))
-               continue; // already attached
+               continue; /* already attached */
 
-            // Tier 1: ready-to-bind GPU image - just copy the handle.
+            /* Tier 1: ready-to-bind GPU image - just copy the handle. */
             { CachedGpuImage *gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(id));
             if (gpu != NULL) {
                hd_tex_map_set(&upload->textures, id.palette_hash, gpu->image, gpu->alpha_flags);
@@ -19991,10 +19981,10 @@ static bool is_power_of_two(int n) {
                continue;
             }
 
-            // Tier 2: decoded CPU levels - upload to GPU, then cache the image.
+            /* Tier 2: decoded CPU levels - upload to GPU, then cache the image. */
             { CachedHdImage *cached = HdImageCache_get(&self->hd_cache, hd_pack_key(id));
             if (cached == NULL)
-               continue; // evicted from both caches; will be re-self->requested on draw
+               continue; /* evicted from both caches; will be re-self->requested on draw */
 
             width = cached->levels.levels[0].width;
             height = cached->levels.levels[0].height;
@@ -20017,8 +20007,8 @@ static bool is_power_of_two(int n) {
             } else {
                TT_LOG(RETRO_LOG_WARN, "Dimension mismatch for %x-%x, original=%dx%d, replacement=%dx%d\n",
                      id.hash, id.palette_hash, upload->width, upload->height, width, height);
-               HdImageCache_erase(&self->hd_cache, hd_pack_key(id));    // don't keep a bad-sized image around
-               hd_key_set_insert(&self->requested, hd_pack_key(id));  // negatively cache so we don't reload + re-warn every self->frame
+               HdImageCache_erase(&self->hd_cache, hd_pack_key(id)); /* don't keep a bad-sized image around */
+               hd_key_set_insert(&self->requested, hd_pack_key(id)); /* negatively cache so we don't reload + re-warn every self->frame */
             }
             }
             }
@@ -20038,7 +20028,7 @@ static bool is_power_of_two(int n) {
       if (upload != NULL)
          return upload;
 
-      // backup search, in case it's restorable but currently missing from the rect tracker
+      /* backup search, in case it's restorable but currently missing from the rect tracker */
       for (_ri = 0; _ri < rrvec_size(&self->restorable_rects); _ri++)
       {
          RestorableRect *entry = &self->restorable_rects.items[_ri];
@@ -20153,11 +20143,11 @@ static bool is_power_of_two(int n) {
 
    void texture_tracker_reload_textures_from_disk(struct TextureTracker *self) {
       char rpath[PATH_MAX_TT];
-      // Reload the directory listing
+      /* Reload the directory listing */
       read_texture_directory(&self->known_files, replacements_path(rpath, sizeof(rpath)));
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "Found %d hd textures\n", (int)self->known_files.count);
 
-      // Drop all cached / loaded HD state so edited files on disk take effect.
+      /* Drop all cached / loaded HD state so edited files on disk take effect. */
       HdGpuCache_clear(&self->hd_gpu_cache);
       HdImageCache_clear(&self->hd_cache);
       hd_key_set_clear(&self->requested);
@@ -20181,13 +20171,13 @@ static bool is_power_of_two(int n) {
       }
       }
 
-      // Delete fused textures
+      /* Delete fused textures */
       { Rect _mdr; _mdr.x = 0; _mdr.y = 0; _mdr.width = FB_WIDTH; _mdr.height = FB_HEIGHT; fused_pages_mark_dead(&self->fused_pages, _mdr); }
 
-      // Draws will lazily re-request and the cache repopulates.
+      /* Draws will lazily re-request and the cache repopulates. */
    }
 
-   // RectTracker
+   /* RectTracker */
 
    static bool intersects(SRect a, SRect b) {
       return !(
@@ -20214,7 +20204,7 @@ static bool is_power_of_two(int n) {
 
       intersection = intersectionResult.rect;
 
-      // Top rect
+      /* Top rect */
       if (srect_top(&intersection) > srect_top(&original)) {
          results[(*count)++] = bounds(
                srect_left(&original),
@@ -20224,7 +20214,7 @@ static bool is_power_of_two(int n) {
                );
       }
 
-      // Bottom rect
+      /* Bottom rect */
       if (srect_bottom(&intersection) < srect_bottom(&original)) {
          results[(*count)++] = bounds(
                srect_left(&original),
@@ -20234,7 +20224,7 @@ static bool is_power_of_two(int n) {
                );
       }
 
-      // Left rect
+      /* Left rect */
       if (srect_left(&intersection) > srect_left(&original)) {
          results[(*count)++] = bounds(
                srect_left(&original),
@@ -20244,7 +20234,7 @@ static bool is_power_of_two(int n) {
                );
       }
 
-      // Right rect
+      /* Right rect */
       if (srect_right(&intersection) < srect_right(&original)) {
          results[(*count)++] = bounds(
                srect_right(&intersection),
@@ -20304,8 +20294,8 @@ static bool is_power_of_two(int n) {
       if (self->lookup_grid_dirty)
          rect_tracker_rebuild_lookup_grid(self);
 
-      // TODO: remove this when renderer/build_attribs doesn't 
-      // have an unnecessary - 1
+      /* TODO: remove this when renderer/build_attribs doesn't
+       * have an unnecessary - 1 */
       if (uvrect.width == 0)
          uvrect.width = 1;
 
@@ -20336,11 +20326,11 @@ static bool is_power_of_two(int n) {
 
             splits_count = 0;
             split(old->vram_rect, *rect, splits, &splits_count);
-            // The rect didn't split, do nothing
+            /* The rect didn't split, do nothing */
             if (splits_count == 1 && srect_eq(&splits[0], &old->vram_rect)) { }
             else
             {
-               // The rect split, mark this texture as dead and push its splits to be added
+               /* The rect split, mark this texture as dead and push its splits to be added */
                unsigned i;
                eold->alive = false;
                for (i = 0; i < splits_count; i++)
@@ -20389,9 +20379,9 @@ static int clamp(int x, int low, int high)
    struct CellBounds
    {
       int lowX;
-      int highX; // exclusive
+      int highX; /* exclusive */
       int lowY;
-      int highY; // exclusive
+      int highY; /* exclusive */
    };
 
    static CellBounds cellBounds(SRect vram) {
@@ -20467,7 +20457,7 @@ static int clamp(int x, int low, int high)
          self->cells[i].count = 0; /* keep allocation for reuse */
    }
 
-   // FusedPages
+   /* FusedPages */
 
 static int64_t page_bytes(FusionRects *fusion)
    {
@@ -20494,7 +20484,7 @@ static int64_t page_bytes(FusionRects *fusion)
    }
 
    static bool texture_rect_sort_gt(const struct TextureRect *a, const struct TextureRect *b) {
-      // Compare .upload by pointer
+      /* Compare .upload by pointer */
       if (a->upload != b->upload)
          return a->upload > b->upload;
       if (!srect_eq(&a->vram_rect, &b->vram_rect))
@@ -20532,7 +20522,7 @@ static int64_t page_bytes(FusionRects *fusion)
             HdTexEntry *hd_texture = hd_tex_map_find(&upload->textures, palette_hash);
             if (hd_texture != NULL) {
                Rect r;
-               // Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity)
+               /* Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity) */
                TextureRect clipped = subTexture(e->texture_rect, intersection.rect);
                unsigned hd_scale_x = image_get_width(hd_texture->image, 0) / upload->width;
                unsigned hd_scale_y = image_get_height(hd_texture->image, 0) / upload->height;
@@ -20548,7 +20538,7 @@ static int64_t page_bytes(FusionRects *fusion)
          }
       }
 
-      // Sort rects so that the vector itself can be compared
+      /* Sort rects so that the vector itself can be compared */
       qsort(TextureRectVec_data(&f->rects.v), TextureRectVec_size(&f->rects.v), sizeof(TextureRect), texture_rect_qsort_cmp);
 
    }
@@ -20590,18 +20580,18 @@ static int64_t page_bytes(FusionRects *fusion)
       texture_width = page->fusion.vram_rect.width * page->fusion.scaleX;
       { int texture_height = page->fusion.vram_rect.height * page->fusion.scaleY;
 
-      // TODO: I don't know SHIT about barriers.
+      /* TODO: I don't know SHIT about barriers. */
 
-      // special sentinel value
-      // Note that due to the way textures are put into a page, these special values will not bleed into neighbors in the mipmaps,
-      // because the mipmaps are only used down to the original resolution, and hd textures are aligned to that original resolution's
-      // texels.
+      /* special sentinel value
+       * Note that due to the way textures are put into a page, these special values will not bleed into neighbors in the mipmaps,
+       * because the mipmaps are only used down to the original resolution, and hd textures are aligned to that original resolution's
+       * texels. */
       VkClearValue fallthrough = {0.0, 0.0, 0.0, 1.0};
 
       int mip_levels = log2(min_(page->fusion.scaleX, page->fusion.scaleY)) + 1;
 
       if (ih_is_valid(&page->texture) && image_get_width(ih_get(&page->texture), 0) == texture_width && image_get_height(ih_get(&page->texture), 0) == texture_height)
-         // Switch back into transfer dst layout
+         /* Switch back into transfer dst layout */
          commandbuffer_image_barrier(cbh_get(cmd), ih_get(&page->texture),
                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -20610,7 +20600,7 @@ static int64_t page_bytes(FusionRects *fusion)
          ih_move(&page->texture, renderer_create_texture(uploader, texture_width, texture_height, mip_levels));
       commandbuffer_clear_image(cbh_get(cmd), ih_get(&page->texture), &fallthrough);
 
-      // Second pass to blit all the existing textures into the new texture
+      /* Second pass to blit all the existing textures into the new texture */
       {
       int _fri;
       for (_fri = 0; _fri < ownedrects_size(&page->fusion.rects); _fri++) {
@@ -20620,7 +20610,7 @@ static int64_t page_bytes(FusionRects *fusion)
          TextureUpload *upload = tex->upload;
 
          HdTexEntry *hd_texture = hd_tex_map_find(&upload->textures, page->palette);
-         // That's odd
+         /* That's odd */
          if (hd_texture == NULL)
             continue;
 
@@ -20648,8 +20638,8 @@ static int64_t page_bytes(FusionRects *fusion)
             1
          };
 
-         // Switch into transfer src
-         // what the fuck am I doing?
+         /* Switch into transfer src
+          * what the fuck am I doing? */
          commandbuffer_image_barrier(cbh_get(cmd), 
                image,
                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -20660,12 +20650,12 @@ static int64_t page_bytes(FusionRects *fusion)
                0
                );
 
-         // Blit into every mipmap level down to base vram
-         // TODO: this isn't a great way to do this, will probably be blurrier than it could be if src and dst aspect ratios are different
-         // TODO: is this line even right? it sure doesn't look right
+         /* Blit into every mipmap level down to base vram
+          * TODO: this isn't a great way to do this, will probably be blurrier than it could be if src and dst aspect ratios are different
+          * TODO: is this line even right? it sure doesn't look right */
          full_res_levels = log2(max_(rx, ry)) + 1;
-         // assert(max_level >= 0 && max_level <= 6);
-         // TODO: this is incredibly finicky, and one bad (out of bounds) blit can bork everything
+         /* assert(max_level >= 0 && max_level <= 6);
+          * TODO: this is incredibly finicky, and one bad (out of bounds) blit can bork everything */
          { int dstLevel; for (dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
             int srcLevel = max_(0, dstLevel - full_res_levels);
 
@@ -20683,7 +20673,7 @@ static int64_t page_bytes(FusionRects *fusion)
             dst_extent.y = max_(dst_extent.y >> 1, 1);
          } }
 
-         // Change back to shader read
+         /* Change back to shader read */
          commandbuffer_image_barrier(cbh_get(cmd), 
                image,
                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -20697,8 +20687,8 @@ static int64_t page_bytes(FusionRects *fusion)
       }
       }
 
-      // I have no idea what the fuck I'm doing
-      // Make the fused texture readable by shaders
+      /* I have no idea what the fuck I'm doing
+       * Make the fused texture readable by shaders */
       commandbuffer_image_barrier(cbh_get(cmd), ih_get(&page->texture),
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -20745,12 +20735,12 @@ static int64_t page_bytes(FusionRects *fusion)
       for (x = 0; x < fused_page_vec_size(&self->pages); x++)
       {
          FusedPage *p = fused_page_vec_at(&self->pages, x);
-         // return page
+         /* return page */
          if (!p->dead && p->palette == palette && rect_eq(&p->full_page_rect, &page_rect))
             return hd_handle_make_fused(x);
       }
 
-      // Make a new fused page
+      /* Make a new fused page */
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "Creating new fused page for palette %x\n", palette);
 
       page.dead = false;
@@ -20810,11 +20800,11 @@ static int64_t page_bytes(FusionRects *fusion)
    }
 
 
-   //========================================
-   // Save State
+   /* ========================================
+    * Save State */
 
    /* Allocate a new upload (refcount 1) that is a deep copy of to_copy with the
-    * HD textures map cleared. Replaces the old by-value copy ctor flow. */
+    * HD textures map cleared. Replaces the old by-value copy initialiser flow. */
    static TextureUpload *texture_upload_new_copy_without_handles(const TextureUpload *to_copy) {
       TextureUpload *copy = texture_upload_new();
       texture_upload_copy_contents(copy, to_copy);
@@ -20826,7 +20816,7 @@ static int64_t page_bytes(FusionRects *fusion)
     * state. Non-owning (the pointers are owned by the +1 ref taken in
     * load_state and dropped at the end), keys are unique and inserted once, so
     * a flat POD array with a linear scan replaces the old
-    * std::map<uint32_t, TextureUpload*>. */
+    * a uint32_t -> TextureUpload* map. */
    struct UploadPtrEntry { uint32_t key; TextureUpload *val; };
    POD_VEC_DECLARE(UploadPtrVec, UploadPtrEntry);
 
@@ -20906,7 +20896,7 @@ static int64_t page_bytes(FusionRects *fusion)
       } }
 
       { Rect _crr; _crr.x = 0; _crr.y = 0; _crr.width = FB_WIDTH; _crr.height = FB_HEIGHT; texture_tracker_clearRegion(self, _crr); }
-      enduring_arr_clear(&self->tracker.textures); // load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway
+      enduring_arr_clear(&self->tracker.textures); /* load_state should only be called right after creating this TextureTracker, so this ought to be empty already anyway */
       {
          int _i;
          for (_i = 0; _i < TextureRectSaveStateVec_size(&state->rects); _i++)
@@ -20929,15 +20919,15 @@ static int64_t page_bytes(FusionRects *fusion)
             restorablerect_destroy(&loaded);
          }
       }
-      // Need to reload the hd textures, too
+      /* Need to reload the hd textures, too */
       { int e; for (e = 0; e < state->uploads.count; e++) texture_tracker_load_hd_texture(self, state->uploads.items[e].key); }
-      // Drop the map's construction refs; the placed/restorable TextureRects now
-      // hold their own references to each upload.
+      /* Drop the map's construction refs; the placed/restorable TextureRects now
+       * hold their own references to each upload. */
       { int i; for (i = 0; i < uploads.count; i++) texture_upload_release(uploads.items[i].val); }
       UploadPtrVec_free_storage(&uploads);
    }
-   // End of Save State
-   //========================================
+   /* End of Save State
+    * ======================================== */
    static bool dbg_hotkey_query(struct DbgHotkey *self)
    {
       uint16_t state = dbg_input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, self->key);
@@ -20950,8 +20940,8 @@ static int64_t page_bytes(FusionRects *fusion)
 
 #include "libretro_vulkan.h"
 
-// #include "mednafen/mednafen.h" is required
-// for #include "mednafen/psx/gpu.h" to work properly.
+/* #include "mednafen/mednafen.h" is required
+ * for #include "mednafen/psx/gpu.h" to work properly. */
 #include "mednafen/mednafen.h"
 #include "mednafen/psx/gpu.h"
 
@@ -20972,7 +20962,7 @@ static struct retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
 
 /* Owning vector of retro_vulkan_image (POD), replacing
- * std::vector<retro_vulkan_image>. resize() grows/shrinks the backing array;
+ * A dynamic array of retro_vulkan_image. resize() grows/shrinks the backing array;
  * grown slots are zero-initialised. */
 struct SwapchainImageVec {
    struct retro_vulkan_image *items;
@@ -20996,9 +20986,9 @@ static void swapchainimagevec_resize(struct SwapchainImageVec *self, int n) {
 static void swapchainimagevec_free_storage(struct SwapchainImageVec *self) { free(self->items); self->items = NULL; self->count = 0; self->cap = 0; }
 
 /* Owning vector of ImageHandle (refcounted), replacing
- * std::vector<ImageHandle>. resize() default-constructs grown slots (NULL
+ * A dynamic array of ImageHandle. resize() zero-initialises grown slots (NULL
  * handles) and resets/destroys dropped ones; clear() resets every element.
- * operator[] returns a reference so assignment goes through ImageHandle's own
+ * indexing returns a pointer so assignment goes through ImageHandle's own
  * release-old/retain-new assignment. */
 struct ScanoutHandleVec {
    ImageHandle *items;
@@ -21044,9 +21034,9 @@ static bool mdec_yuv;
  * frontend's RETRO_ENVIRONMENT_SET_HW_RENDER acceptance and the
  * frontend invoking vk_context_reset. Drained at the end of
  * vk_context_reset, after the renderer is constructed. This used to be
- * a std::vector<std::function<void()>> with per-entry-point lambdas;
+ * a list of per-entry-point callbacks;
  * it was migrated to the shared C-callable rhi_defer module so the GL
- * backend (a C TU, can't use std::function) can use the same mechanism
+ * backend can use the same mechanism
  * and so both backends share a single defer policy. See
  * rhi/rhi_defer.h for which ops are deferred and which are dropped.
  */
@@ -21055,9 +21045,9 @@ static enum dither_mode dither_mode = DITHER_NATIVE;
 static bool dump_textures = false;
 static bool replace_textures = false;
 static bool track_textures = false;
-static size_t hd_cache_vram_bytes = (size_t)3 * 1024 * 1024 * 1024; // 3 GB default (matches HD_CACHE_VRAM_BUDGET)
-static size_t hd_cache_ram_bytes  = (size_t)2 * 1024 * 1024 * 1024; // 2 GB default (matches HD_CACHE_RAM_BUDGET)
-static bool   eager_hd_textures   = true; // default eager (master-consistent); false = lazy
+static size_t hd_cache_vram_bytes = (size_t)3 * 1024 * 1024 * 1024; /* 3 GB default (matches HD_CACHE_VRAM_BUDGET) */
+static size_t hd_cache_ram_bytes  = (size_t)2 * 1024 * 1024 * 1024; /* 2 GB default (matches HD_CACHE_RAM_BUDGET) */
+static bool   eager_hd_textures   = true; /* default eager (master-consistent); false = lazy */
 /*
  * File-local copy of the crop_overscan core option, distinct
  * from the cross-TU `crop_overscan` global declared in
@@ -21260,7 +21250,7 @@ static bool libretro_create_device(
       context = NULL;
    }
 
-   /* parallel-psx's Context constructor used to throw on
+   /* parallel-psx's Context initialiser used to throw on
     * failure; it now sets a valid=false flag instead. The
     * try/catch boundary is gone with it. */
    context = (Context *)malloc(sizeof(Context));
@@ -21332,7 +21322,7 @@ void rhi_vulkan_get_system_av_info(struct retro_system_av_info *info)
 
    memset(info, 0, sizeof(*info));
 
-   // Set retro_game_geometry
+   /* Set retro_game_geometry */
    info->geometry.base_width   = MEDNAFEN_CORE_GEOMETRY_BASE_W;
    info->geometry.base_height  = MEDNAFEN_CORE_GEOMETRY_BASE_H;
    info->geometry.max_width    = MEDNAFEN_CORE_GEOMETRY_MAX_W * (super_sampling ? 1 : scaling);
@@ -21342,7 +21332,7 @@ void rhi_vulkan_get_system_av_info(struct retro_system_av_info *info)
                                        content_is_pal ? last_scanline_pal : last_scanline,
                                        aspect_ratio_setting, show_vram, widescreen_hack, widescreen_hack_aspect_ratio_setting);
 
-   // Set retro_system_timing
+   /* Set retro_system_timing */
    info->timing.fps = rhi_common_get_timing_fps();
    info->timing.sample_rate = SOUND_FREQUENCY;
 }
@@ -21598,7 +21588,7 @@ void rhi_vulkan_refresh_variables(void)
 
    var.key = BEETLE_OPT(hd_caching_method);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      eager_hd_textures = (strcmp(var.value, "lazy") != 0); // "eager" (default) or "lazy"
+      eager_hd_textures = (strcmp(var.value, "lazy") != 0); /* "eager" (default) or "lazy" */
 
    option_display.visible = track_textures;
 
@@ -21633,7 +21623,7 @@ void rhi_vulkan_refresh_variables(void)
          show_vram = false;
    }
 
-   // Clean this up. Possible to categorize by order of severity, e.g. geometry dirty flag vs full system_av dirty flag
+   /* Clean this up. Possible to categorize by order of severity, e.g. geometry dirty flag vs full system_av dirty flag */
    if ((old_scaling != scaling ||
         old_super_sampling != super_sampling ||
         old_msaa != msaa ||
@@ -21645,14 +21635,14 @@ void rhi_vulkan_refresh_variables(void)
         visible_scanlines_changed)
        && renderer)
    {
-      // Potential bad behavior from calling rhi_vulkan_get_system_av_info() from inside
-      // rhi_vulkan_refresh_variables() since both functions call each other...
+      /* Potential bad behavior from calling rhi_vulkan_get_system_av_info() from inside
+       * rhi_vulkan_refresh_variables() since both functions call each other... */
       struct retro_system_av_info info;
       rhi_vulkan_get_system_av_info(&info);
 
       if (!environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
       {
-         // Failed to change scale, just keep using the old one.
+         /* Failed to change scale, just keep using the old one. */
          scaling = old_scaling;
       }
    }
@@ -21718,7 +21708,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    {
       /* Any visual core option changes will be deferred to next non-duped frame */
 
-      //printf("No PSX GPU display update; duping frame\n");
+      /* printf("No PSX GPU display update; duping frame\n"); */
       renderer_flush(renderer);
       video_refresh_cb(NULL, prev_frame_width, prev_frame_height, 0);
 
@@ -22154,11 +22144,11 @@ void rhi_vulkan_load_image(
    }
    renderer_end_copy(renderer, handle);
 
-   // This is called on state loading. 
+   /* This is called on state loading. */
    if (!inside_frame)
       renderer_flush(renderer);
    /* renderer_copy_cpu_to_vram produced an owning BufferHandle and renderer_end_copy
-    * only unmaps it; the old C++ 'handle' value released it via its destructor at
+    * only unmaps it; the old C++ 'handle' value released it via its teardown at
     * scope end (after the flush above), so drop that reference here. */
    bh_reset(&handle);
    }
