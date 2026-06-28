@@ -22926,13 +22926,26 @@ static void vk_apply_pending_scale_rebuild(void)
 
    savestate_destroy(&save_state);
    renderer_save_vram_state(renderer, &save_state);
-   /* Drain in-flight GPU work before freeing the renderer's resources. */
-   device_wait_idle_nolock(device);
-   /* Release scanout image references before renderer_fini frees those images,
-    * so the next finalize_frame's ih_assign does not release a dangling
-    * pointer. The vector is re-sized by ensure_sync_index_resources. */
+   /* Release scanout image references first so renderer_fini's teardown drops
+    * the last reference to those images and queues their deferred destroy too.
+    * The vector is re-sized by ensure_sync_index_resources next frame. */
    scanouthandlevec_clear(&scanout_handles);
+   /* Tear the renderer down BEFORE the idle/flush. renderer_fini does not
+    * destroy its Vulkan images directly; image_fini routes every vkDestroyImage
+    * / vkDestroyBuffer through the device's per-frame deferred-destruction
+    * queue (device_destroy_image_nolock pushes onto device_frame()->
+    * destroyed_images, flushed later by per_frame_begin after the frame fence).
+    * device_wait_idle_nolock is what drains the GPU AND flushes those queues
+    * (it calls per_frame_begin on every frame context). So the idle/flush MUST
+    * run AFTER renderer_fini has queued the destroys -- otherwise the old
+    * images' vkDestroyImage calls sit pending while renderer_init below reuses
+    * the freed object-pool slots and allocates new images, and the deferred
+    * destroy later fires against reallocated state: a GPU-side use-after-free in
+    * the driver that only crashes outside a debugger. This mirrors the full
+    * vk_context_destroy path, which runs renderer_fini before
+    * device_deinit -> device_wait_idle_nolock. */
    renderer_fini(renderer);
+   device_wait_idle_nolock(device);
    renderer_init(renderer, device, scaling, msaa,
          owned_u32_empty(&save_state.vram) ? NULL : &save_state);
    if (!renderer_is_valid(renderer))
