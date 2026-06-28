@@ -8523,6 +8523,20 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
          const Rect *rect,
          uint16_t *vram);
+   /* End the current render pass and transition the reusable scanout image from
+      colour-attachment to shader-read-only, then record it as the last scanout.
+      Shared tail of the scanout-to-texture paths. */
+   static void renderer_finish_reuseable_scanout(Renderer *self)
+   {
+      commandbuffer_end_render_pass(cbh_get(&self->cmd));
+
+      commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         VK_ACCESS_SHADER_READ_BIT);
+
+      ih_assign(&self->last_scanout, &self->reuseable_scanout);
+   }
    static ImageHandle renderer_scanout_vram_to_texture(Renderer *self,
          bool scaled);
    static ImageHandle renderer_scanout_to_texture(Renderer *self);
@@ -9911,14 +9925,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
 
-   commandbuffer_end_render_pass(cbh_get(&self->cmd));
-
-   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                      VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                      VK_ACCESS_SHADER_READ_BIT);
-
-   ih_assign(&self->last_scanout, &self->reuseable_scanout);
+   renderer_finish_reuseable_scanout(self);
 
    return self->reuseable_scanout;
    }
@@ -9971,14 +9978,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
                          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
       commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
-      commandbuffer_end_render_pass(cbh_get(&self->cmd));
-
-      commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                         VK_ACCESS_SHADER_READ_BIT);
-
-      ih_assign(&self->last_scanout, &self->reuseable_scanout);
+      renderer_finish_reuseable_scanout(self);
       return self->reuseable_scanout;
       }
       }
@@ -10182,14 +10182,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
 
-   commandbuffer_end_render_pass(cbh_get(&self->cmd));
-
-   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                      VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                      VK_ACCESS_SHADER_READ_BIT);
-
-   ih_assign(&self->last_scanout, &self->reuseable_scanout);
+   renderer_finish_reuseable_scanout(self);
 
    return self->reuseable_scanout;
    }
