@@ -22924,6 +22924,27 @@ static void vk_apply_pending_scale_rebuild(void)
    if (device == NULL || renderer == NULL)
       return;
 
+   /* The frontend owns the scanout images we lent it via set_image and may
+    * still be presenting / doing layout transitions on them on its own queue.
+    * The libretro Vulkan contract is explicit: "the image must not be touched
+    * by the core until wait_sync_index has been completed", and waiting on
+    * wait_sync_index "ensures that the frontend has released ownership back to
+    * the application". device_wait_idle only covers OUR queue work, not the
+    * frontend's in-flight presents, so without this the renderer teardown below
+    * frees scanout images the frontend still owns -- a GPU-side use-after-free
+    * that surfaces in the driver's present/worker thread and is hidden by any
+    * delay (debugger, logging) that lets the frontend finish first. Wait for the
+    * frontend to release every in-flight frame before touching the renderer. */
+   if (vulkan && vulkan->wait_sync_index)
+      vulkan->wait_sync_index(vulkan->handle);
+
+   /* renderer_fini / device_wait_idle below submit to and wait on the queue the
+    * frontend also presents on. Per the contract, a core that submits to the
+    * shared queue must lock/unlock the frontend out for the duration, or the
+    * two race on the VkQueue. lock_queue/unlock_queue are optional, so guard. */
+   if (vulkan && vulkan->lock_queue)
+      vulkan->lock_queue(vulkan->handle);
+
    savestate_destroy(&save_state);
    renderer_save_vram_state(renderer, &save_state);
    /* Release scanout image references first so renderer_fini's teardown drops
@@ -22958,6 +22979,11 @@ static void vk_apply_pending_scale_rebuild(void)
       renderer = NULL;
       rhi_type = RHI_SOFTWARE;
    }
+
+   /* Release the frontend queue lock taken above, now that all teardown queue
+    * work and the new renderer's init submissions are done. */
+   if (vulkan && vulkan->unlock_queue)
+      vulkan->unlock_queue(vulkan->handle);
 }
 
 void rhi_vulkan_prepare_frame(void)
