@@ -107,6 +107,7 @@ void rhi_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
 void rhi_vulkan_toggle_display(bool status);
 
 bool rhi_vulkan_has_software_renderer(void);
+bool rhi_vulkan_context_ready(void);
 
 #ifdef __cplusplus
 }

@@ -22938,7 +22938,17 @@ void rhi_vulkan_prepare_frame(void)
 {
    if (device == NULL)
    {
-      rhi_type = RHI_SOFTWARE;
+      /* The HW context is down (between context_destroy and the next
+       * context_reset). Do NOT flip rhi_type to RHI_SOFTWARE here: there is no
+       * software surface on a HW build, and the flip makes everything that
+       * dispatches on rhi_type (rhi_intf_is_type / has_software_renderer /
+       * context_ready, and the core's GPU_Update display path) believe a
+       * software renderer is live, which then writes display/scanout state into
+       * torn-down resources. Leaving rhi_type as RHI_VULKAN lets
+       * rhi_intf_context_ready() report the context as not ready (device ==
+       * NULL) so the display pipeline is skipped until context_reset rebuilds
+       * the device. The per-primitive entry points already no-op while
+       * renderer == NULL, and finalize_frame returns early on device == NULL. */
       return;
    }
 
@@ -23499,4 +23509,13 @@ void rhi_vulkan_toggle_display(bool status)
 bool rhi_vulkan_has_software_renderer(void)
 {
    return has_software_fb;
+}
+
+/* The Vulkan HW context is only usable between context_reset (which builds the
+ * device and renderer) and context_destroy (which tears them down and NULLs
+ * the device). While it is down the renderer must not be driven and no display
+ * /scanout state may be written. device != NULL is exactly that signal. */
+bool rhi_vulkan_context_ready(void)
+{
+   return device != NULL && renderer != NULL;
 }

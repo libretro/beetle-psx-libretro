@@ -938,6 +938,32 @@ bool rhi_intf_has_software_renderer(void)
    return false;
 }
 
+/* Whether the active renderer's HW context is currently usable. The software
+ * renderer is always ready; the HW backends report whether their device/GL
+ * context is live (between context_reset and context_destroy). retro_run uses
+ * this to avoid driving the display pipeline while a HW context is down. */
+bool rhi_intf_context_ready(void)
+{
+   switch (rhi_type)
+   {
+      case RHI_SOFTWARE:
+         return true;
+      case RHI_OPENGL:
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         return rhi_gl_context_ready();
+#endif
+         break;
+      case RHI_VULKAN:
+#if defined(HAVE_VULKAN)
+         return rhi_vulkan_context_ready();
+#else
+         break;
+#endif
+   }
+
+   return false;
+}
+
 void rhi_intf_toggle_display(bool status)
 {
 #ifdef RHI_DUMP

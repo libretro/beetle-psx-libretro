@@ -5071,3 +5071,13 @@ bool rhi_gl_has_software_renderer(void)
       return false;
    return has_software_fb;
 }
+
+/* The GL HW context is only usable once gl_context_reset has brought the
+ * renderer up (state != GL_STATE_INVALID with valid state_data) and before a
+ * context_destroy tears it down. While it is down the renderer must not be
+ * driven and no display/scanout state may be written. */
+bool rhi_gl_context_ready(void)
+{
+   return static_renderer.state != GL_STATE_INVALID
+      && static_renderer.state_data != NULL;
+}

@@ -2186,7 +2186,16 @@ int32_t GPU_Update(const int32_t sys_timestamp)
             const int32_t surf_pitch =
                GPU.surface ? GPU.surface->pitch32 : 0;
 
-            if((bool)(GPU.DisplayMode & DISP_PAL) == GPU.HardwarePALType
+            /* The display/scanout output below writes renderer-visible state
+             * (GPU.LineWidths, the software surface, and the HW scanout
+             * records) and dereferences espec/surface. When a HW context has
+             * been torn down and not yet reset, the renderer is gone and none
+             * of that state may be touched until libretro signals the context
+             * is ready again (rhi_intf_context_ready); driving it through the
+             * down window is a use-after-free. The software renderer is always
+             * ready, so native software builds are unaffected. */
+            if(rhi_intf_context_ready()
+                  && (bool)(GPU.DisplayMode & DISP_PAL) == GPU.HardwarePALType
                   && GPU.scanline >= FirstVisibleLine
                   && GPU.scanline < (FirstVisibleLine + VisibleLineCount))
             {

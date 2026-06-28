@@ -160,6 +160,7 @@ enum rhi_renderer_type rhi_intf_is_type(void);
 void rhi_intf_toggle_display(bool status);
 
 bool rhi_intf_has_software_renderer(void);
+bool rhi_intf_context_ready(void);
 
 double rhi_common_get_timing_fps(void);
 
