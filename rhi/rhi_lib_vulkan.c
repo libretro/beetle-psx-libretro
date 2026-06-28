@@ -22405,6 +22405,14 @@ static void vk_context_destroy(void)
    if (device == NULL)
       return;
 
+   /* If the context is torn down mid-frame (e.g. a scale-factor change runs
+    * check_variables -> SET_SYSTEM_AV_INFO between prepare_frame and
+    * finalize_frame, recreating the device/renderer/swapchain), any frame that
+    * prepare_frame started no longer has valid per-frame state. Clear the flag
+    * so a finalize_frame arriving after the rebuild skips the present instead
+    * of operating on the freshly-rebuilt-but-not-yet-started context. */
+   inside_frame = false;
+
    savestate_destroy(&save_state);
    renderer_save_vram_state(renderer, &save_state);
    vulkan     = NULL;
@@ -22903,6 +22911,16 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    unsigned index;
    ImageHandle scanout;
    if (device == NULL)
+      return;
+
+   /* prepare_frame sets inside_frame; if it is clear here, the context was
+    * rebuilt between prepare_frame and now (mid-frame scale-factor / geometry
+    * change, see vk_context_destroy) and this frame's per-frame state was never
+    * established on the current device. Presenting would submit command buffers
+    * that were never begun and read a renderer whose scanout state is empty, so
+    * skip this frame; the next retro_run pairs prepare_frame with the new
+    * context normally. */
+   if (!inside_frame)
       return;
 
    tt_frame_advance();
