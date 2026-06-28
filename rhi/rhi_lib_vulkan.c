@@ -22179,7 +22179,12 @@ struct SwapchainImageVec {
    int count;
    int cap;
 };
-static void swapchainimagevec_clear(struct SwapchainImageVec *self) { self->count = 0; }
+static void swapchainimagevec_free_storage(struct SwapchainImageVec *self) {
+   free(self->items);
+   self->items = NULL;
+   self->count = 0;
+   self->cap = 0;
+}
 static int swapchainimagevec_size(const struct SwapchainImageVec *self) { return self->count; }
 static void swapchainimagevec_resize(struct SwapchainImageVec *self, int n) {
    if (n > self->cap) {
@@ -22207,6 +22212,12 @@ struct ScanoutHandleVec {
 static void scanouthandlevec_clear(struct ScanoutHandleVec *self) {
    { int i; for (i = 0; i < self->count; i++) ih_reset(&self->items[i]); }
    self->count = 0;
+}
+static void scanouthandlevec_free_storage(struct ScanoutHandleVec *self) {
+   scanouthandlevec_clear(self);
+   free(self->items);
+   self->items = NULL;
+   self->cap = 0;
 }
 static void scanouthandlevec_resize(struct ScanoutHandleVec *self, int n) {
    { int i; for (i = n; i < self->count; i++) ih_reset(&self->items[i]); }
@@ -22413,8 +22424,8 @@ static void vk_context_destroy(void)
    savestate_destroy(&save_state);
    renderer_save_vram_state(renderer, &save_state);
    vulkan     = NULL;
-   scanouthandlevec_clear(&scanout_handles);
-   swapchainimagevec_clear(&swapchain_images);
+   scanouthandlevec_free_storage(&scanout_handles);
+   swapchainimagevec_free_storage(&swapchain_images);
 
    renderer_fini(renderer);
    free(renderer);
