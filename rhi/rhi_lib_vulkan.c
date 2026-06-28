@@ -5141,8 +5141,6 @@ static void cbh_move(struct CommandBufferHandle *dst,
    static void device_add_frame_counter_nolock(Device *self);
    static void device_decrement_frame_counter_nolock(Device *self);
    static void device_init_workarounds(Device *self);
-   static void device_wait_idle(Device *self);
-   static void device_flush_frame(Device *self);
    static void *device_map_host_buffer(Device *self,
          const Buffer *buffer,
          MemoryAccessFlags access);
@@ -5162,7 +5160,6 @@ static void cbh_move(struct CommandBufferHandle *dst,
          StockSampler sampler);
    static const ImplementationWorkarounds *device_get_workarounds(Device *self);
    static const DeviceFeatures *device_get_device_features(Device *self);
-   static void device_reset_fence(Device *self, VkFence fence);
    static void device_destroy_pipeline_nolock(Device *self,
          VkPipeline pipeline);
    static void device_destroy_image_view_nolock(Device *self, VkImageView view);
@@ -5310,8 +5307,6 @@ static void cbh_move(struct CommandBufferHandle *dst,
     * *_nolock members (not yet converted) through self->. Defined here, right
     * after the class, so they precede all callers; friend-declared inside the
     * class for private-member access. */
-static void device_wait_idle(Device *self) { device_wait_idle_nolock(self); }
-static void device_flush_frame(Device *self) { device_flush_frame_nolock(self); }
 static void *device_map_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access) { return deviceallocator_map_memory(&self->managers.memory, buffer_get_allocation(buffer), access); }
 static void device_unmap_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access) { deviceallocator_unmap_memory(&self->managers.memory, buffer_get_allocation(buffer), access); }
 static ImageView *device_get_transient_attachment(Device *self, unsigned width, unsigned height, VkFormat format, unsigned index, unsigned samples, unsigned layers) { return attachment_allocator_request_attachment(&self->transient_allocator, width, height, format, index, samples, layers); }
@@ -7173,9 +7168,11 @@ static void rrss_init(struct RestorableRectSaveState *r) {
 static void rrss_destroy(struct RestorableRectSaveState *r) {
       TextureRectSaveStateVec_free_storage(&r->to_restore);
    }
+
    /* Move src into dst (steal to_restore), leaving src empty. */
-static void rrss_move(struct RestorableRectSaveState *dst,
-      struct RestorableRectSaveState *src){
+   static void rrss_move(struct RestorableRectSaveState *dst,
+      struct RestorableRectSaveState *src)
+   {
       dst->rect = src->rect;
       dst->hash = src->hash;
       TextureRectSaveStateVec_move(&dst->to_restore, &src->to_restore);
@@ -7617,7 +7614,8 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
 
    static void cached_gpu_image_dispose(CachedGpuImage *p)
    {
-      if (p->image) {
+      if (p->image)
+      {
          image_release_reference(p->image);
          p->image = NULL;
       }
@@ -7861,6 +7859,7 @@ static void texture_tracker_set_cache_budgets(struct TextureTracker *self,
    static void texture_tracker_dump_image(struct TextureTracker *self,
          TextureUpload *upload,
          UsedMode *mode);
+
 static void texture_tracker_clear_palette_cache(struct TextureTracker *self,
       Rect rect)
    {
@@ -8025,13 +8024,13 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
    typedef enum FilterExclude FilterExclude;
 
    enum FilterMode {
-   FilterMode_NearestNeighbor = 0,
-   FilterMode_XBR = 1,
-   FilterMode_SABR = 2,
-   FilterMode_Bilinear = 3,
-   FilterMode_Bilinear3Point = 4,
-   FilterMode_JINC2 = 5
-};
+      FilterMode_NearestNeighbor = 0,
+      FilterMode_XBR = 1,
+      FilterMode_SABR = 2,
+      FilterMode_Bilinear = 3,
+      FilterMode_Bilinear3Point = 4,
+      FilterMode_JINC2 = 5
+   };
    typedef enum FilterMode FilterMode;
 
    enum TransMode {
@@ -8145,118 +8144,118 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
 static void rect_zero(Rect *r) { r->x = 0; r->y = 0; r->width = 0; r->height = 0; }
 
 static void render_state_init(struct RenderState *s)
-   {
-      rect_zero(&s->display_fb_rect);
-      s->texture_window.mask_x = 0; s->texture_window.mask_y = 0;
-      s->texture_window.or_x = 0; s->texture_window.or_y = 0;
-      rect_zero(&s->cached_window_rect);
-      rect_zero(&s->draw_rect);
-      s->draw_offset_x = 0;
-      s->draw_offset_y = 0;
-      s->palette_offset_x = 0;
-      s->palette_offset_y = 0;
-      s->texture_offset_x = 0;
-      s->texture_offset_y = 0;
+{
+   rect_zero(&s->display_fb_rect);
+   s->texture_window.mask_x = 0; s->texture_window.mask_y = 0;
+   s->texture_window.or_x = 0; s->texture_window.or_y = 0;
+   rect_zero(&s->cached_window_rect);
+   rect_zero(&s->draw_rect);
+   s->draw_offset_x = 0;
+   s->draw_offset_y = 0;
+   s->palette_offset_x = 0;
+   s->palette_offset_y = 0;
+   s->texture_offset_x = 0;
+   s->texture_offset_y = 0;
 
-      s->vert_start = 0x10;
-      s->vert_end = 0x100;
-      s->horiz_start = 0x200;
-      s->horiz_end = 0xC00;
+   s->vert_start = 0x10;
+   s->vert_end = 0x100;
+   s->horiz_start = 0x200;
+   s->horiz_end = 0xC00;
 
-      s->is_pal = false;
-      s->is_480i = false;
-      s->width_mode = WidthMode_WIDTH_MODE_320;
-      s->crop_overscan = 0;
-      s->image_crop = 0;
+   s->is_pal = false;
+   s->is_480i = false;
+   s->width_mode = WidthMode_WIDTH_MODE_320;
+   s->crop_overscan = 0;
+   s->image_crop = 0;
 
-      s->offset_cycles = 0;
+   s->offset_cycles = 0;
 
-      s->slstart = 0;
-      s->slend = 239;
+   s->slstart = 0;
+   s->slend = 239;
 
-      s->slstart_pal = 0;
-      s->slend_pal = 287;
+   s->slstart_pal = 0;
+   s->slend_pal = 287;
 
-      s->display_fb_xstart = 0;
-      s->display_fb_ystart = 0;
+   s->display_fb_xstart = 0;
+   s->display_fb_ystart = 0;
 
-      s->texture_mode = TextureMode_None;
-      s->semi_transparent = SemiTransparentMode_None;
-      s->primitive_type = PrimitiveType_Polygon;
-      s->scanout_mode = ScanoutMode_ABGR1555_555;
-      s->scanout_filter = ScanoutFilter_None;
-      s->scanout_mdec_filter = ScanoutFilter_None;
-      s->dither_native_resolution = false;
-      s->force_mask_bit = false;
-      s->texture_color_modulate = false;
-      s->mask_test = false;
-      s->display_on = false;
-      s->adaptive_smoothing = true;
+   s->texture_mode = TextureMode_None;
+   s->semi_transparent = SemiTransparentMode_None;
+   s->primitive_type = PrimitiveType_Polygon;
+   s->scanout_mode = ScanoutMode_ABGR1555_555;
+   s->scanout_filter = ScanoutFilter_None;
+   s->scanout_mdec_filter = ScanoutFilter_None;
+   s->dither_native_resolution = false;
+   s->force_mask_bit = false;
+   s->texture_color_modulate = false;
+   s->mask_test = false;
+   s->display_on = false;
+   s->adaptive_smoothing = true;
 
-      s->UVLimits.min_u = 0; s->UVLimits.min_v = 0;
-      s->UVLimits.max_u = 0; s->UVLimits.max_v = 0;
-   }
+   s->UVLimits.min_u = 0; s->UVLimits.min_v = 0;
+   s->UVLimits.max_u = 0; s->UVLimits.max_v = 0;
+}
 
-   /* Renderer per-frame draw queues. Hoisted out of the Renderer class to file
-    * scope: the {}-zeroed POD_VEC members and scissor_invariant = false default
-    * move into opaque_queue_init, which the Renderer initialiser calls. The
-    * backing storage is freed in ~Renderer (already explicit). */
-   struct OpaqueQueue
-   {
-      /* Non-textured primitives. */
-      BufferVertexVec opaque;
-      PrimitiveInfoVec opaque_scissor;
+/* Renderer per-frame draw queues. Hoisted out of the Renderer class to file
+ * scope: the {}-zeroed POD_VEC members and scissor_invariant = false default
+ * move into opaque_queue_init, which the Renderer initialiser calls. The
+ * backing storage is freed in ~Renderer (already explicit). */
+struct OpaqueQueue
+{
+   /* Non-textured primitives. */
+   BufferVertexVec opaque;
+   PrimitiveInfoVec opaque_scissor;
 
-      /* Textured primitives, no semi-transparency. */
-      BufferVertexVec opaque_textured;
-      PrimitiveInfoVec opaque_textured_scissor;
+   /* Textured primitives, no semi-transparency. */
+   BufferVertexVec opaque_textured;
+   PrimitiveInfoVec opaque_textured_scissor;
 
-      /* Textured primitives, semi-transparency enabled. */
-      BufferVertexVec semi_transparent_opaque;
-      PrimitiveInfoVec semi_transparent_opaque_scissor;
+   /* Textured primitives, semi-transparency enabled. */
+   BufferVertexVec semi_transparent_opaque;
+   PrimitiveInfoVec semi_transparent_opaque_scissor;
 
-      BufferVertexVec semi_transparent;
-      SemiTransparentStateVec semi_transparent_state;
+   BufferVertexVec semi_transparent;
+   SemiTransparentStateVec semi_transparent_state;
 
-      Rect2DVec scaled_resolves;
-      Rect2DVec unscaled_resolves;
-      BlitInfoVec scaled_blits;
-      BlitInfoVec scaled_masked_blits;
-      BlitInfoVec unscaled_blits;
-      BlitInfoVec unscaled_masked_blits;
+   Rect2DVec scaled_resolves;
+   Rect2DVec unscaled_resolves;
+   BlitInfoVec scaled_blits;
+   BlitInfoVec scaled_masked_blits;
+   BlitInfoVec unscaled_blits;
+   BlitInfoVec unscaled_masked_blits;
 
-      Rect2DVec scissors;
-      ClearCandidateVec clear_candidates;
-      VkRect2D default_scissor;
-      bool scissor_invariant;
-   };
+   Rect2DVec scissors;
+   ClearCandidateVec clear_candidates;
+   VkRect2D default_scissor;
+   bool scissor_invariant;
+};
 
 static void opaque_queue_init(struct OpaqueQueue *q)
-   {
-      /* Each POD_VEC's empty state is { items=NULL, count=0, cap=0 }; the macro
-       * provides no _init, so zero the three fields directly. */
+{
+   /* Each POD_VEC's empty state is { items=NULL, count=0, cap=0 }; the macro
+    * provides no _init, so zero the three fields directly. */
 #define OQ_VEC_ZERO(v) do { (v).items = NULL; (v).count = 0; (v).cap = 0; } while (0)
-      OQ_VEC_ZERO(q->opaque);
-      OQ_VEC_ZERO(q->opaque_scissor);
-      OQ_VEC_ZERO(q->opaque_textured);
-      OQ_VEC_ZERO(q->opaque_textured_scissor);
-      OQ_VEC_ZERO(q->semi_transparent_opaque);
-      OQ_VEC_ZERO(q->semi_transparent_opaque_scissor);
-      OQ_VEC_ZERO(q->semi_transparent);
-      OQ_VEC_ZERO(q->semi_transparent_state);
-      OQ_VEC_ZERO(q->scaled_resolves);
-      OQ_VEC_ZERO(q->unscaled_resolves);
-      OQ_VEC_ZERO(q->scaled_blits);
-      OQ_VEC_ZERO(q->scaled_masked_blits);
-      OQ_VEC_ZERO(q->unscaled_blits);
-      OQ_VEC_ZERO(q->unscaled_masked_blits);
-      OQ_VEC_ZERO(q->scissors);
-      OQ_VEC_ZERO(q->clear_candidates);
+   OQ_VEC_ZERO(q->opaque);
+   OQ_VEC_ZERO(q->opaque_scissor);
+   OQ_VEC_ZERO(q->opaque_textured);
+   OQ_VEC_ZERO(q->opaque_textured_scissor);
+   OQ_VEC_ZERO(q->semi_transparent_opaque);
+   OQ_VEC_ZERO(q->semi_transparent_opaque_scissor);
+   OQ_VEC_ZERO(q->semi_transparent);
+   OQ_VEC_ZERO(q->semi_transparent_state);
+   OQ_VEC_ZERO(q->scaled_resolves);
+   OQ_VEC_ZERO(q->unscaled_resolves);
+   OQ_VEC_ZERO(q->scaled_blits);
+   OQ_VEC_ZERO(q->scaled_masked_blits);
+   OQ_VEC_ZERO(q->unscaled_blits);
+   OQ_VEC_ZERO(q->unscaled_masked_blits);
+   OQ_VEC_ZERO(q->scissors);
+   OQ_VEC_ZERO(q->clear_candidates);
 #undef OQ_VEC_ZERO
-      q->default_scissor.offset.x = 0; q->default_scissor.offset.y = 0;
-      q->default_scissor.extent.width = 0; q->default_scissor.extent.height = 0;
-      q->scissor_invariant = false;
-   }
+   q->default_scissor.offset.x = 0; q->default_scissor.offset.y = 0;
+   q->default_scissor.extent.width = 0; q->default_scissor.extent.height = 0;
+   q->scissor_invariant = false;
+}
 
    /* Owning uint32_t buffer (the VRAM snapshot in a SaveState). A plain struct
     * plus owned_u32_* free functions: init nulls it,
@@ -8267,31 +8266,44 @@ static void opaque_queue_init(struct OpaqueQueue *q)
       size_t    n;
    };
 
-static void owned_u32_init(struct OwnedU32Buf *b) { b->items = NULL; b->n = 0; }
-static void owned_u32_deinit(struct OwnedU32Buf *b) { free(b->items); b->items = NULL; b->n = 0; }
+static void owned_u32_init(struct OwnedU32Buf *b)
+{
+   b->items = NULL;
+   b->n = 0;
+}
+
+static void owned_u32_deinit(struct OwnedU32Buf *b)
+{
+   free(b->items);
+   b->items = NULL;
+   b->n = 0;
+}
+
 static void owned_u32_assign(struct OwnedU32Buf *b,
       const uint32_t *src,
       size_t count)
+{
+   free(b->items);
+   b->items = NULL; b->n = 0;
+   if (count)
    {
-      free(b->items);
-      b->items = NULL; b->n = 0;
-      if (count)
-      {
-         b->items = (uint32_t *)malloc(count * sizeof(uint32_t));
-         memcpy(b->items, src, count * sizeof(uint32_t));
-         b->n = count;
-      }
+      b->items = (uint32_t *)malloc(count * sizeof(uint32_t));
+      memcpy(b->items, src, count * sizeof(uint32_t));
+      b->n = count;
    }
-   /* Steal src into dst (dst's prior contents freed); src left empty. */
+}
+
+/* Steal src into dst (dst's prior contents freed); src left empty. */
 static void owned_u32_move(struct OwnedU32Buf *dst, struct OwnedU32Buf *src)
+{
+   if (dst != src)
    {
-      if (dst != src)
-      {
-         free(dst->items);
-         dst->items = src->items; dst->n = src->n;
-         src->items = NULL; src->n = 0;
-      }
+      free(dst->items);
+      dst->items = src->items; dst->n = src->n;
+      src->items = NULL; src->n = 0;
    }
+}
+
 static const uint32_t *owned_u32_data(const struct OwnedU32Buf *b) { return b->items; }
 static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
@@ -8348,52 +8360,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
           * functions after the Renderer class, where OwnedU32Buf and
           * TextureTrackerSaveState are complete). No copy exists. */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
          /* Draw commands */
 
-
-
-
-
-
-
-
-
-
-
-
-
-         /* True iff the initialiser finished successfully. The Renderer
+         /* True if the initialiser finished successfully. The Renderer
           * initialiser does not throw; on failure (e.g. RGBA8_UNORM not
           * supported) it leaves the object in a destroyable but otherwise
           * unusable state. Callers must check is_valid() before use. */
@@ -8421,7 +8390,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          /* Called by FBAtlas (formerly via HazardListener interface). */
 
          /* Called by TextureTracker (formerly via TextureUploader interface). */
-
 
          struct
          {
@@ -8690,7 +8658,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       if (cbh_is_valid(&self->cmd))
          device_submit(self->device, &self->cmd, NULL, 0, NULL);
       cbh_reset(&self->cmd);
-      device_flush_frame(self->device);
+      device_flush_frame_nolock(self->device);
    }
    static INLINE Fence renderer_flush_and_signal(Renderer *self)
    {
@@ -8699,7 +8667,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       if (cbh_is_valid(&self->cmd))
          device_submit(self->device, &self->cmd, &fence, 0, NULL);
       cbh_reset(&self->cmd);
-      device_flush_frame(self->device);
+      device_flush_frame_nolock(self->device);
       /* Return by value transfers ownership to the caller; the struct copy does
        * not incref and this local must NOT reset (emptied). */
       return fence;
@@ -9252,7 +9220,7 @@ static void renderer_save_vram_state(Renderer *self, SaveState *out){
 
    renderer_flush(self);
 
-   device_wait_idle(self->device);
+   device_wait_idle_nolock(self->device);
    { const uint32_t *src = (const uint32_t *)(
          device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
    /* Deep-copy the mapped VRAM straight into the owning buffer (no
@@ -12441,7 +12409,7 @@ static void fenceholder_init(struct FenceHolder *self,
 static void fenceholder_fini(struct FenceHolder *self)
 {
    if (self->fence != VK_NULL_HANDLE)
-      device_reset_fence(self->device, self->fence);
+      FenceVec_push(&device_frame(self->device)->recycle_fences, &self->fence);
 }
 
 static void fenceholder_wait(struct FenceHolder *self)
@@ -16738,7 +16706,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
     * implicit member destruction used to perform, deepest-owned last. */
    static void device_deinit(Device *self)
    {
-      device_wait_idle(self);
+      device_wait_idle_nolock(self);
 
       framebuffer_allocator_clear(&self->framebuffer_allocator);
       attachment_allocator_clear(&self->transient_allocator);
@@ -17801,127 +17769,129 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 #define VK_ASSERT_NOT_IN_VEC(vec, value) ((void)0)
 #endif
 
-   static void device_reset_fence(Device *self, VkFence fence){
-      FenceVec_push(&device_frame(self)->recycle_fences, &fence);
-   }
+static void device_destroy_pipeline_nolock(Device *self,
+      VkPipeline pipeline)
+{
+   VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_pipelines, pipeline);
+   VkPipelineVec_push(&device_frame(self)->destroyed_pipelines, &pipeline);
+}
 
-   static void device_destroy_pipeline_nolock(Device *self,
-         VkPipeline pipeline){
-      VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_pipelines, pipeline);
-      VkPipelineVec_push(&device_frame(self)->destroyed_pipelines, &pipeline);
-   }
+static void device_destroy_image_view_nolock(Device *self, VkImageView view)
+{
+   VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_image_views, view);
+   RenderTargetViewVec_push(&device_frame(self)->destroyed_image_views, &view);
+}
 
-   static void device_destroy_image_view_nolock(Device *self, VkImageView view){
-      VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_image_views, view);
-      RenderTargetViewVec_push(&device_frame(self)->destroyed_image_views, &view);
-   }
+static void device_destroy_buffer_view_nolock(Device *self,
+      VkBufferView view){
+   VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_buffer_views, view);
+   VkBufferViewVec_push(&device_frame(self)->destroyed_buffer_views, &view);
+}
 
-   static void device_destroy_buffer_view_nolock(Device *self,
-         VkBufferView view){
-      VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_buffer_views, view);
-      VkBufferViewVec_push(&device_frame(self)->destroyed_buffer_views, &view);
-   }
+static void device_destroy_semaphore_nolock(Device *self,
+      VkSemaphore semaphore){
+   VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_semaphores, semaphore);
+   SemaphoreVec_push(&device_frame(self)->destroyed_semaphores, &semaphore);
+}
 
-   static void device_destroy_semaphore_nolock(Device *self,
-         VkSemaphore semaphore){
-      VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_semaphores, semaphore);
-      SemaphoreVec_push(&device_frame(self)->destroyed_semaphores, &semaphore);
-   }
+static void device_destroy_image_nolock(Device *self, VkImage image){
+   VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_images, image);
+   VkImageVec_push(&device_frame(self)->destroyed_images, &image);
+}
 
-   static void device_destroy_image_nolock(Device *self, VkImage image){
-      VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_images, image);
-      VkImageVec_push(&device_frame(self)->destroyed_images, &image);
-   }
+static void device_destroy_buffer_nolock(Device *self, VkBuffer buffer){
+   VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_buffers, buffer);
+   VkBufferVec_push(&device_frame(self)->destroyed_buffers, &buffer);
+}
 
-   static void device_destroy_buffer_nolock(Device *self, VkBuffer buffer){
-      VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_buffers, buffer);
-      VkBufferVec_push(&device_frame(self)->destroyed_buffers, &buffer);
-   }
+static void device_destroy_sampler_nolock(Device *self, VkSampler sampler){
+   VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_samplers, sampler);
+   VkSamplerVec_push(&device_frame(self)->destroyed_samplers, &sampler);
+}
 
-   static void device_destroy_sampler_nolock(Device *self, VkSampler sampler){
-      VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_samplers, sampler);
-      VkSamplerVec_push(&device_frame(self)->destroyed_samplers, &sampler);
-   }
+static void device_destroy_framebuffer_nolock(Device *self,
+      VkFramebuffer framebuffer){
+   VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_framebuffers, framebuffer);
+   VkFramebufferVec_push(&device_frame(self)->destroyed_framebuffers, &framebuffer);
+}
 
-   static void device_destroy_framebuffer_nolock(Device *self,
-         VkFramebuffer framebuffer){
-      VK_ASSERT_NOT_IN_VEC(device_frame(self)->destroyed_framebuffers, framebuffer);
-      VkFramebufferVec_push(&device_frame(self)->destroyed_framebuffers, &framebuffer);
-   }
+static void device_clear_wait_semaphores(Device *self)
+{
+   int _wi;
+   for (_wi = 0; _wi < sem_handle_vec_size(&self->graphics.wait_semaphores); _wi++)
+      vkDestroySemaphore(self->device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&self->graphics.wait_semaphores, _wi))), NULL);
+   for (_wi = 0; _wi < sem_handle_vec_size(&self->compute.wait_semaphores); _wi++)
+      vkDestroySemaphore(self->device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&self->compute.wait_semaphores, _wi))), NULL);
+   for (_wi = 0; _wi < sem_handle_vec_size(&self->transfer.wait_semaphores); _wi++)
+      vkDestroySemaphore(self->device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&self->transfer.wait_semaphores, _wi))), NULL);
 
-   static void device_clear_wait_semaphores(Device *self){
-      { int _wi;
-      for (_wi = 0; _wi < sem_handle_vec_size(&self->graphics.wait_semaphores); _wi++)
-         vkDestroySemaphore(self->device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&self->graphics.wait_semaphores, _wi))), NULL);
-      for (_wi = 0; _wi < sem_handle_vec_size(&self->compute.wait_semaphores); _wi++)
-         vkDestroySemaphore(self->device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&self->compute.wait_semaphores, _wi))), NULL);
-      for (_wi = 0; _wi < sem_handle_vec_size(&self->transfer.wait_semaphores); _wi++)
-         vkDestroySemaphore(self->device, semaphoreholder_consume(sem_get(sem_handle_vec_at(&self->transfer.wait_semaphores, _wi))), NULL);
-      }
+   sem_handle_vec_clear(&self->graphics.wait_semaphores);
+   VkPipelineStageVec_clear(&self->graphics.wait_stages);
+   sem_handle_vec_clear(&self->compute.wait_semaphores);
+   VkPipelineStageVec_clear(&self->compute.wait_stages);
+   sem_handle_vec_clear(&self->transfer.wait_semaphores);
+   VkPipelineStageVec_clear(&self->transfer.wait_stages);
+}
 
-      sem_handle_vec_clear(&self->graphics.wait_semaphores);
-      VkPipelineStageVec_clear(&self->graphics.wait_stages);
-      sem_handle_vec_clear(&self->compute.wait_semaphores);
-      VkPipelineStageVec_clear(&self->compute.wait_stages);
-      sem_handle_vec_clear(&self->transfer.wait_semaphores);
-      VkPipelineStageVec_clear(&self->transfer.wait_stages);
-   }
+static void device_wait_idle_nolock(Device *self)
+{
+   if (self->per_frame.count != 0)
+      device_end_frame_nolock(self);
 
-   static void device_wait_idle_nolock(Device *self){
-      if (self->per_frame.count != 0)
-         device_end_frame_nolock(self);
+   if (self->device != VK_NULL_HANDLE)
+      vkDeviceWaitIdle(self->device);
 
-      if (self->device != VK_NULL_HANDLE)
-         vkDeviceWaitIdle(self->device);
+   device_clear_wait_semaphores(self);
 
-      device_clear_wait_semaphores(self);
-
-      /* Free memory for buffer pools. */
-      bufferpool_reset(&self->managers.vbo);
-      bufferpool_reset(&self->managers.ubo);
-      { int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
+   /* Free memory for buffer pools. */
+   bufferpool_reset(&self->managers.vbo);
+   bufferpool_reset(&self->managers.ubo);
+   { int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
       {
          PerFrame *frame = self->per_frame.items[_pi];
          bufferblock_vec_clear(&frame->vbo_blocks);
          bufferblock_vec_clear(&frame->ubo_blocks);
       } }
 
-      framebuffer_allocator_clear(&self->framebuffer_allocator);
-      attachment_allocator_clear(&self->transient_allocator);
-      {
-         struct IntrusiveListNode *n;
-         for (n = descriptor_set_allocator_map_begin(&self->descriptor_set_allocators); n; n = n->next)
-            descriptor_set_allocator_clear(descriptor_set_allocator_map_iter_get(n));
-      }
+   framebuffer_allocator_clear(&self->framebuffer_allocator);
+   attachment_allocator_clear(&self->transient_allocator);
+   {
+      struct IntrusiveListNode *n;
+      for (n = descriptor_set_allocator_map_begin(&self->descriptor_set_allocators); n; n = n->next)
+         descriptor_set_allocator_clear(descriptor_set_allocator_map_iter_get(n));
+   }
 
-      { int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
+   {
+      int _pi; for (_pi = 0; _pi < self->per_frame.count; _pi++)
       {
          PerFrame *frame = self->per_frame.items[_pi];
          /* We have done WaitIdle, no need to wait for extra fences, it's also not safe. */
          FenceVec_clear(&frame->wait_fences);
          per_frame_begin(frame);
-      } }
-   }
-
-   static void device_next_frame_context(Device *self){
-      /* Flush the frame here as we might have pending staging command buffers from init stage. */
-      device_end_frame_nolock(self);
-
-      framebuffer_allocator_begin_frame(&self->framebuffer_allocator);
-      attachment_allocator_begin_frame(&self->transient_allocator);
-      {
-         struct IntrusiveListNode *n;
-         for (n = descriptor_set_allocator_map_begin(&self->descriptor_set_allocators); n; n = n->next)
-            descriptor_set_allocator_begin_frame(descriptor_set_allocator_map_iter_get(n));
       }
-
-      VK_ASSERT(self->per_frame.count != 0);
-      self->frame_context_index++;
-      if (self->frame_context_index >= (unsigned)self->per_frame.count)
-         self->frame_context_index = 0;
-
-      per_frame_begin(device_frame(self));
    }
+}
+
+static void device_next_frame_context(Device *self)
+{
+   /* Flush the frame here as we might have pending staging command buffers from init stage. */
+   device_end_frame_nolock(self);
+
+   framebuffer_allocator_begin_frame(&self->framebuffer_allocator);
+   attachment_allocator_begin_frame(&self->transient_allocator);
+   {
+      struct IntrusiveListNode *n;
+      for (n = descriptor_set_allocator_map_begin(&self->descriptor_set_allocators); n; n = n->next)
+         descriptor_set_allocator_begin_frame(descriptor_set_allocator_map_iter_get(n));
+   }
+
+   VK_ASSERT(self->per_frame.count != 0);
+   self->frame_context_index++;
+   if (self->frame_context_index >= (unsigned)self->per_frame.count)
+      self->frame_context_index = 0;
+
+   per_frame_begin(device_frame(self));
+}
 
    static void per_frame_begin(struct PerFrame *self)
    {
@@ -22906,7 +22876,7 @@ void rhi_vulkan_prepare_frame(void)
    }
 
    inside_frame = true;
-   device_flush_frame(device);
+   device_flush_frame_nolock(device);
    vulkan->wait_sync_index(vulkan->handle);
    ensure_sync_index_resources();
    device_next_frame_context(device);
@@ -23191,13 +23161,13 @@ void rhi_vulkan_push_triangle(
 
    renderer_set_primitive_type(renderer, PrimitiveType_Polygon);
 
-   { Vertex vertices[3] = {
-      { p0x, p0y, p0w, c0, t0x, t0y },
-      { p1x, p1y, p1w, c1, t1x, t1y },
-      { p2x, p2y, p2w, c2, t2x, t2y },
-   };
-
-   renderer_draw_triangle(renderer, vertices);
+   {
+      Vertex vertices[3] = {
+         { p0x, p0y, p0w, c0, t0x, t0y },
+         { p1x, p1y, p1w, c1, t1x, t1y },
+         { p2x, p2y, p2w, c2, t2x, t2y },
+      };
+      renderer_draw_triangle(renderer, vertices);
    }
 }
 
@@ -23242,14 +23212,15 @@ void rhi_vulkan_push_quad(
    else
       renderer_set_primitive_type(renderer, PrimitiveType_Polygon);
 
-   { Vertex vertices[4] = {
-      { p0x, p0y, p0w, c0, t0x, t0y },
-      { p1x, p1y, p1w, c1, t1x, t1y },
-      { p2x, p2y, p2w, c2, t2x, t2y },
-      { p3x, p3y, p3w, c3, t3x, t3y },
-   };
+   {
+      Vertex vertices[4] = {
+         { p0x, p0y, p0w, c0, t0x, t0y },
+         { p1x, p1y, p1w, c1, t1x, t1y },
+         { p2x, p2y, p2w, c2, t2x, t2y },
+         { p3x, p3y, p3w, c3, t3x, t3y },
+      };
 
-   renderer_draw_quad(renderer, vertices);
+      renderer_draw_quad(renderer, vertices);
    }
 }
 
@@ -23302,69 +23273,77 @@ void rhi_vulkan_load_image(
      renderer_notify_texture_upload(renderer, _ntu_rect, vram); }
    renderer->render_state.mask_test      = mask_test;
    renderer->render_state.force_mask_bit = set_mask;
-   { Rect _r = { x, y, w, h }; BufferHandle handle = renderer_copy_cpu_to_vram(renderer, &_r);
-   uint16_t *tmp = (uint16_t*)(device_map_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
-
-   /* The row loop has two independent invariants: x-wrap (dual_copy)
-    * and y-wrap. Both are determined entirely by (x, y, w, h) before
-    * the loop runs. Hoisting them out lets the inner loops degenerate
-    * to a single straight memcpy in the common no-wrap case and lets
-    * the compiler/CPU prefetcher see the full source-pointer stride.
-    *
-    * The (y + off_y) & (FB_HEIGHT - 1) mask in the original code was
-    * a no-op for every iteration when y + h <= FB_HEIGHT (the dominant
-    * case for upload rects), but the compiler can't prove that without
-    * splitting the loop.
-    */
-   const bool dual_copy = x + w > FB_WIDTH;
-   const bool y_wrap    = y + h > FB_HEIGHT;
-
-   if (dual_copy)
    {
-      const unsigned first  = FB_WIDTH - x;
-      const unsigned second = w - first;
-      if (y_wrap)
+      Rect _r = { x, y, w, h };
+      BufferHandle handle = renderer_copy_cpu_to_vram(renderer, &_r);
+      uint16_t *tmp = (uint16_t*)(device_map_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
+
+      /* The row loop has two independent invariants: x-wrap (dual_copy)
+       * and y-wrap. Both are determined entirely by (x, y, w, h) before
+       * the loop runs. Hoisting them out lets the inner loops degenerate
+       * to a single straight memcpy in the common no-wrap case and lets
+       * the compiler/CPU prefetcher see the full source-pointer stride.
+       *
+       * The (y + off_y) & (FB_HEIGHT - 1) mask in the original code was
+       * a no-op for every iteration when y + h <= FB_HEIGHT (the dominant
+       * case for upload rects), but the compiler can't prove that without
+       * splitting the loop.
+       */
+      const bool dual_copy = x + w > FB_WIDTH;
+      const bool y_wrap    = y + h > FB_HEIGHT;
+
+      if (dual_copy)
       {
-         { unsigned off_y; for (off_y = 0; off_y < h; off_y++) {
-            const uint16_t *row = vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH;
-            memcpy(tmp + off_y * w,         row + x, first  * sizeof(uint16_t));
-            memcpy(tmp + off_y * w + first, row,     second * sizeof(uint16_t));
-         } }
+         unsigned off_y;
+         const unsigned first  = FB_WIDTH - x;
+         const unsigned second = w - first;
+         if (y_wrap)
+         {
+            for (off_y = 0; off_y < h; off_y++)
+            {
+               const uint16_t *row = vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH;
+               memcpy(tmp + off_y * w,         row + x, first  * sizeof(uint16_t));
+               memcpy(tmp + off_y * w + first, row,     second * sizeof(uint16_t));
+            }
+         }
+         else
+         {
+            for (off_y = 0; off_y < h; off_y++)
+            {
+               const uint16_t *row = vram + (y + off_y) * FB_WIDTH;
+               memcpy(tmp + off_y * w,         row + x, first  * sizeof(uint16_t));
+               memcpy(tmp + off_y * w + first, row,     second * sizeof(uint16_t));
+            }
+         }
       }
       else
       {
-         { unsigned off_y; for (off_y = 0; off_y < h; off_y++) {
-            const uint16_t *row = vram + (y + off_y) * FB_WIDTH;
-            memcpy(tmp + off_y * w,         row + x, first  * sizeof(uint16_t));
-            memcpy(tmp + off_y * w + first, row,     second * sizeof(uint16_t));
-         } }
+         unsigned off_y;
+         if (y_wrap)
+         {
+            for (off_y = 0; off_y < h; off_y++)
+               memcpy(tmp + off_y * w,
+                     vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH + x,
+                     w * sizeof(uint16_t));
+         }
+         else
+         {
+            for (off_y = 0; off_y < h; off_y++)
+               memcpy(tmp + off_y * w,
+                     vram + (y + off_y) * FB_WIDTH + x,
+                     w * sizeof(uint16_t));
+         }
       }
-   }
-   else
-   {
-      if (y_wrap)
-      {
-         { unsigned off_y; for (off_y = 0; off_y < h; off_y++) memcpy(tmp + off_y * w,
-                  vram + ((y + off_y) & (FB_HEIGHT - 1)) * FB_WIDTH + x,
-                  w * sizeof(uint16_t)); }
-      }
-      else
-      {
-         { unsigned off_y; for (off_y = 0; off_y < h; off_y++) memcpy(tmp + off_y * w,
-                  vram + (y + off_y) * FB_WIDTH + x,
-                  w * sizeof(uint16_t)); }
-      }
-   }
-   device_unmap_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
+      device_unmap_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
 
-   /* This is called on state loading. */
-   if (!inside_frame)
-      renderer_flush(renderer);
-   /* renderer_copy_cpu_to_vram produced an owning BufferHandle and
-    * device_unmap_host_buffer only unmaps it; the former handle released it
-    * at scope end (after the flush above), so drop that
-    * reference here. */
-   bh_reset(&handle);
+      /* This is called on state loading. */
+      if (!inside_frame)
+         renderer_flush(renderer);
+      /* renderer_copy_cpu_to_vram produced an owning BufferHandle and
+       * device_unmap_host_buffer only unmaps it; the former handle released it
+       * at scope end (after the flush above), so drop that
+       * reference here. */
+      bh_reset(&handle);
    }
 }
 
@@ -23386,7 +23365,10 @@ void rhi_vulkan_fill_rect(uint32_t color,
                           uint16_t w, uint16_t h)
 {
    if (renderer)
-      { Rect _r = { x, y, w, h }; renderer_clear_rect(renderer, &_r, color); }
+   {
+      Rect _r = { x, y, w, h };
+      renderer_clear_rect(renderer, &_r, color);
+   }
 }
 
 void rhi_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
