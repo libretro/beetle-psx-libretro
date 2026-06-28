@@ -5986,6 +5986,14 @@ extern retro_log_printf_t log_cb;
       dst->cap = src->count;
       if (src->count) {
          dst->entries = (HdTexEntry *)malloc((size_t)src->count * sizeof(HdTexEntry));
+         if (!dst->entries) {
+            /* OOM: keep the map consistently empty rather than leaving count/cap
+             * advertising entries over a NULL buffer (which the copy loop and
+             * every later entries[] access would dereference). */
+            dst->count = 0;
+            dst->cap = 0;
+            return;
+         }
          for (i = 0; i < src->count; i++) {
             dst->entries[i] = src->entries[i];
             if (dst->entries[i].image)
@@ -6070,11 +6078,18 @@ extern retro_log_printf_t log_cb;
       dst->hash = src->hash;
       if (dst->image_count) {
          dst->image = (uint16_t *)malloc((size_t)dst->image_count * sizeof(uint16_t));
-         memcpy(dst->image, src->image, (size_t)dst->image_count * sizeof(uint16_t));
+         if (!dst->image)
+            dst->image_count = 0; /* OOM: stay consistent (no buffer, no count) */
+         else
+            memcpy(dst->image, src->image, (size_t)dst->image_count * sizeof(uint16_t));
       }
       if (dst->dumped_modes_count) {
          dst->dumped_modes = (DumpedMode *)malloc((size_t)dst->dumped_modes_count * sizeof(DumpedMode));
-         memcpy(dst->dumped_modes, src->dumped_modes, (size_t)dst->dumped_modes_count * sizeof(DumpedMode));
+         if (!dst->dumped_modes) {
+            dst->dumped_modes_count = 0; /* OOM: stay consistent */
+            dst->dumped_modes_cap = 0;
+         } else
+            memcpy(dst->dumped_modes, src->dumped_modes, (size_t)dst->dumped_modes_count * sizeof(DumpedMode));
       }
       hd_tex_map_copy(&dst->textures, &src->textures);
    }
