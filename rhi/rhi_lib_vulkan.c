@@ -22876,6 +22876,17 @@ void rhi_vulkan_refresh_variables(void)
           * the frontend's mask in prepare_frame, so leave them alone. */
          savestate_destroy(&save_state);
          renderer_save_vram_state(renderer, &save_state);
+         /* Wait for the GPU to finish any in-flight work before tearing the
+          * renderer down. renderer_fini only flushes the recorded command
+          * stream; it does not wait for the device to go idle (that wait lives
+          * in device_deinit, which the full vk_context_reset path runs after
+          * renderer_fini). Here we keep the device alive and rebuild only the
+          * renderer, so without an explicit wait the about-to-be-freed images,
+          * buffers and pipelines may still be referenced by command buffers the
+          * GPU is executing -- a use-after-free that manifests as a crash only
+          * outside a debugger (the timing window is widest at the largest scale,
+          * e.g. 16x -> 1x). */
+         device_wait_idle_nolock(device);
          renderer_fini(renderer);
          renderer_init(renderer, device, scaling, msaa,
                owned_u32_empty(&save_state.vram) ? NULL : &save_state);
