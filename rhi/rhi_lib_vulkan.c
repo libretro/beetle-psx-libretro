@@ -22191,14 +22191,6 @@ static void scanouthandlevec_resize(struct ScanoutHandleVec *self, int n) {
 static SwapchainImageVec swapchain_images;
 static ScanoutHandleVec scanout_handles;
 static SaveState save_state;
-/* Set by rhi_vulkan_refresh_variables when a renderer-affecting option
- * (scaling / super_sampling / msaa) changes. The actual renderer rebuild is
- * deferred to the top of the next prepare_frame, BEFORE that frame is begun on
- * the device, so we never tear the renderer down in the middle of a frame that
- * prepare_frame already started (which submitted partial work the driver's
- * worker threads then ran against freed resources -- a crash only outside a
- * debugger). See vk_apply_pending_scale_rebuild. */
-static bool scale_rebuild_pending;
 static bool inside_frame;
 static bool has_software_fb;
 static bool scaled_uv_offset;
@@ -22864,31 +22856,6 @@ void rhi_vulkan_refresh_variables(void)
          /* Failed to change scale, just keep using the old one. */
          scaling = old_scaling;
       }
-      else if (device != NULL &&
-               (old_scaling != scaling ||
-                old_super_sampling != super_sampling ||
-                old_msaa != msaa))
-      {
-         /* The renderer's internal framebuffers and the scanout image are sized
-          * from renderer->scaling, which is fixed at renderer_init time. The
-          * frontend has now resized its swapchain to the new max we just
-          * advertised, but unless the frontend also tears down and rebuilds the
-          * HW context (it does not, for a plain SET_SYSTEM_AV_INFO geometry
-          * change), renderer->scaling stays at the old value and the scanout we
-          * hand to video_refresh_cb keeps the old (e.g. larger) dimensions --
-          * which overflows the frontend's freshly-resized swapchain and crashes
-          * inside video_refresh. The renderer must be rebuilt at the new
-          * scaling so the scanout dimensions track the advertised max.
-          *
-          * refresh_variables runs from check_variables, which retro_run calls
-          * AFTER prepare_frame has already begun this frame on the device.
-          * Rebuilding the renderer here would tear it down mid-frame, under work
-          * prepare_frame already submitted -- the driver's worker threads then
-          * run against freed resources, crashing only outside a debugger. So
-          * just flag the rebuild; vk_apply_pending_scale_rebuild performs it at
-          * the top of the next prepare_frame, before that frame is begun. */
-         scale_rebuild_pending = true;
-      }
    }
    }
 }
@@ -22915,83 +22882,8 @@ static void ensure_sync_index_resources(void)
  * frame. Preserves VRAM across the rebuild exactly as vk_context_reset does
  * (save -> idle -> release scanout handles -> fini -> init with the saved
  * state). */
-static void vk_apply_pending_scale_rebuild(void)
-{
-   if (!scale_rebuild_pending)
-      return;
-   scale_rebuild_pending = false;
-
-   if (device == NULL || renderer == NULL)
-      return;
-
-   /* The frontend owns the scanout images we lent it via set_image and may
-    * still be presenting / doing layout transitions on them on its own queue.
-    * The libretro Vulkan contract is explicit: "the image must not be touched
-    * by the core until wait_sync_index has been completed", and waiting on
-    * wait_sync_index "ensures that the frontend has released ownership back to
-    * the application". device_wait_idle only covers OUR queue work, not the
-    * frontend's in-flight presents, so without this the renderer teardown below
-    * frees scanout images the frontend still owns -- a GPU-side use-after-free
-    * that surfaces in the driver's present/worker thread and is hidden by any
-    * delay (debugger, logging) that lets the frontend finish first. Wait for the
-    * frontend to release every in-flight frame before touching the renderer. */
-   if (vulkan && vulkan->wait_sync_index)
-      vulkan->wait_sync_index(vulkan->handle);
-
-   /* renderer_fini / device_wait_idle below submit to and wait on the queue the
-    * frontend also presents on. Per the contract, a core that submits to the
-    * shared queue must lock/unlock the frontend out for the duration, or the
-    * two race on the VkQueue. lock_queue/unlock_queue are optional, so guard. */
-   if (vulkan && vulkan->lock_queue)
-      vulkan->lock_queue(vulkan->handle);
-
-   savestate_destroy(&save_state);
-   renderer_save_vram_state(renderer, &save_state);
-   /* Release scanout image references first so renderer_fini's teardown drops
-    * the last reference to those images and queues their deferred destroy too.
-    * The vector is re-sized by ensure_sync_index_resources next frame. */
-   scanouthandlevec_clear(&scanout_handles);
-   /* Tear the renderer down BEFORE the idle/flush. renderer_fini does not
-    * destroy its Vulkan images directly; image_fini routes every vkDestroyImage
-    * / vkDestroyBuffer through the device's per-frame deferred-destruction
-    * queue (device_destroy_image_nolock pushes onto device_frame()->
-    * destroyed_images, flushed later by per_frame_begin after the frame fence).
-    * device_wait_idle_nolock is what drains the GPU AND flushes those queues
-    * (it calls per_frame_begin on every frame context). So the idle/flush MUST
-    * run AFTER renderer_fini has queued the destroys -- otherwise the old
-    * images' vkDestroyImage calls sit pending while renderer_init below reuses
-    * the freed object-pool slots and allocates new images, and the deferred
-    * destroy later fires against reallocated state: a GPU-side use-after-free in
-    * the driver that only crashes outside a debugger. This mirrors the full
-    * vk_context_destroy path, which runs renderer_fini before
-    * device_deinit -> device_wait_idle_nolock. */
-   renderer_fini(renderer);
-   device_wait_idle_nolock(device);
-   renderer_init(renderer, device, scaling, msaa,
-         owned_u32_empty(&save_state.vram) ? NULL : &save_state);
-   if (!renderer_is_valid(renderer))
-   {
-      /* Rebuild failed (e.g. the new scale exceeds device image limits); tear
-       * the renderer down and fall back to software rather than presenting from
-       * an invalid renderer. */
-      renderer_fini(renderer);
-      free(renderer);
-      renderer = NULL;
-      rhi_type = RHI_SOFTWARE;
-   }
-
-   /* Release the frontend queue lock taken above, now that all teardown queue
-    * work and the new renderer's init submissions are done. */
-   if (vulkan && vulkan->unlock_queue)
-      vulkan->unlock_queue(vulkan->handle);
-}
-
 void rhi_vulkan_prepare_frame(void)
 {
-   /* Apply any renderer rebuild deferred from refresh_variables, before this
-    * frame is begun on the device. */
-   vk_apply_pending_scale_rebuild();
-
    if (device == NULL)
    {
       /* The HW context is down (between context_destroy and the next
@@ -23014,8 +22906,8 @@ void rhi_vulkan_prepare_frame(void)
    ensure_sync_index_resources();
    device_next_frame_context(device);
 
-   /* A failed deferred rebuild leaves device non-NULL but renderer NULL (rolled
-    * back to software); nothing further here may touch the renderer. */
+   /* Defensive: if the renderer is somehow absent while the device is live,
+    * don't dereference it. */
    if (renderer == NULL)
       return;
 
