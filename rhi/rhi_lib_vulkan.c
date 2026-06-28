@@ -8624,15 +8624,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          unsigned x,
          unsigned y);
    static void renderer_ensure_command_buffer(Renderer *self);
-   static float renderer_allocate_depth(Renderer *self,
-         Domain domain,
-         const Rect *rect);
    static void renderer_reset_scissor_queue(Renderer *self);
    static void renderer_reset_queue(Renderer *self);
    static void renderer_flush(Renderer *self);
    static Fence renderer_flush_and_signal(Renderer *self);
-   static ScanoutMode renderer_get_scanout_mode(const Renderer *self);
-   static void renderer_discard_render_pass(Renderer *self);
    static CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self);
    static bool renderer_get_filer_exclude(Renderer *self,
          FilterExclude exclude);
@@ -8644,8 +8639,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static void renderer_set_palette_offset(Renderer *self,
          unsigned x,
          unsigned y);
-   static uint16_t * renderer_begin_copy(Renderer *self, BufferHandle handle);
-   static void renderer_end_copy(Renderer *self, BufferHandle handle);
    static void renderer_notify_texture_upload(Renderer *self,
          Rect rect,
          uint16_t *vram);
@@ -8657,15 +8650,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          bool is_pal,
          bool is_480i,
          WidthMode width_mode);
-   static void renderer_toggle_display(Renderer *self, bool enable);
-   static void renderer_set_texture_mode(Renderer *self, TextureMode mode);
-   static void renderer_set_semi_transparent(Renderer *self,
-         SemiTransparentMode state);
    static void renderer_set_primitive_type(Renderer *self,
          PrimitiveType primitive_type);
-   static void renderer_set_force_mask_bit(Renderer *self, bool enable);
-   static void renderer_set_mask_test(Renderer *self, bool enable);
-   static void renderer_set_texture_color_modulate(Renderer *self, bool enable);
    static void renderer_set_UV_limits(Renderer *self,
          uint16_t min_u,
          uint16_t min_v,
@@ -8674,7 +8660,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static void renderer_set_hd_cache_budgets(Renderer *self,
          size_t ram_bytes,
          size_t vram_bytes);
-   static void renderer_set_draw_offset(Renderer *self, int x, int y);
    static void renderer_set_horizontal_display_range(Renderer *self,
          int x1,
          int x2);
@@ -8686,8 +8671,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          int slend,
          int slstart_pal,
          int slend_pal);
-   static void renderer_set_mdec_filter(Renderer *self,
-         ScanoutFilter mdec_filter);
    static void renderer_save_vram_state(Renderer *self, SaveState *out);
    static void renderer_init(Renderer *self,
          Device *device_,
@@ -8720,14 +8703,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       /* Return by value transfers ownership to the caller; the struct copy does
        * not incref and this local must NOT reset (emptied). */
       return fence;
-   }
-   static INLINE ScanoutMode renderer_get_scanout_mode(const Renderer *self)
-   {
-      return self->render_state.scanout_mode;
-   }
-   static INLINE void renderer_discard_render_pass(Renderer *self)
-   {
-      renderer_reset_queue(self);
    }
    static INLINE CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self)
    {
@@ -8770,15 +8745,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       self->render_state.palette_offset_x = x;
       self->render_state.palette_offset_y = y;
    }
-   static INLINE uint16_t *renderer_begin_copy(Renderer *self,
-         BufferHandle handle)
-   {
-      return (uint16_t *)(device_map_host_buffer(self->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
-   }
-   static INLINE void renderer_end_copy(Renderer *self, BufferHandle handle)
-   {
-      device_unmap_host_buffer(self->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
-   }
    static INLINE void renderer_notify_texture_upload(Renderer *self,
          Rect rect,
          uint16_t *vram)
@@ -8809,41 +8775,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       self->render_state.is_480i = is_480i;
       self->render_state.width_mode = width_mode;
    }
-   static INLINE void renderer_toggle_display(Renderer *self, bool enable)
-   {
-      if (enable != self->render_state.display_on)
-         ih_reset(&self->last_scanout);
-
-      self->render_state.display_on = enable;
-   }
-   static INLINE void renderer_set_texture_mode(Renderer *self,
-         TextureMode mode)
-   {
-      self->render_state.texture_mode = mode;
-      fbatlas_set_texture_mode(&self->atlas, mode);
-   }
-   static INLINE void renderer_set_semi_transparent(Renderer *self,
-         SemiTransparentMode state)
-   {
-      self->render_state.semi_transparent = state;
-   }
    static INLINE void renderer_set_primitive_type(Renderer *self,
          PrimitiveType primitive_type)
    {
       self->render_state.primitive_type = primitive_type;
-   }
-   static INLINE void renderer_set_force_mask_bit(Renderer *self, bool enable)
-   {
-      self->render_state.force_mask_bit = enable;
-   }
-   static INLINE void renderer_set_mask_test(Renderer *self, bool enable)
-   {
-      self->render_state.mask_test = enable;
-   }
-   static INLINE void renderer_set_texture_color_modulate(Renderer *self,
-         bool enable)
-   {
-      self->render_state.texture_color_modulate = enable;
    }
    static INLINE void renderer_set_UV_limits(Renderer *self,
          uint16_t min_u,
@@ -8866,11 +8801,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          size_t vram_bytes)
    {
       texture_tracker_set_cache_budgets(&self->tracker, ram_bytes, vram_bytes);
-   }
-   static INLINE void renderer_set_draw_offset(Renderer *self, int x, int y)
-   {
-      self->render_state.draw_offset_x = x;
-      self->render_state.draw_offset_y = y;
    }
    static INLINE void renderer_set_horizontal_display_range(Renderer *self,
          int x1,
@@ -8897,11 +8827,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       self->render_state.slend = slend;
       self->render_state.slstart_pal = slstart_pal;
       self->render_state.slend_pal = slend_pal;
-   }
-   static INLINE void renderer_set_mdec_filter(Renderer *self,
-         ScanoutFilter mdec_filter)
-   {
-      self->render_state.scanout_mdec_filter = mdec_filter;
    }
 
    static const uint32_t quad_vert[] =
@@ -10410,16 +10335,15 @@ static HdTextureHandle renderer_get_hd_texture_index(Renderer *self,
       self->render_state.palette_offset_x,
       self->render_state.palette_offset_y
    };
-   if (mode.mode == TextureMode_ABGR1555) {
+   if (mode.mode == TextureMode_ABGR1555)
+   {
       /* HACK: This mode doesn't use a palette, so this a hack to make the palette irrelevant for equality purposes */
       mode.palette_offset_x = 0;
       mode.palette_offset_y = 0;
    }
-   if (self->texture_tracking_enabled) {
+   if (self->texture_tracking_enabled)
       return texture_tracker_get_hd_texture_index(&self->tracker, *vram_rect, &mode, self->render_state.texture_offset_x, self->render_state.texture_offset_y, fastpath_capable_out, cache_hit_out);
-   } else {
-      return hd_handle_make_none();
-   }
+   return hd_handle_make_none();
 }
 
 static void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle *hd_texture_index_out,
@@ -10917,7 +10841,7 @@ static void renderer_clear_quad(Renderer *self,
    TextureMode old;
    ih_reset(&self->last_scanout);
    old = fbatlas_set_texture_mode(&self->atlas, TextureMode_None);
-   z = renderer_allocate_depth(self, Domain_Unscaled, rect);
+   z   = renderer_allocate_depth(self, Domain_Unscaled, rect);
    fbatlas_set_texture_mode(&self->atlas, old);
 
    { BufferVertex pos0 = { (float)(rect->x), (float)(rect->y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
@@ -19722,7 +19646,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
    static void fbatlas_discard_render_pass(FBAtlas *self)
    {
       self->renderpass.inside = false;
-      renderer_discard_render_pass(self->listener);
+      renderer_reset_queue(self->listener);
    }
 
    static void fbatlas_notify_external_barrier(FBAtlas *self,
@@ -23038,10 +22962,10 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    renderer->render_state.image_crop = image_crop;
 
    renderer->render_state.scanout_filter = super_sampling ? ScanoutFilter_SSAA : ScanoutFilter_None;
-   if (renderer_get_scanout_mode(renderer) == ScanoutMode_BGR24)
-      renderer_set_mdec_filter(renderer, mdec_yuv ? ScanoutFilter_MDEC_YUV : ScanoutFilter_None);
+   if (renderer->render_state.scanout_mode == ScanoutMode_BGR24)
+      renderer->render_state.scanout_mdec_filter = mdec_yuv ? ScanoutFilter_MDEC_YUV : ScanoutFilter_None;
    else
-      renderer_set_mdec_filter(renderer, ScanoutFilter_None);
+      renderer->render_state.scanout_mdec_filter = ScanoutFilter_None;
 
    scanout = show_vram ? renderer_scanout_vram_to_texture(renderer, true) : renderer_scanout_to_texture(renderer);
    index = vulkan->get_sync_index(vulkan->handle);
@@ -23102,7 +23026,10 @@ void rhi_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
 void rhi_vulkan_set_draw_offset(int16_t x, int16_t y)
 {
    if (renderer)
-      renderer_set_draw_offset(renderer, x, y);
+   {
+      renderer->render_state.draw_offset_x = x;
+      renderer->render_state.draw_offset_y = y;
+   }
    else
       rhi_defer_push_set_draw_offset(&defer, x, y);
 }
@@ -23187,18 +23114,24 @@ static void renderer_apply_texture_mode(Renderer *renderer,
       {
          default:
          case 0:
-            renderer_set_texture_mode(renderer, TextureMode_ABGR1555);
+            renderer->render_state.texture_mode = TextureMode_ABGR1555;
+            fbatlas_set_texture_mode(&renderer->atlas, TextureMode_ABGR1555);
             break;
          case 1:
-            renderer_set_texture_mode(renderer, TextureMode_Palette8bpp);
+            renderer->render_state.texture_mode = TextureMode_Palette8bpp;
+            fbatlas_set_texture_mode(&renderer->atlas, TextureMode_Palette8bpp);
             break;
          case 2:
-            renderer_set_texture_mode(renderer, TextureMode_Palette4bpp);
+            renderer->render_state.texture_mode = TextureMode_Palette4bpp;
+            fbatlas_set_texture_mode(&renderer->atlas, TextureMode_Palette4bpp);
             break;
       }
    }
    else
-      renderer_set_texture_mode(renderer, TextureMode_None);
+   {
+      renderer->render_state.texture_mode = TextureMode_None;
+      fbatlas_set_texture_mode(&renderer->atlas, TextureMode_None);
+   }
 }
 
 static void renderer_apply_blend_mode(Renderer *renderer, int blend_mode)
@@ -23206,20 +23139,19 @@ static void renderer_apply_blend_mode(Renderer *renderer, int blend_mode)
    switch (blend_mode)
    {
       default:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_None);
+         renderer->render_state.semi_transparent = SemiTransparentMode_None;
          break;
-
       case 0:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Average);
+         renderer->render_state.semi_transparent = SemiTransparentMode_Average;
          break;
       case 1:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Add);
+         renderer->render_state.semi_transparent = SemiTransparentMode_Add;
          break;
       case 2:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_Sub);
+         renderer->render_state.semi_transparent = SemiTransparentMode_Sub;
          break;
       case 3:
-         renderer_set_semi_transparent(renderer, SemiTransparentMode_AddQuarter);
+         renderer->render_state.semi_transparent = SemiTransparentMode_AddQuarter;
          break;
    }
 }
@@ -23247,11 +23179,11 @@ void rhi_vulkan_push_triangle(
    if (!renderer)
       return;
 
-   renderer_set_texture_color_modulate(renderer, texture_blend_mode == 2);
+   renderer->render_state.texture_color_modulate = texture_blend_mode == 2;
    renderer_set_palette_offset(renderer, clut_x, clut_y);
    renderer_set_texture_offset(renderer, texpage_x, texpage_y);
-   renderer_set_mask_test(renderer, mask_test);
-   renderer_set_force_mask_bit(renderer, set_mask);
+   renderer->render_state.mask_test = mask_test;
+   renderer->render_state.force_mask_bit = set_mask;
    renderer_set_UV_limits(renderer, min_u, min_v, max_u, max_v);
    renderer_apply_texture_mode(renderer, texture_blend_mode, depth_shift);
 
@@ -23293,11 +23225,11 @@ void rhi_vulkan_push_quad(
    if (!renderer)
       return;
 
-   renderer_set_texture_color_modulate(renderer, texture_blend_mode == 2);
+   renderer->render_state.texture_color_modulate = texture_blend_mode == 2;
    renderer_set_palette_offset(renderer, clut_x, clut_y);
    renderer_set_texture_offset(renderer, texpage_x, texpage_y);
-   renderer_set_mask_test(renderer, mask_test);
-   renderer_set_force_mask_bit(renderer, set_mask);
+   renderer->render_state.mask_test = mask_test;
+   renderer->render_state.force_mask_bit = set_mask;
    renderer_set_UV_limits(renderer, min_u, min_v, max_u, max_v);
    renderer_apply_texture_mode(renderer, texture_blend_mode, depth_shift);
 
@@ -23333,17 +23265,19 @@ void rhi_vulkan_push_line(
    if (!renderer)
       return;
 
-   renderer_set_texture_mode(renderer, TextureMode_None);
-   renderer_set_mask_test(renderer, mask_test);
-   renderer_set_force_mask_bit(renderer, set_mask);
+   renderer->render_state.texture_mode = TextureMode_None;
+   fbatlas_set_texture_mode(&renderer->atlas, TextureMode_None);
+   renderer->render_state.mask_test      = mask_test;
+   renderer->render_state.force_mask_bit = set_mask;
    renderer_apply_blend_mode(renderer, blend_mode);
 
-   { Vertex vertices[2] = {
-      { (float)(p0x), (float)(p0y), 1.0f, c0, 0, 0 },
-      { (float)(p1x), (float)(p1y), 1.0f, c1, 0, 0 },
-   };
-   renderer_set_texture_color_modulate(renderer, false);
-   renderer_draw_line(renderer, vertices);
+   {
+      Vertex vertices[2] = {
+         { (float)(p0x), (float)(p0y), 1.0f, c0, 0, 0 },
+         { (float)(p1x), (float)(p1y), 1.0f, c1, 0, 0 },
+      };
+      renderer->render_state.texture_color_modulate = false;
+      renderer_draw_line(renderer, vertices);
    }
 }
 
@@ -23366,10 +23300,10 @@ void rhi_vulkan_load_image(
 
    { Rect _ntu_rect; _ntu_rect.x = x; _ntu_rect.y = y; _ntu_rect.width = w; _ntu_rect.height = h;
      renderer_notify_texture_upload(renderer, _ntu_rect, vram); }
-   renderer_set_mask_test(renderer, mask_test);
-   renderer_set_force_mask_bit(renderer, set_mask);
+   renderer->render_state.mask_test      = mask_test;
+   renderer->render_state.force_mask_bit = set_mask;
    { Rect _r = { x, y, w, h }; BufferHandle handle = renderer_copy_cpu_to_vram(renderer, &_r);
-   uint16_t *tmp = renderer_begin_copy(renderer, handle);
+   uint16_t *tmp = (uint16_t*)(device_map_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
 
    /* The row loop has two independent invariants: x-wrap (dual_copy)
     * and y-wrap. Both are determined entirely by (x, y, w, h) before
@@ -23421,13 +23355,13 @@ void rhi_vulkan_load_image(
                   w * sizeof(uint16_t)); }
       }
    }
-   renderer_end_copy(renderer, handle);
+   device_unmap_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
 
    /* This is called on state loading. */
    if (!inside_frame)
       renderer_flush(renderer);
    /* renderer_copy_cpu_to_vram produced an owning BufferHandle and
-    * renderer_end_copy only unmaps it; the former handle released it
+    * device_unmap_host_buffer only unmaps it; the former handle released it
     * at scope end (after the flush above), so drop that
     * reference here. */
    bh_reset(&handle);
@@ -23462,8 +23396,8 @@ void rhi_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
 {
    if (!renderer)
       return;
-   renderer_set_mask_test(renderer, mask_test);
-   renderer_set_force_mask_bit(renderer, set_mask);
+   renderer->render_state.mask_test      = mask_test;
+   renderer->render_state.force_mask_bit = set_mask;
    {
       Rect _d = { dst_x, dst_y, w, h };
       Rect _s = { src_x, src_y, w, h };
@@ -23474,7 +23408,12 @@ void rhi_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
 void rhi_vulkan_toggle_display(bool status)
 {
    if (renderer)
-      renderer_toggle_display(renderer, status == 0);
+   {
+      bool enable = status == 0;
+      if (enable != renderer->render_state.display_on)
+         ih_reset(&renderer->last_scanout);
+      renderer->render_state.display_on = enable;
+   }
    else
       rhi_defer_push_toggle_display(&defer, status);
 }
