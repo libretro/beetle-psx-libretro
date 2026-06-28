@@ -8446,7 +8446,7 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 		{ Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT }; fbatlas_write_transfer(&self->atlas, Domain_Unscaled, &_r); }
 	}
 
-	ImageInitialData initial_vram = {
+	{ ImageInitialData initial_vram = {
 		state ? owned_u32_data(&state->vram) : NULL, 0, 0,
 	};
 	ih_move(&self->framebuffer, device_create_image(self->device, &info, state ? &initial_vram : NULL));
@@ -8550,12 +8550,12 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 
 	dither_info = image_create_info_immutable_2d_image(4, 4, VK_FORMAT_R8_UNORM, false);
 	// This lut is biased with 4 to be able to use UNORM easily.
-	static const uint8_t dither_lut_data[16] = { 0, 4, 1, 5, 6, 2, 7, 3, 1, 5, 0, 4, 7, 3, 6, 2 };
+	{ static const uint8_t dither_lut_data[16] = { 0, 4, 1, 5, 6, 2, 7, 3, 1, 5, 0, 4, 7, 3, 6, 2 };
 
 	ImageInitialData dither_initial = { dither_lut_data };
 	ih_move(&self->dither_lut, device_create_image(self->device, &dither_info, &dither_initial));
 
-	static const float quad_data[] = {
+	{ static const float quad_data[] = {
 		-128, -128, +127, -128, -128, +127, +127, +127,
 	};
 
@@ -8572,6 +8572,9 @@ void renderer_init(Renderer *self, Device *device_, unsigned scaling_, unsigned 
 		texture_tracker_load_state(&self->tracker, &state->tracker_state);
 	}
 
+	}
+	}
+	}
 	self->valid = true;}
 
 void renderer_save_vram_state(Renderer *self, SaveState *out){
@@ -8905,7 +8908,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 
 		commandbuffer_set_quad_state(cbh_get(&self->cmd));
 		commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
-		struct Push
+		{ struct Push
 		{
 			float offset[2];
 			float range[2];
@@ -8940,6 +8943,7 @@ void renderer_mipmap_framebuffer(Renderer *self)
 			                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			                   VK_ACCESS_SHADER_READ_BIT);
+		}
 		}
 	} }
 }
@@ -8978,7 +8982,7 @@ void renderer_ssaa_framebuffer(Renderer *self)
 	else
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearClamp);
 
-	struct Push
+	{ struct Push
 	{
 		float inv_size[2];
 		uint32_t scale;
@@ -8996,6 +9000,7 @@ void renderer_ssaa_framebuffer(Renderer *self)
 		commandbuffer_dispatch(cbh_get(&self->cmd), 1, 1, to_run);
 	} }
 	free(resolves_ssaa);
+	}
 }
 
 Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
@@ -9058,7 +9063,7 @@ DisplayRect renderer_compute_display_rect(Renderer *self)
 		break;
 	}
 
-	unsigned display_width;
+	{ unsigned display_width;
 	int left_offset;
 	if (self->render_state.crop_overscan)
 	{
@@ -9078,7 +9083,7 @@ DisplayRect renderer_compute_display_rect(Renderer *self)
 		left_offset = floor((self->render_state.horiz_start + self->render_state.offset_cycles - 488) / (double) clock_div);
 	}
 
-	int upper_offset;
+	{ int upper_offset;
 	if (self->render_state.crop_overscan == 2)
 	{
 		if (self->render_state.is_pal)
@@ -9112,6 +9117,8 @@ DisplayRect renderer_compute_display_rect(Renderer *self)
 	}
 
 	return display_rect_make(left_offset, upper_offset, display_width, display_height);
+	}
+	}
 }
 
 ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
@@ -9126,7 +9133,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
 	fbatlas_flush_render_pass(&self->atlas);
 
-	Rect vram_rect = {0, 0, FB_WIDTH, FB_HEIGHT};
+	{ Rect vram_rect = {0, 0, FB_WIDTH, FB_HEIGHT};
 
 	if (scaled)
 		fbatlas_read_fragment(&self->atlas, Domain_Scaled, &vram_rect);
@@ -9153,7 +9160,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
 	render_scale = scaled ? self->scaling : 1;
 
-	ImageCreateInfo info = image_create_info_render_target(
+	{ ImageCreateInfo info = image_create_info_render_target(
 			FB_WIDTH * render_scale,
 			FB_HEIGHT * render_scale,
 			VK_FORMAT_A1R5G5B5_UNORM_PACK16); // Default to 15bit color for now
@@ -9189,7 +9196,7 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	}
 
 	commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
-	struct Push
+	{ struct Push
 	{
 		float offset[2];
 		float scale[2];
@@ -9219,6 +9226,9 @@ ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 	ih_assign(&self->last_scanout, &self->reuseable_scanout);
 
 	return self->reuseable_scanout;
+	}
+	}
+	}
 }
 
 ImageHandle renderer_scanout_to_texture(Renderer *self)
@@ -9235,7 +9245,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		return self->last_scanout;
 
 	self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
-	Rect *rect = &self->render_state.display_fb_rect;
+	{ Rect *rect = &self->render_state.display_fb_rect;
 
 	if (rect->width == 0 || rect->height == 0 || !self->render_state.display_on)
 	{
@@ -9244,14 +9254,14 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 
 		renderer_ensure_command_buffer(self);
 
-		ImageCreateInfo info = image_create_info_render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
+		{ ImageCreateInfo info = image_create_info_render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
 
 		info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		info.usage =
 		    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		ih_move(&self->reuseable_scanout, device_create_image(self->device, &info, NULL));
 
-		RenderPassInfo rp;
+		{ RenderPassInfo rp;
 		render_pass_info_defaults(&rp);
 		rp.color_attachments[0] = image_get_view(ih_get(&self->reuseable_scanout));
 		rp.num_color_attachments = 1;
@@ -9272,9 +9282,11 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 
 		ih_assign(&self->last_scanout, &self->reuseable_scanout);
 		return self->reuseable_scanout;
+		}
+		}
 	}
 
-	bool bpp24 = self->render_state.scanout_mode == ScanoutMode_BGR24;
+	{ bool bpp24 = self->render_state.scanout_mode == ScanoutMode_BGR24;
 	bool ssaa = self->render_state.scanout_filter == ScanoutFilter_SSAA && self->scaling != 1;
 
 	Rect read_rect = *rect;
@@ -9308,7 +9320,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	else if (self->msaa > 1)
 	{
 		renderer_ensure_command_buffer(self);
-		VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+		{ VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 		VkOffset3D offset = { (int)(rect->x * self->scaling), (int)(rect->y * self->scaling), 0 };
 		VkExtent3D extent = { rect->width * self->scaling, rect->height * self->scaling, 1 };
 		if (rect->x + rect->width > FB_WIDTH)
@@ -9321,7 +9333,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 			offset.y = 0;
 			extent.height = FB_HEIGHT * self->scaling;
 		}
-		VkImageResolve region = { subres, offset, subres, offset, extent };
+		{ VkImageResolve region = { subres, offset, subres, offset, extent };
 		vkCmdResolveImage(commandbuffer_get_command_buffer(cbh_get(&self->cmd)),
 			image_get_image(ih_get(&self->scaled_framebuffer_msaa)), VK_IMAGE_LAYOUT_GENERAL,
 			image_get_image(ih_get(&self->scaled_framebuffer)), VK_IMAGE_LAYOUT_GENERAL,
@@ -9330,6 +9342,8 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		commandbuffer_barrier_simple(cbh_get(&self->cmd), 
 			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+		}
+		}
 	}
 
 	if (self->render_state.adaptive_smoothing && !bpp24 && !ssaa && self->scaling != 1)
@@ -9337,7 +9351,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 
 	renderer_ensure_command_buffer(self);
 
-	bool scaled = !ssaa;
+	{ bool scaled = !ssaa;
 
 	unsigned render_scale = scaled ? self->scaling : 1;
 
@@ -9369,7 +9383,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	commandbuffer_set_quad_state(cbh_get(&self->cmd));
 
 	old_vp = *commandbuffer_get_viewport(cbh_get(&self->cmd));
-	VkViewport new_vp = {display_rect.x * (float) render_scale,
+	{ VkViewport new_vp = {display_rect.x * (float) render_scale,
 	                     display_rect.y * (float) render_scale,
 	                     rect->width * (float) render_scale,
 	                     rect->height * (float) render_scale,
@@ -9420,7 +9434,7 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	if (dither)
 	{
 		commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 2, image_get_view(ih_get(&self->dither_lut)), StockSampler_NearestWrap);
-		struct DitherData
+		{ struct DitherData
 		{
 			float range;
 			float inv_range;
@@ -9447,10 +9461,11 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 		{
 			dither->dither_shift = 0;
 		}
+		}
 	}
 
 	commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
-	struct Push
+	{ struct Push
 	{
 		float offset[2];
 		float scale[2];
@@ -9479,6 +9494,11 @@ ImageHandle renderer_scanout_to_texture(Renderer *self)
 	ih_assign(&self->last_scanout, &self->reuseable_scanout);
 
 	return self->reuseable_scanout;
+	}
+	}
+	}
+	}
+	}
 }
 
 void renderer_hazard(Renderer *self, StatusFlags flags)
@@ -9672,7 +9692,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 		break;
 	}
 
-	Rect hd_texture_vram = make_rect(0, 0, 0, 0);
+	{ Rect hd_texture_vram = make_rect(0, 0, 0, 0);
 
 	if (self->render_state.texture_mode != TextureMode_None)
 	{
@@ -9721,7 +9741,7 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 	}
 
 	// Compute bounding box for the draw call.
-	float max_x = 0.0f;
+	{ float max_x = 0.0f;
 	float max_y = 0.0f;
 	float min_x = (float)(FB_WIDTH);
 	float min_y = (float)(FB_HEIGHT);
@@ -9839,6 +9859,8 @@ void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *
 		output[i].color |= self->render_state.force_mask_bit ? 0xff000000u : 0u;
 	} }
 	*hd_texture_index_out = hd_texture_index; *filtering_out = filtering; *scaled_read_out = scaled_read; *shift_out = shift; *offset_uv_out = offset_uv;
+	}
+	}
 	}
 }
 
@@ -10016,7 +10038,7 @@ void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 	ih_reset(&self->last_scanout);
 
 	hd_texture_index = hd_handle_make_none();
-	bool filtering = false;
+	{ bool filtering = false;
 	bool scaled_read = false;
 	unsigned shift = 0;
 	bool offset_uv = false;
@@ -10050,6 +10072,7 @@ void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 		self->render_pass_is_feedback = true;
 	}
 	}
+	}
 }
 
 void renderer_draw_quad(Renderer *self, const Vertex *vertices)
@@ -10067,7 +10090,7 @@ void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 	// to be very careful not to let it get invalidated by build_attribs; so any such logic should happen within
 	// build_attribs itself, and not out here.
 	hd_texture_index = hd_handle_make_none();
-	bool filtering = false;
+	{ bool filtering = false;
 	bool scaled_read = false;
 	unsigned shift = 0;
 	bool offset_uv = false;
@@ -10112,6 +10135,7 @@ void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 		}
 	}
 	}
+	}
 }
 
 void renderer_clear_quad(Renderer *self, const Rect *rect, uint32_t fb_color, bool candidate)
@@ -10123,7 +10147,7 @@ void renderer_clear_quad(Renderer *self, const Rect *rect, uint32_t fb_color, bo
 	z = renderer_allocate_depth(self, Domain_Unscaled, rect);
 	fbatlas_set_texture_mode(&self->atlas, old);
 
-	BufferVertex pos0 = { (float)(rect->x), (float)(rect->y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
+	{ BufferVertex pos0 = { (float)(rect->x), (float)(rect->y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
 	BufferVertex pos1 = { (float)(rect->x) + (float)(rect->width), (float)(rect->y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
 	BufferVertex pos2 = { (float)(rect->x), (float)(rect->y) + (float)(rect->height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
 	BufferVertex pos3 = { (float)(rect->x) + (float)(rect->width), (float)(rect->y) + (float)(rect->height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
@@ -10144,6 +10168,7 @@ void renderer_clear_quad(Renderer *self, const Rect *rect, uint32_t fb_color, bo
 
 	if (candidate)
 		{ ClearCandidate _vpush = { *rect, fb_color, z }; ClearCandidateVec_push(&self->queue.clear_candidates, &_vpush); }
+	}
 }
 
 const ClearCandidate * renderer_find_clear_candidate(Renderer *self, const Rect *rect){
@@ -10165,7 +10190,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 	RenderPassInfo_Subpass subpass;
 	renderer_ensure_command_buffer(self);
 
-	RenderPassInfo info;
+	{ RenderPassInfo info;
 	render_pass_info_defaults(&info);
 
 	if (self->msaa > 1)
@@ -10232,6 +10257,7 @@ void renderer_flush_render_pass(Renderer *self, const Rect *rect)
 
 	renderer_reset_queue(self);
 	}
+	}
 }
 
 void renderer_dispatch_set_scaled_read_texture(Renderer *self, bool scaled_read, bool textured)
@@ -10291,7 +10317,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, Primitiv
 	qsort(PrimitiveInfoVec_data(scissors), PrimitiveInfoVec_size(scissors), sizeof(PrimitiveInfo), renderer_primitive_info_qsort_cmp);
 
 	// Render flat-shaded primitives.
-	BufferVertex *vert = (BufferVertex *)(
+	{ BufferVertex *vert = (BufferVertex *)(
 	    commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, BufferVertexVec_size(vertices) * sizeof(BufferVertex), sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX));
 
 	int scissor = (*PrimitiveInfoVec_front(scissors)).scissor_index;
@@ -10355,6 +10381,7 @@ void renderer_dispatch(Renderer *self, const BufferVertexVec *vertices, Primitiv
 	to_draw = size - last_draw;
 	commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 	commandbuffer_draw(cbh_get(&self->cmd), 3 * to_draw, 1, 3 * last_draw, 0);
+	}
 }
 
 void renderer_render_opaque_primitives(Renderer *self){
@@ -10374,8 +10401,6 @@ void renderer_render_opaque_primitives(Renderer *self){
 }
 
 void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_index) {
-	HdTexture hd = texture_tracker_get_hd_texture(&self->tracker, hd_texture_index);
-	commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 4, image_get_view(ih_get(&hd.texture)), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
 	// ivec4, ivec4
 	struct HDPush {
 		int32_t vram_rect_x;
@@ -10388,11 +10413,13 @@ void renderer_hd_texture_uniforms(Renderer *self, HdTextureHandle hd_texture_ind
 		int32_t texel_rect_width;
 		int32_t texel_rect_height;
 	};
-	struct HDPush push = {
+	HdTexture hd = texture_tracker_get_hd_texture(&self->tracker, hd_texture_index);
+	commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 4, image_get_view(ih_get(&hd.texture)), StockSampler_TrilinearClamp); // Type of sampler only matters for the fast path
+	{ struct HDPush push = {
 		hd.vram_rect.x, hd.vram_rect.y, hd.vram_rect.width, hd.vram_rect.height,
 		hd.texel_rect.x, hd.texel_rect.y, hd.texel_rect.width, hd.texel_rect.height
 	};
-	commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+	commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push)); }
 }
 
 void renderer_render_semi_transparent_primitives(Renderer *self){
@@ -10402,7 +10429,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 	if (!prims)
 		return;
 
-	unsigned last_draw_offset = 0;
+	{ unsigned last_draw_offset = 0;
 
 	commandbuffer_set_opaque_state(cbh_get(&self->cmd));
 	commandbuffer_set_cull_mode(cbh_get(&self->cmd), VK_CULL_MODE_NONE);
@@ -10416,7 +10443,7 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
 	commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-	size_t size = BufferVertexVec_size(&self->queue.semi_transparent) * sizeof(BufferVertex);
+	{ size_t size = BufferVertexVec_size(&self->queue.semi_transparent) * sizeof(BufferVertex);
 	void *verts = commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, size, sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX);
 	memcpy(verts, BufferVertexVec_data(&self->queue.semi_transparent), size);
 
@@ -10461,6 +10488,8 @@ void renderer_render_semi_transparent_primitives(Renderer *self){
 	commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
 	if (self->msaa > 1)
 		commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
+	}
+	}
 }
 
 void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
@@ -10592,7 +10621,7 @@ void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src){
 		factor = domain == Domain_Scaled ? self->scaling : 1u;
 
 		// Slower path where we do this in a single workgroup which steps through line by line, just like the software version.
-		struct Push
+		{ struct Push
 		{
 			uint32_t src_offset[2];
 			uint32_t dst_offset[2];
@@ -10631,6 +10660,7 @@ void renderer_blit_vram(Renderer *self, const Rect *dst, const Rect *src){
 		}
 		//LOG("Intersecting blit_vram, hitting slow path (src: %u, %u, dst: %u, %u, size: %u, %u)\n", src.x, src.y, dst.x,
 		//    dst.y, dst.width, dst.height);
+		}
 	}
 	else
 	{
@@ -10716,16 +10746,16 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 	size = rect->width * rect->height * sizeof(uint16_t);
 
 	// TODO: Chain allocate this.
-	BufferCreateInfo buffer_create_info;
+	{ BufferCreateInfo buffer_create_info;
 	buffer_create_info.domain = BufferDomain_Host;
 	buffer_create_info.size = size;
 	buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
 	buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
 
-	BufferViewCreateInfo view_info = {};
+	{ BufferViewCreateInfo view_info = {};
 	view_info.buffer = bh_get(&buffer);
 
-	struct Push
+	{ struct Push
 	{
 		Rect rect;
 		uint32_t offset;
@@ -10747,13 +10777,15 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 			view_info.format = VK_FORMAT_R16_UINT;
 			view = device_create_buffer_view(self->device, &view_info);
 
-			Rect small_rect = { rect->x, rect->y + y, rect->width, y_size };
+			{ Rect small_rect = { rect->x, rect->y + y, rect->width, y_size };
 
 			commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, bvh_get(&view));
-			struct Push push = { small_rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
+			{ struct Push push = { small_rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
 			commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 			commandbuffer_dispatch(cbh_get(&self->cmd), (small_rect.width + 7) >> 3, (small_rect.height + 7) >> 3, 1);
 			bvh_reset(&view);
+			}
+			}
 		} }
 	}
 	else
@@ -10766,15 +10798,19 @@ BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 
 		commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, bvh_get(&view));
 
-		struct Push push = { *rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
+		{ struct Push push = { *rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
 		commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
 
 		// TODO: Batch up work.
 		commandbuffer_dispatch(cbh_get(&self->cmd), (rect->width + 7) >> 3, (rect->height + 7) >> 3, 1);
 		bvh_reset(&view);
+		}
 	}
 
 	return buffer;
+	}
+	}
+	}
 }
 
 void renderer_fini(Renderer *self)
@@ -10864,7 +10900,7 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 	else
 		commandbuffer_set_scissor(cbh_get(&self->cmd), Rect2DVec_at(&self->queue.scissors, state->scissor_index));
 
-	Program *textured = state->textured ? state->scaled_read ?
+	{ Program *textured = state->textured ? state->scaled_read ?
 		self->pipelines.textured_scaled : self->pipelines.textured_unscaled : self->pipelines.flat;
 	Program *textured_masked = state->textured ? state->scaled_read ?
 		self->pipelines.textured_masked_scaled : self->pipelines.textured_masked_unscaled : self->pipelines.flat_masked;
@@ -11001,6 +11037,7 @@ void renderer_semi_transparent_set_state(Renderer *self, const SemiTransparentSt
 			                       VK_BLEND_FACTOR_ZERO);
 		}
 		break;
+	}
 	}
 	}
 }
@@ -11855,10 +11892,11 @@ static void command_pool_init(CommandPool *cp, VkDevice device, uint32_t queue_f
 #endif
 	cp->index = 0;
 
-	VkCommandPoolCreateInfo info = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+	{ VkCommandPoolCreateInfo info = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 	info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 	info.queueFamilyIndex = queue_family_index;
 	vkCreateCommandPool(device, &info, NULL, &cp->pool);
+	}
 }
 
 static void command_pool_deinit(CommandPool *cp)
@@ -11976,7 +12014,7 @@ void block_allocate(struct Block *self, uint32_t num_blocks, DeviceAllocation *b
 		block_mask = ((1u << num_blocks) - 1u);
 
 	mask = self->free_blocks[num_blocks - 1];
-	uint32_t b = trailing_zeroes(mask);
+	{ uint32_t b = trailing_zeroes(mask);
 
 	VK_ASSERT(((self->free_blocks[0] >> b) & block_mask) == block_mask);
 
@@ -11986,6 +12024,7 @@ void block_allocate(struct Block *self, uint32_t num_blocks, DeviceAllocation *b
 
 	block->mask = sb;
 	block->offset = b;
+	}
 }
 
 void block_free(struct Block *self, uint32_t mask)
@@ -12029,9 +12068,9 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 		VK_ASSERT(itr);
 		VK_ASSERT(index >= (num_blocks - 1));
 
-		MiniHeap *heap = itr;
+		{ MiniHeap *heap = itr;
 		classallocator_suballocate(self, num_blocks, masked_tiling_mode, self->memory_type, heap, alloc);
-		unsigned new_index = block_get_longest_run(&heap->heap) - 1;
+		{ unsigned new_index = block_get_longest_run(&heap->heap) - 1;
 
 		if (block_full(&heap->heap))
 		{
@@ -12052,10 +12091,12 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 		alloc->hierarchical = hierarchical;
 
 		return true;
+		}
+		}
 	}
 
 	// We didn't find a vacant heap, make a new one.
-	MiniHeap *node = (MiniHeap *)object_pool_raw_allocate(&self->object_pool);
+	{ MiniHeap *node = (MiniHeap *)object_pool_raw_allocate(&self->object_pool);
 	if (!node)
 		return false;
 	memset(node, 0, sizeof(*node)); /* was placement-new MiniHeap() value-init */
@@ -12104,6 +12145,7 @@ bool classallocator_allocate(struct ClassAllocator *self, uint32_t size, Allocat
 	alloc->hierarchical = hierarchical;
 
 	return true;
+	}
 }
 
 void classallocator_init(struct ClassAllocator *self)
@@ -12302,10 +12344,10 @@ bool deviceallocator_allocate_image_memory(struct DeviceAllocator *self, uint32_
 	if (!self->use_dedicated)
 		return deviceallocator_allocate_typed(self, size, alignment, memory_type, tiling, alloc);
 
-	VkImageMemoryRequirementsInfo2KHR info = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2_KHR };
+	{ VkImageMemoryRequirementsInfo2KHR info = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2_KHR };
 	info.image = image;
 
-	VkMemoryDedicatedRequirementsKHR dedicated_req = { VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS_KHR };
+	{ VkMemoryDedicatedRequirementsKHR dedicated_req = { VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS_KHR };
 	VkMemoryRequirements2KHR mem_req = { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2_KHR };
 	mem_req.pNext = &dedicated_req;
 	vkGetImageMemoryRequirements2KHR(self->device, &info, &mem_req);
@@ -12314,6 +12356,8 @@ bool deviceallocator_allocate_image_memory(struct DeviceAllocator *self, uint32_
 		return alloc_allocate_dedicated(self->allocators.items[memory_type], size, alloc, image);
 	else
 		return deviceallocator_allocate_typed(self, size, alignment, memory_type, tiling, alloc);
+	}
+	}
 }
 
 void da_heap_garbage_collect(struct DeviceAllocatorHeap *self, VkDevice device)
@@ -12423,7 +12467,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		return true;
 	}
 
-	VkMemoryAllocateInfo info = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, NULL, size, memory_type };
+	{ VkMemoryAllocateInfo info = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, NULL, size, memory_type };
 	VkMemoryDedicatedAllocateInfoKHR dedicated = { VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO_KHR };
 	if (dedicated_image != VK_NULL_HANDLE)
 	{
@@ -12483,6 +12527,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		else
 			return false;
 	}
+	}
 }
 
 /* === shader.cpp === */
@@ -12511,7 +12556,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 				num_sets = i + 1;
 		}
 
-		VkPipelineLayoutCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+		{ VkPipelineLayoutCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 		if (num_sets)
 		{
 			info.setLayoutCount = num_sets;
@@ -12527,6 +12572,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		LOGI("Creating pipeline layout.\n");
 		if (vkCreatePipelineLayout(device_get_device(device), &info, NULL, &self->pipe_layout) != VK_SUCCESS)
 			LOGE("Failed to create pipeline layout.\n");
+		}
 	}
 
 	void pipeline_layout_fini(struct PipelineLayout *self)
@@ -12559,6 +12605,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 	void shader_init(struct Shader *self, Hash hash, Device *device, const uint32_t *data, size_t size)
 	{
 		RhiSpirvResourceLayout reflected;
+		RHI_STATIC_ASSERT(sizeof(reflected) == sizeof(self->layout),
+				"reflection layout mirror size mismatch");
 		self->device = device;
 		self->module = VK_NULL_HANDLE;
 		self->intrusive_node.key = hash;
@@ -12576,7 +12624,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		}
 #endif
 
-		VkShaderModuleCreateInfo info = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+		{ VkShaderModuleCreateInfo info = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
 		info.codeSize = size;
 		info.pCode = data;
 
@@ -12588,9 +12636,8 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		 * so this translation unit does not depend on SPIRV-Cross. The shim writes
 		 * a POD layout whose fields mirror ResourceLayout; copy it across. */
 		rhi_spirv_reflect(data, size / sizeof(uint32_t), &reflected);
-		RHI_STATIC_ASSERT(sizeof(reflected) == sizeof(self->layout),
-				"reflection layout mirror size mismatch");
 		memcpy(&self->layout, &reflected, sizeof(self->layout));
+		}
 	}
 
 	void shader_fini(struct Shader *self)
@@ -12656,7 +12703,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		/* The set_nodes temp-map was previously brought up by the TemporaryHashmap
 		 * default constructor; as a concrete POD member it must be initialised here. */
 		descriptor_set_thmap_init_empty(&self->per_thread.set_nodes);
-		VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+		{ VkDescriptorSetLayoutCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
 		DescriptorBindingVec bindings = { NULL, 0, 0 };
 		/* Immutable-sampler handles referenced by pImmutableSamplers must stay alive
@@ -12749,6 +12796,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		if (vkCreateDescriptorSetLayout(device_get_device(self->device), &info, NULL, &self->set_layout) != VK_SUCCESS)
 			LOGE("Failed to create descriptor set layout.");
 		DescriptorBindingVec_free_storage(&bindings);
+		}
 	}
 
 	DescriptorSetAllocation descriptor_set_allocator_find(struct DescriptorSetAllocator *self, Hash hash)
@@ -12774,7 +12822,7 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			DescriptorSetAllocation r; r.set = node->set; r.cached = false; return r;
 		}
 
-		VkDescriptorPool pool;
+		{ VkDescriptorPool pool;
 		VkDescriptorPoolCreateInfo info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
 		info.maxSets = VULKAN_NUM_SETS_PER_POOL;
 		if (!DescriptorPoolSizeVec_empty(&self->pool_size))
@@ -12786,10 +12834,10 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 		if (vkCreateDescriptorPool(device_get_device(self->device), &info, NULL, &pool) != VK_SUCCESS)
 			LOGE("Failed to create descriptor pool.\n");
 
-		VkDescriptorSetLayout layouts[VULKAN_NUM_SETS_PER_POOL];
+		{ VkDescriptorSetLayout layouts[VULKAN_NUM_SETS_PER_POOL];
 		{ unsigned i; for (i = 0; i < VULKAN_NUM_SETS_PER_POOL; i++) layouts[i] = self->set_layout; }
 
-		VkDescriptorSetAllocateInfo alloc = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+		{ VkDescriptorSetAllocateInfo alloc = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 		alloc.descriptorPool = pool;
 		alloc.descriptorSetCount = VULKAN_NUM_SETS_PER_POOL;
 		alloc.pSetLayouts = layouts;
@@ -12809,6 +12857,9 @@ bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size, uint3
 			r.set = descriptor_set_thmap_request_vacant(&state->set_nodes, hash)->set;
 			r.cached = false;
 			return r;
+		}
+		}
+		}
 		}
 	}
 
@@ -12983,7 +13034,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		VK_ASSERT(info->num_color_attachments || info->depth_stencil);
 
 		// Want to make load/store to transient a very explicit thing to do, since it will kill performance.
-		bool enable_transient_store = (info->op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT) != 0;
+		{ bool enable_transient_store = (info->op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_STORE_BIT) != 0;
 		bool enable_transient_load = (info->op_flags & RENDER_PASS_OP_ENABLE_TRANSIENT_LOAD_BIT) != 0;
 
 		// Set up default subpass info structure if we don't have it.
@@ -13022,7 +13073,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		if (info->op_flags & RENDER_PASS_OP_STORE_DEPTH_STENCIL_BIT)
 			ds_store_op = VK_ATTACHMENT_STORE_OP_STORE;
 
-		bool ds_read_only = (info->op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT) != 0;
+		{ bool ds_read_only = (info->op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT) != 0;
 		VkImageLayout depth_stencil_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 		if (info->depth_stencil)
 		{
@@ -13035,7 +13086,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		{ unsigned i; for (i = 0; i < info->num_color_attachments; i++) {
 			VK_ASSERT(info->color_attachments[i]);
 			self->color_attachments[i] = imageview_get_format(info->color_attachments[i]);
-			Image *image = imageview_get_image(info->color_attachments[i]);
+			{ Image *image = imageview_get_image(info->color_attachments[i]);
 			VkAttachmentDescription *att = &attachments[i];
 			att->flags = 0;
 			att->format = self->color_attachments[i];
@@ -13069,6 +13120,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			}
 			else
 				att->initialLayout = image_get_layout(imageview_get_image(info->color_attachments[i]), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			}
 		} }
 
 		self->depth_stencil = info->depth_stencil ? imageview_get_format(info->depth_stencil) : VK_FORMAT_UNDEFINED;
@@ -13126,18 +13178,18 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 				att->initialLayout = depth_stencil_layout;
 		}
 
-		struct StackAllocatorRef reference_allocator;
+		{ struct StackAllocatorRef reference_allocator;
 		struct StackAllocatorU32 preserve_allocator;
 		reference_allocator.offset = 0;
 		preserve_allocator.offset = 0;
 
-		VkSubpassDescriptionVec subpasses = { NULL, 0, 0 };
+		{ VkSubpassDescriptionVec subpasses = { NULL, 0, 0 };
 		{
 			VkSubpassDescription zero_sp;
 			memset(&zero_sp, 0, sizeof(zero_sp));
 			{ unsigned sp; for (sp = 0; sp < num_subpasses; sp++) { VkSubpassDescription _sp = zero_sp; VkSubpassDescriptionVec_push(&subpasses, &_sp); } }
 		}
-		VkSubpassDependencyVec external_dependencies = { NULL, 0, 0 };
+		{ VkSubpassDependencyVec external_dependencies = { NULL, 0, 0 };
 		{ unsigned i; for (i = 0; i < num_subpasses; i++) {
 			VkAttachmentReference *colors = stackalloc_ref_allocate_cleared(&reference_allocator, subpass_infos[i].num_color_attachments);
 			VkAttachmentReference *inputs = stackalloc_ref_allocate_cleared(&reference_allocator, subpass_infos[i].num_input_attachments);
@@ -13201,7 +13253,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		// Now, figure out how each attachment is used throughout the subpasses.
 		// Either we don't care (inherit previous pass), or we need something specific.
 		// Start with initial layouts.
-		uint32_t preserve_masks[VULKAN_NUM_ATTACHMENTS + 1] = {};
+		{ uint32_t preserve_masks[VULKAN_NUM_ATTACHMENTS + 1] = {};
 
 		// Last subpass which makes use of an attachment.
 		unsigned last_subpass_for_attachment[VULKAN_NUM_ATTACHMENTS + 1] = {};
@@ -13214,7 +13266,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		depth_self_dependencies = 0;
 
 		// 1 << subpass bit set if any input attachment is read in the subpass.
-		uint32_t input_attachment_read = 0;
+		{ uint32_t input_attachment_read = 0;
 		uint32_t color_attachment_read_write = 0;
 		uint32_t depth_stencil_attachment_write = 0;
 		uint32_t depth_stencil_attachment_read = 0;
@@ -13445,7 +13497,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		} }
 
 		VK_ASSERT(num_subpasses > 0);
-		VkRenderPassCreateInfo rp_info = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+		{ VkRenderPassCreateInfo rp_info = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
 		rp_info.subpassCount = num_subpasses;
 		rp_info.pSubpasses = VkSubpassDescriptionVec_data(&subpasses);
 		rp_info.pAttachments = attachments;
@@ -13633,6 +13685,14 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 		VkSubpassDescriptionVec_free_storage(&subpasses);
 		VkSubpassDependencyVec_free_storage(&external_dependencies);
 		}
+		}
+		}
+		}
+		}
+		}
+		}
+		}
+		}
 	}
 
 	static void render_pass_fixup_render_pass_nvidia(struct RenderPass *self, VkRenderPassCreateInfo *create_info, VkAttachmentDescription *attachments)
@@ -13691,12 +13751,13 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			VK_ASSERT(info->color_attachments[i]);
 			att = info->color_attachments[i];
 			lod = imageview_get_create_info(att)->base_level;
-			unsigned aw  = image_get_width(imageview_get_image(att), lod);
+			{ unsigned aw  = image_get_width(imageview_get_image(att), lod);
 			unsigned ah  = image_get_height(imageview_get_image(att), lod);
 			if (aw < self->width)  self->width  = aw;
 			if (ah < self->height) self->height = ah;
 			views[num_views++] = imageview_get_render_target_view(att, info->layer);
 			self->attachments[self->num_attachments++] = att;
+			}
 		} }
 
 		if (info->depth_stencil)
@@ -13711,7 +13772,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 			self->attachments[self->num_attachments++] = att;
 		}
 
-		VkFramebufferCreateInfo fb_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+		{ VkFramebufferCreateInfo fb_info = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
 		fb_info.renderPass = render_pass_get_render_pass(rp);
 		fb_info.attachmentCount = num_views;
 		fb_info.pAttachments = views;
@@ -13721,6 +13782,7 @@ uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a, size_t co
 
 		if (vkCreateFramebuffer(device_get_device(device), &fb_info, NULL, &self->framebuffer) != VK_SUCCESS)
 			LOGE("Failed to create framebuffer.");
+		}
 	}
 
 	void framebuffer_fini(struct Framebuffer *self)
@@ -13927,7 +13989,7 @@ VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
 		VK_ASSERT(!self->actual_render_pass);
 
 		aspect = format_to_aspect_mask(image_get_format(image));
-		VkImageSubresourceRange range = {};
+		{ VkImageSubresourceRange range = {};
 		range.aspectMask = aspect;
 		range.baseArrayLayer = 0;
 		range.baseMipLevel = 0;
@@ -13942,6 +14004,7 @@ VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
 		{
 			vkCmdClearDepthStencilImage(self->cmd, image_get_image(image), image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
 					&value->depthStencil, 1, &range);
+		}
 		}
 	}
 
@@ -13962,11 +14025,12 @@ VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
 	{
 		VK_ASSERT(self->actual_render_pass);
 		VK_ASSERT(self->framebuffer);
-		VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+		{ VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
 		barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 		vkCmdPipelineBarrier(self->cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				VK_DEPENDENCY_BY_REGION_BIT, 1, &barrier, 0, NULL, 0, NULL);
+		}
 	}
 
 void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
@@ -13989,11 +14053,12 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 	{
 		VK_ASSERT(!self->actual_render_pass);
 		VK_ASSERT(!self->framebuffer);
-		VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+		{ VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
 		barrier.srcAccessMask = src_access;
 		barrier.dstAccessMask = dst_access;
 		fixup_src_stage(&src_stages, device_get_workarounds(self->device)->optimize_all_graphics_barrier);
 		vkCmdPipelineBarrier(self->cmd, src_stages, dst_stages, 0, 1, &barrier, 0, NULL, 0, NULL);
+		}
 	}
 
 	void commandbuffer_barrier(struct CommandBuffer *self, VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages, unsigned barriers,
@@ -14015,7 +14080,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		VK_ASSERT(!self->framebuffer);
 		VK_ASSERT(image_get_create_info(image)->domain != ImageDomain_Transient);
 
-		VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+		{ VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
 		barrier.srcAccessMask = src_access;
 		barrier.dstAccessMask = dst_access;
 		barrier.oldLayout = old_layout;
@@ -14029,6 +14094,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 		fixup_src_stage(&src_stages, device_get_workarounds(self->device)->optimize_all_graphics_barrier);
 		vkCmdPipelineBarrier(self->cmd, src_stages, dst_stages, 0, 0, NULL, 0, NULL, 1, &barrier);
+		}
 	}
 
 	void commandbuffer_barrier_prepare_generate_mipmap(struct CommandBuffer *self, const Image *image, VkImageLayout base_level_layout,
@@ -14081,7 +14147,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 		VK_ASSERT(image_get_layout(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-		VkImageMemoryBarrier b = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+		{ VkImageMemoryBarrier b = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
 		b.image = image_get_image(image);
 		b.subresourceRange.levelCount = 1;
 		b.subresourceRange.layerCount = image_get_create_info(image)->layers;
@@ -14109,6 +14175,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			commandbuffer_barrier(self, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					0, NULL, 0, NULL, 1, &b);
 		} }
+		}
 	}
 
 	void commandbuffer_blit_image(struct CommandBuffer *self, const Image *dst, const Image *src,
@@ -14196,7 +14263,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			num_clear_values = info->num_color_attachments + 1;
 		}
 
-		VkRenderPassBeginInfo begin_info = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+		{ VkRenderPassBeginInfo begin_info = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 		begin_info.renderPass = render_pass_get_render_pass(self->actual_render_pass);
 		begin_info.framebuffer = framebuffer_get_framebuffer(self->framebuffer);
 		begin_info.renderArea = self->scissor;
@@ -14207,6 +14274,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
 		self->current_contents = contents;
 		commandbuffer_begin_graphics(self);
+		}
 	}
 
 	void commandbuffer_end_render_pass(struct CommandBuffer *self)
@@ -14240,7 +14308,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				(to_string(shader.intrusive_node.key) + ".spv").c_str());
 #endif
 
-		VkSpecializationInfo spec_info = {};
+		{ VkSpecializationInfo spec_info = {};
 		VkSpecializationMapEntry spec_entries[VULKAN_NUM_SPEC_CONSTANTS];
 		uint32_t mask = pipeline_layout_get_resource_layout(self->current_layout)->combined_spec_constant_mask &
 			self->static_state.state.spec_constant_mask;
@@ -14268,6 +14336,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			LOGE("Failed to create compute pipeline!\n");
 
 		return program_add_pipeline(self->current_program, hash, compute_pipeline);
+		}
 	}
 
 	VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self, Hash hash)
@@ -14281,15 +14350,15 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		vp.scissorCount = 1;
 
 		// Dynamic state
-		VkPipelineDynamicStateCreateInfo dyn = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
+		{ VkPipelineDynamicStateCreateInfo dyn = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
 		dyn.dynamicStateCount = 2;
-		static const VkDynamicState states[2] = {
+		{ static const VkDynamicState states[2] = {
 			VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_VIEWPORT,
 		};
 		dyn.pDynamicStates = states;
 
 		// Blend state
-		VkPipelineColorBlendAttachmentState blend_attachments[VULKAN_NUM_ATTACHMENTS];
+		{ VkPipelineColorBlendAttachmentState blend_attachments[VULKAN_NUM_ATTACHMENTS];
 		VkPipelineColorBlendStateCreateInfo blend = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
 		blend.attachmentCount = render_pass_get_num_color_attachments(self->compatible_render_pass, self->current_subpass);
 		blend.pAttachments = blend_attachments;
@@ -14316,7 +14385,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		memcpy(blend.blendConstants, self->potential_static_state.blend_constants, sizeof(blend.blendConstants));
 
 		// Depth state
-		VkPipelineDepthStencilStateCreateInfo ds = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+		{ VkPipelineDepthStencilStateCreateInfo ds = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
 		ds.depthTestEnable = render_pass_has_depth(self->compatible_render_pass, self->current_subpass) && self->static_state.state.depth_test;
 		ds.depthWriteEnable = render_pass_has_depth(self->compatible_render_pass, self->current_subpass) && self->static_state.state.depth_write;
 
@@ -14324,11 +14393,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			ds.depthCompareOp = (VkCompareOp)(self->static_state.state.depth_compare);
 
 		// Vertex input
-		VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+		{ VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 		VkVertexInputAttributeDescription vi_attribs[VULKAN_NUM_VERTEX_ATTRIBS];
 		vi.pVertexAttributeDescriptions = vi_attribs;
 		attr_mask = pipeline_layout_get_resource_layout(self->current_layout)->attribute_mask;
-		uint32_t binding_mask = 0;
+		{ uint32_t binding_mask = 0;
 		{ uint32_t _feit, bit; FOR_EACH_BIT(attr_mask, _feit, bit)
 		{
 			VkVertexInputAttributeDescription *attr = &vi_attribs[vi.vertexAttributeDescriptionCount++];
@@ -14340,7 +14409,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		}
 		}
 
-		VkVertexInputBindingDescription vi_bindings[VULKAN_NUM_VERTEX_BUFFERS];
+		{ VkVertexInputBindingDescription vi_bindings[VULKAN_NUM_VERTEX_BUFFERS];
 		vi.pVertexBindingDescriptions = vi_bindings;
 		{ uint32_t _feit, bit; FOR_EACH_BIT(binding_mask, _feit, bit)
 		{
@@ -14352,11 +14421,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		}
 
 		// Input assembly
-		VkPipelineInputAssemblyStateCreateInfo ia = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
+		{ VkPipelineInputAssemblyStateCreateInfo ia = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
 		ia.topology = (VkPrimitiveTopology)(self->static_state.state.topology);
 
 		// Multisample
-		VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+		{ VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
 		ms.rasterizationSamples = (VkSampleCountFlagBits)(render_pass_get_sample_count(self->compatible_render_pass, self->current_subpass));
 
 		if (render_pass_get_sample_count(self->compatible_render_pass, self->current_subpass) > 1)
@@ -14368,14 +14437,14 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		}
 
 		// Raster
-		VkPipelineRasterizationStateCreateInfo raster = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+		{ VkPipelineRasterizationStateCreateInfo raster = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
 		raster.cullMode = (VkCullModeFlags)(self->static_state.state.cull_mode);
 		raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		raster.lineWidth = 1.0f;
 		raster.polygonMode = VK_POLYGON_MODE_FILL;
 
 		// Stages
-		VkPipelineShaderStageCreateInfo stages[(unsigned)(ShaderStage_Count)];
+		{ VkPipelineShaderStageCreateInfo stages[(unsigned)(ShaderStage_Count)];
 		unsigned num_stages = 0;
 
 		VkSpecializationInfo spec_info[(unsigned)ShaderStage_Count] = {};
@@ -14396,7 +14465,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				s->pName = "main";
 				s->stage = (VkShaderStageFlagBits)(1u << i);
 
-				uint32_t mask = pipeline_layout_get_resource_layout(self->current_layout)->spec_constant_mask[i] &
+				{ uint32_t mask = pipeline_layout_get_resource_layout(self->current_layout)->spec_constant_mask[i] &
 					self->static_state.state.spec_constant_mask;
 
 				if (mask)
@@ -14415,10 +14484,11 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 					}
 					}
 				}
+				}
 			}
 		} }
 
-		VkGraphicsPipelineCreateInfo pipe = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+		{ VkGraphicsPipelineCreateInfo pipe = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
 		pipe.layout = self->current_pipeline_layout;
 		pipe.renderPass = render_pass_get_render_pass(self->compatible_render_pass);
 		pipe.subpass = self->current_subpass;
@@ -14441,6 +14511,18 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			LOGE("Failed to create graphics pipeline!\n");
 
 		return program_add_pipeline(self->current_program, hash, pipeline);
+		}
+		}
+		}
+		}
+		}
+		}
+		}
+		}
+		}
+		}
+		}
+		}
 	}
 
 	void commandbuffer_flush_compute_pipeline(struct CommandBuffer *self)
@@ -15343,7 +15425,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			if (gpu_count == 0)
 				return false;
 
-			VkPhysicalDevice *gpus = (VkPhysicalDevice *)malloc(gpu_count * sizeof(VkPhysicalDevice));
+			{ VkPhysicalDevice *gpus = (VkPhysicalDevice *)malloc(gpu_count * sizeof(VkPhysicalDevice));
 			if (vkEnumeratePhysicalDevices(self->instance, &gpu_count, gpus) != VK_SUCCESS)
 			{
 				LOGE("vkEnumeratePhysicalDevices failed.\n");
@@ -15378,17 +15460,18 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				gpu = gpus[0];
 			free(gpus);
 			}
+			}
 		}
 
-		uint32_t ext_count = 0;
+		{ uint32_t ext_count = 0;
 		vkEnumerateDeviceExtensionProperties(gpu, NULL, &ext_count, NULL);
-		VkExtensionProperties *queried_extensions = (VkExtensionProperties *)malloc((ext_count ? ext_count : 1) * sizeof(VkExtensionProperties));
+		{ VkExtensionProperties *queried_extensions = (VkExtensionProperties *)malloc((ext_count ? ext_count : 1) * sizeof(VkExtensionProperties));
 		if (ext_count)
 			vkEnumerateDeviceExtensionProperties(gpu, NULL, &ext_count, queried_extensions);
 
-		uint32_t layer_count = 0;
+		{ uint32_t layer_count = 0;
 		vkEnumerateDeviceLayerProperties(gpu, &layer_count, NULL);
-		VkLayerProperties *queried_layers = (VkLayerProperties *)malloc((layer_count ? layer_count : 1) * sizeof(VkLayerProperties));
+		{ VkLayerProperties *queried_layers = (VkLayerProperties *)malloc((layer_count ? layer_count : 1) * sizeof(VkLayerProperties));
 		if (layer_count)
 			vkEnumerateDeviceLayerProperties(gpu, &layer_count, queried_layers);
 
@@ -15412,7 +15495,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			LOGI("GPU supports Vulkan 1.0.\n");
 
 		vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, NULL);
-		VkQueueFamilyProperties *queue_props = (VkQueueFamilyProperties *)malloc((queue_count ? queue_count : 1) * sizeof(VkQueueFamilyProperties));
+		{ VkQueueFamilyProperties *queue_props = (VkQueueFamilyProperties *)malloc((queue_count ? queue_count : 1) * sizeof(VkQueueFamilyProperties));
 		vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_count, queue_props);
 
 		{ unsigned i; for (i = 0; i < queue_count; i++) {
@@ -15420,11 +15503,12 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			if (surface != VK_NULL_HANDLE)
 				vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &supported);
 
-			static const VkQueueFlags required = VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT;
+			{ static const VkQueueFlags required = VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT;
 			if (supported && ((queue_props[i].queueFlags & required) == required))
 			{
 				self->graphics_queue_family = i;
 				break;
+			}
 			}
 		} }
 
@@ -15462,7 +15546,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		{ free(queried_extensions); free(queried_layers); free(queue_props); return false; }
 
 		universal_queue_index = 1;
-		uint32_t graphics_queue_index = 0;
+		{ uint32_t graphics_queue_index = 0;
 		uint32_t compute_queue_index = 0;
 		uint32_t transfer_queue_index = 0;
 
@@ -15482,7 +15566,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		else if (self->transfer_queue_family == self->compute_queue_family)
 			transfer_queue_index = min_(queue_props[self->compute_queue_family].queueCount - 1, 1u);
 
-		static const float graphics_queue_prio = 0.5f;
+		{ static const float graphics_queue_prio = 0.5f;
 		static const float compute_queue_prio = 1.0f;
 		static const float transfer_queue_prio = 1.0f;
 		float prio[3] = { graphics_queue_prio, compute_queue_prio, transfer_queue_prio };
@@ -15564,7 +15648,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			self->ext.supports_external = false;
 #endif
 
-		VkPhysicalDeviceFeatures2KHR features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR };
+		{ VkPhysicalDeviceFeatures2KHR features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR };
 
 		if (has_vk_extension(queried_extensions, ext_count, VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME))
 			enabled_extensions[enabled_extensions_count++] = (VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
@@ -15638,6 +15722,14 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		vkGetDeviceQueue(self->device, self->transfer_queue_family, transfer_queue_index, &self->transfer_queue);
 
 		return true;
+		}
+		}
+		}
+		}
+		}
+		}
+		}
+		}
 		}
 	}
 
@@ -15914,7 +16006,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				}
 				}
 
-				uint32_t active_binds =
+				{ uint32_t active_binds =
 					shader_layout->sets[set].sampled_image_mask |
 					shader_layout->sets[set].storage_image_mask |
 					shader_layout->sets[set].uniform_buffer_mask|
@@ -15930,6 +16022,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				{ uint32_t _feit, bit; FOR_EACH_BIT(active_binds, _feit, bit)
 				{
 					layout.stages_for_bindings[set][bit] |= stage_mask;
+				}
 				}
 				}
 			} }
@@ -15953,11 +16046,12 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 				layout.descriptor_set_mask |= 1u << i;
 		} }
 
-		Hasher h; hasher_init(&h);
+		{ Hasher h; hasher_init(&h);
 		hasher_u32(&h, layout.push_constant_range.stageFlags);
 		hasher_u32(&h, layout.push_constant_range.size);
 		layout.push_constant_layout_hash = hasher_get(&h);
 		program_set_pipeline_layout(program, device_request_pipeline_layout(self, &layout));
+		}
 	}
 
 	void device_set_context(Device *self, const Context *context){
@@ -16357,7 +16451,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		if (type != Type_AsyncTransfer)
 			device_flush_frame_queue(self, Type_AsyncTransfer);
 
-		QueueData *data = device_get_queue_data(self, type);
+		{ QueueData *data = device_get_queue_data(self, type);
 		CommandBufferHandleVec *submissions = device_get_queue_submissions(self, type);
 
 		if (cbhvec_empty(submissions))
@@ -16367,7 +16461,7 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			return;
 		}
 
-		CommandBufferVec cmds = { NULL, 0, 0 };
+		{ CommandBufferVec cmds = { NULL, 0, 0 };
 
 		VkSubmitInfoVec submits = { NULL, 0, 0 };
 		size_t last_cmd = 0;
@@ -16408,12 +16502,13 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 			memset(&zero_submit, 0, sizeof(zero_submit));
 			VkSubmitInfoVec_push(&submits, &zero_submit);
 
-			VkSubmitInfo *submit = VkSubmitInfoVec_back(&submits);
+			{ VkSubmitInfo *submit = VkSubmitInfoVec_back(&submits);
 			submit->sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submit->pNext = NULL;
 			submit->commandBufferCount = CommandBufferVec_size(&cmds) - last_cmd;
 			submit->pCommandBuffers = CommandBufferVec_data(&cmds) + last_cmd;
 			last_cmd = CommandBufferVec_size(&cmds);
+			}
 		}
 
 		cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
@@ -16486,6 +16581,8 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		}
 		else
 			data->need_fence = true;
+		}
+		}
 	}
 
 	void device_sync_buffer_blocks(Device *self){
@@ -16618,8 +16715,8 @@ void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 		info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		vkBeginCommandBuffer(cmd, &info);
 		device_add_frame_counter_nolock(self);
-		_cb = (struct CommandBuffer *)object_pool_raw_allocate(&self->handle_pool.command_buffers); commandbuffer_init(_cb, self, cmd, type); CommandBufferHandle handle = cbh_make(_cb);
-		return handle;
+		_cb = (struct CommandBuffer *)object_pool_raw_allocate(&self->handle_pool.command_buffers); commandbuffer_init(_cb, self, cmd, type);
+		return cbh_make(_cb);
 	}
 
 	void device_init_frame_contexts(Device *self, unsigned count){
@@ -17133,7 +17230,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			return false;
 		}
 
-		VkImageViewCreateInfo default_view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+		{ VkImageViewCreateInfo default_view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
 		if (!view_info)
 		{
 			default_view_info.image = self->image;
@@ -17158,6 +17255,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			return false;
 
 		return true;
+		}
 	}
 
 	static bool image_resource_holder_create_render_target_views(struct ImageResourceHolder *self, const ImageCreateInfo *image_create_info, const VkImageViewCreateInfo *info)
@@ -17269,6 +17367,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		ImageViewCreateInfo tmp;
 		unsigned num_layers;
 		struct ImageView * _iv;
+		ImageViewHandle ret;
 		ImageResourceHolder holder;
 		image_resource_holder_init(&holder, self->device);
 		{ const ImageCreateInfo *image_create_info = image_get_create_info(create_info->image);
@@ -17286,7 +17385,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		view_info.subresourceRange.layerCount = create_info->layers;
 		view_info.viewType = get_image_view_type(image_create_info, create_info);
 
-		unsigned num_levels;
+		{ unsigned num_levels;
 		if (view_info.subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS)
 			num_levels = image_get_create_info(create_info->image)->levels - view_info.subresourceRange.baseMipLevel;
 		else
@@ -17308,7 +17407,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		tmp = *create_info;
 		tmp.format = format;
-		_iv = (struct ImageView *)object_pool_raw_allocate(&self->handle_pool.image_views); imageview_init(_iv, self, holder.image_view, &tmp); ImageViewHandle ret = iv_make(_iv);
+		_iv = (struct ImageView *)object_pool_raw_allocate(&self->handle_pool.image_views); imageview_init(_iv, self, holder.image_view, &tmp);
+		ret = iv_make(_iv);
 		if (iv_is_valid(&ret))
 		{
 			holder.owned = false;
@@ -17322,6 +17422,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		{
 			image_resource_holder_fini(&holder);
 			return iv_make(NULL);
+		}
 		}
 		}
 	}
@@ -17358,7 +17459,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				{ InitialImageBuffer _empty; memset(&_empty, 0, sizeof(_empty)); return _empty; }
 		}
 
-		BufferCreateInfo buffer_info = {};
+		{ BufferCreateInfo buffer_info = {};
 		buffer_info.domain = BufferDomain_Host;
 		buffer_info.size = tfl_get_required_size(&layout);
 		buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
@@ -17396,6 +17497,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		device_unmap_host_buffer(self, bh_get(&result.buffer), MEMORY_ACCESS_WRITE_BIT);
 		tfl_build_buffer_image_copies(&layout, result.blits, &result.num_blits);
 		return result;
+		}
 	}
 
 	ImageHandle device_create_image(Device *self, const ImageCreateInfo *create_info, const ImageInitialData *initial){
@@ -17416,11 +17518,12 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			const InitialImageBuffer *staging_buffer){
 				ImageCreateInfo tmpinfo;
 				struct Image * _im;
+				ImageHandle handle;
 		ImageResourceHolder holder;
 		VkMemoryRequirements reqs;
 		image_resource_holder_init(&holder, self->device);
 
-		VkImageCreateInfo info = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+		{ VkImageCreateInfo info = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 		info.format = create_info->format;
 		info.extent.width = create_info->width;
 		info.extent.height = create_info->height;
@@ -17463,7 +17566,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		}
 
 		vkGetImageMemoryRequirements(self->device, holder.image, &reqs);
-		uint32_t memory_type = device_find_memory_type_image(self, create_info->domain, reqs.memoryTypeBits);
+		{ uint32_t memory_type = device_find_memory_type_image(self, create_info->domain, reqs.memoryTypeBits);
 		if (memory_type == UINT32_MAX)
 		{
 			image_resource_holder_fini(&holder);
@@ -17490,7 +17593,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		tmpinfo.usage = info.usage;
 		tmpinfo.levels = info.mipLevels;
 
-		bool has_view = (info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+		{ bool has_view = (info.usage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) != 0;
 		if (has_view)
 		{
@@ -17501,7 +17604,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			}
 		}
 
-		_im = (struct Image *)object_pool_raw_allocate(&self->handle_pool.images); image_init(_im, self, holder.image, holder.image_view, &holder.allocation, &tmpinfo); ImageHandle handle = ih_make(_im);
+		_im = (struct Image *)object_pool_raw_allocate(&self->handle_pool.images); image_init(_im, self, holder.image, holder.image_view, &holder.allocation, &tmpinfo);
+		handle = ih_make(_im);
 		if (ih_is_valid(&handle))
 		{
 			holder.owned = false;
@@ -17524,7 +17628,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			bool share_async_graphics;
 			VK_ASSERT(create_info->domain != ImageDomain_Transient);
 			VK_ASSERT(create_info->initial_layout != VK_IMAGE_LAYOUT_UNDEFINED);
-			bool generate_mips = (create_info->misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
+			{ bool generate_mips = (create_info->misc & IMAGE_MISC_GENERATE_MIPS_BIT) != 0;
 
 			// If self->graphics_queue != self->transfer_queue, we will use a semaphore, so no srcAccess mask is necessary.
 			VkAccessFlags final_transition_src_access = 0;
@@ -17534,7 +17638,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				final_transition_src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
 
 			prepare_src_access = self->graphics_queue == self->transfer_queue ? VK_ACCESS_TRANSFER_WRITE_BIT : 0;
-			bool need_mipmap_barrier = true;
+			{ bool need_mipmap_barrier = true;
 			bool need_initial_barrier = true;
 
 			// Now we've used the TRANSFER queue to copy data over to the GPU.
@@ -17573,7 +17677,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					VkImageMemoryBarrier acquire;
 					need_mipmap_barrier = false;
 
-					VkImageMemoryBarrier release = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+					{ VkImageMemoryBarrier release = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
 					release.image = image_get_image(ih_get(&handle));
 					release.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 					release.dstAccessMask = 0;
@@ -17611,12 +17715,14 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 					commandbuffer_barrier(cbh_get(&graphics_cmd), dst_stages,
 							dst_stages,
 							0, NULL, 0, NULL, 1, &acquire);
+					}
 				}
 
-				Semaphore sem; sem.data = NULL;
+				{ Semaphore sem; sem.data = NULL;
 				device_submit(self, &transfer_cmd, NULL, 1, &sem);
 				device_add_wait_semaphore_nolock(self, Type_Generic, sem, dst_stages, true);
 				sem_reset(&sem);
+				}
 			}
 
 			if (generate_mips)
@@ -17656,6 +17762,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			}
 			else
 				device_submit(self, &graphics_cmd, NULL, 0, NULL);
+			}
+			}
 		}
 		else if (create_info->initial_layout != VK_IMAGE_LAYOUT_UNDEFINED)
 		{
@@ -17671,6 +17779,9 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		}
 
 		return handle;
+		}
+		}
+		}
 	}
 
 	static VkSamplerCreateInfo fill_vk_sampler_info(const SamplerCreateInfo *sampler_info)
@@ -17710,6 +17821,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		BufferCreateInfo tmpinfo;
 		uint32_t sharing_indices[3];
 		struct Buffer * _b;
+		BufferHandle handle;
 		VkBuffer buffer;
 		VkMemoryRequirements reqs;
 		DeviceAllocation allocation;
@@ -17745,7 +17857,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		vkGetBufferMemoryRequirements(self->device, buffer, &reqs);
 
-		uint32_t memory_type = device_find_memory_type_buffer(self, create_info->domain, reqs.memoryTypeBits);
+		{ uint32_t memory_type = device_find_memory_type_buffer(self, create_info->domain, reqs.memoryTypeBits);
 		if (memory_type == UINT32_MAX)
 		{
 			vkDestroyBuffer(self->device, buffer, NULL);
@@ -17767,7 +17879,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		tmpinfo = *create_info;
 		tmpinfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		_b = (struct Buffer *)object_pool_raw_allocate(&self->handle_pool.buffers); buffer_init(_b, self, buffer, &allocation, &tmpinfo); BufferHandle handle = bh_make(_b);
+		_b = (struct Buffer *)object_pool_raw_allocate(&self->handle_pool.buffers); buffer_init(_b, self, buffer, &allocation, &tmpinfo);
+		handle = bh_make(_b);
 
 		if (create_info->domain == BufferDomain_Device && initial && !device_memory_type_is_host_visible(self, memory_type))
 		{
@@ -17800,6 +17913,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			deviceallocator_unmap_memory(&self->managers.memory, &allocation, MEMORY_ACCESS_WRITE_BIT);
 		}
 		return handle;
+		}
 	}
 
 	bool device_get_image_format_properties(Device *self, VkFormat format, VkImageType type, VkImageTiling tiling,
@@ -17834,7 +17948,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		VkFormat formats[VULKAN_NUM_ATTACHMENTS];
 		Hash hash;
 		Hasher h; hasher_init(&h);
-		VkFormat depth_stencil;
+		{ VkFormat depth_stencil;
 		uint32_t lazy = 0;
 		uint32_t optimal = 0;
 
@@ -17890,6 +18004,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		if (!ret)
 			ret = render_pass_map_emplace_yield(&self->render_passes, hash, self, info);
 		return ret;
+		}
 	}
 
 	void device_set_name_buffer(Device *self, const Buffer *buffer, const char *name)
@@ -17932,10 +18047,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		xbegin = rect->x / BLOCK_WIDTH;
 		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
-		unsigned ybegin = rect->y / BLOCK_HEIGHT;
+		{ unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
 			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED; } }
+		}
 	}
 
 	static bool fbatlas_texture_rendered(FBAtlas *self, const Rect *rect)
@@ -17947,13 +18063,14 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		xbegin = rect->x / BLOCK_WIDTH;
 		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
-		unsigned ybegin = rect->y / BLOCK_HEIGHT;
+		{ unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
 			{ unsigned x; for (x = xbegin; x <= xend; x++)
 				if ((*fbatlas_info(self, x, y)) & STATUS_TEXTURE_RENDERED)
 					return true; } }
 		return false;
+		}
 	}
 
 	static Domain fbatlas_blit_vram(FBAtlas *self, const Rect *dst, const Rect *src)
@@ -17969,7 +18086,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		dst_xbegin = dst->x / BLOCK_WIDTH;
 		dst_xend = (dst->x + dst->width - 1) / BLOCK_WIDTH;
-		unsigned dst_ybegin = dst->y / BLOCK_HEIGHT;
+		{ unsigned dst_ybegin = dst->y / BLOCK_HEIGHT;
 		unsigned dst_yend = (dst->y + dst->height - 1) / BLOCK_HEIGHT;
 
 		unsigned src_xbegin = src->x / BLOCK_WIDTH;
@@ -17992,6 +18109,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		}
 
 		return domain;
+		}
 	}
 
 	static void fbatlas_read_fragment(FBAtlas *self, Domain domain, const Rect *rect)
@@ -18021,7 +18139,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		//Domain domain = palette ? Domain_Unscaled : fbatlas_find_suitable_domain(self, shifted);
 		fbatlas_sync_domain(self, domain, &shifted);
 
-		Rect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
+		{ Rect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
 			self->renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
 
 		if (palette)
@@ -18030,6 +18148,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		fbatlas_read_domain(self, domain, Stage_FragmentTexture, &shifted);
 		if (palette)
 			fbatlas_read_domain(self, domain, Stage_FragmentTexture, &palette_rect);
+		}
 	}
 
 	static bool fbatlas_write_domain(FBAtlas *self, Domain domain, Stage stage, const Rect *rect)
@@ -18041,7 +18160,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		xbegin = rect->x / BLOCK_WIDTH;
 		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
-		unsigned ybegin = rect->y / BLOCK_HEIGHT;
+		{ unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 
 		unsigned write_domains = 0;
@@ -18097,6 +18216,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) = ((*fbatlas_info(self, x, y)) & ~STATUS_OWNERSHIP_MASK) | resolve_domains; } }
 
 		return (write_domains & STATUS_FRAGMENT_SFB_READ) != 0;
+		}
 	}
 
 	static void fbatlas_read_domain(FBAtlas *self, Domain domain, Stage stage, const Rect *rect)
@@ -18108,7 +18228,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		xbegin = rect->x / BLOCK_WIDTH;
 		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
-		unsigned ybegin = rect->y / BLOCK_HEIGHT;
+		{ unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 
 		unsigned write_domains = 0;
@@ -18159,6 +18279,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
 			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) |= resolve_domains; } }
+		}
 	}
 
 	static void fbatlas_sync_domain(FBAtlas *self, Domain domain, const Rect *rect)
@@ -18170,7 +18291,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			fbatlas_flush_render_pass(self);
 
 		xbegin = rect->x / BLOCK_WIDTH;
-		unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
+		{ unsigned xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
 		unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 
@@ -18192,7 +18313,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		// For scaled domain,
 		// we need to blit from unscaled domain to scaled.
-		unsigned hazard_domains;
+		{ unsigned hazard_domains;
 		unsigned resolve_domains;
 		if (domain == Domain_Scaled)
 		{
@@ -18239,6 +18360,8 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 				}
 			} }
 		} }
+		}
+		}
 	}
 
 	static Domain fbatlas_find_suitable_domain(FBAtlas *self, const Rect *rect)
@@ -18250,7 +18373,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		xbegin = rect->x / BLOCK_WIDTH;
 		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
-		unsigned ybegin = rect->y / BLOCK_HEIGHT;
+		{ unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 
 		{ unsigned y; for (y = ybegin; y <= yend; y++) {
@@ -18261,6 +18384,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 			} }
 		} }
 		return Domain_Scaled;
+		}
 	}
 
 	static bool fbatlas_inside_render_pass(FBAtlas *self, const Rect *rect)
@@ -18272,7 +18396,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		xbegin = rect->x & ~(BLOCK_WIDTH - 1);
 		ybegin = rect->y & ~(BLOCK_HEIGHT - 1);
-		unsigned xend = ((rect->x + rect->width - 1) | (BLOCK_WIDTH - 1)) + 1;
+		{ unsigned xend = ((rect->x + rect->width - 1) | (BLOCK_WIDTH - 1)) + 1;
 		unsigned yend = ((rect->y + rect->height - 1) | (BLOCK_HEIGHT - 1)) + 1;
 
 		unsigned rpx2 = self->renderpass.rect.x + self->renderpass.rect.width;
@@ -18283,6 +18407,7 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 		unsigned y1 = (rpy2 < yend) ? rpy2 : yend;
 
 		return x1 > x0 && y1 > y0;
+		}
 	}
 
 	static void fbatlas_flush_render_pass(FBAtlas *self)
@@ -18306,10 +18431,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		xbegin = rect->x / BLOCK_WIDTH;
 		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
-		unsigned ybegin = rect->y / BLOCK_HEIGHT;
+		{ unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
 			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) |= STATUS_TEXTURE_RENDERED; } }
+		}
 		}
 	}
 
@@ -18415,10 +18541,11 @@ void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 		xbegin = rect->x / BLOCK_WIDTH;
 		xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
-		unsigned ybegin = rect->y / BLOCK_HEIGHT;
+		{ unsigned ybegin = rect->y / BLOCK_HEIGHT;
 		unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
 		{ unsigned y; for (y = ybegin; y <= yend; y++)
 			{ unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) &= ~STATUS_TEXTURE_RENDERED; } }
+		}
 	}
 
 	static void fbatlas_discard_render_pass(FBAtlas *self)
@@ -18605,10 +18732,11 @@ bool write_image(const char *path, int width, int height, const void *data) {
             RETRO_VFS_FILE_ACCESS_HINT_NONE);
     if (!f)
         return false;
-    int ok = stbi_write_png_to_func(rhi_stbi_vfs_write, f,
+    { int ok = stbi_write_png_to_func(rhi_stbi_vfs_write, f,
                                     width, height, 4, data, 4 * width);
     filestream_close(f);
     return ok != 0;
+    }
 }
 
 /* === dbg_input_callback.h (extern, defined in libretro.c) === */
@@ -18942,12 +19070,12 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 				return; // Early out
 		}
 
-		size_t plen;
+		{ size_t plen;
 		dump_path(path, sizeof(path));
 		plen = strlen(path);
 		snprintf(path + plen, sizeof(path) - plen, "%x", (unsigned)hash);
 
-		uint16_t *palette = NULL;
+		{ uint16_t *palette = NULL;
 		if (mode->mode == TextureMode_Palette4bpp || mode->mode == TextureMode_Palette8bpp) {
 			Rect palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
 			Palette p = texture_tracker_get_palette(self, palette_rect);
@@ -18968,7 +19096,7 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 
 		ppp = 1 << shift;
 		bpp = 16 >> shift;
-		int mask = (1 << bpp) - 1;
+		{ int mask = (1 << bpp) - 1;
 		/* Output is exactly 4 bytes per (subpixel) = image.size() * ppp * 4. */
 		img_count = (size_t)upload->image_count;
 		bytes_len = img_count * (size_t)ppp * 4u;
@@ -18998,7 +19126,7 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 						}
 						r = ((abgr1555 >> 0) & 0x1f) * 255.0 / 31.0;
 						g = ((abgr1555 >> 5) & 0x1f) * 255.0 / 31.0;
-						int b = ((abgr1555 >> 10) & 0x1f) * 255.0 / 31.0;
+						{ int b = ((abgr1555 >> 10) & 0x1f) * 255.0 / 31.0;
 						int a = (abgr1555 >> 15) * 255.0;
 						// Convert psx to tri
 						if (a == 0) {
@@ -19017,6 +19145,7 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 						bytes[bi++] = (uint8_t)g;
 						bytes[bi++] = (uint8_t)b;
 						bytes[bi++] = (uint8_t)a;
+						}
 					}
 				}
 			}
@@ -19044,6 +19173,9 @@ uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 			io_channel_push_request(self->iothread.channel, dump);
 			slock_unlock(self->iothread.channel->lock);
 			scond_signal(self->iothread.channel->cond);
+		}
+		}
+		}
 		}
 	}
 
@@ -19156,7 +19288,7 @@ Rect fromSRect(SRect rect) {
 	Palette texture_tracker_get_palette(struct TextureTracker *self, Rect palette_rect) {
 		assert(palette_rect.height == 1);
 
-		static RectIndexSet overlap = { NULL, 0, 0 };
+		{ static RectIndexSet overlap = { NULL, 0, 0 };
 		rect_tracker_overlapping(&self->tracker, palette_rect, &overlap);
 		{ int oi; for (oi = 0; oi < overlap.count; oi++) {
 			RectIndex index = overlap.items[oi];
@@ -19169,13 +19301,15 @@ Rect fromSRect(SRect rect) {
 				}
 				x = palette_rect.x - other->texture_rect.vram_rect.x;
 				y = palette_rect.y - other->texture_rect.vram_rect.y;
-				int offset = y * other->texture_rect.vram_rect.width + x;
+				{ int offset = y * other->texture_rect.vram_rect.width + x;
 				uint16_t *data = other->texture_rect.upload->image + offset;
 				uint32_t hash = crc32(0, (unsigned char*)data, palette_rect.width * sizeof(uint16_t));
 				{ Palette _p; _p.data = data; _p.hash = hash; return _p; }
+				}
 			}
 		} }
 		{ Palette _p; _p.data = NULL; _p.hash = 0; return _p; }
+		}
 	}
 
 	uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, Rect palette_rect) {
@@ -19294,8 +19428,9 @@ Rect fromSRect(SRect rect) {
 			TextureRectResult r = { subTexture(*t, intersection.rect), true };
 			return r;
 		}
-		TextureRectResult r = { make_texture_rect(NULL, 0, 0, make_srect(0, 0, 1, 1)), false };
+		{ TextureRectResult r = { make_texture_rect(NULL, 0, 0, make_srect(0, 0, 1, 1)), false };
 		return r;
+		}
 	}
 
 	void texture_tracker_notifyReadback(struct TextureTracker *self, Rect rect, uint16_t *vram) {
@@ -19320,7 +19455,7 @@ Rect fromSRect(SRect rect) {
 				i++;
 		} }
 
-		static RectIndexSet overlap = { NULL, 0, 0 };
+		{ static RectIndexSet overlap = { NULL, 0, 0 };
 
 		OwnedRectVec to_restore;
 		rect_tracker_overlapping(&self->tracker, rect, &overlap);
@@ -19343,6 +19478,7 @@ Rect fromSRect(SRect rect) {
 		ownedrects_move(&rr.to_restore, &to_restore);
 		rrvec_push(&self->restorable_rects, &rr);
 		restorablerect_destroy(&rr);
+		}
 	}
 
 	void texture_tracker_upload(struct TextureTracker *self, Rect rect, uint16_t *vram) {
@@ -19363,7 +19499,7 @@ Rect fromSRect(SRect rect) {
 		}
 
 		upload = NULL;
-		bool preexisting = false;
+		{ bool preexisting = false;
 		{
 			uint32_t hash;
 			unsigned x = rect.x,
@@ -19451,6 +19587,7 @@ Rect fromSRect(SRect rect) {
 			}
 		}
 		texture_upload_release(upload); /* drop the local ref; rects hold their own */
+		}
 	}
 
 	void texture_tracker_load_hd_texture(struct TextureTracker *self, uint32_t hash) {
@@ -19520,7 +19657,7 @@ Rect fromSRect(SRect rect) {
 		if (hd_tex_map_contains(&upload->textures, palette_hash))
 			return; // already attached to this upload
 
-		HdTextureId current = { upload->hash, palette_hash };
+		{ HdTextureId current = { upload->hash, palette_hash };
 
 		// GPU-cache hit: the Vulkan image already exists, so binding it is just a
 		// ref-counted handle copy (no Vulkan commands). Bind it IMMEDIATELY so the
@@ -19541,6 +19678,7 @@ Rect fromSRect(SRect rect) {
 			hd_key_set_insert(&self->pending_attach, hd_pack_key(current));
 		else
 			texture_tracker_want_combo(self, current);            // queue a single disk load for the drawn combo
+		}
 	}
 
 	void output_rect_json(RFILE *stream, Rect *rect) {
@@ -19627,7 +19765,7 @@ Rect fromSRect(SRect rect) {
 
 		// TODO: I'm pretty sure this doesn't handle TextureMode_ABGR1555
 
-		uint32_t palette_hash = 0;
+		{ uint32_t palette_hash = 0;
 		(*cache_hit) = false;
 		if (self->hd_textures_enabled || self->dump_enabled) {
 			if (mode->mode == TextureMode_Palette8bpp || mode->mode == TextureMode_Palette4bpp) {
@@ -19649,7 +19787,7 @@ Rect fromSRect(SRect rect) {
 			}
 		}
 
-		static RectIndexSet overlap = { NULL, 0, 0 };
+		{ static RectIndexSet overlap = { NULL, 0, 0 };
 		rect_tracker_overlapping(&self->tracker, rect, &overlap);
 
 		// Dump texture
@@ -19712,6 +19850,8 @@ Rect fromSRect(SRect rect) {
 		if (!hd_handle_is_none(&result))
 			handle_lru_cache_insert(&self->handle_cache, result_rect, palette_hash, result);
 		return result;
+		}
+		}
 	}
 
 	HdTexture texture_tracker_get_hd_texture(struct TextureTracker *self, HdTextureHandle handle)
@@ -19737,7 +19877,7 @@ Rect fromSRect(SRect rect) {
 					return _r;
 				}
 			}
-			TextureUpload *upload = tex->upload;
+			{ TextureUpload *upload = tex->upload;
 			// Use find rather than index, because if a stale HdTextureHandle was provided this could segfault
 			// because indexing on a key that isn't present would initialize a new one with a null pointer
 			HdTexEntry *iter = hd_tex_map_find(&upload->textures, handle.palette_hash);
@@ -19756,7 +19896,7 @@ Rect fromSRect(SRect rect) {
 			image_add_reference(iter->image);
 			image = ih_make(iter->image);
 			scaleX = image_get_width(ih_get(&image), 0) / upload->width;
-			int scaleY = image_get_height(ih_get(&image), 0) / upload->height;
+			{ int scaleY = image_get_height(ih_get(&image), 0) / upload->height;
 			SRect texture_subrect = texture_rect_subrect(tex);
 			{
 				HdTexture _r;
@@ -19773,6 +19913,8 @@ Rect fromSRect(SRect rect) {
 				 * copy-into-return / local-dtor pair netted out. */
 				_r.texture = image;
 				return _r;
+			}
+			}
 			}
 		}
 		else
@@ -19792,7 +19934,7 @@ bool is_power_of_two(int n) {
 		// Poll HD uploads
 
 		slock_lock(self->iothread.channel->lock);
-		IOResponse *responses = io_channel_take_responses(self->iothread.channel); // steal the list
+		{ IOResponse *responses = io_channel_take_responses(self->iothread.channel); // steal the list
 		slock_unlock(self->iothread.channel->lock);
 
 		// Move freshly decoded images into the cache (decode-once); mark them for
@@ -19827,14 +19969,14 @@ bool is_power_of_two(int n) {
 				HdTextureId id;
 				id.hash = (uint32_t)(self->pending_attach.keys[pi] >> 32);
 				id.palette_hash = (uint32_t)self->pending_attach.keys[pi];
-				TextureUpload *upload = texture_tracker_find_upload(self, id.hash); /* borrowed */
+				{ TextureUpload *upload = texture_tracker_find_upload(self, id.hash); /* borrowed */
 				if (upload == NULL)
 					continue; // not resident yet; kept in cache
 				if (hd_tex_map_contains(&upload->textures, id.palette_hash))
 					continue; // already attached
 
 				// Tier 1: ready-to-bind GPU image - just copy the handle.
-				CachedGpuImage *gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(id));
+				{ CachedGpuImage *gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(id));
 				if (gpu != NULL) {
 					hd_tex_map_set(&upload->textures, id.palette_hash, gpu->image, gpu->alpha_flags);
 					self->dbg_attaches++;
@@ -19848,7 +19990,7 @@ bool is_power_of_two(int n) {
 				}
 
 				// Tier 2: decoded CPU levels - upload to GPU, then cache the image.
-				CachedHdImage *cached = HdImageCache_get(&self->hd_cache, hd_pack_key(id));
+				{ CachedHdImage *cached = HdImageCache_get(&self->hd_cache, hd_pack_key(id));
 				if (cached == NULL)
 					continue; // evicted from both caches; will be re-self->requested on draw
 
@@ -19876,12 +20018,16 @@ bool is_power_of_two(int n) {
 					HdImageCache_erase(&self->hd_cache, hd_pack_key(id));    // don't keep a bad-sized image around
 					hd_key_set_insert(&self->requested, hd_pack_key(id));  // negatively cache so we don't reload + re-warn every self->frame
 				}
+				}
+				}
+				}
 			}
 		}
 		hd_key_set_clear(&self->pending_attach);
 
 		fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self->uploader);
 		fused_pages_remove_dead(&self->fused_pages);
+		}
 	}
 	TextureUpload *texture_tracker_find_upload(struct TextureTracker *self, uint32_t hash) {
 		TextureUpload *upload = rect_tracker_find_upload(&self->tracker, hash); /* borrowed */
@@ -19989,7 +20135,7 @@ bool is_power_of_two(int n) {
 	void texture_tracker_set_texture_uploader(struct TextureTracker *self, Renderer *t) {
 		LoadedLevels default_levels;
 		self->uploader = t;
-		LoadedImage default_image;
+		{ LoadedImage default_image;
 		loaded_levels_init(&default_levels);
 		loaded_image_init(&default_image);
 		loaded_image_alloc(&default_image, 1, 1);
@@ -20000,6 +20146,7 @@ bool is_power_of_two(int n) {
 		loaded_levels_push_move(&default_levels, &default_image);
 
 		ih_move(&self->default_hd_texture, renderer_upload_texture(self->uploader, &default_levels));
+		}
 	}
 
 	void texture_tracker_reload_textures_from_disk(struct TextureTracker *self) {
@@ -20439,7 +20586,7 @@ int64_t page_bytes(FusionRects *fusion)
 		cmd = renderer_command_buffer_hack_fixme(uploader);
 
 		texture_width = page->fusion.vram_rect.width * page->fusion.scaleX;
-		int texture_height = page->fusion.vram_rect.height * page->fusion.scaleY;
+		{ int texture_height = page->fusion.vram_rect.height * page->fusion.scaleY;
 
 		// TODO: I don't know SHIT about barriers.
 
@@ -20477,7 +20624,7 @@ int64_t page_bytes(FusionRects *fusion)
 
 			image = hd_texture->image;
 
-			int srcWidth = image_get_width(image, 0);
+			{ int srcWidth = image_get_width(image, 0);
 			int srcHeight = image_get_height(image, 0);
 
 			int sx = srcWidth / upload->width;
@@ -20544,6 +20691,7 @@ int64_t page_bytes(FusionRects *fusion)
 					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 					0
 					);
+			}
 		}
 		}
 
@@ -20558,6 +20706,7 @@ int64_t page_bytes(FusionRects *fusion)
 				page->fusion.vram_rect.width * page->fusion.scaleX, page->fusion.vram_rect.height * page->fusion.scaleY,
 				page_bytes(&page->fusion), page_bytes(&page->fusion) / 1048576.0
 			      );
+		}
 	}
 
 	HdTexture fused_pages_get_from_handle(struct FusedPages *self, HdTextureHandle handle, ImageHandle *default_hd_texture) {
@@ -20749,8 +20898,9 @@ int64_t page_bytes(FusionRects *fusion)
 		{ int e; for (e = 0; e < state->uploads.count; e++) {
 			TextureUpload *ptr = texture_upload_new(); /* owns +1 */
 			texture_upload_copy_contents(ptr, state->uploads.items[e].val); /* deep-copy contents (refcount untouched) */
-			UploadPtrEntry pe = { state->uploads.items[e].key, ptr };
+			{ UploadPtrEntry pe = { state->uploads.items[e].key, ptr };
 			UploadPtrVec_push(&uploads, &pe);
+			}
 		} }
 
 		{ Rect _crr; _crr.x = 0; _crr.y = 0; _crr.width = FB_WIDTH; _crr.height = FB_HEIGHT; texture_tracker_clearRegion(self, _crr); }
@@ -21149,7 +21299,7 @@ bool rhi_vulkan_open(bool is_pal)
    if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
       return false;
 
-   static const struct retro_hw_render_context_negotiation_interface_vulkan iface = {
+   { static const struct retro_hw_render_context_negotiation_interface_vulkan iface = {
       RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN,
       RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN_VERSION,
 
@@ -21161,6 +21311,7 @@ bool rhi_vulkan_open(bool is_pal)
    environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE, (void*)&iface);
 
    return true;
+   }
 }
 
 void rhi_vulkan_set_environment(retro_environment_t cb)
@@ -21216,7 +21367,7 @@ void rhi_vulkan_refresh_variables(void)
 
    old_scaling = scaling;
    old_msaa = msaa;
-   bool old_super_sampling = super_sampling;
+   { bool old_super_sampling = super_sampling;
    bool old_show_vram = show_vram;
    int old_crop_overscan = vulkan_crop_overscan;
    unsigned old_image_crop = image_crop;
@@ -21503,6 +21654,7 @@ void rhi_vulkan_refresh_variables(void)
          scaling = old_scaling;
       }
    }
+   }
 }
 
 static void ensure_sync_index_resources(void)
@@ -21595,7 +21747,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    scanout = show_vram ? renderer_scanout_vram_to_texture(renderer, true) : renderer_scanout_to_texture(renderer);
    index = vulkan->get_sync_index(vulkan->handle);
 
-   struct retro_vulkan_image *image                          = &swapchain_images.items[index];
+   { struct retro_vulkan_image *image                          = &swapchain_images.items[index];
 
    image->create_info.sType                           = 
       VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -21626,6 +21778,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
 
    prev_frame_width = image_get_width(ih_get(&scanout), 0);
    prev_frame_height = image_get_height(ih_get(&scanout), 0);
+   }
 }
 
 /* Draw commands */
@@ -21784,13 +21937,14 @@ void rhi_vulkan_push_triangle(
 
    renderer_set_primitive_type(renderer, PrimitiveType_Polygon);
 
-   Vertex vertices[3] = {
+   { Vertex vertices[3] = {
       { p0x, p0y, p0w, c0, t0x, t0y },
       { p1x, p1y, p1w, c1, t1x, t1y },
       { p2x, p2y, p2w, c2, t2x, t2y },
    };
 
    renderer_draw_triangle(renderer, vertices);
+   }
 }
 
 void rhi_vulkan_push_quad(
@@ -21869,7 +22023,7 @@ void rhi_vulkan_push_quad(
    else
       renderer_set_primitive_type(renderer, PrimitiveType_Polygon);
 
-   Vertex vertices[4] = {
+   { Vertex vertices[4] = {
       { p0x, p0y, p0w, c0, t0x, t0y },
       { p1x, p1y, p1w, c1, t1x, t1y },
       { p2x, p2y, p2w, c2, t2x, t2y },
@@ -21877,6 +22031,7 @@ void rhi_vulkan_push_quad(
    };
 
    renderer_draw_quad(renderer, vertices);
+   }
 }
 
 void rhi_vulkan_push_line(
@@ -21914,12 +22069,13 @@ void rhi_vulkan_push_line(
          break;
    }
 
-   Vertex vertices[2] = {
+   { Vertex vertices[2] = {
       { (float)(p0x), (float)(p0y), 1.0f, c0, 0, 0 },
       { (float)(p1x), (float)(p1y), 1.0f, c1, 0, 0 },
    };
    renderer_set_texture_color_modulate(renderer, false);
    renderer_draw_line(renderer, vertices);
+   }
 }
 
 void rhi_vulkan_load_image(
@@ -21943,7 +22099,7 @@ void rhi_vulkan_load_image(
      renderer_notify_texture_upload(renderer, _ntu_rect, vram); }
    renderer_set_mask_test(renderer, mask_test);
    renderer_set_force_mask_bit(renderer, set_mask);
-   Rect _r = { x, y, w, h }; BufferHandle handle = renderer_copy_cpu_to_vram(renderer, &_r);
+   { Rect _r = { x, y, w, h }; BufferHandle handle = renderer_copy_cpu_to_vram(renderer, &_r);
    uint16_t *tmp = renderer_begin_copy(renderer, handle);
 
    /* The row loop has two independent invariants: x-wrap (dual_copy)
@@ -22005,6 +22161,7 @@ void rhi_vulkan_load_image(
     * only unmaps it; the old C++ 'handle' value released it via its destructor at
     * scope end (after the flush above), so drop that reference here. */
    bh_reset(&handle);
+   }
 }
 
 bool rhi_vulkan_read_vram(uint16_t x, uint16_t y,
