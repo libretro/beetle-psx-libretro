@@ -8656,7 +8656,29 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static INLINE void renderer_flush(Renderer *self)
    {
       if (cbh_is_valid(&self->cmd))
+      {
+         /* fbatlas issues hazard barriers within a command buffer, but its
+          * per-block read status is not flushed across a submit boundary. A
+          * fragment draw that samples an image in this submission is therefore
+          * left unordered against a compute storage write to the same image in
+          * the next submission: a cross-submit write-after-read on the queue
+          * (reported by synchronization validation at vkQueueSubmit as a compute
+          * SHADER_STORAGE_WRITE whose prior fragment SHADER_SAMPLED_READ carries
+          * no compute-stage read barrier). Same-queue submissions are ordered by
+          * submission, but ordering alone does not make the read visible to the
+          * later compute write. Emit a fragment-read -> compute-write barrier at
+          * the tail of this command buffer so the reads retire first. This runs
+          * only at the handful of per-frame flush points (VRAM upload, readback,
+          * frame end), not per draw. */
+         { VkMemoryBarrier _b = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+         _b.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+         _b.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+         vkCmdPipelineBarrier(commandbuffer_get_command_buffer(cbh_get(&self->cmd)),
+               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+               VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+               0, 1, &_b, 0, NULL, 0, NULL); }
          device_submit(self->device, &self->cmd, NULL, 0, NULL);
+      }
       cbh_reset(&self->cmd);
       device_flush_frame_nolock(self->device);
    }
