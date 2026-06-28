@@ -133,153 +133,17 @@ extern PFN_vkWaitForFences vkWaitForFences;
 #if defined(VK_VERSION_1_1)
 extern PFN_vkEnumerateInstanceVersion vkEnumerateInstanceVersion;
 #endif /* defined(VK_VERSION_1_1) */
-#if defined(VK_AMD_buffer_marker)
-#endif /* defined(VK_AMD_buffer_marker) */
-#if defined(VK_AMD_draw_indirect_count)
-#endif /* defined(VK_AMD_draw_indirect_count) */
-#if defined(VK_AMD_shader_info)
-#endif /* defined(VK_AMD_shader_info) */
-#if defined(VK_ANDROID_external_memory_android_hardware_buffer)
-#endif /* defined(VK_ANDROID_external_memory_android_hardware_buffer) */
-#if defined(VK_EXT_acquire_xlib_display)
-#endif /* defined(VK_EXT_acquire_xlib_display) */
-#if defined(VK_EXT_calibrated_timestamps)
-#endif /* defined(VK_EXT_calibrated_timestamps) */
-#if defined(VK_EXT_conditional_rendering)
-#endif /* defined(VK_EXT_conditional_rendering) */
 #if defined(VK_EXT_debug_marker)
 extern PFN_vkCmdDebugMarkerBeginEXT vkCmdDebugMarkerBeginEXT;
 extern PFN_vkCmdDebugMarkerEndEXT vkCmdDebugMarkerEndEXT;
 extern PFN_vkDebugMarkerSetObjectNameEXT vkDebugMarkerSetObjectNameEXT;
 #endif /* defined(VK_EXT_debug_marker) */
-#if defined(VK_EXT_debug_report)
-#endif /* defined(VK_EXT_debug_report) */
-#if defined(VK_EXT_debug_utils)
-#endif /* defined(VK_EXT_debug_utils) */
-#if defined(VK_EXT_direct_mode_display)
-#endif /* defined(VK_EXT_direct_mode_display) */
-#if defined(VK_EXT_discard_rectangles)
-#endif /* defined(VK_EXT_discard_rectangles) */
-#if defined(VK_EXT_display_control)
-#endif /* defined(VK_EXT_display_control) */
-#if defined(VK_EXT_display_surface_counter)
-#endif /* defined(VK_EXT_display_surface_counter) */
-#if defined(VK_EXT_external_memory_host)
-#endif /* defined(VK_EXT_external_memory_host) */
-#if defined(VK_EXT_hdr_metadata)
-#endif /* defined(VK_EXT_hdr_metadata) */
-#if defined(VK_EXT_image_drm_format_modifier)
-#endif /* defined(VK_EXT_image_drm_format_modifier) */
-#if defined(VK_EXT_sample_locations)
-#endif /* defined(VK_EXT_sample_locations) */
-#if defined(VK_EXT_transform_feedback)
-#endif /* defined(VK_EXT_transform_feedback) */
-#if defined(VK_EXT_validation_cache)
-#endif /* defined(VK_EXT_validation_cache) */
-#if defined(VK_FUCHSIA_imagepipe_surface)
-#endif /* defined(VK_FUCHSIA_imagepipe_surface) */
-#if defined(VK_GOOGLE_display_timing)
-#endif /* defined(VK_GOOGLE_display_timing) */
-#if defined(VK_KHR_android_surface)
-#endif /* defined(VK_KHR_android_surface) */
-#if defined(VK_KHR_bind_memory2)
-#endif /* defined(VK_KHR_bind_memory2) */
-#if defined(VK_KHR_create_renderpass2)
-#endif /* defined(VK_KHR_create_renderpass2) */
-#if defined(VK_KHR_descriptor_update_template)
-#endif /* defined(VK_KHR_descriptor_update_template) */
-#if defined(VK_KHR_device_group)
-#endif /* defined(VK_KHR_device_group) */
-#if defined(VK_KHR_device_group_creation)
-#endif /* defined(VK_KHR_device_group_creation) */
-#if defined(VK_KHR_display)
-#endif /* defined(VK_KHR_display) */
-#if defined(VK_KHR_display_swapchain)
-#endif /* defined(VK_KHR_display_swapchain) */
-#if defined(VK_KHR_draw_indirect_count)
-#endif /* defined(VK_KHR_draw_indirect_count) */
-#if defined(VK_KHR_external_fence_capabilities)
-#endif /* defined(VK_KHR_external_fence_capabilities) */
-#if defined(VK_KHR_external_fence_fd)
-#endif /* defined(VK_KHR_external_fence_fd) */
-#if defined(VK_KHR_external_fence_win32)
-#endif /* defined(VK_KHR_external_fence_win32) */
-#if defined(VK_KHR_external_memory_capabilities)
-#endif /* defined(VK_KHR_external_memory_capabilities) */
-#if defined(VK_KHR_external_memory_fd)
-#endif /* defined(VK_KHR_external_memory_fd) */
-#if defined(VK_KHR_external_memory_win32)
-#endif /* defined(VK_KHR_external_memory_win32) */
-#if defined(VK_KHR_external_semaphore_capabilities)
-#endif /* defined(VK_KHR_external_semaphore_capabilities) */
-#if defined(VK_KHR_external_semaphore_fd)
-#endif /* defined(VK_KHR_external_semaphore_fd) */
-#if defined(VK_KHR_external_semaphore_win32)
-#endif /* defined(VK_KHR_external_semaphore_win32) */
-#if defined(VK_KHR_get_display_properties2)
-#endif /* defined(VK_KHR_get_display_properties2) */
 #if defined(VK_KHR_get_memory_requirements2)
 extern PFN_vkGetImageMemoryRequirements2KHR vkGetImageMemoryRequirements2KHR;
 #endif /* defined(VK_KHR_get_memory_requirements2) */
-#if defined(VK_KHR_get_physical_device_properties2)
-#endif /* defined(VK_KHR_get_physical_device_properties2) */
-#if defined(VK_KHR_get_surface_capabilities2)
-#endif /* defined(VK_KHR_get_surface_capabilities2) */
-#if defined(VK_KHR_maintenance1)
-#endif /* defined(VK_KHR_maintenance1) */
-#if defined(VK_KHR_maintenance3)
-#endif /* defined(VK_KHR_maintenance3) */
-#if defined(VK_KHR_push_descriptor)
-#endif /* defined(VK_KHR_push_descriptor) */
-#if defined(VK_KHR_sampler_ycbcr_conversion)
-#endif /* defined(VK_KHR_sampler_ycbcr_conversion) */
-#if defined(VK_KHR_shared_presentable_image)
-#endif /* defined(VK_KHR_shared_presentable_image) */
 #if defined(VK_KHR_surface)
 extern PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 #endif /* defined(VK_KHR_surface) */
-#if defined(VK_KHR_swapchain)
-#endif /* defined(VK_KHR_swapchain) */
-#if defined(VK_KHR_wayland_surface)
-#endif /* defined(VK_KHR_wayland_surface) */
-#if defined(VK_KHR_win32_surface)
-#endif /* defined(VK_KHR_win32_surface) */
-#if defined(VK_KHR_xcb_surface)
-#endif /* defined(VK_KHR_xcb_surface) */
-#if defined(VK_KHR_xlib_surface)
-#endif /* defined(VK_KHR_xlib_surface) */
-#if defined(VK_MVK_ios_surface)
-#endif /* defined(VK_MVK_ios_surface) */
-#if defined(VK_MVK_macos_surface)
-#endif /* defined(VK_MVK_macos_surface) */
-#if defined(VK_NN_vi_surface)
-#endif /* defined(VK_NN_vi_surface) */
-#if defined(VK_NVX_device_generated_commands)
-#endif /* defined(VK_NVX_device_generated_commands) */
-#if defined(VK_NVX_raytracing)
-#endif /* defined(VK_NVX_raytracing) */
-#if defined(VK_NV_clip_space_w_scaling)
-#endif /* defined(VK_NV_clip_space_w_scaling) */
-#if defined(VK_NV_device_diagnostic_checkpoints)
-#endif /* defined(VK_NV_device_diagnostic_checkpoints) */
-#if defined(VK_NV_external_memory_capabilities)
-#endif /* defined(VK_NV_external_memory_capabilities) */
-#if defined(VK_NV_external_memory_win32)
-#endif /* defined(VK_NV_external_memory_win32) */
-#if defined(VK_NV_mesh_shader)
-#endif /* defined(VK_NV_mesh_shader) */
-#if defined(VK_NV_ray_tracing)
-#endif /* defined(VK_NV_ray_tracing) */
-#if defined(VK_NV_scissor_exclusive)
-#endif /* defined(VK_NV_scissor_exclusive) */
-#if defined(VK_NV_shading_rate_image)
-#endif /* defined(VK_NV_shading_rate_image) */
-#if (defined(VK_KHR_descriptor_update_template) && defined(VK_KHR_push_descriptor)) || (defined(VK_KHR_push_descriptor) && defined(VK_VERSION_1_1))
-#endif /* (defined(VK_KHR_descriptor_update_template) && defined(VK_KHR_push_descriptor)) || (defined(VK_KHR_push_descriptor) && defined(VK_VERSION_1_1)) */
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 /* VOLK_GENERATE_PROTOTYPES_H */
 
 static PFN_vkVoidFunction vkGetInstanceProcAddrStub(void* context, const char* name)
@@ -316,65 +180,9 @@ static void volkGenLoadInstance(void* context, PFN_vkVoidFunction (*load)(void*,
 	vkGetPhysicalDeviceProperties = (PFN_vkGetPhysicalDeviceProperties)load(context, "vkGetPhysicalDeviceProperties");
 	vkGetPhysicalDeviceQueueFamilyProperties = (PFN_vkGetPhysicalDeviceQueueFamilyProperties)load(context, "vkGetPhysicalDeviceQueueFamilyProperties");
 #endif /* defined(VK_VERSION_1_0) */
-#if defined(VK_VERSION_1_1)
-#endif /* defined(VK_VERSION_1_1) */
-#if defined(VK_EXT_acquire_xlib_display)
-#endif /* defined(VK_EXT_acquire_xlib_display) */
-#if defined(VK_EXT_calibrated_timestamps)
-#endif /* defined(VK_EXT_calibrated_timestamps) */
-#if defined(VK_EXT_debug_report)
-#endif /* defined(VK_EXT_debug_report) */
-#if defined(VK_EXT_debug_utils)
-#endif /* defined(VK_EXT_debug_utils) */
-#if defined(VK_EXT_direct_mode_display)
-#endif /* defined(VK_EXT_direct_mode_display) */
-#if defined(VK_EXT_display_surface_counter)
-#endif /* defined(VK_EXT_display_surface_counter) */
-#if defined(VK_EXT_sample_locations)
-#endif /* defined(VK_EXT_sample_locations) */
-#if defined(VK_FUCHSIA_imagepipe_surface)
-#endif /* defined(VK_FUCHSIA_imagepipe_surface) */
-#if defined(VK_KHR_android_surface)
-#endif /* defined(VK_KHR_android_surface) */
-#if defined(VK_KHR_device_group_creation)
-#endif /* defined(VK_KHR_device_group_creation) */
-#if defined(VK_KHR_display)
-#endif /* defined(VK_KHR_display) */
-#if defined(VK_KHR_external_fence_capabilities)
-#endif /* defined(VK_KHR_external_fence_capabilities) */
-#if defined(VK_KHR_external_memory_capabilities)
-#endif /* defined(VK_KHR_external_memory_capabilities) */
-#if defined(VK_KHR_external_semaphore_capabilities)
-#endif /* defined(VK_KHR_external_semaphore_capabilities) */
-#if defined(VK_KHR_get_display_properties2)
-#endif /* defined(VK_KHR_get_display_properties2) */
-#if defined(VK_KHR_get_physical_device_properties2)
-#endif /* defined(VK_KHR_get_physical_device_properties2) */
-#if defined(VK_KHR_get_surface_capabilities2)
-#endif /* defined(VK_KHR_get_surface_capabilities2) */
 #if defined(VK_KHR_surface)
 	vkGetPhysicalDeviceSurfaceSupportKHR = (PFN_vkGetPhysicalDeviceSurfaceSupportKHR)load(context, "vkGetPhysicalDeviceSurfaceSupportKHR");
 #endif /* defined(VK_KHR_surface) */
-#if defined(VK_KHR_wayland_surface)
-#endif /* defined(VK_KHR_wayland_surface) */
-#if defined(VK_KHR_win32_surface)
-#endif /* defined(VK_KHR_win32_surface) */
-#if defined(VK_KHR_xcb_surface)
-#endif /* defined(VK_KHR_xcb_surface) */
-#if defined(VK_KHR_xlib_surface)
-#endif /* defined(VK_KHR_xlib_surface) */
-#if defined(VK_MVK_ios_surface)
-#endif /* defined(VK_MVK_ios_surface) */
-#if defined(VK_MVK_macos_surface)
-#endif /* defined(VK_MVK_macos_surface) */
-#if defined(VK_NN_vi_surface)
-#endif /* defined(VK_NN_vi_surface) */
-#if defined(VK_NVX_device_generated_commands)
-#endif /* defined(VK_NVX_device_generated_commands) */
-#if defined(VK_NV_external_memory_capabilities)
-#endif /* defined(VK_NV_external_memory_capabilities) */
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 	/* VOLK_GENERATE_LOAD_INSTANCE */
 }
 
@@ -456,108 +264,14 @@ static void volkGenLoadDevice(void* context, PFN_vkVoidFunction (*load)(void*, c
 	vkUpdateDescriptorSets = (PFN_vkUpdateDescriptorSets)load(context, "vkUpdateDescriptorSets");
 	vkWaitForFences = (PFN_vkWaitForFences)load(context, "vkWaitForFences");
 #endif /* defined(VK_VERSION_1_0) */
-#if defined(VK_VERSION_1_1)
-#endif /* defined(VK_VERSION_1_1) */
-#if defined(VK_AMD_buffer_marker)
-#endif /* defined(VK_AMD_buffer_marker) */
-#if defined(VK_AMD_draw_indirect_count)
-#endif /* defined(VK_AMD_draw_indirect_count) */
-#if defined(VK_AMD_shader_info)
-#endif /* defined(VK_AMD_shader_info) */
-#if defined(VK_ANDROID_external_memory_android_hardware_buffer)
-#endif /* defined(VK_ANDROID_external_memory_android_hardware_buffer) */
-#if defined(VK_EXT_calibrated_timestamps)
-#endif /* defined(VK_EXT_calibrated_timestamps) */
-#if defined(VK_EXT_conditional_rendering)
-#endif /* defined(VK_EXT_conditional_rendering) */
 #if defined(VK_EXT_debug_marker)
 	vkCmdDebugMarkerBeginEXT = (PFN_vkCmdDebugMarkerBeginEXT)load(context, "vkCmdDebugMarkerBeginEXT");
 	vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)load(context, "vkCmdDebugMarkerEndEXT");
 	vkDebugMarkerSetObjectNameEXT = (PFN_vkDebugMarkerSetObjectNameEXT)load(context, "vkDebugMarkerSetObjectNameEXT");
 #endif /* defined(VK_EXT_debug_marker) */
-#if defined(VK_EXT_debug_utils)
-#endif /* defined(VK_EXT_debug_utils) */
-#if defined(VK_EXT_discard_rectangles)
-#endif /* defined(VK_EXT_discard_rectangles) */
-#if defined(VK_EXT_display_control)
-#endif /* defined(VK_EXT_display_control) */
-#if defined(VK_EXT_external_memory_host)
-#endif /* defined(VK_EXT_external_memory_host) */
-#if defined(VK_EXT_hdr_metadata)
-#endif /* defined(VK_EXT_hdr_metadata) */
-#if defined(VK_EXT_image_drm_format_modifier)
-#endif /* defined(VK_EXT_image_drm_format_modifier) */
-#if defined(VK_EXT_sample_locations)
-#endif /* defined(VK_EXT_sample_locations) */
-#if defined(VK_EXT_transform_feedback)
-#endif /* defined(VK_EXT_transform_feedback) */
-#if defined(VK_EXT_validation_cache)
-#endif /* defined(VK_EXT_validation_cache) */
-#if defined(VK_GOOGLE_display_timing)
-#endif /* defined(VK_GOOGLE_display_timing) */
-#if defined(VK_KHR_bind_memory2)
-#endif /* defined(VK_KHR_bind_memory2) */
-#if defined(VK_KHR_create_renderpass2)
-#endif /* defined(VK_KHR_create_renderpass2) */
-#if defined(VK_KHR_descriptor_update_template)
-#endif /* defined(VK_KHR_descriptor_update_template) */
-#if defined(VK_KHR_device_group)
-#endif /* defined(VK_KHR_device_group) */
-#if defined(VK_KHR_display_swapchain)
-#endif /* defined(VK_KHR_display_swapchain) */
-#if defined(VK_KHR_draw_indirect_count)
-#endif /* defined(VK_KHR_draw_indirect_count) */
-#if defined(VK_KHR_external_fence_fd)
-#endif /* defined(VK_KHR_external_fence_fd) */
-#if defined(VK_KHR_external_fence_win32)
-#endif /* defined(VK_KHR_external_fence_win32) */
-#if defined(VK_KHR_external_memory_fd)
-#endif /* defined(VK_KHR_external_memory_fd) */
-#if defined(VK_KHR_external_memory_win32)
-#endif /* defined(VK_KHR_external_memory_win32) */
-#if defined(VK_KHR_external_semaphore_fd)
-#endif /* defined(VK_KHR_external_semaphore_fd) */
-#if defined(VK_KHR_external_semaphore_win32)
-#endif /* defined(VK_KHR_external_semaphore_win32) */
 #if defined(VK_KHR_get_memory_requirements2)
 	vkGetImageMemoryRequirements2KHR = (PFN_vkGetImageMemoryRequirements2KHR)load(context, "vkGetImageMemoryRequirements2KHR");
 #endif /* defined(VK_KHR_get_memory_requirements2) */
-#if defined(VK_KHR_maintenance1)
-#endif /* defined(VK_KHR_maintenance1) */
-#if defined(VK_KHR_maintenance3)
-#endif /* defined(VK_KHR_maintenance3) */
-#if defined(VK_KHR_push_descriptor)
-#endif /* defined(VK_KHR_push_descriptor) */
-#if defined(VK_KHR_sampler_ycbcr_conversion)
-#endif /* defined(VK_KHR_sampler_ycbcr_conversion) */
-#if defined(VK_KHR_shared_presentable_image)
-#endif /* defined(VK_KHR_shared_presentable_image) */
-#if defined(VK_KHR_swapchain)
-#endif /* defined(VK_KHR_swapchain) */
-#if defined(VK_NVX_device_generated_commands)
-#endif /* defined(VK_NVX_device_generated_commands) */
-#if defined(VK_NVX_raytracing)
-#endif /* defined(VK_NVX_raytracing) */
-#if defined(VK_NV_clip_space_w_scaling)
-#endif /* defined(VK_NV_clip_space_w_scaling) */
-#if defined(VK_NV_device_diagnostic_checkpoints)
-#endif /* defined(VK_NV_device_diagnostic_checkpoints) */
-#if defined(VK_NV_external_memory_win32)
-#endif /* defined(VK_NV_external_memory_win32) */
-#if defined(VK_NV_mesh_shader)
-#endif /* defined(VK_NV_mesh_shader) */
-#if defined(VK_NV_ray_tracing)
-#endif /* defined(VK_NV_ray_tracing) */
-#if defined(VK_NV_scissor_exclusive)
-#endif /* defined(VK_NV_scissor_exclusive) */
-#if defined(VK_NV_shading_rate_image)
-#endif /* defined(VK_NV_shading_rate_image) */
-#if (defined(VK_KHR_descriptor_update_template) && defined(VK_KHR_push_descriptor)) || (defined(VK_KHR_push_descriptor) && defined(VK_VERSION_1_1))
-#endif /* (defined(VK_KHR_descriptor_update_template) && defined(VK_KHR_push_descriptor)) || (defined(VK_KHR_push_descriptor) && defined(VK_VERSION_1_1)) */
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 	/* VOLK_GENERATE_LOAD_DEVICE */
 }
 
@@ -669,153 +383,17 @@ PFN_vkWaitForFences vkWaitForFences;
 #if defined(VK_VERSION_1_1)
 PFN_vkEnumerateInstanceVersion vkEnumerateInstanceVersion;
 #endif /* defined(VK_VERSION_1_1) */
-#if defined(VK_AMD_buffer_marker)
-#endif /* defined(VK_AMD_buffer_marker) */
-#if defined(VK_AMD_draw_indirect_count)
-#endif /* defined(VK_AMD_draw_indirect_count) */
-#if defined(VK_AMD_shader_info)
-#endif /* defined(VK_AMD_shader_info) */
-#if defined(VK_ANDROID_external_memory_android_hardware_buffer)
-#endif /* defined(VK_ANDROID_external_memory_android_hardware_buffer) */
-#if defined(VK_EXT_acquire_xlib_display)
-#endif /* defined(VK_EXT_acquire_xlib_display) */
-#if defined(VK_EXT_calibrated_timestamps)
-#endif /* defined(VK_EXT_calibrated_timestamps) */
-#if defined(VK_EXT_conditional_rendering)
-#endif /* defined(VK_EXT_conditional_rendering) */
 #if defined(VK_EXT_debug_marker)
 PFN_vkCmdDebugMarkerBeginEXT vkCmdDebugMarkerBeginEXT;
 PFN_vkCmdDebugMarkerEndEXT vkCmdDebugMarkerEndEXT;
 PFN_vkDebugMarkerSetObjectNameEXT vkDebugMarkerSetObjectNameEXT;
 #endif /* defined(VK_EXT_debug_marker) */
-#if defined(VK_EXT_debug_report)
-#endif /* defined(VK_EXT_debug_report) */
-#if defined(VK_EXT_debug_utils)
-#endif /* defined(VK_EXT_debug_utils) */
-#if defined(VK_EXT_direct_mode_display)
-#endif /* defined(VK_EXT_direct_mode_display) */
-#if defined(VK_EXT_discard_rectangles)
-#endif /* defined(VK_EXT_discard_rectangles) */
-#if defined(VK_EXT_display_control)
-#endif /* defined(VK_EXT_display_control) */
-#if defined(VK_EXT_display_surface_counter)
-#endif /* defined(VK_EXT_display_surface_counter) */
-#if defined(VK_EXT_external_memory_host)
-#endif /* defined(VK_EXT_external_memory_host) */
-#if defined(VK_EXT_hdr_metadata)
-#endif /* defined(VK_EXT_hdr_metadata) */
-#if defined(VK_EXT_image_drm_format_modifier)
-#endif /* defined(VK_EXT_image_drm_format_modifier) */
-#if defined(VK_EXT_sample_locations)
-#endif /* defined(VK_EXT_sample_locations) */
-#if defined(VK_EXT_transform_feedback)
-#endif /* defined(VK_EXT_transform_feedback) */
-#if defined(VK_EXT_validation_cache)
-#endif /* defined(VK_EXT_validation_cache) */
-#if defined(VK_FUCHSIA_imagepipe_surface)
-#endif /* defined(VK_FUCHSIA_imagepipe_surface) */
-#if defined(VK_GOOGLE_display_timing)
-#endif /* defined(VK_GOOGLE_display_timing) */
-#if defined(VK_KHR_android_surface)
-#endif /* defined(VK_KHR_android_surface) */
-#if defined(VK_KHR_bind_memory2)
-#endif /* defined(VK_KHR_bind_memory2) */
-#if defined(VK_KHR_create_renderpass2)
-#endif /* defined(VK_KHR_create_renderpass2) */
-#if defined(VK_KHR_descriptor_update_template)
-#endif /* defined(VK_KHR_descriptor_update_template) */
-#if defined(VK_KHR_device_group)
-#endif /* defined(VK_KHR_device_group) */
-#if defined(VK_KHR_device_group_creation)
-#endif /* defined(VK_KHR_device_group_creation) */
-#if defined(VK_KHR_display)
-#endif /* defined(VK_KHR_display) */
-#if defined(VK_KHR_display_swapchain)
-#endif /* defined(VK_KHR_display_swapchain) */
-#if defined(VK_KHR_draw_indirect_count)
-#endif /* defined(VK_KHR_draw_indirect_count) */
-#if defined(VK_KHR_external_fence_capabilities)
-#endif /* defined(VK_KHR_external_fence_capabilities) */
-#if defined(VK_KHR_external_fence_fd)
-#endif /* defined(VK_KHR_external_fence_fd) */
-#if defined(VK_KHR_external_fence_win32)
-#endif /* defined(VK_KHR_external_fence_win32) */
-#if defined(VK_KHR_external_memory_capabilities)
-#endif /* defined(VK_KHR_external_memory_capabilities) */
-#if defined(VK_KHR_external_memory_fd)
-#endif /* defined(VK_KHR_external_memory_fd) */
-#if defined(VK_KHR_external_memory_win32)
-#endif /* defined(VK_KHR_external_memory_win32) */
-#if defined(VK_KHR_external_semaphore_capabilities)
-#endif /* defined(VK_KHR_external_semaphore_capabilities) */
-#if defined(VK_KHR_external_semaphore_fd)
-#endif /* defined(VK_KHR_external_semaphore_fd) */
-#if defined(VK_KHR_external_semaphore_win32)
-#endif /* defined(VK_KHR_external_semaphore_win32) */
-#if defined(VK_KHR_get_display_properties2)
-#endif /* defined(VK_KHR_get_display_properties2) */
 #if defined(VK_KHR_get_memory_requirements2)
 PFN_vkGetImageMemoryRequirements2KHR vkGetImageMemoryRequirements2KHR;
 #endif /* defined(VK_KHR_get_memory_requirements2) */
-#if defined(VK_KHR_get_physical_device_properties2)
-#endif /* defined(VK_KHR_get_physical_device_properties2) */
-#if defined(VK_KHR_get_surface_capabilities2)
-#endif /* defined(VK_KHR_get_surface_capabilities2) */
-#if defined(VK_KHR_maintenance1)
-#endif /* defined(VK_KHR_maintenance1) */
-#if defined(VK_KHR_maintenance3)
-#endif /* defined(VK_KHR_maintenance3) */
-#if defined(VK_KHR_push_descriptor)
-#endif /* defined(VK_KHR_push_descriptor) */
-#if defined(VK_KHR_sampler_ycbcr_conversion)
-#endif /* defined(VK_KHR_sampler_ycbcr_conversion) */
-#if defined(VK_KHR_shared_presentable_image)
-#endif /* defined(VK_KHR_shared_presentable_image) */
 #if defined(VK_KHR_surface)
 PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 #endif /* defined(VK_KHR_surface) */
-#if defined(VK_KHR_swapchain)
-#endif /* defined(VK_KHR_swapchain) */
-#if defined(VK_KHR_wayland_surface)
-#endif /* defined(VK_KHR_wayland_surface) */
-#if defined(VK_KHR_win32_surface)
-#endif /* defined(VK_KHR_win32_surface) */
-#if defined(VK_KHR_xcb_surface)
-#endif /* defined(VK_KHR_xcb_surface) */
-#if defined(VK_KHR_xlib_surface)
-#endif /* defined(VK_KHR_xlib_surface) */
-#if defined(VK_MVK_ios_surface)
-#endif /* defined(VK_MVK_ios_surface) */
-#if defined(VK_MVK_macos_surface)
-#endif /* defined(VK_MVK_macos_surface) */
-#if defined(VK_NN_vi_surface)
-#endif /* defined(VK_NN_vi_surface) */
-#if defined(VK_NVX_device_generated_commands)
-#endif /* defined(VK_NVX_device_generated_commands) */
-#if defined(VK_NVX_raytracing)
-#endif /* defined(VK_NVX_raytracing) */
-#if defined(VK_NV_clip_space_w_scaling)
-#endif /* defined(VK_NV_clip_space_w_scaling) */
-#if defined(VK_NV_device_diagnostic_checkpoints)
-#endif /* defined(VK_NV_device_diagnostic_checkpoints) */
-#if defined(VK_NV_external_memory_capabilities)
-#endif /* defined(VK_NV_external_memory_capabilities) */
-#if defined(VK_NV_external_memory_win32)
-#endif /* defined(VK_NV_external_memory_win32) */
-#if defined(VK_NV_mesh_shader)
-#endif /* defined(VK_NV_mesh_shader) */
-#if defined(VK_NV_ray_tracing)
-#endif /* defined(VK_NV_ray_tracing) */
-#if defined(VK_NV_scissor_exclusive)
-#endif /* defined(VK_NV_scissor_exclusive) */
-#if defined(VK_NV_shading_rate_image)
-#endif /* defined(VK_NV_shading_rate_image) */
-#if (defined(VK_KHR_descriptor_update_template) && defined(VK_KHR_push_descriptor)) || (defined(VK_KHR_push_descriptor) && defined(VK_VERSION_1_1))
-#endif /* (defined(VK_KHR_descriptor_update_template) && defined(VK_KHR_push_descriptor)) || (defined(VK_KHR_push_descriptor) && defined(VK_VERSION_1_1)) */
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 /* VOLK_GENERATE_PROTOTYPES_C */
 
 #ifdef __cplusplus
