@@ -1,4 +1,5 @@
 #include "rhi_intf.h"
+#include "tt_trace.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -332,10 +333,6 @@ void rhi_intf_close(void)
 
 void rhi_intf_refresh_variables(void)
 {
-#ifdef DEBUG
-   tt_log_startup("vulkan_refresh_variables: has_software_fb=%d\n",
-         (int)has_software_fb);
-#endif
    switch (rhi_type)
    {
       case RHI_SOFTWARE:
