@@ -4173,10 +4173,6 @@ static void command_pool_signal_submitted(CommandPool *self,
     * the struct, so the still-inline member methods can call them during the
     * staged conversion; defined after the struct. */
    struct CommandBuffer;
-   static void commandbuffer_set_dirty(struct CommandBuffer *self,
-         CommandBufferDirtyFlags flags);
-   static CommandBufferDirtyFlags commandbuffer_get_and_clear(struct CommandBuffer *self,
-         CommandBufferDirtyFlags flags);
    /* Formerly CommandBufferType (a nested enum). Hoisted to file scope so the
     * forthcoming class -> C struct conversion of CommandBuffer does not have to
     * carry a nested type. The Type_* enumerator names are already prefixed, so
@@ -4824,7 +4820,6 @@ static void cbh_move(struct CommandBufferHandle *dst,
    static void device_set_name_image(Device *self,
          const Image *image,
          const char *name);
-   static bool device_memory_type_is_host_visible(Device *self, uint32_t type);
    static BufferViewHandle device_create_buffer_view(Device *self,
          const BufferViewCreateInfo *view_info);
    static ImageViewHandle device_create_image_view(Device *self,
@@ -4856,37 +4851,6 @@ static void cbh_move(struct CommandBufferHandle *dst,
          const RenderPassInfo *info,
          bool compatible);
    static uint64_t device_allocate_cookie(Device *self);
-   static void device_request_vertex_block(Device *self,
-         BufferBlock *block,
-         VkDeviceSize size);
-   static void device_request_uniform_block(Device *self,
-         BufferBlock *block,
-         VkDeviceSize size);
-   static const Framebuffer *device_request_framebuffer(Device *self,
-         const RenderPassInfo *info);
-   static void device_recycle_semaphore_nolock(Device *self,
-         VkSemaphore semaphore);
-   static void device_add_frame_counter_nolock(Device *self);
-   static void device_decrement_frame_counter_nolock(Device *self);
-   static void device_init_workarounds(Device *self);
-   static void *device_map_host_buffer(Device *self,
-         const Buffer *buffer,
-         MemoryAccessFlags access);
-   static void device_unmap_host_buffer(Device *self,
-         const Buffer *buffer,
-         MemoryAccessFlags access);
-   static ImageView *device_get_transient_attachment(Device *self,
-         unsigned width,
-         unsigned height,
-         VkFormat format,
-         unsigned index,
-         unsigned samples,
-         unsigned layers);
-   static const VkPhysicalDeviceProperties *device_get_gpu_properties(Device *self);
-   static const Sampler *device_get_stock_sampler(Device *self,
-         StockSampler sampler);
-   static const ImplementationWorkarounds *device_get_workarounds(Device *self);
-   static const DeviceFeatures *device_get_device_features(Device *self);
    static void device_destroy_pipeline_nolock(Device *self,
          VkPipeline pipeline);
    static void device_destroy_image_view_nolock(Device *self, VkImageView view);
@@ -4904,17 +4868,12 @@ static void cbh_move(struct CommandBufferHandle *dst,
          VkFormatFeatureFlags required,
          VkImageTiling tiling);
    static VkFormat device_get_default_depth_format(Device *self);
-   static void cbhvec_init(struct CommandBufferHandleVec *v);
-   static void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap);
-   static void cbhvec_deinit(struct CommandBufferHandleVec *v);
    static CommandBufferHandleVec *device_get_queue_submissions(Device *self,
          CommandBufferType type);
    static void per_frame_init(struct PerFrame *self, Device *device);
    static void per_frame_fini(struct PerFrame *self);
    static void per_frame_begin(struct PerFrame *self);
    static struct PerFrame *device_frame(Device *self);
-   static void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v);
-   static void per_frame_ptr_vec_clear(struct PerFramePtrVec *v);
    static QueueData *device_get_queue_data(Device *self,
          CommandBufferType type);
 
@@ -8158,8 +8117,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          const TextureWindow *window);
    static void renderer_reset_scissor_queue(Renderer *self);
    static void renderer_reset_queue(Renderer *self);
-   static void renderer_flush(Renderer *self);
-   static Fence renderer_flush_and_signal(Renderer *self);
    static void renderer_ensure_command_buffer(Renderer *self)
    {
       if (!cbh_is_valid(&self->cmd))
@@ -8223,49 +8180,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       renderer_dispatch(self, vertices, scissors, true);
    }
 
-   static CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self);
-   static bool renderer_get_filer_exclude(Renderer *self,
-         FilterExclude exclude);
-   static void renderer_set_texture_window(Renderer *self,
-         const TextureWindow *window);
-   static void renderer_set_texture_offset(Renderer *self,
-         unsigned x,
-         unsigned y);
-   static void renderer_set_palette_offset(Renderer *self,
-         unsigned x,
-         unsigned y);
-   static void renderer_notify_texture_upload(Renderer *self,
-         Rect rect,
-         uint16_t *vram);
-   static void renderer_set_vram_framebuffer_coords(Renderer *self,
-         unsigned xstart,
-         unsigned ystart);
-   static void renderer_set_display_mode(Renderer *self,
-         ScanoutMode mode,
-         bool is_pal,
-         bool is_480i,
-         WidthMode width_mode);
-   static void renderer_set_primitive_type(Renderer *self,
-         PrimitiveType primitive_type);
-   static void renderer_set_UV_limits(Renderer *self,
-         uint16_t min_u,
-         uint16_t min_v,
-         uint16_t max_u,
-         uint16_t max_v);
-   static void renderer_set_hd_cache_budgets(Renderer *self,
-         size_t ram_bytes,
-         size_t vram_bytes);
-   static void renderer_set_horizontal_display_range(Renderer *self,
-         int x1,
-         int x2);
-   static void renderer_set_vertical_display_range(Renderer *self,
-         int y1,
-         int y2);
-   static void renderer_set_visible_scanlines(Renderer *self,
-         int slstart,
-         int slend,
-         int slstart_pal,
-         int slend_pal);
 
 
    /* ---- Renderer flush/accessor methods (batch 3) -> free functions. These
@@ -17834,9 +17748,6 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          image_resource_holder_cleanup(self);
    }
 
-   static bool image_resource_holder_create_default_views(struct ImageResourceHolder *self,
-         const ImageCreateInfo *create_info,
-         const VkImageViewCreateInfo *view_info);
    static bool image_resource_holder_create_render_target_views(struct ImageResourceHolder *self,
          const ImageCreateInfo *image_create_info,
          const VkImageViewCreateInfo *info);
@@ -19375,12 +19286,6 @@ struct RGBAImage {
 
 /* Decode an image from disk into *img (RGBA, 4 channels). On failure img->data
  * is NULL. The caller owns img->data and must release it with rgba_image_free. */
-static void load_image(const char *path, RGBAImage *img);
-static void rgba_image_free(RGBAImage *img);
-static bool write_image(const char *path,
-      int width,
-      int height,
-      const void *data);
 
 #define STB_IMAGE_WRITE_STATIC
 #define STB_IMAGE_WRITE_IMPLEMENTATION
