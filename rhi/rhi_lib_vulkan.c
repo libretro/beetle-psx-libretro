@@ -5154,7 +5154,6 @@ static void cbh_move(struct CommandBufferHandle *dst,
          unsigned index,
          unsigned samples,
          unsigned layers);
-   static VkDevice device_get_device(Device *self);
    static const VkPhysicalDeviceProperties *device_get_gpu_properties(Device *self);
    static const Sampler *device_get_stock_sampler(Device *self,
          StockSampler sampler);
@@ -5244,10 +5243,6 @@ static void cbh_move(struct CommandBufferHandle *dst,
          const RenderPassInfo *info);
    static void cbhvec_init(struct CommandBufferHandleVec *v);
    static void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap);
-   static void cbhvec_push(struct CommandBufferHandleVec *v,
-         CommandBufferHandle *e);
-   static bool cbhvec_empty(const struct CommandBufferHandleVec *v);
-   static void cbhvec_clear(struct CommandBufferHandleVec *v);
    static void cbhvec_deinit(struct CommandBufferHandleVec *v);
    static CommandBufferHandleVec *device_get_queue_submissions(Device *self,
          CommandBufferType type);
@@ -5256,9 +5251,6 @@ static void cbh_move(struct CommandBufferHandle *dst,
    static void per_frame_begin(struct PerFrame *self);
    static struct PerFrame *device_frame(Device *self);
    static void per_frame_ptr_vec_init_empty(struct PerFramePtrVec *v);
-   static void per_frame_ptr_vec_deinit(struct PerFramePtrVec *v);
-   static void per_frame_ptr_vec_push(struct PerFramePtrVec *v,
-         struct PerFrame *p);
    static void per_frame_ptr_vec_clear(struct PerFramePtrVec *v);
    static QueueData *device_get_queue_data(Device *self,
          CommandBufferType type);
@@ -8545,7 +8537,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          const Rect *vram_rect,
          bool *fastpath_capable_out,
          bool *cache_hit_out);
-   static void renderer_draw_line(Renderer *self, const Vertex *vertices);
    static void renderer_draw_triangle(Renderer *self, const Vertex *vertices);
    static void renderer_draw_quad(Renderer *self, const Vertex *vertices);
    static void renderer_clear_quad(Renderer *self,
@@ -8573,9 +8564,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          Program *program,
          bool scaled);
    static void renderer_set_draw_rect(Renderer *self, const Rect *rect);
-   static void renderer_clear_rect(Renderer *self,
-         const Rect *rect,
-         uint32_t fb_color);
    static Rect renderer_compute_window_rect(Renderer *self,
          const TextureWindow *window);
    static void renderer_reset_scissor_queue(Renderer *self);
