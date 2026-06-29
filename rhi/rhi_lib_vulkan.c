@@ -5178,69 +5178,8 @@ static void cbh_move(struct CommandBufferHandle *dst,
          VkFormatFeatureFlags required,
          VkImageTiling tiling);
    static VkFormat device_get_default_depth_format(Device *self);
-   static void semaphoreholder_fini(struct SemaphoreHolder *self);
-   static void fenceholder_fini(struct FenceHolder *self);
-   static void sampler_fini(struct Sampler *self);
-   static void buffer_fini(struct Buffer *self);
-   static void bufferview_fini(struct BufferView *self);
-   static void imageview_fini(struct ImageView *self);
-   static void image_fini(struct Image *self);
-   static void image_init(struct Image *self,
-         Device *device,
-         VkImage image,
-         VkImageView default_view,
-         const DeviceAllocation *alloc,
-         const ImageCreateInfo *info);
-   static void commandbuffer_begin_render_pass(struct CommandBuffer *self,
-         const RenderPassInfo *info,
-         VkSubpassContents contents);
-   static void commandbuffer_end_render_pass(struct CommandBuffer *self);
-   static void commandbuffer_set_program(struct CommandBuffer *self,
-         Program *program);
-   static void commandbuffer_flush_render_state(struct CommandBuffer *self);
-   static VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self,
-         Hash hash);
-   static VkPipeline commandbuffer_build_compute_pipeline(struct CommandBuffer *self,
-         Hash hash);
-   static void commandbuffer_flush_graphics_pipeline(struct CommandBuffer *self);
-   static void commandbuffer_flush_compute_pipeline(struct CommandBuffer *self);
-   static void commandbuffer_flush_descriptor_sets(struct CommandBuffer *self);
-   static void commandbuffer_flush_descriptor_set(struct CommandBuffer *self,
-         uint32_t set);
-   static void commandbuffer_begin_context(struct CommandBuffer *self);
-   static void commandbuffer_flush_compute_state(struct CommandBuffer *self);
-   static void commandbuffer_init_viewport_scissor(struct CommandBuffer *self,
-         const RenderPassInfo *info,
-         const Framebuffer *framebuffer);
-   static void commandbuffer_begin_region(struct CommandBuffer *self,
-         const char *name,
-         const float *color);
-   static void commandbuffer_end_region(struct CommandBuffer *self);
-   static void commandbuffer_end(struct CommandBuffer *self);
-   static void *commandbuffer_allocate_constant_data(struct CommandBuffer *self,
-         unsigned set,
-         unsigned binding,
-         VkDeviceSize size);
-   static void *commandbuffer_allocate_vertex_data(struct CommandBuffer *self,
-         unsigned binding,
-         VkDeviceSize size,
-         VkDeviceSize stride,
-         VkVertexInputRate step_rate);
    static void device_init(Device *self);
    static void device_deinit(Device *self);
-   static void program_init_graphics(struct Program *self,
-         Device *device,
-         Shader *vertex,
-         Shader *fragment);
-   static void program_init_compute(struct Program *self,
-         Device *device,
-         Shader *compute);
-   static void pipeline_layout_init(struct PipelineLayout *self,
-         Hash hash,
-         Device *device,
-         const CombinedResourceLayout *layout);
-   static struct Framebuffer *framebuffer_allocator_request_framebuffer(struct FramebufferAllocator *self,
-         const RenderPassInfo *info);
    static void cbhvec_init(struct CommandBufferHandleVec *v);
    static void cbhvec_grow(struct CommandBufferHandleVec *v, int ncap);
    static void cbhvec_deinit(struct CommandBufferHandleVec *v);
@@ -5254,8 +5193,6 @@ static void cbh_move(struct CommandBufferHandle *dst,
    static void per_frame_ptr_vec_clear(struct PerFramePtrVec *v);
    static QueueData *device_get_queue_data(Device *self,
          CommandBufferType type);
-   static void program_fini(struct Program *self);
-   static void framebuffer_fini(struct Framebuffer *self);
 
    static INLINE bool device_memory_type_is_host_visible(Device *self, uint32_t type) { return (self->mem_props.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0; }
 
