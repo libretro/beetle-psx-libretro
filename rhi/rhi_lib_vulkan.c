@@ -8493,9 +8493,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          bool *scaled_read_out,
          unsigned *shift_out,
          bool *offset_uv_out);
-   static void renderer_build_line_quad(Renderer *self,
-         Vertex *output,
-         const Vertex *input);
    static void renderer_dispatch(Renderer *self,
          const BufferVertexVec *vertices,
          PrimitiveInfoVec *scissors,
@@ -8503,11 +8500,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb);
    static void renderer_render_opaque_primitives(Renderer *self);
    static void renderer_render_semi_transparent_primitives(Renderer *self);
-   static void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self);
-   static void renderer_render_opaque_texture_primitives(Renderer *self);
-   static void renderer_blit_vram(Renderer *self,
-         const Rect *dst,
-         const Rect *src);
    static ImageHandle renderer_upload_texture(Renderer *self,
          LoadedLevels *levels);
    static ImageHandle renderer_create_texture(Renderer *self,
@@ -8576,7 +8568,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static bool renderer_primitive_info_sort_gt(const PrimitiveInfo *a,
          const PrimitiveInfo *b);
    static void renderer_flush_resolves(Renderer *self);
-   static void renderer_flush_blits(Renderer *self);
    static void renderer_flush_blit(Renderer *self,
          const BlitInfoVec *infos,
          Program *program,
@@ -8587,15 +8578,73 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          uint32_t fb_color);
    static Rect renderer_compute_window_rect(Renderer *self,
          const TextureWindow *window);
-   static void renderer_resolve(Renderer *self,
-         Domain target_domain,
-         unsigned x,
-         unsigned y);
-   static void renderer_ensure_command_buffer(Renderer *self);
    static void renderer_reset_scissor_queue(Renderer *self);
    static void renderer_reset_queue(Renderer *self);
    static void renderer_flush(Renderer *self);
    static Fence renderer_flush_and_signal(Renderer *self);
+   static void renderer_ensure_command_buffer(Renderer *self)
+   {
+      if (!cbh_is_valid(&self->cmd))
+         self->cmd = device_request_command_buffer(self->device, Type_Generic);
+   }
+
+   static void renderer_flush_blits(Renderer *self)
+   {
+      renderer_ensure_command_buffer(self);
+      renderer_flush_blit(self, &self->queue.scaled_blits, self->pipelines.blit_vram_scaled, true);
+      renderer_flush_blit(self, &self->queue.scaled_masked_blits, self->pipelines.blit_vram_scaled_masked, true);
+      renderer_flush_blit(self, &self->queue.unscaled_blits, self->pipelines.blit_vram_unscaled, false);
+      renderer_flush_blit(self, &self->queue.unscaled_masked_blits, self->pipelines.blit_vram_unscaled_masked, false);
+      BlitInfoVec_clear(&self->queue.scaled_blits);
+      BlitInfoVec_clear(&self->queue.scaled_masked_blits);
+      BlitInfoVec_clear(&self->queue.unscaled_blits);
+      BlitInfoVec_clear(&self->queue.unscaled_masked_blits);
+   }
+
+   static void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
+      BufferVertexVec *vertices = &self->queue.semi_transparent_opaque;
+      PrimitiveInfoVec *scissors = &self->queue.semi_transparent_opaque_scissor;
+      if (BufferVertexVec_empty(vertices))
+         return;
+
+      commandbuffer_set_opaque_state(cbh_get(&self->cmd));
+      commandbuffer_set_cull_mode(cbh_get(&self->cmd), VK_CULL_MODE_NONE);
+      commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_SemiTransOpaque);
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
+      commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+
+      renderer_dispatch(self, vertices, scissors, true);
+   }
+
+   static void renderer_render_opaque_texture_primitives(Renderer *self){
+      BufferVertexVec *vertices = &self->queue.opaque_textured;
+      PrimitiveInfoVec *scissors = &self->queue.opaque_textured_scissor;
+      if (BufferVertexVec_empty(vertices))
+         return;
+
+      commandbuffer_set_opaque_state(cbh_get(&self->cmd));
+      commandbuffer_set_cull_mode(cbh_get(&self->cmd), VK_CULL_MODE_NONE);
+      commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_Opaque);
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
+      commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); /* Pad to support AMD */
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+
+      renderer_dispatch(self, vertices, scissors, true);
+   }
+
    static CommandBufferHandle *renderer_command_buffer_hack_fixme(Renderer *self);
    static bool renderer_get_filer_exclude(Renderer *self,
          FilterExclude exclude);
@@ -10314,12 +10363,6 @@ static void renderer_resolve(Renderer *self,
       }
 }
 
-static void renderer_ensure_command_buffer(Renderer *self)
-{
-   if (!cbh_is_valid(&self->cmd))
-      self->cmd = device_request_command_buffer(self->device, Type_Generic);
-}
-
 static float renderer_allocate_depth(Renderer *self,
       Domain domain,
       const Rect *rect)
@@ -11219,63 +11262,6 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
       commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
    }
    }
-}
-
-static void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
-   BufferVertexVec *vertices = &self->queue.semi_transparent_opaque;
-   PrimitiveInfoVec *scissors = &self->queue.semi_transparent_opaque_scissor;
-   if (BufferVertexVec_empty(vertices))
-      return;
-
-   commandbuffer_set_opaque_state(cbh_get(&self->cmd));
-   commandbuffer_set_cull_mode(cbh_get(&self->cmd), VK_CULL_MODE_NONE);
-   commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
-   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_SemiTransOpaque);
-   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
-   commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
-
-   renderer_dispatch(self, vertices, scissors, true);
-}
-
-static void renderer_render_opaque_texture_primitives(Renderer *self){
-   BufferVertexVec *vertices = &self->queue.opaque_textured;
-   PrimitiveInfoVec *scissors = &self->queue.opaque_textured_scissor;
-   if (BufferVertexVec_empty(vertices))
-      return;
-
-   commandbuffer_set_opaque_state(cbh_get(&self->cmd));
-   commandbuffer_set_cull_mode(cbh_get(&self->cmd), VK_CULL_MODE_NONE);
-   commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
-   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_Opaque);
-   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
-   commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); /* Pad to support AMD */
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
-
-   renderer_dispatch(self, vertices, scissors, true);
-}
-
-static void renderer_flush_blits(Renderer *self)
-{
-   renderer_ensure_command_buffer(self);
-   renderer_flush_blit(self, &self->queue.scaled_blits, self->pipelines.blit_vram_scaled, true);
-   renderer_flush_blit(self, &self->queue.scaled_masked_blits, self->pipelines.blit_vram_scaled_masked, true);
-   renderer_flush_blit(self, &self->queue.unscaled_blits, self->pipelines.blit_vram_unscaled, false);
-   renderer_flush_blit(self, &self->queue.unscaled_masked_blits, self->pipelines.blit_vram_unscaled_masked, false);
-   BlitInfoVec_clear(&self->queue.scaled_blits);
-   BlitInfoVec_clear(&self->queue.scaled_masked_blits);
-   BlitInfoVec_clear(&self->queue.unscaled_blits);
-   BlitInfoVec_clear(&self->queue.unscaled_masked_blits);
 }
 
 static void renderer_flush_blit(Renderer *self,
