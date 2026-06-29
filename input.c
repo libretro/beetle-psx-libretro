@@ -2,7 +2,6 @@
 #include <retro_miscellaneous.h>
 #include <retro_inline.h>
 #include "mednafen/mednafen-types.h"
-#include <math.h>
 #include "mednafen/git.h"
 #include "mednafen/psx/frontio.h"
 #include "input.h"
@@ -23,7 +22,7 @@ static FrontIO* FIO; /*  cached in input_set_fio */
 
 static unsigned players = 2;
 static bool enable_analog_calibration = false;
-static float mouse_sensitivity = 1.0f;
+static int32_t mouse_sensitivity_q16 = (1 << 16); /* 1.0 in Q16 */
 static int gun_cursor = SETTING_GUN_CROSSHAIR_CROSS;
 
 int gun_input_mode = SETTING_GUN_INPUT_LIGHTGUN;
@@ -68,9 +67,9 @@ static INPUT_DATA input_data[ MAX_CONTROLLERS ] = {{{0}}};
 
 struct analog_calibration
 {
-   float left;
-   float right;
-   float twist;
+   int32_t left;   /* Q16 running-max stick radius  */
+   int32_t right;  /* Q16 running-max stick radius  */
+   int32_t twist;  /* Q16 running-max twist deflect */
 };
 
 static struct analog_calibration analog_calibration[MAX_CONTROLLERS];
@@ -181,21 +180,98 @@ static const unsigned input_map_controller[ INPUT_MAP_CONTROLLER_SIZE ] =
 /*  Local Functions */
 /* ------------------------------------------------------------------------------ */
 
-/*  Return the normalized distance between the origin and the current */
-/*  (x,y) analog stick position */
-static float analog_radius(int x, int y)
-{
-   float fx = ((float)x) / 0x8000;
-   float fy = ((float)y) / 0x8000;
+/* ----------------------------------------------------------------------
+ *  Deterministic fixed-point analog calibration
+ *
+ *  The DualShock self-calibration and neGcon twist paths used to run in
+ *  float (sqrtf, division, square/cube response curves) and feed the
+ *  result straight into the emulated controller registers
+ *  (p_input->u32[]).  float sqrt/divide is not bit-reproducible across
+ *  architectures, x87-vs-SSE code generation, or FMA contraction, so
+ *  two netplay peers could derive different controller bytes from
+ *  identical stick input and desync.  Everything below is integer Q16
+ *  fixed point: the same stick coordinates now yield byte-identical
+ *  controller output on every build, arch and FPU mode.
+ *
+ *  (analog_calibration[] is host-only runtime state - it is never
+ *  serialized into a savestate - so no state-format compatibility is
+ *  affected by changing its representation to Q16.)
+ * -------------------------------------------------------------------- */
 
-   return sqrtf(fx * fx + fy * fy);
+#define ANALOG_Q16_SHIFT 16
+#define ANALOG_Q16_ONE   (1 << ANALOG_Q16_SHIFT)   /* 1.0 in Q16        */
+
+/* Q16 constants, round(x * 65536). */
+#define ANALOG_CALIB_INIT_Q16  45875  /* 0.7   running-max seed         */
+#define DUALSHOCK_RADIUS_Q16   90899  /* 1.387 native full-swing radius */
+#define NEGCON_DEFLECTION_Q16  88474  /* 1.35  native full twist        */
+
+/*  64-bit integer square root (binary, no FPU); returns floor(sqrt(x)). */
+static uint32_t analog_isqrt64(uint64_t x)
+{
+   uint64_t res = 0;
+   uint64_t bit = (uint64_t)1 << 62;
+
+   while (bit > x)
+      bit >>= 2;
+
+   while (bit != 0)
+   {
+      if (x >= res + bit)
+      {
+         x   -= res + bit;
+         res  = (res >> 1) + bit;
+      }
+      else
+         res >>= 1;
+      bit >>= 2;
+   }
+   return (uint32_t)res;
 }
 
-static INLINE uint32_t analog_clamp_scale(uint32_t v, float s)
+/*  Q16-by-Q16 multiply -> Q16, truncating toward zero (portable; avoids
+ *  implementation-defined signed right shift). */
+static INLINE int32_t analog_q16_mul(int32_t a, int32_t b)
 {
-   float r = (float)v * s;
-   uint32_t u = (uint32_t)r;
-   return u > 0x7fff ? 0x7fff : u;
+   return (int32_t)(((int64_t)a * b) / ANALOG_Q16_ONE);
+}
+
+/*  Return the normalized distance between the origin and the current
+ *  (x,y) analog stick position, in Q16 (1.0 == full axis swing).
+ *  radius = sqrt(x^2 + y^2) / 32768; in Q16 that is
+ *  sqrt((x^2 + y^2) << 2), since (sqrt(N)*2)^2 == N<<2 and
+ *  65536/32768 == 2. */
+static int32_t analog_radius_q16(int x, int y)
+{
+   uint64_t mag2 = (uint64_t)((int64_t)x * x) + (uint64_t)((int64_t)y * y);
+   return (int32_t)analog_isqrt64(mag2 << 2);
+}
+
+/*  scale = native / calib, both Q16 -> result in Q16. */
+static int32_t analog_scale_q16(int32_t native_q16, int32_t calib_q16)
+{
+   if (calib_q16 <= 0)
+      return ANALOG_Q16_ONE;
+   return (int32_t)(((uint64_t)(uint32_t)native_q16 << ANALOG_Q16_SHIFT)
+                    / (uint32_t)calib_q16);
+}
+
+/*  Scale controller-axis magnitude v (0..0x8000) by Q16 factor s,
+ *  truncating toward zero (matching the old (uint32_t)(float) cast) and
+ *  clamping to the 0x7FFF controller range. */
+static INLINE uint32_t analog_clamp_scale_q16(uint32_t v, int32_t s_q16)
+{
+   uint64_t r = ((uint64_t)v * (uint32_t)s_q16) >> ANALOG_Q16_SHIFT;
+   return r > 0x7FFF ? 0x7FFF : (uint32_t)r;
+}
+
+/*  Q16/Q32 product -> int, rounded half away from zero (matches roundf). */
+static INLINE int32_t analog_q16_round(int64_t q16_product)
+{
+   int64_t half = ANALOG_Q16_ONE / 2;
+   if (q16_product >= 0)
+      return  (int32_t)(( q16_product + half) >> ANALOG_Q16_SHIFT);
+   return    -(int32_t)((-q16_product + half) >> ANALOG_Q16_SHIFT);
 }
 
 static uint16_t get_analog_button( retro_input_state_t input_state_cb,
@@ -459,9 +535,9 @@ void input_init_calibration(void)
    unsigned i;
    for (i = 0; i < MAX_CONTROLLERS; i++ )
    {
-      analog_calibration[ i ].left = 0.7f;
-      analog_calibration[ i ].right = 0.7f;
-      analog_calibration[ i ].twist = 0.7f;
+      analog_calibration[ i ].left  = ANALOG_CALIB_INIT_Q16;
+      analog_calibration[ i ].right = ANALOG_CALIB_INIT_Q16;
+      analog_calibration[ i ].twist = ANALOG_CALIB_INIT_Q16;
    }
 }
 
@@ -479,7 +555,7 @@ void input_set_player_count(unsigned _players)
 void input_set_mouse_sensitivity( int percent )
 {
    if ( percent > 0 && percent <= 200 )
-      mouse_sensitivity = (float)percent / 100.0f;
+      mouse_sensitivity_q16 = (int32_t)(((int64_t)percent << 16) / 100);
 }
 
 void input_set_gun_cursor( int cursor )
@@ -750,8 +826,8 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                int dx_raw = input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X );
                int dy_raw = input_state_cb( iplayer, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y );
 
-               p_input->u32[ 0 ] = (int)roundf( dx_raw * mouse_sensitivity );
-               p_input->u32[ 1 ] = (int)roundf( dy_raw * mouse_sensitivity );
+               p_input->u32[ 0 ] = analog_q16_round( (int64_t)dx_raw * mouse_sensitivity_q16 );
+               p_input->u32[ 1 ] = analog_q16_round( (int64_t)dy_raw * mouse_sensitivity_q16 );
             }
 
             break;
@@ -857,8 +933,8 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                if ( enable_analog_calibration )
                {
                   /*  This represents the maximal value the DualShock sticks can */
-                  /*  reach, where 1.0 would be the maximum value along the X or */
-                  /*  Y axis. */
+                  /*  reach, where 1.0 (== ANALOG_Q16_ONE in Q16) would be the */
+                  /*  maximum value along the X or Y axis. */
                   /*  */
                   /*  simias: With my (old and clunky) DualShock I managed to */
                   /*  reach x = 0x00, y = 0x05 on the left stick which give us a */
@@ -869,50 +945,49 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                   /*  */
                   /*    sqrt(left_x * left_x + left_y * left_y) / 0x80 */
                   /*  */
-                  /*  Which gives the value below */
-                  static const float dualshock_analog_radius = 1.387;
-                  float l_scaling, r_scaling;
+                  /*  Which gives DUALSHOCK_RADIUS_Q16 (1.387 in Q16). */
+                  int32_t l_scaling, r_scaling;
                   /* Compute the "radius" (distance from 0, 0) of the current
-                   * stick position, using the same normalized values */
-                  float l = analog_radius(analog_left_x, analog_left_y);
-                  float r = analog_radius(analog_right_x, analog_right_y);
+                   * stick position in Q16, using the same normalized values */
+                  int32_t l = analog_radius_q16(analog_left_x, analog_left_y);
+                  int32_t r = analog_radius_q16(analog_right_x, analog_right_y);
 
                   /* We recalibrate when we find a new max value for the sticks */
                   if ( l > calibration->left )
                   {
                      calibration->left = l;
-                     log_cb(RETRO_LOG_DEBUG, "Recalibrating left stick, radius: %f\n", l);
+                     log_cb(RETRO_LOG_DEBUG, "Recalibrating left stick, radius q16: %d\n", l);
                   }
 
                   if ( r > calibration->right )
                   {
                      calibration->right = r;
-                     log_cb(RETRO_LOG_DEBUG, "Recalibrating right stick, radius: %f\n", r);
+                     log_cb(RETRO_LOG_DEBUG, "Recalibrating right stick, radius q16: %d\n", r);
                   }
 
                   /*  Now compute the scaling factor to apply to convert the */
                   /*  emulator's controller coordinates to a native DualShock's */
                   /*  ones */
-                  l_scaling = dualshock_analog_radius / calibration->left;
-                  r_scaling = dualshock_analog_radius / calibration->right;
+                  l_scaling = analog_scale_q16(DUALSHOCK_RADIUS_Q16, calibration->left);
+                  r_scaling = analog_scale_q16(DUALSHOCK_RADIUS_Q16, calibration->right);
 
-                  l_left = analog_clamp_scale(l_left, l_scaling);
-                  l_right = analog_clamp_scale(l_right, l_scaling);
-                  l_up = analog_clamp_scale(l_up, l_scaling);
-                  l_down = analog_clamp_scale(l_down, l_scaling);
+                  l_left = analog_clamp_scale_q16(l_left, l_scaling);
+                  l_right = analog_clamp_scale_q16(l_right, l_scaling);
+                  l_up = analog_clamp_scale_q16(l_up, l_scaling);
+                  l_down = analog_clamp_scale_q16(l_down, l_scaling);
 
-                  r_left = analog_clamp_scale(r_left, r_scaling);
-                  r_right = analog_clamp_scale(r_right, r_scaling);
-                  r_up = analog_clamp_scale(r_up, r_scaling);
-                  r_down = analog_clamp_scale(r_down, r_scaling);
+                  r_left = analog_clamp_scale_q16(r_left, r_scaling);
+                  r_right = analog_clamp_scale_q16(r_right, r_scaling);
+                  r_up = analog_clamp_scale_q16(r_up, r_scaling);
+                  r_down = analog_clamp_scale_q16(r_down, r_scaling);
                }
                else
                {
                   /*  Reset the calibration. Since we only increase the */
                   /*  calibration coordinates we can start with a reasonably */
                   /*  small value. */
-                  calibration->left = 0.7;
-                  calibration->right = 0.7;
+                  calibration->left  = ANALOG_CALIB_INIT_Q16;
+                  calibration->right = ANALOG_CALIB_INIT_Q16;
                }
 
                p_input->u32[1] = r_right;
@@ -961,7 +1036,8 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
             /*  Twist */
             {
                struct analog_calibration *calibration = &analog_calibration[ iplayer ];
-               float analog_left_x_amplitude;
+               int32_t amplitude_q16;       /* Q16 'amplitude' in [-1.0,1.0] */
+               int32_t denom;
                uint32_t twist_left, twist_right;
                int analog_left_x = input_state_cb( iplayer, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
                      RETRO_DEVICE_ID_ANALOG_X);
@@ -974,8 +1050,11 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                else
                   analog_left_x = 0;
 
-               /* Convert to an 'amplitude' [-1.0,1.0] */
-               analog_left_x_amplitude = (float)analog_left_x / (float)(NEGCON_RANGE - negcon_deadzone);
+               /* Convert to a Q16 'amplitude' in [-1.0,1.0] */
+               denom = NEGCON_RANGE - negcon_deadzone;
+               if (denom < 1)
+                  denom = 1;
+               amplitude_q16 = (int32_t)(((int64_t)analog_left_x << ANALOG_Q16_SHIFT) / denom);
 
                /*  Handle 'analog self-calibration'... */
                /*  NB: This seems pointless, since all it does is arbitrarily */
@@ -985,52 +1064,56 @@ void input_update(bool libretro_supports_bitmasks, retro_input_state_t input_sta
                /*  in place... */
                if ( enable_analog_calibration )
                {
-                  /* NOTE: This value was copied from the DualShock code. Needs confirmation. */
-                  static const float neGcon_analog_deflection = 1.35f;
-                  /* Compute the current stick deflection */
-                  float twist = fabsf(analog_left_x_amplitude);
-                  float twist_scaling;
+                  /* Compute the current stick deflection (Q16 magnitude) */
+                  int32_t twist = amplitude_q16 < 0 ? -amplitude_q16 : amplitude_q16;
+                  int32_t twist_scaling;
                   /* We recalibrate when we find a new max value for the sticks */
                   if ( twist > calibration->twist )
                   {
                      calibration->twist = twist;
-                     log_cb(RETRO_LOG_DEBUG, "Recalibrating twist, deflection: %f\n", twist);
+                     log_cb(RETRO_LOG_DEBUG, "Recalibrating twist, deflection q16: %d\n", twist);
                   }
 
-
                   /* Now compute the scaling factor to apply to convert the
-                   * emulator's controller coordinates to a native neGcon range. */
-                  twist_scaling = neGcon_analog_deflection / calibration->twist;
+                   * emulator's controller coordinates to a native neGcon range.
+                   * NEGCON_DEFLECTION_Q16 is 1.35 in Q16, copied from the
+                   * DualShock code (needs confirmation). */
+                  twist_scaling = analog_scale_q16(NEGCON_DEFLECTION_Q16, calibration->twist);
 
-                  analog_left_x_amplitude = analog_left_x_amplitude * twist_scaling;
+                  amplitude_q16 = analog_q16_mul(amplitude_q16, twist_scaling);
                }
                else
                {
                   /*  Reset the calibration. Since we only increase the */
                   /*  calibration coordinates we can start with a reasonably */
                   /*  small value. */
-                  calibration->twist = 0.7;
+                  calibration->twist = ANALOG_CALIB_INIT_Q16;
                }
 
                /*  Safety check */
                /*  (also fixes range when above 'analog self-calibration' twist_scaling */
                /*  is applied) */
-               analog_left_x_amplitude = analog_left_x_amplitude < -1.0f ? -1.0f : analog_left_x_amplitude;
-               analog_left_x_amplitude = analog_left_x_amplitude > 1.0f ? 1.0f : analog_left_x_amplitude;
+               if (amplitude_q16 < -ANALOG_Q16_ONE)
+                  amplitude_q16 = -ANALOG_Q16_ONE;
+               else if (amplitude_q16 > ANALOG_Q16_ONE)
+                  amplitude_q16 = ANALOG_Q16_ONE;
 
                /* Adjust response */
                if (negcon_linearity == 2)
                {
-                  if (analog_left_x_amplitude < 0.0)
-                     analog_left_x_amplitude = -(analog_left_x_amplitude * analog_left_x_amplitude);
-                  else
-                     analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude;
+                  int32_t sq = analog_q16_mul(amplitude_q16, amplitude_q16);
+                  amplitude_q16 = (amplitude_q16 < 0) ? -sq : sq;
                }
                else if (negcon_linearity == 3)
-                  analog_left_x_amplitude = analog_left_x_amplitude * analog_left_x_amplitude * analog_left_x_amplitude;
+               {
+                  int32_t sq = analog_q16_mul(amplitude_q16, amplitude_q16);
+                  amplitude_q16 = analog_q16_mul(sq, amplitude_q16);
+               }
 
-               /*  Convert back from an 'amplitude' [-1.0,1.0] to a 'range' [-0x7FFF,0x7FFF] */
-               analog_left_x = (int)(analog_left_x_amplitude * NEGCON_RANGE);
+               /*  Convert back from a Q16 'amplitude' [-1.0,1.0] to a 'range'
+                *  [-0x7FFF,0x7FFF], truncating toward zero like the old
+                *  (int)(amplitude * NEGCON_RANGE) cast. */
+               analog_left_x = (int)(((int64_t)amplitude_q16 * NEGCON_RANGE) / ANALOG_Q16_ONE);
 
                twist_left  = analog_left_x < 0 ? -analog_left_x : 0;
                twist_right = analog_left_x > 0 ?  analog_left_x : 0;
