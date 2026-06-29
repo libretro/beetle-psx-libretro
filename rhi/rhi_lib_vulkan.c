@@ -12165,7 +12165,7 @@ static void command_pool_deinit(CommandPool *cp)
 #endif
 }
 
-VkCommandBuffer command_pool_request_command_buffer(CommandPool *self)
+static VkCommandBuffer command_pool_request_command_buffer(CommandPool *self)
 {
    if (self->index < CommandBufferVec_size(&self->buffers))
    {
@@ -12207,7 +12207,7 @@ VkCommandBuffer command_pool_request_command_buffer(CommandPool *self)
    }
 }
 
-void command_pool_begin(CommandPool *self)
+static void command_pool_begin(CommandPool *self)
 {
 #ifdef VULKAN_DEBUG
    VK_ASSERT(CommandBufferVec_empty(&self->in_flight));
@@ -15756,7 +15756,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       return true;
    }
 
-   bool context_init(Context *ctx, VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface,
+   static bool context_init(Context *ctx, VkInstance instance, VkPhysicalDevice gpu, VkSurfaceKHR surface,
          const char **required_device_extensions, unsigned num_required_device_extensions,
          const char **required_device_layers, unsigned num_required_device_layers,
          const VkPhysicalDeviceFeatures *required_features)
@@ -15797,7 +15797,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       return true;
    }
 
-   void context_deinit(Context *ctx)
+   static void context_deinit(Context *ctx)
    {
       context_destroy(ctx);
    }
@@ -19603,7 +19603,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
     * bursts short without starving the emulation/render threads. */
    enum { NUM_IO_THREADS = 4 };
 
-   void io_thread_init(IOThread *t) {
+   static void io_thread_init(IOThread *t) {
       io_channel_rc_lock_init();
       t->channel = io_channel_new(); /* this IOThread holds one reference */
       { int i; for (i = 0; i < NUM_IO_THREADS; i++) {
@@ -19620,7 +19620,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
          }
       } }
    }
-   void io_thread_deinit(IOThread *t) {
+   static void io_thread_deinit(IOThread *t) {
       slock_lock(t->channel->lock);
       t->channel->done = true;
       slock_unlock(t->channel->lock);
@@ -19630,7 +19630,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       t->channel = NULL;
    }
 
-   void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode) {
+   static void texture_tracker_dump_image(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode) {
       int bpp;
       char path[PATH_MAX_TT];
       int ppp;
@@ -19874,7 +19874,7 @@ static Rect fromSRect(SRect rect) {
       return rect_contains(&fr, &r);
    }
 
-   Palette texture_tracker_get_palette(struct TextureTracker *self, Rect palette_rect) {
+   static Palette texture_tracker_get_palette(struct TextureTracker *self, Rect palette_rect) {
       assert(palette_rect.height == 1);
 
       { static RectIndexSet overlap = { NULL, 0, 0 };
@@ -19901,7 +19901,7 @@ static Rect fromSRect(SRect rect) {
       }
    }
 
-   uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, Rect palette_rect) {
+   static uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, Rect palette_rect) {
       Palette palette;
       int i;
       for (i = 0; i < self->cached_palette_hashes_count; i++) {
@@ -20177,7 +20177,7 @@ static Rect fromSRect(SRect rect) {
       }
    }
 
-   void texture_tracker_load_hd_texture(struct TextureTracker *self, uint32_t hash) {
+   static void texture_tracker_load_hd_texture(struct TextureTracker *self, uint32_t hash) {
       int lo = hd_key_set_lower_bound(&self->known_files, (uint64_t)hash << 32);
       int hi = hd_key_set_lower_bound(&self->known_files, ((uint64_t)hash + 1) << 32);
       if (lo != hi) {
@@ -20206,7 +20206,7 @@ static Rect fromSRect(SRect rect) {
     * cache. The IO thread only pushes a response on success, so a
     * failed/missing load stays in `requested` and is never retried (until a
     * reload clears it). */
-   void texture_tracker_want_combo(struct TextureTracker *self, HdTextureId id) {
+   static void texture_tracker_want_combo(struct TextureTracker *self, HdTextureId id) {
       if (HdGpuCache_contains(&self->hd_gpu_cache, hd_pack_key(id)) || HdImageCache_contains(&self->hd_cache, hd_pack_key(id)))
          return; /* already resident in VRAM, or already decoded in RAM */
       if (!hd_key_set_insert(&self->requested, hd_pack_key(id)))
@@ -20242,7 +20242,7 @@ static Rect fromSRect(SRect rect) {
     * decoded combos that were never drawn - thrashing the RAM cache and
     * clogging the IO queue ahead of the combos actually on screen, which made
     * pop-in worse.) */
-   void texture_tracker_request_hd_texture(struct TextureTracker *self, TextureUpload *upload, uint32_t palette_hash) {
+   static void texture_tracker_request_hd_texture(struct TextureTracker *self, TextureUpload *upload, uint32_t palette_hash) {
       if (hd_tex_map_contains(&upload->textures, palette_hash))
          return; /* already attached to this upload */
 
@@ -20276,7 +20276,7 @@ static Rect fromSRect(SRect rect) {
             rect->x, rect->y, rect->width, rect->height);
    }
 
-   void texture_tracker_dump_texture(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode, DumpedMode dump_mode) {
+   static void texture_tracker_dump_texture(struct TextureTracker *self, TextureUpload *upload, UsedMode *mode, DumpedMode dump_mode) {
       int dmi;
       bool already_dumped;
       if (!upload->dumpable) {
@@ -20643,7 +20643,7 @@ static bool is_power_of_two(int n) {
       fused_pages_remove_dead(&self->fused_pages);
       }
    }
-   TextureUpload *texture_tracker_find_upload(struct TextureTracker *self, uint32_t hash) {
+   static TextureUpload *texture_tracker_find_upload(struct TextureTracker *self, uint32_t hash) {
       TextureUpload *upload = rect_tracker_find_upload(&self->tracker, hash); /* borrowed */
       int _ri;
 
@@ -20764,7 +20764,7 @@ static bool is_power_of_two(int n) {
       }
    }
 
-   void texture_tracker_reload_textures_from_disk(struct TextureTracker *self) {
+   static void texture_tracker_reload_textures_from_disk(struct TextureTracker *self) {
       char rpath[PATH_MAX_TT];
       /* Reload the directory listing */
       read_texture_directory(&self->known_files, replacements_path(rpath, sizeof(rpath)));
@@ -21040,7 +21040,7 @@ static int clamp(int x, int low, int high)
       }
    }
 
-   void lookup_grid_init(LookupGrid *g) {
+   static void lookup_grid_init(LookupGrid *g) {
       int i;
       for (i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++) {
          g->cells[i].entries = NULL;
@@ -21049,13 +21049,13 @@ static int clamp(int x, int low, int high)
       }
    }
 
-   void lookup_grid_deinit(LookupGrid *g) {
+   static void lookup_grid_deinit(LookupGrid *g) {
       int i;
       for (i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++)
          free(g->cells[i].entries);
    }
 
-   void lookup_grid_insert(LookupGrid *self, SRect r, RectIndex index)
+   static void lookup_grid_insert(LookupGrid *self, SRect r, RectIndex index)
    {
       CellBounds c = cellBounds(r);
       int x, y;
@@ -21077,7 +21077,7 @@ static int clamp(int x, int low, int high)
       }
    }
 
-   void lookup_grid_get(LookupGrid *self, SRect r, RectIndexSet *results)
+   static void lookup_grid_get(LookupGrid *self, SRect r, RectIndexSet *results)
    {
       CellBounds c = cellBounds(r);
       int x, y;
@@ -21095,7 +21095,7 @@ static int clamp(int x, int low, int high)
          }
       }
    }
-   void lookup_grid_clear(LookupGrid *self)
+   static void lookup_grid_clear(LookupGrid *self)
    {
       int i;
       for (i = 0; i < LOOKUP_GRID_COLUMNS * LOOKUP_GRID_ROWS; i++)
