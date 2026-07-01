@@ -9881,7 +9881,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    bool *filtering_out, bool *scaled_read_out, unsigned *shift_out, bool *offset_uv_out){
       int16_t param;
       float z;
-   unsigned shift; bool filtering, scaled_read, offset_uv; HdTextureHandle hd_texture_index; /* local working copies; written back to *_out at function end */
+   unsigned shift; bool filtering, scaled_read, offset_uv; HdTextureHandle hd_texture_index = hd_handle_make_none(); /* local working copies; written back to *_out at function end. Seeded to 'none' so untextured draws (which skip the hd_texture_vram.height > 0 assignment below) don't write back / test an indeterminate handle. */
    switch (self->render_state.texture_mode)
    {
    case TextureMode_Palette4bpp:
@@ -21406,12 +21406,24 @@ static int64_t page_bytes(FusionRects *fusion)
       /* Make a new fused page */
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "Creating new fused page for palette %x\n", palette);
 
+      /* Initialise the handle and fusion to a valid empty state before
+       * rebuild_page reads them: it tests ih_is_valid(&page->texture) then
+       * dereferences via image_get_width, and fusionrects_eq/_move touch
+       * page->fusion.rects.  The C++->C conversion dropped FusedPage's
+       * default member initialisers, so these were left indeterminate; at
+       * -O2/-O3 the garbage texture handle (observed 0xffffffff) passes
+       * ih_is_valid and crashes in image_get_width. */
+      page.texture = ih_make(NULL);   /* null handle -> ih_is_valid() false -> rebuild_page creates a fresh texture */
+      fusionrects_init(&page.fusion); /* empty rects + zeroed vram_rect/scaleX/scaleY (never spuriously eq to a real fusion) */
       page.dead = false;
       page.dirty = false;
       page.full_page_rect = page_rect;
       page.palette = palette;
       rebuild_page(&page, tracker, uploader);
       fused_page_vec_push(&self->pages, &page);
+      /* push deep-copies via fp_copy (increfs the texture, deep-copies the
+       * rects), so release the local's now-redundant owned references. */
+      fp_destroy(&page);
       return hd_handle_make_fused(fused_page_vec_size(&self->pages) - 1);
    }
    static void fused_pages_mark_dirty(struct FusedPages *self, Rect rect) {
