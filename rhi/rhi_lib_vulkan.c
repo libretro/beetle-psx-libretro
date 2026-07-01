@@ -20041,6 +20041,7 @@ static Rect fromSRect(SRect rect) {
       { static RectIndexSet overlap = { NULL, 0, 0 };
 
       OwnedRectVec to_restore;
+      ownedrects_init(&to_restore); /* must be valid before ownedrects_push below (reads v.items/count/cap); left indeterminate otherwise -> garbage push at -O2/-O3 */
       rect_tracker_overlapping(&self->tracker, rect, &overlap);
       { int oi; for (oi = 0; oi < overlap.count; oi++) {
          RectIndex index = overlap.items[oi];
