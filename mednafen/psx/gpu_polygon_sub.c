@@ -12,7 +12,6 @@
 #include "../../rhi/rhi_intf.h"
 #include "../../beetle_psx_globals.h"
 
-#include <float.h>
 #include <retro_miscellaneous.h>
 
 /* Determine whether to offset UVs to account for difference in interpolation between PS1 and modern GPUs */
@@ -41,54 +40,54 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 	 */
 	{
 		/* It might be faster to do more direct checking here, but the code below handles primitives in any order
-		 * and orientation, and is far more SIMD-friendly if needed. */
-		float abx = vertices[1].x - vertices[0].x;
-		float aby = vertices[1].y - vertices[0].y;
-		float bcx = vertices[2].x - vertices[1].x;
-		float bcy = vertices[2].y - vertices[1].y;
-		float cax = vertices[0].x - vertices[2].x;
-		float cay = vertices[0].y - vertices[2].y;
+		 * and orientation, and is far more SIMD-friendly if needed.
+		 *
+		 * All inputs (x, y, u, v) are int32_t, so every derivative below is
+		 * integer-valued.  It used to be computed in float: at upscale_shift
+		 * == 0 the coords are small and the float math is exact, but with the
+		 * software renderer upscaling (upscale_shift > 0) the coords are
+		 * shifted up and the mul-add chains overflow 2^24, at which point the
+		 * < 0 / == 0 tests round - and round differently under FMA contraction
+		 * or x87-vs-SSE codegen, so off_u/off_v/may_be_2d (and the Wild Arms 2
+		 * vertex fixup) could diverge between netplay peers.  Compute the
+		 * derivatives exactly in int64 instead; the results feed only sign and
+		 * zero tests, so the old `* inv_area` scaling was a no-op for the
+		 * decisions (it cannot change a sign or a zero) and is dropped. */
+		int64_t abx = (int64_t)vertices[1].x - vertices[0].x;
+		int64_t aby = (int64_t)vertices[1].y - vertices[0].y;
+		int64_t bcx = (int64_t)vertices[2].x - vertices[1].x;
+		int64_t bcy = (int64_t)vertices[2].y - vertices[1].y;
+		int64_t cax = (int64_t)vertices[0].x - vertices[2].x;
+		int64_t cay = (int64_t)vertices[0].y - vertices[2].y;
 
 		/* Compute static derivatives, just assume W is uniform across the primitive
 		 * and that the plane equation remains the same across the quad. */
-		float dudx = -aby * (float)vertices[2].u - bcy * (float)vertices[0].u - cay * (float)vertices[1].u;
-		float dvdx = -aby * (float)vertices[2].v - bcy * (float)vertices[0].v - cay * (float)vertices[1].v;
-		float dudy = +abx * (float)vertices[2].u + bcx * (float)vertices[0].u + cax * (float)vertices[1].u;
-		float dvdy = +abx * (float)vertices[2].v + bcx * (float)vertices[0].v + cax * (float)vertices[1].v;
-		float area = bcx * cay - bcy * cax;
+		int64_t dudx = -aby * vertices[2].u - bcy * vertices[0].u - cay * vertices[1].u;
+		int64_t dvdx = -aby * vertices[2].v - bcy * vertices[0].v - cay * vertices[1].v;
+		int64_t dudy = +abx * vertices[2].u + bcx * vertices[0].u + cax * vertices[1].u;
+		int64_t dvdy = +abx * vertices[2].v + bcx * vertices[0].v + cax * vertices[1].v;
+		int64_t area = bcx * cay - bcy * cax;
 
 		/* iCB: Detect and reject any triangles with 0 size texture area */
-		float texArea = (vertices[1].u - vertices[0].u) * (vertices[2].v - vertices[0].v) - (vertices[2].u - vertices[0].u) * (vertices[1].v - vertices[0].v);
+		int64_t texArea = ((int64_t)vertices[1].u - vertices[0].u) * (vertices[2].v - vertices[0].v) - ((int64_t)vertices[2].u - vertices[0].u) * (vertices[1].v - vertices[0].v);
 
 		/* Leverage PGXP to further avoid 3D polygons that just happen to align this way after projection */
 		bool is3D = ((vertices[0].precise[2] != vertices[1].precise[2]) || (vertices[1].precise[2] != vertices[2].precise[2]));
 
 		/* Shouldn't matter as degenerate primitives will be culled anyways. */
-		if ((area != 0.0f) && (texArea != 0.0f) && !is3D)
+		if ((area != 0) && (texArea != 0) && !is3D)
 		{
-			float inv_area = 1.0f / area;
-			bool neg_dudx;
-			bool neg_dudy;
-			bool neg_dvdx;
-			bool neg_dvdy;
-			bool zero_dudx;
-			bool zero_dudy;
-			bool zero_dvdx;
-			bool zero_dvdy;
-
-			dudx *= inv_area;
-			dudy *= inv_area;
-			dvdx *= inv_area;
-			dvdy *= inv_area;
-
-			neg_dudx = dudx < 0.0f;
-			neg_dudy = dudy < 0.0f;
-			neg_dvdx = dvdx < 0.0f;
-			neg_dvdy = dvdy < 0.0f;
-			zero_dudx = dudx == 0.0f;
-			zero_dudy = dudy == 0.0f;
-			zero_dvdx = dvdx == 0.0f;
-			zero_dvdy = dvdy == 0.0f;
+			/* Sign of (deriv / inv_area) equals (sign of deriv) XOR (sign
+			 * of area); zero-ness is unchanged since inv_area is non-zero. */
+			bool neg_area  = area < 0;
+			bool neg_dudx  = (dudx < 0) != neg_area;
+			bool neg_dudy  = (dudy < 0) != neg_area;
+			bool neg_dvdx  = (dvdx < 0) != neg_area;
+			bool neg_dvdy  = (dvdy < 0) != neg_area;
+			bool zero_dudx = dudx == 0;
+			bool zero_dudy = dudy == 0;
+			bool zero_dvdx = dvdx == 0;
+			bool zero_dvdy = dvdy == 0;
 
 			/* Dumb heuristic to check if a polygon may be 2D */
 			may_be_2d = may_be_2d || zero_dudy || zero_dudx || zero_dvdy || zero_dvdx;
@@ -120,10 +119,10 @@ void Calc_UVOffsets_Adjust_Verts(PS_GPU *gpu, tri_vertex *vertices, unsigned cou
 			/* HACK fix Wild Arms 2 overworld forest sprite
 			 * TODO generalize this perhaps? */
 			{
-				const float one = (float)(1 << gpu->upscale_shift);
+				const int64_t one = (int64_t)1 << gpu->upscale_shift;
 				if (zero_dvdx &&
 					(aby == one || bcy == one || cay == one) &&
-					(aby == 0.0 || bcy == 0.0 || cay == 0.0) &&
+					(aby == 0 || bcy == 0 || cay == 0) &&
 					(aby == -one || bcy == -one || cay == -one)
 				)
 				{
