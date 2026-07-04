@@ -13,12 +13,35 @@ Notable additions in this fork are:
 * PGXP perspective correct texturing and subpixel precision, developed by iCatButler;
 * OpenBIOS, allowing the emulator to be used without a BIOS file;
 * HD texture replacement caching overhaul (Vulkan renderer), see [HD_TEXTURE_CACHE.md](HD_TEXTURE_CACHE.md);
+* Page-aligned HD texture dump/replacement, an opt-in mode for static/3D art (Vulkan renderer), see [PAGE_ALIGN.md](PAGE_ALIGN.md);
+* HD Reduce Palette Range, an opt-in hash of only a texture's used palette entries for better replacement match coverage (Vulkan renderer);
 
 ## HD texture replacement caching
 
 This fork overhauls the Vulkan renderer's HD texture replacement pipeline so packs stay smooth on demanding content — particularly multi-palette animated sprites like Alucard in *Castlevania: Symphony of the Night*. It adds a three-tier, decode-once cache (VRAM images → RAM pixels → disk, LRU-evicted), binds cached textures in the same frame they're drawn to eliminate per-frame pop-in, and decodes PNGs on a 4-thread pool. New core options let you choose the **caching method** — *Eager* (the stock-Beetle default: prefetch all of a texture's palettes) or *Lazy* (load each texture+palette on demand) — and set the **VRAM/RAM cache budgets** (defaults 3 GB / 2 GB). The on-disk pack format is unchanged. Full details: [HD_TEXTURE_CACHE.md](HD_TEXTURE_CACHE.md).
 
 Tested with **RetroArch 1.22.2** (git 69a4f0e, build date Nov 20 2025, Compiler: MinGW 10.2.0 64-bit) on Windows.
+
+## Page-aligned texture replacement (experimental)
+
+An opt-in alternative to per-upload-rectangle HD textures: the Vulkan renderer can
+dump and replace at whole VRAM texture-page granularity (clean 256×256 tiles) instead
+of the fragmented upload-rectangle sections, which is friendlier for authoring static
+backgrounds, UI and 3D art. It layers on top of the HD texture cache above and reuses
+the same three-tier cache, IO pool and budgets. Default behaviour is unchanged
+(upload-rect), so existing packs are unaffected.
+
+Options (all default to the classic upload-rect behaviour):
+* **HD Dump Mode** — `Upload-rect` / `Page-aligned` / `Both` (collect both pack types in one playthrough).
+* **HD Replacement Mode** — `Upload-rect` / `Page-aligned`, with an optional **Cross-Mode Fallback** so one pack type can fill gaps from the other without converting packs.
+* **HD Reduce Palette Range** — hash only the CLUT entries a texture actually uses (not the whole CLUT), so one replacement keeps matching across unused/rewritten palette slots; applies to both upload-rect and page paths. Backward-compatible with existing packs.
+* **HD Texture Caching Method** also gains **Lazy (synchronous)** — load on first use but block until ready (no pop-in, may briefly stutter when many new textures appear at once).
+* **HD Texture Folder** — keep the dump/replacement folders under the Content, System or Save directory (auto-created).
+* Live hotkeys (requires RetroArch **Game Focus**): `]` toggles HD replacements with an on-screen message; `'` reloads replacements from disk.
+
+Page packs and upload-rect packs are **not** interchangeable (the hash covers a
+different region of VRAM). Full details and the authoring workflow:
+[PAGE_ALIGN.md](PAGE_ALIGN.md).
 
 ## Building
 

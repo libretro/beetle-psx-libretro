@@ -530,6 +530,21 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "disabled"
    },
+   {
+      BEETLE_OPT(hd_dump_mode),
+      "HD Dump Mode",
+      NULL,
+      "How dumped textures are laid out (experimental). 'Upload-rect' (default) dumps each tracked upload to <cd>-texture-dump/ (matches stock Beetle). 'Page-aligned' dumps whole VRAM texture pages to <cd>-texture-dump-pages/ for cleaner tiles. 'Both' dumps to both folders simultaneously, so a single playthrough collects both pack types (folders stay separate; pick which to edit afterwards). Page packs are NOT interchangeable with upload-rect packs (the hash covers a different region).",
+      NULL,
+      "video",
+      {
+         { "upload_rect",  "Upload-rect (match master)" },
+         { "page_aligned", "Page-aligned (experimental)" },
+         { "both",         "Both (dump to both folders)" },
+         { NULL, NULL },
+      },
+      "upload_rect"
+   },
 #endif
    {
       BEETLE_OPT(replace_textures),
@@ -546,15 +561,73 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
-      BEETLE_OPT(hd_caching_method),
-      "HD Texture Caching Method",
+      BEETLE_OPT(texture_directory),
+      "HD Texture Folder",
       NULL,
-      "How HD replacement textures are loaded. 'Eager' prefetches all palette variants of a texture when it is uploaded (matches stock Beetle); 'Lazy' loads each texture+palette only when first drawn (leaner; better for large multi-palette packs). Both use the VRAM/RAM caches and budgets below.",
+      "Where texture dump and replacement folders are kept. 'Content directory' (default) keeps them next to the game image (current behaviour). 'System directory' / 'Save directory' put them under RetroArch's configured System or Save folder instead - one central location for every game's packs (set those paths in Settings > Directory). Each game still gets its own '<name>-texture-dump' / '-replacements' subfolder, so games never collide. Changing this re-scans replacements from the new folder.",
       NULL,
       "video",
       {
-         { "eager", "Eager (match master)" },
-         { "lazy",  "Lazy (on demand)" },
+         { "content", "Content directory (default)" },
+         { "system",  "System directory" },
+         { "save",    "Save directory" },
+         { NULL, NULL },
+      },
+      "content"
+   },
+   {
+      BEETLE_OPT(hd_replacement_mode),
+      "HD Replacement Mode",
+      NULL,
+      "Where replacement textures are looked up (experimental). 'Upload-rect' (default) matches per-upload textures from <cd>-texture-replacements/ (matches stock Beetle). 'Page-aligned' matches whole VRAM pages from <cd>-texture-replacements-pages/. Independent of HD Dump Mode; page packs are NOT interchangeable with upload-rect packs.",
+      NULL,
+      "video",
+      {
+         { "upload_rect",  "Upload-rect (match master)" },
+         { "page_aligned", "Page-aligned (experimental)" },
+         { NULL, NULL },
+      },
+      "upload_rect"
+   },
+   {
+      BEETLE_OPT(hd_replacement_fallback),
+      "HD Replacement Cross-Mode Fallback",
+      NULL,
+      "On an HD texture miss in the active HD Replacement Mode, also check the OTHER mode's folder before falling back to native. Works both ways: an upload-rect pack can fill gaps from a page-aligned pack and vice-versa, without converting packs. Best with the Lazy caching method.",
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(reduce_palette_range),
+      "HD Reduce Palette Range",
+      NULL,
+      "Opt-in. When dumping/replacing HD textures, hash only the palette (CLUT) entries the texture actually uses instead of the whole CLUT. This makes a texture's hash ignore unused palette entries that games often leave as garbage or rewrite over time, so one replacement keeps matching across those variations - fewer dumps and far better match coverage (most useful for 8bpp textures). Filenames are unchanged in format and remain loadable; old full-palette packs still match with this enabled (the matcher falls back to the full-palette hash when no reduced file is present). Applies to both the upload-rect and page-aligned paths. Re-dump a game to benefit.",
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(hd_caching_method),
+      "HD Texture Caching Method",
+      NULL,
+      "How HD replacement textures are loaded. 'Eager' prefetches all palette variants of a texture when it is uploaded (matches stock Beetle). 'Lazy' loads each texture+palette only when first drawn, in the background (leaner; brief pop-in possible on first use). 'Lazy (synchronous)' also loads on first use but blocks the renderer until ready (no pop-in, but may briefly stutter when many new textures appear at once). Both use the VRAM/RAM caches and budgets below.",
+      NULL,
+      "video",
+      {
+         { "eager",     "Eager (match master)" },
+         { "lazy",      "Lazy (async, on demand)" },
+         { "lazy_sync", "Lazy (synchronous, no pop-in)" },
          { NULL, NULL },
       },
       "eager"
