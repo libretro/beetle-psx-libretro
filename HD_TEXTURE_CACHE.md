@@ -45,20 +45,23 @@ Packs are authored exactly as before: textures live in
 
 ## Technical detail
 
-All changes are in `rhi/rhi_lib_vulkan.cpp` (the texture system is compiled only
-with `HAVE_VULKAN` / `TEXTURE_DUMPING_ENABLED`).
+All changes are in `rhi/rhi_lib_vulkan.c` (the texture system is compiled only
+with `HAVE_VULKAN` / `TEXTURE_DUMPING_ENABLED`). The renderer — and this caching
+system with it — has been ported to C (C89) alongside upstream's Vulkan backend,
+so the type names below are now C `struct`s with hand-rolled equivalents of the
+original C++ containers: an intrusive LRU list indexed through `HdKeySet`, and a
+manual-refcount `ImageHandle` in place of the STL/`shared_ptr` types.
 
 ### New types
 
-- **`CachedHdImage` / `HdImageCache`** — a byte-budgeted LRU cache (`std::list` +
-  `std::map`, keyed by `HdTextureId = {texture hash, palette hash}`) holding
-  **decoded CPU pixel levels** (RGBA + mips) and alpha flags. Default budget
-  `HD_CACHE_RAM_BUDGET = 2 GB`.
+- **`CachedHdImage` / `HdImageCache`** — a byte-budgeted LRU cache (an intrusive
+  linked list with an `HdKeySet` index, keyed by `HdTextureId = {texture hash,
+  palette hash}`) holding **decoded CPU pixel levels** (RGBA + mips) and alpha
+  flags. Default budget `HD_CACHE_RAM_BUDGET = 2 GB`.
 - **`CachedGpuImage` / `HdGpuCache`** — an analogous LRU cache holding
-  **uploaded `Vulkan::ImageHandle`s** (ready to bind, in VRAM). Default budget
+  **uploaded `ImageHandle`s** (ready to bind, in VRAM). Default budget
   `HD_CACHE_VRAM_BUDGET = 3 GB`. Eviction releases the handle, freeing VRAM once
   no live draw references it.
-- Added `#include <list>`.
 
 ### `TextureTracker` changes
 
@@ -110,9 +113,9 @@ the next safe point), and `dbg_*` diagnostic counters.
   into a **pool worker**: it takes one request at a time, runs PNG decode +
   mipmap generation **outside** the channel lock (workers run in parallel),
   pushes the response under the lock, and cascade-signals the next worker.
-- **`IOThread`** — the constructor spawns `NUM_IO_THREADS` (4) detached workers,
-  each given its own heap-allocated `shared_ptr` to the channel; the destructor
-  uses `scond_broadcast` to wake all workers for shutdown.
+- **`IOThread`** — spins up `NUM_IO_THREADS` (4) detached workers, each given its
+  own heap-allocated pointer to the shared channel; shutdown uses
+  `scond_broadcast` to wake all workers.
 
 ### Core options
 
@@ -123,10 +126,23 @@ the next safe point), and `dbg_*` diagnostic counters.
 Budgets are runtime-adjustable (lowering one evicts immediately). The `[hdcache]`
 INFO log line shows the active mode and `used/budget` for each tier.
 
+### Palette-range hashing (opt-in)
+
+- **HD Reduce Palette Range** — when enabled, a texture's palette hash covers only
+  the CLUT entries the texture actually indexes (`reduce_palette_bounds()` finds
+  the used `lo..hi` range) instead of the whole CLUT. Games frequently leave unused
+  CLUT entries as garbage or rewrite them over time; ignoring them lets a single
+  replacement keep matching across those variations — fewer dumps and much better
+  match coverage, most noticeably for 8bpp textures. It applies to **both** the
+  upload-rect and page-aligned paths. Dump **filenames are unchanged** and remain
+  loadable; when no reduced-range file is present the matcher falls back to the
+  full-palette hash, so existing full-palette packs still match with it enabled.
+  Off by default — re-dump a game to benefit.
+
 ### Build
 
 Build the HW core as usual — `make HAVE_HW=1` — then optionally `strip` the
-result. No new dependencies; the caches use only the C++ standard library plus
+result. No new dependencies; the caches use only the C standard library plus
 the `stb_image` and libretro threading already vendored in the tree.
 
 Built and tested on **Windows** (`mednafen_psx_hw_libretro.dll`, MSYS2/MinGW-w64)
