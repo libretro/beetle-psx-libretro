@@ -1353,6 +1353,31 @@ void FrontIO_SaveMemcardToPath(FrontIO *self_, unsigned int which, const char *p
  }
 }
 
+void FrontIO_SaveMemcardToPathAsync(FrontIO *self_, unsigned int which,
+      const char *path, FrontIO_MemcardWriteFn writer)
+{
+   FrontIO *self = self_;
+
+   assert(which < 8);
+
+   if (!writer)
+   {
+      FrontIO_SaveMemcardToPath(self, which, path, false);
+      return;
+   }
+
+   if ((self->DevicesMC[which])->vt->GetNVSize((self->DevicesMC[which]))
+         && (self->DevicesMC[which])->vt->GetNVDirtyCount((self->DevicesMC[which])))
+   {
+      (self->DevicesMC[which])->vt->ReadNV((self->DevicesMC[which]),
+            (self->DevicesMC[which])->vt->GetNVData((self->DevicesMC[which])), 0, (1 << 17));
+      /* writer copies synchronously, so it is safe to reset the dirty count
+       * and let the emulator mutate the card immediately after. */
+      writer(path, (self->DevicesMC[which])->vt->GetNVData((self->DevicesMC[which])), (1 << 17));
+      (self->DevicesMC[which])->vt->ResetNVDirtyCount((self->DevicesMC[which]));
+   }
+}
+
 void FrontIO_GPULineHook(FrontIO *self_, const int32_t timestamp, const int32_t line_timestamp, bool vsync, uint32_t *pixels, const unsigned width, const unsigned pix_clock_offset, const unsigned pix_clock, const unsigned pix_clock_divider, const unsigned surf_pitchinpix, const unsigned upscale_factor)
 {
    unsigned i;

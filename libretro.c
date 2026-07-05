@@ -738,6 +738,179 @@ static disk_control_ext_info_t disk_control_ext_info;
 static uint64_t Memcard_PrevDC[8];
 static int64_t Memcard_SaveDelay[8];
 
+/* ------------------------------------------------------------------------
+ * Asynchronous memory-card file writer.
+ *
+ * The periodic memcard flush in retro_run used to do a synchronous 128 KiB
+ * filestream_write on the emulation thread, stalling a frame each time a
+ * game saved (file-managed cards: all secondary cards, and card 0 under the
+ * mednafen method). Move the file write to a background thread; the emu
+ * thread only snapshots the 128 KiB under a lock and enqueues.
+ *
+ * Ordering/safety (verified with a threaded differential harness - no loss,
+ * latest-wins, drain-before-stop, no leaks, under a saturated ring):
+ *   - single producer (the emulation thread), one writer thread -> per-path
+ *     write order preserved;
+ *   - per-path coalescing: a newer snapshot replaces a pending older one
+ *     (idempotent full-buffer saves, latest wins);
+ *   - on a full ring the producer WAITS for space rather than writing inline
+ *     (an inline write could be overtaken on disk by the writer flushing an
+ *     older dequeued job for the same path). Coalescing bounds pending jobs
+ *     to the number of distinct card paths, so the ring never fills in
+ *     practice - the wait is a correctness safety valve only;
+ *   - flush_and_stop drains all pending then joins -> no save lost at exit;
+ *   - if the writer thread cannot be created, writes fall back to inline
+ *     sync (no concurrent writer -> order trivially preserved).
+ * ---------------------------------------------------------------------- */
+#define MC_ASYNC_SLOTS 16
+
+typedef struct
+{
+   bool     used;
+   char     path[4096];
+   uint8_t *data;
+   uint32_t size;
+} mc_async_job;
+
+static mc_async_job mc_async_jobs[MC_ASYNC_SLOTS];
+static sthread_t   *mc_async_thread  = NULL;
+static slock_t     *mc_async_lock    = NULL;
+static scond_t     *mc_async_work    = NULL;  /* writer wakes on new job      */
+static scond_t     *mc_async_space   = NULL;  /* producer wakes on freed slot */
+static bool         mc_async_running = false;
+static bool         mc_async_quit    = false;
+
+static void mc_async_file_write(const char *path, const uint8_t *data, uint32_t size)
+{
+   RFILE *mf = filestream_open(path,
+         RETRO_VFS_FILE_ACCESS_WRITE, RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if (!mf)
+      return;
+   filestream_write(mf, data, size);
+   filestream_close(mf);
+}
+
+static void mc_async_writer(void *unused)
+{
+   (void)unused;
+   for (;;)
+   {
+      mc_async_job job;
+      int i, slot;
+      slock_lock(mc_async_lock);
+      for (;;)
+      {
+         slot = -1;
+         for (i = 0; i < MC_ASYNC_SLOTS; i++)
+            if (mc_async_jobs[i].used) { slot = i; break; }
+         if (slot >= 0)
+            break;
+         if (mc_async_quit) { slock_unlock(mc_async_lock); return; } /* drained + quit */
+         scond_wait(mc_async_work, mc_async_lock);
+      }
+      job                      = mc_async_jobs[slot];
+      mc_async_jobs[slot].used = false;
+      mc_async_jobs[slot].data = NULL;
+      scond_signal(mc_async_space);
+      slock_unlock(mc_async_lock);
+
+      mc_async_file_write(job.path, job.data, job.size);
+      free(job.data);
+   }
+}
+
+/* Producer (emulation thread). Snapshots synchronously, so the caller may
+ * mutate the source buffer as soon as this returns. */
+static void mc_async_enqueue(const char *path, const uint8_t *data, uint32_t size)
+{
+   uint8_t *copy;
+   int      i, slot;
+
+   if (!mc_async_running)   /* no writer thread: inline is the sole writer */
+   {
+      mc_async_file_write(path, data, size);
+      return;
+   }
+   copy = (uint8_t *)malloc(size);
+   if (!copy)               /* OOM: degrade to inline sync (still correct) */
+   {
+      mc_async_file_write(path, data, size);
+      return;
+   }
+   memcpy(copy, data, size);
+
+   slock_lock(mc_async_lock);
+   for (;;)
+   {
+      slot = -1;
+      for (i = 0; i < MC_ASYNC_SLOTS; i++)
+         if (mc_async_jobs[i].used && !strcmp(mc_async_jobs[i].path, path))
+            { slot = i; break; }
+      if (slot >= 0)         /* coalesce: newer snapshot supersedes pending */
+      {
+         free(mc_async_jobs[slot].data);
+         mc_async_jobs[slot].data = copy;
+         mc_async_jobs[slot].size = size;
+         break;
+      }
+      for (i = 0; i < MC_ASYNC_SLOTS; i++)
+         if (!mc_async_jobs[i].used) { slot = i; break; }
+      if (slot >= 0)
+      {
+         mc_async_jobs[slot].used = true;
+         strncpy(mc_async_jobs[slot].path, path, sizeof(mc_async_jobs[slot].path) - 1);
+         mc_async_jobs[slot].path[sizeof(mc_async_jobs[slot].path) - 1] = '\0';
+         mc_async_jobs[slot].data = copy;
+         mc_async_jobs[slot].size = size;
+         break;
+      }
+      scond_wait(mc_async_space, mc_async_lock);  /* ring full (never in practice) */
+   }
+   scond_signal(mc_async_work);
+   slock_unlock(mc_async_lock);
+}
+
+static void mc_async_init(void)
+{
+   int i;
+   if (mc_async_running)
+      return;
+   for (i = 0; i < MC_ASYNC_SLOTS; i++)
+   {
+      mc_async_jobs[i].used = false;
+      mc_async_jobs[i].data = NULL;
+   }
+   mc_async_quit  = false;
+   mc_async_lock  = slock_new();
+   mc_async_work  = scond_new();
+   mc_async_space = scond_new();
+   if (mc_async_lock && mc_async_work && mc_async_space)
+      mc_async_thread = sthread_create(mc_async_writer, NULL);
+   mc_async_running = (mc_async_thread != NULL);
+   if (!mc_async_running)   /* setup failed: fall back to inline sync writes */
+   {
+      if (mc_async_lock)  { slock_free(mc_async_lock);   mc_async_lock  = NULL; }
+      if (mc_async_work)  { scond_free(mc_async_work);   mc_async_work  = NULL; }
+      if (mc_async_space) { scond_free(mc_async_space);  mc_async_space = NULL; }
+   }
+}
+
+static void mc_async_flush_and_stop(void)
+{
+   if (!mc_async_running)
+      return;
+   slock_lock(mc_async_lock);
+   mc_async_quit = true;
+   scond_signal(mc_async_work);
+   slock_unlock(mc_async_lock);
+   sthread_join(mc_async_thread);   /* returns only after all pending drained */
+   mc_async_thread  = NULL;
+   mc_async_running = false;
+   slock_free(mc_async_lock);   mc_async_lock  = NULL;
+   scond_free(mc_async_work);   mc_async_work  = NULL;
+   scond_free(mc_async_space);  mc_async_space = NULL;
+}
+
 /* PSX_CPU lives at file scope in cpu.c (always points at &s_cpu). */
 PS_CDC *PSX_CDC = NULL;
 FrontIO *PSX_FIO = NULL;
@@ -2754,6 +2927,8 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
       Memcard_SaveDelay[i] = -1;
    }
 
+   mc_async_init();
+
 	input_init_calibration();
 
    PSX_Power();
@@ -3157,6 +3332,10 @@ static int LoadCD(void)
 static void CloseGame(void)
 {
    int i;
+
+   /* Drain and stop the async memcard writer before the synchronous save
+    * loop and Cleanup(); guarantees no pending write is lost at teardown. */
+   mc_async_flush_and_stop();
 
    /* If load failed partway through, PSX_FIO may be NULL while the
     * cdifs array and other state still exist. Skip memcard saves in
@@ -5628,7 +5807,7 @@ void retro_run(void)
 
             snprintf(ext, sizeof(ext), "%d.mcr", index);
             MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_SaveMemcardToPath(PSX_FIO, i, memcard, false);
+            FrontIO_SaveMemcardToPathAsync(PSX_FIO, i, memcard, mc_async_enqueue);
             Memcard_SaveDelay[i] = -1;
             Memcard_PrevDC[i] = 0;
          }

@@ -140,6 +140,16 @@ void     FrontIO_LoadMemcardFromPath(FrontIO *fio, unsigned which,
 void     FrontIO_LoadMemcard         (FrontIO *fio, unsigned which);
 void     FrontIO_SaveMemcardToPath  (FrontIO *fio, unsigned which,
                                      const char *path, bool force_save);
+
+/* Async variant of the periodic save: does the dirty-check + ReadNV, then
+ * hands (path, GetNVData, 1<<17) to `writer` INSTEAD of writing the file
+ * inline. `writer` must copy the buffer synchronously; on return the NV
+ * dirty count is reset. If `writer` is NULL, falls back to a synchronous
+ * FrontIO_SaveMemcardToPath. */
+typedef void (*FrontIO_MemcardWriteFn)(const char *path,
+                                       const uint8_t *data, uint32_t size);
+void     FrontIO_SaveMemcardToPathAsync(FrontIO *fio, unsigned which,
+                                     const char *path, FrontIO_MemcardWriteFn writer);
 void     FrontIO_SaveMemcard         (FrontIO *fio, unsigned which);
 
 int      FrontIO_StateAction(FrontIO *fio, StateMem *sm,
