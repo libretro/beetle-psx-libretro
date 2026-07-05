@@ -121,14 +121,26 @@ int PGXP_NCLIP_valid(uint32_t sxy0, uint32_t sxy1, uint32_t sxy2)
 	return 0;
 }
 
-float PGXP_NCLIP()
+double PGXP_NCLIP()
 {
-	float nclip = ((SX0 * SY1) + (SX1 * SY2) + (SX2 * SY0) - (SX0 * SY2) - (SX1 * SY0) - (SX2 * SY1));
+	/* Factored cross product - same algebra as the native integer NCLIP
+	 * (x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1)) - accumulated in double.
+	 * The previous form summed six separate float products; for the thin /
+	 * near-degenerate triangles typical of PSX geometry that suffers
+	 * catastrophic cancellation (observed error up to ~1.4 in the int32
+	 * result written to MAC0).  Double + the factored form is accurate to
+	 * the true cross product of the (float) shadow coords. */
+	double nclip = (double)SX0 * ((double)SY1 - (double)SY2)
+	             + (double)SX1 * ((double)SY2 - (double)SY0)
+	             + (double)SX2 * ((double)SY0 - (double)SY1);
+	double nclipAbs = fabs(nclip);
 
-	/* ensure fractional values are not incorrectly rounded to 0 */
-	float nclipAbs = fabs(nclip);
-	if (( 0.1f < nclipAbs) && (nclipAbs < 1.f))
-		nclip += (nclip < 0.f ? -1 : 1);
+	/* Preserve a tiny but non-zero orientation through the caller's
+	 * truncation to int32 (a genuine near-degenerate result would otherwise
+	 * read as 0 and flip the culling decision).  Kept with identical intent;
+	 * simply hit far less often now the cancellation error is gone. */
+	if ((0.1 < nclipAbs) && (nclipAbs < 1.0))
+		nclip += (nclip < 0.0 ? -1.0 : 1.0);
 
 	return nclip;
 }

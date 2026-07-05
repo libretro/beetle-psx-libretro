@@ -48,7 +48,7 @@ void	PGXP_pushSXYZ2s(int64_t _x, int64_t _y, int64_t _z, uint32_t v);
 void	PGXP_RTPS(uint32_t _n, uint32_t _v);
 
 int		PGXP_NCLIP_valid(uint32_t sxy0, uint32_t sxy1, uint32_t sxy2);
-float	PGXP_NCLIP();
+double	PGXP_NCLIP();
 
 // Data transfer tracking
 void	PGXP_GTE_MFC2(uint32_t instr, uint32_t rtVal, uint32_t rdVal);		// copy GTE data reg to GPR reg (MFC2)
