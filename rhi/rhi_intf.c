@@ -75,6 +75,7 @@ static int rhi_height_mode = HEIGHT_MODE_240;
 #define TT_COH_BH     (TT_COH_VRAM_H >> TT_COH_SH)   /* 64  block rows    */
 
 static bool     tt_coh_skip_enabled = true;
+static bool     tt_coh_da_pending   = true;  /* re-mark draw area on next primitive */
 static uint8_t  tt_coh_clean[TT_COH_BH * TT_COH_BW]; /* 0=dirty (default), 1=clean */
 static uint16_t tt_coh_dax, tt_coh_day, tt_coh_daw, tt_coh_dah; /* draw area x,y,w,h */
 
@@ -83,6 +84,7 @@ static void tt_coh_reset(void)
    memset(tt_coh_clean, 0, sizeof(tt_coh_clean));
    tt_coh_dax = tt_coh_day = 0;
    tt_coh_daw = tt_coh_dah = 0;
+   tt_coh_da_pending = true;
 }
 
 /* DIRTY: every block the rect OVERLAPS (conservative superset). */
@@ -137,6 +139,20 @@ static bool tt_coh_all_clean(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
                          + ((bx0 + kx) & (TT_COH_BW - 1))])
             return false;
    return true;
+}
+
+/* Re-mark the whole draw area dirty, but only when it may have changed
+ * (set_draw_area) or a clean op cleaned part of it since the last mark.
+ * Primitives are scissor-clipped to the draw area, so this stays a superset
+ * while avoiding an O(blocks) mark on every one of the thousands of quads a
+ * frame may push into a stable draw area. */
+static void tt_coh_mark_draw_area(void)
+{
+   if (tt_coh_da_pending)
+   {
+      tt_coh_dirty(tt_coh_dax, tt_coh_day, tt_coh_daw, tt_coh_dah);
+      tt_coh_da_pending = false;
+   }
 }
 
 static bool rhi_soft_open(bool is_pal)
@@ -590,6 +606,7 @@ void rhi_intf_set_draw_area(uint16_t x0, uint16_t y0,
    tt_coh_day = y0;
    tt_coh_daw = (x1 >= x0) ? (uint16_t)(x1 - x0 + 1) : 0;
    tt_coh_dah = (y1 >= y0) ? (uint16_t)(y1 - y0 + 1) : 0;
+   tt_coh_da_pending = true;
 
    switch (rhi_type)
    {
@@ -845,7 +862,7 @@ void rhi_intf_push_quad(
 #endif
 
    /* Scissor-clipped to the draw area, so it is a guaranteed superset. */
-   tt_coh_dirty(tt_coh_dax, tt_coh_day, tt_coh_daw, tt_coh_dah);
+   tt_coh_mark_draw_area();
 
    switch (rhi_type)
    {
@@ -896,7 +913,7 @@ void rhi_intf_push_line(int16_t p0x, int16_t p0y,
    rhi_dump_line(&line);
 #endif
 
-   tt_coh_dirty(tt_coh_dax, tt_coh_day, tt_coh_daw, tt_coh_dah);
+   tt_coh_mark_draw_area();
 
    switch (rhi_type)
    {
@@ -946,7 +963,10 @@ bool rhi_intf_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t
 
    /* On a successful readback the rect now mirrors the GPU. */
    if (ret)
+   {
       tt_coh_clean_rect(x, y, w, h);
+      tt_coh_da_pending = true;
+   }
 
    return ret;
 }
@@ -968,9 +988,14 @@ void rhi_intf_load_image(uint16_t x, uint16_t y,
     * upload writes every pixel to g->vram but the GPU skips mask-blocked
     * ones, so the region may diverge - treat it as dirty. */
    if (mask_test)
+   {
       tt_coh_dirty(x, y, w, h);
+   }
    else
+   {
       tt_coh_clean_rect(x, y, w, h);
+      tt_coh_da_pending = true;   /* a clean inside the draw area must re-arm marking */
+   }
 
    switch (rhi_type)
    {
