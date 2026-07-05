@@ -9208,35 +9208,99 @@ static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
       const Rect *rect,
       uint16_t *vram)
 {
-   BufferHandle buffer;
+   BufferHandle     buffer;
    BufferCreateInfo buffer_create_info;
-   Fence fence;
-   bool wrap_x = rect->x + rect->width > FB_WIDTH;
-   bool wrap_y = rect->y + rect->height > FB_HEIGHT;
-   Rect copy_rect = *rect;
-   bool wrap = wrap_x || wrap_y;
-   /* We could do four separate reads but this is eaiser */
-   if (wrap)
+   Fence            fence;
+   /* Split the (possibly VRAM-wrapping) request into up to four
+    * non-wrapping tiles in unscaled framebuffer space.  Only the covered
+    * region is transferred GPU->CPU instead of widening a wrapping read to
+    * the whole framebuffer (FB_WIDTH*FB_HEIGHT*4 bytes) purely to line up
+    * the scatter indices.  The non-wrapping case collapses to a single tile
+    * identical to the previous fast path. */
+   uint32_t x0 = rect->x & (FB_WIDTH  - 1);
+   uint32_t y0 = rect->y & (FB_HEIGHT - 1);
+   uint32_t hx[2], hw[2];
+   uint32_t vy[2], vh[2];
+   int      nh = 1;
+   int      nv = 1;
+   uint32_t sum_w;
+   uint32_t sum_h;
+
+   if (rect->width >= FB_WIDTH)
    {
-      copy_rect.x = 0;
-      copy_rect.width = FB_WIDTH;
-      copy_rect.y = 0;
-      copy_rect.height = FB_HEIGHT;
+      hx[0] = 0;  hw[0] = FB_WIDTH;
+   }
+   else if (x0 + rect->width > FB_WIDTH)
+   {
+      nh    = 2;
+      hx[0] = x0; hw[0] = FB_WIDTH - x0;
+      hx[1] = 0;  hw[1] = rect->width - hw[0];
+   }
+   else
+   {
+      hx[0] = x0; hw[0] = rect->width;
    }
 
-   fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &copy_rect);
+   if (rect->height >= FB_HEIGHT)
+   {
+      vy[0] = 0;  vh[0] = FB_HEIGHT;
+   }
+   else if (y0 + rect->height > FB_HEIGHT)
+   {
+      nv    = 2;
+      vy[0] = y0; vh[0] = FB_HEIGHT - y0;
+      vy[1] = 0;  vh[1] = rect->height - vh[0];
+   }
+   else
+   {
+      vy[0] = y0; vh[0] = rect->height;
+   }
+
+   sum_w = (nh == 2) ? (hw[0] + hw[1]) : hw[0];
+   sum_h = (nv == 2) ? (vh[0] + vh[1]) : vh[0];
+
+   /* Sync each tile's source region from the scaled domain - mirrors the old
+    * single full-rect fbatlas_read_transfer, but only over what we read. */
+   {
+      int i, j;
+      for (j = 0; j < nv; j++)
+      {
+         for (i = 0; i < nh; i++)
+         {
+            Rect tr;
+            tr.x     = hx[i]; tr.y      = vy[j];
+            tr.width = hw[i]; tr.height = vh[j];
+            fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &tr);
+         }
+      }
+   }
+
    renderer_ensure_command_buffer(self);
 
    buffer_create_info.domain = BufferDomain_CachedHost;
-   buffer_create_info.size = copy_rect.width * copy_rect.height * 4;
-   buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
+   buffer_create_info.size   = sum_w * sum_h * 4;
+   buffer_create_info.usage  = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
    buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
+
+   /* One copy per tile into a single tightly packed host buffer.  Still a
+    * single flush + single fence wait - no extra GPU round-trips. */
    {
-   VkOffset3D _o = { (int)(copy_rect.x), (int)(copy_rect.y), 0 };
-   VkExtent3D _e = { copy_rect.width, copy_rect.height, 1 };
-   VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-   commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer), ih_get(&self->framebuffer), 0, &_o, &_e, 0, 0, &_s);
+      int         i, j;
+      VkDeviceSize byteoff = 0;
+      for (j = 0; j < nv; j++)
+      {
+         for (i = 0; i < nh; i++)
+         {
+            VkOffset3D               _o = { 0, 0, 0 };
+            VkExtent3D               _e = { 0, 0, 1 };
+            VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+            _o.x = (int)hx[i]; _o.y = (int)vy[j];
+            _e.width = hw[i];  _e.height = vh[j];
+            commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer),
+                  ih_get(&self->framebuffer), byteoff, &_o, &_e, 0, 0, &_s);
+            byteoff += (VkDeviceSize)hw[i] * vh[j] * 4;
+         }
+      }
    }
 
    commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -9245,32 +9309,42 @@ static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
    fence = renderer_flush_and_signal(self);
    fenceholder_wait(fence_get(&fence));
 
-   { const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
-
-   if (!wrap)
    {
-      { uint16_t y; for (y = 0; y < rect->height; y++)
-         { uint16_t x; for (x = 0; x < rect->width; x++) vram[(y + rect->y) * FB_WIDTH + (x + rect->x)] = (uint16_t)(mapped[y * rect->width + x]); } }
-   }
-   else
-   {
-      { uint16_t y; for (y = 0; y < rect->height; y++) { uint16_t x; for (x = 0; x < rect->width; x++) {
-               uint32_t h = (x + rect->x) & (FB_WIDTH - 1);
-               uint32_t v = (y + rect->y) & (FB_HEIGHT - 1);
-               uint32_t p = v * FB_WIDTH + h;
-               vram[p] = (uint16_t)(mapped[p]);
-            } } }
-   }
+      const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
+      int             i, j;
+      uint32_t        elemoff = 0;
+      for (j = 0; j < nv; j++)
+      {
+         for (i = 0; i < nh; i++)
+         {
+            uint32_t tw = hw[i];
+            uint32_t th = vh[j];
+            uint32_t bx = hx[i];
+            uint32_t by = vy[j];
+            {
+               uint32_t yy;
+               for (yy = 0; yy < th; yy++)
+               {
+                  uint32_t xx;
+                  for (xx = 0; xx < tw; xx++)
+                     vram[(by + yy) * FB_WIDTH + (bx + xx)] =
+                        (uint16_t)(mapped[elemoff + yy * tw + xx]);
+               }
+            }
+            elemoff += tw * th;
+         }
+      }
 
-   if (self->texture_tracking_enabled) {
-      texture_tracker_notifyReadback(&self->tracker, *rect, vram);
-   }
+      if (self->texture_tracking_enabled)
+      {
+         texture_tracker_notifyReadback(&self->tracker, *rect, vram);
+      }
 
-   device_unmap_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
+      device_unmap_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
 
-   /* Single surviving owner of the fence handle (ownership moved out of
-    * flush_and_signal); drop its reference at scope exit. */
-   fence_reset(&fence);
+      /* Single surviving owner of the fence handle (ownership moved out of
+       * flush_and_signal); drop its reference at scope exit. */
+      fence_reset(&fence);
    }
 }
 
