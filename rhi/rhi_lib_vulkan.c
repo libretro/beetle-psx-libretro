@@ -8970,6 +8970,7 @@ static void renderer_init(Renderer *self,
 static void renderer_save_vram_state(Renderer *self, SaveState *out){
    BufferHandle buffer;
    BufferCreateInfo buffer_create_info;
+   Fence fence;
    buffer_create_info.domain = BufferDomain_CachedHost;
    buffer_create_info.size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
    buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -8985,9 +8986,14 @@ static void renderer_save_vram_state(Renderer *self, SaveState *out){
    commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
                 VK_ACCESS_HOST_READ_BIT);
 
-   renderer_flush(self);
-
-   device_wait_idle_nolock(self->device);
+   /* Wait only on this readback's copy fence (as
+    * renderer_copy_vram_to_cpu_synchronous does) rather than a full
+    * vkDeviceWaitIdle, which drains every queue and resets all buffer pools
+    * and allocators.  Savestate serialize runs every frame under runahead /
+    * rewind / netplay, so the device-wide stall here is a heavy, needless
+    * hit; a fence wait on the single framebuffer->host copy suffices. */
+   fence = renderer_flush_and_signal(self);
+   fenceholder_wait(fence_get(&fence));
    { const uint32_t *src = (const uint32_t *)(
          device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
    /* Deep-copy the mapped VRAM straight into the owning buffer (no
@@ -9008,6 +9014,7 @@ static void renderer_save_vram_state(Renderer *self, SaveState *out){
     * remain alive at the following vkDestroyDevice (VUID-vkDestroyDevice-device-
     * 05137), undefined behaviour that crashes strict drivers on a resolution
     * (renderer-rebuild) change. */
+   fence_reset(&fence);
    bh_reset(&buffer);
 }
 
