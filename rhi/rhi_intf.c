@@ -699,12 +699,11 @@ void rhi_intf_set_display_mode(bool depth_24bpp,
                                bool is_480i,
                                int width_mode)
 {
-   bool boot_debounce;
 #ifdef RHI_DUMP
    rhi_dump_set_display_mode(depth_24bpp, is_pal, is_480i, width_mode);
 #endif
 
-   /* During the first 10 GP1(0x08) writes (the BIOS boot animation),
+   /* During the first 20 GP1(0x08) writes (the BIOS boot animation),
     * suppress the dirty flags that trigger
     * retro_set_geometry/retro_set_system_av_info, since those round-
     * trip through the frontend and can cause a window/audio re-init
@@ -721,25 +720,28 @@ void rhi_intf_set_display_mode(bool depth_24bpp,
     * That stuck-default produces the classic symptom: HW renderer
     * shows the EXE's content squashed/scrambled into a 350x240 window
     * even though SW renders the same content correctly at 700x576. */
-   boot_debounce = (startup_frame_count < 10);
-   if (boot_debounce)
+   if (startup_frame_count < 20)
       startup_frame_count++;
-
-   /* Is this check accurate for 240i timing? May need to be fixed later */
-   if (currently_interlaced != is_480i)
+   else
    {
-      currently_interlaced = is_480i;
-      if (!boot_debounce)
+      /* Enforce weird interlaced non-480i modes as interlaced */
+      if (rhi_type == RHI_SOFTWARE && image_height > MEDNAFEN_CORE_GEOMETRY_BASE_H)
+         is_480i = true;
+
+      /* Is this check accurate for 240i timing? May need to be fixed later */
+      if (currently_interlaced != is_480i)
+      {
+         currently_interlaced = is_480i;
          interlace_setting_dirty = true;
-   }
+      }
 
-   /* Also verify if this is accurate for 240i */
-   if ((rhi_width_mode != width_mode) || (rhi_height_mode != (int)is_480i))
-   {
-      rhi_width_mode = width_mode;
-      rhi_height_mode = (int)is_480i;
-      if (!boot_debounce)
+      /* Also verify if this is accurate for 240i */
+      if ((rhi_width_mode != width_mode) || (rhi_height_mode != (int)is_480i))
+      {
+         rhi_width_mode = width_mode;
+         rhi_height_mode = (int)is_480i;
          aspect_ratio_dirty = true;
+      }
    }
 
    switch (rhi_type)

@@ -3979,6 +3979,9 @@ void retro_reset(void)
       return;
 
    DoSimpleCommand(MDFN_MSC_RESET);
+
+   currently_interlaced    = true;
+   interlace_setting_dirty = true;
 }
 
 bool retro_load_game_special(unsigned game_type, const struct retro_game_info *info, size_t num_info)
