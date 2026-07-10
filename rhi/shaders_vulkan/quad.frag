@@ -32,7 +32,14 @@ mediump vec3 sample_bpp24(ivec2 coord)
 	uint value = (textureLod(uTexture, uv, 0.0).x & 0xffffu) | (textureLodOffset(uTexture, uv, 0.0, ivec2(1, 0)).x << 16u);
 	value >>= uint(shift);
 
-	mediump vec3 rgb = vec3((uvec3(value) >> uvec3(0u, 8u, 16u)) & 0xffu) / 255.0;
+	// The byte extraction must stay highp. Assigning the expression
+	// directly to a mediump vec3 makes glslang decorate the integer
+	// constructor/shift/mask chain RelaxedPrecision, and mobile GPUs
+	// which honor 16-bit relaxed integers then truncate `value` before
+	// the per-channel shifts, zeroing the blue (>> 16) lane.
+	highp uvec3 channels = (uvec3(value) >> uvec3(0u, 8u, 16u)) & 0xffu;
+
+	mediump vec3 rgb = vec3(channels) / 255.0;
 	return rgb;
 }
 
