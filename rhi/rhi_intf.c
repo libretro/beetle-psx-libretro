@@ -1262,6 +1262,10 @@ float rhi_common_get_aspect_ratio(bool pal_content, int crop_overscan,
 
       return ar;
    }
+	else if (aspect_ratio_setting == 4) /* Force 16:9 */
+   {
+      return (16.0 / 9.0);
+   }
 
    return ar; /* 4:3 */
 }

@@ -4356,6 +4356,12 @@ static void check_variables(bool startup)
             has_new_geometry = true;
          aspect_ratio_setting = 3;
       }
+	  else if (!strcmp(var.value, "16:9"))
+      {
+         if (!startup && aspect_ratio_setting != 4)
+            has_new_geometry = true;
+         aspect_ratio_setting = 4;
+      }
    }
 
    if (startup)
