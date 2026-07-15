@@ -25,6 +25,16 @@ uniform uint dither_scaling;
 // 0: Only draw opaque pixels, 1: only draw semi-transparent pixels
 uniform uint draw_semi_transparent;
 
+// ---- HD texture replacement (shared rhi_tt texture tracker) ----
+// Per-batch state set by gl_renderer_draw. hd_texture lives on unit 1.
+uniform sampler2D hd_texture;
+// 0: no replacement bound for this batch
+uniform uint hd_enabled;
+// The area of vram this hd texture covers (x, y, w, h)
+uniform ivec4 hd_vram_rect;
+// The area of this hd texture's own texels that may currently be used (x, y, w, h)
+uniform ivec4 hd_texel_rect;
+
 //uniform uint mask_setor;
 //uniform uint mask_evaland;
 
@@ -106,6 +116,145 @@ vec4 reinterpret_color(vec4 color) {
   float r = float(pre_bits & 0x1FU) / 31.;
 
   return vec4(r, g, b, a);
+}
+
+// ---- HD texture replacement sampling ----
+// Port of rhi/shaders_vulkan/hdtextures.h onto this shader's varyings:
+// vUV -> frag_texture_coord, vBaseUV -> frag_texture_page,
+// vParam.z & 3 -> frag_depth_shift, vTexLimits -> frag_texture_limits,
+// vWindow (mask.xy, or.zw) -> frag_texture_window (x_mask, x_or, y_mask,
+// y_or - note the interleaved component order), push constants ->
+// hd_vram_rect / hd_texel_rect uniforms. All int->float conversions are
+// explicit for GLES3 (no implicit conversions in ES GLSL).
+//
+// Three spaces: local (page texels), vram, and hd_texture. local->vram
+// via the depth shift; vram->hd via hd_vram_rect + hd_texel_rect.
+
+struct HdLevelInfo {
+   vec4 clamp_rect;        // clamp window in level texels
+   vec4 level_texel_rect;  // (left, top, right-exclusive, bottom-exclusive)
+   vec2 local_to_level;    // hd texels per local texel at this level
+   vec2 level_texel_offset;
+   int level;
+};
+
+void hd_make_level(int l, out HdLevelInfo level) {
+   ivec2 v2l_i = (hd_texel_rect.zw / hd_vram_rect.zw) >> l;
+   vec2 vram_to_level = vec2(v2l_i);
+   ivec4 texel_rect = hd_texel_rect >> l;
+   level.level = l;
+   level.local_to_level = vec2(1.0 / float(1 << int(frag_depth_shift)), 1.0) * vram_to_level;
+   level.clamp_rect = vec4(vec2(frag_texture_limits.xy) * level.local_to_level,
+         (vec2(frag_texture_limits.zw) + vec2(1.0)) * level.local_to_level - vec2(1.0));
+   level.level_texel_rect = vec4(vec2(texel_rect.xy), vec2(texel_rect.xy + texel_rect.zw));
+   level.level_texel_offset = (vec2(frag_texture_page) - vec2(hd_vram_rect.xy)) * vram_to_level
+         + vec2(texel_rect.xy);
+}
+
+vec2 hd_limit_coord(vec2 hd_uv, in HdLevelInfo level) {
+   vec2 hd_clamped = clamp(hd_uv, level.clamp_rect.xy, level.clamp_rect.zw);
+   vec2 local_clamped = hd_clamped / level.local_to_level;
+   // Texture window: frag_texture_window = (x_mask, x_or, y_mask, y_or)
+   vec2 local_limited = vec2((ivec2(local_clamped) & ivec2(frag_texture_window.xz))
+         | ivec2(frag_texture_window.yw)) + fract(local_clamped);
+   return local_limited * level.local_to_level;
+}
+
+bool hd_texel_valid(ivec2 texel, in HdLevelInfo level) {
+   return !any(bvec4(lessThan(vec2(texel), level.level_texel_rect.xy),
+         greaterThanEqual(vec2(texel), level.level_texel_rect.zw)));
+}
+
+ivec2 hd_texel_at(vec2 hd_uv, in HdLevelInfo level) {
+   return ivec2(level.level_texel_offset + hd_limit_coord(hd_uv, level));
+}
+
+vec4 hd_sample_nearest(vec2 hd_uv, in HdLevelInfo level, inout bool valid) {
+   ivec2 texel = hd_texel_at(hd_uv, level);
+   vec4 color = texelFetch(hd_texture, texel, level.level);
+   // (0,0,0,1) is the fall-through-to-SD sentinel (see the fused page clear)
+   valid = valid && hd_texel_valid(texel, level) && color != vec4(0.0, 0.0, 0.0, 1.0);
+   return color;
+}
+
+// modified from the Vulkan port of vram.h
+vec4 hd_sample_bilinear(vec2 uv /* hd */, in HdLevelInfo level, inout bool valid) {
+   // interpolate from centre of texel
+   vec2 uv_frac = fract(uv) - vec2(0.5, 0.5);
+   vec2 uv_offs = sign(uv_frac);
+   uv_frac = abs(uv_frac);
+
+   // sample 4 nearest texels
+   vec4 texel_00 = hd_sample_nearest(vec2(uv.x, uv.y), level, valid);
+   vec4 texel_10 = hd_sample_nearest(vec2(uv.x + uv_offs.x, uv.y), level, valid);
+   vec4 texel_01 = hd_sample_nearest(vec2(uv.x, uv.y + uv_offs.y), level, valid);
+   vec4 texel_11 = hd_sample_nearest(vec2(uv.x + uv_offs.x, uv.y + uv_offs.y), level, valid);
+
+   // test for fully transparent texel; .w becomes a weight for true transparency
+   texel_00.w = (texel_00 != vec4(0.0)) ? 1.0 : 0.0;
+   texel_10.w = (texel_10 != vec4(0.0)) ? 1.0 : 0.0;
+   texel_01.w = (texel_01 != vec4(0.0)) ? 1.0 : 0.0;
+   texel_11.w = (texel_11 != vec4(0.0)) ? 1.0 : 0.0;
+
+   // average samples
+   return texel_00 * (1. - uv_frac.x) * (1. - uv_frac.y)
+        + texel_10 * uv_frac.x * (1. - uv_frac.y)
+        + texel_01 * (1. - uv_frac.x) * uv_frac.y
+        + texel_11 * uv_frac.x * uv_frac.y;
+}
+
+// Nearest lookup in SD (local) coords; replaces the NN texel when it hits
+// real replacement content (mirrors sample_hd_texture_nearest_hack).
+bool hd_sample_nearest_sd(vec2 uv /* local */, out vec4 color) {
+   HdLevelInfo level;
+   bool valid = true;
+   hd_make_level(0, level);
+   color = hd_sample_nearest(uv * level.local_to_level, level, valid);
+   return valid;
+}
+
+vec4 hd_sample_trilinear(vec2 uv /* local */, out bool valid) {
+   ivec2 vram_to_local = ivec2(1 << int(frag_depth_shift), 1);
+   vec2 hd_uv = uv / vec2(vram_to_local)
+         * (vec2(hd_texel_rect.zw) / vec2(hd_vram_rect.zw));
+   // GL 3.3 / GLES3 have no textureQueryLod in the fragment stage; derive
+   // the LOD from screen-space derivatives of the HD texel coordinate.
+   vec2 duvdx = dFdx(hd_uv);
+   vec2 duvdy = dFdy(hd_uv);
+   float lod = 0.5 * log2(max(max(dot(duvdx, duvdx), dot(duvdy, duvdy)), 1e-12));
+   int lod_low = int(lod);
+   int lod_high = lod_low + 1;
+   float t = fract(lod);
+
+   // Do not sample a mipmap level that is below native resolution.
+   vec2 axis_lod = log2(vec2(hd_texel_rect.zw)
+         / (vec2(hd_vram_rect.zw) * vec2(vram_to_local)));
+   int max_lod = max(0, int(min(axis_lod.x, axis_lod.y)));
+   HdLevelInfo level;
+   vec4 color_high;
+   vec4 color;
+
+   lod_low = clamp(lod_low, 0, max_lod);
+   lod_high = clamp(lod_high, 0, max_lod);
+
+   hd_make_level(lod_high, level);
+   valid = true;
+   color_high = hd_sample_bilinear(uv * level.local_to_level, level, valid);
+
+   if (lod_low != lod_high) {
+      vec4 color_low;
+      hd_make_level(lod_low, level);
+      color_low = hd_sample_bilinear(uv * level.local_to_level, level, valid);
+      color = mix(color_low, color_high, t);
+   } else {
+      color = color_high;
+   }
+   // Remove the influence of transparent samples on the color (they are
+   // vec4(0.0), so they pull the color towards black).
+   if (color.a > 1e-6) {
+      color.rgb /= color.a;
+   }
+   return color;
 }
 
 // PlayStation dithering pattern. The offset is selected based on the
@@ -832,10 +981,21 @@ void main() {
       else
       {
          vec4 texel;
+         bool hd_on = hd_enabled != 0U;
          vec4 texel0 = sample_texel(vec2(frag_texture_coord.x,
                   frag_texture_coord.y));
 				  
 		 opacity = float(!is_transparent(texel0));
+
+         // HD replacement: the nearest HD sample replaces the NN texel for
+         // the transparency/mask decisions below (primitive.frag's NNColor).
+         if (hd_on) {
+            vec4 hd_nn;
+            if (hd_sample_nearest_sd(frag_texture_coord.xy, hd_nn)) {
+               texel0 = hd_nn;
+               opacity = (hd_nn != vec4(0.0)) ? 1.0 : 0.0;
+            }
+         }
 )
 #if defined(FILTER_SABR)
 STRINGIZE(
@@ -865,6 +1025,19 @@ STRINGIZE(
 )
 #endif
 STRINGIZE(
+         // HD replacement filtering overrides the SD (filtered) color when
+         // the trilinear sample lands on real replacement content; the mask
+         // bit stays with texel0 (the NN sample), matching primitive.frag.
+         if (hd_on) {
+            bool hd_valid = true;
+            vec4 hd_color = hd_sample_trilinear(frag_texture_coord.xy, hd_valid);
+            if (hd_valid) {
+               texel.rgb = hd_color.rgb;
+               texel.a = texel0.a;
+               opacity = hd_color.a;
+            }
+         }
+
 	 // texel color 0x0000 is always fully transparent (even for opaque
          // draw commands)
       //   if (is_transparent(texel0)) {

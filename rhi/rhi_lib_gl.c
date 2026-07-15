@@ -17,6 +17,7 @@
 #include "libretro_options.h"
 
 #include "rhi_intf.h" /* enums */
+#include "rhi_tt.h"  /* shared HD texture replacement/tracking engine */
 #include "rhi_defer.h"
 #include "tt_trace.h"
 #include "beetle_psx_globals.h"
@@ -574,6 +575,10 @@ struct gl_primitive_batch {
    unsigned first;
    /* Count of indices */
    unsigned count;
+   /* HD texture replacement bound for this batch (none = SD only).
+    * Batches split whenever the handle changes so the flush loop can
+    * bind one replacement texture + uniform set per batch. */
+   HdTextureHandle hd;
 };
 typedef struct gl_primitive_batch gl_primitive_batch;
 
@@ -739,6 +744,15 @@ struct gl_renderer {
    int32_t initial_scanline_pal;
    int32_t last_scanline;
    int32_t last_scanline_pal;
+
+   /* ---- Shared HD texture replacement/tracking (rhi_tt.c) ---- */
+   TextureTracker *tracker;
+   bool texture_tracking_enabled;
+   /* HD handle of the batch currently being built (splits on change) */
+   HdTextureHandle hd_handle;
+   /* Scratch FBOs for fused-page compositing blits */
+   GLuint tt_read_fbo;
+   GLuint tt_draw_fbo;
 };
 typedef struct gl_renderer gl_renderer;
 
@@ -1488,6 +1502,377 @@ static void gl_texture_set_sub_image_window(
  * NULL on any failure (allocation, shader compile, program link,
  * GL object creation).  The caller is responsible for calling
  * gl_draw_buffer_free + free() to release a non-NULL return. */
+/* ============================================================
+ * GL TTGpuBackend - the GPU services the shared HD-texture
+ * tracker (rhi_tt.c) needs, over plain GL objects. TTGpuImage*
+ * is a small refcounted wrapper around a GL texture name with an
+ * explicit mip chain. Everything here runs on the libretro
+ * thread with the core GL context current (all tracker entry
+ * points are driven from the rsx calls / retro_run).
+ *
+ * Fused-page compositing mirrors the Vulkan backend contract:
+ * page_begin returns a cleared (0,0,0,1-sentinel) target, reusing
+ * a dimension-matched page (same handle, no ref change) or
+ * creating a fresh one (+1 ref, caller releases the stale one);
+ * page_blit replays one level-0 rect across the page's mip chain
+ * with glBlitFramebuffer; page_end is a no-op in GL (no layout
+ * transitions).
+ * ============================================================ */
+
+struct gl_tt_image {
+   GLuint tex;
+   unsigned width;   /* level 0 */
+   unsigned height;  /* level 0 */
+   int levels;
+   int refcount;
+};
+
+static struct gl_tt_image *gl_tt_image_new(unsigned width, unsigned height, int levels)
+{
+   struct gl_tt_image *img =
+      (struct gl_tt_image *)calloc(1, sizeof(*img));
+   GLint prev_tex = 0;
+   int l;
+   unsigned w;
+   unsigned h;
+   if (!img)
+      return NULL;
+   glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_tex);
+   glGenTextures(1, &img->tex);
+   glBindTexture(GL_TEXTURE_2D, img->tex);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+         levels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, levels - 1);
+   w = width;
+   h = height;
+   for (l = 0; l < levels; l++)
+   {
+      glTexImage2D(GL_TEXTURE_2D, l, GL_RGBA8,
+            (GLsizei)w, (GLsizei)h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+      w = (w > 1u) ? (w >> 1) : 1u;
+      h = (h > 1u) ? (h >> 1) : 1u;
+   }
+   glBindTexture(GL_TEXTURE_2D, (GLuint)prev_tex);
+   img->width    = width;
+   img->height   = height;
+   img->levels   = levels;
+   img->refcount = 1;
+   return img;
+}
+
+static TTGpuImage *gl_tt_upload_levels(void *ctx, const LoadedLevels *levels)
+{
+   struct gl_tt_image *img;
+   GLint prev_tex = 0;
+   GLint prev_unpack = 4;
+   int l;
+   (void)ctx;
+   if (!levels || levels->count <= 0 || !levels->levels[0].owned_data)
+      return NULL;
+   img = gl_tt_image_new((unsigned)levels->levels[0].width,
+         (unsigned)levels->levels[0].height, levels->count);
+   if (!img)
+      return NULL;
+   glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_tex);
+   glGetIntegerv(GL_UNPACK_ALIGNMENT, &prev_unpack);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 4); /* tightly packed RGBA8 */
+   glBindTexture(GL_TEXTURE_2D, img->tex);
+   for (l = 0; l < levels->count; l++)
+   {
+      const LoadedImage *lvl = &levels->levels[l];
+      glTexSubImage2D(GL_TEXTURE_2D, l, 0, 0,
+            (GLsizei)lvl->width, (GLsizei)lvl->height,
+            GL_RGBA, GL_UNSIGNED_BYTE, lvl->owned_data);
+   }
+   glPixelStorei(GL_UNPACK_ALIGNMENT, prev_unpack);
+   glBindTexture(GL_TEXTURE_2D, (GLuint)prev_tex);
+   return (TTGpuImage *)img;
+}
+
+static void gl_tt_image_addref(void *ctx, TTGpuImage *img_in)
+{
+   struct gl_tt_image *img = (struct gl_tt_image *)img_in;
+   (void)ctx;
+   if (img)
+      img->refcount++;
+}
+
+static void gl_tt_image_release(void *ctx, TTGpuImage *img_in)
+{
+   struct gl_tt_image *img = (struct gl_tt_image *)img_in;
+   (void)ctx;
+   if (!img)
+      return;
+   if (--img->refcount == 0)
+   {
+      glDeleteTextures(1, &img->tex);
+      free(img);
+   }
+}
+
+static unsigned gl_tt_image_width(void *ctx, TTGpuImage *img)
+{
+   (void)ctx;
+   return img ? ((struct gl_tt_image *)img)->width : 0;
+}
+
+static unsigned gl_tt_image_height(void *ctx, TTGpuImage *img)
+{
+   (void)ctx;
+   return img ? ((struct gl_tt_image *)img)->height : 0;
+}
+
+static size_t gl_tt_image_vram_bytes(void *ctx, TTGpuImage *img_in)
+{
+   /* RGBA8 mip chain: level 0 + ~1/3 for the tail. */
+   struct gl_tt_image *img = (struct gl_tt_image *)img_in;
+   size_t base;
+   (void)ctx;
+   if (!img)
+      return 0;
+   base = (size_t)img->width * (size_t)img->height * 4u;
+   return base + base / 3u;
+}
+
+/* Clear every mip level of a page texture to the (0,0,0,1) fall-through
+ * sentinel. The sentinel will not bleed into neighbors in the mipmaps
+ * because the mipmaps are only used down to the original resolution, and
+ * hd textures are aligned to that resolution's texels. */
+static void gl_tt_page_clear(gl_renderer *r, struct gl_tt_image *page)
+{
+   static const GLfloat sentinel[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+   GLint prev_draw_fbo = 0;
+   GLboolean scissor_was_enabled;
+   int l;
+   glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prev_draw_fbo);
+   scissor_was_enabled = glIsEnabled(GL_SCISSOR_TEST);
+   if (scissor_was_enabled)
+      glDisable(GL_SCISSOR_TEST);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, r->tt_draw_fbo);
+   for (l = 0; l < page->levels; l++)
+   {
+      glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+            GL_TEXTURE_2D, page->tex, l);
+      glClearBufferfv(GL_COLOR, 0, sentinel);
+   }
+   glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+         GL_TEXTURE_2D, 0, 0);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)prev_draw_fbo);
+   if (scissor_was_enabled)
+      glEnable(GL_SCISSOR_TEST);
+}
+
+static TTGpuImage *gl_tt_page_begin(void *ctx, TTGpuImage *reuse_in,
+      int width, int height, int mip_levels)
+{
+   gl_renderer *r = (gl_renderer *)ctx;
+   struct gl_tt_image *reuse = (struct gl_tt_image *)reuse_in;
+   struct gl_tt_image *page;
+   if (reuse && reuse->width == (unsigned)width &&
+         reuse->height == (unsigned)height)
+      page = reuse; /* same handle back, no reference change */
+   else
+   {
+      page = gl_tt_image_new((unsigned)width, (unsigned)height, mip_levels);
+      if (!page)
+         return NULL;
+   }
+   gl_tt_page_clear(r, page);
+   return (TTGpuImage *)page;
+}
+
+static void gl_tt_page_blit(void *ctx, TTGpuImage *page_in, TTGpuImage *src_in,
+      const TTPageBlit *b)
+{
+   gl_renderer *r = (gl_renderer *)ctx;
+   struct gl_tt_image *page = (struct gl_tt_image *)page_in;
+   struct gl_tt_image *src  = (struct gl_tt_image *)src_in;
+   GLint prev_read_fbo = 0;
+   GLint prev_draw_fbo = 0;
+   GLboolean scissor_was_enabled;
+   int dst_x = b->dst_x;
+   int dst_y = b->dst_y;
+   int dst_w = b->dst_w;
+   int dst_h = b->dst_h;
+   int dstLevel;
+
+   glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev_read_fbo);
+   glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prev_draw_fbo);
+   scissor_was_enabled = glIsEnabled(GL_SCISSOR_TEST);
+   if (scissor_was_enabled)
+      glDisable(GL_SCISSOR_TEST);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, r->tt_read_fbo);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, r->tt_draw_fbo);
+
+   for (dstLevel = 0; dstLevel < page->levels; dstLevel++)
+   {
+      int srcLevel = dstLevel - b->full_res_levels;
+      int sx0, sy0, sx1, sy1;
+      if (srcLevel < 0)
+         srcLevel = 0;
+      if (srcLevel >= src->levels)
+         srcLevel = src->levels - 1;
+      sx0 = b->src_x >> srcLevel;
+      sy0 = b->src_y >> srcLevel;
+      sx1 = sx0 + (b->src_w >> srcLevel);
+      sy1 = sy0 + (b->src_h >> srcLevel);
+      glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+            GL_TEXTURE_2D, src->tex, srcLevel);
+      glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+            GL_TEXTURE_2D, page->tex, dstLevel);
+      glBlitFramebuffer(sx0, sy0, sx1, sy1,
+            dst_x, dst_y, dst_x + dst_w, dst_y + dst_h,
+            GL_COLOR_BUFFER_BIT, GL_LINEAR);
+      dst_x >>= 1;
+      dst_y >>= 1;
+      dst_w = (dst_w >> 1) > 1 ? (dst_w >> 1) : 1;
+      dst_h = (dst_h >> 1) > 1 ? (dst_h >> 1) : 1;
+   }
+
+   glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+         GL_TEXTURE_2D, 0, 0);
+   glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+         GL_TEXTURE_2D, 0, 0);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prev_read_fbo);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)prev_draw_fbo);
+   if (scissor_was_enabled)
+      glEnable(GL_SCISSOR_TEST);
+}
+
+static void gl_tt_page_end(void *ctx, TTGpuImage *page)
+{
+   /* No layout transitions in GL. */
+   (void)ctx;
+   (void)page;
+}
+
+static TTGpuBackend gl_tt_make_backend(gl_renderer *r)
+{
+   TTGpuBackend vt;
+   vt.ctx              = r;
+   vt.upload_levels    = gl_tt_upload_levels;
+   vt.image_addref     = gl_tt_image_addref;
+   vt.image_release    = gl_tt_image_release;
+   vt.image_width      = gl_tt_image_width;
+   vt.image_height     = gl_tt_image_height;
+   vt.image_vram_bytes = gl_tt_image_vram_bytes;
+   vt.page_begin       = gl_tt_page_begin;
+   vt.page_blit        = gl_tt_page_blit;
+   vt.page_end         = gl_tt_page_end;
+   return vt;
+}
+
+/* Derive the VRAM rect a textured primitive samples from (mirror of the
+ * Vulkan renderer_build_attribs hd_texture_vram derivation, driven by
+ * the GL-side texture window fields + per-primitive UV bounds). */
+static Rect gl_tt_texture_vram_rect(gl_renderer *r,
+      unsigned texpage_x, unsigned texpage_y,
+      unsigned min_u, unsigned min_v,
+      unsigned max_u, unsigned max_v,
+      unsigned shift)
+{
+   Rect out = make_rect(0, 0, 0, 0);
+   if (r->tex_x_mask == 0xffu && r->tex_y_mask == 0xffu)
+   {
+      unsigned height = max_v - min_v + 1;
+      if (max_u > 255 || max_v > 255)
+      {
+         /* Wraparound behavior, assume the whole page is hit. */
+         out.x = texpage_x;
+         out.y = texpage_y;
+         out.width = 256u >> shift;
+         out.height = 256;
+      }
+      else
+      {
+         unsigned width;
+         min_u >>= shift;
+         max_u = (max_u + (1u << shift) - 1) >> shift;
+         width = max_u - min_u + 1;
+         out.x = texpage_x + min_u;
+         out.y = texpage_y + min_v;
+         /* -1 due to the boundary rounding above (see the Vulkan
+          * counterpart's HDTODO note). */
+         out.width = width - 1;
+         out.height = height;
+      }
+   }
+   else
+   {
+      /* Masked texture window: assume the window rect is the true rect
+       * (renderer_compute_window_rect equivalent). */
+      unsigned mx = r->tex_x_mask;
+      unsigned my = r->tex_y_mask;
+      unsigned mask_bits_x = 0;
+      unsigned mask_bits_y = 0;
+      unsigned x;
+      unsigned y;
+      while ((1u << mask_bits_x) <= mx && mask_bits_x < 8)
+         mask_bits_x++;
+      while ((1u << mask_bits_y) <= my && mask_bits_y < 8)
+         mask_bits_y++;
+      x = r->tex_x_or & ~((1u << mask_bits_x) - 1u);
+      y = r->tex_y_or & ~((1u << mask_bits_y) - 1u);
+      out.x = texpage_x + (x >> shift);
+      out.y = texpage_y + y;
+      out.width = (1u << mask_bits_x) >> shift;
+      out.height = 1u << mask_bits_y;
+   }
+   return out;
+}
+
+/* Per-primitive HD query (Vulkan renderer_get_hd_texture_index
+ * counterpart). Also drives dumping and prefetch, so it runs even when
+ * no replacement ends up bound. */
+static HdTextureHandle gl_tt_query_hd(gl_renderer *r,
+      const gl_command_vertex *v)
+{
+   UsedMode mode;
+   Rect vram_rect;
+   unsigned shift;
+   bool fastpath_capable = false;
+   bool cache_hit = false;
+
+   if (!r->tracker || !r->texture_tracking_enabled)
+      return hd_handle_make_none();
+   if (v[0].texture_blend_mode == 0) /* untextured */
+      return hd_handle_make_none();
+
+   /* GL depth_shift: 0=16bpp, 1=8bpp, 2=4bpp - same shift the Vulkan
+    * side derives from TextureMode. */
+   shift = v[0].depth_shift;
+   mode.mode = (shift == 2) ? TextureMode_Palette4bpp
+             : (shift == 1) ? TextureMode_Palette8bpp
+             : TextureMode_ABGR1555;
+   if (mode.mode == TextureMode_ABGR1555)
+   {
+      /* HACK: no palette in this mode; zero it so it is irrelevant for
+       * equality purposes (matches the Vulkan side). */
+      mode.palette_offset_x = 0;
+      mode.palette_offset_y = 0;
+   }
+   else
+   {
+      mode.palette_offset_x = v[0].clut[0];
+      mode.palette_offset_y = v[0].clut[1];
+   }
+
+   vram_rect = gl_tt_texture_vram_rect(r,
+         v[0].texture_page[0], v[0].texture_page[1],
+         v[0].texture_limits[0], v[0].texture_limits[1],
+         v[0].texture_limits[2], v[0].texture_limits[3],
+         shift);
+   if (vram_rect.height == 0)
+      return hd_handle_make_none();
+
+   return texture_tracker_get_hd_texture_index(r->tracker, vram_rect,
+         &mode, v[0].texture_page[0], v[0].texture_page[1],
+         &fastpath_capable, &cache_hit);
+}
+
 static gl_draw_buffer *gl_draw_buffer_build(const char *vertex_shader_src,
       const char *fragment_shader_src,
       size_t capacity,
@@ -1526,6 +1911,8 @@ static void gl_renderer_draw(gl_renderer *renderer)
       glUniform2i(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "offset"), (GLint)x, (GLint)y);
       /* We use texture unit 0 */
       glUniform1i(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "fb_texture"), 0);
+      /* HD replacement texture lives on unit 1 */
+      glUniform1i(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "hd_texture"), 1);
    }
 
    /* Bind the out framebuffer */
@@ -1635,6 +2022,37 @@ static void gl_renderer_draw(gl_renderer *renderer)
          glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
       }
 
+      /* HD replacement binding for this batch. get_hd_texture hands out
+       * an OWNED +1 reference; release it right after the draw is issued
+       * (GL keeps deleted-but-queued textures alive until the GPU is
+       * done with them). */
+      {
+         TTGpuImage *hd_owned = NULL;
+         const struct gl_uniform_map *um = renderer->command_buffer->program
+            ? &renderer->command_buffer->program->uniforms : NULL;
+         bool have_hd = renderer->tracker && !hd_handle_is_none(&it->hd);
+         if (have_hd)
+         {
+            HdTexture hd = texture_tracker_get_hd_texture(renderer->tracker, it->hd);
+            struct gl_tt_image *img = (struct gl_tt_image *)hd.texture;
+            hd_owned = hd.texture;
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, img ? img->tex : 0);
+            glActiveTexture(GL_TEXTURE0);
+            if (um)
+            {
+               glUniform1ui(gl_uniform_map_get(um, "hd_enabled"), img ? 1u : 0u);
+               glUniform4i(gl_uniform_map_get(um, "hd_vram_rect"),
+                     hd.vram_rect.x, hd.vram_rect.y,
+                     hd.vram_rect.width, hd.vram_rect.height);
+               glUniform4i(gl_uniform_map_get(um, "hd_texel_rect"),
+                     hd.texel_rect.x, hd.texel_rect.y,
+                     hd.texel_rect.width, hd.texel_rect.height);
+            }
+         }
+         else if (um)
+            glUniform1ui(gl_uniform_map_get(um, "hd_enabled"), 0u);
+
       /* Drawing */
       if (!gl_draw_buffer_is_empty(renderer->command_buffer))
       {
@@ -1644,6 +2062,10 @@ static void gl_renderer_draw(gl_renderer *renderer)
           * draw calls between the prepare/finalize) */
          glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
                         (GLvoid*)(it->first * sizeof(GLushort)));
+      }
+
+         if (hd_owned)
+            gl_tt_image_release(renderer, hd_owned);
       }
       }
    }
@@ -2099,8 +2521,28 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    renderer->set_mask  = false;
    renderer->mask_test = false;
 
+   /* Shared HD texture replacement/tracking: create the tracker over the
+    * GL backend before the initial full-VRAM upload below so the upload
+    * seeds the tracker's VRAM mirror (full-frame uploads take the
+    * savestate path: clear + mirror refresh). */
+   glGenFramebuffers(1, &renderer->tt_read_fbo);
+   glGenFramebuffers(1, &renderer->tt_draw_fbo);
+   {
+      TTGpuBackend vt = gl_tt_make_backend(renderer);
+      renderer->tracker = texture_tracker_new(&vt, NULL);
+   }
+   renderer->texture_tracking_enabled = false;
+   renderer->hd_handle = hd_handle_make_none();
+
    if (renderer)
+   {
       gl_renderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
+      if (renderer->tracker)
+      {
+         Rect _full = { 0, 0, (unsigned)VRAM_WIDTH_PIXELS, (unsigned)VRAM_HEIGHT };
+         texture_tracker_upload(renderer->tracker, _full, GPU_get_vram());
+      }
+   }
 
    return true;
 }
@@ -2154,6 +2596,19 @@ static void gl_renderer_free(gl_renderer *renderer)
    renderer->fb_out_depth.id     = 0;
    renderer->fb_out_depth.width  = 0;
    renderer->fb_out_depth.height = 0;
+
+   /* Shared HD texture replacement/tracking teardown. The tracker
+    * releases every TTGpuImage it holds through the GL backend, so this
+    * must run while the context is still current (it is: we're called
+    * from context_destroy / context_reset). */
+   texture_tracker_free(renderer->tracker);
+   renderer->tracker = NULL;
+   if (renderer->tt_read_fbo)
+      glDeleteFramebuffers(1, &renderer->tt_read_fbo);
+   if (renderer->tt_draw_fbo)
+      glDeleteFramebuffers(1, &renderer->tt_draw_fbo);
+   renderer->tt_read_fbo = 0;
+   renderer->tt_draw_fbo = 0;
 
    {
       unsigned i;
@@ -2572,6 +3027,122 @@ static bool retro_refresh_variables(gl_renderer *renderer)
 
    glLineWidth((GLfloat) upscaling);
 
+   /* ---- Shared HD texture replacement/tracking options (same keys and
+    * semantics as the Vulkan renderer's refresh path). ---- */
+   if (renderer->tracker)
+   {
+      bool track_textures   = false;
+      bool dump_textures    = false;
+      bool replace_textures = false;
+      size_t hd_cache_vram_bytes = (size_t)3 * 1024 * 1024 * 1024;
+      size_t hd_cache_ram_bytes  = (size_t)2 * 1024 * 1024 * 1024;
+      bool eager_hd_textures     = true;
+      bool lazy_sync_hd_textures = false;
+      bool hd_dump_mode_rect     = true;
+      bool hd_dump_mode_pages    = false;
+      bool hd_replacement_mode_pages = false;
+      bool hd_replacement_fallback   = false;
+      bool hd_reduce_palette_range   = false;
+      int  hd_texture_dir_mode       = 0;
+
+      var.key = BEETLE_OPT(track_textures);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         track_textures = (!strcmp(var.value, "enabled"));
+
+      var.key = BEETLE_OPT(dump_textures);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         dump_textures = (!strcmp(var.value, "enabled"));
+
+      var.key = BEETLE_OPT(replace_textures);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         replace_textures = (!strcmp(var.value, "enabled"));
+
+      var.key = BEETLE_OPT(hd_cache_vram_budget);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         hd_cache_vram_bytes = (size_t)atoi(var.value) * 1024 * 1024;
+
+      var.key = BEETLE_OPT(hd_cache_ram_budget);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         hd_cache_ram_bytes = (size_t)atoi(var.value) * 1024 * 1024;
+
+      var.key = BEETLE_OPT(hd_caching_method);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         /* "eager" (default), "lazy" (async), or "lazy_sync" (synchronous) */
+         eager_hd_textures     = (!strcmp(var.value, "eager"));
+         lazy_sync_hd_textures = (!strcmp(var.value, "lazy_sync"));
+      }
+
+      /* Page-aligned experiment: "upload_rect" (default), "page_aligned", or "both". */
+      var.key = BEETLE_OPT(hd_dump_mode);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         hd_dump_mode_rect  = (!strcmp(var.value, "upload_rect")  || !strcmp(var.value, "both"));
+         hd_dump_mode_pages = (!strcmp(var.value, "page_aligned") || !strcmp(var.value, "both"));
+      }
+
+      var.key = BEETLE_OPT(hd_replacement_mode);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         hd_replacement_mode_pages = (!strcmp(var.value, "page_aligned"));
+
+      var.key = BEETLE_OPT(hd_replacement_fallback);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         hd_replacement_fallback = (!strcmp(var.value, "enabled"));
+
+      var.key = BEETLE_OPT(reduce_palette_range);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         hd_reduce_palette_range = (!strcmp(var.value, "enabled"));
+
+      /* HD Texture Folder: base location for dump/replacement folders. */
+      var.key = BEETLE_OPT(texture_directory);
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "system"))    hd_texture_dir_mode = 1;
+         else if (!strcmp(var.value, "save")) hd_texture_dir_mode = 2;
+         else                                 hd_texture_dir_mode = 0;
+      }
+
+      renderer->texture_tracking_enabled = track_textures;
+
+      /* HD Texture Folder changed (or first non-default read): re-point
+       * the tracker's folder helpers and re-scan replacements from the
+       * new base (the tracker init loaded from the content dir, mode 0). */
+      {
+         static int texture_dir_mode_applied = 0;
+         texture_tracker_set_texture_dir_mode(hd_texture_dir_mode);
+         if (hd_texture_dir_mode != texture_dir_mode_applied)
+         {
+            texture_tracker_reload_textures_from_disk(renderer->tracker);
+            texture_dir_mode_applied = hd_texture_dir_mode;
+         }
+      }
+
+      /* Everything else goes through the shared tracker's config setter.
+       * Replace Textures is edge-applied inside set_config so the in-game
+       * ']' toggle (see texture_tracker_endFrame) isn't re-stamped back to
+       * the menu value on every refresh. */
+      {
+         TextureTrackerConfig ttcfg;
+         ttcfg.dump_enabled           = dump_textures;
+         ttcfg.hd_textures_enabled    = replace_textures;
+         ttcfg.eager_textures         = eager_hd_textures;
+         ttcfg.lazy_sync              = lazy_sync_hd_textures;
+         ttcfg.dump_mode_rect         = hd_dump_mode_rect;
+         ttcfg.dump_mode_pages        = hd_dump_mode_pages;
+         ttcfg.replacement_mode_pages = hd_replacement_mode_pages;
+         ttcfg.replacement_fallback   = hd_replacement_fallback;
+         ttcfg.reduce_palette_range   = hd_reduce_palette_range;
+         texture_tracker_set_config(renderer->tracker, &ttcfg);
+      }
+      texture_tracker_set_cache_budgets(renderer->tracker,
+            hd_cache_ram_bytes, hd_cache_vram_bytes);
+      /* Auto-create the dump/replacement folders once enabled + a game is
+       * loaded (after the config above so it picks the right rect/pages
+       * folder). */
+      texture_tracker_ensure_directories(renderer->tracker,
+            dump_textures, replace_textures);
+   }
+
    /* If the scaling factor has changed the frontend should be
    *  reconfigured. We can't do that here because it could
    *  destroy the OpenGL context which would destroy 'this' */
@@ -2602,7 +3173,8 @@ static void vertex_preprocessing(
       GLenum mode,
       gl_semi_transparency_mode stm,
       bool mask_test,
-      bool set_mask)
+      bool set_mask,
+      HdTextureHandle hd)
 {
    bool is_semi_transparent;
    bool is_textured;
@@ -2649,7 +3221,8 @@ static void vertex_preprocessing(
        || (is_semi_transparent &&
            stm != renderer->semi_transparency_mode)
        || renderer->set_mask != set_mask
-       || renderer->mask_test != mask_test)
+       || renderer->mask_test != mask_test
+       || hd_handle_ne(&hd, &renderer->hd_handle))
    {
       struct gl_primitive_batch batch;
 
@@ -2665,6 +3238,7 @@ static void vertex_preprocessing(
       batch.mask_test = mask_test;
       batch.first = renderer->vertex_index_pos;
       batch.count = 0;
+      batch.hd = hd;
       gl_primitive_batch_vec_push(&renderer->batches, &batch);
 
       renderer->semi_transparency_mode = stm;
@@ -2672,6 +3246,7 @@ static void vertex_preprocessing(
       renderer->opaque = is_opaque;
       renderer->set_mask = set_mask;
       renderer->mask_test = mask_test;
+      renderer->hd_handle = hd;
    }
 }
 
@@ -2692,6 +3267,7 @@ static void vertex_add_blended_pass(
       batch.mask_test = last->mask_test;
       batch.first = vertex_index;
       batch.count = 0;
+      batch.hd = last->hd;
       gl_primitive_batch_vec_push(&renderer->batches, &batch);
 
       renderer->opaque = false;
@@ -2720,7 +3296,14 @@ static void push_primitive(
    is_semi_transparent = v[0].semi_transparent   == 1;
    is_textured         = v[0].texture_blend_mode != 0;
 
-   vertex_preprocessing(renderer, v, count, mode, stm, mask_test, set_mask);
+   {
+      /* Per-primitive HD replacement query. Even when no replacement is
+       * bound this drives dumping + prefetch (Vulkan does the same from
+       * renderer_build_attribs). Untextured primitives short-circuit to
+       * a none handle inside the query. */
+      HdTextureHandle hd = gl_tt_query_hd(renderer, v);
+      vertex_preprocessing(renderer, v, count, mode, stm, mask_test, set_mask, hd);
+   }
 
    index     = gl_draw_buffer_next_index(renderer->command_buffer);
    index_pos = renderer->vertex_index_pos;
@@ -3541,6 +4124,16 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
    if (!gl_draw_buffer_is_empty(renderer->command_buffer))
       gl_renderer_draw(renderer);
 
+   /* Shared HD texture tracker frame boundary: process decoded IO
+    * responses, rebuild dirty fused pages, run the LRU budgets and the
+    * debug hotkeys. Runs after the final flush so every handle handed
+    * out this frame has been consumed. */
+   if (renderer->tracker)
+   {
+      texture_tracker_endFrame(renderer->tracker);
+      renderer->hd_handle = hd_handle_make_none();
+   }
+
    /* Calculate native PSX framebuffer dimensions to update renderer
       state before calling bind_libretro_framebuffer */
    compute_vram_framebuffer_dimensions(renderer);
@@ -4098,8 +4691,12 @@ void rhi_gl_push_quad(
       is_semi_transparent = v[0].semi_transparent == 1;
       is_textured         = v[0].texture_blend_mode != 0;
 
-      vertex_preprocessing(renderer, v, 4,
-            GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask);
+      {
+         /* Per-primitive HD replacement query (see push_primitive). */
+         HdTextureHandle hd = gl_tt_query_hd(renderer, v);
+         vertex_preprocessing(renderer, v, 4,
+               GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask, hd);
+      }
 
       index     = gl_draw_buffer_next_index(renderer->command_buffer);
       index_pos = renderer->vertex_index_pos;
@@ -4238,6 +4835,14 @@ void rhi_gl_load_image(
 
    renderer->set_mask     = set_mask;
    renderer->mask_test    = mask_test;
+
+   if (renderer->tracker && renderer->texture_tracking_enabled)
+   {
+      Rect _ntu_rect;
+      _ntu_rect.x = x; _ntu_rect.y = y;
+      _ntu_rect.width = w; _ntu_rect.height = h;
+      texture_tracker_upload(renderer->tracker, _ntu_rect, vram);
+   }
 
    top_left[0]            = x;
    top_left[1]            = y;
@@ -4656,6 +5261,14 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
                 &scratch_pixels[row * w],
                 (size_t)w * sizeof(uint16_t));
       }
+
+      /* Shared HD texture tracker: rendered content flowed back into
+       * VRAM - refresh the mirror + invalidate covered rects. */
+      if (renderer->tracker && renderer->texture_tracking_enabled)
+      {
+         Rect _rb = { x, y, w, h };
+         texture_tracker_notifyReadback(renderer->tracker, _rb, vram);
+      }
    }
 
 cleanup:
@@ -4848,6 +5461,19 @@ void rhi_gl_fill_rect(
    col[1]        = (uint8_t) (color >> 8);
    col[2]        = (uint8_t) (color >> 16);
 
+   if (renderer->tracker && renderer->texture_tracking_enabled)
+   {
+      /* color is 0x00BBGGRR (8-bit channels, low 3 bits ignored). Pack to
+       * ABGR1555 (R in the low bits, mask/alpha bit cleared) to match how
+       * the VRAM mirror is read back - same conversion as the Vulkan
+       * renderer_clear_rect. */
+      uint16_t fill16 = (uint16_t)(((color >> 3) & 0x1f)
+            | (((color >> 11) & 0x1f) << 5)
+            | (((color >> 19) & 0x1f) << 10));
+      Rect _cr = { x, y, w, h };
+      texture_tracker_clearRegion(renderer->tracker, _cr, fill16);
+   }
+
    /* Draw pending commands */
    if (!gl_draw_buffer_is_empty(renderer->command_buffer))
       gl_renderer_draw(renderer);
@@ -4951,6 +5577,13 @@ void rhi_gl_copy_rect(
 
    renderer->set_mask          = set_mask;
    renderer->mask_test         = mask_test;
+
+   if (renderer->tracker && renderer->texture_tracking_enabled)
+   {
+      Rect _dst = { dst_x, dst_y, w, h };
+      Rect _src = { src_x, src_y, w, h };
+      texture_tracker_blit(renderer->tracker, _dst, _src);
+   }
 
    source_top_left[0] = src_x;
    source_top_left[1] = src_y;
