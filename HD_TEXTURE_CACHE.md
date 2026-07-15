@@ -19,8 +19,8 @@ This fork reworks the **HD texture replacement** pipeline in the Vulkan
 (e.g. Alucard in *Castlevania: Symphony of the Night*), where the stock
 implementation suffers persistent texture pop-in and load stalls.
 
-What's different from upstream (Vulkan backend only; the on-disk pack format is
-unchanged):
+What's different from upstream (the on-disk pack format is unchanged; the
+engine is now shared between the GL and Vulkan RHI backends):
 
 - **Selectable caching method (core option).** *Eager* (default, matches stock
   Beetle) prefetches all palette variants of a texture when it enters VRAM;
@@ -34,23 +34,41 @@ unchanged):
   it's needed rather than one frame later — this eliminates the persistent
   per-frame pop-in that affected animated sprites even when their textures were
   already cached.
-- **Multithreaded decode.** PNG decode + mipmap generation runs on a 4-thread
+- **Multithreaded decode.** Image decode + mipmap generation runs on a 4-thread
   pool instead of a single thread, so first-appearance loads land faster.
 - **Built-in diagnostics.** An `[hdcache]` line is written to the RetroArch INFO
   log every 300 frames (decodes / GPU uploads / binds + cache occupancy) for
   tuning.
 
 Packs are authored exactly as before: textures live in
-`<content>-texture-replacements/`, named `<texturehash>-<palettehash>.png`.
+`<content>-texture-replacements/`, named `<texturehash>-<palettehash>.<ext>`.
+Replacements may be **PNG, JPEG, BMP, TGA, WEBP or DDS** (probed in the order
+`png, dds, webp, jpg, jpeg, bmp, tga` when several exist for the same combo);
+dumps are always written as PNG. Decoding goes through libretro-common's
+`image_texture` / `image_transfer` front end (rpng / rjpeg / rbmp / rtga /
+rwebp / rdds) — the vendored `stb_image` is gone.
 
 ## Technical detail
 
-All changes are in `rhi/rhi_lib_vulkan.c` (the texture system is compiled only
-with `HAVE_VULKAN` / `TEXTURE_DUMPING_ENABLED`). The renderer — and this caching
-system with it — has been ported to C (C89) alongside upstream's Vulkan backend,
-so the type names below are now C `struct`s with hand-rolled equivalents of the
+The engine lives in **`rhi/rhi_tt.c` / `rhi_tt.h`** and is shared by **both the
+RHI GL and RHI Vulkan renderers** (built whenever either HW renderer is —
+`SET_HAVE_HW`). It is renderer-agnostic: every GPU operation goes through a
+`TTGpuBackend` vtable the active renderer installs at `texture_tracker_new()`
+time — uploading decoded RGBA mip chains, refcounting the opaque `TTGpuImage`
+handles, and compositing fused page textures (`page_begin` / `page_blit` /
+`page_end`). The Vulkan backend hands out its refcounted `Image*` and replays
+the old barrier/clear/blit sequence; the GL backend wraps GL texture names and
+composites pages with `glBlitFramebuffer`. On the GL side, draw batches split
+on `HdTextureHandle` changes and the command fragment shader carries a port of
+`shaders_vulkan/hdtextures.h` (per-batch `hd_texture` sampler + `hd_vram_rect`
+/ `hd_texel_rect` uniforms, derivative-based LOD since GL 3.3/GLES3 lack
+fragment `textureQueryLod`).
+
+The engine — and this caching system with it — has been ported to C (C89), so
+the type names below are C `struct`s with hand-rolled equivalents of the
 original C++ containers: an intrusive LRU list indexed through `HdKeySet`, and a
-manual-refcount `ImageHandle` in place of the STL/`shared_ptr` types.
+manual-refcount `ImageHandle` (now backed by the `TTGpuBackend` refcount ops) in
+place of the STL/`shared_ptr` types.
 
 ### New types
 
@@ -110,7 +128,7 @@ the next safe point), and `dbg_*` diagnostic counters.
 ### IO subsystem
 
 - **`io_thread`** — converted from a single worker that drained the entire queue
-  into a **pool worker**: it takes one request at a time, runs PNG decode +
+  into a **pool worker**: it takes one request at a time, runs image decode +
   mipmap generation **outside** the channel lock (workers run in parallel),
   pushes the response under the lock, and cascade-signals the next worker.
 - **`IOThread`** — spins up `NUM_IO_THREADS` (4) detached workers, each given its
@@ -142,8 +160,11 @@ INFO log line shows the active mode and `used/budget` for each tier.
 ### Build
 
 Build the HW core as usual — `make HAVE_HW=1` — then optionally `strip` the
-result. No new dependencies; the caches use only the C standard library plus
-the `stb_image` and libretro threading already vendored in the tree.
+result. No new external dependencies; image decode/encode uses the
+libretro-common format decoders vendored under `libretro-common/formats/`
+(PNG through the bundled zlib, which gained `deflate.c`/`trees.c` for the PNG
+encoder) plus the libretro threading already in the tree. `stb_image` has been
+removed.
 
 Built and tested on **Windows** (`mednafen_psx_hw_libretro.dll`, MSYS2/MinGW-w64)
 against **RetroArch 1.22.2** (git 69a4f0e, build date Nov 20 2025, Compiler:
