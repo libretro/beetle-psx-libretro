@@ -4686,6 +4686,12 @@ static bool is_power_of_two(int n) {
       hd_key_set_clear(&self->requested);
       hd_key_set_clear(&self->pending_attach);
       hd_key_set_clear(&self->pending_attach_pages);
+      /* The per-draw handle cache memoizes (rect, mode) -> handle; with the
+       * upload bindings cleared above those handles now resolve to the 1x1
+       * default texture. Without this clear, re-enabling Replace Textures
+       * kept serving the stale memoized handles instead of re-running the
+       * load/attach path, leaving placeholder textures on screen. */
+      handle_lru_cache_clear(&self->handle_cache);
       for (i = 0; i < self->page_bindings_count; i++)
          ih_reset(&self->page_bindings[i].texture);
       self->page_bindings_count = 0;
