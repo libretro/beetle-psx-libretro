@@ -68,6 +68,8 @@ IMAGE_FORMAT_SOURCES_C = \
 		 $(LIBRETRO_COMM_DIR)/encodings/encoding_crc32.c \
 		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_intf.c \
 		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_stdio.c \
+		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_windowsmmap.c \
+		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_unixmmap.c \
 		 $(LIBRETRO_COMM_DIR)/features/features_cpu.c
 
 IMAGE_FORMAT_FLAGS = -DHAVE_RPNG -DHAVE_RJPEG -DHAVE_RBMP -DHAVE_RTGA \
