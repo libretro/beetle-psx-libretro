@@ -33,10 +33,45 @@ ZLIB_INCFLAGS = -I$(ZLIB_DIR)
 ZLIB_SOURCES_C = \
 		 $(ZLIB_DIR)/adler32.c \
 		 $(ZLIB_DIR)/crc32.c \
+		 $(ZLIB_DIR)/deflate.c \
 		 $(ZLIB_DIR)/inffast.c \
 		 $(ZLIB_DIR)/inflate.c \
 		 $(ZLIB_DIR)/inftrees.c \
+		 $(ZLIB_DIR)/trees.c \
 		 $(ZLIB_DIR)/zutil.c
+
+# Image decoders for the shared RHI HD-texture replacement system (rhi/rhi_tt.c).
+# Replacement packs may use PNG, JPEG, BMP, TGA, WEBP or DDS; dumps are written
+# as PNG through rpng_encode (which is why deflate.c/trees.c joined the bundled
+# zlib above - it was inflate-only before). Decoding goes through the
+# image_texture / image_transfer front end; rjpeg's runtime SIMD kernel
+# selection needs features_cpu, rwebp's lossy path needs the rvp8 decoder, and
+# image_texture's file path needs nbio.
+IMAGE_FORMAT_SOURCES_C = \
+		 $(LIBRETRO_COMM_DIR)/formats/image_texture.c \
+		 $(LIBRETRO_COMM_DIR)/formats/image_transfer.c \
+		 $(LIBRETRO_COMM_DIR)/formats/png/rpng.c \
+		 $(LIBRETRO_COMM_DIR)/formats/png/rpng_encode.c \
+		 $(LIBRETRO_COMM_DIR)/formats/jpeg/rjpeg.c \
+		 $(LIBRETRO_COMM_DIR)/formats/bmp/rbmp.c \
+		 $(LIBRETRO_COMM_DIR)/formats/tga/rtga.c \
+		 $(LIBRETRO_COMM_DIR)/formats/webp/rwebp.c \
+		 $(LIBRETRO_COMM_DIR)/formats/vp8/rvp8.c \
+		 $(LIBRETRO_COMM_DIR)/formats/dds/rdds.c \
+		 $(LIBRETRO_COMM_DIR)/streams/trans_stream.c \
+		 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c \
+		 $(LIBRETRO_COMM_DIR)/streams/trans_stream_zlib.c \
+		 $(LIBRETRO_COMM_DIR)/streams/interface_stream.c \
+		 $(LIBRETRO_COMM_DIR)/streams/memory_stream.c \
+		 $(LIBRETRO_COMM_DIR)/streams/rzip_stream.c \
+		 $(LIBRETRO_COMM_DIR)/streams/chd_stream.c \
+		 $(LIBRETRO_COMM_DIR)/encodings/encoding_crc32.c \
+		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_intf.c \
+		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_stdio.c \
+		 $(LIBRETRO_COMM_DIR)/features/features_cpu.c
+
+IMAGE_FORMAT_FLAGS = -DHAVE_RPNG -DHAVE_RJPEG -DHAVE_RBMP -DHAVE_RTGA \
+		 -DHAVE_RWEBP -DHAVE_RDDS -DHAVE_ZLIB=1
 
 ifeq ($(HAVE_OPENGL), 1)
    ifeq ($(GLES3), 1)
@@ -234,8 +269,6 @@ endif
    endif
 
    ifeq ($(HAVE_VULKAN), 1)
-      CFLAGS      += -DTEXTURE_DUMPING_ENABLED
-      CXXFLAGS    += -DTEXTURE_DUMPING_ENABLED
       SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
                      $(CORE_DIR)/rhi/rhi_spirv_reflect.cpp
       SOURCES_C   += $(CORE_DIR)/rhi/rhi_lib_vulkan.c

@@ -4304,6 +4304,9 @@ struct retro_log_callback
 /** Indicates CPU support for the AVX512 instruction set. */
 #define RETRO_SIMD_AVX512   (1 << 22)
 
+/** Indicates CPU support for the LZCNT instruction. */
+#define RETRO_SIMD_LZCNT    (1 << 23)
+
 /** @} */
 
 /**
