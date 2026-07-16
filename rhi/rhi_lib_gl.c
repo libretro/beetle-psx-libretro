@@ -1768,13 +1768,13 @@ static TTGpuBackend gl_tt_make_backend(gl_renderer *r)
 /* Derive the VRAM rect a textured primitive samples from (mirror of the
  * Vulkan renderer_build_attribs hd_texture_vram derivation, driven by
  * the GL-side texture window fields + per-primitive UV bounds). */
-static Rect gl_tt_texture_vram_rect(gl_renderer *r,
+static TTRect gl_tt_texture_vram_rect(gl_renderer *r,
       unsigned texpage_x, unsigned texpage_y,
       unsigned min_u, unsigned min_v,
       unsigned max_u, unsigned max_v,
       unsigned shift)
 {
-   Rect out = make_rect(0, 0, 0, 0);
+   TTRect out = make_rect(0, 0, 0, 0);
    if (r->tex_x_mask == 0xffu && r->tex_y_mask == 0xffu)
    {
       unsigned height = max_v - min_v + 1;
@@ -1831,7 +1831,7 @@ static HdTextureHandle gl_tt_query_hd(gl_renderer *r,
       const gl_command_vertex *v)
 {
    UsedMode mode;
-   Rect vram_rect;
+   TTRect vram_rect;
    unsigned shift;
    bool fastpath_capable = false;
    bool cache_hit = false;
@@ -2539,7 +2539,7 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
       gl_renderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
       if (renderer->tracker)
       {
-         Rect _full = { 0, 0, (unsigned)VRAM_WIDTH_PIXELS, (unsigned)VRAM_HEIGHT };
+         TTRect _full = { 0, 0, (unsigned)VRAM_WIDTH_PIXELS, (unsigned)VRAM_HEIGHT };
          texture_tracker_upload(renderer->tracker, _full, GPU_get_vram());
       }
    }
@@ -4838,7 +4838,7 @@ void rhi_gl_load_image(
 
    if (renderer->tracker && renderer->texture_tracking_enabled)
    {
-      Rect _ntu_rect;
+      TTRect _ntu_rect;
       _ntu_rect.x = x; _ntu_rect.y = y;
       _ntu_rect.width = w; _ntu_rect.height = h;
       texture_tracker_upload(renderer->tracker, _ntu_rect, vram);
@@ -5266,7 +5266,7 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
        * VRAM - refresh the mirror + invalidate covered rects. */
       if (renderer->tracker && renderer->texture_tracking_enabled)
       {
-         Rect _rb = { x, y, w, h };
+         TTRect _rb = { x, y, w, h };
          texture_tracker_notifyReadback(renderer->tracker, _rb, vram);
       }
    }
@@ -5470,7 +5470,7 @@ void rhi_gl_fill_rect(
       uint16_t fill16 = (uint16_t)(((color >> 3) & 0x1f)
             | (((color >> 11) & 0x1f) << 5)
             | (((color >> 19) & 0x1f) << 10));
-      Rect _cr = { x, y, w, h };
+      TTRect _cr = { x, y, w, h };
       texture_tracker_clearRegion(renderer->tracker, _cr, fill16);
    }
 
@@ -5580,8 +5580,8 @@ void rhi_gl_copy_rect(
 
    if (renderer->tracker && renderer->texture_tracking_enabled)
    {
-      Rect _dst = { dst_x, dst_y, w, h };
-      Rect _src = { src_x, src_y, w, h };
+      TTRect _dst = { dst_x, dst_y, w, h };
+      TTRect _src = { src_x, src_y, w, h };
       texture_tracker_blit(renderer->tracker, _dst, _src);
    }
 

@@ -125,44 +125,44 @@ enum TextureMode {
 };
 typedef enum TextureMode TextureMode;
 
-/* Rect: plain C struct (was a value type with ctors / equality helper/!= /
+/* TTRect: plain C struct (was a value type with ctors / equality helper/!= /
  * contains / intersects / scissor / extend_bounding_box). The default
  * initialiser + zero NSDMIs become brace-initialisation { 0, 0, 0, 0 }; the
  * 4-arg initialiser becomes make_rect. The methods become rect_* free
- * functions taking const struct Rect * (extend_bounding_box mutates, so its
+ * functions taking const struct TTRect * (extend_bounding_box mutates, so its
  * first arg is non-const). Most Rects are already built by brace-init, which
  * a plain struct supports unchanged. */
-struct Rect
+struct TTRect
 {
    unsigned x;
    unsigned y;
    unsigned width;
    unsigned height;
 };
-typedef struct Rect Rect;
+typedef struct TTRect TTRect;
 
-static INLINE struct Rect make_rect(unsigned x,
+static INLINE struct TTRect make_rect(unsigned x,
       unsigned y,
       unsigned width,
       unsigned height)
 {
-   struct Rect r;
+   struct TTRect r;
    r.x = x; r.y = y; r.width = width; r.height = height;
    return r;
 }
-static INLINE bool rect_eq(const struct Rect *a, const struct Rect *b)
+static INLINE bool rect_eq(const struct TTRect *a, const struct TTRect *b)
 {
    return a->x == b->x && a->y == b->y && a->width == b->width && a->height == b->height;
 }
-static INLINE bool rect_contains(const struct Rect *self,
-      const struct Rect *rect)
+static INLINE bool rect_contains(const struct TTRect *self,
+      const struct TTRect *rect)
 {
    return self->x <= rect->x && self->y <= rect->y &&
       (self->x + self->width) >= (rect->x + rect->width) &&
       (self->y + self->height) >= (rect->y + rect->height);
 }
-static INLINE bool rect_intersects(const struct Rect *self,
-      const struct Rect *rect)
+static INLINE bool rect_intersects(const struct TTRect *self,
+      const struct TTRect *rect)
 {
    unsigned x_end_self = self->x + self->width;
    unsigned x_end_other = rect->x + rect->width;
@@ -174,8 +174,8 @@ static INLINE bool rect_intersects(const struct Rect *self,
    unsigned ybegin = (self->y > rect->y) ? self->y : rect->y;
    return xbegin < xend && ybegin < yend;
 }
-static INLINE struct Rect rect_scissor(const struct Rect *self,
-      const struct Rect *rect)
+static INLINE struct TTRect rect_scissor(const struct TTRect *self,
+      const struct TTRect *rect)
 {
    unsigned x_end_self = self->x + self->width;
    unsigned x_end_other = rect->x + rect->width;
@@ -187,12 +187,12 @@ static INLINE struct Rect rect_scissor(const struct Rect *self,
    unsigned y1 = (y_end_self < y_end_other) ? y_end_self : y_end_other;
    unsigned w = (x1 > x0) ? (x1 - x0) : 0u;
    unsigned h = (y1 > y0) ? (y1 - y0) : 0u;
-   struct Rect out;
+   struct TTRect out;
    out.x = x0; out.y = y0; out.width = w; out.height = h;
    return out;
 }
-static INLINE void rect_extend_bounding_box(struct Rect *self,
-      const struct Rect *rect)
+static INLINE void rect_extend_bounding_box(struct TTRect *self,
+      const struct TTRect *rect)
 {
    unsigned x_end_self = self->x + self->width;
    unsigned x_end_other = rect->x + rect->width;
@@ -469,15 +469,15 @@ void texture_tracker_set_texture_dir_mode(int mode);
 /* ---- VRAM mutation + frame hooks -------------------------------------- */
 
 void texture_tracker_upload(TextureTracker *self,
-      Rect rect,
+      TTRect rect,
       uint16_t *vram);
 void texture_tracker_blit(TextureTracker *self,
-      Rect dst,
-      Rect src);
+      TTRect dst,
+      TTRect src);
 void texture_tracker_clearRegion(TextureTracker *self,
-      Rect rect, uint16_t fill16);
+      TTRect rect, uint16_t fill16);
 void texture_tracker_notifyReadback(TextureTracker *self,
-      Rect rect,
+      TTRect rect,
       uint16_t *vram);
 
 void texture_tracker_endFrame(TextureTracker *self);
@@ -486,7 +486,7 @@ void texture_tracker_on_queues_reset(TextureTracker *self);
 /* ---- Draw-path resolution --------------------------------------------- */
 
 HdTextureHandle texture_tracker_get_hd_texture_index(TextureTracker *self,
-      Rect rect,
+      TTRect rect,
       UsedMode *mode,
       unsigned int page_x,
       unsigned int page_y,

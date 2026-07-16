@@ -85,7 +85,7 @@ typedef struct UploadPtrEntry UploadPtrEntry;
       int h;
    };
 
-static bool rect_match_matches(const RectMatch *m, Rect r) {
+static bool rect_match_matches(const RectMatch *m, TTRect r) {
       return (m->x == -1 || m->x == r.x) && (m->y == -1 || m->y == r.y) &&
          (m->w == -1 || m->w == (int)r.width) && (m->h == -1 || m->h == (int)r.height);
    }
@@ -704,7 +704,7 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
    };
 
    struct CachedPaletteHash {
-      Rect rect;
+      TTRect rect;
       uint32_t hash;
    };
 
@@ -1030,7 +1030,7 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
    static void rect_tracker_releaseDeadHandles(struct RectTracker *self);
    /* Returns results by pointer (was a reference). */
    static RectIndexSet *rect_tracker_overlapping(struct RectTracker *self,
-         Rect rect,
+         TTRect rect,
          RectIndexSet *results);
 
    /* This pointer will be valid until the next upload/blit/clear/endFrame, so
@@ -1052,7 +1052,7 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
     * fusionrects_init. */
    struct FusionRects {
       OwnedRectVec rects;
-      Rect vram_rect;
+      TTRect vram_rect;
       unsigned int scaleX;
       unsigned int scaleY;
    };
@@ -1087,7 +1087,7 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
       ImageHandle texture;
 
       uint32_t palette;
-      Rect full_page_rect;
+      TTRect full_page_rect;
 
       bool dirty;
       bool dead;
@@ -1220,14 +1220,14 @@ static void fused_pages_init(struct FusedPages *self) {
 static void fused_pages_set_budget(struct FusedPages *self, size_t bytes) { self->budget_bytes = bytes; }
 static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(&self->pages); }
    static HdTextureHandle fused_pages_get_or_make(struct FusedPages *self,
-         Rect page_rect,
+         TTRect page_rect,
          uint32_t palette,
          struct RectTracker *tracker);
    static HdTexture fused_pages_get_from_handle(struct FusedPages *self,
          HdTextureHandle handle,
          ImageHandle *default_hd_texture);
-   static void fused_pages_mark_dirty(struct FusedPages *self, Rect rect); /* For blit dst, upload, and hd texture load */
-   static void fused_pages_mark_dead(struct FusedPages *self, Rect rect); /* For clear */
+   static void fused_pages_mark_dirty(struct FusedPages *self, TTRect rect); /* For blit dst, upload, and hd texture load */
+   static void fused_pages_mark_dead(struct FusedPages *self, TTRect rect); /* For clear */
    static void fused_pages_rebuild_dirty(struct FusedPages *self,
          struct RectTracker *tracker);
    static void fused_pages_remove_dead(struct FusedPages *self);
@@ -1235,7 +1235,7 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
    static int64_t page_bytes(FusionRects *fusion); /* approx VRAM footprint of a fused page */
 
    struct RestorableRect {
-      Rect rect;
+      TTRect rect;
       uint32_t hash;
       OwnedRectVec to_restore;
    };
@@ -1350,7 +1350,7 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
    static bool dbg_hotkey_query(struct DbgHotkey *self);
 
    struct CacheEntry {
-      Rect rect;
+      TTRect rect;
       /* Lookup key (the draw's full palette hash). Kept separate from
        * handle.palette_hash because with Reduce Palette Range the bound handle may
        * carry a reduced palette hash, while the cache is keyed by the full hash. */
@@ -1515,7 +1515,7 @@ static void TextureRectSaveStateVec_move(struct TextureRectSaveStateVec *dst,
    }
 
    struct RestorableRectSaveState {
-      Rect rect;
+      TTRect rect;
       uint32_t hash;
       TextureRectSaveStateVec to_restore;
    };
@@ -2109,7 +2109,7 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
     * hashed_frame caps re-hashing to once per page per frame (busy VRAM regions
     * otherwise re-CRC a 256-row page on nearly every draw). */
    struct CachedPageHash {
-      Rect rect;
+      TTRect rect;
       uint32_t hash;
       bool dirty;
       uint64_t hashed_frame;
@@ -2121,7 +2121,7 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
     * self-invalidates when the page content (and thus its hash) changes; no dirty
     * coupling with CachedPageHash. pal_min < 0 means "no palette / no range". */
    struct CachedPageBounds {
-      Rect rect;
+      TTRect rect;
       uint32_t hash;
       int pal_min;
       int pal_max;
@@ -2136,7 +2136,7 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
     * to the full image via (vram_rect, texel_rect={0,0,img_w,img_h}).
     * (PAGE_ALIGN.md section 6.) */
    struct ReplacedPage {
-      Rect page_rect;        /* VRAM words */
+      TTRect page_rect;        /* VRAM words */
       ImageHandle texture;
       int alpha_flags;
    };
@@ -2267,19 +2267,19 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
          const TextureTrackerSaveState *state);
 
    void texture_tracker_upload(struct TextureTracker *self,
-         Rect rect,
+         TTRect rect,
          uint16_t *vram);
    void texture_tracker_blit(struct TextureTracker *self,
-         Rect dst,
-         Rect src);
+         TTRect dst,
+         TTRect src);
    void texture_tracker_clearRegion(struct TextureTracker *self,
-         Rect rect, uint16_t fill16);
+         TTRect rect, uint16_t fill16);
    void texture_tracker_notifyReadback(struct TextureTracker *self,
-         Rect rect,
+         TTRect rect,
          uint16_t *vram);
 
    HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self,
-         Rect rect,
+         TTRect rect,
          UsedMode *mode,
          unsigned int page_x,
          unsigned int page_y,
@@ -2303,9 +2303,9 @@ void texture_tracker_set_cache_budgets(struct TextureTracker *self,
    }
 
    static Palette texture_tracker_get_palette(struct TextureTracker *self,
-         Rect palette_rect);
+         TTRect palette_rect);
    static uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self,
-         Rect palette_rect);
+         TTRect palette_rect);
    static void texture_tracker_want_combo(struct TextureTracker *self,
          HdTextureId id, bool high_priority, bool pages);
    static void texture_tracker_dump_texture(struct TextureTracker *self,
@@ -2323,19 +2323,19 @@ void texture_tracker_set_cache_budgets(struct TextureTracker *self,
          UsedMode *mode,
          uint32_t palette_hash_override);
    /* ---- Page-aligned experiment + HD QoL forward declarations (PAGE_ALIGN.md) ---- */
-   static void texture_tracker_mirror_store(struct TextureTracker *self, Rect rect, const uint16_t *vram);
-   static void texture_tracker_mirror_blit(struct TextureTracker *self, Rect dst, Rect src);
-   static void texture_tracker_mirror_fill(struct TextureTracker *self, Rect rect, uint16_t value);
-   static void texture_tracker_invalidate_page_hashes(struct TextureTracker *self, Rect written);
-   static uint32_t texture_tracker_hash_page(struct TextureTracker *self, Rect page_rect);
-   static uint32_t texture_tracker_hash_page_cached(struct TextureTracker *self, Rect page_rect);
-   static void texture_tracker_dump_page(struct TextureTracker *self, Rect page_rect, uint32_t page_hash, UsedMode *mode, uint32_t palette_hash);
+   static void texture_tracker_mirror_store(struct TextureTracker *self, TTRect rect, const uint16_t *vram);
+   static void texture_tracker_mirror_blit(struct TextureTracker *self, TTRect dst, TTRect src);
+   static void texture_tracker_mirror_fill(struct TextureTracker *self, TTRect rect, uint16_t value);
+   static void texture_tracker_invalidate_page_hashes(struct TextureTracker *self, TTRect written);
+   static uint32_t texture_tracker_hash_page(struct TextureTracker *self, TTRect page_rect);
+   static uint32_t texture_tracker_hash_page_cached(struct TextureTracker *self, TTRect page_rect);
+   static void texture_tracker_dump_page(struct TextureTracker *self, TTRect page_rect, uint32_t page_hash, UsedMode *mode, uint32_t palette_hash);
    void texture_tracker_ensure_directories(struct TextureTracker *self, bool dump, bool replace);
    static void texture_tracker_sync_load_combo(struct TextureTracker *self, TextureUpload *upload, uint32_t palette_hash);
    static void texture_tracker_sync_load_page(struct TextureTracker *self, HdTextureId id);
-   static HdTextureHandle texture_tracker_match_page(struct TextureTracker *self, Rect page_rect, uint32_t page_hash, uint32_t palette_hash);
+   static HdTextureHandle texture_tracker_match_page(struct TextureTracker *self, TTRect page_rect, uint32_t page_hash, uint32_t palette_hash);
 static void texture_tracker_clear_palette_cache(struct TextureTracker *self,
-      Rect rect)
+      TTRect rect)
    {
       self->cached_palette_hashes_count = 0; /* keep allocation for reuse */
    }
@@ -3027,7 +3027,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 
       { uint16_t *palette = NULL;
       if (mode->mode == TextureMode_Palette4bpp || mode->mode == TextureMode_Palette8bpp) {
-         Rect palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
+         TTRect palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
          Palette p = texture_tracker_get_palette(self, palette_rect);
          if (p.data != NULL) {
             palette = p.data;
@@ -3231,21 +3231,21 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       io_thread_deinit(&self->iothread);
    }
 
-static SRect toSRect(Rect rect) {
+static SRect toSRect(TTRect rect) {
       return make_srect(rect.x, rect.y, rect.width, rect.height);
    }
-static Rect fromSRect(SRect rect) {
+static TTRect fromSRect(SRect rect) {
       return make_rect(rect.x, rect.y, rect.width, rect.height);
    }
 
    /* fromSRect(s).contains(r) in one shot, so the by-value temporary the old
     * chained call relied on has a stable address for rect_contains. */
-   static INLINE bool fromSRect_contains(SRect s, Rect r) {
-      struct Rect fr = fromSRect(s);
+   static INLINE bool fromSRect_contains(SRect s, TTRect r) {
+      struct TTRect fr = fromSRect(s);
       return rect_contains(&fr, &r);
    }
 
-   static Palette texture_tracker_get_palette(struct TextureTracker *self, Rect palette_rect) {
+   static Palette texture_tracker_get_palette(struct TextureTracker *self, TTRect palette_rect) {
       assert(palette_rect.height == 1);
 
       { static RectIndexSet overlap = { NULL, 0, 0 };
@@ -3294,7 +3294,7 @@ static Rect fromSRect(SRect rect) {
       }
    }
 
-   static uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, Rect palette_rect) {
+   static uint32_t texture_tracker_get_palette_hash(struct TextureTracker *self, TTRect palette_rect) {
       Palette palette;
       int i;
       for (i = 0; i < self->cached_palette_hashes_count; i++) {
@@ -3322,7 +3322,7 @@ static Rect fromSRect(SRect rect) {
    }
 
    void texture_tracker_clearRegion(struct TextureTracker *self,
-         Rect rect, uint16_t fill16){
+         TTRect rect, uint16_t fill16){
       if (rect.width == 0 || rect.height == 0) {
          /* Some games do this, apparently. */
          return;
@@ -3336,8 +3336,8 @@ static Rect fromSRect(SRect rect) {
 
 
    void texture_tracker_blit(struct TextureTracker *self,
-         Rect dst,
-         Rect src){
+         TTRect dst,
+         TTRect src){
       rect_tracker_blit(&self->tracker, make_srect(dst.x, dst.y, dst.width, dst.height), make_srect(src.x, src.y, src.width, src.height));
       texture_tracker_mirror_blit(self, dst, src); /* keep the page mirror current */
       fused_pages_mark_dirty(&self->fused_pages, dst);
@@ -3346,7 +3346,7 @@ static Rect fromSRect(SRect rect) {
    }
 
    static uint32_t texture_tracker_dbgHashVram(struct TextureTracker *self,
-         Rect rect,
+         TTRect rect,
          uint16_t *vram){
       unsigned x = rect.x,
           y = rect.y,
@@ -3398,7 +3398,7 @@ static Rect fromSRect(SRect rect) {
    }
 
    static TextureRectResult clip_texture_rect_to_vram(TextureRect *t,
-         Rect vram_rect){
+         TTRect vram_rect){
       SRectResult intersection = intersect(t->vram_rect, toSRect(vram_rect));
       if (intersection.valid) {
          TextureRectResult r = { subTexture(*t, intersection.rect), true };
@@ -3410,7 +3410,7 @@ static Rect fromSRect(SRect rect) {
    }
 
    void texture_tracker_notifyReadback(struct TextureTracker *self,
-         Rect rect,
+         TTRect rect,
          uint16_t *vram){
       RestorableRect rr;
       uint32_t hash;
@@ -3463,7 +3463,7 @@ static Rect fromSRect(SRect rect) {
    }
 
    void texture_tracker_upload(struct TextureTracker *self,
-         Rect rect,
+         TTRect rect,
          uint16_t *vram){
       TextureUpload * upload;
       RestorableRect * restore;
@@ -3690,7 +3690,7 @@ static Rect fromSRect(SRect rect) {
       }
    }
 
-   static void output_rect_json(RFILE *stream, Rect *rect) {
+   static void output_rect_json(RFILE *stream, TTRect *rect) {
       filestream_printf(stream,
             "{ \"x\": %u,\"y\": %u,\"width\": %u,\"height\": %u}\n",
             rect->x, rect->y, rect->width, rect->height);
@@ -3731,7 +3731,7 @@ static Rect fromSRect(SRect rect) {
    }
 
    static HandleCacheResult handle_lru_cache_get(struct HandleLRUCache *self,
-         Rect rect,
+         TTRect rect,
          uint32_t palette_hash){
       HandleCacheResult res;
       int i, j;
@@ -3755,7 +3755,7 @@ static Rect fromSRect(SRect rect) {
       return res;
    }
    static void handle_lru_cache_insert(struct HandleLRUCache *self,
-         Rect rect,
+         TTRect rect,
          uint32_t palette_hash,
          HdTextureHandle handle){
       int j;
@@ -3848,7 +3848,7 @@ static Rect fromSRect(SRect rect) {
    /* Page-aligned counterpart. The [min,max] scan over the page's index words (read
     * from vram_mirror) is memoised in cached_page_bounds keyed by (rect, page_hash). */
    static uint32_t texture_tracker_effective_palette_hash_page(struct TextureTracker *self,
-         Rect page_rect, uint32_t page_hash, const uint16_t *palette, uint32_t full_hash) {
+         TTRect page_rect, uint32_t page_hash, const uint16_t *palette, uint32_t full_hash) {
       int mode;
       int i;
       CachedPageBounds *slot = NULL;
@@ -3914,14 +3914,14 @@ static Rect fromSRect(SRect rect) {
    }
 
    HdTextureHandle texture_tracker_get_hd_texture_index(struct TextureTracker *self,
-         Rect rect,
+         TTRect rect,
          UsedMode *mode,
          unsigned int page_x,
          unsigned int page_y,
          bool *fastpath_capable_out,
          bool *cache_hit){
-      Rect palette_rect;
-      Rect result_rect;
+      TTRect palette_rect;
+      TTRect result_rect;
       HdTextureHandle result;
       (*fastpath_capable_out) = false;
       palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
@@ -4011,7 +4011,7 @@ static Rect fromSRect(SRect rect) {
                = mode->mode == TextureMode_Palette4bpp ? 64
                : mode->mode == TextureMode_Palette8bpp ? 128
                : 256;
-            Rect page_rect = { 0, 0, 0, 0 };
+            TTRect page_rect = { 0, 0, 0, 0 };
             uint32_t page_hash;
             uint32_t page_phash;
             HdTextureId page_id;
@@ -4050,7 +4050,7 @@ static Rect fromSRect(SRect rect) {
        * instead of per-upload rects. Bypasses the overlap/fuse path. */
       if (self->replacement_mode_pages) {
          unsigned width;
-         Rect page_rect = { 0, 0, 0, 0 };
+         TTRect page_rect = { 0, 0, 0, 0 };
          uint32_t page_hash;
          uint32_t page_phash;
          HdTextureHandle page;
@@ -4122,7 +4122,7 @@ static Rect fromSRect(SRect rect) {
                   = mode->mode == TextureMode_Palette4bpp ? 64
                   : mode->mode == TextureMode_Palette8bpp ? 128
                   : 256;
-               Rect page_rect = { page_x, page_y, width, 256 };
+               TTRect page_rect = { page_x, page_y, width, 256 };
                (*fastpath_capable_out) = false;
                return fused_pages_get_or_make(&self->fused_pages, page_rect, palette_hash, &self->tracker);
             }
@@ -4162,7 +4162,7 @@ static Rect fromSRect(SRect rect) {
          if (!upload_rect_has_file) {
             unsigned width = mode->mode == TextureMode_Palette4bpp ? 64
                   : mode->mode == TextureMode_Palette8bpp ? 128 : 256;
-            Rect page_rect = { 0, 0, 0, 0 };
+            TTRect page_rect = { 0, 0, 0, 0 };
             uint32_t page_hash;
             uint32_t page_phash;
             HdTextureHandle page;
@@ -4301,7 +4301,7 @@ static bool is_power_of_two(int n) {
    /* CRC32 of a VRAM page rect read from the CPU mirror. Row-by-row incremental
     * CRC is bit-identical to CRCing one gathered buffer, so it matches -pages
     * dumps while avoiding a malloc+copy on the common (no x-wrap) path. */
-   static uint32_t texture_tracker_hash_page(struct TextureTracker *self, Rect page_rect) {
+   static uint32_t texture_tracker_hash_page(struct TextureTracker *self, TTRect page_rect) {
       uint32_t crc = 0;
       self->dbg_page_hashes++;
       if (page_rect.x + page_rect.width <= FB_WIDTH) {
@@ -4332,7 +4332,7 @@ static bool is_power_of_two(int n) {
 
    /* Memoized page hash: re-CRC only if the page was written since last hash AND
     * not already refreshed this frame (caps busy regions to one re-hash/page/frame). */
-   static uint32_t texture_tracker_hash_page_cached(struct TextureTracker *self, Rect page_rect) {
+   static uint32_t texture_tracker_hash_page_cached(struct TextureTracker *self, TTRect page_rect) {
       int i;
       for (i = 0; i < self->cached_page_hashes_count; i++) {
          CachedPageHash *c = &self->cached_page_hashes[i];
@@ -4361,7 +4361,7 @@ static bool is_power_of_two(int n) {
    }
 
    /* Drop (mark dirty) memoized page hashes whose page overlaps a written VRAM rect. */
-   static void texture_tracker_invalidate_page_hashes(struct TextureTracker *self, Rect written) {
+   static void texture_tracker_invalidate_page_hashes(struct TextureTracker *self, TTRect written) {
       int i;
       bool all;
       if (self->cached_page_hashes_count == 0)
@@ -4374,7 +4374,7 @@ static bool is_power_of_two(int n) {
    }
 
    /* --- VRAM mirror helpers. All x/y wrap to match the live VRAM access pattern. --- */
-   static void texture_tracker_mirror_store(struct TextureTracker *self, Rect rect, const uint16_t *vram) {
+   static void texture_tracker_mirror_store(struct TextureTracker *self, TTRect rect, const uint16_t *vram) {
       unsigned j, i;
       texture_tracker_invalidate_page_hashes(self, rect);
       for (j = rect.y; j < rect.y + rect.height; j++) {
@@ -4385,7 +4385,7 @@ static bool is_power_of_two(int n) {
          }
       }
    }
-   static void texture_tracker_mirror_blit(struct TextureTracker *self, Rect dst, Rect src) {
+   static void texture_tracker_mirror_blit(struct TextureTracker *self, TTRect dst, TTRect src) {
       uint16_t *tmp;
       unsigned j, i;
       texture_tracker_invalidate_page_hashes(self, dst);
@@ -4407,7 +4407,7 @@ static bool is_power_of_two(int n) {
       }
       free(tmp);
    }
-   static void texture_tracker_mirror_fill(struct TextureTracker *self, Rect rect, uint16_t value) {
+   static void texture_tracker_mirror_fill(struct TextureTracker *self, TTRect rect, uint16_t value) {
       unsigned j, i;
       texture_tracker_invalidate_page_hashes(self, rect);
       for (j = rect.y; j < rect.y + rect.height; j++) {
@@ -4420,7 +4420,7 @@ static bool is_power_of_two(int n) {
    /* Decode a FULL VRAM texture page from the mirror via the active palette and
     * queue a PNG to <cd>-texture-dump-pages/. Snapshots raw words; the IO worker
     * decodes off-thread (decode_dump_rgba). */
-   static void texture_tracker_dump_page(struct TextureTracker *self, Rect page_rect, uint32_t page_hash, UsedMode *mode, uint32_t palette_hash) {
+   static void texture_tracker_dump_page(struct TextureTracker *self, TTRect page_rect, uint32_t page_hash, UsedMode *mode, uint32_t palette_hash) {
       int shift;
       int ppp;
       uint16_t *palette = NULL;
@@ -4438,7 +4438,7 @@ static bool is_power_of_two(int n) {
          default: return;
       }
       if (mode->mode == TextureMode_Palette4bpp || mode->mode == TextureMode_Palette8bpp) {
-         Rect palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
+         TTRect palette_rect = make_rect(mode->palette_offset_x, mode->palette_offset_y, mode->mode == TextureMode_Palette8bpp ? 256 : 16, 1);
          Palette p = texture_tracker_get_palette(self, palette_rect);
          if (p.data != NULL)
             palette = p.data;
@@ -4615,7 +4615,7 @@ static bool is_power_of_two(int n) {
 
    /* Draw-time page resolve: GPU-cache hit -> bind this frame; else load per the
     * caching method (lazy_sync inline, else async high-priority) and native this frame. */
-   static HdTextureHandle texture_tracker_match_page(struct TextureTracker *self, Rect page_rect, uint32_t page_hash, uint32_t palette_hash) {
+   static HdTextureHandle texture_tracker_match_page(struct TextureTracker *self, TTRect page_rect, uint32_t page_hash, uint32_t palette_hash) {
       HdTextureId id;
       CachedGpuImage *gpu;
       id.hash = page_hash; id.palette_hash = palette_hash; id.pages = true;
@@ -4679,7 +4679,7 @@ static bool is_power_of_two(int n) {
     * is turned off so VRAM is reclaimed immediately (does NOT re-scan folders). */
    void texture_tracker_flush_hd_state(struct TextureTracker *self) {
       int i;
-      Rect _mdr;
+      TTRect _mdr;
       texture_tracker_clear_all_upload_bindings(self);
       HdGpuCache_clear(&self->hd_gpu_cache);
       HdImageCache_clear(&self->hd_cache);
@@ -4949,7 +4949,7 @@ static bool is_power_of_two(int n) {
                for (_eti = 0; _eti < self->tracker.textures.count; _eti++)
                {
                   EnduringTextureRect *etexture = &self->tracker.textures.a[_eti];
-                  Rect rect;
+                  TTRect rect;
                   TextureRect *texture;
                   if (!etexture->alive) continue;
                   texture = &etexture->texture_rect;
@@ -5049,7 +5049,7 @@ static bool is_power_of_two(int n) {
 
       /* Delete fused textures */
       {
-         Rect _mdr;
+         TTRect _mdr;
          _mdr.x = 0;
          _mdr.y = 0;
          _mdr.width = FB_WIDTH;
@@ -5179,7 +5179,7 @@ static bool is_power_of_two(int n) {
    }
 
    static RectIndexSet *rect_tracker_overlapping(struct RectTracker *self,
-         Rect uvrect,
+         TTRect uvrect,
          RectIndexSet *results)
    {
       SRect rect;
@@ -5410,7 +5410,7 @@ static int64_t page_bytes(FusionRects *fusion)
    }
 
    static void fusion_rects(struct FusionRects *out,
-         Rect full_page_rect,
+         TTRect full_page_rect,
          uint32_t palette_hash,
          struct RectTracker *tracker){
       int _ei;
@@ -5427,7 +5427,7 @@ static int64_t page_bytes(FusionRects *fusion)
             TextureUpload *upload = e->texture_rect.upload;
             HdTexEntry *hd_texture = hd_tex_map_find(&upload->textures, palette_hash);
             if (hd_texture != NULL) {
-               Rect r;
+               TTRect r;
                /* Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity) */
                TextureRect clipped = subTexture(e->texture_rect, intersection.rect);
                unsigned hd_scale_x = tt_img_width(hd_texture->image) / upload->width;
@@ -5592,7 +5592,7 @@ static int64_t page_bytes(FusionRects *fusion)
    }
 
    static HdTextureHandle fused_pages_get_or_make(struct FusedPages *self,
-         Rect page_rect,
+         TTRect page_rect,
          uint32_t palette,
          struct RectTracker *tracker){
       int x;
@@ -5633,7 +5633,7 @@ static int64_t page_bytes(FusionRects *fusion)
       fused_page_vec_push(&self->pages, &page);
       return hd_handle_make_fused(fused_page_vec_size(&self->pages) - 1);
    }
-   static void fused_pages_mark_dirty(struct FusedPages *self, Rect rect) {
+   static void fused_pages_mark_dirty(struct FusedPages *self, TTRect rect) {
       int _i;
       for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++)
       {
@@ -5642,7 +5642,7 @@ static int64_t page_bytes(FusionRects *fusion)
             page->dirty = true;
       }
    }
-   static void fused_pages_mark_dead(struct FusedPages *self, Rect rect) {
+   static void fused_pages_mark_dead(struct FusedPages *self, TTRect rect) {
       int _i;
       for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++)
       {
@@ -5815,7 +5815,7 @@ static int64_t page_bytes(FusionRects *fusion)
       } }
 
       {
-         Rect _crr;
+         TTRect _crr;
          _crr.x = 0;
          _crr.y = 0;
          _crr.width = FB_WIDTH;

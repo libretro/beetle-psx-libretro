@@ -5028,9 +5028,9 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
 
       struct RenderPassState
       {
-         Rect rect;
-         Rect scissor;
-         Rect texture_window;
+         TTRect rect;
+         TTRect scissor;
+         TTRect texture_window;
          unsigned texture_offset_x, texture_offset_y;
          unsigned palette_offset_x, palette_offset_y;
          TextureMode texture_mode;
@@ -5045,70 +5045,70 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
     * const overload folds into the same accessor). */
    static void fbatlas_read_fragment(FBAtlas *self,
          Domain domain,
-         const Rect *rect);
+         const TTRect *rect);
    static Domain fbatlas_blit_vram(FBAtlas *self,
-         const Rect *dst,
-         const Rect *src);
-   static void fbatlas_load_image(FBAtlas *self, const Rect *rect);
-   static bool fbatlas_texture_rendered(FBAtlas *self, const Rect *rect);
+         const TTRect *dst,
+         const TTRect *src);
+   static void fbatlas_load_image(FBAtlas *self, const TTRect *rect);
+   static bool fbatlas_texture_rendered(FBAtlas *self, const TTRect *rect);
    static void fbatlas_write_fragment(FBAtlas *self,
          Domain domain,
-         const Rect *rect);
+         const TTRect *rect);
    static void fbatlas_clear_rect(FBAtlas *self,
-         const Rect *rect,
+         const TTRect *rect,
          uint32_t color);
    static void fbatlas_pipeline_barrier(FBAtlas *self, StatusFlags domains);
    static void fbatlas_flush_render_pass(FBAtlas *self);
    static void fbatlas_read_domain(FBAtlas *self,
          Domain domain,
          Stage stage,
-         const Rect *rect);
+         const TTRect *rect);
    static bool fbatlas_write_domain(FBAtlas *self,
          Domain domain,
          Stage stage,
-         const Rect *rect);
+         const TTRect *rect);
    static void fbatlas_sync_domain(FBAtlas *self,
          Domain domain,
-         const Rect *rect);
-   static Domain fbatlas_find_suitable_domain(FBAtlas *self, const Rect *rect);
+         const TTRect *rect);
+   static Domain fbatlas_find_suitable_domain(FBAtlas *self, const TTRect *rect);
    static void fbatlas_discard_render_pass(FBAtlas *self);
-   static bool fbatlas_inside_render_pass(FBAtlas *self, const Rect *rect);
+   static bool fbatlas_inside_render_pass(FBAtlas *self, const TTRect *rect);
 
 static void fbatlas_set_hazard_listener(FBAtlas *self, Renderer *hazard)
    {
       self->listener = hazard;
    }
-static void fbatlas_read_compute(FBAtlas *self, Domain domain, const Rect *rect)
+static void fbatlas_read_compute(FBAtlas *self, Domain domain, const TTRect *rect)
    {
       fbatlas_sync_domain(self, domain, rect);
       fbatlas_read_domain(self, domain, Stage_Compute, rect);
    }
 static void fbatlas_write_compute(FBAtlas *self,
       Domain domain,
-      const Rect *rect)
+      const TTRect *rect)
    {
       fbatlas_sync_domain(self, domain, rect);
       fbatlas_write_domain(self, domain, Stage_Compute, rect);
    }
 static void fbatlas_read_transfer(FBAtlas *self,
       Domain domain,
-      const Rect *rect)
+      const TTRect *rect)
    {
       fbatlas_sync_domain(self, domain, rect);
       fbatlas_read_domain(self, domain, Stage_Transfer, rect);
    }
 static void fbatlas_write_transfer(FBAtlas *self,
       Domain domain,
-      const Rect *rect)
+      const TTRect *rect)
    {
       fbatlas_sync_domain(self, domain, rect);
       fbatlas_write_domain(self, domain, Stage_Transfer, rect);
    }
-static void fbatlas_set_draw_rect(FBAtlas *self, const Rect *rect)
+static void fbatlas_set_draw_rect(FBAtlas *self, const TTRect *rect)
    {
       self->renderpass.scissor = *rect;
    }
-static void fbatlas_set_texture_window(FBAtlas *self, const Rect *rect)
+static void fbatlas_set_texture_window(FBAtlas *self, const TTRect *rect)
    {
       self->renderpass.texture_window = *rect;
    }
@@ -5143,9 +5143,9 @@ static StatusFlags *fbatlas_info(FBAtlas *self,
       for (i = 0; i < NUM_BLOCKS_X * NUM_BLOCKS_Y; i++)
          a->fb_info[i] = STATUS_FB_PREFER;
       a->listener = NULL;
-      /* Zero each renderpass field explicitly. (Rect is now a plain POD, so a
+      /* Zero each renderpass field explicitly. (TTRect is now a plain POD, so a
        * memset would be fine, but the explicit form is kept for clarity and to
-       * cover the non-Rect fields below.) This matches the former NSDMIs: the
+       * cover the non-TTRect fields below.) This matches the former NSDMIs: the
        * three Rects become {0,0,0,0}, the offsets 0, texture_mode
        * TextureMode_None (value 0) and inside false. */
       a->renderpass.rect.x = 0; a->renderpass.rect.y = 0; a->renderpass.rect.width = 0; a->renderpass.rect.height = 0;
@@ -5190,13 +5190,13 @@ static StatusFlags *fbatlas_info(FBAtlas *self,
    };
    typedef enum PrimitiveType PrimitiveType;
 
-   /* Display rectangle (signed origin, unlike Rect). Hoisted out of Renderer to
+   /* Display rectangle (signed origin, unlike TTRect). Hoisted out of Renderer to
     * file scope: the 4-arg initialiser becomes display_rect_make and the
     * default-member-initialisers are dropped (every constructed DisplayRect is
     * fully assigned). */
    struct DisplayRect
    {
-      /* Unlike Rect, the x-y coordinates for a DisplayRect can be negative */
+      /* Unlike TTRect, the x-y coordinates for a DisplayRect can be negative */
       int x;
       int y;
       unsigned width;
@@ -5362,7 +5362,7 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
 
    struct ClearCandidate
    {
-      Rect rect;
+      TTRect rect;
       uint32_t color; /* fb_color */
       float z;
    };
@@ -5375,15 +5375,15 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
    /* Renderer top-level render state. Hoisted out of the Renderer class to file
     * scope (it is carried by value inside SaveState and named by many methods)
     * and the default member initialisers move into render_state_init, which the
-    * Renderer initialiser calls. The Rect / TextureWindow / UVRect members are
-    * zeroed explicitly (Rect is non-trivial, so no memset). */
+    * Renderer initialiser calls. The TTRect / TextureWindow / UVRect members are
+    * zeroed explicitly (TTRect is non-trivial, so no memset). */
    struct RenderState
    {
-      /* Rect display_mode; */
-      Rect display_fb_rect;
+      /* TTRect display_mode; */
+      TTRect display_fb_rect;
       TextureWindow texture_window;
-      Rect cached_window_rect;
-      Rect draw_rect;
+      TTRect cached_window_rect;
+      TTRect draw_rect;
       int draw_offset_x;
       int draw_offset_y;
       unsigned palette_offset_x;
@@ -5430,7 +5430,7 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
       UVRect UVLimits;
    };
 
-static void rect_zero(Rect *r) { r->x = 0; r->y = 0; r->width = 0; r->height = 0; }
+static void rect_zero(TTRect *r) { r->x = 0; r->y = 0; r->width = 0; r->height = 0; }
 
 static void render_state_init(struct RenderState *s)
 {
@@ -5797,7 +5797,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static ImageHandle renderer_scanout_to_texture(Renderer *self);
    static void renderer_draw_quad(Renderer *self, const Vertex *vertices);
    static void renderer_init_pipelines(Renderer *self);
-   static Rect renderer_compute_vram_framebuffer_rect(Renderer *self);
+   static TTRect renderer_compute_vram_framebuffer_rect(Renderer *self);
    static void renderer_hd_texture_uniforms(Renderer *self,
          HdTextureHandle hd_texture_index);
    static void renderer_flush_resolves(Renderer *self);
@@ -5805,7 +5805,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          const BlitInfoVec *infos,
          Program *program,
          bool scaled);
-   static Rect renderer_compute_window_rect(Renderer *self,
+   static TTRect renderer_compute_window_rect(Renderer *self,
          const TextureWindow *window);
    static void renderer_reset_scissor_queue(Renderer *self);
    static void renderer_reset_queue(Renderer *self);
@@ -5961,7 +5961,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       self->render_state.palette_offset_y = y;
    }
    static INLINE void renderer_notify_texture_upload(Renderer *self,
-         Rect rect,
+         TTRect rect,
          uint16_t *vram)
    {
       if (self->texture_tracking_enabled)
@@ -6316,7 +6316,7 @@ static void renderer_init(Renderer *self,
       fbatlas_set_palette_offset(&self->atlas, self->render_state.palette_offset_x, self->render_state.palette_offset_y);
       fbatlas_set_texture_window(&self->atlas, &self->render_state.cached_window_rect);
       {
-         Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT };
+         TTRect _r = { 0, 0, FB_WIDTH, FB_HEIGHT };
          fbatlas_write_transfer(&self->atlas, Domain_Unscaled, &_r);
       }
    }
@@ -6466,7 +6466,7 @@ static void renderer_save_vram_state(Renderer *self, SaveState *out){
 
    buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
    {
-      Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT };
+      TTRect _r = { 0, 0, FB_WIDTH, FB_HEIGHT };
       fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &_r);
    }
    renderer_ensure_command_buffer(self);
@@ -6644,7 +6644,7 @@ static void renderer_init_pipelines(Renderer *self)
    renderer_init_primitive_feedback_pipelines(self);
 }
 
-static void renderer_set_draw_rect(Renderer *self, const Rect *rect)
+static void renderer_set_draw_rect(Renderer *self, const TTRect *rect)
 {
    fbatlas_set_draw_rect(&self->atlas, rect);
    self->render_state.draw_rect = *rect;
@@ -6664,7 +6664,7 @@ static void renderer_set_draw_rect(Renderer *self, const Rect *rect)
 }
 
 static void renderer_clear_rect(Renderer *self,
-      const Rect *rect,
+      const TTRect *rect,
       uint32_t fb_color)
 {
    if (self->texture_tracking_enabled) {
@@ -6683,7 +6683,7 @@ static void renderer_clear_rect(Renderer *self,
    VK_ASSERT(rect->y + rect->height <= FB_HEIGHT);
 }
 
-static Rect renderer_compute_window_rect(Renderer *self,
+static TTRect renderer_compute_window_rect(Renderer *self,
       const TextureWindow *window)
 {
    unsigned mask_bits_x = 32 - leading_zeroes(window->mask_x);
@@ -6691,7 +6691,7 @@ static Rect renderer_compute_window_rect(Renderer *self,
    unsigned x = window->or_x & ~((1u << mask_bits_x) - 1);
    unsigned y = window->or_y & ~((1u << mask_bits_y) - 1);
    {
-      Rect _wr;
+      TTRect _wr;
       _wr.x = x;
       _wr.y = y;
       _wr.width = 1u << mask_bits_x;
@@ -6701,7 +6701,7 @@ static Rect renderer_compute_window_rect(Renderer *self,
 }
 
 static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
-      const Rect *rect,
+      const TTRect *rect,
       uint16_t *vram)
 {
    BufferHandle     buffer;
@@ -6763,7 +6763,7 @@ static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
       {
          for (i = 0; i < nh; i++)
          {
-            Rect tr;
+            TTRect tr;
             tr.x     = hx[i]; tr.y      = vy[j];
             tr.width = hw[i]; tr.height = vh[j];
             fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &tr);
@@ -6848,7 +6848,7 @@ static void renderer_mipmap_framebuffer(Renderer *self)
 {
    unsigned levels;
    /* self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self); */
-   Rect rect = self->render_state.display_fb_rect;
+   TTRect rect = self->render_state.display_fb_rect;
    if (rect.x + rect.width > FB_WIDTH)
    {
       rect.x = 0;
@@ -6943,7 +6943,7 @@ static void renderer_mipmap_framebuffer(Renderer *self)
 static void renderer_ssaa_framebuffer(Renderer *self)
 {
    /* self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self); */
-   Rect *rect = &self->render_state.display_fb_rect;
+   TTRect *rect = &self->render_state.display_fb_rect;
    unsigned left = rect->x / BLOCK_WIDTH;
    unsigned top = rect->y / BLOCK_HEIGHT;
    unsigned right = (rect->x + rect->width + BLOCK_WIDTH - 1) / BLOCK_WIDTH;
@@ -6995,7 +6995,7 @@ static void renderer_ssaa_framebuffer(Renderer *self)
    }
 }
 
-static Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
+static TTRect renderer_compute_vram_framebuffer_rect(Renderer *self)
 {
    unsigned fb_width;
    unsigned fb_height;
@@ -7027,7 +7027,7 @@ static Rect renderer_compute_vram_framebuffer_rect(Renderer *self)
    fb_height = (unsigned) (self->render_state.vert_end - self->render_state.vert_start);
    fb_height *= self->render_state.is_480i ? 2 : 1;
 
-   { Rect _dr; _dr.x = self->render_state.display_fb_xstart;
+   { TTRect _dr; _dr.x = self->render_state.display_fb_xstart;
            _dr.y = self->render_state.display_fb_ystart;
            _dr.width = fb_width;
            _dr.height = fb_height; return _dr; }
@@ -7128,7 +7128,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
    fbatlas_flush_render_pass(&self->atlas);
 
-   { Rect vram_rect = {0, 0, FB_WIDTH, FB_HEIGHT};
+   { TTRect vram_rect = {0, 0, FB_WIDTH, FB_HEIGHT};
 
    if (scaled)
       fbatlas_read_fragment(&self->atlas, Domain_Scaled, &vram_rect);
@@ -7233,13 +7233,13 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       return self->last_scanout;
 
    self->render_state.display_fb_rect = renderer_compute_vram_framebuffer_rect(self);
-   { Rect *rect = &self->render_state.display_fb_rect;
+   { TTRect *rect = &self->render_state.display_fb_rect;
 
    if (rect->width == 0 || rect->height == 0 || !self->render_state.display_on)
    {
       /* Black screen, just flush out everything. */
       {
-         Rect _r = { 0, 0, FB_WIDTH, FB_HEIGHT };
+         TTRect _r = { 0, 0, FB_WIDTH, FB_HEIGHT };
          fbatlas_read_fragment(&self->atlas, Domain_Scaled, &_r);
       }
 
@@ -7273,7 +7273,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    { bool bpp24 = self->render_state.scanout_mode == ScanoutMode_BGR24;
    bool ssaa = self->render_state.scanout_filter == ScanoutFilter_SSAA && self->scaling != 1;
 
-   Rect read_rect = *rect;
+   TTRect read_rect = *rect;
    if (rect->x + rect->width > FB_WIDTH)
    {
       read_rect.x = 0;
@@ -7286,7 +7286,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    }
    if (bpp24)
    {
-      Rect tmp = read_rect;
+      TTRect tmp = read_rect;
       if (bpp24)
       {
          tmp.width = (tmp.width * 3 + 1) / 2;
@@ -7631,7 +7631,7 @@ static void renderer_resolve(Renderer *self,
 
 static float renderer_allocate_depth(Renderer *self,
       Domain domain,
-      const Rect *rect)
+      const TTRect *rect)
 {
    fbatlas_write_fragment(&self->atlas, domain, rect);
    self->primitive_index++;
@@ -7640,7 +7640,7 @@ static float renderer_allocate_depth(Renderer *self,
 }
 
 static HdTextureHandle renderer_get_hd_texture_index(Renderer *self,
-      const Rect *vram_rect,
+      const TTRect *vram_rect,
       bool *fastpath_capable_out,
       bool *cache_hit_out){
    UsedMode mode = {
@@ -7677,7 +7677,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       break;
    }
 
-   { Rect hd_texture_vram = make_rect(0, 0, 0, 0);
+   { TTRect hd_texture_vram = make_rect(0, 0, 0, 0);
 
    if (self->render_state.texture_mode != TextureMode_None)
    {
@@ -7693,7 +7693,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
          if (max_u > 255 || max_v > 255) /* Wraparound behavior, assume the whole page is hit. */
          {
             {
-               Rect _r = { 0, 0, 256u >> shift, 256 };
+               TTRect _r = { 0, 0, 256u >> shift, 256 };
                fbatlas_set_texture_window(&self->atlas, &_r);
             }
             hd_texture_vram.x = self->render_state.texture_offset_x;
@@ -7707,14 +7707,14 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
             max_u = (max_u + (1 << shift) - 1) >> shift;
             width = max_u - min_u + 1;
             {
-               Rect _r = { min_u, min_v, width, height };
+               TTRect _r = { min_u, min_v, width, height };
                fbatlas_set_texture_window(&self->atlas, &_r);
             }
 
             hd_texture_vram.x = self->render_state.texture_offset_x + min_u;
             hd_texture_vram.y = self->render_state.texture_offset_y + min_v;
 
-            /* HDTODO: this might be wrong because it can result in Rect's with 0 width, also notice that height has the same +1 */
+            /* HDTODO: this might be wrong because it can result in TTRect's with 0 width, also notice that height has the same +1 */
             hd_texture_vram.width = width - 1; /* This is -1 due to boundary shenanigans above (otherwise upload.rect.contains(snoop) would return false for the right-most tiles) */
             hd_texture_vram.height = height;
          }
@@ -7722,9 +7722,9 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       else
       {
          /* If we have a masked texture window, assume this is the true rect we should use. */
-         Rect effective_rect = self->render_state.cached_window_rect;
+         TTRect effective_rect = self->render_state.cached_window_rect;
          {
-            Rect _r = { effective_rect.x >> shift, effective_rect.y, effective_rect.width >> shift, effective_rect.height };
+            TTRect _r = { effective_rect.x >> shift, effective_rect.y, effective_rect.width >> shift, effective_rect.height };
             fbatlas_set_texture_window(&self->atlas, &_r);
          }
          hd_texture_vram.x = self->render_state.texture_offset_x + (effective_rect.x >> shift);
@@ -7773,7 +7773,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    max_x = ceilf(min_(max_x, (float)(FB_WIDTH)));
    max_y = ceilf(min_(max_y, (float)(FB_HEIGHT)));
 
-   { const Rect rect = {
+   { const TTRect rect = {
       (unsigned)(min_x), (unsigned)(min_y), (unsigned)(max_x) - (unsigned)(min_x), (unsigned)(max_y) - (unsigned)(min_y),
    };
 
@@ -8146,7 +8146,7 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices)
 }
 
 static void renderer_clear_quad(Renderer *self,
-      const Rect *rect,
+      const TTRect *rect,
       uint32_t fb_color,
       bool candidate)
 {
@@ -8185,7 +8185,7 @@ static void renderer_clear_quad(Renderer *self,
 }
 
 static const ClearCandidate * renderer_find_clear_candidate(Renderer *self,
-      const Rect *rect){
+      const TTRect *rect){
    const ClearCandidate *ret = NULL;
    {
       int _i;
@@ -8199,7 +8199,7 @@ static const ClearCandidate * renderer_find_clear_candidate(Renderer *self,
    return ret;
 }
 
-static void renderer_flush_render_pass(Renderer *self, const Rect *rect)
+static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
 {
    RenderPassInfo_Subpass subpass;
    renderer_ensure_command_buffer(self);
@@ -8582,8 +8582,8 @@ static void renderer_flush_blit(Renderer *self,
 }
 
 static void renderer_blit_vram(Renderer *self,
-      const Rect *dst,
-      const Rect *src){
+      const TTRect *dst,
+      const TTRect *src){
    Domain domain;
    VK_ASSERT(dst->width == src->width);
    VK_ASSERT(dst->height == src->height);
@@ -8905,7 +8905,7 @@ static TTGpuBackend vk_tt_make_backend(Renderer *self)
    return vt;
 }
 
-static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
+static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const TTRect *rect){
    VkDeviceSize size;
    BufferHandle buffer;
    ih_reset(&self->last_scanout);
@@ -8924,7 +8924,7 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
 
    { struct Push
    {
-      Rect rect;
+      TTRect rect;
       uint32_t offset;
       uint32_t mask_or;
    };
@@ -8944,7 +8944,7 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const Rect *rect){
          view_info.format = VK_FORMAT_R16_UINT;
          view = device_create_buffer_view(self->device, &view_info);
 
-         { Rect small_rect = { rect->x, rect->y + y, rect->width, y_size };
+         { TTRect small_rect = { rect->x, rect->y + y, rect->width, y_size };
 
          commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, bvh_get(&view));
          { struct Push push = { small_rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
@@ -9020,7 +9020,7 @@ static bool renderer_is_valid(const Renderer *self) { return self->valid; }
 
 static void renderer_reset_scissor_queue(Renderer *self)
 {
-   Rect * rect;
+   TTRect * rect;
    Rect2DVec_clear(&self->queue.scissors);
    rect = &self->render_state.draw_rect;
    {
@@ -16614,7 +16614,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       }
    }
 
-   static void fbatlas_load_image(FBAtlas *self, const Rect *rect)
+   static void fbatlas_load_image(FBAtlas *self, const TTRect *rect)
    {
       unsigned xend;
       unsigned xbegin;
@@ -16632,7 +16632,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       }
    }
 
-   static bool fbatlas_texture_rendered(FBAtlas *self, const Rect *rect)
+   static bool fbatlas_texture_rendered(FBAtlas *self, const TTRect *rect)
    {
       unsigned xend;
       unsigned xbegin;
@@ -16652,8 +16652,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
    }
 
    static Domain fbatlas_blit_vram(FBAtlas *self,
-         const Rect *dst,
-         const Rect *src)
+         const TTRect *dst,
+         const TTRect *src)
    {
       unsigned dst_xend;
       unsigned dst_xbegin;
@@ -16694,7 +16694,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
    static void fbatlas_read_fragment(FBAtlas *self,
          Domain domain,
-         const Rect *rect)
+         const TTRect *rect)
    {
       fbatlas_sync_domain(self, domain, rect);
       fbatlas_read_domain(self, domain, Stage_Fragment, rect);
@@ -16702,7 +16702,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
    static void fbatlas_read_texture(FBAtlas *self, Domain domain)
    {
-      Rect shifted = self->renderpass.texture_window;
+      TTRect shifted = self->renderpass.texture_window;
       bool palette;
       switch (self->renderpass.texture_mode)
       {
@@ -16721,7 +16721,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       /* Domain domain = palette ? Domain_Unscaled : fbatlas_find_suitable_domain(self, shifted); */
       fbatlas_sync_domain(self, domain, &shifted);
 
-      { Rect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
+      { TTRect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
          self->renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
 
       if (palette)
@@ -16736,7 +16736,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
    static bool fbatlas_write_domain(FBAtlas *self,
          Domain domain,
          Stage stage,
-         const Rect *rect)
+         const TTRect *rect)
    {
       unsigned xend;
       unsigned xbegin;
@@ -16807,7 +16807,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
    static void fbatlas_read_domain(FBAtlas *self,
          Domain domain,
          Stage stage,
-         const Rect *rect)
+         const TTRect *rect)
    {
       unsigned xend;
       unsigned xbegin;
@@ -16872,7 +16872,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
    static void fbatlas_sync_domain(FBAtlas *self,
          Domain domain,
-         const Rect *rect)
+         const TTRect *rect)
    {
       unsigned xbegin;
       unsigned ownership;
@@ -16954,7 +16954,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       }
    }
 
-   static Domain fbatlas_find_suitable_domain(FBAtlas *self, const Rect *rect)
+   static Domain fbatlas_find_suitable_domain(FBAtlas *self, const TTRect *rect)
    {
       unsigned xend;
       unsigned xbegin;
@@ -16977,7 +16977,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       }
    }
 
-   static bool fbatlas_inside_render_pass(FBAtlas *self, const Rect *rect)
+   static bool fbatlas_inside_render_pass(FBAtlas *self, const TTRect *rect)
    {
       unsigned ybegin;
       unsigned xbegin;
@@ -17012,7 +17012,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          self->fb_info[_i] &= ~STATUS_TEXTURE_READ; }
 
       self->renderpass.inside = false;
-      { const Rect *rect = &self->renderpass.rect;
+      { const TTRect *rect = &self->renderpass.rect;
       if (rect->width == 0 || rect->height == 0)
          return;
 
@@ -17030,10 +17030,10 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
    }
 
    static void fbatlas_extend_render_pass(FBAtlas *self,
-         const Rect *rect,
+         const TTRect *rect,
          bool scissor)
    {
-      Rect scissored_rect;
+      TTRect scissored_rect;
       bool scissor_invariant = !scissor || rect_contains(&self->renderpass.scissor, rect);
       self->listener->queue.scissor_invariant = scissor_invariant;
       scissored_rect = !scissor_invariant ? rect_scissor(rect, &self->renderpass.scissor) : *rect;
@@ -17076,12 +17076,12 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
    static void fbatlas_write_fragment(FBAtlas *self,
          Domain domain,
-         const Rect *rect)
+         const TTRect *rect)
    {
       bool reads_window = self->renderpass.texture_mode != TextureMode_None;
       if (reads_window)
       {
-         Rect shifted = self->renderpass.texture_window;
+         TTRect shifted = self->renderpass.texture_window;
          bool reads_palette;
          switch (self->renderpass.texture_mode)
          {
@@ -17097,7 +17097,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
          shifted.x += self->renderpass.texture_offset_x;
          shifted.y += self->renderpass.texture_offset_y;
 
-         { const Rect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
+         { const TTRect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
             self->renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
 
          if (reads_palette)
@@ -17116,7 +17116,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
    }
 
    static void fbatlas_clear_rect(FBAtlas *self,
-         const Rect *rect,
+         const TTRect *rect,
          uint32_t fb_color)
    {
       unsigned xend;
@@ -18274,7 +18274,7 @@ void rhi_vulkan_set_draw_area(uint16_t x0, uint16_t y0,
 
    if (renderer)
       {
-         Rect _r = { x0, y0, (unsigned)(width), (unsigned)(height) };
+         TTRect _r = { x0, y0, (unsigned)(width), (unsigned)(height) };
          renderer_set_draw_rect(renderer, &_r);
       }
    else
@@ -18522,12 +18522,12 @@ void rhi_vulkan_load_image(
       return;
    }
 
-   { Rect _ntu_rect; _ntu_rect.x = x; _ntu_rect.y = y; _ntu_rect.width = w; _ntu_rect.height = h;
+   { TTRect _ntu_rect; _ntu_rect.x = x; _ntu_rect.y = y; _ntu_rect.width = w; _ntu_rect.height = h;
      renderer_notify_texture_upload(renderer, _ntu_rect, vram); }
    renderer->render_state.mask_test      = mask_test;
    renderer->render_state.force_mask_bit = set_mask;
    {
-      Rect _r = { x, y, w, h };
+      TTRect _r = { x, y, w, h };
       BufferHandle handle = renderer_copy_cpu_to_vram(renderer, &_r);
       uint16_t *tmp = (uint16_t*)(device_map_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
 
@@ -18607,7 +18607,7 @@ bool rhi_vulkan_read_vram(uint16_t x, uint16_t y,
    if (!renderer)
       return false;
    {
-      Rect _r = { x, y, w, h };
+      TTRect _r = { x, y, w, h };
       renderer_copy_vram_to_cpu_synchronous(renderer, &_r, vram);
    }
    return true;
@@ -18619,7 +18619,7 @@ void rhi_vulkan_fill_rect(uint32_t color,
 {
    if (renderer)
    {
-      Rect _r = { x, y, w, h };
+      TTRect _r = { x, y, w, h };
       renderer_clear_rect(renderer, &_r, color);
    }
 }
@@ -18634,8 +18634,8 @@ void rhi_vulkan_copy_rect(uint16_t src_x, uint16_t src_y,
    renderer->render_state.mask_test      = mask_test;
    renderer->render_state.force_mask_bit = set_mask;
    {
-      Rect _d = { dst_x, dst_y, w, h };
-      Rect _s = { src_x, src_y, w, h };
+      TTRect _d = { dst_x, dst_y, w, h };
+      TTRect _s = { src_x, src_y, w, h };
       renderer_blit_vram(renderer, &_d, &_s);
    }
 }
