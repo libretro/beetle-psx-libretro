@@ -273,10 +273,14 @@ endif
    # Shared HD-texture replacement/tracking engine (rhi/rhi_tt.c): used by both
    # the GL and Vulkan RHI backends, so it is built whenever either HW renderer
    # is. Image decode/encode goes through the libretro-common formats front end
-   # (IMAGE_FORMAT_SOURCES_C above).
-   ifeq ($(SET_HAVE_HW), 1)
-      CFLAGS      += -DTEXTURE_DUMPING_ENABLED $(IMAGE_FORMAT_FLAGS)
-      CXXFLAGS    += -DTEXTURE_DUMPING_ENABLED $(IMAGE_FORMAT_FLAGS)
+   # (IMAGE_FORMAT_SOURCES_C above). Gate on the renderer switches directly and
+   # publish the defines through FLAGS: SET_HAVE_HW and CFLAGS/CXXFLAGS are
+   # top-level-Makefile conventions that the jni (ndk-build) build never sets -
+   # it assigns HAVE_OPENGL/HAVE_VULKAN itself and consumes SOURCES_* + FLAGS
+   # only, so the previous gating left rhi_tt.c and the decoders out of the
+   # Android link entirely.
+   ifneq (,$(filter 1,$(HAVE_OPENGL) $(HAVE_VULKAN)))
+      FLAGS       += -DTEXTURE_DUMPING_ENABLED $(IMAGE_FORMAT_FLAGS)
       SOURCES_C   += $(CORE_DIR)/rhi/rhi_tt.c \
                      $(IMAGE_FORMAT_SOURCES_C)
 
