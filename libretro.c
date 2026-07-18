@@ -5412,12 +5412,14 @@ bool retro_load_game(const struct retro_game_info *info)
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(mdec_yuv);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-         option_display.key = BEETLE_OPT(track_textures);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-         option_display.key = BEETLE_OPT(dump_textures);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-         option_display.key = BEETLE_OPT(replace_textures);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+
+         /* Track/Dump/Replace Textures are NOT hidden here any more: the
+          * GL backend drives the same shared tracker (rhi/rhi_tt.c) as the
+          * Vulkan one, and rhi_lib_gl.c's retro_refresh_variables() owns
+          * the dependent visibility of Dump/Replace (they follow Track
+          * Textures, exactly as on Vulkan). Hiding them here dated from
+          * when tracking was Vulkan-only and merely made the whole feature
+          * unreachable on an OpenGL frontend. */
 
          option_display.key = BEETLE_OPT(image_offset);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);

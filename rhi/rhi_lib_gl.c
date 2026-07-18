@@ -3044,6 +3044,7 @@ static bool retro_refresh_variables(gl_renderer *renderer)
       bool hd_replacement_fallback   = false;
       bool hd_reduce_palette_range   = false;
       int  hd_texture_dir_mode       = 0;
+      struct retro_core_option_display option_display;
 
       var.key = BEETLE_OPT(track_textures);
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3101,6 +3102,16 @@ static bool retro_refresh_variables(gl_renderer *renderer)
          else if (!strcmp(var.value, "save")) hd_texture_dir_mode = 2;
          else                                 hd_texture_dir_mode = 0;
       }
+
+      /* Dump/Replace Textures only mean anything once tracking is on;
+       * mirror the Vulkan backend's dependent visibility so the option
+       * page reads the same on both hardware renderers. */
+      option_display.visible = track_textures;
+
+      option_display.key = BEETLE_OPT(dump_textures);
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+      option_display.key = BEETLE_OPT(replace_textures);
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
 
       renderer->texture_tracking_enabled = track_textures;
 
