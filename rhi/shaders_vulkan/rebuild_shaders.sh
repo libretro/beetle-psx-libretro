@@ -50,8 +50,6 @@ mkdir -p prebuilt
 # Format = 30-bit (HDR)" path is engaged on Vulkan (psx_hdr_active).
 "$GLSLC" -o prebuilt/hdr.scaled.quad.frag.inc -mfmt=c -DHDR -DSCALED quad.frag
 "$GLSLC" -o prebuilt/hdr.unscaled.quad.frag.inc -mfmt=c -DHDR -DUNSCALED quad.frag
-"$GLSLC" -o prebuilt/hdr.scaled.dither.quad.frag.inc -mfmt=c -DHDR -DDITHER -DSCALED quad.frag
-"$GLSLC" -o prebuilt/hdr.unscaled.dither.quad.frag.inc -mfmt=c -DHDR -DDITHER -DUNSCALED quad.frag
 "$GLSLC" -o prebuilt/hdr.bpp24.quad.frag.inc -mfmt=c -DHDR -DUNSCALED -DBPP24 quad.frag
 "$GLSLC" -o prebuilt/hdr.bpp24.yuv.quad.frag.inc -mfmt=c -DHDR -DUNSCALED -DBPP24 -DBPP24_YUV quad.frag
 

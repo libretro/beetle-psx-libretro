@@ -5716,8 +5716,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
              * plain scaled quad there. */
             Program *hdr_scaled_quad_blitter;
             Program *hdr_unscaled_quad_blitter;
-            Program *hdr_scaled_dither_quad_blitter;
-            Program *hdr_unscaled_dither_quad_blitter;
             Program *hdr_bpp24_quad_blitter;
             Program *hdr_bpp24_yuv_quad_blitter;
             Program *resolve_to_scaled;
@@ -6104,12 +6102,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       ;
    static const uint32_t hdr_unscaled_quad_frag[] =
 #include "shaders_vulkan/prebuilt/hdr.unscaled.quad.frag.inc"
-      ;
-   static const uint32_t hdr_scaled_dither_quad_frag[] =
-#include "shaders_vulkan/prebuilt/hdr.scaled.dither.quad.frag.inc"
-      ;
-   static const uint32_t hdr_unscaled_dither_quad_frag[] =
-#include "shaders_vulkan/prebuilt/hdr.unscaled.dither.quad.frag.inc"
       ;
    static const uint32_t hdr_bpp24_quad_frag[] =
 #include "shaders_vulkan/prebuilt/hdr.bpp24.quad.frag.inc"
@@ -6691,10 +6683,6 @@ static void renderer_init_pipelines(Renderer *self)
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_scaled_quad_frag, sizeof(hdr_scaled_quad_frag));
    self->pipelines.hdr_unscaled_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_unscaled_quad_frag, sizeof(hdr_unscaled_quad_frag));
-   self->pipelines.hdr_scaled_dither_quad_blitter =
-      device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_scaled_dither_quad_frag, sizeof(hdr_scaled_dither_quad_frag));
-   self->pipelines.hdr_unscaled_dither_quad_blitter =
-      device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_unscaled_dither_quad_frag, sizeof(hdr_unscaled_dither_quad_frag));
    self->pipelines.hdr_bpp24_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_bpp24_quad_frag, sizeof(hdr_bpp24_quad_frag));
    self->pipelines.hdr_bpp24_yuv_quad_blitter =
@@ -7563,7 +7551,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    else if (ssaa)
    {
       if (dither)
-         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_unscaled_dither_quad_blitter : self->pipelines.unscaled_dither_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.unscaled_dither_quad_blitter);
       else
          commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_unscaled_quad_blitter : self->pipelines.unscaled_quad_blitter);
 
@@ -7572,7 +7560,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    else if (!self->render_state.adaptive_smoothing || self->scaling == 1)
    {
       if (dither)
-         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_scaled_dither_quad_blitter : self->pipelines.scaled_dither_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.scaled_dither_quad_blitter);
       else
          commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_scaled_quad_blitter : self->pipelines.scaled_quad_blitter);
 
