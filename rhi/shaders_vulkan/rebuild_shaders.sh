@@ -73,6 +73,7 @@ mkdir -p prebuilt
 # the storage image format qualifier to rgba16f. SDR builds are unaffected.
 "$GLSLC" -o prebuilt/resolve.hdr16.scaled.comp.inc -mfmt=c -DSCALED -DHDR16 resolve.comp
 "$GLSLC" -o prebuilt/resolve.hdr16.msaa.scaled.comp.inc -mfmt=c -DSCALED -DMSAA -DHDR16 resolve.comp
+"$GLSLC" -o prebuilt/msaa_resolve_weighted.comp.inc -mfmt=c msaa_resolve_weighted.comp
 "$GLSLC" -o prebuilt/blit_vram.hdr16.scaled.comp.inc -mfmt=c -DSCALED -DHDR16 blit_vram.comp
 "$GLSLC" -o prebuilt/blit_vram.hdr16.masked.scaled.comp.inc -mfmt=c -DSCALED -DMASKED -DHDR16 blit_vram.comp
 "$GLSLC" -o prebuilt/blit_vram.hdr16.msaa.scaled.comp.inc -mfmt=c -DMSAA -DSCALED -DHDR16 blit_vram.comp

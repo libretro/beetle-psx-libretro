@@ -1,0 +1,65 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8) in;
+
+/* HDR-only tonemap-weighted ("Karis") MSAA resolve for the scaled
+ * framebuffer.
+ *
+ * This path is taken only when the scaled framebuffer is the wide 16F HDR
+ * target, so both the multisample source and the single-sample destination
+ * are R16G16B16A16_SFLOAT and the store format is fixed rgba16f.
+ *
+ * The fixed-function vkCmdResolveImage the SDR path uses does a plain linear
+ * box average of the samples. Under HDR that reintroduces bright-edge
+ * aliasing: a single very-bright sub-sample (an additive spark, a specular
+ * glint, an over-white polygon edge) dominates the linear mean and, after the
+ * PQ curve, still reads as a hard aliased edge - the coverage was averaged but
+ * it does not look anti-aliased. Weighting each sample by 1/(1 + luma) before
+ * averaging tames the hot outlier so the edge actually softens. This is
+ * HDR-specific: in SDR the [0,1] clamp already bounds the outlier, so the SDR
+ * path keeps the cheaper fixed-function resolve untouched.
+ *
+ * The weight uses the luma of the stored (PSX-native, gamma-ish) value, which
+ * is where the resolve happens; the PQ encode is applied later at display
+ * time. Fully-covered pixels (all samples equal) resolve to exactly the input,
+ * so only mixed-coverage edges are affected. Alpha is resolved with a plain
+ * average to match the fixed-function behaviour for anything that later reads
+ * it. */
+
+layout(constant_id = 0) const int NUM_SAMPLES = 1;
+
+layout(set = 0, binding = 0, rgba16f) uniform writeonly image2D uResolved;
+layout(set = 0, binding = 1) uniform sampler2DMS uScaledMS;
+
+/* Resolve only the [offset, offset+extent) region (the displayed rect); the
+ * dispatch is sized to extent and the base is added per invocation so both the
+ * full-framebuffer and partial-rect callers share one shader. */
+layout(push_constant, std430) uniform Push
+{
+	ivec2 offset;
+	ivec2 extent;
+} reg;
+
+void main()
+{
+	ivec2 local = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 coord = reg.offset + local;
+	vec3  acc   = vec3(0.0);
+	float wsum  = 0.0;
+	float a     = 0.0;
+	int   i;
+
+	if (any(greaterThanEqual(local, reg.extent)))
+		return;
+
+	for (i = 0; i < NUM_SAMPLES; i++)
+	{
+		vec4  s    = texelFetch(uScaledMS, coord, i);
+		float luma = dot(max(s.rgb, vec3(0.0)), vec3(0.2126, 0.7152, 0.0722));
+		float w    = 1.0 / (1.0 + luma);
+		acc  += s.rgb * w;
+		wsum += w;
+		a    += s.a;
+	}
+
+	imageStore(uResolved, coord, vec4(acc / wsum, a / float(NUM_SAMPLES)));
+}

@@ -5720,6 +5720,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *hdr_bpp24_yuv_quad_blitter;
             Program *resolve_to_scaled;
             Program *resolve_to_unscaled;
+            Program *msaa_resolve_weighted;   /* HDR: tonemap-weighted MSAA resolve (16F only) */
 
             Program *blit_vram_scaled;
             Program *blit_vram_scaled_masked;
@@ -6132,6 +6133,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       ;
    static const uint32_t resolve_msaa_to_unscaled[] =
 #include "shaders_vulkan/prebuilt/resolve.msaa.unscaled.comp.inc"
+      ;
+   static const uint32_t msaa_resolve_weighted_comp[] =
+#include "shaders_vulkan/prebuilt/msaa_resolve_weighted.comp.inc"
       ;
 
    static const uint32_t flat_vert[] =
@@ -6665,6 +6669,8 @@ static void renderer_init_pipelines(Renderer *self)
       self->pipelines.resolve_to_unscaled = device_request_program_compute_code(self->device, resolve_msaa_to_unscaled, sizeof(resolve_msaa_to_unscaled));
    else
       self->pipelines.resolve_to_unscaled = device_request_program_compute_code(self->device, resolve_to_unscaled, sizeof(resolve_to_unscaled));
+
+   self->pipelines.msaa_resolve_weighted = device_request_program_compute_code(self->device, msaa_resolve_weighted_comp, sizeof(msaa_resolve_weighted_comp));
 
    self->pipelines.scaled_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
@@ -7247,7 +7253,39 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
    renderer_ensure_command_buffer(self);
 
-   if (scaled && self->msaa > 1)
+   if (scaled && self->msaa > 1 &&
+         self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT)
+   {
+      /* HDR: tonemap-weighted (Karis) compute resolve. The fixed-function
+       * vkCmdResolveImage below does a plain linear box average, which under
+       * HDR lets a lone very-bright sub-sample dominate and leaves the edge
+       * aliased after the PQ curve. Weighting each sample by 1/(1+luma)
+       * softens it. Writes level 0 of the single-sample scaled framebuffer;
+       * both images stay in GENERAL. */
+      unsigned rw = FB_WIDTH * self->scaling;
+      unsigned rh = FB_HEIGHT * self->scaling;
+      struct WPush { int32_t offset[2]; int32_t extent[2]; } wpush;
+      wpush.offset[0] = 0; wpush.offset[1] = 0;
+      wpush.extent[0] = (int32_t)rw; wpush.extent[1] = (int32_t)rh;
+
+      commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->scaled_framebuffer_msaa),
+         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
+      commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), 1u << SpecConstIndex_Samples);
+      commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.msaa_resolve_weighted);
+      commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)));
+      commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
+      commandbuffer_push_constants(cbh_get(&self->cmd), &wpush, 0, sizeof(wpush));
+      commandbuffer_dispatch(cbh_get(&self->cmd), (rw + 7) / 8, (rh + 7) / 8, 1);
+
+      commandbuffer_barrier_simple(cbh_get(&self->cmd),
+         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   }
+   else if (scaled && self->msaa > 1)
    {
       VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
       VkOffset3D offset = { 0, 0, 0 };
@@ -7474,6 +7512,32 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          offset.y = 0;
          extent.height = FB_HEIGHT * self->scaling;
       }
+      if (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT)
+      {
+         /* HDR: tonemap-weighted (Karis) compute resolve of the displayed
+          * region (see renderer_scanout_vram_to_texture for the rationale). */
+         struct WPush { int32_t offset[2]; int32_t extent[2]; } wpush;
+         wpush.offset[0] = offset.x;            wpush.offset[1] = offset.y;
+         wpush.extent[0] = (int32_t)extent.width; wpush.extent[1] = (int32_t)extent.height;
+
+         commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->scaled_framebuffer_msaa),
+            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+
+         commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
+         commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), 1u << SpecConstIndex_Samples);
+         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.msaa_resolve_weighted);
+         commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)));
+         commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
+         commandbuffer_push_constants(cbh_get(&self->cmd), &wpush, 0, sizeof(wpush));
+         commandbuffer_dispatch(cbh_get(&self->cmd), (extent.width + 7) / 8, (extent.height + 7) / 8, 1);
+
+         commandbuffer_barrier_simple(cbh_get(&self->cmd),
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+      }
+      else
       { VkImageResolve region = { subres, offset, subres, offset, extent };
       vkCmdResolveImage(commandbuffer_get_command_buffer(cbh_get(&self->cmd)),
          image_get_image(ih_get(&self->scaled_framebuffer_msaa)), VK_IMAGE_LAYOUT_GENERAL,
