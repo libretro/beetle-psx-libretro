@@ -5478,13 +5478,22 @@ bool retro_load_game(const struct retro_game_info *info)
          psx_hdr_active = false;
          if (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR)
          {
-            bool     tenbpc = false;
-            unsigned gamut  = 0;
-            unsigned omode  = 1;   /* assume HDR10 if unqueryable */
-            float    pw     = 0.0f;
-
-            if (environ_cb(RETRO_ENVIRONMENT_GET_SCREEN_10BPC_CAPABLE, &tenbpc) && tenbpc)
+            /* The confirmed contract (RetroArch gfx/video_driver.c: source_hdr10
+             * is set from this pixel format; gfx/drivers/vulkan.c routes it to
+             * the HDR passthrough composition, and the HW-render set_image() path
+             * feeds the same filter chain): SET_PIXEL_FORMAT(HDR10_2101010) IS
+             * the signal that our presented image is PQ Rec.2020. Unlike
+             * XRGB2101010, a frontend that cannot present HDR10 must *reject*
+             * this format rather than silently down-convert, so a true return is
+             * an authoritative "HDR is on and will be presented". On rejection
+             * we restore XRGB8888 and fall back to 24-bit. */
+            enum retro_pixel_format hdrfmt = RETRO_PIXEL_FORMAT_HDR10_2101010;
+            if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &hdrfmt))
             {
+               unsigned gamut = 0;
+               unsigned omode = 1;
+               float    pw    = 0.0f;
+
                if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
                   psx_hdr_paper_white_nits = pw;
                if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
@@ -5492,15 +5501,20 @@ bool retro_load_game(const struct retro_game_info *info)
                if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE, &omode))
                   psx_hdr_output_mode = (int)omode;
 
-               /* omode == 0 means the frontend has HDR output off, so a
-                * PQ frame would be misread as SDR - keep 24-bit in that case. */
-               psx_hdr_active = (psx_hdr_output_mode != 0);
+               psx_hdr_active = true;
+            }
+            else
+            {
+               /* Rejected: restore the SDR frame format the SW-fallback path
+                * (FMV / software framebuffer) still uses. */
+               enum retro_pixel_format sdrfmt = RETRO_PIXEL_FORMAT_XRGB8888;
+               environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &sdrfmt);
             }
 
             if (log_cb)
                log_cb(RETRO_LOG_INFO,
-                     "[Color Format] 30-bit HDR requested: %s (10bpc-capable renderer path, paper white %.0f nits, gamut %d, output mode %d).\n",
-                     psx_hdr_active ? "engaged" : "unavailable - falling back to 24-bit",
+                     "[Color Format] 30-bit HDR requested: %s (paper white %.0f nits, gamut %d, output mode %d).\n",
+                     psx_hdr_active ? "engaged" : "rejected by frontend - falling back to 24-bit",
                      psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
          }
 

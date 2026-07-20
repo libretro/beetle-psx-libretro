@@ -37,6 +37,15 @@
 #include <vulkan/vulkan.h>
 #endif
 
+/* HDR output state, owned by libretro.c (see beetle_psx_globals.h). When
+ * psx_hdr_active is set, the Vulkan renderer emits the display quad as
+ * PQ-encoded Rec.2020 into a 10-bit (A2B10G10R10) scanout image, which the
+ * frontend presents to an HDR10 swapchain (it was told via
+ * SET_PIXEL_FORMAT(HDR10_2101010)). */
+extern bool  psx_hdr_active;
+extern float psx_hdr_paper_white_nits;
+extern int   psx_hdr_expand_gamut;
+
 /* VOLK_GENERATE_PROTOTYPES_H */
 #if defined(VK_VERSION_1_0)
 extern PFN_vkAllocateCommandBuffers vkAllocateCommandBuffers;
@@ -5688,6 +5697,16 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *scaled_dither_quad_blitter;
             Program *bpp24_quad_blitter;
             Program *bpp24_yuv_quad_blitter;
+            /* HDR10 (PQ Rec.2020) counterparts of the display quad blitters,
+             * used only when psx_hdr_active. The adaptive-smoothing (mipmap
+             * resolve) path has no HDR variant yet, so HDR falls back to the
+             * plain scaled quad there. */
+            Program *hdr_scaled_quad_blitter;
+            Program *hdr_unscaled_quad_blitter;
+            Program *hdr_scaled_dither_quad_blitter;
+            Program *hdr_unscaled_dither_quad_blitter;
+            Program *hdr_bpp24_quad_blitter;
+            Program *hdr_bpp24_yuv_quad_blitter;
             Program *resolve_to_scaled;
             Program *resolve_to_unscaled;
 
@@ -6064,6 +6083,24 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       ;
    static const uint32_t unscaled_dither_quad_frag[] =
 #include "shaders_vulkan/prebuilt/unscaled.dither.quad.frag.inc"
+      ;
+   static const uint32_t hdr_scaled_quad_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.scaled.quad.frag.inc"
+      ;
+   static const uint32_t hdr_unscaled_quad_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.unscaled.quad.frag.inc"
+      ;
+   static const uint32_t hdr_scaled_dither_quad_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.scaled.dither.quad.frag.inc"
+      ;
+   static const uint32_t hdr_unscaled_dither_quad_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.unscaled.dither.quad.frag.inc"
+      ;
+   static const uint32_t hdr_bpp24_quad_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bpp24.quad.frag.inc"
+      ;
+   static const uint32_t hdr_bpp24_yuv_quad_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bpp24.yuv.quad.frag.inc"
       ;
    static const uint32_t copy_vram_comp[] =
 #include "shaders_vulkan/prebuilt/copy_vram.comp.inc"
@@ -6588,6 +6625,19 @@ static void renderer_init_pipelines(Renderer *self)
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
    self->pipelines.unscaled_dither_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), unscaled_dither_quad_frag, sizeof(unscaled_dither_quad_frag));
+
+   self->pipelines.hdr_scaled_quad_blitter =
+      device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_scaled_quad_frag, sizeof(hdr_scaled_quad_frag));
+   self->pipelines.hdr_unscaled_quad_blitter =
+      device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_unscaled_quad_frag, sizeof(hdr_unscaled_quad_frag));
+   self->pipelines.hdr_scaled_dither_quad_blitter =
+      device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_scaled_dither_quad_frag, sizeof(hdr_scaled_dither_quad_frag));
+   self->pipelines.hdr_unscaled_dither_quad_blitter =
+      device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_unscaled_dither_quad_frag, sizeof(hdr_unscaled_dither_quad_frag));
+   self->pipelines.hdr_bpp24_quad_blitter =
+      device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_bpp24_quad_frag, sizeof(hdr_bpp24_quad_frag));
+   self->pipelines.hdr_bpp24_yuv_quad_blitter =
+      device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_bpp24_yuv_quad_frag, sizeof(hdr_bpp24_yuv_quad_frag));
 
    self->pipelines.copy_to_vram = device_request_program_compute_code(self->device, copy_vram_comp, sizeof(copy_vram_comp));
    self->pipelines.copy_to_vram_masked = device_request_program_compute_code(self->device, copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
@@ -7344,7 +7394,8 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    ImageCreateInfo info = image_create_info_render_target(
          display_rect.width * render_scale,
          display_rect.height * render_scale,
-         self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM);
+         psx_hdr_active ? VK_FORMAT_A2B10G10R10_UNORM_PACK32
+            : (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM));
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -7381,26 +7432,29 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    if (bpp24)
    {
       if (self->render_state.scanout_mdec_filter == ScanoutFilter_MDEC_YUV)
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.bpp24_yuv_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_bpp24_yuv_quad_blitter : self->pipelines.bpp24_yuv_quad_blitter);
       else
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.bpp24_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_bpp24_quad_blitter : self->pipelines.bpp24_quad_blitter);
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestWrap);
    }
    else if (ssaa)
    {
       if (dither)
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.unscaled_dither_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_unscaled_dither_quad_blitter : self->pipelines.unscaled_dither_quad_blitter);
       else
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.unscaled_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_unscaled_quad_blitter : self->pipelines.unscaled_quad_blitter);
 
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer_ssaa)), StockSampler_NearestWrap);
    }
-   else if (!self->render_state.adaptive_smoothing || self->scaling == 1)
+   else if (psx_hdr_active || !self->render_state.adaptive_smoothing || self->scaling == 1)
    {
+      /* HDR forces the plain scaled quad: the adaptive-smoothing (mipmap
+       * resolve) path below has no HDR variant, so we take the single-texture
+       * scaled path here instead. */
       if (dither)
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.scaled_dither_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_scaled_dither_quad_blitter : self->pipelines.scaled_dither_quad_blitter);
       else
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.scaled_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_scaled_quad_blitter : self->pipelines.scaled_quad_blitter);
 
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearWrap);
    }
@@ -7463,7 +7517,30 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
                 { (rect->x + rect->width - 0.5f) / FB_WIDTH, (rect->y + rect->height - 0.5f) / FB_HEIGHT },
                 (float)(imageview_vec_size(&self->scaled_views) - 1) };
 
-   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   if (psx_hdr_active)
+   {
+      /* The -DHDR quad reflects a 24-byte push (offset, range, paper white,
+       * gamut); reuse offset/scale computed above and append the HDR params.
+       * commandbuffer_push_constants copies into the shared buffer; the flush
+       * pushes exactly the bound program's reflected range. */
+      struct HdrPush
+      {
+         float   offset[2];
+         float   range[2];
+         float   paper_white_nits;
+         int32_t expand_gamut;
+      };
+      struct HdrPush hpush;
+      hpush.offset[0]        = push.offset[0];
+      hpush.offset[1]        = push.offset[1];
+      hpush.range[0]         = push.scale[0];
+      hpush.range[1]         = push.scale[1];
+      hpush.paper_white_nits = psx_hdr_paper_white_nits;
+      hpush.expand_gamut     = psx_hdr_expand_gamut;
+      commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
+   }
+   else
+      commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
