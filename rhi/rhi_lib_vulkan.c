@@ -45,6 +45,11 @@
 extern bool  psx_hdr_active;
 extern float psx_hdr_paper_white_nits;
 extern int   psx_hdr_expand_gamut;
+/* The requested color format (enum psx_color_format_e). Unlike psx_hdr_active
+ * this is known at renderer init (read at startup), so it gates the wide
+ * (16F) scaled framebuffer, which is allocated before HDR negotiation
+ * completes. Non-zero = a 30-bit/HDR format was requested. */
+extern int   psx_color_format;
 
 /* VOLK_GENERATE_PROTOTYPES_H */
 #if defined(VK_VERSION_1_0)
@@ -5669,6 +5674,11 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          /* Cached, device-probed format for the HDR scanout image (lazily
           * filled on first HDR frame). VK_FORMAT_UNDEFINED = not yet probed. */
          VkFormat hdr_scanout_format;
+         /* Colour format of the scaled framebuffer. R8G8B8A8_UNORM normally;
+          * R16G16B16A16_SFLOAT when a 30-bit/HDR format was requested and the
+          * device supports it for every scaled-fb usage (probed at init), so
+          * Gouraud/texture/blend precision survives to the 10-bit output. */
+         VkFormat scaled_fb_format;
          bool scaled_uv_offset;
          bool valid;
          FilterMode primitive_filter_mode;
@@ -6116,8 +6126,14 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t resolve_to_scaled[] =
 #include "shaders_vulkan/prebuilt/resolve.scaled.comp.inc"
       ;
+   static const uint32_t resolve_to_scaled_hdr16[] =
+#include "shaders_vulkan/prebuilt/resolve.hdr16.scaled.comp.inc"
+      ;
    static const uint32_t resolve_to_msaa_scaled[] =
 #include "shaders_vulkan/prebuilt/resolve.msaa.scaled.comp.inc"
+      ;
+   static const uint32_t resolve_to_msaa_scaled_hdr16[] =
+#include "shaders_vulkan/prebuilt/resolve.hdr16.msaa.scaled.comp.inc"
       ;
    static const uint32_t resolve_to_unscaled[] =
 #include "shaders_vulkan/prebuilt/resolve.unscaled.comp.inc"
@@ -6157,27 +6173,51 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t blit_vram_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.scaled.comp.inc"
       ;
+   static const uint32_t blit_vram_scaled_comp_hdr16[] =
+#include "shaders_vulkan/prebuilt/blit_vram.hdr16.scaled.comp.inc"
+      ;
    static const uint32_t blit_vram_scaled_masked_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.masked.scaled.comp.inc"
+      ;
+   static const uint32_t blit_vram_scaled_masked_comp_hdr16[] =
+#include "shaders_vulkan/prebuilt/blit_vram.hdr16.masked.scaled.comp.inc"
       ;
    static const uint32_t blit_vram_cached_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.cached.scaled.comp.inc"
       ;
+   static const uint32_t blit_vram_cached_scaled_comp_hdr16[] =
+#include "shaders_vulkan/prebuilt/blit_vram.hdr16.cached.scaled.comp.inc"
+      ;
    static const uint32_t blit_vram_cached_scaled_masked_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.cached.masked.scaled.comp.inc"
+      ;
+   static const uint32_t blit_vram_cached_scaled_masked_comp_hdr16[] =
+#include "shaders_vulkan/prebuilt/blit_vram.hdr16.cached.masked.scaled.comp.inc"
       ;
 
    static const uint32_t blit_vram_msaa_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.msaa.scaled.comp.inc"
       ;
+   static const uint32_t blit_vram_msaa_scaled_comp_hdr16[] =
+#include "shaders_vulkan/prebuilt/blit_vram.hdr16.msaa.scaled.comp.inc"
+      ;
    static const uint32_t blit_vram_msaa_scaled_masked_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.msaa.masked.scaled.comp.inc"
+      ;
+   static const uint32_t blit_vram_msaa_scaled_masked_comp_hdr16[] =
+#include "shaders_vulkan/prebuilt/blit_vram.hdr16.msaa.masked.scaled.comp.inc"
       ;
    static const uint32_t blit_vram_msaa_cached_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.msaa.cached.scaled.comp.inc"
       ;
+   static const uint32_t blit_vram_msaa_cached_scaled_comp_hdr16[] =
+#include "shaders_vulkan/prebuilt/blit_vram.hdr16.msaa.cached.scaled.comp.inc"
+      ;
    static const uint32_t blit_vram_msaa_cached_scaled_masked_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.msaa.cached.masked.scaled.comp.inc"
+      ;
+   static const uint32_t blit_vram_msaa_cached_scaled_masked_comp_hdr16[] =
+#include "shaders_vulkan/prebuilt/blit_vram.hdr16.msaa.cached.masked.scaled.comp.inc"
       ;
 
    static const uint32_t blit_vram_unscaled_comp[] =
@@ -6383,7 +6423,19 @@ static void renderer_init(Renderer *self,
 
    info.width *= self->scaling;
    info.height *= self->scaling;
-   info.format = VK_FORMAT_R8G8B8A8_UNORM;
+   /* Decide the scaled-framebuffer colour format. Widen to 16F only when a
+    * 30-bit/HDR format was requested AND the device supports R16F for every
+    * usage the scaled fb needs (colour attachment, sampled, storage). SDR and
+    * unsupported GPUs keep R8G8B8A8 and render exactly as before. */
+   self->scaled_fb_format = VK_FORMAT_R8G8B8A8_UNORM;
+   if (psx_color_format != 0 &&
+         device_image_format_is_supported(self->device, VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+            VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT |
+            VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT,
+            VK_IMAGE_TILING_OPTIMAL))
+      self->scaled_fb_format = VK_FORMAT_R16G16B16A16_SFLOAT;
+   info.format = self->scaled_fb_format;
    info.levels = trailing_zeroes(self->scaling) + 1;
    info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
@@ -6414,7 +6466,7 @@ static void renderer_init(Renderer *self,
          self->msaa = 1;
          LOGI("[Vulkan]: shaderStorageImageMultisample is not supported by self implementation. Cannot use MSAA.\n");
       }
-      else if (!device_get_image_format_properties(self->device, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+      else if (!device_get_image_format_properties(self->device, self->scaled_fb_format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                VK_IMAGE_USAGE_STORAGE_BIT |
                VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
@@ -6651,33 +6703,42 @@ static void renderer_init_pipelines(Renderer *self)
    self->pipelines.copy_to_vram = device_request_program_compute_code(self->device, copy_vram_comp, sizeof(copy_vram_comp));
    self->pipelines.copy_to_vram_masked = device_request_program_compute_code(self->device, copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
 
+   /* Select the 16F storage program twin when the scaled framebuffer is
+    * R16F (see scaled_fb_format); the rgba8 program otherwise. One
+    * decision per program at build time, so the dispatch sites are
+    * unchanged. */
+#define SSP_FB16 (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT)
+#define SSP(a) device_request_program_compute_code(self->device, SSP_FB16 ? a##_hdr16 : a, SSP_FB16 ? sizeof(a##_hdr16) : sizeof(a))
+
    if (self->msaa > 1)
    {
       self->pipelines.resolve_to_scaled =
-         device_request_program_compute_code(self->device, resolve_to_msaa_scaled, sizeof(resolve_to_msaa_scaled));
+         SSP(resolve_to_msaa_scaled);
 
       self->pipelines.blit_vram_scaled =
-         device_request_program_compute_code(self->device, blit_vram_msaa_scaled_comp, sizeof(blit_vram_msaa_scaled_comp));
+         SSP(blit_vram_msaa_scaled_comp);
       self->pipelines.blit_vram_scaled_masked =
-         device_request_program_compute_code(self->device, blit_vram_msaa_scaled_masked_comp, sizeof(blit_vram_msaa_scaled_masked_comp));
+         SSP(blit_vram_msaa_scaled_masked_comp);
       self->pipelines.blit_vram_msaa_cached_scaled =
-         device_request_program_compute_code(self->device, blit_vram_msaa_cached_scaled_comp, sizeof(blit_vram_msaa_cached_scaled_comp));
+         SSP(blit_vram_msaa_cached_scaled_comp);
       self->pipelines.blit_vram_msaa_cached_scaled_masked =
-         device_request_program_compute_code(self->device, blit_vram_msaa_cached_scaled_masked_comp, sizeof(blit_vram_msaa_cached_scaled_masked_comp));
+         SSP(blit_vram_msaa_cached_scaled_masked_comp);
    }
    else
    {
-      self->pipelines.resolve_to_scaled = device_request_program_compute_code(self->device, resolve_to_scaled, sizeof(resolve_to_scaled));
+      self->pipelines.resolve_to_scaled = SSP(resolve_to_scaled);
 
-      self->pipelines.blit_vram_scaled = device_request_program_compute_code(self->device, blit_vram_scaled_comp, sizeof(blit_vram_scaled_comp));
+      self->pipelines.blit_vram_scaled = SSP(blit_vram_scaled_comp);
       self->pipelines.blit_vram_scaled_masked =
-         device_request_program_compute_code(self->device, blit_vram_scaled_masked_comp, sizeof(blit_vram_scaled_masked_comp));
+         SSP(blit_vram_scaled_masked_comp);
    }
 
    self->pipelines.blit_vram_cached_scaled =
-      device_request_program_compute_code(self->device, blit_vram_cached_scaled_comp, sizeof(blit_vram_cached_scaled_comp));
+      SSP(blit_vram_cached_scaled_comp);
    self->pipelines.blit_vram_cached_scaled_masked =
-      device_request_program_compute_code(self->device, blit_vram_cached_scaled_masked_comp, sizeof(blit_vram_cached_scaled_masked_comp));
+      SSP(blit_vram_cached_scaled_masked_comp);
+#undef SSP
+#undef SSP_FB16
 
    self->pipelines.blit_vram_unscaled = device_request_program_compute_code(self->device, blit_vram_unscaled_comp, sizeof(blit_vram_unscaled_comp));
    self->pipelines.blit_vram_unscaled_masked =

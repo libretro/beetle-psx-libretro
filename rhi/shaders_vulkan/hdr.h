@@ -59,7 +59,12 @@ highp vec3 rec709_to_target(highp vec3 c, int expand_gamut)
 
 highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut)
 {
-	highp vec3 lin = pow(max(rgb, vec3(0.0)), vec3(2.4)) * paper_white_nits;
+	/* STEP 1: clamp to paper white. With the wide (16F) framebuffer, additive
+	 * blends can now exceed 1.0 in the scaled fb; capping here keeps HDR output
+	 * behaviourally identical (nothing above paper white yet) while the (c)
+	 * precision below paper white is preserved. Step 3 removes this clamp (with
+	 * a soft knee) to let additive content glow above paper white. */
+	highp vec3 lin = pow(clamp(rgb, vec3(0.0), vec3(1.0)), vec3(2.4)) * paper_white_nits;
 	lin = rec709_to_target(lin, expand_gamut);
 	return pq_encode(lin);
 }
