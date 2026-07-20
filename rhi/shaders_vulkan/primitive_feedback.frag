@@ -26,7 +26,7 @@ void main()
 
 	vec4 color = NNColor;
 
-	vec3 shaded = color.rgb * vColor.rgb * (255.0 / 128.0);
+	vec3 shaded = clamp(color.rgb * vColor.rgb * (255.0 / 128.0), 0.0, 1.0);
 	float blend_amt = NNColor.a;
 #else
 	vec3 shaded = vColor.rgb;

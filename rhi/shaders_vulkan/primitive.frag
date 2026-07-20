@@ -92,7 +92,7 @@ void main()
 	if (opacity < 0.5)
 		discard;
 
-	vec3 shaded = color.rgb * vColor.rgb * (255.0 / 128.0);
+	vec3 shaded = clamp(color.rgb * vColor.rgb * (255.0 / 128.0), 0.0, 1.0);
 	FragColor = vec4(shaded, NNColor.a + vColor.a);
 #else
 	FragColor = vColor;
