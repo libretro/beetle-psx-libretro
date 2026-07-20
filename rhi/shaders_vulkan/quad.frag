@@ -124,6 +124,18 @@ highp vec3 hdr_deband(highp vec3 rgb, highp vec2 fragcoord)
 		hdr_tri(hdr_ign(fragcoord, vec2( 0.06711056, -0.00583715))));
 	return rgb + t * (1.0 / 255.0);
 }
+
+/* Luma-only variant for the YUV FMV path. There the chroma is reconstructed
+ * at sub-8-bit precision (2x2 box average + bilinear upsample) and 10-bit
+ * output preserves it, so it must NOT be dithered - only the per-pixel 8-bit
+ * luma still steps. An equal offset to R,G,B is chroma-neutral through the
+ * BT.601 matrix (the U and V rows sum to ~0, the Y row to 1), so a single
+ * triangular sample added to all three channels dithers luma alone. */
+highp vec3 hdr_deband_luma(highp vec3 rgb, highp vec2 fragcoord)
+{
+	highp float t = hdr_tri(hdr_ign(fragcoord, vec2(0.06711056, 0.00583715)));
+	return rgb + vec3(t) * (1.0 / 255.0);
+}
 #endif
 
 #if defined(BPP24)
@@ -223,7 +235,13 @@ void main()
 			rgb = sample_bpp24(coord);
 		#endif
 		#if defined(HDR)
-			rgb = hdr_deband(rgb, gl_FragCoord.xy);
+			#if defined(BPP24_YUV)
+				/* chroma is already sub-8-bit (interpolated) and preserved
+				 * at 10-bit; dither luma only so we don't re-roughen it */
+				rgb = hdr_deband_luma(rgb, gl_FragCoord.xy);
+			#else
+				rgb = hdr_deband(rgb, gl_FragCoord.xy);
+			#endif
 		#endif
 	#else
 		uint value = textureLod(uTexture, vUV, 0.0).x;
