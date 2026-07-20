@@ -91,6 +91,39 @@ highp vec3 encode_hdr10(highp vec3 rgb)
 	lin = rec709_to_target(lin);
 	return pq_encode(lin);
 }
+
+/* Debanding dither for the genuinely-8-bit HDR paths (FMV/bpp24 and the
+ * upscaled scaled path). Their source is 8-bit, so gradients are already
+ * quantised; shown at 10-bit the steps stand out as bands. Add ~1 8-bit-LSB
+ * of triangular-PDF noise, spatially distributed with interleaved gradient
+ * noise (a blue-noise-like hash - no texture, ~a few ALU ops), so the hard
+ * 8-bit step becomes a transition the eye integrates. TPDF (vs a flat/ordered
+ * pattern) decorrelates the added noise from the signal, so it reads as a
+ * faint even grain rather than structured dither. Applied in gamma space,
+ * where the banding is perceived; NOT on the 15-bit path, whose 5-bit steps
+ * need a coarser amplitude that is the native dither's job. */
+highp float hdr_ign(highp vec2 p, highp vec2 k)  /* IGN along direction k -> [0,1) */
+{
+	return fract(52.9829189 * fract(dot(p, k)));
+}
+
+highp float hdr_tri(highp float u)  /* uniform [0,1) -> triangular (-1,1) */
+{
+	return u < 0.5 ? sqrt(2.0 * u) - 1.0 : 1.0 - sqrt(2.0 - 2.0 * u);
+}
+
+highp vec3 hdr_deband(highp vec3 rgb, highp vec2 fragcoord)
+{
+	/* A per-channel IGN *direction* (not a shared field offset) gives three
+	 * decorrelated blue-noise-like fields, so the grain carries no chroma
+	 * tint (pairwise channel correlation ~0). Each is remapped to a
+	 * triangular PDF for correct, signal-independent quantisation. */
+	highp vec3 t = vec3(
+		hdr_tri(hdr_ign(fragcoord, vec2( 0.06711056,  0.00583715))),
+		hdr_tri(hdr_ign(fragcoord, vec2( 0.00583715,  0.06711056))),
+		hdr_tri(hdr_ign(fragcoord, vec2( 0.06711056, -0.00583715))));
+	return rgb + t * (1.0 / 255.0);
+}
 #endif
 
 #if defined(BPP24)
@@ -178,6 +211,9 @@ void main()
 	#if defined(DITHER)
 		rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));
 	#endif
+	#if defined(HDR)
+		rgb = hdr_deband(rgb, gl_FragCoord.xy);
+	#endif
 #elif defined(UNSCALED)
 	#if defined(BPP24)
 		ivec2 coord = ivec2((vUV - registers.offset) * vec2(1024.0, 512.0));
@@ -185,6 +221,9 @@ void main()
 			rgb = sample_bpp24_yuv(coord);
 		#else
 			rgb = sample_bpp24(coord);
+		#endif
+		#if defined(HDR)
+			rgb = hdr_deband(rgb, gl_FragCoord.xy);
 		#endif
 	#else
 		uint value = textureLod(uTexture, vUV, 0.0).x;
