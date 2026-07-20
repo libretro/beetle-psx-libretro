@@ -45,6 +45,16 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/bpp24.quad.frag.inc -mfmt=c -DUNSCALED -DBPP24 quad.frag
 "$GLSLC" -o prebuilt/bpp24.yuv.quad.frag.inc -mfmt=c -DUNSCALED -DBPP24 -DBPP24_YUV quad.frag
 
+# HDR10 (30-bit Color) output variants of the display quad. PQ-encoded
+# Rec.2020 absolute luminance; selected by the rhi only when the "Color
+# Format = 30-bit (HDR)" path is engaged on Vulkan (psx_hdr_active).
+"$GLSLC" -o prebuilt/hdr.scaled.quad.frag.inc -mfmt=c -DHDR -DSCALED quad.frag
+"$GLSLC" -o prebuilt/hdr.unscaled.quad.frag.inc -mfmt=c -DHDR -DUNSCALED quad.frag
+"$GLSLC" -o prebuilt/hdr.scaled.dither.quad.frag.inc -mfmt=c -DHDR -DDITHER -DSCALED quad.frag
+"$GLSLC" -o prebuilt/hdr.unscaled.dither.quad.frag.inc -mfmt=c -DHDR -DDITHER -DUNSCALED quad.frag
+"$GLSLC" -o prebuilt/hdr.bpp24.quad.frag.inc -mfmt=c -DHDR -DUNSCALED -DBPP24 quad.frag
+"$GLSLC" -o prebuilt/hdr.bpp24.yuv.quad.frag.inc -mfmt=c -DHDR -DUNSCALED -DBPP24 -DBPP24_YUV quad.frag
+
 # Copy VRAM shaders
 "$GLSLC" -o prebuilt/copy_vram.comp.inc -mfmt=c copy_vram.comp
 "$GLSLC" -o prebuilt/copy_vram.masked.comp.inc -mfmt=c -DMASKED copy_vram.comp
