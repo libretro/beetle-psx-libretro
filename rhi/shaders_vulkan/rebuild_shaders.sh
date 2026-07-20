@@ -70,6 +70,20 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/blit_vram.msaa.cached.scaled.comp.inc -mfmt=c -DMSAA -DSCALED blit_vram_cached.comp
 "$GLSLC" -o prebuilt/blit_vram.msaa.cached.masked.scaled.comp.inc -mfmt=c -DMSAA -DSCALED -DMASKED blit_vram_cached.comp
 
+# 16-bit-float (HDR) twins of the scaled-framebuffer storage writers. Used only
+# when the wide HDR render target (R16G16B16A16_SFLOAT) is active; -DHDR16 flips
+# the storage image format qualifier to rgba16f. SDR builds are unaffected.
+"$GLSLC" -o prebuilt/resolve.hdr16.scaled.comp.inc -mfmt=c -DSCALED -DHDR16 resolve.comp
+"$GLSLC" -o prebuilt/resolve.hdr16.msaa.scaled.comp.inc -mfmt=c -DSCALED -DMSAA -DHDR16 resolve.comp
+"$GLSLC" -o prebuilt/blit_vram.hdr16.scaled.comp.inc -mfmt=c -DSCALED -DHDR16 blit_vram.comp
+"$GLSLC" -o prebuilt/blit_vram.hdr16.masked.scaled.comp.inc -mfmt=c -DSCALED -DMASKED -DHDR16 blit_vram.comp
+"$GLSLC" -o prebuilt/blit_vram.hdr16.msaa.scaled.comp.inc -mfmt=c -DMSAA -DSCALED -DHDR16 blit_vram.comp
+"$GLSLC" -o prebuilt/blit_vram.hdr16.msaa.masked.scaled.comp.inc -mfmt=c -DMSAA -DSCALED -DMASKED -DHDR16 blit_vram.comp
+"$GLSLC" -o prebuilt/blit_vram.hdr16.cached.scaled.comp.inc -mfmt=c -DSCALED -DHDR16 blit_vram_cached.comp
+"$GLSLC" -o prebuilt/blit_vram.hdr16.cached.masked.scaled.comp.inc -mfmt=c -DSCALED -DMASKED -DHDR16 blit_vram_cached.comp
+"$GLSLC" -o prebuilt/blit_vram.hdr16.msaa.cached.scaled.comp.inc -mfmt=c -DMSAA -DSCALED -DHDR16 blit_vram_cached.comp
+"$GLSLC" -o prebuilt/blit_vram.hdr16.msaa.cached.masked.scaled.comp.inc -mfmt=c -DMSAA -DSCALED -DMASKED -DHDR16 blit_vram_cached.comp
+
 "$GLSLC" -o prebuilt/blit_vram.unscaled.comp.inc -mfmt=c -DUNSCALED blit_vram.comp
 "$GLSLC" -o prebuilt/blit_vram.masked.unscaled.comp.inc -mfmt=c -DUNSCALED -DMASKED blit_vram.comp
 "$GLSLC" -o prebuilt/blit_vram.cached.unscaled.comp.inc -mfmt=c -DUNSCALED blit_vram_cached.comp

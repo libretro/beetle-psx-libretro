@@ -1,11 +1,20 @@
 #version 450
 layout(local_size_x = 128) in;
 
+/* Scaled-framebuffer storage format. rgba16f under -DHDR16 (the wide HDR
+ * render target); rgba8 otherwise. */
+#if defined(HDR16)
+#define SCALED_STORE_FMT rgba16f
+#else
+#define SCALED_STORE_FMT rgba8
+#endif
+
+
 #if defined(SCALED)
 #if defined(MSAA)
-layout(set = 0, binding = 0, rgba8) uniform image2DMS uFramebuffer;
+layout(set = 0, binding = 0, SCALED_STORE_FMT) uniform image2DMS uFramebuffer;
 #else
-layout(set = 0, binding = 0, rgba8) uniform image2D uFramebuffer;
+layout(set = 0, binding = 0, SCALED_STORE_FMT) uniform image2D uFramebuffer;
 #endif
 #elif defined(UNSCALED)
 layout(set = 0, binding = 0, r32ui) uniform uimage2D uFramebuffer;

@@ -3,11 +3,21 @@ layout(local_size_x = 8, local_size_y = 8) in;
 
 #include "common.h"
 
+/* Scaled-framebuffer storage format. rgba16f under -DHDR16 (the wide HDR
+ * render target); rgba8 otherwise. The image the store targets is
+ * created to match (see renderer scaled_fb_format). */
+#if defined(HDR16)
+#define SCALED_STORE_FMT rgba16f
+#else
+#define SCALED_STORE_FMT rgba8
+#endif
+
+
 #if defined(SCALED)
 #if defined(MSAA)
-layout(set = 0, binding = 0, rgba8) uniform writeonly image2DMS uScaledMS;
+layout(set = 0, binding = 0, SCALED_STORE_FMT) uniform writeonly image2DMS uScaledMS;
 #else
-layout(set = 0, binding = 0, rgba8) uniform writeonly image2D uScaled;
+layout(set = 0, binding = 0, SCALED_STORE_FMT) uniform writeonly image2D uScaled;
 #endif
 layout(set = 0, binding = 1) uniform usampler2D uUnscaled;
 #else

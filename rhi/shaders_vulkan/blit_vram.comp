@@ -1,12 +1,22 @@
 #version 450
 layout(local_size_x = 8, local_size_y = 8) in;
 
+/* Scaled-framebuffer storage format. rgba16f under -DHDR16 (the wide HDR
+ * render target); rgba8 otherwise. The image the store targets is
+ * created to match (see renderer scaled_fb_format). */
+#if defined(HDR16)
+#define SCALED_STORE_FMT rgba16f
+#else
+#define SCALED_STORE_FMT rgba8
+#endif
+
+
 #if defined(SCALED)
 #if defined(MSAA)
-layout(set = 0, binding = 0, rgba8) uniform writeonly image2DMS uFramebufferMS;
+layout(set = 0, binding = 0, SCALED_STORE_FMT) uniform writeonly image2DMS uFramebufferMS;
 layout(set = 0, binding = 1) uniform sampler2DMS uImageMS;
 #else
-layout(set = 0, binding = 0, rgba8) uniform writeonly image2D uFramebuffer;
+layout(set = 0, binding = 0, SCALED_STORE_FMT) uniform writeonly image2D uFramebuffer;
 layout(set = 0, binding = 1) uniform sampler2D uImage;
 #endif
 #elif defined(UNSCALED)
