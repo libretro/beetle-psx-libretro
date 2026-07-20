@@ -59,12 +59,21 @@ highp vec3 rec709_to_target(highp vec3 c, int expand_gamut)
 
 highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut)
 {
-	/* STEP 1: clamp to paper white. With the wide (16F) framebuffer, additive
-	 * blends can now exceed 1.0 in the scaled fb; capping here keeps HDR output
-	 * behaviourally identical (nothing above paper white yet) while the (c)
-	 * precision below paper white is preserved. Step 3 removes this clamp (with
-	 * a soft knee) to let additive content glow above paper white. */
-	highp vec3 lin = pow(clamp(rgb, vec3(0.0), vec3(1.0)), vec3(2.4)) * paper_white_nits;
+	/* STEP 3: additive highlights above paper white. Ordinary content in
+	 * [0,1] maps to [0, paper white] exactly as SDR does. Additive blends
+	 * (B+F) leave >1.0 values in the 16F framebuffer; instead of clamping
+	 * them, soft-knee the overshoot so a muzzle flash / lamp / explosion
+	 * glows above paper white but rolls off toward a fixed peak rather than
+	 * blowing out (pow(2.4) alone would send 2.0 to ~5x paper white). The
+	 * knee is Reinhard: over/(over+1) maps [0,inf) -> [0,1), scaled by the
+	 * headroom between paper white and the highlight ceiling. */
+	const highp float peak_nits = 1000.0;   /* additive highlight ceiling */
+	highp vec3  c        = max(rgb, vec3(0.0));
+	highp vec3  base     = pow(min(c, vec3(1.0)), vec3(2.4)) * paper_white_nits;
+	highp vec3  over     = max(c - vec3(1.0), vec3(0.0));
+	highp float headroom = max(peak_nits - paper_white_nits, 0.0);
+	highp vec3  glow     = headroom * (over / (over + 1.0));
+	highp vec3  lin      = base + glow;
 	lin = rec709_to_target(lin, expand_gamut);
 	return pq_encode(lin);
 }

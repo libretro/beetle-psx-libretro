@@ -22,13 +22,14 @@ vec4 get_bias(vec3 c00, vec3 c01, vec3 c10, vec3 c11)
    float s01 = dot(c01 - avg, c01 - avg);
    float s10 = dot(c10 - avg, c10 - avg);
    float s11 = dot(c11 - avg, c11 - avg);
-   // Clamp to [0,1] to match what the historical RGBA8_UNORM mip storage did
-   // implicitly. The bias is negative for high-variance (edge) regions, and
-   // the colour can exceed 1.0 with additive content on the 16F framebuffer;
-   // leaving either unclamped breaks the bias accumulation below (a negative
-   // bias times a negative neighbour average yields a spurious positive =
-   // over-smoothing) and inflates the variance of later levels.
-   return clamp(vec4(avg, 1.0 - log2(1000.0 * (s00 + s01 + s10 + s11) + 1.0)), vec4(0.0), vec4(1.0));
+   // Clamp only the bias (alpha) to [0,1] - this is what fixed the 16F
+   // over-smoothing: the bias is negative at edges and the accumulation
+   // below (bias.a *= neighbour-average) relies on it staying in range.
+   // The colour (rgb) is deliberately left unclamped now so additive
+   // highlights (>1.0) survive the adaptive-smoothing path and still glow;
+   // variance behaves sensibly with >1.0 (uniform-bright -> smooth,
+   // bright-edge -> sharp), and colours are never negative.
+   return vec4(avg, clamp(1.0 - log2(1000.0 * (s00 + s01 + s10 + s11) + 1.0), 0.0, 1.0));
 }
 
 vec4 get_bias(vec4 c00, vec4 c01, vec4 c10, vec4 c11)
