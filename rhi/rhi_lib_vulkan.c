@@ -5735,6 +5735,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
             Program *mipmap_resolve;
             Program *mipmap_dither_resolve;
+            Program *hdr_mipmap_resolve;   /* PQ Rec.2020 variant of mipmap_resolve, HDR only */
             Program *mipmap_energy_first;
             Program *mipmap_energy;
             Program *mipmap_energy_blur;
@@ -6228,6 +6229,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t mipmap_dither_resolve_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.dither.resolve.frag.inc"
       ;
+   static const uint32_t hdr_mipmap_resolve_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.mipmap.resolve.frag.inc"
+      ;
    static const uint32_t mipmap_energy_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.energy.frag.inc"
       ;
@@ -6687,6 +6691,8 @@ static void renderer_init_pipelines(Renderer *self)
       device_request_program_graphics_code(self->device, mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
    self->pipelines.mipmap_dither_resolve =
       device_request_program_graphics_code(self->device, mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
+   self->pipelines.hdr_mipmap_resolve =
+      device_request_program_graphics_code(self->device, mipmap_vert, sizeof(mipmap_vert), hdr_mipmap_resolve_frag, sizeof(hdr_mipmap_resolve_frag));
 
    self->pipelines.mipmap_energy = device_request_program_graphics_code(self->device, mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
          mipmap_energy_frag, sizeof(mipmap_energy_frag));
@@ -7324,6 +7330,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    VkViewport old_vp;
    RenderPassInfo rp;
    bool dither;
+   bool using_mipmap = false;   /* set in the adaptive-smoothing branch; picks the 44-byte HDR push */
    fbatlas_flush_render_pass(&self->atlas);
    if (self->texture_tracking_enabled) {
       texture_tracker_endFrame(self->tracker);
@@ -7501,11 +7508,8 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
 
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer_ssaa)), StockSampler_NearestWrap);
    }
-   else if (psx_hdr_active || !self->render_state.adaptive_smoothing || self->scaling == 1)
+   else if (!self->render_state.adaptive_smoothing || self->scaling == 1)
    {
-      /* HDR forces the plain scaled quad: the adaptive-smoothing (mipmap
-       * resolve) path below has no HDR variant, so we take the single-texture
-       * scaled path here instead. */
       if (dither)
          commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_scaled_dither_quad_blitter : self->pipelines.scaled_dither_quad_blitter);
       else
@@ -7515,10 +7519,16 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    }
    else
    {
+      /* Adaptive smoothing. HDR selects the PQ variant so the trilinear
+       * resolve's interpolated (sub-8-bit) output is preserved at 10-bit
+       * rather than being crushed by the plain scaled fallback. dither is
+       * already false under HDR (forced above), so the dither branch is SDR
+       * only. */
+      using_mipmap = true;
       if (dither)
          commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.mipmap_dither_resolve);
       else
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.mipmap_resolve);
+         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_mipmap_resolve : self->pipelines.mipmap_resolve);
 
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer)), StockSampler_TrilinearWrap);
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->bias_framebuffer)), StockSampler_LinearWrap);
@@ -7572,7 +7582,36 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
                 { (rect->x + rect->width - 0.5f) / FB_WIDTH, (rect->y + rect->height - 0.5f) / FB_HEIGHT },
                 (float)(imageview_vec_size(&self->scaled_views) - 1) };
 
-   if (psx_hdr_active)
+   if (psx_hdr_active && using_mipmap)
+   {
+      /* The -DHDR mipmap_resolve reflects a 44-byte push: the full 36-byte
+       * resolve layout (offset, scale, uv_min, uv_max, max_bias) plus paper
+       * white + gamut appended. */
+      struct HdrMipmapPush
+      {
+         float   offset[2];
+         float   scale[2];
+         float   uv_min[2];
+         float   uv_max[2];
+         float   max_bias;
+         float   paper_white_nits;
+         int32_t expand_gamut;
+      };
+      struct HdrMipmapPush mp;
+      mp.offset[0]        = push.offset[0];
+      mp.offset[1]        = push.offset[1];
+      mp.scale[0]         = push.scale[0];
+      mp.scale[1]         = push.scale[1];
+      mp.uv_min[0]        = push.uv_min[0];
+      mp.uv_min[1]        = push.uv_min[1];
+      mp.uv_max[0]        = push.uv_max[0];
+      mp.uv_max[1]        = push.uv_max[1];
+      mp.max_bias         = push.max_bias;
+      mp.paper_white_nits = psx_hdr_paper_white_nits;
+      mp.expand_gamut     = psx_hdr_expand_gamut;
+      commandbuffer_push_constants(cbh_get(&self->cmd), &mp, 0, sizeof(mp));
+   }
+   else if (psx_hdr_active)
    {
       /* The -DHDR quad reflects a 24-byte push (offset, range, paper white,
        * gamut); reuse offset/scale computed above and append the HDR params.
