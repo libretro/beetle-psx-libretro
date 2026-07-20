@@ -5817,6 +5817,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       ih_assign(&self->last_scanout, &self->reuseable_scanout);
    }
    static ImageHandle renderer_scanout_to_texture(Renderer *self);
+   static VkFormat renderer_hdr_scanout_format(Renderer *self);
    static void renderer_draw_quad(Renderer *self, const Vertex *vertices);
    static void renderer_init_pipelines(Renderer *self);
    static TTRect renderer_compute_vram_framebuffer_rect(Renderer *self);
@@ -7212,7 +7213,8 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
    { ImageCreateInfo info = image_create_info_render_target(
          FB_WIDTH * render_scale,
          FB_HEIGHT * render_scale,
-         VK_FORMAT_A1R5G5B5_UNORM_PACK16); /* Default to 15bit color for now */
+         psx_hdr_active ? renderer_hdr_scanout_format(self)
+            : VK_FORMAT_A1R5G5B5_UNORM_PACK16); /* Default to 15bit color for now */
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -7235,12 +7237,12 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
    if (scaled)
    {
-      commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.scaled_quad_blitter);
+      commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_scaled_quad_blitter : self->pipelines.scaled_quad_blitter);
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearClamp);
    }
    else
    {
-      commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.unscaled_quad_blitter);
+      commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_unscaled_quad_blitter : self->pipelines.unscaled_quad_blitter);
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_LinearClamp);
    }
 
@@ -7260,7 +7262,26 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
                 { (vram_rect.x + vram_rect.width - 0.5f) / FB_WIDTH, (vram_rect.y + vram_rect.height - 0.5f) / FB_HEIGHT },
                 (float)(imageview_vec_size(&self->scaled_views) - 1) };
 
-   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   if (psx_hdr_active)
+   {
+      struct HdrPush
+      {
+         float   offset[2];
+         float   range[2];
+         float   paper_white_nits;
+         int32_t expand_gamut;
+      };
+      struct HdrPush hpush;
+      hpush.offset[0]        = push.offset[0];
+      hpush.offset[1]        = push.offset[1];
+      hpush.range[0]         = push.scale[0];
+      hpush.range[1]         = push.scale[1];
+      hpush.paper_white_nits = psx_hdr_paper_white_nits;
+      hpush.expand_gamut     = psx_hdr_expand_gamut;
+      commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
+   }
+   else
+      commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
@@ -7456,7 +7477,12 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
 
    commandbuffer_set_viewport(cbh_get(&self->cmd), &new_vp);
 
-   dither = self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither;
+   /* Native (5-bit-targeted) dithering is counterproductive against a 10-bit
+    * PQ target - the dither amplitude is far larger than a 10-bit step, so it
+    * reads as noise rather than anti-banding. Force it off under HDR; this
+    * also makes the non-dither hdr quad variants the ones actually selected
+    * below and skips the dither push/LUT block. */
+   dither = (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither) && !psx_hdr_active;
 
    if (bpp24)
    {

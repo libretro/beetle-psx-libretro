@@ -5634,6 +5634,22 @@ void retro_run(void)
    if (!PSX_CPU || !PSX_FIO || !PSX_CDC)
       return;
 
+   /* Keep the HDR encode in sync with the frontend's live HDR controls.
+    * RetroArch's paper-white and Colour Boost sliders change at runtime and
+    * do NOT fire the core's variable-update path, so re-query them each frame
+    * while HDR is engaged. They feed the display quad's push constant, so
+    * updating the globals here takes effect on the very next present. Cheap
+    * env_cb reads, gated on psx_hdr_active. */
+   if (psx_hdr_active)
+   {
+      float    pw    = 0.0f;
+      unsigned gamut = 0;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
+         psx_hdr_paper_white_nits = pw;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
+         psx_hdr_expand_gamut = (int)gamut;
+   }
+
    /* Apply any geometry change deferred from a previous frame's
     * check_variables before beginning this frame, so the frontend's
     * synchronous video-driver reinit runs between frames. */
