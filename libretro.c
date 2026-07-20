@@ -4402,6 +4402,16 @@ static void check_variables(bool startup)
          if (!strcmp(var.value, "30bit_hdr"))
             psx_color_format = PSX_COLOR_FORMAT_30BIT_HDR;
       }
+
+      /* HDR highlight roll-off curve (Vulkan HDR path only): 0 Reinhard,
+       * 1 ACES. Inert unless the HDR scanout is actually engaged. */
+      var.key = BEETLE_OPT(hdr_shoulder);
+      psx_hdr_shoulder = 0;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "aces"))
+            psx_hdr_shoulder = 1;
+      }
 #endif
 
       var.key = BEETLE_OPT(internal_resolution);

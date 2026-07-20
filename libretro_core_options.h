@@ -354,6 +354,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "24bit"
    },
+   {
+      BEETLE_OPT(hdr_shoulder),
+      "HDR Highlight Roll-Off",
+      NULL,
+      "Selects how additive highlights that rise above SDR white are compressed toward the HDR peak, when 'Color Format' is set to '30-bit Color (HDR)'. 'Reinhard (Soft Knee)' is a gentle, gradual roll-off. 'ACES (Filmic)' uses a filmic shoulder that rises faster and reaches the peak sooner, giving punchier highlights. Only affects over-white emissive/additive content on the Vulkan HDR path; ordinary colour and everything in the standard range are identical either way. Has no effect on the OpenGL/Software renderers or in 24-bit mode.",
+      NULL,
+      "video",
+      {
+         { "reinhard", "Reinhard (Soft Knee)" },
+         { "aces",     "ACES (Filmic)" },
+         { NULL, NULL },
+      },
+      "reinhard"
+   },
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    {
