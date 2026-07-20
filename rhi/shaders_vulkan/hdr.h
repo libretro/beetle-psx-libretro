@@ -66,13 +66,23 @@ highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand
 	 * glows above paper white but rolls off toward a fixed peak rather than
 	 * blowing out (pow(2.4) alone would send 2.0 to ~5x paper white). The
 	 * knee is Reinhard: over/(over+1) maps [0,inf) -> [0,1), scaled by the
-	 * headroom between paper white and the highlight ceiling. */
+	 * headroom between paper white and the highlight ceiling.
+	 *
+	 * The knee is driven by the peak (brightest) overshoot channel and the
+	 * overshoot is scaled proportionally, rather than kneeing each channel
+	 * on its own: a per-channel Reinhard compresses the brightest channel
+	 * hardest, which desaturates a hot coloured highlight toward white (a
+	 * saturated additive red would wash out as it brightens). Scaling by the
+	 * shared factor keeps the overshoot's chromaticity, so a hot additive
+	 * red stays red. The peak channel rolls off identically to before, and
+	 * neutral (grey) highlights and all [0,1] content are unchanged. */
 	const highp float peak_nits = 1000.0;   /* additive highlight ceiling */
 	highp vec3  c        = max(rgb, vec3(0.0));
 	highp vec3  base     = pow(min(c, vec3(1.0)), vec3(2.4)) * paper_white_nits;
 	highp vec3  over     = max(c - vec3(1.0), vec3(0.0));
+	highp float o        = max(over.r, max(over.g, over.b));
 	highp float headroom = max(peak_nits - paper_white_nits, 0.0);
-	highp vec3  glow     = headroom * (over / (over + 1.0));
+	highp vec3  glow     = headroom * over / (o + 1.0);
 	highp vec3  lin      = base + glow;
 	lin = rec709_to_target(lin, expand_gamut);
 	return pq_encode(lin);
