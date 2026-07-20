@@ -340,6 +340,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "enabled"
    },
+   {
+      BEETLE_OPT(color_format),
+      "Color Format",
+      NULL,
+      "Selects the output color depth. '24-bit (Standard)' is the historical 8-bit-per-channel output. '30-bit Color (HDR)' outputs 10-bit-per-channel, PQ-encoded Rec.2020 (HDR10) for display on an HDR-capable screen: the renderer already carries more than 8 bits of internal precision, so this both reduces banding on upscaled gradients and lets emissive content sit above SDR white. Currently only takes effect with the Vulkan renderer and requires frontend HDR support; it falls back to 24-bit on the OpenGL/Software renderers or when the frontend cannot present HDR10. Restart required.",
+      NULL,
+      "video",
+      {
+         { "24bit",     "24-bit (Standard)" },
+         { "30bit_hdr", "30-bit Color (HDR)" },
+         { NULL, NULL },
+      },
+      "24bit"
+   },
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    {

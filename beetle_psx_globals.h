@@ -56,6 +56,30 @@ extern int aspect_ratio_setting;
 extern bool aspect_ratio_dirty;
 extern bool is_monkey_hero;
 
+/* Output color format ("Color Format" core option).
+ *
+ * PSX_COLOR_FORMAT_24BIT is the historical path (8 bits per channel,
+ * XRGB8888 for the truecolor renderers).  PSX_COLOR_FORMAT_30BIT_HDR
+ * requests 10-bit-per-channel PQ-encoded Rec.2020 (HDR10) output.
+ *
+ * The user's *request* lives in psx_color_format; whether HDR is
+ * actually engaged lives in psx_hdr_active, which is only ever true
+ * once the renderer is confirmed to be Vulkan AND the frontend has
+ * accepted the HDR10 format.  Everything downstream must gate on
+ * psx_hdr_active, never on psx_color_format alone, so the SW/GL paths
+ * and HDR-incapable frontends fall back cleanly to 24-bit. */
+enum psx_color_format_e
+{
+   PSX_COLOR_FORMAT_24BIT = 0,
+   PSX_COLOR_FORMAT_30BIT_HDR
+};
+
+extern int   psx_color_format;         /* enum psx_color_format_e; core option */
+extern bool  psx_hdr_active;           /* true only when HDR10 is really engaged */
+extern float psx_hdr_paper_white_nits; /* frontend SDR white, default 200        */
+extern int   psx_hdr_expand_gamut;     /* frontend "Colour Boost" rotation        */
+extern int   psx_hdr_output_mode;      /* frontend HDR output mode (0 off/1 HDR10) */
+
 #ifdef __cplusplus
 }
 #endif

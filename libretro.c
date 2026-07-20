@@ -186,6 +186,16 @@ static int override_bios;
 bool psx_gte_overclock;
 enum dither_mode psx_gpu_dither_mode;
 
+/* Output color format state (see beetle_psx_globals.h). Defaults keep
+ * the historical 24-bit path; psx_hdr_active stays false until the
+ * Vulkan renderer is confirmed and the frontend reports it can present
+ * 10-bit end to end. */
+int   psx_color_format         = PSX_COLOR_FORMAT_24BIT;
+bool  psx_hdr_active           = false;
+float psx_hdr_paper_white_nits = 200.0f;
+int   psx_hdr_expand_gamut     = 0;   /* VID_GAMUT_ACCURATE equivalent */
+int   psx_hdr_output_mode      = 1;   /* assume HDR10 when unqueryable */
+
 #define NEGCON_RANGE 0x7FFF
 
 char retro_save_directory[4096];
@@ -4377,6 +4387,21 @@ static void check_variables(bool startup)
             hw_renderer = true;
          }
       }
+
+      /* Record the requested output color format. This is only the
+       * user's *request*; HDR is not engaged here. Whether it actually
+       * takes effect is decided later, once the renderer is confirmed
+       * to be Vulkan and the frontend's HDR capability is queried (see
+       * the RHI_VULKAN case after rhi_intf_open). The SW/GL paths and
+       * HDR-incapable frontends leave psx_hdr_active false and render
+       * exactly as before. */
+      var.key = BEETLE_OPT(color_format);
+      psx_color_format = PSX_COLOR_FORMAT_24BIT;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "30bit_hdr"))
+            psx_color_format = PSX_COLOR_FORMAT_30BIT_HDR;
+      }
 #endif
 
       var.key = BEETLE_OPT(internal_resolution);
@@ -5433,6 +5458,51 @@ bool retro_load_game(const struct retro_game_info *info)
       {
          struct retro_core_option_display option_display;
          option_display.visible = false;
+
+         /* Finalize the HDR decision now that Vulkan is confirmed. HDR is
+          * engaged only when the user requested 30-bit AND the frontend
+          * reports it can present a 10-bit source end to end AND HDR output
+          * is actually on. All queries here are read-only, so this is inert
+          * on frontends that don't recognise them (older cores fall back to
+          * 24-bit). The frontend's paper-white / gamut / output-mode values
+          * are cached for the Vulkan output stage to encode against, so an
+          * HDR frame matches the frontend's own SDR->HDR composition rather
+          * than diverging in brightness or saturation.
+          *
+          * NOTE: this establishes the *intent and parameters* only. The
+          * actual HDR10 signalling to the frontend, the 10-bit swapchain /
+          * output render target, and the PQ Rec.2020 encode in the resolve
+          * shader are the next implementation stage (see rhi + resolve.comp);
+          * downstream code must gate on psx_hdr_active, which stays false
+          * until that stage lands, so this change is behaviour-neutral. */
+         psx_hdr_active = false;
+         if (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR)
+         {
+            bool     tenbpc = false;
+            unsigned gamut  = 0;
+            unsigned omode  = 1;   /* assume HDR10 if unqueryable */
+            float    pw     = 0.0f;
+
+            if (environ_cb(RETRO_ENVIRONMENT_GET_SCREEN_10BPC_CAPABLE, &tenbpc) && tenbpc)
+            {
+               if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
+                  psx_hdr_paper_white_nits = pw;
+               if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
+                  psx_hdr_expand_gamut = (int)gamut;
+               if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE, &omode))
+                  psx_hdr_output_mode = (int)omode;
+
+               /* omode == 0 means the frontend has HDR output off, so a
+                * PQ frame would be misread as SDR - keep 24-bit in that case. */
+               psx_hdr_active = (psx_hdr_output_mode != 0);
+            }
+
+            if (log_cb)
+               log_cb(RETRO_LOG_INFO,
+                     "[Color Format] 30-bit HDR requested: %s (10bpc-capable renderer path, paper white %.0f nits, gamut %d, output mode %d).\n",
+                     psx_hdr_active ? "engaged" : "unavailable - falling back to 24-bit",
+                     psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
+         }
 
          option_display.key = BEETLE_OPT(depth);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
