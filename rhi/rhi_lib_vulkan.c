@@ -7401,7 +7401,8 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
 
       renderer_ensure_command_buffer(self);
 
-      { ImageCreateInfo info = image_create_info_render_target(64u, 64u, VK_FORMAT_R8G8B8A8_UNORM);
+      { ImageCreateInfo info = image_create_info_render_target(64u, 64u,
+            psx_hdr_active ? renderer_hdr_scanout_format(self) : VK_FORMAT_R8G8B8A8_UNORM);
 
       info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
       info.usage =
