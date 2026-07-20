@@ -135,6 +135,15 @@ void main()
 	#endif
 	}
 
+	/* HDR: the rgba16f scaled framebuffer can contain NaN lanes (e.g. from
+	 * blend edge cases); clamp() inside pack_abgr1555 handles Inf and
+	 * out-of-range finite values but is undefined on NaN, which would pack
+	 * to a garbage 1555 word. This resolve feeds VRAM readback and
+	 * savestates, so a single bad word corrupts the saved state. Force NaN
+	 * lanes to 0 first. In SDR the source is UNORM and never NaN, so this is
+	 * a no-op. */
+	value = mix(value, vec4(0.0), isnan(value));
+
 	uint packed_color = pack_abgr1555(value);
 	imageStore(uUnscaled, ivec2(coord), uvec4(packed_color));
 #endif
