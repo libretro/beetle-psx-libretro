@@ -5666,6 +5666,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          Device *device;
          unsigned scaling;
          unsigned msaa;
+         /* Cached, device-probed format for the HDR scanout image (lazily
+          * filled on first HDR frame). VK_FORMAT_UNDEFINED = not yet probed. */
+         VkFormat hdr_scanout_format;
          bool scaled_uv_offset;
          bool valid;
          FilterMode primitive_filter_mode;
@@ -6269,6 +6272,7 @@ static void renderer_init(Renderer *self,
    self->device = device_;
    self->scaling = scaling_;
    self->msaa = msaa_;
+   self->hdr_scanout_format = VK_FORMAT_UNDEFINED;
    self->scaled_uv_offset = false;
    self->valid = false;
    self->primitive_filter_mode = FilterMode_NearestNeighbor;
@@ -7269,6 +7273,31 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
    }
 }
 
+/* Pick the HDR10 scanout image format for this device, once, and cache it.
+ * Prefer packed 10-bit A2B10G10R10 (matches the frontend's expected 2101010
+ * layout); fall back to RGBA16F, which RetroArch also accepts as an HDR10 PQ
+ * source (its "emits_hdr16" passthrough) and carries even more precision. If
+ * a device advertises neither as a sampled colour attachment, fall back to
+ * R8G8B8A8 so image creation can never fail - that case only mis-grades (it
+ * can't carry PQ well) and is essentially unreachable on a Vulkan GPU. */
+static VkFormat renderer_hdr_scanout_format(Renderer *self)
+{
+   const VkFormatFeatureFlags need =
+      VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+
+   if (self->hdr_scanout_format != VK_FORMAT_UNDEFINED)
+      return self->hdr_scanout_format;
+
+   if (device_image_format_is_supported(self->device, VK_FORMAT_A2B10G10R10_UNORM_PACK32, need, VK_IMAGE_TILING_OPTIMAL))
+      self->hdr_scanout_format = VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+   else if (device_image_format_is_supported(self->device, VK_FORMAT_R16G16B16A16_SFLOAT, need, VK_IMAGE_TILING_OPTIMAL))
+      self->hdr_scanout_format = VK_FORMAT_R16G16B16A16_SFLOAT;
+   else
+      self->hdr_scanout_format = VK_FORMAT_R8G8B8A8_UNORM;
+
+   return self->hdr_scanout_format;
+}
+
 static ImageHandle renderer_scanout_to_texture(Renderer *self)
 {
    VkViewport old_vp;
@@ -7394,7 +7423,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    ImageCreateInfo info = image_create_info_render_target(
          display_rect.width * render_scale,
          display_rect.height * render_scale,
-         psx_hdr_active ? VK_FORMAT_A2B10G10R10_UNORM_PACK32
+         psx_hdr_active ? renderer_hdr_scanout_format(self)
             : (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM));
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
