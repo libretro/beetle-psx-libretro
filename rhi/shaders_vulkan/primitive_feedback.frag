@@ -6,9 +6,9 @@ precision highp int;
 #include "primitive.h"
 
 #ifdef MSAA
-layout(set = 0, binding = 3, input_attachment_index = 0) uniform mediump subpassInputMS uFeedbackFramebuffer;
+layout(set = 0, binding = 3, input_attachment_index = 0) uniform highp subpassInputMS uFeedbackFramebuffer;
 #else
-layout(set = 0, binding = 3, input_attachment_index = 0) uniform mediump subpassInput uFeedbackFramebuffer;
+layout(set = 0, binding = 3, input_attachment_index = 0) uniform highp subpassInput uFeedbackFramebuffer;
 #endif
 
 const int BLEND_ADD = 0;
