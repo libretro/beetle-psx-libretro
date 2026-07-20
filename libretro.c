@@ -195,6 +195,10 @@ bool  psx_hdr_active           = false;
 float psx_hdr_paper_white_nits = 200.0f;
 int   psx_hdr_expand_gamut     = 0;   /* VID_GAMUT_ACCURATE equivalent */
 int   psx_hdr_output_mode      = 1;   /* assume HDR10 when unqueryable */
+/* HDR highlight roll-off curve applied to the over-paper-white region only:
+ * 0 = Reinhard soft-knee (default, matches the validated behaviour),
+ * 1 = ACES filmic shoulder. No core option yet - flip here to evaluate. */
+int   psx_hdr_shoulder         = 0;
 
 #define NEGCON_RANGE 0x7FFF
 

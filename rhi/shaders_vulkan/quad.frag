@@ -30,6 +30,7 @@ layout(push_constant, std430) uniform Registers
 	 * HDR params (see libretro.c psx_hdr_paper_white_nits / _expand_gamut). */
 	float paper_white_nits;
 	int   expand_gamut;
+	int   shoulder;   /* highlight roll-off: 0 Reinhard, 1 ACES */
 #endif
 } registers;
 
@@ -154,7 +155,7 @@ void main()
 #if defined(HDR)
 	/* The SDR rgb is gamma-encoded 0..1; encode_hdr10 handles the
 	 * linearise / paper-white / gamut / PQ chain. */
-	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut), 1.0);
+	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut, registers.shoulder), 1.0);
 #else
 	FragColor = vec4(rgb, 1.0);
 #endif

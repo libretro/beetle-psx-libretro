@@ -45,6 +45,7 @@
 extern bool  psx_hdr_active;
 extern float psx_hdr_paper_white_nits;
 extern int   psx_hdr_expand_gamut;
+extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 ACES */
 /* The requested color format (enum psx_color_format_e). Unlike psx_hdr_active
  * this is known at renderer init (read at startup), so it gates the wide
  * (16F) scaled framebuffer, which is allocated before HDR negotiation
@@ -7363,6 +7364,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
          float   range[2];
          float   paper_white_nits;
          int32_t expand_gamut;
+         int32_t shoulder;
       };
       struct HdrPush hpush;
       hpush.offset[0]        = push.offset[0];
@@ -7371,6 +7373,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
       hpush.range[1]         = push.scale[1];
       hpush.paper_white_nits = psx_hdr_paper_white_nits;
       hpush.expand_gamut     = psx_hdr_expand_gamut;
+      hpush.shoulder         = psx_hdr_shoulder;
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
    }
    else
@@ -7710,6 +7713,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          float   max_bias;
          float   paper_white_nits;
          int32_t expand_gamut;
+         int32_t shoulder;
       };
       struct HdrMipmapPush mp;
       mp.offset[0]        = push.offset[0];
@@ -7723,6 +7727,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       mp.max_bias         = push.max_bias;
       mp.paper_white_nits = psx_hdr_paper_white_nits;
       mp.expand_gamut     = psx_hdr_expand_gamut;
+      mp.shoulder         = psx_hdr_shoulder;
       commandbuffer_push_constants(cbh_get(&self->cmd), &mp, 0, sizeof(mp));
    }
    else if (psx_hdr_active)
@@ -7737,6 +7742,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          float   range[2];
          float   paper_white_nits;
          int32_t expand_gamut;
+         int32_t shoulder;
       };
       struct HdrPush hpush;
       hpush.offset[0]        = push.offset[0];
@@ -7745,6 +7751,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       hpush.range[1]         = push.scale[1];
       hpush.paper_white_nits = psx_hdr_paper_white_nits;
       hpush.expand_gamut     = psx_hdr_expand_gamut;
+      hpush.shoulder         = psx_hdr_shoulder;
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
    }
    else

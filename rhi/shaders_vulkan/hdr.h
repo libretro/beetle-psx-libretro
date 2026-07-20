@@ -57,7 +57,18 @@ highp vec3 rec709_to_target(highp vec3 c, int expand_gamut)
 		0.0163916 * c.r + 0.0880132 * c.g + 0.8955950 * c.b);
 }
 
-highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut)
+highp float aces_shoulder(highp float x)
+{
+	/* Narkowicz ACES filmic fit, used here purely as the highlight-shoulder
+	 * magnitude: maps the overshoot [0,inf) to [0,1). It rises faster near
+	 * the knee and rolls off with a filmic shoulder, versus Reinhard's
+	 * gentler o/(o+1). Saturates at a/c ~= 1.03, clamped to 1 so the peak
+	 * channel asymptotes to the highlight ceiling exactly like Reinhard. */
+	highp float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+	return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut, int shoulder)
 {
 	/* STEP 3: additive highlights above paper white. Ordinary content in
 	 * [0,1] maps to [0, paper white] exactly as SDR does. Additive blends
@@ -82,7 +93,16 @@ highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand
 	highp vec3  over     = max(c - vec3(1.0), vec3(0.0));
 	highp float o        = max(over.r, max(over.g, over.b));
 	highp float headroom = max(peak_nits - paper_white_nits, 0.0);
-	highp vec3  glow     = headroom * over / (o + 1.0);
+	/* Per-unit-overshoot glow factor S(o)/o, shared across channels so the
+	 * overshoot keeps its chromaticity (peak channel gets headroom*S(o), the
+	 * rest scale proportionally). shoulder selects the roll-off curve S:
+	 * 0 = Reinhard o/(o+1) (S/o = 1/(o+1)); 1 = ACES filmic shoulder. Both
+	 * leave [0,1] content and neutral highlights untouched (over==0, or all
+	 * channels share o). */
+	highp float knee     = (shoulder == 1)
+	                          ? ((o > 0.0) ? aces_shoulder(o) / o : 0.0)
+	                          : (1.0 / (o + 1.0));
+	highp vec3  glow     = headroom * over * knee;
 	highp vec3  lin      = base + glow;
 	lin = rec709_to_target(lin, expand_gamut);
 	return pq_encode(lin);
