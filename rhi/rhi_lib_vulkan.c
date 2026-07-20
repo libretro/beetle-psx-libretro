@@ -46,6 +46,7 @@ extern bool  psx_hdr_active;
 extern float psx_hdr_paper_white_nits;
 extern int   psx_hdr_expand_gamut;
 extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 ACES */
+extern int   psx_hdr_overbright_hot;   /* additive/sub source: 0 clamped, 1 hot */
 /* The requested color format (enum psx_color_format_e). Unlike psx_hdr_active
  * this is known at renderer init (read at startup), so it gates the wide
  * (16F) scaled framebuffer, which is allocated before HDR negotiation
@@ -5623,6 +5624,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       SpecConstIndex_Scaling = 3,
       SpecConstIndex_Shift = 4,
       SpecConstIndex_OffsetUV = 5,
+      SpecConstIndex_HotSource = 6,
       SpecConstIndex_Samples = 0
    };
 
@@ -9358,6 +9360,7 @@ static void renderer_semi_transparent_set_state(Renderer *self,
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, state->shift);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)state->offset_uv);
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_HotSource, psx_hdr_overbright_hot);
 
    if (state->scissor_index < 0)
       commandbuffer_set_scissor(cbh_get(&self->cmd), &self->queue.default_scissor);

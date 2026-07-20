@@ -368,6 +368,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "reinhard"
    },
+   {
+      BEETLE_OPT(hdr_overbright),
+      "HDR Additive Overbright",
+      NULL,
+      "Controls whether additive and subtractive blend sources may exceed reference white on the Vulkan HDR path, when 'Color Format' is set to '30-bit Color (HDR)'. 'Off' clamps each source to reference white before blending (matching real hardware), so highlights only rise above white where translucent layers stack - accurate and controlled. 'On' lets bright modulated sources push additive/subtractive effects roughly twice as hard for punchier single-layer glow (lasers, lightning, flames), at the cost of accuracy. Opaque surfaces are clamped either way. No effect on the OpenGL/Software renderers or in 24-bit mode.",
+      NULL,
+      "video",
+      {
+         { "clamped", "Off (Reference White Sources)" },
+         { "hot",     "On (Boosted Sources)" },
+         { NULL, NULL },
+      },
+      "clamped"
+   },
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    {

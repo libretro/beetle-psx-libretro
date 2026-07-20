@@ -16,6 +16,14 @@ const int BLEND_AVG = 1;
 const int BLEND_SUB = 2;
 const int BLEND_ADD_QUARTER = 3;
 layout(constant_id = 2) const int BLEND_MODE = BLEND_ADD;
+#ifdef TEXTURED
+/* HDR only. 0: clamp the ~2x modulated source to reference white before the
+ * additive/subtractive blend (over-white then comes only from stacking).
+ * 1: leave the source hot for punchier single-layer additive/subtractive glow.
+ * SDR is unaffected either way - the UNORM write clamps. Set from a core
+ * option via SpecConstIndex_HotSource. */
+layout(constant_id = 6) const int HDR_HOT_SOURCE = 0;
+#endif
 
 void main()
 {
@@ -26,10 +34,13 @@ void main()
 
 	vec4 color = NNColor;
 
-	vec3 shaded = clamp(color.rgb * vColor.rgb * (255.0 / 128.0), 0.0, 1.0);
+	vec3 shaded_hot = color.rgb * vColor.rgb * (255.0 / 128.0);
+	vec3 shaded     = clamp(shaded_hot, 0.0, 1.0);
+	vec3 add_src    = (HDR_HOT_SOURCE != 0) ? shaded_hot : shaded;
 	float blend_amt = NNColor.a;
 #else
 	vec3 shaded = vColor.rgb;
+#define add_src shaded
 	const float blend_amt = 1.0;
 #endif
 
@@ -45,11 +56,11 @@ void main()
 
 	vec3 blended;
 	if (BLEND_MODE == BLEND_ADD)
-		blended = mix(shaded, shaded + fbcolor.rgb, blend_amt);
+		blended = mix(shaded, add_src + fbcolor.rgb, blend_amt);
 	if (BLEND_MODE == BLEND_AVG)
 		blended = mix(shaded, 0.5 * (clamp(shaded, 0.0, 1.0) + fbcolor.rgb), blend_amt);
 	if (BLEND_MODE == BLEND_SUB)
-		blended = mix(shaded, fbcolor.rgb - shaded, blend_amt);
+		blended = mix(shaded, fbcolor.rgb - add_src, blend_amt);
 	if (BLEND_MODE == BLEND_ADD_QUARTER)
 		blended = mix(shaded, clamp(shaded, 0.0, 1.0) * 0.25 + fbcolor.rgb, blend_amt);
 

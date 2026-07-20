@@ -199,6 +199,10 @@ int   psx_hdr_output_mode      = 1;   /* assume HDR10 when unqueryable */
  * 0 = Reinhard soft-knee (default, matches the validated behaviour),
  * 1 = ACES filmic shoulder. No core option yet - flip here to evaluate. */
 int   psx_hdr_shoulder         = 0;
+/* HDR additive/subtractive blend source: 0 clamps the ~2x modulated source to
+ * reference white before blending (over-white only from stacking, default);
+ * 1 leaves it hot for punchier single-layer glow. Read from a core option. */
+int   psx_hdr_overbright_hot   = 0;
 
 #define NEGCON_RANGE 0x7FFF
 
@@ -4415,6 +4419,16 @@ static void check_variables(bool startup)
       {
          if (!strcmp(var.value, "aces"))
             psx_hdr_shoulder = 1;
+      }
+
+      /* HDR additive/subtractive source clamp (Vulkan HDR path only): 0 clamps
+       * the modulated source to reference white, 1 leaves it hot. */
+      var.key = BEETLE_OPT(hdr_overbright);
+      psx_hdr_overbright_hot = 0;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "hot"))
+            psx_hdr_overbright_hot = 1;
       }
 #endif
 
