@@ -2547,6 +2547,19 @@ void GPU_FlushDeferredScanout(void)
 
 void GPU_RestoreStateP1(bool load)
 {
+   if (!load && !rhi_intf_has_software_renderer())
+   {
+      /* Pure hardware renderer: the composited framebuffer lives only on the
+       * GPU. CPU-side GPU.vram is coherent solely where the game issued an
+       * FBRead (see Command_FBRead) or CPU-uploaded, so anything the GPU
+       * rendered but the game never read back is stale here. Without this,
+       * the savestate below (which reads GPU.vram) serializes that stale
+       * data as garbage, and it reloads corrupt in every colour mode. Sync
+       * the whole framebuffer back from the GPU before capture; the coherence
+       * tracker still skips the transfer for regions that are already clean. */
+      rhi_intf_read_vram(0, 0, 1024, 512, GPU.vram);
+   }
+
    if (GPU.upscale_shift == 0)
    {
       /* No upscaling, we can dump the VRAM contents directly */
