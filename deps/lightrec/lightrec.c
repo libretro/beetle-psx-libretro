@@ -42,7 +42,7 @@ static void lightrec_reap_block(struct lightrec_state *state, void *data);
  * the code LUT. Used in DMA-only invalidation mode to catch the rare
  * stores that actually patch cached code, while still skipping the
  * invalidation work for all other stores. */
-static bool lightrec_store_hits_code(struct lightrec_state *state, u32 addr)
+bool lightrec_store_hits_code(struct lightrec_state *state, u32 addr)
 {
 	u32 w = (kunseg(addr) & 0x1FFFFF) >> 2;
 

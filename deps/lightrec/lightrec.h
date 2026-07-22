@@ -151,6 +151,12 @@ __api u32 lightrec_run_interpreter(struct lightrec_state *state,
 __api void lightrec_invalidate(struct lightrec_state *state, u32 addr, u32 len);
 __api void lightrec_invalidate_all(struct lightrec_state *state);
 
+/* True if the written address lies inside a cached block installed in
+ * the code LUT. Custom mem_map_ops store handlers must perform the same
+ * check the default handlers do before skipping invalidation in
+ * DMA-only invalidation mode. */
+__api _Bool lightrec_store_hits_code(struct lightrec_state *state, u32 addr);
+
 __api void lightrec_set_exit_flags(struct lightrec_state *state, u32 flags);
 __api u32 lightrec_exit_flags(struct lightrec_state *state);
 

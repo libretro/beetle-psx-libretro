@@ -3039,7 +3039,10 @@ static void pgxp_nonhw_write_byte(struct lightrec_state *state,
 	*(uint8_t *)host = val;
 	PGXP_CPU_SB(opcode, val, mem);
 
-	if (!psx_dynarec_invalidate)
+	/* Same skip condition as lightrec_default_sb(): in DMA-only
+	 * invalidation mode, stores that patch cached code must still
+	 * invalidate. */
+	if (!psx_dynarec_invalidate || lightrec_store_hits_code(state, mem))
 		lightrec_invalidate(state, mem, 1);
 }
 
@@ -3071,7 +3074,7 @@ static void pgxp_nonhw_write_half(struct lightrec_state *state,
 	*(uint16_t *)host = HTOLE16(val);
 	PGXP_CPU_SH(opcode, val, mem);
 
-	if (!psx_dynarec_invalidate)
+	if (!psx_dynarec_invalidate || lightrec_store_hits_code(state, mem))
 		lightrec_invalidate(state, mem, 2);
 }
 
@@ -3119,7 +3122,7 @@ static void pgxp_nonhw_write_word(struct lightrec_state *state,
 			break;
 	}
 
-	if (!psx_dynarec_invalidate)
+	if (!psx_dynarec_invalidate || lightrec_store_hits_code(state, mem))
 		lightrec_invalidate(state, mem, 4);
 }
 
@@ -3130,8 +3133,13 @@ static void pgxp_nonhw_write_word_unsigned(struct lightrec_state *state,
 
 	PGXP_CPU_SW(opcode, val, mem);
 
-	if (!psx_dynarec_invalidate)
-		lightrec_invalidate(state, mem, 4);
+	/* Unaligned store: may span two words. Match
+	 * lightrec_default_swu(): check both words and invalidate the
+	 * full 8-byte window. */
+	if (!psx_dynarec_invalidate ||
+	    lightrec_store_hits_code(state, mem) ||
+	    lightrec_store_hits_code(state, mem + 4))
+		lightrec_invalidate(state, mem & ~0x3, 8);
 }
 
 static void pgxp_hw_write_word(struct lightrec_state *state,
