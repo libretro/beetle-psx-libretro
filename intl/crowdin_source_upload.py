@@ -8,13 +8,14 @@ import sys
 import urllib.request
 import zipfile
 import core_option_translation as t
+import os
 
 # --------------------          MAIN          -------------------- #
 
 if __name__ == '__main__':
    # Check Crowdin API Token and core name
    try:
-      API_KEY = sys.argv[1]
+      API_KEY = os.environ['CROWDIN_API_TOKEN']
       CORE_NAME = t.clean_file_name(sys.argv[2])
    except IndexError as e:
       print('Please provide Crowdin API Token and core name!')
