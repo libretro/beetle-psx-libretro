@@ -1773,6 +1773,7 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 	struct lightrec_state *state = cstate->state;
 	struct lightrec_branch_target *target;
 	bool fully_tagged = false;
+	bool code_current;
 	struct block *block2;
 	struct opcode *elm;
 	jit_state_t *_jit, *oldjit;
@@ -1892,7 +1893,9 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 	 * Install the compiled function only if the block still matches
 	 * the code in memory; otherwise install the resolver, which will
 	 * re-validate the block and recompile it. */
-	if (block->hash == lightrec_calculate_block_hash(block)) {
+	code_current = block->hash == lightrec_calculate_block_hash(block);
+
+	if (code_current) {
 		/* Add compiled function to the LUT */
 		lut_write(state, lut_offset(block->pc), block->function);
 
@@ -1907,8 +1910,22 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 		lut_write(state, lut_offset(block->pc), NULL);
 	}
 
-	/* Detect old blocks that have been covered by the new one */
-	for (i = 0; ENABLE_THREADED_COMPILER && i < cstate->nb_targets; i++) {
+	/* Detect old blocks that have been covered by the new one.
+	 *
+	 * Skipped entirely when the hash check above failed: a stale
+	 * compilation must not install its inner entry points into the
+	 * code LUT (they dispatch into machine code built from the
+	 * overwritten bytes) and must not reap the covered blocks. The
+	 * head entry was left empty above, so the next fetch
+	 * re-validates and recompiles; the covered-block handling then
+	 * runs on the fresh compilation. This matters most in DMA-only
+	 * invalidation mode: the walk that raced this compilation
+	 * cleared the per-word code bits, so the stores that overwrote
+	 * the block skip both the inline LUT clear and the bitmap trip,
+	 * and a stale inner entry installed here would never be
+	 * scrubbed. */
+	for (i = 0; code_current && ENABLE_THREADED_COMPILER &&
+	     i < cstate->nb_targets; i++) {
 		target = &cstate->targets[i];
 
 		if (!target->offset)
@@ -1939,7 +1956,7 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 			lightrec_recompiler_remove(state->rec, block2);
 	}
 
-	for (i = 0; i < cstate->nb_targets; i++) {
+	for (i = 0; code_current && i < cstate->nb_targets; i++) {
 		target = &cstate->targets[i];
 
 		if (!target->offset)
