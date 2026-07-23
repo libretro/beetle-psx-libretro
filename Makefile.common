@@ -9,25 +9,24 @@ CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
 ZLIB_DIR     := $(DEPS_DIR)/zlib-1.2.11
 
 LIBCHDR_INCFLAGS = \
-                     -I$(DEPS_DIR)/libchdr/include
+                     -I$(DEPS_DIR)/lzma-25.01/include \
+                     -I$(DEPS_DIR)/zstd-1.5.7
 
 LIBCHDR_SOURCES_C = \
-                     $(DEPS_DIR)/libchdr/deps/lzma-25.01/src/LzmaDec.c \
-                     $(DEPS_DIR)/libchdr/deps/zstd-1.5.7/zstddeclib.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_bitstream.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_cdrom.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_chd.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdfl.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdlz.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdzl.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_codec_cdzs.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_codec_flac.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_codec_huff.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_codec_lzma.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_codec_zlib.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_codec_zstd.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_flac.c \
-                     $(DEPS_DIR)/libchdr/src/libchdr_huffman.c
+                     $(DEPS_DIR)/lzma-25.01/src/LzmaDec.c \
+                     $(DEPS_DIR)/zstd-1.5.7/zstddeclib.c \
+                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_bitstream.c \
+                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_cdrom.c \
+                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_chd.c \
+                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_flac.c \
+                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_flac_codec.c \
+                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_huffman.c \
+                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_lzma.c \
+                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_zlib.c \
+                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_zstd.c \
+                     $(LIBRETRO_COMM_DIR)/formats/flac/rflac.c \
+                     $(LIBRETRO_COMM_DIR)/encodings/encoding_deflate.c \
+                     $(LIBRETRO_COMM_DIR)/features/features_cpu.c
 
 ZLIB_INCFLAGS = -I$(ZLIB_DIR)
 ZLIB_SOURCES_C = \
@@ -62,7 +61,6 @@ IMAGE_FORMAT_SOURCES_C = \
 		 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c \
 		 $(LIBRETRO_COMM_DIR)/streams/trans_stream_zlib.c \
 		 $(LIBRETRO_COMM_DIR)/streams/trans_stream_deflate.c \
-		 $(LIBRETRO_COMM_DIR)/encodings/encoding_deflate.c \
 		 $(LIBRETRO_COMM_DIR)/formats/data_transfer.c \
 		 $(LIBRETRO_COMM_DIR)/streams/interface_stream.c \
 		 $(LIBRETRO_COMM_DIR)/streams/memory_stream.c \
@@ -72,8 +70,7 @@ IMAGE_FORMAT_SOURCES_C = \
 		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_intf.c \
 		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_stdio.c \
 		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_windowsmmap.c \
-		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_unixmmap.c \
-		 $(LIBRETRO_COMM_DIR)/features/features_cpu.c
+		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_unixmmap.c
 
 IMAGE_FORMAT_FLAGS = -DHAVE_RPNG -DHAVE_RJPEG -DHAVE_RBMP -DHAVE_RTGA \
 		 -DHAVE_RWEBP -DHAVE_RDDS -DHAVE_ZLIB=1
@@ -158,7 +155,13 @@ ifeq ($(NEED_CD), 1)
 endif
 
 ifeq ($(HAVE_CHD), 1)
-   FLAGS += -DHAVE_CHD
+   # CHD hunk codecs: zlib-format hunks decode through libretro-common's
+   # clean-room DEFLATE codec (CHD_USE_BUILTIN_DEFLATE), FLAC hunks
+   # through the clean-room rflac decoder (HAVE_RFLAC), LZMA through a
+   # decode-only LzmaDec (the props derivation that needed the encoder
+   # is computed arithmetically), zstd through the single-file
+   # decode-only zstddeclib.
+   FLAGS += -DHAVE_CHD -DCHD_USE_BUILTIN_DEFLATE -DHAVE_RFLAC -DHAVE_7ZIP -DHAVE_ZSTD
 
    ifeq ($(SYSTEM_LIBCHDR), 1)
       INCFLAGS += $(shell pkg-config --cflags libchdr)

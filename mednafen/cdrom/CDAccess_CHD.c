@@ -52,20 +52,16 @@ struct CDAccess_CHD
 {
    CDAccess     base;
 
-   RFILE              *fp;
    chd_file    *chd;
    uint8_t     *hunkmem;        /* hunk-data cache */
    int          oldhunk;        /* last hunknum read, -1 sentinel */
 
-   /* Parent (clone) CHD chain. A child CHD references unchanged data in
-    * a parent file; libchdr needs the parent opened and handed in. A
-    * parent can itself be a child, so the chain can be several deep.
-    * Both the chd_file handles and their backing RFILEs must stay alive
-    * for as long as the child is open, and are released in Cleanup. */
+   /* Parent (clone) CHD chain depth guard. A child CHD references
+    * unchanged data in a parent file; a parent can itself be a child.
+    * Parent chd_files and their backing files are owned by the child
+    * chd_file (libchdr closes the whole chain in chd_close), so no
+    * handle tracking lives here - only the recursion bound. */
 #define CHD_MAX_PARENTS 8
-   chd_file    *parent_chd[CHD_MAX_PARENTS];
-   RFILE       *parent_fp[CHD_MAX_PARENTS];
-   int          num_parents;
 
    int32_t      NumTracks;
    int32_t      FirstTrack;
@@ -116,23 +112,29 @@ enum
    _DI_FORMAT_COUNT
 };
 
-/* libchdr file-IO callbacks - operate directly on a libretro-common
- * RFILE pointer.  The user_data we hand chd_open_core_file_callbacks
- * IS a RFILE *, not a wrapper. */
+/* libchdr file IO - a heap-allocated core_file whose argp is a
+ * libretro-common RFILE.  Ownership is linear and fully delegated:
+ * every chd_open_core_file() call consumes the core_file (and any
+ * parent chd_file handed in) whether it succeeds or fails - on
+ * success the chd_file owns them and chd_close() releases the whole
+ * chain (libchdr closes parents recursively and core_fclose()s each
+ * file); on failure libchdr's cleanup path has already released
+ * them.  The fclose shim therefore closes the RFILE and frees the
+ * wrapper itself, and nothing here tracks parent handles. */
 
-static uint64_t Callback_fsize(void *user_data)
+static uint64_t Callback_fsize(core_file *cf)
 {
-   RFILE  *fp = (RFILE *)user_data;
+   RFILE  *fp = (RFILE *)cf->argp;
    int64_t sz = filestream_get_size(fp);
    if (sz < 0)
-      return 0;
+      return (uint64_t)-1;
    return (uint64_t)sz;
 }
 
 static size_t Callback_fread(void *buffer, size_t size, size_t count,
-      void *user_data)
+      core_file *cf)
 {
-   RFILE  *fp = (RFILE *)user_data;
+   RFILE  *fp = (RFILE *)cf->argp;
    int64_t got;
    if (size == 0 || count == 0)
       return 0;
@@ -143,15 +145,16 @@ static size_t Callback_fread(void *buffer, size_t size, size_t count,
    return (size_t)got / size;
 }
 
-static int Callback_fclose(void *user_data)
+static int Callback_fclose(core_file *cf)
 {
-   (void)user_data;
+   filestream_close((RFILE *)cf->argp);
+   free(cf);
    return 0;
 }
 
-static int Callback_fseek(void *user_data, int64_t offset, int whence)
+static int Callback_fseek(core_file *cf, int64_t offset, int whence)
 {
-   RFILE *fp           = (RFILE *)user_data;
+   RFILE *fp            = (RFILE *)cf->argp;
    int    seek_position = RETRO_VFS_SEEK_POSITION_START;
    switch (whence)
    {
@@ -163,13 +166,32 @@ static int Callback_fseek(void *user_data, int64_t offset, int whence)
    return 0;
 }
 
-static const core_file_callbacks chd_callbacks =
+/* Open `path` through the VFS and wrap it as a core_file.  NULL on
+ * open failure.  Successful callers hand the result to libchdr,
+ * which releases it via the fclose shim; a caller done with it
+ * before that must core_fclose() it. */
+static core_file *chd_core_rfile_open(const char *path)
 {
-   Callback_fsize,
-   Callback_fread,
-   Callback_fclose,
-   Callback_fseek
-};
+   core_file *cf;
+   RFILE     *fp = filestream_open(path,
+         RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if (!fp)
+      return NULL;
+
+   cf = (core_file *)calloc(1, sizeof(*cf));
+   if (!cf)
+   {
+      filestream_close(fp);
+      return NULL;
+   }
+   cf->argp   = fp;
+   cf->fsize  = Callback_fsize;
+   cf->fread  = Callback_fread;
+   cf->fclose = Callback_fclose;
+   cf->fseek  = Callback_fseek;
+   return cf;
+}
 
 /* Forward declaration - LoadSBI is called from Read_TOC. */
 static int CDAccess_CHD_LoadSBI(struct CDAccess_CHD *self,
@@ -183,16 +205,15 @@ static int CDAccess_CHD_LoadSBI(struct CDAccess_CHD *self,
  * so we can inspect its SHA1 / parent-SHA1 while hunting for a parent. */
 static bool chd_peek_header(const char *path, chd_header *out)
 {
-   RFILE    *fp;
-   chd_error err;
+   chd_error  err;
+   core_file *cf = chd_core_rfile_open(path);
 
-   fp = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
-         RETRO_VFS_FILE_ACCESS_HINT_NONE);
-   if (!fp)
+   if (!cf)
       return false;
 
-   err = chd_read_header_core_file_callbacks(&chd_callbacks, fp, out);
-   filestream_close(fp);
+   /* chd_read_header_core_file does not consume the file. */
+   err = chd_read_header_core_file(cf, out);
+   core_fclose(cf);
    return err == CHDERR_NONE;
 }
 
@@ -256,27 +277,39 @@ static bool chd_find_parent_in_dir(const char *dir,
 }
 
 /* Open a CHD, resolving any parent chain by searching base_dir. On
- * success returns CHDERR_NONE with *out_chd set; the opened parent
- * handles and their RFILEs are appended to self so they outlive the
- * child and are freed in Cleanup. depth guards against cycles / absurd
- * chains. The RFILE for *this* file is supplied by the caller in fp
- * (it must stay open for the lifetime of the returned chd_file). */
+ * success returns CHDERR_NONE with *out_chd set; the parent chd_files
+ * (and every backing file) are owned by the returned child and are
+ * released by a single chd_close on it. depth guards against cycles /
+ * absurd chains.
+ *
+ * Ownership through libchdr is linear: chd_open_core_file consumes
+ * its core_file AND its parent argument on failure as well as on
+ * success (its cleanup path chd_closes the partially built handle,
+ * which core_fcloses the file and recursively closes the parent).
+ * That is why the first no-parent attempt cannot reuse its file for
+ * the re-open - the failed attempt already closed it - and why no
+ * error path here releases anything already handed to libchdr. */
 static chd_error chd_open_resolving_parents(struct CDAccess_CHD *self,
-      const char *path, const char *base_dir, RFILE *fp, int depth,
+      const char *path, const char *base_dir, int depth,
       chd_file **out_chd)
 {
    chd_header  hdr;
    chd_error   err;
    chd_file   *parent = NULL;
+   core_file  *cf;
 
    *out_chd = NULL;
 
    if (depth >= CHD_MAX_PARENTS)
       return CHDERR_REQUIRES_PARENT;
 
-   /* First, try a plain open. If the file needs no parent this succeeds. */
-   err = chd_open_core_file_callbacks(&chd_callbacks, fp,
-         CHD_OPEN_READ, NULL, out_chd);
+   cf = chd_core_rfile_open(path);
+   if (!cf)
+      return CHDERR_FILE_NOT_FOUND;
+
+   /* First, try a plain open. If the file needs no parent this
+    * succeeds. Either way cf is consumed. */
+   err = chd_open_core_file(cf, CHD_OPEN_READ, NULL, out_chd);
    if (err != CHDERR_REQUIRES_PARENT)
       return err;
 
@@ -287,8 +320,7 @@ static chd_error chd_open_resolving_parents(struct CDAccess_CHD *self,
       return CHDERR_REQUIRES_PARENT;
 
    {
-      char   parent_path[CHD_PATH_BUF];
-      RFILE *parent_fp;
+      char parent_path[CHD_PATH_BUF];
 
       if (!chd_find_parent_in_dir(base_dir, hdr.parentsha1, path,
                parent_path, sizeof(parent_path)))
@@ -299,34 +331,24 @@ static chd_error chd_open_resolving_parents(struct CDAccess_CHD *self,
          return CHDERR_REQUIRES_PARENT;
       }
 
-      parent_fp = filestream_open(parent_path, RETRO_VFS_FILE_ACCESS_READ,
-            RETRO_VFS_FILE_ACCESS_HINT_NONE);
-      if (!parent_fp)
-         return CHDERR_FILE_NOT_FOUND;
-
       err = chd_open_resolving_parents(self, parent_path, base_dir,
-            parent_fp, depth + 1, &parent);
+            depth + 1, &parent);
       if (err != CHDERR_NONE)
-      {
-         filestream_close(parent_fp);
          return err;
-      }
-
-      /* Stash the parent so it lives as long as the child. */
-      if (self->num_parents < CHD_MAX_PARENTS)
-      {
-         self->parent_chd[self->num_parents] = parent;
-         self->parent_fp[self->num_parents]  = parent_fp;
-         self->num_parents++;
-      }
 
       log_cb(RETRO_LOG_INFO, "CHD: \"%s\" using parent \"%s\"\n",
             path, parent_path);
    }
 
-   /* Re-open the child now that we have its parent. */
-   err = chd_open_core_file_callbacks(&chd_callbacks, fp,
-         CHD_OPEN_READ, parent, out_chd);
+   /* Re-open the child now that we have its parent. cf2 and parent
+    * are consumed whether this succeeds or fails. */
+   cf = chd_core_rfile_open(path);
+   if (!cf)
+   {
+      chd_close(parent);
+      return CHDERR_FILE_NOT_FOUND;
+   }
+   err = chd_open_core_file(cf, CHD_OPEN_READ, parent, out_chd);
    return err;
 }
 
@@ -357,7 +379,7 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
       fill_pathname_basedir(base_dir, path, sizeof(base_dir));
 
       err = chd_open_resolving_parents(self, path, base_dir,
-            self->fp, 0, &self->chd);
+            0, &self->chd);
    }
    if (err != CHDERR_NONE)
       return false;
@@ -538,31 +560,19 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
 
 static void CDAccess_CHD_Cleanup(struct CDAccess_CHD *self)
 {
-   int i;
-
+   /* chd_close releases the whole chain: it recursively closes the
+    * parent chd_files and core_fclose()s every backing file, which in
+    * our shims closes the RFILE and frees the core_file wrapper. */
    if (self->chd)
-      chd_close(self->chd);
-
-   /* Close parents from child-most to root, then their backing files.
-    * The child chd_file was closed above; libchdr does not close
-    * parents for us, and the RFILEs are owned here (Callback_fclose is
-    * a no-op). */
-   for (i = self->num_parents - 1; i >= 0; i--)
    {
-      if (self->parent_chd[i])
-         chd_close(self->parent_chd[i]);
-      if (self->parent_fp[i])
-         filestream_close(self->parent_fp[i]);
+      chd_close(self->chd);
+      self->chd = NULL;
    }
-   self->num_parents = 0;
 
    if (self->hunkmem)
-      free(self->hunkmem);
-
-   if (self->fp)
    {
-      filestream_close(self->fp);
-      self->fp = NULL;
+      free(self->hunkmem);
+      self->hunkmem = NULL;
    }
 }
 
@@ -946,15 +956,20 @@ CDAccess *CDAccess_CHD_New(bool *success, const char *path,
    self->FirstTrack    = 99;   /* opposites for min/max init */
    self->LastTrack     = 0;
 
-   self->fp = filestream_open(path,
-         RETRO_VFS_FILE_ACCESS_READ,
-         RETRO_VFS_FILE_ACCESS_HINT_NONE);
-
-   if (!self->fp)
+   /* The file itself is opened (as a core_file wrapper) inside
+    * chd_open_resolving_parents; probe for existence up front only to
+    * keep the historical error message for the common failure. */
    {
-      MDFN_Error(0, "CHD: failed to open \"%s\"", path);
-      *success = false;
-      return &self->base;
+      RFILE *probe = filestream_open(path,
+            RETRO_VFS_FILE_ACCESS_READ,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
+      if (!probe)
+      {
+         MDFN_Error(0, "CHD: failed to open \"%s\"", path);
+         *success = false;
+         return &self->base;
+      }
+      filestream_close(probe);
    }
 
    if (!CDAccess_CHD_ImageOpen(self, path, image_memcache))
