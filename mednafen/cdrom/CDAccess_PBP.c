@@ -26,7 +26,7 @@
 #include <streams/file_stream.h>
 #include <libretro.h>
 
-#include <zlib.h>
+#include <encodings/deflate.h>
 
 #include "../mednafen.h"
 #include "../error.h"
@@ -3178,32 +3178,26 @@ static bool CDAccess_PBP_Read_Raw_PW(CDAccess *base_self, uint8_t *buf, int32_t 
 
 
 static int CDAccess_PBP_decompress2(struct CDAccess_PBP *self, void *out, uint32_t *out_size, void *in, uint32_t in_size){
-   static z_stream z;
-   int ret = 0;
+   /* PBP blocks are raw DEFLATE (the historical inflateInit2(&z, -15)).
+    * One-shot decode through the clean-room codec; a fresh stream per
+    * block replaces the old file-static z_stream, which was shared
+    * across every PBP instance and never freed. */
+   void  *z = rinflate_new(-15);
+   size_t wrote = 0;
+   int    ret;
 
-   if (z.zalloc == NULL) {
-      z.next_in = Z_NULL;
-      z.avail_in = 0;
-      z.zalloc = Z_NULL;
-      z.zfree = Z_NULL;
-      z.opaque = Z_NULL;
-      ret = inflateInit2(&z, -15);
-   }
-   else
-      ret = inflateReset(&z);
+   if (!z)
+      return -1;
 
-   if (ret != Z_OK)
-      return ret;
+   rinflate_set_in(z, (const uint8_t *)in, (size_t)in_size);
+   rinflate_set_out(z, (uint8_t *)out, (size_t)*out_size);
+   ret = rinflate_process(z, NULL, &wrote);
+   rinflate_free(z);
 
-   z.next_in = (Bytef*)in;
-   z.avail_in = in_size;
-   z.next_out = (Bytef*)out;
-   z.avail_out = *out_size;
-
-   ret = inflate(&z, Z_FINISH);
-
-   *out_size -= z.avail_out;
-   return ret == 1 ? 0 : ret;
+   *out_size = (uint32_t)wrote;
+   /* END is success; NEXT here means the block needed more room or
+    * more input than the container promised - a malformed PBP. */
+   return (ret == RDEFLATE_PROCESS_END) ? 0 : -1;
 }
 
 static bool CDAccess_PBP_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf, int32_t lba){
