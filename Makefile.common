@@ -148,10 +148,6 @@ ifeq ($(HAVE_CHD), 1)
    endif
 endif
 
-ifeq ($(NEED_TREMOR), 1)
-   FLAGS += -DNEED_TREMOR
-endif
-
 ifeq ($(HAVE_LIGHTREC), 1)
    FLAGS += -DHAVE_LIGHTREC
 
@@ -196,9 +192,9 @@ endif
                 $(CORE_EMU_DIR)/frontio.c \
                 $(CORE_EMU_DIR)/gpu.c
 
-   ifeq ($(NEED_TREMOR), 1)
-      SOURCES_C += $(sort $(wildcard $(MEDNAFEN_DIR)/tremor/*.c))
-   endif
+   # CD audio tracks decode through libretro-common's rvorbis, the
+   # integer clean-room Vorbis decoder (deterministic s16 output).
+   SOURCES_C +=   $(LIBRETRO_COMM_DIR)/formats/vorbis/rvorbis.c
 
    SOURCES_C +=   $(CDROM_DIR)/CDAccess.c \
                   $(CDROM_DIR)/CDAccess_CCD.c \

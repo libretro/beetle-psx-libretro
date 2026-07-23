@@ -7,7 +7,6 @@ NEED_CD                  := 1
 NEED_BPP                 := 32
 NEED_DEINTERLACER        := 1
 NEED_THREADING           := 1
-NEED_TREMOR              := 1
 GLES                     := 0
 GLES3                    := 0
 HAVE_OPENGL              := 0
