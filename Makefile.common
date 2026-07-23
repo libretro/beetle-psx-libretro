@@ -42,6 +42,7 @@ IMAGE_FORMAT_SOURCES_C = \
 		 $(LIBRETRO_COMM_DIR)/formats/image_transfer.c \
 		 $(LIBRETRO_COMM_DIR)/formats/png/rpng.c \
 		 $(LIBRETRO_COMM_DIR)/formats/png/rpng_encode.c \
+		 $(LIBRETRO_COMM_DIR)/formats/png/rpng_apng.c \
 		 $(LIBRETRO_COMM_DIR)/formats/jpeg/rjpeg.c \
 		 $(LIBRETRO_COMM_DIR)/formats/bmp/rbmp.c \
 		 $(LIBRETRO_COMM_DIR)/formats/tga/rtga.c \
@@ -96,11 +97,6 @@ FLAGS += -DHAVE_PBP
 
 ifeq ($(NEED_THREADING), 1)
    FLAGS += -DWANT_THREADING -DHAVE_THREADS
-endif
-
-ifeq ($(NEED_CRC32), 1)
-   FLAGS += -DWANT_CRC32
-   SOURCES_C += $(CORE_DIR)/scrc32.c
 endif
 
 ifeq ($(NEED_DEINTERLACER), 1)

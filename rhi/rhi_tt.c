@@ -2528,8 +2528,13 @@ extern retro_input_state_t dbg_input_state_cb;
 
 #include "libretro-common/include/retro_dirent.h"
 
-/* Actually using the implementation in deps/zlib/crc32.c I think */
-#include "scrc32.h"
+/* Texture and palette hashes are standard CRC-32 through
+ * libretro-common's encoding_crc32 - bit-identical to the zlib
+ * crc32 previously linked from the bundled zlib (poly 0xEDB88320,
+ * init/final 0xFFFFFFFF), so dumped filenames and replacement-pack
+ * lookups keyed on existing hashes are unchanged. */
+#include <encodings/crc32.h>
+#define crc32(crc, buf, len) encoding_crc32((uint32_t)(crc), (const uint8_t *)(buf), (size_t)(len))
 
 extern char retro_cd_base_name[4096];
 extern char retro_cd_base_directory[4096];
