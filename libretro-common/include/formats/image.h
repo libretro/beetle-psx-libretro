@@ -37,7 +37,13 @@ enum image_process_code
    IMAGE_PROCESS_ERROR     = -2,
    IMAGE_PROCESS_ERROR_END = -1,
    IMAGE_PROCESS_NEXT      =  0,
-   IMAGE_PROCESS_END       =  1
+   IMAGE_PROCESS_END       =  1,
+   /* The transfer cannot advance until more of the file has been read
+    * into the buffer (see image_transfer_set_avail); nothing was
+    * consumed.  Only the video still decoders (WEBM, MP4) return
+    * this, and only after the caller opts in by setting an avail
+    * short of the full length. */
+   IMAGE_PROCESS_WAIT      =  2
 };
 
 struct texture_compressed;  /* defined below, after enum image_type_enum */
@@ -48,6 +54,11 @@ struct texture_image
    unsigned width;
    unsigned height;
    bool supports_rgba;
+   /* When true, ->pixels holds packed XRGB2101010 (10-bit per channel,
+    * bits [29:20]=R [19:10]=G [9:0]=B) rather than 8-bit RGBA/BGRA. Only
+    * honoured by drivers that advertise GFX_CTX_FLAGS_SCREEN_10BPC_SOURCE;
+    * others fall back to an 8-bit copy via image_texture_narrow_10bit(). */
+   bool pix10;
    /* Optional GPU-native compressed payload (BCn).  When non-NULL a
     * capable driver may upload it directly and leave ->pixels NULL;
     * image_texture_realize_rgba() decodes to ->pixels on demand for
@@ -64,7 +75,8 @@ enum image_type_enum
    IMAGE_TYPE_TGA,
    IMAGE_TYPE_WEBP,
    IMAGE_TYPE_DDS,
-   IMAGE_TYPE_WEBM
+   IMAGE_TYPE_WEBM,
+   IMAGE_TYPE_MP4
 };
 
 #define IMAGE_MAX_MIPS 16
@@ -141,6 +153,11 @@ void image_texture_free(struct texture_image *img);
  * a driver cannot sample img->compressed->format. */
 bool image_texture_realize_rgba(struct texture_image *img);
 
+/* Narrow a texture_image whose ->pixels hold packed XRGB2101010 down to
+ * 8-bit ARGB8888 in place (and clear ->pix10), for drivers that cannot sample
+ * a 10-bit texture. No-op unless ->pix10 is set. */
+void image_texture_narrow_10bit(struct texture_image *img);
+
 /* Image transfer */
 
 void image_transfer_free(void *data, enum image_type_enum type);
@@ -175,7 +192,38 @@ bool image_transfer_get_gpu_layout(
 
 bool image_transfer_iterate(void *data, enum image_type_enum type);
 
+/* True when the last image_transfer_iterate stopped because the decoder
+ * reached the resident byte frontier declared by
+ * image_transfer_set_avail, rather than because the image finished.
+ * Both cases return false from iterate, so a caller feeding a growing
+ * read MUST consult this before concluding the transfer is complete -
+ * treating a wall as completion decodes a partially-gathered image and
+ * fails.  Always false for types without an avail wall. */
+bool image_transfer_need_more(void *data, enum image_type_enum type);
+
+/* Video-to-image transfers (WEBM, MP4) keep their decoder stream open
+ * after a successful image_transfer_process, positioned just past the
+ * first displayed frame.  This takes ownership of that stream so the
+ * caller can continue the video as an animation without re-opening the
+ * file; the returned handle is the same opaque stream the
+ * image_transfer_anim_stream_* helpers operate on (free it with
+ * image_transfer_anim_stream_free).  It BORROWS the buffer given via
+ * image_transfer_set_buffer_ptr, which must outlive it.  Returns NULL
+ * for other types, when no stream is held, or if it was already
+ * detached; an undetached stream is closed by image_transfer_free. */
+void *image_transfer_detach_anim_stream(void *data,
+      enum image_type_enum type);
+
 bool image_transfer_is_valid(void *data, enum image_type_enum type);
+
+/* True if the last processed frame was written as packed XRGB2101010
+ * (10-bit); only the video decoders can report this, for HDR sources. */
+bool image_transfer_is_10bit(void *data, enum image_type_enum type);
+
+/* Ask a video decoder to emit packed XRGB2101010 for 10-bit HDR sources
+ * (still-image types ignore it). */
+void image_transfer_set_want_10bit(void *data, enum image_type_enum type,
+      int want);
 
 /* Animation (animated images: WEBP, and the video track of WEBM).
  *
@@ -207,6 +255,17 @@ const uint32_t *image_transfer_anim_get_frame(void *anim,
 void *image_transfer_anim_stream_new(void *buf, size_t len,
       enum image_type_enum type);
 
+/* Progressive open over a partially-resident buffer: only the first
+ * 'avail' bytes are guaranteed present.  On success the stream decodes
+ * forward as far as 'avail' allows; raise it with
+ * image_transfer_anim_stream_set_avail as more arrives.  need_more (may
+ * be NULL) is set when the header/index needed to open is not yet
+ * resident and a larger prefix should be retried.  Returns NULL for
+ * types without a partial open (animated WEBP), so the caller keeps
+ * the whole-buffer path for those. */
+void *image_transfer_anim_stream_new_avail(void *buf, size_t len,
+      size_t avail, enum image_type_enum type, int *need_more);
+
 void image_transfer_anim_stream_free(void *stream,
       enum image_type_enum type);
 
@@ -216,6 +275,57 @@ void image_transfer_anim_stream_get_info(void *stream,
 
 const uint32_t *image_transfer_anim_stream_next(void *stream,
       enum image_type_enum type, int *duration_ms);
+
+/* Ask the stream to emit ARGB words (non-zero) or the default R,G,B,A
+ * memory order (zero) from the next frame on.  Returns true when the
+ * stream type honours the request (WEBM, MP4, and animated WEBP - the
+ * video streams bake the order in their blit, WEBP in its sub-frame
+ * decode stores, converting its persistent canvas once if the order
+ * changes mid-animation) so the caller can skip its own R/B swizzle
+ * pass; false for types that always emit the default order, where the
+ * caller must keep converting. */
+bool image_transfer_anim_stream_set_argb(void *stream,
+      enum image_type_enum type, int argb);
+
+/* For decoding a still from a file whose read is still in progress:
+ * declare how many leading bytes of the buffer are valid.  Monotonic.
+ * Only the video types (WEBM, MP4) honour it - their process step
+ * returns IMAGE_PROCESS_WAIT instead of erroring at the wall - and it
+ * is a no-op for every other type, whose transfers must keep seeing
+ * fully-resident buffers. */
+void image_transfer_set_avail(void *data, enum image_type_enum type,
+      size_t avail);
+
+/* The stream-level counterpart, for an animation stream adopted from
+ * a still whose file read was still in flight: the demuxer's byte
+ * wall was captured at open, and nothing else raises it once the
+ * still's task is gone - without this, a stream adopted at N bytes
+ * read treats N as the end of the file and loops the animation
+ * there, forever.  Call with the full length once the read
+ * completes (or progressively, should a streaming consumer appear).
+ * No-op for types without a byte wall (animated WEBP). */
+void image_transfer_anim_stream_set_avail(void *stream,
+      enum image_type_enum type, size_t avail);
+
+/* Bounded-memory streaming: media_floor is the fixed byte offset
+ * where media data begins; consumed is the monotonic high-water byte
+ * offset the decoder has read to.  A feeder keeps
+ * [media_floor, consumed + lookahead) resident and can free below the
+ * floor.  Both return 0 for a type with no byte cursor (animated
+ * WEBP), which a caller reads as "not windowable - keep whole". */
+size_t image_transfer_anim_stream_media_floor(void *stream,
+      enum image_type_enum type);
+size_t image_transfer_anim_stream_consumed(void *stream,
+      enum image_type_enum type);
+
+/* Companion to the above for WEBM, whose timestamp pre-scan is
+ * truncated by the wall (timestamps live in the block headers): once
+ * the buffer is complete, finish the scan so per-frame durations
+ * match a stream opened over the whole file.  No-op for MP4 (its
+ * scan reads the moov tables and is never truncated) and for types
+ * without a scan. */
+void image_transfer_anim_stream_complete_scan(void *stream,
+      enum image_type_enum type, const void *buf, size_t len);
 
 void image_transfer_anim_stream_rewind(void *stream,
       enum image_type_enum type);

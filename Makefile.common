@@ -61,6 +61,9 @@ IMAGE_FORMAT_SOURCES_C = \
 		 $(LIBRETRO_COMM_DIR)/streams/trans_stream.c \
 		 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c \
 		 $(LIBRETRO_COMM_DIR)/streams/trans_stream_zlib.c \
+		 $(LIBRETRO_COMM_DIR)/streams/trans_stream_deflate.c \
+		 $(LIBRETRO_COMM_DIR)/encodings/encoding_deflate.c \
+		 $(LIBRETRO_COMM_DIR)/formats/data_transfer.c \
 		 $(LIBRETRO_COMM_DIR)/streams/interface_stream.c \
 		 $(LIBRETRO_COMM_DIR)/streams/memory_stream.c \
 		 $(LIBRETRO_COMM_DIR)/streams/rzip_stream.c \
@@ -324,7 +327,7 @@ endif
                      $(LIBRETRO_COMM_DIR)/encodings/encoding_utf.c \
                      $(LIBRETRO_COMM_DIR)/memmap/memalign.c \
                      $(LIBRETRO_COMM_DIR)/time/rtime.c \
-                     $(LIBRETRO_COMM_DIR)/hash/rhash.c
+                     $(LIBRETRO_COMM_DIR)/hash/lrc_hash.c
 
       ifeq ($(HAVE_CDROM), 1)
          CFLAGS    += -DHAVE_CDROM

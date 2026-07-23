@@ -84,7 +84,18 @@ static void rtga_skip(rtga_context *s, int n)
 
 static int rtga_get16le(rtga_context *s)
 {
-   return rtga_get8(s) + (rtga_get8(s) << 8);
+   /* Sequenced explicitly.  Combining the two reads in one expression
+    * (rtga_get8(s) + (rtga_get8(s) << 8)) leaves no sequence point
+    * between them, so their order is unspecified: a compiler free to
+    * evaluate the high byte first swaps them, and since this reader
+    * supplies the frame's width and height a 320x240 image is decoded
+    * as 16385x61440 - reported as success, with the garbage dimensions
+    * then driving a multi-gigabyte allocation.  It works today only by
+    * the order GCC happens to pick; building with -fsanitize=undefined
+    * already flips it. */
+   int lo = rtga_get8(s);
+   int hi = rtga_get8(s);
+   return lo + (hi << 8);
 }
 
 static uint32_t *rtga_tga_load(rtga_context *s,
@@ -165,16 +176,26 @@ static uint32_t *rtga_tga_load(rtga_context *s,
 
    /* Bound the output allocation.  TGA dimensions are attacker-
     * controlled 16-bit values (max 65535), so their product is
-    * up to ~4.29 G pixels.  Pre-patch a 32-bit build could wrap
-    * (size_t)w * h * sizeof(uint32_t) to a small positive size_t
-    * and the per-pixel decode ran off the undersized malloc.
-    * Reject dimensions beyond a sane ceiling so the allocation
-    * never grows anywhere near wrap territory and hostile
-    * headers cannot drive the client into a multi-GiB malloc
-    * attempt.  0x4000 x 0x4000 = 1 GiB of decoded RGBA,
-    * comfortably larger than any real-world libretro asset. */
+    * up to ~4.29 G pixels and the decoded RGBA up to 16 GiB.
+    *
+    * On a 32-bit host that product wraps: (size_t)w * h * 4 for
+    * 65535x65535 truncates to a small positive size_t and the
+    * per-pixel decode then runs off the undersized malloc.  A
+    * ceiling is genuinely required there, and 0x4000 (1 GiB of
+    * decoded RGBA) keeps the allocation far from wrap territory
+    * while matching the cap rjpeg and rwebp apply on 32-bit.
+    *
+    * On a 64-bit host no wrap is possible - the full 16 GiB product
+    * fits size_t with room to spare - so the same constant would be
+    * pure policy, and "larger than any real-world asset" is not a
+    * safe assumption to make on a user's behalf: large scans and
+    * renders exist, and refusing them outright means no thumbnail at
+    * all.  Let the allocation decide instead; a request the host
+    * cannot satisfy fails at malloc and is handled below. */
+#if SIZE_MAX <= 0xFFFFFFFFu
    if (tga_width > 0x4000 || tga_height > 0x4000)
       return NULL;
+#endif
    output = (uint32_t*)malloc(
          (size_t)tga_width * (size_t)tga_height * sizeof(uint32_t));
    if (!output)

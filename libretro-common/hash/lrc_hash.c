@@ -1,7 +1,7 @@
 /* Copyright  (C) 2010-2020 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (rhash.c).
+ * The following license statement only applies to this file (lrc_hash.c).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -22,12 +22,22 @@
 
 #include <string.h>
 #include <stdio.h>
+
 #ifdef _WIN32
 #include <io.h>
 #else
 #include <unistd.h>
 #endif
-#include <rhash.h>
+
+#if defined(__SSE2__) || (defined(_MSC_VER) && (defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)))
+#ifdef _MSC_VER
+#include <intrin.h>
+#else
+#include <emmintrin.h>
+#endif
+#endif
+
+#include <lrc_hash.h>
 #include <retro_miscellaneous.h>
 #include <retro_endianness.h>
 #include <streams/file_stream.h>
@@ -123,13 +133,13 @@ static void sha256_block(struct sha256_ctx *p)
 }
 
 static void sha256_chunk(struct sha256_ctx *p,
-      const uint8_t *s, unsigned len)
+      const uint8_t *s, size_t len)
 {
    p->len += len;
 
    while (len)
    {
-      unsigned l = 64 - p->inlen;
+      size_t l   = 64 - p->inlen;
 
       if (len < l)
          l       = len;
@@ -179,7 +189,7 @@ static void sha256_subhash(struct sha256_ctx *p, uint32_t *t)
  *
  * Hashes SHA256 and outputs a human readable string.
  **/
-void sha256_hash(char *s, const uint8_t *in, size_t size)
+void sha256_hash(char *s, const uint8_t *in, size_t len)
 {
    unsigned i;
    struct sha256_ctx sha;
@@ -191,7 +201,7 @@ void sha256_hash(char *s, const uint8_t *in, size_t size)
    } shahash;
 
    sha256_init(&sha);
-   sha256_chunk(&sha, in, (unsigned)size);
+   sha256_chunk(&sha, in, len);
    sha256_final(&sha);
    sha256_subhash(&sha, shahash.u32);
 
@@ -252,11 +262,11 @@ uint32_t crc32_adjust(uint32_t checksum, uint8_t input)
    return ((checksum >> 8) & 0x00ffffff) ^ crc32_hash_table[(checksum ^ input) & 0xff];
 }
 
-uint32_t crc32_calculate(const uint8_t *data, size_t length)
+uint32_t crc32_calculate(const uint8_t *data, size_t len)
 {
    size_t i;
    uint32_t checksum = ~0;
-   for (i = 0; i < length; i++)
+   for (i = 0; i < len; i++)
       checksum = crc32_adjust(checksum, data[i]);
    return ~checksum;
 }
@@ -470,8 +480,10 @@ static void SHA1PadMessage(struct sha1_context *context)
    SHA1ProcessMessageBlock(context);
 }
 
-static int SHA1Result(struct sha1_context *context)
+static int SHA1Result(struct sha1_context *context, unsigned char digest[20])
 {
+   unsigned i;
+
    if (context->Corrupted)
       return 0;
 
@@ -481,14 +493,24 @@ static int SHA1Result(struct sha1_context *context)
       context->Computed = 1;
    }
 
+   if (digest)
+   {
+      /* Convert Message_Digest to byte array */
+      for (i = 0; i < 20; i++)
+      {
+         digest[i] = (unsigned char)
+            ((context->Message_Digest[i>>2] >> 8 * (3 - (i & 0x03))) & 0xFF);
+      }
+   }
+
    return 1;
 }
 
 static void SHA1Input(struct sha1_context *context,
       const unsigned char *message_array,
-      unsigned length)
+      unsigned len)
 {
-   if (!length)
+   if (!len)
       return;
 
    if (context->Computed || context->Corrupted)
@@ -497,7 +519,7 @@ static void SHA1Input(struct sha1_context *context,
       return;
    }
 
-   while (length-- && !context->Corrupted)
+   while (len-- && !context->Corrupted)
    {
       context->Message_Block[context->Message_Block_Index++] =
          (*message_array & 0xFF);
@@ -519,6 +541,21 @@ static void SHA1Input(struct sha1_context *context,
 
       message_array++;
    }
+}
+
+void SHA1Digest(const uint8_t* data, size_t len, uint8_t digest[20])
+{
+#ifdef __APPLE__
+   CC_SHA1(data, (CC_LONG)len, digest);
+#else
+   struct sha1_context sha;
+
+   SHA1Reset(&sha);
+   SHA1Input(&sha, data, len);
+
+   if (!SHA1Result(&sha, digest))
+      memset(digest, 0, 20);
+#endif
 }
 
 int sha1_calculate(const char *path, char *result)
@@ -546,7 +583,7 @@ int sha1_calculate(const char *path, char *result)
       SHA1Input(&sha, buff, rv);
    } while (rv);
 
-   if (!SHA1Result(&sha))
+   if (!SHA1Result(&sha, NULL))
       goto error;
 
    sprintf(result, "%08X%08X%08X%08X%08X",
@@ -564,13 +601,67 @@ error:
    return -1;
 }
 
+#if defined(__SSE2__) || (defined(_MSC_VER) && (defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)))
+
+#if _MSC_VER
+#define DJB2_ALIGN(x) __declspec(align(x))
+#else
+#define DJB2_ALIGN(x) __attribute__((aligned(x)))
+#endif
+
+static const DJB2_ALIGN(16) uint32_t DJB2_W8[8] = {
+   0xEC41D4E1, /* 33^7 */
+   0x4CFA3CC1, /* 33^6 */
+   0x025528A1, /* 33^5 */
+   0x00121881, /* 33^4 */
+   0x00008C61, /* 33^3 */
+   0x00000441, /* 33^2 */
+   0x00000021, /* 33^1 */
+   0x00000001, /* 33^0 */
+};
+#endif
+
 uint32_t djb2_calculate(const char *str)
 {
-   const unsigned char *aux = (const unsigned char*)str;
-   uint32_t            hash = 5381;
+   uint32_t h = 5381;
+   const unsigned char *p = (const unsigned char*)str;
+#if defined(__SSE2__) || (defined(_MSC_VER) && (defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)))
+   __m128i w_lo = _mm_load_si128((const __m128i *)&DJB2_W8[0]);
+   __m128i w_hi = _mm_load_si128((const __m128i *)&DJB2_W8[4]);
+   size_t len   = strlen((const char*)p);
+   const unsigned char *end8 = p + (len & ~(size_t)7);
 
-   while ( *aux )
-      hash = ( hash << 5 ) + hash + *aux++;
+   while (p < end8)
+   {
+      uint32_t sum = 0;
+      __m128i raw  = _mm_loadl_epi64((const __m128i *)p);
+      __m128i zero = _mm_setzero_si128();
+      __m128i b16  = _mm_unpacklo_epi8(raw, zero);
+      __m128i b_lo = _mm_unpacklo_epi16(b16, zero);
+      __m128i b_hi = _mm_unpackhi_epi16(b16, zero);
 
-   return hash;
+     /* _mm_mul_epu32 multiplies lanes 0,2 → 64-bit results.
+      * Shuffle to access lanes 1,3. */
+      __m128i p02_lo = _mm_mul_epu32(b_lo, w_lo);
+      __m128i p13_lo = _mm_mul_epu32(_mm_shuffle_epi32(b_lo, 0xF5),
+                                     _mm_shuffle_epi32(w_lo, 0xF5));
+      __m128i p02_hi = _mm_mul_epu32(b_hi, w_hi);
+      __m128i p13_hi = _mm_mul_epu32(_mm_shuffle_epi32(b_hi, 0xF5),
+                                     _mm_shuffle_epi32(w_hi, 0xF5));
+      sum += (uint32_t)_mm_cvtsi128_si32(p02_lo);
+      sum += (uint32_t)_mm_cvtsi128_si32(_mm_srli_si128(p02_lo, 8));
+      sum += (uint32_t)_mm_cvtsi128_si32(p13_lo);
+      sum += (uint32_t)_mm_cvtsi128_si32(_mm_srli_si128(p13_lo, 8));
+      sum += (uint32_t)_mm_cvtsi128_si32(p02_hi);
+      sum += (uint32_t)_mm_cvtsi128_si32(_mm_srli_si128(p02_hi, 8));
+      sum += (uint32_t)_mm_cvtsi128_si32(p13_hi);
+      sum += (uint32_t)_mm_cvtsi128_si32(_mm_srli_si128(p13_hi, 8));
+
+      h    = h * UINT32_C(0x747C7101) + sum;
+      p   += 8;
+    }
+#endif
+    while (*p)
+        h = (h << 5) + h + *p++;
+    return h;
 }

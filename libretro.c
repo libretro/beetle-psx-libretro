@@ -12,7 +12,7 @@
 #include <rthreads/rthreads.h>
 #include <streams/file_stream.h>
 #include <string/stdstring.h>
-#include <rhash.h>
+#include <lrc_hash.h>
 #include "rhi/rhi_intf.h"
 #include "libretro_cbs.h"
 #include "beetle_psx_globals.h"

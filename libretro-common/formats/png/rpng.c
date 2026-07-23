@@ -76,6 +76,9 @@ enum png_chunk_type
    PNG_CHUNK_IDAT,
    PNG_CHUNK_PLTE,
    PNG_CHUNK_tRNS,
+   PNG_CHUNK_cICP,
+   PNG_CHUNK_cLLI,
+   PNG_CHUNK_mDCV,
    PNG_CHUNK_IEND
 };
 
@@ -127,6 +130,7 @@ struct rpng_process
    unsigned pass_pos;
    uint8_t flags;
    bool supports_rgba;
+   bool want_10bit;
 };
 
 enum rpng_flags
@@ -135,19 +139,38 @@ enum rpng_flags
    RPNG_FLAG_HAS_IDAT = (1 << 1),
    RPNG_FLAG_HAS_IEND = (1 << 2),
    RPNG_FLAG_HAS_PLTE = (1 << 3),
-   RPNG_FLAG_HAS_TRNS = (1 << 4)
+   RPNG_FLAG_HAS_TRNS = (1 << 4),
+   RPNG_FLAG_HAS_HDR  = (1 << 5),
+   RPNG_FLAG_AVAIL_SET = (1 << 6)  /* rpng_set_avail called: frontier
+                                      is caller-driven, not whole-buffer */
 };
 
 struct rpng
 {
    struct rpng_process *process;
    uint8_t *buff_data;
+   uint8_t *buff_start;  /* fixed buffer base (buff_data advances)     */
    uint8_t *buff_end;
+   /* Resident frontier for prefix decoding: the chunk walk reads only
+    * bytes at or before avail_end, even when buff_end (the true file
+    * end, known from the file size) lies further ahead.  A chunk that
+    * extends past avail_end while more of the file is still to arrive
+    * sets need_more instead of ending the walk, so a caller feeding a
+    * growing buffer can retry.  Defaults to buff_end (whole buffer
+    * resident) when never set. */
+   uint8_t *avail_end;
+   bool     need_more;   /* last iterate stopped at the resident wall */
    struct idat_buffer idat_buf; /* ptr alignment */
    struct png_ihdr ihdr; /* uint32 alignment */
    uint32_t palette[256];
+   /* Populated from cICP / cLLI / mDCV when present (RPNG_FLAG_HAS_HDR). */
+   struct rpng_hdr_metadata hdr;
    uint8_t flags;
    bool supports_rgba;
+   /* When set and the source is 16-bit, decode to packed XRGB2101010
+    * (10-bit) instead of narrowing to 8-bit ARGB, so HDR PNGs can reach a
+    * 10-bit display path. Ignored for 8-bit sources. */
+   bool want_10bit;
 };
 
 static const struct adam7_pass rpng_passes[] = {
@@ -163,6 +186,11 @@ static const struct adam7_pass rpng_passes[] = {
 static INLINE uint32_t rpng_dword_be(const uint8_t *buf)
 {
    return (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | (buf[3] << 0);
+}
+
+static INLINE uint16_t rpng_word_be(const uint8_t *buf)
+{
+   return (uint16_t)((buf[0] << 8) | (buf[1] << 0));
 }
 
 /* ---------------------------------------------------------------------------
@@ -719,7 +747,7 @@ static bool rpng_process_ihdr(struct png_ihdr *ihdr)
 
 static void rpng_reverse_filter_copy_line_rgb(uint32_t *data,
       const uint8_t *decoded, unsigned width, unsigned bpp,
-      bool supports_rgba)
+      bool supports_rgba, bool want_10bit)
 {
    int i;
 
@@ -735,6 +763,25 @@ static void rpng_reverse_filter_copy_line_rgb(uint32_t *data,
       rpng_copy_line_rgb_sse2(data, decoded, width, supports_rgba);
       return;
 #endif
+   }
+
+   /* 16-bit source requested as 10-bit output: pack XRGB2101010
+    * (R in bits [29:20], G [19:10], B [9:0]) from the full 16-bit samples,
+    * scaled 16->10 bit by >> 6. Independent of supports_rgba: the packed
+    * layout is a fixed R-high ordering the 10-bit upload paths expect. */
+   if (want_10bit && bpp == 16)
+   {
+      for (i = 0; i < (int)width; i++, decoded += 6)
+      {
+         uint32_t r = (((uint32_t)decoded[0] << 8) | decoded[1]) >> 6;
+         uint32_t g = (((uint32_t)decoded[2] << 8) | decoded[3]) >> 6;
+         uint32_t b = (((uint32_t)decoded[4] << 8) | decoded[5]) >> 6;
+         /* Top 2 bits = alpha 3 (opaque), matching the video 10-bit blit;
+          * A2R10G10B10_UNORM samples these as alpha, so leaving them 0 would
+          * render the image fully transparent. */
+         data[i]    = (r << 20) | (g << 10) | b | 0xC0000000u;
+      }
+      return;
    }
 
    bpp /= 8;
@@ -1230,7 +1277,7 @@ static int rpng_reverse_filter_copy_line(uint32_t *data,
          break;
       case PNG_IHDR_COLOR_RGB:
          rpng_reverse_filter_copy_line_rgb(data, pngp->decoded_scanline, ihdr->width, ihdr->depth,
-               pngp->supports_rgba);
+               pngp->supports_rgba, pngp->want_10bit);
          break;
       case PNG_IHDR_COLOR_PLT:
          rpng_reverse_filter_copy_line_plt(
@@ -1435,15 +1482,54 @@ false_end:
    return -1;
 }
 
-/* Cap on the accumulated IDAT stream.  The IHDR check rejects
- * images whose decoded output would exceed 4 GiB, so any legitimate
- * IDAT stream will be well under this ceiling.  256 MiB of
- * compressed IDAT is far larger than any realistic libretro asset
- * and small enough that even on 32-bit the doubling loop below
- * cannot overflow.  Rejecting here closes off a decompression-bomb
- * path where a hostile PNG streams many large IDAT chunks to force
- * the intermediate buffer to grow arbitrarily. */
-#define RPNG_IDAT_MAX ((size_t)256 * 1024 * 1024)
+/* Ceiling on the accumulated IDAT stream.  The PNG specification sets
+ * no limit here: IDAT may repeat without bound and the accumulated
+ * compressed stream can legitimately be very large, so this is not a
+ * policy number - a 320 MiB screenshot or scan is a real file, not a
+ * hostile one.  What the arithmetic below genuinely needs is a value
+ * to subtract from so the running total, the per-chunk addition and
+ * the capacity doubling cannot overflow size_t.  Use the largest
+ * quantity that can actually be addressed: SIZE_MAX/2 leaves the
+ * doubling loop headroom (new_cap *= 2 stays representable) and still
+ * rejects only what malloc could never satisfy.
+ *
+ * The decompression-bomb concern the old, much lower cap also served
+ * is covered independently: the IHDR guards reject any image whose
+ * decoded output or intermediate inflate buffer would exceed 4 GiB, so
+ * an IDAT stream far larger than its declared geometry is refused at
+ * inflate time regardless of how much of it accumulated. */
+#define RPNG_IDAT_MAX ((size_t)-1 / 2)
+
+/* When the whole file is in the buffer (every in-tree caller: the
+ * task spine and the synchronous loader decode at completion), the
+ * compressed size is knowable before accumulating: walk the chunk
+ * headers from the first IDAT and sum them.  One exact allocation
+ * replaces the doubling - no copies during accumulation, no
+ * capacity overshoot held across the decode.  A walk that runs off
+ * the end (a truncated or genuinely streaming buffer) returns 0 and
+ * the doubling below stays the fallback. */
+static size_t rpng_idat_presize(const uint8_t *at, const uint8_t *end)
+{
+   size_t total = 0;
+   /* 'at' points at the length field of the first IDAT chunk;
+    * 'end' at the last byte of the input. */
+   while (at + 8 <= end + 1)
+   {
+      uint32_t len =   ((uint32_t)at[0] << 24) | ((uint32_t)at[1] << 16)
+                     | ((uint32_t)at[2] <<  8) |  (uint32_t)at[3];
+      if (len > RPNG_IDAT_MAX - total)
+         return 0;
+      if (!memcmp(at + 4, "IDAT", 4))
+         total += len;
+      else if (!memcmp(at + 4, "IEND", 4))
+         return total;
+      /* length + type + payload + CRC */
+      if ((size_t)(end + 1 - at) < (size_t)len + 12)
+         return 0;             /* truncated: fall back to doubling */
+      at += (size_t)len + 12;
+   }
+   return 0;
+}
 
 static bool rpng_realloc_idat(struct idat_buffer *buf, uint32_t chunk_size)
 {
@@ -1500,6 +1586,17 @@ static struct rpng_process *rpng_process_init(rpng_t *rpng)
       return NULL;
 
    process->stream_backend         = trans_stream_get_zlib_inflate_backend();
+
+   /* A build without an inflate backend (no HAVE_ZLIB) gets a stub
+    * whose members are NULL; without this check the call below jumps
+    * to address zero.  Such a build cannot decode a PNG at all, so
+    * fail the open honestly. */
+   if (   !process->stream_backend
+       || !process->stream_backend->stream_new)
+   {
+      free(process);
+      return NULL;
+   }
 
    rpng_pass_geom(&rpng->ihdr, rpng->ihdr.width,
          rpng->ihdr.height, NULL, NULL, &process->inflate_buf_size);
@@ -1577,6 +1674,12 @@ static enum png_chunk_type rpng_read_chunk_header(
       return PNG_CHUNK_PLTE;
    if (tag == 0x74524E53) /* "tRNS" */
       return PNG_CHUNK_tRNS;
+   if (tag == 0x63494350) /* "cICP" */
+      return PNG_CHUNK_cICP;
+   if (tag == 0x634C4C49) /* "cLLI" */
+      return PNG_CHUNK_cLLI;
+   if (tag == 0x6D444356) /* "mDCV" */
+      return PNG_CHUNK_mDCV;
 
    return PNG_CHUNK_NOOP;
 }
@@ -1587,15 +1690,34 @@ bool rpng_iterate_image(rpng_t *rpng)
    uint32_t chunk_size      = 0;
    size_t   remaining;
 
+   rpng->need_more = false;
+
    /* Check whether data buffer pointer is valid */
    if (buf > rpng->buff_end)
       return false;
 
-   /* Check whether reading the header will overflow
-    * the data buffer.  buff_end points at the LAST byte of the
-    * input, so bytes-remaining = (buff_end - buf) + 1. */
-   if ((size_t)(rpng->buff_end - buf) + 1 < 8)
+   /* The read cursor may have advanced past the resident frontier (the
+    * previous chunk ended near it): that is the wall, not EOF.  Guard
+    * before the size subtractions below, which are unsigned and would
+    * otherwise wrap to a huge "remaining" and wave a non-resident
+    * chunk through. */
+   if (buf > rpng->avail_end)
+   {
+      if (rpng->avail_end < rpng->buff_end)
+         rpng->need_more = true;
       return false;
+   }
+
+   /* The chunk header (length + type = 8 bytes) must lie within the
+    * resident frontier.  If it does not but more of the file is still
+    * to arrive, this is the resident wall, not a malformed header:
+    * flag need_more so the caller retries after feeding. */
+   if ((size_t)(rpng->avail_end - buf) + 1 < 8)
+   {
+      if (rpng->avail_end < rpng->buff_end)
+         rpng->need_more = true;
+      return false;
+   }
 
    chunk_size = rpng_dword_be(buf);
 
@@ -1610,10 +1732,27 @@ bool rpng_iterate_image(rpng_t *rpng)
     * check, letting the memcpy at the IDAT handler read ~4 GiB
     * past the end of the input).  Compare sizes instead of
     * pointers, and reject chunk_size that cannot possibly fit
-    * even before accounting for the type/CRC overhead. */
-   remaining = (size_t)(rpng->buff_end - buf) + 1;
+    * even before accounting for the type/CRC overhead.
+    *
+    * 'remaining' counts only RESIDENT bytes (to avail_end): a chunk
+    * whose body has not fully arrived yet is a wall, not an
+    * overflow.  A chunk that cannot fit within the TRUE end
+    * (buff_end) even when fully resident is genuinely malformed. */
+   remaining = (size_t)(rpng->avail_end - buf) + 1;
    if (chunk_size > remaining || remaining - chunk_size < 12)
+   {
+      /* Would the chunk fit if the rest of the file were resident?
+       * If so, we are only at the resident wall - ask for more. */
+      size_t true_remaining = (size_t)(rpng->buff_end - buf) + 1;
+      if (rpng->avail_end < rpng->buff_end
+            && chunk_size <= true_remaining
+            && true_remaining - chunk_size >= 12)
+      {
+         rpng->need_more = true;
+         return false;
+      }
       return false;
+   }
 
    switch (rpng_read_chunk_header(buf, chunk_size))
    {
@@ -1758,7 +1897,74 @@ bool rpng_iterate_image(rpng_t *rpng)
          rpng->flags         |= RPNG_FLAG_HAS_TRNS;
          break;
 
+      case PNG_CHUNK_cICP:
+         /* Coding-independent code points: 4-byte payload
+          * (primaries, transfer, matrix, full-range flag). Must
+          * precede IDAT. Ignore malformed sizes rather than failing
+          * the whole decode over an ancillary chunk. */
+         if (!(rpng->flags & RPNG_FLAG_HAS_IDAT) && chunk_size == 4)
+         {
+            buf += 8;
+            rpng->hdr.colour_primaries      = buf[0];
+            rpng->hdr.transfer_function     = buf[1];
+            rpng->hdr.matrix_coefficients   = buf[2];
+            rpng->hdr.video_full_range_flag = buf[3];
+            rpng->flags |= RPNG_FLAG_HAS_HDR;
+         }
+         break;
+
+      case PNG_CHUNK_cLLI:
+         /* Content light level: MaxCLL, MaxFALL as 4-byte unsigned
+          * integers in units of 0.0001 cd/m^2. */
+         if (!(rpng->flags & RPNG_FLAG_HAS_IDAT) && chunk_size == 8)
+         {
+            buf += 8;
+            rpng->hdr.max_cll  = (float)rpng_dword_be(buf + 0) / 10000.0f;
+            rpng->hdr.max_fall = (float)rpng_dword_be(buf + 4) / 10000.0f;
+            rpng->flags |= RPNG_FLAG_HAS_HDR;
+         }
+         break;
+
+      case PNG_CHUNK_mDCV:
+         /* Mastering display colour volume: R,G,B then white
+          * chromaticity pairs (2-byte, units of 0.00002), then max
+          * and min luminance (4-byte, units of 0.0001 cd/m^2). */
+         if (!(rpng->flags & RPNG_FLAG_HAS_IDAT) && chunk_size == 24)
+         {
+            int c;
+            buf += 8;
+            for (c = 0; c < 3; c++)
+            {
+               rpng->hdr.primary_chromaticity[c][0] =
+                  (float)rpng_word_be(buf + c * 4 + 0) / 50000.0f;
+               rpng->hdr.primary_chromaticity[c][1] =
+                  (float)rpng_word_be(buf + c * 4 + 2) / 50000.0f;
+            }
+            rpng->hdr.white_point[0] = (float)rpng_word_be(buf + 12) / 50000.0f;
+            rpng->hdr.white_point[1] = (float)rpng_word_be(buf + 14) / 50000.0f;
+            rpng->hdr.max_luminance  = (float)rpng_dword_be(buf + 16) / 10000.0f;
+            rpng->hdr.min_luminance  = (float)rpng_dword_be(buf + 20) / 10000.0f;
+            rpng->hdr.write_mdcv     = 1;
+            rpng->flags |= RPNG_FLAG_HAS_HDR;
+         }
+         break;
+
       case PNG_CHUNK_IDAT:
+         if (!rpng->idat_buf.data && !rpng->idat_buf.capacity)
+         {
+            /* Scan only resident bytes: on a partial buffer the IDAT
+             * run past avail_end has not arrived, and presize reads
+             * chunk headers forward.  It already returns 0 (fall back
+             * to realloc doubling) on truncation, so a prefix simply
+             * gets the incremental path until the buffer completes. */
+            size_t exact = rpng_idat_presize(buf, rpng->avail_end);
+            if (exact)
+            {
+               if (!(rpng->idat_buf.data = (uint8_t*)malloc(exact)))
+                  return false;
+               rpng->idat_buf.capacity = exact;
+            }
+         }
          if (     !(rpng->flags & RPNG_FLAG_HAS_IHDR)
                ||  (rpng->flags & RPNG_FLAG_HAS_IEND)
                ||  (rpng->ihdr.color_type == PNG_IHDR_COLOR_PLT
@@ -1836,6 +2042,7 @@ int rpng_process_image(rpng_t *rpng,
 
       rpng->process = process;
       rpng->process->supports_rgba = supports_rgba;
+      rpng->process->want_10bit    = rpng->want_10bit;
       return IMAGE_PROCESS_NEXT;
    }
 
@@ -1910,6 +2117,25 @@ bool rpng_start(rpng_t *rpng)
    return true;
 }
 
+/* Prefix early-start gate: return true once the resident bytes contain
+ * the 8-byte signature and the whole IHDR chunk, so the chunk walk can
+ * begin (it parses IHDR before anything else, then gathers IDAT with
+ * per-chunk need_more waits as the read progresses).  IHDR is a fixed
+ * 13-byte payload: signature (8) + length (4) + "IHDR" (4) + data (13)
+ * + CRC (4) = 33 bytes.  No allocation, no decode. */
+bool rpng_header_ready(const uint8_t *data, size_t len)
+{
+   if (!data || len < 33)
+      return false;
+   if (memcmp(data, png_magic, sizeof(png_magic)) != 0)
+      return false;
+   /* Bytes 12..15 are the chunk type of the first chunk after the
+    * signature; per spec it must be IHDR. */
+   if (memcmp(data + 12, "IHDR", 4) != 0)
+      return false;
+   return true;
+}
+
 /**
  * rpng_is_valid:
  *
@@ -1929,15 +2155,98 @@ bool rpng_is_valid(rpng_t *rpng)
    return (rpng && ((rpng->flags & valid_mask) == valid_mask));
 }
 
+bool rpng_get_hdr_metadata(rpng_t *rpng, struct rpng_hdr_metadata *out)
+{
+   if (!rpng || !out || !(rpng->flags & RPNG_FLAG_HAS_HDR))
+      return false;
+   *out = rpng->hdr;
+   return true;
+}
+
+void rpng_set_want_10bit(rpng_t *rpng, int want)
+{
+   if (rpng)
+      rpng->want_10bit = (want != 0);
+}
+
+bool rpng_is_10bit(const rpng_t *rpng)
+{
+   /* True only when 10-bit output was requested and the source is a 16-bit
+    * RGB image, i.e. the decode actually produced packed XRGB2101010. Only
+    * the RGB (colour type 2) path packs 10-bit; 16-bit RGBA still narrows to
+    * 8-bit, so it must not report 10-bit here. */
+   return rpng
+      && rpng->want_10bit
+      && (rpng->flags & RPNG_FLAG_HAS_IHDR)
+      && rpng->ihdr.depth == 16
+      && rpng->ihdr.color_type == PNG_IHDR_COLOR_RGB;
+}
+
 bool rpng_set_buf_ptr(rpng_t *rpng, void *data, size_t len)
 {
    if (!rpng || (len < 1))
       return false;
 
    rpng->buff_data = (uint8_t*)data;
+   rpng->buff_start = rpng->buff_data;
    rpng->buff_end  = rpng->buff_data + (len - 1);
+   /* Default: the whole buffer is resident.  A prefix-feeding caller
+    * lowers the frontier with rpng_set_avail after this. */
+   rpng->avail_end = rpng->buff_end;
+   rpng->need_more = false;
 
    return true;
+}
+
+/* Prefix decoding: declare how many bytes from buff_data are actually
+ * resident.  'avail' is a byte count; the frontier is clamped to the
+ * true buffer end and only ever advances.  While the frontier is below
+ * buff_end, rpng_iterate_image treats a chunk that reaches past it as
+ * "need more" (rpng_need_more() returns true) rather than end-of-file,
+ * so a caller feeding a growing read can retry.  With avail == full
+ * length (the default) the walk is exactly the classic whole-buffer
+ * one. */
+void rpng_set_avail(rpng_t *rpng, size_t avail)
+{
+   uint8_t *front;
+   size_t   full;
+   if (!rpng || !rpng->buff_start || !rpng->buff_end)
+      return;
+   /* Clamp in the size domain first: a caller signalling "whole buffer
+    * resident" passes (size_t)-1, and buff_start + (avail - 1) would
+    * overflow the pointer (UB) before the buff_end clamp below could
+    * catch it.  full = total length = (buff_end - buff_start) + 1. */
+   full = (size_t)(rpng->buff_end - rpng->buff_start) + 1;
+   if (avail > full)
+      avail = full;
+   if (avail == 0)   /* nothing resident yet: keep the frontier unset */
+      return;
+   /* Anchor on buff_start (the fixed buffer base captured at
+    * set_buf_ptr): buff_data advances as chunks are consumed, so
+    * deriving the frontier from it would place the wall 'avail' bytes
+    * past the CURSOR instead of past the start. */
+   front = rpng->buff_start + avail - 1;
+   if (front > rpng->buff_end)
+      front = rpng->buff_end;
+   /* The default frontier is the whole buffer (for callers that never
+    * feed a prefix).  The first set_avail switches to caller-driven
+    * mode and sets the frontier absolutely - it is lower than the
+    * default - after which it is strictly monotonic. */
+   if (!(rpng->flags & RPNG_FLAG_AVAIL_SET))
+   {
+      rpng->flags    |= RPNG_FLAG_AVAIL_SET;
+      rpng->avail_end = front;
+   }
+   else if (front > rpng->avail_end)
+      rpng->avail_end = front;
+}
+
+/* True when the last rpng_iterate_image stopped because a chunk lay
+ * past the resident frontier (not EOF, not malformed): raise the
+ * frontier with rpng_set_avail and iterate again. */
+bool rpng_need_more(const rpng_t *rpng)
+{
+   return rpng ? rpng->need_more : false;
 }
 
 rpng_t *rpng_alloc(void)
