@@ -31,44 +31,69 @@ bool cdstream_open(cdstream *out, const char *path)
    return out->fp != NULL;
 }
 
+/* Fill a prefix transfer to the end of the file.  Returns the transfer
+ * with its full-length buffer on success (complete, non-empty), NULL
+ * otherwise.  The transfer's buffer has the whole file at a stable
+ * base: address space is reserved up front and pages are committed as
+ * the fill advances, so there is no up-front allocation spike for
+ * large track images, and a short read (I/O error, file shrank) is
+ * reported as failure rather than a silently truncated buffer. */
+static data_transfer_t *cdstream_slurp_dt(const char *path,
+      const uint8_t **out_base, uint64_t *out_len)
+{
+   size_t           len = 0;
+   const uint8_t   *base;
+   data_transfer_t *dt = data_transfer_open_prefix(path, 0);
+
+   if (!dt)
+      return NULL;
+
+   /* Budget 0 = fill to the end; loop defensively in case the
+    * backend chunks anyway. */
+   while (!data_transfer_complete(dt) && !data_transfer_failed(dt))
+      data_transfer_iterate(dt, 0);
+
+   base = data_transfer_ptr(dt, &len);
+
+   /* A zero-length file is "open and empty", not success: the
+    * historical MemoryStream path reported is_valid=false for an
+    * empty source, making callers treat zero-byte files as "could
+    * not load".  Preserve that behaviour. */
+   if (!data_transfer_complete(dt) || !base || len == 0)
+   {
+      data_transfer_free(dt);
+      return NULL;
+   }
+
+   *out_base = base;
+   *out_len  = (uint64_t)len;
+   return dt;
+}
+
 bool cdstream_open_memcached(cdstream *out, const char *path)
 {
-   void   *buf = NULL;
-   int64_t len = 0;
+   const uint8_t *base = NULL;
+   uint64_t       len  = 0;
 
    memset(out, 0, sizeof(*out));
 
-   /* filestream_read_file returns non-zero on success and allocates
-    * buf with malloc; we own it from this point on. */
-   if (!filestream_read_file(path, &buf, &len) || !buf)
-   {
-      if (buf)
-         free(buf);
+   out->dt = cdstream_slurp_dt(path, &base, &len);
+   if (!out->dt)
       return false;
-   }
 
-   /* Defensive: a zero-length file is "open and empty", not failure.
-    * The historical MemoryStream path treated an empty source as a
-    * NULL buffer with size 0 and reported is_valid=false, which made
-    * the caller treat zero-byte files as "could not load".  Preserve
-    * that behaviour to avoid surprising any existing call site. */
-   if (len <= 0)
-   {
-      free(buf);
-      return false;
-   }
-
-   out->buf  = (uint8_t *)buf;
-   out->size = (uint64_t)len;
+   out->buf  = (uint8_t *)base;
+   out->size = len;
    out->pos  = 0;
    return true;
 }
 
 bool cdstream_memcache_in_place(cdstream *src)
 {
-   uint64_t size;
-   uint64_t got;
-   uint8_t *buf;
+   const uint8_t *base = NULL;
+   uint64_t       len  = 0;
+   int64_t        cur;
+   const char    *path;
+   data_transfer_t *dt;
 
    if (!src->fp)
    {
@@ -76,51 +101,34 @@ bool cdstream_memcache_in_place(cdstream *src)
       return src->buf != NULL;
    }
 
-   /* Read from current position, matching MemoryStream's historical
-    * behaviour (the libretro core only ever called this at pos 0, so
-    * the "preserve source position" branch never mattered, but the
-    * resulting buffer represented "the rest of the file from here"). */
-   {
-      int64_t sz   = filestream_get_size(src->fp);
-      int64_t cur  = filestream_tell(src->fp);
-      if (sz < 0 || cur < 0 || cur > sz)
-      {
-         cdstream_close(src);
-         return false;
-      }
-      size = (uint64_t)(sz - cur);
-   }
-
-   if (size == 0)
+   /* The transfer reads the whole file from its path; the view we
+    * expose starts at the stream's current position, matching
+    * MemoryStream's historical "rest of the file from here"
+    * behaviour (callers only ever invoke this at pos 0). */
+   cur  = filestream_tell(src->fp);
+   path = filestream_get_path(src->fp);
+   if (cur < 0 || !path || !*path)
    {
       cdstream_close(src);
       return false;
    }
 
-   buf = (uint8_t *)malloc((size_t)size);
-   if (!buf)
+   dt = cdstream_slurp_dt(path, &base, &len);
+   if (!dt || (uint64_t)cur >= len)
    {
-      MDFN_Error(0, "cdstream: out of memory (%llu bytes)",
-            (unsigned long long)size);
-      cdstream_close(src);
-      return false;
-   }
-
-   got = (uint64_t)filestream_read(src->fp, buf, (int64_t)size);
-   if (got != size)
-   {
-      MDFN_Error(0, "cdstream: short read (%llu of %llu)",
-            (unsigned long long)got,
-            (unsigned long long)size);
-      free(buf);
+      /* Missing, empty, unreadable, or already at/past EOF - all of
+       * which the historical path reported as failure. */
+      if (dt)
+         data_transfer_free(dt);
       cdstream_close(src);
       return false;
    }
 
    filestream_close(src->fp);
    src->fp   = NULL;
-   src->buf  = buf;
-   src->size = size;
+   src->dt   = dt;
+   src->buf  = (uint8_t *)base + cur;
+   src->size = len - (uint64_t)cur;
    src->pos  = 0;
    return true;
 }

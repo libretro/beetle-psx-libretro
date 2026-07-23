@@ -27,6 +27,7 @@
 #include <streams/file_stream.h>
 
 #include "mednafen.h"
+#include <formats/data_transfer.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,7 +58,12 @@ extern "C" {
 typedef struct cdstream
 {
    RFILE   *fp;     /* file-backed: libretro-common RFILE handle */
-   uint8_t *buf;    /* memory-backed: owned buffer, freed on close */
+   uint8_t *buf;    /* memory-backed: view of the stream's bytes */
+   struct data_transfer *dt; /* when non-NULL, owns the memory buf
+                              * points into (a completed prefix
+                              * transfer); freed on close.  When NULL
+                              * and buf is set, buf is a plain owned
+                              * malloc. */
    uint64_t size;   /* memory-backed: buffer size in bytes */
    int64_t  pos;    /* memory-backed: current read position */
 } cdstream;
@@ -180,6 +186,13 @@ static INLINE void cdstream_close(cdstream *s)
    {
       filestream_close(s->fp);
       s->fp = NULL;
+   }
+   if (s->dt)
+   {
+      /* The transfer owns the memory buf points into. */
+      data_transfer_free(s->dt);
+      s->dt  = NULL;
+      s->buf = NULL;
    }
    if (s->buf)
    {

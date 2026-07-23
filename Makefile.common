@@ -51,16 +51,11 @@ IMAGE_FORMAT_SOURCES_C = \
 		 $(LIBRETRO_COMM_DIR)/streams/trans_stream.c \
 		 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c \
 		 $(LIBRETRO_COMM_DIR)/streams/trans_stream_deflate.c \
-		 $(LIBRETRO_COMM_DIR)/formats/data_transfer.c \
 		 $(LIBRETRO_COMM_DIR)/streams/interface_stream.c \
 		 $(LIBRETRO_COMM_DIR)/streams/memory_stream.c \
 		 $(LIBRETRO_COMM_DIR)/streams/rzip_stream.c \
 		 $(LIBRETRO_COMM_DIR)/streams/chd_stream.c \
-		 $(LIBRETRO_COMM_DIR)/encodings/encoding_crc32.c \
-		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_intf.c \
-		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_stdio.c \
-		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_windowsmmap.c \
-		 $(LIBRETRO_COMM_DIR)/file/nbio/nbio_unixmmap.c
+		 $(LIBRETRO_COMM_DIR)/encodings/encoding_crc32.c
 
 IMAGE_FORMAT_FLAGS = -DHAVE_RPNG -DHAVE_RJPEG -DHAVE_RBMP -DHAVE_RTGA \
 		 -DHAVE_RWEBP -DHAVE_RDDS
@@ -312,7 +307,12 @@ endif
                      $(LIBRETRO_COMM_DIR)/encodings/encoding_utf.c \
                      $(LIBRETRO_COMM_DIR)/memmap/memalign.c \
                      $(LIBRETRO_COMM_DIR)/time/rtime.c \
-                     $(LIBRETRO_COMM_DIR)/hash/lrc_hash.c
+                     $(LIBRETRO_COMM_DIR)/hash/lrc_hash.c \
+                     $(LIBRETRO_COMM_DIR)/formats/data_transfer.c \
+                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_intf.c \
+                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_stdio.c \
+                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_windowsmmap.c \
+                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_unixmmap.c
 
       ifeq ($(HAVE_CDROM), 1)
          CFLAGS    += -DHAVE_CDROM

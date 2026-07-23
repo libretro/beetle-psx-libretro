@@ -13,6 +13,7 @@
 #include <streams/file_stream.h>
 #include <string/stdstring.h>
 #include <lrc_hash.h>
+#include <formats/data_transfer.h>
 #include "rhi/rhi_intf.h"
 #include "libretro_cbs.h"
 #include "beetle_psx_globals.h"
@@ -3281,21 +3282,14 @@ static bool LoadEXE(const uint8_t *data, const uint32_t size, bool ignore_pcsp)
    return true;
 }
 
-/* Load a raw PS-X EXE. The previous version had two leaks:
- *   - malloc()'d a buffer, then immediately overwrote the pointer with
- *     filestream_read_file(), which allocates its own buffer. The
- *     original malloc was leaked unconditionally.
- *   - On LoadEXE failure, the function returned without freeing the
- *     read buffer or undoing InitCommon's allocations - and the
- *     frontend never calls retro_unload_game when retro_load_game
- *     fails, so those allocations would leak for the rest of the
- *     core's lifetime. */
+/* Load a raw PS-X EXE through a data_transfer prefix read: the whole
+ * file arrives at a stable base with pages committed as the fill
+ * advances, and a short read (I/O error, truncated file) reports as
+ * failure instead of a silently short buffer. */
 static int Load(const char *name, RFILE *fp)
 {
    int64_t size     = filestream_get_size(fp);
    char image_label[4096];
-   void   *header   = NULL;
-   int64_t len      = 0;
 
    image_label[0] = '\0';
 
@@ -3311,23 +3305,34 @@ static int Load(const char *name, RFILE *fp)
 
    if (size >= 0x800)
    {
-      /* filestream_read_file allocates its own buffer; the previous
-       * malloc-then-overwrite pattern leaked the malloc. */
-      if (filestream_read_file(name, &header, &len) == 0 || !header)
+      data_transfer_t *dt = data_transfer_open_prefix(name, 0);
+
+      if (dt)
+      {
+         while (!data_transfer_complete(dt) && !data_transfer_failed(dt))
+            data_transfer_iterate(dt, 0);
+      }
+      if (!dt || !data_transfer_complete(dt))
       {
          MDFN_Error(0, "Failed to read \"%s\"", name);
+         data_transfer_free(dt);
          Cleanup();
          return -1;
       }
 
-      if (!LoadEXE((const uint8_t *)header, (uint32_t)len, false))
       {
-         free(header);
-         Cleanup();
-         return -1;
+         size_t         dt_len = 0;
+         const uint8_t *data   = data_transfer_ptr(dt, &dt_len);
+
+         if (!data || !LoadEXE(data, (uint32_t)dt_len, false))
+         {
+            data_transfer_free(dt);
+            Cleanup();
+            return -1;
+         }
       }
 
-      free(header);
+      data_transfer_free(dt);
    }
 
    sv_push(&disk_control_ext_info.image_paths, name);
