@@ -8,12 +8,11 @@ CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
 
 LIBCHDR_INCFLAGS = \
-                     -I$(DEPS_DIR)/lzma-25.01/include \
                      -I$(DEPS_DIR)/zstd-1.5.7
 
 LIBCHDR_SOURCES_C = \
-                     $(DEPS_DIR)/lzma-25.01/src/LzmaDec.c \
                      $(DEPS_DIR)/zstd-1.5.7/zstddeclib.c \
+                     $(LIBRETRO_COMM_DIR)/formats/7z/r7z_lzma.c \
                      $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_bitstream.c \
                      $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_cdrom.c \
                      $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_chd.c \
@@ -130,10 +129,10 @@ endif
 ifeq ($(HAVE_CHD), 1)
    # CHD hunk codecs: zlib-format hunks decode through libretro-common's
    # clean-room DEFLATE codec (CHD_USE_BUILTIN_DEFLATE), FLAC hunks
-   # through the clean-room rflac decoder (HAVE_RFLAC), LZMA through a
-   # decode-only LzmaDec (the props derivation that needed the encoder
-   # is computed arithmetically), zstd through the single-file
-   # decode-only zstddeclib.
+   # through the clean-room rflac decoder (HAVE_RFLAC), LZMA through
+   # the clean-room r7z_lzma decoder (no LZMA SDK at all; the decoder
+   # state is inline and the hunk buffer doubles as the dictionary
+   # window), zstd through the single-file decode-only zstddeclib.
    FLAGS += -DHAVE_CHD -DCHD_USE_BUILTIN_DEFLATE -DHAVE_RFLAC -DHAVE_7ZIP -DHAVE_ZSTD
 
    ifeq ($(SYSTEM_LIBCHDR), 1)
@@ -301,6 +300,7 @@ endif
                      $(LIBRETRO_COMM_DIR)/time/rtime.c \
                      $(LIBRETRO_COMM_DIR)/hash/lrc_hash.c \
                      $(LIBRETRO_COMM_DIR)/formats/data_transfer.c \
+                     $(LIBRETRO_COMM_DIR)/memmap/memmap.c \
                      $(LIBRETRO_COMM_DIR)/file/nbio/nbio_intf.c \
                      $(LIBRETRO_COMM_DIR)/file/nbio/nbio_stdio.c \
                      $(LIBRETRO_COMM_DIR)/file/nbio/nbio_windowsmmap.c \
@@ -367,7 +367,6 @@ ifeq ($(HAVE_LIGHTREC), 1)
    endif
 
    ifneq (,$(findstring win,$(platform)))
-      SOURCES_C +=   $(DEPS_DIR)/mman/sys/mman.c
    endif
 
 endif ##ifeq ($(HAVE_LIGHTREC), 1)

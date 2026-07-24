@@ -14,32 +14,12 @@ GitHub: https://github.com/mackron/dr_libs
 extern "C" {
 #endif
 
-#define RFLAC_STRINGIFY(x)      #x
-#define RFLAC_XSTRINGIFY(x)     RFLAC_STRINGIFY(x)
-
-#define RFLAC_VERSION_MAJOR     0
-#define RFLAC_VERSION_MINOR     12
-#define RFLAC_VERSION_REVISION  42
-#define RFLAC_VERSION_STRING    RFLAC_XSTRINGIFY(RFLAC_VERSION_MAJOR) "." RFLAC_XSTRINGIFY(RFLAC_VERSION_MINOR) "." RFLAC_XSTRINGIFY(RFLAC_VERSION_REVISION)
-
 #include <stddef.h> /* For size_t. */
-
 /* Fixed-width integer types come straight from <stdint.h> rather than a
  * private set of aliases. RetroArch guarantees stdint on every target
  * (via its compat shim for legacy MSVC), so no fallback typedefs are
  * needed here. */
 #include <stdint.h>
-
-#define RFLAC_TRUE             1
-#define RFLAC_FALSE            0
-
-/* Decorations */
-#if !defined(RFLAC_API)
-#define RFLAC_API extern
-#define RFLAC_PRIVATE static
-#endif
-/* End Decorations */
-
 
 /*
 As data is read from the client it is placed into an internal buffer for fast access. This controls the size of that buffer. Larger values means more speed,
@@ -48,7 +28,6 @@ but also more memory. In my testing there is diminishing returns after about 4KB
 #ifndef RFLAC_BUFFER_SIZE
 #define RFLAC_BUFFER_SIZE   4096
 #endif
-
 
 /* Architecture Detection */
 #if defined(_WIN64) || defined(_LP64) || defined(__LP64__)
@@ -77,35 +56,6 @@ but also more memory. In my testing there is diminishing returns after about 4KB
 #define RFLAC_METADATA_BLOCK_TYPE_PICTURE          6
 #define RFLAC_METADATA_BLOCK_TYPE_INVALID          127
 
-/* The various picture types specified in the PICTURE block. */
-#define RFLAC_PICTURE_TYPE_OTHER                   0
-#define RFLAC_PICTURE_TYPE_FILE_ICON               1
-#define RFLAC_PICTURE_TYPE_OTHER_FILE_ICON         2
-#define RFLAC_PICTURE_TYPE_COVER_FRONT             3
-#define RFLAC_PICTURE_TYPE_COVER_BACK              4
-#define RFLAC_PICTURE_TYPE_LEAFLET_PAGE            5
-#define RFLAC_PICTURE_TYPE_MEDIA                   6
-#define RFLAC_PICTURE_TYPE_LEAD_ARTIST             7
-#define RFLAC_PICTURE_TYPE_ARTIST                  8
-#define RFLAC_PICTURE_TYPE_CONDUCTOR               9
-#define RFLAC_PICTURE_TYPE_BAND                    10
-#define RFLAC_PICTURE_TYPE_COMPOSER                11
-#define RFLAC_PICTURE_TYPE_LYRICIST                12
-#define RFLAC_PICTURE_TYPE_RECORDING_LOCATION      13
-#define RFLAC_PICTURE_TYPE_DURING_RECORDING        14
-#define RFLAC_PICTURE_TYPE_DURING_PERFORMANCE      15
-#define RFLAC_PICTURE_TYPE_SCREEN_CAPTURE          16
-#define RFLAC_PICTURE_TYPE_BRIGHT_COLORED_FISH     17
-#define RFLAC_PICTURE_TYPE_ILLUSTRATION            18
-#define RFLAC_PICTURE_TYPE_BAND_LOGOTYPE           19
-#define RFLAC_PICTURE_TYPE_PUBLISHER_LOGOTYPE      20
-
-typedef enum
-{
-    rflac_container_native,
-    rflac_container_ogg,
-    rflac_container_unknown
-} rflac_container;
 
 typedef enum
 {
@@ -155,11 +105,6 @@ typedef struct
     union
     {
         rflac_streaminfo streaminfo;
-
-        struct
-        {
-            int unused;
-        } padding;
 
         struct
         {
@@ -216,7 +161,7 @@ Callback for when data needs to be read from the client.
 Parameters
 ----------
 pUserData (in)
-    The user data that was passed to rflac_open() and family.
+    The user data that was passed to rflac_open_memory() and family.
 
 pBufferOut (out)
     The output buffer.
@@ -244,7 +189,7 @@ Callback for when data needs to be seeked.
 Parameters
 ----------
 pUserData (in)
-    The user data that was passed to rflac_open() and family.
+    The user data that was passed to rflac_open_memory() and family.
 
 offset (in)
     The number of bytes to move, relative to the origin. Will never be negative.
@@ -264,7 +209,7 @@ The offset will never be negative. Whether or not it is relative to the beginnin
 either rflac_seek_origin_start or rflac_seek_origin_current.
 
 When seeking to a PCM frame using rflac_seek_to_pcm_frame(), rflac may call this with an offset beyond the end of the FLAC stream. This needs to be detected
-and handled by returning RFLAC_FALSE.
+and handled by returning 0.
 */
 typedef uint32_t (* rflac_seek_proc)(void* pUserData, int offset, rflac_seek_origin origin);
 
@@ -275,7 +220,7 @@ Callback for when a metadata block is read.
 Parameters
 ----------
 pUserData (in)
-    The user data that was passed to rflac_open() and family.
+    The user data that was passed to rflac_open_memory() and family.
 
 pMetadata (in)
     A pointer to a structure containing the data of the metadata block.
@@ -436,9 +381,6 @@ typedef struct
     uint64_t totalPCMFrameCount;
 
 
-    /* The container type. This is set based on whether or not the decoder was opened from a native or Ogg stream. */
-    rflac_container container;
-
     /* The number of seekpoints in the seektable. */
     uint32_t seekpointCount;
 
@@ -461,16 +403,18 @@ typedef struct
     /* A pointer to the decoded sample data. This is an offset of pExtraData. */
     int32_t* pDecodedSamples;
 
+    /* 64-bit plane for the 33-bit stereo difference channel of 32-bit
+     * streams; NULL otherwise. This is an offset of pExtraData. */
+    int64_t* pWideSamples;
+
+    /* Subframe index of the wide (33-bit) channel in the current frame, or
+     * 0xFF when the current frame has none. */
+    uint8_t wideChannelIndex;
+
     /* A pointer to the seek table. This is an offset of pExtraData, or NULL if there is no seek table. */
     rflac_seekpoint* pSeekpoints;
 
-    /* Internal use only. Only used with Ogg containers. Points to a rflac_oggbs object. This is an offset of pExtraData. */
-    void* _oggbs;
-
     /* Internal use only. Used for profiling and testing different seeking modes. */
-    uint32_t _noSeekTableSeek    : 1;
-    uint32_t _noBinarySearchSeek : 1;
-    uint32_t _noBruteForceSeek   : 1;
 
     /* The bit streamer. The raw FLAC data is fed through this object. */
     rflac_bs bs;
@@ -480,49 +424,6 @@ typedef struct
 } rflac;
 
 
-/*
-Opens a FLAC decoder.
-
-
-Parameters
-----------
-onRead (in)
-    The function to call when data needs to be read from the client.
-
-onSeek (in)
-    The function to call when the read position of the client data needs to move.
-
-pUserData (in, optional)
-    A pointer to application defined data that will be passed to onRead and onSeek.
-
-
-Return Value
-------------
-Returns a pointer to an object representing the decoder.
-
-
-Remarks
--------
-Close the decoder with `rflac_close()`.
-
-
-This function will automatically detect whether or not you are attempting to open a native or Ogg encapsulated FLAC, both of which should work seamlessly
-without any manual intervention. Ogg encapsulation also works with multiplexed streams which basically means it can play FLAC encoded audio tracks in videos.
-
-This is the lowest level function for opening a FLAC stream. You can also use `rflac_open_memory()` to open the stream from a block of memory.
-
-The STREAMINFO block must be present for this to succeed.
-
-Use `rflac_open_with_metadata()` if you need access to metadata.
-
-
-Seek Also
----------
-rflac_open_memory()
-rflac_open_with_metadata()
-rflac_close()
-*/
-RFLAC_API rflac* rflac_open(rflac_read_proc onRead, rflac_seek_proc onSeek, void* pUserData);
 
 /*
 Opens a FLAC decoder and notifies the caller of the metadata chunks (album art, etc.).
@@ -553,7 +454,7 @@ Remarks
 Close the decoder with `rflac_close()`.
 
 
-This is slower than `rflac_open()`, so avoid this one if you don't need metadata. Internally, this will allocate and free memory on the heap for every
+Internally, this will allocate and free memory on the heap for every
 metadata block except for STREAMINFO and PADDING blocks.
 
 The caller is notified of the metadata via the `onMeta` callback. All metadata blocks will be handled before the function returns. This callback takes a
@@ -562,18 +463,13 @@ the different metadata types.
 
 The STREAMINFO block must be present for this to succeed.
 
-Note that this will behave inconsistently with `rflac_open()` if the stream is an Ogg encapsulated stream and a metadata block is corrupted. This is due to
-the way the Ogg stream recovers from corrupted pages. When `rflac_open_with_metadata()` is being used, the open routine will try to read the contents of the
-metadata block, whereas `rflac_open()` will simply seek past it (for the sake of efficiency). This inconsistency can result in different samples being
-returned depending on whether or not the stream is being opened with metadata.
-
 
 Seek Also
 ---------
-rflac_open()
+rflac_open_memory()
 rflac_close()
 */
-RFLAC_API rflac* rflac_open_with_metadata(rflac_read_proc onRead, rflac_seek_proc onSeek, rflac_meta_proc onMeta, void* pUserData);
+rflac* rflac_open_with_metadata(rflac_read_proc onRead, rflac_seek_proc onSeek, rflac_meta_proc onMeta, void* pUserData);
 
 /*
 Closes the given FLAC decoder.
@@ -592,11 +488,10 @@ This will destroy the decoder object.
 
 See Also
 --------
-rflac_open()
-rflac_open_with_metadata()
 rflac_open_memory()
+rflac_open_with_metadata()
 */
-RFLAC_API void rflac_close(rflac* pFlac);
+void rflac_close(rflac* pFlac);
 
 /*
 Reads sample data from the given FLAC decoder, output as interleaved signed 16-bit PCM.
@@ -625,7 +520,7 @@ pBufferOut can be null, in which case the call will act as a seek, and the retur
 
 Note that this is lossy for streams where the bits per sample is larger than 16.
 */
-RFLAC_API uint64_t rflac_read_pcm_frames_s16(rflac* pFlac, uint64_t framesToRead, int16_t* pBufferOut);
+uint64_t rflac_read_pcm_frames_s16(rflac* pFlac, uint64_t framesToRead, int16_t* pBufferOut);
 
 /*
 Reads sample data from the given FLAC decoder, output as interleaved 32-bit floating point PCM.
@@ -654,7 +549,7 @@ pBufferOut can be null, in which case the call will act as a seek, and the retur
 
 Note that this should be considered lossy due to the nature of floating point numbers not being able to exactly represent every possible number.
 */
-RFLAC_API uint64_t rflac_read_pcm_frames_f32(rflac* pFlac, uint64_t framesToRead, float* pBufferOut);
+uint64_t rflac_read_pcm_frames_f32(rflac* pFlac, uint64_t framesToRead, float* pBufferOut);
 
 /*
 Seeks to the PCM frame at the given index.
@@ -671,9 +566,9 @@ pcmFrameIndex (in)
 
 Return Value
 -------------
-`RFLAC_TRUE` if successful; `RFLAC_FALSE` otherwise.
+1 if successful; 0 otherwise.
 */
-RFLAC_API uint32_t rflac_seek_to_pcm_frame(rflac* pFlac, uint64_t pcmFrameIndex);
+uint32_t rflac_seek_to_pcm_frame(rflac* pFlac, uint64_t pcmFrameIndex);
 
 /*
 Opens a FLAC decoder from a pre-allocated block of memory
@@ -700,10 +595,10 @@ This does not create a copy of the data. It is up to the application to ensure t
 
 See Also
 --------
-rflac_open()
+rflac_open_memory()
 rflac_close()
 */
-RFLAC_API rflac* rflac_open_memory(const void* pData, size_t dataSize);
+rflac* rflac_open_memory(const void* pData, size_t dataSize);
 
 /* High Level APIs */
 

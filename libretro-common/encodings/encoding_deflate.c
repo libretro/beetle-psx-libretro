@@ -1250,26 +1250,19 @@ static int32_t rd_insert(struct rdeflate *s, uint32_t pos)
    return prev;
 }
 
-/* find the longest match for the string at `pos`, searching the chain.
- * Returns match length (>=MIN_MATCH) and sets *dist, or 0 if none. */
-/* count-trailing / leading zero bits on a 64-bit word, for the word-at-a-time
- * match compare.  Uses compiler builtins where available. */
-#if defined(__GNUC__) || defined(__clang__)
-static INLINE int rd_ctz64(uint64_t x) { return __builtin_ctzll(x); }
-static INLINE int rd_clz64(uint64_t x) { return __builtin_clzll(x); }
+/* __builtin_clzll / __builtin_ctzll need GCC >= 3.4 (where the
+ * clz/ctz builtin family was introduced) or Clang (which has had
+ * them from the start). Anything older takes the portable
+ * bit-loop fallback. Pre-definable so unusual toolchains (or
+ * tests) can force either path. */
+#ifndef RD_HAS_BIT_BUILTINS
+#if defined(__clang__) || \
+    (defined(__GNUC__) && (__GNUC__ > 3 || \
+    (__GNUC__ == 3 && defined(__GNUC_MINOR__) && __GNUC_MINOR__ >= 4)))
+#define RD_HAS_BIT_BUILTINS 1
 #else
-static INLINE int rd_ctz64(uint64_t x)
-{
-   int n = 0;
-   while (!(x & 1)) { x >>= 1; n++; }
-   return n;
-}
-static INLINE int rd_clz64(uint64_t x)
-{
-   int n = 0;
-   while (!(x & ((uint64_t)1 << 63))) { x <<= 1; n++; }
-   return n;
-}
+#define RD_HAS_BIT_BUILTINS 0
+#endif
 #endif
 
 static INLINE uint32_t rd_longest_match(struct rdeflate *s, uint32_t pos,
@@ -1336,11 +1329,33 @@ static INLINE uint32_t rd_longest_match(struct rdeflate *s, uint32_t pos,
                if (x != 0)
                {
 #if RETRO_IS_BIG_ENDIAN
-                  /* first differing byte is the most-significant nonzero byte */
-                  l += (uint32_t)(rd_clz64(x) >> 3);
+                  /* first differing byte is the 
+                   * most-significant nonzero byte */
+#if RD_HAS_BIT_BUILTINS
+                  l += (uint32_t)(__builtin_clzll(x) >> 3);
 #else
-                  /* first differing byte is the least-significant nonzero byte */
-                  l += (uint32_t)(rd_ctz64(x) >> 3);
+                  int n = 0;
+                  while (!(x & ((uint64_t)1 << 63)))
+                  {
+                     x <<= 1;
+                     n++;
+                  }
+                  l += (uint32_t)(n >> 3);
+#endif
+#else
+                  /* first differing byte is the least-significant 
+                   * nonzero byte */
+#if RD_HAS_BIT_BUILTINS
+                  l += (uint32_t)(__builtin_ctzll(x) >> 3);
+#else
+                  int n = 0;
+                  while (!(x & 1))
+                  {
+                     x >>= 1;
+                     n++;
+                  }
+                  l += (uint32_t)(n >> 3);
+#endif
 #endif
                   goto have_len;
                }

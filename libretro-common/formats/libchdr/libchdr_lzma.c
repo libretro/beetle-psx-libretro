@@ -57,142 +57,6 @@
  ***************************************************************************
  */
 
-void *lzma_fast_alloc(void *p, size_t size);
-void lzma_fast_free(void *p, void *address);
-
-/*-------------------------------------------------
- *  lzma_allocator_init
- *-------------------------------------------------
- */
-
-static void lzma_allocator_init(void* p)
-{
-	lzma_allocator *codec = (lzma_allocator *)(p);
-
-	/* reset pointer list */
-	memset(codec->allocptr, 0, sizeof(codec->allocptr));
-	memset(codec->allocptr2, 0, sizeof(codec->allocptr2));
-	codec->Alloc = lzma_fast_alloc;
-	codec->Free = lzma_fast_free;
-}
-
-/*-------------------------------------------------
- *  lzma_allocator_free
- *-------------------------------------------------
- */
-
-static void lzma_allocator_free(void* p )
-{
-	int i;
-	lzma_allocator *codec = (lzma_allocator *)(p);
-
-	/* free our memory */
-	for (i = 0 ; i < MAX_LZMA_ALLOCS ; i++)
-	{
-		if (codec->allocptr[i] != NULL)
-			free(codec->allocptr[i]);
-	}
-}
-
-/*-------------------------------------------------
- *  lzma_fast_alloc - fast malloc for lzma, which
- *  allocates and frees memory frequently
- *-------------------------------------------------
- */
-
-/* Huge alignment values for possible SIMD optimization by compiler (NEON, SSE, AVX) */
-#define LZMA_MIN_ALIGNMENT_BITS 512
-#define LZMA_MIN_ALIGNMENT_BYTES (LZMA_MIN_ALIGNMENT_BITS / 8)
-
-void *lzma_fast_alloc(void *p, size_t size)
-{
-	int scan;
-	uint32_t *addr        = NULL;
-	lzma_allocator *codec = (lzma_allocator *)(p);
-	uintptr_t vaddr = 0;
-
-	/* compute the size, rounding to the nearest 1k */
-	size = (size + 0x3ff) & ~0x3ff;
-
-	/* reuse a hunk if we can */
-	for (scan = 0; scan < MAX_LZMA_ALLOCS; scan++)
-	{
-		uint32_t *ptr = codec->allocptr[scan];
-		if (ptr != NULL && size == *ptr)
-		{
-			/* set the low bit of the size so we don't match next time */
-			*ptr |= 1;
-
-			/* return aligned address of the block */
-			return codec->allocptr2[scan];
-		}
-	}
-
-	/* alloc a new one and put it into the list */
-	addr = (uint32_t *)malloc(size + sizeof(uint32_t) + LZMA_MIN_ALIGNMENT_BYTES);
-	if (addr==NULL)
-		return NULL;
-	for (scan = 0; scan < MAX_LZMA_ALLOCS; scan++)
-	{
-		if (codec->allocptr[scan] == NULL)
-		{
-			/* store block address */
-			codec->allocptr[scan] = addr;
-
-			/* compute aligned address, store it */
-			vaddr = (uintptr_t)addr;
-			vaddr = (vaddr + sizeof(uint32_t) + (LZMA_MIN_ALIGNMENT_BYTES-1)) & (~(LZMA_MIN_ALIGNMENT_BYTES-1));
-			codec->allocptr2[scan] = (uint32_t*)vaddr;
-			break;
-		}
-	}
-
-	/* set the low bit of the size so we don't match next time */
-	*addr = size | 1;
-
-	/* return aligned address */
-	return (void*)vaddr;
-}
-
-/*-------------------------------------------------
- *  lzma_fast_free - fast free for lzma, which
- *  allocates and frees memory frequently
- *-------------------------------------------------
- */
-
-void lzma_fast_free(void *p, void *address)
-{
-	int scan;
-	uint32_t *ptr = NULL;
-	lzma_allocator *codec = NULL;
-
-	if (address == NULL)
-		return;
-
-	codec = (lzma_allocator *)(p);
-
-	/* find the hunk */
-	ptr = (uint32_t *)address;
-	for (scan = 0; scan < MAX_LZMA_ALLOCS; scan++)
-	{
-		if (ptr == codec->allocptr2[scan])
-		{
-			/* clear the low bit of the size to allow matches */
-			*codec->allocptr[scan] &= ~1;
-			return;
-		}
-	}
-}
-
-/***************************************************************************
- *  LZMA DECOMPRESSOR
- ***************************************************************************
- */
-
-/*-------------------------------------------------
- *  lzma_codec_init - constructor
- *-------------------------------------------------
- */
 
 /*-------------------------------------------------
  *  lzma_compute_dictionary_size
@@ -251,28 +115,21 @@ static uint32_t lzma_compute_dictionary_size(uint32_t hunkbytes)
 chd_error lzma_codec_init(void* codec, uint32_t hunkbytes)
 {
 	unsigned int i;
-	Byte decoder_props[LZMA_PROPS_SIZE];
-	lzma_allocator* alloc;
 	lzma_codec_data* lzma_codec = (lzma_codec_data*) codec;
 	const uint32_t dictSize = lzma_compute_dictionary_size(hunkbytes);
-
-	/* construct the decoder */
-	LzmaDec_Construct(&lzma_codec->decoder);
+	uint8_t decoder_props[RLZMA_PROPS_SIZE];
 
 	/* properties byte 0 encodes (pb * 5 + lp) * 9 + lc for the encoder
 	 * defaults lc=3 lp=0 pb=2 -> 93; bytes 1..4 the dictionary size LE */
 	decoder_props[0] = 93;
-	for (i = 0; i < LZMA_PROPS_SIZE - 1; ++i)
-		decoder_props[1 + i] = (dictSize >> (8 * i)) & 0xFF;
+	for (i = 0; i < RLZMA_PROPS_SIZE - 1; ++i)
+		decoder_props[1 + i] = (uint8_t)((dictSize >> (8 * i)) & 0xFF);
 
-	alloc = &lzma_codec->allocator;
-	lzma_allocator_init(alloc);
-
-	/* do memory allocations */
-	if (LzmaDec_Allocate(&lzma_codec->decoder, decoder_props, LZMA_PROPS_SIZE, (ISzAlloc*)alloc) != SZ_OK)
+	/* No allocation: the decoder state is inline and the dictionary is
+	 * the caller's own output buffer. */
+	if (rlzma_dec_init(&lzma_codec->decoder, decoder_props) != RLZMA_OK)
 		return CHDERR_DECOMPRESSION_ERROR;
 
-	/* Okay */
 	return CHDERR_NONE;
 }
 
@@ -283,11 +140,8 @@ chd_error lzma_codec_init(void* codec, uint32_t hunkbytes)
 
 void lzma_codec_free(void* codec)
 {
-	lzma_codec_data* lzma_codec = (lzma_codec_data*) codec;
-
-	/* free memory */
-	LzmaDec_Free(&lzma_codec->decoder, (ISzAlloc*)&lzma_codec->allocator);
-	lzma_allocator_free(&lzma_codec->allocator);
+	/* rlzma holds no resources. */
+	(void)codec;
 }
 
 /*-------------------------------------------------
@@ -298,18 +152,11 @@ void lzma_codec_free(void* codec)
 
 chd_error lzma_codec_decompress(void* codec, const uint8_t *src, uint32_t complen, uint8_t *dest, uint32_t destlen)
 {
-	ELzmaStatus status;
-	SRes res;
-	SizeT consumedlen, decodedlen;
-	/* initialize */
 	lzma_codec_data* lzma_codec = (lzma_codec_data*) codec;
-	LzmaDec_Init(&lzma_codec->decoder);
 
-	/* decode */
-	consumedlen = complen;
-	decodedlen = destlen;
-	res = LzmaDec_DecodeToBuf(&lzma_codec->decoder, dest, &decodedlen, src, &consumedlen, LZMA_FINISH_END, &status);
-	if ((res != SZ_OK && res != LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK) || consumedlen != complen || decodedlen != destlen)
+	/* Decodes straight into dest, which doubles as the dictionary window.
+	 * The decoder resets itself, so hunks stay independent. */
+	if (rlzma_dec_decode(&lzma_codec->decoder, dest, destlen, src, complen) != RLZMA_OK)
 		return CHDERR_DECOMPRESSION_ERROR;
 	return CHDERR_NONE;
 }
