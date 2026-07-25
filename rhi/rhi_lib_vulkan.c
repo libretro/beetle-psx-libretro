@@ -5630,6 +5630,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       SpecConstIndex_Shift = 4,
       SpecConstIndex_OffsetUV = 5,
       SpecConstIndex_HotSource = 6,
+      SpecConstIndex_ResolveEotf = 7,
       SpecConstIndex_Samples = 0
    };
 
@@ -5728,7 +5729,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *hdr_bpp24_yuv_quad_blitter;
             Program *resolve_to_scaled;
             Program *resolve_to_unscaled;
-            Program *msaa_resolve_weighted;   /* HDR: tonemap-weighted MSAA resolve (16F only) */
+            Program *msaa_resolve_weighted;
+            Program *msaa_resolve_weighted_sdr;   /* HDR: tonemap-weighted MSAA resolve (16F only) */
 
             Program *blit_vram_scaled;
             Program *blit_vram_scaled_masked;
@@ -7201,6 +7203,7 @@ static void renderer_ssaa_framebuffer(Renderer *self)
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, 1);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_ResolveEotf, psx_hdr_sdr_eotf);
    commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.resolve_to_unscaled);
    commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer_ssaa)));
    if (self->msaa > 1)
@@ -7392,8 +7395,13 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
-      commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), 1u << SpecConstIndex_Samples);
-      commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.msaa_resolve_weighted);
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_ResolveEotf, psx_hdr_sdr_eotf);
+      commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd),
+         (1u << SpecConstIndex_Samples) | (1u << SpecConstIndex_ResolveEotf));
+      commandbuffer_set_program(cbh_get(&self->cmd),
+         self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT
+            ? self->pipelines.msaa_resolve_weighted
+            : self->pipelines.msaa_resolve_weighted_sdr);
       commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)));
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
       commandbuffer_push_constants(cbh_get(&self->cmd), &wpush, 0, sizeof(wpush));
@@ -7401,21 +7409,6 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
       commandbuffer_barrier_simple(cbh_get(&self->cmd),
          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
-         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
-   }
-   else if (scaled && self->msaa > 1)
-   {
-      VkImageSubresourceLayers subres = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-      VkOffset3D offset = { 0, 0, 0 };
-      VkExtent3D extent = { FB_WIDTH * self->scaling, FB_HEIGHT * self->scaling, 1 };
-      VkImageResolve region = { subres, offset, subres, offset, extent };
-      vkCmdResolveImage(commandbuffer_get_command_buffer(cbh_get(&self->cmd)),
-         image_get_image(ih_get(&self->scaled_framebuffer_msaa)), VK_IMAGE_LAYOUT_GENERAL,
-         image_get_image(ih_get(&self->scaled_framebuffer)), VK_IMAGE_LAYOUT_GENERAL,
-         1, &region);
-
-      commandbuffer_barrier_simple(cbh_get(&self->cmd), 
-         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
    }
 
@@ -8074,10 +8067,9 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          offset.y = 0;
          extent.height = FB_HEIGHT * self->scaling;
       }
-      if (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT)
       {
-         /* HDR: tonemap-weighted (Karis) compute resolve of the displayed
-          * region (see renderer_scanout_vram_to_texture for the rationale). */
+         /* Compute resolve of the displayed region, both formats (see
+          * renderer_scanout_vram_to_texture for the rationale). */
          struct WPush { int32_t offset[2]; int32_t extent[2]; } wpush;
          wpush.offset[0] = offset.x;            wpush.offset[1] = offset.y;
          wpush.extent[0] = (int32_t)extent.width; wpush.extent[1] = (int32_t)extent.height;
@@ -8088,8 +8080,13 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 
          commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Samples, self->msaa);
-         commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), 1u << SpecConstIndex_Samples);
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.msaa_resolve_weighted);
+         commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_ResolveEotf, psx_hdr_sdr_eotf);
+         commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd),
+            (1u << SpecConstIndex_Samples) | (1u << SpecConstIndex_ResolveEotf));
+         commandbuffer_set_program(cbh_get(&self->cmd),
+            self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT
+               ? self->pipelines.msaa_resolve_weighted
+               : self->pipelines.msaa_resolve_weighted_sdr);
          commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)));
          commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
          commandbuffer_push_constants(cbh_get(&self->cmd), &wpush, 0, sizeof(wpush));
@@ -8098,17 +8095,6 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          commandbuffer_barrier_simple(cbh_get(&self->cmd),
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
-      }
-      else
-      { VkImageResolve region = { subres, offset, subres, offset, extent };
-      vkCmdResolveImage(commandbuffer_get_command_buffer(cbh_get(&self->cmd)),
-         image_get_image(ih_get(&self->scaled_framebuffer_msaa)), VK_IMAGE_LAYOUT_GENERAL,
-         image_get_image(ih_get(&self->scaled_framebuffer)), VK_IMAGE_LAYOUT_GENERAL,
-         1, &region);
-
-      commandbuffer_barrier_simple(cbh_get(&self->cmd), 
-         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
       }
       }
    }

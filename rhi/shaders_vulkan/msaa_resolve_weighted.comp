@@ -1,12 +1,14 @@
 #version 450
 layout(local_size_x = 8, local_size_y = 8) in;
 
-/* HDR-only tonemap-weighted ("Karis") MSAA resolve for the scaled
- * framebuffer.
+#include "hdr.h"
+
+/* Tonemap-weighted ("Karis") MSAA resolve for the scaled framebuffer.
  *
- * This path is taken only when the scaled framebuffer is the wide 16F HDR
- * target, so both the multisample source and the single-sample destination
- * are R16G16B16A16_SFLOAT and the store format is fixed rgba16f.
+ * Built for both framebuffer formats: rgba16f under -DHDR16, rgba8 otherwise.
+ * The SDR path used to take vkCmdResolveImage instead, which averages in the
+ * image's own encoding - the wrong domain, and not something the fixed-function
+ * resolve can be asked to change.
  *
  * The fixed-function vkCmdResolveImage the SDR path uses does a plain linear
  * box average of the samples. Under HDR that reintroduces bright-edge
@@ -17,6 +19,11 @@ layout(local_size_x = 8, local_size_y = 8) in;
  * averaging tames the hot outlier so the edge actually softens. This is
  * HDR-specific: in SDR the [0,1] clamp already bounds the outlier, so the SDR
  * path keeps the cheaper fixed-function resolve untouched.
+ *
+ * Samples are combined as light. Supersampling and multisampling estimate how
+ * much light a pixel emits, so the transfer curve goes inside the mean;
+ * averaging the encoded values is darker by Jensen's inequality, badly so at
+ * edges, which is the only place multisampling does anything.
  *
  * The weight has to be taken against *linear* luminance, which is what the
  * 1/(1+L) form is defined for. The stored value is PSX-native and gamma
@@ -34,8 +41,16 @@ layout(local_size_x = 8, local_size_y = 8) in;
  * it. */
 
 layout(constant_id = 0) const int NUM_SAMPLES = 1;
+/* Transfer curve used to combine samples - the average is taken in light. */
+layout(constant_id = 7) const int RESOLVE_EOTF = 0;
 
-layout(set = 0, binding = 0, rgba16f) uniform writeonly image2D uResolved;
+#if defined(HDR16)
+#define RESOLVE_STORE_FMT rgba16f
+#else
+#define RESOLVE_STORE_FMT rgba8
+#endif
+
+layout(set = 0, binding = 0, RESOLVE_STORE_FMT) uniform writeonly image2D uResolved;
 layout(set = 0, binding = 1) uniform sampler2DMS uScaledMS;
 
 /* Resolve only the [offset, offset+extent) region (the displayed rect); the
@@ -62,12 +77,21 @@ void main()
 	for (i = 0; i < NUM_SAMPLES; i++)
 	{
 		vec4  s    = texelFetch(uScaledMS, coord, i);
-		float luma = dot(max(s.rgb, vec3(0.0)), vec3(0.2126, 0.7152, 0.0722));
-		float w    = 1.0 / (1.0 + pow(luma, 2.4));
-		acc  += s.rgb * w;
+		vec3  lin  = sdr_to_linear(max(s.rgb, vec3(0.0)), RESOLVE_EOTF);
+		float luma = dot(lin, vec3(0.2126, 0.7152, 0.0722));
+#if defined(HDR16)
+		/* Only the wide target can carry over-white samples, so only it has
+		 * fireflies to suppress. In SDR the values are already bounded and
+		 * the weight would just bias the box darker for nothing. */
+		float w    = 1.0 / (1.0 + luma);
+#else
+		float w    = 1.0;
+#endif
+		acc  += lin * w;
 		wsum += w;
 		a    += s.a;
 	}
 
-	imageStore(uResolved, coord, vec4(acc / wsum, a / float(NUM_SAMPLES)));
+	imageStore(uResolved, coord,
+	           vec4(linear_to_sdr(acc / wsum, RESOLVE_EOTF), a / float(NUM_SAMPLES)));
 }

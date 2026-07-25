@@ -420,9 +420,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(hdr_sdr_gamma),
-      "HDR Reference SDR Gamma",
+      "Reference Display Gamma",
       NULL,
-      "Selects the display gamma the 24-bit output is assumed to have been viewed through, used to linearise the picture before it is re-encoded for HDR, when 'Color Format' is set to '30-bit Color (HDR)'. This decides whether HDR lands at the same brightness the standard path did on your screen - it does not change accuracy, only the match between the two. 'BT.1886 (Gamma 2.4)' is the default and matches the frontend's own SDR-to-HDR conversion and a TV-like reference. 'Gamma 2.2' suits a PC monitor tracking sRGB's nominal gamma. 'sRGB (Piecewise)' matches how Windows composites standard content onto an HDR desktop and lifts shadow detail. If HDR looks dimmer or more contrasty than 24-bit on the same display, try 'Gamma 2.2' or 'sRGB (Piecewise)'. Has no effect on the OpenGL/Software renderers or in 24-bit mode.",
+      "Selects the display gamma the console's output is assumed to be viewed through. Used in two places: to linearise the picture before re-encoding it for HDR, and to decide what 'average' means when supersampled or multisampled samples are combined - those estimate how much light a pixel emits, so they are averaged as light rather than as stored values. This decides whether HDR lands at the same brightness the standard path did on your screen - it does not change accuracy, only the match between the two. 'BT.1886 (Gamma 2.4)' is the default and matches the frontend's own SDR-to-HDR conversion and a TV-like reference. 'Gamma 2.2' suits a PC monitor tracking sRGB's nominal gamma. 'sRGB (Piecewise)' matches how Windows composites standard content onto an HDR desktop and lifts shadow detail. If HDR looks dimmer or more contrasty than 24-bit on the same display, try 'Gamma 2.2' or 'sRGB (Piecewise)'. Has no effect on the OpenGL/Software renderers.",
       NULL,
       "video",
       {

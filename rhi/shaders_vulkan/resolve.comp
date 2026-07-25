@@ -2,6 +2,7 @@
 layout(local_size_x = 8, local_size_y = 8) in;
 
 #include "common.h"
+#include "hdr.h"
 
 /* Scaled-framebuffer storage format. rgba16f under -DHDR16 (the wide HDR
  * render target); rgba8 otherwise. The image the store targets is
@@ -31,6 +32,14 @@ layout(set = 0, binding = 1) uniform sampler2D uScaled;
 layout(constant_id = 0) const int NUM_SAMPLES = 1;
 layout(constant_id = 1) const int FILTER_MODE = 0;
 layout(constant_id = 3) const int SCALE = 1;
+/* Transfer curve used to combine samples. Supersampling and multisampling both
+ * estimate how much light a pixel emits, so the samples have to be averaged as
+ * light - the curve belongs inside the mean, not after it. Averaging the
+ * gamma-encoded values instead is darker by Jensen's inequality: ~6% on a
+ * +-10% spread and up to 62% where a sample set straddles black and white,
+ * which is every polygon edge. Re-encoded on the way out because the
+ * framebuffer this feeds is a display-referred one. */
+layout(constant_id = 7) const int RESOLVE_EOTF = 0;
 #endif
 
 layout(set = 1, binding = 0, std140) uniform Rects
@@ -79,59 +88,35 @@ void main()
 		for (int y = 0; y < SCALE; y++)
 			for (int x = 0; x < SCALE; x++)
 				for (int i = 0; i < NUM_SAMPLES; i++)
-					value += texelFetch(uScaledMS, uv + ivec2(x, y), i);
+				{
+					vec4 t = texelFetch(uScaledMS, uv + ivec2(x, y), i);
+					value.rgb += sdr_to_linear(max(t.rgb, vec3(0.0)), RESOLVE_EOTF);
+					value.a   += t.a;
+				}
 		value /= SCALE * SCALE * NUM_SAMPLES;
+		value.rgb = linear_to_sdr(value.rgb, RESOLVE_EOTF);
 	#else
-		vec2 uv = (vec2(coord) + 0.5) * registers.inv_source_size;
-
-		if (SCALE == 2)
-			// Grabs 4 texels and averages them box-style.
-			value = textureLod(uScaled, uv, 0.0);
-
-		if (SCALE == 4)
+		/* Explicit fetches rather than the bilinear ladder this used to
+		 * lean on. The texture unit averages in the framebuffer's own
+		 * encoding, which is exactly the wrong domain, and there is no way
+		 * to ask it for anything else. The cost is real - SCALE 16 goes
+		 * from 64 bilinear taps to 256 point fetches - but the samples are
+		 * adjacent and cache-resident, and it buys the difference between
+		 * averaging light and averaging voltage. */
+		ivec2 srcmax = ivec2(1.0 / registers.inv_source_size) - 1;
+		ivec2 base   = ivec2(coord) * SCALE;
+		value = vec4(0.0);
+		for (int y = 0; y < SCALE; y++)
 		{
-			// Grabs 16 texels and averages them box-style.
-			uv -= vec2(0.25 / 1024.0, 0.25 / 512.0);
-			value = textureLod(uScaled, uv, 0.0);
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 0));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(0, 2));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 2));
-			value /= 4.0;
+			for (int x = 0; x < SCALE; x++)
+			{
+				vec4 t = texelFetch(uScaled, clamp(base + ivec2(x, y), ivec2(0), srcmax), 0);
+				value.rgb += sdr_to_linear(max(t.rgb, vec3(0.0)), RESOLVE_EOTF);
+				value.a   += t.a;
+			}
 		}
-
-		if (SCALE == 8)
-		{
-			// Kinda crazy, grabs 64 texels and averages them.
-			uv -= vec2(0.375 / 1024.0, 0.375 / 512.0);
-			value = textureLod(uScaled, uv, 0.0);
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 0));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(4, 0));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 0));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(0, 2));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 2));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(4, 2));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 2));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(0, 4));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 4));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(4, 4));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 4));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(0, 6));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(2, 6));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(4, 6));
-			value += textureLodOffset(uScaled, uv, 0.0, ivec2(6, 6));
-			value /= 16.0;
-		}
-
-		if (SCALE == 16)
-		{
-			// Batshit insanity :D Should probably split this shader up and use LDS to do final mip, but ... eh.
-			value = vec4(0.0);
-			uv -= vec2(0.4375 / 1024.0, 0.4375 / 512.0);
-			for (int y = 0; y < 8; y++)
-				for (int x = 0; x < 8; x++)
-					value += textureLod(uScaled, uv + vec2(x, y) * vec2(1.0 / 8192.0, 1.0 / 4096.0), 0.0);
-			value /= 64.0;
-		}
+		value /= float(SCALE * SCALE);
+		value.rgb = linear_to_sdr(value.rgb, RESOLVE_EOTF);
 	#endif
 	}
 
