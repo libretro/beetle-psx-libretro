@@ -64,6 +64,7 @@ layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D uOut;
 layout(push_constant, std430) uniform Registers
 {
 	vec2  sig_size;
+	float line_split;    /* 1 progressive, 2 interlaced */
 	float b0, b1, b2;    /* feed-forward: zeros on the subcarrier */
 	float a1, a2;        /* feedback: poles pulling the stop band narrow */
 	int   enable;        /* S-Video has no carrier in luma - nothing to trap */
@@ -100,8 +101,9 @@ highp vec3 fetch_chroma_filtered(int x, int line)
 	highp vec3 cur = fetch(x, line);
 #if defined(PAL)
 	int h = int(reg.sig_size.y) - 1;
-	highp vec3 up = fetch(x, max(line - 1, 0));
-	highp vec3 dn = fetch(x, min(line + 1, h));
+	int d = int(reg.line_split);   /* same-field neighbours */
+	highp vec3 up = fetch(x, max(line - d, 0));
+	highp vec3 dn = fetch(x, min(line + d, h));
 	cur.yz = 0.25 * up.yz + 0.5 * cur.yz + 0.25 * dn.yz;
 #endif
 	return cur;

@@ -36,8 +36,11 @@ layout(set = 0, binding = 0) uniform sampler2D uSignal;
 
 layout(push_constant, std430) uniform Registers
 {
-	vec2 sig_size;
-	int  svideo;
+	vec2  sig_size;
+	float line_split;    /* 1 progressive, 2 interlaced - the comb must stay
+	                      * inside one field, and on a woven frame the
+	                      * same-field neighbours are two rows away */
+	int   svideo;
 } reg;
 
 void main()
@@ -52,7 +55,7 @@ void main()
 		return;
 	}
 
-	highp float dy = 1.0 / reg.sig_size.y;
+	highp float dy = reg.line_split / reg.sig_size.y;
 	highp vec2  up = textureLod(uSignal, vec2(uv.x, max(uv.y - dy, 0.0)), 0.0).xy;
 	highp vec2  dn = textureLod(uSignal, vec2(uv.x, min(uv.y + dy, 1.0)), 0.0).xy;
 

@@ -32,6 +32,8 @@ layout(push_constant, std430) uniform Registers
 	float x1;
 	float inv_ratio;
 	float line_adv;
+	float line_split;    /* 1 progressive, 2 interlaced (woven frame) */
+	float field_off;     /* phase between the two fields of a woven frame */
 	float field_adv;
 	int   svideo;
 } reg;
@@ -47,7 +49,7 @@ void main()
 	highp float n    = floor(gl_FragCoord.x);
 	highp float row  = vUV.y;
 	highp float line = floor(gl_FragCoord.y);
-	highp float vs   = an_v_sign(line);
+	highp float vs   = an_v_sign(an_field_line(line, reg.line_split));
 
 	highp vec2 iq = vec2(0.0);
 	int t;
@@ -57,7 +59,8 @@ void main()
 		highp float k  = n + float(t);
 		highp float cc = fetch(k, row).y;
 		highp float ph = an_phase(k, line, reg.x1, reg.inv_ratio,
-		                          reg.line_adv, reg.field_adv);
+	                          reg.line_adv, reg.line_split, reg.field_off,
+	                          reg.field_adv);
 		iq += w * an_demodulate(cc, an_carrier(ph), vs);
 	}
 
@@ -71,7 +74,8 @@ void main()
 	else
 	{
 		highp float ph = an_phase(n, line, reg.x1, reg.inv_ratio,
-		                          reg.line_adv, reg.field_adv);
+	                          reg.line_adv, reg.line_split, reg.field_off,
+	                          reg.field_adv);
 		y = here.x - an_modulate(iq, an_carrier(ph), vs);
 	}
 

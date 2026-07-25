@@ -7590,6 +7590,14 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
     * 15*fsc with 227.5 cycles per line, PAL 12*fsc with 283.75. */
    const float inv_ratio = pal ? (1.0f / 12.0f) : (1.0f / 15.0f);
    const float line_adv  = pal ? 0.75f : 0.5f;
+   /* 480i arrives woven - renderer_compute_display_rect doubles the height and
+    * the rows alternate between fields. The chain has to stay inside one field:
+    * the comb and the PAL delay line step two rows, and the carrier advances
+    * per *scanline*, with the second field offset by a whole field's worth of
+    * phase. At 240p the split is 1 and every term collapses to what it was. */
+   const bool  ilace     = self->render_state.is_480i;
+   const float line_split = ilace ? 2.0f : 1.0f;
+   const float field_off  = !ilace ? 0.0f : (pal ? 0.375f : 0.25f);
 
    /* GP1(06h).X1, video clocks from HSYNC. Enters the phase directly, and the
     * standard values differ per mode, so this cannot be assumed zero. */
@@ -7668,6 +7676,8 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       float   x1;
       float   inv_ratio;
       float   line_adv;
+      float   line_split;
+      float   field_off;
       float   field_adv;
       int32_t cable;
    } push;
@@ -7677,6 +7687,8 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    push.x1          = x1;
    push.inv_ratio   = inv_ratio;
    push.line_adv    = line_adv;
+   push.line_split  = line_split;
+   push.field_off   = field_off;
    push.field_adv   = field_adv;
    push.cable       = psx_video_cable;
 
@@ -7712,9 +7724,10 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    }
 
    /* ---- pass 2: comb ---- */
-   { struct CombPush { float sig_size[2]; int32_t svideo; } push;
+   { struct CombPush { float sig_size[2]; float line_split; int32_t svideo; } push;
    push.sig_size[0] = (float)sig_w;
    push.sig_size[1] = (float)sig_h;
+   push.line_split  = line_split;
    push.svideo      = svideo ? 1 : 0;
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_sep),
@@ -7756,6 +7769,8 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       float   x1;
       float   inv_ratio;
       float   line_adv;
+      float   line_split;
+      float   field_off;
       float   field_adv;
       int32_t svideo;
    } push;
@@ -7769,6 +7784,8 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    push.x1          = x1;
    push.inv_ratio   = inv_ratio;
    push.line_adv    = line_adv;
+   push.line_split  = line_split;
+   push.field_off   = field_off;
    /* Only the decoder is detuned. The console emitted a correct signal; the
     * error belongs to the receiver, so the encode above keeps true phase. */
    push.field_adv   = field_adv + psx_phase_error;
@@ -7821,6 +7838,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    { struct NotchPush
    {
       float   sig_size[2];
+      float   line_split;
       float   b0, b1, b2;
       float   a1, a2;
       int32_t enable;
@@ -7841,6 +7859,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
    push.sig_size[0] = (float)sig_w;
    push.sig_size[1] = (float)sig_h;
+   push.line_split  = line_split;
    push.b0 = (float)b0; push.b1 = (float)b1; push.b2 = (float)b2;
    push.a1 = (float)a1; push.a2 = (float)a2;
    /* S-Video luma never shared a wire, so there is no residue to trap. */

@@ -137,12 +137,43 @@ highp vec3 an_yc_to_rgb(highp vec3 c)
  *
  * Only the fraction matters, and each term is reduced before summing so a long
  * line cannot grind the mantissa away. */
+/* Which transmitted scanline a row of the image belongs to.
+ *
+ * At 240p the image rows are the scanlines, and line_split is 1. At 480i the
+ * renderer hands over a woven 480-line frame whose rows alternate between the
+ * two fields, so line_split is 2: row L is field L&1, field-line L>>1. Getting
+ * this wrong is not subtle - a comb reading the row above and below would be
+ * separating against the opposite field, half a frame away in time and at the
+ * wrong carrier phase. */
+highp float an_field_line(highp float line, highp float line_split)
+{
+	return floor(line / line_split);
+}
+
+/* Subcarrier phase, in cycles, at base-clock sample `n` of image row `line`.
+ *
+ *   x1          GP1(06h).X1, video clocks from HSYNC to the first visible
+ *               sample. Enters the phase directly.
+ *   inv_ratio   1/15 NTSC, 1/12 PAL - cycles of subcarrier per base clock.
+ *   line_adv    cycles gained per scanline: 0.5 NTSC (227.5), 0.75 PAL
+ *               (283.75).
+ *   line_split  1 progressive, 2 interlaced (see an_field_line).
+ *   field_off   cycles gained between the two fields of a woven frame:
+ *               fract(262.5 * 0.5) = 0.25 NTSC, fract(312.5 * 0.75) = 0.375
+ *               PAL. Unused when line_split is 1.
+ *   field_adv   phase carried in from every field before this one.
+ *
+ * The line term collapses to line * line_adv when line_split is 1, so the
+ * progressive path is unchanged bit for bit. Each term is reduced before
+ * summing so a long line cannot grind the mantissa away. */
 highp float an_phase(highp float n, highp float line, highp float x1,
                      highp float inv_ratio, highp float line_adv,
+                     highp float line_split, highp float field_off,
                      highp float field_adv)
 {
+	highp float f = an_field_line(line, line_split);
 	highp float p = fract((x1 + n) * inv_ratio)
-	              + fract(line * line_adv)
+	              + fract(f * line_adv + (line - f * line_split) * field_off)
 	              + field_adv;
 	return fract(p);
 }
@@ -155,13 +186,20 @@ highp vec2 an_carrier(highp float cycles)
 	return vec2(cos(a), sin(a));
 }
 
-/* PAL alternates the sign of V every line - the Phase Alternate Line the
- * standard is named for. NTSC does not. Kept here so encode and decode cannot
- * disagree about it. */
-highp float an_v_sign(highp float line)
+/* PAL alternates the sign of V every transmitted line - the Phase Alternate
+ * Line the standard is named for. NTSC does not. Takes the field-line index
+ * from an_field_line, not the image row, so it stays correct on a woven frame.
+ *
+ * Caveat for 480i PAL: a field is 312.5 lines, so the alternation across the
+ * field boundary lands on a half line and its parity is not something the
+ * sources settle. This continues the alternation by field-line index, which is
+ * right within a field and may be inverted between them. PSX PAL content is
+ * overwhelmingly 288p, so this is a corner of a corner - but it is a guess and
+ * is marked as one. */
+highp float an_v_sign(highp float field_line)
 {
 #if defined(PAL)
-	return (fract(line * 0.5) > 0.25) ? -1.0 : 1.0;
+	return (fract(field_line * 0.5) > 0.25) ? -1.0 : 1.0;
 #else
 	return 1.0;
 #endif

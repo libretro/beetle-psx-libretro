@@ -35,7 +35,9 @@ layout(push_constant, std430) uniform Registers
 	float div;           /* base clocks per pixel: 10,8,7,5,4 */
 	float x1;            /* GP1(06h).X1, video clocks from HSYNC */
 	float inv_ratio;     /* 1/15 NTSC, 1/12 PAL */
-	float line_adv;      /* 0.5 NTSC, 0.75 PAL */
+	float line_adv;
+	float line_split;    /* 1 progressive, 2 interlaced (woven frame) */
+	float field_off;     /* phase between the two fields of a woven frame */      /* 0.5 NTSC, 0.75 PAL */
 	float field_adv;     /* from the field counter */
 	int   cable;         /* AN_CABLE_*: picks the luma tier, enables the beat */
 } reg;
@@ -98,9 +100,10 @@ void main()
 	}
 
 	highp float ph = an_phase(n, line, reg.x1, reg.inv_ratio,
-	                          reg.line_adv, reg.field_adv);
+	                          reg.line_adv, reg.line_split, reg.field_off,
+	                          reg.field_adv);
 	highp vec2  cs = an_carrier(ph);
-	highp float vs = an_v_sign(line);
+	highp float vs = an_v_sign(an_field_line(line, reg.line_split));
 
 	highp float chroma = an_modulate(iq, cs, vs);
 
