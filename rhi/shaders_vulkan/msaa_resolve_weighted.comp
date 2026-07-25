@@ -18,9 +18,17 @@ layout(local_size_x = 8, local_size_y = 8) in;
  * HDR-specific: in SDR the [0,1] clamp already bounds the outlier, so the SDR
  * path keeps the cheaper fixed-function resolve untouched.
  *
- * The weight uses the luma of the stored (PSX-native, gamma-ish) value, which
- * is where the resolve happens; the PQ encode is applied later at display
- * time. Fully-covered pixels (all samples equal) resolve to exactly the input,
+ * The weight has to be taken against *linear* luminance, which is what the
+ * 1/(1+L) form is defined for. The stored value is PSX-native and gamma
+ * encoded, so weighting it directly gives a code-2.0 sample 1/3 instead of
+ * 1/6.3 - roughly double the influence - and the hot outlier the shader
+ * exists to tame survives at about half the intended suppression. The
+ * transfer is therefore applied before the weight. Luma is taken in the
+ * signal domain and the curve applied once to the scalar rather than per
+ * channel: the weight only has to be monotone in brightness, and this is one
+ * pow per sample instead of three. The exponent matches quad.frag's encode.
+ *
+ * Fully-covered pixels (all samples equal) resolve to exactly the input,
  * so only mixed-coverage edges are affected. Alpha is resolved with a plain
  * average to match the fixed-function behaviour for anything that later reads
  * it. */
@@ -55,7 +63,7 @@ void main()
 	{
 		vec4  s    = texelFetch(uScaledMS, coord, i);
 		float luma = dot(max(s.rgb, vec3(0.0)), vec3(0.2126, 0.7152, 0.0722));
-		float w    = 1.0 / (1.0 + luma);
+		float w    = 1.0 / (1.0 + pow(luma, 2.4));
 		acc  += s.rgb * w;
 		wsum += w;
 		a    += s.a;
