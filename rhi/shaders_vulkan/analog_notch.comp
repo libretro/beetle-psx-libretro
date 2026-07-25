@@ -1,0 +1,168 @@
+#version 450
+precision highp float;
+precision highp int;
+
+/* Chroma trap on the recovered luma, as a two-pole IIR.
+ *
+ * The comb separates by phase, not frequency, so it is exact only where chroma
+ * is constant vertically. At a horizontal colour edge it mis-estimates, and the
+ * residue lands in luma as the dot pattern along the boundary that the
+ * literature calls hanging dots. A trap centred on the subcarrier removes it.
+ *
+ * An FIR trap is the obvious approach and it does not work: to get any depth at
+ * this bandwidth it has to be long, and a long notch either blurs the whole
+ * picture or rings hard enough to double edges. A two-pole IIR gets a narrow,
+ * shallow band-stop out of five coefficients instead:
+ *
+ *   zeros at exp(+-i*w) with radius 0.99   - puts a null essentially on fsc
+ *   poles at exp(+-i*w) with radius 0.85   - pulls the skirts back in, so the
+ *                                            stop band is narrow rather than deep
+ *
+ * Deliberately not a complete null. A full notch rings badly; -23 dB at fsc is
+ * plenty to kill the residue while leaving 1 MHz down only 0.27 dB and 6 MHz
+ * down 0.11 dB, so luma detail survives essentially intact.
+ *
+ * IIR on a GPU looks impossible at first - each output depends on the two
+ * before it. It is not, because the recurrence
+ *
+ *     s[n] = A * s[n-1] + B[n],   s[n] = [y[n], y[n-1]]^T
+ *     A    = [[-a1, -a2], [1, 0]],  B[n] = [f[n], 0]^T
+ *
+ * is an affine map, and affine composition is associative:
+ *
+ *     (A2,B2) . (A1,B1) = (A2*A1, A2*B1 + B2)
+ *
+ * so the whole line is an inclusive scan over 2x2 transfer matrices, which is
+ * O(log n) parallel steps instead of n sequential ones (Blelloch, "Prefix Sums
+ * and Their Applications", 1990, section 1.4). The feed-forward part f[n] is a
+ * plain 3-tap FIR and is embarrassingly parallel.
+ *
+ * One workgroup per scanline. Each thread owns PER_THREAD consecutive samples,
+ * scans them serially, then a Hillis-Steele scan over shared memory composes
+ * across threads. Shared memory rather than subgroup shuffles: the intrinsics
+ * would be faster but need capability checks this backend does not currently
+ * carry, and at 2560 samples the scan is 12 steps either way.
+ *
+ * Also does the YIQ/YUV -> RGB conversion on the way out, so the resolve pass
+ * stays region-independent. */
+
+#include "analog.h"
+
+layout(local_size_x = 256) in;
+
+layout(set = 0, binding = 0) uniform sampler2D uDecoded;   /* (luma, C1, C2) */
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D uOut;
+
+layout(push_constant, std430) uniform Registers
+{
+	vec2  sig_size;
+	float b0, b1, b2;    /* feed-forward: zeros on the subcarrier */
+	float a1, a2;        /* feedback: poles pulling the stop band narrow */
+	int   enable;        /* S-Video has no carrier in luma - nothing to trap */
+} reg;
+
+/* 256 threads x 12 samples covers the widest active line (2688 in 368 mode).
+ * Only the per-element B vectors are kept in registers - the A powers are
+ * identical across threads and are rebuilt on the fly, and the chroma pair is
+ * re-fetched rather than stored, which trades a cached texel read for ~50
+ * registers per thread. */
+#define PER_THREAD 12
+
+shared vec2 s_Ax[256];
+shared vec2 s_Ay[256];
+shared vec2 s_B[256];
+
+/* Compose two affine maps: apply `prev` first, then `cur`. */
+void compose(inout mat2 curA, inout vec2 curB, mat2 prevA, vec2 prevB)
+{
+	curB = curA * prevB + curB;
+	curA = curA * prevA;
+}
+
+highp vec3 fetch(int x, int line)
+{
+	int k = clamp(x, 0, int(reg.sig_size.x) - 1);
+	return texelFetch(uDecoded, ivec2(k, line), 0).xyz;
+}
+
+void main()
+{
+	int line  = int(gl_WorkGroupID.x);
+	int lane  = int(gl_LocalInvocationIndex);
+	int width = int(reg.sig_size.x);
+	int base  = lane * PER_THREAD;
+	int i;
+
+	if (reg.enable == 0)
+	{
+		/* S-Video: luma never shared a wire, so there is no carrier residue to
+		 * trap and a notch here would only cost detail. Straight conversion. */
+		for (i = 0; i < PER_THREAD; i++)
+			if (base + i < width)
+				imageStore(uOut, ivec2(base + i, line),
+				           vec4(an_yc_to_rgb(fetch(base + i, line)), 1.0));
+		return;
+	}
+
+	const mat2 A = mat2(vec2(-reg.a1, 1.0), vec2(-reg.a2, 0.0));
+
+	/* Serial pass over this thread's block: the feed-forward FIR, then the
+	 * recurrence with a zero initial state. Bpart[i] is the B of the composed
+	 * map for elements 0..i. */
+	vec2 Bpart[PER_THREAD];
+	vec2 Bacc = vec2(0.0);
+	for (i = 0; i < PER_THREAD; i++)
+	{
+		highp float x0 = fetch(base + i,     line).x;
+		highp float x1 = fetch(base + i - 1, line).x;
+		highp float x2 = fetch(base + i - 2, line).x;
+		Bacc = A * Bacc + vec2(reg.b0 * x0 + reg.b1 * x1 + reg.b2 * x2, 0.0);
+		Bpart[i] = Bacc;
+	}
+
+	/* Per-thread total map. A^PER_THREAD is the same for every thread. */
+	mat2 blockA = A;
+	for (i = 1; i < PER_THREAD; i++)
+		blockA = A * blockA;
+
+	mat2 accA = blockA;
+	vec2 accB = Bpart[PER_THREAD - 1];
+
+	/* Hillis-Steele inclusive scan across threads. Every lane stores every
+	 * round - conditionally storing leaves lane 0 reading a stale slot. */
+	for (int step = 1; step < 256; step <<= 1)
+	{
+		s_Ax[lane] = accA[0];
+		s_Ay[lane] = accA[1];
+		s_B[lane]  = accB;
+		barrier();
+		if (lane >= step)
+		{
+			mat2 pA = mat2(s_Ax[lane - step], s_Ay[lane - step]);
+			vec2 pB = s_B[lane - step];
+			compose(accA, accB, pA, pB);
+		}
+		barrier();
+	}
+
+	/* Exclusive prefix for this thread = inclusive result of the lane below. */
+	s_Ax[lane] = accA[0];
+	s_Ay[lane] = accA[1];
+	s_B[lane]  = accB;
+	barrier();
+	vec2 preB = (lane > 0) ? s_B[lane - 1] : vec2(0.0);
+
+	/* y[base+i] = (A^(i+1) * preB + Bpart[i]).x */
+	mat2 Apow = mat2(1.0, 0.0, 0.0, 1.0);
+	for (i = 0; i < PER_THREAD; i++)
+	{
+		Apow = A * Apow;
+		if (base + i < width)
+		{
+			highp float y  = (Apow * preB + Bpart[i]).x;
+			highp vec3  yc = fetch(base + i, line);
+			imageStore(uOut, ivec2(base + i, line),
+			           vec4(an_yc_to_rgb(vec3(y, yc.yz)), 1.0));
+		}
+	}
+}

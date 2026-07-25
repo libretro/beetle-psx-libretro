@@ -5763,6 +5763,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *analog_comb_pal;
             Program *analog_demod;
             Program *analog_demod_pal;
+            Program *analog_notch;       /* IIR chroma trap, compute */
+            Program *analog_notch_pal;
             Program *analog_resolve;       /* region-independent: box + encode only */
             Program *analog_resolve_hdr;
             Program *mipmap_energy_first;
@@ -5793,7 +5795,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          ImageHandle analog_native;   /* supersample resolve, only when scaling > 1 */
          ImageHandle analog_sig;
          ImageHandle analog_sep;
-         ImageHandle analog_dec;   /* decoded RGB at base rate */
+         ImageHandle analog_dec;   /* decoded (luma,C1,C2) at base rate */
+         ImageHandle analog_rgb;   /* after the chroma trap, RGB at base rate */
          ImageHandle analog_out;
          /* Field parity for the subcarrier. In 240p the carrier gains half a
           * cycle per field in both regions, so the artifact pattern simply
@@ -6332,6 +6335,12 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t analog_demod_pal_frag[] =
 #include "shaders_vulkan/prebuilt/analog.demod.pal.frag.inc"
    ;
+   static const uint32_t analog_notch_comp[] =
+#include "shaders_vulkan/prebuilt/analog.notch.comp.inc"
+   ;
+   static const uint32_t analog_notch_pal_comp[] =
+#include "shaders_vulkan/prebuilt/analog.notch.pal.comp.inc"
+   ;
    static const uint32_t analog_resolve_frag[] =
 #include "shaders_vulkan/prebuilt/analog.resolve.frag.inc"
    ;
@@ -6835,6 +6844,10 @@ static void renderer_init_pipelines(Renderer *self)
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_demod_frag, sizeof(analog_demod_frag));
    self->pipelines.analog_demod_pal =
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_demod_pal_frag, sizeof(analog_demod_pal_frag));
+   self->pipelines.analog_notch =
+      device_request_program_compute_code(self->device, analog_notch_comp, sizeof(analog_notch_comp));
+   self->pipelines.analog_notch_pal =
+      device_request_program_compute_code(self->device, analog_notch_pal_comp, sizeof(analog_notch_pal_comp));
    self->pipelines.analog_resolve =
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_frag, sizeof(analog_resolve_frag));
    self->pipelines.analog_resolve_hdr =
@@ -7776,6 +7789,72 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
    }
 
+   /* ---- pass 3b: IIR chroma trap on luma, then YC -> RGB ----
+    * The comb separates by phase, so it is exact only where chroma is constant
+    * vertically; at a horizontal colour edge the residue lands in luma as
+    * hanging dots. A two-pole trap on the subcarrier removes it.
+    *
+    * Zeros at radius 0.99 put a null essentially on fsc; poles at 0.85 pull the
+    * skirts in so the stop band is narrow rather than deep. A full null rings
+    * hard enough to double edges - which is why an FIR trap is unusable here
+    * and this one is deliberately only about -23 dB.
+    *
+    * IIR looks impossible to parallelise, but the recurrence is an affine map
+    * on a 2-element state and affine composition is associative, so a scanline
+    * is an inclusive scan over 2x2 transfer matrices - O(log n) instead of n
+    * (Blelloch 1990, 1.4). One workgroup per line. */
+   { struct NotchPush
+   {
+      float   sig_size[2];
+      float   b0, b1, b2;
+      float   a1, a2;
+      int32_t enable;
+   } push;
+   const double wq  = 2.0 * 3.14159265358979323846 * (double)inv_ratio;
+   const double fq  = 0.99;   /* zero radius: depth of the null */
+   const double iq2 = 0.85;   /* pole radius: how narrow the stop band is */
+   double b0 = 1.0, b1 = -2.0 * fq * cos(wq), b2 = fq * fq;
+   const double a1 = -2.0 * iq2 * cos(wq), a2 = iq2 * iq2;
+   /* Normalise the feed-forward for 0 dB at DC against the feedback. */
+   const double g = (1.0 + a1 + a2) / (b0 + b1 + b2);
+   ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16B16A16_SFLOAT);
+   b0 *= g; b1 *= g; b2 *= g;
+
+   info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+   info.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+   ih_move(&self->analog_rgb, device_create_image(self->device, &info, NULL));
+
+   push.sig_size[0] = (float)sig_w;
+   push.sig_size[1] = (float)sig_h;
+   push.b0 = (float)b0; push.b1 = (float)b1; push.b2 = (float)b2;
+   push.a1 = (float)a1; push.a2 = (float)a2;
+   /* S-Video luma never shared a wire, so there is no residue to trap. */
+   push.enable = svideo ? 0 : 1;
+
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_rgb),
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT);
+
+   commandbuffer_set_program(cbh_get(&self->cmd),
+      pal ? self->pipelines.analog_notch_pal : self->pipelines.analog_notch);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
+      image_get_view(ih_get(&self->analog_dec)), StockSampler_NearestClamp);
+   commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 1,
+      image_get_view(ih_get(&self->analog_rgb)));
+   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   commandbuffer_dispatch(cbh_get(&self->cmd), sig_h, 1, 1);
+
+   commandbuffer_barrier_simple(cbh_get(&self->cmd),
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_rgb),
+      VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   }
+
    /* ---- pass 4: resample to display ---- */
    { struct ResPush
    {
@@ -7814,7 +7893,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    commandbuffer_set_program(cbh_get(&self->cmd),
       psx_hdr_active ? self->pipelines.analog_resolve_hdr : self->pipelines.analog_resolve);
    commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
-      image_get_view(ih_get(&self->analog_dec)), StockSampler_NearestClamp);
+      image_get_view(ih_get(&self->analog_rgb)), StockSampler_NearestClamp);
    commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, push_size);
    commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);

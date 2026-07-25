@@ -17,7 +17,7 @@ precision highp int;
  *
  * S-Video skips the reconstruction: luma arrived on its own pin, so subtracting
  * anything from it would be inventing a correction for crosstalk that never
- * happened. */
+ * happened - and for the same reason it skips the chroma trap downstream. */
 
 #include "analog.h"
 
@@ -75,5 +75,7 @@ void main()
 		y = here.x - an_modulate(iq, an_carrier(ph), vs);
 	}
 
-	FragColor = vec4(an_yc_to_rgb(vec3(y, iq)), 1.0);
+	/* Emits (luma, C1, C2), not RGB: the chroma trap runs on luma alone and
+	 * does the conversion itself once the trap has been applied. */
+	FragColor = vec4(y, iq, 1.0);
 }
