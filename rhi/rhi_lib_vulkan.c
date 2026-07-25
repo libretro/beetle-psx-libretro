@@ -7821,7 +7821,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
    }
 
-   /* ---- pass 3b: IIR chroma trap on luma, then YC -> RGB ----
+   /* ---- pass 4: IIR chroma trap on luma, then YC -> RGB ----
     * The comb separates by phase, so it is exact only where chroma is constant
     * vertically; at a horizontal colour edge the residue lands in luma as
     * hanging dots. A two-pole trap on the subcarrier removes it.
@@ -7889,7 +7889,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
    }
 
-   /* ---- pass 4: resample to display ---- */
+   /* ---- pass 5: resample to display ---- */
    { struct ResPush
    {
       float   sig_size[2];
@@ -9892,6 +9892,14 @@ static void renderer_fini(Renderer *self)
    ih_reset(&self->dither_lut);
    ih_reset(&self->last_scanout);
    ih_reset(&self->reuseable_scanout);
+   /* Analog path intermediates. These are recreated every frame, so ih_move
+    * drops the previous one and nothing accumulates while running - but this
+    * list is what releases the last set, and it is maintained by hand. */
+   ih_reset(&self->analog_native);
+   ih_reset(&self->analog_sig);
+   ih_reset(&self->analog_sep);
+   ih_reset(&self->analog_dec);
+   ih_reset(&self->analog_rgb);
    bh_reset(&self->quad);
    imageview_vec_destroy(&self->scaled_views); /* release scaled image views (was member teardown) */
    /* Free the per-frame draw-self->queue arrays (POD_VEC backing storage). */
