@@ -33,6 +33,7 @@ layout(push_constant, std430) uniform Registers
 	/* Fed from the frontend's HDR params (see libretro.c
 	 * psx_hdr_paper_white_nits / _expand_gamut). */
 	float paper_white_nits;
+	float peak_nits;      /* display peak, from GET_HDR_MAX_NITS */
 	int   expand_gamut;
 	int   shoulder;       /* highlight roll-off: 0 Reinhard, 1 filmic */
 #endif
@@ -157,9 +158,9 @@ void main()
 #if defined(HDR)
 	/* The SDR rgb is gamma-encoded 0..1; encode_hdr10 handles the
 	 * linearise / paper-white / gamut / PQ chain. */
-	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut,
-	                              registers.shoulder, registers.sdr_eotf,
-	                              registers.src_primaries), 1.0);
+	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.peak_nits,
+	                              registers.expand_gamut, registers.shoulder,
+	                              registers.sdr_eotf, registers.src_primaries), 1.0);
 #else
 	/* After the dither, not before: the console emits a dithered 15-bit signal
 	 * and the primaries belong to the phosphors that receive it. */

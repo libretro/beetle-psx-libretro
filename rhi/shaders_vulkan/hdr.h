@@ -184,7 +184,8 @@ highp vec3 sdr_apply_src_primaries(highp vec3 rgb, int sdr_eotf, int src_primari
  * reference white; values above that are the additive overshoot the roll-off
  * compresses. */
 highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_nits,
-                               int expand_gamut, int shoulder, int src_primaries)
+                               highp float peak_nits, int expand_gamut, int shoulder,
+                               int src_primaries)
 {
 	/* STEP 3: one transfer function across the whole range, then compress
 	 * whatever lands above paper white.
@@ -210,7 +211,16 @@ highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_
 	 * additive red would wash out as it brightens). Scaling by the shared
 	 * factor keeps the overshoot's chromaticity, so a hot additive red stays
 	 * red. Dim channels are left alone, as before. */
-	const highp float peak_nits = 1000.0;   /* additive highlight ceiling */
+	/* peak_nits is what the display can actually reach, supplied by the
+	 * frontend through GET_HDR_MAX_NITS. Everything above paper white and
+	 * below it is the headroom available for highlights, so a wrong value is
+	 * either wasted range or clipping - which is why this stopped being the
+	 * hardcoded 1000 it was.
+	 *
+	 * The frontend may report a peak below paper white if the user has set it
+	 * that way; headroom then clamps to zero and the roll-off degenerates to a
+	 * clamp at paper white, which is the right behaviour rather than a
+	 * negative range. */
 	highp float headroom = max(peak_nits - paper_white_nits, 0.0);
 	highp vec3  lin      = src_primaries_to_709(max(scene_linear, vec3(0.0)), src_primaries)
 	                     * paper_white_nits;
@@ -246,11 +256,12 @@ highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_
 	return pq_encode(lin);
 }
 
-highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut,
-                        int shoulder, int sdr_eotf, int src_primaries)
+highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, highp float peak_nits,
+                        int expand_gamut, int shoulder, int sdr_eotf, int src_primaries)
 {
 	return encode_hdr10_linear(sdr_to_linear(max(rgb, vec3(0.0)), sdr_eotf),
-	                           paper_white_nits, expand_gamut, shoulder, src_primaries);
+	                           paper_white_nits, peak_nits, expand_gamut, shoulder,
+	                           src_primaries);
 }
 
 /* ---- Debanding dither -----------------------------------------------------

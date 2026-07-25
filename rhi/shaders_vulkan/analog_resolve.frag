@@ -40,6 +40,7 @@ layout(push_constant, std430) uniform Registers
 	vec2  out_size;      /* display resolution, native * internal scale */
 	int   sdr_eotf;      /* needed in both paths now - the box averages light */
 	float paper_white_nits;
+	float peak_nits;      /* display peak, from GET_HDR_MAX_NITS */
 	int   expand_gamut;
 	int   shoulder;
 	int   src_primaries; /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
@@ -75,8 +76,9 @@ void main()
 
 #if defined(HDR)
 	/* encode_hdr10_linear rotates the primaries itself. */
-	FragColor = vec4(encode_hdr10_linear(lin, reg.paper_white_nits, reg.expand_gamut,
-	                                     reg.shoulder, reg.src_primaries), 1.0);
+	FragColor = vec4(encode_hdr10_linear(lin, reg.paper_white_nits, reg.peak_nits,
+	                                     reg.expand_gamut, reg.shoulder,
+	                                     reg.src_primaries), 1.0);
 #else
 	/* Rotated here rather than through sdr_apply_src_primaries: this pass is
 	 * already holding linear light, so it costs a matrix and no round trip. */

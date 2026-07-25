@@ -193,6 +193,11 @@ enum dither_mode psx_gpu_dither_mode;
  * 10-bit end to end. */
 int   psx_color_format         = PSX_COLOR_FORMAT_24BIT;
 bool  psx_hdr_active           = false;
+/* Peak the display can reach. The gap above paper white is the whole headroom
+ * for highlights, so guessing it wrong either wastes range or clips. 1000 is
+ * the fallback for a frontend that does not answer: it is the HDR10 reference
+ * peak and roughly what mid-range panels manage. */
+float psx_hdr_max_nits         = 1000.0f;
 float psx_hdr_paper_white_nits = 200.0f;
 int   psx_hdr_expand_gamut     = 0;   /* VID_GAMUT_ACCURATE equivalent */
 int   psx_hdr_output_mode      = 1;   /* assume HDR10 when unqueryable */
@@ -5618,6 +5623,10 @@ bool retro_load_game(const struct retro_game_info *info)
                unsigned omode = 1;
                float    pw    = 0.0f;
 
+               { float mx = 0.0f;
+                 if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_MAX_NITS, &mx) && mx > 0.0f)
+                    psx_hdr_max_nits = mx;
+               }
                if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
                   psx_hdr_paper_white_nits = pw;
                if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
@@ -5653,6 +5662,7 @@ bool retro_load_game(const struct retro_game_info *info)
                      "[Color Format] 30-bit HDR requested: %s (paper white %.0f nits, gamut %d, output mode %d).\n",
                      psx_hdr_active ? "engaged" : "rejected by frontend - falling back to 24-bit",
                      psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
+               log_cb(RETRO_LOG_INFO, "[HDR] Display peak: %.0f nits\n", psx_hdr_max_nits);
          }
 
          option_display.key = BEETLE_OPT(depth);
@@ -5781,8 +5791,14 @@ void retro_run(void)
    {
       float    pw    = 0.0f;
       unsigned gamut = 0;
+      float    mx    = 0.0f;
       if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
          psx_hdr_paper_white_nits = pw;
+      /* Re-queried rather than cached: libretro.h says the user can change it
+       * at any time, and unlike paper white a stale value here silently
+       * changes how highlights roll off. */
+      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_MAX_NITS, &mx) && mx > 0.0f)
+         psx_hdr_max_nits = mx;
       if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
          psx_hdr_expand_gamut = (int)gamut;
    }

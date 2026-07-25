@@ -44,6 +44,7 @@
  * SET_PIXEL_FORMAT(HDR10_2101010)). */
 extern bool  psx_hdr_active;
 extern float psx_hdr_paper_white_nits;
+extern float psx_hdr_max_nits;
 extern int   psx_hdr_expand_gamut;
 extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
 extern int   psx_hdr_sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
@@ -7476,6 +7477,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
          int32_t sdr_eotf;
          int32_t src_primaries;
          float   paper_white_nits;
+         float   peak_nits;
          int32_t expand_gamut;
          int32_t shoulder;
       };
@@ -7485,6 +7487,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
       hpush.range[0]         = push.scale[0];
       hpush.range[1]         = push.scale[1];
       hpush.paper_white_nits = psx_hdr_paper_white_nits;
+      hpush.peak_nits = psx_hdr_max_nits;
       hpush.expand_gamut     = psx_hdr_expand_gamut;
       hpush.shoulder         = psx_hdr_shoulder;
       hpush.sdr_eotf         = psx_hdr_sdr_eotf;
@@ -7924,6 +7927,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       float   out_size[2];
       int32_t sdr_eotf;
       float   paper_white_nits;
+      float   peak_nits;
       int32_t expand_gamut;
       int32_t shoulder;
       int32_t src_primaries;
@@ -7937,6 +7941,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    push.out_size[1]      = (float)out_h;
    push.sdr_eotf         = psx_hdr_sdr_eotf;
    push.paper_white_nits = psx_hdr_paper_white_nits;
+   push.peak_nits = psx_hdr_max_nits;
    push.expand_gamut     = psx_hdr_expand_gamut;
    push.shoulder         = psx_hdr_shoulder;
    push.src_primaries    = psx_src_primaries;
@@ -8310,6 +8315,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          int32_t sdr_eotf;
          int32_t src_primaries;
          float   paper_white_nits;
+         float   peak_nits;
          int32_t expand_gamut;
          int32_t shoulder;
       };
@@ -8324,6 +8330,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       mp.uv_max[1]        = push.uv_max[1];
       mp.max_bias         = push.max_bias;
       mp.paper_white_nits = psx_hdr_paper_white_nits;
+      mp.peak_nits = psx_hdr_max_nits;
       mp.expand_gamut     = psx_hdr_expand_gamut;
       mp.shoulder         = psx_hdr_shoulder;
       mp.sdr_eotf         = psx_hdr_sdr_eotf;
@@ -8344,6 +8351,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          int32_t sdr_eotf;
          int32_t src_primaries;
          float   paper_white_nits;
+         float   peak_nits;
          int32_t expand_gamut;
          int32_t shoulder;
       };
@@ -8353,6 +8361,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       hpush.range[0]         = push.scale[0];
       hpush.range[1]         = push.scale[1];
       hpush.paper_white_nits = psx_hdr_paper_white_nits;
+      hpush.peak_nits = psx_hdr_max_nits;
       hpush.expand_gamut     = psx_hdr_expand_gamut;
       hpush.shoulder         = psx_hdr_shoulder;
       hpush.sdr_eotf         = psx_hdr_sdr_eotf;
