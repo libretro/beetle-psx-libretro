@@ -112,3 +112,9 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/analog.notch.pal.comp.inc -mfmt=c -DPAL analog_notch.comp
 "$GLSLC" -o prebuilt/analog.resolve.frag.inc -mfmt=c analog_resolve.frag
 "$GLSLC" -o prebuilt/analog.resolve.hdr.frag.inc -mfmt=c -DHDR analog_resolve.frag
+
+# Offline verification harness (tools/analog). Compiled here purely so that an
+# incompatible change to analog.h breaks the build instead of silently
+# disabling the check - which is what happened when the band-pass was removed.
+"$GLSLC" -o /dev/null ../../tools/analog/reference_chain.comp
+"$GLSLC" -o /dev/null -DPAL ../../tools/analog/reference_chain.comp

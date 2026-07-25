@@ -1,0 +1,101 @@
+#version 450
+precision highp float;
+precision highp int;
+layout(local_size_x = 64) in;
+#include "../../rhi/shaders_vulkan/analog.h"
+
+layout(set=0,binding=0,std430) readonly buffer Src { vec4 v[]; } src;
+layout(set=0,binding=1,std430)          buffer A   { vec2 v[]; } sig;
+layout(set=0,binding=2,std430)          buffer B   { vec2 v[]; } sep;
+layout(set=0,binding=3,std430)          buffer C   { vec4 v[]; } outp;
+
+layout(push_constant,std430) uniform P {
+    int stage; int W; int LINES; int PXW;
+    float div; float x1; float inv_ratio; float line_adv; float field_adv;
+    int pal; int svideo; float cable; float k1;
+} pc;
+
+vec3 srcpx(int q, int line){
+    int p = clamp(q, 0, pc.PXW-1);
+    return src.v[line*pc.PXW+p].rgb;
+}
+vec2 sigat(float x,int line){ int k=int(clamp(x,0.0,float(pc.W-1))); return sig.v[line*pc.W+k]; }
+vec2 sepat(float x,int line){ int k=int(clamp(x,0.0,float(pc.W-1))); return sep.v[line*pc.W+k]; }
+
+float span_luma(int lo,int hi){
+    int a=clamp(lo+AN_LUMA_HALF,0,AN_LUMA_N), b=clamp(hi+AN_LUMA_HALF+1,0,AN_LUMA_N);
+    if (pc.cable == 1.0) return AN_LUMA_WIDE_P[b]-AN_LUMA_WIDE_P[a];
+    if (pc.cable == 3.0) return AN_LUMA_RF_P[b]-AN_LUMA_RF_P[a];
+    return AN_LUMA_P[b]-AN_LUMA_P[a];
+}
+float span_chroma(int lo,int hi){
+    int a=clamp(lo+AN_CHROMA_HALF,0,AN_CHROMA_N), b=clamp(hi+AN_CHROMA_HALF+1,0,AN_CHROMA_N);
+    return AN_CHROMA_P[b]-AN_CHROMA_P[a];
+}
+
+void main(){
+    uint gid = gl_GlobalInvocationID.x;
+
+    if (pc.stage == 3) {
+        if (gid >= uint(pc.PXW*pc.LINES)) return;
+        int line=int(gid)/pc.PXW;
+        float bpo = float(pc.W)/float(pc.PXW);
+        float n0 = float(int(gid)%pc.PXW)*bpo;
+        int num = int(clamp(floor(bpo+0.5),1.0,16.0));
+        vec2 acc=vec2(0.0); float cnt=0.0;
+        for(int i=0;i<16;i++){ if(i>=num) break;
+            acc += sigat(n0+float(i), line); cnt += 1.0; }
+        outp.v[gid]=vec4(acc/max(cnt,1.0),0.0,1.0); return;
+    }
+
+    if (gid >= uint(pc.W*pc.LINES)) return;
+    int line=int(gid)/pc.W; float n=float(int(gid)%pc.W); int ni=int(n);
+    int idiv=int(pc.div);
+
+    if (pc.stage == 0) {
+        int q0=(ni-AN_LUMA_HALF)/idiv - 1, q1=(ni+AN_LUMA_HALF)/idiv + 1;
+        float y=0.0; vec2 iq=vec2(0.0);
+        for(int q=q0;q<=q1;q++){
+            int lo=q*idiv-ni, hi=lo+idiv-1;
+            float wl=span_luma(lo,hi), wc=span_chroma(lo,hi);
+            if (wl==0.0 && wc==0.0) continue;
+            vec3 yc = an_rgb_to_yc(srcpx(q,line));
+            y += wl*yc.x; iq += wc*yc.yz;
+        }
+        float ph=an_phase(n,float(line),pc.x1,pc.inv_ratio,pc.line_adv,1.0,0.0,pc.field_adv);
+        vec2 cs=an_carrier(ph); float vs=an_v_sign(an_field_line(float(line),1.0));
+        float chroma = an_modulate(iq,cs,vs);
+        if (pc.cable == 3.0) {
+            float bph=fract(n*AN_BEAT_RATIO + fract(float(line)*AN_BEAT_LINE_ADV));
+            chroma += AN_BEAT_AMPLITUDE*length(iq)*cos(AN_TAU*bph);
+        }
+        sig.v[gid]=vec2(y, chroma);
+    }
+    else if (pc.stage == 1) {
+        vec2 cur=sigat(n,line);
+        if (pc.svideo != 0) { sep.v[gid]=cur; return; }
+        vec2 up=sigat(n,max(line-1,0)), dn=sigat(n,min(line+1,pc.LINES-1));
+        float c=cur.x+cur.y;
+        sep.v[gid]=vec2(c, AN_COMB_GAIN*(c - 0.5*((up.x+up.y)+(dn.x+dn.y))));
+    }
+    else {
+        float vs=an_v_sign(an_field_line(float(line),1.0));
+        vec2 iq=vec2(0.0);
+        for(int t=-AN_CHROMA_HALF;t<=AN_CHROMA_HALF;t++){
+            float w=AN_CHROMA_P[t+AN_CHROMA_HALF+1]-AN_CHROMA_P[t+AN_CHROMA_HALF];
+            float k=n+float(t);
+            float cc=sepat(k,line).y;
+            float ph=an_phase(k,float(line),pc.x1,pc.inv_ratio,pc.line_adv,1.0,0.0,pc.field_adv);
+            iq += w*an_demodulate(cc,an_carrier(ph),vs);
+        }
+        vec2 here=sepat(n,line);
+        float y;
+        if (pc.svideo != 0) y = here.x;
+        else {
+            float ph=an_phase(n,float(line),pc.x1,pc.inv_ratio,pc.line_adv,1.0,0.0,pc.field_adv);
+            y = here.x - an_modulate(iq,an_carrier(ph),vs);
+        }
+        vec3 rgb = an_yc_to_rgb(vec3(y,iq));
+        sig.v[gid]=vec2(rgb.r, rgb.g);
+    }
+}

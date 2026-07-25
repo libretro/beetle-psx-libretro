@@ -9900,6 +9900,7 @@ static void renderer_fini(Renderer *self)
    ih_reset(&self->analog_sep);
    ih_reset(&self->analog_dec);
    ih_reset(&self->analog_rgb);
+   ih_reset(&self->analog_out);
    bh_reset(&self->quad);
    imageview_vec_destroy(&self->scaled_views); /* release scaled image views (was member teardown) */
    /* Free the per-frame draw-self->queue arrays (POD_VEC backing storage). */
