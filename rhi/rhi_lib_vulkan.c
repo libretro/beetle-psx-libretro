@@ -48,6 +48,7 @@ extern int   psx_hdr_expand_gamut;
 extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
 extern int   psx_hdr_sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_video_cable;    /* 0 = RGB/bypass, 1 = S-Video, 2 = composite */
+extern retro_log_printf_t log_cb;
 extern int   psx_hdr_overbright_hot;   /* additive/sub source: 0 clamped, 1 hot */
 /* The requested color format (enum psx_color_format_e). Unlike psx_hdr_active
  * this is known at renderer init (read at startup), so it gates the wide
@@ -7498,6 +7499,21 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
  * average it flat. */
 static bool renderer_analog_active(Renderer *self)
 {
+   /* Log the transition once rather than every frame. Whether the chain is
+    * actually engaged is otherwise invisible from the outside - the option can
+    * be set and the renderer still not take the branch - and that ambiguity is
+    * expensive to debug from a screenshot. */
+   static int last_logged = -1;
+   if (psx_video_cable != last_logged)
+   {
+      last_logged = psx_video_cable;
+      if (log_cb)
+         log_cb(RETRO_LOG_INFO, "[Analog] Video cable: %s (scaling %ux, %s)\n",
+               psx_video_cable == 0 ? "RGB (bypass)" :
+               psx_video_cable == 1 ? "S-Video" : "Composite",
+               self->scaling,
+               self->render_state.is_pal ? "PAL" : "NTSC");
+   }
    return psx_video_cable != 0;
 }
 

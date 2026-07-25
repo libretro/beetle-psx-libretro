@@ -4398,6 +4398,22 @@ static void check_variables(bool startup)
       }
    }
 
+   /* Analog video path. Deliberately read on every check_variables, not just
+    * at startup: nothing about it needs a restart. The pipelines are built at
+    * init whatever the setting is, the intermediates are per-frame, and the
+    * option only selects which branch the scanout takes - so gating it behind
+    * `if (startup)` just meant toggling it in the menu appeared to do nothing
+    * until the core was reloaded. */
+   var.key = BEETLE_OPT(video_cable);
+   psx_video_cable = 0;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "svideo"))
+         psx_video_cable = 1;
+      else if (!strcmp(var.value, "composite"))
+         psx_video_cable = 2;
+   }
+
    if (startup)
    {
       bool hw_renderer = false;
@@ -4435,17 +4451,6 @@ static void check_variables(bool startup)
       {
          if (!strcmp(var.value, "aces"))
             psx_hdr_shoulder = 1;
-      }
-
-      /* Analog video path (Vulkan, 1x internal resolution only). */
-      var.key = BEETLE_OPT(video_cable);
-      psx_video_cable = 0;
-      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      {
-         if (!strcmp(var.value, "svideo"))
-            psx_video_cable = 1;
-         else if (!strcmp(var.value, "composite"))
-            psx_video_cable = 2;
       }
 
       /* Reference SDR transfer for the HDR encode (Vulkan HDR path only).
