@@ -5798,11 +5798,23 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          ImageHandle analog_dec;   /* decoded (luma,C1,C2) at base rate */
          ImageHandle analog_rgb;   /* after the chroma trap, RGB at base rate */
          ImageHandle analog_out;
-         /* Field parity for the subcarrier. In 240p the carrier gains half a
-          * cycle per field in both regions, so the artifact pattern simply
-          * alternates frame to frame - the broadcast 4-field (NTSC) and
-          * 8-field (PAL) sequences only appear at 480i. */
-         unsigned analog_field;
+         /* Running subcarrier phase, in cycles, kept in [0,1).
+          *
+          * Advanced once per field by the field's *total* line count times the
+          * per-line advance - not by the visible height, since the carrier
+          * keeps running through blanking. A frame-parity toggle only ever
+          * expresses a 2-field sequence, which happens to be right for 240p in
+          * both regions and wrong for everything else; accumulating the real
+          * quantity reproduces all four cases without special-casing:
+          *
+          *   NTSC 240p  263    lines * 1/2 -> 1/2 per field, 2-field cycle
+          *   NTSC 480i  262.5  lines * 1/2 -> 1/4 per field, 4-field cycle
+          *   PAL  240p  314    lines * 3/4 -> 1/2 per field, 2-field cycle
+          *   PAL  480i  312.5  lines * 3/4 -> 3/8 per field, 8-field cycle
+          *
+          * Double, and wrapped every field, so it neither drifts nor loses
+          * precision however long the core runs. */
+         double analog_phase;
 
 
          BufferHandle quad;
@@ -6394,7 +6406,7 @@ static void renderer_init(Renderer *self,
    self->scaling = scaling_;
    self->msaa = msaa_;
    self->hdr_scanout_format = VK_FORMAT_UNDEFINED;
-   self->analog_field       = 0;
+   self->analog_phase       = 0.0;
    self->scaled_uv_offset = false;
    self->valid = false;
    self->primitive_filter_mode = FilterMode_NearestNeighbor;
@@ -7579,11 +7591,8 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
     * standard values differ per mode, so this cannot be assumed zero. */
    const float x1 = (float)self->render_state.horiz_start;
 
-   /* 240p advances half a cycle per field in both regions, so the pattern
-    * alternates frame to frame rather than running the broadcast 4-field
-    * (NTSC) or 8-field (PAL) sequence. 480i restores those, and is not
-    * handled here yet - it falls back to the same 2-field alternation. */
-   const float field_adv = (self->analog_field & 1u) ? 0.5f : 0.0f;
+   /* Phase carried in from every field before this one. */
+   const float field_adv = (float)self->analog_phase;
 
    if (out_w == 0 || out_h == 0 || sig_w == 0 || sig_h == 0)
       return self->reuseable_scanout;
@@ -8311,7 +8320,16 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
        * simulation, which emits the real scanout - including the HDR10
        * encode, since the resolve is now the stage that produces the final
        * pixel. */
-      self->analog_field++;
+      /* Total lines in this field, including blanking - the carrier does not
+       * stop during retrace. Interlaced fields are half-lines, which is
+       * exactly what produces the 4- and 8-field broadcast sequences. */
+      { double lines_per_field = self->render_state.is_pal
+              ? (self->render_state.is_480i ? 312.5 : 314.0)
+              : (self->render_state.is_480i ? 262.5 : 263.0);
+        double adv = self->render_state.is_pal ? 0.75 : 0.5;
+        self->analog_phase += lines_per_field * adv;
+        self->analog_phase -= floor(self->analog_phase);
+      }
       return renderer_analog_apply(self,
             display_rect.width, display_rect.height,
             display_rect.width * render_scale,
