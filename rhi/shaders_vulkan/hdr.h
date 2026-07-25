@@ -57,53 +57,85 @@ highp vec3 rec709_to_target(highp vec3 c, int expand_gamut)
 		0.0163916 * c.r + 0.0880132 * c.g + 0.8955950 * c.b);
 }
 
-highp float aces_shoulder(highp float x)
+highp float filmic_shoulder(highp float x)
 {
-	/* Narkowicz ACES filmic fit, used here purely as the highlight-shoulder
-	 * magnitude: maps the overshoot [0,inf) to [0,1). It rises faster near
-	 * the knee and rolls off with a filmic shoulder, versus Reinhard's
-	 * gentler o/(o+1). Saturates at a/c ~= 1.03, clamped to 1 so the peak
-	 * channel asymptotes to the highlight ceiling exactly like Reinhard. */
-	highp float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
-	return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+	/* Punchier alternative to Reinhard's o/(o+1) as the highlight-shoulder
+	 * magnitude: maps the normalised overshoot [0,inf) to [0,1), rising faster
+	 * and reaching the ceiling sooner (0.63 vs 0.50 at x=1, 0.86 vs 0.67 at
+	 * x=2), which is the behaviour the "filmic" roll-off option documents.
+	 *
+	 * Both shoulders have to satisfy S'(0) == 1: that is what keeps the encode
+	 * C1-continuous where the overshoot region joins reference white, because
+	 * the slope just above white is S'(0) * d(lin)/dc against d(lin)/dc just
+	 * below it. The Narkowicz ACES fit previously used here has S'(0) = b/e =
+	 * 0.214 and so dropped the slope 4.7x exactly at white. Normalising it
+	 * (scaling the input by e/b) restores the origin slope but sends the peak
+	 * derivative to ~8.4, trading the step for a worse spike a few percent
+	 * above white. 1 - exp(-x) has unit slope at the origin and a maximum
+	 * derivative of 1, so it is smooth on both counts, and is cheaper than the
+	 * rational fit it replaces. */
+	return 1.0 - exp(-x);
 }
 
 highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut, int shoulder)
 {
-	/* STEP 3: additive highlights above paper white. Ordinary content in
-	 * [0,1] maps to [0, paper white] exactly as SDR does. Additive blends
-	 * (B+F) leave >1.0 values in the 16F framebuffer; instead of clamping
-	 * them, soft-knee the overshoot so a muzzle flash / lamp / explosion
-	 * glows above paper white but rolls off toward a fixed peak rather than
-	 * blowing out (pow(2.4) alone would send 2.0 to ~5x paper white). The
-	 * knee is Reinhard: over/(over+1) maps [0,inf) -> [0,1), scaled by the
-	 * headroom between paper white and the highlight ceiling.
+	/* STEP 3: one transfer function across the whole range, then compress
+	 * whatever lands above paper white.
+	 *
+	 * The signal is PSX-native and gamma-encoded; pow(2.4) is the display
+	 * transfer (RetroArch linearises SDR with 2.4 in its Vulkan/D3D HDR
+	 * shaders; the sRGB piecewise curve is wrong here and lifts blacks).
+	 * Applying it to the whole value - including the >1.0 left in the 16F
+	 * framebuffer by additive blends - is what keeps the encode continuous.
+	 * Decoding only [0,1] and treating the overshoot as if it were already
+	 * linear light mixes two domains in one sum, and the slope then steps by
+	 * headroom/(2.4*paper_white) - 1.67x at 200/1000 nits - exactly at
+	 * reference white, which contours any gradient that crosses it and makes
+	 * the deband grain visibly coarsen at the same threshold.
+	 *
+	 * Content in [0,1] is untouched by this: pow(c,2.4)*paper_white <= paper
+	 * white, so the roll-off below never engages and the standard range still
+	 * maps bit-for-bit onto the SDR result.
 	 *
 	 * The knee is driven by the peak (brightest) overshoot channel and the
-	 * overshoot is scaled proportionally, rather than kneeing each channel
-	 * on its own: a per-channel Reinhard compresses the brightest channel
-	 * hardest, which desaturates a hot coloured highlight toward white (a
-	 * saturated additive red would wash out as it brightens). Scaling by the
-	 * shared factor keeps the overshoot's chromaticity, so a hot additive
-	 * red stays red. The peak channel rolls off identically to before, and
-	 * neutral (grey) highlights and all [0,1] content are unchanged. */
+	 * overshoot is scaled proportionally, rather than kneeing each channel on
+	 * its own: a per-channel roll-off compresses the brightest channel hardest,
+	 * which desaturates a hot coloured highlight toward white (a saturated
+	 * additive red would wash out as it brightens). Scaling by the shared
+	 * factor keeps the overshoot's chromaticity, so a hot additive red stays
+	 * red. Dim channels are left alone, as before. */
 	const highp float peak_nits = 1000.0;   /* additive highlight ceiling */
 	highp vec3  c        = max(rgb, vec3(0.0));
-	highp vec3  base     = pow(min(c, vec3(1.0)), vec3(2.4)) * paper_white_nits;
-	highp vec3  over     = max(c - vec3(1.0), vec3(0.0));
-	highp float o        = max(over.r, max(over.g, over.b));
 	highp float headroom = max(peak_nits - paper_white_nits, 0.0);
-	/* Per-unit-overshoot glow factor S(o)/o, shared across channels so the
-	 * overshoot keeps its chromaticity (peak channel gets headroom*S(o), the
-	 * rest scale proportionally). shoulder selects the roll-off curve S:
-	 * 0 = Reinhard o/(o+1) (S/o = 1/(o+1)); 1 = ACES filmic shoulder. Both
-	 * leave [0,1] content and neutral highlights untouched (over==0, or all
-	 * channels share o). */
-	highp float knee     = (shoulder == 1)
-	                          ? ((o > 0.0) ? aces_shoulder(o) / o : 0.0)
-	                          : (1.0 / (o + 1.0));
-	highp vec3  glow     = headroom * over * knee;
-	highp vec3  lin      = base + glow;
+	highp vec3  lin      = pow(c, vec3(2.4)) * paper_white_nits;
+	/* Linear-light overshoot. Forced to zero when there is no headroom
+	 * (paper white at or above the ceiling), which clamps to paper white
+	 * instead of letting the knee pass the value through unscaled. */
+	highp vec3  over     = (headroom > 0.0)
+	                          ? max(lin - vec3(paper_white_nits), vec3(0.0))
+	                          : vec3(0.0);
+	highp float omax     = max(over.r, max(over.g, over.b));
+	highp float o        = (omax > 0.0) ? (omax / headroom) : 0.0;
+	/* Per-unit-overshoot factor S(o)/o, shared across channels. shoulder
+	 * selects S: 0 = Reinhard o/(o+1) (S/o = 1/(o+1)); 1 = filmic. Both have
+	 * S'(0) == 1, so the peak channel leaves white at the same slope it
+	 * arrived with and asymptotes to the ceiling.
+	 *
+	 * (1-exp(-o))/o cancels catastrophically as o -> 0 - fp32 loses 40% of the
+	 * value by o = 1e-7, and that is precisely the neighbourhood of reference
+	 * white - so the small-o branch uses the series 1 - o/2 + o^2/6, which is
+	 * good to ~1e-7 at the crossover and exact at the origin. */
+	highp float knee     = 0.0;
+	if (o > 0.0)
+	{
+		if (shoulder == 1)
+			knee = (o < 1e-2)
+			          ? (1.0 - o * (0.5 - o * (1.0 / 6.0)))
+			          : (filmic_shoulder(o) / o);
+		else
+			knee = 1.0 / (o + 1.0);
+	}
+	lin = min(lin, vec3(paper_white_nits)) + over * knee;
 	lin = rec709_to_target(lin, expand_gamut);
 	return pq_encode(lin);
 }
