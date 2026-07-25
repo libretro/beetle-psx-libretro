@@ -49,6 +49,7 @@ extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
 extern int   psx_hdr_sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_src_primaries;  /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 extern int   psx_video_cable;    /* 0 = RGB/bypass, 1 = S-Video, 2 = composite */
+extern float psx_phase_error;    /* decoder carrier misalignment, cycles */
 extern retro_log_printf_t log_cb;
 extern int   psx_hdr_overbright_hot;   /* additive/sub source: 0 clamped, 1 hot */
 /* The requested color format (enum psx_color_format_e). Unlike psx_hdr_active
@@ -7768,7 +7769,9 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    push.x1          = x1;
    push.inv_ratio   = inv_ratio;
    push.line_adv    = line_adv;
-   push.field_adv   = field_adv;
+   /* Only the decoder is detuned. The console emitted a correct signal; the
+    * error belongs to the receiver, so the encode above keeps true phase. */
+   push.field_adv   = field_adv + psx_phase_error;
    push.svideo      = svideo ? 1 : 0;
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_dec),

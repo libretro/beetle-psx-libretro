@@ -220,6 +220,14 @@ int   psx_video_cable          = 0;
  * applies to RGB output too. HDR path only: every option maps some primary
  * outside Rec.709, which an SDR output would simply clip. */
 int   psx_src_primaries        = 0;
+/* Carrier misalignment at the decoder, in cycles (1.0 = 360 degrees). Applied
+ * to the demodulator only - the encoder keeps true phase - which is how a
+ * mistuned or drifting decoder behaves. Zero on a direct cable; realistic on
+ * RF, where the modulator and channel are the source. This is what makes PAL's
+ * line-alternating V worth having: the same error that shifts hue outright on
+ * NTSC becomes complementary line to line on PAL and cancels in the delay
+ * line. */
+float psx_phase_error          = 0.0f;
 
 #define NEGCON_RANGE 0x7FFF
 
@@ -4422,6 +4430,11 @@ static void check_variables(bool startup)
       else if (!strcmp(var.value, "ntsc1953"))
          psx_src_primaries = 3;
    }
+
+   var.key = BEETLE_OPT(phase_error);
+   psx_phase_error = 0.0f;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      psx_phase_error = (float)atoi(var.value) / 360.0f;
 
    var.key = BEETLE_OPT(video_cable);
    psx_video_cable = 0;

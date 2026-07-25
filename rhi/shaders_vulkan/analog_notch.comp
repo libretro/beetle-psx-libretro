@@ -43,6 +43,14 @@ precision highp int;
  * would be faster but need capability checks this backend does not currently
  * carry, and at 2560 samples the scan is 12 steps either way.
  *
+ * Under PAL it also averages the chroma pair across the neighbouring lines
+ * (0.25/0.5/0.25) before converting. That is the delay line, and it is the
+ * entire reason PAL alternates V: a carrier phase error rotates hue one way on
+ * even lines and the opposite way on odd ones, so averaging cancels it. With a
+ * 25-degree error that recovers 82% of the damage for 9% lost saturation, and
+ * it does nothing at all for NTSC, whose error is not complementary - which is
+ * why real NTSC sets do not do this and neither do we.
+ *
  * Also does the YIQ/YUV -> RGB conversion on the way out, so the resolve pass
  * stays region-independent. */
 
@@ -85,6 +93,20 @@ highp vec3 fetch(int x, int line)
 	return texelFetch(uDecoded, ivec2(k, line), 0).xyz;
 }
 
+/* Chroma as the decoder sees it after the delay line. Luma is untouched -
+ * averaging it vertically would just cost resolution. */
+highp vec3 fetch_chroma_filtered(int x, int line)
+{
+	highp vec3 cur = fetch(x, line);
+#if defined(PAL)
+	int h = int(reg.sig_size.y) - 1;
+	highp vec3 up = fetch(x, max(line - 1, 0));
+	highp vec3 dn = fetch(x, min(line + 1, h));
+	cur.yz = 0.25 * up.yz + 0.5 * cur.yz + 0.25 * dn.yz;
+#endif
+	return cur;
+}
+
 void main()
 {
 	int line  = int(gl_WorkGroupID.x);
@@ -100,7 +122,7 @@ void main()
 		for (i = 0; i < PER_THREAD; i++)
 			if (base + i < width)
 				imageStore(uOut, ivec2(base + i, line),
-				           vec4(an_yc_to_rgb(fetch(base + i, line)), 1.0));
+				           vec4(an_yc_to_rgb(fetch_chroma_filtered(base + i, line)), 1.0));
 		return;
 	}
 
@@ -160,7 +182,7 @@ void main()
 		if (base + i < width)
 		{
 			highp float y  = (Apow * preB + Bpart[i]).x;
-			highp vec3  yc = fetch(base + i, line);
+			highp vec3  yc = fetch_chroma_filtered(base + i, line);
 			imageStore(uOut, ivec2(base + i, line),
 			           vec4(an_yc_to_rgb(vec3(y, yc.yz)), 1.0));
 		}

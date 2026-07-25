@@ -386,6 +386,23 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "off"
    },
    {
+      BEETLE_OPT(phase_error),
+      "Analog Carrier Phase Error",
+      NULL,
+      "Misaligns the decoder's colour carrier by the given number of degrees, as a mistuned or drifting television would be. Zero on a direct cable; a real effect over RF, where the modulator and channel introduce it. The two systems fail very differently, which is the point: on NTSC the whole picture shifts hue and stays shifted, while on PAL the error lands opposite on alternate lines and the decoder's delay line averages most of it back out, trading a little saturation for it. Only affects 'Analog Video Cable' modes other than RGB.",
+      NULL,
+      "video",
+      {
+         { "0",  "Off" },
+         { "5",  "5 degrees" },
+         { "10", "10 degrees" },
+         { "25", "25 degrees" },
+         { "45", "45 degrees" },
+         { NULL, NULL },
+      },
+      "0"
+   },
+   {
       BEETLE_OPT(video_cable),
       "Analog Video Cable",
       NULL,
