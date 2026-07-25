@@ -17,7 +17,15 @@ precision highp int;
  *
  * Box rather than anything cleverer: the samples being combined are point
  * samples of the same pixel's coverage, so an unweighted mean is what
- * supersampling means. The band-limiting that follows is the real filter. */
+ * supersampling means. The band-limiting that follows is the real filter.
+ *
+ * Averaged as light. Supersampling estimates how much light the pixel emits,
+ * which means the transfer function goes inside the mean - averaging the
+ * gamma-encoded values instead darkens every edge, by up to 62% where a sample
+ * set straddles black and white. The result is re-encoded on the way out
+ * because everything downstream of here is a voltage waveform. */
+
+#include "hdr.h"
 
 layout(location = 0) in highp vec2 vUV;
 layout(location = 0) out highp vec4 FragColor;
@@ -28,6 +36,7 @@ layout(push_constant, std430) uniform Registers
 {
 	vec2 src_size;     /* supersampled framebuffer, texels */
 	vec2 native_size;  /* native display rect */
+	int  sdr_eotf;     /* the average is taken in light, so the curve matters */
 } reg;
 
 void main()
@@ -46,10 +55,11 @@ void main()
 		{
 			highp vec2 t = clamp(base + vec2(float(x), float(y)) + 0.5,
 			                     vec2(0.0), reg.src_size - 0.5);
-			acc += textureLod(uSource, t / reg.src_size, 0.0).rgb;
+			acc += sdr_to_linear(max(textureLod(uSource, t / reg.src_size, 0.0).rgb,
+			                         vec3(0.0)), reg.sdr_eotf);
 			cnt += 1.0;
 		}
 	}
 
-	FragColor = vec4(acc / max(cnt, 1.0), 1.0);
+	FragColor = vec4(linear_to_sdr(acc / max(cnt, 1.0), reg.sdr_eotf), 1.0);
 }

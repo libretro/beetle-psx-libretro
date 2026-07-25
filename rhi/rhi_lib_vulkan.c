@@ -7613,7 +7613,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
     * Skipped at 1x, where the scanout already is native. */
    if (resolve_ss)
    {
-      struct DownPush { float src_size[2]; float native_size[2]; } push;
+      struct DownPush { float src_size[2]; float native_size[2]; int32_t sdr_eotf; } push;
       ImageCreateInfo info = image_create_info_render_target(native_w, native_h, VK_FORMAT_R16G16B16A16_SFLOAT);
       info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
       info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -7623,6 +7623,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       push.src_size[1]    = (float)out_h;
       push.native_size[0] = (float)native_w;
       push.native_size[1] = (float)native_h;
+      push.sdr_eotf       = psx_hdr_sdr_eotf;
 
       commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_native),
          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -7894,23 +7895,24 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    {
       float   sig_size[2];
       float   out_size[2];
+      int32_t sdr_eotf;
       float   paper_white_nits;
       int32_t expand_gamut;
       int32_t shoulder;
-      int32_t sdr_eotf;
       int32_t src_primaries;
    } push;
-   size_t push_size = psx_hdr_active ? sizeof(push)
-                                     : offsetof(struct ResPush, paper_white_nits);
+   /* One layout now: the resolve averages in light, so it needs the transfer
+    * curve whether or not it is going on to encode HDR. */
+   size_t push_size = sizeof(push);
    push.sig_size[0]      = (float)sig_w;
    push.sig_size[1]      = (float)sig_h;
    push.out_size[0]      = (float)out_w;
    push.out_size[1]      = (float)out_h;
+   push.sdr_eotf         = psx_hdr_sdr_eotf;
    push.paper_white_nits = psx_hdr_paper_white_nits;
    push.expand_gamut     = psx_hdr_expand_gamut;
    push.shoulder         = psx_hdr_shoulder;
-   push.sdr_eotf         = psx_hdr_sdr_eotf;
-   push.src_primaries         = psx_src_primaries;
+   push.src_primaries    = psx_src_primaries;
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_out),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,

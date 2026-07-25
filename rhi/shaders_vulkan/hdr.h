@@ -34,6 +34,20 @@ highp vec3 pq_encode(highp vec3 nits)
 	return pow((PQ_C1 + PQ_C2 * ym) / (1.0 + PQ_C3 * ym), vec3(PQ_M2));
 }
 
+/* Inverse of sdr_to_linear. Needed wherever something has to be averaged as
+ * light and then handed back to a signal-domain consumer. */
+highp vec3 linear_to_sdr(highp vec3 c, int sdr_eotf)
+{
+	c = max(c, vec3(0.0));
+	if (sdr_eotf == 1)
+		return pow(c, vec3(1.0 / 2.2));
+	if (sdr_eotf == 2)
+		return mix(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055,
+		           c * 12.92,
+		           lessThanEqual(c, vec3(0.0031308)));
+	return pow(c, vec3(1.0 / 2.4));
+}
+
 /* Source primaries, applied to linear light before the target rotation below.
  *
  * The framebuffer is R'G'B', but which chromaticities those coordinates *mean*
@@ -143,7 +157,12 @@ highp float filmic_shoulder(highp float x)
 	return 1.0 - exp(-x);
 }
 
-highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut, int shoulder, int sdr_eotf, int src_primaries)
+/* Entry point for callers that already hold linear light, so it is not decoded
+ * and re-encoded on the way in. `scene_linear` is normalised with 1.0 at
+ * reference white; values above that are the additive overshoot the roll-off
+ * compresses. */
+highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_nits,
+                               int expand_gamut, int shoulder, int src_primaries)
 {
 	/* STEP 3: one transfer function across the whole range, then compress
 	 * whatever lands above paper white.
@@ -170,9 +189,8 @@ highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand
 	 * factor keeps the overshoot's chromaticity, so a hot additive red stays
 	 * red. Dim channels are left alone, as before. */
 	const highp float peak_nits = 1000.0;   /* additive highlight ceiling */
-	highp vec3  c        = max(rgb, vec3(0.0));
 	highp float headroom = max(peak_nits - paper_white_nits, 0.0);
-	highp vec3  lin      = src_primaries_to_709(sdr_to_linear(c, sdr_eotf), src_primaries)
+	highp vec3  lin      = src_primaries_to_709(max(scene_linear, vec3(0.0)), src_primaries)
 	                     * paper_white_nits;
 	/* Linear-light overshoot. Forced to zero when there is no headroom
 	 * (paper white at or above the ceiling), which clamps to paper white
@@ -204,6 +222,13 @@ highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand
 	lin = min(lin, vec3(paper_white_nits)) + over * knee;
 	lin = rec709_to_target(lin, expand_gamut);
 	return pq_encode(lin);
+}
+
+highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut,
+                        int shoulder, int sdr_eotf, int src_primaries)
+{
+	return encode_hdr10_linear(sdr_to_linear(max(rgb, vec3(0.0)), sdr_eotf),
+	                           paper_white_nits, expand_gamut, shoulder, src_primaries);
 }
 
 /* ---- Debanding dither -----------------------------------------------------

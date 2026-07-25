@@ -14,14 +14,20 @@ precision highp int;
  * Output is gamma-domain R'G'B', exactly what the display quad would otherwise
  * have produced, so the HDR10 encode here is the one the normal path uses.
  *
- * Clamped to [0,1]. Band-limiting rings and the comb leaks, so the decoded
- * signal does overshoot at sharp edges - but that is filter ringing, not light.
- * A television clips it, and treating it as emissive content makes every edge
- * glow. */
+ * The box averages *light*, not signal. The samples being combined are what a
+ * phosphor would have integrated over the span of one output pixel, and a
+ * phosphor integrates emitted light - so the transfer function belongs inside
+ * the average, not after it. Averaging the voltage and applying gamma once is
+ * darker by Jensen's inequality: about 6% on a +-10% ripple and up to 62% at a
+ * hard black-to-white edge, which is precisely where output pixels straddle a
+ * transition.
+ *
+ * Clamped to [0,1] first. Band-limiting rings and the comb leaks, so the
+ * decoded signal does overshoot at sharp edges - but that is filter ringing,
+ * not light. A television clips it, and treating it as emissive content makes
+ * every edge glow. */
 
-#if defined(HDR)
 #include "hdr.h"
-#endif
 
 layout(location = 0) in highp vec2 vUV;
 layout(location = 0) out highp vec4 FragColor;
@@ -32,13 +38,11 @@ layout(push_constant, std430) uniform Registers
 {
 	vec2  sig_size;      /* base-clock signal: native_w*div by native_h */
 	vec2  out_size;      /* display resolution, native * internal scale */
-#if defined(HDR)
+	int   sdr_eotf;      /* needed in both paths now - the box averages light */
 	float paper_white_nits;
 	int   expand_gamut;
 	int   shoulder;
-	int   sdr_eotf;
-	int   src_primaries;  /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
-#endif
+	int   src_primaries; /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 } reg;
 
 void main()
@@ -62,16 +66,17 @@ void main()
 		if (i >= num)
 			break;
 		highp float k = clamp(n0 + float(i), 0.0, reg.sig_size.x - 1.0);
-		acc += textureLod(uDecoded, vec2((k + 0.5) / reg.sig_size.x, row), 0.0).rgb;
+		highp vec3  v = textureLod(uDecoded, vec2((k + 0.5) / reg.sig_size.x, row), 0.0).rgb;
+		acc += sdr_to_linear(clamp(v, vec3(0.0), vec3(1.0)), reg.sdr_eotf);
 		cnt += 1.0;
 	}
 
-	highp vec3 rgb = clamp(acc / max(cnt, 1.0), vec3(0.0), vec3(1.0));
+	highp vec3 lin = acc / max(cnt, 1.0);
 
 #if defined(HDR)
-	FragColor = vec4(encode_hdr10(rgb, reg.paper_white_nits, reg.expand_gamut,
-	                              reg.shoulder, reg.sdr_eotf, reg.src_primaries), 1.0);
+	FragColor = vec4(encode_hdr10_linear(lin, reg.paper_white_nits, reg.expand_gamut,
+	                                     reg.shoulder, reg.src_primaries), 1.0);
 #else
-	FragColor = vec4(rgb, 1.0);
+	FragColor = vec4(linear_to_sdr(lin, reg.sdr_eotf), 1.0);
 #endif
 }
