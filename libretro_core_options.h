@@ -358,15 +358,30 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(hdr_shoulder),
       "HDR Highlight Roll-Off",
       NULL,
-      "Selects how additive highlights that rise above SDR white are compressed toward the HDR peak, when 'Color Format' is set to '30-bit Color (HDR)'. 'Reinhard (Soft Knee)' is a gentle, gradual roll-off. 'ACES (Filmic)' uses a filmic shoulder that rises faster and reaches the peak sooner, giving punchier highlights. Only affects over-white emissive/additive content on the Vulkan HDR path; ordinary colour and everything in the standard range are identical either way. Has no effect on the OpenGL/Software renderers or in 24-bit mode.",
+      "Selects how additive highlights that rise above SDR white are compressed toward the HDR peak, when 'Color Format' is set to '30-bit Color (HDR)'. 'Reinhard (Soft Knee)' is a gentle, gradual roll-off. 'Filmic' uses a shoulder that rises faster and reaches the peak sooner, giving punchier highlights. Only affects over-white emissive/additive content on the Vulkan HDR path; ordinary colour and everything in the standard range are identical either way. Has no effect on the OpenGL/Software renderers or in 24-bit mode.",
       NULL,
       "video",
       {
          { "reinhard", "Reinhard (Soft Knee)" },
-         { "aces",     "ACES (Filmic)" },
+         { "aces",     "Filmic" },
          { NULL, NULL },
       },
       "reinhard"
+   },
+   {
+      BEETLE_OPT(hdr_sdr_gamma),
+      "HDR Reference SDR Gamma",
+      NULL,
+      "Selects the display gamma the 24-bit output is assumed to have been viewed through, used to linearise the picture before it is re-encoded for HDR, when 'Color Format' is set to '30-bit Color (HDR)'. This decides whether HDR lands at the same brightness the standard path did on your screen - it does not change accuracy, only the match between the two. 'BT.1886 (Gamma 2.4)' is the default and matches the frontend's own SDR-to-HDR conversion and a TV-like reference. 'Gamma 2.2' suits a PC monitor tracking sRGB's nominal gamma. 'sRGB (Piecewise)' matches how Windows composites standard content onto an HDR desktop and lifts shadow detail. If HDR looks dimmer or more contrasty than 24-bit on the same display, try 'Gamma 2.2' or 'sRGB (Piecewise)'. Has no effect on the OpenGL/Software renderers or in 24-bit mode.",
+      NULL,
+      "video",
+      {
+         { "bt1886",  "BT.1886 (Gamma 2.4)" },
+         { "gamma22", "Gamma 2.2" },
+         { "srgb",    "sRGB (Piecewise)" },
+         { NULL, NULL },
+      },
+      "bt1886"
    },
    {
       BEETLE_OPT(hdr_overbright),

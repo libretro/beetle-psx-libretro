@@ -204,6 +204,11 @@ int   psx_hdr_shoulder         = 0;
  * reference white before blending (over-white only from stacking, default);
  * 1 leaves it hot for punchier single-layer glow. Read from a core option. */
 int   psx_hdr_overbright_hot   = 0;
+/* Reference SDR transfer the 24-bit path is assumed to have been viewed
+ * through, used to linearise before the HDR encode: 0 = BT.1886 pure 2.4
+ * (default, matches RetroArch's own SDR->HDR composition), 1 = pure 2.2,
+ * 2 = sRGB piecewise. Read from a core option. */
+int   psx_hdr_sdr_eotf         = 0;
 
 #define NEGCON_RANGE 0x7FFF
 
@@ -4424,6 +4429,18 @@ static void check_variables(bool startup)
       {
          if (!strcmp(var.value, "aces"))
             psx_hdr_shoulder = 1;
+      }
+
+      /* Reference SDR transfer for the HDR encode (Vulkan HDR path only).
+       * Inert unless the HDR scanout is actually engaged. */
+      var.key = BEETLE_OPT(hdr_sdr_gamma);
+      psx_hdr_sdr_eotf = 0;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "gamma22"))
+            psx_hdr_sdr_eotf = 1;
+         else if (!strcmp(var.value, "srgb"))
+            psx_hdr_sdr_eotf = 2;
       }
 
       /* HDR additive/subtractive source clamp (Vulkan HDR path only): 0 clamps

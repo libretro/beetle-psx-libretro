@@ -79,6 +79,7 @@ extern bool  psx_hdr_active;           /* true only when HDR10 is really engaged
 extern float psx_hdr_paper_white_nits; /* frontend SDR white, default 200        */
 extern int   psx_hdr_expand_gamut;     /* frontend "Colour Boost" rotation        */
 extern int   psx_hdr_output_mode;      /* frontend HDR output mode (0 off/1 HDR10) */
+extern int   psx_hdr_sdr_eotf;         /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 
 #ifdef __cplusplus
 }

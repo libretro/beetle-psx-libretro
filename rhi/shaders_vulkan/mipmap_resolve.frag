@@ -26,6 +26,7 @@ layout(push_constant, std430) uniform Registers
 	float paper_white_nits;
 	int   expand_gamut;
 	int   shoulder;
+	int   sdr_eotf;
 #endif
 } registers;
 
@@ -38,7 +39,7 @@ void main()
 	/* The trilinear resolve interpolates the 8-bit source, producing
 	 * sub-8-bit precision that 10-bit output preserves - so no debanding is
 	 * needed (or wanted) here; just encode. */
-	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut, registers.shoulder), 1.0);
+	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut, registers.shoulder, registers.sdr_eotf), 1.0);
 #else
 	#if defined(DITHER)
 		rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));

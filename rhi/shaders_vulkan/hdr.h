@@ -57,6 +57,30 @@ highp vec3 rec709_to_target(highp vec3 c, int expand_gamut)
 		0.0163916 * c.r + 0.0880132 * c.g + 0.8955950 * c.b);
 }
 
+/* Reference SDR transfer, applied to the whole signal (see encode_hdr10).
+ *   0  BT.1886 pure 2.4 - matches RetroArch's own SDR->HDR composition and a
+ *      TV-like reference display. Historical behaviour, still the default.
+ *   1  pure 2.2 - closer to a PC monitor tracking sRGB's nominal gamma.
+ *   2  sRGB piecewise - what Windows assumes when it composites SDR content
+ *      into an HDR desktop. Lifts the toe relative to 2.4.
+ * This is a viewing-reference choice, not a correctness one: it decides
+ * whether 30-bit HDR lands at the same brightness the 24-bit path did on the
+ * same display. Against a 2.2 monitor, 2.4 is 12.9% down in linear light at
+ * code 0.5 and 24.2% down at 0.25, which reads as "HDR looks dimmer and more
+ * contrasty". All three agree exactly at 0.0 and 1.0, so paper white and the
+ * roll-off knee threshold do not move, and all extend monotonically past 1.0
+ * so the additive overshoot decodes with the same curve as everything else. */
+highp vec3 sdr_to_linear(highp vec3 c, int sdr_eotf)
+{
+	if (sdr_eotf == 1)
+		return pow(c, vec3(2.2));
+	if (sdr_eotf == 2)
+		return mix(pow((c + vec3(0.055)) / 1.055, vec3(2.4)),
+		           c / 12.92,
+		           lessThanEqual(c, vec3(0.04045)));
+	return pow(c, vec3(2.4));
+}
+
 highp float filmic_shoulder(highp float x)
 {
 	/* Punchier alternative to Reinhard's o/(o+1) as the highlight-shoulder
@@ -77,15 +101,14 @@ highp float filmic_shoulder(highp float x)
 	return 1.0 - exp(-x);
 }
 
-highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut, int shoulder)
+highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut, int shoulder, int sdr_eotf)
 {
 	/* STEP 3: one transfer function across the whole range, then compress
 	 * whatever lands above paper white.
 	 *
-	 * The signal is PSX-native and gamma-encoded; pow(2.4) is the display
-	 * transfer (RetroArch linearises SDR with 2.4 in its Vulkan/D3D HDR
-	 * shaders; the sRGB piecewise curve is wrong here and lifts blacks).
-	 * Applying it to the whole value - including the >1.0 left in the 16F
+	 * The signal is PSX-native and gamma-encoded; sdr_to_linear is the
+	 * display transfer (defaulting to the pure 2.4 RetroArch uses in its own
+	 * Vulkan/D3D HDR shaders). Applying it to the whole value - including the >1.0 left in the 16F
 	 * framebuffer by additive blends - is what keeps the encode continuous.
 	 * Decoding only [0,1] and treating the overshoot as if it were already
 	 * linear light mixes two domains in one sum, and the slope then steps by
@@ -93,8 +116,8 @@ highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand
 	 * reference white, which contours any gradient that crosses it and makes
 	 * the deband grain visibly coarsen at the same threshold.
 	 *
-	 * Content in [0,1] is untouched by this: pow(c,2.4)*paper_white <= paper
-	 * white, so the roll-off below never engages and the standard range still
+	 * Content in [0,1] is untouched by this: the transfer maps 1.0 to 1.0 for
+	 * every sdr_eotf, so sdr_to_linear(c)*paper_white <= paper white, so the roll-off below never engages and the standard range still
 	 * maps bit-for-bit onto the SDR result.
 	 *
 	 * The knee is driven by the peak (brightest) overshoot channel and the
@@ -107,7 +130,7 @@ highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand
 	const highp float peak_nits = 1000.0;   /* additive highlight ceiling */
 	highp vec3  c        = max(rgb, vec3(0.0));
 	highp float headroom = max(peak_nits - paper_white_nits, 0.0);
-	highp vec3  lin      = pow(c, vec3(2.4)) * paper_white_nits;
+	highp vec3  lin      = sdr_to_linear(c, sdr_eotf) * paper_white_nits;
 	/* Linear-light overshoot. Forced to zero when there is no headroom
 	 * (paper white at or above the ceiling), which clamps to paper white
 	 * instead of letting the knee pass the value through unscaled. */

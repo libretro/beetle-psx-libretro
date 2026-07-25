@@ -45,7 +45,8 @@
 extern bool  psx_hdr_active;
 extern float psx_hdr_paper_white_nits;
 extern int   psx_hdr_expand_gamut;
-extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 ACES */
+extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
+extern int   psx_hdr_sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_hdr_overbright_hot;   /* additive/sub source: 0 clamped, 1 hot */
 /* The requested color format (enum psx_color_format_e). Unlike psx_hdr_active
  * this is known at renderer init (read at startup), so it gates the wide
@@ -7367,6 +7368,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
          float   paper_white_nits;
          int32_t expand_gamut;
          int32_t shoulder;
+         int32_t sdr_eotf;
       };
       struct HdrPush hpush;
       hpush.offset[0]        = push.offset[0];
@@ -7376,6 +7378,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
       hpush.paper_white_nits = psx_hdr_paper_white_nits;
       hpush.expand_gamut     = psx_hdr_expand_gamut;
       hpush.shoulder         = psx_hdr_shoulder;
+      hpush.sdr_eotf         = psx_hdr_sdr_eotf;
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
    }
    else
@@ -7703,9 +7706,9 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
 
    if (psx_hdr_active && using_mipmap)
    {
-      /* The -DHDR mipmap_resolve reflects a 44-byte push: the full 36-byte
+      /* The -DHDR mipmap_resolve reflects a 52-byte push: the full 36-byte
        * resolve layout (offset, scale, uv_min, uv_max, max_bias) plus paper
-       * white + gamut appended. */
+       * white, gamut, shoulder and the SDR transfer appended. */
       struct HdrMipmapPush
       {
          float   offset[2];
@@ -7716,6 +7719,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          float   paper_white_nits;
          int32_t expand_gamut;
          int32_t shoulder;
+         int32_t sdr_eotf;
       };
       struct HdrMipmapPush mp;
       mp.offset[0]        = push.offset[0];
@@ -7730,12 +7734,14 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       mp.paper_white_nits = psx_hdr_paper_white_nits;
       mp.expand_gamut     = psx_hdr_expand_gamut;
       mp.shoulder         = psx_hdr_shoulder;
+      mp.sdr_eotf         = psx_hdr_sdr_eotf;
       commandbuffer_push_constants(cbh_get(&self->cmd), &mp, 0, sizeof(mp));
    }
    else if (psx_hdr_active)
    {
-      /* The -DHDR quad reflects a 24-byte push (offset, range, paper white,
-       * gamut); reuse offset/scale computed above and append the HDR params.
+      /* The -DHDR quad reflects a 32-byte push (offset, range, paper white,
+       * gamut, shoulder, SDR transfer); reuse offset/scale computed above
+       * and append the HDR params.
        * commandbuffer_push_constants copies into the shared buffer; the flush
        * pushes exactly the bound program's reflected range. */
       struct HdrPush
@@ -7745,6 +7751,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          float   paper_white_nits;
          int32_t expand_gamut;
          int32_t shoulder;
+         int32_t sdr_eotf;
       };
       struct HdrPush hpush;
       hpush.offset[0]        = push.offset[0];
@@ -7754,6 +7761,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       hpush.paper_white_nits = psx_hdr_paper_white_nits;
       hpush.expand_gamut     = psx_hdr_expand_gamut;
       hpush.shoulder         = psx_hdr_shoulder;
+      hpush.sdr_eotf         = psx_hdr_sdr_eotf;
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
    }
    else
