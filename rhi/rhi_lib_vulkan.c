@@ -5759,12 +5759,12 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *analog_downsample;   /* only when internal resolution > 1x */
             Program *analog_encode;
             Program *analog_encode_pal;
-            Program *analog_separate;
-            Program *analog_separate_pal;
-            Program *analog_resolve;
-            Program *analog_resolve_pal;
+            Program *analog_comb;
+            Program *analog_comb_pal;
+            Program *analog_demod;
+            Program *analog_demod_pal;
+            Program *analog_resolve;       /* region-independent: box + encode only */
             Program *analog_resolve_hdr;
-            Program *analog_resolve_hdr_pal;
             Program *mipmap_energy_first;
             Program *mipmap_energy;
             Program *mipmap_energy_blur;
@@ -5793,6 +5793,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          ImageHandle analog_native;   /* supersample resolve, only when scaling > 1 */
          ImageHandle analog_sig;
          ImageHandle analog_sep;
+         ImageHandle analog_dec;   /* decoded RGB at base rate */
          ImageHandle analog_out;
          /* Field parity for the subcarrier. In 240p the carrier gains half a
           * cycle per field in both regions, so the artifact pattern simply
@@ -6319,23 +6320,24 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t analog_encode_pal_frag[] =
 #include "shaders_vulkan/prebuilt/analog.encode.pal.frag.inc"
    ;
-   static const uint32_t analog_separate_frag[] =
-#include "shaders_vulkan/prebuilt/analog.separate.frag.inc"
+   static const uint32_t analog_comb_frag[] =
+#include "shaders_vulkan/prebuilt/analog.comb.frag.inc"
    ;
-   static const uint32_t analog_separate_pal_frag[] =
-#include "shaders_vulkan/prebuilt/analog.separate.pal.frag.inc"
+   static const uint32_t analog_comb_pal_frag[] =
+#include "shaders_vulkan/prebuilt/analog.comb.pal.frag.inc"
+   ;
+   static const uint32_t analog_demod_frag[] =
+#include "shaders_vulkan/prebuilt/analog.demod.frag.inc"
+   ;
+   static const uint32_t analog_demod_pal_frag[] =
+#include "shaders_vulkan/prebuilt/analog.demod.pal.frag.inc"
    ;
    static const uint32_t analog_resolve_frag[] =
 #include "shaders_vulkan/prebuilt/analog.resolve.frag.inc"
    ;
-   static const uint32_t analog_resolve_pal_frag[] =
-#include "shaders_vulkan/prebuilt/analog.resolve.pal.frag.inc"
-   ;
    static const uint32_t analog_resolve_hdr_frag[] =
 #include "shaders_vulkan/prebuilt/analog.resolve.hdr.frag.inc"
    ;
-   static const uint32_t analog_resolve_hdr_pal_frag[] =
-#include "shaders_vulkan/prebuilt/analog.resolve.hdr.pal.frag.inc"
       ;
    static const uint32_t mipmap_energy_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.energy.frag.inc"
@@ -6825,18 +6827,18 @@ static void renderer_init_pipelines(Renderer *self)
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_encode_frag, sizeof(analog_encode_frag));
    self->pipelines.analog_encode_pal =
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_encode_pal_frag, sizeof(analog_encode_pal_frag));
-   self->pipelines.analog_separate =
-      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_separate_frag, sizeof(analog_separate_frag));
-   self->pipelines.analog_separate_pal =
-      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_separate_pal_frag, sizeof(analog_separate_pal_frag));
+   self->pipelines.analog_comb =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_comb_frag, sizeof(analog_comb_frag));
+   self->pipelines.analog_comb_pal =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_comb_pal_frag, sizeof(analog_comb_pal_frag));
+   self->pipelines.analog_demod =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_demod_frag, sizeof(analog_demod_frag));
+   self->pipelines.analog_demod_pal =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_demod_pal_frag, sizeof(analog_demod_pal_frag));
    self->pipelines.analog_resolve =
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_frag, sizeof(analog_resolve_frag));
-   self->pipelines.analog_resolve_pal =
-      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_pal_frag, sizeof(analog_resolve_pal_frag));
    self->pipelines.analog_resolve_hdr =
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_hdr_frag, sizeof(analog_resolve_hdr_frag));
-   self->pipelines.analog_resolve_hdr_pal =
-      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_hdr_pal_frag, sizeof(analog_resolve_hdr_pal_frag));
 
    self->pipelines.mipmap_energy = device_request_program_graphics_code(self->device, mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
          mipmap_energy_frag, sizeof(mipmap_energy_frag));
@@ -7683,8 +7685,8 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
    }
 
-   /* ---- pass 2: separate ---- */
-   { struct SepPush { float sig_size[2]; int32_t svideo; } push;
+   /* ---- pass 2: comb ---- */
+   { struct CombPush { float sig_size[2]; int32_t svideo; } push;
    push.sig_size[0] = (float)sig_w;
    push.sig_size[1] = (float)sig_h;
    push.svideo      = svideo ? 1 : 0;
@@ -7704,7 +7706,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
    commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
    commandbuffer_set_program(cbh_get(&self->cmd),
-      pal ? self->pipelines.analog_separate_pal : self->pipelines.analog_separate);
+      pal ? self->pipelines.analog_comb_pal : self->pipelines.analog_comb);
    commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
       image_get_view(ih_get(&self->analog_sig)), StockSampler_NearestClamp);
    commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
@@ -7719,15 +7721,66 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
    }
 
-   /* ---- pass 3: resolve ---- */
-   { struct ResPush
+   /* ---- pass 3: demodulate -> RGB at base rate ----
+    * Done once here rather than inside the resolve, so the chain's cost no
+    * longer scales with internal resolution. */
+   { struct DemodPush
    {
       float   sig_size[2];
-      float   out_size[2];
       float   x1;
       float   inv_ratio;
       float   line_adv;
       float   field_adv;
+      int32_t svideo;
+   } push;
+   ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16B16A16_SFLOAT);
+   info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+   info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+   ih_move(&self->analog_dec, device_create_image(self->device, &info, NULL));
+
+   push.sig_size[0] = (float)sig_w;
+   push.sig_size[1] = (float)sig_h;
+   push.x1          = x1;
+   push.inv_ratio   = inv_ratio;
+   push.line_adv    = line_adv;
+   push.field_adv   = field_adv;
+   push.svideo      = svideo ? 1 : 0;
+
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_dec),
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+   render_pass_info_defaults(&rp);
+   rp.color_attachments[0]  = image_get_view(ih_get(&self->analog_dec));
+   rp.num_color_attachments = 1;
+   rp.store_attachments     = 1;
+   commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
+   commandbuffer_set_quad_state(cbh_get(&self->cmd));
+   vp.x = 0.0f; vp.y = 0.0f; vp.width = (float)sig_w; vp.height = (float)sig_h;
+   vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+   commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
+   commandbuffer_set_program(cbh_get(&self->cmd),
+      pal ? self->pipelines.analog_demod_pal : self->pipelines.analog_demod);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
+      image_get_view(ih_get(&self->analog_sep)), StockSampler_NearestClamp);
+   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+   commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+   commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
+   commandbuffer_end_render_pass(cbh_get(&self->cmd));
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_dec),
+      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   }
+
+   /* ---- pass 4: resample to display ---- */
+   { struct ResPush
+   {
+      float   sig_size[2];
+      float   out_size[2];
       float   paper_white_nits;
       int32_t expand_gamut;
       int32_t shoulder;
@@ -7739,10 +7792,6 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    push.sig_size[1]      = (float)sig_h;
    push.out_size[0]      = (float)out_w;
    push.out_size[1]      = (float)out_h;
-   push.x1               = x1;
-   push.inv_ratio        = inv_ratio;
-   push.line_adv         = line_adv;
-   push.field_adv        = field_adv;
    push.paper_white_nits = psx_hdr_paper_white_nits;
    push.expand_gamut     = psx_hdr_expand_gamut;
    push.shoulder         = psx_hdr_shoulder;
@@ -7763,10 +7812,9 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
    commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
    commandbuffer_set_program(cbh_get(&self->cmd),
-      psx_hdr_active ? (pal ? self->pipelines.analog_resolve_hdr_pal : self->pipelines.analog_resolve_hdr)
-                     : (pal ? self->pipelines.analog_resolve_pal     : self->pipelines.analog_resolve));
+      psx_hdr_active ? self->pipelines.analog_resolve_hdr : self->pipelines.analog_resolve);
    commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
-      image_get_view(ih_get(&self->analog_sep)), StockSampler_NearestClamp);
+      image_get_view(ih_get(&self->analog_dec)), StockSampler_NearestClamp);
    commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, push_size);
    commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);

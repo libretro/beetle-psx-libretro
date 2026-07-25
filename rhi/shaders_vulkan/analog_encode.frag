@@ -4,15 +4,23 @@ precision highp int;
 
 /* Pass 1 of the analog path: framebuffer -> modulated signal.
  *
- * Output is one base-clock sample per fragment, at width = visible_pixels *
- * div. The gather folds the CRTC's zero-order hold into the filter, so there
- * is no intermediate upscaled texture: base sample k belongs to native pixel
- * k / div, and the luma / chroma low-passes are evaluated directly over that.
+ * Output is one base-clock sample per fragment, at width = native_pixels * div.
  *
- * Emits vec2: .x = luma-ish channel, .y = modulated chroma. Composite is the
- * sum of the two and the decode has to separate them again; S-Video keeps them
- * apart, which is exactly the difference between the two cables. RGB does not
- * come through here at all - it bypasses the whole path. */
+ * The filters are evaluated against the CRTC's zero-order hold rather than
+ * against individual taps. The source is piecewise constant over `div` base
+ * samples - that is what the hold is - so every run of taps landing on the same
+ * native pixel collapses into one weighted fetch, the weight being a difference
+ * of two prefix-sum entries. A 95-tap luma filter plus a 31-tap chroma filter
+ * becomes 11 to 25 texture reads depending on the dot clock instead of 126, and
+ * the arithmetic is identical, not approximated.
+ *
+ * Luma and chroma share the loop: chroma's tap span is a strict subset of
+ * luma's, so one fetch feeds both and the chroma weight is simply zero outside
+ * its own span.
+ *
+ * Emits vec2: .x luma, .y modulated chroma. Composite sums the two on one wire
+ * and the decoder has to separate them again; S-Video keeps them apart, which
+ * is exactly what distinguishes the cables. RGB never reaches this pass. */
 
 #include "analog.h"
 
@@ -28,16 +36,28 @@ layout(push_constant, std430) uniform Registers
 	float x1;            /* GP1(06h).X1, video clocks from HSYNC */
 	float inv_ratio;     /* 1/15 NTSC, 1/12 PAL */
 	float line_adv;      /* 0.5 NTSC, 0.75 PAL */
-	float field_adv;     /* from the frame/field counter */
+	float field_adv;     /* from the field counter */
 	int   cable;         /* AN_CABLE_*: picks the luma tier, enables the beat */
 } reg;
 
-/* Native pixel under base-clock sample k, clamped at the line edges so the
- * filter skirts do not wrap into the opposite side of the screen. */
-highp vec3 fetch_base(highp float k, highp float row)
+/* Summed weight of every tap falling on one held pixel, from the prefix table.
+ * `lo`/`hi` are tap offsets relative to the filter centre. */
+highp float span_weight_luma(int lo, int hi)
 {
-	highp float px = clamp(floor(k / reg.div), 0.0, reg.src_size.x - 1.0);
-	return textureLod(uSource, vec2((px + 0.5) / reg.src_size.x, row), 0.0).rgb;
+	int a = clamp(lo + AN_LUMA_HALF,     0, AN_LUMA_N);
+	int b = clamp(hi + AN_LUMA_HALF + 1, 0, AN_LUMA_N);
+	if (reg.cable == AN_CABLE_SVIDEO)
+		return AN_LUMA_WIDE_P[b] - AN_LUMA_WIDE_P[a];
+	if (reg.cable == AN_CABLE_RF)
+		return AN_LUMA_RF_P[b] - AN_LUMA_RF_P[a];
+	return AN_LUMA_P[b] - AN_LUMA_P[a];
+}
+
+highp float span_weight_chroma(int lo, int hi)
+{
+	int a = clamp(lo + AN_CHROMA_HALF,     0, AN_CHROMA_N);
+	int b = clamp(hi + AN_CHROMA_HALF + 1, 0, AN_CHROMA_N);
+	return AN_CHROMA_P[b] - AN_CHROMA_P[a];
 }
 
 void main()
@@ -46,37 +66,35 @@ void main()
 	highp float row  = vUV.y;
 	highp float line = floor(gl_FragCoord.y);
 
-	/* Luma and chroma are band-limited separately and to very different
-	 * widths - ~4.2 MHz against ~1.3 MHz - which is most of why composite
-	 * looks the way it does. Two gathers rather than one because the tap
-	 * counts differ by 3x and running luma at the chroma length would throw
-	 * away the detail the luma filter is meant to keep. */
-	/* Luma bandwidth is the main thing separating the cable tiers, and the
-	 * branch is uniform across the draw, so the three loops cost nothing over
-	 * one. S-Video is widest (luma has its own wire), composite is capped by
-	 * having to share with the subcarrier, RF by the modulator. */
-	highp float y = 0.0;
-	if (reg.cable == AN_CABLE_SVIDEO)
-	{
-		for (int t = -AN_LUMA_WIDE_N; t <= AN_LUMA_WIDE_N; t++)
-			y += AN_LUMA_WIDE[t < 0 ? -t : t] * an_rgb_to_yc(fetch_base(n + float(t), row)).x;
-	}
-	else if (reg.cable == AN_CABLE_RF)
-	{
-		for (int t = -AN_LUMA_RF_N; t <= AN_LUMA_RF_N; t++)
-			y += AN_LUMA_RF[t < 0 ? -t : t] * an_rgb_to_yc(fetch_base(n + float(t), row)).x;
-	}
-	else
-	{
-		for (int t = -AN_LUMA_N; t <= AN_LUMA_N; t++)
-			y += AN_LUMA[t < 0 ? -t : t] * an_rgb_to_yc(fetch_base(n + float(t), row)).x;
-	}
+	int   idiv = int(reg.div);
+	int   ni   = int(n);
+	int   maxp = int(reg.src_size.x) - 1;
 
-	highp vec2 iq = vec2(0.0);
-	for (int t = -AN_CHROMA_N; t <= AN_CHROMA_N; t++)
+	/* Native pixels touched by the luma span. */
+	int q0 = (ni - AN_LUMA_HALF) / idiv - 1;
+	int q1 = (ni + AN_LUMA_HALF) / idiv + 1;
+
+	highp float y  = 0.0;
+	highp vec2  iq = vec2(0.0);
+	int q;
+
+	for (q = q0; q <= q1; q++)
 	{
-		highp float w = AN_CHROMA[t < 0 ? -t : t];
-		iq += w * an_rgb_to_yc(fetch_base(n + float(t), row)).yz;
+		/* Tap offsets covered by native pixel q, relative to the centre. */
+		int lo = q * idiv - ni;
+		int hi = lo + idiv - 1;
+
+		highp float wl = span_weight_luma(lo, hi);
+		highp float wc = span_weight_chroma(lo, hi);
+		if (wl == 0.0 && wc == 0.0)
+			continue;
+
+		highp float px  = float(clamp(q, 0, maxp));
+		highp vec3  yc  = an_rgb_to_yc(
+			textureLod(uSource, vec2((px + 0.5) / reg.src_size.x, row), 0.0).rgb);
+
+		y  += wl * yc.x;
+		iq += wc * yc.yz;
 	}
 
 	highp float ph = an_phase(n, line, reg.x1, reg.inv_ratio,
@@ -86,9 +104,9 @@ void main()
 
 	highp float chroma = an_modulate(iq, cs, vs);
 
-	/* RF only: the sound carrier beating against the subcarrier. Added to the
-	 * signal before separation, which is where it lands on real hardware - it
-	 * is far below the chroma band-pass, so the comb leaves it in luma. */
+	/* RF only: the sound carrier beating against the subcarrier. Added before
+	 * separation, which is where it lands on real hardware - it sits far below
+	 * the chroma band, so the comb leaves it in luma. */
 	if (reg.cable == AN_CABLE_RF)
 	{
 		highp float bph = fract(n * AN_BEAT_RATIO + fract(line * AN_BEAT_LINE_ADV));

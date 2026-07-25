@@ -104,9 +104,9 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/analog.downsample.frag.inc -mfmt=c analog_downsample.frag
 "$GLSLC" -o prebuilt/analog.encode.frag.inc -mfmt=c analog_encode.frag
 "$GLSLC" -o prebuilt/analog.encode.pal.frag.inc -mfmt=c -DPAL analog_encode.frag
-"$GLSLC" -o prebuilt/analog.separate.frag.inc -mfmt=c analog_separate.frag
-"$GLSLC" -o prebuilt/analog.separate.pal.frag.inc -mfmt=c -DPAL analog_separate.frag
+"$GLSLC" -o prebuilt/analog.comb.frag.inc -mfmt=c analog_comb.frag
+"$GLSLC" -o prebuilt/analog.comb.pal.frag.inc -mfmt=c -DPAL analog_comb.frag
+"$GLSLC" -o prebuilt/analog.demod.frag.inc -mfmt=c analog_demod.frag
+"$GLSLC" -o prebuilt/analog.demod.pal.frag.inc -mfmt=c -DPAL analog_demod.frag
 "$GLSLC" -o prebuilt/analog.resolve.frag.inc -mfmt=c analog_resolve.frag
-"$GLSLC" -o prebuilt/analog.resolve.pal.frag.inc -mfmt=c -DPAL analog_resolve.frag
 "$GLSLC" -o prebuilt/analog.resolve.hdr.frag.inc -mfmt=c -DHDR analog_resolve.frag
-"$GLSLC" -o prebuilt/analog.resolve.hdr.pal.frag.inc -mfmt=c -DHDR -DPAL analog_resolve.frag
