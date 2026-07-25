@@ -8002,11 +8002,20 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
     * reads as noise rather than anti-banding. Force it off under HDR; this
     * also makes the non-dither hdr quad variants the ones actually selected
     * below and skips the dither push/LUT block. */
-   /* Note !hdr_quad, not !hdr_quad: under HDR+analog the quad is not the
-    * output stage, and the console's 4x4 ordered dither has to survive into
-    * the signal. Dissolving it back into smooth gradients is the single most
-    * visible thing composite does to PSX content. */
-   dither = (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither) && !hdr_quad;
+   /* psx_hdr_active, not hdr_quad. An earlier version forced the console's
+    * 4x4 ordered dither on under HDR whenever a cable was selected, on the
+    * theory that the cable would dissolve it back into smooth gradients. It
+    * does not, at the resolutions PSX games actually use: the Bayer pattern
+    * sits at roughly 1.7 and 3.4 MHz in 320 mode, both below the 4.2 MHz luma
+    * cutoff, so it passes through intact and lands on the output as 2-7%
+    * peak-to-peak ripple across what should be flat colour - worst on blue in
+    * 320 mode, which is to say skies. Only 640 mode pushes the finer
+    * component (6.7 MHz) past the cutoff.
+    *
+    * 30-bit output exists to avoid 15-bit quantisation; re-imposing it to feed
+    * the cable trades the precision the user asked for against an artifact. So
+    * HDR suppresses the dither with a cable exactly as it does without one. */
+   dither = (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither) && !psx_hdr_active;
 
    if (bpp24)
    {
