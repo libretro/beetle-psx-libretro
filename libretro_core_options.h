@@ -386,6 +386,21 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "off"
    },
    {
+      BEETLE_OPT(black_setup),
+      "NTSC Black Setup",
+      NULL,
+      "Simulates a mismatch in where black sits in the signal. NTSC-M, as used in North America, places black 7.5 IRE above blanking; NTSC-J in Japan and PAL everywhere else place it at 0. A console and television from the same market cancel out and look correct, so this does nothing by default - it only matters when a disc crossed between them, which is the better documented difference between NTSC-J and NTSC-M hardware. 'Lifted' reads a North American signal without the compensation, raising black to about 7.5% so the picture looks washed out. 'Crushed' reads a Japanese signal as though it carried the pedestal, clipping everything below 7.5% to black and raising contrast. Only affects 'Analog Video Cable' modes other than RGB, which carries no pedestal, and has no effect on PAL discs.",
+      NULL,
+      "video",
+      {
+         { "off",     "Matched (No Shift)" },
+         { "lifted",  "Lifted (NTSC-M Signal, 0 IRE Display)" },
+         { "crushed", "Crushed (NTSC-J Signal, 7.5 IRE Display)" },
+         { NULL, NULL },
+      },
+      "off"
+   },
+   {
       BEETLE_OPT(phase_error),
       "Analog Carrier Phase Error",
       NULL,

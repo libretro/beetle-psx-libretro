@@ -51,6 +51,13 @@ precision highp int;
  * it does nothing at all for NTSC, whose error is not complementary - which is
  * why real NTSC sets do not do this and neither do we.
  *
+ * It also applies the NTSC setup pedestal, as a plain affine on luma. Black
+ * sits 7.5 IRE above blanking on NTSC-M and at 0 on NTSC-J and PAL, and a
+ * matched encoder and receiver cancel out - so this is only ever non-identity
+ * when the two disagree, which is what happened whenever a disc crossed
+ * between those markets. Luma only: setup is a level shift on the luminance
+ * signal, and chroma is a difference signal riding on it, unaffected.
+ *
  * Also does the YIQ/YUV -> RGB conversion on the way out, so the resolve pass
  * stays region-independent. */
 
@@ -65,6 +72,8 @@ layout(push_constant, std430) uniform Registers
 {
 	vec2  sig_size;
 	float line_split;    /* 1 progressive, 2 interlaced */
+	float black_scale;   /* luma pedestal: y -> y*scale + offset. 1,0 = no-op */
+	float black_offset;
 	float b0, b1, b2;    /* feed-forward: zeros on the subcarrier */
 	float a1, a2;        /* feedback: poles pulling the stop band narrow */
 	int   enable;        /* S-Video has no carrier in luma - nothing to trap */
@@ -123,8 +132,11 @@ void main()
 		 * trap and a notch here would only cost detail. Straight conversion. */
 		for (i = 0; i < PER_THREAD; i++)
 			if (base + i < width)
-				imageStore(uOut, ivec2(base + i, line),
-				           vec4(an_yc_to_rgb(fetch_chroma_filtered(base + i, line)), 1.0));
+			{
+				highp vec3 yc = fetch_chroma_filtered(base + i, line);
+				yc.x = yc.x * reg.black_scale + reg.black_offset;
+				imageStore(uOut, ivec2(base + i, line), vec4(an_yc_to_rgb(yc), 1.0));
+			}
 		return;
 	}
 
@@ -183,7 +195,8 @@ void main()
 		Apow = A * Apow;
 		if (base + i < width)
 		{
-			highp float y  = (Apow * preB + Bpart[i]).x;
+			highp float y  = (Apow * preB + Bpart[i]).x * reg.black_scale
+			               + reg.black_offset;
 			highp vec3  yc = fetch_chroma_filtered(base + i, line);
 			imageStore(uOut, ivec2(base + i, line),
 			           vec4(an_yc_to_rgb(vec3(y, yc.yz)), 1.0));

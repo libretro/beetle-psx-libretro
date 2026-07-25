@@ -228,6 +228,14 @@ int   psx_src_primaries        = 0;
  * NTSC becomes complementary line to line on PAL and cancels in the delay
  * line. */
 float psx_phase_error          = 0.0f;
+/* NTSC setup pedestal. Black sits 7.5 IRE above blanking on NTSC-M and at 0 on
+ * NTSC-J and PAL; a matched encoder and receiver cancel, so this only does
+ * anything when the two disagree - which is exactly what happened when a disc
+ * crossed between those markets. 0 = matched, 1 = NTSC-M signal read without
+ * setup (blacks lifted), 2 = NTSC-J signal read as though it had setup (blacks
+ * crushed). NTSC only, and only with a cable that carries a composite
+ * luminance signal - RGB has no pedestal concept at all. */
+int   psx_black_setup          = 0;
 
 #define NEGCON_RANGE 0x7FFF
 
@@ -4429,6 +4437,16 @@ static void check_variables(bool startup)
          psx_src_primaries = 2;
       else if (!strcmp(var.value, "ntsc1953"))
          psx_src_primaries = 3;
+   }
+
+   var.key = BEETLE_OPT(black_setup);
+   psx_black_setup = 0;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "lifted"))
+         psx_black_setup = 1;
+      else if (!strcmp(var.value, "crushed"))
+         psx_black_setup = 2;
    }
 
    var.key = BEETLE_OPT(phase_error);

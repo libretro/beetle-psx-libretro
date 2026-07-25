@@ -82,6 +82,7 @@ extern int   psx_hdr_output_mode;      /* frontend HDR output mode (0 off/1 HDR1
 extern int   psx_hdr_sdr_eotf;         /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_src_primaries;        /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 extern int   psx_video_cable;
+extern int   psx_black_setup;          /* NTSC pedestal mismatch: 0 none, 1 lifted, 2 crushed */
 extern float psx_phase_error;          /* decoder carrier misalignment, cycles */          /* 0 = RGB/bypass, 1 = S-Video, 2 = composite */
 
 #ifdef __cplusplus

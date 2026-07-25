@@ -50,6 +50,7 @@ extern int   psx_hdr_sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB
 extern int   psx_src_primaries;  /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 extern int   psx_video_cable;    /* 0 = RGB/bypass, 1 = S-Video, 2 = composite */
 extern float psx_phase_error;    /* decoder carrier misalignment, cycles */
+extern int   psx_black_setup;    /* NTSC pedestal mismatch: 0 none, 1 lifted, 2 crushed */
 extern retro_log_printf_t log_cb;
 extern int   psx_hdr_overbright_hot;   /* additive/sub source: 0 clamped, 1 hot */
 /* The requested color format (enum psx_color_format_e). Unlike psx_hdr_active
@@ -7847,6 +7848,8 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    {
       float   sig_size[2];
       float   line_split;
+      float   black_scale;
+      float   black_offset;
       float   b0, b1, b2;
       float   a1, a2;
       int32_t enable;
@@ -7868,6 +7871,23 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    push.sig_size[0] = (float)sig_w;
    push.sig_size[1] = (float)sig_h;
    push.line_split  = line_split;
+   /* Setup is an NTSC composite-luminance concept: PAL never had it, and RGB
+    * carries no pedestal to mismatch. */
+   if (pal || psx_black_setup == 0)
+   {
+      push.black_scale  = 1.0f;
+      push.black_offset = 0.0f;
+   }
+   else if (psx_black_setup == 1)      /* NTSC-M signal, no compensation */
+   {
+      push.black_scale  = 1.0f - 0.075f;
+      push.black_offset = 0.075f;
+   }
+   else                                /* NTSC-J signal read with setup */
+   {
+      push.black_scale  = 1.0f / (1.0f - 0.075f);
+      push.black_offset = -0.075f / (1.0f - 0.075f);
+   }
    push.b0 = (float)b0; push.b1 = (float)b1; push.b2 = (float)b2;
    push.a1 = (float)a1; push.a2 = (float)a2;
    /* S-Video luma never shared a wire, so there is no residue to trap. */
