@@ -209,6 +209,12 @@ int   psx_hdr_overbright_hot   = 0;
  * (default, matches RetroArch's own SDR->HDR composition), 1 = pure 2.2,
  * 2 = sRGB piecewise. Read from a core option. */
 int   psx_hdr_sdr_eotf         = 0;
+/* Analog video path. 0 = RGB (the PSX multi-out's top tier, a straight
+ * bypass and the default), 1 = S-Video, 2 = composite. Only the Vulkan
+ * renderer implements it, and only at 1x internal resolution - the whole
+ * premise is native-resolution output, and upscaled input has no meaningful
+ * mapping onto a fixed-rate analog signal. */
+int   psx_video_cable          = 0;
 
 #define NEGCON_RANGE 0x7FFF
 
@@ -4429,6 +4435,17 @@ static void check_variables(bool startup)
       {
          if (!strcmp(var.value, "aces"))
             psx_hdr_shoulder = 1;
+      }
+
+      /* Analog video path (Vulkan, 1x internal resolution only). */
+      var.key = BEETLE_OPT(video_cable);
+      psx_video_cable = 0;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "svideo"))
+            psx_video_cable = 1;
+         else if (!strcmp(var.value, "composite"))
+            psx_video_cable = 2;
       }
 
       /* Reference SDR transfer for the HDR encode (Vulkan HDR path only).

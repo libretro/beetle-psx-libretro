@@ -98,3 +98,14 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/mipmap.energy.frag.inc -mfmt=c mipmap_energy.frag
 "$GLSLC" -o prebuilt/mipmap.energy.blur.frag.inc -mfmt=c mipmap_blur.frag
 
+# Analog video path (composite / S-Video). Region is compile-time: the
+# subcarrier, colour space, modulation axes and comb gain all differ.
+"$GLSLC" -o prebuilt/analog.vert.inc -mfmt=c analog.vert
+"$GLSLC" -o prebuilt/analog.encode.frag.inc -mfmt=c analog_encode.frag
+"$GLSLC" -o prebuilt/analog.encode.pal.frag.inc -mfmt=c -DPAL analog_encode.frag
+"$GLSLC" -o prebuilt/analog.separate.frag.inc -mfmt=c analog_separate.frag
+"$GLSLC" -o prebuilt/analog.separate.pal.frag.inc -mfmt=c -DPAL analog_separate.frag
+"$GLSLC" -o prebuilt/analog.resolve.frag.inc -mfmt=c analog_resolve.frag
+"$GLSLC" -o prebuilt/analog.resolve.pal.frag.inc -mfmt=c -DPAL analog_resolve.frag
+"$GLSLC" -o prebuilt/analog.resolve.hdr.frag.inc -mfmt=c -DHDR analog_resolve.frag
+"$GLSLC" -o prebuilt/analog.resolve.hdr.pal.frag.inc -mfmt=c -DHDR -DPAL analog_resolve.frag

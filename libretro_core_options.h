@@ -369,6 +369,21 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "reinhard"
    },
    {
+      BEETLE_OPT(video_cable),
+      "Analog Video Cable",
+      NULL,
+      "Simulates the cable between the console and the television, including the colour encoding and the television's decoder. 'RGB' is the sharpest output the PSX could produce and is a straight bypass (default). 'S-Video' band-limits colour heavily but keeps luma and colour on separate wires, so fine detail stays clean. 'Composite' sums them onto one wire, which the decoder then has to pull apart again - this blends the console's 4x4 ordered dither into smooth gradients the way a period television did, at the cost of colour smearing and rainbow fringing on fine patterns. Only supported by the Vulkan renderer, and only at an internal resolution of 1x; higher resolutions fall back to 'RGB'. Restart required.",
+      NULL,
+      "video",
+      {
+         { "off",       "RGB (Sharp, No Simulation)" },
+         { "svideo",    "S-Video" },
+         { "composite", "Composite" },
+         { NULL, NULL },
+      },
+      "off"
+   },
+   {
       BEETLE_OPT(hdr_sdr_gamma),
       "HDR Reference SDR Gamma",
       NULL,

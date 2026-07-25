@@ -47,6 +47,7 @@ extern float psx_hdr_paper_white_nits;
 extern int   psx_hdr_expand_gamut;
 extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
 extern int   psx_hdr_sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
+extern int   psx_video_cable;    /* 0 = RGB/bypass, 1 = S-Video, 2 = composite */
 extern int   psx_hdr_overbright_hot;   /* additive/sub source: 0 clamped, 1 hot */
 /* The requested color format (enum psx_color_format_e). Unlike psx_hdr_active
  * this is known at renderer init (read at startup), so it gates the wide
@@ -5749,6 +5750,19 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *mipmap_resolve;
             Program *mipmap_dither_resolve;
             Program *hdr_mipmap_resolve;   /* PQ Rec.2020 variant of mipmap_resolve, HDR only */
+
+            /* Analog video path. Region is baked into the shader (subcarrier,
+             * colour space, modulation axes, comb gain all differ), so each
+             * stage has an NTSC and a PAL build; resolve additionally has an
+             * HDR build because it is the stage that emits the final pixel. */
+            Program *analog_encode;
+            Program *analog_encode_pal;
+            Program *analog_separate;
+            Program *analog_separate_pal;
+            Program *analog_resolve;
+            Program *analog_resolve_pal;
+            Program *analog_resolve_hdr;
+            Program *analog_resolve_hdr_pal;
             Program *mipmap_energy_first;
             Program *mipmap_energy;
             Program *mipmap_energy_blur;
@@ -5768,6 +5782,20 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
          ImageHandle last_scanout;
          ImageHandle reuseable_scanout;
+         /* Analog path intermediates. sig holds the modulated signal at the
+          * CRTC base clock, sep the separated luma/chroma; both are RG16F and
+          * bipolar (composite swings negative and the comb produces negative
+          * luma estimates), so a UNORM target would clip them. out is the
+          * final display-resolution image the chain returns instead of the
+          * plain scanout. */
+         ImageHandle analog_sig;
+         ImageHandle analog_sep;
+         ImageHandle analog_out;
+         /* Field parity for the subcarrier. In 240p the carrier gains half a
+          * cycle per field in both regions, so the artifact pattern simply
+          * alternates frame to frame - the broadcast 4-field (NTSC) and
+          * 8-field (PAL) sequences only appear at 480i. */
+         unsigned analog_field;
 
 
          BufferHandle quad;
@@ -5832,6 +5860,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    }
    static ImageHandle renderer_scanout_to_texture(Renderer *self);
    static VkFormat renderer_hdr_scanout_format(Renderer *self);
+   static bool renderer_analog_active(Renderer *self);
+   static ImageHandle renderer_analog_apply(Renderer *self, unsigned out_w, unsigned out_h);
    static void renderer_draw_quad(Renderer *self, const Vertex *vertices);
    static void renderer_init_pipelines(Renderer *self);
    static TTRect renderer_compute_vram_framebuffer_rect(Renderer *self);
@@ -6272,6 +6302,34 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t hdr_mipmap_resolve_frag[] =
 #include "shaders_vulkan/prebuilt/hdr.mipmap.resolve.frag.inc"
       ;
+
+   static const uint32_t analog_vert[] =
+#include "shaders_vulkan/prebuilt/analog.vert.inc"
+   ;
+   static const uint32_t analog_encode_frag[] =
+#include "shaders_vulkan/prebuilt/analog.encode.frag.inc"
+   ;
+   static const uint32_t analog_encode_pal_frag[] =
+#include "shaders_vulkan/prebuilt/analog.encode.pal.frag.inc"
+   ;
+   static const uint32_t analog_separate_frag[] =
+#include "shaders_vulkan/prebuilt/analog.separate.frag.inc"
+   ;
+   static const uint32_t analog_separate_pal_frag[] =
+#include "shaders_vulkan/prebuilt/analog.separate.pal.frag.inc"
+   ;
+   static const uint32_t analog_resolve_frag[] =
+#include "shaders_vulkan/prebuilt/analog.resolve.frag.inc"
+   ;
+   static const uint32_t analog_resolve_pal_frag[] =
+#include "shaders_vulkan/prebuilt/analog.resolve.pal.frag.inc"
+   ;
+   static const uint32_t analog_resolve_hdr_frag[] =
+#include "shaders_vulkan/prebuilt/analog.resolve.hdr.frag.inc"
+   ;
+   static const uint32_t analog_resolve_hdr_pal_frag[] =
+#include "shaders_vulkan/prebuilt/analog.resolve.hdr.pal.frag.inc"
+      ;
    static const uint32_t mipmap_energy_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.energy.frag.inc"
       ;
@@ -6318,6 +6376,7 @@ static void renderer_init(Renderer *self,
    self->scaling = scaling_;
    self->msaa = msaa_;
    self->hdr_scanout_format = VK_FORMAT_UNDEFINED;
+   self->analog_field       = 0;
    self->scaled_uv_offset = false;
    self->valid = false;
    self->primitive_filter_mode = FilterMode_NearestNeighbor;
@@ -6752,6 +6811,23 @@ static void renderer_init_pipelines(Renderer *self)
       device_request_program_graphics_code(self->device, mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
    self->pipelines.hdr_mipmap_resolve =
       device_request_program_graphics_code(self->device, mipmap_vert, sizeof(mipmap_vert), hdr_mipmap_resolve_frag, sizeof(hdr_mipmap_resolve_frag));
+
+   self->pipelines.analog_encode =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_encode_frag, sizeof(analog_encode_frag));
+   self->pipelines.analog_encode_pal =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_encode_pal_frag, sizeof(analog_encode_pal_frag));
+   self->pipelines.analog_separate =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_separate_frag, sizeof(analog_separate_frag));
+   self->pipelines.analog_separate_pal =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_separate_pal_frag, sizeof(analog_separate_pal_frag));
+   self->pipelines.analog_resolve =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_frag, sizeof(analog_resolve_frag));
+   self->pipelines.analog_resolve_pal =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_pal_frag, sizeof(analog_resolve_pal_frag));
+   self->pipelines.analog_resolve_hdr =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_hdr_frag, sizeof(analog_resolve_hdr_frag));
+   self->pipelines.analog_resolve_hdr_pal =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_hdr_pal_frag, sizeof(analog_resolve_hdr_pal_frag));
 
    self->pipelines.mipmap_energy = device_request_program_graphics_code(self->device, mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
          mipmap_energy_frag, sizeof(mipmap_energy_frag));
@@ -7402,6 +7478,229 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
  * a device advertises neither as a sampled colour attachment, fall back to
  * R8G8B8A8 so image creation can never fail - that case only mis-grades (it
  * can't carry PQ well) and is essentially unreachable on a Vulkan GPU. */
+/* The analog path only runs at 1x internal resolution. That is not a
+ * limitation to be lifted later so much as the premise: the chain is defined
+ * against a fixed-rate signal whose sample grid is the CRTC base clock, and an
+ * upscaled framebuffer has no meaningful mapping onto it. Native resolution is
+ * also the only case where simulating the cable is the point. */
+static bool renderer_analog_active(Renderer *self)
+{
+   return psx_video_cable != 0 && self->scaling == 1;
+}
+
+/* Base clocks per pixel. These are the GP1(08h) horizontal resolution dividers
+ * off the CRTC base clock, and they are exact: every mode lands on a constant
+ * 2560-sample active line except 368, which uses 7 and comes out 2688 - the
+ * 5% wider mode. */
+static unsigned renderer_analog_divisor(Renderer *self)
+{
+   switch (self->render_state.width_mode)
+   {
+      case WidthMode_WIDTH_MODE_256: return 10;
+      case WidthMode_WIDTH_MODE_320: return 8;
+      case WidthMode_WIDTH_MODE_368: return 7;
+      case WidthMode_WIDTH_MODE_512: return 5;
+      default:                       return 4;   /* 640 */
+   }
+}
+
+/* Run encode -> separate -> resolve over the image already sitting in
+ * reuseable_scanout (which the analog path had rendered as gamma-domain RGB in
+ * 16F rather than the usual scanout format) and return the result.
+ *
+ * Three passes rather than one: the band-pass in `separate` needs the comb
+ * estimate at neighbouring samples along the line, and the demodulator in
+ * `resolve` needs a finished chroma signal, so neither can be folded into its
+ * predecessor without re-deriving a full filter per tap. */
+static ImageHandle renderer_analog_apply(Renderer *self, unsigned out_w, unsigned out_h)
+{
+   RenderPassInfo rp;
+   VkViewport vp;
+   const unsigned div    = renderer_analog_divisor(self);
+   const unsigned sig_w  = out_w * div;
+   const bool     pal    = self->render_state.is_pal;
+   const bool     svideo = (psx_video_cable == 1);
+
+   /* Subcarrier cycles per base clock, and per line. Both exact: NTSC runs
+    * 15*fsc with 227.5 cycles per line, PAL 12*fsc with 283.75. */
+   const float inv_ratio = pal ? (1.0f / 12.0f) : (1.0f / 15.0f);
+   const float line_adv  = pal ? 0.75f : 0.5f;
+
+   /* GP1(06h).X1, video clocks from HSYNC. Enters the phase directly, and the
+    * standard values differ per mode, so this cannot be assumed zero. */
+   const float x1 = (float)self->render_state.horiz_start;
+
+   /* 240p advances half a cycle per field in both regions, so the pattern
+    * alternates frame to frame rather than running the broadcast 4-field
+    * (NTSC) or 8-field (PAL) sequence. 480i restores those, and is not
+    * handled here yet - it falls back to the same 2-field alternation. */
+   const float field_adv = (self->analog_field & 1u) ? 0.5f : 0.0f;
+
+   if (out_w == 0 || out_h == 0 || sig_w == 0)
+      return self->reuseable_scanout;
+
+   /* Intermediates. RG16F because the signal is bipolar. */
+   { ImageCreateInfo info = image_create_info_render_target(sig_w, out_h, VK_FORMAT_R16G16_SFLOAT);
+   info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+   info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+   ih_move(&self->analog_sig, device_create_image(self->device, &info, NULL));
+   ih_move(&self->analog_sep, device_create_image(self->device, &info, NULL));
+   }
+
+   { ImageCreateInfo info = image_create_info_render_target(out_w, out_h,
+         psx_hdr_active ? renderer_hdr_scanout_format(self) : VK_FORMAT_R8G8B8A8_UNORM);
+   info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+   info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+   ih_move(&self->analog_out, device_create_image(self->device, &info, NULL));
+   }
+
+   /* ---- pass 1: encode ---- */
+   { struct EncPush
+   {
+      float src_size[2];
+      float div;
+      float x1;
+      float inv_ratio;
+      float line_adv;
+      float field_adv;
+   } push;
+   push.src_size[0] = (float)out_w;
+   push.src_size[1] = (float)out_h;
+   push.div         = (float)div;
+   push.x1          = x1;
+   push.inv_ratio   = inv_ratio;
+   push.line_adv    = line_adv;
+   push.field_adv   = field_adv;
+
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_sig),
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+   render_pass_info_defaults(&rp);
+   rp.color_attachments[0]  = image_get_view(ih_get(&self->analog_sig));
+   rp.num_color_attachments = 1;
+   rp.store_attachments     = 1;
+   commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
+   commandbuffer_set_quad_state(cbh_get(&self->cmd));
+   vp.x = 0.0f; vp.y = 0.0f; vp.width = (float)sig_w; vp.height = (float)out_h;
+   vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+   commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
+   commandbuffer_set_program(cbh_get(&self->cmd),
+      pal ? self->pipelines.analog_encode_pal : self->pipelines.analog_encode);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
+      image_get_view(ih_get(&self->reuseable_scanout)), StockSampler_NearestClamp);
+   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+   commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+   commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
+   commandbuffer_end_render_pass(cbh_get(&self->cmd));
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_sig),
+      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   }
+
+   /* ---- pass 2: separate ---- */
+   { struct SepPush { float sig_size[2]; int32_t svideo; } push;
+   push.sig_size[0] = (float)sig_w;
+   push.sig_size[1] = (float)out_h;
+   push.svideo      = svideo ? 1 : 0;
+
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_sep),
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+   render_pass_info_defaults(&rp);
+   rp.color_attachments[0]  = image_get_view(ih_get(&self->analog_sep));
+   rp.num_color_attachments = 1;
+   rp.store_attachments     = 1;
+   commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
+   commandbuffer_set_quad_state(cbh_get(&self->cmd));
+   vp.x = 0.0f; vp.y = 0.0f; vp.width = (float)sig_w; vp.height = (float)out_h;
+   vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+   commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
+   commandbuffer_set_program(cbh_get(&self->cmd),
+      pal ? self->pipelines.analog_separate_pal : self->pipelines.analog_separate);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
+      image_get_view(ih_get(&self->analog_sig)), StockSampler_NearestClamp);
+   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+   commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+   commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
+   commandbuffer_end_render_pass(cbh_get(&self->cmd));
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_sep),
+      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   }
+
+   /* ---- pass 3: resolve ---- */
+   { struct ResPush
+   {
+      float   sig_size[2];
+      float   div;
+      float   x1;
+      float   inv_ratio;
+      float   line_adv;
+      float   field_adv;
+      float   paper_white_nits;
+      int32_t expand_gamut;
+      int32_t shoulder;
+      int32_t sdr_eotf;
+   } push;
+   size_t push_size = psx_hdr_active ? sizeof(push)
+                                     : offsetof(struct ResPush, paper_white_nits);
+   push.sig_size[0]      = (float)sig_w;
+   push.sig_size[1]      = (float)out_h;
+   push.div              = (float)div;
+   push.x1               = x1;
+   push.inv_ratio        = inv_ratio;
+   push.line_adv         = line_adv;
+   push.field_adv        = field_adv;
+   push.paper_white_nits = psx_hdr_paper_white_nits;
+   push.expand_gamut     = psx_hdr_expand_gamut;
+   push.shoulder         = psx_hdr_shoulder;
+   push.sdr_eotf         = psx_hdr_sdr_eotf;
+
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_out),
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+   render_pass_info_defaults(&rp);
+   rp.color_attachments[0]  = image_get_view(ih_get(&self->analog_out));
+   rp.num_color_attachments = 1;
+   rp.store_attachments     = 1;
+   commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
+   commandbuffer_set_quad_state(cbh_get(&self->cmd));
+   vp.x = 0.0f; vp.y = 0.0f; vp.width = (float)out_w; vp.height = (float)out_h;
+   vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+   commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
+   commandbuffer_set_program(cbh_get(&self->cmd),
+      psx_hdr_active ? (pal ? self->pipelines.analog_resolve_hdr_pal : self->pipelines.analog_resolve_hdr)
+                     : (pal ? self->pipelines.analog_resolve_pal     : self->pipelines.analog_resolve));
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
+      image_get_view(ih_get(&self->analog_sep)), StockSampler_NearestClamp);
+   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, push_size);
+   commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+   commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+   commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
+   commandbuffer_end_render_pass(cbh_get(&self->cmd));
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_out),
+      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   }
+
+   ih_assign(&self->last_scanout, &self->analog_out);
+   return self->analog_out;
+}
+
 static VkFormat renderer_hdr_scanout_format(Renderer *self)
 {
    const VkFormatFeatureFlags need =
@@ -7426,6 +7725,14 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    RenderPassInfo rp;
    bool dither;
    bool using_mipmap = false;   /* set in the adaptive-smoothing branch; picks the 44-byte HDR push */
+   /* When the analog path is engaged the display quad stops being the last
+    * stage: it renders gamma-domain R'G'B' into a 16F intermediate that the
+    * cable simulation consumes, and the analog resolve emits the real scanout
+    * (applying the HDR10 encode itself, if HDR is on). So the quad must use
+    * the plain SDR programs and pushes even under HDR - hence hdr_quad rather
+    * than psx_hdr_active throughout the tail of this function. */
+   const bool analog   = renderer_analog_active(self);
+   const bool hdr_quad = psx_hdr_active && !analog;
    fbatlas_flush_render_pass(&self->atlas);
    if (self->texture_tracking_enabled) {
       texture_tracker_endFrame(self->tracker);
@@ -7570,10 +7877,14 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
 
    DisplayRect display_rect = renderer_compute_display_rect(self);
 
+   /* Analog wants a wide intermediate: the chain reads this back as a signal,
+    * and a UNORM target would clamp the overshoot before it ever reaches the
+    * encode. */
    ImageCreateInfo info = image_create_info_render_target(
          display_rect.width * render_scale,
          display_rect.height * render_scale,
-         psx_hdr_active ? renderer_hdr_scanout_format(self)
+         analog ? VK_FORMAT_R16G16B16A16_SFLOAT
+         : hdr_quad ? renderer_hdr_scanout_format(self)
             : (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM));
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -7611,14 +7922,18 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
     * reads as noise rather than anti-banding. Force it off under HDR; this
     * also makes the non-dither hdr quad variants the ones actually selected
     * below and skips the dither push/LUT block. */
-   dither = (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither) && !psx_hdr_active;
+   /* Note !hdr_quad, not !hdr_quad: under HDR+analog the quad is not the
+    * output stage, and the console's 4x4 ordered dither has to survive into
+    * the signal. Dissolving it back into smooth gradients is the single most
+    * visible thing composite does to PSX content. */
+   dither = (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither) && !hdr_quad;
 
    if (bpp24)
    {
       if (self->render_state.scanout_mdec_filter == ScanoutFilter_MDEC_YUV)
-         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_bpp24_yuv_quad_blitter : self->pipelines.bpp24_yuv_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_bpp24_yuv_quad_blitter : self->pipelines.bpp24_yuv_quad_blitter);
       else
-         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_bpp24_quad_blitter : self->pipelines.bpp24_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_bpp24_quad_blitter : self->pipelines.bpp24_quad_blitter);
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestWrap);
    }
    else if (ssaa)
@@ -7626,7 +7941,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       if (dither)
          commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.unscaled_dither_quad_blitter);
       else
-         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_unscaled_quad_blitter : self->pipelines.unscaled_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_unscaled_quad_blitter : self->pipelines.unscaled_quad_blitter);
 
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer_ssaa)), StockSampler_NearestWrap);
    }
@@ -7635,7 +7950,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       if (dither)
          commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.scaled_dither_quad_blitter);
       else
-         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_scaled_quad_blitter : self->pipelines.scaled_quad_blitter);
+         commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_scaled_quad_blitter : self->pipelines.scaled_quad_blitter);
 
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearWrap);
    }
@@ -7650,7 +7965,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       if (dither)
          commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.mipmap_dither_resolve);
       else
-         commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_mipmap_resolve : self->pipelines.mipmap_resolve);
+         commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_mipmap_resolve : self->pipelines.mipmap_resolve);
 
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer)), StockSampler_TrilinearWrap);
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->bias_framebuffer)), StockSampler_LinearWrap);
@@ -7704,7 +8019,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
                 { (rect->x + rect->width - 0.5f) / FB_WIDTH, (rect->y + rect->height - 0.5f) / FB_HEIGHT },
                 (float)(imageview_vec_size(&self->scaled_views) - 1) };
 
-   if (psx_hdr_active && using_mipmap)
+   if (hdr_quad && using_mipmap)
    {
       /* The -DHDR mipmap_resolve reflects a 52-byte push: the full 36-byte
        * resolve layout (offset, scale, uv_min, uv_max, max_bias) plus paper
@@ -7737,7 +8052,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       mp.sdr_eotf         = psx_hdr_sdr_eotf;
       commandbuffer_push_constants(cbh_get(&self->cmd), &mp, 0, sizeof(mp));
    }
-   else if (psx_hdr_active)
+   else if (hdr_quad)
    {
       /* The -DHDR quad reflects a 32-byte push (offset, range, paper white,
        * gamut, shoulder, SDR transfer); reuse offset/scale computed above
@@ -7771,6 +8086,18 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
 
    renderer_finish_reuseable_scanout(self);
+
+   if (analog)
+   {
+      /* The quad rendered a signal, not a picture. Hand it to the cable
+       * simulation, which emits the real scanout - including the HDR10
+       * encode, since the resolve is now the stage that produces the final
+       * pixel. */
+      self->analog_field++;
+      return renderer_analog_apply(self,
+            display_rect.width * render_scale,
+            display_rect.height * render_scale);
+   }
 
    return self->reuseable_scanout;
    }
