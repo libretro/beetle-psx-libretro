@@ -157,6 +157,28 @@ highp float filmic_shoulder(highp float x)
 	return 1.0 - exp(-x);
 }
 
+/* Source primaries for a signal-domain consumer: decode, rotate, re-encode.
+ *
+ * The HDR path gets this for free inside encode_hdr10, which is already
+ * holding linear light. An SDR output has to round-trip for it, which is two
+ * extra pow() per pixel - so the identity case returns immediately, and a
+ * default configuration pays nothing.
+ *
+ * Every one of the rotations maps some primary outside Rec.709, and an SDR
+ * output clips those. That is a real loss and the reason NTSC 1953 in
+ * particular only makes sense on a wide-gamut display - but clipping the
+ * out-of-gamut corners is still closer to the intended picture than
+ * interpreting SMPTE-C coordinates as Rec.709 ones, which is what happens
+ * otherwise. */
+highp vec3 sdr_apply_src_primaries(highp vec3 rgb, int sdr_eotf, int src_primaries)
+{
+	if (src_primaries == 0)
+		return rgb;
+	return linear_to_sdr(
+		src_primaries_to_709(sdr_to_linear(max(rgb, vec3(0.0)), sdr_eotf), src_primaries),
+		sdr_eotf);
+}
+
 /* Entry point for callers that already hold linear light, so it is not decoded
  * and re-encoded on the way in. `scene_linear` is normalised with 1.0 at
  * reference white; values above that are the additive overshoot the roll-off

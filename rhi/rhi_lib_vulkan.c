@@ -7472,11 +7472,11 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
       {
          float   offset[2];
          float   range[2];
+         int32_t sdr_eotf;
+         int32_t src_primaries;
          float   paper_white_nits;
          int32_t expand_gamut;
          int32_t shoulder;
-         int32_t sdr_eotf;
-         int32_t src_primaries;
       };
       struct HdrPush hpush;
       hpush.offset[0]        = push.offset[0];
@@ -7491,7 +7491,21 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
    }
    else
-      commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   { struct SdrQuadPush
+   {
+      float   offset[2];
+      float   range[2];
+      int32_t sdr_eotf;
+      int32_t src_primaries;
+   } qp;
+   qp.offset[0]     = push.offset[0];
+   qp.offset[1]     = push.offset[1];
+   qp.range[0]      = push.scale[0];
+   qp.range[1]      = push.scale[1];
+   qp.sdr_eotf      = psx_hdr_sdr_eotf;
+   qp.src_primaries = psx_src_primaries;
+   commandbuffer_push_constants(cbh_get(&self->cmd), &qp, 0, sizeof(qp));
+   }
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
@@ -8273,11 +8287,11 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          float   uv_min[2];
          float   uv_max[2];
          float   max_bias;
+         int32_t sdr_eotf;
+         int32_t src_primaries;
          float   paper_white_nits;
          int32_t expand_gamut;
          int32_t shoulder;
-         int32_t sdr_eotf;
-         int32_t src_primaries;
       };
       struct HdrMipmapPush mp;
       mp.offset[0]        = push.offset[0];
@@ -8307,11 +8321,11 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       {
          float   offset[2];
          float   range[2];
+         int32_t sdr_eotf;
+         int32_t src_primaries;
          float   paper_white_nits;
          int32_t expand_gamut;
          int32_t shoulder;
-         int32_t sdr_eotf;
-         int32_t src_primaries;
       };
       struct HdrPush hpush;
       hpush.offset[0]        = push.offset[0];
@@ -8325,8 +8339,46 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       hpush.src_primaries         = psx_src_primaries;
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
    }
+   else if (using_mipmap)
+   { struct SdrMipmapPush
+   {
+      float   offset[2];
+      float   scale[2];
+      float   uv_min[2];
+      float   uv_max[2];
+      float   max_bias;
+      int32_t sdr_eotf;
+      int32_t src_primaries;
+   } mp;
+   mp.offset[0]     = push.offset[0];
+   mp.offset[1]     = push.offset[1];
+   mp.scale[0]      = push.scale[0];
+   mp.scale[1]      = push.scale[1];
+   mp.uv_min[0]     = push.uv_min[0];
+   mp.uv_min[1]     = push.uv_min[1];
+   mp.uv_max[0]     = push.uv_max[0];
+   mp.uv_max[1]     = push.uv_max[1];
+   mp.max_bias      = push.max_bias;
+   mp.sdr_eotf      = psx_hdr_sdr_eotf;
+   mp.src_primaries = psx_src_primaries;
+   commandbuffer_push_constants(cbh_get(&self->cmd), &mp, 0, sizeof(mp));
+   }
    else
-      commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   { struct SdrQuadPush
+   {
+      float   offset[2];
+      float   range[2];
+      int32_t sdr_eotf;
+      int32_t src_primaries;
+   } qp;
+   qp.offset[0]     = push.offset[0];
+   qp.offset[1]     = push.offset[1];
+   qp.range[0]      = push.scale[0];
+   qp.range[1]      = push.scale[1];
+   qp.sdr_eotf      = psx_hdr_sdr_eotf;
+   qp.src_primaries = psx_src_primaries;
+   commandbuffer_push_constants(cbh_get(&self->cmd), &qp, 0, sizeof(qp));
+   }
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);

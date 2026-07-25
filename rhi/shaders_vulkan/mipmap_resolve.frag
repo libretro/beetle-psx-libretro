@@ -5,9 +5,7 @@ precision highp int;
 #if defined(DITHER)
 #include "dither.h"
 #endif
-#if defined(HDR)
 #include "hdr.h"
-#endif
 
 layout(location = 0) out vec4 FragColor;
 layout(set = 0, binding = 0) uniform sampler2D uTexture;
@@ -21,13 +19,12 @@ layout(push_constant, std430) uniform Registers
 	vec2 uv_min;
 	vec2 uv_max;
 	float max_bias;
+	int   sdr_eotf;       /* reference display transfer: 0 2.4, 1 2.2, 2 sRGB */
+	int   src_primaries;  /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 #if defined(HDR)
-	/* Appended for the -DHDR variant; SDR keeps its 36-byte layout. */
 	float paper_white_nits;
 	int   expand_gamut;
 	int   shoulder;
-	int   sdr_eotf;
-	int   src_primaries;  /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 #endif
 } registers;
 
@@ -40,12 +37,15 @@ void main()
 	/* The trilinear resolve interpolates the 8-bit source, producing
 	 * sub-8-bit precision that 10-bit output preserves - so no debanding is
 	 * needed (or wanted) here; just encode. */
-	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut, registers.shoulder, registers.sdr_eotf, registers.src_primaries), 1.0);
+	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut,
+	                              registers.shoulder, registers.sdr_eotf,
+	                              registers.src_primaries), 1.0);
 #else
 	#if defined(DITHER)
 		rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));
 	#endif
-	FragColor = vec4(rgb, 1.0);
+	FragColor = vec4(sdr_apply_src_primaries(rgb, registers.sdr_eotf,
+	                                         registers.src_primaries), 1.0);
 #endif
 }
 

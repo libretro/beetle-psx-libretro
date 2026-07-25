@@ -74,9 +74,13 @@ void main()
 	highp vec3 lin = acc / max(cnt, 1.0);
 
 #if defined(HDR)
+	/* encode_hdr10_linear rotates the primaries itself. */
 	FragColor = vec4(encode_hdr10_linear(lin, reg.paper_white_nits, reg.expand_gamut,
 	                                     reg.shoulder, reg.src_primaries), 1.0);
 #else
-	FragColor = vec4(linear_to_sdr(lin, reg.sdr_eotf), 1.0);
+	/* Rotated here rather than through sdr_apply_src_primaries: this pass is
+	 * already holding linear light, so it costs a matrix and no round trip. */
+	FragColor = vec4(linear_to_sdr(src_primaries_to_709(lin, reg.src_primaries),
+	                               reg.sdr_eotf), 1.0);
 #endif
 }

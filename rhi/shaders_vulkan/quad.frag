@@ -24,21 +24,21 @@ layout(push_constant, std430) uniform Registers
 {
 	vec2 offset;
 	vec2 range;
+	/* Present in every variant now. Source primaries are a property of the
+	 * display the content was authored on, so they apply to SDR output as
+	 * much as HDR, and the transfer curve is needed to rotate them. */
+	int   sdr_eotf;       /* reference display transfer: 0 2.4, 1 2.2, 2 sRGB */
+	int   src_primaries;  /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 #if defined(HDR)
-	/* Only present in the -DHDR variants, so the SDR pipelines keep
-	 * their exact 16-byte push-constant layout. Fed from the frontend's
-	 * HDR params (see libretro.c psx_hdr_paper_white_nits / _expand_gamut). */
+	/* Fed from the frontend's HDR params (see libretro.c
+	 * psx_hdr_paper_white_nits / _expand_gamut). */
 	float paper_white_nits;
 	int   expand_gamut;
-	int   shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
-	int   sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
-	int   src_primaries;  /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
+	int   shoulder;       /* highlight roll-off: 0 Reinhard, 1 filmic */
 #endif
 } registers;
 
-#if defined(HDR)
 #include "hdr.h"
-#endif
 
 #if defined(BPP24)
 mediump vec3 sample_bpp24(ivec2 coord)
@@ -157,8 +157,13 @@ void main()
 #if defined(HDR)
 	/* The SDR rgb is gamma-encoded 0..1; encode_hdr10 handles the
 	 * linearise / paper-white / gamut / PQ chain. */
-	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut, registers.shoulder, registers.sdr_eotf, registers.src_primaries), 1.0);
+	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut,
+	                              registers.shoulder, registers.sdr_eotf,
+	                              registers.src_primaries), 1.0);
 #else
-	FragColor = vec4(rgb, 1.0);
+	/* After the dither, not before: the console emits a dithered 15-bit signal
+	 * and the primaries belong to the phosphors that receive it. */
+	FragColor = vec4(sdr_apply_src_primaries(rgb, registers.sdr_eotf,
+	                                         registers.src_primaries), 1.0);
 #endif
 }
