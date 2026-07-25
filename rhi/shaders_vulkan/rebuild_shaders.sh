@@ -101,6 +101,7 @@ mkdir -p prebuilt
 # Analog video path (composite / S-Video). Region is compile-time: the
 # subcarrier, colour space, modulation axes and comb gain all differ.
 "$GLSLC" -o prebuilt/analog.vert.inc -mfmt=c analog.vert
+"$GLSLC" -o prebuilt/analog.downsample.frag.inc -mfmt=c analog_downsample.frag
 "$GLSLC" -o prebuilt/analog.encode.frag.inc -mfmt=c analog_encode.frag
 "$GLSLC" -o prebuilt/analog.encode.pal.frag.inc -mfmt=c -DPAL analog_encode.frag
 "$GLSLC" -o prebuilt/analog.separate.frag.inc -mfmt=c analog_separate.frag

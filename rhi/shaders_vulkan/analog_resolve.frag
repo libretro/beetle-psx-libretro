@@ -28,8 +28,8 @@ layout(set = 0, binding = 0) uniform sampler2D uSeparated;
 
 layout(push_constant, std430) uniform Registers
 {
-	vec2  sig_size;
-	float div;
+	vec2  sig_size;      /* base-clock signal: native_w*div by native_h */
+	vec2  out_size;      /* display resolution, native * internal scale */
 	float x1;
 	float inv_ratio;
 	float line_adv;
@@ -72,17 +72,28 @@ highp vec3 decode_at(highp float n, highp float row, highp float line)
 
 void main()
 {
-	highp float line = floor(gl_FragCoord.y);
+	/* The scanline index drives the subcarrier phase, so it has to be the
+	 * signal's line and not the output row - those differ the moment internal
+	 * resolution scales the output vertically. The signal has exactly one
+	 * sample per scanline; there is no vertical detail beyond that to find. */
+	highp float line = floor(vUV.y * reg.sig_size.y);
 	highp float row  = vUV.y;
 
-	/* Box-average the base samples belonging to this output pixel: the
-	 * inverse of the CRTC hold, doubling as the resample filter. */
-	highp float n0  = floor(gl_FragCoord.x) * reg.div;
+	/* Base samples per output pixel. At 1x internal resolution this is `div`
+	 * and the box is the exact inverse of the CRTC hold. Above 1x the output
+	 * grid is finer than native, the window narrows, and the sub-native
+	 * structure the cable produces - ringing, chroma smear, dot crawl, all of
+	 * it at base-clock scale - survives instead of being averaged flat. Below
+	 * 1 the signal is simply being interpolated, which is legitimate: it is
+	 * band-limited, so there is nothing between the samples to miss. */
+	highp float bpo = reg.sig_size.x / max(reg.out_size.x, 1.0);
+	highp float n0  = floor(gl_FragCoord.x) * bpo;
+	highp int   num = int(clamp(floor(bpo + 0.5), 1.0, 16.0));
 	highp vec3  acc = vec3(0.0);
 	highp float cnt = 0.0;
 	for (int i = 0; i < 16; i++)
 	{
-		if (float(i) >= reg.div)
+		if (i >= num)
 			break;
 		acc += decode_at(n0 + float(i), row, line);
 		cnt += 1.0;
