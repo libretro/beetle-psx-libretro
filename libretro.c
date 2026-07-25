@@ -5604,6 +5604,19 @@ bool retro_load_game(const struct retro_game_info *info)
                   psx_hdr_paper_white_nits = pw;
                if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
                   psx_hdr_expand_gamut = (int)gamut;
+               /* Queried and logged, deliberately not compensated for. The
+                * libretro.h note warns that an scRGB swapchain applies
+                * Rec.2020 -> Rec.709 on the way and can undo a core's gamut
+                * choice, but working it through, it does not: the frontend's
+                * rotation is exactly the inverse of the container
+                * reinterpretation, so for emitted samples X the perceived
+                * colour is M_2020 * X under HDR10 and
+                * M_709 * M_2020->709 * X = M_2020 * X under scRGB. Identical,
+                * and that holds for the deliberate mis-mappings the Colour
+                * Boost modes rely on too, since the boost is baked into X
+                * either way. Kept for the log, and because the value is worth
+                * having if that analysis is ever shown wrong - which it might
+                * be, as no scRGB frontend has been available to test against. */
                if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE, &omode))
                   psx_hdr_output_mode = (int)omode;
 
