@@ -32,6 +32,7 @@ layout(push_constant, std430) uniform Registers
 	int   expand_gamut;
 	int   shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
 	int   sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
+	int   src_primaries;  /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 #endif
 } registers;
 
@@ -156,7 +157,7 @@ void main()
 #if defined(HDR)
 	/* The SDR rgb is gamma-encoded 0..1; encode_hdr10 handles the
 	 * linearise / paper-white / gamut / PQ chain. */
-	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut, registers.shoulder, registers.sdr_eotf), 1.0);
+	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.expand_gamut, registers.shoulder, registers.sdr_eotf, registers.src_primaries), 1.0);
 #else
 	FragColor = vec4(rgb, 1.0);
 #endif

@@ -34,6 +34,48 @@ highp vec3 pq_encode(highp vec3 nits)
 	return pow((PQ_C1 + PQ_C2 * ym) / (1.0 + PQ_C3 * ym), vec3(PQ_M2));
 }
 
+/* Source primaries, applied to linear light before the target rotation below.
+ *
+ * The framebuffer is R'G'B', but which chromaticities those coordinates *mean*
+ * is a property of the display the content was authored on, and PSX-era content
+ * was not authored on Rec.709. This is orthogonal to the cable: primaries are a
+ * property of the authoring monitor, not the wire, so RGB output wants the same
+ * treatment as composite.
+ *
+ *   1  SMPTE-C  (BT.601 525) - what NTSC-era studio monitors used
+ *   2  EBU      (BT.601 625) - PAL. Differs from Rec.709 in green alone and by
+ *                              only 4%, which is why PAL barely moves.
+ *   3  NTSC 1953             - the original, aspirational FCC primaries.
+ *                              Enormously wider: its green lands at -0.40 in
+ *                              Rec.709, i.e. 40% outside the gamut, so it is
+ *                              only actually representable in a wide container.
+ *                              Reportedly retained in Japan, though the better
+ *                              documented NTSC-J difference is black setup, so
+ *                              treat this as flavour rather than accuracy.
+ *
+ * Every one of these maps some primary outside Rec.709, so on an SDR output the
+ * result clips; under HDR10 the Rec.2020 container holds it. Default is 0, no
+ * rotation, which leaves the 24-bit path and the HDR path agreeing. */
+highp vec3 src_primaries_to_709(highp vec3 c, int src_primaries)
+{
+	if (src_primaries == 1)          /* SMPTE-C */
+		return vec3(
+			 0.939542064 * c.r +  0.050181357 * c.g +  0.010276579 * c.b,
+			 0.017772223 * c.r +  0.965792862 * c.g +  0.016434914 * c.b,
+			-0.001621600 * c.r + -0.004369750 * c.g +  1.005991350 * c.b);
+	else if (src_primaries == 2)     /* EBU */
+		return vec3(
+			 1.044043209 * c.r + -0.044043209 * c.g,
+			                       c.g,
+			                       0.011793378 * c.g +  0.988206622 * c.b);
+	else if (src_primaries == 3)     /* NTSC 1953, Bradford-adapted C -> D65 */
+		return vec3(
+			 1.486156846 * c.r + -0.403554906 * c.g + -0.082601940 * c.b,
+			-0.025101109 * c.r +  0.954024686 * c.g +  0.071076423 * c.b,
+			-0.027224002 * c.r + -0.044095233 * c.g +  1.071319235 * c.b);
+	return c;
+}
+
 /* Gamut rotation, applied to linear light. Cases mirror prboom / RetroArch:
  * 0 Accurate (709->2020), 1 Expanded, 2 Wide (709->P3), 3 Super (no rotation). */
 highp vec3 rec709_to_target(highp vec3 c, int expand_gamut)
@@ -101,7 +143,7 @@ highp float filmic_shoulder(highp float x)
 	return 1.0 - exp(-x);
 }
 
-highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut, int shoulder, int sdr_eotf)
+highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand_gamut, int shoulder, int sdr_eotf, int src_primaries)
 {
 	/* STEP 3: one transfer function across the whole range, then compress
 	 * whatever lands above paper white.
@@ -130,7 +172,8 @@ highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, int expand
 	const highp float peak_nits = 1000.0;   /* additive highlight ceiling */
 	highp vec3  c        = max(rgb, vec3(0.0));
 	highp float headroom = max(peak_nits - paper_white_nits, 0.0);
-	highp vec3  lin      = sdr_to_linear(c, sdr_eotf) * paper_white_nits;
+	highp vec3  lin      = src_primaries_to_709(sdr_to_linear(c, sdr_eotf), src_primaries)
+	                     * paper_white_nits;
 	/* Linear-light overshoot. Forced to zero when there is no headroom
 	 * (paper white at or above the ceiling), which clamps to paper white
 	 * instead of letting the knee pass the value through unscaled. */

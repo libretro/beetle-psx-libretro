@@ -369,6 +369,23 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "reinhard"
    },
    {
+      BEETLE_OPT(src_primaries),
+      "HDR Source Colour Primaries",
+      NULL,
+      "Selects the chromaticities the game's colours are interpreted against, when 'Color Format' is set to '30-bit Color (HDR)'. PSX content was not authored on a modern Rec.709 display, and which real colours a given RGB value stands for depends on the monitor it was made on. This is independent of 'Analog Video Cable' - primaries belong to the authoring display, not the wire - so it applies to RGB output as well. 'Rec.709' (default) leaves the picture matching the 24-bit path. 'SMPTE-C' is the NTSC-era studio standard and shifts colour by around 6%. 'EBU' is the PAL equivalent and differs from Rec.709 in green alone, by about 4%. 'NTSC 1953' is the original FCC standard, dramatically wider - its green sits 40% outside Rec.709 and is only representable at all on a wide-gamut HDR display. 'Auto' picks SMPTE-C or EBU from the disc region. Has no effect in 24-bit mode.",
+      NULL,
+      "video",
+      {
+         { "off",      "Rec.709 (Match 24-bit)" },
+         { "auto",     "Auto (By Region)" },
+         { "smptec",   "SMPTE-C (NTSC Studio)" },
+         { "ebu",      "EBU (PAL)" },
+         { "ntsc1953", "NTSC 1953 (Wide)" },
+         { NULL, NULL },
+      },
+      "off"
+   },
+   {
       BEETLE_OPT(video_cable),
       "Analog Video Cable",
       NULL,

@@ -215,6 +215,11 @@ int   psx_hdr_sdr_eotf         = 0;
  * premise is native-resolution output, and upscaled input has no meaningful
  * mapping onto a fixed-rate analog signal. */
 int   psx_video_cable          = 0;
+/* Chromaticities the content was authored against. Orthogonal to the cable -
+ * primaries are a property of the authoring monitor, not the wire - so this
+ * applies to RGB output too. HDR path only: every option maps some primary
+ * outside Rec.709, which an SDR output would simply clip. */
+int   psx_src_primaries        = 0;
 
 #define NEGCON_RANGE 0x7FFF
 
@@ -4404,6 +4409,20 @@ static void check_variables(bool startup)
     * option only selects which branch the scanout takes - so gating it behind
     * `if (startup)` just meant toggling it in the menu appeared to do nothing
     * until the core was reloaded. */
+   var.key = BEETLE_OPT(src_primaries);
+   psx_src_primaries = 0;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "auto"))
+         psx_src_primaries = content_is_pal ? 2 : 1;
+      else if (!strcmp(var.value, "smptec"))
+         psx_src_primaries = 1;
+      else if (!strcmp(var.value, "ebu"))
+         psx_src_primaries = 2;
+      else if (!strcmp(var.value, "ntsc1953"))
+         psx_src_primaries = 3;
+   }
+
    var.key = BEETLE_OPT(video_cable);
    psx_video_cable = 0;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)

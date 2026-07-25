@@ -47,6 +47,7 @@ extern float psx_hdr_paper_white_nits;
 extern int   psx_hdr_expand_gamut;
 extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
 extern int   psx_hdr_sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
+extern int   psx_src_primaries;  /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 extern int   psx_video_cable;    /* 0 = RGB/bypass, 1 = S-Video, 2 = composite */
 extern retro_log_printf_t log_cb;
 extern int   psx_hdr_overbright_hot;   /* additive/sub source: 0 clamped, 1 hot */
@@ -7481,6 +7482,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
          int32_t expand_gamut;
          int32_t shoulder;
          int32_t sdr_eotf;
+         int32_t src_primaries;
       };
       struct HdrPush hpush;
       hpush.offset[0]        = push.offset[0];
@@ -7491,6 +7493,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
       hpush.expand_gamut     = psx_hdr_expand_gamut;
       hpush.shoulder         = psx_hdr_shoulder;
       hpush.sdr_eotf         = psx_hdr_sdr_eotf;
+      hpush.src_primaries         = psx_src_primaries;
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
    }
    else
@@ -7873,6 +7876,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       int32_t expand_gamut;
       int32_t shoulder;
       int32_t sdr_eotf;
+      int32_t src_primaries;
    } push;
    size_t push_size = psx_hdr_active ? sizeof(push)
                                      : offsetof(struct ResPush, paper_white_nits);
@@ -7884,6 +7888,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    push.expand_gamut     = psx_hdr_expand_gamut;
    push.shoulder         = psx_hdr_shoulder;
    push.sdr_eotf         = psx_hdr_sdr_eotf;
+   push.src_primaries         = psx_src_primaries;
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_out),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -8262,6 +8267,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          int32_t expand_gamut;
          int32_t shoulder;
          int32_t sdr_eotf;
+         int32_t src_primaries;
       };
       struct HdrMipmapPush mp;
       mp.offset[0]        = push.offset[0];
@@ -8277,6 +8283,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       mp.expand_gamut     = psx_hdr_expand_gamut;
       mp.shoulder         = psx_hdr_shoulder;
       mp.sdr_eotf         = psx_hdr_sdr_eotf;
+      mp.src_primaries         = psx_src_primaries;
       commandbuffer_push_constants(cbh_get(&self->cmd), &mp, 0, sizeof(mp));
    }
    else if (hdr_quad)
@@ -8294,6 +8301,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          int32_t expand_gamut;
          int32_t shoulder;
          int32_t sdr_eotf;
+         int32_t src_primaries;
       };
       struct HdrPush hpush;
       hpush.offset[0]        = push.offset[0];
@@ -8304,6 +8312,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       hpush.expand_gamut     = psx_hdr_expand_gamut;
       hpush.shoulder         = psx_hdr_shoulder;
       hpush.sdr_eotf         = psx_hdr_sdr_eotf;
+      hpush.src_primaries         = psx_src_primaries;
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
    }
    else

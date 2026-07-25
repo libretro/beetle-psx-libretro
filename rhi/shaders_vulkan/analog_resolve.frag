@@ -37,6 +37,7 @@ layout(push_constant, std430) uniform Registers
 	int   expand_gamut;
 	int   shoulder;
 	int   sdr_eotf;
+	int   src_primaries;  /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 #endif
 } reg;
 
@@ -69,7 +70,7 @@ void main()
 
 #if defined(HDR)
 	FragColor = vec4(encode_hdr10(rgb, reg.paper_white_nits, reg.expand_gamut,
-	                              reg.shoulder, reg.sdr_eotf), 1.0);
+	                              reg.shoulder, reg.sdr_eotf, reg.src_primaries), 1.0);
 #else
 	FragColor = vec4(rgb, 1.0);
 #endif
