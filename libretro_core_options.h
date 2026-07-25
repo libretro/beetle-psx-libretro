@@ -372,13 +372,14 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(video_cable),
       "Analog Video Cable",
       NULL,
-      "Simulates the cable between the console and the television, including the colour encoding and the television's decoder. 'RGB' is the sharpest output the PSX could produce and is a straight bypass (default). 'S-Video' band-limits colour heavily but keeps luma and colour on separate wires, so fine detail stays clean. 'Composite' sums them onto one wire, which the decoder then has to pull apart again - this blends the console's 4x4 ordered dither into smooth gradients the way a period television did, at the cost of colour smearing and rainbow fringing on fine patterns. Works at any internal resolution: the extra samples are resolved down before the signal is generated, so higher settings act as supersampling into the cable rather than a wider signal, and the output still carries the sub-pixel detail the decoder produces. Only supported by the Vulkan renderer. Applies immediately; no restart needed.",
+      "Simulates the cable between the console and the television, including the colour encoding and the television's decoder. 'RGB' is the sharpest output the PSX could produce and is a straight bypass (default). 'S-Video' band-limits colour heavily but keeps luma and colour on separate wires, so fine detail stays clean. 'Composite' sums them onto one wire, which the decoder then has to pull apart again, costing luma detail and adding colour smearing and rainbow fringing on fine patterns. 'RF' models an external modulator - the console itself has none, only a DC jack to power one - narrowing luma further and adding the beat pattern the sound carrier makes against the colour subcarrier, which is strongest on saturated colour. Works at any internal resolution: the extra samples are resolved down before the signal is generated, so higher settings act as supersampling into the cable rather than a wider signal, and the output still carries the sub-pixel detail the decoder produces. Only supported by the Vulkan renderer. Applies immediately; no restart needed.",
       NULL,
       "video",
       {
          { "off",       "RGB (Sharp, No Simulation)" },
          { "svideo",    "S-Video" },
          { "composite", "Composite" },
+         { "rf",        "RF" },
          { NULL, NULL },
       },
       "off"

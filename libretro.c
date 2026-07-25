@@ -4412,6 +4412,8 @@ static void check_variables(bool startup)
          psx_video_cable = 1;
       else if (!strcmp(var.value, "composite"))
          psx_video_cable = 2;
+      else if (!strcmp(var.value, "rf"))
+         psx_video_cable = 3;
    }
 
    if (startup)

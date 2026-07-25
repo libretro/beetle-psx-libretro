@@ -29,6 +29,7 @@ layout(push_constant, std430) uniform Registers
 	float inv_ratio;     /* 1/15 NTSC, 1/12 PAL */
 	float line_adv;      /* 0.5 NTSC, 0.75 PAL */
 	float field_adv;     /* from the frame/field counter */
+	int   cable;         /* AN_CABLE_*: picks the luma tier, enables the beat */
 } reg;
 
 /* Native pixel under base-clock sample k, clamped at the line edges so the
@@ -50,11 +51,25 @@ void main()
 	 * looks the way it does. Two gathers rather than one because the tap
 	 * counts differ by 3x and running luma at the chroma length would throw
 	 * away the detail the luma filter is meant to keep. */
+	/* Luma bandwidth is the main thing separating the cable tiers, and the
+	 * branch is uniform across the draw, so the three loops cost nothing over
+	 * one. S-Video is widest (luma has its own wire), composite is capped by
+	 * having to share with the subcarrier, RF by the modulator. */
 	highp float y = 0.0;
-	for (int t = -AN_LUMA_N; t <= AN_LUMA_N; t++)
+	if (reg.cable == AN_CABLE_SVIDEO)
 	{
-		highp float w = AN_LUMA[t < 0 ? -t : t];
-		y += w * an_rgb_to_yc(fetch_base(n + float(t), row)).x;
+		for (int t = -AN_LUMA_WIDE_N; t <= AN_LUMA_WIDE_N; t++)
+			y += AN_LUMA_WIDE[t < 0 ? -t : t] * an_rgb_to_yc(fetch_base(n + float(t), row)).x;
+	}
+	else if (reg.cable == AN_CABLE_RF)
+	{
+		for (int t = -AN_LUMA_RF_N; t <= AN_LUMA_RF_N; t++)
+			y += AN_LUMA_RF[t < 0 ? -t : t] * an_rgb_to_yc(fetch_base(n + float(t), row)).x;
+	}
+	else
+	{
+		for (int t = -AN_LUMA_N; t <= AN_LUMA_N; t++)
+			y += AN_LUMA[t < 0 ? -t : t] * an_rgb_to_yc(fetch_base(n + float(t), row)).x;
 	}
 
 	highp vec2 iq = vec2(0.0);
@@ -69,5 +84,16 @@ void main()
 	highp vec2  cs = an_carrier(ph);
 	highp float vs = an_v_sign(line);
 
-	FragColor = vec4(y, an_modulate(iq, cs, vs), 0.0, 1.0);
+	highp float chroma = an_modulate(iq, cs, vs);
+
+	/* RF only: the sound carrier beating against the subcarrier. Added to the
+	 * signal before separation, which is where it lands on real hardware - it
+	 * is far below the chroma band-pass, so the comb leaves it in luma. */
+	if (reg.cable == AN_CABLE_RF)
+	{
+		highp float bph = fract(n * AN_BEAT_RATIO + fract(line * AN_BEAT_LINE_ADV));
+		chroma += AN_BEAT_AMPLITUDE * length(iq) * cos(AN_TAU * bph);
+	}
+
+	FragColor = vec4(y, chroma, 0.0, 1.0);
 }

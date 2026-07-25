@@ -41,6 +41,30 @@
 #define AN_CABLE_RGB       0
 #define AN_CABLE_SVIDEO    1
 #define AN_CABLE_COMPOSITE 2
+#define AN_CABLE_RF        3
+
+/* Intercarrier beat. The PSX has no RF modulator of its own - the rear jack is
+ * a 2.5 mm DC feed for an external one - so this models a modulator, not a
+ * console output. Its defining artifact is the sound carrier beating against
+ * the chroma subcarrier: 4.5 MHz - fsc = 920.455 kHz on NTSC-M, 5.5 MHz - fsc
+ * = 1.066 MHz on PAL-B/G. Both land well inside the luma passband, so the beat
+ * survives demodulation and shows as a fine pattern, exactly as it does on a
+ * real set.
+ *
+ * NTSC works out to exactly 3/175 of the base clock and half a cycle per line,
+ * so it alternates line to line like the carrier itself. PAL is 0.248 per
+ * line, close to but not exactly a quarter.
+ *
+ * Amplitude tracks chroma magnitude because the beat is a product of the two
+ * carriers: greyscale is clean, saturated colour is where it bites. */
+#if defined(PAL)
+#define AN_BEAT_RATIO    0.020043470
+#define AN_BEAT_LINE_ADV 0.248
+#else
+#define AN_BEAT_RATIO    0.017142857
+#define AN_BEAT_LINE_ADV 0.5
+#endif
+#define AN_BEAT_AMPLITUDE 0.18
 
 /* Gain the three-line comb needs to recover C(l) from
  *     comp(l) - 0.5 * (comp(l+1) + comp(l-1))

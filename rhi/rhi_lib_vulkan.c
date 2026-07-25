@@ -7553,7 +7553,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    const unsigned sig_h  = native_h;
    const bool     resolve_ss = (out_w != native_w) || (out_h != native_h);
    const bool     pal    = self->render_state.is_pal;
-   const bool     svideo = (psx_video_cable == 1);
+   const bool     svideo = (psx_video_cable == 1);   /* RF separates like composite */
 
    /* Subcarrier cycles per base clock, and per line. Both exact: NTSC runs
     * 15*fsc with 227.5 cycles per line, PAL 12*fsc with 283.75. */
@@ -7635,12 +7635,13 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    /* ---- pass 1: encode ---- */
    { struct EncPush
    {
-      float src_size[2];
-      float div;
-      float x1;
-      float inv_ratio;
-      float line_adv;
-      float field_adv;
+      float   src_size[2];
+      float   div;
+      float   x1;
+      float   inv_ratio;
+      float   line_adv;
+      float   field_adv;
+      int32_t cable;
    } push;
    push.src_size[0] = (float)native_w;
    push.src_size[1] = (float)native_h;
@@ -7649,6 +7650,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    push.inv_ratio   = inv_ratio;
    push.line_adv    = line_adv;
    push.field_adv   = field_adv;
+   push.cable       = psx_video_cable;
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_sig),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
