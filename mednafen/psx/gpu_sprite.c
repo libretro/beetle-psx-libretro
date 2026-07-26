@@ -276,7 +276,7 @@ static void DrawSprite_##SUFFIX(PS_GPU *gpu, int32_t x_arg, int32_t y_arg, int32
                { \
                   if (TM_LIT) \
                   { \
-                     uint8_t *dither_offset = gpu->DitherLUT[2][3]; \
+                     uint8_t *dither_offset = &gpu->DitherLUT[2][0][3]; \
                      fbw = ModTexel(dither_offset, fbw, r, g, b); \
                   } \
                   PlotNativePixel_##BM_TAG##_ME##ME_LIT##_T1(gpu, x, y, fbw); \

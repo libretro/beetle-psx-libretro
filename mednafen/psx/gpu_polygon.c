@@ -960,7 +960,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
                   dither_x = 3; \
                   dither_y = 2; \
                } \
-               dither_offset = gpu->DitherLUT[dither_y][dither_x]; \
+               dither_offset = &gpu->DitherLUT[dither_y][0][dither_x]; \
                fbw = ModTexel(dither_offset, fbw, r, g, b); \
             } \
             PlotPixel_##BM_TAG##_ME##ME_LIT##_T1(gpu, x, y, fbw); \
@@ -971,9 +971,9 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
          uint16_t pix = 0x8000; \
          if ((GOURAUD_LIT) && DitherEnabled(gpu)) \
          { \
-            pix |= gpu->DitherLUT[dither_y][dither_x][r] << 0; \
-            pix |= gpu->DitherLUT[dither_y][dither_x][g] << 5; \
-            pix |= gpu->DitherLUT[dither_y][dither_x][b] << 10; \
+            pix |= gpu->DitherLUT[dither_y][r][dither_x] << 0; \
+            pix |= gpu->DitherLUT[dither_y][g][dither_x] << 5; \
+            pix |= gpu->DitherLUT[dither_y][b][dither_x] << 10; \
          } \
          else \
          { \

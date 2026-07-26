@@ -244,7 +244,10 @@ DEFINE_PlotNativePixel(BMaddq_ME1_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 1)
  * gone in stage 5; callers now reference the right
  * PlotNativePixel_<TAG>_<...> specialisation by mangled name. */
 
-#define ModTexel(dither_offset, texel, r, g, b) ((texel & 0x8000) | (dither_offset[(((texel & 0x1F)  * (r))   >> (5 - 1))] << 0) | (dither_offset[(((texel & 0x3E0)  * (g))  >> (10 - 1))] << 5) | (dither_offset[(((texel & 0x7C00) * (b)) >> (15 - 1))] << 10))
+/* dither_offset points at &DitherLUT[y][0][x]; the reordered LUT
+ * ([y][value][x], see gpu.h) indexes source values at stride 4, which
+ * folds into scaled addressing. */
+#define ModTexel(dither_offset, texel, r, g, b) ((texel & 0x8000) | (dither_offset[((((texel & 0x1F)  * (r))   >> (5 - 1))) * 4] << 0) | (dither_offset[((((texel & 0x3E0)  * (g))  >> (10 - 1))) * 4] << 5) | (dither_offset[((((texel & 0x7C00) * (b)) >> (15 - 1))) * 4] << 10))
 
 /*
  * Refresh the per-PS_GPU CLUT (palette) cache if the new texture

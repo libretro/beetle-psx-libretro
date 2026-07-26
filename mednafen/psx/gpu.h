@@ -234,7 +234,14 @@ struct PS_GPU
    bool HardwarePALType;
    int LineVisFirst, LineVisLast;
 
-   uint8_t DitherLUT[4][4][512]; // Y, X, 8-bit source value(256 extra for saturation)
+   /* Y, 8-bit source value (256 extra for saturation), X.
+    * X is innermost so the four x-phases of one source value share a
+    * host cache line: as a span cycles x&3, gouraud-continuous colour
+    * values re-hit the same lines instead of hopping between four
+    * 512-byte tables.  "dither offset" pointers used with ModTexel are
+    * &DitherLUT[y][0][x] and index values at stride 4 (free scaled
+    * addressing); direct sites index [y][value][x]. */
+   uint8_t DitherLUT[4][512][4];
 
    /*
    VRAM has to be a ptr type or else we have to rely on smartcode void* shenanigans to

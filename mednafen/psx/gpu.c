@@ -1090,7 +1090,7 @@ bool GPU_Init(bool pal_clock_and_tv,
             if(value > 0x1F)
                value = 0x1F;
 
-            GPU.DitherLUT[y][x][v] = value;
+            GPU.DitherLUT[y][v][x] = value;
          }
       }
    }
