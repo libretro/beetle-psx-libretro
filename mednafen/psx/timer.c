@@ -462,7 +462,7 @@ void TIMER_Power(void)
 int TIMER_StateAction(void *sm, const unsigned load, const bool data_only)
 {
    int ret;
-   SFORMAT StateRegs[] =
+   static SFORMAT StateRegs[] =
    {
 #define SFTIMER(n)   SFVARN(Timers[n].Mode, #n "Mode"),        \
       SFVARN(Timers[n].Counter, #n "Counter"),     \

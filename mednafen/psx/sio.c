@@ -104,7 +104,7 @@ void SIO_Write(int32_t timestamp, uint32_t A, uint32_t V)
 
 int SIO_StateAction(void *data, int load, int data_only)
 {
-   SFORMAT StateRegs[] =
+   static SFORMAT StateRegs[] =
    {
       SFVARN(Status, "Status"),
       SFVARN(Mode, "Mode"),

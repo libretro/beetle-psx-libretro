@@ -40,7 +40,7 @@ void IRQ_Power(void)
 
 int IRQ_StateAction(void *data, int load, int data_only)
 {
-   SFORMAT StateRegs[] =
+   static SFORMAT StateRegs[] =
    {
       SFVARN(Asserted, "Asserted"),
       SFVARN(Mask, "Mask"),

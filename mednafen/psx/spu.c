@@ -1930,7 +1930,7 @@ void SPU_Init(void)
 
   int SPU_StateAction(StateMem *sm, int load, int data_only)
 {
-   SFORMAT StateRegs[] =
+   static SFORMAT StateRegs[] =
    {
 #define SFSWEEP(r) SFVAR((r).Control),	\
       SFVAR((r).Current),	\

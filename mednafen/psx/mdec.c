@@ -181,7 +181,7 @@ void MDEC_Power(void)
 
 int MDEC_StateAction(StateMem *sm, int load, int data_only)
 {
-   SFORMAT StateRegs[] =
+   static SFORMAT StateRegs[] =
    {
       SFVAR(ClockCounter),
       SFVAR(MDRPhase),

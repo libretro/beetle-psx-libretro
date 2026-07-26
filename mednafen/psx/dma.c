@@ -720,7 +720,7 @@ uint32_t DMA_Read(const int32_t timestamp, uint32_t A)
 
 int DMA_StateAction(StateMem *sm, int load, int data_only)
 {
-   SFORMAT StateRegs[] =
+   static SFORMAT StateRegs[] =
    {
       SFVAR(DMACycleCounter),
       SFVAR(DMAControl),
