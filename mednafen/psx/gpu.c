@@ -122,7 +122,10 @@ struct CTEntry
 };
 typedef struct CTEntry CTEntry;
 
-PS_GPU GPU;
+/* 64-byte alignment anchors the struct-relative layout to host cache
+ * lines: CLUT_Cache spans exactly 8 lines and each padded 16-byte
+ * TexCache entry sits inside a single line (see gpu.h). */
+MDFN_ALIGN(64) PS_GPU GPU;
 
 /* Scratch handles for PS1-state save/load and resolution rescale.
  * Used as a swap buffer between the GPU.vram (which is at the current

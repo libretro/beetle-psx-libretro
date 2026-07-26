@@ -71,10 +71,21 @@ struct PS_GPU
       uint32_t TWY_ADD;
    } SUCV;
 
+   /* Pad so TexCache below starts on a 16-byte boundary relative to the
+    * struct (CLUT_Cache 512 + CLUT_Cache_VB 4 + SUCV 16 = 532; +12 = 544).
+    * Together with the 64-byte alignment of the GPU global this keeps
+    * every 16-byte TexCache entry inside a single host cache line. */
+   uint32_t TexCacheAlignPad_[3];
+
    struct TexCache_t
    {
       uint16_t Data[4];
       uint32_t Tag;
+      /* Entry padded from 12 to 16 bytes: 4 entries per 64-byte host
+       * cache line with no entry straddling a line boundary, and the
+       * entry index scales by a power of two.  Not serialised - the
+       * savestate path marshals Tag/Data element-wise. */
+      uint32_t EntryPad_;
    } TexCache[256];
 
    /* Same-cache-line fast path for the textured-span inner loop: when a
