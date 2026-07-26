@@ -334,11 +334,16 @@ DEFINE_AddIDeltas_DY(g1_t1, 1, 1)
  *     serves both.
  *   - store: (pix & 0x7FFF) | MaskSetOR.
  *
- * Gated by the caller on upscale_shift == 0 (which also forces
- * dither_upscale_shift == 0, so the dither phase is plain x&3) and on
- * the run being contiguous in a single VRAM row (y already masked,
- * x in [0,1024)); the caller passes a span that does not cross the
- * 1024 column wrap.
+ * Runs at every upscale factor: the row base mirrors PlotPixel's
+ * scaled y-mask and vram_fetch's scaled row shift, and the dither
+ * phase applies dither_upscale_shift exactly as the scalar loop's
+ * (x >> dus) & 3 / (y >> dus) & 3 (dus is 0 at native res and under
+ * DITHER_UPSCALED, so the native-res codegen is unchanged).  The
+ * caller passes a span clipped to [ClipX0, ClipX1] within
+ * [0, (1024 << upscale_shift)), so the run is contiguous in one
+ * VRAM row and never crosses the scaled column wrap.
+ * Differentially fuzz-verified against the scalar loop at
+ * upscale_shift 0-3 (see commit message).
  *
  * GOURAUD_LIT/DITHER_ON/BM_VAL/ME_LIT are passed as literal ints from
  * the macro so this fully specialises and inlines per call site.
@@ -348,7 +353,12 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
       const int GOURAUD_LIT, const int DITHER_ON,
       const int BM_VAL, const int ME_LIT)
 {
-   uint16_t *row       = &gpu->vram[(uint32_t)(y & 511) << 10];
+   /* Upscale-aware row base, mirroring PlotPixel's
+    * `y &= (512 << upscale_shift) - 1` and vram_fetch's
+    * `y << (10 + upscale_shift)` addressing exactly. */
+   const uint32_t us   = gpu->upscale_shift;
+   const uint32_t dus  = gpu->dither_upscale_shift;
+   uint16_t *row       = &gpu->vram[(uint32_t)(y & ((512 << us) - 1)) << (10 + us)];
    const uint16_t mso  = gpu->MaskSetOR;
    uint32_t cr         = igp->r;
    uint32_t cg         = igp->g;
@@ -452,7 +462,7 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
          if (use_dither)
          {
             int16_t doff[8];
-            for (l = 0; l < step; l++) doff[l] = dither_table[y & 3][(bx + l) & 3];
+            for (l = 0; l < step; l++) doff[l] = dither_table[(y >> dus) & 3][((bx + l) >> dus) & 3];
             if (step == 4) doff[4]=doff[5]=doff[6]=doff[7]=0;
             {
                __m128i d = _mm_loadu_si128((const __m128i*)doff);
@@ -537,7 +547,7 @@ static INLINE int DrawSpanVec_NT(PS_GPU *gpu, int y, int32_t x, int32_t w,
          if (use_dither)
          {
             int16_t doff[8];
-            for (l = 0; l < step; l++) doff[l] = dither_table[y & 3][(bx + l) & 3];
+            for (l = 0; l < step; l++) doff[l] = dither_table[(y >> dus) & 3][((bx + l) >> dus) & 3];
             if (step == 4) doff[4]=doff[5]=doff[6]=doff[7]=0;
             {
                int16x8_t d  = vld1q_s16(doff);
@@ -846,7 +856,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
     * colour interpolants past the consumed pixels; the scalar do/while \
     * below finishes any 4/8-pixel remainder.  Textured spans and any \
     * upscale are left entirely to the scalar loop. */ \
-   if (!(TEXTURED_LIT) && gpu->upscale_shift == 0) \
+   if (!(TEXTURED_LIT)) \
    { \
       int32_t _vn = DrawSpanVec_NT(gpu, y, x, w, &ig, idl, \
             (GOURAUD_LIT), DitherEnabled(gpu), (BM_VAL), (ME_LIT)); \
