@@ -105,6 +105,18 @@ enum
  * in CPU_New. */
 static PS_CPU            s_cpu;
 PS_CPU                  *PSX_CPU = &s_cpu;
+
+/* Interpreter dispatch replication (computed-goto builds only): each
+ * opcode handler ends with its own fetch/decode/indirect-jump instead
+ * of funnelling through one central dispatch site, giving the branch
+ * predictor per-opcode successor context.  Costs ~30 instructions of
+ * .text per handler.  Define to 0 to A/B against the classic central
+ * dispatch; the switch-based (non-GNU) build always uses central
+ * dispatch regardless. */
+#ifndef PSX_DISPATCH_REPLICATE
+#define PSX_DISPATCH_REPLICATE 1
+#endif
+
 int32_t                  cpu_next_event_ts;
 static uint32_t          cpu_IPCache;
 static uint32_t          cpu_BIU;
@@ -930,7 +942,68 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 
    #define DO_LDS() { s_cpu.GPR_full[LDWhich] = LDValue; ReadAbsorb[LDWhich] = LDAbsorb; ReadFudge = LDWhich; ReadAbsorbWhich |= LDWhich & 0x1F; LDWhich = 0x22; }
    #define BEGIN_OPF(name) { op_##name:
+
+#if HAVE_COMPUTED_GOTO && PSX_DISPATCH_REPLICATE
+   /* Replicated dispatch: instead of every handler funnelling through
+    * one central `goto *op_goto_table[opf]` site (a single indirect-
+    * branch BTB entry shared by every opcode transition, i.e. near-
+    * guaranteed mispredicts), each handler ends by fetching, decoding
+    * and dispatching the next instruction itself.  Each of the ~90
+    * resulting indirect-jump sites gets its own predictor context
+    * keyed to that opcode's actual successor distribution.
+    *
+    * REDISPATCH is textually the loop-head sequence: event-slice
+    * check, r0 pinning, ADEL check (rare path re-enters through the
+    * central OpDone tail), ReadInstruction, decode, IPCache fold,
+    * ReadAbsorb tick, table jump.  op_goto_table is in scope at all
+    * expansion sites because handlers live in the same block as
+    * CGBEGIN.  The central while-head remains as the entry path and
+    * as the target of the exception route, so semantics are
+    * identical instruction-for-instruction. */
+   #define REDISPATCH \
+	if(MDFN_UNLIKELY(timestamp >= next_event_ts)) \
+	 goto RunSliceExit; \
+	GPR[0] = 0; \
+	if(MDFN_UNLIKELY(PC & 0x3)) \
+	{ \
+	 CP0.BADA = PC; \
+	 new_PC = CPU_Exception(EXCEPTION_ADEL, PC, new_PC, 0); \
+	 goto OpDone; \
+	} \
+	instr = ReadInstruction(&timestamp, PC); \
+	opf = instr & 0x3F; \
+	if(instr & (0x3F << 26)) \
+	 opf = 0x40 | (instr >> 26); \
+	opf |= IPCache; \
+	if(ReadAbsorb[ReadAbsorbWhich]) \
+	 ReadAbsorb[ReadAbsorbWhich]--; \
+	else \
+	 timestamp++; \
+	/* Anti-merge construction, refined empirically against GCC 13 \
+	 * -O3 cross-jumping (which merges common SUFFIXES): \
+	 *   - marker at the head of REDISPATCH: bodies merged, 15 \
+	 *     indirect sites survive; \
+	 *   - marker before `goto *table[opf]`: table-load+jmp tails \
+	 *     still merged, 22 sites; \
+	 *   - this form: the loaded target is tied through a \
+	 *     zero-instruction asm with a unique immediate per \
+	 *     expansion, so everything up to and including the load is \
+	 *     RTL-distinct and the only remaining common tail is the \
+	 *     bare 2-byte `jmp *reg` - merging that behind a 5-byte \
+	 *     direct jmp is a size regression cross-jumping rejects. */ \
+	{ \
+	 const void *dispatch_target_ = op_goto_table[opf]; \
+	 __asm__ __volatile__ ("" : "+r" (dispatch_target_) : "i" (__COUNTER__)); \
+	 goto *dispatch_target_; \
+	}
+   #define END_OPF { PC = new_PC; new_PC = new_PC + 4; BDBT = 0; REDISPATCH } }
+   /* Branch handlers already set PC/new_PC/BDBT; they skip the
+    * OpDone tail, matching the old `goto SkipNPCStuff`. */
+   #define BRANCH_DISPATCH REDISPATCH
+#else
    #define END_OPF goto OpDone; }
+   #define BRANCH_DISPATCH goto SkipNPCStuff;
+#endif
 
    #define DO_BRANCH(arg_cond, arg_offset, arg_mask, arg_dolink, arg_linkreg)\
 	{							\
@@ -950,7 +1023,7 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 	  BDBT = 3;						\
 	 }							\
 								\
-	 goto SkipNPCStuff;					\
+	 BRANCH_DISPATCH					\
 	}
 
    #define ITYPE uint32_t rs MDFN_NOWARN_UNUSED = (instr >> 21) & 0x1F; uint32_t rt MDFN_NOWARN_UNUSED = (instr >> 16) & 0x1F; uint32_t immediate = (int32_t)(int16_t)(instr & 0xFFFF);
@@ -2781,6 +2854,9 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 
    SkipNPCStuff:	;
   }
+#if HAVE_COMPUTED_GOTO && PSX_DISPATCH_REPLICATE
+  RunSliceExit:	;
+#endif
 #if defined(HAVE_LIGHTREC) && defined(LIGHTREC_DEBUG)
   if (timestamp >= 0 && PC != oldpc)
      print_for_big_ass_debugger(timestamp, PC);
