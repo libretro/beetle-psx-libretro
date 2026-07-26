@@ -26,16 +26,68 @@ static PGXP_value UserMem[USER_MEM_COUNT];
 static PGXP_value ScratchMem[SCRATCH_MEM_COUNT];
 static PGXP_value RegisterMem[REGISTER_MEM_COUNT];
 
+#define PGXP_MEM_TOTAL (USER_MEM_COUNT + SCRATCH_MEM_COUNT + REGISTER_MEM_COUNT)
+
+/* One-way "ever PGXP-written" bitmap over the packed address space,
+ * one bit per shadow word (~64 KB total, L2-resident).
+ *
+ * The shadow arrays above total ~14.4 MB of 28-byte entries walked in
+ * lockstep with guest loads, but for most games the overwhelming
+ * majority of guest words are never stored through a PGXP-tracked
+ * path: their entries stay exactly as PGXP_InitMem's memset left them
+ * (all zero), and the 28-byte read on every guest load is pure L2/L3
+ * traffic for a predetermined answer.  A clear bit proves the entry
+ * is that memset zero, so the load path can synthesize the identical
+ * result without touching the entry's cache line at all.
+ *
+ * Invariants that make this bit-exact rather than approximate:
+ *   - The ONLY mutation paths into the arrays are WriteMem and
+ *     WriteMem16 (InvalidStore funnels through WriteMem; ReadMem /
+ *     GetPtr consumers in pgxp_cpu.c are read-only), and both set
+ *     the bit before writing.
+ *   - Validate()/MaskValidate() on an all-zero entry are no-ops
+ *     (flags &= x on flags == 0), so the skipped array access could
+ *     never have changed the entry either.
+ *   - The bit is never cleared except by PGXP_InitMem, matching the
+ *     lifetime of the memset.  Entries that were written once keep
+ *     taking the full path even after invalidation - conservative,
+ *     but the touched set (stack, vertex scratch) stays small.
+ * PGXP state is not serialised in savestates, so there is nothing to
+ * version. */
+static uint32_t MemEverWritten[(PGXP_MEM_TOTAL + 31) / 32];
+
 const uint32_t UserMemOffset  = 0;
 const uint32_t ScratchOffset  = USER_MEM_COUNT;
 const uint32_t RegisterOffset = USER_MEM_COUNT + SCRATCH_MEM_COUNT;
 const uint32_t InvalidAddress = USER_MEM_COUNT + SCRATCH_MEM_COUNT + REGISTER_MEM_COUNT;
+
+static inline int MemBitTest(uint32_t paddr)
+{
+	return (MemEverWritten[paddr >> 5] >> (paddr & 31)) & 1;
+}
+
+static inline void MemBitSet(uint32_t paddr)
+{
+	MemEverWritten[paddr >> 5] |= (uint32_t)1 << (paddr & 31);
+}
+
+/* Resolve an already-converted (packed) address to its entry.
+ * Caller guarantees paddr < InvalidAddress. */
+static inline PGXP_value* PtrFromPacked(uint32_t paddr)
+{
+	if (paddr < ScratchOffset)
+		return &UserMem[paddr - UserMemOffset];
+	if (paddr < RegisterOffset)
+		return &ScratchMem[paddr - ScratchOffset];
+	return &RegisterMem[paddr - RegisterOffset];
+}
 
 void PGXP_InitMem()
 {
 	memset(UserMem,     0, sizeof(UserMem));
 	memset(ScratchMem,  0, sizeof(ScratchMem));
 	memset(RegisterMem, 0, sizeof(RegisterMem));
+	memset(MemEverWritten, 0, sizeof(MemEverWritten));
 }
 
 /*  Playstation Memory Map (from Playstation doc by Joshua Walker)
@@ -116,12 +168,8 @@ PGXP_value* GetPtr(uint32_t addr)
 {
 	addr = PGXP_ConvertAddress(addr);
 
-	if (addr < ScratchOffset)
-		return &UserMem[addr - UserMemOffset];
-	if (addr < RegisterOffset)
-		return &ScratchMem[addr - ScratchOffset];
 	if (addr < InvalidAddress)
-		return &RegisterMem[addr - RegisterOffset];
+		return PtrFromPacked(addr);
 	return NULL;
 }
 
@@ -132,9 +180,22 @@ PGXP_value* ReadMem(uint32_t addr)
 
 void ValidateAndCopyMem(PGXP_value* dest, uint32_t addr, uint32_t value)
 {
-	PGXP_value* pMem = GetPtr(addr);
-	if (pMem != NULL)
+	uint32_t paddr = PGXP_ConvertAddress(addr);
+	if (paddr < InvalidAddress)
 	{
+		PGXP_value* pMem;
+
+		if (!MemBitTest(paddr))
+		{
+			/* Entry is provably the InitMem memset zero: Validate()
+			 * on a zero entry is a no-op and the copy would yield
+			 * all-zero.  Synthesize that without touching the
+			 * entry's cache line. */
+			memset(dest, 0, sizeof(*dest));
+			return;
+		}
+
+		pMem = PtrFromPacked(paddr);
 		Validate(pMem, value);
 		*dest = *pMem;
 		return;
@@ -147,7 +208,27 @@ void ValidateAndCopyMem16(PGXP_value* dest, uint32_t addr, uint32_t value, int s
 {
 	uint32_t validMask = 0;
 	psx_value val, mask;
-	PGXP_value* pMem = GetPtr(addr);
+	PGXP_value zero_local;
+	PGXP_value* pMem = NULL;
+	uint32_t paddr = PGXP_ConvertAddress(addr);
+
+	if (paddr < InvalidAddress)
+	{
+		if (!MemBitTest(paddr))
+		{
+			/* Never-written entry is the memset zero; run the
+			 * identical merge/truncate body below against a local
+			 * zero so the result is bit-for-bit what reading the
+			 * array would produce, without touching its cache
+			 * line.  MaskValidate's writeback lands in the
+			 * throwaway. */
+			memset(&zero_local, 0, sizeof(zero_local));
+			pMem = &zero_local;
+		}
+		else
+			pMem = PtrFromPacked(paddr);
+	}
+
 	if (pMem != NULL)
 	{
 		mask.d = val.d = 0;
@@ -190,15 +271,29 @@ void ValidateAndCopyMem16(PGXP_value* dest, uint32_t addr, uint32_t value, int s
 
 void WriteMem(PGXP_value* value, uint32_t addr)
 {
-	PGXP_value* pMem = GetPtr(addr);
+	uint32_t paddr = PGXP_ConvertAddress(addr);
 
-	if (pMem)
-		*pMem = *value;
+	if (paddr < InvalidAddress)
+	{
+		MemBitSet(paddr);
+		*PtrFromPacked(paddr) = *value;
+	}
 }
 
 void WriteMem16(PGXP_value* src, uint32_t addr)
 {
-	PGXP_value* dest = GetPtr(addr);
+	PGXP_value* dest = NULL;
+	uint32_t paddr = PGXP_ConvertAddress(addr);
+
+	if (paddr < InvalidAddress)
+	{
+		/* The halfword merge below reads the entry's other half, so
+		 * the bit must be set even though a never-written entry is
+		 * still all-zero at this point - reading zeros from the
+		 * array here is exactly the pre-bitmap behaviour. */
+		MemBitSet(paddr);
+		dest = PtrFromPacked(paddr);
+	}
 
 	if (dest)
 	{
