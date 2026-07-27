@@ -95,6 +95,10 @@ static bool rect_match_matches(const RectMatch *m, TTRect r) {
  * a handful of entries, so this is never approached. */
 #define DUMP_IGNORE_MAX 256
 
+/* Maximum number of "pageignore" rules read from dump.cfg (regions whose
+ * pages are excluded from page-aligned dumping). */
+#define PAGE_IGNORE_MAX 64
+
 /* ------------------------------------------------------------------
  * GPU backend shims. One tracker instance exists per process (the
  * core runs exactly one RHI renderer at a time), so the backend is
@@ -2209,6 +2213,26 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       bool lazy_sync;               /* Lazy mode only: load+upload synchronously on the render thread */
       bool reduce_palette_range;    /* opt-in: hash only the CLUT entries a texture uses */
 
+      /* dump.cfg `clutrows a,b`: VRAM rows holding live in-page CLUTs that some
+       * games animate (e.g. SotN keeps stage palettes in the bottom rows of its
+       * tile pages). These rows are hashed as zeros so palette writes can't churn
+       * the page hash for unchanged art. Active purely from dump.cfg (like the
+       * `ignore` directive) - inert when clut_rows_count == 0. */
+      uint8_t clut_rows[FB_HEIGHT];
+      int     clut_rows_count;
+
+      /* dump.cfg `pageignore x,y,w,h`: VRAM regions the game composites at runtime
+       * (sprite frames, menu text, icon slots); a page intersecting one is skipped
+       * by page-aligned DUMPING. Replacement matching is unaffected. */
+      RectMatch page_ignore[PAGE_IGNORE_MAX];
+      int       page_ignore_count;
+
+      /* dump.cfg `pagemindump w,h` (VRAM halfwords; 0,0 = off): a page dump only
+       * fires when it overlaps a dumpable upload at least this large - suppresses
+       * page dumps triggered by tiny composite writes (glyphs, icons, map pixels). */
+      int page_min_dump_w;
+      int page_min_dump_h;
+
       /* CPU mirror of 16-bit VRAM (FB_WIDTH x FB_HEIGHT), kept current by every
        * VRAM mutation hook. Page hashing/dumping reads page bytes from here
        * because the draw path carries no CPU VRAM pointer (PAGE_ALIGN.md sec 3). */
@@ -2422,6 +2446,156 @@ static int parse_config_file(const char *path, RectMatch *out, int max) {
     }
     filestream_close(in);
     return count;
+}
+
+/* Match:  ^\s*clutrows\s+(\d+)\s*,\s*(\d+)\s*(?:#.*)?$  - an inclusive range of
+ * VRAM rows that hold CLUTs (excluded from page-aligned hashes). */
+static bool cfg_match_clutrows(const char *line, int *start, int *end)
+{
+    const char *p = cfg_skip_ws(line);
+    if (strncmp(p, "clutrows", 8) != 0)
+        return false;
+    p += 8;
+    if (!cfg_is_space((unsigned char)*p))
+        return false;
+    p = cfg_skip_ws(p);
+    if (cfg_parse_field(&p, start) != 0)
+        return false;
+    if (*p != ',')
+        return false;
+    p++;
+    if (cfg_parse_field(&p, end) != 0)
+        return false;
+    if (*p == '#')
+        return true;
+    return *p == '\0';
+}
+
+/* Scan dump.cfg for `clutrows a,b` lines, setting rows[a..b] (clamped).
+ * Returns the number of rows flagged. */
+static int parse_clut_rows_config(const char *path, uint8_t *rows, int height)
+{
+    char line[1024];
+    int flagged = 0;
+    RFILE *in = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
+                                RETRO_VFS_FILE_ACCESS_HINT_NONE);
+    if (!in)
+        return 0;
+    while (filestream_gets(in, line, sizeof(line))) {
+        int start = -1, end = -1, y;
+        if (!cfg_match_clutrows(line, &start, &end))
+            continue;
+        if (start < 0) start = 0;
+        if (end >= height) end = height - 1;
+        for (y = start; y <= end; y++) {
+            if (!rows[y]) {
+                rows[y] = 1;
+                flagged++;
+            }
+        }
+    }
+    filestream_close(in);
+    return flagged;
+}
+
+/* Match:  ^\s*pageignore\s+(\d+),(\d+),(\d+),(\d+)\s*(?:#.*)?$  - a VRAM rect
+ * whose pages are excluded from page-aligned dumping (plain numbers, no `*`). */
+static bool cfg_match_pageignore(const char *line, RectMatch *m)
+{
+    const char *p = cfg_skip_ws(line);
+    int i;
+    int *fields[4];
+    if (strncmp(p, "pageignore", 10) != 0)
+        return false;
+    p += 10;
+    if (!cfg_is_space((unsigned char)*p))
+        return false;
+    p = cfg_skip_ws(p);
+    fields[0] = &m->x; fields[1] = &m->y; fields[2] = &m->w; fields[3] = &m->h;
+    for (i = 0; i < 4; i++) {
+        if (cfg_parse_field(&p, fields[i]) != 0)
+            return false;
+        if (*fields[i] < 0)
+            return false; /* no wildcards: this is an intersection test, not exact-match */
+        if (i < 3) {
+            if (*p != ',')
+                return false;
+            p++;
+        }
+    }
+    if (*p == '#')
+        return true;
+    return *p == '\0';
+}
+
+static int parse_page_ignore_config(const char *path, RectMatch *out, int max)
+{
+    char line[1024];
+    int count = 0;
+    RFILE *in = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
+                                RETRO_VFS_FILE_ACCESS_HINT_NONE);
+    if (!in)
+        return 0;
+    while (count < max && filestream_gets(in, line, sizeof(line))) {
+        RectMatch m;
+        if (cfg_match_pageignore(line, &m))
+            out[count++] = m;
+    }
+    filestream_close(in);
+    return count;
+}
+
+/* Match:  ^\s*pagemindump\s+(\d+)\s*,\s*(\d+)\s*(?:#.*)?$  (VRAM halfwords) */
+static bool cfg_match_pagemindump(const char *line, int *w, int *h)
+{
+    const char *p = cfg_skip_ws(line);
+    if (strncmp(p, "pagemindump", 11) != 0)
+        return false;
+    p += 11;
+    if (!cfg_is_space((unsigned char)*p))
+        return false;
+    p = cfg_skip_ws(p);
+    if (cfg_parse_field(&p, w) != 0 || *w < 0)
+        return false;
+    if (*p != ',')
+        return false;
+    p++;
+    if (cfg_parse_field(&p, h) != 0 || *h < 0)
+        return false;
+    if (*p == '#')
+        return true;
+    return *p == '\0';
+}
+
+/* Scan dump.cfg for a `pagemindump w,h` line (last one wins). */
+static void parse_page_min_dump_config(const char *path, int *out_w, int *out_h)
+{
+    char line[1024];
+    RFILE *in = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
+                                RETRO_VFS_FILE_ACCESS_HINT_NONE);
+    if (!in)
+        return;
+    while (filestream_gets(in, line, sizeof(line))) {
+        int w, h;
+        if (cfg_match_pagemindump(line, &w, &h)) {
+            *out_w = w;
+            *out_h = h;
+        }
+    }
+    filestream_close(in);
+}
+
+/* True when a page rect intersects any dump.cfg `pageignore` region - page-aligned
+ * dumping skips such pages (runtime-composited content). */
+static bool texture_tracker_page_dump_ignored(struct TextureTracker *self, TTRect page_rect) {
+   int i;
+   for (i = 0; i < self->page_ignore_count; i++) {
+      const RectMatch *m = &self->page_ignore[i];
+      TTRect r = make_rect((unsigned)m->x, (unsigned)m->y, (unsigned)m->w, (unsigned)m->h);
+      if (rect_intersects(&page_rect, &r))
+         return true;
+   }
+   return false;
 }
 
 struct RGBAImage {
@@ -3174,6 +3348,11 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       self->replacement_fallback  = false;
       self->lazy_sync             = false;
       self->reduce_palette_range  = false;
+      memset(self->clut_rows, 0, sizeof(self->clut_rows));
+      self->clut_rows_count       = 0;
+      self->page_ignore_count     = 0;
+      self->page_min_dump_w       = 0;
+      self->page_min_dump_h       = 0;
       self->vram_mirror           = (uint16_t*)calloc((size_t)FB_WIDTH * FB_HEIGHT, sizeof(uint16_t));
       self->ensured_dump_dir[0]       = '\0';
       self->ensured_dump_pages_dir[0] = '\0';
@@ -3207,6 +3386,15 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
          RectMatch m = self->dump_ignore[mi];
          TT_LOG_VERBOSE(RETRO_LOG_INFO, "Ignoring %d,%d,%d,%d\n", m.x, m.y, m.w, m.h);
       }
+      self->clut_rows_count = parse_clut_rows_config(cfg, self->clut_rows, FB_HEIGHT);
+      if (self->clut_rows_count > 0)
+         TT_LOG(RETRO_LOG_INFO, "clutmask: %d VRAM row(s) declared as CLUT rows via dump.cfg\n", self->clut_rows_count);
+      self->page_ignore_count = parse_page_ignore_config(cfg, self->page_ignore, PAGE_IGNORE_MAX);
+      if (self->page_ignore_count > 0)
+         TT_LOG(RETRO_LOG_INFO, "pageignore: %d region(s) excluded from page dumping via dump.cfg\n", self->page_ignore_count);
+      parse_page_min_dump_config(cfg, &self->page_min_dump_w, &self->page_min_dump_h);
+      if (self->page_min_dump_w > 0 || self->page_min_dump_h > 0)
+         TT_LOG(RETRO_LOG_INFO, "pagemindump: page dumps need an overlapping upload >= %dx%d halfwords\n", self->page_min_dump_w, self->page_min_dump_h);
       /* Spin up the IO worker pool last, once the self->tracker is fully built. */
       io_thread_init(&self->iothread);
    }
@@ -3897,12 +4085,14 @@ static TTRect fromSRect(SRect rect) {
             return full_hash;
          for (j = 0; j < page_rect.height; j++) {
             unsigned vy = (page_rect.y + j) & (FB_HEIGHT - 1);
+            if (self->clut_rows[vy])
+               continue; /* CLUT rows hold palette data, not texture indices - skip the bounds scan */
             for (x = 0; x < page_rect.width; x++) {
                unsigned vx = (page_rect.x + x) & (FB_WIDTH - 1);
                words[k++] = self->vram_mirror[vy * FB_WIDTH + vx];
             }
          }
-         if (reduce_palette_bounds(words, n, mode, &lo, &hi)) {
+         if (reduce_palette_bounds(words, k, mode, &lo, &hi)) {
             slot->pal_min = (int)lo;
             slot->pal_max = (int)hi;
          } else {
@@ -4006,7 +4196,13 @@ static TTRect fromSRect(SRect rect) {
          bool dumpable = false;
          int oi;
          for (oi = 0; oi < overlap.count; oi++) {
-            if (rect_tracker_get_index(&self->tracker, overlap.items[oi])->upload->dumpable) {
+            TextureUpload *u = rect_tracker_get_index(&self->tracker, overlap.items[oi])->upload;
+            /* dump.cfg `pagemindump`: small uploads (text glyphs, map pixels, icon
+             * slots) are runtime compositing, not page content worth a page dump -
+             * require a substantial upload to trigger one. */
+            if (u->dumpable &&
+                (int)u->width  >= self->page_min_dump_w &&
+                (int)u->height >= self->page_min_dump_h) {
                dumpable = true;
                break;
             }
@@ -4021,15 +4217,20 @@ static TTRect fromSRect(SRect rect) {
             uint32_t page_phash;
             HdTextureId page_id;
             page_rect.x = page_x; page_rect.y = page_y; page_rect.width = width; page_rect.height = 256;
-            page_hash = texture_tracker_hash_page_cached(self, page_rect);
-            /* Reduce Palette Range (page path): dump under the page's reduced hash. */
-            page_phash = have_pal_data
-               ? texture_tracker_effective_palette_hash_page(self, page_rect, page_hash, pal_local, palette_hash)
-               : palette_hash;
-            page_id.hash = page_hash; page_id.palette_hash = page_phash; page_id.pages = true;
-            if (!hd_key_set_contains(&self->dumped_pages, hd_pack_key(page_id))) {
-               hd_key_set_insert(&self->dumped_pages, hd_pack_key(page_id));
-               texture_tracker_dump_page(self, page_rect, page_hash, mode, page_phash);
+            /* dump.cfg `pageignore`: runtime-composited regions (sprites, menu text,
+             * icon slots) churn page content by design - skip before hashing so
+             * ignored pages cost no CRC work. */
+            if (!texture_tracker_page_dump_ignored(self, page_rect)) {
+               page_hash = texture_tracker_hash_page_cached(self, page_rect);
+               /* Reduce Palette Range (page path): dump under the page's reduced hash. */
+               page_phash = have_pal_data
+                  ? texture_tracker_effective_palette_hash_page(self, page_rect, page_hash, pal_local, palette_hash)
+                  : palette_hash;
+               page_id.hash = page_hash; page_id.palette_hash = page_phash; page_id.pages = true;
+               if (!hd_key_set_contains(&self->dumped_pages, hd_pack_key(page_id))) {
+                  hd_key_set_insert(&self->dumped_pages, hd_pack_key(page_id));
+                  texture_tracker_dump_page(self, page_rect, page_hash, mode, page_phash);
+               }
             }
          }
       }
@@ -4306,6 +4507,10 @@ static bool is_power_of_two(int n) {
    /* CRC32 of a VRAM page rect read from the CPU mirror. Row-by-row incremental
     * CRC is bit-identical to CRCing one gathered buffer, so it matches -pages
     * dumps while avoiding a malloc+copy on the common (no x-wrap) path. */
+   /* A zeroed stand-in row for CLUT-row masking; wide enough for any page width
+    * (256 halfwords = direct-colour pages). */
+   static const uint16_t tt_zero_row[256] = {0};
+
    static uint32_t texture_tracker_hash_page(struct TextureTracker *self, TTRect page_rect) {
       uint32_t crc = 0;
       self->dbg_page_hashes++;
@@ -4314,6 +4519,8 @@ static bool is_power_of_two(int n) {
          for (j = 0; j < page_rect.height; j++) {
             unsigned vy = (page_rect.y + j) & (FB_HEIGHT - 1);
             const uint16_t *row = &self->vram_mirror[vy * FB_WIDTH + page_rect.x];
+            if (self->clut_rows[vy])
+               row = tt_zero_row; /* dump.cfg CLUT row: hash as zeros so palette writes can't churn the page */
             crc = crc32(crc, (const unsigned char*)row, page_rect.width * sizeof(uint16_t));
          }
          return crc;
@@ -4324,6 +4531,11 @@ static bool is_power_of_two(int n) {
          size_t k = 0;
          for (j = 0; j < page_rect.height; j++) {
             unsigned vy = (page_rect.y + j) & (FB_HEIGHT - 1);
+            if (self->clut_rows[vy]) {
+               memset(vec + k, 0, (size_t)page_rect.width * sizeof(uint16_t));
+               k += page_rect.width;
+               continue;
+            }
             for (i = 0; i < page_rect.width; i++) {
                unsigned vx = (page_rect.x + i) & (FB_WIDTH - 1);
                vec[k++] = self->vram_mirror[vy * FB_WIDTH + vx];
@@ -5024,6 +5236,11 @@ static bool is_power_of_two(int n) {
       dump_path(cfg, sizeof(cfg));
       snprintf(cfg + strlen(cfg), sizeof(cfg) - strlen(cfg), "/dump.cfg");
       self->dump_ignore_count = parse_config_file(cfg, self->dump_ignore, DUMP_IGNORE_MAX);
+      memset(self->clut_rows, 0, sizeof(self->clut_rows));
+      self->clut_rows_count = parse_clut_rows_config(cfg, self->clut_rows, FB_HEIGHT);
+      self->page_ignore_count = parse_page_ignore_config(cfg, self->page_ignore, PAGE_IGNORE_MAX);
+      self->page_min_dump_w = 0; self->page_min_dump_h = 0;
+      parse_page_min_dump_config(cfg, &self->page_min_dump_w, &self->page_min_dump_h);
 
       /* Drop all cached / loaded HD state so edited files on disk take effect. */
       HdGpuCache_clear(&self->hd_gpu_cache);
