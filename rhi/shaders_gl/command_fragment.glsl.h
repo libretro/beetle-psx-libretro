@@ -110,7 +110,7 @@ vec4 reinterpret_color(vec4 color) {
   uint pre_bits = rebuild_psx_color(color);
 
   // interpret as 1555
-  float a = float((pre_bits & 0x8000U) >> 15) / 31.;
+  float a = float((pre_bits & 0x8000U) >> 15);
   float b = float((pre_bits & 0x7C00U) >> 10) / 31.;
   float g = float((pre_bits & 0x3E0U) >> 5) / 31.;
   float r = float(pre_bits & 0x1FU) / 31.;
