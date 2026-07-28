@@ -820,9 +820,9 @@ vec4 get_texel_bilinear(out float opacity)
   uv_frac = abs(uv_frac);
 
   // sample 4 nearest texels
-  vec4 texel_00 = sample_texel(vec2(x + 0, y + 0));
-  vec4 texel_10 = sample_texel(vec2(x + uv_offs.x, y + 0));
-  vec4 texel_01 = sample_texel(vec2(x + 0, y + uv_offs.y));
+  vec4 texel_00 = sample_texel(vec2(x, y));
+  vec4 texel_10 = sample_texel(vec2(x + uv_offs.x, y));
+  vec4 texel_01 = sample_texel(vec2(x, y + uv_offs.y));
   vec4 texel_11 = sample_texel(vec2(x + uv_offs.x, y + uv_offs.y));
   
   // test for fully transparent texel
