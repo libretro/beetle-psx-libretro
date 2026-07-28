@@ -87,15 +87,9 @@ uint rebuild_psx_color(vec4 color) {
   uint b = uint(floor(color.b * 31. + 0.5));
 
 )
-#ifdef HAVE_OPENGLES3
-STRINGIZE(
-  return (r << 11) | (g << 6) | (b << 1) | a;
-)
-#else
 STRINGIZE(
   return (a << 15) | (b << 10) | (g << 5) | r;
 )
-#endif
 STRINGIZE(
 }
 
@@ -108,6 +102,15 @@ bool is_transparent(vec4 texel) {
 }
 
 // reinterpret 5551 color for GLES (doesn't support 1555 REV)
+)
+#ifdef HAVE_OPENGLES3
+STRINGIZE(
+vec4 reinterpret_color(vec4 color) {
+  return color;
+}
+)
+#else
+STRINGIZE(
 vec4 reinterpret_color(vec4 color) {
   // rebuild as 5551
   uint pre_bits = rebuild_psx_color(color);
@@ -120,6 +123,9 @@ vec4 reinterpret_color(vec4 color) {
 
   return vec4(r, g, b, a);
 }
+)
+#endif
+STRINGIZE(
 
 // ---- HD texture replacement sampling ----
 // Port of rhi/shaders_vulkan/hdtextures.h onto this shader's varyings:

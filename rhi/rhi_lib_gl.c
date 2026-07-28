@@ -1495,6 +1495,59 @@ static void gl_texture_set_sub_image_window(
    glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint) row_len);
    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
    glBindTexture(GL_TEXTURE_2D, tex->id);
+
+#ifdef HAVE_OPENGLES3
+   /*
+    * PS1 VRAM stores 16-bit ABGR1555 words. OpenGL ES lacks
+    * GL_UNSIGNED_SHORT_1_5_5_5_REV, so convert them to the RGBA5551
+    * layout required by GL_UNSIGNED_SHORT_5_5_5_1. Display mode
+    * affects scanout interpretation, not the underlying VRAM layout.
+    */
+   if (ty == GL_UNSIGNED_SHORT_5_5_5_1)
+   {
+      size_t sub_w = (size_t) resolution[0];
+      size_t sub_h = (size_t) resolution[1];
+      uint16_t* converted =
+            (uint16_t*) malloc(sub_w * sub_h * sizeof(uint16_t));
+
+      if (!converted)
+      {
+         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+         return;
+      }
+
+      for (size_t line = 0; line < sub_h; line++)
+      {
+         const uint16_t* src_row = sub_data + line * row_len;
+         uint16_t* dst_row = converted + line * sub_w;
+
+         for (size_t px = 0; px < sub_w; px++)
+         {
+            uint16_t val = src_row[px];
+            uint16_t r = val & 0x1Fu;
+            uint16_t g = (val >> 5) & 0x1Fu;
+            uint16_t b = (val >> 10) & 0x1Fu;
+            uint16_t a = (val >> 15) & 0x01u;
+
+            dst_row[px] = (r << 11) | (g << 6) | (b << 1) | a;
+         }
+      }
+
+      glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+      glTexSubImage2D(  GL_TEXTURE_2D,
+                        0,
+                        (GLint) top_left[0],
+                        (GLint) top_left[1],
+                        (GLsizei) resolution[0],
+                        (GLsizei) resolution[1],
+                        format,
+                        ty,
+                        (void*)converted);
+      free(converted);
+      return;
+   }
+#endif
+
    glTexSubImage2D(  GL_TEXTURE_2D,
                      0,
                      (GLint) top_left[0],
@@ -2118,29 +2171,18 @@ static void gl_renderer_upload_textures(
    if (!gl_draw_buffer_is_empty(renderer->command_buffer))
       gl_renderer_draw(renderer);
 
-   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-   glBindTexture(GL_TEXTURE_2D, renderer->fb_texture.id);
-   glTexSubImage2D(  GL_TEXTURE_2D,
-         0,
-         (GLint) top_left[0],
-         (GLint) top_left[1],
-         (GLsizei) dimensions[0],
-         (GLsizei) dimensions[1],
+   gl_texture_set_sub_image_window(
+         &renderer->fb_texture,
+         top_left,
+         dimensions,
+         (size_t) VRAM_WIDTH_PIXELS,
          GL_RGBA,
 #ifdef HAVE_OPENGLES3
          GL_UNSIGNED_SHORT_5_5_5_1,
-         /* bits are always in the order that they show
-          * REV indicates the channels are in reversed order
-          * RGBA
-          * 16 bit unsigned short: R5 G5 B5 A1
-          * RRRRRGGGGGBBBBBA */
 #else
          GL_UNSIGNED_SHORT_1_5_5_5_REV,
-         /* ABGR
-          * 16 bit unsigned short: A1 B5 G5 R5
-          * ABBBBBGGGGGRRRRR */
 #endif
-         (void*)pixel_buffer);
+         pixel_buffer);
 
    x_start    = top_left[0];
    x_end      = x_start + dimensions[0];
