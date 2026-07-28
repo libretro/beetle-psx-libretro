@@ -35,8 +35,11 @@ uniform ivec4 hd_vram_rect;
 // The area of this hd texture's own texels that may currently be used (x, y, w, h)
 uniform ivec4 hd_texel_rect;
 
-//uniform uint mask_setor;
-//uniform uint mask_evaland;
+// GP0(E6h) bit 0, "Set mask while drawing". 0: the mask bit written to
+// VRAM is bit 15 of the texture color (and zero for untextured
+// primitives), 1: bit 15 is forced to one. GP0(E6h) bit 1 ("Check mask
+// before draw") is handled outside the shader, by the stencil buffer.
+uniform uint force_mask_bit;
 
 in vec3 frag_shading_color;
 // Texture page: base offset for texture lookup.
@@ -976,7 +979,9 @@ void main() {
    
       if (frag_texture_blend_mode == BLEND_MODE_NO_TEXTURE)
       {
-         color = vec4(frag_shading_color, 0.);
+         // Untextured primitives write a zero mask bit unless GP0(E6h)
+         // bit 0 forces it to one.
+         color = vec4(frag_shading_color, float(force_mask_bit));
       }
       else
       {
@@ -1058,17 +1063,21 @@ STRINGIZE(
             discard;
          }
 
+         // The mask bit written to VRAM is bit 15 of the texture color,
+         // OR'd with GP0(E6h) bit 0. Matches primitive.frag's
+         // `NNColor.a + vColor.a` on the Vulkan renderer.
+         float mask_bit = max(texel.a, float(force_mask_bit));
+
          if (frag_texture_blend_mode == BLEND_MODE_RAW_TEXTURE) {
-            color = texel;
+            color = vec4(texel.rgb, mask_bit);
          } else /* BLEND_MODE_TEXTURE_BLEND */ {
             // Blend the texel with the shading color. `frag_shading_color`
             // is multiplied by two so that it can be used to darken or
             // lighten the texture as needed. The result of the
             // multiplication should be saturated to 1.0 (0xff) but I think
             // OpenGL will take care of that since the output buffer holds
-            // integers. The alpha/mask bit bit is taken directly from the
-            // texture however.
-            color = vec4(frag_shading_color * 2. * texel.rgb, texel.a);
+            // integers.
+            color = vec4(frag_shading_color * 2. * texel.rgb, mask_bit);
          }
       }
 

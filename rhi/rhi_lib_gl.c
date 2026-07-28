@@ -569,7 +569,15 @@ struct gl_primitive_batch {
    /* GL_TRIANGLES or GL_LINES */
    GLenum draw_mode;
    bool opaque;
+   /* Drives the stencil write value for this batch.  Note that
+    * vertex_add_blended_pass() forces this true for the second pass of a
+    * textured semi-transparent primitive, so it is NOT a faithful copy of
+    * the PS1's MaskSetOR - use `force_mask` for that. */
    bool set_mask;
+   /* GP0(E6h).0 (MaskSetOR) as the GPU saw it, propagated to the shader's
+    * `force_mask_bit` uniform so the mask bit stored in VRAM matches
+    * hardware. */
+   bool force_mask;
    bool mask_test;
    /* First index */
    unsigned first;
@@ -719,6 +727,7 @@ struct gl_renderer {
    uint8_t tex_y_or;
 
    bool set_mask;
+   bool force_mask;
    bool mask_test;
 
    uint8_t filter_type;
@@ -1983,7 +1992,10 @@ static void gl_renderer_draw(gl_renderer *renderer)
          /* Blending */
       opaque = it->opaque;
       if (renderer->command_buffer->program)
+      {
          glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "draw_semi_transparent"), !opaque);
+         glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_mask_bit"), it->force_mask ? 1u : 0u);
+      }
       if (opaque)
          glDisable(GL_BLEND);
       else
@@ -2082,6 +2094,7 @@ static void gl_renderer_draw(gl_renderer *renderer)
    renderer->vertex_index_pos = 0;
    renderer->mask_test = false;
    renderer->set_mask = false;
+   renderer->force_mask = false;
 
    glDeleteFramebuffers(1, &_fb.id);
 }
@@ -2519,6 +2532,7 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    renderer->tex_y_or = 0;
    renderer->display_vram = display_vram;
    renderer->set_mask  = false;
+   renderer->force_mask = false;
    renderer->mask_test = false;
 
    /* Shared HD texture replacement/tracking: create the tracker over the
@@ -3232,6 +3246,7 @@ static void vertex_preprocessing(
        || (is_semi_transparent &&
            stm != renderer->semi_transparency_mode)
        || renderer->set_mask != set_mask
+       || renderer->force_mask != set_mask
        || renderer->mask_test != mask_test
        || hd_handle_ne(&hd, &renderer->hd_handle))
    {
@@ -3246,6 +3261,7 @@ static void vertex_preprocessing(
       batch.draw_mode = mode;
       batch.transparency_mode = stm;
       batch.set_mask = set_mask;
+      batch.force_mask = set_mask;
       batch.mask_test = mask_test;
       batch.first = renderer->vertex_index_pos;
       batch.count = 0;
@@ -3256,6 +3272,7 @@ static void vertex_preprocessing(
       renderer->command_draw_mode = mode;
       renderer->opaque = is_opaque;
       renderer->set_mask = set_mask;
+      renderer->force_mask = set_mask;
       renderer->mask_test = mask_test;
       renderer->hd_handle = hd;
    }
@@ -3275,6 +3292,7 @@ static void vertex_add_blended_pass(
       batch.draw_mode = last->draw_mode;
       batch.transparency_mode = last->transparency_mode;
       batch.set_mask = true;
+      batch.force_mask = last->force_mask;
       batch.mask_test = last->mask_test;
       batch.first = vertex_index;
       batch.count = 0;
@@ -4845,6 +4863,7 @@ void rhi_gl_load_image(
    }
 
    renderer->set_mask     = set_mask;
+   renderer->force_mask   = set_mask;
    renderer->mask_test    = mask_test;
 
    if (renderer->tracker && renderer->texture_tracking_enabled)
@@ -5587,6 +5606,7 @@ void rhi_gl_copy_rect(
      return;
 
    renderer->set_mask          = set_mask;
+   renderer->force_mask        = set_mask;
    renderer->mask_test         = mask_test;
 
    if (renderer->tracker && renderer->texture_tracking_enabled)
