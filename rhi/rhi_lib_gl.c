@@ -1470,25 +1470,9 @@ static void gl_texture_set_sub_image_window(
    uint16_t x         = top_left[0];
    uint16_t y         = top_left[1];
 
-   /* `data` is the caller's full 1024x512 VRAM buffer.  `index`
-    * picks the first pixel of the upload region.  With x < 1024
-    * and y < 512 (both clamped at the GP0 FBWrite parser via
-    * x &= 0x3FF, y &= 0x1FF, see gpu.cpp), index is at most
-    * 511*1024 + 1023 == 524287, the last element of vram.
-    *
-    * glTexSubImage2D below then reads (resolution[1]-1) * row_len
-    * + resolution[0] words past sub_data using GL_UNPACK_ROW_LENGTH.
-    * If x + resolution[0] > 1024 or y + resolution[1] > 512 the
-    * upload reads past the end of vram - i.e. an FBWrite whose
-    * target rectangle wraps across the VRAM seam.  The PS1 GPU
-    * wraps such writes (the SW renderer's texel_put does
-    * curx & 1023, cury & 511); this GL fast-path does not, and
-    * the corresponding upload is incorrect for wrap-across writes.
-    *
-    * This is a pre-existing limitation, not introduced by this
-    * function.  Fixing it would require splitting the upload
-    * into 1-4 glTexSubImage2D calls along the seam(s), or
-    * pre-rotating the source data into a scratch buffer. */
+   /* Callers split wrap-around VRAM transfers at the 1024x512 seams,
+    * so this function always receives a contiguous source and a
+    * destination rectangle contained within the texture. */
    size_t index       = ((size_t) y) * row_len + ((size_t) x);
    uint16_t* sub_data = &( data[index] );
 
@@ -4887,6 +4871,8 @@ void rhi_gl_load_image(
    if (static_renderer.state == GL_STATE_INVALID)
       return;
 
+   x &= VRAM_WIDTH_PIXELS - 1;
+   y &= VRAM_HEIGHT - 1;
    renderer = static_renderer.state_data;
    if (!renderer)
    {
@@ -4901,6 +4887,42 @@ void rhi_gl_load_image(
        * which lives for the whole core lifetime - safe to hold. */
       rhi_defer_push_load_image(&gl_defer_queue,
             x, y, w, h, vram, mask_test, set_mask);
+      return;
+   }
+
+   if ((unsigned)x + w > VRAM_WIDTH_PIXELS ||
+       (unsigned)y + h > VRAM_HEIGHT)
+   {
+      uint16_t widths[2];
+      uint16_t heights[2];
+      unsigned x_parts;
+      unsigned y_parts;
+      unsigned yi;
+      unsigned xi;
+
+      widths[0] = w < (uint16_t)(VRAM_WIDTH_PIXELS - x)
+            ? w : (uint16_t)(VRAM_WIDTH_PIXELS - x);
+      widths[1] = (uint16_t)(w - widths[0]);
+      heights[0] = h < (uint16_t)(VRAM_HEIGHT - y)
+            ? h : (uint16_t)(VRAM_HEIGHT - y);
+      heights[1] = (uint16_t)(h - heights[0]);
+      x_parts = widths[1] ? 2 : 1;
+      y_parts = heights[1] ? 2 : 1;
+
+      for (yi = 0; yi < y_parts; yi++)
+      {
+         for (xi = 0; xi < x_parts; xi++)
+         {
+            rhi_gl_load_image(
+                  xi ? 0 : x,
+                  yi ? 0 : y,
+                  widths[xi],
+                  heights[yi],
+                  vram,
+                  mask_test,
+                  set_mask);
+         }
+      }
       return;
    }
 
