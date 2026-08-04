@@ -1079,12 +1079,15 @@ STRINGIZE(
          } else /* BLEND_MODE_TEXTURE_BLEND */ {
             // Blend the texel with the shading color. `frag_shading_color`
             // is multiplied by two so that it can be used to darken or
-            // lighten the texture as needed. The result of the
-            // multiplication should be saturated to 1.0 (0xff) but I think
-            // OpenGL will take care of that since the output buffer holds
-            // integers.
+            // lighten the texture as needed.
             color = vec4(frag_shading_color * 2. * texel.rgb, mask_bit);
          }
+
+         // Saturate the modulated source to 1.0. The old comment here
+         // relied on the UNORM framebuffer clamping at the write stage
+         // ("I think OpenGL will take care of that"), which GL_RGBA16F
+         // does not do. No-op on the UNORM targets.
+         color.rgb = min(color.rgb, vec3(1.));
       }
 
    // 4x4 dithering pattern scaled by `dither_scaling`

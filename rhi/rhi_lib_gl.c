@@ -22,6 +22,40 @@
 #include "tt_trace.h"
 #include "beetle_psx_globals.h"
 
+/* HDR output state, owned by libretro.c (same contract as the Vulkan
+ * renderer's extern block). psx_color_format records the *requested*
+ * color format; psx_hdr_active is true only once the frontend accepted
+ * SET_PIXEL_FORMAT(HDR10_2101010), so the display encode gates on the
+ * latter while the fp16 render target gates on the former (it is
+ * allocated before negotiation completes). */
+extern int   psx_color_format;
+extern bool  psx_hdr_active;
+extern float psx_hdr_paper_white_nits;
+extern float psx_hdr_max_nits;
+extern int   psx_hdr_expand_gamut;
+extern int   psx_hdr_shoulder;
+extern int   psx_hdr_sdr_eotf;
+extern int   psx_hdr_overbright_hot;
+extern int   psx_src_primaries;
+
+/* fp16 render targets are core on desktop GL 3.0+; GLES3 needs an
+ * extension to make them color-renderable. When unavailable, fb_out
+ * stays on its SDR storage: the PQ display encode still runs if the
+ * frontend engaged HDR10 (the signal contract requires it), but
+ * over-white content clamps at reference white. */
+static bool gl_fp16_renderable(void)
+{
+#ifdef HAVE_OPENGLES3
+   const char *ext = (const char *)glGetString(GL_EXTENSIONS);
+   if (!ext)
+      return false;
+   return strstr(ext, "GL_EXT_color_buffer_float") != NULL ||
+          strstr(ext, "GL_EXT_color_buffer_half_float") != NULL;
+#else
+   return true;
+#endif
+}
+
 #define gl_draw_buffer_is_empty(x)           ((x)->map_index == 0)
 #define gl_draw_buffer_remaining_capacity(x) ((x)->capacity - (x)->map_index)
 #define gl_draw_buffer_next_index(x)         ((x)->map_start + (x)->map_index)
@@ -717,6 +751,10 @@ struct gl_renderer {
    uint32_t internal_upscaling;
    /* Current internal color depth */
    uint8_t internal_color_depth;
+   /* fb_out is GL_RGBA16F: 30-bit/HDR color format requested and fp16 is
+    * color-renderable. Drives the explicit source clamp, the subtractive
+    * zero-floor pass, dither force-off, and readback quantisation. */
+   bool fb_out_fp16;
    /* Counter for preserving primitive draw order in the z-buffer
     * since we draw semi-transparent primitives out-of-order. */
    int16_t primitive_ordering;
@@ -2111,6 +2149,7 @@ static void gl_renderer_draw(gl_renderer *renderer)
           * draw calls between the prepare/finalize) */
          glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
                         (GLvoid*)(it->first * sizeof(GLushort)));
+
       }
 
          if (hd_owned)
@@ -2476,10 +2515,14 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
     * textures. */
    gl_texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1);
 
-   if (dither_mode == DITHER_OFF)
+   renderer->fb_out_fp16 = psx_color_format != 0 && gl_fp16_renderable();
+
+   if (dither_mode == DITHER_OFF || renderer->fb_out_fp16)
    {
       /* Dithering is superfluous when we increase the internal
-      * color depth, but users asked for it */
+      * color depth, but users asked for it. On the fp16 HDR target it is
+      * force-disabled, matching the Vulkan renderer: the wide target
+      * carries the full precision the dither exists to fake. */
       gl_draw_buffer_disable_attribute(command_buffer, "dither");
    }
    else
@@ -2507,6 +2550,12 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
          log_cb(RETRO_LOG_ERROR, "Unsupported depth %d\n", depth);
          exit(EXIT_FAILURE);
    }
+
+   /* The HDR scaled framebuffer overrides the Internal Color Depth
+    * choice: additive overshoot and the subtractive floor need a wide
+    * float target, exactly like the Vulkan renderer's 16F path. */
+   if (renderer->fb_out_fp16)
+      texture_storage = GL_RGBA16F;
 
    gl_texture_init(
          &renderer->fb_out,
@@ -2991,12 +3040,14 @@ static bool retro_refresh_variables(gl_renderer *renderer)
       if (!strcmp(var.value, "1x(native)"))
       {
          dither_mode = DITHER_NATIVE;
-         gl_draw_buffer_enable_attribute(renderer->command_buffer, "dither");
+         if (!renderer->fb_out_fp16)
+            gl_draw_buffer_enable_attribute(renderer->command_buffer, "dither");
       }
       else if (!strcmp(var.value, "internal resolution"))
       {
          dither_mode = DITHER_UPSCALED;
-         gl_draw_buffer_enable_attribute(renderer->command_buffer, "dither");
+         if (!renderer->fb_out_fp16)
+            gl_draw_buffer_enable_attribute(renderer->command_buffer, "dither");
       }
       else if (!strcmp(var.value, "disabled"))
       {
@@ -3019,7 +3070,7 @@ static bool retro_refresh_variables(gl_renderer *renderer)
       uint16_t top_left[2]   = {0, 0};
       uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
 
-      if (dither_mode == DITHER_OFF)
+      if (dither_mode == DITHER_OFF || renderer->fb_out_fp16)
          gl_draw_buffer_disable_attribute(renderer->command_buffer, "dither");
       else
          gl_draw_buffer_enable_attribute(renderer->command_buffer, "dither");
@@ -3036,6 +3087,11 @@ static bool retro_refresh_variables(gl_renderer *renderer)
             log_cb(RETRO_LOG_ERROR, "Unsupported depth %d\n", depth);
             exit(EXIT_FAILURE);
       }
+
+      /* See the initial allocation: HDR pins the storage to fp16
+       * regardless of the Internal Color Depth setting. */
+      if (renderer->fb_out_fp16)
+         texture_storage = GL_RGBA16F;
 
       glDeleteTextures(1, &renderer->fb_out.id);
       renderer->fb_out.id     = 0;
@@ -4255,6 +4311,7 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
                glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "depth_24bpp"), depth_24bpp);
 
                glUniform1ui(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "internal_upscaling"), renderer->internal_upscaling);
+
             }
 
             if (!gl_draw_buffer_is_empty(renderer->output_buffer))
@@ -5083,6 +5140,12 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
       return true;
 
    is_32bpp = (renderer->internal_color_depth == 32);
+   /* The fp16 HDR target reads back through the 16bpp path: every GL
+    * conversion to 1555 / RGB5_A1 clamps to [0,1] first and quantises
+    * straight to 5 bits, which is the hardware FBRead behaviour. The
+    * RGBA8 intermediate would round to 8 bits before truncating to 5. */
+   if (renderer->fb_out_fp16)
+      is_32bpp = false;
    upscale  = renderer->internal_upscaling;
    if (upscale == 0)
       upscale = 1;
