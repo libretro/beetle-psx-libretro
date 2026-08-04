@@ -209,6 +209,7 @@ int   psx_hdr_shoulder         = 0;
  * reference white before blending (over-white only from stacking, default);
  * 1 leaves it hot for punchier single-layer glow. Read from a core option. */
 int   psx_hdr_overbright_hot   = 0;
+int   psx_hdr_multipass        = 0;
 /* Reference SDR transfer the 24-bit path is assumed to have been viewed
  * through, used to linearise before the HDR encode: 0 = BT.1886 pure 2.4
  * (default, matches RetroArch's own SDR->HDR composition), 1 = pure 2.2,
@@ -4536,6 +4537,18 @@ static void check_variables(bool startup)
       {
          if (!strcmp(var.value, "hot"))
             psx_hdr_overbright_hot = 1;
+      }
+
+      /* HDR true multi-pass blending (Vulkan HDR path only): 1 routes
+       * non-masked subtractive prims through the per-primitive programmable
+       * blend path, 0 keeps fixed-function subtract plus a zero-floor pass.
+       * Safe to toggle at runtime; consulted per flush. */
+      var.key = BEETLE_OPT(hdr_multipass);
+      psx_hdr_multipass = 0;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "enabled"))
+            psx_hdr_multipass = 1;
       }
 #endif
 

@@ -30,6 +30,9 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/feedback.msaa.unscaled.frag.inc -mfmt=c -DTEXTURED -DMSAA -DUNSCALED primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.msaa.flat.frag.inc -mfmt=c -DMSAA primitive_feedback.frag
 
+# Zero-floor pass (HDR fixed-function subtractive; see floor.frag)
+"$GLSLC" -o prebuilt/floor.frag.inc -mfmt=c floor.frag
+
 # Resolve shaders
 "$GLSLC" -o prebuilt/resolve.scaled.comp.inc -mfmt=c -DSCALED resolve.comp
 "$GLSLC" -o prebuilt/resolve.msaa.scaled.comp.inc -mfmt=c -DSCALED -DMSAA resolve.comp

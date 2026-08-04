@@ -462,6 +462,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "clamped"
    },
+   {
+      BEETLE_OPT(hdr_multipass),
+      "HDR True Multi-Pass Blending",
+      NULL,
+      "Selects how subtractive semi-transparency is blended on the Vulkan HDR path, when 'Color Format' is set to '30-bit Color (HDR)'. Both settings floor the result at zero exactly as real hardware does. 'Off' uses fixed-function blending followed by a single cheap floor pass per batch - hardware-accurate at almost no cost. 'On' instead routes every subtractive primitive through the same per-primitive programmable blend path used for mask-tested draws; this additionally lets 'HDR Additive Overbright' boost subtractive sources (deeper single-layer cuts), at a per-primitive synchronisation cost that can add up in subtractive-heavy scenes such as drop shadows and screen fades. No effect on the OpenGL/Software renderers or in 24-bit mode.",
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    {
