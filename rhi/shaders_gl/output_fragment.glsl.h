@@ -24,17 +24,7 @@ static const char *output_fragment = GLSL_FRAGMENT(
       uint g = uint(floor(color.g * 31. + 0.5));
       uint b = uint(floor(color.b * 31. + 0.5));
 
-)
-#ifdef HAVE_OPENGLES3
-STRINGIZE(
-      return (r << 11) | (g << 6) | (b << 1) | a;
-)
-#else
-STRINGIZE(
       return (a << 15) | (b << 10) | (g << 5) | r;
-)
-#endif
-STRINGIZE(
    }
 
    void main() {
@@ -45,7 +35,6 @@ STRINGIZE(
          // texture. The alpha/mask bit is ignored here.
 	vec2 off = vec2(offset) / vec2(1024., 512.);
 
-	// GLES 5551 note: color reinterpretation shouldn't be done here
 	color = texture(fb, frag_fb_coord + off).rgb;
       } else {
          // In this mode we have to interpret the framebuffer as containing
