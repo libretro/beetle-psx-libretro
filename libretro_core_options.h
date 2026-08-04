@@ -344,7 +344,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(color_format),
       "Color Format",
       NULL,
-      "Selects the output color depth. '24-bit (Standard)' is the historical 8-bit-per-channel output. '30-bit Color (HDR)' outputs 10-bit-per-channel, PQ-encoded Rec.2020 (HDR10) for display on an HDR-capable screen: the renderer already carries more than 8 bits of internal precision, so this both reduces banding on upscaled gradients and lets emissive content sit above SDR white. Currently only takes effect with the Vulkan renderer and requires frontend HDR support; it falls back to 24-bit on the OpenGL/Software renderers or when the frontend cannot present HDR10. Restart required.",
+      "Selects the output color depth. '24-bit (Standard)' is the historical 8-bit-per-channel output. '30-bit Color (HDR)' outputs 10-bit-per-channel, PQ-encoded Rec.2020 (HDR10) for display on an HDR-capable screen: the renderer already carries more than 8 bits of internal precision, so this both reduces banding on upscaled gradients and lets emissive content sit above SDR white. Takes effect with the Vulkan and OpenGL hardware renderers and requires frontend HDR support; it falls back to 24-bit on the Software renderer or when the frontend cannot present HDR10. Restart required.",
       NULL,
       "video",
       {
@@ -358,7 +358,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(hdr_shoulder),
       "HDR Highlight Roll-Off",
       NULL,
-      "Selects how additive highlights that rise above SDR white are compressed toward the HDR peak, when 'Color Format' is set to '30-bit Color (HDR)'. 'Reinhard (Soft Knee)' is a gentle, gradual roll-off. 'Filmic' uses a shoulder that rises faster and reaches the peak sooner, giving punchier highlights. Only affects over-white emissive/additive content on the Vulkan HDR path; ordinary colour and everything in the standard range are identical either way. Has no effect on the OpenGL/Software renderers or in 24-bit mode.",
+      "Selects how additive highlights that rise above SDR white are compressed toward the HDR peak, when 'Color Format' is set to '30-bit Color (HDR)'. 'Reinhard (Soft Knee)' is a gentle, gradual roll-off. 'Filmic' uses a shoulder that rises faster and reaches the peak sooner, giving punchier highlights. Only affects over-white emissive/additive content on the hardware-renderer HDR path; ordinary colour and everything in the standard range are identical either way. Has no effect on the Software renderer or in 24-bit mode.",
       NULL,
       "video",
       {
@@ -437,7 +437,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(hdr_sdr_gamma),
       "Reference Display Gamma",
       NULL,
-      "Selects the display gamma the console's output is assumed to be viewed through. Used in two places: to linearise the picture before re-encoding it for HDR, and to decide what 'average' means when supersampled or multisampled samples are combined - those estimate how much light a pixel emits, so they are averaged as light rather than as stored values. This decides whether HDR lands at the same brightness the standard path did on your screen - it does not change accuracy, only the match between the two. 'BT.1886 (Gamma 2.4)' is the default and matches the frontend's own SDR-to-HDR conversion and a TV-like reference. 'Gamma 2.2' suits a PC monitor tracking sRGB's nominal gamma. 'sRGB (Piecewise)' matches how Windows composites standard content onto an HDR desktop and lifts shadow detail. If HDR looks dimmer or more contrasty than 24-bit on the same display, try 'Gamma 2.2' or 'sRGB (Piecewise)'. Has no effect on the OpenGL/Software renderers.",
+      "Selects the display gamma the console's output is assumed to be viewed through. Used in two places: to linearise the picture before re-encoding it for HDR, and to decide what 'average' means when supersampled or multisampled samples are combined - those estimate how much light a pixel emits, so they are averaged as light rather than as stored values. This decides whether HDR lands at the same brightness the standard path did on your screen - it does not change accuracy, only the match between the two. 'BT.1886 (Gamma 2.4)' is the default and matches the frontend's own SDR-to-HDR conversion and a TV-like reference. 'Gamma 2.2' suits a PC monitor tracking sRGB's nominal gamma. 'sRGB (Piecewise)' matches how Windows composites standard content onto an HDR desktop and lifts shadow detail. If HDR looks dimmer or more contrasty than 24-bit on the same display, try 'Gamma 2.2' or 'sRGB (Piecewise)'. Has no effect on the Software renderer.",
       NULL,
       "video",
       {
@@ -452,7 +452,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(hdr_overbright),
       "HDR Additive Overbright",
       NULL,
-      "Controls whether additive and subtractive blend sources may exceed reference white on the Vulkan HDR path, when 'Color Format' is set to '30-bit Color (HDR)'. 'Off' clamps each source to reference white before blending (matching real hardware), so highlights only rise above white where translucent layers stack - accurate and controlled. 'On' lets bright modulated sources push additive/subtractive effects roughly twice as hard for punchier single-layer glow (lasers, lightning, flames), at the cost of accuracy. Opaque surfaces are clamped either way. No effect on the OpenGL/Software renderers or in 24-bit mode.",
+      "Controls whether additive and subtractive blend sources may exceed reference white on the hardware-renderer HDR path, when 'Color Format' is set to '30-bit Color (HDR)'. On the OpenGL renderer this affects additive sources only. 'Off' clamps each source to reference white before blending (matching real hardware), so highlights only rise above white where translucent layers stack - accurate and controlled. 'On' lets bright modulated sources push additive/subtractive effects roughly twice as hard for punchier single-layer glow (lasers, lightning, flames), at the cost of accuracy. Opaque surfaces are clamped either way. No effect on the Software renderer or in 24-bit mode.",
       NULL,
       "video",
       {

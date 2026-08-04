@@ -5444,6 +5444,82 @@ error:
    return false;
 }
 
+/* Finalize the HDR decision once a hardware renderer is confirmed
+ * (Vulkan or OpenGL - both carry the fp16 scaled framebuffer and the PQ
+ * Rec.2020 display encode). HDR is engaged only when the user requested
+ * 30-bit AND the frontend accepted the HDR10 pixel format. All env
+ * queries are read-only and inert on frontends that don't recognise
+ * them; rejection falls back to 24-bit. */
+static void negotiate_hdr_output(void)
+{
+   /* The frontend's paper-white / gamut / output-mode values are cached
+    * for the renderer's output stage to encode against, so an HDR frame
+    * matches the frontend's own SDR->HDR composition rather than
+    * diverging in brightness or saturation. */
+   psx_hdr_active = false;
+   if (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR)
+   {
+      /* The confirmed contract (RetroArch gfx/video_driver.c: source_hdr10
+       * is set from this pixel format; gfx/drivers/vulkan.c routes it to
+       * the HDR passthrough composition, and the HW-render set_image() path
+       * feeds the same filter chain): SET_PIXEL_FORMAT(HDR10_2101010) IS
+       * the signal that our presented image is PQ Rec.2020. Unlike
+       * XRGB2101010, a frontend that cannot present HDR10 must *reject*
+       * this format rather than silently down-convert, so a true return is
+       * an authoritative "HDR is on and will be presented". On rejection
+       * we restore XRGB8888 and fall back to 24-bit. */
+      enum retro_pixel_format hdrfmt = RETRO_PIXEL_FORMAT_HDR10_2101010;
+      if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &hdrfmt))
+      {
+         unsigned gamut = 0;
+         unsigned omode = 1;
+         float    pw    = 0.0f;
+
+         { float mx = 0.0f;
+           if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_MAX_NITS, &mx) && mx > 0.0f)
+              psx_hdr_max_nits = mx;
+         }
+         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
+            psx_hdr_paper_white_nits = pw;
+         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
+            psx_hdr_expand_gamut = (int)gamut;
+         /* Queried and logged, deliberately not compensated for. The
+          * libretro.h note warns that an scRGB swapchain applies
+          * Rec.2020 -> Rec.709 on the way and can undo a core's gamut
+          * choice, but working it through, it does not: the frontend's
+          * rotation is exactly the inverse of the container
+          * reinterpretation, so for emitted samples X the perceived
+          * colour is M_2020 * X under HDR10 and
+          * M_709 * M_2020->709 * X = M_2020 * X under scRGB. Identical,
+          * and that holds for the deliberate mis-mappings the Colour
+          * Boost modes rely on too, since the boost is baked into X
+          * either way. Kept for the log, and because the value is worth
+          * having if that analysis is ever shown wrong - which it might
+          * be, as no scRGB frontend has been available to test against. */
+         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE, &omode))
+            psx_hdr_output_mode = (int)omode;
+
+         psx_hdr_active = true;
+      }
+      else
+      {
+         /* Rejected: restore the SDR frame format the SW-fallback path
+          * (FMV / software framebuffer) still uses. */
+         enum retro_pixel_format sdrfmt = RETRO_PIXEL_FORMAT_XRGB8888;
+         environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &sdrfmt);
+      }
+
+      if (log_cb)
+      {
+         log_cb(RETRO_LOG_INFO,
+               "[Color Format] 30-bit HDR requested: %s (paper white %.0f nits, gamut %d, output mode %d).\n",
+               psx_hdr_active ? "engaged" : "rejected by frontend - falling back to 24-bit",
+               psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
+         log_cb(RETRO_LOG_INFO, "[HDR] Display peak: %.0f nits\n", psx_hdr_max_nits);
+      }
+   }
+}
+
 bool retro_load_game(const struct retro_game_info *info)
 {
    char tocbasepath[4096];
@@ -5571,6 +5647,8 @@ bool retro_load_game(const struct retro_game_info *info)
          struct retro_core_option_display option_display;
          option_display.visible = false;
 
+         negotiate_hdr_output();
+
          option_display.key = BEETLE_OPT(scaled_uv_offset);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter_exclude_sprite);
@@ -5607,84 +5685,7 @@ bool retro_load_game(const struct retro_game_info *info)
          struct retro_core_option_display option_display;
          option_display.visible = false;
 
-         /* Finalize the HDR decision now that Vulkan is confirmed. HDR is
-          * engaged only when the user requested 30-bit AND the frontend
-          * reports it can present a 10-bit source end to end AND HDR output
-          * is actually on. All queries here are read-only, so this is inert
-          * on frontends that don't recognise them (older cores fall back to
-          * 24-bit). The frontend's paper-white / gamut / output-mode values
-          * are cached for the Vulkan output stage to encode against, so an
-          * HDR frame matches the frontend's own SDR->HDR composition rather
-          * than diverging in brightness or saturation.
-          *
-          * NOTE: this establishes the *intent and parameters* only. The
-          * actual HDR10 signalling to the frontend, the 10-bit swapchain /
-          * output render target, and the PQ Rec.2020 encode in the resolve
-          * shader are the next implementation stage (see rhi + resolve.comp);
-          * downstream code must gate on psx_hdr_active, which stays false
-          * until that stage lands, so this change is behaviour-neutral. */
-         psx_hdr_active = false;
-         if (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR)
-         {
-            /* The confirmed contract (RetroArch gfx/video_driver.c: source_hdr10
-             * is set from this pixel format; gfx/drivers/vulkan.c routes it to
-             * the HDR passthrough composition, and the HW-render set_image() path
-             * feeds the same filter chain): SET_PIXEL_FORMAT(HDR10_2101010) IS
-             * the signal that our presented image is PQ Rec.2020. Unlike
-             * XRGB2101010, a frontend that cannot present HDR10 must *reject*
-             * this format rather than silently down-convert, so a true return is
-             * an authoritative "HDR is on and will be presented". On rejection
-             * we restore XRGB8888 and fall back to 24-bit. */
-            enum retro_pixel_format hdrfmt = RETRO_PIXEL_FORMAT_HDR10_2101010;
-            if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &hdrfmt))
-            {
-               unsigned gamut = 0;
-               unsigned omode = 1;
-               float    pw    = 0.0f;
-
-               { float mx = 0.0f;
-                 if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_MAX_NITS, &mx) && mx > 0.0f)
-                    psx_hdr_max_nits = mx;
-               }
-               if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
-                  psx_hdr_paper_white_nits = pw;
-               if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
-                  psx_hdr_expand_gamut = (int)gamut;
-               /* Queried and logged, deliberately not compensated for. The
-                * libretro.h note warns that an scRGB swapchain applies
-                * Rec.2020 -> Rec.709 on the way and can undo a core's gamut
-                * choice, but working it through, it does not: the frontend's
-                * rotation is exactly the inverse of the container
-                * reinterpretation, so for emitted samples X the perceived
-                * colour is M_2020 * X under HDR10 and
-                * M_709 * M_2020->709 * X = M_2020 * X under scRGB. Identical,
-                * and that holds for the deliberate mis-mappings the Colour
-                * Boost modes rely on too, since the boost is baked into X
-                * either way. Kept for the log, and because the value is worth
-                * having if that analysis is ever shown wrong - which it might
-                * be, as no scRGB frontend has been available to test against. */
-               if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE, &omode))
-                  psx_hdr_output_mode = (int)omode;
-
-               psx_hdr_active = true;
-            }
-            else
-            {
-               /* Rejected: restore the SDR frame format the SW-fallback path
-                * (FMV / software framebuffer) still uses. */
-               enum retro_pixel_format sdrfmt = RETRO_PIXEL_FORMAT_XRGB8888;
-               environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &sdrfmt);
-            }
-
-            if (log_cb)
-            {
-               log_cb(RETRO_LOG_INFO,
-                     "[Color Format] 30-bit HDR requested: %s (paper white %.0f nits, gamut %d, output mode %d).\n",
-                     psx_hdr_active ? "engaged" : "rejected by frontend - falling back to 24-bit",
-                     psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
-               log_cb(RETRO_LOG_INFO, "[HDR] Display peak: %.0f nits\n", psx_hdr_max_nits);
-            }
-         }
+         negotiate_hdr_output();
 
          option_display.key = BEETLE_OPT(depth);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
