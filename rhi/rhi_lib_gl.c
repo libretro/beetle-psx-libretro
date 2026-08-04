@@ -2070,6 +2070,12 @@ static void gl_renderer_draw(gl_renderer *renderer)
       {
          glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "draw_semi_transparent"), !opaque);
          glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_mask_bit"), it->force_mask ? 1u : 0u);
+         /* "HDR Additive Overbright": skip the source clamp for plain
+          * additive draws on the fp16 target only, matching the Vulkan
+          * renderer (primitive.frag gates hot on BLEND_ADD). */
+         glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "hdr_hot"),
+               (renderer->fb_out_fp16 && psx_hdr_overbright_hot && !it->opaque &&
+                it->transparency_mode == SEMI_TRANSPARENCY_MODE_ADD) ? 1u : 0u);
       }
       if (opaque)
          glDisable(GL_BLEND);

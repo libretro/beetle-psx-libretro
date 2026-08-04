@@ -21,6 +21,12 @@ uniform sampler2D fb_texture;
 
 // Scaling to apply to the dither pattern
 uniform uint dither_scaling;
+// HDR fp16 target only. 0: saturate the modulated texture source to 1.0
+// before blending (hardware behaviour; the UNORM targets do this at the
+// write stage for free). 1: leave it hot for over-white single-layer
+// additive glow ("HDR Additive Overbright"; the renderer sets this for
+// plain additive draws only).
+uniform uint hdr_hot;
 // When 1, emit vec4(0.0) unconditionally: used by the zero-floor pass
 // that follows each subtractive batch on the fp16 target (blend
 // equation MAX against zero restores the hardware floor).
@@ -1095,8 +1101,10 @@ STRINGIZE(
          // Saturate the modulated source to 1.0. The old comment here
          // relied on the UNORM framebuffer clamping at the write stage
          // ("I think OpenGL will take care of that"), which GL_RGBA16F
-         // does not do. No-op on the UNORM targets.
-         color.rgb = min(color.rgb, vec3(1.));
+         // does not do. No-op on the UNORM targets; hdr_hot skips it for
+         // over-white additive sources on the fp16 target.
+         if (hdr_hot == 0u)
+            color.rgb = min(color.rgb, vec3(1.));
       }
 
    // 4x4 dithering pattern scaled by `dither_scaling`
