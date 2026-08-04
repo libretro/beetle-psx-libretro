@@ -4312,6 +4312,18 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
 
                glUniform1ui(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "internal_upscaling"), renderer->internal_upscaling);
 
+               /* HDR10 output encode parameters. hdr_active follows the
+                * negotiated pixel format, not fb_out_fp16: once the
+                * frontend accepted HDR10_2101010, the presented image
+                * must be PQ Rec.2020 - a non-fp16 fallback merely means
+                * over-white content clamps at reference white. */
+               glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_active"), psx_hdr_active ? 1 : 0);
+               glUniform1f(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_paper_white"), psx_hdr_paper_white_nits);
+               glUniform1f(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_max_nits"), psx_hdr_max_nits);
+               glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_expand_gamut"), psx_hdr_expand_gamut);
+               glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_shoulder"), psx_hdr_shoulder);
+               glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_sdr_eotf"), psx_hdr_sdr_eotf);
+               glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_src_primaries"), psx_src_primaries);
             }
 
             if (!gl_draw_buffer_is_empty(renderer->output_buffer))
