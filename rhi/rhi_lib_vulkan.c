@@ -5731,8 +5731,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *hdr_bpp24_yuv_quad_blitter;
             Program *resolve_to_scaled;
             Program *resolve_to_unscaled;
-            Program *msaa_resolve_weighted;
-            Program *msaa_resolve_weighted_sdr;   /* HDR: tonemap-weighted MSAA resolve (16F only) */
+            Program *msaa_resolve_weighted;       /* light-domain MSAA resolve, Karis-weighted (rgba16f) */
+            Program *msaa_resolve_weighted_sdr;   /* light-domain MSAA resolve, plain box (rgba8) */
 
             Program *blit_vram_scaled;
             Program *blit_vram_scaled_masked;
@@ -6196,6 +6196,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       ;
    static const uint32_t msaa_resolve_weighted_comp[] =
 #include "shaders_vulkan/prebuilt/msaa_resolve_weighted.comp.inc"
+      ;
+   static const uint32_t msaa_resolve_weighted_sdr_comp[] =
+#include "shaders_vulkan/prebuilt/msaa_resolve_weighted.sdr.comp.inc"
       ;
 
    static const uint32_t flat_vert[] =
@@ -6770,6 +6773,7 @@ static void renderer_init_pipelines(Renderer *self)
       self->pipelines.resolve_to_unscaled = device_request_program_compute_code(self->device, resolve_to_unscaled, sizeof(resolve_to_unscaled));
 
    self->pipelines.msaa_resolve_weighted = device_request_program_compute_code(self->device, msaa_resolve_weighted_comp, sizeof(msaa_resolve_weighted_comp));
+   self->pipelines.msaa_resolve_weighted_sdr = device_request_program_compute_code(self->device, msaa_resolve_weighted_sdr_comp, sizeof(msaa_resolve_weighted_sdr_comp));
 
    self->pipelines.scaled_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
