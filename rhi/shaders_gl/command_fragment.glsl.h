@@ -21,6 +21,10 @@ uniform sampler2D fb_texture;
 
 // Scaling to apply to the dither pattern
 uniform uint dither_scaling;
+// When 1, emit vec4(0.0) unconditionally: used by the zero-floor pass
+// that follows each subtractive batch on the fp16 target (blend
+// equation MAX against zero restores the hardware floor).
+uniform uint force_zero;
 
 // 0: Only draw opaque pixels, 1: only draw semi-transparent pixels
 uniform uint draw_semi_transparent;
@@ -980,6 +984,11 @@ vec4 get_texel_jinc2(out float opacity)
 #endif
 STRINGIZE(
 void main() {
+   if (force_zero != 0u) {
+      frag_color = vec4(0.);
+      return;
+   }
+
    vec4 color;
    float opacity=1.;
    

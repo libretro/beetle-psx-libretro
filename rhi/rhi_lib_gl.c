@@ -2150,6 +2150,30 @@ static void gl_renderer_draw(gl_renderer *renderer)
          glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
                         (GLvoid*)(it->first * sizeof(GLushort)));
 
+         /* Zero-floor pass for subtractive blending on the fp16 target.
+          * GL_FUNC_REVERSE_SUBTRACT clamps at zero on a UNORM attachment
+          * but not on GL_RGBA16F; hardware floors B - F at 0 per channel.
+          * Redraw the same geometry with blend equation MAX and the
+          * shader forced to emit vec4(0): max(dst, 0) after a contiguous
+          * subtractive run is algebraically identical to hardware's
+          * per-primitive floor (once the running value would clamp,
+          * every further subtraction keeps both forms at zero). Depth is
+          * LEQUAL so the redraw passes against its own depth writes;
+          * alpha (the mask bit) is preserved via ZERO/ONE ADD; stencil
+          * writes are masked off so set_mask state cannot double-apply. */
+         if (renderer->fb_out_fp16 && !it->opaque &&
+             it->transparency_mode == SEMI_TRANSPARENCY_MODE_SUBTRACT_SOURCE &&
+             renderer->command_buffer->program)
+         {
+            glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_zero"), 1u);
+            glBlendEquationSeparate(GL_MAX, GL_FUNC_ADD);
+            glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
+            glStencilMask(0);
+            glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
+                           (GLvoid*)(it->first * sizeof(GLushort)));
+            glStencilMask(1);
+            glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_zero"), 0u);
+         }
       }
 
          if (hd_owned)
