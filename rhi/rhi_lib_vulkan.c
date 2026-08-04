@@ -5633,7 +5633,13 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       SpecConstIndex_OffsetUV = 5,
       SpecConstIndex_HotSource = 6,
       SpecConstIndex_ResolveEotf = 7,
-      SpecConstIndex_Samples = 0
+      SpecConstIndex_Samples = 0,
+      /* Feedback (programmable blend) shaders only. Aliases ResolveEotf the
+       * same way Samples aliases TransMode: the resolve/display programs and
+       * the primitive feedback programs never share a pipeline, and the
+       * pipeline hash masks spec constants by the program's reflected usage,
+       * so the slots cannot collide. */
+      SpecConstIndex_MaskTest = 7
    };
 
    struct SaveState
@@ -9439,6 +9445,25 @@ static void renderer_hd_texture_uniforms(Renderer *self,
    hd.texture = NULL;
 }
 
+/* True when a semi-transparent prim must go through the programmable-blend
+ * feedback program (input attachment + per-primitive by-region barrier)
+ * rather than fixed-function blending. Masked prims always do. Non-masked
+ * subtractive prims additionally do on the 16F HDR target: fixed-function
+ * REVERSE_SUBTRACT cannot floor the result at zero on a float attachment,
+ * and hardware clamps B - F at 0 per channel. The feedback program applies
+ * the floor in-shader (see primitive_feedback.frag) with the check-mask
+ * test disabled via SpecConstIndex_MaskTest. */
+static bool renderer_semi_trans_needs_feedback(const Renderer *self,
+      const SemiTransparentState *state)
+{
+   if (state->semi_transparent == SemiTransparentMode_None)
+      return false;
+   if (state->masked)
+      return true;
+   return state->semi_transparent == SemiTransparentMode_Sub &&
+      self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT;
+}
+
 static void renderer_render_semi_transparent_primitives(Renderer *self){
    SemiTransparentState last_state;
    unsigned to_draw;
@@ -9474,7 +9499,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
       /* If we need programmable shading, we can't batch as primitives may
        * overlap. We could in theory do some fancy tests here, but probably
        * overkill here. */
-      if ((last_state.masked && last_state.semi_transparent != SemiTransparentMode_None) ||
+      if (renderer_semi_trans_needs_feedback(self, &last_state) ||
           !semi_transparent_state_eq(&last_state, SemiTransparentStateVec_at(&self->queue.semi_transparent_state, i)))
       {
          unsigned to_draw = i - last_draw_offset;
@@ -10046,6 +10071,10 @@ static void renderer_semi_transparent_set_state(Renderer *self,
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, state->shift);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)state->offset_uv);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_HotSource, psx_hdr_overbright_hot);
+   /* Only the feedback programs declare this; the pipeline hash masks it out
+    * everywhere else. 1 = check-mask (historical behaviour), 0 = the routed
+    * non-masked subtractive case. */
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_MaskTest, state->masked ? 1 : 0);
 
    if (state->scissor_index < 0)
       commandbuffer_set_scissor(cbh_get(&self->cmd), &self->queue.default_scissor);
@@ -10132,7 +10161,12 @@ static void renderer_semi_transparent_set_state(Renderer *self,
    }
    case SemiTransparentMode_Sub:
    {
-      if (state->masked)
+      /* On the 16F HDR target, non-masked subtractive prims are also routed
+       * through the feedback program: it applies the floor-at-zero hardware
+       * semantics in-shader (fixed-function REVERSE_SUBTRACT cannot on a
+       * float attachment). MaskTest, set above from state->masked, keeps the
+       * check-mask discard off for the routed case. */
+      if (renderer_semi_trans_needs_feedback(self, state))
       {
          commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendSub);
          commandbuffer_set_program(cbh_get(&self->cmd), textured_masked);
