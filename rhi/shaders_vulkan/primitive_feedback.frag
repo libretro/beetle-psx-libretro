@@ -60,7 +60,12 @@ void main()
 	if (BLEND_MODE == BLEND_AVG)
 		blended = mix(shaded, 0.5 * (clamp(shaded, 0.0, 1.0) + fbcolor.rgb), blend_amt);
 	if (BLEND_MODE == BLEND_SUB)
-		blended = mix(shaded, fbcolor.rgb - add_src, blend_amt);
+		/* Hardware floors B - F at zero per channel. The UNORM attachment
+		 * used to provide that implicitly at the write stage; the 16F HDR
+		 * target does not, and a negative residue both diverges from
+		 * hardware and dims every later additive draw over the same pixels
+		 * (dark halos around subtractive effects). No-op on UNORM. */
+		blended = mix(shaded, max(fbcolor.rgb - add_src, vec3(0.0)), blend_amt);
 	if (BLEND_MODE == BLEND_ADD_QUARTER)
 		blended = mix(shaded, clamp(shaded, 0.0, 1.0) * 0.25 + fbcolor.rgb, blend_amt);
 
