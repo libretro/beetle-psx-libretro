@@ -10070,7 +10070,11 @@ static void renderer_semi_transparent_set_state(Renderer *self,
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, state->shift);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)state->offset_uv);
-   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_HotSource, psx_hdr_overbright_hot);
+   /* Off the 16F target the UNORM write clamps anyway, so hot would only
+    * split pipelines for an identical result; force it off there. This is
+    * also what makes primitive.frag's hot path SDR-safe by construction. */
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_HotSource,
+         (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? psx_hdr_overbright_hot : 0);
    /* Only the feedback programs declare this; the pipeline hash masks it out
     * everywhere else. 1 = check-mask (historical behaviour), 0 = the routed
     * non-masked subtractive case. */
@@ -10093,6 +10097,10 @@ static void renderer_semi_transparent_set_state(Renderer *self,
       /* For opaque primitives which are just masked, we can make use of fixed function blending. */
       commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_Opaque);
+      /* primitive.frag now declares BLEND_MODE (hot-additive support) and the
+       * flush loop marks every spec slot dirty, so set it deterministically on
+       * the fixed-function branches too or stale values split pipelines. */
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAdd);
       commandbuffer_set_program(cbh_get(&self->cmd), textured);
       commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
       commandbuffer_set_blend_factors(cbh_get(&self->cmd), VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
@@ -10120,6 +10128,7 @@ static void renderer_semi_transparent_set_state(Renderer *self,
       else
       {
          commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_SemiTrans);
+         commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAdd);
          commandbuffer_set_program(cbh_get(&self->cmd), textured);
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
          commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
@@ -10150,6 +10159,7 @@ static void renderer_semi_transparent_set_state(Renderer *self,
       {
          static const float rgba[4] = { 0.5f, 0.5f, 0.5f, 0.5f };
          commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_SemiTrans);
+         commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAvg);
          commandbuffer_set_program(cbh_get(&self->cmd), textured);
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
          commandbuffer_set_blend_constants(cbh_get(&self->cmd), rgba);
@@ -10185,6 +10195,7 @@ static void renderer_semi_transparent_set_state(Renderer *self,
       else
       {
          commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_SemiTrans);
+         commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendSub);
          commandbuffer_set_program(cbh_get(&self->cmd), textured);
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
          commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_ADD);
@@ -10215,6 +10226,7 @@ static void renderer_semi_transparent_set_state(Renderer *self,
       {
          static const float rgba[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
          commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_SemiTrans);
+         commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAddQuarter);
          commandbuffer_set_program(cbh_get(&self->cmd), textured);
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
          commandbuffer_set_blend_constants(cbh_get(&self->cmd), rgba);

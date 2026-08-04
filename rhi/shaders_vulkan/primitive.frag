@@ -30,6 +30,17 @@ const int FILTER_BILINEAR = 3;
 const int FILTER_3POINT = 4;
 const int FILTER_JINC2 = 5;
 layout(constant_id = 1) const int FILTER_TYPE = FILTER_NEAREST;
+
+/* Mirrors primitive_feedback.frag. The fixed-function additive path
+ * (ONE/ONE ADD) carries fragment output through unclamped on the 16F HDR
+ * target, so the overbright option is honoured by conditionally skipping the
+ * source clamp below. BLEND_MODE is the fixed-function blend this draw uses;
+ * only plain additive goes hot - AVG and ADD_QUARTER clamp the source like
+ * hardware, and subtractive is routed through the feedback program on 16F.
+ * SDR is unaffected either way: the rhi forces HDR_HOT_SOURCE to 0 there. */
+const int BLEND_ADD = 0;
+layout(constant_id = 2) const int BLEND_MODE = BLEND_ADD;
+layout(constant_id = 6) const int HDR_HOT_SOURCE = 0;
 #endif
 
 void main()
@@ -92,7 +103,12 @@ void main()
 	if (opacity < 0.5)
 		discard;
 
-	vec3 shaded = clamp(color.rgb * vColor.rgb * (255.0 / 128.0), 0.0, 1.0);
+	vec3 shaded_hot = color.rgb * vColor.rgb * (255.0 / 128.0);
+	vec3 shaded = clamp(shaded_hot, 0.0, 1.0);
+	/* The semi-trans-opaque pass and every other blend mode stay clamped;
+	 * over-white there comes only from stacking, matching the option text. */
+	if (HDR_HOT_SOURCE != 0 && TRANSPARENCY_MODE == SEMI_TRANS && BLEND_MODE == BLEND_ADD)
+		shaded = shaded_hot;
 	FragColor = vec4(shaded, NNColor.a + vColor.a);
 #else
 	FragColor = vColor;
