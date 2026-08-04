@@ -5677,11 +5677,13 @@ bool retro_load_game(const struct retro_game_info *info)
             }
 
             if (log_cb)
+            {
                log_cb(RETRO_LOG_INFO,
                      "[Color Format] 30-bit HDR requested: %s (paper white %.0f nits, gamut %d, output mode %d).\n",
                      psx_hdr_active ? "engaged" : "rejected by frontend - falling back to 24-bit",
                      psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
                log_cb(RETRO_LOG_INFO, "[HDR] Display peak: %.0f nits\n", psx_hdr_max_nits);
+            }
          }
 
          option_display.key = BEETLE_OPT(depth);
