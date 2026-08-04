@@ -2644,7 +2644,13 @@ static void Cleanup(void)
     * cycle on the fallback path. */
    if (psx_mmap > 0)
    {
+      /* The backing memory belongs to the mmap, but the Attach wrappers
+       * are heap descriptors of our own (owned=false, so Free releases
+       * only the wrapper, not the mapping). */
       lightrec_free_mmap();
+      MultiAccessSizeMem_Free(MainRAM);
+      MultiAccessSizeMem_Free(ScratchRAM);
+      MultiAccessSizeMem_Free(BIOSROM);
    }
    else
    {
