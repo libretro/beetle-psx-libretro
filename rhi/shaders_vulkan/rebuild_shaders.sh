@@ -119,6 +119,11 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/analog.resolve.frag.inc -mfmt=c analog_resolve.frag
 "$GLSLC" -o prebuilt/analog.resolve.hdr.frag.inc -mfmt=c -DHDR analog_resolve.frag
 
+# GL translations of the analog chain. Generated from the sources above rather
+# than forked, so the two backends cannot drift apart; regenerated here so a
+# change to the signal math lands on both.
+( cd ../shaders_gl && ./gen_analog_gl.py )
+
 # Offline verification harness (tools/analog). Compiled here purely so that an
 # incompatible change to analog.h breaks the build instead of silently
 # disabling the check - which is what happened when the band-pass was removed.
