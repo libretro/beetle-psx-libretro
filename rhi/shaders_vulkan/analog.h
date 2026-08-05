@@ -35,13 +35,25 @@
 
 #include "analog_taps.h"
 
-/* cable: 0 = RGB (bypass), 1 = S-Video, 2 = composite.
- * RGB is the PSX's top tier - the multi-out carries analog RGB, not the YPbPr
- * component the PS2 added - and is a straight passthrough. */
-#define AN_CABLE_RGB       0
+/* cable: 0 = no simulation, 1 = S-Video, 2 = composite, 3 = RF, 4 = RGB.
+ *
+ * AN_CABLE_NONE is not a cable at all - it is the chain switched off, the
+ * framebuffer handed to the display encode untouched. Every other value is a
+ * real wire.
+ *
+ * AN_CABLE_RGB is the PSX's top tier: the multi-out carries analog RGB (not
+ * the YPbPr component the PS2 added), so nothing is modulated, nothing has to
+ * be separated back out, and none of the encoded tiers' artifacts exist on it.
+ * What it does share with them is that it is still an analog wire out of a
+ * video amplifier into a receiver's input stage, so it is band-limited - just
+ * far more generously, and per channel rather than on a luma/chroma split.
+ * That band limit is the whole of the simulation, which is why it needs no
+ * modulate/separate/demodulate passes and takes its own single-pass path. */
+#define AN_CABLE_NONE      0
 #define AN_CABLE_SVIDEO    1
 #define AN_CABLE_COMPOSITE 2
 #define AN_CABLE_RF        3
+#define AN_CABLE_RGB       4
 
 /* Intercarrier beat. The PSX has no RF modulator of its own - the rear jack is
  * a 2.5 mm DC feed for an external one - so this models a modulator, not a

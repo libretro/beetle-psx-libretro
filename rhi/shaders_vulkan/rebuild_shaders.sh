@@ -114,6 +114,8 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/analog.demod.pal.frag.inc -mfmt=c -DPAL analog_demod.frag
 "$GLSLC" -o prebuilt/analog.notch.comp.inc -mfmt=c analog_notch.comp
 "$GLSLC" -o prebuilt/analog.notch.pal.comp.inc -mfmt=c -DPAL analog_notch.comp
+"$GLSLC" -o prebuilt/analog.rgb.frag.inc -mfmt=c analog_rgb.frag
+"$GLSLC" -o prebuilt/analog.rgb.pal.frag.inc -mfmt=c -DPAL analog_rgb.frag
 "$GLSLC" -o prebuilt/analog.resolve.frag.inc -mfmt=c analog_resolve.frag
 "$GLSLC" -o prebuilt/analog.resolve.hdr.frag.inc -mfmt=c -DHDR analog_resolve.frag
 

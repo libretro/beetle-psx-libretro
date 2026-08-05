@@ -4476,6 +4476,8 @@ static void check_variables(bool startup)
          psx_video_cable = 2;
       else if (!strcmp(var.value, "rf"))
          psx_video_cable = 3;
+      else if (!strcmp(var.value, "rgb"))
+         psx_video_cable = 4;
    }
 
    if (startup)

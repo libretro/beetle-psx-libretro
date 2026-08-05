@@ -49,7 +49,16 @@ extern int   psx_hdr_expand_gamut;
 extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
 extern int   psx_hdr_sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_src_primaries;  /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
-extern int   psx_video_cable;    /* 0 = RGB/bypass, 1 = S-Video, 2 = composite */
+extern int   psx_video_cable;    /* 0 = off, 1 = S-Video, 2 = composite, 3 = RF, 4 = RGB */
+
+/* Mirror of the AN_CABLE_* values in shaders_vulkan/analog.h. That header is
+ * GLSL and cannot be included here, so the two lists have to be kept in step
+ * by hand; the shaders receive this value verbatim as a push constant. */
+#define RHI_CABLE_NONE      0
+#define RHI_CABLE_SVIDEO    1
+#define RHI_CABLE_COMPOSITE 2
+#define RHI_CABLE_RF        3
+#define RHI_CABLE_RGB       4
 extern float psx_phase_error;    /* decoder carrier misalignment, cycles */
 extern int   psx_black_setup;    /* NTSC pedestal mismatch: 0 none, 1 lifted, 2 crushed */
 extern retro_log_printf_t log_cb;
@@ -5789,6 +5798,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *analog_comb_pal;
             Program *analog_demod;
             Program *analog_demod_pal;
+            Program *analog_rgb;         /* RGB/SCART: single-pass band limit */
+            Program *analog_rgb_pal;
             Program *analog_notch;       /* IIR chroma trap, compute */
             Program *analog_notch_pal;
             Program *analog_resolve;       /* region-independent: box + encode only */
@@ -6385,6 +6396,12 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t analog_notch_pal_comp[] =
 #include "shaders_vulkan/prebuilt/analog.notch.pal.comp.inc"
    ;
+   static const uint32_t analog_rgb_frag[] =
+#include "shaders_vulkan/prebuilt/analog.rgb.frag.inc"
+   ;
+   static const uint32_t analog_rgb_pal_frag[] =
+#include "shaders_vulkan/prebuilt/analog.rgb.pal.frag.inc"
+   ;
    static const uint32_t analog_resolve_frag[] =
 #include "shaders_vulkan/prebuilt/analog.resolve.frag.inc"
    ;
@@ -6899,6 +6916,10 @@ static void renderer_init_pipelines(Renderer *self)
       device_request_program_compute_code(self->device, analog_notch_comp, sizeof(analog_notch_comp));
    self->pipelines.analog_notch_pal =
       device_request_program_compute_code(self->device, analog_notch_pal_comp, sizeof(analog_notch_pal_comp));
+   self->pipelines.analog_rgb =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_rgb_frag, sizeof(analog_rgb_frag));
+   self->pipelines.analog_rgb_pal =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_rgb_pal_frag, sizeof(analog_rgb_pal_frag));
    self->pipelines.analog_resolve =
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_frag, sizeof(analog_resolve_frag));
    self->pipelines.analog_resolve_hdr =
@@ -7591,12 +7612,14 @@ static bool renderer_analog_active(Renderer *self)
       last_logged = psx_video_cable;
       if (log_cb)
          log_cb(RETRO_LOG_INFO, "[Analog] Video cable: %s (scaling %ux, %s)\n",
-               psx_video_cable == 0 ? "RGB (bypass)" :
-               psx_video_cable == 1 ? "S-Video" : "Composite",
+               psx_video_cable == 0 ? "none (no simulation)" :
+               psx_video_cable == 1 ? "S-Video" :
+               psx_video_cable == 2 ? "Composite" :
+               psx_video_cable == 3 ? "RF" : "RGB (SCART)",
                self->scaling,
                self->render_state.is_pal ? "PAL" : "NTSC");
    }
-   return psx_video_cable != 0;
+   return psx_video_cable != RHI_CABLE_NONE;
 }
 
 /* Base clocks per pixel. These are the GP1(08h) horizontal resolution dividers
@@ -7635,7 +7658,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    const unsigned sig_h  = native_h;
    const bool     resolve_ss = (out_w != native_w) || (out_h != native_h);
    const bool     pal    = self->render_state.is_pal;
-   const bool     svideo = (psx_video_cable == 1);   /* RF separates like composite */
+   const bool     svideo = (psx_video_cable == RHI_CABLE_SVIDEO); /* RF separates like composite */
 
    /* Subcarrier cycles per base clock, and per line. Both exact: NTSC runs
     * 15*fsc with 227.5 cycles per line, PAL 12*fsc with 283.75. */
@@ -7718,6 +7741,60 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
    ih_move(&self->analog_out, device_create_image(self->device, &info, NULL));
+   }
+
+   /* ---- RGB/SCART: one band-limit pass, then straight to the resolve ----
+    *
+    * Nothing is modulated on this wire, so passes 1-4 (encode, comb, demod,
+    * chroma trap) have nothing to do: there is no subcarrier to put on, no
+    * Y/C to pull apart, and no separation residue to trap. The whole cable is
+    * its band limit, applied per channel. Write the RGB the resolve expects
+    * and skip to it - which also means this tier costs one pass instead of
+    * five, and shares the supersample resolve, HDR encode and gamut handling
+    * with every other tier because pass 5 is unchanged. */
+   if (psx_video_cable == RHI_CABLE_RGB)
+   {
+      struct RgbPush { float src_size[2]; float div; } push;
+      ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16B16A16_SFLOAT);
+      info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+      info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+      ih_move(&self->analog_rgb, device_create_image(self->device, &info, NULL));
+
+      push.src_size[0] = (float)native_w;
+      push.src_size[1] = (float)native_h;
+      push.div         = (float)div;
+
+      commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_rgb),
+         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+      render_pass_info_defaults(&rp);
+      rp.color_attachments[0]  = image_get_view(ih_get(&self->analog_rgb));
+      rp.num_color_attachments = 1;
+      rp.store_attachments     = 1;
+      commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
+      commandbuffer_set_quad_state(cbh_get(&self->cmd));
+      vp.x = 0.0f; vp.y = 0.0f; vp.width = (float)sig_w; vp.height = (float)sig_h;
+      vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+      commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
+      commandbuffer_set_program(cbh_get(&self->cmd),
+         pal ? self->pipelines.analog_rgb_pal : self->pipelines.analog_rgb);
+      commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
+         image_get_view(resolve_ss ? ih_get(&self->analog_native)
+                                   : ih_get(&self->reuseable_scanout)), StockSampler_NearestClamp);
+      commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+      commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+      commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+      commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
+      commandbuffer_end_render_pass(cbh_get(&self->cmd));
+      commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_rgb),
+         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+         VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+
+      goto resolve;
    }
 
    /* ---- pass 1: encode ---- */
@@ -7960,6 +8037,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
    }
 
+resolve:
    /* ---- pass 5: resample to display ---- */
    { struct ResPush
    {
