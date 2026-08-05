@@ -62,6 +62,11 @@ uniform that is set wrong or a pass reading the wrong target.
 
 ## What is not done yet
 
+The core option description now says the chain works on OpenGL, so this is
+user-facing: a bug here is visible to people, not just to whoever is reading
+the code.
+
+
 **The C plumbing.** `rhi_lib_gl.c` has no analog path at all yet: no
 render targets for the signal/separated/decoded stages, no program objects, no
 uniform upload, and no hook into the display path where the Vulkan renderer
