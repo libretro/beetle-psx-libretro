@@ -113,19 +113,41 @@ enum
 };
 
 /* libchdr file IO - a heap-allocated core_file whose argp is a
- * libretro-common RFILE.  Ownership is linear and fully delegated:
- * every chd_open_core_file() call consumes the core_file (and any
- * parent chd_file handed in) whether it succeeds or fails - on
- * success the chd_file owns them and chd_close() releases the whole
- * chain (libchdr closes parents recursively and core_fclose()s each
- * file); on failure libchdr's cleanup path has already released
- * them.  The fclose shim therefore closes the RFILE and frees the
- * wrapper itself, and nothing here tracks parent handles. */
+ * chd_rfile wrapper around a libretro-common RFILE.  Ownership is
+ * linear and fully delegated: every chd_open_core_file() call
+ * consumes the core_file (and any parent chd_file handed in) whether
+ * it succeeds or fails - on success the chd_file owns them and
+ * chd_close() releases the whole chain (libchdr closes parents
+ * recursively and core_fclose()s each file); on failure libchdr's
+ * cleanup path has already released them.  The fclose shim therefore
+ * closes the RFILE and frees the wrapper itself, and nothing here
+ * tracks parent handles.
+ *
+ * Mapped mode: the open passes FREQUENT_ACCESS, inviting the local
+ * VFS to memory-map the .chd - hunk fetches are the whole read
+ * traffic of a CHD for the whole session, the exact access pattern
+ * the hint describes.  When a mapping comes back, every fread the
+ * decompressor issues becomes a memcpy from the page cache at a
+ * cursor this wrapper tracks itself: zero per-hunk syscalls feeding
+ * the decompressor.  Frontend-backed handles and mmap-less platforms
+ * get NULL from the accessor and take the filestream path below,
+ * unchanged. */
+
+typedef struct
+{
+   RFILE         *fp;
+   const uint8_t *base;   /* non-NULL when the VFS mapped the file */
+   int64_t        len;
+   int64_t        pos;    /* mapped-mode cursor */
+} chd_rfile;
 
 static uint64_t Callback_fsize(core_file *cf)
 {
-   RFILE  *fp = (RFILE *)cf->argp;
-   int64_t sz = filestream_get_size(fp);
+   chd_rfile *rf = (chd_rfile *)cf->argp;
+   int64_t    sz;
+   if (rf->base)
+      return (uint64_t)rf->len;
+   sz = filestream_get_size(rf->fp);
    if (sz < 0)
       return (uint64_t)-1;
    return (uint64_t)sz;
@@ -134,12 +156,26 @@ static uint64_t Callback_fsize(core_file *cf)
 static size_t Callback_fread(void *buffer, size_t size, size_t count,
       core_file *cf)
 {
-   RFILE  *fp = (RFILE *)cf->argp;
-   int64_t got;
+   chd_rfile *rf = (chd_rfile *)cf->argp;
+   int64_t    got;
    if (size == 0 || count == 0)
       return 0;
 
-   got = filestream_read(fp, buffer, (int64_t)(count * size));
+   if (rf->base)
+   {
+      int64_t want = (int64_t)(count * size);
+      int64_t avail;
+      if (rf->pos < 0 || rf->pos >= rf->len)
+         return 0;
+      avail = rf->len - rf->pos;
+      if (want > avail)
+         want = avail;
+      memcpy(buffer, rf->base + rf->pos, (size_t)want);
+      rf->pos += want;
+      return (size_t)want / size;
+   }
+
+   got = filestream_read(rf->fp, buffer, (int64_t)(count * size));
    if (got < 0)
       return 0;
    return (size_t)got / size;
@@ -147,23 +183,45 @@ static size_t Callback_fread(void *buffer, size_t size, size_t count,
 
 static int Callback_fclose(core_file *cf)
 {
-   filestream_close((RFILE *)cf->argp);
+   chd_rfile *rf = (chd_rfile *)cf->argp;
+   /* closing the RFILE releases the mapping with it */
+   filestream_close(rf->fp);
+   free(rf);
    free(cf);
    return 0;
 }
 
 static int Callback_fseek(core_file *cf, int64_t offset, int whence)
 {
-   RFILE *fp            = (RFILE *)cf->argp;
-   int    seek_position = RETRO_VFS_SEEK_POSITION_START;
-   switch (whence)
+   chd_rfile *rf = (chd_rfile *)cf->argp;
+   if (rf->base)
    {
-      case SEEK_SET: seek_position = RETRO_VFS_SEEK_POSITION_START;   break;
-      case SEEK_CUR: seek_position = RETRO_VFS_SEEK_POSITION_CURRENT; break;
-      case SEEK_END: seek_position = RETRO_VFS_SEEK_POSITION_END;     break;
+      int64_t new_pos;
+      switch (whence)
+      {
+         case SEEK_SET: new_pos = offset;            break;
+         case SEEK_CUR: new_pos = rf->pos + offset;  break;
+         case SEEK_END: new_pos = rf->len + offset;  break;
+         default:       return -1;
+      }
+      if (new_pos < 0)
+         return -1;
+      /* past-EOF positions read as EOF (fread clamps), matching the
+       * filestream branch's behaviour */
+      rf->pos = new_pos;
+      return 0;
    }
-   filestream_seek(fp, offset, seek_position);
-   return 0;
+   {
+      int seek_position = RETRO_VFS_SEEK_POSITION_START;
+      switch (whence)
+      {
+         case SEEK_SET: seek_position = RETRO_VFS_SEEK_POSITION_START;   break;
+         case SEEK_CUR: seek_position = RETRO_VFS_SEEK_POSITION_CURRENT; break;
+         case SEEK_END: seek_position = RETRO_VFS_SEEK_POSITION_END;     break;
+      }
+      filestream_seek(rf->fp, offset, seek_position);
+      return 0;
+   }
 }
 
 /* Open `path` through the VFS and wrap it as a core_file.  NULL on
@@ -173,19 +231,27 @@ static int Callback_fseek(core_file *cf, int64_t offset, int whence)
 static core_file *chd_core_rfile_open(const char *path)
 {
    core_file *cf;
+   chd_rfile *rf;
    RFILE     *fp = filestream_open(path,
          RETRO_VFS_FILE_ACCESS_READ,
-         RETRO_VFS_FILE_ACCESS_HINT_NONE);
+         RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS);
    if (!fp)
       return NULL;
 
+   rf = (chd_rfile *)calloc(1, sizeof(*rf));
    cf = (core_file *)calloc(1, sizeof(*cf));
-   if (!cf)
+   if (!rf || !cf)
    {
       filestream_close(fp);
+      free(rf);
+      free(cf);
       return NULL;
    }
-   cf->argp   = fp;
+   rf->fp   = fp;
+   rf->base = filestream_get_mapped_ptr(fp, &rf->len);
+   if (rf->base && rf->len <= 0)
+      rf->base = NULL;
+   cf->argp   = rf;
    cf->fsize  = Callback_fsize;
    cf->fread  = Callback_fread;
    cf->fclose = Callback_fclose;
