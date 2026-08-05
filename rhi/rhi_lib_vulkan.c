@@ -12052,6 +12052,11 @@ static bool deviceallocator_allocate(struct DeviceAllocator *self, uint32_t size
       struct IntrusiveListNode *n;
       for (n = vk_pipeline_map_begin(&self->pipelines); n; n = n->next)
          device_destroy_pipeline_nolock(self->device, vk_pipeline_map_iter_get(n)->value);
+      /* Destroying the VkPipelines is not the whole teardown: the map that
+       * held them owns a node pool and the holder's bucket storage. In the
+       * C++ original the member's destructor released those; in C the map
+       * must be deinit'd explicitly or every Program leaks its pool slab. */
+      vk_pipeline_map_deinit(&self->pipelines);
    }
 
    static void descriptor_set_allocator_init(struct DescriptorSetAllocator *self,
