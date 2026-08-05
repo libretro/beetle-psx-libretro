@@ -1399,6 +1399,7 @@ static IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
       {                                                                           \
          NAME##_clear(m);                                                        \
          object_pool_raw_deinit(&m->object_pool);                                \
+         vk_ptr_map_deinit(&m->hashmap);                                         \
          free(m->vacant_items);                                                  \
       }                                                                           \
    static void NAME##_begin_frame(struct NAME *m)                       \
