@@ -32,6 +32,7 @@ extern int   psx_color_format;
 extern bool  psx_hdr_active;
 extern int   psx_video_cable;   /* 0 off, 1 S-Video, 2 composite, 3 RF, 4 RGB */
 extern float psx_phase_error;   /* receiver hue detune, in cycles */
+extern int   psx_black_setup;   /* NTSC pedestal mismatch: 0 none, 1 lifted, 2 crushed */
 extern float psx_hdr_paper_white_nits;
 extern float psx_hdr_max_nits;
 extern int   psx_hdr_expand_gamut;
@@ -3037,6 +3038,26 @@ static bool gl_analog_build(struct gl_analog *a)
 /* (Re)allocate the intermediate targets for a given geometry. All are fp16:
  * the chain runs in the gamma domain but carries a modulated signal that
  * swings below black and above white, which 8-bit storage would clip. */
+/* The display-resolution pair: the extracted frame and the chain's output.
+ * Split out because the extraction pass needs these before the dot clock -
+ * and so the signal-rate targets - are known. */
+static bool gl_analog_resize_scanout(struct gl_analog *a,
+      uint32_t out_w, uint32_t out_h)
+{
+   if (!out_w || !out_h)
+      return false;
+   if (a->out_w != out_w || a->out_h != out_h)
+   {
+      if (a->out.id)     glDeleteTextures(1, &a->out.id);
+      if (a->scanout.id) glDeleteTextures(1, &a->scanout.id);
+      gl_texture_init(&a->out, out_w, out_h, GL_RGBA16F);
+      gl_texture_init(&a->scanout, out_w, out_h, GL_RGBA16F);
+      a->out_w = out_w;
+      a->out_h = out_h;
+   }
+   return a->out.id != 0 && a->scanout.id != 0;
+}
+
 static bool gl_analog_resize(struct gl_analog *a,
       uint32_t native_w, uint32_t native_h,
       uint32_t sig_w, uint32_t sig_h,
@@ -3068,15 +3089,8 @@ static bool gl_analog_resize(struct gl_analog *a,
       a->sig_h = sig_h;
    }
 
-   if (a->out_w != out_w || a->out_h != out_h)
-   {
-      if (a->out.id)     glDeleteTextures(1, &a->out.id);
-      if (a->scanout.id) glDeleteTextures(1, &a->scanout.id);
-      gl_texture_init(&a->out, out_w, out_h, GL_RGBA16F);
-      gl_texture_init(&a->scanout, out_w, out_h, GL_RGBA16F);
-      a->out_w = out_w;
-      a->out_h = out_h;
-   }
+   if (!gl_analog_resize_scanout(a, out_w, out_h))
+      return false;
 
    return true;
 }
@@ -3107,7 +3121,7 @@ static GLuint a_ok_texture(struct gl_analog *a, bool ok)
  * rather than a textured quad: the sizes match exactly, there is nothing left
  * to sample or convert, and the resolve has already done the encode. */
 static void gl_analog_blit(gl_renderer *renderer, struct gl_analog *a,
-      GLuint tex, unsigned w, unsigned h)
+      GLuint tex, unsigned w, unsigned h, int dst_x, int dst_y)
 {
    GLint draw_fbo = 0;
 
@@ -3124,7 +3138,8 @@ static void gl_analog_blit(gl_renderer *renderer, struct gl_analog *a,
    {
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)draw_fbo);
       gl_caps.fp_glBlitFramebuffer(0, 0, (GLint)w, (GLint)h,
-            0, 0, (GLint)w, (GLint)h,
+            (GLint)dst_x, (GLint)dst_y,
+            (GLint)(dst_x + (int)w), (GLint)(dst_y + (int)h),
             GL_COLOR_BUFFER_BIT, GL_NEAREST);
    }
 
@@ -3143,11 +3158,12 @@ static void gl_analog_blit(gl_renderer *renderer, struct gl_analog *a,
 static bool gl_analog_begin_extract(struct gl_analog *a,
       unsigned native_w, unsigned native_h, unsigned out_w, unsigned out_h)
 {
-   unsigned div   = 1;   /* sized in gl_analog_run; here we only need scanout */
-   (void)div;
-   if (!gl_analog_resize(a, native_w, native_h,
-            native_w ? native_w : 1, native_h ? native_h : 1, out_w, out_h))
+   /* Only the scanout is needed here. The signal-rate targets depend on the
+    * dot clock, which gl_analog_run derives; sizing them from a placeholder
+    * would reallocate all four of them twice per frame. */
+   if (!gl_analog_resize_scanout(a, out_w, out_h))
       return false;
+   (void)native_w; (void)native_h;
    if (!a->scanout.id)
       return false;
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, a->fbo);
@@ -3337,6 +3353,29 @@ static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
             float black_offset = 0.0f;
             gl_program *notch  = a->programs[pal ? GL_ANALOG_NOTCH_PAL
                                                  : GL_ANALOG_NOTCH];
+
+            /* NTSC setup. Black sits 7.5 IRE above blanking on NTSC-M and at
+             * 0 on NTSC-J and PAL, and a matched encoder and receiver cancel
+             * out - so this is only ever non-identity when the two disagree,
+             * which is what happened whenever a disc crossed between those
+             * markets. Setup is an NTSC composite-luminance concept: PAL
+             * never had it, and it is applied to luma only, chroma being a
+             * difference signal riding on it. */
+            if (pal || psx_black_setup == 0)
+            {
+               black_scale  = 1.0f;
+               black_offset = 0.0f;
+            }
+            else if (psx_black_setup == 1)   /* NTSC-M signal, no compensation */
+            {
+               black_scale  = 1.0f - 0.075f;
+               black_offset = 0.075f;
+            }
+            else                             /* NTSC-J signal read with setup */
+            {
+               black_scale  = 1.0f / (1.0f - 0.075f);
+               black_offset = -0.075f / (1.0f - 0.075f);
+            }
 
             if (notch)
             {
@@ -5076,6 +5115,8 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
    unsigned          analog_native_h = 0;
    unsigned          analog_out_w    = 0;
    unsigned          analog_out_h    = 0;
+   int               analog_dst_x    = 0;
+   int               analog_dst_y    = 0;
 
    /* Setup 2 triangles that cover the entire framebuffer
       then copy the displayed portion of the screen from fb_out */
@@ -5119,10 +5160,19 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
       analog = NULL;
    if (analog)
    {
-      analog_native_w = renderer->config.display_resolution[0];
-      analog_native_h = renderer->config.display_resolution[1];
+      /* Geometry must match what bind_libretro_framebuffer would have set up,
+       * not config.display_resolution: the frontend viewport comes from the
+       * display rect, which carries the overscan crop and an x/y offset. Size
+       * the chain from the same rect and blit back into the same place, or
+       * the picture lands at the wrong size in the wrong corner. */
+      gl_display_rect disp_rect = compute_gl_display_rect(renderer);
+
+      analog_native_w = disp_rect.width;
+      analog_native_h = disp_rect.height;
       analog_out_w    = analog_native_w * renderer->internal_upscaling;
       analog_out_h    = analog_native_h * renderer->internal_upscaling;
+      analog_dst_x    = disp_rect.x * (int)renderer->internal_upscaling;
+      analog_dst_y    = disp_rect.y * (int)renderer->internal_upscaling;
 
       if (!gl_analog_begin_extract(analog, analog_native_w, analog_native_h,
                analog_out_w, analog_out_h))
@@ -5229,7 +5279,16 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
                analog_out_w, analog_out_h));
 
       bind_libretro_framebuffer(renderer);
-      gl_analog_blit(renderer, analog, result, analog_out_w, analog_out_h);
+
+      /* The clear above went to the extraction target, not here, and the blit
+       * only covers the display rect - so without this the frontend buffer
+       * keeps whatever was in it, which is the leftover-pixel case that clear
+       * exists to prevent. */
+      glClearColor(0.0, 0.0, 0.0, 0.0);
+      glClear(GL_COLOR_BUFFER_BIT);
+
+      gl_analog_blit(renderer, analog, result, analog_out_w, analog_out_h,
+            analog_dst_x, analog_dst_y);
 
       /* Advance the subcarrier phase by one field. Total lines including
        * blanking - the carrier does not stop during retrace - and interlaced
