@@ -39,9 +39,11 @@ precision highp int;
  *
  * One workgroup per scanline. Each thread owns PER_THREAD consecutive samples,
  * scans them serially, then a Hillis-Steele scan over shared memory composes
- * across threads. Shared memory rather than subgroup shuffles: the intrinsics
- * would be faster but need capability checks this backend does not currently
- * carry, and at 2560 samples the scan is 12 steps either way.
+ * across threads. Because the filter is time-invariant the matrix half of the
+ * map is uniform across the workgroup and never enters shared memory - see the
+ * scan loop. Shared memory rather than subgroup shuffles: the intrinsics would
+ * be faster but need capability checks this backend does not currently carry,
+ * and at 2560 samples the scan is 12 steps either way.
  *
  * Under PAL it also averages the chroma pair across the neighbouring lines
  * (0.25/0.5/0.25) before converting. That is the delay line, and it is the
@@ -86,16 +88,8 @@ layout(push_constant, std430) uniform Registers
  * registers per thread. */
 #define PER_THREAD 12
 
-shared vec2 s_Ax[256];
-shared vec2 s_Ay[256];
+/* Only B crosses lanes. The transfer matrix does not: see the scan loop. */
 shared vec2 s_B[256];
-
-/* Compose two affine maps: apply `prev` first, then `cur`. */
-void compose(inout mat2 curA, inout vec2 curB, mat2 prevA, vec2 prevB)
-{
-	curB = curA * prevB + curB;
-	curA = curA * prevA;
-}
 
 highp vec3 fetch(int x, int line)
 {
@@ -161,30 +155,40 @@ void main()
 	for (i = 1; i < PER_THREAD; i++)
 		blockA = A * blockA;
 
-	mat2 accA = blockA;
 	vec2 accB = Bpart[PER_THREAD - 1];
 
-	/* Hillis-Steele inclusive scan across threads. Every lane stores every
-	 * round - conditionally storing leaves lane 0 reading a stale slot. */
+	/* Hillis-Steele inclusive scan across threads.
+	 *
+	 * The generic form of this scan carries the whole affine map (A,B) through
+	 * shared memory, because in general each element's A can differ. Ours
+	 * cannot: the filter is time-invariant, so every element contributes the
+	 * same A and a lane's accumulated matrix depends only on how many blocks
+	 * it has absorbed. Entering the round with offset `step`, a lane holds
+	 * min(lane+1, step) blocks, and every lane that actually composes has
+	 * lane >= step, hence exactly `step` blocks. So the matrix factor is
+	 * A^(PER_THREAD*step) - uniform across the workgroup, known in advance,
+	 * and obtained by squaring a register-resident matrix each round.
+	 *
+	 * Only B needs to cross lanes. That drops shared memory from three vec2
+	 * arrays to one and removes two of the three store/load pairs per round.
+	 * The arithmetic is unchanged; tools/analog/scan_check.c checks both forms
+	 * against a serial reference.
+	 *
+	 * Every lane stores every round - conditionally storing leaves lane 0
+	 * reading a stale slot. */
+	mat2 M = blockA;   /* A^(PER_THREAD * step) */
 	for (int step = 1; step < 256; step <<= 1)
 	{
-		s_Ax[lane] = accA[0];
-		s_Ay[lane] = accA[1];
-		s_B[lane]  = accB;
+		s_B[lane] = accB;
 		barrier();
 		if (lane >= step)
-		{
-			mat2 pA = mat2(s_Ax[lane - step], s_Ay[lane - step]);
-			vec2 pB = s_B[lane - step];
-			compose(accA, accB, pA, pB);
-		}
+			accB = M * s_B[lane - step] + accB;
 		barrier();
+		M = M * M;
 	}
 
 	/* Exclusive prefix for this thread = inclusive result of the lane below. */
-	s_Ax[lane] = accA[0];
-	s_Ay[lane] = accA[1];
-	s_B[lane]  = accB;
+	s_B[lane] = accB;
 	barrier();
 	vec2 preB = (lane > 0) ? s_B[lane - 1] : vec2(0.0);
 

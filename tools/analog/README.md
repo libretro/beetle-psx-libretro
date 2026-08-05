@@ -28,6 +28,23 @@ evidence than it looks: it catches transcription errors and misses conceptual
 ones. Treat a pass as "the arithmetic survived the last refactor", not as
 "the feature works".
 
+## scan_check.c
+
+Separate, and not Vulkan at all: a scalar model of the IIR trap's parallel
+scan. It runs the serial recurrence, the generic form of the scan that carries
+the whole affine map across lanes, and the time-invariant form that carries
+only the history vector, then compares all three.
+
+That exists because the shader relies on a property that is easy to state and
+easy to get wrong: since the filter is time-invariant, the matrix half of the
+scan operator is uniform across the workgroup at every round, so it never has
+to enter shared memory. `cc -O2 -o scan_check scan_check.c -lm && ./scan_check`
+prints the error of both parallel forms against the serial reference; they
+should agree to rounding.
+
+It models the algorithm, not the shader, so it verifies the algebra and not
+the GLSL.
+
 ## Why it is in the tree
 
 It used to live outside the repo and silently stopped compiling for several
