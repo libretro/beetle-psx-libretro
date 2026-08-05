@@ -47,6 +47,19 @@ the harness prints it separately from a failure so it does not read as one.
 This checks that the GLSL is valid and that the names the C side will look up
 exist. It does not check that the chain produces the right picture.
 
+## Status
+
+The chain runs on GL: the passes are wired into `rhi_gl_finalize_frame`, which
+redirects the display draw into a texture, runs encode -> comb -> demod ->
+trap -> resolve (or the single RGB band-limit pass), and blits the result.
+
+It has *not* been looked at. No display was available where this was written,
+so the evidence is that every pass executes with no GL error and no sanitizer
+complaint - not that the picture is right. Before trusting it, compare against
+the Vulkan renderer on the same content and settings: they run the same shader
+sources, so any visible difference is a bug in this plumbing, most likely a
+uniform that is set wrong or a pass reading the wrong target.
+
 ## What is not done yet
 
 **The C plumbing.** `rhi_lib_gl.c` has no analog path at all yet: no

@@ -31,6 +31,7 @@
 extern int   psx_color_format;
 extern bool  psx_hdr_active;
 extern int   psx_video_cable;   /* 0 off, 1 S-Video, 2 composite, 3 RF, 4 RGB */
+extern float psx_phase_error;   /* receiver hue detune, in cycles */
 extern float psx_hdr_paper_white_nits;
 extern float psx_hdr_max_nits;
 extern int   psx_hdr_expand_gamut;
@@ -759,6 +760,11 @@ struct gl_renderer {
     * chain owns a dozen programs and six render targets, so a session that
     * never enables it never pays for it. Freed with the renderer. */
    struct gl_analog *analog;
+
+   /* Subcarrier phase carried in from every field before this one, in
+    * cycles. Advanced once per displayed field; wrapped to [0,1) so a long
+    * session cannot grind the mantissa away. */
+   double analog_phase;
    /* Depth buffer for fb_out */
    gl_texture fb_out_depth;
    /* Current resolution of the frontend's framebuffer */
@@ -2773,6 +2779,7 @@ struct gl_analog
    gl_texture  sep;       /* after the comb */
    gl_texture  dec;       /* after demodulation */
    gl_texture  rgb;       /* after the trap (or its bypass): RGB, base rate */
+   gl_texture  scanout;   /* the frame as the display path would have drawn it */
    gl_texture  out;       /* resolved to display resolution */
 
    GLuint      fbo;       /* one reused FBO; the colour attachment is rebound */
@@ -2780,6 +2787,9 @@ struct gl_analog
    uint32_t    native_w, native_h;
    uint32_t    sig_w, sig_h;
    uint32_t    out_w, out_h;
+
+   GLuint      quad_vao;  /* full-viewport strip, shared by every pass */
+   GLuint      quad_vbo;
 
    int         built;     /* programs compiled */
    int         failed;    /* a program failed to build - do not retry */
@@ -2905,12 +2915,15 @@ static void gl_analog_free(struct gl_analog *a)
       }
    }
 
+   if (a->quad_vbo) { glDeleteBuffers(1, &a->quad_vbo); a->quad_vbo = 0; }
+   if (a->quad_vao) { glDeleteVertexArrays(1, &a->quad_vao); a->quad_vao = 0; }
    if (a->fbo)      { glDeleteFramebuffers(1, &a->fbo); a->fbo = 0; }
    if (a->native.id) { glDeleteTextures(1, &a->native.id); a->native.id = 0; }
    if (a->sig.id)    { glDeleteTextures(1, &a->sig.id);    a->sig.id = 0; }
    if (a->sep.id)    { glDeleteTextures(1, &a->sep.id);    a->sep.id = 0; }
    if (a->dec.id)    { glDeleteTextures(1, &a->dec.id);    a->dec.id = 0; }
    if (a->rgb.id)    { glDeleteTextures(1, &a->rgb.id);    a->rgb.id = 0; }
+   if (a->scanout.id){ glDeleteTextures(1, &a->scanout.id);a->scanout.id = 0; }
    if (a->out.id)    { glDeleteTextures(1, &a->out.id);    a->out.id = 0; }
 
    a->built  = 0;
@@ -3057,9 +3070,10 @@ static bool gl_analog_resize(struct gl_analog *a,
 
    if (a->out_w != out_w || a->out_h != out_h)
    {
-      if (a->out.id)
-         glDeleteTextures(1, &a->out.id);
+      if (a->out.id)     glDeleteTextures(1, &a->out.id);
+      if (a->scanout.id) glDeleteTextures(1, &a->scanout.id);
       gl_texture_init(&a->out, out_w, out_h, GL_RGBA16F);
+      gl_texture_init(&a->scanout, out_w, out_h, GL_RGBA16F);
       a->out_w = out_w;
       a->out_h = out_h;
    }
@@ -3080,6 +3094,331 @@ static unsigned gl_analog_divisor(unsigned width_mode)
       case 3:  return 5;   /* 512 */
       default: return 4;   /* 640 */
    }
+}
+
+/* Which texture to present: the chain's output when every pass ran, otherwise
+ * the extracted frame. Separated out so the call site reads as one decision. */
+static GLuint a_ok_texture(struct gl_analog *a, bool ok)
+{
+   return ok ? a->out.id : a->scanout.id;
+}
+
+/* Put the finished texture on the frontend's buffer. A framebuffer blit
+ * rather than a textured quad: the sizes match exactly, there is nothing left
+ * to sample or convert, and the resolve has already done the encode. */
+static void gl_analog_blit(gl_renderer *renderer, struct gl_analog *a,
+      GLuint tex, unsigned w, unsigned h)
+{
+   GLint draw_fbo = 0;
+
+   if (!gl_caps.fp_glBlitFramebuffer)
+      return;
+
+   glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fbo);
+
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, a->fbo);
+   glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+         GL_TEXTURE_2D, tex, 0);
+
+   if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+   {
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)draw_fbo);
+      gl_caps.fp_glBlitFramebuffer(0, 0, (GLint)w, (GLint)h,
+            0, 0, (GLint)w, (GLint)h,
+            GL_COLOR_BUFFER_BIT, GL_NEAREST);
+   }
+
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)draw_fbo);
+   (void)renderer;
+}
+
+/* Redirect the display draw into a texture instead of the frontend's buffer.
+ * The chain needs the frame as the ordinary display path would have produced
+ * it - gamma-domain RGB, offsets and 24bpp unpacking already applied - which
+ * is exactly what the output program emits with the HDR encode switched off.
+ * So rather than duplicating that shader, the existing draw is pointed at a
+ * texture and the encode is left to the chain's resolve, which is the stage
+ * that emits the final pixel. */
+static bool gl_analog_begin_extract(struct gl_analog *a,
+      unsigned native_w, unsigned native_h, unsigned out_w, unsigned out_h)
+{
+   unsigned div   = 1;   /* sized in gl_analog_run; here we only need scanout */
+   (void)div;
+   if (!gl_analog_resize(a, native_w, native_h,
+            native_w ? native_w : 1, native_h ? native_h : 1, out_w, out_h))
+      return false;
+   if (!a->scanout.id)
+      return false;
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, a->fbo);
+   glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+         GL_TEXTURE_2D, a->scanout.id, 0);
+   glViewport(0, 0, (GLsizei)out_w, (GLsizei)out_h);
+   return glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+}
+
+/* Bind one of the chain's textures as the FBO colour attachment and set the
+ * viewport to match. The chain reuses a single FBO and rebinds rather than
+ * keeping six around: the attachment change is cheap next to the passes
+ * themselves, and six live FBOs is six more things to leak. */
+static bool gl_analog_target(struct gl_analog *a, gl_texture *tex)
+{
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, a->fbo);
+   glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+         GL_TEXTURE_2D, tex->id, 0);
+   glViewport(0, 0, (GLsizei)tex->width, (GLsizei)tex->height);
+   return glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+}
+
+/* Full-viewport triangle strip. The analog vertex shader takes a plain
+ * normalised position and every fragment stage addresses off gl_FragCoord, so
+ * one static quad serves all of them. */
+static void gl_analog_draw_quad(struct gl_analog *a)
+{
+   static const GLfloat verts[8] =
+   {
+      -1.0f, -1.0f,
+       1.0f, -1.0f,
+      -1.0f,  1.0f,
+       1.0f,  1.0f
+   };
+
+   if (!a->quad_vbo)
+   {
+      glGenVertexArrays(1, &a->quad_vao);
+      glGenBuffers(1, &a->quad_vbo);
+      glBindVertexArray(a->quad_vao);
+      glBindBuffer(GL_ARRAY_BUFFER, a->quad_vbo);
+      glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+      glEnableVertexAttribArray(0);
+      glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), NULL);
+   }
+   else
+      glBindVertexArray(a->quad_vao);
+
+   glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+static void gl_analog_bind_source(gl_program *p, const char *name, GLuint tex)
+{
+   glActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, tex);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, name), 0);
+}
+
+/* Run the chain over `src` (gamma-domain RGB at display resolution) and leave
+ * the result in a->out. Returns false if anything could not be set up, in
+ * which case the caller falls back to the ordinary display blit.
+ *
+ * Mirrors renderer_analog_apply in the Vulkan backend pass for pass; the
+ * shaders are the same source translated, so the parameter derivation has to
+ * match exactly or the two renderers disagree on phase. */
+static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
+      GLuint src, unsigned native_w, unsigned native_h,
+      unsigned out_w, unsigned out_h)
+{
+   const unsigned div    = gl_analog_divisor((unsigned)renderer->curr_width_mode);
+   const unsigned sig_w  = native_w * div;
+   const unsigned sig_h  = native_h;
+   const bool     pal    = renderer->config.is_pal;
+   const bool     ilace  = renderer->config.is_480i;
+   const bool     resolve_ss = (out_w != native_w) || (out_h != native_h);
+   const bool     svideo = (psx_video_cable == GL_CABLE_SVIDEO);
+   const float    inv_ratio  = pal ? (1.0f / 12.0f) : (1.0f / 15.0f);
+   const float    line_adv   = pal ? 0.75f : 0.5f;
+   const float    line_split = ilace ? 2.0f : 1.0f;
+   const float    field_off  = !ilace ? 0.0f : (pal ? 0.375f : 0.25f);
+   const float    x1         = (float)renderer->config.display_area_hrange[0];
+   const float    field_adv  = (float)renderer->analog_phase;
+   gl_program    *p;
+
+   if (!out_w || !out_h || !sig_w || !sig_h)
+      return false;
+   if (!gl_analog_resize(a, native_w, native_h, sig_w, sig_h, out_w, out_h))
+      return false;
+
+   glDisable(GL_BLEND);
+   glDisable(GL_DEPTH_TEST);
+   glDisable(GL_SCISSOR_TEST);
+
+   /* ---- pass 0: resolve supersampling down to native ----
+    * Skipped at 1x, where the extracted image already is native. */
+   if (resolve_ss)
+   {
+      p = a->programs[GL_ANALOG_DOWNSAMPLE];
+      if (!gl_analog_target(a, &a->native))
+         return false;
+      glUseProgram(p->id);
+      gl_analog_bind_source(p, "uSource", src);
+      glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_src_size"),
+            (float)out_w, (float)out_h);
+      glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_native_size"),
+            (float)native_w, (float)native_h);
+      glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_sdr_eotf"), psx_hdr_sdr_eotf);
+      gl_analog_draw_quad(a);
+   }
+
+   {
+      GLuint chain_src = resolve_ss ? a->native.id : src;
+
+      if (psx_video_cable == GL_CABLE_RGB)
+      {
+         /* RGB/SCART: one band-limit pass, no modulation to undo, straight
+          * to the resolve. See analog_rgb.frag. */
+         p = a->programs[pal ? GL_ANALOG_RGB_PAL : GL_ANALOG_RGB];
+         if (!gl_analog_target(a, &a->rgb))
+            return false;
+         glUseProgram(p->id);
+         gl_analog_bind_source(p, "uSource", chain_src);
+         glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_src_size"),
+               (float)native_w, (float)native_h);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_div"), (float)div);
+         gl_analog_draw_quad(a);
+      }
+      else
+      {
+         /* ---- pass 1: encode ---- */
+         p = a->programs[pal ? GL_ANALOG_ENCODE_PAL : GL_ANALOG_ENCODE];
+         if (!gl_analog_target(a, &a->sig))
+            return false;
+         glUseProgram(p->id);
+         gl_analog_bind_source(p, "uSource", chain_src);
+         glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_src_size"),
+               (float)native_w, (float)native_h);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_div"), (float)div);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_x1"), x1);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_inv_ratio"), inv_ratio);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_line_adv"), line_adv);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_line_split"), line_split);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_field_off"), field_off);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_field_adv"), field_adv);
+         glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_cable"), psx_video_cable);
+         gl_analog_draw_quad(a);
+
+         /* ---- pass 2: comb ---- */
+         p = a->programs[pal ? GL_ANALOG_COMB_PAL : GL_ANALOG_COMB];
+         if (!gl_analog_target(a, &a->sep))
+            return false;
+         glUseProgram(p->id);
+         gl_analog_bind_source(p, "uSignal", a->sig.id);
+         glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_sig_size"),
+               (float)sig_w, (float)sig_h);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_line_split"), line_split);
+         glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_svideo"), svideo ? 1 : 0);
+         gl_analog_draw_quad(a);
+
+         /* ---- pass 3: demodulate ---- */
+         p = a->programs[pal ? GL_ANALOG_DEMOD_PAL : GL_ANALOG_DEMOD];
+         if (!gl_analog_target(a, &a->dec))
+            return false;
+         glUseProgram(p->id);
+         gl_analog_bind_source(p, "uComb", a->sep.id);
+         glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_sig_size"),
+               (float)sig_w, (float)sig_h);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_x1"), x1);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_inv_ratio"), inv_ratio);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_line_adv"), line_adv);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_line_split"), line_split);
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_field_off"), field_off);
+         /* Only the decoder is detuned: the console emitted a correct signal,
+          * so the error belongs on this side, not on the encode. */
+         glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_field_adv"),
+               field_adv + psx_phase_error);
+         glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_svideo"), svideo ? 1 : 0);
+         gl_analog_draw_quad(a);
+
+         /* ---- pass 4: chroma trap (or its bypass) -> RGB ----
+          * The trap is compute; without it the bypass fragment path runs and
+          * composite/RF keep everything but the trap. Both stages also do the
+          * PAL delay line, the setup pedestal and the YC->RGB conversion, so
+          * one of them must run. */
+         {
+            float black_scale  = 1.0f;
+            float black_offset = 0.0f;
+            gl_program *notch  = a->programs[pal ? GL_ANALOG_NOTCH_PAL
+                                                 : GL_ANALOG_NOTCH];
+
+            if (notch)
+            {
+               const double wq  = 2.0 * M_PI * (double)inv_ratio;
+               const double fq  = 0.99, iq = 0.85;
+               double b0 = 1.0;
+               double b1 = -2.0 * fq * cos(wq);
+               double b2 = fq * fq;
+               double a1 = 2.0 * iq * cos(wq);
+               double a2 = -iq * iq;
+               double gain   = b0 + b1 + b2;
+               double target = 1.0 - a1 - a2;
+               double scale  = (gain != 0.0) ? (target / gain) : 1.0;
+
+               b0 *= scale; b1 *= scale; b2 *= scale;
+
+               glUseProgram(notch->id);
+               glActiveTexture(GL_TEXTURE0);
+               glBindTexture(GL_TEXTURE_2D, a->dec.id);
+               glUniform1i(gl_uniform_map_get(&notch->uniforms, "uDecoded"), 0);
+               glBindImageTexture(1, a->rgb.id, 0, GL_FALSE, 0,
+                     GL_WRITE_ONLY, GL_RGBA16F);
+               glUniform2f(gl_uniform_map_get(&notch->uniforms, "reg_sig_size"),
+                     (float)sig_w, (float)sig_h);
+               glUniform1f(gl_uniform_map_get(&notch->uniforms, "reg_line_split"), line_split);
+               glUniform1f(gl_uniform_map_get(&notch->uniforms, "reg_black_scale"), black_scale);
+               glUniform1f(gl_uniform_map_get(&notch->uniforms, "reg_black_offset"), black_offset);
+               glUniform1f(gl_uniform_map_get(&notch->uniforms, "reg_b0"), (float)b0);
+               glUniform1f(gl_uniform_map_get(&notch->uniforms, "reg_b1"), (float)b1);
+               glUniform1f(gl_uniform_map_get(&notch->uniforms, "reg_b2"), (float)b2);
+               glUniform1f(gl_uniform_map_get(&notch->uniforms, "reg_a1"), (float)a1);
+               glUniform1f(gl_uniform_map_get(&notch->uniforms, "reg_a2"), (float)a2);
+               /* S-Video never shared a wire, so there is no residue to trap
+                * and a notch would only cost detail. */
+               glUniform1i(gl_uniform_map_get(&notch->uniforms, "reg_enable"),
+                     svideo ? 0 : 1);
+               /* One workgroup per scanline, as the shader's scan assumes. */
+               glDispatchCompute(sig_h, 1, 1);
+               glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT |
+                               GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            }
+            else
+            {
+               p = a->programs[pal ? GL_ANALOG_YC_PAL : GL_ANALOG_YC];
+               if (!gl_analog_target(a, &a->rgb))
+                  return false;
+               glUseProgram(p->id);
+               gl_analog_bind_source(p, "uDecoded", a->dec.id);
+               glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_sig_size"),
+                     (float)sig_w, (float)sig_h);
+               glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_line_split"), line_split);
+               glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_black_scale"), black_scale);
+               glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_black_offset"), black_offset);
+               gl_analog_draw_quad(a);
+            }
+         }
+      }
+   }
+
+   /* ---- pass 5: resample to display, and encode ----
+    * The resolve is the stage that emits the final pixel, HDR included, so
+    * the display blit that follows is a plain copy. */
+   p = a->programs[psx_hdr_active ? GL_ANALOG_RESOLVE_HDR : GL_ANALOG_RESOLVE];
+   if (!gl_analog_target(a, &a->out))
+      return false;
+   glUseProgram(p->id);
+   gl_analog_bind_source(p, "uDecoded", a->rgb.id);
+   glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_sig_size"),
+         (float)sig_w, (float)sig_h);
+   glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_out_size"),
+         (float)out_w, (float)out_h);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_sdr_eotf"), psx_hdr_sdr_eotf);
+   glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_paper_white_nits"),
+         psx_hdr_paper_white_nits);
+   glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_peak_nits"), psx_hdr_max_nits);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_expand_gamut"), psx_hdr_expand_gamut);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_shoulder"), psx_hdr_shoulder);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_src_primaries"), psx_src_primaries);
+   gl_analog_draw_quad(a);
+
+   glBindVertexArray(0);
+   return true;
 }
 
 /* Bring the chain up if the option asks for it, tear it down if it does not.
@@ -4731,7 +5070,12 @@ static void compute_vram_framebuffer_dimensions(gl_renderer *renderer)
 void rhi_gl_finalize_frame(const void *fb, unsigned width,
                            unsigned height, unsigned pitch)
 {
-   gl_renderer *renderer;
+   gl_renderer      *renderer;
+   struct gl_analog *analog          = NULL;
+   unsigned          analog_native_w = 0;
+   unsigned          analog_native_h = 0;
+   unsigned          analog_out_w    = 0;
+   unsigned          analog_out_h    = 0;
 
    /* Setup 2 triangles that cover the entire framebuffer
       then copy the displayed portion of the screen from fb_out */
@@ -4759,18 +5103,35 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
       renderer->hd_handle = hd_handle_make_none();
    }
 
-   /* Bring the analog chain up or down to match the option. The passes that
-    * consume it are not wired into the display path yet, so for now this only
-    * owns the programs and their lifetime; the frame still goes out through
-    * the ordinary fb_out blit below. */
-   (void)gl_analog_get(renderer);
-
    /* Calculate native PSX framebuffer dimensions to update renderer
       state before calling bind_libretro_framebuffer */
    compute_vram_framebuffer_dimensions(renderer);
 
+   /* Analog cable chain. When engaged the display draw is redirected into a
+    * texture, run through the chain, and blitted; the frame the chain wants
+    * is exactly what the output program produces with the HDR encode off, so
+    * the draw below is reused rather than duplicated.
+    *
+    * The VRAM viewer is excluded on purpose: it is a debug view of memory,
+    * not a picture the console ever put on a wire. */
+   analog = gl_analog_get(renderer);
+   if (analog && renderer->display_vram)
+      analog = NULL;
+   if (analog)
+   {
+      analog_native_w = renderer->config.display_resolution[0];
+      analog_native_h = renderer->config.display_resolution[1];
+      analog_out_w    = analog_native_w * renderer->internal_upscaling;
+      analog_out_h    = analog_native_h * renderer->internal_upscaling;
+
+      if (!gl_analog_begin_extract(analog, analog_native_w, analog_native_h,
+               analog_out_w, analog_out_h))
+         analog = NULL;
+   }
+
    /* We can now render to the frontend's buffer */
-   bind_libretro_framebuffer(renderer);
+   if (!analog)
+      bind_libretro_framebuffer(renderer);
 
    glDisable(GL_SCISSOR_TEST);
    glDisable(GL_DEPTH_TEST);
@@ -4837,7 +5198,10 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
                 * frontend accepted HDR10_2101010, the presented image
                 * must be PQ Rec.2020 - a non-fp16 fallback merely means
                 * over-white content clamps at reference white. */
-               glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_active"), psx_hdr_active ? 1 : 0);
+               /* With the chain engaged the resolve emits the final pixel,
+                * HDR included, so this draw must stay in the gamma domain. */
+               glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_active"),
+                     (psx_hdr_active && !analog) ? 1 : 0);
                glUniform1f(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_paper_white"), psx_hdr_paper_white_nits);
                glUniform1f(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_max_nits"), psx_hdr_max_nits);
                glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_expand_gamut"), psx_hdr_expand_gamut);
@@ -4849,6 +5213,35 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
             if (!gl_draw_buffer_is_empty(renderer->output_buffer))
                gl_draw_buffer_draw(renderer->output_buffer, GL_TRIANGLE_STRIP);
          }
+      }
+   }
+
+   /* Run the chain over the extracted frame and put the result on screen.
+    *
+    * If a pass could not be set up the frame is already drawn into scanout,
+    * so blit that instead of the chain output: an unfiltered picture is a far
+    * better failure than a black one, and the cause is in the log. */
+   if (analog)
+   {
+      GLuint result = a_ok_texture(analog,
+            gl_analog_run(renderer, analog, analog->scanout.id,
+               analog_native_w, analog_native_h,
+               analog_out_w, analog_out_h));
+
+      bind_libretro_framebuffer(renderer);
+      gl_analog_blit(renderer, analog, result, analog_out_w, analog_out_h);
+
+      /* Advance the subcarrier phase by one field. Total lines including
+       * blanking - the carrier does not stop during retrace - and interlaced
+       * fields are half-lines, which is what produces the 4- and 8-field
+       * broadcast sequences. Wrapped so a long session stays exact. */
+      {
+         double lines_per_field = renderer->config.is_pal
+               ? (renderer->config.is_480i ? 312.5 : 314.0)
+               : (renderer->config.is_480i ? 262.5 : 263.0);
+         double adv = renderer->config.is_pal ? 0.75 : 0.5;
+         renderer->analog_phase += lines_per_field * adv;
+         renderer->analog_phase -= floor(renderer->analog_phase);
       }
    }
 
