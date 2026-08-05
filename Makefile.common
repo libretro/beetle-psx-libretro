@@ -370,3 +370,13 @@ ifeq ($(HAVE_LIGHTREC), 1)
    endif
 
 endif ##ifeq ($(HAVE_LIGHTREC), 1)
+
+# The hybrid VFS only exists for dynamically loaded builds: statically
+# linked frontends share one libretro-common with the core (the hybrid is
+# semantically void there), and vfs_hybrid.o's reference to
+# filestream_set_mapped_ptr_cb can pull this tree's file_stream.o into
+# symbol collision with griffin.
+ifneq ($(STATIC_LINKING), 1)
+SOURCES_C += $(LIBRETRO_COMM_DIR)/vfs/vfs_hybrid.c \
+	$(LIBRETRO_COMM_DIR)/file/retro_dirent.c
+endif

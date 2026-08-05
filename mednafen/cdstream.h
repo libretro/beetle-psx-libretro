@@ -37,6 +37,10 @@ extern "C" {
  * possible backends:
  *
  *   - File-backed: `fp` is a libretro-common RFILE *, `buf` is NULL.
+ *   - Mapped: `fp` is open AND `buf` points into the VFS's mapping of
+ *     the file (`dt` NULL): all reads serve from the map with zero
+ *     syscalls, and closing `fp` releases the mapping.  `buf` is the
+ *     authoritative mode marker - dispatchers test it first.
  *     read / seek / tell / size delegate straight to filestream_*.
  *
  *   - Memory-backed: `buf` is a malloc'd buffer owned by the cdstream
@@ -92,16 +96,8 @@ bool cdstream_memcache_in_place(cdstream *src);
  * bytes actually read; 0 on EOF or error. */
 static INLINE uint64_t cdstream_read(cdstream *s, void *data, uint64_t count)
 {
-   if (s->fp)
-   {
-      int64_t got = filestream_read(s->fp, data, (int64_t)count);
-      /* filestream_read returns -1 on error.  Don't wrap a negative
-       * up to UINT64_MAX - return 0 so callers comparing against the
-       * requested count behave sanely. */
-      if (got < 0)
-         return 0;
-      return (uint64_t)got;
-   }
+   /* buf first: a mapped stream keeps its RFILE open for the map's
+    * lifetime, so buf is the authoritative mode marker. */
    if (s->buf)
    {
       uint64_t avail;
@@ -114,23 +110,21 @@ static INLINE uint64_t cdstream_read(cdstream *s, void *data, uint64_t count)
       s->pos += (int64_t)count;
       return count;
    }
+   if (s->fp)
+   {
+      int64_t got = filestream_read(s->fp, data, (int64_t)count);
+      /* filestream_read returns -1 on error.  Don't wrap a negative
+       * up to UINT64_MAX - return 0 so callers comparing against the
+       * requested count behave sanely. */
+      if (got < 0)
+         return 0;
+      return (uint64_t)got;
+   }
    return 0;
 }
 
 static INLINE void cdstream_seek(cdstream *s, int64_t offset, int whence)
 {
-   if (s->fp)
-   {
-      int seek_position = RETRO_VFS_SEEK_POSITION_START;
-      switch (whence)
-      {
-         case SEEK_SET: seek_position = RETRO_VFS_SEEK_POSITION_START;   break;
-         case SEEK_CUR: seek_position = RETRO_VFS_SEEK_POSITION_CURRENT; break;
-         case SEEK_END: seek_position = RETRO_VFS_SEEK_POSITION_END;     break;
-      }
-      filestream_seek(s->fp, offset, seek_position);
-      return;
-   }
    if (s->buf)
    {
       int64_t new_position;
@@ -147,10 +141,24 @@ static INLINE void cdstream_seek(cdstream *s, int64_t offset, int whence)
        * behaviour; the historical grow-on-write path is gone. */
       s->pos = new_position;
    }
+   if (s->fp)
+   {
+      int seek_position = RETRO_VFS_SEEK_POSITION_START;
+      switch (whence)
+      {
+         case SEEK_SET: seek_position = RETRO_VFS_SEEK_POSITION_START;   break;
+         case SEEK_CUR: seek_position = RETRO_VFS_SEEK_POSITION_CURRENT; break;
+         case SEEK_END: seek_position = RETRO_VFS_SEEK_POSITION_END;     break;
+      }
+      filestream_seek(s->fp, offset, seek_position);
+      return;
+   }
 }
 
 static INLINE uint64_t cdstream_tell(cdstream *s)
 {
+   if (s->buf)
+      return (uint64_t)s->pos;
    if (s->fp)
    {
       int64_t pos = filestream_tell(s->fp);
@@ -158,13 +166,13 @@ static INLINE uint64_t cdstream_tell(cdstream *s)
          return (uint64_t)-1;
       return (uint64_t)pos;
    }
-   if (s->buf)
-      return (uint64_t)s->pos;
    return (uint64_t)-1;
 }
 
 static INLINE uint64_t cdstream_size(cdstream *s)
 {
+   if (s->buf)
+      return s->size;
    if (s->fp)
    {
       int64_t sz = filestream_get_size(s->fp);
@@ -172,8 +180,6 @@ static INLINE uint64_t cdstream_size(cdstream *s)
          return (uint64_t)-1;
       return (uint64_t)sz;
    }
-   if (s->buf)
-      return s->size;
    return (uint64_t)-1;
 }
 

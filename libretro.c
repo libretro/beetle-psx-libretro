@@ -11,6 +11,7 @@
 #include <libretro.h>
 #include <rthreads/rthreads.h>
 #include <streams/file_stream.h>
+#include <vfs/vfs_hybrid.h>
 #include <string/stdstring.h>
 #include <lrc_hash.h>
 #include <formats/data_transfer.h>
@@ -6389,10 +6390,17 @@ void retro_set_environment(retro_environment_t cb)
    libretro_supports_option_categories = false;
    libretro_set_core_options(environ_cb, &libretro_supports_option_categories);
 
-   vfs_iface_info.required_interface_version = 2;
-   vfs_iface_info.iface                      = NULL;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &vfs_iface_info))
-      filestream_vfs_init(&vfs_iface_info);
+#ifndef STATIC_LINKING
+   /*
+      Hybrid VFS replaces the wholesale adoption: plain paths (disc
+      images, BIOS, memcards) serve through the local implementation -
+      no per-sector frontend indirection, and the local VFS can map
+      disc images for the cdstream zero-copy path - while the frontend
+      covers URI-shaped paths and sandboxed-platform fallback, plus
+      dirent/stat coverage the old wiring lacked.
+   */
+   vfs_hybrid_init(environ_cb, NULL);
+#endif
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_LED_INTERFACE, &led_interface))
       if (led_interface.set_led_state && !led_state_cb)

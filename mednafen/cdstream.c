@@ -24,11 +24,32 @@
 
 bool cdstream_open(cdstream *out, const char *path)
 {
+   const uint8_t *base = NULL;
+   int64_t        mlen = 0;
+
    memset(out, 0, sizeof(*out));
+   /* FREQUENT_ACCESS invites the local VFS to memory-map: disc images
+    * are read sector-by-sector for the whole session, the textbook
+    * case.  When a mapping comes back, reads become memcpy from the
+    * page cache with zero per-sector syscalls - the memcache
+    * feature's win without its copy, commit, or memory cost.  The
+    * RFILE stays open because the map's lifetime is tied to it.
+    * NULL (frontend-backed handle, no mmap support, or platform
+    * without HAVE_MMAP) leaves the file-backed path exactly as it
+    * was. */
    out->fp = filestream_open(path,
          RETRO_VFS_FILE_ACCESS_READ,
-         RETRO_VFS_FILE_ACCESS_HINT_NONE);
-   return out->fp != NULL;
+         RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS);
+   if (!out->fp)
+      return false;
+   base = filestream_get_mapped_ptr(out->fp, &mlen);
+   if (base && mlen > 0)
+   {
+      out->buf  = (uint8_t *)base;
+      out->size = (uint64_t)mlen;
+      out->pos  = 0;
+   }
+   return true;
 }
 
 /* Fill a prefix transfer to the end of the file.  Returns the transfer
@@ -95,11 +116,15 @@ bool cdstream_memcache_in_place(cdstream *src)
    const char    *path;
    data_transfer_t *dt;
 
-   if (!src->fp)
+   if (src->buf)
    {
-      /* Already memory-backed (or closed); nothing to do. */
-      return src->buf != NULL;
+      /* Already memory-backed - including the mapped mode, where the
+       * page cache IS the memcache and slurping would only add a
+       * copy. */
+      return true;
    }
+   if (!src->fp)
+      return false;
 
    /* The transfer reads the whole file from its path; the view we
     * expose starts at the stream's current position, matching

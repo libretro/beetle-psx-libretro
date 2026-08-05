@@ -105,6 +105,8 @@ endif
 
 # Unix
 ifneq (,$(findstring unix,$(platform)))
+   # local VFS may mmap FREQUENT_ACCESS files (cdstream zero-copy)
+   FLAGS += -DHAVE_MMAP
    TARGET := $(TARGET_NAME)_libretro.so
    fpic   := -fPIC
    ifneq ($(findstring SunOS,$(shell uname -a)),)
@@ -558,6 +560,9 @@ all: $(TARGET)
 ifeq ($(DEBUG), 1)
    ifneq (,$(findstring msvc,$(platform)))
       ifeq ($(STATIC_LINKING),1)
+   # Statically linked frontends compile their own libretro-common; the core
+   # must not wire up the hybrid VFS there (see Makefile.common / libretro.c).
+   FLAGS += -DSTATIC_LINKING
          CFLAGS   += -MTd
          CXXFLAGS += -MTd
       else
