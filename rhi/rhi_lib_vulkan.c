@@ -2023,6 +2023,8 @@ struct ClassAllocator
 };
 
 static void classallocator_init(struct ClassAllocator *self);
+static void classallocator_fini(struct ClassAllocator *self);
+static void alloc_fini(struct Allocator *self);
 static void classallocator_free(struct ClassAllocator *self,
       struct DeviceAllocation *alloc);
 
@@ -2289,6 +2291,8 @@ static INLINE void deviceallocator_deinit(struct DeviceAllocator *self)
    int i;
    for (i = 0; i < self->heaps.count; i++)
       da_heap_garbage_collect(&self->heaps.items[i], self->device);
+   for (i = 0; i < self->allocators.count; i++)
+      alloc_fini(self->allocators.items[i]);
    AllocatorPtrVec_destroy(&self->allocators);
    da_heap_vec_free_storage(&self->heaps);
 }
@@ -11648,6 +11652,17 @@ static void alloc_init(struct Allocator *self)
    classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_LARGE), 128 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS);
    classallocator_set_sub_block_size(alloc_get_class_allocator(self, MEMORY_CLASS_HUGE),
        64 * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS * BLOCK_NUM_SUB_BLOCKS); /* 2M */
+}
+
+/* Teardown counterpart to alloc_init. Each class allocator owns a MiniHeap
+ * object pool; classallocator_fini releases it (and reports any heap still
+ * live). The Allocator objects are heap-allocated by deviceallocator_init and
+ * were previously just free()d, which dropped those pools on the floor. */
+static void alloc_fini(struct Allocator *self)
+{
+   unsigned i;
+   for (i = 0; i < MEMORY_CLASS_COUNT; i++)
+      classallocator_fini(&self->classes[i]);
 }
 
 static void deviceallocator_init(struct DeviceAllocator *self,
