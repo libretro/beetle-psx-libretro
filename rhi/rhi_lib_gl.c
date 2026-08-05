@@ -3846,6 +3846,21 @@ static void gl_context_reset(void)
       return;
    }
 
+   /* A context_reset may arrive while a renderer from a previous reset is
+    * still live: some frontends fire it on surface/window recreation without
+    * an intervening context_destroy. Allocating over the existing pointer
+    * would orphan that renderer along with every GL object, texture tracker
+    * and draw buffer it owns. Tear it down first so reset is idempotent,
+    * mirroring vk_context_reset. */
+   if (static_renderer.state_data)
+   {
+      gl_renderer_free(static_renderer.state_data);
+      free(static_renderer.state_data);
+      static_renderer.state_data = NULL;
+      static_renderer.state      = GL_STATE_INVALID;
+      static_renderer.inited     = false;
+   }
+
    static_renderer.state_data = (gl_renderer *)calloc(1, sizeof(gl_renderer));
    if (!static_renderer.state_data)
    {
