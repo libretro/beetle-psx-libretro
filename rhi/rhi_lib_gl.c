@@ -2730,10 +2730,30 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
  * RHI_CABLE_* in rhi_lib_vulkan.c; analog.h is GLSL and cannot be included
  * here, so the lists are kept in step by hand. The value reaches the shaders
  * verbatim as the `cable` uniform. */
-/* Not guaranteed to be present in the glsym headers this renderer compiles
- * against, and the enum value is fixed by the spec. */
+/* Compute is not something every GL header this core builds against can even
+ * express. GLES below 3.1 has none of it; webOS builds against GLES2; and
+ * Apple's GL stops at 4.1, which has image load/store but not the memory
+ * barrier bits the trap needs. Detect that from the constants themselves
+ * rather than from a version macro, because the version macros differ across
+ * the glsym, GLES and Apple header sets while these three are exactly what
+ * the dispatch below refers to.
+ *
+ * Where this comes out false the trap is never compiled, gl_caps.has_compute
+ * is forced off, and the encoded tiers take the analog_yc bypass - the same
+ * path a 3.0-era driver gets at runtime. Nothing else in the renderer is
+ * affected. */
+#if defined(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT) && \
+    defined(GL_TEXTURE_FETCH_BARRIER_BIT) && \
+    defined(GL_WRITE_ONLY)
+#define RHI_GL_HAVE_COMPUTE 1
+#endif
+
+#if defined(RHI_GL_HAVE_COMPUTE)
+/* Not guaranteed to be present even where the rest is, and the enum value is
+ * fixed by the spec. */
 #ifndef GL_COMPUTE_SHADER
 #define GL_COMPUTE_SHADER 0x91B9
+#endif
 #endif
 
 /* The trap declares 12 active uniforms; UNIFORM_MAX_ENTRIES is 16, so it
@@ -2849,6 +2869,13 @@ static gl_program *gl_analog_build_program(const char *fs_src, const char *name)
 /* The trap is compute-only, so it cannot go through gl_program_init (which
  * takes a vertex/fragment pair). Built by hand, and only when the context
  * actually supports compute. */
+#if !defined(RHI_GL_HAVE_COMPUTE)
+static gl_program *gl_analog_build_compute(const char *cs_src, const char *name)
+{
+   (void)cs_src; (void)name;
+   return NULL;   /* headers cannot express compute; see RHI_GL_HAVE_COMPUTE */
+}
+#else
 static gl_program *gl_analog_build_compute(const char *cs_src, const char *name)
 {
    GLuint      sh, id;
@@ -2899,6 +2926,7 @@ static gl_program *gl_analog_build_compute(const char *cs_src, const char *name)
    program->uniforms = load_program_uniforms(id);
    return program;
 }
+#endif /* RHI_GL_HAVE_COMPUTE */
 
 static void gl_analog_free(struct gl_analog *a)
 {
@@ -3377,6 +3405,7 @@ static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
                black_offset = -0.075f / (1.0f - 0.075f);
             }
 
+#if defined(RHI_GL_HAVE_COMPUTE)
             if (notch)
             {
                const double wq  = 2.0 * M_PI * (double)inv_ratio;
@@ -3418,6 +3447,7 @@ static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
                                GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
             else
+#endif /* RHI_GL_HAVE_COMPUTE */
             {
                p = a->programs[pal ? GL_ANALOG_YC_PAL : GL_ANALOG_YC];
                if (!gl_analog_target(a, &a->rgb))
@@ -4581,10 +4611,16 @@ static void gl_caps_init(void)
     * here. Logged either way: which path the trap took is otherwise
     * invisible from a screenshot, and hanging dots look like a bug
     * rather than a documented fallback. */
+#if defined(RHI_GL_HAVE_COMPUTE)
    if (gl_caps.api == GL_API_GLES)
       gl_caps.has_compute = (gl_caps.version_packed >= 0x0301);
    else
       gl_caps.has_compute = (gl_caps.version_packed >= 0x0403);
+#else
+   /* Built against headers with no compute at all - a runtime version check
+    * would be answering a question this binary cannot act on. */
+   gl_caps.has_compute = 0;
+#endif
 
    if (log_cb && !gl_caps.unsupported)
       log_cb(RETRO_LOG_INFO,

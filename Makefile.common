@@ -376,7 +376,10 @@ endif ##ifeq ($(HAVE_LIGHTREC), 1)
 # semantically void there), and vfs_hybrid.o's reference to
 # filestream_set_mapped_ptr_cb can pull this tree's file_stream.o into
 # symbol collision with griffin.
+# retro_dirent.c is already listed in the non-static block above; listing it
+# twice is harmless where the object list gets sorted, but ndk-build feeds
+# LOCAL_SRC_FILES to the linker verbatim and every symbol in it comes up
+# duplicated.
 ifneq ($(STATIC_LINKING), 1)
-SOURCES_C += $(LIBRETRO_COMM_DIR)/vfs/vfs_hybrid.c \
-	$(LIBRETRO_COMM_DIR)/file/retro_dirent.c
+SOURCES_C += $(LIBRETRO_COMM_DIR)/vfs/vfs_hybrid.c
 endif
