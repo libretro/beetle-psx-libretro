@@ -30,6 +30,7 @@
  * allocated before negotiation completes). */
 extern int   psx_color_format;
 extern bool  psx_hdr_active;
+extern int   psx_video_cable;   /* 0 off, 1 S-Video, 2 composite, 3 RF, 4 RGB */
 extern float psx_hdr_paper_white_nits;
 extern float psx_hdr_max_nits;
 extern int   psx_hdr_expand_gamut;
@@ -234,6 +235,14 @@ typedef struct gl_caps
     * gl_context_reset checks this and refuses to activate the
     * renderer when set. */
    int unsupported;
+
+   /* Compute shaders with shared memory and image stores: GL 4.3 or
+    * GLES 3.1. Well above the renderer's floor, so this is optional
+    * and nothing else in the renderer depends on it. The analog
+    * chain's IIR chroma trap needs it; without it the encoded cable
+    * tiers run the trap's own bypass path and show hanging dots
+    * rather than losing the cable simulation entirely. */
+   int has_compute;
 } gl_caps_t;
 
 static gl_caps_t gl_caps;
@@ -717,6 +726,8 @@ struct gl_draw_buffer
 typedef struct gl_draw_buffer gl_draw_buffer;
 
 
+struct gl_analog;
+
 struct gl_renderer {
    /* Buffer used to handle PlayStation GPU draw commands */
    gl_draw_buffer *command_buffer;
@@ -743,6 +754,11 @@ struct gl_renderer {
    gl_texture fb_texture;
    /* gl_framebuffer used as an output when running draw commands */
    gl_texture fb_out;
+
+   /* Analog cable chain. NULL until the option is first switched on; the
+    * chain owns a dozen programs and six render targets, so a session that
+    * never enables it never pays for it. Freed with the renderer. */
+   struct gl_analog *analog;
    /* Depth buffer for fb_out */
    gl_texture fb_out_depth;
    /* Current resolution of the frontend's framebuffer */
@@ -2666,6 +2682,432 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    return true;
 }
 
+/* === Analog video cable chain: GL resources ==============================
+ *
+ * The signal math lives in rhi/shaders_vulkan and is translated to GL GLSL by
+ * rhi/shaders_gl/gen_analog_gl.py; see rhi/shaders_gl/README_analog.md. This
+ * section owns the GL-side objects those programs need: the program objects
+ * themselves, the intermediate render targets, and their lifetime.
+ *
+ * Programs are built on first use rather than at context reset. The chain is
+ * off by default and most sessions never turn it on, and building twelve
+ * programs costs real time on some drivers - paying that at load for a feature
+ * nobody asked for is the kind of cost that shows up as "the core got slower".
+ * Once built they live until context destroy.
+ *
+ * The trap (gl_analog_notch) is the one stage that can legitimately be absent:
+ * it is a compute program and needs GL 4.3 / GLES 3.1. When gl_caps.has_compute
+ * is false it is never built and gl_analog_yc runs in its place, which is the
+ * trap's own bypass branch - the encoded tiers keep everything except the trap
+ * and show hanging dots. See README_analog.md.
+ */
+
+#include "shaders_gl/analog_vertex.glsl.h"
+#include "shaders_gl/analog_downsample.glsl.h"
+#include "shaders_gl/analog_encode.glsl.h"
+#include "shaders_gl/analog_encode_pal.glsl.h"
+#include "shaders_gl/analog_comb.glsl.h"
+#include "shaders_gl/analog_comb_pal.glsl.h"
+#include "shaders_gl/analog_demod.glsl.h"
+#include "shaders_gl/analog_demod_pal.glsl.h"
+#include "shaders_gl/analog_rgb.glsl.h"
+#include "shaders_gl/analog_rgb_pal.glsl.h"
+#include "shaders_gl/analog_yc.glsl.h"
+#include "shaders_gl/analog_yc_pal.glsl.h"
+#include "shaders_gl/analog_resolve.glsl.h"
+#include "shaders_gl/analog_resolve_hdr.glsl.h"
+#include "shaders_gl/analog_notch.glsl.h"
+#include "shaders_gl/analog_notch_pal.glsl.h"
+
+/* Cable tiers. Mirror of AN_CABLE_* in shaders_vulkan/analog.h and of
+ * RHI_CABLE_* in rhi_lib_vulkan.c; analog.h is GLSL and cannot be included
+ * here, so the lists are kept in step by hand. The value reaches the shaders
+ * verbatim as the `cable` uniform. */
+/* Not guaranteed to be present in the glsym headers this renderer compiles
+ * against, and the enum value is fixed by the spec. */
+#ifndef GL_COMPUTE_SHADER
+#define GL_COMPUTE_SHADER 0x91B9
+#endif
+
+/* The trap declares 12 active uniforms; UNIFORM_MAX_ENTRIES is 16, so it
+ * fits, but there is not much room. If a stage ever grows past that,
+ * load_program_uniforms silently stops recording the extras and the failure
+ * looks like a uniform that will not set. */
+
+#define GL_CABLE_NONE      0
+#define GL_CABLE_SVIDEO    1
+#define GL_CABLE_COMPOSITE 2
+#define GL_CABLE_RF        3
+#define GL_CABLE_RGB       4
+
+enum
+{
+   GL_ANALOG_DOWNSAMPLE = 0,
+   GL_ANALOG_ENCODE,
+   GL_ANALOG_ENCODE_PAL,
+   GL_ANALOG_COMB,
+   GL_ANALOG_COMB_PAL,
+   GL_ANALOG_DEMOD,
+   GL_ANALOG_DEMOD_PAL,
+   GL_ANALOG_RGB,
+   GL_ANALOG_RGB_PAL,
+   GL_ANALOG_YC,
+   GL_ANALOG_YC_PAL,
+   GL_ANALOG_RESOLVE,
+   GL_ANALOG_RESOLVE_HDR,
+   GL_ANALOG_NOTCH,       /* compute; absent without gl_caps.has_compute */
+   GL_ANALOG_NOTCH_PAL,   /* compute */
+   GL_ANALOG_PROGRAM_COUNT
+};
+
+struct gl_analog
+{
+   gl_program *programs[GL_ANALOG_PROGRAM_COUNT];
+
+   /* Intermediate targets. Sized from the native display rect and the dot
+    * clock, never from the internal resolution: the signal is fixed-rate, so
+    * a higher internal setting supersamples into the cable rather than
+    * widening the signal. Reallocated only when those dimensions change. */
+   gl_texture  native;    /* supersample resolve down to native, scaling > 1 */
+   gl_texture  sig;       /* modulated signal, base-clock rate */
+   gl_texture  sep;       /* after the comb */
+   gl_texture  dec;       /* after demodulation */
+   gl_texture  rgb;       /* after the trap (or its bypass): RGB, base rate */
+   gl_texture  out;       /* resolved to display resolution */
+
+   GLuint      fbo;       /* one reused FBO; the colour attachment is rebound */
+
+   uint32_t    native_w, native_h;
+   uint32_t    sig_w, sig_h;
+   uint32_t    out_w, out_h;
+
+   int         built;     /* programs compiled */
+   int         failed;    /* a program failed to build - do not retry */
+};
+
+/* Compile one vertex+fragment program from the generated sources. */
+static gl_program *gl_analog_build_program(const char *fs_src, const char *name)
+{
+   gl_shader   vs, fs;
+   gl_program *program;
+
+   memset(&vs, 0, sizeof(vs));
+   memset(&fs, 0, sizeof(fs));
+
+   if (!gl_shader_init(&vs, analog_vertex_glsl, GL_VERTEX_SHADER))
+   {
+      log_cb(RETRO_LOG_ERROR, "[gl_analog] %s: vertex shader failed\n", name);
+      if (vs.info_log) free(vs.info_log);
+      return NULL;
+   }
+   if (!gl_shader_init(&fs, fs_src, GL_FRAGMENT_SHADER))
+   {
+      log_cb(RETRO_LOG_ERROR, "[gl_analog] %s: fragment shader failed\n", name);
+      glDeleteShader(vs.id);
+      if (vs.info_log) free(vs.info_log);
+      if (fs.info_log) free(fs.info_log);
+      return NULL;
+   }
+
+   program = (gl_program *)calloc(1, sizeof(*program));
+   if (!program)
+   {
+      glDeleteShader(vs.id);
+      glDeleteShader(fs.id);
+      if (vs.info_log) free(vs.info_log);
+      if (fs.info_log) free(fs.info_log);
+      return NULL;
+   }
+
+   if (!gl_program_init(program, &vs, &fs))
+   {
+      log_cb(RETRO_LOG_ERROR, "[gl_analog] %s: link failed\n", name);
+      free(program);
+      program = NULL;
+   }
+
+   /* The program owns the linked binary from here; the shader objects and
+    * their info logs are ours to release either way. */
+   glDeleteShader(vs.id);
+   glDeleteShader(fs.id);
+   if (vs.info_log) free(vs.info_log);
+   if (fs.info_log) free(fs.info_log);
+   return program;
+}
+
+/* The trap is compute-only, so it cannot go through gl_program_init (which
+ * takes a vertex/fragment pair). Built by hand, and only when the context
+ * actually supports compute. */
+static gl_program *gl_analog_build_compute(const char *cs_src, const char *name)
+{
+   GLuint      sh, id;
+   GLint       status = GL_FALSE;
+   gl_program *program;
+
+   sh = glCreateShader(GL_COMPUTE_SHADER);
+   if (sh == 0)
+      return NULL;
+   glShaderSource(sh, 1, &cs_src, NULL);
+   glCompileShader(sh);
+   glGetShaderiv(sh, GL_COMPILE_STATUS, &status);
+   if (status == GL_FALSE)
+   {
+      log_cb(RETRO_LOG_ERROR, "[gl_analog] %s: compute shader failed\n", name);
+      glDeleteShader(sh);
+      return NULL;
+   }
+
+   id = glCreateProgram();
+   if (id == 0)
+   {
+      glDeleteShader(sh);
+      return NULL;
+   }
+   glAttachShader(id, sh);
+   glLinkProgram(id);
+   glDetachShader(id, sh);
+   glDeleteShader(sh);
+
+   status = GL_FALSE;
+   glGetProgramiv(id, GL_LINK_STATUS, &status);
+   if (status == GL_FALSE)
+   {
+      log_cb(RETRO_LOG_ERROR, "[gl_analog] %s: compute link failed\n", name);
+      glDeleteProgram(id);
+      return NULL;
+   }
+
+   program = (gl_program *)calloc(1, sizeof(*program));
+   if (!program)
+   {
+      glDeleteProgram(id);
+      return NULL;
+   }
+   program->id       = id;
+   program->info_log = NULL;
+   program->uniforms = load_program_uniforms(id);
+   return program;
+}
+
+static void gl_analog_free(struct gl_analog *a)
+{
+   int i;
+   if (!a)
+      return;
+
+   for (i = 0; i < GL_ANALOG_PROGRAM_COUNT; i++)
+   {
+      if (a->programs[i])
+      {
+         gl_program_free(a->programs[i]);
+         free(a->programs[i]);
+         a->programs[i] = NULL;
+      }
+   }
+
+   if (a->fbo)      { glDeleteFramebuffers(1, &a->fbo); a->fbo = 0; }
+   if (a->native.id) { glDeleteTextures(1, &a->native.id); a->native.id = 0; }
+   if (a->sig.id)    { glDeleteTextures(1, &a->sig.id);    a->sig.id = 0; }
+   if (a->sep.id)    { glDeleteTextures(1, &a->sep.id);    a->sep.id = 0; }
+   if (a->dec.id)    { glDeleteTextures(1, &a->dec.id);    a->dec.id = 0; }
+   if (a->rgb.id)    { glDeleteTextures(1, &a->rgb.id);    a->rgb.id = 0; }
+   if (a->out.id)    { glDeleteTextures(1, &a->out.id);    a->out.id = 0; }
+
+   a->built  = 0;
+   a->failed = 0;
+   a->native_w = a->native_h = 0;
+   a->sig_w = a->sig_h = 0;
+   a->out_w = a->out_h = 0;
+}
+
+/* Build every program the chain can need. All or nothing: a partially built
+ * chain would fail somewhere mid-frame with no useful diagnostic, so on any
+ * failure everything is released and `failed` latches so the next frame does
+ * not try again and spam the log.
+ *
+ * The trap is the exception - absent by design without compute, not a
+ * failure. */
+static bool gl_analog_build(struct gl_analog *a)
+{
+   static const struct { int slot; const char *src; const char *name; } progs[] =
+   {
+      { GL_ANALOG_DOWNSAMPLE,  NULL, "downsample"  },
+      { GL_ANALOG_ENCODE,      NULL, "encode"      },
+      { GL_ANALOG_ENCODE_PAL,  NULL, "encode_pal"  },
+      { GL_ANALOG_COMB,        NULL, "comb"        },
+      { GL_ANALOG_COMB_PAL,    NULL, "comb_pal"    },
+      { GL_ANALOG_DEMOD,       NULL, "demod"       },
+      { GL_ANALOG_DEMOD_PAL,   NULL, "demod_pal"   },
+      { GL_ANALOG_RGB,         NULL, "rgb"         },
+      { GL_ANALOG_RGB_PAL,     NULL, "rgb_pal"     },
+      { GL_ANALOG_YC,          NULL, "yc"          },
+      { GL_ANALOG_YC_PAL,      NULL, "yc_pal"      },
+      { GL_ANALOG_RESOLVE,     NULL, "resolve"     },
+      { GL_ANALOG_RESOLVE_HDR, NULL, "resolve_hdr" },
+   };
+   const char *srcs[GL_ANALOG_PROGRAM_COUNT];
+   unsigned i;
+
+   if (a->built)
+      return true;
+   if (a->failed)
+      return false;
+
+   srcs[GL_ANALOG_DOWNSAMPLE]  = analog_downsample_glsl;
+   srcs[GL_ANALOG_ENCODE]      = analog_encode_glsl;
+   srcs[GL_ANALOG_ENCODE_PAL]  = analog_encode_pal_glsl;
+   srcs[GL_ANALOG_COMB]        = analog_comb_glsl;
+   srcs[GL_ANALOG_COMB_PAL]    = analog_comb_pal_glsl;
+   srcs[GL_ANALOG_DEMOD]       = analog_demod_glsl;
+   srcs[GL_ANALOG_DEMOD_PAL]   = analog_demod_pal_glsl;
+   srcs[GL_ANALOG_RGB]         = analog_rgb_glsl;
+   srcs[GL_ANALOG_RGB_PAL]     = analog_rgb_pal_glsl;
+   srcs[GL_ANALOG_YC]          = analog_yc_glsl;
+   srcs[GL_ANALOG_YC_PAL]      = analog_yc_pal_glsl;
+   srcs[GL_ANALOG_RESOLVE]     = analog_resolve_glsl;
+   srcs[GL_ANALOG_RESOLVE_HDR] = analog_resolve_hdr_glsl;
+
+   for (i = 0; i < sizeof(progs) / sizeof(progs[0]); i++)
+   {
+      a->programs[progs[i].slot] =
+         gl_analog_build_program(srcs[progs[i].slot], progs[i].name);
+      if (!a->programs[progs[i].slot])
+      {
+         log_cb(RETRO_LOG_ERROR,
+               "[gl_analog] chain unavailable: '%s' did not build\n",
+               progs[i].name);
+         gl_analog_free(a);
+         a->failed = 1;
+         return false;
+      }
+   }
+
+   if (gl_caps.has_compute)
+   {
+      a->programs[GL_ANALOG_NOTCH] =
+         gl_analog_build_compute(analog_notch_glsl, "notch");
+      a->programs[GL_ANALOG_NOTCH_PAL] =
+         gl_analog_build_compute(analog_notch_pal_glsl, "notch_pal");
+
+      /* A driver that claims 4.3 and then fails to build the trap is not a
+       * reason to lose the cable: drop back to the same bypass path used
+       * below the compute floor and say so once. */
+      if (!a->programs[GL_ANALOG_NOTCH] || !a->programs[GL_ANALOG_NOTCH_PAL])
+      {
+         if (a->programs[GL_ANALOG_NOTCH])
+         {
+            gl_program_free(a->programs[GL_ANALOG_NOTCH]);
+            free(a->programs[GL_ANALOG_NOTCH]);
+            a->programs[GL_ANALOG_NOTCH] = NULL;
+         }
+         if (a->programs[GL_ANALOG_NOTCH_PAL])
+         {
+            gl_program_free(a->programs[GL_ANALOG_NOTCH_PAL]);
+            free(a->programs[GL_ANALOG_NOTCH_PAL]);
+            a->programs[GL_ANALOG_NOTCH_PAL] = NULL;
+         }
+         log_cb(RETRO_LOG_WARN,
+               "[gl_analog] chroma trap did not build on a context that "
+               "reports compute; falling back to the no-trap path "
+               "(composite/RF will show hanging dots)\n");
+      }
+   }
+
+   glGenFramebuffers(1, &a->fbo);
+   a->built = 1;
+
+   log_cb(RETRO_LOG_INFO, "[gl_analog] chain built (chroma trap: %s)\n",
+         a->programs[GL_ANALOG_NOTCH] ? "on" : "off - no compute");
+   return true;
+}
+
+/* (Re)allocate the intermediate targets for a given geometry. All are fp16:
+ * the chain runs in the gamma domain but carries a modulated signal that
+ * swings below black and above white, which 8-bit storage would clip. */
+static bool gl_analog_resize(struct gl_analog *a,
+      uint32_t native_w, uint32_t native_h,
+      uint32_t sig_w, uint32_t sig_h,
+      uint32_t out_w, uint32_t out_h)
+{
+   if (!native_w || !native_h || !sig_w || !sig_h || !out_w || !out_h)
+      return false;
+
+   if (a->native_w != native_w || a->native_h != native_h)
+   {
+      if (a->native.id)
+         glDeleteTextures(1, &a->native.id);
+      gl_texture_init(&a->native, native_w, native_h, GL_RGBA16F);
+      a->native_w = native_w;
+      a->native_h = native_h;
+   }
+
+   if (a->sig_w != sig_w || a->sig_h != sig_h)
+   {
+      if (a->sig.id) glDeleteTextures(1, &a->sig.id);
+      if (a->sep.id) glDeleteTextures(1, &a->sep.id);
+      if (a->dec.id) glDeleteTextures(1, &a->dec.id);
+      if (a->rgb.id) glDeleteTextures(1, &a->rgb.id);
+      gl_texture_init(&a->sig, sig_w, sig_h, GL_RGBA16F);
+      gl_texture_init(&a->sep, sig_w, sig_h, GL_RGBA16F);
+      gl_texture_init(&a->dec, sig_w, sig_h, GL_RGBA16F);
+      gl_texture_init(&a->rgb, sig_w, sig_h, GL_RGBA16F);
+      a->sig_w = sig_w;
+      a->sig_h = sig_h;
+   }
+
+   if (a->out_w != out_w || a->out_h != out_h)
+   {
+      if (a->out.id)
+         glDeleteTextures(1, &a->out.id);
+      gl_texture_init(&a->out, out_w, out_h, GL_RGBA16F);
+      a->out_w = out_w;
+      a->out_h = out_h;
+   }
+
+   return true;
+}
+
+/* Base clocks per pixel, from GP1(08h)'s horizontal resolution divider.
+ * Same table as the Vulkan renderer's renderer_analog_divisor; these are the
+ * exact CRTC dividers, not an approximation. */
+static unsigned gl_analog_divisor(unsigned width_mode)
+{
+   switch (width_mode)
+   {
+      case 0:  return 10;  /* 256 */
+      case 1:  return 8;   /* 320 */
+      case 2:  return 7;   /* 368 - the 5% wider mode */
+      case 3:  return 5;   /* 512 */
+      default: return 4;   /* 640 */
+   }
+}
+
+/* Bring the chain up if the option asks for it, tear it down if it does not.
+ * Called once per frame from the display path: the option is live (no restart
+ * needed) so the answer can change between frames, and building is guarded by
+ * the `built`/`failed` flags so the steady state is two predictable branches.
+ *
+ * Returns the chain when it is available and wanted, NULL otherwise - which is
+ * also what a build failure returns, so the caller falls back to the ordinary
+ * display path rather than showing nothing. */
+static struct gl_analog *gl_analog_get(gl_renderer *renderer)
+{
+   if (psx_video_cable == GL_CABLE_NONE)
+      return NULL;
+
+   if (!renderer->analog)
+   {
+      renderer->analog = (struct gl_analog *)calloc(1, sizeof(struct gl_analog));
+      if (!renderer->analog)
+         return NULL;
+   }
+
+   if (!gl_analog_build(renderer->analog))
+      return NULL;
+
+   return renderer->analog;
+}
+
 static void gl_renderer_free(gl_renderer *renderer)
 {
    if (!renderer)
@@ -2695,6 +3137,13 @@ static void gl_renderer_free(gl_renderer *renderer)
    /* Release the dynamic batch list backing storage.  C++ used
     * to do this implicitly via std::vector's destructor; in C we
     * must call gl_primitive_batch_vec_free explicitly or leak. */
+   if (renderer->analog)
+   {
+      gl_analog_free(renderer->analog);
+      free(renderer->analog);
+      renderer->analog = NULL;
+   }
+
    gl_primitive_batch_vec_free(&renderer->batches);
 
    if (renderer->index_buffer)
@@ -3746,6 +4195,26 @@ static void gl_caps_init(void)
             "screen or no output.\n",
             gl_caps.version_major, gl_caps.version_minor);
    }
+
+   /* Compute availability. Core in GL 4.3 and GLES 3.1; below that a
+    * driver may still expose ARB_compute_shader, but that extension
+    * does not carry the image-store and shared-memory guarantees the
+    * trap relies on in one piece, so only the core versions count
+    * here. Logged either way: which path the trap took is otherwise
+    * invisible from a screenshot, and hanging dots look like a bug
+    * rather than a documented fallback. */
+   if (gl_caps.api == GL_API_GLES)
+      gl_caps.has_compute = (gl_caps.version_packed >= 0x0301);
+   else
+      gl_caps.has_compute = (gl_caps.version_packed >= 0x0403);
+
+   if (log_cb && !gl_caps.unsupported)
+      log_cb(RETRO_LOG_INFO,
+            "[gl_caps] compute shaders: %s (analog chroma trap %s)\n",
+            gl_caps.has_compute ? "yes" : "no",
+            gl_caps.has_compute ? "available"
+                                : "unavailable - composite/RF will show "
+                                  "hanging dots");
 }
 
 /*
@@ -4289,6 +4758,12 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
       texture_tracker_endFrame(renderer->tracker);
       renderer->hd_handle = hd_handle_make_none();
    }
+
+   /* Bring the analog chain up or down to match the option. The passes that
+    * consume it are not wired into the display path yet, so for now this only
+    * owns the programs and their lifetime; the frame still goes out through
+    * the ordinary fb_out blit below. */
+   (void)gl_analog_get(renderer);
 
    /* Calculate native PSX framebuffer dimensions to update renderer
       state before calling bind_libretro_framebuffer */
