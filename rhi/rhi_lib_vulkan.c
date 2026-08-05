@@ -7112,6 +7112,13 @@ static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
       /* Single surviving owner of the fence handle (ownership moved out of
        * flush_and_signal); drop its reference at scope exit. */
       fence_reset(&fence);
+
+      /* Same for the staging buffer: device_create_buffer returned an owning
+       * reference, and nothing else holds one. In the C++ original the
+       * BufferHandle destructor dropped it at scope exit; in C the drop is
+       * explicit. Without this every synchronous VRAM readback (savestates,
+       * software-fb reads) leaked the staging VkBuffer and its memory. */
+      bh_reset(&buffer);
    }
 }
 
