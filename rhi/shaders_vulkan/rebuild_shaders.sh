@@ -119,6 +119,13 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/analog.resolve.frag.inc -mfmt=c analog_resolve.frag
 "$GLSLC" -o prebuilt/analog.resolve.hdr.frag.inc -mfmt=c -DHDR analog_resolve.frag
 
+# analog_yc.frag is the trap's bypass branch as a fragment shader, used by the
+# GL backend below the compute floor. Vulkan does not run it (its compute trap
+# handles the same case internally), but it includes analog.h, so compile it
+# here to keep it from rotting.
+"$GLSLC" -o /dev/null analog_yc.frag
+"$GLSLC" -o /dev/null -DPAL analog_yc.frag
+
 # GL translations of the analog chain. Generated from the sources above rather
 # than forked, so the two backends cannot drift apart; regenerated here so a
 # change to the signal math lands on both.

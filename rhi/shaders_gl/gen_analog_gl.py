@@ -45,6 +45,17 @@ SHADERS = [
     ('analog_rgb.frag',        'analog_rgb_pal',          ['PAL']),
     ('analog_resolve.frag',    'analog_resolve',          []),
     ('analog_resolve.frag',    'analog_resolve_hdr',      ['HDR']),
+    ('analog_yc.frag',         'analog_yc',               []),
+    ('analog_yc.frag',         'analog_yc_pal',           ['PAL']),
+]
+
+# Compute stages. Separate because they need a higher GL/GLES version than the
+# fragment floor: shared memory, barrier() and imageStore mean GL 4.3 / GLES
+# 3.1. The backend runs these only when the context reports that, and falls
+# back to analog_yc (the trap's own bypass branch) when it does not.
+COMPUTE = [
+    ('analog_notch.comp',      'analog_notch',            []),
+    ('analog_notch.comp',      'analog_notch_pal',        ['PAL']),
 ]
 
 
@@ -119,7 +130,7 @@ def collect_push_uniforms(text):
     return members, text
 
 
-def translate(src_name, defines, es):
+def translate(src_name, defines, es, compute=False):
     path = os.path.join(SRC, src_name)
     text = expand_includes(path)
     text = strip_pragma_guards(text)
@@ -131,13 +142,21 @@ def translate(src_name, defines, es):
     members, text = collect_push_uniforms(text)
 
     # Descriptor-set bindings become plain uniforms; GL binds by name.
-    text = re.sub(r'layout\s*\(\s*set\s*=\s*\d+\s*,\s*binding\s*=\s*\d+\s*\)\s*uniform',
+    # Image bindings keep their format layout - GL needs the format qualifier on
+    # an image2D - but lose the descriptor set. Sampler bindings become plain
+    # uniforms; GL binds those by name.
+    text = re.sub(r'layout\s*\(\s*set\s*=\s*\d+\s*,\s*binding\s*=\s*(\d+)\s*,\s*(\w+)\s*\)\s*uniform',
+                  r'layout(binding = \1, \2) uniform', text)
+    text = re.sub(r'layout\s*\(\s*set\s*=\s*\d+\s*,\s*binding\s*=\s*(\d+)\s*\)\s*uniform',
                   'uniform', text)
     # Varying/attribute locations: GL 3.0 and GLES 3.0 do not allow location
     # qualifiers on varyings, and the single fragment output is bound by name.
     text = re.sub(r'layout\s*\(\s*location\s*=\s*\d+\s*\)\s*', '', text)
 
-    header = ['#version %s' % ('300 es' if es else '330 core')]
+    if compute:
+        header = ['#version %s' % ('310 es' if es else '430 core')]
+    else:
+        header = ['#version %s' % ('300 es' if es else '330 core')]
     if es:
         header.append('precision highp float;\nprecision highp int;')
     else:
@@ -175,9 +194,11 @@ def emit_header(stem, glsl_desktop, glsl_es, members):
 
 
 def main():
-    for src, stem, defines in SHADERS:
-        desktop, members = translate(src, defines, es=False)
-        es, _ = translate(src, defines, es=True)
+    for src, stem, defines, is_compute in (
+            [(a, b, c, False) for a, b, c in SHADERS] +
+            [(a, b, c, True) for a, b, c in COMPUTE]):
+        desktop, members = translate(src, defines, es=False, compute=is_compute)
+        es, _ = translate(src, defines, es=True, compute=is_compute)
         out = os.path.join(DST, '%s.glsl.h' % stem)
         open(out, 'w').write(emit_header(stem, desktop, es, members))
         print('generated %s (%d uniforms)' % (os.path.basename(out), len(members)))

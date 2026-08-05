@@ -30,6 +30,10 @@
 #include "analog_rgb_pal.glsl.h"
 #include "analog_resolve.glsl.h"
 #include "analog_resolve_hdr.glsl.h"
+#include "analog_yc.glsl.h"
+#include "analog_yc_pal.glsl.h"
+#include "analog_notch.glsl.h"
+#include "analog_notch_pal.glsl.h"
 
 typedef unsigned int GLenum_, GLuint_;
 typedef int GLint_, GLsizei_;
@@ -38,6 +42,7 @@ typedef int GLint_, GLsizei_;
 #define GL_COMPILE_STATUS_  0x8B81
 #define GL_LINK_STATUS_     0x8B82
 #define GL_ACTIVE_UNIFORMS_ 0x8B86
+#define GL_COMPUTE_SHADER_  0x91B9
 
 static GLuint_ (*p_glCreateShader)(GLenum_);
 static void (*p_glShaderSource)(GLuint_, GLsizei_, const char *const *, const GLint_ *);
@@ -122,7 +127,51 @@ static void check(const char *name, const char *fs, const char **uniforms, int n
    p_glDeleteProgram(prog);
 }
 
-int main(void)
+/* Compute stages: same check, but they need a 4.3 context, so a failure here
+ * is informative rather than fatal - the backend falls back to analog_yc when
+ * the driver cannot run them. */
+static void check_compute(const char *name, const char *cs,
+                          const char **uniforms, int nu)
+{
+   GLuint_ c, prog;
+   GLint_ ok = 0, active = 0;
+   int i, missing = 0;
+
+   c = compile(cs, GL_COMPUTE_SHADER_, name);
+   if (!c)
+      return;
+   prog = p_glCreateProgram();
+   p_glAttachShader(prog, c);
+   p_glLinkProgram(prog);
+   p_glGetProgramiv(prog, GL_LINK_STATUS_, &ok);
+   if (!ok)
+   {
+      char log[8192];
+      GLsizei_ n = 0;
+      p_glGetProgramInfoLog(prog, sizeof(log) - 1, &n, log);
+      log[n] = 0;
+      printf("  FAIL link %s:\n%s\n", name, log);
+      failures++;
+      return;
+   }
+   p_glGetProgramiv(prog, GL_ACTIVE_UNIFORMS_, &active);
+   for (i = 0; i < nu; i++)
+      if (p_glGetUniformLocation(prog, uniforms[i]) < 0)
+      {
+         if (!missing)
+            printf("  %-22s linked, but optimised out:", name);
+         printf(" %s", uniforms[i]);
+         missing++;
+      }
+   if (missing)
+      printf("\n");
+   else
+      printf("  %-22s OK (%d active uniforms)\n", name, (int)active);
+   p_glDeleteShader(c);
+   p_glDeleteProgram(prog);
+}
+
+int main(int argc, char **argv)
 {
    EGLDisplay dpy;
    EGLContext ctx;
@@ -131,11 +180,18 @@ int main(void)
    static const EGLint cfg_attr[] = {
       EGL_SURFACE_TYPE, 0, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_NONE
    };
-   static const EGLint ctx_attr[] = {
-      EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 3,
+   /* Version to request, default 4.3. Pass "3.3" to check that the fragment
+    * stages still build at the renderer's practical floor; compute is skipped
+    * below 4.3, which is the situation the analog_yc fallback exists for. */
+   int want_major = (argc > 1) ? atoi(argv[1]) : 4;
+   int want_minor = (argc > 2) ? atoi(argv[2]) : 3;
+   EGLint ctx_attr[] = {
+      EGL_CONTEXT_MAJOR_VERSION, 4, EGL_CONTEXT_MINOR_VERSION, 3,
       EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
       EGL_NONE
    };
+   ctx_attr[1] = want_major;
+   ctx_attr[3] = want_minor;
    PFNEGLGETPLATFORMDISPLAYEXTPROC gpd =
       (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
 
@@ -150,7 +206,7 @@ int main(void)
    ctx = eglCreateContext(dpy, cfg, EGL_NO_CONTEXT, ctx_attr);
    if (ctx == EGL_NO_CONTEXT || !eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx))
    {
-      printf("no GL 3.3 core context\n");
+      printf("no GL %d.%d core context\n", want_major, want_minor);
       return 2;
    }
 
@@ -188,6 +244,25 @@ int main(void)
       check("rgb_pal",      analog_rgb_pal_glsl,      u_rgb,  2);
       check("resolve",      analog_resolve_glsl,      u_res,  8);
       check("resolve_hdr",  analog_resolve_hdr_glsl,  u_res,  8);
+
+      {
+         static const char *u_yc[] = { "reg_sig_size", "reg_line_split",
+                                       "reg_black_scale", "reg_black_offset" };
+         static const char *u_no[] = { "reg_sig_size", "reg_line_split",
+                                       "reg_black_scale", "reg_black_offset",
+                                       "reg_b0", "reg_b1", "reg_b2",
+                                       "reg_a1", "reg_a2", "reg_enable" };
+         check("yc",          analog_yc_glsl,      u_yc, 4);
+         check("yc_pal",      analog_yc_pal_glsl,  u_yc, 4);
+         if (want_major > 4 || (want_major == 4 && want_minor >= 3))
+         {
+            printf("  -- compute (GL 4.3 / GLES 3.1 only) --\n");
+            check_compute("notch",     analog_notch_glsl,     u_no, 10);
+            check_compute("notch_pal", analog_notch_pal_glsl, u_no, 10);
+         }
+         else
+            printf("  -- compute skipped (context below 4.3; analog_yc path) --\n");
+      }
    }
 
    printf("%s\n", failures ? "FAILURES" : "ALL PROGRAMS COMPILE AND LINK");

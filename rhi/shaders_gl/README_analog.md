@@ -55,24 +55,39 @@ uniform upload, and no hook into the display path where the Vulkan renderer
 calls `renderer_analog_apply`. That is the bulk of the remaining work, and
 until it exists the option remains Vulkan-only in practice.
 
-**The IIR trap, which is the hard part.** `analog_notch.comp` is a compute
-shader: shared memory, a barrier, a cross-lane Hillis-Steele scan and an
-`imageStore`. That needs GL 4.3 or GLES 3.1. This renderer's floor is GL/GLES
-3.0, so it cannot simply be translated the way the fragment stages were, and
-the choice is a real one rather than a transform:
+**The IIR trap needs compute, and degrades rather than disappearing.**
+`analog_notch.comp` uses shared memory, a barrier, a cross-lane Hillis-Steele
+scan and an `imageStore`, so it needs GL 4.3 or GLES 3.1 against this
+renderer's GL/GLES 3.0 floor. The policy:
 
-- *Require compute for the encoded tiers.* Gate on 4.3/3.1, and fall back to
-  no simulation below it. Simplest, and matches what the trap is for, but
-  silently downgrades on older drivers.
-- *Multi-pass ping-pong scan.* A Hillis-Steele scan across texels is
-  expressible as fragment passes: about 12 of them at 2560 samples, each a full
-  target read and write. Works at the 3.0 floor, costs far more bandwidth than
-  the compute version.
-- *Skip the trap on GL.* Composite and RF would show the hanging dots the trap
-  exists to remove. Cheapest and a visible quality split between backends;
-  would need saying out loud in the option description rather than quietly.
+- **GL 4.3 / GLES 3.1 and above:** run the real trap, translated from the same
+  compute source the Vulkan backend uses. Identical output.
+- **Below that:** run `analog_yc` instead - the trap's own `enable == 0`
+  branch, as a fragment shader. Composite and RF keep their band limits, comb,
+  demodulation, PAL delay line, pedestal and RF beat, and show the hanging dots
+  along horizontal colour edges that the trap removes.
 
-S-Video is unaffected either way - it sets `enable = 0` on the trap, because
-luma never shared a wire and there is no carrier residue to remove. RGB/SCART
-is likewise unaffected: it is a single band-limit pass with no comb and no
-trap, so it is the one tier that is complete on GL once the plumbing exists.
+The cable simulation is never switched off for lack of compute. Losing the
+trap costs one artifact; losing the simulation costs all of it, and a composite
+picture with hanging dots is far closer to composite than a sharp RGB one is.
+
+That fallback is not a special case written for GL: `enable == 0` is what
+S-Video already takes on both backends, because luma never shared a wire there
+and a notch would only cost detail. `analog_yc.frag` is that branch lifted into
+a fragment shader, kept beside the compute shader it mirrors so the delay line
+and the colour matrices are not copied.
+
+RGB/SCART never touches the trap at all - one band-limit pass, no comb - so it
+is unaffected on every driver.
+
+## Uniforms reported as optimised out
+
+The harness prints these separately from failures because they are expected:
+
+- SDR `resolve`: `reg_paper_white_nits`, `reg_peak_nits`, `reg_expand_gamut`,
+  `reg_shoulder` - unreachable without `HDR`.
+- NTSC `yc` and `notch`: `reg_line_split` - only read by the PAL delay line.
+
+If one of these appears on a variant *not* listed here, something is wrong: the
+C side would be setting a uniform the shader never uses, which usually means a
+`#if` went the wrong way.
