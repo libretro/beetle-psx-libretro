@@ -47,3 +47,40 @@ Robustness, ASan + UBSan, on vcd_ntsc.mpg: 64 truncations, 64 mid-stream
 entry points, 3000 random byte-corruption runs (1..64 flips each) and 400
 pure-random buffers. No leaks, no out-of-bounds access, no stalls, no
 zero-length packets emitted.
+
+## rmpeg1_video
+
+`diff_video.c` cross-checks the bitstream layers against pl_mpeg;
+`idct_accuracy.c` measures the IDCT against a double-precision reference in
+the style of IEEE 1180-1990 and is the authoritative check on pixel values.
+
+```sh
+gcc -O2 -std=gnu99 -o diffvid tools/rmpeg1/diff_video.c \
+    libretro-common/formats/mpeg1/rmpeg1_ps.c \
+    libretro-common/formats/mpeg1/rmpeg1_video.c \
+    -Ilibretro-common/include -Ilibretro-common/formats/mpeg1 \
+    -Ideps/pl_mpeg -lm
+
+gcc -O2 -std=gnu99 -o idctacc tools/rmpeg1/idct_accuracy.c \
+    -Ilibretro-common/include -Ilibretro-common/formats/mpeg1 -lm
+```
+
+### IDCT accuracy at the time of writing
+
+| coefficient range | peak | mse | me | worst pme |
+|---|---|---|---|---|
+| intra-like (DC ~1024) | 1 | 0.01058 | 0.000045 | 0.00180 |
+| 1180 L=256 | 1 | 0.00935 | -0.001259 | 0.00485 |
+| 1180 L=5 | 1 | 0.00516 | -0.000098 | 0.00160 |
+| 1180 L=300 | 1 | 0.00988 | -0.001392 | 0.00505 |
+| DC only | 0 | 0 | 0 | 0 |
+
+All within the 1180 bounds (peak 1, mse 0.06, me 0.015, pme 0.015), and
+all-zero input gives all-zero output.
+
+### I-frame cross-check vs pl_mpeg
+
+90 to 95% of luma samples identical, the rest almost all off by one, a
+handful in 84,000 by up to 5. Since ours is within peak error 1 of the
+double-precision reference, that tail is the other decoder's IDCT.
+Identical results at chunk sizes 1, 7, 64, 2324 and 1 MiB; zero slice errors.
