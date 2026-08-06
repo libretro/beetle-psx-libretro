@@ -1,6 +1,21 @@
 # rmpeg1 test harnesses
 
-Not built by the core. Build them by hand against the tree:
+Not built by the core.
+
+`diff_video.c` and `bench.c` compare against pl_mpeg, which is no longer a
+dependency of this tree -- it was removed once rmpeg1 replaced it. To run
+them, fetch it into a scratch directory and point `-I` at that:
+
+```sh
+mkdir -p /tmp/plmref && curl -Lo /tmp/plmref/pl_mpeg.h \
+    https://raw.githubusercontent.com/phoboslab/pl_mpeg/master/pl_mpeg.h
+# then add -I/tmp/plmref to the commands below
+```
+
+`idct_accuracy.c` and the demuxer sweep have no such dependency: they measure
+against a double-precision reference and against the format itself.
+
+Build them by hand against the tree:
 
 ```sh
 # differential test vs the pl_mpeg demuxer (needs deps/pl_mpeg)
@@ -177,3 +192,30 @@ not where the time was.
 to the frame bounds inside the innermost loop. Hoisting both out, with a
 fast path for the (near-universal) case of a block fully inside the
 reference, took the whole decoder to 13.1 ms.
+
+## End-to-end: tools/vcd/vcd_pipeline.c
+
+Wraps a real MPEG-1 program stream in Mode 2 Form 2 sectors the way a Video
+CD carries it and pushes them through `VCD_FeedSector`, which exercises the
+seam the per-module tests do not: the sector tap, subheader filtering, packet
+routing to the two decoders, and the YCbCr to RGB565 conversion.
+
+```sh
+gcc -O2 -std=gnu99 -o vcdpipe tools/vcd/vcd_pipeline.c \
+    mednafen/psx/vcd.c \
+    libretro-common/formats/mpeg1/rmpeg1_ps.c \
+    libretro-common/formats/mpeg1/rmpeg1_video.c \
+    libretro-common/formats/mp3/rmp3.c \
+    -Ilibretro-common/include -Imednafen -I. -lm
+```
+
+| stream | sectors | pictures | audio frames | geometry | rate |
+|---|---|---|---|---|---|
+| vcd_ntsc | 223 | 88 | 126720 | 352x240 | 29.97 |
+| vcd_pal | 298 | 98 | 171648 | 352x288 | 25.00 |
+| bframes | 98 | 88 | 126720 | 352x240 | 29.97 |
+
+Pictures run two short of the stream's total because the decoder holds its
+final reference and a picture is only known to be complete when the following
+start code arrives. In continuous playback that is a two-frame latency, not a
+loss; a track change should call `rmpeg1_video_flush()`.

@@ -187,7 +187,7 @@ endif
                 $(CORE_EMU_DIR)/vcd.c \
                 $(LIBRETRO_COMM_DIR)/formats/mpeg1/rmpeg1_ps.c \
                 $(LIBRETRO_COMM_DIR)/formats/mpeg1/rmpeg1_video.c \
-                $(DEPS_DIR)/pl_mpeg/pl_mpeg.c \
+                $(LIBRETRO_COMM_DIR)/formats/mp3/rmp3.c \
                 $(CORE_EMU_DIR)/frontio.c \
                 $(CORE_EMU_DIR)/gpu.c
 
