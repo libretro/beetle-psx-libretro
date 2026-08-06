@@ -16,6 +16,7 @@ Notable additions in this fork are:
 * Page-aligned HD texture dump/replacement, an opt-in mode for static/3D art (Vulkan renderer), see [PAGE_ALIGN.md](PAGE_ALIGN.md);
 * HD Reduce Palette Range, an opt-in hash of only a texture's used palette entries for better replacement match coverage (Vulkan renderer);
 * Video CD playback, including support for the 1 MB SCPH-5903 kernel, see [Video CD](#video-cd-scph-5903);
+* HDR10 output (PQ Rec.2020, 10-bit), with highlight roll-off, gamut and reference-gamma controls, see [HDR.md](HDR.md);
 
 ## HD texture replacement caching
 
@@ -43,6 +44,28 @@ Options (all default to the classic upload-rect behaviour):
 Page packs and upload-rect packs are **not** interchangeable (the hash covers a
 different region of VRAM). Full details and the authoring workflow:
 [PAGE_ALIGN.md](PAGE_ALIGN.md).
+
+## HDR output
+
+With **Color Format** set to **30-bit Color (HDR)**, the Vulkan and OpenGL
+renderers present HDR10 — 10-bit, PQ-encoded Rec.2020 — instead of the
+historical 8-bit-per-channel output. This does two separate things: it keeps
+the precision the renderer already carries, so upscaled gradients stop banding
+at the final quantisation, and it keeps the additive overshoot the PSX's
+blending produces, which an 8-bit path clamps away, mapping it into the
+headroom above reference white.
+
+Paper white, display peak and Colour Boost come from the frontend and are
+re-queried every frame, so RetroArch's sliders take effect live. The core does
+not guess whether HDR is really on: a frontend that cannot present HDR10 must
+reject the pixel format, and on rejection the core falls back to 24-bit and
+says so in the log.
+
+Options cover the highlight roll-off curve, the reference display gamma the
+picture is assumed to be viewed through, whether additive and subtractive
+blend sources may exceed reference white, subtractive blending mode on Vulkan,
+and the source colour primaries the game's RGB is interpreted against. Full
+details, including the encode step by step and troubleshooting: [HDR.md](HDR.md).
 
 ## Video CD (SCPH-5903)
 
