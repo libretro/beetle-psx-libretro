@@ -51,6 +51,7 @@
 #include "psx_events.h"
 #include "irq.h"
 #include "cdc.h"
+#include "vcd.h"
 #include "spu.h"
 
 #include "../mednafen-types.h"
@@ -283,6 +284,7 @@ static int32_t PS_CDC_Command_Init(PS_CDC *cdc, const int arg_count, const uint8
 static int32_t PS_CDC_Command_ReadTOC(PS_CDC *cdc, const int arg_count, const uint8_t *args);
 static int32_t PS_CDC_Command_ReadTOC_Part2(PS_CDC *cdc);
 static int32_t PS_CDC_Command_0x1d(PS_CDC *cdc, const int arg_count, const uint8_t *args);
+static int32_t PS_CDC_Command_VideoCD(PS_CDC *cdc, const int arg_count, const uint8_t *args);
 
 /* Command dispatch table.  Defined here at the top (after the
  * forward decls for each Command_* function above) so it precedes
@@ -323,7 +325,13 @@ static const CDC_CTEntry Commands[0x20] =
    { /* 0x1C, */ 0, 0, "Init", PS_CDC_Command_Init, NULL },
    { /* 0x1D, */ 2, 2, "Unknown 0x1D", PS_CDC_Command_0x1d, NULL },
    { /* 0x1E, */ 0, 0, "ReadTOC", PS_CDC_Command_ReadTOC, PS_CDC_Command_ReadTOC_Part2 },
-   { /* 0x1F, */ 0, 0, NULL, NULL, NULL },
+   /* 0x1F VideoCD: SCPH-5903 only.  The SC430924 sub-CPU carries this
+    * command as a transparent 5-byte serial bridge to the MPEG
+    * daughterboard (sub 01h) plus an audio/video multiplexor toggle
+    * (sub 02h).  On every other model the HC05 rejects it with
+    * INT5(11h,40h) and, notably, does NOT drain the parameter FIFO --
+    * PS_CDC_Command_VideoCD reproduces both behaviours. */
+   { /* 0x1F, */ 1, 6, "VideoCD", PS_CDC_Command_VideoCD, NULL },
 };
 
 void PS_CDC_Init(PS_CDC *cdc)
@@ -1470,6 +1478,14 @@ void PS_CDC_HandlePlayRead(PS_CDC *cdc)
    }
 
    PS_CDC_DecodeSubQ(cdc, target + 2352);
+
+   /* Video CD tap.  On a real SCPH-5903 the MPEG daughterboard is not on the
+    * CPU bus at all: it sits on the CD DSP's serial audio bus and sees every
+    * sector the drive reads, independently of what the host does with it.
+    * Mirroring the raw sector here is the exact analogue, and it keeps the
+    * VCD path out of the host transfer path entirely.  VCD_FeedSector is a
+    * cheap early-out when VCD mode is off. */
+   VCD_FeedSector(target, cdc->CurSector);
 
    if(cdc->SubQBuf_Safe[1] == 0xAA && (cdc->DriveStatus == DS_PLAYING || (cdc->DriveStatus == DS_READING && !(cdc->SubQBuf_Safe[0] & 0x40) && (cdc->Mode & MODE_CDDA))))
    {
@@ -3011,5 +3027,77 @@ int32_t PS_CDC_Command_0x1d(PS_CDC *cdc, const int arg_count, const uint8_t *arg
 {
    PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false));
    PS_CDC_WriteIRQ(cdc, CDCIRQ_ACKNOWLEDGE);
+   return(0);
+}
+
+/* Cmd 1Fh,sub,a,b,c,d,e --> INT3(stat,a,b,c,d,e)
+ *
+ *   sub 01h  VideoCdSio    five bytes out, five bytes back, exchanged
+ *                          simultaneously over Port F.0/1/2 of the sub-CPU.
+ *   sub 02h  VideoCdSwitch Port F.3, 0 = GPU/SPU output, nonzero = board.
+ *                          Response is (stat,0,0,x,x,x) -- the last three
+ *                          bytes are whatever was left in the shift register,
+ *                          so we mirror the caller's own arguments back.
+ *
+ * Anything else falls through to the generic bad-command error.
+ */
+static int32_t PS_CDC_Command_VideoCD(PS_CDC *cdc, const int arg_count, const uint8_t *args)
+{
+   uint8_t resp[5];
+   int     i;
+
+   if(VCD_GetMode() != VCD_MODE_BOARD)
+   {
+      /* Unsupported on this model.  psx-spx: the parameter FIFO is left
+       * untouched, so the stale arguments leak into the next command --
+       * software is expected to set CLRPRM after the INT5.  Reproduce it. */
+      PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, true));
+      PS_CDC_WriteResult(cdc, ERRCODE_BAD_COMMAND);
+      PS_CDC_WriteIRQ(cdc, CDCIRQ_DISC_ERROR);
+      return(0);
+   }
+
+   memset(resp, 0, sizeof(resp));
+
+   switch(args[0])
+   {
+      case 0x01:
+         if(arg_count < 6)
+         {
+            PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, true));
+            PS_CDC_WriteResult(cdc, ERRCODE_BAD_NUMARGS);
+            PS_CDC_WriteIRQ(cdc, CDCIRQ_DISC_ERROR);
+            return(0);
+         }
+         VCD_SioExchange(&args[1], resp);
+         break;
+
+      case 0x02:
+         if(arg_count < 2)
+         {
+            PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, true));
+            PS_CDC_WriteResult(cdc, ERRCODE_BAD_NUMARGS);
+            PS_CDC_WriteIRQ(cdc, CDCIRQ_DISC_ERROR);
+            return(0);
+         }
+         VCD_SetAVSwitch(args[1] != 0x00);
+         resp[0] = 0x00;
+         resp[1] = 0x00;
+         for(i = 2; i < 5; i++)
+            resp[i] = (arg_count > (i + 1)) ? args[i + 1] : 0x00;
+         break;
+
+      default:
+         PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, true));
+         PS_CDC_WriteResult(cdc, ERRCODE_BAD_ARGVAL);
+         PS_CDC_WriteIRQ(cdc, CDCIRQ_DISC_ERROR);
+         return(0);
+   }
+
+   PS_CDC_WriteResult(cdc, PS_CDC_MakeStatus(cdc, false));
+   for(i = 0; i < 5; i++)
+      PS_CDC_WriteResult(cdc, resp[i]);
+   PS_CDC_WriteIRQ(cdc, CDCIRQ_ACKNOWLEDGE);
+
    return(0);
 }
