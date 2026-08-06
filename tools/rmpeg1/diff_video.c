@@ -5,6 +5,7 @@
  * we want to see, and any large deviation is a real bug). */
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdlib.h>
 #include <string.h>
 #include <formats/rmpeg1_ps.h>
 #include <formats/rmpeg1_video.h>
@@ -17,8 +18,9 @@
 static unsigned long fnv(const unsigned char *p, size_t n)
 { unsigned long h=2166136261UL; size_t i; for(i=0;i<n;i++){h^=p[i];h*=16777619UL;} return h; }
 
-typedef struct { unsigned w,h; unsigned long hy,hcb,hcr; unsigned char *y,*cb,*cr; unsigned ys,cs; } shot_t;
+typedef struct { unsigned char type; unsigned w,h; unsigned long hy,hcb,hcr; unsigned char *y,*cb,*cr; unsigned ys,cs; } shot_t;
 
+static void grab_t(shot_t *s, unsigned char ty){ s->type=ty; }
 static void grab(shot_t *s, const unsigned char *y,const unsigned char *cb,const unsigned char *cr,
                  unsigned w,unsigned h,unsigned ys,unsigned cs)
 {
@@ -60,17 +62,18 @@ int main(int argc, char **argv)
             size_t w=rmpeg1_video_write(vid,pkt.data+p,pkt.size-p);
             p+=w;
             while(rmpeg1_video_decode(vid,&fr)){
-               if(fr.coding_type==1 && nm<4096)
-                  grab(&mine[nm++],fr.y,fr.cb,fr.cr,fr.width,fr.height,fr.y_stride,fr.c_stride);
+               if((fr.coding_type==1||fr.coding_type==2) && nm<4096)
+                  { grab(&mine[nm],fr.y,fr.cb,fr.cr,fr.width,fr.height,fr.y_stride,fr.c_stride); grab_t(&mine[nm],fr.coding_type); nm++; }
             }
             if(w==0) break;
          }
       }
       if(got==0) break;
    }
+   rmpeg1_video_flush(vid);
    while(rmpeg1_video_decode(vid,&fr))
-      if(fr.coding_type==1 && nm<4096)
-         grab(&mine[nm++],fr.y,fr.cb,fr.cr,fr.width,fr.height,fr.y_stride,fr.c_stride);
+      if((fr.coding_type==1||fr.coding_type==2) && nm<4096)
+         { grab(&mine[nm],fr.y,fr.cb,fr.cr,fr.width,fr.height,fr.y_stride,fr.c_stride); grab_t(&mine[nm],fr.coding_type); nm++; }
 
    /* ---- reference ---- */
    plm=plm_create_with_memory(data,(size_t)len,0);
@@ -89,31 +92,50 @@ int main(int argc, char **argv)
 
    if(nm==0){ printf("RESULT: FAIL (no I-frames decoded)\n"); return 1; }
 
-   /* ref[0] is the first frame in coded order, which is the first I-frame. */
-   for(i=0;i<nm && i<1;i++){
-      shot_t *a=&mine[i], *b=&ref[0];
-      long maxd=0, sum=0; size_t k, n=(size_t)a->w*a->h;
-      if(a->w!=b->w||a->h!=b->h){ printf("MISMATCH geometry %ux%u vs %ux%u\n",a->w,a->h,b->w,b->h); fails++; continue; }
-      { long hist[16]; int q; for(q=0;q<16;q++) hist[q]=0;
-        for(k=0;k<n;k++){ long d=(long)a->y[k]-(long)b->y[k]; if(d<0)d=-d;
-                          if(d>maxd)maxd=d; sum+=d; hist[d<15?d:15]++; }
-        printf("frame %zu Y: hash %s  maxdiff=%ld  meandiff=%.4f\n", i,
-               a->hy==b->hy?"EXACT":"differs", maxd, (double)sum/(double)n);
-        printf("  |diff| histogram: ");
-        for(q=0;q<8;q++) if(hist[q]) printf("%d:%ld(%.3f%%) ",q,hist[q],100.0*hist[q]/n);
-        printf("\n");
-        /* pl_mpeg is a cross-check on the bitstream layers, not ground
-         * truth for pixel values: idct_accuracy.c shows ours is within the
-         * IEEE 1180 peak error of 1 against a double-precision reference,
-         * and a few samples in 84,000 differing by up to 5 means the other
-         * IDCT is the looser one. Fail only on a difference too large to be
-         * IDCT rounding, which would mean a real decode error. */
-        if(maxd>16) fails++; }
-      { long md=0; size_t cn=(size_t)(a->w/2)*(a->h/2);
-        for(k=0;k<cn;k++){ long d=(long)a->cb[k]-(long)b->cb[k]; if(d<0)d=-d; if(d>md)md=d;
-                           d=(long)a->cr[k]-(long)b->cr[k]; if(d<0)d=-d; if(d>md)md=d; }
-        printf("frame %zu C: maxdiff=%ld\n", i, md);
-        if(md>16){ printf("  chroma deviation too large\n"); fails++; } }
+   /* Compare every frame, not just the first. A P picture is built on the
+    * previous one, so an error in motion compensation or in the residual
+    * does not stay put -- it accumulates down the GOP. Checking frame 0
+    * alone would pass a decoder whose prediction is subtly wrong.
+    *
+    * With no B pictures in the stream, coded order and display order agree,
+    * so index i lines up between the two decoders. */
+   {
+      long worst = 0; size_t worst_i = 0; double worst_mean = 0;
+      size_t n_cmp = nm < nr ? nm : nr;
+      for (i = 0; i < n_cmp; i++) {
+         shot_t *a2 = &mine[i], *b2 = &ref[i];
+         long maxd = 0; double sum = 0; size_t k, n;
+         if (a2->w != b2->w || a2->h != b2->h) {
+            printf("MISMATCH geometry at frame %zu\n", i); fails++; break; }
+         n = (size_t)a2->w * a2->h;
+         for (k = 0; k < n; k++) {
+            long d = (long)a2->y[k] - (long)b2->y[k]; if (d < 0) d = -d;
+            if (d > maxd) maxd = d; sum += d; }
+         if (getenv("RMPEG1_LOCATE") && maxd > 16) {
+            size_t kk; long bd=0; size_t bk=0;
+            for (kk=0;kk<n;kk++){ long d=(long)a2->y[kk]-(long)b2->y[kk]; if(d<0)d=-d;
+                                  if(d>bd){bd=d;bk=kk;} }
+            printf("  frame %zu worst at x=%zu y=%zu (mb %zu,%zu) ours=%u ref=%u\n",
+                   i, bk%a2->w, bk/a2->w, (bk%a2->w)/16, (bk/a2->w)/16,
+                   a2->y[bk], b2->y[bk]);
+            { size_t mbx=((bk%a2->w)/16)*16, mby=((bk/a2->w)/16)*16, r2,c2;
+              printf("  16x16 diff block at (%zu,%zu):\n",mbx,mby);
+              for(r2=0;r2<16;r2++){ printf("   ");
+                for(c2=0;c2<16;c2++){ long d=(long)a2->y[(mby+r2)*a2->w+mbx+c2]
+                                        -(long)b2->y[(mby+r2)*a2->w+mbx+c2];
+                                      printf("%4ld",d); }
+                printf("\n"); } }
+            return 1;
+         }
+         if (getenv("RMPEG1_PERFRAME"))
+            printf("  frame %3zu type=%c maxdiff=%3ld mean=%.4f\n",
+                   i, a2->type==1?'I':'P', maxd, sum/(double)n);
+         if (maxd > worst) { worst = maxd; worst_i = i; worst_mean = sum/(double)n; }
+         if (maxd > 16) { printf("frame %zu: Y maxdiff=%ld mean=%.4f\n",
+                                 i, maxd, sum/(double)n); fails++; }
+      }
+      printf("frames compared: %zu   worst Y maxdiff=%ld at frame %zu (mean %.4f)\n",
+             n_cmp, worst, worst_i, worst_mean);
    }
    printf(fails?"RESULT: FAIL\n":"RESULT: PASS\n");
    return fails?1:0;

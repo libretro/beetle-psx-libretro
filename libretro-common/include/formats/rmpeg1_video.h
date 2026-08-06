@@ -57,6 +57,12 @@ size_t rmpeg1_video_write(rmpeg1_video_t *v, const uint8_t *data, size_t len);
  * more input is needed. The frame's planes stay valid until the next call. */
 int rmpeg1_video_decode(rmpeg1_video_t *v, rmpeg1_video_frame_t *out);
 
+/* Signal that no more input is coming. A picture is normally known to be
+ * complete only when the following start code arrives, so without this the
+ * last picture of a stream is never emitted -- streams do not always end
+ * with a sequence_end_code. Call it once, then drain with _decode(). */
+void rmpeg1_video_flush(rmpeg1_video_t *v);
+
 /* True once a sequence header has been parsed and the geometry is known. */
 bool     rmpeg1_video_has_sequence(const rmpeg1_video_t *v);
 unsigned rmpeg1_video_width(const rmpeg1_video_t *v);

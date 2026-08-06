@@ -68,8 +68,12 @@ def pairs(a, b, want_two_values=False):
                 if cs[j] == 's':
                     j += 1
                     continue
-                if re.match(r'^\d+$', cs[j]):
-                    vals.append(int(cs[j]))
+                # The specification prints minus as an en-dash, so a plain
+                # \d+ match silently drops every negative motion_code and
+                # leaves a table that is prefix-free but half missing.
+                tok = cs[j].replace('\u2013', '-').replace('\u2212', '-')
+                if re.match(r'^-?\d+$', tok):
+                    vals.append(int(tok))
                     j += 1
                     continue
                 break
@@ -89,6 +93,26 @@ b13 = list(pairs(8197, 8217))
 mba_escape = '00000001000'
 assert all(1 <= v <= 33 for _, v in b1), 'unexpected value in B.1'
 assert sorted(v for _, v in b1) == list(range(1, 34)), 'B.1 incomplete'
+
+# B.3, macroblock_type in P-pictures. The six flag columns are packed into
+# one value: quant | forward<<1 | backward<<2 | pattern<<3 | intra<<4.
+def flagtable(a, b):
+    out = []
+    for ln in clean(a, b):
+        cs = cells(ln)
+        if not cs or not CODE.match(cs[0]):
+            continue
+        bits = [c for c in cs[1:] if c in ('0', '1')]
+        if len(bits) < 6:
+            continue
+        q, mf, mb, pat, intra = (int(x) for x in bits[:5])
+        out.append((cs[0].replace(' ', ''),
+                    q | (mf << 1) | (mb << 2) | (pat << 3) | (intra << 4)))
+    return out
+
+b3  = flagtable(7875, 7901)
+b9  = list(pairs(8060, 8114))
+b10 = list(pairs(8115, 8160))
 
 first = [c for c in b14 if c[0] != '11']
 rest  = [c for c in b14 if c[0] != '1']
@@ -114,6 +138,12 @@ validate('dct_next',  [c[0] for c in rest] + [EOB, ESC],   Fraction(4095, 4096))
 validate('mba',       [c[0] for c in b1] + [mba_escape])
 validate('dc_lum',    [c[0] for c in b12], Fraction(1))
 validate('dc_chr',    [c[0] for c in b13], Fraction(1))
+validate('mb_type_p', [c[0] for c in b3])
+validate('cbp',       [c[0] for c in b9])
+validate('motion',    [c[0] for c in b10])
+assert sorted(v for _, v in b9)  == list(range(1, 64)), 'B.9 incomplete'
+assert sorted(v for _, v in b10) == list(range(-16, 17)), 'B.10 incomplete'
+assert len(b3) == 7, 'B.3 expected 7 rows, got %d' % len(b3)
 
 def emit(name, entries):
     print("static const rmpeg1_vlc_t %s[] = {" % name)
@@ -177,4 +207,15 @@ emit("rmpeg1_vlc_dct_next",  rest)
 emit("rmpeg1_vlc_mba",       b1)
 emit("rmpeg1_vlc_dc_lum",    b12)
 emit("rmpeg1_vlc_dc_chr",    b13)
+emit("rmpeg1_vlc_mb_type_p", b3)
+emit("rmpeg1_vlc_cbp",       b9)
+emit("rmpeg1_vlc_motion",    b10)
+print("""
+/* Packing of the macroblock_type flag columns in rmpeg1_vlc_mb_type_p. */
+#define RMPEG1_MB_QUANT     0x01
+#define RMPEG1_MB_FORWARD   0x02
+#define RMPEG1_MB_BACKWARD  0x04
+#define RMPEG1_MB_PATTERN   0x08
+#define RMPEG1_MB_INTRA     0x10
+""")
 print("#endif")

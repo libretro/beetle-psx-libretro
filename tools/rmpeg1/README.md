@@ -84,3 +84,28 @@ all-zero input gives all-zero output.
 handful in 84,000 by up to 5. Since ours is within peak error 1 of the
 double-precision reference, that tail is the other decoder's IDCT.
 Identical results at chunk sizes 1, 7, 64, 2324 and 1 MiB; zero slice errors.
+
+### P-picture support
+
+`diff_video.c` compares every frame, not just the first: a P picture is built
+on its predecessor, so a prediction error accumulates down the GOP and a
+frame-0 check would pass a decoder whose motion compensation is subtly wrong.
+Set `RMPEG1_PERFRAME=1` for a per-frame breakdown and `RMPEG1_LOCATE=1` to
+dump the worst macroblock when a frame exceeds the threshold.
+
+| stream | frames | worst Y maxdiff | mean |
+|---|---|---|---|
+| vcd_ntsc | 90/90 | 5 | 0.11 |
+| vcd_pal | 100/100 | 5 | 0.10 |
+| vcd_noaudio | 60/60 | 3 | 0.05 |
+| generic (full-pel, f_code 7) | 60/60 | 6 | 0.12 |
+
+Zero slice errors, zero skipped pictures, identical at chunk sizes 1 through
+1 MiB, and clean under ASan and UBSan.
+
+The residual deviation resets at every I-picture and stays bounded across a
+GOP, which is the signature of two decoders' IDCTs drifting apart rather than
+a prediction fault -- the thing MPEG's oddification mismatch control exists
+to bound. A motion compensation bug does not reset cleanly, which is how the
+skipped-macroblock DC predictor defect was found: it showed as a uniform
+-46 across one 16x16 block that persisted, unchanged, for the rest of the GOP.
