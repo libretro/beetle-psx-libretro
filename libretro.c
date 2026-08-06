@@ -1786,11 +1786,11 @@ static INLINE void MemPoke(int32_t timestamp, uint32_t A, uint32_t V, unsigned s
       else
       {
          if (size == 4)
-            MASMEM_WriteU32(BIOSROM, A & 0x7FFFFF, V);
+            MASMEM_WriteU32(BIOSROM, A & 0x7FFFF, V);
          else if (size == 2)
-            MASMEM_WriteU16(BIOSROM, A & 0x7FFFFF, V);
+            MASMEM_WriteU16(BIOSROM, A & 0x7FFFF, V);
          else
-            MASMEM_WriteU8(BIOSROM, A & 0x7FFFFF, V);
+            MASMEM_WriteU8(BIOSROM, A & 0x7FFFF, V);
       }
 
       return;
