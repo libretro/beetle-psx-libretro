@@ -45,6 +45,9 @@
 #include "../state_helpers.h"
 #include "../../rhi/rhi_intf.h"
 #include "../../rhi/tt_trace.h"
+#ifdef PSX_MEASURE_MODULATE
+#include "../../include/debug.h"   /* log_cb */
+#endif
 
 #include "../pgxp/pgxp_main.h"
 #include "../pgxp/pgxp_gpu.h"
@@ -1040,6 +1043,59 @@ static void RHI_UpdateDisplayMode(void)
          is_480i_mode,
          curr_width_mode);
 }
+
+#ifdef PSX_MEASURE_MODULATE
+/* See ModTexel in gpu_common.h. Counts how often texture modulation drives a
+ * channel past the point the DitherLUT clamps at, which is the headroom an
+ * HDR path could keep instead of discarding.
+ *
+ * The LUT's input is 8-bit scale and its output is clamped to 0x1F after
+ * value >>= 3, so an index above 255 is exactly a saturating channel. The
+ * largest index the modulation can produce is 0x1F * 0xFF >> 4 = 494, so the
+ * biggest possible overshoot is 494/255 -- a little under 2x, which is the
+ * modulation headroom arriving where you would expect it. */
+static uint64_t mod_pixels;
+static uint64_t mod_sat_pixels;   /* pixels with any channel clamped */
+static uint64_t mod_sat_channels; /* channels clamped, 0..3 per pixel */
+static uint32_t mod_peak;         /* largest index seen, 8-bit scale */
+
+void GPU_NoteModulate(int idx_r, int idx_g, int idx_b)
+{
+   int hits = (idx_r > 255) + (idx_g > 255) + (idx_b > 255);
+   int peak = idx_r;
+
+   if (idx_g > peak) peak = idx_g;
+   if (idx_b > peak) peak = idx_b;
+   if (peak > (int)mod_peak)
+      mod_peak = (uint32_t)peak;
+
+   mod_pixels++;
+   if (hits)
+   {
+      mod_sat_pixels++;
+      mod_sat_channels += (uint64_t)hits;
+   }
+
+   if (!(mod_pixels & 0xFFFFFFull) && log_cb)
+      log_cb(RETRO_LOG_INFO,
+            "[GPU modulate] pixels=%llu saturating=%llu (%.2f%%) "
+            "channels=%llu peak=%u (%.2fx)\n",
+            (unsigned long long)mod_pixels,
+            (unsigned long long)mod_sat_pixels,
+            100.0 * (double)mod_sat_pixels / (double)mod_pixels,
+            (unsigned long long)mod_sat_channels,
+            mod_peak, (double)mod_peak / 255.0);
+}
+
+void GPU_GetModulateStats(uint64_t *pixels, uint64_t *sat_pixels,
+      uint64_t *sat_channels, uint32_t *peak)
+{
+   if (pixels)       *pixels       = mod_pixels;
+   if (sat_pixels)   *sat_pixels   = mod_sat_pixels;
+   if (sat_channels) *sat_channels = mod_sat_channels;
+   if (peak)         *peak         = mod_peak;
+}
+#endif
 
 /* Allocate the GPU framebuffer at the requested upscale shift. Returns
  * NULL on allocation failure. Was previously `new uint16_t[size]`,

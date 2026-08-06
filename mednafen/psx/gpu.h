@@ -251,6 +251,13 @@ struct PS_GPU
 };
 typedef struct PS_GPU PS_GPU;
 
+#ifdef PSX_MEASURE_MODULATE
+/* Texture-modulation saturation counters; see ModTexel in gpu_common.h.
+ * Built only under -DPSX_MEASURE_MODULATE. */
+void GPU_GetModulateStats(uint64_t *pixels, uint64_t *sat_pixels,
+      uint64_t *sat_channels, uint32_t *peak);
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

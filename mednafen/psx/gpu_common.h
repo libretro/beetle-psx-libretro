@@ -247,7 +247,45 @@ DEFINE_PlotNativePixel(BMaddq_ME1_T1,   BLEND_MODE_ADD_FOURTH, BMaddq,   1, 1)
 /* dither_offset points at &DitherLUT[y][0][x]; the reordered LUT
  * ([y][value][x], see gpu.h) indexes source values at stride 4, which
  * folds into scaled addressing. */
-#define ModTexel(dither_offset, texel, r, g, b) ((texel & 0x8000) | (dither_offset[((((texel & 0x1F)  * (r))   >> (5 - 1))) * 4] << 0) | (dither_offset[((((texel & 0x3E0)  * (g))  >> (10 - 1))) * 4] << 5) | (dither_offset[((((texel & 0x7C00) * (b)) >> (15 - 1))) * 4] << 10))
+#define ModTexelIndexR(texel, r) ((((texel) & 0x1F)   * (r)) >> (5 - 1))
+#define ModTexelIndexG(texel, g) ((((texel) & 0x3E0)  * (g)) >> (10 - 1))
+#define ModTexelIndexB(texel, b) ((((texel) & 0x7C00) * (b)) >> (15 - 1))
+
+#define ModTexelRaw(dither_offset, texel, r, g, b) \
+   ((texel & 0x8000) \
+    | (dither_offset[ModTexelIndexR(texel, r) * 4] << 0) \
+    | (dither_offset[ModTexelIndexG(texel, g) * 4] << 5) \
+    | (dither_offset[ModTexelIndexB(texel, b) * 4] << 10))
+
+#ifdef PSX_MEASURE_MODULATE
+/* Opt-in measurement, off by default and free when off -- this is a
+ * per-pixel inner loop and the counters are not worth paying for in a
+ * shipping build.
+ *
+ * Texture modulation multiplies the texel by the vertex colour with the
+ * vertex colour's 0x80 as unity, so the product carries up to about 2x of
+ * headroom above the 5-bit channel ceiling: 0x1F * 0xFF >> 4 = 494 against a
+ * DitherLUT input of 255 for full scale. Everything above that is clamped
+ * away by the table (value >>= 3 then clamp to 0x1F), and clamped identically
+ * on real hardware.
+ *
+ * Whether an HDR path should keep that headroom instead of clamping it is a
+ * question about content, not about the pipeline: if games rarely drive the
+ * product past the ceiling there is nothing to keep, and if they drive it
+ * past constantly then lifting the clamp would push ordinary lit geometry
+ * above reference white rather than producing highlights. Build with
+ * -DPSX_MEASURE_MODULATE and read the counters before deciding either way. */
+void GPU_NoteModulate(int idx_r, int idx_g, int idx_b);
+
+#define ModTexel(dither_offset, texel, r, g, b) \
+   (GPU_NoteModulate(ModTexelIndexR(texel, r), \
+                     ModTexelIndexG(texel, g), \
+                     ModTexelIndexB(texel, b)), \
+    ModTexelRaw(dither_offset, texel, r, g, b))
+#else
+#define ModTexel(dither_offset, texel, r, g, b) \
+   ModTexelRaw(dither_offset, texel, r, g, b)
+#endif
 
 /*
  * Refresh the per-PS_GPU CLUT (palette) cache if the new texture

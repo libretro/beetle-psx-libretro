@@ -628,6 +628,14 @@ ifeq ($(HAVE_VULKAN),1)
 endif
 
 CXXFLAGS += $(FLAGS)
+# Hook for extra defines from the command line. A plain `make FLAGS=...` or
+# `make CFLAGS=...` cannot be used for this: a command-line assignment
+# overrides every `+=` in the makefile, so the include paths and platform
+# flags vanish with it. Set this instead:
+#
+#   make EXTRA_FLAGS=-DPSX_MEASURE_MODULATE
+FLAGS    += $(EXTRA_FLAGS)
+
 CFLAGS   += $(FLAGS)
 
 # The libretro core has been audited to remove all exception throws
