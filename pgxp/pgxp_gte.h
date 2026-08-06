@@ -44,6 +44,7 @@ void PGXP_InitGTE();
 // Transforms
 void	PGXP_pushSXYZ2f(float _x, float _y, float _z, uint32_t _v);
 void	PGXP_pushSXYZ2s(int64_t _x, int64_t _y, int64_t _z, uint32_t v);
+void	PGXP_pushRGBf(float _r, float _g, float _b, uint32_t _v);
 
 void	PGXP_RTPS(uint32_t _n, uint32_t _v);
 

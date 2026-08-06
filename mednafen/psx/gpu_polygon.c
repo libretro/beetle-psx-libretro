@@ -1436,6 +1436,13 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          vertices[v].r = raw_color & 0xFF; \
          vertices[v].g = (raw_color >> 8) & 0xFF; \
          vertices[v].b = (raw_color >> 16) & 0xFF; \
+         /* Measurement slice: probe the precise-color shadow for every \
+          * color word (v==0 covers the flat/command word, whose CD byte \
+          * the GTE carries) and accumulate hit statistics.  Result \
+          * deliberately unused - rendering is unchanged until the \
+          * renderer slice consumes it. */ \
+         if (PGXP_LIT) \
+            PGXP_GetColor(cb - baseCB, cb, NULL); \
          cb++; \
       } \
       else \

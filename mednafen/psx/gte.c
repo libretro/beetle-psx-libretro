@@ -1009,9 +1009,25 @@ static INLINE uint16_t i64_to_otz(int64_t average, int unchained)
 
 static INLINE void MAC_to_RGB_FIFO(void)
 {
+   uint32_t packed = Lm_C(0, MAC(1) >> 4) | ((Lm_C(1, MAC(2) >> 4)) << 8) | ((Lm_C(2, MAC(3) >> 4)) << 16) | (RGB_CD << 24);
+
    RGB_FIFO(0) = RGB_FIFO(1);
    RGB_FIFO(1) = RGB_FIFO(2);
-   RGB_FIFO(2) = Lm_C(0, MAC(1) >> 4) | ((Lm_C(1, MAC(2) >> 4)) << 8) | ((Lm_C(2, MAC(3) >> 4)) << 16) | (RGB_CD << 24);
+   RGB_FIFO(2) = packed;
+
+   /* PGXP shadow of the ColorFIFO push: the architectural write above is
+    * MACn/16 saturated to 8 bits, which discards both the 4 fractional
+    * bits (>>4 floors) and any over-range.  Keep the pre-saturation
+    * value, in 8-bit scale, alongside the packed word.  MACn/16.0f is
+    * exact for |MACn| < 2^24 (division by a power of two only rounds
+    * through the int->float conversion of MACn itself); beyond that the
+    * value is thousands of times over-range and saturates identically
+    * either way, so the shadow requantizes to the architectural bytes
+    * bit-exactly across the whole domain.  Same unconditional-call
+    * convention as the SXY push in TransformXY. */
+   PGXP_pushRGBf((float)MAC(1) / 16.0f,
+                 (float)MAC(2) / 16.0f,
+                 (float)MAC(3) / 16.0f, packed);
 }
 
 static INLINE int16_t Lm_B(unsigned int which, int32_t value, int lm)

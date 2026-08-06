@@ -107,6 +107,31 @@ void PGXP_pushSXYZ2s(int64_t _x, int64_t _y, int64_t _z, uint32_t v)
 	PGXP_pushSXYZ2f(fx, fy, fz, v);
 }
 
+/* Shadow of the GTE ColorFIFO push (gte.c MAC_to_RGB_FIFO).  x/y/z carry
+ * the pre-saturation MACn/16 channel values in 8-bit scale; value is the
+ * packed architectural RGB|CD word written to DR[22].  The registers 20-22
+ * shadows already ride the generic MFC2/SWC2/memory transport, so filling
+ * them here is all that is needed for a display-list color word stored via
+ * `swc2 $22` to arrive at the GPU-side command buffer with its precise
+ * payload attached. */
+void PGXP_pushRGBf(float _r, float _g, float _b, uint32_t _v)
+{
+	static uint32_t uCount = 0;
+
+	GTE_data_reg[20] = GTE_data_reg[21];
+	GTE_data_reg[21] = GTE_data_reg[22];
+
+	GTE_data_reg[22].x      = _r;
+	GTE_data_reg[22].y      = _g;
+	GTE_data_reg[22].z      = _b;
+	GTE_data_reg[22].value  = _v;
+	GTE_data_reg[22].flags  = VALID_ALL;
+	GTE_data_reg[22].count  = uCount++;
+	GTE_data_reg[22].gFlags = 0;
+	GTE_data_reg[22].lFlags = 0;
+	GTE_data_reg[22].hFlags = 0;
+}
+
 #define VX(n) (psxRegs.CP2D.p[ n << 1 ].sw.l)
 #define VY(n) (psxRegs.CP2D.p[ n << 1 ].sw.h)
 #define VZ(n) (psxRegs.CP2D.p[ (n << 1) + 1 ].sw.l)

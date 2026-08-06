@@ -56,6 +56,22 @@ extern "C" {
 	int		PGXP_GetVertices(const uint32_t* addr, void* pOutput, int xOffs, int yOffs);
 	int		PGXP_GetVertex(const uint32_t offset, const uint32_t* addr, OGLVertex* pOutput, int xOffs, int yOffs);
 
+	/* Look up the precise (pre-ColorFIFO-saturation) color for the GP0
+	 * color word at `offset` in the command buffer.  Self-validating:
+	 * accepts the shadow only if its low 24 bits match the architectural
+	 * word AND each float channel requantizes (floor + saturate, exactly
+	 * as the GTE did) to the corresponding byte - so a false accept is
+	 * within half an LSB of truth by construction, and any game-side
+	 * color math degrades to the architectural bytes, never to a glitch.
+	 * On success writes out_rgb[0..2] in 8-bit scale (may exceed 255.0
+	 * for over-range lighting; caller decides clamping policy) when
+	 * out_rgb is non-NULL, and returns 1.  Returns 0 on fallback.
+	 * Maintains hit-rate statistics; see PGXP_GetColorStats. */
+	int		PGXP_GetColor(const uint32_t offset, const uint32_t* addr, float* out_rgb);
+
+	/* stats[0]=attempts, [1]=hits, [2]=shadow/value misses, [3]=requantize misses */
+	void	PGXP_GetColorStats(uint32_t stats[4]);
+
 #ifdef __cplusplus
 }
 #endif

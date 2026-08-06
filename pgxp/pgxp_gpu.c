@@ -30,6 +30,8 @@
 #include "pgxp_value.h"
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
 #include <assert.h>
 
 /* ============================================================
@@ -245,6 +247,85 @@ void PGXP_SetAddress(uint32_t addr)
 }
 
 /* Get single parallel vertex value */
+static uint32_t color_stats[4]; /* attempts, hits, value miss, quant miss */
+
+/* Requantize a shadow channel exactly as gte.c's MAC_to_RGB_FIFO did:
+ * MACn >> 4 is an arithmetic shift (floor), then Lm_C saturates to
+ * 0..0xFF.  The shadow holds MACn/16.0f, so floor+saturate here inverts
+ * it bit-exactly wherever the result is not saturated (the float is
+ * exact below 2^24, see the push site), and saturation absorbs any
+ * conversion rounding above that.  Returns -1 for non-finite input so
+ * a corrupt shadow can never match. */
+static int32_t pgxp_requant8(float f)
+{
+	int32_t q;
+	if (!(f >= -2147483648.0f && f < 2147483648.0f))
+		return -1;
+	q = (int32_t)floor((double)f);
+	if (q < 0)
+		return 0;
+	if (q > 0xFF)
+		return 0xFF;
+	return q;
+}
+
+int PGXP_GetColor(const uint32_t offset, const uint32_t* addr, float* out_rgb)
+{
+	PGXP_value* col = PGXP_ReadCB(offset);
+	uint32_t word   = *addr;
+	int ok          = 0;
+
+	color_stats[0]++;
+
+	if (col && ((col->flags & VALID_012) == VALID_012) &&
+	    (((col->value ^ word) & 0x00FFFFFFu) == 0))
+	{
+		/* Byte 3 is the GP0 command code and is excluded from the value
+		 * match: the swc2-$22 idiom carries it through the GTE CD field
+		 * (full-word match), while the mfc2+or idiom rewrites it on the
+		 * CPU.  The requantization test below is the actual guarantee
+		 * either way. */
+		if (pgxp_requant8(col->x) == (int32_t)(word & 0xFF) &&
+		    pgxp_requant8(col->y) == (int32_t)((word >> 8) & 0xFF) &&
+		    pgxp_requant8(col->z) == (int32_t)((word >> 16) & 0xFF))
+		{
+			if (out_rgb)
+			{
+				out_rgb[0] = col->x;
+				out_rgb[1] = col->y;
+				out_rgb[2] = col->z;
+			}
+			color_stats[1]++;
+			ok = 1;
+		}
+		else
+			color_stats[3]++;
+	}
+	else
+		color_stats[2]++;
+
+	/* Instrumentation for the go/no-go measurement: one cumulative line
+	 * per ~1M gouraud/flat color words.  Scaffolding - the durable API
+	 * is PGXP_GetColorStats; this line goes away with the renderer
+	 * slice. */
+	if (!(color_stats[0] & 0xFFFFFu))
+		fprintf(stderr,
+		      "[PGXP color] words=%u hit=%u (%.1f%%) value-miss=%u quant-miss=%u\n",
+		      color_stats[0], color_stats[1],
+		      100.0 * (double)color_stats[1] / (double)color_stats[0],
+		      color_stats[2], color_stats[3]);
+
+	return ok;
+}
+
+void PGXP_GetColorStats(uint32_t stats[4])
+{
+	stats[0] = color_stats[0];
+	stats[1] = color_stats[1];
+	stats[2] = color_stats[2];
+	stats[3] = color_stats[3];
+}
+
 int PGXP_GetVertex(const uint32_t offset, const uint32_t* addr, OGLVertex* pOutput, int xOffs, int yOffs)
 {
 	PGXP_value* vert = PGXP_ReadCB(offset);          /* pointer to vertex */
