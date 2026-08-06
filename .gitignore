@@ -26,3 +26,4 @@ nul
 tools/analog/runner
 tools/analog/*.spv
 tools/pgxp_color/oracle
+tools/pgxp_color/transport

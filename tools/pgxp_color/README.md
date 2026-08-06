@@ -1,11 +1,12 @@
-# PGXP precise-colour oracle check
+# PGXP precise-colour offline checks
 
-Verifies the accept rule that the PGXP precise-colour path rests on, outside
-the emulator. No GPU, no Vulkan device, no PSX content.
+Two checks on the PGXP precise-colour path, outside the emulator. No GPU, no
+Vulkan device, no PSX content. `oracle` verifies that an accepted shadow is
+*correct*; `transport` verifies that a shadow *arrives* at all.
 
     make -C tools/pgxp_color check
 
-## What it actually covers
+## Oracle (`oracle.c`) — what it actually covers
 
 `oracle.c` links the **real** `pgxp/pgxp_gpu.c`, so `PGXP_GetColor()` under
 test is the shipping function rather than a copy of it. Against it sits a
@@ -45,18 +46,49 @@ Clean under `-fsanitize=address,undefined`, and at `-O0`, `-O2`, and
 `-O3 -ffast-math` (the round trip is a power-of-two divide, so it does not
 depend on strict FP).
 
+## Transport (`transport.c`)
+
+`oracle.c` injects the shadow straight into the command buffer, so it says
+nothing about whether a colour *survives the journey* from the GTE to a GP0
+packet. `transport.c` drives that journey through the real PGXP functions —
+`PGXP_pushRGBf`, the GTE register hooks, CPU register and memory tracking,
+and the FIFO → command-buffer copy — in the same order `gte.c`,
+`pgxp_cpu.c` and `gpu.c` call them. Only the two MIPS instruction words are
+assembled by hand.
+
+Five cases: the `swc2 $22` display-list idiom; the `mfc2` + OR-in-opcode +
+`sw` idiom; a three-vertex gouraud packet with colours checked at their real
+command-buffer offsets (and vertex slots checked *not* to be mistaken for
+colours); ColorFIFO ordering across three pushes, which would catch an
+off-by-one in the `DR[20..22]` shadow shift; and a negative control where
+the CPU overwrites a list slot and the stale shadow must be refused.
+
+### The finding: only the direct path carries colour
+
+`swc2 $22` works — that is the dominant display-list idiom and it arrives
+fully tracked, including through DMA, since `gpu.c` reads the tracked value
+out of memory by address.
+
+`mfc2` + OR + `sw` **does not**, and this is structural rather than a bug.
+PGXP's CPU-side value model treats a tracked word as two 16-bit halves
+(`x` = low, `y` = high) because PGXP exists to carry packed screen
+coordinates. A colour word packs three 8-bit channels, which does not fit
+that model, so `PGXP_CPU_AND` (which OR/XOR/NOR route through) reinterprets
+the payload instead of preserving it.
+
+That bounds the achievable hit rate: content that composes colour words on
+the CPU cannot contribute, no matter how the renderer slice is written.
+It is not a *safety* problem — the accept rule's requantization test refuses
+the mangled shadow, which is exactly what it is for — but it means a low hit
+rate in content should be read as "games touch colours on the CPU", not as
+"transport is broken".
+
 ## What it does not cover
 
-**The hit rate.** This harness proves that an accepted shadow is correct. It
-says nothing about how often a shadow survives from the GTE to the GP0
-packet in real content — that depends on what games do with colours between
-the two, and only running content answers it. That number, not this check,
-is the go/no-go for the renderer slice; read it from the `[PGXP color]` line
-the measurement slice logs.
-
-**Transport.** The shadow is injected directly with `PGXP_WriteCB`. The real
-path (MFC2/SWC2 → CPU register tracking → memory tracking → command-buffer
-shadow) is PGXP's existing machinery and is not exercised here.
+**The hit rate.** Both harnesses together prove that an accepted shadow is
+correct and that the direct path delivers one. Neither says how often real
+content uses that path. That number is the go/no-go for the renderer slice;
+read it from the `[PGXP color]` line the measurement slice logs.
 
 **32-bit x87.** Not run: no multilib in the environment it was written in.
 The round trip is a power-of-two divide and a widening `float -> double`, so
