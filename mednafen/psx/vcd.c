@@ -16,6 +16,9 @@
 #include <retro_inline.h>
 
 #include "vcd.h"
+
+#include "../state.h"
+#include "../state_helpers.h"
 #include "../../libretro_cbs.h"
 #include "../cdrom/cdromif.h"
 
@@ -856,16 +859,59 @@ void VCD_Kill(void)
  * saved LBA on load, which costs one GOP of latency and nothing else. */
 int VCD_StateAction(void *sm, int load, int data_only)
 {
-   /* Placeholder: wire into the core's SFORMAT machinery alongside the other
-    * PSX subsystems. Fields that must round-trip:
-    *   mode, av_switch, xport, pos_lba, cur_entry, pad, pad_prev,
-    *   board_state, board_task, last_req
-    * On load: stream_reset() and let VCD_FeedSector re-fill from pos_lba. */
-   (void)sm;
-   (void)data_only;
+   int      ret;
+   uint8_t  xport   = (uint8_t)vcd.xport;
+   uint8_t  mode    = (uint8_t)vcd.mode;
+   uint32_t entry   = vcd.cur_entry;
+
+   SFORMAT StateRegs[] =
+   {
+      SFVARN(mode,                "vcd_mode"),
+      SFVARN(xport,               "vcd_xport"),
+      SFVARN_BOOL(vcd.av_switch,  "vcd_av_switch"),
+      SFVARN(vcd.pos_lba,         "vcd_pos_lba"),
+      SFVARN(entry,               "vcd_cur_entry"),
+      SFVARN(vcd.pad,             "vcd_pad"),
+      SFVARN(vcd.pad_prev,        "vcd_pad_prev"),
+      SFVARN(vcd.board_state,     "vcd_board_state"),
+      SFVARN(vcd.board_task,      "vcd_board_task"),
+      SFVARN(vcd.last_req,        "vcd_last_req"),
+      SFVARN_BOOL(vcd.board_detected, "vcd_board_detected"),
+      SFVARN_BOOL(vcd.board_started,  "vcd_board_started"),
+      SFEND
+   };
+
+   ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "VCD");
 
    if (load)
+   {
+      /* The decoders' internal state -- reference pictures, the MP2 bit
+       * reservoir, the demuxer window -- is deliberately not serialised. It
+       * is large, it belongs to modules with no state-export API, and it is
+       * entirely recoverable: a Video CD is losslessly re-readable, so the
+       * cheapest correct thing is to drop it and let the drive re-prime the
+       * pipeline from the restored position. The cost is one GOP of latency
+       * after a load, and nothing else.
+       *
+       * This is also why it must not be skipped when the transport happens
+       * to be stopped: a stale reference picture from before the load would
+       * otherwise survive and be predicted from. */
       stream_reset();
 
-   return 1;
+      vcd.mode  = (VCD_Mode)mode;
+      vcd.xport = (VCD_Transport)xport;
+
+      /* A state saved against a different disc, or a corrupt one, must not
+       * be able to index outside the chapter list. */
+      vcd.cur_entry = (entry < vcd.info.num_entries) ? entry : 0;
+
+      /* The pad shadow decides which buttons read as newly pressed. Restoring
+       * it verbatim is right -- it is what the guest last saw -- but a load
+       * mid-press must not synthesise a release-and-press on the next frame,
+       * so the live pad is aligned to it and the next real edge comes from
+       * the frontend. */
+      vcd.pad = vcd.pad_prev;
+   }
+
+   return ret;
 }

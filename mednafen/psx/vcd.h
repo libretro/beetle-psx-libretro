@@ -214,6 +214,10 @@ double   VCD_GetFrameRate(void);
 
 /* ---- save states ----------------------------------------------------- */
 
+/* Round-trips the transport only. The decoders' internal state is not saved:
+ * a Video CD is losslessly re-readable, so on load the pipeline is dropped
+ * and re-primed from the restored position, which costs one GOP of latency
+ * and nothing else. */
 int VCD_StateAction(void *sm, int load, int data_only);
 
 #ifdef __cplusplus

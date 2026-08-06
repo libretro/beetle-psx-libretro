@@ -3556,6 +3556,11 @@ int StateAction(StateMem *sm, int load, int data_only)
 
    ret &= FrontIO_StateAction(PSX_FIO, sm, load, data_only);
 
+   /* After the CDC, whose restored position the transport is re-primed
+    * against, and harmless when no Video CD is mounted -- the section is
+    * written either way so a state stays loadable across a disc change. */
+   ret &= VCD_StateAction(sm, load, data_only);
+
    ret &= IRQ_StateAction(sm, load, data_only); // Do it last.
 
    if(load)
