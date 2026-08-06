@@ -422,11 +422,17 @@ Kraft sum before emitting it. Test harnesses are in
   `-- tocread --`, `-- vcd ack --`, `-- ff --`, `-- fr --`, plus `80h`/`81h`
   for the board-present answer the "Check VideoCD..." probe reads back. The
   position bytes are BCD because the play handler feeds them straight to
-  `Setloc`. What remains untested is the sequencing: which request the board
-  issues when, whether the kernel expects any of them unprompted, and the
-  meaning of the `State`/`Task` bytes it sends, which the board consumes and a
-  stand-in does not have to interpret. Prefer HLE until someone runs it on a
-  real machine.
+  `Setloc`. The `State` and `Task` bytes the kernel sends are derived too, and
+  from the drive rather than invented: `80010540h` issues `Nop` then `GetID`,
+  and `800105A0h` onward turns the status into `State` (0 stopped, 1 playing,
+  2 idle, held across a seek) and `Task` (`FFh` idle, `01h` disc newly valid,
+  `80h` no disc, `0Ah` a pending event), with `Task` reset to `FFh` at the top
+  of the response dispatcher so every other value is a one-shot. The kernel
+  therefore drives the exchange from state it already has, and a stand-in
+  board only has to answer. What cannot be recovered from the kernel is what
+  the *real* board chooses to send and when -- that is its own firmware's
+  business, and it has never been dumped -- only what the kernel will accept.
+  Untested on real hardware; prefer HLE.
 * **SVCD is recognised but not decoded.** SVCD video is MPEG-2; only MPEG-1
   is implemented, so an SVCD gives audio and no picture.
 * **Playback Control (PBC) is detected but not interpreted.** Discs play

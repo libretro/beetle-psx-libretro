@@ -702,12 +702,39 @@ bool VCD_GetAVSwitch(void)
  * encoding Setloc takes.
  *
  * What the kernel *sends* is [subcmd, JoyL, JoyH, State, Task, 0], built at
- * 800109E8h: the pad halfword from 80010540h, State from the byte at
- * 800191F4h, Task from 800191F0h. The detection loop forces Task=01h on its
- * first exchange and repeats with the running value after -- which matches the
- * "1F 01 7F FF 02 01 00" then "1F 01 7F FF 02 FF 00" traffic nocash captured
- * from the kernel. State and Task are the player's own bookkeeping; a
- * stand-in board does not have to interpret them to answer correctly. */
+ * 800109E8h. The pad halfword comes from 80010540h, State from the byte at
+ * 800191F4h and Task from 800191F0h -- and both of those are derived from the
+ * drive, not invented, which is what makes the sequencing recoverable without
+ * a real machine.
+ *
+ * 80010540h issues Nop (01h) for the status byte and then GetID (1Ah), and
+ * 800105A0h onward turns the results into State:
+ *
+ *   stat bit7 (playing)      -> State 1
+ *   stat bit1 clear (motor off) -> State 0
+ *   stat bit6 clear (not seeking) -> State 2
+ *   otherwise (seeking)      -> State unchanged
+ *
+ * So State is simply what the drive is doing: 0 stopped, 1 playing, 2 idle,
+ * held across a seek. Task is the request the host wants acknowledged:
+ *
+ *   stat bit3 (IdError) and GetID flags bit6 -> Task 80h  (no disc)
+ *   a pending-flag global at 80019
+ *   1F8h clear                -> Task 00h
+ *   otherwise                                -> Task FFh  (idle)
+ *   stat bit0 set, GetID bit7 clear          -> Task 01h  (disc newly valid)
+ *   a set bit4 in the flag byte at 8001A718h -> Task 0Ah
+ *
+ * and 80010C70h resets Task to FFh at the top of the response dispatcher, so
+ * every non-idle Task is a one-shot the board is expected to acknowledge.
+ *
+ * The consequence for a stand-in board: the kernel drives the exchange from
+ * drive state it already has, and the board only has to answer. Answering
+ * PRESENT once to the 01h probe and then issuing transport requests against
+ * the position bytes is a sequence the kernel accepts, because nothing in its
+ * state machine requires a request it has not been given a reason for. What
+ * cannot be recovered this way is what the *real* board chooses to send when
+ * -- that is its firmware's business -- only what the kernel will accept. */
 #define VCD_REQ_NONE      0x00
 #define VCD_REQ_PLAY      0x01
 #define VCD_REQ_PAUSE     0x02
