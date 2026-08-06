@@ -42,10 +42,6 @@ Five phases:
    the GTE carries an unrelated CD value there, so the match deliberately
    ignores it.
 
-Clean under `-fsanitize=address,undefined`, and at `-O0`, `-O2`, and
-`-O3 -ffast-math` (the round trip is a power-of-two divide, so it does not
-depend on strict FP).
-
 ## Transport (`transport.c`)
 
 `oracle.c` injects the shadow straight into the command buffer, so it says
@@ -90,6 +86,21 @@ correct and that the direct path delivers one. Neither says how often real
 content uses that path. That number is the go/no-go for the renderer slice;
 read it from the `[PGXP color]` line the measurement slice logs.
 
-**32-bit x87.** Not run: no multilib in the environment it was written in.
-The round trip is a power-of-two divide and a widening `float -> double`, so
-excess precision should be inert, but this is unverified on x87 targets.
+**Real content.** Every colour here is synthesised. No game has been run
+against either harness, and neither one is a substitute for doing so.
+
+## Configurations verified
+
+Both harnesses pass under all of:
+
+* `-O0`, `-O2`, `-O3 -ffast-math` (64-bit)
+* `-fsanitize=address,undefined`
+* `-m32 -mfpmath=387`, including at `-O0` and with `-ffloat-store`
+* `-m32 -mfpmath=sse -msse2`
+
+The x87 runs matter because the round trip is a `float` divide by a power of
+two followed by a widening `float -> double`; excess precision was argued to
+be inert there rather than measured, and now it is measured. Neither the
+divide (exact, exponent-only) nor the widening can round, so `-ffloat-store`
+changes nothing — which is the expected result, and a mismatch under it
+would have meant the argument was wrong.
