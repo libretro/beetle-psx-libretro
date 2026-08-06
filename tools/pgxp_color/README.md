@@ -79,12 +79,37 @@ the mangled shadow, which is exactly what it is for — but it means a low hit
 rate in content should be read as "games touch colours on the CPU", not as
 "transport is broken".
 
+## Range (`range.c`)
+
+The hit rate answers whether the precise colour can be *recovered*. It does
+not answer whether recovering it would change any pixel, and for an HDR
+renderer slice that is the deciding question. A colour whose channels all
+sit at or below 255 requantizes to exactly the byte the architectural path
+already carried, so a wide framebuffer has nothing to hold: a 90% hit rate
+over content that never lights above white buys nothing at all.
+
+`PGXP_GetColorRangeStats` measures that, over accepted words only -- a
+refused shadow cannot be used however bright it is, and counting it would
+overstate the case. `range.c` checks the counters against MAC values whose
+classification is known by construction: the 255 ceiling is not over-white,
+each bucket boundary lands in the lower bucket, the peak tracks the
+brightest channel, and a refused shadow is not counted.
+
+The measurement slice logs both lines together:
+
+    [PGXP color] words=N hit=N (P%) value-miss=N quant-miss=N
+    [PGXP color] over-white=N (P% of hits) buckets<=1.25x/1.5x/2x/>2x=... peak=...
+
+Read the second one for the go/no-go. `over-white=0` means stop.
+
 ## What it does not cover
 
-**The hit rate.** Both harnesses together prove that an accepted shadow is
-correct and that the direct path delivers one. Neither says how often real
-content uses that path. That number is the go/no-go for the renderer slice;
-read it from the `[PGXP color]` line the measurement slice logs.
+**The hit rate, and the over-white rate.** The three harnesses together
+prove that an accepted shadow is correct, that the direct path delivers one,
+and that the over-range counters count what they claim to. None of them says
+how often real content uses that path or lights above white. Those two
+numbers are the go/no-go for the renderer slice; read them from the
+`[PGXP color]` lines the measurement slice logs.
 
 **Real content.** Every colour here is synthesised. No game has been run
 against either harness, and neither one is a substitute for doing so.

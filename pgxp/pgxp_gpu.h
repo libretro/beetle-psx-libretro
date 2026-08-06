@@ -72,6 +72,21 @@ extern "C" {
 	/* stats[0]=attempts, [1]=hits, [2]=shadow/value misses, [3]=requantize misses */
 	void	PGXP_GetColorStats(uint32_t stats[4]);
 
+	/* Over-range statistics, over accepted words only.
+	 *
+	 * The hit rate says whether the precise colour can be recovered. This
+	 * says whether recovering it would change anything: a colour whose
+	 * channels all sit at or below 255 requantizes to the byte the
+	 * architectural path already had, so a wide framebuffer gains nothing
+	 * from it. For an HDR renderer slice, over-white frequency is the
+	 * deciding number and hit rate is only a precondition.
+	 *
+	 * buckets are on the peak channel relative to the 255 ceiling:
+	 * [0] (1,1.25]  [1] (1.25,1.5]  [2] (1.5,2]  [3] >2
+	 * peak is the largest single channel seen, in 8-bit scale. */
+	void	PGXP_GetColorRangeStats(uint32_t *over, uint32_t buckets[4],
+			float *peak);
+
 #ifdef __cplusplus
 }
 #endif

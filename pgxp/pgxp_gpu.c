@@ -253,6 +253,45 @@ void PGXP_SetAddress(uint32_t addr)
 /* Get single parallel vertex value */
 static uint32_t color_stats[4]; /* attempts, hits, value miss, quant miss */
 
+/* Over-range measurement.
+ *
+ * The hit rate answers "can the precise colour be recovered". It does not
+ * answer "is there anything above white to recover", and for the HDR
+ * renderer slice that second question is the one that decides the feature:
+ * a high hit rate over content whose lighting never exceeds the Color FIFO
+ * ceiling buys exactly nothing, because every recovered value requantizes to
+ * the byte the architectural path already had.
+ *
+ * Only accepted words are counted -- a shadow that was refused cannot be
+ * used no matter how bright it is. Buckets are on the peak channel relative
+ * to the 255 ceiling, so bucket 0 is a colour that would clip slightly and
+ * bucket 3 is one the GTE computed at more than twice white. */
+static uint32_t color_over;          /* accepted words with any channel > 255 */
+static uint32_t color_over_bucket[4];/* (1,1.25] (1.25,1.5] (1.5,2] (2,inf) */
+static float    color_peak;          /* largest channel seen, 8-bit scale */
+
+static void color_note_range(float r, float g, float b)
+{
+   float peak = r;
+   float ratio;
+
+   if (g > peak) peak = g;
+   if (b > peak) peak = b;
+
+   if (peak > color_peak)
+      color_peak = peak;
+
+   if (!(peak > 255.0f))
+      return;
+
+   color_over++;
+   ratio = peak / 255.0f;
+   if (ratio <= 1.25f)      color_over_bucket[0]++;
+   else if (ratio <= 1.5f)  color_over_bucket[1]++;
+   else if (ratio <= 2.0f)  color_over_bucket[2]++;
+   else                     color_over_bucket[3]++;
+}
+
 /* Requantize a shadow channel exactly as gte.c's MAC_to_RGB_FIFO did:
  * MACn >> 4 is an arithmetic shift (floor), then Lm_C saturates to
  * 0..0xFF.  The shadow holds MACn/16.0f, so floor+saturate here inverts
@@ -299,6 +338,10 @@ int PGXP_GetColor(const uint32_t offset, const uint32_t* addr, float* out_rgb)
 				out_rgb[1] = col->y;
 				out_rgb[2] = col->z;
 			}
+			/* Recorded whether or not the caller wanted the value: the
+			 * measurement slice passes NULL and this is the number it
+			 * exists to collect. */
+			color_note_range(col->x, col->y, col->z);
 			color_stats[1]++;
 			ok = 1;
 		}
@@ -314,13 +357,42 @@ int PGXP_GetColor(const uint32_t offset, const uint32_t* addr, float* out_rgb)
 	 * slice.  log_cb is NULL both before the frontend installs it and in
 	 * the offline harness, which links this TU without libretro.c. */
 	if (!(color_stats[0] & 0xFFFFFu) && log_cb)
+	{
 		log_cb(RETRO_LOG_INFO,
 		      "[PGXP color] words=%u hit=%u (%.1f%%) value-miss=%u quant-miss=%u\n",
 		      color_stats[0], color_stats[1],
 		      100.0 * (double)color_stats[1] / (double)color_stats[0],
 		      color_stats[2], color_stats[3]);
+		/* The go/no-go for an HDR renderer slice is this line, not the
+		 * one above: over=0 means the recovered colours are all inside
+		 * the byte range the architectural path already carried, and a
+		 * wide framebuffer has nothing to hold. */
+		log_cb(RETRO_LOG_INFO,
+		      "[PGXP color] over-white=%u (%.2f%% of hits) "
+		      "buckets<=1.25x/1.5x/2x/>2x=%u/%u/%u/%u peak=%.1f (%.2fx)\n",
+		      color_over,
+		      color_stats[1] ? 100.0 * (double)color_over / (double)color_stats[1] : 0.0,
+		      color_over_bucket[0], color_over_bucket[1],
+		      color_over_bucket[2], color_over_bucket[3],
+		      color_peak, (double)color_peak / 255.0);
+	}
 
 	return ok;
+}
+
+void PGXP_GetColorRangeStats(uint32_t *over, uint32_t buckets[4], float *peak)
+{
+	if (over)
+		*over = color_over;
+	if (buckets)
+	{
+		buckets[0] = color_over_bucket[0];
+		buckets[1] = color_over_bucket[1];
+		buckets[2] = color_over_bucket[2];
+		buckets[3] = color_over_bucket[3];
+	}
+	if (peak)
+		*peak = color_peak;
 }
 
 void PGXP_GetColorStats(uint32_t stats[4])
