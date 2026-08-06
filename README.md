@@ -413,13 +413,20 @@ Kraft sum before emitting it. Test harnesses are in
 
 ### Limitations
 
-* **Daughterboard mode is best-effort.** The CD-ROM sub-CPU only relays five
-  opaque bytes in each direction, and the daughterboard's own firmware has
-  never been dumped, so the meaning of the exchanged status bytes is not
-  publicly known. The encoding used here is this fork's own: it presents the
-  kernel with a live, well-formed board and a sane clock, but the kernel's
-  player may not advance exactly as it would on real hardware. Prefer HLE
-  until someone captures a Port F trace from a real machine.
+* **Daughterboard mode has not been tested on real hardware.** The protocol
+  itself is no longer guesswork: the daughterboard's firmware has never been
+  dumped, but the kernel's interpretation of what the board says is in the
+  kernel, and the kernel is dumped. The request codes were recovered from the
+  jump table at `800189ECh` and the debug strings each handler logs — Sony's
+  own names for them, `-- play --`, `-- pause --`, `-- stop --`,
+  `-- tocread --`, `-- vcd ack --`, `-- ff --`, `-- fr --`, plus `80h`/`81h`
+  for the board-present answer the "Check VideoCD..." probe reads back. The
+  position bytes are BCD because the play handler feeds them straight to
+  `Setloc`. What remains untested is the sequencing: which request the board
+  issues when, whether the kernel expects any of them unprompted, and the
+  meaning of the `State`/`Task` bytes it sends, which the board consumes and a
+  stand-in does not have to interpret. Prefer HLE until someone runs it on a
+  real machine.
 * **SVCD is recognised but not decoded.** SVCD video is MPEG-2; only MPEG-1
   is implemented, so an SVCD gives audio and no picture.
 * **Playback Control (PBC) is detected but not interpreted.** Discs play

@@ -88,6 +88,8 @@ typedef struct
 
    /* board bridge */
    uint8_t       last_req;
+   bool          board_detected;
+   bool          board_started;
    uint8_t       board_state;
    uint8_t       board_task;
 } VCD_State;
@@ -664,28 +666,60 @@ bool VCD_GetAVSwitch(void)
 
 /* Request codes returned in the "req" byte.
  *
- * CAUTION: the real SC430924 firmware only relays five opaque bytes between
- * the kernel and the daughterboard; the daughterboard's own firmware has never
- * been dumped, so the meaning of State/Task and of req is NOT publicly known.
- * The encoding below is ours. It is sufficient for the kernel's player to see
- * a live, well-formed board and a sane clock, but the kernel's own state
- * machine may still not advance exactly as it would on real hardware. Treat
- * BOARD mode as best-effort and prefer HLE mode until someone captures a real
- * SIO trace. */
-#define VCD_REQ_NONE     0x00
-#define VCD_REQ_PLAY     0x01
-#define VCD_REQ_PAUSE    0x02
-#define VCD_REQ_STOP     0x03
-#define VCD_REQ_SEEK     0x04
-#define VCD_REQ_NEXT     0x05
-#define VCD_REQ_PREV     0x06
-#define VCD_REQ_PRESENT  0x40    /* board answered            */
-#define VCD_REQ_DISC_OK  0x80    /* a VCD is actually mounted */
+ * These are not guesses. The daughterboard's own firmware has never been
+ * dumped, but its firmware is not what we need: what matters is how the
+ * kernel *interprets* the bytes it gets back, and the kernel is dumped.
+ *
+ * VideoCdSio's response is consumed at 80010C5Ch, which dispatches on the req
+ * byte: codes 00h..07h through a jump table at 800189ECh, 80h and 81h by
+ * separate branches, everything else ignored. Each handler opens by logging a
+ * debug string when the flag at 80026FA0h is set, and those strings are Sony's
+ * own names for the requests -- the protocol is documented inside the binary.
+ *
+ * Derived, with the addresses to re-check the work:
+ *
+ *   00h  no request                          80010FD0h (returns immediately)
+ *   01h  "-- play --"                        80010CE8h
+ *   02h  "-- pause --"                       80010DF0h
+ *   03h  "-- stop --"                        80010E3Ch
+ *   04h  "-- tocread --"                     80010E88h
+ *   05h  "-- vcd ack --"                     80010EF0h
+ *   06h  "-- ff --"     (fast forward)       80010F20h
+ *   07h  "-- fr --"     (fast reverse)       80010F6Ch
+ *   80h  board present                       80010FB8h -> state 1
+ *   81h  board absent                        80010FC8h -> state 2
+ *
+ * 80h/81h are the answer to the detection probe: both call the setter at
+ * 800104C0h, and the "Check VideoCD..." routine at 800101ACh reads it back
+ * through 800104CCh and prints "Found" for state 1, "Not found" for state 2.
+ *
+ * The three bytes after req are the position, in BCD: the play handler copies
+ * them straight into a Setloc (command 02h) followed by SeekP (16h), so they
+ * are the seek target the board is asking the host to move to, in the same
+ * encoding Setloc takes.
+ *
+ * What the kernel *sends* is [subcmd, JoyL, JoyH, State, Task, 0], built at
+ * 800109E8h: the pad halfword from 80010540h, State from the byte at
+ * 800191F4h, Task from 800191F0h. The detection loop forces Task=01h on its
+ * first exchange and repeats with the running value after -- which matches the
+ * "1F 01 7F FF 02 01 00" then "1F 01 7F FF 02 FF 00" traffic nocash captured
+ * from the kernel. State and Task are the player's own bookkeeping; a
+ * stand-in board does not have to interpret them to answer correctly. */
+#define VCD_REQ_NONE      0x00
+#define VCD_REQ_PLAY      0x01
+#define VCD_REQ_PAUSE     0x02
+#define VCD_REQ_STOP      0x03
+#define VCD_REQ_TOCREAD   0x04
+#define VCD_REQ_ACK       0x05
+#define VCD_REQ_FF        0x06
+#define VCD_REQ_FR        0x07
+#define VCD_REQ_PRESENT   0x80
+#define VCD_REQ_ABSENT    0x81
 
 void VCD_SioExchange(const uint8_t *args, uint8_t *resp)
 {
-   unsigned m, s, f;
-   uint8_t  req = VCD_REQ_PRESENT;
+   unsigned m, s2, f;
+   uint8_t  req = VCD_REQ_NONE;
    uint16_t joy = (uint16_t)(args[0] | ((uint16_t)args[1] << 8));
    uint16_t edge;
 
@@ -698,22 +732,58 @@ void VCD_SioExchange(const uint8_t *args, uint8_t *resp)
    edge = (uint16_t)(joy & ~vcd.pad_prev);
    vcd.pad_prev = joy;
 
-   if (vcd.info.type != VCD_DISC_NONE)
-      req |= VCD_REQ_DISC_OK;
+   /* The kernel probes first and will not proceed until the board says
+    * whether it is there. Answer that before anything else. */
+   if (!vcd.board_detected)
+   {
+      vcd.board_detected = true;
+      req = (vcd.info.type != VCD_DISC_NONE) ? VCD_REQ_PRESENT
+                                             : VCD_REQ_ABSENT;
+   }
+   else if (!vcd.board_started && vcd.info.num_entries)
+   {
+      /* Ask the host to move to the first chapter and start. The kernel turns
+       * this into Setloc + SeekP against the position bytes below. */
+      vcd.board_started = true;
+      vcd.cur_entry     = 0;
+      vcd.pos_lba       = vcd.info.entries[0].lba;
+      req               = VCD_REQ_PLAY;
+      VCD_Play(0);
+   }
+   else if (edge & (1u << 5))        /* Start  */
+   {
+      VCD_Pause();
+      req = (vcd.xport == VCD_XPORT_PLAY) ? VCD_REQ_PLAY : VCD_REQ_PAUSE;
+   }
+   else if (edge & (1u << 1))        /* Triangle */
+   {
+      VCD_Stop();
+      req = VCD_REQ_STOP;
+   }
+   else if (edge & (1u << 11))       /* Right */
+   {
+      VCD_NextTrack();
+      req = VCD_REQ_PLAY;
+   }
+   else if (edge & (1u << 10))       /* Left */
+   {
+      VCD_PrevTrack();
+      req = VCD_REQ_PLAY;
+   }
+   else if (edge & (1u << 4))        /* Cross  -> fast forward */
+      req = VCD_REQ_FF;
+   else if (edge & (1u << 3))        /* Circle -> fast reverse */
+      req = VCD_REQ_FR;
 
-   if      (edge & (1u << 5))  { req |= VCD_REQ_PLAY;  VCD_Play(vcd.cur_entry); }
-   else if (edge & (1u << 4))  { req |= VCD_REQ_PAUSE; VCD_Pause(); }
-   else if (edge & (1u << 1))  { req |= VCD_REQ_STOP;  VCD_Stop();  }
-   else if (edge & (1u << 11)) { req |= VCD_REQ_NEXT;  VCD_NextTrack(); }
-   else if (edge & (1u << 10)) { req |= VCD_REQ_PREV;  VCD_PrevTrack(); }
-
-   lba_to_msf(vcd.pos_lba, &m, &s, &f);
+   lba_to_msf(vcd.pos_lba, &m, &s2, &f);
 
    vcd.last_req = req;
 
+   /* Position is BCD: the kernel hands these three bytes straight to Setloc,
+    * which takes packed BCD and rejects anything else. */
    resp[0] = req;
    resp[1] = bin2bcd(m % 100u);
-   resp[2] = bin2bcd(s);
+   resp[2] = bin2bcd(s2);
    resp[3] = bin2bcd(f);
    resp[4] = 0x00;
 }
@@ -751,6 +821,8 @@ void VCD_Reset(void)
    vcd.xport     = VCD_XPORT_STOP;
    vcd.av_switch = false;
    vcd.cur_entry = 0;
+   vcd.board_detected = false;
+   vcd.board_started  = false;
    vcd.pad = vcd.pad_prev = 0;
    stream_reset();
 }
