@@ -54,6 +54,110 @@
 
 #include <formats/image.h>
 
+/* Per-type dispatch for the still/animation decode front end.  Every
+ * entry point below is a switch over enum image_type_enum that forwards
+ * to one of the r<fmt> backends, so a caller can drive any supported
+ * format through one API and read an unsupported combination off the
+ * return value instead of testing the type itself.
+ *
+ * Each backend sits behind its own HAVE_R<FMT> build guard.  With the
+ * guard off, image_transfer_new() returns NULL for that type and the
+ * rest of the entry points degrade to the unsupported answer (NULL /
+ * false / 0 / no-op), so no caller needs a compile-time type list.
+ *
+ * Y = forwarded to the backend, . = returns the unsupported answer,
+ * s = constant stub (see the notes below):
+ *
+ *                                   PNG JPG BMP TGA WBP DDS WBM MP4
+ *   new / free / set_buf_ptr        Y   Y   Y   Y   Y   Y   Y   Y
+ *   start                           Y   Y   s   s   s   s   s   s
+ *   is_valid                        Y   Y   s   s   s   s   s   s
+ *   process                         Y   Y   Y   Y   Y   Y   Y   Y
+ *   process slices (returns NEXT)   Y   Y   Y   Y   Y   Y   Y   Y
+ *   iterate                         Y   Y   .   .   .   .   .   .
+ *   need_more                       Y   Y   .   .   .   .   .   .
+ *   set_avail                       Y   Y   .   .   .   .   Y   Y
+ *   get_gpu_layout                  .   .   .   .   .   Y   .   .
+ *   set_want_10bit / is_10bit       Y   .   .   .   .   .   Y   Y
+ *   detach_anim_stream              .   .   .   .   .   .   Y   Y
+ *   anim_* (whole buffer)           .   .   .   .   Y   .   .   .
+ *   anim_stream_new                 Y   .   .   .   Y   .   Y   Y
+ *   anim_stream_new_avail           Y   .   .   .   .   .   Y   Y
+ *   anim_stream_free / _get_info /
+ *     _next / _rewind / _set_argb   Y   .   .   .   Y   .   Y   Y
+ *   anim_stream_set_avail           Y   .   .   .   .   .   Y   Y
+ *   anim_stream_media_floor /
+ *     _consumed                     .   .   .   .   .   .   Y   Y
+ *   anim_stream_complete_scan       .   .   .   .   .   .   Y   .
+ *
+ * The gaps, in the order a caller runs into them:
+ *
+ * - start / is_valid are header probes.  Only PNG and JPEG parse a
+ *   header incrementally and can therefore fail before decoding; the
+ *   other backends validate inside their one-shot process step, so the
+ *   stubs answer true and let process() report the failure.  Each stub
+ *   is behind its format's HAVE_ guard like every other case, so a
+ *   type compiled out answers false here as well.
+ *
+ * - there are two independent slicing mechanisms here, and the matrix
+ *   rows for them do not line up.  iterate() is the incremental
+ *   *parse* loop - walking chunk or marker structure before any pixels
+ *   exist - and only PNG and JPEG have one; need_more() tells an
+ *   iterate() that stalled at the resident-byte wall apart from one
+ *   that finished.  Decode-phase slicing is the separate business of
+ *   process() returning IMAGE_PROCESS_NEXT until the surface is
+ *   complete, and every type does that.  So a false from iterate() does
+ *   NOT mean the type decodes in one go - no type produces a whole
+ *   surface from a single process() call any more, and the ones that
+ *   answer false to iterate() are simply the ones with nothing to parse
+ *   incrementally before the pixels start.
+ *
+ * - set_avail (the still-image byte wall) is honoured by PNG and JPEG,
+ *   where it surfaces as need_more(), and by WEBM and MP4, where it
+ *   surfaces as IMAGE_PROCESS_WAIT out of process().  BMP, TGA, WEBP
+ *   and DDS have no partial-buffer decode and must be handed fully
+ *   resident data.
+ *
+ * - 10-bit output is a property of the source, not of this layer: PNG
+ *   (from 16-bit-per-channel RGB) and the two video types (from 10-bit
+ *   HDR) can pack XRGB2101010.  JPEG is 8-bit by construction; BMP,
+ *   TGA, WEBP and DDS are not wired for it.
+ *
+ * - get_gpu_layout is DDS only, and only for part of it - see
+ *   rdds_get_gpu_layout() for the payloads it declines and hands back
+ *   to the CPU decode path.
+ *
+ * - animation splits two ways.  Animated WEBP is the only type with
+ *   the whole-buffer anim_* handle (decode everything, then index
+ *   frames); APNG, animated WEBP, WEBM and MP4 all have the streaming
+ *   form.  Of those, only WEBM and MP4 carry a byte cursor, so only
+ *   they can be windowed (media_floor / consumed) or adopted from a
+ *   still whose read is still in flight (detach_anim_stream).
+ *   Animated WEBP additionally has no partial open, so
+ *   anim_stream_new_avail() returns NULL for it and the caller keeps
+ *   the whole-buffer path.  complete_scan() is WEBM only because only
+ *   its timestamp pre-scan can be truncated by the wall.
+ *
+ * Deliberately not dispatched here:
+ *
+ * - Encoding.  rpng_save_image_*() and rbmp_save_image() are called
+ *   directly by their users; there is no image_transfer_save().
+ *
+ * - Type sniffing.  image_texture_get_type() derives the enum from the
+ *   path extension; nothing here inspects magic bytes.
+ *
+ * - The pre-decode readiness probes (rpng_header_ready,
+ *   rjpeg_header_ready, rwebp_still_ready, rpng_is_apng).  They take a
+ *   raw buffer rather than a handle, so tasks/task_image.c calls them
+ *   before there is anything to dispatch on.
+ *
+ * - Format-specific side channels with no cross-type meaning, such as
+ *   rpng_get_hdr_metadata() and the player-grade MP4 controls
+ *   (rmp4_video_stream_seek_ms / _skip / _render / _span_ms), which
+ *   exist for the WEBM core - it holds the concrete stream type and
+ *   does not need this layer.
+ */
+
 void image_transfer_free(void *data, enum image_type_enum type)
 {
    switch (type)
@@ -194,13 +298,29 @@ bool image_transfer_start(void *data, enum image_type_enum type)
          break;
 #endif
       case IMAGE_TYPE_BMP:
+#ifdef HAVE_RBMP
          return true;
+#else
+         break;
+#endif
       case IMAGE_TYPE_WEBP:
+#ifdef HAVE_RWEBP
          return true;
+#else
+         break;
+#endif
       case IMAGE_TYPE_WEBM:
+#ifdef HAVE_RWEBM
          return true;
+#else
+         break;
+#endif
       case IMAGE_TYPE_MP4:
+#ifdef HAVE_RMP4
          return true;
+#else
+         break;
+#endif
       case IMAGE_TYPE_DDS:
 #ifdef HAVE_RDDS
          return true;
@@ -239,13 +359,29 @@ bool image_transfer_is_valid(
          break;
 #endif
       case IMAGE_TYPE_BMP:
+#ifdef HAVE_RBMP
          return true;
+#else
+         break;
+#endif
       case IMAGE_TYPE_WEBP:
+#ifdef HAVE_RWEBP
          return true;
+#else
+         break;
+#endif
       case IMAGE_TYPE_WEBM:
+#ifdef HAVE_RWEBM
          return true;
+#else
+         break;
+#endif
       case IMAGE_TYPE_MP4:
+#ifdef HAVE_RMP4
          return true;
+#else
+         break;
+#endif
       case IMAGE_TYPE_DDS:
 #ifdef HAVE_RDDS
          return true;
@@ -399,64 +535,82 @@ int image_transfer_process(
    if (ret == IMAGE_PROCESS_END && *buf && *width && *height)
    {
       unsigned tmp_pitch, width2, i;
-      const uint16_t *src = NULL;
-      uint16_t *dst       = NULL;
-      /* (size_t) casts on width and height: pre-patch the uint32
-       * multiplication width * height * 4 wrapped on 32-bit Wii
-       * (Gekko is a 32-bit PowerPC) for any image with
-       * width*height > 2^30, the malloc returned an undersized
-       * buffer, and the memcpy below ran off the end.  This file
-       * is reached only after rpng/rjpeg has already accepted the
-       * image; on 32-bit (which is where this matters) those
-       * decoders cap dimensions at 0x4000 which closes the
-       * primitive at the source.  The casts here keep the
-       * arithmetic safe regardless of upstream caps and on any
-       * platform where image_transfer.c is compiled, including
-       * future 64-bit Wii-class targets. */
-      void *tmp           = malloc(
-            (size_t)(*width) * (size_t)(*height) * sizeof(uint32_t));
-
-      if (!tmp)
-         return IMAGE_PROCESS_ERROR;
-
-      memcpy(tmp, *buf,
-            (size_t)(*width) * (size_t)(*height) * sizeof(uint32_t));
-      tmp_pitch = ((*width) * sizeof(uint32_t)) >> 1;
+      uint16_t *dst      = NULL;
+      size_t    bandsz;
+      /* The temporary is four source rows, not the whole image.
+       * (size_t) casts on width: pre-patch the uint32 multiplication
+       * width * height * 4 wrapped on 32-bit Wii (Gekko is a 32-bit
+       * PowerPC) for any image with width*height > 2^30, the malloc
+       * returned an undersized buffer, and the memcpy below ran off
+       * the end.  This file is reached only after rpng/rjpeg has
+       * already accepted the image; on 32-bit (which is where this
+       * matters) those decoders cap dimensions at 0x4000 which closes
+       * the primitive at the source.  A band cannot overflow at all,
+       * being linear in width, and the casts here keep the arithmetic
+       * safe regardless of upstream caps.
+       *
+       * The whole-image copy was the expensive part of this
+       * conversion, not the tiling: a 1280x720 wallpaper allocated
+       * and copied 3.6 MB on a console with 24 MB of MEM1, where the
+       * band is 20 KB.  A band also stays resident across the four
+       * row passes below, which the image did not.
+       *
+       * Reading the band before writing is what makes it safe to
+       * source from the destination buffer: the four rows are copied
+       * out, then the tiles that overwrite exactly those rows are
+       * written.  tmp_pitch is taken from the unmasked width and
+       * width2 from the masked one, so where the width is not a
+       * multiple of four the writes trail the reads rather than
+       * running ahead of them. */
+      tmp_pitch = (unsigned)(((size_t)(*width) * sizeof(uint32_t)) >> 1);
+      bandsz    = (size_t)tmp_pitch * 4 * sizeof(uint16_t);
 
       *width  &= ~3;
       *height &= ~3;
       width2   = (*width) << 1;
-      src      = (const uint16_t*)tmp;
       dst      = (uint16_t*)*buf;
 
-      for (i = 0; i < *height; i += 4, dst += 4 * width2)
       {
-#define GX_BLIT_LINE_32(off) \
-         { \
-            unsigned x; \
-            const uint16_t *tmp_src = src; \
-            uint16_t       *tmp_dst = dst; \
-            for (x = 0; x < width2 >> 3; x++, tmp_src += 8, tmp_dst += 32) \
-            { \
-               tmp_dst[  0 + off] = tmp_src[0]; \
-               tmp_dst[ 16 + off] = tmp_src[1]; \
-               tmp_dst[  1 + off] = tmp_src[2]; \
-               tmp_dst[ 17 + off] = tmp_src[3]; \
-               tmp_dst[  2 + off] = tmp_src[4]; \
-               tmp_dst[ 18 + off] = tmp_src[5]; \
-               tmp_dst[  3 + off] = tmp_src[6]; \
-               tmp_dst[ 19 + off] = tmp_src[7]; \
-            } \
-            src += tmp_pitch; \
-         }
-         GX_BLIT_LINE_32(0)
-         GX_BLIT_LINE_32(4)
-         GX_BLIT_LINE_32(8)
-         GX_BLIT_LINE_32(12)
-#undef GX_BLIT_LINE_32
-      }
+         void *tmp = malloc(bandsz);
 
-      free(tmp);
+         if (!tmp)
+            return IMAGE_PROCESS_ERROR;
+
+         for (i = 0; i < *height; i += 4, dst += 4 * width2)
+         {
+            const uint16_t *src;
+
+            memcpy(tmp, (const uint16_t*)*buf + (size_t)i * tmp_pitch,
+                  bandsz);
+            src = (const uint16_t*)tmp;
+
+#define GX_BLIT_LINE_32(off) \
+            { \
+               unsigned x; \
+               const uint16_t *tmp_src = src; \
+               uint16_t       *tmp_dst = dst; \
+               for (x = 0; x < width2 >> 3; x++, tmp_src += 8, tmp_dst += 32) \
+               { \
+                  tmp_dst[  0 + off] = tmp_src[0]; \
+                  tmp_dst[ 16 + off] = tmp_src[1]; \
+                  tmp_dst[  1 + off] = tmp_src[2]; \
+                  tmp_dst[ 17 + off] = tmp_src[3]; \
+                  tmp_dst[  2 + off] = tmp_src[4]; \
+                  tmp_dst[ 18 + off] = tmp_src[5]; \
+                  tmp_dst[  3 + off] = tmp_src[6]; \
+                  tmp_dst[ 19 + off] = tmp_src[7]; \
+               } \
+               src += tmp_pitch; \
+            }
+            GX_BLIT_LINE_32(0)
+            GX_BLIT_LINE_32(4)
+            GX_BLIT_LINE_32(8)
+            GX_BLIT_LINE_32(12)
+#undef GX_BLIT_LINE_32
+         }
+
+         free(tmp);
+      }
    }
 #endif
 
@@ -483,11 +637,10 @@ bool image_transfer_get_gpu_layout(
    return false;
 }
 
-/* Report whether the last processed frame was written as packed XRGB2101010
- * (10-bit) rather than 8-bit RGBA. Only the video decoders can produce this,
- * and only for 10-bit HDR sources. */
-/* Ask a video decoder to emit packed XRGB2101010 for 10-bit HDR sources.
- * Only the video types honour it; still images ignore it. */
+/* Ask a decoder to emit packed XRGB2101010 instead of 8-bit RGBA.
+ * Honoured by PNG (16-bit-per-channel RGB sources) and by the two video
+ * types (10-bit HDR sources); a no-op for every other type, and for an
+ * 8-bit source of an honouring type. */
 void image_transfer_set_want_10bit(void *data, enum image_type_enum type,
       int want)
 {
@@ -513,6 +666,10 @@ void image_transfer_set_want_10bit(void *data, enum image_type_enum type,
    }
 }
 
+/* Report whether the last processed frame was actually written as
+ * packed XRGB2101010 rather than 8-bit RGBA, i.e. 10-bit was requested
+ * and the source could supply it.  False for every type that cannot
+ * produce it - see image_transfer_set_want_10bit above. */
 bool image_transfer_is_10bit(void *data, enum image_type_enum type)
 {
    switch (type)
@@ -565,40 +722,50 @@ bool image_transfer_iterate(void *data, enum image_type_enum type)
       case IMAGE_TYPE_PNG:
 #ifdef HAVE_RPNG
          if (!rpng_iterate_image((rpng_t*)data))
-            return false;
-#endif
+            break;
+         return true;
+#else
          break;
+#endif
       case IMAGE_TYPE_JPEG:
 #ifdef HAVE_RJPEG
          if (!rjpeg_iterate_image((rjpeg_t*)data))
-            return false;
-#endif
+            break;
+         return true;
+#else
          break;
+#endif
+      /* One-shot decoders: nothing to iterate, the whole image is
+       * produced by image_transfer_process(). */
       case IMAGE_TYPE_TGA:
-#ifdef HAVE_RTGA
-         return false;
-#else
-         break;
-#endif
       case IMAGE_TYPE_BMP:
-         return false;
       case IMAGE_TYPE_WEBP:
-         return false;
-      case IMAGE_TYPE_WEBM:
-         return false;
-      case IMAGE_TYPE_MP4:
-         return false;
       case IMAGE_TYPE_DDS:
-#ifdef HAVE_RDDS
-         return false;
-#else
-         break;
-#endif
+      case IMAGE_TYPE_WEBM:
+      case IMAGE_TYPE_MP4:
       case IMAGE_TYPE_NONE:
-         return false;
+         break;
    }
 
-   return true;
+   return false;
+}
+
+void image_transfer_set_rgba(void *data, enum image_type_enum type,
+      bool rgba)
+{
+   switch (type)
+   {
+      case IMAGE_TYPE_JPEG:
+#ifdef HAVE_RJPEG
+         rjpeg_set_out_rgba((rjpeg_t*)data, rgba);
+#endif
+         break;
+      default:
+         /* Only the JPEG decoder emits final pixels during the
+          * transfer phase; the others take the order at process
+          * time. */
+         break;
+   }
 }
 
 void image_transfer_set_avail(void *data, enum image_type_enum type,
@@ -789,10 +956,11 @@ void *image_transfer_detach_anim_stream(void *data,
 }
 
 /* ===== Animation ===== *
- * WEBP (animated) and WEBM (video track) support animation. These
- * helpers return NULL / false for every other image type, so callers
- * may attempt animation unconditionally and fall back to the
- * still-image path. */
+ * Animated WEBP is the only type with the whole-buffer form directly
+ * below; APNG, animated WEBP, WEBM and MP4 all have the streaming form
+ * further down.  Both sets return NULL / false / 0 for every other
+ * image type, so callers may attempt animation unconditionally and
+ * fall back to the still-image path. */
 
 void *image_transfer_anim_new(void *buf, size_t len,
       enum image_type_enum type)
@@ -915,10 +1083,15 @@ void *image_transfer_anim_stream_new(void *buf, size_t len,
 }
 
 void *image_transfer_anim_stream_new_avail(void *buf, size_t len,
-      size_t avail, enum image_type_enum type, int *need_more)
+      size_t avail, enum image_type_enum type, int *need_more,
+      size_t *need_lo, size_t *need_hi)
 {
    if (need_more)
       *need_more = 0;
+   if (need_lo)
+      *need_lo = 0;
+   if (need_hi)
+      *need_hi = 0;
    switch (type)
    {
       case IMAGE_TYPE_PNG:
@@ -938,7 +1111,7 @@ void *image_transfer_anim_stream_new_avail(void *buf, size_t len,
       case IMAGE_TYPE_MP4:
 #ifdef HAVE_RMP4
          return rmp4_video_stream_open_avail((const uint8_t*)buf, len,
-               avail, need_more);
+               avail, need_more, need_lo, need_hi);
 #else
          break;
 #endif

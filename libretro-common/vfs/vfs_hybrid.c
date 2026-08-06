@@ -160,6 +160,13 @@ static int64_t hyb_truncate( struct retro_vfs_file_handle *fh, int64_t length ) 
 		return -1;
 	if ( f->be == HYB_LOCAL )
 		return retro_vfs_file_truncate_impl( (libretro_vfs_implementation_file *)f->h, length );
+	/* truncate is v2. A frontend that advertised v1 has not filled
+	   this member, so it must not be called - unlike the v3 members
+	   below, which are unreachable by construction because a
+	   frontend-backed dir handle can only be created when the
+	   negotiated version is already 3. */
+	if ( hyb_front_version < 2 || !hyb_front->truncate )
+		return -1;
 	return hyb_front->truncate( (struct retro_vfs_file_handle *)f->h, length );
 }
 
@@ -225,6 +232,30 @@ static int hyb_stat( const char *path, int32_t *size ) {
 	return 0;
 }
 
+/* ---- v4: 64-bit stat ---- */
+
+static int hyb_stat_64( const char *path, int64_t *size ) {
+	if ( !hyb_is_uri( path ) ) {
+		int r = retro_vfs_stat_64_impl( path, size );
+		if ( r != 0 || !( hyb_front && HYB_SANDBOXED ) )
+			return r;
+	}
+	/* stat_64 is v4. A frontend that advertised less has not filled
+	   this member, so it must not be called; sandboxed content on
+	   such a frontend falls back to the 32-bit stat above, which the
+	   callers of the 64-bit path already treat as best-effort. */
+	if ( hyb_front && hyb_front_version >= 4 && hyb_front->stat_64 )
+		return hyb_front->stat_64( path, size );
+	if ( hyb_front && hyb_front_version >= 3 && hyb_front->stat ) {
+		int32_t s32 = 0;
+		int r = hyb_front->stat( path, size ? &s32 : NULL );
+		if ( size )
+			*size = (int64_t)s32;
+		return r;
+	}
+	return 0;
+}
+
 static int hyb_mkdir( const char *dir ) {
 	if ( !hyb_is_uri( dir ) ) {
 		int r = retro_vfs_mkdir_impl( dir );
@@ -256,8 +287,15 @@ static struct retro_vfs_dir_handle *hyb_opendir( const char *dir, bool include_h
 	if ( !h )
 		return NULL;
 	d = (hyb_dir_t *)calloc( 1, sizeof( *d ) );
-	if ( !d )
+	if ( !d ) {
+		/* the backend handle is already open; hyb_open() releases its
+		   own on this path and so must this one */
+		if ( be == HYB_LOCAL )
+			retro_vfs_closedir_impl( (libretro_vfs_implementation_dir *)h );
+		else
+			hyb_front->closedir( (struct retro_vfs_dir_handle *)h );
 		return NULL;
+	}
 	d->be = be;
 	d->h = h;
 	return (struct retro_vfs_dir_handle *)d;
@@ -322,15 +360,21 @@ static struct retro_vfs_interface hyb_iface = {
 	hyb_truncate,
 	/* v3 */
 	hyb_stat, hyb_mkdir, hyb_opendir, hyb_readdir,
-	hyb_dirent_get_name, hyb_dirent_is_dir, hyb_closedir
+	hyb_dirent_get_name, hyb_dirent_is_dir, hyb_closedir,
+	/* v4 */
+	hyb_stat_64
 };
 
 void vfs_hybrid_init( retro_environment_t env_cb, retro_log_printf_t log ) {
 	struct retro_vfs_interface_info info;
 
-	info.required_interface_version = 3;
+	info.required_interface_version = 4;
 	info.iface = NULL;
 	if ( !env_cb( RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &info ) || !info.iface ) {
+		info.required_interface_version = 3;
+		info.iface = NULL;
+	}
+	if ( !info.iface && ( !env_cb( RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &info ) || !info.iface ) ) {
 		info.required_interface_version = 1;
 		info.iface = NULL;
 		if ( !env_cb( RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &info ) || !info.iface ) {
@@ -344,7 +388,7 @@ void vfs_hybrid_init( retro_environment_t env_cb, retro_log_printf_t log ) {
 
 	{
 		struct retro_vfs_interface_info ours;
-		ours.required_interface_version = 3;
+		ours.required_interface_version = 4;
 		ours.iface = &hyb_iface;
 		filestream_vfs_init( &ours );
 		path_vfs_init( &ours );

@@ -70,7 +70,7 @@ bool trans_stream_trans_full(
 
 const struct trans_stream_backend* trans_stream_get_zlib_deflate_backend(void)
 {
-#if defined(HAVE_ZLIB) && HAVE_ZLIB /* defined(): -Wundef */
+#if HAVE_ZLIB
    return &zlib_deflate_backend;
 #else
    /* No zlib: use the built-in clean-room DEFLATE backend so compression
@@ -81,7 +81,7 @@ const struct trans_stream_backend* trans_stream_get_zlib_deflate_backend(void)
 
 const struct trans_stream_backend* trans_stream_get_zlib_inflate_backend(void)
 {
-#if defined(HAVE_ZLIB) && HAVE_ZLIB /* defined(): -Wundef */
+#if HAVE_ZLIB
    return &zlib_inflate_backend;
 #else
    return &deflate_inflate_backend;

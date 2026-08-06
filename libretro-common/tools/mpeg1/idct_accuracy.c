@@ -16,7 +16,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "../../libretro-common/formats/mpeg1/rmpeg1_video.c"
+#include "../../formats/mpeg1/rmpeg1_video.c"
 
 static unsigned long rs = 1;
 static long rnd(long lo, long hi)

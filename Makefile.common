@@ -54,8 +54,7 @@ IMAGE_FORMAT_SOURCES_C = \
 		 $(LIBRETRO_COMM_DIR)/streams/interface_stream.c \
 		 $(LIBRETRO_COMM_DIR)/streams/memory_stream.c \
 		 $(LIBRETRO_COMM_DIR)/streams/rzip_stream.c \
-		 $(LIBRETRO_COMM_DIR)/streams/chd_stream.c \
-		 $(LIBRETRO_COMM_DIR)/encodings/encoding_crc32.c
+		 $(LIBRETRO_COMM_DIR)/streams/chd_stream.c
 
 IMAGE_FORMAT_FLAGS = -DHAVE_RPNG -DHAVE_RJPEG -DHAVE_RBMP -DHAVE_RTGA \
 		 -DHAVE_RWEBP -DHAVE_RDDS
@@ -300,6 +299,7 @@ endif
                      $(LIBRETRO_COMM_DIR)/compat/compat_strcasestr.c \
                      $(LIBRETRO_COMM_DIR)/compat/compat_posix_string.c \
                      $(LIBRETRO_COMM_DIR)/encodings/encoding_utf.c \
+                     $(LIBRETRO_COMM_DIR)/encodings/encoding_crc32.c \
                      $(LIBRETRO_COMM_DIR)/memmap/memalign.c \
                      $(LIBRETRO_COMM_DIR)/time/rtime.c \
                      $(LIBRETRO_COMM_DIR)/hash/lrc_hash.c \

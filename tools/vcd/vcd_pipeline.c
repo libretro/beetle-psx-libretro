@@ -91,10 +91,11 @@ int main(int argc, char **argv)
             for (x = 0; x < w; x++)
                if (px[y * stride16 + x] != first) { varied = 1; break; }
          printf("picture varied: %s\n", varied ? "yes" : "NO (uniform)");
-         if (!varied) { VCD_Kill(); return 1; }
+         if (!varied) { VCD_Kill(); free(mpg); return 1; }
       }
 
       VCD_Kill();
+      free(mpg);
       if (!fb || frames < 10 || audio_frames < 10000) {
          printf("RESULT: FAIL\n"); return 1; }
    }

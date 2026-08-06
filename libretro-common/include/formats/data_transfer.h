@@ -31,6 +31,17 @@
 
 RETRO_BEGIN_DECLS
 
+/* Strict decommit: release pages unreadable, so touching a released
+ * byte faults instead of quietly reading zeros.  The switch was
+ * DT_WINDOW_STRICT when only the window decommitted strictly;
+ * discard() honours it now too, so the general spelling is DT_STRICT
+ * and the old name is an alias.  Defined here rather than in the .c
+ * so a consumer built with either spelling agrees with the module
+ * about which one is in force. */
+#if defined(DT_WINDOW_STRICT) && !defined(DT_STRICT)
+#define DT_STRICT
+#endif
+
 /* A growing, stable-pointer view of a file being read: the source-side
  * companion to the image_transfer/audio_transfer decode facades, for
  * consumers that decode against a partially-read buffer (the video
@@ -38,17 +49,22 @@ RETRO_BEGIN_DECLS
  * demuxers via rwebm_set_avail/rmp4_set_avail, or any other
  * incremental parser).
  *
- * A thin wrapper over nbio that packages its sharp edges into an
- * unmissable shape rather than a documented one: the buffer pointer is
- * valid and stable from open (nbio sizes or maps it up front); filling
- * happens in caller-budgeted steps; a read that ends short of the file
- * (I/O error, the file shrank) is reported as failure with an honest
- * byte count, never as completion; and free cancels any in-flight
- * operation first, which on the stdio backend would otherwise abort.
+ * The sharp edges are packaged into an unmissable shape rather than a
+ * documented one: the buffer pointer is valid and stable from open
+ * (the length is known there and the whole of it is reserved, or
+ * allocated, up front); filling happens in caller-budgeted steps; and
+ * a read that ends short of the file (I/O error, the file shrank) is
+ * reported as failure with an honest byte count, never as completion.
  *
- * Each of those edges cost a real bug in the thumbnail partial-read
- * work before nbio was fixed to expose them safely; this interface
- * exists so the next consumer cannot re-hit them. */
+ * Each of those cost a real bug in the thumbnail partial-read work;
+ * this interface exists so the next consumer cannot re-hit them.
+ *
+ * Reads are synchronous.  This began as a wrapper over nbio and took
+ * its vocabulary from it, but nothing here is asynchronous: iterate()
+ * blocks for the length of its budget on the calling thread, the
+ * caller does the time-slicing, and free() has nothing in flight to
+ * cancel.  The scope comment at the top of data_transfer.c states what
+ * the module does and does not cover. */
 
 typedef struct data_transfer data_transfer_t;
 
@@ -86,7 +102,7 @@ bool data_transfer_arena_init(data_transfer_arena_t *a, size_t ceiling);
  * [lo, hi) that the feeder advances behind the consumer and extends
  * ahead of it.  rewind() decommits the old window after the consumer
  * loops; extend() re-reads from the file, so a second lap costs I/O,
- * not memory.  Compile with DT_WINDOW_STRICT to make advanced-past
+ * not memory.  Compile with DT_STRICT to make advanced-past
  * pages fault on touch instead of reading as zeros - the oracle's
  * proof that a consumer honours the sequential contract.  Platforms
  * without reservations fall back to holding the whole file.
@@ -100,7 +116,7 @@ bool data_transfer_arena_init(data_transfer_arena_t *a, size_t ceiling);
  *
  * The reason is page lifetime, which no amount of refcounting fixes.
  * feed() advances the window behind the consumer, and advancing
- * decommits: MADV_DONTNEED, or PROT_NONE under DT_WINDOW_STRICT.  A
+ * decommits: MADV_DONTNEED, or PROT_NONE under DT_STRICT.  A
  * second consumer trailing the first - audio behind video, the normal
  * case - reads pages the feeder is releasing underneath it.  Keeping
  * the struct alive keeps the struct alive; the pages still go.  Under
@@ -158,6 +174,27 @@ bool data_transfer_window_is_reserved(data_transfer_t *dt);
  * would silently take the wrong branch. */
 bool data_transfer_reserve_supported(void);
 bool data_transfer_window_extend(data_transfer_t *dt, size_t hi);
+/* Make an arbitrary byte range resident and read, without touching
+ * the sequential window: pages between the frontier and the range
+ * stay uncommitted.  This is what lets a trailing MP4 moov become
+ * readable without paging the multi-gigabyte mdat before it through
+ * memory.  Idempotent; safe to overlap the head, the window, or a
+ * previous island.  The island stays resident until the handle is
+ * freed - the decommit sweeps only run below the sequential
+ * frontier, which an island by construction sits above.  Callers
+ * must only dereference bytes inside the head, the window, or a
+ * range this call has covered. */
+bool data_transfer_window_ensure(data_transfer_t *dt, size_t lo,
+      size_t hi);
+/* Restart the sequential window at pos: after a need-range open
+ * jumped over the mdat to a trailing moov, the read frontier still
+ * sits at the head, and the first extend() toward the media would
+ * read the skipped gigabytes after all.  Rebasing moves the frontier
+ * to the media floor so extend()/advance() stream the samples from
+ * there, exactly as they do for a front-moov file from the head.
+ * No-op when pos does not lie past the frontier, so front-moov files
+ * are unaffected. */
+void data_transfer_window_rebase(data_transfer_t *dt, size_t pos);
 void data_transfer_window_advance(data_transfer_t *dt, size_t lo);
 void data_transfer_window_rewind(data_transfer_t *dt);
 /* Raise the permanently-resident head.  For codecs whose loop
@@ -176,7 +213,7 @@ bool data_transfer_window_peek(data_transfer_t *dt, size_t off,
 /* Release an inert range inside the head - bytes the consumer will
  * never revisit (a skipped PICTURE block between the stream info
  * and the first frame).  Whole pages strictly inside (from, to)
- * are decommitted; under DT_WINDOW_STRICT they fault on touch. */
+ * are decommitted; under DT_STRICT they fault on touch. */
 void data_transfer_window_punch(data_transfer_t *dt, size_t from,
       size_t to);
 /* One-call feeder policy: keep [tell - margin, tell + lookahead)
@@ -203,9 +240,10 @@ void data_transfer_arena_release(data_transfer_arena_t *a);
  * complete() keeps its whole-file meaning for every consumer.
  *
  * On platforms without address-space reservation the buffer degrades
- * to a plain allocation of min(len, commit_cap) (or a built-in
- * window when commit_cap is 0), so callers there should treat the
- * cap as advisory sizing. */
+ * to a plain allocation of min(len, commit_cap), or of the whole file
+ * when commit_cap is 0.  There is no built-in ceiling: a caller that
+ * asks for no cap gets no cap, and a file too large for memory is
+ * refused at open rather than presented as a capped prefix. */
 data_transfer_t *data_transfer_open_prefix(const char *path,
       size_t commit_cap);
 
@@ -220,8 +258,11 @@ bool data_transfer_capped(data_transfer_t *dt);
  * first, and the discard contract is a promise not to touch them
  * meanwhile.  A consumer that discards behind its read position as
  * it goes plays a file of any size in a constant residency window.
- * Best-effort: a no-op on the nbio strategy and on the no-reservation
- * fallback (whose bytes simply stay). */
+ * Best-effort: a no-op on a window handle and on the no-reservation
+ * fallback (whose bytes simply stay).  Under DT_STRICT the released
+ * bytes fault on touch rather than reading as zeros, which turns a
+ * consumer's look-back margin from an assumption into something a
+ * test can catch. */
 void data_transfer_discard(data_transfer_t *dt, size_t up_to);
 
 /* Make [from, avail) readable again after discards, re-reading any
@@ -237,6 +278,35 @@ bool data_transfer_refill(data_transfer_t *dt, size_t from);
  * bytes now valid at the front of the buffer.  Cheap once the fill is
  * over. */
 size_t data_transfer_iterate(data_transfer_t *dt, size_t max_bytes);
+
+/* Consulted between the fill's internal reads, which is a far finer
+ * grain than a byte budget can express: returning false stops the
+ * fill where it stands.  'avail' and 'len' are the position and the
+ * total, so a caller has what it needs to report progress without
+ * holding the handle.
+ *
+ * Stopping this way is a pause, not a failure - nothing settles, and
+ * the next iterate resumes where this one stopped. */
+typedef bool (*data_transfer_continue_t)(void *ud, size_t avail,
+      size_t len);
+
+/* iterate() with that hook.  One mechanism covers three things a
+ * caller would otherwise build itself: a time budget (return false
+ * once the clock says so), cancellation (return false on a flag), and
+ * progress (report from inside, then return true).
+ *
+ * The hook is where the clock belongs.  Callers previously wrapped
+ * iterate() in a do/while that checked elapsed time between calls,
+ * which made the byte budget a stand-in for a time slice and left the
+ * check no finer than the chunk they passed - a frame budget could
+ * overshoot by however long one chunk took to read from cold storage.
+ * Consulted here it lands between the fill's own reads instead, and
+ * no timing dependency enters this module.
+ *
+ * Both budgets apply; whichever comes first stops the fill.  Pass 0
+ * for max_bytes to let the hook govern alone. */
+size_t data_transfer_iterate_while(data_transfer_t *dt, size_t max_bytes,
+      data_transfer_continue_t should_continue, void *ud);
 
 /* The buffer.  Valid and stable from open; its leading
  * data_transfer_avail() bytes are file content, the rest not yet.
@@ -256,6 +326,17 @@ bool data_transfer_failed(data_transfer_t *dt);
 
 /* Close, cancelling any in-flight read.  NULL-safe. */
 void data_transfer_free(data_transfer_t *dt);
+
+/* Release the calling thread's pooled reservations.
+ *
+ * A prefix transfer over a file small enough to fit a pool slot
+ * recycles its reservation instead of releasing it, which skips the
+ * first-touch faults that dominate a small load.  The pool holds a
+ * bounded amount of memory per thread between loads; this hands it
+ * back - for a low-memory signal, or when a thread is done loading.
+ * Purely an optimisation either way: nothing needs to call it, and a
+ * flushed pool simply refills. */
+void data_transfer_pool_flush(void);
 
 RETRO_END_DECLS
 
