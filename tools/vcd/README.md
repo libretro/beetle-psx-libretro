@@ -98,22 +98,25 @@ CD carries it and pushes them through `VCD_FeedSector`, covering the sector
 tap, subheader filtering, packet routing to the two decoders, and the YCbCr
 to RGB565 conversion.
 
-All three share a build line; `state_stub.c` satisfies `mednafen/state.c`'s
-reference to the core's whole-machine `StateAction`, which these harnesses
-never reach:
+Build every harness with `tools/vcd/build.sh`:
 
 ```sh
-gcc -O1 -g -std=gnu99 -fsanitize=address,undefined \
-    -DMEDNAFEN_VERSION_NUMERIC=9386 \
-    -o vcdprobe tools/vcd/vcd_probe.c \
-    mednafen/psx/vcd.c mednafen/state.c tools/vcd/state_stub.c \
-    libretro-common/compat/compat_strl.c \
-    libretro-common/formats/mpeg1/rmpeg1_ps.c \
-    libretro-common/formats/mpeg1/rmpeg1_video.c \
-    libretro-common/formats/mp3/rmp3.c \
-    -Ilibretro-common/include -Imednafen -I. -lm
+sh tools/vcd/build.sh vcd_probe -fsanitize=address,undefined
+sh tools/vcd/build.sh vcd_disc  -fsanitize=address,undefined
 ```
 
-Substitute `vcd_state.c` or `vcd_pipeline.c` for the harness.
+Harnesses: `vcd_probe`, `vcd_pipeline`, `vcd_state`, `cdstream_map_test`,
+`vcd_disc`. The binary lands in `$OUT` (default `/tmp/<harness>`).
+
+**Do not hand-write the flags.** `build.sh` gets them from
+`tools/harness_cflags.sh`, which reads them back out of the core's own build
+with `make -n`, so there is no second list to keep in step. The reason this
+exists is that these harnesses previously carried hand-written `-D` lists,
+and those drifted: built without `-DHAVE_MMAP`, a harness that opens the same
+disc images the core opens never takes the file mapping path, so a heap
+corruption that fired on every mapped image was unreachable in test while the
+coverage looked complete. Restoring the real flags also pulls in dependencies
+the short lists hid -- the CHD stack under `-DHAVE_CHD`, rthreads under
+`-DHAVE_THREADS` -- which is the same drift seen from the other side.
 
 Both are clean under ASan and UBSan.
