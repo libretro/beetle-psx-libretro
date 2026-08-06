@@ -184,6 +184,8 @@ endif
 
    SOURCES_C += $(CORE_EMU_DIR)/cpu.c \
                 $(CORE_EMU_DIR)/cdc.c \
+                $(CORE_EMU_DIR)/vcd.c \
+                $(DEPS_DIR)/pl_mpeg/pl_mpeg.c \
                 $(CORE_EMU_DIR)/frontio.c \
                 $(CORE_EMU_DIR)/gpu.c
 
