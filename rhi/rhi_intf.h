@@ -84,6 +84,12 @@ void rhi_intf_push_triangle(float p0x, float p0y, float p0w,
                             float p1x, float p1y, float p1w,
                             float p2x, float p2y, float p2w,
                             uint32_t c0, uint32_t c1, uint32_t c2,
+                            /* Optional precise vertex colours: 3 floats per
+                             * vertex in 0..~2 scale (1.0 = 0xFF), or NULL to
+                             * derive from the packed bytes above. Carries the
+                             * GTE's pre-saturation colour, which can exceed
+                             * white; only meaningful on an fp16 target. */
+                            const float *precise_rgb,
                             uint16_t t0x, uint16_t t0y,
                             uint16_t t1x, uint16_t t1y,
                             uint16_t t2x, uint16_t t2y,
@@ -109,6 +115,8 @@ void rhi_intf_push_quad(float p0x, float p0y, float p0w,
                         uint32_t c1,
                         uint32_t c2,
                         uint32_t c3,
+                        /* As push_triangle: 4x3 floats or NULL. */
+                        const float *precise_rgb,
                         uint16_t t0x, uint16_t t0y,
                         uint16_t t1x, uint16_t t1y,
                         uint16_t t2x, uint16_t t2y,

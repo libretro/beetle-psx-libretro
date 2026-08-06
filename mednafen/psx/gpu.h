@@ -35,6 +35,11 @@ struct tri_vertex
    int32_t r, g, b;
    // Precise x, y, and w coordinates using PGXP (if available)
    float precise[3];
+   /* Precise colour in 1.0 == 0xFF scale: the GTE's pre-saturation value
+    * when the PGXP shadow was accepted (may exceed 1.0), else r/g/b / 255.
+    * Only consulted by the hardware renderers when the precise-colour
+    * option is on. */
+   float cf[3];
 };
 typedef struct tri_vertex tri_vertex;
 

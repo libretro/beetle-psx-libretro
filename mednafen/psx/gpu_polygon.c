@@ -1,6 +1,51 @@
 #include <math.h>
 #include "beetle_psx_globals.h"
 
+/* PGXP precise colour plumbing to the hardware renderers.
+ *
+ * psx_pgxp_color gates it: off, the rhi receives NULL and unpacks the packed
+ * bytes exactly as before, so the shader inputs are bit-identical to the old
+ * 8-bit attribute path. On, the per-vertex floats carry the GTE's
+ * pre-saturation value, which exceeds 1.0 for over-range lighting; the fp16
+ * framebuffer holds it and the display-stage encode maps it above reference
+ * white. The buffers are static because the push macros expand inside deep
+ * template functions and the pointer only needs to live across the call. */
+extern int psx_pgxp_color;
+
+static float gpu_precise_rgb_buf[12];
+
+static INLINE const float *gpu_precise_tri_rgb(const tri_vertex *v)
+{
+   int i;
+   if (!psx_pgxp_color)
+      return NULL;
+   for (i = 0; i < 3; i++)
+   {
+      gpu_precise_rgb_buf[i * 3 + 0] = v[i].cf[0];
+      gpu_precise_rgb_buf[i * 3 + 1] = v[i].cf[1];
+      gpu_precise_rgb_buf[i * 3 + 2] = v[i].cf[2];
+   }
+   return gpu_precise_rgb_buf;
+}
+
+static INLINE const float *gpu_precise_quad_rgb(const tri_vertex *first,
+      const tri_vertex *rest)
+{
+   int i;
+   if (!psx_pgxp_color)
+      return NULL;
+   gpu_precise_rgb_buf[0] = first->cf[0];
+   gpu_precise_rgb_buf[1] = first->cf[1];
+   gpu_precise_rgb_buf[2] = first->cf[2];
+   for (i = 0; i < 3; i++)
+   {
+      gpu_precise_rgb_buf[3 + i * 3 + 0] = rest[i].cf[0];
+      gpu_precise_rgb_buf[3 + i * 3 + 1] = rest[i].cf[1];
+      gpu_precise_rgb_buf[3 + i * 3 + 2] = rest[i].cf[2];
+   }
+   return gpu_precise_rgb_buf;
+}
+
 /* Defined later in the same translation unit (gpu.c includes this
  * file before the dither_table definition).  Forward-declared here so
  * the non-textured SSE2/NEON span helper below can read it; the later
@@ -1433,16 +1478,27 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       if (v == 0 || GOURAUD_LIT) \
       { \
          uint32_t raw_color = (*cb & 0xFFFFFF); \
+         float pgxp_rgb[3]; \
          vertices[v].r = raw_color & 0xFF; \
          vertices[v].g = (raw_color >> 8) & 0xFF; \
          vertices[v].b = (raw_color >> 16) & 0xFF; \
-         /* Measurement slice: probe the precise-color shadow for every \
-          * color word (v==0 covers the flat/command word, whose CD byte \
-          * the GTE carries) and accumulate hit statistics.  Result \
-          * deliberately unused - rendering is unchanged until the \
-          * renderer slice consumes it. */ \
-         if (PGXP_LIT) \
-            PGXP_GetColor(cb - baseCB, cb, NULL); \
+         /* Renderer slice: recover the GTE's pre-saturation colour where \
+          * the shadow is accepted (v==0 covers the flat/command word, \
+          * whose CD byte the GTE carries). The accept rule guarantees a \
+          * refused or absent shadow degrades to the architectural bytes, \
+          * so the miss path below is today's picture exactly. */ \
+         if (PGXP_LIT && PGXP_GetColor(cb - baseCB, cb, pgxp_rgb)) \
+         { \
+            vertices[v].cf[0] = pgxp_rgb[0] / 255.0f; \
+            vertices[v].cf[1] = pgxp_rgb[1] / 255.0f; \
+            vertices[v].cf[2] = pgxp_rgb[2] / 255.0f; \
+         } \
+         else \
+         { \
+            vertices[v].cf[0] = (float)vertices[v].r / 255.0f; \
+            vertices[v].cf[1] = (float)vertices[v].g / 255.0f; \
+            vertices[v].cf[2] = (float)vertices[v].b / 255.0f; \
+         } \
          cb++; \
       } \
       else \
@@ -1450,6 +1506,9 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          vertices[v].r = vertices[0].r; \
          vertices[v].g = vertices[0].g; \
          vertices[v].b = vertices[0].b; \
+         vertices[v].cf[0] = vertices[0].cf[0]; \
+         vertices[v].cf[1] = vertices[0].cf[1]; \
+         vertices[v].cf[2] = vertices[0].cf[2]; \
       } \
       x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF))); \
       y = sign_x_to_s32(11, ((int16_t)(*cb >> 16))); \
@@ -1618,6 +1677,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                   ((uint32_t)vertices[0].r) | ((uint32_t)vertices[0].g << 8) | ((uint32_t)vertices[0].b << 16), \
                   ((uint32_t)vertices[1].r) | ((uint32_t)vertices[1].g << 8) | ((uint32_t)vertices[1].b << 16), \
                   ((uint32_t)vertices[2].r) | ((uint32_t)vertices[2].g << 8) | ((uint32_t)vertices[2].b << 16), \
+                  gpu_precise_quad_rgb(first, vertices), \
                   first->u + gpu->off_u, first->v + gpu->off_v, \
                   vertices[0].u + gpu->off_u, vertices[0].v + gpu->off_v, \
                   vertices[1].u + gpu->off_u, vertices[1].v + gpu->off_v, \
@@ -1659,6 +1719,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                ((uint32_t)verts[0].r) | ((uint32_t)verts[0].g << 8) | ((uint32_t)verts[0].b << 16), \
                ((uint32_t)verts[1].r) | ((uint32_t)verts[1].g << 8) | ((uint32_t)verts[1].b << 16), \
                ((uint32_t)verts[2].r) | ((uint32_t)verts[2].g << 8) | ((uint32_t)verts[2].b << 16), \
+               gpu_precise_tri_rgb(verts), \
                verts[0].u, verts[0].v, \
                verts[1].u, verts[1].v, \
                verts[2].u, verts[2].v, \

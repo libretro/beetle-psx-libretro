@@ -211,6 +211,7 @@ int   psx_hdr_shoulder         = 0;
  * reference white before blending (over-white only from stacking, default);
  * 1 leaves it hot for punchier single-layer glow. Read from a core option. */
 int   psx_hdr_overbright_hot   = 0;
+int   psx_pgxp_color           = 0;
 int   psx_hdr_multipass        = 0;
 /* Reference SDR transfer the 24-bit path is assumed to have been viewed
  * through, used to linearise before the HDR encode: 0 = BT.1886 pure 2.4
@@ -4598,6 +4599,18 @@ static void check_variables(bool startup)
       {
          if (!strcmp(var.value, "hot"))
             psx_hdr_overbright_hot = 1;
+      }
+
+      /* PGXP precise colour: carry the GTE's pre-saturation vertex colour
+       * to the hardware renderers. Needs PGXP memory-tracking for the
+       * shadow to exist, and only shows above white on the fp16 (HDR)
+       * target; the renderers force it off elsewhere. */
+      var.key = BEETLE_OPT(pgxp_color);
+      psx_pgxp_color = 0;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "enabled"))
+            psx_pgxp_color = 1;
       }
 
       /* HDR true multi-pass blending (Vulkan HDR path only): 1 routes

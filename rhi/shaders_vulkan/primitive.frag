@@ -41,6 +41,11 @@ layout(constant_id = 1) const int FILTER_TYPE = FILTER_NEAREST;
 const int BLEND_ADD = 0;
 layout(constant_id = 2) const int BLEND_MODE = BLEND_ADD;
 layout(constant_id = 6) const int HDR_HOT_SOURCE = 0;
+/* PGXP precise colour: the vertex colour itself may exceed 1.0 (the GTE's
+ * pre-saturation value), so the source clamp stands aside on every draw,
+ * not just plain additive. The rhi forces this to 0 off the fp16 target,
+ * which keeps the hot path SDR-safe the same way HDR_HOT_SOURCE is. */
+layout(constant_id = 8) const int PRECISE_COLOR = 0;
 #endif
 
 void main()
@@ -108,6 +113,8 @@ void main()
 	/* The semi-trans-opaque pass and every other blend mode stay clamped;
 	 * over-white there comes only from stacking, matching the option text. */
 	if (HDR_HOT_SOURCE != 0 && TRANSPARENCY_MODE == SEMI_TRANS && BLEND_MODE == BLEND_ADD)
+		shaded = shaded_hot;
+	if (PRECISE_COLOR != 0)
 		shaded = shaded_hot;
 	FragColor = vec4(shaded, NNColor.a + vColor.a);
 #else

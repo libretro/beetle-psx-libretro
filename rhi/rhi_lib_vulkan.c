@@ -63,6 +63,7 @@ extern float psx_phase_error;    /* decoder carrier misalignment, cycles */
 extern int   psx_black_setup;    /* NTSC pedestal mismatch: 0 none, 1 lifted, 2 crushed */
 extern retro_log_printf_t log_cb;
 extern int   psx_hdr_overbright_hot;   /* additive/sub source: 0 clamped, 1 hot */
+extern int   psx_pgxp_color;           /* PGXP precise colour: vertex colour may exceed 1.0 on fp16 */
 /* "HDR True Multi-Pass Blending": 1 routes non-masked subtractive prims
  * through the per-primitive programmable-blend path; 0 keeps them on
  * fixed-function REVERSE_SUBTRACT and floors the result with a MAX-blend
@@ -5204,6 +5205,9 @@ static StatusFlags *fbatlas_info(FBAtlas *self,
    {
       float x, y, w;
       uint32_t color;
+      /* Always set by the pushers: the precise (pre-saturation) colour when
+       * supplied, else color's bytes / 255. 1.0 == 0xFF either way. */
+      float cf[3];
       uint16_t u, v;
    };
 
@@ -5387,7 +5391,10 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
    struct BufferVertex
    {
       float x, y, z, w;
-      uint32_t color;
+      /* rgb in 1.0 == 0xFF scale (may exceed 1.0 under precise colour);
+       * [3] is the force-mask bit as 0.0/1.0, replacing the old packed
+       * alpha byte. */
+      float color[4];
       TextureWindow window;
       int16_t pal_x, pal_y, params;
       int16_t u, v, base_uv_x, base_uv_y;
@@ -5659,7 +5666,12 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
        * the primitive feedback programs never share a pipeline, and the
        * pipeline hash masks spec constants by the program's reflected usage,
        * so the slots cannot collide. */
-      SpecConstIndex_MaskTest = 7
+      SpecConstIndex_MaskTest = 7,
+      /* PGXP precise colour: vertex colour may exceed 1.0 on the fp16
+       * target, so the primitive source clamp stands aside on every draw.
+       * Its own slot rather than an alias: it is declared by the primitive
+       * programs, which also declare 0..6. */
+      SpecConstIndex_PreciseColor = 8
    };
 
    struct SaveState
@@ -5965,7 +5977,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
       commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, color));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
@@ -5987,7 +5999,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
       commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, color));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); /* Pad to support AMD */
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
@@ -8918,7 +8930,10 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       output[i].y = y[i];
       output[i].z = z;
       output[i].w = vertices[i].w;
-      output[i].color = vertices[i].color & 0xffffffu;
+      output[i].color[0] = vertices[i].cf[0];
+      output[i].color[1] = vertices[i].cf[1];
+      output[i].color[2] = vertices[i].cf[2];
+      output[i].color[3] = 0.0f;
       output[i].window = self->render_state.texture_window;
       output[i].pal_x = (int16_t)(self->render_state.palette_offset_x);
       output[i].pal_y = (int16_t)(self->render_state.palette_offset_y);
@@ -8933,9 +8948,13 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       output[i].max_v = self->render_state.UVLimits.max_v;
 
       if (self->render_state.texture_mode != TextureMode_None && !self->render_state.texture_color_modulate)
-         output[i].color = 0x808080;
+      {
+         /* Raw texture: neutral modulate, 0x80 == unity. */
+         output[i].color[0] = output[i].color[1] = output[i].color[2]
+            = 128.0f / 255.0f;
+      }
 
-      output[i].color |= self->render_state.force_mask_bit ? 0xff000000u : 0u;
+      output[i].color[3] = self->render_state.force_mask_bit ? 1.0f : 0.0f;
    } }
    *hd_texture_index_out = hd_texture_index; *filtering_out = filtering; *scaled_read_out = scaled_read; *shift_out = shift; *offset_uv_out = offset_uv;
    }
@@ -9005,14 +9024,13 @@ static void renderer_build_line_quad(Renderer *self,
       output[3].y = input[1].y + 1.0f;
 
       c = input[0].color;
-      output[0].w = 1.0f;
-      output[0].color = c;
-      output[1].w = 1.0f;
-      output[1].color = c;
-      output[2].w = 1.0f;
-      output[2].color = c;
-      output[3].w = 1.0f;
-      output[3].color = c;
+      { int k; for (k = 0; k < 4; k++) {
+         output[k].w     = 1.0f;
+         output[k].color = c;
+         output[k].cf[0] = input[0].cf[0];
+         output[k].cf[1] = input[0].cf[1];
+         output[k].cf[2] = input[0].cf[2];
+      } }
       return;
    }
 
@@ -9073,10 +9091,8 @@ static void renderer_build_line_quad(Renderer *self,
 
    { const float x0 = input[0].x + pad_x0;
    const float y0 = input[0].y + pad_y0;
-   const float c0 = input[0].color;
    const float x1 = input[1].x + pad_x1;
    const float y1 = input[1].y + pad_y1;
-   const float c1 = input[1].color;
 
    output[0].x = x0;
    output[0].y = y0;
@@ -9087,14 +9103,14 @@ static void renderer_build_line_quad(Renderer *self,
    output[3].x = x1 + fill_dx;
    output[3].y = y1 + fill_dy;
 
-   output[0].w = 1.0f;
-   output[0].color = c0;
-   output[1].w = 1.0f;
-   output[1].color = c0;
-   output[2].w = 1.0f;
-   output[2].color = c1;
-   output[3].w = 1.0f;
-   output[3].color = c1;
+   { int k; for (k = 0; k < 4; k++) {
+      const Vertex *src = (k < 2) ? &input[0] : &input[1];
+      output[k].w     = 1.0f;
+      output[k].color = src->color;
+      output[k].cf[0] = src->cf[0];
+      output[k].cf[1] = src->cf[1];
+      output[k].cf[2] = src->cf[2];
+   } }
    }
    }
 }
@@ -9514,7 +9530,7 @@ static void renderer_render_opaque_primitives(Renderer *self){
    commandbuffer_set_cull_mode(cbh_get(&self->cmd), VK_CULL_MODE_NONE);
    commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, color));
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
    renderer_dispatch(self, vertices, scissors, false);
@@ -9617,7 +9633,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
    commandbuffer_set_depth_test(cbh_get(&self->cmd), true, false);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(BufferVertex, color));
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, color));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
@@ -10244,6 +10260,10 @@ static void renderer_semi_transparent_set_state(Renderer *self,
     * also what makes primitive.frag's hot path SDR-safe by construction. */
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_HotSource,
          (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? psx_hdr_overbright_hot : 0);
+   /* Same fp16-only rule as HotSource, same reason: off the wide target the
+    * UNORM write clamps regardless, so a variant would be identical. */
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_PreciseColor,
+         (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? psx_pgxp_color : 0);
    /* Only the feedback programs declare this; the pipeline hash masks it out
     * everywhere else. 1 = check-mask (historical behaviour), 0 = the routed
     * non-masked subtractive case. */
@@ -19590,6 +19610,21 @@ static void renderer_apply_blend_mode(Renderer *renderer, int blend_mode)
    }
 }
 
+
+/* Fill Vertex::cf for `n` vertices from the caller's precise colours when
+ * given, else from the packed bytes. 1.0 == 0xFF either way, so without
+ * precise colour the shader sees exactly the values the UNORM attrib
+ * produced before. */
+static void vertices_set_cf(Vertex *v, int n, const float *precise_rgb)
+{
+   int i, c;
+   for (i = 0; i < n; i++)
+      for (c = 0; c < 3; c++)
+         v[i].cf[c] = precise_rgb
+            ? precise_rgb[i * 3 + c]
+            : (float)((v[i].color >> (c * 8)) & 0xFF) / 255.0f;
+}
+
 void rhi_vulkan_push_triangle(
       float p0x, float p0y, float p0w,
       float p1x, float p1y, float p1w,
@@ -19597,6 +19632,7 @@ void rhi_vulkan_push_triangle(
       uint32_t c0,
       uint32_t c1,
       uint32_t c2,
+      const float *precise_rgb,
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -19631,6 +19667,7 @@ void rhi_vulkan_push_triangle(
          { p1x, p1y, p1w, c1, t1x, t1y },
          { p2x, p2y, p2w, c2, t2x, t2y },
       };
+      vertices_set_cf(vertices, 3, precise_rgb);
       renderer_draw_triangle(renderer, vertices);
    }
 }
@@ -19641,6 +19678,7 @@ void rhi_vulkan_push_quad(
       float p2x, float p2y, float p2w,
       float p3x, float p3y, float p3w,
       uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
+      const float *precise_rgb,
       uint16_t t0x, uint16_t t0y, 
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -19684,6 +19722,7 @@ void rhi_vulkan_push_quad(
          { p3x, p3y, p3w, c3, t3x, t3y },
       };
 
+      vertices_set_cf(vertices, 4, precise_rgb);
       renderer_draw_quad(renderer, vertices);
    }
 }
@@ -19711,6 +19750,7 @@ void rhi_vulkan_push_line(
          { (float)(p0x), (float)(p0y), 1.0f, c0, 0, 0 },
          { (float)(p1x), (float)(p1y), 1.0f, c1, 0, 0 },
       };
+      vertices_set_cf(vertices, 2, NULL);
       renderer->render_state.texture_color_modulate = false;
       renderer_draw_line(renderer, vertices);
    }

@@ -464,6 +464,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "clamped"
    },
    {
+      BEETLE_OPT(pgxp_color),
+      "PGXP Precise Colour (HDR)",
+      NULL,
+      "Carries the GTE's pre-saturation vertex colour to the hardware renderers instead of the 8-bit value the Color FIFO clamps to. The PSX computes lighting at higher precision and saturates it to 8 bits per channel; where PGXP memory tracking can recover the original value, surfaces lit brighter than white keep that energy on the HDR framebuffer and the display encode maps it above reference white. Requires a PGXP mode with memory tracking (the colour shadow travels with the display list), and shows above white only when 'Color Format' is '30-bit Color (HDR)'. Safe by construction: a colour that cannot be verified against the exact bytes the game sent falls back to those bytes, so at worst the picture is unchanged. No effect on the Software renderer.",
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       BEETLE_OPT(hdr_multipass),
       "HDR True Multi-Pass Blending",
       NULL,

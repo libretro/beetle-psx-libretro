@@ -10,7 +10,7 @@
 static const char * command_vertex_name_ = GLSL_VERTEX(
 // Vertex shader for rendering GPU draw commands in the framebuffer
 in vec4 position;
-in uvec3 color;
+in vec3 color;
 in uvec2 texture_page;
 in uvec2 texture_coord;
 in uvec2 clut;
@@ -66,7 +66,9 @@ void main() {
    //gl_Position.xyzw = vec4(xpos, ypos, zpos, 1.);
 
    // Glium doesn't support 'normalized' for now
-   frag_shading_color = vec3(color) / 255.;
+   /* Already in 0..1+ scale (1.0 == 0xFF). May exceed 1.0 when the PGXP
+   // precise-colour path supplies the GTE's pre-saturation value. */
+   frag_shading_color = color;
 
    // Let OpenGL interpolate the texel position
    frag_texture_coord = vec2(texture_coord) + vec2(0.001, 0.001);

@@ -768,6 +768,7 @@ void rhi_intf_push_triangle(
       uint32_t c0,
       uint32_t c1,
       uint32_t c2,
+      const float *precise_rgb,
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -802,7 +803,7 @@ void rhi_intf_push_triangle(
       case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rhi_gl_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
-               c0, c1, c2, t0x, t0y, t1x, t1y, t2x, t2y,
+               c0, c1, c2, precise_rgb, t0x, t0y, t1x, t1y, t2x, t2y,
                min_u, min_v, max_u, max_v,
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
@@ -814,7 +815,7 @@ void rhi_intf_push_triangle(
       case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
          rhi_vulkan_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
-               c0, c1, c2, t0x, t0y, t1x, t1y, t2x, t2y,
+               c0, c1, c2, precise_rgb, t0x, t0y, t1x, t1y, t2x, t2y,
                min_u, min_v, max_u, max_v,
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
@@ -832,6 +833,7 @@ void rhi_intf_push_quad(
    float p2x, float p2y, float p2w,
    float p3x, float p3y, float p3w,
    uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
+   const float *precise_rgb,
    uint16_t t0x, uint16_t t0y,
    uint16_t t1x, uint16_t t1y,
    uint16_t t2x, uint16_t t2y,
@@ -873,7 +875,7 @@ void rhi_intf_push_quad(
       case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rhi_gl_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
-               c0, c1, c2, c3,
+               c0, c1, c2, c3, precise_rgb,
                t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
                min_u, min_v, max_u, max_v,
                texpage_x, texpage_y, clut_x, clut_y,
@@ -886,7 +888,7 @@ void rhi_intf_push_quad(
       case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
          rhi_vulkan_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
-               c0, c1, c2, c3,
+               c0, c1, c2, c3, precise_rgb,
                t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
                min_u, min_v, max_u, max_v,
                texpage_x, texpage_y, clut_x, clut_y,
