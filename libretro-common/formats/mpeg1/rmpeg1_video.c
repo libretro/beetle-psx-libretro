@@ -124,16 +124,24 @@ struct rmpeg1_video
    uint8_t   intra_q[64];
    uint8_t   non_intra_q[64];
 
-   /* Two frame buffers: the picture being decoded and the most recent I or
-    * P picture, which is what a P picture predicts from. They swap after
-    * every reference picture rather than being copied. */
-   uint8_t  *plane_y;
-   uint8_t  *plane_cb;
-   uint8_t  *plane_cr;
-   uint8_t  *ref_y;
-   uint8_t  *ref_cb;
-   uint8_t  *ref_cr;
-   bool      have_ref;
+   /* Three frame slots, rotated by pointer rather than copied.
+    *
+    *   cur  the picture being decoded
+    *   fwd  the past reference   (forward prediction)
+    *   bwd  the future reference (backward prediction)
+    *
+    * A B picture predicts from both and is never itself a reference, so it
+    * is decoded into cur and emitted straight away. An I or P picture is
+    * decoded into cur, then the slots rotate: the old bwd becomes
+    * displayable and is emitted, fwd takes its place, and the new picture
+    * becomes bwd. That one-picture delay is the reordering B pictures
+    * require -- they are transmitted after the reference they predict
+    * forward from, and displayed before it. */
+   uint8_t  *plane[3][3];     /* [slot][Y, Cb, Cr] */
+   int       slot_cur, slot_fwd, slot_bwd;
+   bool      have_fwd, have_bwd;
+   unsigned  bwd_tref;
+   unsigned  bwd_type;
    bool      eof;
    size_t    plane_bytes;
 
@@ -144,10 +152,17 @@ struct rmpeg1_video
    int       dc_pred[3];      /* Y, Cb, Cr */
    unsigned  mb_addr;
 
-   int       f_code;          /* forward_f_code, 1..7  */
-   bool      full_pel;        /* full_pel_forward_vector */
-   int       mv_pred_x;       /* motion vector predictor */
-   int       mv_pred_y;
+   /* Index 0 is forward, 1 is backward, matching the s subscript the
+    * specification uses for f_code[s][t]. */
+   int       f_code[2];
+   bool      full_pel[2];
+   int       mv_pred[2][2];   /* [direction][x, y] */
+
+   /* A skipped macroblock in a B picture repeats the previous macroblock's
+    * vectors and prediction mode, unlike in a P picture where it means a
+    * zero vector. Remember them. */
+   unsigned  last_flags;
+   int       last_mv[2][2];
 
    uint32_t  skipped;
    uint32_t  errors;
@@ -310,27 +325,43 @@ static bool alloc_planes(rmpeg1_video_t *v)
    ysz = (size_t)v->y_stride * (v->mb_h * 16);
    csz = (size_t)v->c_stride * (v->mb_h * 8);
 
-   free(v->plane_y);  free(v->plane_cb); free(v->plane_cr);
-   free(v->ref_y);    free(v->ref_cb);   free(v->ref_cr);
-
-   v->plane_y  = (uint8_t *)calloc(1, ysz);
-   v->plane_cb = (uint8_t *)calloc(1, csz);
-   v->plane_cr = (uint8_t *)calloc(1, csz);
-   v->ref_y    = (uint8_t *)calloc(1, ysz);
-   v->ref_cb   = (uint8_t *)calloc(1, csz);
-   v->ref_cr   = (uint8_t *)calloc(1, csz);
-
-   if (     !v->plane_y || !v->plane_cb || !v->plane_cr
-         || !v->ref_y   || !v->ref_cb   || !v->ref_cr)
    {
-      free(v->plane_y); free(v->plane_cb); free(v->plane_cr);
-      free(v->ref_y);   free(v->ref_cb);   free(v->ref_cr);
-      v->plane_y = v->plane_cb = v->plane_cr = NULL;
-      v->ref_y   = v->ref_cb   = v->ref_cr   = NULL;
-      v->plane_bytes = 0;
-      return false;
+      int k, j;
+
+      for (k = 0; k < 3; k++)
+         for (j = 0; j < 3; j++)
+         {
+            free(v->plane[k][j]);
+            v->plane[k][j] = NULL;
+         }
+
+      for (k = 0; k < 3; k++)
+      {
+         v->plane[k][0] = (uint8_t *)calloc(1, ysz);
+         v->plane[k][1] = (uint8_t *)calloc(1, csz);
+         v->plane[k][2] = (uint8_t *)calloc(1, csz);
+
+         if (!v->plane[k][0] || !v->plane[k][1] || !v->plane[k][2])
+         {
+            int m, n;
+
+            for (m = 0; m < 3; m++)
+               for (n = 0; n < 3; n++)
+               {
+                  free(v->plane[m][n]);
+                  v->plane[m][n] = NULL;
+               }
+            v->plane_bytes = 0;
+            return false;
+         }
+      }
    }
-   v->have_ref = false;
+
+   v->slot_cur = 0;
+   v->slot_fwd = 1;
+   v->slot_bwd = 2;
+   v->have_fwd = false;
+   v->have_bwd = false;
 
    v->plane_bytes = ysz;
    return true;
@@ -850,7 +881,7 @@ static bool decode_inter_block(rmpeg1_video_t *v, int16_t *blk)
  * residual of f_code-1 bits refines it. The result is differential against
  * the previous vector in the slice and wraps within +/-16f, which is what
  * lets a long pan stay in range. */
-static bool decode_motion(rmpeg1_video_t *v, int *pred, int *out)
+static bool decode_motion(rmpeg1_video_t *v, int dir, int *pred, int *out)
 {
    const rmpeg1_vlc_t *e = vlc_decode(v, rmpeg1_vlc_motion);
    int code, r = 0, f, delta, val;
@@ -859,10 +890,10 @@ static bool decode_motion(rmpeg1_video_t *v, int *pred, int *out)
       return false;
 
    code = e->a;
-   f    = 1 << (v->f_code - 1);
+   f    = 1 << (v->f_code[dir] - 1);
 
    if (f != 1 && code != 0)
-      r = (int)get_bits(v, (unsigned)(v->f_code - 1));
+      r = (int)get_bits(v, (unsigned)(v->f_code[dir] - 1));
 
    if (code == 0)
       delta = 0;
@@ -889,21 +920,25 @@ static bool decode_motion(rmpeg1_video_t *v, int *pred, int *out)
 /* Macroblock layer                                                      */
 /* --------------------------------------------------------------------- */
 
+#define RM_Y(v, slot)  ((v)->plane[(slot)][0])
+#define RM_CB(v, slot) ((v)->plane[(slot)][1])
+#define RM_CR(v, slot) ((v)->plane[(slot)][2])
+
 static void mb_plane_ptrs(rmpeg1_video_t *v, unsigned addr,
       uint8_t **y, uint8_t **cb, uint8_t **cr)
 {
    unsigned mx = addr % v->mb_w;
    unsigned my = addr / v->mb_w;
 
-   *y  = v->plane_y  + (size_t)my * 16 * v->y_stride + (size_t)mx * 16;
-   *cb = v->plane_cb + (size_t)my *  8 * v->c_stride + (size_t)mx *  8;
-   *cr = v->plane_cr + (size_t)my *  8 * v->c_stride + (size_t)mx *  8;
+   *y  = RM_Y(v, v->slot_cur)  + (size_t)my * 16 * v->y_stride + (size_t)mx * 16;
+   *cb = RM_CB(v, v->slot_cur) + (size_t)my *  8 * v->c_stride + (size_t)mx *  8;
+   *cr = RM_CR(v, v->slot_cur) + (size_t)my *  8 * v->c_stride + (size_t)mx *  8;
 }
 
 /* Predict a whole macroblock from the reference, then add whatever residual
  * blocks the coded block pattern says are present. */
 static bool decode_inter_macroblock(rmpeg1_video_t *v, unsigned addr,
-      int mvx, int mvy, unsigned cbp)
+      unsigned flags, const int mv[2][2], unsigned cbp)
 {
    int16_t  blk[64];
    uint8_t *py, *pcb, *pcr;
@@ -912,26 +947,107 @@ static bool decode_inter_macroblock(rmpeg1_video_t *v, unsigned addr,
    unsigned ph = v->mb_h * 16;
    unsigned ch = v->mb_h * 8;
    int      i;
-   int      cmvx, cmvy;
+   int      fwd_on = (flags & RMPEG1_MB_FORWARD)  ? 1 : 0;
+   int      bwd_on = (flags & RMPEG1_MB_BACKWARD) ? 1 : 0;
+
+   /* Scratch for the second prediction when interpolating. 16x16 luma plus
+    * two 8x8 chroma; small enough to keep automatic and still leave the
+    * frame far inside the stack budget. */
+   uint8_t  tmp_y[16 * 16];
+   uint8_t  tmp_cb[8 * 8];
+   uint8_t  tmp_cr[8 * 8];
 
    if (addr >= v->mb_w * v->mb_h)
       return false;
 
+   /* A macroblock with neither direction set only occurs as a skipped
+    * macroblock in a P picture, where forward prediction with a zero vector
+    * is exactly what is wanted. */
+   if (!fwd_on && !bwd_on)
+      fwd_on = 1;
+
    mb_plane_ptrs(v, addr, &py, &pcb, &pcr);
 
-   mc_predict(v->ref_y, v->y_stride, v->y_stride, ph,
-              py, v->y_stride, (int)mx * 16, (int)my * 16, mvx, mvy, 16, 16);
+   {
+      int d;
 
-   /* Chroma is half resolution in both axes, so the vector halves too. The
-    * standard specifies truncation toward zero here, not the arithmetic
-    * shift used for the integer part of a luma vector. */
-   cmvx = mvx / 2;
-   cmvy = mvy / 2;
+      for (d = 0; d < 2; d++)
+      {
+         int      slot, cmvx, cmvy;
+         uint8_t *dy, *dcb, *dcr;
+         unsigned dsy, dsc;
 
-   mc_predict(v->ref_cb, v->c_stride, v->c_stride, ch,
-              pcb, v->c_stride, (int)mx * 8, (int)my * 8, cmvx, cmvy, 8, 8);
-   mc_predict(v->ref_cr, v->c_stride, v->c_stride, ch,
-              pcr, v->c_stride, (int)mx * 8, (int)my * 8, cmvx, cmvy, 8, 8);
+         if (d == 0 && !fwd_on)
+            continue;
+         if (d == 1 && !bwd_on)
+            continue;
+
+         /* Which slot a direction refers to depends on the picture type.
+          *
+          * A B picture sits between two references: forward is the older
+          * one (slot_fwd), backward the newer (slot_bwd).
+          *
+          * A P picture has only one reference, the most recent, and that is
+          * whatever is in slot_bwd -- slot_fwd holds the reference before
+          * it, which a P picture must not touch. Reading slot_fwd here
+          * predicts every P picture from a frame two references old, which
+          * looks plausible on static content and falls apart on motion. */
+         if (d == 0)
+            slot = (v->coding_type == RMPEG1_PIC_B) ? v->slot_fwd
+                                                    : v->slot_bwd;
+         else
+            slot = v->slot_bwd;
+
+         /* The first prediction goes straight to the frame; a second one
+          * lands in scratch so the two can be averaged. */
+         if (d == 1 && fwd_on)
+         {
+            dy = tmp_y;  dcb = tmp_cb; dcr = tmp_cr;
+            dsy = 16;    dsc = 8;
+         }
+         else
+         {
+            dy = py;     dcb = pcb;    dcr = pcr;
+            dsy = v->y_stride; dsc = v->c_stride;
+         }
+
+         mc_predict(RM_Y(v, slot), v->y_stride, v->y_stride, ph,
+                    dy, dsy, (int)mx * 16, (int)my * 16,
+                    mv[d][0], mv[d][1], 16, 16);
+
+         /* Chroma is half resolution in both axes, so the vector halves.
+          * The specification divides with truncation toward zero here, not
+          * the arithmetic shift used for the integer part of a luma
+          * vector. */
+         cmvx = mv[d][0] / 2;
+         cmvy = mv[d][1] / 2;
+
+         mc_predict(RM_CB(v, slot), v->c_stride, v->c_stride, ch,
+                    dcb, dsc, (int)mx * 8, (int)my * 8, cmvx, cmvy, 8, 8);
+         mc_predict(RM_CR(v, slot), v->c_stride, v->c_stride, ch,
+                    dcr, dsc, (int)mx * 8, (int)my * 8, cmvx, cmvy, 8, 8);
+      }
+
+      if (fwd_on && bwd_on)
+      {
+         unsigned r, c;
+
+         for (r = 0; r < 16; r++)
+            for (c = 0; c < 16; c++)
+            {
+               uint8_t *p = py + (size_t)r * v->y_stride + c;
+               *p = (uint8_t)((*p + tmp_y[r * 16 + c] + 1) >> 1);
+            }
+         for (r = 0; r < 8; r++)
+            for (c = 0; c < 8; c++)
+            {
+               uint8_t *p = pcb + (size_t)r * v->c_stride + c;
+               uint8_t *q = pcr + (size_t)r * v->c_stride + c;
+               *p = (uint8_t)((*p + tmp_cb[r * 8 + c] + 1) >> 1);
+               *q = (uint8_t)((*q + tmp_cr[r * 8 + c] + 1) >> 1);
+            }
+      }
+   }
 
    for (i = 0; i < 4; i++)
    {
@@ -1026,16 +1142,21 @@ static bool decode_slice(rmpeg1_video_t *v, unsigned vertical_pos, size_t end)
       (void)get_bits(v, 8);
 
    reset_dc_predictors(v);
-   v->mb_addr   = mb_row * v->mb_w - 1;
-   v->mv_pred_x = 0;
-   v->mv_pred_y = 0;
+   v->mb_addr = mb_row * v->mb_w - 1;
+   v->mv_pred[0][0] = v->mv_pred[0][1] = 0;
+   v->mv_pred[1][0] = v->mv_pred[1][1] = 0;
+   v->last_flags    = 0;
+   memset(v->last_mv, 0, sizeof(v->last_mv));
 
    for (;;)
    {
       const rmpeg1_vlc_t *e;
       unsigned increment = 0;
       unsigned flags, cbp;
-      int      mvx = 0, mvy = 0;
+      int      mv[2][2];
+      int      d;
+
+      memset(mv, 0, sizeof(mv));
 
       if (v->rd >= end)
          break;
@@ -1072,38 +1193,58 @@ static bool decode_slice(rmpeg1_video_t *v, unsigned vertical_pos, size_t end)
          return false;
       increment += (unsigned)e->a;
 
-      /* Any gap is skipped macroblocks. In a P picture they are copied from
-       * the reference with a zero vector, and -- easy to miss -- the vector
-       * predictor resets to zero, so the next coded macroblock's vector is
-       * differential against nothing rather than against the last one. */
+      /* Any gap is skipped macroblocks, and what that means depends on the
+       * picture type.
+       *
+       * In a P picture: forward prediction with a zero vector, and the
+       * vector predictors reset, so the next coded macroblock's vector is
+       * differential against nothing rather than against the last one.
+       *
+       * In a B picture: repeat the previous macroblock's vectors and
+       * prediction mode exactly, and do NOT reset the predictors. Treating
+       * a B skip like a P skip produces a picture that looks almost right,
+       * which is the worst kind of wrong.
+       *
+       * Either way the DC predictors reset. */
       if (increment > 1)
       {
+         unsigned k;
+
+         if (v->coding_type == RMPEG1_PIC_I)
+            return false;   /* skipped macroblocks are illegal in I pictures */
+
+         for (k = 1; k < increment; k++)
+         {
+            unsigned a2 = v->mb_addr + k;
+            unsigned sflags;
+            int      smv[2][2];
+
+            if (a2 >= v->mb_w * v->mb_h)
+               return false;
+
+            if (v->coding_type == RMPEG1_PIC_B)
+            {
+               sflags = v->last_flags
+                      & (RMPEG1_MB_FORWARD | RMPEG1_MB_BACKWARD);
+               memcpy(smv, v->last_mv, sizeof(smv));
+            }
+            else
+            {
+               sflags = RMPEG1_MB_FORWARD;
+               memset(smv, 0, sizeof(smv));
+            }
+
+            if (!decode_inter_macroblock(v, a2, sflags, (const int (*)[2])smv, 0))
+               return false;
+         }
+
          if (v->coding_type == RMPEG1_PIC_P)
          {
-            unsigned k;
-
-            for (k = 1; k < increment; k++)
-            {
-               unsigned a = v->mb_addr + k;
-
-               if (a >= v->mb_w * v->mb_h)
-                  return false;
-               if (!decode_inter_macroblock(v, a, 0, 0, 0))
-                  return false;
-            }
-            v->mv_pred_x = 0;
-            v->mv_pred_y = 0;
-
-            /* A skipped macroblock resets the DC predictors, exactly as a
-             * coded non-intra one does. Missing this is invisible until an
-             * intra macroblock appears in a P picture after a skip run: its
-             * four luma blocks share one prediction chain, so the whole
-             * 16x16 comes out uniformly offset, and prediction then carries
-             * that block forward unchanged for the rest of the GOP. */
-            reset_dc_predictors(v);
+            v->mv_pred[0][0] = v->mv_pred[0][1] = 0;
+            v->mv_pred[1][0] = v->mv_pred[1][1] = 0;
          }
-         else if (v->coding_type == RMPEG1_PIC_I)
-            return false;   /* skipped macroblocks are illegal in I pictures */
+
+         reset_dc_predictors(v);
       }
 
       v->mb_addr += increment;
@@ -1122,7 +1263,8 @@ static bool decode_slice(rmpeg1_video_t *v, unsigned vertical_pos, size_t end)
       }
       else
       {
-         e = vlc_decode(v, rmpeg1_vlc_mb_type_p);
+         e = vlc_decode(v, v->coding_type == RMPEG1_PIC_B
+                           ? rmpeg1_vlc_mb_type_b : rmpeg1_vlc_mb_type_p);
          if (!e)
             return false;
          flags = (unsigned)e->a;
@@ -1135,36 +1277,41 @@ static bool decode_slice(rmpeg1_video_t *v, unsigned vertical_pos, size_t end)
             return false;
       }
 
-      if (flags & RMPEG1_MB_FORWARD)
+      for (d = 0; d < 2; d++)
       {
-         if (!decode_motion(v, &v->mv_pred_x, &mvx))
-            return false;
-         if (!decode_motion(v, &v->mv_pred_y, &mvy))
-            return false;
+         unsigned bit = (d == 0) ? RMPEG1_MB_FORWARD : RMPEG1_MB_BACKWARD;
 
-         /* A full-pel vector is stored in whole samples, so it doubles into
-          * the half-sample units everything downstream works in. */
-         if (v->full_pel)
+         if (flags & bit)
          {
-            mvx *= 2;
-            mvy *= 2;
+            if (!decode_motion(v, d, &v->mv_pred[d][0], &mv[d][0]))
+               return false;
+            if (!decode_motion(v, d, &v->mv_pred[d][1], &mv[d][1]))
+               return false;
+
+            /* A full-pel vector is stored in whole samples, so it doubles
+             * into the half-sample units everything downstream works in. */
+            if (v->full_pel[d])
+            {
+               mv[d][0] *= 2;
+               mv[d][1] *= 2;
+            }
          }
-      }
-      else
-      {
-         /* No motion vector: predict from the co-located block, and reset
-          * the predictor for the same reason as a skipped macroblock. */
-         v->mv_pred_x = 0;
-         v->mv_pred_y = 0;
+         else if (v->coding_type != RMPEG1_PIC_B)
+         {
+            /* No vector in a P picture: predict from the co-located block,
+             * and reset the predictor for the same reason as a skip. In a B
+             * picture an unused direction leaves its predictor alone. */
+            v->mv_pred[d][0] = v->mv_pred[d][1] = 0;
+         }
       }
 
       if (flags & RMPEG1_MB_INTRA)
       {
          if (!decode_intra_macroblock(v, v->mb_addr))
             return false;
-         /* An intra macroblock breaks the vector prediction chain. */
-         v->mv_pred_x = 0;
-         v->mv_pred_y = 0;
+         /* An intra macroblock breaks both vector prediction chains. */
+         v->mv_pred[0][0] = v->mv_pred[0][1] = 0;
+         v->mv_pred[1][0] = v->mv_pred[1][1] = 0;
       }
       else
       {
@@ -1177,12 +1324,16 @@ static bool decode_slice(rmpeg1_video_t *v, unsigned vertical_pos, size_t end)
             cbp = (unsigned)e->a;
          }
 
-         if (!decode_inter_macroblock(v, v->mb_addr, mvx, mvy, cbp))
+         if (!decode_inter_macroblock(v, v->mb_addr, flags,
+                                      (const int (*)[2])mv, cbp))
             return false;
 
          /* DC predictors reset on any non-intra macroblock. */
          reset_dc_predictors(v);
       }
+
+      v->last_flags = flags;
+      memcpy(v->last_mv, mv, sizeof(mv));
    }
 
    return true;
@@ -1250,21 +1401,104 @@ static bool parse_picture_header(rmpeg1_video_t *v)
 
    if (v->coding_type == RMPEG1_PIC_P || v->coding_type == RMPEG1_PIC_B)
    {
-      v->full_pel = get_bit(v) ? true : false;
-      v->f_code   = (int)get_bits(v, 3);
-      if (v->f_code < 1)
+      v->full_pel[0] = get_bit(v) ? true : false;
+      v->f_code[0]   = (int)get_bits(v, 3);
+      if (v->f_code[0] < 1)
          return false;           /* forward_f_code 0 is forbidden */
    }
    if (v->coding_type == RMPEG1_PIC_B)
    {
-      (void)get_bit(v);          /* full_pel_backward_vector */
-      (void)get_bits(v, 3);      /* backward_f_code          */
+      v->full_pel[1] = get_bit(v) ? true : false;
+      v->f_code[1]   = (int)get_bits(v, 3);
+      if (v->f_code[1] < 1)
+         return false;           /* backward_f_code 0 is forbidden */
    }
 
    while (get_bit(v))
       (void)get_bits(v, 8);      /* extra_information_picture */
 
    return true;
+}
+
+/* --------------------------------------------------------------------- */
+/* Frame ordering                                                        */
+/* --------------------------------------------------------------------- */
+
+static bool picture_decodable(const rmpeg1_video_t *v)
+{
+   if (!v->have_seq)
+      return false;
+
+   switch (v->coding_type)
+   {
+      case RMPEG1_PIC_I:
+         return true;
+      case RMPEG1_PIC_P:
+         return v->have_bwd;              /* predicts from the last ref */
+      case RMPEG1_PIC_B:
+         return v->have_fwd && v->have_bwd;
+      default:
+         break;
+   }
+   return false;
+}
+
+static void fill_frame(rmpeg1_video_t *v, int slot,
+      rmpeg1_video_frame_t *out, unsigned tref, unsigned ctype)
+{
+   out->y            = RM_Y(v, slot);
+   out->cb           = RM_CB(v, slot);
+   out->cr           = RM_CR(v, slot);
+   out->width        = v->width;
+   out->height       = v->height;
+   out->y_stride     = v->y_stride;
+   out->c_stride     = v->c_stride;
+   out->temporal_ref = tref;
+   out->coding_type  = (uint8_t)ctype;
+}
+
+/* Emit in display order and rotate the reference slots.
+ *
+ * A B picture is never a reference, so it goes out as soon as it is decoded.
+ * An I or P picture cannot: the B pictures that follow it in the bitstream
+ * are displayed before it. So decoding one releases the *previous* future
+ * reference instead, and the new picture takes its place. That is the whole
+ * of the reordering -- a one-picture delay on references and none on B.
+ *
+ * Nothing is emitted for the very first reference picture of a stream, since
+ * there is no older one to release yet; rmpeg1_video_flush() drains it at
+ * the end.
+ *
+ * out->y is left NULL when there is nothing to display this call. */
+static void emit_picture(rmpeg1_video_t *v, rmpeg1_video_frame_t *out)
+{
+   memset(out, 0, sizeof(*out));
+
+   if (v->coding_type == RMPEG1_PIC_B)
+   {
+      fill_frame(v, v->slot_cur, out, v->temporal_ref, v->coding_type);
+      return;
+   }
+
+   if (v->have_bwd)
+      fill_frame(v, v->slot_bwd, out, v->bwd_tref, v->bwd_type);
+
+   {
+      int freed = v->slot_fwd;
+
+      v->slot_fwd = v->slot_bwd;
+      v->slot_bwd = v->slot_cur;
+      v->slot_cur = freed;
+   }
+
+   v->have_fwd  = v->have_bwd;
+   v->have_bwd  = true;
+   v->bwd_tref  = v->temporal_ref;
+   v->bwd_type  = v->coding_type;
+
+   /* The frame just handed out now lives in slot_fwd and is not written
+    * again until two reference pictures later, so the caller's pointers stay
+    * valid for the lifetime the header promises. */
 }
 
 /* --------------------------------------------------------------------- */
@@ -1297,12 +1531,13 @@ void rmpeg1_video_free(rmpeg1_video_t *v)
    if (!v)
       return;
    free(v->buf);
-   free(v->plane_y);
-   free(v->plane_cb);
-   free(v->plane_cr);
-   free(v->ref_y);
-   free(v->ref_cb);
-   free(v->ref_cr);
+   {
+      int k, j;
+
+      for (k = 0; k < 3; k++)
+         for (j = 0; j < 3; j++)
+            free(v->plane[k][j]);
+   }
    free(v);
 }
 
@@ -1312,6 +1547,18 @@ void rmpeg1_video_flush(rmpeg1_video_t *v)
       v->eof = true;
 }
 
+/* After the last picture, the future reference is still held back. Release
+ * it once. */
+static int drain_held(rmpeg1_video_t *v, rmpeg1_video_frame_t *out)
+{
+   if (!v->eof || !v->have_bwd)
+      return 0;
+
+   fill_frame(v, v->slot_bwd, out, v->bwd_tref, v->bwd_type);
+   v->have_bwd = false;
+   return 1;
+}
+
 void rmpeg1_video_reset(rmpeg1_video_t *v)
 {
    if (!v)
@@ -1319,7 +1566,8 @@ void rmpeg1_video_reset(rmpeg1_video_t *v)
    v->eof = false;
    v->rd = v->wr = 0;
    v->bit = 0;
-   v->have_ref = false;
+   v->have_fwd = false;
+   v->have_bwd = false;
 }
 
 static void compact(rmpeg1_video_t *v)
@@ -1375,7 +1623,7 @@ int rmpeg1_video_decode(rmpeg1_video_t *v, rmpeg1_video_frame_t *out)
       if (code < 0)
       {
          v->rd = save_rd;
-         return 0;
+         return drain_held(v, out);
       }
 
       switch (code)
@@ -1404,12 +1652,17 @@ int rmpeg1_video_decode(rmpeg1_video_t *v, rmpeg1_video_frame_t *out)
                v->rd = save_rd;
                return 0;
             }
-            /* A P picture without a reference cannot be reconstructed --
-             * this happens on entry mid-stream, before the first I. */
-            if (v->coding_type == RMPEG1_PIC_P && !v->have_ref)
+            /* A predicted picture without its reference cannot be
+             * reconstructed. This happens on entry mid-stream, before the
+             * first I picture has been seen. */
+            if (v->coding_type == RMPEG1_PIC_P && !v->have_bwd)
+               v->skipped++;
+            else if (     v->coding_type == RMPEG1_PIC_B
+                       && (!v->have_fwd || !v->have_bwd))
                v->skipped++;
             else if (     v->coding_type != RMPEG1_PIC_I
-                       && v->coding_type != RMPEG1_PIC_P)
+                       && v->coding_type != RMPEG1_PIC_P
+                       && v->coding_type != RMPEG1_PIC_B)
                v->skipped++;
             break;
 
@@ -1455,11 +1708,7 @@ int rmpeg1_video_decode(rmpeg1_video_t *v, rmpeg1_video_frame_t *out)
                   end = v->wr;
                }
 
-               /* I and P are reconstructed. B pictures need a backward
-                * reference and display reordering, so their slices are
-                * stepped over. */
-               if (     v->coding_type != RMPEG1_PIC_I
-                     && !(v->coding_type == RMPEG1_PIC_P && v->have_ref))
+               if (!picture_decodable(v))
                {
                   v->rd  = end;
                   v->bit = 0;
@@ -1486,29 +1735,10 @@ int rmpeg1_video_decode(rmpeg1_video_t *v, rmpeg1_video_frame_t *out)
                         && v->buf[p + 3] <= RMPEG1_START_SLICE_HI)
                      break;         /* same picture continues */
 
-                  out->y            = v->plane_y;
-                  out->cb           = v->plane_cb;
-                  out->cr           = v->plane_cr;
-                  /* Swap rather than copy: the picture just completed is the
-                   * reference for the next P. The caller's planes stay valid
-                   * until its next call, which is what the header promises,
-                   * because the buffer it was handed becomes ref_* and is
-                   * not written again until the picture after next. */
-                  {
-                     uint8_t *ty = v->plane_y, *tb = v->plane_cb, *tr = v->plane_cr;
-                     v->plane_y  = v->ref_y;  v->plane_cb = v->ref_cb;
-                     v->plane_cr = v->ref_cr;
-                     v->ref_y    = ty;        v->ref_cb   = tb;
-                     v->ref_cr   = tr;
-                     v->have_ref = true;
-                  }
-                  out->width        = v->width;
-                  out->height       = v->height;
-                  out->y_stride     = v->y_stride;
-                  out->c_stride     = v->c_stride;
-                  out->temporal_ref = v->temporal_ref;
-                  out->coding_type  = (uint8_t)v->coding_type;
-                  return 1;
+                  emit_picture(v, out);
+                  if (out->y)
+                     return 1;
+                  break;
                }
             }
             break;

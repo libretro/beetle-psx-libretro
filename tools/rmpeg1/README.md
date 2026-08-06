@@ -109,3 +109,29 @@ a prediction fault -- the thing MPEG's oddification mismatch control exists
 to bound. A motion compensation bug does not reset cleanly, which is how the
 skipped-macroblock DC predictor defect was found: it showed as a uniform
 -46 across one 16x16 block that persisted, unchanged, for the rest of the GOP.
+
+### B-picture support
+
+Generate a stream with B pictures:
+
+```sh
+ffmpeg -f lavfi -i "testsrc=size=352x240:rate=29.97:duration=3" \
+       -f lavfi -i "sine=frequency=440:sample_rate=44100:duration=3" \
+       -c:v mpeg1video -b:v 1150k -bf 2 -g 15 -c:a mp2 -b:a 224k \
+       -f mpeg bframes.mpg
+```
+
+| stream | frames | worst Y maxdiff | mean |
+|---|---|---|---|
+| vcd_ntsc | 90/90 | 5 | 0.11 |
+| vcd_pal | 100/100 | 5 | 0.10 |
+| vcd_noaudio | 60/60 | 3 | 0.05 |
+| generic (full-pel, f_code 7) | 60/60 | 6 | 0.12 |
+| bframes (6 I, 24 P, 59 B) | 89 compared | 5 | 0.11 |
+
+Coded order `IPBBPBBPBB...` comes out as `IBBPBBPBB...`, which is the
+reordering the format requires.
+
+On the B stream we emit 90 frames where pl_mpeg emits 89. That is not a
+discrepancy in the pictures: pl_mpeg holds its final reference and has no
+flush, so it drops the last one. rmpeg1_video_flush() releases ours.

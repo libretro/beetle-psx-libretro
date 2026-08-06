@@ -10,11 +10,15 @@
  * Takes the video elementary stream -- what rmpeg1_ps hands out for
  * RMPEG1_PS_VIDEO packets -- and produces 4:2:0 planar frames.
  *
- * Current scope: I-pictures. P and B pictures are parsed far enough to be
- * skipped cleanly rather than corrupting the bitstream position, and are
- * reported through rmpeg1_video_skipped(). Intra decoding stands alone --
- * an I-picture needs no reference frames -- which makes it the piece that
- * can be verified in isolation before prediction is added.
+ * Decodes I, P and B pictures. Frames come out in display order: a B picture
+ * is emitted as soon as it is decoded, while an I or P picture is held back
+ * one reference, because the B pictures that follow it in the bitstream are
+ * displayed before it. Call rmpeg1_video_flush() at end of stream to release
+ * the last one.
+ *
+ * Pictures that cannot be reconstructed -- a P or B before the first I, on a
+ * mid-stream entry -- are counted by rmpeg1_video_skipped() and stepped over
+ * without disturbing the bitstream position.
  *
  * Buffers live in the decoder context, not on the stack: the only block-sized
  * object in automatic storage is a single 64-entry coefficient array, so the

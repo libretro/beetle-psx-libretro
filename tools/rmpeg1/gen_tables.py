@@ -111,6 +111,7 @@ def flagtable(a, b):
     return out
 
 b3  = flagtable(7875, 7901)
+b4  = flagtable(7902, 7928)
 b9  = list(pairs(8060, 8114))
 b10 = list(pairs(8115, 8160))
 
@@ -139,11 +140,13 @@ validate('mba',       [c[0] for c in b1] + [mba_escape])
 validate('dc_lum',    [c[0] for c in b12], Fraction(1))
 validate('dc_chr',    [c[0] for c in b13], Fraction(1))
 validate('mb_type_p', [c[0] for c in b3])
+validate('mb_type_b', [c[0] for c in b4])
 validate('cbp',       [c[0] for c in b9])
 validate('motion',    [c[0] for c in b10])
 assert sorted(v for _, v in b9)  == list(range(1, 64)), 'B.9 incomplete'
 assert sorted(v for _, v in b10) == list(range(-16, 17)), 'B.10 incomplete'
-assert len(b3) == 7, 'B.3 expected 7 rows, got %d' % len(b3)
+assert len(b3) == 7,  'B.3 expected 7 rows, got %d' % len(b3)
+assert len(b4) == 11, 'B.4 expected 11 rows, got %d' % len(b4)
 
 def emit(name, entries):
     print("static const rmpeg1_vlc_t %s[] = {" % name)
@@ -208,6 +211,7 @@ emit("rmpeg1_vlc_mba",       b1)
 emit("rmpeg1_vlc_dc_lum",    b12)
 emit("rmpeg1_vlc_dc_chr",    b13)
 emit("rmpeg1_vlc_mb_type_p", b3)
+emit("rmpeg1_vlc_mb_type_b", b4)
 emit("rmpeg1_vlc_cbp",       b9)
 emit("rmpeg1_vlc_motion",    b10)
 print("""

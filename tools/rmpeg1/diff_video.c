@@ -62,7 +62,7 @@ int main(int argc, char **argv)
             size_t w=rmpeg1_video_write(vid,pkt.data+p,pkt.size-p);
             p+=w;
             while(rmpeg1_video_decode(vid,&fr)){
-               if((fr.coding_type==1||fr.coding_type==2) && nm<4096)
+               if(nm<4096)
                   { grab(&mine[nm],fr.y,fr.cb,fr.cr,fr.width,fr.height,fr.y_stride,fr.c_stride); grab_t(&mine[nm],fr.coding_type); nm++; }
             }
             if(w==0) break;
@@ -72,7 +72,7 @@ int main(int argc, char **argv)
    }
    rmpeg1_video_flush(vid);
    while(rmpeg1_video_decode(vid,&fr))
-      if((fr.coding_type==1||fr.coding_type==2) && nm<4096)
+      if(nm<4096)
          { grab(&mine[nm],fr.y,fr.cb,fr.cr,fr.width,fr.height,fr.y_stride,fr.c_stride); grab_t(&mine[nm],fr.coding_type); nm++; }
 
    /* ---- reference ---- */
@@ -129,7 +129,7 @@ int main(int argc, char **argv)
          }
          if (getenv("RMPEG1_PERFRAME"))
             printf("  frame %3zu type=%c maxdiff=%3ld mean=%.4f\n",
-                   i, a2->type==1?'I':'P', maxd, sum/(double)n);
+                   i, a2->type==1?'I':(a2->type==2?'P':'B'), maxd, sum/(double)n);
          if (maxd > worst) { worst = maxd; worst_i = i; worst_mean = sum/(double)n; }
          if (maxd > 16) { printf("frame %zu: Y maxdiff=%ld mean=%.4f\n",
                                  i, maxd, sum/(double)n); fails++; }
