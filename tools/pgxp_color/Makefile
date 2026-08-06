@@ -1,18 +1,27 @@
 ROOT := ../..
 CFLAGS ?= -O2 -g -Wall -Wextra -Wno-unused-parameter -fwrapv
-CPPFLAGS := -I$(ROOT) -I$(ROOT)/pgxp
+CPPFLAGS := -I$(ROOT) -I$(ROOT)/pgxp -I$(ROOT)/libretro-common/include
 
-all: oracle
+# Links the real PGXP sources, so the code under test is the shipping code
+# rather than a copy of it.
+PGXP_SRC := $(ROOT)/pgxp/pgxp_gpu.c $(ROOT)/pgxp/pgxp_gte.c \
+            $(ROOT)/pgxp/pgxp_cpu.c $(ROOT)/pgxp/pgxp_mem.c \
+            $(ROOT)/pgxp/pgxp_main.c $(ROOT)/pgxp/pgxp_value.c
 
-# Links the real pgxp_gpu.c, so the accept rule under test is the shipping
-# one rather than a copy of it.
+all: oracle transport
+
 oracle: oracle.c $(ROOT)/pgxp/pgxp_gpu.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ oracle.c $(ROOT)/pgxp/pgxp_gpu.c -lm
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ oracle.c $(ROOT)/pgxp/pgxp_gpu.c stub_log.c -lm
 
-check: oracle
+transport: transport.c $(PGXP_SRC)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ transport.c $(PGXP_SRC) stub_log.c -lm
+
+check: oracle transport
 	./oracle
+	@echo
+	./transport
 
 clean:
-	rm -f oracle
+	rm -f oracle transport
 
 .PHONY: all check clean

@@ -34,6 +34,10 @@
 #include <math.h>
 #include <assert.h>
 
+#include <libretro.h>
+
+extern retro_log_printf_t log_cb;
+
 /* ============================================================
  * Partial FIFO and Command Buffer implementation
  * ============================================================ */
@@ -307,9 +311,10 @@ int PGXP_GetColor(const uint32_t offset, const uint32_t* addr, float* out_rgb)
 	/* Instrumentation for the go/no-go measurement: one cumulative line
 	 * per ~1M gouraud/flat color words.  Scaffolding - the durable API
 	 * is PGXP_GetColorStats; this line goes away with the renderer
-	 * slice. */
-	if (!(color_stats[0] & 0xFFFFFu))
-		fprintf(stderr,
+	 * slice.  log_cb is NULL both before the frontend installs it and in
+	 * the offline harness, which links this TU without libretro.c. */
+	if (!(color_stats[0] & 0xFFFFFu) && log_cb)
+		log_cb(RETRO_LOG_INFO,
 		      "[PGXP color] words=%u hit=%u (%.1f%%) value-miss=%u quant-miss=%u\n",
 		      color_stats[0], color_stats[1],
 		      100.0 * (double)color_stats[1] / (double)color_stats[0],
