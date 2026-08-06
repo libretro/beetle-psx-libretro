@@ -15,6 +15,7 @@ Notable additions in this fork are:
 * HD texture replacement caching overhaul (Vulkan renderer), see [HD_TEXTURE_CACHE.md](HD_TEXTURE_CACHE.md);
 * Page-aligned HD texture dump/replacement, an opt-in mode for static/3D art (Vulkan renderer), see [PAGE_ALIGN.md](PAGE_ALIGN.md);
 * HD Reduce Palette Range, an opt-in hash of only a texture's used palette entries for better replacement match coverage (Vulkan renderer);
+* Video CD playback, including support for the 1 MB SCPH-5903 kernel, see [Video CD](#video-cd-scph-5903);
 
 ## HD texture replacement caching
 
@@ -42,6 +43,84 @@ Options (all default to the classic upload-rect behaviour):
 Page packs and upload-rect packs are **not** interchangeable (the hash covers a
 different region of VRAM). Full details and the authoring workflow:
 [PAGE_ALIGN.md](PAGE_ALIGN.md).
+
+## Video CD (SCPH-5903)
+
+The SCPH-5903 is a PlayStation sold in Asia in 1996 with an MPEG-1 decoder
+daughterboard, able to play Video CDs. It is the only PS1 model that could.
+This fork plays VCDs, with or without that machine's kernel.
+
+Two things are worth knowing about the hardware, because they shape how this
+works. The daughterboard is not on the CPU bus: it hangs off three GPIO pins
+of the CD-ROM sub-CPU and takes its data straight from the CD DSP's serial
+audio bus, and its video and audio outputs are selected against the GPU's and
+SPU's by analogue multiplexors on the mainboard. So MPEG video never enters
+VRAM and MPEG audio never enters the SPU — Video CD mode substitutes the
+whole video and audio front end rather than drawing into the frame the GPU
+produced. And Video CD is **MPEG-1**, not the H.261 it is sometimes said to
+be; MPEG-1 borrows from H.261 but adds B-frames and half-sample motion
+compensation, which is exactly why the PS1's MDEC — intra-only, no motion
+compensation — could not do the job and the extra board existed at all.
+
+A Video CD is detected automatically from the disc and one of two modes is
+selected:
+
+* **HLE** (any BIOS, or OpenBIOS) — the PSX is not booted at all; there is no
+  PSX-side program on a Video CD to run, and the stock shell would report
+  *Audio Disk !!* or reject the disc. The core supplies the player itself.
+  **Start** plays and pauses, **Select** stops, **Left**/**Right** change
+  track. This is the mode to use.
+* **Daughterboard** (SCPH-5903 kernel loaded) — the kernel's own Video CD
+  player runs and the core stands in for the MPEG board, answering CD-ROM
+  command `1Fh`. See the caveat below.
+
+### Using the SCPH-5903 kernel
+
+The kernel is 1 MB rather than the usual 512 KB, and the core previously
+could not load it at all. It is a Japanese-region machine, so it expects SCEI
+discs.
+
+```
+size 1048576
+md5  81328b966e6dcf7ea1e32e55e1c104bb
+sha1 15c94da3cc5a38a582429575af4198c487fe893c
+```
+
+Point the BIOS path override at it, or drop it in the system directory for
+the firmware scan to find. It is not used unless selected — it is only wanted
+for the Video CD case.
+
+### Decoding
+
+The MPEG-1 program stream demultiplexer and video decoder live in
+libretro-common as `rmpeg1`, written from ITU-T H.262 (whose Annex B carries
+the same code tables as ISO/IEC 11172-2) rather than derived from an existing
+implementation. Audio is MPEG-1 layer II, which libretro-common's `rmp3`
+already decodes. Nothing here is vendored third-party code.
+
+The video decoder's IDCT is within the IEEE 1180-1990 peak error of 1 against
+a double-precision reference, and the tables it uses are generated from the
+specification by a script that proves each one prefix-free and checks its
+Kraft sum before emitting it. Test harnesses are in
+`libretro-common/tools/mpeg1` and `tools/vcd`.
+
+### Limitations
+
+* **Daughterboard mode is best-effort.** The CD-ROM sub-CPU only relays five
+  opaque bytes in each direction, and the daughterboard's own firmware has
+  never been dumped, so the meaning of the exchanged status bytes is not
+  publicly known. The encoding used here is this fork's own: it presents the
+  kernel with a live, well-formed board and a sane clock, but the kernel's
+  player may not advance exactly as it would on real hardware. Prefer HLE
+  until someone captures a Port F trace from a real machine.
+* **SVCD is recognised but not decoded.** SVCD video is MPEG-2; only MPEG-1
+  is implemented, so an SVCD gives audio and no picture.
+* **Playback Control (PBC) is detected but not interpreted.** Discs play
+  their chapter list linearly rather than through their menus. Many
+  commercial discs ship broken PSD files, so this is a defensible default
+  regardless.
+* Testing has been against synthesised sectors carrying real MPEG streams,
+  not yet against a pressed disc image end to end.
 
 ## Building
 
