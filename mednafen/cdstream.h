@@ -188,6 +188,20 @@ static INLINE uint64_t cdstream_size(cdstream *s)
  * open. */
 static INLINE void cdstream_close(cdstream *s)
 {
+   /* buf is always borrowed, never owned. It points either into a VFS file
+    * mapping, whose lifetime belongs to the RFILE and which the VFS unmaps
+    * on close, or into a data_transfer's buffer, which the transfer owns.
+    * Nothing here ever allocates it, so it must never be freed.
+    *
+    * This previously ended with a free(s->buf) for the case where neither
+    * owner was set. There is no such case -- every assignment to buf comes
+    * from filestream_get_mapped_ptr or from data_transfer_ptr -- so that
+    * branch could only ever fire on a mapped pointer, and only after the
+    * filestream_close above had already unmapped it. It went unnoticed
+    * because file mapping was POSIX-only; once the VFS gained a Win32
+    * MapViewOfFile path, every close of a mapped disc image freed an
+    * unmapped, never-allocated pointer, which is a heap corruption that
+    * surfaces as a crash inside RtlFreeHeap on the next allocation. */
    if (s->fp)
    {
       filestream_close(s->fp);
@@ -195,16 +209,10 @@ static INLINE void cdstream_close(cdstream *s)
    }
    if (s->dt)
    {
-      /* The transfer owns the memory buf points into. */
       data_transfer_free(s->dt);
-      s->dt  = NULL;
-      s->buf = NULL;
+      s->dt = NULL;
    }
-   if (s->buf)
-   {
-      free(s->buf);
-      s->buf  = NULL;
-   }
+   s->buf  = NULL;
    s->size = 0;
    s->pos  = 0;
 }

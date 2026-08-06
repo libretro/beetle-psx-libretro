@@ -20,6 +20,25 @@ A disc whose INFO identifies it as a Video CD but whose ENTRIES is corrupt
 keeps its type and returns an empty chapter list. The type comes from INFO,
 not from ENTRIES, and the caller has to handle a short list regardless.
 
+## cdstream_map_test.c
+
+Ownership check for `mednafen/cdstream`: open, close, heap-allocated variant,
+and the memcache conversion, followed by a fresh allocation to prove the heap
+survived.
+
+**Must be built with `-DHAVE_MMAP`** or it proves nothing. `cdstream_open`
+asks the VFS for a file mapping, and without that define no mapping comes
+back, `buf` stays NULL, and the branch under test is unreachable. Every other
+harness here was built without it, which is exactly how a heap-corrupting
+free reached a user.
+
+`cdstream::buf` is always borrowed -- from a VFS mapping whose lifetime
+belongs to the RFILE, or from a `data_transfer`'s buffer owned by the
+transfer. Nothing ever allocates it, so it must never be freed. The
+corruption does not surface at the free either; it surfaces in a later,
+unrelated allocation, which is why the reported crash was inside
+`RtlFreeHeap` under `CDAccess_Image_ImageOpen`.
+
 ## vcd_state.c
 
 `VCD_StateAction` round-trip through the real SFORMAT machinery. Drives the
