@@ -5211,10 +5211,18 @@ static StatusFlags *fbatlas_info(FBAtlas *self,
    {
       float x, y, w;
       uint32_t color;
-      /* Always set by the pushers: the precise (pre-saturation) colour when
-       * supplied, else color's bytes / 255. 1.0 == 0xFF either way. */
-      float cf[3];
       uint16_t u, v;
+      /* Always set by the pushers (vertices_set_cf): the precise
+       * (pre-saturation) colour when supplied, else color's bytes / 255.
+       * 1.0 == 0xFF either way.
+       *
+       * MUST REMAIN THE LAST MEMBER. The pushers initialize Vertex
+       * positionally -- { x, y, w, color, u, v } -- so a field inserted
+       * before u/v silently receives the texture coordinates and every
+       * textured draw samples texel (0,0): all fonts, sprites and logos
+       * vanish while untextured polygons keep rendering. That is not a
+       * hypothetical; it shipped. */
+      float cf[3];
    };
 
    struct TextureWindow
@@ -9263,10 +9271,20 @@ static void renderer_clear_quad(Renderer *self,
    z   = renderer_allocate_depth(self, Domain_Unscaled, rect);
    fbatlas_set_texture_mode(&self->atlas, old);
 
-   { BufferVertex pos0 = { (float)(rect->x), (float)(rect->y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
-   BufferVertex pos1 = { (float)(rect->x) + (float)(rect->width), (float)(rect->y), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
-   BufferVertex pos2 = { (float)(rect->x), (float)(rect->y) + (float)(rect->height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
-   BufferVertex pos3 = { (float)(rect->x) + (float)(rect->width), (float)(rect->y) + (float)(rect->height), z, 1.0f, FBCOLOR_TO_RGBA8(fb_color) };
+   /* BufferVertex colour is float[4] now; a positional initializer would
+    * put the packed word into color[0] as a nonsense float and zero the
+    * rest, so unpack it once and initialize the array explicitly. Alpha is
+    * the force-mask bit: fills never set the mask, and FBCOLOR_TO_RGBA8's
+    * old alpha byte was masked to 0xf8 anyway -- the mask semantics live in
+    * bit 15 of VRAM, produced by the fragment stage, not in this attrib. */
+   { const uint32_t fbc = FBCOLOR_TO_RGBA8(fb_color);
+   const float fbr = (float)((fbc >>  0) & 0xFF) / 255.0f;
+   const float fbg = (float)((fbc >>  8) & 0xFF) / 255.0f;
+   const float fbb = (float)((fbc >> 16) & 0xFF) / 255.0f;
+   BufferVertex pos0 = { (float)(rect->x), (float)(rect->y), z, 1.0f, { fbr, fbg, fbb, 0.0f } };
+   BufferVertex pos1 = { (float)(rect->x) + (float)(rect->width), (float)(rect->y), z, 1.0f, { fbr, fbg, fbb, 0.0f } };
+   BufferVertex pos2 = { (float)(rect->x), (float)(rect->y) + (float)(rect->height), z, 1.0f, { fbr, fbg, fbb, 0.0f } };
+   BufferVertex pos3 = { (float)(rect->x) + (float)(rect->width), (float)(rect->y) + (float)(rect->height), z, 1.0f, { fbr, fbg, fbb, 0.0f } };
    BufferVertexVec_push(&self->queue.opaque, &pos0);
    BufferVertexVec_push(&self->queue.opaque, &pos1);
    BufferVertexVec_push(&self->queue.opaque, &pos2);
