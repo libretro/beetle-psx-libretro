@@ -983,6 +983,16 @@ static void mc_async_flush_and_stop(void)
 PS_CDC *PSX_CDC = NULL;
 FrontIO *PSX_FIO = NULL;
 
+/* The SCPH-5903 (PU-16, "PSX with Video CD") ships a 1 Mbyte kernel ROM
+ * (M538032E-02) rather than the usual 512 Kbyte part.  Low 512K is an
+ * ordinary "System ROM Version 2.2 12/04/95 J" kernel; the upper half holds
+ * an enlarged shell overlay at BFC80000h and the Video CD player image at
+ * BFCD0000h.  Reserve the larger size unconditionally -- it is half a
+ * megabyte of address space, and making the reservation conditional would
+ * mean re-doing the lightrec mapping when the user swaps BIOS. */
+#define BIOS_SIZE    0x100000
+#define BIOS_SIZE_STD 0x80000
+
 MultiAccessSizeMem *BIOSROM = NULL;
 
 /* Address mask for the mapped BIOS: 0x7FFFF for a stock 512K image,
@@ -2215,15 +2225,7 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
  * MultiAccessSizeMem_New() in the non-lightrec path), so they must NOT be
  * gated on HAVE_LIGHTREC. */
 #define RAM_SIZE     0x200000
-/* The SCPH-5903 (PU-16, "PSX with Video CD") ships a 1 Mbyte kernel ROM
- * (M538032E-02) rather than the usual 512 Kbyte part.  Low 512K is an
- * ordinary "System ROM Version 2.2 12/04/95 J" kernel; the upper half holds
- * an enlarged shell overlay at BFC80000h and the Video CD player image at
- * BFCD0000h.  Reserve the larger size unconditionally -- it is half a
- * megabyte of address space, and making the reservation conditional would
- * mean re-doing the lightrec mapping when the user swaps BIOS. */
-#define BIOS_SIZE    0x100000
-#define BIOS_SIZE_STD 0x80000
+
 #define SCRATCH_SIZE 0x400
 #define SHM_SIZE     (RAM_SIZE + BIOS_SIZE + SCRATCH_SIZE)
 #define PIO_SIZE     (65536)
@@ -5811,7 +5813,9 @@ bool retro_load_game(const struct retro_game_info *info)
    {
       VCD_DiscInfo vi;
 
-      if (VCD_ProbeDisc(&vi) != VCD_DISC_NONE)
+      CDIF *vcd_cdif = (cdifs_loaded && cdifs.count > 0) ? cdifs.items[0] : NULL;
+
+      if (vcd_cdif && VCD_ProbeDisc(vcd_cdif, &vi) != VCD_DISC_NONE)
       {
          VCD_SetMode(psx_bios_is_scph5903 ? VCD_MODE_BOARD : VCD_MODE_HLE);
 

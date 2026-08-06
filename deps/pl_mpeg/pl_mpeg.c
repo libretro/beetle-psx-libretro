@@ -13,4 +13,10 @@
 
 #define PLM_NO_STDIO 1
 #define PL_MPEG_IMPLEMENTATION
+
+/* pl_mpeg.h uses size_t in its public types but only reaches <stddef.h>
+ * transitively via <stdio.h>, which PLM_NO_STDIO removes. Pull it in here
+ * rather than patching the vendored header. */
+#include <stddef.h>
+
 #include "pl_mpeg.h"

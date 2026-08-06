@@ -144,11 +144,11 @@ static VCD_DiscType classify_info(const uint8_t *info)
    return VCD_DISC_NONE;
 }
 
-VCD_DiscType VCD_ProbeDisc(VCD_DiscInfo *out_info)
+VCD_DiscType VCD_ProbeDisc(struct CDIF *cdif, VCD_DiscInfo *out_info)
 {
    uint8_t      sec[2048];
    VCD_DiscInfo di;
-   CDIF        *c = CDIF_GetCurrent();
+   CDIF        *c = (CDIF *)cdif;
    unsigned     n, i;
    uint32_t     psd_size;
 

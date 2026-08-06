@@ -47,7 +47,10 @@
  */
 
 #include <stdint.h>
+#include <stddef.h>
 #include <boolean.h>
+
+struct CDIF;
 
 #ifdef __cplusplus
 extern "C" {
@@ -108,9 +111,13 @@ void VCD_Init(void);
 void VCD_Kill(void);
 void VCD_Reset(void);
 
-/* Probe the currently mounted disc. Returns the detected type and fills
- * *out_info when non-NULL. Safe to call with no disc. */
-VCD_DiscType VCD_ProbeDisc(VCD_DiscInfo *out_info);
+/* Probe a mounted disc. Returns the detected type and fills *out_info when
+ * non-NULL. Safe to call with cdif == NULL.
+ *
+ * The CDIF is passed in rather than fetched: libretro.c owns the disc array
+ * and the tray state, and probing has to work for any disc in an m3u set,
+ * not only whichever one happens to be current. */
+VCD_DiscType VCD_ProbeDisc(struct CDIF *cdif, VCD_DiscInfo *out_info);
 
 /* Select the operating mode. Called once after BIOS load: pass have_5903 =
  * true when the loaded kernel is the 1 Mbyte SCPH-5903 image. */
