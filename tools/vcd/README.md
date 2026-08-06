@@ -35,6 +35,43 @@ CD is losslessly re-readable. Dropping and re-priming costs one GOP of latency
 after a load. It also has to happen unconditionally -- a stale reference
 picture surviving a load would be predicted from.
 
+## make_vcd.py and vcd_disc.c
+
+`make_vcd.py` builds a synthetic but spec-conformant Video CD (CUE + BIN);
+`vcd_disc.c` opens it with `CDIF_Open`, reads the TOC, runs `VCD_ProbeDisc`
+against the image, and walks track 2 with `CDIF_ReadRawSector` -- the same
+call cdc.c's sector tap uses.
+
+```sh
+python3 tools/vcd/make_vcd.py stream.mpg out          # add --pal for PAL
+```
+
+This is the only test that exercises the real disc path: the CUE parse, the
+TOC, Mode 2 sector framing as CDIF hands it over, and whether the probe finds
+the control sectors at their mandated LBAs on an actual image. Writing it
+found four things, all in the generator, each caught by the real reader
+rejecting what a hand-rolled one would have accepted:
+
+CUE `INDEX` times are file-relative -- 00:00:00 is the first sector of the
+file, with no lead-in offset. Using the absolute form shifts every track by
+two seconds; the TOC then reports track 2 at LBA 600 for a track that starts
+at 450.
+
+A Mode 2 Form 1 sector is 12 + 4 + 8 + 2048 + 4 + 276. There is no 8-byte
+reserved gap -- Mode 1 has one, and Mode 2 Form 1 spends those bytes on the
+subheader instead. Including both makes a 2360-byte sector, and nothing
+reports it: the file is a plausible size, sector 0 reads correctly, and every
+sector after it is progressively misaligned.
+
+The EDC has to be right. `CDIF_ReadSector` runs each sector through
+`edc_lec_check_and_correct` and returns nothing if it fails, so a probe
+reading INFO.VCD off an image without a valid EDC gets zero bytes and decides
+the disc is not a Video CD -- while raw reads of the same sector work fine,
+which makes it look like a probe bug rather than an image one.
+
+The EDC polynomial is the CD one, x^32 + x^31 + x^16 + x^15 + x^4 + x^3 + x +
+1, not the ordinary CRC-32 polynomial.
+
 ## vcd_pipeline.c
 
 Wraps a real MPEG-1 program stream in Mode 2 Form 2 sectors the way a Video

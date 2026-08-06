@@ -69,13 +69,17 @@ void Kill_LEC_Correct(void)
 
 int CheckEDC(const unsigned char *cd_frame, bool xa_mode)
 { 
-   unsigned int expected_crc, real_crc;
+   uint32_t expected_crc, real_crc;
    unsigned int crc_base = xa_mode ? 2072 : 2064;
 
-   expected_crc = cd_frame[crc_base + 0] << 0;
-   expected_crc |= cd_frame[crc_base + 1] << 8;
-   expected_crc |= cd_frame[crc_base + 2] << 16;
-   expected_crc |= cd_frame[crc_base + 3] << 24;
+   /* Cast before shifting: cd_frame is unsigned char, which promotes to int,
+    * and shifting a value >= 0x80 left by 24 overflows a signed 32-bit int.
+    * That is undefined behaviour, and it happens for roughly half of all
+    * sectors -- any whose EDC high byte has the top bit set. */
+   expected_crc  = (uint32_t)cd_frame[crc_base + 0] << 0;
+   expected_crc |= (uint32_t)cd_frame[crc_base + 1] << 8;
+   expected_crc |= (uint32_t)cd_frame[crc_base + 2] << 16;
+   expected_crc |= (uint32_t)cd_frame[crc_base + 3] << 24;
 
    if(xa_mode) 
       real_crc = EDCCrc32(cd_frame+16, 2056);
