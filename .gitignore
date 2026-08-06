@@ -25,3 +25,4 @@ nul
 # analog verification harness build output (tools/analog)
 tools/analog/runner
 tools/analog/*.spv
+tools/pgxp_color/oracle
