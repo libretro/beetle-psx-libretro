@@ -5829,6 +5829,11 @@ bool retro_load_game(const struct retro_game_info *info)
                vi.has_pbc ? "present" : "absent",
                psx_bios_is_scph5903 ? "daughterboard" : "HLE");
 
+         if (!vi.num_entries)
+            log_cb(RETRO_LOG_WARN,
+                  "Video CD chapter list is empty or unreadable; "
+                  "playback cannot be started automatically\n");
+
          /* HLE mode never boots the kernel: there is no PSX-side program on
           * a Video CD to boot, and the stock shell would just show "Audio
           * Disk !!" or refuse the disc outright. */
@@ -6108,6 +6113,30 @@ void retro_run(void)
       input_poll_cb();
 
    input_update(libretro_supports_bitmasks, input_state_cb);
+
+   /* Video CD transport. In HLE mode there is no PSX-side player to read the
+    * pad, so the buttons have to reach the transport directly or the disc
+    * plays track one and nothing else. In BOARD mode this is what gets
+    * forwarded to the daughterboard over command 1Fh. */
+   if (VCD_GetMode() != VCD_MODE_OFF && input_state_cb)
+   {
+      uint16_t vcd_pad = 0;
+      unsigned bi;
+      static const unsigned vcd_ids[] =
+      {
+         RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_START,
+         RETRO_DEVICE_ID_JOYPAD_UP,     RETRO_DEVICE_ID_JOYPAD_DOWN,
+         RETRO_DEVICE_ID_JOYPAD_LEFT,   RETRO_DEVICE_ID_JOYPAD_RIGHT,
+         RETRO_DEVICE_ID_JOYPAD_A,      RETRO_DEVICE_ID_JOYPAD_B,
+         RETRO_DEVICE_ID_JOYPAD_X,      RETRO_DEVICE_ID_JOYPAD_Y
+      };
+
+      for (bi = 0; bi < sizeof(vcd_ids) / sizeof(vcd_ids[0]); bi++)
+         if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, vcd_ids[bi]))
+            vcd_pad |= (uint16_t)(1u << bi);
+
+      VCD_SetPadState(vcd_pad);
+   }
 
    rects[0] = ~0;
 

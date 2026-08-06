@@ -172,10 +172,28 @@ void VCD_SeekLBA(uint32_t lba);
 VCD_Transport VCD_GetTransport(void);
 uint32_t VCD_GetPositionLBA(void);
 
-/* Feed one frame of libretro pad state (RETRO_DEVICE_ID_JOYPAD_* bitmask).
- * Used by both modes: BOARD mode forwards it over the SIO bridge, HLE mode
- * acts on it directly. */
+/* Feed one frame of pad state. Bit order is the frontend's, packed by the
+ * caller:
+ *
+ *   0 select   2 up     4 left   6 A (cross)   8 X (triangle)
+ *   1 start    3 down   5 right  7 B (circle)  9 Y (square)
+ *
+ * HLE mode acts on the edges directly -- start plays and pauses, select
+ * stops, left and right change track. BOARD mode repacks them into the
+ * daughterboard's own bit order and forwards them over command 1Fh. */
 void VCD_SetPadState(uint16_t buttons);
+
+/* Bit positions in the VCD_SetPadState mask. */
+#define VCD_PAD_SELECT  (1u << 0)
+#define VCD_PAD_START   (1u << 1)
+#define VCD_PAD_UP      (1u << 2)
+#define VCD_PAD_DOWN    (1u << 3)
+#define VCD_PAD_LEFT    (1u << 4)
+#define VCD_PAD_RIGHT   (1u << 5)
+#define VCD_PAD_CROSS   (1u << 6)
+#define VCD_PAD_CIRCLE  (1u << 7)
+#define VCD_PAD_TRIANGLE (1u << 8)
+#define VCD_PAD_SQUARE  (1u << 9)
 
 /* ---- output ---------------------------------------------------------- */
 

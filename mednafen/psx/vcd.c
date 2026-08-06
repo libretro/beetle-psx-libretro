@@ -198,6 +198,14 @@ VCD_DiscType VCD_ProbeDisc(struct CDIF *cdif, VCD_DiscInfo *out_info)
    if (!CDIF_ReadSector(c, sec, VCD_LBA_ENTRIES, 1))
       goto done;
 
+   /* A disc whose INFO identifies it as a Video CD is one, even if the
+    * chapter list is unreadable -- the type comes from INFO, not ENTRIES.
+    * Keep the type and return an empty list rather than reporting the disc
+    * as something else entirely; the caller has to cope with an empty list
+    * anyway, since a disc can legitimately carry very few entries.
+    *
+    * This was previously the behaviour by accident, via a fallthrough with
+    * di.type already assigned. It is now deliberate, and the caller logs it. */
    if (memcmp(sec, "ENTRYVCD", 8) && memcmp(sec, "ENTRYSVD", 8))
       goto done;
 
@@ -523,10 +531,31 @@ double VCD_GetFrameRate(void)
 /* Transport                                                             */
 /* --------------------------------------------------------------------- */
 
+/* Tell the video decoder no more of the current track is coming, then drain
+ * whatever it was holding back. A picture is only known to be complete when
+ * the following start code arrives, and the decoder holds one reference for
+ * B-picture reordering, so without this a track change loses its last couple
+ * of frames. */
+static void flush_video(void)
+{
+   rmpeg1_video_frame_t fr;
+   int guard = 0;
+
+   if (!vcd.vid)
+      return;
+
+   rmpeg1_video_flush(vcd.vid);
+
+   while (rmpeg1_video_decode(vcd.vid, &fr) && guard++ < 8)
+      frame_to_fb(&fr);
+}
+
+
 void VCD_Play(unsigned entry_index)
 {
    if (entry_index >= vcd.info.num_entries)
       return;
+   flush_video();
    vcd.cur_entry = entry_index;
    vcd.pos_lba   = vcd.info.entries[entry_index].lba;
    stream_reset();
@@ -561,6 +590,7 @@ void VCD_PrevTrack(void)
 
 void VCD_SeekLBA(uint32_t lba)
 {
+   flush_video();
    vcd.pos_lba = lba;
    stream_reset();
    vcd.xport = VCD_XPORT_PLAY;
@@ -571,8 +601,32 @@ uint32_t      VCD_GetPositionLBA(void) { return vcd.pos_lba; }
 
 void VCD_SetPadState(uint16_t buttons)
 {
+   uint16_t edge;
+
    vcd.pad_prev = vcd.pad;
    vcd.pad      = buttons;
+
+   /* Act on rising edges so one press is one action. BOARD mode does not act
+    * here: the daughterboard owns the transport there, and the pad is passed
+    * to it over the SIO bridge instead. */
+   if (vcd.mode != VCD_MODE_HLE)
+      return;
+
+   edge = (uint16_t)(buttons & ~vcd.pad_prev);
+
+   if (edge & VCD_PAD_START)
+   {
+      if (vcd.xport == VCD_XPORT_STOP)
+         VCD_Play(vcd.cur_entry);
+      else
+         VCD_Pause();
+   }
+   if (edge & VCD_PAD_SELECT)
+      VCD_Stop();
+   if (edge & VCD_PAD_RIGHT)
+      VCD_NextTrack();
+   if (edge & VCD_PAD_LEFT)
+      VCD_PrevTrack();
 }
 
 /* --------------------------------------------------------------------- */
