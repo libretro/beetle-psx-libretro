@@ -49,6 +49,50 @@
 
 #include "rmpeg1_tables.h"
 
+/* The generated tables stay the single source of truth; the decoder builds a
+ * lookup index over them at init rather than carrying a second, hand-written
+ * copy of the same data in a faster shape.
+ *
+ * A linear scan over up to 113 entries, one peek per entry, was 36% of decode
+ * time. RMPEG1_LUT_BITS covers every code short enough to matter -- the long
+ * ones are by construction the rare symbols -- and anything longer falls back
+ * to the scan, restricted to the entries that can still match. */
+#define RMPEG1_LUT_BITS 9
+#define RMPEG1_LUT_SIZE (1 << RMPEG1_LUT_BITS)
+
+enum
+{
+   RM_VLC_DCT_FIRST = 0,
+   RM_VLC_DCT_NEXT,
+   RM_VLC_MBA,
+   RM_VLC_DC_LUM,
+   RM_VLC_DC_CHR,
+   RM_VLC_MB_TYPE_P,
+   RM_VLC_MB_TYPE_B,
+   RM_VLC_CBP,
+   RM_VLC_MOTION,
+   RM_VLC_COUNT
+};
+
+static const rmpeg1_vlc_t * const rmpeg1_vlc_tables[RM_VLC_COUNT] =
+{
+   rmpeg1_vlc_dct_first,
+   rmpeg1_vlc_dct_next,
+   rmpeg1_vlc_mba,
+   rmpeg1_vlc_dc_lum,
+   rmpeg1_vlc_dc_chr,
+   rmpeg1_vlc_mb_type_p,
+   rmpeg1_vlc_mb_type_b,
+   rmpeg1_vlc_cbp,
+   rmpeg1_vlc_motion
+};
+
+typedef struct
+{
+   int16_t idx;   /* index into the table, or -1 for no short code here */
+   int8_t  len;
+} rmpeg1_lut_ent;
+
 #define RMPEG1_START_PICTURE   0x00
 #define RMPEG1_START_SLICE_LO  0x01
 #define RMPEG1_START_SLICE_HI  0xAF
@@ -120,6 +164,8 @@ struct rmpeg1_video
    unsigned  mb_w, mb_h;
    unsigned  y_stride, c_stride;
    unsigned  fps_code, aspect_code;
+
+   rmpeg1_lut_ent lut[RM_VLC_COUNT][RMPEG1_LUT_SIZE];
 
    uint8_t   intra_q[64];
    uint8_t   non_intra_q[64];
@@ -203,30 +249,39 @@ static uint32_t get_bits(rmpeg1_video_t *v, unsigned n)
    return r;
 }
 
-/* Peek without consuming; returns bits left-aligned in the low n bits, zero
- * padded past the end of the buffer. */
+/* Peek without consuming. Gathers eight bytes into a 64-bit accumulator and
+ * shifts, rather than walking bit by bit: the VLC decoder peeks once per
+ * symbol and a per-bit loop made that the hottest function in the decoder.
+ * Reads past the write cursor return zero, which is what the start-code
+ * hunt below relies on. */
 static uint32_t peek_bits(const rmpeg1_video_t *v, unsigned n)
 {
-   size_t   rd  = v->rd;
-   unsigned bit = v->bit;
-   uint32_t r   = 0;
+   uint64_t acc;
+   size_t   i = v->rd;
 
-   while (n--)
+   if (n == 0)
+      return 0;
+
+   if (i + 8 <= v->wr)
    {
-      unsigned b = 0;
+      const uint8_t *p = v->buf + i;
 
-      if (rd < v->wr)
-         b = (v->buf[rd] >> (7 - bit)) & 1u;
-
-      r = (r << 1) | b;
-
-      if (++bit == 8)
-      {
-         bit = 0;
-         rd++;
-      }
+      acc = ((uint64_t)p[0] << 56) | ((uint64_t)p[1] << 48)
+          | ((uint64_t)p[2] << 40) | ((uint64_t)p[3] << 32)
+          | ((uint64_t)p[4] << 24) | ((uint64_t)p[5] << 16)
+          | ((uint64_t)p[6] <<  8) |  (uint64_t)p[7];
    }
-   return r;
+   else
+   {
+      unsigned k;
+
+      acc = 0;
+      for (k = 0; k < 8; k++)
+         acc = (acc << 8) | ((i + k < v->wr) ? v->buf[i + k] : 0);
+   }
+
+   acc <<= v->bit;
+   return (uint32_t)(acc >> (64 - n));
 }
 
 static void byte_align(rmpeg1_video_t *v)
@@ -242,18 +297,64 @@ static void byte_align(rmpeg1_video_t *v)
 /* VLC decode                                                            */
 /* --------------------------------------------------------------------- */
 
-/* Linear scan over a table ordered by increasing code length. The tables are
- * small and this keeps the generated table verifiable by eye against the
- * specification; a lookup tree can replace it later without changing the
- * table itself. Returns the matching entry, or NULL. */
-static const rmpeg1_vlc_t *vlc_decode(rmpeg1_video_t *v,
-      const rmpeg1_vlc_t *tab)
+static void build_luts(rmpeg1_video_t *v)
 {
-   const rmpeg1_vlc_t *e;
+   int t;
+
+   for (t = 0; t < RM_VLC_COUNT; t++)
+   {
+      const rmpeg1_vlc_t *tab = rmpeg1_vlc_tables[t];
+      const rmpeg1_vlc_t *e;
+      int i;
+
+      for (i = 0; i < RMPEG1_LUT_SIZE; i++)
+      {
+         v->lut[t][i].idx = -1;
+         v->lut[t][i].len = 0;
+      }
+
+      for (e = tab, i = 0; e->len; e++, i++)
+      {
+         unsigned shift, base, span, k;
+
+         if ((unsigned)e->len > RMPEG1_LUT_BITS)
+            continue;
+
+         shift = RMPEG1_LUT_BITS - (unsigned)e->len;
+         base  = (unsigned)e->code << shift;
+         span  = 1u << shift;
+
+         /* The tables are prefix-free, so no slot is ever written twice --
+          * the generator proves that before emitting them. */
+         for (k = 0; k < span; k++)
+         {
+            v->lut[t][base + k].idx = (int16_t)i;
+            v->lut[t][base + k].len = e->len;
+         }
+      }
+   }
+}
+
+/* Decode one symbol. A single peek indexes the table for any code up to
+ * RMPEG1_LUT_BITS; longer codes fall through to a scan restricted to the
+ * entries that can still match. Returns the table entry, or NULL. */
+static const rmpeg1_vlc_t *vlc_decode(rmpeg1_video_t *v, int t)
+{
+   const rmpeg1_vlc_t   *tab = rmpeg1_vlc_tables[t];
+   const rmpeg1_lut_ent *hit = &v->lut[t][peek_bits(v, RMPEG1_LUT_BITS)];
+   const rmpeg1_vlc_t   *e;
+
+   if (hit->len)
+   {
+      (void)get_bits(v, (unsigned)hit->len);
+      return &tab[hit->idx];
+   }
 
    for (e = tab; e->len; e++)
    {
-      if ((unsigned)e->len > bits_left(v))
+      if ((unsigned)e->len <= RMPEG1_LUT_BITS)
+         continue;
+      if ((size_t)e->len > bits_left(v))
          continue;
       if (peek_bits(v, (unsigned)e->len) == e->code)
       {
@@ -659,13 +760,67 @@ static void mc_predict(const uint8_t *ref, unsigned stride,
    unsigned hy = (unsigned)(mvy & 1);
    unsigned i, j;
 
+   /* Fast path: the whole source block, including the extra row and column
+    * a half-sample position touches, lies inside the reference. That is the
+    * case for essentially every macroblock of a conforming stream, and it
+    * lets the interpolation mode leave the inner loop -- with the mode
+    * branch and the bounds clamp both inside it, this function was two
+    * thirds of decode time. */
+   if (     sx >= 0 && sy >= 0
+         && (unsigned)(sx + (int)bw + (int)hx) <= pw
+         && (unsigned)(sy + (int)bh + (int)hy) <= ph)
+   {
+      const uint8_t *src = ref + (size_t)sy * stride + sx;
+
+      if (!hx && !hy)
+      {
+         for (j = 0; j < bh; j++)
+            memcpy(dst + (size_t)j * dstride, src + (size_t)j * stride, bw);
+      }
+      else if (hx && !hy)
+      {
+         for (j = 0; j < bh; j++)
+         {
+            const uint8_t *r = src + (size_t)j * stride;
+            uint8_t       *d = dst + (size_t)j * dstride;
+            for (i = 0; i < bw; i++)
+               d[i] = (uint8_t)((r[i] + r[i + 1] + 1) >> 1);
+         }
+      }
+      else if (!hx && hy)
+      {
+         for (j = 0; j < bh; j++)
+         {
+            const uint8_t *r = src + (size_t)j * stride;
+            uint8_t       *d = dst + (size_t)j * dstride;
+            for (i = 0; i < bw; i++)
+               d[i] = (uint8_t)((r[i] + r[i + stride] + 1) >> 1);
+         }
+      }
+      else
+      {
+         for (j = 0; j < bh; j++)
+         {
+            const uint8_t *r = src + (size_t)j * stride;
+            uint8_t       *d = dst + (size_t)j * dstride;
+            for (i = 0; i < bw; i++)
+               d[i] = (uint8_t)((r[i] + r[i + 1]
+                               + r[i + stride] + r[i + stride + 1] + 2) >> 2);
+         }
+      }
+      return;
+   }
+
+   /* Slow path, clamped per sample. A conforming stream never points a
+    * vector outside the reference frame, but a damaged one can, and reading
+    * off the end of the plane is not an acceptable way to find out. */
    for (j = 0; j < bh; j++)
    {
       for (i = 0; i < bw; i++)
       {
          int cx = sx + (int)i;
          int cy = sy + (int)j;
-         int nx, ny, a, b, c, d;
+         int nx, ny, a2, b2, c2, d2;
 
          if (cx < 0) cx = 0;
          if (cy < 0) cy = 0;
@@ -675,19 +830,19 @@ static void mc_predict(const uint8_t *ref, unsigned stride,
          nx = (cx + 1 > (int)pw - 1) ? (int)pw - 1 : cx + 1;
          ny = (cy + 1 > (int)ph - 1) ? (int)ph - 1 : cy + 1;
 
-         a = ref[(size_t)cy * stride + cx];
-         b = ref[(size_t)cy * stride + nx];
-         c = ref[(size_t)ny * stride + cx];
-         d = ref[(size_t)ny * stride + nx];
+         a2 = ref[(size_t)cy * stride + cx];
+         b2 = ref[(size_t)cy * stride + nx];
+         c2 = ref[(size_t)ny * stride + cx];
+         d2 = ref[(size_t)ny * stride + nx];
 
          if (hx && hy)
-            dst[(size_t)j * dstride + i] = (uint8_t)((a + b + c + d + 2) >> 2);
+            dst[(size_t)j * dstride + i] = (uint8_t)((a2 + b2 + c2 + d2 + 2) >> 2);
          else if (hx)
-            dst[(size_t)j * dstride + i] = (uint8_t)((a + b + 1) >> 1);
+            dst[(size_t)j * dstride + i] = (uint8_t)((a2 + b2 + 1) >> 1);
          else if (hy)
-            dst[(size_t)j * dstride + i] = (uint8_t)((a + c + 1) >> 1);
+            dst[(size_t)j * dstride + i] = (uint8_t)((a2 + c2 + 1) >> 1);
          else
-            dst[(size_t)j * dstride + i] = (uint8_t)a;
+            dst[(size_t)j * dstride + i] = (uint8_t)a2;
       }
    }
 }
@@ -717,7 +872,7 @@ static bool decode_intra_block(rmpeg1_video_t *v, int16_t *blk, int cc)
 
    memset(blk, 0, sizeof(int16_t) * 64);
 
-   e = vlc_decode(v, cc == 0 ? rmpeg1_vlc_dc_lum : rmpeg1_vlc_dc_chr);
+   e = vlc_decode(v, cc == 0 ? RM_VLC_DC_LUM : RM_VLC_DC_CHR);
    if (!e)
       return false;
    dc_size = e->a;
@@ -766,7 +921,7 @@ static bool decode_intra_block(rmpeg1_video_t *v, int16_t *blk, int cc)
          /* Only the second and later coefficients of an intra block use this
           * table; the DC term was handled above, so the "first coefficient"
           * spelling of (0,1) never occurs here. */
-         e = vlc_decode(v, rmpeg1_vlc_dct_next);
+         e = vlc_decode(v, RM_VLC_DCT_NEXT);
          if (!e)
             return false;
          run   = e->a;
@@ -840,7 +995,7 @@ static bool decode_inter_block(rmpeg1_video_t *v, int16_t *blk)
       }
       else
       {
-         e = vlc_decode(v, first ? rmpeg1_vlc_dct_first : rmpeg1_vlc_dct_next);
+         e = vlc_decode(v, first ? RM_VLC_DCT_FIRST : RM_VLC_DCT_NEXT);
          if (!e)
             return false;
          run   = e->a;
@@ -883,7 +1038,7 @@ static bool decode_inter_block(rmpeg1_video_t *v, int16_t *blk)
  * lets a long pan stay in range. */
 static bool decode_motion(rmpeg1_video_t *v, int dir, int *pred, int *out)
 {
-   const rmpeg1_vlc_t *e = vlc_decode(v, rmpeg1_vlc_motion);
+   const rmpeg1_vlc_t *e = vlc_decode(v, RM_VLC_MOTION);
    int code, r = 0, f, delta, val;
 
    if (!e)
@@ -1188,7 +1343,7 @@ static bool decode_slice(rmpeg1_video_t *v, unsigned vertical_pos, size_t end)
          break;
       }
 
-      e = vlc_decode(v, rmpeg1_vlc_mba);
+      e = vlc_decode(v, RM_VLC_MBA);
       if (!e)
          return false;
       increment += (unsigned)e->a;
@@ -1264,7 +1419,7 @@ static bool decode_slice(rmpeg1_video_t *v, unsigned vertical_pos, size_t end)
       else
       {
          e = vlc_decode(v, v->coding_type == RMPEG1_PIC_B
-                           ? rmpeg1_vlc_mb_type_b : rmpeg1_vlc_mb_type_p);
+                           ? RM_VLC_MB_TYPE_B : RM_VLC_MB_TYPE_P);
          if (!e)
             return false;
          flags = (unsigned)e->a;
@@ -1318,7 +1473,7 @@ static bool decode_slice(rmpeg1_video_t *v, unsigned vertical_pos, size_t end)
          cbp = 0;
          if (flags & RMPEG1_MB_PATTERN)
          {
-            e = vlc_decode(v, rmpeg1_vlc_cbp);
+            e = vlc_decode(v, RM_VLC_CBP);
             if (!e)
                return false;
             cbp = (unsigned)e->a;
@@ -1519,6 +1674,8 @@ rmpeg1_video_t *rmpeg1_video_init(void)
       return NULL;
    }
    v->cap = RMPEG1_WINDOW;
+
+   build_luts(v);
 
    memcpy(v->intra_q, rmpeg1_default_intra, 64);
    memset(v->non_intra_q, 16, 64);

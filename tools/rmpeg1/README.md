@@ -135,3 +135,45 @@ reordering the format requires.
 On the B stream we emit 90 frames where pl_mpeg emits 89. That is not a
 discrepancy in the pictures: pl_mpeg holds its final reference and has no
 flush, so it drops the last one. rmpeg1_video_flush() releases ours.
+
+## Performance
+
+`bench.c` times decode only, against pl_mpeg on the same stream.
+
+```sh
+gcc -O3 -std=gnu99 -o bench tools/rmpeg1/bench.c \
+    libretro-common/formats/mpeg1/rmpeg1_ps.c \
+    libretro-common/formats/mpeg1/rmpeg1_video.c \
+    -Ilibretro-common/include -Ilibretro-common/formats/mpeg1 \
+    -Ideps/pl_mpeg -lm
+```
+
+| stream | rmpeg1 | pl_mpeg |
+|---|---|---|
+| vcd_ntsc (90 frames) | 14.6 ms | 15.8 ms |
+| vcd_pal (100 frames) | 22.4 ms | 23.2 ms |
+| bframes (90 frames) | 14.1 ms | 15.0 ms |
+
+Demux alone is far below the noise floor for both (>10 GB/s).
+
+### How it got there
+
+The first working version was 60.8 ms against pl_mpeg's 15.0, a 4x deficit.
+gprof put 36% in `vlc_decode` and 33% in `mc_predict`; three changes closed
+it, each measured rather than assumed.
+
+`peek_bits` walked the input one bit at a time. Gathering eight bytes into a
+64-bit accumulator and shifting took it to 37.5 ms -- the single largest win,
+and it also removed most of the cost attributed to `vlc_decode`.
+
+The VLC decoder scanned up to 113 entries per symbol. A 9-bit lookup index,
+built at init from the generated tables so they remain the only copy of the
+data, made `vlc_decode` disappear from the profile entirely. On its own it
+measured as noise, because the faster peek had already absorbed the cost --
+worth keeping for targets where the branchy scan would not be free, but it is
+not where the time was.
+
+`mc_predict` was then 68%: it branched on the interpolation mode and clamped
+to the frame bounds inside the innermost loop. Hoisting both out, with a
+fast path for the (near-universal) case of a block fully inside the
+reference, took the whole decoder to 13.1 ms.
