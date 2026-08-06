@@ -5,6 +5,7 @@
 #include "mednafen/settings.h"
 #include <compat/msvc.h>
 #include "mednafen/psx/gpu.h"
+#include "mednafen/psx/vcd.h"
 #ifdef NEED_DEINTERLACER
 #include "mednafen/video/Deinterlacer.h"
 #endif
@@ -312,13 +313,13 @@ static bool search_firmware(char *obtained_sha1, const char *bios_sha1)
 
       if (BIOSFile)
       {
-         const int64_t expected = 512 * 1024;
-         int64_t bios_size      = filestream_get_size(BIOSFile);
+         int64_t bios_size = filestream_get_size(BIOSFile);
 
          filestream_close(BIOSFile);
 
-         /* SHA1 is expensive, verify correct file size first */
-         if(bios_size == expected)
+         /* SHA1 is expensive, verify correct file size first.  Both the
+          * stock 512K geometry and the 1M SCPH-5903 part are candidates. */
+         if(bios_size == 512 * 1024 || bios_size == 1024 * 1024)
          {
             sha1_calculate(bios_path, obtained_sha1);
 
@@ -435,6 +436,15 @@ static bool firmware_is_present(unsigned region)
       bios_name_list[4] = "SCPH-5500.BIN";
       bios_name_list[5] = NULL;
       bios_sha1 = "B05DEF971D8EC59F346F2D9AC21FB742E3EB6917";
+
+      /* The SCPH-5903 carries a Japanese kernel ("System ROM Version 2.2
+       * 12/04/95 J") and expects SCEI discs, so it lives in the JP bucket.
+       * It is not offered as the default: it is a 1 MB part and only the
+       * Video CD use case wants it.  Selected explicitly via the BIOS path
+       * override, or auto-detected by size + SHA1 during the firmware scan.
+       *   size 1048576
+       *   md5  81328b966e6dcf7ea1e32e55e1c104bb
+       *   sha1 15c94da3cc5a38a582429575af4198c487fe893c   */
    }
    else if (region == REGION_NA)
    {
@@ -974,6 +984,12 @@ PS_CDC *PSX_CDC = NULL;
 FrontIO *PSX_FIO = NULL;
 
 MultiAccessSizeMem *BIOSROM = NULL;
+
+/* Address mask for the mapped BIOS: 0x7FFFF for a stock 512K image,
+ * 0xFFFFF for the 1M SCPH-5903 image.  Set once at load time. */
+static uint32_t bios_addr_mask = 0x7FFFF;
+static uint32_t bios_mapped_size = BIOS_SIZE_STD;
+bool psx_bios_is_scph5903 = false;
 MultiAccessSizeMem *PIOMem = NULL;
 MultiAccessSizeMem *MainRAM = NULL;
 MultiAccessSizeMem *ScratchRAM = NULL;
@@ -1303,7 +1319,7 @@ void PSX_RequestMLExit(void)
 void MDFN_FASTCALL PSX_MemWrite8(int32_t timestamp, uint32_t A, uint32_t V)
 {
    if(A < 0x00800000)                       { MASMEM_WriteU8(MainRAM, A & 0x1FFFFF, V); return; }
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)   return;
+   if(A >= 0x1FC00000 && A <= (0x1FC00000 + bios_addr_mask))   return;
    if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
       PSX_EventHandler(timestamp);
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
@@ -1326,7 +1342,7 @@ void MDFN_FASTCALL PSX_MemWrite8(int32_t timestamp, uint32_t A, uint32_t V)
 void MDFN_FASTCALL PSX_MemWrite16(int32_t timestamp, uint32_t A, uint32_t V)
 {
    if(A < 0x00800000)                       { MASMEM_WriteU16(MainRAM, A & 0x1FFFFF, V); return; }
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)   return;
+   if(A >= 0x1FC00000 && A <= (0x1FC00000 + bios_addr_mask))   return;
    if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
       PSX_EventHandler(timestamp);
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
@@ -1349,7 +1365,7 @@ void MDFN_FASTCALL PSX_MemWrite16(int32_t timestamp, uint32_t A, uint32_t V)
 void MDFN_FASTCALL PSX_MemWrite24(int32_t timestamp, uint32_t A, uint32_t V)
 {
    if(A < 0x00800000)                       { MASMEM_WriteU24(MainRAM, A & 0x1FFFFF, V); return; }
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)   return;
+   if(A >= 0x1FC00000 && A <= (0x1FC00000 + bios_addr_mask))   return;
    if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
       PSX_EventHandler(timestamp);
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
@@ -1372,7 +1388,7 @@ void MDFN_FASTCALL PSX_MemWrite24(int32_t timestamp, uint32_t A, uint32_t V)
 void MDFN_FASTCALL PSX_MemWrite32(int32_t timestamp, uint32_t A, uint32_t V)
 {
    if(A < 0x00800000)                       { MASMEM_WriteU32(MainRAM, A & 0x1FFFFF, V); return; }
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)   return;
+   if(A >= 0x1FC00000 && A <= (0x1FC00000 + bios_addr_mask))   return;
    if(timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
       PSX_EventHandler(timestamp);
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
@@ -1404,8 +1420,8 @@ uint8_t MDFN_FASTCALL PSX_MemRead8(int32_t *timestamp, uint32_t A)
          *timestamp += 3;
       return MASMEM_ReadU8(MainRAM, A & 0x1FFFFF);
    }
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
-      return MASMEM_ReadU8(BIOSROM, A & 0x7FFFF);
+   if(A >= 0x1FC00000 && A <= (0x1FC00000 + bios_addr_mask))
+      return MASMEM_ReadU8(BIOSROM, A & bios_addr_mask);
    if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
       PSX_EventHandler(*timestamp);
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
@@ -1454,8 +1470,8 @@ uint16_t MDFN_FASTCALL PSX_MemRead16(int32_t *timestamp, uint32_t A)
          *timestamp += 3;
       return MASMEM_ReadU16(MainRAM, A & 0x1FFFFF);
    }
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
-      return MASMEM_ReadU16(BIOSROM, A & 0x7FFFF);
+   if(A >= 0x1FC00000 && A <= (0x1FC00000 + bios_addr_mask))
+      return MASMEM_ReadU16(BIOSROM, A & bios_addr_mask);
    if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
       PSX_EventHandler(*timestamp);
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
@@ -1513,8 +1529,8 @@ uint32_t MDFN_FASTCALL PSX_MemRead24(int32_t *timestamp, uint32_t A)
          *timestamp += 3;
       return MASMEM_ReadU24(MainRAM, A & 0x1FFFFF);
    }
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
-      return MASMEM_ReadU24(BIOSROM, A & 0x7FFFF);
+   if(A >= 0x1FC00000 && A <= (0x1FC00000 + bios_addr_mask))
+      return MASMEM_ReadU24(BIOSROM, A & bios_addr_mask);
    if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
       PSX_EventHandler(*timestamp);
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
@@ -1566,8 +1582,8 @@ uint32_t MDFN_FASTCALL PSX_MemRead32(int32_t *timestamp, uint32_t A)
          *timestamp += 3;
       return MASMEM_ReadU32(MainRAM, A & 0x1FFFFF);
    }
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
-      return MASMEM_ReadU32(BIOSROM, A & 0x7FFFF);
+   if(A >= 0x1FC00000 && A <= (0x1FC00000 + bios_addr_mask))
+      return MASMEM_ReadU32(BIOSROM, A & bios_addr_mask);
    if(*timestamp >= events[PSX_EVENT__SYNFIRST].next->event_time)
       PSX_EventHandler(*timestamp);
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
@@ -1628,15 +1644,15 @@ static INLINE uint32_t MemPeek(int32_t timestamp, uint32_t A, unsigned size, boo
       return MASMEM_ReadU8(MainRAM, A & 0x1FFFFF);
    }
 
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
+   if(A >= 0x1FC00000 && A <= (0x1FC00000 + bios_addr_mask))
    {
       if(access24)
-         return(MASMEM_ReadU24(BIOSROM, A & 0x7FFFF));
+         return(MASMEM_ReadU24(BIOSROM, A & bios_addr_mask));
       if (size == 4)
-         return MASMEM_ReadU32(BIOSROM, A & 0x7FFFF);
+         return MASMEM_ReadU32(BIOSROM, A & bios_addr_mask);
       if (size == 2)
-         return MASMEM_ReadU16(BIOSROM, A & 0x7FFFF);
-      return MASMEM_ReadU8(BIOSROM, A & 0x7FFFF);
+         return MASMEM_ReadU16(BIOSROM, A & bios_addr_mask);
+      return MASMEM_ReadU8(BIOSROM, A & bios_addr_mask);
    }
 
    if(A >= 0x1F801000 && A <= 0x1F802FFF)
@@ -1779,18 +1795,18 @@ static INLINE void MemPoke(int32_t timestamp, uint32_t A, uint32_t V, unsigned s
       return;
    }
 
-   if(A >= 0x1FC00000 && A <= 0x1FC7FFFF)
+   if(A >= 0x1FC00000 && A <= (0x1FC00000 + bios_addr_mask))
    {
       if(access24)
-         MASMEM_WriteU24(BIOSROM, A & 0x7FFFF, V);
+         MASMEM_WriteU24(BIOSROM, A & bios_addr_mask, V);
       else
       {
          if (size == 4)
-            MASMEM_WriteU32(BIOSROM, A & 0x7FFFF, V);
+            MASMEM_WriteU32(BIOSROM, A & bios_addr_mask, V);
          else if (size == 2)
-            MASMEM_WriteU16(BIOSROM, A & 0x7FFFF, V);
+            MASMEM_WriteU16(BIOSROM, A & bios_addr_mask, V);
          else
-            MASMEM_WriteU8(BIOSROM, A & 0x7FFFF, V);
+            MASMEM_WriteU8(BIOSROM, A & bios_addr_mask, V);
       }
 
       return;
@@ -2199,7 +2215,15 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
  * MultiAccessSizeMem_New() in the non-lightrec path), so they must NOT be
  * gated on HAVE_LIGHTREC. */
 #define RAM_SIZE     0x200000
-#define BIOS_SIZE    0x80000
+/* The SCPH-5903 (PU-16, "PSX with Video CD") ships a 1 Mbyte kernel ROM
+ * (M538032E-02) rather than the usual 512 Kbyte part.  Low 512K is an
+ * ordinary "System ROM Version 2.2 12/04/95 J" kernel; the upper half holds
+ * an enlarged shell overlay at BFC80000h and the Video CD player image at
+ * BFCD0000h.  Reserve the larger size unconditionally -- it is half a
+ * megabyte of address space, and making the reservation conditional would
+ * mean re-doing the lightrec mapping when the user swaps BIOS. */
+#define BIOS_SIZE    0x100000
+#define BIOS_SIZE_STD 0x80000
 #define SCRATCH_SIZE 0x400
 #define SHM_SIZE     (RAM_SIZE + BIOS_SIZE + SCRATCH_SIZE)
 #define PIO_SIZE     (65536)
@@ -2881,9 +2905,9 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
       CPU_SetFastMap(PSX_CPU, MultiAccessSizeMem_get_data32(MainRAM), 0xA0000000 + ma, 2048 * 1024);
    }
 
-   CPU_SetFastMap(PSX_CPU, MultiAccessSizeMem_get_data32(BIOSROM), 0x1FC00000, 512 * 1024);
-   CPU_SetFastMap(PSX_CPU, MultiAccessSizeMem_get_data32(BIOSROM), 0x9FC00000, 512 * 1024);
-   CPU_SetFastMap(PSX_CPU, MultiAccessSizeMem_get_data32(BIOSROM), 0xBFC00000, 512 * 1024);
+   CPU_SetFastMap(PSX_CPU, MultiAccessSizeMem_get_data32(BIOSROM), 0x1FC00000, bios_mapped_size);
+   CPU_SetFastMap(PSX_CPU, MultiAccessSizeMem_get_data32(BIOSROM), 0x9FC00000, bios_mapped_size);
+   CPU_SetFastMap(PSX_CPU, MultiAccessSizeMem_get_data32(BIOSROM), 0xBFC00000, bios_mapped_size);
 
    if(PIOMem)
    {
@@ -2937,14 +2961,31 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
 
    if (BIOSFile)
    {
-      const int64_t expected = 512 * 1024;
       int64_t bios_size      = filestream_get_size(BIOSFile);
+      int64_t expected       = BIOS_SIZE_STD;
       int64_t got;
 
-      /* Zero out the BIOS region first so a short read leaves a
-       * deterministic state - the previous code left the tail
-       * uninitialized whenever the file was smaller than 512 KB. */
-      memset(BIOSROM->data8, 0, expected);
+      /* Two legal geometries: the stock 512 Kbyte kernel, and the 1 Mbyte
+       * SCPH-5903 part (M538032E-02).  Anything else is loaded as a 512K
+       * image and warned about, as before. */
+      if (bios_size == BIOS_SIZE)
+      {
+         expected              = BIOS_SIZE;
+         bios_addr_mask        = BIOS_SIZE - 1;
+         bios_mapped_size      = BIOS_SIZE;
+         psx_bios_is_scph5903  = true;
+      }
+      else
+      {
+         bios_addr_mask        = BIOS_SIZE_STD - 1;
+         bios_mapped_size      = BIOS_SIZE_STD;
+         psx_bios_is_scph5903  = false;
+      }
+
+      /* Zero the whole reservation, not just the part we are about to
+       * fill: a 512K image left over 512K of stale bytes visible at
+       * BFC80000h, which the 1M decode window now exposes. */
+      memset(BIOSROM->data8, 0, BIOS_SIZE);
 
       got = filestream_read(BIOSFile, BIOSROM->data8, expected);
       filestream_close(BIOSFile);
@@ -2957,9 +2998,17 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
          log_cb(RETRO_LOG_WARN,
                "BIOS file short read (%lld of %lld bytes); results may differ from real hardware\n",
                (long long)got, (long long)expected);
+
+      if (psx_bios_is_scph5903)
+         log_cb(RETRO_LOG_INFO,
+               "SCPH-5903 kernel detected (1 MB); Video CD daughterboard emulation available\n");
    }
    else
    {
+      bios_addr_mask       = BIOS_SIZE_STD - 1;
+      bios_mapped_size     = BIOS_SIZE_STD;
+      psx_bios_is_scph5903 = false;
+      memset(BIOSROM->data8, 0, BIOS_SIZE);
       memcpy(BIOSROM->data8, openbios, sizeof(openbios));
    }
 
@@ -3964,6 +4013,8 @@ static void fallback_log(enum retro_log_level level, const char *fmt, ...)
 
 void retro_init(void)
 {
+   VCD_Init();
+
    struct retro_log_callback log;
    uint64_t serialization_quirks = RETRO_SERIALIZATION_QUIRK_CORE_VARIABLE_SIZE;
    unsigned dci_version          = 0;
@@ -5750,11 +5801,52 @@ bool retro_load_game(const struct retro_game_info *info)
       environ_cb(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &mmap);
    }
 
+   /* Video CD mode selection.
+    *
+    * BOARD mode requires the 1 MB SCPH-5903 kernel, because the player UI
+    * and the transport logic live in that ROM; we only stand in for the
+    * daughterboard.  With any other kernel the disc still plays, but we
+    * have to supply the player as well, so fall through to full HLE.
+    * A non-VCD disc leaves the subsystem off entirely and costs nothing. */
+   {
+      VCD_DiscInfo vi;
+
+      if (VCD_ProbeDisc(&vi) != VCD_DISC_NONE)
+      {
+         VCD_SetMode(psx_bios_is_scph5903 ? VCD_MODE_BOARD : VCD_MODE_HLE);
+
+         log_cb(RETRO_LOG_INFO,
+               "Video CD detected: %s, %u entries, %s, PBC %s, mode %s\n",
+               (vi.type == VCD_DISC_SVCD)  ? "SVCD"  :
+               (vi.type == VCD_DISC_HQVCD) ? "HQ-VCD" :
+               (vi.type == VCD_DISC_VCD20) ? "VCD 2.0" : "VCD 1.1",
+               vi.num_entries,
+               vi.pal ? "PAL" : "NTSC",
+               vi.has_pbc ? "present" : "absent",
+               psx_bios_is_scph5903 ? "daughterboard" : "HLE");
+
+         /* HLE mode never boots the kernel: there is no PSX-side program on
+          * a Video CD to boot, and the stock shell would just show "Audio
+          * Disk !!" or refuse the disc outright. */
+         if (!psx_bios_is_scph5903)
+         {
+            VCD_SetAVSwitch(true);
+            if (vi.num_entries)
+               VCD_Play(0);
+         }
+      }
+      else
+         VCD_SetMode(VCD_MODE_OFF);
+   }
+
    return ret;
 }
 
 void retro_unload_game(void)
 {
+   VCD_SetMode(VCD_MODE_OFF);
+   VCD_Reset();
+
    rhi_intf_close();
 
    MDFN_FlushGameCheats(0);
@@ -6252,11 +6344,50 @@ void retro_run(void)
          fb = pix;
    }
 
+   /* Video CD output substitution.
+    *
+    * On real SCPH-5903 hardware the MPEG daughterboard drives its own
+    * analogue RGB and audio; three multiplexors on the mainboard cut the
+    * GPU and SPU out of the signal path entirely when Port F.3 is high.
+    * The emulator equivalent is to bypass the GPU framebuffer and the SPU
+    * mix here rather than trying to blit MPEG output into VRAM -- VRAM is
+    * simply not where it lives.
+    *
+    * Note the GPU still runs: the kernel's player UI keeps drawing (and on
+    * hardware keeps being generated) behind the multiplexor.  We just do
+    * not show it.  Overlaying the two is NOT hardware behaviour. */
+   if (VCD_GetMode() != VCD_MODE_OFF && VCD_GetAVSwitch())
+   {
+      unsigned    vcd_w = 0, vcd_h = 0;
+      size_t      vcd_pitch = 0;
+      const void *vcd_fb;
+
+      VCD_RunFrame();
+      vcd_fb = VCD_GetVideo(&vcd_w, &vcd_h, &vcd_pitch);
+
+      if (vcd_fb)
+         rhi_intf_finalize_frame(vcd_fb, vcd_w, vcd_h, (unsigned)vcd_pitch);
+      else
+         rhi_intf_finalize_frame(NULL, width, height,
+               MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
+
+      if (audio_batch_cb)
+      {
+         static int16_t vcd_abuf[4096 * 2];
+         size_t frames = VCD_GetAudio(vcd_abuf,
+               sizeof(vcd_abuf) / (2 * sizeof(int16_t)));
+         if (frames)
+            audio_batch_cb(vcd_abuf, frames);
+      }
+   }
+   else
+   {
    rhi_intf_finalize_frame(fb, width, height,
 		   MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
 
    if (audio_batch_cb)
       audio_batch_cb(&IntermediateBuffer[0][0], spec.SoundBufSize);
+   }
 
    if (GPU_get_display_possibly_dirty() || (GPU_get_display_change_count() != 0))
    {
@@ -6305,6 +6436,8 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
  * caused subtle misbehavior. */
 void retro_deinit(void)
 {
+   VCD_Kill();
+
    if (surf)
    {
       MDFN_Surface_Delete(surf);
