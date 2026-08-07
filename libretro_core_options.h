@@ -464,34 +464,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "clamped"
    },
    {
-      BEETLE_OPT(pgxp_color),
-      "PGXP Precise Colour (HDR)",
-      NULL,
-      "Carries the GTE's pre-saturation vertex colour to the hardware renderers instead of the 8-bit value the Color FIFO clamps to. The PSX computes lighting at higher precision and saturates it to 8 bits per channel; where PGXP memory tracking can recover the original value, surfaces lit brighter than white keep that energy on the HDR framebuffer and the display encode maps it above reference white. Requires a PGXP mode with memory tracking (the colour shadow travels with the display list), and shows above white only when 'Color Format' is '30-bit Color (HDR)'. Safe by construction: a colour that cannot be verified against the exact bytes the game sent falls back to those bytes, so at worst the picture is unchanged. No effect on the Software renderer.",
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-   {
-      BEETLE_OPT(pgxp_fog),
-      "PGXP Linear-Light Fog (HDR)",
-      NULL,
-      "Recomputes GTE depth cueing (fog) in linear light on the hardware renderers. The GTE interpolates a colour toward the far colour in the console's 8-bit gamma domain; where PGXP can recover the pre-cue colour, the far colour and the blend factor for a vertex, the mix is redone in linear light, which blends atmospherics the way light actually mixes. Endpoints are unchanged -- no fog and full fog match the console exactly -- only the transition differs. Requires 'PGXP Precise Colour (HDR)' and a PGXP mode with memory tracking; where the values cannot be recovered the console's own fogged colour is used, so at worst the picture is unchanged. No effect on the Software renderer.",
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-   {
       BEETLE_OPT(hdr_multipass),
       "HDR True Multi-Pass Blending",
       NULL,
