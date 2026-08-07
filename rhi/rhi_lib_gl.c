@@ -5014,9 +5014,37 @@ bool rhi_gl_open(bool is_pal)
 #elif defined(HAVE_OPENGLES) && defined(HAVE_OPENGLES2)
    hw_render.context_type    = RETRO_HW_CONTEXT_OPENGLES2;
 #else
-   hw_render.context_type    = RETRO_HW_CONTEXT_OPENGL_CORE;
-   hw_render.version_major   = 3;
-   hw_render.version_minor   = 3;
+   /* Since RetroArch's October 2020 driver/context pairing change, an
+    * OPENGL_CORE request is served only by the glcore video driver (or
+    * through a driver switch), while the gl driver answers
+    * GET_PREFERRED_HW_RENDER with RETRO_HW_CONTEXT_OPENGL and serves
+    * that. This renderer runs fine on a desktop compatibility context:
+    * every GL 3.3 core feature it uses is a subset of what a
+    * compatibility context exposes, the "#version 330 core" shader
+    * sources are accepted there (the shader's profile qualifier is
+    * independent of the context's), and the gl_caps 3.0 floor check at
+    * context_reset still gates genuinely-too-old drivers. Pinning Core
+    * 3.3 unconditionally - as this code did from the glsm era on -
+    * therefore means the gl driver, with driver switching disabled,
+    * silently drops the whole GL renderer to software. Ask the frontend
+    * which flavour it prefers and request that first; if the first
+    * request is refused, retry once with the other flavour before
+    * giving up. */
+   {
+      unsigned pref = RETRO_HW_CONTEXT_NONE;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER, &pref) &&
+          pref == RETRO_HW_CONTEXT_OPENGL)
+      {
+         hw_render.context_type = RETRO_HW_CONTEXT_OPENGL;
+         profile_str            = "OpenGL (compatibility)";
+      }
+      else
+      {
+         hw_render.context_type  = RETRO_HW_CONTEXT_OPENGL_CORE;
+         hw_render.version_major = 3;
+         hw_render.version_minor = 3;
+      }
+   }
 #endif
    hw_render.context_reset      = gl_context_reset;
    hw_render.context_destroy    = gl_context_destroy;
@@ -5031,11 +5059,41 @@ bool rhi_gl_open(bool is_pal)
 
    if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
    {
+#if !defined(HAVE_OPENGLES)
+      /* Second rung of the ladder: whichever desktop flavour was
+       * refused, offer the other one. Covers frontends that reject
+       * Core on the gl driver but do not implement the preference
+       * query, and frontends whose preference answer was wrong. */
+      const char *retry_str;
+      if (hw_render.context_type == RETRO_HW_CONTEXT_OPENGL_CORE)
+      {
+         hw_render.context_type  = RETRO_HW_CONTEXT_OPENGL;
+         hw_render.version_major = 0;
+         hw_render.version_minor = 0;
+         retry_str               = "OpenGL (compatibility)";
+      }
+      else
+      {
+         hw_render.context_type  = RETRO_HW_CONTEXT_OPENGL_CORE;
+         hw_render.version_major = 3;
+         hw_render.version_minor = 3;
+         retry_str               = "OpenGL Core 3.3+";
+      }
+      log_cb(RETRO_LOG_WARN,
+            "[rhi_gl_open] frontend rejected SET_HW_RENDER for %s; "
+            "retrying as %s\n", profile_str, retry_str);
+      profile_str = retry_str;
+      if (environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
+         goto hw_render_accepted;
+#endif
       log_cb(RETRO_LOG_ERROR,
             "[rhi_gl_open] frontend rejected SET_HW_RENDER for %s\n",
             profile_str);
       return false;
    }
+#if !defined(HAVE_OPENGLES)
+hw_render_accepted:
+#endif
 
    /* No context until 'context_reset' is called */
    static_renderer.video_clock  = clock;

@@ -40,6 +40,13 @@ static EGLContext egl_ctx;
 static GLuint fbo, fbo_tex, fbo_depth;
 static unsigned fbo_w = 4096, fbo_h = 4096;
 static unsigned last_w, last_h, frames_presented;
+/* GLHOST_CTX: "core" (default) = accept OPENGL_CORE or OPENGL on a core
+ * context; "gl2" = simulate the modern RetroArch gl driver: answer
+ * GET_PREFERRED_HW_RENDER with RETRO_HW_CONTEXT_OPENGL, accept ONLY that,
+ * serve a compatibility-profile context; "rejcore" = no preference query,
+ * reject OPENGL_CORE, accept OPENGL on a compatibility context (exercises
+ * the rejection-retry ladder). */
+static int ctx_gl2, ctx_rejcore;
 static char sysdir[512] = "/tmp/vkhost_sys";
 static char savedir[512] = "/tmp/vkhost_save";
 
@@ -109,9 +116,20 @@ static bool env_cb(unsigned cmd, void *data)
       }
       case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
          *(bool *)data = false; return true;
+      case RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER:
+         if (!ctx_gl2) return false;
+         *(unsigned *)data = RETRO_HW_CONTEXT_OPENGL;
+         fprintf(stderr, "[glhost] GET_PREFERRED_HW_RENDER -> OPENGL\n");
+         return true;
       case RETRO_ENVIRONMENT_SET_HW_RENDER:
       {
          struct retro_hw_render_callback *cb = (struct retro_hw_render_callback *)data;
+         if ((ctx_gl2 || ctx_rejcore) && cb->context_type != RETRO_HW_CONTEXT_OPENGL)
+         {
+            fprintf(stderr, "[glhost] SET_HW_RENDER type=%d REJECTED (mode)\n",
+                    (int)cb->context_type);
+            return false;
+         }
          if (cb->context_type != RETRO_HW_CONTEXT_OPENGL_CORE &&
              cb->context_type != RETRO_HW_CONTEXT_OPENGL)
             return false;
@@ -165,6 +183,9 @@ static int egl_init(void)
       EGL_CONTEXT_MINOR_VERSION, 3,
       EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
       EGL_NONE };
+   static const EGLint ctx_attr_compat[] = {
+      EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
+      EGL_NONE };
    EGLConfig cfg; EGLint n;
    setenv("EGL_PLATFORM", "surfaceless", 0); /* headless Mesa default */
    egl_dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
@@ -174,7 +195,8 @@ static int egl_init(void)
    { fprintf(stderr, "[glhost] eglBindAPI(GL) failed\n"); return 0; }
    if (!eglChooseConfig(egl_dpy, cfg_attr, &cfg, 1, &n) || n < 1)
    { fprintf(stderr, "[glhost] eglChooseConfig failed\n"); return 0; }
-   egl_ctx = eglCreateContext(egl_dpy, cfg, EGL_NO_CONTEXT, ctx_attr);
+   egl_ctx = eglCreateContext(egl_dpy, cfg, EGL_NO_CONTEXT,
+                              (ctx_gl2 || ctx_rejcore) ? ctx_attr_compat : ctx_attr);
    if (egl_ctx == EGL_NO_CONTEXT)
    { fprintf(stderr, "[glhost] eglCreateContext failed\n"); return 0; }
    if (!eglMakeCurrent(egl_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, egl_ctx))
@@ -268,6 +290,9 @@ int main(int argc, char **argv)
        while (tok) { char *eq = strchr(tok, '=');
          if (eq) { *eq = 0; add_var(tok, eq + 1); } tok = strtok(NULL, ";"); } free(dup); } }
    add_var("beetle_psx_hw_renderer", "opengl");
+   { const char *m = getenv("GLHOST_CTX");
+     if (m && !strcmp(m, "gl2"))     ctx_gl2 = 1;
+     if (m && !strcmp(m, "rejcore")) ctx_rejcore = 1; }
 
    if (!egl_init()) return 3;
    if (!fbo_init()) return 3;
