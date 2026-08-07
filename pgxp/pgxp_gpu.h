@@ -69,6 +69,17 @@ extern "C" {
 	 * Maintains hit-rate statistics; see PGXP_GetColorStats. */
 	int		PGXP_GetColor(const uint32_t offset, const uint32_t* addr, float* out_rgb);
 
+	/* Depth-cue recovery for the GP0 color word at `offset`. Succeeds only
+	 * when PGXP_GetColor would accept the word (same shadow, same
+	 * requantization guarantee -- the POST-fog value must reproduce the
+	 * architectural bytes exactly) AND the push recorded a depth cue whose
+	 * sidecar slot still belongs to this word's count. Outputs are
+	 * 8-bit-scale floats: the pre-cue colour (may exceed 255), the far
+	 * colour, and the blend factor in [0,1]. A refusal means the renderer
+	 * uses the architectural post-fog colour, which is today's picture. */
+	int		PGXP_GetFog(const uint32_t offset, const uint32_t* addr,
+			float out_pre[3], float out_fc[3], float* out_t);
+
 	/* stats[0]=attempts, [1]=hits, [2]=shadow/value misses, [3]=requantize misses */
 	void	PGXP_GetColorStats(uint32_t stats[4]);
 

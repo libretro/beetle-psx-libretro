@@ -46,6 +46,28 @@ void	PGXP_pushSXYZ2f(float _x, float _y, float _z, uint32_t _v);
 void	PGXP_pushSXYZ2s(int64_t _x, int64_t _y, int64_t _z, uint32_t v);
 void	PGXP_pushRGBf(float _r, float _g, float _b, uint32_t _v);
 
+	/* Depth-cue sidecar. The colour FIFO shadow carries the POST-fog value
+	 * (MAC_to_RGB_FIFO runs after the interpolation), so linear-light fog
+	 * at the renderer needs three more quantities per colour word: the
+	 * pre-cue colour, the far colour FC, and the blend factor IR0/4096.
+	 * They cannot ride the PGXP_value itself without growing every tracked
+	 * word in RAM, but the value's `count` field already travels through
+	 * memory -- so the sidecar lives in a ring keyed by count, written at
+	 * push time and looked up at the GPU end, with an exact count compare
+	 * rejecting stale slots.
+	 *
+	 * A fog op calls PGXP_GTE_SetFogContext with 8-bit-scale floats before
+	 * MAC_to_RGB_FIFO; the next pushRGBf consumes it (one-shot). Pushes
+	 * without a pending context record "no cue". */
+	void	PGXP_GTE_SetFogContext(float pre_r, float pre_g, float pre_b,
+			float fc_r, float fc_g, float fc_b, float t);
+
+	/* Sidecar lookup by the colour shadow's count. Returns 1 and fills the
+	 * outputs only if the slot still belongs to `count` AND it recorded a
+	 * depth cue; 0 for stale slots and cue-less pushes. */
+	int	PGXP_GTE_GetFogByCount(uint32_t count, float out_pre[3],
+			float out_fc[3], float *out_t);
+
 void	PGXP_RTPS(uint32_t _n, uint32_t _v);
 
 int		PGXP_NCLIP_valid(uint32_t sxy0, uint32_t sxy1, uint32_t sxy2);

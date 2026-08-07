@@ -64,6 +64,7 @@ extern int   psx_black_setup;    /* NTSC pedestal mismatch: 0 none, 1 lifted, 2 
 extern retro_log_printf_t log_cb;
 extern int   psx_hdr_overbright_hot;   /* additive/sub source: 0 clamped, 1 hot */
 extern int   psx_pgxp_color;           /* PGXP precise colour: vertex colour may exceed 1.0 on fp16 */
+extern int   psx_pgxp_fog;             /* PGXP linear-light depth cue; effective only with precise colour */
 /* "HDR True Multi-Pass Blending": 1 routes non-masked subtractive prims
  * through the per-primitive programmable-blend path; 0 keeps them on
  * fixed-function REVERSE_SUBTRACT and floors the result with a MAX-blend
@@ -1574,7 +1575,7 @@ static bool context_is_valid(const struct Context *self) { return self->valid; }
     * rejected there is silently never applied to any pipeline -- while a
     * constant set past this bound is an out-of-bounds write into the
     * static state. Both happened; keep them in step. */
-   enum { VULKAN_NUM_SPEC_CONSTANTS = 9 };
+   enum { VULKAN_NUM_SPEC_CONSTANTS = 10 };
 
    struct ImplementationWorkarounds
    {
@@ -5223,6 +5224,10 @@ static StatusFlags *fbatlas_info(FBAtlas *self,
        * vanish while untextured polygons keep rendering. That is not a
        * hypothetical; it shipped. */
       float cf[3];
+      /* Depth-cue sidecar: far colour and blend factor, t == 0 meaning no
+       * cue. Same rule as cf: trailing floats only, set by the pushers
+       * after the positional initializer, never inside it. */
+      float fog[4];
    };
 
    struct TextureWindow
@@ -5413,6 +5418,10 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
       int16_t pal_x, pal_y, params;
       int16_t u, v, base_uv_x, base_uv_y;
       uint16_t min_u, min_v, max_u, max_v;
+      /* Depth-cue sidecar (far colour + blend factor). Trailing so the
+       * clear-quad positional initializers zero it, which is exactly the
+       * no-cue encoding. */
+      float fog[4];
    };
 
    struct BlitInfo
@@ -5685,7 +5694,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
        * target, so the primitive source clamp stands aside on every draw.
        * Its own slot rather than an alias: it is declared by the primitive
        * programs, which also declare 0..6. */
-      SpecConstIndex_PreciseColor = 8
+      SpecConstIndex_PreciseColor = 8,
+      /* Linear-light depth cueing; rides the precise-colour vertex path. */
+      SpecConstIndex_PgxpFog = 9
    };
 
    struct SaveState
@@ -5996,6 +6007,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, fog));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, fog));
 
       renderer_dispatch(self, vertices, scissors, true);
    }
@@ -6018,6 +6031,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x)); /* Pad to support AMD */
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+      commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, fog));
 
       renderer_dispatch(self, vertices, scissors, true);
    }
@@ -8948,6 +8962,10 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       output[i].color[1] = vertices[i].cf[1];
       output[i].color[2] = vertices[i].cf[2];
       output[i].color[3] = 0.0f;
+      output[i].fog[0]   = vertices[i].fog[0];
+      output[i].fog[1]   = vertices[i].fog[1];
+      output[i].fog[2]   = vertices[i].fog[2];
+      output[i].fog[3]   = vertices[i].fog[3];
       output[i].window = self->render_state.texture_window;
       output[i].pal_x = (int16_t)(self->render_state.palette_offset_x);
       output[i].pal_y = (int16_t)(self->render_state.palette_offset_y);
@@ -9044,6 +9062,10 @@ static void renderer_build_line_quad(Renderer *self,
          output[k].cf[0] = input[0].cf[0];
          output[k].cf[1] = input[0].cf[1];
          output[k].cf[2] = input[0].cf[2];
+         output[k].fog[0] = input[0].fog[0];
+         output[k].fog[1] = input[0].fog[1];
+         output[k].fog[2] = input[0].fog[2];
+         output[k].fog[3] = input[0].fog[3];
       } }
       return;
    }
@@ -9124,6 +9146,10 @@ static void renderer_build_line_quad(Renderer *self,
       output[k].cf[0] = src->cf[0];
       output[k].cf[1] = src->cf[1];
       output[k].cf[2] = src->cf[2];
+      output[k].fog[0] = src->fog[0];
+      output[k].fog[1] = src->fog[1];
+      output[k].fog[2] = src->fog[2];
+      output[k].fog[3] = src->fog[3];
    } }
    }
    }
@@ -10288,6 +10314,8 @@ static void renderer_semi_transparent_set_state(Renderer *self,
     * UNORM write clamps regardless, so a variant would be identical. */
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_PreciseColor,
          (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? psx_pgxp_color : 0);
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_PgxpFog,
+         (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? (psx_pgxp_color && psx_pgxp_fog) : 0);
    /* Only the feedback programs declare this; the pipeline hash masks it out
     * everywhere else. 1 = check-mask (historical behaviour), 0 = the routed
     * non-masked subtractive case. */
@@ -19649,6 +19677,16 @@ static void vertices_set_cf(Vertex *v, int n, const float *precise_rgb)
             : (float)((v[i].color >> (c * 8)) & 0xFF) / 255.0f;
 }
 
+/* Depth-cue sidecar per vertex: 4 floats (far colour, t) or NULL for none.
+ * t == 0 is the no-cue encoding the shader treats as identity. */
+static void vertices_set_fog(Vertex *v, int n, const float *fog)
+{
+   int i, c;
+   for (i = 0; i < n; i++)
+      for (c = 0; c < 4; c++)
+         v[i].fog[c] = fog ? fog[i * 4 + c] : 0.0f;
+}
+
 void rhi_vulkan_push_triangle(
       float p0x, float p0y, float p0w,
       float p1x, float p1y, float p1w,
@@ -19657,6 +19695,7 @@ void rhi_vulkan_push_triangle(
       uint32_t c1,
       uint32_t c2,
       const float *precise_rgb,
+      const float *fog,
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -19692,6 +19731,7 @@ void rhi_vulkan_push_triangle(
          { p2x, p2y, p2w, c2, t2x, t2y },
       };
       vertices_set_cf(vertices, 3, precise_rgb);
+      vertices_set_fog(vertices, 3, fog);
       renderer_draw_triangle(renderer, vertices);
    }
 }
@@ -19703,6 +19743,7 @@ void rhi_vulkan_push_quad(
       float p3x, float p3y, float p3w,
       uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
       const float *precise_rgb,
+      const float *fog,
       uint16_t t0x, uint16_t t0y, 
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -19747,6 +19788,7 @@ void rhi_vulkan_push_quad(
       };
 
       vertices_set_cf(vertices, 4, precise_rgb);
+      vertices_set_fog(vertices, 4, fog);
       renderer_draw_quad(renderer, vertices);
    }
 }
@@ -19775,6 +19817,7 @@ void rhi_vulkan_push_line(
          { (float)(p1x), (float)(p1y), 1.0f, c1, 0, 0 },
       };
       vertices_set_cf(vertices, 2, NULL);
+      vertices_set_fog(vertices, 2, NULL);
       renderer->render_state.texture_color_modulate = false;
       renderer_draw_line(renderer, vertices);
    }

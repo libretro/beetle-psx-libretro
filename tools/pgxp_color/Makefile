@@ -10,11 +10,11 @@ PGXP_SRC := $(ROOT)/pgxp/pgxp_gpu.c $(ROOT)/pgxp/pgxp_gte.c \
 
 all: oracle transport range
 
-oracle: oracle.c $(ROOT)/pgxp/pgxp_gpu.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ oracle.c $(ROOT)/pgxp/pgxp_gpu.c stub_log.c -lm
+oracle: oracle.c $(PGXP_SRC)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ oracle.c $(PGXP_SRC) stub_log.c -lm
 
-range: range.c $(ROOT)/pgxp/pgxp_gpu.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ range.c $(ROOT)/pgxp/pgxp_gpu.c stub_log.c -lm
+range: range.c $(PGXP_SRC)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ range.c $(PGXP_SRC) stub_log.c -lm
 
 transport: transport.c $(PGXP_SRC)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ transport.c $(PGXP_SRC) stub_log.c -lm

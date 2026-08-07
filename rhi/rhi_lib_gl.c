@@ -40,6 +40,7 @@ extern int   psx_hdr_shoulder;
 extern int   psx_hdr_sdr_eotf;
 extern int   psx_hdr_overbright_hot;
 extern int   psx_pgxp_color;   /* PGXP precise colour: vertex colour may exceed 1.0 on fp16 */
+extern int   psx_pgxp_fog;     /* PGXP linear-light depth cue; effective only with precise colour */
 extern int   psx_src_primaries;
 
 /* fp16 render targets are core on desktop GL 3.0+; GLES3 needs an
@@ -538,6 +539,13 @@ struct gl_command_vertex {
    uint16_t texture_limits[4];
    /* gl_texture window mask/OR values */
    uint8_t texture_window[4];
+   /* Depth-cue sidecar: far colour (1.0 == 0xFF) in [0..2], blend factor in
+    * [3]. t == 0 makes the shader mix the identity, so vertices without a
+    * recovered cue cost nothing. KEEP LAST -- positional initializers above
+    * omit trailing fields and zero-fill them, which is exactly what a
+    * cue-less vertex wants; a field inserted mid-struct shifts every
+    * initializer after it (see the Vertex struct in rhi_lib_vulkan.c). */
+   float fog[4];
 };
 typedef struct gl_command_vertex gl_command_vertex;
 
@@ -2110,6 +2118,8 @@ static void gl_renderer_draw(gl_renderer *renderer)
                   * shadow's accept rule refuses anything that would not
                   * requantize to the architectural bytes. */
                  || psx_pgxp_color)) ? 1u : 0u);
+         glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "pgxp_fog"),
+               (renderer->fb_out_fp16 && psx_pgxp_color && psx_pgxp_fog) ? 1u : 0u);
       }
       if (opaque)
          glDisable(GL_BLEND);
@@ -4336,6 +4346,7 @@ static void push_primitive(
 static const struct gl_attribute gl_command_vertex_attribs[] = {
    { "position",           offsetof(gl_command_vertex, position),           GL_FLOAT,          4 },
    { "color",              offsetof(gl_command_vertex, color),              GL_FLOAT,          3 },
+   { "fog",                offsetof(gl_command_vertex, fog),                GL_FLOAT,          4 },
    { "texture_coord",      offsetof(gl_command_vertex, texture_coord),      GL_UNSIGNED_SHORT, 2 },
    { "texture_page",       offsetof(gl_command_vertex, texture_page),       GL_UNSIGNED_SHORT, 2 },
    { "clut",               offsetof(gl_command_vertex, clut),               GL_UNSIGNED_SHORT, 2 },
@@ -5603,6 +5614,7 @@ void rhi_gl_push_triangle(
       uint32_t c1,
       uint32_t c2,
       const float *precise_rgb,
+      const float *fog,
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -5706,6 +5718,12 @@ void rhi_gl_push_triangle(
          }
       };
 
+      { int _fi, _fc;
+        for (_fi = 0; _fi < 3; _fi++)
+           for (_fc = 0; _fc < 4; _fc++)
+              v[_fi].fog[_fc] = fog ? fog[_fi * 4 + _fc] : 0.0f; }
+
+
       push_primitive(renderer, v, 3, GL_TRIANGLES,
             semi_transparency_mode, mask_test, set_mask);
    }
@@ -5721,6 +5739,7 @@ void rhi_gl_push_quad(
       uint32_t c2,
       uint32_t c3,
       const float *precise_rgb,
+      const float *fog,
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -5845,6 +5864,12 @@ void rhi_gl_push_quad(
             { min_u, min_v, max_u, max_v },
          },
       };
+
+      { int _fi, _fc;
+        for (_fi = 0; _fi < 4; _fi++)
+           for (_fc = 0; _fc < 4; _fc++)
+              v[_fi].fog[_fc] = fog ? fog[_fi * 4 + _fc] : 0.0f; }
+
 
       is_semi_transparent = v[0].semi_transparent == 1;
       is_textured         = v[0].texture_blend_mode != 0;

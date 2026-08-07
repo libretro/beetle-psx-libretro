@@ -27,6 +27,24 @@ uniform uint dither_scaling;
 // additive glow ("HDR Additive Overbright"; the renderer sets this for
 // plain additive draws only).
 uniform uint hdr_hot;
+// PGXP linear-light fog: 1 when the option pair is on and the target is
+// fp16. The mix is the identity at frag_fog.a == 0, so gating is purely a
+// perf refusal to pay two pow() per fragment when the feature is off.
+uniform uint pgxp_fog;
+
+// The GTE interpolates toward the far colour in the console's gamma
+// domain; this redoes the mix in linear light (display gamma 2.2, matching
+// the HDR path's reference default). Endpoints are exact: t == 0 returns
+// the pre-cue colour and t == 1 returns the far colour, both equal to the
+// console's own output there -- only the transition differs. The vertex
+// carries the PRE-cue colour whenever frag_fog.a > 0.
+vec3 pgxp_shading() {
+   if (pgxp_fog == 0u || frag_fog.a <= 0.)
+      return frag_shading_color;
+   vec3 pre = pow(max(frag_shading_color, vec3(0.)), vec3(2.2));
+   vec3 far = pow(max(frag_fog.rgb, vec3(0.)), vec3(2.2));
+   return pow(mix(pre, far, clamp(frag_fog.a, 0., 1.)), vec3(1. / 2.2));
+}
 // When 1, emit vec4(0.0) unconditionally: used by the zero-floor pass
 // that follows each subtractive batch on the fp16 target (blend
 // equation MAX against zero restores the hardware floor).
@@ -52,6 +70,7 @@ uniform ivec4 hd_texel_rect;
 uniform uint force_mask_bit;
 
 in vec3 frag_shading_color;
+in vec4 frag_fog;
 // Texture page: base offset for texture lookup.
 flat in uvec2 frag_texture_page;
 // Texel coordinates within the page. Interpolated by OpenGL.
@@ -1002,7 +1021,7 @@ void main() {
       {
          // Untextured primitives write a zero mask bit unless GP0(E6h)
          // bit 0 forces it to one.
-         color = vec4(frag_shading_color, float(force_mask_bit));
+         color = vec4(pgxp_shading(), float(force_mask_bit));
       }
       else
       {
@@ -1095,7 +1114,7 @@ STRINGIZE(
             // Blend the texel with the shading color. `frag_shading_color`
             // is multiplied by two so that it can be used to darken or
             // lighten the texture as needed.
-            color = vec4(frag_shading_color * 2. * texel.rgb, mask_bit);
+            color = vec4(pgxp_shading() * 2. * texel.rgb, mask_bit);
          }
 
          // Saturate the modulated source to 1.0. The old comment here

@@ -15,6 +15,10 @@ layout(location = 4) flat out mediump ivec4 vWindow;
 layout(location = 5) flat out mediump ivec4 vTexLimits;
 #endif
 layout(location = 0) out mediump vec4 vColor;
+/* Depth-cue sidecar: far colour + blend factor. t == 0 (the no-cue
+ * encoding) makes the fragment mix the identity. */
+layout(location = 6) in vec4 Fog;
+layout(location = 6) out mediump vec4 vFog;
 
 const vec2 FB_SIZE = vec2(1024.0, 512.0);
 //const vec4 texture_limits = vec4(0.0, 0.0, 1024.0, 1024.0);
@@ -30,6 +34,7 @@ void main()
    gl_Position = vec4(Position.xy / FB_SIZE * 2.0 - 1.0, Position.z, 1.0) * Position.w;
 #endif
    vColor = Color;
+   vFog   = Fog;
 #ifdef TEXTURED
    // iCB: Offset UVs by half a pixel to account for rounding errors in projection
 #ifdef UNSCALED

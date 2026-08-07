@@ -40,6 +40,12 @@ struct tri_vertex
     * Only consulted by the hardware renderers when the precise-colour
     * option is on. */
    float cf[3];
+   /* Depth-cue sidecar for linear-light fog: far colour (1.0 == 0xFF) and
+    * blend factor in [3]. t == 0 means no cue -- the shader mix is then the
+    * identity. When fog is recovered, cf above carries the PRE-cue colour.
+    * KEEP LAST: see the Vertex struct in rhi_lib_vulkan.c for what a field
+    * inserted mid-struct does to positional initializers. */
+   float fog[4];
 };
 typedef struct tri_vertex tri_vertex;
 

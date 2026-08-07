@@ -90,6 +90,7 @@ void rhi_intf_push_triangle(float p0x, float p0y, float p0w,
                              * GTE's pre-saturation colour, which can exceed
                              * white; only meaningful on an fp16 target. */
                             const float *precise_rgb,
+                            const float *fog,
                             uint16_t t0x, uint16_t t0y,
                             uint16_t t1x, uint16_t t1y,
                             uint16_t t2x, uint16_t t2y,
@@ -117,6 +118,7 @@ void rhi_intf_push_quad(float p0x, float p0y, float p0w,
                         uint32_t c3,
                         /* As push_triangle: 4x3 floats or NULL. */
                         const float *precise_rgb,
+                            const float *fog,
                         uint16_t t0x, uint16_t t0y,
                         uint16_t t1x, uint16_t t1y,
                         uint16_t t2x, uint16_t t2y,

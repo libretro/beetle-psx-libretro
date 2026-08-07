@@ -11,8 +11,45 @@
  * white. The buffers are static because the push macros expand inside deep
  * template functions and the pointer only needs to live across the call. */
 extern int psx_pgxp_color;
+extern int psx_pgxp_fog;
 
 static float gpu_precise_rgb_buf[12];
+static float gpu_precise_fog_buf[16];
+
+static INLINE const float *gpu_precise_tri_fog(const tri_vertex *v)
+{
+   int i;
+   if (!psx_pgxp_fog || !psx_pgxp_color)
+      return NULL;
+   for (i = 0; i < 3; i++)
+   {
+      gpu_precise_fog_buf[i * 4 + 0] = v[i].fog[0];
+      gpu_precise_fog_buf[i * 4 + 1] = v[i].fog[1];
+      gpu_precise_fog_buf[i * 4 + 2] = v[i].fog[2];
+      gpu_precise_fog_buf[i * 4 + 3] = v[i].fog[3];
+   }
+   return gpu_precise_fog_buf;
+}
+
+static INLINE const float *gpu_precise_quad_fog(const tri_vertex *first,
+      const tri_vertex *rest)
+{
+   int i;
+   if (!psx_pgxp_fog || !psx_pgxp_color)
+      return NULL;
+   gpu_precise_fog_buf[0] = first->fog[0];
+   gpu_precise_fog_buf[1] = first->fog[1];
+   gpu_precise_fog_buf[2] = first->fog[2];
+   gpu_precise_fog_buf[3] = first->fog[3];
+   for (i = 0; i < 3; i++)
+   {
+      gpu_precise_fog_buf[4 + i * 4 + 0] = rest[i].fog[0];
+      gpu_precise_fog_buf[4 + i * 4 + 1] = rest[i].fog[1];
+      gpu_precise_fog_buf[4 + i * 4 + 2] = rest[i].fog[2];
+      gpu_precise_fog_buf[4 + i * 4 + 3] = rest[i].fog[3];
+   }
+   return gpu_precise_fog_buf;
+}
 
 static INLINE const float *gpu_precise_tri_rgb(const tri_vertex *v)
 {
@@ -1478,7 +1515,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       if (v == 0 || GOURAUD_LIT) \
       { \
          uint32_t raw_color = (*cb & 0xFFFFFF); \
-         float pgxp_rgb[3]; \
+         float pgxp_rgb[3], pgxp_pre[3], pgxp_fc[3], pgxp_t; \
          vertices[v].r = raw_color & 0xFF; \
          vertices[v].g = (raw_color >> 8) & 0xFF; \
          vertices[v].b = (raw_color >> 16) & 0xFF; \
@@ -1487,7 +1524,23 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
           * whose CD byte the GTE carries). The accept rule guarantees a \
           * refused or absent shadow degrades to the architectural bytes, \
           * so the miss path below is today's picture exactly. */ \
-         if (PGXP_LIT && PGXP_GetColor(cb - baseCB, cb, pgxp_rgb)) \
+         vertices[v].fog[0] = vertices[v].fog[1] = 0.0f; \
+         vertices[v].fog[2] = vertices[v].fog[3] = 0.0f; \
+         if (PGXP_LIT && psx_pgxp_fog && psx_pgxp_color && \
+             PGXP_GetFog(cb - baseCB, cb, pgxp_pre, pgxp_fc, &pgxp_t)) \
+         { \
+            /* Depth cue recovered: the vertex carries the PRE-cue colour
+             * and the shader redoes the mix in linear light. The colour
+             * accept inside GetFog is the safety gate. */ \
+            vertices[v].cf[0]  = pgxp_pre[0] / 255.0f; \
+            vertices[v].cf[1]  = pgxp_pre[1] / 255.0f; \
+            vertices[v].cf[2]  = pgxp_pre[2] / 255.0f; \
+            vertices[v].fog[0] = pgxp_fc[0] / 255.0f; \
+            vertices[v].fog[1] = pgxp_fc[1] / 255.0f; \
+            vertices[v].fog[2] = pgxp_fc[2] / 255.0f; \
+            vertices[v].fog[3] = pgxp_t; \
+         } \
+         else if (PGXP_LIT && PGXP_GetColor(cb - baseCB, cb, pgxp_rgb)) \
          { \
             vertices[v].cf[0] = pgxp_rgb[0] / 255.0f; \
             vertices[v].cf[1] = pgxp_rgb[1] / 255.0f; \
@@ -1509,6 +1562,10 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          vertices[v].cf[0] = vertices[0].cf[0]; \
          vertices[v].cf[1] = vertices[0].cf[1]; \
          vertices[v].cf[2] = vertices[0].cf[2]; \
+         vertices[v].fog[0] = vertices[0].fog[0]; \
+         vertices[v].fog[1] = vertices[0].fog[1]; \
+         vertices[v].fog[2] = vertices[0].fog[2]; \
+         vertices[v].fog[3] = vertices[0].fog[3]; \
       } \
       x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF))); \
       y = sign_x_to_s32(11, ((int16_t)(*cb >> 16))); \
@@ -1678,6 +1735,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                   ((uint32_t)vertices[1].r) | ((uint32_t)vertices[1].g << 8) | ((uint32_t)vertices[1].b << 16), \
                   ((uint32_t)vertices[2].r) | ((uint32_t)vertices[2].g << 8) | ((uint32_t)vertices[2].b << 16), \
                   gpu_precise_quad_rgb(first, vertices), \
+                  gpu_precise_quad_fog(first, vertices), \
                   first->u + gpu->off_u, first->v + gpu->off_v, \
                   vertices[0].u + gpu->off_u, vertices[0].v + gpu->off_v, \
                   vertices[1].u + gpu->off_u, vertices[1].v + gpu->off_v, \
@@ -1720,6 +1778,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                ((uint32_t)verts[1].r) | ((uint32_t)verts[1].g << 8) | ((uint32_t)verts[1].b << 16), \
                ((uint32_t)verts[2].r) | ((uint32_t)verts[2].g << 8) | ((uint32_t)verts[2].b << 16), \
                gpu_precise_tri_rgb(verts), \
+               gpu_precise_tri_fog(verts), \
                verts[0].u, verts[0].v, \
                verts[1].u, verts[1].v, \
                verts[2].u, verts[2].v, \

@@ -48,6 +48,29 @@ layout(constant_id = 6) const int HDR_HOT_SOURCE = 0;
 layout(constant_id = 8) const int PRECISE_COLOR = 0;
 #endif
 
+/* PGXP linear-light depth cueing; rides the precise-colour vertex path.
+ * Common scope: fog applies to untextured gouraud (the classic depth-cued
+ * geometry) as much as to textured surfaces. The rhi forces this to 0 off
+ * the fp16 target and when either option is off, so the pow() cost exists
+ * only where the feature is live. */
+layout(constant_id = 9) const int PGXP_FOG = 0;
+layout(location = 6) in mediump vec4 vFog;
+
+/* The GTE interpolates toward the far colour in the console's gamma
+ * domain; this redoes the mix in linear light (display gamma 2.2, the HDR
+ * path's reference default). Endpoints are exact -- t == 0 returns the
+ * pre-cue colour and t == 1 the far colour, both equal to the console's
+ * own output there; only the transition differs. When PGXP_FOG is set the
+ * vertex colour carries the PRE-cue value for cued vertices. */
+mediump vec3 pgxp_shaded_color()
+{
+	if (PGXP_FOG == 0 || vFog.a <= 0.0)
+		return vColor.rgb;
+	mediump vec3 pre = pow(max(vColor.rgb, vec3(0.0)), vec3(2.2));
+	mediump vec3 far = pow(max(vFog.rgb, vec3(0.0)), vec3(2.2));
+	return pow(mix(pre, far, clamp(vFog.a, 0.0, 1.0)), vec3(1.0 / 2.2));
+}
+
 void main()
 {
 	float opacity = 1.0;
@@ -108,7 +131,7 @@ void main()
 	if (opacity < 0.5)
 		discard;
 
-	vec3 shaded_hot = color.rgb * vColor.rgb * (255.0 / 128.0);
+	vec3 shaded_hot = color.rgb * pgxp_shaded_color() * (255.0 / 128.0);
 	vec3 shaded = clamp(shaded_hot, 0.0, 1.0);
 	/* The semi-trans-opaque pass and every other blend mode stay clamped;
 	 * over-white there comes only from stacking, matching the option text. */
@@ -118,7 +141,7 @@ void main()
 		shaded = shaded_hot;
 	FragColor = vec4(shaded, NNColor.a + vColor.a);
 #else
-	FragColor = vColor;
+	FragColor = vec4(pgxp_shaded_color(), vColor.a);
 #endif
 
 	// Get round down behavior instead of round-to-nearest.

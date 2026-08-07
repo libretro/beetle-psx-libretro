@@ -11,6 +11,7 @@ static const char * command_vertex_name_ = GLSL_VERTEX(
 // Vertex shader for rendering GPU draw commands in the framebuffer
 in vec4 position;
 in vec3 color;
+in vec4 fog;
 in uvec2 texture_page;
 in uvec2 texture_coord;
 in uvec2 clut;
@@ -25,6 +26,7 @@ in uvec4 texture_limits;
 uniform ivec2 offset;
 
 out vec3 frag_shading_color;
+out vec4 frag_fog;
 flat out uvec2 frag_texture_page;
 out vec2 frag_texture_coord;
 flat out uvec2 frag_clut;
@@ -69,6 +71,7 @@ void main() {
    /* Already in 0..1+ scale (1.0 == 0xFF). May exceed 1.0 when the PGXP
    // precise-colour path supplies the GTE's pre-saturation value. */
    frag_shading_color = color;
+   frag_fog = fog;
 
    // Let OpenGL interpolate the texel position
    frag_texture_coord = vec2(texture_coord) + vec2(0.001, 0.001);

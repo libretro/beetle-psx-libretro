@@ -24,7 +24,7 @@ extern "C" {
 /* Mirrors VULKAN_NUM_SPEC_CONSTANTS in rhi_lib_vulkan.c; see the comment
  * there. A shader constant_id at or past this is ignored with a log line,
  * which turns a too-small value into a feature that silently does nothing. */
-#define RHI_SPIRV_NUM_SPEC_CONSTANTS  9
+#define RHI_SPIRV_NUM_SPEC_CONSTANTS  10
 
 /* Mirror of Vulkan::DescriptorSetLayout (all POD bitmask fields). */
 typedef struct RhiSpirvDescriptorSetLayout

@@ -1464,6 +1464,17 @@ static INLINE void DPC(uint32_t instr)
 
    MAC_to_IR(lm);
 
+   /* Depth-cue sidecar for linear-light fog at the renderer: the exact
+    * pre-cue colour, far colour and blend factor, in 8-bit-scale floats.
+    * RGB_temp is the FIFO byte <<4, so /16 is the byte. FC is 1.27.4 so /16 lands on 8-bit scale; t is IR0/4096.
+    * Consumed by the next PGXP_pushRGBf (inside MAC_to_RGB_FIFO). */
+   PGXP_GTE_SetFogContext((float)RGB_temp[0] / 16.0f,
+         (float)RGB_temp[1] / 16.0f,
+         (float)RGB_temp[2] / 16.0f,
+         (float)(int32_t)CR[CRV_FC]     / 16.0f,
+         (float)(int32_t)CR[CRV_FC + 1] / 16.0f,
+         (float)(int32_t)CR[CRV_FC + 2] / 16.0f,
+         (float)IR0 / 4096.0f);
    MAC_to_RGB_FIFO();
 }
 
@@ -1489,6 +1500,17 @@ static int32_t DCPL(uint32_t instr)
 
    MAC_to_IR(lm);
 
+   /* Depth-cue sidecar for linear-light fog at the renderer: the exact
+    * pre-cue colour, far colour and blend factor, in 8-bit-scale floats.
+    * Pre-cue here is the lit colour RGB*IR: RGB_temp is byte<<4 and IR is 1.3.12, so /65536 (16*4096) lands on 8-bit scale. FC is 1.27.4 so /16 lands on 8-bit scale; t is IR0/4096.
+    * Consumed by the next PGXP_pushRGBf (inside MAC_to_RGB_FIFO). */
+   PGXP_GTE_SetFogContext((float)((int64_t)RGB_temp[0] * IR_temp[0]) / 65536.0f,
+         (float)((int64_t)RGB_temp[1] * IR_temp[1]) / 65536.0f,
+         (float)((int64_t)RGB_temp[2] * IR_temp[2]) / 65536.0f,
+         (float)(int32_t)CR[CRV_FC]     / 16.0f,
+         (float)(int32_t)CR[CRV_FC + 1] / 16.0f,
+         (float)(int32_t)CR[CRV_FC + 2] / 16.0f,
+         (float)IR0 / 4096.0f);
    MAC_to_RGB_FIFO();
 
 
@@ -1515,6 +1537,17 @@ static int32_t DPCS(uint32_t instr)
    }
 
    MAC_to_IR(lm);
+   /* Depth-cue sidecar for linear-light fog at the renderer: the exact
+    * pre-cue colour, far colour and blend factor, in 8-bit-scale floats.
+    * RGB_temp is the colour-register byte <<4, so /16 is the byte. FC is 1.27.4 so /16 lands on 8-bit scale; t is IR0/4096.
+    * Consumed by the next PGXP_pushRGBf (inside MAC_to_RGB_FIFO). */
+   PGXP_GTE_SetFogContext((float)RGB_temp[0] / 16.0f,
+         (float)RGB_temp[1] / 16.0f,
+         (float)RGB_temp[2] / 16.0f,
+         (float)(int32_t)CR[CRV_FC]     / 16.0f,
+         (float)(int32_t)CR[CRV_FC + 1] / 16.0f,
+         (float)(int32_t)CR[CRV_FC + 2] / 16.0f,
+         (float)IR0 / 4096.0f);
    MAC_to_RGB_FIFO();
 
    return(8);
@@ -1549,6 +1582,17 @@ static int32_t INTPL(uint32_t instr)
    SET_MAC(3, i64_to_i44(2, ((int64_t)((uint64_t)(int64_t)IR3 << 12) + IR0 * i32_to_i16_saturate(2, MAC(3), false)) >> sf));
 
    MAC_to_IR(lm);
+   /* Depth-cue sidecar for linear-light fog at the renderer: the exact
+    * pre-cue colour, far colour and blend factor, in 8-bit-scale floats.
+    * Pre-cue is the IR vector, 1.3.12: /16 lands on 8-bit scale. FC is 1.27.4 so /16 lands on 8-bit scale; t is IR0/4096.
+    * Consumed by the next PGXP_pushRGBf (inside MAC_to_RGB_FIFO). */
+   PGXP_GTE_SetFogContext((float)IR1 / 16.0f,
+         (float)IR2 / 16.0f,
+         (float)IR3 / 16.0f,
+         (float)(int32_t)CR[CRV_FC]     / 16.0f,
+         (float)(int32_t)CR[CRV_FC + 1] / 16.0f,
+         (float)(int32_t)CR[CRV_FC + 2] / 16.0f,
+         (float)IR0 / 4096.0f);
    MAC_to_RGB_FIFO();
 
    return(8);

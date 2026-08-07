@@ -25,6 +25,7 @@
 *      Author: iCatButler
 ***************************************************************************/
 #include "pgxp_gpu.h"
+#include "pgxp_gte.h"
 #include "pgxp_main.h"
 #include "pgxp_mem.h"
 #include "pgxp_value.h"
@@ -378,6 +379,26 @@ int PGXP_GetColor(const uint32_t offset, const uint32_t* addr, float* out_rgb)
 	}
 
 	return ok;
+}
+
+int PGXP_GetFog(const uint32_t offset, const uint32_t* addr,
+		float out_pre[3], float out_fc[3], float* out_t)
+{
+	PGXP_value* col = PGXP_ReadCB(offset);
+	float       rgb[3];
+
+	/* The colour accept is the safety gate; run it first (it also keeps the
+	 * hit statistics honest -- a fog probe is a colour probe). */
+	if (!PGXP_GetColor(offset, addr, rgb))
+		return 0;
+
+	if (!col)
+		return 0;
+
+	if (!PGXP_GTE_GetFogByCount(col->count, out_pre, out_fc, out_t))
+		return 0;
+
+	return 1;
 }
 
 void PGXP_GetColorRangeStats(uint32_t *over, uint32_t buckets[4], float *peak)

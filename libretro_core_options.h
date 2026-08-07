@@ -478,6 +478,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(pgxp_fog),
+      "PGXP Linear-Light Fog (HDR)",
+      NULL,
+      "Recomputes GTE depth cueing (fog) in linear light on the hardware renderers. The GTE interpolates a colour toward the far colour in the console's 8-bit gamma domain; where PGXP can recover the pre-cue colour, the far colour and the blend factor for a vertex, the mix is redone in linear light, which blends atmospherics the way light actually mixes. Endpoints are unchanged -- no fog and full fog match the console exactly -- only the transition differs. Requires 'PGXP Precise Colour (HDR)' and a PGXP mode with memory tracking; where the values cannot be recovered the console's own fogged colour is used, so at worst the picture is unchanged. No effect on the Software renderer.",
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       BEETLE_OPT(hdr_multipass),
       "HDR True Multi-Pass Blending",
       NULL,

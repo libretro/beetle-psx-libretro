@@ -431,6 +431,7 @@ DRAWSPRITE_T1_BMGROUP(1, 2, 1, 1)
                                * GTE lighting the precise path recovers
                                * lives in gouraud polygons. */ \
                               NULL, \
+                              NULL, /* no depth-cue sidecar either */ \
                               (u),         (v), \
                               (u) + (w),   (v), \
                               (u),         (v) + (h), \
