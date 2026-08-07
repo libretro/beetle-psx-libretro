@@ -1529,24 +1529,40 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          if (PGXP_LIT && psx_pgxp_fog && psx_pgxp_color && \
              PGXP_GetFog(cb - baseCB, cb, pgxp_pre, pgxp_fc, &pgxp_t)) \
          { \
-            /* Depth cue recovered: the vertex carries the PRE-cue colour
-             * and the shader redoes the mix in linear light. The colour
-             * accept inside GetFog is the safety gate. */ \
-            /* Floor at zero: the GTE's pre-saturation lighting underflows
-             * below zero routinely (a negative MAC requantizes to the
-             * architectural 0 byte, so the accept rule passes it), and a
-             * negative vertex colour on the fp16 target is anti-light --
-             * additive draws darken, and the framebuffer accumulates
-             * negative energy frame over frame. Over-WHITE is the recovered
-             * signal; under-zero is not light. Same floor the Color FIFO
-             * applies, minus its ceiling. */ \
-            vertices[v].cf[0]  = (pgxp_pre[0] > 0.0f ? pgxp_pre[0] : 0.0f) / 255.0f; \
-            vertices[v].cf[1]  = (pgxp_pre[1] > 0.0f ? pgxp_pre[1] : 0.0f) / 255.0f; \
-            vertices[v].cf[2]  = (pgxp_pre[2] > 0.0f ? pgxp_pre[2] : 0.0f) / 255.0f; \
-            vertices[v].fog[0] = (pgxp_fc[0] > 0.0f ? pgxp_fc[0] : 0.0f) / 255.0f; \
-            vertices[v].fog[1] = (pgxp_fc[1] > 0.0f ? pgxp_fc[1] : 0.0f) / 255.0f; \
-            vertices[v].fog[2] = (pgxp_fc[2] > 0.0f ? pgxp_fc[2] : 0.0f) / 255.0f; \
-            vertices[v].fog[3] = pgxp_t; \
+            /* Depth cue recovered: redo the console's mix HERE, per vertex,
+             * in float, and hand the rasterizer the finished colour. Two
+             * shipped models were measured wrong before this one. Mixing in
+             * linearised light breaks against a black far colour (Silent
+             * Hill: FC = 0, t -> 1): the console scales by (1 - t), the
+             * linear round-trip by (1 - t)^(1/2.2) -- 2-3.5x too bright
+             * across the whole fade, which reads as no fog at all.
+             * Deferring a gamma-domain mix to the fragment shader is wrong
+             * by interpolation ORDER: the console lerps the mixed colour
+             * affinely, while a shader mixes interpolated (pre, t) per
+             * fragment, and the bilinear pre*t cross-term bows each quad
+             * interior a few counts against its neighbour -- alternating
+             * diagonal splits render that as a checkerboard on Silent
+             * Hill's pavement. Mix-then-interpolate in float matches the
+             * console's order and appearance exactly, minus only the 5-bit
+             * requantisation banding, which is the point of the feature.
+             * The fog attribute stays zero: the shader's mix bypasses on
+             * fog.a <= 0, and hit and miss vertices now agree to within
+             * quantisation by construction. */ \
+            /* Floor at zero AFTER the mix: the GTE's pre-saturation
+             * lighting underflows below zero routinely (a negative MAC
+             * requantizes to the architectural 0 byte, so the accept rule
+             * passes it), and a negative vertex colour on the fp16 target
+             * is anti-light. The mix itself runs on the unfloored values
+             * the console used, so the reconstruction stays exact.
+             * Over-WHITE survives where t is small; under-zero is not
+             * light. */ \
+            { int _fch; float _fmix; \
+              for (_fch = 0; _fch < 3; _fch++) \
+              { \
+                 _fmix = pgxp_pre[_fch] + pgxp_t * (pgxp_fc[_fch] - pgxp_pre[_fch]); \
+                 vertices[v].cf[_fch] = (_fmix > 0.0f ? _fmix : 0.0f) / 255.0f; \
+              } \
+            } \
          } \
          else if (PGXP_LIT && PGXP_GetColor(cb - baseCB, cb, pgxp_rgb)) \
          { \
