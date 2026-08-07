@@ -6417,8 +6417,10 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
    GLenum   err;
    bool     ok = false;
    bool     is_32bpp;
+   bool     is_fp16;
    uint16_t *scratch_pixels = NULL;
    uint32_t *scratch_rgba8  = NULL;
+   float    *scratch_f      = NULL;
    size_t   row;
 
    if (static_renderer.state == GL_STATE_INVALID)
@@ -6438,11 +6440,21 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
       return true;
 
    is_32bpp = (renderer->internal_color_depth == 32);
-   /* The fp16 HDR target reads back through the 16bpp path: every GL
-    * conversion to 1555 / RGB5_A1 clamps to [0,1] first and quantises
-    * straight to 5 bits, which is the hardware FBRead behaviour. The
-    * RGBA8 intermediate would round to 8 bits before truncating to 5. */
-   if (renderer->fb_out_fp16)
+   /* The fp16 HDR target gets its own readback route: transfer the
+    * pixels as plain floats - the one format the spec guarantees for
+    * float color buffers - and quantise to 1555 in C. The previous
+    * route asked glReadPixels (and, upscaled, glBlitFramebuffer) to
+    * convert RGBA16F straight to packed 1555 in the driver: a rarely
+    * exercised conversion pair that Mesa implements correctly but that
+    * produced channel-scrambled VRAM on NVIDIA under savestate-heavy
+    * loads (Preemptive Frames runs this full-frame readback every
+    * frame, and any conversion defect compounds through the
+    * read -> serialize -> restore -> redraw cycle). Owning the
+    * quantisation makes the result deterministic and identical across
+    * drivers: clamp to [0,1], round to 5 bits, alpha at half - the
+    * hardware FBRead behaviour. */
+   is_fp16  = renderer->fb_out_fp16;
+   if (is_fp16)
       is_32bpp = false;
    upscale  = renderer->internal_upscaling;
    if (upscale == 0)
@@ -6490,6 +6502,12 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
       if (!scratch_rgba8)
          goto cleanup;
    }
+   if (is_fp16)
+   {
+      scratch_f = (float *)malloc((size_t)w * (size_t)h * 4u * sizeof(float));
+      if (!scratch_f)
+         goto cleanup;
+   }
 
    if (upscale == 1)
    {
@@ -6520,7 +6538,15 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
             GL_FRAMEBUFFER_COMPLETE)
       {
          GLint gl_y = (GLint)VRAM_HEIGHT - (GLint)y - (GLint)h;
-         if (is_32bpp)
+         if (is_fp16)
+         {
+            glReadPixels(
+                  (GLint) x, gl_y,
+                  (GLsizei) w, (GLsizei) h,
+                  GL_RGBA, GL_FLOAT,
+                  scratch_f);
+         }
+         else if (is_32bpp)
          {
             glReadPixels(
                   (GLint) x, gl_y,
@@ -6551,7 +6577,11 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
        * at the blit step), then read the scratch.  We use NEAREST
        * downsampling to match the SW renderer's "no filtering"
        * behaviour. */
-      GLenum   scratch_format = is_32bpp ? GL_RGBA8 : GL_RGB5_A1;
+      /* fp16 blits into an fp16 scratch - a same-format blit, the most
+       * conservative possible - and the float readback below does the
+       * only conversion, in C. */
+      GLenum   scratch_format = is_fp16 ? GL_RGBA16F
+                              : is_32bpp ? GL_RGBA8 : GL_RGB5_A1;
 
       glGenTextures(1, &scratch_tex);
       glBindTexture(GL_TEXTURE_2D, scratch_tex);
@@ -6607,7 +6637,15 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
          glBindFramebuffer(GL_READ_FRAMEBUFFER, scratch_fbo);
          glReadBuffer(GL_COLOR_ATTACHMENT0);
 
-         if (is_32bpp)
+         if (is_fp16)
+         {
+            glReadPixels(
+                  0, 0,
+                  (GLsizei) w, (GLsizei) h,
+                  GL_RGBA, GL_FLOAT,
+                  scratch_f);
+         }
+         else if (is_32bpp)
          {
             glReadPixels(
                   0, 0,
@@ -6643,6 +6681,32 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
     *   GLES3   (GL_UNSIGNED_SHORT_5_5_5_1):     (r<<11)|(g<<6)|(b<<1)|a
     * which are the same packings the command_fragment shader
     * `rebuild_psx_color` produces. */
+   /* fp16 mode: quantise the float readback to 1555 in C, exactly what
+    * the driver conversion was asked to do before: clamp to [0,1],
+    * round each channel to 5 bits, alpha thresholds at half. Identical
+    * across drivers by construction. */
+   if (ok && is_fp16)
+   {
+      size_t n = (size_t)w * (size_t)h;
+      size_t k;
+      for (k = 0; k < n; k++)
+      {
+         const float *px = scratch_f + k * 4u;
+         float rf = px[0], gf = px[1], bf = px[2], af = px[3];
+         uint32_t r5 = rf <= 0.0f ? 0u : rf >= 1.0f ? 31u : (uint32_t)(rf * 31.0f + 0.5f);
+         uint32_t g5 = gf <= 0.0f ? 0u : gf >= 1.0f ? 31u : (uint32_t)(gf * 31.0f + 0.5f);
+         uint32_t b5 = bf <= 0.0f ? 0u : bf >= 1.0f ? 31u : (uint32_t)(bf * 31.0f + 0.5f);
+         uint32_t a1 = (af >= 0.5f) ? 1u : 0u;
+#ifdef HAVE_OPENGLES3
+         scratch_pixels[k] = (uint16_t)(
+               (r5 << 11) | (g5 << 6) | (b5 << 1) | a1);
+#else
+         scratch_pixels[k] = (uint16_t)(
+               (a1 << 15) | (b5 << 10) | (g5 << 5) | r5);
+#endif
+      }
+   }
+
    if (ok && is_32bpp)
    {
       size_t n = (size_t)w * (size_t)h;
@@ -6731,6 +6795,7 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
 cleanup:
    if (scratch_pixels)
       free(scratch_pixels);
+   free(scratch_f);
    if (scratch_rgba8)
       free(scratch_rgba8);
 
