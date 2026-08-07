@@ -1568,7 +1568,13 @@ static bool context_is_valid(const struct Context *self) { return self->valid; }
    enum { VULKAN_NUM_VERTEX_ATTRIBS = 16 };
    enum { VULKAN_NUM_VERTEX_BUFFERS = 4 };
    enum { VULKAN_PUSH_CONSTANT_SIZE = 128 };
-   enum { VULKAN_NUM_SPEC_CONSTANTS = 8 };
+   /* Grown from 8 for SpecConstIndex_PreciseColor (constant_id 8). Two
+    * places must agree on this number: RHI_SPIRV_NUM_SPEC_CONSTANTS in
+    * rhi_spirv_reflect.h mirrors it, and a constant accepted here but
+    * rejected there is silently never applied to any pipeline -- while a
+    * constant set past this bound is an out-of-bounds write into the
+    * static state. Both happened; keep them in step. */
+   enum { VULKAN_NUM_SPEC_CONSTANTS = 9 };
 
    struct ImplementationWorkarounds
    {
