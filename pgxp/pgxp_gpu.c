@@ -352,31 +352,11 @@ int PGXP_GetColor(const uint32_t offset, const uint32_t* addr, float* out_rgb)
 	else
 		color_stats[2]++;
 
-	/* Instrumentation for the go/no-go measurement: one cumulative line
-	 * per ~1M gouraud/flat color words.  Scaffolding - the durable API
-	 * is PGXP_GetColorStats; this line goes away with the renderer
-	 * slice.  log_cb is NULL both before the frontend installs it and in
-	 * the offline harness, which links this TU without libretro.c. */
-	if (!(color_stats[0] & 0xFFFFFu) && log_cb)
-	{
-		log_cb(RETRO_LOG_INFO,
-		      "[PGXP color] words=%u hit=%u (%.1f%%) value-miss=%u quant-miss=%u\n",
-		      color_stats[0], color_stats[1],
-		      100.0 * (double)color_stats[1] / (double)color_stats[0],
-		      color_stats[2], color_stats[3]);
-		/* The go/no-go for an HDR renderer slice is this line, not the
-		 * one above: over=0 means the recovered colours are all inside
-		 * the byte range the architectural path already carried, and a
-		 * wide framebuffer has nothing to hold. */
-		log_cb(RETRO_LOG_INFO,
-		      "[PGXP color] over-white=%u (%.2f%% of hits) "
-		      "buckets<=1.25x/1.5x/2x/>2x=%u/%u/%u/%u peak=%.1f (%.2fx)\n",
-		      color_over,
-		      color_stats[1] ? 100.0 * (double)color_over / (double)color_stats[1] : 0.0,
-		      color_over_bucket[0], color_over_bucket[1],
-		      color_over_bucket[2], color_over_bucket[3],
-		      color_peak, (double)color_peak / 255.0);
-	}
+	/* The measurement scaffolding that used to print a cumulative
+	 * [PGXP color] line here every ~1M colour words is gone: the
+	 * renderer slice it was the go/no-go for shipped long ago, and the
+	 * durable API is PGXP_GetColorStats / PGXP_GetColorRangeStats,
+	 * which the offline range harness still consumes. */
 
 	return ok;
 }
