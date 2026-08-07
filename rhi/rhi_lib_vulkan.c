@@ -8661,7 +8661,17 @@ static void renderer_hazard(Renderer *self, StatusFlags flags)
       renderer_flush_resolves(self);
    }
 
-   VK_ASSERT(src_stages);
+   /* srcStageMask == 0 is illegal without synchronization2
+    * (VUID-vkCmdPipelineBarrier-srcStageMask-03937). It happens when the
+    * flag set names no prior producer -- observed on a clean 30-bit HDR
+    * boot via tools/vkhost with the Khronos validation layer, which is
+    * also how the debug assert below evidently never fired in anyone's
+    * release build. TOP_OF_PIPE is the spec's spelling of "wait on
+    * nothing": correct semantics for a hazard with no producer, and no
+    * longer invalid usage that stricter drivers may answer with a
+    * device loss. */
+   if (!src_stages)
+      src_stages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
    VK_ASSERT(dst_stages);
    renderer_ensure_command_buffer(self);
    commandbuffer_barrier_simple(cbh_get(&self->cmd), src_stages, src_access, dst_stages, dst_access);
@@ -19508,6 +19518,46 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    vulkan->set_image(vulkan->handle, image, 0,
          NULL, VK_QUEUE_FAMILY_IGNORED);
    renderer_flush(renderer);
+
+   /* VKHOST_CORE_DUMP: readback through the core's own machinery. */
+   if (getenv("VKHOST_CORE_DUMP"))
+   {
+      static int dump_n;
+      if (++dump_n == 100)
+      {
+         unsigned w = image_get_width(ih_get(&scanout), 0);
+         unsigned h = image_get_height(ih_get(&scanout), 0);
+         BufferCreateInfo bi;
+         BufferHandle buf;
+         CommandBufferHandle c;
+         memset(&bi, 0, sizeof(bi));
+         bi.size   = (VkDeviceSize)w * h * 8;
+         bi.domain  = BufferDomain_CachedHost;
+         bi.usage  = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+         buf = device_create_buffer(renderer->device, &bi, NULL);
+         c = device_request_command_buffer(renderer->device, Type_Generic);
+         { VkOffset3D o = { 0, 0, 0 };
+           VkExtent3D e = { w, h, 1 };
+           commandbuffer_image_barrier(cbh_get(&c), ih_get(&scanout),
+                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT,
+                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
+           { VkImageSubresourceLayers sub = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+             commandbuffer_copy_image_to_buffer(cbh_get(&c), bh_get(&buf), ih_get(&scanout), 0, &o, &e, 0, 0, &sub); }
+           commandbuffer_image_barrier(cbh_get(&c), ih_get(&scanout),
+                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_READ_BIT); }
+         device_submit(renderer->device, &c, NULL, 0, NULL);
+         device_wait_idle_nolock(renderer->device);
+         { void *m = device_map_host_buffer(renderer->device, bh_get(&buf), MEMORY_ACCESS_READ_BIT);
+           FILE *f = fopen("/tmp/core_scanout.raw", "wb");
+           if (f && m) { fwrite(m, 1, (size_t)w * h * 8, f); fclose(f); }
+           if (m) device_unmap_host_buffer(renderer->device, bh_get(&buf), MEMORY_ACCESS_READ_BIT);
+           fprintf(stderr, "[core-dump] wrote /tmp/core_scanout.raw %ux%u\n", w, h); }
+         bh_reset(&buf);
+      }
+   }
 
    ih_assign(&scanout_handles.items[index], &scanout);
    video_refresh_cb(RETRO_HW_FRAME_BUFFER_VALID, image_get_width(ih_get(&scanout), 0), image_get_height(ih_get(&scanout), 0), 0);
