@@ -96,11 +96,94 @@ static bool gl_fp16_renderable(void)
  * corruption - reproduces on end-user machines but not on Mesa, where
  * every map is serviced synchronously; when that happens the user's
  * log, not our rig, is the instrument. */
+bool rhi_gl_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+                      uint16_t *vram);
+
 static int gl_diag_state = -1;
+static int gl_diag_nested;
 static unsigned gl_diag_logged;
 static unsigned gl_diag_wraps;
 #define GL_DIAG_ON() (gl_diag_state >= 0 ? gl_diag_state : \
       (gl_diag_state = (getenv("BEETLE_GL_DIAG") ? 1 : 0)))
+/* Compare a full-VRAM diagnostic re-read against a reference copy and
+ * report the first divergence. The two probes below split the
+ * savestate cycle into its stages so a field log can say WHICH stage
+ * corrupts: a serialize-time double-read that differs means the GPU
+ * readback itself is nondeterministic; a restore-time roundtrip that
+ * differs means the upload/redraw side altered the data. Both are
+ * bit-exact on a correct stack: the restore draw expands 5-bit
+ * channels to float and the readback rounds them straight back. */
+static void gl_diag_compare_vram(const char *stage,
+      const uint16_t *ref, const uint16_t *got)
+{
+   size_t   n     = (size_t)1024 * 512; /* VRAM_WIDTH_PIXELS x VRAM_HEIGHT; defined below this helper */
+   size_t   k;
+   size_t   first = n;
+   unsigned diffs = 0;
+   for (k = 0; k < n; k++)
+   {
+      if (ref[k] != got[k])
+      {
+         if (first == n)
+            first = k;
+         diffs++;
+      }
+   }
+   if (diffs && getenv("BEETLE_GL_DIAG_DUMP"))
+   {
+      /* One-shot: write ref and readback as PPMs for eyeball analysis. */
+      static int dumped;
+      if (!dumped)
+      {
+         FILE *f; size_t i2; const uint16_t *src; int which;
+         char path[512];
+         dumped = 1;
+         for (which = 0; which < 2; which++)
+         {
+            src = which ? got : ref;
+            snprintf(path, sizeof(path), "%s.%s.ppm",
+                  getenv("BEETLE_GL_DIAG_DUMP"), which ? "got" : "ref");
+            f = fopen(path, "wb");
+            if (f)
+            {
+               fprintf(f, "P6\n1024 512\n255\n");
+               for (i2 = 0; i2 < n; i2++)
+               {
+                  uint16_t v = src[i2];
+                  fputc(((v      ) & 31) << 3, f);
+                  fputc(((v >>  5) & 31) << 3, f);
+                  fputc(((v >> 10) & 31) << 3, f);
+               }
+               fclose(f);
+            }
+         }
+      }
+   }
+   if (!log_cb)
+      return;
+   if (diffs)
+   {
+      if (gl_diag_logged < 128)
+      {
+         gl_diag_logged++;
+         log_cb(RETRO_LOG_ERROR,
+               "[gl_diag] %s MISMATCH: %u/%u pixels differ, first at "
+               "x=%u y=%u: 0x%04x vs 0x%04x\n",
+               stage, diffs, (unsigned)n,
+               (unsigned)(first % 1024u),
+               (unsigned)(first / 1024u),
+               (unsigned)ref[first], (unsigned)got[first]);
+      }
+   }
+   else if (gl_diag_logged < 8)
+   {
+      /* A few explicit clean reports early on, so an all-quiet log is
+       * distinguishable from probes that never ran. */
+      gl_diag_logged++;
+      log_cb(RETRO_LOG_INFO, "[gl_diag] %s clean\n", stage);
+   }
+}
+
 static void gl_diag_errors(const char *site)
 {
    GLenum e;
@@ -108,7 +191,7 @@ static void gl_diag_errors(const char *site)
       return;
    while ((e = glGetError()) != GL_NO_ERROR)
    {
-      if (gl_diag_logged < 64 && log_cb)
+      if (gl_diag_logged < 128 && log_cb)
       {
          gl_diag_logged++;
          log_cb(RETRO_LOG_ERROR,
@@ -6360,6 +6443,27 @@ void rhi_gl_load_image(
 #endif
 
    glDeleteFramebuffers(1, &_fb.id);
+
+   /* Diagnostic restore roundtrip: after a full-VRAM upload (the
+    * savestate-restore path), read the framebuffer straight back and
+    * compare to what was just uploaded. The restore draw expands each
+    * 5-bit channel to float and the readback rounds it back, so a
+    * correct stack returns the exact bytes; a mismatch localises the
+    * corruption to the upload/redraw side and names the first pixel. */
+   if (GL_DIAG_ON() && !gl_diag_nested &&
+       x == 0 && y == 0 && w == VRAM_WIDTH_PIXELS && h == VRAM_HEIGHT)
+   {
+      uint16_t *again = (uint16_t *)malloc(
+            (size_t)VRAM_WIDTH_PIXELS * (size_t)VRAM_HEIGHT * sizeof(uint16_t));
+      if (again)
+      {
+         gl_diag_nested = 1;
+         if (rhi_gl_read_vram(0, 0, VRAM_WIDTH_PIXELS, VRAM_HEIGHT, again))
+            gl_diag_compare_vram("RESTORE ROUNDTRIP", vram, again);
+         gl_diag_nested = 0;
+         free(again);
+      }
+   }
 }
 
 /* GP0 0xC0 (FBRead / Image Store): VRAM-to-CPU transfer.  The PS1
@@ -6405,6 +6509,7 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
                       uint16_t *vram)
 {
    gl_renderer *renderer;
+   int diag_full_read;
    GLuint   read_fbo    = 0;
    GLuint   scratch_tex = 0;
    GLuint   scratch_fbo = 0;
@@ -6438,6 +6543,9 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
       return false;
    if (w == 0 || h == 0)
       return true;
+
+   diag_full_read = GL_DIAG_ON() && !gl_diag_nested &&
+         x == 0 && y == 0 && w == VRAM_WIDTH_PIXELS && h == VRAM_HEIGHT;
 
    is_32bpp = (renderer->internal_color_depth == 32);
    /* The fp16 HDR target gets its own readback route: transfer the
@@ -6513,15 +6621,22 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
    {
       /* Native res: read straight from fb_out into scratch.
        *
-       * fb_out is rasterised with PS1-y -> GL-y mapping that flips
-       * vertically (the vertex shader maps PS1 y=0 to GL y=-1, see
-       * command_vertex.glsl).  glReadPixels uses GL convention
-       * (origin at bottom-left), so the GL y of PS1 row Y is
-       * (VRAM_HEIGHT - Y - 1).  For a rect (x, y, w, h) in PS1
-       * coords, the read region is (x, VRAM_HEIGHT - y - h, w, h)
-       * in GL coords, and the returned scanlines come out
-       * bottom-to-top - we flip them on the way into the caller's
-       * `vram`. */
+       * Both draw paths (command_vertex and image_load_vertex) map
+       * PS1 y with the SAME formula, y/256 - 1: PS1 row 0 lands at
+       * GL y = -1, i.e. GL row 0, the bottom. So fb_out's GL row g
+       * simply holds PS1 row g - no inversion. The previous version
+       * of this readback assumed the opposite (read origin at
+       * VRAM_HEIGHT - y - h plus a mirrored row copy), which returned
+       * every full-VRAM read vertically flipped and every partial
+       * FBRead from the wrong band entirely. Full-frame flips are
+       * invisible in normal play - textures sample fb_texture, and
+       * the display region is redrawn every frame - but the savestate
+       * path serializes the flipped image, and savestate-heavy
+       * runahead (Preemptive Frames) re-uploads and re-captures it
+       * every frame, toggling every texture page and CLUT upside down
+       * per cycle: the reported striped VRAM noise on GL only. Read
+       * the rect at GL y = y directly; rows arrive in increasing PS1
+       * order and copy straight. */
       glGenFramebuffers(1, &read_fbo);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, read_fbo);
 #ifdef HAVE_OPENGLES3
@@ -6537,7 +6652,7 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
       if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) ==
             GL_FRAMEBUFFER_COMPLETE)
       {
-         GLint gl_y = (GLint)VRAM_HEIGHT - (GLint)y - (GLint)h;
+         GLint gl_y = (GLint)y;
          if (is_fp16)
          {
             glReadPixels(
@@ -6625,8 +6740,8 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
           * bottom-first) to PS1 top-first. */
          GLint sx0 = (GLint) x        * (GLint) upscale;
          GLint sx1 = (GLint)(x + w)   * (GLint) upscale;
-         GLint sy0 = ((GLint)VRAM_HEIGHT - (GLint)y - (GLint)h) * (GLint) upscale;
-         GLint sy1 = ((GLint)VRAM_HEIGHT - (GLint)y          ) * (GLint) upscale;
+         GLint sy0 = (GLint) y        * (GLint) upscale;
+         GLint sy1 = (GLint)(y + h)   * (GLint) upscale;
 
          gl_caps.fp_glBlitFramebuffer(
                sx0, sy0, sx1, sy1,
@@ -6775,9 +6890,9 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
 
       for (row = 0; row < h; row++)
       {
-         /* scratch row 0 == GL bottom == PS1 row (y + h - 1).
-          * scratch row r == PS1 row (y + h - 1 - r). */
-         size_t ps1_row = (size_t)y + (h - 1 - row);
+         /* scratch row r == GL row (y + r) == PS1 row (y + r):
+          * straight copy, no mirror. */
+         size_t ps1_row = (size_t)y + row;
          memcpy(&vram[ps1_row * vram_stride + (size_t)x],
                 &scratch_pixels[row * w],
                 (size_t)w * sizeof(uint16_t));
@@ -6789,6 +6904,23 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
       {
          TTRect _rb = { x, y, w, h };
          texture_tracker_notifyReadback(renderer->tracker, _rb, vram);
+      }
+   }
+
+   /* Diagnostic double-read: immediately repeat the full-VRAM read and
+    * compare. Any difference means the GPU-side readback itself is
+    * nondeterministic on this driver. */
+   if (ok && diag_full_read)
+   {
+      uint16_t *again = (uint16_t *)malloc(
+            (size_t)VRAM_WIDTH_PIXELS * (size_t)VRAM_HEIGHT * sizeof(uint16_t));
+      if (again)
+      {
+         gl_diag_nested = 1;
+         if (rhi_gl_read_vram(0, 0, VRAM_WIDTH_PIXELS, VRAM_HEIGHT, again))
+            gl_diag_compare_vram("READBACK DOUBLE-READ", vram, again);
+         gl_diag_nested = 0;
+         free(again);
       }
    }
 
