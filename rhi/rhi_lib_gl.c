@@ -66,8 +66,59 @@ static bool gl_fp16_renderable(void)
 #define gl_draw_buffer_next_index(x)         ((x)->map_start + (x)->map_index)
 
 #ifndef GL_MAP_INVALIDATE_RANGE_BIT
-#define GL_MAP_INVALIDATE_RANGE_BIT       0x000
+#define GL_MAP_INVALIDATE_RANGE_BIT       0x0004
 #endif
+#ifndef GL_PIXEL_PACK_BUFFER
+#define GL_PIXEL_PACK_BUFFER              0x88EB
+#endif
+#ifndef GL_PIXEL_UNPACK_BUFFER
+#define GL_PIXEL_UNPACK_BUFFER            0x88EC
+#endif
+#ifndef GL_UNPACK_SKIP_ROWS
+#define GL_UNPACK_SKIP_ROWS               0x0CF3
+#endif
+#ifndef GL_UNPACK_SKIP_PIXELS
+#define GL_UNPACK_SKIP_PIXELS             0x0CF4
+#endif
+#ifndef GL_PACK_SKIP_ROWS
+#define GL_PACK_SKIP_ROWS                 0x0D03
+#endif
+#ifndef GL_PACK_SKIP_PIXELS
+#define GL_PACK_SKIP_PIXELS               0x0D04
+#endif
+
+/* Normalise the pixel-transfer state this renderer inherits from the
+ * frontend. The glsm shim used to reset all of this around every core
+ * entry; the rhi port dropped the shim for its unused state mirror and
+ * with it, silently, the incoming-state normalisation that was doing
+ * real work. RetroArch legitimately uploads its own UI textures between
+ * retro_run calls (the statistics overlay does so every frame) and can
+ * leave GL_UNPACK_* skips/lengths set and a pixel buffer bound. A bound
+ * GL_PIXEL_UNPACK_BUFFER turns every client-pointer glTexSubImage into
+ * an offset into the frontend's buffer - out of bounds, the whole
+ * upload is dropped with GL_INVALID_OPERATION; in bounds, it uploads
+ * the frontend's bytes. Under Preemptive Frames runahead the savestate
+ * restore replays the full 1MiB VRAM image through exactly that path
+ * every frame, which turned this latent inheritance into constant
+ * whole-VRAM corruption on the GL renderer, while Vulkan - with no
+ * shared mutable transfer state - was immune. Called at every entry
+ * point that touches the context after the frontend may have. */
+static void gl_normalize_inherited_state(void)
+{
+   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+   glPixelStorei(GL_UNPACK_ALIGNMENT,   4);
+   glPixelStorei(GL_UNPACK_ROW_LENGTH,  0);
+   glPixelStorei(GL_UNPACK_SKIP_ROWS,   0);
+   glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+   glPixelStorei(GL_PACK_ALIGNMENT,     4);
+#ifdef GL_PACK_ROW_LENGTH
+   glPixelStorei(GL_PACK_ROW_LENGTH,    0);
+#endif
+   glPixelStorei(GL_PACK_SKIP_ROWS,     0);
+   glPixelStorei(GL_PACK_SKIP_PIXELS,   0);
+   glActiveTexture(GL_TEXTURE0);
+}
 
 #include "shaders_gl/command_vertex.glsl.h"
 #include "shaders_gl/command_fragment.glsl.h"
@@ -4738,6 +4789,8 @@ static void gl_context_reset(void)
     * feature-gated code path is taken. */
    gl_caps_init();
 
+   gl_normalize_inherited_state();
+
    /* If the version is below our floor, leave the renderer in
     * GL_STATE_INVALID so all subsequent rhi_gl_* entry points
     * short-circuit.  The user sees nothing render but gets an
@@ -5168,6 +5221,8 @@ void rhi_gl_prepare_frame(void)
       static_renderer.state = GL_STATE_INVALID;
       return;
    }
+
+   gl_normalize_inherited_state();
 
    /* In case we're upscaling we need to increase the line width
     * proportionally */
@@ -6089,6 +6144,8 @@ void rhi_gl_load_image(
       return;
    }
 
+   gl_normalize_inherited_state();
+
    if ((unsigned)x + w > VRAM_WIDTH_PIXELS ||
        (unsigned)y + h > VRAM_HEIGHT)
    {
@@ -6293,6 +6350,8 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
       upscale = 1;
    if (upscale > 1 && !gl_caps.fp_glBlitFramebuffer)
       return false;
+
+   gl_normalize_inherited_state();
 
    /* Make sure all queued draws have actually landed in fb_out before
     * we read it back. */

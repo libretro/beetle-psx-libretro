@@ -47,6 +47,7 @@ static unsigned last_w, last_h, frames_presented;
  * reject OPENGL_CORE, accept OPENGL on a compatibility context (exercises
  * the rejection-retry ladder). */
 static int ctx_gl2, ctx_rejcore;
+static int avflags_on;
 static char sysdir[512] = "/tmp/vkhost_sys";
 static char savedir[512] = "/tmp/vkhost_save";
 
@@ -116,6 +117,17 @@ static bool env_cb(unsigned cmd, void *data)
       }
       case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
          *(bool *)data = false; return true;
+      case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
+      {
+         /* Only answered once the run loop starts, so the boot savestate
+          * (a labelled RetroArch state) still loads via the labelled
+          * reader - RA likewise only reports fast-savestates while the
+          * runahead machinery itself is saving/loading. */
+         const char *f = getenv("GLHOST_AVFLAGS");
+         if (!f || !avflags_on) return false;
+         *(int *)data = atoi(f);
+         return true;
+      }
       case RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER:
          if (!ctx_gl2) return false;
          *(unsigned *)data = RETRO_HW_CONTEXT_OPENGL;
@@ -259,6 +271,61 @@ static void dump_frame(const char *path)
    free(buf);
 }
 
+/* GLHOST_DIRTY=1: between retro_run calls, leave behind the kind of GL
+ * state a frontend legitimately leaves after drawing its own UI - the
+ * exact churn RetroArch's per-frame OSD produces. A robust core must
+ * set everything it depends on; glsm used to normalise all of this. */
+static GLuint dirty_pbo, dirty_tex;
+static void frontend_dirty_state(void)
+{
+   typedef void (*bindbuf_t)(GLenum, GLuint);
+   typedef void (*genbuf_t)(GLsizei, GLuint *);
+   typedef void (*bufdata_t)(GLenum, GLsizeiptr, const void *, GLenum);
+   typedef void (*acttex_t)(GLenum);
+   typedef void (*bindvao_t)(GLuint);
+   typedef void (*useprog_t)(GLuint);
+   static bindbuf_t pBindBuffer; static genbuf_t pGenBuffers;
+   static bufdata_t pBufferData; static acttex_t pActiveTexture;
+   static bindvao_t pBindVertexArray; static useprog_t pUseProgram;
+   if (!pBindBuffer)
+   {
+      pBindBuffer      = (bindbuf_t)eglGetProcAddress("glBindBuffer");
+      pGenBuffers      = (genbuf_t)eglGetProcAddress("glGenBuffers");
+      pBufferData      = (bufdata_t)eglGetProcAddress("glBufferData");
+      pActiveTexture   = (acttex_t)eglGetProcAddress("glActiveTexture");
+      pBindVertexArray = (bindvao_t)eglGetProcAddress("glBindVertexArray");
+      pUseProgram      = (useprog_t)eglGetProcAddress("glUseProgram");
+   }
+   if (!dirty_pbo)
+   {
+      static unsigned char junk[4096];
+      unsigned i; for (i = 0; i < sizeof(junk); i++) junk[i] = (unsigned char)(i * 37u + 11u);
+      pGenBuffers(1, &dirty_pbo);
+      pBindBuffer(0x88EC /*GL_PIXEL_UNPACK_BUFFER*/, dirty_pbo);
+      pBufferData(0x88EC, sizeof(junk), junk, GL_STATIC_DRAW);
+      glGenTextures(1, &dirty_tex);
+   }
+   /* the frontend drew its font atlas: unpack state + PBO left bound */
+   pBindBuffer(0x88EC, dirty_pbo);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+   glPixelStorei(GL_UNPACK_ROW_LENGTH, 333);
+   glPixelStorei(0x0CF3 /*GL_UNPACK_SKIP_ROWS*/, 3);
+   glPixelStorei(0x0CF4 /*GL_UNPACK_SKIP_PIXELS*/, 5);
+   glPixelStorei(GL_PACK_ALIGNMENT, 8);
+   /* its own texture on the unit the core uses, wrong active unit */
+   pActiveTexture(GL_TEXTURE0 + 5);
+   glBindTexture(GL_TEXTURE_2D, dirty_tex);
+   pActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, dirty_tex);
+   /* no VAO, no program, blend enabled with odd funcs */
+   pBindVertexArray(0);
+   pUseProgram(0);
+   glEnable(GL_BLEND);
+   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+   glDisable(GL_DEPTH_TEST);
+   glDisable(GL_SCISSOR_TEST);
+}
+
 typedef void (*set_env_t)(retro_environment_t);
 typedef void (*set_vid_t)(retro_video_refresh_t);
 typedef void (*set_as_t)(retro_audio_sample_t);
@@ -269,6 +336,7 @@ typedef void (*fn_t)(void);
 typedef bool (*load_t)(const struct retro_game_info *);
 typedef void (*run_t)(void);
 typedef bool (*unser_t)(const void *, size_t);
+typedef bool (*ser_t)(void *, size_t);
 typedef size_t (*ssize_t_t)(void);
 
 int main(int argc, char **argv)
@@ -346,14 +414,62 @@ int main(int argc, char **argv)
    }
 
    { run_t run = (run_t)dlsym(core, "retro_run");
+     /* GLHOST_PREEMPT=1: model RetroArch's Preemptive Frames runahead.
+      * Each presented frame: serialize the core, unserialize the very
+      * same state back, and run - the constant savestate load-and-replay
+      * churn that mode produces while input is held. */
+     ser_t   ser    = (ser_t)dlsym(core, "retro_serialize");
+     ssize_t_t ssz  = (ssize_t_t)dlsym(core, "retro_serialize_size");
+     unser_t unser  = (unser_t)dlsym(core, "retro_unserialize");
+     int preempt    = getenv("GLHOST_PREEMPT") ? atoi(getenv("GLHOST_PREEMPT")) : 0;
+     void *pbuf     = NULL; void *pbuf2 = NULL; size_t pcap = 0; int have_prev = 0;
+     avflags_on = 1;
      for (i = 1; i <= frames; i++)
      {
+        if (preempt && (i < 5 || (i % 50) == 0))
+           fprintf(stderr, "[glhost] frame %d serialize_size=%zu\n", i, ssz());
+        if (preempt == 1)
+        {
+           /* same-state cycle: serialize and immediately restore */
+           size_t need = ssz();
+           if (need > pcap) { free(pbuf); pbuf = malloc(need); pcap = need; }
+           if (!pbuf || !ser(pbuf, need) || !unser(pbuf, need))
+              fprintf(stderr, "[glhost] preempt cycle FAILED at frame %d\n", i);
+        }
+        else if (preempt == 2)
+        {
+           /* true rollback, RetroArch Preemptive Frames N=1: restore the
+            * state saved before the PREVIOUS frame, re-run that frame
+            * (replay), then save and run the current frame - two
+            * retro_run calls per presented frame, rolling back one. */
+           size_t need = ssz();
+           if (need > pcap)
+           { free(pbuf); free(pbuf2); pbuf = malloc(need); pbuf2 = malloc(need); pcap = need; }
+           if (pbuf && pbuf2)
+           {
+              if (have_prev)
+              {
+                 if (!unser(pbuf, pcap))
+                    fprintf(stderr, "[glhost] rollback unser FAILED frame %d\n", i);
+                 run(); /* replay previous frame */
+                 if (getenv("GLHOST_DIRTY"))
+                    frontend_dirty_state();
+              }
+              if (!ser(pbuf2, need))
+                 fprintf(stderr, "[glhost] rollback ser FAILED frame %d\n", i);
+              { void *t = pbuf; pbuf = pbuf2; pbuf2 = t; }
+              have_prev = 1;
+           }
+        }
         run();
+        if (getenv("GLHOST_DIRTY"))
+           frontend_dirty_state();
         if ((i % 30) == 0 || i == frames)
         { char path[1024];
           snprintf(path, sizeof(path), "%s/frame_%04d.ppm", outdir, i);
           dump_frame(path); }
      }
+   free(pbuf); free(pbuf2);
    }
    fprintf(stderr, "[glhost] done: %d frames run, %u presented, last %ux%u\n",
            frames, frames_presented, last_w, last_h);
