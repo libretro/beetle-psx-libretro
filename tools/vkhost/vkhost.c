@@ -259,6 +259,17 @@ static bool create_instance(void)
 }
 
 /* ---- frame dump: copy last_image to host memory and write PPM ---- */
+/* The .raw next to each .ppm holds the exact copied bytes; decode it by the
+ * numeric VkFormat in the log line, not by assumption. The trap that cost
+ * this harness two debugging sessions: VkFormat 64 is
+ * VK_FORMAT_A2B10G10R10_UNORM_PACK32 - 4-byte packed texels - while
+ * R16G16B16A16_SFLOAT is 97. The core's HDR scanout prefers A2B10G10R10
+ * when the device supports it (renderer_hdr_scanout_format), so an "HDR"
+ * raw is normally 10-bit packed PQ, not fp16. Reading those 4-byte texels
+ * as 8-byte half-float pairs manufactures a doubled side-by-side picture
+ * over a dead lower half, +/-50000 pseudo-values, NaNs, and an
+ * always-wrong alpha lane - which a correct 10-10-10-2 decode of the same
+ * bytes reveals to be an ordinary, healthy PQ frame. */
 static int dump_frame(const char *path)
 {
    VkDevice dev = vkctx.device;
