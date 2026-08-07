@@ -6007,7 +6007,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
-   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, fog));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, fog));
 
       renderer_dispatch(self, vertices, scissors, true);
@@ -9581,6 +9580,7 @@ static void renderer_render_opaque_primitives(Renderer *self){
    commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, color));
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, fog));
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
    renderer_dispatch(self, vertices, scissors, false);
@@ -9688,6 +9688,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, fog));
 
    { bool append_floor = self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT &&
          !psx_hdr_multipass;
