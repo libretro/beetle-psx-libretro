@@ -30,6 +30,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 #include "mednafen/error.h"
 
 #include "pgxp/pgxp_main.h"
+#include "pgxp/pgxp_gte.h"
 
 #include "deps/openbios/openbios.bin.h"
 
@@ -6725,6 +6726,10 @@ bool retro_serialize(void *data, size_t size)
 
 bool retro_unserialize(const void *data, size_t size)
 {
+   /* The fog sidecar ring is keyed by a push counter that restarts with the
+    * loaded state while counts inside RAM shadows survive; stale slots must
+    * not satisfy post-load lookups. */
+   PGXP_GTE_InvalidateFogRing();
    StateMem st;
    bool okay;
 

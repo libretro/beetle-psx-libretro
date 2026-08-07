@@ -56,20 +56,7 @@ layout(constant_id = 8) const int PRECISE_COLOR = 0;
 layout(constant_id = 9) const int PGXP_FOG = 0;
 layout(location = 6) in mediump vec4 vFog;
 
-/* The GTE interpolates toward the far colour in the console's gamma
- * domain; this redoes the mix in linear light (display gamma 2.2, the HDR
- * path's reference default). Endpoints are exact -- t == 0 returns the
- * pre-cue colour and t == 1 the far colour, both equal to the console's
- * own output there; only the transition differs. When PGXP_FOG is set the
- * vertex colour carries the PRE-cue value for cued vertices. */
-mediump vec3 pgxp_shaded_color()
-{
-	if (PGXP_FOG == 0 || vFog.a <= 0.0)
-		return vColor.rgb;
-	mediump vec3 pre = pow(max(vColor.rgb, vec3(0.0)), vec3(2.2));
-	mediump vec3 far = pow(max(vFog.rgb, vec3(0.0)), vec3(2.2));
-	return pow(mix(pre, far, clamp(vFog.a, 0.0, 1.0)), vec3(1.0 / 2.2));
-}
+#include "pgxp_fog.h"
 
 void main()
 {
@@ -131,7 +118,7 @@ void main()
 	if (opacity < 0.5)
 		discard;
 
-	vec3 shaded_hot = color.rgb * pgxp_shaded_color() * (255.0 / 128.0);
+	vec3 shaded_hot = color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
 	vec3 shaded = clamp(shaded_hot, 0.0, 1.0);
 	/* The semi-trans-opaque pass and every other blend mode stay clamped;
 	 * over-white there comes only from stacking, matching the option text. */
@@ -141,7 +128,7 @@ void main()
 		shaded = shaded_hot;
 	FragColor = vec4(shaded, NNColor.a + vColor.a);
 #else
-	FragColor = vec4(pgxp_shaded_color(), vColor.a);
+	FragColor = vec4((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, vColor.a);
 #endif
 
 	// Get round down behavior instead of round-to-nearest.

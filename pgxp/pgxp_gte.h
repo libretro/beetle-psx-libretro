@@ -68,6 +68,11 @@ void	PGXP_pushRGBf(float _r, float _g, float _b, uint32_t _v);
 	int	PGXP_GTE_GetFogByCount(uint32_t count, float out_pre[3],
 			float out_fc[3], float *out_t);
 
+	/* Refuse every stored cue. Called on init and savestate load: the push
+	 * counter restarts there while counts inside RAM shadows survive, and a
+	 * recycled slot must not satisfy a pre-load association. */
+	void	PGXP_GTE_InvalidateFogRing(void);
+
 void	PGXP_RTPS(uint32_t _n, uint32_t _v);
 
 int		PGXP_NCLIP_valid(uint32_t sxy0, uint32_t sxy1, uint32_t sxy2);

@@ -31,6 +31,13 @@ layout(constant_id = 6) const int HDR_HOT_SOURCE = 0;
  * REVERSE_SUBTRACT cannot floor at zero on a float attachment - and those
  * must not check-mask. Set from SpecConstIndex_MaskTest. */
 layout(constant_id = 7) const int MASK_TEST = 1;
+/* Mirrors primitive.frag: the vertex colour carries the PRE-cue value when
+ * the fog sidecar hits, so every program that shades with vColor must run
+ * the same mix or it un-fogs the primitive. */
+layout(constant_id = 9) const int PGXP_FOG = 0;
+layout(location = 6) in mediump vec4 vFog;
+#include "pgxp_fog.h"
+
 
 void main()
 {
@@ -41,12 +48,12 @@ void main()
 
 	vec4 color = NNColor;
 
-	vec3 shaded_hot = color.rgb * vColor.rgb * (255.0 / 128.0);
+	vec3 shaded_hot = color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
 	vec3 shaded     = clamp(shaded_hot, 0.0, 1.0);
 	vec3 add_src    = (HDR_HOT_SOURCE != 0) ? shaded_hot : shaded;
 	float blend_amt = NNColor.a;
 #else
-	vec3 shaded = vColor.rgb;
+	vec3 shaded = (PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb;
 #define add_src shaded
 	const float blend_amt = 1.0;
 #endif

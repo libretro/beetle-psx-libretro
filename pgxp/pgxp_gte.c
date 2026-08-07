@@ -46,6 +46,7 @@ PGXP_value* GTE_ctrl_reg = GTE_ctrl_reg_mem;
 
 void PGXP_InitGTE()
 {
+	PGXP_GTE_InvalidateFogRing();
 	memset(GTE_data_reg_mem, 0, sizeof(GTE_data_reg_mem));
 	memset(GTE_ctrl_reg_mem, 0, sizeof(GTE_ctrl_reg_mem));
 }
@@ -145,6 +146,23 @@ void PGXP_GTE_SetFogContext(float pre_r, float pre_g, float pre_b,
 	if (t > 1.0f) t = 1.0f;
 	pgxp_fog_pending.t      = t;
 	pgxp_fog_pending_set    = 1;
+}
+
+void PGXP_GTE_InvalidateFogRing(void)
+{
+	/* t < 0 is the no-cue encoding; count 0 with t < 0 can never satisfy a
+	 * lookup, so this refuses every stale association in one pass. Called on
+	 * init and on savestate load, where the push counter restarts while the
+	 * counts stored in RAM shadows survive -- without this, a recycled slot
+	 * whose new count collides with a pre-load shadow's count would hand a
+	 * validated colour someone else's fog. */
+	unsigned i;
+	for (i = 0; i < PGXP_FOG_RING_SIZE; i++)
+	{
+		pgxp_fog_ring[i].t     = -1.0f;
+		pgxp_fog_ring[i].count = 0;
+	}
+	pgxp_fog_pending_set = 0;
 }
 
 int PGXP_GTE_GetFogByCount(uint32_t count, float out_pre[3],

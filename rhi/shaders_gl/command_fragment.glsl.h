@@ -41,9 +41,12 @@ uniform uint pgxp_fog;
 vec3 pgxp_shading() {
    if (pgxp_fog == 0u || frag_fog.a <= 0.)
       return frag_shading_color;
-   vec3 pre = pow(max(frag_shading_color, vec3(0.)), vec3(2.2));
-   vec3 far = pow(max(frag_fog.rgb, vec3(0.)), vec3(2.2));
-   return pow(mix(pre, far, clamp(frag_fog.a, 0., 1.)), vec3(1. / 2.2));
+   // highp math: dark fog colours pass through pow(x, 2.2) below the fp16
+   // normal range and flush to zero on mediump-default GLES targets,
+   // crushing dark fog to black.
+   highp vec3 pre = pow(max(vec3(frag_shading_color), vec3(0.)), vec3(2.2));
+   highp vec3 far = pow(max(vec3(frag_fog.rgb), vec3(0.)), vec3(2.2));
+   return vec3(pow(mix(pre, far, clamp(frag_fog.a, 0., 1.)), vec3(1. / 2.2)));
 }
 // When 1, emit vec4(0.0) unconditionally: used by the zero-floor pass
 // that follows each subtractive batch on the fp16 target (blend
