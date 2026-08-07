@@ -50,7 +50,7 @@ void main()
 
 	vec3 shaded_hot = color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
 	vec3 shaded     = clamp(shaded_hot, 0.0, 1.0);
-	vec3 add_src    = (HDR_HOT_SOURCE != 0) ? shaded_hot : shaded;
+	vec3 add_src    = (HDR_HOT_SOURCE != 0) ? max(shaded_hot, vec3(0.0)) : shaded;
 	float blend_amt = NNColor.a;
 #else
 	vec3 shaded = (PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb;

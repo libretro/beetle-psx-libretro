@@ -15323,7 +15323,14 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       /* Enable device features we might care about. */
       {
-         VkPhysicalDeviceFeatures enabled_features = *required_features;
+         /* The negotiation contract lets a frontend pass NULL for "no
+          * required features"; RetroArch always passes a zeroed struct, so
+          * this dereference survived until a frontend that did not. */
+         VkPhysicalDeviceFeatures enabled_features;
+         if (required_features)
+            enabled_features = *required_features;
+         else
+            memset(&enabled_features, 0, sizeof(enabled_features));
          if (features.features.textureCompressionETC2)
             enabled_features.textureCompressionETC2 = VK_TRUE;
          if (features.features.textureCompressionBC)

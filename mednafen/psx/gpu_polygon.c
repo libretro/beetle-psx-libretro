@@ -1532,19 +1532,27 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
             /* Depth cue recovered: the vertex carries the PRE-cue colour
              * and the shader redoes the mix in linear light. The colour
              * accept inside GetFog is the safety gate. */ \
-            vertices[v].cf[0]  = pgxp_pre[0] / 255.0f; \
-            vertices[v].cf[1]  = pgxp_pre[1] / 255.0f; \
-            vertices[v].cf[2]  = pgxp_pre[2] / 255.0f; \
-            vertices[v].fog[0] = pgxp_fc[0] / 255.0f; \
-            vertices[v].fog[1] = pgxp_fc[1] / 255.0f; \
-            vertices[v].fog[2] = pgxp_fc[2] / 255.0f; \
+            /* Floor at zero: the GTE's pre-saturation lighting underflows
+             * below zero routinely (a negative MAC requantizes to the
+             * architectural 0 byte, so the accept rule passes it), and a
+             * negative vertex colour on the fp16 target is anti-light --
+             * additive draws darken, and the framebuffer accumulates
+             * negative energy frame over frame. Over-WHITE is the recovered
+             * signal; under-zero is not light. Same floor the Color FIFO
+             * applies, minus its ceiling. */ \
+            vertices[v].cf[0]  = (pgxp_pre[0] > 0.0f ? pgxp_pre[0] : 0.0f) / 255.0f; \
+            vertices[v].cf[1]  = (pgxp_pre[1] > 0.0f ? pgxp_pre[1] : 0.0f) / 255.0f; \
+            vertices[v].cf[2]  = (pgxp_pre[2] > 0.0f ? pgxp_pre[2] : 0.0f) / 255.0f; \
+            vertices[v].fog[0] = (pgxp_fc[0] > 0.0f ? pgxp_fc[0] : 0.0f) / 255.0f; \
+            vertices[v].fog[1] = (pgxp_fc[1] > 0.0f ? pgxp_fc[1] : 0.0f) / 255.0f; \
+            vertices[v].fog[2] = (pgxp_fc[2] > 0.0f ? pgxp_fc[2] : 0.0f) / 255.0f; \
             vertices[v].fog[3] = pgxp_t; \
          } \
          else if (PGXP_LIT && PGXP_GetColor(cb - baseCB, cb, pgxp_rgb)) \
          { \
-            vertices[v].cf[0] = pgxp_rgb[0] / 255.0f; \
-            vertices[v].cf[1] = pgxp_rgb[1] / 255.0f; \
-            vertices[v].cf[2] = pgxp_rgb[2] / 255.0f; \
+            vertices[v].cf[0] = (pgxp_rgb[0] > 0.0f ? pgxp_rgb[0] : 0.0f) / 255.0f; \
+            vertices[v].cf[1] = (pgxp_rgb[1] > 0.0f ? pgxp_rgb[1] : 0.0f) / 255.0f; \
+            vertices[v].cf[2] = (pgxp_rgb[2] > 0.0f ? pgxp_rgb[2] : 0.0f) / 255.0f; \
          } \
          else \
          { \

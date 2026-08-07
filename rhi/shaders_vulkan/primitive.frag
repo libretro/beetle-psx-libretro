@@ -125,7 +125,9 @@ void main()
 	if (HDR_HOT_SOURCE != 0 && TRANSPARENCY_MODE == SEMI_TRANS && BLEND_MODE == BLEND_ADD)
 		shaded = shaded_hot;
 	if (PRECISE_COLOR != 0)
-		shaded = shaded_hot;
+		/* Hot above white, still floored at zero: a negative source is
+		 * anti-light and unrepresentable on hardware. */
+		shaded = max(shaded_hot, vec3(0.0));
 	FragColor = vec4(shaded, NNColor.a + vColor.a);
 #else
 	FragColor = vec4((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, vColor.a);
