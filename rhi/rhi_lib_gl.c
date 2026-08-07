@@ -86,6 +86,37 @@ static bool gl_fp16_renderable(void)
 #ifndef GL_PACK_SKIP_PIXELS
 #define GL_PACK_SKIP_PIXELS               0x0D04
 #endif
+#ifndef GL_MAP_INVALIDATE_BUFFER_BIT
+#define GL_MAP_INVALIDATE_BUFFER_BIT      0x0008
+#endif
+
+/* Field diagnostics, enabled by setting BEETLE_GL_DIAG in the
+ * environment. Zero-cost when unset (one getenv on first use). Exists
+ * because a class of report - GL-only, NVIDIA-only, runahead-triggered
+ * corruption - reproduces on end-user machines but not on Mesa, where
+ * every map is serviced synchronously; when that happens the user's
+ * log, not our rig, is the instrument. */
+static int gl_diag_state = -1;
+static unsigned gl_diag_logged;
+static unsigned gl_diag_wraps;
+#define GL_DIAG_ON() (gl_diag_state >= 0 ? gl_diag_state : \
+      (gl_diag_state = (getenv("BEETLE_GL_DIAG") ? 1 : 0)))
+static void gl_diag_errors(const char *site)
+{
+   GLenum e;
+   if (!GL_DIAG_ON())
+      return;
+   while ((e = glGetError()) != GL_NO_ERROR)
+   {
+      if (gl_diag_logged < 64 && log_cb)
+      {
+         gl_diag_logged++;
+         log_cb(RETRO_LOG_ERROR,
+               "[gl_diag] GL error 0x%04X at %s (report #%u)\n",
+               (unsigned)e, site, gl_diag_logged);
+      }
+   }
+}
 
 /* Normalise the pixel-transfer state this renderer inherits from the
  * frontend. The glsm shim used to reset all of this around every core
@@ -1227,20 +1258,42 @@ static void gl_draw_buffer_disable_attribute(gl_draw_buffer *drawbuffer, const c
  * each from 'slice' into the mapped buffer.  The map is typed
  * void* (was T* in the templated version) so we cast to char*
  * for byte arithmetic. */
+/* The NULL-map guard pairs with the release-build map-failure handling
+ * in gl_draw_buffer_map_no_bind: a failed map logs loudly once, and
+ * every push until the next successful map becomes a no-op instead of
+ * a memcpy through NULL. */
 #ifdef DEBUG
 #define gl_draw_buffer_push_slice(drawbuffer, slice, n, len) \
-   assert((n) <= gl_draw_buffer_remaining_capacity(drawbuffer)); \
-   assert((drawbuffer)->map != NULL); \
-   memcpy((char *)(drawbuffer)->map + (drawbuffer)->map_index * (len), (slice), (n) * (len)); \
-   (drawbuffer)->map_index += (n);
+   do { \
+      assert((n) <= gl_draw_buffer_remaining_capacity(drawbuffer)); \
+      assert((drawbuffer)->map != NULL); \
+      if ((drawbuffer)->map) \
+      { \
+         memcpy((char *)(drawbuffer)->map + (drawbuffer)->map_index * (len), (slice), (n) * (len)); \
+         (drawbuffer)->map_index += (n); \
+      } \
+   } while (0)
 #else
 #define gl_draw_buffer_push_slice(drawbuffer, slice, n, len) \
-   memcpy((char *)(drawbuffer)->map + (drawbuffer)->map_index * (len), (slice), (n) * (len)); \
-   (drawbuffer)->map_index += (n);
+   do { \
+      if ((drawbuffer)->map) \
+      { \
+         memcpy((char *)(drawbuffer)->map + (drawbuffer)->map_index * (len), (slice), (n) * (len)); \
+         (drawbuffer)->map_index += (n); \
+      } \
+   } while (0)
 #endif
 
 static void gl_draw_buffer_draw(gl_draw_buffer *drawbuffer, GLenum mode)
 {
+   if (!drawbuffer->map)
+   {
+      /* A previous map failed; nothing was pushed. Reset and retry the
+       * map rather than unmapping a buffer that is not mapped. */
+      drawbuffer->map_index = 0;
+      gl_draw_buffer_map_no_bind(drawbuffer);
+      return;
+   }
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
    /* Unmap the active buffer */
    glUnmapBuffer(GL_ARRAY_BUFFER);
@@ -1268,6 +1321,7 @@ static void gl_draw_buffer_map_no_bind(gl_draw_buffer *drawbuffer)
    void *m                = NULL;
    size_t element_size    = drawbuffer->element_size;
    GLsizeiptr buffer_size = drawbuffer->capacity * element_size;
+   GLbitfield map_flags   = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT;
 
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
 
@@ -1277,17 +1331,49 @@ static void gl_draw_buffer_map_no_bind(gl_draw_buffer *drawbuffer)
    /* We don't have enough room left to remap 'capacity',
     * start back from the beginning of the buffer. */
    if (drawbuffer->map_start > 2 * drawbuffer->capacity)
+   {
       drawbuffer->map_start = 0;
+      /* At the wrap the mapped window lands back on vertex data whose
+       * draws may still be in flight on a deeply pipelined driver. A
+       * non-UNSYNCHRONIZED map is required to be safe there - the
+       * implementation must either wait for the pending reads or
+       * rename the range - so on a conforming driver this is a stall,
+       * not a hazard. Orphan the whole buffer instead: the driver
+       * hands back fresh storage while pending draws keep the old one,
+       * removing both the stall and any reliance on the driver getting
+       * the overlap of INVALIDATE_RANGE with in-flight reads right. */
+      map_flags = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT;
+      if (GL_DIAG_ON())
+      {
+         gl_diag_wraps++;
+         if (log_cb && (gl_diag_wraps <= 4 || (gl_diag_wraps & 0x3FFu) == 0))
+            log_cb(RETRO_LOG_INFO,
+                  "[gl_diag] draw buffer wrap #%u (capacity %u, esz %u): orphaning\n",
+                  gl_diag_wraps, (unsigned)drawbuffer->capacity,
+                  (unsigned)element_size);
+      }
+   }
 
    offset_bytes = drawbuffer->map_start * element_size;
 
    m = glMapBufferRange(GL_ARRAY_BUFFER,
          offset_bytes,
          buffer_size,
-         GL_MAP_WRITE_BIT |
-         GL_MAP_INVALIDATE_RANGE_BIT);
+         map_flags);
 
-   assert(m != NULL);
+   /* assert() vanishes under NDEBUG, and a NULL map used to flow
+    * straight into the push-slice memcpy - a release-build crash on
+    * any driver that fails the map. Fail loudly and leave the buffer
+    * unmapped; the push and draw paths check for that now. */
+   if (!m)
+   {
+      if (log_cb)
+         log_cb(RETRO_LOG_ERROR,
+               "[gl_draw_buffer_map_no_bind] glMapBufferRange failed "
+               "(offset %ld, size %ld, flags 0x%X)\n",
+               (long)offset_bytes, (long)buffer_size, (unsigned)map_flags);
+      gl_diag_errors("map_no_bind/map-failed");
+   }
 
    drawbuffer->map = m;
 }
@@ -2071,6 +2157,19 @@ static void gl_renderer_draw(gl_renderer *renderer)
 
    if (!renderer || static_renderer.state == GL_STATE_INVALID)
       return;
+
+   if (!renderer->command_buffer->map)
+   {
+      /* A previous command-buffer map failed; nothing was pushed and the
+       * buffer is not mapped, so there is nothing to unmap or draw.
+       * Clear the batch bookkeeping and retry the map. */
+      renderer->command_buffer->map_index = 0;
+      renderer->primitive_ordering        = 0;
+      gl_primitive_batch_vec_clear(&renderer->batches);
+      renderer->vertex_index_pos          = 0;
+      gl_draw_buffer_map_no_bind(renderer->command_buffer);
+      return;
+   }
 
    x = renderer->config.draw_offset[0];
    y = renderer->config.draw_offset[1];
