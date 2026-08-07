@@ -223,7 +223,9 @@ static bool create_instance(void)
       if (ai) app = *ai;
    }
    ci.pApplicationInfo = &app;
-   ci.enabledLayerCount = 1;
+   /* VKHOST_NO_VALIDATION=1 drops the layer: needed under ThreadSanitizer,
+    * where the layer's own rwlock teardown races and aborts the run. */
+   ci.enabledLayerCount = (getenv("VKHOST_NO_VALIDATION") != NULL) ? 0 : 1;
    ci.ppEnabledLayerNames = layers;
    ci.enabledExtensionCount = 1;
    ci.ppEnabledExtensionNames = exts;
@@ -361,6 +363,16 @@ static int dump_frame(const char *path)
        rf = fopen(rawpath, "wb");
        if (rf) { fwrite(map, 1, (size_t)size, rf); fclose(rf); } }
      f = fopen(path, "wb");
+     if (!f)
+     {
+        /* A full disk here used to crash the harness inside fprintf(NULL):
+         * the .raw fopen above was guarded, this one was not. */
+        fprintf(stderr, "[vkhost] cannot open %s for writing\n", path);
+        vkUnmapMemory(dev, mem);
+        vkDestroyBuffer(dev, buf, NULL);
+        vkFreeMemory(dev, mem, NULL);
+        return 0;
+     }
      fprintf(f, "P6\n%u %u\n255\n", ext.width, ext.height);
      for (y = 0; y < ext.height; y++)
         for (x = 0; x < ext.width; x++)
