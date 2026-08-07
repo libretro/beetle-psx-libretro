@@ -27,27 +27,11 @@ uniform uint dither_scaling;
 // additive glow ("HDR Additive Overbright"; the renderer sets this for
 // plain additive draws only).
 uniform uint hdr_hot;
-// PGXP linear-light fog: 1 when the option pair is on and the target is
-// fp16. The mix is the identity at frag_fog.a == 0, so gating is purely a
-// perf refusal to pay two pow() per fragment when the feature is off.
+// PGXP depth cue: 1 when the option pair is on and the target is fp16.
+// The mix is the identity at frag_fog.a == 0 -- and the CPU-side per-vertex
+// mix keeps the attribute at zero, so this is a dormant hook.
 uniform uint pgxp_fog;
 
-// The GTE interpolates toward the far colour in the console's gamma
-// domain; this redoes the mix in linear light (display gamma 2.2, matching
-// the HDR path's reference default). Endpoints are exact: t == 0 returns
-// the pre-cue colour and t == 1 returns the far colour, both equal to the
-// console's own output there -- only the transition differs. The vertex
-// carries the PRE-cue colour whenever frag_fog.a > 0.
-vec3 pgxp_shading() {
-   if (pgxp_fog == 0u || frag_fog.a <= 0.)
-      return frag_shading_color;
-   // highp math: dark fog colours pass through pow(x, 2.2) below the fp16
-   // normal range and flush to zero on mediump-default GLES targets,
-   // crushing dark fog to black.
-   highp vec3 pre = pow(max(vec3(frag_shading_color), vec3(0.)), vec3(2.2));
-   highp vec3 far = pow(max(vec3(frag_fog.rgb), vec3(0.)), vec3(2.2));
-   return vec3(pow(mix(pre, far, clamp(frag_fog.a, 0., 1.)), vec3(1. / 2.2)));
-}
 // When 1, emit vec4(0.0) unconditionally: used by the zero-floor pass
 // that follows each subtractive batch on the fp16 target (blend
 // equation MAX against zero restores the hardware floor).
@@ -74,6 +58,25 @@ uniform uint force_mask_bit;
 
 in vec3 frag_shading_color;
 in vec4 frag_fog;
+
+// The depth-cue mix runs per vertex on the CPU in the console's own gamma
+// domain (see gpu_polygon.c); the vertex arrives with the FINISHED colour
+// and frag_fog.a == 0, so this function is the identity at runtime. It is
+// kept correct for anything that ever re-enables the attribute: the mix
+// must stay in the gamma domain -- games fade to a BLACK far colour
+// (Silent Hill: FC = 0, t -> 1), where a linearised mix turns the
+// console's (1 - t) scale into (1 - t)^(1/2.2), two to three-and-a-half
+// times too bright across the whole fade. This definition also has to sit
+// BELOW the frag_* input declarations: GLSL requires declaration before
+// use, and placing it above them is a compile error that core-profile
+// drivers reject, taking the whole renderer down with it.
+vec3 pgxp_shading() {
+   if (pgxp_fog == 0u || frag_fog.a <= 0.)
+      return frag_shading_color;
+   return mix(max(vec3(frag_shading_color), vec3(0.)),
+              max(vec3(frag_fog.rgb), vec3(0.)),
+              clamp(frag_fog.a, 0., 1.));
+}
 // Texture page: base offset for texture lookup.
 flat in uvec2 frag_texture_page;
 // Texel coordinates within the page. Interpolated by OpenGL.

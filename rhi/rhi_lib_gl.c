@@ -4814,6 +4814,14 @@ static void gl_context_reset(void)
       gl_renderer_free(static_renderer.state_data);
       free(static_renderer.state_data);
       static_renderer.state_data = NULL;
+      /* Every sibling failure branch marks the state INVALID; this one
+       * did not, which left "state VALID, data NULL" behind a failed
+       * shader build -- prepare_frame then demoted to RHI_SOFTWARE, and
+       * GPU_Update walked the software line renderer over surfaces a HW
+       * session never allocates: the reported boot SEGV at
+       * GPU_Update+775. INVALID makes every rhi_gl_* entry point refuse
+       * cleanly instead. */
+      static_renderer.state      = GL_STATE_INVALID;
 
       /* Drop any pending deferred ops too: with no renderer they
        * can never be replayed, and surviving across a failed
@@ -5093,8 +5101,13 @@ void rhi_gl_prepare_frame(void)
    renderer = static_renderer.state_data;
    if (!renderer)
    {
-      rhi_type = RHI_SOFTWARE;
+      /* Never demote to RHI_SOFTWARE here: a hardware session has no
+       * software surfaces, so the demotion sent GPU_Update's line
+       * renderer through a NULL framebuffer. Log and refuse; the
+       * INVALID state set by the failed context_reset keeps every
+       * other entry point out too. */
       log_cb(RETRO_LOG_ERROR, "[rhi_gl_prepare_frame] Renderer state marked as valid but state data is null.\n");
+      static_renderer.state = GL_STATE_INVALID;
       return;
    }
 
