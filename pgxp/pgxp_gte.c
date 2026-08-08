@@ -86,6 +86,22 @@ void PGXP_InitGTE()
 #define SXY2 (GTE_data_reg[ 14 ])
 #define SXYP (GTE_data_reg[ 15 ])
 
+/* Drop the three-deep screen-XY FIFO.
+ *
+ * Called when PGXP transitions from off to on. While gMode is zero
+ * TransformXY skips the push entirely, so SXY0..2 still hold whatever
+ * was there before PGXP was switched off - or, at startup, zeroes.
+ * PGXP_GetVertex matches the stored value against the GP0 command word
+ * so a stale entry would almost certainly be rejected on its own, but
+ * "almost certainly" is a coincidence rather than a guarantee, and the
+ * cost of not relying on it is three stores at a mode change. */
+void PGXP_InvalidateVertexFIFO(void)
+{
+	SXY0.flags = 0;
+	SXY1.flags = 0;
+	SXY2.flags = 0;
+}
+
 void PGXP_pushSXYZ2f(float _x, float _y, float _z, uint32_t _v)
 {
 	static uint32_t uCount = 0;

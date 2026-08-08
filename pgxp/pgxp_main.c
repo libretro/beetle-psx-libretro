@@ -35,6 +35,11 @@ static void apply_modes(uint32_t new_modes)
 	gMode = new_modes;
 	if ((old_modes & PGXP_VERTEX_CACHE) && !(new_modes & PGXP_VERTEX_CACHE))
 		PGXP_FreeVertexCache();
+	/* Off to on: TransformXY skips the vertex push entirely while gMode is
+	 * zero, so the screen-XY FIFO holds entries from before PGXP was last
+	 * disabled. Retire them rather than let a stale one match by chance. */
+	if (!old_modes && new_modes)
+		PGXP_InvalidateVertexFIFO();
 }
 
 void PGXP_SetModes(uint32_t modes)

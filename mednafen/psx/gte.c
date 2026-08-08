@@ -1310,7 +1310,30 @@ static INLINE void TransformXY(int64_t h_div_sz, float precise_h_div_sz, float p
    XY_FIFO(1) = XY_FIFO(2);
    XY_FIFO(2) = XY_FIFO(3);
 
-   /* PGXP hack to add subpixel precision as well */
+   /* PGXP hack to add subpixel precision as well.
+    *
+    * Gated on gMode. With PGXP off this whole block was still executing
+    * on every transformed vertex: two conversions and a divide for the
+    * screen offsets, the widescreen ratio, two multiply-adds, two
+    * clamps, and then a call into PGXP_pushSXYZ2f which shuffles the
+    * three-deep vertex FIFO and calls PGXP_CacheVertex - all so the
+    * callee could check the mode and drop the result. The mode test
+    * lived one level too deep.
+    *
+    * Nothing reads the shadow while gMode is zero: gpu_polygon.c selects
+    * its DrawPolygon specialisation on the compile-time PGXP_LIT
+    * parameter, so the code that would consult the FIFO is not the code
+    * that runs. And because pgxp_precise_z and pgxp_precise_h_div_sz are
+    * side-effect free in a non-PGXP_DIAG build, the compiler is free to
+    * sink their work into this branch too, which takes the int64 to
+    * double conversion and the projection divide off the path as well.
+    *
+    * PGXP_InvalidateVertexFIFO on the off-to-on transition covers the
+    * one case this opens up: entries left behind from before PGXP was
+    * enabled. They would in practice be rejected anyway, since
+    * PGXP_GetVertex matches the stored value against the command word,
+    * but relying on that is relying on a coincidence not happening. */
+   if (PGXP_GetModes())
    {
       float fofx       = ((float)OFX / (float)(1 << 16));
       float fofy       = ((float)OFY / (float)(1 << 16));

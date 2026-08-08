@@ -84,6 +84,9 @@ void	PGXP_GTE_MTC2(uint32_t instr, uint32_t rdVal, uint32_t rtVal);		// copy GPR
 void	PGXP_GTE_CFC2(uint32_t instr, uint32_t rtVal, uint32_t rdVal);		// copy GTE ctrl reg to GPR reg (CFC2)
 void	PGXP_GTE_CTC2(uint32_t instr, uint32_t rdVal, uint32_t rtVal);		// copy GPR reg to GTE ctrl reg (CTC2)
 // Memory Access
+/* Drop the screen-XY FIFO; used on an off-to-on PGXP transition. */
+void	PGXP_InvalidateVertexFIFO(void);
+
 void	PGXP_GTE_LWC2(uint32_t instr, uint32_t rtVal, uint32_t addr);	// copy memory to GTE reg
 void	PGXP_GTE_SWC2(uint32_t instr, uint32_t rtVal, uint32_t addr);	// copy GTE reg to memory
 
