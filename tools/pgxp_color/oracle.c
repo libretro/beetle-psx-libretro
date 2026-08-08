@@ -181,8 +181,15 @@ int main(void)
    trial(INT32_MAX, INT32_MIN, 0, 0xAB);
    for (i = 0; i < 24; i++)
    {
-      int32_t big = (int32_t)(1u << (i + 8));
-      trial(big, -big, big - 1, (uint8_t)i);
+      /* i == 23 makes this 1u << 31, which converts to INT32_MIN. Both
+       * -INT32_MIN and INT32_MIN - 1 are signed overflow, so computing
+       * them directly aborts the whole run under -fsanitize=undefined
+       * and costs every phase after this one. Unsigned arithmetic wraps
+       * by definition and yields the identical values on two's
+       * complement, so the coverage is unchanged. */
+      uint32_t bigu = 1u << (i + 8);
+      int32_t  big  = (int32_t)bigu;
+      trial(big, (int32_t)(0u - bigu), (int32_t)(bigu - 1u), (uint8_t)i);
       trial(INT32_MAX - (int32_t)i, INT32_MIN + (int32_t)i, big, 0);
    }
 
