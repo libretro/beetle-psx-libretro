@@ -3806,7 +3806,13 @@ static int CDAccess_PBP_decompress(struct CDAccess_PBP *self, unsigned char *out
    unsigned char head = in[0];
 
    unsigned int range = 0xFFFFFFFF;
-   unsigned int code = (in[1] << 24) | (in[2] << 16) | (in[3] << 8) | in[4];
+   /* Cast before shifting: in[1] is an unsigned char, promoted to int, so
+    * in[1] << 24 overflows a signed int for any byte from 0x80 up. `in`
+    * is buff_compressed, read straight out of the PBP by cdstream_read,
+    * so roughly half of all compressed sectors reach here with the high
+    * bit set - this fires on ordinary images, not only corrupt ones. */
+   unsigned int code = ((unsigned int)in[1] << 24) | ((unsigned int)in[2] << 16) |
+                       ((unsigned int)in[3] <<  8) |  (unsigned int)in[4];
 
    if (head < 0) /* Check if we have a valid starting byte. */
    {
