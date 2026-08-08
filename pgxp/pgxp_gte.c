@@ -27,6 +27,9 @@
 
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
+
+#include <libretro.h>
 
 #include "pgxp_gte.h"
 #include "pgxp_main.h"
@@ -34,6 +37,9 @@
 #include "pgxp_mem.h"
 #include "pgxp_cpu.h"
 #include "pgxp_gpu.h"
+
+/* Same declaration pgxp_gpu.c uses; the frontend owns the callback. */
+extern retro_log_printf_t log_cb;
 
 
 /* GTE registers */
@@ -49,6 +55,14 @@ void PGXP_InitGTE()
 	PGXP_GTE_InvalidateFogRing();
 	memset(GTE_data_reg_mem, 0, sizeof(GTE_data_reg_mem));
 	memset(GTE_ctrl_reg_mem, 0, sizeof(GTE_ctrl_reg_mem));
+
+#if PGXP_DIAG
+	/* Per-session, so loading a second game in the same process does not
+	 * report the first one's geometry. */
+	pgxp_z_total       = 0;
+	pgxp_z_ceiling     = 0;
+	pgxp_z_ceiling_max = 0.0;
+#endif
 }
 
 /* Instruction register decoding */
@@ -349,3 +363,54 @@ void	PGXP_GTE_SWC2(uint32_t instr, uint32_t rtVal, uint32_t addr)
 	Validate(&GTE_data_reg[rt(instr)], rtVal);
 	WriteMem(&GTE_data_reg[rt(instr)], addr);
 }
+
+/* --- Transform-range instrumentation; see pgxp_gte.h ----------------
+ * Compiled out unless built with -DPGXP_DIAG=1. */
+#if PGXP_DIAG
+
+uint64_t pgxp_z_total;
+uint64_t pgxp_z_ceiling;
+double   pgxp_z_ceiling_max;
+
+void PGXP_GetTransformStats(uint64_t stats[3])
+{
+	stats[0] = pgxp_z_total;
+	stats[1] = pgxp_z_ceiling;
+	stats[2] = (uint64_t)pgxp_z_ceiling_max;
+}
+
+void PGXP_DiagDump(void)
+{
+	static int   diag_state = -1;
+	uint32_t     vc[7];
+	double       sat_pct;
+
+	if (diag_state < 0)
+		diag_state = getenv("BEETLE_PGXP_DIAG") ? 1 : 0;
+	if (!diag_state || !log_cb)
+		return;
+
+	sat_pct = pgxp_z_total
+		? (100.0 * (double)pgxp_z_ceiling / (double)pgxp_z_total)
+		: 0.0;
+
+	/* The two numbers the ceiling decision turns on: how much geometry
+	 * saturates, and how far past 0xFFFF it actually reaches.  A max
+	 * barely above 65535 means lifting the ceiling buys nothing; a max
+	 * an order of magnitude past it means the clamp is folding real
+	 * depth range onto one plane. */
+	log_cb(RETRO_LOG_INFO,
+		"[pgxp_diag] transforms %llu | Z at ceiling %llu (%.4f%%) | max pre-clamp Z %.0f\n",
+		(unsigned long long)pgxp_z_total,
+		(unsigned long long)pgxp_z_ceiling,
+		sat_pct,
+		pgxp_z_ceiling_max);
+
+	PGXP_GetVertexCacheStats(vc);
+	if (vc[0] || vc[3])
+		log_cb(RETRO_LOG_INFO,
+			"[pgxp_diag] vcache w=%u amb=%u retired=%u | r=%u hit=%u stale=%u ambref=%u\n",
+			vc[0], vc[1], vc[2], vc[3], vc[4], vc[5], vc[6]);
+}
+
+#endif /* PGXP_DIAG */

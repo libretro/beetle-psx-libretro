@@ -87,6 +87,52 @@ void	PGXP_GTE_CTC2(uint32_t instr, uint32_t rdVal, uint32_t rtVal);		// copy GPR
 void	PGXP_GTE_LWC2(uint32_t instr, uint32_t rtVal, uint32_t addr);	// copy memory to GTE reg
 void	PGXP_GTE_SWC2(uint32_t instr, uint32_t rtVal, uint32_t addr);	// copy GTE reg to memory
 
+/* --- Transform-range instrumentation ---------------------------------
+ *
+ * OFF BY DEFAULT AND COMPILED OUT ENTIRELY. Build with -DPGXP_DIAG=1 to
+ * enable. A default build must contain none of this: the counters below
+ * sit in pgxp_precise_z(), which is called from RTPS/RTPT once per
+ * transformed vertex, and that is not a place to spend cycles on a
+ * diagnostic. A 64-bit increment is not free on the 32-bit ARM, MIPS and
+ * PowerPC targets this core ships to - it is an add/add-with-carry pair
+ * plus two stores - and a store to a static in a hot inline constrains
+ * reordering on every target. Measuring it as noise on one x86-64 desktop
+ * does not generalise, and is not the bar for the GTE inner loop.
+ *
+ * With PGXP_DIAG unset the object code of gte.c is byte-identical to a
+ * tree without this patch; that identity is verified rather than
+ * asserted, by disassembly comparison.
+ *
+ * What it measures, when enabled: pgxp_precise_z() clamps the exact
+ * view-space Z to the same 0xFFFF ceiling the architectural SZ3
+ * saturates at. Keeping that ceiling was a deliberate, documented
+ * choice, but whether it is worth lifting is an empirical question about
+ * real content that no offline harness can answer - it depends on how
+ * much geometry sits past saturation and how far past it goes.
+ *
+ * Not thread safe by design. The GTE runs on the emulation thread; a
+ * torn read costs a wrong digit in a log line, which is not worth a
+ * locked instruction even in a diagnostic build. */
+#ifndef PGXP_DIAG
+#define PGXP_DIAG 0
+#endif
+
+#if PGXP_DIAG
+extern uint64_t pgxp_z_total;      /* vertices through pgxp_precise_z    */
+extern uint64_t pgxp_z_ceiling;    /* ...of those, clamped at 0xFFFF     */
+extern double   pgxp_z_ceiling_max;/* largest pre-clamp Z seen, else 0.0 */
+
+/* stats[0] total, [1] ceiling hits, [2] largest pre-clamp Z (rounded). */
+void	PGXP_GetTransformStats(uint64_t stats[3]);
+
+/* Field diagnostics within a PGXP_DIAG build, same contract as
+ * BEETLE_GL_DIAG in rhi_lib_gl.c: enabled by setting BEETLE_PGXP_DIAG in
+ * the environment, one getenv on first use, silent otherwise. Dumps the
+ * transform counters plus the vertex cache counters, which had no reader
+ * until now. Called from the periodic tick in gte.c. */
+void	PGXP_DiagDump(void);
+#endif /* PGXP_DIAG */
+
 #ifdef __cplusplus
 }
 #endif

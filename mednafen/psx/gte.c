@@ -1398,8 +1398,22 @@ static INLINE float pgxp_precise_z(int64_t acc)
 {
    double z = (double)acc * (1.0 / 4096.0);
 
+#if PGXP_DIAG
+   /* Diagnostic build only; see pgxp_gte.h. A default build emits none
+    * of this and is byte-identical to a tree without the counters. */
+   if ((++pgxp_z_total & 0x3FFFFFu) == 0)
+      PGXP_DiagDump();
+#endif
+
    if (z > 65535.0)
+   {
+#if PGXP_DIAG
+      pgxp_z_ceiling++;
+      if (z > pgxp_z_ceiling_max)
+         pgxp_z_ceiling_max = z;
+#endif
       z = 65535.0;
+   }
 
    return float_max(H/2.f, (float)z);
 }
