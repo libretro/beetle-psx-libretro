@@ -52,6 +52,18 @@ extern "C" {
 
 	void	PGXP_FreeVertexCache(void);
 
+	/* Vertex cache instrumentation, same shape as PGXP_GetColorStats.
+	 * Indices:
+	 *   0 writes                    3 read attempts
+	 *   1 writes marked ambiguous   4 read hits
+	 *   2 writes retiring an older  5 reads refused: stale generation
+	 *     generation                6 reads refused: ambiguous cell
+	 * Counters are zeroed when the cache is (re)allocated.  [1], [5] and
+	 * [6] are the false positives this cache used to answer with a wrong
+	 * vertex and now declines; [4]/[3] is the hit rate those refusals are
+	 * paid for out of. */
+	void	PGXP_GetVertexCacheStats(uint32_t stats[7]);
+
 	void	PGXP_SetAddress(uint32_t addr);
 	int		PGXP_GetVertices(const uint32_t* addr, void* pOutput, int xOffs, int yOffs);
 	int		PGXP_GetVertex(const uint32_t offset, const uint32_t* addr, OGLVertex* pOutput, int xOffs, int yOffs);

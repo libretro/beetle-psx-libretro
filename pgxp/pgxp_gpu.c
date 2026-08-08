@@ -32,6 +32,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 #include <assert.h>
 
@@ -94,16 +95,63 @@ uint32_t PGXP_tDebug = 0;
  *
  * The cache is freed in PGXP_Shutdown() (called from retro_deinit)
  * so we don't leak across libretro dlopen/dlclose cycles.
+ *
+ * False positives.  This is the defect the core option warns about
+ * ("false positives when querying the cache may produce graphical
+ * glitches. It is currently recommended to leave this option
+ * disabled"), and it had two distinct sources, both of which returned
+ * a confidently wrong vertex rather than declining:
+ *
+ *   1. Staleness.  The old gFlags was set to 1 on write and never
+ *      cleared by anything - not per frame, not per session, not on
+ *      savestate load.  "Valid this session" was aspirational; an
+ *      entry written hundreds of frames ago stayed valid forever, so
+ *      a lookup could be answered with the precise position of
+ *      geometry that had long since moved or been discarded.
+ *   2. Collision.  The key is the *integer* screen position, so two
+ *      distinct vertices in the same frame that project to the same
+ *      pixel share a cell.  The second write silently overwrote the
+ *      first and the reader had no way to tell.  The gFlags == 5
+ *      "ambiguous" encoding the original author left behind was the
+ *      intended guard for this, but the branch that would have set it
+ *      was disabled, so nothing ever produced that value.
+ *
+ * Both are now refused rather than answered.  A refusal costs nothing:
+ * PGXP_GetVertex simply falls through to the native PSX vertex, which
+ * is precisely what the (recommended, default) cache-disabled setting
+ * yields.  Over-refusal therefore degrades to the current default,
+ * while under-refusal is the glitch source - so the policy here is
+ * deliberately conservative.
+ *
+ * Determinism note: the generation counter is render-side state and is
+ * not serialized, exactly as the cache contents were not serialized
+ * before.  This is not a regression, and it is arguably a small
+ * improvement: after a savestate load the game's next transform batch
+ * opens a new generation, which retires every pre-load entry instead
+ * of leaving it live.
  * ============================================================ */
 typedef struct
 {
-	float   x;
-	float   y;
-	float   z;
-	uint8_t gFlags;	/* 0: empty.  1: valid this session.  5 was used by
-	                 * the (currently disabled) "ambiguous" branch. */
-	/* 3 bytes of tail padding bring this to 16 bytes naturally. */
+	float    x;
+	float    y;
+	float    z;
+	/* Validity tag, replacing the old uint8_t gFlags plus its 3 bytes of
+	 * tail padding.  The struct stays 16 bytes, so the 256 MB allocation
+	 * does not grow.
+	 *
+	 *   0                     : empty, never written
+	 *   bit 0                 : ambiguous - two different vertices landed
+	 *                           on this cell in the same write session
+	 *   bits 1..31            : generation in which the cell was written
+	 *
+	 * Generations start at 1, so a zeroed (calloc'd) buffer reads as
+	 * entirely empty without a separate init pass. */
+	uint32_t tag;
 } PGXP_cache_entry;
+
+#define PGXP_TAG_MAKE(gen)   (((uint32_t)(gen) << 1))
+#define PGXP_TAG_GEN(tag)    ((tag) >> 1)
+#define PGXP_TAG_AMBIGUOUS   (1u)
 
 const uint32_t mode_init = 0;
 const uint32_t mode_write = 1;
@@ -117,6 +165,33 @@ static PGXP_cache_entry *vertexCache = NULL;
 
 uint32_t cacheMode = 0;
 
+/* Current write generation.  Bumped when a write session opens (i.e. on
+ * every read -> write transition), which is what retires the previous
+ * session's entries.
+ *
+ * It is only ever reset to 1 alongside a fresh calloc, never on its own:
+ * resetting the counter while the buffer still holds tags from earlier
+ * generations would make those stale entries validate again, which is
+ * exactly the bug being fixed.  31 bits at one bump per frame is over a
+ * year of continuous play, so the wrap is not reachable in practice; the
+ * saturating guard below makes it a permanent refusal rather than a
+ * wrap-to-collision if it ever were. */
+static uint32_t cacheGen = 1;
+
+/* Instrumentation, mirroring the PGXP_GetColorStats idiom.  Indices:
+ *   0 writes                    3 read attempts
+ *   1 writes marked ambiguous   4 read hits
+ *   2 writes retiring an older  5 reads refused: stale generation
+ *     generation                6 reads refused: ambiguous cell */
+static uint32_t vcache_stats[7];
+
+void PGXP_GetVertexCacheStats(uint32_t stats[7])
+{
+	unsigned i;
+	for (i = 0; i < 7; i++)
+		stats[i] = vcache_stats[i];
+}
+
 /* Allocate the vertex cache on first use.  Returns 1 on success, 0 on
  * allocation failure (in which case the cache stays NULL and callers
  * fall back to mode_fail). */
@@ -125,7 +200,14 @@ static int VertexCacheEnsureAllocated(void)
 	if (vertexCache)
 		return 1;
 	vertexCache = (PGXP_cache_entry*)calloc(VERTEX_CACHE_SIZE, sizeof(PGXP_cache_entry));
-	return vertexCache ? 1 : 0;
+	if (!vertexCache)
+		return 0;
+
+	/* The buffer is zeroed, so every tag reads as empty and restarting
+	 * the generation counter here cannot resurrect anything. */
+	cacheGen = 1;
+	memset(vcache_stats, 0, sizeof(vcache_stats));
+	return 1;
 }
 
 /* Free the heap-allocated vertex cache.  Safe to call when the
@@ -176,20 +258,61 @@ void PGXP_CacheVertex(int16_t sx, int16_t sy, const PGXP_value* _pVertex)
 			return;
 		}
 
-		/* First vertex of write session (frame?) */
+		/* First vertex of write session (frame?).
+		 *
+		 * Opening a generation here is what retires the previous
+		 * session's entries.  Note the asymmetry with a naive
+		 * "clear the cache each frame": a game that transforms its
+		 * geometry once and then re-draws the same display list for
+		 * many frames issues no writes in those frames, so no
+		 * generation opens and its entries stay legitimately live.
+		 * Only a fresh transform batch retires the old one. */
+		if (cacheGen < 0x7FFFFFFFu)
+			cacheGen++;
 		cacheMode = mode_write;
 	}
 
 	if (sx >= -0x800 && sx <= 0x7ff &&
 		sy >= -0x800 && sy <= 0x7ff)
 	{
+		uint32_t tag = PGXP_TAG_MAKE(cacheGen);
+
 		pOldVertex = &vertexCache[(sy + 0x800) * VERTEX_CACHE_DIM + (sx + 0x800)];
 
+		vcache_stats[0]++;
+
+		if (PGXP_TAG_GEN(pOldVertex->tag) == cacheGen)
+		{
+			/* Something already claimed this cell this generation.
+			 * If it is bit-identical the game simply transformed the
+			 * same vertex twice (RTPT overlap, a redundant RTPS) and
+			 * there is nothing ambiguous about it - the transform is
+			 * deterministic, so equal inputs give equal bits and an
+			 * exact compare is the right test.  Otherwise two
+			 * distinct vertices project to the same pixel and the
+			 * cell can no longer answer for either of them. */
+			if (pOldVertex->x != pNewVertex->x ||
+			    pOldVertex->y != pNewVertex->y ||
+			    pOldVertex->z != pNewVertex->z)
+			{
+				pOldVertex->tag |= PGXP_TAG_AMBIGUOUS;
+				vcache_stats[1]++;
+				return;
+			}
+			/* Identical rewrite: nothing to do, and in particular do
+			 * not clear an ambiguous mark already set this
+			 * generation. */
+			return;
+		}
+
+		if (pOldVertex->tag != 0)
+			vcache_stats[2]++;
+
 		/* Write vertex into cache */
-		pOldVertex->x      = pNewVertex->x;
-		pOldVertex->y      = pNewVertex->y;
-		pOldVertex->z      = pNewVertex->z;
-		pOldVertex->gFlags = 1;
+		pOldVertex->x   = pNewVertex->x;
+		pOldVertex->y   = pNewVertex->y;
+		pOldVertex->z   = pNewVertex->z;
+		pOldVertex->tag = tag;
 	}
 }
 
@@ -217,8 +340,32 @@ static PGXP_cache_entry* PGXP_GetCachedVertex(int16_t sx, int16_t sy)
 	if (sx >= -0x800 && sx <= 0x7ff &&
 		sy >= -0x800 && sy <= 0x7ff)
 	{
-		/* Return pointer to cache entry */
-		return &vertexCache[(sy + 0x800) * VERTEX_CACHE_DIM + (sx + 0x800)];
+		PGXP_cache_entry *e = &vertexCache[(sy + 0x800) * VERTEX_CACHE_DIM + (sx + 0x800)];
+
+		vcache_stats[3]++;
+
+		/* The accept decision lives here rather than at the call site.
+		 * Previously the caller had to remember to test gFlags == 1
+		 * itself, which is the kind of check that gets dropped when a
+		 * second consumer is added; returning NULL for anything we
+		 * will not stand behind makes the refusal unskippable. */
+		if (e->tag == 0)
+			return NULL;                       /* never written */
+
+		if (PGXP_TAG_GEN(e->tag) != cacheGen)
+		{
+			vcache_stats[5]++;                 /* retired generation */
+			return NULL;
+		}
+
+		if (e->tag & PGXP_TAG_AMBIGUOUS)
+		{
+			vcache_stats[6]++;                 /* pixel claimed twice */
+			return NULL;
+		}
+
+		vcache_stats[4]++;
+		return e;
 	}
 
 	return NULL;
@@ -434,10 +581,12 @@ int PGXP_GetVertex(const uint32_t offset, const uint32_t* addr, OGLVertex* pOutp
 	else
 	{
 		/* Look in cache for valid vertex.  The cache holds a smaller
-		 * struct (just x/y/z/gFlags) than the FIFO/CB, so we use a
-		 * separate local rather than aliasing `vert`. */
+		 * struct (just x/y/z/tag) than the FIFO/CB, so we use a
+		 * separate local rather than aliasing `vert`.  A non-NULL
+		 * return is already fully validated - current generation,
+		 * unambiguous - so there is no flag test to repeat here. */
 		PGXP_cache_entry* cache_vert = PGXP_GetCachedVertex(psxX, psxY);
-		if ((cache_vert) && (cache_vert->gFlags == 1))
+		if (cache_vert)
 		{
 			/* a value is found, it is from the current session and is unambiguous (there was only one value recorded at that position) */
 			pOutput->x = cache_vert->x + xOffs;
