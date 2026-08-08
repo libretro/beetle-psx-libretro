@@ -459,7 +459,18 @@ int main(int argc, char **argv)
      if (ov) { char *dup = strdup(ov), *tok = strtok(dup, ";");
        while (tok) { char *eq = strchr(tok, '=');
          if (eq) { *eq = 0; add_var(tok, eq + 1); } tok = strtok(NULL, ";"); } free(dup); } }
-   add_var("beetle_psx_hw_renderer", "opengl");
+   /* Must be one of the values the core declares for this option
+    * (hardware / hardware_gl / hardware_vk / software). "opengl" is
+    * not one of them: the core still ends up on the GL backend, but
+    * its startup path only recognises the declared hardware values
+    * when it decides whether the internal upscale belongs on the GPU,
+    * so an undeclared value left the upscale on the CPU side and
+    * allocated GPU.vram at upscaled resolution. Real frontends never
+    * produce that state - RetroArch writes "hardware_gl" - and it
+    * silently invalidated every measurement this harness took above
+    * 1x, because the savestate readback writes native-resolution rows
+    * into what was then an upscale-strided buffer. */
+   add_var("beetle_psx_hw_renderer", "hardware_gl");
    { const char *m = getenv("GLHOST_CTX");
      if (m && !strcmp(m, "gl2"))     ctx_gl2 = 1;
      if (m && !strcmp(m, "rejcore")) ctx_rejcore = 1; }
