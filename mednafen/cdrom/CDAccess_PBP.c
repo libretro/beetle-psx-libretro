@@ -3110,9 +3110,19 @@ static void CDAccess_PBP_MakeSubPQ(struct CDAccess_PBP *self, int32_t lba, uint8
    s            = ((lba_relative / 75) % 60);
    m            = (lba_relative / 75 / 60);
 
-   fa           = (lba + 150) % 75;
-   sa           = ((lba + 150) / 75) % 60;
-   ma           = ((lba + 150) / 75 / 60);
+   /* (uint32_t)lba + 150u wraps by definition and converts back to the
+    * same int32_t that -fwrapv already produces here, so the signed
+    * division and remainder below - which yield negative values for
+    * pregap LBAs, and the uint32_t results depend on that - are
+    * unchanged. lba comes from the image's own tables, so a malformed
+    * sheet reaches this with values at the extremes of int32_t and the
+    * bare addition is undefined. */
+   {
+      int32_t lba_a = (int32_t)((uint32_t)lba + 150u);
+      fa = lba_a % 75;
+      sa = (lba_a / 75) % 60;
+      ma = (lba_a / 75 / 60);
+   }
 
    adr          = 0x1; /* Q channel data encodes position */
    control      = self->Tracks[track].subq_control;

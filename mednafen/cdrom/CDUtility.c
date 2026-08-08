@@ -261,7 +261,15 @@ void subpw_synth_udapp_lba(const struct TOC *toc, const int32_t lba, const int32
    uint32_t lba_relative;
    uint32_t m, s, f;
    uint32_t ma, sa, fa;
-   int32_t lba_tmp = lba + lba_subq_relative_offs;
+   /* The addition alone is what overflows: lba and lba_subq_relative_offs
+    * both come from the disc image's tables, so a malformed sheet reaches
+    * here with values at the extremes of int32_t. Wrapping through
+    * uint32_t and converting back keeps the exact result -fwrapv already
+    * gives this code while removing the undefined behaviour, and leaves
+    * the signed division and remainder below untouched - those produce
+    * negative values for negative input, which the uint32_t results are
+    * relying on. */
+   int32_t lba_tmp = (int32_t)((uint32_t)lba + (uint32_t)lba_subq_relative_offs);
 
    if(lba_tmp < 0)
       lba_relative = 0 - 1 - lba_tmp;
@@ -272,9 +280,12 @@ void subpw_synth_udapp_lba(const struct TOC *toc, const int32_t lba, const int32
    s  = ((lba_relative / 75) % 60);
    m  = (lba_relative  / 75 / 60);
 
-   fa = (lba + 150)    % 75;
-   sa = ((lba + 150)  / 75) % 60;
-   ma = ((lba + 150)  / 75 / 60);
+   {
+      int32_t lba_a = (int32_t)((uint32_t)lba + 150u);
+      fa = lba_a       % 75;
+      sa = (lba_a / 75) % 60;
+      ma = (lba_a / 75 / 60);
+   }
 
    {
       uint8_t adr     = 0x1; /* Q channel data encodes position */
@@ -347,13 +358,15 @@ void subpw_synth_leadout_lba(const struct TOC *toc, const int32_t lba, uint8_t* 
 {
    unsigned i;
    uint8_t buf[0xC];
-   uint32_t lba_relative = lba - toc->tracks[100].lba;
+   /* Same overflow, same treatment, as subpw_synth_udapp_lba above. */
+   int32_t  lba_a        = (int32_t)((uint32_t)lba + 150u);
+   uint32_t lba_relative = (uint32_t)lba - (uint32_t)toc->tracks[100].lba;
    uint32_t f  = (lba_relative  % 75);
    uint32_t s  = ((lba_relative / 75) % 60);
    uint32_t m  = (lba_relative  / 75 / 60);
-   uint32_t fa = (lba + 150)    % 75;
-   uint32_t sa = ((lba + 150)  / 75) % 60;
-   uint32_t ma = ((lba + 150)  / 75 / 60);
+   uint32_t fa = lba_a        % 75;
+   uint32_t sa = (lba_a / 75)  % 60;
+   uint32_t ma = (lba_a / 75 / 60);
 
    uint8_t adr     = 0x1; // Q channel data encodes position
    uint8_t control =  toc->tracks[100].control;

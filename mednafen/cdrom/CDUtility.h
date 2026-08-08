@@ -122,7 +122,10 @@ static INLINE int32_t ABA_to_LBA(uint32_t aba)
 
 static INLINE uint32_t LBA_to_ABA(int32_t lba)
 {
-   return(lba + 150);
+   /* Wrapped through uint32_t: the result is a uint32_t either way, and
+    * lba arrives from image-supplied tables where it can sit at the
+    * extremes of int32_t, making the bare addition undefined. */
+   return((uint32_t)lba + 150u);
 }
 
 static INLINE int32_t AMSF_to_LBA(uint8_t m_a, uint8_t s_a, uint8_t f_a)
