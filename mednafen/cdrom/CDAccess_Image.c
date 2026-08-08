@@ -283,6 +283,17 @@ static void   CDAccess_Image_MakeSubPQ(CDAccess_Image *self, int32_t lba, uint8_
 static uint32_t CDAccess_Image_GetSectorCount(CDAccess_Image *self, CDRFILE_TRACK_INFO *track){
    int64_t size;
 
+   /* A TRACK that never got a FILE has no stream. The sheet is malformed
+    * - a cue is supposed to open a file before declaring tracks in it -
+    * but the parser accepts the ordering and commits the track anyway, so
+    * this is reachable from any image whose sheet lost its first FILE
+    * line. Both cdstream_size calls below dereference the handle without
+    * checking, and the audio branch only avoids it when an AReader was
+    * opened, which itself requires a stream. Report an empty track and
+    * let the caller's existing length handling take it from there. */
+   if (!track->fp && !track->AReader)
+      return 0;
+
    if(track->DIFormat == DI_FORMAT_AUDIO)
    {
       if(track->AReader)
@@ -803,6 +814,28 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
                active_track = -1;
             }
 
+            /* A FILE with no TRACK since the previous FILE. The commit
+             * above is what normally hands TmpTrack's stream over to
+             * self->Tracks[]; when it does not run, the handle is still
+             * owned here and the open below would overwrite it, orphaning
+             * the stream and its VFS handle. Unlike the TOC branch, whose
+             * streams are registered with toc_streamcache and released by
+             * toc_streamcache_free, a cue FILE's stream is held only by
+             * TmpTrack, so nothing else would ever free it. */
+            if (TmpTrack.FirstFileInstance)
+            {
+               if (TmpTrack.AReader)
+               {
+                  AR_Close(TmpTrack.AReader);
+                  TmpTrack.AReader = NULL;
+               }
+               if (TmpTrack.fp)
+               {
+                  cdstream_destroy(TmpTrack.fp);
+                  TmpTrack.fp = NULL;
+               }
+            }
+
             if (!strstr(args[0], "cdrom://"))
                MDFN_EvalFIP_c(self->base_dir, args[0], efn, sizeof(efn));
             else
@@ -984,7 +1017,19 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
    } /* end of fgets() loop */
 
    if (active_track >= 0)
+   {
+      /* Same ownership transfer as the two commit sites inside the loop:
+       * copy the staged track out, then clear the staging struct so it no
+       * longer aliases the handles it just handed over. This site was
+       * missing the clear, which left TmpTrack.fp pointing at a stream
+       * self->Tracks[] now owns - harmless while nothing else looked at
+       * TmpTrack afterwards, but it makes "TmpTrack owns its handles iff
+       * they are non-NULL" false exactly at the point the cleanup label
+       * needs it to be true. */
       memcpy(&self->Tracks[active_track], &TmpTrack, sizeof(TmpTrack));
+      memset(&TmpTrack, 0, sizeof(TmpTrack));
+      active_track = -1;
+   }
    } /* end of if (!RawImage) */
    else
    {
@@ -1093,7 +1138,21 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
             RunningLBA  += self->Tracks[x].sectors;
             RunningLBA  += self->Tracks[x].postgap;
 
-            FileOffset  += self->Tracks[x].sectors * DI_Size_Table[self->Tracks[x].DIFormat];
+            /* sectors is an int32_t derived from the difference of two
+             * INDEX values the sheet supplied, so a malformed sheet can
+             * make it large or negative; multiplying it by a sector size
+             * of up to 2352 then overflows a signed int, which is
+             * undefined. FileOffset is a long, so the product only needed
+             * to be computed in a wider type - it was being truncated to
+             * int purely by the operand types.
+             *
+             * Note this does not make a negative sectors value sensible,
+             * only defined; a track of negative length still yields a
+             * nonsensical offset. Rejecting it outright would be the
+             * stronger fix but changes what the parser accepts, so it is
+             * left as a separate question. */
+            FileOffset  += (int64_t)self->Tracks[x].sectors
+                           * (int64_t)DI_Size_Table[self->Tracks[x].DIFormat];
          } /* end to cue sheet handling */
       } /* end to track loop */
    }
@@ -1128,6 +1187,35 @@ static bool CDAccess_Image_ImageOpen(CDAccess_Image *self, const char *path, boo
    }
 
 cleanup:
+   /* TmpTrack stages a track while the sheet is parsed and still owns
+    * whatever the last FILE opened until the track is committed - the
+    * commit sites memcpy into self->Tracks[] and then memset TmpTrack, so
+    * a non-NULL handle here is always an uncommitted one. Without this,
+    * any sheet that opens a FILE and then fails - a bad track format, an
+    * unparsable MSF, a truncated sheet - orphans the stream and its VFS
+    * handle.
+    *
+    * FirstFileInstance is the ownership bit, checked here for the same
+    * reason CDAccess_Image_Cleanup checks it: the TOC path shares one
+    * open stream across several tracks via toc_streamcache, and the
+    * reusing track gets FirstFileInstance = 0 and a borrowed pointer.
+    * toc_streamcache_free releases only the filenames and the table, not
+    * the streams, so freeing a borrowed handle here would leave the
+    * owning track pointing at freed memory. */
+   if (TmpTrack.FirstFileInstance)
+   {
+      if (TmpTrack.AReader)
+      {
+         AR_Close(TmpTrack.AReader);
+         TmpTrack.AReader = NULL;
+      }
+      if (TmpTrack.fp)
+      {
+         cdstream_destroy(TmpTrack.fp);
+         TmpTrack.fp = NULL;
+      }
+   }
+
    toc_streamcache_free(&cache);
    cdstream_close(&fp);
    return ok;
