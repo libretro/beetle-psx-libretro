@@ -5231,7 +5231,24 @@ static void check_variables(bool startup)
  *      legitimate playlist fits well within that. */
 #define M3U_MAX_DEPTH 8
 
-static void ReadM3U(string_vec_t *file_list, const char *path, unsigned depth)
+/* Total .m3u files expanded across the whole tree, not per branch.
+ *
+ * The depth limit alone bounds how deep the recursion goes, not how much
+ * work it does: a playlist whose entries are themselves playlists fans
+ * out multiplicatively, so eight levels of eight entries is 8^8 - about
+ * 16.7 million ReadM3U calls - from nine files totalling a few hundred
+ * bytes. Measured at 98 seconds, and it produces no entries at all;
+ * raising the fan-out to twenty puts it past 10^10 and it never returns.
+ * The files come with a downloaded multi-disc set like any other sidecar,
+ * so this is reachable without the user doing anything unusual.
+ *
+ * Sixty-four is far above any real playlist - a multi-disc release is one
+ * m3u listing a handful of cues - while bounding the work regardless of
+ * how the tree is shaped. */
+#define M3U_MAX_FILES 64
+
+static void ReadM3U_r(string_vec_t *file_list, const char *path,
+      unsigned depth, unsigned *files_seen)
 {
    char  dir_path[4096];
    char  linebuf[2048];
@@ -5241,6 +5258,14 @@ static void ReadM3U(string_vec_t *file_list, const char *path, unsigned depth)
    {
       log_cb(RETRO_LOG_ERROR, "M3U recursion limit (%u) reached at \"%s\"\n",
             M3U_MAX_DEPTH, path);
+      return;
+   }
+
+   if (++(*files_seen) > M3U_MAX_FILES)
+   {
+      log_cb(RETRO_LOG_ERROR,
+            "M3U expansion limit (%u files) reached at \"%s\"\n",
+            M3U_MAX_FILES, path);
       return;
    }
 
@@ -5278,7 +5303,7 @@ static void ReadM3U(string_vec_t *file_list, const char *path, unsigned depth)
          }
 
          /* Pre-increment so the depth limit actually trips. */
-         ReadM3U(file_list, efp_buf, depth + 1);
+         ReadM3U_r(file_list, efp_buf, depth + 1, files_seen);
       }
       else
          sv_push(file_list, efp_buf);
@@ -5286,6 +5311,12 @@ static void ReadM3U(string_vec_t *file_list, const char *path, unsigned depth)
 
 end:
    filestream_close(fp);
+}
+
+static void ReadM3U(string_vec_t *file_list, const char *path, unsigned depth)
+{
+   unsigned files_seen = 0;
+   ReadM3U_r(file_list, path, depth, &files_seen);
 }
 
 // TODO: LoadCommon()
