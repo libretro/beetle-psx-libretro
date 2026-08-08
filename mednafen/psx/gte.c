@@ -256,8 +256,15 @@ int GTE_StateAction(StateMem *sm, int load, int data_only)
    int16_t _ZSF3 = ZSF3;
    int16_t _ZSF4 = ZSF4;
 
-   /* compatibility variables, transfer to/from CR/DR[32] during save states */
-   int16_t Vectors[3][4];
+   /* compatibility variables, transfer to/from CR/DR[32] during save states.
+    * Vectors is zero-initialised because the save path only fills
+    * elements [i][0..2]: the [i][3] pads previously went into the
+    * savestate as uninitialised stack bytes, making two serializations
+    * of identical emulator state differ - poison for anything that
+    * compares or hashes states (netplay, runahead diagnostics,
+    * serialize-unserialize-serialize fixed-point checks). The load
+    * side never reads the pads, so this changes no behaviour. */
+   int16_t Vectors[3][4] = {{0}};
    int32_t MAC[4];
    uint16_t _OTZ;
    gtergb RGB;
