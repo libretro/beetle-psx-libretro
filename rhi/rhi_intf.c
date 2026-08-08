@@ -797,6 +797,9 @@ void rhi_intf_push_triangle(
    rhi_dump_triangle(vertices, &state);
 #endif
 
+   /* Scissor-clipped to the draw area, so it is a guaranteed superset. */
+   tt_coh_mark_draw_area();
+
    switch (rhi_type)
    {
       case RHI_SOFTWARE:
