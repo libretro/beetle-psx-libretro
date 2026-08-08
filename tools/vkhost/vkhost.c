@@ -20,6 +20,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <time.h>
 #include <dlfcn.h>
 #include <vulkan/vulkan.h>
 #include "libretro.h"
@@ -250,7 +251,16 @@ static bool create_instance(void)
       if (!n) return false;
       if (n > 8) n = 8;
       vkEnumeratePhysicalDevices(instance, &n, devs);
-      gpu = devs[0];
+      {
+         /* Not GRANITE_VULKAN_DEVICE_INDEX: that one is read by the core's
+          * own device creation, which the negotiation interface bypasses -
+          * the harness picks the GPU here and hands it to create_device. */
+         const char *e  = getenv("VKHOST_DEVICE_INDEX");
+         uint32_t    ix = e ? (uint32_t)strtoul(e, NULL, 0) : 0;
+         if (ix >= n)
+            ix = 0;
+         gpu = devs[ix];
+      }
       {
          VkPhysicalDeviceProperties props;
          vkGetPhysicalDeviceProperties(gpu, &props);
@@ -561,17 +571,57 @@ run_frames_sw:
 
    {
       int i;
+      /* VKHOST_BENCH turns the harness into a stopwatch: the periodic PPM
+       * dump is suppressed (it does a vkDeviceWaitIdle, a full image copy
+       * and a file write every 30 frames, which is most of the wall time
+       * at any real frame rate), and the first VKHOST_BENCH_SKIP frames
+       * run untimed so pipeline creation and first-use shader compilation
+       * stay out of the measurement. */
+      int bench      = getenv("VKHOST_BENCH") != NULL;
+      int bench_skip = 0;
+      struct timespec t0, t1;
       void (*retro_run_fn)(void) = dlsym(core, "retro_run");
+
+      if (bench)
+      {
+         const char *e = getenv("VKHOST_BENCH_SKIP");
+         bench_skip = e ? atoi(e) : 120;
+         if (bench_skip >= frames)
+            bench_skip = frames / 4;
+      }
+
       for (i = 0; i < frames; i++)
       {
          cur_frame = i;
+         if (bench && i == bench_skip)
+         {
+            if (vkctx.device)
+               vkDeviceWaitIdle(vkctx.device);
+            clock_gettime(CLOCK_MONOTONIC, &t0);
+         }
          retro_run_fn();
-         if (vkctx.device && ((i % 30) == 29 || i == frames - 1))
+         if (!bench && vkctx.device && ((i % 30) == 29 || i == frames - 1))
          {
             char path[600];
             snprintf(path, sizeof(path), "%s/frame_%04d.ppm", outdir, i + 1);
             dump_frame(path);
          }
+      }
+
+      if (bench)
+      {
+         double secs;
+         /* Charge queued-but-unretired GPU work to the measurement rather
+          * than to teardown: wait_sync_index is a no-op in this harness,
+          * so the core is free to run ahead of the device. */
+         if (vkctx.device)
+            vkDeviceWaitIdle(vkctx.device);
+         clock_gettime(CLOCK_MONOTONIC, &t1);
+         secs = (double)(t1.tv_sec - t0.tv_sec)
+              + (double)(t1.tv_nsec - t0.tv_nsec) * 1e-9;
+         fprintf(stderr, "[vkhost] BENCH %d frames in %.4f s = %.1f fps\n",
+               frames - bench_skip, secs,
+               secs > 0.0 ? (double)(frames - bench_skip) / secs : 0.0);
       }
    }
 
