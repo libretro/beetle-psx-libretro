@@ -60,6 +60,35 @@ static retro_proc_address_t get_proc_address(const char *sym)
 { return (retro_proc_address_t)eglGetProcAddress(sym); }
 
 /* ---- environment ---- */
+/* ---- software-renderer mode ----
+ * glhost began as a GL hw-render host, but savestate-cycling reports
+ * (libretro/beetle-psx-libretro#977) come from the software renderer
+ * too, so the harness accepts plain framebuffer cores as well: if the
+ * core never requests a hw context, frames arriving through
+ * video_refresh are copied out and dumped/hashed directly. */
+static int      soft_mode;
+static unsigned soft_fmt;      /* RETRO_PIXEL_FORMAT_*: 0=0RGB1555 1=XRGB8888 2=RGB565 */
+static unsigned char *soft_buf;
+static size_t   soft_cap;
+static unsigned soft_w, soft_h;
+
+/* GLHOST_FRAMEHASH=1: print an FNV-1a of every presented frame's pixel
+ * bytes. Two runs with identical input scripts must print identical
+ * hash sequences if savestate cycling is transparent - the
+ * control-vs-rollback equivalence oracle. */
+/* Emulated-frame counter driven by the main loop so input scripts see
+ * the same frame numbering whether or not rollback replays are running
+ * (replays re-present, so frames_presented advances differently between
+ * a control run and a rollback run - keying input on it would feed the
+ * two runs different scripts and break the equivalence oracle). */
+static unsigned input_frame;
+static int      in_replay;
+
+static unsigned fnv1a(const unsigned char *d, size_t n)
+{ unsigned h = 2166136261u; size_t i;
+  for (i = 0; i < n; i++) { h ^= d[i]; h *= 16777619u; }
+  return h; }
+
 static bool env_cb(unsigned cmd, void *data)
 {
    switch (cmd)
@@ -71,6 +100,7 @@ static bool env_cb(unsigned cmd, void *data)
       case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
          *(const char **)data = savedir; return true;
       case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
+         soft_fmt = *(const unsigned *)data;
          return true;
       case RETRO_ENVIRONMENT_GET_CAN_DUPE:
          *(bool *)data = true; return true;
@@ -159,19 +189,59 @@ static bool env_cb(unsigned cmd, void *data)
 
 /* ---- video/audio/input stubs ---- */
 static void video_cb(const void *data, unsigned width, unsigned height, size_t pitch)
-{ (void)data; (void)pitch;
+{
   if (width != last_w || height != last_h)
      fprintf(stderr, "[glhost] geometry %ux%u\n", width, height);
-  last_w = width; last_h = height; frames_presented++; }
+  last_w = width; last_h = height; frames_presented++;
+  if ((!data || data == (const void *)-1) && getenv("GLHOST_FRAMEHASH")
+      && width && height)
+  {
+     /* hw-render frame: hash a readback of the host FBO the core just
+      * rendered into, so GL runs get the same equivalence oracle. */
+     size_t need = (size_t)width * height * 4;
+     typedef void (*bindfb_t)(GLenum, GLuint);
+     bindfb_t pbind = (bindfb_t)eglGetProcAddress("glBindFramebuffer");
+     if (need > soft_cap) { free(soft_buf); soft_buf = malloc(need); soft_cap = need; }
+     if (soft_buf && pbind)
+     {
+        pbind(GL_FRAMEBUFFER, fbo);
+        glReadPixels(0, 0, (GLsizei)width, (GLsizei)height,
+                     GL_RGBA, GL_UNSIGNED_BYTE, soft_buf);
+        fprintf(stderr, "[glhost] frame %u hash %08x%s\n",
+                input_frame, fnv1a(soft_buf, need),
+                in_replay ? " (replay)" : "");
+     }
+  }
+  if (data && data != (const void *)-1 /* RETRO_HW_FRAME_BUFFER_VALID */)
+  {
+     /* software frame: pack rows tight so dumps and hashes ignore pitch slack */
+     unsigned bpp = (soft_fmt == 1) ? 4 : 2;
+     size_t need = (size_t)width * height * bpp;
+     unsigned y;
+     if (need > soft_cap) { free(soft_buf); soft_buf = malloc(need); soft_cap = need; }
+     if (soft_buf)
+     {
+        for (y = 0; y < height; y++)
+           memcpy(soft_buf + (size_t)y * width * bpp,
+                  (const unsigned char *)data + (size_t)y * pitch,
+                  (size_t)width * bpp);
+        soft_w = width; soft_h = height;
+        if (getenv("GLHOST_FRAMEHASH"))
+           fprintf(stderr, "[glhost] frame %u hash %08x%s\n",
+                   input_frame, fnv1a(soft_buf, need),
+                   in_replay ? " (replay)" : "");
+     }
+  }
+}
 static void audio_sample_cb(int16_t l, int16_t r) { (void)l; (void)r; }
 static size_t audio_batch_cb(const int16_t *d, size_t f) { (void)d; return f; }
 static void input_poll_cb(void) {}
 static int16_t input_state_cb(unsigned port, unsigned dev, unsigned idx, unsigned id)
 {
    const char *inj = getenv("GLHOST_INPUT"); /* "first-last:id,..." */
-   static unsigned frame_now; (void)dev; (void)idx;
+   unsigned frame_now; (void)dev; (void)idx;
    if (port != 0 || !inj) return 0;
-   frame_now = frames_presented;
+   frame_now = input_frame;
    { const char *p = inj;
      while (*p)
      { unsigned a, b, i2;
@@ -247,6 +317,38 @@ static int fbo_init(void)
 static void dump_frame(const char *path)
 {
    unsigned w = last_w ? last_w : 640, h = last_h ? last_h : 480;
+   if (soft_mode)
+   {
+      FILE *sf;
+      unsigned x, y;
+      if (!soft_buf) return;
+      sf = fopen(path, "wb");
+      if (!sf) return;
+      fprintf(sf, "P6\n%u %u\n255\n", soft_w, soft_h);
+      for (y = 0; y < soft_h; y++)
+         for (x = 0; x < soft_w; x++)
+         {
+            unsigned r, g, b2;
+            if (soft_fmt == 1)
+            {
+               const unsigned char *px = soft_buf + ((size_t)y * soft_w + x) * 4;
+               r = px[2]; g = px[1]; b2 = px[0]; /* XRGB8888 little-endian */
+            }
+            else
+            {
+               unsigned v = soft_buf[((size_t)y * soft_w + x) * 2] |
+                           (soft_buf[((size_t)y * soft_w + x) * 2 + 1] << 8);
+               if (soft_fmt == 2) /* RGB565 */
+               { r = ((v >> 11) & 31) << 3; g = ((v >> 5) & 63) << 2; b2 = (v & 31) << 3; }
+               else               /* 0RGB1555 */
+               { r = ((v >> 10) & 31) << 3; g = ((v >> 5) & 31) << 3; b2 = (v & 31) << 3; }
+            }
+            fputc(r, sf); fputc(g, sf); fputc(b2, sf);
+         }
+      fclose(sf);
+      fprintf(stderr, "[glhost] dumped %s (%ux%u soft)\n", path, soft_w, soft_h);
+      return;
+   }
    unsigned char *buf = malloc((size_t)w * h * 4);
    FILE *f;
    typedef void (*bindfb_t)(GLenum, GLuint);
@@ -382,8 +484,12 @@ int main(int argc, char **argv)
    }
 
    if (!hw_render.context_reset)
-   { fprintf(stderr, "[glhost] core did not request a GL hw context\n"); return 5; }
-   hw_render.context_reset();
+   {
+      soft_mode = 1;
+      fprintf(stderr, "[glhost] no hw context requested: software-renderer mode\n");
+   }
+   else
+      hw_render.context_reset();
 
    if (state_path)
    {
@@ -426,15 +532,58 @@ int main(int argc, char **argv)
      avflags_on = 1;
      for (i = 1; i <= frames; i++)
      {
+        input_frame = (unsigned)i;
         if (preempt && (i < 5 || (i % 50) == 0))
            fprintf(stderr, "[glhost] frame %d serialize_size=%zu\n", i, ssz());
         if (preempt == 1)
         {
-           /* same-state cycle: serialize and immediately restore */
+           /* same-state cycle: serialize and immediately restore.
+            * GLHOST_SERDIFF=1 additionally re-serializes right after the
+            * restore and compares: any byte that differs means
+            * serialize -> unserialize -> serialize is not a fixed point,
+            * i.e. some subsystem's state is degraded or regenerated
+            * differently by the restore - the engine behind savestate-
+            * cycling corruption that no renderer-level check can see.
+            * With labeled (non-fast) savestates the report's ASCII
+            * context names the owning chunk directly. */
            size_t need = ssz();
            if (need > pcap) { free(pbuf); pbuf = malloc(need); pcap = need; }
            if (!pbuf || !ser(pbuf, need) || !unser(pbuf, need))
               fprintf(stderr, "[glhost] preempt cycle FAILED at frame %d\n", i);
+           else if (getenv("GLHOST_SERDIFF"))
+           {
+              size_t need2 = ssz();
+              static void *dbuf; static size_t dcap;
+              if (need2 > dcap) { free(dbuf); dbuf = malloc(need2); dcap = need2; }
+              if (dbuf && ser(dbuf, need2))
+              {
+                 if (need2 != need)
+                    fprintf(stderr, "[glhost] SERDIFF frame %d: size changed %zu -> %zu\n", i, need, need2);
+                 else if (memcmp(pbuf, dbuf, need) != 0)
+                 {
+                    const unsigned char *A = (const unsigned char *)pbuf;
+                    const unsigned char *B = (const unsigned char *)dbuf;
+                    size_t k, first = need, last = 0, count = 0;
+                    for (k = 0; k < need; k++)
+                       if (A[k] != B[k]) { if (first == need) first = k; last = k; count++; }
+                    fprintf(stderr, "[glhost] SERDIFF frame %d: %zu bytes differ, offsets %zu..%zu (state %zu)\n",
+                            i, count, first, last, need);
+                    if (i < 4 || (i % 10) == 0)
+                    {
+                       /* nearest label: scan back for a run of printable chars */
+                       size_t s0 = first > 96 ? first - 96 : 0, j;
+                       fprintf(stderr, "[glhost]   context before first diff: \"");
+                       for (j = s0; j < first; j++)
+                          fputc((A[j] >= 32 && A[j] < 127) ? A[j] : '.', stderr);
+                       fprintf(stderr, "\"\n[glhost]   A: ");
+                       for (j = first; j < first + 16 && j < need; j++) fprintf(stderr, "%02x ", A[j]);
+                       fprintf(stderr, "\n[glhost]   B: ");
+                       for (j = first; j < first + 16 && j < need; j++) fprintf(stderr, "%02x ", B[j]);
+                       fprintf(stderr, "\n");
+                    }
+                 }
+              }
+           }
         }
         else if (preempt == 2)
         {
@@ -451,7 +600,11 @@ int main(int argc, char **argv)
               {
                  if (!unser(pbuf, pcap))
                     fprintf(stderr, "[glhost] rollback unser FAILED frame %d\n", i);
+                 input_frame = (unsigned)i - 1;
+                 in_replay   = 1;
                  run(); /* replay previous frame */
+                 in_replay   = 0;
+                 input_frame = (unsigned)i;
                  if (getenv("GLHOST_DIRTY"))
                     frontend_dirty_state();
               }
