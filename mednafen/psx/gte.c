@@ -1403,18 +1403,37 @@ static INLINE float pgxp_precise_z(int64_t acc)
     * of this and is byte-identical to a tree without the counters. */
    if ((++pgxp_z_total & 0x3FFFFFu) == 0)
       PGXP_DiagDump();
-#endif
 
+   /* Now purely informational - it records how much geometry sits past
+    * where SZ3 saturates, rather than gating anything. */
    if (z > 65535.0)
    {
-#if PGXP_DIAG
       pgxp_z_ceiling++;
       if (z > pgxp_z_ceiling_max)
          pgxp_z_ceiling_max = z;
-#endif
-      z = 65535.0;
    }
+#endif
 
+   /* No 0xFFFF ceiling. The architectural SZ3 saturates there because it
+    * is a uint16_t, and the shadow used to be clamped to match. Matching
+    * it was wrong: past saturation the integer path places a vertex
+    * (z / 65535) times too far from the projection centre, so the error
+    * is proportional rather than bounded - 1% past the clamp is half a
+    * pixel, twice past it is 80 pixels for a vertex 80 pixels out, and it
+    * grows without limit. Reproducing that in the shadow discards the one
+    * correct answer PGXP has.
+    *
+    * Removing it cannot regress anything: for z <= 65535 the clamp never
+    * fired, so the result is bit-identical to before, and the only inputs
+    * whose behaviour changes are the ones the old code got wrong. The 2D
+    * tolerance heuristic is self-limiting here rather than a hazard - if
+    * it is enabled and the corrected position lands far from the integer
+    * one, it substitutes the integer coordinate, which is exactly the old
+    * behaviour.
+    *
+    * The float_max floor stays. That one mirrors Divide()'s own overflow
+    * behaviour rather than a storage width, so it is not the same kind of
+    * artefact. */
    return float_max(H/2.f, (float)z);
 }
 
