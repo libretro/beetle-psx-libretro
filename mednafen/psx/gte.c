@@ -1404,6 +1404,41 @@ static INLINE float pgxp_precise_z(int64_t acc)
    return float_max(H/2.f, (float)z);
 }
 
+/* Companion to pgxp_precise_z: the shadow's h/z, with the H == 0 corner
+ * handled the way the integer pipeline handles it.
+ *
+ * precise_z is zero only when H is zero. The floor in pgxp_precise_z is
+ * H/2, so any non-zero H keeps it strictly positive; H == 0 with a
+ * non-positive view-space Z is the one input that reaches zero, and
+ * (float)0 / 0.0f there is a 0/0.
+ *
+ * That divide was not producing a NaN in the renderer - the
+ * float_max/float_min clamp at the end of TransformXY absorbs it, and
+ * does so identically under all three float_minmax.h backends (SSE2
+ * min_ss/max_ss, C99 fminf/fmaxf, and the ternary fallback all yield the
+ * bound), so there was no arch-dependent divergence either. What it did
+ * produce is worse than useless in a quieter way: every affected vertex
+ * got pinned to the clamp corner at +1023 instead of following the
+ * integer path, which puts stray geometry in the frame rather than a
+ * visibly broken primitive. The 2D tolerance net in gpu_polygon.c would
+ * normally replace such an outlier with the native coordinate, but that
+ * option defaults to disabled (psx_pgxp_2d_tol == -1), so in the default
+ * configuration nothing catches it.
+ *
+ * Divide() answers this same corner by clipping: with H == 0 and SZ3 == 0
+ * the `(divisor * 2) > dividend` test fails, FLAGS bit 17 is raised and
+ * it returns the saturated 0x1FFFF. Returning that value scaled out of
+ * Q16 keeps the shadow on the integer path's answer instead of inventing
+ * one, and incidentally retires a latent -fsanitize=float-divide-by-zero
+ * trip in the sweep. */
+static INLINE float pgxp_precise_h_div_sz(float precise_z)
+{
+   if (precise_z > 0.0f)
+      return (float)H / precise_z;
+
+   return (float)0x1FFFF / 65536.0f;
+}
+
 static int32_t RTPS(uint32_t instr)
 {
  int64_t h_div_sz;
@@ -1416,7 +1451,7 @@ static int32_t RTPS(uint32_t instr)
  h_div_sz = Divide(H, Z_FIFO(3));
 
  precise_z = pgxp_precise_z(precise_z_acc);
- precise_h_div_sz  = (float)H / precise_z;
+ precise_h_div_sz  = pgxp_precise_h_div_sz(precise_z);
 
  TransformXY(h_div_sz, precise_h_div_sz, precise_z);
  TransformDQ(h_div_sz);
@@ -1440,7 +1475,7 @@ static int32_t RTPT(uint32_t instr)
   h_div_sz = Divide(H, Z_FIFO(3));
 
   precise_z = pgxp_precise_z(precise_z_acc);
-  precise_h_div_sz  = (float)H / precise_z;
+  precise_h_div_sz  = pgxp_precise_h_div_sz(precise_z);
 
   TransformXY(h_div_sz, precise_h_div_sz, precise_z);
 
