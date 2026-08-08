@@ -182,14 +182,32 @@ static uint32_t cacheGen = 1;
  *   0 writes                    3 read attempts
  *   1 writes marked ambiguous   4 read hits
  *   2 writes retiring an older  5 reads refused: stale generation
- *     generation                6 reads refused: ambiguous cell */
+ *     generation                6 reads refused: ambiguous cell
+ *
+ * Behind PGXP_DIAG and compiled out otherwise; see pgxp_gte.h.  These
+ * shipped unconditional in c478571d, which was wrong for the same reason
+ * the transform counters were: [0] and [3] are per-vertex on a live
+ * feature path, and a counter nobody reads in a shipping build has no
+ * business costing anything there. */
+#if PGXP_DIAG
 static uint32_t vcache_stats[7];
+#define VCACHE_STAT(i) (vcache_stats[i]++)
+
+#else
+#define VCACHE_STAT(i) ((void)0)
+#endif
 
 void PGXP_GetVertexCacheStats(uint32_t stats[7])
 {
 	unsigned i;
 	for (i = 0; i < 7; i++)
+#if PGXP_DIAG
 		stats[i] = vcache_stats[i];
+#else
+		/* Callable in every build so consumers need no ifdef of their
+		 * own; a non-PGXP_DIAG build simply has nothing to report. */
+		stats[i] = 0;
+#endif
 }
 
 /* Allocate the vertex cache on first use.  Returns 1 on success, 0 on
@@ -206,7 +224,9 @@ static int VertexCacheEnsureAllocated(void)
 	/* The buffer is zeroed, so every tag reads as empty and restarting
 	 * the generation counter here cannot resurrect anything. */
 	cacheGen = 1;
+#if PGXP_DIAG
 	memset(vcache_stats, 0, sizeof(vcache_stats));
+#endif
 	return 1;
 }
 
@@ -279,7 +299,7 @@ void PGXP_CacheVertex(int16_t sx, int16_t sy, const PGXP_value* _pVertex)
 
 		pOldVertex = &vertexCache[(sy + 0x800) * VERTEX_CACHE_DIM + (sx + 0x800)];
 
-		vcache_stats[0]++;
+		VCACHE_STAT(0);
 
 		if (PGXP_TAG_GEN(pOldVertex->tag) == cacheGen)
 		{
@@ -296,7 +316,7 @@ void PGXP_CacheVertex(int16_t sx, int16_t sy, const PGXP_value* _pVertex)
 			    pOldVertex->z != pNewVertex->z)
 			{
 				pOldVertex->tag |= PGXP_TAG_AMBIGUOUS;
-				vcache_stats[1]++;
+				VCACHE_STAT(1);
 				return;
 			}
 			/* Identical rewrite: nothing to do, and in particular do
@@ -306,7 +326,7 @@ void PGXP_CacheVertex(int16_t sx, int16_t sy, const PGXP_value* _pVertex)
 		}
 
 		if (pOldVertex->tag != 0)
-			vcache_stats[2]++;
+			VCACHE_STAT(2);
 
 		/* Write vertex into cache */
 		pOldVertex->x   = pNewVertex->x;
@@ -342,7 +362,7 @@ static PGXP_cache_entry* PGXP_GetCachedVertex(int16_t sx, int16_t sy)
 	{
 		PGXP_cache_entry *e = &vertexCache[(sy + 0x800) * VERTEX_CACHE_DIM + (sx + 0x800)];
 
-		vcache_stats[3]++;
+		VCACHE_STAT(3);
 
 		/* The accept decision lives here rather than at the call site.
 		 * Previously the caller had to remember to test gFlags == 1
@@ -354,17 +374,17 @@ static PGXP_cache_entry* PGXP_GetCachedVertex(int16_t sx, int16_t sy)
 
 		if (PGXP_TAG_GEN(e->tag) != cacheGen)
 		{
-			vcache_stats[5]++;                 /* retired generation */
+			VCACHE_STAT(5);                 /* retired generation */
 			return NULL;
 		}
 
 		if (e->tag & PGXP_TAG_AMBIGUOUS)
 		{
-			vcache_stats[6]++;                 /* pixel claimed twice */
+			VCACHE_STAT(6);                 /* pixel claimed twice */
 			return NULL;
 		}
 
-		vcache_stats[4]++;
+		VCACHE_STAT(4);
 		return e;
 	}
 
@@ -399,7 +419,17 @@ void PGXP_SetAddress(uint32_t addr)
 }
 
 /* Get single parallel vertex value */
+/* Same treatment as the vertex cache counters above: measurement only,
+ * so it is compiled out of a shipping build.  Pre-dates PGXP_DIAG; folded
+ * in here so the tree has one convention for instrumentation rather than
+ * two.  tools/pgxp_color builds with -DPGXP_DIAG=1, which is what its
+ * range harness needs to read these back. */
+#if PGXP_DIAG
 static uint32_t color_stats[4]; /* attempts, hits, value miss, quant miss */
+#define COLOR_STAT(i) (color_stats[i]++)
+#else
+#define COLOR_STAT(i) ((void)0)
+#endif
 
 /* Over-range measurement.
  *
@@ -466,7 +496,7 @@ int PGXP_GetColor(const uint32_t offset, const uint32_t* addr, float* out_rgb)
 	uint32_t word   = *addr;
 	int ok          = 0;
 
-	color_stats[0]++;
+	COLOR_STAT(0);
 
 	if (col && ((col->flags & VALID_012) == VALID_012) &&
 	    (((col->value ^ word) & 0x00FFFFFFu) == 0))
@@ -490,14 +520,14 @@ int PGXP_GetColor(const uint32_t offset, const uint32_t* addr, float* out_rgb)
 			 * measurement slice passes NULL and this is the number it
 			 * exists to collect. */
 			color_note_range(col->x, col->y, col->z);
-			color_stats[1]++;
+			COLOR_STAT(1);
 			ok = 1;
 		}
 		else
-			color_stats[3]++;
+			COLOR_STAT(3);
 	}
 	else
-		color_stats[2]++;
+		COLOR_STAT(2);
 
 	/* The measurement scaffolding that used to print a cumulative
 	 * [PGXP color] line here every ~1M colour words is gone: the
@@ -545,10 +575,16 @@ void PGXP_GetColorRangeStats(uint32_t *over, uint32_t buckets[4], float *peak)
 
 void PGXP_GetColorStats(uint32_t stats[4])
 {
+#if PGXP_DIAG
 	stats[0] = color_stats[0];
 	stats[1] = color_stats[1];
 	stats[2] = color_stats[2];
 	stats[3] = color_stats[3];
+#else
+	/* Kept callable so consumers need no ifdef of their own; a
+	 * non-PGXP_DIAG build simply has nothing to report. */
+	stats[0] = stats[1] = stats[2] = stats[3] = 0;
+#endif
 }
 
 int PGXP_GetVertex(const uint32_t offset, const uint32_t* addr, OGLVertex* pOutput, int xOffs, int yOffs)

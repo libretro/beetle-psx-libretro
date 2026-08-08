@@ -3,6 +3,19 @@
 
 #include <stdint.h>
 
+/* Build switch for all PGXP instrumentation: transform Z-range counters,
+ * vertex cache counters, colour counters, and the BEETLE_PGXP_DIAG dump.
+ *
+ * Off, and compiled out entirely, unless built with -DPGXP_DIAG=1. None
+ * of it may cost anything in a shipping build: the counters sit on
+ * per-vertex paths, and a runtime flag would still be a load, a test and
+ * a branch each time. It lives here because every PGXP header includes
+ * this one, so no translation unit can pick up an instrumented
+ * declaration and a non-instrumented definition, or vice versa. */
+#ifndef PGXP_DIAG
+#define PGXP_DIAG 0
+#endif
+
 typedef struct PGXP_value_Tag
 {
    float       x;

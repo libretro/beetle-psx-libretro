@@ -1,6 +1,8 @@
 ROOT := ../..
 CFLAGS ?= -O2 -g -Wall -Wextra -Wno-unused-parameter -fwrapv
-CPPFLAGS := -I$(ROOT) -I$(ROOT)/pgxp -I$(ROOT)/libretro-common/include
+# PGXP_DIAG=1 so the counters the range harness reads are actually compiled
+# in; they are absent from a default (shipping) build by design.
+CPPFLAGS := -DPGXP_DIAG=1 -I$(ROOT) -I$(ROOT)/pgxp -I$(ROOT)/libretro-common/include
 
 # Links the real PGXP sources, so the code under test is the shipping code
 # rather than a copy of it.

@@ -113,10 +113,6 @@ void	PGXP_GTE_SWC2(uint32_t instr, uint32_t rtVal, uint32_t addr);	// copy GTE r
  * Not thread safe by design. The GTE runs on the emulation thread; a
  * torn read costs a wrong digit in a log line, which is not worth a
  * locked instruction even in a diagnostic build. */
-#ifndef PGXP_DIAG
-#define PGXP_DIAG 0
-#endif
-
 #if PGXP_DIAG
 extern uint64_t pgxp_z_total;      /* vertices through pgxp_precise_z    */
 extern uint64_t pgxp_z_ceiling;    /* ...of those, clamped at 0xFFFF     */
