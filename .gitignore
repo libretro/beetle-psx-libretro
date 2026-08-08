@@ -26,4 +26,12 @@ nul
 tools/analog/runner
 tools/analog/*.spv
 tools/pgxp_color/oracle
+tools/pgxp_color/range
 tools/pgxp_color/transport
+
+# vkhost harness build output (tools/vkhost)
+tools/vkhost/vkhost
+
+# Python bytecode from the VCD authoring script (tools/vcd)
+__pycache__/
+*.pyc
