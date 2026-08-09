@@ -6,6 +6,7 @@
 #include <stdlib.h> /* exit() */
 #include <stddef.h> /* offsetof() */
 #include <assert.h>
+#include <math.h>
 
 #include <glsym/glsym.h>
 
@@ -904,6 +905,26 @@ struct gl_draw_buffer
 };
 typedef struct gl_draw_buffer gl_draw_buffer;
 
+#define GL_VRAM_SYNC_TILE_SIZE 8u
+#define GL_VRAM_SYNC_TILES_X (VRAM_WIDTH_PIXELS / GL_VRAM_SYNC_TILE_SIZE)
+#define GL_VRAM_SYNC_TILES_Y (VRAM_HEIGHT / GL_VRAM_SYNC_TILE_SIZE)
+#define GL_VRAM_SYNC_WRITERS_PER_TILE 8u
+
+struct gl_vram_sync_writer
+{
+   uint64_t sequence;
+   uint64_t pixel_mask;
+   uint16_t x;
+   uint16_t y;
+   uint16_t w;
+   uint16_t h;
+};
+
+struct gl_vram_sync_tile
+{
+   struct gl_vram_sync_writer writers[GL_VRAM_SYNC_WRITERS_PER_TILE];
+};
+
 
 struct gl_analog;
 
@@ -1000,6 +1021,19 @@ struct gl_renderer {
    /* Scratch FBOs for fused-page compositing blits */
    GLuint tt_read_fbo;
    GLuint tt_draw_fbo;
+   /* Persistent FBOs for fb_out -> fb_texture dependency resolves. */
+   GLuint vram_sync_read_fbo;
+   GLuint vram_sync_draw_fbo;
+
+   /* fb_out receives primitive rendering while fb_texture supplies texels.
+    * Remember native VRAM regions that are newer in fb_out so a later draw
+    * can resolve only the texture page or CLUT data it actually depends on. */
+   struct
+   {
+      uint64_t sequence;
+      struct gl_vram_sync_tile tiles
+            [GL_VRAM_SYNC_TILES_Y][GL_VRAM_SYNC_TILES_X];
+   } vram_sync;
 };
 typedef struct gl_renderer gl_renderer;
 
@@ -1046,6 +1080,13 @@ static rhi_defer_queue_t gl_defer_queue;
 static void gl_defer_dispatch(void *user, const rhi_defer_op_t *op);
 
 static bool has_software_fb = false;
+
+static void gl_renderer_draw(gl_renderer *renderer);
+#ifdef GL_READ_FRAMEBUFFER
+static void gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
+      uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+      bool allow_with_software_fb);
+#endif
 
 #ifdef __cplusplus
 extern "C"
@@ -2163,6 +2204,426 @@ static TTRect gl_tt_texture_vram_rect(gl_renderer *r,
    return out;
 }
 
+static void gl_vram_sync_clear(gl_renderer *renderer)
+{
+   memset(renderer->vram_sync.tiles, 0, sizeof(renderer->vram_sync.tiles));
+}
+
+/* Return the bits covered by a native VRAM rectangle inside one 8x8 tile.
+ * raw_tx/raw_ty may address a wrapped tile; the caller folds the resulting
+ * tile index back into the 1024x512 VRAM array. */
+static uint64_t gl_vram_sync_tile_mask(unsigned x, unsigned y,
+      unsigned w, unsigned h, unsigned raw_tx, unsigned raw_ty)
+{
+   unsigned tile_x = raw_tx * GL_VRAM_SYNC_TILE_SIZE;
+   unsigned tile_y = raw_ty * GL_VRAM_SYNC_TILE_SIZE;
+   unsigned x0 = x > tile_x ? x : tile_x;
+   unsigned y0 = y > tile_y ? y : tile_y;
+   unsigned x1 = x + w < tile_x + GL_VRAM_SYNC_TILE_SIZE ?
+         x + w : tile_x + GL_VRAM_SYNC_TILE_SIZE;
+   unsigned y1 = y + h < tile_y + GL_VRAM_SYNC_TILE_SIZE ?
+         y + h : tile_y + GL_VRAM_SYNC_TILE_SIZE;
+   unsigned local_x = x0 - tile_x;
+   unsigned row_width = x1 - x0;
+   uint64_t row_mask = ((1u << row_width) - 1u) << local_x;
+   uint64_t mask = 0;
+   unsigned py;
+
+   for (py = y0; py < y1; py++)
+      mask |= row_mask << ((py - tile_y) * GL_VRAM_SYNC_TILE_SIZE);
+
+   return mask;
+}
+
+static bool gl_vram_sync_rect_is_dirty(gl_renderer *renderer,
+      unsigned x, unsigned y, unsigned w, unsigned h)
+{
+   unsigned tx0;
+   unsigned tx1;
+   unsigned ty0;
+   unsigned ty1;
+   unsigned raw_tx;
+   unsigned raw_ty;
+
+   if (!w || !h)
+      return false;
+
+   x %= VRAM_WIDTH_PIXELS;
+   y %= VRAM_HEIGHT;
+   tx0 = x / GL_VRAM_SYNC_TILE_SIZE;
+   tx1 = (x + w - 1) / GL_VRAM_SYNC_TILE_SIZE;
+   ty0 = y / GL_VRAM_SYNC_TILE_SIZE;
+   ty1 = (y + h - 1) / GL_VRAM_SYNC_TILE_SIZE;
+
+   for (raw_ty = ty0; raw_ty <= ty1; raw_ty++)
+   {
+      unsigned ty = raw_ty % GL_VRAM_SYNC_TILES_Y;
+      for (raw_tx = tx0; raw_tx <= tx1; raw_tx++)
+      {
+         unsigned tx = raw_tx % GL_VRAM_SYNC_TILES_X;
+         uint64_t read_mask = gl_vram_sync_tile_mask(
+               x, y, w, h, raw_tx, raw_ty);
+         unsigned wi;
+
+         for (wi = 0; wi < GL_VRAM_SYNC_WRITERS_PER_TILE; wi++)
+            if (read_mask & renderer->vram_sync.tiles[ty][tx]
+                  .writers[wi].pixel_mask)
+               return true;
+      }
+   }
+
+   return false;
+}
+
+static void gl_vram_sync_clean_rect(gl_renderer *renderer,
+      unsigned x, unsigned y, unsigned w, unsigned h)
+{
+   unsigned tx0;
+   unsigned tx1;
+   unsigned ty0;
+   unsigned ty1;
+   unsigned raw_tx;
+   unsigned raw_ty;
+
+   if (!w || !h)
+      return;
+
+   x %= VRAM_WIDTH_PIXELS;
+   y %= VRAM_HEIGHT;
+   tx0 = x / GL_VRAM_SYNC_TILE_SIZE;
+   tx1 = (x + w - 1) / GL_VRAM_SYNC_TILE_SIZE;
+   ty0 = y / GL_VRAM_SYNC_TILE_SIZE;
+   ty1 = (y + h - 1) / GL_VRAM_SYNC_TILE_SIZE;
+
+   for (raw_ty = ty0; raw_ty <= ty1; raw_ty++)
+   {
+      unsigned ty = raw_ty % GL_VRAM_SYNC_TILES_Y;
+      for (raw_tx = tx0; raw_tx <= tx1; raw_tx++)
+      {
+         unsigned tx = raw_tx % GL_VRAM_SYNC_TILES_X;
+         uint64_t mask = gl_vram_sync_tile_mask(
+               x, y, w, h, raw_tx, raw_ty);
+         unsigned wi;
+
+         for (wi = 0; wi < GL_VRAM_SYNC_WRITERS_PER_TILE; wi++)
+            renderer->vram_sync.tiles[ty][tx]
+                  .writers[wi].pixel_mask &= ~mask;
+      }
+   }
+}
+
+static void gl_vram_sync_mark_rect(gl_renderer *renderer,
+      unsigned x, unsigned y, unsigned w, unsigned h)
+{
+   unsigned tx0;
+   unsigned tx1;
+   unsigned ty0;
+   unsigned ty1;
+   unsigned raw_tx;
+   unsigned raw_ty;
+   uint64_t sequence;
+
+   if (!w || !h)
+      return;
+
+   sequence = ++renderer->vram_sync.sequence;
+   x %= VRAM_WIDTH_PIXELS;
+   y %= VRAM_HEIGHT;
+   tx0 = x / GL_VRAM_SYNC_TILE_SIZE;
+   tx1 = (x + w - 1) / GL_VRAM_SYNC_TILE_SIZE;
+   ty0 = y / GL_VRAM_SYNC_TILE_SIZE;
+   ty1 = (y + h - 1) / GL_VRAM_SYNC_TILE_SIZE;
+
+   for (raw_ty = ty0; raw_ty <= ty1; raw_ty++)
+   {
+      unsigned ty = raw_ty % GL_VRAM_SYNC_TILES_Y;
+      for (raw_tx = tx0; raw_tx <= tx1; raw_tx++)
+      {
+         unsigned tx = raw_tx % GL_VRAM_SYNC_TILES_X;
+         uint64_t mask = gl_vram_sync_tile_mask(
+               x, y, w, h, raw_tx, raw_ty);
+         unsigned slot = GL_VRAM_SYNC_WRITERS_PER_TILE;
+         unsigned oldest_slot = 0;
+         uint64_t oldest_sequence = UINT64_MAX;
+         unsigned write_x = x;
+         unsigned write_y = y;
+         unsigned write_x1 = x + w;
+         unsigned write_y1 = y + h;
+         unsigned wi;
+
+         /* Preserve provenance for neighboring pixels. A newer primitive
+          * supersedes only the pixels it actually covers. */
+         for (wi = 0; wi < GL_VRAM_SYNC_WRITERS_PER_TILE; wi++)
+         {
+            renderer->vram_sync.tiles[ty][tx]
+                  .writers[wi].pixel_mask &= ~mask;
+            if (!renderer->vram_sync.tiles[ty][tx]
+                     .writers[wi].pixel_mask &&
+                slot == GL_VRAM_SYNC_WRITERS_PER_TILE)
+               slot = wi;
+            if (renderer->vram_sync.tiles[ty][tx]
+                     .writers[wi].sequence < oldest_sequence)
+            {
+               oldest_sequence = renderer->vram_sync.tiles[ty][tx]
+                     .writers[wi].sequence;
+               oldest_slot = wi;
+            }
+         }
+
+         /* A tile can contain more independent writers than the fixed-size
+          * provenance list. Merge the oldest record into the new one rather
+          * than losing dirty pixels. The resulting producer rectangle is
+          * conservative, so a later dependency may copy extra current data
+          * but cannot sample stale data because of this overflow. */
+         if (slot == GL_VRAM_SYNC_WRITERS_PER_TILE)
+         {
+            struct gl_vram_sync_writer *oldest =
+                  &renderer->vram_sync.tiles[ty][tx].writers[oldest_slot];
+            if (oldest->x < write_x) write_x = oldest->x;
+            if (oldest->y < write_y) write_y = oldest->y;
+            if (oldest->x + oldest->w > write_x1)
+               write_x1 = oldest->x + oldest->w;
+            if (oldest->y + oldest->h > write_y1)
+               write_y1 = oldest->y + oldest->h;
+            mask |= oldest->pixel_mask;
+            slot = oldest_slot;
+         }
+
+         renderer->vram_sync.tiles[ty][tx].writers[slot].sequence = sequence;
+         renderer->vram_sync.tiles[ty][tx].writers[slot].pixel_mask = mask;
+         renderer->vram_sync.tiles[ty][tx].writers[slot].x =
+               (uint16_t)write_x;
+         renderer->vram_sync.tiles[ty][tx].writers[slot].y =
+               (uint16_t)write_y;
+         renderer->vram_sync.tiles[ty][tx].writers[slot].w =
+               (uint16_t)(write_x1 - write_x);
+         renderer->vram_sync.tiles[ty][tx].writers[slot].h =
+               (uint16_t)(write_y1 - write_y);
+      }
+   }
+}
+
+/* Find the union of pending primitive destinations sampled by a texture
+ * rectangle. Mirroring the producer union avoids an unconditional full-VRAM
+ * copy between draw batches while making every intersecting write visible. */
+static bool gl_vram_sync_get_producer_rect(gl_renderer *renderer,
+      unsigned x, unsigned y, unsigned w, unsigned h, TTRect *out)
+{
+   unsigned tx0;
+   unsigned tx1;
+   unsigned ty0;
+   unsigned ty1;
+   unsigned raw_tx;
+   unsigned raw_ty;
+   unsigned x0 = VRAM_WIDTH_PIXELS;
+   unsigned y0 = VRAM_HEIGHT;
+   unsigned x1 = 0;
+   unsigned y1 = 0;
+   bool found = false;
+
+   if (!w || !h)
+      return false;
+
+   x %= VRAM_WIDTH_PIXELS;
+   y %= VRAM_HEIGHT;
+   tx0 = x / GL_VRAM_SYNC_TILE_SIZE;
+   tx1 = (x + w - 1) / GL_VRAM_SYNC_TILE_SIZE;
+   ty0 = y / GL_VRAM_SYNC_TILE_SIZE;
+   ty1 = (y + h - 1) / GL_VRAM_SYNC_TILE_SIZE;
+
+   for (raw_ty = ty0; raw_ty <= ty1; raw_ty++)
+   {
+      unsigned ty = raw_ty % GL_VRAM_SYNC_TILES_Y;
+      for (raw_tx = tx0; raw_tx <= tx1; raw_tx++)
+      {
+         unsigned tx = raw_tx % GL_VRAM_SYNC_TILES_X;
+         uint64_t read_mask = gl_vram_sync_tile_mask(
+               x, y, w, h, raw_tx, raw_ty);
+         unsigned wi;
+
+         for (wi = 0; wi < GL_VRAM_SYNC_WRITERS_PER_TILE; wi++)
+         {
+            const uint64_t writer_mask = renderer->vram_sync.tiles[ty][tx]
+                  .writers[wi].pixel_mask;
+            unsigned wx;
+            unsigned wy;
+            unsigned ww;
+            unsigned wh;
+
+            if (!(read_mask & writer_mask))
+               continue;
+
+            wx = renderer->vram_sync.tiles[ty][tx].writers[wi].x;
+            wy = renderer->vram_sync.tiles[ty][tx].writers[wi].y;
+            ww = renderer->vram_sync.tiles[ty][tx].writers[wi].w;
+            wh = renderer->vram_sync.tiles[ty][tx].writers[wi].h;
+
+            /* Primitive destinations are clipped, but retain a safe fallback
+             * for any future writer capable of wrapping around VRAM. */
+            if (wx + ww > VRAM_WIDTH_PIXELS || wy + wh > VRAM_HEIGHT)
+            {
+               out->x = x;
+               out->y = y;
+               out->width = w;
+               out->height = h;
+               return true;
+            }
+
+            if (wx < x0) x0 = wx;
+            if (wy < y0) y0 = wy;
+            if (wx + ww > x1) x1 = wx + ww;
+            if (wy + wh > y1) y1 = wy + wh;
+            found = true;
+         }
+      }
+   }
+
+   if (found)
+   {
+      out->x = x0;
+      out->y = y0;
+      out->width = x1 - x0;
+      out->height = y1 - y0;
+   }
+
+   return found;
+}
+
+#ifdef GL_READ_FRAMEBUFFER
+static void gl_vram_sync_mirror_rect(gl_renderer *renderer,
+      unsigned x, unsigned y, unsigned w, unsigned h)
+{
+   unsigned first_w;
+   unsigned first_h;
+
+   if (!w || !h || !gl_caps.fp_glBlitFramebuffer)
+      return;
+
+   x %= VRAM_WIDTH_PIXELS;
+   y %= VRAM_HEIGHT;
+   first_w = w < VRAM_WIDTH_PIXELS - x ? w : VRAM_WIDTH_PIXELS - x;
+   first_h = h < VRAM_HEIGHT - y ? h : VRAM_HEIGHT - y;
+
+   gl_mirror_fb_out_to_fb_texture(renderer, (uint16_t)x, (uint16_t)y,
+         (uint16_t)first_w, (uint16_t)first_h, true);
+   gl_vram_sync_clean_rect(renderer, x, y, first_w, first_h);
+
+   if (w > first_w)
+   {
+      gl_mirror_fb_out_to_fb_texture(renderer, 0, (uint16_t)y,
+            (uint16_t)(w - first_w), (uint16_t)first_h, true);
+      gl_vram_sync_clean_rect(renderer, 0, y, w - first_w, first_h);
+   }
+   if (h > first_h)
+   {
+      gl_mirror_fb_out_to_fb_texture(renderer, (uint16_t)x, 0,
+            (uint16_t)first_w, (uint16_t)(h - first_h), true);
+      gl_vram_sync_clean_rect(renderer, x, 0, first_w, h - first_h);
+      if (w > first_w)
+      {
+         gl_mirror_fb_out_to_fb_texture(renderer, 0, 0,
+               (uint16_t)(w - first_w), (uint16_t)(h - first_h), true);
+         gl_vram_sync_clean_rect(renderer, 0, 0,
+               w - first_w, h - first_h);
+      }
+   }
+}
+#endif
+
+static void gl_vram_sync_primitive(gl_renderer *renderer,
+      const gl_command_vertex *v, unsigned vertices)
+{
+   float min_x;
+   float min_y;
+   float max_x;
+   float max_y;
+   int x0;
+   int y0;
+   int x1;
+   int y1;
+   unsigned i;
+
+#ifdef GL_READ_FRAMEBUFFER
+   if (v[0].texture_blend_mode != 0 &&
+       gl_caps.fp_glBlitFramebuffer)
+   {
+      unsigned depth = v[0].depth_shift > 2 ? 0 : v[0].depth_shift;
+      TTRect texture_rect = gl_tt_texture_vram_rect(renderer,
+            v[0].texture_page[0], v[0].texture_page[1],
+            v[0].texture_limits[0], v[0].texture_limits[1],
+            v[0].texture_limits[2], v[0].texture_limits[3], depth);
+      TTRect producer_rect;
+      unsigned clut_width = depth == 1 ? 256u : 16u;
+      bool texture_dirty;
+      bool clut_dirty = false;
+
+      if (texture_rect.height && !texture_rect.width)
+         texture_rect.width = 1;
+      texture_dirty = gl_vram_sync_get_producer_rect(renderer,
+            texture_rect.x, texture_rect.y,
+            texture_rect.width, texture_rect.height, &producer_rect);
+      if (depth == 1 || depth == 2)
+         clut_dirty = gl_vram_sync_rect_is_dirty(renderer,
+               v[0].clut[0], v[0].clut[1], clut_width, 1);
+
+      if (texture_dirty || clut_dirty)
+      {
+         /* Pending vertices must reach fb_out before their native-resolution
+          * representation can be copied into fb_texture. */
+         if (!gl_draw_buffer_is_empty(renderer->command_buffer))
+            gl_renderer_draw(renderer);
+
+         if (texture_dirty)
+            gl_vram_sync_mirror_rect(renderer,
+                  producer_rect.x, producer_rect.y,
+                  producer_rect.width, producer_rect.height);
+
+         /* A texture resolve may already have covered the palette row. */
+         if (clut_dirty && gl_vram_sync_rect_is_dirty(renderer,
+               v[0].clut[0], v[0].clut[1], clut_width, 1))
+            gl_vram_sync_mirror_rect(renderer,
+                  v[0].clut[0], v[0].clut[1], clut_width, 1);
+      }
+   }
+#endif
+
+   min_x = max_x = v[0].position[0] + renderer->config.draw_offset[0];
+   min_y = max_y = v[0].position[1] + renderer->config.draw_offset[1];
+   for (i = 1; i < vertices; i++)
+   {
+      float px = v[i].position[0] + renderer->config.draw_offset[0];
+      float py = v[i].position[1] + renderer->config.draw_offset[1];
+      if (px < min_x) min_x = px;
+      if (px > max_x) max_x = px;
+      if (py < min_y) min_y = py;
+      if (py > max_y) max_y = py;
+   }
+
+   x0 = (int)floorf(min_x);
+   y0 = (int)floorf(min_y);
+   x1 = (int)ceilf(max_x);
+   y1 = (int)ceilf(max_y);
+   if (x1 == x0) x1++;
+   if (y1 == y0) y1++;
+
+   if (x0 < (int)renderer->config.draw_area_top_left[0])
+      x0 = renderer->config.draw_area_top_left[0];
+   if (y0 < (int)renderer->config.draw_area_top_left[1])
+      y0 = renderer->config.draw_area_top_left[1];
+   if (x1 > (int)renderer->config.draw_area_bot_right[0])
+      x1 = renderer->config.draw_area_bot_right[0];
+   if (y1 > (int)renderer->config.draw_area_bot_right[1])
+      y1 = renderer->config.draw_area_bot_right[1];
+   if (x0 < 0) x0 = 0;
+   if (y0 < 0) y0 = 0;
+   if (x1 > VRAM_WIDTH_PIXELS) x1 = VRAM_WIDTH_PIXELS;
+   if (y1 > VRAM_HEIGHT) y1 = VRAM_HEIGHT;
+
+   if (x1 > x0 && y1 > y0)
+      gl_vram_sync_mark_rect(renderer, (unsigned)x0, (unsigned)y0,
+            (unsigned)(x1 - x0), (unsigned)(y1 - y0));
+}
+
 /* Per-primitive HD query (Vulkan renderer_get_hd_texture_index
  * counterpart). Also drives dumping and prefetch, so it runs even when
  * no replacement ends up bound. */
@@ -2923,6 +3384,8 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
     * savestate path: clear + mirror refresh). */
    glGenFramebuffers(1, &renderer->tt_read_fbo);
    glGenFramebuffers(1, &renderer->tt_draw_fbo);
+   glGenFramebuffers(1, &renderer->vram_sync_read_fbo);
+   glGenFramebuffers(1, &renderer->vram_sync_draw_fbo);
    {
       TTGpuBackend vt = gl_tt_make_backend(renderer);
       renderer->tracker = texture_tracker_new(&vt, NULL);
@@ -3839,6 +4302,12 @@ static void gl_renderer_free(gl_renderer *renderer)
       glDeleteFramebuffers(1, &renderer->tt_draw_fbo);
    renderer->tt_read_fbo = 0;
    renderer->tt_draw_fbo = 0;
+   if (renderer->vram_sync_read_fbo)
+      glDeleteFramebuffers(1, &renderer->vram_sync_read_fbo);
+   if (renderer->vram_sync_draw_fbo)
+      glDeleteFramebuffers(1, &renderer->vram_sync_draw_fbo);
+   renderer->vram_sync_read_fbo = 0;
+   renderer->vram_sync_draw_fbo = 0;
 
    {
       unsigned i;
@@ -5715,6 +6184,10 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
       glDeleteFramebuffers(1, &_fb.id);
    }
 
+   /* The unconditional full-VRAM fb_out -> fb_texture copy above makes
+    * every tile current for the start of the next frame. */
+   gl_vram_sync_clear(renderer);
+
    cleanup_gl_state();
 
    /* When using a hardware renderer we set the data pointer to
@@ -6031,7 +6504,7 @@ void rhi_gl_push_triangle(
            for (_fc = 0; _fc < 4; _fc++)
               v[_fi].fog[_fc] = fog ? fog[_fi * 4 + _fc] : 0.0f; }
 
-
+      gl_vram_sync_primitive(renderer, v, 3);
       push_primitive(renderer, v, 3, GL_TRIANGLES,
             semi_transparency_mode, mask_test, set_mask);
    }
@@ -6178,7 +6651,7 @@ void rhi_gl_push_quad(
            for (_fc = 0; _fc < 4; _fc++)
               v[_fi].fog[_fc] = fog ? fog[_fi * 4 + _fc] : 0.0f; }
 
-
+      gl_vram_sync_primitive(renderer, v, 4);
       is_semi_transparent = v[0].semi_transparent == 1;
       is_textured         = v[0].texture_blend_mode != 0;
 
@@ -6283,6 +6756,7 @@ void rhi_gl_push_line(
          }
       };
 
+      gl_vram_sync_primitive(renderer, v, 2);
       push_primitive(renderer, v, 2,
             GL_LINES, semi_transparency_mode, mask_test, set_mask);
    }
@@ -6437,6 +6911,9 @@ void rhi_gl_load_image(
       gl_draw_buffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
 
    glEnable(GL_SCISSOR_TEST);
+
+   /* The CPU upload is applied to both fb_texture and fb_out. */
+   gl_vram_sync_clean_rect(renderer, x, y, w, h);
 
 #ifdef DEBUG
    get_error("rhi_gl_load_image");
@@ -6975,13 +7452,6 @@ cleanup:
  * fb_texture stays stale until end-of-frame, so the textured draw reads
  * pre-mutation pixels.
  *
- * Historically that gap was papered over by the "Software gl_framebuffer"
- * core option, which spins up a shadow software renderer that keeps
- * GPU.vram in sync; some downstream paths feed that back into
- * fb_texture. With the SW option disabled (the modern-GL path users
- * actually want, to avoid the per-frame CPU bookkeeping), the gap is
- * exposed.
- *
  * This helper closes the gap on demand. Call it from any rhi_gl_*
  * entry point that mutates a region of fb_out and wants subsequent
  * same-frame textured draws to see the new pixels. The blit goes
@@ -6992,9 +7462,10 @@ cleanup:
  * Gating (the same conditions the long-standing rhi_gl_copy_rect
  * mirror has used since the FF7-swirl fix):
  *
- *   - has_software_fb is false. When it's true the shadow SW renderer
- *     plus the end-of-frame mirror produce the right result and a
- *     per-op mirror is wasted GPU work.
+ *   - Existing fill/copy callers skip the mirror when has_software_fb is
+ *     true. Dependency-driven resolves pass allow_with_software_fb because
+ *     the shadow renderer does not make a queued GL primitive visible in
+ *     fb_texture before a later draw in the same frame.
  *
  *   - gl_caps.fp_glBlitFramebuffer is non-NULL. GL 3.0+ / GLES 3.0+
  *     have it; GLES 2.0 drivers without GL_NV_framebuffer_blit do
@@ -7010,10 +7481,9 @@ cleanup:
  * in fb_out is the same rect scaled by internal_upscaling. */
 static void gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
                                            uint16_t x, uint16_t y,
-                                           uint16_t w, uint16_t h)
+                                           uint16_t w, uint16_t h,
+                                           bool allow_with_software_fb)
 {
-   GLuint    read_fbo = 0;
-   GLuint    draw_fbo = 0;
    GLboolean scissor_was_enabled;
    GLint     ux;
    GLint     uy;
@@ -7021,7 +7491,8 @@ static void gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
    GLint     uh;
    uint32_t  upscale;
 
-   if (has_software_fb || !gl_caps.fp_glBlitFramebuffer)
+   if ((!allow_with_software_fb && has_software_fb) ||
+       !gl_caps.fp_glBlitFramebuffer)
       return;
 
    upscale = renderer->internal_upscaling;
@@ -7032,11 +7503,8 @@ static void gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
 
    scissor_was_enabled = glIsEnabled(GL_SCISSOR_TEST);
 
-   glGenFramebuffers(1, &read_fbo);
-   glGenFramebuffers(1, &draw_fbo);
-
    /* Read source: fb_out at upscaled coords. */
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, read_fbo);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, renderer->vram_sync_read_fbo);
 #ifdef HAVE_OPENGLES3
    glFramebufferTexture2D(GL_READ_FRAMEBUFFER,
          GL_COLOR_ATTACHMENT0,
@@ -7052,7 +7520,7 @@ static void gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
    glReadBuffer(GL_COLOR_ATTACHMENT0);
 
    /* Draw target: fb_texture at native coords. */
-   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw_fbo);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, renderer->vram_sync_draw_fbo);
 #ifdef HAVE_OPENGLES3
    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER,
          GL_COLOR_ATTACHMENT0,
@@ -7082,8 +7550,6 @@ static void gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
 
    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-   glDeleteFramebuffers(1, &read_fbo);
-   glDeleteFramebuffers(1, &draw_fbo);
 }
 #endif /* GL_READ_FRAMEBUFFER */
 
@@ -7197,7 +7663,17 @@ void rhi_gl_fill_rect(
     * gl_mirror_fb_out_to_fb_texture for the gating rationale (only
     * runs when has_software_fb is off and glBlitFramebuffer is
     * present). */
-   gl_mirror_fb_out_to_fb_texture(renderer, x, y, w, h);
+   gl_mirror_fb_out_to_fb_texture(renderer, x, y, w, h, false);
+#endif
+
+#ifdef GL_READ_FRAMEBUFFER
+   if (gl_caps.fp_glBlitFramebuffer)
+   {
+      if (has_software_fb)
+         gl_vram_sync_mark_rect(renderer, x, y, w, h);
+      else
+         gl_vram_sync_clean_rect(renderer, x, y, w, h);
+   }
 #endif
 }
 
@@ -7328,7 +7804,17 @@ void rhi_gl_copy_rect(
     * rationale - this used to be ~60 lines of inline FBO dance
     * here, extracted so rhi_gl_fill_rect can share it. */
 #ifdef GL_READ_FRAMEBUFFER
-   gl_mirror_fb_out_to_fb_texture(renderer, dst_x, dst_y, w, h);
+   gl_mirror_fb_out_to_fb_texture(renderer, dst_x, dst_y, w, h, false);
+#endif
+
+#ifdef GL_READ_FRAMEBUFFER
+   if (gl_caps.fp_glBlitFramebuffer)
+   {
+      if (has_software_fb)
+         gl_vram_sync_mark_rect(renderer, dst_x, dst_y, w, h);
+      else
+         gl_vram_sync_clean_rect(renderer, dst_x, dst_y, w, h);
+   }
 #endif
 
 #ifdef DEBUG
