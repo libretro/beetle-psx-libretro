@@ -21,6 +21,12 @@ uniform sampler2D fb_texture;
 
 // Scaling to apply to the dither pattern
 uniform uint dither_scaling;
+// The current render target stores native RGB5 channels. Quantize explicitly
+// so OpenGL's normalized conversion cannot round a feedback value to itself.
+uniform uint native_rgb5;
+// Reproduce the GPU's fixed-point texture modulation before attachment
+// conversion can round away a low-intensity framebuffer decrement.
+uniform uint fixed_point_modulation;
 // HDR fp16 target only. 0: saturate the modulated texture source to 1.0
 // before blending (hardware behaviour; the UNORM targets do this at the
 // write stage for free). 1: leave it hot for over-white single-layer
@@ -95,6 +101,8 @@ flat in uint frag_semi_transparent;
 flat in uvec4 frag_texture_window;
 // Texture limits: [Umin, Vmin, Umax, Vmax]
 flat in uvec4 frag_texture_limits;
+// The sampled texture or palette contains GPU-rendered VRAM data.
+flat in uint frag_framebuffer_feedback;
 
 out vec4 frag_color;
 
@@ -1021,6 +1029,7 @@ void main() {
    }
 
    vec4 color;
+   bool modulation_quantized = false;
    float opacity=1.;
    
       if (frag_texture_blend_mode == BLEND_MODE_NO_TEXTURE)
@@ -1117,10 +1126,35 @@ STRINGIZE(
          if (frag_texture_blend_mode == BLEND_MODE_RAW_TEXTURE) {
             color = vec4(texel.rgb, mask_bit);
          } else /* BLEND_MODE_TEXTURE_BLEND */ {
-            // Blend the texel with the shading color. `frag_shading_color`
-            // is multiplied by two so that it can be used to darken or
-            // lighten the texture as needed.
-            color = vec4(pgxp_shading() * 2. * texel.rgb, mask_bit);
+            if (fixed_point_modulation != 0u &&
+                frag_framebuffer_feedback != 0u)
+            {
+               uint mod_x =
+                  (uint(gl_FragCoord.x) / dither_scaling) & 3u;
+               uint mod_y =
+                  (uint(gl_FragCoord.y) / dither_scaling) & 3u;
+               float mod_dither = float(
+                  dither_pattern[mod_y * 4u + mod_x] * int(frag_dither));
+               vec3 texel5 = floor(texel.rgb * 31. + vec3(0.5));
+               vec3 shade8 = floor(clamp(pgxp_shading(), vec3(0.),
+                                         vec3(1.)) * 255. + vec3(0.001));
+               vec3 modulated = floor(texel5 * shade8 / 16.);
+
+               /* ModTexel first truncates the 5-bit texel times the 8-bit
+                * shading colour to an intermediate fixed-point value.  Its
+                * DitherLUT then adds the 4x4 offset, divides by eight with
+                * truncation, and clamps the result to a 5-bit channel. */
+               color = vec4(clamp(floor((modulated + mod_dither) / 8.),
+                                  vec3(0.), vec3(31.)) / 31., mask_bit);
+               modulation_quantized = true;
+            }
+            else
+            {
+               // Blend the texel with the shading color. The shading color
+               // is multiplied by two so that it can darken or lighten the
+               // texture as needed.
+               color = vec4(pgxp_shading() * 2. * texel.rgb, mask_bit);
+            }
          }
 
          // Saturate the modulated source to 1.0. The old comment here
@@ -1141,9 +1175,23 @@ STRINGIZE(
    int dither_offset =
       dither_pattern[y_dither * 4U + x_dither] * int(frag_dither);
 
-   float dither = float(dither_offset) / 255.;
+   if (modulation_quantized)
+      frag_color = color;
+   else
+   {
+      float dither = float(dither_offset) / 255.;
+      vec3 output_rgb = color.rgb + vec3(dither);
 
-   frag_color = color + vec4(dither, dither, dither, 0.);
+      /* RGB5 attachments convert normalized values by rounding. The GPU
+       * truncates instead; make that conversion explicit. This also keeps
+       * filtered framebuffer feedback moving toward zero without reducing
+       * the sampling precision used to produce output_rgb. */
+      if (native_rgb5 != 0u)
+         output_rgb = floor(clamp(output_rgb, vec3(0.), vec3(1.)) * 31.) /
+                      31.;
+
+      frag_color = vec4(output_rgb, color.a);
+   }
 }
 );
 
