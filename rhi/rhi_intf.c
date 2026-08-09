@@ -886,7 +886,8 @@ void rhi_intf_push_quad(
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
                depth_shift,
-               dither,
+               /* Sprite modulation uses a zero dither offset. */
+               dither && !is_sprite,
                blend_mode, mask_test, set_mask);
 #endif
          break;

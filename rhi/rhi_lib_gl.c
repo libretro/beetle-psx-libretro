@@ -705,6 +705,9 @@ struct gl_command_vertex {
    uint16_t texture_limits[4];
    /* gl_texture window mask/OR values */
    uint8_t texture_window[4];
+   /* The primitive samples VRAM content produced by GPU rendering rather
+    * than only game-uploaded texture data. */
+   uint8_t framebuffer_feedback;
    /* Depth-cue sidecar: far colour (1.0 == 0xFF) in [0..2], blend factor in
     * [3]. t == 0 makes the shader mix the identity, so vertices without a
     * recovered cue cost nothing. KEEP LAST -- positional initializers above
@@ -923,6 +926,9 @@ struct gl_vram_sync_writer
 struct gl_vram_sync_tile
 {
    struct gl_vram_sync_writer writers[GL_VRAM_SYNC_WRITERS_PER_TILE];
+   /* Pixels whose current contents originated from GPU rendering. Unlike
+    * pending writers, this provenance survives synchronization and frames. */
+   uint64_t gpu_written_mask;
 };
 
 
@@ -2206,7 +2212,15 @@ static TTRect gl_tt_texture_vram_rect(gl_renderer *r,
 
 static void gl_vram_sync_clear(gl_renderer *renderer)
 {
-   memset(renderer->vram_sync.tiles, 0, sizeof(renderer->vram_sync.tiles));
+   unsigned ty;
+   unsigned tx;
+
+   /* Synchronization makes pending writers current, but does not change
+    * where the pixels originated. Preserve GPU-written provenance. */
+   for (ty = 0; ty < GL_VRAM_SYNC_TILES_Y; ty++)
+      for (tx = 0; tx < GL_VRAM_SYNC_TILES_X; tx++)
+         memset(renderer->vram_sync.tiles[ty][tx].writers, 0,
+               sizeof(renderer->vram_sync.tiles[ty][tx].writers));
 }
 
 /* Return the bits covered by a native VRAM rectangle inside one 8x8 tile.
@@ -2275,6 +2289,80 @@ static bool gl_vram_sync_rect_is_dirty(gl_renderer *renderer,
    return false;
 }
 
+static bool gl_vram_sync_rect_is_gpu_written(gl_renderer *renderer,
+      unsigned x, unsigned y, unsigned w, unsigned h)
+{
+   unsigned tx0;
+   unsigned tx1;
+   unsigned ty0;
+   unsigned ty1;
+   unsigned raw_tx;
+   unsigned raw_ty;
+
+   if (!w || !h)
+      return false;
+
+   x %= VRAM_WIDTH_PIXELS;
+   y %= VRAM_HEIGHT;
+   tx0 = x / GL_VRAM_SYNC_TILE_SIZE;
+   tx1 = (x + w - 1) / GL_VRAM_SYNC_TILE_SIZE;
+   ty0 = y / GL_VRAM_SYNC_TILE_SIZE;
+   ty1 = (y + h - 1) / GL_VRAM_SYNC_TILE_SIZE;
+
+   for (raw_ty = ty0; raw_ty <= ty1; raw_ty++)
+   {
+      unsigned ty = raw_ty % GL_VRAM_SYNC_TILES_Y;
+      for (raw_tx = tx0; raw_tx <= tx1; raw_tx++)
+      {
+         unsigned tx = raw_tx % GL_VRAM_SYNC_TILES_X;
+         uint64_t read_mask = gl_vram_sync_tile_mask(
+               x, y, w, h, raw_tx, raw_ty);
+
+         if (read_mask & renderer->vram_sync.tiles[ty][tx].gpu_written_mask)
+            return true;
+      }
+   }
+
+   return false;
+}
+
+static void gl_vram_sync_update_gpu_written_rect(gl_renderer *renderer,
+      unsigned x, unsigned y, unsigned w, unsigned h, bool gpu_written)
+{
+   unsigned tx0;
+   unsigned tx1;
+   unsigned ty0;
+   unsigned ty1;
+   unsigned raw_tx;
+   unsigned raw_ty;
+
+   if (!w || !h)
+      return;
+
+   x %= VRAM_WIDTH_PIXELS;
+   y %= VRAM_HEIGHT;
+   tx0 = x / GL_VRAM_SYNC_TILE_SIZE;
+   tx1 = (x + w - 1) / GL_VRAM_SYNC_TILE_SIZE;
+   ty0 = y / GL_VRAM_SYNC_TILE_SIZE;
+   ty1 = (y + h - 1) / GL_VRAM_SYNC_TILE_SIZE;
+
+   for (raw_ty = ty0; raw_ty <= ty1; raw_ty++)
+   {
+      unsigned ty = raw_ty % GL_VRAM_SYNC_TILES_Y;
+      for (raw_tx = tx0; raw_tx <= tx1; raw_tx++)
+      {
+         unsigned tx = raw_tx % GL_VRAM_SYNC_TILES_X;
+         uint64_t mask = gl_vram_sync_tile_mask(
+               x, y, w, h, raw_tx, raw_ty);
+
+         if (gpu_written)
+            renderer->vram_sync.tiles[ty][tx].gpu_written_mask |= mask;
+         else
+            renderer->vram_sync.tiles[ty][tx].gpu_written_mask &= ~mask;
+      }
+   }
+}
+
 static void gl_vram_sync_clean_rect(gl_renderer *renderer,
       unsigned x, unsigned y, unsigned w, unsigned h)
 {
@@ -2327,6 +2415,7 @@ static void gl_vram_sync_mark_rect(gl_renderer *renderer,
       return;
 
    sequence = ++renderer->vram_sync.sequence;
+   gl_vram_sync_update_gpu_written_rect(renderer, x, y, w, h, true);
    x %= VRAM_WIDTH_PIXELS;
    y %= VRAM_HEIGHT;
    tx0 = x / GL_VRAM_SYNC_TILE_SIZE;
@@ -2531,7 +2620,7 @@ static void gl_vram_sync_mirror_rect(gl_renderer *renderer,
 #endif
 
 static void gl_vram_sync_primitive(gl_renderer *renderer,
-      const gl_command_vertex *v, unsigned vertices)
+      gl_command_vertex *v, unsigned vertices)
 {
    float min_x;
    float min_y;
@@ -2542,6 +2631,7 @@ static void gl_vram_sync_primitive(gl_renderer *renderer,
    int x1;
    int y1;
    unsigned i;
+   bool framebuffer_feedback = false;
 
 #ifdef GL_READ_FRAMEBUFFER
    if (v[0].texture_blend_mode != 0 &&
@@ -2556,15 +2646,26 @@ static void gl_vram_sync_primitive(gl_renderer *renderer,
       unsigned clut_width = depth == 1 ? 256u : 16u;
       bool texture_dirty;
       bool clut_dirty = false;
+      bool texture_gpu_written;
+      bool clut_gpu_written = false;
 
       if (texture_rect.height && !texture_rect.width)
          texture_rect.width = 1;
       texture_dirty = gl_vram_sync_get_producer_rect(renderer,
             texture_rect.x, texture_rect.y,
             texture_rect.width, texture_rect.height, &producer_rect);
+      texture_gpu_written = gl_vram_sync_rect_is_gpu_written(renderer,
+            texture_rect.x, texture_rect.y,
+            texture_rect.width, texture_rect.height);
       if (depth == 1 || depth == 2)
+      {
          clut_dirty = gl_vram_sync_rect_is_dirty(renderer,
                v[0].clut[0], v[0].clut[1], clut_width, 1);
+         clut_gpu_written = gl_vram_sync_rect_is_gpu_written(renderer,
+               v[0].clut[0], v[0].clut[1], clut_width, 1);
+      }
+
+      framebuffer_feedback = texture_gpu_written || clut_gpu_written;
 
       if (texture_dirty || clut_dirty)
       {
@@ -2586,6 +2687,9 @@ static void gl_vram_sync_primitive(gl_renderer *renderer,
       }
    }
 #endif
+
+   for (i = 0; i < vertices; i++)
+      v[i].framebuffer_feedback = framebuffer_feedback;
 
    min_x = max_x = v[0].position[0] + renderer->config.draw_offset[0];
    min_y = max_y = v[0].position[1] + renderer->config.draw_offset[1];
@@ -2980,6 +3084,9 @@ static void gl_renderer_upload_textures(
    y_start    = top_left[1];
    y_end      = y_start + dimensions[1];
 
+   gl_vram_sync_update_gpu_written_rect(renderer,
+         x_start, y_start, dimensions[0], dimensions[1], false);
+
    {
       gl_image_load_vertex init[4] =
       {
@@ -3301,9 +3408,15 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    if (command_buffer->program)
    {
       uint32_t dither_scaling = dither_mode == DITHER_UPSCALED ? 1 : upscaling;
+      uint32_t native_rgb5 = depth == 16 && !renderer->fb_out_fp16;
+      uint32_t fixed_point_modulation = !psx_pgxp_color;
 
       glUseProgram(command_buffer->program->id);
       glUniform1ui(gl_uniform_map_get(&command_buffer->program->uniforms, "dither_scaling"), dither_scaling);
+      glUniform1ui(gl_uniform_map_get(&command_buffer->program->uniforms,
+               "fixed_point_modulation"), fixed_point_modulation);
+      glUniform1ui(gl_uniform_map_get(&command_buffer->program->uniforms,
+               "native_rgb5"), native_rgb5);
    }
 
    switch (depth)
@@ -4726,9 +4839,15 @@ static bool retro_refresh_variables(gl_renderer *renderer)
    if (renderer->command_buffer->program)
    {
       uint32_t dither_scaling = dither_mode == DITHER_UPSCALED ? 1 : upscaling;
+      uint32_t native_rgb5 = depth == 16 && !renderer->fb_out_fp16;
+      uint32_t fixed_point_modulation = !psx_pgxp_color;
 
       glUseProgram(renderer->command_buffer->program->id);
       glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "dither_scaling"), dither_scaling);
+      glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms,
+               "fixed_point_modulation"), fixed_point_modulation);
+      glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms,
+               "native_rgb5"), native_rgb5);
    }
 
    glLineWidth((GLfloat) upscaling);
@@ -5057,6 +5176,8 @@ static const struct gl_attribute gl_command_vertex_attribs[] = {
    { "dither",             offsetof(gl_command_vertex, dither),             GL_UNSIGNED_BYTE,  1 },
    { "semi_transparent",   offsetof(gl_command_vertex, semi_transparent),   GL_UNSIGNED_BYTE,  1 },
    { "texture_window",     offsetof(gl_command_vertex, texture_window),     GL_UNSIGNED_BYTE,  4 },
+   { "framebuffer_feedback",
+      offsetof(gl_command_vertex, framebuffer_feedback), GL_UNSIGNED_BYTE, 1 },
    { "texture_limits",     offsetof(gl_command_vertex, texture_limits),     GL_UNSIGNED_SHORT, 4 }
 };
 
@@ -6914,6 +7035,7 @@ void rhi_gl_load_image(
 
    /* The CPU upload is applied to both fb_texture and fb_out. */
    gl_vram_sync_clean_rect(renderer, x, y, w, h);
+   gl_vram_sync_update_gpu_written_rect(renderer, x, y, w, h, false);
 
 #ifdef DEBUG
    get_error("rhi_gl_load_image");
@@ -7675,6 +7797,7 @@ void rhi_gl_fill_rect(
          gl_vram_sync_clean_rect(renderer, x, y, w, h);
    }
 #endif
+   gl_vram_sync_update_gpu_written_rect(renderer, x, y, w, h, true);
 }
 
 void rhi_gl_copy_rect(
@@ -7816,6 +7939,7 @@ void rhi_gl_copy_rect(
          gl_vram_sync_clean_rect(renderer, dst_x, dst_y, w, h);
    }
 #endif
+   gl_vram_sync_update_gpu_written_rect(renderer, dst_x, dst_y, w, h, true);
 
 #ifdef DEBUG
    get_error("rhi_gl_copy_rect");
