@@ -118,6 +118,39 @@ void main()
 	if (opacity < 0.5)
 		discard;
 
+	bool fixed_feedback = (uint(vParam.z) & 0x800u) != 0u;
+	if (fixed_feedback)
+	{
+		/* The sampled texture or palette holds GPU-rendered VRAM data.
+		 * Reproduce the PlayStation GPU's fixed-point modulation so
+		 * repeated framebuffer feedback decays at hardware rate: the
+		 * float path below, plus the -0.49/255 store bias, truncates at
+		 * 8-bit granularity and fades 2-4x slower than the console.
+		 * ModTexel truncates the 5-bit texel times the 8-bit shading
+		 * colour; DitherLUT adds the 4x4 offset, divides by eight with
+		 * truncation, and clamps to a 5-bit channel. The result is
+		 * emitted without the store bias so rgba8/10-bit storage
+		 * round-trips it exactly. */
+		const int dither_pattern[16] = int[](
+			-4,  0, -3,  1,
+			 2, -2,  3, -1,
+			-3,  1, -4,  0,
+			 3, -1,  2, -2);
+		vec3 fshade = clamp((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, 0.0, 1.0);
+		vec3 texel5 = floor(color.rgb * 31.0 + vec3(0.5));
+		vec3 shade8 = floor(fshade * 255.0 + vec3(0.001));
+		vec3 modulated = floor(texel5 * shade8 / 16.0);
+#if defined(UNSCALED)
+		ivec2 dc = ivec2(gl_FragCoord.xy) & 3;
+#else
+		ivec2 dc = (ivec2(gl_FragCoord.xy) / SCALE) & 3;
+#endif
+		float md = ((uint(vParam.z) & 0x8000u) != 0u)
+			? float(dither_pattern[dc.y * 4 + dc.x]) : 0.0;
+		vec3 q5 = clamp(floor((modulated + md) / 8.0), vec3(0.0), vec3(31.0));
+		FragColor = vec4(q5 / 31.0, NNColor.a + vColor.a);
+		return;
+	}
 	vec3 shaded_hot = color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
 	vec3 shaded = clamp(shaded_hot, 0.0, 1.0);
 	/* The semi-trans-opaque pass and every other blend mode stay clamped;

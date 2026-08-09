@@ -5432,6 +5432,18 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
       float fog[4];
    };
 
+/* Persistent GPU-written VRAM provenance at 8x8-block granularity,
+ * the Vulkan analogue of the GL renderer's per-tile provenance from the
+ * fixed-point modulation change: primitives, fills and VRAM-to-VRAM
+ * blits mark; CPU uploads clear; savestate restores clear implicitly
+ * because they arrive as CPU uploads. Coarser than GL's per-pixel
+ * masks, and deliberately conservative in the accurate direction: a
+ * false positive routes an uploaded texture through the PlayStation's
+ * own fixed-point modulation, which is the hardware behaviour. */
+#define VRAM_PROV_BLOCKS_X (FB_WIDTH / 8)
+#define VRAM_PROV_BLOCKS_Y (FB_HEIGHT / 8)
+#define VRAM_PROV_WORDS ((VRAM_PROV_BLOCKS_X / 32) * VRAM_PROV_BLOCKS_Y)
+
    struct BlitInfo
    {
       uint32_t src_offset[2];
@@ -5502,6 +5514,10 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
       ScanoutFilter scanout_filter;
       ScanoutFilter scanout_mdec_filter;
       bool dither_native_resolution;
+      /* The dtd bit of the primitive being queued (from the push_*
+       * entry points). Feeds the fixed-point framebuffer-feedback
+       * modulation path; the scanout-level dither is separate. */
+      bool primitive_dither;
       bool force_mask_bit;
       bool texture_color_modulate;
       bool mask_test;
@@ -5773,6 +5789,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          ImageHandle framebuffer_ssaa;
          ImageViewHandleVec scaled_views;
          FBAtlas atlas;
+   uint32_t vram_gpu_written[VRAM_PROV_WORDS];
          bool texture_tracking_enabled;
          TextureTracker *tracker;
 
@@ -7013,6 +7030,9 @@ static void renderer_set_draw_rect(Renderer *self, const TTRect *rect)
    }
 }
 
+static void vram_prov_op(Renderer *self, int x, int y, int w, int h, int set);
+static bool vram_prov_any(Renderer *self, int x, int y, int w, int h);
+
 static void renderer_clear_rect(Renderer *self,
       const TTRect *rect,
       uint32_t fb_color)
@@ -7025,6 +7045,10 @@ static void renderer_clear_rect(Renderer *self,
             | (((fb_color >> 11) & 0x1f) << 5)
             | (((fb_color >> 19) & 0x1f) << 10));
       texture_tracker_clearRegion(self->tracker, *rect, fill16);
+      /* A fill is GPU-produced content, though a constant is exact under
+       * either modulation path; mark it for consistency with hardware. */
+      vram_prov_op(self, (int)rect->x, (int)rect->y,
+            (int)rect->width, (int)rect->height, 1);
    }
    ih_reset(&self->last_scanout);
    fbatlas_clear_rect(&self->atlas, rect, fb_color);
@@ -8811,6 +8835,56 @@ static HdTextureHandle renderer_get_hd_texture_index(Renderer *self,
    return hd_handle_make_none();
 }
 
+/* --- GPU-written VRAM provenance (see vram_gpu_written) --- */
+static void vram_prov_op(Renderer *self, int x, int y, int w, int h, int set)
+{
+   int bx0, by0, bx1, by1, bx, by;
+   if (w <= 0 || h <= 0)
+      return;
+   if (x < 0) { w += x; x = 0; }
+   if (y < 0) { h += y; y = 0; }
+   if (x >= (int)FB_WIDTH || y >= (int)FB_HEIGHT || w <= 0 || h <= 0)
+      return;
+   if (x + w > (int)FB_WIDTH)  w = (int)FB_WIDTH  - x;
+   if (y + h > (int)FB_HEIGHT) h = (int)FB_HEIGHT - y;
+   bx0 = x / 8; by0 = y / 8;
+   bx1 = (x + w - 1) / 8; by1 = (y + h - 1) / 8;
+   for (by = by0; by <= by1; by++)
+      for (bx = bx0; bx <= bx1; bx++)
+      {
+         unsigned bit  = (unsigned)(by * VRAM_PROV_BLOCKS_X + bx);
+         unsigned word = bit / 32u;
+         uint32_t m    = 1u << (bit & 31u);
+         if (set)
+            self->vram_gpu_written[word] |= m;
+         else
+            self->vram_gpu_written[word] &= ~m;
+      }
+}
+
+static bool vram_prov_any(Renderer *self, int x, int y, int w, int h)
+{
+   int bx0, by0, bx1, by1, bx, by;
+   if (w <= 0 || h <= 0)
+      return false;
+   if (x < 0) { w += x; x = 0; }
+   if (y < 0) { h += y; y = 0; }
+   if (x >= (int)FB_WIDTH || y >= (int)FB_HEIGHT || w <= 0 || h <= 0)
+      return false;
+   if (x + w > (int)FB_WIDTH)  w = (int)FB_WIDTH  - x;
+   if (y + h > (int)FB_HEIGHT) h = (int)FB_HEIGHT - y;
+   bx0 = x / 8; by0 = y / 8;
+   bx1 = (x + w - 1) / 8; by1 = (y + h - 1) / 8;
+   for (by = by0; by <= by1; by++)
+      for (bx = bx0; bx <= bx1; bx++)
+      {
+         unsigned bit  = (unsigned)(by * VRAM_PROV_BLOCKS_X + bx);
+         if (self->vram_gpu_written[bit / 32u] & (1u << (bit & 31u)))
+            return true;
+      }
+   return false;
+}
+
 static void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle *hd_texture_index_out,
    bool *filtering_out, bool *scaled_read_out, unsigned *shift_out, bool *offset_uv_out){
       int16_t param;
@@ -8954,6 +9028,8 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    offset_uv = self->scaled_uv_offset && self->render_state.primitive_type == PrimitiveType_Polygon;
 
    z = renderer_allocate_depth(self, scaled_read ? Domain_Scaled : Domain_Unscaled, &rect);
+   vram_prov_op(self, (int)rect.x, (int)rect.y,
+         (int)rect.width, (int)rect.height, 1);
 
    /* Look up the hd texture index This is done here at the end of the function
     * because the `allocate_depth` call above can call `reset_queue` which would
@@ -8980,6 +9056,46 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       /* This flag says skip hd textures */
       param = param | 0x200;
    }
+
+   /* Fixed-point framebuffer-feedback modulation (Vulkan port of the GL
+    * change): when the sampled texture or palette contains GPU-rendered
+    * VRAM data, route modulation through the PlayStation GPU's own
+    * fixed-point order in the shader so repeated feedback decays at
+    * hardware rate instead of the float path's slower fade. Disabled
+    * under PGXP precise colour, matching the GL gate. 0x8000 is masked
+    * as unsigned in the shader because params is a signed 16-bit lane. */
+   if (!psx_pgxp_color &&
+       self->render_state.texture_mode != TextureMode_None &&
+       hd_texture_vram.height > 0)
+   {
+      bool feedback = vram_prov_any(self,
+            (int)hd_texture_vram.x, (int)hd_texture_vram.y,
+            (int)hd_texture_vram.width + 1, (int)hd_texture_vram.height);
+      if (!feedback && self->render_state.texture_mode != TextureMode_ABGR1555)
+      {
+         unsigned pal_w = self->render_state.texture_mode ==
+               TextureMode_Palette8bpp ? 256u : 16u;
+         feedback = vram_prov_any(self,
+               (int)self->render_state.palette_offset_x,
+               (int)self->render_state.palette_offset_y,
+               (int)pal_w, 1);
+      }
+      if (feedback)
+      {
+         param = (int16_t)(param | 0x800);
+         if (getenv("BEETLE_VK_DIAG"))
+         {
+            static unsigned _fb_n;
+            if (_fb_n < 8 || (_fb_n % 512) == 0)
+               fprintf(stderr, "[vk_diag] fixed-point feedback draw #%u tex(%u,%u %ux%u)\n",
+                     _fb_n, (unsigned)hd_texture_vram.x, (unsigned)hd_texture_vram.y,
+                     (unsigned)hd_texture_vram.width, (unsigned)hd_texture_vram.height);
+            _fb_n++;
+         }
+      }
+   }
+   if (self->render_state.primitive_dither)
+      param = (int16_t)((uint16_t)param | 0x8000u);
 
    { unsigned i; for (i = 0; i < count; i++) {
       output[i].x = x[i];
@@ -9852,6 +9968,10 @@ static void renderer_blit_vram(Renderer *self,
    Domain domain;
    VK_ASSERT(dst->width == src->width);
    VK_ASSERT(dst->height == src->height);
+   /* Conservative provenance: the destination may now hold GPU-rendered
+    * content whether or not the source blocks were marked. */
+   vram_prov_op(self, (int)dst->x, (int)dst->y,
+         (int)dst->width, (int)dst->height, 1);
 
    /* Happens a lot in Square games for some reason. */
    if (rect_eq(dst, src))
@@ -10175,6 +10295,9 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const TTRect *rect
    BufferHandle buffer;
    ih_reset(&self->last_scanout);
    fbatlas_load_image(&self->atlas, rect);
+   /* CPU-uploaded pixels replace any GPU-written provenance. */
+   vram_prov_op(self, (int)rect->x, (int)rect->y,
+         (int)rect->width, (int)rect->height, 0);
    size = rect->width * rect->height * sizeof(uint16_t);
 
    /* TODO: Chain allocate this. */
@@ -19795,6 +19918,7 @@ void rhi_vulkan_push_triangle(
       return;
 
    renderer->render_state.texture_color_modulate = texture_blend_mode == 2;
+   renderer->render_state.primitive_dither = dither;
    renderer_set_palette_offset(renderer, clut_x, clut_y);
    renderer_set_texture_offset(renderer, texpage_x, texpage_y);
    renderer->render_state.mask_test = mask_test;
@@ -19845,6 +19969,7 @@ void rhi_vulkan_push_quad(
       return;
 
    renderer->render_state.texture_color_modulate = texture_blend_mode == 2;
+   renderer->render_state.primitive_dither = dither;
    renderer_set_palette_offset(renderer, clut_x, clut_y);
    renderer_set_texture_offset(renderer, texpage_x, texpage_y);
    renderer->render_state.mask_test = mask_test;
@@ -19889,6 +20014,7 @@ void rhi_vulkan_push_line(
 
    renderer->render_state.texture_mode = TextureMode_None;
    fbatlas_set_texture_mode(&renderer->atlas, TextureMode_None);
+   renderer->render_state.primitive_dither = dither;
    renderer->render_state.mask_test      = mask_test;
    renderer->render_state.force_mask_bit = set_mask;
    renderer_apply_blend_mode(renderer, blend_mode);
