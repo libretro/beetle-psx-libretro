@@ -7667,6 +7667,11 @@ static void gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
          GL_COLOR_BUFFER_BIT,
          GL_NEAREST);
 
+   /* Some drivers do not make dependency-driven framebuffer mirrors visible
+    * to the following texture fetch without explicit completion. */
+   if (allow_with_software_fb)
+      glFinish();
+
    if (scissor_was_enabled)
       glEnable(GL_SCISSOR_TEST);
 
