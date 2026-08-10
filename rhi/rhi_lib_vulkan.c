@@ -9064,18 +9064,18 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
     * hardware rate instead of the float path's slower fade. Disabled
     * under PGXP precise colour, matching the GL gate. 0x8000 is masked
     * as unsigned in the shader because params is a signed 16-bit lane. */
-   /* Unlike the GL gate, this path stays armed under PGXP precise
-    * colour / 30-bit HDR. Feedback-sourced texels are 5-bit hardware
-    * data being iterated by the GPU's own fixed-point modulation - the
-    * precise-colour enhancement does not apply to them, and the float
-    * path demonstrably stalls at its seed on this renderer (Tomb
-    * Raider 2 modulates its water CLUT rows toward blue by rendering
-    * onto them; with the float path the iteration freezes at whatever
-    * the rows held - grey on a cold boot, correct after a savestate
-    * repaint). GL converges under HDR only because its fp16 target
-    * happens to preserve the decrement; the Vulkan loop rounds through
-    * the 10-bit native domain and does not. */
-   if (self->render_state.texture_mode != TextureMode_None &&
+   /* Restored: the gate-drop shipped for the Tomb Raider 2 water made
+    * the title worse, not better. The water surface samples the
+    * framebuffer as a 4bpp CLUT texture (screen-space refraction); on
+    * the reporter's configuration GL renders it correctly with this
+    * same gate CLOSED - its float path plus working same-frame
+    * fb-to-texture synchronization - so quantizing those draws was
+    * never the fix, and unleashing 5-bit quantization plus dither on
+    * them produced white output with dither speckle. The real defect
+    * is Vulkan-side stale unscaled-domain content under the sampled
+    * rect, tracked separately. */
+   if (!psx_pgxp_color &&
+       self->render_state.texture_mode != TextureMode_None &&
        hd_texture_vram.height > 0)
    {
       bool feedback = vram_prov_any(self,
