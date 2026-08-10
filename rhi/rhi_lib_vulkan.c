@@ -9064,8 +9064,18 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
     * hardware rate instead of the float path's slower fade. Disabled
     * under PGXP precise colour, matching the GL gate. 0x8000 is masked
     * as unsigned in the shader because params is a signed 16-bit lane. */
-   if (!psx_pgxp_color &&
-       self->render_state.texture_mode != TextureMode_None &&
+   /* Unlike the GL gate, this path stays armed under PGXP precise
+    * colour / 30-bit HDR. Feedback-sourced texels are 5-bit hardware
+    * data being iterated by the GPU's own fixed-point modulation - the
+    * precise-colour enhancement does not apply to them, and the float
+    * path demonstrably stalls at its seed on this renderer (Tomb
+    * Raider 2 modulates its water CLUT rows toward blue by rendering
+    * onto them; with the float path the iteration freezes at whatever
+    * the rows held - grey on a cold boot, correct after a savestate
+    * repaint). GL converges under HDR only because its fp16 target
+    * happens to preserve the decrement; the Vulkan loop rounds through
+    * the 10-bit native domain and does not. */
+   if (self->render_state.texture_mode != TextureMode_None &&
        hd_texture_vram.height > 0)
    {
       bool feedback = vram_prov_any(self,

@@ -369,8 +369,9 @@ static int dump_frame(const char *path)
    { void *map = NULL; FILE *f; unsigned x, y;
      vkMapMemory(dev, mem, 0, VK_WHOLE_SIZE, 0, &map);
      { char rawpath[640]; FILE *rf;
-       snprintf(rawpath, sizeof(rawpath), "%s.raw", path);
-       rf = fopen(rawpath, "wb");
+       if (!getenv("VKHOST_DUMP_RAW")) rawpath[0] = 0;
+       else snprintf(rawpath, sizeof(rawpath), "%s.raw", path);
+       rf = rawpath[0] ? fopen(rawpath, "wb") : NULL;
        if (rf) { fwrite(map, 1, (size_t)size, rf); fclose(rf); } }
      f = fopen(path, "wb");
      if (!f)
@@ -449,7 +450,10 @@ int main(int argc, char **argv)
    system(cmdbuf);
 
    /* defaults, overridable via VKHOST_VARS */
-   add_var("beetle_psx_hw_renderer", "vulkan");
+   /* Must be a value the option declares; an undeclared value leaves
+    * the internal upscale on the CPU side, a state no frontend
+    * produces (same defect the GL harness had). */
+   add_var("beetle_psx_hw_renderer", "hardware_vk");
    add_var("beetle_psx_hw_pgxp_mode", "memory only");
    add_var("beetle_psx_hw_color_format", "30bit_hdr");
    add_var("beetle_psx_hw_internal_resolution", "1x");
@@ -600,12 +604,43 @@ run_frames_sw:
             clock_gettime(CLOCK_MONOTONIC, &t0);
          }
          retro_run_fn();
-         if (!bench && vkctx.device && ((i % 30) == 29 || i == frames - 1))
+         {
+            /* VKHOST_SAVE_STATE=path:frame - checkpoint mid-run so long
+             * cold-boot treks can be chained across invocations. */
+            static char sv_path[512]; static int sv_at = -1;
+            if (sv_at < 0)
+            {
+               const char *ss = getenv("VKHOST_SAVE_STATE");
+               sv_at = 0;
+               if (ss)
+               {  const char *c = strrchr(ss, ':');
+                  if (c) { sv_at = atoi(c + 1);
+                           snprintf(sv_path, sizeof(sv_path), "%.*s",
+                                    (int)(c - ss), ss); } }
+            }
+            if (sv_at && i + 1 == sv_at && sv_path[0])
+            {
+               size_t (*ssz_fn)(void) = dlsym(core, "retro_serialize_size");
+               bool (*ser_fn)(void *, size_t) = dlsym(core, "retro_serialize");
+               size_t need = ssz_fn();
+               void *sb = malloc(need);
+               if (sb && ser_fn(sb, need))
+               {  FILE *sf = fopen(sv_path, "wb");
+                  if (sf) { fwrite(sb, 1, need, sf); fclose(sf);
+                            fprintf(stderr, "[vkhost] state saved %s (%zu) at frame %d\n",
+                                    sv_path, need, i + 1); } }
+               free(sb);
+            }
+         }
+         { static int dump_iv = 0;
+           if (!dump_iv) { const char *e = getenv("VKHOST_DUMP_INTERVAL");
+                           dump_iv = e ? atoi(e) : 30; if (dump_iv < 1) dump_iv = 30; }
+         if (!bench && vkctx.device && ((i % dump_iv) == dump_iv - 1 || i == frames - 1))
          {
             char path[600];
             snprintf(path, sizeof(path), "%s/frame_%04d.ppm", outdir, i + 1);
             dump_frame(path);
-         }
+         } }
       }
 
       if (bench)
