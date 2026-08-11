@@ -292,7 +292,10 @@ static bool search_firmware(char *obtained_sha1, const char *bios_sha1)
    int i, r;
    RFILE *BIOSFile;
 
-   log_cb(RETRO_LOG_INFO, "Searching for Firmware checksum: %s\n", bios_sha1);
+   if (!bios_sha1)
+      return false;
+
+   log_cb(RETRO_LOG_INFO, "Searching for firmware checksum: %s\n", bios_sha1);
 
    /* Consider setting recursive flag */
    struct string_list *dir_list = dir_list_new(retro_base_directory, NULL, false, false, false, false);
