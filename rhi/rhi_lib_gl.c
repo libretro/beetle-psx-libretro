@@ -6898,6 +6898,7 @@ void rhi_gl_load_image(
    uint16_t y_start;
    uint16_t y_end;
    gl_image_load_vertex slice[4];
+   GLboolean scissor_was_enabled;
 
    if (static_renderer.state == GL_STATE_INVALID)
       return;
@@ -7022,7 +7023,19 @@ void rhi_gl_load_image(
       }
    }
 
-   glDisable(GL_SCISSOR_TEST);
+   /* Save and restore rather than unconditionally re-enabling: this
+    * entry point is also reachable outside a prepare_frame /
+    * finalize_frame pair (the deferred-upload drain in
+    * gl_context_reset, and GPU_RestoreStateP3()'s full-VRAM replay on
+    * savestate load), where scissor is off on entry and forcing it
+    * back on hands the frontend a dirty context. Matches
+    * gl_tt_page_clear, gl_tt_page_blit, rhi_gl_read_vram and
+    * gl_mirror_fb_out_to_fb_texture. GL_BLEND is deliberately left
+    * off: it is per-draw state owned by the command buffer, not a
+    * frame-wide invariant like scissor. */
+   scissor_was_enabled = glIsEnabled(GL_SCISSOR_TEST);
+   if (scissor_was_enabled)
+      glDisable(GL_SCISSOR_TEST);
    glDisable(GL_BLEND);
 
    /* Bind the output framebuffer */
@@ -7031,7 +7044,8 @@ void rhi_gl_load_image(
    if (!gl_draw_buffer_is_empty(renderer->image_load_buffer))
       gl_draw_buffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
 
-   glEnable(GL_SCISSOR_TEST);
+   if (scissor_was_enabled)
+      glEnable(GL_SCISSOR_TEST);
 
    /* The CPU upload is applied to both fb_texture and fb_out. */
    gl_vram_sync_clean_rect(renderer, x, y, w, h);
