@@ -1273,6 +1273,11 @@ static void GPU_SoftReset(void) /* Control command 0x00 */
    FastFIFO_Flush(&GPU_BlitterFIFO);
    GPU.DataReadBufferEx = 0;
    GPU.InCmd = INCMD_NONE;
+   /* A GP1 reset mid-quad drops the pending primitive entirely -
+    * drop any SW-deferred first quad triangle with it (the HW
+    * renderer's whole-quad push is naturally dropped the same
+    * way). */
+   GPU.QuadPerspT1Deferred = false;
 
    GPU.DisplayOff = 1;
    GPU.DisplayFB_XStart = 0;
@@ -1382,6 +1387,7 @@ void GPU_Power(void)
    GPU.InQuad_clut = 0;
    GPU.InQuad_invalidW = false;
    GPU.killQuadPart = 0;
+   GPU.QuadPerspT1Deferred = false;
    memset(GPU.InQuad_F3Vertices, 0, sizeof(GPU.InQuad_F3Vertices));
    memset(&GPU.InPLine_PrevPoint, 0, sizeof(GPU.InPLine_PrevPoint));
 
@@ -2796,6 +2802,7 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       SFVARN(GPU.InQuad_clut, "InQuad_clut"),
       SFVARN(GPU.InQuad_invalidW, "InQuad_invalidW"),
       SFVARN(GPU.killQuadPart, "killQuadPart"),
+      SFVARN(GPU.QuadPerspT1Deferred, "QuadPerspT1Deferred"),
 
       SFVARN(GPU.InQuad_F3Vertices[0].x, "InQuad_F3Vertices[0].x"),
       SFVARN(GPU.InQuad_F3Vertices[0].y, "InQuad_F3Vertices[0].y"),

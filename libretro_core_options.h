@@ -1402,9 +1402,9 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
    {
       BEETLE_OPT(subdivision),
-      "Polygon Subdivision (Software)",
+      "Polygon Subdivision (Phong Tessellation)",
       NULL,
-      "Refine untextured 3D meshes with Loop subdivision before rasterising, rounding off the chunky low-polygon look of PS1 character models. Higher levels produce smoother silhouettes at the cost of CPU time per draw. Software renderer only. Textured polygons, 2D UI, sprites, and lines are passed through unchanged.",
+      "Smooth untextured PGXP-tracked 3D geometry with Phong tessellation before rasterising, rounding off the chunky low-polygon look of PS1 character models. Higher levels produce smoother silhouettes at the cost of CPU/GPU time per draw. Hardware renderers only. Textured polygons, 2D UI, sprites, and lines are passed through unchanged.",
       NULL,
       "hacks",
       {
@@ -1412,6 +1412,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "1",        "1 pass (4x triangle count)" },
          { "2",        "2 passes (16x triangle count)" },
          { "3",        "3 passes (64x triangle count)" },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      BEETLE_OPT(quad_persp),
+      "Perspective Correct Texturing For Quads (No PGXP)",
+      NULL,
+      "Reduce affine texture warping on textured 3D quads by inferring per-vertex depth from the quad's on-screen shape (a projected planar texture rectangle fully determines it). Unlike PGXP this needs no CPU-side data and also works when PGXP vertex matching fails, but it is a heuristic: quads that are not planar texture rectangles are automatically skipped, and 2D elements are unaffected. Applies to all renderers. When PGXP supplies real vertex depth for a primitive, PGXP wins and this hack stands down.",
+      NULL,
+      "hacks",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
          { NULL, NULL },
       },
       "disabled"

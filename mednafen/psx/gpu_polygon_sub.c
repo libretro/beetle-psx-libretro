@@ -403,3 +403,183 @@ bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices)
 
 	return true;
 }
+
+/* Tunables for GPU_QuadPersp_Recover below.  QP_MIN_W rejects w
+ * that a later 1/w would blow up on; QP_MIN_RATIO skips quads
+ * whose affine error is sub-texel anyway; QP_MAX_RATIO rejects
+ * implausibly extreme recoveries. */
+#define QP_MIN_W     (1e-3)
+#define QP_MIN_RATIO (1.01)
+#define QP_MAX_RATIO (64.0)
+
+/* GPU_QuadPersp_Recover - recover per-vertex perspective w for a
+ * textured quad from its screen-space shape alone.
+ *
+ * A PS1 textured 4-point primitive is, in the overwhelmingly
+ * common case, the projection of a planar rectangle in texture
+ * space (the artist maps an axis-aligned texture rect onto a 3D
+ * quad).  Four screen<->parameter point correspondences fully
+ * determine the projective mapping (homography) from the unit
+ * parameter square to the screen quad:
+ *
+ *   x(s,t) = (a*s + b*t + c) / (g*s + h*t + 1)
+ *   y(s,t) = (d*s + e*t + f) / (g*s + h*t + 1)
+ *
+ * The denominator evaluated at the four corners IS the per-vertex
+ * perspective w, up to a global scale that perspective-correct
+ * interpolation is invariant to:
+ *
+ *   w(0,0) = 1        w(1,0) = 1 + g
+ *   w(0,1) = 1 + h    w(1,1) = 1 + g + h
+ *
+ * g and h come from the standard square->quad closed form
+ * (Heckbert, "Fundamentals of Texture Mapping and Image Warping",
+ * sec. 2.2; re-derived independently and validated against
+ * synthetic pinhole projections in the unit harness):
+ *
+ *   S  = P00 - P10 - P01 + P11
+ *   D1 = P10 - P11
+ *   D2 = P01 - P11
+ *   g  = cross(S, D2) / cross(D1, D2)
+ *   h  = cross(D1, S) / cross(D1, D2)
+ *
+ * PS1 quads arrive in strip order A,B,C,D covering the parameter
+ * corners A=(0,0), B=(1,0), C=(0,1), D=(1,1); the perimeter is
+ * therefore A->B->D->C.
+ *
+ * The recovered w is a heuristic - the quad might not actually be
+ * a projected planar rectangle - so eligibility is gated hard:
+ *
+ *   - texture-space parallelogram: |uA - uB - uC + uD| <= 2 and
+ *     likewise for v.  If the UV corners don't form (close to) a
+ *     parallelogram, the planar-rect premise is already false and
+ *     the homography would "correct" toward garbage.
+ *   - convex screen perimeter with a consistent winding.  PS1
+ *     quads can legally be twisted (bowties) or non-convex, and
+ *     games use that; a homography does not describe those.
+ *   - all recovered w strictly positive.  A sign flip means the
+ *     recovered plane crosses the eye plane - not a projection of
+ *     anything visible.
+ *   - bounded anisotropy: wmax/wmin in (QP_MIN_RATIO,
+ *     QP_MAX_RATIO).  Below the floor the affine error is
+ *     sub-texel and correction is wasted per-pixel work in the
+ *     software rasteriser; above the cap the quad is more likely
+ *     degenerate data than a legitimate near-horizon surface.
+ *
+ * Decision math is exact: the parallelogram, degeneracy, winding
+ * and convexity tests are integer (int64), following the
+ * gpu_polygon_sub.c convention established by the Wild Arms 2
+ * derivative fix above - accept/reject cannot diverge across
+ * platforms from FP contraction.  Only the accepted-path w values
+ * involve floating point, mirroring the existing PGXP pct maths.
+ *
+ * Inputs are the four corner vertices in strip order (A from the
+ * first half-command, B,C,D from the second).  Screen x/y are the
+ * post-offset, post-upscale integer coordinates; both offset and
+ * uniform scale cancel in the difference/ratio structure above,
+ * so software (upscaled) and hardware (native+PGXP-space) callers
+ * recover identical w.
+ *
+ * Returns 1 and fills w_out[4] (normalised so min(w) == 1.0, all
+ * finite, all >= 1.0) on success; returns 0 leaving w_out
+ * untouched when the quad is ineligible.
+ */
+int GPU_QuadPersp_Recover(const tri_vertex *A, const tri_vertex *BCD,
+      float *w_out)
+{
+	const tri_vertex *B = &BCD[0];
+	const tri_vertex *C = &BCD[1];
+	const tri_vertex *D = &BCD[2];
+
+	int64_t sx, sy;          /* S  = A - B - C + D */
+	int64_t d1x, d1y;        /* D1 = B - D */
+	int64_t d2x, d2y;        /* D2 = C - D */
+	int64_t den;
+	int64_t e0x, e0y, e1x, e1y, e2x, e2y, e3x, e3y;
+	int64_t c0, c1, c2, c3;
+	double g, h;
+	double w0, w1, w2, w3;
+	double wmin, wmax;
+
+	/* Texture-space parallelogram gate (exact).  u/v are 0..255
+	 * so plain int arithmetic cannot overflow, but keep the int64
+	 * convention of this file. */
+	{
+		int64_t pu = (int64_t)A->u - B->u - C->u + D->u;
+		int64_t pv = (int64_t)A->v - B->v - C->v + D->v;
+		if (pu < -2 || pu > 2 || pv < -2 || pv > 2)
+			return 0;
+	}
+
+	sx  = (int64_t)A->x - B->x - C->x + D->x;
+	sy  = (int64_t)A->y - B->y - C->y + D->y;
+
+	/* Exact affine fast-out: a screen parallelogram is what the
+	 * affine rasteriser already renders correctly. */
+	if (sx == 0 && sy == 0)
+		return 0;
+
+	d1x = (int64_t)B->x - D->x;
+	d1y = (int64_t)B->y - D->y;
+	d2x = (int64_t)C->x - D->x;
+	d2y = (int64_t)C->y - D->y;
+
+	den = d1x * d2y - d1y * d2x;
+	if (den == 0)
+		return 0;
+
+	/* Convexity + consistent winding of the perimeter A->B->D->C
+	 * (exact).  Consecutive edge cross products must all share a
+	 * strict sign; any zero (collinear corner) also rejects. */
+	e0x = (int64_t)B->x - A->x;  e0y = (int64_t)B->y - A->y;
+	e1x = (int64_t)D->x - B->x;  e1y = (int64_t)D->y - B->y;
+	e2x = (int64_t)C->x - D->x;  e2y = (int64_t)C->y - D->y;
+	e3x = (int64_t)A->x - C->x;  e3y = (int64_t)A->y - C->y;
+	c0  = e0x * e1y - e0y * e1x;
+	c1  = e1x * e2y - e1y * e2x;
+	c2  = e2x * e3y - e2y * e3x;
+	c3  = e3x * e0y - e3y * e0x;
+	if (c0 > 0)
+	{
+		if (c1 <= 0 || c2 <= 0 || c3 <= 0)
+			return 0;
+	}
+	else if (c0 < 0)
+	{
+		if (c1 >= 0 || c2 >= 0 || c3 >= 0)
+			return 0;
+	}
+	else
+		return 0;
+
+	g = (double)(sx * d2y - sy * d2x) / (double)den;
+	h = (double)(d1x * sy - d1y * sx) / (double)den;
+
+	w0 = 1.0;
+	w1 = 1.0 + g;
+	w2 = 1.0 + h;
+	w3 = 1.0 + g + h;
+
+	if (w1 <= QP_MIN_W || w2 <= QP_MIN_W || w3 <= QP_MIN_W)
+		return 0;
+
+	wmin = w0;
+	wmax = w0;
+	if (w1 < wmin) wmin = w1;
+	if (w1 > wmax) wmax = w1;
+	if (w2 < wmin) wmin = w2;
+	if (w2 > wmax) wmax = w2;
+	if (w3 < wmin) wmin = w3;
+	if (w3 > wmax) wmax = w3;
+
+	if (wmax < wmin * QP_MIN_RATIO)
+		return 0; /* visually indistinguishable from affine */
+	if (wmax > wmin * QP_MAX_RATIO)
+		return 0; /* implausibly extreme - likely not a planar rect */
+
+	w_out[0] = (float)(w0 / wmin);
+	w_out[1] = (float)(w1 / wmin);
+	w_out[2] = (float)(w2 / wmin);
+	w_out[3] = (float)(w3 / wmin);
+	return 1;
+}

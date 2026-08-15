@@ -37,6 +37,9 @@ extern uint8_t psx_gpu_upscale_shift_hw;
  */
 extern bool psx_gpu_rasterize_both_fields;
 extern int line_render_mode;
+/* Perspective Correct Texturing for quads without PGXP: 0 = off,
+ * 1 = on.  Consumed by the polygon decoder in gpu_polygon.c. */
+extern int psx_quad_persp_mode;
 extern int filter_mode;
 extern int crop_overscan;
 

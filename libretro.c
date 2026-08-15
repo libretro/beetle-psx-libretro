@@ -90,6 +90,7 @@ uint8_t psx_gpu_upscale_shift_hw;
 bool psx_gpu_rasterize_both_fields = false;
 int line_render_mode;
 int psx_gpu_subdivision_level = 0;
+int psx_quad_persp_mode;
 int filter_mode;
 int crop_overscan = 0;
 
@@ -4785,6 +4786,17 @@ static void check_variables(bool startup)
    }
    else
       psx_gpu_subdivision_level = 0;
+
+   var.key = BEETLE_OPT(quad_persp);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "disabled") == 0)
+         psx_quad_persp_mode = 0;
+      else if (strcmp(var.value, "enabled") == 0)
+         psx_quad_persp_mode = 1;
+   }
+   else
+      psx_quad_persp_mode = 0;
 
    var.key = BEETLE_OPT(filter);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)

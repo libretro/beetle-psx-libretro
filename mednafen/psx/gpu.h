@@ -174,6 +174,12 @@ struct PS_GPU
    uint32_t InQuad_clut;
    bool InQuad_invalidW;
    uint32_t killQuadPart;	// bit flags for tris in quad that are to be culled
+   /* Quad-perspective hack: the SW rasteriser's first quad triangle
+    * was deferred to the second half-command so that the recovered
+    * per-vertex w (see GPU_QuadPersp_Recover) can apply to both
+    * halves.  Reconstructed from InQuad_F3Vertices[0] plus the
+    * re-parsed shared vertices - no extra vertex state. */
+   bool QuadPerspT1Deferred;
 
    // primitive UV offsets (used to correct flipped sprites)
    uint16_t off_u, off_v;

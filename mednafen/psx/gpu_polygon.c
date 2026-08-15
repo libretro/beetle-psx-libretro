@@ -1407,6 +1407,55 @@ void Reset_UVLimits(PS_GPU *gpu);
 void Extend_UVLimits(PS_GPU *gpu, tri_vertex *vertices, unsigned count);
 void Finalise_UVLimits(PS_GPU *gpu);
 bool Hack_FindLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
+int GPU_QuadPersp_Recover(const tri_vertex *A, const tri_vertex *BCD, float *w_out);
+
+/* QUAD_PERSP_FLUSH_T1 - draw the software rasteriser's deferred
+ * first quad triangle.
+ *
+ * When the quad-perspective hack is active, the SW draw of a quad's
+ * first triangle is postponed from the first half-command to the
+ * second, so that the w recovered from the completed quad can apply
+ * to both halves.  This helper reconstructs that triangle as
+ * { InQuad_F3Vertices[0], vertices[0], vertices[1] } - i.e. corner A
+ * from the saved (and savestated) mid-quad state plus the shared
+ * B/C corners as re-parsed and re-adjusted by the second
+ * half-command.  Calc_UVOffsets_Adjust_Verts deliberately reuses
+ * the first half-command's offsets while InCmd == INCMD_QUAD, and
+ * the HW whole-quad push already depends on the resulting
+ * equivalence, so the reconstruction matches what the first
+ * half-command would have drawn.
+ *
+ * Expanded only inside DEFINE_Command_DrawPolygon; DRAWFN is the
+ * fully specialised DrawTriangle_<...> name and PCTVAL the pct flag
+ * to rasterise with (true only when recovery succeeded).  The
+ * PGXP_LIT precise->int coordinate copy mirrors the copy the normal
+ * SW path applies to `vertices` before drawing. */
+#define QUAD_PERSP_FLUSH_T1(QP_NV, QP_TEX, QP_PGXP, DRAWFN, PCTVAL) \
+   do \
+   { \
+      if ((QP_NV == 4) && (QP_TEX) && gpu->QuadPerspT1Deferred && \
+          gpu->InCmd == INCMD_NONE && rhi_intf_has_software_renderer()) \
+      { \
+         tri_vertex qp_t1[3]; \
+         qp_t1[0] = gpu->InQuad_F3Vertices[0]; \
+         qp_t1[1] = vertices[0]; \
+         qp_t1[2] = vertices[1]; \
+         if (QP_PGXP && rhi_intf_is_type() == RHI_SOFTWARE) \
+         { \
+            /* mirror the pure-SW precise->int coordinate copy the \
+             * normal path applies to `vertices` (hybrid mode skips \
+             * it there, so skip it here too) */ \
+            uint32_t qp_i; \
+            for (qp_i = 0; qp_i < 3; qp_i++) \
+            { \
+               qp_t1[qp_i].x = qp_t1[qp_i].precise[0]; \
+               qp_t1[qp_i].y = qp_t1[qp_i].precise[1]; \
+            } \
+         } \
+         gpu->QuadPerspT1Deferred = false; \
+         DRAWFN(gpu, qp_t1, (PCTVAL), NULL); \
+      } \
+   } while (0)
 bool Hack_ForceLine(PS_GPU *gpu, tri_vertex* vertices, tri_vertex* outVertices);
 
 /* No runtime switch on BlendMode / TexMode_TA / TexMult / MaskEval is
@@ -1469,7 +1518,10 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
    uint16_t       clut_x, clut_y; \
    tri_vertex     lineVertices[3]; \
    bool           lineFound = false; \
+   float          qp_w[4]; \
+   int            quad_pct = 0; \
    /*uint32_t tpage = 0;*/ \
+   (void)qp_w; \
    vertices[0].x          = 0; \
    vertices[0].y          = 0; \
    vertices[0].u          = 0; \
@@ -1708,7 +1760,14 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2; \
       /* hardware renderer still needs to render first triangle */ \
       if ((rhi_intf_is_type() == RHI_SOFTWARE) || (gpu->killQuadPart != 2)) \
+      { \
+         /* second quad triangle rejected for size: the SW-deferred \
+          * first triangle (if any) must still be drawn, exactly as \
+          * the pre-deferral code drew it on the first half-command \
+          * (recovery has not run here, so quad_pct is still 0) */ \
+         QUAD_PERSP_FLUSH_T1(NV_LIT, TEXTURED_LIT, PGXP_LIT, DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT, (quad_pct != 0)); \
          return; \
+      } \
    } \
    if (abs(vertices[2].x - vertices[0].x) >= (1024 << gpu->upscale_shift) || \
        abs(vertices[2].x - vertices[1].x) >= (1024 << gpu->upscale_shift) || \
@@ -1718,10 +1777,39 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          gpu->killQuadPart |= (gpu->InCmd == INCMD_QUAD) ? 1 : 2; \
       /* hardware renderer still needs to render first triangle */ \
       if ((rhi_intf_is_type() == RHI_SOFTWARE) || (gpu->killQuadPart != 2)) \
+      { \
+         /* second quad triangle rejected for size: the SW-deferred \
+          * first triangle (if any) must still be drawn, exactly as \
+          * the pre-deferral code drew it on the first half-command \
+          * (recovery has not run here, so quad_pct is still 0) */ \
+         QUAD_PERSP_FLUSH_T1(NV_LIT, TEXTURED_LIT, PGXP_LIT, DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT, (quad_pct != 0)); \
          return; \
+      } \
    } \
    clut_x = (clut & (0x3f << 4)); \
    clut_y = (clut >> 10) & 0x1ff; \
+   /* Quad-perspective hack: with all four corners known and no real \
+    * PGXP w available, try to recover per-vertex w from the quad's \
+    * screen shape.  On success the w lands in precise[2], where the \
+    * HW push_quad already transmits it (both HW vertex shaders \
+    * multiply position by w unconditionally, making all varyings \
+    * perspective-correct) and where the SW pct path consumes it. \
+    * When the SW rasteriser is active, recovery additionally \
+    * requires the deferred first triangle so both quad halves get \
+    * identical treatment. */ \
+   if ((NV_LIT == 4) && (TEXTURED_LIT) && psx_quad_persp_mode && \
+       gpu->InCmd == INCMD_NONE && !gpu->killQuadPart && invalidW && \
+       (!rhi_intf_has_software_renderer() || gpu->QuadPerspT1Deferred)) \
+   { \
+      if (GPU_QuadPersp_Recover(&gpu->InQuad_F3Vertices[0], vertices, qp_w)) \
+      { \
+         gpu->InQuad_F3Vertices[0].precise[2] = qp_w[0]; \
+         vertices[0].precise[2] = qp_w[1]; \
+         vertices[1].precise[2] = qp_w[2]; \
+         vertices[2].precise[2] = qp_w[3]; \
+         quad_pct = 1; \
+      } \
+   } \
    /* Line Render: store second triangle vertices (software renderer modifies originals) */ \
    /* Used to loop drawing code to draw second triangle (avoids second inline call) */ \
    do \
@@ -2068,7 +2156,23 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
             if (rhi_intf_is_type() == RHI_SOFTWARE) \
                tt_subdiv_flush_if_pending(gpu, gpu_subdiv_emit_one, NULL); \
          } \
-         DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices, pct, NULL); \
+         /* Quad-perspective hack: on the second half-command, draw \
+          * the deferred first triangle (perspective-corrected when \
+          * recovery above succeeded) before `vertices` is mutated \
+          * by the second triangle's rasterisation below. */ \
+         QUAD_PERSP_FLUSH_T1(NV_LIT, TEXTURED_LIT, PGXP_LIT, DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT, (quad_pct != 0)); \
+         if ((NV_LIT == 4) && (TEXTURED_LIT) && psx_quad_persp_mode && \
+             gpu->InCmd == INCMD_QUAD && invalidW) \
+         { \
+            /* First half of a quad with no real PGXP w: defer this \
+             * triangle until the fourth vertex is known, so the \
+             * recovered w can apply to the whole quad.  The HW \
+             * renderer already defers to the whole-quad push \
+             * naturally.  Draw-time cost is charged when it draws. */ \
+            gpu->QuadPerspT1Deferred = true; \
+         } \
+         else \
+            DrawTriangle_g##GOURAUD_LIT##_t##TEXTURED_LIT##_##BM_TAG##_TM##TM_LIT##_MO##MO_LIT##_ME##ME_LIT(gpu, vertices, pct || (quad_pct != 0), NULL); \
       } \
       /* Line Render: Overwrite vertices with those of the second triangle */ \
       if ((lineFound) && (NV_LIT == 3) && (TEXTURED_LIT)) \
