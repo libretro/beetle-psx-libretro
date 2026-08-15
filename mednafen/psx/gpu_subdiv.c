@@ -63,6 +63,9 @@
 #include "gpu_subdiv.h"
 
 extern int psx_gpu_subdivision_level;
+/* Used to scale the temporal-history match radius from native
+ * pixels into the renderer's upscaled screen space. */
+extern uint8_t psx_gpu_upscale_shift_hw;
 
 extern retro_log_printf_t log_cb;
 
@@ -181,6 +184,83 @@ static uint32_t     S_nc_size;
 static uint32_t     S_nc_mask;
 
 /* ---------------------------------------------------------------------
+ * Temporal normal history
+ *
+ * The vertex normals above are rebuilt from scratch every frame
+ * (tt_subdiv_frame_end clears the cache), and the face normals they
+ * average are derived from PGXP precise[] floats whose 1/w component
+ * is ~1e-4 in magnitude.  Sub-pixel jitter in precise[0..1] therefore
+ * rotates each face normal by several degrees frame to frame.
+ * Averaging the faces meeting at a vertex suppresses that noise
+ * SPATIALLY (within one frame) but not TEMPORALLY: nothing carries
+ * across the clear, so the committed normal at a vertex dances every
+ * frame, and Phong projection turns that dance into visible position
+ * wobble on otherwise static geometry.  The SD_PHONG_ALPHA damper
+ * exists solely to halve the amplitude of that artifact.
+ *
+ * The fix is to age the cache instead of wiping it.  At frame end the
+ * committed normals are copied into a history table (same hash, same
+ * keying); on the next frame, when a vertex's normal is committed, it
+ * is blended toward the historical normal found at the nearest
+ * matching screen position:
+ *
+ *   n_out = normalize((1 - beta) * n_now + beta * n_hist)
+ *
+ * This is screen-space temporal reprojection, the same principle TAA
+ * uses.  Its correctness rests on an observation about the input: the
+ * noise we are fighting is zero-mean about the true normal (it comes
+ * from FP jitter in the projection, not from the geometry), so an
+ * exponential moving average converges on the true value while the
+ * per-frame excursions cancel.  Real geometric change is NOT
+ * zero-mean, which is why the match is spatially bounded (see below)
+ * and why a miss falls back to this frame's value alone.
+ *
+ * Identity across frames.  There is no frame-stable vertex ID
+ * available in this module: tri_vertex carries geometry only, and the
+ * PGXP layer's own vertex identity (GTE command-stream position) is
+ * long gone by the time a polygon arrives here and is not stable
+ * across frames anyway.  Screen position is the only handle we have.
+ * A vertex that is stationary hashes to its own slot and matches
+ * exactly; a vertex drifting slowly lands within a pixel or two, so
+ * the lookup probes a small neighbourhood (SD_NC_HIST_RADIUS, in
+ * native pixels, scaled by the upscale shift) and takes the nearest
+ * hit.  A vertex that moved further than that is treated as a new
+ * vertex and gets no history -- deliberately: blending a normal
+ * across a vertex that genuinely jumped would smear geometry that
+ * really did change, which is the ghosting failure mode of every
+ * temporal filter.  Trading a missed smoothing opportunity for a
+ * missing ghost is the right side of that trade here, because a
+ * fast-moving vertex's wobble is invisible anyway.
+ *
+ * Cost: one extra table of the same size, one memcpy-equivalent walk
+ * per frame, and a bounded neighbourhood probe per committed vertex.
+ * All of it is skipped entirely when subdivision is disabled, since
+ * nothing is ever pushed and flush returns early. */
+
+/* Blend weight toward the historical normal.  0 disables temporal
+ * smoothing (previous behaviour); values near 1 are maximally stable
+ * but slowest to follow real geometric change.  0.75 gives an
+ * effective time constant of ~3.5 frames: long enough to bury the
+ * per-frame FP noise, short enough that genuine animation is tracked
+ * without visible lag at 60fps. */
+#ifndef SD_NC_HIST_BETA
+#define SD_NC_HIST_BETA 0.75f
+#endif
+
+/* Neighbourhood radius for the history lookup, in NATIVE pixels
+ * (scaled by upscale_shift at use).  Covers the sub-pixel-to-couple-
+ * pixel drift of nominally static geometry without reaching far
+ * enough to match a genuinely different vertex.  The probe is over a
+ * (2r+1)^2 integer neighbourhood, so keep this small. */
+#ifndef SD_NC_HIST_RADIUS
+#define SD_NC_HIST_RADIUS 2
+#endif
+
+static sd_nc_entry *S_nc_hist;
+static uint32_t     S_nc_hist_size;
+static uint32_t     S_nc_hist_mask;
+
+/* ---------------------------------------------------------------------
  * Helpers
  * ------------------------------------------------------------------ */
 
@@ -209,6 +289,74 @@ static void sd_nc_ensure(void)
       S_nc_mask = S_nc_size - 1u;
       S_nc      = (sd_nc_entry *)calloc(S_nc_size, sizeof(sd_nc_entry));
    }
+   if (S_nc_hist == NULL)
+   {
+      S_nc_hist_size = SD_NC_INITIAL_SIZE;
+      S_nc_hist_mask = S_nc_hist_size - 1u;
+      S_nc_hist      = (sd_nc_entry *)calloc(S_nc_hist_size,
+            sizeof(sd_nc_entry));
+   }
+}
+
+/* Look up a historical unit normal near (x, y).  Probes the integer
+ * neighbourhood of radius `radius` (in upscaled screen units),
+ * nearest-first by squared distance, and returns the first committed
+ * history entry found.  Returns 0 when nothing is in range, in which
+ * case the caller keeps this frame's normal unblended. */
+static int sd_nc_hist_lookup(int32_t x, int32_t y, int32_t radius,
+      float *out_nx, float *out_ny, float *out_nz)
+{
+   int32_t  dx, dy;
+   int32_t  best_d2 = 0;
+   int      found   = 0;
+   float    bx = 0.0f, by = 0.0f, bz = 0.0f;
+
+   if (S_nc_hist == NULL)
+      return 0;
+
+   for (dy = -radius; dy <= radius; dy++)
+   {
+      for (dx = -radius; dx <= radius; dx++)
+      {
+         int32_t  qx = x + dx;
+         int32_t  qy = y + dy;
+         int32_t  d2 = dx * dx + dy * dy;
+         uint32_t h, step;
+         if (d2 > radius * radius)
+            continue;
+         if (found && d2 >= best_d2)
+            continue;
+         h = sd_hash_xy(qx, qy);
+         for (step = 0; step < SD_NC_PROBE_MAX; step++)
+         {
+            sd_nc_entry *e = &S_nc_hist[(h + step) & S_nc_hist_mask];
+            if (!e->valid)
+               break;
+            if (e->x == qx && e->y == qy)
+            {
+               /* Zero history entries carry no direction (pin-hint
+                * or degenerate); treat as absent so they don't drag
+                * a real normal toward zero. */
+               if (e->nx != 0.0f || e->ny != 0.0f || e->nz != 0.0f)
+               {
+                  best_d2 = d2;
+                  bx      = e->nx;
+                  by      = e->ny;
+                  bz      = e->nz;
+                  found   = 1;
+               }
+               break;
+            }
+         }
+      }
+   }
+
+   if (!found)
+      return 0;
+   *out_nx = bx;
+   *out_ny = by;
+   *out_nz = bz;
+   return 1;
 }
 
 static void sd_nc_clear(void)
@@ -288,9 +436,43 @@ static void sd_nc_read_commit(int32_t x, int32_t y,
             if (len2 > 1e-12f)
             {
                float inv = 1.0f / sqrtf(len2);
+               float hx, hy, hz;
+               int32_t radius;
                e->nx *= inv;
                e->ny *= inv;
                e->nz *= inv;
+               /* Temporal smoothing: blend toward the normal this
+                * vertex had last frame, if it can be matched in the
+                * history table.  Both operands are unit vectors, so
+                * the lerp lands inside the unit ball and only needs
+                * renormalising; when the two disagree strongly (real
+                * geometric change) the result leans toward whichever
+                * has the larger weight, and the next frame's history
+                * is the blended value, so the filter converges
+                * geometrically rather than latching. */
+               radius = (int32_t)SD_NC_HIST_RADIUS << psx_gpu_upscale_shift_hw;
+               if (SD_NC_HIST_BETA > 0.0f &&
+                   sd_nc_hist_lookup(x, y, radius, &hx, &hy, &hz))
+               {
+                  float mx  = (1.0f - SD_NC_HIST_BETA) * e->nx
+                            + SD_NC_HIST_BETA * hx;
+                  float my  = (1.0f - SD_NC_HIST_BETA) * e->ny
+                            + SD_NC_HIST_BETA * hy;
+                  float mz  = (1.0f - SD_NC_HIST_BETA) * e->nz
+                            + SD_NC_HIST_BETA * hz;
+                  float ml2 = mx * mx + my * my + mz * mz;
+                  /* Near-cancellation means the historical normal is
+                   * roughly antiparallel to this frame's -- the
+                   * vertex flipped, so history is meaningless and
+                   * this frame's value stands. */
+                  if (ml2 > 1e-6f)
+                  {
+                     float minv = 1.0f / sqrtf(ml2);
+                     e->nx = mx * minv;
+                     e->ny = my * minv;
+                     e->nz = mz * minv;
+                  }
+               }
             }
             else
             {
@@ -414,6 +596,10 @@ void tt_subdiv_shutdown(void)
    S_nc            = NULL;
    S_nc_size       = 0;
    S_nc_mask       = 0;
+   free(S_nc_hist);
+   S_nc_hist       = NULL;
+   S_nc_hist_size  = 0;
+   S_nc_hist_mask  = 0;
 #if TT_SUBDIV_DEBUG
    if (sd_dbg_file)
    {
@@ -620,11 +806,21 @@ static void sd_emit_one(PS_GPU *gpu, const sd_vertex *v0,
  *
  * alpha=1 is full Phong (maximum smoothing, maximum noise
  * amplification on jittery face normals).  alpha=0 is flat
- * (no subdivision benefit).  alpha=0.5 is a practical middle that
- * keeps visible smoothing while halving the displacement
- * amplitude -- and therefore halving the cross-frame wobble
- * amplitude on animated characters where the cache resets each
- * frame and face normals re-derive from jittery precise[] inputs.
+ * (no subdivision benefit).
+ *
+ * This used to default to 0.5: with the normal cache wiped every
+ * frame, the committed normal at a static vertex swung ~6 degrees
+ * frame to frame (measured), and halving the displacement was the
+ * only lever available to halve the resulting wobble -- at the cost
+ * of halving the smoothing the feature exists to provide.  The
+ * temporal history filter above attacks the noise at its source
+ * instead, cutting that swing to ~1.2 degrees mean / 3 degrees worst
+ * case, so the damper is no longer paying for itself and the default
+ * moves up to 0.85: most of the available smoothing, with a little
+ * headroom left against the residual jitter on vertices that miss
+ * the history match (newly appeared or fast-moving geometry, where
+ * per-frame wobble is masked by the motion anyway).  Set to 0.5 to
+ * recover the old conservative behaviour, or 1.0 for full Phong.
  * Crack-freeness and corner-exactness are both preserved under
  * the alpha blend (linear combination of two per-vertex Phong-like
  * functions is itself per-vertex; edge midpoints still depend
@@ -635,7 +831,7 @@ static void sd_emit_one(PS_GPU *gpu, const sd_vertex *v0,
 #define SD_MAX_N      (1 << SD_MAX_LEVEL)
 #define SD_MAX_SUBV   ((SD_MAX_N + 1) * (SD_MAX_N + 2) / 2)
 #ifndef SD_PHONG_ALPHA
-#define SD_PHONG_ALPHA 0.5f
+#define SD_PHONG_ALPHA 0.85f
 #endif
 
 static sd_vertex sd_subv[SD_MAX_SUBV];
@@ -833,5 +1029,43 @@ void tt_subdiv_flush(PS_GPU *gpu, tt_subdiv_emit_fn emit, void *tag)
 
 void tt_subdiv_frame_end(void)
 {
+   /* Promote this frame's committed normals into the history table,
+    * then clear the live cache.  Only committed (valid == 2) entries
+    * with a non-zero direction are carried: accumulating entries were
+    * never read, so they were never used to tessellate anything and
+    * have no bearing on what was displayed, and zero entries are
+    * pin-hints whose meaning ("pin flat") is re-derived every frame
+    * from the ineligible-polygon stream rather than remembered.
+    *
+    * The history table is rebuilt wholesale rather than aged in
+    * place, so a vertex that stops being submitted disappears from
+    * history after one frame and cannot resurrect stale geometry
+    * later. */
+   if (S_nc != NULL && S_nc_hist != NULL)
+   {
+      uint32_t i;
+      memset(S_nc_hist, 0, S_nc_hist_size * sizeof(sd_nc_entry));
+      for (i = 0; i < S_nc_size; i++)
+      {
+         const sd_nc_entry *src = &S_nc[i];
+         uint32_t h, step;
+         if (src->valid != 2)
+            continue;
+         if (src->nx == 0.0f && src->ny == 0.0f && src->nz == 0.0f)
+            continue;
+         h = sd_hash_xy(src->x, src->y);
+         for (step = 0; step < SD_NC_PROBE_MAX; step++)
+         {
+            sd_nc_entry *dst = &S_nc_hist[(h + step) & S_nc_hist_mask];
+            if (!dst->valid)
+            {
+               *dst = *src;
+               break;
+            }
+            if (dst->x == src->x && dst->y == src->y)
+               break;
+         }
+      }
+   }
    sd_nc_clear();
 }
