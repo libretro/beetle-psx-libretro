@@ -89,6 +89,12 @@ extern uint8_t psx_gpu_upscale_shift_hw;
 static FILE *S_cap_file;
 static int   S_cap_frames;
 static int   S_cap_done;
+static int   S_cap_frame_limit;
+/* Tally of what the module was offered and what it decided, so a dump
+ * answers "why was nothing subdivided" from the summary lines alone,
+ * without reading the per-polygon records. */
+static unsigned S_cap_n_offer, S_cap_n_elig, S_cap_n_tex;
+static unsigned S_cap_n_nopgxp, S_cap_n_pin;
 
 static void sd_cap_open(void)
 {
@@ -100,8 +106,21 @@ static void sd_cap_open(void)
       path = "subdiv_capture.txt";
    S_cap_file = fopen(path, "w");
    if (S_cap_file)
-      fprintf(S_cap_file, "# tt_subdiv capture v1\n# upscale_shift %u\n",
+   {
+      /* Frame budget is a runtime knob, not a compile-time one: the
+       * useful capture window depends on what the game is doing when
+       * the core happens to start writing, and rebuilding the core to
+       * widen it is a slow way to find that out.  A two-frame default
+       * is easily narrow enough to catch only, say, a character's
+       * shadow and none of the character. */
+      const char *fr = getenv("TT_SUBDIV_CAPTURE_FRAMES");
+      S_cap_frame_limit = (fr && *fr) ? atoi(fr) : TT_SUBDIV_CAPTURE_FRAMES;
+      if (S_cap_frame_limit < 1)
+         S_cap_frame_limit = 1;
+      fprintf(S_cap_file, "# tt_subdiv capture v2\n# upscale_shift %u\n",
             (unsigned)psx_gpu_upscale_shift_hw);
+      fflush(S_cap_file);
+   }
 }
 
 static void sd_cap_tri(const char *kind, const tri_vertex *v, uint8_t flags)
@@ -120,6 +139,11 @@ static void sd_cap_tri(const char *kind, const tri_vertex *v, uint8_t flags)
             (double)v[i].precise[2],
             (int)v[i].r, (int)v[i].g, (int)v[i].b);
    fprintf(S_cap_file, "\n");
+   /* Flushed per record.  A capture session normally ends by closing
+    * the emulator, which discards whatever is still buffered --
+    * typically including the frame markers, leaving a dump that looks
+    * truncated for no visible reason. */
+   fflush(S_cap_file);
 }
 
 static void sd_cap_mark(const char *what)
@@ -822,6 +846,29 @@ static void sd_face_normal_raw(const tri_vertex *v0, const tri_vertex *v1,
 bool tt_subdiv_is_eligible(const tri_vertex *v, uint8_t flags)
 {
    (void)v;
+#if TT_SUBDIV_CAPTURE
+   /* Record the verdict for every polygon offered.  A dump holding
+    * only accepted polygons cannot tell "this geometry never reached
+    * the module" apart from "it reached it and was rejected", and
+    * those two call for opposite fixes. */
+   {
+      const char *why = "eligible";
+      S_cap_n_offer++;
+      if (flags & TT_SUBDIV_F_TEXTURED)
+      {
+         why = "reject_textured";
+         S_cap_n_tex++;
+      }
+      else if (!(flags & TT_SUBDIV_F_PGXP_VALID))
+      {
+         why = "reject_no_pgxp";
+         S_cap_n_nopgxp++;
+      }
+      else
+         S_cap_n_elig++;
+      sd_cap_tri(why, v, flags);
+   }
+#endif
    /* Reject textured polys (UV refinement not implemented).  Reject
     * PGXP-invalid polys (Phong needs sub-pixel positions and the
     * 1/w depth axis from precise[2]). */
@@ -920,6 +967,7 @@ void tt_subdiv_add_pin_hints(const tri_vertex *vertices)
 {
    int i;
 #if TT_SUBDIV_CAPTURE
+   S_cap_n_pin++;
    sd_cap_tri("pin", vertices, 0u);
 #endif
    for (i = 0; i < 3; i++)
@@ -1374,8 +1422,19 @@ void tt_subdiv_frame_end(void)
 #if TT_SUBDIV_CAPTURE
    if (S_cap_file && !S_cap_done)
    {
+      /* Per-frame tally.  offered == 0 means the subdivision path is
+       * not being reached for this content at all and the problem is
+       * upstream of this module; offered > 0 with eligible == 0 means
+       * the geometry arrived and was rejected, and the reason counters
+       * say which test did it. */
+      fprintf(S_cap_file,
+            "stats frame=%d offered=%u eligible=%u textured=%u"
+            " no_pgxp=%u pins=%u\n",
+            S_cap_frames, S_cap_n_offer, S_cap_n_elig,
+            S_cap_n_tex, S_cap_n_nopgxp, S_cap_n_pin);
       sd_cap_mark("frame");
-      if (++S_cap_frames >= TT_SUBDIV_CAPTURE_FRAMES)
+      fflush(S_cap_file);
+      if (++S_cap_frames >= S_cap_frame_limit)
       {
          fclose(S_cap_file);
          S_cap_file = NULL;
