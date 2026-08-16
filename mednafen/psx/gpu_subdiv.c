@@ -879,6 +879,12 @@ static void sd_emit_one(PS_GPU *gpu, const sd_vertex *v0,
 #define SD_PHONG_ALPHA 0.85f
 #endif
 
+/* Keep sub-vertex w on the flat interpolant instead of Phong-
+ * projecting it; see the rationale at the assignment site. */
+#ifndef SD_PHONG_LOCK_W
+#define SD_PHONG_LOCK_W 1
+#endif
+
 static sd_vertex sd_subv[SD_MAX_SUBV];
 static int       sd_row_start[SD_MAX_N + 2];
 
@@ -976,7 +982,33 @@ static void sd_tessellate_phong(PS_GPU *gpu, const sd_pending_tri *pt,
          sd_vertex *sv = &sd_subv[idx++];
          sv->px = (1.0f - SD_PHONG_ALPHA) * fx + SD_PHONG_ALPHA * phong_x;
          sv->py = (1.0f - SD_PHONG_ALPHA) * fy + SD_PHONG_ALPHA * phong_y;
+#if SD_PHONG_LOCK_W
+         /* w is NOT displaced: it stays the flat barycentric value.
+          *
+          * x and y are screen pixels; w is the projective divisor,
+          * order 1.  Treating them as three axes of one Euclidean
+          * space (which is what the cross product and the dot-product
+          * projection above do) mixes incommensurable units, and the
+          * w axis is where that mixing does visible damage: unlike a
+          * displacement in x/y, a displacement in w does not move the
+          * vertex on screen, it changes the perspective weight the
+          * vertex carries into attribute interpolation.  A subdivided
+          * polygon whose sub-vertices carry perturbed w therefore
+          * interpolates colour differently along a shared edge than an
+          * unsubdivided neighbour does, and the mismatch draws a line
+          * exactly along the boundary between subdivided and
+          * unsubdivided geometry.
+          *
+          * Locking w to the flat interpolant keeps the smoothing
+          * (which lives entirely in x/y, where it belongs) and makes
+          * every sub-vertex's perspective weight agree with what the
+          * parent plane would have produced at that barycentric
+          * position -- which is exactly what the neighbour uses.
+          * Set to 0 to restore the previous behaviour. */
+         sv->pw = fw;
+#else
          sv->pw = (1.0f - SD_PHONG_ALPHA) * fw + SD_PHONG_ALPHA * phong_w;
+#endif
          sv->r  = u * Ar + v * Br + w * Cr;
          sv->g  = u * Ag + v * Bg + w * Cg;
          sv->b  = u * Ab + v * Bb + w * Cb;
