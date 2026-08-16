@@ -63,6 +63,72 @@
 #include "gpu_subdiv.h"
 
 extern int psx_gpu_subdivision_level;
+extern uint8_t psx_gpu_upscale_shift_hw;
+
+/* ---------------------------------------------------------------------
+ * Capture (debug builds only)
+ *
+ * Build with -DTT_SUBDIV_CAPTURE=1 to dump every polygon this module
+ * is offered, in submission order, to the path in the environment
+ * variable TT_SUBDIV_CAPTURE_PATH (default "subdiv_capture.txt" in
+ * the working directory).  The dump records exactly what the
+ * subdivision path sees -- integer screen coords, precise[] floats,
+ * per-vertex colour, flags, and flush/frame boundaries -- so the real
+ * stream from a real game can be replayed offline against the real
+ * algorithm, instead of testing against a hand-built approximation of
+ * a model.  Capture stops after TT_SUBDIV_CAPTURE_FRAMES frames so a
+ * dump from a live game stays a manageable size. */
+#ifndef TT_SUBDIV_CAPTURE
+#define TT_SUBDIV_CAPTURE 0
+#endif
+#ifndef TT_SUBDIV_CAPTURE_FRAMES
+#define TT_SUBDIV_CAPTURE_FRAMES 2
+#endif
+
+#if TT_SUBDIV_CAPTURE
+static FILE *S_cap_file;
+static int   S_cap_frames;
+static int   S_cap_done;
+
+static void sd_cap_open(void)
+{
+   const char *path;
+   if (S_cap_file || S_cap_done)
+      return;
+   path = getenv("TT_SUBDIV_CAPTURE_PATH");
+   if (!path || !*path)
+      path = "subdiv_capture.txt";
+   S_cap_file = fopen(path, "w");
+   if (S_cap_file)
+      fprintf(S_cap_file, "# tt_subdiv capture v1\n# upscale_shift %u\n",
+            (unsigned)psx_gpu_upscale_shift_hw);
+}
+
+static void sd_cap_tri(const char *kind, const tri_vertex *v, uint8_t flags)
+{
+   int i;
+   if (S_cap_done)
+      return;
+   sd_cap_open();
+   if (!S_cap_file)
+      return;
+   fprintf(S_cap_file, "%s %u", kind, (unsigned)flags);
+   for (i = 0; i < 3; i++)
+      fprintf(S_cap_file, " %d %d %.9g %.9g %.9g %d %d %d",
+            (int)v[i].x, (int)v[i].y,
+            (double)v[i].precise[0], (double)v[i].precise[1],
+            (double)v[i].precise[2],
+            (int)v[i].r, (int)v[i].g, (int)v[i].b);
+   fprintf(S_cap_file, "\n");
+}
+
+static void sd_cap_mark(const char *what)
+{
+   if (S_cap_done || !S_cap_file)
+      return;
+   fprintf(S_cap_file, "%s\n", what);
+}
+#endif
 /* Used to scale the temporal-history match radius from native
  * pixels into the renderer's upscaled screen space. */
 extern uint8_t psx_gpu_upscale_shift_hw;
@@ -813,6 +879,9 @@ bool tt_subdiv_push(const tri_vertex *vertices, uint8_t flags)
 {
    sd_pending_tri *p;
    int i;
+#if TT_SUBDIV_CAPTURE
+   sd_cap_tri("push", vertices, flags);
+#endif
    if (S_pending == NULL)
       tt_subdiv_init();
    if (S_pending_count >= TT_SUBDIV_MAX_PENDING_TRIS)
@@ -850,6 +919,9 @@ bool tt_subdiv_push(const tri_vertex *vertices, uint8_t flags)
 void tt_subdiv_add_pin_hints(const tri_vertex *vertices)
 {
    int i;
+#if TT_SUBDIV_CAPTURE
+   sd_cap_tri("pin", vertices, 0u);
+#endif
    for (i = 0; i < 3; i++)
    {
       /* Pin both facings: the ineligible polygon constrains whichever
@@ -1237,6 +1309,10 @@ void tt_subdiv_flush(PS_GPU *gpu, tt_subdiv_emit_fn emit, void *tag)
    uint32_t dbg_pending   = S_pending_count;
    uint32_t dbg_out_count = 0;
 
+#if TT_SUBDIV_CAPTURE
+   sd_cap_mark("flush");
+#endif
+
    if (S_pending_count == 0)
       return;
 
@@ -1295,6 +1371,18 @@ void tt_subdiv_flush(PS_GPU *gpu, tt_subdiv_emit_fn emit, void *tag)
 
 void tt_subdiv_frame_end(void)
 {
+#if TT_SUBDIV_CAPTURE
+   if (S_cap_file && !S_cap_done)
+   {
+      sd_cap_mark("frame");
+      if (++S_cap_frames >= TT_SUBDIV_CAPTURE_FRAMES)
+      {
+         fclose(S_cap_file);
+         S_cap_file = NULL;
+         S_cap_done = 1;
+      }
+   }
+#endif
    /* Promote this frame's committed normals into the history table,
     * then clear the live cache.  Only committed (valid == 2) entries
     * with a non-zero direction are carried: accumulating entries were
