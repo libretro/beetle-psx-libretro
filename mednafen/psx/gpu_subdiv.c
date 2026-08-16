@@ -184,6 +184,10 @@ typedef struct
 {
    int32_t x, y;
    float   nx, ny, nz;
+   /* Sum of the LENGTHS of the face normals accumulated here, as
+    * opposed to the length of their sum (nx, ny, nz).  The ratio of
+    * the two is a confidence measure -- see sd_nc_read_commit. */
+   float   wsum;
    uint8_t valid;
 } sd_nc_entry;
 
@@ -269,6 +273,14 @@ static uint32_t     S_nc_mask;
  * (2r+1)^2 integer neighbourhood, so keep this small. */
 #ifndef SD_NC_HIST_RADIUS
 #define SD_NC_HIST_RADIUS 2
+#endif
+
+/* Minimum len(sum of face normals) / sum(len of face normals) for a
+ * vertex normal to be considered meaningful; below this the faces
+ * meeting at the vertex have cancelled and the residual is noise.
+ * See the cancellation guard in sd_nc_read_commit. */
+#ifndef SD_NC_CONF_MIN
+#define SD_NC_CONF_MIN 0.35f
 #endif
 
 static sd_nc_entry *S_nc_hist;
@@ -408,15 +420,17 @@ static void sd_nc_accumulate(int32_t x, int32_t y,
          e->nx    = cx;
          e->ny    = cy;
          e->nz    = cz;
+         e->wsum  = sqrtf(cx * cx + cy * cy + cz * cz);
          return;
       }
       if (e->x == x && e->y == y)
       {
          if (e->valid == 1)
          {
-            e->nx += cx;
-            e->ny += cy;
-            e->nz += cz;
+            e->nx   += cx;
+            e->ny   += cy;
+            e->nz   += cz;
+            e->wsum += sqrtf(cx * cx + cy * cy + cz * cz);
          }
          return;
       }
@@ -449,6 +463,43 @@ static void sd_nc_read_commit(int32_t x, int32_t y,
          if (e->valid == 1)
          {
             float len2 = e->nx * e->nx + e->ny * e->ny + e->nz * e->nz;
+            /* Cancellation guard.
+             *
+             * The vertex normal here is the SUM of the face normals
+             * of every triangle meeting at this screen position.  On
+             * a closed convex surface those faces roughly agree and
+             * the sum is long relative to the individual lengths.
+             * On the geometry PS1 models are actually made of, they
+             * frequently do not: hair spikes, capes, collars and
+             * skirts are thin double-sided shells whose front and
+             * back faces share vertices with nearly opposite
+             * orientation, so the sum largely cancels.
+             *
+             * What survives a near-cancellation is a short residual
+             * made mostly of the FP noise in precise[], and
+             * normalising it produces a unit vector pointing in an
+             * essentially arbitrary direction.  Phong projection then
+             * displaces the sub-vertices toward a plane that has no
+             * relationship to the surface -- which does not round the
+             * silhouette outward, it skews and shrinks it.  That is
+             * the reported "hair spike becomes crooked and thinner"
+             * artifact, and it is worst exactly where the geometry is
+             * thinnest, because thinner shells cancel more completely.
+             *
+             * len(sum) / sum(len) is the standard confidence measure
+             * for this: 1 when every face agrees, 0 when they cancel
+             * exactly.  Below the threshold the normal carries no
+             * usable direction, so the vertex is pinned flat (zero
+             * normal) rather than displaced by noise.  Pinning is
+             * safe by construction: a zero normal makes the Phong
+             * projection the identity at that corner, so the vertex
+             * keeps its original position and neighbours sharing it
+             * stay watertight. */
+            if (len2 > 1e-12f && e->wsum > 1e-12f &&
+                sqrtf(len2) < SD_NC_CONF_MIN * e->wsum)
+            {
+               len2 = 0.0f;
+            }
             if (len2 > 1e-12f)
             {
                float inv = 1.0f / sqrtf(len2);
@@ -884,6 +935,7 @@ static void sd_emit_one(PS_GPU *gpu, const sd_vertex *v0,
 #ifndef SD_PHONG_LOCK_W
 #define SD_PHONG_LOCK_W 1
 #endif
+
 
 static sd_vertex sd_subv[SD_MAX_SUBV];
 static int       sd_row_start[SD_MAX_N + 2];
