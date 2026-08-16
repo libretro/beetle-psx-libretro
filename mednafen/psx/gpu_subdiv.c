@@ -188,6 +188,10 @@ typedef struct
     * opposed to the length of their sum (nx, ny, nz).  The ratio of
     * the two is a confidence measure -- see sd_nc_read_commit. */
    float   wsum;
+   /* Which side of a surface this slot belongs to: 0 for faces
+    * wound one way in screen space, 1 for the other.  See
+    * sd_hash_xyf. */
+   uint8_t face;
    uint8_t valid;
 } sd_nc_entry;
 
@@ -279,6 +283,19 @@ static uint32_t     S_nc_mask;
  * vertex normal to be considered meaningful; below this the faces
  * meeting at the vertex have cancelled and the residual is noise.
  * See the cancellation guard in sd_nc_read_commit. */
+/* Reconstruction constants for screen <-> view space; see
+ * sd_screen_to_view.  Canonical PS1 projection: 320x240 screen,
+ * centred, with the GTE's usual projection distance. */
+#ifndef SD_PROJ_CENTER_X
+#define SD_PROJ_CENTER_X 160.0f
+#endif
+#ifndef SD_PROJ_CENTER_Y
+#define SD_PROJ_CENTER_Y 120.0f
+#endif
+#ifndef SD_PROJ_DISTANCE
+#define SD_PROJ_DISTANCE 320.0f
+#endif
+
 #ifndef SD_NC_CONF_MIN
 #define SD_NC_CONF_MIN 0.35f
 #endif
@@ -291,10 +308,42 @@ static uint32_t     S_nc_hist_mask;
  * Helpers
  * ------------------------------------------------------------------ */
 
-static uint32_t sd_hash_xy(int32_t x, int32_t y)
+/* Hash a vertex slot.
+ *
+ * The key includes a FACING bit, not just the screen position.
+ *
+ * PS1 character geometry is full of thin double-sided shells -- hair
+ * spikes, capes, collars, skirts -- whose front and back surfaces are
+ * submitted as separate triangles over the same vertices with
+ * opposite winding.  Keyed on position alone, both sides land in one
+ * slot and their face normals, which point in nearly opposite
+ * directions, cancel when summed.  What survives is a short residual
+ * of FP noise that normalises to an arbitrary direction, and the
+ * Phong projection then skews and shrinks the shell instead of
+ * rounding it.
+ *
+ * But the two sides are not one surface that needs one normal; they
+ * are two surfaces that each want their own.  Splitting the key by
+ * facing lets each side accumulate coherently: no cancellation, a
+ * meaningful normal per side, and the outward rounding the feature
+ * exists to produce.  Vertices shared by faces of the same facing
+ * still share a slot, which is what keeps neighbouring triangles
+ * watertight. */
+/* Facing bit for a triangle, from the sign of its screen-space
+ * winding (the z component of its raw face normal).  Front and back
+ * shells of a thin surface are submitted with opposite winding, so
+ * this cleanly separates them; a degenerate face (zero winding) is
+ * arbitrarily assigned 0 since it contributes nothing either way. */
+static uint8_t sd_face_bit(float cz)
+{
+   return (cz < 0.0f) ? 1u : 0u;
+}
+
+static uint32_t sd_hash_xyf(int32_t x, int32_t y, uint8_t face)
 {
    uint32_t h  = (uint32_t)x * 0x9E3779B1u;
    h          ^= (uint32_t)y * 0x85EBCA77u;
+   h          ^= (uint32_t)face * 0xC2B2AE35u;
    h          ^= h >> 16;
    h          *= 0x7FEB352Du;
    h          ^= h >> 15;
@@ -330,7 +379,7 @@ static void sd_nc_ensure(void)
  * nearest-first by squared distance, and returns the first committed
  * history entry found.  Returns 0 when nothing is in range, in which
  * case the caller keeps this frame's normal unblended. */
-static int sd_nc_hist_lookup(int32_t x, int32_t y, int32_t radius,
+static int sd_nc_hist_lookup(int32_t x, int32_t y, uint8_t face, int32_t radius,
       float *out_nx, float *out_ny, float *out_nz, int32_t *out_d2)
 {
    int32_t  dx, dy;
@@ -353,13 +402,13 @@ static int sd_nc_hist_lookup(int32_t x, int32_t y, int32_t radius,
             continue;
          if (found && d2 >= best_d2)
             continue;
-         h = sd_hash_xy(qx, qy);
+         h = sd_hash_xyf(qx, qy, face);
          for (step = 0; step < SD_NC_PROBE_MAX; step++)
          {
             sd_nc_entry *e = &S_nc_hist[(h + step) & S_nc_hist_mask];
             if (!e->valid)
                break;
-            if (e->x == qx && e->y == qy)
+            if (e->x == qx && e->y == qy && e->face == face)
             {
                /* Zero history entries carry no direction (pin-hint
                 * or degenerate); treat as absent so they don't drag
@@ -403,12 +452,12 @@ static void sd_nc_clear(void)
  * cache consistent (the cached vertex normal just averages fewer
  * face normals than it might have) at the cost of slightly noisier
  * tessellation at that vertex. */
-static void sd_nc_accumulate(int32_t x, int32_t y,
+static void sd_nc_accumulate(int32_t x, int32_t y, uint8_t face,
       float cx, float cy, float cz)
 {
    uint32_t h, step;
    sd_nc_ensure();
-   h = sd_hash_xy(x, y);
+   h = sd_hash_xyf(x, y, face);
    for (step = 0; step < SD_NC_PROBE_MAX; step++)
    {
       sd_nc_entry *e = &S_nc[(h + step) & S_nc_mask];
@@ -417,13 +466,14 @@ static void sd_nc_accumulate(int32_t x, int32_t y,
          e->valid = 1;
          e->x     = x;
          e->y     = y;
+         e->face  = face;
          e->nx    = cx;
          e->ny    = cy;
          e->nz    = cz;
          e->wsum  = sqrtf(cx * cx + cy * cy + cz * cz);
          return;
       }
-      if (e->x == x && e->y == y)
+      if (e->x == x && e->y == y && e->face == face)
       {
          if (e->valid == 1)
          {
@@ -442,12 +492,12 @@ static void sd_nc_accumulate(int32_t x, int32_t y,
  * is missing (vertex was never accumulated, e.g. probe overflow)
  * or the accumulated sum was degenerate.  Subsequent reads of a
  * committed slot return the same value. */
-static void sd_nc_read_commit(int32_t x, int32_t y,
+static void sd_nc_read_commit(int32_t x, int32_t y, uint8_t face,
       float *out_nx, float *out_ny, float *out_nz)
 {
    uint32_t h, step;
    sd_nc_ensure();
-   h = sd_hash_xy(x, y);
+   h = sd_hash_xyf(x, y, face);
    for (step = 0; step < SD_NC_PROBE_MAX; step++)
    {
       sd_nc_entry *e = &S_nc[(h + step) & S_nc_mask];
@@ -458,7 +508,7 @@ static void sd_nc_read_commit(int32_t x, int32_t y,
          *out_nz = 0.0f;
          return;
       }
-      if (e->x == x && e->y == y)
+      if (e->x == x && e->y == y && e->face == face)
       {
          if (e->valid == 1)
          {
@@ -520,7 +570,7 @@ static void sd_nc_read_commit(int32_t x, int32_t y,
                 * geometrically rather than latching. */
                radius = (int32_t)SD_NC_HIST_RADIUS << psx_gpu_upscale_shift_hw;
                if (SD_NC_HIST_BETA > 0.0f &&
-                   sd_nc_hist_lookup(x, y, radius, &hx, &hy, &hz, &hd2))
+                   sd_nc_hist_lookup(x, y, face, radius, &hx, &hy, &hz, &hd2))
                {
                   /* Adaptive blend weight.  The match distance is a
                    * free motion estimate: a vertex that landed on
@@ -583,11 +633,11 @@ static void sd_nc_read_commit(int32_t x, int32_t y,
  * The polygon-path's tt_subdiv_would_intersect_ineligible test is
  * what prevents the eligibles-already-flushed-then-ineligible-
  * neighbour case from arising in normal play. */
-static void sd_nc_insert_zero(int32_t x, int32_t y)
+static void sd_nc_insert_zero(int32_t x, int32_t y, uint8_t face)
 {
    uint32_t h, step;
    sd_nc_ensure();
-   h = sd_hash_xy(x, y);
+   h = sd_hash_xyf(x, y, face);
    for (step = 0; step < SD_NC_PROBE_MAX; step++)
    {
       sd_nc_entry *e = &S_nc[(h + step) & S_nc_mask];
@@ -601,7 +651,7 @@ static void sd_nc_insert_zero(int32_t x, int32_t y)
          e->nz    = 0.0f;
          return;
       }
-      if (e->x == x && e->y == y)
+      if (e->x == x && e->y == y && e->face == face)
          return;
    }
 }
@@ -622,17 +672,80 @@ static void sd_nc_insert_zero(int32_t x, int32_t y)
  * after a single normalisation in Pass B.
  * ------------------------------------------------------------------ */
 
+/* Screen space <-> view space.
+ *
+ * The geometry this module smooths arrives as (screen x, screen y,
+ * w).  Those are not three axes of one space: x and y are pixels,
+ * tens to hundreds of them, while w is the projective divisor, order
+ * one.  Cross products and dot-product projections over that triple
+ * are dimensionally meaningless, and the consequence is not subtle:
+ * the z term of a face normal is the product of two pixel-scale
+ * quantities while the x and y terms each pair a pixel-scale
+ * quantity with a w-scale one, so z outweighs them by three or four
+ * orders of magnitude.  EVERY normal comes out as approximately
+ * (0, 0, 1).  Phong projection against a normal that always points
+ * down the w axis displaces almost nothing in x/y -- which is to say
+ * the smoothing was, geometrically, barely happening at all, and
+ * what movement there was came from the noise in the residual.
+ *
+ * Undoing the projection fixes this at the root.  A vertex at screen
+ * (x, y) with divisor w came from view-space
+ *
+ *   X = (x - cx) * w / f,   Y = (y - cy) * w / f,   Z = w
+ *
+ * where f is the projection distance and (cx, cy) the projection
+ * centre.  In that space all three axes are the same kind of
+ * quantity, normals are true surface normals, and Phong projection
+ * means what it says.  The result is projected back to screen for
+ * rasterisation.
+ *
+ * f and (cx, cy) are not knowable exactly from the GPU stream -- the
+ * GTE's H register and offset live on the CPU side -- but they do not
+ * need to be.  A wrong f rescales the depth axis uniformly, which
+ * tilts every normal by the same factor and simply makes the
+ * smoothing slightly stronger or weaker; it cannot reintroduce the
+ * pathology, because the pathology was a scale difference of ten
+ * thousand, not of two.  The canonical PS1 values (f = 320 at a
+ * 320x240 projection centred on the screen) are used, scaled by the
+ * renderer's upscale shift so the reconstruction stays consistent
+ * with whatever coordinate scale precise[] is carrying. */
+static void sd_screen_to_view(float px, float py, float pw,
+      float *X, float *Y, float *Z)
+{
+   float scale = (float)(1u << psx_gpu_upscale_shift_hw);
+   float cx    = SD_PROJ_CENTER_X * scale;
+   float cy    = SD_PROJ_CENTER_Y * scale;
+   float f     = SD_PROJ_DISTANCE * scale;
+   *X = (px - cx) * pw / f;
+   *Y = (py - cy) * pw / f;
+   *Z = pw;
+}
+
+static void sd_view_to_screen(float X, float Y, float Z,
+      float *px, float *py, float *pw)
+{
+   float scale = (float)(1u << psx_gpu_upscale_shift_hw);
+   float cx    = SD_PROJ_CENTER_X * scale;
+   float cy    = SD_PROJ_CENTER_Y * scale;
+   float f     = SD_PROJ_DISTANCE * scale;
+   float z     = (fabsf(Z) > 1e-6f) ? Z : 1e-6f;
+   *px = X * f / z + cx;
+   *py = Y * f / z + cy;
+   *pw = Z;
+}
+
 static void sd_face_normal_raw(const tri_vertex *v0, const tri_vertex *v1,
       const tri_vertex *v2, float *cx, float *cy, float *cz)
 {
-   float ax = v1->precise[0] - v0->precise[0];
-   float ay = v1->precise[1] - v0->precise[1];
-   float aw = v1->precise[2] - v0->precise[2];
-   float bx = v2->precise[0] - v0->precise[0];
-   float by = v2->precise[1] - v0->precise[1];
-   float bw = v2->precise[2] - v0->precise[2];
-   *cx = ay * bw - aw * by;
-   *cy = aw * bx - ax * bw;
+   float X0, Y0, Z0, X1, Y1, Z1, X2, Y2, Z2;
+   float ax, ay, az, bx, by, bz;
+   sd_screen_to_view(v0->precise[0], v0->precise[1], v0->precise[2], &X0, &Y0, &Z0);
+   sd_screen_to_view(v1->precise[0], v1->precise[1], v1->precise[2], &X1, &Y1, &Z1);
+   sd_screen_to_view(v2->precise[0], v2->precise[1], v2->precise[2], &X2, &Y2, &Z2);
+   ax = X1 - X0; ay = Y1 - Y0; az = Z1 - Z0;
+   bx = X2 - X0; by = Y2 - Y0; bz = Z2 - Z0;
+   *cx = ay * bz - az * by;
+   *cy = az * bx - ax * bz;
    *cz = ax * by - ay * bx;
 }
 
@@ -738,7 +851,13 @@ void tt_subdiv_add_pin_hints(const tri_vertex *vertices)
 {
    int i;
    for (i = 0; i < 3; i++)
-      sd_nc_insert_zero(vertices[i].x, vertices[i].y);
+   {
+      /* Pin both facings: the ineligible polygon constrains whichever
+       * side of the surface its eligible neighbours belong to, and
+       * which that is isn't known here. */
+      sd_nc_insert_zero(vertices[i].x, vertices[i].y, 0u);
+      sd_nc_insert_zero(vertices[i].x, vertices[i].y, 1u);
+   }
 }
 
 bool tt_subdiv_would_overlap(const tri_vertex *vertices)
@@ -927,7 +1046,7 @@ static void sd_emit_one(PS_GPU *gpu, const sd_vertex *v0,
 #define SD_MAX_N      (1 << SD_MAX_LEVEL)
 #define SD_MAX_SUBV   ((SD_MAX_N + 1) * (SD_MAX_N + 2) / 2)
 #ifndef SD_PHONG_ALPHA
-#define SD_PHONG_ALPHA 0.85f
+#define SD_PHONG_ALPHA 0.35f
 #endif
 
 /* Keep sub-vertex w on the flat interpolant instead of Phong-
@@ -990,9 +1109,18 @@ static void sd_tessellate_phong(PS_GPU *gpu, const sd_pending_tri *pt,
    /* Vertex normals were accumulated in Pass A; read & normalise
     * (first read commits the slot, subsequent reads return the
     * cached unit vector). */
-   sd_nc_read_commit(V0->x, V0->y, &n0x, &n0y, &n0z);
-   sd_nc_read_commit(V1->x, V1->y, &n1x, &n1y, &n1z);
-   sd_nc_read_commit(V2->x, V2->y, &n2x, &n2y, &n2z);
+   {
+      /* Read the slot belonging to THIS triangle's side of the
+       * surface, so a front face never picks up the back face's
+       * normal (and vice versa). */
+      float fnx, fny, fnz;
+      uint8_t fb;
+      sd_face_normal_raw(V0, V1, V2, &fnx, &fny, &fnz);
+      fb = sd_face_bit(fnz);
+      sd_nc_read_commit(V0->x, V0->y, fb, &n0x, &n0y, &n0z);
+      sd_nc_read_commit(V1->x, V1->y, fb, &n1x, &n1y, &n1z);
+      sd_nc_read_commit(V2->x, V2->y, fb, &n2x, &n2y, &n2z);
+   }
 
    /* Triangular grid row offsets.  Row i (0 <= i <= N) holds
     * (N - i + 1) vertices at j in [0, N - i].  Linear index for
@@ -1013,54 +1141,54 @@ static void sd_tessellate_phong(PS_GPU *gpu, const sd_pending_tri *pt,
          float u     = (float)(N - i - j) * invN;
          float v     = (float)i           * invN;
          float w     = (float)j           * invN;
+         /* Flat (barycentric) position, in screen space, is what the
+          * unsubdivided triangle would have drawn here. */
          float fx    = u * Ax + v * Bx + w * Cx;
          float fy    = u * Ay + v * By + w * Cy;
          float fw    = u * Aw + v * Bw + w * Cw;
-         float dot_a = (fx - Ax) * n0x + (fy - Ay) * n0y + (fw - Aw) * n0z;
-         float dot_b = (fx - Bx) * n1x + (fy - By) * n1y + (fw - Bw) * n1z;
-         float dot_c = (fx - Cx) * n2x + (fy - Cy) * n2y + (fw - Cw) * n2z;
-         float pa_x  = fx - dot_a * n0x;
-         float pa_y  = fy - dot_a * n0y;
-         float pa_w  = fw - dot_a * n0z;
-         float pb_x  = fx - dot_b * n1x;
-         float pb_y  = fy - dot_b * n1y;
-         float pb_w  = fw - dot_b * n1z;
-         float pc_x  = fx - dot_c * n2x;
-         float pc_y  = fy - dot_c * n2y;
-         float pc_w  = fw - dot_c * n2z;
-         float phong_x = u * pa_x + v * pb_x + w * pc_x;
-         float phong_y = u * pa_y + v * pb_y + w * pc_y;
-         float phong_w = u * pa_w + v * pb_w + w * pc_w;
          sd_vertex *sv = &sd_subv[idx++];
-         sv->px = (1.0f - SD_PHONG_ALPHA) * fx + SD_PHONG_ALPHA * phong_x;
-         sv->py = (1.0f - SD_PHONG_ALPHA) * fy + SD_PHONG_ALPHA * phong_y;
+         {
+            /* Phong projection is carried out in reconstructed view
+             * space, where the three axes are commensurate and the
+             * vertex normals are true surface normals (see
+             * sd_screen_to_view).  Doing it on the raw (x, y, w)
+             * triple instead makes every normal point down the w axis
+             * and the displacement collapses to nothing. */
+            float fX, fY, fZ;
+            float aX, aY, aZ, bX, bY, bZ, cX, cY, cZ;
+            float dot_a, dot_b, dot_c;
+            float phX, phY, phZ;
+            float outX, outY, outZ;
+            float sx, sy, sw;
+            sd_screen_to_view(fx, fy, fw, &fX, &fY, &fZ);
+            sd_screen_to_view(Ax, Ay, Aw, &aX, &aY, &aZ);
+            sd_screen_to_view(Bx, By, Bw, &bX, &bY, &bZ);
+            sd_screen_to_view(Cx, Cy, Cw, &cX, &cY, &cZ);
+            dot_a = (fX - aX) * n0x + (fY - aY) * n0y + (fZ - aZ) * n0z;
+            dot_b = (fX - bX) * n1x + (fY - bY) * n1y + (fZ - bZ) * n1z;
+            dot_c = (fX - cX) * n2x + (fY - cY) * n2y + (fZ - cZ) * n2z;
+            phX   = u * (fX - dot_a * n0x) + v * (fX - dot_b * n1x)
+                  + w * (fX - dot_c * n2x);
+            phY   = u * (fY - dot_a * n0y) + v * (fY - dot_b * n1y)
+                  + w * (fY - dot_c * n2y);
+            phZ   = u * (fZ - dot_a * n0z) + v * (fZ - dot_b * n1z)
+                  + w * (fZ - dot_c * n2z);
+            outX  = (1.0f - SD_PHONG_ALPHA) * fX + SD_PHONG_ALPHA * phX;
+            outY  = (1.0f - SD_PHONG_ALPHA) * fY + SD_PHONG_ALPHA * phY;
+            outZ  = (1.0f - SD_PHONG_ALPHA) * fZ + SD_PHONG_ALPHA * phZ;
+            sd_view_to_screen(outX, outY, outZ, &sx, &sy, &sw);
+            sv->px = sx;
+            sv->py = sy;
 #if SD_PHONG_LOCK_W
-         /* w is NOT displaced: it stays the flat barycentric value.
-          *
-          * x and y are screen pixels; w is the projective divisor,
-          * order 1.  Treating them as three axes of one Euclidean
-          * space (which is what the cross product and the dot-product
-          * projection above do) mixes incommensurable units, and the
-          * w axis is where that mixing does visible damage: unlike a
-          * displacement in x/y, a displacement in w does not move the
-          * vertex on screen, it changes the perspective weight the
-          * vertex carries into attribute interpolation.  A subdivided
-          * polygon whose sub-vertices carry perturbed w therefore
-          * interpolates colour differently along a shared edge than an
-          * unsubdivided neighbour does, and the mismatch draws a line
-          * exactly along the boundary between subdivided and
-          * unsubdivided geometry.
-          *
-          * Locking w to the flat interpolant keeps the smoothing
-          * (which lives entirely in x/y, where it belongs) and makes
-          * every sub-vertex's perspective weight agree with what the
-          * parent plane would have produced at that barycentric
-          * position -- which is exactly what the neighbour uses.
-          * Set to 0 to restore the previous behaviour. */
-         sv->pw = fw;
+            /* Keep the projective divisor on the flat interpolant so a
+             * subdivided polygon carries the same perspective weight
+             * along a shared edge as an unsubdivided neighbour; the
+             * smoothing itself lives in x/y. */
+            sv->pw = fw;
 #else
-         sv->pw = (1.0f - SD_PHONG_ALPHA) * fw + SD_PHONG_ALPHA * phong_w;
+            sv->pw = sw;
 #endif
+         }
          sv->r  = u * Ar + v * Br + w * Cr;
          sv->g  = u * Ag + v * Bg + w * Cg;
          sv->b  = u * Ab + v * Bb + w * Cb;
@@ -1132,9 +1260,12 @@ void tt_subdiv_flush(PS_GPU *gpu, tt_subdiv_emit_fn emit, void *tag)
       sd_pending_tri *pt = &S_pending[i];
       float cx, cy, cz;
       sd_face_normal_raw(&pt->v[0], &pt->v[1], &pt->v[2], &cx, &cy, &cz);
-      sd_nc_accumulate(pt->v[0].x, pt->v[0].y, cx, cy, cz);
-      sd_nc_accumulate(pt->v[1].x, pt->v[1].y, cx, cy, cz);
-      sd_nc_accumulate(pt->v[2].x, pt->v[2].y, cx, cy, cz);
+      {
+         uint8_t fb = sd_face_bit(cz);
+         sd_nc_accumulate(pt->v[0].x, pt->v[0].y, fb, cx, cy, cz);
+         sd_nc_accumulate(pt->v[1].x, pt->v[1].y, fb, cx, cy, cz);
+         sd_nc_accumulate(pt->v[2].x, pt->v[2].y, fb, cx, cy, cz);
+      }
    }
 
    /* Pass B: tessellate each triangle.  sd_tessellate_phong
@@ -1188,7 +1319,7 @@ void tt_subdiv_frame_end(void)
             continue;
          if (src->nx == 0.0f && src->ny == 0.0f && src->nz == 0.0f)
             continue;
-         h = sd_hash_xy(src->x, src->y);
+         h = sd_hash_xyf(src->x, src->y, src->face);
          for (step = 0; step < SD_NC_PROBE_MAX; step++)
          {
             sd_nc_entry *dst = &S_nc_hist[(h + step) & S_nc_hist_mask];
@@ -1197,7 +1328,7 @@ void tt_subdiv_frame_end(void)
                *dst = *src;
                break;
             }
-            if (dst->x == src->x && dst->y == src->y)
+            if (dst->x == src->x && dst->y == src->y && dst->face == src->face)
                break;
          }
       }
