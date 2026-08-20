@@ -9669,6 +9669,21 @@ static void renderer_dispatch(Renderer *self,
    unsigned last_draw = 0;
    unsigned i = 1;
    unsigned size = PrimitiveInfoVec_size(scissors);
+   unsigned avail = (unsigned)BufferVertexVec_size(vertices) / 3;
+
+   /* A vertex block allocation can come back empty when the device is out
+    * of host-visible memory; the staging writes below have nowhere to go. */
+   if (!vert)
+      return;
+
+   /* One PrimitiveInfo per three queued vertices. The two queues grow
+    * independently, so bound the walk by the vertices actually present:
+    * the loop writes three vertices per entry into an allocation sized
+    * from the vertex queue, and indexes the source by triangle_index. */
+   if (size > avail)
+      size = avail;
+   if (!size)
+      return;
 
    renderer_hd_texture_uniforms(self, hd_texture);
    commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? &self->queue.default_scissor : Rect2DVec_at(&self->queue.scissors, scissor));
@@ -9852,10 +9867,24 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
 
    { bool append_floor = self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT &&
          !psx_hdr_multipass;
-   size_t size = BufferVertexVec_size(&self->queue.semi_transparent) * sizeof(BufferVertex);
+   unsigned nverts = (unsigned)BufferVertexVec_size(&self->queue.semi_transparent);
+   size_t size = (size_t)nverts * sizeof(BufferVertex);
    void *verts = commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0,
          size + (append_floor ? 6 * sizeof(BufferVertex) : 0),
          sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX);
+
+   /* Out of host-visible memory: nothing to stage into. */
+   if (!verts)
+      return;
+
+   /* One SemiTransparentState per three queued vertices. The two queues
+    * grow independently, so bound the batch walk and every draw range by
+    * the vertices actually present. */
+   if (prims > nverts / 3)
+      prims = nverts / 3;
+   if (!prims)
+      return;
+
    memcpy(verts, BufferVertexVec_data(&self->queue.semi_transparent), size);
 
    /* Multipass off: one full-framebuffer quad at the tail of the vertex
@@ -9865,7 +9894,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
     * depth test. */
    if (append_floor)
    {
-      BufferVertex *fv = (BufferVertex *)verts + prims * 3;
+      BufferVertex *fv = (BufferVertex *)verts + nverts;
       unsigned fi;
       memset(fv, 0, 6 * sizeof(BufferVertex));
       fv[1].x = (float)FB_WIDTH;
@@ -9912,7 +9941,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
          if (self->msaa > 1)
             commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
          if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
-            renderer_emit_sub_floor(self, prims * 3);
+            renderer_emit_sub_floor(self, nverts);
          last_draw_offset = i;
 
          last_state = *SemiTransparentStateVec_at(&self->queue.semi_transparent_state, i);
@@ -9926,7 +9955,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
    if (self->msaa > 1)
       commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
    if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
-      renderer_emit_sub_floor(self, prims * 3);
+      renderer_emit_sub_floor(self, nverts);
    }
    }
 }
