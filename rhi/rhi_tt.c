@@ -1099,6 +1099,14 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
       size_t   bytes;      /* approx VRAM footprint of texture (w*h*4); for the LRU budget */
       uint64_t last_used;  /* LRU tick (higher = more recently used) */
 
+      /* Reduce Palette Range: snapshot of the draw's gathered CLUT contents at
+       * page creation (`palette` identifies it, so equal hash = equal contents).
+       * Rebuilds use it to resolve each upload's REDUCED-range hash - the hash
+       * the draw path bound its image under - instead of only the full-palette
+       * `palette`. pal_count 0 = no snapshot (option off / palette ungathered). */
+      uint16_t pal_data[256];
+      unsigned pal_count;
+
       FusionRects fusion;
    };
 
@@ -1118,6 +1126,8 @@ static void fp_copy(FusedPage *dst, const FusedPage *src) {
       dst->dead            = src->dead;
       dst->bytes           = src->bytes;
       dst->last_used       = src->last_used;
+      memcpy(dst->pal_data, src->pal_data, sizeof(dst->pal_data));
+      dst->pal_count       = src->pal_count;
       dst->fusion.vram_rect = src->fusion.vram_rect;
       dst->fusion.scaleX    = src->fusion.scaleX;
       dst->fusion.scaleY    = src->fusion.scaleY;
@@ -1135,6 +1145,7 @@ static void fp_init_raw(FusedPage *p) {
       ownedrects_init(&p->fusion.rects);
       p->bytes = 0;
       p->last_used = 0;
+      p->pal_count = 0;
    }
 static void fp_destroy(FusedPage *p) {
       ih_reset(&p->texture);
@@ -1226,14 +1237,18 @@ static void fused_pages_deinit(struct FusedPages *self) { fused_page_vec_deinit(
    static HdTextureHandle fused_pages_get_or_make(struct FusedPages *self,
          TTRect page_rect,
          uint32_t palette,
-         struct RectTracker *tracker);
+         struct RectTracker *tracker,
+         TextureTracker *tt,               /* for Reduce Palette Range resolution */
+         const uint16_t *pal_data,         /* draw's gathered CLUT (NULL if none) */
+         unsigned pal_count);
    static HdTexture fused_pages_get_from_handle(struct FusedPages *self,
          HdTextureHandle handle,
          ImageHandle *default_hd_texture);
    static void fused_pages_mark_dirty(struct FusedPages *self, TTRect rect); /* For blit dst, upload, and hd texture load */
    static void fused_pages_mark_dead(struct FusedPages *self, TTRect rect); /* For clear */
    static void fused_pages_rebuild_dirty(struct FusedPages *self,
-         struct RectTracker *tracker);
+         struct RectTracker *tracker,
+         TextureTracker *tt);
    static void fused_pages_remove_dead(struct FusedPages *self);
    static void fused_pages_evict(struct FusedPages *self); /* LRU-evict live pages to the budget */
    static int64_t page_bytes(FusionRects *fusion); /* approx VRAM footprint of a fused page */
@@ -3534,7 +3549,7 @@ static TTRect fromSRect(SRect rect) {
       rect_tracker_blit(&self->tracker, make_srect(dst.x, dst.y, dst.width, dst.height), make_srect(src.x, src.y, src.width, src.height));
       texture_tracker_mirror_blit(self, dst, src); /* keep the page mirror current */
       fused_pages_mark_dirty(&self->fused_pages, dst);
-      fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker);
+      fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self);
       texture_tracker_clear_palette_cache(self, dst);
    }
 
@@ -3748,7 +3763,7 @@ static TTRect fromSRect(SRect rect) {
          rect_tracker_upload(&self->tracker, toSRect(rect), upload);
       }
       fused_pages_mark_dirty(&self->fused_pages, rect);
-      fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker);
+      fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self);
 
       /* HD texture caching method: - Lazy (self->eager_textures=false): nothing
        * is queued here; each (hash,palette) is loaded on demand when first
@@ -4330,7 +4345,10 @@ static TTRect fromSRect(SRect rect) {
                   : 256;
                TTRect page_rect = { page_x, page_y, width, 256 };
                (*fastpath_capable_out) = false;
-               return fused_pages_get_or_make(&self->fused_pages, page_rect, palette_hash, &self->tracker);
+               return fused_pages_get_or_make(&self->fused_pages, page_rect, palette_hash, &self->tracker,
+                     self,
+                     have_pal_data ? pal_local : NULL,
+                     have_pal_data ? (unsigned)palette_rect.width : 0);
             }
          }
       } }
@@ -5060,7 +5078,7 @@ static bool is_power_of_two(int n) {
       }
       hd_key_set_clear(&self->pending_attach_pages);
 
-      fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker);
+      fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self);
       fused_pages_evict(&self->fused_pages);      /* LRU-evict to budget (marks dead) */
       fused_pages_remove_dead(&self->fused_pages); /* free the marked-dead pages' VRAM */
 
@@ -5631,10 +5649,57 @@ static int64_t page_bytes(FusionRects *fusion)
       return 0;
    }
 
+   /* Per-upload effective palette hash for the FUSED-page path: the same
+    * reduced-range resolution the single-upload draw path applies (reduced hash
+    * preferred only when that replacement file exists, else the full hash), so
+    * a fused page finds/blits the images the draw path actually bound. Mode is
+    * implied by the fused page's width (64 = 4bpp, 128 = 8bpp). Without this,
+    * composited multi-upload draws (e.g. SotN's end-credits letter lines, built
+    * from dozens of 12x16 glyph uploads drawn by one 240x16 line prim) bind
+    * nothing when Reduce Palette Range is enabled: the images sit in
+    * upload->textures under reduced hashes while the fusion looked up only the
+    * full hash. */
+   static uint32_t fused_effective_palette_hash(TextureTracker *tt,
+         TextureUpload *upload,
+         unsigned page_width,
+         const uint16_t *pal_data,
+         unsigned pal_count,
+         uint32_t full_hash){
+      int mode;
+      uint32_t rh;
+      HdTextureId rid;
+      if (tt == NULL || !tt->reduce_palette_range || pal_data == NULL || pal_count == 0)
+         return full_hash;
+      if (page_width == 64)
+         mode = (int)TextureMode_Palette4bpp;
+      else if (page_width == 128)
+         mode = (int)TextureMode_Palette8bpp;
+      else
+         return full_hash;                     /* direct colour: no palette */
+      if (mode == (int)TextureMode_Palette8bpp && pal_count < 256)
+         return full_hash;
+      if (mode == (int)TextureMode_Palette4bpp && pal_count < 16)
+         return full_hash;
+      rh = texture_tracker_effective_palette_hash_upload(tt, upload, mode, pal_data, full_hash);
+      if (rh == full_hash)
+         return full_hash;
+      /* Same gating as the draw path: prefer the reduced hash only when a
+       * reduced-range file exists, so full-palette packs keep matching. */
+      rid.hash = upload->hash;
+      rid.palette_hash = rh;
+      rid.pages = false;
+      if (hd_key_set_contains(&tt->known_files, hd_pack_key(rid)))
+         return rh;
+      return full_hash;
+   }
+
    static void fusion_rects(struct FusionRects *out,
          TTRect full_page_rect,
          uint32_t palette_hash,
-         struct RectTracker *tracker){
+         struct RectTracker *tracker,
+         TextureTracker *tt,
+         const uint16_t *pal_data,
+         unsigned pal_count){
       int _ei;
       struct FusionRects *f = out;
       fusionrects_init(f);
@@ -5647,7 +5712,9 @@ static int64_t page_bytes(FusionRects *fusion)
          intersection = intersect(toSRect(full_page_rect), e->texture_rect.vram_rect);
          if (intersection.valid) {
             TextureUpload *upload = e->texture_rect.upload;
-            HdTexEntry *hd_texture = hd_tex_map_find(&upload->textures, palette_hash);
+            uint32_t eff = fused_effective_palette_hash(tt, upload,
+                  (unsigned)full_page_rect.width, pal_data, pal_count, palette_hash);
+            HdTexEntry *hd_texture = hd_tex_map_find(&upload->textures, eff);
             if (hd_texture != NULL) {
                TTRect r;
                /* Clip to the destination texture (important, otherwise it might blit out of bounds which may have wrought havoc upon my sanity) */
@@ -5672,7 +5739,8 @@ static int64_t page_bytes(FusionRects *fusion)
    }
 
    static void rebuild_page(FusedPage *page,
-         struct RectTracker *tracker){
+         struct RectTracker *tracker,
+         TextureTracker *tt){
       int texture_width;
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilding page for %x, %d,%d %dx%d\n",
             page->palette,
@@ -5686,7 +5754,8 @@ static int64_t page_bytes(FusionRects *fusion)
 
       {
          FusionRects fusion;
-         fusion_rects(&fusion, page->full_page_rect, page->palette, tracker);
+         fusion_rects(&fusion, page->full_page_rect, page->palette, tracker, tt,
+               page->pal_count ? page->pal_data : NULL, page->pal_count);
          if (fusionrects_eq(&page->fusion, &fusion)) {
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "Rebuilt page: no change\n");
             fusionrects_destroy(&fusion);
@@ -5731,7 +5800,11 @@ static int64_t page_bytes(FusionRects *fusion)
          TextureRect *tex = &page->fusion.rects.v.items[_fri];
          TextureUpload *upload = tex->upload;
 
-         HdTexEntry *hd_texture = hd_tex_map_find(&upload->textures, page->palette);
+         HdTexEntry *hd_texture = hd_tex_map_find(&upload->textures,
+               fused_effective_palette_hash(tt, upload,
+                     (unsigned)page->full_page_rect.width,
+                     page->pal_count ? page->pal_data : NULL,
+                     page->pal_count, page->palette));
          /* That's odd */
          if (hd_texture == NULL)
             continue;
@@ -5816,14 +5889,27 @@ static int64_t page_bytes(FusionRects *fusion)
    static HdTextureHandle fused_pages_get_or_make(struct FusedPages *self,
          TTRect page_rect,
          uint32_t palette,
-         struct RectTracker *tracker){
+         struct RectTracker *tracker,
+         TextureTracker *tt,
+         const uint16_t *pal_data,
+         unsigned pal_count){
       int x;
       FusedPage page;
+      if (pal_count > 256)
+         pal_count = 256;
       for (x = 0; x < fused_page_vec_size(&self->pages); x++)
       {
          FusedPage *p = fused_page_vec_at(&self->pages, x);
          /* return page */
          if (!p->dead && p->palette == palette && rect_eq(&p->full_page_rect, &page_rect)) {
+            if (p->pal_count == 0 && pal_data != NULL && pal_count > 0) {
+               /* Page predates the palette snapshot (e.g. Reduce Palette Range
+                * toggled mid-session): adopt it and re-fuse so per-upload
+                * reduced hashes resolve. */
+               memcpy(p->pal_data, pal_data, (size_t)pal_count * sizeof(uint16_t));
+               p->pal_count = pal_count;
+               rebuild_page(p, tracker, tt);
+            }
             p->last_used = ++self->tick; /* touch LRU */
             return hd_handle_make_fused(x);
          }
@@ -5847,7 +5933,12 @@ static int64_t page_bytes(FusionRects *fusion)
       page.dirty = false;
       page.full_page_rect = page_rect;
       page.palette = palette;
-      rebuild_page(&page, tracker);
+      page.pal_count = 0;
+      if (pal_data != NULL && pal_count > 0) {
+         memcpy(page.pal_data, pal_data, (size_t)pal_count * sizeof(uint16_t));
+         page.pal_count = pal_count;
+      }
+      rebuild_page(&page, tracker, tt);
       page.last_used = ++self->tick;
       page.bytes = ih_is_valid(&page.texture)
          ? (size_t)tt_img_width(ih_get(&page.texture)) * (size_t)tt_img_height(ih_get(&page.texture)) * 4u
@@ -5874,13 +5965,14 @@ static int64_t page_bytes(FusionRects *fusion)
       }
    }
    static void fused_pages_rebuild_dirty(struct FusedPages *self,
-         struct RectTracker *tracker){
+         struct RectTracker *tracker,
+         TextureTracker *tt){
       bool changed = false;
       int _i;
       for (_i = 0; _i < fused_page_vec_size(&self->pages); _i++) {
          FusedPage *page = fused_page_vec_at(&self->pages, _i);
          if (!page->dead && page->dirty) {
-            rebuild_page(page, tracker);
+            rebuild_page(page, tracker, tt);
             changed = true;
          }
       }
