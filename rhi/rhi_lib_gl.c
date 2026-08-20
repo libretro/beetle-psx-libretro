@@ -104,6 +104,11 @@ static int gl_diag_state = -1;
 static int gl_diag_nested;
 static unsigned gl_diag_logged;
 static unsigned gl_diag_wraps;
+/* Consecutive glMapBufferRange failures on the command buffer. The
+ * push path retries the map once per primitive while it is unmapped,
+ * so the report is throttled to keep a persistently failing driver
+ * from writing a log line per triangle. */
+static unsigned gl_map_failures;
 #define GL_DIAG_ON() (gl_diag_state >= 0 ? gl_diag_state : \
       (gl_diag_state = (getenv("BEETLE_GL_DIAG") ? 1 : 0)))
 /* Compare a full-VRAM diagnostic re-read against a reference copy and
@@ -1497,13 +1502,20 @@ static void gl_draw_buffer_map_no_bind(gl_draw_buffer *drawbuffer)
     * unmapped; the push and draw paths check for that now. */
    if (!m)
    {
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR,
-               "[gl_draw_buffer_map_no_bind] glMapBufferRange failed "
-               "(offset %ld, size %ld, flags 0x%X)\n",
-               (long)offset_bytes, (long)buffer_size, (unsigned)map_flags);
-      gl_diag_errors("map_no_bind/map-failed");
+      gl_map_failures++;
+      if (gl_map_failures <= 4 || (gl_map_failures & 0x3FFu) == 0)
+      {
+         if (log_cb)
+            log_cb(RETRO_LOG_ERROR,
+                  "[gl_draw_buffer_map_no_bind] glMapBufferRange failed "
+                  "(offset %ld, size %ld, flags 0x%X, failure #%u)\n",
+                  (long)offset_bytes, (long)buffer_size,
+                  (unsigned)map_flags, gl_map_failures);
+         gl_diag_errors("map_no_bind/map-failed");
+      }
    }
+   else
+      gl_map_failures = 0;
 
    drawbuffer->map = m;
 }
@@ -5016,6 +5028,8 @@ static void vertex_preprocessing(
    bool is_textured;
    bool is_opaque;
    bool buffer_full;
+   bool index_full;
+   bool unmapped;
 
    if (!renderer)
       return;
@@ -5029,8 +5043,26 @@ static void vertex_preprocessing(
     * drawn as opaque. */
    is_opaque   = !is_semi_transparent || is_textured;
    buffer_full = gl_draw_buffer_remaining_capacity(renderer->command_buffer) < count;
+   /* Index space is tracked separately from vertex space: a quad
+    * occupies four vertices but six indices, so the two run out at
+    * different times. Charge the primitive the same 3/2 worst case
+    * INDEX_BUFFER_LEN is sized on, which covers the quad exactly and
+    * over-reserves slightly for triangles and lines. */
+   index_full  = (renderer->vertex_index_pos + ((count * 3 + 1) / 2))
+                 > INDEX_BUFFER_LEN;
+   /* An unmapped command buffer accepts no vertices, so map_index
+    * stays where it is and neither the capacity test above nor the
+    * is_empty gate below can ever fire again. Route into
+    * gl_renderer_draw regardless so its remap path runs and the index
+    * cursor is reset; without this the index writes in push_primitive
+    * and rhi_gl_push_quad accumulate past INDEX_BUFFER_LEN and run
+    * off the end of renderer->vertex_indices into the members that
+    * follow it. */
+   unmapped    = (renderer->command_buffer->map == NULL);
 
-   if (buffer_full)
+   if (unmapped)
+      gl_renderer_draw(renderer);
+   else if (buffer_full || index_full)
    {
       if (!gl_draw_buffer_is_empty(renderer->command_buffer))
          gl_renderer_draw(renderer);
@@ -5147,6 +5179,11 @@ static void push_primitive(
 
    index     = gl_draw_buffer_next_index(renderer->command_buffer);
    index_pos = renderer->vertex_index_pos;
+
+#ifdef DEBUG
+   /* vertex_preprocessing reserves the index space for this primitive. */
+   assert(renderer->vertex_index_pos + count <= INDEX_BUFFER_LEN);
+#endif
 
    for (i = 0; i < count; i++)
       renderer->vertex_indices[renderer->vertex_index_pos++] = index + i;
@@ -6785,6 +6822,11 @@ void rhi_gl_push_quad(
 
       index     = gl_draw_buffer_next_index(renderer->command_buffer);
       index_pos = renderer->vertex_index_pos;
+
+#ifdef DEBUG
+      /* vertex_preprocessing reserves six indices for a four-vertex quad. */
+      assert(renderer->vertex_index_pos + 6 <= INDEX_BUFFER_LEN);
+#endif
 
       for (i = 0; i < 6; i++)
          renderer->vertex_indices[renderer->vertex_index_pos++] = index + indices[i];
