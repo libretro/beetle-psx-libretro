@@ -137,6 +137,18 @@ dedup — kills the O(n^2) reload stall), handle-cache doubled hd_tex_map_find
 fixed, savestate re-warm routed through want_combo (dedup + cache-skip).
 All in rhi/rhi_tt.c (154 insertions / 44 deletions).
 
+### Finding H (2026-08-21b, from Jed's flicker localization) — per-mutation inline
+fused rebuilds. Flicker appeared ONLY in streaming-text scenes (typewriter
+dialogue at boss intros, end credits) and never in upload-once static text, and
+predated every loader patch. Cause: the upload/blit hooks called
+`fused_pages_rebuild_dirty` INLINE on every VRAM mutation — once per typed
+character — clearing + re-blitting an in-place-reused composite image mid-frame
+while earlier draws of the frame still referenced it (vk_tt_page_begin reuses
+the same handle and records into the current command buffer). FIXED (commit
+7eb7ddea): hooks only mark dirty; rebuilds coalesced to the on_queues_reset safe
+point + a page's FIRST serve of each frame (`rebuilt_frame` stamp on FusedPage).
+Trade-off: mid-frame mutations reach the composite one serve later.
+
 Not yet done (candidates for a later pass): Eager re-prefetch after reload,
 `requested`/pending clear on caching-mode switch, reload IO generation stamp,
 the GL on_queues_reset gap, the `replace_textures_applied` static latch, the
