@@ -3121,7 +3121,24 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 
                rgba_image_free(&image);
             } else {
+               /* FAILURE response (empty levels): previously the failure branch
+                * pushed nothing, so the combo stayed in `requested` forever -
+                * one transient open/decode failure (AV/indexer sharing
+                * violation, handle pressure during a burst) meant permanent
+                * native until a manual reload. The drain erases `requested` on
+                * an empty response so the next draw can retry. */
+               IOResponse *response = (IOResponse *)malloc(sizeof(IOResponse));
                TT_LOG(RETRO_LOG_ERROR, "failed to load: %s\n", path);
+               response->next         = NULL;
+               response->hash         = hash;
+               response->palette_hash = palette_hash;
+               response->alpha_flags  = 0;
+               response->pages        = request->pages;
+               loaded_levels_init(&response->levels);
+
+               slock_lock(channel->lock);
+               io_channel_push_response(channel, response);
+               slock_unlock(channel->lock);
             }
          } else if (request->kind == IORequestKind_Dump) {
             /* Decode (palette->RGBA->tri-alpha) here on the worker, then encode+write,
@@ -3286,6 +3303,15 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       }
    }
 
+   /* qsort comparator for HdKeySet bulk builds (u64 ascending). */
+   static int hd_key_u64_cmp(const void *a, const void *b) {
+      uint64_t ka = *(const uint64_t *)a;
+      uint64_t kb = *(const uint64_t *)b;
+      if (ka < kb) return -1;
+      if (ka > kb) return 1;
+      return 0;
+   }
+
    static void read_texture_directory(HdKeySet *out, const char *path, bool pages) {
       RDIR *dir;
       hd_key_set_clear(out);
@@ -3311,10 +3337,32 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             /* pages=true sets id.pages so hd_pack_key salts these away from the
              * upload-rect keyspace (they share the cache, separate known_files). */
             id.hash = hash; id.palette_hash = palette_hash; id.pages = pages;
-            hd_key_set_insert(out, hd_pack_key(id));
+            /* Bulk build: append unsorted, then one qsort+dedup below. The
+             * sorted-insert (memmove per key) made this scan O(n^2) - with a
+             * 25k-file pack that is gigabytes of moves, paid at init AND on
+             * every reload-textures keypress (the reload stall). */
+            if (out->count == out->cap) {
+               int ncap = out->cap ? out->cap * 2 : 16;
+               uint64_t *nk = (uint64_t *)realloc(out->keys, (size_t)ncap * sizeof(uint64_t));
+               if (nk == NULL)
+                  break;
+               out->keys = nk;
+               out->cap = ncap;
+            }
+            out->keys[out->count++] = hd_pack_key(id);
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "file found: %s\n", name);
          }
          retro_closedir(dir);
+      }
+      if (out->count > 1) {
+         int r, w;
+         qsort(out->keys, (size_t)out->count, sizeof(uint64_t), hd_key_u64_cmp);
+         /* dedup in place (the same combo present in several extensions) */
+         w = 1;
+         for (r = 1; r < out->count; r++)
+            if (out->keys[r] != out->keys[w - 1])
+               out->keys[w++] = out->keys[r];
+         out->count = w;
       }
    }
 
@@ -3790,25 +3838,22 @@ static TTRect fromSRect(SRect rect) {
    }
 
    static void texture_tracker_load_hd_texture(struct TextureTracker *self, uint32_t hash) {
+      /* Savestate re-warm. Route through want_combo (like the Eager prefetch)
+       * rather than raw IORequest pushes: that restores the cache-hit skip,
+       * in-flight dedup via `requested`, and low-priority classification. The
+       * raw path re-read and re-decoded already-cached combos wholesale after
+       * every savestate load, and could triple-load one combo (raw + draw-path
+       * async + lazy-sync inline). */
       int lo = hd_key_set_lower_bound(&self->known_files, (uint64_t)hash << 32);
       int hi = hd_key_set_lower_bound(&self->known_files, ((uint64_t)hash + 1) << 32);
-      if (lo != hi) {
-         int ki;
-         slock_lock(self->iothread.channel->lock);
-         for (ki = lo; ki < hi; ki++) {
-            uint32_t palette_hash = (uint32_t)self->known_files.keys[ki];
-            IORequest *load = (IORequest *)malloc(sizeof(IORequest));
-            TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting texture: %x-%x\n", hash, palette_hash);
-            load->next = NULL;
-            load->kind = IORequestKind_Load;
-            load->hash = hash;
-            load->palette_hash = palette_hash;
-            load->pages = false;
-            load->src = NULL; load->palette = NULL; /* Load: no dump payload to free */
-            io_channel_push_request(self->iothread.channel, load); /* savestate warm = background */
-         }
-         slock_unlock(self->iothread.channel->lock);
-         scond_signal(self->iothread.channel->cond);
+      int ki;
+      for (ki = lo; ki < hi; ki++) {
+         HdTextureId combo;
+         combo.hash = hash;
+         combo.palette_hash = (uint32_t)self->known_files.keys[ki];
+         combo.pages = false;
+         TT_LOG_VERBOSE(RETRO_LOG_INFO, "requesting texture: %x-%x\n", hash, combo.palette_hash);
+         texture_tracker_want_combo(self, combo, false, false); /* savestate warm = background */
       }
    }
 
@@ -3822,8 +3867,19 @@ static TTRect fromSRect(SRect rect) {
       /* pages=true sources the file from the -pages folder and checks
        * known_files_pages; both feed the SAME 3-tier cache (id.pages namespaces
        * the shared requested/hd_cache/hd_gpu_cache via hd_pack_key's salt). */
-      if (HdGpuCache_contains(&self->hd_gpu_cache, hd_pack_key(id)) || HdImageCache_contains(&self->hd_cache, hd_pack_key(id)))
-         return; /* already resident in VRAM, or already decoded in RAM */
+      if (HdGpuCache_contains(&self->hd_gpu_cache, hd_pack_key(id)) || HdImageCache_contains(&self->hd_cache, hd_pack_key(id))) {
+         /* Already decoded/resident - but not necessarily BOUND to the current
+          * upload object: bindings live on TextureUpload, and uploads are
+          * destroyed and recreated (with EMPTY textures maps) as their VRAM
+          * recycles. Schedule an attach so the safe-point pass re-binds the
+          * cached image; returning silently here made the Eager prefetch a
+          * no-op exactly for cached combos on recreated uploads. */
+         if (pages)
+            hd_key_set_insert(&self->pending_attach_pages, ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash);
+         else
+            hd_key_set_insert(&self->pending_attach, hd_pack_key(id));
+         return;
+      }
       if (!hd_key_set_insert(&self->requested, hd_pack_key(id)))
          return; /* already in flight, or negatively cached */
       if (!hd_key_set_contains(pages ? &self->known_files_pages : &self->known_files, hd_pack_key(id)))
@@ -3878,6 +3934,16 @@ static TTRect fromSRect(SRect rect) {
       if (gpu != NULL) {
          hd_tex_map_set(&upload->textures, palette_hash, gpu->image, gpu->alpha_flags);
          self->dbg_attaches++;
+         /* Invalidate covering fused pages, exactly like sync_load_combo and
+          * the safe-point attach pass do - this was the one bind site that
+          * didn't, so a composite that predated the bind kept rendering the
+          * native texels for this upload indefinitely. */
+         { int _ti; for (_ti = 0; _ti < self->tracker.textures.count; _ti++)
+         {
+            EnduringTextureRect *e = &self->tracker.textures.a[_ti];
+            if (e->alive && e->texture_rect.upload == upload)
+               fused_pages_mark_dirty(&self->fused_pages, fromSRect(e->texture_rect.vram_rect));
+         } }
          return;
       }
 
@@ -4174,7 +4240,8 @@ static TTRect fromSRect(SRect rect) {
                /* Index by the handle's own palette hash (may be a reduced-range hash),
                 * not the draw's full palette_hash. */
                uint32_t hh = cache_result.handle.palette_hash;
-               (*fastpath_capable_out) = self->fastpath_enabled && ((hd_tex_map_find(&tex->texture_rect.upload->textures, hh) ? hd_tex_map_find(&tex->texture_rect.upload->textures, hh)->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0;
+               HdTexEntry *hce = hd_tex_map_find(&tex->texture_rect.upload->textures, hh);
+               (*fastpath_capable_out) = self->fastpath_enabled && (((hce ? hce->alpha_flags : 0) & ALPHA_FLAG_TRANSPARENT) == 0);
                return cache_result.handle;
             }
          }
@@ -4305,7 +4372,16 @@ static TTRect fromSRect(SRect rect) {
 
       result = hd_handle_make_none();
 
-      { int oi; for (oi = 0; oi < overlap.count; oi++) {
+      { int oi;
+      int bound_count = 0;
+      /* Iterate the ENTIRE overlap set before deciding single-vs-fused. This
+       * loop is the ONLY producer of upload-rect load requests in the Lazy
+       * modes, and it used to return the fused handle mid-loop at the second
+       * image-bearing upload - so in a draw spanning many uploads (e.g. a text
+       * line built from dozens of glyph uploads) every upload past that point
+       * was never requested, this frame or any later one: those replacements
+       * could never load (and Lazy-synchronous loaded exactly two per draw). */
+      for (oi = 0; oi < overlap.count; oi++) {
          RectIndex index = overlap.items[oi];
          TextureRect *tex = rect_tracker_get_index(&self->tracker, index);
          uint32_t eff = palette_hash;
@@ -4332,25 +4408,27 @@ static TTRect fromSRect(SRect rect) {
             overlapped_image = hd_tex_map_find(&tex->upload->textures, eff);
          }
          if (overlapped_image != NULL) {
+            bound_count++;
             if (hd_handle_is_none(&result)) {
                /* note that if tex->vram_rect contains rect, then it will be the only entry in overlap, so an early out would be pointless */
                result_rect = fromSRect(tex->vram_rect);
                (*fastpath_capable_out) = self->fastpath_enabled && fromSRect_contains(tex->vram_rect, rect) && (overlapped_image->alpha_flags & ALPHA_FLAG_TRANSPARENT) == 0;
                result = hd_handle_make(index, eff);
-            } else {
-               /* Multiple overlap, must fuse */
-               unsigned int width
-                  = mode->mode == TextureMode_Palette4bpp ? 64
-                  : mode->mode == TextureMode_Palette8bpp ? 128
-                  : 256;
-               TTRect page_rect = { page_x, page_y, width, 256 };
-               (*fastpath_capable_out) = false;
-               return fused_pages_get_or_make(&self->fused_pages, page_rect, palette_hash, &self->tracker,
-                     self,
-                     have_pal_data ? pal_local : NULL,
-                     have_pal_data ? (unsigned)palette_rect.width : 0);
             }
          }
+      }
+      if (bound_count >= 2) {
+         /* Multiple overlap, must fuse - decided AFTER the full request pass. */
+         unsigned int width
+            = mode->mode == TextureMode_Palette4bpp ? 64
+            : mode->mode == TextureMode_Palette8bpp ? 128
+            : 256;
+         TTRect page_rect = { page_x, page_y, width, 256 };
+         (*fastpath_capable_out) = false;
+         return fused_pages_get_or_make(&self->fused_pages, page_rect, palette_hash, &self->tracker,
+               self,
+               have_pal_data ? pal_local : NULL,
+               have_pal_data ? (unsigned)palette_rect.width : 0);
       } }
 
       /* Cross-mode fallback (Direction A): upload-rect found no HD match. Try the
@@ -4968,13 +5046,20 @@ static bool is_power_of_two(int n) {
             id.hash = response->hash;
             id.palette_hash = response->palette_hash;
             id.pages = response->pages;
-            hd_key_set_erase(&self->requested, hd_pack_key(id)); /* no longer in flight; now cached */
-            hd_image_cache_put(&self->hd_cache, id, &response->levels, response->alpha_flags);
-            if (response->pages)
-               /* page combo: store the BASE (unsalted) key so the page attach pass can unpack it */
-               hd_key_set_insert(&self->pending_attach_pages, ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash);
-            else
-               hd_key_set_insert(&self->pending_attach, hd_pack_key(id));
+            hd_key_set_erase(&self->requested, hd_pack_key(id)); /* no longer in flight; retryable or cached */
+            if (response->levels.count == 0) {
+               /* Failure response: the load failed although the file is listed
+                * in known_files (transient open/decode error). Erasing
+                * `requested` above lets the next draw retry; nothing to cache. */
+               self->dbg_responses_received--; /* not a delivered image */
+            } else {
+               hd_image_cache_put(&self->hd_cache, id, &response->levels, response->alpha_flags);
+               if (response->pages)
+                  /* page combo: store the BASE (unsalted) key so the page attach pass can unpack it */
+                  hd_key_set_insert(&self->pending_attach_pages, ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash);
+               else
+                  hd_key_set_insert(&self->pending_attach, hd_pack_key(id));
+            }
             io_response_free(response); /* levels already moved out (now empty) */
             response = rnext;
          }
@@ -4987,6 +5072,7 @@ static bool is_power_of_two(int n) {
        * stay cached (NOT discarded) and attach on a later self->frame. */
       {
          int pi;
+         int kept = 0;
          for (pi = 0; pi < self->pending_attach.count; pi++) {
             int height;
             int width;
@@ -4995,8 +5081,19 @@ static bool is_power_of_two(int n) {
             id.palette_hash = (uint32_t)self->pending_attach.keys[pi];
             id.pages = false;
             { TextureUpload *upload = texture_tracker_find_upload(self, id.hash); /* borrowed */
-            if (upload == NULL)
-               continue; /* not resident yet; kept in cache */
+            if (upload == NULL) {
+               /* Not resident yet: RETAIN the marker (in place, order kept) so
+                * the combo attaches when its hash returns to VRAM. The
+                * wholesale clear below used to discard these - a response
+                * draining while its upload was momentarily dead (constant for
+                * recycling text rows) lost its attach forever. Bounded: drop
+                * the marker once the image has been evicted from both caches
+                * (it will be re-requested on draw). */
+               if (HdGpuCache_contains(&self->hd_gpu_cache, hd_pack_key(id)) ||
+                     HdImageCache_contains(&self->hd_cache, hd_pack_key(id)))
+                  self->pending_attach.keys[kept++] = self->pending_attach.keys[pi];
+               continue;
+            }
             if (hd_tex_map_contains(&upload->textures, id.palette_hash))
                continue; /* already attached */
 
@@ -5047,8 +5144,8 @@ static bool is_power_of_two(int n) {
             }
             }
          }
+         self->pending_attach.count = kept; /* attached/evicted/mismatched dropped; unresident retained */
       }
-      hd_key_set_clear(&self->pending_attach);
 
       /* Page attach pass: page combos have no TextureUpload to bind to - they're
        * resolved at draw time from the GPU cache. So this only promotes decoded CPU
@@ -5482,6 +5579,11 @@ static bool is_power_of_two(int n) {
          TextureRect texture){
       rect_tracker_clear_rect(self, &texture.vram_rect);
       enduring_arr_push(&self->textures, texture, true);
+      /* The other mutators (upload/blit/clear) flag the spatial grid; place
+       * did not, so rects re-placed by the readback-restore path were invisible
+       * to rect_tracker_overlapping for the rest of the frame - a fully-cached
+       * sprite could draw native right after a restore. */
+      self->lookup_grid_dirty = true;
    }
 
    static void rect_tracker_rebuild_lookup_grid(struct RectTracker *self) {
@@ -5910,6 +6012,14 @@ static int64_t page_bytes(FusionRects *fusion)
                p->pal_count = pal_count;
                rebuild_page(p, tracker, tt);
             }
+            /* Serve the page FRESH: bindings made earlier this frame (sync
+             * loads, in-frame GPU-cache hits) only MARK the page dirty, and
+             * dirty pages used to rebuild no earlier than the next VRAM write
+             * or safe point - so every fused draw rendered at least one frame
+             * behind its own bindings (a native flash even in Lazy-sync).
+             * rebuild_page early-outs via fusionrects_eq when nothing changed. */
+            if (p->dirty)
+               rebuild_page(p, tracker, tt);
             p->last_used = ++self->tick; /* touch LRU */
             return hd_handle_make_fused(x);
          }
