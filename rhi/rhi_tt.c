@@ -1107,6 +1107,15 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
       uint16_t pal_data[256];
       unsigned pal_count;
 
+      /* Frame stamp of the last rebuild (tracker frame counter). Guards the
+       * serve-time rebuild to at most once per page per frame: streaming
+       * content (typewriter dialogue, credits lines building letter by letter)
+       * dirties a page many times per frame, and rebuilding an in-place-reused
+       * image while earlier draws of the same frame reference it produced
+       * transient partial composites (visible flicker in exactly those
+       * scenes). (uint64_t)-1 = never rebuilt. */
+      uint64_t rebuilt_frame;
+
       FusionRects fusion;
    };
 
@@ -1128,6 +1137,7 @@ static void fp_copy(FusedPage *dst, const FusedPage *src) {
       dst->last_used       = src->last_used;
       memcpy(dst->pal_data, src->pal_data, sizeof(dst->pal_data));
       dst->pal_count       = src->pal_count;
+      dst->rebuilt_frame   = src->rebuilt_frame;
       dst->fusion.vram_rect = src->fusion.vram_rect;
       dst->fusion.scaleX    = src->fusion.scaleX;
       dst->fusion.scaleY    = src->fusion.scaleY;
@@ -1146,6 +1156,7 @@ static void fp_init_raw(FusedPage *p) {
       p->bytes = 0;
       p->last_used = 0;
       p->pal_count = 0;
+      p->rebuilt_frame = (uint64_t)-1;
    }
 static void fp_destroy(FusedPage *p) {
       ih_reset(&p->texture);
@@ -3596,8 +3607,11 @@ static TTRect fromSRect(SRect rect) {
          TTRect src){
       rect_tracker_blit(&self->tracker, make_srect(dst.x, dst.y, dst.width, dst.height), make_srect(src.x, src.y, src.width, src.height));
       texture_tracker_mirror_blit(self, dst, src); /* keep the page mirror current */
+      /* Mark only - rebuilds are COALESCED to the safe point / first serve of
+       * the frame. The inline rebuild here ran once per VRAM blit (once per
+       * typed character during dialogue), clearing+re-blitting a possibly
+       * in-use composite mid-frame: the streaming-text flicker. */
       fused_pages_mark_dirty(&self->fused_pages, dst);
-      fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self);
       texture_tracker_clear_palette_cache(self, dst);
    }
 
@@ -3810,8 +3824,10 @@ static TTRect fromSRect(SRect rect) {
       } else {
          rect_tracker_upload(&self->tracker, toSRect(rect), upload);
       }
+      /* Mark only - rebuilds are COALESCED (see texture_tracker_blit). Uploads
+       * during streaming text (credits letters, dialogue glyphs) dirtied and
+       * inline-rebuilt composites once per letter. */
       fused_pages_mark_dirty(&self->fused_pages, rect);
-      fused_pages_rebuild_dirty(&self->fused_pages, &self->tracker, self);
 
       /* HD texture caching method: - Lazy (self->eager_textures=false): nothing
        * is queued here; each (hash,palette) is loaded on demand when first
@@ -5853,6 +5869,7 @@ static int64_t page_bytes(FusionRects *fusion)
                );
 
       page->dirty = false;
+      page->rebuilt_frame = tt ? tt->frame : (uint64_t)-1;
 
       {
          FusionRects fusion;
@@ -6012,13 +6029,17 @@ static int64_t page_bytes(FusionRects *fusion)
                p->pal_count = pal_count;
                rebuild_page(p, tracker, tt);
             }
-            /* Serve the page FRESH: bindings made earlier this frame (sync
-             * loads, in-frame GPU-cache hits) only MARK the page dirty, and
-             * dirty pages used to rebuild no earlier than the next VRAM write
-             * or safe point - so every fused draw rendered at least one frame
-             * behind its own bindings (a native flash even in Lazy-sync).
-             * rebuild_page early-outs via fusionrects_eq when nothing changed. */
-            if (p->dirty)
+            /* Serve the page FRESH - but at most ONE rebuild per page per
+             * frame. The first serve of a frame rebuilds a dirty page (so
+             * bindings made since last frame show without a native flash, even
+             * in Lazy-sync); later same-frame serves of a re-dirtied page keep
+             * the image stable instead of clearing+re-blitting it while
+             * earlier draws of this frame still reference it (streaming text
+             * dirties a page per typed character - rebuilding per mutation
+             * produced transient partial composites = flicker). Re-dirtied
+             * pages catch up at the next safe point or next frame's first
+             * serve. rebuild_page early-outs via fusionrects_eq if unchanged. */
+            if (p->dirty && (tt == NULL || p->rebuilt_frame != tt->frame))
                rebuild_page(p, tracker, tt);
             p->last_used = ++self->tick; /* touch LRU */
             return hd_handle_make_fused(x);
