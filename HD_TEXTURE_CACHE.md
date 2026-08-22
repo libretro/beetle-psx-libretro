@@ -157,6 +157,18 @@ INFO log line shows the active mode and `used/budget` for each tier.
   full-palette hash, so existing full-palette packs still match with it enabled.
   Off by default — re-dump a game to benefit.
 
+  **Fused-page path** (fixed): a draw whose sample region spans several uploads
+  composites them through a fused page. The fusion used to look each upload's
+  image up under the draw's **full**-palette hash only, while the draw path had
+  bound those images under each upload's **reduced** hash — so composited draws
+  (e.g. a text line built from dozens of per-glyph uploads, as in SotN's end
+  credits) replaced nothing with the option enabled. Each `FusedPage` now
+  snapshots the draw's gathered CLUT contents at creation, and
+  `fusion_rects()` / `rebuild_page()` resolve the same per-upload effective hash
+  as the single-upload path (`fused_effective_palette_hash()`: reduced when that
+  file exists, else full), so fused pages find and blit exactly the images the
+  draw path bound. Behaviour with the option off is unchanged.
+
 ### Build
 
 Build the HW core as usual — `make HAVE_HW=1` — then optionally `strip` the
