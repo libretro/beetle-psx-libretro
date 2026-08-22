@@ -2134,6 +2134,97 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       s->count--;
    }
 
+   /* -------------------------------------------------------------------------
+    * * HdCountMap - HdKeySet plus a per-key uint32 counter, MSVC C89.
+    *
+    * Same sorted-array/binary-search shape as HdKeySet; the sets it counts are
+    * small (only keys currently misbehaving live in one). Used to put a hard
+    * ceiling on two otherwise open-ended retry loops: disk loads that keep
+    * failing, and attach markers whose upload never comes back.
+    * ------------------------------------------------------------------------- */
+   /* Failed disk loads per combo before it is written off permanently. Three
+    * gives a transient error (an antivirus or indexer sharing violation, handle
+    * pressure during a four-worker burst) several frames to clear while keeping
+    * a deterministic failure cheap. */
+#define TT_LOAD_MAX_ATTEMPTS 3
+   /* Attach passes a pending_attach marker survives without its upload becoming
+    * resident. Text rows recycle within a few frames, so a marker still waiting
+    * after two seconds of gameplay is waiting on VRAM that is not coming back;
+    * dropping it costs nothing, since the next draw re-requests the combo and
+    * the cache hit re-arms the marker. */
+#define TT_ATTACH_MAX_RETRIES 120
+
+   typedef struct HdCountEntry {
+      uint64_t key;
+      uint32_t count;
+   } HdCountEntry;
+
+   typedef struct HdCountMap {
+      HdCountEntry *entries;
+      int           count;
+      int           cap;
+   } HdCountMap;
+
+   static void hd_count_map_init(HdCountMap *m)
+   {
+      m->entries = NULL;
+      m->count = 0;
+      m->cap = 0;
+   }
+   static void hd_count_map_free(HdCountMap *m)
+   {
+      free(m->entries);
+      m->entries = NULL;
+      m->count = 0;
+      m->cap = 0;
+   }
+   static void hd_count_map_clear(HdCountMap *m)
+   {
+      m->count = 0; /* keep the allocation for reuse */
+   }
+   static int hd_count_map_lower_bound(const HdCountMap *m, uint64_t key)
+   {
+      int lo = 0, hi = m->count;
+      while (lo < hi) {
+         int mid = lo + ((hi - lo) >> 1);
+         if (m->entries[mid].key < key)
+            lo = mid + 1;
+         else
+            hi = mid;
+      }
+      return lo;
+   }
+   /* Increment key's counter (inserting it at 1 if absent) and return the new
+    * value. Returns 0 only if the allocation failed, which reads as "not yet at
+    * the limit" - a lost counter must never escalate to a permanent give-up. */
+   static uint32_t hd_count_map_bump(HdCountMap *m, uint64_t key)
+   {
+      int i = hd_count_map_lower_bound(m, key);
+      if (i < m->count && m->entries[i].key == key)
+         return ++m->entries[i].count;
+      if (m->count == m->cap) {
+         int ncap = m->cap ? m->cap * 2 : 16;
+         HdCountEntry *ne = (HdCountEntry *)realloc(m->entries, (size_t)ncap * sizeof(HdCountEntry));
+         if (!ne)
+            return 0;
+         m->entries = ne;
+         m->cap = ncap;
+      }
+      memmove(&m->entries[i + 1], &m->entries[i], (size_t)(m->count - i) * sizeof(HdCountEntry));
+      m->entries[i].key = key;
+      m->entries[i].count = 1;
+      m->count++;
+      return 1;
+   }
+   static void hd_count_map_erase(HdCountMap *m, uint64_t key)
+   {
+      int i = hd_count_map_lower_bound(m, key);
+      if (i >= m->count || m->entries[i].key != key)
+         return;
+      memmove(&m->entries[i], &m->entries[i + 1], (size_t)(m->count - i - 1) * sizeof(HdCountEntry));
+      m->count--;
+   }
+
    /* Page-aligned experiment: memoized page CRC keyed by the page rect (VRAM
     * words). dirty = the page's VRAM was written since we last hashed it;
     * hashed_frame caps re-hashing to once per page per frame (busy VRAM regions
@@ -2211,6 +2302,17 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       HdImageCache hd_cache;
       HdKeySet requested; /* disk load in flight, or known to have no file (negative cache) */
       HdKeySet pending_attach; /* cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset */
+      /* Consecutive failed disk loads per combo. At TT_LOAD_MAX_ATTEMPTS the
+       * combo goes back into `requested` as a permanent negative, so a file
+       * that fails deterministically (unreadable, or a pack whose on-disk
+       * spelling the loader cannot reconstruct) costs a bounded number of open
+       * attempts instead of one per draw forever. Cleared with `requested`. */
+      HdCountMap load_attempts;
+      /* Consecutive attach passes a pending_attach marker has been retained
+       * without its upload being resident. Retained markers are exactly the
+       * keys that miss texture_tracker_find_upload, whose miss path walks every
+       * restorable rect, so the retained set has to have a ceiling. */
+      HdCountMap attach_retries;
 
       /* Diagnostics (logged every 300 frames by endFrame). */
       uint64_t dbg_responses_received;
@@ -3409,6 +3511,8 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       hd_key_set_init(&self->known_files);
       hd_key_set_init(&self->requested);
       hd_key_set_init(&self->pending_attach);
+      hd_count_map_init(&self->load_attempts);
+      hd_count_map_init(&self->attach_retries);
       self->cached_palette_hashes = NULL;
       self->cached_palette_hashes_count = 0;
       self->cached_palette_hashes_cap = 0;
@@ -3481,6 +3585,8 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       hd_key_set_free(&self->known_files);
       hd_key_set_free(&self->requested);
       hd_key_set_free(&self->pending_attach);
+      hd_count_map_free(&self->load_attempts);
+      hd_count_map_free(&self->attach_retries);
       hd_key_set_free(&self->known_files_pages);
       hd_key_set_free(&self->pending_attach_pages);
       hd_key_set_free(&self->dumped_pages);
@@ -3876,9 +3982,11 @@ static TTRect fromSRect(SRect rect) {
    /* Queue a disk load for one (hash,palette) combo, unless it's already
     * decoded (in the cache), already in flight, or known to have no file.
     * Combos with no file are inserted into `requested` as a permanent negative
-    * cache. The IO thread only pushes a response on success, so a
-    * failed/missing load stays in `requested` and is never retried (until a
-    * reload clears it). */
+    * cache. A load that fails despite the file being listed is retried on the
+    * next draw and written off as a permanent negative after
+    * TT_LOAD_MAX_ATTEMPTS. A combo already resident in either cache schedules a
+    * pending attach rather than returning, since residency in the cache says
+    * nothing about whether the current upload object carries the binding. */
    static void texture_tracker_want_combo(struct TextureTracker *self, HdTextureId id, bool high_priority, bool pages) {
       /* pages=true sources the file from the -pages folder and checks
        * known_files_pages; both feed the SAME 3-tier cache (id.pages namespaces
@@ -4866,10 +4974,19 @@ static bool is_power_of_two(int n) {
          image.data = NULL;
          load_image(path, &image);
          if (image.data == NULL) {
+            /* Same bounded retry as the async drain: a transient failure must
+             * not cost the combo the rest of the session, and a deterministic
+             * one must not be reattempted once per draw. Lazy (synchronous)
+             * previously wrote every failure off permanently, so the mode most
+             * sensitive to a missed load was also the one that never retried. */
             TT_LOG(RETRO_LOG_ERROR, "sync load failed: %s\n", path);
-            hd_key_set_insert(&self->requested, hd_pack_key(id));
+            if (hd_count_map_bump(&self->load_attempts, hd_pack_key(id)) >= TT_LOAD_MAX_ATTEMPTS) {
+               hd_key_set_insert(&self->requested, hd_pack_key(id));
+               hd_count_map_erase(&self->load_attempts, hd_pack_key(id));
+            }
             return;
          }
+         hd_count_map_erase(&self->load_attempts, hd_pack_key(id));
          levels = prepare_texture(&image, &alpha_flags);
          width  = levels.levels[0].width;
          height = levels.levels[0].height;
@@ -5015,6 +5132,8 @@ static bool is_power_of_two(int n) {
       hd_key_set_clear(&self->requested);
       hd_key_set_clear(&self->pending_attach);
       hd_key_set_clear(&self->pending_attach_pages);
+      hd_count_map_clear(&self->load_attempts);
+      hd_count_map_clear(&self->attach_retries);
       /* The per-draw handle cache memoizes (rect, mode) -> handle; with the
        * upload bindings cleared above those handles now resolve to the 1x1
        * default texture. Without this clear, re-enabling Replace Textures
@@ -5058,17 +5177,27 @@ static bool is_power_of_two(int n) {
          while (response != NULL) {
             IOResponse *rnext = response->next;
             HdTextureId id;
-            self->dbg_responses_received++;
             id.hash = response->hash;
             id.palette_hash = response->palette_hash;
             id.pages = response->pages;
             hd_key_set_erase(&self->requested, hd_pack_key(id)); /* no longer in flight; retryable or cached */
             if (response->levels.count == 0) {
                /* Failure response: the load failed although the file is listed
-                * in known_files (transient open/decode error). Erasing
-                * `requested` above lets the next draw retry; nothing to cache. */
-               self->dbg_responses_received--; /* not a delivered image */
+                * in known_files. Erasing `requested` above lets the next draw
+                * retry, which is what a transient error needs - but a file that
+                * fails every time (unreadable, or spelled on disk in a form
+                * find_replacement_file cannot reconstruct) would otherwise be
+                * reopened once per draw for the rest of the session. Count the
+                * attempts and reinstate the permanent negative at the limit. */
+               if (hd_count_map_bump(&self->load_attempts, hd_pack_key(id)) >= TT_LOAD_MAX_ATTEMPTS) {
+                  TT_LOG(RETRO_LOG_WARN, "giving up on %x-%x after %d failed loads\n",
+                        id.hash, id.palette_hash, TT_LOAD_MAX_ATTEMPTS);
+                  hd_key_set_insert(&self->requested, hd_pack_key(id));
+                  hd_count_map_erase(&self->load_attempts, hd_pack_key(id));
+               }
             } else {
+               self->dbg_responses_received++;
+               hd_count_map_erase(&self->load_attempts, hd_pack_key(id));
                hd_image_cache_put(&self->hd_cache, id, &response->levels, response->alpha_flags);
                if (response->pages)
                   /* page combo: store the BASE (unsalted) key so the page attach pass can unpack it */
@@ -5102,14 +5231,25 @@ static bool is_power_of_two(int n) {
                 * the combo attaches when its hash returns to VRAM. The
                 * wholesale clear below used to discard these - a response
                 * draining while its upload was momentarily dead (constant for
-                * recycling text rows) lost its attach forever. Bounded: drop
-                * the marker once the image has been evicted from both caches
-                * (it will be re-requested on draw). */
-               if (HdGpuCache_contains(&self->hd_gpu_cache, hd_pack_key(id)) ||
-                     HdImageCache_contains(&self->hd_cache, hd_pack_key(id)))
+                * recycling text rows) lost its attach forever.
+                *
+                * Retention needs two ceilings, because a retained marker is by
+                * definition one that misses texture_tracker_find_upload, and a
+                * miss walks every rect of every restorable entry: drop it once
+                * the image leaves both caches, and drop it after
+                * TT_ATTACH_MAX_RETRIES passes so a marker whose upload never
+                * returns cannot pin that scan for the rest of the session. A
+                * dropped marker is not a lost binding - the next draw of that
+                * combo hits the cache and re-arms it. */
+               if ((HdGpuCache_contains(&self->hd_gpu_cache, hd_pack_key(id)) ||
+                     HdImageCache_contains(&self->hd_cache, hd_pack_key(id))) &&
+                     hd_count_map_bump(&self->attach_retries, hd_pack_key(id)) < TT_ATTACH_MAX_RETRIES)
                   self->pending_attach.keys[kept++] = self->pending_attach.keys[pi];
+               else
+                  hd_count_map_erase(&self->attach_retries, hd_pack_key(id));
                continue;
             }
+            hd_count_map_erase(&self->attach_retries, hd_pack_key(id));
             if (hd_tex_map_contains(&upload->textures, id.palette_hash))
                continue; /* already attached */
 
@@ -5379,6 +5519,8 @@ static bool is_power_of_two(int n) {
       hd_key_set_clear(&self->requested);
       hd_key_set_clear(&self->pending_attach);
       hd_key_set_clear(&self->pending_attach_pages);
+      hd_count_map_clear(&self->load_attempts);
+      hd_count_map_clear(&self->attach_retries);
       self->cached_page_hashes_count = 0;
       self->cached_page_bounds_count = 0;
       { int _ti; for (_ti = 0; _ti < self->tracker.textures.count; _ti++) {
