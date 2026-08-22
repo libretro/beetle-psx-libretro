@@ -1099,14 +1099,6 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
       size_t   bytes;      /* approx VRAM footprint of texture (w*h*4); for the LRU budget */
       uint64_t last_used;  /* LRU tick (higher = more recently used) */
 
-      /* Reduce Palette Range: snapshot of the draw's gathered CLUT contents at
-       * page creation (`palette` identifies it, so equal hash = equal contents).
-       * Rebuilds use it to resolve each upload's REDUCED-range hash - the hash
-       * the draw path bound its image under - instead of only the full-palette
-       * `palette`. pal_count 0 = no snapshot (option off / palette ungathered). */
-      uint16_t pal_data[256];
-      unsigned pal_count;
-
       /* Frame stamp of the last rebuild (tracker frame counter). Guards the
        * serve-time rebuild to at most once per page per frame: streaming
        * content (typewriter dialogue, credits lines building letter by letter)
@@ -1117,6 +1109,15 @@ static void rect_tracker_clear(struct RectTracker *self, SRect rect)
       uint64_t rebuilt_frame;
 
       FusionRects fusion;
+
+      /* Reduce Palette Range: snapshot of the draw's gathered CLUT contents at
+       * page creation (`palette` identifies it, so equal hash = equal contents).
+       * Rebuilds use it to resolve each upload's REDUCED-range hash - the hash
+       * the draw path bound its image under - instead of only the full-palette
+       * `palette`. Only the first pal_count entries are meaningful; pal_count 0
+       * = no snapshot (option off / palette ungathered). */
+      unsigned pal_count;
+      uint16_t pal_data[256];
    };
 
    /* Copy/destroy helpers for FusedPage's ImageHandle member, replacing the
@@ -1135,9 +1136,13 @@ static void fp_copy(FusedPage *dst, const FusedPage *src) {
       dst->dead            = src->dead;
       dst->bytes           = src->bytes;
       dst->last_used       = src->last_used;
-      memcpy(dst->pal_data, src->pal_data, sizeof(dst->pal_data));
-      dst->pal_count       = src->pal_count;
       dst->rebuilt_frame   = src->rebuilt_frame;
+      dst->pal_count       = src->pal_count;
+      /* Only the populated prefix: fp_init_raw leaves the tail indeterminate,
+       * and copying all 512 bytes propagated that through every vector growth
+       * and compaction. */
+      if (src->pal_count)
+         memcpy(dst->pal_data, src->pal_data, (size_t)src->pal_count * sizeof(uint16_t));
       dst->fusion.vram_rect = src->fusion.vram_rect;
       dst->fusion.scaleX    = src->fusion.scaleX;
       dst->fusion.scaleY    = src->fusion.scaleY;
