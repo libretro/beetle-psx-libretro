@@ -2130,6 +2130,45 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       s->count++;
       return 1;
    }
+   /* Bulk build: append_unsorted + finalize_sorted, for callers that produce
+    * many keys at once (a directory scan). Sorted insertion memmoves the tail
+    * per key, which is O(n^2) over a large pack; one qsort at the end is not.
+    * The set is NOT queryable between the two calls. */
+   static int hd_key_u64_cmp(const void *a, const void *b)
+   {
+      uint64_t ka = *(const uint64_t *)a;
+      uint64_t kb = *(const uint64_t *)b;
+      if (ka < kb) return -1;
+      if (ka > kb) return 1;
+      return 0;
+   }
+   /* Returns 0 if the allocation failed (key not stored). */
+   static int hd_key_set_append_unsorted(HdKeySet *s, uint64_t key)
+   {
+      if (s->count == s->cap) {
+         int ncap = s->cap ? s->cap * 2 : 16;
+         uint64_t *nk = (uint64_t *)realloc(s->keys, (size_t)ncap * sizeof(uint64_t));
+         if (!nk)
+            return 0;
+         s->keys = nk;
+         s->cap = ncap;
+      }
+      s->keys[s->count++] = key;
+      return 1;
+   }
+   static void hd_key_set_finalize_sorted(HdKeySet *s)
+   {
+      int r, w;
+      if (s->count < 2)
+         return;
+      qsort(s->keys, (size_t)s->count, sizeof(uint64_t), hd_key_u64_cmp);
+      /* dedup in place (the same combo present under several extensions) */
+      w = 1;
+      for (r = 1; r < s->count; r++)
+         if (s->keys[r] != s->keys[w - 1])
+            s->keys[w++] = s->keys[r];
+      s->count = w;
+   }
    static void hd_key_set_erase(HdKeySet *s, uint64_t key)
    {
       int i = hd_key_set_lower_bound(s, key);
@@ -3421,15 +3460,6 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       }
    }
 
-   /* qsort comparator for HdKeySet bulk builds (u64 ascending). */
-   static int hd_key_u64_cmp(const void *a, const void *b) {
-      uint64_t ka = *(const uint64_t *)a;
-      uint64_t kb = *(const uint64_t *)b;
-      if (ka < kb) return -1;
-      if (ka > kb) return 1;
-      return 0;
-   }
-
    static void read_texture_directory(HdKeySet *out, const char *path, bool pages) {
       RDIR *dir;
       hd_key_set_clear(out);
@@ -3455,33 +3485,17 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             /* pages=true sets id.pages so hd_pack_key salts these away from the
              * upload-rect keyspace (they share the cache, separate known_files). */
             id.hash = hash; id.palette_hash = palette_hash; id.pages = pages;
-            /* Bulk build: append unsorted, then one qsort+dedup below. The
-             * sorted-insert (memmove per key) made this scan O(n^2) - with a
-             * 25k-file pack that is gigabytes of moves, paid at init AND on
-             * every reload-textures keypress (the reload stall). */
-            if (out->count == out->cap) {
-               int ncap = out->cap ? out->cap * 2 : 16;
-               uint64_t *nk = (uint64_t *)realloc(out->keys, (size_t)ncap * sizeof(uint64_t));
-               if (nk == NULL)
-                  break;
-               out->keys = nk;
-               out->cap = ncap;
-            }
-            out->keys[out->count++] = hd_pack_key(id);
+            /* Bulk build: append unsorted here, sort and dedup once below. The
+             * sorted insert this replaces memmoved the tail per key, which on a
+             * 25k-file pack is gigabytes of moves paid at init AND on every
+             * reload-textures keypress (the reload stall). */
+            if (!hd_key_set_append_unsorted(out, hd_pack_key(id)))
+               break;
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "file found: %s\n", name);
          }
          retro_closedir(dir);
       }
-      if (out->count > 1) {
-         int r, w;
-         qsort(out->keys, (size_t)out->count, sizeof(uint64_t), hd_key_u64_cmp);
-         /* dedup in place (the same combo present in several extensions) */
-         w = 1;
-         for (r = 1; r < out->count; r++)
-            if (out->keys[r] != out->keys[w - 1])
-               out->keys[w++] = out->keys[r];
-         out->count = w;
-      }
+      hd_key_set_finalize_sorted(out);
    }
 
    static void texture_tracker_init(struct TextureTracker *self)
