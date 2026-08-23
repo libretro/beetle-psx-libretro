@@ -162,7 +162,7 @@ else ifeq ($(platform), osx)
    endif
    ifeq ($(HAVE_LIGHTREC), 1)
       LDFLAGS += -lSystem
-      FLAGS += -DHAVE_SHM -DUSE_FIXED
+      FLAGS += -DHAVE_SHM
    endif
    # Apple Silicon: NEON is architecturally guaranteed. Covers native
    # builds (uname) and cross builds (the target triple). An x86 slice

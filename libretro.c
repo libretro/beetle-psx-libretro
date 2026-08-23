@@ -2237,17 +2237,28 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
 #define PIO_SIZE     (65536)
 
 #ifdef HAVE_LIGHTREC
-/* MAP_FIXED_NOREPLACE allows base 0 to work if "sysctl vm.mmap_min_addr = 0"
- was used. Base 0 will perform better by directly mapping emulated addresses
- to host addresses. If MAP_FIXED_NOREPLACE is not available we should not use
- MAP_FIXED, since it can cause strange crashes by unmapping memory mappings. */
-#ifndef MAP_FIXED_NOREPLACE
- #ifdef USE_FIXED
- #define MAP_FIXED_NOREPLACE MAP_FIXED
- #else
- #define MAP_FIXED_NOREPLACE 0
- #endif
-#endif
+/* Address-space strategy: reserve, then carve.
+ *
+ * The direct-mapped PSX address space needs several host mappings at exact,
+ * related addresses (RAM plus its mirrors, the code buffer, the scratchpad,
+ * the BIOS). Each candidate io_base is claimed in two phases:
+ *
+ * 1. Reserve every required block with a hinted, non-FIXED PROT_NONE
+ *    mapping and verify the kernel honored the hint; if it did not, release
+ *    the misplaced block and move to the next candidate. A hinted mmap
+ *    never disturbs existing mappings, so probing is side-effect free.
+ * 2. Carve the real mappings with MAP_FIXED strictly inside the blocks
+ *    reserved in phase 1. Replacing a range this process owns and that is
+ *    fully mapped is safe on every mmap implementation: it cannot unmap
+ *    foreign memory, and XNU processes running with virtual-memory guards
+ *    raise no EXC_GUARD (GUARD_TYPE_VIRT_MEMORY / kGUARD_EXC_DEALLOC_GAP)
+ *    because the replaced range contains no gap.
+ *
+ * The reservation makes the claim atomic: once phase 1 succeeds nothing
+ * else can allocate inside the range, so phase 2 cannot lose a race. Only
+ * baseline POSIX semantics are required - MAP_FIXED_NOREPLACE (Linux 4.17+,
+ * absent on XNU and the BSDs) is unnecessary, and destructive MAP_FIXED
+ * probing at unowned addresses is never performed. */
 #ifndef MFD_HUGETLB
 #define MFD_HUGETLB 0x0004
 #endif
@@ -2290,6 +2301,12 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
 #define MAP_CODE(addr,size,fd,offset)\
 	MapViewOfFileEx(fd, FILE_MAP_ALL_ACCESS|FILE_MAP_EXECUTE, 0, offset, size, addr)
 #define UNMAP(addr, size) UnmapViewOfFile(addr)
+/* MapViewOfFileEx at an explicit base address fails cleanly when the range
+   is busy instead of replacing it, so probing is already non-destructive
+   and no separate reservation phase is needed. */
+#define RESERVE(addr, size) (addr)
+#define UNRESERVE(addr, size) ((void)0)
+#define HAVE_RESERVATION 0
 #define MFAILED NULL
 #define NUM_MEM 4
 #define MEMFDTYPE HANDLE
@@ -2323,16 +2340,31 @@ static void * mmap_huge(void *addr, size_t length, int prot, int flags,
 	return map;
 }
 
+#ifndef MAP_NORESERVE
+/* No-op where absent (Darwin defines it as a Sun-compat no-op already);
+   PROT_NONE reservations carry no commit charge regardless. */
+#define MAP_NORESERVE 0
+#endif
+
+/* Phase 1: hinted, non-destructive block reservation. */
+#define RESERVE(addr, size) \
+	mmap(addr, size, PROT_NONE, \
+	MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0)
+#define UNRESERVE(addr, size) munmap(addr, size)
+#define HAVE_RESERVATION 1
+
+/* Phase 2: MAP_FIXED is legal here only because the target range was
+   reserved above and is therefore owned by us and fully mapped. */
 /* mmap with MAP_ANONYMOUS can ignore fd and offset */
 #define MAP(addr,size,fd,offset)\
 	mmap(addr,size, PROT_READ | PROT_WRITE, \
-	MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0)
+	MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0)
 #define MAP_SHM(addr, size, fd, offset) \
 	mmap_huge(addr,size, PROT_READ | PROT_WRITE, \
-	MAP_SHARED | MAP_FIXED_NOREPLACE, fd, offset)
+	MAP_SHARED | MAP_FIXED, fd, offset)
 #define MAP_CODE(addr, size, fd, offset) \
 	mmap(addr,size, PROT_EXEC | PROT_READ | PROT_WRITE, \
-	MAP_PRIVATE | MAP_FIXED_NOREPLACE | MAP_ANONYMOUS, -1, 0)
+	MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0)
 #define UNMAP(addr, size) munmap(addr, size)
 #define MFAILED MAP_FAILED
 #define NUM_MEM 4
@@ -2341,9 +2373,15 @@ static void * mmap_huge(void *addr, size_t length, int prot, int flags,
 #define MAP(addr, size, fd, offset) \
 	mmap(addr,size, PROT_READ | PROT_WRITE, \
 	MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)
-#define MAP_SHM(addr,size,fd,offset)\
-#define MAP_CODE(addr,size,fd,offset)\
-	MAP(addr,size,fd,offset)
+#define MAP_SHM(addr, size, fd, offset) \
+	MAP(addr, size, fd, offset)
+#define MAP_CODE(addr, size, fd, offset) \
+	mmap(addr, size, PROT_EXEC | PROT_READ | PROT_WRITE, \
+	MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)
+/* Hint-only mappings; misplaced results are rejected by the caller. */
+#define RESERVE(addr, size) (addr)
+#define UNRESERVE(addr, size) ((void)0)
+#define HAVE_RESERVATION 0
 #define UNMAP(addr, size) munmap(addr, size)
 #define MFAILED MAP_FAILED
 #define NUM_MEM 1
@@ -2355,27 +2393,66 @@ int lightrec_try_map(MEMFDTYPE memfd, int i, uintptr_t inc_io_base, uintptr_t ma
 {
 	int nmaps;
 	uintptr_t io_base;
-	void *bios, *scratch, *map;
+	size_t mirror_block_size;
+	void *bios, *scratch, *map, *res;
+
+	/* RAM, its mirrors and the code buffer form one contiguous block. */
+	mirror_block_size = (size_t)NUM_MEM * RAM_SIZE;
+	if (ENABLE_CODE_BUFFER)
+		mirror_block_size += LIGHTREC_CODEBUFFER_SIZE;
 
 	/* Try to map at various io_base addresses*/
 	for (; i*inc_io_base <= max_io_base; i++)
 	{
 		io_base = i*inc_io_base;
 
-		/* Skip base=0: even if mmap honors NULL+MAP_FIXED_NOREPLACE
-		 * (some kernels permit it when mmap_min_addr is small or
-		 * inside containers), psx_mem=NULL is indistinguishable from
-		 * "no mmap" and would then be passed to placement-new for
-		 * MainRAM, leaving MainRAM->data8 also NULL and breaking
-		 * retro_get_memory_data + every direct RAM access. The first
-		 * usable base is 0x10000000 or min_io_base, whichever is 
-                 * higher. */
+		/* Skip base=0: even if the kernel honors a NULL hint (some
+		 * permit it when mmap_min_addr is small or inside containers),
+		 * psx_mem=NULL is indistinguishable from "no mmap" and would
+		 * then be passed to placement-new for MainRAM, leaving
+		 * MainRAM->data8 also NULL and breaking retro_get_memory_data
+		 * + every direct RAM access. The first usable base is
+		 * 0x10000000 or min_io_base, whichever is higher. */
 		if(io_base < min_io_base || io_base == 0)
 			continue;
 
 		bios = (void *)(io_base + 0x1fc00000);
 		scratch = (void *)(io_base + 0x1f800000);
 
+		/* Phase 1: reserve all three blocks at this base. Hinted,
+		 * non-FIXED mappings never disturb what the host process has
+		 * mapped; a block that lands elsewhere is released and the
+		 * base rejected. */
+		res = RESERVE((void *)io_base, mirror_block_size);
+		if (res == MFAILED)
+			continue;
+		if (res != (void *)io_base)
+		{
+			UNRESERVE(res, mirror_block_size);
+			continue;
+		}
+
+		res = RESERVE(scratch, SCRATCH_SIZE);
+		if (res == MFAILED)
+			goto err_release_mirrors;
+		if (res != scratch)
+		{
+			UNRESERVE(res, SCRATCH_SIZE);
+			goto err_release_mirrors;
+		}
+
+		res = RESERVE(bios, BIOS_SIZE);
+		if (res == MFAILED)
+			goto err_release_scratch;
+		if (res != bios)
+		{
+			UNRESERVE(res, BIOS_SIZE);
+			goto err_release_scratch;
+		}
+
+		/* Phase 2: carve the real mappings inside our reservations.
+		 * From here on MAP_FIXED only ever replaces memory this
+		 * process reserved above. */
 		for (nmaps = 0; nmaps < NUM_MEM; nmaps++) {
 			map = MAP_SHM((void *)(io_base + nmaps * RAM_SIZE), RAM_SIZE, memfd, 0);
 			if (map == MFAILED)
@@ -2388,17 +2465,14 @@ int lightrec_try_map(MEMFDTYPE memfd, int i, uintptr_t inc_io_base, uintptr_t ma
 			}
 		}
 
-		/* Impossible to map using this io_base */
-		if (nmaps == 0)
-			continue;
-
 		/* All mirrors mapped - we got a match! */
 		if (nmaps == NUM_MEM)
 		{
 			psx_mem = (uint8_t *)io_base;
 
 			if (ENABLE_CODE_BUFFER) {
-				/* Allocate a codebuffer after ram and mirrors, but don't reject if actual location is different */
+				/* The code buffer sits directly after the RAM
+				 * mirrors, inside the reserved block. */
 				map = MAP_CODE((void *)(io_base + NUM_MEM * RAM_SIZE), LIGHTREC_CODEBUFFER_SIZE, memfd, RAM_SIZE);
 
 				if (map == MFAILED)
@@ -2429,6 +2503,21 @@ int lightrec_try_map(MEMFDTYPE memfd, int i, uintptr_t inc_io_base, uintptr_t ma
 		}
 
 err_unmap:
+#if HAVE_RESERVATION
+		/* Every piece was carved inside the reserved blocks, so
+		 * releasing the blocks whole is exact: each range is fully
+		 * mapped (reservation + carvings), leaves no residue and
+		 * contains no gap for XNU guard exceptions to trip on. */
+		psx_mem = NULL;
+		psx_bios = NULL;
+		psx_scratch = NULL;
+		lightrec_codebuffer = NULL;
+		UNRESERVE(bios, BIOS_SIZE);
+err_release_scratch:
+		UNRESERVE(scratch, SCRATCH_SIZE);
+err_release_mirrors:
+		UNRESERVE((void *)io_base, mirror_block_size);
+#else
 		if(lightrec_codebuffer){
 			UNMAP(lightrec_codebuffer, LIGHTREC_CODEBUFFER_SIZE);
 			lightrec_codebuffer = NULL;
@@ -2449,6 +2538,10 @@ err_unmap:
 			UNMAP((void *)(io_base + (nmaps - 1) * RAM_SIZE), RAM_SIZE);
 
 		psx_mem = NULL;
+err_release_scratch:
+err_release_mirrors:
+		;
+#endif
 	}
 
 	return 0;
