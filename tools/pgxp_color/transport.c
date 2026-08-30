@@ -270,6 +270,64 @@ static void test_untracked_colour(void)
       fail("untracked colour accepted from stale shadow", 0, 0);
 }
 
+static void test_nclip_magnitude(void)
+{
+   if (PGXP_NCLIP_preserve_magnitude(1234, -1) != -1234)
+      fail("NCLIP positive orientation replacement", 0, 1);
+   if (PGXP_NCLIP_preserve_magnitude(-4321, 1) != 4321)
+      fail("NCLIP negative orientation replacement", 0, 1);
+   if (PGXP_NCLIP_preserve_magnitude(1234, 1) != 1234)
+      fail("NCLIP changed matching magnitude", 0, 1);
+   if (PGXP_NCLIP_preserve_magnitude(1234, 0) != 1234)
+      fail("NCLIP replaced native result with zero", 0, 1);
+   if (PGXP_NCLIP_preserve_magnitude(0, -1) != -1)
+      fail("NCLIP lost orientation at native zero", 0, 1);
+   if (PGXP_NCLIP_preserve_magnitude(0, 1) != 1)
+      fail("NCLIP lost positive orientation at native zero", 0, 1);
+   if (PGXP_NCLIP_preserve_magnitude(INT32_MIN, -1) != INT32_MIN)
+      fail("NCLIP changed matching minimum", 0, 1);
+   if (PGXP_NCLIP_preserve_magnitude(INT32_MIN, 1) != INT32_MAX)
+      fail("NCLIP overflowed reversed minimum", 0, 1);
+
+   SetValue(&GTE_data_reg[12], 0);
+   SetValue(&GTE_data_reg[13], 0);
+   SetValue(&GTE_data_reg[14], 0);
+   if (PGXP_NCLIP_valid(0, 0, 0))
+      fail("NCLIP accepted vertices without precise Z", 1, 0);
+   GTE_data_reg[12].flags |= VALID_2;
+   GTE_data_reg[13].flags |= VALID_2;
+   GTE_data_reg[14].flags |= VALID_2;
+   if (!PGXP_NCLIP_valid(0, 0, 0))
+      fail("NCLIP rejected precise XYZ vertices", 0, 1);
+
+   GTE_data_reg[12].x = 0.0f;
+   GTE_data_reg[12].y = 0.0f;
+   GTE_data_reg[13].x = 1.0f;
+   GTE_data_reg[13].y = 0.0f;
+   GTE_data_reg[14].x = 0.0f;
+   GTE_data_reg[14].y = 1.0f;
+   if (PGXP_NCLIP_sign() != 1)
+      fail("NCLIP lost positive precise orientation", 0, 1);
+   GTE_data_reg[13].x = 0.0f;
+   GTE_data_reg[13].y = 1.0f;
+   GTE_data_reg[14].x = 1.0f;
+   GTE_data_reg[14].y = 0.0f;
+   if (PGXP_NCLIP_sign() != -1)
+      fail("NCLIP lost negative precise orientation", 0, 1);
+   GTE_data_reg[14].x = 0.05f;
+   if (PGXP_NCLIP_sign() != 0)
+      fail("NCLIP accepted unstable precise orientation", 1, 0);
+   GTE_data_reg[14].x = 0.101f;
+   if (PGXP_NCLIP_sign() != -1)
+      fail("NCLIP rejected stable precise orientation", 0, 1);
+   GTE_data_reg[13].x = 1.0f;
+   GTE_data_reg[13].y = 0.0f;
+   GTE_data_reg[14].x = 0.0f;
+   GTE_data_reg[14].y = 0.101f;
+   if (PGXP_NCLIP_sign() != 1)
+      fail("NCLIP rejected stable positive orientation", 0, 1);
+}
+
 int main(void)
 {
    PGXP_Init();
@@ -291,6 +349,9 @@ int main(void)
 
    printf("[T5] negative control: CPU-composed colour must be refused\n");
    test_untracked_colour();
+
+   printf("[T6] NCLIP native magnitude preservation\n");
+   test_nclip_magnitude();
 
    if (failures)
    {

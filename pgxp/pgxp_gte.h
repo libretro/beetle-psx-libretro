@@ -76,7 +76,29 @@ void	PGXP_pushRGBf(float _r, float _g, float _b, uint32_t _v);
 void	PGXP_RTPS(uint32_t _n, uint32_t _v);
 
 int		PGXP_NCLIP_valid(uint32_t sxy0, uint32_t sxy1, uint32_t sxy2);
-double	PGXP_NCLIP();
+int		PGXP_NCLIP_sign(void);
+
+static inline int32_t PGXP_NCLIP_preserve_magnitude(int32_t native_value,
+		int precise_sign)
+{
+	uint32_t magnitude;
+
+	/* NCLIP controls orientation, but MAC0 remains visible to the emulated
+	 * CPU. Keep the native area magnitude and use the precise result only
+	 * when it provides a non-zero orientation. */
+	if (precise_sign == 0)
+		return native_value;
+	if (native_value == 0)
+		return precise_sign < 0 ? -1 : 1;
+	if ((native_value < 0) == (precise_sign < 0))
+		return native_value;
+	if (native_value == INT32_MIN)
+		return precise_sign < 0 ? INT32_MIN : INT32_MAX;
+
+	magnitude = native_value < 0 ? (uint32_t)-native_value :
+		(uint32_t)native_value;
+	return precise_sign < 0 ? -(int32_t)magnitude : (int32_t)magnitude;
+}
 
 // Data transfer tracking
 void	PGXP_GTE_MFC2(uint32_t instr, uint32_t rtVal, uint32_t rdVal);		// copy GTE data reg to GPR reg (MFC2)
