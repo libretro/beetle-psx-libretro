@@ -26,7 +26,6 @@
 ***************************************************************************/
 
 #include <string.h>
-#include <math.h>
 #include <stdlib.h>
 
 #include <libretro.h>
@@ -244,12 +243,12 @@ int PGXP_NCLIP_valid(uint32_t sxy0, uint32_t sxy1, uint32_t sxy2)
 	Validate(&SXY0, sxy0);
 	Validate(&SXY1, sxy1);
 	Validate(&SXY2, sxy2);
-	if (((SXY0.flags & SXY1.flags & SXY2.flags & VALID_01) == VALID_01))/* && Config.PGXP_GTE && (Config.PGXP_Mode > 0)) */
+	if (((SXY0.flags & SXY1.flags & SXY2.flags & VALID_012) == VALID_012))/* && Config.PGXP_GTE && (Config.PGXP_Mode > 0)) */
 		return 1;
 	return 0;
 }
 
-double PGXP_NCLIP()
+int PGXP_NCLIP_sign(void)
 {
 	/* Factored cross product - same algebra as the native integer NCLIP
 	 * (x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1)) - accumulated in double.
@@ -261,16 +260,11 @@ double PGXP_NCLIP()
 	double nclip = (double)SX0 * ((double)SY1 - (double)SY2)
 	             + (double)SX1 * ((double)SY2 - (double)SY0)
 	             + (double)SX2 * ((double)SY0 - (double)SY1);
-	double nclipAbs = fabs(nclip);
 
-	/* Preserve a tiny but non-zero orientation through the caller's
-	 * truncation to int32 (a genuine near-degenerate result would otherwise
-	 * read as 0 and flip the culling decision).  Kept with identical intent;
-	 * simply hit far less often now the cancellation error is gone. */
-	if ((0.1 < nclipAbs) && (nclipAbs < 1.0))
-		nclip += (nclip < 0.0 ? -1.0 : 1.0);
-
-	return nclip;
+	/* Ignore a result too close to zero to provide a stable orientation.
+	 * This is equivalent to the old fractional adjustment followed by
+	 * truncation, without retaining a magnitude that the caller discards. */
+	return nclip > 0.1 ? 1 : nclip < -0.1 ? -1 : 0;
 }
 
 static void PGXP_MTC2_int(PGXP_value value, uint32_t reg)

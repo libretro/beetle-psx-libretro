@@ -1906,29 +1906,22 @@ static int32_t NCLIP(uint32_t instr)
    int16_t y1     = XY_FIFO_Y(1);
    int16_t x2     = XY_FIFO_X(2);
    int16_t y2     = XY_FIFO_Y(2);
-   int64_t a      = x0 * (y1 - y2);
-   int64_t b      = x1 * (y2 - y0);
-   int64_t c      = x2 * (y0 - y1);
-   int32_t sum    = a + b + c;
+   int64_t native_sum = (int64_t)x0 * (y1 - y2) +
+                        (int64_t)x1 * (y2 - y0) +
+                        (int64_t)x2 * (y0 - y1);
+   int32_t sum = F(native_sum);
 
    /* PGXP_NCLIP wants the three XY_FIFO entries packed as u32. The
     * previous code did `*((uint32*)&XY_FIFO[N])` which is a strict
     * aliasing violation; memcpy is well-defined and modern compilers
     * fold it into a single mov per call. */
-   bool used_pgxp = false;
    if (PGXP_GetModes() & PGXP_NCLIP_IMPL) {
       uint32_t v0, v1, v2;
       memcpy(&v0, &XY_FIFO(0), sizeof(v0));
       memcpy(&v1, &XY_FIFO(1), sizeof(v1));
       memcpy(&v2, &XY_FIFO(2), sizeof(v2));
-      if (PGXP_NCLIP_valid(v0, v1, v2)) {
-         sum = PGXP_NCLIP();
-         used_pgxp = true;
-      }
-   }
-   if (!used_pgxp) {
-      sum = F( (int64_t)(XY_FIFO_X(0) * (XY_FIFO_Y(1) - XY_FIFO_Y(2))) + (XY_FIFO_X(1) * (XY_FIFO_Y(2) - XY_FIFO_Y(0))) + (XY_FIFO_X(2) * (XY_FIFO_Y(0) - XY_FIFO_Y(1))));
-      check_mac_overflow(sum);
+      if (PGXP_NCLIP_valid(v0, v1, v2))
+         sum = PGXP_NCLIP_preserve_magnitude(sum, PGXP_NCLIP_sign());
    }
 
    SET_MAC(0, sum);
