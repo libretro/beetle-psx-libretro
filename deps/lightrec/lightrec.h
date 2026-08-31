@@ -127,6 +127,11 @@ struct lightrec_ops {
 	 * tracking is enabled; leaving it NULL keeps the fast path. */
 	void (*pgxp_cpu)(struct lightrec_state *state, u32 instr,
 			 u32 rd, u32 rs, u32 rt, u32 hi, u32 lo, u32 addr);
+	/* Optional exact-copy hook for `addu rd, rs, $zero`. The native result
+	 * equals the source for this architectural identity, so only the
+	 * destination value needs to cross the callback boundary. */
+	void (*pgxp_addu_identity)(struct lightrec_state *state, u32 instr,
+				    u32 value);
 };
 
 struct lightrec_registers {

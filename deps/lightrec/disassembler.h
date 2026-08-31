@@ -44,6 +44,9 @@
 #define LIGHTREC_FLAGS_GET_IO_MODE(x) \
 	(((x) & LIGHTREC_IO_MASK) >> LIGHTREC_IO_MODE_LSB)
 
+/* Preserve the original architectural identity through opcode transforms. */
+#define LIGHTREC_PGXP_ADDU_IDENTITY BIT(9)
+
 /* Flags for branches */
 #define LIGHTREC_EMULATE_BRANCH	BIT(2)
 #define LIGHTREC_LOCAL_BRANCH	BIT(3)
@@ -355,6 +358,11 @@ static inline _Bool op_flag_no_hi(u32 flags)
 static inline _Bool op_flag_no_div_check(u32 flags)
 {
 	return OPT_FLAG_MULT_DIV && (flags & LIGHTREC_NO_DIV_CHECK);
+}
+
+static inline _Bool op_flag_pgxp_addu_identity(u32 flags)
+{
+	return flags & LIGHTREC_PGXP_ADDU_IDENTITY;
 }
 
 #endif /* __DISASSEMBLER_H__ */

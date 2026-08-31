@@ -893,6 +893,16 @@ static void lightrec_pgxp_cpu_cb(struct lightrec_state *state, u32 arg)
 			       addr);
 }
 
+static void lightrec_pgxp_addu_identity_cb(struct lightrec_state *state,
+		u32 arg)
+{
+	union code c = { .opcode = arg };
+
+	if (state->ops.pgxp_addu_identity)
+		(*state->ops.pgxp_addu_identity)(state, c.opcode,
+				state->regs.gpr[c.r.rd]);
+}
+
 static struct block * lightrec_get_block(struct lightrec_state *state, u32 pc)
 {
 	struct block *block = lightrec_find_block(state->block_cache, pc);
@@ -2276,6 +2286,8 @@ struct lightrec_state * lightrec_init(char *argv0,
 	state->c_wrappers[C_WRAPPER_CP] = lightrec_cp_cb;
 	state->c_wrappers[C_WRAPPER_CP2_GTE] = lightrec_cp2_gte_cb;
 	state->c_wrappers[C_WRAPPER_PGXP_CPU] = lightrec_pgxp_cpu_cb;
+	state->c_wrappers[C_WRAPPER_PGXP_ADDU_IDENTITY] =
+		lightrec_pgxp_addu_identity_cb;
 
 	map = &maps[PSX_MAP_BIOS];
 	state->offset_bios = (uintptr_t)map->address - map->pc;

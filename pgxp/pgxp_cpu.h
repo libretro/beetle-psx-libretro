@@ -82,6 +82,7 @@ void PGXP_CPU_LUI(uint32_t instr, uint32_t rtVal);
 // Register Arithmetic
 void PGXP_CPU_ADD(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal);
 void PGXP_CPU_ADDU(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal);
+void PGXP_CPU_ADDU_Identity(uint32_t instr, uint32_t rdVal, uint32_t rsVal);
 void PGXP_CPU_SUB(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal);
 void PGXP_CPU_SUBU(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal);
 void PGXP_CPU_AND(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal);

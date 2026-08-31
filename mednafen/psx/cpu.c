@@ -1195,6 +1195,8 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
 
 	if (PGXP_GetModes() & PGXP_MODE_CPU)
 		PGXP_CPU_ADDU(instr, result, GPR[rs], GPR[rt]);
+	else if ((PGXP_GetModes() & PGXP_MODE_MEMORY) && rt == 0)
+		PGXP_CPU_ADDU_Identity(instr, result, GPR[rs]);
 
 	DO_LDS();
 
@@ -3062,6 +3064,13 @@ static void pgxp_cpu_track(struct lightrec_state *state, uint32_t instr,
 	PGXP_CPU_Dispatch(instr, rd, rs, rt, hi, lo, addr);
 }
 
+static void pgxp_addu_identity_track(struct lightrec_state *state,
+		uint32_t instr, uint32_t value)
+{
+	(void)state;
+	PGXP_CPU_ADDU_Identity(instr, value, value);
+}
+
 static bool cp2_ops[0x40] = {0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,
                              1,1,1,1,1,0,1,0,0,0,0,1,1,0,1,0,
                              1,0,0,0,0,0,0,0,1,1,1,0,0,1,1,0,
@@ -3636,6 +3645,10 @@ static int lightrec_plugin_init(PS_CPU *self)
        * path after a mode change. */
       pgxp_ops.pgxp_cpu = (PGXP_GetModes() & PGXP_MODE_CPU)
                           ? pgxp_cpu_track : NULL;
+      pgxp_ops.pgxp_addu_identity =
+            (PGXP_GetModes() & PGXP_MODE_MEMORY) &&
+            !(PGXP_GetModes() & PGXP_MODE_CPU)
+            ? pgxp_addu_identity_track : NULL;
 
       cop_ops = &pgxp_ops;
    }
