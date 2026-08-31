@@ -3,6 +3,17 @@
  * Copyright (C) 2019-2021 Paul Cercueil <paul@crapouillou.net>
  */
 
+/* libretro: threading and CPU topology via libretro-common rather than raw
+ * pthreads, so every platform lane (including MSVC, where pthreads never
+ * existed) goes through the same primitives the rest of the core uses.
+ * These come first, and ARRAY_SIZE is undefined between them and the
+ * lightrec headers: retro_miscellaneous.h (via rthreads.h) and
+ * lightrec-private.h both define it unguarded, and this order plus the
+ * undef keeps lightrec's own definition in force for lightrec code. */
+#include <rthreads/rthreads.h>
+#include <features/features_cpu.h>
+#undef ARRAY_SIZE
+
 #include "blockcache.h"
 #include "debug.h"
 #include "interpreter.h"
@@ -15,13 +26,6 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <pthread.h>
-#ifdef __linux__
-#include <unistd.h>
-#endif
-#if defined(__APPLE__) || defined(__FreeBSD__)
-#include <sys/sysctl.h>
-#endif
 
 struct block_rec {
 	struct block *block;
@@ -33,18 +37,18 @@ struct block_rec {
 struct recompiler_thd {
 	struct lightrec_cstate *cstate;
 	unsigned int tid;
-	pthread_t thd;
+	sthread_t *thd;
 };
 
 struct recompiler {
 	struct lightrec_state *state;
-	pthread_cond_t cond;
-	pthread_cond_t cond2;
-	pthread_mutex_t mutex;
+	scond_t *cond;
+	scond_t *cond2;
+	slock_t *mutex;
 	bool stop, pause, must_flush;
 	struct slist_elm slist;
 
-	pthread_mutex_t alloc_mutex;
+	slock_t *alloc_mutex;
 
 	unsigned int nb_recs, nb_cpus;
 	struct recompiler_thd thds[];
@@ -52,18 +56,8 @@ struct recompiler {
 
 static unsigned int get_processors_count(void)
 {
-	int nb = 1;
-
-#if defined(PTW32_VERSION)
-        nb = pthread_num_processors_np();
-#elif defined(__APPLE__) || defined(__FreeBSD__)
-        int count;
-        size_t size = sizeof(count);
-
-        nb = sysctlbyname("hw.ncpu", &count, &size, NULL, 0) ? 1 : count;
-#elif defined(_SC_NPROCESSORS_ONLN)
-	nb = (int)sysconf(_SC_NPROCESSORS_ONLN);
-#endif
+	/* One call covering every platform the per-OS ifdefs used to. */
+	unsigned nb = cpu_features_get_core_amount();
 
 	return nb < 1 ? 1 : nb;
 }
@@ -90,7 +84,7 @@ static bool lightrec_cancel_block_rec(struct recompiler *rec,
 	if (block_rec->compiling) {
 		/* Block is being recompiled - wait for
 		 * completion */
-		pthread_cond_wait(&rec->cond2, &rec->mutex);
+		scond_wait(rec->cond2, rec->mutex);
 
 		/* We can't guarantee the signal was for us.
 		 * Since block_rec may have been removed while
@@ -139,7 +133,7 @@ static void lightrec_compile_list(struct recompiler *rec,
 		block_rec->compiling = true;
 		block = block_rec->block;
 
-		pthread_mutex_unlock(&rec->mutex);
+		slock_unlock(rec->mutex);
 
 		if (likely(!block_has_flag(block, BLOCK_IS_DEAD))) {
 			ret = lightrec_compile_block(thd->cstate, block);
@@ -147,9 +141,9 @@ static void lightrec_compile_list(struct recompiler *rec,
 				/* Code buffer is full. Request the reaper to
 				 * flush it. */
 
-				pthread_mutex_lock(&rec->mutex);
+				slock_lock(rec->mutex);
 				block_rec->compiling = false;
-				pthread_cond_broadcast(&rec->cond2);
+				scond_broadcast(rec->cond2);
 
 				if (!rec->must_flush) {
 					rec->must_flush = true;
@@ -168,25 +162,25 @@ static void lightrec_compile_list(struct recompiler *rec,
 			}
 		}
 
-		pthread_mutex_lock(&rec->mutex);
+		slock_lock(rec->mutex);
 
 		slist_remove(&rec->slist, &block_rec->slist);
 		lightrec_free(rec->state, MEM_FOR_LIGHTREC,
 			      sizeof(*block_rec), block_rec);
-		pthread_cond_broadcast(&rec->cond2);
+		scond_broadcast(rec->cond2);
 	}
 }
 
-static void * lightrec_recompiler_thd(void *d)
+static void lightrec_recompiler_thd(void *d)
 {
 	struct recompiler_thd *thd = d;
 	struct recompiler *rec = container_of(thd, struct recompiler, thds[thd->tid]);
 
-	pthread_mutex_lock(&rec->mutex);
+	slock_lock(rec->mutex);
 
 	while (!rec->stop) {
 		do {
-			pthread_cond_wait(&rec->cond, &rec->mutex);
+			scond_wait(rec->cond, rec->mutex);
 
 			if (rec->stop)
 				goto out_unlock;
@@ -197,15 +191,13 @@ static void * lightrec_recompiler_thd(void *d)
 	}
 
 out_unlock:
-	pthread_mutex_unlock(&rec->mutex);
-	return NULL;
+	slock_unlock(rec->mutex);
 }
 
 struct recompiler *lightrec_recompiler_init(struct lightrec_state *state)
 {
 	struct recompiler *rec;
 	unsigned int i, nb_recs, nb_cpus;
-	int ret;
 
 	nb_cpus = get_processors_count();
 	nb_recs = nb_cpus < 2 ? 1 : nb_cpus - 1;
@@ -238,36 +230,36 @@ struct recompiler *lightrec_recompiler_init(struct lightrec_state *state)
 	rec->nb_cpus = nb_cpus;
 	slist_init(&rec->slist);
 
-	ret = pthread_cond_init(&rec->cond, NULL);
-	if (ret) {
-		pr_err("Cannot init cond variable: %d\n", ret);
+	rec->cond = scond_new();
+	if (!rec->cond) {
+		pr_err("Cannot init cond variable\n");
 		goto err_free_cstates;
 	}
 
-	ret = pthread_cond_init(&rec->cond2, NULL);
-	if (ret) {
-		pr_err("Cannot init cond variable: %d\n", ret);
+	rec->cond2 = scond_new();
+	if (!rec->cond2) {
+		pr_err("Cannot init cond variable\n");
 		goto err_cnd_destroy;
 	}
 
-	ret = pthread_mutex_init(&rec->alloc_mutex, NULL);
-	if (ret) {
-		pr_err("Cannot init alloc mutex variable: %d\n", ret);
+	rec->alloc_mutex = slock_new();
+	if (!rec->alloc_mutex) {
+		pr_err("Cannot init alloc mutex variable\n");
 		goto err_cnd2_destroy;
 	}
 
-	ret = pthread_mutex_init(&rec->mutex, NULL);
-	if (ret) {
-		pr_err("Cannot init mutex variable: %d\n", ret);
+	rec->mutex = slock_new();
+	if (!rec->mutex) {
+		pr_err("Cannot init mutex variable\n");
 		goto err_alloc_mtx_destroy;
 	}
 
 	for (i = 0; i < nb_recs; i++) {
-		ret = pthread_create(&rec->thds[i].thd, NULL,
-				     lightrec_recompiler_thd, &rec->thds[i]);
-		if (ret) {
-			pr_err("Cannot create recompiler thread: %d\n", ret);
-			/* TODO: Handle cleanup properly */
+		rec->thds[i].thd = sthread_create(lightrec_recompiler_thd,
+						  &rec->thds[i]);
+		if (!rec->thds[i].thd) {
+			pr_err("Cannot create recompiler thread\n");
+				/* TODO: Handle cleanup properly */
 			goto err_mtx_destroy;
 		}
 	}
@@ -277,13 +269,13 @@ struct recompiler *lightrec_recompiler_init(struct lightrec_state *state)
 	return rec;
 
 err_mtx_destroy:
-	pthread_mutex_destroy(&rec->mutex);
+	slock_free(rec->mutex);
 err_alloc_mtx_destroy:
-	pthread_mutex_destroy(&rec->alloc_mutex);
+	slock_free(rec->alloc_mutex);
 err_cnd2_destroy:
-	pthread_cond_destroy(&rec->cond2);
+	scond_free(rec->cond2);
 err_cnd_destroy:
-	pthread_cond_destroy(&rec->cond);
+	scond_free(rec->cond);
 err_free_cstates:
 	for (i = 0; i < nb_recs; i++) {
 		if (rec->thds[i].cstate)
@@ -300,21 +292,21 @@ void lightrec_free_recompiler(struct recompiler *rec)
 	rec->stop = true;
 
 	/* Stop the thread */
-	pthread_mutex_lock(&rec->mutex);
-	pthread_cond_broadcast(&rec->cond);
+	slock_lock(rec->mutex);
+	scond_broadcast(rec->cond);
 	lightrec_cancel_list(rec);
-	pthread_mutex_unlock(&rec->mutex);
+	slock_unlock(rec->mutex);
 
 	for (i = 0; i < rec->nb_recs; i++)
-		pthread_join(rec->thds[i].thd, NULL);
+		sthread_join(rec->thds[i].thd);
 
 	for (i = 0; i < rec->nb_recs; i++)
 		lightrec_free_cstate(rec->thds[i].cstate);
 
-	pthread_mutex_destroy(&rec->mutex);
-	pthread_mutex_destroy(&rec->alloc_mutex);
-	pthread_cond_destroy(&rec->cond);
-	pthread_cond_destroy(&rec->cond2);
+	slock_free(rec->mutex);
+	slock_free(rec->alloc_mutex);
+	scond_free(rec->cond);
+	scond_free(rec->cond2);
 	lightrec_free(rec->state, MEM_FOR_LIGHTREC, sizeof(*rec), rec);
 }
 
@@ -325,7 +317,7 @@ int lightrec_recompiler_add(struct recompiler *rec, struct block *block)
 	u32 pc1, pc2;
 	int ret = 0;
 
-	pthread_mutex_lock(&rec->mutex);
+	slock_lock(rec->mutex);
 
 	/* If the recompiler must flush the code cache, we can't add the new
 	 * job. It will be re-added next time the block's address is jumped to
@@ -354,7 +346,7 @@ int lightrec_recompiler_add(struct recompiler *rec, struct block *block)
 				 * will be interpreted until then, wasting a lot
 				 * of performance. In that case, it is better to
 				 * just let the compiler thread run now. */
-				pthread_cond_wait(&rec->cond2, &rec->mutex);
+				scond_wait(rec->cond2, rec->mutex);
 			}
 			goto out_unlock;
 		}
@@ -394,10 +386,10 @@ int lightrec_recompiler_add(struct recompiler *rec, struct block *block)
 	slist_append(elm, &block_rec->slist);
 
 	/* Signal the thread */
-	pthread_cond_signal(&rec->cond);
+	scond_signal(rec->cond);
 
 out_unlock:
-	pthread_mutex_unlock(&rec->mutex);
+	slock_unlock(rec->mutex);
 
 	return ret;
 }
@@ -407,7 +399,7 @@ void lightrec_recompiler_remove(struct recompiler *rec, struct block *block)
 	struct block_rec *block_rec;
 	struct slist_elm *elm;
 
-	pthread_mutex_lock(&rec->mutex);
+	slock_lock(rec->mutex);
 
 	while (true) {
 		for (elm = slist_first(&rec->slist); elm; elm = elm->next) {
@@ -426,7 +418,7 @@ void lightrec_recompiler_remove(struct recompiler *rec, struct block *block)
 	}
 
 out_unlock:
-	pthread_mutex_unlock(&rec->mutex);
+	slock_unlock(rec->mutex);
 }
 
 void * lightrec_recompiler_run_first_pass(struct lightrec_state *state,
@@ -496,22 +488,22 @@ void * lightrec_recompiler_run_first_pass(struct lightrec_state *state,
 
 void lightrec_code_alloc_lock(struct lightrec_state *state)
 {
-	pthread_mutex_lock(&state->rec->alloc_mutex);
+	slock_lock(state->rec->alloc_mutex);
 }
 
 void lightrec_code_alloc_unlock(struct lightrec_state *state)
 {
-	pthread_mutex_unlock(&state->rec->alloc_mutex);
+	slock_unlock(state->rec->alloc_mutex);
 }
 
 void lightrec_recompiler_pause(struct recompiler *rec)
 {
 	rec->pause = true;
 
-	pthread_mutex_lock(&rec->mutex);
-	pthread_cond_broadcast(&rec->cond);
+	slock_lock(rec->mutex);
+	scond_broadcast(rec->cond);
 	lightrec_cancel_list(rec);
-	pthread_mutex_unlock(&rec->mutex);
+	slock_unlock(rec->mutex);
 }
 
 void lightrec_recompiler_unpause(struct recompiler *rec)

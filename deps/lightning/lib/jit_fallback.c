@@ -407,6 +407,48 @@ _fallback_calli(jit_state_t *_jit, jit_word_t i0, jit_word_t i1)
 }
 
 #ifdef NEED_FALLBACK_CASX
+/* libretro: the CAS fallback used to emit calls to pthread_mutex_lock and
+ * pthread_mutex_unlock on a static PTHREAD_MUTEX_INITIALIZER mutex.  rthreads
+ * mutexes are heap objects with no static initializer, so the generated code
+ * calls these two helpers instead; the lock is installed once with an atomic
+ * compare-and-swap on first use (the loser of a racing first call frees its
+ * candidate and takes the winner's).  Zero-initialized static storage is NULL
+ * for every retro_atomic backend, so no static initializer is needed. */
+#include <rthreads/rthreads.h>
+#include <retro_atomic.h>
+
+static retro_atomic_ptr_t fallback_casx_lock;
+
+static slock_t *
+fallback_casx_get_lock(void)
+{
+    slock_t *lock = (slock_t *)
+	retro_atomic_load_acquire_ptr(&fallback_casx_lock);
+    if (!lock) {
+	slock_t *fresh = slock_new();
+	if (retro_atomic_cas_ptr(&fallback_casx_lock, NULL, fresh))
+	    lock = fresh;
+	else {
+	    slock_free(fresh);
+	    lock = (slock_t *)
+		retro_atomic_load_acquire_ptr(&fallback_casx_lock);
+	}
+    }
+    return lock;
+}
+
+static void
+fallback_casx_acquire(void)
+{
+    slock_lock(fallback_casx_get_lock());
+}
+
+static void
+fallback_casx_release(void)
+{
+    slock_unlock(fallback_casx_get_lock());
+}
+
 static void
 _fallback_casx(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1,
 	       jit_int32_t r2, jit_int32_t r3, jit_word_t i0)
@@ -414,14 +456,13 @@ _fallback_casx(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1,
     jit_int32_t		r1_reg, iscasi;
     jit_word_t		jump, done;
     /* XXX only attempts to fallback cas for lightning jit code */
-    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     if ((iscasi = r1 == _NOREG)) {
 	r1_reg = fallback_jit_get_reg(jit_class_gpr|jit_class_sav);
 	r1 = rn(r1_reg);
 	movi(r1, i0);
     }
     fallback_save_regs(r0);
-    fallback_calli((jit_word_t)pthread_mutex_lock, (jit_word_t)&mutex);
+    fallback_calli((jit_word_t)fallback_casx_acquire, (jit_word_t)0);
     fallback_load(r1);
     ldr(r0, r1);
     fallback_load(r2);
@@ -437,7 +478,7 @@ _fallback_casx(jit_state_t *_jit, jit_int32_t r0, jit_int32_t r1,
     /* done: */
     fallback_flush();
     done = _jit->pc.w;
-    fallback_calli((jit_word_t)pthread_mutex_unlock, (jit_word_t)&mutex);
+    fallback_calli((jit_word_t)fallback_casx_release, (jit_word_t)0);
     fallback_load(r0);
     fallback_flush();
     fallback_patch_bnei(jump, done);
