@@ -10,7 +10,7 @@ PGXP_SRC := $(ROOT)/pgxp/pgxp_gpu.c $(ROOT)/pgxp/pgxp_gte.c \
             $(ROOT)/pgxp/pgxp_cpu.c $(ROOT)/pgxp/pgxp_mem.c \
             $(ROOT)/pgxp/pgxp_main.c $(ROOT)/pgxp/pgxp_value.c
 
-all: oracle transport range
+all: oracle transport range compatibility
 
 oracle: oracle.c $(PGXP_SRC)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ oracle.c $(PGXP_SRC) stub_log.c -lm
@@ -21,14 +21,21 @@ range: range.c $(PGXP_SRC)
 transport: transport.c $(PGXP_SRC)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ transport.c $(PGXP_SRC) stub_log.c -lm
 
-check: oracle transport range
+compatibility: compatibility.c $(ROOT)/libretro_game_database.c \
+		$(ROOT)/database/psx_games.inc
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ compatibility.c \
+		$(ROOT)/libretro_game_database.c
+
+check: oracle transport range compatibility
 	./oracle
 	@echo
 	./transport
 	@echo
 	./range
+	@echo
+	./compatibility
 
 clean:
-	rm -f oracle transport range
+	rm -f oracle transport range compatibility
 
 .PHONY: all check clean

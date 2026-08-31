@@ -1550,6 +1550,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
 #endif
    {
+      BEETLE_OPT(compatibility_settings),
+      "Compatibility Settings",
+      NULL,
+      "Apply compatibility settings per game and per setting. Disable to allow user-selected settings to override them.",
+      NULL,
+      "hacks",
+      {
+         { "enabled",  "Enabled (Recommended)" },
+         { "disabled", "Disabled (Allow Overrides)" },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
       BEETLE_OPT(core_timing_fps),
       "Core-Reported FPS Timing",
       NULL,
