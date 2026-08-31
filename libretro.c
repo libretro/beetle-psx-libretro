@@ -19,6 +19,7 @@
 #include "rhi/rhi_intf.h"
 #include "libretro_cbs.h"
 #include "beetle_psx_globals.h"
+#include "libretro_game_database.h"
 #include "libretro_options.h"
 #include "input.h"
 #include "osd_message.h"
@@ -98,7 +99,7 @@ uint8_t startup_frame_count = 0;
 
 int aspect_ratio_setting = 0;
 bool aspect_ratio_dirty = false;
-bool is_monkey_hero = false;
+bool gpu_fbwrite_fifo_delay = false;
 
 /* libretro callback pointers, formerly defined in libretro_cbs.c. Declared in
  * libretro_cbs.h; assigned by retro_set_environment / retro_set_video_refresh
@@ -138,12 +139,15 @@ static int memcard_right_index = 1;
 static int memcard_right_index_old;
 
 unsigned cd_2x_speedup = 1;
-/* Compatibility cap on cd_2x_speedup for known-fragile titles.  Set
- * once during disc identification (see the cd_speedup_compat_table
- * in CalcDiscSCEx_BySYSTEMCNF), 0 means "no cap" (i.e. honour the
- * full user-selected CD Loading Speed setting).  Applied in
- * check_variables after the user-facing option is parsed. */
+/* A value of 0 means that the active database entry does not limit the
+ * user-selected CD loading speed. */
 static unsigned cd_speedup_compat_max = 0;
+static bool compatibility_settings_enabled = true;
+static bool compatibility_runtime_ready;
+static char compatibility_disc_serial[BEETLE_DISC_SERIAL_SIZE];
+static const struct beetle_game_database_entry *compatibility_game;
+static void check_variables(bool startup);
+static unsigned disk_get_num_images(void);
 bool cd_async = false;
 bool cd_warned_slow = false;
 int64_t cd_slow_timeout = 8000; // microseconds
@@ -267,6 +271,80 @@ int psx_pgxp_2d_tol;
 unsigned int psx_pgxp_vertex_caching;
 unsigned int psx_pgxp_texture_correction;
 unsigned int psx_pgxp_nclip;
+
+static void apply_pgxp_settings(void)
+{
+   PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching |
+         psx_pgxp_texture_correction | psx_pgxp_nclip);
+}
+
+static void apply_game_compatibility_settings(void)
+{
+   unsigned previous_mode;
+   unsigned previous_vertex;
+   unsigned previous_texture;
+   unsigned previous_nclip;
+   unsigned previous_cd_speedup_max;
+   bool previous_fbwrite_delay;
+   uint32_t settings = 0;
+
+   previous_mode = psx_pgxp_mode;
+   previous_vertex = psx_pgxp_vertex_caching;
+   previous_texture = psx_pgxp_texture_correction;
+   previous_nclip = psx_pgxp_nclip;
+   previous_cd_speedup_max = cd_speedup_compat_max;
+   previous_fbwrite_delay = gpu_fbwrite_fifo_delay;
+
+   cd_speedup_compat_max = 0;
+   gpu_fbwrite_fifo_delay = false;
+
+   if (compatibility_settings_enabled && compatibility_game)
+   {
+      settings = compatibility_game->settings;
+      cd_speedup_compat_max =
+         PSX_COMPAT_GET_MAX_CD_SPEED(settings);
+      gpu_fbwrite_fifo_delay =
+         !!(settings & PSX_COMPAT_FBWRITE_FIFO_DELAY);
+
+      if (cd_speedup_compat_max && cd_2x_speedup > cd_speedup_compat_max)
+         cd_2x_speedup = cd_speedup_compat_max;
+
+      if (psx_pgxp_mode != PGXP_MODE_NONE)
+      {
+         if (settings & PSX_COMPAT_PGXP_MEM_CPU)
+            psx_pgxp_mode = PGXP_MODE_MEMORY | PGXP_MODE_GTE | PGXP_MODE_CPU;
+         if (settings & PSX_COMPAT_PGXP_CACHE_OFF)
+            psx_pgxp_vertex_caching = PGXP_MODE_NONE;
+         else if (settings & PSX_COMPAT_PGXP_CACHE_ON)
+            psx_pgxp_vertex_caching = PGXP_VERTEX_CACHE;
+         if (settings & PSX_COMPAT_PGXP_PCT_OFF)
+            psx_pgxp_texture_correction = PGXP_MODE_NONE;
+         else if (settings & PSX_COMPAT_PGXP_PCT_ON)
+            psx_pgxp_texture_correction = PGXP_TEXTURE_CORRECTION;
+         if (settings & PSX_COMPAT_PGXP_CULLING_ON)
+            psx_pgxp_nclip = PGXP_NCLIP_IMPL;
+      }
+   }
+
+   if (!compatibility_settings_enabled || !compatibility_game)
+      return;
+
+   if (previous_mode != psx_pgxp_mode ||
+       previous_vertex != psx_pgxp_vertex_caching ||
+       previous_texture != psx_pgxp_texture_correction ||
+       previous_nclip != psx_pgxp_nclip ||
+       previous_cd_speedup_max != cd_speedup_compat_max ||
+       previous_fbwrite_delay != gpu_fbwrite_fifo_delay)
+      log_cb(RETRO_LOG_INFO,
+            "Compatibility settings applied: %s (%s)\n",
+            beetle_game_database_title(compatibility_game),
+            compatibility_disc_serial);
+}
+
+static void apply_compatibility_settings(void)
+{
+   apply_game_compatibility_settings();
+}
 
 
 /* end of Mednafen psx.cpp */
@@ -746,6 +824,132 @@ extern int PBP_DiscCount;
  * 'physical' disk count, otherwise the
  * frontend disk control interface will fail */
 static int PBP_PhysicalDiscCount;
+static int PBP_LoadedDisc;
+
+typedef struct
+{
+   char serial[BEETLE_DISC_SERIAL_SIZE];
+   const struct beetle_game_database_entry *game;
+   bool identified;
+} disc_compatibility_t;
+
+static disc_compatibility_t *disc_compatibility;
+static size_t disc_compatibility_count;
+
+static bool disc_compatibility_resize(size_t count)
+{
+   disc_compatibility_t *entries;
+   size_t old_count = disc_compatibility_count;
+
+   if (!count)
+   {
+      free(disc_compatibility);
+      disc_compatibility = NULL;
+      disc_compatibility_count = 0;
+      return true;
+   }
+
+   entries = (disc_compatibility_t *)realloc(disc_compatibility,
+         count * sizeof(*entries));
+   if (!entries)
+      return false;
+
+   disc_compatibility = entries;
+   if (count > old_count)
+      memset(&disc_compatibility[old_count], 0,
+            (count - old_count) * sizeof(*disc_compatibility));
+   disc_compatibility_count = count;
+   return true;
+}
+
+static void disc_compatibility_remove_at(size_t index)
+{
+   if (index >= disc_compatibility_count)
+      return;
+   if (index + 1 < disc_compatibility_count)
+      memmove(&disc_compatibility[index],
+            &disc_compatibility[index + 1],
+            (disc_compatibility_count - index - 1) *
+            sizeof(*disc_compatibility));
+   disc_compatibility_count--;
+}
+
+static void disc_compatibility_set(size_t index, const char *serial)
+{
+   disc_compatibility_t *entry;
+
+   if (index >= disc_compatibility_count)
+      return;
+
+   entry = &disc_compatibility[index];
+   memset(entry, 0, sizeof(*entry));
+   entry->identified = true;
+   if (serial && *serial)
+   {
+      strlcpy(entry->serial, serial, sizeof(entry->serial));
+      entry->game = beetle_game_database_lookup(entry->serial);
+   }
+}
+
+static bool select_disc_compatibility(void)
+{
+   const disc_compatibility_t *entry = NULL;
+   const char *serial = "";
+   const struct beetle_game_database_entry *game = NULL;
+
+   if (CD_SelectedDisc >= 0 &&
+       (size_t)CD_SelectedDisc < disc_compatibility_count &&
+       disc_compatibility[CD_SelectedDisc].identified)
+   {
+      entry = &disc_compatibility[CD_SelectedDisc];
+      serial = entry->serial;
+      game = entry->game;
+   }
+
+   if (compatibility_game == game &&
+       string_is_equal(compatibility_disc_serial, serial))
+      return false;
+
+   strlcpy(compatibility_disc_serial, serial,
+         sizeof(compatibility_disc_serial));
+   compatibility_game = game;
+   return true;
+}
+
+static void reapply_disc_compatibility(void)
+{
+   /* At runtime, first restore the frontend-selected values before layering
+    * the active disc's compatibility settings over them. */
+   if (compatibility_runtime_ready)
+      check_variables(false);
+   else
+   {
+      apply_compatibility_settings();
+      apply_pgxp_settings();
+   }
+}
+
+static void refresh_selected_disc_compatibility(void)
+{
+   if (!select_disc_compatibility())
+      return;
+
+   reapply_disc_compatibility();
+}
+
+static void restore_saved_disc_compatibility(void)
+{
+   const struct beetle_game_database_entry *game = NULL;
+
+   if (compatibility_disc_serial[0])
+      game = beetle_game_database_lookup(compatibility_disc_serial);
+
+   if (compatibility_game == game)
+      return;
+
+   compatibility_game = game;
+   reapply_disc_compatibility();
+}
 
 /* Dynamic array of C strings.  Used for the disk-control image
  * paths/labels lists and the M3U file list.  count is the number
@@ -1869,7 +2073,8 @@ static bool TestMagic(const char *name, RFILE *fp, int64_t size)
           (header[6] == 'X') && (header[7] == 'E');
 }
 
-static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
+static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr,
+      char serial[BEETLE_DISC_SERIAL_SIZE])
 {
    /* Find SYSTEM.CNF on the disc and pull the PSX serial out of its
     * BOOT= line.
@@ -1890,6 +2095,11 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
    const char *ret            = NULL;
    unsigned pvd_search_count  = 0;
    uint32_t pvd_sector;
+
+   if (serial)
+      serial[0] = '\0';
+   if (!c)
+      return NULL;
 
    /* PVD scan: ISO 9660 places volume descriptors starting at LBA 16
     * (0x8000 bytes in).  Read one sector at a time until we find
@@ -2019,60 +2229,9 @@ static const char *CalcDiscSCEx_BySYSTEMCNF(CDIF *c, unsigned *rr)
 
          bootpos += 7;
 
-         /* Game-specific framebuffer-write tweak for Monkey Hero. The
-          * filename portion of BOOT=cdrom:\SLUS_007.65;1 starts right
-          * at bootpos here - the previous "bootpos + 7" bug compared
-          * the substring starting 7 chars later, so this never matched. */
-         if (!strncmp(bootpos, "SLUS_007.65", 11) ||
-             !strncmp(bootpos, "SLES_009.79", 11))
-         {
-            is_monkey_hero = true;
-            log_cb(RETRO_LOG_INFO, "Monkey Hero FBWrite Tweak Activated\n");
-         }
-
-         /* Per-game CD-speedup compatibility caps.
-          *
-          * Some titles' CD-handling code can't keep up when the CDC
-          * feeds data sectors at the high end of the cd_2x_speedup
-          * range; the user picks "8x" in core options and the game
-          * wedges or crashes during a streaming read.  We don't try
-          * to fix the underlying mismatch (the timing assumptions
-          * are baked into the game binary), we just clamp the
-          * speedup to the highest value that's been observed to
-          * work for that title.
-          *
-          * The cap is the max value of cd_2x_speedup itself, not
-          * the user-facing "Nx" label - so 3 here means "up to 6x
-          * (2 * 3)" is fine.  Add new entries with the BOOT-format
-          * serial (AAAA_NNN.NN) as it appears in SYSTEM.CNF, not
-          * the redump/SLUS-NNNNN form. */
-         {
-            static const struct { const char *serial; unsigned cap; }
-            cd_speedup_compat_table[] = {
-               /* Myst (Cyan / Psygnosis): freezes/crashes at 8x
-                * when the post-seek streaming pipeline desyncs.
-                * 6x is the highest speed observed to work. */
-               { "SCUS_946.02", 3 }, /* NTSC-U */
-               { "SLES_002.18", 3 }, /* PAL */
-               { "SLPS_000.24", 3 }, /* NTSC-J original */
-               { "SLPS_910.23", 3 }, /* NTSC-J [Playstation the Best] */
-               { "SLPS_911.23", 3 }, /* NTSC-J [Playstation the Best] [Rerelease] */
-               { "SLPS_029.24", 3 }, /* NTSC-J [Value 1500] */
-            };
-            unsigned k;
-            for (k = 0; k < sizeof(cd_speedup_compat_table) / sizeof(cd_speedup_compat_table[0]); k++)
-            {
-               if (!strncmp(bootpos, cd_speedup_compat_table[k].serial, 11))
-               {
-                  cd_speedup_compat_max = cd_speedup_compat_table[k].cap;
-                  log_cb(RETRO_LOG_INFO,
-                        "CD speedup capped to %ux for compatibility (serial %s)\n",
-                        cd_speedup_compat_max * 2,
-                        cd_speedup_compat_table[k].serial);
-                  break;
-               }
-            }
-         }
+         if (serial)
+            beetle_game_database_normalize_serial(bootpos,
+                  serial);
 
          if ((tmp = strchr(bootpos, '_'))) *tmp = 0;
          if ((tmp = strchr(bootpos, '.'))) *tmp = 0;
@@ -2116,6 +2275,10 @@ static unsigned CalcDiscSCEx(void)
    const char *prev_valid_id = NULL;
    unsigned ret_region       = MDFN_GetSettingI("psx.region_default");
 
+   if (!disc_compatibility_resize(disk_get_num_images()))
+      log_cb(RETRO_LOG_ERROR,
+            "Failed to allocate disc compatibility metadata.\n");
+
    if (cdifs_loaded)
    {
       unsigned i;
@@ -2123,7 +2286,20 @@ static unsigned CalcDiscSCEx(void)
       {
          uint8_t buf[2048];
          uint8_t fbuf[2048 + 1];
-         const char *id = CalcDiscSCEx_BySYSTEMCNF(cdifs.items[i], (i == 0) ? &ret_region : NULL);
+         char serial[BEETLE_DISC_SERIAL_SIZE];
+         size_t compatibility_index = CD_IsPBP ?
+               (size_t)PBP_LoadedDisc : (size_t)i;
+         const char *id;
+
+         if (!cdifs.items[i])
+         {
+            cdifs.scex_ids[i] = NULL;
+            disc_compatibility_set(compatibility_index, NULL);
+            continue;
+         }
+
+         id = CalcDiscSCEx_BySYSTEMCNF(cdifs.items[i],
+               (i == 0) ? &ret_region : NULL, serial);
 
          memset(fbuf, 0, sizeof(fbuf));
 
@@ -2195,6 +2371,7 @@ static unsigned CalcDiscSCEx(void)
             prev_valid_id = id;
 
          cdifs.scex_ids[i] = id;
+         disc_compatibility_set(compatibility_index, serial);
       }
    }
 
@@ -2225,6 +2402,9 @@ static void SetDiscWrapper(const bool CD_TrayOpen) {
 
    if (PSX_CDC)
       PS_CDC_SetDisc(PSX_CDC, CD_TrayOpen, cdif, disc_id);
+
+   if (!CD_TrayOpen)
+      refresh_selected_disc_compatibility();
 }
 
 /* PSX memory region sizes - these are used unconditionally below (e.g. for
@@ -2838,6 +3018,15 @@ static void CDInsertEject(void)
       }
    }
 
+   /* CDIF_Eject selects the requested internal PBP disc when the tray
+    * closes. Identify that physical disc before passing its region and
+    * compatibility metadata to the emulated CD controller. */
+   if (!CD_TrayOpen && CD_IsPBP && CD_SelectedDisc >= 0)
+   {
+      PBP_LoadedDisc = CD_SelectedDisc;
+      CalcDiscSCEx();
+   }
+
    SetDiscWrapper(CD_TrayOpen);
 }
 
@@ -2872,8 +3061,32 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
    emulate_multitap[0] = setting_psx_multitap_port_1;
    emulate_multitap[1] = setting_psx_multitap_port_2;
 
-   cdifs_loaded = 1;
-   region       = CalcDiscSCEx();
+   cdifs_loaded       = 1;
+   CD_TrayOpen        = true;
+   CD_SelectedDisc    = -1;
+
+   if (disk_get_num_images())
+   {
+      CD_TrayOpen     = false;
+      CD_SelectedDisc = 0;
+
+      /* Apply the frontend's requested initial disc before identifying
+       * compatibility settings. */
+      if ((disk_control_ext_info.initial_index > 0) &&
+          (disk_control_ext_info.initial_index < disk_get_num_images()) &&
+          (disk_control_ext_info.initial_index <
+           disk_control_ext_info.image_paths.count) &&
+          disk_control_ext_info.initial_path &&
+          string_is_equal(
+            disk_control_ext_info.image_paths.items[
+                  disk_control_ext_info.initial_index],
+            disk_control_ext_info.initial_path))
+         CD_SelectedDisc = (int)disk_control_ext_info.initial_index;
+   }
+
+   region = CalcDiscSCEx();
+   select_disc_compatibility();
+   apply_compatibility_settings();
 
    if(!MDFN_GetSettingB("psx.region_autodetect"))
       region = MDFN_GetSettingI("psx.region_default");
@@ -2934,26 +3147,7 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
          break;
    }
 
-   PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction | psx_pgxp_nclip);
-
-   CD_TrayOpen        = true;
-   CD_SelectedDisc    = -1;
-
-   if(cdifs_loaded)
-   {
-      CD_TrayOpen     = false;
-      CD_SelectedDisc = 0;
-
-      /* Attempt to set initial disk index */
-      if ((disk_control_ext_info.initial_index > 0) &&
-          (disk_control_ext_info.initial_index < disk_get_num_images()))
-         if (disk_control_ext_info.initial_index <
-               disk_control_ext_info.image_paths.count)
-            if (string_is_equal(
-                  disk_control_ext_info.image_paths.items[disk_control_ext_info.initial_index],
-                  disk_control_ext_info.initial_path))
-               CD_SelectedDisc = (int)disk_control_ext_info.initial_index;
-   }
+   apply_pgxp_settings();
 
    PS_CDC_SetDisc(PSX_CDC, true, NULL, NULL);
 
@@ -3607,6 +3801,8 @@ int StateAction(StateMem *sm, int load, int data_only)
    {
       SFVAR(CD_TrayOpen),
       SFVAR(CD_SelectedDisc),
+      SFARRAYN((uint8_t *)compatibility_disc_serial,
+            sizeof(compatibility_disc_serial), "CompatibilityDiscSerial"),
       SFARRAYN(MainRAM->data8, 1024 * 2048, "MainRAM.data8"),
       SFARRAY32(SysControl.Regs, 9),
       SFVAR(PSX_PRNG.lcgo),
@@ -3624,13 +3820,32 @@ int StateAction(StateMem *sm, int load, int data_only)
     * We might want to clean this up in the future. */
    if(load)
    {
+      compatibility_disc_serial[sizeof(compatibility_disc_serial) - 1] = '\0';
+
       if(CD_IsPBP)
       {
+         const bool saved_tray_open = CD_TrayOpen;
+         char saved_compatibility_serial[BEETLE_DISC_SERIAL_SIZE];
+
+         strlcpy(saved_compatibility_serial, compatibility_disc_serial,
+               sizeof(saved_compatibility_serial));
+
          if(!cdifs_loaded || CD_SelectedDisc >= PBP_PhysicalDiscCount)
             CD_SelectedDisc = -1;
 
          CDEject();
          CDInsertEject();
+         if(saved_tray_open)
+         {
+            /* The forced close selects the next PBP disc and refreshes its
+             * profile. Reopen the tray and restore the profile that was
+             * active when the state was saved. */
+            CDEject();
+            strlcpy(compatibility_disc_serial,
+                  saved_compatibility_serial,
+                  sizeof(compatibility_disc_serial));
+            restore_saved_disc_compatibility();
+         }
       }
       else
       {
@@ -3638,6 +3853,10 @@ int StateAction(StateMem *sm, int load, int data_only)
             CD_SelectedDisc = -1;
 
          SetDiscWrapper(CD_TrayOpen);
+         /* While open, CD_SelectedDisc is the next insertion rather than the
+          * disc whose code is still running. Restore the saved active serial. */
+         if(CD_TrayOpen)
+            restore_saved_disc_compatibility();
       }
    }
 
@@ -3984,6 +4203,7 @@ static bool disk_replace_image_index(unsigned index, const struct retro_game_inf
    {
       CDIF_Close(cdifs.items[index]);
       cdif_array_remove_at(&cdifs, index);
+      disc_compatibility_remove_at(index);
       /* CD_SelectedDisc is signed; explicit cast to silence the
        * mixed-sign comparison and to make the intent clear. */
       if ((int)index < CD_SelectedDisc)
@@ -4032,6 +4252,11 @@ static bool disk_add_image_index(void)
 
    if (cdif_array_push(&cdifs, NULL) < 0)
       return false;
+   if (!disc_compatibility_resize(cdifs.count))
+   {
+      cdif_array_remove_at(&cdifs, cdifs.count - 1);
+      return false;
+   }
    sv_push(&disk_control_ext_info.image_paths, "");
    sv_push(&disk_control_ext_info.image_labels, "");
    return true;
@@ -4236,6 +4461,12 @@ extern void PSXDitherApply(bool);
 static void check_variables(bool startup)
 {
    struct retro_variable var = {0};
+
+   var.key = BEETLE_OPT(compatibility_settings);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      compatibility_settings_enabled = strcmp(var.value, "disabled") != 0;
+   else
+      compatibility_settings_enabled = true;
 
    /* Region default fallback (used by CalcDiscSCEx() for non-disc
     * content like raw PS-X EXEs, and for any disc whose region cannot
@@ -5272,12 +5503,6 @@ static void check_variables(bool startup)
    else
       cd_2x_speedup = 1;
 
-   /* Apply per-game compatibility cap if the loaded disc is on the
-    * known-fragile list.  Silent clamp - the one-time log message at
-    * detection covers the user notification. */
-   if (cd_speedup_compat_max && cd_2x_speedup > cd_speedup_compat_max)
-      cd_2x_speedup = cd_speedup_compat_max;
-
    var.key = BEETLE_OPT(memcard_left_index);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -5308,6 +5533,8 @@ static void check_variables(bool startup)
 
       psx_gpu_rasterize_both_fields = (Deinterlacer_GetType(&deint) == DEINT_OFF);
    }
+
+   apply_compatibility_settings();
 }
 
 #ifdef NEED_CD
@@ -5425,6 +5652,12 @@ static void ReadM3U(string_vec_t *file_list, const char *path, unsigned depth)
 static void clear_disc_state(void)
 {
    cdif_array_clear(&cdifs);
+   disc_compatibility_resize(0);
+   compatibility_runtime_ready = false;
+   compatibility_disc_serial[0] = '\0';
+   compatibility_game = NULL;
+   cd_speedup_compat_max = 0;
+   gpu_fbwrite_fifo_delay = false;
 
    disk_control_ext_info.initial_index = 0;
    (free(disk_control_ext_info.initial_path), disk_control_ext_info.initial_path = NULL);
@@ -5489,6 +5722,7 @@ static bool MDFNI_LoadCD(const char *devicename)
       else
       {
          CD_IsPBP = true;
+         PBP_LoadedDisc = 0;
          cdif_array_push(&cdifs, image);
 
          /* CDIF_Open() sets PBP_DiscCount, so we can populate
@@ -5758,16 +5992,11 @@ bool retro_load_game(const struct retro_game_info *info)
    MDFNMP_InstallReadPatches();
 
    // Determine content_is_pal before calling alloc_surface()
-   cd_speedup_compat_max = 0; /* reset; CalcDiscSCEx may repopulate */
    disc_region = CalcDiscSCEx();
+   select_disc_compatibility();
    content_is_pal = (disc_region == REGION_EU);
-
-   /* CalcDiscSCEx may have populated cd_speedup_compat_max from the
-    * disc serial.  check_variables(true) above ran before disc
-    * identification, so re-apply the cap here to honour it on the
-    * very first frame as well. */
-   if (cd_speedup_compat_max && cd_2x_speedup > cd_speedup_compat_max)
-      cd_2x_speedup = cd_speedup_compat_max;
+   apply_compatibility_settings();
+   apply_pgxp_settings();
 
    /* Note: alloc_surface() used to run here, before rhi_intf_open.
     * It now runs AFTER the renderer has been selected so it can
@@ -5993,6 +6222,7 @@ bool retro_load_game(const struct retro_game_info *info)
          VCD_SetMode(VCD_MODE_OFF);
    }
 
+   compatibility_runtime_ready = ret;
    return ret;
 }
 
@@ -6153,7 +6383,7 @@ void retro_run(void)
       GPU_set_visible_scanlines(MDFN_GetSettingI(content_is_pal ? "psx.slstartp" : "psx.slstart"),
                                 MDFN_GetSettingI(content_is_pal ? "psx.slendp" : "psx.slend"));
 
-      PGXP_SetModes(psx_pgxp_mode | psx_pgxp_vertex_caching | psx_pgxp_texture_correction | psx_pgxp_nclip);
+      apply_pgxp_settings();
 
       // Reload memory cards if they were changed
       if (use_mednafen_memcard0_method &&
@@ -6653,6 +6883,7 @@ void retro_deinit(void)
    CD_TrayOpen           = false;
    CD_IsPBP              = false;
    PBP_PhysicalDiscCount = 0;
+   PBP_LoadedDisc        = 0;
    image_offset          = 0;
    image_crop            = 0;
 

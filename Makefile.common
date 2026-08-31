@@ -209,7 +209,8 @@ endif
                   $(CDROM_DIR)/recover-raw.c \
                   $(CDROM_DIR)/edc_crc32.c
 
-   SOURCES_C += $(CORE_DIR)/libretro.c
+   SOURCES_C += $(CORE_DIR)/libretro.c \
+                $(CORE_DIR)/libretro_game_database.c
 
    SOURCES_C +=   $(MEDNAFEN_DIR)/mempatcher.c \
                   $(MEDNAFEN_DIR)/general.c \

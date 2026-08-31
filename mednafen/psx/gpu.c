@@ -975,8 +975,8 @@ static INLINE bool CalcFIFOReadyBit(void)
    if(GPU.InCmd & (INCMD_FBREAD | INCMD_FBWRITE))
       return(false);
 
-   /* Change fifo_fb_len from 2 to 3 for Command_FBWrite when running Monkey Hero. */
-   if(GPU_BlitterFIFO.in_count >= Commands[FastFIFO_Peek(&GPU_BlitterFIFO) >> 24].fifo_fb_len + ((ctcommand >= 0xA0) && (ctcommand <= 0xBF) && is_monkey_hero ? 1 : 0))
+   /* Some titles need one additional FIFO word before framebuffer writes. */
+   if(GPU_BlitterFIFO.in_count >= Commands[FastFIFO_Peek(&GPU_BlitterFIFO) >> 24].fifo_fb_len + ((ctcommand >= 0xA0) && (ctcommand <= 0xBF) && gpu_fbwrite_fifo_delay ? 1 : 0))
       return(false);
 
    return(true);
