@@ -341,9 +341,26 @@ static void apply_game_compatibility_settings(void)
             compatibility_disc_serial);
 }
 
+static void apply_setting_dependencies(void)
+{
+#ifdef HAVE_LIGHTREC
+   if (compatibility_settings_enabled &&
+       (psx_pgxp_mode & PGXP_MODE_CPU) &&
+       psx_dynarec != DYNAREC_DISABLED)
+   {
+      psx_dynarec = DYNAREC_DISABLED;
+      log_cb(RETRO_LOG_INFO,
+            "Compatibility setting applied: CPU Dynarec=Disabled "
+            "(Beetle Interpreter) for PGXP Operation Mode=Memory + CPU "
+            "(Buggy)\n");
+   }
+#endif
+}
+
 static void apply_compatibility_settings(void)
 {
    apply_game_compatibility_settings();
+   apply_setting_dependencies();
 }
 
 
