@@ -30,9 +30,24 @@ Universal relationships between settings remain in `libretro.c`.
 | Disable vertex caching | `PSX_COMPAT_PGXP_CACHE_OFF` |
 | Enable framebuffer-write FIFO delay | `PSX_COMPAT_FBWRITE_FIFO_DELAY` |
 | Limit maximum CD-ROM speed | `PSX_COMPAT_MAX_CD_SPEED(value)` |
+| Support port 1 Digital Controller | `BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DIGITAL)` |
+| Support port 1 DualShock | `BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK)` |
+| Support port 1 Analog Controller | `BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_ANALOG)` |
+| Support port 1 Analog Joystick | `BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_ANALOG_JOYSTICK)` |
+| Support port 1 Guncon / G-Con 45 | `BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_GUNCON)` |
+| Support port 1 Justifier | `BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_JUSTIFIER)` |
+| Support port 1 Mouse | `BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_MOUSE)` |
+| Support port 1 neGcon | `BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_NEGCON)` |
+| Support port 1 neGcon Rumble | `BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_NEGCON_RUMBLE)` |
 
 Example:
 
 ```c
 PSX_COMPAT_PGXP_PCT_ON | PSX_COMPAT_PGXP_CULLING_ON
 ```
+
+Controller settings may be combined to describe every supported controller.
+If the frontend-selected controller is supported, it remains unchanged. If it
+is unsupported, the core selects the first supported type in the table above.
+An explicitly disconnected port remains disconnected. With no controller
+setting, the frontend selection remains unchanged.

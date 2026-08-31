@@ -5,6 +5,16 @@
 #include <libretro.h>
 #include "mednafen/psx/frontio.h"
 
+#define RETRO_DEVICE_PS_CONTROLLER         RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 0)
+#define RETRO_DEVICE_PS_DUALSHOCK          RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1)
+#define RETRO_DEVICE_PS_ANALOG             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 0)
+#define RETRO_DEVICE_PS_ANALOG_JOYSTICK    RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
+#define RETRO_DEVICE_PS_GUNCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 0)
+#define RETRO_DEVICE_PS_JUSTIFIER          RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 1)
+#define RETRO_DEVICE_PS_MOUSE              RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_MOUSE, 0)
+#define RETRO_DEVICE_PS_NEGCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
+#define RETRO_DEVICE_PS_NEGCON_RUMBLE      RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 4)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,6 +40,9 @@ extern void input_set_negcon_deadzone( int deadzone );
 extern void input_set_negcon_linearity( int linearity );
 
 extern void input_set_player_count( unsigned players );
+
+extern bool input_set_controller_port_compatibility(
+      unsigned port, uint32_t supported_controllers);
 
 extern unsigned input_get_player_count(void);
 
