@@ -22,9 +22,10 @@ transport: transport.c $(PGXP_SRC)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ transport.c $(PGXP_SRC) stub_log.c -lm
 
 compatibility: compatibility.c $(ROOT)/libretro_game_database.c \
+      $(ROOT)/input_compatibility.c \
 		$(ROOT)/database/psx_games.inc
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ compatibility.c \
-		$(ROOT)/libretro_game_database.c
+		$(ROOT)/libretro_game_database.c $(ROOT)/input_compatibility.c
 
 check: oracle transport range compatibility
 	./oracle

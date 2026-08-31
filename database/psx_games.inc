@@ -1783,7 +1783,7 @@ PSX_GAME("2362", "SCPS-10031", "SCPS 10031, SCPS 45026, SCPS 91057, SCPS 91304",
 PSX_GAME("2362", "SCPS-45026", "SCPS 10031, SCPS 45026, SCPS 91057, SCPS 91304", "Games", "", "Crash Bandicoot (Japan, Asia)")
 PSX_GAME("2362", "SCPS-91057", "SCPS 10031, SCPS 45026, SCPS 91057, SCPS 91304", "Games", "", "Crash Bandicoot (Japan, Asia)")
 PSX_GAME("2362", "SCPS-91304", "SCPS 10031, SCPS 45026, SCPS 91057, SCPS 91304", "Games", "", "Crash Bandicoot (Japan, Asia)")
-PSX_GAME("2250", "SCUS-94900", "SCUS-94900", "Games", "", "Crash Bandicoot (USA)")
+PSX_GAME_COMPAT("2250", "SCUS-94900", "SCUS-94900", "Games", "", "Crash Bandicoot (USA)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DIGITAL))
 PSX_GAME("122259", "", "", "Preproduction", "", "Crash Bandicoot (USA) (Beta) (1996-05-14)")
 PSX_GAME("5006", "SCUS-94244", "SCUS 94244, SCUS-94244CE", "Games", "", "Crash Bandicoot - Warped (USA)")
 PSX_GAME("134021", "", "", "Preproduction", "", "Crash Bandicoot - Warped (USA) (Beta) (1998-02-12)")
@@ -11937,7 +11937,7 @@ PSX_GAME("36592", "SLPM-86523", "SLPM 86523", "Games", "", "Zutto Issho - With M
 PSX_GAME("58780", "SLPS-00424", "SLPS 00424", "Games", "", "ZXE-D - Legend of Plasmatlite (Japan)")
 
 /* Compatibility entries absent from the source catalog snapshot. */
-PSX_GAME("", "SCUS-9418A", "SCUS-9418A", "Games", "", "Armored Core (USA) (Analog Controller Patch)")
+PSX_GAME_COMPAT("", "SCUS-9418A", "SCUS-9418A", "Games", "", "Armored Core (USA) (Analog Controller Patch)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
 PSX_GAME_COMPAT("", "SCAJ-01001", "SCAJ-01001", "Games", "", "Gran Turismo 2 (Japan) (PSOne Books) (Disc 1)", PSX_COMPAT_PGXP_PCT_ON | PSX_COMPAT_PGXP_CULLING_ON)
 PSX_GAME_COMPAT("", "SCAJ-01002", "SCAJ-01002", "Games", "", "Gran Turismo 2 (Japan) (PSOne Books) (Disc 2)", PSX_COMPAT_PGXP_PCT_ON | PSX_COMPAT_PGXP_CULLING_ON)
 PSX_GAME_COMPAT("", "SLPS-91463", "SLPS-91463", "Games", "", "R4 - Ridge Racer Type 4 (Japan) (PSOne Books)", PSX_COMPAT_PGXP_PCT_ON | PSX_COMPAT_PGXP_CULLING_ON)

@@ -285,7 +285,9 @@ static void apply_game_compatibility_settings(void)
    unsigned previous_texture;
    unsigned previous_nclip;
    unsigned previous_cd_speedup_max;
+   uint32_t supported_controllers = BEETLE_DB_CTRL_NONE;
    bool previous_fbwrite_delay;
+   bool controller_changed;
    uint32_t settings = 0;
 
    previous_mode = psx_pgxp_mode;
@@ -324,7 +326,13 @@ static void apply_game_compatibility_settings(void)
          if (settings & PSX_COMPAT_PGXP_CULLING_ON)
             psx_pgxp_nclip = PGXP_NCLIP_IMPL;
       }
+
+      supported_controllers =
+         BEETLE_DB_GET_PORT1_SUPPORT(settings);
    }
+
+   controller_changed = input_set_controller_port_compatibility(
+         0, supported_controllers);
 
    if (!compatibility_settings_enabled || !compatibility_game)
       return;
@@ -334,7 +342,8 @@ static void apply_game_compatibility_settings(void)
        previous_texture != psx_pgxp_texture_correction ||
        previous_nclip != psx_pgxp_nclip ||
        previous_cd_speedup_max != cd_speedup_compat_max ||
-       previous_fbwrite_delay != gpu_fbwrite_fifo_delay)
+       previous_fbwrite_delay != gpu_fbwrite_fifo_delay ||
+       controller_changed)
       log_cb(RETRO_LOG_INFO,
             "Compatibility settings applied: %s (%s)\n",
             beetle_game_database_title(compatibility_game),
@@ -5675,6 +5684,8 @@ static void clear_disc_state(void)
    compatibility_game = NULL;
    cd_speedup_compat_max = 0;
    gpu_fbwrite_fifo_delay = false;
+   input_set_controller_port_compatibility(
+         0, BEETLE_DB_CTRL_NONE);
 
    disk_control_ext_info.initial_index = 0;
    (free(disk_control_ext_info.initial_path), disk_control_ext_info.initial_path = NULL);

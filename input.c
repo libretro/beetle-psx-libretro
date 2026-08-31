@@ -5,7 +5,9 @@
 #include "mednafen/git.h"
 #include "mednafen/psx/frontio.h"
 #include "input.h"
+#include "input_compatibility.h"
 #include "beetle_psx_globals.h"
+#include "libretro_game_database.h"
 
 extern retro_log_printf_t log_cb;
 
@@ -74,26 +76,22 @@ struct analog_calibration
 
 static struct analog_calibration analog_calibration[MAX_CONTROLLERS];
 
-/* Controller type (per player) */
+/* Controller types (per player). The frontend request is retained while a
+ * game compatibility profile limits the effective emulated device. */
 static uint32_t input_type[ MAX_CONTROLLERS ] = {0};
+static uint32_t requested_input_type[ MAX_CONTROLLERS ] = {0};
+static uint32_t compatibility_controller_mask[ MAX_CONTROLLERS ] = {0};
+static bool input_types_initialized = false;
+
+static void update_input_descriptors(void);
+static void input_apply_controller_port_device(
+      unsigned in_port, unsigned device, bool publish_descriptors);
 
 /* ------------------------------------------------------------------------------ */
 /*  Supported Devices */
 /* ------------------------------------------------------------------------------ */
 
-#define RETRO_DEVICE_PS_CONTROLLER         RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 0)
-#define RETRO_DEVICE_PS_DUALSHOCK          RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1)
-#define RETRO_DEVICE_PS_ANALOG             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 0)
-#define RETRO_DEVICE_PS_ANALOG_JOYSTICK    RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
-#define RETRO_DEVICE_PS_GUNCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 0)
-#define RETRO_DEVICE_PS_JUSTIFIER          RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 1)
-#define RETRO_DEVICE_PS_MOUSE              RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_MOUSE, 0)
-#define RETRO_DEVICE_PS_NEGCON             RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
-#define RETRO_DEVICE_PS_NEGCON_RUMBLE      RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 4)
-
-enum { INPUT_DEVICE_TYPES_COUNT = 1 /*none*/ + 9 }; /*  <-- update me! */
-
-static const struct retro_controller_description input_device_types[ INPUT_DEVICE_TYPES_COUNT ] =
+static const struct retro_controller_description input_device_types[] =
 {
    { "PlayStation Controller", RETRO_DEVICE_JOYPAD },
    { "DualShock", RETRO_DEVICE_PS_DUALSHOCK },
@@ -106,6 +104,8 @@ static const struct retro_controller_description input_device_types[ INPUT_DEVIC
    { "neGcon Rumble", RETRO_DEVICE_PS_NEGCON_RUMBLE },
    { NULL, 0 },
 };
+
+#define INPUT_DEVICE_TYPES_COUNT ARRAY_SIZE(input_device_types)
 
 static const struct retro_controller_info ports8[ 8 + 1 ] =
 {
@@ -136,6 +136,12 @@ static const struct retro_controller_info ports2[ 2 + 1 ] =
    { input_device_types, INPUT_DEVICE_TYPES_COUNT },
    { 0 },
 };
+
+static unsigned input_effective_controller_port_device(unsigned port)
+{
+   return input_resolve_compatible_controller(requested_input_type[port],
+         compatibility_controller_mask[port]);
+}
 
 
 /* ------------------------------------------------------------------------------ */
@@ -514,15 +520,35 @@ void input_set_env( retro_environment_t _environ_cb )
    } /* switch ( players ) */
 }
 
-void input_init()
+static void input_initialize_types(void)
 {
    unsigned i;
-   /*  Initialise to default and bind input buffers to PS1 emulation. */
+
+   if (input_types_initialized)
+      return;
+
    for (i = 0; i < MAX_CONTROLLERS; ++i )
    {
       input_type[ i ] = RETRO_DEVICE_JOYPAD;
-      FrontIO_SetInput(FIO, i, "gamepad", (uint8_t*)&input_data[i]);
+      requested_input_type[ i ] = RETRO_DEVICE_JOYPAD;
+      compatibility_controller_mask[ i ] = BEETLE_DB_CTRL_NONE;
    }
+   input_types_initialized = true;
+}
+
+void input_init()
+{
+   unsigned i;
+
+   input_initialize_types();
+
+   /* Bind the retained frontend request, or the active compatibility
+    * replacement, to the newly-created PS1 input ports. */
+   for (i = 0; i < MAX_CONTROLLERS; ++i )
+      input_apply_controller_port_device(i,
+            input_effective_controller_port_device(i), false);
+
+   update_input_descriptors();
 }
 
 void input_set_fio(FrontIO* fio)
@@ -1238,86 +1264,123 @@ static void update_input_descriptors(void)
    environ_cb( RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc );
 }
 
+static void input_apply_controller_port_device(
+      unsigned in_port, unsigned device, bool publish_descriptors)
+{
+   input_type[ in_port ] = device;
+
+   if (!FIO)
+      return;
+
+   switch ( device )
+   {
+      case RETRO_DEVICE_NONE:
+         log_cb( RETRO_LOG_INFO, "Controller %u: Unplugged\n", (in_port+1) );
+         FrontIO_SetInput(FIO, in_port, "none", (uint8_t*)&input_data[in_port]);
+         break;
+
+      case RETRO_DEVICE_JOYPAD:
+      case RETRO_DEVICE_PS_CONTROLLER:
+         log_cb( RETRO_LOG_INFO, "Controller %u: PlayStation Controller\n", (in_port+1) );
+         FrontIO_SetInput(FIO, in_port, "gamepad", (uint8_t*)&input_data[ in_port ] );
+         break;
+
+      case RETRO_DEVICE_PS_DUALSHOCK:
+         log_cb( RETRO_LOG_INFO, "Controller %u: DualShock\n", (in_port+1) );
+         FrontIO_SetInput(FIO, in_port, "dualshock", (uint8_t*)&input_data[ in_port ] );
+         break;
+
+      case RETRO_DEVICE_PS_ANALOG:
+         log_cb( RETRO_LOG_INFO, "Controller %u: Analog Controller\n", (in_port+1) );
+         FrontIO_SetInput(FIO, in_port, "dualanalog", (uint8_t*)&input_data[ in_port ] );
+         break;
+
+      case RETRO_DEVICE_PS_ANALOG_JOYSTICK:
+         log_cb( RETRO_LOG_INFO, "Controller %u: Analog Joystick\n", (in_port+1) );
+         FrontIO_SetInput(FIO, in_port, "analogjoy", (uint8_t*)&input_data[ in_port ] );
+         break;
+
+      case RETRO_DEVICE_PS_GUNCON:
+         log_cb( RETRO_LOG_INFO, "Controller %u: Guncon / G-Con 45\n", (in_port+1) );
+         FrontIO_SetInput(FIO, in_port, "guncon", (uint8_t*)&input_data[ in_port ] );
+         FrontIO_SetCrosshairsCursor(FIO, in_port, gun_cursor);
+         break;
+
+      case RETRO_DEVICE_PS_JUSTIFIER:
+         log_cb( RETRO_LOG_INFO, "Controller %u: Justifier\n", (in_port+1) );
+         FrontIO_SetInput(FIO, in_port, "justifier", (uint8_t*)&input_data[ in_port ] );
+         FrontIO_SetCrosshairsCursor(FIO, in_port, gun_cursor);
+         break;
+
+      case RETRO_DEVICE_PS_MOUSE:
+         log_cb( RETRO_LOG_INFO, "Controller %u: Mouse\n", (in_port+1) );
+         FrontIO_SetInput(FIO, in_port, "mouse", (uint8_t*)&input_data[ in_port ] );
+         break;
+
+      case RETRO_DEVICE_PS_NEGCON:
+         log_cb( RETRO_LOG_INFO, "Controller %u: neGcon\n", (in_port+1) );
+         FrontIO_SetInput(FIO, in_port, "negcon", (uint8_t*)&input_data[ in_port ] );
+         break;
+
+      case RETRO_DEVICE_PS_NEGCON_RUMBLE:
+         log_cb( RETRO_LOG_INFO, "Controller %u: neGcon Rumble\n", (in_port+1) );
+         FrontIO_SetInput(FIO, in_port, "negconrumble", (uint8_t*)&input_data[ in_port ] );
+         break;
+
+      default:
+         log_cb( RETRO_LOG_WARN, "Controller %u: Unsupported Device (%u)\n", (in_port+1), device );
+         FrontIO_SetInput(FIO, in_port, "none", (uint8_t*)&input_data[ in_port ] );
+         break;
+   }
+
+   /* Clear rumble. */
+   if ( rumble.set_rumble_state )
+   {
+      rumble.set_rumble_state(in_port, RETRO_RUMBLE_STRONG, 0);
+      rumble.set_rumble_state(in_port, RETRO_RUMBLE_WEAK, 0);
+   }
+   input_data[ in_port ].u32[ 9 ] = 0;
+
+   if (publish_descriptors)
+      update_input_descriptors();
+}
+
+bool input_set_controller_port_compatibility(
+      unsigned port, uint32_t supported_controllers)
+{
+   bool changed;
+   unsigned effective_device;
+
+   if (port >= MAX_CONTROLLERS)
+      return false;
+
+   input_initialize_types();
+   supported_controllers &= BEETLE_DB_CTRL_ALL;
+   compatibility_controller_mask[port] = supported_controllers;
+   effective_device = input_effective_controller_port_device(port);
+   changed = input_type[port] != effective_device;
+
+   if (FIO && input_type[port] != effective_device)
+      input_apply_controller_port_device(port, effective_device, true);
+   else
+      input_type[port] = effective_device;
+
+   return changed;
+}
+
 void retro_set_controller_port_device( unsigned in_port, unsigned device )
 {
-   /* valid port? */
-   if ( in_port < MAX_CONTROLLERS )
-   {
-      /* Store input type */
-      input_type[ in_port ] = device;
+   unsigned effective_device;
 
-      switch ( device )
-      {
-         case RETRO_DEVICE_NONE:
-            log_cb( RETRO_LOG_INFO, "Controller %u: Unplugged\n", (in_port+1) );
-	    FrontIO_SetInput(FIO, in_port, "none", (uint8_t*)&input_data[in_port]);
-            break;
+   if (in_port >= MAX_CONTROLLERS)
+      return;
 
-         case RETRO_DEVICE_JOYPAD:
-         case RETRO_DEVICE_PS_CONTROLLER:
-            log_cb( RETRO_LOG_INFO, "Controller %u: PlayStation Controller\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "gamepad", (uint8_t*)&input_data[ in_port ] );
-            break;
+   input_initialize_types();
+   requested_input_type[in_port] = device;
+   effective_device = input_effective_controller_port_device(in_port);
 
-         case RETRO_DEVICE_PS_DUALSHOCK:
-            log_cb( RETRO_LOG_INFO, "Controller %u: DualShock\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "dualshock", (uint8_t*)&input_data[ in_port ] );
-            break;
-
-         case RETRO_DEVICE_PS_ANALOG:
-            log_cb( RETRO_LOG_INFO, "Controller %u: Analog Controller\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "dualanalog", (uint8_t*)&input_data[ in_port ] );
-            break;
-
-         case RETRO_DEVICE_PS_ANALOG_JOYSTICK:
-            log_cb( RETRO_LOG_INFO, "Controller %u: Analog Joystick\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "analogjoy", (uint8_t*)&input_data[ in_port ] );
-            break;
-
-         case RETRO_DEVICE_PS_GUNCON:
-            log_cb( RETRO_LOG_INFO, "Controller %u: Guncon / G-Con 45\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "guncon", (uint8_t*)&input_data[ in_port ] );
-            if ( FIO )
-               FrontIO_SetCrosshairsCursor(FIO, in_port, gun_cursor);
-            break;
-
-         case RETRO_DEVICE_PS_JUSTIFIER:
-            log_cb( RETRO_LOG_INFO, "Controller %u: Justifier\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "justifier", (uint8_t*)&input_data[ in_port ] );
-            if ( FIO )
-               FrontIO_SetCrosshairsCursor(FIO, in_port, gun_cursor);
-            break;
-
-         case RETRO_DEVICE_PS_MOUSE:
-            log_cb( RETRO_LOG_INFO, "Controller %u: Mouse\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "mouse", (uint8_t*)&input_data[ in_port ] );
-            break;
-
-         case RETRO_DEVICE_PS_NEGCON:
-            log_cb( RETRO_LOG_INFO, "Controller %u: neGcon\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "negcon", (uint8_t*)&input_data[ in_port ] );
-            break;
-
-         case RETRO_DEVICE_PS_NEGCON_RUMBLE:
-            log_cb( RETRO_LOG_INFO, "Controller %u: neGcon Rumble\n", (in_port+1) );
-            FrontIO_SetInput(FIO, in_port, "negconrumble", (uint8_t*)&input_data[ in_port ] );
-            break;
-
-         default:
-            log_cb( RETRO_LOG_WARN, "Controller %u: Unsupported Device (%u)\n", (in_port+1), device );
-            FrontIO_SetInput(FIO, in_port, "none", (uint8_t*)&input_data[ in_port ] );
-            break;
-      }
-
-      /* Clear rumble. */
-      if ( rumble.set_rumble_state )
-      {
-         rumble.set_rumble_state(in_port, RETRO_RUMBLE_STRONG, 0);
-         rumble.set_rumble_state(in_port, RETRO_RUMBLE_WEAK, 0);
-      }
-      input_data[ in_port ].u32[ 9 ] = 0;
-
-      /* Re-publish descriptors so the remap UI tracks the new device. */
-      update_input_descriptors();
-   }
+   if (FIO && input_type[in_port] != effective_device)
+      input_apply_controller_port_device(in_port, effective_device, true);
+   else
+      input_type[in_port] = effective_device;
 }
