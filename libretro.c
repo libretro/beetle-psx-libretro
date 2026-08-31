@@ -271,6 +271,7 @@ int psx_pgxp_2d_tol;
 unsigned int psx_pgxp_vertex_caching;
 unsigned int psx_pgxp_texture_correction;
 unsigned int psx_pgxp_nclip;
+bool psx_pgxp_gl_line_expansion;
 
 static void apply_pgxp_settings(void)
 {
@@ -352,6 +353,10 @@ static void apply_game_compatibility_settings(void)
 
 static void apply_setting_dependencies(void)
 {
+   psx_pgxp_gl_line_expansion = compatibility_settings_enabled &&
+         (((psx_pgxp_mode | psx_pgxp_vertex_caching) &
+           (PGXP_MODE_MEMORY | PGXP_VERTEX_CACHE)) != 0);
+
 #ifdef HAVE_LIGHTREC
    if (compatibility_settings_enabled &&
        (psx_pgxp_mode & PGXP_MODE_CPU) &&
@@ -364,6 +369,7 @@ static void apply_setting_dependencies(void)
             "(Buggy)\n");
    }
 #endif
+
 }
 
 static void apply_compatibility_settings(void)

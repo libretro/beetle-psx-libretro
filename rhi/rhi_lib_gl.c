@@ -6840,6 +6840,92 @@ void rhi_gl_push_quad(
    }
 }
 
+/* Expand native-width lines into triangles while PGXP is active. OpenGL's
+ * native line rasterization uses different endpoint and diagonal coverage
+ * rules than the polygon path, which exposes gaps after PGXP moves vertices
+ * to subpixel positions. Vulkan already expands its own lines and is left
+ * unchanged here. */
+static void gl_build_pgxp_line_quad(gl_command_vertex output[4],
+      const gl_command_vertex input[2])
+{
+   float dx = input[1].position[0] - input[0].position[0];
+   float dy = input[1].position[1] - input[0].position[1];
+   float fill_dx;
+   float fill_dy;
+   float pad_x0 = 0.0f;
+   float pad_x1 = 0.0f;
+   float pad_y0 = 0.0f;
+   float pad_y1 = 0.0f;
+   float x0;
+   float y0;
+   float x1;
+   float y1;
+
+   if (dx == 0.0f && dy == 0.0f)
+   {
+      output[0] = input[0];
+      output[1] = input[0];
+      output[2] = input[0];
+      output[3] = input[0];
+      output[1].position[0] += 1.0f;
+      output[2].position[1] += 1.0f;
+      output[3].position[0] += 1.0f;
+      output[3].position[1] += 1.0f;
+      return;
+   }
+
+   if (fabsf(dx) > fabsf(dy))
+   {
+      float slope = dy / fabsf(dx);
+      fill_dx = 0.0f;
+      fill_dy = 1.0f;
+      if (dx > 0.0f)
+      {
+         pad_x1 = 1.0f;
+         pad_y1 = slope;
+      }
+      else
+      {
+         pad_x0 = 1.0f;
+         pad_y0 = -slope;
+      }
+   }
+   else
+   {
+      float slope = dx / fabsf(dy);
+      fill_dx = 1.0f;
+      fill_dy = 0.0f;
+      if (dy > 0.0f)
+      {
+         pad_y1 = 1.0f;
+         pad_x1 = slope;
+      }
+      else
+      {
+         pad_y0 = 1.0f;
+         pad_x0 = -slope;
+      }
+   }
+
+   x0 = input[0].position[0] + pad_x0;
+   y0 = input[0].position[1] + pad_y0;
+   x1 = input[1].position[0] + pad_x1;
+   y1 = input[1].position[1] + pad_y1;
+
+   output[0] = input[0];
+   output[1] = input[0];
+   output[2] = input[1];
+   output[3] = input[1];
+   output[0].position[0] = x0;
+   output[0].position[1] = y0;
+   output[1].position[0] = x0 + fill_dx;
+   output[1].position[1] = y0 + fill_dy;
+   output[2].position[0] = x1;
+   output[2].position[1] = y1;
+   output[3].position[0] = x1 + fill_dx;
+   output[3].position[1] = y1 + fill_dy;
+}
+
 void rhi_gl_push_line(
       int16_t p0x, int16_t p0y,
       int16_t p1x, int16_t p1y,
@@ -6919,9 +7005,28 @@ void rhi_gl_push_line(
          }
       };
 
-      gl_vram_sync_primitive(renderer, v, 2);
-      push_primitive(renderer, v, 2,
-            GL_LINES, semi_transparency_mode, mask_test, set_mask);
+      if (psx_pgxp_gl_line_expansion)
+      {
+         gl_command_vertex quad[4];
+         gl_command_vertex triangles[6];
+
+         gl_build_pgxp_line_quad(quad, v);
+         gl_vram_sync_primitive(renderer, quad, 4);
+         triangles[0] = quad[0];
+         triangles[1] = quad[1];
+         triangles[2] = quad[2];
+         triangles[3] = quad[3];
+         triangles[4] = quad[2];
+         triangles[5] = quad[1];
+         push_primitive(renderer, triangles, 6,
+               GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask);
+      }
+      else
+      {
+         gl_vram_sync_primitive(renderer, v, 2);
+         push_primitive(renderer, v, 2,
+               GL_LINES, semi_transparency_mode, mask_test, set_mask);
+      }
    }
 }
 

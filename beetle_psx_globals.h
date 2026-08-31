@@ -39,6 +39,7 @@ extern bool psx_gpu_rasterize_both_fields;
 extern int line_render_mode;
 extern int filter_mode;
 extern int crop_overscan;
+extern bool psx_pgxp_gl_line_expansion;
 
 enum core_timing_fps_modes
 {
