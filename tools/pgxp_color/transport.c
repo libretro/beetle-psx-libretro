@@ -328,6 +328,51 @@ static void test_nclip_magnitude(void)
       fail("NCLIP rejected stable positive orientation", 0, 1);
 }
 
+static void test_architectural_zero_add_identity(void)
+{
+   const uint32_t runtime_zero_operands = INSTR_RS(4) | INSTR_RT(3) |
+      INSTR_RD(5) | 0x21u;
+   const uint32_t architectural_right_zero = INSTR_RS(4) |
+      INSTR_RD(5) | 0x21u;
+   const uint32_t architectural_left_zero = INSTR_RT(3) |
+      INSTR_RD(5) | 0x21u;
+
+   CPU_reg[4] = PGXP_value_zero;
+   SetValue(&CPU_reg[4], 1);
+   CPU_reg[4].x = 1.25f;
+   CPU_reg[4].z = 7.5f;
+   CPU_reg[0] = PGXP_value_zero;
+   PGXP_CPU_ADDU(architectural_right_zero, 1, 1, 0);
+   if (CPU_reg[5].x != 1.25f || CPU_reg[5].z != 7.5f)
+      fail("architectural right-zero ADD lost identity", 0, 1);
+
+   CPU_reg[3] = PGXP_value_zero;
+   SetValue(&CPU_reg[3], 1);
+   CPU_reg[3].x = 1.25f;
+   CPU_reg[3].z = 7.5f;
+   PGXP_CPU_ADDU(architectural_left_zero, 1, 0, 1);
+   if (CPU_reg[5].x != 1.25f || CPU_reg[5].z != 7.5f)
+      fail("architectural left-zero ADD lost identity", 0, 1);
+
+   /* Ordinary registers whose native value happens to be zero may still
+    * carry meaningful fractional coordinates on either side. */
+   SetValue(&CPU_reg[4], 1);
+   SetValue(&CPU_reg[3], 0);
+   CPU_reg[4].x = 1.25f;
+   CPU_reg[3].x = 0.5f;
+   PGXP_CPU_ADDU(runtime_zero_operands, 1, 1, 0);
+   if (CPU_reg[5].x != 1.75f)
+      fail("runtime-zero right ADD lost precision", 0, 1);
+
+   SetValue(&CPU_reg[4], 0);
+   SetValue(&CPU_reg[3], 1);
+   CPU_reg[4].x = 0.5f;
+   CPU_reg[3].x = 1.25f;
+   PGXP_CPU_ADDU(runtime_zero_operands, 1, 0, 1);
+   if (CPU_reg[5].x != 1.75f)
+      fail("runtime-zero left ADD lost precision", 0, 1);
+}
+
 static void test_memory_zero_add_identity(void)
 {
    const uint32_t instr = INSTR_RS(4) | INSTR_RD(5) | 0x21u;
@@ -402,7 +447,10 @@ int main(void)
    printf("[T6] NCLIP native magnitude preservation\n");
    test_nclip_magnitude();
 
-   printf("[T7] Memory Only right-zero ADDU identity\n");
+   printf("[T7] architectural-zero ADD identity\n");
+   test_architectural_zero_add_identity();
+
+   printf("[T8] Memory Only right-zero ADDU identity\n");
    test_memory_zero_add_identity();
 
    if (failures)

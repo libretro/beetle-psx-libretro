@@ -265,6 +265,21 @@ void PGXP_CPU_ADD(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal
 	Validate(&CPU_reg[rs(instr)], rsVal);
 	Validate(&CPU_reg[rt(instr)], rtVal);
 
+	/* Addition with the architectural zero register is an exact identity.
+	 * Preserve the complete other operand shadow instead of blending. */
+	if (rt(instr) == 0)
+	{
+		CPU_reg[rd(instr)] = CPU_reg[rs(instr)];
+		CPU_reg[rd(instr)].value = rdVal;
+		return;
+	}
+	if (rs(instr) == 0)
+	{
+		CPU_reg[rd(instr)] = CPU_reg[rt(instr)];
+		CPU_reg[rd(instr)].value = rdVal;
+		return;
+	}
+
 	/* iCB: Only require one valid input */
 	if (((CPU_reg[rt(instr)].flags & VALID_01) != VALID_01) != ((CPU_reg[rs(instr)].flags & VALID_01) != VALID_01))
 	{
