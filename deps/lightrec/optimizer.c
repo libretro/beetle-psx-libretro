@@ -917,16 +917,21 @@ static int lightrec_transform_ops(struct lightrec_state *state, struct block *bl
 	struct opcode *op, *list = block->opcode_list;
 	struct constprop_data v[32] = LIGHTREC_CONSTPROP_INITIALIZER;
 	unsigned int i;
-	bool local;
+	bool local, pgxp_addu_identity;
 	int idx;
-	u8 tmp;
+	u8 tmp, pgxp_addu_source;
 
 	for (i = 0; i < block->nb_ops; i++) {
 		op = &list[i];
+		pgxp_addu_identity =
+			op_flag_pgxp_addu_identity(op->flags);
+		pgxp_addu_source = op->r.rs;
 
 		lightrec_consts_propagate(block, i, v);
 
 		lightrec_patch_known_zero(op, v);
+		if (pgxp_addu_identity)
+			op->r.rs = pgxp_addu_source;
 
 		/* Transform all opcodes detected as useless to real NOPs
 		 * (0x0: SLL r0, r0, #0) */
@@ -2414,6 +2419,18 @@ int lightrec_optimize(struct lightrec_state *state, struct block *block)
 {
 	unsigned int i;
 	int ret;
+
+	if (state->ops.pgxp_addu_identity) {
+		for (i = 0; i < block->nb_ops; i++) {
+			union code c = block->opcode_list[i].c;
+
+			if (c.i.op == OP_SPECIAL &&
+			    c.r.op == OP_SPECIAL_ADDU && c.r.rt == 0 &&
+			    c.r.rd != 0 && c.r.rd != c.r.rs)
+				block->opcode_list[i].flags |=
+					LIGHTREC_PGXP_ADDU_IDENTITY;
+		}
+	}
 
 	for (i = 0; i < ARRAY_SIZE(lightrec_optimizers); i++) {
 		if (lightrec_optimizers[i]) {

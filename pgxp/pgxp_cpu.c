@@ -303,6 +303,27 @@ void PGXP_CPU_ADDU(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVa
 	PGXP_CPU_ADD(instr, rdVal, rsVal, rtVal);
 }
 
+void PGXP_CPU_ADDU_Identity(uint32_t instr, uint32_t rdVal, uint32_t rsVal)
+{
+	unsigned dest = rd(instr);
+	unsigned source = rs(instr);
+
+	/* This transport is intentionally limited to the architectural
+	 * `addu rd, rs, $zero` form established by device instrumentation. */
+	if (rt(instr) != 0 || dest == 0 || dest == source)
+		return;
+	if (source == 0)
+	{
+		CPU_reg[dest] = PGXP_value_zero;
+		SetValue(&CPU_reg[dest], rdVal);
+		return;
+	}
+
+	Validate(&CPU_reg[source], rsVal);
+	CPU_reg[dest] = CPU_reg[source];
+	CPU_reg[dest].value = rdVal;
+}
+
 void PGXP_CPU_SUB(uint32_t instr, uint32_t rdVal, uint32_t rsVal, uint32_t rtVal)
 {
 	/* Rd = Rs - Rt (signed) */

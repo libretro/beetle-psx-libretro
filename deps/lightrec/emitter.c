@@ -26,6 +26,8 @@ static void rec_CP0(struct lightrec_cstate *state, const struct block *block, u1
 static void rec_CP2(struct lightrec_cstate *state, const struct block *block, u16 offset);
 static void rec_META(struct lightrec_cstate *state, const struct block *block, u16 offset);
 static _Bool pgxp_cpu_tracked_load(union code c);
+static void rec_pgxp_addu_identity(struct lightrec_cstate *state,
+		const struct block *block, u16 offset);
 static void rec_cp2_do_mtc2(struct lightrec_cstate *state,
 			    const struct block *block, u16 offset, u8 reg, u8 in_reg);
 static void rec_cp2_do_mfc2(struct lightrec_cstate *state,
@@ -766,6 +768,11 @@ static void rec_special_ADDU(struct lightrec_cstate *state,
 {
 	_jit_name(block->_jit, __func__);
 	rec_alu_special(state, block, offset, jit_code_addr, false);
+
+	if (state->state->ops.pgxp_addu_identity &&
+	    op_flag_pgxp_addu_identity(
+		    block->opcode_list[offset].flags))
+		rec_pgxp_addu_identity(state, block, offset);
 }
 
 static void rec_special_ADD(struct lightrec_cstate *state,
@@ -1671,6 +1678,23 @@ static void rec_store_direct_no_invalidate(struct lightrec_cstate *cstate,
 
 	lightrec_free_reg(reg_cache, src_reg);
 	lightrec_free_reg(reg_cache, tmp);
+}
+
+static void rec_pgxp_addu_identity(struct lightrec_cstate *state,
+		const struct block *block, u16 offset)
+{
+	struct regcache *reg_cache = state->reg_cache;
+	jit_state_t *_jit = block->_jit;
+	union code c = block->opcode_list[offset].c;
+	union code identity = { .opcode = 0 };
+
+	identity.r.op = OP_SPECIAL_ADDU;
+	identity.r.rs = c.r.rs;
+	identity.r.rd = c.r.rd;
+
+	lightrec_clean_reg_if_loaded(reg_cache, _jit, c.r.rd, false);
+	call_to_c_wrapper(state, block, identity.opcode,
+			  C_WRAPPER_PGXP_ADDU_IDENTITY);
 }
 
 static void rec_store_direct(struct lightrec_cstate *cstate, const struct block *block,
@@ -3071,7 +3095,7 @@ static void rec_meta_MOV(struct lightrec_cstate *state,
 		rs = lightrec_alloc_reg_in(reg_cache, _jit, c.m.rs, 0);
 		lightrec_remap_reg(reg_cache, _jit, rs, c.m.rd, discard_rs);
 		lightrec_free_reg(reg_cache, rs);
-		return;
+		goto track_identity;
 	}
 
 	unload_rd = OPT_EARLY_UNLOAD
@@ -3105,6 +3129,11 @@ static void rec_meta_MOV(struct lightrec_cstate *state,
 
 		lightrec_free_reg(reg_cache, rd);
 	}
+
+track_identity:
+	if (state->state->ops.pgxp_addu_identity &&
+	    op_flag_pgxp_addu_identity(op->flags))
+		rec_pgxp_addu_identity(state, block, offset);
 }
 
 static void rec_meta_EXTC_EXTS(struct lightrec_cstate *state,

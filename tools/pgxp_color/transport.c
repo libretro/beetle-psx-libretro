@@ -328,6 +328,55 @@ static void test_nclip_magnitude(void)
       fail("NCLIP rejected stable positive orientation", 0, 1);
 }
 
+static void test_memory_zero_add_identity(void)
+{
+   const uint32_t instr = INSTR_RS(4) | INSTR_RD(5) | 0x21u;
+   const uint32_t zero_source = INSTR_RD(5) | 0x21u;
+   const uint32_t wrong_direction = INSTR_RT(4) | INSTR_RD(5) | 0x21u;
+   const uint32_t nonzero_rt = INSTR_RS(4) | INSTR_RT(3) |
+      INSTR_RD(5) | 0x21u;
+
+   CPU_reg[4] = PGXP_value_zero;
+   CPU_reg[5] = PGXP_value_zero;
+   SetValue(&CPU_reg[4], 0x00020001u);
+   CPU_reg[4].x = 1.25f;
+   CPU_reg[4].y = 2.5f;
+   PGXP_CPU_ADDU_Identity(instr, 0x00020001u, 0x00020001u);
+   if (CPU_reg[5].x != 1.25f || CPU_reg[5].y != 2.5f ||
+       CPU_reg[5].value != 0x00020001u)
+      fail("memory ADDU lost exact identity", CPU_reg[5].value,
+            0x00020001u);
+
+   CPU_reg[5] = PGXP_value_zero;
+   CPU_reg[5].x = 9.f;
+   PGXP_CPU_ADDU_Identity(wrong_direction, 0x00020001u, 0x00020001u);
+   if (CPU_reg[5].x != 9.f)
+      fail("left-zero ADDU was transported", 0, 1);
+
+   CPU_reg[5].x = 8.f;
+   PGXP_CPU_ADDU_Identity(nonzero_rt, 0x00020001u, 0x00020001u);
+   if (CPU_reg[5].x != 8.f)
+      fail("runtime-zero ADDU was transported", 0, 1);
+
+   CPU_reg[4].flags = VALID_01;
+   CPU_reg[4].value = 0x00040003u;
+   PGXP_CPU_ADDU_Identity(instr, 0x00020001u, 0x00020001u);
+   if (CPU_reg[5].flags & VALID_01)
+      fail("stale ADDU source stayed valid", CPU_reg[5].flags, 0);
+
+   CPU_reg[5] = PGXP_value_zero;
+   SetValue(&CPU_reg[5], 0);
+   CPU_reg[5].x = 9.f;
+   CPU_reg[5].y = 8.f;
+   CPU_reg[5].z = 7.f;
+   PGXP_CPU_ADDU_Identity(zero_source, 0, 0);
+   if (CPU_reg[5].value != 0 || CPU_reg[5].x != 0.f ||
+       CPU_reg[5].y != 0.f || CPU_reg[5].z != 0.f ||
+       (CPU_reg[5].flags & VALID_01) != VALID_01)
+      fail("zero-source ADDU retained stale precision",
+            CPU_reg[5].value, 0);
+}
+
 int main(void)
 {
    PGXP_Init();
@@ -352,6 +401,9 @@ int main(void)
 
    printf("[T6] NCLIP native magnitude preservation\n");
    test_nclip_magnitude();
+
+   printf("[T7] Memory Only right-zero ADDU identity\n");
+   test_memory_zero_add_identity();
 
    if (failures)
    {
