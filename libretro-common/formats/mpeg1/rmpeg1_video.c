@@ -183,6 +183,9 @@ struct rmpeg1_video
     * becomes bwd. That one-picture delay is the reordering B pictures
     * require -- they are transmitted after the reference they predict
     * forward from, and displayed before it. */
+   /* All nine planes are views into plane_arena, each starting on a
+    * 64-byte boundary. */
+   uint8_t  *plane_arena;
    uint8_t  *plane[3][3];     /* [slot][Y, Cb, Cr] */
    int       slot_cur, slot_fwd, slot_bwd;
    bool      have_fwd, have_bwd;
@@ -428,33 +431,26 @@ static bool alloc_planes(rmpeg1_video_t *v)
 
    {
       int k, j;
+      size_t yreg = (ysz + 63) & ~(size_t)63;
+      size_t creg = (csz + 63) & ~(size_t)63;
+      size_t cur  = 0;
 
-      for (k = 0; k < 3; k++)
-         for (j = 0; j < 3; j++)
-         {
-            free(v->plane[k][j]);
-            v->plane[k][j] = NULL;
-         }
+      free(v->plane_arena);
+      v->plane_arena = (uint8_t *)calloc(1, 3 * (yreg + 2 * creg));
+      if (!v->plane_arena)
+      {
+         for (k = 0; k < 3; k++)
+            for (j = 0; j < 3; j++)
+               v->plane[k][j] = NULL;
+         v->plane_bytes = 0;
+         return false;
+      }
 
       for (k = 0; k < 3; k++)
       {
-         v->plane[k][0] = (uint8_t *)calloc(1, ysz);
-         v->plane[k][1] = (uint8_t *)calloc(1, csz);
-         v->plane[k][2] = (uint8_t *)calloc(1, csz);
-
-         if (!v->plane[k][0] || !v->plane[k][1] || !v->plane[k][2])
-         {
-            int m, n;
-
-            for (m = 0; m < 3; m++)
-               for (n = 0; n < 3; n++)
-               {
-                  free(v->plane[m][n]);
-                  v->plane[m][n] = NULL;
-               }
-            v->plane_bytes = 0;
-            return false;
-         }
+         v->plane[k][0] = v->plane_arena + cur; cur += yreg;
+         v->plane[k][1] = v->plane_arena + cur; cur += creg;
+         v->plane[k][2] = v->plane_arena + cur; cur += creg;
       }
    }
 
@@ -1044,6 +1040,21 @@ static bool decode_motion(rmpeg1_video_t *v, int dir, int *pred, int *out)
    if (!e)
       return false;
 
+   /* f_code is 1..7 by the specification. Zero reaches here two ways: a
+    * slice decoded before any picture header has set it, and a header
+    * whose f_code was rejected. Both are malformed input rather than
+    * hypotheses - a byte-flip fuzzer over a conformant VCD stream hits
+    * them in a few hundred iterations. The consequences of trusting it
+    * are 1 << -1, which is undefined, and then get_bits() asked for
+    * (unsigned)(0 - 1) == 4294967295 bits. get_bit() is bounds safe and
+    * returns zero past the end, so that is not an overread, but it is a
+    * 4.29-billion-iteration loop: measured at 2.7 seconds per occurrence
+    * on a desktop, and it can recur once per macroblock. On the handheld
+    * targets this core ships to it is indistinguishable from a hang, off
+    * nothing more than a corrupt disc image. Refuse the macroblock. */
+   if (v->f_code[dir] < 1)
+      return false;
+
    code = e->a;
    f    = 1 << (v->f_code[dir] - 1);
 
@@ -1547,30 +1558,56 @@ static bool parse_sequence_header(rmpeg1_video_t *v)
 
 static bool parse_picture_header(rmpeg1_video_t *v)
 {
+   /* Parsed into locals and committed only once every field has been
+    * validated. The caller rewinds the bitstream on failure (v->rd =
+    * save_rd) and retries when more data arrives, so decoder state has to
+    * be rewound with it. Assigning straight into v left a rejected
+    * header's values behind: a forbidden f_code of 0 was stored, the
+    * function returned false, the read cursor went back, and the zero
+    * stayed. decode_motion then computed 1 << -1 and asked get_bits for
+    * (unsigned)-1 bits. Only fields this picture type actually carries
+    * are overwritten - an I picture keeps the previous f_code, exactly as
+    * before - so the success path is unchanged. */
+   int  temporal_ref, coding_type;
+   int  f_code[2];
+   bool full_pel[2];
+
    if (bits_left(v) < 29)
       return false;
 
-   v->temporal_ref = get_bits(v, 10);
-   v->coding_type  = get_bits(v, 3);
+   f_code[0]   = v->f_code[0];
+   f_code[1]   = v->f_code[1];
+   full_pel[0] = v->full_pel[0];
+   full_pel[1] = v->full_pel[1];
+
+   temporal_ref = (int)get_bits(v, 10);
+   coding_type  = (int)get_bits(v, 3);
    (void)get_bits(v, 16);        /* vbv_delay */
 
-   if (v->coding_type == RMPEG1_PIC_P || v->coding_type == RMPEG1_PIC_B)
+   if (coding_type == RMPEG1_PIC_P || coding_type == RMPEG1_PIC_B)
    {
-      v->full_pel[0] = get_bit(v) ? true : false;
-      v->f_code[0]   = (int)get_bits(v, 3);
-      if (v->f_code[0] < 1)
+      full_pel[0] = get_bit(v) ? true : false;
+      f_code[0]   = (int)get_bits(v, 3);
+      if (f_code[0] < 1)
          return false;           /* forward_f_code 0 is forbidden */
    }
-   if (v->coding_type == RMPEG1_PIC_B)
+   if (coding_type == RMPEG1_PIC_B)
    {
-      v->full_pel[1] = get_bit(v) ? true : false;
-      v->f_code[1]   = (int)get_bits(v, 3);
-      if (v->f_code[1] < 1)
+      full_pel[1] = get_bit(v) ? true : false;
+      f_code[1]   = (int)get_bits(v, 3);
+      if (f_code[1] < 1)
          return false;           /* backward_f_code 0 is forbidden */
    }
 
    while (get_bit(v))
       (void)get_bits(v, 8);      /* extra_information_picture */
+
+   v->temporal_ref = temporal_ref;
+   v->coding_type  = coding_type;
+   v->f_code[0]    = f_code[0];
+   v->f_code[1]    = f_code[1];
+   v->full_pel[0]  = full_pel[0];
+   v->full_pel[1]  = full_pel[1];
 
    return true;
 }
@@ -1688,13 +1725,7 @@ void rmpeg1_video_free(rmpeg1_video_t *v)
    if (!v)
       return;
    free(v->buf);
-   {
-      int k, j;
-
-      for (k = 0; k < 3; k++)
-         for (j = 0; j < 3; j++)
-            free(v->plane[k][j]);
-   }
+   free(v->plane_arena);
    free(v);
 }
 
