@@ -353,9 +353,11 @@ static void apply_game_compatibility_settings(void)
 
 static void apply_setting_dependencies(void)
 {
+   /* Vertex caching is parsed independently of the operation mode, so
+    * key the line expansion on the mode alone: with PGXP off no precise
+    * geometry exists and the native GL line path must stay in use. */
    psx_pgxp_gl_line_expansion = compatibility_settings_enabled &&
-         (((psx_pgxp_mode | psx_pgxp_vertex_caching) &
-           (PGXP_MODE_MEMORY | PGXP_VERTEX_CACHE)) != 0);
+         psx_pgxp_mode != PGXP_MODE_NONE;
 
 #ifdef HAVE_LIGHTREC
    if (compatibility_settings_enabled &&
@@ -955,10 +957,12 @@ static void reapply_disc_compatibility(void)
    if (compatibility_runtime_ready)
       check_variables(false);
    else
-   {
       apply_compatibility_settings();
-      apply_pgxp_settings();
-   }
+
+   /* check_variables() only rewrites the psx_pgxp_* variables; the mode
+    * word must still be pushed to PGXP here, since retro_run() only does
+    * so after a core-option change and not after a disc change. */
+   apply_pgxp_settings();
 }
 
 static void refresh_selected_disc_compatibility(void)
@@ -3055,8 +3059,19 @@ static void CDInsertEject(void)
     * compatibility metadata to the emulated CD controller. */
    if (!CD_TrayOpen && CD_IsPBP && CD_SelectedDisc >= 0)
    {
-      PBP_LoadedDisc = CD_SelectedDisc;
-      CalcDiscSCEx();
+      /* Only re-read the disc when a different internal PBP disc was
+       * selected, or when this slot has never been identified. Savestate
+       * loads cycle the tray on every load, and re-identifying the same
+       * disc there would add PVD/SYSTEM.CNF reads to every rewind and
+       * runahead frame. */
+      bool identified = (size_t)CD_SelectedDisc < disc_compatibility_count &&
+            disc_compatibility[CD_SelectedDisc].identified;
+
+      if (PBP_LoadedDisc != CD_SelectedDisc || !identified)
+      {
+         PBP_LoadedDisc = CD_SelectedDisc;
+         CalcDiscSCEx();
+      }
    }
 
    SetDiscWrapper(CD_TrayOpen);
