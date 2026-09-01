@@ -57,6 +57,13 @@ static inline u32 execute(lightrec_int_func_t func, struct interpreter *inter)
 
 static inline u32 lightrec_int_op(struct interpreter *inter)
 {
+	/* PGXP CPU-mode tracking: report non-memory ops before they
+	 * execute, mirroring the recompiler.  Loads and stores are
+	 * reported by the memory-map ops. */
+	if (unlikely(inter->state->ops.pgxp_cpu) &&
+	    lightrec_pgxp_cpu_tracked(inter->op->c))
+		lightrec_pgxp_cpu_track(inter->state, inter->op->c);
+
 	return execute(int_standard[inter->op->i.op], inter);
 }
 

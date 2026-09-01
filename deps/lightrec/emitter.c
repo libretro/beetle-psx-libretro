@@ -25,7 +25,6 @@ static void rec_REGIMM(struct lightrec_cstate *state, const struct block *block,
 static void rec_CP0(struct lightrec_cstate *state, const struct block *block, u16 offset);
 static void rec_CP2(struct lightrec_cstate *state, const struct block *block, u16 offset);
 static void rec_META(struct lightrec_cstate *state, const struct block *block, u16 offset);
-static _Bool pgxp_cpu_tracked_load(union code c);
 static void rec_pgxp_addu_identity(struct lightrec_cstate *state,
 		const struct block *block, u16 offset);
 static void rec_cp2_do_mtc2(struct lightrec_cstate *state,
@@ -2416,37 +2415,6 @@ static void rec_load(struct lightrec_cstate *state, const struct block *block,
 		rec_cp2_do_mtc2(state, block, offset, op->i.rt, REG_TEMP);
 		lightrec_discard_reg_if_loaded(state->reg_cache, REG_TEMP);
 	}
-
-	/* PGXP CPU-mode tracking for direct-path loads.  Wrapper-path loads
-	 * are tracked in lightrec_rw_helper(); the direct (inline) load paths
-	 * reach here.  The loaded value is now in the output register; sync it
-	 * (and the address base) back to the register file so the C wrapper
-	 * observes the loaded result, then emit the tracking call.  LWC2 is a
-	 * GTE load with no PGXP_CPU tracker, so it is excluded. */
-	if (state->state->ops.pgxp_cpu && op->i.op != OP_LWC2 &&
-	    pgxp_cpu_tracked_load(op->c)) {
-		struct regcache *reg_cache = state->reg_cache;
-		jit_state_t *_jit = block->_jit;
-		bool load_delay = op_flag_load_delay(op->flags) &&
-				  !state->no_load_delay;
-
-		jit_note(__FILE__, __LINE__);
-
-		/* Non-delayed loads land in gpr[rt]; delayed loads stash the
-		 * value in REG_TEMP until the delay resolves. Sync whichever
-		 * holds the loaded value, plus the address base in rs. */
-		if (load_delay)
-			lightrec_clean_reg_if_loaded(reg_cache, _jit,
-						     REG_TEMP, false);
-		else if (op->c.i.rt)
-			lightrec_clean_reg_if_loaded(reg_cache, _jit,
-						     op->c.i.rt, false);
-		lightrec_clean_reg_if_loaded(reg_cache, _jit, op->c.i.rs, false);
-
-		call_to_c_wrapper(state, block,
-				  (lightrec_get_lut_entry(block) << 16) | offset,
-				  C_WRAPPER_PGXP_CPU);
-	}
 }
 
 static void rec_LB(struct lightrec_cstate *state, const struct block *block, u16 offset)
@@ -3464,65 +3432,11 @@ static void rec_META(struct lightrec_cstate *state,
 		(*f)(state, block, offset);
 }
 
-/* Loads tracked by PGXP CPU mode (have a PGXP_CPU_L* tracker). */
-static _Bool pgxp_cpu_tracked_load(union code c)
-{
-	switch (c.i.op) {
-	case OP_LB:  case OP_LBU: case OP_LH:  case OP_LHU:
-	case OP_LWL: case OP_LWR: case OP_LW:
-		return true;
-	default:
-		return false;
-	}
-}
-
-/* Returns true if `c` is a non-memory CPU op that PGXP CPU mode tracks and
- * whose operands are available from the GPR file (so the post-execution
- * values can be read by the C wrapper after a regcache clean).  Loads and
- * stores are deliberately excluded here: their tracked value/address live in
- * the rec_io path and are handled separately. */
-static _Bool pgxp_cpu_tracked(union code c)
-{
-	switch (c.i.op) {
-	case OP_SPECIAL:
-		switch (c.r.op) {
-		case OP_SPECIAL_SLL:  case OP_SPECIAL_SRL:  case OP_SPECIAL_SRA:
-		case OP_SPECIAL_SLLV: case OP_SPECIAL_SRLV: case OP_SPECIAL_SRAV:
-		case OP_SPECIAL_MFHI: case OP_SPECIAL_MTHI:
-		case OP_SPECIAL_MFLO: case OP_SPECIAL_MTLO:
-		case OP_SPECIAL_MULT: case OP_SPECIAL_MULTU:
-		case OP_SPECIAL_DIV:  case OP_SPECIAL_DIVU:
-		case OP_SPECIAL_ADD:  case OP_SPECIAL_ADDU:
-		case OP_SPECIAL_SUB:  case OP_SPECIAL_SUBU:
-		case OP_SPECIAL_AND:  case OP_SPECIAL_OR:
-		case OP_SPECIAL_XOR:  case OP_SPECIAL_NOR:
-		case OP_SPECIAL_SLT:  case OP_SPECIAL_SLTU:
-			return true;
-		default:
-			return false;
-		}
-	case OP_ADDI:  case OP_ADDIU:
-	case OP_SLTI:  case OP_SLTIU:
-	case OP_ANDI:  case OP_ORI:
-	case OP_XORI:  case OP_LUI:
-		return true;
-	/* Stores: tracked value (rt) and address base (rs) are both live in
-	 * the GPR file at this point and unmodified by the store, so they can
-	 * be read after a regcache clean.  Loads are not yet handled here:
-	 * their tracked result is subject to load-delay and is produced by the
-	 * rec_io path, so they need separate handling. */
-	case OP_SB:  case OP_SH:  case OP_SWL: case OP_SW:
-	case OP_SWR:
-		return true;
-	default:
-		return false;
-	}
-}
-
-/* Emit a PGXP CPU-tracking call after a tracked non-memory op.  The
- * instruction's GPR fields are stored back to state->regs.gpr[] so the
- * wrapper observes the post-execution values, then the single-arg wrapper is
- * invoked (LUT entry + offset, identical encoding to C_WRAPPER_RW_GENERIC). */
+/* Emit the PGXP CPU-tracking call for a non-memory op.  This runs *before*
+ * the native op: the tracker reads the source registers from the GPR file
+ * and computes the result itself (lightrec_pgxp_cpu_track), so the sources
+ * must be synced back but the destination is left alone.  The wrapper
+ * argument is the LUT entry + offset, identical to C_WRAPPER_RW_GENERIC. */
 static void rec_pgxp_cpu_track(struct lightrec_cstate *state,
 			       const struct block *block, u16 offset)
 {
@@ -3533,12 +3447,16 @@ static void rec_pgxp_cpu_track(struct lightrec_cstate *state,
 
 	jit_note(__FILE__, __LINE__);
 
-	/* Sync the registers the tracker will read back to the GPR file. */
-	lightrec_clean_reg_if_loaded(reg_cache, _jit, c.r.rd, false);
+	/* rs/rt occupy the same bits in the r, i and m encodings, so this
+	 * covers the meta opcodes as well.  A stale field on an op that does
+	 * not read that register only costs a redundant store-back. */
 	lightrec_clean_reg_if_loaded(reg_cache, _jit, c.r.rs, false);
 	lightrec_clean_reg_if_loaded(reg_cache, _jit, c.r.rt, false);
-	lightrec_clean_reg_if_loaded(reg_cache, _jit, REG_HI, false);
-	lightrec_clean_reg_if_loaded(reg_cache, _jit, REG_LO, false);
+
+	if (c.i.op == OP_SPECIAL) {
+		lightrec_clean_reg_if_loaded(reg_cache, _jit, REG_HI, false);
+		lightrec_clean_reg_if_loaded(reg_cache, _jit, REG_LO, false);
+	}
 
 	lut_entry = lightrec_get_lut_entry(block);
 	call_to_c_wrapper(state, block, (lut_entry << 16) | offset,
@@ -3572,18 +3490,19 @@ void lightrec_rec_opcode(struct lightrec_cstate *state,
 	if (likely(op->opcode)) {
 		f = rec_standard[op->i.op];
 
+		/* PGXP CPU-mode tracking: when the host has installed a
+		 * pgxp_cpu hook, report each tracked non-memory op before
+		 * it executes so recompiled code maintains the same
+		 * per-register precision metadata the interpreter would.
+		 * Loads and stores are reported by the memory-map ops. */
+		if (state->state->ops.pgxp_cpu &&
+		    lightrec_pgxp_cpu_tracked(op->c))
+			rec_pgxp_cpu_track(state, block, offset);
+
 		if (!HAS_DEFAULT_ELM && unlikely(!f))
 			unknown_opcode(state, block, offset);
 		else
 			(*f)(state, block, offset);
-
-		/* PGXP CPU-mode tracking: when the host has installed a
-		 * pgxp_cpu hook, emit a tracking call after each tracked
-		 * non-memory op so recompiled code maintains the same
-		 * per-register precision metadata the interpreter would. */
-		if (state->state->ops.pgxp_cpu &&
-		    pgxp_cpu_tracked(op->c))
-			rec_pgxp_cpu_track(state, block, offset);
 	}
 
 	if (OPT_EARLY_UNLOAD) {

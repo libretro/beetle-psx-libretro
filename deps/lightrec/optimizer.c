@@ -1032,7 +1032,12 @@ static int lightrec_transform_ops(struct lightrec_state *state, struct block *bl
 			if (!is_delay_slot(list, i))
 				lightrec_modify_lui(block, i);
 			lightrec_remove_useless_lui(block, i, v);
-			if (!is_delay_slot(list, i))
+			/* The MOVI fusion folds the LUI into its consumer
+			 * without ever writing rt to the register file, so
+			 * the consumer's PGXP tracker would read a stale
+			 * source.  Keep the LUI materialised while the
+			 * tracker is active. */
+			if (!is_delay_slot(list, i) && !state->ops.pgxp_cpu)
 				lightrec_lui_to_movi(block, i);
 			break;
 

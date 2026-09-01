@@ -336,6 +336,65 @@ void lightrec_free_cstate(struct lightrec_cstate *cstate);
 
 union code lightrec_read_opcode(struct lightrec_state *state, u32 pc);
 
+/* PGXP CPU-mode tracking.
+ *
+ * The host's ops.pgxp_cpu hook keeps a per-register precision shadow that
+ * must observe every architectural register write the interpreter would
+ * report for the non-memory ops.  (Loads and stores are already reported
+ * by the memory-map ops, which see the address and the value.)  The tracker
+ * is driven from the opcode list *after* the optimizer has run, so the
+ * classifier below must recognise lightrec's meta opcodes as well as the
+ * MIPS forms they replace; lightrec_pgxp_cpu_track() maps each of them
+ * back to the MIPS instruction the PGXP dispatcher expects.
+ *
+ * Tracked ops are reported *before* the native op executes: the tracker
+ * reads the source registers from the GPR file and computes the result
+ * itself, so in-place forms (addu $v0, $v0, $v1) still see the pre-op
+ * source values. */
+static inline bool lightrec_pgxp_cpu_tracked(union code c)
+{
+	if (!c.opcode)
+		return false;
+
+	switch (c.i.op) {
+	case OP_SPECIAL:
+		switch (c.r.op) {
+		case OP_SPECIAL_SLL:  case OP_SPECIAL_SRL:  case OP_SPECIAL_SRA:
+		case OP_SPECIAL_SLLV: case OP_SPECIAL_SRLV: case OP_SPECIAL_SRAV:
+		case OP_SPECIAL_MFHI: case OP_SPECIAL_MTHI:
+		case OP_SPECIAL_MFLO: case OP_SPECIAL_MTLO:
+		case OP_SPECIAL_MULT: case OP_SPECIAL_MULTU:
+		case OP_SPECIAL_DIV:  case OP_SPECIAL_DIVU:
+		case OP_SPECIAL_ADD:  case OP_SPECIAL_ADDU:
+		case OP_SPECIAL_SUB:  case OP_SPECIAL_SUBU:
+		case OP_SPECIAL_AND:  case OP_SPECIAL_OR:
+		case OP_SPECIAL_XOR:  case OP_SPECIAL_NOR:
+		case OP_SPECIAL_SLT:  case OP_SPECIAL_SLTU:
+			return true;
+		default:
+			return false;
+		}
+	case OP_META:
+		switch (c.m.op) {
+		case OP_META_MOV:  case OP_META_COM:
+		case OP_META_EXTC: case OP_META_EXTS:
+			return true;
+		default:
+			return false;
+		}
+	case OP_META_MULT2: case OP_META_MULTU2:
+	case OP_ADDI:  case OP_ADDIU:
+	case OP_SLTI:  case OP_SLTIU:
+	case OP_ANDI:  case OP_ORI:
+	case OP_XORI:  case OP_LUI:
+		return true;
+	default:
+		return false;
+	}
+}
+
+void lightrec_pgxp_cpu_track(struct lightrec_state *state, union code c);
+
 int lightrec_compile_block(struct lightrec_cstate *cstate, struct block *block);
 void lightrec_free_opcode_list(struct lightrec_state *state,
 			       struct opcode *list);

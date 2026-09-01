@@ -116,15 +116,17 @@ struct lightrec_ops {
 	void (*enable_ram)(struct lightrec_state *state, _Bool enable);
 	_Bool (*hw_direct)(u32 kaddr, _Bool is_write, u8 size);
 	void (*code_inv)(void *addr, u32 len);
-	/* When non-NULL, the recompiler emits a call to this after each
-	 * tracked CPU op, passing the instruction word and the post-execution
-	 * GPR values, so a host (e.g. beetle-psx PGXP CPU mode) can keep its
-	 * per-register precision metadata up to date under DYNAREC_EXECUTE.
-	 * rd/rs/rt are the current state->regs.gpr[] values of the
-	 * instruction's register fields; hi/lo are the current HI/LO values;
-	 * addr is the effective memory address (rs + sign-extended imm) for
-	 * load/store ops and 0 otherwise.  Set this only while PGXP CPU
-	 * tracking is enabled; leaving it NULL keeps the fast path. */
+	/* When non-NULL, the recompiler and the interpreter call this for
+	 * each non-memory CPU op *before* it executes, so a host (e.g.
+	 * beetle-psx PGXP CPU mode) can keep its per-register precision
+	 * metadata up to date under either backend.  instr is always a
+	 * plain MIPS encoding: lightrec's meta opcodes are mapped back to
+	 * the instruction they replaced.  rs/rt are the pre-op source
+	 * values; rd (or hi/lo for MULT/DIV/MTHI/MTLO) is the result the
+	 * op will produce, computed by lightrec from those sources.  addr
+	 * is unused (0) since loads and stores are reported through the
+	 * memory-map ops.  Set this only while PGXP CPU tracking is enabled;
+	 * leaving it NULL keeps the fast path. */
 	void (*pgxp_cpu)(struct lightrec_state *state, u32 instr,
 			 u32 rd, u32 rs, u32 rt, u32 hi, u32 lo, u32 addr);
 	/* Optional exact-copy hook for `addu rd, rs, $zero`. The native result

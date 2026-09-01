@@ -443,21 +443,6 @@ static void lightrec_rw_helper(struct lightrec_state *state,
 			state->regs.gpr[op.i.rt] = ret;
 		}
 
-		/* PGXP CPU-mode load tracking.  `ret` is the loaded value
-		 * regardless of whether it was committed to gpr[rt] or held
-		 * in temp_reg for the load delay, so it is the correct value
-		 * to track here.  OP_META_LWU is a lightrec-internal unaligned
-		 * helper with no PGXP tracker, so skip it. */
-		if (state->ops.pgxp_cpu && op.i.op != OP_META_LWU) {
-			u32 addr = state->regs.gpr[op.i.rs] + (u32)(s16)op.i.imm;
-
-			(*state->ops.pgxp_cpu)(state, op.opcode,
-					       ret, state->regs.gpr[op.i.rs],
-					       state->regs.gpr[op.i.rt],
-					       state->regs.gpr[REG_HI],
-					       state->regs.gpr[REG_LO],
-					       addr);
-		}
 		fallthrough;
 	default:
 		break;
@@ -826,18 +811,214 @@ static void lightrec_cp2_gte_cb(struct lightrec_state *state, u32 arg)
 	(*state->ops.cop2_op)(state, ((union code) arg).opcode);
 }
 
-/* Wrapper for PGXP CPU-mode tracking of non-memory ops.  arg encodes the
- * block LUT entry and opcode offset exactly like C_WRAPPER_RW_GENERIC; the
- * recompiler has stored the instruction's GPR fields back to
- * state->regs.gpr[] before the call, so the post-execution values are read
- * from there and handed to the host's pgxp_cpu hook.  HI/LO are read from
- * their GPR-array slots (lightrec keeps them at gpr[32]/gpr[33]). */
+/* PGXP CPU-mode tracking of non-memory ops.  The recompiler (or the
+ * interpreter) has synced the instruction's source registers to
+ * state->regs.gpr[] and calls this *before* the native op runs (see
+ * lightrec-private.h), so the result values that the PGXP dispatcher stores
+ * as each shadow's `.value` are computed here from the pre-op register
+ * file.  The arithmetic mirrors the interpreter, including the MIPS I
+ * divide-by-zero and INT_MIN / -1 results.  HI/LO live at gpr[32]/gpr[33]. */
+static void lightrec_pgxp_cpu_emit(struct lightrec_state *state,
+				   union code mips, u32 rd, u32 rs, u32 rt,
+				   u32 hi, u32 lo, u32 addr)
+{
+	(*state->ops.pgxp_cpu)(state, mips.opcode, rd, rs, rt, hi, lo, addr);
+}
+
+static void lightrec_pgxp_cpu_mult(struct lightrec_state *state,
+				   union code mips, u32 rs, u32 rt,
+				   bool is_signed)
+{
+	u64 res;
+
+	if (is_signed)
+		res = (u64)((s64)(s32)rs * (s64)(s32)rt);
+	else
+		res = (u64)rs * (u64)rt;
+
+	lightrec_pgxp_cpu_emit(state, mips, 0, rs, rt,
+			       (u32)(res >> 32), (u32)res, 0);
+}
+
+static void lightrec_pgxp_cpu_div(struct lightrec_state *state,
+				  union code mips, u32 rs, u32 rt,
+				  bool is_signed)
+{
+	u32 lo, hi;
+
+	if (is_signed) {
+		if (rt == 0) {
+			lo = ((s32)rs < 0) ? 1 : 0xffffffff;
+			hi = rs;
+		} else if (rs == 0x80000000 && rt == 0xffffffff) {
+			lo = 0x80000000;
+			hi = 0;
+		} else {
+			lo = (u32)((s32)rs / (s32)rt);
+			hi = (u32)((s32)rs % (s32)rt);
+		}
+	} else {
+		if (rt == 0) {
+			lo = 0xffffffff;
+			hi = rs;
+		} else {
+			lo = rs / rt;
+			hi = rs % rt;
+		}
+	}
+
+	lightrec_pgxp_cpu_emit(state, mips, 0, rs, rt, hi, lo, 0);
+}
+
+void lightrec_pgxp_cpu_track(struct lightrec_state *state, union code c)
+{
+	u32 *gpr = state->regs.gpr;
+	u32 hi = gpr[REG_HI], lo = gpr[REG_LO];
+	u32 rs, rt, rd;
+	u64 res64;
+	union code mips;
+	unsigned int shift;
+
+	if (!state->ops.pgxp_cpu)
+		return;
+
+	switch (c.i.op) {
+	case OP_META:
+		/* Meta opcodes are re-expressed as the MIPS forms they
+		 * replaced so the PGXP dispatcher can route them; the
+		 * register fields come from the meta encoding. */
+		rs = gpr[c.m.rs];
+		mips.opcode = 0;
+		mips.r.rd = c.m.rd;
+
+		switch (c.m.op) {
+		case OP_META_MOV:
+			/* addu rd, rs, $zero: exact copy of the shadow. */
+			mips.r.op = OP_SPECIAL_ADDU;
+			mips.r.rs = c.m.rs;
+			lightrec_pgxp_cpu_emit(state, mips, rs, rs, 0, hi, lo, 0);
+			return;
+		case OP_META_COM:
+			/* nor rd, rs, $zero */
+			mips.r.op = OP_SPECIAL_NOR;
+			mips.r.rs = c.m.rs;
+			lightrec_pgxp_cpu_emit(state, mips, ~rs, rs, 0, hi, lo, 0);
+			return;
+		case OP_META_EXTC:
+		case OP_META_EXTS:
+			/* sll rd, rs, n ; sra rd, rd, n */
+			shift = c.m.op == OP_META_EXTC ? 24 : 16;
+			mips.r.op = OP_SPECIAL_SLL;
+			mips.r.rt = c.m.rs;
+			mips.r.imm = shift;
+			lightrec_pgxp_cpu_emit(state, mips, rs << shift, 0, rs,
+					       hi, lo, 0);
+			mips.r.op = OP_SPECIAL_SRA;
+			mips.r.rt = c.m.rd;
+			lightrec_pgxp_cpu_emit(state, mips,
+					       (u32)((s32)(rs << shift) >> shift),
+					       0, rs << shift, hi, lo, 0);
+			return;
+		default:
+			return;
+		}
+	case OP_META_MULT2:
+	case OP_META_MULTU2:
+		/* mult(u) rs, rt with rt holding a power of two.  The
+		 * optimizer swapped the operands so rs is the variable; rt's
+		 * producer may have been removed, so pass the constant rather
+		 * than the (possibly stale) register file value. */
+		mips.opcode = 0;
+		mips.r.op = c.i.op == OP_META_MULT2 ?
+			OP_SPECIAL_MULT : OP_SPECIAL_MULTU;
+		mips.r.rs = c.r.rs;
+		mips.r.rt = c.r.rt;
+		rs = gpr[c.r.rs];
+		shift = c.r.op;
+		if (c.i.op == OP_META_MULT2)
+			res64 = (u64)(s64)(s32)rs << shift;
+		else
+			res64 = (u64)rs << shift;
+		lightrec_pgxp_cpu_emit(state, mips, 0, rs,
+				       shift < 32 ? 1u << shift : 0,
+				       (u32)(res64 >> 32), (u32)res64, 0);
+		return;
+	case OP_SPECIAL:
+		rs = gpr[c.r.rs];
+		rt = gpr[c.r.rt];
+
+		switch (c.r.op) {
+		case OP_SPECIAL_SLL:  rd = rt << c.r.imm; break;
+		case OP_SPECIAL_SRL:  rd = rt >> c.r.imm; break;
+		case OP_SPECIAL_SRA:  rd = (u32)((s32)rt >> c.r.imm); break;
+		case OP_SPECIAL_SLLV: rd = rt << (rs & 0x1f); break;
+		case OP_SPECIAL_SRLV: rd = rt >> (rs & 0x1f); break;
+		case OP_SPECIAL_SRAV: rd = (u32)((s32)rt >> (rs & 0x1f)); break;
+		case OP_SPECIAL_MFHI: rd = hi; break;
+		case OP_SPECIAL_MFLO: rd = lo; break;
+		case OP_SPECIAL_MTHI: rd = 0; hi = rs; break;
+		case OP_SPECIAL_MTLO: rd = 0; lo = rs; break;
+		case OP_SPECIAL_MULT:
+		case OP_SPECIAL_MULTU:
+			lightrec_pgxp_cpu_mult(state, c, rs, rt,
+					       c.r.op == OP_SPECIAL_MULT);
+			return;
+		case OP_SPECIAL_DIV:
+		case OP_SPECIAL_DIVU:
+			lightrec_pgxp_cpu_div(state, c, rs, rt,
+					      c.r.op == OP_SPECIAL_DIV);
+			return;
+		case OP_SPECIAL_ADD:
+		case OP_SPECIAL_ADDU: rd = rs + rt; break;
+		case OP_SPECIAL_SUB:
+		case OP_SPECIAL_SUBU: rd = rs - rt; break;
+		case OP_SPECIAL_AND:  rd = rs & rt; break;
+		case OP_SPECIAL_OR:   rd = rs | rt; break;
+		case OP_SPECIAL_XOR:  rd = rs ^ rt; break;
+		case OP_SPECIAL_NOR:  rd = ~(rs | rt); break;
+		case OP_SPECIAL_SLT:  rd = (s32)rs < (s32)rt; break;
+		case OP_SPECIAL_SLTU: rd = rs < rt; break;
+		default:
+			return;
+		}
+
+		lightrec_pgxp_cpu_emit(state, c, rd, rs, rt, hi, lo, 0);
+		return;
+	case OP_ADDI:
+	case OP_ADDIU:
+	case OP_SLTI:
+	case OP_SLTIU:
+	case OP_ANDI:
+	case OP_ORI:
+	case OP_XORI:
+	case OP_LUI:
+		/* Immediate forms write rt; the dispatcher reads the result
+		 * from the rd slot. */
+		rs = gpr[c.i.rs];
+
+		switch (c.i.op) {
+		case OP_ADDI:
+		case OP_ADDIU: rd = rs + (u32)(s32)(s16)c.i.imm; break;
+		case OP_SLTI:  rd = (s32)rs < (s32)(s16)c.i.imm; break;
+		case OP_SLTIU: rd = rs < (u32)(s32)(s16)c.i.imm; break;
+		case OP_ANDI:  rd = rs & c.i.imm; break;
+		case OP_ORI:   rd = rs | c.i.imm; break;
+		case OP_XORI:  rd = rs ^ c.i.imm; break;
+		default:       rd = (u32)c.i.imm << 16; break;
+		}
+
+		lightrec_pgxp_cpu_emit(state, c, rd, rs, gpr[c.i.rt], hi, lo, 0);
+		return;
+	default:
+		return;
+	}
+}
+
+/* JIT wrapper: arg encodes the block LUT entry and opcode offset exactly
+ * like C_WRAPPER_RW_GENERIC. */
 static void lightrec_pgxp_cpu_cb(struct lightrec_state *state, u32 arg)
 {
 	struct block *block;
-	struct opcode *op;
-	union code c;
-	u32 addr;
 	u16 offset = (u16)arg;
 
 	if (!state->ops.pgxp_cpu)
@@ -848,49 +1029,7 @@ static void lightrec_pgxp_cpu_cb(struct lightrec_state *state, u32 arg)
 	if (unlikely(!block))
 		return;
 
-	op = &block->opcode_list[offset];
-	c = op->c;
-
-	/* Effective address for load/store ops: rs + sign-extended imm.
-	 * Harmless (unused) for non-memory ops, where it is passed as 0. */
-	switch (c.i.op) {
-	case OP_LB:  case OP_LH:  case OP_LWL: case OP_LW:
-	case OP_LBU: case OP_LHU: case OP_LWR: {
-		/* Load: the tracked value is the loaded result.  For a load
-		 * in a delay slot lightrec keeps it in temp_reg until the
-		 * delay resolves; otherwise it is already in gpr[rt].  Pass
-		 * the value in the rd slot, which is where PGXP_CPU_Dispatch
-		 * reads the load result from. */
-		u32 rtval = (OPT_HANDLE_LOAD_DELAYS &&
-			     state->in_delay_slot_n == 0xff)
-			    ? state->temp_reg : state->regs.gpr[c.i.rt];
-
-		addr = state->regs.gpr[c.i.rs] + (u32)(s16)c.i.imm;
-
-		(*state->ops.pgxp_cpu)(state, c.opcode,
-				       rtval, state->regs.gpr[c.i.rs],
-				       state->regs.gpr[c.i.rt],
-				       state->regs.gpr[REG_HI],
-				       state->regs.gpr[REG_LO],
-				       addr);
-		return;
-	}
-	case OP_SB:  case OP_SH:  case OP_SWL: case OP_SW:
-	case OP_SWR:
-		addr = state->regs.gpr[c.i.rs] + (u32)(s16)c.i.imm;
-		break;
-	default:
-		addr = 0;
-		break;
-	}
-
-	(*state->ops.pgxp_cpu)(state, c.opcode,
-			       state->regs.gpr[c.r.rd],
-			       state->regs.gpr[c.r.rs],
-			       state->regs.gpr[c.r.rt],
-			       state->regs.gpr[REG_HI],
-			       state->regs.gpr[REG_LO],
-			       addr);
+	lightrec_pgxp_cpu_track(state, block->opcode_list[offset].c);
 }
 
 static void lightrec_pgxp_addu_identity_cb(struct lightrec_state *state,
