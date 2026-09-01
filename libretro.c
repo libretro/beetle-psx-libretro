@@ -358,20 +358,6 @@ static void apply_setting_dependencies(void)
     * geometry exists and the native GL line path must stay in use. */
    psx_pgxp_gl_line_expansion = compatibility_settings_enabled &&
          psx_pgxp_mode != PGXP_MODE_NONE;
-
-#ifdef HAVE_LIGHTREC
-   if (compatibility_settings_enabled &&
-       (psx_pgxp_mode & PGXP_MODE_CPU) &&
-       psx_dynarec != DYNAREC_DISABLED)
-   {
-      psx_dynarec = DYNAREC_DISABLED;
-      log_cb(RETRO_LOG_INFO,
-            "Compatibility setting applied: CPU Dynarec=Disabled "
-            "(Beetle Interpreter) for PGXP Operation Mode=Memory + CPU "
-            "(Buggy)\n");
-   }
-#endif
-
 }
 
 static void apply_compatibility_settings(void)
