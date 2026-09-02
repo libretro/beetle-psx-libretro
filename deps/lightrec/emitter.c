@@ -3435,15 +3435,13 @@ static void rec_META(struct lightrec_cstate *state,
 /* Emit the PGXP CPU-tracking call for a non-memory op.  This runs *before*
  * the native op: the tracker reads the source registers from the GPR file
  * and computes the result itself (lightrec_pgxp_cpu_track), so the sources
- * must be synced back but the destination is left alone.  The wrapper
- * argument is the LUT entry + offset, identical to C_WRAPPER_RW_GENERIC. */
+ * must be synced back but the destination is left alone. */
 static void rec_pgxp_cpu_track(struct lightrec_cstate *state,
 			       const struct block *block, u16 offset)
 {
 	struct regcache *reg_cache = state->reg_cache;
 	jit_state_t *_jit = block->_jit;
 	union code c = block->opcode_list[offset].c;
-	u32 lut_entry;
 
 	jit_note(__FILE__, __LINE__);
 
@@ -3458,9 +3456,7 @@ static void rec_pgxp_cpu_track(struct lightrec_cstate *state,
 		lightrec_clean_reg_if_loaded(reg_cache, _jit, REG_LO, false);
 	}
 
-	lut_entry = lightrec_get_lut_entry(block);
-	call_to_c_wrapper(state, block, (lut_entry << 16) | offset,
-			  C_WRAPPER_PGXP_CPU);
+	call_to_c_wrapper(state, block, c.opcode, C_WRAPPER_PGXP_CPU);
 }
 
 void lightrec_rec_opcode(struct lightrec_cstate *state,

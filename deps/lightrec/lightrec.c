@@ -1014,22 +1014,12 @@ void lightrec_pgxp_cpu_track(struct lightrec_state *state, union code c)
 	}
 }
 
-/* JIT wrapper: arg encodes the block LUT entry and opcode offset exactly
- * like C_WRAPPER_RW_GENERIC. */
 static void lightrec_pgxp_cpu_cb(struct lightrec_state *state, u32 arg)
 {
-	struct block *block;
-	u16 offset = (u16)arg;
-
 	if (!state->ops.pgxp_cpu)
 		return;
 
-	block = lightrec_find_block_from_lut(state->block_cache,
-					     arg >> 16, state->curr_pc);
-	if (unlikely(!block))
-		return;
-
-	lightrec_pgxp_cpu_track(state, block->opcode_list[offset].c);
+	lightrec_pgxp_cpu_track(state, (union code) { .opcode = arg });
 }
 
 static void lightrec_pgxp_addu_identity_cb(struct lightrec_state *state,
