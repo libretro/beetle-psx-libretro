@@ -115,6 +115,7 @@ extern PFN_vkCreateFramebuffer vkCreateFramebuffer;
 extern PFN_vkCreateGraphicsPipelines vkCreateGraphicsPipelines;
 extern PFN_vkCreateImage vkCreateImage;
 extern PFN_vkCreateImageView vkCreateImageView;
+extern PFN_vkCreatePipelineCache vkCreatePipelineCache;
 extern PFN_vkCreatePipelineLayout vkCreatePipelineLayout;
 extern PFN_vkCreateRenderPass vkCreateRenderPass;
 extern PFN_vkCreateSampler vkCreateSampler;
@@ -131,6 +132,7 @@ extern PFN_vkDestroyFramebuffer vkDestroyFramebuffer;
 extern PFN_vkDestroyImage vkDestroyImage;
 extern PFN_vkDestroyImageView vkDestroyImageView;
 extern PFN_vkDestroyPipeline vkDestroyPipeline;
+extern PFN_vkDestroyPipelineCache vkDestroyPipelineCache;
 extern PFN_vkDestroyPipelineLayout vkDestroyPipelineLayout;
 extern PFN_vkDestroyRenderPass vkDestroyRenderPass;
 extern PFN_vkDestroySampler vkDestroySampler;
@@ -266,6 +268,7 @@ static void volkGenLoadDevice(void* context,
    vkCreateGraphicsPipelines = (PFN_vkCreateGraphicsPipelines)load(context, "vkCreateGraphicsPipelines");
    vkCreateImage = (PFN_vkCreateImage)load(context, "vkCreateImage");
    vkCreateImageView = (PFN_vkCreateImageView)load(context, "vkCreateImageView");
+   vkCreatePipelineCache = (PFN_vkCreatePipelineCache)load(context, "vkCreatePipelineCache");
    vkCreatePipelineLayout = (PFN_vkCreatePipelineLayout)load(context, "vkCreatePipelineLayout");
    vkCreateRenderPass = (PFN_vkCreateRenderPass)load(context, "vkCreateRenderPass");
    vkCreateSampler = (PFN_vkCreateSampler)load(context, "vkCreateSampler");
@@ -282,6 +285,7 @@ static void volkGenLoadDevice(void* context,
    vkDestroyImage = (PFN_vkDestroyImage)load(context, "vkDestroyImage");
    vkDestroyImageView = (PFN_vkDestroyImageView)load(context, "vkDestroyImageView");
    vkDestroyPipeline = (PFN_vkDestroyPipeline)load(context, "vkDestroyPipeline");
+   vkDestroyPipelineCache = (PFN_vkDestroyPipelineCache)load(context, "vkDestroyPipelineCache");
    vkDestroyPipelineLayout = (PFN_vkDestroyPipelineLayout)load(context, "vkDestroyPipelineLayout");
    vkDestroyRenderPass = (PFN_vkDestroyRenderPass)load(context, "vkDestroyRenderPass");
    vkDestroySampler = (PFN_vkDestroySampler)load(context, "vkDestroySampler");
@@ -364,6 +368,7 @@ PFN_vkCreateFramebuffer vkCreateFramebuffer;
 PFN_vkCreateGraphicsPipelines vkCreateGraphicsPipelines;
 PFN_vkCreateImage vkCreateImage;
 PFN_vkCreateImageView vkCreateImageView;
+PFN_vkCreatePipelineCache vkCreatePipelineCache;
 PFN_vkCreatePipelineLayout vkCreatePipelineLayout;
 PFN_vkCreateRenderPass vkCreateRenderPass;
 PFN_vkCreateSampler vkCreateSampler;
@@ -380,6 +385,7 @@ PFN_vkDestroyFramebuffer vkDestroyFramebuffer;
 PFN_vkDestroyImage vkDestroyImage;
 PFN_vkDestroyImageView vkDestroyImageView;
 PFN_vkDestroyPipeline vkDestroyPipeline;
+PFN_vkDestroyPipelineCache vkDestroyPipelineCache;
 PFN_vkDestroyPipelineLayout vkDestroyPipelineLayout;
 PFN_vkDestroyRenderPass vkDestroyRenderPass;
 PFN_vkDestroySampler vkDestroySampler;
@@ -4689,6 +4695,7 @@ static void cbh_move(struct CommandBufferHandle *dst,
          VkQueue graphics_queue;
          VkQueue compute_queue;
          VkQueue transfer_queue;
+         VkPipelineCache pipeline_cache;
 
          uint64_t cookie;
 
@@ -4924,6 +4931,7 @@ static void *device_map_host_buffer(Device *self, const Buffer *buffer, MemoryAc
 static void device_unmap_host_buffer(Device *self, const Buffer *buffer, MemoryAccessFlags access) { deviceallocator_unmap_memory(&self->managers.memory, buffer_get_allocation(buffer), access); }
 static ImageView *device_get_transient_attachment(Device *self, unsigned width, unsigned height, VkFormat format, unsigned index, unsigned samples, unsigned layers) { return attachment_allocator_request_attachment(&self->transient_allocator, width, height, format, index, samples, layers); }
 static VkDevice device_get_device(Device *self) { return self->device; }
+static VkPipelineCache device_get_pipeline_cache(Device *self) { return self->pipeline_cache; }
 static const VkPhysicalDeviceProperties *device_get_gpu_properties(Device *self) { return &self->gpu_props; }
 static const Sampler *device_get_stock_sampler(Device *self, StockSampler sampler) { return smh_get(&self->samplers[(unsigned)(sampler)]); }
 static const ImplementationWorkarounds *device_get_workarounds(Device *self) { return &self->workarounds; }
@@ -14117,6 +14125,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
          Hash hash)
    {
       VkPipeline compute_pipeline;
+      VkResult res;
       const Shader *shader = program_get_shader(self->current_program, ShaderStage_Compute);
       VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
       info.layout = pipeline_layout_get_layout(program_get_pipeline_layout(self->current_program));
@@ -14154,8 +14163,10 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
 
 
-      LOGI("Creating compute pipeline.\n");
-      if (vkCreateComputePipelines(device_get_device(self->device), VK_NULL_HANDLE, 1, &info, NULL, &compute_pipeline) != VK_SUCCESS)
+      res = vkCreateComputePipelines(device_get_device(self->device),
+            device_get_pipeline_cache(self->device), 1, &info, NULL,
+            &compute_pipeline);
+      if (res != VK_SUCCESS)
          LOGE("Failed to create compute pipeline!\n");
 
       return program_add_pipeline(self->current_program, hash, compute_pipeline);
@@ -14329,8 +14340,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       pipe.stageCount = num_stages;
 
 
-      LOGI("Creating graphics pipeline.\n");
-      res = vkCreateGraphicsPipelines(device_get_device(self->device), VK_NULL_HANDLE, 1, &pipe, NULL, &pipeline);
+      res = vkCreateGraphicsPipelines(device_get_device(self->device),
+            device_get_pipeline_cache(self->device), 1, &pipe, NULL, &pipeline);
       if (res != VK_SUCCESS)
          LOGE("Failed to create graphics pipeline!\n");
 
@@ -15633,6 +15644,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       self->graphics_queue = VK_NULL_HANDLE;
       self->compute_queue  = VK_NULL_HANDLE;
       self->transfer_queue = VK_NULL_HANDLE;
+      self->pipeline_cache = VK_NULL_HANDLE;
       self->cookie         = 0;
       self->frame_context_index         = 0;
       self->graphics_queue_family_index = 0;
@@ -15711,6 +15723,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       framebuffer_allocator_deinit(&self->framebuffer_allocator);
       attachment_allocator_deinit(&self->transient_allocator);
       program_map_deinit(&self->programs);
+      if (self->pipeline_cache != VK_NULL_HANDLE)
+      {
+         vkDestroyPipelineCache(self->device, self->pipeline_cache, NULL);
+         self->pipeline_cache = VK_NULL_HANDLE;
+      }
       shader_map_deinit(&self->shaders);
       render_pass_map_deinit(&self->render_passes);
       descriptor_set_allocator_map_deinit(&self->descriptor_set_allocators);
@@ -15962,6 +15979,20 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       self->instance = context_get_instance(context);
       self->gpu = context_get_gpu(context);
       self->device = context_get_device(context);
+
+      {
+         VkPipelineCacheCreateInfo cache_info = {
+            VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO
+         };
+         VkResult cache_result = vkCreatePipelineCache(
+               self->device, &cache_info, NULL, &self->pipeline_cache);
+         if (cache_result != VK_SUCCESS)
+         {
+            self->pipeline_cache = VK_NULL_HANDLE;
+            LOGE("[Vulkan pipeline cache] create failed result=%d; continuing without driver cache\n",
+                  (int)cache_result);
+         }
+      }
 
       self->graphics_queue_family_index = context_get_graphics_queue_family(context);
       self->graphics_queue = context_get_graphics_queue(context);
