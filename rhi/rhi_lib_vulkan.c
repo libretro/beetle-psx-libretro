@@ -6014,6 +6014,25 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       BlitInfoVec_clear(&self->queue.unscaled_masked_blits);
    }
 
+   static void renderer_set_opaque_primitive_spec_constants(Renderer *self,
+         int trans_mode)
+   {
+      CommandBuffer *cmd = cbh_get(&self->cmd);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_TransMode, trans_mode);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_FilterMode, FilterMode_NearestNeighbor);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_BlendMode, BlendMode_BlendAdd);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_Scaling, self->scaling);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_Shift, 0);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_OffsetUV, 0);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_HotSource,
+            (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? psx_hdr_overbright_hot : 0);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_MaskTest, 0);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_PreciseColor,
+            (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? psx_pgxp_color : 0);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_PgxpFog,
+            (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? (psx_pgxp_color && psx_pgxp_fog) : 0);
+   }
+
    static void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
       BufferVertexVec *vertices = &self->queue.semi_transparent_opaque;
       PrimitiveInfoVec *scissors = &self->queue.semi_transparent_opaque_scissor;
@@ -6023,11 +6042,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_opaque_state(cbh_get(&self->cmd));
       commandbuffer_set_cull_mode(cbh_get(&self->cmd), VK_CULL_MODE_NONE);
       commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
-      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_SemiTransOpaque);
-      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
-      /* Same omission and same fix as the opaque textured drain below. */
-      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_PgxpFog,
-            (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? (psx_pgxp_color && psx_pgxp_fog) : 0);
+      renderer_set_opaque_primitive_spec_constants(self, TransMode_SemiTransOpaque);
       commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, color));
@@ -6049,17 +6064,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_opaque_state(cbh_get(&self->cmd));
       commandbuffer_set_cull_mode(cbh_get(&self->cmd), VK_CULL_MODE_NONE);
       commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
-      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_TransMode, TransMode_Opaque);
-      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
+      renderer_set_opaque_primitive_spec_constants(self, TransMode_Opaque);
       commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-      /* The linear-light depth-cue constant was set only in
-       * renderer_semi_transparent_set_state, so every opaque pipeline
-       * compiled with the fog mix off while the CPU side had already
-       * substituted pre-cue precise colours: the opaque world rendered
-       * with no fog at all under 30-bit HDR. Same expression as the
-       * semi-transparent site. */
-      commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_PgxpFog,
-            (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? (psx_pgxp_color && psx_pgxp_fog) : 0);
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, color));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 2, 0, VK_FORMAT_R8G8B8A8_UINT, offsetof(BufferVertex, window));
@@ -9751,11 +9757,7 @@ static void renderer_render_opaque_primitives(Renderer *self){
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, color));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, fog));
-   /* Same omission and same fix as the textured drains: without the
-    * constant the flat pipeline compiled with the fog mix off and drew
-    * the pre-cue colour raw. */
-   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_PgxpFog,
-         (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? (psx_pgxp_color && psx_pgxp_fog) : 0);
+   renderer_set_opaque_primitive_spec_constants(self, TransMode_Opaque);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
    renderer_dispatch(self, vertices, scissors, false);
