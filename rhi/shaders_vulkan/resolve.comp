@@ -103,7 +103,7 @@ void main()
 		 * from 64 bilinear taps to 256 point fetches - but the samples are
 		 * adjacent and cache-resident, and it buys the difference between
 		 * averaging light and averaging voltage. */
-		ivec2 srcmax = ivec2(1.0 / registers.inv_source_size) - 1;
+		ivec2 srcmax = textureSize(uScaled, 0) - 1;
 		ivec2 base   = ivec2(coord) * SCALE;
 		value = vec4(0.0);
 		for (int y = 0; y < SCALE; y++)
