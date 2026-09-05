@@ -6941,6 +6941,12 @@ void retro_deinit(void)
    libretro_supports_bitmasks          = false;
    libretro_msg_interface_version      = 0;
    enable_variable_serialization_size  = false;
+
+   /* Frontend callbacks may point into a dynamically loaded module. Do not
+    * retain them across sessions, since the frontend can be reloaded at a
+    * different address before the core is initialized again. */
+   led_state_cb = NULL;
+   memset(retro_led_state, 0, sizeof(retro_led_state));
 }
 
 unsigned retro_get_region(void)
@@ -6961,7 +6967,7 @@ unsigned retro_api_version(void)
 void retro_set_environment(retro_environment_t cb)
 {
    struct retro_vfs_interface_info vfs_iface_info;
-   struct retro_led_interface led_interface;
+   struct retro_led_interface led_interface = {0};
    environ_cb = cb;
 
    libretro_supports_option_categories = false;
@@ -6979,9 +6985,12 @@ void retro_set_environment(retro_environment_t cb)
    vfs_hybrid_init(environ_cb, NULL);
 #endif
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_LED_INTERFACE, &led_interface))
-      if (led_interface.set_led_state && !led_state_cb)
-         led_state_cb = led_interface.set_led_state;
+   /* Always refresh this frontend-owned callback. In particular, a frontend
+    * module can be unloaded and reloaded while the core remains resident. */
+   led_state_cb = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_LED_INTERFACE, &led_interface) &&
+       led_interface.set_led_state)
+      led_state_cb = led_interface.set_led_state;
 
    input_set_env(cb);
 
