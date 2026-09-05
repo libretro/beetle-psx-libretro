@@ -50,7 +50,8 @@ int beetle_game_database_normalize_serial(const char *source,
 
    if (source[4] != '_' && source[4] != '-')
       return 0;
-   if (!is_ascii_digit(source[5]) || !is_ascii_digit(source[6]) ||
+   if ((!is_ascii_digit(source[5]) && !is_ascii_letter(source[5])) ||
+       !is_ascii_digit(source[6]) ||
        !is_ascii_digit(source[7]))
       return 0;
 
@@ -65,7 +66,7 @@ int beetle_game_database_normalize_serial(const char *source,
    for (i = 0; i < 4; i++)
       serial[i] = ascii_toupper(source[i]);
    serial[4] = '-';
-   serial[5] = source[5];
+   serial[5] = ascii_toupper(source[5]);
    serial[6] = source[6];
    serial[7] = source[7];
    serial[8] = source[suffix_offset];
