@@ -74,7 +74,7 @@ void main()
 	} else if (hd_enabled && sample_hd_texture_nearest_hack(vUV, hdColor)) {
 		NNColor = hdColor;
 	} else {
-		NNColor = sample_vram_atlas(clamp_coord(vUV));
+		NNColor = sample_vram_atlas(vUV);
 	}
 
 	// Even for opaque draw calls, this pixel is transparent.
