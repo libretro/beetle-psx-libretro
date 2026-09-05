@@ -2306,6 +2306,12 @@ static unsigned CalcDiscSCEx(void)
       unsigned i;
       for (i = 0; i < cdifs.count; i++)
       {
+         if (!cdifs.items[i])
+         {
+            cdifs.scex_ids[i] = NULL;
+            continue;
+         }
+
          uint8_t buf[2048];
          uint8_t fbuf[2048 + 1];
          char serial[BEETLE_DISC_SERIAL_SIZE];
