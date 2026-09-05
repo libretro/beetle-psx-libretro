@@ -875,6 +875,8 @@ void rhi_intf_push_quad(
    bool is_sprite,
    bool may_be_2d)
 {
+   dither = dither && !is_sprite;
+
 #ifdef RHI_DUMP
    const rhi_dump_vertex vertices[4] = {
       { p0x, p0y, p0w, c0, t0x, t0y },
@@ -905,8 +907,7 @@ void rhi_intf_push_quad(
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
                depth_shift,
-               /* Sprite modulation uses a zero dither offset. */
-               dither && !is_sprite,
+               dither,
                blend_mode, mask_test, set_mask);
 #endif
          break;
