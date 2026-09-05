@@ -2306,6 +2306,12 @@ static unsigned CalcDiscSCEx(void)
       unsigned i;
       for (i = 0; i < cdifs.count; i++)
       {
+         if (!cdifs.items[i])
+         {
+            cdifs.scex_ids[i] = NULL;
+            continue;
+         }
+
          uint8_t buf[2048];
          uint8_t fbuf[2048 + 1];
          char serial[BEETLE_DISC_SERIAL_SIZE];
@@ -3917,6 +3923,8 @@ int StateAction(StateMem *sm, int load, int data_only)
    if(load)
    {
       ForceEventUpdates(0); // FIXME to work with debugger step mode.
+      if (ret)
+         eject_state = CD_TrayOpen;
    }
 
    return(ret);
@@ -4206,9 +4214,15 @@ static bool disk_set_image_index(unsigned index)
 {
    unsigned num_images = disk_get_num_images();
 
-   /* The frontend's contract on this callback is that index is in
-    * [0, num_images). Be defensive: refuse impossible values rather
-    * than letting them flow through to CD_SelectedDisc--. */
+   /* An index of num_images is a request to eject the disc in the libretro API. */
+   if (index == num_images)
+   {
+      eject_state = true;
+      CD_SelectedDisc = -1;
+      DoSimpleCommand(MDFN_MSC_EJECT_DISK);
+      return true;
+   }
+
    if (num_images == 0)
       return false;
    if (index >= num_images)
