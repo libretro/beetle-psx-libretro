@@ -1,8 +1,9 @@
 # PGXP precise-colour offline checks
 
-Two checks on the PGXP precise-colour path, outside the emulator. No GPU, no
+Three checks on the PGXP precise-colour path, outside the emulator. No GPU, no
 Vulkan device, no PSX content. `oracle` verifies that an accepted shadow is
-*correct*; `transport` verifies that a shadow *arrives* at all.
+*correct*; `transport` verifies that a shadow *arrives* at all; and `range`
+verifies the over-white measurement used to evaluate its visual impact.
 
     make -C tools/pgxp_color check
 

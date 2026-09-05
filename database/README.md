@@ -14,6 +14,15 @@ Use `PSX_GAME` for metadata-only entries and `PSX_GAME_COMPAT` for entries with
 compatibility settings. Metadata-only rows are excluded from the compiled
 runtime table.
 
+ROM hacks with a unique boot serial use a catalog-independent
+`PSX_GAME_COMPAT` row after the source catalog. Leave the Redump ID empty,
+retain the original release serial metadata, and append `(<Hack Name> Hack)`
+to the complete source title, after its region, revision, edition, and disc
+qualifiers. Custom boot serials may use an ASCII letter in the first position
+after the four-letter prefix (for example, `SCUS-A4182` from
+`SCUS_A41.82`). Retail catalog rows remain unchanged and metadata-only unless
+they independently require compatibility settings.
+
 Compatibility settings share one settings word and may be combined with `|`.
 PGXP settings modify an active PGXP configuration but do not enable PGXP.
 Universal relationships between settings remain in `libretro.c`.
@@ -51,3 +60,11 @@ If the frontend-selected controller is supported, it remains unchanged. If it
 is unsupported, the core selects the first supported type in the table above.
 An explicitly disconnected port remains disconnected. With no controller
 setting, the frontend selection remains unchanged.
+
+## Testing
+
+Run the focused database and controller-compatibility checks with:
+
+```sh
+make -C tools/game_database clean check
+```
