@@ -42,7 +42,7 @@ layout(location = 6) in mediump vec4 vFog;
 void main()
 {
 #ifdef TEXTURED
-	vec4 NNColor = sample_vram_atlas(clamp_coord(vUV));
+	vec4 NNColor = sample_vram_atlas(vUV);
 	if (all(equal(NNColor, vec4(0.0))))
 		discard;
 
