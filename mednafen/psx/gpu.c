@@ -1309,6 +1309,7 @@ static void GPU_SoftReset(void) /* Control command 0x00 */
    GPU.twy = 0;
 
    RecalcTexWindowStuff(&GPU);
+   rhi_intf_set_tex_window(GPU.tww, GPU.twh, GPU.twx, GPU.twy);
 
    /* */
    GPU.ClipX0 = 0;
