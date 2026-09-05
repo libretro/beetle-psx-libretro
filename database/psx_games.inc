@@ -11937,7 +11937,21 @@ PSX_GAME("36592", "SLPM-86523", "SLPM 86523", "Games", "", "Zutto Issho - With M
 PSX_GAME("58780", "SLPS-00424", "SLPS 00424", "Games", "", "ZXE-D - Legend of Plasmatlite (Japan)")
 
 /* Compatibility entries absent from the source catalog snapshot. */
-PSX_GAME_COMPAT("", "SCUS-9418A", "SCUS-9418A", "Games", "", "Armored Core (USA) (Analog Controller Patch)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
 PSX_GAME_COMPAT("", "SCAJ-01001", "SCAJ-01001", "Games", "", "Gran Turismo 2 (Japan) (PSOne Books) (Disc 1)", PSX_COMPAT_PGXP_PCT_ON | PSX_COMPAT_PGXP_CULLING_ON)
 PSX_GAME_COMPAT("", "SCAJ-01002", "SCAJ-01002", "Games", "", "Gran Turismo 2 (Japan) (PSOne Books) (Disc 2)", PSX_COMPAT_PGXP_PCT_ON | PSX_COMPAT_PGXP_CULLING_ON)
 PSX_GAME_COMPAT("", "SLPS-91463", "SLPS-91463", "Games", "", "R4 - Ridge Racer Type 4 (Japan) (PSOne Books)", PSX_COMPAT_PGXP_PCT_ON | PSX_COMPAT_PGXP_CULLING_ON)
+
+/* ROM hacks with custom boot serials. */
+PSX_GAME_COMPAT("", "SCUS-A4182", "SCUS 94182", "Games", "", "Armored Core (USA) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLUS-A1323", "SLUS 01323", "Games", "", "Armored Core (USA) (Rerelease) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SCES-A0842", "SCES-00842", "Games", "", "Armored Core (Europe) (En,Fr,De,Es,It) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLPS-A0900", "SLPS 03581, SLPS 91064", "Games", "Rev 1", "Armored Core (Japan) (Rev 1) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLUS-A0670", "SLUS-00670", "Games", "", "Armored Core - Project Phantasma (USA) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLPS-A1130", "SLPS 01130", "Games", "Rev 1", "Armored Core - Project Phantasma (Japan) (Rev 1) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLPS-A1110", "SLPS 91110, SLPS 91424", "Games", "", "Armored Core - Project Phantasma (Japan) (PlayStation the Best) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLUS-A1030", "SLUS-01030", "Games", "", "Armored Core - Master of Arena (USA) (Disc 1) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLUS-A1081", "SLUS-01081", "Games", "", "Armored Core - Master of Arena (USA) (Disc 2) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLPS-A1855", "SLPS 01855, SLPS 91188", "Games", "", "Armored Core - Master of Arena (Japan) (Disc 1) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLPS-A1856", "SLPS 01856, SLPS 91189", "Games", "", "Armored Core - Master of Arena (Japan) (Disc 2) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLPS-A1444", "SLPS 91444", "Games", "", "Armored Core - Master of Arena (Japan) (Disc 1) (PSone Books) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
+PSX_GAME_COMPAT("", "SLPS-A1445", "SLPS 91445", "Games", "", "Armored Core - Master of Arena (Japan) (Disc 2) (PSone Books) (True Analog Hack)", BEETLE_DB_PORT1_SUPPORT(BEETLE_DB_CTRL_DUALSHOCK))
