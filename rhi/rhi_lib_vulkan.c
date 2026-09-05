@@ -18536,6 +18536,12 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       unsigned src_xend = (src->x + src->width - 1) / BLOCK_WIDTH;
       unsigned src_ybegin = src->y / BLOCK_HEIGHT;
       unsigned src_yend = (src->y + src->height - 1) / BLOCK_HEIGHT;
+      StatusFlags src_read = domain == Domain_Scaled ? STATUS_COMPUTE_SFB_READ : STATUS_COMPUTE_FB_READ;
+
+      /* Preserve the queued source read across destination barriers. */
+      { unsigned y; for (y = src_ybegin; y <= src_yend; y++)
+         { unsigned x; for (x = src_xbegin; x <= src_xend; x++)
+            *fbatlas_info(self, x, y) |= src_read; } }
 
       {
          unsigned j_max = (dst_yend - dst_ybegin) < (src_yend - src_ybegin)
