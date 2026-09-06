@@ -4565,6 +4565,11 @@ static gl_display_rect compute_gl_display_rect(gl_renderer *renderer)
             y = (256 - renderer->config.display_area_vrange[1]) + (renderer->last_scanline - 239);
         }
    }
+   if (renderer->crop_overscan == 2 && renderer->config.is_480i && height == 239)
+   {
+      height = 236;
+      y -= 3;
+   }
    height *= (renderer->config.is_480i ? 2 : 1);
    y *= (renderer->config.is_480i ? 2 : 1);
 

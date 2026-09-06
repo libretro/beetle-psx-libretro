@@ -7519,6 +7519,8 @@ static DisplayRect renderer_compute_display_rect(Renderer *self)
          upper_offset = self->render_state.vert_start - 16 - self->render_state.slstart;
       }
    }
+   if (self->render_state.crop_overscan == 2 && self->render_state.is_480i && display_height == 239)
+      display_height = 236;
    if (self->render_state.is_480i)
    {
       display_height *= 2;
