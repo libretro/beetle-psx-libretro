@@ -648,7 +648,7 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             else
                DMACH[ch].ChanControl = V & 0x71770703;
 
-            if(!(OldCC & (1 << 24)) && (V & (1 << 24)))
+            if(V & (1 << 24))
             {
                DMACH[ch].WordCounter = 0;
                DMACH[ch].ClockCounter = 0;
