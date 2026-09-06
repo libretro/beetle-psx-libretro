@@ -5111,6 +5111,10 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
       StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
       Renderer *listener;
 
+      unsigned palette_cache_x, palette_cache_y;
+      TextureMode palette_cache_mode;
+      bool palette_cache_valid;
+
       struct RenderPassState
       {
          TTRect rect;
@@ -5228,6 +5232,10 @@ static StatusFlags *fbatlas_info(FBAtlas *self,
       for (i = 0; i < NUM_BLOCKS_X * NUM_BLOCKS_Y; i++)
          a->fb_info[i] = STATUS_FB_PREFER;
       a->listener = NULL;
+      a->palette_cache_x = 0;
+      a->palette_cache_y = 0;
+      a->palette_cache_mode = TextureMode_None;
+      a->palette_cache_valid = false;
       /* Zero each renderpass field explicitly. (TTRect is now a plain POD, so a
        * memset would be fine, but the explicit form is kept for clarity and to
        * cover the non-TTRect fields below.) This matches the former NSDMIs: the
@@ -18578,7 +18586,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       fbatlas_read_domain(self, domain, Stage_Fragment, rect);
    }
 
-   static void fbatlas_read_texture(FBAtlas *self, Domain domain)
+   static void fbatlas_read_texture(FBAtlas *self, Domain domain,
+         bool read_palette)
    {
       TTRect shifted = self->renderpass.texture_window;
       bool palette;
@@ -18602,11 +18611,11 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       { TTRect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
          self->renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
 
-      if (palette)
+      if (palette && read_palette)
          fbatlas_sync_domain(self, domain, &palette_rect);
 
       fbatlas_read_domain(self, domain, Stage_FragmentTexture, &shifted);
-      if (palette)
+      if (palette && read_palette)
          fbatlas_read_domain(self, domain, Stage_FragmentTexture, &palette_rect);
       }
    }
@@ -18961,6 +18970,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       {
          TTRect shifted = self->renderpass.texture_window;
          bool reads_palette;
+         bool palette_cached = false;
          switch (self->renderpass.texture_mode)
          {
             case TextureMode_Palette4bpp:
@@ -18980,13 +18990,26 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
          if (reads_palette)
          {
-            if (fbatlas_inside_render_pass(self, &shifted) || fbatlas_inside_render_pass(self, &palette_rect))
+            palette_cached = self->palette_cache_valid &&
+                  self->palette_cache_mode == self->renderpass.texture_mode &&
+                  self->palette_cache_x == self->renderpass.palette_offset_x &&
+                  self->palette_cache_y == self->renderpass.palette_offset_y;
+            if (!palette_cached)
+            {
+               self->palette_cache_valid = true;
+               self->palette_cache_mode = self->renderpass.texture_mode;
+               self->palette_cache_x = self->renderpass.palette_offset_x;
+               self->palette_cache_y = self->renderpass.palette_offset_y;
+            }
+
+            if (fbatlas_inside_render_pass(self, &shifted) ||
+                (!palette_cached && fbatlas_inside_render_pass(self, &palette_rect)))
                fbatlas_flush_render_pass(self);
          }
          else if (fbatlas_inside_render_pass(self, &shifted))
             fbatlas_flush_render_pass(self);
 
-         fbatlas_read_texture(self, domain);
+         fbatlas_read_texture(self, domain, !palette_cached);
          }
       }
 
