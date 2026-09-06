@@ -18,6 +18,7 @@
 
 static const char * command_fragment_name_ = GLSL_FRAGMENT(
 uniform sampler2D fb_texture;
+uniform sampler2D palette_texture;
 
 // Scaling to apply to the dither pattern
 uniform uint dither_scaling;
@@ -103,6 +104,7 @@ flat in uvec4 frag_texture_window;
 flat in uvec4 frag_texture_limits;
 // The sampled texture or palette contains GPU-rendered VRAM data.
 flat in uint frag_framebuffer_feedback;
+flat in uint frag_palette_cached;
 
 out vec4 frag_color;
 
@@ -376,11 +378,10 @@ vec4 sample_texel(vec2 coords) {
       // Finally we have the index in the CLUT
       uint index = (icolor >> shift) & mask;
 
-      uint clut_x = frag_clut.x + index;
-      uint clut_y = frag_clut.y;
-
-      // Look up the real color for the texel in the CLUT
-      texel = vram_get_pixel(clut_x, clut_y);
+      if (frag_palette_cached != 0U)
+         texel = texelFetch(palette_texture, ivec2(index, 0), 0);
+      else
+         texel = vram_get_pixel(frag_clut.x + index, frag_clut.y);
    }
 
 )
