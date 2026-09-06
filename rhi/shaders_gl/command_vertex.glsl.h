@@ -22,6 +22,7 @@ in uint semi_transparent;
 in uvec4 texture_window;
 in uvec4 texture_limits;
 in uint framebuffer_feedback;
+in uint palette_cached;
 
 // Drawing offset
 uniform ivec2 offset;
@@ -38,6 +39,7 @@ flat out uint frag_semi_transparent;
 flat out uvec4 frag_texture_window;
 flat out uvec4 frag_texture_limits;
 flat out uint frag_framebuffer_feedback;
+flat out uint frag_palette_cached;
 )
 
 #if defined(FILTER_SABR) || defined(FILTER_XBR)
@@ -87,6 +89,7 @@ void main() {
    frag_texture_window = texture_window;
    frag_texture_limits = texture_limits;
    frag_framebuffer_feedback = framebuffer_feedback;
+   frag_palette_cached = palette_cached;
 )
 #if defined(FILTER_SABR) || defined(FILTER_XBR)
 STRINGIZE(
