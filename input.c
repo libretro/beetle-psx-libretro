@@ -496,8 +496,18 @@ void input_init_env( retro_environment_t _environ_cb )
 
    environ_cb( RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc );
 
+   /* The rumble callback is frontend-owned; a declined query must not leave
+    * a pointer from a previous, possibly reloaded, frontend in place. */
+   memset( &rumble, 0, sizeof( rumble ) );
    if ( environ_cb( RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble ) && log_cb )
       log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
+}
+
+void input_deinit_env( void )
+{
+   /* Frontend callbacks may point into a module that is unloaded and
+    * reloaded at another address before the core is initialised again. */
+   memset( &rumble, 0, sizeof( rumble ) );
 }
 
 void input_set_env( retro_environment_t _environ_cb )

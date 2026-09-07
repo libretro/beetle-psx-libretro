@@ -23,6 +23,7 @@ extern "C" {
 /* and map input from the abstract 'retropad' into PlayStation land. */
 
 extern void input_init_env( retro_environment_t environ_cb );
+extern void input_deinit_env( void );
 
 extern void input_init(void);
 

@@ -6897,6 +6897,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 void retro_deinit(void)
 {
    VCD_Kill();
+   input_deinit_env();
 
    if (surf)
    {
