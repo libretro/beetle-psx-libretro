@@ -7519,7 +7519,14 @@ static DisplayRect renderer_compute_display_rect(Renderer *self)
          upper_offset = self->render_state.vert_start - 16 - self->render_state.slstart;
       }
    }
-   if (self->render_state.crop_overscan == 2 && self->render_state.is_480i && display_height == 239)
+   /* Startup-logo shift: the BIOS programs a 239-line window while
+    * interlaced, which would re-geometry the frontend between 478 and the
+    * 472/480 lines of the screens around it. Key the clamp on the window
+    * the game programmed, not on the cropped height, so user scanline
+    * crops on a 240-line title cannot land on 239 and lose six extra
+    * lines they did not ask for. Mirrors the software path. */
+   if (self->render_state.crop_overscan == 2 && self->render_state.is_480i &&
+       self->render_state.vert_end - self->render_state.vert_start == 239)
       display_height = 236;
    if (self->render_state.is_480i)
    {

@@ -2918,6 +2918,11 @@ uint8_t GPU_get_upscale_shift(void)
    return GPU.upscale_shift;
 }
 
+uint32_t GPU_get_vertical_range_lines(void)
+{
+   return GPU.VertEnd - GPU.VertStart;
+}
+
 bool GPU_DMACanWrite(void)
 {
    return CalcFIFOReadyBit();
