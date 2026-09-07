@@ -4565,7 +4565,12 @@ static gl_display_rect compute_gl_display_rect(gl_renderer *renderer)
             y = (256 - renderer->config.display_area_vrange[1]) + (renderer->last_scanline - 239);
         }
    }
-   if (renderer->crop_overscan == 2 && renderer->config.is_480i && height == 239)
+   /* Startup-logo shift, keyed on the programmed window rather than the
+    * cropped height (see the Vulkan renderer). The viewport origin is
+    * lower-left, so the bottom edge moves down by the same six lines the
+    * height loses and the top line stays where software and Vulkan put it. */
+   if (renderer->crop_overscan == 2 && renderer->config.is_480i &&
+       renderer->config.display_area_vrange[1] - renderer->config.display_area_vrange[0] == 239)
    {
       height = 236;
       y -= 3;

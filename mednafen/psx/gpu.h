@@ -290,6 +290,10 @@ void GPU_set_dither_upscale_shift(uint8_t factor);
 
 uint8_t GPU_get_upscale_shift(void);
 
+/* Lines spanned by the programmed vertical display range (GP1(07)),
+ * before any scanline cropping and before interlace doubling. */
+uint32_t GPU_get_vertical_range_lines(void);
+
 bool GPU_get_display_possibly_dirty(void);
 
 void GPU_set_display_possibly_dirty(bool dirty);

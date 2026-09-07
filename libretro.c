@@ -6761,8 +6761,11 @@ void retro_run(void)
          /* Smart height geometry trigger */
          if (crop_overscan == 2)
          {
-            /* Get rid of startup logo shift */
-            if (currently_interlaced || PrevInterlaced)
+            /* Get rid of startup logo shift. Keyed on the 239-line window
+             * the BIOS programs, not on the cropped height, so user
+             * scanline crops on a 240-line title cannot trigger it. */
+            if ((currently_interlaced || PrevInterlaced) &&
+                GPU_get_vertical_range_lines() == 239)
             {
                if (height == 478 || height == 239)
                   height = (height == 239) ? 236 : 472;
