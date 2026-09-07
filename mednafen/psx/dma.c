@@ -627,11 +627,28 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
              * Kludge for DMA timing granularity and other issues.  Needs to occur before setting all bits of ChanControl to the new value, to accommodate the
              * case of a game cancelling DMA and changing the type of DMA(read/write, etc.) at the same time.
              * */
-            if((DMACH[ch].ChanControl & (1 << 24)) && !(V & (1 << 24)))
+            /* A restart (1->1) is the same granularity artifact as a stop:
+             * on hardware the previous transfer finished long before the CPU
+             * could reach CHCR again, so the block still in flight is drained
+             * here under the old mode before the new control word is latched,
+             * rather than left to run under the new one or dropped mid-packet.
+             * The game has already written the new MADR/BCR; the chopping
+             * path's per-word bookkeeping would overwrite them during the
+             * drain, so they are held across it. */
+            if(OldCC & (1 << 24))
             {
+               uint32_t NewBaseAddr     = DMACH[ch].BaseAddr;
+               uint32_t NewBlockControl = DMACH[ch].BlockControl;
+
                DMACH[ch].ChanControl &= ~(1 << 24);	/* Clear bit before RunChannel(), so it will only finish the block it's on at most. */
                RunChannel(timestamp, 128 * 16, ch);
                DMACH[ch].WordCounter = 0;
+
+               if(V & (1 << 24))
+               {
+                  DMACH[ch].BaseAddr     = NewBaseAddr;
+                  DMACH[ch].BlockControl = NewBlockControl;
+               }
 
 #if 0	/* TODO(maybe, need to work out worst-case performance for abnormally/brokenly large block sizes) */
                DMACH[ch].ClockCounter = (1 << 30);
