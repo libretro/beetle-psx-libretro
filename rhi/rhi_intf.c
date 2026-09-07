@@ -568,6 +568,25 @@ void rhi_intf_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
    }
 }
 
+void rhi_intf_invalidate_clut_cache(void)
+{
+   switch (rhi_type)
+   {
+      case RHI_OPENGL:
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         rhi_gl_invalidate_clut_cache();
+#endif
+         break;
+      case RHI_VULKAN:
+#if defined(HAVE_VULKAN)
+         rhi_vulkan_invalidate_clut_cache();
+#endif
+         break;
+      default:
+         break;
+   }
+}
+
 void rhi_intf_set_draw_offset(int16_t x, int16_t y)
 {
 #ifdef RHI_DUMP

@@ -23,6 +23,8 @@ void rhi_gl_set_tex_window(uint8_t tww, uint8_t twh,
 
 void rhi_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and);
 
+void rhi_gl_invalidate_clut_cache(void);
+
 void rhi_gl_set_draw_offset(int16_t x, int16_t y);
 
 void rhi_gl_set_draw_area(uint16_t x0, uint16_t y0,

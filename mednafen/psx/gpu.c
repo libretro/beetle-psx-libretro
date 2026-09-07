@@ -442,6 +442,7 @@ GCMD_DRAWPOLY_BMGROUP_ALL(4, 1)
 static void Command_ClearCache(PS_GPU* g, const uint32_t *cb)
 {
    InvalidateCache(g);
+   rhi_intf_invalidate_clut_cache();
 }
 
 static void Command_IRQ(PS_GPU* g, const uint32_t *cb)
@@ -1268,6 +1269,7 @@ static void GPU_SoftReset(void) /* Control command 0x00 */
    IRQ_Assert(IRQ_GPU, GPU.IRQPending);
 
    InvalidateCache(&GPU);
+   rhi_intf_invalidate_clut_cache();
    GPU.DMAControl = 0;
 
    if(GPU.DrawTimeAvail < 0)
@@ -2690,6 +2692,9 @@ void GPU_RestoreStateP3(void)
    GPU.last_tex_c    = NULL;
    RecalcTexWindowStuff(&GPU);
    rhi_intf_set_tex_window(GPU.tww, GPU.twh, GPU.twx, GPU.twy);
+   /* The retained CLUT in the hardware renderers cannot be restored with
+    * the state; refetching from VRAM on the next draw is the closest match. */
+   rhi_intf_invalidate_clut_cache();
 
    FastFIFO_SaveStatePostLoad(&GPU_BlitterFIFO);
 

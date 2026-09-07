@@ -2700,7 +2700,6 @@ static void gl_palette_cache_preserve(gl_renderer *renderer,
             0, renderer->palette_cache_y,
             palette_width - first_width, 1);
 
-   glFlush();
    glBindTexture(GL_TEXTURE_2D, renderer->fb_texture.id);
    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
    renderer->palette_cache_saved = true;
@@ -6514,6 +6513,27 @@ void rhi_gl_set_tex_window(uint8_t tww, uint8_t twh, uint8_t twx, uint8_t twy)
    renderer->tex_x_or   = (twx & tww) << 3;
    renderer->tex_y_mask = ~(twh << 3);
    renderer->tex_y_or   = (twy & twh) << 3;
+}
+
+void rhi_gl_invalidate_clut_cache(void)
+{
+   gl_renderer *renderer;
+
+   if (static_renderer.state == GL_STATE_INVALID)
+      return;
+
+   renderer = static_renderer.state_data;
+   if (!renderer)
+      return;
+
+   /* Queued draws still address the retained texture; issue them before a
+    * later preserve is allowed to overwrite it. */
+   if (renderer->palette_cache_saved &&
+       !gl_draw_buffer_is_empty(renderer->command_buffer))
+      gl_renderer_draw(renderer);
+
+   renderer->palette_cache_valid = false;
+   renderer->palette_cache_saved = false;
 }
 
 void rhi_gl_set_mask_setting(uint32_t mask_set_or, uint32_t mask_eval_and)
