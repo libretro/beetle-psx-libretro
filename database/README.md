@@ -20,7 +20,10 @@ retain the original release serial metadata, and append `(<Hack Name> Hack)`
 to the complete source title, after its region, revision, edition, and disc
 qualifiers. Custom boot serials may use an ASCII letter in the first position
 after the four-letter prefix (for example, `SCUS-A4182` from
-`SCUS_A41.82`). Retail catalog rows remain unchanged and metadata-only unless
+`SCUS_A41.82`). Use `A` for that letter: it occupies a slot Sony only ever
+filled with a digit, so a single hack serial per source serial cannot collide
+with any retail catalogue entry, and the other four digits keep the source
+release recognisable. Retail catalog rows remain unchanged and metadata-only unless
 they independently require compatibility settings.
 
 Compatibility settings share one settings word and may be combined with `|`.
