@@ -1,11 +1,17 @@
 #ifndef VRAM_H
 #define VRAM_H
 
-layout(location = 1) in mediump vec2 vUV;
+/* vUV and vTexLimits must be highp. The rhi sends UINT16_MAX limits to
+ * disable clamping under a texture window; a driver honouring
+ * RelaxedPrecision with 16-bit integers (Adreno, Mali) folds that to -1
+ * and clamp_coord() collapses every texel to base - 1. vUV in fp16 loses
+ * the sub-texel fraction above u = 128, which mis-selects texels under
+ * upscaling. vParam, vBaseUV and vWindow stay within int16 range. */
+layout(location = 1) in highp vec2 vUV;
 layout(location = 2) flat in mediump ivec3 vParam;
 layout(location = 3) flat in mediump ivec2 vBaseUV;
 layout(location = 4) flat in mediump ivec4 vWindow;
-layout(location = 5) flat in mediump ivec4 vTexLimits;
+layout(location = 5) flat in highp ivec4 vTexLimits;
 #if defined(UNSCALED)
 layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
 #else
