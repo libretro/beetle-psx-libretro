@@ -23,6 +23,8 @@ layout(set = 0, binding = 0) uniform mediump sampler2D uFramebuffer;
 #endif
 #endif
 layout(constant_id = 4) const int SHIFT = 0;
+/* Retained copy of the selected CLUT (see fbatlas_palette_preserve). */
+layout(set = 0, binding = 5) uniform highp usampler2D uPalette;
 
 vec2 clamp_coord(vec2 coord)
 {
@@ -62,6 +64,11 @@ vec4 sample_vram_atlas(vec2 uvv)
 #endif
         int mask = (1 << bpp) - 1;
         value = (value >> align) & mask;
+
+        /* 0x1000: the row was overwritten after the palette was latched;
+         * the entries the GPU still holds live in uPalette. */
+        if ((params.z & 0x1000) != 0)
+            return abgr1555(texelFetch(uPalette, ivec2(value, 0), 0).x);
 
         params.x += value;
         coord = params.xy;

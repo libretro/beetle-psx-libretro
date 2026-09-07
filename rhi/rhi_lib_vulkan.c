@@ -93,6 +93,7 @@ extern PFN_vkCmdBindDescriptorSets vkCmdBindDescriptorSets;
 extern PFN_vkCmdBindPipeline vkCmdBindPipeline;
 extern PFN_vkCmdBindVertexBuffers vkCmdBindVertexBuffers;
 extern PFN_vkCmdBlitImage vkCmdBlitImage;
+extern PFN_vkCmdCopyImage vkCmdCopyImage;
 extern PFN_vkCmdClearColorImage vkCmdClearColorImage;
 extern PFN_vkCmdClearDepthStencilImage vkCmdClearDepthStencilImage;
 extern PFN_vkCmdCopyBuffer vkCmdCopyBuffer;
@@ -248,6 +249,7 @@ static void volkGenLoadDevice(void* context,
    vkCmdBindPipeline = (PFN_vkCmdBindPipeline)load(context, "vkCmdBindPipeline");
    vkCmdBindVertexBuffers = (PFN_vkCmdBindVertexBuffers)load(context, "vkCmdBindVertexBuffers");
    vkCmdBlitImage = (PFN_vkCmdBlitImage)load(context, "vkCmdBlitImage");
+   vkCmdCopyImage = (PFN_vkCmdCopyImage)load(context, "vkCmdCopyImage");
    vkCmdClearColorImage = (PFN_vkCmdClearColorImage)load(context, "vkCmdClearColorImage");
    vkCmdClearDepthStencilImage = (PFN_vkCmdClearDepthStencilImage)load(context, "vkCmdClearDepthStencilImage");
    vkCmdCopyBuffer = (PFN_vkCmdCopyBuffer)load(context, "vkCmdCopyBuffer");
@@ -348,6 +350,7 @@ PFN_vkCmdBindDescriptorSets vkCmdBindDescriptorSets;
 PFN_vkCmdBindPipeline vkCmdBindPipeline;
 PFN_vkCmdBindVertexBuffers vkCmdBindVertexBuffers;
 PFN_vkCmdBlitImage vkCmdBlitImage;
+PFN_vkCmdCopyImage vkCmdCopyImage;
 PFN_vkCmdClearColorImage vkCmdClearColorImage;
 PFN_vkCmdClearDepthStencilImage vkCmdClearDepthStencilImage;
 PFN_vkCmdCopyBuffer vkCmdCopyBuffer;
@@ -4501,6 +4504,12 @@ static void commandbuffer_copy_buffer_whole(struct CommandBuffer *self,
          VkAccessFlags src_access,
          VkPipelineStageFlags dst_stage,
          VkAccessFlags dst_access);
+   static void commandbuffer_copy_image(struct CommandBuffer *self,
+         const Image *dst,
+         const Image *src,
+         const VkOffset3D *dst_offset,
+         const VkOffset3D *src_offset,
+         const VkExtent3D *extent);
    static void commandbuffer_blit_image(struct CommandBuffer *self,
          const Image *dst,
          const Image *src,
@@ -5111,9 +5120,14 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
       StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
       Renderer *listener;
 
+      /* Retained CLUT selection (see fbatlas_palette_preserve). valid: a
+       * 4/8bpp draw has latched this (x, y, depth); saved: a write landed on
+       * the row after that, so the entries live in the renderer's palette
+       * image and draws with this selection sample it instead of VRAM. */
       unsigned palette_cache_x, palette_cache_y;
       TextureMode palette_cache_mode;
       bool palette_cache_valid;
+      bool palette_cache_saved;
 
       struct RenderPassState
       {
@@ -5162,6 +5176,8 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
    static Domain fbatlas_find_suitable_domain(FBAtlas *self, const TTRect *rect);
    static void fbatlas_discard_render_pass(FBAtlas *self);
    static bool fbatlas_inside_render_pass(FBAtlas *self, const TTRect *rect);
+   static void fbatlas_palette_preserve(FBAtlas *self, const TTRect *rect);
+   static void fbatlas_invalidate_palette_cache(FBAtlas *self);
 
 static void fbatlas_set_hazard_listener(FBAtlas *self, Renderer *hazard)
    {
@@ -5236,6 +5252,7 @@ static StatusFlags *fbatlas_info(FBAtlas *self,
       a->palette_cache_y = 0;
       a->palette_cache_mode = TextureMode_None;
       a->palette_cache_valid = false;
+      a->palette_cache_saved = false;
       /* Zero each renderpass field explicitly. (TTRect is now a plain POD, so a
        * memset would be fine, but the explicit form is kept for clarity and to
        * cover the non-TTRect fields below.) This matches the former NSDMIs: the
@@ -5906,6 +5923,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          } pipelines;
 
          ImageHandle dither_lut;
+         /* 256x1 R32_UINT copy of the selected CLUT, filled by
+          * renderer_preserve_palette when a write is about to overwrite the
+          * row in VRAM; bound at set 0 binding 5 (uPalette). */
+         ImageHandle palette_cache;
 
 
          RenderState render_state;
@@ -6029,6 +6050,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          const TextureWindow *window);
    static void renderer_reset_scissor_queue(Renderer *self);
    static void renderer_reset_queue(Renderer *self);
+   static void renderer_preserve_palette(Renderer *self,
+         unsigned x, unsigned y, unsigned width);
    static void renderer_ensure_command_buffer(Renderer *self)
    {
       if (!cbh_is_valid(&self->cmd))
@@ -6590,6 +6613,7 @@ static void renderer_init(Renderer *self,
    self->scaled_framebuffer_msaa.data = NULL;
    self->bias_framebuffer.data        = NULL;
    self->framebuffer.data             = NULL;
+   self->palette_cache.data           = NULL;
    self->framebuffer_ssaa.data        = NULL;
    self->dither_lut.data              = NULL;
    /* self->render_state's default member initializers were moved out when
@@ -6667,6 +6691,14 @@ static void renderer_init(Renderer *self,
    image_set_layout(ih_get(&self->framebuffer), Layout_General);
    ih_move(&self->framebuffer_ssaa, device_create_image(self->device, &info, NULL));
    image_set_layout(ih_get(&self->framebuffer_ssaa), Layout_General);
+
+   {
+      struct ImageCreateInfo palette_info = image_create_info_render_target(256, 1, VK_FORMAT_R32_UINT);
+      palette_info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+      palette_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+      ih_move(&self->palette_cache, device_create_image(self->device, &palette_info, NULL));
+      image_set_layout(ih_get(&self->palette_cache), Layout_General);
+   }
 
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -6773,6 +6805,7 @@ static void renderer_init(Renderer *self,
       VkClearValue _clear_zero;
       memset(&_clear_zero, 0, sizeof(_clear_zero));
       commandbuffer_clear_image(cbh_get(&self->cmd), ih_get(&self->scaled_framebuffer), &_clear_zero);
+      commandbuffer_clear_image(cbh_get(&self->cmd), ih_get(&self->palette_cache), &_clear_zero);
       if (!state)
          commandbuffer_clear_image(cbh_get(&self->cmd), ih_get(&self->framebuffer), &_clear_zero);
    }
@@ -9084,6 +9117,11 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
     * because the `allocate_depth` call above can call `reset_queue` which would
     * invalidate the HdTextureHandle */
    param = (int16_t)(shift);
+   /* 0x1000: the selected CLUT was overwritten after it was latched; sample
+    * the retained copy (uPalette) instead of VRAM. Set right after
+    * renderer_allocate_depth, which is what resolves it for this draw. */
+   if (shift != 0 && self->atlas.palette_cache_saved)
+      param = (int16_t)(param | 0x1000);
    if (hd_texture_vram.height > 0) { /* This condition is just a dumb way to check that the rect was actually set to something */
       bool fastpath_capable_out = false;
       bool cache_hit = false;
@@ -9552,6 +9590,49 @@ static const ClearCandidate * renderer_find_clear_candidate(Renderer *self,
    return ret;
 }
 
+/* Copy the selected CLUT row out of the unscaled framebuffer before a VRAM
+ * write replaces it. The atlas has already taken the transfer-read hazards
+ * on the source rect; the barriers here order the destination image against
+ * draws that sampled the previous palette and against the ones that follow. */
+static void renderer_preserve_palette(Renderer *self,
+      unsigned x, unsigned y, unsigned width)
+{
+   const Image *src;
+   const Image *dst;
+   unsigned first;
+   VkOffset3D dst_offset = { 0, 0, 0 };
+   VkOffset3D src_offset;
+   VkExtent3D extent;
+
+   renderer_ensure_command_buffer(self);
+   src = ih_get(&self->framebuffer);
+   dst = ih_get(&self->palette_cache);
+
+   commandbuffer_image_barrier(cbh_get(&self->cmd), dst,
+         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
+
+   first = width < FB_WIDTH - x ? width : FB_WIDTH - x;
+   src_offset.x = (int32_t)x; src_offset.y = (int32_t)y; src_offset.z = 0;
+   extent.width = first; extent.height = 1; extent.depth = 1;
+   commandbuffer_copy_image(cbh_get(&self->cmd), dst, src, &dst_offset, &src_offset, &extent);
+
+   if (first < width)
+   {
+      /* The row wraps at the VRAM edge, as the software fetch does. */
+      dst_offset.x = (int32_t)first;
+      src_offset.x = 0;
+      extent.width = width - first;
+      commandbuffer_copy_image(cbh_get(&self->cmd), dst, src, &dst_offset, &src_offset, &extent);
+   }
+
+   commandbuffer_image_barrier(cbh_get(&self->cmd), dst,
+         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+}
+
 static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
 {
    RenderPassInfo_Subpass subpass;
@@ -9622,6 +9703,7 @@ static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
    commandbuffer_set_scissor(cbh_get(&self->cmd), &info.render_area);
    self->queue.default_scissor = info.render_area;
    commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 2, image_get_view(ih_get(&self->dither_lut)), StockSampler_NearestWrap);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 5, image_get_view(ih_get(&self->palette_cache)), StockSampler_NearestClamp);
 
    renderer_render_opaque_primitives(self);
    renderer_render_opaque_texture_primitives(self);
@@ -10465,6 +10547,7 @@ static void renderer_fini(Renderer *self)
    ih_reset(&self->framebuffer);
    ih_reset(&self->framebuffer_ssaa);
    ih_reset(&self->dither_lut);
+   ih_reset(&self->palette_cache);
    ih_reset(&self->last_scanout);
    ih_reset(&self->reuseable_scanout);
    /* Analog path intermediates. These are recreated every frame, so ih_move
@@ -14084,6 +14167,30 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
                image_get_image(dst), image_get_layout(dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
                1, &blit, filter);
       } }
+   }
+
+   /* Level 0, layer 0 only: enough for the palette copy, and vkCmdCopyImage
+    * needs no format feature bits, unlike a blit. */
+   static void commandbuffer_copy_image(struct CommandBuffer *self, const Image *dst, const Image *src,
+         const VkOffset3D *dst_offset, const VkOffset3D *src_offset, const VkExtent3D *extent)
+   {
+      VkImageCopy region;
+      region.srcSubresource.aspectMask     = format_to_aspect_mask(image_get_create_info(src)->format);
+      region.srcSubresource.mipLevel       = 0;
+      region.srcSubresource.baseArrayLayer = 0;
+      region.srcSubresource.layerCount     = 1;
+      region.srcOffset                     = *src_offset;
+      region.dstSubresource.aspectMask     = format_to_aspect_mask(image_get_create_info(dst)->format);
+      region.dstSubresource.mipLevel       = 0;
+      region.dstSubresource.baseArrayLayer = 0;
+      region.dstSubresource.layerCount     = 1;
+      region.dstOffset                     = *dst_offset;
+      region.extent                        = *extent;
+
+      vkCmdCopyImage(self->cmd,
+            image_get_image(src), image_get_layout(src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+            image_get_image(dst), image_get_layout(dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+            1, &region);
    }
 
    static void commandbuffer_begin_context(struct CommandBuffer *self)
@@ -18501,6 +18608,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       if (rect->width == 0 || rect->height == 0)
          return;
 
+      fbatlas_palette_preserve(self, rect);
       fbatlas_write_compute(self, Domain_Unscaled, rect);
 
       xbegin = rect->x / BLOCK_WIDTH;
@@ -18537,7 +18645,10 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
    {
       unsigned dst_xend;
       unsigned dst_xbegin;
-      Domain domain = fbatlas_find_suitable_domain(self, src);
+      Domain domain;
+
+      fbatlas_palette_preserve(self, dst);
+      domain = fbatlas_find_suitable_domain(self, src);
 
       fbatlas_sync_domain(self, domain, src);
       fbatlas_sync_domain(self, domain, dst);
@@ -18961,55 +19072,134 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       }
    }
 
+   /* Retained CLUT.
+    *
+    * The GPU latches the 16 or 256 palette entries when the CLUT selection
+    * (x, y, depth) of a 4/8bpp draw changes, and fetches them again only on
+    * the next change, GP0(01) or reset. Writes to the row in VRAM never reach
+    * the latched copy, and games rely on that: Ape Escape overwrites the row
+    * and keeps drawing with the old colours (#890). The palette is sampled
+    * live from the atlas, which costs nothing extra, until a write is about
+    * to land on the selected row; the row is then copied into the renderer's
+    * palette image and later draws with the same selection sample that. The
+    * copy is a transfer read of the unscaled domain, so it takes the atlas
+    * hazards like any other read, and the row it captures is whatever the
+    * previous write left there. */
+   static bool fbatlas_palette_overlaps(const FBAtlas *self, const TTRect *rect)
+   {
+      unsigned palette_width;
+      unsigned palette_from_write;
+      unsigned write_from_palette;
+
+      if (!self->palette_cache_valid || !rect->width || !rect->height)
+         return false;
+      if (self->palette_cache_y < rect->y || self->palette_cache_y >= rect->y + rect->height)
+         return false;
+
+      palette_width = self->palette_cache_mode == TextureMode_Palette8bpp ? 256u : 16u;
+      palette_from_write = (self->palette_cache_x + FB_WIDTH - rect->x) % FB_WIDTH;
+      write_from_palette = (rect->x + FB_WIDTH - self->palette_cache_x) % FB_WIDTH;
+      return palette_from_write < rect->width || write_from_palette < palette_width;
+   }
+
+   static void fbatlas_palette_preserve(FBAtlas *self, const TTRect *rect)
+   {
+      TTRect prect;
+
+      if (self->palette_cache_saved || !fbatlas_palette_overlaps(self, rect))
+         return;
+
+      prect.x = self->palette_cache_x;
+      prect.y = self->palette_cache_y;
+      prect.width = self->palette_cache_mode == TextureMode_Palette8bpp ? 256u : 16u;
+      prect.height = 1;
+
+      /* Draws queued under an earlier selection may still sample the palette
+       * image; record them before its contents change. */
+      fbatlas_flush_render_pass(self);
+
+      if (prect.x + prect.width <= FB_WIDTH)
+         fbatlas_read_transfer(self, Domain_Unscaled, &prect);
+      else
+      {
+         TTRect head = { prect.x, prect.y, FB_WIDTH - prect.x, 1 };
+         TTRect tail = { 0, prect.y, prect.x + prect.width - FB_WIDTH, 1 };
+         fbatlas_read_transfer(self, Domain_Unscaled, &head);
+         fbatlas_read_transfer(self, Domain_Unscaled, &tail);
+      }
+
+      renderer_preserve_palette(self->listener, prect.x, prect.y, prect.width);
+      self->palette_cache_saved = true;
+   }
+
+   /* GP0(01) and reset: the next 4/8bpp draw fetches its palette from VRAM
+    * even if the selection is unchanged. Queued draws that already sample
+    * the palette image are recorded by the next preserve before it writes. */
+   static void fbatlas_invalidate_palette_cache(FBAtlas *self)
+   {
+      self->palette_cache_valid = false;
+      self->palette_cache_saved = false;
+   }
+
    static void fbatlas_write_fragment(FBAtlas *self,
          Domain domain,
          const TTRect *rect)
    {
       bool reads_window = self->renderpass.texture_mode != TextureMode_None;
+      bool reads_palette = false;
+      bool palette_retained = false;
+      TTRect scissored = rect_scissor(rect, &self->renderpass.scissor);
+
+      switch (self->renderpass.texture_mode)
+      {
+         case TextureMode_Palette4bpp:
+         case TextureMode_Palette8bpp:
+            reads_palette = true;
+            break;
+
+         default:
+            break;
+      }
+
+      /* A 4/8bpp draw latches its CLUT selection first; the previous one is
+       * no longer what the GPU holds, so a write over its row can be let go. */
+      if (reads_palette)
+      {
+         bool same = self->palette_cache_valid &&
+               self->palette_cache_mode == self->renderpass.texture_mode &&
+               self->palette_cache_x == self->renderpass.palette_offset_x &&
+               self->palette_cache_y == self->renderpass.palette_offset_y;
+         if (!same)
+         {
+            self->palette_cache_valid = true;
+            self->palette_cache_saved = false;
+            self->palette_cache_mode  = self->renderpass.texture_mode;
+            self->palette_cache_x     = self->renderpass.palette_offset_x;
+            self->palette_cache_y     = self->renderpass.palette_offset_y;
+         }
+      }
+
+      /* Any draw, textured or not, may cover the selected row; the entries
+       * were latched before rasterising, so retain them before it lands. */
+      fbatlas_palette_preserve(self, &scissored);
+      palette_retained = reads_palette && self->palette_cache_saved;
+
       if (reads_window)
       {
          TTRect shifted = self->renderpass.texture_window;
-         bool reads_palette;
-         bool palette_cached = false;
-         switch (self->renderpass.texture_mode)
-         {
-            case TextureMode_Palette4bpp:
-            case TextureMode_Palette8bpp:
-               reads_palette = true;
-               break;
-
-            default:
-               reads_palette = false;
-               break;
-         }
          shifted.x += self->renderpass.texture_offset_x;
          shifted.y += self->renderpass.texture_offset_y;
 
          { const TTRect palette_rect = { self->renderpass.palette_offset_x, self->renderpass.palette_offset_y,
             self->renderpass.texture_mode == TextureMode_Palette8bpp ? 256u : 16u, 1 };
 
-         if (reads_palette)
-         {
-            palette_cached = self->palette_cache_valid &&
-                  self->palette_cache_mode == self->renderpass.texture_mode &&
-                  self->palette_cache_x == self->renderpass.palette_offset_x &&
-                  self->palette_cache_y == self->renderpass.palette_offset_y;
-            if (!palette_cached)
-            {
-               self->palette_cache_valid = true;
-               self->palette_cache_mode = self->renderpass.texture_mode;
-               self->palette_cache_x = self->renderpass.palette_offset_x;
-               self->palette_cache_y = self->renderpass.palette_offset_y;
-            }
-
-            if (fbatlas_inside_render_pass(self, &shifted) ||
-                (!palette_cached && fbatlas_inside_render_pass(self, &palette_rect)))
-               fbatlas_flush_render_pass(self);
-         }
-         else if (fbatlas_inside_render_pass(self, &shifted))
+         if (fbatlas_inside_render_pass(self, &shifted) ||
+             (reads_palette && !palette_retained && fbatlas_inside_render_pass(self, &palette_rect)))
             fbatlas_flush_render_pass(self);
 
-         fbatlas_read_texture(self, domain, !palette_cached);
+         /* A retained palette is not read from VRAM, so it takes no atlas
+          * hazards; the window still does. */
+         fbatlas_read_texture(self, domain, !palette_retained);
          }
       }
 
@@ -19031,6 +19221,7 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       if (self->renderpass.inside && !rect_intersects(&self->renderpass.rect, rect))
          fbatlas_flush_render_pass(self);
 
+      fbatlas_palette_preserve(self, rect);
       fbatlas_extend_render_pass(self, rect, false);
 
       /* If the render pass area doesn't increase later, we can use loadOp ==
@@ -20169,6 +20360,14 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
 }
 
 /* Draw commands */
+
+void rhi_vulkan_invalidate_clut_cache(void)
+{
+   /* Nothing to defer: before the renderer exists no palette has been
+    * latched, so there is nothing to drop. */
+   if (renderer)
+      fbatlas_invalidate_palette_cache(&renderer->atlas);
+}
 
 void rhi_vulkan_set_tex_window(uint8_t tww, uint8_t twh,
                                uint8_t twx, uint8_t twy)
