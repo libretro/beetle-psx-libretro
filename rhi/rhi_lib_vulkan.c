@@ -9154,6 +9154,12 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
     * because the `allocate_depth` call above can call `reset_queue` which would
     * invalidate the HdTextureHandle */
    param = (int16_t)(shift);
+   /* Preserve the authoritative GP0 raw/modulated distinction in the queued
+    * vertex. 0x2000 is unused in the signed 16-bit parameter lane and remains
+    * safe when 0x8000 makes the combined value negative. */
+   if (self->render_state.texture_mode != TextureMode_None &&
+       !self->render_state.texture_color_modulate)
+      param = (int16_t)(param | 0x2000);
    /* 0x1000: the selected CLUT was overwritten after it was latched; sample
     * the retained copy (uPalette) instead of VRAM. Set right after
     * renderer_allocate_depth, which is what resolves it for this draw. */
@@ -9199,6 +9205,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
     * is Vulkan-side stale unscaled-domain content under the sampled
     * rect, tracked separately. */
    if (!psx_pgxp_color &&
+       self->render_state.texture_color_modulate &&
        self->render_state.texture_mode != TextureMode_None &&
        hd_texture_vram.height > 0)
    {
@@ -9256,13 +9263,6 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       output[i].min_v = self->render_state.UVLimits.min_v;
       output[i].max_u = self->render_state.UVLimits.max_u;
       output[i].max_v = self->render_state.UVLimits.max_v;
-
-      if (self->render_state.texture_mode != TextureMode_None && !self->render_state.texture_color_modulate)
-      {
-         /* Raw texture: neutral modulate, 0x80 == unity. */
-         output[i].color[0] = output[i].color[1] = output[i].color[2]
-            = 128.0f / 255.0f;
-      }
 
       output[i].color[3] = self->render_state.force_mask_bit ? 1.0f : 0.0f;
    } }
