@@ -118,6 +118,9 @@ void main()
 	if (opacity < 0.5)
 		discard;
 
+	/* 0x2000 carries the GP0 raw-texture bit. Do not infer this from a
+	 * neutral vertex colour: 0x808080 is also valid modulated input. */
+	bool raw_texture = (uint(vParam.z) & 0x2000u) != 0u;
 	bool fixed_feedback = (uint(vParam.z) & 0x800u) != 0u;
 	if (fixed_feedback)
 	{
@@ -151,7 +154,8 @@ void main()
 		FragColor = vec4(q5 / 31.0, NNColor.a + vColor.a);
 		return;
 	}
-	vec3 shaded_hot = color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
+	vec3 shaded_hot = raw_texture ? color.rgb :
+		color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
 	vec3 shaded = clamp(shaded_hot, 0.0, 1.0);
 	/* The semi-trans-opaque pass and every other blend mode stay clamped;
 	 * over-white there comes only from stacking, matching the option text. */
@@ -170,7 +174,12 @@ void main()
 	// This is required for various "fade" out effects.
 	// However, don't accidentially round down if we are already rounded to avoid
 	// unintended feedback effects.
-	FragColor.rgb -= 0.49 / 255.0;
+	/* Raw texture colour is already quantized by the PlayStation GPU. The
+	 * generic store bias can move it across a later 1555 packing boundary. */
+#ifdef TEXTURED
+	if (!raw_texture)
+#endif
+		FragColor.rgb -= 0.49 / 255.0;
 
 #if 0
 #if defined(TEXTURED)
