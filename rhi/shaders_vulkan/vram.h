@@ -46,10 +46,10 @@ vec4 sample_vram_atlas(vec2 uvv)
 #else
     vec2 coord;
 #endif
+    ivec2 uv = (ivec2(uvv) & vWindow.xy) | vWindow.zw;
     if (shift != 0)
     {
         int bpp = 16 >> shift;
-        ivec2 uv = (ivec2(uvv) & vWindow.xy) | vWindow.zw;
         int phase = uv.x & ((1 << shift) - 1);
         int align = bpp * phase;
         uv.x >>= shift;
@@ -76,9 +76,9 @@ vec4 sample_vram_atlas(vec2 uvv)
     }
     else
 #if defined(UNSCALED)
-        coord = vBaseUV + ivec2(uvv);
+        coord = vBaseUV + uv;
 #else
-        coord = vBaseUV + uvv;
+        coord = vBaseUV + vec2(uv) + fract(uvv);
 #endif
 
 #if defined(UNSCALED)
