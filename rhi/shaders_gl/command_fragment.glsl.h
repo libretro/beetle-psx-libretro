@@ -1171,9 +1171,9 @@ STRINGIZE(
    uint x_dither = (uint(gl_FragCoord.x) / dither_scaling) & 3U;
    uint y_dither = (uint(gl_FragCoord.y) / dither_scaling) & 3U;
 
-   // The multiplication by `frag_dither` will result in
-   // `dither_offset` being 0 if dithering is disabled
+   // Raw textures bypass modulation and its dither.
    int dither_offset =
+      frag_texture_blend_mode == BLEND_MODE_RAW_TEXTURE ? 0 :
       dither_pattern[y_dither * 4U + x_dither] * int(frag_dither);
 
    if (modulation_quantized)
@@ -1187,7 +1187,12 @@ STRINGIZE(
        * truncates instead; make that conversion explicit. This also keeps
        * filtered framebuffer feedback moving toward zero without reducing
        * the sampling precision used to produce output_rgb. */
-      if (native_rgb5 != 0u)
+      /* A raw texel is already an exact PS1 RGB5 value. Re-quantizing it
+       * here makes the copy depend on the driver's normalized-float
+       * conversion and can turn a channel into n - 1. Let the RGB5
+       * attachment round it back to the same hardware value instead. */
+      if (native_rgb5 != 0u &&
+          frag_texture_blend_mode != BLEND_MODE_RAW_TEXTURE)
          output_rgb = floor(clamp(output_rgb, vec3(0.), vec3(1.)) * 31.) /
                       31.;
 
