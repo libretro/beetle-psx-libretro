@@ -1171,9 +1171,9 @@ STRINGIZE(
    uint x_dither = (uint(gl_FragCoord.x) / dither_scaling) & 3U;
    uint y_dither = (uint(gl_FragCoord.y) / dither_scaling) & 3U;
 
-   // The multiplication by `frag_dither` will result in
-   // `dither_offset` being 0 if dithering is disabled
+   // Raw textures bypass modulation and its dither.
    int dither_offset =
+      frag_texture_blend_mode == BLEND_MODE_RAW_TEXTURE ? 0 :
       dither_pattern[y_dither * 4U + x_dither] * int(frag_dither);
 
    if (modulation_quantized)
