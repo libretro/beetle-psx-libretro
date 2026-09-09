@@ -19,6 +19,18 @@
 static const char * command_fragment_name_ = GLSL_FRAGMENT(
 uniform sampler2D fb_texture;
 uniform sampler2D palette_texture;
+)
+#ifdef HAVE_OPENGLES3
+STRINGIZE(
+uniform highp sampler2D fb_feedback_texture;
+)
+#else
+STRINGIZE(
+uniform sampler2D fb_feedback_texture;
+)
+#endif
+STRINGIZE(
+uniform uint feedback_upscaling;
 
 // Scaling to apply to the dither pattern
 uniform uint dither_scaling;
@@ -119,6 +131,10 @@ const uint FILTER_MODE_SABR         = 1U;
 vec4 vram_get_pixel(uint x, uint y) {
   x = (x & 0x3ffU);
   y = (y & 0x1ffU);
+
+  if (frag_framebuffer_feedback != 0U && feedback_upscaling > 1U)
+     return texelFetch(fb_feedback_texture,
+           ivec2(x, y) * int(feedback_upscaling), 0);
 
   return texelFetch(fb_texture, ivec2(x, y), 0);
 }
