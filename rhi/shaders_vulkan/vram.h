@@ -16,7 +16,8 @@ layout(location = 5) flat in highp ivec4 vTexLimits;
 layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
 #else
 layout(constant_id = 3) const int SCALE = 1;
-#if defined(MSAA)
+/* MSAA feedback can read a resolved snapshot while writing per sample. */
+#if defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
 layout(set = 0, binding = 0) uniform mediump sampler2DMS uFramebufferMS;
 #else
 layout(set = 0, binding = 0) uniform mediump sampler2D uFramebuffer;
@@ -56,7 +57,7 @@ vec4 sample_vram_atlas(vec2 uvv)
         int value = int(texelFetch(uFramebuffer, (vBaseUV + uv) & FB_MASK, 0).x);
 #else
         uv = ivec2(mod((vBaseUV + uv), FB_SIZE));
-#if defined(MSAA)
+#if defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
         int value = int(pack_abgr1555(texelFetch(uFramebufferMS, uv * SCALE, gl_SampleID)));
 #else
         int value = int(pack_abgr1555(texelFetch(uFramebuffer, uv * SCALE, 0)));
@@ -82,7 +83,7 @@ vec4 sample_vram_atlas(vec2 uvv)
 
 #if defined(UNSCALED)
     return abgr1555(texelFetch(uFramebuffer, coord & FB_MASK, 0).x);
-#elif defined(MSAA)
+#elif defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
     return texelFetch(uFramebufferMS, ivec2(mod(coord, FB_SIZE) * SCALE), gl_SampleID);
 #else
     return texelFetch(uFramebuffer, ivec2(mod(coord, FB_SIZE) * SCALE), 0);
