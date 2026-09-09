@@ -270,6 +270,10 @@ void CPU_SetHalt_method(PS_CPU *self, bool status)
 {
    (void)self;
    Halted = status;
+#ifdef HAVE_LIGHTREC
+   if(status && lightrec_state && psx_dynarec != DYNAREC_DISABLED)
+      lightrec_set_exit_flags(lightrec_state, LIGHTREC_EXIT_CHECK_INTERRUPT);
+#endif
    CPU_RecalcIPCache();
 }
 
@@ -3730,14 +3734,22 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
 #endif
       lightrec_reset_cycle_count(lightrec_state, timestamp);
 
-      if (next_interpreter > 0 || psx_dynarec == DYNAREC_RUN_INTERPRETER)
-         PC = lightrec_run_interpreter(lightrec_state, PC, next_event_ts);
-      else if (psx_dynarec == DYNAREC_EXECUTE)
-         PC = lightrec_execute(lightrec_state, PC, next_event_ts);
+      if (Halted)
+      {
+         timestamp = next_event_ts;
+         lightrec_reset_cycle_count(lightrec_state, timestamp);
+         flags = LIGHTREC_EXIT_NORMAL;
+      }
+      else
+      {
+         if (next_interpreter > 0 || psx_dynarec == DYNAREC_RUN_INTERPRETER)
+            PC = lightrec_run_interpreter(lightrec_state, PC, next_event_ts);
+         else if (psx_dynarec == DYNAREC_EXECUTE)
+            PC = lightrec_execute(lightrec_state, PC, next_event_ts);
 
-      timestamp = lightrec_current_cycle_count(lightrec_state);
-
-      flags = lightrec_exit_flags(lightrec_state);
+         timestamp = lightrec_current_cycle_count(lightrec_state);
+         flags = lightrec_exit_flags(lightrec_state);
+      }
 
       if (flags & (LIGHTREC_EXIT_SEGFAULT|LIGHTREC_EXIT_NOMEM)) {
          if (flags & LIGHTREC_EXIT_NOMEM)
@@ -3760,7 +3772,8 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
       if (timestamp >= lightrec_begin_cycles && PC != oldpc)
          print_for_big_ass_debugger(timestamp, PC);
 #endif
-      if ((lightrec_regs->cp0[CP0REG_SR] & lightrec_regs->cp0[CP0REG_CAUSE] & 0xFF00) &&
+      if (!Halted &&
+          (lightrec_regs->cp0[CP0REG_SR] & lightrec_regs->cp0[CP0REG_CAUSE] & 0xFF00) &&
           (lightrec_regs->cp0[CP0REG_SR] & 1))
       {
          /* Handle software interrupts */
