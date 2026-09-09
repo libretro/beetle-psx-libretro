@@ -27,6 +27,7 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/feedback.unscaled.frag.inc -mfmt=c -DTEXTURED -DUNSCALED primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.flat.frag.inc -mfmt=c primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.msaa.frag.inc -mfmt=c -DTEXTURED -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.resolved.frag.inc -mfmt=c -DTEXTURED -DMSAA -DSINGLE_SAMPLE_TEXTURE primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.msaa.unscaled.frag.inc -mfmt=c -DTEXTURED -DMSAA -DUNSCALED primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.msaa.flat.frag.inc -mfmt=c -DMSAA primitive_feedback.frag
 
