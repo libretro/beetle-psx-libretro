@@ -362,7 +362,20 @@ vec4 sample_texel(vec2 coords) {
    tex_x_pix += frag_texture_page.x;
    tex_y += frag_texture_page.y;
 
-   vec4 texel = vram_get_pixel(tex_x_pix, tex_y);
+   vec4 texel;
+   if (frag_depth_shift == 0U && frag_framebuffer_feedback != 0U &&
+       feedback_upscaling > 1U)
+   {
+      vec2 feedback_phase = clamp(coords, vec2(0.0), vec2(255.0));
+      feedback_phase = clamp(feedback_phase, vec2(frag_texture_limits.xy),
+            vec2(frag_texture_limits.zw));
+      vec2 feedback_coord = vec2(tex_x_pix & 0x3ffU, tex_y & 0x1ffU) +
+            fract(feedback_phase);
+      texel = texelFetch(fb_feedback_texture,
+            ivec2(feedback_coord * float(feedback_upscaling)), 0);
+   }
+   else
+      texel = vram_get_pixel(tex_x_pix, tex_y);
 
    if (frag_depth_shift > 0U) {
       // 8 and 4bpp textures are paletted so we need to lookup the
