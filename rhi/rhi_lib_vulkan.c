@@ -9126,6 +9126,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    }
 
    { TTRect hd_texture_vram = make_rect(0, 0, 0, 0);
+   TTRect sampled_vram = make_rect(0, 0, 0, 0);
 
    if (self->render_state.texture_mode != TextureMode_None)
    {
@@ -9180,6 +9181,13 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
          hd_texture_vram.width = effective_rect.width >> shift;
          hd_texture_vram.height = effective_rect.height;
       }
+
+      /* Framebuffer queries need the full texel area, not the HD matching
+       * span whose right edge omits a column. Use the hazard tracker's area
+       * so masked and wrapped windows keep their existing extents. */
+      sampled_vram = self->atlas.renderpass.texture_window;
+      sampled_vram.x += self->render_state.texture_offset_x;
+      sampled_vram.y += self->render_state.texture_offset_y;
    }
 
    /* Compute bounding box for the draw call. */
@@ -9229,10 +9237,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    {
       if (rect_intersects(&self->render_state.draw_rect, &rect))
       {
-         /* HACK hd_texture_vram should contains the texture we are reading from
-          * in vram coordinate avoid texture filtering and enable scaled read if
-          * the texture is rendered content */
-         bool texture_rendered = fbatlas_texture_rendered(&self->atlas, &hd_texture_vram);
+         bool texture_rendered = fbatlas_texture_rendered(&self->atlas, &sampled_vram);
          filtering = !texture_rendered;
          scaled_read = texture_rendered;
       }
@@ -9247,7 +9252,6 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       filtering = self->render_state.texture_mode != TextureMode_None;
       if (self->render_state.texture_mode != TextureMode_None)
       {
-         TTRect sampled_vram = hd_texture_vram;
          TTRect palette_rect = {
             self->render_state.palette_offset_x,
             self->render_state.palette_offset_y,
@@ -9260,8 +9264,6 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
           * themselves rendered. If only the live CLUT was rendered, however,
           * read the scaled domain so its colour is not quantized through a
           * scaled-to-native resolve before the palette lookup. */
-         if (sampled_vram.height && !sampled_vram.width)
-            sampled_vram.width = 1;
          texture_rendered = fbatlas_texture_rendered(&self->atlas, &sampled_vram);
          scaled_read = !texture_rendered &&
                fbatlas_texture_rendered(&self->atlas, &palette_rect);
@@ -9324,8 +9326,8 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
        hd_texture_vram.height > 0)
    {
       bool feedback = vram_prov_any(self,
-            (int)hd_texture_vram.x, (int)hd_texture_vram.y,
-            (int)hd_texture_vram.width + 1, (int)hd_texture_vram.height);
+            (int)sampled_vram.x, (int)sampled_vram.y,
+            (int)sampled_vram.width, (int)sampled_vram.height);
       if (!feedback && self->render_state.texture_mode != TextureMode_ABGR1555)
       {
          unsigned pal_w = self->render_state.texture_mode ==
