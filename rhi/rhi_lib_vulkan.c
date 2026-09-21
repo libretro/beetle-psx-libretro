@@ -7429,18 +7429,13 @@ static void renderer_ssaa_framebuffer(Renderer *self)
    else
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearClamp);
 
-   { struct Push
-   {
-      float inv_size[2];
-      uint32_t scale;
-   };
-   unsigned size = resolves_n;
+   /* No push constants: the unscaled resolve takes its clamp bounds from
+    * textureSize() on the bound source view. */
+   { unsigned size = resolves_n;
    { unsigned i; for (i = 0; i < size; i += 1024) {
       void * ptr;
       unsigned to_run = min_(size - i, 1024u);
 
-      struct Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
-      commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
       ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
       memcpy(ptr, resolves_ssaa + i, to_run * sizeof(VkRect2D));
       commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
@@ -8857,8 +8852,6 @@ static void renderer_flush_resolves(Renderer *self)
          void * ptr;
          unsigned to_run = min_(size - i, 1024u);
 
-         struct Push push = { { 1.0f / FB_WIDTH, 1.0f / FB_HEIGHT }, 1u };
-         commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
          ptr = commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 1, 0, to_run * sizeof(VkRect2D));
          memcpy(ptr, Rect2DVec_data(&self->queue.unscaled_resolves) + i, to_run * sizeof(VkRect2D));
          commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
