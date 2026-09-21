@@ -875,7 +875,10 @@ void rhi_intf_push_quad(
    bool is_sprite,
    bool may_be_2d)
 {
-   dither = dither && !is_sprite;
+   /* Sprites are never dithered on hardware (the software renderer
+    * uses the zero dither offset for them); resolve that once here so
+    * every backend and the dump see the same value. */
+   const bool quad_dither = dither && !is_sprite;
 
 #ifdef RHI_DUMP
    const rhi_dump_vertex vertices[4] = {
@@ -885,7 +888,7 @@ void rhi_intf_push_quad(
       { p3x, p3y, p3w, c3, t3x, t3y },
    };
    const rhi_render_state state = {
-      texpage_x, texpage_y, clut_x, clut_y, texture_blend_mode, depth_shift, dither, blend_mode,
+      texpage_x, texpage_y, clut_x, clut_y, texture_blend_mode, depth_shift, quad_dither, blend_mode,
       mask_test, set_mask,
    };
    rhi_dump_quad(vertices, &state);
@@ -907,7 +910,7 @@ void rhi_intf_push_quad(
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
                depth_shift,
-               dither,
+               quad_dither,
                blend_mode, mask_test, set_mask);
 #endif
          break;
@@ -920,7 +923,7 @@ void rhi_intf_push_quad(
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
                depth_shift,
-               dither,
+               quad_dither,
                blend_mode, mask_test, set_mask, is_sprite, may_be_2d);
 #endif
          break;
