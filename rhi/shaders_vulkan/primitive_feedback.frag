@@ -48,7 +48,11 @@ void main()
 
 	vec4 color = NNColor;
 
-	vec3 shaded_hot = color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
+	/* Raw texture colour bypasses vertex modulation. The final store bias
+	 * remains below because this program emits a derived blended result. */
+	bool raw_texture = (uint(vParam.z) & 0x2000u) != 0u;
+	vec3 shaded_hot = raw_texture ? color.rgb :
+		color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
 	vec3 shaded     = clamp(shaded_hot, 0.0, 1.0);
 	vec3 add_src    = (HDR_HOT_SOURCE != 0) ? max(shaded_hot, vec3(0.0)) : shaded;
 	float blend_amt = NNColor.a;
