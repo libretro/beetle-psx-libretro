@@ -376,6 +376,55 @@ static Deinterlacer deint;
 
 static MDFN_Surface *surf = NULL;
 
+/* RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER for the software
+ * renderer: a buffer of the frontend's own, the size of the scanout
+ * surface, that this frame renders into instead of surf. video_cb then
+ * hands back a pointer inside the frontend's memory - the overscan
+ * crop below is a pointer offset at the surface's stride, which the
+ * frontend accepts - and nothing is copied on the way to the screen.
+ *
+ * Declined, and the frame renders into surf as before, when the
+ * frontend has no such buffer, when it offers a different format or
+ * stride, or when the picture is interlaced: WEAVE and FASTMAD
+ * combine this field with the previous frame's lines in the surface,
+ * and the frontend's buffer holds an older frame than they expect.
+ * The scanout cache is invalidated on every lent frame, because its
+ * "margins are still zero from last time" shortcut assumes the same
+ * buffer as last frame. */
+static MDFN_Surface lent_surf;
+
+static MDFN_Surface *acquire_lent_surface(void)
+{
+   struct retro_framebuffer fb;
+
+   if (!surf || !environ_cb)
+      return NULL;
+   if (currently_interlaced || PrevInterlaced)
+      return NULL;
+
+   memset(&fb, 0, sizeof(fb));
+   fb.width        = (unsigned)surf->w;
+   fb.height       = (unsigned)surf->h;
+   /* Read as well as write: the deinterlacer and the line hooks read
+    * what was scanned out, and the scanout cache's margin check reads
+    * nothing, but a cached mapping is what those need. */
+   fb.access_flags = RETRO_MEMORY_ACCESS_WRITE | RETRO_MEMORY_ACCESS_READ;
+
+   if (   !environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
+       || !fb.data
+       || fb.format != RETRO_PIXEL_FORMAT_XRGB8888
+       || fb.pitch  != (size_t)surf->pitchinpix * sizeof(uint32_t)
+       || !(fb.memory_flags & RETRO_MEMORY_TYPE_CACHED))
+      return NULL;
+
+   lent_surf.pixels     = (uint32_t*)fb.data;
+   lent_surf.w          = surf->w;
+   lent_surf.h          = surf->h;
+   lent_surf.pitchinpix = surf->pitchinpix;
+   GPU_InvalidateScanoutCache();
+   return &lent_surf;
+}
+
 enum
 {
    REGION_JP = 0,
@@ -6315,6 +6364,7 @@ void retro_run(void)
 {
    bool updated = false;
    static int32_t rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
+   MDFN_Surface *frame_surf = surf;
    EmulateSpecStruct spec = {0};
    EmulateSpecStruct *espec;
    int32_t timestamp = 0;
@@ -6564,7 +6614,12 @@ void retro_run(void)
 
    rects[0] = ~0;
 
-   spec.surface      = surf;
+   /* The frontend's buffer when it lends one, else the core's own. */
+   frame_surf        = (rhi_intf_is_type() == RHI_SOFTWARE)
+      ? acquire_lent_surface() : NULL;
+   if (!frame_surf)
+      frame_surf     = surf;
+   spec.surface      = frame_surf;
    spec.LineWidths   = rects;
    spec.SoundBufSize = 0;
 
@@ -6689,7 +6744,7 @@ void retro_run(void)
          if (!PrevInterlaced)
             Deinterlacer_ClearState(&deint);
 
-         Deinterlacer_Process(&deint, surf, &spec.DisplayRect, rects, spec.InterlaceField);
+         Deinterlacer_Process(&deint, frame_surf, &spec.DisplayRect, rects, spec.InterlaceField);
 
          /* The scanout cache assumes margin pixels are still zero
           * from the previous frame's writes.  WEAVE's XReposition
@@ -6727,7 +6782,7 @@ void retro_run(void)
 #endif
 
       // PSX core inserts padding on left and right (overscan). Optionally crop this.
-      pix = surf->pixels;
+      pix = frame_surf->pixels;
       pix_offset = 0;
 
       if (crop_overscan)
