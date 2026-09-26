@@ -24,12 +24,9 @@
 #include "beetle_psx_globals.h"
 
 /* HDR output state, owned by libretro.c (same contract as the Vulkan
- * renderer's extern block). psx_color_format records the *requested*
- * color format; psx_hdr_active is true only once the frontend accepted
- * SET_PIXEL_FORMAT(HDR10_2101010), so the display encode gates on the
- * latter while the fp16 render target gates on the former (it is
- * allocated before negotiation completes). */
-extern int   psx_color_format;
+ * renderer's extern block). psx_hdr_active is true only once the frontend
+ * accepted SET_PIXEL_FORMAT(HDR10_2101010), so both the internal target and
+ * display encode gate on it. */
 extern bool  psx_hdr_active;
 extern int   psx_video_cable;   /* 0 off, 1 S-Video, 2 composite, 3 RF, 4 RGB */
 extern float psx_phase_error;   /* receiver hue detune, in cycles */
@@ -3681,7 +3678,7 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    gl_texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1);
    gl_texture_init(&renderer->palette_texture, 256, 1, GL_RGB5_A1);
 
-   renderer->fb_out_fp16 = psx_color_format != 0 && gl_fp16_renderable();
+   renderer->fb_out_fp16 = psx_hdr_active && gl_fp16_renderable();
 
    if (dither_mode == DITHER_OFF || renderer->fb_out_fp16)
    {

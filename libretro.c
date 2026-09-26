@@ -219,6 +219,14 @@ int   psx_hdr_overbright_hot   = 0;
 int   psx_pgxp_color           = 0;
 int   psx_pgxp_fog             = 0;
 int   psx_hdr_multipass        = 0;
+
+static void reset_hdr_output_state(void)
+{
+   psx_hdr_active = false;
+   psx_pgxp_color = 0;
+   psx_pgxp_fog   = 0;
+}
+
 /* Reference SDR transfer the 24-bit path is assumed to have been viewed
  * through, used to linearise before the HDR encode: 0 = BT.1886 pure 2.4
  * (default, matches RetroArch's own SDR->HDR composition), 1 = pure 2.2,
@@ -4969,6 +4977,10 @@ static void check_variables(bool startup)
    {
       bool hw_renderer = false;
 
+      /* The option below is only a request. Derived HDR state remains off
+       * until the selected hardware renderer and frontend accept HDR10. */
+      reset_hdr_output_state();
+
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
       var.key = BEETLE_OPT(renderer);
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -4993,15 +5005,6 @@ static void check_variables(bool startup)
          if (!strcmp(var.value, "30bit_hdr"))
             psx_color_format = PSX_COLOR_FORMAT_30BIT_HDR;
       }
-
-      /* PGXP precise colour and linear-light fog are part of the 30-bit HDR
-       * mode rather than separate options: both are endpoint-exact and fall
-       * back to the architectural bytes wherever the PGXP shadow cannot be
-       * verified, so the worst case is the standard picture, and both are
-       * inert without PGXP memory tracking and off the fp16 target anyway.
-       * One switch, one look. */
-      psx_pgxp_color = (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR);
-      psx_pgxp_fog   = (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR);
 
       /* HDR highlight roll-off curve (Vulkan HDR path only): 0 Reinhard,
        * 1 ACES. Inert unless the HDR scanout is actually engaged. */
@@ -5989,7 +5992,7 @@ static void negotiate_hdr_output(void)
     * for the renderer's output stage to encode against, so an HDR frame
     * matches the frontend's own SDR->HDR composition rather than
     * diverging in brightness or saturation. */
-   psx_hdr_active = false;
+   reset_hdr_output_state();
    if (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR)
    {
       /* The confirmed contract (RetroArch gfx/video_driver.c: source_hdr10
@@ -6041,6 +6044,13 @@ static void negotiate_hdr_output(void)
          enum retro_pixel_format sdrfmt = RETRO_PIXEL_FORMAT_XRGB8888;
          environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &sdrfmt);
       }
+
+      /* Precise colour and linear-light fog are derived from the accepted
+       * output mode, not the user's request. They feed primitive generation
+       * as well as both hardware renderers, so a rejected request must leave
+       * them off just like the standard 24-bit path. */
+      psx_pgxp_color = psx_hdr_active;
+      psx_pgxp_fog   = psx_hdr_active;
 
       if (log_cb)
       {
@@ -6330,6 +6340,7 @@ void retro_unload_game(void)
    VCD_Reset();
 
    rhi_intf_close();
+   reset_hdr_output_state();
 
    MDFN_FlushGameCheats(0);
 
@@ -7008,6 +7019,7 @@ void retro_deinit(void)
    display_internal_framerate = false;
    display_notifications      = true;
    allow_frame_duping         = false;
+   reset_hdr_output_state();
 
    /* Capability flags re-detected by retro_init. */
    libretro_supports_option_categories = false;

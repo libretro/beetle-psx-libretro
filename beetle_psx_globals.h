@@ -65,7 +65,7 @@ extern bool gpu_fbwrite_fifo_delay;
  *
  * The user's *request* lives in psx_color_format; whether HDR is
  * actually engaged lives in psx_hdr_active, which is only ever true
- * once the renderer is confirmed to be Vulkan AND the frontend has
+ * once a supported hardware renderer is confirmed AND the frontend has
  * accepted the HDR10 format.  Everything downstream must gate on
  * psx_hdr_active, never on psx_color_format alone, so the SW/GL paths
  * and HDR-incapable frontends fall back cleanly to 24-bit. */
