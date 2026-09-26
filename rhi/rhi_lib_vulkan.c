@@ -9213,7 +9213,29 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    else
    {
       filtering = self->render_state.texture_mode != TextureMode_None;
-      scaled_read = false;
+      if (self->render_state.texture_mode != TextureMode_None)
+      {
+         TTRect sampled_vram = hd_texture_vram;
+         TTRect palette_rect = {
+            self->render_state.palette_offset_x,
+            self->render_state.palette_offset_y,
+            self->render_state.texture_mode == TextureMode_Palette8bpp ? 256u : 16u,
+            1
+         };
+         bool texture_rendered;
+
+         /* Keep packed 4/8bpp texture words in the native path when they were
+          * themselves rendered. If only the live CLUT was rendered, however,
+          * read the scaled domain so its colour is not quantized through a
+          * scaled-to-native resolve before the palette lookup. */
+         if (sampled_vram.height && !sampled_vram.width)
+            sampled_vram.width = 1;
+         texture_rendered = fbatlas_texture_rendered(&self->atlas, &sampled_vram);
+         scaled_read = !texture_rendered &&
+               fbatlas_texture_rendered(&self->atlas, &palette_rect);
+      }
+      else
+         scaled_read = false;
    }
    if (scaled_read && !renderer_ensure_scaled_read_snapshot(self))
       scaled_read = false;
