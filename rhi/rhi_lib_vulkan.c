@@ -71,11 +71,6 @@ extern int   psx_pgxp_fog;             /* PGXP linear-light depth cue; effective
  * pass after each subtractive batch. Both floor at zero; see
  * renderer_semi_trans_needs_feedback / renderer_emit_sub_floor. */
 extern int   psx_hdr_multipass;
-/* The requested color format (enum psx_color_format_e). Unlike psx_hdr_active
- * this is known at renderer init (read at startup), so it gates the wide
- * (16F) scaled framebuffer, which is allocated before HDR negotiation
- * completes. Non-zero = a 30-bit/HDR format was requested. */
-extern int   psx_color_format;
 /* Frontend save directory (libretro.c); the persistent pipeline cache lives
  * under it because it is the one directory the core already writes to. */
 extern char  retro_save_directory[4096];
@@ -6785,12 +6780,14 @@ static void renderer_init(Renderer *self,
 
    info.width *= self->scaling;
    info.height *= self->scaling;
-   /* Decide the scaled-framebuffer colour format. Widen to 16F only when a
-    * 30-bit/HDR format was requested AND the device supports R16F for every
-    * usage the scaled fb needs (colour attachment, sampled, storage). SDR and
-    * unsupported GPUs keep R8G8B8A8 and render exactly as before. */
+   /* Decide the scaled-framebuffer colour format. HDR negotiation completes
+    * after SET_HW_RENDER and before the frontend invokes context_reset, so its
+    * accepted result is authoritative here. Widen to 16F only when HDR is
+    * engaged AND the device supports R16F for every usage the scaled fb needs
+    * (colour attachment, sampled, storage). SDR and rejected/unsupported HDR
+    * keep R8G8B8A8 and render exactly as before. */
    self->scaled_fb_format = VK_FORMAT_R8G8B8A8_UNORM;
-   if (psx_color_format != 0 &&
+   if (psx_hdr_active &&
          device_image_format_is_supported(self->device, VK_FORMAT_R16G16B16A16_SFLOAT,
             VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
             VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT |
@@ -20524,11 +20521,12 @@ void rhi_vulkan_prepare_frame(void)
    renderer->primitive_filter_mode = (FilterMode)(filter_mode);
    renderer->sprite_filter_exclude = (FilterExclude)(filter_exclude_sprites);
    renderer->polygon_2d_filter_exclude = (FilterExclude)(filter_exclude_2d_polygons);
-   /* Latch the option at the frame boundary before any GP0 work is queued.
-    * A requested wide/HDR format retains its higher-precision path even if
-    * the frontend leaves the dither option at its default value. */
+   /* Latch the negotiated mode at the frame boundary before any GP0 work is
+    * queued. Engaged HDR retains its higher-precision path even if the
+    * frontend leaves the dither option at its default value; a rejected
+    * request follows the standard path. */
    renderer->render_state.native_color =
-      psx_color_format == 0 && dither_mode != DITHER_OFF;
+      !psx_hdr_active && dither_mode != DITHER_OFF;
    renderer->render_state.dither_native_resolution =
       dither_mode == DITHER_NATIVE;
 }
