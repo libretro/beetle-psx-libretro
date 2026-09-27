@@ -9295,13 +9295,12 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    }
 
    /* Framebuffer feedback samples authoritative 15-bit VRAM even when the
-    * render target is wide. Standard colour uses the existing fixed-point
-    * modulation path. Under precise colour, reconstruct only exact neutral
-    * modulation so a 0x80 draw preserves the RGB5 texel without promoting a
-    * genuinely shaded indexed texture such as Tomb Raider 2's water. Check
-    * every effective vertex colour so Gouraud and recovered PGXP colours
-    * cannot be misclassified from vertex zero or packed GP0 bytes. */
+    * render target is wide. Direct-colour feedback needs RGB5 modulation at
+    * any shade, including Silent Hill's 0x7f fade sprites. For indexed
+    * textures under precise colour, retain the all-vertex neutral test so a
+    * genuinely shaded texture such as Tomb Raider 2's water stays wide. */
    if ((!psx_pgxp_color ||
+        self->render_state.texture_mode == TextureMode_ABGR1555 ||
         vertices_have_neutral_modulation(vertices, count)) &&
        self->render_state.texture_color_modulate &&
        self->render_state.texture_mode != TextureMode_None &&
