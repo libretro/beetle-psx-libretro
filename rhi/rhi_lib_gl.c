@@ -1254,19 +1254,13 @@ static void get_program_info_log(gl_program *pg, GLuint id)
 static bool load_program_uniforms(GLuint program, gl_uniform_map *uniforms)
 {
    GLint u;
-   /* Figure out how long a uniform name can be */
-   GLint max_name_len = 0;
-   GLint n_uniforms   = 0;
+   GLint n_uniforms = 0;
 
    memset(uniforms, 0, sizeof(*uniforms));
 
    glGetProgramiv( program,
          GL_ACTIVE_UNIFORMS,
          &n_uniforms );
-
-   glGetProgramiv( program,
-         GL_ACTIVE_UNIFORM_MAX_LENGTH,
-         &max_name_len);
 
    if (n_uniforms < 0 || n_uniforms > UNIFORM_MAX_ENTRIES)
    {
@@ -1275,18 +1269,15 @@ static bool load_program_uniforms(GLuint program, gl_uniform_map *uniforms)
             program, n_uniforms, UNIFORM_MAX_ENTRIES);
       return false;
    }
-   if (n_uniforms > 0 &&
-       (max_name_len <= 0 || max_name_len > UNIFORM_NAME_MAX))
-   {
-      log_cb(RETRO_LOG_ERROR,
-            "Program %u requires %d-byte uniform names; capacity is %d\n",
-            program, max_name_len, UNIFORM_NAME_MAX);
-      return false;
-   }
 
+   /* GL_ACTIVE_UNIFORM_MAX_LENGTH is not consulted: drivers are known to
+    * over-report it, and the names actually returned are what matter.
+    * The buffer holds one byte more than the map accepts, so a name that
+    * would be truncated is rejected by gl_uniform_map_set instead of being
+    * stored under a shortened key. */
    for (u = 0; u < n_uniforms; ++u)
    {
-      char name[UNIFORM_NAME_MAX];
+      char name[UNIFORM_NAME_MAX + 1];
       GLsizei len     = 0;
       GLint size      = 0;
       GLenum ty       = 0;
@@ -1311,12 +1302,15 @@ static bool load_program_uniforms(GLuint program, gl_uniform_map *uniforms)
       /* Retrieve the location of this uniform */
       location = glGetUniformLocation(program, (const char*) name);
 
+      /* Nothing looks such a uniform up, so skipping it is harmless;
+       * failing the whole program here would turn a driver quirk into
+       * no renderer at all. */
       if (location < 0)
       {
-         log_cb(RETRO_LOG_ERROR,
-               "Active uniform \"%s\" in program %u has no location\n",
+         log_cb(RETRO_LOG_WARN,
+               "Active uniform \"%s\" in program %u has no location, skipping\n",
                name, program);
-         return false;
+         continue;
       }
 
       if (!gl_uniform_map_set(uniforms, name, location))
@@ -8189,6 +8183,7 @@ static bool gl_copy_fb_out_to_feedback(gl_renderer *renderer,
 static void gl_fb_feedback_fail(gl_renderer *renderer, const char *reason)
 {
    GLint active_texture;
+   bool had_texture = renderer->fb_feedback_texture.id != 0;
 
    if (!renderer->fb_feedback_texture_failed)
       log_cb(RETRO_LOG_WARN,
@@ -8196,6 +8191,16 @@ static void gl_fb_feedback_fail(gl_renderer *renderer, const char *reason)
             "falling back to native resolution\n",
             reason, renderer->fb_out.width, renderer->fb_out.height,
             (unsigned)renderer->fb_out_internal_format);
+
+   /* Every region resolved through the scaled snapshot skipped its native
+    * mirror and had its pending mask cleaned, so fb_texture is stale there
+    * and nothing would ever refresh it once the shader falls back to it.
+    * Resync the whole native mirror from fb_out now. Primitives still
+    * queued in the command buffer keep their pending marks and are
+    * mirrored on their next sample as usual. */
+   if (had_texture)
+      (void)gl_blit_fb_out(renderer, &renderer->fb_texture, 1,
+            0, 0, VRAM_WIDTH_PIXELS, VRAM_HEIGHT);
 
    glDeleteTextures(1, &renderer->fb_feedback_texture.id);
    renderer->fb_feedback_texture.id     = 0;
