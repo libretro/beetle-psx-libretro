@@ -135,17 +135,18 @@ void main()
 	if (framebuffer_feedback)
 	{
 		vec3 texel5 = framebuffer_feedback_texel5(color.rgb);
-		if (PRECISE_COLOR != 0)
+		if (PRECISE_COLOR != 0 && (uint(vParam.z) & 3u) != 0u)
 		{
-			/* The texel was stored in 15-bit VRAM even though HDR keeps the
-			 * draw target wide. Restore its exact normalized RGB5 value, then
-			 * continue through the ordinary precise-colour modulation path. */
+			/* Neutral indexed feedback preserves its RGB5 source while the
+			 * precise-colour target remains wide. Shaded indexed textures are
+			 * intentionally not marked as framebuffer feedback. */
 			color.rgb = texel5 / 31.0;
 		}
 		else
 		{
-			/* Reproduce the PlayStation GPU's fixed-point modulation so
-			 * repeated framebuffer feedback decays at hardware rate. */
+			/* Direct-colour feedback must quantize each GP0 modulation step,
+			 * even on an FP16 target, so repeated fades decay at hardware rate.
+			 * Standard-colour feedback retains the same established path. */
 			const int dither_pattern[16] = int[](
 				-4,  0, -3,  1,
 				 2, -2,  3, -1,
