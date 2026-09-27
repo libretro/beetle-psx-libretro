@@ -149,7 +149,13 @@ void main()
 			-3,  1, -4,  0,
 			 3, -1,  2, -2);
 		vec3 fshade = clamp((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, 0.0, 1.0);
-		vec3 texel5 = floor(color.rgb * 31.0 + vec3(0.5));
+		/* Scaled Vulkan VRAM can hold RGB5 as either n << 3 (native-color
+		 * storage) or n / 31 (the older fixed-feedback output). Both are exact
+		 * representations of n, but round(color * 31) turns 248/255 back into
+		 * 30 instead of 31. Decode through the 8-bit expansion so either
+		 * representation remains stable across repeated feedback. */
+		vec3 texel5 = clamp(floor(color.rgb * (255.0 / 8.0) + vec3(0.001)),
+			vec3(0.0), vec3(31.0));
 		vec3 shade8 = floor(fshade * 255.0 + vec3(0.001));
 		vec3 modulated = floor(texel5 * shade8 / 16.0);
 		ivec2 dc = primitive_dither_coord();
