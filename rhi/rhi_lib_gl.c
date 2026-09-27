@@ -3257,6 +3257,31 @@ static void gl_renderer_draw(gl_renderer *renderer)
           * must be handled by the caller. This is because this command
           * can be called several times on the same buffer (i.e. multiple
           * draw calls between the prepare/finalize) */
+         /* Ceiling pass BEFORE subtractive blending on the fp16 target.
+          * Hardware saturates every blend at white, so B - F always starts
+          * from B <= 1.0; GL_RGBA16F lets stacked additive layers exceed it
+          * (SotN Fire Demon death: additive white ghost, then a white canvas
+          * subtracted -> black on hardware, see-through here). Redraw the same
+          * geometry with blend equation MIN and force_one (emitted after the
+          * shader's discards, so only the texels the subtraction will touch):
+          * min(dst, 1). Alpha (the mask bit) kept via ZERO/ONE ADD; stencil
+          * writes masked off; depth LEQUAL lets the real draw pass after it. */
+         if (renderer->fb_out_fp16 && !it->opaque &&
+             it->transparency_mode == SEMI_TRANSPARENCY_MODE_SUBTRACT_SOURCE &&
+             renderer->command_buffer->program)
+         {
+            glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_one"), 1u);
+            glBlendEquationSeparate(GL_MIN, GL_FUNC_ADD);
+            glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
+            glStencilMask(0);
+            glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
+                           (GLvoid*)(it->first * sizeof(GLushort)));
+            glStencilMask(1);
+            glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_one"), 0u);
+            glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
+            glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
+         }
+
          glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
                         (GLvoid*)(it->first * sizeof(GLushort)));
 
