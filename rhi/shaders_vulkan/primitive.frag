@@ -130,41 +130,41 @@ void main()
 	/* 0x2000 carries the GP0 raw-texture bit. Do not infer this from a
 	 * neutral vertex colour: 0x808080 is also valid modulated input. */
 	raw_texture = (uint(vParam.z) & 0x2000u) != 0u;
-	bool fixed_feedback = (uint(vParam.z) & 0x800u) != 0u;
-	if (fixed_feedback)
+	bool framebuffer_feedback =
+		(uint(vParam.z) & PARAM_FRAMEBUFFER_FEEDBACK) != 0u;
+	if (framebuffer_feedback)
 	{
-		/* The sampled texture or palette holds GPU-rendered VRAM data.
-		 * Reproduce the PlayStation GPU's fixed-point modulation so
-		 * repeated framebuffer feedback decays at hardware rate: the
-		 * float path below, plus the -0.49/255 store bias, truncates at
-		 * 8-bit granularity and fades 2-4x slower than the console.
-		 * ModTexel truncates the 5-bit texel times the 8-bit shading
-		 * colour; DitherLUT adds the 4x4 offset, divides by eight with
-		 * truncation, and clamps to a 5-bit channel. The result is
-		 * emitted without the store bias so rgba8/10-bit storage
-		 * round-trips it exactly. */
-		const int dither_pattern[16] = int[](
-			-4,  0, -3,  1,
-			 2, -2,  3, -1,
-			-3,  1, -4,  0,
-			 3, -1,  2, -2);
-		vec3 fshade = clamp((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, 0.0, 1.0);
-		/* Scaled Vulkan VRAM can hold RGB5 as either n << 3 (native-color
-		 * storage) or n / 31 (the older fixed-feedback output). Both are exact
-		 * representations of n, but round(color * 31) turns 248/255 back into
-		 * 30 instead of 31. Decode through the 8-bit expansion so either
-		 * representation remains stable across repeated feedback. */
-		vec3 texel5 = clamp(floor(color.rgb * (255.0 / 8.0) + vec3(0.001)),
-			vec3(0.0), vec3(31.0));
-		vec3 shade8 = floor(fshade * 255.0 + vec3(0.001));
-		vec3 modulated = floor(texel5 * shade8 / 16.0);
-		ivec2 dc = primitive_dither_coord();
-		float md = primitive_dither_enabled()
-			? float(dither_pattern[dc.y * 4 + dc.x]) : 0.0;
-		vec3 q5 = clamp(floor((modulated + md) / 8.0), vec3(0.0), vec3(31.0));
-		FragColor = vec4(primitive_native_color() ? q5 * (8.0 / 255.0) : q5 / 31.0,
-			NNColor.a + vColor.a);
-		return;
+		vec3 texel5 = framebuffer_feedback_texel5(color.rgb);
+		if (PRECISE_COLOR != 0)
+		{
+			/* The texel was stored in 15-bit VRAM even though HDR keeps the
+			 * draw target wide. Restore its exact normalized RGB5 value, then
+			 * continue through the ordinary precise-colour modulation path. */
+			color.rgb = texel5 / 31.0;
+		}
+		else
+		{
+			/* Reproduce the PlayStation GPU's fixed-point modulation so
+			 * repeated framebuffer feedback decays at hardware rate. */
+			const int dither_pattern[16] = int[](
+				-4,  0, -3,  1,
+				 2, -2,  3, -1,
+				-3,  1, -4,  0,
+				 3, -1,  2, -2);
+			vec3 fshade = clamp((PGXP_FOG != 0) ?
+				pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, 0.0, 1.0);
+			vec3 shade8 = floor(fshade * 255.0 + vec3(0.001));
+			vec3 modulated = floor(texel5 * shade8 / 16.0);
+			ivec2 dc = primitive_dither_coord();
+			float md = primitive_dither_enabled()
+				? float(dither_pattern[dc.y * 4 + dc.x]) : 0.0;
+			vec3 q5 = clamp(floor((modulated + md) / 8.0),
+				vec3(0.0), vec3(31.0));
+			FragColor = vec4(primitive_native_color() ?
+				q5 * (8.0 / 255.0) : q5 / 31.0,
+				NNColor.a + vColor.a);
+			return;
+		}
 	}
 	vec3 shaded_hot = raw_texture ? color.rgb :
 		color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);

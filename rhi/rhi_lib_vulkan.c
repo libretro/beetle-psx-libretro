@@ -9075,6 +9075,21 @@ static bool renderer_ensure_scaled_read_snapshot(Renderer *self)
    return true;
 }
 
+static bool vertices_have_neutral_modulation(const Vertex *vertices,
+      unsigned count)
+{
+   const float neutral = 128.0f / 255.0f;
+   unsigned i;
+
+   for (i = 0; i < count; i++)
+      if (vertices[i].cf[0] != neutral ||
+          vertices[i].cf[1] != neutral ||
+          vertices[i].cf[2] != neutral)
+         return false;
+
+   return true;
+}
+
 static void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle *hd_texture_index_out,
    bool *filtering_out, bool *scaled_read_out, unsigned *shift_out, bool *offset_uv_out){
       int16_t param;
@@ -9279,24 +9294,15 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       param = param | 0x200;
    }
 
-   /* Fixed-point framebuffer-feedback modulation (Vulkan port of the GL
-    * change): when the sampled texture or palette contains GPU-rendered
-    * VRAM data, route modulation through the PlayStation GPU's own
-    * fixed-point order in the shader so repeated feedback decays at
-    * hardware rate instead of the float path's slower fade. Disabled
-    * under PGXP precise colour, matching the GL gate. 0x8000 is masked
-    * as unsigned in the shader because params is a signed 16-bit lane. */
-   /* Restored: the gate-drop shipped for the Tomb Raider 2 water made
-    * the title worse, not better. The water surface samples the
-    * framebuffer as a 4bpp CLUT texture (screen-space refraction); on
-    * the reporter's configuration GL renders it correctly with this
-    * same gate CLOSED - its float path plus working same-frame
-    * fb-to-texture synchronization - so quantizing those draws was
-    * never the fix, and unleashing 5-bit quantization plus dither on
-    * them produced white output with dither speckle. The real defect
-    * is Vulkan-side stale unscaled-domain content under the sampled
-    * rect, tracked separately. */
-   if (!psx_pgxp_color &&
+   /* Framebuffer feedback samples authoritative 15-bit VRAM even when the
+    * render target is wide. Standard colour uses the existing fixed-point
+    * modulation path. Under precise colour, reconstruct only exact neutral
+    * modulation so a 0x80 draw preserves the RGB5 texel without promoting a
+    * genuinely shaded indexed texture such as Tomb Raider 2's water. Check
+    * every effective vertex colour so Gouraud and recovered PGXP colours
+    * cannot be misclassified from vertex zero or packed GP0 bytes. */
+   if ((!psx_pgxp_color ||
+        vertices_have_neutral_modulation(vertices, count)) &&
        self->render_state.texture_color_modulate &&
        self->render_state.texture_mode != TextureMode_None &&
        hd_texture_vram.height > 0)

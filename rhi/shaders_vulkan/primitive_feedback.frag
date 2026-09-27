@@ -23,6 +23,9 @@ layout(constant_id = 2) const int BLEND_MODE = BLEND_ADD;
  * SDR is unaffected either way - the UNORM write clamps. Set from a core
  * option via SpecConstIndex_HotSource. */
 layout(constant_id = 6) const int HDR_HOT_SOURCE = 0;
+/* Mirrors primitive.frag. Framebuffer feedback needs its RGB5 texel
+ * reconstructed under HDR, but still uses this wide shading path. */
+layout(constant_id = 8) const int PRECISE_COLOR = 0;
 #endif
 
 /* Check-mask (dst alpha) test. This program originally existed only for
@@ -55,6 +58,9 @@ void main()
 	/* Raw texture colour bypasses vertex modulation. The final store bias
 	 * remains below because this program emits a derived blended result. */
 	raw_texture = (uint(vParam.z) & 0x2000u) != 0u;
+	if ((uint(vParam.z) & PARAM_FRAMEBUFFER_FEEDBACK) != 0u &&
+		PRECISE_COLOR != 0)
+		color.rgb = framebuffer_feedback_texel5(color.rgb) / 31.0;
 	vec3 shaded_hot = raw_texture ? color.rgb :
 		color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
 	shaded     = clamp(shaded_hot, 0.0, 1.0);
