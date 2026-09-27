@@ -97,7 +97,12 @@ void main()
 	// This is required for various "fade" out effects.
 	// However, don't accidentially round down if we are already rounded to avoid
 	// unintended feedback effects.
-	FragColor.rgb -= 0.49 / 255.0;
+	/* Floor at zero: an 8-bit UNORM target clamps the bias to 0 on store, but
+	 * the 16F HDR target keeps it, turning flat black into -0.49/255. A game
+	 * that samples its own render output then sees black != 0x0000, so a
+	 * transparent texel draws opaque (e.g. SotN render-to-texture deaths).
+	 * No-op on UNORM, which clamps the fragment output to [0,1] anyway. */
+	FragColor.rgb = max(FragColor.rgb - 0.49 / 255.0, vec3(0.0));
 
 #if 0
 #if defined(TEXTURED)
