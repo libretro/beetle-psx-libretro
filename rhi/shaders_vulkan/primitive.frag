@@ -175,11 +175,17 @@ void main()
 	// However, don't accidentially round down if we are already rounded to avoid
 	// unintended feedback effects.
 	/* Raw texture colour is already quantized by the PlayStation GPU. The
-	 * generic store bias can move it across a later 1555 packing boundary. */
+	 * generic store bias can move it across a later 1555 packing boundary.
+	 * Floor the biased result at zero: an 8-bit UNORM target clamps the bias
+	 * to 0 on store, but the 16F HDR target keeps it, turning flat black into
+	 * -0.49/255. A game that samples its own render output then sees black
+	 * != 0x0000, so a transparent texel draws opaque (e.g. SotN
+	 * render-to-texture deaths). No-op on UNORM, which clamps the fragment
+	 * output to [0,1] anyway. */
 #ifdef TEXTURED
 	if (!raw_texture)
 #endif
-		FragColor.rgb -= 0.49 / 255.0;
+		FragColor.rgb = max(FragColor.rgb - 0.49 / 255.0, vec3(0.0));
 
 #if 0
 #if defined(TEXTURED)
