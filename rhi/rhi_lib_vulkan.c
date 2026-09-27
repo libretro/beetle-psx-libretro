@@ -5938,6 +5938,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             /* Zero-floor pass for fixed-function HDR subtractive blending
              * (multipass off). flat vertex module + floor.frag. */
             Program *flat_floor;
+            /* HDR ceiling-before-subtract (16F target, fixed-function sub). */
+            Program *flat_ceiling;
+            Program *textured_ceiling_scaled;
+            Program *textured_ceiling_unscaled;
             Program *textured_scaled;
             Program *textured_unscaled;
             Program *flat_masked;
@@ -6448,6 +6452,21 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t textured_msaa_unscaled_frag[] =
 #include "shaders_vulkan/prebuilt/textured.msaa.unscaled.frag.inc"
       ;
+   static const uint32_t flat_ceiling_frag[] =
+#include "shaders_vulkan/prebuilt/flat.ceiling.frag.inc"
+      ;
+   static const uint32_t textured_ceiling_frag[] =
+#include "shaders_vulkan/prebuilt/textured.ceiling.frag.inc"
+      ;
+   static const uint32_t textured_ceiling_unscaled_frag[] =
+#include "shaders_vulkan/prebuilt/textured.ceiling.unscaled.frag.inc"
+      ;
+   static const uint32_t textured_ceiling_msaa_frag[] =
+#include "shaders_vulkan/prebuilt/textured.ceiling.msaa.frag.inc"
+      ;
+   static const uint32_t textured_ceiling_msaa_unscaled_frag[] =
+#include "shaders_vulkan/prebuilt/textured.ceiling.msaa.unscaled.frag.inc"
+      ;
 
    static const uint32_t blit_vram_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.scaled.comp.inc"
@@ -6948,11 +6967,13 @@ static void renderer_init_primitive_pipelines(Renderer *self)
    {
       self->pipelines.flat = device_request_program_graphics_code(self->device, flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
       self->pipelines.flat_floor = device_request_program_graphics_code(self->device, flat_vert, sizeof(flat_vert), floor_frag, sizeof(floor_frag));
+      self->pipelines.flat_ceiling = device_request_program_graphics_code(self->device, flat_vert, sizeof(flat_vert), flat_ceiling_frag, sizeof(flat_ceiling_frag));
    }
    else
    {
       self->pipelines.flat = device_request_program_graphics_code(self->device, flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_frag, sizeof(flat_frag));
       self->pipelines.flat_floor = device_request_program_graphics_code(self->device, flat_unscaled_vert, sizeof(flat_unscaled_vert), floor_frag, sizeof(floor_frag));
+      self->pipelines.flat_ceiling = device_request_program_graphics_code(self->device, flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_ceiling_frag, sizeof(flat_ceiling_frag));
    }
 
    if (self->msaa > 1)
@@ -6961,6 +6982,8 @@ static void renderer_init_primitive_pipelines(Renderer *self)
             self->scaling > 1 ? textured_frag : textured_msaa_frag,
             self->scaling > 1 ? sizeof(textured_frag) : sizeof(textured_msaa_frag));
       self->pipelines.textured_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_msaa_unscaled_frag, sizeof(textured_msaa_unscaled_frag));
+      self->pipelines.textured_ceiling_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_ceiling_msaa_frag, sizeof(textured_ceiling_msaa_frag));
+      self->pipelines.textured_ceiling_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_ceiling_msaa_unscaled_frag, sizeof(textured_ceiling_msaa_unscaled_frag));
    }
    else
    {
@@ -6968,11 +6991,15 @@ static void renderer_init_primitive_pipelines(Renderer *self)
       {
          self->pipelines.textured_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
          self->pipelines.textured_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+         self->pipelines.textured_ceiling_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_ceiling_frag, sizeof(textured_ceiling_frag));
+         self->pipelines.textured_ceiling_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_ceiling_unscaled_frag, sizeof(textured_ceiling_unscaled_frag));
       }
       else
       {
          self->pipelines.textured_scaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_frag, sizeof(textured_frag));
          self->pipelines.textured_unscaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+         self->pipelines.textured_ceiling_scaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_ceiling_frag, sizeof(textured_ceiling_frag));
+         self->pipelines.textured_ceiling_unscaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_ceiling_unscaled_frag, sizeof(textured_ceiling_unscaled_frag));
       }
    }
 }
@@ -10120,6 +10147,31 @@ static void renderer_emit_sub_floor(Renderer *self, unsigned first_vertex)
    commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
 }
 
+/* HDR ceiling-before-subtract (fixed-function path). The hardware saturates every
+ * blend at white, so a subtractive primitive always subtracts from a value <= 1.0; the
+ * 16F target lets stacked additive layers exceed that (SotN's Fire Demon death: an
+ * additive white ghost, then the white canvas subtracted -> black on hardware, the
+ * background showing through here). Redraw the batch first with the CEILING variant of
+ * its own program: same discards and depth test, so exactly the pixels the subtraction
+ * will touch are clamped to white by MIN; alpha (the mask bit) is kept via ZERO/ONE ADD.
+ * Restores the batch's state for the real draw. */
+static void renderer_emit_sub_ceiling(Renderer *self, const SemiTransparentState *state,
+      unsigned first_prim, unsigned count)
+{
+   Program *prog = state->textured
+      ? (state->scaled_read ? self->pipelines.textured_ceiling_scaled : self->pipelines.textured_ceiling_unscaled)
+      : self->pipelines.flat_ceiling;
+   commandbuffer_set_program(cbh_get(&self->cmd), prog);
+   commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
+   commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_MIN, VK_BLEND_OP_ADD);
+   commandbuffer_set_blend_factors(cbh_get(&self->cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO,
+         VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE);
+   commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
+   commandbuffer_draw(cbh_get(&self->cmd), count * 3, 1, first_prim * 3, 0);
+   renderer_semi_transparent_set_state(self, state);
+   commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
+}
+
 static void renderer_render_semi_transparent_primitives(Renderer *self){
    SemiTransparentState last_state;
    unsigned to_draw;
@@ -10214,6 +10266,8 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
                1, &barrier, 0, NULL, 0, NULL);
          }
 
+         if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
+            renderer_emit_sub_ceiling(self, &last_state, last_draw_offset, to_draw);
          commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
          if (self->msaa > 1)
             commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
@@ -10228,6 +10282,8 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
 
    to_draw = prims - last_draw_offset;
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
+   if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
+      renderer_emit_sub_ceiling(self, &last_state, last_draw_offset, to_draw);
    commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
    if (self->msaa > 1)
       commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);

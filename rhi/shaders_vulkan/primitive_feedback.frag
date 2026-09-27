@@ -83,7 +83,9 @@ void main()
 		 * target does not, and a negative residue both diverges from
 		 * hardware and dims every later additive draw over the same pixels
 		 * (dark halos around subtractive effects). No-op on UNORM. */
-		blended = mix(shaded, max(fbcolor.rgb - add_src, vec3(0.0)), blend_amt);
+		/* ...and subtracts from a SATURATED destination: stacked additive layers
+		 * may exceed white on the 16F target, hardware clamped each one at white. */
+		blended = mix(shaded, max(min(fbcolor.rgb, vec3(1.0)) - add_src, vec3(0.0)), blend_amt);
 	if (BLEND_MODE == BLEND_ADD_QUARTER)
 		blended = mix(shaded, clamp(shaded, 0.0, 1.0) * 0.25 + fbcolor.rgb, blend_amt);
 

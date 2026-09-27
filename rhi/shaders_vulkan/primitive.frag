@@ -118,6 +118,15 @@ void main()
 	if (opacity < 0.5)
 		discard;
 
+#ifdef CEILING
+	/* HDR ceiling pass: same coverage as the subtractive draw that follows
+	 * (same discards, same depth test); MIN-blended so the destination is
+	 * clamped to white exactly where the hardware's saturated value would be
+	 * subtracted from. */
+	FragColor = vec4(1.0);
+	return;
+#endif
+
 	/* 0x2000 carries the GP0 raw-texture bit. Do not infer this from a
 	 * neutral vertex colour: 0x808080 is also valid modulated input. */
 	bool raw_texture = (uint(vParam.z) & 0x2000u) != 0u;
@@ -167,6 +176,14 @@ void main()
 		shaded = max(shaded_hot, vec3(0.0));
 	FragColor = vec4(shaded, NNColor.a + vColor.a);
 #else
+#ifdef CEILING
+	/* HDR ceiling pass: same coverage as the subtractive draw that follows
+	 * (same discards, same depth test); MIN-blended so the destination is
+	 * clamped to white exactly where the hardware's saturated value would be
+	 * subtracted from. */
+	FragColor = vec4(1.0);
+	return;
+#endif
 	FragColor = vec4((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, vColor.a);
 #endif
 

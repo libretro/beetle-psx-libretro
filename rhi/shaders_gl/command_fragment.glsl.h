@@ -56,6 +56,12 @@ uniform uint pgxp_fog;
 // equation MAX against zero restores the hardware floor).
 uniform uint force_zero;
 
+// When 1, emit vec4(1.0) AFTER the discards below: the ceiling pass that
+// precedes each subtractive draw on the fp16 target (blend equation MIN
+// clamps the destination to white exactly where the subtraction lands;
+// the hardware saturated every blend at white).
+uniform uint force_one;
+
 // 0: Only draw opaque pixels, 1: only draw semi-transparent pixels
 uniform uint draw_semi_transparent;
 
@@ -1195,6 +1201,11 @@ STRINGIZE(
          if (hdr_hot == 0u)
             color.rgb = min(color.rgb, vec3(1.));
       }
+
+   if (force_one != 0u) {
+      frag_color = vec4(1.);
+      return;
+   }
 
    // 4x4 dithering pattern scaled by `dither_scaling`
    uint x_dither = (uint(gl_FragCoord.x) / dither_scaling) & 3U;
