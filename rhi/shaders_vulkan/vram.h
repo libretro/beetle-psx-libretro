@@ -8,14 +8,12 @@
  * the sub-texel fraction above u = 128, which mis-selects texels under
  * upscaling. vParam, vBaseUV and vWindow stay within int16 range. */
 layout(location = 1) in highp vec2 vUV;
-layout(location = 2) flat in mediump ivec3 vParam;
 layout(location = 3) flat in mediump ivec2 vBaseUV;
 layout(location = 4) flat in mediump ivec4 vWindow;
 layout(location = 5) flat in highp ivec4 vTexLimits;
 #if defined(UNSCALED)
 layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
 #else
-layout(constant_id = 3) const int SCALE = 1;
 /* MSAA feedback can read a resolved snapshot while writing per sample. */
 #if defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
 layout(set = 0, binding = 0) uniform mediump sampler2DMS uFramebufferMS;
