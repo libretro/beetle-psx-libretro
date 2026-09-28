@@ -1520,7 +1520,8 @@ static IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
    enum VendorID
    {
       VENDOR_ID_NVIDIA = 0x10de,
-      VENDOR_ID_ARM = 0x13b5
+      VENDOR_ID_ARM = 0x13b5,
+      VENDOR_ID_QUALCOMM = 0x5143
    };
    typedef enum VendorID VendorID;
 
@@ -1596,6 +1597,11 @@ static bool context_is_valid(const struct Context *self) { return self->valid; }
    struct ImplementationWorkarounds
    {
       bool optimize_all_graphics_barrier;
+      /* Adreno renders overlapping fixed-function-blended primitives out of
+       * order within a single draw under native colour (object-local
+       * flashes in Jumping Flash). Vulkan guarantees primitive order for
+       * blending, so only Qualcomm pays the per-primitive draw split. */
+      bool split_native_semi_trans_draws;
    };
 
    /* TextureFormatLayout: computes mip/layer byte layout for a texture upload
@@ -4950,6 +4956,7 @@ static void cbh_move(struct CommandBufferHandle *dst,
    {
       /* srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only. */
       self->workarounds.optimize_all_graphics_barrier = self->gpu_props.vendorID == VENDOR_ID_ARM;
+      self->workarounds.split_native_semi_trans_draws = self->gpu_props.vendorID == VENDOR_ID_QUALCOMM;
    }
 
    /* Device inline accessors (batch 4), converted from in-class member
@@ -10150,9 +10157,9 @@ static void renderer_hd_texture_uniforms(Renderer *self,
 /* True when a semi-transparent prim uses the programmable-blend feedback
  * program. Native-colour average and quarter-add need post-blend RGB5
  * truncation; fixed-function RGBA8 blending cannot provide it. Native-colour
- * Add sources, including raw texture samples, are quantized before blending
- * by primitive.frag, so fixed Add preserves RGB5 sums (with 255 representing
- * saturation). Keep the existing masked textured Add route, but leave masked
+ * Add and Sub sources, including raw texture samples, are quantized before
+ * blending by primitive.frag, so fixed Add/Sub preserve RGB5 results (with
+ * 255 representing saturation). Keep the existing masked textured Add route, but leave masked
  * flat Add on the fixed path: its input-attachment read causes full-screen
  * flashes on the tested Adreno GPU. */
 static bool renderer_semi_trans_needs_feedback(const Renderer *self,
@@ -10168,7 +10175,12 @@ static bool renderer_semi_trans_needs_feedback(const Renderer *self,
    case SemiTransparentMode_AddQuarter:
       return state->masked || state->native_color;
    case SemiTransparentMode_Sub:
-      return state->masked || state->native_color ||
+      /* Native-colour subtract is exact on the fixed path: primitive.frag
+       * has already stored the source as an RGB5 multiple of 8, the
+       * destination is one too, and REVERSE_SUBTRACT floors at zero on
+       * UNORM. No post-blend truncation is needed, so do not pay the
+       * per-primitive feedback barrier for it. */
+      return state->masked ||
          (psx_hdr_multipass &&
           self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT);
    default:
@@ -10176,15 +10188,16 @@ static bool renderer_semi_trans_needs_feedback(const Renderer *self,
    }
 }
 
-/* Program selection and draw ordering are separate decisions. Native-colour
- * fixed Add still needs the historical per-primitive batch boundaries: using
- * the feedback-program predicate alone caused object-local flashes in
- * Jumping Flash on the tested Adreno GPU. */
+/* Program selection and draw ordering are separate decisions. Feedback
+ * reads always need a draw boundary per primitive. Native-colour draws on
+ * the fixed path only need one on Adreno (see ImplementationWorkarounds);
+ * everywhere else they batch exactly as standard-colour draws do. */
 static bool renderer_semi_trans_needs_separate_draw(const Renderer *self,
       const SemiTransparentState *state)
 {
    return (state->native_color &&
-         state->semi_transparent != SemiTransparentMode_None) ||
+         state->semi_transparent != SemiTransparentMode_None &&
+         device_get_workarounds(self->device)->split_native_semi_trans_draws) ||
       renderer_semi_trans_needs_feedback(self, state);
 }
 
