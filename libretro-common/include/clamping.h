@@ -1,7 +1,7 @@
 /* Copyright  (C) 2010-2020 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (apple_compat.h).
+ * The following license statement only applies to this file (clamping.h).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -20,69 +20,43 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __APPLE_COMPAT_H
-#define __APPLE_COMPAT_H
-#ifdef __MACH__
-#include <TargetConditionals.h>
-#endif
+#ifndef _LIBRETRO_SDK_CLAMPING_H
+#define _LIBRETRO_SDK_CLAMPING_H
 
-#ifdef __APPLE__
-#include <AvailabilityMacros.h>
-#include <CoreFoundation/CoreFoundation.h>
-#endif
+#include <stdint.h>
+#include <retro_inline.h>
 
-#ifdef __OBJC__
-
-#if (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_4)
-typedef int NSInteger;
-typedef unsigned NSUInteger;
-typedef float CGFloat;
-#endif
-
-#ifndef __has_feature
-/* Compatibility with non-Clang compilers. */
-#define __has_feature(x) 0
-#endif
-
-#ifndef CF_RETURNS_RETAINED
-#if __has_feature(attribute_cf_returns_retained)
-#define CF_RETURNS_RETAINED __attribute__((cf_returns_retained))
-#else
-#define CF_RETURNS_RETAINED
-#endif
-#endif
-
-#ifndef NS_INLINE
-#define NS_INLINE inline
-#endif
-
-NS_INLINE CF_RETURNS_RETAINED CFTypeRef CFBridgingRetainCompat(id X)
+/**
+ * Clamps a floating-point value to the specified range.
+ *
+ * @param val The value to clamp.
+ * @param lower The minimum possible value.
+ * @param upper The maximum possible value.
+ *
+ * @returns \c val clamped to between \c lower and \c upper (inclusive).
+ */
+static INLINE float clamp_float(float val, float lower, float upper)
 {
-#if __has_feature(objc_arc)
-   return (__bridge_retained CFTypeRef)X;
-#else
-   return X;
-#endif
+   if (val < lower)
+      return lower;
+   if (val > upper)
+      return upper;
+   return val;
 }
 
-#endif
-
-#if TARGET_OS_IPHONE
-#ifndef __IPHONE_5_0
-#warning "This project uses features only available in iOS SDK 5.0 and later."
-#endif
-
-#ifdef __OBJC__
-#import <UIKit/UIKit.h>
-#import <GLKit/GLKit.h>
-#import <Foundation/Foundation.h>
-#endif
-
-#else
-
-#ifdef __OBJC__
-#include <objc/objc-runtime.h>
-#endif
-#endif
+/**
+ * Clamps an integer to fit in 8 bits.
+ *
+ * @param val The value to clamp.
+ * @return \c val clamped to between 0 and 255 (inclusive).
+ */
+static INLINE uint8_t clamp_8bit(int val)
+{
+   if (val > 255)
+      return 255;
+   if (val < 0)
+      return 0;
+   return (uint8_t)val;
+}
 
 #endif

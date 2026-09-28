@@ -7,11 +7,14 @@ MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
 
-LIBCHDR_INCFLAGS = \
-                     -I$(DEPS_DIR)/zstd-1.5.7
+LIBCHDR_INCFLAGS =
 
+# zstd decode now comes from libretro-common's own rzstd (encoding_rzstd.c,
+# C89, no <zstd.h>), which libchdr_zstd.c and rzip_stream.c both call; the
+# vendored deps/zstd-1.5.7 single-file library is no longer compiled.
 LIBCHDR_SOURCES_C = \
-                     $(DEPS_DIR)/zstd-1.5.7/zstddeclib.c \
+                     $(LIBRETRO_COMM_DIR)/encodings/encoding_rzstd.c \
+                     $(LIBRETRO_COMM_DIR)/streams/trans_stream_rzstd.c \
                      $(LIBRETRO_COMM_DIR)/formats/7z/r7z_lzma.c \
                      $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_bitstream.c \
                      $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_cdrom.c \
@@ -132,7 +135,7 @@ ifeq ($(HAVE_CHD), 1)
    # through the clean-room rflac decoder (HAVE_RFLAC), LZMA through
    # the clean-room r7z_lzma decoder (no LZMA SDK at all; the decoder
    # state is inline and the hunk buffer doubles as the dictionary
-   # window), zstd through the single-file decode-only zstddeclib.
+   # window), zstd through libretro-common's rzstd (encoding_rzstd.c).
    FLAGS += -DHAVE_CHD -DCHD_USE_BUILTIN_DEFLATE -DHAVE_RFLAC -DHAVE_7ZIP -DHAVE_ZSTD
 
    ifeq ($(SYSTEM_LIBCHDR), 1)
