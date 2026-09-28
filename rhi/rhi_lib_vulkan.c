@@ -10144,7 +10144,9 @@ static void renderer_hd_texture_uniforms(Renderer *self,
  * truncation; fixed-function RGBA8 blending cannot provide it. Native-colour
  * Add sources, including raw texture samples, are quantized before blending
  * by primitive.frag, so fixed Add preserves RGB5 sums (with 255 representing
- * saturation). Keep masked Add on the existing feedback route. */
+ * saturation). Keep the existing masked textured Add route, but leave masked
+ * flat Add on the fixed path: its input-attachment read causes full-screen
+ * flashes on the tested Adreno GPU. */
 static bool renderer_semi_trans_needs_feedback(const Renderer *self,
       const SemiTransparentState *state)
 {
@@ -10153,7 +10155,7 @@ static bool renderer_semi_trans_needs_feedback(const Renderer *self,
    switch (state->semi_transparent)
    {
    case SemiTransparentMode_Add:
-      return state->masked;
+      return state->masked && (!state->native_color || state->textured);
    case SemiTransparentMode_Average:
    case SemiTransparentMode_AddQuarter:
       return state->masked || state->native_color;
@@ -10941,7 +10943,8 @@ static void renderer_semi_transparent_set_state(Renderer *self,
    {
       /* Native-colour Add sources are reduced to RGB5 before blending,
        * including raw texture samples. Fixed-function addition preserves
-       * the RGB5 sum for unmasked draws; masked Add retains feedback. */
+       * the RGB5 sum; destination alpha can suppress a masked flat source.
+       * Retain feedback for masked textured Add as before. */
       if (renderer_semi_trans_needs_feedback(self, state))
       {
          commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAdd);
@@ -10965,9 +10968,14 @@ static void renderer_semi_transparent_set_state(Renderer *self,
          commandbuffer_set_program(cbh_get(&self->cmd), textured);
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
          commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-         commandbuffer_set_blend_factors(cbh_get(&self->cmd),
-               VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
-               VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO);
+         if (state->masked)
+            commandbuffer_set_blend_factors(cbh_get(&self->cmd),
+                  VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+                  VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE);
+         else
+            commandbuffer_set_blend_factors(cbh_get(&self->cmd),
+                  VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+                  VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO);
       }
       break;
    }
