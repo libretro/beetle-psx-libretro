@@ -11,7 +11,7 @@ LIBCHDR_INCFLAGS =
 
 # zstd decode now comes from libretro-common's own rzstd (encoding_rzstd.c,
 # C89, no <zstd.h>), which libchdr_zstd.c and rzip_stream.c both call; the
-# vendored deps/zstd-1.5.7 single-file library is no longer compiled.
+# vendored zstd single-file library it replaced has been removed.
 LIBCHDR_SOURCES_C = \
                      $(LIBRETRO_COMM_DIR)/encodings/encoding_rzstd.c \
                      $(LIBRETRO_COMM_DIR)/streams/trans_stream_rzstd.c \
