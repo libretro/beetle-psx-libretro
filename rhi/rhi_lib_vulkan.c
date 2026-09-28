@@ -71,6 +71,9 @@ extern int   psx_pgxp_fog;             /* PGXP linear-light depth cue; effective
  * pass after each subtractive batch. Both floor at zero; see
  * renderer_semi_trans_needs_feedback / renderer_emit_sub_floor. */
 extern int   psx_hdr_multipass;
+/* Opt-in native 15-bit colour rendering (core option). Selects write-time
+ * RGB5 quantisation of every GP0 write on the SDR target. */
+extern int   psx_native_color;
 /* Frontend save directory (libretro.c); the persistent pipeline cache lives
  * under it because it is the one directory the core already writes to. */
 extern char  retro_save_directory[4096];
@@ -20557,11 +20560,12 @@ void rhi_vulkan_prepare_frame(void)
    renderer->sprite_filter_exclude = (FilterExclude)(filter_exclude_sprites);
    renderer->polygon_2d_filter_exclude = (FilterExclude)(filter_exclude_2d_polygons);
    /* Latch the negotiated mode at the frame boundary before any GP0 work is
-    * queued. Engaged HDR retains its higher-precision path even if the
-    * frontend leaves the dither option at its default value; a rejected
-    * request follows the standard path. */
+    * queued. Native colour is an explicit opt-in: it is not implied by the
+    * dither option (which still only selects the per-primitive dither
+    * pattern and the display-level downsample), and engaged HDR always
+    * keeps its higher-precision path. */
    renderer->render_state.native_color =
-      !psx_hdr_active && dither_mode != DITHER_OFF;
+      !psx_hdr_active && psx_native_color != 0;
    renderer->render_state.dither_native_resolution =
       dither_mode == DITHER_NATIVE;
 }
