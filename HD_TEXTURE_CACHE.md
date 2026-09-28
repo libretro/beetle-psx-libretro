@@ -187,8 +187,11 @@ with replacement off.
   prediction costs one background load. The file is read on first use and saved
   at teardown, on reload, when HD is switched off, on the switch to *Eager*, and
   every ~10 s while it has new links (serialised on the render thread, written
-  by a detached thread). Format: a `TTPJ` header, then `{u64 key, u64 successor,
-  u32 flags}` per link, 20 bytes each. A pack can ship a trained journal.
+  by a joinable writer thread that is reaped before every synchronous save and
+  at teardown). Format, little-endian: a `TTPJ` header, then `{u64 key, u64
+  successor, u32 flags}` per link, 20 bytes each. A pack can ship a trained
+  journal. A draw that needs a combo the journal already queued at low
+  priority promotes that request to the high-priority queue.
 - **Inline upload.** In *Lazy*, a CPU-cache hit in `request_hd_texture()` (and a
   decoded page in `match_page()`) is uploaded and bound mid-draw, up to 8 per
   frame, instead of waiting for the next safe point, which cost a one-frame
