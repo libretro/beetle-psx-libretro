@@ -219,6 +219,9 @@ int   psx_hdr_overbright_hot   = 0;
 int   psx_pgxp_color           = 0;
 int   psx_pgxp_fog             = 0;
 int   psx_hdr_multipass        = 0;
+/* Vulkan native 15-bit colour rendering (write-time RGB5 quantisation).
+ * Opt-in; consulted per frame by rhi_vulkan_prepare_frame. */
+int   psx_native_color         = 0;
 
 static void reset_hdr_output_state(void)
 {
@@ -5122,6 +5125,16 @@ static void check_variables(bool startup)
    else
       psx_gpu_dither_mode = DITHER_NATIVE;
 
+#ifdef HAVE_VULKAN
+   var.key = BEETLE_OPT(native_color);
+   psx_native_color = 0;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         psx_native_color = 1;
+   }
+#endif
+
    // iCB: PGXP settings
    var.key = BEETLE_OPT(pgxp_mode);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -6164,6 +6177,8 @@ bool retro_load_game(const struct retro_game_info *info)
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(depth);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+         option_display.key = BEETLE_OPT(native_color);
+         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(display_vram);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter);
@@ -6187,6 +6202,8 @@ bool retro_load_game(const struct retro_game_info *info)
 
          negotiate_hdr_output();
 
+         option_display.key = BEETLE_OPT(native_color);
+         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(scaled_uv_offset);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter_exclude_sprite);

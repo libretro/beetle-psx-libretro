@@ -512,6 +512,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
    },
 #ifdef HAVE_VULKAN
    {
+      BEETLE_OPT(native_color),
+      "Native 15-bit Color Rendering",
+      NULL,
+      "Vulkan renderer only. Stores every GPU write at the PlayStation's native 15-bit color depth inside the framebuffer, quantizing each draw at write time exactly as the original hardware does, instead of rendering at 24-bit and only reducing color depth for display. Fixes brightness seams and framebuffer-feedback artifacts in some games (e.g. Silent Hill's intro logos), at the cost of visible banding on upscaled gradients and texture filtering, and reduced batching of semi-transparent primitives. Has no effect when 'Color Format' is set to '30-bit Color (HDR)' and HDR output is active.",
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       BEETLE_OPT(scaled_uv_offset),
       "Texture UV Offset",
       NULL,
