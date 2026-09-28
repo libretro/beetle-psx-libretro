@@ -3538,14 +3538,34 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       free(c);
    }
 
-   /* Number of parallel PNG-decode workers. Keeps first-appearance prefetch
-    * bursts short without starving the emulation/render threads. */
+   /* Upper bound on parallel PNG-decode workers. Keeps first-appearance
+    * prefetch bursts short without starving the emulation/render threads. */
    enum { NUM_IO_THREADS = 4 };
 
+   /* Size the pool from the machine: leave two physical cores for the
+    * emulation thread and the frontend's video/audio threads, use the rest
+    * up to NUM_IO_THREADS. On a mixed part only the fast cluster counts -
+    * a decoder parked on a little core holds the whole texture behind it.
+    * Where the topology is unknown (consoles) keep the historical four. */
+   static int io_thread_count(void) {
+      unsigned fast = 0, slow = 0;
+      int n;
+      if (!sthread_get_core_topology(&fast, &slow))
+         return NUM_IO_THREADS;
+      n = (int)fast - 2;
+      if (n < 1)
+         n = 1;
+      if (n > NUM_IO_THREADS)
+         n = NUM_IO_THREADS;
+      return n;
+   }
+
    static void io_thread_init(IOThread *t) {
+      int count = io_thread_count();
       io_channel_rc_lock_init();
       t->channel = io_channel_new(); /* this IOThread holds one reference */
-      { int i; for (i = 0; i < NUM_IO_THREADS; i++) {
+      TT_LOG(RETRO_LOG_INFO, "hd texture io pool: %d worker(s)\n", count);
+      { int i; for (i = 0; i < count; i++) {
          sthread_t * thread;
          /* Take a reference on the worker's behalf BEFORE it starts, so the
           * channel can't be freed out from under it; the worker releases on
