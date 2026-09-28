@@ -62,6 +62,11 @@ void main()
 {
 	float opacity = 1.0;
 	bool raw_texture = false;
+	/* True when the texel came from a replacement (HD) texture or a
+	 * texture filter rather than from 15-bit VRAM. Such texels are not
+	 * PlayStation colour words, so native-colour storage leaves them at
+	 * full precision instead of posterising the enhancement. */
+	bool enhanced_texel = false;
 #ifdef TEXTURED
 	vec4 NNColor;
 
@@ -71,8 +76,10 @@ void main()
 	vec4 hdColor;
 	if (fastpath) {
 		NNColor = sample_hd_fast(vUV);
+		enhanced_texel = true;
 	} else if (hd_enabled && sample_hd_texture_nearest_hack(vUV, hdColor)) {
 		NNColor = hdColor;
+		enhanced_texel = true;
 	} else {
 		NNColor = sample_vram_atlas(clamp_coord(vUV));
 	}
@@ -100,6 +107,8 @@ void main()
 		color = sample_vram_jinc2(opacity);
 	if (FILTER_TYPE == FILTER_3POINT)
 		color = sample_vram_3point(opacity);
+	if (FILTER_TYPE != FILTER_NEAREST)
+		enhanced_texel = true;
 
 	if (TRANSPARENCY_MODE == OPAQUE || TRANSPARENCY_MODE == SEMI_TRANS)
 		if (color.a == 0.0 && all(equal(vec4(NNColor), vec4(0.0))))
@@ -112,6 +121,7 @@ void main()
 		if (valid) {
 			color = hd_color;
 			opacity = hd_color.a;
+			enhanced_texel = true;
 		}
 	}
 
@@ -191,11 +201,13 @@ void main()
 	FragColor = vec4((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, vColor.a);
 #endif
 
-	if (primitive_native_color())
+	if (primitive_native_color() && !enhanced_texel)
 	{
 		/* Every PS1 write stores RGB5. Modulated sources may use GP0 DTD;
-		 * raw sources skip modulation and DTD, but a scaled framebuffer or
-		 * replacement texture can still supply a noncanonical raw colour. */
+		 * raw sources skip modulation and DTD, but a scaled framebuffer can
+		 * still supply a noncanonical raw colour. Replacement textures and
+		 * filtered texels (enhanced_texel) are deliberately left wide: they
+		 * are user enhancements, not hardware colour words. */
 		if (!raw_texture)
 			FragColor.rgb = quantize_native_rgb5(FragColor.rgb,
 				primitive_dither_enabled());
