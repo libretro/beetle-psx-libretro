@@ -4789,47 +4789,64 @@ static TTRect fromSRect(SRect rect) {
    }
    static INLINE void handle_lru_cache_clear(struct HandleLRUCache *self) { self->count = 0; }
 
-   /* Reduce Palette Range (see the "HD Reduce Palette Range" core option). Scans a
-    * texture's raw index words to find the lowest/highest CLUT index it references,
-    * so the palette hash can ignore unused CLUT entries (games often leave those as
-    * garbage or rewrite them over time). Mirrors Duckstation's ReducePaletteBounds.
-    * Returns false for non-palettised modes or empty input (caller uses full hash).
-    * min/max inclusive. */
+   /* Reduce Palette Range (see the "HD Reduce Palette Range" core option).
+    * A 4bpp / 8bpp texture can only look up the CLUT entries its index words
+    * name; the rest of the CLUT is slack that games often leave as garbage or
+    * rewrite later. Flag every entry the texture names in a small table, then
+    * walk in from both ends of the table to the first and last flagged entry:
+    * that inclusive span is all the palette hash needs to cover. Once both the
+    * first and the last CLUT entry are flagged the span is the whole CLUT, so
+    * the scan stops early. Returns false for direct-colour modes and for an
+    * empty texture; the caller then hashes the whole CLUT. */
    static bool reduce_palette_bounds(const uint16_t *words, size_t word_count, int mode,
          unsigned *out_min, unsigned *out_max) {
-      unsigned pal_min, pal_max;
+      unsigned char named[256]; /* named[e] != 0: some texel uses CLUT entry e */
+      unsigned top;             /* last addressable CLUT entry: 15 or 255 */
+      unsigned first, last;
       size_t i;
-      if (mode == (int)TextureMode_Palette4bpp) {
-         pal_min = 15; pal_max = 0;
-         for (i = 0; i < word_count; i++) {
-            uint16_t v = words[i];
-            unsigned p0 = v & 0xf, p1 = (v >> 4) & 0xf, p2 = (v >> 8) & 0xf, p3 = (v >> 12) & 0xf;
-            if (p0 < pal_min) pal_min = p0;
-            if (p0 > pal_max) pal_max = p0;
-            if (p1 < pal_min) pal_min = p1;
-            if (p1 > pal_max) pal_max = p1;
-            if (p2 < pal_min) pal_min = p2;
-            if (p2 > pal_max) pal_max = p2;
-            if (p3 < pal_min) pal_min = p3;
-            if (p3 > pal_max) pal_max = p3;
-         }
-      } else if (mode == (int)TextureMode_Palette8bpp) {
-         pal_min = 255; pal_max = 0;
-         for (i = 0; i < word_count; i++) {
-            uint16_t v = words[i];
-            unsigned p0 = v & 0xff, p1 = (v >> 8) & 0xff;
-            if (p0 < pal_min) pal_min = p0;
-            if (p0 > pal_max) pal_max = p0;
-            if (p1 < pal_min) pal_min = p1;
-            if (p1 > pal_max) pal_max = p1;
-         }
-      } else {
-         return false; /* direct colour / no palette */
-      }
-      if (word_count == 0 || pal_min > pal_max)
+
+      if (mode == (int)TextureMode_Palette4bpp)
+         top = 15;
+      else if (mode == (int)TextureMode_Palette8bpp)
+         top = 255;
+      else
+         return false; /* direct colour: no CLUT to narrow */
+      if (word_count == 0)
          return false;
-      *out_min = pal_min;
-      *out_max = pal_max;
+
+      memset(named, 0, top + 1);
+      i = 0;
+      while (i < word_count) {
+         /* flag in blocks of 256 words, checking for the full span between blocks */
+         size_t end = (word_count - i > 256) ? i + 256 : word_count;
+         if (top == 15) {
+            for (; i < end; i++) {
+               unsigned w = words[i];
+               named[w & 15]        = 1;
+               named[(w >> 4) & 15] = 1;
+               named[(w >> 8) & 15] = 1;
+               named[w >> 12]       = 1;
+            }
+         } else {
+            for (; i < end; i++) {
+               unsigned w = words[i];
+               named[w & 255] = 1;
+               named[w >> 8]  = 1;
+            }
+         }
+         if (named[0] && named[top])
+            break;
+      }
+
+      /* word_count > 0, so at least one entry is flagged and both walks stop */
+      first = 0;
+      while (!named[first])
+         first++;
+      last = top;
+      while (!named[last])
+         last--;
+      *out_min = first;
+      *out_max = last;
       return true;
    }
 
