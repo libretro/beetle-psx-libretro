@@ -101,7 +101,8 @@ the next safe point), and `dbg_*` diagnostic counters.
      **immediately** (a ref-counted handle copy, no Vulkan commands, safe
      mid-draw);
   2. **CPU-cache hit →** add to `pending_attach` for a GPU upload at the next
-     safe point;
+     safe point (in *Lazy*, uploaded inline within a per-frame budget, see
+     *Prefetch journal and pooled Lazy-sync* below);
   3. **miss →** `want_combo()` (disk load).
 - **`get_hd_texture_index()`** — the per-draw overlap loop now calls
   `request_hd_texture()` on a miss and **re-checks `upload->textures`
@@ -168,6 +169,45 @@ INFO log line shows the active mode and `used/budget` for each tier.
   as the single-upload path (`fused_effective_palette_hash()`: reduced when that
   file exists, else full), so fused pages find and blit exactly the images the
   draw path bound. Behaviour with the option off is unchanged.
+
+### Prefetch journal and pooled Lazy-sync (Lazy modes only)
+
+Lazy and Lazy (synchronous) only request a combo when a draw needs it, so content
+that produces a new combo every frame misses every time (SotN's intro crawl
+typewrites about a glyph per frame into its text pages, so each page state is
+drawn once). Three additions address that. None of them is active in *Eager* or
+with replacement off.
+
+- **Prefetch journal.** The tracker records which combo was first seen after
+  which, and keeps that across sessions in `prefetch.journal` in the
+  `-texture-replacements` folder. On a combo's first sighting in a session it
+  walks the recorded chain and queues the next 8 combos as low-priority loads
+  through `want_combo()` (cache-checked, deduped, within the budgets). The first
+  playthrough of a scene records; later ones load ahead of the draw. A wrong
+  prediction costs one background load. The file is read on first use and saved
+  at teardown, on reload, when HD is switched off, on the switch to *Eager*, and
+  every ~10 s while it has new links (serialised on the render thread, written
+  by a detached thread). Format: a `TTPJ` header, then `{u64 key, u64 successor,
+  u32 flags}` per link, 20 bytes each. A pack can ship a trained journal.
+- **Inline upload.** In *Lazy*, a CPU-cache hit in `request_hd_texture()` (and a
+  decoded page in `match_page()`) is uploaded and bound mid-draw, up to 8 per
+  frame, instead of waiting for the next safe point, which cost a one-frame
+  native flicker. Over the budget it falls back to `pending_attach`. *Eager*
+  keeps the safe-point attach.
+- **Pooled Lazy (synchronous).** The synchronous mode no longer decodes on the
+  render thread. Before binding, `get_hd_texture_index()` dispatches every
+  unbound, uncached combo in the draw's overlap set to the IO pool. The bind then
+  waits for its own combo (`texture_tracker_sync_wait_combo()`, bounded at
+  ~512 ms) on a response condition variable, draining every delivered response
+  into `hd_cache` while it waits, so a draw with many misses costs about the
+  slowest load instead of the sum. The wait only blocks while the combo is in the
+  new `inflight` set (requests actually queued), so a combo with no file never
+  blocks. Response draining moved from `on_queues_reset()` into
+  `texture_tracker_drain_responses()`; attach passes still run only at the safe
+  point.
+
+The `[hdcache]` log gains a line with the journal size and, per 300 frames, the
+predicted loads, inline uploads and pooled waits (timeouts should stay 0).
 
 ### Build
 
