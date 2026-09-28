@@ -657,6 +657,26 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       if (c->req_high_tail) c->req_high_tail->next = r; else c->req_high_head = r;
       c->req_high_tail = r;
    }
+   /* Move a pending low-priority Load for (hash, palette, pages) to the tail
+    * of the high-priority queue (caller holds the lock). Returns false when
+    * no such request is queued - it was never queued, or a worker has already
+    * popped it and is decoding. */
+   static bool io_channel_promote_request(IOChannel *c, uint32_t hash, uint32_t palette_hash, bool pages) {
+      IORequest *prev = NULL;
+      IORequest *r = c->req_head;
+      while (r) {
+         if (r->kind == IORequestKind_Load && r->hash == hash &&
+               r->palette_hash == palette_hash && r->pages == pages) {
+            if (prev) prev->next = r->next; else c->req_head = r->next;
+            if (c->req_tail == r) c->req_tail = prev;
+            io_channel_push_request_high(c, r);
+            return true;
+         }
+         prev = r;
+         r = r->next;
+      }
+      return false;
+   }
    /* True if either queue has pending work (caller holds the lock). */
    static bool io_channel_has_requests(const IOChannel *c) {
       return c->req_high_head != NULL || c->req_head != NULL;
@@ -4494,8 +4514,19 @@ static TTRect fromSRect(SRect rect) {
             hd_key_set_insert(&self->pending_attach, hd_pack_key(id));
          return;
       }
-      if (!hd_key_set_insert(&self->requested, hd_pack_key(id)))
-         return; /* already in flight, or negatively cached */
+      if (!hd_key_set_insert(&self->requested, hd_pack_key(id))) {
+         /* Already in flight, or negatively cached. If a draw now needs a
+          * combo the journal queued as a low-priority prediction, move that
+          * request ahead of the rest of the prefetch backlog: otherwise a
+          * Lazy-sync bind waits behind every earlier prediction, and an async
+          * Lazy draw shows native for as long as the backlog takes. */
+         if (high_priority && hd_key_set_contains(&self->inflight, hd_pack_key(id))) {
+            slock_lock(self->iothread.channel->lock);
+            io_channel_promote_request(self->iothread.channel, id.hash, id.palette_hash, pages);
+            slock_unlock(self->iothread.channel->lock);
+         }
+         return;
+      }
       if (!hd_key_set_contains(pages ? &self->known_files_pages : &self->known_files, hd_pack_key(id)))
          return; /* no file on disk */
 
