@@ -3696,6 +3696,22 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 #define TT_JOURNAL_MAGIC   0x4A505454u /* "TTPJ" */
 #define TT_JOURNAL_VERSION 1u
 
+   /* The file is little-endian regardless of host: it ships with packs, so
+    * a journal trained on x86/ARM must read the same on a big-endian host.
+    * Byte-identical to the host-order files written so far on LE hosts. */
+   static INLINE void tt_put_le32(uint8_t *p, uint32_t v) {
+      p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
+   }
+   static INLINE void tt_put_le64(uint8_t *p, uint64_t v) {
+      tt_put_le32(p, (uint32_t)v); tt_put_le32(p + 4, (uint32_t)(v >> 32));
+   }
+   static INLINE uint32_t tt_get_le32(const uint8_t *p) {
+      return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+   }
+   static INLINE uint64_t tt_get_le64(const uint8_t *p) {
+      return (uint64_t)tt_get_le32(p) | ((uint64_t)tt_get_le32(p + 4) << 32);
+   }
+
    static char *journal_file_path(char *out, size_t cap) {
       char base[PATH_MAX_TT];
       int n;
@@ -3709,22 +3725,23 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
    static void tt_journal_load_file(TTJournal *j) {
       char path[PATH_MAX_TT];
       RFILE *f;
-      uint32_t head[4];
+      uint8_t head[16];
       journal_file_path(path, sizeof(path));
       f = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ, RETRO_VFS_FILE_ACCESS_HINT_NONE);
       if (f == NULL)
          return;
       if (filestream_read(f, head, sizeof(head)) == (int64_t)sizeof(head) &&
-            head[0] == TT_JOURNAL_MAGIC && head[1] == TT_JOURNAL_VERSION &&
-            head[2] <= 0x400000u) { /* 4M links = a corrupt count, not a real pack */
+            tt_get_le32(head) == TT_JOURNAL_MAGIC &&
+            tt_get_le32(head + 4) == TT_JOURNAL_VERSION &&
+            tt_get_le32(head + 8) <= 0x400000u) { /* 4M links = a corrupt count, not a real pack */
+         uint32_t count = tt_get_le32(head + 8);
          uint32_t i;
-         for (i = 0; i < head[2]; i++) {
-            uint64_t rec[2];
-            uint32_t flags;
-            if (filestream_read(f, rec, sizeof(rec)) != (int64_t)sizeof(rec) ||
-                  filestream_read(f, &flags, sizeof(flags)) != (int64_t)sizeof(flags))
+         for (i = 0; i < count; i++) {
+            uint8_t rec[20];
+            if (filestream_read(f, rec, sizeof(rec)) != (int64_t)sizeof(rec))
                break;
-            tt_journal_record(j, rec[0], rec[1], (flags & 1u) != 0);
+            tt_journal_record(j, tt_get_le64(rec), tt_get_le64(rec + 8),
+                  (tt_get_le32(rec + 16) & 1u) != 0);
          }
       }
       filestream_close(f);
@@ -3740,27 +3757,23 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       uint8_t *buf;
       uint8_t *p;
       size_t i;
-      uint32_t head[4];
       if (j->count == 0)
          return NULL;
       buf = (uint8_t *)malloc(need);
       if (buf == NULL)
          return NULL;
-      head[0] = TT_JOURNAL_MAGIC;
-      head[1] = TT_JOURNAL_VERSION;
-      head[2] = (uint32_t)j->count;
-      head[3] = 0;
-      memcpy(buf, head, sizeof(head));
-      p = buf + sizeof(head);
+      tt_put_le32(buf,      TT_JOURNAL_MAGIC);
+      tt_put_le32(buf + 4,  TT_JOURNAL_VERSION);
+      tt_put_le32(buf + 8,  (uint32_t)j->count);
+      tt_put_le32(buf + 12, 0);
+      p = buf + 16;
       for (i = 0; i < j->cap; i++) {
          const TTJournalSlot *s = &j->slots[i];
-         uint32_t flags;
          if (!s->used)
             continue;
-         memcpy(p, &s->key, 8);      p += 8;
-         memcpy(p, &s->next_key, 8); p += 8;
-         flags = s->next_pages ? 1u : 0u;
-         memcpy(p, &flags, 4);       p += 4;
+         tt_put_le64(p, s->key);       p += 8;
+         tt_put_le64(p, s->next_key);  p += 8;
+         tt_put_le32(p, s->next_pages ? 1u : 0u); p += 4;
       }
       *out_len = (size_t)(p - buf);
       return buf;
