@@ -3796,10 +3796,37 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 
    /* Synchronous save - used only at moments that are not latency-sensitive
     * (tracker teardown, reload keypress, replacement/mode switched off). */
+   /* Background-save state; shared by the synchronous save below and the
+    * background writer further down. */
+   static slock_t  *tt_journal_io_lock = NULL;
+   static bool      tt_journal_io_busy = false;   /* a writer thread is active */
+   static int       tt_journal_io_result = 0;     /* 0 = none, 1 = ok, -1 = failed; consumed in endFrame */
+   /* The writer is joinable, not detached: a detached thread could outlive
+    * retro_deinit and run into a dlclose'd core, and it could race the
+    * synchronous teardown save on the same target file. Reaped by
+    * tt_journal_writer_join before every synchronous save and before the
+    * next background save is started. Guarded by tt_journal_io_lock. */
+   static sthread_t *tt_journal_io_thread = NULL;
+
+   static void tt_journal_writer_join(void);
+
    static void tt_journal_save_file(TTJournal *j) {
       char path[PATH_MAX_TT];
       uint8_t *buf;
       size_t len = 0;
+      /* Never race a background writer on the same target: wait for it and
+       * reap it first. If it succeeded, `dirty` may still be set from links
+       * recorded after its snapshot, which is exactly what this save covers;
+       * if it failed, endFrame's result check has not run yet, so re-dirty
+       * here and let this synchronous save carry the whole map. */
+      tt_journal_writer_join();
+      if (tt_journal_io_lock != NULL) {
+         slock_lock(tt_journal_io_lock);
+         if (tt_journal_io_result < 0)
+            j->dirty = true;
+         tt_journal_io_result = 0;
+         slock_unlock(tt_journal_io_lock);
+      }
       if (!j->dirty)
          return;
       buf = tt_journal_serialize(j, &len);
@@ -3829,9 +3856,6 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
    };
    typedef struct TTJournalSaveJob TTJournalSaveJob;
 
-   static slock_t *tt_journal_io_lock = NULL;
-   static bool     tt_journal_io_busy = false;   /* a writer thread is active */
-   static int      tt_journal_io_result = 0;     /* 0 = none, 1 = ok, -1 = failed; consumed in endFrame */
 
    static void tt_journal_writer_thread(void *ud) {
       TTJournalSaveJob *job = (TTJournalSaveJob *)ud;
@@ -3842,6 +3866,20 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       tt_journal_io_busy = false;
       tt_journal_io_result = ok ? 1 : -1;
       slock_unlock(tt_journal_io_lock);
+   }
+
+   /* Wait for an in-flight background write to finish and reap its thread.
+    * Cheap when nothing is in flight. Called from the render thread only. */
+   static void tt_journal_writer_join(void) {
+      sthread_t *thread;
+      if (tt_journal_io_lock == NULL)
+         return;
+      slock_lock(tt_journal_io_lock);
+      thread = tt_journal_io_thread;
+      tt_journal_io_thread = NULL;
+      slock_unlock(tt_journal_io_lock);
+      if (thread)
+         sthread_join(thread);
    }
 
    static void texture_tracker_journal_save_async(struct TextureTracker *self) {
@@ -3856,6 +3894,9 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       slock_unlock(tt_journal_io_lock);
       if (busy)
          return; /* previous write still in flight; dirty stays set, retried next window */
+      /* The previous writer has finished (busy is clear) but its thread has
+       * not been reaped yet; join it now so handles never accumulate. */
+      tt_journal_writer_join();
       job = (TTJournalSaveJob *)malloc(sizeof(TTJournalSaveJob));
       if (job != NULL) {
          job->buf = tt_journal_serialize(&self->journal, &job->len);
@@ -3872,7 +3913,9 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       {
          sthread_t *thread = sthread_create(tt_journal_writer_thread, job);
          if (thread) {
-            sthread_detach(thread);
+            slock_lock(tt_journal_io_lock);
+            tt_journal_io_thread = thread;
+            slock_unlock(tt_journal_io_lock);
          } else {
             free(job->buf);
             free(job);
