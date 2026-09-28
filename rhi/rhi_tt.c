@@ -588,7 +588,8 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
 
    struct IOChannel {
       slock_t *lock;
-      scond_t *cond;
+      scond_t *cond;       /* signalled when a REQUEST is queued (wakes workers) */
+      scond_t *resp_cond;  /* signalled when a RESPONSE is queued (wakes the pooled Lazy-sync wait) */
       /* Intrusive FIFO lists (protected by `lock`). Heads are popped/drained,
        * tails are where producers append. Dynamic arrays of IORequest /
        * IOResponse. */
@@ -608,6 +609,7 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       IOChannel *c = (IOChannel *)malloc(sizeof(IOChannel));
       c->lock = slock_new();
       c->cond = scond_new();
+      c->resp_cond = scond_new();
       c->req_head = c->req_tail = NULL;
       c->req_high_head = c->req_high_tail = NULL;
       c->resp_head = c->resp_tail = NULL;
@@ -681,6 +683,7 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       r->next = NULL;
       if (c->resp_tail) c->resp_tail->next = r; else c->resp_head = r;
       c->resp_tail = r;
+      scond_signal(c->resp_cond); /* wake a pooled Lazy-sync waiter, if any */
    }
    /* Steal the entire response list; channel left empty. Returns the head. */
    static IOResponse *io_channel_take_responses(IOChannel *c) {
@@ -1668,6 +1671,8 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
    /* (hash, palette_hash) packed into one 64-bit key. The caches below are
     * keyed by this single integer instead of HdTextureId, so lookups compare
     * one int with no comparator / tree descent. */
+#define TT_PAGE_KEY_SALT (UINT64_C(0x9E3779B97F4A7C15))
+
    static uint64_t hd_pack_key(HdTextureId id)
    {
       uint64_t k = ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash;
@@ -1677,10 +1682,24 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
        * 64-bit salt rather than the C++ struct's extra comparison field. The
        * shared structures are point-access only (never unpacked back to a hash),
        * so the salt is safe; page-only sets that ARE unpacked (pending_attach_pages)
-       * store the un-salted base key instead. */
+       * store the un-salted base key instead. (The prefetch journal DOES unpack
+       * salted keys - it stores the pages flag beside each value, which is what
+       * makes the XOR reversible for it; see hd_unpack_key.) */
       if (id.pages)
-         k ^= UINT64_C(0x9E3779B97F4A7C15);
+         k ^= TT_PAGE_KEY_SALT;
       return k;
+   }
+
+   /* Reverse hd_pack_key given the pages flag. Only valid when the flag is
+    * known out-of-band (the journal stores it per entry). */
+   static HdTextureId hd_unpack_key(uint64_t key, bool pages)
+   {
+      HdTextureId id;
+      uint64_t base = pages ? (key ^ TT_PAGE_KEY_SALT) : key;
+      id.hash = (uint32_t)(base >> 32);
+      id.palette_hash = (uint32_t)base;
+      id.pages = pages;
+      return id;
    }
 
    /* -------------------------------------------------------------------------
@@ -2269,6 +2288,118 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       m->count--;
    }
 
+   /* -------------------------------------------------------------------------
+    * Prefetch journal - a persisted successor map for demand-fetch misses.
+    *
+    * Demand fetch discovers a needed (hash,palette) combo only at draw time -
+    * too late for content that mints new combos every frame (SotN's intro
+    * crawl typewrites roughly a glyph per frame into its text pages, so every
+    * page state is a first-seen hash used exactly once; the 3-tier cache never
+    * helps there by construction). The journal records, across sessions, which
+    * combo was FIRST SEEN right after which ("X -> Y"); on later runs, seeing X
+    * queues background loads for Y, Z, ... (a chain walk), so deterministic
+    * streams arrive decoded before they are drawn. A wrong prediction costs
+    * one wasted low-priority background load, bounded by the cache budgets.
+    *
+    * Storage: open-addressed (linear probe, fmix64 hash) uint64 -> {uint64,
+    * pages flag} map. Keys and values are hd_pack_key values; the successor's
+    * pages flag rides beside the value because the key salt is only reversible
+    * when the flag is known (hd_unpack_key). Persisted as prefetch.journal in
+    * the -texture-replacements folder (it travels with the pack).
+    * ------------------------------------------------------------------------- */
+   struct TTJournalSlot {
+      uint64_t key;
+      uint64_t next_key;
+      uint8_t  next_pages;
+      uint8_t  used;
+   };
+   typedef struct TTJournalSlot TTJournalSlot;
+   struct TTJournal {
+      TTJournalSlot *slots;
+      size_t cap;   /* power of two; 0 = unallocated */
+      size_t count;
+      bool dirty;   /* has changes not yet persisted */
+   };
+   typedef struct TTJournal TTJournal;
+
+   static void tt_journal_init(TTJournal *j)
+   {
+      j->slots = NULL;
+      j->cap = 0;
+      j->count = 0;
+      j->dirty = false;
+   }
+   static void tt_journal_free(TTJournal *j)
+   {
+      free(j->slots);
+      tt_journal_init(j);
+   }
+   /* Slot for key: its live entry, or the empty slot where it would insert. */
+   static TTJournalSlot *tt_journal_probe(TTJournal *j, uint64_t key)
+   {
+      size_t i = (size_t)hd_lru_mix(key) & (j->cap - 1);
+      for (;;) {
+         TTJournalSlot *s = &j->slots[i];
+         if (!s->used || s->key == key)
+            return s;
+         i = (i + 1) & (j->cap - 1);
+      }
+   }
+   static bool tt_journal_grow(TTJournal *j)
+   {
+      TTJournalSlot *old = j->slots;
+      size_t old_cap = j->cap;
+      size_t ncap = old_cap ? old_cap * 2 : 256;
+      size_t i;
+      TTJournalSlot *ns = (TTJournalSlot *)calloc(ncap, sizeof(TTJournalSlot));
+      if (!ns)
+         return false;
+      j->slots = ns;
+      j->cap = ncap;
+      for (i = 0; i < old_cap; i++) {
+         if (old[i].used)
+            *tt_journal_probe(j, old[i].key) = old[i];
+      }
+      free(old);
+      return true;
+   }
+   /* Recorded successor of key -> *next_key and *next_pages; false if none. */
+   static bool tt_journal_lookup(TTJournal *j, uint64_t key, uint64_t *next_key, bool *next_pages)
+   {
+      TTJournalSlot *s;
+      if (j->cap == 0)
+         return false;
+      s = tt_journal_probe(j, key);
+      if (!s->used)
+         return false;
+      *next_key = s->next_key;
+      *next_pages = s->next_pages != 0;
+      return true;
+   }
+   /* Record key -> next (the last observation wins, so occasionally
+    * nondeterministic content converges on its dominant successor). */
+   static void tt_journal_record(TTJournal *j, uint64_t key, uint64_t next_key, bool next_pages)
+   {
+      TTJournalSlot *s;
+      if (j->cap == 0 || j->count * 4 >= j->cap * 3) {
+         if (!tt_journal_grow(j))
+            return;
+      }
+      s = tt_journal_probe(j, key);
+      if (!s->used) {
+         s->used = 1;
+         s->key = key;
+         s->next_key = 0;
+         s->next_pages = 0;
+         j->count++;
+      }
+      if (s->next_key != next_key || (s->next_pages != 0) != next_pages) {
+         s->next_key = next_key;
+         s->next_pages = next_pages ? 1 : 0;
+         j->dirty = true;
+      }
+   }
+
    /* Page-aligned experiment: memoized page CRC keyed by the page rect (VRAM
     * words). dirty = the page's VRAM was written since we last hashed it;
     * hashed_frame caps re-hashing to once per page per frame (busy VRAM regions
@@ -2345,6 +2476,12 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       HdGpuCache hd_gpu_cache;
       HdImageCache hd_cache;
       HdKeySet requested; /* disk load in flight, or known to have no file (negative cache) */
+      HdKeySet inflight;  /* combos with an IORequest ACTUALLY queued or decoding right now.
+                           * Render-thread bookkeeping for the pooled Lazy-sync wait: unlike
+                           * `requested` (which also holds permanent negatives), membership
+                           * here guarantees a response is coming, so a bounded wait on the
+                           * response cond can never hang on a no-file combo. Inserted after
+                           * a request is pushed; erased when its response is drained. */
       HdKeySet pending_attach; /* cached combos drawn/decoded this frame, awaiting GPU attach at on_queues_reset */
       /* Consecutive failed disk loads per combo. At TT_LOAD_MAX_ATTEMPTS the
        * combo goes back into `requested` as a permanent negative, so a file
@@ -2357,6 +2494,29 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
        * keys that miss texture_tracker_find_upload, whose miss path walks every
        * restorable rect, so the retained set has to have a ceiling. */
       HdCountMap attach_retries;
+
+      /* Prefetch journal (persisted successor map) + its session state.
+       * journal_seen gates RECORDING to the first sighting of each combo per
+       * session (so replays don't rewrite the chain in re-encounter order);
+       * journal_walked gates the PREDICTION walk to once per origin combo
+       * (cleared periodically so replayed content re-predicts);
+       * journal_prev_* is the tail of the chain being recorded. */
+      TTJournal journal;
+      HdKeySet journal_seen;
+      HdKeySet journal_walked;
+      uint64_t journal_prev_key;
+      bool journal_prev_valid;
+      uint64_t journal_saved_frame;   /* frame of the last periodic save */
+      uint32_t journal_save_backoff;  /* extra frames to wait after a failed background save */
+      bool     journal_loaded;        /* prefetch.journal read from disk yet (lazily, on first use) */
+
+      /* Per-frame budget for inline (mid-draw) GPU uploads of already-decoded
+       * combos on the async Lazy path. Uploading is cheap next to decode, so a
+       * budgeted inline upload+bind removes the guaranteed 1-frame native
+       * flicker of the deferred attach - while the budget stops a burst of
+       * CPU-cache hits (e.g. right after a GPU-cache flush) from turning into
+       * a Lazy-synchronous-style stall. Reset each endFrame. */
+      int inline_uploads_this_frame;
 
       /* Diagnostics (logged every 300 frames by endFrame). */
       uint64_t dbg_responses_received;
@@ -2452,6 +2612,14 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       uint64_t dbg_page_miss_last;
       uint64_t dbg_page_hashes;       /* actual full-page CRC32s computed (memo misses) */
       uint64_t dbg_page_hashes_last;
+      uint64_t dbg_prefetch_issued;   /* journal-predicted combos handed to want_combo */
+      uint64_t dbg_prefetch_issued_last;
+      uint64_t dbg_inline_uploads;    /* async CPU-cache hits GPU-uploaded mid-draw */
+      uint64_t dbg_inline_uploads_last;
+      uint64_t dbg_pool_waits;        /* pooled Lazy-sync waits entered (draw blocked on the IO pool) */
+      uint64_t dbg_pool_waits_last;
+      uint64_t dbg_pool_wait_timeouts;/* pooled waits that hit the ~512ms bound (should stay 0) */
+      uint64_t dbg_pool_wait_timeouts_last;
    };
 
    static void texture_tracker_init(struct TextureTracker *self);
@@ -3163,6 +3331,32 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       return levels;
    }
 
+   /* Load the decoded mip chain for a combo: resolve the pack file, decode
+    * it, and generate mips. Returns false when there is no file or the load
+    * fails; path_out always holds the probed source path (for error
+    * messages). Shared by the async IO workers and both sync loaders;
+    * thread-safe (per-combo dedup via `requested` means no two threads load
+    * the same combo concurrently). */
+   static bool tt_load_replacement_levels(uint32_t hash, uint32_t palette_hash, bool pages,
+         LoadedLevels *out_levels, int *out_alpha_flags,
+         char *path_out, size_t path_cap) {
+      RGBAImage image;
+      if (!find_replacement_file(path_out, path_cap, hash, palette_hash, pages))
+         return false;
+      image.data = NULL;
+      load_image(path_out, &image);
+      if (image.data == NULL)
+         return false;
+      *out_alpha_flags = 0;
+      *out_levels = prepare_texture(&image, out_alpha_flags);
+      rgba_image_free(&image);
+      if (out_levels->count == 0) {
+         loaded_levels_reset(out_levels);
+         return false;
+      }
+      return true;
+   }
+
    /* Worker-side dump decode: expand a snapshot of raw VRAM source words (req->src)
     * into RGBA with the tri-alpha convention, on the IO thread instead of the
     * render thread. Bit-identical to the old inline loops in dump_image/dump_page
@@ -3256,13 +3450,10 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             uint32_t palette_hash = request->palette_hash;
 
             char path[PATH_MAX_TT];
-            RGBAImage image;
-            find_replacement_file(path, sizeof(path), hash, palette_hash, request->pages);
-            image.data = NULL;
-            load_image(path, &image);
-            if (image.data != NULL) {
-               int alpha_flags_out = 0;
-               LoadedLevels levels = prepare_texture(&image, &alpha_flags_out);
+            LoadedLevels levels;
+            int alpha_flags_out = 0;
+            if (tt_load_replacement_levels(hash, palette_hash, request->pages,
+                  &levels, &alpha_flags_out, path, sizeof(path))) {
                IOResponse *response = (IOResponse *)malloc(sizeof(IOResponse));
                response->next         = NULL;
                response->hash         = hash;
@@ -3275,8 +3466,6 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
                slock_lock(channel->lock);
                io_channel_push_response(channel, response);
                slock_unlock(channel->lock);
-
-               rgba_image_free(&image);
             } else {
                /* FAILURE response (empty levels): previously the failure branch
                 * pushed nothing, so the combo stayed in `requested` forever -
@@ -3325,6 +3514,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       while (p) { IOResponse *n = p->next; io_response_free(p); p = n; }
       slock_free(c->lock);
       scond_free(c->cond);
+      scond_free(c->resp_cond);
       free(c);
    }
 
@@ -3498,6 +3688,202 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       hd_key_set_finalize_sorted(out);
    }
 
+   /* ---- Prefetch-journal persistence (see the TTJournal block above). ----
+    * One record per chain link: {u64 key, u64 successor, u32 flags} with
+    * flags bit0 = successor is a page combo. Stored as prefetch.journal in
+    * the -texture-replacements folder so it travels with the pack (authors
+    * can ship it pre-trained); written via temp file + rename. */
+#define TT_JOURNAL_MAGIC   0x4A505454u /* "TTPJ" */
+#define TT_JOURNAL_VERSION 1u
+
+   static char *journal_file_path(char *out, size_t cap) {
+      char base[PATH_MAX_TT];
+      int n;
+      replacements_path(base, sizeof(base));
+      n = snprintf(out, cap, "%sprefetch.journal", base);
+      if (n < 0 || (size_t)n >= cap)
+         out[cap - 1] = '\0';
+      return out;
+   }
+
+   static void tt_journal_load_file(TTJournal *j) {
+      char path[PATH_MAX_TT];
+      RFILE *f;
+      uint32_t head[4];
+      journal_file_path(path, sizeof(path));
+      f = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ, RETRO_VFS_FILE_ACCESS_HINT_NONE);
+      if (f == NULL)
+         return;
+      if (filestream_read(f, head, sizeof(head)) == (int64_t)sizeof(head) &&
+            head[0] == TT_JOURNAL_MAGIC && head[1] == TT_JOURNAL_VERSION &&
+            head[2] <= 0x400000u) { /* 4M links = a corrupt count, not a real pack */
+         uint32_t i;
+         for (i = 0; i < head[2]; i++) {
+            uint64_t rec[2];
+            uint32_t flags;
+            if (filestream_read(f, rec, sizeof(rec)) != (int64_t)sizeof(rec) ||
+                  filestream_read(f, &flags, sizeof(flags)) != (int64_t)sizeof(flags))
+               break;
+            tt_journal_record(j, rec[0], rec[1], (flags & 1u) != 0);
+         }
+      }
+      filestream_close(f);
+      j->dirty = false; /* what was just read IS what is on disk */
+      if (j->count > 0)
+         TT_LOG(RETRO_LOG_INFO, "[prefetch] journal loaded: %u chain links\n", (unsigned)j->count);
+   }
+
+   /* Serialise the journal into a malloc'd blob in the on-disk format (header
+    * + one 20-byte record per link). Memory-speed; NULL if empty or OOM. */
+   static uint8_t *tt_journal_serialize(const TTJournal *j, size_t *out_len) {
+      size_t need = 16 + (size_t)j->count * 20;
+      uint8_t *buf;
+      uint8_t *p;
+      size_t i;
+      uint32_t head[4];
+      if (j->count == 0)
+         return NULL;
+      buf = (uint8_t *)malloc(need);
+      if (buf == NULL)
+         return NULL;
+      head[0] = TT_JOURNAL_MAGIC;
+      head[1] = TT_JOURNAL_VERSION;
+      head[2] = (uint32_t)j->count;
+      head[3] = 0;
+      memcpy(buf, head, sizeof(head));
+      p = buf + sizeof(head);
+      for (i = 0; i < j->cap; i++) {
+         const TTJournalSlot *s = &j->slots[i];
+         uint32_t flags;
+         if (!s->used)
+            continue;
+         memcpy(p, &s->key, 8);      p += 8;
+         memcpy(p, &s->next_key, 8); p += 8;
+         flags = s->next_pages ? 1u : 0u;
+         memcpy(p, &flags, 4);       p += 4;
+      }
+      *out_len = (size_t)(p - buf);
+      return buf;
+   }
+
+   /* Write a serialised journal to disk via <path><tmp_suffix> + rename.
+    * Distinct suffixes keep the synchronous and background writers from
+    * clobbering each other's temp file. */
+   static bool tt_journal_write_blob(const char *path, const char *tmp_suffix,
+         const uint8_t *buf, size_t len) {
+      char tmp[PATH_MAX_TT];
+      RFILE *f;
+      bool ok;
+      if (strlen(path) + strlen(tmp_suffix) + 1 >= sizeof(tmp))
+         return false;
+      snprintf(tmp, sizeof(tmp), "%s%s", path, tmp_suffix);
+      f = filestream_open(tmp, RETRO_VFS_FILE_ACCESS_WRITE, RETRO_VFS_FILE_ACCESS_HINT_NONE);
+      if (f == NULL)
+         return false; /* replacements folder may not exist */
+      ok = filestream_write(f, buf, (int64_t)len) == (int64_t)len;
+      filestream_close(f);
+      if (!ok) {
+         remove(tmp);
+         return false;
+      }
+      remove(path);
+      if (rename(tmp, path) != 0) {
+         remove(tmp);
+         return false;
+      }
+      return true;
+   }
+
+   /* Synchronous save - used only at moments that are not latency-sensitive
+    * (tracker teardown, reload keypress, replacement/mode switched off). */
+   static void tt_journal_save_file(TTJournal *j) {
+      char path[PATH_MAX_TT];
+      uint8_t *buf;
+      size_t len = 0;
+      if (!j->dirty)
+         return;
+      buf = tt_journal_serialize(j, &len);
+      if (buf == NULL)
+         return;
+      journal_file_path(path, sizeof(path));
+      if (tt_journal_write_blob(path, ".tmp", buf, len))
+         j->dirty = false;
+      free(buf);
+   }
+
+   /* ---- Background (periodic) save ----
+    * The periodic autosave used to run the whole open/write/rename inline in
+    * endFrame every 600 frames. Under antivirus/indexer scanning that is a
+    * multi-millisecond render-thread stall - a dropped frame and an audible
+    * ~10-second-period audio stutter - and a failed rename left `dirty` set,
+    * so the full rewrite retried every 10 s for the rest of the session even
+    * on a static screen. Now the render thread only snapshots the map into a
+    * heap buffer (memory-speed) and a detached writer thread does the file
+    * I/O; its outcome is handed back through tt_journal_io_result so a
+    * failure re-dirties the journal and backs the next attempt off (see
+    * endFrame). The lock is process-lifetime, like io_channel_rc_lock. */
+   struct TTJournalSaveJob {
+      char path[PATH_MAX_TT];
+      uint8_t *buf;
+      size_t len;
+   };
+   typedef struct TTJournalSaveJob TTJournalSaveJob;
+
+   static slock_t *tt_journal_io_lock = NULL;
+   static bool     tt_journal_io_busy = false;   /* a writer thread is active */
+   static int      tt_journal_io_result = 0;     /* 0 = none, 1 = ok, -1 = failed; consumed in endFrame */
+
+   static void tt_journal_writer_thread(void *ud) {
+      TTJournalSaveJob *job = (TTJournalSaveJob *)ud;
+      bool ok = tt_journal_write_blob(job->path, ".tmpa", job->buf, job->len);
+      free(job->buf);
+      free(job);
+      slock_lock(tt_journal_io_lock);
+      tt_journal_io_busy = false;
+      tt_journal_io_result = ok ? 1 : -1;
+      slock_unlock(tt_journal_io_lock);
+   }
+
+   static void texture_tracker_journal_save_async(struct TextureTracker *self) {
+      TTJournalSaveJob *job;
+      bool busy;
+      if (tt_journal_io_lock == NULL)
+         return;
+      slock_lock(tt_journal_io_lock);
+      busy = tt_journal_io_busy;
+      if (!busy)
+         tt_journal_io_busy = true;
+      slock_unlock(tt_journal_io_lock);
+      if (busy)
+         return; /* previous write still in flight; dirty stays set, retried next window */
+      job = (TTJournalSaveJob *)malloc(sizeof(TTJournalSaveJob));
+      if (job != NULL) {
+         job->buf = tt_journal_serialize(&self->journal, &job->len);
+         journal_file_path(job->path, sizeof(job->path));
+      }
+      if (job == NULL || job->buf == NULL) {
+         free(job);
+         slock_lock(tt_journal_io_lock);
+         tt_journal_io_busy = false;
+         slock_unlock(tt_journal_io_lock);
+         return;
+      }
+      self->journal.dirty = false; /* optimistic; a writer failure re-dirties via the result flag */
+      {
+         sthread_t *thread = sthread_create(tt_journal_writer_thread, job);
+         if (thread) {
+            sthread_detach(thread);
+         } else {
+            free(job->buf);
+            free(job);
+            self->journal.dirty = true;
+            slock_lock(tt_journal_io_lock);
+            tt_journal_io_busy = false;
+            slock_unlock(tt_journal_io_lock);
+         }
+      }
+   }
+
    static void texture_tracker_init(struct TextureTracker *self)
    {
       char rpath[PATH_MAX_TT];
@@ -3529,9 +3915,27 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       dbg_hotkey_init(&self->fastpath_key, RETROK_SEMICOLON);
       hd_key_set_init(&self->known_files);
       hd_key_set_init(&self->requested);
+      hd_key_set_init(&self->inflight);
       hd_key_set_init(&self->pending_attach);
       hd_count_map_init(&self->load_attempts);
       hd_count_map_init(&self->attach_retries);
+      self->dbg_pool_waits = 0;
+      self->dbg_pool_waits_last = 0;
+      self->dbg_pool_wait_timeouts = 0;
+      self->dbg_pool_wait_timeouts_last = 0;
+      tt_journal_init(&self->journal);
+      hd_key_set_init(&self->journal_seen);
+      hd_key_set_init(&self->journal_walked);
+      self->journal_prev_key = 0;
+      self->journal_prev_valid = false;
+      self->journal_saved_frame = 0;
+      self->journal_save_backoff = 0;
+      self->journal_loaded = false;
+      self->inline_uploads_this_frame = 0;
+      self->dbg_prefetch_issued = 0;
+      self->dbg_prefetch_issued_last = 0;
+      self->dbg_inline_uploads = 0;
+      self->dbg_inline_uploads_last = 0;
       self->cached_palette_hashes = NULL;
       self->cached_palette_hashes_count = 0;
       self->cached_palette_hashes_cap = 0;
@@ -3574,6 +3978,12 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       TT_LOG(RETRO_LOG_INFO, "num hd textures: %d\n", (int)self->known_files.count);
       read_texture_directory(&self->known_files_pages, replacements_pages_path(rpath, sizeof(rpath)), true);
       TT_LOG(RETRO_LOG_INFO, "num hd page textures: %d\n", (int)self->known_files_pages.count);
+      /* Journal file-I/O lock (process lifetime, like io_channel_rc_lock).
+       * The journal itself is read lazily on its first use in a Lazy mode
+       * (texture_tracker_journal_note) - Eager mode and replacement-off
+       * never touch the file. */
+      if (tt_journal_io_lock == NULL)
+         tt_journal_io_lock = slock_new();
 
       /* Read in the dump config file */
       dump_path(cfg, sizeof(cfg));
@@ -3599,10 +4009,15 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
    static void texture_tracker_fini(struct TextureTracker *self)
    {
       ih_reset(&self->default_hd_texture); /* drop the default HD texture reference */
+      tt_journal_save_file(&self->journal); /* persist any un-saved chain links */
+      tt_journal_free(&self->journal);
+      hd_key_set_free(&self->journal_seen);
+      hd_key_set_free(&self->journal_walked);
       HdImageCache_clear(&self->hd_cache);   /* frees decoded levels + arena */
       HdGpuCache_clear(&self->hd_gpu_cache); /* releases cached image refs + arena */
       hd_key_set_free(&self->known_files);
       hd_key_set_free(&self->requested);
+      hd_key_set_free(&self->inflight);
       hd_key_set_free(&self->pending_attach);
       hd_count_map_free(&self->load_attempts);
       hd_count_map_free(&self->attach_retries);
@@ -4046,6 +4461,167 @@ static TTRect fromSRect(SRect rect) {
       }
       slock_unlock(self->iothread.channel->lock);
       scond_signal(self->iothread.channel->cond);
+      /* A request is now genuinely queued - track it so the pooled Lazy-sync
+       * wait knows a response WILL arrive (unlike `requested`, which also
+       * holds permanent no-file negatives that never respond). */
+      hd_key_set_insert(&self->inflight, hd_pack_key(id));
+   }
+
+   /* Drain delivered IO responses into the CPU cache (decode-once) and mark
+    * them for attach. The cache owns them regardless of whether their hash is
+    * resident; each response node is freed after its levels are moved into
+    * the cache. A failure response (empty levels) just erases `requested` so
+    * the next draw can retry. Split out of on_queues_reset so the pooled
+    * Lazy-sync wait can bank responses mid-frame; the ATTACH passes still run
+    * only at the safe point. Render thread only. */
+   static void texture_tracker_drain_responses(struct TextureTracker *self) {
+      IOResponse *responses;
+      slock_lock(self->iothread.channel->lock);
+      responses = io_channel_take_responses(self->iothread.channel); /* steal the list */
+      slock_unlock(self->iothread.channel->lock);
+      {
+         IOResponse *response = responses;
+         while (response != NULL) {
+            IOResponse *rnext = response->next;
+            HdTextureId id;
+            id.hash = response->hash;
+            id.palette_hash = response->palette_hash;
+            id.pages = response->pages;
+            hd_key_set_erase(&self->requested, hd_pack_key(id)); /* no longer in flight; retryable or cached */
+            hd_key_set_erase(&self->inflight, hd_pack_key(id));
+            if (response->levels.count == 0) {
+               /* Failure response: the load failed although the file is listed
+                * in known_files. Erasing `requested` above lets the next draw
+                * retry, which is what a transient error needs - but a file that
+                * fails every time (unreadable, or spelled on disk in a form
+                * find_replacement_file cannot reconstruct) would otherwise be
+                * reopened once per draw for the rest of the session. Count the
+                * attempts and reinstate the permanent negative at the limit. */
+               if (hd_count_map_bump(&self->load_attempts, hd_pack_key(id)) >= TT_LOAD_MAX_ATTEMPTS) {
+                  TT_LOG(RETRO_LOG_WARN, "giving up on %x-%x after %d failed loads\n",
+                        id.hash, id.palette_hash, TT_LOAD_MAX_ATTEMPTS);
+                  hd_key_set_insert(&self->requested, hd_pack_key(id));
+                  hd_count_map_erase(&self->load_attempts, hd_pack_key(id));
+               }
+            } else {
+               self->dbg_responses_received++;
+               hd_count_map_erase(&self->load_attempts, hd_pack_key(id));
+               hd_image_cache_put(&self->hd_cache, id, &response->levels, response->alpha_flags);
+               if (response->pages)
+                  /* page combo: store the BASE (unsalted) key so the page attach pass can unpack it */
+                  hd_key_set_insert(&self->pending_attach_pages, ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash);
+               else
+                  hd_key_set_insert(&self->pending_attach, hd_pack_key(id));
+            }
+            io_response_free(response); /* levels already moved out (now empty) */
+            response = rnext;
+         }
+      }
+   }
+
+   /* Pooled Lazy-sync wait: block (bounded) until combo id's in-flight load
+    * lands in a cache tier, draining every delivered response along the way -
+    * so while this draw waits on ONE combo, every other in-flight combo (the
+    * rest of the overlap set, journal predictions) banks its decode too.
+    * "Synchronous" thus means "do not use native until ready", not "decode
+    * serially on the render thread": a 12-miss draw costs ~max(loads) across
+    * the 4 workers instead of sum(loads) inline.
+    *
+    * Returns true when a cache tier holds the combo. False = nothing is in
+    * flight for it (no file / negative / its load just failed) or the wait
+    * timed out; the draw shows native this frame and retries later. The
+    * bound (~512ms of 2ms slices) means a pathological state degrades to
+    * pop-in rather than hanging the renderer. */
+   enum { TT_POOL_WAIT_SLICE_US = 2000, TT_POOL_WAIT_TRIES = 256 };
+
+   static bool texture_tracker_sync_wait_combo(struct TextureTracker *self, HdTextureId id) {
+      uint64_t key = hd_pack_key(id);
+      int tries;
+      self->dbg_pool_waits++;
+      for (tries = 0; tries < TT_POOL_WAIT_TRIES; tries++) {
+         if (HdGpuCache_contains(&self->hd_gpu_cache, key) ||
+               HdImageCache_contains(&self->hd_cache, key))
+            return true;
+         if (!hd_key_set_contains(&self->inflight, key))
+            return false; /* nothing in flight: no file, negative-cached, or failed */
+         texture_tracker_drain_responses(self);
+         if (HdGpuCache_contains(&self->hd_gpu_cache, key) ||
+               HdImageCache_contains(&self->hd_cache, key))
+            return true;
+         if (!hd_key_set_contains(&self->inflight, key))
+            return false; /* the drain above consumed its failure response */
+         slock_lock(self->iothread.channel->lock);
+         if (self->iothread.channel->resp_head == NULL)
+            scond_wait_timeout(self->iothread.channel->resp_cond,
+                  self->iothread.channel->lock, (int64_t)TT_POOL_WAIT_SLICE_US);
+         slock_unlock(self->iothread.channel->lock);
+      }
+      self->dbg_pool_wait_timeouts++;
+      TT_LOG(RETRO_LOG_WARN, "pooled-sync wait timed out for %x-%x\n",
+            id.hash, id.palette_hash);
+      return false;
+   }
+
+   /* How many predicted combos to keep in flight ahead of the current one. At
+    * one new state per frame (worst case: the intro-crawl typewriter mints a
+    * new page hash per typed glyph) depth 8 covers the ~2-4 frame async
+    * latency with margin; each step is one map lookup + one want_combo
+    * (cache/dedup-checked, low priority), so over-walking is nearly free. */
+   enum { TT_PREFETCH_DEPTH = 8 };
+
+   /* Per-frame cap on inline (mid-draw) GPU uploads of already-decoded combos
+    * in the async Lazy path (see the struct field comment). */
+   enum { TT_INLINE_UPLOAD_BUDGET = 8 };
+
+   /* Journal hook - called for every combo a draw actually needs (rect combos
+    * via request_hd_texture, page combos via match_page).
+    *
+    * 1) RECORD: the first sighting of a combo this session appends it to the
+    *    persisted chain (previous first-seen -> this one).
+    * 2) PREDICT: that first sighting ALSO walks the recorded chain from this
+    *    combo and queues background loads for the next TT_PREFETCH_DEPTH
+    *    predicted combos. As successive stream states arrive, the walk re-runs
+    *    from each one, so the lookahead window slides along with the stream.
+    *
+    * Cost when everything is already known/cached: two sorted-set probes. */
+   /* The journal exists for the two Lazy modes only. In Eager (the upstream
+    * default) and whenever replacement is off it is completely inert: no
+    * recording, no prefetch walks, no file reads or writes - so the fork can
+    * not change stock behaviour in those configurations. */
+   static INLINE bool texture_tracker_journal_active(const struct TextureTracker *self) {
+      return self->hd_textures_enabled && !self->eager_textures;
+   }
+
+   static void texture_tracker_journal_note(struct TextureTracker *self, HdTextureId id) {
+      uint64_t key = hd_pack_key(id);
+      if (!texture_tracker_journal_active(self))
+         return;
+      if (!self->journal_loaded) {
+         /* First use this session: read the trained map now. This coincides
+          * with the first replacement loads anyway, so the one small read is
+          * lost in that noise; it is never done in Eager / replacement-off. */
+         tt_journal_load_file(&self->journal);
+         self->journal_loaded = true;
+      }
+      if (hd_key_set_insert(&self->journal_seen, key)) {
+         if (self->journal_prev_valid && self->journal_prev_key != key)
+            tt_journal_record(&self->journal, self->journal_prev_key, key, id.pages);
+         self->journal_prev_key = key;
+         self->journal_prev_valid = true;
+      }
+      if (hd_key_set_insert(&self->journal_walked, key)) {
+         uint64_t cur = key;
+         int i;
+         for (i = 0; i < TT_PREFETCH_DEPTH; i++) {
+            uint64_t nxt;
+            bool nxt_pages;
+            if (!tt_journal_lookup(&self->journal, cur, &nxt, &nxt_pages))
+               break;
+            texture_tracker_want_combo(self, hd_unpack_key(nxt, nxt_pages), false, nxt_pages);
+            self->dbg_prefetch_issued++;
+            cur = nxt;
+         }
+      }
    }
 
    /* Cache-backed HD texture binding for a drawn (hash,palette): pure lazy.
@@ -4066,6 +4642,8 @@ static TTRect fromSRect(SRect rect) {
          return; /* already attached to this upload */
 
       { HdTextureId current = { upload->hash, palette_hash };
+      CachedGpuImage *gpu;
+      texture_tracker_journal_note(self, current);
 
       /* GPU-cache hit: the Vulkan image already exists, so binding it is just a
        * ref-counted handle copy (no Vulkan commands). Bind it IMMEDIATELY so
@@ -4073,7 +4651,7 @@ static TTRect fromSRect(SRect rect) {
        * on_queues_reset cost a 1-self->frame native flicker every time an
        * animation self->frame's upload was recreated (constant for sprites) -
        * i.e. persistent pop-in even when the image was fully cached. */
-      CachedGpuImage *gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(current));
+      gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(current));
       if (gpu != NULL) {
          hd_tex_map_set(&upload->textures, palette_hash, gpu->image, gpu->alpha_flags);
          self->dbg_attaches++;
@@ -4090,18 +4668,39 @@ static TTRect fromSRect(SRect rect) {
          return;
       }
 
-      /* CPU-cache hit (decoded but not in VRAM): needs a GPU upload, which we
-       * keep at the safe point - schedule it for on_queues_reset. */
-      /* Lazy (synchronous): get this combo ready on the render thread NOW so the
-       * current frame uses it (no pop-in), at the cost of a brief stall. Handles
-       * both the CPU-cache hit (just upload) and the full miss (disk+decode+upload). */
+      /* Lazy (synchronous), pooled: the pre-pass in get_hd_texture_index (and
+       * the journal walk above) already have this draw's misses racing on the
+       * IO pool 4-wide; dispatch this one too (a no-op if already in flight)
+       * and wait for it to land, then bind from the cache tier. The render
+       * thread no longer decodes inline, so a multi-upload draw costs about
+       * max(loads) instead of sum(loads). A failed or absent load falls back
+       * to native for this frame and retries on a later draw. */
       if (self->lazy_sync) {
-         texture_tracker_sync_load_combo(self, upload, palette_hash);
+         if (!HdImageCache_contains(&self->hd_cache, hd_pack_key(current))) {
+            texture_tracker_want_combo(self, current, true, false);
+            if (!texture_tracker_sync_wait_combo(self, current))
+               return; /* native this frame */
+         }
+         texture_tracker_sync_load_combo(self, upload, palette_hash); /* upload+bind from the cache tier */
          return;
       }
 
-      if (HdImageCache_contains(&self->hd_cache, hd_pack_key(current)))
+      if (HdImageCache_contains(&self->hd_cache, hd_pack_key(current))) {
+         /* Decoded but not in VRAM. Lazy (async): uploading is cheap next to
+          * decode, so do a BUDGETED inline upload+bind (the sync loader's
+          * CPU-hit path) instead of deferring to the safe point - the deferral
+          * cost a guaranteed 1-frame native flicker, which in particular
+          * nullified prefetched rect combos (they always arrive
+          * decoded-but-unattached). Eager keeps the stock safe-point attach. */
+         if (!self->eager_textures &&
+               self->inline_uploads_this_frame < TT_INLINE_UPLOAD_BUDGET) {
+            self->inline_uploads_this_frame++;
+            self->dbg_inline_uploads++;
+            texture_tracker_sync_load_combo(self, upload, palette_hash);
+            return;
+         }
          hd_key_set_insert(&self->pending_attach, hd_pack_key(current));
+      }
       else
          texture_tracker_want_combo(self, current, true, false); /* on-demand: high priority */
       }
@@ -4514,6 +5113,38 @@ static TTRect fromSRect(SRect rect) {
       }
 
       result = hd_handle_make_none();
+
+      /* Pooled Lazy-sync pre-pass: dispatch EVERY unbound, uncached combo in
+       * the overlap set to the IO pool BEFORE the bind loop below blocks on
+       * the first one - a text line's dozen glyph misses then decode 4-wide
+       * behind a single wait instead of serially. Mirrors the bind loop's
+       * effective-hash (Reduce) resolution, which is memoised, so the double
+       * scan costs almost nothing. */
+      if (self->lazy_sync) {
+         int pi;
+         for (pi = 0; pi < overlap.count; pi++) {
+            RectIndex pindex = overlap.items[pi];
+            TextureRect *ptex = rect_tracker_get_index(&self->tracker, pindex);
+            uint32_t peff = palette_hash;
+            HdTextureId cid;
+            if (have_pal_data) {
+               uint32_t prh = texture_tracker_effective_palette_hash_upload(self, ptex->upload, (int)mode->mode, pal_local, palette_hash);
+               if (prh != palette_hash) {
+                  HdTextureId prid;
+                  prid.hash = ptex->upload->hash; prid.palette_hash = prh; prid.pages = false;
+                  if (hd_key_set_contains(&self->known_files, hd_pack_key(prid)))
+                     peff = prh;
+               }
+            }
+            if (hd_tex_map_contains(&ptex->upload->textures, peff))
+               continue; /* already bound to this upload */
+            cid.hash = ptex->upload->hash; cid.palette_hash = peff; cid.pages = false;
+            if (HdGpuCache_contains(&self->hd_gpu_cache, hd_pack_key(cid)) ||
+                  HdImageCache_contains(&self->hd_cache, hd_pack_key(cid)))
+               continue; /* a cache tier already holds it; the bind loop attaches it */
+            texture_tracker_want_combo(self, cid, true, false);
+         }
+      }
 
       { int oi;
       int bound_count = 0;
@@ -4977,9 +5608,23 @@ static bool is_power_of_two(int n) {
       ImageHandle texture;
       id.hash = upload->hash; id.palette_hash = palette_hash; id.pages = false;
       cpu = HdImageCache_get(&self->hd_cache, hd_pack_key(id));
+      if (cpu != NULL) {
+         /* Pre-decoded (async response or journal prefetch). The safe-point
+          * attach pass dimension-checks before binding; this bind site must
+          * too, or a mismatched replacement binds unchecked. */
+         int cw = cpu->levels.count > 0 ? cpu->levels.levels[0].width : 0;
+         int ch = cpu->levels.count > 0 ? cpu->levels.levels[0].height : 0;
+         if (!(cw > 0 && cw % upload->width == 0 && is_power_of_two(cw / upload->width) &&
+               ch > 0 && ch % upload->height == 0 && is_power_of_two(ch / upload->height))) {
+            TT_LOG(RETRO_LOG_WARN, "Dimension mismatch (sync, cached) for %x-%x, original=%dx%d, replacement=%dx%d\n",
+                   id.hash, id.palette_hash, upload->width, upload->height, cw, ch);
+            HdImageCache_erase(&self->hd_cache, hd_pack_key(id));
+            hd_key_set_insert(&self->requested, hd_pack_key(id));
+            return;
+         }
+      }
       if (cpu == NULL) {
          char path[PATH_MAX_TT];
-         RGBAImage image;
          int alpha_flags = 0;
          LoadedLevels levels;
          int width, height;
@@ -4989,10 +5634,8 @@ static bool is_power_of_two(int n) {
             hd_key_set_insert(&self->requested, hd_pack_key(id));
             return;
          }
-         find_replacement_file(path, sizeof(path), id.hash, id.palette_hash, false);
-         image.data = NULL;
-         load_image(path, &image);
-         if (image.data == NULL) {
+         if (!tt_load_replacement_levels(id.hash, id.palette_hash, false,
+               &levels, &alpha_flags, path, sizeof(path))) {
             /* Same bounded retry as the async drain: a transient failure must
              * not cost the combo the rest of the session, and a deterministic
              * one must not be reattempted once per draw. Lazy (synchronous)
@@ -5006,7 +5649,6 @@ static bool is_power_of_two(int n) {
             return;
          }
          hd_count_map_erase(&self->load_attempts, hd_pack_key(id));
-         levels = prepare_texture(&image, &alpha_flags);
          width  = levels.levels[0].width;
          height = levels.levels[0].height;
          if (!(width % upload->width == 0 && is_power_of_two(width / upload->width) &&
@@ -5014,14 +5656,14 @@ static bool is_power_of_two(int n) {
             TT_LOG(RETRO_LOG_WARN, "Dimension mismatch (sync) for %x-%x, original=%dx%d, replacement=%dx%d\n",
                    id.hash, id.palette_hash, upload->width, upload->height, width, height);
             loaded_levels_reset(&levels);
-            rgba_image_free(&image);
             hd_key_set_insert(&self->requested, hd_pack_key(id));
             return;
          }
          hd_image_cache_put(&self->hd_cache, id, &levels, alpha_flags);
-         rgba_image_free(&image);
          self->dbg_responses_received++;
          cpu = HdImageCache_get(&self->hd_cache, hd_pack_key(id));
+         if (cpu == NULL)
+            return; /* cache insert failed (allocation); retry on a later draw */
       }
       texture = ih_make(tt_upload_levels(&cpu->levels));
       hd_gpu_cache_put(&self->hd_gpu_cache, id, texture, cpu->alpha_flags, cpu->bytes);
@@ -5049,7 +5691,6 @@ static bool is_power_of_two(int n) {
       cpu = HdImageCache_get(&self->hd_cache, hd_pack_key(id));
       if (cpu == NULL) {
          char path[PATH_MAX_TT];
-         RGBAImage image;
          int alpha_flags = 0;
          LoadedLevels levels;
          if (hd_key_set_contains(&self->requested, hd_pack_key(id)))
@@ -5058,19 +5699,17 @@ static bool is_power_of_two(int n) {
             hd_key_set_insert(&self->requested, hd_pack_key(id));
             return;
          }
-         find_replacement_file(path, sizeof(path), id.hash, id.palette_hash, true);
-         image.data = NULL;
-         load_image(path, &image);
-         if (image.data == NULL) {
+         if (!tt_load_replacement_levels(id.hash, id.palette_hash, true,
+               &levels, &alpha_flags, path, sizeof(path))) {
             TT_LOG(RETRO_LOG_ERROR, "sync page load failed: %s\n", path);
             hd_key_set_insert(&self->requested, hd_pack_key(id));
             return;
          }
-         levels = prepare_texture(&image, &alpha_flags);
          hd_image_cache_put(&self->hd_cache, id, &levels, alpha_flags);
-         rgba_image_free(&image);
          self->dbg_responses_received++;
          cpu = HdImageCache_get(&self->hd_cache, hd_pack_key(id));
+         if (cpu == NULL)
+            return; /* cache insert failed (allocation); retry on a later draw */
       }
       texture = ih_make(tt_upload_levels(&cpu->levels));
       hd_gpu_cache_put(&self->hd_gpu_cache, id, texture, cpu->alpha_flags, cpu->bytes);
@@ -5084,15 +5723,39 @@ static bool is_power_of_two(int n) {
       HdTextureId id;
       CachedGpuImage *gpu;
       id.hash = page_hash; id.palette_hash = palette_hash; id.pages = true;
+      texture_tracker_journal_note(self, id);
       gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(id));
       if (gpu == NULL) {
          if (self->lazy_sync) {
-            texture_tracker_sync_load_page(self, id);
-            gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(id));
+            /* Pooled: dispatch (no-op if the journal already has it in
+             * flight) and wait on the pool instead of decoding inline; the
+             * wait banks every other in-flight page/rect while it blocks.
+             * Then promote the decoded levels CPU -> GPU for this draw. */
+            if (HdImageCache_contains(&self->hd_cache, hd_pack_key(id))) {
+               texture_tracker_sync_load_page(self, id);
+               gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(id));
+            } else {
+               texture_tracker_want_combo(self, id, true, true);
+               if (texture_tracker_sync_wait_combo(self, id)) {
+                  texture_tracker_sync_load_page(self, id);
+                  gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(id));
+               }
+            }
          } else if (HdImageCache_contains(&self->hd_cache, hd_pack_key(id))) {
-            /* decoded; GPU upload at on_queues_reset. Store the BASE (unsalted) key
-             * so the page attach pass can unpack hash/palette. */
-            hd_key_set_insert(&self->pending_attach_pages, ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash);
+            /* Decoded (typically a journal-prefetched page whose GPU promotion
+             * hasn't happened yet). Lazy (async): budgeted inline promote so
+             * THIS frame's draw binds it - the deferred path was a guaranteed
+             * 1-frame native flash per page state. Over budget, and always in
+             * Eager, the stock safe-point attach (BASE key, so the page attach
+             * pass can unpack). */
+            if (!self->eager_textures &&
+                  self->inline_uploads_this_frame < TT_INLINE_UPLOAD_BUDGET) {
+               self->inline_uploads_this_frame++;
+               self->dbg_inline_uploads++;
+               texture_tracker_sync_load_page(self, id);
+               gpu = HdGpuCache_get(&self->hd_gpu_cache, hd_pack_key(id));
+            } else
+               hd_key_set_insert(&self->pending_attach_pages, ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash);
          } else {
             texture_tracker_want_combo(self, id, true, true); /* on-demand page disk load (high priority) */
          }
@@ -5149,10 +5812,17 @@ static bool is_power_of_two(int n) {
       HdGpuCache_clear(&self->hd_gpu_cache);
       HdImageCache_clear(&self->hd_cache);
       hd_key_set_clear(&self->requested);
+      hd_key_set_clear(&self->inflight);
       hd_key_set_clear(&self->pending_attach);
       hd_key_set_clear(&self->pending_attach_pages);
       hd_count_map_clear(&self->load_attempts);
       hd_count_map_clear(&self->attach_retries);
+      /* HD is being turned off: persist the journal and reset its session
+       * state so a later re-enable records/predicts from a clean chain. */
+      tt_journal_save_file(&self->journal);
+      hd_key_set_clear(&self->journal_seen);
+      hd_key_set_clear(&self->journal_walked);
+      self->journal_prev_valid = false;
       /* The per-draw handle cache memoizes (rect, mode) -> handle; with the
        * upload bindings cleared above those handles now resolve to the 1x1
        * default texture. Without this clear, re-enabling Replace Textures
@@ -5181,53 +5851,8 @@ static bool is_power_of_two(int n) {
        * are released only on eviction/reload/flush. */
       rect_tracker_releaseDeadHandles(&self->tracker); /* This is called from reset_queue, so as of now no HdTextureHandle's exist */
 
-      /* Poll HD uploads */
-
-      slock_lock(self->iothread.channel->lock);
-      { IOResponse *responses = io_channel_take_responses(self->iothread.channel); /* steal the list */
-      slock_unlock(self->iothread.channel->lock);
-
-      /* Move freshly decoded images into the cache (decode-once); mark them for
-       * attach. The cache owns them regardless of whether their hash is
-       * resident. Each response node is freed after its levels are moved into
-       * the cache. */
-      {
-         IOResponse *response = responses;
-         while (response != NULL) {
-            IOResponse *rnext = response->next;
-            HdTextureId id;
-            id.hash = response->hash;
-            id.palette_hash = response->palette_hash;
-            id.pages = response->pages;
-            hd_key_set_erase(&self->requested, hd_pack_key(id)); /* no longer in flight; retryable or cached */
-            if (response->levels.count == 0) {
-               /* Failure response: the load failed although the file is listed
-                * in known_files. Erasing `requested` above lets the next draw
-                * retry, which is what a transient error needs - but a file that
-                * fails every time (unreadable, or spelled on disk in a form
-                * find_replacement_file cannot reconstruct) would otherwise be
-                * reopened once per draw for the rest of the session. Count the
-                * attempts and reinstate the permanent negative at the limit. */
-               if (hd_count_map_bump(&self->load_attempts, hd_pack_key(id)) >= TT_LOAD_MAX_ATTEMPTS) {
-                  TT_LOG(RETRO_LOG_WARN, "giving up on %x-%x after %d failed loads\n",
-                        id.hash, id.palette_hash, TT_LOAD_MAX_ATTEMPTS);
-                  hd_key_set_insert(&self->requested, hd_pack_key(id));
-                  hd_count_map_erase(&self->load_attempts, hd_pack_key(id));
-               }
-            } else {
-               self->dbg_responses_received++;
-               hd_count_map_erase(&self->load_attempts, hd_pack_key(id));
-               hd_image_cache_put(&self->hd_cache, id, &response->levels, response->alpha_flags);
-               if (response->pages)
-                  /* page combo: store the BASE (unsalted) key so the page attach pass can unpack it */
-                  hd_key_set_insert(&self->pending_attach_pages, ((uint64_t)id.hash << 32) | (uint64_t)id.palette_hash);
-               else
-                  hd_key_set_insert(&self->pending_attach, hd_pack_key(id));
-            }
-            io_response_free(response); /* levels already moved out (now empty) */
-            response = rnext;
-         }
-      }
+      /* Poll HD uploads (shared with the pooled Lazy-sync wait). */
+      texture_tracker_drain_responses(self);
 
       /* Attach pass: for every wanted combo whose base hash is currently
        * resident, bind an HD image to it. Prefer the GPU cache (a ref-counted
@@ -5359,7 +5984,6 @@ static bool is_power_of_two(int n) {
          if (this_reset_uploads > self->dbg_gpu_uploads_peak)
             self->dbg_gpu_uploads_peak = this_reset_uploads;
       }
-      }
    }
    static TextureUpload *texture_tracker_find_upload(struct TextureTracker *self, uint32_t hash) {
       TextureUpload *upload = rect_tracker_find_upload(&self->tracker, hash); /* borrowed */
@@ -5390,6 +6014,48 @@ static bool is_power_of_two(int n) {
 
    void texture_tracker_endFrame(struct TextureTracker *self) {
       self->frame += 1;
+
+      /* Re-arm the inline-upload budget for the next frame's draws. */
+      self->inline_uploads_this_frame = 0;
+
+      /* Journal housekeeping - only while a Lazy mode is replacing textures
+       * (see texture_tracker_journal_active); otherwise nothing below runs. */
+      if (texture_tracker_journal_active(self)) {
+         /* Consume the outcome of the last background save. A failure means
+          * the links are still unsaved: re-dirty and back the next attempt
+          * off ~5 minutes, so a locked file can never become a periodic
+          * rewrite loop (that loop, run inline, was the ~10s audio stutter). */
+         int save_result = 0;
+         if (tt_journal_io_lock != NULL) {
+            slock_lock(tt_journal_io_lock);
+            save_result = tt_journal_io_result;
+            tt_journal_io_result = 0;
+            slock_unlock(tt_journal_io_lock);
+         }
+         if (save_result < 0) {
+            self->journal.dirty = true;
+            self->journal_save_backoff = 18000; /* ~5 min at 60fps */
+            self->journal_saved_frame = self->frame;
+         } else if (save_result > 0) {
+            self->journal_save_backoff = 0;
+         }
+
+         /* Persist newly recorded links every ~10s (snapshot here, file I/O
+          * on the writer thread) so a crash keeps most of the training; the
+          * synchronous save also runs at teardown, reload, and mode/HD-off. */
+         if (self->journal.dirty &&
+               self->frame - self->journal_saved_frame >= 600 + (uint64_t)self->journal_save_backoff) {
+            texture_tracker_journal_save_async(self);
+            self->journal_saved_frame = self->frame;
+         }
+
+         /* Re-arm the prediction-walk gate periodically so replayed
+          * deterministic content (attract-mode loops, revisited scenes)
+          * prefetches again after the caches have moved on; between clears
+          * each origin walks only once. */
+         if (self->frame % 900 == 0)
+            hd_key_set_clear(&self->journal_walked);
+      }
 
       if (self->frame % 300 == 0)
       {
@@ -5422,6 +6088,12 @@ static bool is_power_of_two(int n) {
                   (unsigned long long)(self->dbg_page_hashes - self->dbg_page_hashes_last),
                   self->cached_page_hashes_count);
          }
+         TT_LOG(RETRO_LOG_INFO, "[hdcache] prefetch: journal %u links; last 300f: %llu predicted loads, %llu inline uploads, %llu pool waits (%llu timeouts)\n",
+               (unsigned)self->journal.count,
+               (unsigned long long)(self->dbg_prefetch_issued - self->dbg_prefetch_issued_last),
+               (unsigned long long)(self->dbg_inline_uploads - self->dbg_inline_uploads_last),
+               (unsigned long long)(self->dbg_pool_waits - self->dbg_pool_waits_last),
+               (unsigned long long)(self->dbg_pool_wait_timeouts - self->dbg_pool_wait_timeouts_last));
          self->dbg_responses_received_last = self->dbg_responses_received;
          self->dbg_gpu_uploads_last = self->dbg_gpu_uploads;
          self->dbg_gpu_uploads_peak = 0;
@@ -5429,6 +6101,10 @@ static bool is_power_of_two(int n) {
          self->dbg_page_binds_last = self->dbg_page_binds;
          self->dbg_page_miss_last = self->dbg_page_miss;
          self->dbg_page_hashes_last = self->dbg_page_hashes;
+         self->dbg_prefetch_issued_last = self->dbg_prefetch_issued;
+         self->dbg_inline_uploads_last = self->dbg_inline_uploads;
+         self->dbg_pool_waits_last = self->dbg_pool_waits;
+         self->dbg_pool_wait_timeouts_last = self->dbg_pool_wait_timeouts;
       }
 
       if (self->frame_dump != NULL) {
@@ -5536,10 +6212,18 @@ static bool is_power_of_two(int n) {
       HdGpuCache_clear(&self->hd_gpu_cache);
       HdImageCache_clear(&self->hd_cache);
       hd_key_set_clear(&self->requested);
+      hd_key_set_clear(&self->inflight);
       hd_key_set_clear(&self->pending_attach);
       hd_key_set_clear(&self->pending_attach_pages);
       hd_count_map_clear(&self->load_attempts);
       hd_count_map_clear(&self->attach_retries);
+      /* Persist the journal, then reset only its SESSION state (seen/walked/
+       * chain tail) - the trained successor map itself survives reloads; the
+       * cleared caches mean everything re-records and re-predicts cleanly. */
+      tt_journal_save_file(&self->journal);
+      hd_key_set_clear(&self->journal_seen);
+      hd_key_set_clear(&self->journal_walked);
+      self->journal_prev_valid = false;
       self->cached_page_hashes_count = 0;
       self->cached_page_bounds_count = 0;
       { int _ti; for (_ti = 0; _ti < self->tracker.textures.count; _ti++) {
@@ -6542,6 +7226,11 @@ void texture_tracker_set_config(TextureTracker *self,
    static int replace_textures_applied = -1; /* -1 = force the first apply */
 
    self->dump_enabled           = cfg->dump_enabled;
+   /* Switching from a Lazy mode to Eager retires the journal (it is inert in
+    * Eager): persist any training now, synchronously - this is option-apply
+    * time, not mid-frame. No-op when there is nothing unsaved. */
+   if (!self->eager_textures && cfg->eager_textures)
+      tt_journal_save_file(&self->journal);
    self->eager_textures         = cfg->eager_textures;
    self->lazy_sync              = cfg->lazy_sync;
    self->dump_mode_rect         = cfg->dump_mode_rect;
