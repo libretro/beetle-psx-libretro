@@ -4723,6 +4723,13 @@ static void cbh_move(struct CommandBufferHandle *dst,
          VkQueue graphics_queue;
          VkQueue compute_queue;
          VkQueue transfer_queue;
+         /* The queue this device shares with the frontend, and the
+          * frontend's lock for it (retro_hw_render_interface_vulkan's
+          * lock_queue / unlock_queue). See device_set_frontend_queue. */
+         VkQueue frontend_queue;
+         void (*frontend_queue_lock)(void *handle);
+         void (*frontend_queue_unlock)(void *handle);
+         void *frontend_queue_handle;
          VkPipelineCache pipeline_cache;
          /* Persistent pipeline cache bookkeeping: CRC/size of the blob last
           * read from or written to disk (so an unchanged blob is not
@@ -16956,6 +16963,47 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
    }
 
+   /* The frontend's queue.
+    *
+    * The graphics queue this device submits to is the one handed to the
+    * frontend in libretro_create_device, and the frontend submits its own
+    * frames and presents on it. A VkQueue must not be used by two threads
+    * at once, and under threaded video the frontend's use is on its video
+    * thread while this device's is on the core's thread. The interface
+    * has a lock for exactly that (lock_queue / unlock_queue), every core
+    * that submits for itself is required to take it around its queue
+    * access, and this one never did: the two threads' submissions raced
+    * on the queue, and both ended up waiting on fences that did not
+    * signal.
+    *
+    * It is taken around the queue call itself and nothing else - never
+    * across a fence wait - and only for the queue the frontend has. The
+    * compute and transfer queues are this device's own where the GPU has
+    * separate ones, and are compared by handle so that where they alias
+    * the graphics queue they take it too. */
+   static void device_set_frontend_queue(Device *self, VkQueue queue,
+         void (*lock)(void *handle), void (*unlock)(void *handle), void *handle)
+   {
+      self->frontend_queue        = (lock && unlock) ? queue : VK_NULL_HANDLE;
+      self->frontend_queue_lock   = lock;
+      self->frontend_queue_unlock = unlock;
+      self->frontend_queue_handle = handle;
+   }
+
+   static INLINE bool device_queue_lock(Device *self, VkQueue queue)
+   {
+      if (self->frontend_queue == VK_NULL_HANDLE || queue != self->frontend_queue)
+         return false;
+      self->frontend_queue_lock(self->frontend_queue_handle);
+      return true;
+   }
+
+   static INLINE void device_queue_unlock(Device *self, bool locked)
+   {
+      if (locked)
+         self->frontend_queue_unlock(self->frontend_queue_handle);
+   }
+
    static void device_submit_nolock(Device *self,
          CommandBufferHandle cmd,
          Fence *fence,
@@ -17053,7 +17101,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
 
       cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
+      { bool queue_locked = device_queue_lock(self, queue);
       result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
+      device_queue_unlock(self, queue_locked); }
 
       if (result != VK_SUCCESS)
          LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
@@ -17328,7 +17378,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             break;
       }
 
+      { bool queue_locked = device_queue_lock(self, queue);
       result = vkQueueSubmit(queue, VkSubmitInfoVec_size(&submits), VkSubmitInfoVec_data(&submits), cleared_fence);
+      device_queue_unlock(self, queue_locked); }
       if (result != VK_SUCCESS)
          LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
       cbhvec_clear(submissions);
@@ -17638,8 +17690,14 @@ static void device_wait_idle_nolock(Device *self)
    if (self->per_frame.count != 0)
       device_end_frame_nolock(self);
 
+   /* vkDeviceWaitIdle is a use of every queue of the device, the
+    * frontend's included. */
    if (self->device != VK_NULL_HANDLE)
+   {
+      bool queue_locked = device_queue_lock(self, self->frontend_queue);
       vkDeviceWaitIdle(self->device);
+      device_queue_unlock(self, queue_locked);
+   }
 
    device_clear_wait_semaphores(self);
 
@@ -19957,6 +20015,13 @@ static void vk_context_reset(void)
     * reset is idempotent, mirroring the GL backend (gl_context_destroy fully
     * resets state before gl_context_reset rebuilds). The context itself is
     * owned by libretro_create_device, not by reset, so it is preserved. */
+   /* The stale device below still names the interface of the reset before
+    * this one, whose handle may be gone with the driver that gave it; its
+    * teardown waits the device idle, so it takes the queue lock through
+    * the interface just fetched. */
+   if (device)
+      device_set_frontend_queue(device, vulkan->queue,
+            vulkan->lock_queue, vulkan->unlock_queue, vulkan->handle);
    if (renderer)
    {
       renderer_fini(renderer);
@@ -19972,6 +20037,10 @@ static void vk_context_reset(void)
 
    device = (Device *)malloc(sizeof(Device));
    device_init(device);
+   /* Before the device touches a queue: device_set_context already
+    * waits the device idle, and renderer_init submits. */
+   device_set_frontend_queue(device, vulkan->queue,
+         vulkan->lock_queue, vulkan->unlock_queue, vulkan->handle);
    device_set_context(device, *&context);
 
    renderer = (Renderer *)malloc(sizeof(Renderer));
@@ -20003,6 +20072,7 @@ static void vk_context_reset(void)
 
 static void vk_context_destroy(void)
 {
+   const struct retro_hw_render_interface_vulkan *iface;
    if (device == NULL)
       return;
 
@@ -20016,6 +20086,9 @@ static void vk_context_destroy(void)
 
    savestate_destroy(&save_state);
    renderer_save_vram_state(renderer, &save_state);
+   /* Kept for the teardown below: context_deinit waits the device idle
+    * as well, which is a use of the frontend's queue. */
+   iface      = vulkan;
    vulkan     = NULL;
    scanouthandlevec_free_storage(&scanout_handles);
    swapchainimagevec_free_storage(&swapchain_images);
@@ -20024,7 +20097,14 @@ static void vk_context_destroy(void)
    free(renderer);
    device_deinit(device);
    free(device);
-   context_deinit(context);
+   if (iface && iface->lock_queue && iface->unlock_queue)
+   {
+      iface->lock_queue(iface->handle);
+      context_deinit(context);
+      iface->unlock_queue(iface->handle);
+   }
+   else
+      context_deinit(context);
    free(context);
    renderer = NULL;
    device = NULL;
