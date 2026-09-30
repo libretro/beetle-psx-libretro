@@ -135,6 +135,15 @@ the next safe point), and `dbg_*` diagnostic counters.
 - **`IOThread`** — spins up `NUM_IO_THREADS` (4) detached workers, each given its
   own heap-allocated pointer to the shared channel; shutdown uses
   `scond_broadcast` to wake all workers.
+- **Channel** — since moved to `rhi/tt_io_channel.c` and no longer locked.
+  The render thread keeps the requests the workers have not been shown in
+  two lists of its own and fills two small rings from them (high priority
+  first); workers take from the rings with a compare-and-swap, deliver
+  responses onto an atomic list, and sleep on an eventcount. Promotion is a
+  move between the render thread's own lists, so it applies to requests
+  outside the workers' window (`TT_IO_WINDOW`, 64). The pooled Lazy-sync
+  wait sleeps on a second eventcount. The journal's background writer
+  reports through two atomics. `tools/ttio/` tests the channel.
 
 ### Core options
 

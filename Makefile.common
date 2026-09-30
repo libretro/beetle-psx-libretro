@@ -266,6 +266,7 @@ endif
    ifneq (,$(filter 1,$(HAVE_OPENGL) $(HAVE_VULKAN)))
       FLAGS       += -DTEXTURE_DUMPING_ENABLED $(IMAGE_FORMAT_FLAGS)
       SOURCES_C   += $(CORE_DIR)/rhi/rhi_tt.c \
+                     $(CORE_DIR)/rhi/tt_io_channel.c \
                      $(IMAGE_FORMAT_SOURCES_C)
 
       # Same MSVC-C89 discipline as the Vulkan TU (see below).

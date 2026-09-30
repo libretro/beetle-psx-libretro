@@ -32,7 +32,10 @@
 #include <formats/image.h>
 #include <formats/rpng.h>
 
+#include <retro_atomic.h>
+
 #include "rhi_tt.h"
+#include "tt_io_channel.h"
 
 /* Tracker-internal forward typedefs (subset of the old rhi_lib_vulkan.c
  * typedef block; the shared types now come from rhi_tt.h). */
@@ -43,7 +46,6 @@ typedef struct HdTexMap HdTexMap;
 typedef struct TextureUpload TextureUpload;
 typedef struct IORequest IORequest;
 typedef struct IOResponse IOResponse;
-typedef struct IOChannel IOChannel;
 typedef struct IOThread IOThread;
 typedef struct Palette Palette;
 typedef struct CachedPaletteHash CachedPaletteHash;
@@ -535,7 +537,7 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
    typedef enum IORequestKind IORequestKind;
 
    struct IORequest {
-      struct IORequest *next;        /* intrusive FIFO link (queue-owned) */
+      tt_io_node node;               /* first: the channel's link (tt_io_channel.h) */
       IORequestKind kind;
       /* Load payload (valid when kind == Load): */
       uint32_t hash;
@@ -570,7 +572,7 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
    const int ALPHA_FLAG_TRANSPARENT = 4;
 
    struct IOResponse {
-      struct IOResponse *next;       /* intrusive FIFO link (queue-owned) */
+      tt_io_node node;               /* first: the channel's link (tt_io_channel.h) */
       uint32_t hash;
       uint32_t palette_hash;
       int alpha_flags;
@@ -586,130 +588,19 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
       }
    }
 
-   struct IOChannel {
-      slock_t *lock;
-      scond_t *cond;       /* signalled when a REQUEST is queued (wakes workers) */
-      scond_t *resp_cond;  /* signalled when a RESPONSE is queued (wakes the pooled Lazy-sync wait) */
-      /* Intrusive FIFO lists (protected by `lock`). Heads are popped/drained,
-       * tails are where producers append. Dynamic arrays of IORequest /
-       * IOResponse. */
-      IORequest  *req_head,  *req_tail;            /* low priority: prefetch, savestate warm, dumps */
-      IORequest  *req_high_head, *req_high_tail;   /* high priority: on-demand draw-time loads */
-      IOResponse *resp_head, *resp_tail;
-      bool done;
-      /* Cross-thread refcount. The owning IOThread holds one reference and each
-       * detached worker holds one; whichever releases last frees the channel.
-       * Mutated only outside the lock, at thread-spawn and thread-exit, so a
-       * plain int with no overlap is fine. */
-      int refcount;
-   };
+   /* The channel to the IO workers is rhi/tt_io_channel.c: no lock, the
+    * render thread keeps the requests the workers have not been shown and
+    * can reorder them freely. These hand it the two node types. */
+   static void io_request_node_free(tt_io_node *n)  { io_request_free((IORequest *)n); }
+   static void io_response_node_free(tt_io_node *n) { io_response_free((IOResponse *)n); }
 
-   static void io_channel_destroy(IOChannel *c);
-   static IOChannel *io_channel_new() {
-      IOChannel *c = (IOChannel *)malloc(sizeof(IOChannel));
-      c->lock = slock_new();
-      c->cond = scond_new();
-      c->resp_cond = scond_new();
-      c->req_head = c->req_tail = NULL;
-      c->req_high_head = c->req_high_tail = NULL;
-      c->resp_head = c->resp_tail = NULL;
-      c->done = false;
-      c->refcount = 1;
-      return c;
-   }
-   /* The refcount is touched from the owning thread (spawn/teardown) and from
-    * the detached workers (exit), so the increment/decrement must be
-    * serialised. A single process-wide lock guards every transition; the actual
-    * free happens after the lock is dropped so we never reference the channel's
-    * own lock once it may be gone. */
-   static slock_t *io_channel_rc_lock = NULL;
-   static void io_channel_rc_lock_init() {
-      if (!io_channel_rc_lock)
-         io_channel_rc_lock = slock_new();
-   }
-   static void io_channel_acquire(IOChannel *c) {
-      if (!c)
-         return;
-      slock_lock(io_channel_rc_lock);
-      c->refcount++;
-      slock_unlock(io_channel_rc_lock);
-   }
-   static void io_channel_release(IOChannel *c) {
-      bool should_free;
-      if (!c)
-         return;
-      slock_lock(io_channel_rc_lock);
-      should_free = (--c->refcount == 0);
-      slock_unlock(io_channel_rc_lock);
-      if (should_free)
-         io_channel_destroy(c);
-   }
-
-   /* FIFO helpers (caller holds channel->lock). Defined here so the IO worker
-    * (io_thread) and the producers can all see them. */
-   static void io_channel_push_request(IOChannel *c, IORequest *r) {       /* low priority */
-      r->next = NULL;
-      if (c->req_tail) c->req_tail->next = r; else c->req_head = r;
-      c->req_tail = r;
-   }
-   static void io_channel_push_request_high(IOChannel *c, IORequest *r) {  /* high priority */
-      r->next = NULL;
-      if (c->req_high_tail) c->req_high_tail->next = r; else c->req_high_head = r;
-      c->req_high_tail = r;
-   }
-   /* Move a pending low-priority Load for (hash, palette, pages) to the tail
-    * of the high-priority queue (caller holds the lock). Returns false when
-    * no such request is queued - it was never queued, or a worker has already
-    * popped it and is decoding. */
-   static bool io_channel_promote_request(IOChannel *c, uint32_t hash, uint32_t palette_hash, bool pages) {
-      IORequest *prev = NULL;
-      IORequest *r = c->req_head;
-      while (r) {
-         if (r->kind == IORequestKind_Load && r->hash == hash &&
-               r->palette_hash == palette_hash && r->pages == pages) {
-            if (prev) prev->next = r->next; else c->req_head = r->next;
-            if (c->req_tail == r) c->req_tail = prev;
-            io_channel_push_request_high(c, r);
-            return true;
-         }
-         prev = r;
-         r = r->next;
-      }
-      return false;
-   }
-   /* True if either queue has pending work (caller holds the lock). */
-   static bool io_channel_has_requests(const IOChannel *c) {
-      return c->req_high_head != NULL || c->req_head != NULL;
-   }
-   /* Pop one request, draining the high-priority queue first so on-demand
-    * draw-time loads jump ahead of background prefetch/dumps. */
-   static IORequest *io_channel_pop_request(IOChannel *c) {
-      IORequest *r = c->req_high_head;
-      if (r) {
-         c->req_high_head = r->next;
-         if (!c->req_high_head) c->req_high_tail = NULL;
-         r->next = NULL;
-         return r;
-      }
-      r = c->req_head;
-      if (r) {
-         c->req_head = r->next;
-         if (!c->req_head) c->req_tail = NULL;
-         r->next = NULL;
-      }
-      return r;
-   }
-   static void io_channel_push_response(IOChannel *c, IOResponse *r) {
-      r->next = NULL;
-      if (c->resp_tail) c->resp_tail->next = r; else c->resp_head = r;
-      c->resp_tail = r;
-      scond_signal(c->resp_cond); /* wake a pooled Lazy-sync waiter, if any */
-   }
-   /* Steal the entire response list; channel left empty. Returns the head. */
-   static IOResponse *io_channel_take_responses(IOChannel *c) {
-      IOResponse *head = c->resp_head;
-      c->resp_head = c->resp_tail = NULL;
-      return head;
+   /* A queued low-priority Load for (hash, palette, pages). */
+   struct IOLoadKey { uint32_t hash; uint32_t palette_hash; bool pages; };
+   static bool io_request_is_load(const tt_io_node *n, void *ctx) {
+      const IORequest *r = (const IORequest *)n;
+      const struct IOLoadKey *k = (const struct IOLoadKey *)ctx;
+      return r->kind == IORequestKind_Load && r->hash == k->hash &&
+            r->palette_hash == k->palette_hash && r->pages == k->pages;
    }
 
    /* Owns the IO worker thread pool. Formerly a class with a initialiser
@@ -719,7 +610,7 @@ static void loaded_levels_move(LoadedLevels *dst, LoadedLevels *src)
     * io_thread_deinit. The single member is the refcounted channel pointer.
     * TextureTracker embeds one by value and drives its init/deinit. */
    struct IOThread {
-      IOChannel *channel; /* refcounted; one ref held here, one per worker */
+      tt_io_channel *channel; /* refcounted; one ref held here, one per worker */
    };
 
    static void io_thread_init(IOThread *t);
@@ -3436,35 +3327,20 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       /* Pool worker. Each worker is handed the channel pointer with a reference
        * already taken on its behalf (at spawn); it releases that reference on
        * the way out. Whichever holder releases last frees the channel. */
-      IOChannel *channel = (IOChannel *)user_data;
+      tt_io_channel *channel = (tt_io_channel *)user_data;
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread starting\n");
 
       while (true) {
-         IORequest *request = NULL;
-         {
-            slock_lock(channel->lock);
-            while (!io_channel_has_requests(channel) && !channel->done) {
-               scond_wait(channel->cond, channel->lock);
-            }
-            if (channel->done) {
-               /* Prompt shutdown; drop any unprocessed requests (matches the
-                * previous single-thread behaviour). The channel teardown
-                * frees whatever is still queued. */
-               slock_unlock(channel->lock);
-               break;
-            }
-            /* Take ONE request (high priority first) so work spreads across the
-             * pool. Wake another worker if anything remains. */
-            request = io_channel_pop_request(channel);
-            if (io_channel_has_requests(channel)) {
-               scond_signal(channel->cond);
-            }
-            slock_unlock(channel->lock);
-         }
+         /* One request at a time, high priority first, so work spreads
+          * across the pool; sleeps while there is none. NULL is a prompt
+          * shutdown: whatever is still queued is dropped and freed with
+          * the channel (matches the previous behaviour). */
+         IORequest *request = (IORequest *)tt_io_channel_pop(channel);
+         if (!request)
+            break;
 
-         /* The expensive part (PNG decode + mipmaps, or decode + PNG write) runs
-          * WITHOUT the lock so workers process in parallel; only the queue access
-          * and the response push are serialised. */
+         /* The expensive part (PNG decode + mipmaps, or decode + PNG write);
+          * workers run it in parallel. */
          if (request->kind == IORequestKind_Load) {
             uint32_t hash = request->hash;
             uint32_t palette_hash = request->palette_hash;
@@ -3475,7 +3351,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             if (tt_load_replacement_levels(hash, palette_hash, request->pages,
                   &levels, &alpha_flags_out, path, sizeof(path))) {
                IOResponse *response = (IOResponse *)malloc(sizeof(IOResponse));
-               response->next         = NULL;
+               response->node.next    = NULL;
                response->hash         = hash;
                response->palette_hash = palette_hash;
                response->alpha_flags  = alpha_flags_out;
@@ -3483,9 +3359,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
                loaded_levels_init(&response->levels);
                loaded_levels_move(&response->levels, &levels);
 
-               slock_lock(channel->lock);
-               io_channel_push_response(channel, response);
-               slock_unlock(channel->lock);
+               tt_io_channel_push_response(channel, &response->node);
             } else {
                /* FAILURE response (empty levels): previously the failure branch
                 * pushed nothing, so the combo stayed in `requested` forever -
@@ -3495,16 +3369,14 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
                 * an empty response so the next draw can retry. */
                IOResponse *response = (IOResponse *)malloc(sizeof(IOResponse));
                TT_LOG(RETRO_LOG_ERROR, "failed to load: %s\n", path);
-               response->next         = NULL;
+               response->node.next    = NULL;
                response->hash         = hash;
                response->palette_hash = palette_hash;
                response->alpha_flags  = 0;
                response->pages        = request->pages;
                loaded_levels_init(&response->levels);
 
-               slock_lock(channel->lock);
-               io_channel_push_response(channel, response);
-               slock_unlock(channel->lock);
+               tt_io_channel_push_response(channel, &response->node);
             }
          } else if (request->kind == IORequestKind_Dump) {
             /* Decode (palette->RGBA->tri-alpha) here on the worker, then encode+write,
@@ -3520,22 +3392,8 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
          }
          io_request_free(request);
       }
-      io_channel_release(channel); /* drop this worker's reference */
+      tt_io_channel_release(channel); /* drop this worker's reference */
       TT_LOG_VERBOSE(RETRO_LOG_INFO, "io thread ending\n");
-   }
-
-   static void io_channel_destroy(IOChannel *c) {
-      /* Free any nodes still queued at shutdown. */
-      IORequest *r = c->req_high_head;
-      IOResponse *p = c->resp_head;
-      while (r) { IORequest *n = r->next; io_request_free(r); r = n; }
-      r = c->req_head;
-      while (r) { IORequest *n = r->next; io_request_free(r); r = n; }
-      while (p) { IOResponse *n = p->next; io_response_free(p); p = n; }
-      slock_free(c->lock);
-      scond_free(c->cond);
-      scond_free(c->resp_cond);
-      free(c);
    }
 
    /* Upper bound on parallel PNG-decode workers. Keeps first-appearance
@@ -3562,30 +3420,32 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
 
    static void io_thread_init(IOThread *t) {
       int count = io_thread_count();
-      io_channel_rc_lock_init();
-      t->channel = io_channel_new(); /* this IOThread holds one reference */
+      t->channel = tt_io_channel_new(io_request_node_free, io_response_node_free); /* this IOThread holds one reference */
+      if (!t->channel) {
+         /* No channel: every request is refused (tt_io_channel_push returns
+          * false) and replacement textures simply never arrive. */
+         TT_LOG(RETRO_LOG_ERROR, "hd texture io pool: could not be set up\n");
+         return;
+      }
       TT_LOG(RETRO_LOG_INFO, "hd texture io pool: %d worker(s)\n", count);
       { int i; for (i = 0; i < count; i++) {
          sthread_t * thread;
          /* Take a reference on the worker's behalf BEFORE it starts, so the
           * channel can't be freed out from under it; the worker releases on
           * exit. */
-         io_channel_acquire(t->channel);
+         tt_io_channel_acquire(t->channel);
          thread = sthread_create(io_thread, t->channel);
          if (thread) {
             sthread_detach(thread);
          } else {
-            io_channel_release(t->channel); /* thread failed to start; undo its ref */
+            tt_io_channel_release(t->channel); /* thread failed to start; undo its ref */
          }
       } }
    }
    static void io_thread_deinit(IOThread *t) {
-      slock_lock(t->channel->lock);
-      t->channel->done = true;
-      slock_unlock(t->channel->lock);
-      scond_broadcast(t->channel->cond); /* wake ALL workers so they can exit */
-      io_channel_release(t->channel); /* drop this IOThread's reference; the last */
-                  /* worker to exit frees the channel */
+      /* Tell the workers to leave, wake them all, and drop this IOThread's
+       * reference; the last worker to exit frees the channel. */
+      tt_io_channel_stop(t->channel);
       t->channel = NULL;
    }
 
@@ -3661,7 +3521,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             (unsigned)(upload->width * ppp), (unsigned)upload->height);
       {
          IORequest *dump = (IORequest *)malloc(sizeof(IORequest));
-         dump->next = NULL;
+         dump->node.next = NULL;
          dump->kind = IORequestKind_Dump;
          snprintf(dump->path, sizeof(dump->path), "%s", path);
          dump->width  = upload->width * ppp;
@@ -3681,10 +3541,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
             dump->palette_len = 0;
          }
 
-         slock_lock(self->iothread.channel->lock);
-         io_channel_push_request(self->iothread.channel, dump); /* texture dumps = background */
-         slock_unlock(self->iothread.channel->lock);
-         scond_signal(self->iothread.channel->cond);
+         tt_io_channel_push(self->iothread.channel, &dump->node, false); /* texture dumps = background */
       }
       }
       }
@@ -3851,14 +3708,20 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
     * (tracker teardown, reload keypress, replacement/mode switched off). */
    /* Background-save state; shared by the synchronous save below and the
     * background writer further down. */
-   static slock_t  *tt_journal_io_lock = NULL;
-   static bool      tt_journal_io_busy = false;   /* a writer thread is active */
-   static int       tt_journal_io_result = 0;     /* 0 = none, 1 = ok, -1 = failed; consumed in endFrame */
+   /* Two words pass between the render thread and the writer thread, and
+    * both are atomics; there is no lock. `busy` is taken by the render
+    * thread with an exchange when it starts a writer and cleared by the
+    * writer as the last thing it does. `result` is stored by the writer
+    * before it clears `busy` and consumed by the render thread with an
+    * exchange - so by the time `busy` reads clear, the result is there. */
+   static retro_atomic_int_t tt_journal_io_busy;    /* a writer thread is active */
+   static retro_atomic_int_t tt_journal_io_result;  /* 0 = none, 1 = ok, -1 = failed; consumed in endFrame */
    /* The writer is joinable, not detached: a detached thread could outlive
     * retro_deinit and run into a dlclose'd core, and it could race the
     * synchronous teardown save on the same target file. Reaped by
     * tt_journal_writer_join before every synchronous save and before the
-    * next background save is started. Guarded by tt_journal_io_lock. */
+    * next background save is started. Render thread only: the writer never
+    * touches its own handle. */
    static sthread_t *tt_journal_io_thread = NULL;
 
    static void tt_journal_writer_join(void);
@@ -3873,13 +3736,8 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
        * if it failed, endFrame's result check has not run yet, so re-dirty
        * here and let this synchronous save carry the whole map. */
       tt_journal_writer_join();
-      if (tt_journal_io_lock != NULL) {
-         slock_lock(tt_journal_io_lock);
-         if (tt_journal_io_result < 0)
-            j->dirty = true;
-         tt_journal_io_result = 0;
-         slock_unlock(tt_journal_io_lock);
-      }
+      if (retro_atomic_exchange_int(&tt_journal_io_result, 0) < 0)
+         j->dirty = true;
       if (!j->dirty)
          return;
       buf = tt_journal_serialize(j, &len);
@@ -3901,7 +3759,7 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
     * heap buffer (memory-speed) and a detached writer thread does the file
     * I/O; its outcome is handed back through tt_journal_io_result so a
     * failure re-dirties the journal and backs the next attempt off (see
-    * endFrame). The lock is process-lifetime, like io_channel_rc_lock. */
+    * endFrame). */
    struct TTJournalSaveJob {
       char path[PATH_MAX_TT];
       uint8_t *buf;
@@ -3915,37 +3773,23 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       bool ok = tt_journal_write_blob(job->path, ".tmpa", job->buf, job->len);
       free(job->buf);
       free(job);
-      slock_lock(tt_journal_io_lock);
-      tt_journal_io_busy = false;
-      tt_journal_io_result = ok ? 1 : -1;
-      slock_unlock(tt_journal_io_lock);
+      /* The result first: whoever sees `busy` clear finds it. */
+      retro_atomic_store_release_int(&tt_journal_io_result, ok ? 1 : -1);
+      retro_atomic_store_release_int(&tt_journal_io_busy, 0);
    }
 
    /* Wait for an in-flight background write to finish and reap its thread.
     * Cheap when nothing is in flight. Called from the render thread only. */
    static void tt_journal_writer_join(void) {
-      sthread_t *thread;
-      if (tt_journal_io_lock == NULL)
-         return;
-      slock_lock(tt_journal_io_lock);
-      thread = tt_journal_io_thread;
+      sthread_t *thread = tt_journal_io_thread;
       tt_journal_io_thread = NULL;
-      slock_unlock(tt_journal_io_lock);
       if (thread)
          sthread_join(thread);
    }
 
    static void texture_tracker_journal_save_async(struct TextureTracker *self) {
       TTJournalSaveJob *job;
-      bool busy;
-      if (tt_journal_io_lock == NULL)
-         return;
-      slock_lock(tt_journal_io_lock);
-      busy = tt_journal_io_busy;
-      if (!busy)
-         tt_journal_io_busy = true;
-      slock_unlock(tt_journal_io_lock);
-      if (busy)
+      if (retro_atomic_exchange_int(&tt_journal_io_busy, 1))
          return; /* previous write still in flight; dirty stays set, retried next window */
       /* The previous writer has finished (busy is clear) but its thread has
        * not been reaped yet; join it now so handles never accumulate. */
@@ -3957,25 +3801,19 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       }
       if (job == NULL || job->buf == NULL) {
          free(job);
-         slock_lock(tt_journal_io_lock);
-         tt_journal_io_busy = false;
-         slock_unlock(tt_journal_io_lock);
+         retro_atomic_store_release_int(&tt_journal_io_busy, 0);
          return;
       }
       self->journal.dirty = false; /* optimistic; a writer failure re-dirties via the result flag */
       {
          sthread_t *thread = sthread_create(tt_journal_writer_thread, job);
          if (thread) {
-            slock_lock(tt_journal_io_lock);
             tt_journal_io_thread = thread;
-            slock_unlock(tt_journal_io_lock);
          } else {
             free(job->buf);
             free(job);
             self->journal.dirty = true;
-            slock_lock(tt_journal_io_lock);
-            tt_journal_io_busy = false;
-            slock_unlock(tt_journal_io_lock);
+            retro_atomic_store_release_int(&tt_journal_io_busy, 0);
          }
       }
    }
@@ -4074,12 +3912,9 @@ static uint8_t *loaded_pixel(LoadedImage *image, int x, int y) {
       TT_LOG(RETRO_LOG_INFO, "num hd textures: %d\n", (int)self->known_files.count);
       read_texture_directory(&self->known_files_pages, replacements_pages_path(rpath, sizeof(rpath)), true);
       TT_LOG(RETRO_LOG_INFO, "num hd page textures: %d\n", (int)self->known_files_pages.count);
-      /* Journal file-I/O lock (process lifetime, like io_channel_rc_lock).
-       * The journal itself is read lazily on its first use in a Lazy mode
+      /* The journal itself is read lazily on its first use in a Lazy mode
        * (texture_tracker_journal_note) - Eager mode and replacement-off
        * never touch the file. */
-      if (tt_journal_io_lock == NULL)
-         tt_journal_io_lock = slock_new();
 
       /* Read in the dump config file */
       dump_path(cfg, sizeof(cfg));
@@ -4541,19 +4376,21 @@ static TTRect fromSRect(SRect rect) {
           * Lazy-sync bind waits behind every earlier prediction, and an async
           * Lazy draw shows native for as long as the backlog takes. */
          if (high_priority && hd_key_set_contains(&self->inflight, hd_pack_key(id))) {
-            slock_lock(self->iothread.channel->lock);
-            io_channel_promote_request(self->iothread.channel, id.hash, id.palette_hash, pages);
-            slock_unlock(self->iothread.channel->lock);
+            /* Only a request the workers have not been shown yet can move;
+             * one already in their window is at most a window's worth of
+             * decodes away, behind every high-priority request. */
+            struct IOLoadKey k;
+            k.hash = id.hash; k.palette_hash = id.palette_hash; k.pages = pages;
+            tt_io_channel_promote(self->iothread.channel, io_request_is_load, &k);
          }
          return;
       }
       if (!hd_key_set_contains(pages ? &self->known_files_pages : &self->known_files, hd_pack_key(id)))
          return; /* no file on disk */
 
-      slock_lock(self->iothread.channel->lock);
       {
          IORequest *load = (IORequest *)malloc(sizeof(IORequest));
-         load->next = NULL;
+         load->node.next = NULL;
          load->kind = IORequestKind_Load;
          load->hash = id.hash;
          load->palette_hash = id.palette_hash;
@@ -4561,13 +4398,9 @@ static TTRect fromSRect(SRect rect) {
          load->src = NULL; load->palette = NULL; /* Load: no dump payload to free */
          /* High priority = needed for an on-screen draw (jumps ahead of prefetch);
           * low priority = speculative prefetch that fills idle IO time. */
-         if (high_priority)
-            io_channel_push_request_high(self->iothread.channel, load);
-         else
-            io_channel_push_request(self->iothread.channel, load);
+         if (!tt_io_channel_push(self->iothread.channel, &load->node, high_priority))
+            return; /* no channel: nothing is in flight, the combo stays native */
       }
-      slock_unlock(self->iothread.channel->lock);
-      scond_signal(self->iothread.channel->cond);
       /* A request is now genuinely queued - track it so the pooled Lazy-sync
        * wait knows a response WILL arrive (unlike `requested`, which also
        * holds permanent no-file negatives that never respond). */
@@ -4582,14 +4415,12 @@ static TTRect fromSRect(SRect rect) {
     * Lazy-sync wait can bank responses mid-frame; the ATTACH passes still run
     * only at the safe point. Render thread only. */
    static void texture_tracker_drain_responses(struct TextureTracker *self) {
-      IOResponse *responses;
-      slock_lock(self->iothread.channel->lock);
-      responses = io_channel_take_responses(self->iothread.channel); /* steal the list */
-      slock_unlock(self->iothread.channel->lock);
+      IOResponse *responses = (IOResponse *)
+            tt_io_channel_take_responses(self->iothread.channel); /* steal the list */
       {
          IOResponse *response = responses;
          while (response != NULL) {
-            IOResponse *rnext = response->next;
+            IOResponse *rnext = (IOResponse *)response->node.next;
             HdTextureId id;
             id.hash = response->hash;
             id.palette_hash = response->palette_hash;
@@ -4657,11 +4488,8 @@ static TTRect fromSRect(SRect rect) {
             return true;
          if (!hd_key_set_contains(&self->inflight, key))
             return false; /* the drain above consumed its failure response */
-         slock_lock(self->iothread.channel->lock);
-         if (self->iothread.channel->resp_head == NULL)
-            scond_wait_timeout(self->iothread.channel->resp_cond,
-                  self->iothread.channel->lock, (int64_t)TT_POOL_WAIT_SLICE_US);
-         slock_unlock(self->iothread.channel->lock);
+         tt_io_channel_wait_response(self->iothread.channel,
+               (int64_t)TT_POOL_WAIT_SLICE_US);
       }
       self->dbg_pool_wait_timeouts++;
       TT_LOG(RETRO_LOG_WARN, "pooled-sync wait timed out for %x-%x\n",
@@ -5676,7 +5504,7 @@ static bool is_power_of_two(int n) {
          snprintf(path, sizeof(path), "%s%x-%x.png", dir, (unsigned)page_hash, (unsigned)palette_hash);
       {
          IORequest *dump = (IORequest *)malloc(sizeof(IORequest));
-         dump->next = NULL;
+         dump->node.next = NULL;
          dump->kind = IORequestKind_Dump;
          snprintf(dump->path, sizeof(dump->path), "%s", path);
          dump->width  = (int)(page_rect.width * ppp);
@@ -5692,10 +5520,7 @@ static bool is_power_of_two(int n) {
          } else {
             dump->palette = NULL; dump->palette_len = 0;
          }
-         slock_lock(self->iothread.channel->lock);
-         io_channel_push_request(self->iothread.channel, dump);
-         slock_unlock(self->iothread.channel->lock);
-         scond_signal(self->iothread.channel->cond);
+         tt_io_channel_push(self->iothread.channel, &dump->node, false);
       }
    }
 
@@ -6149,13 +5974,7 @@ static bool is_power_of_two(int n) {
           * the links are still unsaved: re-dirty and back the next attempt
           * off ~5 minutes, so a locked file can never become a periodic
           * rewrite loop (that loop, run inline, was the ~10s audio stutter). */
-         int save_result = 0;
-         if (tt_journal_io_lock != NULL) {
-            slock_lock(tt_journal_io_lock);
-            save_result = tt_journal_io_result;
-            tt_journal_io_result = 0;
-            slock_unlock(tt_journal_io_lock);
-         }
+         int save_result = retro_atomic_exchange_int(&tt_journal_io_result, 0);
          if (save_result < 0) {
             self->journal.dirty = true;
             self->journal_save_backoff = 18000; /* ~5 min at 60fps */
