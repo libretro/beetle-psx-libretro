@@ -16,8 +16,9 @@
  *   VKHOST_QUEUE_THREAD: run a second thread on the frontend's queue, the
  *   way a threaded frontend does (see "the frontend's queue" below).
  *
- * Exits non-zero on any validation error, and on any use the core makes of
- * the frontend's queue without holding lock_queue.
+ * Exits non-zero on any validation error, on any use the core makes of
+ * the frontend's queue without holding lock_queue, and on any wait it
+ * makes with lock_queue held.
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -105,7 +106,14 @@ static void vk_set_command_buffers(void *handle, uint32_t num, const VkCommandBu
  * So the lock here is a real one, the core's Vulkan entry points for the
  * queue are handed out through this file, and each use of the frontend's
  * queue made without the lock held by the calling thread is counted and
- * fails the run. With VKHOST_QUEUE_THREAD set, a second thread submits on
+ * fails the run.
+ *
+ * The other half of the rule is that the lock is held for the queue call
+ * and nothing longer. A core that waits for the GPU with it held - a
+ * fence wait, or vkDeviceWaitIdle / vkQueueWaitIdle, which are waits and
+ * queue uses both - parks the frontend's video thread for as long as the
+ * GPU takes, and is one dependency away from a deadlock. Each wait made
+ * with the lock held is counted and fails the run as well. With VKHOST_QUEUE_THREAD set, a second thread submits on
  * the queue under the lock the whole time, as the frontend's video
  * thread does, so that the validation layer's own thread check sees a
  * core that skips it too. */
@@ -113,6 +121,8 @@ static pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t queue_owner;
 static int queue_held;                 /* read and written with __atomic */
 static int queue_violations;
+static int queue_waits_locked;
+static PFN_vkWaitForFences real_wait_for_fences;
 static PFN_vkGetDeviceProcAddr real_gdpa;
 static PFN_vkQueueSubmit real_queue_submit;
 static PFN_vkQueueWaitIdle real_queue_wait_idle;
@@ -132,13 +142,24 @@ static void host_unlock_queue(void)
 static void vk_lock_queue(void *handle) { (void)handle; host_lock_queue(); }
 static void vk_unlock_queue(void *handle) { (void)handle; host_unlock_queue(); }
 
+static int host_queue_held_here(void)
+{
+   return __atomic_load_n(&queue_held, __ATOMIC_SEQ_CST)
+      && pthread_equal(queue_owner, pthread_self());
+}
+
+static void core_waits(const char *what)
+{
+   if (host_queue_held_here() && !queue_waits_locked++)
+      fprintf(stderr, "[vkhost] QUEUE: the core waited in %s with lock_queue held\n", what);
+}
+
 /* queue == VK_NULL_HANDLE: a call that uses every queue of the device. */
 static void core_uses_queue(const char *what, VkQueue queue)
 {
    if (!vkctx.queue || (queue && queue != vkctx.queue))
       return;
-   if (__atomic_load_n(&queue_held, __ATOMIC_SEQ_CST)
-         && pthread_equal(queue_owner, pthread_self()))
+   if (host_queue_held_here())
       return;
    if (!queue_violations++)
       fprintf(stderr, "[vkhost] QUEUE: the core called %s on the frontend's queue"
@@ -153,12 +174,20 @@ static VKAPI_ATTR VkResult VKAPI_CALL core_vkQueueSubmit(VkQueue queue,
 static VKAPI_ATTR VkResult VKAPI_CALL core_vkQueueWaitIdle(VkQueue queue)
 {
    core_uses_queue("vkQueueWaitIdle", queue);
+   core_waits("vkQueueWaitIdle");
    return real_queue_wait_idle(queue);
 }
 static VKAPI_ATTR VkResult VKAPI_CALL core_vkDeviceWaitIdle(VkDevice device)
 {
    core_uses_queue("vkDeviceWaitIdle", VK_NULL_HANDLE);
+   core_waits("vkDeviceWaitIdle");
    return real_device_wait_idle(device);
+}
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkWaitForFences(VkDevice device,
+      uint32_t count, const VkFence *fences, VkBool32 all, uint64_t timeout)
+{
+   core_waits("vkWaitForFences");
+   return real_wait_for_fences(device, count, fences, all, timeout);
 }
 static PFN_vkVoidFunction core_queue_entry(const char *name, PFN_vkVoidFunction real)
 {
@@ -170,6 +199,8 @@ static PFN_vkVoidFunction core_queue_entry(const char *name, PFN_vkVoidFunction 
    { real_queue_wait_idle = (PFN_vkQueueWaitIdle)real; return (PFN_vkVoidFunction)core_vkQueueWaitIdle; }
    if (!strcmp(name, "vkDeviceWaitIdle"))
    { real_device_wait_idle = (PFN_vkDeviceWaitIdle)real; return (PFN_vkVoidFunction)core_vkDeviceWaitIdle; }
+   if (!strcmp(name, "vkWaitForFences"))
+   { real_wait_for_fences = (PFN_vkWaitForFences)real; return (PFN_vkVoidFunction)core_vkWaitForFences; }
    return real;
 }
 static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL core_gdpa(VkDevice device, const char *name)
@@ -800,9 +831,10 @@ run_frames_sw:
       pthread_join(queue_thread, NULL);
    }
    fprintf(stderr, "[vkhost] done: %d frames run, %u valid, %d validation errors, %d warnings,"
-           " %d unlocked uses of the frontend's queue\n",
-           frames, frame_valid, validation_errors, validation_warnings, queue_violations);
+           " %d unlocked uses of the frontend's queue, %d waits with its lock held\n",
+           frames, frame_valid, validation_errors, validation_warnings,
+           queue_violations, queue_waits_locked);
    { void (*f)(void) = dlsym(core, "retro_unload_game"); if (f) f(); }
    { void (*f)(void) = dlsym(core, "retro_deinit"); if (f) f(); }
-   return (validation_errors || queue_violations) ? 5 : 0;
+   return (validation_errors || queue_violations || queue_waits_locked) ? 5 : 0;
 }

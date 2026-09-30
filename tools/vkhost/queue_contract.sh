@@ -6,8 +6,9 @@
 #
 # usage: queue_contract.sh <core.so> [frames]
 #
-# Fails (vkhost exits non-zero) on any validation error, and on any use
-# of the frontend's queue made without lock_queue held.
+# Fails (vkhost exits non-zero) on any validation error, on any use of
+# the frontend's queue made without lock_queue held, and on any wait made
+# with it held.
 set -e
 core="$1"; frames="${2:-120}"
 here="$(cd "$(dirname "$0")" && pwd)"

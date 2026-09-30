@@ -15754,11 +15754,18 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
    static void context_destroy(struct Context *self)
    {
-      if (self->device != VK_NULL_HANDLE)
-         vkDeviceWaitIdle(self->device);
-
+      /* Only a device this context still owns. One released to the
+       * frontend (context_release_device) is the frontend's: its queue
+       * is in use on the frontend's threads, the Device has already
+       * drained this core's work on it in device_deinit, and when this
+       * runs for a stale context at the next create_device the frontend
+       * has destroyed the device already. Waiting on it was a use of a
+       * queue that is not ours, or of a device that is gone. */
       if (self->owned_device && self->device != VK_NULL_HANDLE)
+      {
+         vkDeviceWaitIdle(self->device);
          vkDestroyDevice(self->device, NULL);
+      }
    }
 
    static bool context_create_device(struct Context *self, VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
@@ -16976,8 +16983,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
     * on the queue, and both ended up waiting on fences that did not
     * signal.
     *
-    * It is taken around the queue call itself and nothing else - never
-    * across a fence wait - and only for the queue the frontend has. The
+    * It is taken around vkQueueSubmit itself and nothing else - never
+    * across a wait of any kind, see device_wait_queues_idle - and only
+    * for the queue the frontend has. The
     * compute and transfer queues are this device's own where the GPU has
     * separate ones, and are compared by handle so that where they alias
     * the graphics queue they take it too. */
@@ -17685,19 +17693,75 @@ static void device_clear_wait_semaphores(Device *self)
    VkPipelineStageVec_clear(&self->transfer.wait_stages);
 }
 
+/* Wait until everything submitted so far, on every queue this device
+ * uses, has been executed.
+ *
+ * This was vkDeviceWaitIdle. That call is a use of every queue of the
+ * device, the frontend's included, so it needs the frontend's queue lock -
+ * and then the lock is held for as long as the GPU takes to drain, with
+ * the frontend's video thread parked behind it. A lock held across a wait
+ * is how the two ends of a queue come to wait on each other.
+ *
+ * A fence submitted with no batches signals once all work submitted to
+ * that queue before it has completed, which is the same guarantee for
+ * that queue. So each queue gets one: the lock is taken for the submit
+ * call where the queue is the frontend's, and the wait is on the fences
+ * with nothing held. Work the frontend submitted earlier on the shared
+ * queue is covered exactly as it was. */
+static void device_wait_queues_idle(Device *self)
+{
+   VkQueue  queues[3];
+   VkFence  fences[3];
+   unsigned num_queues = 0;
+   unsigned num_fences = 0;
+   unsigned i;
+   VkFenceCreateInfo info = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+
+   if (self->device == VK_NULL_HANDLE)
+      return;
+
+   if (self->graphics_queue != VK_NULL_HANDLE)
+      queues[num_queues++] = self->graphics_queue;
+   if (     self->compute_queue != VK_NULL_HANDLE
+         && self->compute_queue != self->graphics_queue)
+      queues[num_queues++] = self->compute_queue;
+   if (     self->transfer_queue != VK_NULL_HANDLE
+         && self->transfer_queue != self->graphics_queue
+         && self->transfer_queue != self->compute_queue)
+      queues[num_queues++] = self->transfer_queue;
+
+   for (i = 0; i < num_queues; i++)
+   {
+      VkFence  fence = VK_NULL_HANDLE;
+      VkResult result;
+      bool     queue_locked;
+
+      if (vkCreateFence(self->device, &info, NULL, &fence) != VK_SUCCESS)
+         continue;
+      queue_locked = device_queue_lock(self, queues[i]);
+      result       = vkQueueSubmit(queues[i], 0, NULL, fence);
+      device_queue_unlock(self, queue_locked);
+      if (result == VK_SUCCESS)
+         fences[num_fences++] = fence;
+      else
+      {
+         LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
+         vkDestroyFence(self->device, fence, NULL);
+      }
+   }
+
+   if (num_fences)
+      vkWaitForFences(self->device, num_fences, fences, VK_TRUE, UINT64_MAX);
+   for (i = 0; i < num_fences; i++)
+      vkDestroyFence(self->device, fences[i], NULL);
+}
+
 static void device_wait_idle_nolock(Device *self)
 {
    if (self->per_frame.count != 0)
       device_end_frame_nolock(self);
 
-   /* vkDeviceWaitIdle is a use of every queue of the device, the
-    * frontend's included. */
-   if (self->device != VK_NULL_HANDLE)
-   {
-      bool queue_locked = device_queue_lock(self, self->frontend_queue);
-      vkDeviceWaitIdle(self->device);
-      device_queue_unlock(self, queue_locked);
-   }
+   device_wait_queues_idle(self);
 
    device_clear_wait_semaphores(self);
 
@@ -20072,7 +20136,6 @@ static void vk_context_reset(void)
 
 static void vk_context_destroy(void)
 {
-   const struct retro_hw_render_interface_vulkan *iface;
    if (device == NULL)
       return;
 
@@ -20086,9 +20149,6 @@ static void vk_context_destroy(void)
 
    savestate_destroy(&save_state);
    renderer_save_vram_state(renderer, &save_state);
-   /* Kept for the teardown below: context_deinit waits the device idle
-    * as well, which is a use of the frontend's queue. */
-   iface      = vulkan;
    vulkan     = NULL;
    scanouthandlevec_free_storage(&scanout_handles);
    swapchainimagevec_free_storage(&swapchain_images);
@@ -20097,14 +20157,7 @@ static void vk_context_destroy(void)
    free(renderer);
    device_deinit(device);
    free(device);
-   if (iface && iface->lock_queue && iface->unlock_queue)
-   {
-      iface->lock_queue(iface->handle);
-      context_deinit(context);
-      iface->unlock_queue(iface->handle);
-   }
-   else
-      context_deinit(context);
+   context_deinit(context);
    free(context);
    renderer = NULL;
    device = NULL;
