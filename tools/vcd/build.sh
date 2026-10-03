@@ -68,13 +68,8 @@ vcd_disc)
         $CD/l-ec.c $CD/lec.c $CD/recover-raw.c $CD/edc_crc32.c
         $MPEG $VFS $BASE
         $LC/formats/vorbis/rvorbis.c $LC/formats/flac/rflac.c
-        $LC/formats/libchdr/libchdr_bitstream.c
-        $LC/formats/libchdr/libchdr_cdrom.c $LC/formats/libchdr/libchdr_chd.c
-        $LC/formats/libchdr/libchdr_flac.c
-        $LC/formats/libchdr/libchdr_flac_codec.c
-        $LC/formats/libchdr/libchdr_huffman.c
-        $LC/formats/libchdr/libchdr_lzma.c $LC/formats/7z/r7z_lzma.c
-        $LC/formats/libchdr/libchdr_zlib.c $LC/formats/libchdr/libchdr_zstd.c
+        $LC/formats/chd/rchd.c $LC/encodings/encoding_huffman.c
+        $LC/formats/7z/r7z_lzma.c
         $LC/encodings/encoding_rzstd.c $LC/streams/trans_stream_rzstd.c
         $LC/streams/chd_stream.c $LC/streams/memory_stream.c
         $LC/streams/interface_stream.c $LC/streams/trans_stream.c

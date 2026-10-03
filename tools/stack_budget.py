@@ -96,7 +96,6 @@ CROSS_COMPILERS   = ('x86_64-w64-mingw32-gcc', 'i686-w64-mingw32-gcc')
 # Fixed under that rule rather than argued about:
 #   vh_build                     16784 -> 400   scratch to the heap
 #   config_file_write            16432 ->   48  stdio buffer to the heap
-#   chd_read_header_core_file    57504 ->   32  whole chd_file to the heap
 #   rd_gen_lengths               12768 ->  352  scratch into struct rdeflate
 #   rzstd_emit_block              9440 ->    0  FSE tables into encoder scratch
 #   sha1_calculate                4304 ->  224  mapped view, else heap buffer
@@ -168,12 +167,12 @@ def stack_usage(path, workdir, cc='gcc'):
         os.remove(su)
     # The define set has to be at least as wide as a real build, or
     # the check measures code no target compiles and misses code every
-    # target does. HAVE_7ZIP is the case that proved it: without it
-    # libchdr_chd.c's largest frame is 8320 bytes, with it 57504 - a
-    # seven-fold difference in shipped code, under a define that wii,
-    # ctr and every desktop build set.
-    cmd = [cc, '-O2', '-DPSP', '-DHAVE_COMPRESSION', '-DHAVE_7ZIP',
-           '-DHAVE_CHD', '-DHAVE_RPNG', '-DHAVE_RJPEG', '-DHAVE_RBMP',
+    # target does: a codec left out here is a codec whose frames are
+    # never measured. The CHD set is the one Makefile.common builds.
+    cmd = [cc, '-O2', '-DPSP', '-DHAVE_COMPRESSION', '-DHAVE_CHD',
+           '-DHAVE_RCHD', '-DHAVE_RCHD_DEFLATE', '-DHAVE_RCHD_LZMA',
+           '-DHAVE_RCHD_FLAC', '-DHAVE_RCHD_ZSTD', '-DHAVE_RFLAC',
+           '-DHAVE_RZSTD', '-DHAVE_RPNG', '-DHAVE_RJPEG', '-DHAVE_RBMP',
            '-DHAVE_RTGA', '-DHAVE_RWEBP', '-DHAVE_RDDS', '-DHAVE_RWAV',
            '-I' + INCLUDE, '-fstack-usage', '-c', path, '-o', obj]
     r = subprocess.run(cmd, cwd=workdir, capture_output=True)

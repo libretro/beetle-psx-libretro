@@ -36,11 +36,33 @@
 #include "cdaccess_track.h"
 #include "CDUtility.h"
 
-#include <libchdr/chd.h>
+#include <formats/rchd.h>
 
 extern retro_log_printf_t log_cb;
 
 #define CHD_PATH_BUF 4096
+
+/* A child CHD references unchanged data in a parent file and a parent
+ * can itself be a child; this bounds how many images one chain holds. */
+#define CHD_MAX_PARENTS 8
+
+/* Largest single read handed to the decoder when the file is neither
+ * mapped nor cached; rchd accepts short supplies and asks again. */
+#define CHD_IO_CHUNK 65536
+
+/* One image of a chain: the decoder and the file it is fed from. When
+ * the whole file is resident - mapped by the VFS (the open passes
+ * FREQUENT_ACCESS) or read in under image_memcache - @base points at
+ * it and hunk payloads are lent to the decoder in place rather than
+ * copied; otherwise each request is read through the filestream. */
+typedef struct
+{
+   rchd_t        *chd;
+   RFILE         *fp;
+   const uint8_t *base;
+   uint8_t       *owned;   /* the image_memcache copy, when @base is it */
+   int64_t        len;
+} chd_src;
 
 /* ------------------------------------------------------------------
  * Concrete struct.  std::string sbi_path is gone (replaced with a
@@ -52,16 +74,14 @@ struct CDAccess_CHD
 {
    CDAccess     base;
 
-   chd_file    *chd;
+   /* chain[0] is the image itself, chain[i + 1] the parent of
+    * chain[i]. Every level is owned here and closed in Cleanup. */
+   chd_src      chain[CHD_MAX_PARENTS + 1];
    uint8_t     *hunkmem;        /* hunk-data cache */
+   uint8_t     *io_buf;         /* CHD_IO_CHUNK bytes of read staging */
+   uint32_t     chain_len;
+   uint32_t     hunkbytes;
    int          oldhunk;        /* last hunknum read, -1 sentinel */
-
-   /* Parent (clone) CHD chain depth guard. A child CHD references
-    * unchanged data in a parent file; a parent can itself be a child.
-    * Parent chd_files and their backing files are owned by the child
-    * chd_file (libchdr closes the whole chain in chd_close), so no
-    * handle tracking lives here - only the recursion bound. */
-#define CHD_MAX_PARENTS 8
 
    int32_t      NumTracks;
    int32_t      FirstTrack;
@@ -89,8 +109,8 @@ enum
    CDRF_SUBM_RW_RAW
 };
 
-/* Field-width-limited copies of libchdr's CDROM_TRACK_METADATA*_FORMAT.
- * The upstream macros use bare %s with no width, so a crafted CHD whose
+/* Field-width-limited parse formats for the CD track metadata
+ * ('CHT2' and 'CHTR' entries). A bare %s with no width would let a crafted CHD whose
  * TYPE/SUBTYPE/PGTYPE/PGSUB metadata strings exceed the destination
  * buffers (type[64], subtype/pgtype/pgsub[32]) overflows them. The
  * widths below are sizeof(dest)-1 and keep sscanf from writing past the
@@ -112,151 +132,296 @@ enum
    _DI_FORMAT_COUNT
 };
 
-/* libchdr file IO - a heap-allocated core_file whose argp is a
- * chd_rfile wrapper around a libretro-common RFILE.  Ownership is
- * linear and fully delegated: every chd_open_core_file() call
- * consumes the core_file (and any parent chd_file handed in) whether
- * it succeeds or fails - on success the chd_file owns them and
- * chd_close() releases the whole chain (libchdr closes parents
- * recursively and core_fclose()s each file); on failure libchdr's
- * cleanup path has already released them.  The fclose shim therefore
- * closes the RFILE and frees the wrapper itself, and nothing here
- * tracks parent handles.
- *
- * Mapped mode: the open passes FREQUENT_ACCESS, inviting the local
- * VFS to memory-map the .chd - hunk fetches are the whole read
- * traffic of a CHD for the whole session, the exact access pattern
- * the hint describes.  When a mapping comes back, every fread the
- * decompressor issues becomes a memcpy from the page cache at a
- * cursor this wrapper tracks itself: zero per-hunk syscalls feeding
- * the decompressor.  Frontend-backed handles and mmap-less platforms
- * get NULL from the accessor and take the filestream path below,
- * unchanged. */
+/* ------------------------------------------------------------------
+ * Image I/O.  rchd does no I/O of its own: every step that needs bytes
+ * returns RCHD_PENDING with the range it wants, and the functions below
+ * satisfy it from the image's file.
+ * ------------------------------------------------------------------ */
 
-typedef struct
+static void chd_src_close(chd_src *src)
 {
-   RFILE         *fp;
-   const uint8_t *base;   /* non-NULL when the VFS mapped the file */
-   int64_t        len;
-   int64_t        pos;    /* mapped-mode cursor */
-} chd_rfile;
-
-static uint64_t Callback_fsize(core_file *cf)
-{
-   chd_rfile *rf = (chd_rfile *)cf->argp;
-   int64_t    sz;
-   if (rf->base)
-      return (uint64_t)rf->len;
-   sz = filestream_get_size(rf->fp);
-   if (sz < 0)
-      return (uint64_t)-1;
-   return (uint64_t)sz;
+   if (src->chd)
+      rchd_free(src->chd);
+   /* closing the RFILE releases a VFS mapping with it */
+   if (src->fp)
+      filestream_close(src->fp);
+   free(src->owned);
+   src->chd   = NULL;
+   src->fp    = NULL;
+   src->base  = NULL;
+   src->owned = NULL;
+   src->len   = 0;
 }
 
-static size_t Callback_fread(void *buffer, size_t size, size_t count,
-      core_file *cf)
+/* Satisfies one request from @src. @reading selects the read-time feed,
+ * which lends resident bytes in place; the open sequence always copies. */
+static bool chd_src_supply(chd_src *src, const rchd_request_t *rq,
+      uint8_t *io_buf, bool reading)
 {
-   chd_rfile *rf = (chd_rfile *)cf->argp;
-   int64_t    got;
-   if (size == 0 || count == 0)
-      return 0;
+   int64_t got;
 
-   if (rf->base)
+   if (src->base)
    {
-      int64_t want = (int64_t)(count * size);
-      int64_t avail;
-      if (rf->pos < 0 || rf->pos >= rf->len)
-         return 0;
-      avail = rf->len - rf->pos;
-      if (want > avail)
-         want = avail;
-      memcpy(buffer, rf->base + rf->pos, (size_t)want);
-      rf->pos += want;
-      return (size_t)want / size;
+      const uint8_t *p;
+      size_t         n;
+      if (rq->offset >= (uint64_t)src->len)
+         return false;
+      p = src->base + (size_t)rq->offset;
+      n = rq->length;
+      if ((uint64_t)n > (uint64_t)src->len - rq->offset)
+         n = (size_t)((uint64_t)src->len - rq->offset);
+      if (reading)
+         return rchd_feed_borrow(src->chd, rq->offset, rq->source,
+               p, n) == RCHD_OK;
+      return rchd_feed(src->chd, p, n) == RCHD_OK;
    }
 
-   got = filestream_read(rf->fp, buffer, (int64_t)(count * size));
-   if (got < 0)
-      return 0;
-   return (size_t)got / size;
+   if (filestream_seek(src->fp, (int64_t)rq->offset,
+            RETRO_VFS_SEEK_POSITION_START) < 0)
+      return false;
+   got = filestream_read(src->fp, io_buf,
+         rq->length < CHD_IO_CHUNK ? rq->length : CHD_IO_CHUNK);
+   if (got <= 0)
+      return false;
+   if (reading)
+      return rchd_feed_at(src->chd, rq->offset, rq->source,
+            io_buf, (size_t)got) == RCHD_OK;
+   return rchd_feed(src->chd, io_buf, (size_t)got) == RCHD_OK;
 }
 
-static int Callback_fclose(core_file *cf)
+/* Opens @path into @src and runs the decoder's open sequence (header,
+ * map, metadata). On failure @src is left closed. */
+static bool chd_src_open(chd_src *src, const char *path,
+      bool image_memcache, uint8_t *io_buf)
 {
-   chd_rfile *rf = (chd_rfile *)cf->argp;
-   /* closing the RFILE releases the mapping with it */
-   filestream_close(rf->fp);
-   free(rf);
-   free(cf);
-   return 0;
-}
+   rchd_request_t rq;
+   int            err;
 
-static int Callback_fseek(core_file *cf, int64_t offset, int whence)
-{
-   chd_rfile *rf = (chd_rfile *)cf->argp;
-   if (rf->base)
-   {
-      int64_t new_pos;
-      switch (whence)
-      {
-         case SEEK_SET: new_pos = offset;            break;
-         case SEEK_CUR: new_pos = rf->pos + offset;  break;
-         case SEEK_END: new_pos = rf->len + offset;  break;
-         default:       return -1;
-      }
-      if (new_pos < 0)
-         return -1;
-      /* past-EOF positions read as EOF (fread clamps), matching the
-       * filestream branch's behaviour */
-      rf->pos = new_pos;
-      return 0;
-   }
-   {
-      int seek_position = RETRO_VFS_SEEK_POSITION_START;
-      switch (whence)
-      {
-         case SEEK_SET: seek_position = RETRO_VFS_SEEK_POSITION_START;   break;
-         case SEEK_CUR: seek_position = RETRO_VFS_SEEK_POSITION_CURRENT; break;
-         case SEEK_END: seek_position = RETRO_VFS_SEEK_POSITION_END;     break;
-      }
-      filestream_seek(rf->fp, offset, seek_position);
-      return 0;
-   }
-}
-
-/* Open `path` through the VFS and wrap it as a core_file.  NULL on
- * open failure.  Successful callers hand the result to libchdr,
- * which releases it via the fclose shim; a caller done with it
- * before that must core_fclose() it. */
-static core_file *chd_core_rfile_open(const char *path)
-{
-   core_file *cf;
-   chd_rfile *rf;
-   RFILE     *fp = filestream_open(path,
+   src->fp = filestream_open(path,
          RETRO_VFS_FILE_ACCESS_READ,
          RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS);
-   if (!fp)
-      return NULL;
+   if (!src->fp)
+      return false;
 
-   rf = (chd_rfile *)calloc(1, sizeof(*rf));
-   cf = (core_file *)calloc(1, sizeof(*cf));
-   if (!rf || !cf)
+   src->base = (const uint8_t *)filestream_get_mapped_ptr(src->fp,
+         &src->len);
+   if (src->base && src->len <= 0)
+      src->base = NULL;
+
+   if (!src->base && image_memcache)
    {
-      filestream_close(fp);
-      free(rf);
-      free(cf);
-      return NULL;
+      int64_t size = filestream_get_size(src->fp);
+      if (size > 0 && (uint64_t)size == (uint64_t)(size_t)size
+            && (src->owned = (uint8_t *)malloc((size_t)size)))
+      {
+         if (filestream_seek(src->fp, 0, RETRO_VFS_SEEK_POSITION_START) >= 0
+               && filestream_read(src->fp, src->owned, size) == size)
+         {
+            src->base = src->owned;
+            src->len  = size;
+         }
+         else
+         {
+            free(src->owned);
+            src->owned = NULL;
+         }
+      }
+      if (!src->base)
+      {
+         chd_src_close(src);
+         return false;
+      }
    }
-   rf->fp   = fp;
-   rf->base = filestream_get_mapped_ptr(fp, &rf->len);
-   if (rf->base && rf->len <= 0)
-      rf->base = NULL;
-   cf->argp   = rf;
-   cf->fsize  = Callback_fsize;
-   cf->fread  = Callback_fread;
-   cf->fclose = Callback_fclose;
-   cf->fseek  = Callback_fseek;
-   return cf;
+
+   if (!(src->chd = rchd_new()))
+   {
+      chd_src_close(src);
+      return false;
+   }
+
+   while ((err = rchd_open_step(src->chd, &rq)) == RCHD_PENDING)
+   {
+      if (!chd_src_supply(src, &rq, io_buf, false))
+         break;
+   }
+
+   if (err != RCHD_OK)
+   {
+      log_cb(RETRO_LOG_ERROR, "CHD: \"%s\" failed to open (%d)\n",
+            path, err);
+      chd_src_close(src);
+      return false;
+   }
+   return true;
+}
+
+/* Combined SHA-1 of the CHD at @path, from its header alone. That is the
+ * hash a child names its parent by, so this is all a parent search has
+ * to read of each candidate. Versions 1 and 2 carry no SHA-1. */
+static bool chd_peek_sha1(const char *path, uint8_t *sha1)
+{
+   uint8_t  h[124];
+   uint32_t version;
+   size_t   at;
+   int64_t  got;
+   RFILE   *fp = filestream_open(path,
+         RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
+
+   if (!fp)
+      return false;
+   got = filestream_read(fp, h, sizeof(h));
+   filestream_close(fp);
+
+   if (got < 16 || memcmp(h, "MComprHD", 8))
+      return false;
+
+   version = ((uint32_t)h[12] << 24) | ((uint32_t)h[13] << 16)
+           | ((uint32_t)h[14] <<  8) |  (uint32_t)h[15];
+   switch (version)
+   {
+      case 3:  at = 80; break;
+      case 4:  at = 48; break;
+      case 5:  at = 84; break;
+      default: return false;
+   }
+   if ((size_t)got < at + 20)
+      return false;
+   memcpy(sha1, h + at, 20);
+   return true;
+}
+
+/* Search @dir for the parent of @child, matching each candidate's
+ * combined SHA-1 against the parent SHA-1 the child records, and open
+ * the match into @out. The child's own hash never equals the parent
+ * hash it records, so the child is passed over without a path check. */
+static bool chd_find_parent_in_dir(const char *dir, const rchd_t *child,
+      chd_src *out, bool image_memcache, uint8_t *io_buf)
+{
+   struct RDIR *rdir = retro_opendir(dir);
+   bool         ok   = false;
+   char        *cand;
+
+   if (!rdir)
+      return false;
+   if (!(cand = (char *)malloc(CHD_PATH_BUF)))
+   {
+      retro_closedir(rdir);
+      return false;
+   }
+
+   while (retro_readdir(rdir))
+   {
+      const char *name = retro_dirent_get_name(rdir);
+      const char *ext;
+      uint8_t     sha1[20];
+
+      if (!name || retro_dirent_is_dir(rdir, NULL))
+         continue;
+
+      ext = path_get_extension(name);
+      if (!ext || strcasecmp(ext, "chd"))
+         continue;
+
+      fill_pathname_join(cand, dir, name, CHD_PATH_BUF);
+
+      if (!chd_peek_sha1(cand, sha1)
+            || !rchd_parent_sha1_matches(child, sha1))
+         continue;
+
+      if (chd_src_open(out, cand, image_memcache, io_buf))
+      {
+         log_cb(RETRO_LOG_INFO, "CHD: using parent \"%s\"\n", cand);
+         ok = true;
+      }
+      break;
+   }
+
+   free(cand);
+   retro_closedir(rdir);
+   return ok;
+}
+
+/* Opens @path as chain[0], then finds, opens and binds each parent the
+ * chain needs from @base_dir. */
+static bool chd_open_chain(struct CDAccess_CHD *self, const char *path,
+      const char *base_dir, bool image_memcache)
+{
+   if (!chd_src_open(&self->chain[0], path, image_memcache, self->io_buf))
+      return false;
+   self->chain_len = 1;
+
+   while (rchd_info(self->chain[self->chain_len - 1].chd)->has_parent)
+   {
+      rchd_t *child = self->chain[self->chain_len - 1].chd;
+
+      if (self->chain_len > CHD_MAX_PARENTS
+            || !chd_find_parent_in_dir(base_dir, child,
+               &self->chain[self->chain_len], image_memcache,
+               self->io_buf))
+      {
+         log_cb(RETRO_LOG_ERROR,
+               "CHD: \"%s\" needs a parent CHD that was not found in %s\n",
+               path, base_dir);
+         return false;
+      }
+      if (rchd_set_parent(child,
+               self->chain[self->chain_len].chd) != RCHD_OK)
+         return false;
+      self->chain_len++;
+   }
+   return true;
+}
+
+/* Decodes hunk @hunknum into hunkmem. Requests for a hunk that a child
+ * shares with its parent are made by the parent's decoder, so the
+ * level whose request is outstanding is the one whose file is read. */
+static bool CDAccess_CHD_ReadHunk(struct CDAccess_CHD *self,
+      uint32_t hunknum)
+{
+   rchd_request_t rq;
+   int            err = rchd_read_hunk_begin(self->chain[0].chd, hunknum,
+         self->hunkmem);
+
+   while (err == RCHD_OK
+         && (err = rchd_read_step(self->chain[0].chd, &rq)) == RCHD_PENDING)
+   {
+      uint32_t lvl;
+
+      for (lvl = 0; lvl < self->chain_len; lvl++)
+         if (rchd_read_pending(self->chain[lvl].chd, &rq, 1))
+            break;
+
+      if (lvl == self->chain_len)
+         err = RCHD_ERROR_STATE;
+      else if (!chd_src_supply(&self->chain[lvl], &rq, self->io_buf, true))
+         err = RCHD_ERROR_DATA;
+      else
+         err = RCHD_OK;
+   }
+
+   if (err != RCHD_OK)
+   {
+      log_cb(RETRO_LOG_ERROR, "CHD: hunk %u failed to decode (%d)\n",
+            (unsigned)hunknum, err);
+      return false;
+   }
+   return true;
+}
+
+/* Copies the @n'th @tag metadata entry, NUL-terminated, into @out. */
+static bool chd_get_track_meta(const rchd_t *chd, uint32_t tag, uint32_t n,
+      char *out, size_t out_size)
+{
+   const rchd_metadata_t *m = rchd_metadata_find(chd, tag, n);
+   size_t                 len;
+
+   if (!m)
+      return false;
+   len = m->length < out_size - 1 ? m->length : out_size - 1;
+   memcpy(out, m->data, len);
+   out[len] = '\0';
+   return true;
 }
 
 /* Forward declaration - LoadSBI is called from Read_TOC. */
@@ -267,162 +432,10 @@ static int CDAccess_CHD_LoadSBI(struct CDAccess_CHD *self,
  * Body methods.
  * ------------------------------------------------------------------ */
 
-/* Read just the CHD header of a file (no full open, no parent needed),
- * so we can inspect its SHA1 / parent-SHA1 while hunting for a parent. */
-static bool chd_peek_header(const char *path, chd_header *out)
-{
-   chd_error  err;
-   core_file *cf = chd_core_rfile_open(path);
-
-   if (!cf)
-      return false;
-
-   /* chd_read_header_core_file does not consume the file. */
-   err = chd_read_header_core_file(cf, out);
-   core_fclose(cf);
-   return err == CHDERR_NONE;
-}
-
-/* True if the header indicates the file is a child that needs a parent. */
-static bool chd_header_needs_parent(const chd_header *h)
-{
-   static const uint8_t nullsha1[CHD_SHA1_BYTES] = { 0 };
-   if (h->version < 5)
-      return (h->flags & CHDFLAGS_HAS_PARENT) != 0;
-   return memcmp(nullsha1, h->parentsha1, sizeof(h->parentsha1)) != 0;
-}
-
-/* Search dir for a .chd whose own SHA1 matches want_parentsha1 (the
- * child's parentsha1). Returns true and fills found_path on a match.
- * skip_path is the child itself, never a candidate for its own parent. */
-static bool chd_find_parent_in_dir(const char *dir,
-      const uint8_t *want_parentsha1, const char *skip_path,
-      char *found_path, size_t found_path_len)
-{
-   struct RDIR *rdir = retro_opendir(dir);
-   bool         ok   = false;
-
-   if (!rdir)
-      return false;
-
-   while (retro_readdir(rdir))
-   {
-      const char *name = retro_dirent_get_name(rdir);
-      const char *ext;
-      char        cand[CHD_PATH_BUF];
-      chd_header  ch;
-
-      if (!name || retro_dirent_is_dir(rdir, NULL))
-         continue;
-
-      ext = path_get_extension(name);
-      if (!ext || strcasecmp(ext, "chd"))
-         continue;
-
-      fill_pathname_join(cand, dir, name, sizeof(cand));
-
-      /* Don't consider the child file itself. */
-      if (!strcmp(cand, skip_path))
-         continue;
-
-      if (!chd_peek_header(cand, &ch))
-         continue;
-
-      /* libchdr validates a parent by comparing the child's parentsha1
-       * against the parent's (combined) sha1; match the same way. */
-      if (!memcmp(ch.sha1, want_parentsha1, CHD_SHA1_BYTES))
-      {
-         strlcpy(found_path, cand, found_path_len);
-         ok = true;
-         break;
-      }
-   }
-
-   retro_closedir(rdir);
-   return ok;
-}
-
-/* Open a CHD, resolving any parent chain by searching base_dir. On
- * success returns CHDERR_NONE with *out_chd set; the parent chd_files
- * (and every backing file) are owned by the returned child and are
- * released by a single chd_close on it. depth guards against cycles /
- * absurd chains.
- *
- * Ownership through libchdr is linear: chd_open_core_file consumes
- * its core_file AND its parent argument on failure as well as on
- * success (its cleanup path chd_closes the partially built handle,
- * which core_fcloses the file and recursively closes the parent).
- * That is why the first no-parent attempt cannot reuse its file for
- * the re-open - the failed attempt already closed it - and why no
- * error path here releases anything already handed to libchdr. */
-static chd_error chd_open_resolving_parents(struct CDAccess_CHD *self,
-      const char *path, const char *base_dir, int depth,
-      chd_file **out_chd)
-{
-   chd_header  hdr;
-   chd_error   err;
-   chd_file   *parent = NULL;
-   core_file  *cf;
-
-   *out_chd = NULL;
-
-   if (depth >= CHD_MAX_PARENTS)
-      return CHDERR_REQUIRES_PARENT;
-
-   cf = chd_core_rfile_open(path);
-   if (!cf)
-      return CHDERR_FILE_NOT_FOUND;
-
-   /* First, try a plain open. If the file needs no parent this
-    * succeeds. Either way cf is consumed. */
-   err = chd_open_core_file(cf, CHD_OPEN_READ, NULL, out_chd);
-   if (err != CHDERR_REQUIRES_PARENT)
-      return err;
-
-   /* It's a child: read its header to learn the parent SHA1, find the
-    * parent file in the same directory, open it (recursively), then
-    * re-open this file with the parent handle. */
-   if (!chd_peek_header(path, &hdr) || !chd_header_needs_parent(&hdr))
-      return CHDERR_REQUIRES_PARENT;
-
-   {
-      char parent_path[CHD_PATH_BUF];
-
-      if (!chd_find_parent_in_dir(base_dir, hdr.parentsha1, path,
-               parent_path, sizeof(parent_path)))
-      {
-         log_cb(RETRO_LOG_ERROR,
-               "CHD: \"%s\" needs a parent CHD that was not found in %s\n",
-               path, base_dir);
-         return CHDERR_REQUIRES_PARENT;
-      }
-
-      err = chd_open_resolving_parents(self, parent_path, base_dir,
-            depth + 1, &parent);
-      if (err != CHDERR_NONE)
-         return err;
-
-      log_cb(RETRO_LOG_INFO, "CHD: \"%s\" using parent \"%s\"\n",
-            path, parent_path);
-   }
-
-   /* Re-open the child now that we have its parent. cf2 and parent
-    * are consumed whether this succeeds or fails. */
-   cf = chd_core_rfile_open(path);
-   if (!cf)
-   {
-      chd_close(parent);
-      return CHDERR_FILE_NOT_FOUND;
-   }
-   err = chd_open_core_file(cf, CHD_OPEN_READ, parent, out_chd);
-   return err;
-}
-
 static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
       const char *path, bool image_memcache)
 {
-   const chd_header *head;
-   chd_error         err;
+   rchd_t           *chd;
    int               plba       = -150;
    uint32_t          fileOffset = 0;
    char              type[64];
@@ -430,7 +443,6 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
    char              pgtype[32];
    char              pgsub[32];
    char              meta_entry[256];
-   uint32_t          meta_entry_size = 0;
    char              base_dir[CHD_PATH_BUF];
    char              file_base[CHD_PATH_BUF];
    char              file_ext[CHD_PATH_BUF];
@@ -439,30 +451,23 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
    int               i;
    char              sbi_basename[CHD_PATH_BUF];
 
-   {
-      char base_dir[CHD_PATH_BUF];
-      base_dir[0] = '\0';
-      fill_pathname_basedir(base_dir, path, sizeof(base_dir));
-
-      err = chd_open_resolving_parents(self, path, base_dir,
-            0, &self->chd);
-   }
-   if (err != CHDERR_NONE)
+   if (!(self->io_buf = (uint8_t *)malloc(CHD_IO_CHUNK)))
       return false;
 
-   if (image_memcache)
-   {
-      err = chd_precache(self->chd);
-      if (err != CHDERR_NONE)
-         return false;
-   }
+   base_dir[0] = '\0';
+   fill_pathname_basedir(base_dir, path, sizeof(base_dir));
+   if (!chd_open_chain(self, path, base_dir, image_memcache))
+      return false;
 
-   head = chd_get_header(self->chd);
-   self->hunkmem = (uint8_t *)malloc(head->hunkbytes);
+   chd             = self->chain[0].chd;
+   self->hunkbytes = rchd_info(chd)->hunk_bytes;
+   if (self->hunkbytes < 2352 + 96
+         || !(self->hunkmem = (uint8_t *)malloc(self->hunkbytes)))
+      return false;
    self->oldhunk = -1;
 
-   log_cb(RETRO_LOG_INFO, "chd_load '%s' hunkbytes=%d\n", path,
-         head->hunkbytes);
+   log_cb(RETRO_LOG_INFO, "chd_load '%s' hunkbytes=%u\n", path,
+         (unsigned)self->hunkbytes);
 
    for (;;)
    {
@@ -472,28 +477,22 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
       int pregap  = 0;
       int postgap = 0;
 
-      err = chd_get_metadata(self->chd, CDROM_TRACK_METADATA2_TAG,
-            self->NumTracks, meta_entry, sizeof(meta_entry),
-            &meta_entry_size, NULL, NULL);
-      if (err == CHDERR_NONE)
-      {
+      type[0]    = '\0';
+      subtype[0] = '\0';
+      pgtype[0]  = '\0';
+      pgsub[0]   = '\0';
+
+      if (chd_get_track_meta(chd, RCHD_META_CDROM_TRACK2,
+               (uint32_t)self->NumTracks, meta_entry, sizeof(meta_entry)))
          sscanf(meta_entry, CHD_TRACK_METADATA2_FMT_SAFE,
                &tkid, type, subtype, &frames, &pregap, pgtype, pgsub,
                &postgap);
-      }
+      else if (chd_get_track_meta(chd, RCHD_META_CDROM_TRACK,
+               (uint32_t)self->NumTracks, meta_entry, sizeof(meta_entry)))
+         sscanf(meta_entry, CHD_TRACK_METADATA_FMT_SAFE,
+               &tkid, type, subtype, &frames);
       else
-      {
-         err = chd_get_metadata(self->chd, CDROM_TRACK_METADATA_TAG,
-               self->NumTracks, meta_entry, sizeof(meta_entry),
-               &meta_entry_size, NULL, NULL);
-         if (err == CHDERR_NONE)
-         {
-            sscanf(meta_entry, CHD_TRACK_METADATA_FMT_SAFE,
-                  &tkid, type, subtype, &frames);
-         }
-         else
-            break;   /* end of TOC */
-      }
+         break;   /* end of TOC */
 
       if (strncmp(type, "MODE2_RAW", 9) != 0
             && strncmp(type, "AUDIO", 5) != 0)
@@ -626,20 +625,17 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
 
 static void CDAccess_CHD_Cleanup(struct CDAccess_CHD *self)
 {
-   /* chd_close releases the whole chain: it recursively closes the
-    * parent chd_files and core_fclose()s every backing file, which in
-    * our shims closes the RFILE and frees the core_file wrapper. */
-   if (self->chd)
-   {
-      chd_close(self->chd);
-      self->chd = NULL;
-   }
+   uint32_t i;
 
-   if (self->hunkmem)
-   {
-      free(self->hunkmem);
-      self->hunkmem = NULL;
-   }
+   /* A child holds its parent, so the chain closes child first. */
+   for (i = 0; i <= CHD_MAX_PARENTS; i++)
+      chd_src_close(&self->chain[i]);
+   self->chain_len = 0;
+
+   free(self->hunkmem);
+   free(self->io_buf);
+   self->hunkmem = NULL;
+   self->io_buf  = NULL;
 }
 
 /* MakeSubPQ ORs the simulated P and Q subchannel data into SubPWBuf. */
@@ -817,20 +813,17 @@ static bool CDAccess_CHD_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf,
    }
    else
    {
-      const chd_header *head    = chd_get_header(self->chd);
       int               cad     = lba - ct->LBA + ct->FileOffset;
-      int               sph     = head->hunkbytes / (2352 + 96);
+      int               sph     = (int)(self->hunkbytes / (2352 + 96));
       int               hunknum = cad / sph;
       int               hunkofs = cad % sph;
-      int               err     = CHDERR_NONE;
 
       /* Each hunk holds ~8 sectors; cache the most-recently-read one. */
       if (hunknum != self->oldhunk)
       {
-         err = chd_read(self->chd, hunknum, self->hunkmem);
-         if (err != CHDERR_NONE)
+         if (!CDAccess_CHD_ReadHunk(self, (uint32_t)hunknum))
             log_cb(RETRO_LOG_ERROR,
-                  "chd_read_sector failed lba=%d error=%d\n", lba, err);
+                  "chd_read_sector failed lba=%d\n", lba);
          else
             self->oldhunk = hunknum;
       }
@@ -1026,15 +1019,14 @@ CDAccess *CDAccess_CHD_New(bool *success, const char *path,
    self->base.Eject           = CDAccess_CHD_Eject;
    self->base.destroy         = CDAccess_CHD_destroy;
 
-   self->chd           = NULL;
    self->NumTracks     = 0;
    self->total_sectors = 0;
    self->FirstTrack    = 99;   /* opposites for min/max init */
    self->LastTrack     = 0;
 
-   /* The file itself is opened (as a core_file wrapper) inside
-    * chd_open_resolving_parents; probe for existence up front only to
-    * keep the historical error message for the common failure. */
+   /* The file itself is opened inside chd_open_chain; probe for
+    * existence up front only to keep the historical error message for
+    * the common failure. */
    {
       RFILE *probe = filestream_open(path,
             RETRO_VFS_FILE_ACCESS_READ,
