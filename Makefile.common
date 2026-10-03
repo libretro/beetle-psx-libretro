@@ -37,8 +37,7 @@ LIBCHDR_SOURCES_C = \
 # sources) - HAVE_ZLIB is deliberately left undefined so the backend getters
 # resolve to it. Decoding goes through the
 # image_texture / image_transfer front end; rjpeg's runtime SIMD kernel
-# selection needs features_cpu, rwebp's lossy path needs the rvp8 decoder, and
-# image_texture's file path needs nbio.
+# selection needs features_cpu, and rwebp's lossy path needs the rvp8 decoder.
 IMAGE_FORMAT_SOURCES_C = \
 		 $(LIBRETRO_COMM_DIR)/formats/image_texture.c \
 		 $(LIBRETRO_COMM_DIR)/formats/image_transfer.c \
@@ -313,11 +312,7 @@ endif
                      $(LIBRETRO_COMM_DIR)/time/rtime.c \
                      $(LIBRETRO_COMM_DIR)/hash/lrc_hash.c \
                      $(LIBRETRO_COMM_DIR)/formats/data_transfer.c \
-                     $(LIBRETRO_COMM_DIR)/memmap/memmap.c \
-                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_intf.c \
-                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_stdio.c \
-                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_windowsmmap.c \
-                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_unixmmap.c
+                     $(LIBRETRO_COMM_DIR)/memmap/memmap.c
 
       ifeq ($(HAVE_CDROM), 1)
          CFLAGS    += -DHAVE_CDROM
