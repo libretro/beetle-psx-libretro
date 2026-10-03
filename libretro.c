@@ -105,6 +105,7 @@ bool gpu_fbwrite_fifo_delay = false;
  * libretro_cbs.h; assigned by retro_set_environment / retro_set_video_refresh
  * below. */
 retro_video_refresh_t video_cb = NULL;
+static void dummy_video_cb(const void *data, unsigned width, unsigned height, size_t pitch) {}
 retro_environment_t environ_cb = NULL;
 
 static bool libretro_supports_option_categories = false;
@@ -123,6 +124,7 @@ static unsigned internal_frame_count = 0;
 static bool display_internal_framerate = false;
 static bool display_notifications = true;
 static bool allow_frame_duping = false;
+static bool skip_presenting_duplicate_frames = false;
 static unsigned image_offset = 0;
 static unsigned image_crop = 0;
 static bool enable_memcard1 = false;
@@ -5385,6 +5387,17 @@ static void check_variables(bool startup)
    else
       allow_frame_duping = false;
 
+   var.key = BEETLE_OPT(skip_presenting_duplicate_frames);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (strcmp(var.value, "enabled") == 0)
+         skip_presenting_duplicate_frames = true;
+      else if (strcmp(var.value, "disabled") == 0)
+         skip_presenting_duplicate_frames = false;
+   }
+   else
+      skip_presenting_duplicate_frames = false;
+
    var.key = BEETLE_OPT(display_internal_fps);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -6231,6 +6244,8 @@ static bool retro_set_system_av_info(void)
 void retro_run(void)
 {
    bool updated = false;
+   static unsigned skipped_frames = 0;
+   const unsigned MAX_SKIPPED_DUPLICATE_FRAMES = 10;
    static int32_t rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
    MDFN_Surface *frame_surf = surf;
    EmulateSpecStruct spec = {0};
@@ -6275,6 +6290,9 @@ void retro_run(void)
     * check_variables before beginning this frame, so the frontend's
     * synchronous video-driver reinit runs between frames. */
    rhi_intf_apply_pending_geometry();
+
+retry_frame:
+   timestamp = 0;
 
    rhi_intf_prepare_frame();
 
@@ -6725,6 +6743,33 @@ void retro_run(void)
             || (currently_interlaced || PrevInterlaced)
             || !allow_frame_duping)
          fb = pix;
+   }
+
+   {
+      bool is_dupe = !(GPU_get_display_possibly_dirty() || GPU_get_display_change_count() || currently_interlaced || PrevInterlaced);
+      bool vcd_active = (VCD_GetMode() != VCD_MODE_OFF && VCD_GetAVSwitch());
+      
+      if (skip_presenting_duplicate_frames && is_dupe && !vcd_active && skipped_frames < MAX_SKIPPED_DUPLICATE_FRAMES)
+      {
+         retro_video_refresh_t orig_video_cb;
+         skipped_frames++;
+         
+         /* Finalize the frame silently so HW renderer flushes commands properly.
+          * We use a dummy video callback so it doesn't present to the frontend. */
+         orig_video_cb = video_cb;
+         retro_set_video_refresh(dummy_video_cb);
+         rhi_intf_finalize_frame(fb, width, height, MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
+         retro_set_video_refresh(orig_video_cb);
+
+         if (audio_batch_cb)
+            audio_batch_cb(&IntermediateBuffer[0][0], spec.SoundBufSize);
+            
+         GPU_set_display_change_count(0);
+         GPU_set_display_possibly_dirty(false);
+         
+         goto retry_frame;
+      }
+      skipped_frames = 0;
    }
 
    /* Video CD output substitution.

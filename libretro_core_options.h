@@ -1623,6 +1623,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(skip_presenting_duplicate_frames),
+      "Skip Presenting Duplicate Frames",
+      NULL,
+      "Skips the presentation of frames that are not unique. Allows external frame generation tools to work correctly with 30fps games.",
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       BEETLE_OPT(pal_video_timing_override),
       "PAL Video Timing Override",
       NULL,
