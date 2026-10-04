@@ -513,6 +513,11 @@ void texture_tracker_set_cache_budgets(TextureTracker *self,
  * Process-wide (folder layout, not per-tracker state). */
 void texture_tracker_set_texture_dir_mode(int mode);
 
+/* Forget the session's Replace Textures on/off (menu value + in-game
+ * toggle), so the next game starts from the menu value. The state outlives
+ * renderer rebuilds on purpose; call this when the game is unloaded. */
+void texture_tracker_session_reset(void);
+
 /* ---- VRAM mutation + frame hooks -------------------------------------- */
 
 void texture_tracker_upload(TextureTracker *self,
