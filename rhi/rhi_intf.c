@@ -1,5 +1,8 @@
 #include "rhi_intf.h"
 #include "tt_trace.h"
+#if defined(TEXTURE_DUMPING_ENABLED) /* defined exactly when rhi_tt.c is built */
+#include "rhi_tt.h" /* texture_tracker_session_reset */
+#endif
 
 #include <math.h>
 #include <stdint.h>
@@ -429,6 +432,12 @@ void rhi_intf_close(void)
 {
 #if defined(RHI_DUMP)
    rhi_dump_deinit();
+#endif
+
+#if defined(TEXTURE_DUMPING_ENABLED)
+   /* The game is going: its Replace Textures on/off (kept across renderer
+    * rebuilds) must not carry over to the next one. */
+   texture_tracker_session_reset();
 #endif
 
    if (rhi_type != RHI_SOFTWARE)
