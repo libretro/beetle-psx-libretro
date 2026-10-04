@@ -1612,7 +1612,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(skip_presenting_duplicate_frames),
       "Skip Presenting Duplicate Frames",
       NULL,
-      "Skips the presentation of frames that are not unique. Allows external frame generation tools to work correctly with 30fps games.",
+      "Actively drops duplicate frames to halve the frontend output framerate (e.g. 60Hz down to a true 30Hz). Essential for external frame generation/interpolation tools. Differs from 'Frame Duping' which preserves a 60Hz output.",
       NULL,
       "video",
       {
