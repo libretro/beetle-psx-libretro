@@ -1537,6 +1537,11 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       TextureRectSaveStateVec rects;
       RestorableRectSaveStateVec restorable;
       UploadOwningMap uploads;
+      /* Copy of the tracker's CPU VRAM mirror (FB_WIDTH x FB_HEIGHT), or
+       * NULL. Page-aligned hashes and the CLUT fallback read the mirror, and
+       * a renderer rebuild creates a fresh, zeroed one - without this, every
+       * page hashes as blank after a rebuild until the game re-uploads it. */
+      uint16_t *vram_mirror;
    };
 
    static INLINE void tts_init(struct TextureTrackerSaveState *s)
@@ -1544,6 +1549,7 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       TextureRectSaveStateVec_init(&s->rects);
       RestorableRectSaveStateVec_init(&s->restorable);
       uploadmap_init(&s->uploads);
+      s->vram_mirror = NULL;
    }
 
    static INLINE void tts_destroy(struct TextureTrackerSaveState *s)
@@ -1551,6 +1557,8 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       TextureRectSaveStateVec_free_storage(&s->rects);
       RestorableRectSaveStateVec_free_storage(&s->restorable);
       uploadmap_destroy(&s->uploads);
+      free(s->vram_mirror);
+      s->vram_mirror = NULL;
    }
 
    /* Move o into s (which must already be initialized): free s's current
@@ -1564,10 +1572,13 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       TextureRectSaveStateVec_free_storage(&s->rects);
       RestorableRectSaveStateVec_free_storage(&s->restorable);
       uploadmap_destroy(&s->uploads);
+      free(s->vram_mirror);
       TextureRectSaveStateVec_move(&s->rects, &o->rects);
       s->restorable = o->restorable;
       RestorableRectSaveStateVec_init(&o->restorable);
       uploadmap_move(&s->uploads, &o->uploads);
+      s->vram_mirror = o->vram_mirror;
+      o->vram_mirror = NULL;
    }
    /* End of Save State
     * ======================================== */
@@ -7030,6 +7041,13 @@ static int64_t page_bytes(FusionRects *fusion)
       }
       }
 
+      /* The VRAM mirror travels with the rects: see TextureTrackerSaveState. */
+      if (self->vram_mirror != NULL) {
+         state.vram_mirror = (uint16_t*)malloc((size_t)FB_WIDTH * FB_HEIGHT * sizeof(uint16_t));
+         if (state.vram_mirror != NULL)
+            memcpy(state.vram_mirror, self->vram_mirror, (size_t)FB_WIDTH * FB_HEIGHT * sizeof(uint16_t));
+      }
+
       tts_move(out, &state);
       tts_destroy(&state);
    }
@@ -7077,6 +7095,17 @@ static int64_t page_bytes(FusionRects *fusion)
             rrvec_push(&self->restorable_rects, &loaded);
             restorablerect_destroy(&loaded);
          }
+      }
+      /* Put the VRAM mirror back (the clearRegion above zeroed it). The
+       * upload-rect records are restored above and their HD textures
+       * reloaded below; page-aligned replacements and CLUTs read outside a
+       * tracked upload need the mirror itself, or they hash blank pages
+       * until the game re-uploads them. mirror_store also drops any page
+       * hash memoised in between. */
+      if (state->vram_mirror != NULL && self->vram_mirror != NULL) {
+         TTRect _full = { 0, 0, FB_WIDTH, FB_HEIGHT };
+         texture_tracker_mirror_store(self, _full, state->vram_mirror);
+         texture_tracker_clear_palette_cache(self, _full);
       }
       /* Need to reload the hd textures, too */
       {
