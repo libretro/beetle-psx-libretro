@@ -5475,23 +5475,24 @@ static void check_variables(bool startup)
          bool can_dupe = false;
          if (environ_cb(RETRO_ENVIRONMENT_GET_CAN_DUPE, &can_dupe))
             allow_frame_duping = can_dupe;
+         skip_presenting_duplicate_frames = false;
+      }
+      else if (strcmp(var.value, "drop") == 0)
+      {
+         allow_frame_duping = false;
+         skip_presenting_duplicate_frames = true;
       }
       else if (strcmp(var.value, "disabled") == 0)
+      {
          allow_frame_duping = false;
-   }
-   else
-      allow_frame_duping = false;
-
-   var.key = BEETLE_OPT(skip_presenting_duplicate_frames);
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (strcmp(var.value, "enabled") == 0)
-         skip_presenting_duplicate_frames = true;
-      else if (strcmp(var.value, "disabled") == 0)
          skip_presenting_duplicate_frames = false;
+      }
    }
    else
+   {
+      allow_frame_duping = false;
       skip_presenting_duplicate_frames = false;
+   }
 
    var.key = BEETLE_OPT(display_internal_fps);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
