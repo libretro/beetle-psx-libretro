@@ -14,6 +14,23 @@ layout(constant_id = 3) const int SCALE = 1;
 #endif
 layout(location = 0) out vec4 FragColor;
 layout(set = 0, binding = 2) uniform sampler2D uDitherLUT;
+layout(constant_id = 10) const int FRAMEBUFFER_FLOAT16 = 0;
+
+highp vec3 truncate_color8(highp vec3 color)
+{
+	if (FRAMEBUFFER_FLOAT16 != 0)
+		return max(color - 0.49 / 255.0, vec3(0.0));
+
+	/* A bias near half an UNORM code relies on implementation-dependent
+	 * float-to-fixed rounding. An exact GP0 colour can lose a bit that a
+	 * later indexed texture read interprets as a different palette index.
+	 * Truncate explicitly, stabilizing exact 8-bit inputs against float
+	 * interpolation noise, and write at the centre of the UNORM code.
+	 * Keep multiply and add separate so drivers agree at the tolerance
+	 * boundaries instead of choosing different levels through contraction. */
+	precise highp vec3 color8 = max(color, vec3(0.0)) * 255.0 + vec3(0.001);
+	return floor(color8) / 255.0;
+}
 
 /* Per-primitive state carried in BufferVertex::params. Native colour depth is
  * separate from the GP0 DTD bit: DTD selects the offset matrix, while every

@@ -133,8 +133,6 @@ void main()
 	}
 	else
 	{
-		/* Preserve higher-colour truncation, but floor at zero for 16F so
-		 * a later texture read still treats black as transparent. */
-		FragColor.rgb = max(FragColor.rgb - 0.49 / 255.0, vec3(0.0));
+		FragColor.rgb = truncate_color8(FragColor.rgb);
 	}
 }
