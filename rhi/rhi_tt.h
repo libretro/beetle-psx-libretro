@@ -518,6 +518,39 @@ void texture_tracker_set_texture_dir_mode(int mode);
  * renderer rebuilds on purpose; call this when the game is unloaded. */
 void texture_tracker_session_reset(void);
 
+/* Replace Textures on/off for one game session. A changed menu value and
+ * the in-game toggle both set it; every tracker, a rebuilt one included,
+ * follows it. menu_applied is the menu value last applied, so an unchanged
+ * menu value does not undo the toggle. -1 = not set yet. */
+struct tt_replace_latch
+{
+   int session;
+   int menu_applied;
+};
+
+static INLINE void tt_replace_latch_reset(struct tt_replace_latch *l)
+{
+   l->session      = -1;
+   l->menu_applied = -1;
+}
+
+/* Take the current menu value; returns whether replacement is on. */
+static INLINE bool tt_replace_latch_menu(struct tt_replace_latch *l, bool menu)
+{
+   int m = menu ? 1 : 0;
+   if (m != l->menu_applied)
+   {
+      l->session      = m;
+      l->menu_applied = m;
+   }
+   return l->session == 1;
+}
+
+static INLINE void tt_replace_latch_toggle(struct tt_replace_latch *l, bool on)
+{
+   l->session = on ? 1 : 0;
+}
+
 /* ---- VRAM mutation + frame hooks -------------------------------------- */
 
 void texture_tracker_upload(TextureTracker *self,

@@ -1539,8 +1539,7 @@ static void RestorableRectSaveStateVec_free_storage(struct RestorableRectSaveSta
       UploadOwningMap uploads;
       /* Copy of the tracker's CPU VRAM mirror (FB_WIDTH x FB_HEIGHT), or
        * NULL. Page-aligned hashes and the CLUT fallback read the mirror, and
-       * a renderer rebuild creates a fresh, zeroed one - without this, every
-       * page hashes as blank after a rebuild until the game re-uploads it. */
+       * a rebuilt tracker starts with a zeroed one. */
       uint16_t *vram_mirror;
    };
 
@@ -2994,16 +2993,9 @@ static char retro_slash = '/';
    /* HD Texture Folder mode: 0 = content dir (default), 1 = system, 2 = save. */
    static int texture_dir_mode = 0;
 
-   /* Replace Textures on/off for this game session, -1 = not set yet. A
-    * changed menu value sets it, the in-game ']' toggle sets it, and every
-    * tracker follows it (texture_tracker_set_config) - so the last choice
-    * survives a renderer rebuild (windowed <-> fullscreen, resolution
-    * change), which makes a new tracker that starts with replacement off.
-    * tt_replace_menu_applied is the menu value last applied, so an
-    * unchanged menu value does not undo the toggle. Both reset when the
-    * game is unloaded (texture_tracker_session_reset). */
-   static int tt_replace_session      = -1;
-   static int tt_replace_menu_applied = -1;
+   /* Replace Textures on/off for this game session, kept across renderer
+    * rebuilds; reset when the game is unloaded. */
+   static struct tt_replace_latch tt_replace = { -1, -1 };
 
    /* Base directory for the texture dump/replacement folders, chosen by the HD
     * Texture Folder option. Falls back to the content directory if the selected
@@ -6124,7 +6116,7 @@ static bool is_power_of_two(int n) {
             size_t vram_count  = HdGpuCache_count(&self->hd_gpu_cache);
             int    fused_count = fused_page_vec_size(&self->fused_pages.pages);
             self->hd_textures_enabled = !self->hd_textures_enabled;
-            tt_replace_session = self->hd_textures_enabled ? 1 : 0; /* survives a renderer rebuild */
+            tt_replace_latch_toggle(&tt_replace, self->hd_textures_enabled);
             if (!self->hd_textures_enabled)
                texture_tracker_flush_hd_state(self); /* free HD VRAM immediately when turned off */
             TT_LOG_VERBOSE(RETRO_LOG_INFO, "Toggling hd textures: %s\n", self->hd_textures_enabled ? "on" : "off");
@@ -7108,12 +7100,9 @@ static int64_t page_bytes(FusionRects *fusion)
             restorablerect_destroy(&loaded);
          }
       }
-      /* Put the VRAM mirror back (the clearRegion above zeroed it). The
-       * upload-rect records are restored above and their HD textures
-       * reloaded below; page-aligned replacements and CLUTs read outside a
-       * tracked upload need the mirror itself, or they hash blank pages
-       * until the game re-uploads them. mirror_store also drops any page
-       * hash memoised in between. */
+      /* Put the VRAM mirror back (the clearRegion above zeroed it):
+       * page-aligned replacements and CLUTs read outside a tracked upload
+       * hash from it. mirror_store also drops any memoised page hash. */
       if (state->vram_mirror != NULL && self->vram_mirror != NULL) {
          TTRect _full = { 0, 0, FB_WIDTH, FB_HEIGHT };
          texture_tracker_mirror_store(self, _full, state->vram_mirror);
@@ -7201,16 +7190,9 @@ void texture_tracker_free(TextureTracker *self)
 void texture_tracker_set_config(TextureTracker *self,
       const TextureTrackerConfig *cfg)
 {
-   /* Replace Textures is edge-applied: the in-game ']' toggle (see
-    * texture_tracker_endFrame) flips hd_textures_enabled directly, and this
-    * setter runs every frame from the option-refresh path - re-stamping the
-    * menu value unconditionally would immediately undo the hotkey. Only a
-    * CHANGED menu value re-applies, matching the old inline apply logic in
-    * the Vulkan renderer. The on/off state itself is the session's
-    * (tt_replace_session), which this tracker then follows: a rebuilt
-    * tracker starts off and picks up whatever was last chosen, by menu or
-    * by toggle. (The old function-static "last applied" outlived the
-    * tracker, so a rebuild left replacement off until the option changed.) */
+   /* Replace Textures follows the session latch: this setter runs every
+    * frame from the option-refresh path, and only a changed menu value
+    * overrides the in-game ']' toggle (texture_tracker_endFrame). */
    self->dump_enabled           = cfg->dump_enabled;
    /* Switching from a Lazy mode to Eager retires the journal (it is inert in
     * Eager): persist any training now, synchronously - this is option-apply
@@ -7225,22 +7207,20 @@ void texture_tracker_set_config(TextureTracker *self,
    self->replacement_fallback   = cfg->replacement_fallback;
    self->reduce_palette_range   = cfg->reduce_palette_range;
 
-   if ((int)cfg->hd_textures_enabled != tt_replace_menu_applied) {
-      tt_replace_session      = cfg->hd_textures_enabled ? 1 : 0;
-      tt_replace_menu_applied = cfg->hd_textures_enabled ? 1 : 0;
-   }
-   if ((self->hd_textures_enabled ? 1 : 0) != tt_replace_session) {
-      self->hd_textures_enabled = tt_replace_session == 1;
-      if (!self->hd_textures_enabled)
-         texture_tracker_flush_hd_state(self); /* free HD VRAM immediately when turned off */
+   {
+      bool on = tt_replace_latch_menu(&tt_replace, cfg->hd_textures_enabled);
+      if (self->hd_textures_enabled != on) {
+         self->hd_textures_enabled = on;
+         if (!on)
+            texture_tracker_flush_hd_state(self); /* free HD VRAM immediately when turned off */
+      }
    }
 }
 
 void texture_tracker_session_reset(void)
 {
    /* A new game starts from the menu value again. */
-   tt_replace_session      = -1;
-   tt_replace_menu_applied = -1;
+   tt_replace_latch_reset(&tt_replace);
 }
 
 void texture_tracker_set_texture_dir_mode(int mode)
