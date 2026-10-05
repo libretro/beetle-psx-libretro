@@ -174,6 +174,53 @@ static INLINE bool rect_intersects(const struct TTRect *self,
    unsigned ybegin = (self->y > rect->y) ? self->y : rect->y;
    return xbegin < xend && ybegin < yend;
 }
+/* VRAM area, in 16-bit words, that a textured primitive samples: texel
+ * bounds [min_u, max_u] x [min_v, max_v] in the page at (page_x, page_y),
+ * shift = log2 texels per word (2 for 4bpp, 1 for 8bpp, 0 for 15bpp).
+ * A masked texture window samples its whole window; texels past 255 wrap
+ * across the whole page. Both renderers route framebuffer feedback and
+ * rendered-texture decisions through this, so their answers match. */
+static INLINE struct TTRect rhi_sampled_vram_rect(
+      unsigned page_x, unsigned page_y,
+      unsigned min_u, unsigned min_v,
+      unsigned max_u, unsigned max_v,
+      unsigned mask_x, unsigned mask_y,
+      unsigned or_x, unsigned or_y,
+      unsigned shift)
+{
+   struct TTRect r;
+   if (mask_x == 0xffu && mask_y == 0xffu)
+   {
+      if (max_u > 255 || max_v > 255)
+      {
+         r.x      = page_x;
+         r.y      = page_y;
+         r.width  = 256u >> shift;
+         r.height = 256;
+      }
+      else
+      {
+         r.x      = page_x + (min_u >> shift);
+         r.y      = page_y + min_v;
+         r.width  = (max_u >> shift) - (min_u >> shift) + 1;
+         r.height = max_v - min_v + 1;
+      }
+   }
+   else
+   {
+      unsigned bits_x = 0;
+      unsigned bits_y = 0;
+      while (bits_x < 8 && (1u << bits_x) <= mask_x)
+         bits_x++;
+      while (bits_y < 8 && (1u << bits_y) <= mask_y)
+         bits_y++;
+      r.x      = page_x + ((or_x & ~((1u << bits_x) - 1u)) >> shift);
+      r.y      = page_y +  (or_y & ~((1u << bits_y) - 1u));
+      r.width  = (1u << bits_x) >> shift;
+      r.height =  1u << bits_y;
+   }
+   return r;
+}
 static INLINE struct TTRect rect_scissor(const struct TTRect *self,
       const struct TTRect *rect)
 {

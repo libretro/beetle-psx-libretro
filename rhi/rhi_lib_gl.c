@@ -2209,64 +2209,21 @@ static TTGpuBackend gl_tt_make_backend(gl_renderer *r)
    return vt;
 }
 
-/* Derive the VRAM rect a textured primitive samples from (mirror of the
- * Vulkan renderer_build_attribs hd_texture_vram derivation, driven by
- * the GL-side texture window fields + per-primitive UV bounds). */
+/* VRAM rect a textured primitive samples from. The HD replacement bounds
+ * keep the texture tracker's boundary convention: the right edge rounds up
+ * to a whole word and the span omits the final column. */
 static TTRect gl_tt_texture_vram_rect(gl_renderer *r,
       unsigned texpage_x, unsigned texpage_y,
       unsigned min_u, unsigned min_v,
       unsigned max_u, unsigned max_v,
       unsigned shift, bool hd_texture)
 {
-   TTRect out = make_rect(0, 0, 0, 0);
-   if (r->tex_x_mask == 0xffu && r->tex_y_mask == 0xffu)
-   {
-      unsigned height = max_v - min_v + 1;
-      if (max_u > 255 || max_v > 255)
-      {
-         /* Wraparound behavior, assume the whole page is hit. */
-         out.x = texpage_x;
-         out.y = texpage_y;
-         out.width = 256u >> shift;
-         out.height = 256;
-      }
-      else
-      {
-         unsigned width;
-         min_u >>= shift;
-         if (hd_texture)
-            max_u = (max_u + (1u << shift) - 1) >> shift;
-         else
-            max_u >>= shift;
-         width = max_u - min_u + 1;
-         out.x = texpage_x + min_u;
-         out.y = texpage_y + min_v;
-         /* HD bounds retain the Vulkan tracker's boundary convention. */
-         out.width = hd_texture ? width - 1 : width;
-         out.height = height;
-      }
-   }
-   else
-   {
-      /* Masked texture window: assume the window rect is the true rect
-       * (renderer_compute_window_rect equivalent). */
-      unsigned mx = r->tex_x_mask;
-      unsigned my = r->tex_y_mask;
-      unsigned mask_bits_x = 0;
-      unsigned mask_bits_y = 0;
-      unsigned x;
-      unsigned y;
-      while ((1u << mask_bits_x) <= mx && mask_bits_x < 8)
-         mask_bits_x++;
-      while ((1u << mask_bits_y) <= my && mask_bits_y < 8)
-         mask_bits_y++;
-      x = r->tex_x_or & ~((1u << mask_bits_x) - 1u);
-      y = r->tex_y_or & ~((1u << mask_bits_y) - 1u);
-      out.x = texpage_x + (x >> shift);
-      out.y = texpage_y + y;
-      out.width = (1u << mask_bits_x) >> shift;
-      out.height = 1u << mask_bits_y;
-   }
+   TTRect out = rhi_sampled_vram_rect(texpage_x, texpage_y,
+         min_u, min_v, max_u, max_v,
+         r->tex_x_mask, r->tex_y_mask, r->tex_x_or, r->tex_y_or, shift);
+   if (hd_texture && r->tex_x_mask == 0xffu && r->tex_y_mask == 0xffu &&
+       max_u <= 255 && max_v <= 255)
+      out.width = ((max_u + (1u << shift) - 1) >> shift) - (min_u >> shift);
    return out;
 }
 

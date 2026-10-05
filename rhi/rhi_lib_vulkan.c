@@ -9182,12 +9182,20 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
          hd_texture_vram.height = effective_rect.height;
       }
 
-      /* Framebuffer queries need the full texel area, not the HD matching
-       * span whose right edge omits a column. Use the hazard tracker's area
-       * so masked and wrapped windows keep their existing extents. */
-      sampled_vram = self->atlas.renderpass.texture_window;
-      sampled_vram.x += self->render_state.texture_offset_x;
-      sampled_vram.y += self->render_state.texture_offset_y;
+      /* Framebuffer queries take the exact sampled area, not the HD
+       * matching span whose right edge omits a column. */
+      sampled_vram = rhi_sampled_vram_rect(
+            self->render_state.texture_offset_x,
+            self->render_state.texture_offset_y,
+            self->render_state.UVLimits.min_u,
+            self->render_state.UVLimits.min_v,
+            self->render_state.UVLimits.max_u,
+            self->render_state.UVLimits.max_v,
+            self->render_state.texture_window.mask_x,
+            self->render_state.texture_window.mask_y,
+            self->render_state.texture_window.or_x,
+            self->render_state.texture_window.or_y,
+            shift);
    }
 
    /* Compute bounding box for the draw call. */
