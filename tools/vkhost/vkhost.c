@@ -15,6 +15,10 @@
  *   VKHOST_VARS: semicolon list of key=value core option overrides.
  *   VKHOST_QUEUE_THREAD: run a second thread on the frontend's queue, the
  *   way a threaded frontend does (see "the frontend's queue" below).
+ *   VKHOST_NEXT_CONTENT: after the teardown (context_destroy, unload,
+ *   deinit), run this content as a second session in the same process -
+ *   the core stays loaded, as with a statically linked frontend - and dump
+ *   its frames to <outdir>/next.
  *
  * Exits non-zero on any validation error, on any use the core makes of
  * the frontend's queue without holding lock_queue, and on any wait it
@@ -586,6 +590,8 @@ int main(int argc, char **argv)
    const char *state_path = NULL;
    int frames = 120;
    const char *outdir = "/tmp/vkhost_out";
+   const char *next_content = getenv("VKHOST_NEXT_CONTENT");
+   char next_outdir[600];
    char cmdbuf[1024];
 
    if (argc < 3)
@@ -630,6 +636,7 @@ int main(int argc, char **argv)
    if (!core) { fprintf(stderr, "dlopen: %s\n", dlerror()); return 2; }
 
 #define SYM(name) *(void **)(&name##_fn) = dlsym(core, #name)
+session:
    { set_env_t retro_set_environment_fn; SYM(retro_set_environment);
      retro_set_environment_fn(env_cb); }
    { void (*retro_init_fn)(void); SYM(retro_init); retro_init_fn(); }
@@ -646,6 +653,15 @@ int main(int argc, char **argv)
       info.path = content;
       if (!retro_load_game_fn(&info))
       { fprintf(stderr, "[vkhost] retro_load_game failed\n"); return 3; }
+   }
+   {
+      /* Every frontend asks for the AV info right after loading; the core
+       * applies its renderer options (internal resolution, VRAM view) there. */
+      struct retro_system_av_info av;
+      void (*retro_get_system_av_info_fn)(struct retro_system_av_info *) =
+         dlsym(core, "retro_get_system_av_info");
+      if (retro_get_system_av_info_fn)
+         retro_get_system_av_info_fn(&av);
    }
 
    if (!negotiation && !hw_render.context_reset)
@@ -836,5 +852,23 @@ run_frames_sw:
            queue_violations, queue_waits_locked);
    { void (*f)(void) = dlsym(core, "retro_unload_game"); if (f) f(); }
    { void (*f)(void) = dlsym(core, "retro_deinit"); if (f) f(); }
+   if (next_content && !(validation_errors || queue_violations || queue_waits_locked))
+   {
+      content      = next_content;
+      next_content = NULL;
+      state_path   = NULL;
+      snprintf(next_outdir, sizeof(next_outdir), "%.590s/next", outdir);
+      outdir = next_outdir;
+      snprintf(cmdbuf, sizeof(cmdbuf), "mkdir -p %s", outdir);
+      if (system(cmdbuf) != 0)
+         fprintf(stderr, "[vkhost] cannot create %s\n", outdir);
+      memset(&hw_render, 0, sizeof(hw_render));
+      negotiation = NULL;
+      last_image  = NULL;
+      frame_valid = 0;
+      last_w = last_h = 0;
+      fprintf(stderr, "[vkhost] next session: %s\n", content);
+      goto session;
+   }
    return (validation_errors || queue_violations || queue_waits_locked) ? 5 : 0;
 }

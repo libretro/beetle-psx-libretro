@@ -20236,6 +20236,10 @@ bool rhi_vulkan_open(bool is_pal)
    libretro_log   = log_cb;
    content_is_pal = is_pal;
 
+   /* A new game starts from blank VRAM: drop what the previous context
+    * teardown kept for a renderer rebuild. */
+   savestate_destroy(&save_state);
+
    hw_render.context_type    = RETRO_HW_CONTEXT_VULKAN;
    hw_render.version_major   = VK_MAKE_VERSION(1, 0, 32);
    hw_render.version_minor   = 0;
