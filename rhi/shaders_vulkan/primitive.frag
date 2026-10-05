@@ -218,8 +218,6 @@ void main()
 	}
 	else if (!raw_texture)
 	{
-		/* Preserve the higher-colour truncation bias, but do not let the
-		 * 16F target retain a negative value for transparent black. */
-		FragColor.rgb = max(FragColor.rgb - 0.49 / 255.0, vec3(0.0));
+		FragColor.rgb = truncate_color8(FragColor.rgb);
 	}
 }

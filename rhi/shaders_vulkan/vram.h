@@ -16,9 +16,9 @@ layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
 #else
 /* MSAA feedback can read a resolved snapshot while writing per sample. */
 #if defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
-layout(set = 0, binding = 0) uniform mediump sampler2DMS uFramebufferMS;
+layout(set = 0, binding = 0) uniform highp sampler2DMS uFramebufferMS;
 #else
-layout(set = 0, binding = 0) uniform mediump sampler2D uFramebuffer;
+layout(set = 0, binding = 0) uniform highp sampler2D uFramebuffer;
 #endif
 #endif
 layout(constant_id = 4) const int SHIFT = 0;
