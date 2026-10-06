@@ -11,7 +11,9 @@
 #      exercised under TSan.
 #   2. AddressSanitizer + UBSan, three workers, same tiny buffer, in
 #      execute, run_interpreter and disabled modes.
-#   3. A plain THREADED_RECOMPILER=0 build, execute mode: the
+#   3. The single-core shape: no worker thread, the second request for a
+#      block compiles it inline on the emulation thread.
+#   4. A plain THREADED_RECOMPILER=0 build, execute mode: the
 #      single-threaded install path must stay bit-identical.
 #
 # usage: tools/lightrec/run.sh [frames]
@@ -53,6 +55,11 @@ lane_build DEBUG=1 SANITIZER=address,undefined \
 lane_run execute
 lane_run run_interpreter
 lane_run disabled
+
+echo "== lane 2b: ASan+UBSan, single-core shape (no worker, inline compile)"
+lane_build DEBUG=1 SANITIZER=address,undefined \
+	EXTRA_FLAGS="-fno-sanitize=alignment -DLIGHTREC_TEST_WORKERS=0 -DLIGHTREC_CODEBUFFER_SIZE=262144"
+lane_run execute
 
 echo "== lane 3: non-threaded recompiler"
 $CC -O1 -g -Ilibretro-common/include -o "$HOST" tools/lightrec/lightrec_host.c -ldl

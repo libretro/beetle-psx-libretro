@@ -106,7 +106,6 @@ struct recompiler_thd {
 struct recompiler {
 	struct lightrec_state *state;
 	retro_eventcount_t work;	/* workers sleep: a slot went PENDING */
-	retro_eventcount_t done;	/* single-core yield: a result landed */
 	retro_atomic_int_t stop;
 	retro_atomic_int_t pause;
 	retro_atomic_int_t must_flush;
@@ -129,7 +128,11 @@ struct recompiler {
 	unsigned int run_len[REC_CHUNKS];
 	unsigned int live[REC_CHUNKS];
 
-	unsigned int nb_recs, nb_cpus;
+	/* nb_recs is 0 on a single-core host: there is nothing for a worker
+	 * to run on while the emulation thread runs, so the second request
+	 * for a block compiles it inline with inline_cstate instead. */
+	unsigned int nb_recs, nb_arenas;
+	struct lightrec_cstate *inline_cstate;
 	struct rec_arena *arenas;
 	struct recompiler_thd thds[];
 };
@@ -351,8 +354,8 @@ void lightrec_rec_code_free(struct recompiler *rec, void *ptr)
 			&rec->owner[rec_chunk_of(rec, ptr)]);
 	arena = &rec->arenas[idx];
 
-	if (rec->joined) {
-		/* Workers are gone: the arena is ours. */
+	if (rec->joined || !rec->nb_recs) {
+		/* No worker owns it: the arena is ours. */
 		rec_arena_drain(rec, idx);
 		rec_arena_free_now(rec, idx, ptr);
 		return;
@@ -386,7 +389,7 @@ void lightrec_rec_code_free_flush(struct recompiler *rec)
 {
 	unsigned int i;
 
-	for (i = 0; i < rec->nb_recs; i++)
+	for (i = 0; i < rec->nb_arenas; i++)
 		rec_publish_pending(rec, i);
 }
 
@@ -397,7 +400,7 @@ static bool rec_arenas_init(struct recompiler *rec,
 	unsigned int i;
 
 	rec->arenas = lightrec_calloc(rec->state, MEM_FOR_LIGHTREC,
-				      rec->nb_recs * sizeof(*rec->arenas));
+				      rec->nb_arenas * sizeof(*rec->arenas));
 	if (!rec->arenas)
 		return false;
 
@@ -412,7 +415,7 @@ static bool rec_arenas_init(struct recompiler *rec,
 	for (i = 0; i < REC_CHUNKS; i++)
 		retro_atomic_int_init(&rec->owner[i], 0);
 
-	for (i = 0; i < rec->nb_recs; i++) {
+	for (i = 0; i < rec->nb_arenas; i++) {
 		struct rec_arena *arena = &rec->arenas[i];
 
 		arena->control = lightrec_malloc(rec->state, MEM_FOR_LIGHTREC,
@@ -439,7 +442,7 @@ static void rec_arenas_free(struct recompiler *rec)
 	if (!rec->arenas)
 		return;
 
-	for (i = 0; i < rec->nb_recs; i++) {
+	for (i = 0; i < rec->nb_arenas; i++) {
 		struct rec_arena *arena = &rec->arenas[i];
 
 		batch = (struct rec_free_batch *)retro_atomic_exchange_ptr(&arena->inbox, NULL);
@@ -460,7 +463,7 @@ static void rec_arenas_free(struct recompiler *rec)
 	}
 
 	lightrec_free(rec->state, MEM_FOR_LIGHTREC,
-		      rec->nb_recs * sizeof(*rec->arenas), rec->arenas);
+		      rec->nb_arenas * sizeof(*rec->arenas), rec->arenas);
 	rec->arenas = NULL;
 }
 
@@ -624,7 +627,6 @@ static void lightrec_recompiler_thd(void *d)
 			rec_push_result(rec, c);
 
 		retro_atomic_store_release_int(&slot->state, SLOT_FREE);
-		retro_eventcount_notify(&rec->done);
 	}
 }
 
@@ -639,11 +641,10 @@ struct recompiler *lightrec_recompiler_init(struct lightrec_state *state,
 	unsigned int i, nb_recs, nb_cpus;
 
 	nb_cpus = get_processors_count();
-	nb_recs = nb_cpus < 2 ? 1 : nb_cpus - 1;
+	nb_recs = nb_cpus < 2 ? 0 : nb_cpus - 1;
 #ifdef LIGHTREC_TEST_WORKERS
 	/* Regression lane: force a worker count regardless of the host. */
 	nb_recs = LIGHTREC_TEST_WORKERS;
-	nb_cpus = nb_recs + 1;
 #endif
 
 	rec = lightrec_calloc(state, MEM_FOR_LIGHTREC, sizeof(*rec)
@@ -655,7 +656,7 @@ struct recompiler *lightrec_recompiler_init(struct lightrec_state *state,
 
 	rec->state = state;
 	rec->nb_recs = nb_recs;
-	rec->nb_cpus = nb_cpus;
+	rec->nb_arenas = nb_recs ? nb_recs : 1;
 	rec->joined = true;
 	retro_atomic_int_init(&rec->stop, 0);
 	retro_atomic_int_init(&rec->pause, 0);
@@ -679,11 +680,6 @@ struct recompiler *lightrec_recompiler_init(struct lightrec_state *state,
 		goto err_free_rec;
 	}
 
-	if (!retro_eventcount_init(&rec->done)) {
-		pr_err("Cannot init eventcount\n");
-		goto err_free_work;
-	}
-
 	if (codebuf && codebuf->address && !rec_arenas_init(rec, codebuf)) {
 		pr_err("Cannot create recompiler: Out of memory\n");
 		goto err_free_arenas;
@@ -698,6 +694,15 @@ struct recompiler *lightrec_recompiler_init(struct lightrec_state *state,
 		rec->thds[i].cstate->arena = i;
 	}
 
+	if (!nb_recs) {
+		rec->inline_cstate = lightrec_create_cstate(state);
+		if (!rec->inline_cstate) {
+			pr_err("Cannot create recompiler: Out of memory\n");
+			goto err_free_cstates;
+		}
+		rec->inline_cstate->arena = 0;
+	}
+
 	rec->joined = false;
 
 	for (i = 0; i < nb_recs; i++) {
@@ -709,7 +714,10 @@ struct recompiler *lightrec_recompiler_init(struct lightrec_state *state,
 		}
 	}
 
-	pr_info("Threaded recompiler started with %u workers.\n", nb_recs);
+	if (nb_recs)
+		pr_info("Threaded recompiler started with %u workers.\n", nb_recs);
+	else
+		pr_info("Single core: blocks compile inline on their second request.\n");
 
 	return rec;
 
@@ -722,14 +730,14 @@ err_join:
 	}
 	rec->joined = true;
 err_free_cstates:
+	if (rec->inline_cstate)
+		lightrec_free_cstate(rec->inline_cstate);
 	for (i = 0; i < nb_recs; i++) {
 		if (rec->thds[i].cstate)
 			lightrec_free_cstate(rec->thds[i].cstate);
 	}
 err_free_arenas:
 	rec_arenas_free(rec);
-	retro_eventcount_free(&rec->done);
-err_free_work:
 	retro_eventcount_free(&rec->work);
 err_free_rec:
 	lightrec_free(state, MEM_FOR_LIGHTREC,
@@ -773,9 +781,10 @@ void lightrec_free_recompiler(struct recompiler *rec)
 
 	for (i = 0; i < rec->nb_recs; i++)
 		lightrec_free_cstate(rec->thds[i].cstate);
+	if (rec->inline_cstate)
+		lightrec_free_cstate(rec->inline_cstate);
 
 	rec_arenas_free(rec);
-	retro_eventcount_free(&rec->done);
 	retro_eventcount_free(&rec->work);
 	lightrec_free(rec->state, MEM_FOR_LIGHTREC,
 		      sizeof(*rec) + rec->nb_recs * sizeof(*rec->thds), rec);
@@ -785,25 +794,42 @@ void lightrec_free_recompiler(struct recompiler *rec)
 /* Emulation-thread API                                                */
 /* ------------------------------------------------------------------ */
 
-/* Single-core: the worker only runs when we sleep. Wait for the slot to
- * turn over, then the dispatcher loop installs the result. */
-static void rec_yield_to_worker(struct recompiler *rec, struct rec_slot *slot,
-				struct block *block)
+/* Single-core host: a block requested again while still queued is
+ * compiled right here, on the emulation thread. The first request
+ * stays queued so the interpreter's first pass still tags the block. */
+static void rec_compile_inline(struct recompiler *rec, struct rec_slot *slot,
+			       struct block *block)
 {
-	int key, state;
+	struct lightrec_compiled *c;
+	int ret;
 
-	for (;;) {
-		key = retro_eventcount_prepare_wait(&rec->done);
-		state = retro_atomic_load_acquire_int(&slot->state);
+	if (retro_atomic_load_acquire_int(&rec->pause))
+		return;
 
-		if (state == SLOT_FREE || slot->block != block
-		    || retro_atomic_load_acquire_int(&rec->pause)) {
-			retro_eventcount_cancel_wait(&rec->done);
-			return;
+	if (!retro_atomic_cas_int(&slot->state, SLOT_PENDING, SLOT_FREE))
+		return;
+
+	ret = lightrec_compile_block_code(rec->inline_cstate, block, &c);
+	if (ret == -ENOMEM) {
+		/* Code buffer is full: same recovery as a worker's, run
+		 * directly since this is the thread that reaps. */
+		if (!retro_atomic_exchange_int(&rec->must_flush, 1)) {
+			rec_cancel_all(rec);
+			lightrec_reaper_add(rec->state->reaper,
+					    lightrec_flush_code_buffer, rec);
 		}
-
-		retro_eventcount_commit_wait(&rec->done, key);
+		return;
 	}
+
+	if (ret) {
+		pr_err("Unable to compile block at "PC_FMT": %d\n",
+		       block->pc, ret);
+		return;
+	}
+
+	lightrec_install_block(rec->state, block, c);
+	lightrec_free(rec->state, MEM_FOR_LIGHTREC,
+		      sizeof(*c) + c->nb_targets * sizeof(c->targets[0]), c);
 }
 
 int lightrec_recompiler_add(struct recompiler *rec, struct block *block)
@@ -839,15 +865,11 @@ int lightrec_recompiler_add(struct recompiler *rec, struct block *block)
 			 * increment its counter to increase its priority */
 			retro_atomic_fetch_add_int(&slot->requests, 1);
 
-			if (rec->nb_cpus == 1) {
-				/* On single-core CPUs, if we got a request for
-				 * a block that's already in the queue, we'll
-				 * probably get many more before the compiler
-				 * thread can run, which means that the block
-				 * will be interpreted until then, wasting a lot
-				 * of performance. In that case, it is better to
-				 * just let the compiler thread run now. */
-				rec_yield_to_worker(rec, slot, block);
+			if (!rec->nb_recs) {
+				/* On single-core CPUs a worker would only
+				 * run while we sleep, and the block would be
+				 * interpreted until then. Compile it now. */
+				rec_compile_inline(rec, slot, block);
 			}
 			return 0;
 		}
@@ -859,6 +881,12 @@ int lightrec_recompiler_add(struct recompiler *rec, struct block *block)
 			 * another one in the queue - increment its counter to
 			 * increase its priority */
 			retro_atomic_fetch_add_int(&slot->requests, 1);
+
+			/* Single-core: nobody else will compile the covering
+			 * block, and the dispatcher keeps asking for this one
+			 * until it or the covering block is installed. */
+			if (!rec->nb_recs)
+				rec_compile_inline(rec, slot, slot->block);
 			return 0;
 		}
 	}
