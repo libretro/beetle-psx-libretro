@@ -17,7 +17,4 @@ void lightrec_reaper_destroy(struct reaper *reaper);
 int lightrec_reaper_add(struct reaper *reaper, reap_func_t f, void *data);
 void lightrec_reaper_reap(struct reaper *reaper);
 
-void lightrec_reaper_pause(struct reaper *reaper);
-void lightrec_reaper_continue(struct reaper *reaper);
-
 #endif /* __LIGHTREC_REAPER_H__ */

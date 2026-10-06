@@ -1,23 +1,23 @@
-// SPDX-License-Identifier: LGPL-2.1-or-later
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 /*
  * Copyright (C) 2020-2021 Paul Cercueil <paul@crapouillou.net>
  */
 
-/* libretro: rthreads rather than raw pthreads, matching recompiler.c; see
- * the note there for why this include comes first and ARRAY_SIZE is
- * undefined before the lightrec headers. */
-#include <rthreads/rthreads.h>
-#undef ARRAY_SIZE
-
+/* libretro: the reaper is now private to the emulation thread. Workers
+ * no longer touch the code LUT, the block cache or the reap list (their
+ * results are installed by the emulation thread, see recompiler.c), so
+ * there is nothing to lock and nothing to pause. A reap job that cannot
+ * run yet - a block still held by a worker - re-adds itself and runs on
+ * the next pass instead of waiting. */
 #include "blockcache.h"
 #include "debug.h"
 #include "lightrec-private.h"
 #include "memmanager.h"
+#include "recompiler.h"
 #include "slist.h"
 #include "reaper.h"
 
 #include <errno.h>
-#include <stdatomic.h>
 #include <stdbool.h>
 
 struct reaper_elm {
@@ -28,12 +28,7 @@ struct reaper_elm {
 
 struct reaper {
 	struct lightrec_state *state;
-	slock_t *mutex;
-	scond_t *cond;
 	struct slist_elm reap_list;
-
-	bool running;
-	atomic_uint sem;
 };
 
 struct reaper *lightrec_reaper_init(struct lightrec_state *state)
@@ -47,37 +42,18 @@ struct reaper *lightrec_reaper_init(struct lightrec_state *state)
 	}
 
 	reaper->state = state;
-	reaper->running = false;
-	reaper->sem = 0;
 	slist_init(&reaper->reap_list);
 
-	reaper->mutex = slock_new();
-	if (!reaper->mutex) {
-		pr_err("Cannot init mutex variable\n");
-		goto err_free_reaper;
-	}
-
-	reaper->cond = scond_new();
-	if (!reaper->cond) {
-		pr_err("Cannot init cond variable\n");
-		goto err_destroy_mutex;
-	}
-
 	return reaper;
-
-err_destroy_mutex:
-	slock_free(reaper->mutex);
-err_free_reaper:
-	lightrec_free(reaper->state, MEM_FOR_LIGHTREC, sizeof(*reaper), reaper);
-	return NULL;
 }
 
 void lightrec_reaper_destroy(struct reaper *reaper)
 {
-	lightrec_reaper_reap(reaper);
+	/* Deferred frees re-add themselves while a worker holds the block;
+	 * the workers are joined by now, so a pass drains everything. */
+	while (!slist_empty(&reaper->reap_list))
+		lightrec_reaper_reap(reaper);
 
-	scond_free(reaper->cond);
-	slock_free(reaper->mutex);
 	lightrec_free(reaper->state, MEM_FOR_LIGHTREC, sizeof(*reaper), reaper);
 }
 
@@ -85,59 +61,45 @@ int lightrec_reaper_add(struct reaper *reaper, reap_func_t f, void *data)
 {
 	struct reaper_elm *reaper_elm;
 	struct slist_elm *elm;
-	int ret = 0;
-
-	slock_lock(reaper->mutex);
 
 	for (elm = reaper->reap_list.next; elm; elm = elm->next) {
 		reaper_elm = container_of(elm, struct reaper_elm, slist);
 
 		if (reaper_elm->data == data)
-			goto out_unlock;
+			return 0;
 	}
 
 	reaper_elm = lightrec_malloc(reaper->state, MEM_FOR_LIGHTREC,
 				     sizeof(*reaper_elm));
 	if (!reaper_elm) {
 		pr_err("Cannot add reaper entry: Out of memory\n");
-		ret = -ENOMEM;
-		goto out_unlock;
+		return -ENOMEM;
 	}
 
 	reaper_elm->func = f;
 	reaper_elm->data = data;
 	slist_append(&reaper->reap_list, &reaper_elm->slist);
 
-out_unlock:
-	slock_unlock(reaper->mutex);
-	return ret;
-}
-
-static bool lightrec_reaper_can_reap(struct reaper *reaper)
-{
-	return !atomic_load_explicit(&reaper->sem, memory_order_relaxed);
+	return 0;
 }
 
 void lightrec_reaper_reap(struct reaper *reaper)
 {
 	struct reaper_elm *reaper_elm;
-	struct slist_elm *elm;
+	struct slist_elm *elm, pending;
 
 	/* This function runs on every exit from the execution loop, and
-	 * the list is empty the vast majority of the time. Checking the
-	 * head pointer without the lock is safe: a stale non-NULL read
-	 * takes the lock and finds nothing to do, and a stale NULL read
-	 * just postpones the reaping to the next call. */
+	 * the list is empty the vast majority of the time. */
 	if (slist_empty(&reaper->reap_list))
 		return;
 
-	slock_lock(reaper->mutex);
+	/* Take the current list: a job that defers itself lands on the
+	 * fresh one and waits for the next pass rather than spinning here. */
+	pending.next = reaper->reap_list.next;
+	slist_init(&reaper->reap_list);
 
-	while (lightrec_reaper_can_reap(reaper) &&
-	       !!(elm = slist_first(&reaper->reap_list))) {
-		slist_remove(&reaper->reap_list, elm);
-		reaper->running = true;
-		slock_unlock(reaper->mutex);
+	while (!!(elm = slist_first(&pending))) {
+		slist_remove(&pending, elm);
 
 		reaper_elm = container_of(elm, struct reaper_elm, slist);
 
@@ -145,26 +107,10 @@ void lightrec_reaper_reap(struct reaper *reaper)
 
 		lightrec_free(reaper->state, MEM_FOR_LIGHTREC,
 			      sizeof(*reaper_elm), reaper_elm);
-
-		slock_lock(reaper->mutex);
-		reaper->running = false;
-		scond_broadcast(reaper->cond);
 	}
 
-	slock_unlock(reaper->mutex);
-}
-
-void lightrec_reaper_pause(struct reaper *reaper)
-{
-	atomic_fetch_add_explicit(&reaper->sem, 1, memory_order_relaxed);
-
-	slock_lock(reaper->mutex);
-	while (reaper->running)
-		scond_wait(reaper->cond, reaper->mutex);
-	slock_unlock(reaper->mutex);
-}
-
-void lightrec_reaper_continue(struct reaper *reaper)
-{
-	atomic_fetch_sub_explicit(&reaper->sem, 1, memory_order_relaxed);
+	/* Hand the code freed above to its owners without waiting for a
+	 * batch to fill. */
+	if (ENABLE_THREADED_COMPILER && reaper->state->rec)
+		lightrec_rec_code_free_flush(reaper->state->rec);
 }
