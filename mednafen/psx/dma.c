@@ -316,7 +316,7 @@ static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
                break;
          }
          if(CRModeCache & 0x1)
-            GPU_WakeFromIdle(timestamp);
+            GPU_WakeFromIdle(false);  /* no-op unless the event is virtual */
          break;
       case 3:
          switch (CRModeCache)
@@ -568,7 +568,7 @@ int32_t DMA_Update(const int32_t timestamp)
 
    lastts = timestamp;
 
-   GPU_Update(timestamp);
+   GPU_UpdatePassive(timestamp);
    MDEC_Run(clocks);
 
    for (i = 0; i < 7; i++)

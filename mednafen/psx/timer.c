@@ -398,7 +398,7 @@ void MDFN_FASTCALL TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V)
                 break;
 
       case 0x4: if(which == 0)
-                   GPU_WakeFromIdle(timestamp);
+                   GPU_WakeFromIdle(true);
                 Timers[which].Mode = (V & 0x3FF) | (Timers[which].Mode & 0x1C00);
                 Timers[which].IRQDone = false;
                 Timers[which].Counter = 0;

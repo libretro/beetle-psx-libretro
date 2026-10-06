@@ -10,7 +10,9 @@ name: Lightrec threaded compiler
 # program and fixed iteration counts for both make the lane a timing
 # contract as well: the GPU's idle scheduling, the event quantum and the
 # recompiler must leave the emulated timing the programs observe
-# exactly where it is.
+# exactly where it is. Two more programs read GPUSTAT and the dot-clock
+# and hblank timers after every draw and must reproduce fixed sums, so
+# a schedule change that moves a single draw-budget refill fails here.
 
 on:
   push:

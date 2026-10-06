@@ -1083,6 +1083,8 @@ static void * get_next_block_func(struct lightrec_state *state, u32 pc)
 	int err;
 
 	do {
+		state->check_cycle_delta = state->target_cycle - state->current_cycle;
+
 		/* Results the workers published since the last pass go into
 		 * the LUT before it is consulted. */
 		if (ENABLE_THREADED_COMPILER)
@@ -1499,6 +1501,10 @@ static struct block * generate_dispatcher(struct lightrec_state *state)
 		jit_movr(JIT_V(i + FIRST_REG), JIT_V(i + FIRST_REG));
 
 	loop = jit_label();
+
+	/* Every block entry is a cycle-budget check point */
+	jit_stxi_i(lightrec_offset(check_cycle_delta), LIGHTREC_REG_STATE,
+		   LIGHTREC_REG_CYCLE);
 
 	if (!arch_has_fast_mask())
 		jit_movi(JIT_R1, 0x1fffffff);
@@ -2365,6 +2371,8 @@ u32 lightrec_run_interpreter(struct lightrec_state *state, u32 pc,
 	state->target_cycle = target_cycle;
 
 	do {
+		state->check_cycle_delta = state->target_cycle - state->current_cycle;
+
 		block = lightrec_get_block(state, pc);
 		if (!block)
 			break;
@@ -2695,6 +2703,11 @@ u32 lightrec_exit_flags(struct lightrec_state *state)
 u32 lightrec_current_cycle_count(const struct lightrec_state *state)
 {
 	return state->current_cycle;
+}
+
+u32 lightrec_last_check_cycle_count(const struct lightrec_state *state)
+{
+	return state->target_cycle - state->check_cycle_delta;
 }
 
 void lightrec_reset_cycle_count(struct lightrec_state *state, u32 cycles)

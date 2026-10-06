@@ -1438,8 +1438,11 @@ void GPU_Power(void)
    GPU.DrawTimeAvail = 0;
 
    GPU.lastts = 0;
-   GPU.idle_deferred = false;
-   GPU.idle_base = 0;
+   GPU.idle_virtual = false;
+   GPU.idle_last = 0;
+   GPU.idle_line_end = 0;
+   GPU.idle_write_seen = false;
+   GPU.idle_streak = 0;
 
    GPU_SoftReset();
 
@@ -1449,8 +1452,11 @@ void GPU_Power(void)
 
 void GPU_ResetTS(void)
 {
+   /* Called right after a ForceEventUpdates() that set lastts to the
+    * rebase point, so lastts is the amount every timestamp loses. */
+   GPU.idle_last -= GPU.lastts;
+   GPU.idle_line_end -= GPU.lastts;
    GPU.lastts = 0;
-   GPU.idle_base = 0;
 }
 
 
@@ -1593,7 +1599,9 @@ static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
 
 void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 {
-   GPU_WakeFromIdle(timestamp);
+   GPU.idle_write_seen = true;
+   if(GPU.idle_virtual)
+      GPU_WakeFromIdle(true);
 
    V <<= (A & 3) * 8;
 
@@ -1722,6 +1730,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 
 void GPU_WriteDMA(uint32_t V, uint32_t addr)
 {
+   GPU.idle_write_seen = true;
    GPU_WriteCB(V, addr);
 }
 
@@ -1991,34 +2000,100 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
    }
 }
 
-static int32_t GPU_UpdateInt(const int32_t sys_timestamp, bool may_idle);
+enum
+{
+   GPU_UPD_EVENT,    /* the GPU's own event (or ForceEventUpdates) */
+   GPU_UPD_PASSIVE,  /* another device's event: idle schedule untouched */
+   GPU_UPD_CATCHUP   /* a wake bringing the state to a grid point */
+};
+
+static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode);
 
 int32_t GPU_Update(const int32_t sys_timestamp)
 {
-   return GPU_UpdateInt(sys_timestamp, true);
+   return GPU_UpdateInt(sys_timestamp, GPU_UPD_EVENT);
 }
 
-void GPU_WakeFromIdle(const int32_t timestamp)
+void GPU_UpdatePassive(const int32_t sys_timestamp)
 {
-   int32_t grid;
+   GPU_UpdateInt(sys_timestamp, GPU_UPD_PASSIVE);
+}
 
-   if(!GPU.idle_deferred)
+/* The next regular grid point after a virtual one, as GPU_Update()
+ * would have scheduled it from there: EventCycles later, or the end of
+ * the line if that comes first. */
+static INLINE int32_t GPU_NextGridPoint(const int32_t at)
+{
+   int32_t nt = at + EventCycles;
+
+   if(nt >= GPU.idle_line_end)
+      nt = GPU.idle_line_end;
+
+   return nt;
+}
+
+/* Bring the state to the last grid point the cadence ran. It is exact
+ * over any span, so one update lands where the skipped updates would
+ * have - unless another device's update already carried it past. */
+static INLINE void GPU_CatchUp(void)
+{
+   if(GPU.idle_last > GPU.lastts)
+      GPU_UpdateInt(GPU.idle_last, GPU_UPD_CATCHUP);
+}
+
+int32_t GPU_VirtualAdvance(const int32_t event_time)
+{
+   int32_t nt;
+
+   GPU.idle_last = event_time;
+   nt = GPU_NextGridPoint(event_time);
+
+   if(nt == GPU.idle_line_end)
+   {
+      /* The line ends there: that update is real, and a write before
+       * it must see the state as of this grid point. */
+      GPU_CatchUp();
+      GPU.idle_virtual = false;
+      PSX_GPUEventVirtual(false);
+   }
+
+   return nt;
+}
+
+void GPU_WakeFromIdle(bool from_cpu)
+{
+   int32_t check, at;
+
+   if(!GPU.idle_virtual)
       return;
 
-   GPU.idle_deferred = false;
+   if(from_cpu)
+   {
+      /* The regular cadence would have stopped the CPU at every grid
+       * point up to its last event check and run the update there;
+       * advance the event through those exactly as the handler would
+       * have, one PSX_SetEventNT() per point so the event list ends up
+       * in the same order. */
+      check = CPU_LastEventCheckTS();
+      at    = PSX_EventTS(PSX_EVENT_GPU);
 
-   /* The last regular grid point at or before now. Nothing happened
-    * to the GPU in between, so one update over the whole span lands
-    * in the same state the grid's updates would have, and the next
-    * event lands on the same grid point. */
-   grid = GPU.idle_base;
-   if(timestamp > grid)
-      grid += ((timestamp - grid) / EventCycles) * EventCycles;
+      while(GPU.idle_virtual && at <= check)
+      {
+         at = GPU_VirtualAdvance(at);
+         PSX_SetEventNT(PSX_EVENT_GPU, at);
+      }
+   }
 
-   PSX_SetEventNT(PSX_EVENT_GPU, GPU_UpdateInt(grid, false));
+   if(!GPU.idle_virtual)
+      return;
+
+   GPU_CatchUp();
+
+   GPU.idle_virtual = false;
+   PSX_GPUEventVirtual(false);
 }
 
-static int32_t GPU_UpdateInt(const int32_t sys_timestamp, bool may_idle)
+static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
 {
    int32_t gpu_clocks;
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
@@ -2520,17 +2595,41 @@ TheEnd:
     * remember the grid point, so a write can resume the grid exactly
     * where it would have been. A caller catching up to the grid never
     * idles: the write that follows needs the regular cadence. */
-   if (may_idle && next_dt > EventCycles
+   if (mode == GPU_UPD_EVENT)
+   {
+      if (GPU.idle_write_seen)
+      {
+         GPU.idle_write_seen = false;
+         GPU.idle_streak = 0;
+      }
+      else if (GPU.idle_streak < 2)
+         GPU.idle_streak++;
+   }
+
+   if (mode == GPU_UPD_EVENT && GPU.idle_streak >= 2 && next_dt > EventCycles
        && GPU_BlitterFIFO.in_count == 0 && GPU.InCmd == INCMD_NONE
        && GPU.DrawTimeAvail >= (2*EventCycles << psx_gpu_overclock_shift)
        && !TIMER_DotClockActive())
    {
-      GPU.idle_deferred = true;
-      GPU.idle_base = sys_timestamp;
-      return(sys_timestamp + next_dt);
+      /* The event keeps its regular EventCycles cadence but goes
+       * virtual until the end of the line: nothing it would do there
+       * changes anything, and the CPU need not stop for it. */
+      GPU.idle_virtual  = true;
+      GPU.idle_last     = sys_timestamp;
+      GPU.idle_line_end = sys_timestamp + next_dt;
+      PSX_GPUEventVirtual(true);
+      return(sys_timestamp + EventCycles);
    }
 
-   GPU.idle_deferred = false;
+   if (mode == GPU_UPD_EVENT && GPU.idle_virtual)
+   {
+      /* A real update at the end of the line while the event was
+       * virtual: it is real from here (the list entry is re-armed by
+       * the caller). */
+      GPU.idle_virtual = false;
+      PSX_GPUEventVirtual(false);
+   }
+
    if (next_dt > EventCycles) next_dt = EventCycles;
 
    return(sys_timestamp + next_dt);
@@ -2663,8 +2762,11 @@ void GPU_RestoreStateP1(bool load)
 {
    /* The idle schedule is not part of a state; the ForceEventUpdates()
     * after a load puts the GPU on a fresh grid, as it always has. */
-   if (load)
-      GPU.idle_deferred = false;
+   if (load && GPU.idle_virtual)
+   {
+      GPU.idle_virtual = false;
+      PSX_GPUEventVirtual(false);
+   }
 
    if (!load && !rhi_intf_has_software_renderer())
    {

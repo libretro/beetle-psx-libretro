@@ -239,8 +239,12 @@ static void rec_J(struct lightrec_cstate *state, const struct block *block, u16 
 
 		if (is_forward)
 			branch->branch = jit_b();
-		else
+		else {
+			/* A back-edge is a cycle-budget check point */
+			jit_stxi_i(lightrec_offset(check_cycle_delta),
+				   LIGHTREC_REG_STATE, LIGHTREC_REG_CYCLE);
 			branch->branch = jit_bgti(LIGHTREC_REG_CYCLE, 0);
+		}
 
 		if (!is_forward) {
 			/* The cycle budget ran out: exit via the
@@ -387,8 +391,12 @@ static void rec_b(struct lightrec_cstate *state, const struct block *block, u16 
 			branch->branch = jit_new_node_pww(code2, NULL, rs, rt);
 		else if (is_forward)
 			branch->branch = jit_b();
-		else
+		else {
+			/* A back-edge is a cycle-budget check point */
+			jit_stxi_i(lightrec_offset(check_cycle_delta),
+				   LIGHTREC_REG_STATE, LIGHTREC_REG_CYCLE);
 			branch->branch = jit_bgti(LIGHTREC_REG_CYCLE, 0);
+		}
 	}
 
 	if (!op_flag_local_branch(op->flags) || !is_forward) {

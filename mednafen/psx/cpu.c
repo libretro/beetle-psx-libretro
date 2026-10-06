@@ -121,6 +121,8 @@ int32_t                  cpu_next_event_ts;
 static uint32_t          cpu_IPCache;
 static uint32_t          cpu_BIU;
 static bool              cpu_Halted;
+/* Timestamp at the interpreter's last event check (see CPU_LastEventCheckTS). */
+static int32_t           cpu_last_check_ts;
 static CPU_CP0           cpu_CP0;
 #ifdef HAVE_LIGHTREC
 /* cache_buf shadows the first 64KB of MainRAM while the cache-isolated
@@ -912,6 +914,9 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
   {
    uint32_t instr;
    uint32_t opf;
+
+   /* The comparison above is the interpreter's event check point. */
+   cpu_last_check_ts = timestamp;
 
    /* Zero must be zero...until the Master Plan is enacted. */
    GPR[0] = 0;
@@ -3819,3 +3824,17 @@ static void lightrec_plugin_shutdown(void)
 }
 
 #endif
+
+/* The timestamp at which the running CPU core last compared its cycle
+ * budget against the next event: the interpreter checks before every
+ * instruction, lightrec at block entries and loop back-edges. Up to this
+ * point every event the regular cadence would have fired has been
+ * processed; past it, a device skipping its events must not catch up. */
+int32_t CPU_LastEventCheckTS(void)
+{
+#ifdef HAVE_LIGHTREC
+   if (psx_dynarec != DYNAREC_DISABLED && lightrec_state)
+      return (int32_t)lightrec_last_check_cycle_count(lightrec_state);
+#endif
+   return cpu_last_check_ts;
+}

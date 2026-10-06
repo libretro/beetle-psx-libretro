@@ -205,6 +205,13 @@ struct lightrec_state {
 	u32 current_cycle;
 	u32 target_cycle;
 	u32 exit_flags;
+	/* target_cycle minus the cycle count at the last point where the
+	 * running code compared its cycle budget against the target: a
+	 * block entry, a local loop back-edge, or an iteration of the C
+	 * dispatcher loop. The frontend asks for it when a device needs
+	 * to know which of its skipped events the old cadence would have
+	 * run before an I/O access in the current block. */
+	u32 check_cycle_delta;
 	u32 old_cycle_counter;
 	u32 cycles_per_op;
 	u32 cycles_per_op_mem;

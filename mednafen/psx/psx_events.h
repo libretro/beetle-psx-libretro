@@ -2,6 +2,7 @@
 #define __MDFN_PSX_PSX_EVENTS_H
 
 #include <stdint.h>
+#include <boolean.h>
 
 #include <retro_inline.h>
 
@@ -28,6 +29,12 @@ enum
 #define PSX_EVENT_MAXTS             0x20000000
 
 void PSX_SetEventNT(const int type, const int32_t next_timestamp);
+
+/* Mark the GPU's event virtual (the CPU does not stop for it) or real. */
+void PSX_GPUEventVirtual(bool virt);
+
+/* The time an event is currently scheduled at. */
+int32_t PSX_EventTS(const int type);
 void PSX_SetDMACycleSteal(unsigned stealage);
 
 uint32_t PSX_GetRandU32(uint32_t mina, uint32_t maxa);

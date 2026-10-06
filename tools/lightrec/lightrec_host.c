@@ -15,6 +15,7 @@
  *   expected_iterations: when given, the iteration count read from RAM
  *     must match exactly - the emulated timing is part of the contract
  *   nosum: skip the sum check (content that does not keep a sum)
+ *   sum=N: the value at the result address must equal N exactly
  *   LRHOST_VARS: semicolon list of key=value core option overrides.
  */
 #define _GNU_SOURCE
@@ -144,6 +145,8 @@ int main(int argc, char **argv)
    uint32_t sum, count, want;
    long expected_iterations = -1;
    int check_sum = 1;
+   int exact_sum = 0;
+   unsigned long exact_sum_value = 0;
 
    if (argc < 4)
    {
@@ -154,6 +157,12 @@ int main(int argc, char **argv)
    if (argc > 4) mode = argv[4];
    if (argc > 5 && argv[5][0]) expected_iterations = atol(argv[5]);
    if (argc > 6 && !strcmp(argv[6], "nosum")) check_sum = 0;
+   if (argc > 6 && !strncmp(argv[6], "sum=", 4))
+   {
+      check_sum = 0;
+      exact_sum = 1;
+      exact_sum_value = strtoul(argv[6] + 4, NULL, 10);
+   }
 
    add_var("beetle_psx_cpu_dynarec", mode);
    add_var("beetle_psx_skip_bios", "enabled");
@@ -226,6 +235,8 @@ int main(int argc, char **argv)
    { fprintf(stderr, "[lrhost] FAIL: program barely ran (%u iterations)\n", count); return 1; }
    if (check_sum && sum != want)
    { fprintf(stderr, "[lrhost] FAIL: sum mismatch\n"); return 1; }
+   if (exact_sum && sum != (uint32_t)exact_sum_value)
+   { fprintf(stderr, "[lrhost] FAIL: expected sum %lu (GPU timing changed)\n", exact_sum_value); return 1; }
    if (expected_iterations >= 0 && count != (uint32_t)expected_iterations)
    { fprintf(stderr, "[lrhost] FAIL: expected %ld iterations (timing changed)\n", expected_iterations); return 1; }
 

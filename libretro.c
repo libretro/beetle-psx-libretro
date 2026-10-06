@@ -1282,9 +1282,39 @@ struct event_list_entry
 
 static struct event_list_entry events[PSX_EVENT__COUNT];
 
+/* While the GPU has nothing to draw, its event stays in the list - so
+ * its order among equal timestamps evolves exactly as before - but is
+ * virtual: the CPU does not stop for it, and the event handler advances
+ * it without an update. GPU_VirtualAdvance() turns it real again at the
+ * end of the line. */
+static bool gpu_event_virtual;
+
+static INLINE int32_t FirstRealEventTS(void)
+{
+   struct event_list_entry *e = events[PSX_EVENT__SYNFIRST].next;
+
+   if(gpu_event_virtual && e->which == PSX_EVENT_GPU)
+      e = e->next;
+
+   return e->event_time;
+}
+
+int32_t PSX_EventTS(const int type)
+{
+   return events[type].event_time;
+}
+
+void PSX_GPUEventVirtual(bool virt)
+{
+   gpu_event_virtual = virt;
+   CPU_SetEventNT(FirstRealEventTS() & Running);
+}
+
 static void EventReset(void)
 {
    unsigned i;
+
+   gpu_event_virtual = false;
    for(i = 0; i < PSX_EVENT__COUNT; i++)
    {
       events[i].which = i;
@@ -1313,7 +1343,7 @@ static void RebaseTS(const int32_t timestamp)
       events[i].event_time -= timestamp;
    }
 
-   CPU_SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
+   CPU_SetEventNT(FirstRealEventTS());
 }
 
 void PSX_SetEventNT(const int type, const int32_t next_timestamp)
@@ -1330,7 +1360,7 @@ void PSX_SetEventNT(const int type, const int32_t next_timestamp)
       next_timestamp <= e->next->event_time)
    {
       e->event_time = next_timestamp;
-      CPU_SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time & Running);
+      CPU_SetEventNT(FirstRealEventTS() & Running);
       return;
    }
 
@@ -1377,7 +1407,7 @@ void PSX_SetEventNT(const int type, const int32_t next_timestamp)
       e->event_time = next_timestamp;
    }
 
-   CPU_SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time & Running);
+   CPU_SetEventNT(FirstRealEventTS() & Running);
 }
 
 // Called from debug.cpp too.
@@ -1392,7 +1422,7 @@ void ForceEventUpdates(const int32_t timestamp)
 
    PSX_SetEventNT(PSX_EVENT_FIO, FrontIO_Update(PSX_FIO, timestamp));
 
-   CPU_SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
+   CPU_SetEventNT(FirstRealEventTS());
 }
 
 bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
@@ -1409,7 +1439,10 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
          default:
             abort();
          case PSX_EVENT_GPU:
-            nt = GPU_Update(e->event_time);
+            if(gpu_event_virtual)
+               nt = GPU_VirtualAdvance(e->event_time);
+            else
+               nt = GPU_Update(e->event_time);
             break;
          case PSX_EVENT_CDC:
             nt = PS_CDC_Update(PSX_CDC, e->event_time);

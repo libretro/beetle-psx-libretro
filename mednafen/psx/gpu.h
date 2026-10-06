@@ -236,16 +236,26 @@ struct PS_GPU
 
    int32_t lastts;
 
-   /* Idle scheduling: while the GPU has nothing to draw, its update
-    * event sleeps until the end of the line instead of every
-    * EventCycles. idle_base is the time of the last update that ran
-    * on the regular EventCycles grid; a write wakes the GPU by first
-    * catching up to the last grid point before the write, so the
-    * state the write sees is the one the regular grid would have
-    * produced. Not saved: a loaded state re-phases the grid, exactly
-    * as the ForceEventUpdates() after every load always did. */
-   bool idle_deferred;
-   int32_t idle_base;
+   /* Idle scheduling. While the GPU has nothing to draw its event is
+    * virtual: it stays in the event list and the handler advances it
+    * through the regular EventCycles grid points without an update
+    * and without stopping the CPU for them, until the end of the line
+    * where it turns real again. idle_last is the last grid point the
+    * handler advanced through; idle_line_end is where the event turns
+    * real. A GPU write wakes the GPU: the grid points up to the CPU's
+    * last event check are advanced through as the regular cadence
+    * would have run them, the state is brought to the last of them,
+    * and the event turns real on the next one. Not saved: a loaded
+    * state re-phases the grid, exactly as the ForceEventUpdates()
+    * after every load always did. */
+   bool idle_virtual;
+   int32_t idle_last;
+   int32_t idle_line_end;
+   /* Hysteresis: the event only goes virtual after whole grid
+    * intervals with no GP0/GP1 or DMA write, so a stream of small
+    * draws does not pay a wake for every one. */
+   bool idle_write_seen;
+   uint8_t idle_streak;
 
    bool sl_zero_reached;
 
@@ -289,10 +299,20 @@ uint32_t GPU_ReadDMA(void);
 bool     GPU_DMACanWrite(void);
 int32_t  GPU_Update(const int32_t sys_timestamp);
 
-/* Puts the GPU back on its regular update grid before something
- * changes the state its idle schedule relied on (a GP0/GP1 write, a DMA
- * word, timer 0 switching to the dot clock). */
-void GPU_WakeFromIdle(const int32_t timestamp);
+/* Puts the GPU back on its regular update cadence before something
+ * changes the state its idle schedule relied on. from_cpu: the caller is
+ * the running CPU core (a GP0/GP1 write, a timer 0 mode write), so the
+ * grid points up to its last event check are processed first; false
+ * from an event handler (a DMA transfer), where the event list has
+ * already processed exactly what the regular cadence would have. */
+void GPU_WakeFromIdle(bool from_cpu);
+
+/* The GPU's update as called by another device's event (DMA): the state
+ * advances, the idle schedule is untouched. */
+void GPU_UpdatePassive(const int32_t sys_timestamp);
+
+/* The event handler's path for the virtual GPU event. */
+int32_t GPU_VirtualAdvance(const int32_t event_time);
 int32_t  GPU_GetScanlineNum(void);
 
 /* Used by rhi_lib_gl.c to access the VRAM contents and

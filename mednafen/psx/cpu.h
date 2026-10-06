@@ -173,6 +173,9 @@ extern int32_t cpu_next_event_ts;
 #define CPU_GetEventNT() cpu_next_event_ts
 #define CPU_SetEventNT(next_event_ts_arg) (cpu_next_event_ts = (next_event_ts_arg))
 
+/* Timestamp of the running CPU core's last event check. */
+int32_t CPU_LastEventCheckTS(void);
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -173,6 +173,9 @@ __api __cnst struct lightrec_registers *
 lightrec_get_registers(struct lightrec_state *state);
 
 __api u32 lightrec_current_cycle_count(const struct lightrec_state *state);
+/* Cycle count at the last point where the running code checked its
+ * cycle budget against the target (block entry or loop back-edge). */
+__api u32 lightrec_last_check_cycle_count(const struct lightrec_state *state);
 __api void lightrec_reset_cycle_count(struct lightrec_state *state, u32 cycles);
 __api void lightrec_set_target_cycle_count(struct lightrec_state *state,
 					   u32 cycles);
