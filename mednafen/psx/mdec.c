@@ -66,6 +66,8 @@
 #include "../state_helpers.h"
 
 #include "mdec.h"
+#include "dma.h"
+#include "psx_events.h"
 #include "FastFIFO.h"
 
 #if defined(__SSE2__)
@@ -920,6 +922,23 @@ uint32_t MDEC_DMARead(uint32_t* offs)
    return(V);
 }
 
+bool MDEC_IsBlocked(void)
+{
+   /* MDRPhase holds the resume case minus one (see MDRPhaseBias). */
+   switch(MDRPhase + 1)
+   {
+      case 1:
+      case 5:
+      case 11:
+      case 13:
+         return InFIFO.in_count == 0;
+      case 9:
+         return !FastFIFO_CanWrite(&OutFIFO);
+      default:
+         return false;
+   }
+}
+
 bool MDEC_DMACanWrite(void)
 {
  return((FastFIFO_CanWrite(&InFIFO) >= 0x20) && (Control & (1U << 30)) && InCommand && InCounter != 0xFFFF);
@@ -932,6 +951,11 @@ bool MDEC_DMACanRead(void)
 
 void MDEC_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 {
+   /* Input or a reset: the decoder needs DMA's cadence again. */
+   DMA_NoteActivity();
+   if(PSX_AnyEventVirtual())
+      PSX_WakeVirtual(true);
+
    if(A & 4)
    {
       if(V & 0x80000000) /* Reset? */
@@ -976,6 +1000,14 @@ void MDEC_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 uint32_t MDEC_Read(const int32_t timestamp, uint32_t A)
 {
  uint32_t ret = 0;
+
+ /* Draining the output FIFO can unblock the decoder. */
+ if(!(A & 4))
+ {
+    DMA_NoteActivity();
+    if(PSX_AnyEventVirtual())
+       PSX_WakeVirtual(true);
+ }
 
  if(A & 4)
  {

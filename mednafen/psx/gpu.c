@@ -2016,7 +2016,10 @@ int32_t GPU_Update(const int32_t sys_timestamp)
 
 void GPU_UpdatePassive(const int32_t sys_timestamp)
 {
-   GPU_UpdateInt(sys_timestamp, GPU_UPD_PASSIVE);
+   /* Another device's update may already have carried the state past
+    * this point; the state is exact over any span, so nothing is lost. */
+   if(sys_timestamp > GPU.lastts)
+      GPU_UpdateInt(sys_timestamp, GPU_UPD_PASSIVE);
 }
 
 /* The next regular grid point after a virtual one, as GPU_Update()
@@ -2051,46 +2054,36 @@ int32_t GPU_VirtualAdvance(const int32_t event_time)
    if(nt == GPU.idle_line_end)
    {
       /* The line ends there: that update is real, and a write before
-       * it must see the state as of this grid point. */
+       * it must see the state as of this grid point. DMA only idles
+       * while the GPU does, so it comes back with it. */
+      DMA_WakeVirtual();
       GPU_CatchUp();
       GPU.idle_virtual = false;
-      PSX_GPUEventVirtual(false);
+      PSX_EventVirtual(PSX_EVENT_GPU, false);
    }
 
    return nt;
 }
 
-void GPU_WakeFromIdle(bool from_cpu)
+bool GPU_EventVirtual(void)
 {
-   int32_t check, at;
+   return GPU.idle_virtual;
+}
 
-   if(!GPU.idle_virtual)
-      return;
-
-   if(from_cpu)
-   {
-      /* The regular cadence would have stopped the CPU at every grid
-       * point up to its last event check and run the update there;
-       * advance the event through those exactly as the handler would
-       * have, one PSX_SetEventNT() per point so the event list ends up
-       * in the same order. */
-      check = CPU_LastEventCheckTS();
-      at    = PSX_EventTS(PSX_EVENT_GPU);
-
-      while(GPU.idle_virtual && at <= check)
-      {
-         at = GPU_VirtualAdvance(at);
-         PSX_SetEventNT(PSX_EVENT_GPU, at);
-      }
-   }
-
+void GPU_WakeVirtual(void)
+{
    if(!GPU.idle_virtual)
       return;
 
    GPU_CatchUp();
 
    GPU.idle_virtual = false;
-   PSX_GPUEventVirtual(false);
+   PSX_EventVirtual(PSX_EVENT_GPU, false);
+}
+
+void GPU_WakeFromIdle(bool from_cpu)
+{
+   PSX_WakeVirtual(from_cpu);
 }
 
 static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
@@ -2617,7 +2610,7 @@ TheEnd:
       GPU.idle_virtual  = true;
       GPU.idle_last     = sys_timestamp;
       GPU.idle_line_end = sys_timestamp + next_dt;
-      PSX_GPUEventVirtual(true);
+      PSX_EventVirtual(PSX_EVENT_GPU, true);
       return(sys_timestamp + EventCycles);
    }
 
@@ -2625,9 +2618,10 @@ TheEnd:
    {
       /* A real update at the end of the line while the event was
        * virtual: it is real from here (the list entry is re-armed by
-       * the caller). */
+       * the caller), and DMA comes back with it. */
+      DMA_WakeVirtual();
       GPU.idle_virtual = false;
-      PSX_GPUEventVirtual(false);
+      PSX_EventVirtual(PSX_EVENT_GPU, false);
    }
 
    if (next_dt > EventCycles) next_dt = EventCycles;
@@ -2765,7 +2759,7 @@ void GPU_RestoreStateP1(bool load)
    if (load && GPU.idle_virtual)
    {
       GPU.idle_virtual = false;
-      PSX_GPUEventVirtual(false);
+      PSX_EventVirtual(PSX_EVENT_GPU, false);
    }
 
    if (!load && !rhi_intf_has_software_renderer())

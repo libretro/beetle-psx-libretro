@@ -313,6 +313,13 @@ void GPU_UpdatePassive(const int32_t sys_timestamp);
 
 /* The event handler's path for the virtual GPU event. */
 int32_t GPU_VirtualAdvance(const int32_t event_time);
+
+/* Bring the GPU's state to the last grid point its cadence ran and make
+ * its event real (PSX_WakeVirtual's second half). */
+void GPU_WakeVirtual(void);
+
+/* True while the GPU's event is virtual. */
+bool GPU_EventVirtual(void);
 int32_t  GPU_GetScanlineNum(void);
 
 /* Used by rhi_lib_gl.c to access the VRAM contents and

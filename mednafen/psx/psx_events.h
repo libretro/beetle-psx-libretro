@@ -30,8 +30,15 @@ enum
 
 void PSX_SetEventNT(const int type, const int32_t next_timestamp);
 
-/* Mark the GPU's event virtual (the CPU does not stop for it) or real. */
-void PSX_GPUEventVirtual(bool virt);
+/* Mark an event virtual (the CPU does not stop for it) or real. */
+void PSX_EventVirtual(const int type, bool virt);
+bool PSX_AnyEventVirtual(void);
+
+/* Bring every virtual device back to its regular cadence. from_cpu: the
+ * caller is the running CPU core (an I/O write), so the virtual events
+ * up to its last event check are advanced first; false from an event
+ * handler, where the list has already been walked. */
+void PSX_WakeVirtual(bool from_cpu);
 
 /* The time an event is currently scheduled at. */
 int32_t PSX_EventTS(const int type);

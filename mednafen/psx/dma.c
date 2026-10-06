@@ -81,6 +81,18 @@ typedef struct
 static Channel DMACH[7];
 static int32_t lastts;
 
+/* Idle scheduling, see GPU.idle_* in gpu.h: while no channel is started
+ * or mid-block, the MDEC is blocked on its FIFOs and the GPU's event is
+ * virtual, nothing a DMA update does changes anything but its own
+ * exact-over-any-span counters, so the event goes virtual. It comes
+ * back whenever the GPU's does, or when a write gives DMA or the MDEC
+ * work. Not saved: a loaded state re-phases through ForceEventUpdates(). */
+static bool idle_virtual;
+static bool idle_write_seen;
+static uint8_t idle_streak;
+
+static INLINE int32_t CalcNextEvent(int32_t next_event);
+
 static INLINE void RecalcIRQOut(void)
 {
    bool irqo = (bool)DMAIntStatus;
@@ -97,9 +109,76 @@ void DMA_ResetTS(void)
    lastts = 0;
 }
 
+void DMA_NoteActivity(void)
+{
+   idle_write_seen = true;
+}
+
+static INLINE bool DMA_ChannelsIdle(void)
+{
+   unsigned ch;
+
+   for(ch = 0; ch < 7; ch++)
+   {
+      /* Started, or stopped mid-block (the forced-stop kludge keeps
+       * transferring the current block). */
+      if((DMACH[ch].ChanControl & (1U << 24)) || DMACH[ch].WordCounter)
+         return false;
+   }
+
+   return true;
+}
+
+/* DMA's own per-span bookkeeping: the device clock counter and the
+ * channel and MDEC clock budgets, all of which saturate or wrap the
+ * same way over one long span as over many short ones. */
+static INLINE void DMA_AdvanceCounters(const int32_t timestamp)
+{
+   int32_t clocks = timestamp - lastts;
+   unsigned ch;
+
+   overclock_cpu_to_device(&clocks);
+   lastts = timestamp;
+
+   MDEC_Run(clocks);
+
+   for(ch = 0; ch < 7; ch++)
+   {
+      DMACH[ch].ClockCounter += clocks;
+      if(DMACH[ch].ClockCounter > 0)
+         DMACH[ch].ClockCounter = 0;
+   }
+
+   DMACycleCounter -= clocks;
+   while(DMACycleCounter <= 0)
+      DMACycleCounter += EventCycles;
+}
+
+int32_t DMA_VirtualAdvance(const int32_t event_time)
+{
+   DMA_AdvanceCounters(event_time);
+
+   return (event_time + CalcNextEvent(0x10000000));
+}
+
+void DMA_WakeVirtual(void)
+{
+   if(!idle_virtual)
+      return;
+
+   /* The regular cadence updated the GPU at every DMA point it ran. */
+   GPU_UpdatePassive(lastts);
+
+   idle_virtual = false;
+   PSX_EventVirtual(PSX_EVENT_DMA, false);
+}
+
 void DMA_Power(void)
 {
    lastts = 0;
+   idle_virtual = false;
+   idle_write_seen = false;
+   idle_streak = 0;
 
    memset(DMACH, 0, sizeof(DMACH));
 
@@ -558,7 +637,7 @@ static INLINE int32_t CalcNextEvent(int32_t next_event)
    return(next_event);
 }
 
-int32_t DMA_Update(const int32_t timestamp)
+static int32_t DMA_UpdateInt(const int32_t timestamp, bool from_event)
 {
    int32_t clocks, i;
    /*   uint32_t dc = (DMAControl >> (ch * 4)) & 0xF; */
@@ -580,7 +659,38 @@ int32_t DMA_Update(const int32_t timestamp)
 
    RecalcHalt();
 
+   if(from_event)
+   {
+      if(idle_write_seen)
+      {
+         idle_write_seen = false;
+         idle_streak = 0;
+      }
+      else if(idle_streak < 2)
+         idle_streak++;
+
+      if(idle_virtual)
+      {
+         /* A real update while the event was virtual (ForceEventUpdates
+          * at a frame edge or a state load): real from here. */
+         idle_virtual = false;
+         PSX_EventVirtual(PSX_EVENT_DMA, false);
+      }
+
+      if(idle_streak >= 2 && GPU_EventVirtual() && DMA_ChannelsIdle()
+         && MDEC_IsBlocked())
+      {
+         idle_virtual = true;
+         PSX_EventVirtual(PSX_EVENT_DMA, true);
+      }
+   }
+
    return (timestamp + CalcNextEvent(0x10000000));
+}
+
+int32_t DMA_Update(const int32_t timestamp)
+{
+   return DMA_UpdateInt(timestamp, true);
 }
 
 void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
@@ -591,7 +701,11 @@ void DMA_Write(const int32_t timestamp, uint32_t A, uint32_t V)
    /* FIXME if we ever have "accurate" bus emulation */
    V <<= (A & 3) * 8;
 
-   DMA_Update(timestamp);
+   DMA_NoteActivity();
+   if(PSX_AnyEventVirtual())
+      PSX_WakeVirtual(true);
+
+   DMA_UpdateInt(timestamp, false);
 
    switch(A & 0xC)
    {
@@ -764,6 +878,12 @@ int DMA_StateAction(StateMem *sm, int load, int data_only)
    };
 
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "DMA");
+
+   if(load && idle_virtual)
+   {
+      idle_virtual = false;
+      PSX_EventVirtual(PSX_EVENT_DMA, false);
+   }
 
    return(ret);
 }

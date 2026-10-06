@@ -17,6 +17,11 @@ uint32_t MDEC_Read(const int32_t timestamp, uint32_t A);
 void MDEC_Power(void);
 
 bool MDEC_DMACanWrite(void);
+
+/* True while MDEC_Run() would return at once without consuming time:
+ * the decoder is waiting for input words or for room in its output
+ * FIFO, and only a write or a read can change that. */
+bool MDEC_IsBlocked(void);
 bool MDEC_DMACanRead(void);
 void MDEC_Run(int32_t clocks);
 

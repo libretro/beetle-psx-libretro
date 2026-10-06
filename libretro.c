@@ -1282,18 +1282,19 @@ struct event_list_entry
 
 static struct event_list_entry events[PSX_EVENT__COUNT];
 
-/* While the GPU has nothing to draw, its event stays in the list - so
- * its order among equal timestamps evolves exactly as before - but is
+/* While a device has nothing to do, its event stays in the list - so its
+ * order among equal timestamps evolves exactly as before - but is
  * virtual: the CPU does not stop for it, and the event handler advances
- * it without an update. GPU_VirtualAdvance() turns it real again at the
- * end of the line. */
-static bool gpu_event_virtual;
+ * it along its regular cadence without an update. The device turns it
+ * real again itself (the GPU at the end of the line, DMA when the GPU
+ * does), or a write wakes every virtual device at once. */
+static uint32_t virtual_events;
 
 static INLINE int32_t FirstRealEventTS(void)
 {
    struct event_list_entry *e = events[PSX_EVENT__SYNFIRST].next;
 
-   if(gpu_event_virtual && e->which == PSX_EVENT_GPU)
+   while(virtual_events & (1U << e->which))
       e = e->next;
 
    return e->event_time;
@@ -1304,17 +1305,70 @@ int32_t PSX_EventTS(const int type)
    return events[type].event_time;
 }
 
-void PSX_GPUEventVirtual(bool virt)
+bool PSX_AnyEventVirtual(void)
 {
-   gpu_event_virtual = virt;
+   return virtual_events != 0;
+}
+
+void PSX_EventVirtual(const int type, bool virt)
+{
+   if(virt)
+      virtual_events |= 1U << type;
+   else
+      virtual_events &= ~(1U << type);
+
    CPU_SetEventNT(FirstRealEventTS() & Running);
+}
+
+static INLINE int32_t VirtualAdvance(const struct event_list_entry *e)
+{
+   if(e->which == PSX_EVENT_GPU)
+      return GPU_VirtualAdvance(e->event_time);
+
+   return DMA_VirtualAdvance(e->event_time);
+}
+
+/* A write from the running CPU: the regular cadence would have stopped
+ * the CPU at every virtual event up to the core's last event check and
+ * run it there. Advance them exactly as the handler would have, in list
+ * order with one PSX_SetEventNT() each, so the list ends up in the same
+ * order; then bring the devices' state to those points and make their
+ * events real. From an event handler the list has already been walked
+ * up to the right point, so only the second half runs. */
+void PSX_WakeVirtual(bool from_cpu)
+{
+   if(!virtual_events)
+      return;
+
+   if(from_cpu)
+   {
+      const int32_t check = CPU_LastEventCheckTS();
+      struct event_list_entry *e = events[PSX_EVENT__SYNFIRST].next;
+
+      while(check >= e->event_time)
+      {
+         if(virtual_events & (1U << e->which))
+         {
+            struct event_list_entry *prev = e->prev;
+
+            PSX_SetEventNT(e->which, VirtualAdvance(e));
+            e = prev->next;
+         }
+         else
+            e = e->next;
+      }
+   }
+
+   /* DMA first: its update carries the GPU's state along. */
+   DMA_WakeVirtual();
+   GPU_WakeVirtual();
 }
 
 static void EventReset(void)
 {
    unsigned i;
 
-   gpu_event_virtual = false;
+   virtual_events = 0;
    for(i = 0; i < PSX_EVENT__COUNT; i++)
    {
       events[i].which = i;
@@ -1439,7 +1493,7 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
          default:
             abort();
          case PSX_EVENT_GPU:
-            if(gpu_event_virtual)
+            if(virtual_events & (1U << PSX_EVENT_GPU))
                nt = GPU_VirtualAdvance(e->event_time);
             else
                nt = GPU_Update(e->event_time);
@@ -1451,7 +1505,10 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
             nt = TIMER_Update(e->event_time);
             break;
          case PSX_EVENT_DMA:
-            nt = DMA_Update(e->event_time);
+            if(virtual_events & (1U << PSX_EVENT_DMA))
+               nt = DMA_VirtualAdvance(e->event_time);
+            else
+               nt = DMA_Update(e->event_time);
             break;
          case PSX_EVENT_FIO:
             nt = FrontIO_Update(PSX_FIO, e->event_time);

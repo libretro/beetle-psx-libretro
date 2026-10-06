@@ -12,7 +12,8 @@ name: Lightrec threaded compiler
 # recompiler must leave the emulated timing the programs observe
 # exactly where it is. Two more programs read GPUSTAT and the dot-clock
 # and hblank timers after every draw and must reproduce fixed sums, so
-# a schedule change that moves a single draw-budget refill fails here.
+# a schedule change that moves a single draw-budget refill fails here;
+# a fourth drives DMA channels 2 and 6 and the MDEC the same way.
 
 on:
   push:
