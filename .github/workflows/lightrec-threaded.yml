@@ -6,15 +6,19 @@ name: Lightrec threaded compiler
 # self-modifying PS-X EXE through the software core under TSan and ASan
 # with three workers and a code buffer small enough to overflow every
 # few seconds, then through the non-threaded build, and checks the
-# program's arithmetic against the host's own.
+# program's arithmetic against the host's own. A second, GPU-heavy
+# program and fixed iteration counts for both make the lane a timing
+# contract as well: the GPU's idle scheduling, the event quantum and the
+# recompiler must leave the emulated timing the programs observe
+# exactly where it is.
 
 on:
   push:
     paths:
       - 'deps/lightrec/**'
       - 'deps/lightning/**'
-      - 'mednafen/psx/cpu.c'
-      - 'mednafen/psx/cpu.h'
+      - 'mednafen/psx/**'
+      - 'libretro.c'
       - 'tools/lightrec/**'
       - 'libretro-common/rthreads/**'
       - 'libretro-common/include/retro_atomic.h'
@@ -25,8 +29,8 @@ on:
     paths:
       - 'deps/lightrec/**'
       - 'deps/lightning/**'
-      - 'mednafen/psx/cpu.c'
-      - 'mednafen/psx/cpu.h'
+      - 'mednafen/psx/**'
+      - 'libretro.c'
       - 'tools/lightrec/**'
       - 'libretro-common/rthreads/**'
       - 'libretro-common/include/retro_atomic.h'

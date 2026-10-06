@@ -1438,6 +1438,8 @@ void GPU_Power(void)
    GPU.DrawTimeAvail = 0;
 
    GPU.lastts = 0;
+   GPU.idle_deferred = false;
+   GPU.idle_base = 0;
 
    GPU_SoftReset();
 
@@ -1448,6 +1450,7 @@ void GPU_Power(void)
 void GPU_ResetTS(void)
 {
    GPU.lastts = 0;
+   GPU.idle_base = 0;
 }
 
 
@@ -1590,6 +1593,8 @@ static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
 
 void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 {
+   GPU_WakeFromIdle(timestamp);
+
    V <<= (A & 3) * 8;
 
    if(A & 4)   /* GP1 ("Control") */
@@ -1986,7 +1991,34 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
    }
 }
 
+static int32_t GPU_UpdateInt(const int32_t sys_timestamp, bool may_idle);
+
 int32_t GPU_Update(const int32_t sys_timestamp)
+{
+   return GPU_UpdateInt(sys_timestamp, true);
+}
+
+void GPU_WakeFromIdle(const int32_t timestamp)
+{
+   int32_t grid;
+
+   if(!GPU.idle_deferred)
+      return;
+
+   GPU.idle_deferred = false;
+
+   /* The last regular grid point at or before now. Nothing happened
+    * to the GPU in between, so one update over the whole span lands
+    * in the same state the grid's updates would have, and the next
+    * event lands on the same grid point. */
+   grid = GPU.idle_base;
+   if(timestamp > grid)
+      grid += ((timestamp - grid) / EventCycles) * EventCycles;
+
+   PSX_SetEventNT(PSX_EVENT_GPU, GPU_UpdateInt(grid, false));
+}
+
+static int32_t GPU_UpdateInt(const int32_t sys_timestamp, bool may_idle)
 {
    int32_t gpu_clocks;
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
@@ -2479,6 +2511,26 @@ TheEnd:
    next_dt = (((int64_t)next_dt << 16) - GPU.GPUClockCounter + GPU.GPUClockRatio - 1) / GPU.GPUClockRatio;
 
    if (next_dt < 1)          next_dt = 1;
+
+   /* With nothing queued, nothing in progress, the draw-time budget
+    * already at its cap and no timer counting the dot clock, the
+    * EventCycles updates between here and the end of the line would
+    * change nothing: the clock accounting is exact over any span and
+    * the budget refill is saturated. Sleep until the line ends and
+    * remember the grid point, so a write can resume the grid exactly
+    * where it would have been. A caller catching up to the grid never
+    * idles: the write that follows needs the regular cadence. */
+   if (may_idle && next_dt > EventCycles
+       && GPU_BlitterFIFO.in_count == 0 && GPU.InCmd == INCMD_NONE
+       && GPU.DrawTimeAvail >= (2*EventCycles << psx_gpu_overclock_shift)
+       && !TIMER_DotClockActive())
+   {
+      GPU.idle_deferred = true;
+      GPU.idle_base = sys_timestamp;
+      return(sys_timestamp + next_dt);
+   }
+
+   GPU.idle_deferred = false;
    if (next_dt > EventCycles) next_dt = EventCycles;
 
    return(sys_timestamp + next_dt);
@@ -2609,6 +2661,11 @@ void GPU_FlushDeferredScanout(void)
 
 void GPU_RestoreStateP1(bool load)
 {
+   /* The idle schedule is not part of a state; the ForceEventUpdates()
+    * after a load puts the GPU on a fresh grid, as it always has. */
+   if (load)
+      GPU.idle_deferred = false;
+
    if (!load && !rhi_intf_has_software_renderer())
    {
       /* Pure hardware renderer: the composited framebuffer lives only on the

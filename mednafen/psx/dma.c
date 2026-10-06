@@ -315,6 +315,8 @@ static INLINE void RunChannel(int32_t timestamp, int32_t clocks, int ch)
                crmodecache = CRModeCache;
                break;
          }
+         if(CRModeCache & 0x1)
+            GPU_WakeFromIdle(timestamp);
          break;
       case 3:
          switch (CRModeCache)

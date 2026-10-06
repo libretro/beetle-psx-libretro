@@ -24,6 +24,7 @@
 #include "irq.h"
 #include "psx_events.h"
 #include "timer.h"
+#include "gpu.h"
 
 /*
  Notes(some of it may be incomplete or wrong in subtle ways)
@@ -316,6 +317,11 @@ void MDFN_FASTCALL TIMER_SetHRetrace(bool status)
    hretrace = status;
 }
 
+bool TIMER_DotClockActive(void)
+{
+   return (Timers[0].Mode & 0x100) != 0;
+}
+
 void MDFN_FASTCALL TIMER_AddDotClocks(uint32_t count)
 {
    if(Timers[0].Mode & 0x100)
@@ -391,7 +397,9 @@ void MDFN_FASTCALL TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V)
                 Timers[which].Counter = V & 0xFFFF;
                 break;
 
-      case 0x4: Timers[which].Mode = (V & 0x3FF) | (Timers[which].Mode & 0x1C00);
+      case 0x4: if(which == 0)
+                   GPU_WakeFromIdle(timestamp);
+                Timers[which].Mode = (V & 0x3FF) | (Timers[which].Mode & 0x1C00);
                 Timers[which].IRQDone = false;
                 Timers[which].Counter = 0;
 

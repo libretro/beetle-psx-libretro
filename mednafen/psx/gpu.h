@@ -236,6 +236,17 @@ struct PS_GPU
 
    int32_t lastts;
 
+   /* Idle scheduling: while the GPU has nothing to draw, its update
+    * event sleeps until the end of the line instead of every
+    * EventCycles. idle_base is the time of the last update that ran
+    * on the regular EventCycles grid; a write wakes the GPU by first
+    * catching up to the last grid point before the write, so the
+    * state the write sees is the one the regular grid would have
+    * produced. Not saved: a loaded state re-phases the grid, exactly
+    * as the ForceEventUpdates() after every load always did. */
+   bool idle_deferred;
+   int32_t idle_base;
+
    bool sl_zero_reached;
 
    EmulateSpecStruct *espec;
@@ -277,6 +288,11 @@ void     GPU_WriteDMA(uint32_t V, uint32_t addr);
 uint32_t GPU_ReadDMA(void);
 bool     GPU_DMACanWrite(void);
 int32_t  GPU_Update(const int32_t sys_timestamp);
+
+/* Puts the GPU back on its regular update grid before something
+ * changes the state its idle schedule relied on (a GP0/GP1 write, a DMA
+ * word, timer 0 switching to the dot clock). */
+void GPU_WakeFromIdle(const int32_t timestamp);
 int32_t  GPU_GetScanlineNum(void);
 
 /* Used by rhi_lib_gl.c to access the VRAM contents and

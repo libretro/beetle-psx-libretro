@@ -10,8 +10,11 @@
  * retired, deferred frees) is exercised on real content, and a wrong
  * sum is a wrong instruction executed.
  *
- * Usage: lightrec_host <core.so> <content.exe> <frames> [cpu_mode]
+ * Usage: lightrec_host <core.so> <content.exe> <frames> [cpu_mode] [expected_iterations] [nosum]
  *   cpu_mode: execute (default), run_interpreter, disabled
+ *   expected_iterations: when given, the iteration count read from RAM
+ *     must match exactly - the emulated timing is part of the contract
+ *   nosum: skip the sum check (content that does not keep a sum)
  *   LRHOST_VARS: semicolon list of key=value core option overrides.
  */
 #define _GNU_SOURCE
@@ -139,6 +142,8 @@ int main(int argc, char **argv)
    unsigned frames, i;
    const uint8_t *ram;
    uint32_t sum, count, want;
+   long expected_iterations = -1;
+   int check_sum = 1;
 
    if (argc < 4)
    {
@@ -147,6 +152,8 @@ int main(int argc, char **argv)
    }
    core_path = argv[1]; content = argv[2]; frames = (unsigned)atoi(argv[3]);
    if (argc > 4) mode = argv[4];
+   if (argc > 5 && argv[5][0]) expected_iterations = atol(argv[5]);
+   if (argc > 6 && !strcmp(argv[6], "nosum")) check_sum = 0;
 
    add_var("beetle_psx_cpu_dynarec", mode);
    add_var("beetle_psx_skip_bios", "enabled");
@@ -217,8 +224,10 @@ int main(int argc, char **argv)
 
    if (count < 10)
    { fprintf(stderr, "[lrhost] FAIL: program barely ran (%u iterations)\n", count); return 1; }
-   if (sum != want)
+   if (check_sum && sum != want)
    { fprintf(stderr, "[lrhost] FAIL: sum mismatch\n"); return 1; }
+   if (expected_iterations >= 0 && count != (uint32_t)expected_iterations)
+   { fprintf(stderr, "[lrhost] FAIL: expected %ld iterations (timing changed)\n", expected_iterations); return 1; }
 
    fprintf(stderr, "[lrhost] OK\n");
    return 0;
