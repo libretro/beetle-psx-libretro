@@ -503,6 +503,11 @@ void lightrec_recompiler_install(struct recompiler *rec)
 {
 	struct lightrec_compiled *c, *next, *list = NULL;
 
+	/* Called on every LUT miss: a plain load first, the locked exchange
+	 * only when a worker has actually published something. */
+	if (!retro_atomic_load_acquire_ptr(&rec->results))
+		return;
+
 	c = (struct lightrec_compiled *)retro_atomic_exchange_ptr(&rec->results, NULL);
 	if (!c)
 		return;
