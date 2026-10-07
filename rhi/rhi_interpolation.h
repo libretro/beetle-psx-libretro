@@ -25,11 +25,19 @@ static INLINE void rhi_triangle_interpolant(uint32_t *packed,
       const int32_t *x, const int32_t *y, const int32_t *value,
       int64_t denom, unsigned anchor)
 {
-   uint32_t dx = (uint32_t)(((int64_t)(value[1] - value[0]) * (y[2] - y[1]) -
+   uint32_t dx, dy, origin;
+   /* A constant channel has zero slopes, regardless of triangle geometry. */
+   if (value[0] == value[1] && value[0] == value[2])
+   {
+      rhi_pack_interpolant(packed,
+            ((uint32_t)value[0] << 12) + 2048u, 0u, 0u);
+      return;
+   }
+   dx = (uint32_t)(((int64_t)(value[1] - value[0]) * (y[2] - y[1]) -
          (int64_t)(value[2] - value[1]) * (y[1] - y[0])) * 4096 / denom);
-   uint32_t dy = (uint32_t)(((int64_t)(x[1] - x[0]) * (value[2] - value[1]) -
+   dy = (uint32_t)(((int64_t)(x[1] - x[0]) * (value[2] - value[1]) -
          (int64_t)(x[2] - x[1]) * (value[1] - value[0])) * 4096 / denom);
-   uint32_t origin = ((uint32_t)value[anchor] << 12) + 2048u -
+   origin = ((uint32_t)value[anchor] << 12) + 2048u -
          dx * (uint32_t)x[anchor] - dy * (uint32_t)y[anchor];
    rhi_pack_interpolant(packed, origin, dx, dy);
 }

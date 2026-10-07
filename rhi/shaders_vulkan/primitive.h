@@ -19,7 +19,6 @@ layout(constant_id = 3) const int SCALE = 1;
      #include "vram.h"
 #endif
 layout(location = 0) out vec4 FragColor;
-layout(set = 0, binding = 2) uniform sampler2D uDitherLUT;
 layout(constant_id = 10) const int FRAMEBUFFER_FLOAT16 = 0;
 
 highp vec3 truncate_color8(highp vec3 color)
@@ -127,7 +126,7 @@ ivec2 primitive_dither_coord()
 highp float primitive_dither_offset()
 {
 	return primitive_dither_enabled() ?
-		psx_dither_offset(uDitherLUT, primitive_dither_coord()) : 0.0;
+		psx_dither_offset(primitive_dither_coord()) : 0.0;
 }
 
 highp vec3 quantize_native_rgb5(highp vec3 color, bool dither)
