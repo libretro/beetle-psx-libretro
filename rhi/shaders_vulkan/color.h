@@ -20,10 +20,18 @@ highp vec3 psx_color5(highp vec3 color, highp float offset)
 	return clamp(floor(biased / 8.0), vec3(0.0), vec3(31.0));
 }
 
-highp float psx_dither_offset(sampler2D lut, ivec2 coord)
+highp float psx_dither_offset(highp ivec2 coord)
 {
-	/* The shared R8_UNORM LUT stores signed -4..3 as bytes 0..7. */
-	return round(texelFetch(lut, coord & 3, 0).x * 255.0) - 4.0;
+	/* The fixed PS1 matrix is:
+	 * -4  0 -3  1
+	 *  2 -2  3 -1
+	 * -3  1 -4  0
+	 *  3 -1  2 -2
+	 * Its biased three-bit code interleaves XY parity and the low Y bit. */
+	highp int parity = coord.x ^ coord.y;
+	highp int code = ((parity & 1) << 2) | ((coord.y & 1) << 1) |
+		((parity >> 1) & 1);
+	return float(code - 4);
 }
 
 #endif
