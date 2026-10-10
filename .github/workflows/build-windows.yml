@@ -56,3 +56,4 @@ jobs:
           mednafen_psx_libretro.dll
           mednafen_psx_hw_libretro.dll
         if-no-files-found: error
+
