@@ -35,3 +35,7 @@ tools/vkhost/vkhost
 # Python bytecode from the VCD authoring script (tools/vcd)
 __pycache__/
 *.pyc
+
+# Ignore all workflows except build-windows.yml
+.github/workflows/*
+!.github/workflows/build-windows.yml

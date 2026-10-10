@@ -1612,12 +1612,13 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(frame_duping),
       "Frame Duping",
       NULL,
-      "Repeat the previous frame if the core has nothing new to display.",
+      "Choose how duplicate frames (in 30fps games) are handled. 'Duplicate in Core' maintains 60Hz output. 'Duplicate in Frontend' maintains 60Hz but saves rendering cost. 'Drop (External)' outputs 30Hz for external interpolation tools.",
       NULL,
       "video",
       {
-         { "disabled", NULL },
-         { "enabled",  NULL },
+         { "disabled", "Duplicate in Core" },
+         { "enabled",  "Duplicate in Frontend" },
+         { "drop",     "Drop (External)" },
          { NULL, NULL },
       },
       "disabled"
