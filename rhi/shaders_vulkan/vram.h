@@ -8,18 +8,17 @@
  * the sub-texel fraction above u = 128, which mis-selects texels under
  * upscaling. vParam, vBaseUV and vWindow stay within int16 range. */
 layout(location = 1) in highp vec2 vUV;
-layout(location = 2) flat in mediump ivec3 vParam;
 layout(location = 3) flat in mediump ivec2 vBaseUV;
 layout(location = 4) flat in mediump ivec4 vWindow;
 layout(location = 5) flat in highp ivec4 vTexLimits;
 #if defined(UNSCALED)
 layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
 #else
-layout(constant_id = 3) const int SCALE = 1;
-#if defined(MSAA)
-layout(set = 0, binding = 0) uniform mediump sampler2DMS uFramebufferMS;
+/* MSAA feedback can read a resolved snapshot while writing per sample. */
+#if defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
+layout(set = 0, binding = 0) uniform highp sampler2DMS uFramebufferMS;
 #else
-layout(set = 0, binding = 0) uniform mediump sampler2D uFramebuffer;
+layout(set = 0, binding = 0) uniform highp sampler2D uFramebuffer;
 #endif
 #endif
 layout(constant_id = 4) const int SHIFT = 0;
@@ -45,10 +44,10 @@ vec4 sample_vram_atlas(vec2 uvv)
 #else
     vec2 coord;
 #endif
+    ivec2 uv = (ivec2(uvv) & vWindow.xy) | vWindow.zw;
     if (shift != 0)
     {
         int bpp = 16 >> shift;
-        ivec2 uv = (ivec2(uvv) & vWindow.xy) | vWindow.zw;
         int phase = uv.x & ((1 << shift) - 1);
         int align = bpp * phase;
         uv.x >>= shift;
@@ -56,7 +55,7 @@ vec4 sample_vram_atlas(vec2 uvv)
         int value = int(texelFetch(uFramebuffer, (vBaseUV + uv) & FB_MASK, 0).x);
 #else
         uv = ivec2(mod((vBaseUV + uv), FB_SIZE));
-#if defined(MSAA)
+#if defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
         int value = int(pack_abgr1555(texelFetch(uFramebufferMS, uv * SCALE, gl_SampleID)));
 #else
         int value = int(pack_abgr1555(texelFetch(uFramebuffer, uv * SCALE, 0)));
@@ -75,14 +74,14 @@ vec4 sample_vram_atlas(vec2 uvv)
     }
     else
 #if defined(UNSCALED)
-        coord = vBaseUV + ivec2(uvv);
+        coord = vBaseUV + uv;
 #else
-        coord = vBaseUV + uvv;
+        coord = vBaseUV + vec2(uv) + fract(uvv);
 #endif
 
 #if defined(UNSCALED)
     return abgr1555(texelFetch(uFramebuffer, coord & FB_MASK, 0).x);
-#elif defined(MSAA)
+#elif defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
     return texelFetch(uFramebufferMS, ivec2(mod(coord, FB_SIZE) * SCALE), gl_SampleID);
 #else
     return texelFetch(uFramebuffer, ivec2(mod(coord, FB_SIZE) * SCALE), 0);

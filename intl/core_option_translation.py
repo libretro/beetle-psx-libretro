@@ -142,18 +142,23 @@ def is_viable_value(text: str) -> bool:
    return 2 < len(text) and text != 'NULL'
 
 
-def create_non_dupe(base_name: str, opt_num: int, comparison) -> str:
+def create_non_dupe(base_name: str, opt_name: str, comparison) -> str:
    """Makes sure base_name is not in comparison, and if it is it's renamed.
 
+   The name is made unique with the key of the option it belongs to, not with the
+   option's position: the names are the string identifiers on Crowdin, and a name
+   that changes whenever an option is added or removed further up loses its
+   translations.
+
    :param base_name: Name to check/make unique.
-   :param opt_num: Number of the option base_name belongs to, used in making it unique.
+   :param opt_name: Key of the option base_name belongs to, used in making it unique.
    :param comparison: Dictionary or set to search for base_name in.
    :return: Unique name.
    """
    h = base_name
    if h in comparison:
       n = 0
-      h = h + '_O' + str(opt_num)
+      h = h + '_' + opt_name
       h_end = len(h)
       while h in comparison:
          h = h[:h_end] + '_' + str(n)
@@ -209,7 +214,7 @@ def get_texts(text: str) -> dict:
             desc0 = option.group(2)
             if is_viable_non_dupe(desc0, just_string[lang]):
                just_string[lang].add(desc0)
-               m_h = create_non_dupe(re.sub(r'__+', '_', f'{opt_name}_LABEL'), opt, hash_n_string[lang])
+               m_h = create_non_dupe(re.sub(r'__+', '_', f'{opt_name}_LABEL'), opt_name, hash_n_string[lang])
                hash_n_string[lang][m_h] = desc0
          else:
             raise ValueError(f'No label found in struct {struct_type_name[1]} option {option.group(1)}!')
@@ -222,7 +227,7 @@ def get_texts(text: str) -> dict:
                desc1 = next(option_info).group(1)
                if is_viable_non_dupe(desc1, just_string[lang]):
                   just_string[lang].add(desc1)
-                  m_h = create_non_dupe(re.sub(r'__+', '_', f'{opt_name}_LABEL_CAT'), opt, hash_n_string[lang])
+                  m_h = create_non_dupe(re.sub(r'__+', '_', f'{opt_name}_LABEL_CAT'), opt_name, hash_n_string[lang])
                   hash_n_string[lang][m_h] = desc1
                last = None
                m_h = None
@@ -230,7 +235,7 @@ def get_texts(text: str) -> dict:
                   last = info.group(1)
                   if is_viable_non_dupe(last, just_string[lang]):
                      just_string[lang].add(last)
-                     m_h = create_non_dupe(re.sub(r'__+', '_', f'{opt_name}_INFO_{j}'), opt,
+                     m_h = create_non_dupe(re.sub(r'__+', '_', f'{opt_name}_INFO_{j}'), opt_name,
                                            hash_n_string[lang])
                      hash_n_string[lang][m_h] = last
                if last in just_string[lang]:  # category key should not be translated
@@ -241,7 +246,7 @@ def get_texts(text: str) -> dict:
                   gr1 = info.group(1)
                   if is_viable_non_dupe(gr1, just_string[lang]):
                      just_string[lang].add(gr1)
-                     m_h = create_non_dupe(re.sub(r'__+', '_', f'{opt_name}_INFO_{j}'), opt,
+                     m_h = create_non_dupe(re.sub(r'__+', '_', f'{opt_name}_INFO_{j}'), opt_name,
                                            hash_n_string[lang])
                      hash_n_string[lang][m_h] = gr1
          else:
@@ -264,7 +269,7 @@ def get_texts(text: str) -> dict:
                   and not re.sub(r'[+-]', '', set_value[1:-1]).isdigit():
                   clean_key = set_key[1:-1]
                   clean_key = remove_special_chars(clean_key).upper().replace(' ', '_')
-                  m_h = create_non_dupe(re.sub(r'__+', '_', f"OPTION_VAL_{clean_key}"), opt, hash_n_string[lang])
+                  m_h = create_non_dupe(re.sub(r'__+', '_', f"OPTION_VAL_{clean_key}"), opt_name, hash_n_string[lang])
                   hash_n_string[lang][m_h] = set_value
                   just_string[lang].add(set_value)
    return hash_n_string

@@ -14,6 +14,10 @@ void MDFN_FASTCALL TIMER_Write(const int32_t timestamp, uint32_t A, uint16_t V);
 uint16_t MDFN_FASTCALL TIMER_Read(const int32_t timestamp, uint32_t A);
 
 void MDFN_FASTCALL TIMER_AddDotClocks(uint32_t count);
+
+/* True while timer 0 counts the dot clock, which the GPU must then
+ * deliver at its regular update cadence. */
+bool TIMER_DotClockActive(void);
 void TIMER_ClockHRetrace(void);
 void MDFN_FASTCALL TIMER_SetHRetrace(bool status);
 void MDFN_FASTCALL TIMER_SetVBlank(bool status);

@@ -1,0 +1,40 @@
+name: HD texture IO channel
+
+# The channel between the render thread and the HD texture IO workers has
+# no lock. The test runs it with four real workers under ThreadSanitizer
+# and under AddressSanitizer with leak detection: every request taken and
+# answered once, high priority and promoted requests served next, no
+# wakeup lost, nothing left behind at stop.
+
+on:
+  push:
+    paths:
+      - 'rhi/tt_io_channel.c'
+      - 'rhi/tt_io_channel.h'
+      - 'tools/ttio/**'
+      - 'libretro-common/rthreads/**'
+      - 'libretro-common/include/retro_atomic.h'
+      - 'libretro-common/include/rthreads/**'
+      - '.github/workflows/tt-io-channel.yml'
+  pull_request:
+    paths:
+      - 'rhi/tt_io_channel.c'
+      - 'rhi/tt_io_channel.h'
+      - 'tools/ttio/**'
+      - 'libretro-common/rthreads/**'
+      - 'libretro-common/include/retro_atomic.h'
+      - 'libretro-common/include/rthreads/**'
+      - '.github/workflows/tt-io-channel.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tt-io-channel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: IO channel under TSan and ASan
+        run: tools/ttio/run.sh

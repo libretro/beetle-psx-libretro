@@ -1083,6 +1083,13 @@ static void * get_next_block_func(struct lightrec_state *state, u32 pc)
 	int err;
 
 	do {
+		state->check_cycle_delta = state->target_cycle - state->current_cycle;
+
+		/* Results the workers published since the last pass go into
+		 * the LUT before it is consulted. */
+		if (ENABLE_THREADED_COMPILER)
+			lightrec_recompiler_install(state->rec);
+
 		func = lut_read(state, lut_offset(pc));
 		if (func && func != state->get_next_block)
 			break;
@@ -1159,56 +1166,69 @@ static void * get_next_block_func(struct lightrec_state *state, u32 pc)
 	return func;
 }
 
-static void * lightrec_alloc_code(struct lightrec_state *state, size_t size)
+/* Threaded: each worker owns a code arena and the emulation thread only
+ * frees (routed to the owner), so no lock is needed; see recompiler.c.
+ * Non-threaded: one TLSF over the whole code buffer. */
+static bool lightrec_has_code_buffer(struct lightrec_state *state)
 {
-	void *code;
-
+	if (!ENABLE_CODE_BUFFER)
+		return false;
 	if (ENABLE_THREADED_COMPILER)
-		lightrec_code_alloc_lock(state);
+		return state->rec && lightrec_rec_has_code_buffer(state->rec);
+	return state->tlsf != NULL;
+}
 
-	code = tlsf_malloc(state->tlsf, size);
-
+static void * lightrec_alloc_code(struct lightrec_state *state,
+				  unsigned int arena, size_t size)
+{
 	if (ENABLE_THREADED_COMPILER)
-		lightrec_code_alloc_unlock(state);
+		return lightrec_rec_code_alloc(state->rec, arena, size);
 
-	return code;
+	return tlsf_malloc(state->tlsf, size);
 }
 
 static void lightrec_realloc_code(struct lightrec_state *state,
-				  void *ptr, size_t size)
+				  unsigned int arena, void *ptr, size_t size)
 {
 	/* NOTE: 'size' MUST be smaller than the size specified during
 	 * the allocation. */
 
 	if (ENABLE_THREADED_COMPILER)
-		lightrec_code_alloc_lock(state);
-
-	tlsf_realloc(state->tlsf, ptr, size);
-
-	if (ENABLE_THREADED_COMPILER)
-		lightrec_code_alloc_unlock(state);
+		lightrec_rec_code_realloc(state->rec, arena, ptr, size);
+	else
+		tlsf_realloc(state->tlsf, ptr, size);
 }
 
 static void lightrec_free_code(struct lightrec_state *state, void *ptr)
 {
 	if (ENABLE_THREADED_COMPILER)
-		lightrec_code_alloc_lock(state);
+		lightrec_rec_code_free(state->rec, ptr);
+	else
+		tlsf_free(state->tlsf, ptr);
+}
 
-	tlsf_free(state->tlsf, ptr);
-
+/* The arena's owner giving its own allocation back (worker thread). */
+static void lightrec_free_code_own(struct lightrec_state *state,
+				   unsigned int arena, void *ptr)
+{
+	if (!lightrec_has_code_buffer(state))
+		return;
 	if (ENABLE_THREADED_COMPILER)
-		lightrec_code_alloc_unlock(state);
+		lightrec_rec_code_free_own(state->rec, arena, ptr);
+	else
+		tlsf_free(state->tlsf, ptr);
 }
 
 static char lightning_code_data[0x80000];
 
 static void * lightrec_emit_code(struct lightrec_state *state,
 				 const struct block *block,
-				 jit_state_t *_jit, unsigned int *size)
+				 jit_state_t *_jit, unsigned int *size,
+				 unsigned int arena)
 {
-	bool has_code_buffer = ENABLE_CODE_BUFFER && state->tlsf;
+	bool has_code_buffer = lightrec_has_code_buffer(state);
 	jit_word_t code_size, new_code_size;
-	void *code;
+	void *code, *alloc = NULL;
 
 	jit_realize();
 
@@ -1226,7 +1246,7 @@ static void * lightrec_emit_code(struct lightrec_state *state,
 		code_size *= 2;
 #endif
 
-		code = lightrec_alloc_code(state, (size_t) code_size);
+		code = lightrec_alloc_code(state, arena, (size_t) code_size);
 
 		if (!code) {
 			if (ENABLE_THREADED_COMPILER) {
@@ -1242,7 +1262,7 @@ static void * lightrec_emit_code(struct lightrec_state *state,
 
 			pr_debug("Re-try to alloc %zu bytes...\n", code_size);
 
-			code = lightrec_alloc_code(state, code_size);
+			code = lightrec_alloc_code(state, arena, code_size);
 			if (!code) {
 				pr_err("Could not alloc even after removing old blocks!\n");
 				return NULL;
@@ -1252,10 +1272,11 @@ static void * lightrec_emit_code(struct lightrec_state *state,
 		jit_set_code(code, code_size);
 	}
 
+	alloc = code;
 	code = jit_emit();
 	if (!code) {
 		if (has_code_buffer)
-			lightrec_free_code(state, code);
+			lightrec_free_code_own(state, arena, alloc);
 
 		return NULL;
 	}
@@ -1264,7 +1285,7 @@ static void * lightrec_emit_code(struct lightrec_state *state,
 	lightrec_register(MEM_FOR_CODE, new_code_size);
 
 	if (has_code_buffer) {
-		lightrec_realloc_code(state, code, (size_t) new_code_size);
+		lightrec_realloc_code(state, arena, code, (size_t) new_code_size);
 
 		pr_debug("Creating code block at address 0x%" PRIxPTR ", "
 			 "code size: %" PRIuPTR " new: %" PRIuPTR "\n",
@@ -1352,7 +1373,7 @@ static struct block * generate_wrapper(struct lightrec_state *state)
 	block->nb_ops = 0;
 
 	block->function = lightrec_emit_code(state, block, _jit,
-					     &block->code_size);
+					     &block->code_size, 0);
 	if (!block->function)
 		goto err_free_jit;
 
@@ -1480,6 +1501,10 @@ static struct block * generate_dispatcher(struct lightrec_state *state)
 		jit_movr(JIT_V(i + FIRST_REG), JIT_V(i + FIRST_REG));
 
 	loop = jit_label();
+
+	/* Every block entry is a cycle-budget check point */
+	jit_stxi_i(lightrec_offset(check_cycle_delta), LIGHTREC_REG_STATE,
+		   LIGHTREC_REG_CYCLE);
 
 	if (!arch_has_fast_mask())
 		jit_movi(JIT_R1, 0x1fffffff);
@@ -1646,7 +1671,7 @@ static struct block * generate_dispatcher(struct lightrec_state *state)
 	block->nb_ops = 0;
 
 	block->function = lightrec_emit_code(state, block, _jit,
-					     &block->code_size);
+					     &block->code_size, 0);
 	if (!block->function)
 		goto err_free_jit;
 
@@ -1888,7 +1913,7 @@ static void lightrec_reap_jit(struct lightrec_state *state, void *data)
 
 static void lightrec_free_function(struct lightrec_state *state, void *fn)
 {
-	if (ENABLE_CODE_BUFFER && state->tlsf) {
+	if (lightrec_has_code_buffer(state)) {
 		pr_debug("Freeing code block at 0x%" PRIxPTR "\n", (uintptr_t) fn);
 		lightrec_free_code(state, fn);
 	}
@@ -1904,25 +1929,26 @@ static void lightrec_reap_opcode_list(struct lightrec_state *state, void *data)
 	lightrec_free_opcode_list(state, data);
 }
 
-int lightrec_compile_block(struct lightrec_cstate *cstate,
-			   struct block *block)
+/* Worker half of a compilation: emit the code into a fresh jit state.
+ * Shares nothing with the emulation thread but the block itself, which
+ * stays alive while the worker holds it (see lightrec_free_block). */
+int lightrec_compile_block_code(struct lightrec_cstate *cstate,
+				struct block *block,
+				struct lightrec_compiled **out)
 {
-	struct block *dead_blocks[ARRAY_SIZE(cstate->targets)];
-	u32 was_dead[ARRAY_SIZE(cstate->targets) / 8];
 	struct lightrec_state *state = cstate->state;
 	struct lightrec_branch_target *target;
+	struct lightrec_compiled *c;
 	bool fully_tagged = false;
-	bool code_current;
-	struct block *block2;
 	struct opcode *elm;
 	jit_state_t *_jit, *oldjit;
 	jit_node_t *start_of_block;
 	bool skip_next = false;
 	void *old_fn, *new_fn;
-	size_t old_code_size;
+	unsigned int old_code_size, new_code_size;
 	unsigned int i, j;
-	u8 old_flags;
-	u32 offset;
+
+	*out = NULL;
 
 	fully_tagged = lightrec_block_is_fully_tagged(block);
 	if (fully_tagged)
@@ -2010,7 +2036,8 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 	jit_ret();
 	jit_epilog();
 
-	new_fn = lightrec_emit_code(state, block, _jit, &block->code_size);
+	new_fn = lightrec_emit_code(state, block, _jit, &new_code_size,
+				    cstate->arena);
 	if (!new_fn) {
 		if (!ENABLE_THREADED_COMPILER)
 			pr_err("Unable to compile block!\n");
@@ -2020,12 +2047,90 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 		return -ENOMEM;
 	}
 
-	/* Pause the reaper, because lightrec_reset_lut_offset() may try to set
-	 * the old block->function pointer to the code LUT. */
-	if (ENABLE_THREADED_COMPILER)
-		lightrec_reaper_pause(state->reaper);
+	c = lightrec_malloc(state, MEM_FOR_LIGHTREC,
+			    sizeof(*c) + cstate->nb_targets * sizeof(c->targets[0]));
+	if (!c) {
+		lightrec_free_code_own(state, cstate->arena, new_fn);
+		lightrec_unregister(MEM_FOR_CODE, new_code_size);
+		block->_jit = oldjit;
+		jit_clear_state();
+		_jit_destroy_state(_jit);
+		return -ENOMEM;
+	}
 
-	block->function = new_fn;
+	c->next = NULL;
+	c->block = block;
+	c->oldjit = oldjit;
+	c->old_fn = old_fn;
+	c->new_fn = new_fn;
+	c->old_code_size = old_code_size;
+	c->new_code_size = new_code_size;
+	c->fully_tagged = fully_tagged;
+	c->nb_targets = cstate->nb_targets;
+
+	/* Resolve the inner entry points now: the labels go away with
+	 * jit_clear_state() below. */
+	for (i = 0; i < cstate->nb_targets; i++) {
+		target = &cstate->targets[i];
+		c->targets[i].offset = target->offset;
+		c->targets[i].address = target->offset ? jit_address(target->label) : NULL;
+	}
+
+	if (ENABLE_DISASSEMBLER) {
+		pr_debug("Compiling block at "PC_FMT"\n", block->pc);
+		jit_disassemble();
+	}
+
+	jit_clear_state();
+
+	*out = c;
+
+	return 0;
+}
+
+/* Drop a result the emulation thread does not want (the block died, or
+ * the recompiler is being torn down). The block keeps its previous jit
+ * state and function. */
+void lightrec_discard_compiled(struct lightrec_state *state,
+			       struct block *block,
+			       struct lightrec_compiled *c)
+{
+	jit_state_t *newjit = block->_jit;
+
+	block->_jit = c->oldjit;
+	if (newjit && newjit != c->oldjit)
+		_jit_destroy_state(newjit);
+	lightrec_free_function(state, c->new_fn);
+	lightrec_unregister(MEM_FOR_CODE, c->new_code_size);
+}
+
+/* Emulation-thread half of a compilation: publish the function in the
+ * code LUT, retire the blocks it covers and the state it replaces. */
+void lightrec_install_block(struct lightrec_state *state, struct block *block,
+			    struct lightrec_compiled *c)
+{
+	struct block *dead_blocks[ARRAY_SIZE(((struct lightrec_cstate *)0)->targets)];
+	u32 was_dead[ARRAY_SIZE(((struct lightrec_cstate *)0)->targets) / 8];
+	struct lightrec_compiled_target *target;
+	bool fully_tagged = c->fully_tagged;
+	bool code_current;
+	struct block *block2;
+	jit_state_t *oldjit = c->oldjit;
+	void *old_fn = c->old_fn;
+	unsigned int old_code_size = c->old_code_size;
+	unsigned int i;
+	u8 old_flags;
+	u32 offset;
+
+	if (ENABLE_THREADED_COMPILER && block_has_flag(block, BLOCK_IS_DEAD)) {
+		/* The block was retired while it compiled: its old code is
+		 * what lightrec_free_block() will release. */
+		lightrec_discard_compiled(state, block, c);
+		return;
+	}
+
+	block->function = c->new_fn;
+	block->code_size = c->new_code_size;
 	block_clear_flags(block, BLOCK_SHOULD_RECOMPILE);
 
 	/* The code may have been overwritten while it was being compiled.
@@ -2064,8 +2169,8 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 	 * and a stale inner entry installed here would never be
 	 * scrubbed. */
 	for (i = 0; code_current && ENABLE_THREADED_COMPILER &&
-	     i < cstate->nb_targets; i++) {
-		target = &cstate->targets[i];
+	     i < c->nb_targets; i++) {
+		target = &c->targets[i];
 
 		if (!target->offset)
 			continue;
@@ -2089,23 +2194,24 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 
 		dead_blocks[i] = block2;
 
-		/* If block2 was pending for compilation, cancel it.
-		 * If it's being compiled right now, wait until it finishes. */
+		/* If block2 was pending for compilation, cancel it. If a
+		 * worker is emitting it right now, that result is dropped
+		 * at install time because block2 is dead. */
 		if (block2)
 			lightrec_recompiler_remove(state->rec, block2);
 	}
 
-	for (i = 0; code_current && i < cstate->nb_targets; i++) {
-		target = &cstate->targets[i];
+	for (i = 0; code_current && i < c->nb_targets; i++) {
+		target = &c->targets[i];
 
 		if (!target->offset)
 			continue;
 
 		/* We know from now on that block2 (if present) isn't going to
-		 * be compiled. We can override the LUT entry with our new
+		 * be installed. We can override the LUT entry with our new
 		 * block's entry point. */
 		offset = lut_offset(block->pc) + target->offset;
-		lut_write(state, offset, jit_address(target->label));
+		lut_write(state, offset, target->address);
 
 		if (ENABLE_THREADED_COMPILER) {
 			block2 = dead_blocks[i];
@@ -2128,16 +2234,6 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 			}
 		}
 	}
-
-	if (ENABLE_THREADED_COMPILER)
-		lightrec_reaper_continue(state->reaper);
-
-	if (ENABLE_DISASSEMBLER) {
-		pr_debug("Compiling block at "PC_FMT"\n", block->pc);
-		jit_disassemble();
-	}
-
-	jit_clear_state();
 
 	if (fully_tagged)
 		old_flags = block_set_flags(block, BLOCK_NO_OPCODE_LIST);
@@ -2173,6 +2269,21 @@ int lightrec_compile_block(struct lightrec_cstate *cstate,
 	}
 
 	pr_debug("Blocks compiled: %u\n", ++state->nb_compile);
+}
+
+int lightrec_compile_block(struct lightrec_cstate *cstate,
+			   struct block *block)
+{
+	struct lightrec_compiled *c;
+	int ret;
+
+	ret = lightrec_compile_block_code(cstate, block, &c);
+	if (ret)
+		return ret;
+
+	lightrec_install_block(cstate->state, block, c);
+	lightrec_free(cstate->state, MEM_FOR_LIGHTREC,
+		      sizeof(*c) + c->nb_targets * sizeof(c->targets[0]), c);
 
 	return 0;
 }
@@ -2260,6 +2371,8 @@ u32 lightrec_run_interpreter(struct lightrec_state *state, u32 pc,
 	state->target_cycle = target_cycle;
 
 	do {
+		state->check_cycle_delta = state->target_cycle - state->current_cycle;
+
 		block = lightrec_get_block(state, pc);
 		if (!block)
 			break;
@@ -2276,9 +2389,33 @@ u32 lightrec_run_interpreter(struct lightrec_state *state, u32 pc,
 	return pc;
 }
 
+static void lightrec_reap_free_block(struct lightrec_state *state, void *data)
+{
+	lightrec_free_block(state, data);
+}
+
 void lightrec_free_block(struct lightrec_state *state, struct block *block)
 {
 	u8 old_flags;
+
+	if (ENABLE_THREADED_COMPILER && state->rec) {
+		/* A worker may still be emitting this block. Never wait for
+		 * it: the free runs on a later reaper pass, once the slot that
+		 * holds the block has been released. Any pending request is
+		 * dropped first so no new worker can pick it up. */
+		block_set_flags(block, BLOCK_IS_DEAD);
+		lightrec_recompiler_remove(state->rec, block);
+
+		if (lightrec_recompiler_block_busy(state->rec, block)) {
+			lightrec_reaper_add(state->reaper,
+					    lightrec_reap_free_block, block);
+			return;
+		}
+
+		/* The slot is free, so any result for this block is already
+		 * published: install (and discard) it before the block goes. */
+		lightrec_recompiler_install(state->rec);
+	}
 
 	lightrec_unregister(MEM_FOR_MIPS_CODE, block->nb_ops * sizeof(u32));
 	old_flags = block_set_flags(block, BLOCK_NO_OPCODE_LIST);
@@ -2345,11 +2482,13 @@ struct lightrec_state * lightrec_init(char *argv0,
 
 	if (ENABLE_CODE_BUFFER && nb > PSX_MAP_CODE_BUFFER
 	    && codebuf_map->address) {
-		tlsf = tlsf_create_with_pool(codebuf_map->address,
-					     codebuf_map->length);
-		if (!tlsf) {
-			pr_err("Unable to initialize code buffer\n");
-			return NULL;
+		if (!ENABLE_THREADED_COMPILER) {
+			tlsf = tlsf_create_with_pool(codebuf_map->address,
+						     codebuf_map->length);
+			if (!tlsf) {
+				pr_err("Unable to initialize code buffer\n");
+				return NULL;
+			}
 		}
 
 		if (__WORDSIZE == 64) {
@@ -2382,7 +2521,9 @@ struct lightrec_state * lightrec_init(char *argv0,
 		goto err_free_state;
 
 	if (ENABLE_THREADED_COMPILER) {
-		state->rec = lightrec_recompiler_init(state);
+		state->rec = lightrec_recompiler_init(state,
+				(ENABLE_CODE_BUFFER && nb > PSX_MAP_CODE_BUFFER)
+				? codebuf_map : NULL);
 		if (!state->rec)
 			goto err_free_block_cache;
 
@@ -2456,10 +2597,12 @@ err_free_reaper:
 	if (ENABLE_THREADED_COMPILER)
 		lightrec_reaper_destroy(state->reaper);
 err_free_recompiler:
-	if (ENABLE_THREADED_COMPILER)
+	if (ENABLE_THREADED_COMPILER) {
 		lightrec_free_recompiler(state->rec);
-	else
+		state->rec = NULL;
+	} else {
 		lightrec_free_cstate(state->cstate);
+	}
 err_free_block_cache:
 	lightrec_free_block_cache(state->block_cache);
 err_free_state:
@@ -2479,13 +2622,19 @@ void lightrec_destroy(struct lightrec_state *state)
 	state->current_cycle = ~state->current_cycle;
 	lightrec_print_info(state);
 
+	/* Join the workers first so nothing below defers; the arenas stay
+	 * up until every block has released its code. */
+	if (ENABLE_THREADED_COMPILER)
+		lightrec_recompiler_stop(state->rec);
+
 	lightrec_free_block_cache(state->block_cache);
 	lightrec_free_block(state, state->dispatcher);
 	lightrec_free_block(state, state->c_wrapper_block);
 
 	if (ENABLE_THREADED_COMPILER) {
-		lightrec_free_recompiler(state->rec);
 		lightrec_reaper_destroy(state->reaper);
+		lightrec_free_recompiler(state->rec);
+		state->rec = NULL;
 	} else {
 		lightrec_free_cstate(state->cstate);
 	}
@@ -2554,6 +2703,11 @@ u32 lightrec_exit_flags(struct lightrec_state *state)
 u32 lightrec_current_cycle_count(const struct lightrec_state *state)
 {
 	return state->current_cycle;
+}
+
+u32 lightrec_last_check_cycle_count(const struct lightrec_state *state)
+{
+	return state->target_cycle - state->check_cycle_delta;
 }
 
 void lightrec_reset_cycle_count(struct lightrec_state *state, u32 cycles)

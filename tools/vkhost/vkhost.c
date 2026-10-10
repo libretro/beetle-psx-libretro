@@ -13,6 +13,16 @@
  *
  * Usage: vkhost <core.so> <content> [savestate] [frames] [outdir]
  *   VKHOST_VARS: semicolon list of key=value core option overrides.
+ *   VKHOST_QUEUE_THREAD: run a second thread on the frontend's queue, the
+ *   way a threaded frontend does (see "the frontend's queue" below).
+ *   VKHOST_NEXT_CONTENT: after the teardown (context_destroy, unload,
+ *   deinit), run this content as a second session in the same process -
+ *   the core stays loaded, as with a statically linked frontend - and dump
+ *   its frames to <outdir>/next.
+ *
+ * Exits non-zero on any validation error, on any use the core makes of
+ * the frontend's queue without holding lock_queue, and on any wait it
+ * makes with lock_queue held.
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -22,6 +32,7 @@
 #include <stdarg.h>
 #include <time.h>
 #include <dlfcn.h>
+#include <pthread.h>
 #include <vulkan/vulkan.h>
 #include "libretro.h"
 #include "libretro_vulkan.h"
@@ -85,8 +96,145 @@ static uint32_t vk_get_sync_index_mask(void *handle) { (void)handle; return 1; }
 static void vk_wait_sync_index(void *handle) { (void)handle; }
 static void vk_set_command_buffers(void *handle, uint32_t num, const VkCommandBuffer *cmd)
 { (void)handle; (void)num; (void)cmd; }
-static void vk_lock_queue(void *handle) { (void)handle; }
-static void vk_unlock_queue(void *handle) { (void)handle; }
+
+/* ---- the frontend's queue: its lock, and who uses the queue without it ----
+ *
+ * The queue the core hands back from create_device is the frontend's as
+ * well: RetroArch submits its frames and presents on it, and under
+ * threaded video does so on another thread. A core that submits for
+ * itself has to hold lock_queue around every use of that queue, and
+ * vkDeviceWaitIdle is a use of every queue. The core that skipped the
+ * lock ran for years against an unthreaded frontend and then hung the
+ * GPU the moment the frontend's submissions moved to a video thread.
+ *
+ * So the lock here is a real one, the core's Vulkan entry points for the
+ * queue are handed out through this file, and each use of the frontend's
+ * queue made without the lock held by the calling thread is counted and
+ * fails the run.
+ *
+ * The other half of the rule is that the lock is held for the queue call
+ * and nothing longer. A core that waits for the GPU with it held - a
+ * fence wait, or vkDeviceWaitIdle / vkQueueWaitIdle, which are waits and
+ * queue uses both - parks the frontend's video thread for as long as the
+ * GPU takes, and is one dependency away from a deadlock. Each wait made
+ * with the lock held is counted and fails the run as well. With VKHOST_QUEUE_THREAD set, a second thread submits on
+ * the queue under the lock the whole time, as the frontend's video
+ * thread does, so that the validation layer's own thread check sees a
+ * core that skips it too. */
+static pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_t queue_owner;
+static int queue_held;                 /* read and written with __atomic */
+static int queue_violations;
+static int queue_waits_locked;
+static PFN_vkWaitForFences real_wait_for_fences;
+static PFN_vkGetDeviceProcAddr real_gdpa;
+static PFN_vkQueueSubmit real_queue_submit;
+static PFN_vkQueueWaitIdle real_queue_wait_idle;
+static PFN_vkDeviceWaitIdle real_device_wait_idle;
+
+static void host_lock_queue(void)
+{
+   pthread_mutex_lock(&queue_mutex);
+   queue_owner = pthread_self();
+   __atomic_store_n(&queue_held, 1, __ATOMIC_SEQ_CST);
+}
+static void host_unlock_queue(void)
+{
+   __atomic_store_n(&queue_held, 0, __ATOMIC_SEQ_CST);
+   pthread_mutex_unlock(&queue_mutex);
+}
+static void vk_lock_queue(void *handle) { (void)handle; host_lock_queue(); }
+static void vk_unlock_queue(void *handle) { (void)handle; host_unlock_queue(); }
+
+static int host_queue_held_here(void)
+{
+   return __atomic_load_n(&queue_held, __ATOMIC_SEQ_CST)
+      && pthread_equal(queue_owner, pthread_self());
+}
+
+static void core_waits(const char *what)
+{
+   if (host_queue_held_here() && !queue_waits_locked++)
+      fprintf(stderr, "[vkhost] QUEUE: the core waited in %s with lock_queue held\n", what);
+}
+
+/* queue == VK_NULL_HANDLE: a call that uses every queue of the device. */
+static void core_uses_queue(const char *what, VkQueue queue)
+{
+   if (!vkctx.queue || (queue && queue != vkctx.queue))
+      return;
+   if (host_queue_held_here())
+      return;
+   if (!queue_violations++)
+      fprintf(stderr, "[vkhost] QUEUE: the core called %s on the frontend's queue"
+            " without holding lock_queue\n", what);
+}
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkQueueSubmit(VkQueue queue,
+      uint32_t count, const VkSubmitInfo *submits, VkFence fence)
+{
+   core_uses_queue("vkQueueSubmit", queue);
+   return real_queue_submit(queue, count, submits, fence);
+}
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkQueueWaitIdle(VkQueue queue)
+{
+   core_uses_queue("vkQueueWaitIdle", queue);
+   core_waits("vkQueueWaitIdle");
+   return real_queue_wait_idle(queue);
+}
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkDeviceWaitIdle(VkDevice device)
+{
+   core_uses_queue("vkDeviceWaitIdle", VK_NULL_HANDLE);
+   core_waits("vkDeviceWaitIdle");
+   return real_device_wait_idle(device);
+}
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkWaitForFences(VkDevice device,
+      uint32_t count, const VkFence *fences, VkBool32 all, uint64_t timeout)
+{
+   core_waits("vkWaitForFences");
+   return real_wait_for_fences(device, count, fences, all, timeout);
+}
+static PFN_vkVoidFunction core_queue_entry(const char *name, PFN_vkVoidFunction real)
+{
+   if (!real)
+      return real;
+   if (!strcmp(name, "vkQueueSubmit"))
+   { real_queue_submit = (PFN_vkQueueSubmit)real; return (PFN_vkVoidFunction)core_vkQueueSubmit; }
+   if (!strcmp(name, "vkQueueWaitIdle"))
+   { real_queue_wait_idle = (PFN_vkQueueWaitIdle)real; return (PFN_vkVoidFunction)core_vkQueueWaitIdle; }
+   if (!strcmp(name, "vkDeviceWaitIdle"))
+   { real_device_wait_idle = (PFN_vkDeviceWaitIdle)real; return (PFN_vkVoidFunction)core_vkDeviceWaitIdle; }
+   if (!strcmp(name, "vkWaitForFences"))
+   { real_wait_for_fences = (PFN_vkWaitForFences)real; return (PFN_vkVoidFunction)core_vkWaitForFences; }
+   return real;
+}
+static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL core_gdpa(VkDevice device, const char *name)
+{
+   return core_queue_entry(name, real_gdpa(device, name));
+}
+static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL core_gipa(VkInstance inst, const char *name)
+{
+   PFN_vkVoidFunction real = vkGetInstanceProcAddr(inst, name);
+   if (real && !strcmp(name, "vkGetDeviceProcAddr"))
+   { real_gdpa = (PFN_vkGetDeviceProcAddr)real; return (PFN_vkVoidFunction)core_gdpa; }
+   return core_queue_entry(name, real);
+}
+
+/* The frontend's video thread, as far as the queue is concerned. */
+static pthread_t queue_thread;
+static int queue_thread_run;
+static void *queue_thread_main(void *unused)
+{
+   struct timespec nap = { 0, 50 * 1000 };
+   (void)unused;
+   while (__atomic_load_n(&queue_thread_run, __ATOMIC_SEQ_CST))
+   {
+      host_lock_queue();
+      vkQueueSubmit(vkctx.queue, 0, NULL, VK_NULL_HANDLE);
+      host_unlock_queue();
+      nanosleep(&nap, NULL);
+   }
+   return NULL;
+}
 static void vk_set_signal_semaphore(void *handle, VkSemaphore sem) { (void)handle; (void)sem; }
 
 /* ---- environment ---- */
@@ -296,7 +444,9 @@ static int dump_frame(const char *path)
    if (!last_image) { fprintf(stderr, "[vkhost] no image set\n"); return -1; }
    /* The interface hands semaphores with set_image; a real frontend waits
     * them on its own submission. A harness can afford the sledgehammer. */
+   host_lock_queue();
    vkDeviceWaitIdle(dev);
+   host_unlock_queue();
    img = last_image->create_info.image;
    fmt = last_image->create_info.format;
    { const char *e = getenv("VKHOST_DUMP_WH");
@@ -362,7 +512,9 @@ static int dump_frame(const char *path)
      VkFence fence; VkFenceCreateInfo fi = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
      si.commandBufferCount = 1; si.pCommandBuffers = &cmd;
      vkCreateFence(dev, &fi, NULL, &fence);
+     host_lock_queue();
      vkQueueSubmit(queue, 1, &si, fence);
+     host_unlock_queue();
      vkWaitForFences(dev, 1, &fence, VK_TRUE, UINT64_MAX);
      vkDestroyFence(dev, fence, NULL); }
 
@@ -438,6 +590,8 @@ int main(int argc, char **argv)
    const char *state_path = NULL;
    int frames = 120;
    const char *outdir = "/tmp/vkhost_out";
+   const char *next_content = getenv("VKHOST_NEXT_CONTENT");
+   char next_outdir[600];
    char cmdbuf[1024];
 
    if (argc < 3)
@@ -482,6 +636,7 @@ int main(int argc, char **argv)
    if (!core) { fprintf(stderr, "dlopen: %s\n", dlerror()); return 2; }
 
 #define SYM(name) *(void **)(&name##_fn) = dlsym(core, #name)
+session:
    { set_env_t retro_set_environment_fn; SYM(retro_set_environment);
      retro_set_environment_fn(env_cb); }
    { void (*retro_init_fn)(void); SYM(retro_init); retro_init_fn(); }
@@ -499,6 +654,15 @@ int main(int argc, char **argv)
       if (!retro_load_game_fn(&info))
       { fprintf(stderr, "[vkhost] retro_load_game failed\n"); return 3; }
    }
+   {
+      /* Every frontend asks for the AV info right after loading; the core
+       * applies its renderer options (internal resolution, VRAM view) there. */
+      struct retro_system_av_info av;
+      void (*retro_get_system_av_info_fn)(struct retro_system_av_info *) =
+         dlsym(core, "retro_get_system_av_info");
+      if (retro_get_system_av_info_fn)
+         retro_get_system_av_info_fn(&av);
+   }
 
    if (!negotiation && !hw_render.context_reset)
    {
@@ -513,7 +677,7 @@ int main(int argc, char **argv)
    {
       static const VkPhysicalDeviceFeatures no_features; /* zeroed, as RetroArch passes */
       if (!negotiation->create_device(&vkctx, instance, gpu, VK_NULL_HANDLE,
-               vkGetInstanceProcAddr, NULL, 0, NULL, 0, &no_features))
+               core_gipa, NULL, 0, NULL, 0, &no_features))
       { fprintf(stderr, "[vkhost] core create_device failed\n"); return 3; }
    }
    else { fprintf(stderr, "[vkhost] no negotiation interface\n"); return 3; }
@@ -524,8 +688,8 @@ int main(int argc, char **argv)
    iface.instance = instance;
    iface.gpu = vkctx.gpu;
    iface.device = vkctx.device;
-   iface.get_device_proc_addr = (PFN_vkGetDeviceProcAddr)vkGetInstanceProcAddr(instance, "vkGetDeviceProcAddr");
-   iface.get_instance_proc_addr = vkGetInstanceProcAddr;
+   iface.get_device_proc_addr = (PFN_vkGetDeviceProcAddr)core_gipa(instance, "vkGetDeviceProcAddr");
+   iface.get_instance_proc_addr = core_gipa;
    iface.queue = vkctx.queue;
    iface.queue_index = vkctx.queue_family_index;
    iface.set_image = vk_set_image;
@@ -536,6 +700,12 @@ int main(int argc, char **argv)
    iface.lock_queue = vk_lock_queue;
    iface.unlock_queue = vk_unlock_queue;
    iface.set_signal_semaphore = vk_set_signal_semaphore;
+
+   if (getenv("VKHOST_QUEUE_THREAD") && vkctx.queue)
+   {
+      queue_thread_run = 1;
+      pthread_create(&queue_thread, NULL, queue_thread_main, NULL);
+   }
 
    if (hw_render.context_reset) hw_render.context_reset();
 
@@ -600,7 +770,11 @@ run_frames_sw:
          if (bench && i == bench_skip)
          {
             if (vkctx.device)
+            {
+               host_lock_queue();
                vkDeviceWaitIdle(vkctx.device);
+               host_unlock_queue();
+            }
             clock_gettime(CLOCK_MONOTONIC, &t0);
          }
          retro_run_fn();
@@ -650,7 +824,11 @@ run_frames_sw:
           * than to teardown: wait_sync_index is a no-op in this harness,
           * so the core is free to run ahead of the device. */
          if (vkctx.device)
+         {
+            host_lock_queue();
             vkDeviceWaitIdle(vkctx.device);
+            host_unlock_queue();
+         }
          clock_gettime(CLOCK_MONOTONIC, &t1);
          secs = (double)(t1.tv_sec - t0.tv_sec)
               + (double)(t1.tv_nsec - t0.tv_nsec) * 1e-9;
@@ -660,9 +838,37 @@ run_frames_sw:
       }
    }
 
-   fprintf(stderr, "[vkhost] done: %d frames run, %u valid, %d validation errors, %d warnings\n",
-           frames, frame_valid, validation_errors, validation_warnings);
+   /* The core's teardown uses the queue as well, so it is counted before
+    * the verdict; the queue thread runs until then. */
+   if (hw_render.context_destroy && vkctx.device) hw_render.context_destroy();
+   if (queue_thread_run)
+   {
+      __atomic_store_n(&queue_thread_run, 0, __ATOMIC_SEQ_CST);
+      pthread_join(queue_thread, NULL);
+   }
+   fprintf(stderr, "[vkhost] done: %d frames run, %u valid, %d validation errors, %d warnings,"
+           " %d unlocked uses of the frontend's queue, %d waits with its lock held\n",
+           frames, frame_valid, validation_errors, validation_warnings,
+           queue_violations, queue_waits_locked);
    { void (*f)(void) = dlsym(core, "retro_unload_game"); if (f) f(); }
    { void (*f)(void) = dlsym(core, "retro_deinit"); if (f) f(); }
-   return validation_errors ? 5 : 0;
+   if (next_content && !(validation_errors || queue_violations || queue_waits_locked))
+   {
+      content      = next_content;
+      next_content = NULL;
+      state_path   = NULL;
+      snprintf(next_outdir, sizeof(next_outdir), "%.590s/next", outdir);
+      outdir = next_outdir;
+      snprintf(cmdbuf, sizeof(cmdbuf), "mkdir -p %s", outdir);
+      if (system(cmdbuf) != 0)
+         fprintf(stderr, "[vkhost] cannot create %s\n", outdir);
+      memset(&hw_render, 0, sizeof(hw_render));
+      negotiation = NULL;
+      last_image  = NULL;
+      frame_valid = 0;
+      last_w = last_h = 0;
+      fprintf(stderr, "[vkhost] next session: %s\n", content);
+      goto session;
+   }
+   return (validation_errors || queue_violations || queue_waits_locked) ? 5 : 0;
 }

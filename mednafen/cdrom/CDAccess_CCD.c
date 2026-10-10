@@ -165,6 +165,13 @@ struct CDAccess_CCD
 
    cdstream       img_stream;
    cdstream       sub_stream;
+   /* Second handle on the same .sub file, owned by Read_Raw_PW. Under the
+    * threaded CDIF, Read_Raw_Sector runs on the read thread and
+    * Read_Raw_PW on the emulation thread, and a file-backed cdstream has
+    * one seek position: sharing sub_stream between them let one side's
+    * seek land between the other's seek and read. Each thread now owns
+    * its own position, so no lock is needed. */
+   cdstream       sub_stream_pw;
    size_t         img_numsectors;
    TOC            tocd;
 };
@@ -606,6 +613,17 @@ static bool CDAccess_CCD_Load(struct CDAccess_CCD *self, const char *path,
          goto cleanup;
       }
 
+      /* Memcached images run the single-threaded CDIF and one stream
+       * serves both readers; a file-backed image runs the threaded one,
+       * so give the emulation thread's subchannel reads their own
+       * handle. */
+      if (!image_memcache && !cdstream_open(&self->sub_stream_pw, sub_path))
+      {
+         MDFN_Error(0, "Could not open CCD subchannel \"%s\"", sub_path);
+         ok = false;
+         goto cleanup;
+      }
+
       if (cdstream_size(&self->sub_stream)
             != (uint64_t)self->img_numsectors * 96)
       {
@@ -631,6 +649,7 @@ static void CDAccess_CCD_Cleanup(struct CDAccess_CCD *self)
 {
    cdstream_close(&self->img_stream);
    cdstream_close(&self->sub_stream);
+   cdstream_close(&self->sub_stream_pw);
 }
 
 static bool CDAccess_CCD_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf,
@@ -685,8 +704,14 @@ static bool CDAccess_CCD_Read_Raw_PW(CDAccess *base_self, uint8_t *buf,
       return true;
    }
 
-   cdstream_seek(&self->sub_stream, lba * 96, SEEK_SET);
-   cdstream_read(&self->sub_stream, sub_buf, 96);
+   {
+      /* Emulation-thread handle when there is one (threaded CDIF);
+       * otherwise the single shared stream. */
+      cdstream *ss = (self->sub_stream_pw.fp || self->sub_stream_pw.buf)
+         ? &self->sub_stream_pw : &self->sub_stream;
+      cdstream_seek(ss, lba * 96, SEEK_SET);
+      cdstream_read(ss, sub_buf, 96);
+   }
 
    subpw_interleave(sub_buf, buf);
 

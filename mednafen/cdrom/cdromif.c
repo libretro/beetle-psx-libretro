@@ -54,13 +54,37 @@
  *
  *   - The read thread used to read each sector into a 2448-byte
  *     stack tmpbuf and then memcpy it into the ring slot under
- *     the SBMutex.  The sector buffer's `valid` flag is now flipped
- *     to false outside the lock, the read targets the slot directly,
- *     and `valid` flips back to true (with the lba update and a
- *     wake) under the lock.  Saves one 2448-byte memcpy per sector.
+ *     the SBMutex.  The read now targets the slot directly.
  *
  *   - cdromif_c.h's CDIF_* shim functions are now ordinary
  *     definitions in this file; cdromif_c.h is gone.
+ *
+ * Lock-free MT path (no mutex anywhere on it):
+ *
+ *   - The two message queues were mutex + condvar rings.  They are
+ *     strictly single-producer / single-consumer (emu thread -> read
+ *     thread, read thread -> emu thread), so each is now a
+ *     retro_waitable_spsc: a lock-free byte ring with an eventcount on
+ *     each end for the sleeping side.  A write with nobody parked is a
+ *     release store; the old queue silently dropped a message when its
+ *     16 slots were full, this one waits for space instead.
+ *
+ *   - The sector ring was published under SBMutex and scanned under it,
+ *     striding through 256 slots 2448 bytes apart to compare each
+ *     slot's lba.  Each slot is now a seqlock: a compact array of
+ *     per-slot atomic words (lba + 1 while the slot holds that sector,
+ *     0 while it is being rewritten) is the only thing the emu thread
+ *     scans - 1 KiB, sixteen cache lines - and a copy is validated by
+ *     re-reading the word after the memcpy.  The read thread publishes
+ *     with a release store; the emu thread parks on an eventcount
+ *     (retro_eventcount: futex on Linux/Android, no lock on the
+ *     notifier's side anywhere) only when the sector is not there yet.
+ *
+ *   - ra_lba / ra_count / SBWritePos / last_read_lba are read-thread
+ *     private.  disc_toc is written by the read thread only while the
+ *     emu thread is blocked in CDIF_Eject / CDIF_Open waiting for the
+ *     DONE ack, which the queue orders; the same holds for the slot
+ *     invalidation an eject performs.
  */
 
 #include <stdint.h>
@@ -69,9 +93,15 @@
 #include <sys/types.h>
 
 #include <boolean.h>
-#include <rthreads/rthreads.h>
 #include <retro_miscellaneous.h>
 #include <libretro.h>
+#if HAVE_THREADS
+#include <rthreads/rthreads.h>
+#include <rthreads/retro_eventcount.h>
+#include <retro_atomic.h>
+#include <retro_waitable_spsc.h>
+#include <features/features_cpu.h>
+#endif
 
 #include "../mednafen.h"
 #include "../error.h"
@@ -99,82 +129,53 @@ typedef struct CDIF_Message
    uint32_t args[4];
 } CDIF_Message;
 
+#if HAVE_THREADS
 /* ------------------------------------------------------------------
- * CDIF_Queue - fixed-capacity ring buffer of CDIF_Message.
- * Single-producer, single-consumer; mutex protects head/tail/count.
+ * CDIF_Queue - single-producer / single-consumer message ring.
+ * Lock-free (retro_waitable_spsc); a full queue makes the producer
+ * wait rather than drop, a message is never split.
  * ------------------------------------------------------------------ */
 
 #define CDIF_QUEUE_SIZE 16
+#define CDIF_MSG_BYTES  (sizeof(CDIF_Message))
 
-typedef struct CDIF_Queue
-{
-   CDIF_Message ring[CDIF_QUEUE_SIZE];
-   unsigned     head;
-   unsigned     tail;
-   unsigned     count;
-   slock_t     *mutex;
-   scond_t     *cond;
-} CDIF_Queue;
+typedef retro_waitable_spsc_t CDIF_Queue;
 
-static void CDIF_Queue_Init(CDIF_Queue *q)
+static bool CDIF_Queue_Init(CDIF_Queue *q)
 {
-   q->head  = 0;
-   q->tail  = 0;
-   q->count = 0;
-   q->mutex = slock_new();
-   q->cond  = scond_new();
+   return retro_waitable_spsc_init(q, CDIF_QUEUE_SIZE * CDIF_MSG_BYTES);
 }
 
 static void CDIF_Queue_Free(CDIF_Queue *q)
 {
-   if (q->mutex)
-      slock_free(q->mutex);
-   if (q->cond)
-      scond_free(q->cond);
-   q->mutex = NULL;
-   q->cond  = NULL;
+   retro_waitable_spsc_free(q);
 }
 
+/* blocking: sleep until a message arrives (or the queue is cancelled).
+ * non-blocking: take one if present. */
 static bool CDIF_Queue_Read(CDIF_Queue *q, CDIF_Message *out, bool blocking)
 {
-   bool ret = true;
-
-   slock_lock(q->mutex);
-
    if (blocking)
    {
-      while (q->count == 0)
-         scond_wait(q->cond, q->mutex);
+      while (!retro_waitable_spsc_wait_readable(q, CDIF_MSG_BYTES, 1000000))
+         if (retro_waitable_spsc_cancelled(q))
+            return false;
    }
+   else if (retro_spsc_read_avail(&q->queue) < CDIF_MSG_BYTES)
+      return false;
 
-   if (q->count == 0)
-      ret = false;
-   else
-   {
-      *out = q->ring[q->head];
-      q->head = (q->head + 1) & (CDIF_QUEUE_SIZE - 1);
-      q->count--;
-   }
-
-   slock_unlock(q->mutex);
-
-   return ret;
+   return retro_waitable_spsc_read(q, out, CDIF_MSG_BYTES) == CDIF_MSG_BYTES;
 }
 
 static void CDIF_Queue_Write(CDIF_Queue *q, const CDIF_Message *msg)
 {
-   slock_lock(q->mutex);
-
-   if (q->count < CDIF_QUEUE_SIZE)
-   {
-      q->ring[q->tail] = *msg;
-      q->tail = (q->tail + 1) & (CDIF_QUEUE_SIZE - 1);
-      q->count++;
-   }
-
-   scond_signal(q->cond);
-   slock_unlock(q->mutex);
+   /* SPSC: nobody else can take the space we are told is free. */
+   while (!retro_waitable_spsc_wait_writable(q, CDIF_MSG_BYTES, 1000000))
+      if (retro_waitable_spsc_cancelled(q))
+         return;
+   retro_waitable_spsc_write(q, msg, CDIF_MSG_BYTES);
 }
+#endif
 
 /* ------------------------------------------------------------------
  * Sector-ring slot.
@@ -185,11 +186,18 @@ static void CDIF_Queue_Write(CDIF_Queue *q, const CDIF_Message *msg)
 
 typedef struct CDIF_Sector_Buffer
 {
-   bool     valid;
    bool     error;
-   uint32_t lba;
    uint8_t  data[SECTOR_RAW_BYTES];
 } CDIF_Sector_Buffer;
+
+/* Per-slot published state, kept apart from the slot data so the emu
+ * thread's lookup touches 1 KiB instead of 256 x 2448 bytes:
+ *   0        the slot is empty or being rewritten
+ *   lba + 1  the slot holds sector lba, complete
+ * Doubles as the slot's seqlock word: a reader that finds lba + 1,
+ * copies, and finds the same value afterwards copied a stable sector. */
+#define CDIF_SLOT_EMPTY 0
+#define CDIF_SLOT_TAG(lba) ((int)((lba) + 1u))
 
 /* ------------------------------------------------------------------
  * CDIF - one disc instance.
@@ -203,20 +211,24 @@ struct CDIF
    TOC        disc_toc;
    CDAccess  *disc_cdaccess;
 
+#if HAVE_THREADS
    /* MT-only */
    sthread_t *CDReadThread;
-   CDIF_Queue ReadThreadQueue;
-   CDIF_Queue EmuThreadQueue;
+   CDIF_Queue ReadThreadQueue;   /* emu thread -> read thread */
+   CDIF_Queue EmuThreadQueue;    /* read thread -> emu thread (DONE acks) */
 
    CDIF_Sector_Buffer SectorBuffers[SBSIZE];
-   uint32_t   SBWritePos;
-   slock_t   *SBMutex;
-   scond_t   *SBCond;
+   retro_atomic_int_t SlotTag[SBSIZE];    /* see CDIF_SLOT_TAG */
+   retro_eventcount_t SBEvent;            /* "a sector was published" */
+   uint32_t   SBWritePos;                 /* read-thread private */
 
-   uint32_t   ra_lba;
-   int        ra_count;
-   uint32_t   last_read_lba;
+   uint32_t   ra_lba;                     /* read-thread private */
+   int        ra_count;                   /* read-thread private */
+   uint32_t   last_read_lba;              /* read-thread private */
+#endif
 };
+
+#if HAVE_THREADS
 
 /* ------------------------------------------------------------------
  * MT read-thread implementation.
@@ -255,8 +267,10 @@ static bool CDIF_RT_EjectDisc(CDIF *cdif, bool eject_status,
       cdif->ra_lba        = 0;
       cdif->ra_count      = 0;
       cdif->last_read_lba = ~0U;
+      /* The emu thread is blocked waiting for our DONE ack (or, at
+       * start-up, for the first one), so nobody is reading the ring. */
       for (i = 0; i < SBSIZE; i++)
-         cdif->SectorBuffers[i].valid = false;
+         retro_atomic_store_relaxed_int(&cdif->SlotTag[i], CDIF_SLOT_EMPTY);
    }
 
    return true;
@@ -343,25 +357,26 @@ static int CDIF_ReadThread(void *v_arg)
 
       if (cdif->ra_count)
       {
-         CDIF_Sector_Buffer *slot = &cdif->SectorBuffers[cdif->SBWritePos];
+         uint32_t            pos  = cdif->SBWritePos;
+         CDIF_Sector_Buffer *slot = &cdif->SectorBuffers[pos];
 
-         /* Mark stale before reading so a concurrent ReadRawSector
-          * never returns half-written data from this slot. */
-         slock_lock(cdif->SBMutex);
-         slot->valid = false;
-         slock_unlock(cdif->SBMutex);
+         /* Seqlock write side. Empty the slot's tag, then a full fence
+          * so the tag store is ordered before the data writes: a reader
+          * that sees any of the new bytes has, on re-reading the tag,
+          * seen it change (to EMPTY or to the new tag). */
+         retro_atomic_store_relaxed_int(&cdif->SlotTag[pos], CDIF_SLOT_EMPTY);
+         retro_atomic_thread_fence_seq_cst();
 
          /* Read directly into the slot - saves a 2448-byte memcpy. */
          cdif->disc_cdaccess->Read_Raw_Sector(cdif->disc_cdaccess, slot->data,
                cdif->ra_lba);
-
-         slock_lock(cdif->SBMutex);
-         slot->lba   = cdif->ra_lba;
          slot->error = false;
-         slot->valid = true;
-         cdif->SBWritePos = (cdif->SBWritePos + 1) % SBSIZE;
-         scond_signal(cdif->SBCond);
-         slock_unlock(cdif->SBMutex);
+
+         /* Publish: the release orders the data before the tag. */
+         retro_atomic_store_release_int(&cdif->SlotTag[pos],
+               CDIF_SLOT_TAG(cdif->ra_lba));
+         cdif->SBWritePos = (pos + 1) % SBSIZE;
+         retro_eventcount_notify(&cdif->SBEvent);
 
          cdif->ra_lba++;
          cdif->ra_count--;
@@ -370,6 +385,37 @@ static int CDIF_ReadThread(void *v_arg)
 
    return 1;
 }
+
+/* Seqlock read side: copy sector lba out of the ring if some slot holds
+ * it. A slot whose tag changes underneath the copy is rejected and the
+ * scan continues (the read thread rewrites a given slot once per 256
+ * sectors, so this practically never repeats). */
+static bool CDIF_MT_FindSector(CDIF *cdif, uint8_t *buf, uint32_t lba,
+      bool *error)
+{
+   const int tag = CDIF_SLOT_TAG(lba);
+   int i;
+
+   for (i = 0; i < SBSIZE; i++)
+   {
+      CDIF_Sector_Buffer *slot;
+
+      if (retro_atomic_load_acquire_int(&cdif->SlotTag[i]) != tag)
+         continue;
+
+      slot = &cdif->SectorBuffers[i];
+      memcpy(buf, slot->data, SECTOR_RAW_BYTES);
+      *error = slot->error;
+
+      /* Order the copy's loads before the re-check of the tag. */
+      retro_atomic_thread_fence_acquire();
+      if (retro_atomic_load_relaxed_int(&cdif->SlotTag[i]) == tag)
+         return true;
+   }
+
+   return false;
+}
+#endif /* HAVE_THREADS */
 
 /* ------------------------------------------------------------------
  * Public API.
@@ -384,6 +430,7 @@ void CDIF_HintReadSector(CDIF *cdif, uint32_t lba)
 {
    if (cdif->UnrecoverableError)
       return;
+#if HAVE_THREADS
    if (cdif->is_mt)
    {
       CDIF_Message msg;
@@ -392,6 +439,7 @@ void CDIF_HintReadSector(CDIF *cdif, uint32_t lba)
       msg.args[1] = msg.args[2] = msg.args[3] = 0;
       CDIF_Queue_Write(&cdif->ReadThreadQueue, &msg);
    }
+#endif
 }
 
 bool CDIF_ReadRawSector(CDIF *cdif, uint8_t *buf, uint32_t lba,
@@ -416,61 +464,64 @@ bool CDIF_ReadRawSector(CDIF *cdif, uint8_t *buf, uint32_t lba,
       return false;
    }
 
-   if (!cdif->is_mt)
-   {
-      (void)timeout_us;
-      cdif->disc_cdaccess->Read_Raw_Sector(cdif->disc_cdaccess, buf, lba);
-      return true;
-   }
-   else
+#if HAVE_THREADS
+   if (cdif->is_mt)
    {
       CDIF_Message msg;
-      bool found           = false;
       bool error_condition = false;
+      retro_time_t deadline = 0;
 
       msg.message = CDIF_MSG_READ_SECTOR;
       msg.args[0] = lba;
       msg.args[1] = msg.args[2] = msg.args[3] = 0;
       CDIF_Queue_Write(&cdif->ReadThreadQueue, &msg);
 
-      slock_lock(cdif->SBMutex);
+      if (timeout_us >= 0)
+         deadline = cpu_features_get_time_usec() + (retro_time_t)timeout_us;
 
-      do
+      /* Fast path: the read-ahead has usually already landed the sector,
+       * and the lookup is a scan of the tag array plus one memcpy - no
+       * lock, no syscall. Only when it is not there yet do we register
+       * with the eventcount, re-check (so a publish between the two
+       * scans cannot be missed), and park. */
+      for (;;)
       {
-         int i;
-         for (i = 0; i < SBSIZE; i++)
+         int key;
+         int64_t remaining;
+
+         if (CDIF_MT_FindSector(cdif, buf, lba, &error_condition))
+            break;
+
+         key = retro_eventcount_prepare_wait(&cdif->SBEvent);
+         if (CDIF_MT_FindSector(cdif, buf, lba, &error_condition))
          {
-            CDIF_Sector_Buffer *slot = &cdif->SectorBuffers[i];
-            if (slot->valid && slot->lba == lba)
-            {
-               error_condition = slot->error;
-               memcpy(buf, slot->data, SECTOR_RAW_BYTES);
-               found = true;
-               break;
-            }
+            retro_eventcount_cancel_wait(&cdif->SBEvent);
+            break;
          }
 
-         if (!found)
+         if (timeout_us < 0)
          {
-            if (timeout_us >= 0)
-            {
-               if (!scond_wait_timeout(cdif->SBCond, cdif->SBMutex,
-                        timeout_us))
-               {
-                  error_condition = true;
-                  memset(buf, 0, SECTOR_RAW_BYTES);
-                  break;
-               }
-            }
-            else
-               scond_wait(cdif->SBCond, cdif->SBMutex);
+            retro_eventcount_commit_wait(&cdif->SBEvent, key);
+            continue;
          }
-      } while (!found);
 
-      slock_unlock(cdif->SBMutex);
+         remaining = (int64_t)(deadline - cpu_features_get_time_usec());
+         if (remaining <= 0)
+         {
+            retro_eventcount_cancel_wait(&cdif->SBEvent);
+            error_condition = true;
+            memset(buf, 0, SECTOR_RAW_BYTES);
+            break;
+         }
+         retro_eventcount_commit_wait_timeout(&cdif->SBEvent, key, remaining);
+      }
 
       return !error_condition;
    }
+#endif
+   (void)timeout_us;
+   cdif->disc_cdaccess->Read_Raw_Sector(cdif->disc_cdaccess, buf, lba);
+   return true;
 }
 
 bool CDIF_ReadRawSectorPWOnly(CDIF *cdif, uint8_t *buf, uint32_t lba,
@@ -488,8 +539,8 @@ bool CDIF_ReadRawSectorPWOnly(CDIF *cdif, uint8_t *buf, uint32_t lba,
       return false;
    }
 
-   if (cdif->is_mt && hint_fullread)
-      CDIF_HintReadSector(cdif, lba);
+   if (hint_fullread)
+      CDIF_HintReadSector(cdif, lba); /* no-op on the ST path */
 
    return cdif->disc_cdaccess->Read_Raw_PW(cdif->disc_cdaccess, buf, lba);
 }
@@ -499,6 +550,7 @@ bool CDIF_Eject(CDIF *cdif, bool eject_status)
    if (cdif->UnrecoverableError)
       return false;
 
+#if HAVE_THREADS
    if (cdif->is_mt)
    {
       CDIF_Message msg;
@@ -510,7 +562,7 @@ bool CDIF_Eject(CDIF *cdif, bool eject_status)
       CDIF_Queue_Read(&cdif->EmuThreadQueue, &ack, true);
       return true;
    }
-   else
+#endif
    {
       bool old_de = cdif->DiscEjected;
 
@@ -605,26 +657,26 @@ void CDIF_Close(CDIF *cdif)
    if (!cdif)
       return;
 
+#if HAVE_THREADS
    if (cdif->is_mt)
    {
-      CDIF_Message msg;
+      if (cdif->CDReadThread)
+      {
+         CDIF_Message msg;
 
-      msg.message = CDIF_MSG_DIEDIEDIE;
-      msg.args[0] = msg.args[1] = msg.args[2] = msg.args[3] = 0;
-      CDIF_Queue_Write(&cdif->ReadThreadQueue, &msg);
+         msg.message = CDIF_MSG_DIEDIEDIE;
+         msg.args[0] = msg.args[1] = msg.args[2] = msg.args[3] = 0;
+         CDIF_Queue_Write(&cdif->ReadThreadQueue, &msg);
 
-      sthread_join(cdif->CDReadThread);
+         sthread_join(cdif->CDReadThread);
+         cdif->CDReadThread = NULL;
+      }
 
-      if (cdif->SBMutex)
-         slock_free(cdif->SBMutex);
-      if (cdif->SBCond)
-         scond_free(cdif->SBCond);
-      cdif->SBMutex = NULL;
-      cdif->SBCond  = NULL;
-
+      retro_eventcount_free(&cdif->SBEvent);
       CDIF_Queue_Free(&cdif->ReadThreadQueue);
       CDIF_Queue_Free(&cdif->EmuThreadQueue);
    }
+#endif
 
    if (cdif->disc_cdaccess)
       cdif->disc_cdaccess->destroy(cdif->disc_cdaccess);
@@ -637,10 +689,12 @@ void CDIF_Close(CDIF *cdif)
  * Construction.
  * ------------------------------------------------------------------ */
 
+#if HAVE_THREADS
 static CDIF *CDIF_Open_MT(CDAccess *cda)
 {
    CDIF        *cdif;
    CDIF_Message ack;
+   unsigned     i;
 
    cdif = (CDIF *)calloc(1, sizeof(*cdif));
    if (!cdif)
@@ -652,20 +706,31 @@ static CDIF *CDIF_Open_MT(CDAccess *cda)
    cdif->disc_cdaccess      = cda;
    TOC_Clear(&cdif->disc_toc);
 
-   CDIF_Queue_Init(&cdif->ReadThreadQueue);
-   CDIF_Queue_Init(&cdif->EmuThreadQueue);
+   for (i = 0; i < SBSIZE; i++)
+      retro_atomic_int_init(&cdif->SlotTag[i], CDIF_SLOT_EMPTY);
 
-   cdif->SBMutex = slock_new();
-   cdif->SBCond  = scond_new();
+   if (!CDIF_Queue_Init(&cdif->ReadThreadQueue) ||
+       !CDIF_Queue_Init(&cdif->EmuThreadQueue) ||
+       !retro_eventcount_init(&cdif->SBEvent))
+   {
+      cdif->UnrecoverableError = true;
+      return cdif; /* CDIF_Close frees what was set up */
+   }
 
    cdif->CDReadThread = sthread_create(
          (void (*)(void *))CDIF_ReadThread, cdif);
+   if (!cdif->CDReadThread)
+   {
+      cdif->UnrecoverableError = true;
+      return cdif;
+   }
 
    /* Wait for the read thread to finish initial TOC parsing. */
    CDIF_Queue_Read(&cdif->EmuThreadQueue, &ack, true);
 
    return cdif;
 }
+#endif
 
 static CDIF *CDIF_Open_ST(CDAccess *cda)
 {

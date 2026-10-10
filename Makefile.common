@@ -7,21 +7,17 @@ MEDNAFEN_DIR := $(CORE_DIR)/mednafen
 CORE_EMU_DIR := $(MEDNAFEN_DIR)/psx
 CDROM_DIR    := $(MEDNAFEN_DIR)/cdrom
 
-LIBCHDR_INCFLAGS = \
-                     -I$(DEPS_DIR)/zstd-1.5.7
-
-LIBCHDR_SOURCES_C = \
-                     $(DEPS_DIR)/zstd-1.5.7/zstddeclib.c \
+# CHD images are read by libretro-common's clean-room rchd reader
+# (formats/chd/rchd.c). Its hunk codecs come from the same tree: zlib-format
+# hunks through encoding_deflate.c, LZMA through r7z_lzma.c, FLAC through
+# rflac.c, zstd through encoding_rzstd.c, and the version 5 map through
+# encoding_huffman.c, which every image needs to open at all.
+CHD_SOURCES_C = \
+                     $(LIBRETRO_COMM_DIR)/formats/chd/rchd.c \
+                     $(LIBRETRO_COMM_DIR)/encodings/encoding_huffman.c \
+                     $(LIBRETRO_COMM_DIR)/encodings/encoding_rzstd.c \
+                     $(LIBRETRO_COMM_DIR)/streams/trans_stream_rzstd.c \
                      $(LIBRETRO_COMM_DIR)/formats/7z/r7z_lzma.c \
-                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_bitstream.c \
-                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_cdrom.c \
-                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_chd.c \
-                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_flac.c \
-                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_flac_codec.c \
-                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_huffman.c \
-                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_lzma.c \
-                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_zlib.c \
-                     $(LIBRETRO_COMM_DIR)/formats/libchdr/libchdr_zstd.c \
                      $(LIBRETRO_COMM_DIR)/formats/flac/rflac.c \
                      $(LIBRETRO_COMM_DIR)/encodings/encoding_deflate.c \
                      $(LIBRETRO_COMM_DIR)/features/features_cpu.c
@@ -34,8 +30,7 @@ LIBCHDR_SOURCES_C = \
 # sources) - HAVE_ZLIB is deliberately left undefined so the backend getters
 # resolve to it. Decoding goes through the
 # image_texture / image_transfer front end; rjpeg's runtime SIMD kernel
-# selection needs features_cpu, rwebp's lossy path needs the rvp8 decoder, and
-# image_texture's file path needs nbio.
+# selection needs features_cpu, and rwebp's lossy path needs the rvp8 decoder.
 IMAGE_FORMAT_SOURCES_C = \
 		 $(LIBRETRO_COMM_DIR)/formats/image_texture.c \
 		 $(LIBRETRO_COMM_DIR)/formats/image_transfer.c \
@@ -127,20 +122,10 @@ ifeq ($(NEED_CD), 1)
 endif
 
 ifeq ($(HAVE_CHD), 1)
-   # CHD hunk codecs: zlib-format hunks decode through libretro-common's
-   # clean-room DEFLATE codec (CHD_USE_BUILTIN_DEFLATE), FLAC hunks
-   # through the clean-room rflac decoder (HAVE_RFLAC), LZMA through
-   # the clean-room r7z_lzma decoder (no LZMA SDK at all; the decoder
-   # state is inline and the hunk buffer doubles as the dictionary
-   # window), zstd through the single-file decode-only zstddeclib.
-   FLAGS += -DHAVE_CHD -DCHD_USE_BUILTIN_DEFLATE -DHAVE_RFLAC -DHAVE_7ZIP -DHAVE_ZSTD
-
-   ifeq ($(SYSTEM_LIBCHDR), 1)
-      INCFLAGS += $(shell pkg-config --cflags libchdr)
-      LIBS += $(shell pkg-config --libs libchdr)
-   else
-      INCFLAGS += $(LIBCHDR_INCFLAGS)
-   endif
+   # HAVE_RCHD selects rchd for chd_stream.c as well; the HAVE_RCHD_*
+   # flags name the hunk codecs it is built with.
+   FLAGS += -DHAVE_CHD -DHAVE_RCHD -DHAVE_RCHD_DEFLATE -DHAVE_RCHD_LZMA \
+            -DHAVE_RCHD_FLAC -DHAVE_RCHD_ZSTD -DHAVE_RFLAC -DHAVE_RZSTD
 endif
 
 ifeq ($(HAVE_LIGHTREC), 1)
@@ -217,6 +202,7 @@ endif
                   $(MEDNAFEN_DIR)/error.c \
                   $(MEDNAFEN_DIR)/video/Deinterlacer.c \
                   $(CORE_DIR)/input.c \
+                  $(CORE_DIR)/mc_async.c \
                   $(CORE_DIR)/input_compatibility.c \
                   $(CORE_EMU_DIR)/dma.c \
                   $(CORE_EMU_DIR)/gpu_polygon_sub.c \
@@ -262,6 +248,7 @@ endif
    ifneq (,$(filter 1,$(HAVE_OPENGL) $(HAVE_VULKAN)))
       FLAGS       += -DTEXTURE_DUMPING_ENABLED $(IMAGE_FORMAT_FLAGS)
       SOURCES_C   += $(CORE_DIR)/rhi/rhi_tt.c \
+                     $(CORE_DIR)/rhi/tt_io_channel.c \
                      $(IMAGE_FORMAT_SOURCES_C)
 
       # Same MSVC-C89 discipline as the Vulkan TU (see below).
@@ -308,11 +295,7 @@ endif
                      $(LIBRETRO_COMM_DIR)/time/rtime.c \
                      $(LIBRETRO_COMM_DIR)/hash/lrc_hash.c \
                      $(LIBRETRO_COMM_DIR)/formats/data_transfer.c \
-                     $(LIBRETRO_COMM_DIR)/memmap/memmap.c \
-                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_intf.c \
-                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_stdio.c \
-                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_windowsmmap.c \
-                     $(LIBRETRO_COMM_DIR)/file/nbio/nbio_unixmmap.c
+                     $(LIBRETRO_COMM_DIR)/memmap/memmap.c
 
       ifeq ($(HAVE_CDROM), 1)
          CFLAGS    += -DHAVE_CDROM
@@ -327,7 +310,10 @@ endif
       endif
 
       ifeq ($(NEED_THREADING), 1)
-         SOURCES_C += $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
+         SOURCES_C += $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c \
+                      $(LIBRETRO_COMM_DIR)/rthreads/retro_eventcount.c \
+                      $(LIBRETRO_COMM_DIR)/queues/retro_spsc.c \
+                      $(LIBRETRO_COMM_DIR)/queues/retro_waitable_spsc.c
       endif
 
    endif
@@ -340,9 +326,7 @@ SOURCES_C +=   $(CORE_DIR)/pgxp/pgxp_cpu.c \
                $(CORE_DIR)/pgxp/pgxp_value.c
 
 ifeq ($(HAVE_CHD), 1)
-   ifneq ($(SYSTEM_LIBCHDR), 1)
-      SOURCES_C += $(LIBCHDR_SOURCES_C)
-   endif
+   SOURCES_C += $(CHD_SOURCES_C)
 
    SOURCES_C += $(CDROM_DIR)/CDAccess_CHD.c
 endif ## ifeq ($(HAVE_CHD), 1)

@@ -38,6 +38,7 @@ Options (all default to the classic upload-rect behaviour):
 * **HD Replacement Mode** — `Upload-rect` / `Page-aligned`, with an optional **Cross-Mode Fallback** so one pack type can fill gaps from the other without converting packs.
 * **HD Reduce Palette Range** — hash only the CLUT entries a texture actually uses (not the whole CLUT), so one replacement keeps matching across unused/rewritten palette slots; applies to both upload-rect and page paths. Backward-compatible with existing packs.
 * **HD Texture Caching Method** also gains **Lazy (synchronous)** — load on first use but block until ready (no pop-in, may briefly stutter when many new textures appear at once).
+* **Lazy prefetch journal** — both Lazy modes learn the order in which textures first appear and load them ahead of the draw on later playthroughs (`prefetch.journal` in the replacements folder). Lazy (synchronous) waits on the 4-thread decode pool instead of decoding inline. Eager is unaffected.
 * **HD Texture Folder** — keep the dump/replacement folders under the Content, System or Save directory (auto-created).
 * Live hotkeys (requires RetroArch **Game Focus**): `]` toggles HD replacements with an on-screen message; `'` reloads replacements from disk.
 

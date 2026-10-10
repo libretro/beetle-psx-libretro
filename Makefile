@@ -107,6 +107,11 @@ endif
 ifneq (,$(findstring unix,$(platform)))
    # local VFS may mmap FREQUENT_ACCESS files (cdstream zero-copy)
    FLAGS += -DHAVE_MMAP
+   # rthreads' affinity support (cpu_set_t, sched_setaffinity) is a GNU
+   # extension. It must be visible before the first system header, and
+   # the -include of include/debug.h pulls those in ahead of rthreads.c's
+   # own define, so set it on the command line as RetroArch does.
+   FLAGS += -D_GNU_SOURCE
    TARGET := $(TARGET_NAME)_libretro.so
    fpic   := -fPIC
    ifneq ($(findstring SunOS,$(shell uname -a)),)

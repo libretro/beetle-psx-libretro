@@ -61,18 +61,25 @@ layout(location = 6) in mediump vec4 vFog;
 void main()
 {
 	float opacity = 1.0;
+	bool raw_texture = false;
+	/* True when the texel came from a replacement (HD) texture or a
+	 * texture filter rather than from 15-bit VRAM. Such texels are not
+	 * PlayStation colour words, so native-colour storage leaves them at
+	 * full precision instead of posterising the enhancement. */
+	bool enhanced_texel = false;
 #ifdef TEXTURED
 	vec4 NNColor;
 
 	bool fastpath = (vParam.z & 0x100) != 0;
 	bool hd_enabled = !fastpath && (vParam.z & 0x200) == 0;
-	bool cache_hit = (vParam.z & 0x400) != 0;
 
 	vec4 hdColor;
 	if (fastpath) {
 		NNColor = sample_hd_fast(vUV);
+		enhanced_texel = true;
 	} else if (hd_enabled && sample_hd_texture_nearest_hack(vUV, hdColor)) {
 		NNColor = hdColor;
+		enhanced_texel = true;
 	} else {
 		NNColor = sample_vram_atlas(clamp_coord(vUV));
 	}
@@ -100,6 +107,8 @@ void main()
 		color = sample_vram_jinc2(opacity);
 	if (FILTER_TYPE == FILTER_3POINT)
 		color = sample_vram_3point(opacity);
+	if (FILTER_TYPE != FILTER_NEAREST)
+		enhanced_texel = true;
 
 	if (TRANSPARENCY_MODE == OPAQUE || TRANSPARENCY_MODE == SEMI_TRANS)
 		if (color.a == 0.0 && all(equal(vec4(NNColor), vec4(0.0))))
@@ -112,46 +121,64 @@ void main()
 		if (valid) {
 			color = hd_color;
 			opacity = hd_color.a;
+			enhanced_texel = true;
 		}
 	}
 
 	if (opacity < 0.5)
 		discard;
 
-	bool fixed_feedback = (uint(vParam.z) & 0x800u) != 0u;
-	if (fixed_feedback)
-	{
-		/* The sampled texture or palette holds GPU-rendered VRAM data.
-		 * Reproduce the PlayStation GPU's fixed-point modulation so
-		 * repeated framebuffer feedback decays at hardware rate: the
-		 * float path below, plus the -0.49/255 store bias, truncates at
-		 * 8-bit granularity and fades 2-4x slower than the console.
-		 * ModTexel truncates the 5-bit texel times the 8-bit shading
-		 * colour; DitherLUT adds the 4x4 offset, divides by eight with
-		 * truncation, and clamps to a 5-bit channel. The result is
-		 * emitted without the store bias so rgba8/10-bit storage
-		 * round-trips it exactly. */
-		const int dither_pattern[16] = int[](
-			-4,  0, -3,  1,
-			 2, -2,  3, -1,
-			-3,  1, -4,  0,
-			 3, -1,  2, -2);
-		vec3 fshade = clamp((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, 0.0, 1.0);
-		vec3 texel5 = floor(color.rgb * 31.0 + vec3(0.5));
-		vec3 shade8 = floor(fshade * 255.0 + vec3(0.001));
-		vec3 modulated = floor(texel5 * shade8 / 16.0);
-#if defined(UNSCALED)
-		ivec2 dc = ivec2(gl_FragCoord.xy) & 3;
-#else
-		ivec2 dc = (ivec2(gl_FragCoord.xy) / SCALE) & 3;
+#ifdef CEILING
+	/* HDR ceiling pass: same coverage as the subtractive draw that follows
+	 * (same discards, same depth test); MIN-blended so the destination is
+	 * clamped to white exactly where the hardware's saturated value would be
+	 * subtracted from. */
+	FragColor = vec4(1.0);
+	return;
 #endif
-		float md = ((uint(vParam.z) & 0x8000u) != 0u)
-			? float(dither_pattern[dc.y * 4 + dc.x]) : 0.0;
-		vec3 q5 = clamp(floor((modulated + md) / 8.0), vec3(0.0), vec3(31.0));
-		FragColor = vec4(q5 / 31.0, NNColor.a + vColor.a);
-		return;
+
+	/* 0x2000 carries the GP0 raw-texture bit. Do not infer this from a
+	 * neutral vertex colour: 0x808080 is also valid modulated input. */
+	raw_texture = (uint(vParam.z) & 0x2000u) != 0u;
+	bool framebuffer_feedback =
+		(uint(vParam.z) & PARAM_FRAMEBUFFER_FEEDBACK) != 0u;
+	if (framebuffer_feedback)
+	{
+		vec3 texel5 = framebuffer_feedback_texel5(color.rgb);
+		if (PRECISE_COLOR != 0 && (uint(vParam.z) & 3u) != 0u)
+		{
+			/* Neutral indexed feedback preserves its RGB5 source while the
+			 * precise-colour target remains wide. Shaded indexed textures are
+			 * intentionally not marked as framebuffer feedback. */
+			color.rgb = texel5 / 31.0;
+		}
+		else
+		{
+			/* Direct-colour feedback must quantize each GP0 modulation step,
+			 * even on an FP16 target, so repeated fades decay at hardware rate.
+			 * Standard-colour feedback retains the same established path. */
+			const int dither_pattern[16] = int[](
+				-4,  0, -3,  1,
+				 2, -2,  3, -1,
+				-3,  1, -4,  0,
+				 3, -1,  2, -2);
+			vec3 fshade = clamp((PGXP_FOG != 0) ?
+				pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, 0.0, 1.0);
+			vec3 shade8 = floor(fshade * 255.0 + vec3(0.001));
+			vec3 modulated = floor(texel5 * shade8 / 16.0);
+			ivec2 dc = primitive_dither_coord();
+			float md = primitive_dither_enabled()
+				? float(dither_pattern[dc.y * 4 + dc.x]) : 0.0;
+			vec3 q5 = clamp(floor((modulated + md) / 8.0),
+				vec3(0.0), vec3(31.0));
+			FragColor = vec4(primitive_native_color() ?
+				q5 * (8.0 / 255.0) : q5 / 31.0,
+				NNColor.a + vColor.a);
+			return;
+		}
 	}
-	vec3 shaded_hot = color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
+	vec3 shaded_hot = raw_texture ? color.rgb :
+		color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
 	vec3 shaded = clamp(shaded_hot, 0.0, 1.0);
 	/* The semi-trans-opaque pass and every other blend mode stay clamped;
 	 * over-white there comes only from stacking, matching the option text. */
@@ -163,20 +190,34 @@ void main()
 		shaded = max(shaded_hot, vec3(0.0));
 	FragColor = vec4(shaded, NNColor.a + vColor.a);
 #else
+#ifdef CEILING
+	/* HDR ceiling pass: same coverage as the subtractive draw that follows
+	 * (same discards, same depth test); MIN-blended so the destination is
+	 * clamped to white exactly where the hardware's saturated value would be
+	 * subtracted from. */
+	FragColor = vec4(1.0);
+	return;
+#endif
 	FragColor = vec4((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, vColor.a);
 #endif
 
-	// Get round down behavior instead of round-to-nearest.
-	// This is required for various "fade" out effects.
-	// However, don't accidentially round down if we are already rounded to avoid
-	// unintended feedback effects.
-	FragColor.rgb -= 0.49 / 255.0;
-
-#if 0
-#if defined(TEXTURED)
-	if ((vParam.z & 0x100) != 0)
-		FragColor.rgb += textureLod(uDitherLUT, gl_FragCoord.xy * 0.25, 0.0).xxx - 4.0 / 255.0;
+	if (primitive_native_color() && !enhanced_texel)
+	{
+		/* Every PS1 write stores RGB5. Modulated sources may use GP0 DTD;
+		 * raw sources skip modulation and DTD, but a scaled framebuffer can
+		 * still supply a noncanonical raw colour. Replacement textures and
+		 * filtered texels (enhanced_texel) are deliberately left wide: they
+		 * are user enhancements, not hardware colour words. */
+		if (!raw_texture)
+			FragColor.rgb = quantize_native_rgb5(FragColor.rgb,
+				primitive_dither_enabled());
+#ifdef TEXTURED
+		else
+			FragColor.rgb = quantize_native_rgb5(FragColor.rgb, false);
 #endif
-	FragColor.rgb = quantize_bgr555(FragColor.rgb);
-#endif
+	}
+	else if (!raw_texture)
+	{
+		FragColor.rgb = truncate_color8(FragColor.rgb);
+	}
 }

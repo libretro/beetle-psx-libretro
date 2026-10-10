@@ -71,11 +71,9 @@ extern int   psx_pgxp_fog;             /* PGXP linear-light depth cue; effective
  * pass after each subtractive batch. Both floor at zero; see
  * renderer_semi_trans_needs_feedback / renderer_emit_sub_floor. */
 extern int   psx_hdr_multipass;
-/* The requested color format (enum psx_color_format_e). Unlike psx_hdr_active
- * this is known at renderer init (read at startup), so it gates the wide
- * (16F) scaled framebuffer, which is allocated before HDR negotiation
- * completes. Non-zero = a 30-bit/HDR format was requested. */
-extern int   psx_color_format;
+/* Opt-in native 15-bit colour rendering (core option). Selects write-time
+ * RGB5 quantisation of every GP0 write on the SDR target. */
+extern int   psx_native_color;
 /* Frontend save directory (libretro.c); the persistent pipeline cache lives
  * under it because it is the one directory the core already writes to. */
 extern char  retro_save_directory[4096];
@@ -1522,7 +1520,8 @@ static IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
    enum VendorID
    {
       VENDOR_ID_NVIDIA = 0x10de,
-      VENDOR_ID_ARM = 0x13b5
+      VENDOR_ID_ARM = 0x13b5,
+      VENDOR_ID_QUALCOMM = 0x5143
    };
    typedef enum VendorID VendorID;
 
@@ -1593,11 +1592,16 @@ static bool context_is_valid(const struct Context *self) { return self->valid; }
     * rejected there is silently never applied to any pipeline -- while a
     * constant set past this bound is an out-of-bounds write into the
     * static state. Both happened; keep them in step. */
-   enum { VULKAN_NUM_SPEC_CONSTANTS = 10 };
+   enum { VULKAN_NUM_SPEC_CONSTANTS = 11 };
 
    struct ImplementationWorkarounds
    {
       bool optimize_all_graphics_barrier;
+      /* Adreno renders overlapping fixed-function-blended primitives out of
+       * order within a single draw under native colour (object-local
+       * flashes in Jumping Flash). Vulkan guarantees primitive order for
+       * blending, so only Qualcomm pays the per-primitive draw split. */
+      bool split_native_semi_trans_draws;
    };
 
    /* TextureFormatLayout: computes mip/layer byte layout for a texture upload
@@ -4510,6 +4514,12 @@ static void commandbuffer_copy_buffer_whole(struct CommandBuffer *self,
          const VkOffset3D *dst_offset,
          const VkOffset3D *src_offset,
          const VkExtent3D *extent);
+   static void commandbuffer_resolve_image(struct CommandBuffer *self,
+         const Image *dst,
+         const Image *src,
+         const VkOffset3D *dst_offset,
+         const VkOffset3D *src_offset,
+         const VkExtent3D *extent);
    static void commandbuffer_blit_image(struct CommandBuffer *self,
          const Image *dst,
          const Image *src,
@@ -4713,6 +4723,13 @@ static void cbh_move(struct CommandBufferHandle *dst,
          VkQueue graphics_queue;
          VkQueue compute_queue;
          VkQueue transfer_queue;
+         /* The queue this device shares with the frontend, and the
+          * frontend's lock for it (retro_hw_render_interface_vulkan's
+          * lock_queue / unlock_queue). See device_set_frontend_queue. */
+         VkQueue frontend_queue;
+         void (*frontend_queue_lock)(void *handle);
+         void (*frontend_queue_unlock)(void *handle);
+         void *frontend_queue_handle;
          VkPipelineCache pipeline_cache;
          /* Persistent pipeline cache bookkeeping: CRC/size of the blob last
           * read from or written to disk (so an unchanged blob is not
@@ -4946,6 +4963,7 @@ static void cbh_move(struct CommandBufferHandle *dst,
    {
       /* srcStageMask = ALL_GRAPHICS_BIT causes some weird stalls compared to waiting for fragment only. */
       self->workarounds.optimize_all_graphics_barrier = self->gpu_props.vendorID == VENDOR_ID_ARM;
+      self->workarounds.split_native_semi_trans_draws = self->gpu_props.vendorID == VENDOR_ID_QUALCOMM;
    }
 
    /* Device inline accessors (batch 4), converted from in-class member
@@ -5108,6 +5126,8 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
    typedef enum StatusFlag StatusFlag;
    typedef uint16_t StatusFlags;
 
+#define FBATLAS_BLOCK_WORDS ((NUM_BLOCKS_X * NUM_BLOCKS_Y) / 32)
+
    struct Renderer;
 
    /* VRAM framebuffer atlas / hazard tracker. Formerly a class whose only
@@ -5118,6 +5138,10 @@ static const DeviceFeatures *device_get_device_features(Device *self) { return &
    struct FBAtlas
    {
       StatusFlags fb_info[NUM_BLOCKS_X * NUM_BLOCKS_Y];
+      /* The render-pass rectangle is a conservative hazard region. Track the
+       * blocks covered by queued primitives separately so empty gaps do not
+       * become rendered texture content when the pass is submitted. */
+      uint32_t pending_fragment_write[FBATLAS_BLOCK_WORDS];
       Renderer *listener;
 
       /* Retained CLUT selection (see fbatlas_palette_preserve). valid: a
@@ -5242,11 +5266,43 @@ static StatusFlags *fbatlas_info(FBAtlas *self,
       return &self->fb_info[NUM_BLOCKS_X * block_y + block_x];
    }
 
+   static bool fbatlas_block_test(const uint32_t *blocks,
+         unsigned block_x,
+         unsigned block_y)
+   {
+      unsigned index = NUM_BLOCKS_X * (block_y & (NUM_BLOCKS_Y - 1)) +
+            (block_x & (NUM_BLOCKS_X - 1));
+      return (blocks[index / 32] & (1u << (index & 31))) != 0;
+   }
+
+   static void fbatlas_mark_blocks(uint32_t *blocks, const TTRect *rect)
+   {
+      unsigned xbegin, xend, ybegin, yend, x, y;
+
+      if (!rect->width || !rect->height)
+         return;
+
+      xbegin = rect->x / BLOCK_WIDTH;
+      xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
+      ybegin = rect->y / BLOCK_HEIGHT;
+      yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
+
+      for (y = ybegin; y <= yend; y++)
+         for (x = xbegin; x <= xend; x++)
+         {
+            unsigned index = NUM_BLOCKS_X * (y & (NUM_BLOCKS_Y - 1)) +
+                  (x & (NUM_BLOCKS_X - 1));
+            blocks[index / 32] |= 1u << (index & 31);
+         }
+   }
+
    static void fbatlas_init(FBAtlas *a)
    {
       unsigned i;
       for (i = 0; i < NUM_BLOCKS_X * NUM_BLOCKS_Y; i++)
          a->fb_info[i] = STATUS_FB_PREFER;
+      memset(a->pending_fragment_write, 0,
+            sizeof(a->pending_fragment_write));
       a->listener = NULL;
       a->palette_cache_x = 0;
       a->palette_cache_y = 0;
@@ -5381,6 +5437,7 @@ static struct PrimitiveInfo primitive_info_make(
       SemiTransparentMode semi_transparent;
       bool textured;
       bool masked;
+      bool native_color;
       bool filtering;
       bool scaled_read;
       unsigned shift;
@@ -5393,6 +5450,7 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
    {
       return a->scissor_index == b->scissor_index && hd_handle_eq(&a->hd_texture_index, &b->hd_texture_index) &&
          a->semi_transparent == b->semi_transparent && a->textured == b->textured && a->masked == b->masked &&
+         a->native_color == b->native_color &&
          a->filtering == b->filtering && a->scaled_read == b->scaled_read && a->shift == b->shift &&
          a->offset_uv == b->offset_uv;
    }
@@ -5564,10 +5622,13 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
       ScanoutMode scanout_mode;
       ScanoutFilter scanout_filter;
       ScanoutFilter scanout_mdec_filter;
+      /* Frame-latched native-colour configuration. The first flag selects
+       * native versus internal-resolution dither spacing; the second selects
+       * RGB5 write-time storage independently of each primitive's DTD bit. */
       bool dither_native_resolution;
-      /* The dtd bit of the primitive being queued (from the push_*
-       * entry points). Feeds the fixed-point framebuffer-feedback
-       * modulation path; the scanout-level dither is separate. */
+      bool native_color;
+      /* The DTD bit of the primitive being queued (from the push_* entry
+       * points). Feeds fixed-point modulation and native RGB5 writes. */
       bool primitive_dither;
       bool force_mask_bit;
       bool texture_color_modulate;
@@ -5623,6 +5684,7 @@ static void render_state_init(struct RenderState *s)
    s->scanout_filter = ScanoutFilter_None;
    s->scanout_mdec_filter = ScanoutFilter_None;
    s->dither_native_resolution = false;
+   s->native_color = false;
    s->force_mask_bit = false;
    s->texture_color_modulate = false;
    s->mask_test = false;
@@ -5656,6 +5718,7 @@ struct OpaqueQueue
 
    Rect2DVec scaled_resolves;
    Rect2DVec unscaled_resolves;
+   Rect2DVec scaled_texture_reads;
    BlitInfoVec scaled_blits;
    BlitInfoVec scaled_masked_blits;
    BlitInfoVec unscaled_blits;
@@ -5682,6 +5745,7 @@ static void opaque_queue_init(struct OpaqueQueue *q)
    OQ_VEC_ZERO(q->semi_transparent_state);
    OQ_VEC_ZERO(q->scaled_resolves);
    OQ_VEC_ZERO(q->unscaled_resolves);
+   OQ_VEC_ZERO(q->scaled_texture_reads);
    OQ_VEC_ZERO(q->scaled_blits);
    OQ_VEC_ZERO(q->scaled_masked_blits);
    OQ_VEC_ZERO(q->unscaled_blits);
@@ -5771,7 +5835,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
        * programs, which also declare 0..6. */
       SpecConstIndex_PreciseColor = 8,
       /* Linear-light depth cueing; rides the precise-colour vertex path. */
-      SpecConstIndex_PgxpFog = 9
+      SpecConstIndex_PgxpFog = 9,
+      /* Actual primitive render-target format, independent of HDR options. */
+      SpecConstIndex_FramebufferFloat16 = 10
    };
 
    struct SaveState
@@ -5835,6 +5901,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          FilterExclude polygon_2d_filter_exclude;
          ImageHandle scaled_framebuffer;
          ImageHandle scaled_framebuffer_msaa;
+         ImageHandle scaled_read_snapshot;
+         bool scaled_read_snapshot_failed;
          ImageHandle bias_framebuffer;
          ImageHandle framebuffer;
          ImageHandle framebuffer_ssaa;
@@ -5890,6 +5958,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             /* Zero-floor pass for fixed-function HDR subtractive blending
              * (multipass off). flat vertex module + floor.frag. */
             Program *flat_floor;
+            /* HDR ceiling-before-subtract (16F target, fixed-function sub). */
+            Program *flat_ceiling;
+            Program *textured_ceiling_scaled;
+            Program *textured_ceiling_unscaled;
             Program *textured_scaled;
             Program *textured_unscaled;
             Program *flat_masked;
@@ -6088,6 +6160,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? psx_pgxp_color : 0);
       commandbuffer_set_specialization_constant(cmd, SpecConstIndex_PgxpFog,
             (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? (psx_pgxp_color && psx_pgxp_fog) : 0);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_FramebufferFloat16,
+            self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT);
    }
 
    static void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
@@ -6400,6 +6474,21 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t textured_msaa_unscaled_frag[] =
 #include "shaders_vulkan/prebuilt/textured.msaa.unscaled.frag.inc"
       ;
+   static const uint32_t flat_ceiling_frag[] =
+#include "shaders_vulkan/prebuilt/flat.ceiling.frag.inc"
+      ;
+   static const uint32_t textured_ceiling_frag[] =
+#include "shaders_vulkan/prebuilt/textured.ceiling.frag.inc"
+      ;
+   static const uint32_t textured_ceiling_unscaled_frag[] =
+#include "shaders_vulkan/prebuilt/textured.ceiling.unscaled.frag.inc"
+      ;
+   static const uint32_t textured_ceiling_msaa_frag[] =
+#include "shaders_vulkan/prebuilt/textured.ceiling.msaa.frag.inc"
+      ;
+   static const uint32_t textured_ceiling_msaa_unscaled_frag[] =
+#include "shaders_vulkan/prebuilt/textured.ceiling.msaa.unscaled.frag.inc"
+      ;
 
    static const uint32_t blit_vram_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.scaled.comp.inc"
@@ -6477,6 +6566,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
    static const uint32_t feedback_msaa_frag[] =
 #include "shaders_vulkan/prebuilt/feedback.msaa.frag.inc"
+      ;
+   static const uint32_t feedback_msaa_resolved_frag[] =
+#include "shaders_vulkan/prebuilt/feedback.msaa.resolved.frag.inc"
       ;
    static const uint32_t feedback_msaa_unscaled_frag[] =
 #include "shaders_vulkan/prebuilt/feedback.msaa.unscaled.frag.inc"
@@ -6611,6 +6703,7 @@ static void renderer_init(Renderer *self,
    self->quad.data                    = NULL;
    self->scaled_framebuffer.data      = NULL;
    self->scaled_framebuffer_msaa.data = NULL;
+   self->scaled_read_snapshot.data    = NULL;
    self->bias_framebuffer.data        = NULL;
    self->framebuffer.data             = NULL;
    self->palette_cache.data           = NULL;
@@ -6708,12 +6801,14 @@ static void renderer_init(Renderer *self,
 
    info.width *= self->scaling;
    info.height *= self->scaling;
-   /* Decide the scaled-framebuffer colour format. Widen to 16F only when a
-    * 30-bit/HDR format was requested AND the device supports R16F for every
-    * usage the scaled fb needs (colour attachment, sampled, storage). SDR and
-    * unsupported GPUs keep R8G8B8A8 and render exactly as before. */
+   /* Decide the scaled-framebuffer colour format. HDR negotiation completes
+    * after SET_HW_RENDER and before the frontend invokes context_reset, so its
+    * accepted result is authoritative here. Widen to 16F only when HDR is
+    * engaged AND the device supports R16F for every usage the scaled fb needs
+    * (colour attachment, sampled, storage). SDR and rejected/unsupported HDR
+    * keep R8G8B8A8 and render exactly as before. */
    self->scaled_fb_format = VK_FORMAT_R8G8B8A8_UNORM;
-   if (psx_color_format != 0 &&
+   if (psx_hdr_active &&
          device_image_format_is_supported(self->device, VK_FORMAT_R16G16B16A16_SFLOAT,
             VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
             VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT |
@@ -6791,7 +6886,6 @@ static void renderer_init(Renderer *self,
        * have no real choice. The expectation is that self will be used with a
        * lower self->scaling factor to compensate. */
    }
-
    fbatlas_set_hazard_listener(&self->atlas, self);
    {
       TTGpuBackend vt = vk_tt_make_backend(self);
@@ -6897,17 +6991,23 @@ static void renderer_init_primitive_pipelines(Renderer *self)
    {
       self->pipelines.flat = device_request_program_graphics_code(self->device, flat_vert, sizeof(flat_vert), flat_frag, sizeof(flat_frag));
       self->pipelines.flat_floor = device_request_program_graphics_code(self->device, flat_vert, sizeof(flat_vert), floor_frag, sizeof(floor_frag));
+      self->pipelines.flat_ceiling = device_request_program_graphics_code(self->device, flat_vert, sizeof(flat_vert), flat_ceiling_frag, sizeof(flat_ceiling_frag));
    }
    else
    {
       self->pipelines.flat = device_request_program_graphics_code(self->device, flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_frag, sizeof(flat_frag));
       self->pipelines.flat_floor = device_request_program_graphics_code(self->device, flat_unscaled_vert, sizeof(flat_unscaled_vert), floor_frag, sizeof(floor_frag));
+      self->pipelines.flat_ceiling = device_request_program_graphics_code(self->device, flat_unscaled_vert, sizeof(flat_unscaled_vert), flat_ceiling_frag, sizeof(flat_ceiling_frag));
    }
 
    if (self->msaa > 1)
    {
-      self->pipelines.textured_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_msaa_frag, sizeof(textured_msaa_frag));
+      self->pipelines.textured_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert),
+            self->scaling > 1 ? textured_frag : textured_msaa_frag,
+            self->scaling > 1 ? sizeof(textured_frag) : sizeof(textured_msaa_frag));
       self->pipelines.textured_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_msaa_unscaled_frag, sizeof(textured_msaa_unscaled_frag));
+      self->pipelines.textured_ceiling_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_ceiling_msaa_frag, sizeof(textured_ceiling_msaa_frag));
+      self->pipelines.textured_ceiling_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_ceiling_msaa_unscaled_frag, sizeof(textured_ceiling_msaa_unscaled_frag));
    }
    else
    {
@@ -6915,11 +7015,15 @@ static void renderer_init_primitive_pipelines(Renderer *self)
       {
          self->pipelines.textured_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_frag, sizeof(textured_frag));
          self->pipelines.textured_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+         self->pipelines.textured_ceiling_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_ceiling_frag, sizeof(textured_ceiling_frag));
+         self->pipelines.textured_ceiling_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert), textured_ceiling_unscaled_frag, sizeof(textured_ceiling_unscaled_frag));
       }
       else
       {
          self->pipelines.textured_scaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_frag, sizeof(textured_frag));
          self->pipelines.textured_unscaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_unscaled_frag, sizeof(textured_unscaled_frag));
+         self->pipelines.textured_ceiling_scaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_ceiling_frag, sizeof(textured_ceiling_frag));
+         self->pipelines.textured_ceiling_unscaled = device_request_program_graphics_code(self->device, textured_unscaled_vert, sizeof(textured_unscaled_vert), textured_ceiling_unscaled_frag, sizeof(textured_ceiling_unscaled_frag));
       }
    }
 }
@@ -6930,7 +7034,8 @@ static void renderer_init_primitive_feedback_pipelines(Renderer *self)
    if (self->msaa > 1)
    {
       self->pipelines.textured_masked_scaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert),
-            feedback_msaa_frag, sizeof(feedback_msaa_frag));
+            self->scaling > 1 ? feedback_msaa_resolved_frag : feedback_msaa_frag,
+            self->scaling > 1 ? sizeof(feedback_msaa_resolved_frag) : sizeof(feedback_msaa_frag));
       self->pipelines.textured_masked_unscaled = device_request_program_graphics_code(self->device, textured_vert, sizeof(textured_vert),
             feedback_msaa_unscaled_frag, sizeof(feedback_msaa_unscaled_frag));
       self->pipelines.flat_masked = device_request_program_graphics_code(self->device, flat_vert, sizeof(flat_vert),
@@ -8434,7 +8539,8 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          display_rect.height * render_scale,
          analog ? VK_FORMAT_R16G16B16A16_SFLOAT
          : hdr_quad ? renderer_hdr_scanout_format(self)
-            : (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM));
+            : (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither &&
+               !self->render_state.native_color ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM));
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -8484,7 +8590,11 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
     * 30-bit output exists to avoid 15-bit quantisation; re-imposing it to feed
     * the cable trades the precision the user asked for against an artifact. So
     * HDR suppresses the dither with a cable exactly as it does without one. */
-   dither = (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither) && !psx_hdr_active;
+   /* Native-colour rendering has already applied the GP0 primitive's DTD bit
+    * and stored RGB5. Applying this display-wide pass as well would dither and
+    * quantize the image a second time. */
+   dither = (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither) &&
+      !self->render_state.native_color && !psx_hdr_active;
 
    if (bpp24)
    {
@@ -8960,6 +9070,47 @@ static bool vram_prov_any(Renderer *self, int x, int y, int w, int h)
    return false;
 }
 
+static bool renderer_ensure_scaled_read_snapshot(Renderer *self)
+{
+   ImageCreateInfo info;
+
+   if (self->scaling <= 1 || self->msaa > 1 ||
+       ih_is_valid(&self->scaled_read_snapshot))
+      return true;
+   if (self->scaled_read_snapshot_failed)
+      return false;
+
+   info = image_create_info_render_target(
+         FB_WIDTH * self->scaling, FB_HEIGHT * self->scaling,
+         self->scaled_fb_format);
+   info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+   ih_move(&self->scaled_read_snapshot,
+         device_create_image(self->device, &info, NULL));
+   if (!ih_is_valid(&self->scaled_read_snapshot))
+   {
+      self->scaled_read_snapshot_failed = true;
+      return false;
+   }
+
+   image_set_layout(ih_get(&self->scaled_read_snapshot), Layout_General);
+   return true;
+}
+
+static bool vertices_have_neutral_modulation(const Vertex *vertices,
+      unsigned count)
+{
+   const float neutral = 128.0f / 255.0f;
+   unsigned i;
+
+   for (i = 0; i < count; i++)
+      if (vertices[i].cf[0] != neutral ||
+          vertices[i].cf[1] != neutral ||
+          vertices[i].cf[2] != neutral)
+         return false;
+
+   return true;
+}
+
 static void renderer_build_attribs(Renderer *self, BufferVertex *output, const Vertex *vertices, unsigned count, HdTextureHandle *hd_texture_index_out,
    bool *filtering_out, bool *scaled_read_out, unsigned *shift_out, bool *offset_uv_out){
       int16_t param;
@@ -8979,6 +9130,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    }
 
    { TTRect hd_texture_vram = make_rect(0, 0, 0, 0);
+   TTRect sampled_vram = make_rect(0, 0, 0, 0);
 
    if (self->render_state.texture_mode != TextureMode_None)
    {
@@ -9033,6 +9185,21 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
          hd_texture_vram.width = effective_rect.width >> shift;
          hd_texture_vram.height = effective_rect.height;
       }
+
+      /* Framebuffer queries take the exact sampled area, not the HD
+       * matching span whose right edge omits a column. */
+      sampled_vram = rhi_sampled_vram_rect(
+            self->render_state.texture_offset_x,
+            self->render_state.texture_offset_y,
+            self->render_state.UVLimits.min_u,
+            self->render_state.UVLimits.min_v,
+            self->render_state.UVLimits.max_u,
+            self->render_state.UVLimits.max_v,
+            self->render_state.texture_window.mask_x,
+            self->render_state.texture_window.mask_y,
+            self->render_state.texture_window.or_x,
+            self->render_state.texture_window.or_y,
+            shift);
    }
 
    /* Compute bounding box for the draw call. */
@@ -9082,10 +9249,7 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    {
       if (rect_intersects(&self->render_state.draw_rect, &rect))
       {
-         /* HACK hd_texture_vram should contains the texture we are reading from
-          * in vram coordinate avoid texture filtering and enable scaled read if
-          * the texture is rendered content */
-         bool texture_rendered = fbatlas_texture_rendered(&self->atlas, &hd_texture_vram);
+         bool texture_rendered = fbatlas_texture_rendered(&self->atlas, &sampled_vram);
          filtering = !texture_rendered;
          scaled_read = texture_rendered;
       }
@@ -9098,8 +9262,29 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    else
    {
       filtering = self->render_state.texture_mode != TextureMode_None;
-      scaled_read = false;
+      if (self->render_state.texture_mode != TextureMode_None)
+      {
+         TTRect palette_rect = {
+            self->render_state.palette_offset_x,
+            self->render_state.palette_offset_y,
+            self->render_state.texture_mode == TextureMode_Palette8bpp ? 256u : 16u,
+            1
+         };
+         bool texture_rendered;
+
+         /* Keep packed 4/8bpp texture words in the native path when they were
+          * themselves rendered. If only the live CLUT was rendered, however,
+          * read the scaled domain so its colour is not quantized through a
+          * scaled-to-native resolve before the palette lookup. */
+         texture_rendered = fbatlas_texture_rendered(&self->atlas, &sampled_vram);
+         scaled_read = !texture_rendered &&
+               fbatlas_texture_rendered(&self->atlas, &palette_rect);
+      }
+      else
+         scaled_read = false;
    }
+   if (scaled_read && !renderer_ensure_scaled_read_snapshot(self))
+      scaled_read = false;
    offset_uv = self->scaled_uv_offset && self->render_state.primitive_type == PrimitiveType_Polygon;
 
    z = renderer_allocate_depth(self, scaled_read ? Domain_Scaled : Domain_Unscaled, &rect);
@@ -9110,6 +9295,12 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
     * because the `allocate_depth` call above can call `reset_queue` which would
     * invalidate the HdTextureHandle */
    param = (int16_t)(shift);
+   /* Preserve the authoritative GP0 raw/modulated distinction in the queued
+    * vertex. 0x2000 is unused in the signed 16-bit parameter lane and remains
+    * safe when 0x8000 makes the combined value negative. */
+   if (self->render_state.texture_mode != TextureMode_None &&
+       !self->render_state.texture_color_modulate)
+      param = (int16_t)(param | 0x2000);
    /* 0x1000: the selected CLUT was overwritten after it was latched; sample
     * the retained copy (uPalette) instead of VRAM. Set right after
     * renderer_allocate_depth, which is what resolves it for this draw. */
@@ -9128,39 +9319,27 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
          /* All UVs are within a single hd texture, and there are no & or | shenanigans. Tell the shader to use the fast path. */
          param = param | 0x100;
       }
-      if (cache_hit) {
-         param = param | 0x400; /* dbg cache hit */
-      }
    }
    if (hd_handle_is_none(&hd_texture_index)) {
       /* This flag says skip hd textures */
       param = param | 0x200;
    }
 
-   /* Fixed-point framebuffer-feedback modulation (Vulkan port of the GL
-    * change): when the sampled texture or palette contains GPU-rendered
-    * VRAM data, route modulation through the PlayStation GPU's own
-    * fixed-point order in the shader so repeated feedback decays at
-    * hardware rate instead of the float path's slower fade. Disabled
-    * under PGXP precise colour, matching the GL gate. 0x8000 is masked
-    * as unsigned in the shader because params is a signed 16-bit lane. */
-   /* Restored: the gate-drop shipped for the Tomb Raider 2 water made
-    * the title worse, not better. The water surface samples the
-    * framebuffer as a 4bpp CLUT texture (screen-space refraction); on
-    * the reporter's configuration GL renders it correctly with this
-    * same gate CLOSED - its float path plus working same-frame
-    * fb-to-texture synchronization - so quantizing those draws was
-    * never the fix, and unleashing 5-bit quantization plus dither on
-    * them produced white output with dither speckle. The real defect
-    * is Vulkan-side stale unscaled-domain content under the sampled
-    * rect, tracked separately. */
-   if (!psx_pgxp_color &&
+   /* Framebuffer feedback samples authoritative 15-bit VRAM even when the
+    * render target is wide. Direct-colour feedback needs RGB5 modulation at
+    * any shade, including Silent Hill's 0x7f fade sprites. For indexed
+    * textures under precise colour, retain the all-vertex neutral test so a
+    * genuinely shaded texture such as Tomb Raider 2's water stays wide. */
+   if ((!psx_pgxp_color ||
+        self->render_state.texture_mode == TextureMode_ABGR1555 ||
+        vertices_have_neutral_modulation(vertices, count)) &&
+       self->render_state.texture_color_modulate &&
        self->render_state.texture_mode != TextureMode_None &&
        hd_texture_vram.height > 0)
    {
       bool feedback = vram_prov_any(self,
-            (int)hd_texture_vram.x, (int)hd_texture_vram.y,
-            (int)hd_texture_vram.width + 1, (int)hd_texture_vram.height);
+            (int)sampled_vram.x, (int)sampled_vram.y,
+            (int)sampled_vram.width, (int)sampled_vram.height);
       if (!feedback && self->render_state.texture_mode != TextureMode_ABGR1555)
       {
          unsigned pal_w = self->render_state.texture_mode ==
@@ -9186,6 +9365,17 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    }
    if (self->render_state.primitive_dither)
       param = (int16_t)((uint16_t)param | 0x8000u);
+   if (self->render_state.native_color)
+   {
+      /* 0x0400 (formerly an unconsumed cache-hit debug marker) selects native
+       * RGB5 storage; 0x4000 selects a 4x4 dither pattern in native PS1 pixels
+       * instead of internal-resolution pixels. Both are authoritative frame
+       * configuration, while 0x8000 above is the individual primitive's GP0
+       * DTD bit. */
+      param = (int16_t)((uint16_t)param | 0x0400u);
+      if (self->render_state.dither_native_resolution)
+         param = (int16_t)((uint16_t)param | 0x4000u);
+   }
 
    { unsigned i; for (i = 0; i < count; i++) {
       output[i].x = x[i];
@@ -9212,13 +9402,6 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       output[i].min_v = self->render_state.UVLimits.min_v;
       output[i].max_u = self->render_state.UVLimits.max_u;
       output[i].max_v = self->render_state.UVLimits.max_v;
-
-      if (self->render_state.texture_mode != TextureMode_None && !self->render_state.texture_color_modulate)
-      {
-         /* Raw texture: neutral modulate, 0x80 == unity. */
-         output[i].color[0] = output[i].color[1] = output[i].color[2]
-            = 128.0f / 255.0f;
-      }
 
       output[i].color[3] = self->render_state.force_mask_bit ? 1.0f : 0.0f;
    } }
@@ -9438,6 +9621,7 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
          SemiTransparentState _sts = { scissor_index, hd_texture_index, self->render_state.semi_transparent,
                                                self->render_state.texture_mode != TextureMode_None,
                                                self->render_state.mask_test,
+                                               self->render_state.native_color,
                                                filtering,
                                                scaled_read,
                                      shift,
@@ -9498,6 +9682,7 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices)
          scissor_index, hd_texture_index, self->render_state.semi_transparent,
          self->render_state.texture_mode != TextureMode_None,
          self->render_state.mask_test,
+         self->render_state.native_color,
          filtering,
          scaled_read,
          shift,
@@ -9626,10 +9811,80 @@ static void renderer_preserve_palette(Renderer *self,
          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 }
 
+static void renderer_snapshot_scaled_texture_reads(Renderer *self)
+{
+   Image *src;
+   Image *dst;
+   unsigned i;
+
+   if (Rect2DVec_empty(&self->queue.scaled_texture_reads))
+      return;
+
+   src = self->msaa > 1 ? ih_get(&self->scaled_framebuffer_msaa) :
+         ih_get(&self->scaled_framebuffer);
+   dst = self->msaa > 1 ? ih_get(&self->scaled_framebuffer) :
+         ih_get(&self->scaled_read_snapshot);
+
+   renderer_flush_blits(self);
+   renderer_flush_resolves(self);
+
+   commandbuffer_image_barrier(cbh_get(&self->cmd), src,
+         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+         VK_PIPELINE_STAGE_TRANSFER_BIT |
+         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+         VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT |
+         VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
+         VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
+   commandbuffer_image_barrier(cbh_get(&self->cmd), dst,
+         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+         VK_PIPELINE_STAGE_TRANSFER_BIT,
+         VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT |
+         VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
+
+   for (i = 0; i < Rect2DVec_size(&self->queue.scaled_texture_reads); i++)
+   {
+      const VkRect2D *rect = Rect2DVec_at(&self->queue.scaled_texture_reads, i);
+      VkOffset3D offset = {
+         rect->offset.x * (int32_t)self->scaling,
+         rect->offset.y * (int32_t)self->scaling, 0
+      };
+      VkExtent3D extent = {
+         rect->extent.width * self->scaling,
+         rect->extent.height * self->scaling, 1
+      };
+
+      if (self->msaa > 1)
+         commandbuffer_resolve_image(cbh_get(&self->cmd),
+               dst, src, &offset, &offset, &extent);
+      else
+         commandbuffer_copy_image(cbh_get(&self->cmd),
+               dst, src, &offset, &offset, &extent);
+   }
+
+   commandbuffer_image_barrier(cbh_get(&self->cmd), dst,
+         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   commandbuffer_image_barrier(cbh_get(&self->cmd), src,
+         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+         VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+}
+
 static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
 {
    RenderPassInfo_Subpass subpass;
    renderer_ensure_command_buffer(self);
+   renderer_snapshot_scaled_texture_reads(self);
 
    { RenderPassInfo info;
    render_pass_info_defaults(&info);
@@ -9718,17 +9973,22 @@ static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
    }
 }
 
+static const ImageView *renderer_get_scaled_read_view(Renderer *self)
+{
+   if (self->scaling > 1 && self->msaa == 1)
+      return image_get_view(ih_get(&self->scaled_read_snapshot));
+   if (self->scaling > 1 || self->msaa == 1)
+      return iv_get(imageview_vec_at(&self->scaled_views, 0));
+   return image_get_view(ih_get(&self->scaled_framebuffer_msaa));
+}
+
 static void renderer_dispatch_set_scaled_read_texture(Renderer *self,
       bool scaled_read,
       bool textured)
 {
    if (scaled_read)
-   {
-      if (self->msaa > 1)
-         commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
-      else
-         commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_NearestClamp);
-   }
+      commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
+            renderer_get_scaled_read_view(self), StockSampler_NearestClamp);
    else
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
    if (textured)
@@ -9874,6 +10134,7 @@ static void renderer_render_opaque_primitives(Renderer *self){
    commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, color));
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 3, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, pal_x));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 6, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BufferVertex, fog));
    renderer_set_opaque_primitive_spec_constants(self, TransMode_Opaque);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
@@ -9914,24 +10175,51 @@ static void renderer_hd_texture_uniforms(Renderer *self,
    hd.texture = NULL;
 }
 
-/* True when a semi-transparent prim must go through the programmable-blend
- * feedback program (input attachment + per-primitive by-region barrier)
- * rather than fixed-function blending. Masked prims always do. Non-masked
- * subtractive prims additionally do on the 16F HDR target: fixed-function
- * REVERSE_SUBTRACT cannot floor the result at zero on a float attachment,
- * and hardware clamps B - F at 0 per channel. The feedback program applies
- * the floor in-shader (see primitive_feedback.frag) with the check-mask
- * test disabled via SpecConstIndex_MaskTest. */
+/* True when a semi-transparent prim uses the programmable-blend feedback
+ * program. Native-colour average and quarter-add need post-blend RGB5
+ * truncation; fixed-function RGBA8 blending cannot provide it. Native-colour
+ * Add and Sub sources, including raw texture samples, are quantized before
+ * blending by primitive.frag, so fixed Add/Sub preserve RGB5 results (with
+ * 255 representing saturation). Keep the existing masked textured Add route, but leave masked
+ * flat Add on the fixed path: its input-attachment read causes full-screen
+ * flashes on the tested Adreno GPU. */
 static bool renderer_semi_trans_needs_feedback(const Renderer *self,
       const SemiTransparentState *state)
 {
    if (state->semi_transparent == SemiTransparentMode_None)
       return false;
-   if (state->masked)
-      return true;
-   return psx_hdr_multipass &&
-      state->semi_transparent == SemiTransparentMode_Sub &&
-      self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT;
+   switch (state->semi_transparent)
+   {
+   case SemiTransparentMode_Add:
+      return state->masked && (!state->native_color || state->textured);
+   case SemiTransparentMode_Average:
+   case SemiTransparentMode_AddQuarter:
+      return state->masked || state->native_color;
+   case SemiTransparentMode_Sub:
+      /* Native-colour subtract is exact on the fixed path: primitive.frag
+       * has already stored the source as an RGB5 multiple of 8, the
+       * destination is one too, and REVERSE_SUBTRACT floors at zero on
+       * UNORM. No post-blend truncation is needed, so do not pay the
+       * per-primitive feedback barrier for it. */
+      return state->masked ||
+         (psx_hdr_multipass &&
+          self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT);
+   default:
+      return false;
+   }
+}
+
+/* Program selection and draw ordering are separate decisions. Feedback
+ * reads always need a draw boundary per primitive. Native-colour draws on
+ * the fixed path only need one on Adreno (see ImplementationWorkarounds);
+ * everywhere else they batch exactly as standard-colour draws do. */
+static bool renderer_semi_trans_needs_separate_draw(const Renderer *self,
+      const SemiTransparentState *state)
+{
+   return (state->native_color &&
+         state->semi_transparent != SemiTransparentMode_None &&
+         device_get_workarounds(self->device)->split_native_semi_trans_draws) ||
+      renderer_semi_trans_needs_feedback(self, state);
 }
 
 /* With multipass off, the same prims stay on fixed-function
@@ -9961,6 +10249,31 @@ static void renderer_emit_sub_floor(Renderer *self, unsigned first_vertex)
    commandbuffer_draw(cbh_get(&self->cmd), 6, 1, first_vertex, 0);
    commandbuffer_set_depth_test(cbh_get(&self->cmd), true, false);
    commandbuffer_set_depth_compare(cbh_get(&self->cmd), VK_COMPARE_OP_LESS);
+}
+
+/* HDR ceiling-before-subtract (fixed-function path). The hardware saturates every
+ * blend at white, so a subtractive primitive always subtracts from a value <= 1.0; the
+ * 16F target lets stacked additive layers exceed that (SotN's Fire Demon death: an
+ * additive white ghost, then the white canvas subtracted -> black on hardware, the
+ * background showing through here). Redraw the batch first with the CEILING variant of
+ * its own program: same discards and depth test, so exactly the pixels the subtraction
+ * will touch are clamped to white by MIN; alpha (the mask bit) is kept via ZERO/ONE ADD.
+ * Restores the batch's state for the real draw. */
+static void renderer_emit_sub_ceiling(Renderer *self, const SemiTransparentState *state,
+      unsigned first_prim, unsigned count)
+{
+   Program *prog = state->textured
+      ? (state->scaled_read ? self->pipelines.textured_ceiling_scaled : self->pipelines.textured_ceiling_unscaled)
+      : self->pipelines.flat_ceiling;
+   commandbuffer_set_program(cbh_get(&self->cmd), prog);
+   commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
+   commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_MIN, VK_BLEND_OP_ADD);
+   commandbuffer_set_blend_factors(cbh_get(&self->cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO,
+         VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE);
+   commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
+   commandbuffer_draw(cbh_get(&self->cmd), count * 3, 1, first_prim * 3, 0);
+   renderer_semi_transparent_set_state(self, state);
+   commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 }
 
 static void renderer_render_semi_transparent_primitives(Renderer *self){
@@ -10037,10 +10350,9 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
    /* These pixels are blended, so we have to render them in-order.
     * Batch up as long as we can. */
    { unsigned i; for (i = 1; i < prims; i++) {
-      /* If we need programmable shading, we can't batch as primitives may
-       * overlap. We could in theory do some fancy tests here, but probably
-       * overkill here. */
-      if (renderer_semi_trans_needs_feedback(self, &last_state) ||
+      /* Preserve per-primitive boundaries for feedback reads and native-
+       * colour draws; later primitives may overlap earlier ones. */
+      if (renderer_semi_trans_needs_separate_draw(self, &last_state) ||
           !semi_transparent_state_eq(&last_state, SemiTransparentStateVec_at(&self->queue.semi_transparent_state, i)))
       {
          unsigned to_draw = i - last_draw_offset;
@@ -10057,6 +10369,8 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
                1, &barrier, 0, NULL, 0, NULL);
          }
 
+         if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
+            renderer_emit_sub_ceiling(self, &last_state, last_draw_offset, to_draw);
          commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
          if (self->msaa > 1)
             commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
@@ -10071,6 +10385,8 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
 
    to_draw = prims - last_draw_offset;
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
+   if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
+      renderer_emit_sub_ceiling(self, &last_state, last_draw_offset, to_draw);
    commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
    if (self->msaa > 1)
       commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
@@ -10536,6 +10852,7 @@ static void renderer_fini(Renderer *self)
     * teardown, which a plain struct no longer provides). */
    ih_reset(&self->scaled_framebuffer);
    ih_reset(&self->scaled_framebuffer_msaa);
+   ih_reset(&self->scaled_read_snapshot);
    ih_reset(&self->bias_framebuffer);
    ih_reset(&self->framebuffer);
    ih_reset(&self->framebuffer_ssaa);
@@ -10565,6 +10882,7 @@ static void renderer_fini(Renderer *self)
    SemiTransparentStateVec_free_storage(&self->queue.semi_transparent_state);
    Rect2DVec_free_storage(&self->queue.scaled_resolves);
    Rect2DVec_free_storage(&self->queue.unscaled_resolves);
+   Rect2DVec_free_storage(&self->queue.scaled_texture_reads);
    BlitInfoVec_free_storage(&self->queue.scaled_blits);
    BlitInfoVec_free_storage(&self->queue.scaled_masked_blits);
    BlitInfoVec_free_storage(&self->queue.unscaled_blits);
@@ -10597,6 +10915,7 @@ static void renderer_reset_queue(Renderer *self)
    BufferVertexVec_clear(&self->queue.semi_transparent_opaque);
    PrimitiveInfoVec_clear(&self->queue.semi_transparent_opaque_scissor);
    ClearCandidateVec_clear(&self->queue.clear_candidates);
+   Rect2DVec_clear(&self->queue.scaled_texture_reads);
    self->primitive_index = 0;
    self->render_pass_is_feedback = false;
 
@@ -10610,12 +10929,8 @@ static void renderer_reset_queue(Renderer *self)
 static void renderer_semi_transparent_set_state(Renderer *self,
       const SemiTransparentState *state){
    if (state->scaled_read)
-   {
-      if (self->msaa > 1)
-         commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
-      else
-         commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_NearestClamp);
-   }
+      commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
+            renderer_get_scaled_read_view(self), StockSampler_NearestClamp);
    else
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
    renderer_hd_texture_uniforms(self, state->hd_texture_index);
@@ -10634,6 +10949,8 @@ static void renderer_semi_transparent_set_state(Renderer *self,
          (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? psx_pgxp_color : 0);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_PgxpFog,
          (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? (psx_pgxp_color && psx_pgxp_fog) : 0);
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FramebufferFloat16,
+         self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT);
    /* Only the feedback programs declare this; the pipeline hash masks it out
     * everywhere else. 1 = check-mask (historical behaviour), 0 = the routed
     * non-masked subtractive case. */
@@ -10668,7 +10985,11 @@ static void renderer_semi_transparent_set_state(Renderer *self,
    }
    case SemiTransparentMode_Add:
    {
-      if (state->masked)
+      /* Native-colour Add sources are reduced to RGB5 before blending,
+       * including raw texture samples. Fixed-function addition preserves
+       * the RGB5 sum; destination alpha can suppress a masked flat source.
+       * Retain feedback for masked textured Add as before. */
+      if (renderer_semi_trans_needs_feedback(self, state))
       {
          commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAdd);
          commandbuffer_set_program(cbh_get(&self->cmd), textured_masked);
@@ -10691,14 +11012,20 @@ static void renderer_semi_transparent_set_state(Renderer *self,
          commandbuffer_set_program(cbh_get(&self->cmd), textured);
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
          commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-         commandbuffer_set_blend_factors(cbh_get(&self->cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
-                                VK_BLEND_FACTOR_ZERO);
+         if (state->masked)
+            commandbuffer_set_blend_factors(cbh_get(&self->cmd),
+                  VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+                  VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE);
+         else
+            commandbuffer_set_blend_factors(cbh_get(&self->cmd),
+                  VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+                  VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO);
       }
       break;
    }
    case SemiTransparentMode_Average:
    {
-      if (state->masked)
+      if (renderer_semi_trans_needs_feedback(self, state))
       {
          commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAvg);
          commandbuffer_set_program(cbh_get(&self->cmd), textured_masked);
@@ -10765,7 +11092,7 @@ static void renderer_semi_transparent_set_state(Renderer *self,
    }
    case SemiTransparentMode_AddQuarter:
    {
-      if (state->masked)
+      if (renderer_semi_trans_needs_feedback(self, state))
       {
          commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_BlendMode, BlendMode_BlendAddQuarter);
          commandbuffer_set_program(cbh_get(&self->cmd), textured_masked);
@@ -14186,6 +14513,28 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             1, &region);
    }
 
+   static void commandbuffer_resolve_image(struct CommandBuffer *self, const Image *dst, const Image *src,
+         const VkOffset3D *dst_offset, const VkOffset3D *src_offset, const VkExtent3D *extent)
+   {
+      VkImageResolve region;
+      region.srcSubresource.aspectMask     = format_to_aspect_mask(image_get_create_info(src)->format);
+      region.srcSubresource.mipLevel       = 0;
+      region.srcSubresource.baseArrayLayer = 0;
+      region.srcSubresource.layerCount     = 1;
+      region.srcOffset                     = *src_offset;
+      region.dstSubresource.aspectMask     = format_to_aspect_mask(image_get_create_info(dst)->format);
+      region.dstSubresource.mipLevel       = 0;
+      region.dstSubresource.baseArrayLayer = 0;
+      region.dstSubresource.layerCount     = 1;
+      region.dstOffset                     = *dst_offset;
+      region.extent                        = *extent;
+
+      vkCmdResolveImage(self->cmd,
+            image_get_image(src), image_get_layout(src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
+            image_get_image(dst), image_get_layout(dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
+            1, &region);
+   }
+
    static void commandbuffer_begin_context(struct CommandBuffer *self)
    {
       self->dirty = ~0u;
@@ -15421,11 +15770,18 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
    static void context_destroy(struct Context *self)
    {
-      if (self->device != VK_NULL_HANDLE)
-         vkDeviceWaitIdle(self->device);
-
+      /* Only a device this context still owns. One released to the
+       * frontend (context_release_device) is the frontend's: its queue
+       * is in use on the frontend's threads, the Device has already
+       * drained this core's work on it in device_deinit, and when this
+       * runs for a stale context at the next create_device the frontend
+       * has destroyed the device already. Waiting on it was a use of a
+       * queue that is not ours, or of a device that is gone. */
       if (self->owned_device && self->device != VK_NULL_HANDLE)
+      {
+         vkDeviceWaitIdle(self->device);
          vkDestroyDevice(self->device, NULL);
+      }
    }
 
    static bool context_create_device(struct Context *self, VkPhysicalDevice gpu, VkSurfaceKHR surface, const char **required_device_extensions,
@@ -16630,6 +16986,48 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
    }
 
+   /* The frontend's queue.
+    *
+    * The graphics queue this device submits to is the one handed to the
+    * frontend in libretro_create_device, and the frontend submits its own
+    * frames and presents on it. A VkQueue must not be used by two threads
+    * at once, and under threaded video the frontend's use is on its video
+    * thread while this device's is on the core's thread. The interface
+    * has a lock for exactly that (lock_queue / unlock_queue), every core
+    * that submits for itself is required to take it around its queue
+    * access, and this one never did: the two threads' submissions raced
+    * on the queue, and both ended up waiting on fences that did not
+    * signal.
+    *
+    * It is taken around vkQueueSubmit itself and nothing else - never
+    * across a wait of any kind, see device_wait_queues_idle - and only
+    * for the queue the frontend has. The
+    * compute and transfer queues are this device's own where the GPU has
+    * separate ones, and are compared by handle so that where they alias
+    * the graphics queue they take it too. */
+   static void device_set_frontend_queue(Device *self, VkQueue queue,
+         void (*lock)(void *handle), void (*unlock)(void *handle), void *handle)
+   {
+      self->frontend_queue        = (lock && unlock) ? queue : VK_NULL_HANDLE;
+      self->frontend_queue_lock   = lock;
+      self->frontend_queue_unlock = unlock;
+      self->frontend_queue_handle = handle;
+   }
+
+   static INLINE bool device_queue_lock(Device *self, VkQueue queue)
+   {
+      if (self->frontend_queue == VK_NULL_HANDLE || queue != self->frontend_queue)
+         return false;
+      self->frontend_queue_lock(self->frontend_queue_handle);
+      return true;
+   }
+
+   static INLINE void device_queue_unlock(Device *self, bool locked)
+   {
+      if (locked)
+         self->frontend_queue_unlock(self->frontend_queue_handle);
+   }
+
    static void device_submit_nolock(Device *self,
          CommandBufferHandle cmd,
          Fence *fence,
@@ -16727,7 +17125,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
 
       cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
+      { bool queue_locked = device_queue_lock(self, queue);
       result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
+      device_queue_unlock(self, queue_locked); }
 
       if (result != VK_SUCCESS)
          LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
@@ -17002,7 +17402,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             break;
       }
 
+      { bool queue_locked = device_queue_lock(self, queue);
       result = vkQueueSubmit(queue, VkSubmitInfoVec_size(&submits), VkSubmitInfoVec_data(&submits), cleared_fence);
+      device_queue_unlock(self, queue_locked); }
       if (result != VK_SUCCESS)
          LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
       cbhvec_clear(submissions);
@@ -17307,13 +17709,75 @@ static void device_clear_wait_semaphores(Device *self)
    VkPipelineStageVec_clear(&self->transfer.wait_stages);
 }
 
+/* Wait until everything submitted so far, on every queue this device
+ * uses, has been executed.
+ *
+ * This was vkDeviceWaitIdle. That call is a use of every queue of the
+ * device, the frontend's included, so it needs the frontend's queue lock -
+ * and then the lock is held for as long as the GPU takes to drain, with
+ * the frontend's video thread parked behind it. A lock held across a wait
+ * is how the two ends of a queue come to wait on each other.
+ *
+ * A fence submitted with no batches signals once all work submitted to
+ * that queue before it has completed, which is the same guarantee for
+ * that queue. So each queue gets one: the lock is taken for the submit
+ * call where the queue is the frontend's, and the wait is on the fences
+ * with nothing held. Work the frontend submitted earlier on the shared
+ * queue is covered exactly as it was. */
+static void device_wait_queues_idle(Device *self)
+{
+   VkQueue  queues[3];
+   VkFence  fences[3];
+   unsigned num_queues = 0;
+   unsigned num_fences = 0;
+   unsigned i;
+   VkFenceCreateInfo info = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+
+   if (self->device == VK_NULL_HANDLE)
+      return;
+
+   if (self->graphics_queue != VK_NULL_HANDLE)
+      queues[num_queues++] = self->graphics_queue;
+   if (     self->compute_queue != VK_NULL_HANDLE
+         && self->compute_queue != self->graphics_queue)
+      queues[num_queues++] = self->compute_queue;
+   if (     self->transfer_queue != VK_NULL_HANDLE
+         && self->transfer_queue != self->graphics_queue
+         && self->transfer_queue != self->compute_queue)
+      queues[num_queues++] = self->transfer_queue;
+
+   for (i = 0; i < num_queues; i++)
+   {
+      VkFence  fence = VK_NULL_HANDLE;
+      VkResult result;
+      bool     queue_locked;
+
+      if (vkCreateFence(self->device, &info, NULL, &fence) != VK_SUCCESS)
+         continue;
+      queue_locked = device_queue_lock(self, queues[i]);
+      result       = vkQueueSubmit(queues[i], 0, NULL, fence);
+      device_queue_unlock(self, queue_locked);
+      if (result == VK_SUCCESS)
+         fences[num_fences++] = fence;
+      else
+      {
+         LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
+         vkDestroyFence(self->device, fence, NULL);
+      }
+   }
+
+   if (num_fences)
+      vkWaitForFences(self->device, num_fences, fences, VK_TRUE, UINT64_MAX);
+   for (i = 0; i < num_fences; i++)
+      vkDestroyFence(self->device, fences[i], NULL);
+}
+
 static void device_wait_idle_nolock(Device *self)
 {
    if (self->per_frame.count != 0)
       device_end_frame_nolock(self);
 
-   if (self->device != VK_NULL_HANDLE)
-      vkDeviceWaitIdle(self->device);
+   device_wait_queues_idle(self);
 
    device_clear_wait_semaphores(self);
 
@@ -18626,7 +19090,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
       { unsigned y; for (y = ybegin; y <= yend; y++)
          { unsigned x; for (x = xbegin; x <= xend; x++)
-            if ((*fbatlas_info(self, x, y)) & STATUS_TEXTURE_RENDERED)
+            if (((*fbatlas_info(self, x, y)) & STATUS_TEXTURE_RENDERED) ||
+                fbatlas_block_test(self->pending_fragment_write, x, y))
                return true; } }
       return false;
       }
@@ -18690,6 +19155,72 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       fbatlas_read_domain(self, domain, Stage_Fragment, rect);
    }
 
+   static void fbatlas_queue_scaled_texture_read(FBAtlas *self,
+         const TTRect *rect)
+   {
+      unsigned x[2], y[2], width[2], height[2];
+      unsigned total_width, total_height, nx, ny, i, j;
+      Rect2DVec *reads = &self->listener->queue.scaled_texture_reads;
+
+      if (!rect->width || !rect->height)
+         return;
+
+      x[0] = rect->x & (FB_WIDTH - 1);
+      y[0] = rect->y & (FB_HEIGHT - 1);
+      total_width = min_(rect->width, FB_WIDTH);
+      total_height = min_(rect->height, FB_HEIGHT);
+      width[0] = min_(total_width, FB_WIDTH - x[0]);
+      height[0] = min_(total_height, FB_HEIGHT - y[0]);
+      nx = total_width > width[0] ? 2 : 1;
+      ny = total_height > height[0] ? 2 : 1;
+      x[1] = 0;
+      y[1] = 0;
+      width[1] = total_width - width[0];
+      height[1] = total_height - height[0];
+
+      for (j = 0; j < ny; j++)
+         for (i = 0; i < nx; i++)
+         {
+            VkRect2D copy = {
+               { (int32_t)x[i], (int32_t)y[j] },
+               { width[i], height[j] }
+            };
+            unsigned k = 0;
+
+            while (k < Rect2DVec_size(reads))
+            {
+               const VkRect2D *queued = Rect2DVec_at(reads, k);
+               int32_t x0 = min_(copy.offset.x, queued->offset.x);
+               int32_t y0 = min_(copy.offset.y, queued->offset.y);
+               int32_t x1 = max_(copy.offset.x + (int32_t)copy.extent.width,
+                     queued->offset.x + (int32_t)queued->extent.width);
+               int32_t y1 = max_(copy.offset.y + (int32_t)copy.extent.height,
+                     queued->offset.y + (int32_t)queued->extent.height);
+               bool separate = copy.offset.x + (int32_t)copy.extent.width <= queued->offset.x ||
+                     queued->offset.x + (int32_t)queued->extent.width <= copy.offset.x ||
+                     copy.offset.y + (int32_t)copy.extent.height <= queued->offset.y ||
+                     queued->offset.y + (int32_t)queued->extent.height <= copy.offset.y;
+
+               if (separate)
+               {
+                  k++;
+                  continue;
+               }
+
+               copy.offset.x = x0;
+               copy.offset.y = y0;
+               copy.extent.width = (uint32_t)(x1 - x0);
+               copy.extent.height = (uint32_t)(y1 - y0);
+               *Rect2DVec_at(reads, k) = *Rect2DVec_at(reads,
+                     Rect2DVec_size(reads) - 1);
+               reads->count--;
+               k = 0;
+            }
+
+            Rect2DVec_push(reads, &copy);
+         }
+   }
+
    static void fbatlas_read_texture(FBAtlas *self, Domain domain,
          bool read_palette)
    {
@@ -18717,6 +19248,13 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
       if (palette && read_palette)
          fbatlas_sync_domain(self, domain, &palette_rect);
+
+      if (domain == Domain_Scaled && self->listener->scaling > 1)
+      {
+         fbatlas_queue_scaled_texture_read(self, &shifted);
+         if (palette && read_palette)
+            fbatlas_queue_scaled_texture_read(self, &palette_rect);
+      }
 
       fbatlas_read_domain(self, domain, Stage_FragmentTexture, &shifted);
       if (palette && read_palette)
@@ -18993,8 +19531,6 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
    static void fbatlas_flush_render_pass(FBAtlas *self)
    {
-      unsigned xend;
-      unsigned xbegin;
       if (!self->renderpass.inside)
          return;
 
@@ -19010,13 +19546,14 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       fbatlas_write_domain(self, Domain_Scaled, Stage_Fragment, rect);
       renderer_flush_render_pass(self->listener, rect);
 
-      xbegin = rect->x / BLOCK_WIDTH;
-      xend = (rect->x + rect->width - 1) / BLOCK_WIDTH;
-      { unsigned ybegin = rect->y / BLOCK_HEIGHT;
-      unsigned yend = (rect->y + rect->height - 1) / BLOCK_HEIGHT;
-      { unsigned y; for (y = ybegin; y <= yend; y++)
-         { unsigned x; for (x = xbegin; x <= xend; x++) (*fbatlas_info(self, x, y)) |= STATUS_TEXTURE_RENDERED; } }
-      }
+      { unsigned i; for (i = 0; i < FBATLAS_BLOCK_WORDS; i++)
+      {
+         uint32_t iter, bit;
+         uint32_t pending = self->pending_fragment_write[i];
+         FOR_EACH_BIT(pending, iter, bit)
+            self->fb_info[i * 32 + bit] |= STATUS_TEXTURE_RENDERED;
+         self->pending_fragment_write[i] = 0;
+      } }
       }
    }
 
@@ -19197,6 +19734,9 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
       }
 
       fbatlas_extend_render_pass(self, rect, true);
+      /* Extend may submit or discard the previous pass. Associate this
+       * primitive only with the pass that will actually queue it. */
+      fbatlas_mark_blocks(self->pending_fragment_write, &scissored);
    }
 
    static void fbatlas_clear_rect(FBAtlas *self,
@@ -19216,6 +19756,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
       fbatlas_palette_preserve(self, rect);
       fbatlas_extend_render_pass(self, rect, false);
+      /* GP0 fills ignore the draw-area scissor. */
+      fbatlas_mark_blocks(self->pending_fragment_write, rect);
 
       /* If the render pass area doesn't increase later, we can use loadOp ==
        * CLEAR instead of LOAD, which helps a lot on mobile GPUs. */
@@ -19233,6 +19775,8 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
    static void fbatlas_discard_render_pass(FBAtlas *self)
    {
       self->renderpass.inside = false;
+      memset(self->pending_fragment_write, 0,
+            sizeof(self->pending_fragment_write));
       renderer_reset_queue(self->listener);
    }
 
@@ -19551,6 +20095,13 @@ static void vk_context_reset(void)
     * reset is idempotent, mirroring the GL backend (gl_context_destroy fully
     * resets state before gl_context_reset rebuilds). The context itself is
     * owned by libretro_create_device, not by reset, so it is preserved. */
+   /* The stale device below still names the interface of the reset before
+    * this one, whose handle may be gone with the driver that gave it; its
+    * teardown waits the device idle, so it takes the queue lock through
+    * the interface just fetched. */
+   if (device)
+      device_set_frontend_queue(device, vulkan->queue,
+            vulkan->lock_queue, vulkan->unlock_queue, vulkan->handle);
    if (renderer)
    {
       renderer_fini(renderer);
@@ -19566,6 +20117,10 @@ static void vk_context_reset(void)
 
    device = (Device *)malloc(sizeof(Device));
    device_init(device);
+   /* Before the device touches a queue: device_set_context already
+    * waits the device idle, and renderer_init submits. */
+   device_set_frontend_queue(device, vulkan->queue,
+         vulkan->lock_queue, vulkan->unlock_queue, vulkan->handle);
    device_set_context(device, *&context);
 
    renderer = (Renderer *)malloc(sizeof(Renderer));
@@ -19686,6 +20241,10 @@ bool rhi_vulkan_open(bool is_pal)
 {
    libretro_log   = log_cb;
    content_is_pal = is_pal;
+
+   /* A new game starts from blank VRAM: drop what the previous context
+    * teardown kept for a renderer rebuild. */
+   savestate_destroy(&save_state);
 
    hw_render.context_type    = RETRO_HW_CONTEXT_VULKAN;
    hw_render.version_major   = VK_MAKE_VERSION(1, 0, 32);
@@ -20166,6 +20725,15 @@ void rhi_vulkan_prepare_frame(void)
    renderer->primitive_filter_mode = (FilterMode)(filter_mode);
    renderer->sprite_filter_exclude = (FilterExclude)(filter_exclude_sprites);
    renderer->polygon_2d_filter_exclude = (FilterExclude)(filter_exclude_2d_polygons);
+   /* Latch the negotiated mode at the frame boundary before any GP0 work is
+    * queued. Native colour is an explicit opt-in: it is not implied by the
+    * dither option (which still only selects the per-primitive dither
+    * pattern and the display-level downsample), and engaged HDR always
+    * keeps its higher-precision path. */
+   renderer->render_state.native_color =
+      !psx_hdr_active && psx_native_color != 0;
+   renderer->render_state.dither_native_resolution =
+      dither_mode == DITHER_NATIVE;
 }
 
 static ScanoutMode get_scanout_mode(bool bpp24)
@@ -20244,7 +20812,6 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
     * the config above so it picks the right rect/pages folder). */
    texture_tracker_ensure_directories(renderer->tracker, dump_textures, replace_textures);
    renderer->render_state.adaptive_smoothing = adaptive_smoothing;
-   renderer->render_state.dither_native_resolution = dither_mode == DITHER_NATIVE;
    renderer->render_state.crop_overscan = vulkan_crop_overscan;
    renderer->render_state.offset_cycles = image_offset_cycles;
    renderer_set_visible_scanlines(renderer, initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);

@@ -1,0 +1,47 @@
+name: Vulkan queue contract
+
+# The hardware renderer shares its graphics queue with the frontend, which
+# under threaded video uses it from another thread. Every use the core
+# makes of that queue has to hold the frontend's queue lock. vkhost
+# enforces it: it counts each unlocked use, runs a second thread on the
+# queue the way a frontend's video thread does, and has the validation
+# layer's thread check on.
+
+on:
+  push:
+    paths:
+      - 'rhi/**'
+      - 'tools/vkhost/**'
+      - 'libretro.c'
+      - 'Makefile*'
+      - '.github/workflows/vulkan-queue-contract.yml'
+  pull_request:
+    paths:
+      - 'rhi/**'
+      - 'tools/vkhost/**'
+      - 'libretro.c'
+      - 'Makefile*'
+      - '.github/workflows/vulkan-queue-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  queue-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan (lavapipe, validation layer)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libvulkan-dev mesa-vulkan-drivers \
+            vulkan-validationlayers libgl1-mesa-dev python3
+      - name: Build the core
+        run: make -j"$(nproc)" HAVE_HW=1
+      - name: Build vkhost
+        run: make -C tools/vkhost
+      - name: Queue contract
+        run: tools/vkhost/queue_contract.sh "$PWD/mednafen_psx_hw_libretro.so" 120

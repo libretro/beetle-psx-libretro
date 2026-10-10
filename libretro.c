@@ -10,7 +10,7 @@
 #include "mednafen/video/Deinterlacer.h"
 #endif
 #include <libretro.h>
-#include <rthreads/rthreads.h>
+#include "mc_async.h"
 #include <streams/file_stream.h>
 #include <vfs/vfs_hybrid.h>
 #include <string/stdstring.h>
@@ -221,6 +221,17 @@ int   psx_hdr_overbright_hot   = 0;
 int   psx_pgxp_color           = 0;
 int   psx_pgxp_fog             = 0;
 int   psx_hdr_multipass        = 0;
+/* Vulkan native 15-bit colour rendering (write-time RGB5 quantisation).
+ * Opt-in; consulted per frame by rhi_vulkan_prepare_frame. */
+int   psx_native_color         = 0;
+
+static void reset_hdr_output_state(void)
+{
+   psx_hdr_active = false;
+   psx_pgxp_color = 0;
+   psx_pgxp_fog   = 0;
+}
+
 /* Reference SDR transfer the 24-bit path is assumed to have been viewed
  * through, used to linearise before the HDR encode: 0 = BT.1886 pure 2.4
  * (default, matches RetroArch's own SDR->HDR composition), 1 = pure 2.2,
@@ -377,6 +388,55 @@ static Deinterlacer deint;
 #endif
 
 static MDFN_Surface *surf = NULL;
+
+/* RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER for the software
+ * renderer: a buffer of the frontend's own, the size of the scanout
+ * surface, that this frame renders into instead of surf. video_cb then
+ * hands back a pointer inside the frontend's memory - the overscan
+ * crop below is a pointer offset at the surface's stride, which the
+ * frontend accepts - and nothing is copied on the way to the screen.
+ *
+ * Declined, and the frame renders into surf as before, when the
+ * frontend has no such buffer, when it offers a different format or
+ * stride, or when the picture is interlaced: WEAVE and FASTMAD
+ * combine this field with the previous frame's lines in the surface,
+ * and the frontend's buffer holds an older frame than they expect.
+ * The scanout cache is invalidated on every lent frame, because its
+ * "margins are still zero from last time" shortcut assumes the same
+ * buffer as last frame. */
+static MDFN_Surface lent_surf;
+
+static MDFN_Surface *acquire_lent_surface(void)
+{
+   struct retro_framebuffer fb;
+
+   if (!surf || !environ_cb)
+      return NULL;
+   if (currently_interlaced || PrevInterlaced)
+      return NULL;
+
+   memset(&fb, 0, sizeof(fb));
+   fb.width        = (unsigned)surf->w;
+   fb.height       = (unsigned)surf->h;
+   /* Read as well as write: the deinterlacer and the line hooks read
+    * what was scanned out, and the scanout cache's margin check reads
+    * nothing, but a cached mapping is what those need. */
+   fb.access_flags = RETRO_MEMORY_ACCESS_WRITE | RETRO_MEMORY_ACCESS_READ;
+
+   if (   !environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
+       || !fb.data
+       || fb.format != RETRO_PIXEL_FORMAT_XRGB8888
+       || fb.pitch  != (size_t)surf->pitchinpix * sizeof(uint32_t)
+       || !(fb.memory_flags & RETRO_MEMORY_TYPE_CACHED))
+      return NULL;
+
+   lent_surf.pixels     = (uint32_t*)fb.data;
+   lent_surf.w          = surf->w;
+   lent_surf.h          = surf->h;
+   lent_surf.pitchinpix = surf->pitchinpix;
+   GPU_InvalidateScanoutCache();
+   return &lent_surf;
+}
 
 enum
 {
@@ -1040,48 +1100,9 @@ static disk_control_ext_info_t disk_control_ext_info;
 static uint64_t Memcard_PrevDC[8];
 static int64_t Memcard_SaveDelay[8];
 
-/* ------------------------------------------------------------------------
- * Asynchronous memory-card file writer.
- *
- * The periodic memcard flush in retro_run used to do a synchronous 128 KiB
- * filestream_write on the emulation thread, stalling a frame each time a
- * game saved (file-managed cards: all secondary cards, and card 0 under the
- * mednafen method). Move the file write to a background thread; the emu
- * thread only snapshots the 128 KiB under a lock and enqueues.
- *
- * Ordering/safety (verified with a threaded differential harness - no loss,
- * latest-wins, drain-before-stop, no leaks, under a saturated ring):
- *   - single producer (the emulation thread), one writer thread -> per-path
- *     write order preserved;
- *   - per-path coalescing: a newer snapshot replaces a pending older one
- *     (idempotent full-buffer saves, latest wins);
- *   - on a full ring the producer WAITS for space rather than writing inline
- *     (an inline write could be overtaken on disk by the writer flushing an
- *     older dequeued job for the same path). Coalescing bounds pending jobs
- *     to the number of distinct card paths, so the ring never fills in
- *     practice - the wait is a correctness safety valve only;
- *   - flush_and_stop drains all pending then joins -> no save lost at exit;
- *   - if the writer thread cannot be created, writes fall back to inline
- *     sync (no concurrent writer -> order trivially preserved).
- * ---------------------------------------------------------------------- */
-#define MC_ASYNC_SLOTS 16
-
-typedef struct
-{
-   bool     used;
-   char     path[4096];
-   uint8_t *data;
-   uint32_t size;
-} mc_async_job;
-
-static mc_async_job mc_async_jobs[MC_ASYNC_SLOTS];
-static sthread_t   *mc_async_thread  = NULL;
-static slock_t     *mc_async_lock    = NULL;
-static scond_t     *mc_async_work    = NULL;  /* writer wakes on new job      */
-static scond_t     *mc_async_space   = NULL;  /* producer wakes on freed slot */
-static bool         mc_async_running = false;
-static bool         mc_async_quit    = false;
-
+/* One whole card image to its file. Runs on the memory card writer's
+ * thread (mc_async.c), or inline on the emulation thread when there is
+ * no writer. */
 static void mc_async_file_write(const char *path, const uint8_t *data, uint32_t size)
 {
    RFILE *mf = filestream_open(path,
@@ -1090,127 +1111,6 @@ static void mc_async_file_write(const char *path, const uint8_t *data, uint32_t 
       return;
    filestream_write(mf, data, size);
    filestream_close(mf);
-}
-
-static void mc_async_writer(void *unused)
-{
-   (void)unused;
-   for (;;)
-   {
-      mc_async_job job;
-      int i, slot;
-      slock_lock(mc_async_lock);
-      for (;;)
-      {
-         slot = -1;
-         for (i = 0; i < MC_ASYNC_SLOTS; i++)
-            if (mc_async_jobs[i].used) { slot = i; break; }
-         if (slot >= 0)
-            break;
-         if (mc_async_quit) { slock_unlock(mc_async_lock); return; } /* drained + quit */
-         scond_wait(mc_async_work, mc_async_lock);
-      }
-      job                      = mc_async_jobs[slot];
-      mc_async_jobs[slot].used = false;
-      mc_async_jobs[slot].data = NULL;
-      scond_signal(mc_async_space);
-      slock_unlock(mc_async_lock);
-
-      mc_async_file_write(job.path, job.data, job.size);
-      free(job.data);
-   }
-}
-
-/* Producer (emulation thread). Snapshots synchronously, so the caller may
- * mutate the source buffer as soon as this returns. */
-static void mc_async_enqueue(const char *path, const uint8_t *data, uint32_t size)
-{
-   uint8_t *copy;
-   int      i, slot;
-
-   if (!mc_async_running)   /* no writer thread: inline is the sole writer */
-   {
-      mc_async_file_write(path, data, size);
-      return;
-   }
-   copy = (uint8_t *)malloc(size);
-   if (!copy)               /* OOM: degrade to inline sync (still correct) */
-   {
-      mc_async_file_write(path, data, size);
-      return;
-   }
-   memcpy(copy, data, size);
-
-   slock_lock(mc_async_lock);
-   for (;;)
-   {
-      slot = -1;
-      for (i = 0; i < MC_ASYNC_SLOTS; i++)
-         if (mc_async_jobs[i].used && !strcmp(mc_async_jobs[i].path, path))
-            { slot = i; break; }
-      if (slot >= 0)         /* coalesce: newer snapshot supersedes pending */
-      {
-         free(mc_async_jobs[slot].data);
-         mc_async_jobs[slot].data = copy;
-         mc_async_jobs[slot].size = size;
-         break;
-      }
-      for (i = 0; i < MC_ASYNC_SLOTS; i++)
-         if (!mc_async_jobs[i].used) { slot = i; break; }
-      if (slot >= 0)
-      {
-         mc_async_jobs[slot].used = true;
-         strncpy(mc_async_jobs[slot].path, path, sizeof(mc_async_jobs[slot].path) - 1);
-         mc_async_jobs[slot].path[sizeof(mc_async_jobs[slot].path) - 1] = '\0';
-         mc_async_jobs[slot].data = copy;
-         mc_async_jobs[slot].size = size;
-         break;
-      }
-      scond_wait(mc_async_space, mc_async_lock);  /* ring full (never in practice) */
-   }
-   scond_signal(mc_async_work);
-   slock_unlock(mc_async_lock);
-}
-
-static void mc_async_init(void)
-{
-   int i;
-   if (mc_async_running)
-      return;
-   for (i = 0; i < MC_ASYNC_SLOTS; i++)
-   {
-      mc_async_jobs[i].used = false;
-      mc_async_jobs[i].data = NULL;
-   }
-   mc_async_quit  = false;
-   mc_async_lock  = slock_new();
-   mc_async_work  = scond_new();
-   mc_async_space = scond_new();
-   if (mc_async_lock && mc_async_work && mc_async_space)
-      mc_async_thread = sthread_create(mc_async_writer, NULL);
-   mc_async_running = (mc_async_thread != NULL);
-   if (!mc_async_running)   /* setup failed: fall back to inline sync writes */
-   {
-      if (mc_async_lock)  { slock_free(mc_async_lock);   mc_async_lock  = NULL; }
-      if (mc_async_work)  { scond_free(mc_async_work);   mc_async_work  = NULL; }
-      if (mc_async_space) { scond_free(mc_async_space);  mc_async_space = NULL; }
-   }
-}
-
-static void mc_async_flush_and_stop(void)
-{
-   if (!mc_async_running)
-      return;
-   slock_lock(mc_async_lock);
-   mc_async_quit = true;
-   scond_signal(mc_async_work);
-   slock_unlock(mc_async_lock);
-   sthread_join(mc_async_thread);   /* returns only after all pending drained */
-   mc_async_thread  = NULL;
-   mc_async_running = false;
-   slock_free(mc_async_lock);   mc_async_lock  = NULL;
-   scond_free(mc_async_work);   mc_async_work  = NULL;
-   scond_free(mc_async_space);  mc_async_space = NULL;
 }
 
 /* PSX_CPU lives at file scope in cpu.c (always points at &s_cpu). */
@@ -1384,9 +1284,93 @@ struct event_list_entry
 
 static struct event_list_entry events[PSX_EVENT__COUNT];
 
+/* While a device has nothing to do, its event stays in the list - so its
+ * order among equal timestamps evolves exactly as before - but is
+ * virtual: the CPU does not stop for it, and the event handler advances
+ * it along its regular cadence without an update. The device turns it
+ * real again itself (the GPU at the end of the line, DMA when the GPU
+ * does), or a write wakes every virtual device at once. */
+static uint32_t virtual_events;
+
+static INLINE int32_t FirstRealEventTS(void)
+{
+   struct event_list_entry *e = events[PSX_EVENT__SYNFIRST].next;
+
+   while(virtual_events & (1U << e->which))
+      e = e->next;
+
+   return e->event_time;
+}
+
+int32_t PSX_EventTS(const int type)
+{
+   return events[type].event_time;
+}
+
+bool PSX_AnyEventVirtual(void)
+{
+   return virtual_events != 0;
+}
+
+void PSX_EventVirtual(const int type, bool virt)
+{
+   if(virt)
+      virtual_events |= 1U << type;
+   else
+      virtual_events &= ~(1U << type);
+
+   CPU_SetEventNT(FirstRealEventTS() & Running);
+}
+
+static INLINE int32_t VirtualAdvance(const struct event_list_entry *e)
+{
+   if(e->which == PSX_EVENT_GPU)
+      return GPU_VirtualAdvance(e->event_time);
+
+   return DMA_VirtualAdvance(e->event_time);
+}
+
+/* A write from the running CPU: the regular cadence would have stopped
+ * the CPU at every virtual event up to the core's last event check and
+ * run it there. Advance them exactly as the handler would have, in list
+ * order with one PSX_SetEventNT() each, so the list ends up in the same
+ * order; then bring the devices' state to those points and make their
+ * events real. From an event handler the list has already been walked
+ * up to the right point, so only the second half runs. */
+void PSX_WakeVirtual(bool from_cpu)
+{
+   if(!virtual_events)
+      return;
+
+   if(from_cpu)
+   {
+      const int32_t check = CPU_LastEventCheckTS();
+      struct event_list_entry *e = events[PSX_EVENT__SYNFIRST].next;
+
+      while(check >= e->event_time)
+      {
+         if(virtual_events & (1U << e->which))
+         {
+            struct event_list_entry *prev = e->prev;
+
+            PSX_SetEventNT(e->which, VirtualAdvance(e));
+            e = prev->next;
+         }
+         else
+            e = e->next;
+      }
+   }
+
+   /* DMA first: its update carries the GPU's state along. */
+   DMA_WakeVirtual();
+   GPU_WakeVirtual();
+}
+
 static void EventReset(void)
 {
    unsigned i;
+
+   virtual_events = 0;
    for(i = 0; i < PSX_EVENT__COUNT; i++)
    {
       events[i].which = i;
@@ -1415,7 +1399,7 @@ static void RebaseTS(const int32_t timestamp)
       events[i].event_time -= timestamp;
    }
 
-   CPU_SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
+   CPU_SetEventNT(FirstRealEventTS());
 }
 
 void PSX_SetEventNT(const int type, const int32_t next_timestamp)
@@ -1432,7 +1416,7 @@ void PSX_SetEventNT(const int type, const int32_t next_timestamp)
       next_timestamp <= e->next->event_time)
    {
       e->event_time = next_timestamp;
-      CPU_SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time & Running);
+      CPU_SetEventNT(FirstRealEventTS() & Running);
       return;
    }
 
@@ -1479,7 +1463,7 @@ void PSX_SetEventNT(const int type, const int32_t next_timestamp)
       e->event_time = next_timestamp;
    }
 
-   CPU_SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time & Running);
+   CPU_SetEventNT(FirstRealEventTS() & Running);
 }
 
 // Called from debug.cpp too.
@@ -1494,7 +1478,7 @@ void ForceEventUpdates(const int32_t timestamp)
 
    PSX_SetEventNT(PSX_EVENT_FIO, FrontIO_Update(PSX_FIO, timestamp));
 
-   CPU_SetEventNT(events[PSX_EVENT__SYNFIRST].next->event_time);
+   CPU_SetEventNT(FirstRealEventTS());
 }
 
 bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
@@ -1511,7 +1495,10 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
          default:
             abort();
          case PSX_EVENT_GPU:
-            nt = GPU_Update(e->event_time);
+            if(virtual_events & (1U << PSX_EVENT_GPU))
+               nt = GPU_VirtualAdvance(e->event_time);
+            else
+               nt = GPU_Update(e->event_time);
             break;
          case PSX_EVENT_CDC:
             nt = PS_CDC_Update(PSX_CDC, e->event_time);
@@ -1520,7 +1507,10 @@ bool MDFN_FASTCALL PSX_EventHandler(const int32_t timestamp)
             nt = TIMER_Update(e->event_time);
             break;
          case PSX_EVENT_DMA:
-            nt = DMA_Update(e->event_time);
+            if(virtual_events & (1U << PSX_EVENT_DMA))
+               nt = DMA_VirtualAdvance(e->event_time);
+            else
+               nt = DMA_Update(e->event_time);
             break;
          case PSX_EVENT_FIO:
             nt = FrontIO_Update(PSX_FIO, e->event_time);
@@ -3376,7 +3366,7 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
       Memcard_SaveDelay[i] = -1;
    }
 
-   mc_async_init();
+   mc_async_init(mc_async_file_write);
 
 	input_init_calibration();
 
@@ -4922,6 +4912,10 @@ static void check_variables(bool startup)
    {
       bool hw_renderer = false;
 
+      /* The option below is only a request. Derived HDR state remains off
+       * until the selected hardware renderer and frontend accept HDR10. */
+      reset_hdr_output_state();
+
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
       var.key = BEETLE_OPT(renderer);
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -4946,15 +4940,6 @@ static void check_variables(bool startup)
          if (!strcmp(var.value, "30bit_hdr"))
             psx_color_format = PSX_COLOR_FORMAT_30BIT_HDR;
       }
-
-      /* PGXP precise colour and linear-light fog are part of the 30-bit HDR
-       * mode rather than separate options: both are endpoint-exact and fall
-       * back to the architectural bytes wherever the PGXP shadow cannot be
-       * verified, so the worst case is the standard picture, and both are
-       * inert without PGXP memory tracking and off the fp16 target anyway.
-       * One switch, one look. */
-      psx_pgxp_color = (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR);
-      psx_pgxp_fog   = (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR);
 
       /* HDR highlight roll-off curve (Vulkan HDR path only): 0 Reinhard,
        * 1 ACES. Inert unless the HDR scanout is actually engaged. */
@@ -5071,6 +5056,16 @@ static void check_variables(bool startup)
    }
    else
       psx_gpu_dither_mode = DITHER_NATIVE;
+
+#ifdef HAVE_VULKAN
+   var.key = BEETLE_OPT(native_color);
+   psx_native_color = 0;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         psx_native_color = 1;
+   }
+#endif
 
    // iCB: PGXP settings
    var.key = BEETLE_OPT(pgxp_mode);
@@ -5954,7 +5949,7 @@ static void negotiate_hdr_output(void)
     * for the renderer's output stage to encode against, so an HDR frame
     * matches the frontend's own SDR->HDR composition rather than
     * diverging in brightness or saturation. */
-   psx_hdr_active = false;
+   reset_hdr_output_state();
    if (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR)
    {
       /* The confirmed contract (RetroArch gfx/video_driver.c: source_hdr10
@@ -6006,6 +6001,13 @@ static void negotiate_hdr_output(void)
          enum retro_pixel_format sdrfmt = RETRO_PIXEL_FORMAT_XRGB8888;
          environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &sdrfmt);
       }
+
+      /* Precise colour and linear-light fog are derived from the accepted
+       * output mode, not the user's request. They feed primitive generation
+       * as well as both hardware renderers, so a rejected request must leave
+       * them off just like the standard 24-bit path. */
+      psx_pgxp_color = psx_hdr_active;
+      psx_pgxp_fog   = psx_hdr_active;
 
       if (log_cb)
       {
@@ -6119,6 +6121,8 @@ bool retro_load_game(const struct retro_game_info *info)
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(depth);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+         option_display.key = BEETLE_OPT(native_color);
+         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(display_vram);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter);
@@ -6142,6 +6146,8 @@ bool retro_load_game(const struct retro_game_info *info)
 
          negotiate_hdr_output();
 
+         option_display.key = BEETLE_OPT(native_color);
+         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(scaled_uv_offset);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter_exclude_sprite);
@@ -6295,6 +6301,7 @@ void retro_unload_game(void)
    VCD_Reset();
 
    rhi_intf_close();
+   reset_hdr_output_state();
 
    MDFN_FlushGameCheats(0);
 
@@ -6331,6 +6338,7 @@ void retro_run(void)
    static unsigned skipped_frames = 0;
    const unsigned MAX_SKIPPED_DUPLICATE_FRAMES = 10;
    static int32_t rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
+   MDFN_Surface *frame_surf = surf;
    EmulateSpecStruct spec = {0};
    EmulateSpecStruct *espec;
    int32_t timestamp = 0;
@@ -6583,7 +6591,12 @@ retry_frame:
 
    rects[0] = ~0;
 
-   spec.surface      = surf;
+   /* The frontend's buffer when it lends one, else the core's own. */
+   frame_surf        = (rhi_intf_is_type() == RHI_SOFTWARE)
+      ? acquire_lent_surface() : NULL;
+   if (!frame_surf)
+      frame_surf     = surf;
+   spec.surface      = frame_surf;
    spec.LineWidths   = rects;
    spec.SoundBufSize = 0;
 
@@ -6708,7 +6721,7 @@ retry_frame:
          if (!PrevInterlaced)
             Deinterlacer_ClearState(&deint);
 
-         Deinterlacer_Process(&deint, surf, &spec.DisplayRect, rects, spec.InterlaceField);
+         Deinterlacer_Process(&deint, frame_surf, &spec.DisplayRect, rects, spec.InterlaceField);
 
          /* The scanout cache assumes margin pixels are still zero
           * from the previous frame's writes.  WEAVE's XReposition
@@ -6746,7 +6759,7 @@ retry_frame:
 #endif
 
       // PSX core inserts padding on left and right (overscan). Optionally crop this.
-      pix = surf->pixels;
+      pix = frame_surf->pixels;
       pix_offset = 0;
 
       if (crop_overscan)
@@ -6999,6 +7012,7 @@ void retro_deinit(void)
    display_internal_framerate = false;
    display_notifications      = true;
    allow_frame_duping         = false;
+   reset_hdr_output_state();
 
    /* Capability flags re-detected by retro_init. */
    libretro_supports_option_categories = false;

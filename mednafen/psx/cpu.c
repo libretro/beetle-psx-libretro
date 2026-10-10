@@ -121,6 +121,8 @@ int32_t                  cpu_next_event_ts;
 static uint32_t          cpu_IPCache;
 static uint32_t          cpu_BIU;
 static bool              cpu_Halted;
+/* Timestamp at the interpreter's last event check (see CPU_LastEventCheckTS). */
+static int32_t           cpu_last_check_ts;
 static CPU_CP0           cpu_CP0;
 #ifdef HAVE_LIGHTREC
 /* cache_buf shadows the first 64KB of MainRAM while the cache-isolated
@@ -270,6 +272,10 @@ void CPU_SetHalt_method(PS_CPU *self, bool status)
 {
    (void)self;
    Halted = status;
+#ifdef HAVE_LIGHTREC
+   if(status && lightrec_state && psx_dynarec != DYNAREC_DISABLED)
+      lightrec_set_exit_flags(lightrec_state, LIGHTREC_EXIT_CHECK_INTERRUPT);
+#endif
    CPU_RecalcIPCache();
 }
 
@@ -908,6 +914,9 @@ static int32_t CPU_RunReal(PS_CPU *self, int32_t timestamp_in)
   {
    uint32_t instr;
    uint32_t opf;
+
+   /* The comparison above is the interpreter's event check point. */
+   cpu_last_check_ts = timestamp;
 
    /* Zero must be zero...until the Master Plan is enacted. */
    GPR[0] = 0;
@@ -3730,14 +3739,22 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
 #endif
       lightrec_reset_cycle_count(lightrec_state, timestamp);
 
-      if (next_interpreter > 0 || psx_dynarec == DYNAREC_RUN_INTERPRETER)
-         PC = lightrec_run_interpreter(lightrec_state, PC, next_event_ts);
-      else if (psx_dynarec == DYNAREC_EXECUTE)
-         PC = lightrec_execute(lightrec_state, PC, next_event_ts);
+      if (Halted)
+      {
+         timestamp = next_event_ts;
+         lightrec_reset_cycle_count(lightrec_state, timestamp);
+         flags = LIGHTREC_EXIT_NORMAL;
+      }
+      else
+      {
+         if (next_interpreter > 0 || psx_dynarec == DYNAREC_RUN_INTERPRETER)
+            PC = lightrec_run_interpreter(lightrec_state, PC, next_event_ts);
+         else if (psx_dynarec == DYNAREC_EXECUTE)
+            PC = lightrec_execute(lightrec_state, PC, next_event_ts);
 
-      timestamp = lightrec_current_cycle_count(lightrec_state);
-
-      flags = lightrec_exit_flags(lightrec_state);
+         timestamp = lightrec_current_cycle_count(lightrec_state);
+         flags = lightrec_exit_flags(lightrec_state);
+      }
 
       if (flags & (LIGHTREC_EXIT_SEGFAULT|LIGHTREC_EXIT_NOMEM)) {
          if (flags & LIGHTREC_EXIT_NOMEM)
@@ -3760,7 +3777,8 @@ static int32_t lightrec_plugin_execute(PS_CPU *self, int32_t timestamp)
       if (timestamp >= lightrec_begin_cycles && PC != oldpc)
          print_for_big_ass_debugger(timestamp, PC);
 #endif
-      if ((lightrec_regs->cp0[CP0REG_SR] & lightrec_regs->cp0[CP0REG_CAUSE] & 0xFF00) &&
+      if (!Halted &&
+          (lightrec_regs->cp0[CP0REG_SR] & lightrec_regs->cp0[CP0REG_CAUSE] & 0xFF00) &&
           (lightrec_regs->cp0[CP0REG_SR] & 1))
       {
          /* Handle software interrupts */
@@ -3806,3 +3824,17 @@ static void lightrec_plugin_shutdown(void)
 }
 
 #endif
+
+/* The timestamp at which the running CPU core last compared its cycle
+ * budget against the next event: the interpreter checks before every
+ * instruction, lightrec at block entries and loop back-edges. Up to this
+ * point every event the regular cadence would have fired has been
+ * processed; past it, a device skipping its events must not catch up. */
+int32_t CPU_LastEventCheckTS(void)
+{
+#ifdef HAVE_LIGHTREC
+   if (psx_dynarec != DYNAREC_DISABLED && lightrec_state)
+      return (int32_t)lightrec_last_check_cycle_count(lightrec_state);
+#endif
+   return cpu_last_check_ts;
+}

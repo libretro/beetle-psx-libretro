@@ -30,13 +30,15 @@ shift
 CF=$(tools/harness_cflags.sh)
 LC=libretro-common
 CD=mednafen/cdrom
-INC="-I$LC/include -Imednafen -I. -Ideps/zstd-1.5.7"
+INC="-I$LC/include -Imednafen -I."
 
 # Shared by every harness: threads and time come in under -DHAVE_THREADS.
 BASE="$LC/compat/compat_strl.c $LC/compat/fopen_utf8.c
       $LC/compat/compat_posix_string.c $LC/compat/compat_strcasestr.c
-      $LC/string/stdstring.c $LC/encodings/encoding_utf.c
-      $LC/time/rtime.c $LC/rthreads/rthreads.c $LC/features/features_cpu.c"
+      $LC/string/stdstring.c $LC/string/rstrtod.c $LC/encodings/encoding_utf.c
+      $LC/time/rtime.c $LC/rthreads/rthreads.c $LC/features/features_cpu.c
+      $LC/rthreads/retro_eventcount.c $LC/queues/retro_spsc.c
+      $LC/queues/retro_waitable_spsc.c"
 
 MPEG="$LC/formats/mpeg1/rmpeg1_ps.c $LC/formats/mpeg1/rmpeg1_video.c
       $LC/formats/mp3/rmp3.c"
@@ -66,14 +68,9 @@ vcd_disc)
         $CD/l-ec.c $CD/lec.c $CD/recover-raw.c $CD/edc_crc32.c
         $MPEG $VFS $BASE
         $LC/formats/vorbis/rvorbis.c $LC/formats/flac/rflac.c
-        $LC/formats/libchdr/libchdr_bitstream.c
-        $LC/formats/libchdr/libchdr_cdrom.c $LC/formats/libchdr/libchdr_chd.c
-        $LC/formats/libchdr/libchdr_flac.c
-        $LC/formats/libchdr/libchdr_flac_codec.c
-        $LC/formats/libchdr/libchdr_huffman.c
-        $LC/formats/libchdr/libchdr_lzma.c $LC/formats/7z/r7z_lzma.c
-        $LC/formats/libchdr/libchdr_zlib.c $LC/formats/libchdr/libchdr_zstd.c
-        deps/zstd-1.5.7/zstddeclib.c
+        $LC/formats/chd/rchd.c $LC/encodings/encoding_huffman.c
+        $LC/formats/7z/r7z_lzma.c
+        $LC/encodings/encoding_rzstd.c $LC/streams/trans_stream_rzstd.c
         $LC/streams/chd_stream.c $LC/streams/memory_stream.c
         $LC/streams/interface_stream.c $LC/streams/trans_stream.c
         $LC/streams/trans_stream_pipe.c $LC/streams/rzip_stream.c

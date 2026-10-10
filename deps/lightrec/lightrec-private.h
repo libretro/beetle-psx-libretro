@@ -165,7 +165,31 @@ struct lightrec_cstate {
 
 	struct regcache *reg_cache;
 
+	/* Code arena this compiler state allocates from (threaded only). */
+	unsigned int arena;
+
 	_Bool no_load_delay;
+};
+
+/* A finished compilation, handed from the worker that emitted the code
+ * to the emulation thread that installs it. A NULL block is a request to
+ * flush the code buffer. */
+struct lightrec_compiled_target {
+	u32 offset;
+	void *address;
+};
+
+struct lightrec_compiled {
+	struct lightrec_compiled *next;
+	struct block *block;
+	jit_state_t *oldjit;
+	void *old_fn;
+	void *new_fn;
+	unsigned int old_code_size;
+	unsigned int new_code_size;
+	_Bool fully_tagged;
+	unsigned int nb_targets;
+	struct lightrec_compiled_target targets[];
 };
 
 #define CODE_PAGE_SHIFT	12
@@ -181,6 +205,13 @@ struct lightrec_state {
 	u32 current_cycle;
 	u32 target_cycle;
 	u32 exit_flags;
+	/* target_cycle minus the cycle count at the last point where the
+	 * running code compared its cycle budget against the target: a
+	 * block entry, a local loop back-edge, or an iteration of the C
+	 * dispatcher loop. The frontend asks for it when a device needs
+	 * to know which of its skipped events the old cadence would have
+	 * run before an I/O access in the current block. */
+	u32 check_cycle_delta;
 	u32 old_cycle_counter;
 	u32 cycles_per_op;
 	u32 cycles_per_op_mem;
@@ -396,6 +427,17 @@ static inline bool lightrec_pgxp_cpu_tracked(union code c)
 void lightrec_pgxp_cpu_track(struct lightrec_state *state, union code c);
 
 int lightrec_compile_block(struct lightrec_cstate *cstate, struct block *block);
+/* Worker half: emit the code and describe the result. */
+int lightrec_compile_block_code(struct lightrec_cstate *cstate,
+				struct block *block,
+				struct lightrec_compiled **out);
+/* Emulation-thread half: install the result, or drop it if the block
+ * died meanwhile. Frees everything the result owns. */
+void lightrec_install_block(struct lightrec_state *state, struct block *block,
+			    struct lightrec_compiled *c);
+void lightrec_discard_compiled(struct lightrec_state *state,
+			       struct block *block,
+			       struct lightrec_compiled *c);
 void lightrec_free_opcode_list(struct lightrec_state *state,
 			       struct opcode *list);
 

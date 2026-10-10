@@ -54,6 +54,7 @@
  * The minimum version of the VFS interface required by the \c filestream functions.
  */
 #define FILESTREAM_REQUIRED_VFS_VERSION 2
+#define FILESTREAM_COPY_REQUIRED_VFS_VERSION 5
 
 RETRO_BEGIN_DECLS
 
@@ -62,8 +63,6 @@ RETRO_BEGIN_DECLS
  * @warning This is not interchangeable with \c FILE* or \c retro_vfs_file_handle.
  */
 typedef struct RFILE RFILE;
-
-#define FILESTREAM_REQUIRED_VFS_VERSION 2
 
 /**
  * Initializes the \c filestream functions to use the VFS interface provided by the frontend.
@@ -297,9 +296,9 @@ bool filestream_write_file(const char *path, const void *data, int64_t size);
  * length or checksum of its own, where a truncated file is worse than
  * an absent one.
  *
- * On targets whose rename refuses an existing destination, the target
- * is removed first and the rename retried, so on those the replacement
- * is not atomic.
+ * Under a frontend VFS whose rename refuses an existing destination,
+ * the target is removed first and the rename retried, so there the
+ * replacement is not atomic.
  *
  * @param path Path to the file that will be written to.
  * @param data The buffer to write to \c path.
@@ -309,6 +308,34 @@ bool filestream_write_file(const char *path, const void *data, int64_t size);
  * was and no temporary file remains.
  */
 bool filestream_write_file_atomic(const char *path, const void *data, int64_t size);
+
+/**
+ * Opens the sibling temporary file an atomic write of \c path goes
+ * through (\c path with ".tmp" appended), for a writer that produces
+ * the contents a piece at a time.  Finish with
+ * filestream_commit_atomic(), which closes it either way.
+ *
+ * @param path Path of the file that will be replaced.
+ * @return The temporary file, open for writing, or \c NULL on error.
+ */
+RFILE *filestream_open_atomic(const char *path);
+
+/**
+ * Closes a file from filestream_open_atomic() and, if \c ok and the
+ * close succeeded, renames it over \c path, exactly as
+ * filestream_write_file_atomic() does.
+ *
+ * @param file The file returned by filestream_open_atomic(); always
+ * closed and freed.
+ * @param path The same path it was opened for.
+ * @param ok Whether the caller wrote everything it meant to.
+ * @return 0 if \c path now holds the new contents; -1 if the write or
+ * close failed, in which case the temporary file is deleted and \c path
+ * is left as it was; 1 if the contents are complete in the temporary
+ * file but could not be renamed into place, in which case the temporary
+ * file is left for the caller to copy or delete.
+ */
+int filestream_commit_atomic(RFILE *file, const char *path, bool ok);
 
 /**
  * Writes a single character to the given file.
@@ -394,14 +421,55 @@ int filestream_delete(const char *path);
 int filestream_rename(const char *old_path, const char *new_path);
 
 /**
- * Copies a file to a new location.
+ * Copies a regular file to a new location, replacing an existing one,
+ * and does not return until it is done.
  *
- * @param src_path Path to the file to rename.
+ * Kept for callers that predate VFS API v5. It copies through
+ * \c filestream_open/read/write and does not use the platform's copy
+ * primitive; new code should use \c filestream_copy_begin, which does
+ * and does not block.
+ *
+ * @param src_path Path to the file to copy.
  * @param dst_path The target name and location of the file.
  * @return 0 if the file was copied successfully,
- * or -1 if there was an error.
+ * or -1 if there was an error (no partial \c dst_path is left behind).
+ * @see filestream_copy_begin
  */
 int filestream_copy(const char *src_path, const char *dst_path);
+
+/**
+ * Starts copying a regular file without moving any of it yet.
+ * Wraps \c retro_vfs_copy_begin_t; see it for the full contract. The
+ * caller advances the copy with \c filestream_copy_step; no thread is
+ * involved unless the caller supplies one.
+ *
+ * @param src_path Path to the file to copy. Must be a regular file.
+ * @param dst_path Full path of the destination. Must differ from \c src_path.
+ * @param flags Bitwise combination of \c RETRO_VFS_COPY flags, or 0.
+ * @return A handle for \c filestream_copy_step and \c filestream_copy_close,
+ * or \c NULL if the copy could not start (including when the frontend
+ * does not offer VFS API v5).
+ */
+struct retro_vfs_copy_handle *filestream_copy_begin(const char *src_path, const char *dst_path, unsigned flags);
+
+/**
+ * Advances a copy started with \c filestream_copy_begin by at most
+ * \c max_bytes and reports its state. See \c retro_vfs_copy_step_t for
+ * how to use the budget as a latency/throughput dial.
+ *
+ * @param max_bytes Upper bound on bytes moved by this call; 0 selects a
+ * default sized for a frame loop.
+ * @return One of the \c RETRO_VFS_COPY_STATUS values.
+ */
+int filestream_copy_step(struct retro_vfs_copy_handle *handle, int64_t max_bytes, int64_t *bytes_done, int64_t *bytes_total);
+
+/**
+ * Releases a copy handle, cancelling the copy if it is still running.
+ * See \c retro_vfs_copy_close_t.
+ *
+ * @return 0 if the copy had completed successfully, otherwise -1.
+ */
+int filestream_copy_close(struct retro_vfs_copy_handle *handle);
 
 /**
  * Compares and verifies files.

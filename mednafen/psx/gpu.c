@@ -1438,6 +1438,11 @@ void GPU_Power(void)
    GPU.DrawTimeAvail = 0;
 
    GPU.lastts = 0;
+   GPU.idle_virtual = false;
+   GPU.idle_last = 0;
+   GPU.idle_line_end = 0;
+   GPU.idle_write_seen = false;
+   GPU.idle_streak = 0;
 
    GPU_SoftReset();
 
@@ -1447,6 +1452,10 @@ void GPU_Power(void)
 
 void GPU_ResetTS(void)
 {
+   /* Called right after a ForceEventUpdates() that set lastts to the
+    * rebase point, so lastts is the amount every timestamp loses. */
+   GPU.idle_last -= GPU.lastts;
+   GPU.idle_line_end -= GPU.lastts;
    GPU.lastts = 0;
 }
 
@@ -1590,6 +1599,10 @@ static INLINE void GPU_WriteCB(uint32_t InData, uint32_t addr)
 
 void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 {
+   GPU.idle_write_seen = true;
+   if(GPU.idle_virtual)
+      GPU_WakeFromIdle(true);
+
    V <<= (A & 3) * 8;
 
    if(A & 4)   /* GP1 ("Control") */
@@ -1717,6 +1730,7 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
 
 void GPU_WriteDMA(uint32_t V, uint32_t addr)
 {
+   GPU.idle_write_seen = true;
    GPU_WriteCB(V, addr);
 }
 
@@ -1986,7 +2000,93 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
    }
 }
 
+enum
+{
+   GPU_UPD_EVENT,    /* the GPU's own event (or ForceEventUpdates) */
+   GPU_UPD_PASSIVE,  /* another device's event: idle schedule untouched */
+   GPU_UPD_CATCHUP   /* a wake bringing the state to a grid point */
+};
+
+static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode);
+
 int32_t GPU_Update(const int32_t sys_timestamp)
+{
+   return GPU_UpdateInt(sys_timestamp, GPU_UPD_EVENT);
+}
+
+void GPU_UpdatePassive(const int32_t sys_timestamp)
+{
+   /* Another device's update may already have carried the state past
+    * this point; the state is exact over any span, so nothing is lost. */
+   if(sys_timestamp > GPU.lastts)
+      GPU_UpdateInt(sys_timestamp, GPU_UPD_PASSIVE);
+}
+
+/* The next regular grid point after a virtual one, as GPU_Update()
+ * would have scheduled it from there: EventCycles later, or the end of
+ * the line if that comes first. */
+static INLINE int32_t GPU_NextGridPoint(const int32_t at)
+{
+   int32_t nt = at + EventCycles;
+
+   if(nt >= GPU.idle_line_end)
+      nt = GPU.idle_line_end;
+
+   return nt;
+}
+
+/* Bring the state to the last grid point the cadence ran. It is exact
+ * over any span, so one update lands where the skipped updates would
+ * have - unless another device's update already carried it past. */
+static INLINE void GPU_CatchUp(void)
+{
+   if(GPU.idle_last > GPU.lastts)
+      GPU_UpdateInt(GPU.idle_last, GPU_UPD_CATCHUP);
+}
+
+int32_t GPU_VirtualAdvance(const int32_t event_time)
+{
+   int32_t nt;
+
+   GPU.idle_last = event_time;
+   nt = GPU_NextGridPoint(event_time);
+
+   if(nt == GPU.idle_line_end)
+   {
+      /* The line ends there: that update is real, and a write before
+       * it must see the state as of this grid point. DMA only idles
+       * while the GPU does, so it comes back with it. */
+      DMA_WakeVirtual();
+      GPU_CatchUp();
+      GPU.idle_virtual = false;
+      PSX_EventVirtual(PSX_EVENT_GPU, false);
+   }
+
+   return nt;
+}
+
+bool GPU_EventVirtual(void)
+{
+   return GPU.idle_virtual;
+}
+
+void GPU_WakeVirtual(void)
+{
+   if(!GPU.idle_virtual)
+      return;
+
+   GPU_CatchUp();
+
+   GPU.idle_virtual = false;
+   PSX_EventVirtual(PSX_EVENT_GPU, false);
+}
+
+void GPU_WakeFromIdle(bool from_cpu)
+{
+   PSX_WakeVirtual(from_cpu);
+}
+
+static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
 {
    int32_t gpu_clocks;
    static const uint32_t DotClockRatios[5] = { 10, 8, 5, 4, 7 };
@@ -2479,6 +2579,51 @@ TheEnd:
    next_dt = (((int64_t)next_dt << 16) - GPU.GPUClockCounter + GPU.GPUClockRatio - 1) / GPU.GPUClockRatio;
 
    if (next_dt < 1)          next_dt = 1;
+
+   /* With nothing queued, nothing in progress, the draw-time budget
+    * already at its cap and no timer counting the dot clock, the
+    * EventCycles updates between here and the end of the line would
+    * change nothing: the clock accounting is exact over any span and
+    * the budget refill is saturated. Sleep until the line ends and
+    * remember the grid point, so a write can resume the grid exactly
+    * where it would have been. A caller catching up to the grid never
+    * idles: the write that follows needs the regular cadence. */
+   if (mode == GPU_UPD_EVENT)
+   {
+      if (GPU.idle_write_seen)
+      {
+         GPU.idle_write_seen = false;
+         GPU.idle_streak = 0;
+      }
+      else if (GPU.idle_streak < 2)
+         GPU.idle_streak++;
+   }
+
+   if (mode == GPU_UPD_EVENT && GPU.idle_streak >= 2 && next_dt > EventCycles
+       && GPU_BlitterFIFO.in_count == 0 && GPU.InCmd == INCMD_NONE
+       && GPU.DrawTimeAvail >= (2*EventCycles << psx_gpu_overclock_shift)
+       && !TIMER_DotClockActive())
+   {
+      /* The event keeps its regular EventCycles cadence but goes
+       * virtual until the end of the line: nothing it would do there
+       * changes anything, and the CPU need not stop for it. */
+      GPU.idle_virtual  = true;
+      GPU.idle_last     = sys_timestamp;
+      GPU.idle_line_end = sys_timestamp + next_dt;
+      PSX_EventVirtual(PSX_EVENT_GPU, true);
+      return(sys_timestamp + EventCycles);
+   }
+
+   if (mode == GPU_UPD_EVENT && GPU.idle_virtual)
+   {
+      /* A real update at the end of the line while the event was
+       * virtual: it is real from here (the list entry is re-armed by
+       * the caller), and DMA comes back with it. */
+      DMA_WakeVirtual();
+      GPU.idle_virtual = false;
+      PSX_EventVirtual(PSX_EVENT_GPU, false);
+   }
+
    if (next_dt > EventCycles) next_dt = EventCycles;
 
    return(sys_timestamp + next_dt);
@@ -2609,6 +2754,14 @@ void GPU_FlushDeferredScanout(void)
 
 void GPU_RestoreStateP1(bool load)
 {
+   /* The idle schedule is not part of a state; the ForceEventUpdates()
+    * after a load puts the GPU on a fresh grid, as it always has. */
+   if (load && GPU.idle_virtual)
+   {
+      GPU.idle_virtual = false;
+      PSX_EventVirtual(PSX_EVENT_GPU, false);
+   }
+
    if (!load && !rhi_intf_has_software_renderer())
    {
       /* Pure hardware renderer: the composited framebuffer lives only on the

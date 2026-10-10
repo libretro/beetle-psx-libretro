@@ -22,11 +22,19 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/textured.msaa.frag.inc -mfmt=c -DTEXTURED -DMSAA primitive.frag
 "$GLSLC" -o prebuilt/textured.msaa.unscaled.frag.inc -mfmt=c -DTEXTURED -DMSAA -DUNSCALED primitive.frag
 
+# HDR ceiling-before-subtract variants (same coverage, output 1.0, MIN-blended)
+"$GLSLC" -o prebuilt/flat.ceiling.frag.inc -mfmt=c -DCEILING primitive.frag
+"$GLSLC" -o prebuilt/textured.ceiling.frag.inc -mfmt=c -DTEXTURED -DCEILING primitive.frag
+"$GLSLC" -o prebuilt/textured.ceiling.unscaled.frag.inc -mfmt=c -DTEXTURED -DUNSCALED -DCEILING primitive.frag
+"$GLSLC" -o prebuilt/textured.ceiling.msaa.frag.inc -mfmt=c -DTEXTURED -DMSAA -DCEILING primitive.frag
+"$GLSLC" -o prebuilt/textured.ceiling.msaa.unscaled.frag.inc -mfmt=c -DTEXTURED -DMSAA -DUNSCALED -DCEILING primitive.frag
+
 # Feedback shaders
 "$GLSLC" -o prebuilt/feedback.frag.inc -mfmt=c -DTEXTURED primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.unscaled.frag.inc -mfmt=c -DTEXTURED -DUNSCALED primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.flat.frag.inc -mfmt=c primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.msaa.frag.inc -mfmt=c -DTEXTURED -DMSAA primitive_feedback.frag
+"$GLSLC" -o prebuilt/feedback.msaa.resolved.frag.inc -mfmt=c -DTEXTURED -DMSAA -DSINGLE_SAMPLE_TEXTURE primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.msaa.unscaled.frag.inc -mfmt=c -DTEXTURED -DMSAA -DUNSCALED primitive_feedback.frag
 "$GLSLC" -o prebuilt/feedback.msaa.flat.frag.inc -mfmt=c -DMSAA primitive_feedback.frag
 

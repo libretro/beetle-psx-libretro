@@ -37,7 +37,9 @@
 #include <lightrec.h>
 
 /* 8MB should rarely fill up (4 IPI average for entire 2MB ram), 0 will disable, 1 will fill and clean the buffer quickly, good for finding issues with codebuffer cleanup */
+#ifndef LIGHTREC_CODEBUFFER_SIZE
 #define LIGHTREC_CODEBUFFER_SIZE 8*1024*1024
+#endif
 
 enum DYNAREC {DYNAREC_DISABLED, DYNAREC_EXECUTE, DYNAREC_RUN_INTERPRETER};
 #endif
@@ -170,6 +172,9 @@ extern int32_t cpu_next_event_ts;
 
 #define CPU_GetEventNT() cpu_next_event_ts
 #define CPU_SetEventNT(next_event_ts_arg) (cpu_next_event_ts = (next_event_ts_arg))
+
+/* Timestamp of the running CPU core's last event check. */
+int32_t CPU_LastEventCheckTS(void);
 
 #ifdef __cplusplus
 extern "C" {
