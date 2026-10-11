@@ -8,6 +8,9 @@
  * the sub-texel fraction above u = 128, which mis-selects texels under
  * upscaling. vParam, vBaseUV and vWindow stay within int16 range. */
 layout(location = 1) in highp vec2 vUV;
+layout(location = 10) flat in highp uvec2 vUVOrigin;
+layout(location = 11) flat in highp uvec2 vUVDX;
+layout(location = 12) flat in highp uvec2 vUVDY;
 layout(location = 3) flat in mediump ivec2 vBaseUV;
 layout(location = 4) flat in mediump ivec4 vWindow;
 layout(location = 5) flat in highp ivec4 vTexLimits;
@@ -28,6 +31,18 @@ layout(set = 0, binding = 5) uniform highp usampler2D uPalette;
 vec2 clamp_coord(vec2 coord)
 {
 	return clamp(coord.xy, vec2(vTexLimits.xy), vec2(vTexLimits.zw));
+}
+
+/* Native nearest polygons use the same wrapped byte UVs as DrawTriangle.
+ * Apply texture-window bits in sample_vram_atlas, after byte extraction.
+ * Vertex limits are enhancement clamps, not part of this integer path. */
+vec2 native_texture_coord()
+{
+	if ((uint(vParam.z) & 0x0008u) == 0u)
+		return clamp_coord(vUV);
+	uvec2 coord = uvec2(gl_FragCoord.xy);
+	uvec2 uv = vUVOrigin + coord.x * vUVDX + coord.y * vUVDY;
+	return vec2((uv >> 12u) & 255u);
 }
 
 // Nearest neighbor

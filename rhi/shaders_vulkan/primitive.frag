@@ -48,13 +48,13 @@ layout(constant_id = 6) const int HDR_HOT_SOURCE = 0;
 layout(constant_id = 8) const int PRECISE_COLOR = 0;
 #endif
 
-/* PGXP linear-light depth cueing; rides the precise-colour vertex path.
+/* PGXP byte-domain depth cueing; rides the precise-colour vertex path.
  * Common scope: fog applies to untextured gouraud (the classic depth-cued
  * geometry) as much as to textured surfaces. The rhi forces this to 0 off
- * the fp16 target and when either option is off, so the pow() cost exists
+ * the fp16 target and when either option is off, so the mix is evaluated
  * only where the feature is live. */
 layout(constant_id = 9) const int PGXP_FOG = 0;
-layout(location = 6) in mediump vec4 vFog;
+layout(location = 6) in highp vec4 vFog;
 
 #include "pgxp_fog.h"
 
@@ -67,6 +67,7 @@ void main()
 	 * PlayStation colour words, so native-colour storage leaves them at
 	 * full precision instead of posterising the enhancement. */
 	bool enhanced_texel = false;
+	vec3 shade_color = vColor.rgb;
 #ifdef TEXTURED
 	vec4 NNColor;
 
@@ -81,7 +82,8 @@ void main()
 		NNColor = hdColor;
 		enhanced_texel = true;
 	} else {
-		NNColor = sample_vram_atlas(clamp_coord(vUV));
+		NNColor = sample_vram_atlas(FILTER_TYPE == FILTER_NEAREST ?
+			native_texture_coord() : clamp_coord(vUV));
 	}
 
 	// Even for opaque draw calls, this pixel is transparent.
@@ -140,6 +142,8 @@ void main()
 	/* 0x2000 carries the GP0 raw-texture bit. Do not infer this from a
 	 * neutral vertex colour: 0x808080 is also valid modulated input. */
 	raw_texture = (uint(vParam.z) & 0x2000u) != 0u;
+	if (!enhanced_texel)
+		shade_color = primitive_color();
 	bool framebuffer_feedback =
 		(uint(vParam.z) & PARAM_FRAMEBUFFER_FEEDBACK) != 0u;
 	if (framebuffer_feedback)
@@ -157,18 +161,11 @@ void main()
 			/* Direct-colour feedback must quantize each GP0 modulation step,
 			 * even on an FP16 target, so repeated fades decay at hardware rate.
 			 * Standard-colour feedback retains the same established path. */
-			const int dither_pattern[16] = int[](
-				-4,  0, -3,  1,
-				 2, -2,  3, -1,
-				-3,  1, -4,  0,
-				 3, -1,  2, -2);
 			vec3 fshade = clamp((PGXP_FOG != 0) ?
-				pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, 0.0, 1.0);
-			vec3 shade8 = floor(fshade * 255.0 + vec3(0.001));
+				pgxp_fog_mix(shade_color, vFog) : shade_color, 0.0, 1.0);
+			vec3 shade8 = psx_color8(fshade);
 			vec3 modulated = floor(texel5 * shade8 / 16.0);
-			ivec2 dc = primitive_dither_coord();
-			float md = primitive_dither_enabled()
-				? float(dither_pattern[dc.y * 4 + dc.x]) : 0.0;
+			float md = primitive_dither_offset();
 			vec3 q5 = clamp(floor((modulated + md) / 8.0),
 				vec3(0.0), vec3(31.0));
 			FragColor = vec4(primitive_native_color() ?
@@ -178,7 +175,7 @@ void main()
 		}
 	}
 	vec3 shaded_hot = raw_texture ? color.rgb :
-		color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
+		color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(shade_color, vFog) : shade_color) * (255.0 / 128.0);
 	vec3 shaded = clamp(shaded_hot, 0.0, 1.0);
 	/* The semi-trans-opaque pass and every other blend mode stay clamped;
 	 * over-white there comes only from stacking, matching the option text. */
@@ -198,7 +195,8 @@ void main()
 	FragColor = vec4(1.0);
 	return;
 #endif
-	FragColor = vec4((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb, vColor.a);
+	shade_color = primitive_color();
+	FragColor = vec4((PGXP_FOG != 0) ? pgxp_fog_mix(shade_color, vFog) : shade_color, vColor.a);
 #endif
 
 	if (primitive_native_color() && !enhanced_texel)
