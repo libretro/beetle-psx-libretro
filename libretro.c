@@ -364,9 +364,9 @@ static void apply_game_compatibility_settings(void)
 
 static void apply_setting_dependencies(void)
 {
-   /* Vertex caching is parsed independently of the operation mode, so
-    * key the line expansion on the mode alone: with PGXP off no precise
-    * geometry exists and the native GL line path must stay in use. */
+   /* This compatibility opt-out applies only to PGXP line expansion.
+    * With PGXP off, the renderer selects exact native pixels or expanded
+    * quads for enhanced rendering independently of vertex caching. */
    psx_pgxp_gl_line_expansion = compatibility_settings_enabled &&
          psx_pgxp_mode != PGXP_MODE_NONE;
 }

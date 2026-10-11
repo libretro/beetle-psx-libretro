@@ -5530,7 +5530,9 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
    {
       /* With params & 0x0008, X is packed signed XY and Y/W are UV words.
        * The shader decodes them; CPU geometry reads must precede packing.
-       * Z remains depth, and fog[3] supplies the final UV word. */
+       * Z remains depth, and fog[3] supplies the final UV word.
+       * Native lines (0x0010) instead use W/fog[3] for delta/anchor; their
+       * GP0 endpoints have W == 1 and no depth cue. */
       float x, y, z, w;
       /* rgb in 1.0 == 0xFF scale (may exceed 1.0 under precise colour);
        * [3] is the force-mask bit as 0.0/1.0, replacing the old packed
@@ -6136,7 +6138,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsigned native_h,
                                             unsigned out_w, unsigned out_h);
    static void renderer_draw_quad(Renderer *self, const Vertex *vertices, bool polygon,
-      const Vertex *line_vertices);
+      const Vertex *line_vertices, const uint32_t *line_coverage);
    static void renderer_init_pipelines(Renderer *self);
    static TTRect renderer_compute_vram_framebuffer_rect(Renderer *self);
    static void renderer_hd_texture_uniforms(Renderer *self,
@@ -9545,14 +9547,58 @@ static void renderer_build_line_quad(Renderer *self,
    }
 }
 
+/* Coverage is independent of native RGB5 storage. Only integral, single-
+ * sample 1x geometry can use the PS1 grid; enhancements retain the quads. */
+static bool renderer_build_native_line_coverage(Renderer *self,
+      const Vertex *vertices, uint32_t *coverage)
+{
+   int32_t x[2], y[2];
+   unsigned i;
+   if (self->scaling != 1 || self->msaa != 1 || psx_pgxp_mode != 0)
+      return false;
+   for (i = 0; i < 2; i++)
+   {
+      float px = vertices[i].x + self->render_state.draw_offset_x;
+      float py = vertices[i].y + self->render_state.draw_offset_y;
+      if (vertices[i].w != 1.0f ||
+          !(px >= -32768.0f && px <= 32767.0f) ||
+          !(py >= -32768.0f && py <= 32767.0f))
+         return false;
+      x[i] = (int32_t)px;
+      y[i] = (int32_t)py;
+      if ((float)x[i] != px || (float)y[i] != py)
+         return false;
+   }
+   rhi_pack_line_coverage(coverage, x, y);
+   return true;
+}
+
 static void renderer_draw_line(Renderer *self, const Vertex *vertices)
 {
    /* We can move this to GPU, but means more draw calls and more pipeline
     * swapping. This should be plenty fast for the quite small amount of lines
     * games render. */
    Vertex vert[4];
+   uint32_t coverage[2];
+   bool native = renderer_build_native_line_coverage(self, vertices, coverage);
    renderer_build_line_quad(self, vert, vertices);
-   renderer_draw_quad(self, vert, false, vertices);
+   if (native)
+   {
+      float dx = vertices[1].x - vertices[0].x;
+      float dy = vertices[1].y - vertices[0].y;
+      unsigned i, axis = fabsf(dx) > fabsf(dy) ? 1 : 0;
+      /* Cover both possible minor-axis pixels at a rounding boundary;
+       * the fragment shader selects the exact DDA pixel. */
+      if (dx != 0.0f || dy != 0.0f)
+         for (i = 0; i < 4; i++)
+         {
+            if (axis)
+               vert[i].y += (i & 1) ? 1.0f : -1.0f;
+            else
+               vert[i].x += (i & 1) ? 1.0f : -1.0f;
+         }
+   }
+   renderer_draw_quad(self, vert, false, vertices, native ? coverage : NULL);
 }
 
 /* The packed payload is shared by polygon and line colour interpolation.
@@ -9573,9 +9619,8 @@ static void renderer_set_native_color_plane(BufferVertex *output,
 /* Lines advance colour once per dominant-axis pixel, including the endpoint.
  * Derive from the original GP0 endpoints, not the expanded drawing quad: its
  * extra endpoint pixel must not stretch the colour gradient. The existing
- * line coverage remains independent of this colour accumulator. Unlike GL's
- * eligible native line path, Vulkan does not apply an exact DDA pixel mask;
- * both native and enhanced lines retain the existing expanded-quad coverage. */
+ * line coverage remains independent of this colour accumulator: eligible
+ * native lines use an exact DDA pixel mask; enhanced lines retain the quads. */
 static void renderer_build_native_line_colors(Renderer *self,
       BufferVertex *output, const Vertex *vertices)
 {
@@ -9741,7 +9786,7 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
 }
 
 static void renderer_draw_quad(Renderer *self, const Vertex *vertices, bool polygon,
-      const Vertex *line_vertices)
+      const Vertex *line_vertices, const uint32_t *line_coverage)
 {
    HdTextureHandle hd_texture_index;
    BufferVertex vert[6];
@@ -9767,7 +9812,19 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices, bool poly
    vert[4] = vert[2];
    vert[3] = vert[1];
    if (line_vertices)
+   {
       renderer_build_native_line_colors(self, vert, line_vertices);
+      if (line_coverage)
+      {
+         unsigned i;
+         for (i = 0; i < 6; i++)
+         {
+            vert[i].params = (int16_t)((uint16_t)vert[i].params | 0x0010u);
+            memcpy(&vert[i].w, line_coverage + 1, sizeof(uint32_t));
+            memcpy(vert[i].fog + 3, line_coverage, sizeof(uint32_t));
+         }
+      }
+   }
    else if (polygon)
    {
       renderer_build_native_interpolants(self, vert, vertices);
@@ -21320,7 +21377,7 @@ void rhi_vulkan_push_quad(
 
       vertices_set_cf(vertices, 4, precise_rgb);
       vertices_set_fog(vertices, 4, fog);
-      renderer_draw_quad(renderer, vertices, !is_sprite, NULL);
+      renderer_draw_quad(renderer, vertices, !is_sprite, NULL, NULL);
    }
 }
 

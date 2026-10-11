@@ -11,6 +11,7 @@ layout(location = 2) flat in mediump ivec3 vParam;
 layout(location = 7) flat in highp uvec3 vColorOrigin;
 layout(location = 8) flat in highp uvec3 vColorDX;
 layout(location = 9) flat in highp uvec3 vColorDY;
+layout(location = 13) flat in highp uvec2 vLine;
 #if !defined(UNSCALED)
 layout(constant_id = 3) const int SCALE = 1;
 #endif
@@ -40,6 +41,7 @@ highp vec3 truncate_color8(highp vec3 color)
  * separate from the GP0 DTD bit: DTD selects the offset matrix, while every
  * ordinary 16-bpp write is reduced to RGB5 even when DTD is clear. */
 const uint PARAM_FIXED_COLOR = 0x0004u;
+const uint PARAM_NATIVE_LINE = 0x0010u;
 const uint PARAM_NATIVE_COLOR = 0x0400u;
 #ifdef TEXTURED
 const uint PARAM_FRAMEBUFFER_FEEDBACK = 0x0800u;
@@ -63,6 +65,35 @@ highp vec3 framebuffer_feedback_texel5(highp vec3 color)
 bool primitive_native_color()
 {
 	return (uint(vParam.z) & PARAM_NATIVE_COLOR) != 0u;
+}
+
+void primitive_line_coverage()
+{
+	if ((uint(vParam.z) & PARAM_NATIVE_LINE) == 0u)
+		return;
+	ivec2 first = ivec2(int(vLine.x << 16u) >> 16, int(vLine.x) >> 16);
+	ivec2 delta = ivec2(int(vLine.y << 16u) >> 16, int(vLine.y) >> 16);
+	ivec2 coord = ivec2(gl_FragCoord.xy);
+	int steps = max(abs(delta.x), abs(delta.y));
+	bool horizontal = abs(delta.x) > abs(delta.y);
+	int major = horizontal ? coord.x - first.x : coord.y - first.y;
+	int direction = horizontal ? delta.x : delta.y;
+	int k = direction < 0 ? -major : major;
+	if (k < 0 || k > steps)
+		discard;
+	int minor = horizontal ? first.y : first.x;
+	if (steps != 0)
+	{
+		int d = horizontal ? delta.y : delta.x;
+		// Match GL: DrawLine biases X, and descending Y, by -1024 / 2^32.
+		// Legal lines have fewer than 1024 steps, so ceil-step error cannot
+		// cancel the bias. X ties down; Y ties down only when descending.
+		int n = 2 * d * k + steps - ((!horizontal || d < 0) ? 1 : 0);
+		int divisor = 2 * steps;
+		minor += (n - (n < 0 ? divisor - 1 : 0)) / divisor;
+	}
+	if ((horizontal ? coord.y : coord.x) != minor)
+		discard;
 }
 
 highp vec3 primitive_color()

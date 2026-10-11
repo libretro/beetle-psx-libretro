@@ -7378,13 +7378,13 @@ void rhi_gl_push_quad(
    }
 }
 
-/* Expand native-width lines into triangles while PGXP is active. OpenGL's
+/* Expand native-width lines into triangles for enhanced rendering. OpenGL's
  * native line rasterization uses different endpoint and diagonal coverage
  * rules than the polygon path, which exposes gaps against PGXP's subpixel
  * polygons. GP0 line endpoints remain integral. Eligible native draws reuse
  * this builder, widen the quad and trim it to the original PS1 pixel pattern;
- * PGXP keeps the untrimmed coverage. Vulkan retains its existing quads. */
-static void gl_build_pgxp_line_quad(gl_command_vertex output[4],
+ * PGXP and upscaled draws keep the untrimmed coverage. */
+static void gl_build_line_quad(gl_command_vertex output[4],
       const gl_command_vertex input[2])
 {
    float dx = input[1].position[0] - input[0].position[0];
@@ -7550,7 +7550,7 @@ void rhi_gl_push_line(
          if (gl_native_positions(renderer, v, 2, hd, x, y))
          {
             gl_command_vertex quad[4], triangles[6];
-            uint32_t colors[2] = {c0, c1}, planes[6];
+            uint32_t colors[2] = {c0, c1}, planes[6], coverage[2];
             unsigned i, anchor = x[0] > x[1] ? 1 : 0;
             int32_t dx = x[1 - anchor] - x[anchor];
             int32_t dy = y[1 - anchor] - y[anchor];
@@ -7558,7 +7558,8 @@ void rhi_gl_push_line(
             int32_t steps = horizontal ? abs(dx) : abs(dy);
             bool gouraud = c0 != c1 &&
                   rhi_line_color_planes(planes, x, y, colors);
-            gl_build_pgxp_line_quad(quad, v);
+            rhi_pack_line_coverage(coverage, x, y);
+            gl_build_line_quad(quad, v);
             for (i = 0; i < 4; i++)
             {
                /* Widen the strip conservatively; the fragment shader
@@ -7569,10 +7570,7 @@ void rhi_gl_push_line(
                if (gouraud)
                   gl_set_native_color_plane(quad + i, planes, i < 2 ? c0 : c1);
                quad[i].native_flags |= 4;
-               quad[i].native_uv[0] = (uint16_t)x[anchor] |
-                     ((uint32_t)(uint16_t)y[anchor] << 16);
-               quad[i].native_uv[1] = (uint16_t)dx |
-                     ((uint32_t)(uint16_t)dy << 16);
+               memcpy(quad[i].native_uv, coverage, sizeof(coverage));
             }
             gl_vram_sync_primitive(renderer, quad, 4, 0, 0);
             triangles[0] = quad[0];
@@ -7587,12 +7585,14 @@ void rhi_gl_push_line(
          }
       }
 
-      if (psx_pgxp_gl_line_expansion)
+      /* Native draws returned above. Use quads for upscaling and other
+       * enhancements too, while preserving the PGXP compatibility opt-out. */
+      if (psx_pgxp_mode == 0 || psx_pgxp_gl_line_expansion)
       {
          gl_command_vertex quad[4];
          gl_command_vertex triangles[6];
 
-         gl_build_pgxp_line_quad(quad, v);
+         gl_build_line_quad(quad, v);
          gl_vram_sync_primitive(renderer, quad, 4, 0, 0);
          triangles[0] = quad[0];
          triangles[1] = quad[1];
