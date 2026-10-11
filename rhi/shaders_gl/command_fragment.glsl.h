@@ -37,8 +37,10 @@ uniform uint dither_scaling;
 // The current render target stores native RGB5 channels. Quantize explicitly
 // so OpenGL's normalized conversion cannot round a feedback value to itself.
 uniform uint native_rgb5;
-// Reproduce the GPU's fixed-point texture modulation before attachment
-// conversion can round away a low-intensity framebuffer decrement.
+// 1: compensate native averaging; 2: truncate quarter source.
+uniform uint native_blend;
+// Reproduce the GPU's fixed-point texture modulation when precise PGXP
+// colour is disabled.
 uniform uint fixed_point_modulation;
 // HDR fp16 target only. 0: saturate the modulated texture source to 1.0
 // before blending (hardware behaviour; the UNORM targets do this at the
@@ -83,6 +85,17 @@ uniform uint force_mask_bit;
 
 in vec3 frag_shading_color;
 in vec4 frag_fog;
+)
+#if !defined(FILTER_SABR) && !defined(FILTER_XBR)
+STRINGIZE(
+flat in uint frag_native_flags;
+flat in uvec3 frag_color_origin;
+flat in uvec3 frag_color_dx;
+flat in uvec3 frag_color_dy;
+flat in uvec4 frag_native_uv;
+)
+#endif
+STRINGIZE(
 
 // The depth-cue mix runs per vertex on the CPU in the console's own gamma
 // domain (see gpu_polygon.c); the vertex arrives with the FINISHED colour
@@ -96,6 +109,20 @@ in vec4 frag_fog;
 // use, and placing it above them is a compile error that core-profile
 // drivers reject, taking the whole renderer down with it.
 vec3 pgxp_shading() {
+)
+#if !defined(FILTER_SABR) && !defined(FILTER_XBR)
+STRINGIZE(
+   if ((frag_native_flags & 1u) != 0u) {
+      // Primitive passes use a zero-origin, full-VRAM viewport. Scissors
+      // clip drawing without changing these integer VRAM coordinates.
+      uvec2 coord = uvec2(gl_FragCoord.xy);
+      uvec3 accum = frag_color_origin + coord.x * frag_color_dx +
+            coord.y * frag_color_dy;
+      return vec3((accum >> 12u) & 255u) / 255.0;
+   }
+)
+#endif
+STRINGIZE(
    if (pgxp_fog == 0u || frag_fog.a <= 0.)
       return frag_shading_color;
    return mix(max(vec3(frag_shading_color), vec3(0.)),
@@ -105,7 +132,8 @@ vec3 pgxp_shading() {
 // Texture page: base offset for texture lookup.
 flat in uvec2 frag_texture_page;
 // Texel coordinates within the page. Interpolated by OpenGL.
-in vec2 frag_texture_coord;
+in vec2 smooth_texture_coord;
+vec2 frag_texture_coord;
 // Clut coordinates in VRAM
 flat in uvec2 frag_clut;
 // 0: no texture, 1: raw-texture, 2: blended
@@ -354,9 +382,19 @@ vec4 sample_texel(vec2 coords) {
    uint tex_x = clamp(uint(coords.x), 0x0U, 0xffU);
    uint tex_y = clamp(uint(coords.y), 0x0U, 0xffU);
 
-   // Clamp to primitive limits
-   tex_x = clamp(tex_x, frag_texture_limits[0], frag_texture_limits[2]);
-   tex_y = clamp(tex_y, frag_texture_limits[1], frag_texture_limits[3]);
+)
+#if !defined(FILTER_SABR) && !defined(FILTER_XBR)
+STRINGIZE(
+   // Wrapped native byte UVs already reproduce DrawTriangle. Vertex
+   // limits only constrain the floating interpolation used by enhancements.
+   if ((frag_native_flags & 2u) == 0u)
+)
+#endif
+STRINGIZE(
+   {
+      tex_x = clamp(tex_x, frag_texture_limits[0], frag_texture_limits[2]);
+      tex_y = clamp(tex_y, frag_texture_limits[1], frag_texture_limits[3]);
+   }
 
    // Texture window adjustments
    tex_x = (tex_x & frag_texture_window[0]) | frag_texture_window[1];
@@ -1059,6 +1097,49 @@ vec4 get_texel_jinc2(out float opacity)
 #endif
 STRINGIZE(
 void main() {
+   frag_texture_coord = smooth_texture_coord;
+)
+#if !defined(FILTER_SABR) && !defined(FILTER_XBR)
+STRINGIZE(
+   if ((frag_native_flags & 4u) != 0u) {
+      ivec2 first = ivec2(int(frag_native_uv.x << 16u) >> 16,
+            int(frag_native_uv.x) >> 16);
+      ivec2 delta = ivec2(int(frag_native_uv.y << 16u) >> 16,
+            int(frag_native_uv.y) >> 16);
+      ivec2 coord = ivec2(gl_FragCoord.xy);
+      int steps = max(abs(delta.x), abs(delta.y));
+      bool horizontal = abs(delta.x) > abs(delta.y);
+      int major = horizontal ? coord.x - first.x : coord.y - first.y;
+      int direction = horizontal ? delta.x : delta.y;
+      int k = direction < 0 ? -major : major;
+      if (k < 0 || k > steps)
+         discard;
+      int minor = horizontal ? first.y : first.x;
+      if (steps != 0) {
+         int d = horizontal ? delta.y : delta.x;
+         // DrawLine biases X, and descending Y, by -1024 / 2^32.
+         // Legal lines have fewer than 1024 steps, so ceil-step error
+         // cannot cancel that bias: X ties down, Y ties down if descending.
+         int n = 2 * d * k + steps - ((!horizontal || d < 0) ? 1 : 0);
+         int divisor = 2 * steps;
+         minor += (n - (n < 0 ? divisor - 1 : 0)) / divisor;
+      }
+      if ((horizontal ? coord.y : coord.x) != minor)
+         discard;
+   }
+   if ((frag_native_flags & 2u) != 0u) {
+      uvec2 low = frag_native_uv.xz;
+      uvec2 high = frag_native_uv.yw;
+      uvec2 origin = low & 0xfffffu;
+      uvec2 dx = (low >> 20u) | ((high & 0xffu) << 12u);
+      uvec2 dy = high >> 8u;
+      uvec2 coord = uvec2(gl_FragCoord.xy);
+      frag_texture_coord = vec2(((origin + coord.x * dx +
+            coord.y * dy) >> 12u) & 255u);
+   }
+)
+#endif
+STRINGIZE(
    if (force_zero != 0u) {
       frag_color = vec4(0.);
       return;
@@ -1077,6 +1158,7 @@ void main() {
       else
       {
          vec4 texel;
+         bool native_modulation = false;
          bool hd_on = hd_enabled != 0U;
          vec4 texel0 = sample_texel(vec2(frag_texture_coord.x,
                   frag_texture_coord.y));
@@ -1118,6 +1200,7 @@ STRINGIZE(
 #else
 STRINGIZE(
          texel = texel0; //use nearest if nothing else is chosen
+         native_modulation = native_rgb5 != 0u && !hd_on;
 )
 #endif
 STRINGIZE(
@@ -1162,8 +1245,11 @@ STRINGIZE(
          if (frag_texture_blend_mode == BLEND_MODE_RAW_TEXTURE) {
             color = vec4(texel.rgb, mask_bit);
          } else /* BLEND_MODE_TEXTURE_BLEND */ {
+            /* Native nearest texels use the same integer colour levels as
+             * framebuffer feedback. Keep filtered and HD samples on their
+             * existing path so their additional precision is preserved. */
             if (fixed_point_modulation != 0u &&
-                frag_framebuffer_feedback != 0u)
+                (frag_framebuffer_feedback != 0u || native_modulation))
             {
                uint mod_x =
                   (uint(gl_FragCoord.x) / dither_scaling) & 3u;
@@ -1232,11 +1318,46 @@ STRINGIZE(
        * conversion and can turn a channel into n - 1. Let the RGB5
        * attachment round it back to the same hardware value instead. */
       if (native_rgb5 != 0u &&
+          frag_texture_blend_mode == BLEND_MODE_NO_TEXTURE)
+      {
+         /* Untextured shading is an 8-bit color. Dither before reducing
+          * groups of eight to the hardware's 5-bit channel values. */
+         vec3 color8 = color.rgb * 255. + vec3(float(dither_offset));
+         output_rgb = clamp(floor((color8 + vec3(0.001)) / 8.),
+                            vec3(0.), vec3(31.)) / 31.;
+      }
+      else if (native_rgb5 != 0u &&
           frag_texture_blend_mode != BLEND_MODE_RAW_TEXTURE)
          output_rgb = floor(clamp(output_rgb, vec3(0.), vec3(1.)) * 31.) /
                       31.;
 
       frag_color = vec4(output_rgb, color.a);
+   }
+   if (native_blend != 0u) {
+      uvec3 source = uvec3(floor(clamp(frag_color.rgb, vec3(0.0),
+            vec3(1.0)) * 31.0 + vec3(0.5)));
+      if (native_blend == 1u) {
+)
+#ifdef HAVE_OPENGLES3
+STRINGIZE(
+         // Scale before blending to avoid rounding the source twice.
+         // 5/992 is a normalized 5/32 RGB5-code bias. Together with the
+         // host's 251/512 destination weight, the unclamped RGB5 result is
+         // (S+D)/2 - 5/32 - 5*D/512. Its downward bias stays below half a
+         // code: odd sums round down, even sums retain their integer value.
+         // S=0 clamps to zero; the destination bias still truncates odd D.
+         frag_color.rgb = vec3(source) / 62.0 - vec3(5.0 / 992.0);
+)
+#else
+STRINGIZE(
+         frag_color.rgb = vec3(source) / 31.0;
+)
+#endif
+STRINGIZE(
+         return;
+      }
+      source >>= 2u;
+      frag_color.rgb = vec3(source) / 31.0;
    }
 }
 );
