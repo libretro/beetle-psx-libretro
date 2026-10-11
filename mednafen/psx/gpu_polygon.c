@@ -1440,6 +1440,10 @@ extern int psx_pgxp_2d_tol;
  * reduces to direct calls under -O2 since all parameters are
  * compile-time literals in the macro context.
  */
+/* Flat untextured and raw-texture polygons bypass the dither unit. */
+#define POLYGON_DITHER_ENABLED(gpu, textured, modulated, gouraud) \
+   (DitherEnabled(gpu) && ((textured) ? (modulated) : (gouraud)))
+
 #define DEFINE_Command_DrawPolygon(SUFFIX, NV_LIT, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, PGXP_LIT) \
 static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
 { \
@@ -1770,7 +1774,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                   clut_x, clut_y, \
                   blend_mode, \
                   2 - (MO_LIT), \
-                  DitherEnabled(gpu), \
+                  POLYGON_DITHER_ENABLED(gpu, TEXTURED_LIT, TM_LIT, GOURAUD_LIT), \
                   (BM_VAL), \
                   (ME_LIT), \
                   gpu->MaskSetOR != 0, \
@@ -1812,7 +1816,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                clut_x, clut_y, \
                blend_mode, \
                2 - (MO_LIT), \
-               DitherEnabled(gpu), \
+               POLYGON_DITHER_ENABLED(gpu, TEXTURED_LIT, TM_LIT, GOURAUD_LIT), \
                (BM_VAL), \
                (ME_LIT), \
                gpu->MaskSetOR != 0); \
@@ -1908,6 +1912,7 @@ CMD_DRAWPOLY_BMGROUP_ALL(4, 0, 1)
 CMD_DRAWPOLY_BMGROUP_ALL(4, 1, 0)
 CMD_DRAWPOLY_BMGROUP_ALL(4, 1, 1)
 
+#undef POLYGON_DITHER_ENABLED
 #undef COORD_POST_PADDING
 #undef COORD_FBS
 #undef COORD_MF_INT
