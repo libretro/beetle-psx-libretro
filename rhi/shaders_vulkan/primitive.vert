@@ -29,6 +29,7 @@ layout(location = 6) out highp vec4 vFog;
 layout(location = 7) flat out highp uvec3 vColorOrigin;
 layout(location = 8) flat out highp uvec3 vColorDX;
 layout(location = 9) flat out highp uvec3 vColorDY;
+layout(location = 13) flat out highp uvec2 vLine;
 
 const vec2 FB_SIZE = vec2(1024.0, 512.0);
 //const vec4 texture_limits = vec4(0.0, 0.0, 1024.0, 1024.0);
@@ -38,6 +39,9 @@ layout(constant_id = 5) const int OFFSET_UV = 0;
 void main()
 {
    vec4 position = uintBitsToFloat(Position);
+   vLine = uvec2(Fog.w, Position.w);
+   if ((uint(Param.z) & 0x0010u) != 0u)
+      position.w = 1.0;
 #ifdef TEXTURED
    if ((uint(Param.z) & 0x0008u) != 0u)
    {
@@ -72,6 +76,8 @@ void main()
       vColorOrigin = vColorDX = vColorDY = uvec3(0u);
    }
    vParam = Param;
+   if ((uint(Param.z) & 0x0010u) != 0u)
+      vFog.a = 0.0;
 #ifdef TEXTURED
    // iCB: Offset UVs by half a pixel to account for rounding errors in projection
 #ifdef UNSCALED

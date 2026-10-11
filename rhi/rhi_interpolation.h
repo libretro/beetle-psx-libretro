@@ -34,6 +34,19 @@ static INLINE void rhi_triangle_interpolant(uint32_t *packed,
    rhi_pack_interpolant(packed, origin, dx, dy);
 }
 
+/* DrawLine swaps descending-X endpoints before walking both endpoints.
+ * Pack the same anchor and signed delta for GL/Vulkan pixel selection.
+ * GP0 rejects spans of 1024 X or 512 Y pixels before reaching the RHI. */
+static INLINE void rhi_pack_line_coverage(uint32_t *packed,
+      const int32_t *x, const int32_t *y)
+{
+   unsigned anchor = x[0] > x[1] ? 1 : 0;
+   packed[0] = (uint16_t)x[anchor] |
+         ((uint32_t)(uint16_t)y[anchor] << 16);
+   packed[1] = (uint16_t)(x[1 - anchor] - x[anchor]) |
+         ((uint32_t)(uint16_t)(y[1 - anchor] - y[anchor]) << 16);
+}
+
 /* DrawLine advances once per dominant-axis pixel, including the endpoint.
  * It swaps endpoints on descending X, including equal-major ties. */
 static INLINE bool rhi_line_color_planes(uint32_t *planes,

@@ -60,6 +60,7 @@ layout(location = 6) in highp vec4 vFog;
 
 void main()
 {
+	primitive_line_coverage();
 	float opacity = 1.0;
 	bool raw_texture = false;
 	/* True when the texel came from a replacement (HD) texture or a
