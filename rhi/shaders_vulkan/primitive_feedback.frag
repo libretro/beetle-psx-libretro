@@ -38,18 +38,19 @@ layout(constant_id = 7) const int MASK_TEST = 1;
  * the fog sidecar hits, so every program that shades with vColor must run
  * the same mix or it un-fogs the primitive. */
 layout(constant_id = 9) const int PGXP_FOG = 0;
-layout(location = 6) in mediump vec4 vFog;
+layout(location = 6) in highp vec4 vFog;
 #include "pgxp_fog.h"
 
 
 void main()
 {
 	bool raw_texture = false;
+	vec3 shade_color = primitive_color();
 	vec3 shaded;
 	vec3 add_src;
 	float blend_amt;
 #ifdef TEXTURED
-	vec4 NNColor = sample_vram_atlas(clamp_coord(vUV));
+	vec4 NNColor = sample_vram_atlas(native_texture_coord());
 	if (all(equal(NNColor, vec4(0.0))))
 		discard;
 
@@ -62,12 +63,12 @@ void main()
 		PRECISE_COLOR != 0)
 		color.rgb = framebuffer_feedback_texel5(color.rgb) / 31.0;
 	vec3 shaded_hot = raw_texture ? color.rgb :
-		color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb) * (255.0 / 128.0);
+		color.rgb * ((PGXP_FOG != 0) ? pgxp_fog_mix(shade_color, vFog) : shade_color) * (255.0 / 128.0);
 	shaded     = clamp(shaded_hot, 0.0, 1.0);
 	add_src    = (HDR_HOT_SOURCE != 0) ? max(shaded_hot, vec3(0.0)) : shaded;
 	blend_amt = NNColor.a;
 #else
-	shaded = (PGXP_FOG != 0) ? pgxp_fog_mix(vColor.rgb, vFog) : vColor.rgb;
+	shaded = (PGXP_FOG != 0) ? pgxp_fog_mix(shade_color, vFog) : shade_color;
 	add_src = shaded;
 	blend_amt = 1.0;
 #endif

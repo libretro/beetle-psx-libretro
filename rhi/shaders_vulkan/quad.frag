@@ -120,7 +120,11 @@ mediump vec3 sample_bpp24_yuv(ivec2 coord)
 
 void main()
 {
+#if defined(DITHER)
+	highp vec3 rgb;
+#else
 	mediump vec3 rgb;
+#endif
 #if defined(SCALED)
 	rgb = textureLod(uTexture, vUV, 0.0).rgb;
 	#if defined(DITHER)

@@ -33,7 +33,11 @@ void main()
 {
 	vec2 lod_uv = clamp(vUV, registers.uv_min, registers.uv_max);
 	float b = textureLod(uLOD, lod_uv, 0.0).x;
+#if defined(DITHER)
+	highp vec3 rgb = textureLod(uTexture, lod_uv, registers.max_bias * b).rgb;
+#else
 	mediump vec3 rgb = textureLod(uTexture, lod_uv, registers.max_bias * b).rgb;
+#endif
 #if defined(HDR)
 	/* The trilinear resolve interpolates the 8-bit source, producing
 	 * sub-8-bit precision that 10-bit output preserves - so no debanding is
