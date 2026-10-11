@@ -15,7 +15,9 @@ layout(location = 3) flat in mediump ivec2 vBaseUV;
 layout(location = 4) flat in mediump ivec4 vWindow;
 layout(location = 5) flat in highp ivec4 vTexLimits;
 #if defined(UNSCALED)
-layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
+/* Packed VRAM includes RGB5 and extra colour precision in a 32-bit word.
+ * Fetch the complete word before decoding either part. */
+layout(set = 0, binding = 0) uniform highp usampler2D uFramebuffer;
 #else
 /* MSAA feedback can read a resolved snapshot while writing per sample. */
 #if defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
