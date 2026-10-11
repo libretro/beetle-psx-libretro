@@ -7849,12 +7849,7 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
     * target captured is unavoidably lost here; any FBRead consumer
     * is operating in 16bpp anyway.
     *
-    * The 1555 layout is platform-specific, matching the rest of the
-    * codebase:
-    *   Desktop (GL_UNSIGNED_SHORT_1_5_5_5_REV): (a<<15)|(b<<10)|(g<<5)|r
-    *   GLES3   (GL_UNSIGNED_SHORT_5_5_5_1):     (r<<11)|(g<<6)|(b<<1)|a
-    * which are the same packings the command_fragment shader
-    * `rebuild_psx_color` produces. */
+    * CPU VRAM always uses PlayStation ABGR1555, including on GLES. */
    /* fp16 mode: quantise the float readback to 1555 in C, exactly what
     * the driver conversion was asked to do before: clamp to [0,1],
     * round each channel to 5 bits, alpha thresholds at half. Identical
@@ -7871,13 +7866,8 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
          uint32_t g5 = gf <= 0.0f ? 0u : gf >= 1.0f ? 31u : (uint32_t)(gf * 31.0f + 0.5f);
          uint32_t b5 = bf <= 0.0f ? 0u : bf >= 1.0f ? 31u : (uint32_t)(bf * 31.0f + 0.5f);
          uint32_t a1 = (af >= 0.5f) ? 1u : 0u;
-#ifdef HAVE_OPENGLES3
-         scratch_pixels[k] = (uint16_t)(
-               (r5 << 11) | (g5 << 6) | (b5 << 1) | a1);
-#else
          scratch_pixels[k] = (uint16_t)(
                (a1 << 15) | (b5 << 10) | (g5 << 5) | r5);
-#endif
       }
    }
 
@@ -7909,15 +7899,29 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
          uint32_t g5 = (g8 * 31u + 127u) / 255u;
          uint32_t b5 = (b8 * 31u + 127u) / 255u;
          uint32_t a1 = (a8 >= 128u) ? 1u : 0u;
-#ifdef HAVE_OPENGLES3
-         scratch_pixels[k] = (uint16_t)(
-               (r5 << 11) | (g5 << 6) | (b5 << 1) | a1);
-#else
          scratch_pixels[k] = (uint16_t)(
                (a1 << 15) | (b5 << 10) | (g5 << 5) | r5);
-#endif
       }
    }
+
+#ifdef HAVE_OPENGLES3
+   /* ES has no packed ABGR1555 read type. The native RGB5_A1 route
+    * returns RGBA5551; convert before updating the CPU mirror, just as
+    * gl_texture_set_sub_image_window converts in the other direction.
+    * Float and RGBA8 routes already produced PlayStation words above. */
+   if (ok && !is_fp16 && !is_32bpp)
+   {
+      size_t n = (size_t)w * (size_t)h;
+      size_t k;
+      for (k = 0; k < n; k++)
+      {
+         uint16_t color = scratch_pixels[k];
+         scratch_pixels[k] = (uint16_t)(
+               ((color & 1u) << 15) | ((color & 0x3Eu) << 9) |
+               ((color >> 1) & 0x3E0u) | (color >> 11));
+      }
+   }
+#endif
 
    if (ok)
    {
