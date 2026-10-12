@@ -7112,6 +7112,7 @@ size_t retro_serialize_size(void)
       st.len            = 0;
       st.malloced       = 0;
       st.initial_malloc = 0;
+      st.fixed          = false;
 
       if (!MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL))
          return 0;
@@ -7131,31 +7132,13 @@ bool UsingFastSavestates(void)
    return false;
 }
 
-/* Serialize emulator state into the frontend's `data` buffer of `size`
- * bytes.
- *
- * The previous implementation was unsafe in two ways:
- *
- *   1. When size == DEFAULT_STATE_SIZE (the default 16MB hint), it set
- *      st.data = (uint8_t*)data - i.e. handed the frontend's buffer to
- *      the state-saving code. smem_write() in mednafen/state.c calls
- *      realloc() on st.data when the running save exceeds st.malloced.
- *      Calling realloc() on memory the core does not own is undefined
- *      behavior. Today it works because PSX states fit comfortably in
- *      16MB, but a single growth would corrupt the frontend's heap.
- *
- *   2. The non-default branch checked "st.len != size" before saving,
- *      but st.len is always 0 at that point - it's set by smem_write
- *      while saving. The warning was meaningless.
- *
- * The new implementation always saves into a core-owned malloc buffer
- * and memcpys into the frontend's buffer afterward, with explicit
- * truncation handling. */
+/* Serialize emulator state straight into the frontend's `data` buffer
+ * of `size` bytes.  The buffer is never grown: a state that does not
+ * fit fails the save. */
 bool retro_serialize(void *data, size_t size)
 {
    StateMem st;
    bool     ret;
-   uint8_t *scratch;
 
    if (!data || size == 0)
       return false;
@@ -7165,39 +7148,21 @@ bool retro_serialize(void *data, size_t size)
    if (!MainRAM || !PSX_CDC || !PSX_CPU || !PSX_FIO)
       return false;
 
-   scratch = (uint8_t*)malloc(size);
-   if (!scratch)
-      return false;
-
-   st.data           = scratch;
+   st.data           = (uint8_t*)data;
    st.loc            = 0;
    st.len            = 0;
-   st.malloced       = size;
+   st.malloced       = size > UINT32_MAX ? UINT32_MAX : (uint32_t)size;
    st.initial_malloc = 0;
+   st.fixed          = true;
 
    FastSaveStates = UsingFastSavestates();
    ret            = MDFNSS_SaveSM(&st, 0, 0, NULL, NULL, NULL);
    FastSaveStates = false;
 
-   if (ret)
-   {
-      /* st.data may have been reallocated by smem_write; st.len is the
-       * actual amount written. Copy what we have, but warn if it
-       * exceeded the frontend's buffer. */
-      size_t copy_len = (st.len <= size) ? (size_t)st.len : size;
-      if (st.len > size)
-      {
-         log_cb(RETRO_LOG_ERROR,
-               "retro_serialize: state grew to %u bytes, frontend buffer is %u; truncating\n",
-               (unsigned)st.len, (unsigned)size);
-         ret = false;
-      }
-      memcpy(data, st.data, copy_len);
-   }
-
-   /* st.data may differ from `scratch` if smem_write realloc'd. */
-   if (st.data)
-      free(st.data);
+   if (!ret)
+      log_cb(RETRO_LOG_ERROR,
+            "retro_serialize: saving into the frontend's %u bytes failed\n",
+            (unsigned)size);
 
    return ret;
 }
@@ -7222,6 +7187,7 @@ bool retro_unserialize(const void *data, size_t size)
    st.len            = size;
    st.malloced       = 0;
    st.initial_malloc = 0;
+   st.fixed          = true;
 
    FastSaveStates = UsingFastSavestates();
    okay           = MDFNSS_LoadSM(&st, 0, 0);

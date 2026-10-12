@@ -63,7 +63,8 @@ static int32_t smem_read(StateMem *st, void *buffer, uint32_t len)
 }
 
 /* Append `len` bytes from `buffer` to the state stream, growing
- * st->data with realloc as needed. Returns the number of bytes
+ * st->data with realloc as needed, or failing when it is fixed.
+ * Returns the number of bytes
  * actually written - on realloc failure or integer overflow, this is
  * 0 and the original buffer is preserved (realloc returns NULL but
  * does not free the old pointer, so we capture the new pointer in a
@@ -80,6 +81,9 @@ static int32_t smem_write(StateMem *st, void *buffer, uint32_t len)
       uint8_t *new_data;
       uint32_t target  = len + st->loc;
       uint32_t newsize = (st->malloced >= 32768) ? st->malloced : (st->initial_malloc ? st->initial_malloc : 32768);
+
+      if (st->fixed)
+         return 0;
 
       while (newsize < target)
       {

@@ -12,6 +12,7 @@ typedef struct
    uint32_t len;
    uint32_t malloced;
    uint32_t initial_malloc; /* A setting! */
+   bool     fixed;          /* data is the caller's, malloced bytes long; never grown */
 } StateMem;
 
 typedef struct
