@@ -42,6 +42,15 @@ typedef struct
     * surface->pixels is written to by the system emulation code. */
    MDFN_Surface *surface;
 
+   /* Optional, set by the driver code: a surface to scan this frame
+    * out into instead, sized for a progressive field of loan_h lines
+    * of loan_dmw dots.  The emulation code switches surface to it at
+    * the start of the frame if the frame fits, and back if it turns
+    * out not to before anything is drawn in it. */
+   MDFN_Surface *loan;
+   int32_t loan_h;
+   int32_t loan_dmw;
+
    /* Set by the system emulation code every frame, to denote the
     * horizontal and vertical offsets of the image, and the size of the
     * image. If the emulated system sets the elements of LineWidths,

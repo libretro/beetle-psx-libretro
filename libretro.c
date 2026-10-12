@@ -387,53 +387,116 @@ static Deinterlacer deint;
 
 static MDFN_Surface *surf = NULL;
 
-/* RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER for the software
- * renderer: a buffer of the frontend's own, the size of the scanout
- * surface, that this frame renders into instead of surf. video_cb then
- * hands back a pointer inside the frontend's memory - the overscan
- * crop below is a pointer offset at the surface's stride, which the
- * frontend accepts - and nothing is copied on the way to the screen.
- *
- * Declined, and the frame renders into surf as before, when the
- * frontend has no such buffer, when it offers a different format or
- * stride, or when the picture is interlaced: WEAVE and FASTMAD
- * combine this field with the previous frame's lines in the surface,
- * and the frontend's buffer holds an older frame than they expect.
- * The scanout cache is invalidated on every lent frame, because its
- * "margins are still zero from last time" shortcut assumes the same
- * buffer as last frame. */
-static MDFN_Surface lent_surf;
+/* Left edge of the picture in a line of *width dots, and *width cut
+ * down to the picture, when overscan is cropped. */
+static unsigned crop_line(unsigned *width)
+{
+   if (!crop_overscan)
+      return 0;
 
-static MDFN_Surface *acquire_lent_surface(void)
+   /* Crop total # of pixels output by PSX in active scanline region down to # of pixels in corresponding horizontal display mode
+    * 280 width -> 256 width.
+    * 350 width -> 320 width.
+    * 400 width -> 366 width.
+    * 560 width -> 512 width.
+    * 700 width -> 640 width. */
+   switch (*width)
+   {
+      case 280:
+         *width = 256 - image_crop;
+         return 12 - image_offset + (image_crop / 2);
+
+      case 350:
+         *width = 320 - image_crop;
+         return 15 - image_offset + (image_crop / 2);
+
+      /* 368px mode. Some games are overcropped at 364 width or undercropped at 368 width, so crop to 366.
+         Adjust in future if there are issues. */
+      case 400:
+         *width = 366 - image_crop;
+         return 17 - image_offset + (image_crop / 2);
+
+      case 560:
+         *width = 512 - image_crop;
+         return 24 - image_offset + (image_crop / 2);
+
+      case 700:
+         *width = 640 - image_crop;
+         return 30 - image_offset + (image_crop / 2);
+
+      default:
+         /* This shouldn't happen. */
+         return 0;
+   }
+}
+
+/* RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER for the software
+ * renderer: a buffer of the frontend's own, exactly the size of the
+ * picture video_cb is given, that the GPU scans this frame out into
+ * instead of surf; video_cb then gets back the same pointer, width,
+ * height and pitch, and nothing is copied on the way to the screen.
+ *
+ * It is sized from the previous frame, as a window onto the columns
+ * of the scanout the overscan crop keeps.  The GPU only moves into it
+ * once the frame has started and is seen to fit; a frame that turns
+ * out not to (a mode change) is either scanned out into surf as
+ * before, or, if it had already started in the loan, shown as a dupe.
+ *
+ * Not taken for interlaced pictures, whose deinterlacing reads the
+ * previous field back out of surf, with a light gun connected, which
+ * samples the picture by whole surface rows, or for Video CD output. */
+static MDFN_Surface lent_surf;
+static size_t       lent_pitch;
+
+/* The previous frame's line width and field height, when it was a
+ * progressive software frame. */
+static bool         lend_known;
+static int32_t      lend_dmw;
+static int32_t      lend_h;
+
+static void acquire_lent_surface(EmulateSpecStruct *spec)
 {
    struct retro_framebuffer fb;
+   const unsigned us = GPU_get_upscale_shift();
+   unsigned width    = (unsigned)lend_dmw;
+   unsigned x0;
 
-   if (!surf || !environ_cb)
-      return NULL;
+   if (!surf || !environ_cb || !lend_known)
+      return;
    if (currently_interlaced || PrevInterlaced)
-      return NULL;
+      return;
+   if (FrontIO_ReadsScanout(PSX_FIO))
+      return;
+   if (VCD_GetMode() != VCD_MODE_OFF && VCD_GetAVSwitch())
+      return;
+
+   /* Columns past the line's own dots are not scanned out. */
+   x0 = crop_line(&width);
+   if (!width || x0 > (unsigned)lend_dmw || width > (unsigned)lend_dmw - x0)
+      return;
 
    memset(&fb, 0, sizeof(fb));
-   fb.width        = (unsigned)surf->w;
-   fb.height       = (unsigned)surf->h;
-   /* Read as well as write: the deinterlacer and the line hooks read
-    * what was scanned out, and the scanout cache's margin check reads
-    * nothing, but a cached mapping is what those need. */
-   fb.access_flags = RETRO_MEMORY_ACCESS_WRITE | RETRO_MEMORY_ACCESS_READ;
+   fb.width        = width << us;
+   fb.height       = (unsigned)lend_h << us;
+   fb.access_flags = RETRO_MEMORY_ACCESS_WRITE;
 
    if (   !environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
        || !fb.data
        || fb.format != RETRO_PIXEL_FORMAT_XRGB8888
-       || fb.pitch  != (size_t)surf->pitchinpix * sizeof(uint32_t)
-       || !(fb.memory_flags & RETRO_MEMORY_TYPE_CACHED))
-      return NULL;
+       || fb.pitch  <  (size_t)fb.width * sizeof(uint32_t)
+       || fb.pitch  %  sizeof(uint32_t))
+      return;
 
    lent_surf.pixels     = (uint32_t*)fb.data;
-   lent_surf.w          = surf->w;
-   lent_surf.h          = surf->h;
-   lent_surf.pitchinpix = surf->pitchinpix;
-   GPU_InvalidateScanoutCache();
-   return &lent_surf;
+   lent_surf.w          = (int32_t)(width << us);
+   lent_surf.h          = lend_h << us;
+   lent_surf.pitchinpix = (int32_t)(fb.pitch / sizeof(uint32_t));
+   lent_surf.x0         = (int32_t)(x0 << us);
+   lent_pitch           = fb.pitch;
+
+   spec->loan     = &lent_surf;
+   spec->loan_h   = lend_h;
+   spec->loan_dmw = lend_dmw;
 }
 
 enum
@@ -6322,7 +6385,7 @@ void retro_run(void)
 {
    bool updated = false;
    static int32_t rects[MEDNAFEN_CORE_GEOMETRY_MAX_H];
-   MDFN_Surface *frame_surf = surf;
+   MDFN_Surface *frame_surf;
    EmulateSpecStruct spec = {0};
    EmulateSpecStruct *espec;
    int32_t timestamp = 0;
@@ -6332,6 +6395,7 @@ void retro_run(void)
    uint8_t         upscale_shift;
    const uint32_t *pix;
    unsigned        pix_offset;
+   unsigned        pitch;
 
    /* Defensive: a frontend should not call retro_run before
     * retro_load_game succeeds, but if it does we'd crash on the
@@ -6572,12 +6636,9 @@ void retro_run(void)
 
    rects[0] = ~0;
 
-   /* The frontend's buffer when it lends one, else the core's own. */
-   frame_surf        = (rhi_intf_is_type() == RHI_SOFTWARE)
-      ? acquire_lent_surface() : NULL;
-   if (!frame_surf)
-      frame_surf     = surf;
-   spec.surface      = frame_surf;
+   spec.surface      = surf;
+   if (rhi_intf_is_type() == RHI_SOFTWARE)
+      acquire_lent_surface(&spec);
    spec.LineWidths   = rects;
    spec.SoundBufSize = 0;
 
@@ -6693,9 +6754,18 @@ void retro_run(void)
    width         = rects[0];
    height        = spec.DisplayRect.h;
    upscale_shift = GPU_get_upscale_shift();
+   pitch         = MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift);
+   frame_surf    = spec.surface;
 
    if (rhi_intf_is_type() == RHI_SOFTWARE)
    {
+      lend_known = !spec.InterlaceOn
+         && rects[0] > 0
+         && rects[0] <= MEDNAFEN_CORE_GEOMETRY_MAX_W
+         && spec.DisplayRect.h > 0;
+      lend_dmw   = rects[0];
+      lend_h     = spec.DisplayRect.h;
+
 #ifdef NEED_DEINTERLACER
       if (spec.InterlaceOn)
       {
@@ -6740,50 +6810,11 @@ void retro_run(void)
 #endif
 
       // PSX core inserts padding on left and right (overscan). Optionally crop this.
-      pix = frame_surf->pixels;
       pix_offset = 0;
 
       if (crop_overscan)
       {
-         // Crop total # of pixels output by PSX in active scanline region down to # of pixels in corresponding horizontal display mode
-         // 280 width -> 256 width.
-         // 350 width -> 320 width.
-         // 400 width -> 366 width.
-         // 560 width -> 512 width.
-         // 700 width -> 640 width.
-         switch (width)
-         {
-            case 280:
-               pix_offset += 12 - image_offset + (image_crop / 2);
-               width = 256 - image_crop;
-               break;
-
-            case 350:
-               pix_offset += 15 - image_offset + (image_crop / 2);
-               width = 320 - image_crop;
-               break;
-
-            /* 368px mode. Some games are overcropped at 364 width or undercropped at 368 width, so crop to 366.
-               Adjust in future if there are issues. */
-            case 400:
-               pix_offset += 17 - image_offset + (image_crop / 2);
-               width = 366 - image_crop;
-               break;
-
-            case 560:
-               pix_offset += 24 - image_offset + (image_crop / 2);
-               width = 512 - image_crop;
-               break;
-
-            case 700:
-               pix_offset += 30 - image_offset + (image_crop / 2);
-               width = 640 - image_crop;
-               break;
-
-            default:
-               // This shouldn't happen.
-               break;
-         }
+         pix_offset = crop_line(&width);
 
          /* Smart height geometry trigger */
          if (crop_overscan == 2)
@@ -6808,12 +6839,26 @@ void retro_run(void)
 
       width  <<= upscale_shift;
       height <<= upscale_shift;
-      pix     += pix_offset << upscale_shift;
 
-      if (     GPU_get_display_possibly_dirty()
+      if (frame_surf != &lent_surf)
+         pix = frame_surf->pixels + (pix_offset << upscale_shift);
+      /* Handed back only exactly as lent; anything else is a dupe. */
+      else if (   (int32_t)(pix_offset << upscale_shift) == lent_surf.x0
+               && (int32_t)width  == lent_surf.w
+               && (int32_t)height == lent_surf.h
+               && GPU_LoanComplete(spec.loan_h))
+      {
+         pix   = lent_surf.pixels;
+         pitch = (unsigned)lent_pitch;
+      }
+      else
+         pix = NULL;
+
+      if (     pix
+            && (GPU_get_display_possibly_dirty()
             || GPU_get_display_change_count()
             || (currently_interlaced || PrevInterlaced)
-            || !allow_frame_duping)
+            || !allow_frame_duping))
          fb = pix;
    }
 
@@ -6855,8 +6900,7 @@ void retro_run(void)
    }
    else
    {
-   rhi_intf_finalize_frame(fb, width, height,
-		   MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
+   rhi_intf_finalize_frame(fb, width, height, pitch);
 
    if (audio_batch_cb)
       audio_batch_cb(&IntermediateBuffer[0][0], spec.SoundBufSize);

@@ -255,6 +255,30 @@ void GPU_InvalidateScanoutCache(void)
       scanout_cache[i].valid = false;
 }
 
+/* The surface the scanout cache describes. */
+static const MDFN_Surface *scanout_cache_surface;
+
+static INLINE void ScanoutCacheTarget(const MDFN_Surface *surface)
+{
+   if (surface != scanout_cache_surface)
+   {
+      GPU_InvalidateScanoutCache();
+      scanout_cache_surface = surface;
+   }
+}
+
+/* Where each line of this frame has been scanned out to so far. */
+enum
+{
+   ROW_NONE = 0,
+   ROW_OWN,
+   ROW_LOAN
+};
+static uint8_t row_written[GPU_DEST_LINE_MAX];
+/* A line on the loan left some of its columns unwritten, as a line
+ * narrower than the one the loan was sized for does. */
+static bool    loan_short;
+
 static INLINE void InvalidateTexCache(PS_GPU *gpu)
 {
    unsigned i;
@@ -2000,6 +2024,117 @@ static INLINE void ReorderRGB_Var(uint32_t out_Rshift,
    }
 }
 
+/* One upscaled scanout row: zeros over [0, udx_start) and
+ * [udx_end, udmw), VRAM in between, written to the columns of it the
+ * surface holds.  udx_end < 0 leaves the right margin alone, as the
+ * unsigned loop this replaces did. */
+static INLINE void ScanoutRow(const MDFN_Surface *surface, uint32_t *row,
+      bool rgb24, const uint16_t *src,
+      int32_t udx_start, int32_t udx_end, uint32_t udmw, int32_t ufb_x,
+      unsigned s, unsigned up, bool skip_margin)
+{
+   const int32_t x0 = surface->x0;
+   const int32_t x1 = x0 + surface->w;
+   int32_t a, b;
+
+   if (!skip_margin)
+   {
+      a = MAX(x0, 0);
+      b = MIN(x1, udx_start);
+      if (b > a)
+         memset(row + (a - x0), 0, (size_t)(b - a) * sizeof(uint32_t));
+   }
+
+   a = MAX(x0, udx_start);
+   b = MIN(x1, udx_end);
+   if (b > a)
+   {
+      const int32_t fb_mask = (0x7FF << s) + up - 1;
+      const int32_t skip    = a - udx_start;
+      const int32_t fb_x    = (ufb_x + (rgb24 ? (skip >> s) * (3 << s)
+                                              : skip * 2)) & fb_mask;
+      ReorderRGB_Var(RED_SHIFT, GREEN_SHIFT, BLUE_SHIFT, rgb24, src,
+            row, a - x0, b - x0, fb_x, s, up);
+   }
+
+   if (!skip_margin && udx_end >= 0)
+   {
+      a = MAX(x0, udx_end);
+      b = MIN(x1, (int32_t)udmw);
+      if (b > a)
+         memset(row + (a - x0), 0, (size_t)(b - a) * sizeof(uint32_t));
+   }
+}
+
+/* The surface the frame started on, while on a loan. */
+static MDFN_Surface *loan_own;
+
+/* Start of the frame proper: move to the loan if the frame fits it,
+ * bringing along the rows scanned out before this point. */
+static void EnterLoan(bool fits)
+{
+   MDFN_Surface *own  = GPU.surface;
+   MDFN_Surface *loan = GPU.espec->loan;
+   const unsigned s   = GPU.upscale_shift;
+   int32_t line;
+
+   if (!loan || own == loan)
+      return;
+   if (!fits)
+   {
+      GPU.espec->loan = NULL;
+      return;
+   }
+
+   for (line = 0; line < GPU.espec->loan_h && line < GPU_DEST_LINE_MAX; line++)
+   {
+      unsigned i;
+      if (row_written[line] != ROW_OWN)
+         continue;
+      for (i = 0; i < (1u << s); i++)
+      {
+         const int32_t row = (line << s) + i;
+         if (row >= loan->h)
+            break;
+         memcpy(loan->pixels + (size_t)row * loan->pitchinpix,
+               own->pixels + (size_t)row * own->pitchinpix + loan->x0,
+               (size_t)loan->w * sizeof(uint32_t));
+      }
+   }
+
+   loan_own           = own;
+   GPU.surface        = loan;
+   GPU.espec->surface = loan;
+   GPU_InvalidateScanoutCache();
+   scanout_cache_surface = loan;
+}
+
+/* Back to the frame's own surface, unless something is already drawn
+ * in the loan; the driver then finds the frame does not fit it. */
+static void LeaveLoan(void)
+{
+   int32_t line;
+
+   for (line = 0; line < GPU_DEST_LINE_MAX; line++)
+      if (row_written[line] == ROW_LOAN)
+         return;
+
+   GPU.surface        = loan_own;
+   GPU.espec->surface = loan_own;
+   GPU.espec->loan    = NULL;
+}
+
+bool GPU_LoanComplete(int32_t lines)
+{
+   int32_t line;
+   if (loan_short || lines > GPU_DEST_LINE_MAX)
+      return false;
+   for (line = 0; line < lines; line++)
+      if (row_written[line] == ROW_NONE)
+         return false;
+   return true;
+}
+
 enum
 {
    GPU_UPD_EVENT,    /* the GPU's own event (or ForceEventUpdates) */
@@ -2271,6 +2406,11 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                         GPU.LineWidths[i] = 2;
                      }
                   }
+
+                  EnterLoan(
+                           (bool)(GPU.DisplayMode & DISP_PAL) == GPU.HardwarePALType
+                        && !GPU.espec->InterlaceOn
+                        && GPU.DisplayRect->h == GPU.espec->loan_h);
                }
             }
 
@@ -2399,13 +2539,22 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                if (rhi_intf_is_type() == RHI_SOFTWARE)
                {
                   /* Convert the necessary variables to the upscaled version */
-                  uint32_t x;
+                  bool on_loan;
                   uint32_t y        = GPU.DisplayFB_CurLineYReadout << GPU.upscale_shift;
                   uint32_t udmw     = dmw      << GPU.upscale_shift;
                   int32_t udx_start   = dx_start << GPU.upscale_shift;
                   int32_t udx_end     = dx_end   << GPU.upscale_shift;
                   int32_t ufb_x       = fb_x     << GPU.upscale_shift;
                   unsigned _upscale = UPSCALE(&GPU);
+
+                  /* The loan is as wide as line 0 was last frame. */
+                  if (     dest_line == 0
+                        && GPU.espec->loan
+                        && GPU.surface == GPU.espec->loan
+                        && (int32_t)dmw != GPU.espec->loan_dmw)
+                     LeaveLoan();
+                  on_loan = GPU.espec->loan && GPU.surface == GPU.espec->loan;
+                  ScanoutCacheTarget(GPU.surface);
 
                   if (psx_gpu_rasterize_both_fields
                         && (GPU.DisplayMode & 0x24) == 0x24
@@ -2487,30 +2636,31 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                      {
                         const uint16_t *src = GPU.vram +
                            ((y + i) << (10 + GPU.upscale_shift));
+                        const int32_t row =
+                           (dest_line << GPU.upscale_shift) + i;
 
-                        dest = GPU.surface->pixels +
-                           ((dest_line << GPU.upscale_shift) + i) * GPU.surface->pitch32;
+                        if (row >= GPU.surface->h)
+                           break;
 
-                        if (!skip_margin)
-                           memset(dest, 0, udx_start * sizeof(int32_t));
-
-                        ReorderRGB_Var(
-                              RED_SHIFT,
-                              GREEN_SHIFT,
-                              BLUE_SHIFT,
-                              GPU.DisplayMode & DISP_RGB24,
+                        ScanoutRow(GPU.surface,
+                              GPU.surface->pixels + (size_t)row * GPU.surface->pitch32,
+                              (GPU.DisplayMode & DISP_RGB24) != 0,
                               src,
-                              dest,
                               udx_start,
                               udx_end,
+                              udmw,
                               ufb_x,
                               GPU.upscale_shift,
-                              _upscale);
-
-                        if (!skip_margin)
-                           for(x = udx_end; x < udmw; x++)
-                              dest[x] = 0;
+                              _upscale,
+                              skip_margin);
                      }
+
+                     if (dest_line >= 0 && dest_line < GPU_DEST_LINE_MAX)
+                        row_written[dest_line] = on_loan ? ROW_LOAN : ROW_OWN;
+                     if (   on_loan
+                         && (udx_end < 0 ? udx_start : MAX(udx_start, (int32_t)udmw))
+                              < GPU.surface->x0 + GPU.surface->w)
+                        loan_short = true;
 
                      /* Record geometry for next frame's skip check.
                       * dest_line bound was already validated above
@@ -2523,8 +2673,10 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                         scanout_cache[dest_line].valid    = true;
                      }
 
-                     /*reset dest back to i=0 for PSX_GPULineHook call */
-                     dest = GPU.surface->pixels + ((dest_line << GPU.upscale_shift) * GPU.surface->pitch32);
+                     /* Line hooks index whole frame rows; a loan
+                      * is never taken with a device that reads them. */
+                     if (!on_loan)
+                        dest = GPU.surface->pixels + ((dest_line << GPU.upscale_shift) * GPU.surface->pitch32);
                   }
                }
 
@@ -2636,6 +2788,8 @@ void GPU_StartFrame(EmulateSpecStruct *espec_arg)
    GPU.surface         = GPU.espec->surface;
    GPU.DisplayRect     = &GPU.espec->DisplayRect;
    GPU.LineWidths      = GPU.espec->LineWidths;
+   memset(row_written, 0, sizeof(row_written));
+   loan_short = false;
 
    /* Discard any deferred-scanout records left over from a
     * previous frame.  Start of a fresh frame, fresh records. */
@@ -2671,6 +2825,7 @@ void GPU_FlushDeferredScanout(void)
    if (deferred_scanout_count == 0)
       return;
 
+   ScanoutCacheTarget(GPU.surface);
    pitch_pix = GPU.surface->pitch32;
    pixels    = GPU.surface->pixels;
 

@@ -75,6 +75,10 @@ typedef struct
       int32_t pitch32;
       int32_t pitchinpix;
    };
+
+   /* Scanout column of pixels[0]; a window onto columns
+    * [x0, x0 + w) of the frame.  0 for a whole-frame surface. */
+   int32_t x0;
 } MDFN_Surface;
 
 /*
