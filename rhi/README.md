@@ -119,6 +119,9 @@ Arithmetic fixtures, canonical VRAM comparisons and displayed gameplay
 comparisons test different contracts. A passing finite suite is not a claim
 that every game, enhancement or driver matches original hardware.
 
+See [validation results and limits](COLOR_VALIDATION.md) for the tested domains,
+platforms and performance baselines.
+
 ## Building
 
 The RHI API and OpenGL renderer are components of the Beetle PSX libretro core. To build with OpenGL support, run `make HAVE_OPENGL=1` in the repository's top level directory. To build with all possible hardware renderers, instead run `make HAVE_HW=1`. To build with dump support, additionally pass `RHI_DUMP=1`.
