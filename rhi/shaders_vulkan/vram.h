@@ -6,7 +6,7 @@
  * RelaxedPrecision with 16-bit integers (Adreno, Mali) folds that to -1
  * and clamp_coord() collapses every texel to base - 1. vUV in fp16 loses
  * the sub-texel fraction above u = 128, which mis-selects texels under
- * upscaling. vParam, vBaseUV and vWindow stay within int16 range. */
+ * upscaling. vBaseUV and vWindow stay within signed int16 range. */
 layout(location = 1) in highp vec2 vUV;
 layout(location = 10) flat in highp uvec2 vUVOrigin;
 layout(location = 11) flat in highp uvec2 vUVDX;
@@ -40,11 +40,16 @@ vec2 clamp_coord(vec2 coord)
  * Vertex limits are enhancement clamps, not part of this integer path. */
 vec2 native_texture_coord()
 {
-	if ((uint(vParam.z) & 0x0008u) == 0u)
+	if (SCALE != 1 || (uint(vParam.z) & 0x0008u) == 0u)
 		return clamp_coord(vUV);
 	uvec2 coord = uvec2(gl_FragCoord.xy);
 	uvec2 uv = vUVOrigin + coord.x * vUVDX + coord.y * vUVDY;
 	return vec2((uv >> 12u) & 255u);
+}
+
+vec4 decode_vram_color(uint value)
+{
+    return abgr1555_color(value, PRIMITIVE_COLOR_MODE == 2);
 }
 
 // Nearest neighbor
@@ -84,7 +89,7 @@ vec4 sample_vram_atlas(vec2 uvv)
         /* 0x1000: the row was overwritten after the palette was latched;
          * the entries the GPU still holds live in uPalette. */
         if ((params.z & 0x1000) != 0)
-            return abgr1555(texelFetch(uPalette, ivec2(value, 0), 0).x);
+            return decode_vram_color(texelFetch(uPalette, ivec2(value, 0), 0).x);
 
         params.x += value;
         coord = params.xy;
@@ -97,7 +102,7 @@ vec4 sample_vram_atlas(vec2 uvv)
 #endif
 
 #if defined(UNSCALED)
-    return abgr1555(texelFetch(uFramebuffer, coord & FB_MASK, 0).x);
+    return decode_vram_color(texelFetch(uFramebuffer, coord & FB_MASK, 0).x);
 #elif defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
     return texelFetch(uFramebufferMS, ivec2(mod(coord, FB_SIZE) * SCALE), gl_SampleID);
 #else

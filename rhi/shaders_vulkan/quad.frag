@@ -3,8 +3,9 @@ precision highp float;
 precision highp int;
 
 #include "common.h"
-#if defined(DITHER)
-#include "dither.h"
+#include "color.h"
+#if !defined(HDR) && !defined(BPP24)
+layout(constant_id = 0) const int COLOR_MODE = 2;
 #endif
 
 layout(location = 0) in highp vec2 vUV;
@@ -17,7 +18,7 @@ layout(set = 0, binding = 0) uniform usampler2D uTexture;
 #if defined(HDR)
 layout(location = 0) out highp vec4 FragColor;
 #else
-layout(location = 0) out mediump vec4 FragColor;
+layout(location = 0) out highp vec4 FragColor;
 #endif
 
 layout(push_constant, std430) uniform Registers
@@ -125,16 +126,9 @@ mediump vec3 sample_bpp24_yuv(ivec2 coord)
 
 void main()
 {
-#if defined(DITHER)
 	highp vec3 rgb;
-#else
-	mediump vec3 rgb;
-#endif
 #if defined(SCALED)
 	rgb = textureLod(uTexture, vUV, 0.0).rgb;
-	#if defined(DITHER)
-		rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));
-	#endif
 	#if defined(HDR)
 		rgb = hdr_deband(rgb, gl_FragCoord.xy);
 	#endif
@@ -157,11 +151,16 @@ void main()
 		#endif
 	#else
 		uint value = textureLod(uTexture, vUV, 0.0).x;
+		#if defined(HDR)
 		rgb = abgr1555(value).rgb;
-		#if defined(DITHER)
-			rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));
+		#else
+		rgb = abgr1555_color(value, COLOR_MODE == 2).rgb;
 		#endif
 	#endif
+#endif
+
+#if !defined(HDR) && !defined(BPP24)
+	rgb = psx_display_color(rgb, COLOR_MODE);
 #endif
 
 #if defined(HDR)
@@ -173,8 +172,7 @@ void main()
 	                                   registers.black_pq, registers.to_panel,
 	                                   registers.scrgb), 1.0);
 #else
-	/* After the dither, not before: the console emits a dithered 15-bit signal
-	 * and the primaries belong to the phosphors that receive it. */
+	/* Apply source primaries after color expansion. */
 	FragColor = vec4(sdr_apply_src_primaries(rgb, registers.sdr_eotf,
 	                                         registers.src_primaries), 1.0);
 #endif

@@ -7217,6 +7217,11 @@ void texture_tracker_set_config(TextureTracker *self,
    }
 }
 
+bool texture_tracker_hd_textures_enabled(bool menu_enabled)
+{
+   return tt_replace_latch_enabled(&tt_replace, menu_enabled);
+}
+
 void texture_tracker_session_reset(void)
 {
    /* A new game starts from the menu value again. */

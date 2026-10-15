@@ -233,9 +233,8 @@ int   psx_hdr_overbright_hot   = 0;
 int   psx_pgxp_color           = 0;
 int   psx_pgxp_fog             = 0;
 int   psx_hdr_multipass        = 0;
-/* Vulkan native 15-bit colour rendering (write-time RGB5 quantisation).
- * Opt-in; consulted per frame by rhi_vulkan_prepare_frame. */
-int   psx_native_color         = 0;
+enum psx_internal_color_mode_e psx_internal_color_mode =
+      PSX_INTERNAL_COLOR_16BPP;
 
 static void reset_hdr_output_state(void)
 {
@@ -4593,6 +4592,19 @@ static void check_variables(bool startup)
 {
    struct retro_variable var = {0};
 
+   /* Read before refreshing either renderer, so an option change cannot
+    * rebuild storage using the previous frame's drawing policy. The old
+    * Vulkan-only native_color option is intentionally no longer consumed. */
+   psx_internal_color_mode = PSX_INTERNAL_COLOR_16BPP;
+   var.key = BEETLE_OPT(depth);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "native"))
+         psx_internal_color_mode = PSX_INTERNAL_COLOR_NATIVE;
+      else if (!strcmp(var.value, "32bpp"))
+         psx_internal_color_mode = PSX_INTERNAL_COLOR_32BPP;
+   }
+
    var.key = BEETLE_OPT(compatibility_settings);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       compatibility_settings_enabled = strcmp(var.value, "disabled") != 0;
@@ -5020,11 +5032,10 @@ static void check_variables(bool startup)
 
       /* Record the requested output color format. This is only the
        * user's *request*; HDR is not engaged here. Whether it actually
-       * takes effect is decided later, once the renderer is confirmed
-       * to be Vulkan and the frontend's HDR capability is queried (see
-       * the RHI_VULKAN case after rhi_intf_open). The SW/GL paths and
-       * HDR-incapable frontends leave psx_hdr_active false and render
-       * exactly as before. */
+       * takes effect is decided after rhi_intf_open, once the hardware
+       * renderer and frontend accept HDR10. Software and rejected HDR
+       * requests leave psx_hdr_active false and use the selected SDR
+       * color policy. The output-format option requires a restart. */
       var.key = BEETLE_OPT(color_format);
       psx_color_format = PSX_COLOR_FORMAT_24BIT;
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -5150,16 +5161,6 @@ static void check_variables(bool startup)
    }
    else
       psx_gpu_dither_mode = DITHER_NATIVE;
-
-#ifdef HAVE_VULKAN
-   var.key = BEETLE_OPT(native_color);
-   psx_native_color = 0;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (!strcmp(var.value, "enabled"))
-         psx_native_color = 1;
-   }
-#endif
 
    // iCB: PGXP settings
    var.key = BEETLE_OPT(pgxp_mode);
@@ -6380,8 +6381,6 @@ bool retro_load_game(const struct retro_game_info *info)
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(depth);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-         option_display.key = BEETLE_OPT(native_color);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(display_vram);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter);
@@ -6405,8 +6404,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
          negotiate_hdr_output();
 
-         option_display.key = BEETLE_OPT(native_color);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(scaled_uv_offset);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter_exclude_sprite);
@@ -6444,9 +6441,6 @@ bool retro_load_game(const struct retro_game_info *info)
          option_display.visible = false;
 
          negotiate_hdr_output();
-
-         option_display.key = BEETLE_OPT(depth);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
 
          option_display.key = BEETLE_OPT(image_offset);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);

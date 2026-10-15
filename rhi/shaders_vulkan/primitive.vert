@@ -22,10 +22,9 @@ layout(location = 5) flat out highp ivec4 vTexLimits;
  * the fragment input on implementations where mediump maps to FP16. */
 layout(location = 0) out highp vec4 vColor;
 layout(location = 2) flat out mediump ivec3 vParam;
-/* Depth-cue sidecar: far colour + blend factor. t == 0 (the no-cue
- * encoding) makes the fragment mix the identity. */
+/* Retained vertex lanes also carry packed native color and UV planes.
+ * Depth cueing itself is completed in gpu_polygon.c before submission. */
 layout(location = 6) in highp uvec4 Fog;
-layout(location = 6) out highp vec4 vFog;
 layout(location = 7) flat out highp uvec3 vColorOrigin;
 layout(location = 8) flat out highp uvec3 vColorDX;
 layout(location = 9) flat out highp uvec3 vColorDY;
@@ -67,17 +66,13 @@ void main()
       vColorDX = (low >> 20u) | ((high & 0xffu) << 12u);
       vColorDY = (high >> 8u) & 0xfffffu;
       vColor = vec4((uvec4(Fog.z) >> uvec4(0u, 8u, 16u, 24u)) & 255u) / 255.0;
-      vFog = vec4(0.0);
    }
    else
    {
       vColor = uintBitsToFloat(Color);
-      vFog = uintBitsToFloat(Fog);
       vColorOrigin = vColorDX = vColorDY = uvec3(0u);
    }
    vParam = Param;
-   if ((uint(Param.z) & 0x0010u) != 0u)
-      vFog.a = 0.0;
 #ifdef TEXTURED
    // iCB: Offset UVs by half a pixel to account for rounding errors in projection
 #ifdef UNSCALED
@@ -90,10 +85,6 @@ void main()
 #endif
    uvec2 low = uvec2(Position.y, UVPlane);
    uvec2 high = uvec2(Position.w, Fog.w);
-   /* The GP0 native path has no PGXP cue. Restore the zero factor while
-    * retaining the far colour and all enhanced shading inputs. */
-   if ((uint(Param.z) & 0x0008u) != 0u)
-      vFog.a = 0.0;
    vUVOrigin = low & 0xfffffu;
    vUVDX = (low >> 20u) | ((high & 0xffu) << 12u);
    vUVDY = (high >> 8u) & 0xfffffu;

@@ -733,28 +733,28 @@ struct retro_core_option_v2_definition option_defs_ar[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_AR,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_AR,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_AR },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_AR },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_AR,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_AR,
+      NULL,
       NULL,
       "video",
       {
@@ -2809,28 +2809,28 @@ struct retro_core_option_v2_definition option_defs_ast[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_AST,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_AST,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_AST },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_AST },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_AST,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_AST,
+      NULL,
       NULL,
       "video",
       {
@@ -4885,28 +4885,28 @@ struct retro_core_option_v2_definition option_defs_be[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_BE,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_BE,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_BE },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_BE },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_BE,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_BE,
+      NULL,
       NULL,
       "video",
       {
@@ -6961,28 +6961,28 @@ struct retro_core_option_v2_definition option_defs_bg[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_BG,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_BG,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_BG },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_BG },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_BG,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_BG,
+      NULL,
       NULL,
       "video",
       {
@@ -9037,28 +9037,28 @@ struct retro_core_option_v2_definition option_defs_ca[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_CA,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_CA,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_CA },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_CA },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_CA,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_CA,
+      NULL,
       NULL,
       "video",
       {
@@ -11113,28 +11113,28 @@ struct retro_core_option_v2_definition option_defs_chs[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_CHS,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_CHS,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_CHS },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_CHS },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_CHS,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_CHS,
+      NULL,
       NULL,
       "video",
       {
@@ -13189,28 +13189,28 @@ struct retro_core_option_v2_definition option_defs_cht[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_CHT,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_CHT,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_CHT },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_CHT },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_CHT,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_CHT,
+      NULL,
       NULL,
       "video",
       {
@@ -15265,28 +15265,28 @@ struct retro_core_option_v2_definition option_defs_cs[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_CS,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_CS,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_CS },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_CS },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_CS,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_CS,
+      NULL,
       NULL,
       "video",
       {
@@ -17341,28 +17341,28 @@ struct retro_core_option_v2_definition option_defs_cy[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_CY,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_CY,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_CY },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_CY },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_CY,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_CY,
+      NULL,
       NULL,
       "video",
       {
@@ -19417,28 +19417,28 @@ struct retro_core_option_v2_definition option_defs_da[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_DA,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_DA,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_DA },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_DA },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_DA,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_DA,
+      NULL,
       NULL,
       "video",
       {
@@ -21493,28 +21493,28 @@ struct retro_core_option_v2_definition option_defs_de[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_DE,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_DE,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_DE },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_DE },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_DE,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_DE,
+      NULL,
       NULL,
       "video",
       {
@@ -23569,28 +23569,28 @@ struct retro_core_option_v2_definition option_defs_el[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_EL,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_EL,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_EL },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_EL },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_EL,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_EL,
+      NULL,
       NULL,
       "video",
       {
@@ -25645,28 +25645,28 @@ struct retro_core_option_v2_definition option_defs_en[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_EN,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_EN,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_EN },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_EN },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_EN,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_EN,
+      NULL,
       NULL,
       "video",
       {
@@ -27721,28 +27721,28 @@ struct retro_core_option_v2_definition option_defs_eo[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_EO,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_EO,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_EO },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_EO },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_EO,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_EO,
+      NULL,
       NULL,
       "video",
       {
@@ -29797,28 +29797,28 @@ struct retro_core_option_v2_definition option_defs_es[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_ES,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_ES,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_ES },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_ES },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_ES,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_ES,
+      NULL,
       NULL,
       "video",
       {
@@ -31873,28 +31873,28 @@ struct retro_core_option_v2_definition option_defs_fa[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_FA,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_FA,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_FA },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_FA },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_FA,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_FA,
+      NULL,
       NULL,
       "video",
       {
@@ -33949,28 +33949,28 @@ struct retro_core_option_v2_definition option_defs_fi[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_FI,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_FI,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_FI },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_FI },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_FI,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_FI,
+      NULL,
       NULL,
       "video",
       {
@@ -36025,28 +36025,28 @@ struct retro_core_option_v2_definition option_defs_fr[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_FR,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_FR,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_FR },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_FR },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_FR,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_FR,
+      NULL,
       NULL,
       "video",
       {
@@ -38101,28 +38101,28 @@ struct retro_core_option_v2_definition option_defs_ga[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_GA,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_GA,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_GA },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_GA },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_GA,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_GA,
+      NULL,
       NULL,
       "video",
       {
@@ -40177,28 +40177,28 @@ struct retro_core_option_v2_definition option_defs_gl[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_GL,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_GL,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_GL },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_GL },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_GL,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_GL,
+      NULL,
       NULL,
       "video",
       {
@@ -42253,28 +42253,28 @@ struct retro_core_option_v2_definition option_defs_he[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_HE,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_HE,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_HE },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_HE },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_HE,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_HE,
+      NULL,
       NULL,
       "video",
       {
@@ -44329,28 +44329,28 @@ struct retro_core_option_v2_definition option_defs_hr[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_HR,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_HR,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_HR },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_HR },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_HR,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_HR,
+      NULL,
       NULL,
       "video",
       {
@@ -46405,28 +46405,28 @@ struct retro_core_option_v2_definition option_defs_hu[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_HU,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_HU,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_HU },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_HU },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_HU,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_HU,
+      NULL,
       NULL,
       "video",
       {
@@ -48481,28 +48481,28 @@ struct retro_core_option_v2_definition option_defs_id[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_ID,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_ID,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_ID },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_ID },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_ID,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_ID,
+      NULL,
       NULL,
       "video",
       {
@@ -50557,28 +50557,28 @@ struct retro_core_option_v2_definition option_defs_it[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_IT,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_IT,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_IT },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_IT },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_IT,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_IT,
+      NULL,
       NULL,
       "video",
       {
@@ -52633,28 +52633,28 @@ struct retro_core_option_v2_definition option_defs_ja[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_JA,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_JA,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_JA },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_JA },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_JA,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_JA,
+      NULL,
       NULL,
       "video",
       {
@@ -54709,28 +54709,28 @@ struct retro_core_option_v2_definition option_defs_ko[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_KO,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_KO,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_KO },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_KO },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_KO,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_KO,
+      NULL,
       NULL,
       "video",
       {
@@ -56785,28 +56785,28 @@ struct retro_core_option_v2_definition option_defs_nl[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_NL,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_NL,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_NL },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_NL },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_NL,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_NL,
+      NULL,
       NULL,
       "video",
       {
@@ -58861,28 +58861,28 @@ struct retro_core_option_v2_definition option_defs_no[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_NO,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_NO,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_NO },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_NO },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_NO,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_NO,
+      NULL,
       NULL,
       "video",
       {
@@ -60937,28 +60937,28 @@ struct retro_core_option_v2_definition option_defs_or[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_OR,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_OR,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_OR },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_OR },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_OR,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_OR,
+      NULL,
       NULL,
       "video",
       {
@@ -63013,28 +63013,28 @@ struct retro_core_option_v2_definition option_defs_pl[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_PL,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_PL,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_PL },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_PL },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_PL,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_PL,
+      NULL,
       NULL,
       "video",
       {
@@ -65089,28 +65089,28 @@ struct retro_core_option_v2_definition option_defs_pt_br[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_PT_BR,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_PT_BR,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_PT_BR },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_PT_BR },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_PT_BR,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_PT_BR,
+      NULL,
       NULL,
       "video",
       {
@@ -67165,28 +67165,28 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_PT_PT,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_PT_PT,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_PT_PT },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_PT_PT },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_PT_PT,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_PT_PT,
+      NULL,
       NULL,
       "video",
       {
@@ -69241,28 +69241,28 @@ struct retro_core_option_v2_definition option_defs_ru[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_RU,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_RU,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_RU },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_RU },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_RU,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_RU,
+      NULL,
       NULL,
       "video",
       {
@@ -71317,28 +71317,28 @@ struct retro_core_option_v2_definition option_defs_sk[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_SK,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_SK,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_SK },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_SK },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_SK,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_SK,
+      NULL,
       NULL,
       "video",
       {
@@ -73393,28 +73393,28 @@ struct retro_core_option_v2_definition option_defs_sr[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_SR,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_SR,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_SR },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_SR },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_SR,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_SR,
+      NULL,
       NULL,
       "video",
       {
@@ -75469,28 +75469,28 @@ struct retro_core_option_v2_definition option_defs_sv[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_SV,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_SV,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_SV },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_SV },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_SV,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_SV,
+      NULL,
       NULL,
       "video",
       {
@@ -77546,28 +77546,28 @@ struct retro_core_option_v2_definition option_defs_th[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_TH,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_TH,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_TH },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_TH },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_TH,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_TH,
+      NULL,
       NULL,
       "video",
       {
@@ -79623,28 +79623,28 @@ struct retro_core_option_v2_definition option_defs_tr[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_TR,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_TR,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_TR },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_TR },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_TR,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_TR,
+      NULL,
       NULL,
       "video",
       {
@@ -81699,28 +81699,28 @@ struct retro_core_option_v2_definition option_defs_tt[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_TT,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_TT,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_TT },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_TT },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_TT,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_TT,
+      NULL,
       NULL,
       "video",
       {
@@ -83775,28 +83775,28 @@ struct retro_core_option_v2_definition option_defs_uk[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_UK,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_UK,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_UK },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_UK },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_UK,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_UK,
+      NULL,
       NULL,
       "video",
       {
@@ -85851,28 +85851,28 @@ struct retro_core_option_v2_definition option_defs_val[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_VAL,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_VAL,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_VAL },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_VAL },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_VAL,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_VAL,
+      NULL,
       NULL,
       "video",
       {
@@ -87927,28 +87927,28 @@ struct retro_core_option_v2_definition option_defs_vn[] = {
       "enabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       BEETLE_OPT_DEPTH_LABEL_VN,
       NULL,
-      BEETLE_OPT_DEPTH_INFO_0_VN,
+      NULL,
       NULL,
       "video",
       {
-         { "16bpp(native)", OPTION_VAL_16BPP_NATIVE_VN },
+         { "native",        NULL },
+         { "16bpp(native)", NULL },
          { "32bpp",         OPTION_VAL_32BPP_VN },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       BEETLE_OPT_DITHER_MODE_LABEL_VN,
       NULL,
-      BEETLE_OPT_DITHER_MODE_INFO_0_VN,
+      NULL,
       NULL,
       "video",
       {

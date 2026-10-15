@@ -8,9 +8,12 @@
  * directly below the libretro plumbing's preamble. */
 
 #include "rhi_lib_vulkan.h"
+#include "mednafen/mednafen.h"
+#include "mednafen/psx/gpu.h"
 
 #include "rhi_intf.h" /* FPS and audio sample rate macros */
 #include "rhi_interpolation.h"
+#include "beetle_psx_globals.h"
 #include "rhi_defer.h"
 #include "tt_trace.h"
 #include <retro_inline.h>
@@ -83,16 +86,12 @@ extern retro_log_printf_t log_cb;
 extern int   psx_hdr_overbright_hot;   /* additive/sub source: 0 clamped, 1 hot */
 extern unsigned int psx_pgxp_mode;
 extern int   psx_pgxp_color;           /* PGXP precise colour: vertex colour may exceed 1.0 on fp16 */
-extern int   psx_pgxp_fog;             /* PGXP byte-domain depth cue; effective only with precise colour */
 /* "HDR True Multi-Pass Blending": 1 routes non-masked subtractive prims
  * through the per-primitive programmable-blend path; 0 keeps them on
  * fixed-function REVERSE_SUBTRACT and floors the result with a MAX-blend
  * pass after each subtractive batch. Both floor at zero; see
  * renderer_semi_trans_needs_feedback / renderer_emit_sub_floor. */
 extern int   psx_hdr_multipass;
-/* Opt-in native 15-bit colour rendering (core option). Selects write-time
- * RGB5 quantisation of every GP0 write on the SDR target. */
-extern int   psx_native_color;
 /* Frontend save directory (libretro.c); the persistent pipeline cache lives
  * under it because it is the one directory the core already writes to. */
 extern char  retro_save_directory[4096];
@@ -119,6 +118,7 @@ extern PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;
 extern PFN_vkCmdDispatch vkCmdDispatch;
 extern PFN_vkCmdDraw vkCmdDraw;
 extern PFN_vkCmdEndRenderPass vkCmdEndRenderPass;
+extern PFN_vkCmdNextSubpass vkCmdNextSubpass;
 extern PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
 extern PFN_vkCmdPushConstants vkCmdPushConstants;
 extern PFN_vkCmdResolveImage vkCmdResolveImage;
@@ -275,6 +275,7 @@ static void volkGenLoadDevice(void* context,
    vkCmdDispatch = (PFN_vkCmdDispatch)load(context, "vkCmdDispatch");
    vkCmdDraw = (PFN_vkCmdDraw)load(context, "vkCmdDraw");
    vkCmdEndRenderPass = (PFN_vkCmdEndRenderPass)load(context, "vkCmdEndRenderPass");
+   vkCmdNextSubpass = (PFN_vkCmdNextSubpass)load(context, "vkCmdNextSubpass");
    vkCmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)load(context, "vkCmdPipelineBarrier");
    vkCmdPushConstants = (PFN_vkCmdPushConstants)load(context, "vkCmdPushConstants");
    vkCmdResolveImage = (PFN_vkCmdResolveImage)load(context, "vkCmdResolveImage");
@@ -376,6 +377,7 @@ PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;
 PFN_vkCmdDispatch vkCmdDispatch;
 PFN_vkCmdDraw vkCmdDraw;
 PFN_vkCmdEndRenderPass vkCmdEndRenderPass;
+PFN_vkCmdNextSubpass vkCmdNextSubpass;
 PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
 PFN_vkCmdPushConstants vkCmdPushConstants;
 PFN_vkCmdResolveImage vkCmdResolveImage;
@@ -1611,7 +1613,7 @@ static bool context_is_valid(const struct Context *self) { return self->valid; }
     * rejected there is silently never applied to any pipeline -- while a
     * constant set past this bound is an out-of-bounds write into the
     * static state. Both happened; keep them in step. */
-   enum { VULKAN_NUM_SPEC_CONSTANTS = 11 };
+   enum { VULKAN_NUM_SPEC_CONSTANTS = 13 };
 
    struct ImplementationWorkarounds
    {
@@ -4514,6 +4516,7 @@ static void commandbuffer_copy_buffer_whole(struct CommandBuffer *self,
          const VkImageSubresourceLayers *subresrouce);
    static void commandbuffer_full_barrier(struct CommandBuffer *self);
    static void commandbuffer_pixel_barrier(struct CommandBuffer *self);
+   static void commandbuffer_next_subpass(struct CommandBuffer *self);
    static void commandbuffer_barrier_simple(struct CommandBuffer *self,
          VkPipelineStageFlags src_stage,
          VkAccessFlags src_access,
@@ -5457,6 +5460,7 @@ static struct PrimitiveInfo primitive_info_make(
       bool textured;
       bool masked;
       bool native_color;
+      bool canonical_color;
       bool filtering;
       bool scaled_read;
       unsigned shift;
@@ -5470,6 +5474,7 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
       return a->scissor_index == b->scissor_index && hd_handle_eq(&a->hd_texture_index, &b->hd_texture_index) &&
          a->semi_transparent == b->semi_transparent && a->textured == b->textured && a->masked == b->masked &&
          a->native_color == b->native_color &&
+         a->canonical_color == b->canonical_color &&
          a->filtering == b->filtering && a->scaled_read == b->scaled_read && a->shift == b->shift &&
          a->offset_uv == b->offset_uv;
    }
@@ -5481,10 +5486,6 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
    enum ScanoutMode {
       /* Use extra precision bits. */
       ScanoutMode_ABGR1555_555,
-      /* Use extra precision bits to dither down to a native ABGR1555 image. The
-       * dither happens in the wrong place, but should be "good" enough to feel
-       * authentic. */
-      ScanoutMode_ABGR1555_Dither,
       /* MDEC */
       ScanoutMode_BGR24
    };
@@ -5668,11 +5669,14 @@ static void renderer_set_interpolant_attribs(CommandBuffer *cmd)
       ScanoutMode scanout_mode;
       ScanoutFilter scanout_filter;
       ScanoutFilter scanout_mdec_filter;
-      /* Frame-latched native-colour configuration. The first flag selects
-       * native versus internal-resolution dither spacing; the second selects
-       * RGB5 write-time storage independently of each primitive's DTD bit. */
-      bool dither_native_resolution;
+      /* Frame-latched drawing policy. Dither spacing and RGB5 storage are
+       * independent of each primitive's GP0 DTD bit. */
+      enum dither_mode dither_mode;
       bool native_color;
+      enum psx_internal_color_mode_e color_mode;
+      /* Resolves and expanded enhanced color must not observe deferred
+       * saturation residues from fixed-function RGB5 Add/Sub. */
+      bool canonical_color;
       /* The DTD bit of the primitive being queued (from the push_* entry
        * points). Feeds fixed-point modulation and native RGB5 writes. */
       bool primitive_dither;
@@ -5729,8 +5733,10 @@ static void render_state_init(struct RenderState *s)
    s->scanout_mode = ScanoutMode_ABGR1555_555;
    s->scanout_filter = ScanoutFilter_None;
    s->scanout_mdec_filter = ScanoutFilter_None;
-   s->dither_native_resolution = false;
+   s->dither_mode = DITHER_UPSCALED;
    s->native_color = false;
+   s->color_mode = PSX_INTERNAL_COLOR_16BPP;
+   s->canonical_color = false;
    s->force_mask_bit = false;
    s->texture_color_modulate = false;
    s->mask_test = false;
@@ -5869,6 +5875,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       SpecConstIndex_HotSource = 6,
       SpecConstIndex_ResolveEotf = 7,
       SpecConstIndex_Samples = 0,
+      /* Display programs use slot 0 independently of primitive/resolve
+       * programs; reflected masks keep the pipeline keys separate. */
+      SpecConstIndex_ColorMode = 0,
       /* Feedback (programmable blend) shaders only. Aliases ResolveEotf the
        * same way Samples aliases TransMode: the resolve/display programs and
        * the primitive feedback programs never share a pipeline, and the
@@ -5880,10 +5889,16 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
        * Its own slot rather than an alias: it is declared by the primitive
        * programs, which also declare 0..6. */
       SpecConstIndex_PreciseColor = 8,
-      /* Linear-light depth cueing; rides the precise-colour vertex path. */
-      SpecConstIndex_PgxpFog = 9,
+      /* Global primitive color policy; the shader folds unused mode paths. */
+      SpecConstIndex_PrimitiveColorMode = 9,
       /* Actual primitive render-target format, independent of HDR options. */
-      SpecConstIndex_FramebufferFloat16 = 10
+      SpecConstIndex_FramebufferFloat16 = 10,
+      SpecConstIndex_DitherMode = 11,
+      SpecConstIndex_HighResTexture = 12,
+      /* Resolve programs use slot 8 independently of primitive PreciseColor.
+       * Canonical RGB5 uploads expand before 32-bpp drawing; rendered byte
+       * colors retain their existing values through atlas resolves. */
+      SpecConstIndex_ExpandedColor = 8
    };
 
    struct SaveState
@@ -5970,8 +5985,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *copy_to_vram_masked;
             Program *unscaled_quad_blitter;
             Program *scaled_quad_blitter;
-            Program *unscaled_dither_quad_blitter;
-            Program *scaled_dither_quad_blitter;
             Program *bpp24_quad_blitter;
             Program *bpp24_yuv_quad_blitter;
             /* HDR10 (PQ Rec.2020) counterparts of the display quad blitters,
@@ -5984,6 +5997,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *hdr_bpp24_yuv_quad_blitter;
             Program *resolve_to_scaled;
             Program *resolve_to_unscaled;
+            Program *reduce_cached_color;
             Program *msaa_resolve_weighted;       /* light-domain MSAA resolve, Karis-weighted (rgba16f) */
             Program *msaa_resolve_weighted_sdr;   /* light-domain MSAA resolve, plain box (rgba8) */
 
@@ -6015,7 +6029,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *textured_masked_unscaled;
 
             Program *mipmap_resolve;
-            Program *mipmap_dither_resolve;
             Program *hdr_mipmap_resolve;   /* PQ Rec.2020 variant of mipmap_resolve, HDR only */
 
             /* Analog video path. Region is baked into the shader (subcarrier,
@@ -6189,6 +6202,19 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       BlitInfoVec_clear(&self->queue.unscaled_masked_blits);
    }
 
+   static void renderer_set_primitive_color_spec_constants(Renderer *self,
+         CommandBuffer *cmd)
+   {
+      unsigned mode = psx_hdr_active ? 3u :
+            (self->render_state.native_color ?
+             (unsigned)self->render_state.color_mode : PSX_INTERNAL_COLOR_32BPP);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_PrimitiveColorMode, mode);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_DitherMode,
+            psx_hdr_active ? DITHER_OFF : self->render_state.dither_mode);
+      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_FramebufferFloat16,
+            self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT);
+   }
+
    static void renderer_set_opaque_primitive_spec_constants(Renderer *self,
          int trans_mode)
    {
@@ -6204,10 +6230,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_specialization_constant(cmd, SpecConstIndex_MaskTest, 0);
       commandbuffer_set_specialization_constant(cmd, SpecConstIndex_PreciseColor,
             (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? psx_pgxp_color : 0);
-      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_PgxpFog,
-            (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? (psx_pgxp_color && psx_pgxp_fog) : 0);
-      commandbuffer_set_specialization_constant(cmd, SpecConstIndex_FramebufferFloat16,
-            self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT);
+      renderer_set_primitive_color_spec_constants(self, cmd);
    }
 
    static void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
@@ -6428,9 +6451,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t scaled_quad_frag[] =
 #include "shaders_vulkan/prebuilt/scaled.quad.frag.inc"
       ;
-   static const uint32_t scaled_dither_quad_frag[] =
-#include "shaders_vulkan/prebuilt/scaled.dither.quad.frag.inc"
-      ;
    static const uint32_t bpp24_quad_frag[] =
 #include "shaders_vulkan/prebuilt/bpp24.quad.frag.inc"
       ;
@@ -6439,9 +6459,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       ;
    static const uint32_t unscaled_quad_frag[] =
 #include "shaders_vulkan/prebuilt/unscaled.quad.frag.inc"
-      ;
-   static const uint32_t unscaled_dither_quad_frag[] =
-#include "shaders_vulkan/prebuilt/unscaled.dither.quad.frag.inc"
       ;
    static const uint32_t hdr_scaled_quad_frag[] =
 #include "shaders_vulkan/prebuilt/hdr.scaled.quad.frag.inc"
@@ -6532,6 +6549,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 #include "shaders_vulkan/prebuilt/textured.ceiling.msaa.unscaled.frag.inc"
       ;
 
+   static const uint32_t reduce_cached_color_comp[] =
+#include "shaders_vulkan/prebuilt/reduce_cached_color.comp.inc"
+      ;
    static const uint32_t blit_vram_scaled_comp[] =
 #include "shaders_vulkan/prebuilt/blit_vram.scaled.comp.inc"
       ;
@@ -6631,9 +6651,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t mipmap_resolve_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.resolve.frag.inc"
       ;
-   static const uint32_t mipmap_dither_resolve_frag[] =
-#include "shaders_vulkan/prebuilt/mipmap.dither.resolve.frag.inc"
-      ;
    static const uint32_t hdr_mipmap_resolve_frag[] =
 #include "shaders_vulkan/prebuilt/hdr.mipmap.resolve.frag.inc"
       ;
@@ -6688,15 +6705,27 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 #include "shaders_vulkan/prebuilt/mipmap.energy.blur.frag.inc"
       ;
 
-/* 3 LSBs are ignored. */
-#define FBCOLOR_TO_RGBA8(color) ((color) & 0xfff8f8f8u)
-
-static INLINE void fbcolor_to_rgba32f(float *v, uint32_t color)
+/* GP0 fills discard three bits before selecting the display encoding.
+ * Use the same explicit byte for a queued quad and a render-pass clear. */
+static INLINE uint32_t fbcolor_to_rgba8(uint32_t color, bool expanded)
 {
-   /* 3 LSBs are ignored. */
-   unsigned r = (color >> 0) & 0xf8;
-   unsigned g = (color >> 8) & 0xf8;
-   unsigned b = (color >> 16) & 0xf8;
+   color &= 0x00f8f8f8u;
+   if (expanded)
+   {
+      unsigned r = (((color >> 3) & 31u) * 255u + 15u) / 31u;
+      unsigned g = (((color >> 11) & 31u) * 255u + 15u) / 31u;
+      unsigned b = (((color >> 19) & 31u) * 255u + 15u) / 31u;
+      color = r | (g << 8) | (b << 16);
+   }
+   return color;
+}
+
+static INLINE void fbcolor_to_rgba32f(float *v, uint32_t color, bool expanded)
+{
+   uint32_t encoded = fbcolor_to_rgba8(color, expanded);
+   unsigned r = (encoded >> 0) & 255u;
+   unsigned g = (encoded >> 8) & 255u;
+   unsigned b = (encoded >> 16) & 255u;
    v[0] = r * (1.0f / 255.0f);
    v[1] = g * (1.0f / 255.0f);
    v[2] = b * (1.0f / 255.0f);
@@ -6752,6 +6781,8 @@ static void renderer_init(Renderer *self,
    /* self->render_state's default member initializers were moved out when
     * RenderState seed them here (was implicit at construction). */
    render_state_init(&self->render_state);
+   if (!state)
+      self->render_state.color_mode = psx_internal_color_mode;
    opaque_queue_init(&self->queue);
    imageview_vec_init(&self->scaled_views); /* was default-constructed; now a plain struct */
    self->last_scanout.data            = NULL;
@@ -6828,7 +6859,8 @@ static void renderer_init(Renderer *self,
    {
       struct ImageCreateInfo palette_info = image_create_info_render_target(256, 1, VK_FORMAT_R32_UINT);
       palette_info.initial_layout = VK_IMAGE_LAYOUT_GENERAL;
-      palette_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+      palette_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+            VK_IMAGE_USAGE_STORAGE_BIT;
       ih_move(&self->palette_cache, device_create_image(self->device, &palette_info, NULL));
       image_set_layout(ih_get(&self->palette_cache), Layout_General);
    }
@@ -7108,16 +7140,12 @@ static void renderer_init_pipelines(Renderer *self)
 
    self->pipelines.scaled_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), scaled_quad_frag, sizeof(scaled_quad_frag));
-   self->pipelines.scaled_dither_quad_blitter =
-      device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), scaled_dither_quad_frag, sizeof(scaled_dither_quad_frag));
    self->pipelines.bpp24_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), bpp24_quad_frag, sizeof(bpp24_quad_frag));
    self->pipelines.bpp24_yuv_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), bpp24_yuv_quad_frag, sizeof(bpp24_yuv_quad_frag));
    self->pipelines.unscaled_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), unscaled_quad_frag, sizeof(unscaled_quad_frag));
-   self->pipelines.unscaled_dither_quad_blitter =
-      device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), unscaled_dither_quad_frag, sizeof(unscaled_dither_quad_frag));
 
    self->pipelines.hdr_scaled_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_scaled_quad_frag, sizeof(hdr_scaled_quad_frag));
@@ -7128,6 +7156,8 @@ static void renderer_init_pipelines(Renderer *self)
    self->pipelines.hdr_bpp24_yuv_quad_blitter =
       device_request_program_graphics_code(self->device, quad_vert, sizeof(quad_vert), hdr_bpp24_yuv_quad_frag, sizeof(hdr_bpp24_yuv_quad_frag));
 
+   self->pipelines.reduce_cached_color = device_request_program_compute_code(self->device,
+         reduce_cached_color_comp, sizeof(reduce_cached_color_comp));
    self->pipelines.copy_to_vram = device_request_program_compute_code(self->device, copy_vram_comp, sizeof(copy_vram_comp));
    self->pipelines.copy_to_vram_masked = device_request_program_compute_code(self->device, copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
 
@@ -7178,8 +7208,6 @@ static void renderer_init_pipelines(Renderer *self)
 
    self->pipelines.mipmap_resolve =
       device_request_program_graphics_code(self->device, mipmap_vert, sizeof(mipmap_vert), mipmap_resolve_frag, sizeof(mipmap_resolve_frag));
-   self->pipelines.mipmap_dither_resolve =
-      device_request_program_graphics_code(self->device, mipmap_vert, sizeof(mipmap_vert), mipmap_dither_resolve_frag, sizeof(mipmap_dither_resolve_frag));
    self->pipelines.hdr_mipmap_resolve =
       device_request_program_graphics_code(self->device, mipmap_vert, sizeof(mipmap_vert), hdr_mipmap_resolve_frag, sizeof(hdr_mipmap_resolve_frag));
 
@@ -7255,11 +7283,11 @@ static void renderer_clear_rect(Renderer *self,
             | (((fb_color >> 11) & 0x1f) << 5)
             | (((fb_color >> 19) & 0x1f) << 10));
       texture_tracker_clearRegion(self->tracker, *rect, fill16);
-      /* A fill is GPU-produced content, though a constant is exact under
-       * either modulation path; mark it for consistency with hardware. */
-      vram_prov_op(self, (int)rect->x, (int)rect->y,
-            (int)rect->width, (int)rect->height, 1);
    }
+   /* Fills are GPU-produced VRAM even when HD texture tracking is disabled.
+    * Later feedback modulation must retain the word's RGB5 truncation. */
+   vram_prov_op(self, (int)rect->x, (int)rect->y,
+         (int)rect->width, (int)rect->height, 1);
    ih_reset(&self->last_scanout);
    fbatlas_clear_rect(&self->atlas, rect, fb_color);
 
@@ -7559,6 +7587,9 @@ static void renderer_ssaa_framebuffer(Renderer *self)
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, 1);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_ResolveEotf, psx_hdr_sdr_eotf);
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+         SpecConstIndex_ExpandedColor, !psx_hdr_active &&
+         self->render_state.color_mode == PSX_INTERNAL_COLOR_32BPP);
    commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.resolve_to_unscaled);
    commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer_ssaa)));
    if (self->msaa > 1)
@@ -7799,12 +7830,12 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
    if (scaled)
    {
       commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_scaled_quad_blitter : self->pipelines.scaled_quad_blitter);
-      commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearClamp);
+      commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_NearestClamp);
    }
    else
    {
       commandbuffer_set_program(cbh_get(&self->cmd), psx_hdr_active ? self->pipelines.hdr_unscaled_quad_blitter : self->pipelines.unscaled_quad_blitter);
-      commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_LinearClamp);
+      commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
    }
 
    commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
@@ -7873,6 +7904,13 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
    qp.src_primaries = psx_src_primaries;
    commandbuffer_push_constants(cbh_get(&self->cmd), &qp, 0, sizeof(qp));
    }
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+         SpecConstIndex_ColorMode, psx_hdr_active ?
+         PSX_INTERNAL_COLOR_32BPP :
+         (self->render_state.color_mode == PSX_INTERNAL_COLOR_16BPP &&
+          self->render_state.canonical_color ? 3 : self->render_state.color_mode));
+   commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd),
+         1u << SpecConstIndex_ColorMode);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
@@ -8438,7 +8476,6 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
 {
    VkViewport old_vp;
    RenderPassInfo rp;
-   bool dither;
    bool using_mipmap = false;   /* set in the adaptive-smoothing branch; picks the 44-byte HDR push */
    /* When the analog path is engaged the display quad stops being the last
     * stage: it renders gamma-domain R'G'B' into a 16F intermediate that the
@@ -8548,9 +8585,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          display_rect.height * render_scale,
          analog ? VK_FORMAT_R16G16B16A16_SFLOAT
          : hdr_quad ? renderer_hdr_scanout_format(self)
-            : (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither &&
-               !self->render_state.native_color && psx_src_primaries == 0
-               ? VK_FORMAT_A1R5G5B5_UNORM_PACK16 : VK_FORMAT_R8G8B8A8_UNORM));
+            : VK_FORMAT_R8G8B8A8_UNORM);
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -8582,30 +8617,9 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
 
    commandbuffer_set_viewport(cbh_get(&self->cmd), &new_vp);
 
-   /* Native (5-bit-targeted) dithering is counterproductive against a 10-bit
-    * PQ target - the dither amplitude is far larger than a 10-bit step, so it
-    * reads as noise rather than anti-banding. Force it off under HDR; this
-    * also makes the non-dither hdr quad variants the ones actually selected
-    * below and skips the dither push/LUT block. */
-   /* psx_hdr_active, not hdr_quad. An earlier version forced the console's
-    * 4x4 ordered dither on under HDR whenever a cable was selected, on the
-    * theory that the cable would dissolve it back into smooth gradients. It
-    * does not, at the resolutions PSX games actually use: the Bayer pattern
-    * sits at roughly 1.7 and 3.4 MHz in 320 mode, both below the 4.2 MHz luma
-    * cutoff, so it passes through intact and lands on the output as 2-7%
-    * peak-to-peak ripple across what should be flat colour - worst on blue in
-    * 320 mode, which is to say skies. Only 640 mode pushes the finer
-    * component (6.7 MHz) past the cutoff.
-    *
-    * 30-bit output exists to avoid 15-bit quantisation; re-imposing it to feed
-    * the cable trades the precision the user asked for against an artifact. So
-    * HDR suppresses the dither with a cable exactly as it does without one. */
-   /* Native-colour rendering has already applied the GP0 primitive's DTD bit
-    * and stored RGB5. Applying this display-wide pass as well would dither and
-    * quantize the image a second time. */
-   dither = (self->render_state.scanout_mode == ScanoutMode_ABGR1555_Dither) &&
-      !self->render_state.native_color && !psx_hdr_active;
-
+   /* SDR DTD belongs to eligible source primitives. Scanout only applies
+    * the selected expansion, after resolves and before color management.
+    * Accepted HDR bypasses both RGB5 reduction and PS1 dithering. */
    if (bpp24)
    {
       if (self->render_state.scanout_mdec_filter == ScanoutFilter_MDEC_YUV)
@@ -8616,63 +8630,32 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    }
    else if (ssaa)
    {
-      if (dither)
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.unscaled_dither_quad_blitter);
-      else
-         commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_unscaled_quad_blitter : self->pipelines.unscaled_quad_blitter);
+      commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_unscaled_quad_blitter : self->pipelines.unscaled_quad_blitter);
 
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer_ssaa)), StockSampler_NearestWrap);
    }
    else if (!self->render_state.adaptive_smoothing || self->scaling == 1)
    {
-      if (dither)
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.scaled_dither_quad_blitter);
-      else
-         commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_scaled_quad_blitter : self->pipelines.scaled_quad_blitter);
+      commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_scaled_quad_blitter : self->pipelines.scaled_quad_blitter);
 
-      commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, iv_get(imageview_vec_at(&self->scaled_views, 0)), StockSampler_LinearWrap);
+      /* This quad maps each output pixel to one resolved framebuffer texel.
+       * Linear filtering can perturb an exact RGB5 boundary before the final
+       * SDR reduction. Sample that texel directly; adaptive smoothing below
+       * keeps its intentional trilinear filter. HDR retains its wide path. */
+      commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
+            iv_get(imageview_vec_at(&self->scaled_views, 0)),
+            psx_hdr_active ? StockSampler_LinearWrap : StockSampler_NearestWrap);
    }
    else
    {
       /* Adaptive smoothing. HDR selects the PQ variant so the trilinear
        * resolve's interpolated (sub-8-bit) output is preserved at 10-bit
-       * rather than being crushed by the plain scaled fallback. dither is
-       * already false under HDR (forced above), so the dither branch is SDR
-       * only. */
+       * rather than being crushed by the plain scaled fallback. */
       using_mipmap = true;
-      if (dither)
-         commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.mipmap_dither_resolve);
-      else
-         commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_mipmap_resolve : self->pipelines.mipmap_resolve);
+      commandbuffer_set_program(cbh_get(&self->cmd), hdr_quad ? self->pipelines.hdr_mipmap_resolve : self->pipelines.mipmap_resolve);
 
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->scaled_framebuffer)), StockSampler_TrilinearWrap);
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->bias_framebuffer)), StockSampler_LinearWrap);
-   }
-
-   if (dither)
-   {
-      { struct DitherData
-      {
-         int32_t dither_shift;
-      };
-      struct DitherData *dither = (struct DitherData *)commandbuffer_allocate_constant_data(cbh_get(&self->cmd), 0, 3, 1 * sizeof(struct DitherData));
-
-      if (self->render_state.dither_native_resolution && scaled)
-      {
-         int32_t shift = 0;
-         unsigned tmp = self->scaling >> 1;
-         while (tmp)
-         {
-            shift++;
-            tmp >>= 1;
-         }
-         dither->dither_shift = shift;
-      }
-      else
-      {
-         dither->dither_shift = 0;
-      }
-      }
    }
 
    commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
@@ -8815,6 +8798,13 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    qp.src_primaries = psx_src_primaries;
    commandbuffer_push_constants(cbh_get(&self->cmd), &qp, 0, sizeof(qp));
    }
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+         SpecConstIndex_ColorMode, psx_hdr_active ?
+         PSX_INTERNAL_COLOR_32BPP :
+         (self->render_state.color_mode == PSX_INTERNAL_COLOR_16BPP &&
+          self->render_state.canonical_color ? 3 : self->render_state.color_mode));
+   commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd),
+         1u << SpecConstIndex_ColorMode);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
@@ -8940,6 +8930,10 @@ static void renderer_flush_resolves(Renderer *self)
       unsigned size;
       renderer_ensure_command_buffer(self);
       commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.resolve_to_scaled);
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+            SpecConstIndex_ExpandedColor, !psx_hdr_active &&
+            self->render_state.color_mode == PSX_INTERNAL_COLOR_32BPP);
+      commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
       if (self->msaa > 1)
@@ -8971,6 +8965,10 @@ static void renderer_flush_resolves(Renderer *self)
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, 0);
       commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
       commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.resolve_to_unscaled);
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+            SpecConstIndex_ExpandedColor, !psx_hdr_active &&
+            self->render_state.color_mode == PSX_INTERNAL_COLOR_32BPP);
+      commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
       commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
       if (self->msaa > 1)
          commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, image_get_view(ih_get(&self->scaled_framebuffer_msaa)), StockSampler_NearestClamp);
@@ -9308,8 +9306,18 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    offset_uv = self->scaled_uv_offset && self->render_state.primitive_type == PrimitiveType_Polygon;
 
    z = renderer_allocate_depth(self, scaled_read ? Domain_Scaled : Domain_Unscaled, &rect);
-   vram_prov_op(self, (int)rect.x, (int)rect.y,
-         (int)rect.width, (int)rect.height, 1);
+   {
+      const TTRect *clip = &self->render_state.draw_rect;
+      unsigned x0 = max_(rect.x, clip->x);
+      unsigned y0 = max_(rect.y, clip->y);
+      unsigned x1 = min_(rect.x + rect.width, clip->x + clip->width);
+      unsigned y1 = min_(rect.y + rect.height, clip->y + clip->height);
+      /* Scissored pixels are never written. Offscreen polygon bounds must
+       * not classify untouched texture pages as framebuffer feedback. */
+      if (x1 > x0 && y1 > y0)
+         vram_prov_op(self, (int)x0, (int)y0,
+               (int)(x1 - x0), (int)(y1 - y0), 1);
+   }
 
    /* Look up the hd texture index This is done here at the end of the function
     * because the `allocate_depth` call above can call `reset_queue` which would
@@ -9383,19 +9391,10 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
          }
       }
    }
-   if (self->render_state.primitive_dither)
+   /* HDR disables PS1 dithering even when FP16 storage is unavailable. */
+   if (self->render_state.primitive_dither && !psx_hdr_active)
       param = (int16_t)((uint16_t)param | 0x8000u);
-   if (self->render_state.native_color)
-   {
-      /* 0x0400 (formerly an unconsumed cache-hit debug marker) selects native
-       * RGB5 storage; 0x4000 selects a 4x4 dither pattern in native PS1 pixels
-       * instead of internal-resolution pixels. Both are authoritative frame
-       * configuration, while 0x8000 above is the individual primitive's GP0
-       * DTD bit. */
-      param = (int16_t)((uint16_t)param | 0x0400u);
-      if (self->render_state.dither_native_resolution)
-         param = (int16_t)((uint16_t)param | 0x4000u);
-   }
+   /* Color policy is specialized once per batch, separately from GP0 DTD. */
 
    {
    /* These fields are shared by every vertex of this queued primitive.
@@ -9714,7 +9713,7 @@ static void renderer_build_native_line_colors(Renderer *self,
  * Unsigned arithmetic preserves the rasterizer's wrapped 8.12 accumulator.
  * Planes travel with their triangle, so flush/reset/restore retain no side
  * state. Enhanced geometry keeps its existing interpolation policy.
- * Colour planes require Native Color; UV planes also serve other colour
+ * Colour planes require RGB5 drawing; UV planes also serve other colour
  * depths and texture modes. Both require 1x, single-sample, integral non-PGXP
  * geometry. GL's corresponding gate is narrower (native RGB5 and nearest). */
 static void renderer_build_native_interpolants(Renderer *self,
@@ -9828,6 +9827,7 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
                                                self->render_state.texture_mode != TextureMode_None,
                                                self->render_state.mask_test,
                                                self->render_state.native_color,
+                                               self->render_state.canonical_color,
                                                filtering,
                                                scaled_read,
                                      shift,
@@ -9912,6 +9912,7 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices, bool poly
          self->render_state.texture_mode != TextureMode_None,
          self->render_state.mask_test,
          self->render_state.native_color,
+         self->render_state.canonical_color,
          filtering,
          scaled_read,
          shift,
@@ -9948,10 +9949,9 @@ static void renderer_clear_quad(Renderer *self,
    /* BufferVertex colour is float[4] now; a positional initializer would
     * put the packed word into color[0] as a nonsense float and zero the
     * rest, so unpack it once and initialize the array explicitly. Alpha is
-    * the force-mask bit: fills never set the mask, and FBCOLOR_TO_RGBA8's
-    * old alpha byte was masked to 0xf8 anyway -- the mask semantics live in
-    * bit 15 of VRAM, produced by the fragment stage, not in this attrib. */
-   { const uint32_t fbc = FBCOLOR_TO_RGBA8(fb_color);
+    * the force-mask bit: fills always clear it. */
+   { const uint32_t fbc = fbcolor_to_rgba8(fb_color, !psx_hdr_active &&
+         self->render_state.color_mode == PSX_INTERNAL_COLOR_32BPP);
    const float fbr = (float)((fbc >>  0) & 0xFF) / 255.0f;
    const float fbg = (float)((fbc >>  8) & 0xFF) / 255.0f;
    const float fbb = (float)((fbc >> 16) & 0xFF) / 255.0f;
@@ -10111,7 +10111,7 @@ static void renderer_snapshot_scaled_texture_reads(Renderer *self)
 
 static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
 {
-   RenderPassInfo_Subpass subpass;
+   RenderPassInfo_Subpass subpasses[2];
    renderer_ensure_command_buffer(self);
    renderer_snapshot_scaled_texture_reads(self);
 
@@ -10131,24 +10131,26 @@ static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
    info.store_attachments = 1 << 0;
    info.op_flags = RENDER_PASS_OP_CLEAR_DEPTH_STENCIL_BIT;
 
-   render_pass_info_subpass_defaults(&subpass);
-   info.num_subpasses = 1;
-   info.subpasses = &subpass;
-   subpass.num_color_attachments = 1;
+   render_pass_info_subpass_defaults(subpasses);
+   subpasses[0].num_color_attachments = 1;
+   subpasses[0].color_attachments[0] = 0;
+   subpasses[1] = subpasses[0];
+   info.num_subpasses = self->render_pass_is_feedback ? 2 : 1;
+   info.subpasses = subpasses;
 
    { const ClearCandidate *clear_candidate = renderer_find_clear_candidate(self, rect);
 
-   subpass.color_attachments[0] = 0;
    if (self->render_pass_is_feedback)
    {
-      subpass.num_input_attachments = 1;
-      subpass.input_attachments[0] = 0;
+      subpasses[1].num_input_attachments = 1;
+      subpasses[1].input_attachments[0] = 0;
    }
 
    if (clear_candidate)
    {
       info.clear_depth_stencil.depth = clear_candidate->z;
-      fbcolor_to_rgba32f(info.clear_color[0].float32, clear_candidate->color);
+      fbcolor_to_rgba32f(info.clear_color[0].float32, clear_candidate->color,
+            !psx_hdr_active && self->render_state.color_mode == PSX_INTERNAL_COLOR_32BPP);
       info.clear_attachments = 1 << 0;
    }
    else
@@ -10187,6 +10189,8 @@ static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
    renderer_render_opaque_primitives(self);
    renderer_render_opaque_texture_primitives(self);
    renderer_render_semi_transparent_opaque_texture_primitives(self);
+   if (self->render_pass_is_feedback)
+      commandbuffer_next_subpass(cbh_get(&self->cmd));
    renderer_render_semi_transparent_primitives(self);
 
    commandbuffer_end_render_pass(cbh_get(&self->cmd));
@@ -10300,7 +10304,8 @@ static void renderer_dispatch(Renderer *self,
    if (!size)
       return;
 
-   renderer_hd_texture_uniforms(self, hd_texture);
+   if (textured)
+      renderer_hd_texture_uniforms(self, hd_texture);
    commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? &self->queue.default_scissor : Rect2DVec_at(&self->queue.scissors, scissor));
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, filtering ? self->primitive_filter_mode : FilterMode_NearestNeighbor);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, shift);
@@ -10326,7 +10331,8 @@ static void renderer_dispatch(Renderer *self,
          }
          if (hd_handle_ne(&(*PrimitiveInfoVec_at(scissors, i)).hd_texture_index, &hd_texture)) {
             hd_texture = (*PrimitiveInfoVec_at(scissors, i)).hd_texture_index;
-            renderer_hd_texture_uniforms(self, hd_texture);
+            if (textured)
+               renderer_hd_texture_uniforms(self, hd_texture);
          }
          if ((*PrimitiveInfoVec_at(scissors, i)).filtering != filtering) {
             filtering = (*PrimitiveInfoVec_at(scissors, i)).filtering;
@@ -10387,6 +10393,11 @@ static void renderer_hd_texture_uniforms(Renderer *self,
    };
    HdTexture hd = texture_tracker_get_hd_texture(self->tracker, hd_texture_index);
    Image *hd_img = (Image *)hd.texture; /* the Vulkan TTGpuBackend hands out Image* */
+   /* The existing draw batches already separate replacement handles. A none
+    * handle also sets the per-primitive skip flag; specialize that common
+    * case without depending on the menu or the live replacement toggle. */
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+         SpecConstIndex_HighResTexture, !hd_handle_is_none(&hd_texture_index));
    commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 4, image_get_view(hd_img), StockSampler_TrilinearClamp); /* Type of sampler only matters for the fast path */
    { struct HDPush push = {
       hd.vram_rect.x, hd.vram_rect.y, hd.vram_rect.width, hd.vram_rect.height,
@@ -10417,6 +10428,8 @@ static bool renderer_semi_trans_needs_feedback(const Renderer *self,
 {
    if (state->semi_transparent == SemiTransparentMode_None)
       return false;
+   if (state->canonical_color)
+      return true;
    switch (state->semi_transparent)
    {
    case SemiTransparentMode_Add:
@@ -10670,17 +10683,17 @@ static void renderer_blit_vram(Renderer *self,
    Domain domain;
    VK_ASSERT(dst->width == src->width);
    VK_ASSERT(dst->height == src->height);
-   /* Conservative provenance: the destination may now hold GPU-rendered
-    * content whether or not the source blocks were marked. */
-   vram_prov_op(self, (int)dst->x, (int)dst->y,
-         (int)dst->width, (int)dst->height, 1);
-
    /* Happens a lot in Square games for some reason. */
    if (rect_eq(dst, src))
       return;
 
    if (dst->width == 0 || dst->height == 0)
       return;
+
+   /* Real copies may carry rendered content. No-op copies above must not
+    * change provenance, including neighbouring CLUT rows in the same block. */
+   vram_prov_op(self, (int)dst->x, (int)dst->y,
+         (int)dst->width, (int)dst->height, 1);
 
 #ifndef NDEBUG
    TT_LOG_VERBOSE(RETRO_LOG_INFO,
@@ -11159,7 +11172,8 @@ static void renderer_semi_transparent_set_state(Renderer *self,
             renderer_get_scaled_read_view(self), StockSampler_NearestClamp);
    else
       commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)), StockSampler_NearestClamp);
-   renderer_hd_texture_uniforms(self, state->hd_texture_index);
+   if (state->textured)
+      renderer_hd_texture_uniforms(self, state->hd_texture_index);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, state->filtering ? self->primitive_filter_mode : FilterMode_NearestNeighbor);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Scaling, self->scaling);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, state->shift);
@@ -11173,10 +11187,9 @@ static void renderer_semi_transparent_set_state(Renderer *self,
     * UNORM write clamps regardless, so a variant would be identical. */
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_PreciseColor,
          (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? psx_pgxp_color : 0);
-   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_PgxpFog,
-         (self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT) ? (psx_pgxp_color && psx_pgxp_fog) : 0);
-   commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FramebufferFloat16,
-         self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT);
+   renderer_set_primitive_color_spec_constants(self, cbh_get(&self->cmd));
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+         SpecConstIndex_TransMode, TransMode_SemiTrans);
    /* Only the feedback programs declare this; the pipeline hash masks it out
     * everywhere else. 1 = check-mask (historical behaviour), 0 = the routed
     * non-masked subtractive case. */
@@ -11276,8 +11289,13 @@ static void renderer_semi_transparent_set_state(Renderer *self,
          commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
          commandbuffer_set_blend_constants(cbh_get(&self->cmd), rgba);
          commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
-         commandbuffer_set_blend_factors(cbh_get(&self->cmd), VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE,
-                                VK_BLEND_FACTOR_CONSTANT_ALPHA, VK_BLEND_FACTOR_ZERO);
+         /* Complementary weights preserve their sum when UNORM blend
+          * constants are quantized. Two rounded halves can darken even an
+          * integer average. Keep the existing wide-target HDR operation. */
+         commandbuffer_set_blend_factors(cbh_get(&self->cmd),
+               self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT ?
+                  VK_BLEND_FACTOR_CONSTANT_COLOR : VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
+               VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_CONSTANT_ALPHA, VK_BLEND_FACTOR_ZERO);
       }
       break;
    }
@@ -14387,7 +14405,10 @@ static uint32_t *stackalloc_u32_allocate_cleared(struct StackAllocatorU32 *a,
       return image_get_view(ih_get(&node->handle));
    }
 
-#define COMBINER_NEEDS_BLEND_CONSTANT(factor) ((factor) == VK_BLEND_FACTOR_CONSTANT_COLOR || (factor) == VK_BLEND_FACTOR_CONSTANT_ALPHA)
+#define COMBINER_NEEDS_BLEND_CONSTANT(factor) ((factor) == VK_BLEND_FACTOR_CONSTANT_COLOR || \
+      (factor) == VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR || \
+      (factor) == VK_BLEND_FACTOR_CONSTANT_ALPHA || \
+      (factor) == VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA)
 
 static VkOffset3D cb_add_offset(const VkOffset3D *a, const VkOffset3D *b)
    {
@@ -14805,6 +14826,7 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       VK_ASSERT(!self->compatible_render_pass);
       VK_ASSERT(!self->actual_render_pass);
 
+      self->current_subpass = 0;
       self->framebuffer = device_request_framebuffer(self->device, info);
       self->compatible_render_pass = framebuffer_get_compatible_render_pass(self->framebuffer);
       self->actual_render_pass = device_request_render_pass(self->device, info, false);
@@ -14840,6 +14862,15 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       self->current_contents = contents;
       commandbuffer_begin_graphics(self);
       }
+   }
+
+   static void commandbuffer_next_subpass(struct CommandBuffer *self)
+   {
+      vkCmdNextSubpass(self->cmd, VK_SUBPASS_CONTENTS_INLINE);
+      self->current_subpass++;
+      self->current_pipeline = VK_NULL_HANDLE;
+      self->dirty = ~0u;
+      self->dirty_sets = ~0u;
    }
 
    static void commandbuffer_end_render_pass(struct CommandBuffer *self)
@@ -20044,11 +20075,6 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
 #include "libretro_vulkan.h"
 
-/* #include "mednafen/mednafen.h" is required
- * for #include "mednafen/psx/gpu.h" to work properly. */
-#include "mednafen/mednafen.h"
-#include "mednafen/psx/gpu.h"
-
 #include "libretro_cbs.h"
 #include "libretro_options.h"
 #include "beetle_psx_globals.h"
@@ -20058,6 +20084,7 @@ static Context *context = NULL;
 static Device *device = NULL;
 static Renderer *renderer = NULL;
 static unsigned scaling = 4;
+extern enum dither_mode psx_gpu_dither_mode;
 /* Deferred geometry-change state. refresh_variables must not call
  * SET_SYSTEM_AV_INFO inline: the frontend handles it synchronously, tearing down
  * and rebuilding the device/renderer while a frame started by prepare_frame is
@@ -20169,7 +20196,6 @@ static bool mdec_yuv;
  * rhi/rhi_defer.h for which ops are deferred and which are dropped.
  */
 static rhi_defer_queue_t defer = { NULL, 0, 0 };
-static enum dither_mode dither_mode = DITHER_NATIVE;
 static bool dump_textures = false;
 static bool replace_textures = false;
 static bool track_textures = false;
@@ -20638,16 +20664,6 @@ void rhi_vulkan_refresh_variables(void)
          mdec_yuv = false;
    }
 
-   var.key = BEETLE_OPT(dither_mode);
-   dither_mode = DITHER_NATIVE;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (!strcmp(var.value, "internal resolution"))
-         dither_mode = DITHER_UPSCALED;
-      else if (!strcmp(var.value, "disabled"))
-         dither_mode = DITHER_OFF;
-   }
-
    var.key = BEETLE_OPT(crop_overscan);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -20918,8 +20934,53 @@ void rhi_vulkan_apply_pending_geometry(void)
    }
 }
 
+/* Rebuild color caches from their unchanged PS1 words when the SDR policy
+ * changes. Match GL's format-change reduction without a CPU readback or new
+ * images. Preserve rendered provenance and the selected, saved CLUT. */
+static void renderer_reduce_cached_color(Renderer *self)
+{
+   TTRect full = { 0, 0, FB_WIDTH, FB_HEIGHT };
+   CommandBuffer *cmd;
+   unsigned i;
+
+   /* Submit old-policy vertices before changing the global pipeline mode. */
+   renderer_flush(self);
+   fbatlas_write_compute(&self->atlas, Domain_Unscaled, &full);
+   renderer_ensure_command_buffer(self);
+   cmd = cbh_get(&self->cmd);
+   commandbuffer_set_program(cmd, self->pipelines.reduce_cached_color);
+   commandbuffer_set_specialization_constant_mask(cmd, 0);
+   commandbuffer_set_storage_texture(cmd, 0, 0, image_get_view(ih_get(&self->framebuffer)));
+   commandbuffer_dispatch(cmd, FB_WIDTH / 8, FB_HEIGHT / 8, 1);
+
+   if (self->atlas.palette_cache_saved)
+   {
+      Image *palette = ih_get(&self->palette_cache);
+      commandbuffer_image_barrier(cmd, palette,
+            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+      commandbuffer_set_storage_texture(cmd, 0, 0, image_get_view(palette));
+      commandbuffer_dispatch(cmd, 32, 1, 1);
+      commandbuffer_image_barrier(cmd, palette,
+            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   }
+   /* Keep access hazards intact; only the derived scaled colors are stale. */
+   for (i = 0; i < NUM_BLOCKS_X * NUM_BLOCKS_Y; i++)
+      self->atlas.fb_info[i] = (self->atlas.fb_info[i] & ~STATUS_OWNERSHIP_MASK) |
+            STATUS_FB_ONLY;
+   ih_reset(&self->last_scanout);
+}
+
 void rhi_vulkan_prepare_frame(void)
 {
+   enum dither_mode pattern = psx_hdr_active ? DITHER_OFF : psx_gpu_dither_mode;
+   bool native_color = !psx_hdr_active &&
+         psx_internal_color_mode != PSX_INTERNAL_COLOR_32BPP;
    if (device == NULL)
    {
       /* The HW context is down (between context_destroy and the next
@@ -20951,23 +21012,33 @@ void rhi_vulkan_prepare_frame(void)
    renderer->primitive_filter_mode = (FilterMode)(filter_mode);
    renderer->sprite_filter_exclude = (FilterExclude)(filter_exclude_sprites);
    renderer->polygon_2d_filter_exclude = (FilterExclude)(filter_exclude_2d_polygons);
-   /* Latch the negotiated mode at the frame boundary before any GP0 work is
-    * queued. Native colour is an explicit opt-in: it is not implied by the
-    * dither option (which still only selects the per-primitive dither
-    * pattern and the display-level downsample), and engaged HDR always
-    * keeps its higher-precision path. */
-   renderer->render_state.native_color =
-      !psx_hdr_active && psx_native_color != 0;
-   renderer->render_state.dither_native_resolution =
-      dither_mode == DITHER_NATIVE;
+   /* The option selects drawing policy, not storage format. Latch it
+    * before GP0 work; accepted HDR overrides low-color drawing, while
+    * preserving the selected SDR mode for fallback. */
+   if (renderer->render_state.native_color != native_color ||
+       renderer->render_state.dither_mode != pattern)
+      renderer_flush(renderer);
+   if (!psx_hdr_active &&
+       renderer->render_state.color_mode != psx_internal_color_mode)
+      renderer_reduce_cached_color(renderer);
+   renderer->render_state.color_mode = psx_internal_color_mode;
+   renderer->render_state.native_color = native_color;
+   renderer->render_state.dither_mode = pattern;
+   renderer->render_state.canonical_color =
+      renderer->render_state.native_color &&
+      (renderer->msaa > 1 ||
+       (renderer->scaling > 1 &&
+        (renderer->render_state.scanout_filter == ScanoutFilter_SSAA ||
+         renderer->render_state.adaptive_smoothing)) ||
+       (psx_internal_color_mode == PSX_INTERNAL_COLOR_16BPP &&
+        (filter_mode != FilterMode_NearestNeighbor ||
+         texture_tracker_hd_textures_enabled(replace_textures))));
 }
 
 static ScanoutMode get_scanout_mode(bool bpp24)
 {
    if (bpp24)
       return ScanoutMode_BGR24;
-   else if (dither_mode != DITHER_OFF)
-      return ScanoutMode_ABGR1555_Dither;
    else
       return ScanoutMode_ABGR1555_555;
 }
@@ -21320,8 +21391,8 @@ static void vertices_set_cf(Vertex *v, int n, const float *precise_rgb)
             : (float)((v[i].color >> (c * 8)) & 0xFF) / 255.0f;
 }
 
-/* Depth-cue sidecar per vertex: 4 floats (far colour, t) or NULL for none.
- * t == 0 is the no-cue encoding the shader treats as identity. */
+/* Preserve the RHI lanes used by packed native interpolation.
+ * gpu_polygon.c completes depth cueing before submission and supplies zeros. */
 static void vertices_set_fog(Vertex *v, int n, const float *fog)
 {
    int i, c;
