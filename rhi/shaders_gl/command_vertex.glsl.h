@@ -30,7 +30,6 @@ in uvec2 native_uv;
 uniform ivec2 offset;
 
 out vec3 frag_shading_color;
-out vec4 frag_fog;
 flat out uvec2 frag_texture_page;
 out vec2 smooth_texture_coord;
 flat out uvec2 frag_clut;
@@ -42,11 +41,11 @@ flat out uvec4 frag_texture_window;
 flat out uvec4 frag_texture_limits;
 flat out uint frag_framebuffer_feedback;
 flat out uint frag_palette_cached;
+flat out uint frag_native_flags;
 )
 
 #if !defined(FILTER_SABR) && !defined(FILTER_XBR)
 STRINGIZE(
-flat out uint frag_native_flags;
 flat out uvec3 frag_color_origin;
 flat out uvec3 frag_color_dx;
 flat out uvec3 frag_color_dy;
@@ -95,11 +94,10 @@ void main() {
    /* Already in 0..1+ scale (1.0 == 0xFF). May exceed 1.0 when the PGXP
    // precise-colour path supplies the GTE's pre-saturation value. */
    frag_shading_color = uintBitsToFloat(color);
-   frag_fog = uintBitsToFloat(fog);
+   frag_native_flags = native_flags;
 )
 #if !defined(FILTER_SABR) && !defined(FILTER_XBR)
 STRINGIZE(
-   frag_native_flags = native_flags;
    frag_native_uv = (native_flags & 2u) != 0u ?
          uvec4(position.yw, native_uv) : uvec4(native_uv, 0u, 0u);
    frag_color_origin = uvec3(0u);
@@ -113,7 +111,6 @@ STRINGIZE(
       frag_color_dy = high >> 8u;
       frag_shading_color = vec3(uvec3(fog.w, fog.w >> 8u,
             fog.w >> 16u) & 255u) / 255.0;
-      frag_fog = vec4(0.0);
    }
 )
 #endif
@@ -130,6 +127,10 @@ STRINGIZE(
    frag_semi_transparent = semi_transparent;
    frag_texture_window = texture_window;
    frag_texture_limits = texture_limits;
+   // Lines are untextured: reuse their unused texture bounds for coverage.
+   // This avoids adding a UV varying to the larger SABR/xBR interface.
+   if ((native_flags & 4u) != 0u)
+      frag_texture_limits.xy = native_uv;
    frag_framebuffer_feedback = framebuffer_feedback;
    frag_palette_cached = palette_cached;
 )

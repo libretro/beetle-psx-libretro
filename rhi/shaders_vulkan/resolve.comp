@@ -1,5 +1,6 @@
 #version 450
 layout(local_size_x = 8, local_size_y = 8) in;
+layout(constant_id = 8) const int EXPANDED_COLOR = 0;
 
 #include "common.h"
 #include "hdr.h"
@@ -60,7 +61,7 @@ void main()
 	uvec2 coord = gl_GlobalInvocationID.xy + offsets[gl_WorkGroupID.z].xy * registers.scale;
 	vec2 uv = (vec2(coord) + 0.5) * registers.inv_source_size;
 	uint value = textureLod(uUnscaled, uv, 0.0).x;
-	vec4 unorm = abgr1555(value);
+	vec4 unorm = abgr1555_color(value, EXPANDED_COLOR != 0);
 	#if defined(MSAA)
 		int samples = imageSamples(uScaledMS);
 		for (int i = 0; i < samples; i++)
@@ -130,6 +131,8 @@ void main()
 	value = mix(value, vec4(0.0), isnan(value));
 
 	uint packed_color = pack_abgr1555(value);
+	if (EXPANDED_COLOR != 0)
+		packed_color |= ABGR1555_BYTE_COLOR;
 	imageStore(uUnscaled, ivec2(coord), uvec4(packed_color));
 #endif
 }

@@ -40,12 +40,11 @@ extern int   psx_hdr_sdr_eotf;
 extern int   psx_hdr_overbright_hot;
 extern unsigned int psx_pgxp_mode;
 extern int   psx_pgxp_color;   /* PGXP precise colour: vertex colour may exceed 1.0 on fp16 */
-extern int   psx_pgxp_fog;     /* PGXP linear-light depth cue; effective only with precise colour */
 extern int   psx_src_primaries;
 
 /* fp16 render targets are core on desktop GL 3.0+; GLES3 needs an
  * extension to make them color-renderable. When unavailable, fb_out
- * stays on its SDR storage: the PQ display encode still runs if the
+ * uses RGBA8: the PQ display encode still runs if the
  * frontend engaged HDR10 (the signal contract requires it), but
  * over-white content clamps at reference white. */
 static bool gl_fp16_renderable(void)
@@ -859,6 +858,8 @@ struct gl_primitive_batch {
     * Batches split whenever the handle changes so the flush loop can
     * bind one replacement texture + uniform set per batch. */
    HdTextureHandle hd;
+   bool color_blend;
+   int blend_rect[4];
 };
 typedef struct gl_primitive_batch gl_primitive_batch;
 
@@ -1032,6 +1033,11 @@ struct gl_renderer {
    uint32_t internal_upscaling;
    /* Current internal color depth */
    uint8_t internal_color_depth;
+   enum psx_internal_color_mode_e color_mode;
+   /* SDR byte storage uses full-range colors in 32 bpp and q*8 in enhanced
+    * 16 bpp. Ordinary nearest 16-bpp drawing keeps fast RGB5 storage. */
+   bool byte_color_storage;
+   gl_texture blend_texture;
    /* fb_out is GL_RGBA16F: 30-bit/HDR color format requested and fp16 is
     * color-renderable. Drives the explicit source clamp, the subtractive
     * zero-floor pass, dither force-off, and readback quantisation. */
@@ -1091,6 +1097,9 @@ struct gl_renderer {
    struct
    {
       uint64_t sequence;
+      /* Dependency snapshots can consume writer records without updating the
+       * native mirror. Keep frame bounds separately until its final resolve. */
+      uint16_t frame_rect[4];
       struct gl_vram_sync_tile tiles
             [GL_VRAM_SYNC_TILES_Y][GL_VRAM_SYNC_TILES_X];
    } vram_sync;
@@ -1875,13 +1884,14 @@ static void gl_framebuffer_init(struct gl_framebuffer *fb,
                (GLsizei) color_texture->height);
 }
 
-static void gl_texture_init(
+static bool gl_texture_init(
       struct gl_texture *tex,
       uint32_t width,
       uint32_t height,
       GLenum internal_format)
 {
    GLuint id = 0;
+   GLint allocated = GL_FALSE;
 
    glGenTextures(1, &id);
    glBindTexture(GL_TEXTURE_2D, id);
@@ -1896,6 +1906,8 @@ static void gl_texture_init(
    tex->id     = id;
    tex->width  = width;
    tex->height = height;
+   glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_IMMUTABLE_FORMAT, &allocated);
+   return id != 0 && allocated == GL_TRUE;
 }
 
 static void gl_texture_set_sub_image_window(
@@ -1931,7 +1943,8 @@ static void gl_texture_set_sub_image_window(
    {
       size_t sub_w = (size_t) resolution[0];
       size_t sub_h = (size_t) resolution[1];
-      uint16_t* converted =
+      size_t line, px;
+      uint16_t *converted =
             (uint16_t*) malloc(sub_w * sub_h * sizeof(uint16_t));
 
       if (!converted)
@@ -1939,34 +1952,28 @@ static void gl_texture_set_sub_image_window(
          glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
          return;
       }
-
-      for (size_t line = 0; line < sub_h; line++)
+      for (line = 0; line < sub_h; line++)
       {
-         const uint16_t* src_row = sub_data + line * row_len;
-         uint16_t* dst_row = converted + line * sub_w;
-
-         for (size_t px = 0; px < sub_w; px++)
+         const uint16_t *src_row = sub_data + line * row_len;
+         uint16_t *dst_row = converted + line * sub_w;
+         for (px = 0; px < sub_w; px++)
          {
             uint16_t val = src_row[px];
-            uint16_t r = val & 0x1Fu;
-            uint16_t g = (val >> 5) & 0x1Fu;
-            uint16_t b = (val >> 10) & 0x1Fu;
-            uint16_t a = (val >> 15) & 0x01u;
-
+            uint16_t r = val & 31u;
+            uint16_t g = (val >> 5) & 31u;
+            uint16_t b = (val >> 10) & 31u;
+            uint16_t a = (val >> 15) & 1u;
             dst_row[px] = (r << 11) | (g << 6) | (b << 1) | a;
          }
       }
-
+      /* Submit prior framebuffer writes before replacing their texture
+       * data. Adreno can otherwise lose this upload despite correct client
+       * bytes. Submission after the update is too late; this does not wait
+       * for the GPU or change the packed VRAM representation. */
+      glFlush();
       glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-      glTexSubImage2D(  GL_TEXTURE_2D,
-                        0,
-                        (GLint) top_left[0],
-                        (GLint) top_left[1],
-                        (GLsizei) resolution[0],
-                        (GLsizei) resolution[1],
-                        format,
-                        ty,
-                        (void*)converted);
+      glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, resolution[0], resolution[1],
+            format, ty, converted);
       free(converted);
       return;
    }
@@ -2274,6 +2281,9 @@ static void gl_vram_sync_clear(gl_renderer *renderer)
    unsigned ty;
    unsigned tx;
 
+   memset(renderer->vram_sync.frame_rect, 0,
+         sizeof(renderer->vram_sync.frame_rect));
+
    /* Synchronization makes pending writers current, but does not change
     * where the pixels originated. Preserve GPU-written provenance. */
    for (ty = 0; ty < GL_VRAM_SYNC_TILES_Y; ty++)
@@ -2524,6 +2534,30 @@ static void gl_vram_sync_mark_rect(gl_renderer *renderer,
 
    if (!w || !h)
       return;
+
+   {
+      uint16_t *frame = renderer->vram_sync.frame_rect;
+      unsigned x0 = x % VRAM_WIDTH_PIXELS;
+      unsigned y0 = y % VRAM_HEIGHT;
+      unsigned x1 = x0 + w;
+      unsigned y1 = y0 + h;
+      /* Wrapped writes conservatively cover the whole affected axis. */
+      if (x1 > VRAM_WIDTH_PIXELS) { x0 = 0; x1 = VRAM_WIDTH_PIXELS; }
+      if (y1 > VRAM_HEIGHT) { y0 = 0; y1 = VRAM_HEIGHT; }
+      if (frame[2] && frame[3])
+      {
+         unsigned old_x1 = frame[0] + frame[2];
+         unsigned old_y1 = frame[1] + frame[3];
+         if (frame[0] < x0) x0 = frame[0];
+         if (frame[1] < y0) y0 = frame[1];
+         if (old_x1 > x1) x1 = old_x1;
+         if (old_y1 > y1) y1 = old_y1;
+      }
+      frame[0] = (uint16_t)x0;
+      frame[1] = (uint16_t)y0;
+      frame[2] = (uint16_t)(x1 - x0);
+      frame[3] = (uint16_t)(y1 - y0);
+   }
 
    sequence = ++renderer->vram_sync.sequence;
    gl_vram_sync_update_gpu_written_rect(renderer, x, y, w, h, true);
@@ -2952,8 +2986,11 @@ static void gl_vram_sync_primitive(gl_renderer *renderer,
       }
 
       framebuffer_feedback = texture_gpu_written || clut_gpu_written;
+      /* 32 bpp raw reads must preserve rendered byte colors at 1x too.
+       * Reuse the existing snapshot instead of reducing through RGB5. */
       scaled_feedback = framebuffer_feedback &&
-            renderer->internal_upscaling > 1;
+            (renderer->internal_upscaling > 1 ||
+             (!psx_hdr_active && renderer->color_mode == PSX_INTERNAL_COLOR_32BPP));
       if (scaled_feedback && !gl_ensure_fb_feedback_texture(renderer))
          scaled_feedback = false;
 
@@ -3093,6 +3130,26 @@ static gl_draw_buffer *gl_draw_buffer_build(const char *vertex_shader_src,
    return db;
 }
 
+/* Clamp through the same primitive coverage without reading a destination
+ * texture. Keep alpha/mask and stencil unchanged, and restore blend state. */
+static void gl_renderer_ceiling_batch(gl_renderer *renderer,
+      const struct gl_primitive_batch *batch, float ceiling,
+      GLenum blend_src, GLenum blend_dst, GLenum blend_func)
+{
+   GLint uniform = gl_uniform_map_get(
+         &renderer->command_buffer->program->uniforms, "force_ceiling");
+   glUniform1f(uniform, ceiling);
+   glBlendEquationSeparate(GL_MIN, GL_FUNC_ADD);
+   glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
+   glStencilMask(0);
+   glDrawElements(batch->draw_mode, batch->count, GL_UNSIGNED_SHORT,
+         (GLvoid*)(batch->first * sizeof(GLushort)));
+   glStencilMask(1);
+   glUniform1f(uniform, 0.0f);
+   glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
+   glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
+}
+
 static void gl_renderer_draw(gl_renderer *renderer)
 {
    gl_framebuffer _fb;
@@ -3134,7 +3191,7 @@ static void gl_renderer_draw(gl_renderer *renderer)
                "fb_feedback_texture"), 3);
       glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms,
                "feedback_upscaling"), renderer->fb_feedback_texture.id ?
-               renderer->internal_upscaling : 1);
+               renderer->internal_upscaling : 0);
       glActiveTexture(GL_TEXTURE0);
    }
 
@@ -3191,8 +3248,8 @@ static void gl_renderer_draw(gl_renderer *renderer)
          GLenum blend_func = GL_FUNC_ADD;
          GLenum blend_src = GL_CONSTANT_ALPHA;
          GLenum blend_dst = GL_CONSTANT_ALPHA;
-         bool native_rgb5 = renderer->internal_color_depth == 16 &&
-               !renderer->fb_out_fp16;
+         bool color_blend = it->color_blend && !it->opaque;
+         bool native_rgb5 = renderer->fb_out_internal_format == GL_RGB5_A1;
          bool native_average = !it->opaque && native_rgb5 &&
                it->transparency_mode == SEMI_TRANSPARENCY_MODE_AVERAGE;
          bool native_quarter = !it->opaque && native_rgb5 &&
@@ -3217,6 +3274,10 @@ static void gl_renderer_draw(gl_renderer *renderer)
          glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_mask_bit"), it->force_mask ? 1u : 0u);
          glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms,
                   "native_blend"), native_average ? 1u : native_quarter ? 2u : 0u);
+         glUniform1i(gl_uniform_map_get(&renderer->command_buffer->program->uniforms,
+                  "blend_texture"), 4);
+         glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms,
+                  "color_blend"), color_blend ? (unsigned)it->transparency_mode + 1u : 0u);
          /* "HDR Additive Overbright": skip the source clamp for plain
           * additive draws on the fp16 target only, matching the Vulkan
           * renderer (primitive.frag gates hot on BLEND_ADD). */
@@ -3230,8 +3291,6 @@ static void gl_renderer_draw(gl_renderer *renderer)
                   * shadow's accept rule refuses anything that would not
                   * requantize to the architectural bytes. */
                  || psx_pgxp_color)) ? 1u : 0u);
-         glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "pgxp_fog"),
-               (renderer->fb_out_fp16 && psx_pgxp_color && psx_pgxp_fog) ? 1u : 0u);
       }
       /* RGB5 averaging truncates (source + destination) / 2. Bias the
        * fixed-function result below the half-code rounding threshold,
@@ -3254,7 +3313,7 @@ static void gl_renderer_draw(gl_renderer *renderer)
       }
       else
          glBlendColor(0.25f, 0.25f, 0.25f, 0.5f);
-      if (opaque)
+      if (opaque || color_blend)
          glDisable(GL_BLEND);
       else
       {
@@ -3266,7 +3325,12 @@ static void gl_renderer_draw(gl_renderer *renderer)
             case SEMI_TRANSPARENCY_MODE_AVERAGE:
                blend_func = GL_FUNC_ADD;
                /* Native RGB5 uses the truncating weights set above. */
-               blend_src = GL_CONSTANT_ALPHA;
+               /* Complementary weights sum to one even when the driver
+                * quantizes the blend constant. Two rounded halves can turn
+                * white + white into 254 (or darken other integer averages).
+                * Native RGB5 retains its paired truncation compensation. */
+               blend_src = !native_average && !renderer->fb_out_fp16 ?
+                     GL_ONE_MINUS_CONSTANT_ALPHA : GL_CONSTANT_ALPHA;
                blend_dst = native_average ? GL_CONSTANT_COLOR : GL_CONSTANT_ALPHA;
                break;
             /* 1.0xB + 1.0 x F */
@@ -3335,7 +3399,7 @@ static void gl_renderer_draw(gl_renderer *renderer)
           * from B <= 1.0; GL_RGBA16F lets stacked additive layers exceed it
           * (SotN Fire Demon death: additive white ghost, then a white canvas
           * subtracted -> black on hardware, see-through here). Redraw the same
-          * geometry with blend equation MIN and force_one (emitted after the
+          * geometry with blend equation MIN and force_ceiling (emitted after the
           * shader's discards, so only the texels the subtraction will touch):
           * min(dst, 1). Alpha (the mask bit) kept via ZERO/ONE ADD; stencil
           * writes masked off; depth LEQUAL lets the real draw pass after it. */
@@ -3343,20 +3407,46 @@ static void gl_renderer_draw(gl_renderer *renderer)
              it->transparency_mode == SEMI_TRANSPARENCY_MODE_SUBTRACT_SOURCE &&
              renderer->command_buffer->program)
          {
-            glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_one"), 1u);
-            glBlendEquationSeparate(GL_MIN, GL_FUNC_ADD);
-            glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
-            glStencilMask(0);
-            glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
-                           (GLvoid*)(it->first * sizeof(GLushort)));
-            glStencilMask(1);
-            glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_one"), 0u);
-            glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
-            glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
+            gl_renderer_ceiling_batch(renderer, it, 1.0f,
+                  blend_src, blend_dst, blend_func);
          }
 
-         glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
-                        (GLvoid*)(it->first * sizeof(GLushort)));
+         if (color_blend)
+         {
+            unsigned first, stride = it->draw_mode == GL_LINES ? 2 : 3;
+            GLint read_fb;
+            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fb);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, _fb.id);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, renderer->blend_texture.id);
+            for (first = it->first; first < it->first + it->count; first += stride)
+            {
+               if (it->blend_rect[2] > 0 && it->blend_rect[3] > 0)
+                  glCopyTexSubImage2D(GL_TEXTURE_2D, 0,
+                        it->blend_rect[0], it->blend_rect[1],
+                        it->blend_rect[0], it->blend_rect[1],
+                        it->blend_rect[2], it->blend_rect[3]);
+               glDrawElements(it->draw_mode, stride, GL_UNSIGNED_SHORT,
+                     (GLvoid*)(first * sizeof(GLushort)));
+            }
+            glActiveTexture(GL_TEXTURE0);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)read_fb);
+         }
+         else
+            glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
+                           (GLvoid*)(it->first * sizeof(GLushort)));
+
+         /* Enhanced 16-bpp storage ends at byte248. UNORM would clamp ADD
+          * and quarter-ADD at255 instead, leaving a false residue after SUB.
+          * All sources are nonnegative, so clamping after a positive batch
+          * is equivalent to clamping each primitive. This extra MIN draw
+          * avoids a destination snapshot/barrier for every triangle. */
+         if (!color_blend && !it->opaque && renderer->byte_color_storage &&
+             renderer->internal_color_depth == 16 &&
+             (it->transparency_mode == SEMI_TRANSPARENCY_MODE_ADD ||
+              it->transparency_mode == SEMI_TRANSPARENCY_MODE_ADD_QUARTER_SOURCE))
+            gl_renderer_ceiling_batch(renderer, it, 248.0f / 255.0f,
+                  blend_src, blend_dst, blend_func);
 
          /* Zero-floor pass for subtractive blending on the fp16 target.
           * GL_FUNC_REVERSE_SUBTRACT clamps at zero on a UNORM attachment
@@ -3407,6 +3497,55 @@ static void gl_renderer_draw(gl_renderer *renderer)
    glDeleteFramebuffers(1, &_fb.id);
 }
 
+/* Color alpha is the VRAM mask bit; stencil is only its draw-test mirror.
+ * Upload both together, including reset/restore and format changes. The
+ * color-copy pass clears stencil only over the uploaded rectangle. A second,
+ * stencil-only pass sets protected pixels from alpha, without discarding
+ * pixels during color conversion or scanning the upload on the CPU. */
+static void gl_renderer_upload_color_and_stencil(gl_renderer *renderer,
+      const gl_image_load_vertex *slice)
+{
+   gl_draw_buffer *buffer = renderer->image_load_buffer;
+   const struct gl_uniform_map *uniforms;
+   GLboolean depth;
+
+   if (!buffer || !buffer->program)
+      return;
+   uniforms = &buffer->program->uniforms;
+   depth = glIsEnabled(GL_DEPTH_TEST);
+   glDisable(GL_DEPTH_TEST);
+   glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+         GL_TEXTURE_2D, renderer->fb_out_depth.id, 0);
+   glEnable(GL_STENCIL_TEST);
+   glStencilMask(1);
+   glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+   glStencilFunc(GL_ALWAYS, 0, 1);
+   glUseProgram(buffer->program->id);
+   glUniform1ui(gl_uniform_map_get(uniforms, "mask_pass"), 0);
+   if (!gl_draw_buffer_is_empty(buffer))
+      gl_draw_buffer_draw(buffer, GL_TRIANGLE_STRIP);
+
+   glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+   glStencilFunc(GL_ALWAYS, 1, 1);
+   glUniform1ui(gl_uniform_map_get(uniforms, "mask_pass"), 1);
+   gl_draw_buffer_push_slice(buffer, slice, 4, sizeof(gl_image_load_vertex));
+   gl_draw_buffer_draw(buffer, GL_TRIANGLE_STRIP);
+   glUniform1ui(gl_uniform_map_get(uniforms, "mask_pass"), 0);
+   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+   glDisable(GL_STENCIL_TEST);
+   if (depth)
+      glEnable(GL_DEPTH_TEST);
+}
+
+/* CPU RGB5 uploads and rendered byte-color copies have different encodings.
+ * Select from the retained target, including after a failed format change. */
+static uint32_t gl_upload_color_conversion(const gl_renderer *renderer)
+{
+   if (!renderer->byte_color_storage)
+      return 0u;
+   return renderer->color_mode == PSX_INTERNAL_COLOR_32BPP ? 4u : 1u;
+}
+
 static void gl_renderer_upload_textures(
       gl_renderer *renderer,
       uint16_t top_left[2],
@@ -3447,8 +3586,11 @@ static void gl_renderer_upload_textures(
    y_start    = top_left[1];
    y_end      = y_start + dimensions[1];
 
-   gl_vram_sync_update_gpu_written_rect(renderer,
-         x_start, y_start, dimensions[0], dimensions[1], false);
+   /* This helper seeds a new renderer or converts its existing storage.
+    * A readback used for conversion is derived from the same GPU writes;
+    * preserve their origin so later texture feedback keeps its word rules.
+    * New renderer flags start clear. GP0 uploads mark CPU origin separately
+    * in rhi_gl_load_image. */
 
    {
       gl_image_load_vertex init[4] =
@@ -3472,6 +3614,8 @@ static void gl_renderer_upload_textures(
          glUseProgram(renderer->image_load_buffer->program->id);
          glUniform1i(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "fb_texture"), 0);
          glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "internal_upscaling"), 1);
+         glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms,
+                  "color_conversion"), gl_upload_color_conversion(renderer));
 
          glUseProgram(renderer->command_buffer->program->id);
          glUniform1i(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "fb_texture"), 0);
@@ -3484,8 +3628,7 @@ static void gl_renderer_upload_textures(
    /* Bind the output framebuffer */
    gl_framebuffer_init(&_fb, &renderer->fb_out);
 
-   if (!gl_draw_buffer_is_empty(renderer->image_load_buffer))
-      gl_draw_buffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
+   gl_renderer_upload_color_and_stencil(renderer, slice);
 
    glEnable(GL_SCISSOR_TEST);
 
@@ -3525,6 +3668,36 @@ static void get_variables(uint8_t *upscaling, bool *display_vram)
             *display_vram = false;
       }
    }
+}
+
+/* Match CPU word readback from the retained target: truncate q*8 storage,
+ * round normalized byte/float storage, and copy RGB5 directly. Use the
+ * allocated format so a failed settings change keeps the working policy.
+ * Regional copies and the final frame resolve must agree. */
+static uint32_t gl_native_mirror_conversion(const gl_renderer *renderer)
+{
+   if (renderer->byte_color_storage)
+      return 2u;
+   return renderer->fb_out_internal_format == GL_RGBA8 ||
+         renderer->fb_out_internal_format == GL_RGBA16F ? 3u : 0u;
+}
+
+/* Storage selection is derived from the selected mode and enabled source
+ * enhancements, never from the display's output format. No per-pixel color
+ * provenance is retained. Ordinary writes over an enhanced destination still
+ * reduce their source and blended result to RGB5. */
+static bool gl_use_byte_color_storage(uint8_t filter)
+{
+   struct retro_variable var = {0};
+   bool hd = false;
+   var.key = BEETLE_OPT(replace_textures);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      hd = !strcmp(var.value, "enabled");
+   return !psx_hdr_active &&
+         (psx_internal_color_mode == PSX_INTERNAL_COLOR_32BPP ||
+          (psx_internal_color_mode == PSX_INTERNAL_COLOR_16BPP &&
+           (filter != FILTER_MODE_NEAREST ||
+            texture_tracker_hd_textures_enabled(hd))));
 }
 
 static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
@@ -3627,12 +3800,8 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
       renderer->filter_type = filter;
    }
 
-   var.key = BEETLE_OPT(depth);
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (!strcmp(var.value, "32bpp"))
-         depth = 32;
-   }
+   depth = psx_hdr_active ||
+         psx_internal_color_mode == PSX_INTERNAL_COLOR_32BPP ? 32 : 16;
 
    var.key = BEETLE_OPT(dither_mode);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -3741,6 +3910,9 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
          return false;
       }
 
+      /* Transfer ownership before texture allocation can fail. The context
+       * reset caller releases all acquired resources on a failed creation. */
+      renderer->command_buffer    = command_buffer;
       renderer->output_buffer     = output_buffer;
       renderer->image_load_buffer = image_load_buffer;
    }
@@ -3751,12 +3923,14 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    /* gl_texture holding the raw VRAM texture contents. We can't
     * meaningfully upscale it since most games use paletted
     * textures. */
-   gl_texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1);
-   gl_texture_init(&renderer->palette_texture, 256, 1, GL_RGB5_A1);
+   if (!gl_texture_init(&renderer->fb_texture, native_width, native_height, GL_RGB5_A1) ||
+       !gl_texture_init(&renderer->palette_texture, 256, 1, GL_RGB5_A1))
+      goto texture_failed;
 
    renderer->fb_out_fp16 = psx_hdr_active && gl_fp16_renderable();
+   renderer->byte_color_storage = gl_use_byte_color_storage(filter);
 
-   if (dither_mode == DITHER_OFF || renderer->fb_out_fp16)
+   if (dither_mode == DITHER_OFF || psx_hdr_active)
    {
       /* Dithering is superfluous when we increase the internal
       * color depth, but users asked for it. On the fp16 HDR target it is
@@ -3771,8 +3945,9 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
 
    if (command_buffer->program)
    {
-      uint32_t dither_scaling = dither_mode == DITHER_UPSCALED ? 1 : upscaling;
-      uint32_t native_rgb5 = depth == 16 && !renderer->fb_out_fp16;
+      uint32_t dither_scaling = dither_mode == DITHER_OFF || psx_hdr_active ? 0 :
+            (dither_mode == DITHER_UPSCALED ? 1 : upscaling);
+      uint32_t native_rgb5 = depth == 16 && !psx_hdr_active;
       uint32_t fixed_point_modulation = !psx_pgxp_color;
 
       glUseProgram(command_buffer->program->id);
@@ -3781,12 +3956,14 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
                "fixed_point_modulation"), fixed_point_modulation);
       glUniform1ui(gl_uniform_map_get(&command_buffer->program->uniforms,
                "native_rgb5"), native_rgb5);
+      glUniform1ui(gl_uniform_map_get(&command_buffer->program->uniforms,
+               "byte_color_storage"), renderer->byte_color_storage);
    }
 
    switch (depth)
    {
       case 16:
-         texture_storage = GL_RGB5_A1;
+         texture_storage = renderer->byte_color_storage ? GL_RGBA8 : GL_RGB5_A1;
          break;
       case 32:
          texture_storage = GL_RGBA8;
@@ -3799,24 +3976,21 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    /* The HDR scaled framebuffer overrides the Internal Color Depth
     * choice: additive overshoot and the subtractive floor need a wide
     * float target, exactly like the Vulkan renderer's 16F path. */
-   if (renderer->fb_out_fp16)
-      texture_storage = GL_RGBA16F;
+   if (psx_hdr_active)
+      texture_storage = renderer->fb_out_fp16 ? GL_RGBA16F : GL_RGBA8;
 
    renderer->fb_out_internal_format = texture_storage;
-   gl_texture_init(
-         &renderer->fb_out,
-         native_width  * upscaling,
-         native_height * upscaling,
-         texture_storage);
-
-   gl_texture_init(
-         &renderer->fb_out_depth,
-         renderer->fb_out.width,
-         renderer->fb_out.height,
-         GL_DEPTH24_STENCIL8);
+   if (renderer->byte_color_storage && depth == 16 &&
+       !gl_texture_init(&renderer->blend_texture,
+             native_width * upscaling, native_height * upscaling, GL_RGBA8))
+      goto texture_failed;
+   if (!gl_texture_init(&renderer->fb_out,
+             native_width * upscaling, native_height * upscaling, texture_storage) ||
+       !gl_texture_init(&renderer->fb_out_depth,
+             renderer->fb_out.width, renderer->fb_out.height, GL_DEPTH24_STENCIL8))
+      goto texture_failed;
 
    renderer->filter_type = filter;
-   renderer->command_buffer = command_buffer;
    renderer->vertex_index_pos = 0;
 
    /* Create index buffer object for core profile compatibility */
@@ -3835,6 +4009,7 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    renderer->frontend_resolution[1] = 0;
    renderer->internal_upscaling = upscaling;
    renderer->internal_color_depth = depth;
+   renderer->color_mode = psx_internal_color_mode;
 
    tt_log_startup("gl renderer init: internal_upscaling=%u depth=%u has_software_fb=%d\n",
          (unsigned)upscaling, (unsigned)depth, (int)has_software_fb);
@@ -3882,6 +4057,12 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    }
 
    return true;
+
+texture_failed:
+   log_cb(RETRO_LOG_ERROR,
+         "[gl_renderer_new] framebuffer texture allocation failed (%ux, %u bpp)\n",
+         (unsigned)upscaling, (unsigned)depth);
+   return false;
 }
 
 /* === Analog video cable chain: GL resources ==============================
@@ -4776,6 +4957,8 @@ static void gl_renderer_free(gl_renderer *renderer)
    renderer->fb_feedback_texture.height = 0;
    renderer->fb_feedback_texture_failed = false;
 
+   glDeleteTextures(1, &renderer->blend_texture.id);
+   memset(&renderer->blend_texture, 0, sizeof(renderer->blend_texture));
    glDeleteTextures(1, &renderer->fb_out.id);
    renderer->fb_out.id     = 0;
    renderer->fb_out.width  = 0;
@@ -5061,6 +5244,7 @@ static bool retro_refresh_variables(gl_renderer *renderer)
    enum dither_mode dither_mode   = DITHER_NATIVE;
    bool rebuild_fb_out;
    bool reconfigure_frontend;
+   bool byte_color_storage;
 
    var.key = BEETLE_OPT(renderer_software_fb);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -5144,12 +5328,8 @@ static bool retro_refresh_variables(gl_renderer *renderer)
          filter = FILTER_MODE_JINC2;
    }
 
-   var.key = BEETLE_OPT(depth);
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (!strcmp(var.value, "32bpp"))
-         depth = 32;
-   }
+   depth = psx_hdr_active ||
+         psx_internal_color_mode == PSX_INTERNAL_COLOR_32BPP ? 32 : 16;
 
    var.key = BEETLE_OPT(dither_mode);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -5157,25 +5337,27 @@ static bool retro_refresh_variables(gl_renderer *renderer)
       if (!strcmp(var.value, "1x(native)"))
       {
          dither_mode = DITHER_NATIVE;
-         if (!renderer->fb_out_fp16)
-            gl_draw_buffer_enable_attribute(renderer->command_buffer, "dither");
+
       }
       else if (!strcmp(var.value, "internal resolution"))
       {
          dither_mode = DITHER_UPSCALED;
-         if (!renderer->fb_out_fp16)
-            gl_draw_buffer_enable_attribute(renderer->command_buffer, "dither");
+
       }
       else if (!strcmp(var.value, "disabled"))
       {
          dither_mode  = DITHER_OFF;
-         gl_draw_buffer_disable_attribute(renderer->command_buffer, "dither");
+
       }
    }
 
+   byte_color_storage = gl_use_byte_color_storage(filter);
    rebuild_fb_out =
       upscaling != renderer->internal_upscaling ||
-      depth != renderer->internal_color_depth;
+      depth != renderer->internal_color_depth ||
+      byte_color_storage != renderer->byte_color_storage;
+   if (!gl_draw_buffer_is_empty(renderer->command_buffer))
+      gl_renderer_draw(renderer);
 
    if (rebuild_fb_out)
    {
@@ -5186,16 +5368,23 @@ static bool retro_refresh_variables(gl_renderer *renderer)
       GLenum texture_storage = GL_RGB5_A1;
       uint16_t top_left[2]   = {0, 0};
       uint16_t dimensions[2] = {(uint16_t) VRAM_WIDTH_PIXELS, (uint16_t) VRAM_HEIGHT};
+      gl_texture new_out = {0};
+      gl_texture new_blend = {0};
+      gl_texture new_depth = {0};
+      bool keep_depth = renderer->fb_out_depth.width == w &&
+            renderer->fb_out_depth.height == h;
 
-      if (dither_mode == DITHER_OFF || renderer->fb_out_fp16)
-         gl_draw_buffer_disable_attribute(renderer->command_buffer, "dither");
-      else
-         gl_draw_buffer_enable_attribute(renderer->command_buffer, "dither");
+      if (!rhi_gl_read_vram(0, 0, VRAM_WIDTH_PIXELS, VRAM_HEIGHT,
+               GPU_get_vram()))
+      {
+         log_cb(RETRO_LOG_WARN, "Color mode change deferred: VRAM readback failed\n");
+         return false;
+      }
 
       switch (depth)
       {
          case 16:
-            texture_storage = GL_RGB5_A1;
+            texture_storage = byte_color_storage ? GL_RGBA8 : GL_RGB5_A1;
             break;
          case 32:
             texture_storage = GL_RGBA8;
@@ -5207,15 +5396,34 @@ static bool retro_refresh_variables(gl_renderer *renderer)
 
       /* See the initial allocation: HDR pins the storage to fp16
        * regardless of the Internal Color Depth setting. */
-      if (renderer->fb_out_fp16)
-         texture_storage = GL_RGBA16F;
+      if (psx_hdr_active)
+         texture_storage = renderer->fb_out_fp16 ? GL_RGBA16F : GL_RGBA8;
 
+      /* Allocate replacements before releasing a working framebuffer. */
+      if (!gl_texture_init(&new_out, w, h, texture_storage))
+         goto framebuffer_failed;
+      if (byte_color_storage && depth == 16)
+      {
+         if (!gl_texture_init(&new_blend, w, h, GL_RGBA8))
+            goto framebuffer_failed;
+      }
+      if (!keep_depth)
+      {
+         if (!gl_texture_init(&new_depth, w, h, GL_DEPTH24_STENCIL8))
+            goto framebuffer_failed;
+      }
       glDeleteTextures(1, &renderer->fb_out.id);
-      renderer->fb_out.id     = 0;
-      renderer->fb_out.width  = 0;
-      renderer->fb_out.height = 0;
+      renderer->fb_out = new_out;
       renderer->fb_out_internal_format = texture_storage;
-      gl_texture_init(&renderer->fb_out, w, h, texture_storage);
+      renderer->byte_color_storage = byte_color_storage;
+      renderer->color_mode = psx_internal_color_mode;
+      glDeleteTextures(1, &renderer->blend_texture.id);
+      renderer->blend_texture = new_blend;
+      if (!keep_depth)
+      {
+         glDeleteTextures(1, &renderer->fb_out_depth.id);
+         renderer->fb_out_depth = new_depth;
+      }
 
       glDeleteTextures(1, &renderer->fb_feedback_texture.id);
       renderer->fb_feedback_texture.id     = 0;
@@ -5230,17 +5438,30 @@ static bool retro_refresh_variables(gl_renderer *renderer)
       if (renderer)
          gl_renderer_upload_textures(renderer, top_left, dimensions, GPU_get_vram());
 
-      glDeleteTextures(1, &renderer->fb_out_depth.id);
-      renderer->fb_out_depth.id     = 0;
-      renderer->fb_out_depth.width  = 0;
-      renderer->fb_out_depth.height = 0;
-      gl_texture_init(&renderer->fb_out_depth, w, h, GL_DEPTH24_STENCIL8);
+      goto framebuffer_ready;
+
+framebuffer_failed:
+      glDeleteTextures(1, &new_out.id);
+      glDeleteTextures(1, &new_blend.id);
+      glDeleteTextures(1, &new_depth.id);
+      glBindTexture(GL_TEXTURE_2D, renderer->fb_texture.id);
+      log_cb(RETRO_LOG_WARN, "Color mode change deferred: framebuffer allocation failed\n");
+      return false;
+
+framebuffer_ready:
+      ;
    }
+
+   if (dither_mode == DITHER_OFF || psx_hdr_active)
+      gl_draw_buffer_disable_attribute(renderer->command_buffer, "dither");
+   else
+      gl_draw_buffer_enable_attribute(renderer->command_buffer, "dither");
 
    if (renderer->command_buffer->program)
    {
-      uint32_t dither_scaling = dither_mode == DITHER_UPSCALED ? 1 : upscaling;
-      uint32_t native_rgb5 = depth == 16 && !renderer->fb_out_fp16;
+      uint32_t dither_scaling = dither_mode == DITHER_OFF || psx_hdr_active ? 0 :
+            (dither_mode == DITHER_UPSCALED ? 1 : upscaling);
+      uint32_t native_rgb5 = depth == 16 && !psx_hdr_active;
       uint32_t fixed_point_modulation = !psx_pgxp_color;
 
       glUseProgram(renderer->command_buffer->program->id);
@@ -5249,6 +5470,8 @@ static bool retro_refresh_variables(gl_renderer *renderer)
                "fixed_point_modulation"), fixed_point_modulation);
       glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms,
                "native_rgb5"), native_rgb5);
+      glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms,
+               "byte_color_storage"), renderer->byte_color_storage);
    }
 
    glLineWidth((GLfloat) upscaling);
@@ -5391,6 +5614,7 @@ static bool retro_refresh_variables(gl_renderer *renderer)
    renderer->internal_upscaling     = upscaling;
    renderer->display_vram           = display_vram;
    renderer->internal_color_depth   = depth;
+   renderer->color_mode = psx_internal_color_mode;
    renderer->filter_type            = filter;
    renderer->crop_overscan          = crop_overscan;
    renderer->image_offset_cycles    = image_offset_cycles;
@@ -5416,6 +5640,7 @@ static void vertex_preprocessing(
    bool is_semi_transparent;
    bool is_textured;
    bool is_opaque;
+   bool color_blend;
    bool buffer_full;
    bool index_full;
    bool unmapped;
@@ -5425,6 +5650,14 @@ static void vertex_preprocessing(
 
    is_semi_transparent = v[0].semi_transparent == 1;
    is_textured         = v[0].texture_blend_mode != 0;
+   /* Filtered draws retain byte precision and can use fixed blending.
+    * Positive additive batches receive a cheap ceiling pass below. Ordinary
+    * draws still need RGB5 destination/result truncation. Nearest HD draws
+    * can fall back per pixel; masked draws retain their existing exact path. */
+   color_blend = renderer->byte_color_storage &&
+         renderer->internal_color_depth == 16 && is_semi_transparent &&
+         !(is_textured && renderer->filter_type != FILTER_MODE_NEAREST &&
+           !mask_test);
    /* Textured semi-transparent polys can contain opaque texels (when
     * bit 15 of the color is set to 0). Therefore they're drawn twice,
     * once for the opaque texels and once for the semi-transparent
@@ -5473,6 +5706,7 @@ static void vertex_preprocessing(
    }
 
    if (renderer->batches.count == 0
+       || color_blend
        || mode != renderer->command_draw_mode
        || is_opaque != renderer->opaque
        || (is_semi_transparent &&
@@ -5498,6 +5732,15 @@ static void vertex_preprocessing(
       batch.first = renderer->vertex_index_pos;
       batch.count = 0;
       batch.hd = hd;
+      batch.color_blend = color_blend;
+      memset(batch.blend_rect, 0, sizeof(batch.blend_rect));
+      if (color_blend)
+      {
+         unsigned i;
+         gl_primitive_draw_rect(renderer, v, count, batch.blend_rect);
+         for (i = 0; i < 4; i++)
+            batch.blend_rect[i] *= renderer->internal_upscaling;
+      }
       gl_primitive_batch_vec_push(&renderer->batches, &batch);
 
       renderer->semi_transparency_mode = stm;
@@ -5529,6 +5772,8 @@ static void vertex_add_blended_pass(
       batch.first = vertex_index;
       batch.count = 0;
       batch.hd = last->hd;
+      batch.color_blend = last->color_blend;
+      memcpy(batch.blend_rect, last->blend_rect, sizeof(batch.blend_rect));
       gl_primitive_batch_vec_push(&renderer->batches, &batch);
 
       renderer->opaque = false;
@@ -5550,20 +5795,13 @@ static void gl_set_native_color_plane(gl_command_vertex *v,
    v->native_flags |= 1;
 }
 
-/* Eligibility for integer interpolation and native line coverage only.
- * Unlike Vulkan's UV planes, GL keeps filtered, HD, wide and precise-colour
- * draws on their existing floating path. PGXP geometry must not acquire the
- * original-grid line mask. RGB5 blending has a separate target-format gate
- * in gl_renderer_draw and is not restricted to this native geometry path. */
+/* Coverage depends on geometry, not color depth or texture sampling. Match
+ * Vulkan's original-grid selection without applying it to PGXP or upscaling. */
 static bool gl_native_positions(const gl_renderer *renderer,
-      const gl_command_vertex *v, unsigned count, HdTextureHandle hd,
-      int32_t *x, int32_t *y)
+      const gl_command_vertex *v, unsigned count, int32_t *x, int32_t *y)
 {
    unsigned i;
-   if (renderer->internal_color_depth != 16 || renderer->fb_out_fp16 ||
-       renderer->internal_upscaling != 1 || psx_pgxp_mode != 0 ||
-       psx_pgxp_color || renderer->filter_type != FILTER_MODE_NEAREST ||
-       !hd_handle_is_none(&hd))
+   if (renderer->internal_upscaling != 1 || psx_pgxp_mode != 0)
       return false;
    for (i = 0; i < count; i++)
    {
@@ -5581,6 +5819,16 @@ static bool gl_native_positions(const gl_renderer *renderer,
    return true;
 }
 
+/* Integer color/UV interpolation retains its narrower shading policy.
+ * Native line coverage is independent of these restrictions. RGB5 blending
+ * also has its own target-format gate in gl_renderer_draw. */
+static bool gl_native_shading(const gl_renderer *renderer, HdTextureHandle hd)
+{
+   return renderer->internal_color_depth == 16 && !renderer->fb_out_fp16 &&
+         !psx_pgxp_color && renderer->filter_type == FILTER_MODE_NEAREST &&
+         hd_handle_is_none(&hd);
+}
+
 /* Queued GP0 colours and draw-offset-adjusted positions are authoritative.
  * The wrapped 8.12 planes travel with the primitive; no side state survives
  * a flush, reset or savestate restore. Flat colours need no plane. */
@@ -5592,7 +5840,8 @@ static void gl_build_native_triangle_interpolants(gl_renderer *renderer,
    int64_t denom;
    uint32_t planes[6];
    unsigned i, c, anchor;
-   if (!gl_native_positions(renderer, v, 3, hd, x, y))
+   if (!gl_native_shading(renderer, hd) ||
+       !gl_native_positions(renderer, v, 3, x, y))
       return;
    for (i = 0; i < 3; i++)
       v[i].native_flags |= 8;
@@ -6536,6 +6785,23 @@ void rhi_gl_prepare_frame(void)
 
    gl_normalize_inherited_state();
 
+   /* The HD hotkey does not send a core-option update. Change storage at
+    * the next frame boundary through the existing VRAM-preserving refresh.
+    * A failed allocation retains the working target and retries next frame. */
+   if (!psx_hdr_active && renderer->color_mode == PSX_INTERNAL_COLOR_16BPP &&
+       renderer->filter_type == FILTER_MODE_NEAREST &&
+       gl_use_byte_color_storage(renderer->filter_type) !=
+             renderer->byte_color_storage)
+   {
+      rhi_gl_refresh_variables();
+      /* Refresh may recreate the context; do not retain the old pointer. */
+      if (static_renderer.state == GL_STATE_INVALID ||
+          !static_renderer.state_data)
+         return;
+      renderer = static_renderer.state_data;
+      gl_normalize_inherited_state();
+   }
+
    /* In case we're upscaling we need to increase the line width
     * proportionally */
    glLineWidth((GLfloat)renderer->internal_upscaling);
@@ -6740,6 +7006,11 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
                glUniform2ui(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "offset"), fb_x_start, fb_y_start);
 
                glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "depth_24bpp"), depth_24bpp);
+               glUniform1ui(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "color_mode"),
+                     psx_hdr_active ? PSX_INTERNAL_COLOR_32BPP :
+                     (renderer->byte_color_storage && renderer->color_mode == PSX_INTERNAL_COLOR_16BPP ? 3 : renderer->color_mode));
+               glUniform1ui(gl_uniform_map_get(&renderer->output_buffer->program->uniforms,
+                        "byte_color_storage"), renderer->byte_color_storage);
 
                glUniform1ui(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "internal_upscaling"), renderer->internal_upscaling);
 
@@ -6804,18 +7075,21 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
       }
    }
 
-   /* TODO - Hack: copy fb_out back into fb_texture at the end of every
-    * frame to make offscreen rendering kinda sorta work. Very messy
-    * and slow. */
+   /* Resolve rendered bounds into native VRAM for next-frame sampling.
+    * CPU uploads already update both surfaces. Retain pending bounds if the
+    * draw buffer is unavailable, so a later successful frame can retry. */
+   if (renderer->vram_sync.frame_rect[2] && renderer->vram_sync.frame_rect[3])
    {
       gl_framebuffer _fb;
+      uint16_t *rect = renderer->vram_sync.frame_rect;
+      GLfloat x0 = rect[0], y0 = rect[1];
+      GLfloat x1 = rect[0] + rect[2], y1 = rect[1] + rect[3];
       gl_image_load_vertex slice[4] =
       {
-         {   {   0,   0   }   },
-         {   {1023,   0   }   },
-         {   {   0, 511   }   },
-         {   {1023, 511   }   },
+         { {x0, y0} }, { {x1, y0} }, { {x0, y1} }, { {x1, y1} },
       };
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
 
       if (renderer->image_load_buffer)
       {
@@ -6841,17 +7115,18 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
       {
          glUseProgram(renderer->image_load_buffer->program->id);
          glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "internal_upscaling"), renderer->internal_upscaling);
+         glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms,
+                  "color_conversion"), gl_native_mirror_conversion(renderer));
       }
 
       if (!gl_draw_buffer_is_empty(renderer->image_load_buffer))
+      {
          gl_draw_buffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
+         gl_vram_sync_clear(renderer);
+      }
 
       glDeleteFramebuffers(1, &_fb.id);
    }
-
-   /* The unconditional full-VRAM fb_out -> fb_texture copy above makes
-    * every tile current for the start of the next frame. */
-   gl_vram_sync_clear(renderer);
 
    cleanup_gl_state();
 
@@ -7547,7 +7822,7 @@ void rhi_gl_push_line(
       {
          int32_t x[2], y[2];
          HdTextureHandle hd = hd_handle_make_none();
-         if (gl_native_positions(renderer, v, 2, hd, x, y))
+         if (gl_native_positions(renderer, v, 2, x, y))
          {
             gl_command_vertex quad[4], triangles[6];
             uint32_t colors[2] = {c0, c1}, planes[6], coverage[2];
@@ -7556,7 +7831,7 @@ void rhi_gl_push_line(
             int32_t dy = y[1 - anchor] - y[anchor];
             bool horizontal = abs(dx) > abs(dy);
             int32_t steps = horizontal ? abs(dx) : abs(dy);
-            bool gouraud = c0 != c1 &&
+            bool gouraud = c0 != c1 && gl_native_shading(renderer, hd) &&
                   rhi_line_color_planes(planes, x, y, colors);
             rhi_pack_line_coverage(coverage, x, y);
             gl_build_line_quad(quad, v);
@@ -7752,6 +8027,8 @@ void rhi_gl_load_image(
          glUniform1i(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "fb_texture"), 0);
          /* fb_texture is always at 1x */
          glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms, "internal_upscaling"), 1);
+         glUniform1ui(gl_uniform_map_get(&renderer->image_load_buffer->program->uniforms,
+                  "color_conversion"), gl_upload_color_conversion(renderer));
       }
    }
 
@@ -7773,8 +8050,7 @@ void rhi_gl_load_image(
    /* Bind the output framebuffer */
    gl_framebuffer_init(&_fb, &renderer->fb_out);
 
-   if (!gl_draw_buffer_is_empty(renderer->image_load_buffer))
-      gl_draw_buffer_draw(renderer->image_load_buffer, GL_TRIANGLE_STRIP);
+   gl_renderer_upload_color_and_stencil(renderer, slice);
 
    if (scissor_was_enabled)
       glEnable(GL_SCISSOR_TEST);
@@ -7892,7 +8168,7 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
    diag_full_read = GL_DIAG_ON() && !gl_diag_nested &&
          x == 0 && y == 0 && w == VRAM_WIDTH_PIXELS && h == VRAM_HEIGHT;
 
-   is_32bpp = (renderer->internal_color_depth == 32);
+   is_32bpp = renderer->fb_out_internal_format == GL_RGBA8;
    /* The fp16 HDR target gets its own readback route: transfer the
     * pixels as plain floats - the one format the spec guarantees for
     * float color buffers - and quantise to 1555 in C. The previous
@@ -8181,9 +8457,12 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
           * `(c * 249 + 1024) >> 11` reciprocal-multiply form rounds
           * identically).  We use the simpler exact form: round
           * c8 * 31 / 255. */
-         uint32_t r5 = (r8 * 31u + 127u) / 255u;
-         uint32_t g5 = (g8 * 31u + 127u) / 255u;
-         uint32_t b5 = (b8 * 31u + 127u) / 255u;
+         uint32_t r5 = renderer->byte_color_storage ? r8 >> 3 :
+               (r8 * 31u + 127u) / 255u;
+         uint32_t g5 = renderer->byte_color_storage ? g8 >> 3 :
+               (g8 * 31u + 127u) / 255u;
+         uint32_t b5 = renderer->byte_color_storage ? b8 >> 3 :
+               (b8 * 31u + 127u) / 255u;
          uint32_t a1 = (a8 >= 128u) ? 1u : 0u;
          scratch_pixels[k] = (uint16_t)(
                (a1 << 15) | (b5 << 10) | (g5 << 5) | r5);
@@ -8308,6 +8587,73 @@ cleanup:
 
 
 #ifdef GL_READ_FRAMEBUFFER
+/* SDR bytes encode q*8; HDR byte/float targets keep normalized colors. A plain
+ * UNORM blit can use the wrong scale or choose an adjacent RGB5 code near a
+ * conversion threshold. Match CPU readback explicitly through the existing
+ * image-load buffer. This derived mirror never mutates fb_out or stencil;
+ * HDR keeps its floating render target and only reduces the mirror. */
+static bool gl_resolve_color_rect(gl_renderer *renderer, gl_texture *dst,
+      unsigned x, unsigned y, unsigned w, unsigned h)
+{
+   GLint program, vao, array_buffer, active_texture, texture;
+   GLint read_fb, draw_fb, viewport[4];
+   GLboolean scissor, blend, depth, stencil;
+   gl_image_load_vertex slice[4];
+   gl_draw_buffer *buffer = renderer->image_load_buffer;
+   const struct gl_uniform_map *uniforms;
+   if (!buffer || !buffer->program || !buffer->map)
+      return false;
+   assert(gl_draw_buffer_is_empty(buffer));
+   uniforms = &buffer->program->uniforms;
+   glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+   glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
+   glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &array_buffer);
+   glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fb);
+   glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fb);
+   glGetIntegerv(GL_VIEWPORT, viewport);
+   glGetIntegerv(GL_ACTIVE_TEXTURE, &active_texture);
+   glActiveTexture(GL_TEXTURE0);
+   glGetIntegerv(GL_TEXTURE_BINDING_2D, &texture);
+   scissor = glIsEnabled(GL_SCISSOR_TEST);
+   blend = glIsEnabled(GL_BLEND);
+   depth = glIsEnabled(GL_DEPTH_TEST);
+   stencil = glIsEnabled(GL_STENCIL_TEST);
+   glDisable(GL_SCISSOR_TEST);
+   glDisable(GL_BLEND);
+   glDisable(GL_DEPTH_TEST);
+   glDisable(GL_STENCIL_TEST);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, renderer->vram_sync_draw_fbo);
+   glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+         GL_TEXTURE_2D, dst->id, 0);
+   glViewport(0, 0, dst->width, dst->height);
+   glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
+   glUseProgram(buffer->program->id);
+   glUniform1i(gl_uniform_map_get(uniforms, "fb_texture"), 0);
+   glUniform1ui(gl_uniform_map_get(uniforms, "internal_upscaling"),
+         renderer->internal_upscaling);
+   glUniform1ui(gl_uniform_map_get(uniforms, "color_conversion"),
+         gl_native_mirror_conversion(renderer));
+   slice[0].position[0] = x;     slice[0].position[1] = y;
+   slice[1].position[0] = x + w; slice[1].position[1] = y;
+   slice[2].position[0] = x;     slice[2].position[1] = y + h;
+   slice[3].position[0] = x + w; slice[3].position[1] = y + h;
+   gl_draw_buffer_push_slice(buffer, slice, 4, sizeof(gl_image_load_vertex));
+   gl_draw_buffer_draw(buffer, GL_TRIANGLE_STRIP);
+   glBindTexture(GL_TEXTURE_2D, (GLuint)texture);
+   glActiveTexture((GLenum)active_texture);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)read_fb);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)draw_fb);
+   glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+   glUseProgram((GLuint)program);
+   glBindVertexArray((GLuint)vao);
+   glBindBuffer(GL_ARRAY_BUFFER, (GLuint)array_buffer);
+   if (scissor) glEnable(GL_SCISSOR_TEST);
+   if (blend) glEnable(GL_BLEND);
+   if (depth) glEnable(GL_DEPTH_TEST);
+   if (stencil) glEnable(GL_STENCIL_TEST);
+   return true;
+}
+
 static bool gl_blit_fb_out(gl_renderer *renderer, gl_texture *dst,
       unsigned dst_scale, unsigned x, unsigned y, unsigned w, unsigned h)
 {
@@ -8318,6 +8664,10 @@ static bool gl_blit_fb_out(gl_renderer *renderer, gl_texture *dst,
    if (!w || !h || !renderer->fb_out.id || !dst->id ||
        !gl_caps.fp_glBlitFramebuffer)
       return false;
+
+   if (dst == &renderer->fb_texture &&
+       gl_native_mirror_conversion(renderer) != 0u)
+      return gl_resolve_color_rect(renderer, dst, x, y, w, h);
 
    sx = (GLint)x * (GLint)renderer->internal_upscaling;
    sy = (GLint)y * (GLint)renderer->internal_upscaling;
@@ -8374,8 +8724,8 @@ static bool gl_blit_fb_out(gl_renderer *renderer, gl_texture *dst,
  *                 draws (you can't sample-and-render the same texture in
  *                 portable GL).
  *
- * They're loosely synchronised by an unconditional fb_out -> fb_texture
- * blit at end-of-frame (see the bottom of rhi_gl_finalize_frame). That
+ * They are synchronised over rendered bounds by an fb_out -> fb_texture
+ * resolve at end-of-frame (see the bottom of rhi_gl_finalize_frame). That
  * is sufficient for fb_out mutations whose effect only needs to be
  * visible to the *next* frame's textured draws. It is NOT sufficient
  * when the same frame later samples the mutated region as a texture -
@@ -8488,15 +8838,15 @@ static void gl_fb_feedback_fail(gl_renderer *renderer, const char *reason)
 static bool gl_ensure_fb_feedback_texture(gl_renderer *renderer)
 {
    GLint active_texture;
-   GLint immutable_format = GL_FALSE;
    GLenum texture_storage;
 
    if (renderer->fb_feedback_texture.id)
       return true;
    if (renderer->fb_feedback_texture_failed)
       return false;
-   if (renderer->internal_upscaling <= 1 || !renderer->fb_out.id ||
-       !renderer->fb_out.width || !renderer->fb_out.height)
+   if ((renderer->internal_upscaling <= 1 &&
+        (psx_hdr_active || renderer->color_mode != PSX_INTERNAL_COLOR_32BPP)) ||
+       !renderer->fb_out.id || !renderer->fb_out.width || !renderer->fb_out.height)
       return false;
 
    texture_storage = renderer->fb_out_internal_format;
@@ -8510,12 +8860,8 @@ static bool gl_ensure_fb_feedback_texture(gl_renderer *renderer)
 
    glGetIntegerv(GL_ACTIVE_TEXTURE, &active_texture);
    glActiveTexture(GL_TEXTURE3);
-   gl_texture_init(&renderer->fb_feedback_texture,
-         renderer->fb_out.width, renderer->fb_out.height, texture_storage);
-   if (renderer->fb_feedback_texture.id)
-      glGetTexParameteriv(GL_TEXTURE_2D,
-            GL_TEXTURE_IMMUTABLE_FORMAT, &immutable_format);
-   if (immutable_format != GL_TRUE)
+   if (!gl_texture_init(&renderer->fb_feedback_texture,
+             renderer->fb_out.width, renderer->fb_out.height, texture_storage))
       gl_fb_feedback_fail(renderer, "texture allocation failed");
    else
       gl_vram_sync_invalidate_scaled(renderer);
@@ -8596,9 +8942,20 @@ void rhi_gl_fill_rect(
    /* GP0 fill discards the low three bits. Supplying the resulting RGB5
     * code directly avoids driver-dependent UNORM rounding on this target. */
    for (channel = 0; channel < 3; channel++)
-      clear_color[channel] = renderer->fb_out_internal_format == GL_RGB5_A1
-            ? (GLfloat)(col[channel] >> 3) / 31.0f
-            : (GLfloat)col[channel] / 255.0f;
+   {
+      unsigned color5 = col[channel] >> 3;
+      if (renderer->fb_out_internal_format == GL_RGB5_A1)
+         clear_color[channel] = (GLfloat)color5 / 31.0f;
+      else if (renderer->byte_color_storage)
+      {
+         unsigned color8 = renderer->color_mode == PSX_INTERNAL_COLOR_32BPP
+               ? (color5 * 255u + 15u) / 31u : color5 * 8u;
+         clear_color[channel] = (GLfloat)color8 / 255.0f;
+      }
+      else
+         clear_color[channel] = psx_hdr_active ? (GLfloat)col[channel] / 255.0f
+               : (GLfloat)color5 / 31.0f;
+   }
 
    if (renderer->tracker && renderer->texture_tracking_enabled)
    {
@@ -8783,6 +9140,10 @@ void rhi_gl_copy_rect(
       gl_caps.fp_glCopyImageSubData(
             renderer->fb_out.id, GL_TEXTURE_2D, 0, new_src_x, new_src_y, 0,
             renderer->fb_out.id, GL_TEXTURE_2D, 0, new_dst_x, new_dst_y, 0,
+            new_w, new_h, 1);
+      gl_caps.fp_glCopyImageSubData(
+            renderer->fb_out_depth.id, GL_TEXTURE_2D, 0, new_src_x, new_src_y, 0,
+            renderer->fb_out_depth.id, GL_TEXTURE_2D, 0, new_dst_x, new_dst_y, 0,
             new_w, new_h, 1);
    }
 #ifdef GL_READ_FRAMEBUFFER
