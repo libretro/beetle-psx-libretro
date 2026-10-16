@@ -292,6 +292,9 @@ bool rhi_intf_open(bool is_pal, bool force_software)
 {
    bool software_selected    = false;
    enum force_renderer_type force_type = AUTO;
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   struct retro_variable var;
+#endif
    unsigned preferred        = 0; /* Will be set to RETRO_HW_CONTEXT_DUMMY if GET_PREFERRED_HW_RENDER is not supported by frontend */
    vk_initialized            = false;
    gl_initialized            = false;
@@ -299,7 +302,7 @@ bool rhi_intf_open(bool is_pal, bool force_software)
    tt_coh_reset();
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-   struct retro_variable var = {0};
+   memset(&var, 0, sizeof(var));
    var.key                   = BEETLE_OPT(renderer);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
@@ -882,7 +885,8 @@ void rhi_intf_push_quad(
    bool mask_test,
    bool set_mask,
    bool is_sprite,
-   bool may_be_2d)
+   bool may_be_2d,
+   uint16_t uv_offset_u, uint16_t uv_offset_v)
 {
    /* Sprites are never dithered on hardware (the software renderer
     * uses the zero dither offset for them); resolve that once here so
@@ -920,7 +924,7 @@ void rhi_intf_push_quad(
                texture_blend_mode,
                depth_shift,
                quad_dither,
-               blend_mode, mask_test, set_mask);
+               blend_mode, mask_test, set_mask, uv_offset_u, uv_offset_v);
 #endif
          break;
       case RHI_VULKAN:

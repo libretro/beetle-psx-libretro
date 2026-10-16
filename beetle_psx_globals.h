@@ -57,6 +57,20 @@ extern int aspect_ratio_setting;
 extern bool aspect_ratio_dirty;
 extern bool gpu_fbwrite_fifo_delay;
 
+/* Internal drawing policy, independent of the output pixel format. Native
+ * and 16 bpp use the same RGB5 arithmetic for ordinary PS1 draws. Native
+ * keeps unexpanded digital levels; 16 bpp expands them for presentation and
+ * permits additional shades on enhanced texture draws. Accepted HDR overrides
+ * either policy without changing the user's selected mode. */
+enum psx_internal_color_mode_e
+{
+   PSX_INTERNAL_COLOR_NATIVE = 0,
+   PSX_INTERNAL_COLOR_16BPP,
+   PSX_INTERNAL_COLOR_32BPP
+};
+
+extern enum psx_internal_color_mode_e psx_internal_color_mode;
+
 /* Output color format ("Color Format" core option).
  *
  * PSX_COLOR_FORMAT_24BIT is the historical path (8 bits per channel,

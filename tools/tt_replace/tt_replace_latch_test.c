@@ -52,9 +52,27 @@ static void expect(const char *what, bool want)
    }
 }
 
+/* Color policy must preview menu edges without committing them before a
+ * framebuffer allocation succeeds, and must retain an unchanged hotkey choice. */
+static void expect_policy(const char *what, bool menu, bool want)
+{
+   struct tt_replace_latch before = latch;
+   bool was_on = tracker_on;
+   bool on = tt_replace_latch_enabled(&latch, menu);
+   if (on != want || latch.session != before.session ||
+       latch.menu_applied != before.menu_applied || tracker_on != was_on)
+   {
+      fprintf(stderr, "FAIL %s: effective policy or live latch changed\n", what);
+      failures++;
+   }
+}
+
 int main(void)
 {
    int frame;
+
+   expect_policy("initial menu on", true, true);
+   expect_policy("initial menu off", false, false);
 
    /* menu on: a new game's first tracker turns replacement on */
    tracker_on = false;
@@ -66,6 +84,8 @@ int main(void)
    for (frame = 0; frame < 3; frame++)
       set_config(true);
    expect("toggled off, menu unchanged", false);
+   expect_policy("toggle off overrides menu on", true, false);
+   expect_policy("pending menu off", false, false);
 
    /* the toggle survives a rebuild */
    rebuild(true);
@@ -83,7 +103,10 @@ int main(void)
    toggle();
    rebuild(false);
    expect("menu off, toggled on, after rebuild", true);
+   expect_policy("toggle on overrides menu off", false, true);
    set_config(true);
+   expect_policy("pending menu off retains live on", false, false);
+   expect("preview did not disable replacement", true);
    set_config(false);
    expect("menu changed on then off", false);
 
@@ -94,9 +117,11 @@ int main(void)
    tt_replace_latch_reset(&latch);
    rebuild(true);
    expect("next game, menu on", true);
+   expect_policy("reset menu on", true, true);
    tt_replace_latch_reset(&latch);
    rebuild(false);
    expect("next game, menu off", false);
+   expect_policy("reset menu off", false, false);
 
    if (failures)
    {

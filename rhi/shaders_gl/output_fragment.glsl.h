@@ -2,9 +2,11 @@
 
 static const char *output_fragment = GLSL_FRAGMENT(
    // We're sampling from the internal framebuffer texture
-   uniform sampler2D fb;
+   uniform highp sampler2D fb;
    // Framebuffer sampling: 0: Normal 16bpp mode, 1: Use 24bpp mode
    uniform int depth_24bpp;
+   uniform uint color_mode;
+   uniform uint byte_color_storage;
    // Internal resolution upscaling factor. Necessary for proper 24bpp
    // display since we need to know how the pixels are laid out in RAM.
    uniform uint internal_upscaling;
@@ -19,6 +21,9 @@ static const char *output_fragment = GLSL_FRAGMENT(
    // Take a normalized color and convert it into a 16bit 1555 ABGR
    // integer in the format used internally by the Playstation GPU.
    uint rebuild_color(vec4 color) {
+      if (byte_color_storage != 0u)
+         color.rgb = clamp(floor(color.rgb * (255.0 / 8.0) + vec3(0.001)),
+               vec3(0.0), vec3(31.0)) / 31.0;
       uint a = uint(floor(color.a + 0.5));
       uint r = uint(floor(color.r * 31. + 0.5));
       uint g = uint(floor(color.g * 31. + 0.5));
@@ -197,6 +202,22 @@ static const char *output_fragment = GLSL_FRAGMENT(
          float r = float(col & 0xffU) / 255.;
 
          color = vec3(r, g, b);
+      }
+
+      /* Recover the logical code from RGB5 normalized storage. Texture
+       * conversion may use bit replication, so use its nearest code rather
+       * than truncating the sampled float. Choose the displayed byte here:
+       * q/31 alone still relies on driver-dependent UNORM rounding. Actual
+       * PS1 24-bit content bypasses this display policy. */
+      if (depth_24bpp == 0 && color_mode == 3u)
+         color = floor(clamp(color * (255.0 / 248.0), 0.0, 1.0) *
+               255.0 + vec3(0.5)) / 255.0;
+      else if (depth_24bpp == 0 && color_mode != 2u) {
+         vec3 q5 = clamp(floor(color * 31.0 + vec3(0.5)),
+                         vec3(0.0), vec3(31.0));
+         vec3 display8 = color_mode == 0u ? q5 * 8.0 :
+               floor(q5 * (255.0 / 31.0) + vec3(0.5));
+         color = display8 / 255.0;
       }
 
       if (hdr_active != 0) {

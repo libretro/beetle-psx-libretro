@@ -478,28 +478,28 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
 #endif
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(depth),
       "Internal Color Depth",
       NULL,
-      "Higher color depth can reduce color banding effects without the use of dithering. 16 bpp emulates original hardware but may have visible banding if dithering is not enabled. 'Dithering Pattern' is recommended to be disabled when this option is set to 32 bpp.",
+      "'Native (Unexpanded)' uses PS1 color limits. '16 bpp' expands the color range to full white and preserves extra shades from enhancements. '32 bpp' uses more color shades for smoother gradients. Active HDR overrides this setting.",
       NULL,
       "video",
       {
-         { "16bpp(native)", "16 bpp (Native)" },
+         { "native",        "Native (Unexpanded)" },
+         { "16bpp(native)", "16 bpp" },
          { "32bpp",         "32 bpp" },
          { NULL, NULL },
       },
       "16bpp(native)"
    },
-   // Sort of, it's more like 15-bit high color and 24-bit true color for visible output. The alpha channel is used for mask bit. Vulkan renderer uses ABGR1555_555 for 31 bits internal? FMVs are always 24-bit on all renderers like original hardware (BGR888, no alpha)
 #endif
    {
       BEETLE_OPT(dither_mode),
       "Dithering Pattern",
       NULL,
-      "'1x (Native)' emulates native low resolution dithering used by original hardware to smooth out color banding artifacts visible at native color depth. 'Internal Resolution' scales dithering granularity to the configured internal resolution for cleaner results. Recommended to be disabled when running at 32 bpp color depth. Note: On Vulkan, enabling this will force downsampling to native color depth, while disabling will automatically enable output at higher color depth.",
+      "'1x (Native)' keeps PS1 dither resolution; 'Internal Resolution' uses internal-resolution dithering. Disabled in HDR.",
       NULL,
       "video",
       {
@@ -511,20 +511,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "1x(native)"
    },
 #ifdef HAVE_VULKAN
-   {
-      BEETLE_OPT(native_color),
-      "Native 15-bit Color Rendering",
-      NULL,
-      "Vulkan renderer only. Stores every GPU write at the PlayStation's native 15-bit color depth inside the framebuffer, quantizing each draw at write time exactly as the original hardware does, instead of rendering at 24-bit and only reducing color depth for display. Fixes brightness seams and framebuffer-feedback artifacts in some games (e.g. Silent Hill's intro logos), at the cost of visible banding on upscaled gradients and texture filtering, and reduced batching of semi-transparent primitives. Has no effect when 'Color Format' is set to '30-bit Color (HDR)' and HDR output is active.",
-      NULL,
-      "video",
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
    {
       BEETLE_OPT(scaled_uv_offset),
       "Texture UV Offset",

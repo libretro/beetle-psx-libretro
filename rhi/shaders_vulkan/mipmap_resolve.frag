@@ -2,10 +2,11 @@
 precision highp float;
 precision highp int;
 
-#if defined(DITHER)
-#include "dither.h"
-#endif
 #include "hdr.h"
+#include "color.h"
+#if !defined(HDR)
+layout(constant_id = 0) const int COLOR_MODE = 2;
+#endif
 
 layout(location = 0) out vec4 FragColor;
 layout(set = 0, binding = 0) uniform sampler2D uTexture;
@@ -33,7 +34,7 @@ void main()
 {
 	vec2 lod_uv = clamp(vUV, registers.uv_min, registers.uv_max);
 	float b = textureLod(uLOD, lod_uv, 0.0).x;
-	mediump vec3 rgb = textureLod(uTexture, lod_uv, registers.max_bias * b).rgb;
+	highp vec3 rgb = textureLod(uTexture, lod_uv, registers.max_bias * b).rgb;
 #if defined(HDR)
 	/* The trilinear resolve interpolates the 8-bit source, producing
 	 * sub-8-bit precision that 10-bit output preserves - so no debanding is
@@ -42,9 +43,7 @@ void main()
 	                              registers.expand_gamut, registers.shoulder,
 	                              registers.sdr_eotf, registers.src_primaries), 1.0);
 #else
-	#if defined(DITHER)
-		rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));
-	#endif
+	rgb = psx_display_color(rgb, COLOR_MODE);
 	FragColor = vec4(sdr_apply_src_primaries(rgb, registers.sdr_eotf,
 	                                         registers.src_primaries), 1.0);
 #endif

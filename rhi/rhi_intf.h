@@ -111,6 +111,8 @@ void rhi_intf_push_triangle(float p0x, float p0y, float p0w,
                             bool mask_test,
                             bool set_mask);
 
+/* Quad UVs include the decoder's floating-interpolation bias. Pass that
+ * bias separately so native interpolation can recover the command UVs. */
 void rhi_intf_push_quad(float p0x, float p0y, float p0w,
                         float p1x, float p1y, float p1w,
                         float p2x, float p2y, float p2w,
@@ -137,7 +139,8 @@ void rhi_intf_push_quad(float p0x, float p0y, float p0w,
                         bool mask_test,
                         bool set_mask,
                         bool is_sprite,
-                        bool may_be_2d);
+                        bool may_be_2d,
+                        uint16_t uv_offset_u, uint16_t uv_offset_v);
 
 void rhi_intf_push_line(int16_t p0x, int16_t p0y,
                         int16_t p1x, int16_t p1y,
