@@ -39,3 +39,4 @@ __pycache__/
 # Ignore all workflows except build-windows.yml
 .github/workflows/*
 !.github/workflows/build-windows.yml
+/.vscode
