@@ -33,7 +33,7 @@ static void host_hdr_fill(struct retro_hdr_metadata *m)
    m->version           = 1;
    m->size              = sizeof(*m);
    m->output_mode       = 1;  /* PQ Rec.2020 */
-   m->screen_10bpc      = true;
+   m->source_formats    = RETRO_HDR_SOURCE_FORMAT_HDR10_2101010;
    m->paper_white_nits  = 200.0f;
    m->max_nits          = host_hdr_env_float("HOST_HDR_MAX", 1000.0f);
    m->min_nits          = host_hdr_env_float("HOST_HDR_BLACK", 0.0f);

@@ -6021,7 +6021,7 @@ static void hdr_metadata_init(struct retro_hdr_metadata *m)
    m->version           = 1;
    m->size              = sizeof(*m);
    m->output_mode       = 0;
-   m->screen_10bpc      = false;
+   m->source_formats    = 0;
    m->paper_white_nits  = 0.0f;
    m->max_nits          = 0.0f;
    m->min_nits          = 0.0f;
