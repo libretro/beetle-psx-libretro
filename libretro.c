@@ -286,6 +286,14 @@ int   psx_black_setup          = 0;
 
 #define NEGCON_RANGE 0x7FFF
 
+/* Memory card paths: a save directory plus a file name. At libretro-common's
+ * desktop PATH_MAX_LENGTH there is room for any directory a frontend hands
+ * over from a DIR_MAX_LENGTH buffer. Every card path is built at this size,
+ * so the file a card loads from is the file it saves to. The extension
+ * buffer holds "%d.mcr", at most 15 characters. */
+#define MEMCARD_PATH_MAX 2048
+#define MEMCARD_EXT_MAX  16
+
 char retro_save_directory[4096];
 char retro_base_directory[4096];
 char retro_cd_base_directory[4096];
@@ -3430,8 +3438,8 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
 
    for(; i < 8; i++)
    {
-      char ext[64];
-      char memcard[4096];
+      char ext[MEMCARD_EXT_MAX];
+      char memcard[MEMCARD_PATH_MAX];
       if (i == 0)
          snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
       else if (i == 1)
@@ -3869,8 +3877,8 @@ static void CloseGame(void)
    {
       for (i = 0; i < 8; i++)
       {
-         char ext[64];
-         char memcard[4096];
+         char ext[MEMCARD_EXT_MAX];
+         char memcard[MEMCARD_PATH_MAX];
 
          if (i == 0 && !use_mednafen_memcard0_method)
          {
@@ -6102,6 +6110,35 @@ static void apply_hdr_metadata(const struct retro_display_metadata *d)
    }
 }
 
+/* Memory card file swaps and saves, out of line: each holds a full path
+ * buffer, which would otherwise sit in retro_run's frame every frame for a
+ * branch taken only when a card is switched or saved. */
+static NO_INLINE void memcard_swap_index(unsigned port, int old_index, int new_index)
+{
+   char ext[MEMCARD_EXT_MAX];
+   char memcard[MEMCARD_PATH_MAX];
+
+   /* Save the slot's contents to the previously selected index */
+   snprintf(ext, sizeof(ext), "%d.mcr", old_index);
+   MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
+   FrontIO_SaveMemcardToPath(PSX_FIO, port, memcard, true);
+
+   /* Load the currently selected index into the slot */
+   snprintf(ext, sizeof(ext), "%d.mcr", new_index);
+   MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
+   FrontIO_LoadMemcardFromPath(PSX_FIO, port, memcard, true);
+}
+
+static NO_INLINE void memcard_save_index_async(unsigned port, int index)
+{
+   char ext[MEMCARD_EXT_MAX];
+   char memcard[MEMCARD_PATH_MAX];
+
+   snprintf(ext, sizeof(ext), "%d.mcr", index);
+   MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
+   FrontIO_SaveMemcardToPathAsync(PSX_FIO, port, memcard, mc_async_enqueue);
+}
+
 /* Per-frame re-query, kept out of line so the metadata block lives in this
  * frame rather than retro_run's. */
 static NO_INLINE void refresh_hdr_metadata(void)
@@ -6637,20 +6674,7 @@ void retro_run(void)
                           "changing from memory card %d to memory card %d in left slot",
                           memcard_left_index_old, memcard_left_index);
 
-         {
-            char ext[64];
-            char memcard[4096];
-
-            /* Save contents of left memory card to previously selected index */
-            snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index_old);
-            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_SaveMemcardToPath(PSX_FIO, 0, memcard, true);
-
-            /* Load contents of currently selected index to left memory card */
-            snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
-            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_LoadMemcardFromPath(PSX_FIO, 0, memcard, true);
-         }
+         memcard_swap_index(0, memcard_left_index_old, memcard_left_index);
       }
 
       if (memcard_right_index_old != memcard_right_index)
@@ -6660,20 +6684,7 @@ void retro_run(void)
                           "changing from memory card %d to memory card %d in right slot",
                           memcard_right_index_old, memcard_right_index);
 
-         {
-            char ext[64];
-            char memcard[4096];
-
-            /* Save contents of right memory card to previously selected index */
-            snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index_old);
-            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_SaveMemcardToPath(PSX_FIO, 1, memcard, true);
-
-            /* Load contents of currently selected index to right memory card */
-            snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
-            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_LoadMemcardFromPath(PSX_FIO, 1, memcard, true);
-         }
+         memcard_swap_index(1, memcard_right_index_old, memcard_right_index);
       }
 
       // Update gun crosshair color
@@ -6820,8 +6831,6 @@ void retro_run(void)
             Memcard_SaveDelay[i] += timestamp;
             if(Memcard_SaveDelay[i] >= (33868800 * 2))   // Wait until about 2 seconds of no new writes.
             {
-            char ext[64];
-            char memcard[4096];
             int  index = i;
 
 #ifndef NDEBUG
@@ -6839,9 +6848,7 @@ void retro_run(void)
             if (i == 0) index = memcard_left_index;
             else if (i == 1) index = memcard_right_index;
 
-            snprintf(ext, sizeof(ext), "%d.mcr", index);
-            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_SaveMemcardToPathAsync(PSX_FIO, i, memcard, mc_async_enqueue);
+            memcard_save_index_async(i, index);
             Memcard_SaveDelay[i] = -1;
             Memcard_PrevDC[i] = 0;
          }
