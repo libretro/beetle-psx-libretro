@@ -372,6 +372,10 @@ void GPU_FlushDeferredScanout(void);
  * dirtied the margin pixels (Deinterlacer_Process in WEAVE mode). */
 void GPU_InvalidateScanoutCache(void);
 
+/* Whether every line in [0, lines) of this frame was scanned out
+ * across the whole of the loan. */
+bool GPU_LoanComplete(int32_t lines);
+
 int GPU_StateAction(StateMem *sm, int load, int data_only);
 
 void GPU_set_visible_scanlines(int sls, int sle); // Beetle PSX addition

@@ -708,6 +708,15 @@ void FrontIO_SetAMCT(FrontIO *self_, bool enabled)
    self->amct_enabled = enabled;
 }
 
+bool FrontIO_ReadsScanout(const FrontIO *self)
+{
+   unsigned i;
+   for (i = 0; i < 8; i++)
+      if ((self->Devices[i])->vt->GPULineHook != InputDevice_GPULineHook)
+         return true;
+   return false;
+}
+
 void FrontIO_SetCrosshairsCursor(FrontIO *self_, unsigned port, int cursor)
 {
    FrontIO *self = self_;

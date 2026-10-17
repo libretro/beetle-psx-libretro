@@ -128,6 +128,8 @@ void     FrontIO_SetInput(FrontIO *fio, unsigned port,
                           const char *type, void *ptr);
 void     FrontIO_SetAMCT(FrontIO *fio, bool enabled);
 void     FrontIO_SetCrosshairsCursor(FrontIO *fio, unsigned port, int cursor);
+/* Whether a connected device reads the scanned-out picture. */
+bool     FrontIO_ReadsScanout(const FrontIO *fio);
 void     FrontIO_SetCrosshairsColor (FrontIO *fio, unsigned port, uint32_t color);
 
 InputDevice *FrontIO_GetMemcardDevice(FrontIO *fio, unsigned which);
