@@ -1,13 +1,18 @@
 name: Build Windows
-run-name: ${{ github.event.head_commit.message || github.sha }}
+run-name: ${{ inputs.commit_title || github.event.head_commit.message || format('{0} by @{1}', github.ref_name, github.actor) }}
 
 on:
   workflow_dispatch:
+    inputs:
+      commit_title:
+        description: 'Commit title / message'
+        required: false
+        type: string
 
 jobs:
   get_commit:
     name: Get Commit Message
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.commit_title == ''
     runs-on: ubuntu-latest
     outputs:
       commit_title: ${{ steps.commit_info.outputs.title }}
@@ -26,7 +31,7 @@ jobs:
   build:
     needs: get_commit
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
-    name: ${{ github.event.head_commit.message || needs.get_commit.outputs.commit_title || 'Build Windows x86_64' }}
+    name: ${{ inputs.commit_title || github.event.head_commit.message || needs.get_commit.outputs.commit_title || 'Build Windows x86_64' }}
     runs-on: windows-latest
 
     defaults:
