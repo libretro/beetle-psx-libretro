@@ -1,11 +1,32 @@
 name: Build Windows
+run-name: ${{ github.event.head_commit.message || github.sha }}
 
 on:
   workflow_dispatch:
 
 jobs:
+  get_commit:
+    name: Get Commit Message
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      commit_title: ${{ steps.commit_info.outputs.title }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get Commit Title
+        id: commit_info
+        run: |
+          DELIMITER=$(openssl rand -hex 8)
+          {
+            echo "title<<${DELIMITER}"
+            git log -1 --pretty=%s
+            echo "${DELIMITER}"
+          } >> "$GITHUB_OUTPUT"
+
   build:
-    name: Build Windows x86_64
+    needs: get_commit
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    name: ${{ github.event.head_commit.message || needs.get_commit.outputs.commit_title || 'Build Windows x86_64' }}
     runs-on: windows-latest
 
     defaults:
