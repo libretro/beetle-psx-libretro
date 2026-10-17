@@ -32,6 +32,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 
 #include "pgxp/pgxp_main.h"
 #include "pgxp/pgxp_gte.h"
+#include "rhi/hdr_display.h"
 
 #include "deps/openbios/openbios.bin.h"
 
@@ -208,6 +209,18 @@ float psx_hdr_max_nits         = 1000.0f;
 float psx_hdr_paper_white_nits = 200.0f;
 int   psx_hdr_expand_gamut     = 0;   /* VID_GAMUT_ACCURATE equivalent */
 int   psx_hdr_output_mode      = 1;   /* assume HDR10 when unqueryable */
+/* Display state for the encode, both zero until the frontend reports it:
+ * PQ(panel black) for the BT.2390 toe, and linear Rec.2020 -> panel RGB
+ * (column-major) for gamut compression, zero meaning the panel is unknown. */
+float psx_hdr_black_pq         = 0.0f;
+float psx_hdr_to_panel[9]      = { 0.0f };
+/* Which metadata query the frontend answers, settled on first use: 0 when
+ * it answers neither, so the per-frame refresh costs nothing there. The
+ * primaries and black the derived values above were built from are kept so
+ * they are only rebuilt when the frontend reports a change. */
+static unsigned hdr_meta_cmd;
+static uint16_t hdr_panel_xy[8];
+static float    hdr_black_nits;
 /* HDR highlight roll-off curve applied to the over-paper-white region only:
  * 0 = Reinhard soft-knee (default, matches the validated behaviour),
  * 1 = ACES filmic shoulder. No core option yet - flip here to evaluate. */
@@ -225,9 +238,17 @@ int   psx_native_color         = 0;
 
 static void reset_hdr_output_state(void)
 {
-   psx_hdr_active = false;
-   psx_pgxp_color = 0;
-   psx_pgxp_fog   = 0;
+   unsigned i;
+   psx_hdr_active   = false;
+   psx_pgxp_color   = 0;
+   psx_pgxp_fog     = 0;
+   psx_hdr_black_pq = 0.0f;
+   hdr_black_nits   = 0.0f;
+   hdr_meta_cmd     = RETRO_ENVIRONMENT_GET_DISPLAY_METADATA;
+   for (i = 0; i < 9; i++)
+      psx_hdr_to_panel[i] = 0.0f;
+   for (i = 0; i < 8; i++)
+      hdr_panel_xy[i]     = 0;
 }
 
 /* Reference SDR transfer the 24-bit path is assumed to have been viewed
@@ -5986,41 +6007,108 @@ error:
    return false;
 }
 
-/* Reads the frontend's HDR presentation state into the globals the output
- * encode works from. A frontend without GET_HDR_METADATA leaves every value
- * at its current setting, and a zero paper white or peak is ignored rather
- * than letting the encode divide or clamp against nothing. */
-static void query_hdr_metadata(void)
+static void hdr_metadata_init(struct retro_hdr_metadata *m)
 {
    unsigned i;
-   struct retro_hdr_metadata meta;
+   m->version           = 1;
+   m->size              = sizeof(*m);
+   m->output_mode       = 0;
+   m->screen_10bpc      = false;
+   m->paper_white_nits  = 0.0f;
+   m->max_nits          = 0.0f;
+   m->min_nits          = 0.0f;
+   m->expand_gamut      = 0;
+   m->max_cll           = 0.0f;
+   m->max_fall          = 0.0f;
+   m->color_primaries   = 0;
+   m->transfer_function = 0;
+   m->passthrough       = false;
+   m->tonemap_operator  = 0;
+   for (i = 0; i < sizeof(m->reserved) / sizeof(m->reserved[0]); i++)
+      m->reserved[i]    = 0;
+}
 
-   meta.version           = 1;
-   meta.size              = sizeof(meta);
-   meta.output_mode       = 0;
-   meta.screen_10bpc      = false;
-   meta.paper_white_nits  = 0.0f;
-   meta.max_nits          = 0.0f;
-   meta.min_nits          = 0.0f;
-   meta.expand_gamut      = 0;
-   meta.max_cll           = 0.0f;
-   meta.max_fall          = 0.0f;
-   meta.color_primaries   = 0;
-   meta.transfer_function = 0;
-   meta.passthrough       = false;
-   meta.tonemap_operator  = 0;
-   for (i = 0; i < sizeof(meta.reserved) / sizeof(meta.reserved[0]); i++)
-      meta.reserved[i]    = 0;
+/* Asks for GET_DISPLAY_METADATA, which carries the HDR block plus the
+ * panel's own capabilities, and drops to GET_HDR_METADATA (caps left zero)
+ * on a frontend that only has that. Returns false when neither is answered. */
+static bool query_hdr_metadata(struct retro_display_metadata *d)
+{
+   unsigned i;
+   d->version                   = 1;
+   d->size                      = sizeof(*d);
+   d->geo.native_width          = 0;
+   d->geo.native_height         = 0;
+   d->geo.width_mm              = 0;
+   d->geo.height_mm             = 0;
+   d->geo.refresh_min_mHz       = 0;
+   d->geo.refresh_max_mHz       = 0;
+   hdr_metadata_init(&d->hdr);
+   d->caps.peak_nits            = 0.0f;
+   d->caps.min_nits             = 0.0f;
+   d->caps.max_frame_avg_nits   = 0.0f;
+   for (i = 0; i < 8; i++)
+      d->caps.primaries_xy[i]   = 0;
+   d->caps.supported_eotf_mask  = 0;
+   d->caps.edid_gamma_x100      = 0;
+   d->caps.capability_source    = 0;
 
-   if (!environ_cb(RETRO_ENVIRONMENT_GET_HDR_METADATA, &meta))
-      return;
+   if (hdr_meta_cmd == RETRO_ENVIRONMENT_GET_DISPLAY_METADATA)
+   {
+      if (environ_cb(RETRO_ENVIRONMENT_GET_DISPLAY_METADATA, d))
+         return true;
+      hdr_meta_cmd = RETRO_ENVIRONMENT_GET_HDR_METADATA;
+   }
+   if (hdr_meta_cmd == RETRO_ENVIRONMENT_GET_HDR_METADATA)
+   {
+      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_METADATA, &d->hdr))
+         return true;
+      hdr_meta_cmd = 0;
+   }
+   return false;
+}
 
-   if (meta.paper_white_nits > 0.0f)
-      psx_hdr_paper_white_nits = meta.paper_white_nits;
-   if (meta.max_nits > 0.0f)
-      psx_hdr_max_nits         = meta.max_nits;
-   psx_hdr_expand_gamut        = (int)meta.expand_gamut;
-   psx_hdr_output_mode         = (int)meta.output_mode;
+/* Moves an answered query into the globals the output encode works from.
+ * A zero paper white or peak is ignored rather than letting the encode
+ * divide or clamp against nothing. The frontend's own peak and black are
+ * its effective targets and win; the panel's measured values fill in only
+ * where the frontend reports none. */
+static void apply_hdr_metadata(const struct retro_display_metadata *d)
+{
+   const struct retro_hdr_metadata *h = &d->hdr;
+   float black = (h->min_nits > 0.0f) ? h->min_nits : d->caps.min_nits;
+
+   if (h->paper_white_nits > 0.0f)
+      psx_hdr_paper_white_nits = h->paper_white_nits;
+   if (h->max_nits > 0.0f)
+      psx_hdr_max_nits         = h->max_nits;
+   else if (d->caps.peak_nits > 0.0f)
+      psx_hdr_max_nits         = d->caps.peak_nits;
+   psx_hdr_expand_gamut        = (int)h->expand_gamut;
+   psx_hdr_output_mode         = (int)h->output_mode;
+
+   /* A black at or above paper white is not a black level. */
+   if (!(black > 0.0f && black < psx_hdr_paper_white_nits))
+      black = 0.0f;
+   if (black != hdr_black_nits)
+   {
+      hdr_black_nits   = black;
+      psx_hdr_black_pq = (black > 0.0f) ? hdr_display_pq(black) : 0.0f;
+   }
+
+   if (memcmp(hdr_panel_xy, d->caps.primaries_xy, sizeof(hdr_panel_xy)) != 0)
+   {
+      memcpy(hdr_panel_xy, d->caps.primaries_xy, sizeof(hdr_panel_xy));
+      hdr_display_panel_matrix(hdr_panel_xy, psx_hdr_to_panel);
+   }
+}
+
+/* Per-frame re-query, kept out of line so the metadata block lives in this
+ * frame rather than retro_run's. */
+static NO_INLINE void refresh_hdr_metadata(void)
+{
+   struct retro_display_metadata meta;
+   if (query_hdr_metadata(&meta))
+      apply_hdr_metadata(&meta);
 }
 
 /* Finalize the HDR decision once a hardware renderer is confirmed
@@ -6048,8 +6136,11 @@ static void negotiate_hdr_output(void)
        * an authoritative "HDR is on and will be presented". On rejection
        * we restore XRGB8888 and fall back to 24-bit. */
       enum retro_pixel_format hdrfmt = RETRO_PIXEL_FORMAT_HDR10_2101010;
+      bool regraded = false;
       if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &hdrfmt))
       {
+         struct retro_display_metadata meta;
+         bool answered = query_hdr_metadata(&meta);
          /* The output mode is cached for the log and deliberately not
           * compensated for. libretro.h notes that a linear Rec.709 (scRGB)
           * swapchain rotates Rec.2020 -> Rec.709 on the way, but that
@@ -6060,9 +6151,28 @@ static void negotiate_hdr_output(void)
           * the Colour Boost modes rely on too, since the boost is baked into
           * X either way. Kept in case that analysis is ever shown wrong, as
           * no scRGB frontend has been available to test against. */
-         query_hdr_metadata();
 
-         psx_hdr_active = true;
+         /* The encode places absolute luminance itself, so it relies on the
+          * frontend presenting the frame untouched. A frontend that is
+          * presenting HDR but says it will apply its own paper-white scale,
+          * curve or gamut expansion to HDR10 input would grade the picture a
+          * second time; the 24-bit path is then the correct one, since that
+          * is exactly the SDR content its composition is built for. With
+          * output mode 0 nothing is being presented yet (RetroArch answers
+          * that until its video driver is up), so passthrough says nothing
+          * and HDR stays engaged. */
+         if (answered && meta.hdr.output_mode != 0 && !meta.hdr.passthrough)
+         {
+            enum retro_pixel_format sdrfmt = RETRO_PIXEL_FORMAT_XRGB8888;
+            environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &sdrfmt);
+            regraded = true;
+         }
+         else
+         {
+            if (answered)
+               apply_hdr_metadata(&meta);
+            psx_hdr_active = true;
+         }
       }
       else
       {
@@ -6083,9 +6193,13 @@ static void negotiate_hdr_output(void)
       {
          log_cb(RETRO_LOG_INFO,
                "[Color Format] 30-bit HDR requested: %s (paper white %.0f nits, gamut %d, output mode %d).\n",
-               psx_hdr_active ? "engaged" : "rejected by frontend - falling back to 24-bit",
+               psx_hdr_active ? "engaged"
+               : regraded ? "frontend would re-grade HDR10 input - falling back to 24-bit"
+               : "rejected by frontend - falling back to 24-bit",
                psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
-         log_cb(RETRO_LOG_INFO, "[HDR] Display peak: %.0f nits\n", psx_hdr_max_nits);
+         log_cb(RETRO_LOG_INFO, "[HDR] Display peak: %.0f nits, black %.3f nits, panel gamut %s\n",
+               psx_hdr_max_nits, hdr_black_nits,
+               psx_hdr_to_panel[0] != 0.0f ? "mapped" : "unknown");
       }
    }
 }
@@ -6431,7 +6545,7 @@ void retro_run(void)
     * updating the globals here takes effect on the very next present. One
     * env_cb read, gated on psx_hdr_active. */
    if (psx_hdr_active)
-      query_hdr_metadata();
+      refresh_hdr_metadata();
 
    /* Apply any geometry change deferred from a previous frame's
     * check_variables before beginning this frame, so the frontend's

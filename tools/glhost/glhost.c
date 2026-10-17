@@ -12,6 +12,8 @@
  *
  * Usage: glhost <core.so> <content> [savestate|-] [frames] [outdir]
  *   GLHOST_VARS: semicolon list of key=value core option overrides.
+ *   HOST_HDR_*: the display presented through GET_HDR_METADATA and
+ *   GET_DISPLAY_METADATA; see tools/hdr_display/host_metadata.h.
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -24,6 +26,7 @@
 #include <EGL/eglext.h>
 #include <GL/gl.h>
 #include "libretro.h"
+#include "../hdr_display/host_metadata.h"
 
 /* ---- core option overrides / harvested defaults ---- */
 static char *var_keys[512]; static char *var_vals[512]; static int n_vars;
@@ -101,7 +104,11 @@ static bool env_cb(unsigned cmd, void *data)
          *(const char **)data = savedir; return true;
       case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
          soft_fmt = *(const unsigned *)data;
+         fprintf(stderr, "[glhost] pixel format %u\n", soft_fmt);
          return true;
+      case RETRO_ENVIRONMENT_GET_HDR_METADATA:
+      case RETRO_ENVIRONMENT_GET_DISPLAY_METADATA:
+         return host_hdr_metadata(cmd, data);
       case RETRO_ENVIRONMENT_GET_CAN_DUPE:
          *(bool *)data = true; return true;
       case RETRO_ENVIRONMENT_SET_VARIABLES:

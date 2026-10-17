@@ -15,6 +15,8 @@
  *   VKHOST_VARS: semicolon list of key=value core option overrides.
  *   VKHOST_QUEUE_THREAD: run a second thread on the frontend's queue, the
  *   way a threaded frontend does (see "the frontend's queue" below).
+ *   HOST_HDR_*: the display presented through GET_HDR_METADATA and
+ *   GET_DISPLAY_METADATA; see tools/hdr_display/host_metadata.h.
  *   VKHOST_NEXT_CONTENT: after the teardown (context_destroy, unload,
  *   deinit), run this content as a second session in the same process -
  *   the core stays loaded, as with a statically linked frontend - and dump
@@ -35,6 +37,7 @@
 #include <pthread.h>
 #include <vulkan/vulkan.h>
 #include "libretro.h"
+#include "../hdr_display/host_metadata.h"
 #include "libretro_vulkan.h"
 
 /* ---- tiny dynamic table of core option overrides ---- */
@@ -249,6 +252,8 @@ static bool env_cb(unsigned cmd, void *data)
       case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
          *(const char **)data = savedir; return true;
       case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
+         fprintf(stderr, "[vkhost] pixel format %d\n",
+               (int)*(const enum retro_pixel_format *)data);
          return true;
       case RETRO_ENVIRONMENT_GET_CAN_DUPE:
          *(bool *)data = true; return true;
@@ -310,24 +315,8 @@ static bool env_cb(unsigned cmd, void *data)
          *(const struct retro_hw_render_interface_vulkan **)data = &iface;
          return true;
       case RETRO_ENVIRONMENT_GET_HDR_METADATA:
-      {
-         struct retro_hdr_metadata *meta = (struct retro_hdr_metadata *)data;
-         if (meta->version != 1 || meta->size < sizeof(*meta))
-            return false;
-         meta->output_mode       = 1; /* PQ Rec.2020 */
-         meta->screen_10bpc      = true;
-         meta->paper_white_nits  = 200.0f;
-         meta->max_nits          = 1000.0f;
-         meta->min_nits          = 0.0f;
-         meta->expand_gamut      = 0;
-         meta->max_cll           = 0.0f;
-         meta->max_fall          = 0.0f;
-         meta->color_primaries   = 9;  /* H.273 BT.2020 */
-         meta->transfer_function = 16; /* H.273 PQ */
-         meta->passthrough       = true;
-         meta->tonemap_operator  = 0;
-         return true;
-      }
+      case RETRO_ENVIRONMENT_GET_DISPLAY_METADATA:
+         return host_hdr_metadata(cmd, data);
       default:
          return false;
    }

@@ -26,6 +26,10 @@ layout(push_constant, std430) uniform Registers
 	float peak_nits;      /* display peak, GET_HDR_METADATA max_nits */
 	int   expand_gamut;
 	int   shoulder;
+	/* Display state: PQ(panel black) for the toe, and Rec.2020 -> panel RGB
+	 * for gamut compression. Both zero when the frontend does not say. */
+	float black_pq;
+	mat3  to_panel;
 #endif
 } registers;
 
@@ -40,7 +44,8 @@ void main()
 	 * needed (or wanted) here; just encode. */
 	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.peak_nits,
 	                              registers.expand_gamut, registers.shoulder,
-	                              registers.sdr_eotf, registers.src_primaries), 1.0);
+	                              registers.sdr_eotf, registers.src_primaries,
+	                              registers.black_pq, registers.to_panel), 1.0);
 #else
 	#if defined(DITHER)
 		rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));

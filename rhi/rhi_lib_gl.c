@@ -33,6 +33,8 @@ extern float psx_phase_error;   /* receiver hue detune, in cycles */
 extern int   psx_black_setup;   /* NTSC pedestal mismatch: 0 none, 1 lifted, 2 crushed */
 extern float psx_hdr_paper_white_nits;
 extern float psx_hdr_max_nits;
+extern float psx_hdr_black_pq;
+extern float psx_hdr_to_panel[9];
 extern int   psx_hdr_expand_gamut;
 extern int   psx_hdr_shoulder;
 extern int   psx_hdr_sdr_eotf;
@@ -4567,6 +4569,9 @@ static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
    glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_expand_gamut"), psx_hdr_expand_gamut);
    glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_shoulder"), psx_hdr_shoulder);
    glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_src_primaries"), psx_src_primaries);
+   glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_black_pq"), psx_hdr_black_pq);
+   glUniformMatrix3fv(gl_uniform_map_get(&p->uniforms, "reg_to_panel"), 1, GL_FALSE,
+         psx_hdr_to_panel);
    gl_analog_draw_quad(a);
 
    glBindVertexArray(0);
@@ -6527,6 +6532,8 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
                glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_shoulder"), psx_hdr_shoulder);
                glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_sdr_eotf"), psx_hdr_sdr_eotf);
                glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_src_primaries"), psx_src_primaries);
+               glUniform1f(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_black_pq"), psx_hdr_black_pq);
+               glUniformMatrix3fv(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_to_panel"), 1, GL_FALSE, psx_hdr_to_panel);
             }
 
             if (!gl_draw_buffer_is_empty(renderer->output_buffer))

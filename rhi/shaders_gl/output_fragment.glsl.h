@@ -43,6 +43,10 @@ static const char *output_fragment = GLSL_FRAGMENT(
    uniform int hdr_sdr_eotf;
    // 0 Rec.709, 1 SMPTE-C, 2 EBU, 3 NTSC 1953
    uniform int hdr_src_primaries;
+   // PQ(panel black) for the toe; zero when the frontend does not say
+   uniform float hdr_black_pq;
+   // linear Rec.2020 -> panel RGB; all zero when the panel is unknown
+   uniform mat3 hdr_to_panel;
 
    vec3 pq_encode(vec3 nits) {
       float pq_m1 = 2610.0 / 16384.0;
@@ -103,6 +107,31 @@ static const char *output_fragment = GLSL_FRAGMENT(
           0.0163916 * c.r + 0.0880132 * c.g + 0.8955950 * c.b);
    }
 
+   // Panel gamut compression and the BT.2390 black-floor toe; see
+   // panel_gamut_compress and pq_black_floor in hdr.h for the derivation.
+   vec3 panel_gamut_compress(vec3 lin2020) {
+      if (hdr_to_panel[0][0] == 0.0)
+         return lin2020;
+      vec3 p = hdr_to_panel * lin2020;
+      float ach = max(p.r, max(p.g, p.b));
+      if (ach <= 0.0)
+         return lin2020;
+      vec3 d = (vec3(ach) - p) / ach;
+      if (max(d.r, max(d.g, d.b)) <= 0.9)
+         return lin2020;
+      vec3 x = max(d - vec3(0.9), vec3(0.0));
+      d = mix(d, vec3(0.9) + x / (vec3(1.0) + x / 0.1), greaterThan(d, vec3(0.9)));
+      return inverse(hdr_to_panel) * (vec3(ach) - d * ach);
+   }
+
+   vec3 pq_black_floor(vec3 e) {
+      if (hdr_black_pq <= 0.0)
+         return e;
+      vec3 t = vec3(1.0) - e;
+      t = t * t;
+      return e + hdr_black_pq * (t * t);
+   }
+
    vec3 encode_hdr10(vec3 rgb) {
       // One transfer function across the whole range, then compress the
       // overshoot above paper white with a C1-continuous knee driven by
@@ -127,7 +156,8 @@ static const char *output_fragment = GLSL_FRAGMENT(
       }
       lin = min(lin, vec3(hdr_paper_white)) + over * knee;
       lin = rec709_to_target(lin);
-      return pq_encode(lin);
+      lin = panel_gamut_compress(lin);
+      return pq_black_floor(pq_encode(lin));
    }
 
    // Debanding dither for the genuinely quantised paths (see hdr.h):

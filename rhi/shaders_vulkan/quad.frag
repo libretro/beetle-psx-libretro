@@ -36,6 +36,10 @@ layout(push_constant, std430) uniform Registers
 	float peak_nits;      /* display peak, GET_HDR_METADATA max_nits */
 	int   expand_gamut;
 	int   shoulder;       /* highlight roll-off: 0 Reinhard, 1 filmic */
+	/* Display state: PQ(panel black) for the toe, and Rec.2020 -> panel RGB
+	 * for gamut compression. Both zero when the frontend does not say. */
+	float black_pq;
+	mat3  to_panel;
 #endif
 } registers;
 
@@ -160,7 +164,8 @@ void main()
 	 * linearise / paper-white / gamut / PQ chain. */
 	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.peak_nits,
 	                              registers.expand_gamut, registers.shoulder,
-	                              registers.sdr_eotf, registers.src_primaries), 1.0);
+	                              registers.sdr_eotf, registers.src_primaries,
+	                              registers.black_pq, registers.to_panel), 1.0);
 #else
 	/* After the dither, not before: the console emits a dithered 15-bit signal
 	 * and the primaries belong to the phosphors that receive it. */

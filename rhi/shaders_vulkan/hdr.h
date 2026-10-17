@@ -14,7 +14,10 @@
  *   - Rec.709 -> target primaries keyed to the frontend "Colour Boost" (same
  *     matrices RetroArch applies, so switching SDR<->HDR10 does not shift
  *     saturation),
- *   - SMPTE ST.2084 (PQ) encode over 0..10000 nits.
+ *   - colours the panel cannot show compressed toward its own gamut boundary,
+ *     when the frontend reports the panel's primaries,
+ *   - SMPTE ST.2084 (PQ) encode over 0..10000 nits, with the bottom of the
+ *     range lifted onto the panel's black when the frontend reports one.
  * Runs in highp; precision qualifiers are ignored on the desktop Vulkan
  * target but keep the intent explicit. */
 #ifndef HDR_H
@@ -179,13 +182,72 @@ highp vec3 sdr_apply_src_primaries(highp vec3 rgb, int sdr_eotf, int src_primari
 		sdr_eotf);
 }
 
+/* Panel gamut compression, applied to linear Rec.2020 nits.
+ *
+ * The Rec.2020 container holds colours no consumer panel can show - the
+ * NTSC 1953 primaries, the Colour Boost modes and saturated additive
+ * highlights all land there - and a panel left to its own devices clips them
+ * per channel, which flattens gradients and shifts hue. to_panel maps
+ * Rec.2020 into the panel's own RGB, where "outside the gamut" is simply a
+ * channel below zero.
+ *
+ * In panel RGB each channel's distance from the achromatic axis is
+ * d = (max - c) / max: 0 on the axis, 1 on the gamut boundary, above 1
+ * outside it. Distances past the threshold are compressed with
+ * t + x / (1 + x / (1 - t)), which has unit slope where it starts and
+ * approaches the boundary asymptotically, so nothing is clipped and the
+ * transition is C1. The largest channel is untouched, so the highlight
+ * roll-off's luminance placement survives. Only the outer tenth of the
+ * panel's own gamut is touched among colours it can show; everything
+ * further in, which is nearly all content, passes through bit for bit.
+ *
+ * A zero matrix means the panel is unknown, and the colour is returned as is. */
+highp vec3 panel_gamut_compress(highp vec3 lin2020, highp mat3 to_panel)
+{
+	const highp float T = 0.9;
+	const highp float S = 1.0 - T;
+	highp vec3  p;
+	highp float ach;
+	highp vec3  d;
+	highp vec3  x;
+	if (to_panel[0][0] == 0.0)
+		return lin2020;
+	p   = to_panel * lin2020;
+	ach = max(p.r, max(p.g, p.b));
+	if (ach <= 0.0)
+		return lin2020;
+	d   = (vec3(ach) - p) / ach;
+	if (max(d.r, max(d.g, d.b)) <= T)
+		return lin2020;
+	x   = max(d - vec3(T), vec3(0.0));
+	d   = mix(d, vec3(T) + x / (vec3(1.0) + x / S), greaterThan(d, vec3(T)));
+	return inverse(to_panel) * (vec3(ach) - d * ach);
+}
+
+/* Display black floor: the BT.2390 EETF toe, E + b * (1 - E)^4 in the PQ
+ * domain, with b = PQ(panel black). A panel cannot go below its black, so
+ * without this everything encoded under it is crushed into one level; the
+ * toe lands code 0 on the panel's black and lifts the shadows above it with
+ * a weight that has fallen to nothing well before paper white. b is computed
+ * on the CPU; at 0 the curve is the identity. */
+highp vec3 pq_black_floor(highp vec3 e, highp float black_pq)
+{
+	highp vec3 t;
+	if (black_pq <= 0.0)
+		return e;
+	t = vec3(1.0) - e;
+	t = t * t;
+	return e + black_pq * (t * t);
+}
+
 /* Entry point for callers that already hold linear light, so it is not decoded
  * and re-encoded on the way in. `scene_linear` is normalised with 1.0 at
  * reference white; values above that are the additive overshoot the roll-off
  * compresses. */
 highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_nits,
                                highp float peak_nits, int expand_gamut, int shoulder,
-                               int src_primaries)
+                               int src_primaries, highp float black_pq,
+                               highp mat3 to_panel)
 {
 	/* STEP 3: one transfer function across the whole range, then compress
 	 * whatever lands above paper white.
@@ -253,15 +315,17 @@ highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_
 	}
 	lin = min(lin, vec3(paper_white_nits)) + over * knee;
 	lin = rec709_to_target(lin, expand_gamut);
-	return pq_encode(lin);
+	lin = panel_gamut_compress(lin, to_panel);
+	return pq_black_floor(pq_encode(lin), black_pq);
 }
 
 highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, highp float peak_nits,
-                        int expand_gamut, int shoulder, int sdr_eotf, int src_primaries)
+                        int expand_gamut, int shoulder, int sdr_eotf, int src_primaries,
+                        highp float black_pq, highp mat3 to_panel)
 {
 	return encode_hdr10_linear(sdr_to_linear(max(rgb, vec3(0.0)), sdr_eotf),
 	                           paper_white_nits, peak_nits, expand_gamut, shoulder,
-	                           src_primaries);
+	                           src_primaries, black_pq, to_panel);
 }
 
 /* ---- Debanding dither -----------------------------------------------------

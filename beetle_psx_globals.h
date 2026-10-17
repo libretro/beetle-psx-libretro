@@ -81,6 +81,8 @@ extern float psx_hdr_paper_white_nits; /* frontend SDR white, default 200       
 extern float psx_hdr_max_nits;         /* display peak, default 1000              */
 extern int   psx_hdr_expand_gamut;     /* frontend "Colour Boost" rotation        */
 extern int   psx_hdr_output_mode;      /* 0 off, 1 PQ Rec.2020, 2 linear Rec.709  */
+extern float psx_hdr_black_pq;         /* PQ(panel black), 0 when not reported    */
+extern float psx_hdr_to_panel[9];      /* Rec.2020 -> panel RGB, 0 when unknown   */
 extern int   psx_hdr_sdr_eotf;         /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_src_primaries;        /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 extern int   psx_video_cable;
