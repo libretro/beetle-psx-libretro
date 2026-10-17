@@ -309,14 +309,25 @@ static bool env_cb(unsigned cmd, void *data)
       case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE:
          *(const struct retro_hw_render_interface_vulkan **)data = &iface;
          return true;
-      case RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS:
-         *(float *)data = 200.0f; return true;
-      case RETRO_ENVIRONMENT_GET_HDR_MAX_NITS:
-         *(float *)data = 1000.0f; return true;
-      case RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT:
-         *(bool *)data = false; return true;
-      case RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE:
-         *(unsigned *)data = 1; return true; /* HDR10 */
+      case RETRO_ENVIRONMENT_GET_HDR_METADATA:
+      {
+         struct retro_hdr_metadata *meta = (struct retro_hdr_metadata *)data;
+         if (meta->version != 1 || meta->size < sizeof(*meta))
+            return false;
+         meta->output_mode       = 1; /* PQ Rec.2020 */
+         meta->screen_10bpc      = true;
+         meta->paper_white_nits  = 200.0f;
+         meta->max_nits          = 1000.0f;
+         meta->min_nits          = 0.0f;
+         meta->expand_gamut      = 0;
+         meta->max_cll           = 0.0f;
+         meta->max_fall          = 0.0f;
+         meta->color_primaries   = 9;  /* H.273 BT.2020 */
+         meta->transfer_function = 16; /* H.273 PQ */
+         meta->passthrough       = true;
+         meta->tonemap_operator  = 0;
+         return true;
+      }
       default:
          return false;
    }

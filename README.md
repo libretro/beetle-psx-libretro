@@ -103,22 +103,22 @@ rather than mysterious:
 
 #### Values taken from the frontend
 
-Three values are the frontend's to own, not the core's, and are queried
-rather than configured here:
+Three values are the frontend's to own, not the core's, and are read from
+`GET_HDR_METADATA` rather than configured here:
 
-| Value | Source | Used for |
+| Value | Field | Used for |
 |---|---|---|
-| Paper white | `GET_HDR_PAPER_WHITE_NITS` | Where reference white lands, in nits |
-| Display peak | `GET_HDR_MAX_NITS` | The ceiling highlights roll off toward |
-| Colour Boost | `GET_HDR_EXPAND_GAMUT` | Which gamut rotation is applied |
+| Paper white | `paper_white_nits` | Where reference white lands, in nits |
+| Display peak | `max_nits` | The ceiling highlights roll off toward |
+| Colour Boost | `expand_gamut` | Which gamut rotation is applied |
 
 RetroArch's paper-white and Colour Boost sliders change at runtime and do
-**not** fire the core's option-update path, so all three are re-queried every
-frame while HDR is active and take effect on the next present. Display peak is
-re-read for the same reason: a stale value silently changes how highlights
-roll off, which is harder to notice than a brightness shift.
+**not** fire the core's option-update path, so the metadata is re-queried every
+frame while HDR is active and takes effect on the next present. Display peak
+matters as much as the other two: a stale value silently changes how
+highlights roll off, which is harder to notice than a brightness shift.
 
-If the frontend answers nothing, the fallbacks are the HDR10 reference:
+If the frontend does not answer the query, or leaves a value at zero, the fallbacks are the HDR10 reference:
 200 nits paper white, 1000 nits peak.
 
 ### The encode, step by step

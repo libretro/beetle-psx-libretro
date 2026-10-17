@@ -29,6 +29,7 @@
 #include <retro_common_api.h>
 
 #include <boolean.h>
+#include <formats/video_hw_frame.h>
 
 RETRO_BEGIN_DECLS
 
@@ -48,6 +49,19 @@ enum image_process_code
 
 struct texture_compressed;  /* defined below, after enum image_type_enum */
 
+/* An 8-bit YCbCr 4:2:0 frame where it lies. Plane 0 is luma; planes
+ * 1 and 2 are Cb and Cr, @chroma_step bytes between neighbours (1 for
+ * I420; 2 for NV12, whose one interleaved plane is planes 1 and 2 at
+ * offsets 0 and 1). Strides in bytes; @yuv is IMAGE_YUV_FLAG_*
+ * (formats/image_yuv_blit.h). */
+struct texture_planar
+{
+   const uint8_t *planes[3];
+   unsigned strides[3];
+   unsigned chroma_step;
+   unsigned yuv;
+};
+
 struct texture_image
 {
    uint32_t *pixels;
@@ -56,14 +70,22 @@ struct texture_image
    bool supports_rgba;
    /* When true, ->pixels holds packed XRGB2101010 (10-bit per channel,
     * bits [29:20]=R [19:10]=G [9:0]=B) rather than 8-bit RGBA/BGRA. Only
-    * honoured by drivers that advertise GFX_CTX_FLAGS_SCREEN_10BPC_SOURCE;
-    * others fall back to an 8-bit copy via image_texture_narrow_10bit(). */
+    * uploaded as such by drivers that answer TEXTURE_GPU_FORMAT_RGB10A2;
+    * others get an 8-bit copy via image_texture_narrow_10bit(). */
    bool pix10;
+   /* When true, ->pixels holds RGBA half floats, eight bytes a pixel in
+    * memory order R,G,B,A - linear light, which no 8-bit encoding
+    * covers - rather than 32-bit texels. Only uploaded by drivers that
+    * answer TEXTURE_GPU_FORMAT_RGBA16F; exclusive with ->pix10. */
+   bool fp16;
    /* Optional GPU-native compressed payload (BCn).  When non-NULL a
     * capable driver may upload it directly and leave ->pixels NULL;
     * image_texture_realize_rgba() decodes to ->pixels on demand for
     * drivers that cannot sample the format. */
    struct texture_compressed *compressed;
+   /* When non-NULL the frame is this, ->pixels is NULL, and only a
+    * driver answering TEXTURE_GPU_FORMAT_YUV420 is given it. */
+   const struct texture_planar *planar;
 };
 
 enum image_type_enum
@@ -103,7 +125,26 @@ enum texture_gpu_format
    TEXTURE_GPU_FORMAT_BC5,       /* RGTC2 (2 channel)  */
    TEXTURE_GPU_FORMAT_BC6H_UF,   /* BPTC unsigned HDR  */
    TEXTURE_GPU_FORMAT_BC6H_SF,   /* BPTC signed HDR    */
-   TEXTURE_GPU_FORMAT_BC7        /* BPTC LDR           */
+   TEXTURE_GPU_FORMAT_BC7,       /* BPTC LDR           */
+   /* Not a compressed payload and never on a texture_compressed:
+    * packed XRGB2101010 in ->pixels, flagged by ->pix10. Asked of
+    * supports_texture_format to learn whether the driver's load and
+    * in-place update sample it as 10-bit rather than reading its words
+    * as 8-bit texels. */
+   TEXTURE_GPU_FORMAT_RGB10A2,
+   /* Likewise uncompressed: RGBA half floats in ->pixels, flagged by
+    * ->fp16, eight bytes a pixel in memory order R,G,B,A. Asked of
+    * supports_texture_format to learn whether the driver's load and
+    * in-place update keep them as floats. */
+   TEXTURE_GPU_FORMAT_RGBA16F,
+   /* Asked of supports_texture_format to learn whether an RGBA16F
+    * texture drawn in the menu or over content is shown as linear
+    * scRGB - 1.0 at 80 nits, the 709 primaries - rather than as an
+    * SDR-encoded one: true only while the output is HDR. */
+   TEXTURE_GPU_FORMAT_SCRGB,
+   /* 8-bit YCbCr 4:2:0 on ->planar (I420 or NV12), converted to RGB
+    * on the GPU: whether load_texture and update_texture take one. */
+   TEXTURE_GPU_FORMAT_YUV420
 };
 
 /* Numeric mip layout reported by a loader without decoding.  Offsets are
@@ -142,8 +183,198 @@ struct texture_compressed
 
 enum image_type_enum image_texture_get_type(const char *path);
 
+/* ---- The still loader ----------------------------------------------
+ * One decoder for every still the frontend or a core takes from a
+ * file: the bytes are the caller's, read whole or still arriving, and
+ * the decode runs in steps that stop at a time budget, at an abort
+ * hook, or at the byte frontier. image_texture_load() is this loader
+ * run to completion in one call. */
+
+/* Pixel layouts, a bit each, so a consumer can accept several and a
+ * producer pick the best it can emit. A name is a promise about the
+ * layout, not about any consumer taking it. The frontend's surfaces
+ * and a core's own renderer name formats the same way. */
+enum image_pixfmt
+{
+   /* 8 bits a channel in a 32-bit word, ARGB or memory-order RGBA */
+   IMAGE_PIXFMT_8888     = (1 << 0),
+   /* XRGB2101010: bits [29:20]=R [19:10]=G [9:0]=B */
+   IMAGE_PIXFMT_2101010  = (1 << 1),
+   /* Half float a channel, linear scRGB (1.0 = 80 nits) */
+   IMAGE_PIXFMT_FP16     = (1 << 2),
+   IMAGE_PIXFMT_FP32     = (1 << 3),
+   IMAGE_PIXFMT_565      = (1 << 4),
+   IMAGE_PIXFMT_4444     = (1 << 5),
+   /* GX RGBA8, the GameCube/Wii layout: 4x4 tiles of 64 bytes, the AR
+    * halves of a tile's 16 texels then their GB halves, both axes
+    * multiples of 4 (image_texture_tile_gx) */
+   IMAGE_PIXFMT_GX_RGBA8 = (1 << 6),
+   /* YCbCr 4:2:0, as video decoders and cameras produce it: a luma
+    * plane, then chroma at half resolution on both axes. I420 has the
+    * two chroma planes apart, NV12 interleaves them Cb,Cr in one, P010
+    * is NV12 with 16-bit samples holding 10 bits in the high bits. */
+   IMAGE_PIXFMT_I420     = (1 << 7),
+   IMAGE_PIXFMT_NV12     = (1 << 8),
+   IMAGE_PIXFMT_P010     = (1 << 9)
+};
+
+#define IMAGE_PIXFMT_PLANAR \
+   (IMAGE_PIXFMT_I420 | IMAGE_PIXFMT_NV12 | IMAGE_PIXFMT_P010)
+
+/* Planes of one image_pixfmt bit */
+#define IMAGE_PIXFMT_PLANES(f) \
+   (((f) & IMAGE_PIXFMT_I420) ? 3u \
+   : ((f) & (IMAGE_PIXFMT_NV12 | IMAGE_PIXFMT_P010)) ? 2u : 1u)
+
+/* Bytes a texel of a packed format takes, or a luma sample of a planar
+ * one */
+#define IMAGE_PIXFMT_BPP(f) \
+   (((f) & IMAGE_PIXFMT_FP32) ? 16u \
+   : ((f) & IMAGE_PIXFMT_FP16) ? 8u \
+   : ((f) & (IMAGE_PIXFMT_565 | IMAGE_PIXFMT_4444 | IMAGE_PIXFMT_P010)) ? 2u \
+   : ((f) & (IMAGE_PIXFMT_I420 | IMAGE_PIXFMT_NV12)) ? 1u : 4u)
+
+/* Bytes of a whole tightly packed @w x @h frame, every plane of it */
+#define IMAGE_PIXFMT_FRAME_SIZE(f, w, h) \
+   ((size_t)(w) * (size_t)(h) * IMAGE_PIXFMT_BPP(f) \
+    + (((f) & IMAGE_PIXFMT_PLANAR) \
+      ? 2u * (((size_t)(w) + 1) >> 1) * (((size_t)(h) + 1) >> 1) \
+        * IMAGE_PIXFMT_BPP(f) : 0u))
+
+/* What the caller takes of a still, asked of it once by whoever knows
+ * (the video driver, a core's own renderer) and handed down. Zero is
+ * the ordinary 8-bit image, ARGB words. */
+typedef struct
+{
+   /* Memory-order R,G,B,A rather than ARGB words */
+   bool rgba;
+   /* XRGB2101010 where the file has more than 8 bits a channel */
+   bool want_10bit;
+   /* Linear scRGB half floats where the source is HDR (video stills) */
+   bool want_fp16;
+   /* A GPU-native compressed payload (BCn) as it lies in the file,
+    * rather than its CPU decode; the caller then samples it as such or
+    * decodes it later with image_texture_realize_rgba() */
+   bool want_compressed;
+} image_texture_request_t;
+
+typedef struct image_loader image_loader_t;
+
+enum image_loader_state
+{
+   IMAGE_LOADER_ERROR = -1,
+   IMAGE_LOADER_RUNNING,   /* more steps to take */
+   IMAGE_LOADER_WAIT,      /* needs bytes not yet available */
+   IMAGE_LOADER_DONE       /* image_loader_finish() has the image */
+};
+
+/* Whether a decode of @type may start on the first @avail bytes of
+ * a file still being read: the header is resident for the decoders
+ * that paint from a prefix (PNG, JPEG, TGA, BMP, the video stills),
+ * the still's chunk is whole for WEBP. False means wait for the whole
+ * file. */
+bool image_loader_ready(enum image_type_enum type,
+      const void *buf, size_t avail);
+
+/* A loader for a still of @type. @req may be NULL for the ordinary
+ * image. NULL when out of memory. */
+image_loader_t *image_loader_new(enum image_type_enum type,
+      const image_texture_request_t *req);
+
+/* The file's bytes: @buf of @len bytes once fully read, of which
+ * @avail are resident now (@len for a whole file). The buffer is the
+ * caller's and stays where it is until the loader is freed. False
+ * when the decoder refused the start. */
+bool image_loader_start(image_loader_t *l, const void *buf, size_t len,
+      size_t avail);
+
+/* More of the file has arrived: the first @avail bytes are resident
+ * ((size_t)-1: all of them). */
+void image_loader_set_avail(image_loader_t *l, size_t avail);
+
+/* Asked between steps of the decode: true abandons it, and the loader
+ * reports IMAGE_LOADER_ERROR. For decodes that must stop promptly at
+ * shutdown or once their result is no longer wanted. */
+void image_loader_set_abort(image_loader_t *l,
+      bool (*should_abort)(void *ud), void *ud);
+
+/* Decode until @now's clock reaches @deadline, at least one iteration
+ * and, between a transfer and its pixels, never both in one step;
+ * @now NULL runs until the decode is done, aborts, or wants bytes. */
+enum image_loader_state image_loader_step(image_loader_t *l,
+      int64_t (*now)(void), int64_t deadline);
+
+/* The decoded image, the loader's no more: @img's pixels or compressed
+ * payload are the caller's to free with image_texture_free(). Only
+ * after IMAGE_LOADER_DONE. */
+bool image_loader_finish(image_loader_t *l, struct texture_image *img);
+
+/* Whether the loader's PNG is animated: 1 yes, 0 a still, -1 unknown
+ * (not a PNG, or the file is not wholly resident). */
+int image_loader_png_probe(const image_loader_t *l);
+
+/* The animation stream a video still's decode opened, detached for
+ * the caller to play on; NULL when there is none. The stream borrows
+ * the loader's buffer, which the caller keeps alive for it. */
+void *image_loader_detach_anim_stream(image_loader_t *l);
+
+void image_loader_free(image_loader_t *l);
+
+/* Resample a decoded still in place: a whole-factor upscale when an
+ * edge is under @upscale_threshold, then a box reduction to keep the
+ * longer edge within @downscale_cap; 0 skips either. Half-float
+ * images are left as they are. In formats/image_texture_scale.c,
+ * which brings the scaler with it. */
+bool image_texture_scale(struct texture_image *img,
+      unsigned upscale_threshold, unsigned downscale_cap);
+
 bool image_texture_load_buffer(struct texture_image *img,
    enum image_type_enum type, void *s, size_t len);
+
+/* The loader run to completion over a whole buffer or a file, with
+ * @req naming what the caller takes (NULL: the ordinary image). The
+ * abort hook is asked between steps; it may be NULL. False leaves
+ * @img empty. */
+bool image_texture_load_buffer_request(struct texture_image *img,
+      enum image_type_enum type, const void *buf, size_t len,
+      const image_texture_request_t *req,
+      bool (*should_abort)(void *ud), void *ud);
+bool image_texture_load_request(struct texture_image *img,
+      const char *path, const image_texture_request_t *req,
+      bool (*should_abort)(void *ud), void *ud);
+
+/* image_texture_load_request answering, from the bytes it read, whether
+ * the file is an animated PNG: 1 yes, 0 a still, -1 not a PNG or no
+ * decode. Spares a caller that keeps an animation's bytes a second
+ * read of every still to ask. @png_probe may be NULL. */
+bool image_texture_load_request_ex(struct texture_image *img,
+      const char *path, const image_texture_request_t *req,
+      bool (*should_abort)(void *ud), void *ud, int *png_probe);
+
+/* Run @fn for every index below @n, across the cores at once where
+ * there are threads: on Apple over the dispatch pool, elsewhere on
+ * threads of its own with the caller working alongside, and in order
+ * on one thread where there is only one. Returns once every call has.
+ * In formats/image_texture_set.c. */
+void image_texture_set_run(unsigned n,
+      void (*fn)(unsigned i, void *ud), void *ud);
+
+/* image_texture_set_run with @thread_done called on each thread of
+ * the set's own as it finishes, for state it kept per thread - the
+ * data_transfer pool above all, which a thread that exits with it
+ * full would leave resident for good. Not called on the caller's
+ * thread, nor on a dispatch pool's, which live on. May be NULL. */
+void image_texture_set_run_ex(unsigned n,
+      void (*fn)(unsigned i, void *ud), void *ud,
+      void (*thread_done)(void));
+
+/* Decode the @n files @paths name into @imgs together, each as
+ * image_texture_load_request does with @req; a path that is NULL,
+ * empty or unreadable leaves its image empty. Returns how many
+ * decoded. In formats/image_texture_set.c. */
+unsigned image_texture_load_set(const char *const *paths,
+      struct texture_image *imgs, unsigned n,
+      const image_texture_request_t *req);
 
 /* ->pix10 is an ask on the way in and an answer on the way out: set
  * it before the call to have a decoder that can emit XRGB2101010 do
@@ -167,9 +398,32 @@ void image_texture_free(struct texture_image *img);
 bool image_texture_realize_rgba(struct texture_image *img);
 
 /* Narrow a texture_image whose ->pixels hold packed XRGB2101010 down to
- * 8-bit ARGB8888 in place (and clear ->pix10), for drivers that cannot sample
- * a 10-bit texture. No-op unless ->pix10 is set. */
+ * 8 bits a channel in place (and clear ->pix10), for drivers that cannot
+ * sample a 10-bit texture: ARGB8888 words, or memory-order R,G,B,A when
+ * ->supports_rgba is set, so ->supports_rgba stays true of the result.
+ * No-op unless ->pix10 is set. */
 void image_texture_narrow_10bit(struct texture_image *img);
+
+/* Rewrite ->pixels, linear 32-bit texels, in place as GX RGBA8 tiles:
+ * the layout the GameCube/Wii GPU samples straight from memory, 4x4
+ * tiles of 64 bytes holding the AR halves of a tile's sixteen texels
+ * and then their GB halves. ->width and ->height are rounded down to
+ * multiples of 4, which the layout requires. Decoders always emit
+ * linear images; only a consumer that hands the pixels to the GX
+ * itself asks for this. False, with @img untouched, when the four-row
+ * scratch cannot be allocated. */
+bool image_texture_tile_gx(struct texture_image *img);
+
+/* Write @width x @height linear 32-bit texels, @src (ARGB8888 words,
+ * or memory-order R,G,B,A when @rgba), to @dst as GX RGBA8 tiles of a
+ * texture rounded up to multiples of 4 a side, the padding clear: the
+ * layout image_texture_tile_gx() makes, but in a buffer of its own and
+ * keeping every texel. @dst holds image_texture_tile_gx_size() bytes. */
+void image_texture_tile_gx_copy(uint16_t *dst, const uint32_t *src,
+      unsigned width, unsigned height, bool rgba);
+
+/* The bytes image_texture_tile_gx_copy() writes for @width x @height */
+size_t image_texture_tile_gx_size(unsigned width, unsigned height);
 
 /* Image transfer */
 
@@ -235,6 +489,15 @@ bool image_transfer_is_valid(void *data, enum image_type_enum type);
  * every other type. */
 bool image_transfer_is_10bit(void *data, enum image_type_enum type);
 
+/* Ask a video still (WEBM, MP4) for linear scRGB half floats from an
+ * HDR (PQ or HLG) source - RGBA half floats, 8 bytes a pixel, in the
+ * frame image_transfer_process hands out - and whether the last frame
+ * came out so. A no-op and false for every other type and source. Only
+ * for a caller that can take them: nothing narrows half floats. */
+void image_transfer_set_want_fp16(void *data, enum image_type_enum type,
+      bool want);
+bool image_transfer_is_fp16(void *data, enum image_type_enum type);
+
 /* Ask a decoder to emit packed XRGB2101010 instead of 8-bit RGBA.
  * Honoured by PNG (16-bit-per-channel RGB sources) and by the video
  * types (10-bit HDR sources); ignored by every other type, and by an
@@ -290,6 +553,13 @@ void *image_transfer_anim_stream_new_avail(void *buf, size_t len,
       size_t avail, enum image_type_enum type, int *need_more,
       size_t *need_lo, size_t *need_hi);
 
+/* Hardware-capable open: software preference is unchanged. Hardware-only
+ * candidates require an available backend and a GPU sink; no CPU canvas
+ * is supplied. The caller must retain the borrowed buffer as above. */
+void *image_transfer_anim_stream_new_hw_avail(void *buf, size_t len,
+      size_t avail, enum image_type_enum type, int *need_more,
+      size_t *need_lo, size_t *need_hi);
+
 void image_transfer_anim_stream_free(void *stream,
       enum image_type_enum type);
 
@@ -333,8 +603,40 @@ void *image_transfer_anim_stream_h265(void *stream, enum image_type_enum type);
 void image_transfer_anim_stream_set_catchup(void *stream,
       enum image_type_enum type, int behind);
 
+/* HDR video sources: whether the stream's source is PQ or HLG; asking
+ * for linear scRGB half floats for it, which the video streams honour
+ * when they decode into the caller's frame
+ * (image_transfer_anim_stream_set_output) - 8 bytes a pixel then; and
+ * whether the last frame came out so. False and a no-op for every type
+ * without such a source. */
+bool image_transfer_anim_stream_is_hdr(const void *stream,
+      enum image_type_enum type);
+void image_transfer_anim_stream_set_want_fp16(void *stream,
+      enum image_type_enum type, bool want);
+bool image_transfer_anim_stream_is_fp16(const void *stream,
+      enum image_type_enum type);
+
 bool image_transfer_anim_stream_set_output(void *stream,
       enum image_type_enum type, uint32_t *out);
+
+/* Caller output with rows @stride pixels apart (0: width). The stride
+ * counts pixels for both 32-bit and FP16 output. False leaves the
+ * output unchanged for an unsupported stream or invalid stride. */
+bool image_transfer_anim_stream_set_output_stride(void *stream,
+      enum image_type_enum type, uint32_t *out, unsigned stride);
+
+/* Frames decoded on the GPU (formats/video_hw_frame.h) rather than
+ * into pixels, where the stream's decoder has a hardware backend that
+ * takes it (MP4 H.264, rmp4_video_stream_set_hw); true when they will
+ * be. A stream under way starts over. The frame of each shown frame is
+ * then taken with _hw_frame after _next - whose pointer only says a
+ * frame came - and read or abandoned by the caller. */
+bool image_transfer_anim_stream_set_hw(void *stream,
+      enum image_type_enum type, bool enable);
+bool image_transfer_anim_stream_waiting(const void *stream,
+      enum image_type_enum type);
+bool image_transfer_anim_stream_hw_frame(void *stream,
+      enum image_type_enum type, struct video_hw_frame *out);
 
 /* Have the stream convert each decoded frame to pixels in @bands row
  * bands on @pool (an rthreads tpool_t with at least bands - 1 threads;

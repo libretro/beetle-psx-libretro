@@ -5986,6 +5986,43 @@ error:
    return false;
 }
 
+/* Reads the frontend's HDR presentation state into the globals the output
+ * encode works from. A frontend without GET_HDR_METADATA leaves every value
+ * at its current setting, and a zero paper white or peak is ignored rather
+ * than letting the encode divide or clamp against nothing. */
+static void query_hdr_metadata(void)
+{
+   unsigned i;
+   struct retro_hdr_metadata meta;
+
+   meta.version           = 1;
+   meta.size              = sizeof(meta);
+   meta.output_mode       = 0;
+   meta.screen_10bpc      = false;
+   meta.paper_white_nits  = 0.0f;
+   meta.max_nits          = 0.0f;
+   meta.min_nits          = 0.0f;
+   meta.expand_gamut      = 0;
+   meta.max_cll           = 0.0f;
+   meta.max_fall          = 0.0f;
+   meta.color_primaries   = 0;
+   meta.transfer_function = 0;
+   meta.passthrough       = false;
+   meta.tonemap_operator  = 0;
+   for (i = 0; i < sizeof(meta.reserved) / sizeof(meta.reserved[0]); i++)
+      meta.reserved[i]    = 0;
+
+   if (!environ_cb(RETRO_ENVIRONMENT_GET_HDR_METADATA, &meta))
+      return;
+
+   if (meta.paper_white_nits > 0.0f)
+      psx_hdr_paper_white_nits = meta.paper_white_nits;
+   if (meta.max_nits > 0.0f)
+      psx_hdr_max_nits         = meta.max_nits;
+   psx_hdr_expand_gamut        = (int)meta.expand_gamut;
+   psx_hdr_output_mode         = (int)meta.output_mode;
+}
+
 /* Finalize the HDR decision once a hardware renderer is confirmed
  * (Vulkan or OpenGL - both carry the fp16 scaled framebuffer and the PQ
  * Rec.2020 display encode). HDR is engaged only when the user requested
@@ -6013,33 +6050,17 @@ static void negotiate_hdr_output(void)
       enum retro_pixel_format hdrfmt = RETRO_PIXEL_FORMAT_HDR10_2101010;
       if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &hdrfmt))
       {
-         unsigned gamut = 0;
-         unsigned omode = 1;
-         float    pw    = 0.0f;
-
-         { float mx = 0.0f;
-           if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_MAX_NITS, &mx) && mx > 0.0f)
-              psx_hdr_max_nits = mx;
-         }
-         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
-            psx_hdr_paper_white_nits = pw;
-         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
-            psx_hdr_expand_gamut = (int)gamut;
-         /* Queried and logged, deliberately not compensated for. The
-          * libretro.h note warns that an scRGB swapchain applies
-          * Rec.2020 -> Rec.709 on the way and can undo a core's gamut
-          * choice, but working it through, it does not: the frontend's
+         /* The output mode is cached for the log and deliberately not
+          * compensated for. libretro.h notes that a linear Rec.709 (scRGB)
+          * swapchain rotates Rec.2020 -> Rec.709 on the way, but that
           * rotation is exactly the inverse of the container
-          * reinterpretation, so for emitted samples X the perceived
-          * colour is M_2020 * X under HDR10 and
-          * M_709 * M_2020->709 * X = M_2020 * X under scRGB. Identical,
-          * and that holds for the deliberate mis-mappings the Colour
-          * Boost modes rely on too, since the boost is baked into X
-          * either way. Kept for the log, and because the value is worth
-          * having if that analysis is ever shown wrong - which it might
-          * be, as no scRGB frontend has been available to test against. */
-         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE, &omode))
-            psx_hdr_output_mode = (int)omode;
+          * reinterpretation: for emitted samples X the perceived colour is
+          * M_2020 * X under PQ and M_709 * M_2020->709 * X = M_2020 * X under
+          * scRGB. Identical, and that holds for the deliberate mis-mappings
+          * the Colour Boost modes rely on too, since the boost is baked into
+          * X either way. Kept in case that analysis is ever shown wrong, as
+          * no scRGB frontend has been available to test against. */
+         query_hdr_metadata();
 
          psx_hdr_active = true;
       }
@@ -6407,23 +6428,10 @@ void retro_run(void)
     * RetroArch's paper-white and Colour Boost sliders change at runtime and
     * do NOT fire the core's variable-update path, so re-query them each frame
     * while HDR is engaged. They feed the display quad's push constant, so
-    * updating the globals here takes effect on the very next present. Cheap
-    * env_cb reads, gated on psx_hdr_active. */
+    * updating the globals here takes effect on the very next present. One
+    * env_cb read, gated on psx_hdr_active. */
    if (psx_hdr_active)
-   {
-      float    pw    = 0.0f;
-      unsigned gamut = 0;
-      float    mx    = 0.0f;
-      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
-         psx_hdr_paper_white_nits = pw;
-      /* Re-queried rather than cached: libretro.h says the user can change it
-       * at any time, and unlike paper white a stale value here silently
-       * changes how highlights roll off. */
-      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_MAX_NITS, &mx) && mx > 0.0f)
-         psx_hdr_max_nits = mx;
-      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
-         psx_hdr_expand_gamut = (int)gamut;
-   }
+      query_hdr_metadata();
 
    /* Apply any geometry change deferred from a previous frame's
     * check_variables before beginning this frame, so the frontend's

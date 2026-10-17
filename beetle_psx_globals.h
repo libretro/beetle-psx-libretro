@@ -77,10 +77,10 @@ enum psx_color_format_e
 
 extern int   psx_color_format;         /* enum psx_color_format_e; core option */
 extern bool  psx_hdr_active;           /* true only when HDR10 is really engaged */
-extern float psx_hdr_paper_white_nits;
-extern float psx_hdr_max_nits;         /* display peak, GET_HDR_MAX_NITS, 1000 fallback */ /* frontend SDR white, default 200        */
+extern float psx_hdr_paper_white_nits; /* frontend SDR white, default 200        */
+extern float psx_hdr_max_nits;         /* display peak, default 1000              */
 extern int   psx_hdr_expand_gamut;     /* frontend "Colour Boost" rotation        */
-extern int   psx_hdr_output_mode;      /* frontend HDR output mode (0 off/1 HDR10) */
+extern int   psx_hdr_output_mode;      /* 0 off, 1 PQ Rec.2020, 2 linear Rec.709  */
 extern int   psx_hdr_sdr_eotf;         /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_src_primaries;        /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 extern int   psx_video_cable;

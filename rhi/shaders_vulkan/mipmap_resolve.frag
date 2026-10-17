@@ -23,7 +23,7 @@ layout(push_constant, std430) uniform Registers
 	int   src_primaries;  /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 #if defined(HDR)
 	float paper_white_nits;
-	float peak_nits;      /* display peak, from GET_HDR_MAX_NITS */
+	float peak_nits;      /* display peak, GET_HDR_METADATA max_nits */
 	int   expand_gamut;
 	int   shoulder;
 #endif

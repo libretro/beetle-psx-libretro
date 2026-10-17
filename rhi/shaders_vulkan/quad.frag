@@ -33,7 +33,7 @@ layout(push_constant, std430) uniform Registers
 	/* Fed from the frontend's HDR params (see libretro.c
 	 * psx_hdr_paper_white_nits / _expand_gamut). */
 	float paper_white_nits;
-	float peak_nits;      /* display peak, from GET_HDR_MAX_NITS */
+	float peak_nits;      /* display peak, GET_HDR_METADATA max_nits */
 	int   expand_gamut;
 	int   shoulder;       /* highlight roll-off: 0 Reinhard, 1 filmic */
 #endif

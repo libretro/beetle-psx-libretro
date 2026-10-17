@@ -212,7 +212,7 @@ highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_
 	 * factor keeps the overshoot's chromaticity, so a hot additive red stays
 	 * red. Dim channels are left alone, as before. */
 	/* peak_nits is what the display can actually reach, supplied by the
-	 * frontend through GET_HDR_MAX_NITS. Everything above paper white and
+	 * frontend as GET_HDR_METADATA max_nits. Everything above paper white and
 	 * below it is the headroom available for highlights, so a wrong value is
 	 * either wasted range or clipping - which is why this stopped being the
 	 * hardcoded 1000 it was.

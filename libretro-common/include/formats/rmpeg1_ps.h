@@ -3,7 +3,9 @@
 
 /* MPEG-1 Systems (Program Stream) demultiplexer.
  *
- * Written from ISO/IEC 11172-1. Splits an MPEG-1 Program Stream into its
+ * Written from ISO/IEC 11172-1, and takes the MPEG-2 program stream of
+ * ISO/IEC 13818-1 as well - its pack and PES headers, packet by packet -
+ * which is what a PSP movie (rpsmf.h) and a DVD's VOBs are. Splits an MPEG-1 Program Stream into its
  * constituent elementary streams (MPEG-1 video, MPEG-1 audio layer I/II/III,
  * private and padding streams) and recovers the timestamps attached to them.
  *
@@ -50,7 +52,7 @@ enum rmpeg1_ps_packet_type
 };
 
 /* Timestamps are in the 90 kHz system clock. RMPEG1_PS_NO_PTS marks absent. */
-#define RMPEG1_PS_NO_PTS ((uint64_t)UINT64_C(0xFFFFFFFFFFFFFFFF))
+#define RMPEG1_PS_NO_PTS ((uint64_t)-1)
 
 typedef struct rmpeg1_ps rmpeg1_ps_t;
 
@@ -81,6 +83,14 @@ size_t rmpeg1_ps_space(const rmpeg1_ps_t *ps);
 /* Append input. Returns bytes actually consumed, which is less than len only
  * when the buffer is full; drain with rmpeg1_ps_next() and retry the rest. */
 size_t rmpeg1_ps_write(rmpeg1_ps_t *ps, const uint8_t *data, size_t len);
+
+/* Hand over input to be parsed where it lies, rather than copied in: the
+ * packets that lie whole within it point into it, and a unit it ends part
+ * way into is copied, to be completed by what comes next. @data must stay
+ * valid and unchanged until rmpeg1_ps_next() returns 0. Returns @len, or 0
+ * while data borrowed before is still being parsed; rmpeg1_ps_write()
+ * likewise takes nothing until it has been. */
+size_t rmpeg1_ps_borrow(rmpeg1_ps_t *ps, const uint8_t *data, size_t len);
 
 /* Pull one packet. Returns 1 and fills *out on success, 0 when more input is
  * needed. Padding packets are consumed silently and never returned. */

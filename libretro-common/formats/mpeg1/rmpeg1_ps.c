@@ -89,6 +89,12 @@ struct rmpeg1_ps
    uint32_t  mux_rate;
    uint32_t  resyncs;
 
+   /* Data borrowed from the caller (rmpeg1_ps_borrow), parsed in place:
+    * NULL when there is none */
+   const uint8_t *ext;
+   size_t    ext_len;
+   size_t    ext_rd;
+
    bool      ended;
    bool      synced;      /* a start code has been located at least once */
 };
@@ -156,6 +162,7 @@ void rmpeg1_ps_reset(rmpeg1_ps_t *ps)
    ps->mux_rate = 0;
    ps->ended    = false;
    ps->synced   = false;
+   ps->ext      = NULL;
    /* resyncs is a cumulative health counter and deliberately survives. */
 }
 
@@ -171,7 +178,8 @@ size_t rmpeg1_ps_write(rmpeg1_ps_t *ps, const uint8_t *data, size_t len)
 {
    size_t room;
 
-   if (!ps || !data || len == 0)
+   /* Not behind data still borrowed, which comes first */
+   if (!ps || !data || len == 0 || ps->ext)
       return 0;
 
    if (ps->capacity - ps->wr < len)
@@ -196,6 +204,12 @@ size_t rmpeg1_ps_write(rmpeg1_ps_t *ps, const uint8_t *data, size_t len)
 
 /* 33-bit timestamp spread over 5 bytes with marker bits at 0, 23 and 39.
  * The caller has already checked that 5 bytes are present. */
+static bool rmpeg1_ps_valid_ts(const uint8_t *p, unsigned prefix)
+{
+   return (p[0] >> 4) == prefix && (p[0] & 1)
+      && (p[2] & 1) && (p[4] & 1);
+}
+
 static uint64_t rmpeg1_ps_read_ts(const uint8_t *p)
 {
    uint64_t ts;
@@ -214,28 +228,29 @@ static uint64_t rmpeg1_ps_read_ts(const uint8_t *p)
  *
  * Leaves the trailing two bytes unconsumed on failure: a prefix may straddle
  * the end of what we have been given so far. */
-static size_t rmpeg1_ps_find_start(rmpeg1_ps_t *ps)
+static size_t rmpeg1_ps_find_start(const uint8_t *buf, size_t *rdp,
+      size_t wr)
 {
    size_t i;
    size_t end;
 
-   if (ps->wr < ps->rd + 3)
+   if (wr < *rdp + 3)
       return (size_t)-1;
 
-   end = ps->wr - 2;
+   end = wr - 2;
 
-   for (i = ps->rd; i < end; i++)
+   for (i = *rdp; i < end; i++)
    {
-      if (     ps->buf[i    ] == 0x00
-            && ps->buf[i + 1] == 0x00
-            && ps->buf[i + 2] == 0x01)
+      if (     buf[i    ] == 0x00
+            && buf[i + 1] == 0x00
+            && buf[i + 2] == 0x01)
          return i;
    }
 
    /* Nothing found. Everything before the last two bytes is garbage and can
     * be dropped so the buffer does not grow without bound on a broken
     * stream. */
-   ps->rd = end;
+   *rdp = end;
    return (size_t)-1;
 }
 
@@ -273,10 +288,11 @@ static uint8_t rmpeg1_ps_classify(uint8_t stream_id, uint8_t *index)
 /* Parser                                                                */
 /* --------------------------------------------------------------------- */
 
-int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
+/* One packet out of buf[*rdp..wr): 1, or 0 with *rdp at the start of
+ * what is not yet a whole unit */
+static int rmpeg1_ps_parse(rmpeg1_ps_t *ps, const uint8_t *buf,
+      size_t *rdp, size_t wr, rmpeg1_ps_packet_t *out)
 {
-   if (!ps || !out)
-      return 0;
 
    for (;;)
    {
@@ -295,7 +311,7 @@ int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
       if (ps->ended)
          return 0;
 
-      sc = rmpeg1_ps_find_start(ps);
+      sc = rmpeg1_ps_find_start(buf, rdp, wr);
       if (sc == (size_t)-1)
          return 0;
 
@@ -305,14 +321,14 @@ int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
        * legal and expected. Only count a resync when the skipped bytes are
        * something other than zero fill, so the counter stays meaningful as a
        * stream-health signal rather than firing once per sector. */
-      if (sc != ps->rd)
+      if (sc != *rdp)
       {
          size_t g;
          bool   fill = true;
 
-         for (g = ps->rd; g < sc; g++)
+         for (g = *rdp; g < sc; g++)
          {
-            if (ps->buf[g] != 0x00)
+            if (buf[g] != 0x00)
             {
                fill = false;
                break;
@@ -322,21 +338,21 @@ int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
          if (!fill || !ps->synced)
             ps->resyncs++;
 
-         ps->rd = sc;
+         *rdp = sc;
       }
 
       ps->synced = true;
 
-      avail = ps->wr - ps->rd;
+      avail = wr - *rdp;
       if (avail < 4)
          return 0;
 
-      stream_id = ps->buf[ps->rd + 3];
+      stream_id = buf[*rdp + 3];
 
       /* --- end code ------------------------------------------------- */
       if (stream_id == RMPEG1_PS_END_CODE)
       {
-         ps->rd   += 4;
+         *rdp   += 4;
          ps->ended = true;
          return 0;
       }
@@ -349,14 +365,38 @@ int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
          if (avail < 12)
             return 0;
 
-         p = ps->buf + ps->rd + 4;
+         p = buf + *rdp + 4;
 
-         /* MPEG-1 packs carry '0010' here. MPEG-2 uses '01', and its pack
-          * header is 14 bytes with a different SCR layout; we do not claim
-          * to parse those, so resync past it rather than misread it. */
+         /* MPEG-2 (ISO/IEC 13818-1) packs carry '01' here: 14 bytes, the
+          * SCR in another layout, a 22-bit mux rate and up to 7 bytes of
+          * stuffing after. */
+         if ((p[0] & 0xC0) == 0x40)
+         {
+            size_t len;
+            if (avail < 14)
+               return 0;
+            len = 14 + (size_t)(p[9] & 0x07);
+            if (avail < len)
+               return 0;
+            ps->scr      = ((uint64_t)((p[0] >> 3) & 0x07) << 30)
+                         | ((uint64_t)( p[0]       & 0x03) << 28)
+                         | ((uint64_t)  p[1]               << 20)
+                         | ((uint64_t)((p[2] >> 3) & 0x1F) << 15)
+                         | ((uint64_t)( p[2]       & 0x03) << 13)
+                         | ((uint64_t)  p[3]               <<  5)
+                         |  (uint64_t)((p[4] >> 3) & 0x1F);
+            ps->mux_rate = ((uint32_t)p[6] << 14)
+                         | ((uint32_t)p[7] <<  6)
+                         | ((uint32_t)p[8] >>  2);
+            *rdp      += len;
+            continue;
+         }
+
+         /* MPEG-1 packs carry '0010' here: anything else is not a pack
+          * header we know, so resync past it rather than misread it. */
          if ((p[0] & 0xF0) != 0x20)
          {
-            ps->rd += 4;
+            *rdp += 4;
             ps->resyncs++;
             continue;
          }
@@ -367,7 +407,7 @@ int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
                       | ((uint32_t)p[6]          <<  7)
                       | ((uint32_t)p[7]          >>  1);
 
-         ps->rd += 12;
+         *rdp += 12;
          continue;
       }
 
@@ -375,7 +415,7 @@ int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
       if (avail < 6)
          return 0;
 
-      packet_len = ((size_t)ps->buf[ps->rd + 4] << 8) | ps->buf[ps->rd + 5];
+      packet_len = ((size_t)buf[*rdp + 4] << 8) | buf[*rdp + 5];
 
       if (avail < 6 + packet_len)
       {
@@ -383,21 +423,22 @@ int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
           * this start code and resync rather than stalling forever. */
          if (6 + packet_len > ps->capacity)
          {
-            ps->rd += 4;
+            *rdp += 4;
             ps->resyncs++;
             continue;
          }
          return 0;
       }
 
-      pos         = ps->rd + 6;
+      pos         = *rdp + 6;
       payload_end = pos + packet_len;
+
 
       /* System headers describe the stream set; they carry no elementary
        * data, so record nothing and move on. */
       if (stream_id == RMPEG1_PS_SYSTEM_HEADER)
       {
-         ps->rd = payload_end;
+         *rdp = payload_end;
          continue;
       }
 
@@ -405,7 +446,7 @@ int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
 
       if (type == RMPEG1_PS_PADDING)
       {
-         ps->rd = payload_end;
+         *rdp = payload_end;
          continue;
       }
 
@@ -413,76 +454,103 @@ int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
        * recognise) are skipped whole. */
       if (type == RMPEG1_PS_NONE)
       {
-         ps->rd = payload_end;
+         *rdp = payload_end;
          continue;
       }
 
       /* private_stream_2 has no header extension at all: payload starts
        * immediately. Everything else gets the stuffing/STD/timestamp
        * preamble. */
-      if (type != RMPEG1_PS_PRIVATE_2)
+      /* MPEG-2: '10', two flag bytes and the length of the optional
+       * fields, the timestamps first among them */
+      if (     type != RMPEG1_PS_PRIVATE_2 && pos + 3 <= payload_end
+            && (buf[pos] & 0xC0) == 0x80)
+      {
+         unsigned flags = buf[pos + 1] >> 6;
+         size_t   hdr   = pos + 3;
+         size_t   hlen  = buf[pos + 2];
+         if (     hdr + hlen > payload_end
+               || flags == 1
+               || (flags == 2 && hlen < 5)
+               || (flags == 3 && hlen < 10)
+               || (flags == 2 && !rmpeg1_ps_valid_ts(buf + hdr, 2))
+               || (flags == 3 && (!rmpeg1_ps_valid_ts(buf + hdr, 3)
+                  || !rmpeg1_ps_valid_ts(buf + hdr + 5, 1))))
+         {
+            *rdp = payload_end;
+            ps->resyncs++;
+            continue;
+         }
+         if (flags & 2)
+            pts = rmpeg1_ps_read_ts(buf + hdr);
+         if (flags == 3)
+            dts = rmpeg1_ps_read_ts(buf + hdr + 5);
+         pos = hdr + hlen;
+      }
+      else if (type != RMPEG1_PS_PRIVATE_2)
       {
          /* Up to 16 stuffing bytes. The spec caps it; enforcing the cap
           * stops a run of FFh in corrupt data from eating the packet. */
          stuffing = 0;
-         while (pos < payload_end && ps->buf[pos] == 0xFF && stuffing < 16)
+         while (pos < payload_end && buf[pos] == 0xFF && stuffing < 16)
          {
             pos++;
             stuffing++;
          }
 
-         if (pos + 1 < payload_end && (ps->buf[pos] & 0xC0) == 0x40)
+         if (pos + 1 < payload_end && (buf[pos] & 0xC0) == 0x40)
             pos += 2;               /* STD buffer scale and size */
 
          if (pos < payload_end)
          {
-            uint8_t flag = (uint8_t)(ps->buf[pos] & 0xF0);
+            uint8_t flag = (uint8_t)(buf[pos] & 0xF0);
 
             if (flag == 0x20)
             {
-               if (pos + 5 > payload_end)
+               if (pos + 5 > payload_end || !rmpeg1_ps_valid_ts(buf + pos, 2))
                {
-                  ps->rd = payload_end;
+                  *rdp = payload_end;
                   ps->resyncs++;
                   continue;
                }
-               pts  = rmpeg1_ps_read_ts(ps->buf + pos);
+               pts  = rmpeg1_ps_read_ts(buf + pos);
                pos += 5;
             }
             else if (flag == 0x30)
             {
-               if (pos + 10 > payload_end)
+               if (pos + 10 > payload_end || !rmpeg1_ps_valid_ts(buf + pos, 3)
+                     || !rmpeg1_ps_valid_ts(buf + pos + 5, 1))
                {
-                  ps->rd = payload_end;
+                  *rdp = payload_end;
                   ps->resyncs++;
                   continue;
                }
-               pts  = rmpeg1_ps_read_ts(ps->buf + pos);
-               dts  = rmpeg1_ps_read_ts(ps->buf + pos + 5);
+               pts  = rmpeg1_ps_read_ts(buf + pos);
+               dts  = rmpeg1_ps_read_ts(buf + pos + 5);
                pos += 10;
             }
-            else if (ps->buf[pos] == 0x0F)
+            else if (buf[pos] == 0x0F)
                pos += 1;
             else
             {
                /* None of the three legal encodings. The header is malformed;
                 * drop the packet rather than emit whatever follows as if it
                 * were elementary data. */
-               ps->rd = payload_end;
+               *rdp = payload_end;
                ps->resyncs++;
                continue;
             }
          }
       }
 
-      ps->rd = payload_end;
+      *rdp = payload_end;
 
       /* A packet whose header consumed everything is legal and carries no
        * data. Nothing downstream wants a zero-length buffer, so skip it. */
       if (pos >= payload_end)
          continue;
 
-      out->data      = ps->buf + pos;
+      out->data      = buf + pos;
       out->size      = payload_end - pos;
       out->pts       = pts;
       out->dts       = dts;
@@ -492,6 +560,82 @@ int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
 
       return 1;
    }
+}
+
+/* Bytes the unit at the start of the buffered data needs before it can
+ * be parsed whole; at least one */
+static size_t rmpeg1_ps_unit_need(const rmpeg1_ps_t *ps)
+{
+   const uint8_t *b = ps->buf + ps->rd;
+   size_t avail     = ps->wr - ps->rd;
+   size_t need;
+   if (avail < 6 || b[0] || b[1] || b[2] != 1)
+      need = 6;
+   else if (b[3] == RMPEG1_PS_PACK_START)
+      need = (b[4] & 0xC0) == 0x40
+         ? (avail >= 14 ? 14 + (size_t)(b[13] & 0x07) : 14) : 12;
+   else if (b[3] == RMPEG1_PS_END_CODE)
+      need = 4;
+   else
+      need = 6 + (((size_t)b[4] << 8) | b[5]);
+   return need > avail ? need - avail : 1;
+}
+
+/* @n borrowed bytes into the buffer, made room for */
+static void rmpeg1_ps_take(rmpeg1_ps_t *ps, size_t n)
+{
+   if (ps->capacity - ps->wr < n)
+      rmpeg1_ps_compact(ps);
+   memcpy(ps->buf + ps->wr, ps->ext + ps->ext_rd, n);
+   ps->wr     += n;
+   ps->ext_rd += n;
+   if (ps->ext_rd == ps->ext_len)
+      ps->ext = NULL;
+}
+
+int rmpeg1_ps_next(rmpeg1_ps_t *ps, rmpeg1_ps_packet_t *out)
+{
+   if (!ps || !out)
+      return 0;
+   for (;;)
+   {
+      /* What was written, or a unit borrowed data ended part way into */
+      if (ps->rd < ps->wr)
+      {
+         size_t n;
+         if (rmpeg1_ps_parse(ps, ps->buf, &ps->rd, ps->wr, out))
+            return 1;
+         if (!ps->ext || ps->ended)
+            return 0;
+         /* Completed from the borrowed data, as much of it as it takes */
+         n = rmpeg1_ps_unit_need(ps);
+         if (n > ps->ext_len - ps->ext_rd)
+            n = ps->ext_len - ps->ext_rd;
+         rmpeg1_ps_take(ps, n);
+         continue;
+      }
+      if (!ps->ext)
+         return 0;
+      ps->rd = ps->wr = 0;
+      /* Borrowed data is parsed where it lies */
+      if (rmpeg1_ps_parse(ps, ps->ext, &ps->ext_rd, ps->ext_len, out))
+         return 1;
+      /* A unit it ends part way into is kept for the next */
+      if (ps->ext && ps->ext_rd < ps->ext_len && !ps->ended)
+         rmpeg1_ps_take(ps, ps->ext_len - ps->ext_rd);
+      ps->ext = NULL;
+      return 0;
+   }
+}
+
+size_t rmpeg1_ps_borrow(rmpeg1_ps_t *ps, const uint8_t *data, size_t len)
+{
+   if (!ps || !data || !len || ps->ext)
+      return 0;
+   ps->ext    = data;
+   ps->ext_len = len;
+   ps->ext_rd = 0;
+   return len;
 }
 
 /* --------------------------------------------------------------------- */

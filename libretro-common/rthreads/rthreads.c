@@ -56,13 +56,120 @@
 #endif
 #include <windows.h>
 #endif
-#elif defined(GEKKO)
+#elif defined(GEKKO) && !defined(GEKKO_NATIVE)
 #define USE_GX_THREADS
 #include <gccore.h>
 #include <ogc/lwp.h>
 #include <ogc/mutex.h>
 #include <ogc/cond.h>
 #define STACKSIZE (8 * 1024)
+#elif defined(GEKKO_NATIVE)
+/* os/gekko's own threads under the pthread names used below, so this
+ * builds on every devkitPPC: newlib's pthreads only came with r49. */
+#define USE_GEKKO_THREADS
+#include <errno.h>
+#include <gekko/gekko.h>
+#include <gekko/thread.h>
+#include <retro_inline.h>
+
+typedef gk_thread_t *rthreads_gk_thread_t;
+typedef struct
+{
+   size_t stack_size;
+} rthreads_gk_attr_t;
+
+static INLINE int rthreads_gk_attr_init(rthreads_gk_attr_t *attr)
+{
+   attr->stack_size = 0;
+   return 0;
+}
+
+static INLINE int rthreads_gk_attr_setstacksize(rthreads_gk_attr_t *attr,
+      size_t stack_size)
+{
+   attr->stack_size = stack_size;
+   return 0;
+}
+
+static INLINE int rthreads_gk_create(gk_thread_t **t,
+      const rthreads_gk_attr_t *attr, void *(*fn)(void*), void *arg)
+{
+   *t = gk_thread_create(fn, arg, NULL,
+         (attr && attr->stack_size) ? attr->stack_size : 64 * 1024,
+         GK_PRIO_DEFAULT);
+   return *t ? 0 : EAGAIN;
+}
+
+static INLINE int rthreads_gk_join(gk_thread_t *t)
+{
+   gk_thread_join(t);
+   return 0;
+}
+
+static INLINE int rthreads_gk_detach(gk_thread_t *t)
+{
+   gk_thread_detach(t);
+   return 0;
+}
+
+static INLINE int rthreads_gk_mutex_init(gk_mutex_t *m)
+{
+   m->word = 0;
+   return 0;
+}
+
+static INLINE int rthreads_gk_mutex_lock(gk_mutex_t *m)
+{
+   gk_mutex_lock(m);
+   return 0;
+}
+
+static INLINE int rthreads_gk_mutex_unlock(gk_mutex_t *m)
+{
+   gk_mutex_unlock(m);
+   return 0;
+}
+
+static INLINE int rthreads_gk_cond_init(gk_cond_t *c)
+{
+   c->seq = 0;
+   return 0;
+}
+
+static INLINE int rthreads_gk_cond_signal(gk_cond_t *c)
+{
+   gk_cond_signal(c);
+   return 0;
+}
+
+static INLINE int rthreads_gk_cond_broadcast(gk_cond_t *c)
+{
+   gk_cond_broadcast(c);
+   return 0;
+}
+
+#define pthread_t                       rthreads_gk_thread_t
+#define pthread_attr_t                  rthreads_gk_attr_t
+#define pthread_mutex_t                 gk_mutex_t
+#define pthread_cond_t                  gk_cond_t
+#define pthread_attr_init(a)            rthreads_gk_attr_init(a)
+#define pthread_attr_destroy(a)         ((void)(a))
+#define pthread_attr_setstacksize(a, n) rthreads_gk_attr_setstacksize(a, n)
+#define pthread_create(t, a, fn, arg)   rthreads_gk_create(t, a, fn, arg)
+#define pthread_join(t, r)              rthreads_gk_join(t)
+#define pthread_detach(t)               rthreads_gk_detach(t)
+#define pthread_self()                  gk_thread_self()
+#define pthread_equal(a, b)             ((a) == (b))
+#define pthread_mutex_init(m, a)        rthreads_gk_mutex_init(m)
+#define pthread_mutex_destroy(m)        ((void)(m))
+#define pthread_mutex_lock(m)           rthreads_gk_mutex_lock(m)
+#define pthread_mutex_trylock(m)        gk_mutex_trylock(m)
+#define pthread_mutex_unlock(m)         rthreads_gk_mutex_unlock(m)
+#define pthread_cond_init(c, a)         rthreads_gk_cond_init(c)
+#define pthread_cond_destroy(c)         ((void)(c))
+#define pthread_cond_wait(c, m)         gk_cond_wait(c, m, GK_WAIT_FOREVER)
+#define pthread_cond_signal(c)          rthreads_gk_cond_signal(c)
+#define pthread_cond_broadcast(c)       rthreads_gk_cond_broadcast(c)
 #elif defined(_3DS)
 #define USE_CTR_THREADS
 #include <3ds/thread.h>
@@ -603,6 +710,15 @@ typedef LONG (NTAPI *scond_nt_keyed_t)(HANDLE h, void *key, BOOLEAN alertable,
 typedef LONG (NTAPI *scond_nt_create_keyed_t)(HANDLE *h, ULONG access,
       void *attr, ULONG flags);
 
+typedef HANDLE (WINAPI *scond_create_timer_ex_t)(LPSECURITY_ATTRIBUTES,
+      LPCWSTR, DWORD, DWORD);
+/* The APC routine and its argument are always NULL here, so they are
+ * typed as LPVOID rather than depending on PTIMERAPCROUTINE */
+typedef BOOL (WINAPI *scond_set_timer_t)(HANDLE, const LARGE_INTEGER*, LONG,
+      LPVOID, LPVOID, BOOL);
+#define SCOND_TIMER_HIGH_RESOLUTION 0x00000002 /* CREATE_WAITABLE_TIMER_HIGH_RESOLUTION */
+#define SCOND_TIMER_ALL_ACCESS      0x001F0003 /* TIMER_ALL_ACCESS */
+
 static struct
 {
    scond_nt_wait_alert_t wait_alert;
@@ -616,6 +732,16 @@ static struct
    unsigned spin_cycles;       /* TSC bound for the hardware waits */
    unsigned spin_iters;        /* iteration bound for the pause loop */
    DWORD tls_event;
+   /* Bounded waits: a kernel timeout ends on the system timer's tick,
+    * 15.6 ms unless something in the process has lowered it, so a
+    * bounded wait also sleeps on a high resolution waitable timer, one
+    * per thread, together with the thread's event. Unset where the
+    * timer cannot be had (before Windows 10 1803): the kernel timeout
+    * then bounds the wait, as before. */
+   scond_create_timer_ex_t create_timer_ex;
+   scond_set_timer_t       set_timer;
+   DWORD                   tls_timer;
+   bool                    hires;
 } scond_g;
 
 static void scond_global_init(void);
@@ -1274,6 +1400,8 @@ static sthread_t *sthread_create_ex(void (*thread_func)(void*),
 #ifdef HAVE_THREAD_ATTR
    pthread_attr_init(&thread_attr);
 
+   /* os/gekko's threads take no scheduling policy. */
+#ifndef GEKKO_NATIVE
    if ((thread_priority >= 1) && (thread_priority <= 100))
    {
       struct sched_param sp;
@@ -1284,6 +1412,7 @@ static sthread_t *sthread_create_ex(void (*thread_func)(void*),
 
       thread_attr_needed = true;
    }
+#endif
 
 #if defined(__APPLE__)
    /* Default stack size on Apple is 512Kb;
@@ -2168,6 +2297,8 @@ void sthread_yield(void)
    RotateThreadReadyQueue(0);
 #elif defined(USE_PS3_THREADS)
    rthreads_ps3_thread_yield();
+#elif defined(USE_GEKKO_THREADS)
+   gk_thread_yield();
 #else
    sched_yield();
 #endif
@@ -2691,6 +2822,43 @@ static void scond_global_resolve(void)
    if (scond_g.sleep == SCOND_SLEEP_EVENT)
       scond_g.tls_event = TlsAlloc();
 
+   /* The high resolution timer for bounded waits, on every tier. It
+    * needs the thread's event to wait on beside it, so that slot is
+    * taken here on the tiers that do not otherwise use one. Probed
+    * rather than version-checked: the flag is refused before Windows 10
+    * 1803. RTHREADS_SCOND_HIRES=0 keeps the kernel timeout alone, for
+    * measuring against it. */
+   scond_g.hires     = false;
+   scond_g.tls_timer = TLS_OUT_OF_INDEXES;
+#if !defined(_XBOX) && !defined(__WINRT__) && !(defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP)
+   env = getenv("RTHREADS_SCOND_HIRES");
+   if (!(env && !strcmp(env, "0")))
+   {
+      HMODULE k32 = GetModuleHandleA("kernel32.dll");
+      if (k32)
+      {
+         scond_g.create_timer_ex = (scond_create_timer_ex_t)(void (*)(void))
+            GetProcAddress(k32, "CreateWaitableTimerExW");
+         scond_g.set_timer       = (scond_set_timer_t)(void (*)(void))
+            GetProcAddress(k32, "SetWaitableTimer");
+      }
+      if (scond_g.create_timer_ex && scond_g.set_timer)
+      {
+         HANDLE probe = scond_g.create_timer_ex(NULL, NULL,
+               SCOND_TIMER_HIGH_RESOLUTION, SCOND_TIMER_ALL_ACCESS);
+         if (probe)
+         {
+            CloseHandle(probe);
+            if (scond_g.sleep != SCOND_SLEEP_EVENT)
+               scond_g.tls_event = TlsAlloc();
+            scond_g.tls_timer = TlsAlloc();
+            scond_g.hires     = scond_g.tls_event != TLS_OUT_OF_INDEXES
+                             && scond_g.tls_timer != TLS_OUT_OF_INDEXES;
+         }
+      }
+   }
+#endif
+
 #if defined(_XBOX)
    /* the 360 has six hardware threads, the original Xbox one core */
 #if defined(_M_PPC) || defined(_XENON)
@@ -2789,6 +2957,77 @@ static bool scond_sleep(struct scond_waiter *w, LARGE_INTEGER *timeout)
    }
 }
 
+/* This thread's event and high resolution timer, made on first use and
+ * kept for the thread's life, as the event tier keeps its event. NULL
+ * when either cannot be had, and the wait falls back to the kernel
+ * timeout. */
+static HANDLE scond_thread_event(void)
+{
+   HANDLE event = (HANDLE)TlsGetValue(scond_g.tls_event);
+   if (!event)
+   {
+      if (!(event = CreateEvent(NULL, FALSE, FALSE, NULL)))
+         return NULL;
+      if (!TlsSetValue(scond_g.tls_event, event))
+      {
+         CloseHandle(event);
+         return NULL;
+      }
+   }
+   return event;
+}
+
+static HANDLE scond_thread_timer(void)
+{
+   HANDLE timer = (HANDLE)TlsGetValue(scond_g.tls_timer);
+   if (!timer)
+   {
+      if (!(timer = scond_g.create_timer_ex(NULL, NULL,
+                  SCOND_TIMER_HIGH_RESOLUTION, SCOND_TIMER_ALL_ACCESS)))
+         return NULL;
+      if (!TlsSetValue(scond_g.tls_timer, timer))
+      {
+         CloseHandle(timer);
+         return NULL;
+      }
+   }
+   return timer;
+}
+
+/* A bounded sleep on the waiter's event and the high resolution timer:
+ * false when the timer fired first. Setting the timer clears whatever
+ * an earlier wait left signalled on it. */
+static bool scond_sleep_hires(struct scond_waiter *w, HANDLE timer,
+      int64_t timeout_us)
+{
+   HANDLE        handles[2];
+   LARGE_INTEGER due;
+   DWORD         rc;
+
+   due.QuadPart = -(LONGLONG)timeout_us * 10;
+   if (!scond_g.set_timer(timer, &due, 0, NULL, NULL, FALSE))
+   {
+      LONGLONG ms = (timeout_us + 999) / 1000;
+      rc = WaitForSingleObject(w->event,
+            ms >= (LONGLONG)INFINITE ? INFINITE - 1 : (DWORD)ms);
+      return rc != WAIT_TIMEOUT;
+   }
+   handles[0] = w->event;
+   handles[1] = timer;
+   /* The timer is set and will fire; the bound is only there so a
+    * timer that somehow does not cannot make this wait forever */
+   rc = WaitForMultipleObjects(2, handles, FALSE,
+         (DWORD)(timeout_us / 1000) + 100);
+   if (rc == WAIT_OBJECT_0)
+      return true;
+   if (rc == WAIT_OBJECT_0 + 1 || rc == WAIT_TIMEOUT)
+      return false;
+   /* An unusable handle: a wake after a millisecond, the caller
+    * re-checks its own predicate */
+   Sleep(1);
+   return true;
+}
+
 static void scond_wake_one(struct scond_waiter *w)
 {
    /* copies taken first: the waiter may leave as soon as it sees WOKEN */
@@ -2797,6 +3036,13 @@ static void scond_wake_one(struct scond_waiter *w)
    int prev     = retro_atomic_fetch_or_int(&w->flags, SCOND_W_WOKEN);
    if (!(prev & SCOND_W_ASLEEP))
       return;   /* still spinning: it sees the flag, no syscall */
+   /* A waiter that sleeps on its event - every waiter on the event
+    * tier, and bounded ones on the others - is woken through it */
+   if (event)
+   {
+      SetEvent(event);
+      return;
+   }
    switch (scond_g.sleep)
    {
       case SCOND_SLEEP_ALERT:
@@ -2870,19 +3116,30 @@ static bool scond_unlink(scond_t *cond, struct scond_waiter *w)
    }
 }
 
-/* Block on the caller's own flag word until signalled or dwMilliseconds
- * have passed. Returns false only on timeout. */
-static bool scond_wait_win32(scond_t *cond, slock_t *lock, DWORD dwMilliseconds)
+/* Block on the caller's own flag word until signalled or timeout_us
+ * have passed, -1 for never. Returns false only on timeout. */
+static bool scond_wait_win32(scond_t *cond, slock_t *lock, int64_t timeout_us)
 {
    struct scond_waiter w;
    LARGE_INTEGER timeout;
    uintptr_t old;
+   HANDLE timer = NULL;
    bool woken = true;
 
    w.event = NULL;
    w.tid   = GetCurrentThreadId();
    retro_atomic_int_init(&w.flags, 0);
-   if (scond_g.sleep == SCOND_SLEEP_EVENT)
+   /* A bounded wait sleeps on the thread's event and its high
+    * resolution timer, whatever the tier, so it ends when it should
+    * rather than on the system timer's tick. Decided before the block
+    * is listed: the waker reads w.event to know how to wake it. */
+   if (     timeout_us > 0 && scond_g.hires
+         && (timer = scond_thread_timer()))
+   {
+      if (!(w.event = scond_thread_event()))
+         timer = NULL;
+   }
+   if (!w.event && scond_g.sleep == SCOND_SLEEP_EVENT)
    {
       w.event = (HANDLE)TlsGetValue(scond_g.tls_event);
       if (!w.event)
@@ -2969,17 +3226,27 @@ static bool scond_wait_win32(scond_t *cond, slock_t *lock, DWORD dwMilliseconds)
    if (retro_atomic_fetch_or_int(&w.flags, SCOND_W_ASLEEP) & SCOND_W_WOKEN)
       goto done;
 
-   if (dwMilliseconds != INFINITE)
-      timeout.QuadPart = -(LONGLONG)dwMilliseconds * 10000;
-   if (!scond_sleep(&w, dwMilliseconds != INFINITE ? &timeout : NULL))
+   /* Without the timer the bound is in whole milliseconds, as it
+    * always was: under one is one, and over it rounds down */
+   if (timeout_us >= 0 && !timer)
+      timeout.QuadPart = -(LONGLONG)(timeout_us < 1000
+            ? 1 : timeout_us / 1000) * 10000;
+   if (timer ? !scond_sleep_hires(&w, timer, timeout_us)
+             : !scond_sleep(&w, timeout_us >= 0 ? &timeout : NULL))
    {
       /* timed out: unless a waker has already taken the block, in which
-       * case its wake is on the way and has to be consumed */
+       * case its wake is on the way and has to be consumed - on the
+       * event, where the block slept on one */
       scond_lock(cond);
       woken = !scond_unlink(cond, &w);
       scond_unlock(cond);
       if (woken)
-         scond_sleep(&w, NULL);
+      {
+         if (timer)
+            WaitForSingleObject(w.event, INFINITE);
+         else
+            scond_sleep(&w, NULL);
+      }
    }
 
 done:
@@ -2991,7 +3258,7 @@ done:
 void scond_wait(scond_t *cond, slock_t *lock)
 {
 #if defined(USE_WIN32_THREADS)
-   scond_wait_win32(cond, lock, INFINITE);
+   scond_wait_win32(cond, lock, -1);
 #elif defined(USE_GX_THREADS)
    LWP_CondWait(cond->cond, lock->lock);
 #elif defined(USE_CTR_THREADS)
@@ -3250,45 +3517,22 @@ bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
     */
    if (timeout_us == 0)
       return false;
-   else if (timeout_us < 1000)
-      return scond_wait_win32(cond, lock, 1);
-   /* Someone asking for 1000 or 1001 timeout shouldn't
-    * accidentally get 2ms. */
-   return scond_wait_win32(cond, lock, timeout_us / 1000);
+   /* A deadline already past waits the shortest bound it always did,
+    * and is never taken for the unbounded wait */
+   if (timeout_us < 0)
+      timeout_us = 1000;
+   /* In microseconds: the wait rounds to whole milliseconds itself
+    * where it has no high resolution timer, as this did */
+   return scond_wait_win32(cond, lock, timeout_us);
 #elif defined(USE_GX_THREADS)
-#ifdef INTERNAL_LIBOGC
-   /* The in-tree libogc takes an absolute deadline and compares it
-    * against its RTC-based single-argument clock_gettime, so the
-    * deadline has to come from that same clock. Its prototype clashes
-    * with newlib's POSIX clock_gettime, hence the asm binding. A zero
-    * timeout is treated as always timing out, as on Win32. */
-   struct timespec dl;
-   if (timeout_us <= 0)
-      return false;
-   {
-      extern int ogc_rtc_gettime(struct timespec *tp)
-            __asm__("clock_gettime");
-      if (ogc_rtc_gettime(&dl) != 0)
-         return false;
-   }
-   dl.tv_sec  += (time_t)(timeout_us / INT64_C(1000000));
-   dl.tv_nsec += (long)(timeout_us % INT64_C(1000000)) * 1000L;
-   if (dl.tv_nsec >= 1000000000L)
-   {
-      dl.tv_sec  += 1;
-      dl.tv_nsec -= 1000000000L;
-   }
-   return LWP_CondTimedWait(cond->cond, lock->lock, &dl) == 0;
-#else
-   /* Upstream libogc takes the timeout as a relative timespec; a zero
-    * timeout is treated as always timing out, as on Win32. */
+   /* libogc takes the timeout as a relative timespec; a zero timeout
+    * is treated as always timing out, as on Win32. */
    struct timespec rel;
    if (timeout_us <= 0)
       return false;
    rel.tv_sec  = (time_t)(timeout_us / INT64_C(1000000));
    rel.tv_nsec = (long)(timeout_us % INT64_C(1000000)) * 1000L;
    return LWP_CondTimedWait(cond->cond, lock->lock, &rel) == 0;
-#endif
 #elif defined(USE_CTR_THREADS)
    if (timeout_us <= 0)
       return false;
@@ -3437,6 +3681,11 @@ bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
    }
    slock_lock(lock);
    return woken;
+#elif defined(USE_GEKKO_THREADS)
+   if (timeout_us <= 0)
+      return false;
+   return gk_cond_wait(&cond->cond, &lock->lock,
+         GK_US_TO_TICKS(timeout_us)) != GK_ETIMEDOUT;
 #elif defined(RTHREADS_FUTEX_SCOND)
    /* FUTEX_WAIT_BITSET takes an absolute CLOCK_MONOTONIC deadline, so
     * a spurious wake never shortens or stretches the wait. */
@@ -3616,7 +3865,8 @@ bool sthread_is_main_thread(void)
       && !defined(USE_CTR_THREADS) && !defined(USE_PSP_THREADS) \
       && !defined(USE_VITA_THREADS) && !defined(USE_WIIU_THREADS) \
       && !defined(USE_SWITCH_THREADS) && !defined(USE_PS2_THREADS) \
-      && !defined(USE_PS3_THREADS) && !defined(__ANDROID__)
+      && !defined(USE_PS3_THREADS) && !defined(USE_GEKKO_THREADS) \
+      && !defined(__ANDROID__)
 #define RTHREADS_HAVE_CANCEL 1
 #endif
 

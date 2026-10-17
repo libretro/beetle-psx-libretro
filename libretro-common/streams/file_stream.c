@@ -258,8 +258,7 @@ bool filestream_exists(const char *path)
          RETRO_VFS_FILE_ACCESS_HINT_NONE)))
       return false;
 
-   if (filestream_close(dummy) != 0)
-      free(dummy);
+   filestream_close(dummy);
 
    dummy = NULL;
    return true;
@@ -1855,7 +1854,7 @@ bool filestream_matches_buf(const char *path, const void *data, size_t len)
 
 done:
    if (filestream_close(file) != 0)
-      free(file);
+      match = false;
    return match;
 }
 
@@ -1869,6 +1868,16 @@ static filestream_mapped_ptr_cb_t filestream_mapped_ptr_cb;
 void filestream_set_mapped_ptr_cb(filestream_mapped_ptr_cb_t cb)
 {
    filestream_mapped_ptr_cb = cb;
+}
+
+void filestream_prefetch(RFILE *stream, uint64_t offset, uint64_t len)
+{
+   if (!stream || !stream->hfile)
+      return;
+   if (filestream_read_cb)
+      return;   /* no such request in the libretro VFS interface */
+   retro_vfs_file_prefetch_impl(
+         (libretro_vfs_implementation_file*)stream->hfile, offset, len);
 }
 
 const uint8_t *filestream_get_mapped_ptr(RFILE *stream, int64_t *len)
@@ -1966,11 +1975,9 @@ int filestream_close(RFILE *stream)
       output = retro_vfs_file_close_impl(
             (libretro_vfs_implementation_file*)fp);
 
-   if (output == 0)
-   {
-      free(stream->rbuf);
-      free(stream);
-   }
+   /* VFS close consumes the handle even on failure (VFS API v1). */
+   free(stream->rbuf);
+   free(stream);
 
    return output;
 }
@@ -2049,6 +2056,7 @@ static int64_t filestream_read_file_to_eof(RFILE *file, void **buf)
 
 int64_t filestream_read_file(const char *path, void **buf, int64_t *len)
 {
+   int close_result;
    int64_t ret              = 0;
    int64_t content_buf_size = 0;
    void *content_buf        = NULL;
@@ -2088,8 +2096,10 @@ int64_t filestream_read_file(const char *path, void **buf, int64_t *len)
       if ((ret = filestream_read_file_to_eof(file, &content_buf)) < 0)
          goto error;
 
-      if (filestream_close(file) != 0)
-         free(file);
+      close_result = filestream_close(file);
+      file = NULL;
+      if (close_result != 0)
+         goto error;
 
       *buf = content_buf;
       if (len)
@@ -2171,8 +2181,10 @@ int64_t filestream_read_file(const char *path, void **buf, int64_t *len)
    if (ret == 0)
       goto error;
 
-   if (filestream_close(file) != 0)
-      free(file);
+   close_result = filestream_close(file);
+   file = NULL;
+   if (close_result != 0)
+      goto error;
 
    *buf    = content_buf;
 
@@ -2186,8 +2198,8 @@ int64_t filestream_read_file(const char *path, void **buf, int64_t *len)
    return 1;
 
 error:
-   if (filestream_close(file) != 0)
-      free(file);
+   if (file)
+      filestream_close(file);
    if (content_buf)
       free(content_buf);
    if (len)
@@ -2209,9 +2221,7 @@ bool filestream_write_file(const char *path, const void *data, int64_t size)
    if (!file)
       return false;
    ret = filestream_write(file, data, size);
-   if (filestream_close(file) != 0)
-      free(file);
-   return (ret == size);
+   return filestream_close(file) == 0 && ret == size;
 }
 
 /* <path>.tmp, the sibling an atomic write goes through; NULL on OOM */
@@ -2243,26 +2253,38 @@ RFILE *filestream_open_atomic(const char *path)
    return file;
 }
 
+bool filestream_atomic_temp_name(char *s, size_t len, const char *path)
+{
+   size_t path_len;
+   if (!s || !path || !*path)
+      return false;
+   path_len = strlen(path);
+   if (path_len + sizeof(".tmp") > len)
+      return false;
+   memcpy(s, path, path_len);
+   memcpy(s + path_len, ".tmp", sizeof(".tmp"));
+   return true;
+}
+
 int filestream_commit_atomic(RFILE *file, const char *path, bool ok)
 {
-   char *temp_path;
-
    if (!file)
       return -1;
-   if (!path || !*path || !(temp_path = filestream_atomic_temp_path(path)))
-   {
-      if (filestream_close(file) != 0)
-         free(file);
-      return -1;
-   }
 
    /* A buffered write reports a full disk at close, not at write,
     * so both have to agree before the rename goes ahead. */
    if (filestream_close(file) != 0)
-   {
-      free(file);
       ok = false;
-   }
+
+   return filestream_finish_atomic(path, ok);
+}
+
+int filestream_finish_atomic(const char *path, bool ok)
+{
+   char *temp_path;
+
+   if (!path || !*path || !(temp_path = filestream_atomic_temp_path(path)))
+      return -1;
 
    if (!ok)
    {

@@ -59,6 +59,18 @@
 #define FILE_MAP_EXECUTE 0x0020
 #endif
 
+/* A UWP build's headers leave MapViewOfFileEx out, and C takes a call
+ * to a function it has not seen declared to return int: on a 64-bit
+ * build the address it hands back loses its upper half. The function
+ * is there to link against; this is the declaration the desktop
+ * headers give it. */
+#if defined(WINAPI_FAMILY) && defined(WINAPI_FAMILY_APP) \
+   && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
+WINBASEAPI LPVOID WINAPI MapViewOfFileEx(HANDLE hFileMappingObject,
+      DWORD dwDesiredAccess, DWORD dwFileOffsetHigh, DWORD dwFileOffsetLow,
+      SIZE_T dwNumberOfBytesToMap, LPVOID lpBaseAddress);
+#endif
+
 /* Map POSIX prot bits to a PAGE_* protection constant.  Windows has
  * no write-only or exec-only protections; those requests take the
  * nearest expressible superset, as every mman shim does. */
@@ -627,20 +639,33 @@ void memshm_unmap(void *addr, size_t len) { (void)addr; (void)len; }
  * TARGET_OS_OSX is the test, not the architecture. */
 #if defined(__APPLE__) && defined(__aarch64__) && defined(TARGET_OS_OSX) && TARGET_OS_OSX
 #include <pthread.h>
+#include <dlfcn.h>
 /* pthread_jit_write_protect_np is per thread, and so is this depth:
  * one thread's nesting must not flip another's pages. */
 static __thread int memjit_depth;
 
+/* Every macOS that runs on arm64 has pthread_jit_write_protect_np, but
+ * the SDK declares it for macOS 11 against a lower deployment target,
+ * so it is resolved by name once, at load: the call through the
+ * pointer is the same indirect call the library stub makes. */
+static void (*memjit_protect)(int);
+
+static void __attribute__((constructor)) memjit_resolve(void)
+{
+   *(void **)(&memjit_protect) = dlsym(RTLD_DEFAULT,
+         "pthread_jit_write_protect_np");
+}
+
 void memjit_write_begin(void)
 {
-   if (memjit_depth++ == 0)
-      pthread_jit_write_protect_np(0);
+   if (memjit_depth++ == 0 && memjit_protect)
+      memjit_protect(0);
 }
 
 void memjit_write_end(void)
 {
-   if (--memjit_depth == 0)
-      pthread_jit_write_protect_np(1);
+   if (--memjit_depth == 0 && memjit_protect)
+      memjit_protect(1);
 }
 #else
 void memjit_write_begin(void) { }
@@ -798,19 +823,28 @@ static bool memshm_placeholder_apis(void)
  * flat array is right for the few tens of ranges a fastmem window
  * splits into, and keeps the whole thing allocation-light. */
 #define MEMSHM_MAX_PLACEHOLDERS 256
+#endif
 
 typedef struct
 {
    size_t start;
    size_t end;
 } memshm_range_t;
-#endif
 
 struct memshm_area
 {
    unsigned char *base;
    size_t         len;
-   size_t         mappings;
+   /* The mappings the area holds, a bit a page: mapped[] for every page
+    * one covers, starts[] for its first. Map refuses a range touching a
+    * mapped page and unmap takes only exactly one mapping: on POSIX both
+    * write over whatever range they are given (MAP_FIXED, PROT_NONE),
+    * and Windows unmaps a view whole. One allocation, starts[] after
+    * mapped[]; a 4 GB window of 4 KB pages costs 256 KB. */
+   uint32_t      *mapped;
+   uint32_t      *starts;
+   size_t         unit;   /* bytes a bit stands for */
+   size_t         pages;
 #if defined(_WIN32) && !defined(_XBOX)
    memshm_range_t ranges[MEMSHM_MAX_PLACEHOLDERS];
    int            range_count;
@@ -937,6 +971,21 @@ static void memshm_legacy_release(memshm_area_t *a, size_t first, size_t count)
 
 #endif
 
+#if (defined(_WIN32) && !defined(_XBOX)) || (defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_ANONYMOUS))
+static bool memshm_area_track_init(memshm_area_t *a)
+{
+   size_t words;
+   if (!(a->unit = mempagesize()))
+      a->unit = 4096;
+   a->pages = a->len / a->unit + ((a->len % a->unit) ? 1 : 0);
+   words    = (a->pages + 31) / 32;
+   if (!(a->mapped = (uint32_t*)calloc(words * 2, sizeof(uint32_t))))
+      return false;
+   a->starts = a->mapped + words;
+   return true;
+}
+#endif
+
 memshm_area_t *memshm_area_create(size_t len)
 {
 #if (defined(_WIN32) && !defined(_XBOX)) || (defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_ANONYMOUS))
@@ -979,11 +1028,18 @@ memshm_area_t *memshm_area_create(size_t len)
       a->slot       = gran;
       a->slot_count = slots;
       a->legacy     = 1;
+      if (!memshm_area_track_init(a))
+      {
+         free(a->reserved);
+         free(a);
+         return NULL;
+      }
       for (i = 0; i < slots; i++)
       {
          if (!VirtualAlloc(a->base + i * gran, gran, MEM_RESERVE, PAGE_NOACCESS))
          {
             memshm_legacy_release(a, 0, i);
+            free(a->mapped);
             free(a->reserved);
             free(a);
             return NULL;
@@ -1050,6 +1106,12 @@ memshm_area_t *memshm_area_create(size_t len)
    }
    a->base = (unsigned char*)alloc;
    a->len  = len;
+   if (!memshm_area_track_init(a))
+   {
+      VirtualFree(alloc, 0, MEM_RELEASE);
+      free(a);
+      return NULL;
+   }
    a->ranges[0].start = 0;
    a->ranges[0].end   = len;
    a->range_count     = 1;
@@ -1069,6 +1131,12 @@ memshm_area_t *memshm_area_create(size_t len)
    }
    a->base = (unsigned char*)alloc;
    a->len  = len;
+   if (!memshm_area_track_init(a))
+   {
+      munmap(alloc, len);
+      free(a);
+      return NULL;
+   }
    return a;
 #else
    (void)len;
@@ -1094,6 +1162,7 @@ void memshm_area_free(memshm_area_t *area)
             UnmapViewOfFile(area->base + i * area->slot);
       }
       free(area->reserved);
+      free(area->mapped);
       free(area);
       return;
    }
@@ -1102,6 +1171,7 @@ void memshm_area_free(memshm_area_t *area)
 #elif defined(HAVE_MMAN) && !defined(__EMSCRIPTEN__) && defined(MAP_FIXED) && defined(MAP_ANONYMOUS)
    munmap(area->base, area->len);
 #endif
+   free(area->mapped);
    free(area);
 }
 
@@ -1140,6 +1210,76 @@ static bool memshm_area_offset(const memshm_area_t *area, const void *at,
    *off = (size_t)(addr - base);
    return true;
 }
+
+#define MEMSHM_BIT(m, i)     (((m)[(i) >> 5] >> ((i) & 31)) & 1u)
+#define MEMSHM_SET(m, i)     ((m)[(i) >> 5] |=  (1u << ((i) & 31)))
+#define MEMSHM_CLEAR(m, i)   ((m)[(i) >> 5] &= ~(1u << ((i) & 31)))
+
+/* The pages [*first, *first + *count) that [off, off + len) covers; false
+ * when off is not on a page, which no mapping is. */
+static bool memshm_area_pages(const memshm_area_t *area, size_t off,
+      size_t len, size_t *first, size_t *count)
+{
+   if (off % area->unit)
+      return false;
+   *first = off / area->unit;
+   *count = len / area->unit + ((len % area->unit) ? 1 : 0);
+   return *count && *count <= area->pages - *first;
+}
+
+/* No page of [off, off + len) is mapped. */
+static bool memshm_area_can_map(const memshm_area_t *area,
+      size_t off, size_t len)
+{
+   size_t p, first, count;
+   if (!memshm_area_pages(area, off, len, &first, &count))
+      return false;
+   for (p = first; p < first + count; p++)
+      if (MEMSHM_BIT(area->mapped, p))
+         return false;
+   return true;
+}
+
+/* [off, off + len) is exactly one mapping: it starts there, covers
+ * every page, has no other start inside and does not run on past. */
+static bool memshm_area_is_map(const memshm_area_t *area,
+      size_t off, size_t len)
+{
+   size_t p, first, count;
+   if (     !memshm_area_pages(area, off, len, &first, &count)
+         || !MEMSHM_BIT(area->starts, first))
+      return false;
+   for (p = first; p < first + count; p++)
+      if (     !MEMSHM_BIT(area->mapped, p)
+            || (p != first && MEMSHM_BIT(area->starts, p)))
+         return false;
+   return p == area->pages
+       || !MEMSHM_BIT(area->mapped, p)
+       || MEMSHM_BIT(area->starts, p);
+}
+
+/* Checked by memshm_area_can_map() before the OS is asked. */
+static void memshm_area_add_map(memshm_area_t *area,
+      size_t off, size_t len)
+{
+   size_t p, first, count;
+   if (!memshm_area_pages(area, off, len, &first, &count))
+      return;
+   for (p = first; p < first + count; p++)
+      MEMSHM_SET(area->mapped, p);
+   MEMSHM_SET(area->starts, first);
+}
+
+static void memshm_area_drop_map(memshm_area_t *area,
+      size_t off, size_t len)
+{
+   size_t p, first, count;
+   if (!memshm_area_pages(area, off, len, &first, &count))
+      return;
+   for (p = first; p < first + count; p++)
+      MEMSHM_CLEAR(area->mapped, p);
+   MEMSHM_CLEAR(area->starts, first);
+}
 #endif
 
 unsigned char *memshm_area_map(memshm_area_t *area, void *handle,
@@ -1155,7 +1295,8 @@ unsigned char *memshm_area_map(memshm_area_t *area, void *handle,
    DWORD  page_prot;
 #endif
 
-   if (!memshm_area_offset(area, at, len, &map_off))
+   if (     !memshm_area_offset(area, at, len, &map_off)
+         || !memshm_area_can_map(area, map_off, len))
       return NULL;
 
    if (area->legacy)
@@ -1183,7 +1324,7 @@ unsigned char *memshm_area_map(memshm_area_t *area, void *handle,
                (DWORD)(offset & 0xFFFFFFFFu), len, at);
          if (view == at)
          {
-            area->mappings++;
+            memshm_area_add_map(area, map_off, len);
             return (unsigned char*)view;
          }
          if (view)
@@ -1261,7 +1402,7 @@ unsigned char *memshm_area_map(memshm_area_t *area, void *handle,
       DWORD old_prot;
       VirtualProtect(at, len, page_prot, &old_prot);
    }
-   area->mappings++;
+   memshm_area_add_map(area, map_off, len);
    return (unsigned char*)at;
 #else
    return NULL;
@@ -1281,13 +1422,14 @@ unsigned char *memshm_area_map(memshm_area_t *area, void *handle,
          return NULL;
       span += page - (span % page);
    }
-   if (!memshm_area_offset(area, at, span, &map_off))
+   if (     !memshm_area_offset(area, at, span, &map_off)
+         || !memshm_area_can_map(area, map_off, span))
       return NULL;
    p = mmap(at, len, prot, MAP_SHARED | MAP_FIXED,
          MEMSHM_FD(handle), (off_t)offset);
    if (p == MAP_FAILED)
       return NULL;
-   area->mappings++;
+   memshm_area_add_map(area, map_off, span);
    return (unsigned char*)p;
 #else
    (void)area; (void)handle; (void)offset; (void)at; (void)len; (void)prot;
@@ -1303,12 +1445,9 @@ bool memshm_area_unmap(memshm_area_t *area, void *at, size_t len)
    int    cur, left, right;
 #endif
 
-   if (!memshm_area_offset(area, at, len, &map_off))
-      return false;
-   /* Nothing is mapped, so this address cannot be one this returned:
-    * an unbalanced unmap would otherwise wrap the count and take the
-    * area's own teardown with it. */
-   if (!area->mappings)
+   /* Only a mapping exactly as made: a view is unmapped whole. */
+   if (     !memshm_area_offset(area, at, len, &map_off)
+         || !memshm_area_is_map(area, map_off, len))
       return false;
 
    if (area->legacy)
@@ -1322,16 +1461,16 @@ bool memshm_area_unmap(memshm_area_t *area, void *at, size_t len)
       /* Put the reservations back at once: an unreserved hole in the
        * span is an address another allocation can take, and then the
        * next map there fails for good. */
+      memshm_area_drop_map(area, map_off, len);
       if (!memshm_legacy_reserve(area, first, count))
          return false;
-      area->mappings--;
       return true;
    }
 
 #if defined(MEMSHM_HAVE_PLACEHOLDERS)
    if (!s_UnmapViewOfFile2(GetCurrentProcess(), at, MEM_PRESERVE_PLACEHOLDER))
       return false;
-   area->mappings--;
+   memshm_area_drop_map(area, map_off, len);
 
    /* The range is a free placeholder of its own now, whether or not it
     * goes on to coalesce with a neighbour, so record that before either
@@ -1393,15 +1532,16 @@ bool memshm_area_unmap(memshm_area_t *area, void *at, size_t len)
          return false;
       span += page - (span % page);
    }
-   if (!memshm_area_offset(area, at, span, &map_off))
-      return false;
-   if (!area->mappings)
+   /* Only a mapping exactly as made: PROT_NONE covers whatever range
+    * it is given. */
+   if (     !memshm_area_offset(area, at, span, &map_off)
+         || !memshm_area_is_map(area, map_off, span))
       return false;
    /* Anonymous PROT_NONE back over the range: the reservation is whole
     * again and the kernel merges the VMAs. */
    if (mmap(at, len, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) == MAP_FAILED)
       return false;
-   area->mappings--;
+   memshm_area_drop_map(area, map_off, span);
    return true;
 #else
    (void)area; (void)at; (void)len;

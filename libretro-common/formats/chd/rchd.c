@@ -356,6 +356,7 @@ struct rchd
     * audio/video pays nothing for them. */
    uint16_t          *av_lookup;
    int16_t           *av_samples;
+   uint32_t           av_samples_capacity;
    struct rchd_av_scratch *av_scratch;
 
    /* One decoded hunk, kept so a range spanning several hunks, or two
@@ -674,7 +675,7 @@ static int rchd_parse_header(rchd_t *chd, const uint8_t *h)
    }
 
    if (!chd->info.hunk_bytes
-         || chd->info.hunk_bytes > (version >= 5 ? RCHD_MAX_HUNK_BYTES_V5
+         || chd->info.hunk_bytes > (uint32_t)(version >= 5 ? RCHD_MAX_HUNK_BYTES_V5
                                                  : RCHD_MAX_HUNK_BYTES_OLD))
       return RCHD_ERROR_DATA;
    if (!chd->info.hunk_count || chd->info.hunk_count > RCHD_MAX_HUNK_COUNT)
@@ -1550,11 +1551,15 @@ static int rchd_decode_avhuff(rchd_t *chd, const uint8_t *src,
 
       if (mode == 0xffff)
       {
-      if (!chd->av_samples)
+      if (samples > chd->av_samples_capacity)
       {
-         chd->av_samples = (int16_t*)malloc((size_t)samples * sizeof(int16_t));
-         if (!chd->av_samples)
+         int16_t *grown = (int16_t*)realloc(chd->av_samples,
+               (size_t)samples * sizeof(int16_t));
+
+         if (!grown)
             return RCHD_ERROR_MEM;
+         chd->av_samples          = grown;
+         chd->av_samples_capacity = samples;
       }
 
       fmt.sample_rate     = 44100;
@@ -2656,10 +2661,14 @@ int rchd_read_extent(const rchd_t *chd, uint32_t lba, uint32_t count,
    if (!chd->track_count)
       return RCHD_ERROR_STATE;
 
+   /* Frame numbers are 32-bit: an extent running past the last one
+    * cannot be in the image. */
+   if ((uint64_t)lba + count > 0xFFFFFFFFu + (uint64_t)1)
+      return RCHD_ERROR_PARAM;
+
    for (i = 0; i < count; i++)
    {
-      const rchd_track_t *t = rchd_track_for_lba(chd,
-            (uint64_t)lba + i);
+      const rchd_track_t *t = rchd_track_for_lba(chd, lba + i);
 
       if (!t)
          return RCHD_ERROR_PARAM;
