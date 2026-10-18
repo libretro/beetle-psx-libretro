@@ -39,6 +39,7 @@ layout(push_constant, std430) uniform Registers
 	/* Display state: PQ(panel black) for the toe, and Rec.2020 -> panel RGB
 	 * for gamut compression. Both zero when the frontend does not say. */
 	float black_pq;
+	int   scrgb;          /* 0 HDR10 PQ Rec.2020, 1 linear scRGB FP16 */
 	mat3  to_panel;
 #endif
 } registers;
@@ -160,12 +161,13 @@ void main()
 #endif
 
 #if defined(HDR)
-	/* The SDR rgb is gamma-encoded 0..1; encode_hdr10 handles the
+	/* The SDR rgb is gamma-encoded 0..1; encode_hdr_output handles the
 	 * linearise / paper-white / gamut / PQ chain. */
-	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.peak_nits,
-	                              registers.expand_gamut, registers.shoulder,
-	                              registers.sdr_eotf, registers.src_primaries,
-	                              registers.black_pq, registers.to_panel), 1.0);
+	FragColor = vec4(encode_hdr_output(rgb, registers.paper_white_nits, registers.peak_nits,
+	                                   registers.expand_gamut, registers.shoulder,
+	                                   registers.sdr_eotf, registers.src_primaries,
+	                                   registers.black_pq, registers.to_panel,
+	                                   registers.scrgb), 1.0);
 #else
 	/* After the dither, not before: the console emits a dithered 15-bit signal
 	 * and the primaries belong to the phosphors that receive it. */

@@ -21,6 +21,15 @@
 #      analog_panel  composite, P3, black 0.05      green inside P3, black
 #                                                   bar on the toe (Vulkan)
 #
+#    The same displays again with Color Format = 64-bit scRGB. Each scRGB
+#    frame is taken back to Rec.2020 nits and PQ, and must match the HDR10
+#    frame of the same display: the two formats present one picture.
+#      scrgb           scRGB offered                      matches base
+#      display         P3 panel, black 0.05 (HDR10)       reference for next
+#      scrgb_display   the same, scRGB                    matches display
+#      scrgb_fallback  scRGB asked, not offered           HDR10, same as base
+#      scrgb_analog    composite, P3, black, scRGB        matches analog_panel
+#
 # KEEP=<dir> keeps the logs and frames there instead of a temporary dir.
 #
 # Usage, from the repo root after `make HAVE_HW=1`:
@@ -89,13 +98,14 @@ run() {
    host="$1"; name="$2"; shift 2
    mkdir -p "$work/$host/$name"
    opts="beetle_psx_hw_src_primaries=ntsc1953;beetle_psx_hw_video_cable=${CABLE:-off}"
+   opts="$opts;beetle_psx_hw_color_format=${FMT:-30bit_hdr}"
    if [ "$host" = vk ]; then
       env VKHOST_VARS="$opts" VKHOST_DUMP_RAW=1 \
          VKHOST_DUMP_INTERVAL=$FRAMES "$@" \
          "$root/tools/vkhost/vkhost" "$core" "$work/bars.exe" - $FRAMES \
          "$work/$host/$name" > "$work/$host/$name/log" 2>&1
    else
-      env GLHOST_VARS="beetle_psx_hw_color_format=30bit_hdr;$opts" \
+      env GLHOST_VARS="$opts" \
          "$@" \
          "$root/tools/glhost/glhost" "$core" "$work/bars.exe" - $FRAMES \
          "$work/$host/$name" > "$work/$host/$name/log" 2>&1
@@ -113,9 +123,15 @@ scenarios() {
    run "$host" regrade HOST_HDR_PASSTHROUGH=0
    # Vulkan only: under glhost the GL analog chain presents a black frame
    # with any cable, in 24-bit as well, so there is nothing to measure there.
+   run "$host" display HOST_HDR_PANEL=$P3 HOST_HDR_BLACK=0.05
+   FMT=64bit_scrgb run "$host" scrgb          HOST_HDR_SCRGB=1
+   FMT=64bit_scrgb run "$host" scrgb_display  HOST_HDR_SCRGB=1 HOST_HDR_PANEL=$P3 HOST_HDR_BLACK=0.05
+   FMT=64bit_scrgb run "$host" scrgb_fallback
    if [ "$host" = vk ]; then
       CABLE=composite run "$host" analog
       CABLE=composite run "$host" analog_panel HOST_HDR_PANEL=$P3 HOST_HDR_BLACK=0.05
+      CABLE=composite FMT=64bit_scrgb run "$host" scrgb_analog \
+         HOST_HDR_SCRGB=1 HOST_HDR_PANEL=$P3 HOST_HDR_BLACK=0.05
    fi
 }
 
@@ -163,9 +179,29 @@ TO_P3 = np.linalg.inv(rgb_to_xyz([(0.680, 0.320), (0.265, 0.690), (0.150, 0.060)
 def log(host, name):
     return open(os.path.join(work, host, name, 'log'), errors='replace').read()
 
+TO_2020 = np.linalg.inv(np.array([
+    [1.6604903, -0.5876391, -0.0728516],
+    [-0.1245500, 1.1328999, -0.0083480],
+    [-0.0181511, -0.1005787, 1.1187299]]))
+
+def scrgb_to_pq(v):
+    """scRGB (linear Rec.709, 1.0 = 80 nits) to the HDR10 PQ code of the same light."""
+    return np.array([pq(np.maximum(TO_2020 @ (px * 80.0), 0.0)) for px in v])
+
 def bars(host, name):
-    """PQ code values (0..1) at the middle of each bar: black, green, grey, white."""
+    """PQ code values (0..1) at the middle of each bar: black, green, grey, white.
+    An scRGB frame is converted to the PQ code of the same light."""
     d = os.path.join(work, host, name)
+    scrgb = 'engaged as scRGB' in log(host, name)
+    if host == 'gl' and scrgb:
+        raws = sorted(glob.glob(os.path.join(d, 'frame_*.ppm.raw')))
+        ppms = sorted(glob.glob(os.path.join(d, 'frame_*.ppm')))
+        if not raws or not ppms:
+            fails.append('%s/%s: no scRGB frame dumped' % (host, name)); return None
+        _, wh, _, _ = open(ppms[-1], 'rb').read().split(b'\n', 3)
+        w, h = map(int, wh.split())
+        f = np.fromfile(raws[-1], '<f4').reshape(h, w, 4)
+        return scrgb_to_pq(np.array([f[h - 1 - h // 2, x, :3] for x in (40, 120, 200, 280)])), 1.5 / 1023
     if host == 'vk':
         raws = sorted(glob.glob(os.path.join(d, 'frame_*.ppm.raw')))
         m = re.findall(r'dumped \S+ \((\d+)x(\d+) fmt (\d+)\)', log(host, name))
@@ -179,8 +215,9 @@ def bars(host, name):
             if fmt == 64:      # A2B10G10R10_UNORM_PACK32
                 v = struct.unpack_from('<I', data, i * 4)[0]
                 out.append(np.array([v & 1023, (v >> 10) & 1023, (v >> 20) & 1023]) / 1023)
-            elif fmt == 97:    # R16G16B16A16_SFLOAT
-                out.append(np.frombuffer(data, '<f2', 3, i * 8).astype(float))
+            elif fmt == 97:    # R16G16B16A16_SFLOAT: scRGB, or PQ where 10-bit is missing
+                px = np.frombuffer(data, '<f2', 3, i * 8).astype(float)
+                out.append(scrgb_to_pq([px])[0] if scrgb else px)
             else:
                 fails.append('%s/%s: scanout format %d is not HDR10' % (host, name, fmt))
                 return None
@@ -249,6 +286,25 @@ for host in lanes:
         want = a[0] + b * (1 - a[0]) ** 4
         check(np.abs(ap[0] - want).max() <= tol,
               '%s/analog_panel: black bar %s, expected the toe %s' % (host, ap[0].round(4), want.round(4)))
+
+    # scRGB: the same light as HDR10. GL's HDR10 frames are read back at 8 bits.
+    for name, ref in (('scrgb', 'base'), ('scrgb_display', 'display')):
+        r, rr = bars(host, name), bars(host, ref)
+        check('engaged as scRGB' in log(host, name), '%s/%s: scRGB not engaged' % (host, name))
+        if r is not None and rr is not None:
+            t = max(r[1], rr[1])
+            check(np.abs(r[0] - rr[0]).max() <= t,
+                  '%s/%s: scRGB light %s differs from HDR10 %s' % (host, name, r[0].round(4), rr[0].round(4)))
+    lg = log(host, 'scrgb_fallback')
+    check('engaged as HDR10' in lg, '%s/scrgb_fallback: no HDR10 fallback when scRGB is not offered' % host)
+    r = bars(host, 'scrgb_fallback')
+    if r is not None:
+        check(np.abs(r[0] - base).max() == 0, '%s/scrgb_fallback: frame differs from base' % host)
+    if host == 'vk':
+        r, rr = bars(host, 'scrgb_analog'), bars(host, 'analog_panel')
+        if r is not None and rr is not None:
+            check(np.abs(r[0] - rr[0]).max() <= max(r[1], rr[1]),
+                  '%s/scrgb_analog: scRGB light %s differs from HDR10 %s' % (host, r[0].round(4), rr[0].round(4)))
 
     lg = log(host, 'regrade')
     fmts = re.findall(r'pixel format (\d+)', lg)

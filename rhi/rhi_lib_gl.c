@@ -25,9 +25,10 @@
 
 /* HDR output state, owned by libretro.c (same contract as the Vulkan
  * renderer's extern block). psx_hdr_active is true only once the frontend
- * accepted SET_PIXEL_FORMAT(HDR10_2101010), so both the internal target and
- * display encode gate on it. */
+ * accepted SET_PIXEL_FORMAT(HDR10_2101010) or (SCRGB_RGBA16F), so both the
+ * internal target and display encode gate on it; psx_hdr_scrgb says which. */
 extern bool  psx_hdr_active;
+extern int   psx_hdr_scrgb;
 extern int   psx_video_cable;   /* 0 off, 1 S-Video, 2 composite, 3 RF, 4 RGB */
 extern float psx_phase_error;   /* receiver hue detune, in cycles */
 extern int   psx_black_setup;   /* NTSC pedestal mismatch: 0 none, 1 lifted, 2 crushed */
@@ -4577,6 +4578,7 @@ static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
    glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_black_pq"), psx_hdr_black_pq);
    glUniformMatrix3fv(gl_uniform_map_get(&p->uniforms, "reg_to_panel"), 1, GL_FALSE,
          psx_hdr_to_panel);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_scrgb"), psx_hdr_scrgb);
    gl_analog_draw_quad(a);
 
    /* Leave the frontend's framebuffer bound with the viewport
@@ -6543,6 +6545,7 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
                glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_src_primaries"), psx_src_primaries);
                glUniform1f(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_black_pq"), psx_hdr_black_pq);
                glUniformMatrix3fv(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_to_panel"), 1, GL_FALSE, psx_hdr_to_panel);
+               glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_scrgb"), psx_hdr_scrgb);
             }
 
             if (!gl_draw_buffer_is_empty(renderer->output_buffer))

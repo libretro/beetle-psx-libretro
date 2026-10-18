@@ -344,12 +344,13 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       BEETLE_OPT(color_format),
       "Color Format",
       NULL,
-      "Selects the output color depth. '24-bit (Standard)' is the historical 8-bit-per-channel output. '30-bit Color (HDR)' outputs 10-bit-per-channel, PQ-encoded Rec.2020 (HDR10) for display on an HDR-capable screen: the renderer already carries more than 8 bits of internal precision, so this both reduces banding on upscaled gradients and lets emissive content sit above SDR white. Takes effect with the Vulkan and OpenGL hardware renderers and requires frontend HDR support; it falls back to 24-bit on the Software renderer or when the frontend cannot present HDR10. Restart required.",
+      "Selects the output color depth. '24-bit (Standard)' is the historical 8-bit-per-channel output. '30-bit Color (HDR)' outputs 10-bit-per-channel, PQ-encoded Rec.2020 (HDR10) for display on an HDR-capable screen: the renderer already carries more than 8 bits of internal precision, so this both reduces banding on upscaled gradients and lets emissive content sit above SDR white. '64-bit Color (HDR, scRGB)' outputs 16-bit floating point, linear Rec.709 (scRGB): the same picture as 30-bit HDR without the 10-bit PQ quantisation, and colours outside Rec.709 carried as negative values rather than through a Rec.2020 container; it falls back to 30-bit HDR when the frontend does not offer scRGB input. Takes effect with the Vulkan and OpenGL hardware renderers and requires frontend HDR support; it falls back to 24-bit on the Software renderer or when the frontend cannot present HDR. Restart required.",
       NULL,
       "video",
       {
-         { "24bit",     "24-bit (Standard)" },
-         { "30bit_hdr", "30-bit Color (HDR)" },
+         { "24bit",       "24-bit (Standard)" },
+         { "30bit_hdr",   "30-bit Color (HDR)" },
+         { "64bit_scrgb", "64-bit Color (HDR, scRGB)" },
          { NULL, NULL },
       },
       "24bit"

@@ -30,6 +30,7 @@ layout(push_constant, std430) uniform Registers
 	 * for gamut compression. Both zero when the frontend does not say. */
 	float black_pq;
 	mat3  to_panel;
+	int   scrgb;          /* 0 HDR10 PQ Rec.2020, 1 linear scRGB FP16 */
 #endif
 } registers;
 
@@ -42,10 +43,11 @@ void main()
 	/* The trilinear resolve interpolates the 8-bit source, producing
 	 * sub-8-bit precision that 10-bit output preserves - so no debanding is
 	 * needed (or wanted) here; just encode. */
-	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.peak_nits,
-	                              registers.expand_gamut, registers.shoulder,
-	                              registers.sdr_eotf, registers.src_primaries,
-	                              registers.black_pq, registers.to_panel), 1.0);
+	FragColor = vec4(encode_hdr_output(rgb, registers.paper_white_nits, registers.peak_nits,
+	                                   registers.expand_gamut, registers.shoulder,
+	                                   registers.sdr_eotf, registers.src_primaries,
+	                                   registers.black_pq, registers.to_panel,
+	                                   registers.scrgb), 1.0);
 #else
 	#if defined(DITHER)
 		rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));

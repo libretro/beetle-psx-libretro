@@ -16,7 +16,7 @@ Notable additions in this fork are:
 * Page-aligned HD texture dump/replacement, an opt-in mode for static/3D art (Vulkan renderer), see [PAGE_ALIGN.md](PAGE_ALIGN.md);
 * HD Reduce Palette Range, an opt-in hash of only a texture's used palette entries for better replacement match coverage (Vulkan renderer);
 * Video CD playback, including support for the 1 MB SCPH-5903 kernel, see [Video CD](#video-cd-scph-5903);
-* HDR10 output (PQ Rec.2020, 10-bit), with highlight roll-off, gamut and reference-gamma controls, see [HDR output](#hdr-output);
+* HDR output as HDR10 (PQ Rec.2020, 10-bit) or scRGB (linear FP16), with highlight roll-off, gamut and reference-gamma controls, see [HDR output](#hdr-output);
 
 ## HD texture replacement caching
 
@@ -53,6 +53,15 @@ renderers present HDR10 — 10 bits per channel, PQ-encoded, Rec.2020 — instea
 of the historical 8-bit-per-channel output. Set it and restart; everything
 else below is optional tuning.
 
+**64-bit Color (HDR, scRGB)** presents the same picture as
+`RETRO_PIXEL_FORMAT_SCRGB_RGBA16F`: 16-bit floating point, linear Rec.709,
+1.0 = 80 nits. It is the same graded light as the HDR10 encode, taken out of
+the Rec.2020 container instead of into PQ, so it carries no 10-bit
+quantisation and colours outside Rec.709 travel as negative values. It is
+offered only to a frontend that lists `RETRO_HDR_SOURCE_FORMAT_SCRGB_RGBA16F`
+in `GET_HDR_METADATA`'s `source_formats`; otherwise, or if the frontend
+rejects it, the core falls back to HDR10 and then to 24-bit.
+
 ### Why a PS1 emulator has anything to put in HDR
 
 Two separate things, and it is worth keeping them apart because they are
@@ -78,7 +87,7 @@ the renderer already produced.
 | | |
 |---|---|
 | Renderer | Vulkan or OpenGL. The Software renderer has no HDR path and ignores every option here. |
-| Frontend | Must accept `SET_PIXEL_FORMAT(HDR10_2101010)`. |
+| Frontend | Must accept `SET_PIXEL_FORMAT(HDR10_2101010)`, or `(SCRGB_RGBA16F)` for scRGB. |
 | Display | An HDR-capable screen, in HDR mode, with the frontend's HDR output enabled. |
 | Restart | **Color Format** takes effect on restart. The rest apply immediately. |
 
@@ -104,7 +113,7 @@ Either way it is logged, so a configuration that did not take is visible
 rather than mysterious:
 
 ```
-[Color Format] 30-bit HDR requested: engaged (paper white 200 nits, gamut 0, output mode 1).
+[Color Format] 30-bit HDR requested: engaged as HDR10 (paper white 200 nits, gamut 0, output mode 1).
 [HDR] Display peak: 1000 nits, black 0.000 nits, panel gamut unknown
 ```
 
@@ -353,7 +362,8 @@ plain scaled quad.
 
 ### Troubleshooting
 
-**Nothing changed.** Check the log for `[Color Format] 30-bit HDR requested`.
+**Nothing changed.** Check the log for `[Color Format] 30-bit HDR requested`
+(or `64-bit scRGB requested`, which also says which format was engaged).
 If it says *rejected by frontend*, the frontend is not presenting HDR10 —
 check its HDR output setting and that the display is in HDR mode. Did you
 restart after changing **Color Format**?
@@ -393,6 +403,13 @@ its own push constant rather than the header reaching into a fixed layout.
 
 The colour math deliberately matches RetroArch's own HDR composition, so an
 HDR frame lands at the same brightness and saturation as the SDR one.
+
+Nothing is copied after the encode, in either format. On Vulkan the stage
+that encodes - the display quad, or the analog resolve - renders straight into
+the scanout image (A2B10G10R10 for HDR10, RGBA16F for scRGB) that is handed to
+`set_image`. On OpenGL the output program, or the analog chain's resolve,
+draws straight into the frontend's framebuffer. scRGB versus HDR10 is a
+push-constant switch in the same shaders, so neither format adds a pipeline.
 
 ## Video CD (SCPH-5903)
 

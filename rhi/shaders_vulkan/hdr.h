@@ -37,6 +37,13 @@ highp vec3 pq_encode(highp vec3 nits)
 	return pow((PQ_C1 + PQ_C2 * ym) / (1.0 + PQ_C3 * ym), vec3(PQ_M2));
 }
 
+highp vec3 pq_decode(highp vec3 e)
+{
+	highp vec3 p = pow(clamp(e, vec3(0.0), vec3(1.0)), vec3(1.0 / PQ_M2));
+	return PQ_MAXNITS * pow(max(p - vec3(PQ_C1), vec3(0.0)) / (vec3(PQ_C2) - PQ_C3 * p),
+	                        vec3(1.0 / PQ_M1));
+}
+
 /* Inverse of sdr_to_linear. Needed wherever something has to be averaged as
  * light and then handed back to a signal-domain consumer. */
 highp vec3 linear_to_sdr(highp vec3 c, int sdr_eotf)
@@ -116,7 +123,7 @@ highp vec3 rec709_to_target(highp vec3 c, int expand_gamut)
 		0.0163916 * c.r + 0.0880132 * c.g + 0.8955950 * c.b);
 }
 
-/* Reference SDR transfer, applied to the whole signal (see encode_hdr10).
+/* Reference SDR transfer, applied to the whole signal (see encode_hdr_output).
  *   0  BT.1886 pure 2.4 - matches RetroArch's own SDR->HDR composition and a
  *      TV-like reference display. Historical behaviour, still the default.
  *   1  pure 2.2 - closer to a PC monitor tracking sRGB's nominal gamma.
@@ -162,7 +169,7 @@ highp float filmic_shoulder(highp float x)
 
 /* Source primaries for a signal-domain consumer: decode, rotate, re-encode.
  *
- * The HDR path gets this for free inside encode_hdr10, which is already
+ * The HDR path gets this for free inside encode_hdr_output, which is already
  * holding linear light. An SDR output has to round-trip for it, which is two
  * extra pow() per pixel - so the identity case returns immediately, and a
  * default configuration pays nothing.
@@ -240,14 +247,13 @@ highp vec3 pq_black_floor(highp vec3 e, highp float black_pq)
 	return e + black_pq * (t * t);
 }
 
-/* Entry point for callers that already hold linear light, so it is not decoded
- * and re-encoded on the way in. `scene_linear` is normalised with 1.0 at
- * reference white; values above that are the additive overshoot the roll-off
- * compresses. */
-highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_nits,
-                               highp float peak_nits, int expand_gamut, int shoulder,
-                               int src_primaries, highp float black_pq,
-                               highp mat3 to_panel)
+/* The grade both HDR outputs share: linear light in, absolute nits out, in
+ * the Rec.2020 container after the Colour Boost rotation and panel gamut
+ * compression. `scene_linear` is normalised with 1.0 at reference white;
+ * values above that are the additive overshoot the roll-off compresses. */
+highp vec3 hdr_grade_linear(highp vec3 scene_linear, highp float paper_white_nits,
+                            highp float peak_nits, int expand_gamut, int shoulder,
+                            int src_primaries, highp mat3 to_panel)
 {
 	/* STEP 3: one transfer function across the whole range, then compress
 	 * whatever lands above paper white.
@@ -315,17 +321,52 @@ highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_
 	}
 	lin = min(lin, vec3(paper_white_nits)) + over * knee;
 	lin = rec709_to_target(lin, expand_gamut);
-	lin = panel_gamut_compress(lin, to_panel);
-	return pq_black_floor(pq_encode(lin), black_pq);
+	return panel_gamut_compress(lin, to_panel);
 }
 
-highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, highp float peak_nits,
-                        int expand_gamut, int shoulder, int sdr_eotf, int src_primaries,
-                        highp float black_pq, highp mat3 to_panel)
+/* Rec.2020 -> Rec.709, the inverse of the Accurate rotation. */
+highp vec3 rec2020_to_709(highp vec3 c)
 {
-	return encode_hdr10_linear(sdr_to_linear(max(rgb, vec3(0.0)), sdr_eotf),
-	                           paper_white_nits, peak_nits, expand_gamut, shoulder,
-	                           src_primaries, black_pq, to_panel);
+	return vec3(
+		 1.6604903 * c.r + -0.5876391 * c.g + -0.0728516 * c.b,
+		-0.1245500 * c.r +  1.1328999 * c.g + -0.0083480 * c.b,
+		-0.0181511 * c.r + -0.1005787 * c.g +  1.1187299 * c.b);
+}
+
+/* HDR output from linear light, in the format the frontend accepted.
+ *
+ *   scrgb == 0  HDR10: PQ-encoded Rec.2020, with the black-floor toe in the
+ *               PQ domain.
+ *   scrgb != 0  RETRO_PIXEL_FORMAT_SCRGB_RGBA16F: linear Rec.709, 1.0 = 80
+ *               nits. The same graded light, so the two formats present the
+ *               same picture: the container rotation is undone exactly, colours
+ *               outside Rec.709 are negative rather than clipped, and the toe
+ *               is applied through a PQ round trip so it lands where the HDR10
+ *               path puts it. That round trip runs only when a black level is
+ *               known.
+ *
+ * scrgb comes from a push constant, so the branch is uniform. */
+highp vec3 encode_hdr_output_linear(highp vec3 scene_linear, highp float paper_white_nits,
+                                    highp float peak_nits, int expand_gamut, int shoulder,
+                                    int src_primaries, highp float black_pq,
+                                    highp mat3 to_panel, int scrgb)
+{
+	highp vec3 lin = hdr_grade_linear(scene_linear, paper_white_nits, peak_nits,
+	                                  expand_gamut, shoulder, src_primaries, to_panel);
+	if (scrgb == 0)
+		return pq_black_floor(pq_encode(lin), black_pq);
+	if (black_pq > 0.0)
+		lin = pq_decode(pq_black_floor(pq_encode(lin), black_pq));
+	return rec2020_to_709(lin) * (1.0 / 80.0);
+}
+
+highp vec3 encode_hdr_output(highp vec3 rgb, highp float paper_white_nits, highp float peak_nits,
+                             int expand_gamut, int shoulder, int sdr_eotf, int src_primaries,
+                             highp float black_pq, highp mat3 to_panel, int scrgb)
+{
+	return encode_hdr_output_linear(sdr_to_linear(max(rgb, vec3(0.0)), sdr_eotf),
+	                                paper_white_nits, peak_nits, expand_gamut, shoulder,
+	                                src_primaries, black_pq, to_panel, scrgb);
 }
 
 /* ---- Debanding dither -----------------------------------------------------

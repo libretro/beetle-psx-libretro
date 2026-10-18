@@ -61,7 +61,8 @@ extern bool gpu_fbwrite_fifo_delay;
  *
  * PSX_COLOR_FORMAT_24BIT is the historical path (8 bits per channel,
  * XRGB8888 for the truecolor renderers).  PSX_COLOR_FORMAT_30BIT_HDR
- * requests 10-bit-per-channel PQ-encoded Rec.2020 (HDR10) output.
+ * requests 10-bit-per-channel PQ-encoded Rec.2020 (HDR10) output, and
+ * PSX_COLOR_FORMAT_64BIT_SCRGB linear FP16 scRGB, falling back to HDR10.
  *
  * The user's *request* lives in psx_color_format; whether HDR is
  * actually engaged lives in psx_hdr_active, which is only ever true
@@ -72,11 +73,13 @@ extern bool gpu_fbwrite_fifo_delay;
 enum psx_color_format_e
 {
    PSX_COLOR_FORMAT_24BIT = 0,
-   PSX_COLOR_FORMAT_30BIT_HDR
+   PSX_COLOR_FORMAT_30BIT_HDR,
+   PSX_COLOR_FORMAT_64BIT_SCRGB
 };
 
 extern int   psx_color_format;         /* enum psx_color_format_e; core option */
-extern bool  psx_hdr_active;           /* true only when HDR10 is really engaged */
+extern bool  psx_hdr_active;           /* true only when HDR is really engaged   */
+extern int   psx_hdr_scrgb;            /* HDR is linear scRGB FP16, not HDR10     */
 extern float psx_hdr_paper_white_nits; /* frontend SDR white, default 200        */
 extern float psx_hdr_max_nits;         /* display peak, default 1000              */
 extern int   psx_hdr_expand_gamut;     /* frontend "Colour Boost" rotation        */

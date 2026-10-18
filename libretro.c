@@ -201,6 +201,7 @@ enum dither_mode psx_gpu_dither_mode;
  * 10-bit end to end. */
 int   psx_color_format         = PSX_COLOR_FORMAT_24BIT;
 bool  psx_hdr_active           = false;
+int   psx_hdr_scrgb            = 0;
 /* Peak the display can reach. The gap above paper white is the whole headroom
  * for highlights, so guessing it wrong either wastes range or clips. 1000 is
  * the fallback for a frontend that does not answer: it is the HDR10 reference
@@ -240,6 +241,7 @@ static void reset_hdr_output_state(void)
 {
    unsigned i;
    psx_hdr_active   = false;
+   psx_hdr_scrgb    = 0;
    psx_pgxp_color   = 0;
    psx_pgxp_fog     = 0;
    psx_hdr_black_pq = 0.0f;
@@ -5029,6 +5031,8 @@ static void check_variables(bool startup)
       {
          if (!strcmp(var.value, "30bit_hdr"))
             psx_color_format = PSX_COLOR_FORMAT_30BIT_HDR;
+         else if (!strcmp(var.value, "64bit_scrgb"))
+            psx_color_format = PSX_COLOR_FORMAT_64BIT_SCRGB;
       }
 
       /* HDR highlight roll-off curve (Vulkan HDR path only): 0 Reinhard,
@@ -6149,19 +6153,51 @@ static NO_INLINE void refresh_hdr_metadata(void)
 }
 
 /* Finalize the HDR decision once a hardware renderer is confirmed
- * (Vulkan or OpenGL - both carry the fp16 scaled framebuffer and the PQ
- * Rec.2020 display encode). HDR is engaged only when the user requested
- * 30-bit AND the frontend accepted the HDR10 pixel format. All env
- * queries are read-only and inert on frontends that don't recognise
- * them; rejection falls back to 24-bit. */
+ * (Vulkan or OpenGL - both carry the fp16 scaled framebuffer and the HDR
+ * display encode). HDR is engaged only when the user requested it AND the
+ * frontend accepted an HDR pixel format: SCRGB_RGBA16F first when that was
+ * requested, then HDR10_2101010. All env queries are read-only and inert on
+ * frontends that don't recognise them; rejection falls back to 24-bit. */
 static void negotiate_hdr_output(void)
 {
+   bool        regraded = false;
+   const char *asked;
+
    /* The frontend's paper-white / gamut / output-mode values are cached
     * for the renderer's output stage to encode against, so an HDR frame
     * matches the frontend's own SDR->HDR composition rather than
     * diverging in brightness or saturation. */
    reset_hdr_output_state();
-   if (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR)
+   if (     psx_color_format != PSX_COLOR_FORMAT_30BIT_HDR
+         && psx_color_format != PSX_COLOR_FORMAT_64BIT_SCRGB)
+      return;
+   asked = (psx_color_format == PSX_COLOR_FORMAT_64BIT_SCRGB)
+      ? "64-bit scRGB" : "30-bit HDR";
+
+   /* scRGB is offered only to a frontend that lists it in source_formats:
+    * one from before RETRO_PIXEL_FORMAT_SCRGB_RGBA16F existed cannot list it,
+    * and must not be handed a format number it may accept without
+    * understanding. The frontend converts it on the GPU for its own output
+    * and applies neither SDR expansion nor a paper-white scale, which is
+    * what the passthrough guard below establishes for HDR10, so acceptance
+    * alone engages it. Rejection falls through to HDR10. */
+   if (psx_color_format == PSX_COLOR_FORMAT_64BIT_SCRGB)
+   {
+      struct retro_display_metadata meta;
+      if (     query_hdr_metadata(&meta)
+            && (meta.hdr.source_formats & RETRO_HDR_SOURCE_FORMAT_SCRGB_RGBA16F))
+      {
+         enum retro_pixel_format scrgbfmt = RETRO_PIXEL_FORMAT_SCRGB_RGBA16F;
+         if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &scrgbfmt))
+         {
+            apply_hdr_metadata(&meta);
+            psx_hdr_scrgb  = 1;
+            psx_hdr_active = true;
+         }
+      }
+   }
+
+   if (!psx_hdr_active)
    {
       /* The confirmed contract (RetroArch gfx/video_driver.c: source_hdr10
        * is set from this pixel format; gfx/drivers/vulkan.c routes it to
@@ -6173,7 +6209,6 @@ static void negotiate_hdr_output(void)
        * an authoritative "HDR is on and will be presented". On rejection
        * we restore XRGB8888 and fall back to 24-bit. */
       enum retro_pixel_format hdrfmt = RETRO_PIXEL_FORMAT_HDR10_2101010;
-      bool regraded = false;
       if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &hdrfmt))
       {
          struct retro_display_metadata meta;
@@ -6218,26 +6253,29 @@ static void negotiate_hdr_output(void)
          enum retro_pixel_format sdrfmt = RETRO_PIXEL_FORMAT_XRGB8888;
          environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &sdrfmt);
       }
+   }
 
-      /* Precise colour and linear-light fog are derived from the accepted
-       * output mode, not the user's request. They feed primitive generation
-       * as well as both hardware renderers, so a rejected request must leave
-       * them off just like the standard 24-bit path. */
-      psx_pgxp_color = psx_hdr_active;
-      psx_pgxp_fog   = psx_hdr_active;
+   /* Precise colour and linear-light fog are derived from the accepted
+    * output mode, not the user's request. They feed primitive generation
+    * as well as both hardware renderers, so a rejected request must leave
+    * them off just like the standard 24-bit path. */
+   psx_pgxp_color = psx_hdr_active;
+   psx_pgxp_fog   = psx_hdr_active;
 
-      if (log_cb)
-      {
-         log_cb(RETRO_LOG_INFO,
-               "[Color Format] 30-bit HDR requested: %s (paper white %.0f nits, gamut %d, output mode %d).\n",
-               psx_hdr_active ? "engaged"
-               : regraded ? "frontend would re-grade HDR10 input - falling back to 24-bit"
-               : "rejected by frontend - falling back to 24-bit",
-               psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
-         log_cb(RETRO_LOG_INFO, "[HDR] Display peak: %.0f nits, black %.3f nits, panel gamut %s\n",
-               psx_hdr_max_nits, hdr_black_nits,
-               psx_hdr_to_panel[0] != 0.0f ? "mapped" : "unknown");
-      }
+   if (log_cb)
+   {
+      log_cb(RETRO_LOG_INFO,
+            "[Color Format] %s requested: %s (paper white %.0f nits, gamut %d, output mode %d).\n",
+            asked,
+            !psx_hdr_active ? (regraded
+               ? "frontend would re-grade HDR10 input - falling back to 24-bit"
+               : "rejected by frontend - falling back to 24-bit")
+            : psx_hdr_scrgb ? "engaged as scRGB FP16"
+            : "engaged as HDR10",
+            psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
+      log_cb(RETRO_LOG_INFO, "[HDR] Display peak: %.0f nits, black %.3f nits, panel gamut %s\n",
+            psx_hdr_max_nits, hdr_black_nits,
+            psx_hdr_to_panel[0] != 0.0f ? "mapped" : "unknown");
    }
 }
 

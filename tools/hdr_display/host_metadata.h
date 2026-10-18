@@ -10,6 +10,7 @@
  *   HOST_HDR_MAX          the frontend's peak target in nits (0 = unreported)
  *   HOST_HDR_PASSTHROUGH  0 to report that HDR10 input is re-graded
  *   HOST_HDR_NO_DISPLAY   answer GET_HDR_METADATA only
+ *   HOST_HDR_SCRGB        1 to also list SCRGB_RGBA16F in source_formats
  *
  * Unknown versions and undersized buffers are refused, as the API asks. */
 #ifndef HOST_HDR_METADATA_H
@@ -34,6 +35,8 @@ static void host_hdr_fill(struct retro_hdr_metadata *m)
    m->size              = sizeof(*m);
    m->output_mode       = 1;  /* PQ Rec.2020 */
    m->source_formats    = RETRO_HDR_SOURCE_FORMAT_HDR10_2101010;
+   if (getenv("HOST_HDR_SCRGB") && atoi(getenv("HOST_HDR_SCRGB")))
+      m->source_formats |= RETRO_HDR_SOURCE_FORMAT_SCRGB_RGBA16F;
    m->paper_white_nits  = 200.0f;
    m->max_nits          = host_hdr_env_float("HOST_HDR_MAX", 1000.0f);
    m->min_nits          = host_hdr_env_float("HOST_HDR_BLACK", 0.0f);

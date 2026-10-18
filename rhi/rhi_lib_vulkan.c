@@ -38,11 +38,13 @@
 #endif
 
 /* HDR output state, owned by libretro.c (see beetle_psx_globals.h). When
- * psx_hdr_active is set, the Vulkan renderer emits the display quad as
- * PQ-encoded Rec.2020 into a 10-bit (A2B10G10R10) scanout image, which the
- * frontend presents to an HDR10 swapchain (it was told via
- * SET_PIXEL_FORMAT(HDR10_2101010)). */
+ * psx_hdr_active is set, the Vulkan renderer emits the display quad in the
+ * format the frontend accepted: PQ-encoded Rec.2020 into a 10-bit
+ * (A2B10G10R10) scanout for SET_PIXEL_FORMAT(HDR10_2101010), or linear scRGB
+ * into an RGBA16F scanout for SET_PIXEL_FORMAT(SCRGB_RGBA16F). Either way the
+ * scanout is the image handed to set_image, with no copy after the encode. */
 extern bool  psx_hdr_active;
+extern int   psx_hdr_scrgb;      /* HDR output is linear scRGB FP16, not HDR10 */
 extern float psx_hdr_paper_white_nits;
 extern float psx_hdr_black_pq;
 extern float psx_hdr_to_panel[9];
@@ -7821,7 +7823,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
          int32_t expand_gamut;
          int32_t shoulder;
          float   black_pq;
-         float   pad0;
+         int32_t scrgb;
          float   to_panel[12];
       };
       struct HdrPush hpush;
@@ -7838,7 +7840,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
       hpush.sdr_eotf         = psx_hdr_sdr_eotf;
       hpush.src_primaries         = psx_src_primaries;
       hpush.black_pq         = psx_hdr_black_pq;
-      hpush.pad0             = 0.0f;
+      hpush.scrgb            = psx_hdr_scrgb;
       hdr_push_panel(hpush.to_panel);
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
    }
@@ -8337,7 +8339,7 @@ resolve:
       int32_t shoulder;
       int32_t src_primaries;
       float   black_pq;
-      float   pad0;
+      int32_t scrgb;
       float   to_panel[12];
    } push;
    enum { analog_res_push_layout = 1 / (sizeof(push) == 96) };
@@ -8355,7 +8357,7 @@ resolve:
    push.shoulder         = psx_hdr_shoulder;
    push.src_primaries    = psx_src_primaries;
    push.black_pq         = psx_hdr_black_pq;
-   push.pad0             = 0.0f;
+   push.scrgb            = psx_hdr_scrgb;
    hdr_push_panel(push.to_panel);
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_out),
@@ -8399,6 +8401,15 @@ static VkFormat renderer_hdr_scanout_format(Renderer *self)
 
    if (self->hdr_scanout_format != VK_FORMAT_UNDEFINED)
       return self->hdr_scanout_format;
+
+   /* scRGB is defined as RGBA16F, and the scanout is the image the frontend
+    * receives, so it is rendered in that format directly. Vulkan requires
+    * the format for sampling and colour attachment on every device. */
+   if (psx_hdr_scrgb)
+   {
+      self->hdr_scanout_format = VK_FORMAT_R16G16B16A16_SFLOAT;
+      return self->hdr_scanout_format;
+   }
 
    if (device_image_format_is_supported(self->device, VK_FORMAT_A2B10G10R10_UNORM_PACK32, need, VK_IMAGE_TILING_OPTIMAL))
       self->hdr_scanout_format = VK_FORMAT_A2B10G10R10_UNORM_PACK32;
@@ -8719,10 +8730,10 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
 
    if (hdr_quad && using_mipmap)
    {
-      /* The -DHDR mipmap_resolve reflects a 112-byte push: the 36-byte
+      /* The -DHDR mipmap_resolve reflects a 116-byte push: the 36-byte
        * resolve layout (offset, scale, uv_min, uv_max, max_bias), then the
        * SDR transfer, source primaries, paper white, peak, gamut, shoulder,
-       * panel black and the Rec.2020 -> panel matrix. */
+       * panel black, the Rec.2020 -> panel matrix and the output format. */
       struct HdrMipmapPush
       {
          float   offset[2];
@@ -8738,9 +8749,10 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          int32_t shoulder;
          float   black_pq;
          float   to_panel[12];
+         int32_t scrgb;
       };
       struct HdrMipmapPush mp;
-      enum { hdr_mipmap_push_layout = 1 / (sizeof(struct HdrMipmapPush) == 112) };
+      enum { hdr_mipmap_push_layout = 1 / (sizeof(struct HdrMipmapPush) == 116) };
       mp.offset[0]        = push.offset[0];
       mp.offset[1]        = push.offset[1];
       mp.scale[0]         = push.scale[0];
@@ -8758,14 +8770,15 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       mp.src_primaries         = psx_src_primaries;
       mp.black_pq         = psx_hdr_black_pq;
       hdr_push_panel(mp.to_panel);
+      mp.scrgb            = psx_hdr_scrgb;
       commandbuffer_push_constants(cbh_get(&self->cmd), &mp, 0, sizeof(mp));
    }
    else if (hdr_quad)
    {
       /* The -DHDR quad reflects a 96-byte push (offset, range, SDR transfer,
-       * source primaries, paper white, peak, gamut, shoulder, panel black
-       * and the Rec.2020 -> panel matrix); reuse offset/scale computed above
-       * and append the HDR params.
+       * source primaries, paper white, peak, gamut, shoulder, panel black,
+       * the output format and the Rec.2020 -> panel matrix); reuse
+       * offset/scale computed above and append the HDR params.
        * commandbuffer_push_constants copies into the shared buffer; the flush
        * pushes exactly the bound program's reflected range. */
       struct HdrPush
@@ -8779,7 +8792,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
          int32_t expand_gamut;
          int32_t shoulder;
          float   black_pq;
-         float   pad0;
+         int32_t scrgb;
          float   to_panel[12];
       };
       struct HdrPush hpush;
@@ -8796,7 +8809,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       hpush.sdr_eotf         = psx_hdr_sdr_eotf;
       hpush.src_primaries         = psx_src_primaries;
       hpush.black_pq         = psx_hdr_black_pq;
-      hpush.pad0             = 0.0f;
+      hpush.scrgb            = psx_hdr_scrgb;
       hdr_push_panel(hpush.to_panel);
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
    }
