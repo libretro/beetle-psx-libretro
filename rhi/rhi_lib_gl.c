@@ -3877,7 +3877,6 @@ struct gl_analog
    gl_texture  dec;       /* after demodulation */
    gl_texture  rgb;       /* after the trap (or its bypass): RGB, base rate */
    gl_texture  scanout;   /* the frame as the display path would have drawn it */
-   gl_texture  out;       /* resolved to display resolution */
 
    GLuint      fbo;       /* one reused FBO; the colour attachment is rebound */
 
@@ -4038,7 +4037,6 @@ static void gl_analog_free(struct gl_analog *a)
    if (a->dec.id)    { glDeleteTextures(1, &a->dec.id);    a->dec.id = 0; }
    if (a->rgb.id)    { glDeleteTextures(1, &a->rgb.id);    a->rgb.id = 0; }
    if (a->scanout.id){ glDeleteTextures(1, &a->scanout.id);a->scanout.id = 0; }
-   if (a->out.id)    { glDeleteTextures(1, &a->out.id);    a->out.id = 0; }
 
    a->built  = 0;
    a->failed = 0;
@@ -4151,9 +4149,10 @@ static bool gl_analog_build(struct gl_analog *a)
 /* (Re)allocate the intermediate targets for a given geometry. All are fp16:
  * the chain runs in the gamma domain but carries a modulated signal that
  * swings below black and above white, which 8-bit storage would clip. */
-/* The display-resolution pair: the extracted frame and the chain's output.
- * Split out because the extraction pass needs these before the dot clock -
- * and so the signal-rate targets - are known. */
+/* The display-resolution target: the extracted frame. Split out because the
+ * extraction pass needs it before the dot clock - and so the signal-rate
+ * targets - are known. The chain's output has no target of its own; the
+ * resolve draws straight into the frontend's framebuffer. */
 static bool gl_analog_resize_scanout(struct gl_analog *a,
       uint32_t out_w, uint32_t out_h)
 {
@@ -4161,14 +4160,12 @@ static bool gl_analog_resize_scanout(struct gl_analog *a,
       return false;
    if (a->out_w != out_w || a->out_h != out_h)
    {
-      if (a->out.id)     glDeleteTextures(1, &a->out.id);
       if (a->scanout.id) glDeleteTextures(1, &a->scanout.id);
-      gl_texture_init(&a->out, out_w, out_h, GL_RGBA16F);
       gl_texture_init(&a->scanout, out_w, out_h, GL_RGBA16F);
       a->out_w = out_w;
       a->out_h = out_h;
    }
-   return a->out.id != 0 && a->scanout.id != 0;
+   return a->scanout.id != 0;
 }
 
 static bool gl_analog_resize(struct gl_analog *a,
@@ -4225,14 +4222,10 @@ static unsigned gl_analog_divisor(unsigned width_mode)
 
 /* Which texture to present: the chain's output when every pass ran, otherwise
  * the extracted frame. Separated out so the call site reads as one decision. */
-static GLuint a_ok_texture(struct gl_analog *a, bool ok)
-{
-   return ok ? a->out.id : a->scanout.id;
-}
-
-/* Put the finished texture on the frontend's buffer. A framebuffer blit
- * rather than a textured quad: the sizes match exactly, there is nothing left
- * to sample or convert, and the resolve has already done the encode. */
+/* Fallback when a pass of the chain could not be set up: put the extracted
+ * frame on the frontend's buffer as it is. An unfiltered picture is a far
+ * better failure than a black one. A framebuffer blit rather than a textured
+ * quad, since the sizes match exactly. */
 static void gl_analog_blit(gl_renderer *renderer, struct gl_analog *a,
       GLuint tex, unsigned w, unsigned h, int dst_x, int dst_y)
 {
@@ -4335,17 +4328,23 @@ static void gl_analog_bind_source(gl_program *p, const char *name, GLuint tex)
    glUniform1i(gl_uniform_map_get(&p->uniforms, name), 0);
 }
 
-/* Run the chain over `src` (gamma-domain RGB at display resolution) and leave
- * the result in a->out. Returns false if anything could not be set up, in
- * which case the caller falls back to the ordinary display blit.
+static void bind_libretro_framebuffer(gl_renderer *renderer);
+
+/* Run the chain over `src` (gamma-domain RGB at display resolution). The
+ * resolve emits the final pixel straight into the frontend's framebuffer at
+ * (dst_x, dst_y), cleared first, so nothing is copied after the encode.
+ * Returns false if a pass could not be set up before that point, in which
+ * case the frontend's framebuffer is untouched and the caller falls back to
+ * blitting the extracted frame.
  *
  * Mirrors renderer_analog_apply in the Vulkan backend pass for pass; the
  * shaders are the same source translated, so the parameter derivation has to
  * match exactly or the two renderers disagree on phase. */
 static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
       GLuint src, unsigned native_w, unsigned native_h,
-      unsigned out_w, unsigned out_h)
+      unsigned out_w, unsigned out_h, int dst_x, int dst_y)
 {
+   GLint          frontend_vp[4];
    const unsigned div    = gl_analog_divisor((unsigned)renderer->curr_width_mode);
    const unsigned sig_w  = native_w * div;
    const unsigned sig_h  = native_h;
@@ -4551,11 +4550,17 @@ static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
    }
 
    /* ---- pass 5: resample to display, and encode ----
-    * The resolve is the stage that emits the final pixel, HDR included, so
-    * the display blit that follows is a plain copy. */
+    * The resolve is the stage that emits the final pixel, HDR included, and
+    * it draws it into the frontend's framebuffer. The clear covers what the
+    * display rect does not: the frame's own clear went to the extraction
+    * target, so without it the frontend buffer would keep last frame's
+    * leftovers. */
    p = a->programs[psx_hdr_active ? GL_ANALOG_RESOLVE_HDR : GL_ANALOG_RESOLVE];
-   if (!gl_analog_target(a, &a->out))
-      return false;
+   bind_libretro_framebuffer(renderer);
+   glGetIntegerv(GL_VIEWPORT, frontend_vp);
+   glClearColor(0.0, 0.0, 0.0, 0.0);
+   glClear(GL_COLOR_BUFFER_BIT);
+   glViewport((GLint)dst_x, (GLint)dst_y, (GLsizei)out_w, (GLsizei)out_h);
    glUseProgram(p->id);
    gl_analog_bind_source(p, "uDecoded", a->rgb.id);
    glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_sig_size"),
@@ -4574,6 +4579,9 @@ static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
          psx_hdr_to_panel);
    gl_analog_draw_quad(a);
 
+   /* Leave the frontend's framebuffer bound with the viewport
+    * bind_libretro_framebuffer set, as the rest of the frame expects. */
+   glViewport(frontend_vp[0], frontend_vp[1], frontend_vp[2], frontend_vp[3]);
    glBindVertexArray(0);
    return true;
 }
@@ -6423,7 +6431,8 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
    compute_vram_framebuffer_dimensions(renderer);
 
    /* Analog cable chain. When engaged the display draw is redirected into a
-    * texture, run through the chain, and blitted; the frame the chain wants
+    * texture and run through the chain, whose resolve draws the result into
+    * the frontend's buffer; the frame the chain wants
     * is exactly what the output program produces with the HDR encode off, so
     * the draw below is reused rather than duplicated.
     *
@@ -6549,22 +6558,18 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
     * better failure than a black one, and the cause is in the log. */
    if (analog)
    {
-      GLuint result = a_ok_texture(analog,
-            gl_analog_run(renderer, analog, analog->scanout.id,
+      if (!gl_analog_run(renderer, analog, analog->scanout.id,
                analog_native_w, analog_native_h,
-               analog_out_w, analog_out_h));
-
-      bind_libretro_framebuffer(renderer);
-
-      /* The clear above went to the extraction target, not here, and the blit
-       * only covers the display rect - so without this the frontend buffer
-       * keeps whatever was in it, which is the leftover-pixel case that clear
-       * exists to prevent. */
-      glClearColor(0.0, 0.0, 0.0, 0.0);
-      glClear(GL_COLOR_BUFFER_BIT);
-
-      gl_analog_blit(renderer, analog, result, analog_out_w, analog_out_h,
-            analog_dst_x, analog_dst_y);
+               analog_out_w, analog_out_h, analog_dst_x, analog_dst_y))
+      {
+         bind_libretro_framebuffer(renderer);
+         /* As in the resolve: the frame's clear went to the extraction
+          * target, and the blit covers only the display rect. */
+         glClearColor(0.0, 0.0, 0.0, 0.0);
+         glClear(GL_COLOR_BUFFER_BIT);
+         gl_analog_blit(renderer, analog, analog->scanout.id,
+               analog_out_w, analog_out_h, analog_dst_x, analog_dst_y);
+      }
 
       /* Advance the subcarrier phase by one field. Total lines including
        * blanking - the carrier does not stop during retrace - and interlaced
