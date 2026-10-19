@@ -11,6 +11,8 @@ set -x
 
 mkdir -p prebuilt
 
+"$GLSLC" -o prebuilt/reduce_cached_color.comp.inc -mfmt=c reduce_cached_color.comp
+
 # Primitives shaders
 "$GLSLC" -o prebuilt/flat.vert.inc -mfmt=c primitive.vert
 "$GLSLC" -o prebuilt/flat.unscaled.vert.inc -mfmt=c -DUNSCALED primitive.vert
@@ -51,8 +53,6 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/quad.vert.inc -mfmt=c quad.vert
 "$GLSLC" -o prebuilt/unscaled.quad.frag.inc -mfmt=c -DUNSCALED quad.frag
 "$GLSLC" -o prebuilt/scaled.quad.frag.inc -mfmt=c -DSCALED quad.frag
-"$GLSLC" -o prebuilt/unscaled.dither.quad.frag.inc -mfmt=c -DDITHER -DUNSCALED quad.frag
-"$GLSLC" -o prebuilt/scaled.dither.quad.frag.inc -mfmt=c -DDITHER -DSCALED quad.frag
 "$GLSLC" -o prebuilt/bpp24.quad.frag.inc -mfmt=c -DUNSCALED -DBPP24 quad.frag
 "$GLSLC" -o prebuilt/bpp24.yuv.quad.frag.inc -mfmt=c -DUNSCALED -DBPP24 -DBPP24_YUV quad.frag
 
@@ -104,7 +104,6 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/mipmap.vert.inc -mfmt=c mipmap.vert
 "$GLSLC" -o prebuilt/mipmap.shifted.vert.inc -mfmt=c -DSHIFT_QUAD mipmap.vert
 "$GLSLC" -o prebuilt/mipmap.resolve.frag.inc -mfmt=c mipmap_resolve.frag
-"$GLSLC" -o prebuilt/mipmap.dither.resolve.frag.inc -mfmt=c -DDITHER mipmap_resolve.frag
 "$GLSLC" -o prebuilt/hdr.mipmap.resolve.frag.inc -mfmt=c -DHDR mipmap_resolve.frag
 "$GLSLC" -o prebuilt/mipmap.energy.first.frag.inc -mfmt=c -DFIRST_PASS mipmap_energy.frag
 "$GLSLC" -o prebuilt/mipmap.energy.frag.inc -mfmt=c mipmap_energy.frag

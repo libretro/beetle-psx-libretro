@@ -292,6 +292,9 @@ bool rhi_intf_open(bool is_pal, bool force_software)
 {
    bool software_selected    = false;
    enum force_renderer_type force_type = AUTO;
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+   struct retro_variable var;
+#endif
    unsigned preferred        = 0; /* Will be set to RETRO_HW_CONTEXT_DUMMY if GET_PREFERRED_HW_RENDER is not supported by frontend */
    vk_initialized            = false;
    gl_initialized            = false;
@@ -299,8 +302,8 @@ bool rhi_intf_open(bool is_pal, bool force_software)
    tt_coh_reset();
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-   struct retro_variable var = {0};
    var.key                   = BEETLE_OPT(renderer);
+   var.value                 = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "software") || force_software)
@@ -797,7 +800,6 @@ void rhi_intf_push_triangle(
       uint32_t c1,
       uint32_t c2,
       const float *precise_rgb,
-      const float *fog,
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -835,7 +837,7 @@ void rhi_intf_push_triangle(
       case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rhi_gl_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
-               c0, c1, c2, precise_rgb, fog, t0x, t0y, t1x, t1y, t2x, t2y,
+               c0, c1, c2, precise_rgb, t0x, t0y, t1x, t1y, t2x, t2y,
                min_u, min_v, max_u, max_v,
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
@@ -847,7 +849,7 @@ void rhi_intf_push_triangle(
       case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
          rhi_vulkan_push_triangle(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w,
-               c0, c1, c2, precise_rgb, fog, t0x, t0y, t1x, t1y, t2x, t2y,
+               c0, c1, c2, precise_rgb, t0x, t0y, t1x, t1y, t2x, t2y,
                min_u, min_v, max_u, max_v,
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
@@ -866,7 +868,6 @@ void rhi_intf_push_quad(
    float p3x, float p3y, float p3w,
    uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
    const float *precise_rgb,
-      const float *fog,
    uint16_t t0x, uint16_t t0y,
    uint16_t t1x, uint16_t t1y,
    uint16_t t2x, uint16_t t2y,
@@ -882,7 +883,8 @@ void rhi_intf_push_quad(
    bool mask_test,
    bool set_mask,
    bool is_sprite,
-   bool may_be_2d)
+   bool may_be_2d,
+   uint32_t uv_offset)
 {
    /* Sprites are never dithered on hardware (the software renderer
     * uses the zero dither offset for them); resolve that once here so
@@ -913,20 +915,20 @@ void rhi_intf_push_quad(
       case RHI_OPENGL:
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
          rhi_gl_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
-               c0, c1, c2, c3, precise_rgb, fog,
+               c0, c1, c2, c3, precise_rgb,
                t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
                min_u, min_v, max_u, max_v,
                texpage_x, texpage_y, clut_x, clut_y,
                texture_blend_mode,
                depth_shift,
                quad_dither,
-               blend_mode, mask_test, set_mask);
+               blend_mode, mask_test, set_mask, uv_offset);
 #endif
          break;
       case RHI_VULKAN:
 #if defined(HAVE_VULKAN)
          rhi_vulkan_push_quad(p0x, p0y, p0w, p1x, p1y, p1w, p2x, p2y, p2w, p3x, p3y, p3w,
-               c0, c1, c2, c3, precise_rgb, fog,
+               c0, c1, c2, c3, precise_rgb,
                t0x, t0y, t1x, t1y, t2x, t2y, t3x, t3y,
                min_u, min_v, max_u, max_v,
                texpage_x, texpage_y, clut_x, clut_y,

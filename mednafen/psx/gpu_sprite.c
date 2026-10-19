@@ -431,7 +431,6 @@ DRAWSPRITE_T1_BMGROUP(1, 2, 1, 1)
                                * GTE lighting the precise path recovers
                                * lives in gouraud polygons. */ \
                               NULL, \
-                              NULL, /* no depth-cue sidecar either */ \
                               (u),         (v), \
                               (u) + (w),   (v), \
                               (u),         (v) + (h), \
@@ -449,7 +448,7 @@ DRAWSPRITE_T1_BMGROUP(1, 2, 1, 1)
                               (BM_VAL), \
                               (ME_LIT), \
                               (gpu)->MaskSetOR != 0, \
-                              true, true); \
+                              true, true, 0); \
       } \
    } while (0)
 #else

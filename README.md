@@ -16,6 +16,7 @@ Notable additions in this fork are:
 * Page-aligned HD texture dump/replacement, an opt-in mode for static/3D art (Vulkan renderer), see [PAGE_ALIGN.md](PAGE_ALIGN.md);
 * HD Reduce Palette Range, an opt-in hash of only a texture's used palette entries for better replacement match coverage (Vulkan renderer);
 * Video CD playback, including support for the 1 MB SCPH-5903 kernel, see [Video CD](#video-cd-scph-5903);
+* Shared Native, 16 bpp and 32 bpp color modes for OpenGL and Vulkan, see [Color modes](rhi/README.md#color-modes);
 * HDR output as HDR10 (PQ Rec.2020, 10-bit) or scRGB (linear FP16), with highlight roll-off, gamut and reference-gamma controls, see [HDR output](#hdr-output);
 
 ## HD texture replacement caching

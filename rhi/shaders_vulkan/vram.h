@@ -6,13 +6,18 @@
  * RelaxedPrecision with 16-bit integers (Adreno, Mali) folds that to -1
  * and clamp_coord() collapses every texel to base - 1. vUV in fp16 loses
  * the sub-texel fraction above u = 128, which mis-selects texels under
- * upscaling. vParam, vBaseUV and vWindow stay within int16 range. */
+ * upscaling. vBaseUV and vWindow stay within signed int16 range. */
 layout(location = 1) in highp vec2 vUV;
+layout(location = 10) flat in highp uvec2 vUVOrigin;
+layout(location = 11) flat in highp uvec2 vUVDX;
+layout(location = 12) flat in highp uvec2 vUVDY;
 layout(location = 3) flat in mediump ivec2 vBaseUV;
 layout(location = 4) flat in mediump ivec4 vWindow;
 layout(location = 5) flat in highp ivec4 vTexLimits;
 #if defined(UNSCALED)
-layout(set = 0, binding = 0) uniform mediump usampler2D uFramebuffer;
+/* Packed VRAM includes RGB5 and extra colour precision in a 32-bit word.
+ * Fetch the complete word before decoding either part. */
+layout(set = 0, binding = 0) uniform highp usampler2D uFramebuffer;
 #else
 /* MSAA feedback can read a resolved snapshot while writing per sample. */
 #if defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
@@ -28,6 +33,23 @@ layout(set = 0, binding = 5) uniform highp usampler2D uPalette;
 vec2 clamp_coord(vec2 coord)
 {
 	return clamp(coord.xy, vec2(vTexLimits.xy), vec2(vTexLimits.zw));
+}
+
+/* Native nearest polygons use the same wrapped byte UVs as DrawTriangle.
+ * Apply texture-window bits in sample_vram_atlas, after byte extraction.
+ * Vertex limits are enhancement clamps, not part of this integer path. */
+vec2 native_texture_coord()
+{
+	if (SCALE != 1 || (uint(vParam.z) & 0x0008u) == 0u)
+		return clamp_coord(vUV);
+	uvec2 coord = uvec2(gl_FragCoord.xy);
+	uvec2 uv = vUVOrigin + coord.x * vUVDX + coord.y * vUVDY;
+	return vec2((uv >> 12u) & 255u);
+}
+
+vec4 decode_vram_color(uint value)
+{
+    return abgr1555_color(value, PRIMITIVE_COLOR_MODE == 2);
 }
 
 // Nearest neighbor
@@ -67,7 +89,7 @@ vec4 sample_vram_atlas(vec2 uvv)
         /* 0x1000: the row was overwritten after the palette was latched;
          * the entries the GPU still holds live in uPalette. */
         if ((params.z & 0x1000) != 0)
-            return abgr1555(texelFetch(uPalette, ivec2(value, 0), 0).x);
+            return decode_vram_color(texelFetch(uPalette, ivec2(value, 0), 0).x);
 
         params.x += value;
         coord = params.xy;
@@ -80,7 +102,7 @@ vec4 sample_vram_atlas(vec2 uvv)
 #endif
 
 #if defined(UNSCALED)
-    return abgr1555(texelFetch(uFramebuffer, coord & FB_MASK, 0).x);
+    return decode_vram_color(texelFetch(uFramebuffer, coord & FB_MASK, 0).x);
 #elif defined(MSAA) && !defined(SINGLE_SAMPLE_TEXTURE)
     return texelFetch(uFramebufferMS, ivec2(mod(coord, FB_SIZE) * SCALE), gl_SampleID);
 #else
