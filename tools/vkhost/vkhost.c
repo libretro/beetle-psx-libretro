@@ -13,6 +13,10 @@
  *
  * Usage: vkhost <core.so> <content> [savestate] [frames] [outdir]
  *   VKHOST_VARS: semicolon list of key=value core option overrides.
+ *   VKHOST_NEGOTIATION=1: a frontend that predates Vulkan negotiation v2
+ *   (no support query, only a version 1 interface accepted). By default
+ *   the host offers v2, as RetroArch does, and requires the core to create
+ *   its device through create_device2's wrapper.
  *   VKHOST_QUEUE_THREAD: run a second thread on the frontend's queue, the
  *   way a threaded frontend does (see "the frontend's queue" below).
  *   HOST_HDR_*: the display presented through GET_HDR_METADATA and
@@ -128,6 +132,10 @@ static pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t queue_owner;
 static int queue_held;                 /* read and written with __atomic */
 static int queue_violations;
+/* the negotiation version offered, and create_device2 wrapper calls */
+static unsigned negotiation_offer = 2;
+static unsigned wrapper_calls;
+static VkPhysicalDevice wrapper_gpu;
 static int queue_waits_locked;
 static PFN_vkWaitForFences real_wait_for_fences;
 static PFN_vkGetDeviceProcAddr real_gdpa;
@@ -214,6 +222,38 @@ static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL core_gdpa(VkDevice device, const
 {
    return core_queue_entry(name, real_gdpa(device, name));
 }
+/* create_device2's wrapper: adds an extension of the frontend's own where
+ * the GPU has it, as RetroArch adds its low-latency ones, and creates the
+ * device. */
+static VkDevice create_device_wrapper(VkPhysicalDevice pgpu, void *opaque, const VkDeviceCreateInfo *info)
+{
+   VkDeviceCreateInfo local = *info;
+   const char *exts[256];
+   VkExtensionProperties props[512];
+   uint32_t i, j, n = 512, count = info->enabledExtensionCount;
+   VkDevice device = VK_NULL_HANDLE;
+   (void)opaque;
+   wrapper_calls++;
+   wrapper_gpu = pgpu;
+   if (count > 255)
+      return VK_NULL_HANDLE;
+   if (count)
+      memcpy(exts, info->ppEnabledExtensionNames, count * sizeof(*exts));
+   if (vkEnumerateDeviceExtensionProperties(pgpu, NULL, &n, props) >= 0)
+      for (i = 0; i < n; i++)
+         if (!strcmp(props[i].extensionName, "VK_KHR_present_id"))
+         {
+            for (j = 0; j < count && strcmp(exts[j], "VK_KHR_present_id"); j++) ;
+            if (j == count)
+               exts[count++] = "VK_KHR_present_id";
+         }
+   local.enabledExtensionCount   = count;
+   local.ppEnabledExtensionNames = exts;
+   if (vkCreateDevice(pgpu, &local, NULL, &device) != VK_SUCCESS)
+      return VK_NULL_HANDLE;
+   return device;
+}
+
 static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL core_gipa(VkInstance inst, const char *name)
 {
    PFN_vkVoidFunction real = vkGetInstanceProcAddr(inst, name);
@@ -310,7 +350,22 @@ static bool env_cb(unsigned cmd, void *data)
       }
       case RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE:
          negotiation = (const struct retro_hw_render_context_negotiation_interface_vulkan *)data;
+         /* a frontend that predates v2 drops any other version */
+         if (negotiation_offer < 2 && negotiation->interface_version != 1)
+         {
+            fprintf(stderr, "[vkhost] interface version %u dropped\n", negotiation->interface_version);
+            negotiation = NULL;
+         }
          return true;
+      case RETRO_ENVIRONMENT_GET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_SUPPORT:
+      {
+         struct retro_hw_render_context_negotiation_interface *n =
+            (struct retro_hw_render_context_negotiation_interface *)data;
+         if (negotiation_offer < 2)
+            return false;
+         n->interface_version = n->interface_type == RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN ? 2 : 0;
+         return true;
+      }
       case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE:
          *(const struct retro_hw_render_interface_vulkan **)data = &iface;
          return true;
@@ -591,6 +646,8 @@ int main(int argc, char **argv)
    int frames = 120;
    const char *outdir = "/tmp/vkhost_out";
    const char *next_content = getenv("VKHOST_NEXT_CONTENT");
+   if (getenv("VKHOST_NEGOTIATION"))
+      negotiation_offer = (unsigned)atoi(getenv("VKHOST_NEGOTIATION"));
    char next_outdir[600];
    char cmdbuf[1024];
 
@@ -673,7 +730,19 @@ session:
    gipa = vkGetInstanceProcAddr;
 
    memset(&vkctx, 0, sizeof(vkctx));
-   if (negotiation && negotiation->create_device)
+   if (negotiation_offer >= 2)
+   {
+      /* RetroArch: create_device2 when the core has it */
+      if (!negotiation || negotiation->interface_version < 2 || !negotiation->create_device2)
+      { fprintf(stderr, "[vkhost] the core did not offer create_device2\n"); return 3; }
+      wrapper_calls = 0;
+      if (!negotiation->create_device2(&vkctx, instance, gpu, VK_NULL_HANDLE,
+               core_gipa, create_device_wrapper, NULL))
+      { fprintf(stderr, "[vkhost] core create_device2 failed\n"); return 3; }
+      if (wrapper_calls != 1 || wrapper_gpu != gpu || vkctx.gpu != gpu)
+      { fprintf(stderr, "[vkhost] the core did not create its device through the frontend (%u)\n", wrapper_calls); return 3; }
+   }
+   else if (negotiation && negotiation->create_device)
    {
       static const VkPhysicalDeviceFeatures no_features; /* zeroed, as RetroArch passes */
       if (!negotiation->create_device(&vkctx, instance, gpu, VK_NULL_HANDLE,

@@ -27,4 +27,7 @@ code = bytearray(0x800)
 code[0:8] = struct.pack('<II', 0x08004000, 0)   # j 0x80010000 ; nop
 open(sys.argv[1], 'wb').write(bytes(hdr) + bytes(code))
 PY
+# Negotiation v2 (the device made through the frontend's wrapper, as
+# RetroArch does), then a frontend that predates v2.
 VKHOST_QUEUE_THREAD=1 "$here/vkhost" "$core" "$work/loop.exe" - "$frames" "$work/out"
+VKHOST_NEGOTIATION=1 VKHOST_QUEUE_THREAD=1 "$here/vkhost" "$core" "$work/loop.exe" - "$frames" "$work/out1"

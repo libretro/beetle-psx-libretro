@@ -1577,6 +1577,12 @@ static IntrusivePODWrapperPipeline *vk_pipeline_map_emplace_yield(
          unsigned num_required_device_layers, const VkPhysicalDeviceFeatures *required_features);
    static void context_destroy(struct Context *self);
 
+/* Negotiation v2: the frontend's vkCreateDevice, which adds what it needs
+ * (e.g. its low-latency extensions). Set only while create_device2 runs. */
+static VkDevice (*context_device_wrapper)(VkPhysicalDevice gpu, void *opaque,
+      const VkDeviceCreateInfo *create_info);
+static void *context_device_wrapper_opaque;
+
 static VkInstance context_get_instance(const struct Context *self) { return self->instance; }
 static VkPhysicalDevice context_get_gpu(const struct Context *self) { return self->gpu; }
 static VkDevice context_get_device(const struct Context *self) { return self->device; }
@@ -16351,7 +16357,15 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       free(queried_layers);
       free(queue_props);
 
-      dev_res = vkCreateDevice(gpu, &device_info, NULL, &self->device);
+      if (context_device_wrapper)
+      {
+         self->device = context_device_wrapper(gpu,
+               context_device_wrapper_opaque, &device_info);
+         dev_res = self->device != VK_NULL_HANDLE
+            ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED;
+      }
+      else
+         dev_res = vkCreateDevice(gpu, &device_info, NULL, &self->device);
       free(enabled_extensions);
       free(enabled_layers);
       if (dev_res != VK_SUCCESS)
@@ -20427,7 +20441,7 @@ static void vk_context_destroy(void)
    rhi_defer_clear(&defer);
 }
 
-static bool libretro_create_device(
+static bool create_device_common(
       struct retro_vulkan_context *libretro_context,
       VkInstance instance,
       VkPhysicalDevice gpu,
@@ -20476,6 +20490,45 @@ static bool libretro_create_device(
    return true;
 }
 
+static bool libretro_create_device(
+      struct retro_vulkan_context *libretro_context,
+      VkInstance instance,
+      VkPhysicalDevice gpu,
+      VkSurfaceKHR surface,
+      PFN_vkGetInstanceProcAddr get_instance_proc_addr,
+      const char **required_device_extensions,
+      unsigned num_required_device_extensions,
+      const char **required_device_layers,
+      unsigned num_required_device_layers,
+      const VkPhysicalDeviceFeatures *required_features)
+{
+   return create_device_common(libretro_context, instance, gpu, surface,
+         get_instance_proc_addr, required_device_extensions,
+         num_required_device_extensions, required_device_layers,
+         num_required_device_layers, required_features);
+}
+
+/* The same device, made through the frontend's wrapper, which brings its
+ * own extensions and features. */
+static bool libretro_create_device2(
+      struct retro_vulkan_context *libretro_context,
+      VkInstance instance,
+      VkPhysicalDevice gpu,
+      VkSurfaceKHR surface,
+      PFN_vkGetInstanceProcAddr get_instance_proc_addr,
+      retro_vulkan_create_device_wrapper_t create_device_wrapper,
+      void *opaque)
+{
+   bool ret;
+   context_device_wrapper        = create_device_wrapper;
+   context_device_wrapper_opaque = opaque;
+   ret = create_device_common(libretro_context, instance, gpu, surface,
+         get_instance_proc_addr, NULL, 0, NULL, 0, NULL);
+   context_device_wrapper        = NULL;
+   context_device_wrapper_opaque = NULL;
+   return ret;
+}
+
 bool rhi_vulkan_open(bool is_pal)
 {
    libretro_log   = log_cb;
@@ -20494,16 +20547,34 @@ bool rhi_vulkan_open(bool is_pal)
    if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
       return false;
 
-   { static const struct retro_hw_render_context_negotiation_interface_vulkan iface = {
+   /* v2 where the frontend has it, so it makes the device and can add
+    * what it needs; a frontend that predates v2 rejects a v2 interface. */
+   { static const struct retro_hw_render_context_negotiation_interface_vulkan iface_v1 = {
       RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN,
-      RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN_VERSION,
+      1,
 
       get_application_info,
       libretro_create_device,
       NULL,
    };
+   static const struct retro_hw_render_context_negotiation_interface_vulkan iface_v2 = {
+      RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN,
+      2,
 
-   environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE, (void*)&iface);
+      get_application_info,
+      libretro_create_device,
+      NULL,
+      NULL,
+      libretro_create_device2,
+   };
+   struct retro_hw_render_context_negotiation_interface support;
+   support.interface_type    = RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN;
+   support.interface_version = 0;
+   if (!environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_SUPPORT, &support))
+      support.interface_version = 0;
+
+   environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE,
+         (void*)(support.interface_version >= 2 ? &iface_v2 : &iface_v1));
 
    return true;
    }
