@@ -1032,6 +1032,8 @@ struct gl_renderer {
    /* SDR byte storage uses full-range colors in 32 bpp and q*8 in enhanced
     * 16 bpp. Ordinary nearest 16-bpp drawing keeps fast RGB5 storage. */
    bool byte_color_storage;
+   /* The last framebuffer rebuild failed; the old target stays in use. */
+   bool fb_rebuild_failed;
    gl_texture blend_texture;
    /* fb_out is GL_RGBA16F: 30-bit/HDR color format requested and fp16 is
     * color-renderable. Drives the explicit source clamp, the subtractive
@@ -3665,22 +3667,31 @@ static uint32_t gl_native_mirror_conversion(const gl_renderer *renderer)
          renderer->fb_out_internal_format == GL_RGBA16F ? 3u : 0u;
 }
 
+/* Menu value of Replace Textures, read once per option refresh. The HD
+ * hotkey only flips the tracker's session latch, which is resolved per call. */
+static bool gl_replace_textures_menu = false;
+
+static void gl_read_replace_textures_menu(void)
+{
+   struct retro_variable var;
+   var.key   = BEETLE_OPT(replace_textures);
+   var.value = NULL;
+   gl_replace_textures_menu =
+         environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value &&
+         !strcmp(var.value, "enabled");
+}
+
 /* Storage selection is derived from the selected mode and enabled source
  * enhancements, never from the display's output format. No per-pixel color
  * provenance is retained. Ordinary writes over an enhanced destination still
  * reduce their source and blended result to RGB5. */
 static bool gl_use_byte_color_storage(uint8_t filter)
 {
-   struct retro_variable var = {0};
-   bool hd = false;
-   var.key = BEETLE_OPT(replace_textures);
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      hd = !strcmp(var.value, "enabled");
    return !psx_hdr_active &&
          (psx_internal_color_mode == PSX_INTERNAL_COLOR_32BPP ||
           (psx_internal_color_mode == PSX_INTERNAL_COLOR_16BPP &&
            (filter != FILTER_MODE_NEAREST ||
-            texture_tracker_hd_textures_enabled(hd))));
+            texture_tracker_hd_textures_enabled(gl_replace_textures_menu))));
 }
 
 static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
@@ -3911,6 +3922,7 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
       goto texture_failed;
 
    renderer->fb_out_fp16 = psx_hdr_active && gl_fp16_renderable();
+   gl_read_replace_textures_menu();
    renderer->byte_color_storage = gl_use_byte_color_storage(filter);
 
    if (dither_mode == DITHER_OFF || psx_hdr_active)
@@ -5373,6 +5385,7 @@ static bool retro_refresh_variables(gl_renderer *renderer)
       }
    }
 
+   gl_read_replace_textures_menu();
    byte_color_storage = gl_use_byte_color_storage(filter);
    rebuild_fb_out =
       upscaling != renderer->internal_upscaling ||
@@ -5396,11 +5409,13 @@ static bool retro_refresh_variables(gl_renderer *renderer)
       bool keep_depth = renderer->fb_out_depth.width == w &&
             renderer->fb_out_depth.height == h;
 
-      if (!rhi_gl_read_vram(0, 0, VRAM_WIDTH_PIXELS, VRAM_HEIGHT,
-               GPU_get_vram()))
+      /* With the software framebuffer the CPU copy is authoritative and is
+       * re-uploaded below; otherwise pull the GPU's VRAM back first. */
+      if (!has_software_fb && !rhi_intf_read_vram(0, 0, VRAM_WIDTH_PIXELS,
+               VRAM_HEIGHT, GPU_get_vram()))
       {
          log_cb(RETRO_LOG_WARN, "Color mode change deferred: VRAM readback failed\n");
-         return false;
+         goto framebuffer_kept;
       }
 
       switch (depth)
@@ -5438,7 +5453,6 @@ static bool retro_refresh_variables(gl_renderer *renderer)
       renderer->fb_out = new_out;
       renderer->fb_out_internal_format = texture_storage;
       renderer->byte_color_storage = byte_color_storage;
-      renderer->color_mode = psx_internal_color_mode;
       glDeleteTextures(1, &renderer->blend_texture.id);
       renderer->blend_texture = new_blend;
       if (!keep_depth)
@@ -5471,10 +5485,26 @@ framebuffer_failed:
       glDeleteTextures(1, &new_depth.id);
       glBindTexture(GL_TEXTURE_2D, renderer->fb_texture.id);
       log_cb(RETRO_LOG_WARN, "Color mode change deferred: framebuffer allocation failed\n");
-      return false;
+
+framebuffer_kept:
+      /* Keep drawing to the working target with its own settings; the
+       * remaining options still apply. The next option refresh retries. */
+      renderer->fb_rebuild_failed = true;
+      upscaling = renderer->internal_upscaling;
+      depth     = renderer->internal_color_depth;
+      goto framebuffer_done;
 
 framebuffer_ready:
+      renderer->fb_rebuild_failed = false;
+      renderer->color_mode = psx_internal_color_mode;
+
+framebuffer_done:
       ;
+   }
+   else
+   {
+      renderer->fb_rebuild_failed = false;
+      renderer->color_mode = psx_internal_color_mode;
    }
 
    if (dither_mode == DITHER_OFF || psx_hdr_active)
@@ -5639,7 +5669,6 @@ framebuffer_ready:
    renderer->internal_upscaling     = upscaling;
    renderer->display_vram           = display_vram;
    renderer->internal_color_depth   = depth;
-   renderer->color_mode = psx_internal_color_mode;
    renderer->filter_type            = filter;
    renderer->crop_overscan          = crop_overscan;
    renderer->image_offset_cycles    = image_offset_cycles;
@@ -6811,9 +6840,10 @@ void rhi_gl_prepare_frame(void)
    gl_normalize_inherited_state();
 
    /* The HD hotkey does not send a core-option update. Change storage at
-    * the next frame boundary through the existing VRAM-preserving refresh.
-    * A failed allocation retains the working target and retries next frame. */
-   if (!psx_hdr_active && renderer->color_mode == PSX_INTERNAL_COLOR_16BPP &&
+    * the next frame boundary through the VRAM-preserving refresh. A failed
+    * rebuild keeps the working target until the next option refresh. */
+   if (!psx_hdr_active && !renderer->fb_rebuild_failed &&
+       renderer->color_mode == PSX_INTERNAL_COLOR_16BPP &&
        renderer->filter_type == FILTER_MODE_NEAREST &&
        gl_use_byte_color_storage(renderer->filter_type) !=
              renderer->byte_color_storage)
