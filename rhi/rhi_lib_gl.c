@@ -2915,8 +2915,7 @@ static void gl_primitive_draw_rect(const gl_renderer *renderer,
 }
 
 static void gl_vram_sync_primitive(gl_renderer *renderer,
-      gl_command_vertex *v, unsigned vertices,
-      uint16_t uv_offset_u, uint16_t uv_offset_v)
+      gl_command_vertex *v, unsigned vertices, uint32_t uv_offset)
 {
    GLint rect[4];
    unsigned i;
@@ -2947,8 +2946,8 @@ static void gl_vram_sync_primitive(gl_renderer *renderer,
          native_uv |= (v[i].native_flags & 2) != 0;
       for (i = 0; native_uv && i < vertices; i++)
       {
-         uint16_t u = v[i].texture_coord[0] - uv_offset_u;
-         uint16_t t = v[i].texture_coord[1] - uv_offset_v;
+         uint16_t u = v[i].texture_coord[0] - (uint16_t)uv_offset;
+         uint16_t t = v[i].texture_coord[1] - (uint16_t)(uv_offset >> 16);
          if (u < min_u) min_u = u;
          if (t < min_v) min_v = t;
          if (u > max_u) max_u = u;
@@ -5897,7 +5896,7 @@ static bool gl_native_shading(const gl_renderer *renderer, HdTextureHandle hd)
  * a flush, reset or savestate restore. Flat colours need no plane. */
 static void gl_build_native_triangle_interpolants(gl_renderer *renderer,
       gl_command_vertex *v, const uint32_t *colors, HdTextureHandle hd,
-      uint16_t uv_offset_u, uint16_t uv_offset_v)
+      uint32_t uv_offset)
 {
    int32_t x[3], y[3];
    int64_t denom;
@@ -5922,7 +5921,7 @@ static void gl_build_native_triangle_interpolants(gl_renderer *renderer,
             /* The decoder biases flipped quads for floating interpolation.
              * Native 8.12 planes must start from the original command UVs. */
             value[i] = (int32_t)v[i].texture_coord[c] -
-                  (c == 0 ? uv_offset_u : uv_offset_v);
+                  (int32_t)(uint16_t)(uv_offset >> (c * 16));
          rhi_triangle_interpolant(planes + c * 2,
                x, y, value, denom, anchor);
       }
@@ -5981,8 +5980,8 @@ static void push_primitive(
       HdTextureHandle hd = gl_tt_query_hd(renderer, v);
       if (colors && count == 3)
       {
-         gl_build_native_triangle_interpolants(renderer, v, colors, hd, 0, 0);
-         gl_vram_sync_primitive(renderer, v, count, 0, 0);
+         gl_build_native_triangle_interpolants(renderer, v, colors, hd, 0);
+         gl_vram_sync_primitive(renderer, v, count, 0);
       }
       vertex_preprocessing(renderer, v, count, mode, stm, mask_test, set_mask, hd);
    }
@@ -7558,7 +7557,7 @@ void rhi_gl_push_quad(
       bool dither,
       int blend_mode,
       bool mask_test, bool set_mask,
-      uint16_t uv_offset_u, uint16_t uv_offset_v)
+      uint32_t uv_offset)
 {
    gl_renderer *renderer;
    gl_semi_transparency_mode semi_transparency_mode = SEMI_TRANSPARENCY_MODE_ADD;
@@ -7681,10 +7680,10 @@ void rhi_gl_push_quad(
          /* Indices 0,1,2 and 1,2,3 have distinct last vertices. Pack
           * each triangle's flat plane there without expanding the quad. */
          gl_build_native_triangle_interpolants(renderer, v + 1, colors + 1, hd,
-               uv_offset_u, uv_offset_v);
+               uv_offset);
          gl_build_native_triangle_interpolants(renderer, v, colors, hd,
-               uv_offset_u, uv_offset_v);
-         gl_vram_sync_primitive(renderer, v, 4, uv_offset_u, uv_offset_v);
+               uv_offset);
+         gl_vram_sync_primitive(renderer, v, 4, uv_offset);
          vertex_preprocessing(renderer, v, 4,
                GL_TRIANGLES, semi_transparency_mode, mask_test, set_mask, hd);
       }
@@ -7903,7 +7902,7 @@ void rhi_gl_push_line(
                quad[i].native_flags |= 4;
                memcpy(quad[i].native_uv, coverage, sizeof(coverage));
             }
-            gl_vram_sync_primitive(renderer, quad, 4, 0, 0);
+            gl_vram_sync_primitive(renderer, quad, 4, 0);
             triangles[0] = quad[0];
             triangles[1] = quad[1];
             triangles[2] = quad[2];
@@ -7924,7 +7923,7 @@ void rhi_gl_push_line(
          gl_command_vertex triangles[6];
 
          gl_build_line_quad(quad, v);
-         gl_vram_sync_primitive(renderer, quad, 4, 0, 0);
+         gl_vram_sync_primitive(renderer, quad, 4, 0);
          triangles[0] = quad[0];
          triangles[1] = quad[1];
          triangles[2] = quad[2];
@@ -7937,7 +7936,7 @@ void rhi_gl_push_line(
       else
       {
          uint32_t colors[2] = {c0, c1};
-         gl_vram_sync_primitive(renderer, v, 2, 0, 0);
+         gl_vram_sync_primitive(renderer, v, 2, 0);
          push_primitive(renderer, v, 2, colors,
                GL_LINES, semi_transparency_mode, mask_test, set_mask);
       }

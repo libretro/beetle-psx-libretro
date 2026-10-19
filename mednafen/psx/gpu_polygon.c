@@ -1735,7 +1735,8 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                   (ME_LIT), \
                   gpu->MaskSetOR != 0, \
                   false, \
-                  gpu->may_be_2d, gpu->off_u, gpu->off_v); \
+                  gpu->may_be_2d, \
+                  (uint32_t)gpu->off_u | ((uint32_t)gpu->off_v << 16)); \
             } \
          } \
          else \
