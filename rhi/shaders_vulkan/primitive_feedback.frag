@@ -33,7 +33,7 @@ void main()
 	vec3 shaded = source.rgb;
 	vec3 blend_source = shaded;
 #ifdef TEXTURED
-	/* Match the existing HDR feedback contract: opaque texels use the
+	/* HDR feedback contract: opaque texels use the
 	 * saturated source, while additive/subtractive blends may use a hot
 	 * source. Keep both for fractional replacement-texture alpha too. */
 	if (FRAMEBUFFER_FLOAT16 != 0)

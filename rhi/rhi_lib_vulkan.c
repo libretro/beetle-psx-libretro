@@ -5668,8 +5668,8 @@ static void renderer_set_interpolant_attribs(CommandBuffer *cmd)
       /* Frame-latched drawing policy. Dither spacing and RGB5 storage are
        * independent of each primitive's GP0 DTD bit. */
       enum dither_mode dither_mode;
-      bool native_color;
       enum psx_internal_color_mode_e color_mode;
+      bool native_color;
       /* Resolves and expanded enhanced color must not observe deferred
        * saturation residues from fixed-function RGB5 Add/Sub. */
       bool canonical_color;
@@ -9594,10 +9594,11 @@ static void renderer_build_line_quad(Renderer *self,
 
 /* Coverage is independent of native RGB5 storage. Only integral, single-
  * sample 1x geometry can use the PS1 grid; enhancements retain the quads. */
-static bool renderer_build_native_line_coverage(Renderer *self,
-      const Vertex *vertices, uint32_t *coverage)
+/* Integral draw-offset-adjusted endpoints of a native line: 1x,
+ * single-sample, non-PGXP geometry only. */
+static bool renderer_native_line_endpoints(const Renderer *self,
+      const Vertex *vertices, int32_t *x, int32_t *y)
 {
-   int32_t x[2], y[2];
    unsigned i;
    if (self->scaling != 1 || self->msaa != 1 || psx_pgxp_mode != 0)
       return false;
@@ -9614,6 +9615,15 @@ static bool renderer_build_native_line_coverage(Renderer *self,
       if ((float)x[i] != px || (float)y[i] != py)
          return false;
    }
+   return true;
+}
+
+static bool renderer_build_native_line_coverage(Renderer *self,
+      const Vertex *vertices, uint32_t *coverage)
+{
+   int32_t x[2], y[2];
+   if (!renderer_native_line_endpoints(self, vertices, x, y))
+      return false;
    rhi_pack_line_coverage(coverage, x, y);
    return true;
 }
@@ -9673,23 +9683,10 @@ static void renderer_build_native_line_colors(Renderer *self,
    uint32_t planes[6], colors[2];
    unsigned i;
 
-   if (!self->render_state.native_color || self->scaling != 1 ||
-       self->msaa != 1 || psx_pgxp_mode != 0 ||
-       vertices[0].color == vertices[1].color)
+   if (!self->render_state.native_color ||
+       vertices[0].color == vertices[1].color ||
+       !renderer_native_line_endpoints(self, vertices, x, y))
       return;
-   for (i = 0; i < 2; i++)
-   {
-      float px = vertices[i].x + self->render_state.draw_offset_x;
-      float py = vertices[i].y + self->render_state.draw_offset_y;
-      if (vertices[i].w != 1.0f ||
-          !(px >= -32768.0f && px <= 32767.0f) ||
-          !(py >= -32768.0f && py <= 32767.0f))
-         return;
-      x[i] = (int32_t)px;
-      y[i] = (int32_t)py;
-      if ((float)x[i] != px || (float)y[i] != py)
-         return;
-   }
    colors[0] = vertices[0].color;
    colors[1] = vertices[1].color;
    if (!rhi_line_color_planes(planes, x, y, colors))
@@ -10406,9 +10403,9 @@ static void renderer_hd_texture_uniforms(Renderer *self,
  * truncation; fixed-function RGBA8 blending cannot provide it. Native-colour
  * Add and Sub sources, including raw texture samples, are quantized before
  * blending by primitive.frag, so fixed Add/Sub preserve RGB5 results (with
- * 255 representing saturation). Keep the existing masked textured Add route, but leave masked
- * flat Add on the fixed path: its input-attachment read causes full-screen
- * flashes on the tested Adreno GPU. */
+ * 255 representing saturation). Masked textured Add uses feedback; masked
+ * flat Add stays on the fixed path: its input-attachment read causes
+ * full-screen flashes on the tested Adreno GPU. */
 static bool renderer_semi_trans_needs_feedback(const Renderer *self,
       const SemiTransparentState *state)
 {
@@ -11281,7 +11278,7 @@ static void renderer_semi_transparent_set_state(Renderer *self,
          commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
          /* Complementary weights preserve their sum when UNORM blend
           * constants are quantized. Two rounded halves can darken even an
-          * integer average. Keep the existing wide-target HDR operation. */
+          * integer average. The fp16 target uses its own wide factors. */
          commandbuffer_set_blend_factors(cbh_get(&self->cmd),
                self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT ?
                   VK_BLEND_FACTOR_CONSTANT_COLOR : VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,

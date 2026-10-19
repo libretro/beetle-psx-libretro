@@ -302,8 +302,8 @@ bool rhi_intf_open(bool is_pal, bool force_software)
    tt_coh_reset();
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
-   memset(&var, 0, sizeof(var));
    var.key                   = BEETLE_OPT(renderer);
+   var.value                 = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "software") || force_software)

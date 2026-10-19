@@ -4593,8 +4593,7 @@ static void check_variables(bool startup)
    struct retro_variable var = {0};
 
    /* Read before refreshing either renderer, so an option change cannot
-    * rebuild storage using the previous frame's drawing policy. The old
-    * Vulkan-only native_color option is intentionally no longer consumed. */
+    * rebuild storage using the previous frame's drawing policy. */
    psx_internal_color_mode = PSX_INTERNAL_COLOR_16BPP;
    var.key = BEETLE_OPT(depth);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)

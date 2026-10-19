@@ -842,6 +842,16 @@ struct gl_primitive_batch {
    gl_semi_transparency_mode transparency_mode;
    /* GL_TRIANGLES or GL_LINES */
    GLenum draw_mode;
+   /* First index */
+   unsigned first;
+   /* Count of indices */
+   unsigned count;
+   /* Destination snapshot rect of a color-blend batch, in upscaled pixels. */
+   int blend_rect[4];
+   /* HD texture replacement bound for this batch (none = SD only).
+    * Batches split whenever the handle changes so the flush loop can
+    * bind one replacement texture + uniform set per batch. */
+   HdTextureHandle hd;
    bool opaque;
    /* Drives the stencil write value for this batch.  Note that
     * vertex_add_blended_pass() forces this true for the second pass of a
@@ -853,16 +863,7 @@ struct gl_primitive_batch {
     * hardware. */
    bool force_mask;
    bool mask_test;
-   /* First index */
-   unsigned first;
-   /* Count of indices */
-   unsigned count;
-   /* HD texture replacement bound for this batch (none = SD only).
-    * Batches split whenever the handle changes so the flush loop can
-    * bind one replacement texture + uniform set per batch. */
-   HdTextureHandle hd;
    bool color_blend;
-   int blend_rect[4];
 };
 typedef struct gl_primitive_batch gl_primitive_batch;
 

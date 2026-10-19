@@ -170,7 +170,7 @@ void primitive_source(out vec4 source, out bool enhanced_texel,
 		{
 			/* Direct-colour feedback must quantize each GP0 modulation step,
 			 * even on an FP16 target, so repeated fades decay at hardware rate.
-			 * Standard-colour feedback retains the same established path. */
+			 * Standard-colour feedback shares this path. */
 			vec3 fshade = clamp(shade_color, 0.0, 1.0);
 			vec3 shade8 = psx_color8(fshade);
 			vec3 modulated = floor(texel5 * shade8 / 16.0);
@@ -195,8 +195,9 @@ void primitive_source(out vec4 source, out bool enhanced_texel,
 	 * Keep modulation shared without imposing the fixed-function clamp. */
 	vec3 shaded = shaded_hot;
 #else
-	/* SDR dithering precedes saturation. Preserve the existing fixed-function
-	 * HDR precise-colour policy. */
+	/* SDR dithering precedes saturation, so SDR keeps the unclamped value.
+	 * The fp16 target clamps here; the hot source below reopens it for
+	 * additive blends. */
 	vec3 shaded = FRAMEBUFFER_FLOAT16 == 0 ? shaded_hot : clamp(shaded_hot, 0.0, 1.0);
 	if (HDR_HOT_SOURCE != 0 && TRANSPARENCY_MODE == SEMI_TRANS &&
 		BLEND_MODE == BLEND_ADD)
@@ -245,12 +246,13 @@ void primitive_source(out vec4 source, out bool enhanced_texel,
 	else if (!raw_texture)
 	{
 		/* Higher-color dithering is a source operation, not a late RGB5
-		 * display conversion. HDR retains its existing wide path. */
+		 * display conversion. HDR takes the wide path undithered. */
 		if (FRAMEBUFFER_FLOAT16 == 0)
 			source.rgb += vec3(primitive_dither_offset() / 255.0);
 #ifdef FEEDBACK
-		/* Wide feedback applies its existing export bias to the blended
-		 * result, once. The fixed-function source retains its old bias. */
+		/* Wide (fp16) feedback applies its export bias to the blended
+		 * result, once, so it skips this truncation; every other source is
+		 * truncated here. */
 		if (FRAMEBUFFER_FLOAT16 == 0)
 #endif
 			source.rgb = truncate_color8(source.rgb);
