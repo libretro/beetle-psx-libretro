@@ -208,45 +208,6 @@ static void gl_diag_errors(const char *site)
    }
 }
 
-/* Normalise the pixel-transfer state this renderer inherits from the
- * frontend. The glsm shim used to reset all of this around every core
- * entry; the rhi port dropped the shim for its unused state mirror and
- * with it, silently, the incoming-state normalisation that was doing
- * real work. RetroArch legitimately uploads its own UI textures between
- * retro_run calls (the statistics overlay does so every frame) and can
- * leave GL_UNPACK_* skips/lengths set and a pixel buffer bound. A bound
- * GL_PIXEL_UNPACK_BUFFER turns every client-pointer glTexSubImage into
- * an offset into the frontend's buffer - out of bounds, the whole
- * upload is dropped with GL_INVALID_OPERATION; in bounds, it uploads
- * the frontend's bytes. Under Preemptive Frames runahead the savestate
- * restore replays the full 1MiB VRAM image through exactly that path
- * every frame, which turned this latent inheritance into constant
- * whole-VRAM corruption on the GL renderer, while Vulkan - with no
- * shared mutable transfer state - was immune. Called at every entry
- * point that touches the context after the frontend may have. */
-static void gl_normalize_inherited_state(void)
-{
-   /* PS1 dithering is applied in the draw shader. Driver dithering would
-    * also alter exact VRAM uploads and copies into the RGB5_A1 target. */
-   glDisable(GL_DITHER);
-#ifndef HAVE_OPENGLES3
-   /* Per-triangle flat attributes use the last vertex, as required by ES. */
-   glProvokingVertex(GL_LAST_VERTEX_CONVENTION);
-#endif
-   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-   glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-   glPixelStorei(GL_UNPACK_ALIGNMENT,   4);
-   glPixelStorei(GL_UNPACK_ROW_LENGTH,  0);
-   glPixelStorei(GL_UNPACK_SKIP_ROWS,   0);
-   glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
-   glPixelStorei(GL_PACK_ALIGNMENT,     4);
-#ifdef GL_PACK_ROW_LENGTH
-   glPixelStorei(GL_PACK_ROW_LENGTH,    0);
-#endif
-   glPixelStorei(GL_PACK_SKIP_ROWS,     0);
-   glPixelStorei(GL_PACK_SKIP_PIXELS,   0);
-   glActiveTexture(GL_TEXTURE0);
-}
 
 #include "shaders_gl/command_vertex.glsl.h"
 #include "shaders_gl/command_fragment.glsl.h"
@@ -383,6 +344,12 @@ typedef void (BEETLE_GL_APIENTRYP PFN_BEETLE_GL_BLITFRAMEBUFFER)(
       GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1,
       GLbitfield mask, GLenum filter);
 
+typedef void (BEETLE_GL_APIENTRYP PFN_BEETLE_GL_PROVOKINGVERTEX)(GLenum mode);
+
+#ifndef GL_LAST_VERTEX_CONVENTION
+#define GL_LAST_VERTEX_CONVENTION 0x8E4E
+#endif
+
 typedef void (BEETLE_GL_APIENTRYP PFN_BEETLE_GL_COPYIMAGESUBDATA)(
       GLuint srcName, GLenum srcTarget, GLint srcLevel,
       GLint srcX, GLint srcY, GLint srcZ,
@@ -412,6 +379,9 @@ typedef struct gl_caps
    /* Resolved entry points.  NULL when not available. */
    PFN_BEETLE_GL_BLITFRAMEBUFFER  fp_glBlitFramebuffer;
    PFN_BEETLE_GL_COPYIMAGESUBDATA fp_glCopyImageSubData;
+   /* Desktop GL 3.2+. Without it the provoking vertex is always the last
+    * one, which is the convention the native planes rely on. */
+   PFN_BEETLE_GL_PROVOKINGVERTEX  fp_glProvokingVertex;
 
    /* Set to 1 when the detected version is below the floor
     * beetle's GL renderer needs to function (GL/GLES 3.0).
@@ -429,6 +399,45 @@ typedef struct gl_caps
 } gl_caps_t;
 
 static gl_caps_t gl_caps;
+
+/* Normalise the pixel-transfer state this renderer inherits from the
+ * frontend. The glsm shim used to reset all of this around every core
+ * entry; the rhi port dropped the shim for its unused state mirror and
+ * with it, silently, the incoming-state normalisation that was doing
+ * real work. RetroArch legitimately uploads its own UI textures between
+ * retro_run calls (the statistics overlay does so every frame) and can
+ * leave GL_UNPACK_* skips/lengths set and a pixel buffer bound. A bound
+ * GL_PIXEL_UNPACK_BUFFER turns every client-pointer glTexSubImage into
+ * an offset into the frontend's buffer - out of bounds, the whole
+ * upload is dropped with GL_INVALID_OPERATION; in bounds, it uploads
+ * the frontend's bytes. Under Preemptive Frames runahead the savestate
+ * restore replays the full 1MiB VRAM image through exactly that path
+ * every frame, which turned this latent inheritance into constant
+ * whole-VRAM corruption on the GL renderer, while Vulkan - with no
+ * shared mutable transfer state - was immune. Called at every entry
+ * point that touches the context after the frontend may have. */
+static void gl_normalize_inherited_state(void)
+{
+   /* PS1 dithering is applied in the draw shader. Driver dithering would
+    * also alter exact VRAM uploads and copies into the RGB5_A1 target. */
+   glDisable(GL_DITHER);
+   /* Per-triangle flat attributes use the last vertex, as ES always does. */
+   if (gl_caps.fp_glProvokingVertex)
+      gl_caps.fp_glProvokingVertex(GL_LAST_VERTEX_CONVENTION);
+   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+   glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+   glPixelStorei(GL_UNPACK_ALIGNMENT,   4);
+   glPixelStorei(GL_UNPACK_ROW_LENGTH,  0);
+   glPixelStorei(GL_UNPACK_SKIP_ROWS,   0);
+   glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+   glPixelStorei(GL_PACK_ALIGNMENT,     4);
+#ifdef GL_PACK_ROW_LENGTH
+   glPixelStorei(GL_PACK_ROW_LENGTH,    0);
+#endif
+   glPixelStorei(GL_PACK_SKIP_ROWS,     0);
+   glPixelStorei(GL_PACK_SKIP_PIXELS,   0);
+   glActiveTexture(GL_TEXTURE0);
+}
 
 /* === GLES 2.x compile-time bridges ============================
  *
@@ -1159,7 +1168,7 @@ static bool has_software_fb = false;
 
 static void gl_renderer_draw(gl_renderer *renderer);
 #ifdef GL_READ_FRAMEBUFFER
-static void gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
+static bool gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
       uint16_t x, uint16_t y, uint16_t w, uint16_t h,
       bool allow_with_software_fb);
 static bool gl_ensure_fb_feedback_texture(gl_renderer *renderer);
@@ -2740,28 +2749,25 @@ static void gl_vram_sync_mirror_rect(gl_renderer *renderer,
    first_w = w < VRAM_WIDTH_PIXELS - x ? w : VRAM_WIDTH_PIXELS - x;
    first_h = h < VRAM_HEIGHT - y ? h : VRAM_HEIGHT - y;
 
-   gl_mirror_fb_out_to_fb_texture(renderer, (uint16_t)x, (uint16_t)y,
-         (uint16_t)first_w, (uint16_t)first_h, true);
-   gl_vram_sync_clean_rect(renderer, x, y, first_w, first_h);
+   /* A region stays dirty unless its mirror actually ran. */
+   if (gl_mirror_fb_out_to_fb_texture(renderer, (uint16_t)x, (uint16_t)y,
+         (uint16_t)first_w, (uint16_t)first_h, true))
+      gl_vram_sync_clean_rect(renderer, x, y, first_w, first_h);
 
-   if (w > first_w)
-   {
-      gl_mirror_fb_out_to_fb_texture(renderer, 0, (uint16_t)y,
-            (uint16_t)(w - first_w), (uint16_t)first_h, true);
+   if (w > first_w &&
+       gl_mirror_fb_out_to_fb_texture(renderer, 0, (uint16_t)y,
+            (uint16_t)(w - first_w), (uint16_t)first_h, true))
       gl_vram_sync_clean_rect(renderer, 0, y, w - first_w, first_h);
-   }
    if (h > first_h)
    {
-      gl_mirror_fb_out_to_fb_texture(renderer, (uint16_t)x, 0,
-            (uint16_t)first_w, (uint16_t)(h - first_h), true);
-      gl_vram_sync_clean_rect(renderer, x, 0, first_w, h - first_h);
-      if (w > first_w)
-      {
-         gl_mirror_fb_out_to_fb_texture(renderer, 0, 0,
-               (uint16_t)(w - first_w), (uint16_t)(h - first_h), true);
+      if (gl_mirror_fb_out_to_fb_texture(renderer, (uint16_t)x, 0,
+            (uint16_t)first_w, (uint16_t)(h - first_h), true))
+         gl_vram_sync_clean_rect(renderer, x, 0, first_w, h - first_h);
+      if (w > first_w &&
+          gl_mirror_fb_out_to_fb_texture(renderer, 0, 0,
+               (uint16_t)(w - first_w), (uint16_t)(h - first_h), true))
          gl_vram_sync_clean_rect(renderer, 0, 0,
                w - first_w, h - first_h);
-      }
    }
 }
 #endif
@@ -3159,6 +3165,9 @@ static void gl_renderer_draw(gl_renderer *renderer)
    size_t bi;
    GLint semi_uniform = -1, mask_uniform = -1, native_uniform = -1;
    GLint color_uniform = -1, hot_uniform = -1;
+   /* Read binding to restore after color-blend snapshots, queried at most
+    * once per draw. */
+   GLint read_fb = -1;
 
    if (!renderer || static_renderer.state == GL_STATE_INVALID)
       return;
@@ -3403,8 +3412,8 @@ static void gl_renderer_draw(gl_renderer *renderer)
          if (color_blend)
          {
             unsigned first, stride = it->draw_mode == GL_LINES ? 2 : 3;
-            GLint read_fb;
-            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fb);
+            if (read_fb < 0)
+               glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fb);
             glBindFramebuffer(GL_READ_FRAMEBUFFER, renderer->fb_out_fbo);
             glActiveTexture(GL_TEXTURE4);
             glBindTexture(GL_TEXTURE_2D, renderer->blend_texture.id);
@@ -3655,8 +3664,9 @@ static void get_variables(uint8_t *upscaling, bool *display_vram)
    }
 }
 
-/* Match CPU word readback from the retained target: truncate q*8 storage,
- * round normalized byte/float storage, and copy RGB5 directly. Use the
+/* Match CPU word readback from the retained target: truncate SDR byte
+ * storage (q*8 in 16 bpp, full range in 32 bpp) as the Vulkan renderer's
+ * psx_color5 does, round HDR byte/float storage, and copy RGB5 directly. Use the
  * allocated format so a failed settings change keeps the working policy.
  * Regional copies and the final frame resolve must agree. */
 static uint32_t gl_native_mirror_conversion(const gl_renderer *renderer)
@@ -6244,6 +6254,11 @@ static void gl_caps_init(void)
       gl_caps.fp_glCopyImageSubData =
          (PFN_BEETLE_GL_COPYIMAGESUBDATA)gl_caps_resolve(
             get_proc, "glCopyImageSubData", copy_image_suffixes);
+
+      if (gl_caps.api == GL_API_DESKTOP && gl_caps.version_packed >= 0x0302)
+         gl_caps.fp_glProvokingVertex =
+            (PFN_BEETLE_GL_PROVOKINGVERTEX)gl_caps_resolve(
+               get_proc, "glProvokingVertex", NULL);
    }
 
    log_cb(RETRO_LOG_INFO,
@@ -8504,12 +8519,9 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
          uint32_t g8 = (px >>  8) & 0xFFu;
          uint32_t b8 = (px >> 16) & 0xFFu;
          uint32_t a8 = (px >> 24) & 0xFFu;
-         /* 8-bit -> 5-bit: divide by 8 with rounding-to-nearest, the
-          * same `floor(c*31 + 0.5)` the shader uses (note c here is
-          * already 0..255 so c*31/255 + 0.5 == c/8.226... and the
-          * `(c * 249 + 1024) >> 11` reciprocal-multiply form rounds
-          * identically).  We use the simpler exact form: round
-          * c8 * 31 / 255. */
+         /* 8-bit -> 5-bit: SDR byte storage truncates (see
+          * gl_native_mirror_conversion); the HDR RGBA8 fallback rounds
+          * c8 * 31 / 255 to nearest. */
          uint32_t r5 = renderer->byte_color_storage ? r8 >> 3 :
                (r8 * 31u + 127u) / 255u;
          uint32_t g5 = renderer->byte_color_storage ? g8 >> 3 :
@@ -8649,7 +8661,7 @@ static bool gl_resolve_color_rect(gl_renderer *renderer, gl_texture *dst,
       unsigned x, unsigned y, unsigned w, unsigned h)
 {
    GLint program, vao, array_buffer, active_texture, texture;
-   GLint read_fb, draw_fb, viewport[4];
+   GLint viewport[4];
    GLboolean scissor, blend, depth, stencil;
    gl_image_load_vertex slice[4];
    gl_draw_buffer *buffer = renderer->image_load_buffer;
@@ -8661,8 +8673,6 @@ static bool gl_resolve_color_rect(gl_renderer *renderer, gl_texture *dst,
    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &array_buffer);
-   glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fb);
-   glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fb);
    glGetIntegerv(GL_VIEWPORT, viewport);
    glGetIntegerv(GL_ACTIVE_TEXTURE, &active_texture);
    glActiveTexture(GL_TEXTURE0);
@@ -8694,8 +8704,9 @@ static bool gl_resolve_color_rect(gl_renderer *renderer, gl_texture *dst,
    gl_draw_buffer_draw(buffer, GL_TRIANGLE_STRIP);
    glBindTexture(GL_TEXTURE_2D, (GLuint)texture);
    glActiveTexture((GLenum)active_texture);
-   glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)read_fb);
-   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)draw_fb);
+   /* Same framebuffer exit state as the blit path in gl_blit_fb_out. */
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
    glUseProgram((GLuint)program);
    glBindVertexArray((GLuint)vao);
@@ -8812,20 +8823,22 @@ static bool gl_blit_fb_out(gl_renderer *renderer, gl_texture *dst,
  *
  * Args are PS1 native coords for the destination rect; the source rect
  * in fb_out is the same rect scaled by internal_upscaling. */
-static void gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
+static bool gl_mirror_fb_out_to_fb_texture(gl_renderer *renderer,
                                            uint16_t x, uint16_t y,
                                            uint16_t w, uint16_t h,
                                            bool allow_with_software_fb)
 {
+   bool mirrored;
    if ((!allow_with_software_fb && has_software_fb) ||
        !gl_caps.fp_glBlitFramebuffer)
-      return;
+      return false;
 
-   (void)gl_blit_fb_out(renderer, &renderer->fb_texture, 1, x, y, w, h);
+   mirrored = gl_blit_fb_out(renderer, &renderer->fb_texture, 1, x, y, w, h);
 
    /* Submit dependency-driven mirrors before following texture fetches. */
    if (allow_with_software_fb)
       glFlush();
+   return mirrored;
 }
 
 static bool gl_copy_fb_out_to_feedback(gl_renderer *renderer,
@@ -9078,7 +9091,7 @@ void rhi_gl_fill_rect(
     * gl_mirror_fb_out_to_fb_texture for the gating rationale (only
     * runs when has_software_fb is off and glBlitFramebuffer is
     * present). */
-   gl_mirror_fb_out_to_fb_texture(renderer, x, y, w, h, false);
+   (void)gl_mirror_fb_out_to_fb_texture(renderer, x, y, w, h, false);
 #endif
 
 #ifdef GL_READ_FRAMEBUFFER
@@ -9226,7 +9239,7 @@ void rhi_gl_copy_rect(
     * rationale - this used to be ~60 lines of inline FBO dance
     * here, extracted so rhi_gl_fill_rect can share it. */
 #ifdef GL_READ_FRAMEBUFFER
-   gl_mirror_fb_out_to_fb_texture(renderer, dst_x, dst_y, w, h, false);
+   (void)gl_mirror_fb_out_to_fb_texture(renderer, dst_x, dst_y, w, h, false);
 #endif
 
 #ifdef GL_READ_FRAMEBUFFER

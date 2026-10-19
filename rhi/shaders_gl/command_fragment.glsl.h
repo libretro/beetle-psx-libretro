@@ -1428,7 +1428,7 @@ STRINGIZE(
 STRINGIZE(
          // Scale before blending to avoid rounding the source twice.
          // 5/992 is a normalized 5/32 RGB5-code bias. Together with the
-         // host's 251/512 destination weight, the unclamped RGB5 result is
+         // 251/512 destination blend weight, the unclamped RGB5 result is
          // (S+D)/2 - 5/32 - 5*D/512. Its downward bias stays below half a
          // code: odd sums round down, even sums retain their integer value.
          // S=0 clamps to zero; the destination bias still truncates odd D.

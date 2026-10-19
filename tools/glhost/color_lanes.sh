@@ -6,7 +6,9 @@
 #   1. Software renderer: the reference.
 #   2. GL 1x, software framebuffer off: every native average cell equals
 #      (S + D) >> 1 and the triangle matches the reference.
-#   3. GL 4x with the software framebuffer on, switched to 2x mid-run: the
+#   3. As 2, on a driver without glProvokingVertex (GL 3.0/3.1): the
+#      renderer must not call it and the native planes still hold.
+#   4. GL 4x with the software framebuffer on, switched to 2x mid-run: the
 #      framebuffer rebuild must keep the software VRAM, so the triangle
 #      still matches the reference.
 #
@@ -27,8 +29,8 @@ python3 tools/glhost/gen_color_exe.py "$OUT/color.exe"
 
 run()
 {
-   # $1 name, $2 GLHOST_VARS, $3 GLHOST_VARS_AT
-   GLHOST_VARS="$2" GLHOST_VARS_AT="$3" \
+   # $1 name, $2 GLHOST_VARS, $3 GLHOST_VARS_AT, $4 GLHOST_HIDE_PROCS
+   GLHOST_VARS="$2" GLHOST_VARS_AT="$3" GLHOST_HIDE_PROCS="$4" \
    GLHOST_RAM_OUT="$OUT/$1.bin:100000:20000" \
       tools/glhost/glhost "$CORE" "$OUT/color.exe" - "$FRAMES" "$OUT/$1" \
       2> "$OUT/$1.log" || { cat "$OUT/$1.log"; exit 1; }
@@ -36,6 +38,7 @@ run()
 
 run sw "${P}_renderer=software" ""
 run gl1x "${P}_renderer_software_fb=disabled" ""
+run gl30 "${P}_renderer_software_fb=disabled" "" glProvokingVertex
 run gl4to2 "${P}_internal_resolution=4x" "150:${P}_internal_resolution=2x"
 
 python3 - "$OUT" <<'EOF'
@@ -57,7 +60,8 @@ def triangle_diff(v):
     return sum(1 for y in range(256) for x in range(128, 256)
                if v[y * 256 + x] != ref[y * 256 + x])
 fail = 0
-for name, check_average in (('sw', True), ('gl1x', True), ('gl4to2', False)):
+for name, check_average in (('sw', True), ('gl1x', True), ('gl30', True),
+                            ('gl4to2', False)):
     v = load(name)
     a = average_wrong(v) if check_average else 0
     t = triangle_diff(v)

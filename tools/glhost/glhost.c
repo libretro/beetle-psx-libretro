@@ -38,6 +38,9 @@ static const char *find_var(const char *k)
  *   GLHOST_VARS_AT: semicolon list of frame:key=value option changes, each
  *     applied before that frame's retro_run and reported through
  *     GET_VARIABLE_UPDATE, as a frontend does when the user edits an option.
+ *   GLHOST_HIDE_PROCS: comma list of GL entry points get_proc_address
+ *     reports missing, modelling an older driver (e.g. glProvokingVertex
+ *     on GL 3.0/3.1).
  *   GLHOST_RAM_OUT: path:offset:length - after the last frame, write that
  *     window of system RAM to path (content can copy VRAM there via GP0). */
 static int vars_updated;
@@ -94,7 +97,21 @@ static void log_cb(enum retro_log_level level, const char *fmt, ...)
 /* ---- HW render callbacks the core consumes ---- */
 static uintptr_t get_current_framebuffer(void) { return (uintptr_t)fbo; }
 static retro_proc_address_t get_proc_address(const char *sym)
-{ return (retro_proc_address_t)eglGetProcAddress(sym); }
+{
+   const char *hide = getenv("GLHOST_HIDE_PROCS");
+   if (hide)
+   {
+      size_t n = strlen(sym);
+      const char *p = hide;
+      while ((p = strstr(p, sym)) != NULL)
+      {
+         if ((p == hide || p[-1] == ',') && (p[n] == ',' || p[n] == 0))
+            return NULL;
+         p += n;
+      }
+   }
+   return (retro_proc_address_t)eglGetProcAddress(sym);
+}
 
 /* ---- environment ---- */
 /* ---- software-renderer mode ----
