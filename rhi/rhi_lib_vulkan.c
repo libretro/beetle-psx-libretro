@@ -5361,10 +5361,6 @@ static StatusFlags *fbatlas_info(FBAtlas *self,
        * vanish while untextured polygons keep rendering. That is not a
        * hypothetical; it shipped. */
       float cf[3];
-      /* Depth-cue sidecar: far colour and blend factor, t == 0 meaning no
-       * cue. Same rule as cf: trailing floats only, set by the pushers
-       * after the positional initializer, never inside it. */
-      float fog[4];
    };
 
    struct TextureWindow
@@ -5560,13 +5556,13 @@ static bool semi_transparent_state_eq(const struct SemiTransparentState *a,
       int16_t pal_x, pal_y, params;
       int16_t u, v, base_uv_x, base_uv_y;
       uint16_t min_u, min_v, max_u, max_v;
-      /* Depth-cue sidecar (far colour + blend factor). Trailing so the
-       * clear-quad positional initializers zero it, which is exactly the
-       * no-cue encoding. */
+      /* Auxiliary lanes for native colour/UV planes and line coverage, zero
+       * otherwise. Trailing so the clear-quad positional initializers zero
+       * them. */
       float fog[4];
       /* One native UV word; the remaining coefficients share packed XY/w
-       * and the zero depth-cue factor. Keep original UVs, depth, enhancement
-       * limits and far colour intact for filtered/HD shading. */
+       * and the auxiliary lanes. Keep original UVs, depth and enhancement
+       * limits intact for filtered/HD shading. */
       uint32_t uv_plane;
    };
 
@@ -5577,7 +5573,7 @@ RHI_STATIC_ASSERT(sizeof(float) == sizeof(uint32_t) &&
       offsetof(BufferVertex, fog) == 60 && offsetof(BufferVertex, uv_plane) == 76,
       "BufferVertex must match the packed shader payload");
 
-/* Read both payloads as bits. Ordinary vertices carry float colour/fog;
+/* Read both payloads as bits. Ordinary vertices carry float colour;
  * native polygons reuse those same 32 bytes for wrapped colour planes and
  * their original packed colour. The vertex shader selects the interpretation. */
 static void renderer_set_interpolant_attribs(CommandBuffer *cmd)
@@ -9417,10 +9413,10 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
       output[i].color[0] = vertices[i].cf[0];
       output[i].color[1] = vertices[i].cf[1];
       output[i].color[2] = vertices[i].cf[2];
-      output[i].fog[0]   = vertices[i].fog[0];
-      output[i].fog[1]   = vertices[i].fog[1];
-      output[i].fog[2]   = vertices[i].fog[2];
-      output[i].fog[3]   = vertices[i].fog[3];
+      output[i].fog[0]   = 0.0f;
+      output[i].fog[1]   = 0.0f;
+      output[i].fog[2]   = 0.0f;
+      output[i].fog[3]   = 0.0f;
       output[i].uv_plane = 0;
       output[i].window = window;
       output[i].pal_x = pal_x;
@@ -9511,10 +9507,6 @@ static void renderer_build_line_quad(Renderer *self,
          output[k].cf[0] = input[0].cf[0];
          output[k].cf[1] = input[0].cf[1];
          output[k].cf[2] = input[0].cf[2];
-         output[k].fog[0] = input[0].fog[0];
-         output[k].fog[1] = input[0].fog[1];
-         output[k].fog[2] = input[0].fog[2];
-         output[k].fog[3] = input[0].fog[3];
       } }
       return;
    }
@@ -9595,10 +9587,6 @@ static void renderer_build_line_quad(Renderer *self,
       output[k].cf[0] = src->cf[0];
       output[k].cf[1] = src->cf[1];
       output[k].cf[2] = src->cf[2];
-      output[k].fog[0] = src->fog[0];
-      output[k].fog[1] = src->fog[1];
-      output[k].fog[2] = src->fog[2];
-      output[k].fog[3] = src->fog[3];
    } }
    }
    }
@@ -9779,10 +9767,6 @@ static void renderer_build_native_interpolants(Renderer *self,
          memcpy(&output[i].w, planes + 7, sizeof(uint32_t));
          output[i].params = (int16_t)((uint16_t)output[i].params | 0x0008u);
          output[i].uv_plane = planes[8];
-         /* Native interpolation excludes PGXP; its GP0 vertices have no
-          * depth-cue sidecar. Only the zero cue factor is reused here, not
-          * the far colour, depth, original UVs or enhancement limits. */
-         VK_ASSERT(vertices[i].fog[3] == 0.0f);
          memcpy(output[i].fog + 3, planes + 9, sizeof(uint32_t));
       }
    }
@@ -21404,16 +21388,6 @@ static void vertices_set_cf(Vertex *v, int n, const float *precise_rgb)
             : (float)((v[i].color >> (c * 8)) & 0xFF) / 255.0f;
 }
 
-/* Preserve the RHI lanes used by packed native interpolation.
- * gpu_polygon.c completes depth cueing before submission and supplies zeros. */
-static void vertices_set_fog(Vertex *v, int n, const float *fog)
-{
-   int i, c;
-   for (i = 0; i < n; i++)
-      for (c = 0; c < 4; c++)
-         v[i].fog[c] = fog ? fog[i * 4 + c] : 0.0f;
-}
-
 void rhi_vulkan_push_triangle(
       float p0x, float p0y, float p0w,
       float p1x, float p1y, float p1w,
@@ -21422,7 +21396,6 @@ void rhi_vulkan_push_triangle(
       uint32_t c1,
       uint32_t c2,
       const float *precise_rgb,
-      const float *fog,
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -21459,7 +21432,6 @@ void rhi_vulkan_push_triangle(
          { p2x, p2y, p2w, c2, t2x, t2y },
       };
       vertices_set_cf(vertices, 3, precise_rgb);
-      vertices_set_fog(vertices, 3, fog);
       renderer_draw_triangle(renderer, vertices);
    }
 }
@@ -21471,7 +21443,6 @@ void rhi_vulkan_push_quad(
       float p3x, float p3y, float p3w,
       uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3,
       const float *precise_rgb,
-      const float *fog,
       uint16_t t0x, uint16_t t0y, 
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -21517,7 +21488,6 @@ void rhi_vulkan_push_quad(
       };
 
       vertices_set_cf(vertices, 4, precise_rgb);
-      vertices_set_fog(vertices, 4, fog);
       renderer_draw_quad(renderer, vertices, !is_sprite, NULL, NULL);
    }
 }
@@ -21547,7 +21517,6 @@ void rhi_vulkan_push_line(
          { (float)(p1x), (float)(p1y), 1.0f, c1, 0, 0 },
       };
       vertices_set_cf(vertices, 2, NULL);
-      vertices_set_fog(vertices, 2, NULL);
       renderer->render_state.texture_color_modulate = false;
       renderer_draw_line(renderer, vertices);
    }

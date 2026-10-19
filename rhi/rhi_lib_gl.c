@@ -738,9 +738,8 @@ struct gl_command_vertex {
     * 8 integer pixel origin.
     * This byte occupies existing padding before fog. */
    uint8_t native_flags;
-   /* Depth-cue sidecar: far colour (1.0 == 0xFF) in [0..2], blend factor in
-    * [3]. t == 0 makes the shader mix the identity, so vertices without a
-    * recovered cue cost nothing. Positional initializers omit these trailing
+   /* Native colour planes and the packed flat colour (see
+    * gl_set_native_color_plane). Positional initializers omit these trailing
     * fields and zero-fill them. Append new payloads rather than shifting
     * existing initializer fields. */
    float fog[4];
@@ -7425,7 +7424,6 @@ void rhi_gl_push_triangle(
       uint32_t c1,
       uint32_t c2,
       const float *precise_rgb,
-      const float *fog,
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -7529,11 +7527,6 @@ void rhi_gl_push_triangle(
          }
       };
 
-      { int _fi, _fc;
-        for (_fi = 0; _fi < 3; _fi++)
-           for (_fc = 0; _fc < 4; _fc++)
-              v[_fi].fog[_fc] = fog ? fog[_fi * 4 + _fc] : 0.0f; }
-
       {
          uint32_t colors[3] = {c0, c1, c2};
          push_primitive(renderer, v, 3, colors, GL_TRIANGLES,
@@ -7552,7 +7545,6 @@ void rhi_gl_push_quad(
       uint32_t c2,
       uint32_t c3,
       const float *precise_rgb,
-      const float *fog,
       uint16_t t0x, uint16_t t0y,
       uint16_t t1x, uint16_t t1y,
       uint16_t t2x, uint16_t t2y,
@@ -7678,11 +7670,6 @@ void rhi_gl_push_quad(
             { min_u, min_v, max_u, max_v },
          },
       };
-
-      { int _fi, _fc;
-        for (_fi = 0; _fi < 4; _fi++)
-           for (_fc = 0; _fc < 4; _fc++)
-              v[_fi].fog[_fc] = fog ? fog[_fi * 4 + _fc] : 0.0f; }
 
       is_semi_transparent = v[0].semi_transparent == 1;
       is_textured         = v[0].texture_blend_mode != 0;
