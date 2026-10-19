@@ -154,6 +154,7 @@ void main()
 		#if defined(HDR)
 		rgb = abgr1555(value).rgb;
 		#else
+		/* Only 32 bpp expands canonical words; HDR (4) takes them as is. */
 		rgb = abgr1555_color(value, COLOR_MODE == 2).rgb;
 		#endif
 	#endif

@@ -7776,6 +7776,14 @@ static void renderer_resolve_scanout_msaa(Renderer *self, const TTRect *rect)
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 }
 
+/* Display ColorMode spec constant: the selected SDR mode, 3 for 16 bpp with
+ * canonical (enhanced) colors, or 4 for accepted HDR, which takes resolved
+ * words and colors as they are - no expansion and no RGB5 reduction. */
+#define RENDERER_DISPLAY_COLOR_MODE(self) (psx_hdr_active ? 4 : \
+      ((self)->render_state.color_mode == PSX_INTERNAL_COLOR_16BPP && \
+       (self)->render_state.canonical_color ? 3 : \
+       (int)(self)->render_state.color_mode))
+
 static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 {
    RenderPassInfo rp;
@@ -7905,10 +7913,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
    commandbuffer_push_constants(cbh_get(&self->cmd), &qp, 0, sizeof(qp));
    }
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
-         SpecConstIndex_ColorMode, psx_hdr_active ?
-         PSX_INTERNAL_COLOR_32BPP :
-         (self->render_state.color_mode == PSX_INTERNAL_COLOR_16BPP &&
-          self->render_state.canonical_color ? 3 : self->render_state.color_mode));
+         SpecConstIndex_ColorMode, RENDERER_DISPLAY_COLOR_MODE(self));
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd),
          1u << SpecConstIndex_ColorMode);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
@@ -8799,10 +8804,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    commandbuffer_push_constants(cbh_get(&self->cmd), &qp, 0, sizeof(qp));
    }
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
-         SpecConstIndex_ColorMode, psx_hdr_active ?
-         PSX_INTERNAL_COLOR_32BPP :
-         (self->render_state.color_mode == PSX_INTERNAL_COLOR_16BPP &&
-          self->render_state.canonical_color ? 3 : self->render_state.color_mode));
+         SpecConstIndex_ColorMode, RENDERER_DISPLAY_COLOR_MODE(self));
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd),
          1u << SpecConstIndex_ColorMode);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
@@ -10427,6 +10429,10 @@ static bool renderer_semi_trans_needs_feedback(const Renderer *self,
       const SemiTransparentState *state)
 {
    if (state->semi_transparent == SemiTransparentMode_None)
+      return false;
+   /* The Adreno exception holds under canonical colour too. */
+   if (state->semi_transparent == SemiTransparentMode_Add &&
+       state->masked && state->native_color && !state->textured)
       return false;
    if (state->canonical_color)
       return true;
@@ -20981,6 +20987,7 @@ void rhi_vulkan_prepare_frame(void)
    enum dither_mode pattern = psx_hdr_active ? DITHER_OFF : psx_gpu_dither_mode;
    bool native_color = !psx_hdr_active &&
          psx_internal_color_mode != PSX_INTERNAL_COLOR_32BPP;
+   bool canonical_color;
    if (device == NULL)
    {
       /* The HW context is down (between context_destroy and the next
@@ -21015,17 +21022,7 @@ void rhi_vulkan_prepare_frame(void)
    /* The option selects drawing policy, not storage format. Latch it
     * before GP0 work; accepted HDR overrides low-color drawing, while
     * preserving the selected SDR mode for fallback. */
-   if (renderer->render_state.native_color != native_color ||
-       renderer->render_state.dither_mode != pattern)
-      renderer_flush(renderer);
-   if (!psx_hdr_active &&
-       renderer->render_state.color_mode != psx_internal_color_mode)
-      renderer_reduce_cached_color(renderer);
-   renderer->render_state.color_mode = psx_internal_color_mode;
-   renderer->render_state.native_color = native_color;
-   renderer->render_state.dither_mode = pattern;
-   renderer->render_state.canonical_color =
-      renderer->render_state.native_color &&
+   canonical_color = native_color &&
       (renderer->msaa > 1 ||
        (renderer->scaling > 1 &&
         (renderer->render_state.scanout_filter == ScanoutFilter_SSAA ||
@@ -21033,6 +21030,22 @@ void rhi_vulkan_prepare_frame(void)
        (psx_internal_color_mode == PSX_INTERNAL_COLOR_16BPP &&
         (filter_mode != FilterMode_NearestNeighbor ||
          texture_tracker_hd_textures_enabled(replace_textures))));
+   /* Primitives still queued (a duped frame skips scanout) are emitted
+    * with the policy they were queued under. */
+   if (renderer->render_state.native_color != native_color ||
+       renderer->render_state.dither_mode != pattern ||
+       renderer->render_state.canonical_color != canonical_color)
+   {
+      fbatlas_flush_render_pass(&renderer->atlas);
+      renderer_flush(renderer);
+   }
+   if (!psx_hdr_active &&
+       renderer->render_state.color_mode != psx_internal_color_mode)
+      renderer_reduce_cached_color(renderer);
+   renderer->render_state.color_mode = psx_internal_color_mode;
+   renderer->render_state.native_color = native_color;
+   renderer->render_state.dither_mode = pattern;
+   renderer->render_state.canonical_color = canonical_color;
 }
 
 static ScanoutMode get_scanout_mode(bool bpp24)

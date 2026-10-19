@@ -45,7 +45,8 @@ highp float psx_dither_offset(highp ivec2 coord)
  * Called after core resolves, before color management or analog simulation. */
 highp vec3 psx_display_color(highp vec3 color, int mode)
 {
-	if (mode == 2)
+	/* 32 bpp and accepted HDR (4) present resolved colors unchanged. */
+	if (mode == 2 || mode == 4)
 		return color;
 	/* Expanded 16 bpp with enhanced draws/resolves: ordinary stores are
 	 * canonical q*8; preserve intermediate shades during display expansion. */
