@@ -511,7 +511,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "1x(native)"
    },
-#ifdef HAVE_VULKAN
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
    {
       BEETLE_OPT(scaled_uv_offset),
       "Texture UV Offset",
