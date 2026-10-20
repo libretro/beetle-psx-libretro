@@ -162,7 +162,7 @@ static INLINE int32_t GetPolyXFP_Int(int64_t xfp)
  */
 #define CALCIS(x,y) (((B->x - A->x) * (C->y - B->y)) - ((C->x - B->x) * (B->y - A->y)))
 #define DEFINE_CalcIDeltas(SUFFIX, GOURAUD_LIT, TEXTURED_LIT) \
-static INLINE bool CalcIDeltas_##SUFFIX(i_deltas *idl, const tri_vertex *A, const tri_vertex *B, const tri_vertex *C) \
+static INLINE bool CalcIDeltas_##SUFFIX(i_deltas *idl, const tri_vertex *A, const tri_vertex *B, const tri_vertex *C, unsigned upscale_shift) \
 { \
    int32_t denom = CALCIS(x, y); \
    if (!denom) \
@@ -178,10 +178,13 @@ static INLINE bool CalcIDeltas_##SUFFIX(i_deltas *idl, const tri_vertex *A, cons
    } \
    if (TEXTURED_LIT) \
    { \
-      idl->du_dx = (uint32_t)(CALCIS(u, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->du_dy = (uint32_t)(CALCIS(x, u) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->dv_dx = (uint32_t)(CALCIS(v, y) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
-      idl->dv_dy = (uint32_t)(CALCIS(x, v) * (1 << COORD_FBS) / denom) << COORD_POST_PADDING; \
+      /* Keep native UV precision; widen products to avoid upscaled overflow. */ \
+      unsigned precision = COORD_FBS + upscale_shift; \
+      unsigned padding = COORD_POST_PADDING - upscale_shift; \
+      idl->du_dx = (uint32_t)((int64_t)CALCIS(u, y) * (INT64_C(1) << precision) / denom) << padding; \
+      idl->du_dy = (uint32_t)((int64_t)CALCIS(x, u) * (INT64_C(1) << precision) / denom) << padding; \
+      idl->dv_dx = (uint32_t)((int64_t)CALCIS(v, y) * (INT64_C(1) << precision) / denom) << padding; \
+      idl->dv_dy = (uint32_t)((int64_t)CALCIS(x, v) * (INT64_C(1) << precision) / denom) << padding; \
    } \
    return true; \
 }
@@ -955,12 +958,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
           *     correct 0 (clamp(.,0,max) + +0.5 bias = 0..max+0.5, \
           *     int cast = 0..max, AND = same; for negative inputs \
           *     pre-clamp, the clamp brings them to 0 anyway). \
-          * The +bias matches the affine seed's `+(1 << (COORD_FBS \
-          * - 1 - upscale_shift))`: half a native texel added \
-          * before the integer truncation, i.e. round-to-nearest \
-          * sampling.  The HW backends get this implicitly via \
-          * primitive.frag's `int(vUV)` after the GPU's pixel- \
-          * center interpolation. */ \
+          * Half-texel bias preserves affine rounding at every resolution. */ \
          if (pct) \
          { \
             /* Pull the perspective-correct UV from the SIMD-precomputed \
@@ -977,7 +975,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
             { \
                int remain = (int)w; \
                int blk    = (remain < PCT_UV_BLOCK) ? remain : PCT_UV_BLOCK; \
-               float bias = 0.5f / (float)(1 << gpu->upscale_shift); \
+               float bias = 0.5f; \
                PCT_UVBatch(blk, bias, &ig.pct_inv_w, &ig.pct_u_over_w, \
                      &ig.pct_v_over_w, idl->d_inv_w_dx, idl->d_u_over_w_dx, \
                      idl->d_v_over_w_dx, idl->min_u, idl->max_u, \
@@ -1164,7 +1162,7 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
    /* 0-height, abort out. */ \
    if (vertices[0].y == vertices[2].y) \
       return; \
-   if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(&idl, &vertices[0], &vertices[1], &vertices[2])) \
+   if (!CalcIDeltas_g##GOURAUD_LIT##_t##TEXTURED_LIT(&idl, &vertices[0], &vertices[1], &vertices[2], gpu->upscale_shift)) \
       return; \
    /* Perspective-correct UV deltas - only when the caller said this \
     * primitive is eligible (textured + PGXP-on + texture-correction \
@@ -1180,19 +1178,10 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
    /* [0] should be top vertex, [2] should be bottom vertex, [1] should be off to the side vertex. */ \
    if (TEXTURED_LIT) \
    { \
-      ig.u = (COORD_MF_INT(vertices[core_vertex].u) + (1 << (COORD_FBS - 1 - gpu->upscale_shift))) << COORD_POST_PADDING; \
-      ig.v = (COORD_MF_INT(vertices[core_vertex].v) + (1 << (COORD_FBS - 1 - gpu->upscale_shift))) << COORD_POST_PADDING; \
-      if (gpu->upscale_shift > 0) \
-      { \
-         /* Bias the texture coordinates so that it rounds to the */ \
-         /* correct value when the game is mapping a 2D sprite using */ \
-         /* triangles.  Otherwise this could cause a small "shift" in */ \
-         /* the texture coordinates when upscaling. */ \
-         if (gpu->off_u) \
-            ig.u += (COORD_MF_INT(1) - (1 << (COORD_FBS - gpu->upscale_shift))) << COORD_POST_PADDING; \
-         if (gpu->off_v) \
-            ig.v += (COORD_MF_INT(1) - (1 << (COORD_FBS - gpu->upscale_shift))) << COORD_POST_PADDING; \
-      } \
+      /* Keep native rounding at every scale; hardware sprite offsets cause \
+       * discontinuities when projected edges align. */ \
+      ig.u = (COORD_MF_INT(vertices[core_vertex].u) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
+      ig.v = (COORD_MF_INT(vertices[core_vertex].v) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
       if (pct_local) \
       { \
          /* Seed the perspective interpolants at the core vertex (origin \
