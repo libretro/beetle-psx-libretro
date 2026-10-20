@@ -1605,12 +1605,31 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          } \
          vertices[v].precise[2] = 1.f; \
       } \
-   /* Copy before Calc_UVOffsets which modifies vertices */ \
-   /* Calc_UVOffsets likes to see unadjusted vertices */ \
+   /* Retain vertices before applying UV adjustments. */ \
    if (NV_LIT == 4 && gpu->InCmd != INCMD_QUAD) \
       memcpy(&gpu->InQuad_F3Vertices[1], &vertices[1], sizeof(tri_vertex) * 2); \
-   /* Calculated UV offsets (needed for hardware renderers and software with scaling) */ \
-   /* Do one time updates for primitive */ \
+   /* Classify the quad using the same fallback coordinates sent to the RHI. */ \
+   if (NV_LIT == 4 && gpu->InCmd == INCMD_QUAD) \
+   { \
+      if (invalidW) \
+      { \
+         if (PGXP_LIT && psx_pgxp_2d_tol >= 0) \
+         { \
+            float tol = (float)((unsigned)psx_pgxp_2d_tol << gpu->upscale_shift); \
+            if ( \
+               fabsf(gpu->InQuad_F3Vertices[0].precise[0] - (float)gpu->InQuad_F3Vertices[0].x) > tol || \
+               fabsf(gpu->InQuad_F3Vertices[0].precise[1] - (float)gpu->InQuad_F3Vertices[0].y) > tol \
+            ) \
+            { \
+               gpu->InQuad_F3Vertices[0].precise[0] = gpu->InQuad_F3Vertices[0].x; \
+               gpu->InQuad_F3Vertices[0].precise[1] = gpu->InQuad_F3Vertices[0].y; \
+            } \
+         } \
+         /* Apply the unit-depth fallback to the retained first vertex too. */ \
+         gpu->InQuad_F3Vertices[0].precise[2] = 1.f; \
+      } \
+   } \
+   /* Calculate UV corrections and one-pixel vertex adjustments. */ \
    if (TEXTURED_LIT) \
       Calc_UVOffsets_Adjust_Verts(gpu, vertices, NV_LIT); \
    if (NV_LIT == 4) \
@@ -1618,23 +1637,6 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
       if (gpu->InCmd == INCMD_QUAD) \
       { \
          gpu->InCmd = INCMD_NONE; \
-         if (invalidW) \
-         { \
-            if (PGXP_LIT && psx_pgxp_2d_tol >= 0) \
-            { \
-               float tol = (float)((unsigned)psx_pgxp_2d_tol << gpu->upscale_shift); \
-               if ( \
-                  fabsf(gpu->InQuad_F3Vertices[0].precise[0] - (float)gpu->InQuad_F3Vertices[0].x) > tol || \
-                  fabsf(gpu->InQuad_F3Vertices[0].precise[1] - (float)gpu->InQuad_F3Vertices[0].y) > tol \
-               ) \
-               { \
-                  gpu->InQuad_F3Vertices[0].precise[0] = gpu->InQuad_F3Vertices[0].x; \
-                  gpu->InQuad_F3Vertices[0].precise[1] = gpu->InQuad_F3Vertices[0].y; \
-               } \
-            } \
-            /* default first vertex of quad to 1 if any of the vertices are 1 (even if the first triangle was okay) */ \
-            gpu->InQuad_F3Vertices[0].precise[2] = 1.f; \
-         } \
       } \
       else \
       { \
