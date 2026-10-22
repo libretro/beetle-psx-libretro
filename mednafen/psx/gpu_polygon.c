@@ -14,42 +14,6 @@ extern int psx_pgxp_color;
 extern int psx_pgxp_fog;
 
 static float gpu_precise_rgb_buf[12];
-static float gpu_precise_fog_buf[16];
-
-static INLINE const float *gpu_precise_tri_fog(const tri_vertex *v)
-{
-   int i;
-   if (!psx_pgxp_fog || !psx_pgxp_color)
-      return NULL;
-   for (i = 0; i < 3; i++)
-   {
-      gpu_precise_fog_buf[i * 4 + 0] = v[i].fog[0];
-      gpu_precise_fog_buf[i * 4 + 1] = v[i].fog[1];
-      gpu_precise_fog_buf[i * 4 + 2] = v[i].fog[2];
-      gpu_precise_fog_buf[i * 4 + 3] = v[i].fog[3];
-   }
-   return gpu_precise_fog_buf;
-}
-
-static INLINE const float *gpu_precise_quad_fog(const tri_vertex *first,
-      const tri_vertex *rest)
-{
-   int i;
-   if (!psx_pgxp_fog || !psx_pgxp_color)
-      return NULL;
-   gpu_precise_fog_buf[0] = first->fog[0];
-   gpu_precise_fog_buf[1] = first->fog[1];
-   gpu_precise_fog_buf[2] = first->fog[2];
-   gpu_precise_fog_buf[3] = first->fog[3];
-   for (i = 0; i < 3; i++)
-   {
-      gpu_precise_fog_buf[4 + i * 4 + 0] = rest[i].fog[0];
-      gpu_precise_fog_buf[4 + i * 4 + 1] = rest[i].fog[1];
-      gpu_precise_fog_buf[4 + i * 4 + 2] = rest[i].fog[2];
-      gpu_precise_fog_buf[4 + i * 4 + 3] = rest[i].fog[3];
-   }
-   return gpu_precise_fog_buf;
-}
 
 static INLINE const float *gpu_precise_tri_rgb(const tri_vertex *v)
 {
@@ -1440,6 +1404,10 @@ extern int psx_pgxp_2d_tol;
  * reduces to direct calls under -O2 since all parameters are
  * compile-time literals in the macro context.
  */
+/* Flat untextured and raw-texture polygons bypass the dither unit. */
+#define POLYGON_DITHER_ENABLED(gpu, textured, modulated, gouraud) \
+   (DitherEnabled(gpu) && ((textured) ? (modulated) : (gouraud)))
+
 #define DEFINE_Command_DrawPolygon(SUFFIX, NV_LIT, GOURAUD_LIT, TEXTURED_LIT, BM_VAL, BM_TAG, TM_LIT, MO_LIT, ME_LIT, PGXP_LIT) \
 static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
 { \
@@ -1524,8 +1492,6 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
           * whose CD byte the GTE carries). The accept rule guarantees a \
           * refused or absent shadow degrades to the architectural bytes, \
           * so the miss path below is today's picture exactly. */ \
-         vertices[v].fog[0] = vertices[v].fog[1] = 0.0f; \
-         vertices[v].fog[2] = vertices[v].fog[3] = 0.0f; \
          if (PGXP_LIT && psx_pgxp_fog && psx_pgxp_color && \
              PGXP_GetFog(cb - baseCB, cb, pgxp_pre, pgxp_fc, &pgxp_t)) \
          { \
@@ -1545,9 +1511,8 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
              * Hill's pavement. Mix-then-interpolate in float matches the
              * console's order and appearance exactly, minus only the 5-bit
              * requantisation banding, which is the point of the feature.
-             * The fog attribute stays zero: the shader's mix bypasses on
-             * fog.a <= 0, and hit and miss vertices now agree to within
-             * quantisation by construction. */ \
+             * Hit and miss vertices agree to within quantisation by
+             * construction. */ \
             /* Floor at zero AFTER the mix: the GTE's pre-saturation
              * lighting underflows below zero routinely (a negative MAC
              * requantizes to the architectural 0 byte, so the accept rule
@@ -1586,10 +1551,6 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
          vertices[v].cf[0] = vertices[0].cf[0]; \
          vertices[v].cf[1] = vertices[0].cf[1]; \
          vertices[v].cf[2] = vertices[0].cf[2]; \
-         vertices[v].fog[0] = vertices[0].fog[0]; \
-         vertices[v].fog[1] = vertices[0].fog[1]; \
-         vertices[v].fog[2] = vertices[0].fog[2]; \
-         vertices[v].fog[3] = vertices[0].fog[3]; \
       } \
       x = sign_x_to_s32(11, ((int16_t)(*cb & 0xFFFF))); \
       y = sign_x_to_s32(11, ((int16_t)(*cb >> 16))); \
@@ -1759,7 +1720,6 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                   ((uint32_t)vertices[1].r) | ((uint32_t)vertices[1].g << 8) | ((uint32_t)vertices[1].b << 16), \
                   ((uint32_t)vertices[2].r) | ((uint32_t)vertices[2].g << 8) | ((uint32_t)vertices[2].b << 16), \
                   gpu_precise_quad_rgb(first, vertices), \
-                  gpu_precise_quad_fog(first, vertices), \
                   first->u + gpu->off_u, first->v + gpu->off_v, \
                   vertices[0].u + gpu->off_u, vertices[0].v + gpu->off_v, \
                   vertices[1].u + gpu->off_u, vertices[1].v + gpu->off_v, \
@@ -1770,12 +1730,13 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                   clut_x, clut_y, \
                   blend_mode, \
                   2 - (MO_LIT), \
-                  DitherEnabled(gpu), \
+                  POLYGON_DITHER_ENABLED(gpu, TEXTURED_LIT, TM_LIT, GOURAUD_LIT), \
                   (BM_VAL), \
                   (ME_LIT), \
                   gpu->MaskSetOR != 0, \
                   false, \
-                  gpu->may_be_2d); \
+                  gpu->may_be_2d, \
+                  (uint32_t)gpu->off_u | ((uint32_t)gpu->off_v << 16)); \
             } \
          } \
          else \
@@ -1802,7 +1763,6 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                ((uint32_t)verts[1].r) | ((uint32_t)verts[1].g << 8) | ((uint32_t)verts[1].b << 16), \
                ((uint32_t)verts[2].r) | ((uint32_t)verts[2].g << 8) | ((uint32_t)verts[2].b << 16), \
                gpu_precise_tri_rgb(verts), \
-               gpu_precise_tri_fog(verts), \
                verts[0].u, verts[0].v, \
                verts[1].u, verts[1].v, \
                verts[2].u, verts[2].v, \
@@ -1812,7 +1772,7 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                clut_x, clut_y, \
                blend_mode, \
                2 - (MO_LIT), \
-               DitherEnabled(gpu), \
+               POLYGON_DITHER_ENABLED(gpu, TEXTURED_LIT, TM_LIT, GOURAUD_LIT), \
                (BM_VAL), \
                (ME_LIT), \
                gpu->MaskSetOR != 0); \
@@ -1908,6 +1868,7 @@ CMD_DRAWPOLY_BMGROUP_ALL(4, 0, 1)
 CMD_DRAWPOLY_BMGROUP_ALL(4, 1, 0)
 CMD_DRAWPOLY_BMGROUP_ALL(4, 1, 1)
 
+#undef POLYGON_DITHER_ENABLED
 #undef COORD_POST_PADDING
 #undef COORD_FBS
 #undef COORD_MF_INT

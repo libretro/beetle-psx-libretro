@@ -505,6 +505,10 @@ void texture_tracker_free(TextureTracker *self);
 
 void texture_tracker_set_config(TextureTracker *self,
       const TextureTrackerConfig *cfg);
+/* Resolve the current menu value against the session toggle without applying
+ * it. Renderers may need to allocate new color storage before set_config. */
+bool texture_tracker_hd_textures_enabled(bool menu_enabled);
+
 void texture_tracker_set_cache_budgets(TextureTracker *self,
       size_t ram_bytes,
       size_t vram_bytes);
@@ -544,6 +548,13 @@ static INLINE bool tt_replace_latch_menu(struct tt_replace_latch *l, bool menu)
       l->menu_applied = m;
    }
    return l->session == 1;
+}
+
+static INLINE bool tt_replace_latch_enabled(
+      const struct tt_replace_latch *l, bool menu)
+{
+   struct tt_replace_latch pending = *l;
+   return tt_replace_latch_menu(&pending, menu);
 }
 
 static INLINE void tt_replace_latch_toggle(struct tt_replace_latch *l, bool on)

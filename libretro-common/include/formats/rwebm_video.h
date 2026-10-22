@@ -32,6 +32,7 @@
 
 #include <boolean.h>
 #include <retro_common_api.h>
+#include <formats/video_hw_frame.h>
 
 RETRO_BEGIN_DECLS
 
@@ -71,6 +72,17 @@ void rwebm_video_blit_i420_10bit(uint32_t *dst, unsigned dst_stride,
       unsigned matrix, unsigned transfer, unsigned range,
       unsigned max_cll);
 
+/* HDR variant: a PQ (transfer 16) or HLG (transfer 18) source as linear
+ * scRGB - 80 nits is 1.0, the 709 primaries, components outside 709
+ * kept negative - in RGBA half floats, 8 bytes a pixel, memory order
+ * R,G,B,A with A 1.0. No tone map: for a display that shows HDR. dst_stride
+ * is in pixels. Returns 0, writing nothing, for any other transfer, which
+ * is not HDR and takes the 8-bit or 10-bit paths above. */
+int rwebm_video_blit_i420_fp16(uint16_t *dst, unsigned dst_stride,
+      unsigned w, unsigned h, const uint16_t *y, int ys,
+      const uint16_t *u, const uint16_t *v, int uvs,
+      unsigned matrix, unsigned transfer, unsigned range);
+
 bool rwebm_video_set_buf_ptr(rwebm_video_t *webm, void *data, size_t len);
 
 /* Request packed XRGB2101010 (10-bit) output for 10-bit HDR sources; 8-bit
@@ -87,6 +99,14 @@ void rwebm_video_set_avail(rwebm_video_t *webm, size_t avail);
 
 /* True if the last rwebm_video_process_image() produced XRGB2101010. */
 bool rwebm_video_is_10bit(const rwebm_video_t *webm);
+
+/* Half floats for an HDR still: with want set, a PQ or HLG source's
+ * first frame is decoded as linear scRGB (rwebm_video_blit_i420_fp16)
+ * straight into the frame process hands out, 8 bytes a pixel; is_fp16
+ * says whether the last one came out so. Any other source decodes as
+ * it always did. */
+void rwebm_video_set_want_fp16(rwebm_video_t *webm, int want);
+bool rwebm_video_is_fp16(const rwebm_video_t *webm);
 
 /* Decodes the first displayed frame of the first supported video track
  * into a freshly malloc'd buffer at *buf. Returns IMAGE_PROCESS_END on
@@ -125,6 +145,11 @@ rwebm_video_stream_t *rwebm_video_stream_open(const uint8_t *buf,
 rwebm_video_stream_t *rwebm_video_stream_open_avail(const uint8_t *buf,
       size_t len, size_t avail, int *need_more);
 
+/* Hardware-only AV1 candidate, without a CPU canvas. Call set_hw before
+ * decoding. The buffer, including pending packets, remains borrowed. */
+rwebm_video_stream_t *rwebm_video_stream_open_hw_avail(const uint8_t *buf,
+      size_t len, size_t avail, int *need_more);
+
 void rwebm_video_stream_close(rwebm_video_stream_t *stream);
 
 /* num_frames is the number of coded video packets, saturating at the
@@ -143,6 +168,22 @@ void rwebm_video_stream_get_info(const rwebm_video_stream_t *stream,
 const uint32_t *rwebm_video_stream_next(rwebm_video_stream_t *stream,
       int *duration_ms);
 
+/* Decode and discard the next displayed frame without color conversion or
+ * GPU surface export. References and timestamps advance normally. Returns 1
+ * for a displayed frame, 2 for retry, 0 at end/error. While waiting, retry the
+ * same operation (next or skip), or rewind/close to cancel it. */
+int rwebm_video_stream_skip(rwebm_video_stream_t *stream, int *duration_ms);
+
+/* Enable registered hardware before playback (VP9 rewinds on success), or
+ * query the active mode with enable == 0. AV1 candidates have no software
+ * decoder; other failures retain software state.
+ * GPU next returns a non-pixel token; take the lease with hw_frame.
+ * A NULL next while waiting is a retry, not EOS. Owner-thread calls. */
+int rwebm_video_stream_set_hw(rwebm_video_stream_t *stream, int enable);
+int rwebm_video_stream_hw_frame(rwebm_video_stream_t *stream,
+      video_hw_frame_t *out);
+int rwebm_video_stream_waiting(const rwebm_video_stream_t *stream);
+
 /* Select the channel order of subsequent frames: non-zero emits ARGB
  * words (memory order B,G,R,A on little-endian), zero restores the
  * default R,G,B,A memory order.  Applies to the 8-bit output paths;
@@ -157,11 +198,29 @@ void rwebm_video_stream_set_argb(rwebm_video_stream_t *stream, int argb);
 /* Blit decoded frames into @out - width * height words, the caller's,
  * which then comes back from rwebm_video_stream_next - instead of the
  * stream's own frame, so a caller uploading from its own buffer needs
- * no copy out of the stream. NULL restores the stream's frame. Takes
- * effect from the next decoded frame; @out must stay valid until the
- * next call that decodes has returned. */
+ * no copy out of the stream. NULL restores the stream's frame, allocated
+ * on its first displayed software frame. Takes effect from the next
+ * decoded frame; @out must stay valid until the next call that decodes
+ * has returned. */
 void rwebm_video_stream_set_output(rwebm_video_stream_t *stream,
       uint32_t *out);
+
+/* As set_output, with rows @stride pixels apart (0: width), including
+ * FP16 pixels. NULL restores the canvas. False leaves output unchanged
+ * if the stride is too short or its frame extent overflows size_t. */
+int rwebm_video_stream_set_output_stride(rwebm_video_stream_t *stream,
+      uint32_t *out, unsigned stride);
+
+/* Linear scRGB half floats for an HDR source: a 10-bit PQ or HLG frame
+ * decoded into the caller's frame (rwebm_video_stream_set_output),
+ * which then holds 8 bytes a pixel, through rwebm_video_blit_i420_fp16
+ * - no tone map. Every other frame, and every frame without a caller's
+ * output, takes the paths it always did. is_fp16 answers for the last
+ * frame decoded; is_hdr for the source, from its track's transfer. */
+void rwebm_video_stream_set_want_fp16(rwebm_video_stream_t *stream,
+      int want);
+int rwebm_video_stream_is_fp16(const rwebm_video_stream_t *stream);
+int rwebm_video_stream_is_hdr(const rwebm_video_stream_t *stream);
 
 /* Convert decoded frames in @bands row bands on @pool (an rthreads
  * tpool_t of at least bands - 1 threads; the calling thread takes one
@@ -181,8 +240,8 @@ void rwebm_video_stream_set_avail(rwebm_video_stream_t *stream,
 
 /* Bounded-memory streaming support: media_floor is the fixed byte
  * offset where the cluster data begins (nothing below it is ever
- * read); consumed is the monotonic high-water byte offset the demuxer
- * has read up to.  Together they bound the window a feeder must keep
+ * read); consumed is the earliest byte still needed by pending packets
+ * or laces.  Together they bound the window a feeder must keep
  * resident: [media_floor, consumed + lookahead). */
 size_t rwebm_video_stream_media_floor(rwebm_video_stream_t *stream);
 size_t rwebm_video_stream_consumed(rwebm_video_stream_t *stream);

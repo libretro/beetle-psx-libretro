@@ -2,10 +2,11 @@
 precision highp float;
 precision highp int;
 
-#if defined(DITHER)
-#include "dither.h"
-#endif
 #include "hdr.h"
+#include "color.h"
+#if !defined(HDR)
+layout(constant_id = 0) const int COLOR_MODE = 2;
+#endif
 
 layout(location = 0) out vec4 FragColor;
 layout(set = 0, binding = 0) uniform sampler2D uTexture;
@@ -23,9 +24,14 @@ layout(push_constant, std430) uniform Registers
 	int   src_primaries;  /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 #if defined(HDR)
 	float paper_white_nits;
-	float peak_nits;      /* display peak, from GET_HDR_MAX_NITS */
+	float peak_nits;      /* display peak, GET_HDR_METADATA max_nits */
 	int   expand_gamut;
 	int   shoulder;
+	/* Display state: PQ(panel black) for the toe, and Rec.2020 -> panel RGB
+	 * for gamut compression. Both zero when the frontend does not say. */
+	float black_pq;
+	mat3  to_panel;
+	int   scrgb;          /* 0 HDR10 PQ Rec.2020, 1 linear scRGB FP16 */
 #endif
 } registers;
 
@@ -33,18 +39,18 @@ void main()
 {
 	vec2 lod_uv = clamp(vUV, registers.uv_min, registers.uv_max);
 	float b = textureLod(uLOD, lod_uv, 0.0).x;
-	mediump vec3 rgb = textureLod(uTexture, lod_uv, registers.max_bias * b).rgb;
+	highp vec3 rgb = textureLod(uTexture, lod_uv, registers.max_bias * b).rgb;
 #if defined(HDR)
 	/* The trilinear resolve interpolates the 8-bit source, producing
 	 * sub-8-bit precision that 10-bit output preserves - so no debanding is
 	 * needed (or wanted) here; just encode. */
-	FragColor = vec4(encode_hdr10(rgb, registers.paper_white_nits, registers.peak_nits,
-	                              registers.expand_gamut, registers.shoulder,
-	                              registers.sdr_eotf, registers.src_primaries), 1.0);
+	FragColor = vec4(encode_hdr_output(rgb, registers.paper_white_nits, registers.peak_nits,
+	                                   registers.expand_gamut, registers.shoulder,
+	                                   registers.sdr_eotf, registers.src_primaries,
+	                                   registers.black_pq, registers.to_panel,
+	                                   registers.scrgb), 1.0);
 #else
-	#if defined(DITHER)
-		rgb = apply_dither(rgb, ivec2(gl_FragCoord.xy));
-	#endif
+	rgb = psx_display_color(rgb, COLOR_MODE);
 	FragColor = vec4(sdr_apply_src_primaries(rgb, registers.sdr_eotf,
 	                                         registers.src_primaries), 1.0);
 #endif

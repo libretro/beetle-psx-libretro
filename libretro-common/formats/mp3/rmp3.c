@@ -609,10 +609,13 @@ static void rmp3_L3_decode_scalefactors(const uint8_t *hdr, uint8_t *ist_pos, rm
     }
     rmp3_L3_read_scalefactors(iscf, ist_pos, scf_size, scf_partition, bs, scfsi);
 
-    if (gr->n_short_sfb)
+    /* n_short_sfb is a multiple of 3 and n_long_sfb + n_short_sfb at
+     * most 39 (rmp3_L3_read_side_info sets only 22+0, 0+39, 8+30 and
+     * 6+30); written so the compiler can see the writes stay in iscf. */
+    if (gr->n_short_sfb && gr->n_long_sfb + gr->n_short_sfb <= (int)sizeof(iscf))
     {
         int sh = 3 - scf_shift;
-        for (i = 0; i < gr->n_short_sfb; i += 3)
+        for (i = 0; i + 2 < gr->n_short_sfb; i += 3)
         {
             iscf[gr->n_long_sfb + i + 0] += gr->subblock_gain[0] << sh;
             iscf[gr->n_long_sfb + i + 1] += gr->subblock_gain[1] << sh;
@@ -3267,4 +3270,21 @@ int rmp3_stream_process(rmp3_stream_t *s, size_t *read, size_t *wrote)
    if (wrote)
       *wrote = s->out_pos - w0;
    return ret;
+}
+
+void rmp3dec_init(rmp3dec *dec)
+{
+   memset(dec, 0, sizeof(*dec));
+}
+
+int rmp3dec_decode_s16(rmp3dec *dec, const uint8_t *mp3, int mp3_bytes,
+      int16_t *pcm, rmp3dec_frame_info *info)
+{
+   if (!dec || !mp3 || mp3_bytes <= 0 || !pcm || !info)
+   {
+      if (info)
+         memset(info, 0, sizeof(*info));
+      return 0;
+   }
+   return rmp3dec_decode_frame(dec, mp3, mp3_bytes, pcm, info, 0);
 }

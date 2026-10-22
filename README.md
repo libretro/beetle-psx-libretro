@@ -16,7 +16,8 @@ Notable additions in this fork are:
 * Page-aligned HD texture dump/replacement, an opt-in mode for static/3D art (Vulkan renderer), see [PAGE_ALIGN.md](PAGE_ALIGN.md);
 * HD Reduce Palette Range, an opt-in hash of only a texture's used palette entries for better replacement match coverage (Vulkan renderer);
 * Video CD playback, including support for the 1 MB SCPH-5903 kernel, see [Video CD](#video-cd-scph-5903);
-* HDR10 output (PQ Rec.2020, 10-bit), with highlight roll-off, gamut and reference-gamma controls, see [HDR output](#hdr-output);
+* Shared Native, 16 bpp and 32 bpp color modes for OpenGL and Vulkan, see [Color modes](rhi/README.md#color-modes);
+* HDR output as HDR10 (PQ Rec.2020, 10-bit) or scRGB (linear FP16), with highlight roll-off, gamut and reference-gamma controls, see [HDR output](#hdr-output);
 
 ## HD texture replacement caching
 
@@ -53,6 +54,15 @@ renderers present HDR10 — 10 bits per channel, PQ-encoded, Rec.2020 — instea
 of the historical 8-bit-per-channel output. Set it and restart; everything
 else below is optional tuning.
 
+**64-bit Color (HDR, scRGB)** presents the same picture as
+`RETRO_PIXEL_FORMAT_SCRGB_RGBA16F`: 16-bit floating point, linear Rec.709,
+1.0 = 80 nits. It is the same graded light as the HDR10 encode, taken out of
+the Rec.2020 container instead of into PQ, so it carries no 10-bit
+quantisation and colours outside Rec.709 travel as negative values. It is
+offered only to a frontend that lists `RETRO_HDR_SOURCE_FORMAT_SCRGB_RGBA16F`
+in `GET_HDR_METADATA`'s `source_formats`; otherwise, or if the frontend
+rejects it, the core falls back to HDR10 and then to 24-bit.
+
 ### Why a PS1 emulator has anything to put in HDR
 
 Two separate things, and it is worth keeping them apart because they are
@@ -78,7 +88,7 @@ the renderer already produced.
 | | |
 |---|---|
 | Renderer | Vulkan or OpenGL. The Software renderer has no HDR path and ignores every option here. |
-| Frontend | Must accept `SET_PIXEL_FORMAT(HDR10_2101010)`. |
+| Frontend | Must accept `SET_PIXEL_FORMAT(HDR10_2101010)`, or `(SCRGB_RGBA16F)` for scRGB. |
 | Display | An HDR-capable screen, in HDR mode, with the frontend's HDR output enabled. |
 | Restart | **Color Format** takes effect on restart. The rest apply immediately. |
 
@@ -92,34 +102,58 @@ down-convert. So the return value is authoritative.
 * Accepted → HDR encode engaged.
 * Rejected → the core restores `XRGB8888` and falls back to the 24-bit path.
   Nothing is half-enabled and nothing is quietly wrong.
+* Accepted, but the frontend reports through `GET_HDR_METADATA` that it is
+  presenting HDR **without** `passthrough` → also the 24-bit path. Such a
+  frontend applies its own paper-white scale, curve or gamut expansion to
+  HDR10 input, which would grade the core's already-encoded frame a second
+  time; its composition is built for SDR content, so that is what it gets.
+  An output mode of 0 (RetroArch reports that until its video driver is up)
+  says nothing about passthrough, and HDR stays engaged.
 
 Either way it is logged, so a configuration that did not take is visible
 rather than mysterious:
 
 ```
-[Color Format] 30-bit HDR requested: engaged (paper white 200 nits, gamut 0, output mode 1).
-[HDR] Display peak: 1000 nits
+[Color Format] 30-bit HDR requested: engaged as HDR10 (paper white 200 nits, gamut 0, output mode 1).
+[HDR] Display peak: 1000 nits, black 0.000 nits, panel gamut unknown
 ```
 
 #### Values taken from the frontend
 
-Three values are the frontend's to own, not the core's, and are queried
-rather than configured here:
+Three values are the frontend's to own, not the core's, and are read from
+`GET_HDR_METADATA` rather than configured here:
 
-| Value | Source | Used for |
+| Value | Field | Used for |
 |---|---|---|
-| Paper white | `GET_HDR_PAPER_WHITE_NITS` | Where reference white lands, in nits |
-| Display peak | `GET_HDR_MAX_NITS` | The ceiling highlights roll off toward |
-| Colour Boost | `GET_HDR_EXPAND_GAMUT` | Which gamut rotation is applied |
+| Paper white | `paper_white_nits` | Where reference white lands, in nits |
+| Display peak | `max_nits` | The ceiling highlights roll off toward |
+| Colour Boost | `expand_gamut` | Which gamut rotation is applied |
 
 RetroArch's paper-white and Colour Boost sliders change at runtime and do
-**not** fire the core's option-update path, so all three are re-queried every
-frame while HDR is active and take effect on the next present. Display peak is
-re-read for the same reason: a stale value silently changes how highlights
-roll off, which is harder to notice than a brightness shift.
+**not** fire the core's option-update path, so the metadata is re-queried every
+frame while HDR is active and takes effect on the next present. Display peak
+matters as much as the other two: a stale value silently changes how
+highlights roll off, which is harder to notice than a brightness shift.
 
-If the frontend answers nothing, the fallbacks are the HDR10 reference:
+If the frontend does not answer the query, or leaves a value at zero, the fallbacks are the HDR10 reference:
 200 nits paper white, 1000 nits peak.
+
+#### Values taken from the display
+
+`GET_DISPLAY_METADATA` adds the panel's own capabilities, when the frontend
+knows them. Two of them change the encode; with neither reported the output
+is bit-for-bit what it is without them.
+
+| Value | Field | Used for |
+|---|---|---|
+| Panel primaries | `caps.primaries_xy` | Gamut compression toward what the panel can show |
+| Black level | `min_nits`, else `caps.min_nits` | Black floor (BT.2390 toe) |
+| Panel peak | `caps.peak_nits` | Display peak, only when `max_nits` is unreported |
+
+The frontend's own `max_nits` and `min_nits` are its effective targets, so
+they win; the panel's measured values fill in where the frontend has none. A
+frontend with only `GET_HDR_METADATA` gets the paper white / peak / Colour
+Boost behaviour above and no panel handling.
 
 ### The encode, step by step
 
@@ -154,7 +188,24 @@ the display peak. See below.
 frontend's Colour Boost, using the same matrices RetroArch applies — so
 switching between SDR and HDR10 does not shift saturation.
 
-**6. PQ encode.** SMPTE ST.2084 over 0–10000 nits.
+**6. Panel gamut compression.** When the panel's primaries are known, the
+colour is taken into the panel's own RGB, where "outside its gamut" is just a
+channel below zero. Each channel's distance from the achromatic axis,
+`d = (max − c) / max`, is 0 on the axis and 1 on the gamut boundary; past 0.9
+it is compressed with `0.9 + x / (1 + x / 0.1)` (`x = d − 0.9`), which starts at
+unit slope and approaches the boundary without reaching it. Nothing clips,
+the brightest channel is untouched so the roll-off's luminance placement
+holds, and everything the panel shows comfortably passes through unchanged.
+This is what keeps **NTSC 1953** primaries and the wider Colour Boost modes
+from clipping flat on a P3 panel.
+
+**7. PQ encode.** SMPTE ST.2084 over 0–10000 nits.
+
+**8. Black floor.** When a black level is known, the BT.2390 toe
+`E + b · (1 − E)⁴`, with `b = PQ(black)`, lands code 0 on the panel's black
+and lifts the shadows above it instead of crushing everything below it into
+one level. Its weight has all but gone by paper white. `b` is computed once on
+the CPU, so this costs no extra `pow` per pixel.
 
 ### Highlight roll-off
 
@@ -312,7 +363,8 @@ plain scaled quad.
 
 ### Troubleshooting
 
-**Nothing changed.** Check the log for `[Color Format] 30-bit HDR requested`.
+**Nothing changed.** Check the log for `[Color Format] 30-bit HDR requested`
+(or `64-bit scRGB requested`, which also says which format was engaged).
 If it says *rejected by frontend*, the frontend is not presenting HDR10 —
 check its HDR output setting and that the display is in HDR mode. Did you
 restart after changing **Color Format**?
@@ -339,18 +391,26 @@ there; the options are inert.
 
 | | |
 |---|---|
-| `rhi/shaders_vulkan/hdr.h` | Shared encode math — PQ, transfers, primaries, gamut, shoulders, deband |
+| `rhi/shaders_vulkan/hdr.h` | Shared encode math — PQ, transfers, primaries, gamut, shoulders, panel gamut, black floor, deband |
+| `rhi/hdr_display.c` | PQ of the panel black and the Rec.2020 → panel matrix, from the frontend's display metadata |
 | `rhi/shaders_gl/analog_resolve_hdr.glsl.h` | OpenGL analog-chain HDR resolve |
 | `libretro.c` | Frontend negotiation, per-frame re-query, option parsing |
 | `rhi/rhi_lib_vulkan.c` | Vulkan HDR blitters, 16F target, blending paths |
 | `rhi/rhi_lib_gl.c` | OpenGL HDR output program and 16F target |
 
 The encode is parameterised throughout — paper white, peak, gamut, shoulder,
-transfer and primaries are all passed in — so each shader supplies them from
+transfer, primaries, panel black and panel matrix are all passed in — so each shader supplies them from
 its own push constant rather than the header reaching into a fixed layout.
 
 The colour math deliberately matches RetroArch's own HDR composition, so an
 HDR frame lands at the same brightness and saturation as the SDR one.
+
+Nothing is copied after the encode, in either format. On Vulkan the stage
+that encodes - the display quad, or the analog resolve - renders straight into
+the scanout image (A2B10G10R10 for HDR10, RGBA16F for scRGB) that is handed to
+`set_image`. On OpenGL the output program, or the analog chain's resolve,
+draws straight into the frontend's framebuffer. scRGB versus HDR10 is a
+push-constant switch in the same shaders, so neither format adds a pipeline.
 
 ## Video CD (SCPH-5903)
 

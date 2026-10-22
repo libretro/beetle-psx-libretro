@@ -39,6 +39,17 @@
  * build, where glibc hides it, sees the same one. */
 extern long syscall(long number, ...);
 #endif
+#if defined(__linux__) && (defined(__arm__) || defined(__aarch64__))
+#if defined(HAVE_GETAUXVAL) || \
+      (defined(__GLIBC__) && ((__GLIBC__ > 2) || \
+       (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 16))) || \
+      (defined(__ANDROID__) && defined(__ANDROID_API__) && __ANDROID_API__ >= 18)
+#define CPU_ARM_GETAUXVAL 1
+#include <errno.h>
+#include <sys/auxv.h>
+#include <asm/hwcap.h>
+#endif
+#endif
 #include <retro_atomic.h>
 #include <retro_timers.h>
 
@@ -97,7 +108,9 @@ extern long syscall(long number, ...);
 #include <sys/sys_time.h>
 #endif
 
-#ifdef GEKKO
+#if defined(GEKKO_NATIVE)
+#include <gekko/gekko.h>
+#elif defined(GEKKO)
 #include <ogc/lwp_watchdog.h>
 #endif
 
@@ -107,9 +120,6 @@ extern long syscall(long number, ...);
 
 #if defined(HAVE_LIBNX)
 #include <switch.h>
-#elif defined(SWITCH)
-#include <libtransistor/types.h>
-#include <libtransistor/svc.h>
 #endif
 
 #if defined(_3DS)
@@ -198,6 +208,8 @@ retro_perf_tick_t cpu_features_get_perf_counter(void)
       QueryPerformanceCounter(&c);
       time_ticks = (retro_perf_tick_t)c.QuadPart;
    }
+#elif defined(GEKKO_NATIVE)
+   time_ticks = gk_ticks();
 #elif defined(GEKKO)
    time_ticks = gettime();
 #elif !defined(__MACH__) && !defined(__FreeBSD__) && (defined(_XBOX360) || defined(__powerpc__) || defined(__ppc__) || defined(__POWERPC__) || defined(__PSL1GHT__) || defined(__PPC64__) || defined(__powerpc64__))
@@ -245,6 +257,8 @@ retro_time_t cpu_features_get_time_usec(void)
    return sysGetSystemTime();
 #elif !defined(__PSL1GHT__) && defined(__PS3__)
    return sys_time_get_system_time();
+#elif defined(GEKKO_NATIVE)
+   return gk_ticks_to_us(gk_ticks());
 #elif defined(GEKKO)
    return ticks_to_microsecs(gettime());
 #elif defined(WIIU)
@@ -380,7 +394,89 @@ static unsigned char check_arm_cpu_feature(const char* feature)
 {
    char line[1024];
    unsigned char status = 0;
-   FILE *fp = fopen("/proc/cpuinfo", "r");
+   FILE *fp;
+
+#ifdef CPU_ARM_GETAUXVAL
+   unsigned long mask = 0;
+   unsigned long caps;
+   unsigned long type = AT_HWCAP;
+#if defined(__aarch64__)
+#ifdef HWCAP_ASIMD
+   if (!strcmp(feature, "asimd"))
+      mask = HWCAP_ASIMD;
+#endif
+#ifdef HWCAP_AES
+   if (!strcmp(feature, "aes"))
+      mask = HWCAP_AES;
+#endif
+#ifdef HWCAP_CRC32
+   if (!strcmp(feature, "crc32"))
+      mask = HWCAP_CRC32;
+#endif
+#ifdef HWCAP_SHA1
+   if (!strcmp(feature, "sha1"))
+      mask = HWCAP_SHA1;
+#endif
+#ifdef HWCAP_SHA2
+   if (!strcmp(feature, "sha2"))
+      mask = HWCAP_SHA2;
+#endif
+#ifdef HWCAP_SHA512
+   if (!strcmp(feature, "sha512"))
+      mask = HWCAP_SHA512;
+#endif
+#else
+#ifdef HWCAP_NEON
+   if (!strcmp(feature, "neon"))
+      mask = HWCAP_NEON;
+#endif
+#ifdef HWCAP_VFPv3
+   if (!strcmp(feature, "vfpv3"))
+      mask = HWCAP_VFPv3;
+#endif
+#ifdef HWCAP_VFPv4
+   if (!strcmp(feature, "vfpv4"))
+      mask = HWCAP_VFPv4;
+#endif
+#if defined(AT_HWCAP2) && defined(HWCAP2_AES)
+   if (!strcmp(feature, "aes"))
+   {
+      mask = HWCAP2_AES;
+      type = AT_HWCAP2;
+   }
+#endif
+#if defined(AT_HWCAP2) && defined(HWCAP2_CRC32)
+   if (!strcmp(feature, "crc32"))
+   {
+      mask = HWCAP2_CRC32;
+      type = AT_HWCAP2;
+   }
+#endif
+#if defined(AT_HWCAP2) && defined(HWCAP2_SHA1)
+   if (!strcmp(feature, "sha1"))
+   {
+      mask = HWCAP2_SHA1;
+      type = AT_HWCAP2;
+   }
+#endif
+#if defined(AT_HWCAP2) && defined(HWCAP2_SHA2)
+   if (!strcmp(feature, "sha2"))
+   {
+      mask = HWCAP2_SHA2;
+      type = AT_HWCAP2;
+   }
+#endif
+#endif
+   if (mask)
+   {
+      errno = 0;
+      caps = getauxval(type);
+      if (errno == 0)
+         return (caps & mask) != 0;
+   }
+#endif
+
+   fp = fopen("/proc/cpuinfo", "r");
 
    if (!fp)
       return 0;
@@ -923,7 +1019,9 @@ static size_t cpu_features_processor_order_masked(
 
 size_t cpu_features_get_processor_order(unsigned *s, size_t len)
 {
+#if defined(__linux__) || (defined(_WIN32) && !defined(_XBOX) && !defined(__WINRT__))
    unsigned char allowed[CPU_CLASS_MAX_IDS];
+#endif
    const unsigned char *mask = NULL;
 #if defined(__linux__)
    {

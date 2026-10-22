@@ -14,7 +14,10 @@
  *   - Rec.709 -> target primaries keyed to the frontend "Colour Boost" (same
  *     matrices RetroArch applies, so switching SDR<->HDR10 does not shift
  *     saturation),
- *   - SMPTE ST.2084 (PQ) encode over 0..10000 nits.
+ *   - colours the panel cannot show compressed toward its own gamut boundary,
+ *     when the frontend reports the panel's primaries,
+ *   - SMPTE ST.2084 (PQ) encode over 0..10000 nits, with the bottom of the
+ *     range lifted onto the panel's black when the frontend reports one.
  * Runs in highp; precision qualifiers are ignored on the desktop Vulkan
  * target but keep the intent explicit. */
 #ifndef HDR_H
@@ -32,6 +35,13 @@ highp vec3 pq_encode(highp vec3 nits)
 	highp vec3 y  = clamp(nits / PQ_MAXNITS, vec3(0.0), vec3(1.0));
 	highp vec3 ym = pow(y, vec3(PQ_M1));
 	return pow((PQ_C1 + PQ_C2 * ym) / (1.0 + PQ_C3 * ym), vec3(PQ_M2));
+}
+
+highp vec3 pq_decode(highp vec3 e)
+{
+	highp vec3 p = pow(clamp(e, vec3(0.0), vec3(1.0)), vec3(1.0 / PQ_M2));
+	return PQ_MAXNITS * pow(max(p - vec3(PQ_C1), vec3(0.0)) / (vec3(PQ_C2) - PQ_C3 * p),
+	                        vec3(1.0 / PQ_M1));
 }
 
 /* Inverse of sdr_to_linear. Needed wherever something has to be averaged as
@@ -113,7 +123,7 @@ highp vec3 rec709_to_target(highp vec3 c, int expand_gamut)
 		0.0163916 * c.r + 0.0880132 * c.g + 0.8955950 * c.b);
 }
 
-/* Reference SDR transfer, applied to the whole signal (see encode_hdr10).
+/* Reference SDR transfer, applied to the whole signal (see encode_hdr_output).
  *   0  BT.1886 pure 2.4 - matches RetroArch's own SDR->HDR composition and a
  *      TV-like reference display. Historical behaviour, still the default.
  *   1  pure 2.2 - closer to a PC monitor tracking sRGB's nominal gamma.
@@ -159,7 +169,7 @@ highp float filmic_shoulder(highp float x)
 
 /* Source primaries for a signal-domain consumer: decode, rotate, re-encode.
  *
- * The HDR path gets this for free inside encode_hdr10, which is already
+ * The HDR path gets this for free inside encode_hdr_output, which is already
  * holding linear light. An SDR output has to round-trip for it, which is two
  * extra pow() per pixel - so the identity case returns immediately, and a
  * default configuration pays nothing.
@@ -179,13 +189,71 @@ highp vec3 sdr_apply_src_primaries(highp vec3 rgb, int sdr_eotf, int src_primari
 		sdr_eotf);
 }
 
-/* Entry point for callers that already hold linear light, so it is not decoded
- * and re-encoded on the way in. `scene_linear` is normalised with 1.0 at
- * reference white; values above that are the additive overshoot the roll-off
- * compresses. */
-highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_nits,
-                               highp float peak_nits, int expand_gamut, int shoulder,
-                               int src_primaries)
+/* Panel gamut compression, applied to linear Rec.2020 nits.
+ *
+ * The Rec.2020 container holds colours no consumer panel can show - the
+ * NTSC 1953 primaries, the Colour Boost modes and saturated additive
+ * highlights all land there - and a panel left to its own devices clips them
+ * per channel, which flattens gradients and shifts hue. to_panel maps
+ * Rec.2020 into the panel's own RGB, where "outside the gamut" is simply a
+ * channel below zero.
+ *
+ * In panel RGB each channel's distance from the achromatic axis is
+ * d = (max - c) / max: 0 on the axis, 1 on the gamut boundary, above 1
+ * outside it. Distances past the threshold are compressed with
+ * t + x / (1 + x / (1 - t)), which has unit slope where it starts and
+ * approaches the boundary asymptotically, so nothing is clipped and the
+ * transition is C1. The largest channel is untouched, so the highlight
+ * roll-off's luminance placement survives. Only the outer tenth of the
+ * panel's own gamut is touched among colours it can show; everything
+ * further in, which is nearly all content, passes through bit for bit.
+ *
+ * A zero matrix means the panel is unknown, and the colour is returned as is. */
+highp vec3 panel_gamut_compress(highp vec3 lin2020, highp mat3 to_panel)
+{
+	const highp float T = 0.9;
+	const highp float S = 1.0 - T;
+	highp vec3  p;
+	highp float ach;
+	highp vec3  d;
+	highp vec3  x;
+	if (to_panel[0][0] == 0.0)
+		return lin2020;
+	p   = to_panel * lin2020;
+	ach = max(p.r, max(p.g, p.b));
+	if (ach <= 0.0)
+		return lin2020;
+	d   = (vec3(ach) - p) / ach;
+	if (max(d.r, max(d.g, d.b)) <= T)
+		return lin2020;
+	x   = max(d - vec3(T), vec3(0.0));
+	d   = mix(d, vec3(T) + x / (vec3(1.0) + x / S), greaterThan(d, vec3(T)));
+	return inverse(to_panel) * (vec3(ach) - d * ach);
+}
+
+/* Display black floor: the BT.2390 EETF toe, E + b * (1 - E)^4 in the PQ
+ * domain, with b = PQ(panel black). A panel cannot go below its black, so
+ * without this everything encoded under it is crushed into one level; the
+ * toe lands code 0 on the panel's black and lifts the shadows above it with
+ * a weight that has fallen to nothing well before paper white. b is computed
+ * on the CPU; at 0 the curve is the identity. */
+highp vec3 pq_black_floor(highp vec3 e, highp float black_pq)
+{
+	highp vec3 t;
+	if (black_pq <= 0.0)
+		return e;
+	t = vec3(1.0) - e;
+	t = t * t;
+	return e + black_pq * (t * t);
+}
+
+/* The grade both HDR outputs share: linear light in, absolute nits out, in
+ * the Rec.2020 container after the Colour Boost rotation and panel gamut
+ * compression. `scene_linear` is normalised with 1.0 at reference white;
+ * values above that are the additive overshoot the roll-off compresses. */
+highp vec3 hdr_grade_linear(highp vec3 scene_linear, highp float paper_white_nits,
+                            highp float peak_nits, int expand_gamut, int shoulder,
+                            int src_primaries, highp mat3 to_panel)
 {
 	/* STEP 3: one transfer function across the whole range, then compress
 	 * whatever lands above paper white.
@@ -212,7 +280,7 @@ highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_
 	 * factor keeps the overshoot's chromaticity, so a hot additive red stays
 	 * red. Dim channels are left alone, as before. */
 	/* peak_nits is what the display can actually reach, supplied by the
-	 * frontend through GET_HDR_MAX_NITS. Everything above paper white and
+	 * frontend as GET_HDR_METADATA max_nits. Everything above paper white and
 	 * below it is the headroom available for highlights, so a wrong value is
 	 * either wasted range or clipping - which is why this stopped being the
 	 * hardcoded 1000 it was.
@@ -253,15 +321,52 @@ highp vec3 encode_hdr10_linear(highp vec3 scene_linear, highp float paper_white_
 	}
 	lin = min(lin, vec3(paper_white_nits)) + over * knee;
 	lin = rec709_to_target(lin, expand_gamut);
-	return pq_encode(lin);
+	return panel_gamut_compress(lin, to_panel);
 }
 
-highp vec3 encode_hdr10(highp vec3 rgb, highp float paper_white_nits, highp float peak_nits,
-                        int expand_gamut, int shoulder, int sdr_eotf, int src_primaries)
+/* Rec.2020 -> Rec.709, the inverse of the Accurate rotation. */
+highp vec3 rec2020_to_709(highp vec3 c)
 {
-	return encode_hdr10_linear(sdr_to_linear(max(rgb, vec3(0.0)), sdr_eotf),
-	                           paper_white_nits, peak_nits, expand_gamut, shoulder,
-	                           src_primaries);
+	return vec3(
+		 1.6604903 * c.r + -0.5876391 * c.g + -0.0728516 * c.b,
+		-0.1245500 * c.r +  1.1328999 * c.g + -0.0083480 * c.b,
+		-0.0181511 * c.r + -0.1005787 * c.g +  1.1187299 * c.b);
+}
+
+/* HDR output from linear light, in the format the frontend accepted.
+ *
+ *   scrgb == 0  HDR10: PQ-encoded Rec.2020, with the black-floor toe in the
+ *               PQ domain.
+ *   scrgb != 0  RETRO_PIXEL_FORMAT_SCRGB_RGBA16F: linear Rec.709, 1.0 = 80
+ *               nits. The same graded light, so the two formats present the
+ *               same picture: the container rotation is undone exactly, colours
+ *               outside Rec.709 are negative rather than clipped, and the toe
+ *               is applied through a PQ round trip so it lands where the HDR10
+ *               path puts it. That round trip runs only when a black level is
+ *               known.
+ *
+ * scrgb comes from a push constant, so the branch is uniform. */
+highp vec3 encode_hdr_output_linear(highp vec3 scene_linear, highp float paper_white_nits,
+                                    highp float peak_nits, int expand_gamut, int shoulder,
+                                    int src_primaries, highp float black_pq,
+                                    highp mat3 to_panel, int scrgb)
+{
+	highp vec3 lin = hdr_grade_linear(scene_linear, paper_white_nits, peak_nits,
+	                                  expand_gamut, shoulder, src_primaries, to_panel);
+	if (scrgb == 0)
+		return pq_black_floor(pq_encode(lin), black_pq);
+	if (black_pq > 0.0)
+		lin = pq_decode(pq_black_floor(pq_encode(lin), black_pq));
+	return rec2020_to_709(lin) * (1.0 / 80.0);
+}
+
+highp vec3 encode_hdr_output(highp vec3 rgb, highp float paper_white_nits, highp float peak_nits,
+                             int expand_gamut, int shoulder, int sdr_eotf, int src_primaries,
+                             highp float black_pq, highp mat3 to_panel, int scrgb)
+{
+	return encode_hdr_output_linear(sdr_to_linear(max(rgb, vec3(0.0)), sdr_eotf),
+	                                paper_white_nits, peak_nits, expand_gamut, shoulder,
+	                                src_primaries, black_pq, to_panel, scrgb);
 }
 
 /* ---- Debanding dither -----------------------------------------------------

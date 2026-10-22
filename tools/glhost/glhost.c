@@ -12,6 +12,8 @@
  *
  * Usage: glhost <core.so> <content> [savestate|-] [frames] [outdir]
  *   GLHOST_VARS: semicolon list of key=value core option overrides.
+ *   HOST_HDR_*: the display presented through GET_HDR_METADATA and
+ *   GET_DISPLAY_METADATA; see tools/hdr_display/host_metadata.h.
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -24,6 +26,7 @@
 #include <EGL/eglext.h>
 #include <GL/gl.h>
 #include "libretro.h"
+#include "../hdr_display/host_metadata.h"
 
 /* ---- core option overrides / harvested defaults ---- */
 static char *var_keys[512]; static char *var_vals[512]; static int n_vars;
@@ -31,6 +34,43 @@ static void add_var(const char *k, const char *v)
 { if (n_vars < 512) { var_keys[n_vars] = strdup(k); var_vals[n_vars] = strdup(v); n_vars++; } }
 static const char *find_var(const char *k)
 { int i; for (i = 0; i < n_vars; i++) if (!strcmp(var_keys[i], k)) return var_vals[i]; return NULL; }
+/* Further knobs:
+ *   GLHOST_VARS_AT: semicolon list of frame:key=value option changes, each
+ *     applied before that frame's retro_run and reported through
+ *     GET_VARIABLE_UPDATE, as a frontend does when the user edits an option.
+ *   GLHOST_HIDE_PROCS: comma list of GL entry points get_proc_address
+ *     reports missing, modelling an older driver (e.g. glProvokingVertex
+ *     on GL 3.0/3.1).
+ *   GLHOST_RAM_OUT: path:offset:length - after the last frame, write that
+ *     window of system RAM to path (content can copy VRAM there via GP0). */
+static int vars_updated;
+static void set_var(const char *k, const char *v)
+{
+   int i;
+   for (i = 0; i < n_vars; i++)
+      if (!strcmp(var_keys[i], k))
+      { free(var_vals[i]); var_vals[i] = strdup(v); vars_updated = 1; return; }
+   add_var(k, v); vars_updated = 1;
+}
+/* Apply the GLHOST_VARS_AT entries scheduled for this frame. */
+static void apply_vars_at(int frame)
+{
+   const char *at = getenv("GLHOST_VARS_AT");
+   char *dup, *tok;
+   if (!at) return;
+   dup = strdup(at);
+   for (tok = strtok(dup, ";"); tok; tok = strtok(NULL, ";"))
+   {
+      char *colon = strchr(tok, ':'), *eq;
+      if (!colon || atoi(tok) != frame) continue;
+      eq = strchr(colon + 1, '=');
+      if (!eq) continue;
+      *eq = 0;
+      fprintf(stderr, "[glhost] frame %d: %s=%s\n", frame, colon + 1, eq + 1);
+      set_var(colon + 1, eq + 1);
+   }
+   free(dup);
+}
 
 /* ---- state ---- */
 static void *core;
@@ -57,7 +97,21 @@ static void log_cb(enum retro_log_level level, const char *fmt, ...)
 /* ---- HW render callbacks the core consumes ---- */
 static uintptr_t get_current_framebuffer(void) { return (uintptr_t)fbo; }
 static retro_proc_address_t get_proc_address(const char *sym)
-{ return (retro_proc_address_t)eglGetProcAddress(sym); }
+{
+   const char *hide = getenv("GLHOST_HIDE_PROCS");
+   if (hide)
+   {
+      size_t n = strlen(sym);
+      const char *p = hide;
+      while ((p = strstr(p, sym)) != NULL)
+      {
+         if ((p == hide || p[-1] == ',') && (p[n] == ',' || p[n] == 0))
+            return NULL;
+         p += n;
+      }
+   }
+   return (retro_proc_address_t)eglGetProcAddress(sym);
+}
 
 /* ---- environment ---- */
 /* ---- software-renderer mode ----
@@ -101,7 +155,11 @@ static bool env_cb(unsigned cmd, void *data)
          *(const char **)data = savedir; return true;
       case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
          soft_fmt = *(const unsigned *)data;
+         fprintf(stderr, "[glhost] pixel format %u\n", soft_fmt);
          return true;
+      case RETRO_ENVIRONMENT_GET_HDR_METADATA:
+      case RETRO_ENVIRONMENT_GET_DISPLAY_METADATA:
+         return host_hdr_metadata(cmd, data);
       case RETRO_ENVIRONMENT_GET_CAN_DUPE:
          *(bool *)data = true; return true;
       case RETRO_ENVIRONMENT_SET_VARIABLES:
@@ -146,7 +204,7 @@ static bool env_cb(unsigned cmd, void *data)
          return v != NULL;
       }
       case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
-         *(bool *)data = false; return true;
+         *(bool *)data = vars_updated != 0; vars_updated = 0; return true;
       case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
       {
          /* Only answered once the run loop starts, so the boot savestate
@@ -314,6 +372,19 @@ static int fbo_init(void)
    return 1;
 }
 
+/* A core that negotiated RETRO_PIXEL_FORMAT_SCRGB_RGBA16F gets an RGBA16F
+ * "default framebuffer", as a frontend accepting the format must give it, and
+ * the dump also writes the float samples to <path>.raw (RGBA float32,
+ * bottom-up as GL reads them). */
+static int fbo_fp16;
+static void fbo_make_fp16(void)
+{
+   glBindTexture(GL_TEXTURE_2D, fbo_tex);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, fbo_w, fbo_h, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+   fbo_fp16 = 1;
+   fprintf(stderr, "[glhost] framebuffer RGBA16F for scRGB\n");
+}
+
 static void dump_frame(const char *path)
 {
    unsigned w = last_w ? last_w : 640, h = last_h ? last_h : 480;
@@ -355,6 +426,20 @@ static void dump_frame(const char *path)
    bindfb_t pglBindFramebuffer = (bindfb_t)eglGetProcAddress("glBindFramebuffer");
    if (!buf) return;
    pglBindFramebuffer(GL_FRAMEBUFFER, fbo);
+   if (fbo_fp16)
+   {
+      float *fb = malloc((size_t)w * h * 4 * sizeof(float));
+      if (fb)
+      {
+         char  rawpath[1100];
+         FILE *rf;
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_FLOAT, fb);
+         snprintf(rawpath, sizeof(rawpath), "%s.raw", path);
+         rf = fopen(rawpath, "wb");
+         if (rf) { fwrite(fb, sizeof(float), (size_t)w * h * 4, rf); fclose(rf); }
+         free(fb);
+      }
+   }
    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, buf);
    f = fopen(path, "wb");
    if (f)
@@ -493,6 +578,8 @@ int main(int argc, char **argv)
      if (!((load_t)dlsym(core, "retro_load_game"))(&info))
      { fprintf(stderr, "[glhost] retro_load_game failed\n"); return 4; }
    }
+   if (soft_fmt == RETRO_PIXEL_FORMAT_SCRGB_RGBA16F)
+      fbo_make_fp16();
 
    if (!hw_render.context_reset)
    {
@@ -544,6 +631,7 @@ int main(int argc, char **argv)
      for (i = 1; i <= frames; i++)
      {
         input_frame = (unsigned)i;
+        apply_vars_at(i);
         if (preempt && (i < 5 || (i % 50) == 0))
            fprintf(stderr, "[glhost] frame %d serialize_size=%zu\n", i, ssz());
         if (preempt == 1)
@@ -637,6 +725,30 @@ int main(int argc, char **argv)
    }
    fprintf(stderr, "[glhost] done: %d frames run, %u presented, last %ux%u\n",
            frames, frames_presented, last_w, last_h);
+
+   { const char *ro = getenv("GLHOST_RAM_OUT");
+     if (ro)
+     {
+        typedef void *(*mem_data_t)(unsigned);
+        typedef size_t (*mem_size_t)(unsigned);
+        char path[1024]; unsigned long off = 0, len = 0;
+        const char *c1 = strchr(ro, ':');
+        unsigned char *ram = (unsigned char *)((mem_data_t)dlsym(core,
+              "retro_get_memory_data"))(RETRO_MEMORY_SYSTEM_RAM);
+        size_t ram_size = ((mem_size_t)dlsym(core,
+              "retro_get_memory_size"))(RETRO_MEMORY_SYSTEM_RAM);
+        FILE *f;
+        if (!c1 || (size_t)(c1 - ro) >= sizeof(path) ||
+            sscanf(c1 + 1, "%lx:%lx", &off, &len) != 2 || !ram ||
+            off + len > ram_size)
+        { fprintf(stderr, "[glhost] GLHOST_RAM_OUT invalid\n"); return 5; }
+        memcpy(path, ro, c1 - ro); path[c1 - ro] = 0;
+        f = fopen(path, "wb");
+        if (!f || fwrite(ram + off, 1, len, f) != len)
+        { fprintf(stderr, "[glhost] GLHOST_RAM_OUT write failed\n"); return 5; }
+        fclose(f);
+     }
+   }
 
    ((fn_t)dlsym(core, "retro_unload_game"))();
    ((fn_t)dlsym(core, "retro_deinit"))();

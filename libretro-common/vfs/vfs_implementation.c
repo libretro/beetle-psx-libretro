@@ -859,7 +859,7 @@ libretro_vfs_implementation_file *retro_vfs_file_open_impl(
          case VFS_SCHEME_CDROM:
             retro_vfs_file_open_cdrom(stream, path, mode, hints);
 #if defined(_WIN32) && !defined(_XBOX)
-            if (!stream->fh)
+            if (!stream->fh || stream->fh == INVALID_HANDLE_VALUE)
                goto error;
 #elif defined(__APPLE__)
             if (!stream->iokit_mmc)
@@ -1200,13 +1200,14 @@ error:
 
 int retro_vfs_file_close_impl(libretro_vfs_implementation_file *stream)
 {
+   int result = 0;
    if (!stream)
       return -1;
 
 #ifdef HAVE_CDROM
    if (stream->scheme == VFS_SCHEME_CDROM)
    {
-      retro_vfs_file_close_cdrom(stream);
+      result = retro_vfs_file_close_cdrom(stream);
       goto end;
    }
 #endif
@@ -1229,7 +1230,8 @@ int retro_vfs_file_close_impl(libretro_vfs_implementation_file *stream)
    if ((stream->hints & RFILE_HINT_UNBUFFERED) == 0)
    {
       if (stream->fp)
-         fclose(stream->fp);
+         if (fclose(stream->fp) != 0)
+            result = -1;
    }
    else
    {
@@ -1253,9 +1255,11 @@ int retro_vfs_file_close_impl(libretro_vfs_implementation_file *stream)
    if (stream->fd >= 0)
    {
 #if defined(VITA)
-      sceIoClose((SceUID)stream->fd);
+      if (sceIoClose((SceUID)stream->fd) < 0)
+         result = -1;
 #else
-      close(stream->fd);
+      if (close(stream->fd) != 0)
+         result = -1;
 #endif
    }
 #ifdef HAVE_CDROM
@@ -1282,7 +1286,7 @@ netend:
 
    free(stream);
 
-   return 0;
+   return result;
 }
 
 int retro_vfs_file_error_impl(libretro_vfs_implementation_file *stream)
@@ -1330,14 +1334,10 @@ int64_t retro_vfs_file_size_impl(libretro_vfs_implementation_file *stream)
  * The two control codes are the documented CTL_CODE expansions:
  *   FSCTL_SET_SPARSE    = CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 49, METHOD_BUFFERED, FILE_SPECIAL_ACCESS)
  *   FSCTL_SET_ZERO_DATA = CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 50, METHOD_BUFFERED, FILE_WRITE_DATA)
- * Each is guarded, so a translation unit that has already seen
- * winioctl.h through some other path keeps that header's definitions. */
-#ifndef FSCTL_SET_SPARSE
-#define FSCTL_SET_SPARSE 0x000900c4
-#endif
-#ifndef FSCTL_SET_ZERO_DATA
-#define FSCTL_SET_ZERO_DATA 0x000980c8
-#endif
+ * They carry their own names so a translation unit that also sees
+ * winioctl.h holds one definition of each. */
+#define RA_FSCTL_SET_SPARSE    0x000900c4
+#define RA_FSCTL_SET_ZERO_DATA 0x000980c8
 #ifndef FILE_ZERO_DATA_INFORMATION_DEFINED
 #define FILE_ZERO_DATA_INFORMATION_DEFINED
 typedef struct _RETRO_FILE_ZERO_DATA_INFORMATION
@@ -1549,13 +1549,13 @@ int retro_vfs_file_punch_hole_impl(libretro_vfs_implementation_file *stream,
        * zeroes, which is correct but saves nothing. Marking is idempotent. */
       {
          DWORD tmp = 0;
-         DeviceIoControl(handle, FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &tmp, NULL);
+         DeviceIoControl(handle, RA_FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &tmp, NULL);
       }
 
       zero_info.FileOffset.QuadPart      = offset;
       zero_info.BeyondFinalZero.QuadPart = offset + len;
 
-      if (!DeviceIoControl(handle, FSCTL_SET_ZERO_DATA, &zero_info,
+      if (!DeviceIoControl(handle, RA_FSCTL_SET_ZERO_DATA, &zero_info,
                sizeof(zero_info), NULL, 0, &returned, NULL))
          return -1;
       return 0;
@@ -1568,9 +1568,12 @@ int retro_vfs_file_punch_hole_impl(libretro_vfs_implementation_file *stream,
  * undeclared function -- a warning today, an error on stricter
  * compilers, and wrong argument passing for the off_t pair on 32-bit.
  * Require the declaration too, and fall through to the unsupported
- * path when it is absent. */
+ * path when it is absent. uClibc declares it only from uClibc-ng 1.0
+ * on, and only with its Linux-specific API enabled. */
 #elif defined(__linux__) && defined(FALLOC_FL_PUNCH_HOLE) \
-      && (defined(_GNU_SOURCE) || defined(__USE_GNU))
+      && (defined(_GNU_SOURCE) || defined(__USE_GNU)) \
+      && (!defined(__UCLIBC__) || (defined(__UCLIBC_LINUX_SPECIFIC__) \
+         && defined(__UCLIBC_MAJOR__) && __UCLIBC_MAJOR__ >= 1))
    {
       int fd = stream->fd;
 
@@ -1621,7 +1624,7 @@ int64_t retro_vfs_file_truncate_impl(libretro_vfs_implementation_file *stream, i
 	   return 0;
    }
 #endif
-#elif !defined(VITA) && !defined(PSP) && !defined(PS2) && !defined(ORBIS) && (!defined(SWITCH) || defined(HAVE_LIBNX))
+#elif !defined(VITA) && !defined(PSP) && !defined(PS2) && !defined(ORBIS)
    if (stream && stream->fp && ftruncate(fileno(stream->fp), (off_t)len) == 0)
    {
       stream->size = len;
@@ -2225,7 +2228,7 @@ int retro_vfs_file_rename_impl(const char *old_path, const char *new_path)
       free(aside);
       return ret;
    }
-#elif defined(_3DS) || defined(PS2) || defined(WIIU) || defined(GEKKO) || defined(__PSL1GHT__) || defined(__PS3__) || (defined(SWITCH) && defined(HAVE_LIBNX))
+#elif defined(_3DS) || defined(PS2) || defined(WIIU) || defined(GEKKO) || defined(__PSL1GHT__) || defined(__PS3__) || defined(SWITCH)
    /* The filesystems here refuse to rename onto an existing entry -
     * FS on 3DS and Switch, FatFs behind bdmfs_fatfs on PS2, libfat
     * on Wii and GameCube, LV2's sys_fs_rename on PS3 - and libnx,
@@ -2287,6 +2290,102 @@ const char *retro_vfs_file_get_path_impl(
    if (!stream)
       return NULL;
    return stream->orig_path;
+}
+
+#if defined(_WIN32) && !defined(_XBOX) && !defined(HAVE_MMAP)
+/* PrefetchVirtualMemory is Windows 8 and later; resolved by name so the
+ * binary still loads where it is absent. */
+typedef struct
+{
+   PVOID  VirtualAddress;
+   SIZE_T NumberOfBytes;
+} vfs_win32_memory_range_t;
+typedef BOOL (WINAPI *vfs_prefetch_t)(HANDLE, ULONG_PTR,
+      vfs_win32_memory_range_t*, ULONG);
+
+static vfs_prefetch_t vfs_win32_prefetch(void)
+{
+   static vfs_prefetch_t p_prefetch;
+   static int            resolved;
+
+   if (!resolved)
+   {
+      HMODULE k32 = GetModuleHandleA("kernel32.dll");
+
+      resolved = 1;
+      if (k32)
+         p_prefetch = (vfs_prefetch_t)GetProcAddress(k32,
+               "PrefetchVirtualMemory");
+   }
+   return p_prefetch;
+}
+#endif
+
+void retro_vfs_file_prefetch_impl(
+      libretro_vfs_implementation_file *stream, uint64_t offset,
+      uint64_t len)
+{
+   if (!stream || !len)
+      return;
+   if (stream->scheme != VFS_SCHEME_NONE)
+      return;
+
+#ifdef VFS_HAVE_FILE_MAPPING
+   if (stream->mapped
+         && (stream->hints & RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS))
+   {
+      size_t page;
+      size_t lo, hi;
+
+      if (offset >= stream->mapsize)
+         return;
+      if (len > stream->mapsize - offset)
+         len = stream->mapsize - offset;
+#if defined(HAVE_MMAP)
+      {
+         long sz = sysconf(_SC_PAGESIZE);
+         page    = sz > 0 ? (size_t)sz : 0;
+      }
+#else
+      {
+         SYSTEM_INFO si;
+         GetSystemInfo(&si);
+         page = si.dwPageSize;
+      }
+#endif
+      if (!page)
+         return;
+      lo = (size_t)offset & ~(page - 1);
+      hi = (size_t)(offset + len);
+#if defined(HAVE_MMAP)
+      /* Older libc feature profiles may expose only the POSIX advice API.
+       * Prefetch is advisory: leave it a no-op if neither API is exposed. */
+#if defined(MADV_WILLNEED)
+      madvise(stream->mapped + lo, hi - lo, MADV_WILLNEED);
+#elif defined(POSIX_MADV_WILLNEED)
+      posix_madvise(stream->mapped + lo, hi - lo, POSIX_MADV_WILLNEED);
+#endif
+#else
+      {
+         vfs_prefetch_t            prefetch = vfs_win32_prefetch();
+         vfs_win32_memory_range_t  range;
+
+         if (!prefetch)
+            return;
+         range.VirtualAddress = stream->mapped + lo;
+         range.NumberOfBytes  = hi - lo;
+         prefetch(GetCurrentProcess(), 1, &range, 0);
+      }
+#endif
+      return;
+   }
+#endif
+
+#if defined(POSIX_FADV_WILLNEED) && !defined(_WIN32)
+   if (stream->fd >= 0)
+      posix_fadvise(stream->fd, (off_t)offset, (off_t)len,
+            POSIX_FADV_WILLNEED);
+#endif
 }
 
 const uint8_t *retro_vfs_file_get_mapped_ptr_impl(

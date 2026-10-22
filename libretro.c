@@ -32,6 +32,7 @@ retro_input_state_t dbg_input_state_cb = 0;
 
 #include "pgxp/pgxp_main.h"
 #include "pgxp/pgxp_gte.h"
+#include "rhi/hdr_display.h"
 
 #include "deps/openbios/openbios.bin.h"
 
@@ -202,6 +203,7 @@ enum dither_mode psx_gpu_dither_mode;
  * 10-bit end to end. */
 int   psx_color_format         = PSX_COLOR_FORMAT_24BIT;
 bool  psx_hdr_active           = false;
+int   psx_hdr_scrgb            = 0;
 /* Peak the display can reach. The gap above paper white is the whole headroom
  * for highlights, so guessing it wrong either wastes range or clips. 1000 is
  * the fallback for a frontend that does not answer: it is the HDR10 reference
@@ -210,6 +212,18 @@ float psx_hdr_max_nits         = 1000.0f;
 float psx_hdr_paper_white_nits = 200.0f;
 int   psx_hdr_expand_gamut     = 0;   /* VID_GAMUT_ACCURATE equivalent */
 int   psx_hdr_output_mode      = 1;   /* assume HDR10 when unqueryable */
+/* Display state for the encode, both zero until the frontend reports it:
+ * PQ(panel black) for the BT.2390 toe, and linear Rec.2020 -> panel RGB
+ * (column-major) for gamut compression, zero meaning the panel is unknown. */
+float psx_hdr_black_pq         = 0.0f;
+float psx_hdr_to_panel[9]      = { 0.0f };
+/* Which metadata query the frontend answers, settled on first use: 0 when
+ * it answers neither, so the per-frame refresh costs nothing there. The
+ * primaries and black the derived values above were built from are kept so
+ * they are only rebuilt when the frontend reports a change. */
+static unsigned hdr_meta_cmd;
+static uint16_t hdr_panel_xy[8];
+static float    hdr_black_nits;
 /* HDR highlight roll-off curve applied to the over-paper-white region only:
  * 0 = Reinhard soft-knee (default, matches the validated behaviour),
  * 1 = ACES filmic shoulder. No core option yet - flip here to evaluate. */
@@ -221,15 +235,23 @@ int   psx_hdr_overbright_hot   = 0;
 int   psx_pgxp_color           = 0;
 int   psx_pgxp_fog             = 0;
 int   psx_hdr_multipass        = 0;
-/* Vulkan native 15-bit colour rendering (write-time RGB5 quantisation).
- * Opt-in; consulted per frame by rhi_vulkan_prepare_frame. */
-int   psx_native_color         = 0;
+enum psx_internal_color_mode_e psx_internal_color_mode =
+      PSX_INTERNAL_COLOR_16BPP;
 
 static void reset_hdr_output_state(void)
 {
-   psx_hdr_active = false;
-   psx_pgxp_color = 0;
-   psx_pgxp_fog   = 0;
+   unsigned i;
+   psx_hdr_active   = false;
+   psx_hdr_scrgb    = 0;
+   psx_pgxp_color   = 0;
+   psx_pgxp_fog     = 0;
+   psx_hdr_black_pq = 0.0f;
+   hdr_black_nits   = 0.0f;
+   hdr_meta_cmd     = RETRO_ENVIRONMENT_GET_DISPLAY_METADATA;
+   for (i = 0; i < 9; i++)
+      psx_hdr_to_panel[i] = 0.0f;
+   for (i = 0; i < 8; i++)
+      hdr_panel_xy[i]     = 0;
 }
 
 /* Reference SDR transfer the 24-bit path is assumed to have been viewed
@@ -266,6 +288,14 @@ float psx_phase_error          = 0.0f;
 int   psx_black_setup          = 0;
 
 #define NEGCON_RANGE 0x7FFF
+
+/* Memory card paths: a save directory plus a file name. At libretro-common's
+ * desktop PATH_MAX_LENGTH there is room for any directory a frontend hands
+ * over from a DIR_MAX_LENGTH buffer. Every card path is built at this size,
+ * so the file a card loads from is the file it saves to. The extension
+ * buffer holds "%d.mcr", at most 15 characters. */
+#define MEMCARD_PATH_MAX 2048
+#define MEMCARD_EXT_MAX  16
 
 char retro_save_directory[4096];
 char retro_base_directory[4096];
@@ -366,9 +396,9 @@ static void apply_game_compatibility_settings(void)
 
 static void apply_setting_dependencies(void)
 {
-   /* Vertex caching is parsed independently of the operation mode, so
-    * key the line expansion on the mode alone: with PGXP off no precise
-    * geometry exists and the native GL line path must stay in use. */
+   /* This compatibility opt-out applies only to PGXP line expansion.
+    * With PGXP off, the renderer selects exact native pixels or expanded
+    * quads for enhanced rendering independently of vertex caching. */
    psx_pgxp_gl_line_expansion = compatibility_settings_enabled &&
          psx_pgxp_mode != PGXP_MODE_NONE;
 }
@@ -3411,8 +3441,8 @@ static void InitCommon(const bool EmulateMemcards, const bool WantPIOMem)
 
    for(; i < 8; i++)
    {
-      char ext[64];
-      char memcard[4096];
+      char ext[MEMCARD_EXT_MAX];
+      char memcard[MEMCARD_PATH_MAX];
       if (i == 0)
          snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
       else if (i == 1)
@@ -3850,8 +3880,8 @@ static void CloseGame(void)
    {
       for (i = 0; i < 8; i++)
       {
-         char ext[64];
-         char memcard[4096];
+         char ext[MEMCARD_EXT_MAX];
+         char memcard[MEMCARD_PATH_MAX];
 
          if (i == 0 && !use_mednafen_memcard0_method)
          {
@@ -4564,6 +4594,18 @@ static void check_variables(bool startup)
 {
    struct retro_variable var = {0};
 
+   /* Read before refreshing either renderer, so an option change cannot
+    * rebuild storage using the previous frame's drawing policy. */
+   psx_internal_color_mode = PSX_INTERNAL_COLOR_16BPP;
+   var.key = BEETLE_OPT(depth);
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "native"))
+         psx_internal_color_mode = PSX_INTERNAL_COLOR_NATIVE;
+      else if (!strcmp(var.value, "32bpp"))
+         psx_internal_color_mode = PSX_INTERNAL_COLOR_32BPP;
+   }
+
    var.key = BEETLE_OPT(compatibility_settings);
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       compatibility_settings_enabled = strcmp(var.value, "disabled") != 0;
@@ -4991,17 +5033,18 @@ static void check_variables(bool startup)
 
       /* Record the requested output color format. This is only the
        * user's *request*; HDR is not engaged here. Whether it actually
-       * takes effect is decided later, once the renderer is confirmed
-       * to be Vulkan and the frontend's HDR capability is queried (see
-       * the RHI_VULKAN case after rhi_intf_open). The SW/GL paths and
-       * HDR-incapable frontends leave psx_hdr_active false and render
-       * exactly as before. */
+       * takes effect is decided after rhi_intf_open, once the hardware
+       * renderer and frontend accept HDR10. Software and rejected HDR
+       * requests leave psx_hdr_active false and use the selected SDR
+       * color policy. The output-format option requires a restart. */
       var.key = BEETLE_OPT(color_format);
       psx_color_format = PSX_COLOR_FORMAT_24BIT;
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
          if (!strcmp(var.value, "30bit_hdr"))
             psx_color_format = PSX_COLOR_FORMAT_30BIT_HDR;
+         else if (!strcmp(var.value, "64bit_scrgb"))
+            psx_color_format = PSX_COLOR_FORMAT_64BIT_SCRGB;
       }
 
       /* HDR highlight roll-off curve (Vulkan HDR path only): 0 Reinhard,
@@ -5119,16 +5162,6 @@ static void check_variables(bool startup)
    }
    else
       psx_gpu_dither_mode = DITHER_NATIVE;
-
-#ifdef HAVE_VULKAN
-   var.key = BEETLE_OPT(native_color);
-   psx_native_color = 0;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      if (!strcmp(var.value, "enabled"))
-         psx_native_color = 1;
-   }
-#endif
 
    // iCB: PGXP settings
    var.key = BEETLE_OPT(pgxp_mode);
@@ -6000,20 +6033,185 @@ error:
    return false;
 }
 
+static void hdr_metadata_init(struct retro_hdr_metadata *m)
+{
+   unsigned i;
+   m->version           = 1;
+   m->size              = sizeof(*m);
+   m->output_mode       = 0;
+   m->source_formats    = 0;
+   m->paper_white_nits  = 0.0f;
+   m->max_nits          = 0.0f;
+   m->min_nits          = 0.0f;
+   m->expand_gamut      = 0;
+   m->max_cll           = 0.0f;
+   m->max_fall          = 0.0f;
+   m->color_primaries   = 0;
+   m->transfer_function = 0;
+   m->passthrough       = false;
+   m->tonemap_operator  = 0;
+   for (i = 0; i < sizeof(m->reserved) / sizeof(m->reserved[0]); i++)
+      m->reserved[i]    = 0;
+}
+
+/* Asks for GET_DISPLAY_METADATA, which carries the HDR block plus the
+ * panel's own capabilities, and drops to GET_HDR_METADATA (caps left zero)
+ * on a frontend that only has that. Returns false when neither is answered. */
+static bool query_hdr_metadata(struct retro_display_metadata *d)
+{
+   unsigned i;
+   d->version                   = 1;
+   d->size                      = sizeof(*d);
+   d->geo.native_width          = 0;
+   d->geo.native_height         = 0;
+   d->geo.width_mm              = 0;
+   d->geo.height_mm             = 0;
+   d->geo.refresh_min_mHz       = 0;
+   d->geo.refresh_max_mHz       = 0;
+   hdr_metadata_init(&d->hdr);
+   d->caps.peak_nits            = 0.0f;
+   d->caps.min_nits             = 0.0f;
+   d->caps.max_frame_avg_nits   = 0.0f;
+   for (i = 0; i < 8; i++)
+      d->caps.primaries_xy[i]   = 0;
+   d->caps.supported_eotf_mask  = 0;
+   d->caps.edid_gamma_x100      = 0;
+   d->caps.capability_source    = 0;
+
+   if (hdr_meta_cmd == RETRO_ENVIRONMENT_GET_DISPLAY_METADATA)
+   {
+      if (environ_cb(RETRO_ENVIRONMENT_GET_DISPLAY_METADATA, d))
+         return true;
+      hdr_meta_cmd = RETRO_ENVIRONMENT_GET_HDR_METADATA;
+   }
+   if (hdr_meta_cmd == RETRO_ENVIRONMENT_GET_HDR_METADATA)
+   {
+      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_METADATA, &d->hdr))
+         return true;
+      hdr_meta_cmd = 0;
+   }
+   return false;
+}
+
+/* Moves an answered query into the globals the output encode works from.
+ * A zero paper white or peak is ignored rather than letting the encode
+ * divide or clamp against nothing. The frontend's own peak and black are
+ * its effective targets and win; the panel's measured values fill in only
+ * where the frontend reports none. */
+static void apply_hdr_metadata(const struct retro_display_metadata *d)
+{
+   const struct retro_hdr_metadata *h = &d->hdr;
+   float black = (h->min_nits > 0.0f) ? h->min_nits : d->caps.min_nits;
+
+   if (h->paper_white_nits > 0.0f)
+      psx_hdr_paper_white_nits = h->paper_white_nits;
+   if (h->max_nits > 0.0f)
+      psx_hdr_max_nits         = h->max_nits;
+   else if (d->caps.peak_nits > 0.0f)
+      psx_hdr_max_nits         = d->caps.peak_nits;
+   psx_hdr_expand_gamut        = (int)h->expand_gamut;
+   psx_hdr_output_mode         = (int)h->output_mode;
+
+   /* A black at or above paper white is not a black level. */
+   if (!(black > 0.0f && black < psx_hdr_paper_white_nits))
+      black = 0.0f;
+   if (black != hdr_black_nits)
+   {
+      hdr_black_nits   = black;
+      psx_hdr_black_pq = (black > 0.0f) ? hdr_display_pq(black) : 0.0f;
+   }
+
+   if (memcmp(hdr_panel_xy, d->caps.primaries_xy, sizeof(hdr_panel_xy)) != 0)
+   {
+      memcpy(hdr_panel_xy, d->caps.primaries_xy, sizeof(hdr_panel_xy));
+      hdr_display_panel_matrix(hdr_panel_xy, psx_hdr_to_panel);
+   }
+}
+
+/* Memory card file swaps and saves, out of line: each holds a full path
+ * buffer, which would otherwise sit in retro_run's frame every frame for a
+ * branch taken only when a card is switched or saved. */
+static NO_INLINE void memcard_swap_index(unsigned port, int old_index, int new_index)
+{
+   char ext[MEMCARD_EXT_MAX];
+   char memcard[MEMCARD_PATH_MAX];
+
+   /* Save the slot's contents to the previously selected index */
+   snprintf(ext, sizeof(ext), "%d.mcr", old_index);
+   MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
+   FrontIO_SaveMemcardToPath(PSX_FIO, port, memcard, true);
+
+   /* Load the currently selected index into the slot */
+   snprintf(ext, sizeof(ext), "%d.mcr", new_index);
+   MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
+   FrontIO_LoadMemcardFromPath(PSX_FIO, port, memcard, true);
+}
+
+static NO_INLINE void memcard_save_index_async(unsigned port, int index)
+{
+   char ext[MEMCARD_EXT_MAX];
+   char memcard[MEMCARD_PATH_MAX];
+
+   snprintf(ext, sizeof(ext), "%d.mcr", index);
+   MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
+   FrontIO_SaveMemcardToPathAsync(PSX_FIO, port, memcard, mc_async_enqueue);
+}
+
+/* Per-frame re-query, kept out of line so the metadata block lives in this
+ * frame rather than retro_run's. */
+static NO_INLINE void refresh_hdr_metadata(void)
+{
+   struct retro_display_metadata meta;
+   if (query_hdr_metadata(&meta))
+      apply_hdr_metadata(&meta);
+}
+
 /* Finalize the HDR decision once a hardware renderer is confirmed
- * (Vulkan or OpenGL - both carry the fp16 scaled framebuffer and the PQ
- * Rec.2020 display encode). HDR is engaged only when the user requested
- * 30-bit AND the frontend accepted the HDR10 pixel format. All env
- * queries are read-only and inert on frontends that don't recognise
- * them; rejection falls back to 24-bit. */
+ * (Vulkan or OpenGL - both carry the fp16 scaled framebuffer and the HDR
+ * display encode). HDR is engaged only when the user requested it AND the
+ * frontend accepted an HDR pixel format: SCRGB_RGBA16F first when that was
+ * requested, then HDR10_2101010. All env queries are read-only and inert on
+ * frontends that don't recognise them; rejection falls back to 24-bit. */
 static void negotiate_hdr_output(void)
 {
+   bool        regraded = false;
+   const char *asked;
+
    /* The frontend's paper-white / gamut / output-mode values are cached
     * for the renderer's output stage to encode against, so an HDR frame
     * matches the frontend's own SDR->HDR composition rather than
     * diverging in brightness or saturation. */
    reset_hdr_output_state();
-   if (psx_color_format == PSX_COLOR_FORMAT_30BIT_HDR)
+   if (     psx_color_format != PSX_COLOR_FORMAT_30BIT_HDR
+         && psx_color_format != PSX_COLOR_FORMAT_64BIT_SCRGB)
+      return;
+   asked = (psx_color_format == PSX_COLOR_FORMAT_64BIT_SCRGB)
+      ? "64-bit scRGB" : "30-bit HDR";
+
+   /* scRGB is offered only to a frontend that lists it in source_formats:
+    * one from before RETRO_PIXEL_FORMAT_SCRGB_RGBA16F existed cannot list it,
+    * and must not be handed a format number it may accept without
+    * understanding. The frontend converts it on the GPU for its own output
+    * and applies neither SDR expansion nor a paper-white scale, which is
+    * what the passthrough guard below establishes for HDR10, so acceptance
+    * alone engages it. Rejection falls through to HDR10. */
+   if (psx_color_format == PSX_COLOR_FORMAT_64BIT_SCRGB)
+   {
+      struct retro_display_metadata meta;
+      if (     query_hdr_metadata(&meta)
+            && (meta.hdr.source_formats & RETRO_HDR_SOURCE_FORMAT_SCRGB_RGBA16F))
+      {
+         enum retro_pixel_format scrgbfmt = RETRO_PIXEL_FORMAT_SCRGB_RGBA16F;
+         if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &scrgbfmt))
+         {
+            apply_hdr_metadata(&meta);
+            psx_hdr_scrgb  = 1;
+            psx_hdr_active = true;
+         }
+      }
+   }
+
+   if (!psx_hdr_active)
    {
       /* The confirmed contract (RetroArch gfx/video_driver.c: source_hdr10
        * is set from this pixel format; gfx/drivers/vulkan.c routes it to
@@ -6027,35 +6225,40 @@ static void negotiate_hdr_output(void)
       enum retro_pixel_format hdrfmt = RETRO_PIXEL_FORMAT_HDR10_2101010;
       if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &hdrfmt))
       {
-         unsigned gamut = 0;
-         unsigned omode = 1;
-         float    pw    = 0.0f;
-
-         { float mx = 0.0f;
-           if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_MAX_NITS, &mx) && mx > 0.0f)
-              psx_hdr_max_nits = mx;
-         }
-         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
-            psx_hdr_paper_white_nits = pw;
-         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
-            psx_hdr_expand_gamut = (int)gamut;
-         /* Queried and logged, deliberately not compensated for. The
-          * libretro.h note warns that an scRGB swapchain applies
-          * Rec.2020 -> Rec.709 on the way and can undo a core's gamut
-          * choice, but working it through, it does not: the frontend's
+         struct retro_display_metadata meta;
+         bool answered = query_hdr_metadata(&meta);
+         /* The output mode is cached for the log and deliberately not
+          * compensated for. libretro.h notes that a linear Rec.709 (scRGB)
+          * swapchain rotates Rec.2020 -> Rec.709 on the way, but that
           * rotation is exactly the inverse of the container
-          * reinterpretation, so for emitted samples X the perceived
-          * colour is M_2020 * X under HDR10 and
-          * M_709 * M_2020->709 * X = M_2020 * X under scRGB. Identical,
-          * and that holds for the deliberate mis-mappings the Colour
-          * Boost modes rely on too, since the boost is baked into X
-          * either way. Kept for the log, and because the value is worth
-          * having if that analysis is ever shown wrong - which it might
-          * be, as no scRGB frontend has been available to test against. */
-         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE, &omode))
-            psx_hdr_output_mode = (int)omode;
+          * reinterpretation: for emitted samples X the perceived colour is
+          * M_2020 * X under PQ and M_709 * M_2020->709 * X = M_2020 * X under
+          * scRGB. Identical, and that holds for the deliberate mis-mappings
+          * the Colour Boost modes rely on too, since the boost is baked into
+          * X either way. Kept in case that analysis is ever shown wrong, as
+          * no scRGB frontend has been available to test against. */
 
-         psx_hdr_active = true;
+         /* The encode places absolute luminance itself, so it relies on the
+          * frontend presenting the frame untouched. A frontend that is
+          * presenting HDR but says it will apply its own paper-white scale,
+          * curve or gamut expansion to HDR10 input would grade the picture a
+          * second time; the 24-bit path is then the correct one, since that
+          * is exactly the SDR content its composition is built for. With
+          * output mode 0 nothing is being presented yet (RetroArch answers
+          * that until its video driver is up), so passthrough says nothing
+          * and HDR stays engaged. */
+         if (answered && meta.hdr.output_mode != 0 && !meta.hdr.passthrough)
+         {
+            enum retro_pixel_format sdrfmt = RETRO_PIXEL_FORMAT_XRGB8888;
+            environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &sdrfmt);
+            regraded = true;
+         }
+         else
+         {
+            if (answered)
+               apply_hdr_metadata(&meta);
+            psx_hdr_active = true;
+         }
       }
       else
       {
@@ -6064,22 +6267,29 @@ static void negotiate_hdr_output(void)
          enum retro_pixel_format sdrfmt = RETRO_PIXEL_FORMAT_XRGB8888;
          environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &sdrfmt);
       }
+   }
 
-      /* Precise colour and linear-light fog are derived from the accepted
-       * output mode, not the user's request. They feed primitive generation
-       * as well as both hardware renderers, so a rejected request must leave
-       * them off just like the standard 24-bit path. */
-      psx_pgxp_color = psx_hdr_active;
-      psx_pgxp_fog   = psx_hdr_active;
+   /* Precise colour and linear-light fog are derived from the accepted
+    * output mode, not the user's request. They feed primitive generation
+    * as well as both hardware renderers, so a rejected request must leave
+    * them off just like the standard 24-bit path. */
+   psx_pgxp_color = psx_hdr_active;
+   psx_pgxp_fog   = psx_hdr_active;
 
-      if (log_cb)
-      {
-         log_cb(RETRO_LOG_INFO,
-               "[Color Format] 30-bit HDR requested: %s (paper white %.0f nits, gamut %d, output mode %d).\n",
-               psx_hdr_active ? "engaged" : "rejected by frontend - falling back to 24-bit",
-               psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
-         log_cb(RETRO_LOG_INFO, "[HDR] Display peak: %.0f nits\n", psx_hdr_max_nits);
-      }
+   if (log_cb)
+   {
+      log_cb(RETRO_LOG_INFO,
+            "[Color Format] %s requested: %s (paper white %.0f nits, gamut %d, output mode %d).\n",
+            asked,
+            !psx_hdr_active ? (regraded
+               ? "frontend would re-grade HDR10 input - falling back to 24-bit"
+               : "rejected by frontend - falling back to 24-bit")
+            : psx_hdr_scrgb ? "engaged as scRGB FP16"
+            : "engaged as HDR10",
+            psx_hdr_paper_white_nits, psx_hdr_expand_gamut, psx_hdr_output_mode);
+      log_cb(RETRO_LOG_INFO, "[HDR] Display peak: %.0f nits, black %.3f nits, panel gamut %s\n",
+            psx_hdr_max_nits, hdr_black_nits,
+            psx_hdr_to_panel[0] != 0.0f ? "mapped" : "unknown");
    }
 }
 
@@ -6184,8 +6394,6 @@ bool retro_load_game(const struct retro_game_info *info)
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(depth);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-         option_display.key = BEETLE_OPT(native_color);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(display_vram);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter);
@@ -6209,8 +6417,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
          negotiate_hdr_output();
 
-         option_display.key = BEETLE_OPT(native_color);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(scaled_uv_offset);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter_exclude_sprite);
@@ -6248,9 +6454,6 @@ bool retro_load_game(const struct retro_game_info *info)
          option_display.visible = false;
 
          negotiate_hdr_output();
-
-         option_display.key = BEETLE_OPT(depth);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
 
          option_display.key = BEETLE_OPT(image_offset);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
@@ -6423,23 +6626,10 @@ void retro_run(void)
     * RetroArch's paper-white and Colour Boost sliders change at runtime and
     * do NOT fire the core's variable-update path, so re-query them each frame
     * while HDR is engaged. They feed the display quad's push constant, so
-    * updating the globals here takes effect on the very next present. Cheap
-    * env_cb reads, gated on psx_hdr_active. */
+    * updating the globals here takes effect on the very next present. One
+    * env_cb read, gated on psx_hdr_active. */
    if (psx_hdr_active)
-   {
-      float    pw    = 0.0f;
-      unsigned gamut = 0;
-      float    mx    = 0.0f;
-      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &pw) && pw > 0.0f)
-         psx_hdr_paper_white_nits = pw;
-      /* Re-queried rather than cached: libretro.h says the user can change it
-       * at any time, and unlike paper white a stale value here silently
-       * changes how highlights roll off. */
-      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_MAX_NITS, &mx) && mx > 0.0f)
-         psx_hdr_max_nits = mx;
-      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
-         psx_hdr_expand_gamut = (int)gamut;
-   }
+      refresh_hdr_metadata();
 
    /* Apply any geometry change deferred from a previous frame's
     * check_variables before beginning this frame, so the frontend's
@@ -6534,20 +6724,7 @@ retry_frame:
                           "changing from memory card %d to memory card %d in left slot",
                           memcard_left_index_old, memcard_left_index);
 
-         {
-            char ext[64];
-            char memcard[4096];
-
-            /* Save contents of left memory card to previously selected index */
-            snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index_old);
-            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_SaveMemcardToPath(PSX_FIO, 0, memcard, true);
-
-            /* Load contents of currently selected index to left memory card */
-            snprintf(ext, sizeof(ext), "%d.mcr", memcard_left_index);
-            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_LoadMemcardFromPath(PSX_FIO, 0, memcard, true);
-         }
+         memcard_swap_index(0, memcard_left_index_old, memcard_left_index);
       }
 
       if (memcard_right_index_old != memcard_right_index)
@@ -6557,20 +6734,7 @@ retry_frame:
                           "changing from memory card %d to memory card %d in right slot",
                           memcard_right_index_old, memcard_right_index);
 
-         {
-            char ext[64];
-            char memcard[4096];
-
-            /* Save contents of right memory card to previously selected index */
-            snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index_old);
-            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_SaveMemcardToPath(PSX_FIO, 1, memcard, true);
-
-            /* Load contents of currently selected index to right memory card */
-            snprintf(ext, sizeof(ext), "%d.mcr", memcard_right_index);
-            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_LoadMemcardFromPath(PSX_FIO, 1, memcard, true);
-         }
+         memcard_swap_index(1, memcard_right_index_old, memcard_right_index);
       }
 
       // Update gun crosshair color
@@ -6717,8 +6881,6 @@ retry_frame:
             Memcard_SaveDelay[i] += timestamp;
             if(Memcard_SaveDelay[i] >= (33868800 * 2))   // Wait until about 2 seconds of no new writes.
             {
-            char ext[64];
-            char memcard[4096];
             int  index = i;
 
 #ifndef NDEBUG
@@ -6736,9 +6898,7 @@ retry_frame:
             if (i == 0) index = memcard_left_index;
             else if (i == 1) index = memcard_right_index;
 
-            snprintf(ext, sizeof(ext), "%d.mcr", index);
-            MDFN_MakeFName(MDFNMKF_SAV, 0, ext, memcard, sizeof(memcard));
-            FrontIO_SaveMemcardToPathAsync(PSX_FIO, i, memcard, mc_async_enqueue);
+            memcard_save_index_async(i, index);
             Memcard_SaveDelay[i] = -1;
             Memcard_PrevDC[i] = 0;
          }

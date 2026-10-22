@@ -2,9 +2,11 @@
 
 static const char *output_fragment = GLSL_FRAGMENT(
    // We're sampling from the internal framebuffer texture
-   uniform sampler2D fb;
+   uniform highp sampler2D fb;
    // Framebuffer sampling: 0: Normal 16bpp mode, 1: Use 24bpp mode
    uniform int depth_24bpp;
+   uniform uint color_mode;
+   uniform uint byte_color_storage;
    // Internal resolution upscaling factor. Necessary for proper 24bpp
    // display since we need to know how the pixels are laid out in RAM.
    uniform uint internal_upscaling;
@@ -19,6 +21,9 @@ static const char *output_fragment = GLSL_FRAGMENT(
    // Take a normalized color and convert it into a 16bit 1555 ABGR
    // integer in the format used internally by the Playstation GPU.
    uint rebuild_color(vec4 color) {
+      if (byte_color_storage != 0u)
+         color.rgb = clamp(floor(color.rgb * (255.0 / 8.0) + vec3(0.001)),
+               vec3(0.0), vec3(31.0)) / 31.0;
       uint a = uint(floor(color.a + 0.5));
       uint r = uint(floor(color.r * 31. + 0.5));
       uint g = uint(floor(color.g * 31. + 0.5));
@@ -27,11 +32,11 @@ static const char *output_fragment = GLSL_FRAGMENT(
       return (a << 15) | (b << 10) | (g << 5) | r;
    }
 
-   // ---- HDR10 (PQ Rec.2020) output ------------------------------------
+   // ---- HDR output: HDR10 (PQ Rec.2020) or scRGB (linear FP16) --------
    // Ported from shaders_vulkan/hdr.h; same math as the Vulkan display
-   // shaders so 30-bit output matches across renderers. hdr_active
-   // follows the negotiated pixel format: once the frontend accepted
-   // HDR10_2101010 the presented image must be PQ Rec.2020.
+   // shaders so HDR output matches across renderers. hdr_active follows
+   // the negotiated pixel format: once the frontend accepted HDR10_2101010
+   // or SCRGB_RGBA16F the presented image must be in that format.
    uniform int hdr_active;
    uniform float hdr_paper_white;
    uniform float hdr_max_nits;
@@ -43,6 +48,12 @@ static const char *output_fragment = GLSL_FRAGMENT(
    uniform int hdr_sdr_eotf;
    // 0 Rec.709, 1 SMPTE-C, 2 EBU, 3 NTSC 1953
    uniform int hdr_src_primaries;
+   // PQ(panel black) for the toe; zero when the frontend does not say
+   uniform float hdr_black_pq;
+   // linear Rec.2020 -> panel RGB; all zero when the panel is unknown
+   uniform mat3 hdr_to_panel;
+   // output format: 0 HDR10 PQ Rec.2020, 1 linear scRGB (1.0 = 80 nits)
+   uniform int hdr_scrgb;
 
    vec3 pq_encode(vec3 nits) {
       float pq_m1 = 2610.0 / 16384.0;
@@ -53,6 +64,24 @@ static const char *output_fragment = GLSL_FRAGMENT(
       vec3 y = clamp(nits / 10000.0, vec3(0.0), vec3(1.0));
       vec3 ym = pow(y, vec3(pq_m1));
       return pow((pq_c1 + pq_c2 * ym) / (1.0 + pq_c3 * ym), vec3(pq_m2));
+   }
+
+   vec3 pq_decode(vec3 e) {
+      float pq_m1 = 2610.0 / 16384.0;
+      float pq_m2 = (2523.0 / 4096.0) * 128.0;
+      float pq_c1 = 3424.0 / 4096.0;
+      float pq_c2 = (2413.0 / 4096.0) * 32.0;
+      float pq_c3 = (2392.0 / 4096.0) * 32.0;
+      vec3 p = pow(clamp(e, vec3(0.0), vec3(1.0)), vec3(1.0 / pq_m2));
+      return 10000.0 * pow(max(p - vec3(pq_c1), vec3(0.0)) / (vec3(pq_c2) - pq_c3 * p),
+                           vec3(1.0 / pq_m1));
+   }
+
+   vec3 rec2020_to_709(vec3 c) {
+      return vec3(
+          1.6604903 * c.r + -0.5876391 * c.g + -0.0728516 * c.b,
+         -0.1245500 * c.r +  1.1328999 * c.g + -0.0083480 * c.b,
+         -0.0181511 * c.r + -0.1005787 * c.g +  1.1187299 * c.b);
    }
 
    vec3 sdr_to_linear(vec3 c) {
@@ -103,7 +132,32 @@ static const char *output_fragment = GLSL_FRAGMENT(
           0.0163916 * c.r + 0.0880132 * c.g + 0.8955950 * c.b);
    }
 
-   vec3 encode_hdr10(vec3 rgb) {
+   // Panel gamut compression and the BT.2390 black-floor toe; see
+   // panel_gamut_compress and pq_black_floor in hdr.h for the derivation.
+   vec3 panel_gamut_compress(vec3 lin2020) {
+      if (hdr_to_panel[0][0] == 0.0)
+         return lin2020;
+      vec3 p = hdr_to_panel * lin2020;
+      float ach = max(p.r, max(p.g, p.b));
+      if (ach <= 0.0)
+         return lin2020;
+      vec3 d = (vec3(ach) - p) / ach;
+      if (max(d.r, max(d.g, d.b)) <= 0.9)
+         return lin2020;
+      vec3 x = max(d - vec3(0.9), vec3(0.0));
+      d = mix(d, vec3(0.9) + x / (vec3(1.0) + x / 0.1), greaterThan(d, vec3(0.9)));
+      return inverse(hdr_to_panel) * (vec3(ach) - d * ach);
+   }
+
+   vec3 pq_black_floor(vec3 e) {
+      if (hdr_black_pq <= 0.0)
+         return e;
+      vec3 t = vec3(1.0) - e;
+      t = t * t;
+      return e + hdr_black_pq * (t * t);
+   }
+
+   vec3 encode_hdr_output(vec3 rgb) {
       // One transfer function across the whole range, then compress the
       // overshoot above paper white with a C1-continuous knee driven by
       // the peak channel (chromaticity-preserving). See hdr.h for the
@@ -127,7 +181,13 @@ static const char *output_fragment = GLSL_FRAGMENT(
       }
       lin = min(lin, vec3(hdr_paper_white)) + over * knee;
       lin = rec709_to_target(lin);
-      return pq_encode(lin);
+      lin = panel_gamut_compress(lin);
+      // Same graded light in either format; see encode_hdr_output in hdr.h.
+      if (hdr_scrgb == 0)
+         return pq_black_floor(pq_encode(lin));
+      if (hdr_black_pq > 0.0)
+         lin = pq_decode(pq_black_floor(pq_encode(lin)));
+      return rec2020_to_709(lin) * (1.0 / 80.0);
    }
 
    // Debanding dither for the genuinely quantised paths (see hdr.h):
@@ -199,11 +259,27 @@ static const char *output_fragment = GLSL_FRAGMENT(
          color = vec3(r, g, b);
       }
 
+      /* Recover the logical code from RGB5 normalized storage. Texture
+       * conversion may use bit replication, so use its nearest code rather
+       * than truncating the sampled float. Choose the displayed byte here:
+       * q/31 alone still relies on driver-dependent UNORM rounding. Actual
+       * PS1 24-bit content bypasses this display policy. */
+      if (depth_24bpp == 0 && color_mode == 3u)
+         color = floor(clamp(color * (255.0 / 248.0), 0.0, 1.0) *
+               255.0 + vec3(0.5)) / 255.0;
+      else if (depth_24bpp == 0 && color_mode != 2u) {
+         vec3 q5 = clamp(floor(color * 31.0 + vec3(0.5)),
+                         vec3(0.0), vec3(31.0));
+         vec3 display8 = color_mode == 0u ? q5 * 8.0 :
+               floor(q5 * (255.0 / 31.0) + vec3(0.5));
+         color = display8 / 255.0;
+      }
+
       if (hdr_active != 0) {
          // Both display paths carry quantised content (5-bit VRAM or
          // 8-bit FMV) that would band at 10-bit; deband, then encode.
          color = hdr_deband(color, gl_FragCoord.xy);
-         frag_color = vec4(encode_hdr10(color), 1.0);
+         frag_color = vec4(encode_hdr_output(color), 1.0);
          return;
       }
 

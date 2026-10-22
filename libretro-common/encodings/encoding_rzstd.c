@@ -179,11 +179,14 @@ static int rzstd_cpu_bmi2(void)
 
    if (have < 0)
    {
-      unsigned a, b, c, d;
+      unsigned a, b = 0, c, d;
 
-      /* Both racers write the same answer, so the race is benign. */
-      have = (__get_cpuid_count(7, 0, &a, &b, &c, &d) && (b & (1u << 8)))
-           ? 1 : 0;
+      /* __get_cpuid_count only exists from GCC 7; __get_cpuid_max and
+       * __cpuid_count are in every cpuid.h this branch accepts. Both
+       * racers write the same answer, so the race is benign. */
+      if (__get_cpuid_max(0, NULL) >= 7)
+         __cpuid_count(7, 0, a, b, c, d);
+      have = (b & (1u << 8)) ? 1 : 0;
    }
    return have;
 }
@@ -3921,7 +3924,7 @@ literals_done:
             /* the block's own: accuracy by the count, as the reference
              * picks it, capped by the table's maximum */
             alog = 5;
-            while (alog < log_max[t] && ((uint32_t)1 << alog) < nseq) alog++;
+            while (alog < log_max[t] && ((size_t)1 << alog) < nseq) alog++;
             if (rzstd_fse_normalize(hist[t], max + 1, (uint32_t)nseq, alog, norm[t]))
             {
                for (s = 0; s <= max; s++)

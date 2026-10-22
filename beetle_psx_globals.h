@@ -57,11 +57,26 @@ extern int aspect_ratio_setting;
 extern bool aspect_ratio_dirty;
 extern bool gpu_fbwrite_fifo_delay;
 
+/* Internal drawing policy, independent of the output pixel format. Native
+ * and 16 bpp use the same RGB5 arithmetic for ordinary PS1 draws. Native
+ * keeps unexpanded digital levels; 16 bpp expands them for presentation and
+ * permits additional shades on enhanced texture draws. Accepted HDR overrides
+ * either policy without changing the user's selected mode. */
+enum psx_internal_color_mode_e
+{
+   PSX_INTERNAL_COLOR_NATIVE = 0,
+   PSX_INTERNAL_COLOR_16BPP,
+   PSX_INTERNAL_COLOR_32BPP
+};
+
+extern enum psx_internal_color_mode_e psx_internal_color_mode;
+
 /* Output color format ("Color Format" core option).
  *
  * PSX_COLOR_FORMAT_24BIT is the historical path (8 bits per channel,
  * XRGB8888 for the truecolor renderers).  PSX_COLOR_FORMAT_30BIT_HDR
- * requests 10-bit-per-channel PQ-encoded Rec.2020 (HDR10) output.
+ * requests 10-bit-per-channel PQ-encoded Rec.2020 (HDR10) output, and
+ * PSX_COLOR_FORMAT_64BIT_SCRGB linear FP16 scRGB, falling back to HDR10.
  *
  * The user's *request* lives in psx_color_format; whether HDR is
  * actually engaged lives in psx_hdr_active, which is only ever true
@@ -72,15 +87,19 @@ extern bool gpu_fbwrite_fifo_delay;
 enum psx_color_format_e
 {
    PSX_COLOR_FORMAT_24BIT = 0,
-   PSX_COLOR_FORMAT_30BIT_HDR
+   PSX_COLOR_FORMAT_30BIT_HDR,
+   PSX_COLOR_FORMAT_64BIT_SCRGB
 };
 
 extern int   psx_color_format;         /* enum psx_color_format_e; core option */
-extern bool  psx_hdr_active;           /* true only when HDR10 is really engaged */
-extern float psx_hdr_paper_white_nits;
-extern float psx_hdr_max_nits;         /* display peak, GET_HDR_MAX_NITS, 1000 fallback */ /* frontend SDR white, default 200        */
+extern bool  psx_hdr_active;           /* true only when HDR is really engaged   */
+extern int   psx_hdr_scrgb;            /* HDR is linear scRGB FP16, not HDR10     */
+extern float psx_hdr_paper_white_nits; /* frontend SDR white, default 200        */
+extern float psx_hdr_max_nits;         /* display peak, default 1000              */
 extern int   psx_hdr_expand_gamut;     /* frontend "Colour Boost" rotation        */
-extern int   psx_hdr_output_mode;      /* frontend HDR output mode (0 off/1 HDR10) */
+extern int   psx_hdr_output_mode;      /* 0 off, 1 PQ Rec.2020, 2 linear Rec.709  */
+extern float psx_hdr_black_pq;         /* PQ(panel black), 0 when not reported    */
+extern float psx_hdr_to_panel[9];      /* Rec.2020 -> panel RGB, 0 when unknown   */
 extern int   psx_hdr_sdr_eotf;         /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_src_primaries;        /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 extern int   psx_video_cable;

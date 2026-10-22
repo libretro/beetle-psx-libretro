@@ -40,10 +40,15 @@ layout(push_constant, std430) uniform Registers
 	vec2  out_size;      /* display resolution, native * internal scale */
 	int   sdr_eotf;      /* needed in both paths now - the box averages light */
 	float paper_white_nits;
-	float peak_nits;      /* display peak, from GET_HDR_MAX_NITS */
+	float peak_nits;      /* display peak, GET_HDR_METADATA max_nits */
 	int   expand_gamut;
 	int   shoulder;
 	int   src_primaries; /* authoring display gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
+	/* Display state: PQ(panel black) for the toe, and Rec.2020 -> panel RGB
+	 * for gamut compression. Both zero when the frontend does not say. */
+	float black_pq;
+	int   scrgb;         /* 0 HDR10 PQ Rec.2020, 1 linear scRGB FP16 */
+	mat3  to_panel;
 } reg;
 
 void main()
@@ -75,10 +80,11 @@ void main()
 	highp vec3 lin = acc / max(cnt, 1.0);
 
 #if defined(HDR)
-	/* encode_hdr10_linear rotates the primaries itself. */
-	FragColor = vec4(encode_hdr10_linear(lin, reg.paper_white_nits, reg.peak_nits,
-	                                     reg.expand_gamut, reg.shoulder,
-	                                     reg.src_primaries), 1.0);
+	/* encode_hdr_output_linear rotates the primaries itself. */
+	FragColor = vec4(encode_hdr_output_linear(lin, reg.paper_white_nits, reg.peak_nits,
+	                                          reg.expand_gamut, reg.shoulder,
+	                                          reg.src_primaries, reg.black_pq,
+	                                          reg.to_panel, reg.scrgb), 1.0);
 #else
 	/* Rotated here rather than through sdr_apply_src_primaries: this pass is
 	 * already holding linear light, so it costs a matrix and no round trip. */
