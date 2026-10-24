@@ -6116,6 +6116,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          ImageHandle analog_out;
          /* Display Transform tables (hdr_transform.c) and their stand-in. */
          ImageHandle dt_aces2_lut;
+         ImageHandle dt_aces2_cube;
+         ImageHandle dt_dummy_3d;
          ImageHandle dt_film_lut;
          ImageHandle dt_film_desat;
          ImageHandle dt_dummy;
@@ -7914,9 +7916,25 @@ static ImageHandle renderer_dt_image(Renderer *self, const uint16_t *unorm,
    return img;
 }
 
+/* A Display Transform cube: half RGBA, n^3 texels, red fastest; NULL data
+ * makes the 1x1x1 stand-in the binding needs before the cube exists. */
+static ImageHandle renderer_dt_cube_image(Renderer *self, const uint16_t *half, unsigned n)
+{
+   static const uint16_t zero[4] = { 0, 0, 0, 0 };
+   ImageCreateInfo  info = image_create_info_immutable_2d_image(n, n,
+         VK_FORMAT_R16G16B16A16_SFLOAT, false);
+   ImageInitialData init;
+   info.depth        = n;
+   info.type         = VK_IMAGE_TYPE_3D;
+   init.data         = half ? (const void*)half : (const void*)zero;
+   init.row_length   = 0;
+   init.image_height = 0;
+   return device_create_image(self->device, &info, &init);
+}
+
 /* The Display Transform for the HDR output programs: its constants at
  * binding 8, written straight into the frame's uniform ring, and its
- * tables at 9-11. Tables are rebuilt only when hdr_transform.c does. */
+ * tables at 9-12. Tables are rebuilt only when hdr_transform.c does. */
 static void renderer_bind_display_transform(Renderer *self)
 {
    struct hdr_dt_block *b = (struct hdr_dt_block*)commandbuffer_allocate_constant_data(
@@ -7928,14 +7946,21 @@ static void renderer_bind_display_transform(Renderer *self)
    gen = hdr_dt_generation();
    if (!ih_get(&self->dt_dummy))
       ih_move(&self->dt_dummy, renderer_dt_image(self, NULL, 1, 1, 4));
+   if (!ih_get(&self->dt_dummy_3d))
+      ih_move(&self->dt_dummy_3d, renderer_dt_cube_image(self, NULL, 1));
    if (gen != self->dt_generation)
    {
+      const uint16_t *cube   = hdr_dt_aces2_cube();
       const uint16_t *aces2  = hdr_dt_aces2_lut();
       const uint16_t *film   = hdr_dt_film_lut();
       const uint16_t *desat  = hdr_dt_film_desat();
       ih_reset(&self->dt_aces2_lut);
       ih_reset(&self->dt_film_lut);
       ih_reset(&self->dt_film_desat);
+      ih_reset(&self->dt_aces2_cube);
+      if (cube)
+         ih_move(&self->dt_aces2_cube, renderer_dt_cube_image(self, cube,
+               HDR_DT_ACES2_CUBE));
       if (aces2)
          ih_move(&self->dt_aces2_lut, renderer_dt_image(self, aces2,
                HDR_DT_ACES2_LUT_WIDTH, 1, 4));
@@ -7947,8 +7972,14 @@ static void renderer_bind_display_transform(Renderer *self)
                HDR_DT_DESAT_WIDTH, HDR_DT_DESAT_HEIGHT, 4));
       self->dt_generation = gen;
    }
-   if (!ih_get(&self->dt_dummy))
+   /* The cube only once the renderer holds it, whatever the block says. */
+   if (b && !ih_get(&self->dt_aces2_cube))
+      b->gm[2] = 0.0f;
+   if (!ih_get(&self->dt_dummy) || !ih_get(&self->dt_dummy_3d))
       return;
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 12, image_get_view(ih_get(
+         ih_get(&self->dt_aces2_cube) ? &self->dt_aces2_cube : &self->dt_dummy_3d)),
+         StockSampler_LinearClamp);
    commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 9, image_get_view(ih_get(
          ih_get(&self->dt_aces2_lut) ? &self->dt_aces2_lut : &self->dt_dummy)),
          StockSampler_LinearWrap);
@@ -11720,6 +11751,8 @@ static void renderer_fini(Renderer *self)
    ih_reset(&self->analog_rgb);
    ih_reset(&self->analog_out);
    ih_reset(&self->dt_aces2_lut);
+   ih_reset(&self->dt_aces2_cube);
+   ih_reset(&self->dt_dummy_3d);
    ih_reset(&self->dt_film_lut);
    ih_reset(&self->dt_film_desat);
    ih_reset(&self->dt_dummy);

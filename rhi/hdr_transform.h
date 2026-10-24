@@ -81,6 +81,10 @@ struct hdr_dt_block
 };
 
 #define HDR_DT_ACES2_LUT_WIDTH 2048
+/* ACES 2.0 (full) as a cube of output colours, CUBE per side over the PQ
+ * code of the input light; baked ROWS_PER_FILL rows of CUBE at a time. */
+#define HDR_DT_ACES2_CUBE      65
+#define HDR_DT_CUBE_ROWS_PER_FILL 16
 #define HDR_DT_FILM_LUT_WIDTH  256
 #define HDR_DT_DESAT_WIDTH     1089
 #define HDR_DT_DESAT_HEIGHT    33
@@ -104,6 +108,19 @@ const uint16_t *hdr_dt_aces2_lut(void);
 const uint16_t *hdr_dt_film_lut(void);
 const uint16_t *hdr_dt_film_desat(void);
 unsigned hdr_dt_generation(void);
+
+/* The ACES 2.0 cube, half RGBA, HDR_DT_ACES2_CUBE^3 texels with red
+ * fastest; NULL until it is fully baked for the current tables and paper
+ * white. A new cube bumps the generation. In the block, gm[2] is 1 while
+ * the shader should read it. */
+const uint16_t *hdr_dt_aces2_cube(void);
+/* Bake the rest of the cube now; for tests. */
+void hdr_dt_aces2_cube_finish(float paper_white_nits);
+/* The reference the cube is baked from: what dt_aces2() computes, in
+ * double precision. Scene Rec.709 (1.0 = paper white) in, the limiting
+ * primaries (1.0 = 100 nits) out. Valid once hdr_dt_fill ran with
+ * ACES 2.0 (full). */
+void hdr_dt_aces2_cpu(const double v[3], float paper_white_nits, double out[3]);
 
 /* IEEE half from a unorm16, for GLES, which has no 16-bit unorm. */
 uint16_t hdr_dt_unorm16_to_half(uint16_t v);

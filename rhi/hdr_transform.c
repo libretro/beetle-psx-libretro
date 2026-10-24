@@ -25,6 +25,16 @@ static int       dt_aces2_gamut = -1;
 static int       dt_aces2_surround = -1;
 static uint16_t  dt_aces2_xy[8];
 
+/* ACES 2.0 (full) baked from the double-precision reference: a cube of
+ * output colours over the PQ code of the input light, built a few rows per
+ * hdr_dt_fill and switched to once complete. Keyed by the tables it was
+ * built from (dt_aces2_built bumps per rebuild) and paper white. */
+static uint16_t *dt_cube;          /* half RGBA, CUBE^3 */
+static unsigned  dt_cube_rows;     /* rows of CUBE done, of CUBE * CUBE */
+static unsigned  dt_cube_key;      /* dt_aces2_built it was baked from */
+static float     dt_cube_paper;
+static unsigned  dt_aces2_built;
+
 static uint16_t  dt_film_lut[HDR_DT_FILM_LUT_WIDTH];
 static int       dt_film_contrast = -1;
 static uint16_t *dt_film_desat;
@@ -320,6 +330,7 @@ static bool dt_aces2_build(float peak, const uint16_t panel_xy[8])
    ACES2_SetSurround(dt_set.aces2_surround);
    ACES2_Init(prims, (double)peak, dt_aces2);
    ACES2_PackHueTables(dt_aces2, dt_aces2_lut, dt_aces2_scales);
+   dt_aces2_built++;
    dt_aces2_peak     = peak;
    dt_aces2_gamut    = dt_set.aces2_gamut;
    dt_aces2_surround = dt_set.aces2_surround;
@@ -339,6 +350,155 @@ static void dt_mat3(float dst[12], const double m[9])
       dst[c * 4 + 2] = (float)m[c * 3 + 2];
       dst[c * 4 + 3] = 0.0f;
    }
+}
+
+/* IEEE half, round to nearest even; the cube's storage. */
+static uint16_t dt_half(float f)
+{
+   union { float f; uint32_t u; } v;
+   uint32_t sign, mant;
+   int      exp;
+   v.f  = f;
+   sign = (v.u >> 16) & 0x8000u;
+   exp  = (int)((v.u >> 23) & 0xff) - 127 + 15;
+   mant = v.u & 0x7fffffu;
+   if (exp >= 31)
+      return (uint16_t)(sign | 0x7bffu);
+   if (exp <= 0)
+   {
+      if (exp < -10)
+         return (uint16_t)sign;
+      mant |= 0x800000u;
+      {
+         unsigned shift = (unsigned)(14 - exp);
+         uint32_t h     = mant >> shift;
+         uint32_t rem   = mant & ((1u << shift) - 1u);
+         uint32_t half  = 1u << (shift - 1u);
+         if (rem > half || (rem == half && (h & 1u)))
+            h++;
+         return (uint16_t)(sign | h);
+      }
+   }
+   {
+      uint32_t h = ((uint32_t)exp << 10) | (mant >> 13);
+      uint32_t rem = mant & 0x1fffu;
+      if (rem > 0x1000u || (rem == 0x1000u && (h & 1u)))
+         h++;
+      return (uint16_t)(sign | h);
+   }
+}
+
+/* The shader's ACES 2.0 input stage on the CPU: Rec.709 scene light (1.0 =
+ * paper white) to AP0 at paper/100 exposure, clamped through AP1 to the
+ * tone scale's forward limit, then the reference transform. Out: the
+ * limiting primaries, 1.0 = 100 nits - what dt_aces2() returns. */
+void hdr_dt_aces2_cpu(const double v[3], float paper_white_nits, double out[3])
+{
+   static const double to_ap0[9] = {
+      0.4397010, 0.3829780, 0.1773350,
+      0.0897923, 0.8134230, 0.0967616,
+      0.0175440, 0.1115440, 0.8707040 };
+   static const double ap0_ap1[9] = {
+       1.4514393161, -0.2365107469, -0.2149285693,
+      -0.0765537733,  1.1762296998, -0.0996759265,
+       0.0083161484, -0.0060324498,  0.9977163014 };
+   static const double ap1_ap0[9] = {
+      0.6954522414, 0.1406786965, 0.1638690622,
+      0.0447945634, 0.8596711185, 0.0955343182,
+     -0.0055258826, 0.0040252103, 1.0015006723 };
+   double a[3], b[3], c[3];
+   double exposure = (double)(float)(paper_white_nits / 100.0f);
+   double limit;
+   int    i;
+   if (!dt_aces2)
+   {
+      out[0] = out[1] = out[2] = 0.0;
+      return;
+   }
+   limit = (double)(float)dt_aces2->ts.forward_limit;
+   for (i = 0; i < 3; i++)
+      a[i] = (to_ap0[i * 3] * v[0] + to_ap0[i * 3 + 1] * v[1]
+            + to_ap0[i * 3 + 2] * v[2]) * exposure;
+   for (i = 0; i < 3; i++)
+   {
+      b[i] = ap0_ap1[i * 3] * a[0] + ap0_ap1[i * 3 + 1] * a[1] + ap0_ap1[i * 3 + 2] * a[2];
+      if (b[i] < 0.0)
+         b[i] = 0.0;
+      if (b[i] > limit)
+         b[i] = limit;
+   }
+   for (i = 0; i < 3; i++)
+      c[i] = ap1_ap0[i * 3] * b[0] + ap1_ap0[i * 3 + 1] * b[1] + ap1_ap0[i * 3 + 2] * b[2];
+   ACES2_OutputTransformFwd(c, dt_aces2, out);
+}
+
+/* Scene light of cube node i: the inverse of the shader's PQ index. */
+static double dt_cube_light(unsigned i, float paper)
+{
+   const double m1 = 0.1593017578125, m2 = 78.84375;
+   const double c1 = 0.8359375, c2 = 18.8515625, c3 = 18.6875;
+   double u = (double)i / (HDR_DT_ACES2_CUBE - 1);
+   double p = pow(u, 1.0 / m2);
+   double d = c2 - c3 * p;
+   double y = (p > c1 && d > 0.0) ? pow((p - c1) / d, 1.0 / m1) : 0.0;
+   return y * 10000.0 / paper;
+}
+
+/* Bake up to `rows` rows of the cube; true once it is complete. */
+static bool dt_cube_bake(unsigned rows, float paper)
+{
+   const unsigned n = HDR_DT_ACES2_CUBE;
+   if (!dt_aces2)
+      return false;
+   if (dt_cube_key != dt_aces2_built || dt_cube_paper != paper)
+   {
+      dt_cube_key   = dt_aces2_built;
+      dt_cube_paper = paper;
+      if (dt_cube_rows == n * n)
+         dt_generation++;     /* the complete cube in use goes stale */
+      dt_cube_rows  = 0;
+   }
+   if (dt_cube_rows == n * n)
+      return true;
+   if (!dt_cube)
+   {
+      dt_cube = (uint16_t*)malloc(sizeof(uint16_t) * 4 * n * n * n);
+      if (!dt_cube)
+         return false;
+   }
+   while (rows-- && dt_cube_rows < n * n)
+   {
+      unsigned row = dt_cube_rows++;
+      unsigned g = row % n, b = row / n, r;
+      for (r = 0; r < n; r++)
+      {
+         double    v[3], o[3];
+         uint16_t *dst = dt_cube + 4 * (row * n + r);
+         v[0] = dt_cube_light(r, paper);
+         v[1] = dt_cube_light(g, paper);
+         v[2] = dt_cube_light(b, paper);
+         hdr_dt_aces2_cpu(v, paper, o);
+         dst[0] = dt_half((float)o[0]);
+         dst[1] = dt_half((float)o[1]);
+         dst[2] = dt_half((float)o[2]);
+         dst[3] = 0x3c00u;
+      }
+   }
+   if (dt_cube_rows < n * n)
+      return false;
+   dt_generation++;
+   return true;
+}
+
+void hdr_dt_aces2_cube_finish(float paper_white_nits)
+{
+   dt_cube_bake(HDR_DT_ACES2_CUBE * HDR_DT_ACES2_CUBE, paper_white_nits);
+}
+
+const uint16_t *hdr_dt_aces2_cube(void)
+{
+   return (dt_cube && dt_cube_rows == HDR_DT_ACES2_CUBE * HDR_DT_ACES2_CUBE)
+         ? dt_cube : NULL;
 }
 
 /* ---- public ---- */
@@ -449,6 +609,9 @@ void hdr_dt_fill(struct hdr_dt_block *b, float paper_white_nits,
       b->cc2[3] = (float)p->gamut.focus_dist;
       b->gm[0]  = (float)p->gamut.lower_hull_gamma_inv;
       b->gm[1]  = (float)p->ts.forward_limit;
+      /* Once the cube is baked the shader reads it instead of solving the
+       * transform per pixel. Until then, a slice of it per frame. */
+      b->gm[2]  = dt_cube_bake(HDR_DT_CUBE_ROWS_PER_FILL, paper) ? 1.0f : 0.0f;
       for (i = 0; i < 4; i++)
          b->lut_scale[i] = (float)dt_aces2_scales[i];
    }
@@ -575,6 +738,9 @@ void hdr_post_frame_params(struct hdr_post_frame *f, unsigned w, unsigned h)
 
 void hdr_dt_free(void)
 {
+   free(dt_cube);
+   dt_cube      = NULL;
+   dt_cube_rows = 0;
    free(dt_aces2);
    dt_aces2 = NULL;
    dt_aces2_gamut = -1;

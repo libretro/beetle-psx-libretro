@@ -26,7 +26,8 @@
 #      every pixel within the packed format's precision of the half-float
 #      picture, with bloom and aberration on and through the analog cable -
 #      and does change it, so the packed format is really in use.
-#   9. Every lane agrees between Vulkan and OpenGL.
+#   9. Every lane agrees between Vulkan and OpenGL - ACES 2.0 (full) among
+#      them, read through its baked cube by the end of the run.
 #
 # Usage (from the repository root, after a HAVE_HW=1 build):
 #   sh tools/hdr_post/post_lanes.sh [core.so]
@@ -76,6 +77,7 @@ FX="${P}_internal_resolution=4x;${P}_hdr_bloom=standard;${P}_hdr_chromatic=heavy
 run full4x    "$FX"
 run compact4x "$FX;${P}_hdr_post_compact=enabled"
 run analogc   "${P}_video_cable=svideo;${P}_hdr_bloom=standard;${P}_hdr_post_compact=enabled"
+run aces2f    "${P}_hdr_display_transform=aces2full;${P}_hdr_bloom=standard"
 
 python3 - "$OUT" "$FRAMES" <<'EOF'
 import struct, sys, glob, re
@@ -171,7 +173,7 @@ CENTRE, CORNER, GREY = (152, 112, 16), (16, 16, 16), (152, 192, 16)
 # reference transfer at paper white 200.
 GREY_NITS = (128.0 / 255.0) ** 2.4 * 200.0
 lanes = ['off', 'bloom', 'halation', 'conv', 'off4x', 'ca4x', 'analog', 'smooth2x',
-         'aces', 'live', 'full4x', 'compact4x', 'analogc']
+         'aces', 'live', 'full4x', 'compact4x', 'analogc', 'aces2f']
 img = {}
 for lane in lanes:
     for r in ('vk', 'gl'):

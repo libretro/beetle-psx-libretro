@@ -8,6 +8,9 @@ name: HDR display transform and post effects
 #   their invariants, the shader carrying every curve constant, and every
 #   GL and GLES shader source compiling under glslang. Strict C89,
 #   ASan/UBSan, and a mingw-w64 build under Wine.
+# aces2: ACES 2.0 (full) through the shipping shader on llvmpipe - the
+#   baked cube and the per-pixel solve - against the double-precision
+#   reference, as Delta E ITP (tools/hdr_transform/aces2_gpu.c).
 # options: each curve's own options (ACES 2.0, AgX, GT, Filmic) are shown
 #   only while the Display Transform is set to that curve
 #   (tools/core_options/dt_visibility.c, against the built core).
@@ -80,6 +83,8 @@ jobs:
           git diff --exit-code -- rhi/shaders_gl
       - name: Build the core
         run: make -j"$(nproc)" HAVE_HW=1
+      - name: ACES 2.0 shader and baked cube against the reference
+        run: sh tools/hdr_transform/aces2_gpu.sh
       - name: Display Transform option visibility
         run: sh tools/core_options/run.sh "$PWD/mednafen_psx_hw_libretro.so"
       - name: Post-effect lanes

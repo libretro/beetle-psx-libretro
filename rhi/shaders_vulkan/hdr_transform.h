@@ -8,7 +8,7 @@
  * except ACES 2.0 (full) returns the same units; ACES 2.0 (full) returns
  * its limiting primaries at 1.0 = 100 nits, which dt_grade converts.
  *
- * Vulkan builds (glslang predefines VULKAN) bind at set 0, bindings 8-11. */
+ * Vulkan builds (glslang predefines VULKAN) bind at set 0, bindings 8-12. */
 #ifndef HDR_TRANSFORM_H
 #define HDR_TRANSFORM_H
 
@@ -32,7 +32,7 @@ layout(std140) uniform DisplayTransform
 	vec4 ts;            /* m_2, s_2, g, t_1 */
 	vec4 cc;            /* limit_J_max, model_gamma_inv, sat, sat_thr */
 	vec4 cc2;           /* compr, chroma compress scale, mid_J, focus_dist */
-	vec4 gm;            /* lower hull gamma inv, forward limit, unused, unused */
+	vec4 gm;            /* lower hull gamma inv, forward limit, cube ready, unused */
 	vec4 lutScale;      /* cusp J, cusp M, reach M, upper hull gamma inv */
 } dt;
 
@@ -40,10 +40,12 @@ layout(std140) uniform DisplayTransform
 layout(set = 0, binding = 9) uniform sampler2D uDtAces2Lut;
 layout(set = 0, binding = 10) uniform sampler2D uDtFilmLut;
 layout(set = 0, binding = 11) uniform sampler2D uDtFilmDesat;
+layout(set = 0, binding = 12) uniform sampler3D uDtAces2Cube;
 #else
 uniform highp sampler2D uDtAces2Lut;
 uniform highp sampler2D uDtFilmLut;
 uniform highp sampler2D uDtFilmDesat;
+uniform highp sampler3D uDtAces2Cube;
 #endif
 
 /* Curves without headroom of their own are used up to paper white and
@@ -433,6 +435,18 @@ highp vec3 dt_expand(highp vec3 c)
 	return c * (dt_expand_curve(vec3(p), E, dt.film.z).x / p);
 }
 
+/* dt_aces2() baked: the whole transform, solved in double precision on the
+ * CPU, as a 65^3 cube over the PQ code of the input light. Closer to the
+ * reference than the per-pixel solve, and one filtered fetch. */
+highp vec3 dt_aces2_cube(highp vec3 v)
+{
+	const highp float n = 65.0;
+	highp vec3 y = clamp(v * dt.film.w * 0.01, 0.0, 1.0);
+	highp vec3 p = pow(y, vec3(0.1593017578125));
+	highp vec3 u = pow((0.8359375 + 18.8515625 * p) / (1.0 + 18.6875 * p), vec3(78.84375));
+	return textureLod(uDtAces2Cube, u * ((n - 1.0) / n) + 0.5 / n, 0.0).rgb;
+}
+
 /* Scene Rec.709 (1.0 = paper white) -> Rec.709 in paper-white units, or,
  * for ACES 2.0 (full), Rec.2020 nits; `absolute` tells the caller which. */
 highp vec3 dt_apply(highp vec3 v, highp float paper_white_nits, out bool absolute)
@@ -442,7 +456,7 @@ highp vec3 dt_apply(highp vec3 v, highp float paper_white_nits, out bool absolut
 	v = dt_expand(max(v, vec3(0.0)));
 	absolute = (m == 23);
 	if (absolute)
-		return dt.aces2ToOut * dt_aces2(v) * 100.0;
+		return dt.aces2ToOut * (dt.gm.z > 0.5 ? dt_aces2_cube(v) : dt_aces2(v)) * 100.0;
 	pre = max(v.r, max(v.g, v.b));
 	if (m >= 18)
 		v = dt_curve_rgb(v);

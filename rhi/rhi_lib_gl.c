@@ -692,10 +692,33 @@ typedef struct gl_program gl_program;
 #define GL_DT_UNIT_ACES2  8
 #define GL_DT_UNIT_FILM   9
 #define GL_DT_UNIT_DESAT  10
+#define GL_DT_UNIT_CUBE   11
 
 static GLuint   gl_dt_ubo;
 static GLuint   gl_dt_tex[3];
 static GLuint   gl_dt_dummy;
+static GLuint   gl_dt_cube;
+static GLuint   gl_dt_dummy_3d;
+
+/* A Display Transform cube: half RGBA, n^3 texels, red fastest; NULL data
+ * makes the 1x1x1 stand-in the sampler needs before the cube exists. */
+static GLuint gl_dt_cube_texture(const uint16_t *half, unsigned n)
+{
+   static const uint16_t zero[4] = { 0, 0, 0, 0 };
+   GLuint tex = 0;
+   glGenTextures(1, &tex);
+   glBindTexture(GL_TEXTURE_3D, tex);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+   glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, (GLsizei)n, (GLsizei)n, (GLsizei)n, 0,
+         GL_RGBA, GL_HALF_FLOAT, half ? (const void*)half : (const void*)zero);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+   return tex;
+}
 static unsigned gl_dt_generation;
 
 static GLuint gl_dt_texture(const uint16_t *unorm, unsigned w, unsigned h,
@@ -745,6 +768,12 @@ static void gl_dt_free(void)
    }
    if (gl_dt_dummy)
       glDeleteTextures(1, &gl_dt_dummy);
+   if (gl_dt_cube)
+      glDeleteTextures(1, &gl_dt_cube);
+   if (gl_dt_dummy_3d)
+      glDeleteTextures(1, &gl_dt_dummy_3d);
+   gl_dt_cube       = 0;
+   gl_dt_dummy_3d   = 0;
    if (gl_dt_ubo)
       glDeleteBuffers(1, &gl_dt_ubo);
    gl_dt_dummy      = 0;
@@ -772,21 +801,17 @@ static void gl_bind_display_transform(const struct gl_program *p)
             psx_hdr_panel_xy);
    else
       memset(&b, 0, sizeof(b));
-   if (!gl_dt_ubo)
-      glGenBuffers(1, &gl_dt_ubo);
-   glBindBuffer(GL_UNIFORM_BUFFER, gl_dt_ubo);
-   /* Respecified per draw: the driver renames rather than waits. */
-   glBufferData(GL_UNIFORM_BUFFER, sizeof(b), &b, GL_STREAM_DRAW);
-   glBindBufferBase(GL_UNIFORM_BUFFER, GL_DT_UBO_BINDING, gl_dt_ubo);
-   block = glGetUniformBlockIndex(p->id, "DisplayTransform");
-   if (block != GL_INVALID_INDEX)
-      glUniformBlockBinding(p->id, block, GL_DT_UBO_BINDING);
-
    gen = hdr_dt_generation();
    if (!gl_dt_dummy)
       gl_dt_dummy = gl_dt_texture(NULL, 1, 1, 4, GL_CLAMP_TO_EDGE);
+   if (!gl_dt_dummy_3d)
+   {
+      glActiveTexture(GL_TEXTURE0 + GL_DT_UNIT_CUBE);
+      gl_dt_dummy_3d = gl_dt_cube_texture(NULL, 1);
+   }
    if (gen != gl_dt_generation)
    {
+      const uint16_t *cube  = hdr_dt_aces2_cube();
       const uint16_t *aces2 = hdr_dt_aces2_lut();
       const uint16_t *film  = hdr_dt_film_lut();
       const uint16_t *desat = hdr_dt_film_desat();
@@ -797,6 +822,12 @@ static void gl_bind_display_transform(const struct gl_program *p)
             glDeleteTextures(1, &gl_dt_tex[i]);
          gl_dt_tex[i] = 0;
       }
+      if (gl_dt_cube)
+         glDeleteTextures(1, &gl_dt_cube);
+      gl_dt_cube = 0;
+      glActiveTexture(GL_TEXTURE0 + GL_DT_UNIT_CUBE);
+      if (cube)
+         gl_dt_cube = gl_dt_cube_texture(cube, HDR_DT_ACES2_CUBE);
       glActiveTexture(GL_TEXTURE0 + GL_DT_UNIT_ACES2);
       if (aces2)
          gl_dt_tex[0] = gl_dt_texture(aces2, HDR_DT_ACES2_LUT_WIDTH, 1, 4, GL_REPEAT);
@@ -807,13 +838,29 @@ static void gl_bind_display_transform(const struct gl_program *p)
                4, GL_CLAMP_TO_EDGE);
       gl_dt_generation = gen;
    }
+   /* The cube only once this context holds it, whatever the block says. */
+   if (!gl_dt_cube)
+      b.gm[2] = 0.0f;
+   if (!gl_dt_ubo)
+      glGenBuffers(1, &gl_dt_ubo);
+   glBindBuffer(GL_UNIFORM_BUFFER, gl_dt_ubo);
+   /* Respecified per draw: the driver renames rather than waits. */
+   glBufferData(GL_UNIFORM_BUFFER, sizeof(b), &b, GL_STREAM_DRAW);
+   glBindBufferBase(GL_UNIFORM_BUFFER, GL_DT_UBO_BINDING, gl_dt_ubo);
+   block = glGetUniformBlockIndex(p->id, "DisplayTransform");
+   if (block != GL_INVALID_INDEX)
+      glUniformBlockBinding(p->id, block, GL_DT_UBO_BINDING);
+
    gl_dt_bind_unit(GL_DT_UNIT_ACES2, gl_dt_tex[0]);
    gl_dt_bind_unit(GL_DT_UNIT_FILM,  gl_dt_tex[1]);
    gl_dt_bind_unit(GL_DT_UNIT_DESAT, gl_dt_tex[2]);
+   glActiveTexture(GL_TEXTURE0 + GL_DT_UNIT_CUBE);
+   glBindTexture(GL_TEXTURE_3D, gl_dt_cube ? gl_dt_cube : gl_dt_dummy_3d);
    glActiveTexture(GL_TEXTURE0);
    glUniform1i(gl_uniform_map_get(&p->uniforms, "uDtAces2Lut"), GL_DT_UNIT_ACES2);
    glUniform1i(gl_uniform_map_get(&p->uniforms, "uDtFilmLut"),  GL_DT_UNIT_FILM);
    glUniform1i(gl_uniform_map_get(&p->uniforms, "uDtFilmDesat"), GL_DT_UNIT_DESAT);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "uDtAces2Cube"), GL_DT_UNIT_CUBE);
 }
 
 /* output_fragment with the Display Transform spliced in; caller frees. */
