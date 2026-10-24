@@ -20,7 +20,9 @@
 #      direct encode, at a value where gamma and linear differ.
 #   6. The same holds through the analog cable's resolve and the adaptive
 #      smoothing resolve, the other stages that can feed the effects.
-#   7. Every lane agrees between Vulkan and OpenGL.
+#   7. The Display Transform changes tone below paper white, and changing
+#      it or the post effects mid-run applies without a restart.
+#   8. Every lane agrees between Vulkan and OpenGL.
 #
 # Usage (from the repository root, after a HAVE_HW=1 build):
 #   sh tools/hdr_post/post_lanes.sh [core.so]
@@ -42,15 +44,15 @@ python3 tools/hdr_post/gen_post_exe.py "$OUT/post.exe"
 
 run()
 {
-   # $1 lane name, $2 extra core options
-   HOST_HDR_SCRGB=1 VKHOST_DUMP_RAW=1 \
+   # $1 lane name, $2 extra core options, $3 frame:key=value changes mid-run
+   HOST_HDR_SCRGB=1 VKHOST_DUMP_RAW=1 VKHOST_VARS_AT="$3" \
    VKHOST_VARS="${P}_renderer=hardware_vk;${P}_color_format=64bit_scrgb;$2" \
       tools/vkhost/vkhost "$CORE" "$OUT/post.exe" - "$FRAMES" "$OUT/$1.vk" \
       > "$OUT/$1.vk.log" 2>&1 || { cat "$OUT/$1.vk.log"; exit 1; }
    if ! grep -q " 0 validation errors" "$OUT/$1.vk.log"; then
       cat "$OUT/$1.vk.log"; echo "$1: Vulkan validation errors" >&2; exit 1
    fi
-   HOST_HDR_SCRGB=1 \
+   HOST_HDR_SCRGB=1 GLHOST_VARS_AT="$3" \
    GLHOST_VARS="${P}_renderer=hardware_gl;${P}_color_format=64bit_scrgb;$2" \
       tools/glhost/glhost "$CORE" "$OUT/post.exe" - "$FRAMES" "$OUT/$1.gl" \
       > "$OUT/$1.gl.log" 2>&1 || { cat "$OUT/$1.gl.log"; exit 1; }
@@ -64,6 +66,8 @@ run off4x     "${P}_internal_resolution=4x"
 run ca4x      "${P}_internal_resolution=4x;${P}_hdr_chromatic=heavy"
 run analog    "${P}_video_cable=svideo;${P}_hdr_bloom=standard"
 run smooth2x  "${P}_internal_resolution=2x;${P}_adaptive_smoothing=enabled;${P}_hdr_bloom=standard"
+run aces      "${P}_hdr_display_transform=aces;${P}_hdr_bloom=standard"
+run live      "" "270:${P}_hdr_display_transform=aces;270:${P}_hdr_bloom=standard"
 
 python3 - "$OUT" "$FRAMES" <<'EOF'
 import struct, sys, glob, re
@@ -153,7 +157,8 @@ CENTRE, CORNER, GREY = (152, 112, 16), (16, 16, 16), (152, 192, 16)
 # RGB5 grey 16, displayed as the byte 16 * 8 = 128, through the 2.4
 # reference transfer at paper white 200.
 GREY_NITS = (128.0 / 255.0) ** 2.4 * 200.0
-lanes = ['off', 'bloom', 'halation', 'conv', 'off4x', 'ca4x', 'analog', 'smooth2x']
+lanes = ['off', 'bloom', 'halation', 'conv', 'off4x', 'ca4x', 'analog', 'smooth2x',
+         'aces', 'live']
 img = {}
 for lane in lanes:
     for r in ('vk', 'gl'):
@@ -214,6 +219,17 @@ for r in ('vk', 'gl'):
             fail.append('%s: no bloom halo through the %s display stage' % (r, lane))
         if mean(inside(img[lane, r], CENTRE, sc, 4 * sc), lum) < white * 0.8:
             fail.append('%s: the square is dim through the %s display stage' % (r, lane))
+    # A Display Transform changes tone below paper white (ACES lifts mid
+    # grey), and options changed mid-run apply: the live lane switches the
+    # curve and bloom on at frame 270 and must end on the picture a run
+    # started with them shows.
+    g_aces = mean(inside(img['aces', r], GREY, 1, 3), lum)
+    if g_aces < grey * 1.2:
+        fail.append('%s: ACES leaves mid grey at %.2f nits (%.2f without)' % (r, g_aces, grey))
+    live = max(abs(p[i] - q[i]) for ra, rb in zip(img['live', r], img['aces', r])
+               for p, q in zip(ra, rb) for i in range(3))
+    if live > 0.05:
+        fail.append('%s: options changed mid-run did not apply (%.2f nits off)' % (r, live))
     print('%s: white %.1f nits, halo %.2f nits, halation r/b %.2f, conv reach %.3f/%.3f, '
           'corner split %.2f px' % (r, white, near_bloom, rb_warm, far_conv, far_two, split_corner))
 

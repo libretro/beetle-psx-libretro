@@ -5130,6 +5130,13 @@ static void check_variables(bool startup)
          psx_video_cable = 4;
    }
 
+#ifdef HAVE_HDR_TRANSFORM
+   /* Display Transform, its parameters and the post effects (HDR output
+    * only). Read on every update, not just at startup: all of it is
+    * consumed per frame, so a change applies on the next frame. */
+   check_display_transform_variables();
+#endif
+
    if (startup)
    {
       bool hw_renderer = false;
@@ -5163,11 +5170,6 @@ static void check_variables(bool startup)
          else if (!strcmp(var.value, "64bit_scrgb"))
             psx_color_format = PSX_COLOR_FORMAT_64BIT_SCRGB;
       }
-
-#ifdef HAVE_HDR_TRANSFORM
-      /* Display Transform and its parameters (HDR output only). */
-      check_display_transform_variables();
-#endif
 
       /* Reference SDR transfer for the HDR encode (Vulkan HDR path only).
        * Inert unless the HDR scanout is actually engaged. */

@@ -6085,6 +6085,16 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 
          ImageHandle last_scanout;
+         /* What last_scanout was encoded with besides VRAM; see
+          * renderer_output_key. */
+         struct RendererOutputKey
+         {
+            float    paper_white_nits, max_nits, black_pq, phase_error;
+            float    to_panel[9];
+            int32_t  hdr_active, scrgb, expand_gamut, shoulder, sdr_eotf;
+            int32_t  src_primaries, video_cable, black_setup;
+            uint32_t dt_serial;
+         } output_key;
          ImageHandle reuseable_scanout;
          /* Analog path intermediates. sig holds the modulated signal at the
           * CRTC base clock, sep the separated luma/chroma; both are RG16F and
@@ -8867,6 +8877,26 @@ static VkFormat renderer_hdr_scanout_format(Renderer *self)
    return self->hdr_scanout_format;
 }
 
+/* Everything the display encode reads other than VRAM. */
+static void renderer_output_key(struct RendererOutputKey *k)
+{
+   memset(k, 0, sizeof(*k));
+   k->paper_white_nits = psx_hdr_paper_white_nits;
+   k->max_nits         = psx_hdr_max_nits;
+   k->black_pq         = psx_hdr_black_pq;
+   k->phase_error      = psx_phase_error;
+   memcpy(k->to_panel, psx_hdr_to_panel, sizeof(k->to_panel));
+   k->hdr_active       = psx_hdr_active ? 1 : 0;
+   k->scrgb            = psx_hdr_scrgb;
+   k->expand_gamut     = psx_hdr_expand_gamut;
+   k->shoulder         = psx_hdr_shoulder;
+   k->sdr_eotf         = psx_hdr_sdr_eotf;
+   k->src_primaries    = psx_src_primaries;
+   k->video_cable      = psx_video_cable;
+   k->black_setup      = psx_black_setup;
+   k->dt_serial        = hdr_dt_serial();
+}
+
 static ImageHandle renderer_scanout_to_texture(Renderer *self)
 {
    VkViewport old_vp;
@@ -8888,6 +8918,18 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       texture_tracker_endFrame(self->tracker);
    }
 
+   /* The cached scanout is only current while the output encode is: an
+    * option or frontend HDR change on a static picture (a paused game, a
+    * still screen) must re-encode even though VRAM did not change. */
+   {
+      struct RendererOutputKey key;
+      renderer_output_key(&key);
+      if (memcmp(&key, &self->output_key, sizeof(key)))
+      {
+         self->output_key = key;
+         ih_reset(&self->last_scanout);
+      }
+   }
    if (ih_is_valid(&self->last_scanout))
       return self->last_scanout;
 

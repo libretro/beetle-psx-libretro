@@ -86,6 +86,10 @@ struct hdr_dt_block
 #define HDR_DT_DESAT_HEIGHT    33
 
 void hdr_dt_configure(const struct hdr_dt_settings *s);
+/* Changes whenever hdr_dt_configure or hdr_post_configure is handed
+ * settings different from the current ones; a cached encoded frame from
+ * an older serial is stale. */
+unsigned hdr_dt_serial(void);
 bool hdr_dt_enabled(void);
 
 /* Fills the block for one frame. panel_xy (CIE xy x 10000, all zero when

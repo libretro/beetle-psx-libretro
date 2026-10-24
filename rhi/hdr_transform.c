@@ -343,11 +343,22 @@ static void dt_mat3(float dst[12], const double m[9])
 
 /* ---- public ---- */
 
+/* Bumped whenever the Display Transform or post-effect settings change. */
+static unsigned dt_serial = 1;
+
 void hdr_dt_configure(const struct hdr_dt_settings *s)
 {
-   dt_set = *s;
-   if (dt_set.curve < 0 || dt_set.curve >= HDR_DT_COUNT)
-      dt_set.curve = HDR_DT_KNEE;
+   struct hdr_dt_settings n = *s;
+   if (n.curve < 0 || n.curve >= HDR_DT_COUNT)
+      n.curve = HDR_DT_KNEE;
+   if (memcmp(&n, &dt_set, sizeof(n)))
+      dt_serial++;
+   dt_set = n;
+}
+
+unsigned hdr_dt_serial(void)
+{
+   return dt_serial;
 }
 
 bool hdr_dt_enabled(void)
@@ -492,6 +503,8 @@ static struct hdr_post_settings post_set = { 0.0f, 0, 0, 1.0f, 0, 0 };
 
 void hdr_post_configure(const struct hdr_post_settings *s)
 {
+   if (memcmp(s, &post_set, sizeof(*s)))
+      dt_serial++;
    post_set = *s;
 }
 

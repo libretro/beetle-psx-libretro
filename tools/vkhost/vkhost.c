@@ -13,6 +13,10 @@
  *
  * Usage: vkhost <core.so> <content> [savestate] [frames] [outdir]
  *   VKHOST_VARS: semicolon list of key=value core option overrides.
+ *   VKHOST_VARS_AT: semicolon list of frame:key=value option changes, each
+ *     applied before that frame's retro_run and reported through
+ *     GET_VARIABLE_UPDATE, as a frontend does when the user edits an option
+ *     (glhost's GLHOST_VARS_AT).
  *   VKHOST_NEGOTIATION=1: a frontend that predates Vulkan negotiation v2
  *   (no support query, only a version 1 interface accepted). By default
  *   the host offers v2, as RetroArch does, and requires the core to create
@@ -50,6 +54,34 @@ static void add_var(const char *k, const char *v)
 { if (n_vars < 512) { var_keys[n_vars] = strdup(k); var_vals[n_vars] = strdup(v); n_vars++; } }
 static const char *find_var(const char *k)
 { int i; for (i = 0; i < n_vars; i++) if (!strcmp(var_keys[i], k)) return var_vals[i]; return NULL; }
+static int vars_updated;
+static void set_var(const char *k, const char *v)
+{
+   int i;
+   for (i = 0; i < n_vars; i++)
+      if (!strcmp(var_keys[i], k))
+      { free(var_vals[i]); var_vals[i] = strdup(v); vars_updated = 1; return; }
+   add_var(k, v); vars_updated = 1;
+}
+/* Apply the VKHOST_VARS_AT entries scheduled for this frame. */
+static void apply_vars_at(int frame)
+{
+   const char *at = getenv("VKHOST_VARS_AT");
+   char *dup, *tok;
+   if (!at) return;
+   dup = strdup(at);
+   for (tok = strtok(dup, ";"); tok; tok = strtok(NULL, ";"))
+   {
+      char *colon = strchr(tok, ':'), *eq;
+      if (!colon || atoi(tok) != frame) continue;
+      eq = strchr(colon + 1, '=');
+      if (!eq) continue;
+      *eq = 0;
+      fprintf(stderr, "[vkhost] frame %d: %s=%s\n", frame, colon + 1, eq + 1);
+      set_var(colon + 1, eq + 1);
+   }
+   free(dup);
+}
 
 /* ---- state ---- */
 static void *core;
@@ -340,7 +372,7 @@ static bool env_cb(unsigned cmd, void *data)
          return v != NULL;
       }
       case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
-         *(bool *)data = false; return true;
+         *(bool *)data = vars_updated != 0; vars_updated = 0; return true;
       case RETRO_ENVIRONMENT_SET_HW_RENDER:
       {
          struct retro_hw_render_callback *cb = (struct retro_hw_render_callback *)data;
@@ -846,6 +878,7 @@ run_frames_sw:
             }
             clock_gettime(CLOCK_MONOTONIC, &t0);
          }
+         apply_vars_at(i);
          retro_run_fn();
          {
             /* VKHOST_SAVE_STATE=path:frame - checkpoint mid-run so long
