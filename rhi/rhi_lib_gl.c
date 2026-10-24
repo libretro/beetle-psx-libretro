@@ -565,6 +565,14 @@ static GLuint beetle_gl_get_current_framebuffer(void)
  * two duplicated vertices it can be up to 3/2 the vertex buffer
  * length */
 #define INDEX_BUFFER_LEN  ((VERTEX_BUFFER_LEN * 3 + 1) / 2)
+/* The index buffer object is a ring of this many indices: each flush
+ * writes its indices past the previous flush's, through an unsynchronized
+ * map of a range no draw in flight reads, and only the wrap orphans the
+ * storage - instead of every flush. */
+#define INDEX_RING_LEN    (INDEX_BUFFER_LEN * 16)
+/* Byte offset of index `first` of the current flush in the ring. */
+#define GL_INDEX_OFFSET(r, first) \
+   ((GLvoid*)(((size_t)(r)->index_base + (size_t)(first)) * sizeof(GLushort)))
 
 /* Maximum uniform name length (matches the buffer size used in
  * load_program_uniforms when querying glGetActiveUniform). */
@@ -695,6 +703,9 @@ typedef struct gl_program gl_program;
 #define GL_DT_UNIT_CUBE   11
 
 static GLuint   gl_dt_ubo;
+/* What gl_dt_ubo holds: re-specified only when a draw needs other
+ * contents, which is when the settings, the peak or the cube change. */
+static struct hdr_dt_block gl_dt_ubo_block;
 static GLuint   gl_dt_tex[3];
 static GLuint   gl_dt_dummy;
 static GLuint   gl_dt_cube;
@@ -842,10 +853,20 @@ static void gl_bind_display_transform(const struct gl_program *p)
    if (!gl_dt_cube)
       b.gm[2] = 0.0f;
    if (!gl_dt_ubo)
+   {
       glGenBuffers(1, &gl_dt_ubo);
-   glBindBuffer(GL_UNIFORM_BUFFER, gl_dt_ubo);
-   /* Respecified per draw: the driver renames rather than waits. */
-   glBufferData(GL_UNIFORM_BUFFER, sizeof(b), &b, GL_STREAM_DRAW);
+      glBindBuffer(GL_UNIFORM_BUFFER, gl_dt_ubo);
+      glBufferData(GL_UNIFORM_BUFFER, sizeof(b), &b, GL_STATIC_DRAW);
+      gl_dt_ubo_block = b;
+   }
+   else if (memcmp(&b, &gl_dt_ubo_block, sizeof(b)))
+   {
+      /* Draws in flight may still read the old contents: fresh storage
+       * rather than a wait. */
+      glBindBuffer(GL_UNIFORM_BUFFER, gl_dt_ubo);
+      glBufferData(GL_UNIFORM_BUFFER, sizeof(b), &b, GL_STATIC_DRAW);
+      gl_dt_ubo_block = b;
+   }
    glBindBufferBase(GL_UNIFORM_BUFFER, GL_DT_UBO_BINDING, gl_dt_ubo);
    block = glGetUniformBlockIndex(p->id, "DisplayTransform");
    if (block != GL_INVALID_INDEX)
@@ -1187,8 +1208,12 @@ struct gl_renderer {
    gl_draw_buffer *image_load_buffer;
 
    GLushort vertex_indices[INDEX_BUFFER_LEN];
-   /* GPU buffer for vertex_indices (required for core profile) */
+   /* GPU buffer for vertex_indices (required for core profile), a ring
+    * of INDEX_RING_LEN: index_base is where this flush's indices start,
+    * index_ring_pos where the next flush's go. */
    GLuint index_buffer;
+   unsigned index_base;
+   unsigned index_ring_pos;
    /* Primitive type for the vertices in the command buffers
     * (TRIANGLES or LINES) */
    GLenum command_draw_mode;
@@ -3389,11 +3414,48 @@ static void gl_renderer_ceiling_batch(gl_renderer *renderer,
    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
    glStencilMask(0);
    glDrawElements(batch->draw_mode, batch->count, GL_UNSIGNED_SHORT,
-         (GLvoid*)(batch->first * sizeof(GLushort)));
+         GL_INDEX_OFFSET(renderer, batch->first));
    glStencilMask(1);
    glUniform1f(uniform, 0.0f);
    glBlendFuncSeparate(blend_src, blend_dst, GL_ONE, GL_ZERO);
    glBlendEquationSeparate(blend_func, GL_FUNC_ADD);
+}
+
+static void gl_renderer_upload_indices(gl_renderer *renderer)
+{
+   const unsigned n     = renderer->vertex_index_pos;
+   const size_t   bytes = (size_t)n * sizeof(GLushort);
+   void          *dst;
+#ifdef HAVE_OPENGLES3
+   const GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
+#else
+   const GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT
+         | GL_MAP_UNSYNCHRONIZED_BIT;
+#endif
+
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
+   if (renderer->index_ring_pos + n > INDEX_RING_LEN)
+   {
+      /* Wrapped: fresh storage while the draws in flight keep the old. */
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+            INDEX_RING_LEN * sizeof(GLushort), NULL, GL_DYNAMIC_DRAW);
+      renderer->index_ring_pos = 0;
+   }
+   renderer->index_base = renderer->index_ring_pos;
+   if (!n)
+      return;
+   dst = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,
+         (GLintptr)renderer->index_base * sizeof(GLushort), (GLsizeiptr)bytes, flags);
+   if (dst)
+   {
+      memcpy(dst, renderer->vertex_indices, bytes);
+      glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+   }
+   else
+      glBufferSubData(GL_ELEMENT_ARRAY_BUFFER,
+            (GLintptr)renderer->index_base * sizeof(GLushort), (GLsizeiptr)bytes,
+            renderer->vertex_indices);
+   renderer->index_ring_pos += n;
 }
 
 static void gl_renderer_draw(gl_renderer *renderer)
@@ -3473,15 +3535,9 @@ static void gl_renderer_draw(gl_renderer *renderer)
    }
 
    /* Upload index data to EBO (required for core profile - client-side
-    * index pointers are not allowed). Orphan first: the previous flush's
-    * draws may still read this storage, and overwriting it in place
-    * makes the driver stall or copy. */
-   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
-   glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                INDEX_BUFFER_LEN * sizeof(GLushort), NULL, GL_DYNAMIC_DRAW);
-   glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0,
-                   renderer->vertex_index_pos * sizeof(GLushort),
-                   renderer->vertex_indices);
+    * index pointers are not allowed) past the previous flush's indices,
+    * which draws still in flight may read. Only a wrap orphans. */
+   gl_renderer_upload_indices(renderer);
 
    {
       size_t bi;
@@ -3667,14 +3723,14 @@ static void gl_renderer_draw(gl_renderer *renderer)
                         it->blend_rect[0], it->blend_rect[1],
                         it->blend_rect[2], it->blend_rect[3]);
                glDrawElements(it->draw_mode, stride, GL_UNSIGNED_SHORT,
-                     (GLvoid*)(first * sizeof(GLushort)));
+                     GL_INDEX_OFFSET(renderer, first));
             }
             glActiveTexture(GL_TEXTURE0);
             glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)read_fb);
          }
          else
             glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
-                           (GLvoid*)(it->first * sizeof(GLushort)));
+                           GL_INDEX_OFFSET(renderer, it->first));
 
          /* Enhanced 16-bpp storage ends at byte248. UNORM would clamp ADD
           * and quarter-ADD at255 instead, leaving a false residue after SUB.
@@ -3708,7 +3764,7 @@ static void gl_renderer_draw(gl_renderer *renderer)
             glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
             glStencilMask(0);
             glDrawElements(it->draw_mode, it->count, GL_UNSIGNED_SHORT,
-                           (GLvoid*)(it->first * sizeof(GLushort)));
+                           GL_INDEX_OFFSET(renderer, it->first));
             glStencilMask(1);
             glUniform1ui(gl_uniform_map_get(&renderer->command_buffer->program->uniforms, "force_zero"), 0u);
          }
@@ -4266,8 +4322,10 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
    glGenBuffers(1, &renderer->index_buffer);
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                INDEX_BUFFER_LEN * sizeof(GLushort),
+                INDEX_RING_LEN * sizeof(GLushort),
                 NULL, GL_DYNAMIC_DRAW);
+   renderer->index_base     = 0;
+   renderer->index_ring_pos = 0;
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
    renderer->command_draw_mode = GL_TRIANGLES;
    renderer->semi_transparency_mode =  SEMI_TRANSPARENCY_MODE_AVERAGE;

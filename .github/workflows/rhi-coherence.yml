@@ -13,6 +13,8 @@ name: VRAM readback coherence
 # GPU only the VRAM it changed; loading a state straight back each frame
 # must leave the output and the upload work as they were
 # (tools/rhi_coherence/state_load_lanes.sh).
+# gl steady state: once warm, an OpenGL frame re-specifies no buffers and
+# creates no objects (tools/glhost/steady_state.sh).
 
 on:
   push:
@@ -75,3 +77,5 @@ jobs:
         run: sh tools/rhi_coherence/rollback_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"
       - name: State load lanes
         run: sh tools/rhi_coherence/state_load_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"
+      - name: OpenGL steady state
+        run: sh tools/glhost/steady_state.sh "$PWD/mednafen_psx_hw_libretro.so"

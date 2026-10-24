@@ -110,6 +110,31 @@ void glTexSubImage2D(GLenum target, GLint level, GLint x, GLint y,
    real(target, level, x, y, w, h, format, type, px);
 }
 
+/* Buffer re-specifications and object creations the core makes, counted
+ * so a steady-state report can say how many a run of frames needed: a
+ * display path that keeps its resources makes none once warmed up. The
+ * GL 1.1 entry points come in through the PLT and are defined here; the
+ * rest through get_proc_address, which hands out these wrappers. */
+static unsigned long gl_respec, gl_respec_half, gl_creates, gl_creates_half;
+typedef void (*bufdata_t)(GLenum, GLsizeiptr, const void *, GLenum);
+typedef void (*gen_t)(GLsizei, GLuint *);
+static bufdata_t real_buffer_data;
+static gen_t     real_gen_buffers, real_gen_framebuffers;
+static void count_buffer_data(GLenum t, GLsizeiptr n, const void *d, GLenum u)
+{ gl_respec++; real_buffer_data(t, n, d, u); }
+static void count_gen_buffers(GLsizei n, GLuint *o)
+{ gl_creates += (unsigned long)n; real_gen_buffers(n, o); }
+static void count_gen_framebuffers(GLsizei n, GLuint *o)
+{ gl_creates += (unsigned long)n; real_gen_framebuffers(n, o); }
+void glGenTextures(GLsizei n, GLuint *o)
+{
+   static gen_t real;
+   if (!real)
+      real = (gen_t)dlsym(RTLD_NEXT, "glGenTextures");
+   gl_creates += (unsigned long)n;
+   real(n, o);
+}
+
 /* ---- HW render callbacks the core consumes ---- */
 static uintptr_t get_current_framebuffer(void) { return (uintptr_t)fbo; }
 static retro_proc_address_t get_proc_address(const char *sym)
@@ -126,7 +151,18 @@ static retro_proc_address_t get_proc_address(const char *sym)
          p += n;
       }
    }
-   return (retro_proc_address_t)eglGetProcAddress(sym);
+   {
+      retro_proc_address_t f = (retro_proc_address_t)eglGetProcAddress(sym);
+      if (!f)
+         return f;
+      if (!strcmp(sym, "glBufferData"))
+      { real_buffer_data = (bufdata_t)f; return (retro_proc_address_t)count_buffer_data; }
+      if (!strcmp(sym, "glGenBuffers"))
+      { real_gen_buffers = (gen_t)f; return (retro_proc_address_t)count_gen_buffers; }
+      if (!strcmp(sym, "glGenFramebuffers"))
+      { real_gen_framebuffers = (gen_t)f; return (retro_proc_address_t)count_gen_framebuffers; }
+      return f;
+   }
 }
 
 /* ---- environment ---- */
@@ -649,7 +685,11 @@ int main(int argc, char **argv)
         input_frame = (unsigned)i;
         apply_vars_at(i);
         if (i == frames / 2 + 1)
+        {
            upload_texels_half = upload_texels;
+           gl_respec_half     = gl_respec;
+           gl_creates_half    = gl_creates;
+        }
         if (preempt && (i < 5 || (i % 50) == 0))
            fprintf(stderr, "[glhost] frame %d serialize_size=%zu\n", i, ssz());
         if (preempt == 1)
@@ -743,6 +783,9 @@ int main(int argc, char **argv)
    }
    fprintf(stderr, "[glhost] steady state: %llu texels uploaded in the second half of the run\n",
            upload_texels - upload_texels_half);
+   fprintf(stderr, "[glhost] steady state: %lu buffer re-specifications, %lu GL objects created"
+           " in the second half of the run\n",
+           gl_respec - gl_respec_half, gl_creates - gl_creates_half);
    fprintf(stderr, "[glhost] done: %d frames run, %u presented, last %ux%u\n",
            frames, frames_presented, last_w, last_h);
 
