@@ -4619,6 +4619,55 @@ static const char *display_transform_value(const char *key)
    return NULL;
 }
 
+/* Options that tune one Display Transform curve, shown only while that
+ * curve is selected. The ACES 2.0 two belong to the full output transform;
+ * the tone scale alone has no surround or limiting gamut. */
+static const struct
+{
+   const char *key;
+   const char *curve;
+} dt_curve_options[] = {
+   { BEETLE_OPT(hdr_aces2_surround),     "aces2full" },
+   { BEETLE_OPT(hdr_aces2_gamut),        "aces2full" },
+   { BEETLE_OPT(hdr_agx_look),           "agx" },
+   { BEETLE_OPT(hdr_gt_toe),             "gt" },
+   { BEETLE_OPT(hdr_gt_linear),          "gt" },
+   { BEETLE_OPT(hdr_filmiclog_contrast), "filmiclog" },
+   { BEETLE_OPT(hdr_filmiclog_range),    "filmiclog" }
+};
+#define DT_CURVE_OPTIONS (sizeof(dt_curve_options) / sizeof(dt_curve_options[0]))
+
+/* Bit i set: dt_curve_options[i] is shown. Options start out visible. */
+static unsigned dt_curve_options_shown = (1u << DT_CURVE_OPTIONS) - 1;
+
+/* Returns whether any visibility changed, as the frontend's update-display
+ * callback expects. */
+static bool update_display_transform_options(void)
+{
+   const char *v    = display_transform_value(BEETLE_OPT(hdr_display_transform));
+   unsigned    mask = 0;
+   unsigned    i;
+
+   if (!v)
+      v = "reinhard";
+   for (i = 0; i < DT_CURVE_OPTIONS; i++)
+      if (!strcmp(v, dt_curve_options[i].curve))
+         mask |= 1u << i;
+   if (mask == dt_curve_options_shown)
+      return false;
+   for (i = 0; i < DT_CURVE_OPTIONS; i++)
+   {
+      struct retro_core_option_display option_display;
+      if (!((mask ^ dt_curve_options_shown) & (1u << i)))
+         continue;
+      option_display.key     = dt_curve_options[i].key;
+      option_display.visible = (mask >> i) & 1;
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
+   }
+   dt_curve_options_shown = mask;
+   return true;
+}
+
 static void check_display_transform_variables(void)
 {
    static const char *const contrast[7] = {
@@ -4694,6 +4743,7 @@ static void check_display_transform_variables(void)
       post.chromatic = !strcmp(v, "subtle") ? 1 : !strcmp(v, "strong") ? 2
                      : !strcmp(v, "heavy") ? 3 : 0;
    hdr_post_configure(&post);
+   update_display_transform_options();
 
    /* HDR Display Peak Luminance; the per-frame metadata refresh reapplies
     * it over whatever the frontend reports. */
@@ -7327,6 +7377,19 @@ void retro_set_environment(retro_environment_t cb)
 
    libretro_supports_option_categories = false;
    libretro_set_core_options(environ_cb, &libretro_supports_option_categories);
+
+#ifdef HAVE_HDR_TRANSFORM
+   /* Setting the options made every one visible again; the frontend asks
+    * through the callback whenever its options menu may need refreshing,
+    * so the curve options follow the Display Transform as it is changed. */
+   {
+      struct retro_core_options_update_display_callback update_display;
+      dt_curve_options_shown      = (1u << DT_CURVE_OPTIONS) - 1;
+      update_display.callback     = update_display_transform_options;
+      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_UPDATE_DISPLAY_CALLBACK,
+            &update_display);
+   }
+#endif
 
 #ifndef STATIC_LINKING
    /*

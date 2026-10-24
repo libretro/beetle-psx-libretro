@@ -8,6 +8,9 @@ name: HDR display transform and post effects
 #   their invariants, the shader carrying every curve constant, and every
 #   GL and GLES shader source compiling under glslang. Strict C89,
 #   ASan/UBSan, and a mingw-w64 build under Wine.
+# options: each curve's own options (ACES 2.0, AgX, GT, Filmic) are shown
+#   only while the Display Transform is set to that curve
+#   (tools/core_options/dt_visibility.c, against the built core).
 # post: the core rendering a reference scene through both hardware
 #   renderers (lavapipe, llvmpipe) with each effect on, measured in linear
 #   light; also checks that the generated GL shaders match their sources.
@@ -21,6 +24,7 @@ on:
       - 'Makefile*'
       - 'tools/hdr_transform/**'
       - 'tools/hdr_post/**'
+      - 'tools/core_options/**'
       - 'tools/vkhost/**'
       - 'tools/glhost/**'
       - '.github/workflows/hdr-transform.yml'
@@ -32,6 +36,7 @@ on:
       - 'Makefile*'
       - 'tools/hdr_transform/**'
       - 'tools/hdr_post/**'
+      - 'tools/core_options/**'
       - 'tools/vkhost/**'
       - 'tools/glhost/**'
       - '.github/workflows/hdr-transform.yml'
@@ -75,5 +80,7 @@ jobs:
           git diff --exit-code -- rhi/shaders_gl
       - name: Build the core
         run: make -j"$(nproc)" HAVE_HW=1
+      - name: Display Transform option visibility
+        run: sh tools/core_options/run.sh "$PWD/mednafen_psx_hw_libretro.so"
       - name: Post-effect lanes
         run: sh tools/hdr_post/post_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"
