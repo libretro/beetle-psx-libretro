@@ -131,6 +131,7 @@ struct hdr_post_settings
    float firefly_knee;  /* 1 standard, 0.25 wide, 0.0625 widest */
    int   halation;      /* 0 off, 1 subtle, 2 strong */
    int   chromatic;     /* 0 off, 1 subtle, 2 strong, 3 heavy */
+   int   compact;       /* 1: 11/11/10 float intermediates instead of RGBA16F */
 };
 
 /* Per frame, from the settings and the scene size. */
@@ -146,6 +147,9 @@ struct hdr_post_frame
 
 void hdr_post_configure(const struct hdr_post_settings *s);
 bool hdr_post_enabled(void);
+/* Whether the post effects' intermediates (the scene image and the bloom
+ * chain) may use the packed 11/11/10 float format. */
+bool hdr_post_compact(void);
 void hdr_post_frame_params(struct hdr_post_frame *f, unsigned w, unsigned h);
 
 #ifdef __cplusplus

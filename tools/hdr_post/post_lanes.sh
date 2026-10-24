@@ -22,7 +22,11 @@
 #      smoothing resolve, the other stages that can feed the effects.
 #   7. The Display Transform changes tone below paper white, and changing
 #      it or the post effects mid-run applies without a restart.
-#   8. Every lane agrees between Vulkan and OpenGL.
+#   8. Compact Intermediates (11/11/10 float scene and bloom images) keeps
+#      every pixel within the packed format's precision of the half-float
+#      picture, with bloom and aberration on and through the analog cable -
+#      and does change it, so the packed format is really in use.
+#   9. Every lane agrees between Vulkan and OpenGL.
 #
 # Usage (from the repository root, after a HAVE_HW=1 build):
 #   sh tools/hdr_post/post_lanes.sh [core.so]
@@ -68,6 +72,10 @@ run analog    "${P}_video_cable=svideo;${P}_hdr_bloom=standard"
 run smooth2x  "${P}_internal_resolution=2x;${P}_adaptive_smoothing=enabled;${P}_hdr_bloom=standard"
 run aces      "${P}_hdr_display_transform=aces;${P}_hdr_bloom=standard"
 run live      "" "270:${P}_hdr_display_transform=aces;270:${P}_hdr_bloom=standard"
+FX="${P}_internal_resolution=4x;${P}_hdr_bloom=standard;${P}_hdr_chromatic=heavy"
+run full4x    "$FX"
+run compact4x "$FX;${P}_hdr_post_compact=enabled"
+run analogc   "${P}_video_cable=svideo;${P}_hdr_bloom=standard;${P}_hdr_post_compact=enabled"
 
 python3 - "$OUT" "$FRAMES" <<'EOF'
 import struct, sys, glob, re
@@ -106,6 +114,11 @@ def load(lane, r):
         rows = [[tuple(x * 80.0 for x in v[((h - 1 - y) * w + x) * 4:((h - 1 - y) * w + x) * 4 + 3])
                  for x in range(w)] for y in range(h)]
     return rows
+
+def pq(nits):
+    """10-bit PQ code of a light level, as the HDR10 output encodes it."""
+    y = min(max(nits / 10000.0, 0.0), 1.0) ** 0.1593017578125
+    return round(((0.8359375 + 18.8515625 * y) / (1.0 + 18.6875 * y)) ** 78.84375 * 1023.0)
 
 def lum(c):
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
@@ -158,7 +171,7 @@ CENTRE, CORNER, GREY = (152, 112, 16), (16, 16, 16), (152, 192, 16)
 # reference transfer at paper white 200.
 GREY_NITS = (128.0 / 255.0) ** 2.4 * 200.0
 lanes = ['off', 'bloom', 'halation', 'conv', 'off4x', 'ca4x', 'analog', 'smooth2x',
-         'aces', 'live']
+         'aces', 'live', 'full4x', 'compact4x', 'analogc']
 img = {}
 for lane in lanes:
     for r in ('vk', 'gl'):
@@ -230,8 +243,29 @@ for r in ('vk', 'gl'):
                for p, q in zip(ra, rb) for i in range(3))
     if live > 0.05:
         fail.append('%s: options changed mid-run did not apply (%.2f nits off)' % (r, live))
+    # Compact Intermediates: within the packed float's precision, measured
+    # as 10-bit PQ output codes - 6-bit mantissas for red and green, 5 for
+    # blue, rounded once in the scene and again down the bloom chain - but
+    # not identical.
+    for lane, ref in (('compact4x', 'full4x'), ('analogc', 'analog')):
+        worst = [0, 0, 0]
+        changed = 0
+        for ra, rb in zip(img[lane, r], img[ref, r]):
+            for p, q in zip(ra, rb):
+                for i in range(3):
+                    d = abs(pq(p[i]) - pq(q[i]))
+                    changed += d > 0
+                    worst[i] = max(worst[i], d)
+        if worst[0] > 4 or worst[1] > 4 or worst[2] > 8:
+            fail.append('%s: %s is %d/%d/%d PQ codes off half floats' % ((r, lane) + tuple(worst)))
+        if not changed:
+            fail.append('%s: %s is identical to half floats, compact format not in use'
+                        % (r, lane))
+        if lane == 'compact4x':
+            compact_worst = worst
     print('%s: white %.1f nits, halo %.2f nits, halation r/b %.2f, conv reach %.3f/%.3f, '
-          'corner split %.2f px' % (r, white, near_bloom, rb_warm, far_conv, far_two, split_corner))
+          'corner split %.2f px, compact %d/%d/%d PQ codes' % ((r, white, near_bloom, rb_warm, far_conv,
+          far_two, split_corner) + tuple(compact_worst)))
 
 for lane in lanes:
     a, b = img[lane, 'vk'], img[lane, 'gl']

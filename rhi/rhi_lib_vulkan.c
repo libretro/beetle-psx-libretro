@@ -5962,6 +5962,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          /* Cached, device-probed format for the HDR scanout image (lazily
           * filled on first HDR frame). VK_FORMAT_UNDEFINED = not yet probed. */
          VkFormat hdr_scanout_format;
+         /* 0 until probed: whether B10G11R11_UFLOAT can be a blended,
+          * filtered render target (1) or not (-1). */
+         int post_compact_supported;
          /* Colour format of the scaled framebuffer. R8G8B8A8_UNORM normally;
           * R16G16B16A16_SFLOAT when a 30-bit/HDR format was requested and the
           * device supports it for every scaled-fb usage (probed at init), so
@@ -6230,6 +6233,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    }
    static ImageHandle renderer_scanout_to_texture(Renderer *self);
    static VkFormat renderer_hdr_scanout_format(Renderer *self);
+   static VkFormat renderer_post_format(Renderer *self);
    static void renderer_take_image(Renderer *self, ImageHandle *dst,
          const ImageCreateInfo *info);
    static bool renderer_analog_active(Renderer *self);
@@ -8144,7 +8148,7 @@ static void renderer_post_pass(Renderer *self, ImageHandle *dst, unsigned w, uns
 
    if (!add)
    {
-      ImageCreateInfo info = image_create_info_render_target(w, h, VK_FORMAT_R16G16B16A16_SFLOAT);
+      ImageCreateInfo info = image_create_info_render_target(w, h, renderer_post_format(self));
       info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
       info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
       renderer_take_image(self, dst, &info);
@@ -8503,7 +8507,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    }
 
    { ImageCreateInfo info = image_create_info_render_target(out_w, out_h,
-         renderer_post_active() ? VK_FORMAT_R16G16B16A16_SFLOAT
+         renderer_post_active() ? renderer_post_format(self)
          : psx_hdr_active ? renderer_hdr_scanout_format(self) : VK_FORMAT_R8G8B8A8_UNORM);
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -8876,6 +8880,26 @@ resolve:
    return self->analog_out;
 }
 
+/* The HDR post effects' intermediates: RGBA16F, or with Compact
+ * Intermediates the packed 11/11/10 float, which halves their traffic.
+ * Everything they hold is non-negative light, which the unsigned format
+ * carries; the bloom pyramid blends into it. */
+static VkFormat renderer_post_format(Renderer *self)
+{
+   if (!hdr_post_compact())
+      return VK_FORMAT_R16G16B16A16_SFLOAT;
+   if (!self->post_compact_supported)
+      self->post_compact_supported = device_image_format_is_supported(self->device,
+            VK_FORMAT_B10G11R11_UFLOAT_PACK32,
+            VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
+            | VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT
+            | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT
+            | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT,
+            VK_IMAGE_TILING_OPTIMAL) ? 1 : -1;
+   return self->post_compact_supported > 0 ? VK_FORMAT_B10G11R11_UFLOAT_PACK32
+         : VK_FORMAT_R16G16B16A16_SFLOAT;
+}
+
 static VkFormat renderer_hdr_scanout_format(Renderer *self)
 {
    const VkFormatFeatureFlags need =
@@ -9095,7 +9119,8 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    ImageCreateInfo info = image_create_info_render_target(
          display_rect.width * render_scale,
          display_rect.height * render_scale,
-         (analog || post) ? VK_FORMAT_R16G16B16A16_SFLOAT
+         analog ? VK_FORMAT_R16G16B16A16_SFLOAT
+         : post ? renderer_post_format(self)
          : hdr_quad ? renderer_hdr_scanout_format(self)
             : VK_FORMAT_R8G8B8A8_UNORM);
 

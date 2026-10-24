@@ -977,6 +977,7 @@ struct gl_texture
    GLuint id;
    uint32_t width;
    uint32_t height;
+   GLenum internal_format;
 };
 typedef struct gl_texture gl_texture;
 
@@ -2081,6 +2082,7 @@ static bool gl_texture_init(
    tex->id     = id;
    tex->width  = width;
    tex->height = height;
+   tex->internal_format = internal_format;
    glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_IMMUTABLE_FORMAT, &allocated);
    return id != 0 && allocated == GL_TRUE;
 }
@@ -5275,14 +5277,32 @@ static bool gl_post_build(struct gl_post *pp)
    return true;
 }
 
-/* (Re)allocate a half-float target, bilinear and edge-clamped: the bloom
+#ifndef GL_R11F_G11F_B10F
+#define GL_R11F_G11F_B10F 0x8C3A
+#endif
+
+/* Set once a packed-float target failed to attach: Compact Intermediates
+ * then falls back to half floats for the rest of the session. */
+static bool gl_post_compact_broken;
+
+/* The post intermediates' format: half floats, or with Compact
+ * Intermediates the packed 11/11/10 float, which halves their traffic.
+ * They only ever hold non-negative light, which it carries. */
+static GLenum gl_post_format(void)
+{
+   return (hdr_post_compact() && !gl_post_compact_broken)
+         ? GL_R11F_G11F_B10F : GL_RGBA16F;
+}
+
+/* (Re)allocate a post target, bilinear and edge-clamped: the bloom
  * samples between texels and the aberration reaches past the frame. */
 static bool gl_post_texture(gl_texture *t, unsigned w, unsigned h)
 {
-   if (t->id && t->width == w && t->height == h)
+   GLenum fmt = gl_post_format();
+   if (t->id && t->width == w && t->height == h && t->internal_format == fmt)
       return true;
    gl_post_free_texture(t);
-   if (!gl_texture_init(t, w, h, GL_RGBA16F))
+   if (!gl_texture_init(t, w, h, fmt))
    {
       gl_post_free_texture(t);
       return false;
@@ -5300,7 +5320,11 @@ static bool gl_post_target(struct gl_post *pp, gl_texture *t)
    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
          GL_TEXTURE_2D, t->id, 0);
    glViewport(0, 0, (GLsizei)t->width, (GLsizei)t->height);
-   return glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+   if (glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+      return true;
+   if (t->internal_format == GL_R11F_G11F_B10F)
+      gl_post_compact_broken = true;
+   return false;
 }
 
 static void gl_post_draw_quad(struct gl_post *pp)

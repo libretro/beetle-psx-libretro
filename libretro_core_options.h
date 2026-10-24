@@ -646,6 +646,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
+      BEETLE_OPT(hdr_post_compact),
+      "HDR Post: Compact Intermediates",
+      NULL,
+      "Stores the images the HDR post effects work on - the full-size scene and the bloom chain - as packed 32-bit floats (11/11/10 bits) instead of 64-bit half floats, halving the memory traffic of the effects. Worth it on integrated and mobile GPUs, where that traffic is a real share of the frame. The picture changes slightly: a few 10-bit HDR output steps at most, up to about six in blue in dim bloom glow. Only matters while HDR Bloom or HDR Chromatic Aberration is on, on the HDR outputs.",
+      NULL,
+      "video",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       BEETLE_OPT(src_primaries),
       "Source Colour Primaries",
       NULL,

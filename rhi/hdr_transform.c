@@ -513,6 +513,11 @@ bool hdr_post_enabled(void)
    return post_set.bloom > 0.0f || post_set.chromatic > 0;
 }
 
+bool hdr_post_compact(void)
+{
+   return post_set.compact != 0;
+}
+
 /* The bright pass threshold. Classic is the 0.70 the bloom was tuned
  * against; the curve knee follows Neutral's start of compression or GT's
  * solved shoulder start, so the bloom picks the pixels the curve will

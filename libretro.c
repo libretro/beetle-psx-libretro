@@ -4739,6 +4739,8 @@ static void check_display_transform_variables(void)
       post.convolution = !strcmp(v, "enabled");
    if ((v = display_transform_value(BEETLE_OPT(hdr_halation))))
       post.halation = !strcmp(v, "subtle") ? 1 : !strcmp(v, "strong") ? 2 : 0;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_post_compact))))
+      post.compact = !strcmp(v, "enabled");
    if ((v = display_transform_value(BEETLE_OPT(hdr_chromatic))))
       post.chromatic = !strcmp(v, "subtle") ? 1 : !strcmp(v, "strong") ? 2
                      : !strcmp(v, "heavy") ? 3 : 0;
