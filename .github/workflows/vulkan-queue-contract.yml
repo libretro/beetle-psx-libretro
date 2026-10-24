@@ -6,6 +6,13 @@ name: Vulkan queue contract
 # enforces it: it counts each unlocked use, runs a second thread on the
 # queue the way a frontend's video thread does, and has the validation
 # layer's thread check on.
+#
+# The same job checks the renderer's steady state: once warm, a frame must
+# not create Vulkan objects. vkhost counts every image, view, buffer,
+# framebuffer and memory allocation the core makes; each display path
+# (native, 2x, smoothing, composite cable, HDR post, rollback) must stay
+# within a handful over the last 300 of 600 frames, where per-frame
+# creation shows up as thousands.
 
 on:
   push:
@@ -45,3 +52,5 @@ jobs:
         run: make -C tools/vkhost
       - name: Queue contract
         run: tools/vkhost/queue_contract.sh "$PWD/mednafen_psx_hw_libretro.so" 120
+      - name: Steady state resources
+        run: sh tools/vkhost/steady_state.sh "$PWD/mednafen_psx_hw_libretro.so"

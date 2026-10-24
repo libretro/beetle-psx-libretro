@@ -3,7 +3,7 @@
 #
 #   sh tools/vcd/build.sh <harness> [extra cc args...]
 #
-# where <harness> is one of: vcd_probe vcd_pipeline vcd_state
+# where <harness> is one of: vcd_probe vcd_pipeline vcd_state vcd_churn
 #                            cdstream_map_test vcd_disc
 #
 # The binary lands in $OUT (default /tmp/<harness>). Pass
@@ -50,7 +50,7 @@ VFS="$LC/streams/file_stream.c $LC/vfs/vfs_implementation.c
      $LC/lists/dir_list.c $LC/formats/data_transfer.c"
 
 case "$HARNESS" in
-vcd_probe|vcd_pipeline|vcd_state)
+vcd_probe|vcd_pipeline|vcd_state|vcd_churn)
    SRC="tools/vcd/$HARNESS.c tools/vcd/state_stub.c
         mednafen/psx/vcd.c mednafen/state.c $MPEG $BASE"
    ;;

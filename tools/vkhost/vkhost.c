@@ -239,10 +239,51 @@ static VKAPI_ATTR VkResult VKAPI_CALL core_vkWaitForFences(VkDevice device,
    core_waits("vkWaitForFences");
    return real_wait_for_fences(device, count, fences, all, timeout);
 }
+/* Vulkan objects the core creates, counted so the steady-state report can
+ * say how many a run of frames needed: a display path that keeps its
+ * resources creates none once warmed up. */
+static unsigned long object_creates, object_creates_half;
+static PFN_vkCreateImage        real_create_image;
+static PFN_vkCreateImageView    real_create_image_view;
+static PFN_vkCreateBuffer       real_create_buffer;
+static PFN_vkCreateBufferView   real_create_buffer_view;
+static PFN_vkCreateFramebuffer  real_create_framebuffer;
+static PFN_vkAllocateMemory     real_allocate_memory;
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkCreateImage(VkDevice d,
+      const VkImageCreateInfo *i, const VkAllocationCallbacks *a, VkImage *o)
+{ object_creates++; return real_create_image(d, i, a, o); }
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkCreateImageView(VkDevice d,
+      const VkImageViewCreateInfo *i, const VkAllocationCallbacks *a, VkImageView *o)
+{ object_creates++; return real_create_image_view(d, i, a, o); }
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkCreateBuffer(VkDevice d,
+      const VkBufferCreateInfo *i, const VkAllocationCallbacks *a, VkBuffer *o)
+{ object_creates++; return real_create_buffer(d, i, a, o); }
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkCreateBufferView(VkDevice d,
+      const VkBufferViewCreateInfo *i, const VkAllocationCallbacks *a, VkBufferView *o)
+{ object_creates++; return real_create_buffer_view(d, i, a, o); }
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkCreateFramebuffer(VkDevice d,
+      const VkFramebufferCreateInfo *i, const VkAllocationCallbacks *a, VkFramebuffer *o)
+{ object_creates++; return real_create_framebuffer(d, i, a, o); }
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkAllocateMemory(VkDevice d,
+      const VkMemoryAllocateInfo *i, const VkAllocationCallbacks *a, VkDeviceMemory *o)
+{ object_creates++; return real_allocate_memory(d, i, a, o); }
+
 static PFN_vkVoidFunction core_queue_entry(const char *name, PFN_vkVoidFunction real)
 {
    if (!real)
       return real;
+   if (!strcmp(name, "vkCreateImage"))
+   { real_create_image = (PFN_vkCreateImage)real; return (PFN_vkVoidFunction)core_vkCreateImage; }
+   if (!strcmp(name, "vkCreateImageView"))
+   { real_create_image_view = (PFN_vkCreateImageView)real; return (PFN_vkVoidFunction)core_vkCreateImageView; }
+   if (!strcmp(name, "vkCreateBuffer"))
+   { real_create_buffer = (PFN_vkCreateBuffer)real; return (PFN_vkVoidFunction)core_vkCreateBuffer; }
+   if (!strcmp(name, "vkCreateBufferView"))
+   { real_create_buffer_view = (PFN_vkCreateBufferView)real; return (PFN_vkVoidFunction)core_vkCreateBufferView; }
+   if (!strcmp(name, "vkCreateFramebuffer"))
+   { real_create_framebuffer = (PFN_vkCreateFramebuffer)real; return (PFN_vkVoidFunction)core_vkCreateFramebuffer; }
+   if (!strcmp(name, "vkAllocateMemory"))
+   { real_allocate_memory = (PFN_vkAllocateMemory)real; return (PFN_vkVoidFunction)core_vkAllocateMemory; }
    if (!strcmp(name, "vkQueueSubmit"))
    { real_queue_submit = (PFN_vkQueueSubmit)real; return (PFN_vkVoidFunction)core_vkQueueSubmit; }
    if (!strcmp(name, "vkQueueWaitIdle"))
@@ -919,6 +960,8 @@ run_frames_sw:
             clock_gettime(CLOCK_MONOTONIC, &t0);
          }
          apply_vars_at(i);
+         if (i == frames / 2)
+            object_creates_half = object_creates;
          retro_run_fn();
          {
             /* VKHOST_SAVE_STATE=path:frame - checkpoint mid-run so long
@@ -988,6 +1031,8 @@ run_frames_sw:
       __atomic_store_n(&queue_thread_run, 0, __ATOMIC_SEQ_CST);
       pthread_join(queue_thread, NULL);
    }
+   fprintf(stderr, "[vkhost] steady state: %lu Vulkan objects created in the second half of the run\n",
+         object_creates - object_creates_half);
    fprintf(stderr, "[vkhost] done: %d frames run, %u valid, %d validation errors, %d warnings,"
            " %d unlocked uses of the frontend's queue, %d waits with its lock held\n",
            frames, frame_valid, validation_errors, validation_warnings,

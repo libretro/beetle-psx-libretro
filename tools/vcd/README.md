@@ -98,6 +98,14 @@ CD carries it and pushes them through `VCD_FeedSector`, covering the sector
 tap, subheader filtering, packet routing to the two decoders, and the YCbCr
 to RGB565 conversion.
 
+## vcd_churn.c
+
+Counts the heap allocations inside each `VCD_StateAction` load (link with
+`-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc`). Runahead and rollback
+load a state every frame; decoders nothing has fed must survive the load,
+and fed ones must still be rebuilt. Needs no MPEG input. Run in CI by
+`vcd-state-churn.yml`.
+
 Build every harness with `tools/vcd/build.sh`:
 
 ```sh
@@ -105,8 +113,8 @@ sh tools/vcd/build.sh vcd_probe -fsanitize=address,undefined
 sh tools/vcd/build.sh vcd_disc  -fsanitize=address,undefined
 ```
 
-Harnesses: `vcd_probe`, `vcd_pipeline`, `vcd_state`, `cdstream_map_test`,
-`vcd_disc`. The binary lands in `$OUT` (default `/tmp/<harness>`).
+Harnesses: `vcd_probe`, `vcd_pipeline`, `vcd_state`, `vcd_churn`,
+`cdstream_map_test`, `vcd_disc`. The binary lands in `$OUT` (default `/tmp/<harness>`).
 
 **Do not hand-write the flags.** `build.sh` gets them from
 `tools/harness_cflags.sh`, which reads them back out of the core's own build

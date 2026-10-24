@@ -5918,6 +5918,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       TextureTrackerSaveState *tracker_state;
    };
    typedef struct SaveState SaveState;
+   enum { RENDERER_UPLOAD_RINGS = 8 };
+   enum { RENDERER_IMAGE_CACHE = 32 };
    struct Renderer
    {
          /* batch-7 out-of-line methods -> free functions. */
@@ -6146,6 +6148,27 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
           * next can reuse it, and creating one per FBRead allocated device
           * memory on the hot path. */
          BufferHandle readback;
+         /* CPU->VRAM upload staging: one persistent texel buffer and view
+          * per frame context, sub-allocated linearly. A frame context is
+          * reused only after device_next_frame_context waited on its
+          * fences, so a slot's space is free again once its serial is
+          * stale. Uploads that do not fit take a buffer of their own. */
+         struct UploadRing
+         {
+            BufferHandle     buf;
+            BufferViewHandle view;
+            VkDeviceSize     size;
+            VkDeviceSize     used;
+            unsigned         serial;
+         } upload_ring[RENDERER_UPLOAD_RINGS];
+         unsigned upload_serial;
+         /* Per-frame images (scanout, the analog chain's and the HDR post
+          * effects' intermediates) kept for reuse, so the display path stops
+          * creating images, memory and views every frame. An image only this
+          * cache references is free: the member that last held it moved on,
+          * and the frontend's per-sync-index handle is dropped once that
+          * index comes round again. Sized for two frames of intermediates. */
+         ImageHandle image_cache[RENDERER_IMAGE_CACHE];
    };
 
    /* SaveState lifecycle free functions (SaveState is a plain struct). vram is
@@ -6207,6 +6230,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    }
    static ImageHandle renderer_scanout_to_texture(Renderer *self);
    static VkFormat renderer_hdr_scanout_format(Renderer *self);
+   static void renderer_take_image(Renderer *self, ImageHandle *dst,
+         const ImageCreateInfo *info);
    static bool renderer_analog_active(Renderer *self);
    static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsigned native_h,
                                             unsigned out_w, unsigned out_h);
@@ -7965,7 +7990,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-   ih_move(&self->reuseable_scanout, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->reuseable_scanout, &info);
 
    render_pass_info_defaults(&rp);
    rp.color_attachments[0] = image_get_view(ih_get(&self->reuseable_scanout));
@@ -7976,7 +8001,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
    rp.clear_attachments = 1;
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
@@ -8122,10 +8147,10 @@ static void renderer_post_pass(Renderer *self, ImageHandle *dst, unsigned w, uns
       ImageCreateInfo info = image_create_info_render_target(w, h, VK_FORMAT_R16G16B16A16_SFLOAT);
       info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
       info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-      ih_move(dst, device_create_image(self->device, &info, NULL));
+      renderer_take_image(self, dst, &info);
       commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(dst),
          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
    }
    else
@@ -8298,10 +8323,10 @@ static ImageHandle renderer_hdr_post_apply(Renderer *self, ImageHandle *scene,
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-   ih_move(&self->post_out, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->post_out, &info);
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->post_out),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    render_pass_info_defaults(&rp);
@@ -8432,7 +8457,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       ImageCreateInfo info = image_create_info_render_target(native_w, native_h, VK_FORMAT_R16G16B16A16_SFLOAT);
       info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
       info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-      ih_move(&self->analog_native, device_create_image(self->device, &info, NULL));
+      renderer_take_image(self, &self->analog_native, &info);
 
       push.src_size[0]    = (float)out_w;
       push.src_size[1]    = (float)out_h;
@@ -8442,7 +8467,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
       commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_native),
          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
       render_pass_info_defaults(&rp);
@@ -8473,8 +8498,8 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    { ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16_SFLOAT);
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-   ih_move(&self->analog_sig, device_create_image(self->device, &info, NULL));
-   ih_move(&self->analog_sep, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->analog_sig, &info);
+   renderer_take_image(self, &self->analog_sep, &info);
    }
 
    { ImageCreateInfo info = image_create_info_render_target(out_w, out_h,
@@ -8482,7 +8507,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
          : psx_hdr_active ? renderer_hdr_scanout_format(self) : VK_FORMAT_R8G8B8A8_UNORM);
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-   ih_move(&self->analog_out, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->analog_out, &info);
    }
 
    /* ---- RGB/SCART: one band-limit pass, then straight to the resolve ----
@@ -8500,7 +8525,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16B16A16_SFLOAT);
       info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
       info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-      ih_move(&self->analog_rgb, device_create_image(self->device, &info, NULL));
+      renderer_take_image(self, &self->analog_rgb, &info);
 
       push.src_size[0] = (float)native_w;
       push.src_size[1] = (float)native_h;
@@ -8508,7 +8533,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
       commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_rgb),
          VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
       render_pass_info_defaults(&rp);
@@ -8565,7 +8590,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_sig),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    render_pass_info_defaults(&rp);
@@ -8603,7 +8628,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_sep),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    render_pass_info_defaults(&rp);
@@ -8648,7 +8673,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16B16A16_SFLOAT);
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-   ih_move(&self->analog_dec, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->analog_dec, &info);
 
    push.sig_size[0] = (float)sig_w;
    push.sig_size[1] = (float)sig_h;
@@ -8664,7 +8689,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_dec),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    render_pass_info_defaults(&rp);
@@ -8722,7 +8747,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-   ih_move(&self->analog_rgb, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->analog_rgb, &info);
 
    push.sig_size[0] = (float)sig_w;
    push.sig_size[1] = (float)sig_h;
@@ -8751,7 +8776,7 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_rgb),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT);
 
    commandbuffer_set_program(cbh_get(&self->cmd),
@@ -8809,7 +8834,7 @@ resolve:
 
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->analog_out),
       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    render_pass_info_defaults(&rp);
@@ -8876,6 +8901,52 @@ static VkFormat renderer_hdr_scanout_format(Renderer *self)
       self->hdr_scanout_format = VK_FORMAT_R8G8B8A8_UNORM;
 
    return self->hdr_scanout_format;
+}
+
+/* Point *dst at an image matching `info`: a cached one nothing else
+ * references any more, or a new one, kept in the cache when a slot is free.
+ * A reused image keeps its old contents, so callers discard them with a
+ * barrier from UNDEFINED - and wait for all earlier work, since reads of it
+ * from a previous frame may still be ahead in the queue. */
+static void renderer_take_image(Renderer *self, ImageHandle *dst,
+      const ImageCreateInfo *info)
+{
+   unsigned i, empty = RENDERER_IMAGE_CACHE, stale = RENDERER_IMAGE_CACHE;
+   ImageHandle img;
+
+   for (i = 0; i < RENDERER_IMAGE_CACHE; i++)
+   {
+      Image *c = ih_get(&self->image_cache[i]);
+      if (!c)
+      {
+         if (empty == RENDERER_IMAGE_CACHE)
+            empty = i;
+         continue;
+      }
+      if (c->reference_count.count != 1)
+         continue;
+      if (c->create_info.width  == info->width
+       && c->create_info.height == info->height
+       && c->create_info.format == info->format
+       && c->create_info.usage  == info->usage
+       && c->create_info.levels == info->levels)
+      {
+         ih_assign(dst, &self->image_cache[i]);
+         return;
+      }
+      stale = i;
+   }
+
+   img = device_create_image(self->device, info, NULL);
+   /* A free image of the wrong size or format makes room. */
+   if (empty == RENDERER_IMAGE_CACHE && stale != RENDERER_IMAGE_CACHE)
+   {
+      ih_reset(&self->image_cache[stale]);
+      empty = stale;
+   }
+   if (empty != RENDERER_IMAGE_CACHE)
+      ih_copy(&self->image_cache[empty], &img);
+   ih_move(dst, img);
 }
 
 /* Everything the display encode reads other than VRAM. */
@@ -8953,7 +9024,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
       info.usage =
           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-      ih_move(&self->reuseable_scanout, device_create_image(self->device, &info, NULL));
+      renderer_take_image(self, &self->reuseable_scanout, &info);
 
       { RenderPassInfo rp;
       render_pass_info_defaults(&rp);
@@ -8963,7 +9034,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       rp.store_attachments = 1;
 
       commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
       commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
@@ -9030,7 +9101,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-   ih_move(&self->reuseable_scanout, device_create_image(self->device, &info, NULL));
+   renderer_take_image(self, &self->reuseable_scanout, &info);
 
    render_pass_info_defaults(&rp);
    rp.color_attachments[0] = image_get_view(ih_get(&self->reuseable_scanout));
@@ -9041,8 +9112,10 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    /* rp.clear_color[0] = {60.0f/256.0f, 230.0f/256.0f, 60.0f/256.0f, 0}; */
    rp.clear_attachments = 1;
 
+   /* A reused image may still have reads of an earlier frame ahead of
+    * this pass in the queue: wait for all of them before overwriting. */
    commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->reuseable_scanout), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
    commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
@@ -11440,9 +11513,81 @@ static TTGpuBackend vk_tt_make_backend(Renderer *self)
    return vt;
 }
 
-static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const TTRect *rect){
-   VkDeviceSize size;
-   BufferHandle buffer;
+/* Space for one upload in the current frame context's ring; NULL when the
+ * ring cannot hold it. *elem receives its texel offset in the ring's view. */
+static uint16_t *renderer_upload_ring_alloc(Renderer *self, VkDeviceSize size,
+      struct UploadRing **out, uint32_t *elem)
+{
+   const unsigned slot = self->device->frame_context_index;
+   struct UploadRing *r;
+   VkDeviceSize      off;
+   uint8_t          *base;
+
+   if (slot >= RENDERER_UPLOAD_RINGS)
+      return NULL;
+   r = &self->upload_ring[slot];
+   if (!bh_get(&r->buf))
+   {
+      const VkDeviceSize limit = (VkDeviceSize)device_get_gpu_properties(self->device)
+            ->limits.maxTexelBufferElements * sizeof(uint16_t);
+      BufferCreateInfo     info;
+      BufferViewCreateInfo view_info;
+      VkDeviceSize         want = 4u * 1024u * 1024u;
+      if (want > limit)
+         want = limit & ~(VkDeviceSize)0xffff;
+      if (!want)
+         return NULL;
+      info.domain = BufferDomain_Host;
+      info.size   = want;
+      info.usage  = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+      bh_move(&r->buf, device_create_buffer(self->device, &info, NULL));
+      if (!bh_get(&r->buf))
+         return NULL;
+      memset(&view_info, 0, sizeof(view_info));
+      view_info.buffer = bh_get(&r->buf);
+      view_info.format = VK_FORMAT_R16_UINT;
+      view_info.offset = 0;
+      view_info.range  = want;
+      r->view   = device_create_buffer_view(self->device, &view_info);
+      r->size   = want;
+      r->used   = 0;
+      r->serial = self->upload_serial;
+   }
+   if (r->serial != self->upload_serial)
+   {
+      r->serial = self->upload_serial;
+      r->used   = 0;
+   }
+   off = (r->used + 63u) & ~(VkDeviceSize)63u;
+   if (off + size > r->size || !bvh_get(&r->view))
+      return NULL;
+   base = (uint8_t *)device_map_host_buffer(self->device, bh_get(&r->buf), MEMORY_ACCESS_WRITE_BIT);
+   if (!base)
+      return NULL;
+   r->used = off + size;
+   *out    = r;
+   *elem   = (uint32_t)(off / sizeof(uint16_t));
+   return (uint16_t *)(base + off);
+}
+
+/* Record the copy of `rect` from a staging buffer into VRAM and return
+ * where the caller writes the pixels, mapped. The staging comes from the
+ * frame's upload ring; *owned receives a buffer of its own only when the
+ * ring cannot hold the rect, and *mapped the buffer to unmap afterwards. */
+static uint16_t *renderer_copy_cpu_to_vram(Renderer *self, const TTRect *rect,
+      BufferHandle *owned, const Buffer **mapped)
+{
+   VkDeviceSize       size;
+   struct UploadRing *ring = NULL;
+   uint32_t           elem = 0;
+   uint16_t          *dst;
+   struct Push
+   {
+      TTRect   rect;
+      uint32_t offset;
+      uint32_t mask_or;
+   };
+
    ih_reset(&self->last_scanout);
    fbatlas_load_image(&self->atlas, rect);
    /* CPU-uploaded pixels replace any GPU-written provenance. */
@@ -11450,26 +11595,35 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const TTRect *rect
          (int)rect->width, (int)rect->height, 0);
    size = rect->width * rect->height * sizeof(uint16_t);
 
-   /* TODO: Chain allocate this. */
-   { BufferCreateInfo buffer_create_info;
-   buffer_create_info.domain = BufferDomain_Host;
-   buffer_create_info.size = size;
-   buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
-   buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
-
-   { BufferViewCreateInfo view_info = {};
-   view_info.buffer = bh_get(&buffer);
-
-   { struct Push
-   {
-      TTRect rect;
-      uint32_t offset;
-      uint32_t mask_or;
-   };
-
    renderer_ensure_command_buffer(self);
    commandbuffer_set_program(cbh_get(&self->cmd), self->render_state.mask_test ? self->pipelines.copy_to_vram_masked : self->pipelines.copy_to_vram);
    commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
+
+   dst = renderer_upload_ring_alloc(self, size, &ring, &elem);
+   if (dst)
+   {
+      struct Push push;
+      push.rect    = *rect;
+      push.offset  = elem;
+      push.mask_or = self->render_state.force_mask_bit ? 0x8000u : 0u;
+      commandbuffer_set_buffer_view(cbh_get(&self->cmd), 0, 1, bvh_get(&ring->view));
+      commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+      commandbuffer_dispatch(cbh_get(&self->cmd), (rect->width + 7) >> 3, (rect->height + 7) >> 3, 1);
+      *mapped = bh_get(&ring->buf);
+      return dst;
+   }
+
+   { BufferCreateInfo buffer_create_info;
+   BufferViewCreateInfo view_info;
+   buffer_create_info.domain = BufferDomain_Host;
+   buffer_create_info.size = size;
+   buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+   bh_move(owned, device_create_buffer(self->device, &buffer_create_info, NULL));
+   if (!bh_get(owned))
+      return NULL;
+
+   memset(&view_info, 0, sizeof(view_info));
+   view_info.buffer = bh_get(owned);
 
    /* Vulkan minimum limit, for large buffer views, split up the work. */
    if (rect->width * rect->height > device_get_gpu_properties(self->device)->limits.maxTexelBufferElements)
@@ -11505,17 +11659,14 @@ static BufferHandle renderer_copy_cpu_to_vram(Renderer *self, const TTRect *rect
 
       { struct Push push = { *rect, 0, self->render_state.force_mask_bit ? 0x8000u : 0u };
       commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
-
-      /* TODO: Batch up work. */
       commandbuffer_dispatch(cbh_get(&self->cmd), (rect->width + 7) >> 3, (rect->height + 7) >> 3, 1);
       bvh_reset(&view);
       }
    }
+   }
 
-   return buffer;
-   }
-   }
-   }
+   *mapped = bh_get(owned);
+   return (uint16_t *)device_map_host_buffer(self->device, bh_get(owned), MEMORY_ACCESS_WRITE_BIT);
 }
 
 static void renderer_fini(Renderer *self)
@@ -11548,6 +11699,17 @@ static void renderer_fini(Renderer *self)
    ih_reset(&self->dt_film_desat);
    ih_reset(&self->dt_dummy);
    bh_reset(&self->readback);
+   { unsigned i;
+   for (i = 0; i < RENDERER_IMAGE_CACHE; i++)
+      ih_reset(&self->image_cache[i]);
+   }
+   { unsigned i;
+   for (i = 0; i < RENDERER_UPLOAD_RINGS; i++)
+   {
+      bvh_reset(&self->upload_ring[i].view);
+      bh_reset(&self->upload_ring[i].buf);
+   }
+   }
    { unsigned i;
    for (i = 0; i < 4; i++)
       ih_reset(&self->post_bloom[i]);
@@ -17542,7 +17704,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       deviceallocator_set_supports_dedicated_allocation(&self->managers.memory, self->ext.supports_dedicated);
       semaphoremanager_init(&self->managers.semaphore, self->device);
       fencemanager_init(&self->managers.fence, self->device);
-      bufferpool_init(&self->managers.vbo, self, 4 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+      /* Sized for a whole frame's primitive batches. A request larger than
+       * a block gets a dedicated buffer that is never recycled, and a
+       * 4 KiB block made that every flush of more than ~100 quads: a
+       * buffer and memory allocation per batch, every frame. */
+      bufferpool_init(&self->managers.vbo, self, 512 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
       bufferpool_init(&self->managers.ubo, self, 256 * 1024, max_((VkDeviceSize)16u, self->gpu_props.limits.minUniformBufferOffsetAlignment),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
    }
@@ -21520,6 +21686,7 @@ void rhi_vulkan_prepare_frame(void)
     * don't dereference it. */
    if (renderer == NULL)
       return;
+   renderer->upload_serial++;
 
    renderer->scaled_uv_offset = scaled_uv_offset;
    renderer->primitive_filter_mode = (FilterMode)(filter_mode);
@@ -22066,9 +22233,18 @@ void rhi_vulkan_load_image(
    renderer->render_state.mask_test      = mask_test;
    renderer->render_state.force_mask_bit = set_mask;
    {
-      TTRect _r = { x, y, w, h };
-      BufferHandle handle = renderer_copy_cpu_to_vram(renderer, &_r);
-      uint16_t *tmp = (uint16_t*)(device_map_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT));
+      TTRect        _r = { x, y, w, h };
+      BufferHandle  handle;
+      const Buffer *mapped = NULL;
+      uint16_t     *tmp;
+      bool          dual_copy, y_wrap;
+      handle.data = NULL;
+      tmp = renderer_copy_cpu_to_vram(renderer, &_r, &handle, &mapped);
+      if (!tmp)
+      {
+         bh_reset(&handle);
+         return;
+      }
 
       /* The row loop has two independent invariants: x-wrap (dual_copy)
        * and y-wrap. Both are determined entirely by (x, y, w, h) before
@@ -22081,8 +22257,8 @@ void rhi_vulkan_load_image(
        * case for upload rects), but the compiler can't prove that without
        * splitting the loop.
        */
-      const bool dual_copy = x + w > FB_WIDTH;
-      const bool y_wrap    = y + h > FB_HEIGHT;
+      dual_copy = x + w > FB_WIDTH;
+      y_wrap    = y + h > FB_HEIGHT;
 
       if (dual_copy)
       {
@@ -22126,15 +22302,13 @@ void rhi_vulkan_load_image(
                      w * sizeof(uint16_t));
          }
       }
-      device_unmap_host_buffer(renderer->device, bh_get(&handle), MEMORY_ACCESS_WRITE_BIT);
+      device_unmap_host_buffer(renderer->device, mapped, MEMORY_ACCESS_WRITE_BIT);
 
       /* This is called on state loading. */
       if (!inside_frame)
          renderer_flush(renderer);
-      /* renderer_copy_cpu_to_vram produced an owning BufferHandle and
-       * device_unmap_host_buffer only unmaps it; the former handle released it
-       * at scope end (after the flush above), so drop that
-       * reference here. */
+      /* The staging buffer of its own, when the ring could not hold the
+       * rect; the recorded copy keeps its own reference. */
       bh_reset(&handle);
    }
 }

@@ -71,6 +71,7 @@ typedef struct
    rmpeg1_ps_t    *ps;
    rmpeg1_video_t *vid;
    rmp3_stream_t  *aud;
+   bool            stream_used;  /* decoders touched since stream_reset */
 
    /* video out */
    uint8_t      *fb;             /* VCD_MAX_W * VCD_MAX_H * 4 */
@@ -359,6 +360,17 @@ size_t VCD_GetAudio(int16_t *out, size_t max_frames)
 
 static void stream_reset(void)
 {
+   vcd.headers_ok = false;
+   vcd.fb_valid   = false;
+   vcd.ard = vcd.awr = 0;
+
+   /* Decoders nothing has touched since they were made are already in the
+    * state a fresh set would be in. Every savestate load lands here, so
+    * runahead would otherwise rebuild all three - over 2 MiB of allocation
+    * and clearing - on every frame of every game, Video CD or not. */
+   if (vcd.ps && vcd.vid && vcd.aud && !vcd.stream_used)
+      return;
+
    if (vcd.vid)
       rmpeg1_video_free(vcd.vid);
    if (vcd.aud)
@@ -370,10 +382,6 @@ static void stream_reset(void)
    vcd.aud = NULL;
    vcd.ps  = NULL;
 
-   vcd.headers_ok = false;
-   vcd.fb_valid   = false;
-   vcd.ard = vcd.awr = 0;
-
    /* The demuxer window slides on its own: bytes the decoders have consumed
     * are reclaimed and a write that would overflow is truncated rather than
     * growing the buffer. A VCD is CBR, so the decoders never fall more than
@@ -382,6 +390,7 @@ static void stream_reset(void)
    vcd.ps  = rmpeg1_ps_init(VCD_RING_BYTES);
    vcd.vid = rmpeg1_video_init();
    vcd.aud = rmp3_stream_new();
+   vcd.stream_used = false;
 }
 
 /* Hand one elementary stream packet to the decoder it belongs to. */
@@ -459,6 +468,7 @@ void VCD_FeedSector(const uint8_t *raw2352, uint32_t lba)
 
    payload = raw2352 + 24;
 
+   vcd.stream_used = true;
    rmpeg1_ps_write(vcd.ps, payload, VCD_FORM2_PAYLOAD);
    vcd.pos_lba = lba;
 
@@ -485,6 +495,7 @@ bool VCD_RunFrame(void)
     * the flag never gets set because decode is never called, and decode is
     * never called because the flag is not set. headers_ok is a report of
     * what has been seen, not a precondition. */
+   vcd.stream_used = true;
    if (!rmpeg1_video_decode(vcd.vid, &fr))
       return false;
 
@@ -549,6 +560,7 @@ static void flush_video(void)
    if (!vcd.vid)
       return;
 
+   vcd.stream_used = true;
    rmpeg1_video_flush(vcd.vid);
 
    while (rmpeg1_video_decode(vcd.vid, &fr) && guard++ < 8)
@@ -868,6 +880,7 @@ void VCD_Kill(void)
    vcd.vid = NULL;
    vcd.aud = NULL;
    vcd.ps  = NULL;
+   vcd.stream_used = false;
 
    free(vcd.fb);
    free(vcd.abuf);
