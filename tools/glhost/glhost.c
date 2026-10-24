@@ -94,6 +94,22 @@ static char savedir[512] = "/tmp/vkhost_save";
 static void log_cb(enum retro_log_level level, const char *fmt, ...)
 { va_list ap; (void)level; va_start(ap, fmt); vfprintf(stderr, fmt, ap); va_end(ap); }
 
+/* Texels the core uploads with glTexSubImage2D, which is how its CPU->VRAM
+ * transfers reach the GPU. The core calls it through its PLT, so this
+ * definition (exported with -rdynamic) takes the call and forwards it. */
+static unsigned long long upload_texels, upload_texels_half;
+typedef void (*tsi2d_t)(GLenum, GLint, GLint, GLint, GLsizei, GLsizei,
+      GLenum, GLenum, const void *);
+void glTexSubImage2D(GLenum target, GLint level, GLint x, GLint y,
+      GLsizei w, GLsizei h, GLenum format, GLenum type, const void *px)
+{
+   static tsi2d_t real;
+   if (!real)
+      real = (tsi2d_t)dlsym(RTLD_NEXT, "glTexSubImage2D");
+   upload_texels += (unsigned long long)w * h;
+   real(target, level, x, y, w, h, format, type, px);
+}
+
 /* ---- HW render callbacks the core consumes ---- */
 static uintptr_t get_current_framebuffer(void) { return (uintptr_t)fbo; }
 static retro_proc_address_t get_proc_address(const char *sym)
@@ -632,6 +648,8 @@ int main(int argc, char **argv)
      {
         input_frame = (unsigned)i;
         apply_vars_at(i);
+        if (i == frames / 2 + 1)
+           upload_texels_half = upload_texels;
         if (preempt && (i < 5 || (i % 50) == 0))
            fprintf(stderr, "[glhost] frame %d serialize_size=%zu\n", i, ssz());
         if (preempt == 1)
@@ -723,6 +741,8 @@ int main(int argc, char **argv)
      }
    free(pbuf); free(pbuf2);
    }
+   fprintf(stderr, "[glhost] steady state: %llu texels uploaded in the second half of the run\n",
+           upload_texels - upload_texels_half);
    fprintf(stderr, "[glhost] done: %d frames run, %u presented, last %ux%u\n",
            frames, frames_presented, last_w, last_h);
 

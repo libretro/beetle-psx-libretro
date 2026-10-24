@@ -9,12 +9,18 @@ name: VRAM readback coherence
 # rollback: both hardware renderers under one-frame rollback with the
 # Software Framebuffer off, every savestate read checked against a whole
 # re-read (tools/rhi_coherence/rollback_lanes.sh).
+# state load: with the Software Framebuffer on, a savestate load hands the
+# GPU only the VRAM it changed; loading a state straight back each frame
+# must leave the output and the upload work as they were
+# (tools/rhi_coherence/state_load_lanes.sh).
 
 on:
   push:
     paths:
       - 'rhi/**'
       - 'mednafen/psx/gpu.c'
+      - 'mednafen/state.c'
+      - 'mednafen/state.h'
       - 'Makefile*'
       - 'tools/rhi_coherence/**'
       - 'tools/vkhost/**'
@@ -24,6 +30,8 @@ on:
     paths:
       - 'rhi/**'
       - 'mednafen/psx/gpu.c'
+      - 'mednafen/state.c'
+      - 'mednafen/state.h'
       - 'Makefile*'
       - 'tools/rhi_coherence/**'
       - 'tools/vkhost/**'
@@ -65,3 +73,5 @@ jobs:
         run: make -j"$(nproc)" HAVE_HW=1
       - name: Rollback lanes
         run: sh tools/rhi_coherence/rollback_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"
+      - name: State load lanes
+        run: sh tools/rhi_coherence/state_load_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"

@@ -142,6 +142,8 @@ static uint16_t *vram_new = NULL;
 /* 1x savestate staging for upscaled VRAM; kept across states so runahead
  * and rewind do not allocate 1 MiB per frame. */
 static uint16_t *state_vram_1x = NULL;
+/* Rows of VRAM a savestate load changed (MDFNSS_SetDiffMap entries). */
+static uint16_t  state_vram_rows[512];
 
 /*
  * Deferred SW-renderer scanout records.
@@ -3008,7 +3010,49 @@ void GPU_RestoreStateP2(bool load)
    }
 }
 
+static void gpu_restore_state_p3(bool upload_all);
+
 void GPU_RestoreStateP3(void)
+{
+   gpu_restore_state_p3(true);
+}
+
+/* Hand the hardware renderer the VRAM rows a diff load changed, in bands
+ * of 16 rows cut to the changed columns. Rows the load left alone already
+ * hold the same pixels on the GPU - at its internal resolution, which a
+ * re-upload of the 1x copy would throw away. */
+static void gpu_upload_changed_rows(void)
+{
+   unsigned band;
+
+   for (band = 0; band < 512; band += 16)
+   {
+      unsigned y, y0 = 512, y1 = 0, x0 = 1024, x1 = 0;
+
+      for (y = band; y < band + 16; y++)
+      {
+         uint16_t e = state_vram_rows[y];
+         unsigned a, b;
+         if (!(e & MDFNSS_DIFF_CHANGED))
+            continue;
+         /* 64-byte blocks are 32 pixels. */
+         a = MDFNSS_DIFF_FIRST(e) * 32;
+         b = (MDFNSS_DIFF_LAST(e) + 1) * 32;
+         if (y < y0)
+            y0 = y;
+         y1 = y + 1;
+         if (a < x0)
+            x0 = a;
+         if (b > x1)
+            x1 = b;
+      }
+      if (y0 < y1)
+         rhi_intf_load_image(x0, y0, x1 - x0, y1 - y0, GPU.vram,
+               false, false);
+   }
+}
+
+static void gpu_restore_state_p3(bool upload_all)
 {
    for(unsigned i = 0; i < 256; i++)
    {
@@ -3054,9 +3098,12 @@ void GPU_RestoreStateP3(void)
    rhi_intf_set_draw_area( GPU.ClipX0, GPU.ClipY0,
                            GPU.ClipX1, GPU.ClipY1);
 
-   rhi_intf_load_image( 0,    0,
-                        1024, 512,
-                        GPU.vram, false, false);
+   if (upload_all)
+      rhi_intf_load_image( 0,    0,
+                           1024, 512,
+                           GPU.vram, false, false);
+   else
+      gpu_upload_changed_rows();
 
    rhi_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
    rhi_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
@@ -3072,6 +3119,23 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
    uint16_t off_u = !load && GPU.InCmd == INCMD_QUAD ? GPU.off_u : 0;
    uint16_t off_v = !load && GPU.InCmd == INCMD_QUAD ? GPU.off_v : 0;
    bool may_be_2d = !load && GPU.InCmd == INCMD_QUAD && GPU.may_be_2d;
+   /* A load only has to hand the hardware renderer the VRAM it changed
+    * when the GPU's copy is known to match GPU.vram: the software
+    * framebuffer keeps the two in step and the context is up. Everything
+    * else uploads all of VRAM. */
+   bool diff_load = load && GPU.upscale_shift == 0
+         && rhi_intf_is_type() != RHI_SOFTWARE
+         && rhi_intf_has_software_renderer()
+         && rhi_intf_context_ready();
+   /* The one exception: a CPU->VRAM transfer half way through has put its
+    * pixels in GPU.vram but not yet on the GPU, so what it has written
+    * goes up too, whether the load changes it or not. */
+   bool     fbw      = diff_load && GPU.InCmd == INCMD_FBWRITE;
+   uint32_t fbw_x    = GPU.FBRW_X, fbw_y = GPU.FBRW_Y, fbw_w = GPU.FBRW_W;
+   uint32_t fbw_rows = (GPU.FBRW_CurY - GPU.FBRW_Y) & 511;
+   uint32_t fbw_cury = GPU.FBRW_CurY;
+   uint32_t fbw_curx = (GPU.FBRW_CurX - GPU.FBRW_X) & 1023;
+   int      ret;
    GPU_RestoreStateP1(load);
 
    SFORMAT StateRegs[] =
@@ -3225,7 +3289,17 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       SFEND
    };
 
-   int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GPU");
+   if (load && GPU.upscale_shift == 0)
+   {
+      /* Compare before copying: a state one frame old leaves most of VRAM
+       * as it is. */
+      StateRegs[0].flags |= MDFNSTATE_DIFF;
+      memset(state_vram_rows, 0, sizeof(state_vram_rows));
+      MDFNSS_SetDiffMap(state_vram_rows, 1024 * sizeof(uint16_t));
+   }
+
+   ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GPU");
+   MDFNSS_SetDiffMap(NULL, 0);
 
    if(load && ret)
    {
@@ -3237,7 +3311,18 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
    GPU_RestoreStateP2(load);
 
    if(load)
-      GPU_RestoreStateP3();
+   {
+      gpu_restore_state_p3(!(diff_load && ret));
+      if (fbw && ret)
+      {
+         if (fbw_rows)
+            rhi_intf_load_image(fbw_x, fbw_y, fbw_w, fbw_rows, GPU.vram,
+                  false, false);
+         if (fbw_curx)
+            rhi_intf_load_image(fbw_x, fbw_cury, fbw_curx, 1, GPU.vram,
+                  false, false);
+      }
+   }
 
    return(ret);
 }

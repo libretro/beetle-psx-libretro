@@ -46,6 +46,17 @@ struct SSDescriptor
 
 #define MDFNSTATE_BOOL		  0x08000000
 
+/* Load by comparing before copying, recording what changed in the map set
+ * with MDFNSS_SetDiffMap. Unchanged memory is left unwritten. */
+#define MDFNSTATE_DIFF            0x04000000
+
+/* MDFNSS_DIFF_CHANGED is set in a map entry whose chunk changed; bits 0-6
+ * and 7-13 hold its first and last changed MDFNSS_DIFF_BLOCK-byte block. */
+#define MDFNSS_DIFF_BLOCK         64
+#define MDFNSS_DIFF_CHANGED       0x8000
+#define MDFNSS_DIFF_FIRST(e)      ((unsigned)(e) & 0x7F)
+#define MDFNSS_DIFF_LAST(e)       (((unsigned)(e) >> 7) & 0x7F)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -55,6 +66,11 @@ int MDFNSS_LoadSM(void *st, int a, int b);
 
 int MDFNSS_StateAction(void *st, int load, int data_only,
       SFORMAT *sf, const char *name);
+
+/* Map for MDFNSTATE_DIFF loads: one entry per chunk_bytes of the entry
+ * (at most 127 blocks per chunk). Entries of loaded chunks are written,
+ * others left as they are. NULL turns diff loads back into plain ones. */
+void MDFNSS_SetDiffMap(uint16_t *map, uint32_t chunk_bytes);
 
 #ifdef __cplusplus
 }

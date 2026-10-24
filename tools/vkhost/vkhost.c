@@ -268,10 +268,21 @@ static VKAPI_ATTR VkResult VKAPI_CALL core_vkAllocateMemory(VkDevice d,
       const VkMemoryAllocateInfo *i, const VkAllocationCallbacks *a, VkDeviceMemory *o)
 { object_creates++; return real_allocate_memory(d, i, a, o); }
 
+/* Compute workgroups the core dispatches. The renderer's CPU->VRAM uploads
+ * are compute passes sized by the rect, so this measures how much VRAM a
+ * run hands the GPU. */
+static unsigned long long dispatch_groups, dispatch_groups_half;
+static PFN_vkCmdDispatch        real_cmd_dispatch;
+static VKAPI_ATTR void VKAPI_CALL core_vkCmdDispatch(VkCommandBuffer cb,
+      uint32_t x, uint32_t y, uint32_t z)
+{ dispatch_groups += (unsigned long long)x * y * z; real_cmd_dispatch(cb, x, y, z); }
+
 static PFN_vkVoidFunction core_queue_entry(const char *name, PFN_vkVoidFunction real)
 {
    if (!real)
       return real;
+   if (!strcmp(name, "vkCmdDispatch"))
+   { real_cmd_dispatch = (PFN_vkCmdDispatch)real; return (PFN_vkVoidFunction)core_vkCmdDispatch; }
    if (!strcmp(name, "vkCreateImage"))
    { real_create_image = (PFN_vkCreateImage)real; return (PFN_vkVoidFunction)core_vkCreateImage; }
    if (!strcmp(name, "vkCreateImageView"))
@@ -921,6 +932,10 @@ run_frames_sw:
       vk_unser_t unser = (vk_unser_t)dlsym(core, "retro_unserialize");
       vk_ssize_t ssz   = (vk_ssize_t)dlsym(core, "retro_serialize_size");
       int        preempt = getenv("VKHOST_PREEMPT") != NULL;
+      /* VKHOST_RELOAD: save a state and load it straight back before
+       * every frame. Nothing changes in between, so the output must be
+       * exactly what a run without it produces. */
+      int        reload  = getenv("VKHOST_RELOAD") != NULL;
       void      *pbuf = NULL, *pbuf2 = NULL;
       size_t     pcap = 0;
       int        have_prev = 0;
@@ -949,6 +964,17 @@ run_frames_sw:
                have_prev = 1;
             }
          }
+         if (reload && ser && unser && ssz)
+         {
+            size_t need = ssz();
+            if (need > pcap)
+            {
+               free(pbuf); free(pbuf2);
+               pbuf = malloc(need); pbuf2 = malloc(need); pcap = need;
+            }
+            if (!pbuf || !ser(pbuf, need) || !unser(pbuf, need))
+               fprintf(stderr, "[vkhost] reload FAILED frame %d\n", i);
+         }
          if (bench && i == bench_skip)
          {
             if (vkctx.device)
@@ -961,7 +987,10 @@ run_frames_sw:
          }
          apply_vars_at(i);
          if (i == frames / 2)
-            object_creates_half = object_creates;
+         {
+            object_creates_half  = object_creates;
+            dispatch_groups_half = dispatch_groups;
+         }
          retro_run_fn();
          {
             /* VKHOST_SAVE_STATE=path:frame - checkpoint mid-run so long
@@ -1033,6 +1062,8 @@ run_frames_sw:
    }
    fprintf(stderr, "[vkhost] steady state: %lu Vulkan objects created in the second half of the run\n",
          object_creates - object_creates_half);
+   fprintf(stderr, "[vkhost] steady state: %llu compute workgroups dispatched in the second half of the run\n",
+         dispatch_groups - dispatch_groups_half);
    fprintf(stderr, "[vkhost] done: %d frames run, %u valid, %d validation errors, %d warnings,"
            " %d unlocked uses of the frontend's queue, %d waits with its lock held\n",
            frames, frame_valid, validation_errors, validation_warnings,

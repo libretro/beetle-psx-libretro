@@ -623,6 +623,62 @@ static SFORMAT *FindSF(const char *name, SFORMAT *sf)
    return NULL;
 }
 
+static uint16_t *diff_map;
+static uint32_t  diff_chunk;
+
+void MDFNSS_SetDiffMap(uint16_t *map, uint32_t chunk_bytes)
+{
+   diff_map   = map;
+   diff_chunk = chunk_bytes;
+}
+
+/* Copy `size` bytes of the stream into dst, writing only the blocks that
+ * differ and recording each chunk's changed span in diff_map. A savestate
+ * load usually lands on memory that mostly holds the same bytes already -
+ * runahead and rollback load a state one frame old every frame - and
+ * reading both is cheaper than dirtying every line of the destination. */
+static int smem_read_diff(StateMem *st, uint8_t *dst, uint32_t size)
+{
+   const uint8_t *src;
+   uint32_t       off;
+
+   if (st->loc > st->len || size > (st->len - st->loc))
+      return 0;
+
+   src = st->data + st->loc;
+   for (off = 0; off < size; off += diff_chunk)
+   {
+      uint32_t n      = size - off < diff_chunk ? size - off : diff_chunk;
+      uint32_t blocks = (n + MDFNSS_DIFF_BLOCK - 1) / MDFNSS_DIFF_BLOCK;
+      uint32_t first, last, b, e;
+
+      if (!memcmp(dst + off, src + off, n))
+         continue;
+
+      for (first = 0; first < blocks; first++)
+      {
+         b = first * MDFNSS_DIFF_BLOCK;
+         e = b + MDFNSS_DIFF_BLOCK < n ? b + MDFNSS_DIFF_BLOCK : n;
+         if (memcmp(dst + off + b, src + off + b, e - b))
+            break;
+      }
+      for (last = blocks - 1; last > first; last--)
+      {
+         b = last * MDFNSS_DIFF_BLOCK;
+         e = b + MDFNSS_DIFF_BLOCK < n ? b + MDFNSS_DIFF_BLOCK : n;
+         if (memcmp(dst + off + b, src + off + b, e - b))
+            break;
+      }
+      b = first * MDFNSS_DIFF_BLOCK;
+      e = (last + 1) * MDFNSS_DIFF_BLOCK < n ? (last + 1) * MDFNSS_DIFF_BLOCK : n;
+      memcpy(dst + off + b, src + off + b, e - b);
+      diff_map[off / diff_chunk] = (uint16_t)(MDFNSS_DIFF_CHANGED
+            | (last << 7) | first);
+   }
+   st->loc += size;
+   return 1;
+}
+
 static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
 {
    int temp = st->loc;
@@ -673,11 +729,30 @@ static int ReadStateChunk(StateMem *st, SFORMAT *sf, int size)
          }
          else
          {
+#ifndef MSB_FIRST
+            if ((tmp->flags & MDFNSTATE_DIFF) && diff_map && diff_chunk)
+            {
+               if (!smem_read_diff(st, (uint8_t *)tmp->v, expected_size))
+                  return 0;
+               continue;
+            }
+#endif
             /* Refuse to load a partial subsystem region. A short
              * read here would leave tmp->v half-old / half-new and
              * silently break determinism for the entire run. */
             if (smem_read(st, (uint8_t *)tmp->v, expected_size) != expected_size)
                return 0;
+
+            if ((tmp->flags & MDFNSTATE_DIFF) && diff_map && diff_chunk)
+            {
+               /* Byte-swapped below, so it cannot be compared in place:
+                * report every chunk whole. */
+               uint32_t c;
+               uint32_t last = (diff_chunk + MDFNSS_DIFF_BLOCK - 1)
+                     / MDFNSS_DIFF_BLOCK - 1;
+               for (c = 0; c * diff_chunk < expected_size; c++)
+                  diff_map[c] = (uint16_t)(MDFNSS_DIFF_CHANGED | (last << 7));
+            }
 
             if(tmp->flags & MDFNSTATE_BOOL)
             {

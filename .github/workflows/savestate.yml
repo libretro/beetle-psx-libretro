@@ -1,0 +1,41 @@
+name: Savestate diff loads
+
+# mednafen/state.c can load an entry by comparing before copying, writing
+# only what changed and recording it in a map (MDFNSTATE_DIFF); the GPU
+# uses it to hand the hardware renderer only the VRAM a load changed.
+# tools/savestate/diff_load_test checks the result against plain loads and
+# the map against the actual differences. Strict C89, ASan/UBSan, and a
+# mingw-w64 build under Wine.
+
+on:
+  push:
+    paths:
+      - 'mednafen/state.c'
+      - 'mednafen/state.h'
+      - 'tools/savestate/**'
+      - '.github/workflows/savestate.yml'
+  pull_request:
+    paths:
+      - 'mednafen/state.c'
+      - 'mednafen/state.h'
+      - 'tools/savestate/**'
+      - '.github/workflows/savestate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diff-load:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux (C89, ASan/UBSan)
+        run: tools/savestate/run.sh
+      - name: Install mingw-w64 and Wine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 wine64 wine
+      - name: Windows (mingw-w64 under Wine)
+        run: CC=x86_64-w64-mingw32-gcc WINEDEBUG=-all RUN=wine tools/savestate/run.sh
