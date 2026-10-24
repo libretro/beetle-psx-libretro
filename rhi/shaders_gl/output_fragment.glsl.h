@@ -54,6 +54,9 @@ static const char *output_fragment = GLSL_FRAGMENT(
    uniform mat3 hdr_to_panel;
    // output format: 0 HDR10 PQ Rec.2020, 1 linear scRGB (1.0 = 80 nits)
    uniform int hdr_scrgb;
+   // 1: write scene-linear light (1.0 = paper white) to the post
+   // effects' half-float scene instead of encoding; they encode after.
+   uniform int hdr_linear_out;
 
    vec3 pq_encode(vec3 nits) {
       float pq_m1 = 2610.0 / 16384.0;
@@ -165,23 +168,32 @@ static const char *output_fragment = GLSL_FRAGMENT(
       // cancellation of (1-exp(-o))/o right at reference white.
       float headroom = max(hdr_max_nits - hdr_paper_white, 0.0);
       vec3 lin = src_primaries_to_709(sdr_to_linear(max(rgb, vec3(0.0)))) * hdr_paper_white;
-      vec3 over = (headroom > 0.0)
-                     ? max(lin - vec3(hdr_paper_white), vec3(0.0))
-                     : vec3(0.0);
-      float omax = max(over.r, max(over.g, over.b));
-      float o = (omax > 0.0) ? (omax / headroom) : 0.0;
-      float knee = 0.0;
-      if (o > 0.0) {
-         if (hdr_shoulder == 1)
-            knee = (o < 1e-2)
-                      ? (1.0 - o * (0.5 - o * (1.0 / 6.0)))
-                      : ((1.0 - exp(-o)) / o);
-         else
-            knee = 1.0 / (o + 1.0);
+      // The Display Transform (hdr_transform.glsl.h, spliced in at program
+      // build) replaces the knee when a curve is selected.
+      if (dt.mode.x > 0.5) {
+         bool absolute;
+         lin = dt_apply(lin / hdr_paper_white, hdr_paper_white, absolute);
+         if (!absolute)
+            lin = panel_gamut_compress(rec709_to_target(lin * hdr_paper_white));
+      } else {
+         vec3 over = (headroom > 0.0)
+                        ? max(lin - vec3(hdr_paper_white), vec3(0.0))
+                        : vec3(0.0);
+         float omax = max(over.r, max(over.g, over.b));
+         float o = (omax > 0.0) ? (omax / headroom) : 0.0;
+         float knee = 0.0;
+         if (o > 0.0) {
+            if (hdr_shoulder == 1)
+               knee = (o < 1e-2)
+                         ? (1.0 - o * (0.5 - o * (1.0 / 6.0)))
+                         : ((1.0 - exp(-o)) / o);
+            else
+               knee = 1.0 / (o + 1.0);
+         }
+         lin = min(lin, vec3(hdr_paper_white)) + over * knee;
+         lin = rec709_to_target(lin);
+         lin = panel_gamut_compress(lin);
       }
-      lin = min(lin, vec3(hdr_paper_white)) + over * knee;
-      lin = rec709_to_target(lin);
-      lin = panel_gamut_compress(lin);
       // Same graded light in either format; see encode_hdr_output in hdr.h.
       if (hdr_scrgb == 0)
          return pq_black_floor(pq_encode(lin));
@@ -279,7 +291,10 @@ static const char *output_fragment = GLSL_FRAGMENT(
          // Both display paths carry quantised content (5-bit VRAM or
          // 8-bit FMV) that would band at 10-bit; deband, then encode.
          color = hdr_deband(color, gl_FragCoord.xy);
-         frag_color = vec4(encode_hdr_output(color), 1.0);
+         if (hdr_linear_out != 0)
+            frag_color = vec4(sdr_to_linear(max(color, vec3(0.0))), 1.0);
+         else
+            frag_color = vec4(encode_hdr_output(color), 1.0);
          return;
       }
 

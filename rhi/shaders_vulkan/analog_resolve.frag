@@ -81,10 +81,17 @@ void main()
 
 #if defined(HDR)
 	/* encode_hdr_output_linear rotates the primaries itself. */
-	FragColor = vec4(encode_hdr_output_linear(lin, reg.paper_white_nits, reg.peak_nits,
-	                                          reg.expand_gamut, reg.shoulder,
-	                                          reg.src_primaries, reg.black_pq,
-	                                          reg.to_panel, reg.scrgb), 1.0);
+	if (HDR_LINEAR_OUT != 0)
+	{
+		FragColor = vec4(lin, 1.0);
+	}
+	else
+	{
+		FragColor = vec4(encode_hdr_output_linear(lin, reg.paper_white_nits, reg.peak_nits,
+		                                          reg.expand_gamut, reg.shoulder,
+		                                          reg.src_primaries, reg.black_pq,
+		                                          reg.to_panel, reg.scrgb), 1.0);
+	}
 #else
 	/* Rotated here rather than through sdr_apply_src_primaries: this pass is
 	 * already holding linear light, so it costs a matrix and no round trip. */

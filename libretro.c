@@ -33,6 +33,10 @@ retro_input_state_t dbg_input_state_cb = 0;
 #include "pgxp/pgxp_main.h"
 #include "pgxp/pgxp_gte.h"
 #include "rhi/hdr_display.h"
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES) || defined(HAVE_VULKAN)
+#define HAVE_HDR_TRANSFORM
+#include "rhi/hdr_transform.h"
+#endif
 
 #include "deps/openbios/openbios.bin.h"
 
@@ -220,7 +224,12 @@ float psx_hdr_to_panel[9]      = { 0.0f };
  * primaries and black the derived values above were built from are kept so
  * they are only rebuilt when the frontend reports a change. */
 static unsigned hdr_meta_cmd;
-static uint16_t hdr_panel_xy[8];
+/* The panel's primaries (CIE xy x 10000, zero = unknown) and peak, for the
+ * Display Transform's ACES 2.0 Auto gamut and Display peak. */
+uint16_t psx_hdr_panel_xy[8];
+static float hdr_panel_peak_nits;
+/* HDR Display Peak Luminance: 0 the frontend's, -1 the panel's, else nits. */
+static float hdr_peak_option;
 static float    hdr_black_nits;
 /* HDR highlight roll-off curve applied to the over-paper-white region only:
  * 0 = Reinhard soft-knee (default, matches the validated behaviour),
@@ -249,7 +258,8 @@ static void reset_hdr_output_state(void)
    for (i = 0; i < 9; i++)
       psx_hdr_to_panel[i] = 0.0f;
    for (i = 0; i < 8; i++)
-      hdr_panel_xy[i]     = 0;
+      psx_hdr_panel_xy[i]     = 0;
+   hdr_panel_peak_nits = 0.0f;
 }
 
 /* Reference SDR transfer the 24-bit path is assumed to have been viewed
@@ -4588,6 +4598,115 @@ uint8_t analog_combo_hold = 0;
 
 extern void PSXDitherApply(bool);
 
+#ifdef HAVE_HDR_TRANSFORM
+/* Value keys of the Display Transform option in enum hdr_dt_curve order.
+ * The two knees are hdr.h's own roll-off ("knee_exp" its filmic shoulder);
+ * every other curve is the transform in rhi/hdr_transform.c. */
+static const char *const display_transform_keys[HDR_DT_COUNT] = {
+   "reinhard", "aces", "hejl", "gt", "hable", "lottes", "drago", "unreal",
+   "filmicalu", "rplain", "rext", "expo", "hable2017", "aces2", "tumblin",
+   "ward", "schlick", "devlin", "filmiclog", "jodie", "acesfit", "neutral",
+   "agx", "aces2full"
+};
+
+static const char *display_transform_value(const char *key)
+{
+   struct retro_variable var;
+   var.key   = key;
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      return var.value;
+   return NULL;
+}
+
+static void check_display_transform_variables(void)
+{
+   static const char *const contrast[7] = {
+      "verylow", "low", "medium", "base", "medhigh", "high", "veryhigh" };
+   struct hdr_dt_settings dt;
+   struct hdr_post_settings post;
+   const char *v;
+   int i;
+
+   memset(&dt, 0, sizeof(dt));
+   dt.curve           = HDR_DT_KNEE;
+   dt.aces2_surround  = 1;
+   dt.aces2_gamut     = 3;
+   dt.gt_toe          = 0.22f;
+   dt.gt_linear       = 0.40f;
+   dt.filmic_contrast = 3;
+   dt.filmic_max_ev   = 4.026068811f;
+   psx_hdr_shoulder   = 0;
+
+   if ((v = display_transform_value(BEETLE_OPT(hdr_display_transform))))
+   {
+      if (!strcmp(v, "knee_exp"))
+         psx_hdr_shoulder = 1;
+      for (i = 1; i < HDR_DT_COUNT; i++)
+         if (!strcmp(v, display_transform_keys[i]))
+            dt.curve = i;
+   }
+   if ((v = display_transform_value(BEETLE_OPT(hdr_aces2_surround))))
+      dt.aces2_surround = !strcmp(v, "dark") ? 0 : !strcmp(v, "average") ? 2 : 1;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_aces2_gamut))))
+      dt.aces2_gamut = !strcmp(v, "rec709") ? 0 : !strcmp(v, "p3") ? 1
+                     : !strcmp(v, "rec2020") ? 2 : 3;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_agx_look))))
+      dt.agx_punchy = !strcmp(v, "punchy");
+   if ((v = display_transform_value(BEETLE_OPT(hdr_gt_toe))))
+      dt.gt_toe = (float)atof(v);
+   if ((v = display_transform_value(BEETLE_OPT(hdr_gt_linear))))
+      dt.gt_linear = (float)atof(v);
+   if (!(dt.gt_toe > 0.0f && dt.gt_toe < 1.0f))
+      dt.gt_toe = 0.22f;
+   if (!(dt.gt_linear > 0.0f && dt.gt_linear < 1.0f))
+      dt.gt_linear = 0.40f;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_filmiclog_contrast))))
+      for (i = 0; i < 7; i++)
+         if (!strcmp(v, contrast[i]))
+            dt.filmic_contrast = i;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_filmiclog_range))))
+   {
+      float ev = (float)atof(v);
+      dt.filmic_max_ev = (ev > 4.5f) ? ev : 4.026068811f;
+   }
+   if ((v = display_transform_value(BEETLE_OPT(hdr_highlight_hue))))
+      dt.hue_preserve = !strcmp(v, "enabled");
+   if ((v = display_transform_value(BEETLE_OPT(hdr_expansion))))
+      dt.expansion = !strcmp(v, "inverse") ? 1 : !strcmp(v, "hue") ? 2 : 0;
+   hdr_dt_configure(&dt);
+
+   /* HDR post effects: bloom, halation, chromatic aberration. */
+   memset(&post, 0, sizeof(post));
+   post.firefly_knee = 1.0f;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_bloom))))
+      post.bloom = !strcmp(v, "subtle") ? 0.55f : !strcmp(v, "standard") ? 1.0f
+                 : !strcmp(v, "intense") ? 1.7f : 0.0f;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_bloom_select))))
+      post.bloom_knee = !strcmp(v, "knee");
+   if ((v = display_transform_value(BEETLE_OPT(hdr_bloom_range))))
+      post.firefly_knee = !strcmp(v, "wide") ? 0.25f : !strcmp(v, "widest") ? 0.0625f : 1.0f;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_bloom_convolution))))
+      post.convolution = !strcmp(v, "enabled");
+   if ((v = display_transform_value(BEETLE_OPT(hdr_halation))))
+      post.halation = !strcmp(v, "subtle") ? 1 : !strcmp(v, "strong") ? 2 : 0;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_chromatic))))
+      post.chromatic = !strcmp(v, "subtle") ? 1 : !strcmp(v, "strong") ? 2
+                     : !strcmp(v, "heavy") ? 3 : 0;
+   hdr_post_configure(&post);
+
+   /* HDR Display Peak Luminance; the per-frame metadata refresh reapplies
+    * it over whatever the frontend reports. */
+   hdr_peak_option = 0.0f;
+   if ((v = display_transform_value(BEETLE_OPT(hdr_peak))) && strcmp(v, "auto"))
+      hdr_peak_option = !strcmp(v, "display") ? -1.0f : (float)atof(v);
+   if (hdr_peak_option > 0.0f)
+      psx_hdr_max_nits = hdr_peak_option;
+   else if (hdr_peak_option < 0.0f && hdr_panel_peak_nits > 0.0f)
+      psx_hdr_max_nits = hdr_panel_peak_nits;
+}
+#endif
+
 static void check_variables(bool startup)
 {
    struct retro_variable var = {0};
@@ -5045,15 +5164,10 @@ static void check_variables(bool startup)
             psx_color_format = PSX_COLOR_FORMAT_64BIT_SCRGB;
       }
 
-      /* HDR highlight roll-off curve (Vulkan HDR path only): 0 Reinhard,
-       * 1 ACES. Inert unless the HDR scanout is actually engaged. */
-      var.key = BEETLE_OPT(hdr_shoulder);
-      psx_hdr_shoulder = 0;
-      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-      {
-         if (!strcmp(var.value, "aces"))
-            psx_hdr_shoulder = 1;
-      }
+#ifdef HAVE_HDR_TRANSFORM
+      /* Display Transform and its parameters (HDR output only). */
+      check_display_transform_variables();
+#endif
 
       /* Reference SDR transfer for the HDR encode (Vulkan HDR path only).
        * Inert unless the HDR scanout is actually engaged. */
@@ -6095,6 +6209,11 @@ static void apply_hdr_metadata(const struct retro_display_metadata *d)
       psx_hdr_max_nits         = h->max_nits;
    else if (d->caps.peak_nits > 0.0f)
       psx_hdr_max_nits         = d->caps.peak_nits;
+   hdr_panel_peak_nits         = d->caps.peak_nits;
+   if (hdr_peak_option > 0.0f)
+      psx_hdr_max_nits         = hdr_peak_option;
+   else if (hdr_peak_option < 0.0f && hdr_panel_peak_nits > 0.0f)
+      psx_hdr_max_nits         = hdr_panel_peak_nits;
    psx_hdr_expand_gamut        = (int)h->expand_gamut;
    psx_hdr_output_mode         = (int)h->output_mode;
 
@@ -6107,10 +6226,10 @@ static void apply_hdr_metadata(const struct retro_display_metadata *d)
       psx_hdr_black_pq = (black > 0.0f) ? hdr_display_pq(black) : 0.0f;
    }
 
-   if (memcmp(hdr_panel_xy, d->caps.primaries_xy, sizeof(hdr_panel_xy)) != 0)
+   if (memcmp(psx_hdr_panel_xy, d->caps.primaries_xy, sizeof(psx_hdr_panel_xy)) != 0)
    {
-      memcpy(hdr_panel_xy, d->caps.primaries_xy, sizeof(hdr_panel_xy));
-      hdr_display_panel_matrix(hdr_panel_xy, psx_hdr_to_panel);
+      memcpy(psx_hdr_panel_xy, d->caps.primaries_xy, sizeof(psx_hdr_panel_xy));
+      hdr_display_panel_matrix(psx_hdr_panel_xy, psx_hdr_to_panel);
    }
 }
 

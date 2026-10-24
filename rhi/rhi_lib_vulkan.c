@@ -58,6 +58,9 @@ extern int   psx_hdr_shoulder;   /* highlight roll-off: 0 Reinhard, 1 filmic */
 extern int   psx_hdr_sdr_eotf;   /* reference SDR transfer: 0 2.4, 1 2.2, 2 sRGB */
 extern int   psx_src_primaries;  /* authoring gamut: 0 709, 1 SMPTE-C, 2 EBU, 3 NTSC1953 */
 extern int   psx_video_cable;    /* 0 = off, 1 = S-Video, 2 = composite, 3 = RF, 4 = RGB */
+extern uint16_t psx_hdr_panel_xy[8];
+
+#include "hdr_transform.h"
 
 /* psx_hdr_to_panel as a std430 mat3: three columns, each padded to a vec4. */
 static void hdr_push_panel(float dst[12])
@@ -5880,6 +5883,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       /* Display programs use slot 0 independently of primitive/resolve
        * programs; reflected masks keep the pipeline keys separate. */
       SpecConstIndex_ColorMode = 0,
+      /* HDR display programs only (hdr.h HDR_LINEAR_OUT): write scene-linear
+       * light for the post effects instead of encoding. Aliases FilterMode,
+       * which only the primitive programs reflect. */
+      SpecConstIndex_HdrLinearOut = 1,
       /* Feedback (programmable blend) shaders only. Aliases ResolveEotf the
        * same way Samples aliases TransMode: the resolve/display programs and
        * the primitive feedback programs never share a pipeline, and the
@@ -6050,6 +6057,13 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
             Program *analog_notch_pal;
             Program *analog_resolve;       /* region-independent: box + encode only */
             Program *analog_resolve_hdr;
+            /* HDR post effects (hdr_bloom.frag, hdr_post.frag). */
+            Program *hdr_bloom_bright;
+            Program *hdr_bloom_blur;
+            Program *hdr_bloom_down;
+            Program *hdr_bloom_down_karis;
+            Program *hdr_bloom_up;
+            Program *hdr_post;
             Program *mipmap_energy_first;
             Program *mipmap_energy;
             Program *mipmap_energy_blur;
@@ -6084,6 +6098,18 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          ImageHandle analog_dec;   /* decoded (luma,C1,C2) at base rate */
          ImageHandle analog_rgb;   /* after the chroma trap, RGB at base rate */
          ImageHandle analog_out;
+         /* Display Transform tables (hdr_transform.c) and their stand-in. */
+         ImageHandle dt_aces2_lut;
+         ImageHandle dt_film_lut;
+         ImageHandle dt_film_desat;
+         ImageHandle dt_dummy;
+         unsigned    dt_generation;
+         /* HDR post effects: the two bloom bands' ping-pong pairs ([0,1] at
+          * quarter size, [2,3] at a sixteenth), the convolution pyramid, and
+          * the encoded result. Recreated per frame like the analog chain's. */
+         ImageHandle post_bloom[4];
+         ImageHandle post_conv[HDR_POST_CONV_MAX];
+         ImageHandle post_out;
          /* Running subcarrier phase, in cycles, kept in [0,1).
           *
           * Advanced once per field by the field's *total* line count times the
@@ -6699,6 +6725,24 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    static const uint32_t analog_resolve_hdr_frag[] =
 #include "shaders_vulkan/prebuilt/analog.resolve.hdr.frag.inc"
    ;
+   static const uint32_t hdr_bloom_bright_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bloom.bright.frag.inc"
+   ;
+   static const uint32_t hdr_bloom_blur_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bloom.blur.frag.inc"
+   ;
+   static const uint32_t hdr_bloom_down_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bloom.down.frag.inc"
+   ;
+   static const uint32_t hdr_bloom_down_karis_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bloom.down.karis.frag.inc"
+   ;
+   static const uint32_t hdr_bloom_up_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.bloom.up.frag.inc"
+   ;
+   static const uint32_t hdr_post_frag[] =
+#include "shaders_vulkan/prebuilt/hdr.post.frag.inc"
+   ;
       ;
    static const uint32_t mipmap_energy_frag[] =
 #include "shaders_vulkan/prebuilt/mipmap.energy.frag.inc"
@@ -7239,6 +7283,18 @@ static void renderer_init_pipelines(Renderer *self)
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_frag, sizeof(analog_resolve_frag));
    self->pipelines.analog_resolve_hdr =
       device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), analog_resolve_hdr_frag, sizeof(analog_resolve_hdr_frag));
+   self->pipelines.hdr_bloom_bright =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_bloom_bright_frag, sizeof(hdr_bloom_bright_frag));
+   self->pipelines.hdr_bloom_blur =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_bloom_blur_frag, sizeof(hdr_bloom_blur_frag));
+   self->pipelines.hdr_bloom_down =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_bloom_down_frag, sizeof(hdr_bloom_down_frag));
+   self->pipelines.hdr_bloom_down_karis =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_bloom_down_karis_frag, sizeof(hdr_bloom_down_karis_frag));
+   self->pipelines.hdr_bloom_up =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_bloom_up_frag, sizeof(hdr_bloom_up_frag));
+   self->pipelines.hdr_post =
+      device_request_program_graphics_code(self->device, analog_vert, sizeof(analog_vert), hdr_post_frag, sizeof(hdr_post_frag));
 
    self->pipelines.mipmap_energy = device_request_program_graphics_code(self->device, mipmap_shifted_vert, sizeof(mipmap_shifted_vert),
          mipmap_energy_frag, sizeof(mipmap_energy_frag));
@@ -7786,6 +7842,78 @@ static void renderer_resolve_scanout_msaa(Renderer *self, const TTRect *rect)
        (self)->render_state.canonical_color ? 3 : \
        (int)(self)->render_state.color_mode))
 
+/* A Display Transform table as an immutable RGBA16F image: half floats
+ * are the 16-bit format every device must filter. */
+static ImageHandle renderer_dt_image(Renderer *self, const uint16_t *unorm,
+      unsigned w, unsigned h, unsigned channels)
+{
+   ImageCreateInfo  info = image_create_info_immutable_2d_image(w, h,
+         VK_FORMAT_R16G16B16A16_SFLOAT, false);
+   ImageInitialData init;
+   ImageHandle      img;
+   uint16_t        *half = (uint16_t*)malloc(sizeof(uint16_t) * 4 * w * h);
+   unsigned         i, c;
+   img.data = NULL;
+   if (!half)
+      return img;
+   for (i = 0; i < w * h; i++)
+      for (c = 0; c < 4; c++)
+         half[i * 4 + c] = hdr_dt_unorm16_to_half(
+               unorm ? unorm[i * channels + (c < channels ? c : 0)] : 0);
+   init.data         = half;
+   init.row_length   = 0;
+   init.image_height = 0;
+   img = device_create_image(self->device, &info, &init);
+   free(half);
+   return img;
+}
+
+/* The Display Transform for the HDR output programs: its constants at
+ * binding 8, written straight into the frame's uniform ring, and its
+ * tables at 9-11. Tables are rebuilt only when hdr_transform.c does. */
+static void renderer_bind_display_transform(Renderer *self)
+{
+   struct hdr_dt_block *b = (struct hdr_dt_block*)commandbuffer_allocate_constant_data(
+         cbh_get(&self->cmd), 0, 8, sizeof(*b));
+   unsigned gen;
+   if (b)
+      hdr_dt_fill(b, psx_hdr_paper_white_nits, psx_hdr_max_nits, 0.0f,
+            psx_hdr_panel_xy);
+   gen = hdr_dt_generation();
+   if (!ih_get(&self->dt_dummy))
+      ih_move(&self->dt_dummy, renderer_dt_image(self, NULL, 1, 1, 4));
+   if (gen != self->dt_generation)
+   {
+      const uint16_t *aces2  = hdr_dt_aces2_lut();
+      const uint16_t *film   = hdr_dt_film_lut();
+      const uint16_t *desat  = hdr_dt_film_desat();
+      ih_reset(&self->dt_aces2_lut);
+      ih_reset(&self->dt_film_lut);
+      ih_reset(&self->dt_film_desat);
+      if (aces2)
+         ih_move(&self->dt_aces2_lut, renderer_dt_image(self, aces2,
+               HDR_DT_ACES2_LUT_WIDTH, 1, 4));
+      if (film)
+         ih_move(&self->dt_film_lut, renderer_dt_image(self, film,
+               HDR_DT_FILM_LUT_WIDTH, 1, 1));
+      if (desat)
+         ih_move(&self->dt_film_desat, renderer_dt_image(self, desat,
+               HDR_DT_DESAT_WIDTH, HDR_DT_DESAT_HEIGHT, 4));
+      self->dt_generation = gen;
+   }
+   if (!ih_get(&self->dt_dummy))
+      return;
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 9, image_get_view(ih_get(
+         ih_get(&self->dt_aces2_lut) ? &self->dt_aces2_lut : &self->dt_dummy)),
+         StockSampler_LinearWrap);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 10, image_get_view(ih_get(
+         ih_get(&self->dt_film_lut) ? &self->dt_film_lut : &self->dt_dummy)),
+         StockSampler_LinearClamp);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 11, image_get_view(ih_get(
+         ih_get(&self->dt_film_desat) ? &self->dt_film_desat : &self->dt_dummy)),
+         StockSampler_LinearClamp);
+}
+
 static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
 {
    RenderPassInfo rp;
@@ -7897,6 +8025,7 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
       hpush.scrgb            = psx_hdr_scrgb;
       hdr_push_panel(hpush.to_panel);
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
+      renderer_bind_display_transform(self);
    }
    else
    { struct SdrQuadPush
@@ -7947,6 +8076,254 @@ static ImageHandle renderer_scanout_vram_to_texture(Renderer *self, bool scaled)
  * The output, on the other hand, does scale: the decoded signal carries real
  * sub-native structure at base-clock rate, and emitting at native would
  * average it flat. */
+/* ---- HDR post effects ----
+ *
+ * The display stage (quad, mipmap resolve or analog resolve) ran with
+ * HDR_LINEAR_OUT and left scene-linear light in a half-float image. Build the
+ * bloom from it - a bright pass into a quarter-size band, then either the
+ * two-band separable blur or the convolution pyramid - and composite: the
+ * chromatic aberration, the tinted bloom, and the same grade and encode the
+ * display stage would have run. Mirrors boom3's hdr_present_vk pass for
+ * pass; gl_post_run in the GL backend runs the same shaders translated. */
+struct PostPush
+{
+   float p0[4];
+   float p1[4];
+};
+
+/* One full-target pass. `add` blends into what the target already holds
+ * (the pyramid's upsample); otherwise the target is created and cleared. */
+static void renderer_post_pass(Renderer *self, ImageHandle *dst, unsigned w, unsigned h,
+      Program *program, ImageView *src, const float p0[4], const float p1[4], bool add)
+{
+   RenderPassInfo rp;
+   VkViewport vp;
+   struct PostPush push;
+
+   if (!add)
+   {
+      ImageCreateInfo info = image_create_info_render_target(w, h, VK_FORMAT_R16G16B16A16_SFLOAT);
+      info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+      info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+      ih_move(dst, device_create_image(self->device, &info, NULL));
+      commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(dst),
+         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+   }
+   else
+      commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(dst),
+         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT,
+         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+         VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+   memset(&push, 0, sizeof(push));
+   if (p0)
+      memcpy(push.p0, p0, sizeof(push.p0));
+   if (p1)
+      memcpy(push.p1, p1, sizeof(push.p1));
+
+   render_pass_info_defaults(&rp);
+   rp.color_attachments[0]  = image_get_view(ih_get(dst));
+   rp.num_color_attachments = 1;
+   rp.store_attachments     = 1;
+   if (add)
+      rp.load_attachments   = 1;
+   else
+      rp.clear_attachments  = 1;
+   commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
+   commandbuffer_set_quad_state(cbh_get(&self->cmd));
+   if (add)
+   {
+      commandbuffer_set_blend_enable(cbh_get(&self->cmd), true);
+      commandbuffer_set_blend_op(cbh_get(&self->cmd), VK_BLEND_OP_ADD, VK_BLEND_OP_ADD);
+      commandbuffer_set_blend_factors(cbh_get(&self->cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE,
+            VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE);
+   }
+   vp.x = 0.0f; vp.y = 0.0f; vp.width = (float)w; vp.height = (float)h;
+   vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+   commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
+   commandbuffer_set_program(cbh_get(&self->cmd), program);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, src, StockSampler_LinearClamp);
+   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+   commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+   commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
+   commandbuffer_end_render_pass(cbh_get(&self->cmd));
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(dst),
+      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+}
+
+static unsigned renderer_post_dim(unsigned v, unsigned shift)
+{
+   v >>= shift;
+   return v ? v : 1u;
+}
+
+/* `scene` holds scene-linear light at w x h and is in SHADER_READ_ONLY. */
+static ImageHandle renderer_hdr_post_apply(Renderer *self, ImageHandle *scene,
+      unsigned w, unsigned h)
+{
+   struct hdr_post_frame f;
+   RenderPassInfo rp;
+   VkViewport vp;
+   ImageView *scene_view = image_get_view(ih_get(scene));
+   ImageView *bloom_t    = scene_view;
+   ImageView *bloom_w    = scene_view;
+   float p0[4], p1[4];
+   int i;
+
+   hdr_post_frame_params(&f, w, h);
+
+   if (f.bloom)
+   {
+      const unsigned qw = renderer_post_dim(w, 2), qh = renderer_post_dim(h, 2);
+      const unsigned sw = renderer_post_dim(w, 4), sh = renderer_post_dim(h, 4);
+      ImageHandle *base = f.levels ? &self->post_conv[0] : &self->post_bloom[0];
+
+      /* The bright pass, into the tight band or the pyramid's base. */
+      memcpy(p0, f.bright, sizeof(p0));
+      p1[0] = 1.0f / (float)w;
+      p1[1] = 1.0f / (float)h;
+      p1[2] = p1[3] = 0.0f;
+      renderer_post_pass(self, base, qw, qh, self->pipelines.hdr_bloom_bright,
+            scene_view, p0, p1, false);
+
+      if (f.levels)
+      {
+         /* Down the pyramid, then back up adding each level into the one above. */
+         for (i = 1; i < f.levels; i++)
+         {
+            const unsigned pw = renderer_post_dim(qw, (unsigned)(i - 1));
+            const unsigned ph = renderer_post_dim(qh, (unsigned)(i - 1));
+            p1[0] = 1.0f / (float)pw;
+            p1[1] = 1.0f / (float)ph;
+            renderer_post_pass(self, &self->post_conv[i],
+                  pw > 1 ? pw / 2 : 1, ph > 1 ? ph / 2 : 1,
+                  i == 1 ? self->pipelines.hdr_bloom_down_karis : self->pipelines.hdr_bloom_down,
+                  image_get_view(ih_get(&self->post_conv[i - 1])), NULL, p1, false);
+         }
+         p0[0] = 1.0f;   /* the radius */
+         p0[1] = p0[2] = p0[3] = 0.0f;
+         for (i = f.levels - 1; i > 0; i--)
+         {
+            const unsigned pw = renderer_post_dim(qw, (unsigned)i);
+            const unsigned ph = renderer_post_dim(qh, (unsigned)i);
+            const unsigned dw = renderer_post_dim(qw, (unsigned)(i - 1));
+            const unsigned dh = renderer_post_dim(qh, (unsigned)(i - 1));
+            p1[0] = 1.0f / (float)pw;
+            p1[1] = 1.0f / (float)ph;
+            renderer_post_pass(self, &self->post_conv[i - 1], dw, dh,
+                  self->pipelines.hdr_bloom_up,
+                  image_get_view(ih_get(&self->post_conv[i])), p0, p1, true);
+         }
+         bloom_t = bloom_w = image_get_view(ih_get(&self->post_conv[0]));
+      }
+      else
+      {
+         /* Two bands: a separable blur at a quarter, and the sixteenth band
+          * seeded from it. */
+         p1[2] = p1[3] = 0.0f;
+         p1[0] = 1.0f / (float)qw; p1[1] = 0.0f;
+         renderer_post_pass(self, &self->post_bloom[1], qw, qh, self->pipelines.hdr_bloom_blur,
+               image_get_view(ih_get(&self->post_bloom[0])), NULL, p1, false);
+         p1[0] = 0.0f; p1[1] = 1.0f / (float)qh;
+         renderer_post_pass(self, &self->post_bloom[0], qw, qh, self->pipelines.hdr_bloom_blur,
+               image_get_view(ih_get(&self->post_bloom[1])), NULL, p1, false);
+         p1[0] = 1.0f / (float)sw; p1[1] = 0.0f;
+         renderer_post_pass(self, &self->post_bloom[3], sw, sh, self->pipelines.hdr_bloom_blur,
+               image_get_view(ih_get(&self->post_bloom[0])), NULL, p1, false);
+         p1[0] = 0.0f; p1[1] = 1.0f / (float)sh;
+         renderer_post_pass(self, &self->post_bloom[2], sw, sh, self->pipelines.hdr_bloom_blur,
+               image_get_view(ih_get(&self->post_bloom[3])), NULL, p1, false);
+         bloom_t = image_get_view(ih_get(&self->post_bloom[0]));
+         bloom_w = image_get_view(ih_get(&self->post_bloom[2]));
+      }
+   }
+
+   /* The composite: aberration, bloom, grade, encode. */
+   { struct CompositePush
+   {
+      float   hal_bloom[4];
+      float   band_w[2];
+      float   ca;
+      float   paper_white_nits;
+      float   peak_nits;
+      int32_t expand_gamut;
+      int32_t shoulder;
+      int32_t src_primaries;
+      float   black_pq;
+      int32_t scrgb;
+      float   pad[2];
+      float   to_panel[12];
+   } push;
+   /* Must match hdr_post.frag's push block byte for byte. */
+   enum { hdr_post_push_layout = 1 / (sizeof(struct CompositePush) == 112) };
+   ImageCreateInfo info = image_create_info_render_target(w, h, renderer_hdr_scanout_format(self));
+
+   memset(&push, 0, sizeof(push));
+   memcpy(push.hal_bloom, f.hal_bloom, sizeof(push.hal_bloom));
+   push.band_w[0]        = f.band_w[0];
+   push.band_w[1]        = f.band_w[1];
+   push.ca               = f.ca;
+   push.paper_white_nits = psx_hdr_paper_white_nits;
+   push.peak_nits        = psx_hdr_max_nits;
+   push.expand_gamut     = psx_hdr_expand_gamut;
+   push.shoulder         = psx_hdr_shoulder;
+   push.src_primaries    = psx_src_primaries;
+   push.black_pq         = psx_hdr_black_pq;
+   push.scrgb            = psx_hdr_scrgb;
+   hdr_push_panel(push.to_panel);
+
+   info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+   info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+   ih_move(&self->post_out, device_create_image(self->device, &info, NULL));
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->post_out),
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+   render_pass_info_defaults(&rp);
+   rp.color_attachments[0]  = image_get_view(ih_get(&self->post_out));
+   rp.num_color_attachments = 1;
+   rp.store_attachments     = 1;
+   rp.clear_attachments     = 1;
+   commandbuffer_begin_render_pass(cbh_get(&self->cmd), &rp, VK_SUBPASS_CONTENTS_INLINE);
+   commandbuffer_set_quad_state(cbh_get(&self->cmd));
+   vp.x = 0.0f; vp.y = 0.0f; vp.width = (float)w; vp.height = (float)h;
+   vp.minDepth = 0.0f; vp.maxDepth = 1.0f;
+   commandbuffer_set_viewport(cbh_get(&self->cmd), &vp);
+   commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.hdr_post);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0, scene_view, StockSampler_LinearClamp);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 1, bloom_t, StockSampler_LinearClamp);
+   commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 2, bloom_w, StockSampler_LinearClamp);
+   commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+   renderer_bind_display_transform(self);
+   commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
+   commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
+   commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+   commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
+   commandbuffer_end_render_pass(cbh_get(&self->cmd));
+   commandbuffer_image_barrier(cbh_get(&self->cmd), ih_get(&self->post_out),
+      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   }
+
+   ih_assign(&self->last_scanout, &self->post_out);
+   return self->post_out;
+}
+
+/* Whether this frame's HDR output runs through the post effects. */
+static bool renderer_post_active(void)
+{
+   return psx_hdr_active && hdr_post_enabled();
+}
+
 static bool renderer_analog_active(Renderer *self)
 {
    /* Log the transition once rather than every frame. Whether the chain is
@@ -8084,7 +8461,8 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
    }
 
    { ImageCreateInfo info = image_create_info_render_target(out_w, out_h,
-         psx_hdr_active ? renderer_hdr_scanout_format(self) : VK_FORMAT_R8G8B8A8_UNORM);
+         renderer_post_active() ? VK_FORMAT_R16G16B16A16_SFLOAT
+         : psx_hdr_active ? renderer_hdr_scanout_format(self) : VK_FORMAT_R8G8B8A8_UNORM);
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
    ih_move(&self->analog_out, device_create_image(self->device, &info, NULL));
@@ -8437,6 +8815,14 @@ resolve:
    commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 0,
       image_get_view(ih_get(&self->analog_rgb)), StockSampler_NearestClamp);
    commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, push_size);
+   if (psx_hdr_active)
+   {
+      renderer_bind_display_transform(self);
+      commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+            SpecConstIndex_HdrLinearOut, renderer_post_active() ? 1 : 0);
+      commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd),
+            1u << SpecConstIndex_HdrLinearOut);
+   }
    commandbuffer_set_vertex_binding(cbh_get(&self->cmd), 0, bh_get(&self->quad), 0, 8, VK_VERTEX_INPUT_RATE_VERTEX);
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
@@ -8448,6 +8834,8 @@ resolve:
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
    }
 
+   if (renderer_post_active())
+      return renderer_hdr_post_apply(self, &self->analog_out, out_w, out_h);
    ih_assign(&self->last_scanout, &self->analog_out);
    return self->analog_out;
 }
@@ -8492,6 +8880,9 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
     * than psx_hdr_active throughout the tail of this function. */
    const bool analog   = renderer_analog_active(self);
    const bool hdr_quad = psx_hdr_active && !analog;
+   /* With the post effects on, the HDR quad writes scene-linear light to a
+    * half-float image and renderer_hdr_post_apply encodes. */
+   const bool post     = hdr_quad && renderer_post_active();
    fbatlas_flush_render_pass(&self->atlas);
    if (self->texture_tracking_enabled) {
       texture_tracker_endFrame(self->tracker);
@@ -8590,7 +8981,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    ImageCreateInfo info = image_create_info_render_target(
          display_rect.width * render_scale,
          display_rect.height * render_scale,
-         analog ? VK_FORMAT_R16G16B16A16_SFLOAT
+         (analog || post) ? VK_FORMAT_R16G16B16A16_SFLOAT
          : hdr_quad ? renderer_hdr_scanout_format(self)
             : VK_FORMAT_R8G8B8A8_UNORM);
 
@@ -8724,6 +9115,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       hdr_push_panel(mp.to_panel);
       mp.scrgb            = psx_hdr_scrgb;
       commandbuffer_push_constants(cbh_get(&self->cmd), &mp, 0, sizeof(mp));
+      renderer_bind_display_transform(self);
    }
    else if (hdr_quad)
    {
@@ -8764,6 +9156,7 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
       hpush.scrgb            = psx_hdr_scrgb;
       hdr_push_panel(hpush.to_panel);
       commandbuffer_push_constants(cbh_get(&self->cmd), &hpush, 0, sizeof(hpush));
+      renderer_bind_display_transform(self);
    }
    else if (using_mipmap)
    { struct SdrMipmapPush
@@ -8807,13 +9200,19 @@ static ImageHandle renderer_scanout_to_texture(Renderer *self)
    }
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
          SpecConstIndex_ColorMode, RENDERER_DISPLAY_COLOR_MODE(self));
+   commandbuffer_set_specialization_constant(cbh_get(&self->cmd),
+         SpecConstIndex_HdrLinearOut, post ? 1 : 0);
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd),
-         1u << SpecConstIndex_ColorMode);
+         (1u << SpecConstIndex_ColorMode) | (1u << SpecConstIndex_HdrLinearOut));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 0, 0, VK_FORMAT_R32G32_SFLOAT, 0);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
    commandbuffer_draw(cbh_get(&self->cmd), 4, 1, 0, 0);
 
    renderer_finish_reuseable_scanout(self);
+
+   if (post)
+      return renderer_hdr_post_apply(self, &self->reuseable_scanout,
+            display_rect.width * render_scale, display_rect.height * render_scale);
 
    if (analog)
    {
@@ -11101,6 +11500,17 @@ static void renderer_fini(Renderer *self)
    ih_reset(&self->analog_dec);
    ih_reset(&self->analog_rgb);
    ih_reset(&self->analog_out);
+   ih_reset(&self->dt_aces2_lut);
+   ih_reset(&self->dt_film_lut);
+   ih_reset(&self->dt_film_desat);
+   ih_reset(&self->dt_dummy);
+   { unsigned i;
+   for (i = 0; i < 4; i++)
+      ih_reset(&self->post_bloom[i]);
+   for (i = 0; i < HDR_POST_CONV_MAX; i++)
+      ih_reset(&self->post_conv[i]);
+   }
+   ih_reset(&self->post_out);
    bh_reset(&self->quad);
    imageview_vec_destroy(&self->scaled_views); /* release scaled image views (was member teardown) */
    /* Free the per-frame draw-self->queue arrays (POD_VEC backing storage). */

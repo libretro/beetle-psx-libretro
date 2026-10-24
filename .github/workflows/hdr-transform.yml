@@ -1,0 +1,79 @@
+name: HDR display transform and post effects
+
+# The HDR outputs' Display Transform (tone curves, full ACES 2.0, expansion,
+# hue preservation) and post effects (bloom, halation, chromatic
+# aberration).
+#
+# transform: the CPU twins of every curve and the ACES 2.0 solve against
+#   their invariants, the shader carrying every curve constant, and every
+#   GL and GLES shader source compiling under glslang. Strict C89,
+#   ASan/UBSan, and a mingw-w64 build under Wine.
+# post: the core rendering a reference scene through both hardware
+#   renderers (lavapipe, llvmpipe) with each effect on, measured in linear
+#   light; also checks that the generated GL shaders match their sources.
+
+on:
+  push:
+    paths:
+      - 'rhi/**'
+      - 'libretro.c'
+      - 'libretro_core_options.h'
+      - 'Makefile*'
+      - 'tools/hdr_transform/**'
+      - 'tools/hdr_post/**'
+      - 'tools/vkhost/**'
+      - 'tools/glhost/**'
+      - '.github/workflows/hdr-transform.yml'
+  pull_request:
+    paths:
+      - 'rhi/**'
+      - 'libretro.c'
+      - 'libretro_core_options.h'
+      - 'Makefile*'
+      - 'tools/hdr_transform/**'
+      - 'tools/hdr_post/**'
+      - 'tools/vkhost/**'
+      - 'tools/glhost/**'
+      - '.github/workflows/hdr-transform.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transform:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install glslang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends glslang-tools
+      - name: Linux, C89, ASan/UBSan, GL/GLES shader compile
+        run: tools/hdr_transform/run.sh
+      - name: Install mingw-w64 and Wine
+        run: sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 wine64 wine
+      - name: Windows (mingw-w64 under Wine)
+        run: CC=x86_64-w64-mingw32-gcc WINEDEBUG=-all RUN=wine tools/hdr_transform/run.sh
+
+  post:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan and GL (lavapipe, llvmpipe, validation layer)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libvulkan-dev mesa-vulkan-drivers \
+            vulkan-validationlayers libgl1-mesa-dev libegl1-mesa-dev \
+            libgl1-mesa-dri python3
+      - name: Generated GL shaders match their Vulkan sources
+        run: |
+          (cd rhi/shaders_gl && ./gen_analog_gl.py)
+          git diff --exit-code -- rhi/shaders_gl
+      - name: Build the core
+        run: make -j"$(nproc)" HAVE_HW=1
+      - name: Post-effect lanes
+        run: sh tools/hdr_post/post_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"

@@ -39,6 +39,7 @@ extern float psx_hdr_black_pq;
 extern float psx_hdr_to_panel[9];
 extern int   psx_hdr_expand_gamut;
 extern int   psx_hdr_shoulder;
+extern uint16_t psx_hdr_panel_xy[8];
 extern int   psx_hdr_sdr_eotf;
 extern int   psx_hdr_overbright_hot;
 extern unsigned int psx_pgxp_mode;
@@ -229,8 +230,11 @@ static void gl_diag_errors(const char *site)
 #undef FILTER_JINC2
 #include "shaders_gl/output_vertex.glsl.h"
 #include "shaders_gl/output_fragment.glsl.h"
+#include "shaders_gl/hdr_splice.h"
 #include "shaders_gl/image_load_vertex.glsl.h"
 #include "shaders_gl/image_load_fragment.glsl.h"
+#include "shaders_gl/hdr_transform.glsl.h"
+#include "hdr_transform.h"
 
 #include "libretro.h"
 #include "libretro_options.h"
@@ -567,9 +571,10 @@ static GLuint beetle_gl_get_current_framebuffer(void)
 #define UNIFORM_NAME_MAX 64
 
 /* Maximum uniforms per program. The command program can expose 17 active
- * uniforms, while the optional analog programs currently need at most 12.
- * Keep fixed storage, with enough headroom for either family to grow. */
-#define UNIFORM_MAX_ENTRIES 32
+ * uniforms, the optional analog programs at most 12; the HDR outputs also
+ * count the 16 members of the Display Transform block, which are listed
+ * as active but never stored. Fixed storage, with headroom to grow. */
+#define UNIFORM_MAX_ENTRIES 64
 
 struct gl_uniform_entry
 {
@@ -679,6 +684,144 @@ struct gl_program
    char *info_log;
 };
 typedef struct gl_program gl_program;
+
+/* ---- Display Transform (hdr_transform.c) for the HDR output programs ----
+ * Its constants travel as a uniform block, its tables on texture units
+ * 8-10. GLES has no 16-bit unorm textures, so it gets half floats. */
+#define GL_DT_UBO_BINDING 0
+#define GL_DT_UNIT_ACES2  8
+#define GL_DT_UNIT_FILM   9
+#define GL_DT_UNIT_DESAT  10
+
+static GLuint   gl_dt_ubo;
+static GLuint   gl_dt_tex[3];
+static GLuint   gl_dt_dummy;
+static unsigned gl_dt_generation;
+
+static GLuint gl_dt_texture(const uint16_t *unorm, unsigned w, unsigned h,
+      unsigned channels, GLenum wrap)
+{
+   GLuint    tex  = 0;
+   uint16_t *rgba = (uint16_t*)malloc(sizeof(uint16_t) * 4 * w * h);
+   unsigned  i, c;
+   if (!rgba)
+      return 0;
+   for (i = 0; i < w * h; i++)
+      for (c = 0; c < 4; c++)
+      {
+         uint16_t v = unorm ? unorm[i * channels + (c < channels ? c : 0)] : 0;
+#ifdef HAVE_OPENGLES3
+         v = hdr_dt_unorm16_to_half(v);
+#endif
+         rgba[i * 4 + c] = v;
+      }
+   glGenTextures(1, &tex);
+   glBindTexture(GL_TEXTURE_2D, tex);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 2);
+#ifdef HAVE_OPENGLES3
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, (GLsizei)w, (GLsizei)h, 0,
+         GL_RGBA, GL_HALF_FLOAT, rgba);
+#else
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, (GLsizei)w, (GLsizei)h, 0,
+         GL_RGBA, GL_UNSIGNED_SHORT, rgba);
+#endif
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, (GLint)wrap);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   free(rgba);
+   return tex;
+}
+
+static void gl_dt_free(void)
+{
+   unsigned i;
+   for (i = 0; i < 3; i++)
+   {
+      if (gl_dt_tex[i])
+         glDeleteTextures(1, &gl_dt_tex[i]);
+      gl_dt_tex[i] = 0;
+   }
+   if (gl_dt_dummy)
+      glDeleteTextures(1, &gl_dt_dummy);
+   if (gl_dt_ubo)
+      glDeleteBuffers(1, &gl_dt_ubo);
+   gl_dt_dummy      = 0;
+   gl_dt_ubo        = 0;
+   gl_dt_generation = 0;
+}
+
+static void gl_dt_bind_unit(unsigned unit, GLuint tex)
+{
+   glActiveTexture(GL_TEXTURE0 + unit);
+   glBindTexture(GL_TEXTURE_2D, tex ? tex : gl_dt_dummy);
+}
+
+/* Call with the program in use, after its other HDR uniforms. A program
+ * that declares the block always gets one bound; outside HDR it is the
+ * zero block, which selects no curve and builds no tables. */
+static void gl_bind_display_transform(const struct gl_program *p)
+{
+   struct hdr_dt_block b;
+   GLuint   block;
+   unsigned gen;
+
+   if (psx_hdr_active)
+      hdr_dt_fill(&b, psx_hdr_paper_white_nits, psx_hdr_max_nits, 0.0f,
+            psx_hdr_panel_xy);
+   else
+      memset(&b, 0, sizeof(b));
+   if (!gl_dt_ubo)
+      glGenBuffers(1, &gl_dt_ubo);
+   glBindBuffer(GL_UNIFORM_BUFFER, gl_dt_ubo);
+   /* Respecified per draw: the driver renames rather than waits. */
+   glBufferData(GL_UNIFORM_BUFFER, sizeof(b), &b, GL_STREAM_DRAW);
+   glBindBufferBase(GL_UNIFORM_BUFFER, GL_DT_UBO_BINDING, gl_dt_ubo);
+   block = glGetUniformBlockIndex(p->id, "DisplayTransform");
+   if (block != GL_INVALID_INDEX)
+      glUniformBlockBinding(p->id, block, GL_DT_UBO_BINDING);
+
+   gen = hdr_dt_generation();
+   if (!gl_dt_dummy)
+      gl_dt_dummy = gl_dt_texture(NULL, 1, 1, 4, GL_CLAMP_TO_EDGE);
+   if (gen != gl_dt_generation)
+   {
+      const uint16_t *aces2 = hdr_dt_aces2_lut();
+      const uint16_t *film  = hdr_dt_film_lut();
+      const uint16_t *desat = hdr_dt_film_desat();
+      unsigned i;
+      for (i = 0; i < 3; i++)
+      {
+         if (gl_dt_tex[i])
+            glDeleteTextures(1, &gl_dt_tex[i]);
+         gl_dt_tex[i] = 0;
+      }
+      glActiveTexture(GL_TEXTURE0 + GL_DT_UNIT_ACES2);
+      if (aces2)
+         gl_dt_tex[0] = gl_dt_texture(aces2, HDR_DT_ACES2_LUT_WIDTH, 1, 4, GL_REPEAT);
+      if (film)
+         gl_dt_tex[1] = gl_dt_texture(film, HDR_DT_FILM_LUT_WIDTH, 1, 1, GL_CLAMP_TO_EDGE);
+      if (desat)
+         gl_dt_tex[2] = gl_dt_texture(desat, HDR_DT_DESAT_WIDTH, HDR_DT_DESAT_HEIGHT,
+               4, GL_CLAMP_TO_EDGE);
+      gl_dt_generation = gen;
+   }
+   gl_dt_bind_unit(GL_DT_UNIT_ACES2, gl_dt_tex[0]);
+   gl_dt_bind_unit(GL_DT_UNIT_FILM,  gl_dt_tex[1]);
+   gl_dt_bind_unit(GL_DT_UNIT_DESAT, gl_dt_tex[2]);
+   glActiveTexture(GL_TEXTURE0);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "uDtAces2Lut"), GL_DT_UNIT_ACES2);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "uDtFilmLut"),  GL_DT_UNIT_FILM);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "uDtFilmDesat"), GL_DT_UNIT_DESAT);
+}
+
+/* output_fragment with the Display Transform spliced in; caller frees. */
+static char *gl_output_fragment_source(void)
+{
+   return gl_hdr_splice_output_fragment(output_fragment, hdr_transform_glsl);
+}
+
 
 
 struct gl_shader
@@ -985,6 +1128,7 @@ struct gl_vram_sync_tile
 
 
 struct gl_analog;
+struct gl_post;
 
 struct gl_renderer {
    /* Buffer used to handle PlayStation GPU draw commands */
@@ -1024,6 +1168,10 @@ struct gl_renderer {
     * chain owns a dozen programs and six render targets, so a session that
     * never enables it never pays for it. Freed with the renderer. */
    struct gl_analog *analog;
+
+   /* HDR post effects (bloom, halation, chromatic aberration). NULL until
+    * one is first switched on; freed with the renderer. */
+   struct gl_post *post;
 
    /* Subcarrier phase carried in from every field before this one, in
     * cycles. Advanced once per displayed field; wrapped to [0,1) so a long
@@ -1363,6 +1511,9 @@ static bool load_program_uniforms(GLuint program, gl_uniform_map *uniforms)
       /* Nothing looks such a uniform up, so skipping it is harmless;
        * failing the whole program here would turn a driver quirk into
        * no renderer at all. */
+      /* Uniform block members are active but have no location. */
+      if (location < 0 && strchr(name, '.'))
+         continue;
       if (location < 0)
       {
          log_cb(RETRO_LOG_WARN,
@@ -3884,12 +4035,16 @@ static bool gl_renderer_new(gl_renderer *renderer, gl_draw_config config)
                   sizeof(gl_command_vertex), cmd_attrs, cmd_n_attrs);
       }
 
-      output_buffer =
-         gl_draw_buffer_build(
-               output_vertex,
-               output_fragment,
-               4,
-               sizeof(gl_output_vertex), out_attrs, out_n_attrs);
+      {
+         char *out_src = gl_output_fragment_source();
+         output_buffer =
+            gl_draw_buffer_build(
+                  output_vertex,
+                  out_src ? out_src : output_fragment,
+                  4,
+                  sizeof(gl_output_vertex), out_attrs, out_n_attrs);
+         free(out_src);
+      }
 
       image_load_buffer =
          gl_draw_buffer_build(
@@ -4137,6 +4292,12 @@ texture_failed:
 #include "shaders_gl/analog_resolve_hdr.glsl.h"
 #include "shaders_gl/analog_notch.glsl.h"
 #include "shaders_gl/analog_notch_pal.glsl.h"
+#include "shaders_gl/hdr_bloom_bright.glsl.h"
+#include "shaders_gl/hdr_bloom_blur.glsl.h"
+#include "shaders_gl/hdr_bloom_down.glsl.h"
+#include "shaders_gl/hdr_bloom_down_karis.glsl.h"
+#include "shaders_gl/hdr_bloom_up.glsl.h"
+#include "shaders_gl/hdr_post.glsl.h"
 
 /* Cable tiers. Mirror of AN_CABLE_* in shaders_vulkan/analog.h and of
  * RHI_CABLE_* in rhi_lib_vulkan.c; analog.h is GLSL and cannot be included
@@ -4234,7 +4395,13 @@ static gl_program *gl_analog_build_program(const char *fs_src, const char *name)
    memset(&vs, 0, sizeof(vs));
    memset(&fs, 0, sizeof(fs));
 
+   /* GLES takes the generator's "#version 300 es" twin of every source;
+    * the desktop "#version 330 core" text does not compile there. */
+#ifdef HAVE_OPENGLES3
+   if (!gl_shader_init(&vs, analog_vertex_glsl_ES, GL_VERTEX_SHADER))
+#else
    if (!gl_shader_init(&vs, analog_vertex_glsl, GL_VERTEX_SHADER))
+#endif
    {
       log_cb(RETRO_LOG_ERROR, "[gl_analog] %s: vertex shader failed\n", name);
       if (vs.info_log) free(vs.info_log);
@@ -4425,6 +4592,21 @@ static bool gl_analog_build(struct gl_analog *a)
    srcs[GL_ANALOG_YC_PAL]      = analog_yc_pal_glsl;
    srcs[GL_ANALOG_RESOLVE]     = analog_resolve_glsl;
    srcs[GL_ANALOG_RESOLVE_HDR] = analog_resolve_hdr_glsl;
+#ifdef HAVE_OPENGLES3
+   srcs[GL_ANALOG_DOWNSAMPLE]  = analog_downsample_glsl_ES;
+   srcs[GL_ANALOG_ENCODE]      = analog_encode_glsl_ES;
+   srcs[GL_ANALOG_ENCODE_PAL]  = analog_encode_pal_glsl_ES;
+   srcs[GL_ANALOG_COMB]        = analog_comb_glsl_ES;
+   srcs[GL_ANALOG_COMB_PAL]    = analog_comb_pal_glsl_ES;
+   srcs[GL_ANALOG_DEMOD]       = analog_demod_glsl_ES;
+   srcs[GL_ANALOG_DEMOD_PAL]   = analog_demod_pal_glsl_ES;
+   srcs[GL_ANALOG_RGB]         = analog_rgb_glsl_ES;
+   srcs[GL_ANALOG_RGB_PAL]     = analog_rgb_pal_glsl_ES;
+   srcs[GL_ANALOG_YC]          = analog_yc_glsl_ES;
+   srcs[GL_ANALOG_YC_PAL]      = analog_yc_pal_glsl_ES;
+   srcs[GL_ANALOG_RESOLVE]     = analog_resolve_glsl_ES;
+   srcs[GL_ANALOG_RESOLVE_HDR] = analog_resolve_hdr_glsl_ES;
+#endif
 
    for (i = 0; i < sizeof(progs) / sizeof(progs[0]); i++)
    {
@@ -4443,10 +4625,17 @@ static bool gl_analog_build(struct gl_analog *a)
 
    if (gl_caps.has_compute)
    {
+#ifdef HAVE_OPENGLES3
+      a->programs[GL_ANALOG_NOTCH] =
+         gl_analog_build_compute(analog_notch_glsl_ES, "notch");
+      a->programs[GL_ANALOG_NOTCH_PAL] =
+         gl_analog_build_compute(analog_notch_pal_glsl_ES, "notch_pal");
+#else
       a->programs[GL_ANALOG_NOTCH] =
          gl_analog_build_compute(analog_notch_glsl, "notch");
       a->programs[GL_ANALOG_NOTCH_PAL] =
          gl_analog_build_compute(analog_notch_pal_glsl, "notch_pal");
+#endif
 
       /* A driver that claims 4.3 and then fails to build the trap is not a
        * reason to lose the cable: drop back to the same bypass path used
@@ -4676,7 +4865,8 @@ static void bind_libretro_framebuffer(gl_renderer *renderer);
  * match exactly or the two renderers disagree on phase. */
 static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
       GLuint src, unsigned native_w, unsigned native_h,
-      unsigned out_w, unsigned out_h, int dst_x, int dst_y)
+      unsigned out_w, unsigned out_h, int dst_x, int dst_y,
+      gl_texture *linear_dst)
 {
    GLint          frontend_vp[4];
    const unsigned div    = gl_analog_divisor((unsigned)renderer->curr_width_mode);
@@ -4890,12 +5080,26 @@ static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
     * target, so without it the frontend buffer would keep last frame's
     * leftovers. */
    p = a->programs[psx_hdr_active ? GL_ANALOG_RESOLVE_HDR : GL_ANALOG_RESOLVE];
-   bind_libretro_framebuffer(renderer);
-   glGetIntegerv(GL_VIEWPORT, frontend_vp);
-   glClearColor(0.0, 0.0, 0.0, 0.0);
-   glClear(GL_COLOR_BUFFER_BIT);
-   glViewport((GLint)dst_x, (GLint)dst_y, (GLsizei)out_w, (GLsizei)out_h);
+   /* With the HDR post effects on, the resolve writes scene-linear light
+    * into their scene image instead, and gl_post_run encodes. */
+   if (linear_dst)
+   {
+      frontend_vp[0] = frontend_vp[1] = frontend_vp[2] = frontend_vp[3] = 0;
+      if (!gl_analog_target(a, linear_dst))
+         return false;
+      glClearColor(0.0, 0.0, 0.0, 0.0);
+      glClear(GL_COLOR_BUFFER_BIT);
+   }
+   else
+   {
+      bind_libretro_framebuffer(renderer);
+      glGetIntegerv(GL_VIEWPORT, frontend_vp);
+      glClearColor(0.0, 0.0, 0.0, 0.0);
+      glClear(GL_COLOR_BUFFER_BIT);
+      glViewport((GLint)dst_x, (GLint)dst_y, (GLsizei)out_w, (GLsizei)out_h);
+   }
    glUseProgram(p->id);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "HDR_LINEAR_OUT"), linear_dst ? 1 : 0);
    gl_analog_bind_source(p, "uDecoded", a->rgb.id);
    glUniform2f(gl_uniform_map_get(&p->uniforms, "reg_sig_size"),
          (float)sig_w, (float)sig_h);
@@ -4912,12 +5116,362 @@ static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
    glUniformMatrix3fv(gl_uniform_map_get(&p->uniforms, "reg_to_panel"), 1, GL_FALSE,
          psx_hdr_to_panel);
    glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_scrgb"), psx_hdr_scrgb);
+   if (psx_hdr_active)
+      gl_bind_display_transform(p);
    gl_analog_draw_quad(a);
 
    /* Leave the frontend's framebuffer bound with the viewport
-    * bind_libretro_framebuffer set, as the rest of the frame expects. */
+    * bind_libretro_framebuffer set, as the rest of the frame expects. The
+    * post effects rebind it themselves. */
+   if (!linear_dst)
+      glViewport(frontend_vp[0], frontend_vp[1], frontend_vp[2], frontend_vp[3]);
+   glBindVertexArray(0);
+   return true;
+}
+
+/* ---- HDR post effects: bloom, halation, chromatic aberration ----
+ *
+ * The GL twin of renderer_hdr_post_apply: the display draw (or the analog
+ * resolve) writes scene-linear light into `scene`, the bloom is built from it
+ * and the composite encodes into the frontend's framebuffer. The shaders are
+ * hdr_bloom.frag / hdr_post.frag translated by gen_analog_gl.py, run through
+ * the analog chain's vertex stage. Built on first use; a session that never
+ * enables an effect never compiles them. */
+enum
+{
+   GL_POST_BRIGHT = 0,
+   GL_POST_BLUR,
+   GL_POST_DOWN,
+   GL_POST_DOWN_KARIS,
+   GL_POST_UP,
+   GL_POST_COMPOSITE,
+   GL_POST_PROGRAM_COUNT
+};
+
+struct gl_post
+{
+   gl_program *programs[GL_POST_PROGRAM_COUNT];
+   gl_texture  scene;                    /* scene-linear, display size */
+   gl_texture  bloom[4];                 /* [0,1] quarter, [2,3] sixteenth */
+   gl_texture  conv[HDR_POST_CONV_MAX];  /* the convolution pyramid */
+   GLuint      fbo;
+   GLuint      quad_vao;
+   GLuint      quad_vbo;
+   int         built;
+   int         failed;
+};
+
+static void gl_post_free_texture(gl_texture *t)
+{
+   if (t->id)
+      glDeleteTextures(1, &t->id);
+   t->id = 0;
+   t->width = t->height = 0;
+}
+
+static void gl_post_free(struct gl_post *pp)
+{
+   unsigned i;
+   if (!pp)
+      return;
+   for (i = 0; i < GL_POST_PROGRAM_COUNT; i++)
+   {
+      if (pp->programs[i])
+      {
+         gl_program_free(pp->programs[i]);
+         free(pp->programs[i]);
+         pp->programs[i] = NULL;
+      }
+   }
+   gl_post_free_texture(&pp->scene);
+   for (i = 0; i < 4; i++)
+      gl_post_free_texture(&pp->bloom[i]);
+   for (i = 0; i < HDR_POST_CONV_MAX; i++)
+      gl_post_free_texture(&pp->conv[i]);
+   if (pp->fbo)      { glDeleteFramebuffers(1, &pp->fbo); pp->fbo = 0; }
+   if (pp->quad_vbo) { glDeleteBuffers(1, &pp->quad_vbo); pp->quad_vbo = 0; }
+   if (pp->quad_vao) { glDeleteVertexArrays(1, &pp->quad_vao); pp->quad_vao = 0; }
+   pp->built  = 0;
+   pp->failed = 0;
+}
+
+static bool gl_post_build(struct gl_post *pp)
+{
+   static const char *const names[GL_POST_PROGRAM_COUNT] = {
+      "bloom_bright", "bloom_blur", "bloom_down", "bloom_down_karis",
+      "bloom_up", "post" };
+   const char *srcs[GL_POST_PROGRAM_COUNT];
+   unsigned i;
+
+   if (pp->built)
+      return true;
+   if (pp->failed)
+      return false;
+
+   srcs[GL_POST_BRIGHT]     = hdr_bloom_bright_glsl;
+   srcs[GL_POST_BLUR]       = hdr_bloom_blur_glsl;
+   srcs[GL_POST_DOWN]       = hdr_bloom_down_glsl;
+   srcs[GL_POST_DOWN_KARIS] = hdr_bloom_down_karis_glsl;
+   srcs[GL_POST_UP]         = hdr_bloom_up_glsl;
+   srcs[GL_POST_COMPOSITE]  = hdr_post_glsl;
+#ifdef HAVE_OPENGLES3
+   srcs[GL_POST_BRIGHT]     = hdr_bloom_bright_glsl_ES;
+   srcs[GL_POST_BLUR]       = hdr_bloom_blur_glsl_ES;
+   srcs[GL_POST_DOWN]       = hdr_bloom_down_glsl_ES;
+   srcs[GL_POST_DOWN_KARIS] = hdr_bloom_down_karis_glsl_ES;
+   srcs[GL_POST_UP]         = hdr_bloom_up_glsl_ES;
+   srcs[GL_POST_COMPOSITE]  = hdr_post_glsl_ES;
+#endif
+
+   for (i = 0; i < GL_POST_PROGRAM_COUNT; i++)
+   {
+      pp->programs[i] = gl_analog_build_program(srcs[i], names[i]);
+      if (!pp->programs[i])
+      {
+         log_cb(RETRO_LOG_ERROR,
+               "[gl_post] HDR post effects unavailable: '%s' did not build\n", names[i]);
+         gl_post_free(pp);
+         pp->failed = 1;
+         return false;
+      }
+   }
+   glGenFramebuffers(1, &pp->fbo);
+   pp->built = 1;
+   return true;
+}
+
+/* (Re)allocate a half-float target, bilinear and edge-clamped: the bloom
+ * samples between texels and the aberration reaches past the frame. */
+static bool gl_post_texture(gl_texture *t, unsigned w, unsigned h)
+{
+   if (t->id && t->width == w && t->height == h)
+      return true;
+   gl_post_free_texture(t);
+   if (!gl_texture_init(t, w, h, GL_RGBA16F))
+   {
+      gl_post_free_texture(t);
+      return false;
+   }
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   return true;
+}
+
+static bool gl_post_target(struct gl_post *pp, gl_texture *t)
+{
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, pp->fbo);
+   glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+         GL_TEXTURE_2D, t->id, 0);
+   glViewport(0, 0, (GLsizei)t->width, (GLsizei)t->height);
+   return glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+}
+
+static void gl_post_draw_quad(struct gl_post *pp)
+{
+   static const GLfloat verts[8] =
+   {
+      -1.0f, -1.0f,
+       1.0f, -1.0f,
+      -1.0f,  1.0f,
+       1.0f,  1.0f
+   };
+
+   if (!pp->quad_vbo)
+   {
+      glGenVertexArrays(1, &pp->quad_vao);
+      glGenBuffers(1, &pp->quad_vbo);
+      glBindVertexArray(pp->quad_vao);
+      glBindBuffer(GL_ARRAY_BUFFER, pp->quad_vbo);
+      glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+      glEnableVertexAttribArray(0);
+      glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), NULL);
+   }
+   else
+      glBindVertexArray(pp->quad_vao);
+
+   glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+/* One bloom stage: p0/p1 are hdr_bloom.frag's two vec4 registers. */
+static bool gl_post_pass(struct gl_post *pp, int prog, gl_texture *dst,
+      unsigned w, unsigned h, GLuint src, const float p0[4], const float p1[4], bool add)
+{
+   gl_program *p = pp->programs[prog];
+   static const float zero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+   if (!add && !gl_post_texture(dst, w, h))
+      return false;
+   if (!gl_post_target(pp, dst))
+      return false;
+   if (add)
+   {
+      glEnable(GL_BLEND);
+      glBlendEquation(GL_FUNC_ADD);
+      glBlendFunc(GL_ONE, GL_ONE);
+   }
+   glUseProgram(p->id);
+   glActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, src);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "uSource"), 0);
+   glUniform4fv(gl_uniform_map_get(&p->uniforms, "reg_p0"), 1, p0 ? p0 : zero);
+   glUniform4fv(gl_uniform_map_get(&p->uniforms, "reg_p1"), 1, p1 ? p1 : zero);
+   gl_post_draw_quad(pp);
+   if (add)
+      glDisable(GL_BLEND);
+   return true;
+}
+
+static unsigned gl_post_dim(unsigned v, unsigned shift)
+{
+   v >>= shift;
+   return v ? v : 1u;
+}
+
+static void bind_libretro_framebuffer(gl_renderer *renderer);
+static void gl_bind_display_transform(const struct gl_program *p);
+
+/* Bloom from pp->scene, then the composite into the frontend's framebuffer
+ * at (dst_x, dst_y). Mirrors renderer_hdr_post_apply pass for pass. */
+static bool gl_post_run(gl_renderer *renderer, struct gl_post *pp,
+      int dst_x, int dst_y)
+{
+   struct hdr_post_frame f;
+   const unsigned w = pp->scene.width, h = pp->scene.height;
+   GLuint bloom_t = pp->scene.id, bloom_w = pp->scene.id;
+   GLint  frontend_vp[4];
+   gl_program *p;
+   float p0[4], p1[4];
+   int i;
+
+   hdr_post_frame_params(&f, w, h);
+   glDisable(GL_SCISSOR_TEST);
+   glDisable(GL_DEPTH_TEST);
+   glDisable(GL_BLEND);
+
+   if (f.bloom)
+   {
+      const unsigned qw = gl_post_dim(w, 2), qh = gl_post_dim(h, 2);
+      const unsigned sw = gl_post_dim(w, 4), sh = gl_post_dim(h, 4);
+      gl_texture *base = f.levels ? &pp->conv[0] : &pp->bloom[0];
+
+      memcpy(p0, f.bright, sizeof(p0));
+      p1[0] = 1.0f / (float)w;
+      p1[1] = 1.0f / (float)h;
+      p1[2] = p1[3] = 0.0f;
+      if (!gl_post_pass(pp, GL_POST_BRIGHT, base, qw, qh, pp->scene.id, p0, p1, false))
+         return false;
+
+      if (f.levels)
+      {
+         for (i = 1; i < f.levels; i++)
+         {
+            const unsigned pw = gl_post_dim(qw, (unsigned)(i - 1));
+            const unsigned ph = gl_post_dim(qh, (unsigned)(i - 1));
+            p1[0] = 1.0f / (float)pw;
+            p1[1] = 1.0f / (float)ph;
+            if (!gl_post_pass(pp, i == 1 ? GL_POST_DOWN_KARIS : GL_POST_DOWN,
+                     &pp->conv[i], pw > 1 ? pw / 2 : 1, ph > 1 ? ph / 2 : 1,
+                     pp->conv[i - 1].id, NULL, p1, false))
+               return false;
+         }
+         p0[0] = 1.0f;
+         p0[1] = p0[2] = p0[3] = 0.0f;
+         for (i = f.levels - 1; i > 0; i--)
+         {
+            const unsigned pw = gl_post_dim(qw, (unsigned)i);
+            const unsigned ph = gl_post_dim(qh, (unsigned)i);
+            p1[0] = 1.0f / (float)pw;
+            p1[1] = 1.0f / (float)ph;
+            if (!gl_post_pass(pp, GL_POST_UP, &pp->conv[i - 1], 0, 0,
+                     pp->conv[i].id, p0, p1, true))
+               return false;
+         }
+         bloom_t = bloom_w = pp->conv[0].id;
+      }
+      else
+      {
+         p1[2] = p1[3] = 0.0f;
+         p1[0] = 1.0f / (float)qw; p1[1] = 0.0f;
+         if (!gl_post_pass(pp, GL_POST_BLUR, &pp->bloom[1], qw, qh, pp->bloom[0].id, NULL, p1, false))
+            return false;
+         p1[0] = 0.0f; p1[1] = 1.0f / (float)qh;
+         if (!gl_post_pass(pp, GL_POST_BLUR, &pp->bloom[0], qw, qh, pp->bloom[1].id, NULL, p1, false))
+            return false;
+         p1[0] = 1.0f / (float)sw; p1[1] = 0.0f;
+         if (!gl_post_pass(pp, GL_POST_BLUR, &pp->bloom[3], sw, sh, pp->bloom[0].id, NULL, p1, false))
+            return false;
+         p1[0] = 0.0f; p1[1] = 1.0f / (float)sh;
+         if (!gl_post_pass(pp, GL_POST_BLUR, &pp->bloom[2], sw, sh, pp->bloom[3].id, NULL, p1, false))
+            return false;
+         bloom_t = pp->bloom[0].id;
+         bloom_w = pp->bloom[2].id;
+      }
+   }
+
+   /* The composite, into the frontend's framebuffer. The clear covers what
+    * the display rect does not, as the analog resolve's does. */
+   p = pp->programs[GL_POST_COMPOSITE];
+   bind_libretro_framebuffer(renderer);
+   glGetIntegerv(GL_VIEWPORT, frontend_vp);
+   glClearColor(0.0, 0.0, 0.0, 0.0);
+   glClear(GL_COLOR_BUFFER_BIT);
+   glViewport((GLint)dst_x, (GLint)dst_y, (GLsizei)w, (GLsizei)h);
+   glUseProgram(p->id);
+   glActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, pp->scene.id);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "uScene"), 0);
+   glActiveTexture(GL_TEXTURE1);
+   glBindTexture(GL_TEXTURE_2D, bloom_t);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "uBloomT"), 1);
+   glActiveTexture(GL_TEXTURE2);
+   glBindTexture(GL_TEXTURE_2D, bloom_w);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "uBloomW"), 2);
+   glActiveTexture(GL_TEXTURE0);
+   glUniform4fv(gl_uniform_map_get(&p->uniforms, "reg_hal_bloom"), 1, f.hal_bloom);
+   glUniform2fv(gl_uniform_map_get(&p->uniforms, "reg_band_w"), 1, f.band_w);
+   glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_ca"), f.ca);
+   glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_paper_white_nits"), psx_hdr_paper_white_nits);
+   glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_peak_nits"), psx_hdr_max_nits);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_expand_gamut"), psx_hdr_expand_gamut);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_shoulder"), psx_hdr_shoulder);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_src_primaries"), psx_src_primaries);
+   glUniform1f(gl_uniform_map_get(&p->uniforms, "reg_black_pq"), psx_hdr_black_pq);
+   glUniformMatrix3fv(gl_uniform_map_get(&p->uniforms, "reg_to_panel"), 1, GL_FALSE,
+         psx_hdr_to_panel);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "reg_scrgb"), psx_hdr_scrgb);
+   glUniform1i(gl_uniform_map_get(&p->uniforms, "HDR_LINEAR_OUT"), 0);
+   gl_bind_display_transform(p);
+   gl_post_draw_quad(pp);
+
    glViewport(frontend_vp[0], frontend_vp[1], frontend_vp[2], frontend_vp[3]);
    glBindVertexArray(0);
+   return true;
+}
+
+static struct gl_post *gl_post_get(gl_renderer *renderer)
+{
+   if (!psx_hdr_active || !hdr_post_enabled())
+      return NULL;
+   if (!renderer->post)
+   {
+      renderer->post = (struct gl_post *)calloc(1, sizeof(struct gl_post));
+      if (!renderer->post)
+         return NULL;
+   }
+   if (!gl_post_build(renderer->post))
+      return NULL;
+   return renderer->post;
+}
+
+/* Point the display draw at the scene image, as the analog extraction does. */
+static bool gl_post_begin(struct gl_post *pp, unsigned w, unsigned h)
+{
+   if (!gl_post_texture(&pp->scene, w, h))
+      return false;
+   if (!gl_post_target(pp, &pp->scene))
+      return false;
    return true;
 }
 
@@ -4951,6 +5505,8 @@ static void gl_renderer_free(gl_renderer *renderer)
 {
    if (!renderer)
       return;
+
+   gl_dt_free();
 
    if (renderer->fb_out_fbo)
       glDeleteFramebuffers(1, &renderer->fb_out_fbo);
@@ -4988,6 +5544,12 @@ static void gl_renderer_free(gl_renderer *renderer)
       gl_analog_free(renderer->analog);
       free(renderer->analog);
       renderer->analog = NULL;
+   }
+   if (renderer->post)
+   {
+      gl_post_free(renderer->post);
+      free(renderer->post);
+      renderer->post = NULL;
    }
 
    gl_primitive_batch_vec_free(&renderer->batches);
@@ -6966,6 +7528,9 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
    unsigned          analog_out_h    = 0;
    int               analog_dst_x    = 0;
    int               analog_dst_y    = 0;
+   struct gl_post   *post            = NULL;
+   int               post_dst_x      = 0;
+   int               post_dst_y      = 0;
 
    /* Setup 2 triangles that cover the entire framebuffer
       then copy the displayed portion of the screen from fb_out */
@@ -7029,8 +7594,30 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
          analog = NULL;
    }
 
+   /* HDR post effects. The display draw - or, with the cable chain, its
+    * resolve - writes scene-linear light into the post scene, sized and
+    * placed from the same display rect, and gl_post_run encodes it into the
+    * frontend's buffer. Not for the VRAM viewer, as above. */
+   post = gl_post_get(renderer);
+   if (post && renderer->display_vram)
+      post = NULL;
+   if (post)
+   {
+      gl_display_rect disp_rect = compute_gl_display_rect(renderer);
+      unsigned        w = disp_rect.width  * renderer->internal_upscaling;
+      unsigned        h = disp_rect.height * renderer->internal_upscaling;
+
+      post_dst_x = disp_rect.x * (int)renderer->internal_upscaling;
+      post_dst_y = disp_rect.y * (int)renderer->internal_upscaling;
+      if (!w || !h)
+         post = NULL;
+      else if (analog ? !gl_post_texture(&post->scene, w, h)
+                      : !gl_post_begin(post, w, h))
+         post = NULL;
+   }
+
    /* We can now render to the frontend's buffer */
-   if (!analog)
+   if (!analog && !post)
       bind_libretro_framebuffer(renderer);
 
    glDisable(GL_SCISSOR_TEST);
@@ -7116,6 +7703,9 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
                glUniform1f(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_black_pq"), psx_hdr_black_pq);
                glUniformMatrix3fv(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_to_panel"), 1, GL_FALSE, psx_hdr_to_panel);
                glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_scrgb"), psx_hdr_scrgb);
+               glUniform1i(gl_uniform_map_get(&renderer->output_buffer->program->uniforms, "hdr_linear_out"),
+                     (post && !analog) ? 1 : 0);
+               gl_bind_display_transform(renderer->output_buffer->program);
             }
 
             if (!gl_draw_buffer_is_empty(renderer->output_buffer))
@@ -7133,8 +7723,11 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
    {
       if (!gl_analog_run(renderer, analog, analog->scanout.id,
                analog_native_w, analog_native_h,
-               analog_out_w, analog_out_h, analog_dst_x, analog_dst_y))
+               analog_out_w, analog_out_h, analog_dst_x, analog_dst_y,
+               post ? &post->scene : NULL))
       {
+         /* Nothing reached the post scene; show the extracted frame. */
+         post = NULL;
          bind_libretro_framebuffer(renderer);
          /* As in the resolve: the frame's clear went to the extraction
           * target, and the blit covers only the display rect. */
@@ -7156,6 +7749,15 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
          renderer->analog_phase += lines_per_field * adv;
          renderer->analog_phase -= floor(renderer->analog_phase);
       }
+   }
+
+   /* The post effects encode what the display stage left in their scene. */
+   if (post && !gl_post_run(renderer, post, post_dst_x, post_dst_y))
+   {
+      log_cb(RETRO_LOG_WARN, "[gl_post] a bloom target could not be set up; frame dropped\n");
+      bind_libretro_framebuffer(renderer);
+      glClearColor(0.0, 0.0, 0.0, 0.0);
+      glClear(GL_COLOR_BUFFER_BIT);
    }
 
    /* Resolve rendered bounds into native VRAM for next-frame sampling.

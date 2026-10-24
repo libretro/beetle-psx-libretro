@@ -126,6 +126,15 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/analog.resolve.frag.inc -mfmt=c analog_resolve.frag
 "$GLSLC" -o prebuilt/analog.resolve.hdr.frag.inc -mfmt=c -DHDR analog_resolve.frag
 
+# HDR post effects: the bloom stages and the composite that applies them,
+# the chromatic aberration and the encode. See hdr_bloom.frag / hdr_post.frag.
+"$GLSLC" -o prebuilt/hdr.bloom.bright.frag.inc -mfmt=c -DBRIGHT hdr_bloom.frag
+"$GLSLC" -o prebuilt/hdr.bloom.blur.frag.inc -mfmt=c -DBLUR hdr_bloom.frag
+"$GLSLC" -o prebuilt/hdr.bloom.down.frag.inc -mfmt=c -DDOWN hdr_bloom.frag
+"$GLSLC" -o prebuilt/hdr.bloom.down.karis.frag.inc -mfmt=c -DDOWN -DKARIS hdr_bloom.frag
+"$GLSLC" -o prebuilt/hdr.bloom.up.frag.inc -mfmt=c -DUP hdr_bloom.frag
+"$GLSLC" -o prebuilt/hdr.post.frag.inc -mfmt=c -DHDR hdr_post.frag
+
 # analog_yc.frag is the trap's bypass branch as a fragment shader, used by the
 # GL backend below the compute floor. Vulkan does not run it (its compute trap
 # handles the same case internally), but it includes analog.h, so compile it
