@@ -139,6 +139,9 @@ MDFN_ALIGN(64) PS_GPU GPU;
 static uint32_t  TexCache_Tag[256];
 static uint16_t  TexCache_Data[256][4];
 static uint16_t *vram_new = NULL;
+/* 1x savestate staging for upscaled VRAM; kept across states so runahead
+ * and rewind do not allocate 1 MiB per frame. */
+static uint16_t *state_vram_1x = NULL;
 
 /*
  * Deferred SW-renderer scanout records.
@@ -1212,6 +1215,8 @@ void GPU_Destroy(void)
 {
    free(GPU.vram);
    GPU.vram = NULL;
+   free(state_vram_1x);
+   state_vram_1x = NULL;
 }
 
 /* Rescale the GPU with a different upscale_shift.
@@ -2925,7 +2930,25 @@ void GPU_RestoreStateP1(bool load)
        * the savestate below (which reads GPU.vram) serializes that stale
        * data as garbage, and it reloads corrupt in every colour mode. Sync
        * the whole framebuffer back from the GPU before capture; the coherence
-       * tracker still skips the transfer for regions that are already clean. */
+       * tracker still skips the transfer for regions that are already clean.
+       *
+       * A CPU->VRAM transfer still in flight has written its pixels so far to
+       * GPU.vram but reaches the GPU only when it completes, so the readback
+       * would overwrite them with what the GPU held before. Hand the written
+       * part to the GPU first. The completing upload sends the whole rect
+       * again, which writes the same values. */
+      if (GPU.InCmd == INCMD_FBWRITE)
+      {
+         const uint32_t rows = (GPU.FBRW_CurY - GPU.FBRW_Y) & 511;
+         const bool     mt   = GPU.MaskEvalAND != 0;
+         const bool     ms   = GPU.MaskSetOR != 0;
+         if (rows)
+            rhi_intf_load_image(GPU.FBRW_X, GPU.FBRW_Y, GPU.FBRW_W, rows,
+                  GPU.vram, mt, ms);
+         if (GPU.FBRW_CurX != GPU.FBRW_X)
+            rhi_intf_load_image(GPU.FBRW_X, GPU.FBRW_CurY,
+                  (GPU.FBRW_CurX - GPU.FBRW_X) & 1023, 1, GPU.vram, mt, ms);
+      }
       rhi_intf_read_vram(0, 0, 1024, 512, GPU.vram);
    }
 
@@ -2942,7 +2965,9 @@ void GPU_RestoreStateP1(bool load)
       /* fails the SFARRAY16N would deref NULL, so we leave vram_new */
       /* at NULL and the StateAction caller is responsible for noticing */
       /* (an upcoming change will surface the failure to libretro). */
-      vram_new = (uint16_t *)malloc(1024 * 512 * sizeof(uint16_t));
+      if (!state_vram_1x)
+         state_vram_1x = (uint16_t *)malloc(1024 * 512 * sizeof(uint16_t));
+      vram_new = state_vram_1x;
 
       if (vram_new && !load)
       {
@@ -2979,7 +3004,6 @@ void GPU_RestoreStateP2(bool load)
          }
       }
 
-      free(vram_new);
       vram_new = NULL;
    }
 }

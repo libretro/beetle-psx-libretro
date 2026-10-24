@@ -6141,6 +6141,11 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
 
 
          BufferHandle quad;
+         /* Staging for synchronous VRAM readbacks, sized for the whole
+          * framebuffer and kept: each read waits on its fence before the
+          * next can reuse it, and creating one per FBRead allocated device
+          * memory on the hot path. */
+         BufferHandle readback;
    };
 
    /* SaveState lifecycle free functions (SaveState is a plain struct). vram is
@@ -7381,102 +7386,113 @@ static TTRect renderer_compute_window_rect(Renderer *self,
    }
 }
 
-static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
-      const TTRect *rect,
-      uint16_t *vram)
+/* Synchronous GPU->CPU readback of one or more VRAM rects, all in one
+ * submission and one fence. A rect that wraps VRAM is split into up to four
+ * non-wrapping tiles in unscaled framebuffer space, so only the covered
+ * region is transferred rather than widening the read to the whole
+ * framebuffer. The rects must not overlap: their tiles share the staging
+ * buffer, which holds one whole framebuffer. */
+#define RENDERER_READBACK_TILES 32
+static void renderer_copy_vram_to_cpu_rects(Renderer *self,
+      const TTRect *rects, unsigned count, uint16_t *vram)
 {
-   BufferHandle     buffer;
-   BufferCreateInfo buffer_create_info;
-   Fence            fence;
-   /* Split the (possibly VRAM-wrapping) request into up to four
-    * non-wrapping tiles in unscaled framebuffer space.  Only the covered
-    * region is transferred GPU->CPU instead of widening a wrapping read to
-    * the whole framebuffer (FB_WIDTH*FB_HEIGHT*4 bytes) purely to line up
-    * the scatter indices.  The non-wrapping case collapses to a single tile
-    * identical to the previous fast path. */
-   uint32_t x0 = rect->x & (FB_WIDTH  - 1);
-   uint32_t y0 = rect->y & (FB_HEIGHT - 1);
-   uint32_t hx[2], hw[2];
-   uint32_t vy[2], vh[2];
-   int      nh = 1;
-   int      nv = 1;
-   uint32_t sum_w;
-   uint32_t sum_h;
+   BufferHandle *buffer = &self->readback;
+   Fence         fence;
+   uint32_t      tx[RENDERER_READBACK_TILES], ty[RENDERER_READBACK_TILES];
+   uint32_t      tw[RENDERER_READBACK_TILES], th[RENDERER_READBACK_TILES];
+   unsigned      tiles = 0, r, t;
 
-   if (rect->width >= FB_WIDTH)
+   for (r = 0; r < count; r++)
    {
-      hx[0] = 0;  hw[0] = FB_WIDTH;
-   }
-   else if (x0 + rect->width > FB_WIDTH)
-   {
-      nh    = 2;
-      hx[0] = x0; hw[0] = FB_WIDTH - x0;
-      hx[1] = 0;  hw[1] = rect->width - hw[0];
-   }
-   else
-   {
-      hx[0] = x0; hw[0] = rect->width;
-   }
+      const TTRect *rect = &rects[r];
+      uint32_t x0 = rect->x & (FB_WIDTH  - 1);
+      uint32_t y0 = rect->y & (FB_HEIGHT - 1);
+      uint32_t hx[2], hw[2];
+      uint32_t vy[2], vh[2];
+      int      nh = 1, nv = 1, i, j;
 
-   if (rect->height >= FB_HEIGHT)
-   {
-      vy[0] = 0;  vh[0] = FB_HEIGHT;
-   }
-   else if (y0 + rect->height > FB_HEIGHT)
-   {
-      nv    = 2;
-      vy[0] = y0; vh[0] = FB_HEIGHT - y0;
-      vy[1] = 0;  vh[1] = rect->height - vh[0];
-   }
-   else
-   {
-      vy[0] = y0; vh[0] = rect->height;
-   }
+      if (!rect->width || !rect->height)
+         continue;
 
-   sum_w = (nh == 2) ? (hw[0] + hw[1]) : hw[0];
-   sum_h = (nv == 2) ? (vh[0] + vh[1]) : vh[0];
-
-   /* Sync each tile's source region from the scaled domain - mirrors the old
-    * single full-rect fbatlas_read_transfer, but only over what we read. */
-   {
-      int i, j;
-      for (j = 0; j < nv; j++)
+      if (rect->width >= FB_WIDTH)
       {
+         hx[0] = 0;  hw[0] = FB_WIDTH;
+      }
+      else if (x0 + rect->width > FB_WIDTH)
+      {
+         nh    = 2;
+         hx[0] = x0; hw[0] = FB_WIDTH - x0;
+         hx[1] = 0;  hw[1] = rect->width - hw[0];
+      }
+      else
+      {
+         hx[0] = x0; hw[0] = rect->width;
+      }
+
+      if (rect->height >= FB_HEIGHT)
+      {
+         vy[0] = 0;  vh[0] = FB_HEIGHT;
+      }
+      else if (y0 + rect->height > FB_HEIGHT)
+      {
+         nv    = 2;
+         vy[0] = y0; vh[0] = FB_HEIGHT - y0;
+         vy[1] = 0;  vh[1] = rect->height - vh[0];
+      }
+      else
+      {
+         vy[0] = y0; vh[0] = rect->height;
+      }
+
+      for (j = 0; j < nv; j++)
          for (i = 0; i < nh; i++)
          {
-            TTRect tr;
-            tr.x     = hx[i]; tr.y      = vy[j];
-            tr.width = hw[i]; tr.height = vh[j];
-            fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &tr);
+            if (tiles == RENDERER_READBACK_TILES)
+               break;
+            tx[tiles] = hx[i]; tw[tiles] = hw[i];
+            ty[tiles] = vy[j]; th[tiles] = vh[j];
+            tiles++;
          }
-      }
+   }
+   if (!tiles)
+      return;
+
+   /* Sync each tile's source region from the scaled domain - only over
+    * what we read. */
+   for (t = 0; t < tiles; t++)
+   {
+      TTRect tr;
+      tr.x     = tx[t]; tr.y      = ty[t];
+      tr.width = tw[t]; tr.height = th[t];
+      fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &tr);
    }
 
    renderer_ensure_command_buffer(self);
 
-   buffer_create_info.domain = BufferDomain_CachedHost;
-   buffer_create_info.size   = sum_w * sum_h * 4;
-   buffer_create_info.usage  = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-   buffer = device_create_buffer(self->device, &buffer_create_info, NULL);
-
-   /* One copy per tile into a single tightly packed host buffer.  Still a
-    * single flush + single fence wait - no extra GPU round-trips. */
+   if (!bh_get(buffer))
    {
-      int         i, j;
+      BufferCreateInfo info;
+      info.domain = BufferDomain_CachedHost;
+      info.size   = (VkDeviceSize)FB_WIDTH * FB_HEIGHT * 4;
+      info.usage  = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+      bh_move(buffer, device_create_buffer(self->device, &info, NULL));
+      if (!bh_get(buffer))
+         return;
+   }
+
+   /* One copy per tile into the tightly packed staging buffer. */
+   {
       VkDeviceSize byteoff = 0;
-      for (j = 0; j < nv; j++)
+      for (t = 0; t < tiles; t++)
       {
-         for (i = 0; i < nh; i++)
-         {
-            VkOffset3D               _o = { 0, 0, 0 };
-            VkExtent3D               _e = { 0, 0, 1 };
-            VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-            _o.x = (int)hx[i]; _o.y = (int)vy[j];
-            _e.width = hw[i];  _e.height = vh[j];
-            commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(&buffer),
-                  ih_get(&self->framebuffer), byteoff, &_o, &_e, 0, 0, &_s);
-            byteoff += (VkDeviceSize)hw[i] * vh[j] * 4;
-         }
+         VkOffset3D               _o = { 0, 0, 0 };
+         VkExtent3D               _e = { 0, 0, 1 };
+         VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+         _o.x = (int)tx[t]; _o.y = (int)ty[t];
+         _e.width = tw[t];  _e.height = th[t];
+         commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(buffer),
+               ih_get(&self->framebuffer), byteoff, &_o, &_e, 0, 0, &_s);
+         byteoff += (VkDeviceSize)tw[t] * th[t] * 4;
       }
    }
 
@@ -7487,49 +7503,39 @@ static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
    fenceholder_wait(fence_get(&fence));
 
    {
-      const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT));
-      int             i, j;
+      const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(buffer), MEMORY_ACCESS_READ_BIT));
       uint32_t        elemoff = 0;
-      for (j = 0; j < nv; j++)
+      for (t = 0; t < tiles; t++)
       {
-         for (i = 0; i < nh; i++)
+         uint32_t yy;
+         for (yy = 0; yy < th[t]; yy++)
          {
-            uint32_t tw = hw[i];
-            uint32_t th = vh[j];
-            uint32_t bx = hx[i];
-            uint32_t by = vy[j];
-            {
-               uint32_t yy;
-               for (yy = 0; yy < th; yy++)
-               {
-                  uint32_t xx;
-                  for (xx = 0; xx < tw; xx++)
-                     vram[(by + yy) * FB_WIDTH + (bx + xx)] =
-                        (uint16_t)(mapped[elemoff + yy * tw + xx]);
-               }
-            }
-            elemoff += tw * th;
+            const uint32_t *src = mapped + elemoff + yy * tw[t];
+            uint16_t       *dst = vram + (ty[t] + yy) * FB_WIDTH + tx[t];
+            uint32_t        xx;
+            for (xx = 0; xx < tw[t]; xx++)
+               dst[xx] = (uint16_t)src[xx];
          }
+         elemoff += tw[t] * th[t];
       }
 
       if (self->texture_tracking_enabled)
-      {
-         texture_tracker_notifyReadback(self->tracker, *rect, vram);
-      }
+         for (r = 0; r < count; r++)
+            texture_tracker_notifyReadback(self->tracker, rects[r], vram);
 
-      device_unmap_host_buffer(self->device, bh_get(&buffer), MEMORY_ACCESS_READ_BIT);
+      device_unmap_host_buffer(self->device, bh_get(buffer), MEMORY_ACCESS_READ_BIT);
 
       /* Single surviving owner of the fence handle (ownership moved out of
        * flush_and_signal); drop its reference at scope exit. */
       fence_reset(&fence);
-
-      /* Same for the staging buffer: device_create_buffer returned an owning
-       * reference, and nothing else holds one. In the C++ original the
-       * BufferHandle destructor dropped it at scope exit; in C the drop is
-       * explicit. Without this every synchronous VRAM readback (savestates,
-       * software-fb reads) leaked the staging VkBuffer and its memory. */
-      bh_reset(&buffer);
    }
+}
+
+static void renderer_copy_vram_to_cpu_synchronous(Renderer *self,
+      const TTRect *rect,
+      uint16_t *vram)
+{
+   renderer_copy_vram_to_cpu_rects(self, rect, 1, vram);
 }
 
 static void renderer_mipmap_framebuffer(Renderer *self)
@@ -11541,6 +11547,7 @@ static void renderer_fini(Renderer *self)
    ih_reset(&self->dt_film_lut);
    ih_reset(&self->dt_film_desat);
    ih_reset(&self->dt_dummy);
+   bh_reset(&self->readback);
    { unsigned i;
    for (i = 0; i < 4; i++)
       ih_reset(&self->post_bloom[i]);
@@ -22142,6 +22149,24 @@ bool rhi_vulkan_read_vram(uint16_t x, uint16_t y,
       TTRect _r = { x, y, w, h };
       renderer_copy_vram_to_cpu_synchronous(renderer, &_r, vram);
    }
+   return true;
+}
+
+bool rhi_vulkan_read_vram_rects(const uint16_t (*rects)[4], unsigned count,
+                                uint16_t *vram)
+{
+   TTRect   r[8];
+   unsigned i;
+   if (!renderer || count > 8)
+      return false;
+   for (i = 0; i < count; i++)
+   {
+      r[i].x      = rects[i][0];
+      r[i].y      = rects[i][1];
+      r[i].width  = rects[i][2];
+      r[i].height = rects[i][3];
+   }
+   renderer_copy_vram_to_cpu_rects(renderer, r, count, vram);
    return true;
 }
 

@@ -1,0 +1,67 @@
+name: VRAM readback coherence
+
+# rhi_intf_read_vram skips blocking GPU->CPU readbacks, or splits them into
+# the dirty parts, using the per-block coherence map in rhi/rhi_coherence.h.
+# model: random op streams (draws, uploads, fills, wrapping rects, savestate
+# reads) check that the CPU VRAM copy always matches the GPU over every
+# requested rect, and that a game-shaped frame's savestate read moves under
+# a fifth of VRAM. Strict C89, ASan/UBSan, mingw-w64 under Wine.
+# rollback: both hardware renderers under one-frame rollback with the
+# Software Framebuffer off, every savestate read checked against a whole
+# re-read (tools/rhi_coherence/rollback_lanes.sh).
+
+on:
+  push:
+    paths:
+      - 'rhi/**'
+      - 'mednafen/psx/gpu.c'
+      - 'Makefile*'
+      - 'tools/rhi_coherence/**'
+      - 'tools/vkhost/**'
+      - 'tools/glhost/**'
+      - '.github/workflows/rhi-coherence.yml'
+  pull_request:
+    paths:
+      - 'rhi/**'
+      - 'mednafen/psx/gpu.c'
+      - 'Makefile*'
+      - 'tools/rhi_coherence/**'
+      - 'tools/vkhost/**'
+      - 'tools/glhost/**'
+      - '.github/workflows/rhi-coherence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux, C89 and ASan/UBSan
+        run: tools/rhi_coherence/run.sh
+      - name: Install mingw-w64 and Wine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 wine64 wine
+      - name: Windows (mingw-w64 under Wine)
+        run: CC=x86_64-w64-mingw32-gcc WINEDEBUG=-all RUN=wine tools/rhi_coherence/run.sh
+
+  rollback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan and GL (lavapipe, llvmpipe, validation layer)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libvulkan-dev mesa-vulkan-drivers \
+            vulkan-validationlayers libgl1-mesa-dev libegl1-mesa-dev \
+            libgl1-mesa-dri python3
+      - name: Build the core
+        run: make -j"$(nproc)" HAVE_HW=1
+      - name: Rollback lanes
+        run: sh tools/rhi_coherence/rollback_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"

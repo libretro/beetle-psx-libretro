@@ -1173,6 +1173,17 @@ struct gl_renderer {
     * one is first switched on; freed with the renderer. */
    struct gl_post *post;
 
+   /* rhi_gl_read_vram's objects, kept across reads rather than created
+    * and deleted per FBRead: the read and downsample framebuffers, a
+    * VRAM-sized downsample target in the format last needed, and one
+    * CPU scratch block for the packed and converted pixels. */
+   GLuint   rb_read_fbo;
+   GLuint   rb_scratch_fbo;
+   GLuint   rb_scratch_tex;
+   GLenum   rb_scratch_format;
+   void    *rb_cpu;
+   size_t   rb_cpu_len;
+
    /* Subcarrier phase carried in from every field before this one, in
     * cycles. Advanced once per displayed field; wrapped to [0,1) so a long
     * session cannot grind the mantissa away. */
@@ -1715,13 +1726,14 @@ static void gl_draw_buffer_map_no_bind(gl_draw_buffer *drawbuffer)
    size_t element_size    = drawbuffer->element_size;
    size_t map_start       = drawbuffer->map_start;
    GLsizeiptr buffer_size = drawbuffer->capacity * element_size;
-   /* Before wrap, previously submitted vertices end at map_start. GLES
-    * can map the unused window without waiting. Desktop GL retains its
-    * existing mapping flags; the wrap below keeps synchronization. */
+   /* Before wrap, previously submitted vertices end at map_start: map
+    * the unused window without waiting on in-flight draws. Only the
+    * wrap below reuses submitted storage, and it orphans the buffer. */
 #ifdef HAVE_OPENGLES3
    GLbitfield map_flags   = GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
 #else
-   GLbitfield map_flags   = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT;
+   GLbitfield map_flags   = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT
+         | GL_MAP_UNSYNCHRONIZED_BIT;
 #endif
 
    glBindBuffer(GL_ARRAY_BUFFER, drawbuffer->id);
@@ -2073,6 +2085,34 @@ static bool gl_texture_init(
    return id != 0 && allocated == GL_TRUE;
 }
 
+#ifdef HAVE_OPENGLES3
+/* GLES upload conversion scratch, kept across uploads: MDEC streams
+ * hundreds of block uploads per frame. */
+static uint16_t *gl_upload_scratch;
+static size_t    gl_upload_scratch_len;
+
+static uint16_t *gl_upload_scratch_get(size_t len)
+{
+   if (len > gl_upload_scratch_len)
+   {
+      uint16_t *p = (uint16_t*)realloc(gl_upload_scratch,
+            len * sizeof(uint16_t));
+      if (!p)
+         return NULL;
+      gl_upload_scratch     = p;
+      gl_upload_scratch_len = len;
+   }
+   return gl_upload_scratch;
+}
+
+static void gl_upload_scratch_free(void)
+{
+   free(gl_upload_scratch);
+   gl_upload_scratch     = NULL;
+   gl_upload_scratch_len = 0;
+}
+#endif
+
 static void gl_texture_set_sub_image_window(
       struct gl_texture *tex,
       uint16_t top_left[2],
@@ -2107,8 +2147,7 @@ static void gl_texture_set_sub_image_window(
       size_t sub_w = (size_t) resolution[0];
       size_t sub_h = (size_t) resolution[1];
       size_t line, px;
-      uint16_t *converted =
-            (uint16_t*) malloc(sub_w * sub_h * sizeof(uint16_t));
+      uint16_t *converted = gl_upload_scratch_get(sub_w * sub_h);
 
       if (!converted)
       {
@@ -2137,7 +2176,6 @@ static void gl_texture_set_sub_image_window(
       glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
       glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, resolution[0], resolution[1],
             format, ty, converted);
-      free(converted);
       return;
    }
 #endif
@@ -3386,8 +3424,12 @@ static void gl_renderer_draw(gl_renderer *renderer)
    }
 
    /* Upload index data to EBO (required for core profile - client-side
-    * index pointers are not allowed) */
+    * index pointers are not allowed). Orphan first: the previous flush's
+    * draws may still read this storage, and overwriting it in place
+    * makes the driver stall or copy. */
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer->index_buffer);
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                INDEX_BUFFER_LEN * sizeof(GLushort), NULL, GL_DYNAMIC_DRAW);
    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0,
                    renderer->vertex_index_pos * sizeof(GLushort),
                    renderer->vertex_indices);
@@ -5544,6 +5586,16 @@ static void gl_renderer_free(gl_renderer *renderer)
       free(renderer->post);
       renderer->post = NULL;
    }
+   if (renderer->rb_read_fbo)
+      glDeleteFramebuffers(1, &renderer->rb_read_fbo);
+   if (renderer->rb_scratch_fbo)
+      glDeleteFramebuffers(1, &renderer->rb_scratch_fbo);
+   if (renderer->rb_scratch_tex)
+      glDeleteTextures(1, &renderer->rb_scratch_tex);
+   free(renderer->rb_cpu);
+   renderer->rb_read_fbo = renderer->rb_scratch_fbo = renderer->rb_scratch_tex = 0;
+   renderer->rb_cpu      = NULL;
+   renderer->rb_cpu_len  = 0;
 
    gl_primitive_batch_vec_free(&renderer->batches);
 
@@ -7356,6 +7408,9 @@ void rhi_gl_close(void)
 {
    static_renderer.state       = GL_STATE_INVALID;
    static_renderer.video_clock = VIDEO_CLOCK_NTSC;
+#ifdef HAVE_OPENGLES3
+   gl_upload_scratch_free();
+#endif
 }
 
 void rhi_gl_refresh_variables(void)
@@ -8889,29 +8944,33 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
    glPixelStorei(GL_PACK_ROW_LENGTH, 0); /* tightly packed scratch */
 #endif
 
-   /* Allocate a tightly-packed `w x h` scratch buffer in PS1 1555
-    * format that holds the eventually-converted readback.  We then
-    * expand it into the caller's vram with the right upscale-factor
-    * block duplication.
-    *
-    * In 32bpp mode we additionally allocate an RGBA8 scratch that
-    * receives the raw glReadPixels result; pixels are converted to
-    * 1555 before going into scratch_pixels. */
-   scratch_pixels = (uint16_t *)malloc((size_t)w * (size_t)h * sizeof(uint16_t));
-   if (!scratch_pixels)
-      goto cleanup;
-   if (is_32bpp)
+   /* A tightly-packed `w x h` scratch in PS1 1555 holds the converted
+    * readback; 32bpp and fp16 targets read into a raw RGBA8 or float
+    * scratch first and convert into it. */
    {
-      scratch_rgba8 = (uint32_t *)malloc((size_t)w * (size_t)h * sizeof(uint32_t));
-      if (!scratch_rgba8)
-         goto cleanup;
+      /* One block, grown on demand: the 1555 result first, then the raw
+       * RGBA8 or float readback after it. */
+      size_t n     = (size_t)w * (size_t)h;
+      size_t head  = (n * sizeof(uint16_t) + 15u) & ~(size_t)15u;
+      size_t extra = is_fp16 ? n * 4u * sizeof(float)
+                   : is_32bpp ? n * sizeof(uint32_t) : 0;
+      if (head + extra > renderer->rb_cpu_len)
+      {
+         void *p = realloc(renderer->rb_cpu, head + extra);
+         if (!p)
+            goto cleanup;
+         renderer->rb_cpu     = p;
+         renderer->rb_cpu_len = head + extra;
+      }
+      scratch_pixels = (uint16_t *)renderer->rb_cpu;
+      if (is_fp16)
+         scratch_f     = (float *)((uint8_t *)renderer->rb_cpu + head);
+      else if (is_32bpp)
+         scratch_rgba8 = (uint32_t *)((uint8_t *)renderer->rb_cpu + head);
    }
-   if (is_fp16)
-   {
-      scratch_f = (float *)malloc((size_t)w * (size_t)h * 4u * sizeof(float));
-      if (!scratch_f)
-         goto cleanup;
-   }
+   if (!renderer->rb_read_fbo)
+      glGenFramebuffers(1, &renderer->rb_read_fbo);
+   read_fbo = renderer->rb_read_fbo;
 
    if (upscale == 1)
    {
@@ -8933,7 +8992,6 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
        * per cycle: the reported striped VRAM noise on GL only. Read
        * the rect at GL y = y directly; rows arrive in increasing PS1
        * order and copy straight. */
-      glGenFramebuffers(1, &read_fbo);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, read_fbo);
 #ifdef HAVE_OPENGLES3
       glFramebufferTexture2D(GL_READ_FRAMEBUFFER,
@@ -8994,15 +9052,24 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
       GLenum   scratch_format = is_fp16 ? GL_RGBA16F
                               : is_32bpp ? GL_RGBA8 : GL_RGB5_A1;
 
-      glGenTextures(1, &scratch_tex);
-      glBindTexture(GL_TEXTURE_2D, scratch_tex);
-      glTexStorage2D(GL_TEXTURE_2D, 1, scratch_format,
-            (GLsizei) w, (GLsizei) h);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-      glGenFramebuffers(1, &read_fbo);
-      glGenFramebuffers(1, &scratch_fbo);
+      /* VRAM-sized, so any read fits in its corner; rebuilt only when
+       * the target format changes. */
+      if (!renderer->rb_scratch_tex || renderer->rb_scratch_format != scratch_format)
+      {
+         if (renderer->rb_scratch_tex)
+            glDeleteTextures(1, &renderer->rb_scratch_tex);
+         glGenTextures(1, &renderer->rb_scratch_tex);
+         glBindTexture(GL_TEXTURE_2D, renderer->rb_scratch_tex);
+         glTexStorage2D(GL_TEXTURE_2D, 1, scratch_format,
+               (GLsizei) VRAM_WIDTH_PIXELS, (GLsizei) VRAM_HEIGHT);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+         renderer->rb_scratch_format = scratch_format;
+      }
+      scratch_tex = renderer->rb_scratch_tex;
+      if (!renderer->rb_scratch_fbo)
+         glGenFramebuffers(1, &renderer->rb_scratch_fbo);
+      scratch_fbo = renderer->rb_scratch_fbo;
 
       glBindFramebuffer(GL_READ_FRAMEBUFFER, read_fbo);
 #ifdef HAVE_OPENGLES3
@@ -9225,11 +9292,18 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
    }
 
 cleanup:
-   if (scratch_pixels)
-      free(scratch_pixels);
-   free(scratch_f);
-   if (scratch_rgba8)
-      free(scratch_rgba8);
+   /* Detach fb_out so the kept framebuffer does not hold a rebuilt
+    * target's old storage alive. */
+   if (read_fbo)
+   {
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, read_fbo);
+#ifdef HAVE_OPENGLES3
+      glFramebufferTexture2D(GL_READ_FRAMEBUFFER,
+            GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+#else
+      glFramebufferTexture(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 0, 0);
+#endif
+   }
 
 #ifdef GL_PACK_ROW_LENGTH
    glPixelStorei(GL_PACK_ROW_LENGTH, prev_pack_row_length);
@@ -9238,13 +9312,6 @@ cleanup:
 
    glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint) prev_read_fbo);
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint) prev_draw_fbo);
-
-   if (read_fbo)
-      glDeleteFramebuffers(1, &read_fbo);
-   if (scratch_fbo)
-      glDeleteFramebuffers(1, &scratch_fbo);
-   if (scratch_tex)
-      glDeleteTextures(1, &scratch_tex);
 
    if (scissor_was_enabled)
       glEnable(GL_SCISSOR_TEST);

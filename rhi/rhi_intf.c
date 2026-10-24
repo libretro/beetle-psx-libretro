@@ -44,119 +44,7 @@ static bool vk_initialized                      = false;
 static int rhi_width_mode = WIDTH_MODE_256;
 static int rhi_height_mode = HEIGHT_MODE_240;
 
-/* ------------------------------------------------------------------------
- * VRAM readback coherence tracker.
- *
- * FBRead (Command_FBRead) issues a hard, blocking GPU->CPU readback that
- * stalls the emulation thread on a fence. Many such reads are redundant:
- * the region was last written by the CPU (load_image / FBWrite, which also
- * updates g->vram) and never rendered into since, so g->vram already holds
- * the result. Track per-8x8-block coherence between g->vram and the GPU and
- * skip the readback (and its fence) when the whole rect is provably clean.
- *
- * Rule (asymmetric, conservative):
- *   - Any GPU-side VRAM write marks every OVERLAPPING block dirty (superset).
- *     Draws are scissor-clipped to the draw area, so marking the draw area is
- *     a guaranteed superset of a primitive's writes; fills/copies/masked
- *     uploads mark their literal destination rect.
- *   - A coherence-making op (unmasked CPU load_image, or a completed
- *     readback) marks only FULLY CONTAINED blocks clean (subset); a partially
- *     covered boundary block keeps its prior state, as its uncovered pixels
- *     are not made coherent by the op.
- *   - A readback is skipped only when every block the rect touches is clean.
- *
- * Default state is dirty (zero-init), and rhi_intf_open() re-dirties on every
- * renderer (re)creation, so the first read of any region always reads back.
- * The state machine was verified bit-exact against an always-readback baseline
- * over 250k randomized op sequences incl. VRAM wrap, sub-block writes/reads,
- * and draw-area superset marking of scissor-clipped primitives.
- * ---------------------------------------------------------------------- */
-#define TT_COH_VRAM_W 1024
-#define TT_COH_VRAM_H 512
-#define TT_COH_SH     3
-#define TT_COH_BW     (TT_COH_VRAM_W >> TT_COH_SH)   /* 128 block columns */
-#define TT_COH_BH     (TT_COH_VRAM_H >> TT_COH_SH)   /* 64  block rows    */
-
-static bool     tt_coh_skip_enabled = true;
-static bool     tt_coh_da_pending   = true;  /* re-mark draw area on next primitive */
-static uint8_t  tt_coh_clean[TT_COH_BH * TT_COH_BW]; /* 0=dirty (default), 1=clean */
-static uint16_t tt_coh_dax, tt_coh_day, tt_coh_daw, tt_coh_dah; /* draw area x,y,w,h */
-
-static void tt_coh_reset(void)
-{
-   memset(tt_coh_clean, 0, sizeof(tt_coh_clean));
-   tt_coh_dax = tt_coh_day = 0;
-   tt_coh_daw = tt_coh_dah = 0;
-   tt_coh_da_pending = true;
-}
-
-/* DIRTY: every block the rect OVERLAPS (conservative superset). */
-static void tt_coh_dirty(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
-{
-   uint32_t bx0, by0, nbx, nby, kx, ky;
-   if (!w || !h)
-      return;
-   bx0 = (x & (TT_COH_VRAM_W - 1)) >> TT_COH_SH;
-   by0 = (y & (TT_COH_VRAM_H - 1)) >> TT_COH_SH;
-   nbx = ((x & 7) + w + 7) >> TT_COH_SH; if (nbx > TT_COH_BW) nbx = TT_COH_BW;
-   nby = ((y & 7) + h + 7) >> TT_COH_SH; if (nby > TT_COH_BH) nby = TT_COH_BH;
-   for (ky = 0; ky < nby; ky++)
-      for (kx = 0; kx < nbx; kx++)
-         tt_coh_clean[((by0 + ky) & (TT_COH_BH - 1)) * TT_COH_BW
-                    + ((bx0 + kx) & (TT_COH_BW - 1))] = 0;
-}
-
-/* CLEAN: only blocks FULLY CONTAINED in the rect (subset). */
-static void tt_coh_clean_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
-{
-   uint32_t cb0, cb1, rb0, rb1, sc, sr, bc, br;
-   if (w < 8 || h < 8)
-      return;
-   cb0 = (x + 7) >> TT_COH_SH;   /* first fully covered col (unwrapped) */
-   cb1 = (x + w) >> TT_COH_SH;   /* one past last fully covered col     */
-   rb0 = (y + 7) >> TT_COH_SH;
-   rb1 = (y + h) >> TT_COH_SH;
-   if (cb1 <= cb0 || rb1 <= rb0)
-      return;
-   sc = cb1 - cb0; if (sc > TT_COH_BW) sc = TT_COH_BW;
-   sr = rb1 - rb0; if (sr > TT_COH_BH) sr = TT_COH_BH;
-   for (br = 0; br < sr; br++)
-      for (bc = 0; bc < sc; bc++)
-         tt_coh_clean[((rb0 + br) & (TT_COH_BH - 1)) * TT_COH_BW
-                    + ((cb0 + bc) & (TT_COH_BW - 1))] = 1;
-}
-
-/* True iff every block the rect touches is clean (=> whole rect coherent). */
-static bool tt_coh_all_clean(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
-{
-   uint32_t bx0, by0, nbx, nby, kx, ky;
-   if (!w || !h)
-      return true;
-   bx0 = (x & (TT_COH_VRAM_W - 1)) >> TT_COH_SH;
-   by0 = (y & (TT_COH_VRAM_H - 1)) >> TT_COH_SH;
-   nbx = ((x & 7) + w + 7) >> TT_COH_SH; if (nbx > TT_COH_BW) nbx = TT_COH_BW;
-   nby = ((y & 7) + h + 7) >> TT_COH_SH; if (nby > TT_COH_BH) nby = TT_COH_BH;
-   for (ky = 0; ky < nby; ky++)
-      for (kx = 0; kx < nbx; kx++)
-         if (!tt_coh_clean[((by0 + ky) & (TT_COH_BH - 1)) * TT_COH_BW
-                         + ((bx0 + kx) & (TT_COH_BW - 1))])
-            return false;
-   return true;
-}
-
-/* Re-mark the whole draw area dirty, but only when it may have changed
- * (set_draw_area) or a clean op cleaned part of it since the last mark.
- * Primitives are scissor-clipped to the draw area, so this stays a superset
- * while avoiding an O(blocks) mark on every one of the thousands of quads a
- * frame may push into a stable draw area. */
-static void tt_coh_mark_draw_area(void)
-{
-   if (tt_coh_da_pending)
-   {
-      tt_coh_dirty(tt_coh_dax, tt_coh_day, tt_coh_daw, tt_coh_dah);
-      tt_coh_da_pending = false;
-   }
-}
+#include "rhi_coherence.h"
 
 static bool rhi_soft_open(bool is_pal)
 {
@@ -978,34 +866,69 @@ void rhi_intf_push_line(int16_t p0x, int16_t p0y,
    }
 }
 
+/* BEETLE_RHI_COHERENCE_CHECK=1: after every read, read the whole rect
+ * again and log any pixel the coherence map left stale in the CPU copy.
+ * tools/rhi_coherence/rollback_lanes.sh runs with it. */
+static int rhi_coh_check = -1;
+
+static bool rhi_intf_read_rects(const tt_coh_rect *r, unsigned n, uint16_t *vram);
+
+static void rhi_intf_check_read(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+      const uint16_t *vram, unsigned parts)
+{
+   static uint16_t *full;
+   tt_coh_rect      whole;
+   unsigned         xx, yy, bad = 0;
+   if ((unsigned)x + w > TT_COH_VRAM_W || (unsigned)y + h > TT_COH_VRAM_H)
+      return;
+   if (!full && !(full = (uint16_t *)malloc(TT_COH_VRAM_W * TT_COH_VRAM_H * sizeof(uint16_t))))
+      return;
+   memcpy(full, vram, TT_COH_VRAM_W * TT_COH_VRAM_H * sizeof(uint16_t));
+   whole.x = x; whole.y = y; whole.w = w; whole.h = h;
+   if (!rhi_intf_read_rects(&whole, 1, full))
+      return;
+   for (yy = y; yy < (unsigned)y + h; yy++)
+      for (xx = x; xx < (unsigned)x + w; xx++)
+         if (full[yy * TT_COH_VRAM_W + xx] != vram[yy * TT_COH_VRAM_W + xx])
+            bad++;
+   if (bad && log_cb)
+      log_cb(RETRO_LOG_ERROR, "[rhi_coherence] stale: read (%u,%u %ux%u) in %u part(s) "
+            "left %u pixel(s) differing from the GPU\n",
+            (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h, parts, bad);
+   else if (log_cb)
+      log_cb(RETRO_LOG_DEBUG, "[rhi_coherence] read (%u,%u %ux%u) in %u part(s) checked\n",
+            (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h, parts);
+}
+
 bool rhi_intf_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *vram)
 {
-   bool ret = false;
+   bool        ret = false;
+   tt_coh_rect r[TT_COH_MAX_RECTS];
+   unsigned    n;
 #ifdef DEBUG
    tt_log("read_vram rect=(%u,%u %ux%u)\n",
          (unsigned)x, (unsigned)y, (unsigned)w, (unsigned)h);
 #endif
 
-   /* Redundant readback: the whole rect is already coherent in g->vram, so
-    * skip the blocking GPU->CPU fence entirely and leave vram untouched. */
-   if (tt_coh_skip_enabled && tt_coh_all_clean(x, y, w, h))
-      return true;
-
-   switch (rhi_type)
+   /* Skip the blocking GPU->CPU fence when the rect is already coherent
+    * in g->vram, and otherwise fetch only its dirty parts. */
+   if (rhi_coh_check < 0)
    {
-      case RHI_VULKAN:
-#if defined(HAVE_VULKAN)
-         ret = rhi_vulkan_read_vram(x, y, w, h, vram);
-#endif
-         break;
-      case RHI_OPENGL:
-#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-         ret = rhi_gl_read_vram(x, y, w, h, vram);
-#endif
-         break;
-      default:
-         break;
+      const char *e = getenv("BEETLE_RHI_COHERENCE_CHECK");
+      rhi_coh_check = (e && *e && *e != '0') ? 1 : 0;
    }
+
+   n = tt_coh_read_rects(x, y, w, h, r);
+   if (!n)
+   {
+      if (rhi_coh_check)
+         rhi_intf_check_read(x, y, w, h, vram, 0);
+      return true;
+   }
+
+   ret = rhi_intf_read_rects(r, n, vram);
+   if (ret && rhi_coh_check)
+      rhi_intf_check_read(x, y, w, h, vram, n);
 
    /* On a successful readback the rect now mirrors the GPU. */
    if (ret)
@@ -1014,6 +937,45 @@ bool rhi_intf_read_vram(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t
       tt_coh_da_pending = true;
    }
 
+   return ret;
+}
+
+/* Fetch the rects from the active backend. */
+static bool rhi_intf_read_rects(const tt_coh_rect *r, unsigned n, uint16_t *vram)
+{
+   bool     ret = false;
+   unsigned i;
+
+   switch (rhi_type)
+   {
+      case RHI_VULKAN:
+#if defined(HAVE_VULKAN)
+         {
+            /* All parts in one submission and one fence. */
+            uint16_t q[TT_COH_MAX_RECTS][4];
+            for (i = 0; i < n; i++)
+            {
+               q[i][0] = (uint16_t)r[i].x;
+               q[i][1] = (uint16_t)r[i].y;
+               q[i][2] = (uint16_t)r[i].w;
+               q[i][3] = (uint16_t)r[i].h;
+            }
+            ret = rhi_vulkan_read_vram_rects((const uint16_t (*)[4])q, n, vram);
+         }
+#endif
+         break;
+      case RHI_OPENGL:
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
+         /* The first read waits for rendering; the rest find it done. */
+         ret = true;
+         for (i = 0; i < n && ret; i++)
+            ret = rhi_gl_read_vram((uint16_t)r[i].x, (uint16_t)r[i].y,
+                  (uint16_t)r[i].w, (uint16_t)r[i].h, vram);
+#endif
+         break;
+      default:
+         break;
+   }
    return ret;
 }
 

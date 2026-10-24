@@ -13,6 +13,9 @@
  *
  * Usage: vkhost <core.so> <content> [savestate] [frames] [outdir]
  *   VKHOST_VARS: semicolon list of key=value core option overrides.
+ *   VKHOST_PREEMPT=1: model RetroArch's Preemptive Frames (rollback by
+ *     one frame, glhost's GLHOST_PREEMPT=2): every frame restore the state
+ *     saved before the previous one, replay that frame, save, then run.
  *   VKHOST_VARS_AT: semicolon list of frame:key=value option changes, each
  *     applied before that frame's retro_run and reported through
  *     GET_VARIABLE_UPDATE, as a frontend does when the user edits an option
@@ -870,9 +873,41 @@ run_frames_sw:
             bench_skip = frames / 4;
       }
 
+      typedef bool   (*vk_ser_t)(void *, size_t);
+      typedef bool   (*vk_unser_t)(const void *, size_t);
+      typedef size_t (*vk_ssize_t)(void);
+      vk_ser_t   ser   = (vk_ser_t)dlsym(core, "retro_serialize");
+      vk_unser_t unser = (vk_unser_t)dlsym(core, "retro_unserialize");
+      vk_ssize_t ssz   = (vk_ssize_t)dlsym(core, "retro_serialize_size");
+      int        preempt = getenv("VKHOST_PREEMPT") != NULL;
+      void      *pbuf = NULL, *pbuf2 = NULL;
+      size_t     pcap = 0;
+      int        have_prev = 0;
       for (i = 0; i < frames; i++)
       {
          cur_frame = i;
+         if (preempt && ser && unser && ssz)
+         {
+            size_t need = ssz();
+            if (need > pcap)
+            {
+               free(pbuf); free(pbuf2);
+               pbuf = malloc(need); pbuf2 = malloc(need); pcap = need;
+            }
+            if (pbuf && pbuf2)
+            {
+               if (have_prev)
+               {
+                  if (!unser(pbuf, pcap))
+                     fprintf(stderr, "[vkhost] rollback unser FAILED frame %d\n", i);
+                  retro_run_fn();   /* replay the previous frame */
+               }
+               if (!ser(pbuf2, need))
+                  fprintf(stderr, "[vkhost] rollback ser FAILED frame %d\n", i);
+               { void *t = pbuf; pbuf = pbuf2; pbuf2 = t; }
+               have_prev = 1;
+            }
+         }
          if (bench && i == bench_skip)
          {
             if (vkctx.device)
