@@ -7449,7 +7449,8 @@ void rhi_gl_push_triangle(
       uint8_t depth_shift,
       bool dither,
       int blend_mode,
-      bool mask_test, bool set_mask)
+      bool mask_test, bool set_mask,
+      bool may_be_2d)
 {
    gl_renderer *renderer;
    gl_semi_transparency_mode semi_transparency_mode    = SEMI_TRANSPARENCY_MODE_ADD;
@@ -7544,7 +7545,8 @@ void rhi_gl_push_triangle(
       {
          uint32_t colors[3] = {c0, c1, c2};
          unsigned i;
-         if (renderer->internal_upscaling > 1 && renderer->scaled_uv_offset)
+         if (renderer->internal_upscaling > 1 && renderer->scaled_uv_offset &&
+             !may_be_2d)
             for (i = 0; i < 3; i++)
                v[i].native_flags |= 16;
          push_primitive(renderer, v, 3, colors, GL_TRIANGLES,

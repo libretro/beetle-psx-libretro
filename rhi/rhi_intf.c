@@ -812,7 +812,8 @@ void rhi_intf_push_triangle(
       bool dither,
       int blend_mode,
       bool mask_test,
-      bool set_mask)
+      bool set_mask,
+      bool may_be_2d)
 {
 #ifdef RHI_DUMP
    const rhi_dump_vertex vertices[3] = {
@@ -843,7 +844,7 @@ void rhi_intf_push_triangle(
                texture_blend_mode,
                depth_shift,
                dither,
-               blend_mode, mask_test, set_mask);
+               blend_mode, mask_test, set_mask, may_be_2d);
 #endif
          break;
       case RHI_VULKAN:

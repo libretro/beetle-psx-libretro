@@ -108,7 +108,9 @@ void rhi_intf_push_triangle(float p0x, float p0y, float p0w,
                              * FFI */
                             int blend_mode,
                             bool mask_test,
-                            bool set_mask);
+                            bool set_mask,
+                            /* Sprite-like geometry: no enhanced UV offset. */
+                            bool may_be_2d);
 
 /* Quad UVs include the decoder's floating-interpolation bias. Pass that
  * bias separately, packed as u | v << 16, so native interpolation can

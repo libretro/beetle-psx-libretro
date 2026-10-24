@@ -1,5 +1,6 @@
 #include <math.h>
 #include "beetle_psx_globals.h"
+#include "gpu_uv_phase.h"
 
 /* PGXP precise colour plumbing to the hardware renderers.
  *
@@ -53,10 +54,7 @@ static INLINE const float *gpu_precise_quad_rgb(const tri_vertex *first,
  * definition in gpu.c provides storage. */
 static const int8_t dither_table[4][4];
 
-#define COORD_FBS 12
 #define PCT_UV_BLOCK 64
-#define COORD_MF_INT(n) ((n) << COORD_FBS)
-#define COORD_POST_PADDING 12
 
 struct i_group
 {
@@ -106,6 +104,8 @@ struct i_deltas
     * fragment shader does via clamp_coord(vUV) against vTexLimits -
     * keeps these edge pixels at the closest valid texel. */
    float min_u, max_u, min_v, max_v;
+   /* Seed bias of the perspective-correct U/V, in texels. */
+   float pct_bias;
 };
 typedef struct i_deltas i_deltas;
 
@@ -178,13 +178,10 @@ static INLINE bool CalcIDeltas_##SUFFIX(i_deltas *idl, const tri_vertex *A, cons
    } \
    if (TEXTURED_LIT) \
    { \
-      /* Keep native UV precision; widen products to avoid upscaled overflow. */ \
-      unsigned precision = COORD_FBS + upscale_shift; \
-      unsigned padding = COORD_POST_PADDING - upscale_shift; \
-      idl->du_dx = (uint32_t)((int64_t)CALCIS(u, y) * (INT64_C(1) << precision) / denom) << padding; \
-      idl->du_dy = (uint32_t)((int64_t)CALCIS(x, u) * (INT64_C(1) << precision) / denom) << padding; \
-      idl->dv_dx = (uint32_t)((int64_t)CALCIS(v, y) * (INT64_C(1) << precision) / denom) << padding; \
-      idl->dv_dy = (uint32_t)((int64_t)CALCIS(x, v) * (INT64_C(1) << precision) / denom) << padding; \
+      idl->du_dx = gpu_uv_delta(CALCIS(u, y), denom, upscale_shift); \
+      idl->du_dy = gpu_uv_delta(CALCIS(x, u), denom, upscale_shift); \
+      idl->dv_dx = gpu_uv_delta(CALCIS(v, y), denom, upscale_shift); \
+      idl->dv_dy = gpu_uv_delta(CALCIS(x, v), denom, upscale_shift); \
    } \
    return true; \
 }
@@ -958,7 +955,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
           *     correct 0 (clamp(.,0,max) + +0.5 bias = 0..max+0.5, \
           *     int cast = 0..max, AND = same; for negative inputs \
           *     pre-clamp, the clamp brings them to 0 anyway). \
-          * Half-texel bias preserves affine rounding at every resolution. */ \
+          * The bias matches the affine seed (gpu_uv_seed). */ \
          if (pct) \
          { \
             /* Pull the perspective-correct UV from the SIMD-precomputed \
@@ -975,7 +972,7 @@ static INLINE void DrawSpan_##SUFFIX(PS_GPU *gpu, int y, const int32_t x_start, 
             { \
                int remain = (int)w; \
                int blk    = (remain < PCT_UV_BLOCK) ? remain : PCT_UV_BLOCK; \
-               float bias = 0.5f; \
+               float bias = idl->pct_bias; \
                PCT_UVBatch(blk, bias, &ig.pct_inv_w, &ig.pct_u_over_w, \
                      &ig.pct_v_over_w, idl->d_inv_w_dx, idl->d_u_over_w_dx, \
                      idl->d_v_over_w_dx, idl->min_u, idl->max_u, \
@@ -1178,10 +1175,11 @@ static INLINE void DrawTriangle_##SUFFIX(PS_GPU *gpu, tri_vertex *vertices, cons
    /* [0] should be top vertex, [2] should be bottom vertex, [1] should be off to the side vertex. */ \
    if (TEXTURED_LIT) \
    { \
-      /* Keep native rounding at every scale; hardware sprite offsets cause \
-       * discontinuities when projected edges align. */ \
-      ig.u = (COORD_MF_INT(vertices[core_vertex].u) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
-      ig.v = (COORD_MF_INT(vertices[core_vertex].v) + (1 << (COORD_FBS - 1))) << COORD_POST_PADDING; \
+      ig.u = gpu_uv_seed(vertices[core_vertex].u, gpu->upscale_shift, \
+            gpu->may_be_2d, gpu->off_u != 0); \
+      ig.v = gpu_uv_seed(vertices[core_vertex].v, gpu->upscale_shift, \
+            gpu->may_be_2d, gpu->off_v != 0); \
+      idl.pct_bias = gpu_uv_pct_bias(gpu->upscale_shift, gpu->may_be_2d); \
       if (pct_local) \
       { \
          /* Seed the perspective interpolants at the core vertex (origin \
@@ -1766,7 +1764,8 @@ static void Command_DrawPolygon_##SUFFIX(PS_GPU *gpu, const uint32_t *cb) \
                POLYGON_DITHER_ENABLED(gpu, TEXTURED_LIT, TM_LIT, GOURAUD_LIT), \
                (BM_VAL), \
                (ME_LIT), \
-               gpu->MaskSetOR != 0); \
+               gpu->MaskSetOR != 0, \
+               gpu->may_be_2d); \
             if (gpu->killQuadPart == 2) \
             { \
                gpu->killQuadPart = 0; \
