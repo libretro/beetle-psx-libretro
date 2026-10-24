@@ -61,6 +61,7 @@ extern int   psx_video_cable;    /* 0 = off, 1 = S-Video, 2 = composite, 3 = RF,
 extern uint16_t psx_hdr_panel_xy[8];
 
 #include "hdr_transform.h"
+#include "analog_trap.h"
 
 /* psx_hdr_to_panel as a std430 mat3: three columns, each padded to a vec4. */
 static void hdr_push_panel(float dst[12])
@@ -8709,15 +8710,9 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       float   a1, a2;
       int32_t enable;
    } push;
-   const double wq  = 2.0 * 3.14159265358979323846 * (double)inv_ratio;
-   const double fq  = 0.99;   /* zero radius: depth of the null */
-   const double iq2 = 0.85;   /* pole radius: how narrow the stop band is */
-   double b0 = 1.0, b1 = -2.0 * fq * cos(wq), b2 = fq * fq;
-   const double a1 = -2.0 * iq2 * cos(wq), a2 = iq2 * iq2;
-   /* Normalise the feed-forward for 0 dB at DC against the feedback. */
-   const double g = (1.0 + a1 + a2) / (b0 + b1 + b2);
+   double c[5];
    ImageCreateInfo info = image_create_info_render_target(sig_w, sig_h, VK_FORMAT_R16G16B16A16_SFLOAT);
-   b0 *= g; b1 *= g; b2 *= g;
+   analog_trap_coeffs((double)inv_ratio, c);
 
    info.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
    info.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -8743,8 +8738,8 @@ static ImageHandle renderer_analog_apply(Renderer *self, unsigned native_w, unsi
       push.black_scale  = 1.0f / (1.0f - 0.075f);
       push.black_offset = -0.075f / (1.0f - 0.075f);
    }
-   push.b0 = (float)b0; push.b1 = (float)b1; push.b2 = (float)b2;
-   push.a1 = (float)a1; push.a2 = (float)a2;
+   push.b0 = (float)c[0]; push.b1 = (float)c[1]; push.b2 = (float)c[2];
+   push.a1 = (float)c[3]; push.a2 = (float)c[4];
    /* S-Video luma never shared a wire, so there is no residue to trap. */
    push.enable = svideo ? 0 : 1;
 

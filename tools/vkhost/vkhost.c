@@ -652,7 +652,8 @@ static int dump_frame(const char *path)
                  float v = 0.0f;
                  if (e) v = (float)(m + 1024) * (1.0f / 1024.0f) * (float)(1 << e) / 32768.0f;
                  else   v = (float)m * (1.0f / 1024.0f) / 16384.0f;
-                 if (v < 0.0f) v = 0.0f; if (v > 1.0f) v = 1.0f;
+                 if (v < 0.0f) v = 0.0f;
+                 if (v > 1.0f) v = 1.0f;
                  px[c] = (unsigned char)(v * 255.0f + 0.5f);
               }
            }
@@ -690,7 +691,8 @@ int main(int argc, char **argv)
    if (argc > 4) frames = atoi(argv[4]);
    if (argc > 5) outdir = argv[5];
    snprintf(cmdbuf, sizeof(cmdbuf), "mkdir -p %s %s %s", outdir, sysdir, savedir);
-   system(cmdbuf);
+   if (system(cmdbuf) != 0)
+      fprintf(stderr, "[vkhost] could not create %s\n", outdir);
 
    /* defaults, overridable via VKHOST_VARS */
    /* Must be a value the option declares; an undeclared value leaves
@@ -818,7 +820,10 @@ run_frames_sw:
       bool (*retro_unserialize_fn)(const void *, size_t) = dlsym(core, "retro_unserialize");
       if (!f) { fprintf(stderr, "[vkhost] cannot open state\n"); return 4; }
       fseek(f, 0, SEEK_END); sz = ftell(f); fseek(f, 0, SEEK_SET);
-      data = malloc(sz); fread(data, 1, sz, f); fclose(f);
+      data = malloc(sz);
+      if (!data || fread(data, 1, sz, f) != (size_t)sz)
+      { fprintf(stderr, "[vkhost] cannot read state\n"); fclose(f); return 4; }
+      fclose(f);
       /* RetroArch RASTATE container: find the MEM chunk and use its payload. */
       if (sz > 8 && !memcmp(data, "RASTATE", 7))
       {

@@ -4292,6 +4292,7 @@ texture_failed:
 #include "shaders_gl/analog_resolve_hdr.glsl.h"
 #include "shaders_gl/analog_notch.glsl.h"
 #include "shaders_gl/analog_notch_pal.glsl.h"
+#include "analog_trap.h"
 #include "shaders_gl/hdr_bloom_bright.glsl.h"
 #include "shaders_gl/hdr_bloom_blur.glsl.h"
 #include "shaders_gl/hdr_bloom_down.glsl.h"
@@ -5016,18 +5017,10 @@ static bool gl_analog_run(gl_renderer *renderer, struct gl_analog *a,
 #if defined(RHI_GL_HAVE_COMPUTE)
             if (notch)
             {
-               const double wq  = 2.0 * M_PI * (double)inv_ratio;
-               const double fq  = 0.99, iq = 0.85;
-               double b0 = 1.0;
-               double b1 = -2.0 * fq * cos(wq);
-               double b2 = fq * fq;
-               double a1 = 2.0 * iq * cos(wq);
-               double a2 = -iq * iq;
-               double gain   = b0 + b1 + b2;
-               double target = 1.0 - a1 - a2;
-               double scale  = (gain != 0.0) ? (target / gain) : 1.0;
-
-               b0 *= scale; b1 *= scale; b2 *= scale;
+               double c[5];
+               double b0, b1, b2, a1, a2;
+               analog_trap_coeffs((double)inv_ratio, c);
+               b0 = c[0]; b1 = c[1]; b2 = c[2]; a1 = c[3]; a2 = c[4];
 
                glUseProgram(notch->id);
                glActiveTexture(GL_TEXTURE0);
