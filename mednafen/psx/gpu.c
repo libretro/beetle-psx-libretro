@@ -1303,6 +1303,9 @@ static void GPU_SoftReset(void) /* Control command 0x00 */
    GPU.DataReadBufferEx = 0;
    GPU.InCmd = INCMD_NONE;
 
+   GPU.off_u = GPU.off_v = 0;
+   GPU.may_be_2d = false;
+
    GPU.DisplayOff = 1;
    GPU.DisplayFB_XStart = 0;
    GPU.DisplayFB_YStart = 0;
@@ -1404,11 +1407,7 @@ void GPU_Power(void)
    GPU.DataReadBufferEx = 0;
    GPU.InCmd = INCMD_NONE;
    GPU.InCmd_CC = 0;
-   /* Mid-cmd quad state. Power doesn't strictly need to clear these
-    * because they're only consumed when InCmd == INCMD_QUAD (and we
-    * just zeroed InCmd above), but explicit clears match the saved
-    * state and make cold-reset behavior deterministic regardless of
-    * BSS contents. */
+   /* Clear pending-quad state; GPU_SoftReset() clears UV corrections. */
    GPU.InQuad_clut = 0;
    GPU.InQuad_invalidW = false;
    GPU.killQuadPart = 0;
@@ -3044,6 +3043,11 @@ void GPU_RestoreStateP3(void)
 
 int GPU_StateAction(StateMem *sm, int load, int data_only)
 {
+   /* Retain pending UV corrections; adjusted vertices cannot reconstruct them.
+    * Neutral defaults keep older states from inheriting a previous draw. */
+   uint16_t off_u = !load && GPU.InCmd == INCMD_QUAD ? GPU.off_u : 0;
+   uint16_t off_v = !load && GPU.InCmd == INCMD_QUAD ? GPU.off_v : 0;
+   bool may_be_2d = !load && GPU.InCmd == INCMD_QUAD && GPU.may_be_2d;
    GPU_RestoreStateP1(load);
 
    SFORMAT StateRegs[] =
@@ -3189,10 +3193,22 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
 
       SFVARN(GPU.DrawTimeAvail, "DrawTimeAvail"),
 
+      /* Append so older positional fast states keep their existing order. */
+      SFVARN(off_u, "InQuad_off_u"),
+      SFVARN(off_v, "InQuad_off_v"),
+      SFVARN(may_be_2d, "InQuad_may_be_2d"),
+
       SFEND
    };
 
    int ret = MDFNSS_StateAction(sm, load, data_only, StateRegs, "GPU");
+
+   if(load && ret)
+   {
+      GPU.off_u = off_u;
+      GPU.off_v = off_v;
+      GPU.may_be_2d = may_be_2d;
+   }
 
    GPU_RestoreStateP2(load);
 

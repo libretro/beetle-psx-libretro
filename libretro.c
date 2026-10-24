@@ -6403,8 +6403,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
          negotiate_hdr_output();
 
-         option_display.key = BEETLE_OPT(scaled_uv_offset);
-         environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter_exclude_sprite);
          environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
          option_display.key = BEETLE_OPT(filter_exclude_2d_polygon);

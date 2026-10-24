@@ -5,6 +5,11 @@
 
 Beetle PSX is a port/fork of Mednafen's PSX module to the libretro API. Beetle PSX currently runs on Linux, OSX and Windows.
 
+## OpenGL texture sampling
+
+OpenGL now honors **Texture UV Offset** above 1x, enabled by default as in
+Vulkan. Disable it to restore the previous enhanced OpenGL sampling phase.
+
 Notable additions in this fork are:
 * PBP and CHD file format support, developed by Zapeth;
 * Software renderer internal resolution upscaling, implemented by simias;
