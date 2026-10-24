@@ -3138,6 +3138,13 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
    int      ret;
    GPU_RestoreStateP1(load);
 
+   /* Invalidate cache tags missing from older states. */
+   if (load)
+   {
+      GPU.CLUT_Cache_VB = ~0U;
+      memset(TexCache_Tag, 0xFF, sizeof(TexCache_Tag));
+   }
+
    SFORMAT StateRegs[] =
    {
       /* Hardcode entry name to remain backward compatible with the */
@@ -3285,6 +3292,12 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
       SFVARN(off_u, "InQuad_off_u"),
       SFVARN(off_v, "InQuad_off_v"),
       SFVARN(may_be_2d, "InQuad_may_be_2d"),
+
+      /* Retained PS1 cache contents can differ from VRAM. */
+      SFARRAY16N(GPU.CLUT_Cache, 256, "CLUT_Cache"),
+      SFVARN(GPU.CLUT_Cache_VB, "CLUT_Cache_VB"),
+      SFARRAY32N(TexCache_Tag, 256, "TexCache_Tag"),
+      SFARRAY16N(&TexCache_Data[0][0], 256 * 4, "TexCache_Data"),
 
       SFEND
    };
