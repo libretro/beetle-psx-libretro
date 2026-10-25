@@ -63,7 +63,8 @@ static int32_t smem_read(StateMem *st, void *buffer, uint32_t len)
 }
 
 /* Append `len` bytes from `buffer` to the state stream, growing
- * st->data with realloc as needed, or failing when it is fixed.
+ * st->data with realloc as needed, or failing when it is fixed. A
+ * sizing stream only advances, so a save measures its own length.
  * Returns the number of bytes
  * actually written - on realloc failure or integer overflow, this is
  * 0 and the original buffer is preserved (realloc returns NULL but
@@ -75,6 +76,14 @@ static int32_t smem_write(StateMem *st, void *buffer, uint32_t len)
     * subtraction-from-UINT32_MAX so we can compare safely. */
    if (len > UINT32_MAX - st->loc)
       return 0;
+
+   if (st->sizing)
+   {
+      st->loc += len;
+      if (st->loc > st->len)
+         st->len = st->loc;
+      return (int32_t)len;
+   }
 
    if ((len + st->loc) > st->malloced)
    {

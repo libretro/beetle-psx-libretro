@@ -13,6 +13,11 @@
  *   - other entries in the section load as before, and with no map set a
  *     flagged entry is a plain load.
  *
+ * A sizing stream (what retro_serialize_size saves into) measures the
+ * same length as a real save, plain and fast, without touching its data,
+ * and a fixed buffer of exactly that length takes the save while one
+ * byte less fails it.
+ *
  * Sizes cover a whole number of chunks, a short last chunk and a short
  * last block. */
 #include <stdio.h>
@@ -21,13 +26,17 @@
 
 #include "mednafen/state.h"
 
+extern bool FastSaveStates;
+
+/* The section a whole-state save writes, when set */
+static SFORMAT *state_sf;
+
 int StateAction(StateMem *sm, int load, int data_only);
 int StateAction(StateMem *sm, int load, int data_only)
 {
-   (void)sm;
-   (void)load;
-   (void)data_only;
-   return 1;
+   if (!state_sf)
+      return 1;
+   return MDFNSS_StateAction(sm, load, data_only, state_sf, "TEST");
 }
 
 static int      fails;
@@ -78,6 +87,38 @@ static void run(uint32_t size, uint32_t chunk, int mode)
       chk(0, "save", size, chunk);
       return;
    }
+
+   /* Whole-state saves: measured, then into exactly that many bytes */
+   state_sf = sf;
+   for (i = 0; i < 2; i++)
+   {
+      StateMem m, g, f;
+      FastSaveStates = i != 0;
+      memset(&m, 0, sizeof(m));
+      memset(&g, 0, sizeof(g));
+      m.sizing = true;
+      chk(MDFNSS_SaveSM(&m, 0, 0, NULL, NULL, NULL) != 0, "sizing save", size, i);
+      chk(m.data == NULL && m.malloced == 0, "sizing leaves data alone", size, i);
+      chk(MDFNSS_SaveSM(&g, 0, 0, NULL, NULL, NULL) != 0, "growing save", size, i);
+      chk(m.len == g.len, "sizing length matches", m.len, g.len);
+
+      memset(&f, 0, sizeof(f));
+      f.fixed    = true;
+      f.malloced = m.len;
+      f.data     = (uint8_t *)malloc(m.len);
+      chk(f.data && MDFNSS_SaveSM(&f, 0, 0, NULL, NULL, NULL) != 0,
+            "fixed save of the measured length", size, i);
+      chk(f.data && f.len == g.len && !memcmp(f.data, g.data, g.len),
+            "fixed save matches", f.len, g.len);
+      f.loc = f.len = 0;
+      f.malloced = m.len - 1;
+      chk(f.data && MDFNSS_SaveSM(&f, 0, 0, NULL, NULL, NULL) == 0,
+            "one byte short fails", size, i);
+      free(f.data);
+      free(g.data);
+   }
+   FastSaveStates = false;
+   state_sf       = NULL;
 
    memcpy(live, saved, size);
    switch (mode)
