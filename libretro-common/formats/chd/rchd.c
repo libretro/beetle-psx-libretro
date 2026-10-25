@@ -2771,7 +2771,7 @@ int rchd_read_begin(rchd_t *chd, uint64_t offset, void *dst, size_t len)
 
 int rchd_read_hunk_begin(rchd_t *chd, uint32_t hunk, void *dst)
 {
-   if (!chd || !dst || chd->state != RCHD_OPEN_DONE
+   if (!chd || chd->state != RCHD_OPEN_DONE
          || hunk >= chd->info.hunk_count)
       return RCHD_ERROR_PARAM;
 
@@ -2790,6 +2790,11 @@ int rchd_read_hunk_begin(rchd_t *chd, uint32_t hunk, void *dst)
    chd->rd_offset = (uint64_t)hunk * chd->info.hunk_bytes;
    chd->reading   = 1;
    return RCHD_OK;
+}
+
+const uint8_t *rchd_hunk_cache(const rchd_t *chd)
+{
+   return chd ? chd->cache : NULL;
 }
 
 size_t rchd_read_progress(const rchd_t *chd)
@@ -2836,6 +2841,10 @@ static int rchd_read_step_bytes(rchd_t *chd, rchd_request_t *req)
       {
          const rchd_map_entry_t *e;
          e = &chd->map[src_hunk];
+
+         /* The cache is about to be overwritten; until a hunk is built
+          * whole in it, it holds none */
+         chd->cached = (uint32_t)-1;
 
          /* A parent reference is the parent's data at a unit position,
           * so it is read from the bound parent rather than from here. */
@@ -2894,7 +2903,9 @@ static int rchd_read_step_bytes(rchd_t *chd, rchd_request_t *req)
          }
       }
 
-      memcpy(chd->rd_dst + chd->rd_done, chd->cache + skip, avail);
+      /* A whole-hunk read with no destination is left in the cache */
+      if (chd->rd_dst)
+         memcpy(chd->rd_dst + chd->rd_done, chd->cache + skip, avail);
       chd->rd_done += avail;
    }
 

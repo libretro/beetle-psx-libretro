@@ -77,7 +77,7 @@ struct CDAccess_CHD
    /* chain[0] is the image itself, chain[i + 1] the parent of
     * chain[i]. Every level is owned here and closed in Cleanup. */
    chd_src      chain[CHD_MAX_PARENTS + 1];
-   uint8_t     *hunkmem;        /* hunk-data cache */
+   const uint8_t *hunk;         /* hunk oldhunk, in chain[0]'s own cache */
    uint8_t     *io_buf;         /* CHD_IO_CHUNK bytes of read staging */
    uint32_t     chain_len;
    uint32_t     hunkbytes;
@@ -373,7 +373,8 @@ static bool chd_open_chain(struct CDAccess_CHD *self, const char *path,
    return true;
 }
 
-/* Decodes hunk @hunknum into hunkmem. Requests for a hunk that a child
+/* Decodes hunk @hunknum, left where chain[0]'s decoder builds it, at
+ * self->hunk until the next read. Requests for a hunk that a child
  * shares with its parent are made by the parent's decoder, so the
  * level whose request is outstanding is the one whose file is read. */
 static bool CDAccess_CHD_ReadHunk(struct CDAccess_CHD *self,
@@ -381,7 +382,7 @@ static bool CDAccess_CHD_ReadHunk(struct CDAccess_CHD *self,
 {
    rchd_request_t rq;
    int            err = rchd_read_hunk_begin(self->chain[0].chd, hunknum,
-         self->hunkmem);
+         NULL);
 
    while (err == RCHD_OK
          && (err = rchd_read_step(self->chain[0].chd, &rq)) == RCHD_PENDING)
@@ -400,12 +401,15 @@ static bool CDAccess_CHD_ReadHunk(struct CDAccess_CHD *self,
          err = RCHD_OK;
    }
 
+   /* A failed decode leaves the cache holding no hunk at all */
    if (err != RCHD_OK)
    {
       log_cb(RETRO_LOG_ERROR, "CHD: hunk %u failed to decode (%d)\n",
             (unsigned)hunknum, err);
+      self->oldhunk = -1;
       return false;
    }
+   self->hunk = rchd_hunk_cache(self->chain[0].chd);
    return true;
 }
 
@@ -461,8 +465,7 @@ static bool CDAccess_CHD_ImageOpen(struct CDAccess_CHD *self,
 
    chd             = self->chain[0].chd;
    self->hunkbytes = rchd_info(chd)->hunk_bytes;
-   if (self->hunkbytes < 2352 + 96
-         || !(self->hunkmem = (uint8_t *)malloc(self->hunkbytes)))
+   if (self->hunkbytes < 2352 + 96)
       return false;
    self->oldhunk = -1;
 
@@ -632,9 +635,8 @@ static void CDAccess_CHD_Cleanup(struct CDAccess_CHD *self)
       chd_src_close(&self->chain[i]);
    self->chain_len = 0;
 
-   free(self->hunkmem);
    free(self->io_buf);
-   self->hunkmem = NULL;
+   self->hunk    = NULL;
    self->io_buf  = NULL;
 }
 
@@ -826,51 +828,61 @@ static bool CDAccess_CHD_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf,
             self->oldhunk = hunknum;
       }
 
-      memcpy(buf, self->hunkmem + hunkofs * (2352 + 96), 2352);
-
-      /* If the disc carries real subchannel data (LibCrypt), use the
-       * recorded 96 bytes that trail the sector in the hunk instead of
-       * the synthesized subchannel placed in buf+2352 above. RW_RAW is
-       * interleaved P-W exactly as the rest of the pipeline expects, so
-       * it is copied verbatim; a deinterleaved "RW" image is rare and
-       * is interleaved into the same layout. The SBI replacement map,
-       * applied during synthesis, is intentionally not re-applied here
-       * because the recorded subchannel already contains the protection
-       * data SBI would otherwise patch in. */
-      if (self->has_subchannel
-            && ct->SubchannelMode != CDRF_SUBM_NONE)
+      /* A hunk that failed to decode reads as silence / zeros */
+      if (hunknum != self->oldhunk)
       {
-         const uint8_t *sub = self->hunkmem + hunkofs * (2352 + 96) + 2352;
-
-         if (ct->SubchannelMode == CDRF_SUBM_RW_RAW)
-            memcpy(buf + 2352, sub, 96);
-         else /* CDRF_SUBM_RW: deinterleaved on disc, re-interleave it. */
-            subpw_interleave(sub, buf + 2352);
+         memset(buf, 0, 2352);
+         return true;
       }
 
-      /* Path 2 contract: buf holds host-endian int16 stereo
-       * samples. Swap iff source byte order differs from host
-       * byte order. CHD AUDIO tracks are always BE-stored
-       * (RawAudioMSBFirst = true). */
-      if (ct->DIFormat == DI_FORMAT_AUDIO
-#ifdef MSB_FIRST
-            && !ct->RawAudioMSBFirst
-#else
-            && ct->RawAudioMSBFirst
-#endif
-         )
       {
-         /* 32-bit-chunked A16 swap; see CDAccess_Image.c
-          * counterpart for the rationale. 588 iterations
-          * over 2352 bytes of stereo 16-bit samples. */
-         uint8_t *_s = (uint8_t *)buf;
-         int32_t  _i;
-         for (_i = 0; _i + 3 < 588 * 2 * 2; _i += 4)
+         const uint8_t *sector = self->hunk + hunkofs * (2352 + 96);
+
+         /* Path 2 contract: buf holds host-endian int16 stereo samples.
+          * CHD AUDIO tracks are always BE-stored (RawAudioMSBFirst =
+          * true), so where that differs from the host the samples are
+          * swapped as they are copied out of the hunk. */
+         if (ct->DIFormat == DI_FORMAT_AUDIO
+#ifdef MSB_FIRST
+               && !ct->RawAudioMSBFirst
+#else
+               && ct->RawAudioMSBFirst
+#endif
+            )
          {
-            uint32_t _v;
-            memcpy(&_v, _s + _i, 4);
-            _v = ((_v & 0xFF00FF00U) >> 8) | ((_v & 0x00FF00FFU) << 8);
-            memcpy(_s + _i, &_v, 4);
+            /* 32-bit-chunked A16 swap; see CDAccess_Image.c counterpart
+             * for the rationale. 588 iterations over 2352 bytes of
+             * stereo 16-bit samples. */
+            int32_t i;
+            for (i = 0; i < 588 * 2 * 2; i += 4)
+            {
+               uint32_t v;
+               memcpy(&v, sector + i, 4);
+               v = ((v & 0xFF00FF00U) >> 8) | ((v & 0x00FF00FFU) << 8);
+               memcpy(buf + i, &v, 4);
+            }
+         }
+         else
+            memcpy(buf, sector, 2352);
+
+         /* If the disc carries real subchannel data (LibCrypt), use the
+          * recorded 96 bytes that trail the sector in the hunk instead
+          * of the synthesized subchannel placed in buf+2352 above.
+          * RW_RAW is interleaved P-W exactly as the rest of the pipeline
+          * expects, so it is copied verbatim; a deinterleaved "RW" image
+          * is rare and is interleaved into the same layout. The SBI
+          * replacement map, applied during synthesis, is intentionally
+          * not re-applied here because the recorded subchannel already
+          * contains the protection data SBI would otherwise patch in. */
+         if (self->has_subchannel
+               && ct->SubchannelMode != CDRF_SUBM_NONE)
+         {
+            const uint8_t *sub = sector + 2352;
+
+            if (ct->SubchannelMode == CDRF_SUBM_RW_RAW)
+               memcpy(buf + 2352, sub, 96);
+            else /* CDRF_SUBM_RW: deinterleaved on disc, re-interleave it. */
+               subpw_interleave(sub, buf + 2352);
          }
       }
    }
