@@ -32,6 +32,7 @@
 #include "rhi_lib_vulkan.h"
 #endif
 
+extern retro_log_printf_t log_cb;
 extern bool fast_pal;
 extern unsigned int image_height;
 
