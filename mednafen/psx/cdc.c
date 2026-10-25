@@ -64,80 +64,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* SimpleFIFO is declared in cdc.h */
-static INLINE bool SimpleFIFO_Init(SimpleFIFO *f, uint32_t the_size)
-{
-   f->data = (uint8_t *)malloc(the_size * sizeof(uint8_t));
-   if (!f->data)
-   {
-      f->size      = 0;
-      f->read_pos  = 0;
-      f->write_pos = 0;
-      f->in_count  = 0;
-      return false;
-   }
-   f->size      = the_size;
-   f->read_pos  = 0;
-   f->write_pos = 0;
-   f->in_count  = 0;
-   return true;
-}
-
-static INLINE void SimpleFIFO_Destroy(SimpleFIFO *f)
-{
-   if (f->data)
-   {
-      free(f->data);
-      f->data = NULL;
-   }
-}
-
-static INLINE uint32_t SimpleFIFO_CanWrite(const SimpleFIFO *f)
-{
-   return f->size - f->in_count;
-}
-
-static INLINE uint8_t SimpleFIFO_ReadByte(SimpleFIFO *f)
-{
-   uint8_t ret  = f->data[f->read_pos];
-   f->read_pos  = (f->read_pos + 1) & (f->size - 1);
-   f->in_count--;
-   return ret;
-}
-
-static INLINE void SimpleFIFO_Write(SimpleFIFO *f,
-      const uint8_t *src, uint32_t cnt)
-{
-   while (cnt)
-   {
-      f->data[f->write_pos] = *src;
-      f->write_pos          = (f->write_pos + 1) & (f->size - 1);
-      f->in_count++;
-      src++;
-      cnt--;
-   }
-}
-
-static INLINE void SimpleFIFO_WriteByte(SimpleFIFO *f, uint8_t v)
-{
-   f->data[f->write_pos] = v;
-   f->write_pos          = (f->write_pos + 1) & (f->size - 1);
-   f->in_count++;
-}
-
-static INLINE void SimpleFIFO_Flush(SimpleFIFO *f)
-{
-   f->read_pos  = 0;
-   f->write_pos = 0;
-   f->in_count  = 0;
-}
-
-static INLINE void SimpleFIFO_SaveStatePostLoad(SimpleFIFO *f)
-{
-   f->read_pos  %= f->size;
-   f->write_pos %= f->size;
-   f->in_count  %= (f->size + 1);
-}
 
 /* Enum values formerly nested inside class PS_CDC.  Promoted to
  * file scope as anonymous enums.  Names unchanged so call sites
@@ -1929,9 +1855,8 @@ void PS_CDC_Write(PS_CDC *cdc, const int32_t timestamp, uint32_t A, uint8_t V)
                   {
 
                      SimpleFIFO_Write(&cdc->DMABuffer, cdc->SB, 2340);
-
-                     while(SimpleFIFO_CanWrite(&cdc->DMABuffer))
-                        SimpleFIFO_WriteByte(&cdc->DMABuffer, 0x00);
+                     SimpleFIFO_Write(&cdc->DMABuffer, NULL,
+                           SimpleFIFO_CanWrite(&cdc->DMABuffer));
                   }
                   else
                   {
@@ -2063,16 +1988,7 @@ bool PS_CDC_DMACanRead(PS_CDC *cdc)
 
 uint32_t PS_CDC_DMARead(PS_CDC *cdc)
 {
-   unsigned i;
-   uint32_t data = 0;
-
-   for(i = 0; i < 4; i++)
-   {
-      if(cdc->DMABuffer.in_count)
-         data |= SimpleFIFO_ReadByte(&cdc->DMABuffer) << (i * 8);
-   }
-
-   return data;
+   return SimpleFIFO_ReadWordLE(&cdc->DMABuffer);
 }
 
 #ifdef __cplusplus
