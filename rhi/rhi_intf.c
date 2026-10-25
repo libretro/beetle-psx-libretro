@@ -44,6 +44,8 @@ static bool vk_initialized                      = false;
 /* GPU reset defaults */
 static int rhi_width_mode = WIDTH_MODE_256;
 static int rhi_height_mode = HEIGHT_MODE_240;
+/* GP1(06h) range: x1 in the low 16 bits, x2 in the high 16 bits. */
+static uint32_t rhi_hrange = 0x200u | (0xC00u << 16);
 
 #include "rhi_coherence.h"
 
@@ -570,6 +572,18 @@ void rhi_intf_set_vram_framebuffer_coords(uint32_t xstart, uint32_t ystart)
 
 void rhi_intf_set_horizontal_display_range(uint16_t x1, uint16_t x2)
 {
+   const uint32_t hrange = (uint32_t)x1 | ((uint32_t)x2 << 16);
+
+   if (hrange != rhi_hrange)
+   {
+      /* The window's width is what the aspect ratio follows. */
+      if (   RHI_CROP_WIN_WIDTH(rhi_common_crop_window(crop_overscan,
+                  (int32_t)(rhi_hrange & 0xFFFFu), (int32_t)(rhi_hrange >> 16)))
+          != RHI_CROP_WIN_WIDTH(rhi_common_crop_window(crop_overscan, x1, x2)))
+         crop_window_dirty = true;
+      rhi_hrange = hrange;
+   }
+
 #ifdef RHI_DUMP
    rhi_dump_set_horizontal_display_range(x1, x2);
 #endif
@@ -1178,15 +1192,50 @@ double rhi_common_get_timing_fps(void)
                (currently_interlaced ? FPS_NTSC_INTERLACED : FPS_NTSC_NONINTERLACED));
 }
 
+uint32_t rhi_common_crop_window(int crop_overscan, int32_t x1, int32_t x2)
+{
+   int32_t width = x2 - x1;
+   int32_t start;
+
+   if (width <= 2560)
+      return 608u | (2560u << 16);
+
+   if (width > 2800)
+      width = 2800;
+
+   /* Every window stays on the 2800-clock line, which starts at clock
+    * 488.  Where the dynamic crop pulls the picture over to the window,
+    * the window moves left as far as the picture needs; elsewhere it
+    * starts with the picture, and the line's end cuts what runs past. */
+   if (crop_overscan == 2 && x1 < 938)
+   {
+      start = 3288 - width;
+      if (start > 608)
+         start = 608;
+   }
+   else
+   {
+      start = x1 < 488 ? 488 : x1;
+      if (start > 3288 - 2560)
+         start = 3288 - 2560;
+      if (width > 3288 - start)
+         width = 3288 - start;
+   }
+
+   return (uint32_t)start | ((uint32_t)width << 16);
+}
+
 float rhi_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,
                                   int aspect_ratio_setting, bool vram_override, bool widescreen_override,
                                   int widescreen_hack_aspect_ratio_setting)
 {
-   float ar = (4.0 / 3.0);
+   float ar              = (4.0 / 3.0);
+   const int crop_clocks = RHI_CROP_WIN_WIDTH(rhi_common_crop_window(crop_overscan,
+            (int32_t)(rhi_hrange & 0xFFFFu), (int32_t)(rhi_hrange >> 16)));
 
    /* Current assumptions
-    *    A fixed percentage of width is cropped when crop_overscan isn't 0
+    *    When crop_overscan isn't 0, the crop window (rhi_common_crop_window) is kept
     *    aspect_ratio_setting is one of the following:
     *          0 - Corrected
     *          1 - Uncorrected (1:1 PAR)
@@ -1222,7 +1271,7 @@ float rhi_common_get_aspect_ratio(bool pal_content, int crop_overscan,
       int num_vis_scanlines = last_visible_scanline - first_visible_scanline + 1;
 
       /* Calculate horizontal scaling in terms of gpu clock cycles */
-      ar *= (crop_overscan ? (2560.0 / 2800.0) : 1.0);
+      ar *= (crop_overscan ? (crop_clocks / 2800.0) : 1.0);
 
       /* Calculate vertical scaling in terms of visible scanline count */
       ar *= (pal_content ? (288.0 / num_vis_scanlines) : (240.0 / num_vis_scanlines));
@@ -1231,28 +1280,31 @@ float rhi_common_get_aspect_ratio(bool pal_content, int crop_overscan,
    }
    else if (aspect_ratio_setting == 1) /* Uncorrected */
    {
-      int width_base = 0;
+      int width_base;
+      int clock_div;
       double height_base;
 
       switch (rhi_width_mode)
       {
          case WIDTH_MODE_256:
-            width_base = crop_overscan ? 256 : 280;
-            break;
-         case WIDTH_MODE_320:
-            width_base = crop_overscan ? 320 : 350;
+            clock_div = 10;
             break;
          case WIDTH_MODE_512:
-            width_base = crop_overscan ? 512 : 560;
+            clock_div = 5;
             break;
          case WIDTH_MODE_640:
-            width_base = crop_overscan ? 640 : 700;
+            clock_div = 4;
             break;
          case WIDTH_MODE_368:
-            /* Probably slightly off because of rounding, see libretro.cpp comments */
-            width_base = crop_overscan ? 366 : 400;
+            clock_div = 7;
+            break;
+         default:
+            clock_div = 8;
             break;
       }
+
+      /* Rounded to the dot, as the software crop rounds it */
+      width_base = ((crop_overscan ? crop_clocks : 2800) + clock_div / 2) / clock_div;
 
       height_base = (last_visible_scanline - first_visible_scanline + 1) *
                     (rhi_height_mode == HEIGHT_MODE_480 ? 2.0 : 1.0);
@@ -1264,7 +1316,7 @@ float rhi_common_get_aspect_ratio(bool pal_content, int crop_overscan,
    {
       int num_vis_scanlines = last_visible_scanline - first_visible_scanline + 1;
 
-      ar *= (crop_overscan ? (2560.0 / 2800.0) : 1.0);
+      ar *= (crop_overscan ? (crop_clocks / 2800.0) : 1.0);
       ar *= (240.0 / num_vis_scanlines);
 
       return ar;

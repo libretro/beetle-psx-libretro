@@ -1321,6 +1321,7 @@ static void GPU_SoftReset(void) /* Control command 0x00 */
 
    GPU.HorizStart = 0x200;
    GPU.HorizEnd = 0xC00;
+   GPU.crop_window = 608u | (2560u << 16);
 
    GPU.VertStart = 0x10;
    GPU.VertEnd = 0x100;
@@ -1435,6 +1436,7 @@ void GPU_Power(void)
 
    GPU.HorizStart = 0;
    GPU.HorizEnd = 0;
+   GPU.crop_window = 608u | (2560u << 16);
 
    GPU.VertStart = 0;
    GPU.VertEnd = 0;
@@ -1689,12 +1691,19 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V)
             break;
 
          case 0x06:  /* Horizontal display range */
+            /* A new range is a new picture, even with VRAM unchanged */
+            if (   GPU.HorizStart != (V & 0xFFF)
+                || GPU.HorizEnd   != ((V >> 12) & 0xFFF))
+               GPU.display_change_count++;
             GPU.HorizStart = V & 0xFFF;
             GPU.HorizEnd = (V >> 12) & 0xFFF;
             rhi_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
             break;
 
          case 0x07:
+            if (   GPU.VertStart != (V & 0x3FF)
+                || GPU.VertEnd   != ((V >> 10) & 0x3FF))
+               GPU.display_change_count++;
             GPU.VertStart = V & 0x3FF;
             GPU.VertEnd = (V >> 10) & 0x3FF;
             rhi_intf_set_vertical_display_range(GPU.VertStart, GPU.VertEnd);
@@ -2508,15 +2517,33 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                   && GPU.scanline < (FirstVisibleLine + VisibleLineCount))
             {
                int32_t fb_x      = GPU.DisplayFB_XStart * 2;
-               /* Restore old center behaviour if GPU.HorizStart is intentionally very high. */
-               /* 938 fixes Gunbird (1008) and Mobile Light Force (EU release of Gunbird), */
-               /* but this value should be lowered in the future if necessary. */
-               /* Additionally cut off everything after GPU.HorizEnd that shouldn't be */
-               /* in the viewport (the hardware renderers already takes care of this). */
-               int32_t dx_start  = (crop_overscan == 2 && GPU.HorizStart < 938 ? 608 : GPU.HorizStart), dx_end = (crop_overscan == 2 && GPU.HorizStart < 938 ? GPU.HorizEnd - GPU.HorizStart + 608 : GPU.HorizEnd - (GPU.HorizStart < 938 ? 0 : 1));
+               int32_t dx_start, dx_end;
                int32_t dest_line =
                   ((GPU.scanline - FirstVisibleLine) << GPU.espec->InterlaceOn)
                   + GPU.espec->InterlaceField;
+
+               /* One crop window for the whole frame */
+               if (GPU.scanline == FirstVisibleLine)
+                  GPU.crop_window = rhi_common_crop_window(crop_overscan,
+                        (int32_t)GPU.HorizStart, (int32_t)GPU.HorizEnd);
+
+               /* The dynamic crop moves the picture to the start of the
+                * crop window, unless GPU.HorizStart is intentionally very
+                * high: 938 fixes Gunbird (1008) and Mobile Light Force (EU
+                * release of Gunbird), but this value should be lowered in
+                * the future if necessary.  Additionally cut off everything
+                * after GPU.HorizEnd that shouldn't be in the viewport (the
+                * hardware renderers already take care of this). */
+               if (crop_overscan == 2 && GPU.HorizStart < 938)
+               {
+                  dx_start = RHI_CROP_WIN_START(GPU.crop_window);
+                  dx_end   = dx_start + GPU.HorizEnd - GPU.HorizStart;
+               }
+               else
+               {
+                  dx_start = GPU.HorizStart;
+                  dx_end   = GPU.HorizEnd - (GPU.HorizStart < 938 ? 0 : 1);
+               }
 
                if(dx_end < dx_start)
                   dx_end = dx_start;
@@ -2557,7 +2584,8 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
                   if (     dest_line == 0
                         && GPU.espec->loan
                         && GPU.surface == GPU.espec->loan
-                        && (int32_t)dmw != GPU.espec->loan_dmw)
+                        && (   (int32_t)dmw != GPU.espec->loan_dmw
+                            || GPU.crop_window != GPU.espec->loan_win))
                      LeaveLoan();
                   on_loan = GPU.espec->loan && GPU.surface == GPU.espec->loan;
                   ScanoutCacheTarget(GPU.surface);
@@ -3360,6 +3388,11 @@ uint8_t GPU_get_upscale_shift(void)
 uint32_t GPU_get_vertical_range_lines(void)
 {
    return GPU.VertEnd - GPU.VertStart;
+}
+
+uint32_t GPU_get_crop_window(void)
+{
+   return GPU.crop_window;
 }
 
 bool GPU_DMACanWrite(void)

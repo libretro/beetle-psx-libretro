@@ -182,6 +182,14 @@ bool rhi_intf_context_ready(void);
 
 double rhi_common_get_timing_fps(void);
 
+/* Horizontal window the overscan crop keeps, in GPU clocks on the
+ * scanline: start in the low 16 bits, width in the high 16 bits.  It is
+ * the standard 2560-clock window from clock 608, or, for a game whose
+ * GP1(06h) range is wider, that range clamped to the 2800-clock line. */
+#define RHI_CROP_WIN_START(w) ((int32_t)((w) & 0xFFFFu))
+#define RHI_CROP_WIN_WIDTH(w) ((int32_t)((w) >> 16))
+uint32_t rhi_common_crop_window(int crop_overscan, int32_t x1, int32_t x2);
+
 float rhi_common_get_aspect_ratio(bool pal_content, int crop_overscan,
                                   int first_visible_scanline, int last_visible_scanline,
                                   int aspect_ratio_setting, bool vram_override, bool widescreen_override,

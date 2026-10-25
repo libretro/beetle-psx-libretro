@@ -6497,6 +6497,10 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          int x1,
          int x2)
    {
+      /* The scanout is cut to the range; games rewrite an unchanged one
+       * every frame, which must not cost the cached scanout */
+      if (self->render_state.horiz_start != x1 || self->render_state.horiz_end != x2)
+         ih_reset(&self->last_scanout);
       self->render_state.horiz_start = x1;
       self->render_state.horiz_end = x2;
    }
@@ -6504,6 +6508,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          int y1,
          int y2)
    {
+      if (self->render_state.vert_start != y1 || self->render_state.vert_end != y2)
+         ih_reset(&self->last_scanout);
       self->render_state.vert_start = y1;
       self->render_state.vert_end = y2;
    }
@@ -7785,16 +7791,18 @@ static DisplayRect renderer_compute_display_rect(Renderer *self)
    int left_offset;
    if (self->render_state.crop_overscan)
    {
-      /* Horizontal crop amount is currently hardcoded. Future improvement could
-       * allow adjusting this. Restore old center behaviour is
+      /* The crop window follows the game's horizontal range when that is
+       * wider than the standard 2560 clocks. Restore old center behaviour is
        * self->render_state.horiz_start is intentionally very high. 938 fixes
        * Gunbird (1008) and Mobile Light Force (EU release of Gunbird), but this
        * value should be lowerer in the future if necessary. */
-      display_width = (2560/clock_div) - self->render_state.image_crop;
+      uint32_t win = rhi_common_crop_window(self->render_state.crop_overscan,
+            (int32_t)self->render_state.horiz_start, (int32_t)self->render_state.horiz_end);
+      display_width = (RHI_CROP_WIN_WIDTH(win)/clock_div) - self->render_state.image_crop;
       if ((self->render_state.horiz_start < 938) && (self->render_state.crop_overscan == 2))
          left_offset = floor((self->render_state.offset_cycles / (double) clock_div) - (self->render_state.image_crop / 2));
       else
-         left_offset = floor(((self->render_state.horiz_start + self->render_state.offset_cycles - 608) / (double) clock_div) - (self->render_state.image_crop / 2));
+         left_offset = floor(((self->render_state.horiz_start + self->render_state.offset_cycles - RHI_CROP_WIN_START(win)) / (double) clock_div) - (self->render_state.image_crop / 2));
    }
    else
    {

@@ -198,6 +198,9 @@ struct PS_GPU
 
    uint32_t HorizStart;
    uint32_t HorizEnd;
+   /* The overscan crop window for the frame being scanned out, latched
+    * at its first visible line (rhi_common_crop_window) */
+   uint32_t crop_window;
 
    uint32_t VertStart;
    uint32_t VertEnd;
@@ -330,6 +333,7 @@ uint8_t GPU_get_upscale_shift(void);
 /* Lines spanned by the programmed vertical display range (GP1(07)),
  * before any scanline cropping and before interlace doubling. */
 uint32_t GPU_get_vertical_range_lines(void);
+uint32_t GPU_get_crop_window(void);
 
 bool GPU_get_display_possibly_dirty(void);
 

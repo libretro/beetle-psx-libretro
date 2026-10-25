@@ -104,6 +104,7 @@ uint8_t startup_frame_count = 0;
 
 int aspect_ratio_setting = 0;
 bool aspect_ratio_dirty = false;
+bool crop_window_dirty = false;
 bool gpu_fbwrite_fifo_delay = false;
 
 /* libretro callback pointers, formerly defined in libretro_cbs.c. Declared in
@@ -428,46 +429,39 @@ static Deinterlacer deint;
 static MDFN_Surface *surf = NULL;
 
 /* Left edge of the picture in a line of *width dots, and *width cut
- * down to the picture, when overscan is cropped. */
+ * down to the picture, when overscan is cropped.  The line starts at GPU
+ * clock 488 and spans 2800 clocks; what is kept is the window the GPU
+ * latched for the frame (rhi_common_crop_window). */
 static unsigned crop_line(unsigned *width)
 {
+   uint32_t win;
+   unsigned clock_div, start, w;
+
    if (!crop_overscan)
       return 0;
 
-   /* Crop total # of pixels output by PSX in active scanline region down to # of pixels in corresponding horizontal display mode
-    * 280 width -> 256 width.
-    * 350 width -> 320 width.
-    * 400 width -> 366 width.
-    * 560 width -> 512 width.
-    * 700 width -> 640 width. */
    switch (*width)
    {
-      case 280:
-         *width = 256 - image_crop;
-         return 12 - image_offset + (image_crop / 2);
-
-      case 350:
-         *width = 320 - image_crop;
-         return 15 - image_offset + (image_crop / 2);
-
-      /* 368px mode. Some games are overcropped at 364 width or undercropped at 368 width, so crop to 366.
-         Adjust in future if there are issues. */
-      case 400:
-         *width = 366 - image_crop;
-         return 17 - image_offset + (image_crop / 2);
-
-      case 560:
-         *width = 512 - image_crop;
-         return 24 - image_offset + (image_crop / 2);
-
-      case 700:
-         *width = 640 - image_crop;
-         return 30 - image_offset + (image_crop / 2);
-
+      case 280: clock_div = 10; break;
+      case 350: clock_div = 8;  break;
+      case 400: clock_div = 7;  break;
+      case 560: clock_div = 5;  break;
+      case 700: clock_div = 4;  break;
       default:
          /* This shouldn't happen. */
          return 0;
    }
+
+   win   = GPU_get_crop_window();
+   /* Same truncation as the scanout's own dx_start */
+   start = (unsigned)RHI_CROP_WIN_START(win) / clock_div - 488 / clock_div;
+   /* Rounded to the dot: the standard 2560 clocks keep 366 in 368 mode */
+   w     = ((unsigned)RHI_CROP_WIN_WIDTH(win) + clock_div / 2) / clock_div;
+   if (w > *width - start)
+      w = *width - start;
+
+   *width = w - image_crop;
+   return start - image_offset + (image_crop / 2);
 }
 
 /* RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER for the software
@@ -537,6 +531,7 @@ static void acquire_lent_surface(EmulateSpecStruct *spec)
    spec->loan     = &lent_surf;
    spec->loan_h   = lend_h;
    spec->loan_dmw = lend_dmw;
+   spec->loan_win = GPU_get_crop_window();
 }
 
 enum
@@ -7067,6 +7062,14 @@ void retro_run(void)
          aspect_ratio_dirty = false;
 
       // If unable to change geometry here, defer to next frame and leave aspect_ratio_dirty flagged
+   }
+
+   /* The cropped picture's aspect follows the crop window, which follows
+    * the game's horizontal display range. */
+   if (MDFN_UNLIKELY(crop_window_dirty))
+   {
+      if (!crop_overscan || retro_set_geometry())
+         crop_window_dirty = false;
    }
 
    // Check if timing needs to be changed due to interlacing change on this frame

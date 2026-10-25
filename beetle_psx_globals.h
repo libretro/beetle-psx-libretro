@@ -55,6 +55,8 @@ extern uint8_t startup_frame_count;
 
 extern int aspect_ratio_setting;
 extern bool aspect_ratio_dirty;
+/* The overscan crop's window changed width with the GP1(06h) range. */
+extern bool crop_window_dirty;
 extern bool gpu_fbwrite_fifo_delay;
 
 /* Internal drawing policy, independent of the output pixel format. Native
