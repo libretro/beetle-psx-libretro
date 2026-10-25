@@ -1,0 +1,32 @@
+#version 450
+// Packs a rect of the R32 framebuffer into 16-bit VRAM words, two to a
+// uint, for the CPU to copy out row by row: each row starts on a whole
+// uint, an odd row's last half zero.
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(set = 0, binding = 0, r32ui) uniform readonly uimage2D uFramebuffer;
+layout(set = 0, binding = 1, std430) writeonly buffer Packed
+{
+    uint words[];
+};
+
+layout(push_constant, std430) uniform Tile
+{
+    uvec2 offset;
+    uvec2 extent;
+    uint word_offset;
+    uint row_words;
+} tile;
+
+void main()
+{
+    uvec2 id = gl_GlobalInvocationID.xy;
+    if (id.x < tile.row_words && id.y < tile.extent.y)
+    {
+        uint x  = id.x * 2u;
+        uint lo = imageLoad(uFramebuffer, ivec2(tile.offset + uvec2(x, id.y))).x & 0xffffu;
+        uint hi = 0u;
+        if (x + 1u < tile.extent.x)
+            hi = imageLoad(uFramebuffer, ivec2(tile.offset + uvec2(x + 1u, id.y))).x & 0xffffu;
+        words[tile.word_offset + id.y * tile.row_words + id.x] = lo | (hi << 16);
+    }
+}

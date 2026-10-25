@@ -4340,6 +4340,12 @@ static void command_pool_signal_submitted(CommandPool *self,
          unsigned set,
          unsigned binding,
          const ImageView *view);
+   static void commandbuffer_set_storage_buffer(struct CommandBuffer *self,
+         unsigned set,
+         unsigned binding,
+         const Buffer *buffer,
+         VkDeviceSize offset,
+         VkDeviceSize range);
    static void commandbuffer_set_uniform_buffer(struct CommandBuffer *self,
          unsigned set,
          unsigned binding,
@@ -5998,6 +6004,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
          {
             Program *copy_to_vram;
             Program *copy_to_vram_masked;
+            Program *readback_pack;
             Program *unscaled_quad_blitter;
             Program *scaled_quad_blitter;
             Program *bpp24_quad_blitter;
@@ -6555,6 +6562,9 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       ;
    static const uint32_t copy_vram_comp[] =
 #include "shaders_vulkan/prebuilt/copy_vram.comp.inc"
+      ;
+   static const uint32_t readback_pack_comp[] =
+#include "shaders_vulkan/prebuilt/readback_pack.comp.inc"
       ;
    static const uint32_t copy_vram_masked_comp[] =
 #include "shaders_vulkan/prebuilt/copy_vram.masked.comp.inc"
@@ -7259,6 +7269,7 @@ static void renderer_init_pipelines(Renderer *self)
          reduce_cached_color_comp, sizeof(reduce_cached_color_comp));
    self->pipelines.copy_to_vram = device_request_program_compute_code(self->device, copy_vram_comp, sizeof(copy_vram_comp));
    self->pipelines.copy_to_vram_masked = device_request_program_compute_code(self->device, copy_vram_masked_comp, sizeof(copy_vram_masked_comp));
+   self->pipelines.readback_pack = device_request_program_compute_code(self->device, readback_pack_comp, sizeof(readback_pack_comp));
 
    /* Select the 16F storage program twin when the scaled framebuffer is
     * R16F (see scaled_fb_format); the rgba8 program otherwise. One
@@ -7501,7 +7512,7 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
       TTRect tr;
       tr.x     = tx[t]; tr.y      = ty[t];
       tr.width = tw[t]; tr.height = th[t];
-      fbatlas_read_transfer(&self->atlas, Domain_Unscaled, &tr);
+      fbatlas_read_compute(&self->atlas, Domain_Unscaled, &tr);
    }
 
    renderer_ensure_command_buffer(self);
@@ -7511,29 +7522,42 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
       BufferCreateInfo info;
       info.domain = BufferDomain_CachedHost;
       info.size   = (VkDeviceSize)FB_WIDTH * FB_HEIGHT * 4;
-      info.usage  = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+      info.usage  = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
       bh_move(buffer, device_create_buffer(self->device, &info, NULL));
       if (!bh_get(buffer))
          return;
    }
 
-   /* One copy per tile into the tightly packed staging buffer. */
+   /* Each tile is packed to 16-bit words on the GPU, two to a uint and
+    * each row starting on a whole uint, so half the bytes cross to the
+    * host and come out of the staging buffer a row at a time. */
+   commandbuffer_set_program(cbh_get(&self->cmd), self->pipelines.readback_pack);
+   commandbuffer_set_storage_texture(cbh_get(&self->cmd), 0, 0, image_get_view(ih_get(&self->framebuffer)));
+   commandbuffer_set_storage_buffer(cbh_get(&self->cmd), 0, 1, bh_get(buffer), 0,
+         buffer_get_create_info(bh_get(buffer))->size);
    {
-      VkDeviceSize byteoff = 0;
+      uint32_t wordoff = 0;
       for (t = 0; t < tiles; t++)
       {
-         VkOffset3D               _o = { 0, 0, 0 };
-         VkExtent3D               _e = { 0, 0, 1 };
-         VkImageSubresourceLayers _s = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-         _o.x = (int)tx[t]; _o.y = (int)ty[t];
-         _e.width = tw[t];  _e.height = th[t];
-         commandbuffer_copy_image_to_buffer(cbh_get(&self->cmd), bh_get(buffer),
-               ih_get(&self->framebuffer), byteoff, &_o, &_e, 0, 0, &_s);
-         byteoff += (VkDeviceSize)tw[t] * th[t] * 4;
+         struct
+         {
+            uint32_t offset[2];
+            uint32_t extent[2];
+            uint32_t word_offset;
+            uint32_t row_words;
+         } push;
+         push.offset[0]   = tx[t]; push.offset[1] = ty[t];
+         push.extent[0]   = tw[t]; push.extent[1] = th[t];
+         push.word_offset = wordoff;
+         push.row_words   = (tw[t] + 1) >> 1;
+         commandbuffer_push_constants(cbh_get(&self->cmd), &push, 0, sizeof(push));
+         commandbuffer_dispatch(cbh_get(&self->cmd),
+               (push.row_words + 7) >> 3, (th[t] + 7) >> 3, 1);
+         wordoff += push.row_words * th[t];
       }
    }
 
-   commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+   commandbuffer_barrier_simple(cbh_get(&self->cmd), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
                 VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
 
    fence = renderer_flush_and_signal(self);
@@ -7541,19 +7565,26 @@ static void renderer_copy_vram_to_cpu_rects(Renderer *self,
 
    {
       const uint32_t *mapped = (const uint32_t *)(device_map_host_buffer(self->device, bh_get(buffer), MEMORY_ACCESS_READ_BIT));
-      uint32_t        elemoff = 0;
+      uint32_t        wordoff = 0;
       for (t = 0; t < tiles; t++)
       {
-         uint32_t yy;
+         const uint32_t row_words = (tw[t] + 1) >> 1;
+         uint32_t       yy;
+         /* The words hold the pixels in order, low half first, which is
+          * vram's layout on a little-endian host */
          for (yy = 0; yy < th[t]; yy++)
          {
-            const uint32_t *src = mapped + elemoff + yy * tw[t];
+            const uint32_t *src = mapped + wordoff + yy * row_words;
             uint16_t       *dst = vram + (ty[t] + yy) * FB_WIDTH + tx[t];
+#ifdef MSB_FIRST
             uint32_t        xx;
             for (xx = 0; xx < tw[t]; xx++)
-               dst[xx] = (uint16_t)src[xx];
+               dst[xx] = (uint16_t)(src[xx >> 1] >> ((xx & 1) << 4));
+#else
+            memcpy(dst, src, (size_t)tw[t] * sizeof(uint16_t));
+#endif
          }
-         elemoff += tw[t] * th[t];
+         wordoff += row_words * th[t];
       }
 
       if (self->texture_tracking_enabled)
@@ -16113,6 +16144,24 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
       VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
       VK_ASSERT(buffer_get_create_info(buffer)->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+      b = &self->bindings.bindings[set][binding];
+
+      if (buffer->cookie_base.cookie == self->bindings.cookies[set][binding] && b->buffer.offset == offset && b->buffer.range == range)
+         return;
+
+      b->buffer.buffer = buffer_get_buffer(buffer); b->buffer.offset = offset; b->buffer.range = range;
+      self->bindings.cookies[set][binding] = buffer->cookie_base.cookie;
+      self->bindings.secondary_cookies[set][binding] = 0;
+      self->dirty_sets |= 1u << set;
+   }
+
+   static void commandbuffer_set_storage_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer *buffer, VkDeviceSize offset,
+         VkDeviceSize range)
+   {
+      ResourceBinding * b;
+      VK_ASSERT(set < VULKAN_NUM_DESCRIPTOR_SETS);
+      VK_ASSERT(binding < VULKAN_NUM_BINDINGS);
+      VK_ASSERT(buffer_get_create_info(buffer)->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
       b = &self->bindings.bindings[set][binding];
 
       if (buffer->cookie_base.cookie == self->bindings.cookies[set][binding] && b->buffer.offset == offset && b->buffer.range == range)

@@ -67,6 +67,7 @@ mkdir -p prebuilt
 # Copy VRAM shaders
 "$GLSLC" -o prebuilt/copy_vram.comp.inc -mfmt=c copy_vram.comp
 "$GLSLC" -o prebuilt/copy_vram.masked.comp.inc -mfmt=c -DMASKED copy_vram.comp
+"$GLSLC" -o prebuilt/readback_pack.comp.inc -mfmt=c readback_pack.comp
 
 # Blit VRAM shaders
 "$GLSLC" -o prebuilt/blit_vram.scaled.comp.inc -mfmt=c -DSCALED blit_vram.comp
