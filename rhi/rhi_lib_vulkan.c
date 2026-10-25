@@ -121,6 +121,8 @@ extern PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage;
 extern PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;
 extern PFN_vkCmdDispatch vkCmdDispatch;
 extern PFN_vkCmdDraw vkCmdDraw;
+extern PFN_vkCmdDrawIndexed vkCmdDrawIndexed;
+extern PFN_vkCmdBindIndexBuffer vkCmdBindIndexBuffer;
 extern PFN_vkCmdEndRenderPass vkCmdEndRenderPass;
 extern PFN_vkCmdNextSubpass vkCmdNextSubpass;
 extern PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
@@ -278,6 +280,8 @@ static void volkGenLoadDevice(void* context,
    vkCmdCopyImageToBuffer = (PFN_vkCmdCopyImageToBuffer)load(context, "vkCmdCopyImageToBuffer");
    vkCmdDispatch = (PFN_vkCmdDispatch)load(context, "vkCmdDispatch");
    vkCmdDraw = (PFN_vkCmdDraw)load(context, "vkCmdDraw");
+   vkCmdDrawIndexed = (PFN_vkCmdDrawIndexed)load(context, "vkCmdDrawIndexed");
+   vkCmdBindIndexBuffer = (PFN_vkCmdBindIndexBuffer)load(context, "vkCmdBindIndexBuffer");
    vkCmdEndRenderPass = (PFN_vkCmdEndRenderPass)load(context, "vkCmdEndRenderPass");
    vkCmdNextSubpass = (PFN_vkCmdNextSubpass)load(context, "vkCmdNextSubpass");
    vkCmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)load(context, "vkCmdPipelineBarrier");
@@ -380,6 +384,8 @@ PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage;
 PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;
 PFN_vkCmdDispatch vkCmdDispatch;
 PFN_vkCmdDraw vkCmdDraw;
+PFN_vkCmdDrawIndexed vkCmdDrawIndexed;
+PFN_vkCmdBindIndexBuffer vkCmdBindIndexBuffer;
 PFN_vkCmdEndRenderPass vkCmdEndRenderPass;
 PFN_vkCmdNextSubpass vkCmdNextSubpass;
 PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
@@ -4361,6 +4367,8 @@ static void command_pool_signal_submitted(CommandPool *self,
          VkDeviceSize size,
          VkDeviceSize stride,
          VkVertexInputRate step_rate);
+   static uint32_t *commandbuffer_allocate_index_data(struct CommandBuffer *self,
+         uint32_t count);
 
    /* Group D: state-setter free functions. The SET_STATIC_STATE /
     * SET_POTENTIALLY_STATIC_STATE macros are redefined to operate on self. */
@@ -4409,6 +4417,9 @@ static void command_pool_signal_submitted(CommandPool *self,
          uint32_t instance_count,
          uint32_t first_vertex,
          uint32_t first_instance);
+   static void commandbuffer_draw_indexed(struct CommandBuffer *self,
+         uint32_t index_count,
+         uint32_t first_index);
    static void commandbuffer_dispatch(struct CommandBuffer *self,
          uint32_t groups_x,
          uint32_t groups_y,
@@ -5477,6 +5488,8 @@ static struct PrimitiveInfo primitive_info_make(
       bool scaled_read;
       unsigned shift;
       bool offset_uv;
+      /* The triangle in the queue's vertices; not part of the state */
+      unsigned triangle_index;
    };
    POD_VEC_DECLARE(SemiTransparentStateVec, SemiTransparentState);
 
@@ -5765,19 +5778,20 @@ static void render_state_init(struct RenderState *s)
  * backing storage is freed in ~Renderer (already explicit). */
 struct OpaqueQueue
 {
+   /* Every queued primitive's vertices, once, in the order pushed; the
+    * queues below refer to them by triangle and draw them indexed. */
+   BufferVertexVec vertices;
+
    /* Non-textured primitives. */
-   BufferVertexVec opaque;
    PrimitiveInfoVec opaque_scissor;
 
    /* Textured primitives, no semi-transparency. */
-   BufferVertexVec opaque_textured;
    PrimitiveInfoVec opaque_textured_scissor;
 
    /* Textured primitives, semi-transparency enabled. */
-   BufferVertexVec semi_transparent_opaque;
    PrimitiveInfoVec semi_transparent_opaque_scissor;
 
-   BufferVertexVec semi_transparent;
+   /* Blended in order: one per triangle */
    SemiTransparentStateVec semi_transparent_state;
 
    Rect2DVec scaled_resolves;
@@ -5799,13 +5813,10 @@ static void opaque_queue_init(struct OpaqueQueue *q)
    /* Each POD_VEC's empty state is { items=NULL, count=0, cap=0 }; the macro
     * provides no _init, so zero the three fields directly. */
 #define OQ_VEC_ZERO(v) do { (v).items = NULL; (v).count = 0; (v).cap = 0; } while (0)
-   OQ_VEC_ZERO(q->opaque);
+   OQ_VEC_ZERO(q->vertices);
    OQ_VEC_ZERO(q->opaque_scissor);
-   OQ_VEC_ZERO(q->opaque_textured);
    OQ_VEC_ZERO(q->opaque_textured_scissor);
-   OQ_VEC_ZERO(q->semi_transparent_opaque);
    OQ_VEC_ZERO(q->semi_transparent_opaque_scissor);
-   OQ_VEC_ZERO(q->semi_transparent);
    OQ_VEC_ZERO(q->semi_transparent_state);
    OQ_VEC_ZERO(q->scaled_resolves);
    OQ_VEC_ZERO(q->unscaled_resolves);
@@ -6219,7 +6230,6 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
     * ones whose definitions appear later in the file. */
    static TTGpuBackend vk_tt_make_backend(Renderer *self);
    static void renderer_dispatch(Renderer *self,
-         const BufferVertexVec *vertices,
          PrimitiveInfoVec *scissors,
          bool textured);
    static void renderer_render_opaque_primitives(Renderer *self);
@@ -6316,9 +6326,8 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    }
 
    static void renderer_render_semi_transparent_opaque_texture_primitives(Renderer *self){
-      BufferVertexVec *vertices = &self->queue.semi_transparent_opaque;
       PrimitiveInfoVec *scissors = &self->queue.semi_transparent_opaque_scissor;
-      if (BufferVertexVec_empty(vertices))
+      if (PrimitiveInfoVec_empty(scissors))
          return;
 
       commandbuffer_set_opaque_state(cbh_get(&self->cmd));
@@ -6332,13 +6341,12 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-      renderer_dispatch(self, vertices, scissors, true);
+      renderer_dispatch(self, scissors, true);
    }
 
    static void renderer_render_opaque_texture_primitives(Renderer *self){
-      BufferVertexVec *vertices = &self->queue.opaque_textured;
       PrimitiveInfoVec *scissors = &self->queue.opaque_textured_scissor;
-      if (BufferVertexVec_empty(vertices))
+      if (PrimitiveInfoVec_empty(scissors))
          return;
 
       commandbuffer_set_opaque_state(cbh_get(&self->cmd));
@@ -6352,7 +6360,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
       commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-      renderer_dispatch(self, vertices, scissors, true);
+      renderer_dispatch(self, scissors, true);
    }
 
 
@@ -10055,47 +10063,38 @@ static void renderer_build_attribs(Renderer *self, BufferVertex *output, const V
    }
 }
 
-static BufferVertexVec * renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture,
+/* Queues the next prims triangles, about to be pushed to queue.vertices,
+ * on the opaque queue their state selects; false when they are drawn only
+ * through the blended path. */
+static bool renderer_select_pipeline(Renderer *self, unsigned prims, int scissor, HdTextureHandle hd_texture,
    bool filtering, bool scaled_read, unsigned shift, bool offset_uv){
+   const unsigned first = (unsigned)BufferVertexVec_size(&self->queue.vertices) / 3;
+   PrimitiveInfoVec *queue;
+   unsigned i;
+
    /* For mask testing, force primitives through the serialized blend path. */
    if (self->render_state.mask_test)
-      return NULL;
+      return false;
 
    if (filtering)
       filtering = !renderer_get_filer_exclude(self, FilterExcludeOpaque);
 
    if (self->render_state.texture_mode != TextureMode_None)
-   {
-      if (self->render_state.semi_transparent != SemiTransparentMode_None)
-      {
-         { unsigned i; for (i = 0; i < prims; i++) {
-            PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&self->queue.semi_transparent_opaque_scissor), scissor, hd_texture,
-               filtering, scaled_read, shift, offset_uv);
-            PrimitiveInfoVec_push(&self->queue.semi_transparent_opaque_scissor, &_pi);
-         } }
-         return &self->queue.semi_transparent_opaque;
-      }
-      else
-      {
-         { unsigned i; for (i = 0; i < prims; i++) {
-            PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_textured_scissor), scissor, hd_texture,
-               filtering, scaled_read, shift, offset_uv);
-            PrimitiveInfoVec_push(&self->queue.opaque_textured_scissor, &_pi);
-         } }
-         return &self->queue.opaque_textured;
-      }
-   }
+      queue = self->render_state.semi_transparent != SemiTransparentMode_None
+         ? &self->queue.semi_transparent_opaque_scissor
+         : &self->queue.opaque_textured_scissor;
    else if (self->render_state.semi_transparent != SemiTransparentMode_None)
-      return NULL;
+      return false;
    else
+      queue = &self->queue.opaque_scissor;
+
+   for (i = 0; i < prims; i++)
    {
-      { unsigned i; for (i = 0; i < prims; i++) {
-         PrimitiveInfo _pi = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), scissor, hd_texture,
+      PrimitiveInfo _pi = primitive_info_make(first + i, scissor, hd_texture,
             filtering, scaled_read, shift, offset_uv);
-         PrimitiveInfoVec_push(&self->queue.opaque_scissor, &_pi);
-      } }
-      return &self->queue.opaque;
+      PrimitiveInfoVec_push(queue, &_pi);
    }
+   return true;
 }
 
 static void renderer_build_line_quad(Renderer *self,
@@ -10402,25 +10401,18 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
    renderer_build_attribs(self, vert, vertices, 3, &hd_texture_index, &filtering, &scaled_read, &shift, &offset_uv);
    renderer_build_native_interpolants(self, vert, vertices);
    { const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
-   BufferVertexVec *out = renderer_select_pipeline(self, 1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
-   if (out)
-   {
-      {
-         unsigned i;
-         for (i = 0; i < 3; i++) BufferVertexVec_push(out, &vert[i]);
-      }
-   }
+   const unsigned triangle = (unsigned)BufferVertexVec_size(&self->queue.vertices) / 3;
+   unsigned i;
+
+   renderer_select_pipeline(self, 1, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+   for (i = 0; i < 3; i++)
+      BufferVertexVec_push(&self->queue.vertices, &vert[i]);
 
    if (self->render_state.mask_test || self->render_state.semi_transparent != SemiTransparentMode_None)
    {
       if (filtering)
          filtering = !renderer_get_filer_exclude(self, FilterExcludeOpaqueAndSemiTrans);
 
-      {
-         unsigned i;
-         for (i = 0; i < 3; i++)
-            BufferVertexVec_push(&self->queue.semi_transparent, &vert[i]);
-      }
       {
          SemiTransparentState _sts = { scissor_index, hd_texture_index, self->render_state.semi_transparent,
                                                self->render_state.texture_mode != TextureMode_None,
@@ -10431,6 +10423,7 @@ static void renderer_draw_triangle(Renderer *self, const Vertex *vertices)
                                                scaled_read,
                                      shift,
                                      offset_uv };
+         _sts.triangle_index = triangle;
          SemiTransparentStateVec_push(&self->queue.semi_transparent_state, &_sts);
       }
 
@@ -10489,24 +10482,22 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices, bool poly
       renderer_build_native_interpolants(self, vert + 3, vertices + 1);
    }
    { const int scissor_index = self->queue.scissor_invariant ? -1 : (int)(Rect2DVec_size(&self->queue.scissors) - 1);
-   BufferVertexVec *out = renderer_select_pipeline(self, 2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+   const unsigned triangle = (unsigned)BufferVertexVec_size(&self->queue.vertices) / 3;
 
-   if (out)
-   {
-      BufferVertexVec_push(out, &vert[0]);
-      BufferVertexVec_push(out, &vert[1]);
-      BufferVertexVec_push(out, &vert[2]);
-      BufferVertexVec_push(out, &vert[5]);
-      BufferVertexVec_push(out, &vert[4]);
-      BufferVertexVec_push(out, &vert[3]);
-   }
+   renderer_select_pipeline(self, 2, scissor_index, hd_texture_index, filtering, scaled_read, shift, offset_uv);
+   BufferVertexVec_push(&self->queue.vertices, &vert[0]);
+   BufferVertexVec_push(&self->queue.vertices, &vert[1]);
+   BufferVertexVec_push(&self->queue.vertices, &vert[2]);
+   BufferVertexVec_push(&self->queue.vertices, &vert[5]);
+   BufferVertexVec_push(&self->queue.vertices, &vert[4]);
+   BufferVertexVec_push(&self->queue.vertices, &vert[3]);
 
    if (self->render_state.mask_test || self->render_state.semi_transparent != SemiTransparentMode_None)
    {
       if (filtering)
          filtering = !renderer_get_filer_exclude(self, FilterExcludeOpaqueAndSemiTrans);
 
-      { const SemiTransparentState state = {
+      { SemiTransparentState state = {
          scissor_index, hd_texture_index, self->render_state.semi_transparent,
          self->render_state.texture_mode != TextureMode_None,
          self->render_state.mask_test,
@@ -10516,13 +10507,9 @@ static void renderer_draw_quad(Renderer *self, const Vertex *vertices, bool poly
          scaled_read,
          shift,
          offset_uv };
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[0]);
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[1]);
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[2]);
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[5]);
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[4]);
-      BufferVertexVec_push(&self->queue.semi_transparent, &vert[3]);
+      state.triangle_index = triangle;
       SemiTransparentStateVec_push(&self->queue.semi_transparent_state, &state);
+      state.triangle_index = triangle + 1;
       SemiTransparentStateVec_push(&self->queue.semi_transparent_state, &state);
 
       /* We've hit the dragon path, we'll need programmable blending for this render pass. */
@@ -10558,18 +10545,19 @@ static void renderer_clear_quad(Renderer *self,
    BufferVertex pos1 = { (float)(rect->x) + (float)(rect->width), (float)(rect->y), z, 1.0f, { fbr, fbg, fbb, 0.0f } };
    BufferVertex pos2 = { (float)(rect->x), (float)(rect->y) + (float)(rect->height), z, 1.0f, { fbr, fbg, fbb, 0.0f } };
    BufferVertex pos3 = { (float)(rect->x) + (float)(rect->width), (float)(rect->y) + (float)(rect->height), z, 1.0f, { fbr, fbg, fbb, 0.0f } };
-   BufferVertexVec_push(&self->queue.opaque, &pos0);
-   BufferVertexVec_push(&self->queue.opaque, &pos1);
-   BufferVertexVec_push(&self->queue.opaque, &pos2);
-   BufferVertexVec_push(&self->queue.opaque, &pos3);
-   BufferVertexVec_push(&self->queue.opaque, &pos2);
-   BufferVertexVec_push(&self->queue.opaque, &pos1);
+   const unsigned triangle = (unsigned)BufferVertexVec_size(&self->queue.vertices) / 3;
+   BufferVertexVec_push(&self->queue.vertices, &pos0);
+   BufferVertexVec_push(&self->queue.vertices, &pos1);
+   BufferVertexVec_push(&self->queue.vertices, &pos2);
+   BufferVertexVec_push(&self->queue.vertices, &pos3);
+   BufferVertexVec_push(&self->queue.vertices, &pos2);
+   BufferVertexVec_push(&self->queue.vertices, &pos1);
    {
-      PrimitiveInfo _pi0 = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), -1, hd_handle_make_none(), false, false, 0, false);
+      PrimitiveInfo _pi0 = primitive_info_make(triangle, -1, hd_handle_make_none(), false, false, 0, false);
       PrimitiveInfoVec_push(&self->queue.opaque_scissor, &_pi0);
    }
    {
-      PrimitiveInfo _pi1 = primitive_info_make(PrimitiveInfoVec_size(&self->queue.opaque_scissor), -1, hd_handle_make_none(), false, false, 0, false);
+      PrimitiveInfo _pi1 = primitive_info_make(triangle + 1, -1, hd_handle_make_none(), false, false, 0, false);
       PrimitiveInfoVec_push(&self->queue.opaque_scissor, &_pi1);
    }
 
@@ -10708,6 +10696,49 @@ static void renderer_snapshot_scaled_texture_reads(Renderer *self)
          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 }
 
+/* The render pass's queued vertices, staged once, for every queue to draw
+ * from by index. On the 16F target, with blended primitives queued, the
+ * full-framebuffer quad the subtractive floor draws (renderer_emit_sub_floor)
+ * follows them: depth is a don't-care, the floor pass disables the depth
+ * test. False when there is nothing to draw or nowhere to stage it. */
+static bool renderer_upload_queued_vertices(Renderer *self)
+{
+   const unsigned nverts = (unsigned)BufferVertexVec_size(&self->queue.vertices);
+   const bool     floor  = !SemiTransparentStateVec_empty(&self->queue.semi_transparent_state)
+      && self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT
+      && !psx_hdr_multipass;
+   BufferVertex  *dst;
+
+   if (!nverts)
+      return false;
+   dst = (BufferVertex *)commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0,
+         (VkDeviceSize)(nverts + (floor ? 6 : 0)) * sizeof(BufferVertex),
+         sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX);
+   if (!dst)
+      return false;
+
+   memcpy(dst, BufferVertexVec_data(&self->queue.vertices),
+         (size_t)nverts * sizeof(BufferVertex));
+   if (floor)
+   {
+      BufferVertex *fv = dst + nverts;
+      unsigned fi;
+      memset(fv, 0, 6 * sizeof(BufferVertex));
+      fv[1].x = (float)FB_WIDTH;
+      fv[2].y = (float)FB_HEIGHT;
+      fv[3].x = (float)FB_WIDTH;
+      fv[3].y = (float)FB_HEIGHT;
+      fv[4] = fv[2];
+      fv[5] = fv[1];
+      for (fi = 0; fi < 6; fi++)
+      {
+         fv[fi].z = 0.5f;
+         fv[fi].w = 1.0f;
+      }
+   }
+   return true;
+}
+
 static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
 {
    RenderPassInfo_Subpass subpasses[2];
@@ -10785,12 +10816,18 @@ static void renderer_flush_render_pass(Renderer *self, const TTRect *rect)
    self->queue.default_scissor = info.render_area;
    commandbuffer_set_texture_view_stock(cbh_get(&self->cmd), 0, 5, image_get_view(ih_get(&self->palette_cache)), StockSampler_NearestClamp);
 
-   renderer_render_opaque_primitives(self);
-   renderer_render_opaque_texture_primitives(self);
-   renderer_render_semi_transparent_opaque_texture_primitives(self);
+   { const bool staged = renderer_upload_queued_vertices(self);
+   if (staged)
+   {
+      renderer_render_opaque_primitives(self);
+      renderer_render_opaque_texture_primitives(self);
+      renderer_render_semi_transparent_opaque_texture_primitives(self);
+   }
    if (self->render_pass_is_feedback)
       commandbuffer_next_subpass(cbh_get(&self->cmd));
-   renderer_render_semi_transparent_primitives(self);
+   if (staged)
+      renderer_render_semi_transparent_primitives(self);
+   }
 
    commandbuffer_end_render_pass(cbh_get(&self->cmd));
 
@@ -10868,40 +10905,43 @@ static int renderer_primitive_info_qsort_cmp(const void *pa, const void *pb){
 }
 
 static void renderer_dispatch(Renderer *self,
-      const BufferVertexVec *vertices,
       PrimitiveInfoVec *scissors,
       bool textured){
+   const PrimitiveInfo *pi;
    unsigned to_draw;
-   qsort(PrimitiveInfoVec_data(scissors), PrimitiveInfoVec_size(scissors), sizeof(PrimitiveInfo), renderer_primitive_info_qsort_cmp);
-
-   /* Render flat-shaded primitives. */
-   { BufferVertex *vert = (BufferVertex *)(
-       commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0, BufferVertexVec_size(vertices) * sizeof(BufferVertex), sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX));
-
-   int scissor = (*PrimitiveInfoVec_front(scissors)).scissor_index;
-   HdTextureHandle hd_texture = (*PrimitiveInfoVec_front(scissors)).hd_texture_index;
-   bool filtering = (*PrimitiveInfoVec_front(scissors)).filtering;
-   bool scaled_read = (*PrimitiveInfoVec_front(scissors)).scaled_read;
-   unsigned shift = (*PrimitiveInfoVec_front(scissors)).shift;
-   bool offset_uv = (*PrimitiveInfoVec_front(scissors)).offset_uv;
-   unsigned last_draw = 0;
-   unsigned i = 1;
+   uint32_t *index;
+   unsigned i, k, last_draw = 0;
    unsigned size = PrimitiveInfoVec_size(scissors);
-   unsigned avail = (unsigned)BufferVertexVec_size(vertices) / 3;
+   /* A triangle the vertices do not hold is drawn degenerate */
+   const unsigned avail = (unsigned)BufferVertexVec_size(&self->queue.vertices) / 3;
+   int scissor;
+   HdTextureHandle hd_texture;
+   bool filtering, scaled_read, offset_uv;
+   unsigned shift;
 
-   /* A vertex block allocation can come back empty when the device is out
-    * of host-visible memory; the staging writes below have nowhere to go. */
-   if (!vert)
-      return;
-
-   /* One PrimitiveInfo per three queued vertices. The two queues grow
-    * independently, so bound the walk by the vertices actually present:
-    * the loop writes three vertices per entry into an allocation sized
-    * from the vertex queue, and indexes the source by triangle_index. */
-   if (size > avail)
-      size = avail;
    if (!size)
       return;
+   qsort(PrimitiveInfoVec_data(scissors), size, sizeof(PrimitiveInfo), renderer_primitive_info_qsort_cmp);
+
+   /* The queue's triangles, in the order sorted, as indices into the
+    * render pass's vertices. NULL when the device is out of host-visible
+    * memory: there is nowhere to stage them. */
+   if (!(index = commandbuffer_allocate_index_data(cbh_get(&self->cmd), 3 * size)))
+      return;
+   for (i = 0; i < size; i++)
+   {
+      const unsigned t = PrimitiveInfoVec_at(scissors, i)->triangle_index;
+      for (k = 0; k < 3; k++)
+         index[3 * i + k] = t < avail ? 3 * t + k : 0;
+   }
+
+   pi          = PrimitiveInfoVec_front(scissors);
+   scissor     = pi->scissor_index;
+   hd_texture  = pi->hd_texture_index;
+   filtering   = pi->filtering;
+   scaled_read = pi->scaled_read;
+   shift       = pi->shift;
+   offset_uv   = pi->offset_uv;
 
    if (textured)
       renderer_hd_texture_uniforms(self, hd_texture);
@@ -10910,59 +10950,55 @@ static void renderer_dispatch(Renderer *self,
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, shift);
    commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
    renderer_dispatch_set_scaled_read_texture(self, scaled_read, textured);
-   memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)vertices) + 3 * (*PrimitiveInfoVec_front(scissors)).triangle_index, 3 * sizeof(BufferVertex));
-   vert += 3;
 
-   for (; i < size; i++, vert += 3)
+   for (i = 1; i < size; i++)
    {
-      if ((*PrimitiveInfoVec_at(scissors, i)).scissor_index != scissor || hd_handle_ne(&(*PrimitiveInfoVec_at(scissors, i)).hd_texture_index, &hd_texture) ||
-         (*PrimitiveInfoVec_at(scissors, i)).filtering != filtering || (*PrimitiveInfoVec_at(scissors, i)).scaled_read != scaled_read || (*PrimitiveInfoVec_at(scissors, i)).shift != shift ||
-         (*PrimitiveInfoVec_at(scissors, i)).offset_uv != offset_uv)
+      pi = PrimitiveInfoVec_at(scissors, i);
+      if (pi->scissor_index != scissor || hd_handle_ne(&pi->hd_texture_index, &hd_texture) ||
+         pi->filtering != filtering || pi->scaled_read != scaled_read || pi->shift != shift ||
+         pi->offset_uv != offset_uv)
       {
-         unsigned to_draw = i - last_draw;
+         to_draw = i - last_draw;
          commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
-         commandbuffer_draw(cbh_get(&self->cmd), 3 * to_draw, 1, 3 * last_draw, 0);
+         commandbuffer_draw_indexed(cbh_get(&self->cmd), 3 * to_draw, 3 * last_draw);
          last_draw = i;
 
-         if ((*PrimitiveInfoVec_at(scissors, i)).scissor_index != scissor) {
-            scissor = (*PrimitiveInfoVec_at(scissors, i)).scissor_index;
+         if (pi->scissor_index != scissor) {
+            scissor = pi->scissor_index;
             commandbuffer_set_scissor(cbh_get(&self->cmd), scissor < 0 ? &self->queue.default_scissor : Rect2DVec_at(&self->queue.scissors, scissor));
          }
-         if (hd_handle_ne(&(*PrimitiveInfoVec_at(scissors, i)).hd_texture_index, &hd_texture)) {
-            hd_texture = (*PrimitiveInfoVec_at(scissors, i)).hd_texture_index;
+         if (hd_handle_ne(&pi->hd_texture_index, &hd_texture)) {
+            hd_texture = pi->hd_texture_index;
             if (textured)
                renderer_hd_texture_uniforms(self, hd_texture);
          }
-         if ((*PrimitiveInfoVec_at(scissors, i)).filtering != filtering) {
-            filtering = (*PrimitiveInfoVec_at(scissors, i)).filtering;
+         if (pi->filtering != filtering) {
+            filtering = pi->filtering;
             commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_FilterMode, filtering ? self->primitive_filter_mode : FilterMode_NearestNeighbor);
          }
-         if ((*PrimitiveInfoVec_at(scissors, i)).scaled_read != scaled_read) {
-            scaled_read = (*PrimitiveInfoVec_at(scissors, i)).scaled_read;
+         if (pi->scaled_read != scaled_read) {
+            scaled_read = pi->scaled_read;
             renderer_dispatch_set_scaled_read_texture(self, scaled_read, textured);
          }
-         if ((*PrimitiveInfoVec_at(scissors, i)).shift != shift) {
-            shift = (*PrimitiveInfoVec_at(scissors, i)).shift;
+         if (pi->shift != shift) {
+            shift = pi->shift;
             commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_Shift, shift);
          }
-         if ((*PrimitiveInfoVec_at(scissors, i)).offset_uv != offset_uv) {
-            offset_uv = (*PrimitiveInfoVec_at(scissors, i)).offset_uv;
+         if (pi->offset_uv != offset_uv) {
+            offset_uv = pi->offset_uv;
             commandbuffer_set_specialization_constant(cbh_get(&self->cmd), SpecConstIndex_OffsetUV, (int)offset_uv);
          }
       }
-      memcpy(vert, BufferVertexVec_data((struct BufferVertexVec *)vertices) + 3 * (*PrimitiveInfoVec_at(scissors, i)).triangle_index, 3 * sizeof(BufferVertex));
    }
 
    to_draw = size - last_draw;
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
-   commandbuffer_draw(cbh_get(&self->cmd), 3 * to_draw, 1, 3 * last_draw, 0);
-   }
+   commandbuffer_draw_indexed(cbh_get(&self->cmd), 3 * to_draw, 3 * last_draw);
 }
 
 static void renderer_render_opaque_primitives(Renderer *self){
-   BufferVertexVec *vertices = &self->queue.opaque;
    PrimitiveInfoVec *scissors = &self->queue.opaque_scissor;
-   if (BufferVertexVec_empty(vertices))
+   if (PrimitiveInfoVec_empty(scissors))
       return;
 
    commandbuffer_set_opaque_state(cbh_get(&self->cmd));
@@ -10973,7 +11009,7 @@ static void renderer_render_opaque_primitives(Renderer *self){
    renderer_set_opaque_primitive_spec_constants(self, TransMode_Opaque);
    commandbuffer_set_primitive_topology(cbh_get(&self->cmd), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-   renderer_dispatch(self, vertices, scissors, false);
+   renderer_dispatch(self, scissors, false);
 }
 
 static void renderer_hd_texture_uniforms(Renderer *self,
@@ -11116,7 +11152,7 @@ static void renderer_emit_sub_ceiling(Renderer *self, const SemiTransparentState
    commandbuffer_set_blend_factors(cbh_get(&self->cmd), VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO,
          VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ONE);
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
-   commandbuffer_draw(cbh_get(&self->cmd), count * 3, 1, first_prim * 3, 0);
+   commandbuffer_draw_indexed(cbh_get(&self->cmd), count * 3, first_prim * 3);
    renderer_semi_transparent_set_state(self, state);
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
 }
@@ -11141,49 +11177,20 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 4, 0, VK_FORMAT_R16G16B16A16_SINT, offsetof(BufferVertex, u));
    commandbuffer_set_vertex_attrib(cbh_get(&self->cmd), 5, 0, VK_FORMAT_R16G16B16A16_UINT, offsetof(BufferVertex, min_u));
 
-   { bool append_floor = self->scaled_fb_format == VK_FORMAT_R16G16B16A16_SFLOAT &&
-         !psx_hdr_multipass;
-   unsigned nverts = (unsigned)BufferVertexVec_size(&self->queue.semi_transparent);
-   size_t size = (size_t)nverts * sizeof(BufferVertex);
-   void *verts = commandbuffer_allocate_vertex_data(cbh_get(&self->cmd), 0,
-         size + (append_floor ? 6 * sizeof(BufferVertex) : 0),
-         sizeof(BufferVertex), VK_VERTEX_INPUT_RATE_VERTEX);
-
-   /* Out of host-visible memory: nothing to stage into. */
-   if (!verts)
+   { const unsigned nverts = (unsigned)BufferVertexVec_size(&self->queue.vertices);
+   const unsigned avail  = nverts / 3;
+   unsigned i, k;
+   /* In the order queued, as indices into the render pass's vertices; a
+    * triangle the vertices do not hold is drawn degenerate. NULL when out
+    * of host-visible memory: nowhere to stage them. */
+   uint32_t *index = commandbuffer_allocate_index_data(cbh_get(&self->cmd), 3 * prims);
+   if (!index)
       return;
-
-   /* One SemiTransparentState per three queued vertices. The two queues
-    * grow independently, so bound the batch walk and every draw range by
-    * the vertices actually present. */
-   if (prims > nverts / 3)
-      prims = nverts / 3;
-   if (!prims)
-      return;
-
-   memcpy(verts, BufferVertexVec_data(&self->queue.semi_transparent), size);
-
-   /* Multipass off: one full-framebuffer quad at the tail of the vertex
-    * data, drawn with MAX blending after each fixed-function subtractive
-    * batch (renderer_emit_sub_floor). 96 bytes, appended only on the 16F
-    * target; depth is a don't-care because the floor pass disables the
-    * depth test. */
-   if (append_floor)
+   for (i = 0; i < prims; i++)
    {
-      BufferVertex *fv = (BufferVertex *)verts + nverts;
-      unsigned fi;
-      memset(fv, 0, 6 * sizeof(BufferVertex));
-      fv[1].x = (float)FB_WIDTH;
-      fv[2].y = (float)FB_HEIGHT;
-      fv[3].x = (float)FB_WIDTH;
-      fv[3].y = (float)FB_HEIGHT;
-      fv[4] = fv[2];
-      fv[5] = fv[1];
-      for (fi = 0; fi < 6; fi++)
-      {
-         fv[fi].z = 0.5f;
-         fv[fi].w = 1.0f;
-      }
+      const unsigned t = SemiTransparentStateVec_at(&self->queue.semi_transparent_state, i)->triangle_index;
+      for (k = 0; k < 3; k++)
+         index[3 * i + k] = t < avail ? 3 * t + k : 0;
    }
 
    last_state = *SemiTransparentStateVec_at(&self->queue.semi_transparent_state, 0);
@@ -11192,7 +11199,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
 
    /* These pixels are blended, so we have to render them in-order.
     * Batch up as long as we can. */
-   { unsigned i; for (i = 1; i < prims; i++) {
+   { for (i = 1; i < prims; i++) {
       /* Preserve per-primitive boundaries for feedback reads and native-
        * colour draws; later primitives may overlap earlier ones. */
       if (renderer_semi_trans_needs_separate_draw(self, &last_state) ||
@@ -11214,7 +11221,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
 
          if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
             renderer_emit_sub_ceiling(self, &last_state, last_draw_offset, to_draw);
-         commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
+         commandbuffer_draw_indexed(cbh_get(&self->cmd), to_draw * 3, last_draw_offset * 3);
          if (self->msaa > 1)
             commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
          if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
@@ -11230,7 +11237,7 @@ static void renderer_render_semi_transparent_primitives(Renderer *self){
    commandbuffer_set_specialization_constant_mask(cbh_get(&self->cmd), -1);
    if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
       renderer_emit_sub_ceiling(self, &last_state, last_draw_offset, to_draw);
-   commandbuffer_draw(cbh_get(&self->cmd), to_draw * 3, 1, last_draw_offset * 3, 0);
+   commandbuffer_draw_indexed(cbh_get(&self->cmd), to_draw * 3, last_draw_offset * 3);
    if (self->msaa > 1)
       commandbuffer_set_multisample_state(cbh_get(&self->cmd), false, false, false);
    if (renderer_semi_trans_batch_wants_sub_floor(self, &last_state))
@@ -11817,13 +11824,10 @@ static void renderer_fini(Renderer *self)
    bh_reset(&self->quad);
    imageview_vec_destroy(&self->scaled_views); /* release scaled image views (was member teardown) */
    /* Free the per-frame draw-self->queue arrays (POD_VEC backing storage). */
-   BufferVertexVec_free_storage(&self->queue.opaque);
+   BufferVertexVec_free_storage(&self->queue.vertices);
    PrimitiveInfoVec_free_storage(&self->queue.opaque_scissor);
-   BufferVertexVec_free_storage(&self->queue.opaque_textured);
    PrimitiveInfoVec_free_storage(&self->queue.opaque_textured_scissor);
-   BufferVertexVec_free_storage(&self->queue.semi_transparent_opaque);
    PrimitiveInfoVec_free_storage(&self->queue.semi_transparent_opaque_scissor);
-   BufferVertexVec_free_storage(&self->queue.semi_transparent);
    SemiTransparentStateVec_free_storage(&self->queue.semi_transparent_state);
    Rect2DVec_free_storage(&self->queue.scaled_resolves);
    Rect2DVec_free_storage(&self->queue.unscaled_resolves);
@@ -11851,13 +11855,10 @@ static void renderer_reset_scissor_queue(Renderer *self)
 
 static void renderer_reset_queue(Renderer *self)
 {
-   BufferVertexVec_clear(&self->queue.opaque);
+   BufferVertexVec_clear(&self->queue.vertices);
    PrimitiveInfoVec_clear(&self->queue.opaque_scissor);
-   BufferVertexVec_clear(&self->queue.opaque_textured);
    PrimitiveInfoVec_clear(&self->queue.opaque_textured_scissor);
-   BufferVertexVec_clear(&self->queue.semi_transparent);
    SemiTransparentStateVec_clear(&self->queue.semi_transparent_state);
-   BufferVertexVec_clear(&self->queue.semi_transparent_opaque);
    PrimitiveInfoVec_clear(&self->queue.semi_transparent_opaque_scissor);
    ClearCandidateVec_clear(&self->queue.clear_candidates);
    Rect2DVec_clear(&self->queue.scaled_texture_reads);
@@ -16137,6 +16138,25 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       return data.host;
    }
 
+   /* count 32-bit indices out of the vertex block, bound as the index
+    * buffer; NULL when the device is out of host-visible memory */
+   static uint32_t *commandbuffer_allocate_index_data(struct CommandBuffer *self,
+         uint32_t count)
+   {
+      const VkDeviceSize size = (VkDeviceSize)count * sizeof(uint32_t);
+      BufferBlockAllocation data = bufferblock_allocate(&self->vbo_block, size);
+      if (!data.host)
+      {
+         device_request_vertex_block(self->device, &self->vbo_block, size);
+         data = bufferblock_allocate(&self->vbo_block, size);
+      }
+      if (!data.host)
+         return NULL;
+      vkCmdBindIndexBuffer(self->cmd, buffer_get_buffer(bh_get(&self->vbo_block.gpu)),
+            data.offset, VK_INDEX_TYPE_UINT32);
+      return (uint32_t *)data.host;
+   }
+
    static void commandbuffer_set_uniform_buffer(struct CommandBuffer *self, unsigned set, unsigned binding, const Buffer *buffer, VkDeviceSize offset,
          VkDeviceSize range)
    {
@@ -16542,6 +16562,18 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       VK_ASSERT(!self->is_compute);
       commandbuffer_flush_render_state(self);
       vkCmdDraw(self->cmd, vertex_count, instance_count, first_vertex, first_instance);
+   }
+
+   /* Draws index_count 32-bit indices from first_index of the index buffer
+    * commandbuffer_allocate_index_data bound last */
+   static void commandbuffer_draw_indexed(struct CommandBuffer *self,
+         uint32_t index_count,
+         uint32_t first_index)
+   {
+      VK_ASSERT(self->current_program);
+      VK_ASSERT(!self->is_compute);
+      commandbuffer_flush_render_state(self);
+      vkCmdDrawIndexed(self->cmd, index_count, 1, first_index, 0, 0);
    }
 
    static void commandbuffer_dispatch(struct CommandBuffer *self,
@@ -17823,7 +17855,8 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
        * a block gets a dedicated buffer that is never recycled, and a
        * 4 KiB block made that every flush of more than ~100 quads: a
        * buffer and memory allocation per batch, every frame. */
-      bufferpool_init(&self->managers.vbo, self, 512 * 1024, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+      bufferpool_init(&self->managers.vbo, self, 512 * 1024, 16,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
       bufferpool_init(&self->managers.ubo, self, 256 * 1024, max_((VkDeviceSize)16u, self->gpu_props.limits.minUniformBufferOffsetAlignment),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
    }
