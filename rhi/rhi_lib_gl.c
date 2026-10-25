@@ -9005,6 +9005,8 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
    bool     ok = false;
    bool     is_32bpp;
    bool     is_fp16;
+   bool     direct;
+   uint16_t *dst;
    uint16_t *scratch_pixels = NULL;
    uint32_t *scratch_rgba8  = NULL;
    float    *scratch_f      = NULL;
@@ -9070,35 +9072,44 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
    if (scissor_was_enabled)
       glDisable(GL_SCISSOR_TEST);
 
+   /* A 1555 target is read straight into the rows of vram; 32bpp and
+    * fp16 targets are read into a raw RGBA8 or float scratch and
+    * converted into vram from there. Without a pack row length (GLES2)
+    * a 1555 read goes through a tight scratch too. */
+#ifdef GL_PACK_ROW_LENGTH
+   direct = !is_fp16 && !is_32bpp;
+#else
+   direct = false;
+#endif
+   dst = &vram[(size_t)y * VRAM_WIDTH_PIXELS + (size_t)x];
+
    glPixelStorei(GL_PACK_ALIGNMENT, 1);
 #ifdef GL_PACK_ROW_LENGTH
-   glPixelStorei(GL_PACK_ROW_LENGTH, 0); /* tightly packed scratch */
+   glPixelStorei(GL_PACK_ROW_LENGTH, direct ? (GLint)VRAM_WIDTH_PIXELS : 0);
 #endif
 
-   /* A tightly-packed `w x h` scratch in PS1 1555 holds the converted
-    * readback; 32bpp and fp16 targets read into a raw RGBA8 or float
-    * scratch first and convert into it. */
+   if (!direct)
    {
-      /* One block, grown on demand: the 1555 result first, then the raw
-       * RGBA8 or float readback after it. */
       size_t n     = (size_t)w * (size_t)h;
-      size_t head  = (n * sizeof(uint16_t) + 15u) & ~(size_t)15u;
-      size_t extra = is_fp16 ? n * 4u * sizeof(float)
-                   : is_32bpp ? n * sizeof(uint32_t) : 0;
-      if (head + extra > renderer->rb_cpu_len)
+      size_t bytes = is_fp16 ? n * 4u * sizeof(float)
+                   : is_32bpp ? n * sizeof(uint32_t) : n * sizeof(uint16_t);
+      if (bytes > renderer->rb_cpu_len)
       {
-         void *p = realloc(renderer->rb_cpu, head + extra);
+         void *p = realloc(renderer->rb_cpu, bytes);
          if (!p)
             goto cleanup;
          renderer->rb_cpu     = p;
-         renderer->rb_cpu_len = head + extra;
+         renderer->rb_cpu_len = bytes;
       }
-      scratch_pixels = (uint16_t *)renderer->rb_cpu;
       if (is_fp16)
-         scratch_f     = (float *)((uint8_t *)renderer->rb_cpu + head);
+         scratch_f      = (float *)renderer->rb_cpu;
       else if (is_32bpp)
-         scratch_rgba8 = (uint32_t *)((uint8_t *)renderer->rb_cpu + head);
+         scratch_rgba8  = (uint32_t *)renderer->rb_cpu;
+      else
+         scratch_pixels = (uint16_t *)renderer->rb_cpu;
    }
+   else
+      scratch_pixels = dst;
    if (!renderer->rb_read_fbo)
       glGenFramebuffers(1, &renderer->rb_read_fbo);
    read_fbo = renderer->rb_read_fbo;
@@ -9279,7 +9290,7 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
       }
    }
 
-   /* In 32bpp mode, downsample RGBA8 scratch -> 1555 scratch.  PS1
+   /* In 32bpp mode, downsample the RGBA8 scratch into vram.  PS1
     * VRAM is 16bpp natively so the extra precision the 32bpp render
     * target captured is unavoidably lost here; any FBRead consumer
     * is operating in 16bpp anyway.
@@ -9291,28 +9302,28 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
     * across drivers by construction. */
    if (ok && is_fp16)
    {
-      size_t n = (size_t)w * (size_t)h;
-      size_t k;
-      for (k = 0; k < n; k++)
+      size_t c;
+      for (row = 0; row < h; row++)
+      for (c = 0; c < w; c++)
       {
-         const float *px = scratch_f + k * 4u;
+         const float *px = scratch_f + (row * w + c) * 4u;
          float rf = px[0], gf = px[1], bf = px[2], af = px[3];
          uint32_t r5 = rf <= 0.0f ? 0u : rf >= 1.0f ? 31u : (uint32_t)(rf * 31.0f + 0.5f);
          uint32_t g5 = gf <= 0.0f ? 0u : gf >= 1.0f ? 31u : (uint32_t)(gf * 31.0f + 0.5f);
          uint32_t b5 = bf <= 0.0f ? 0u : bf >= 1.0f ? 31u : (uint32_t)(bf * 31.0f + 0.5f);
          uint32_t a1 = (af >= 0.5f) ? 1u : 0u;
-         scratch_pixels[k] = (uint16_t)(
+         dst[row * VRAM_WIDTH_PIXELS + c] = (uint16_t)(
                (a1 << 15) | (b5 << 10) | (g5 << 5) | r5);
       }
    }
 
    if (ok && is_32bpp)
    {
-      size_t n = (size_t)w * (size_t)h;
-      size_t k;
-      for (k = 0; k < n; k++)
+      size_t c;
+      for (row = 0; row < h; row++)
+      for (c = 0; c < w; c++)
       {
-         uint32_t px = scratch_rgba8[k];
+         uint32_t px = scratch_rgba8[row * w + c];
          /* On both desktop and GLES, GL_RGBA + GL_UNSIGNED_BYTE
           * stores bytes as R, G, B, A in memory.  When reinterpreted
           * as a host uint32_t this is little-endian R | G<<8 |
@@ -9334,7 +9345,7 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
          uint32_t b5 = renderer->byte_color_storage ? b8 >> 3 :
                (b8 * 31u + 127u) / 255u;
          uint32_t a1 = (a8 >= 128u) ? 1u : 0u;
-         scratch_pixels[k] = (uint16_t)(
+         dst[row * VRAM_WIDTH_PIXELS + c] = (uint16_t)(
                (a1 << 15) | (b5 << 10) | (g5 << 5) | r5);
       }
    }
@@ -9346,12 +9357,13 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
     * Float and RGBA8 routes already produced PlayStation words above. */
    if (ok && !is_fp16 && !is_32bpp)
    {
-      size_t n = (size_t)w * (size_t)h;
-      size_t k;
-      for (k = 0; k < n; k++)
+      size_t stride = direct ? VRAM_WIDTH_PIXELS : w;
+      size_t c;
+      for (row = 0; row < h; row++)
+      for (c = 0; c < w; c++)
       {
-         uint16_t color = scratch_pixels[k];
-         scratch_pixels[k] = (uint16_t)(
+         uint16_t color = scratch_pixels[row * stride + c];
+         scratch_pixels[row * stride + c] = (uint16_t)(
                ((color & 1u) << 15) | ((color & 0x3Eu) << 9) |
                ((color >> 1) & 0x3E0u) | (color >> 11));
       }
@@ -9360,41 +9372,15 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
 
    if (ok)
    {
-      /* Splat scratch pixels into the caller's vram buffer.
-       * scratch_pixels is in GL order (bottom-to-top from the initial
-       * readback). PS1 vram is top-to-bottom, so each scratch row maps
-       * to its mirror PS1 row.
-       *
-       * IMPORTANT: `vram` is always the native-resolution PS1 mirror
-       * (1024 x 512 uint16). When a hardware backend is in use the
-       * core forces psx_gpu_upscale_shift=0 (see
-       * libretro.c:rhi_intf_open's hw_renderer branch); GPU.vram is
-       * therefore allocated 1024*512*sizeof(uint16) = 1 MiB, NOT
-       * (1024*upscale)*(512*upscale)*sizeof(uint16). The GL renderer's
-       * `internal_upscaling` is independent and applies only to the
-       * GL-side `fb_out` texture; by the time we reach this splat we
-       * have already downsampled to a tightly-packed `w x h` scratch
-       * (the blit-down at line 4535 took care of that), so the splat
-       * MUST also be native-sized.
-       *
-       * The previous version of this code multiplied the destination
-       * stride/origin by `upscale` and per-pixel splatted an
-       * upscale x upscale block, which was correct ONLY if `vram` were
-       * sized to upscale resolution - it isn't. With internal_upscaling=8
-       * and a Dino Crisis 2 FBRead of (x=0, y=256, w=320, h=240), the
-       * loop wrote ~41 MiB into a 1 MiB buffer and crashed in
-       * Command_FBRead via rhi_intf_read_vram. */
-      const size_t vram_stride = (size_t)VRAM_WIDTH_PIXELS;
-
-      for (row = 0; row < h; row++)
-      {
-         /* scratch row r == GL row (y + r) == PS1 row (y + r):
-          * straight copy, no mirror. */
-         size_t ps1_row = (size_t)y + row;
-         memcpy(&vram[ps1_row * vram_stride + (size_t)x],
-                &scratch_pixels[row * w],
-                (size_t)w * sizeof(uint16_t));
-      }
+      /* A 1555 read through the tight scratch: rows of the rect, in
+       * increasing PS1 order (fb_out's GL row g holds PS1 row g). vram
+       * is always the native-resolution 1024 x 512 mirror; an upscaled
+       * fb_out was blitted down to w x h before the read. */
+      if (!direct && !is_fp16 && !is_32bpp)
+         for (row = 0; row < h; row++)
+            memcpy(&dst[row * VRAM_WIDTH_PIXELS],
+                   &scratch_pixels[row * w],
+                   (size_t)w * sizeof(uint16_t));
 
       /* Shared HD texture tracker: rendered content flowed back into
        * VRAM - refresh the mirror + invalidate covered rects. */
