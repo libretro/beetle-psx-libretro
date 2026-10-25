@@ -46,11 +46,6 @@
  * video plus slack, rounded to a whole number of Form 2 payloads. */
 #define VCD_RING_BYTES    (VCD_FORM2_PAYLOAD * 512)
 
-/* Staging for one call into the audio decoder. An MP2 frame is 1152 samples
- * per channel and a VCD sector carries three of them, so this is a few
- * sectors' worth and the loop below rarely goes round twice. */
-#define VCD_AUD_CHUNK     8192
-
 /* Decoded audio staging ring, in stereo frames. */
 #define VCD_AUDIO_FRAMES  16384
 
@@ -73,12 +68,14 @@ typedef struct
    rmp3_stream_t  *aud;
    bool            stream_used;  /* decoders touched since stream_reset */
 
-   /* video out */
+   /* video out: the decoder's newest picture, until it is converted to
+    * XRGB8888 - into fb, or straight into a buffer of the frontend's */
+   rmpeg1_video_frame_t pic;
    uint8_t      *fb;             /* VCD_MAX_W * VCD_MAX_H * 4 */
    unsigned      fb_w, fb_h;
    size_t        fb_pitch;
+   bool          pic_pending;
    bool          fb_valid;
-   bool          fb_is_xrgb;     /* false = RGB565 */
 
    /* audio out */
    int16_t      *abuf;           /* VCD_AUDIO_FRAMES * 2 */
@@ -270,25 +267,27 @@ static INLINE int clamp255(int v)
    return v;
 }
 
-static void frame_to_fb(const rmpeg1_video_frame_t *fr)
+/* The picture's size, clamped to what the core accepts */
+static void picture_size(const rmpeg1_video_frame_t *fr, unsigned *w, unsigned *h)
 {
-   unsigned w = fr->width;
-   unsigned h = fr->height;
-   unsigned x, y;
+   *w = fr->width  > VCD_MAX_W ? VCD_MAX_W : fr->width;
+   *h = fr->height > VCD_MAX_H ? VCD_MAX_H : fr->height;
+}
 
-   if (w > VCD_MAX_W) w = VCD_MAX_W;
-   if (h > VCD_MAX_H) h = VCD_MAX_H;
+/* Converts a picture to XRGB8888, the core's pixel format, at dst */
+static void convert_picture(const rmpeg1_video_frame_t *fr, uint8_t *dst,
+      size_t pitch)
+{
+   unsigned w, h, x, y;
 
-   vcd.fb_w     = w;
-   vcd.fb_h     = h;
-   vcd.fb_pitch = (size_t)VCD_MAX_W * (vcd.fb_is_xrgb ? 4u : 2u);
+   picture_size(fr, &w, &h);
 
    for (y = 0; y < h; y++)
    {
       const uint8_t *yr = fr->y  + (size_t)y * fr->y_stride;
       const uint8_t *cb = fr->cb + (size_t)(y >> 1) * fr->c_stride;
       const uint8_t *cr = fr->cr + (size_t)(y >> 1) * fr->c_stride;
-      uint8_t       *dr = vcd.fb + (size_t)y * vcd.fb_pitch;
+      uint32_t      *dr = (uint32_t *)(dst + (size_t)y * pitch);
 
       for (x = 0; x < w; x++)
       {
@@ -299,21 +298,16 @@ static void frame_to_fb(const rmpeg1_video_frame_t *fr)
          int g  = clamp255((yy - YC_GU * u - YC_GV * v) >> 10);
          int b  = clamp255((yy + YC_BU * u) >> 10);
 
-         if (vcd.fb_is_xrgb)
-         {
-            uint32_t p = ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
-            memcpy(dr + (size_t)x * 4, &p, 4);
-         }
-         else
-         {
-            uint16_t p = (uint16_t)(((r & 0xF8) << 8) |
-                                    ((g & 0xFC) << 3) |
-                                    ((b & 0xF8) >> 3));
-            memcpy(dr + (size_t)x * 2, &p, 2);
-         }
+         dr[x] = ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
       }
    }
+}
 
+static void picture_to_fb(const rmpeg1_video_frame_t *fr)
+{
+   picture_size(fr, &vcd.fb_w, &vcd.fb_h);
+   vcd.fb_pitch = (size_t)VCD_MAX_W * 4u;
+   convert_picture(fr, vcd.fb, vcd.fb_pitch);
    vcd.fb_valid = true;
 }
 
@@ -321,37 +315,27 @@ static void frame_to_fb(const rmpeg1_video_frame_t *fr)
 /* Audio staging                                                         */
 /* --------------------------------------------------------------------- */
 
-/* rmp3 hands back interleaved s16 already, so this is a copy into the ring
- * rather than a float conversion. */
-static void push_audio(const int16_t *pcm, size_t frames)
+/* Frames that can be written at awr without wrapping; one slot is kept
+ * empty so a full ring is told from an empty one */
+static size_t audio_write_span(void)
 {
-   size_t i;
-
-   for (i = 0; i < frames; i++)
-   {
-      size_t nxt = (vcd.awr + 1) % VCD_AUDIO_FRAMES;
-
-      if (nxt == vcd.ard)
-         break;                  /* overrun; drop rather than stall decode */
-
-      vcd.abuf[vcd.awr * 2 + 0] = pcm[i * 2 + 0];
-      vcd.abuf[vcd.awr * 2 + 1] = pcm[i * 2 + 1];
-      vcd.awr = nxt;
-   }
+   if (vcd.ard > vcd.awr)
+      return vcd.ard - vcd.awr - 1;
+   return VCD_AUDIO_FRAMES - vcd.awr - (vcd.ard == 0);
 }
 
-size_t VCD_GetAudio(int16_t *out, size_t max_frames)
+const int16_t *VCD_PeekAudio(size_t *frames)
 {
-   size_t n = 0;
+   size_t n = vcd.awr >= vcd.ard
+      ? vcd.awr - vcd.ard : VCD_AUDIO_FRAMES - vcd.ard;
 
-   while (n < max_frames && vcd.ard != vcd.awr)
-   {
-      out[n * 2 + 0] = vcd.abuf[vcd.ard * 2 + 0];
-      out[n * 2 + 1] = vcd.abuf[vcd.ard * 2 + 1];
-      vcd.ard = (vcd.ard + 1) % VCD_AUDIO_FRAMES;
-      n++;
-   }
-   return n;
+   *frames = n;
+   return n ? vcd.abuf + vcd.ard * 2 : NULL;
+}
+
+void VCD_ConsumeAudio(size_t frames)
+{
+   vcd.ard = (vcd.ard + frames) % VCD_AUDIO_FRAMES;
 }
 
 /* --------------------------------------------------------------------- */
@@ -360,8 +344,9 @@ size_t VCD_GetAudio(int16_t *out, size_t max_frames)
 
 static void stream_reset(void)
 {
-   vcd.headers_ok = false;
-   vcd.fb_valid   = false;
+   vcd.headers_ok  = false;
+   vcd.fb_valid    = false;
+   vcd.pic_pending = false;
    vcd.ard = vcd.awr = 0;
 
    /* Decoders nothing has touched since they were made are already in the
@@ -422,20 +407,23 @@ static void route_packet(const rmpeg1_ps_packet_t *pkt)
          return;
 
       /* rmp3's stream interface carries any unconsumed tail internally, so a
-       * packet ending mid-frame costs nothing here. */
+       * packet ending mid-frame costs nothing here. PCM is decoded straight
+       * into the ring; with the ring full the stream is still parsed, so it
+       * stays in step and what does not fit is dropped rather than stalling
+       * decode. */
       while (off < pkt->size)
       {
-         int16_t pcm[VCD_AUD_CHUNK * 2];
-         size_t  rd = 0, wr = 0;
-         int     r;
+         size_t room = audio_write_span();
+         size_t rd   = 0, wr = 0;
+         int    r;
 
          rmp3_stream_set_in(vcd.aud, pkt->data + off, pkt->size - off);
-         rmp3_stream_set_out_s16(vcd.aud, pcm, VCD_AUD_CHUNK);
+         rmp3_stream_set_out_s16(vcd.aud,
+               room ? vcd.abuf + vcd.awr * 2 : NULL, room);
          r = rmp3_stream_process(vcd.aud, &rd, &wr);
 
-         off += rd;
-         if (wr)
-            push_audio(pcm, wr);
+         off     += rd;
+         vcd.awr  = (vcd.awr + wr) % VCD_AUDIO_FRAMES;
 
          if (r == RMP3_STREAM_ERROR || r == RMP3_STREAM_END)
             break;
@@ -469,7 +457,9 @@ void VCD_FeedSector(const uint8_t *raw2352, uint32_t lba)
    payload = raw2352 + 24;
 
    vcd.stream_used = true;
-   rmpeg1_ps_write(vcd.ps, payload, VCD_FORM2_PAYLOAD);
+   /* Parsed where it lies; every packet is drained before this returns */
+   if (!rmpeg1_ps_borrow(vcd.ps, payload, VCD_FORM2_PAYLOAD))
+      rmpeg1_ps_write(vcd.ps, payload, VCD_FORM2_PAYLOAD);
    vcd.pos_lba = lba;
 
    while (rmpeg1_ps_next(vcd.ps, &pkt))
@@ -511,12 +501,36 @@ bool VCD_RunFrame(void)
          vcd.srate = 44100;
    }
 
-   frame_to_fb(&fr);
+   vcd.pic         = fr;
+   vcd.pic_pending = true;
    return true;
+}
+
+bool VCD_PendingVideo(unsigned *w, unsigned *h)
+{
+   if (!vcd.pic_pending)
+      return false;
+   picture_size(&vcd.pic, w, h);
+   return true;
+}
+
+void VCD_ConvertVideo(void *dst, size_t pitch)
+{
+   if (!vcd.pic_pending)
+      return;
+   convert_picture(&vcd.pic, (uint8_t *)dst, pitch);
+   vcd.pic_pending = false;
+   /* fb holds an older picture now */
+   vcd.fb_valid    = false;
 }
 
 const void *VCD_GetVideo(unsigned *w, unsigned *h, size_t *pitch)
 {
+   if (vcd.pic_pending)
+   {
+      picture_to_fb(&vcd.pic);
+      vcd.pic_pending = false;
+   }
    if (!vcd.fb_valid)
       return NULL;
    if (w)     *w     = vcd.fb_w;
@@ -555,7 +569,8 @@ double VCD_GetFrameRate(void)
 static void flush_video(void)
 {
    rmpeg1_video_frame_t fr;
-   int guard = 0;
+   int  guard = 0;
+   bool got   = false;
 
    if (!vcd.vid)
       return;
@@ -563,8 +578,15 @@ static void flush_video(void)
    vcd.stream_used = true;
    rmpeg1_video_flush(vcd.vid);
 
+   /* Only the last picture is shown, and it has to be converted before
+    * the decoders it lives in are rebuilt */
    while (rmpeg1_video_decode(vcd.vid, &fr) && guard++ < 8)
-      frame_to_fb(&fr);
+      got = true;
+   if (got)
+      picture_to_fb(&fr);
+   else if (vcd.pic_pending)
+      picture_to_fb(&vcd.pic);
+   vcd.pic_pending = false;
 }
 
 
@@ -854,7 +876,6 @@ void VCD_Init(void)
    vcd.abuf = (int16_t *)calloc(VCD_AUDIO_FRAMES * 2, sizeof(int16_t));
 
    vcd.srate      = 44100;
-   vcd.fb_is_xrgb = false;
    vcd.xport      = VCD_XPORT_STOP;
 }
 
@@ -881,6 +902,7 @@ void VCD_Kill(void)
    vcd.aud = NULL;
    vcd.ps  = NULL;
    vcd.stream_used = false;
+   vcd.pic_pending = false;
 
    free(vcd.fb);
    free(vcd.abuf);

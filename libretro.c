@@ -534,6 +534,32 @@ static void acquire_lent_surface(EmulateSpecStruct *spec)
    spec->loan_win = GPU_get_crop_window();
 }
 
+/* The new Video CD picture, converted straight into a framebuffer of the
+ * frontend's; NULL when the frontend has none to lend. */
+static const void *lend_vcd_picture(unsigned w, unsigned h, size_t *pitch)
+{
+   struct retro_framebuffer fb;
+
+   if (!environ_cb)
+      return NULL;
+
+   memset(&fb, 0, sizeof(fb));
+   fb.width        = w;
+   fb.height       = h;
+   fb.access_flags = RETRO_MEMORY_ACCESS_WRITE;
+
+   if (   !environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
+       || !fb.data
+       || fb.format != RETRO_PIXEL_FORMAT_XRGB8888
+       || fb.pitch  <  (size_t)w * sizeof(uint32_t)
+       || fb.pitch  %  sizeof(uint32_t))
+      return NULL;
+
+   VCD_ConvertVideo(fb.data, fb.pitch);
+   *pitch = fb.pitch;
+   return fb.data;
+}
+
 enum
 {
    REGION_JP = 0,
@@ -7212,10 +7238,20 @@ void retro_run(void)
    {
       unsigned    vcd_w = 0, vcd_h = 0;
       size_t      vcd_pitch = 0;
-      const void *vcd_fb;
+      const void *vcd_fb    = NULL;
+      bool        fresh;
 
       VCD_RunFrame();
-      vcd_fb = VCD_GetVideo(&vcd_w, &vcd_h, &vcd_pitch);
+      fresh = VCD_PendingVideo(&vcd_w, &vcd_h);
+
+      /* A Video CD runs at half the display rate or less. Where the
+       * frontend dupes, a new picture is converted straight into its own
+       * framebuffer and the frames between are dupes; otherwise each is
+       * shown from the core's copy. */
+      if (fresh && allow_frame_duping && rhi_intf_is_type() == RHI_SOFTWARE)
+         vcd_fb = lend_vcd_picture(vcd_w, vcd_h, &vcd_pitch);
+      if (!vcd_fb && (fresh || !allow_frame_duping))
+         vcd_fb = VCD_GetVideo(&vcd_w, &vcd_h, &vcd_pitch);
 
       if (vcd_fb)
          rhi_intf_finalize_frame(vcd_fb, vcd_w, vcd_h, (unsigned)vcd_pitch);
@@ -7223,13 +7259,18 @@ void retro_run(void)
          rhi_intf_finalize_frame(NULL, width, height,
                MEDNAFEN_CORE_GEOMETRY_MAX_W << (2 + upscale_shift));
 
+      /* Handed over where it lies in the ring, in two spans at its wrap */
       if (audio_batch_cb)
       {
-         static int16_t vcd_abuf[4096 * 2];
-         size_t frames = VCD_GetAudio(vcd_abuf,
-               sizeof(vcd_abuf) / (2 * sizeof(int16_t)));
-         if (frames)
-            audio_batch_cb(vcd_abuf, frames);
+         unsigned       spans;
+         size_t         frames;
+         const int16_t *pcm;
+
+         for (spans = 0; spans < 2 && (pcm = VCD_PeekAudio(&frames)); spans++)
+         {
+            audio_batch_cb(pcm, frames);
+            VCD_ConsumeAudio(frames);
+         }
       }
    }
    else

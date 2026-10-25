@@ -96,7 +96,8 @@ The EDC polynomial is the CD one, x^32 + x^31 + x^16 + x^15 + x^4 + x^3 + x +
 Wraps a real MPEG-1 program stream in Mode 2 Form 2 sectors the way a Video
 CD carries it and pushes them through `VCD_FeedSector`, covering the sector
 tap, subheader filtering, packet routing to the two decoders, and the YCbCr
-to RGB565 conversion.
+to XRGB8888 conversion, both into the core's copy and straight into a
+framebuffer of the frontend's, with the audio taken where it lies in the ring.
 
 ## vcd_churn.c
 
