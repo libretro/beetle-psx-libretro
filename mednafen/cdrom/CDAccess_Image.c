@@ -1249,14 +1249,11 @@ static void CDAccess_Image_Cleanup(CDAccess_Image *self){
 static bool CDAccess_Image_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf, int32_t lba){
    CDAccess_Image *self = (CDAccess_Image *)base_self;
    int32_t track;
-   uint8_t SimuQ[0xC];
    bool TrackFound = false;
 
    memset(buf + 2352, 0, 96);
 
    CDAccess_Image_MakeSubPQ(self, lba, buf + 2352);
-
-   subq_deinterleave(buf + 2352, SimuQ);
 
    for(track = self->FirstTrack; track < (self->FirstTrack + self->NumTracks); track++)
    {

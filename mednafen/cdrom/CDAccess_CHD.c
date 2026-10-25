@@ -746,7 +746,6 @@ static bool CDAccess_CHD_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf,
       int32_t lba)
 {
    struct CDAccess_CHD *self = (struct CDAccess_CHD *)base_self;
-   uint8_t              SimuQ[0xC];
    int32_t              track;
    CDRFILE_TRACK_INFO  *ct;
 
@@ -774,7 +773,6 @@ static bool CDAccess_CHD_Read_Raw_Sector(CDAccess *base_self, uint8_t *buf,
 
    memset(buf + 2352, 0, 96);
    track = CDAccess_CHD_MakeSubPQ(self, lba, buf + 2352);
-   subq_deinterleave(buf + 2352, SimuQ);
 
    ct = &self->Tracks[track];
 
