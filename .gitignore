@@ -36,6 +36,10 @@ tools/vkhost/vkhost
 tools/cdc_fifo/cdc_fifo_test
 tools/cdc_fifo/cdc_fifo_test.exe
 
+# deinterlace lane build output (tools/deinterlace)
+tools/deinterlace/deint_test
+tools/deinterlace/deint_test.exe
+
 # crop window lane build output (tools/crop_window)
 tools/crop_window/crop_window_test
 tools/crop_window/crop_window_test.exe

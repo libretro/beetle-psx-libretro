@@ -2518,9 +2518,13 @@ static int32_t GPU_UpdateInt(const int32_t sys_timestamp, int mode)
             {
                int32_t fb_x      = GPU.DisplayFB_XStart * 2;
                int32_t dx_start, dx_end;
+               /* A field's lines interleave with the other field's,
+                * unless they are bobbed */
                int32_t dest_line =
-                  ((GPU.scanline - FirstVisibleLine) << GPU.espec->InterlaceOn)
-                  + GPU.espec->InterlaceField;
+                  (GPU.espec->InterlaceOn && psx_gpu_bob_scanout)
+                  ? (int32_t)(GPU.scanline - FirstVisibleLine)
+                  : ((GPU.scanline - FirstVisibleLine) << GPU.espec->InterlaceOn)
+                     + GPU.espec->InterlaceField;
 
                /* One crop window for the whole frame */
                if (GPU.scanline == FirstVisibleLine)
@@ -2842,7 +2846,43 @@ void GPU_StartFrame(EmulateSpecStruct *espec_arg)
  * the immediate-scanout path in Update() is what runs unless
  * psx_gpu_rasterize_both_fields is set + SW renderer + 480i).
  */
-void GPU_FlushDeferredScanout(void)
+bool GPU_DeferredScanoutWhole(int32_t lines, int32_t *dmw)
+{
+   uint8_t  seen[GPU_DEST_LINE_MAX];
+   int32_t  filled = 0;
+   unsigned r;
+
+   if (!deferred_scanout_count || lines <= 0 || lines > GPU_DEST_LINE_MAX)
+      return false;
+
+   memset(seen, 0, (size_t)lines);
+   *dmw = deferred_scanouts[0].dmw;
+
+   for (r = 0; r < deferred_scanout_count; r++)
+   {
+      const GPU_DeferredScanline *rec = &deferred_scanouts[r];
+      int32_t line[2];
+      int     k;
+
+      if (rec->dmw != *dmw)
+         return false;
+      line[0] = rec->dest_line;
+      line[1] = rec->dest_line_other;
+      for (k = 0; k < 2; k++)
+      {
+         if (line[k] < 0 || line[k] >= lines)
+            return false;
+         if (!seen[line[k]])
+         {
+            seen[line[k]] = 1;
+            filled++;
+         }
+      }
+   }
+   return filled == lines;
+}
+
+void GPU_FlushDeferredScanout(MDFN_Surface *target)
 {
    const unsigned s = GPU.upscale_shift;
    const unsigned up = 1u << s;
@@ -2858,6 +2898,42 @@ void GPU_FlushDeferredScanout(void)
     * needed". */
    if (deferred_scanout_count == 0)
       return;
+
+   if (target)
+   {
+      /* A frontend buffer the picture is cut to; every row of it is
+       * written (GPU_DeferredScanoutWhole), margins included. The
+       * core's own surface and its margin cache are left alone. */
+      for (r = 0; r < deferred_scanout_count; r++)
+      {
+         const GPU_DeferredScanline *rec = &deferred_scanouts[r];
+         int field;
+
+         for (field = 0; field < 2; field++)
+         {
+            const int32_t  dest_line = field ? rec->dest_line_other : rec->dest_line;
+            const uint32_t y_up      = (uint32_t)(field ? rec->vram_y_other
+                                                        : rec->vram_y_native) << s;
+            unsigned i;
+
+            for (i = 0; i < up; i++)
+            {
+               const int32_t row = (dest_line << s) + (int32_t)i;
+               if (row >= target->h)
+                  break;
+               ScanoutRow(target,
+                     target->pixels + (size_t)row * target->pitchinpix,
+                     rec->rgb24, GPU.vram + ((y_up + i) << (10 + s)),
+                     rec->dx_start << s, rec->dx_end << s,
+                     (uint32_t)rec->dmw << s, rec->fb_x << s,
+                     s, up, false);
+            }
+         }
+         GPU.LineWidths[rec->dest_line_other] = rec->dmw;
+      }
+      deferred_scanout_count = 0;
+      return;
+   }
 
    ScanoutCacheTarget(GPU.surface);
    pitch_pix = GPU.surface->pitch32;

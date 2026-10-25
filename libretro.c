@@ -93,6 +93,7 @@ uint8_t widescreen_hack_aspect_ratio_setting;
 uint8_t psx_gpu_upscale_shift;
 uint8_t psx_gpu_upscale_shift_hw;
 bool psx_gpu_rasterize_both_fields = false;
+bool psx_gpu_bob_scanout = false;
 int line_render_mode;
 int filter_mode;
 int crop_overscan = 0;
@@ -558,6 +559,55 @@ static const void *lend_vcd_picture(unsigned w, unsigned h, size_t *pitch)
    VCD_ConvertVideo(fb.data, fb.pitch);
    *pitch = fb.pitch;
    return fb.data;
+}
+
+/* The 480i picture the deferred scanout (the "Off" deinterlacer) holds,
+ * scanned out straight into a frontend buffer cut to x0, w, h (upscaled)
+ * when it is the whole picture and the frontend lends one: its pixels,
+ * and *pitch. Otherwise it goes to the core's surface, and NULL. */
+static MDFN_Surface field_surf;
+
+static const uint32_t *flush_deferred_scanout(unsigned x0, unsigned w,
+      unsigned h, unsigned *pitch)
+{
+   struct retro_framebuffer fb;
+   const unsigned us = GPU_get_upscale_shift();
+   int32_t        dmw;
+
+   if (   !environ_cb
+       || FrontIO_ReadsScanout(PSX_FIO)
+       || (VCD_GetMode() != VCD_MODE_OFF && VCD_GetAVSwitch())
+       || !GPU_DeferredScanoutWhole((int32_t)(h >> us), &dmw)
+       || x0 + w > ((unsigned)dmw << us))
+   {
+      GPU_FlushDeferredScanout(NULL);
+      return NULL;
+   }
+
+   memset(&fb, 0, sizeof(fb));
+   fb.width        = w;
+   fb.height       = h;
+   fb.access_flags = RETRO_MEMORY_ACCESS_WRITE;
+
+   if (   !environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
+       || !fb.data
+       || fb.format != RETRO_PIXEL_FORMAT_XRGB8888
+       || fb.pitch  <  (size_t)w * sizeof(uint32_t)
+       || fb.pitch  %  sizeof(uint32_t))
+   {
+      GPU_FlushDeferredScanout(NULL);
+      return NULL;
+   }
+
+   field_surf.pixels     = (uint32_t *)fb.data;
+   field_surf.w          = (int32_t)w;
+   field_surf.h          = (int32_t)h;
+   field_surf.pitchinpix = (int32_t)(fb.pitch / sizeof(uint32_t));
+   field_surf.x0         = (int32_t)x0;
+   GPU_FlushDeferredScanout(&field_surf);
+
+   *pitch = (unsigned)fb.pitch;
+   return field_surf.pixels;
 }
 
 enum
@@ -5859,6 +5909,7 @@ static void check_variables(bool startup)
          Deinterlacer_SetType(&deint, DEINT_WEAVE);
 
       psx_gpu_rasterize_both_fields = (Deinterlacer_GetType(&deint) == DEINT_OFF);
+      psx_gpu_bob_scanout           = (Deinterlacer_GetType(&deint) == DEINT_BOB);
    }
 
    apply_compatibility_settings();
@@ -7017,12 +7068,10 @@ void retro_run(void)
 
    ForceEventUpdates(timestamp);
 
-   /* Drain any deferred SW-renderer scanout records collected
-    * during this frame's emulation.  See GPU_FlushDeferredScanout
-    * and psx_gpu_rasterize_both_fields - this is the safe point
-    * to read VRAM since rasterisation for this frame is finished
-    * and the frontend hasn't yet read the surface for display. */
-   GPU_FlushDeferredScanout();
+   /* The deferred SW-renderer scanout records collected during this
+    * frame's emulation (psx_gpu_rasterize_both_fields) are drained in
+    * retro_run below, once the picture's size is known: rasterisation
+    * for this frame is finished, and nothing touches VRAM before. */
 
    espec->SoundBufSize = IntermediateBufferPos;
    IntermediateBufferPos = 0;
@@ -7200,7 +7249,13 @@ void retro_run(void)
       width  <<= upscale_shift;
       height <<= upscale_shift;
 
-      if (frame_surf != &lent_surf)
+      pix = flush_deferred_scanout(pix_offset << upscale_shift,
+            width, height, &pitch);
+      if (pix)
+      {
+         /* the 480i "Off" picture, straight in a frontend buffer */
+      }
+      else if (frame_surf != &lent_surf)
          pix = frame_surf->pixels + (pix_offset << upscale_shift);
       /* Handed back only exactly as lent; anything else is a dupe. */
       else if (   (int32_t)(pix_offset << upscale_shift) == lent_surf.x0

@@ -361,7 +361,12 @@ void GPU_Write(const int32_t timestamp, uint32_t A, uint32_t V);
 uint32_t GPU_Read(const int32_t timestamp, uint32_t A);
 
 void GPU_StartFrame(EmulateSpecStruct *espec_arg);
-void GPU_FlushDeferredScanout(void);
+/* Whether the deferred 480i scanout fills rows [0, lines) at one line
+ * width, *dmw: the whole picture. */
+bool GPU_DeferredScanoutWhole(int32_t lines, int32_t *dmw);
+/* Scans the deferred records out into target (a frontend buffer cut to
+ * the picture, by its x0 and w) or, NULL, into the core's surface. */
+void GPU_FlushDeferredScanout(MDFN_Surface *target);
 
 /* Resets the per-dest_line cache that lets the SW renderer skip
  * re-zeroing margin pixels each frame when geometry is unchanged.
