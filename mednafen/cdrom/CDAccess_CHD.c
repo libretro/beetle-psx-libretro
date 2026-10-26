@@ -30,6 +30,7 @@
 #include "../mednafen.h"
 #include "../error.h"
 #include "../general.h"
+#include "../mapped_readahead.h"
 
 #include "CDAccess.h"
 #include "CDAccess_CHD.h"
@@ -62,6 +63,7 @@ typedef struct
    const uint8_t *base;
    uint8_t       *owned;   /* the image_memcache copy, when @base is it */
    int64_t        len;
+   mapped_readahead ra;    /* when @base is the mapping */
 } chd_src;
 
 /* ------------------------------------------------------------------
@@ -151,6 +153,8 @@ static void chd_src_close(chd_src *src)
    src->base  = NULL;
    src->owned = NULL;
    src->len   = 0;
+   src->ra.next = 0;
+   src->ra.last = 0;
 }
 
 /* Satisfies one request from @src. @reading selects the read-time feed,
@@ -170,6 +174,8 @@ static bool chd_src_supply(chd_src *src, const rchd_request_t *rq,
       n = rq->length;
       if ((uint64_t)n > (uint64_t)src->len - rq->offset)
          n = (size_t)((uint64_t)src->len - rq->offset);
+      if (!src->owned)
+         mapped_readahead_note(&src->ra, src->fp, rq->offset, n);
       if (reading)
          return rchd_feed_borrow(src->chd, rq->offset, rq->source,
                p, n) == RCHD_OK;
@@ -207,6 +213,9 @@ static bool chd_src_open(chd_src *src, const char *path,
          &src->len);
    if (src->base && src->len <= 0)
       src->base = NULL;
+   /* the mapping is the memcache, but it still has to be read in */
+   if (src->base && image_memcache)
+      filestream_prefetch(src->fp, 0, (uint64_t)src->len);
 
    if (!src->base && image_memcache)
    {

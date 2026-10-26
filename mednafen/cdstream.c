@@ -120,7 +120,9 @@ bool cdstream_memcache_in_place(cdstream *src)
    {
       /* Already memory-backed - including the mapped mode, where the
        * page cache IS the memcache and slurping would only add a
-       * copy. */
+       * copy. A mapping still has to be read in: ask for all of it. */
+      if (src->fp)
+         filestream_prefetch(src->fp, 0, src->size);
       return true;
    }
    if (!src->fp)

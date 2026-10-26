@@ -1,0 +1,53 @@
+name: Mapped image read-ahead
+
+# Disc images are read straight from a memory mapping, and Windows reads
+# nothing ahead on a mapped view: the readers hint the file ahead of a
+# reader that goes on in order, and Pre-Cache asks for a mapped image to
+# be read in whole. Checked on Linux under ASan + UBSan, and as a Windows
+# build under Wine in each RETRO_VFS_PREFETCH mode (PrefetchVirtualMemory,
+# the pre-Windows 8 toucher thread, none).
+
+on:
+  push:
+    paths:
+      - 'mednafen/cdstream.*'
+      - 'mednafen/mapped_readahead.h'
+      - 'mednafen/cdrom/CDAccess_CHD.c'
+      - 'tools/readahead/**'
+      - 'libretro-common/vfs/**'
+      - 'libretro-common/streams/file_stream.c'
+      - 'libretro-common/include/vfs/**'
+      - 'libretro-common/include/streams/file_stream.h'
+      - '.github/workflows/mapped-readahead.yml'
+  pull_request:
+    paths:
+      - 'mednafen/cdstream.*'
+      - 'mednafen/mapped_readahead.h'
+      - 'mednafen/cdrom/CDAccess_CHD.c'
+      - 'tools/readahead/**'
+      - 'libretro-common/vfs/**'
+      - 'libretro-common/streams/file_stream.c'
+      - 'libretro-common/include/vfs/**'
+      - 'libretro-common/include/streams/file_stream.h'
+      - '.github/workflows/mapped-readahead.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mapped-readahead:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mingw-w64 and Wine
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 wine wine64
+      - name: Read-ahead on Linux and under Wine
+        env:
+          MINGW: 1
+          WINEPREFIX: /tmp/wineprefix
+        run: sh tools/readahead/run.sh
