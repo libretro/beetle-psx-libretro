@@ -3,7 +3,9 @@
 #
 #   sh tools/readahead/run.sh            Linux, ASan + UBSan, leaks on
 #   MINGW=1 sh tools/readahead/run.sh    also mingw-w64 under Wine, in
-#                                        each RETRO_VFS_PREFETCH mode
+#                                        each RETRO_VFS_PREFETCH mode, and
+#                                        with the prefetch made slow: no
+#                                        read waits on it
 set -e
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$ROOT"
@@ -33,4 +35,10 @@ if [ -n "$MINGW" ]; then
       ( cd "$WORK" && RETRO_VFS_PREFETCH=$m WINEDEBUG=-all \
          timeout 120 wine ./t.exe )
    done
+   # PrefetchVirtualMemory swapped for a stand-in that sleeps like a cold
+   # disk: a reader in order never waits on it
+   OT="tools/readahead/offthread_test.c ${SRC#tools/readahead/mapped_readahead_test.c}"
+   x86_64-w64-mingw32-gcc $FLAGS -DVFS_WIN32_PREFETCH_HOOK=readahead_test_hook \
+      -include tools/readahead/prefetch_hook.h -o "$WORK/ot.exe" $OT $WRAP -static
+   ( cd "$WORK" && WINEDEBUG=-all timeout 120 wine ./ot.exe )
 fi

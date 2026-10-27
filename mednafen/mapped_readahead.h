@@ -10,7 +10,10 @@
  * straight from one stalls the emulation thread on the disk at each new
  * page. A read that goes on from where the last one ended (within
  * MAPPED_RA_GAP) hints the MAPPED_RA_AHEAD bytes past it, again once
- * half of that is used. Elsewhere the kernel reads ahead by itself. */
+ * half of that is used: past it, so the read in hand is the mapping's
+ * to fault in and never waits on the hint. The hint itself is taken
+ * by the file layer's own thread. Elsewhere the kernel reads ahead by
+ * itself. */
 #define MAPPED_RA_AHEAD (4u * 1024u * 1024u)
 #define MAPPED_RA_GAP   (256u * 1024u)
 
@@ -20,7 +23,7 @@ typedef struct mapped_readahead
    uint64_t last;
 } mapped_readahead;
 
-/* true: hint [pos, pos + len + MAPPED_RA_AHEAD) */
+/* true: hint [pos + len, pos + len + MAPPED_RA_AHEAD) */
 static INLINE bool mapped_readahead_step(mapped_readahead *ra,
       uint64_t pos, uint64_t len)
 {
@@ -41,7 +44,7 @@ static INLINE void mapped_readahead_note(mapped_readahead *ra, RFILE *fp,
 {
 #ifdef _WIN32
    if (fp && mapped_readahead_step(ra, pos, len))
-      filestream_prefetch(fp, pos, len + MAPPED_RA_AHEAD);
+      filestream_prefetch(fp, pos + len, MAPPED_RA_AHEAD);
 #else
    (void)ra;
    (void)fp;
