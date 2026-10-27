@@ -488,6 +488,11 @@ PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 #include <streams/file_stream.h>
 #include <encodings/crc32.h>
 #include <file/file_path.h>
+#ifdef HAVE_THREADS
+#include <rthreads/rthreads.h>
+#include <retro_spsc.h>
+#include <retro_waitable_spsc.h>
+#endif
 #include <compat/strl.h>
 
 /* C89-compatible compile-time assertion. C89 has no static_assert /
@@ -4789,6 +4794,11 @@ static void cbh_move(struct CommandBufferHandle *dst,
          size_t   pipeline_cache_saved_size;
          unsigned pipeline_cache_dirty;
          unsigned pipeline_cache_quiet_frames;
+#ifdef HAVE_THREADS
+         /* The pipeline warm-up thread and the pipeline list: see
+          * device_warm_start. */
+         struct PipelineWarm *warm;
+#endif
 
          uint64_t cookie;
 
@@ -15594,14 +15604,49 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       commandbuffer_begin_compute(self);
    }
 
-   static VkPipeline commandbuffer_build_compute_pipeline(struct CommandBuffer *self,
-         Hash hash)
+   /* What a pipeline is built from: the state a command buffer holds when
+    * it needs one, or the same state read back from the pipeline list
+    * (see the pipeline warm-up below). Everything it points at is
+    * immutable once made, so a thread other than the renderer's can build
+    * from it. */
+   /* Kept out of the flush that calls it: a pipeline that has to be made
+    * is the cold path. */
+#ifndef RHI_NOINLINE
+#if defined(_MSC_VER)
+#define RHI_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__)
+#define RHI_NOINLINE __attribute__((noinline))
+#else
+#define RHI_NOINLINE
+#endif
+#endif
+
+   typedef struct PipelineDesc
    {
-      VkPipeline compute_pipeline;
+      Device                  *device;
+      Program                 *program;
+      const RenderPass        *rp;            /* graphics only */
+      const PipelineState     *static_state;
+      const PotentialState    *potential;
+      const VertexAttribState *attribs;       /* VULKAN_NUM_VERTEX_ATTRIBS */
+      const VkDeviceSize      *strides;       /* VULKAN_NUM_VERTEX_BUFFERS */
+      const VkVertexInputRate *input_rates;   /* VULKAN_NUM_VERTEX_BUFFERS */
+      unsigned                 subpass;
+   } PipelineDesc;
+
+   static int  device_warm_take(Device *self, Program *program, Hash hash,
+         VkPipeline *out);
+   static void device_warm_record(Device *self, const PipelineDesc *d,
+         Hash hash, bool compute);
+
+   static VkPipeline pipeline_build_compute(const PipelineDesc *d)
+   {
+      const PipelineLayout *layout = program_get_pipeline_layout(d->program);
+      VkPipeline compute_pipeline = VK_NULL_HANDLE;
       VkResult res;
-      const Shader *shader = program_get_shader(self->current_program, ShaderStage_Compute);
+      const Shader *shader = program_get_shader(d->program, ShaderStage_Compute);
       VkComputePipelineCreateInfo info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-      info.layout = pipeline_layout_get_layout(program_get_pipeline_layout(self->current_program));
+      info.layout = pipeline_layout_get_layout(program_get_pipeline_layout(d->program));
       info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
       info.stage.module = shader_get_module(shader);
       info.stage.pName = "main";
@@ -15615,14 +15660,14 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       { VkSpecializationInfo spec_info = {};
       VkSpecializationMapEntry spec_entries[VULKAN_NUM_SPEC_CONSTANTS];
-      uint32_t mask = pipeline_layout_get_resource_layout(self->current_layout)->combined_spec_constant_mask &
-         self->static_state.state.spec_constant_mask;
+      uint32_t mask = pipeline_layout_get_resource_layout(layout)->combined_spec_constant_mask &
+         d->static_state->state.spec_constant_mask;
 
       if (mask)
       {
          info.stage.pSpecializationInfo = &spec_info;
-         spec_info.pData = self->potential_static_state.spec_constants;
-         spec_info.dataSize = sizeof(self->potential_static_state.spec_constants);
+         spec_info.pData = d->potential->spec_constants;
+         spec_info.dataSize = sizeof(d->potential->spec_constants);
          spec_info.pMapEntries = spec_entries;
 
          { uint32_t _feit, bit; FOR_EACH_BIT(mask, _feit, bit)
@@ -15636,21 +15681,23 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       }
 
 
-      res = vkCreateComputePipelines(device_get_device(self->device),
-            device_get_pipeline_cache(self->device), 1, &info, NULL,
+      res = vkCreateComputePipelines(device_get_device(d->device),
+            device_get_pipeline_cache(d->device), 1, &info, NULL,
             &compute_pipeline);
       if (res != VK_SUCCESS)
+      {
          LOGE("Failed to create compute pipeline!\n");
-
-      return program_add_pipeline(self->current_program, hash, compute_pipeline);
+         compute_pipeline = VK_NULL_HANDLE;
+      }
+      return compute_pipeline;
       }
    }
 
-   static VkPipeline commandbuffer_build_graphics_pipeline(struct CommandBuffer *self,
-         Hash hash)
+   static VkPipeline pipeline_build_graphics(const PipelineDesc *d)
    {
+      const PipelineLayout *layout = program_get_pipeline_layout(d->program);
       uint32_t attr_mask;
-      VkPipeline pipeline;
+      VkPipeline pipeline = VK_NULL_HANDLE;
       VkResult res;
       /* Viewport state */
       VkPipelineViewportStateCreateInfo vp = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
@@ -15668,51 +15715,51 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       /* Blend state */
       { VkPipelineColorBlendAttachmentState blend_attachments[VULKAN_NUM_ATTACHMENTS];
       VkPipelineColorBlendStateCreateInfo blend = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-      blend.attachmentCount = render_pass_get_num_color_attachments(self->compatible_render_pass, self->current_subpass);
+      blend.attachmentCount = render_pass_get_num_color_attachments(d->rp, d->subpass);
       blend.pAttachments = blend_attachments;
       { unsigned i; for (i = 0; i < blend.attachmentCount; i++) {
          VkPipelineColorBlendAttachmentState *att = &blend_attachments[i];
          memset(att, 0, sizeof(*att));
 
-         if (render_pass_get_color_attachment(self->compatible_render_pass, self->current_subpass, i)->attachment != VK_ATTACHMENT_UNUSED &&
-               (pipeline_layout_get_resource_layout(self->current_layout)->render_target_mask & (1u << i)))
+         if (render_pass_get_color_attachment(d->rp, d->subpass, i)->attachment != VK_ATTACHMENT_UNUSED &&
+               (pipeline_layout_get_resource_layout(layout)->render_target_mask & (1u << i)))
          {
             att->colorWriteMask = 0xf;
-            att->blendEnable = self->static_state.state.blend_enable;
+            att->blendEnable = d->static_state->state.blend_enable;
             if (att->blendEnable)
             {
-               att->alphaBlendOp = (VkBlendOp)(self->static_state.state.alpha_blend_op);
-               att->colorBlendOp = (VkBlendOp)(self->static_state.state.color_blend_op);
-               att->dstAlphaBlendFactor = (VkBlendFactor)(self->static_state.state.dst_alpha_blend);
-               att->srcAlphaBlendFactor = (VkBlendFactor)(self->static_state.state.src_alpha_blend);
-               att->dstColorBlendFactor = (VkBlendFactor)(self->static_state.state.dst_color_blend);
-               att->srcColorBlendFactor = (VkBlendFactor)(self->static_state.state.src_color_blend);
+               att->alphaBlendOp = (VkBlendOp)(d->static_state->state.alpha_blend_op);
+               att->colorBlendOp = (VkBlendOp)(d->static_state->state.color_blend_op);
+               att->dstAlphaBlendFactor = (VkBlendFactor)(d->static_state->state.dst_alpha_blend);
+               att->srcAlphaBlendFactor = (VkBlendFactor)(d->static_state->state.src_alpha_blend);
+               att->dstColorBlendFactor = (VkBlendFactor)(d->static_state->state.dst_color_blend);
+               att->srcColorBlendFactor = (VkBlendFactor)(d->static_state->state.src_color_blend);
             }
          }
       } }
-      memcpy(blend.blendConstants, self->potential_static_state.blend_constants, sizeof(blend.blendConstants));
+      memcpy(blend.blendConstants, d->potential->blend_constants, sizeof(blend.blendConstants));
 
       /* Depth state */
       { VkPipelineDepthStencilStateCreateInfo ds = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-      ds.depthTestEnable = render_pass_has_depth(self->compatible_render_pass, self->current_subpass) && self->static_state.state.depth_test;
-      ds.depthWriteEnable = render_pass_has_depth(self->compatible_render_pass, self->current_subpass) && self->static_state.state.depth_write;
+      ds.depthTestEnable = render_pass_has_depth(d->rp, d->subpass) && d->static_state->state.depth_test;
+      ds.depthWriteEnable = render_pass_has_depth(d->rp, d->subpass) && d->static_state->state.depth_write;
 
       if (ds.depthTestEnable)
-         ds.depthCompareOp = (VkCompareOp)(self->static_state.state.depth_compare);
+         ds.depthCompareOp = (VkCompareOp)(d->static_state->state.depth_compare);
 
       /* Vertex input */
       { VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
       VkVertexInputAttributeDescription vi_attribs[VULKAN_NUM_VERTEX_ATTRIBS];
       vi.pVertexAttributeDescriptions = vi_attribs;
-      attr_mask = pipeline_layout_get_resource_layout(self->current_layout)->attribute_mask;
+      attr_mask = pipeline_layout_get_resource_layout(layout)->attribute_mask;
       { uint32_t binding_mask = 0;
       { uint32_t _feit, bit; FOR_EACH_BIT(attr_mask, _feit, bit)
       {
          VkVertexInputAttributeDescription *attr = &vi_attribs[vi.vertexAttributeDescriptionCount++];
          attr->location = bit;
-         attr->binding = self->attribs[bit].binding;
-         attr->format = self->attribs[bit].format;
-         attr->offset = self->attribs[bit].offset;
+         attr->binding = d->attribs[bit].binding;
+         attr->format = d->attribs[bit].format;
+         attr->offset = d->attribs[bit].offset;
          binding_mask |= 1u << attr->binding;
       }
       }
@@ -15723,30 +15770,30 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       {
          VkVertexInputBindingDescription *bind = &vi_bindings[vi.vertexBindingDescriptionCount++];
          bind->binding = bit;
-         bind->inputRate = self->vbo.input_rates[bit];
-         bind->stride = self->vbo.strides[bit];
+         bind->inputRate = d->input_rates[bit];
+         bind->stride = d->strides[bit];
       }
       }
 
       /* Input assembly */
       { VkPipelineInputAssemblyStateCreateInfo ia = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-      ia.topology = (VkPrimitiveTopology)(self->static_state.state.topology);
+      ia.topology = (VkPrimitiveTopology)(d->static_state->state.topology);
 
       /* Multisample */
       { VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-      ms.rasterizationSamples = (VkSampleCountFlagBits)(render_pass_get_sample_count(self->compatible_render_pass, self->current_subpass));
+      ms.rasterizationSamples = (VkSampleCountFlagBits)(render_pass_get_sample_count(d->rp, d->subpass));
 
-      if (render_pass_get_sample_count(self->compatible_render_pass, self->current_subpass) > 1)
+      if (render_pass_get_sample_count(d->rp, d->subpass) > 1)
       {
-         ms.alphaToCoverageEnable = self->static_state.state.alpha_to_coverage;
-         ms.alphaToOneEnable = self->static_state.state.alpha_to_one;
-         ms.sampleShadingEnable = self->static_state.state.sample_shading;
+         ms.alphaToCoverageEnable = d->static_state->state.alpha_to_coverage;
+         ms.alphaToOneEnable = d->static_state->state.alpha_to_one;
+         ms.sampleShadingEnable = d->static_state->state.sample_shading;
          ms.minSampleShading = 1.0f;
       }
 
       /* Raster */
       { VkPipelineRasterizationStateCreateInfo raster = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-      raster.cullMode = (VkCullModeFlags)(self->static_state.state.cull_mode);
+      raster.cullMode = (VkCullModeFlags)(d->static_state->state.cull_mode);
       raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
       raster.lineWidth = 1.0f;
       raster.polygonMode = VK_POLYGON_MODE_FILL;
@@ -15760,27 +15807,27 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       { unsigned i; for (i = 0; i < (unsigned)(ShaderStage_Count); i++) {
          ShaderStage stage = (ShaderStage)(i);
-         if (program_get_shader(self->current_program, stage))
+         if (program_get_shader(d->program, stage))
          {
             VkPipelineShaderStageCreateInfo *s = &stages[num_stages++];
             memset(s, 0, sizeof(*s)); s->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            s->module = shader_get_module(program_get_shader(self->current_program, stage));
+            s->module = shader_get_module(program_get_shader(d->program, stage));
 #ifdef GRANITE_SPIRV_DUMP
             LOGI("Compiling SPIR-V file: (%s) %s\n",
                   shader_stage_to_name(stage),
-                  (to_string(program_get_shader(self->current_program, stage)->intrusive_node.key) + ".spv").c_str());
+                  (to_string(program_get_shader(d->program, stage)->intrusive_node.key) + ".spv").c_str());
 #endif
             s->pName = "main";
             s->stage = (VkShaderStageFlagBits)(1u << i);
 
-            { uint32_t mask = pipeline_layout_get_resource_layout(self->current_layout)->spec_constant_mask[i] &
-               self->static_state.state.spec_constant_mask;
+            { uint32_t mask = pipeline_layout_get_resource_layout(layout)->spec_constant_mask[i] &
+               d->static_state->state.spec_constant_mask;
 
             if (mask)
             {
                s->pSpecializationInfo = &spec_info[i];
-               spec_info[i].pData = self->potential_static_state.spec_constants;
-               spec_info[i].dataSize = sizeof(self->potential_static_state.spec_constants);
+               spec_info[i].pData = d->potential->spec_constants;
+               spec_info[i].dataSize = sizeof(d->potential->spec_constants);
                spec_info[i].pMapEntries = spec_entries[i];
 
                { uint32_t _feit, bit; FOR_EACH_BIT(mask, _feit, bit)
@@ -15797,9 +15844,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       } }
 
       { VkGraphicsPipelineCreateInfo pipe = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-      pipe.layout = self->current_pipeline_layout;
-      pipe.renderPass = render_pass_get_render_pass(self->compatible_render_pass);
-      pipe.subpass = self->current_subpass;
+      pipe.layout = pipeline_layout_get_layout(layout);
+      pipe.renderPass = render_pass_get_render_pass(d->rp);
+      pipe.subpass = d->subpass;
 
       pipe.pViewportState = &vp;
       pipe.pDynamicState = &dyn;
@@ -15813,24 +15860,78 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       pipe.stageCount = num_stages;
 
 
-      res = vkCreateGraphicsPipelines(device_get_device(self->device),
-            device_get_pipeline_cache(self->device), 1, &pipe, NULL, &pipeline);
+      res = vkCreateGraphicsPipelines(device_get_device(d->device),
+            device_get_pipeline_cache(d->device), 1, &pipe, NULL, &pipeline);
       if (res != VK_SUCCESS)
+      {
          LOGE("Failed to create graphics pipeline!\n");
+         pipeline = VK_NULL_HANDLE;
+      }
+      return pipeline;
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+   }
 
+   static void commandbuffer_pipeline_desc(struct CommandBuffer *self,
+         PipelineDesc *d)
+   {
+      d->device       = self->device;
+      d->program      = self->current_program;
+      d->rp           = self->compatible_render_pass;
+      d->static_state = &self->static_state;
+      d->potential    = &self->potential_static_state;
+      d->attribs      = self->attribs;
+      d->strides      = self->vbo.strides;
+      d->input_rates  = self->vbo.input_rates;
+      d->subpass      = self->current_subpass;
+   }
+
+   /* A pipeline the program does not have yet: one the warm-up thread has
+    * built, else built here. Either way it goes on the pipeline list. */
+   static RHI_NOINLINE VkPipeline commandbuffer_build_compute_pipeline(
+         struct CommandBuffer *self, Hash hash)
+   {
+      PipelineDesc d;
+      VkPipeline   pipeline;
+
+      commandbuffer_pipeline_desc(self, &d);
+      if (device_warm_take(self->device, self->current_program, hash, &pipeline))
+      {
+         device_warm_record(self->device, &d, hash, true);
+         return pipeline;
+      }
+      pipeline = pipeline_build_compute(&d);
+      if (pipeline != VK_NULL_HANDLE)
+         device_warm_record(self->device, &d, hash, true);
       return program_add_pipeline(self->current_program, hash, pipeline);
+   }
+
+   static RHI_NOINLINE VkPipeline commandbuffer_build_graphics_pipeline(
+         struct CommandBuffer *self, Hash hash)
+   {
+      PipelineDesc d;
+      VkPipeline   pipeline;
+
+      commandbuffer_pipeline_desc(self, &d);
+      if (device_warm_take(self->device, self->current_program, hash, &pipeline))
+      {
+         device_warm_record(self->device, &d, hash, false);
+         return pipeline;
       }
-      }
-      }
-      }
-      }
-      }
-      }
-      }
-      }
-      }
-      }
-      }
+      pipeline = pipeline_build_graphics(&d);
+      if (pipeline != VK_NULL_HANDLE)
+         device_warm_record(self->device, &d, hash, false);
+      return program_add_pipeline(self->current_program, hash, pipeline);
    }
 
    static void commandbuffer_flush_compute_pipeline(struct CommandBuffer *self)
@@ -17468,6 +17569,1012 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       free(buf);
    }
 
+   /* Pipeline warm-up.
+    *
+    * Every pipeline the renderer makes is recorded by the state it was
+    * made from - program, compatible render pass and subpass (by their
+    * keys, which hash their contents), fixed-function state, blend and
+    * spec constants, vertex layout - and every compatible render pass by
+    * what it was made from: attachment formats and sample counts, which
+    * are transient, and the subpasses. None of it says anything of the
+    * driver. The records are kept in a file of their own beside the
+    * pipeline cache blob, <save>/Beetle PSX HW/
+    * vulkan_pipeline_list_<vendor><device>.bin, which a driver update
+    * leaves standing.
+    *
+    * When a device is made, the listed render passes are made again
+    * (compatibility goes by formats, samples and subpasses alone, so
+    * 1x1 stand-ins for the attachments make the same pass, which its key
+    * confirms). A thread then builds every listed pipeline, as its
+    * program comes to exist, into the device's pipeline cache, and hands
+    * the VkPipeline back through a queue. The renderer looks there before
+    * it builds one itself, so a pipeline the thread got to first costs the
+    * render thread nothing. One it has not got to yet is built on the
+    * spot, as it always was: a draw is never skipped. Compute programs
+    * without spec constants have one pipeline, which the thread builds as
+    * soon as the program is made, after the listed ones.
+    *
+    * The thread only reads what does not change once made (programs,
+    * render passes, pipeline layouts, shader modules) and the pipeline
+    * cache, which Vulkan synchronises itself; the program tables are only
+    * ever touched by the render thread. Jobs go to it through a waitable
+    * SPSC queue and pipelines come back through a plain one: nothing locks
+    * and neither side waits on the other. */
+#define PIPELINE_LIST_FILE_MAGIC   "BPSXVKL1"
+#define PIPELINE_LIST_FILE_VERSION 1u
+#define PIPELINE_LIST_FILE_HEADER  32u
+#define PIPELINE_LIST_MAX          4096u
+#define PIPELINE_LIST_PASSES_MAX   256u
+#define PIPELINE_LIST_KNOWN        (PIPELINE_LIST_MAX * 4u)
+#define PIPELINE_PASS_SUBPASSES    4u
+   /* hash, program, render pass (2 words each), compute, subpass, the
+    * state words, blend constants, spec constants, attributes (binding,
+    * format, offset), strides, input rates */
+#define PIPELINE_RECORD_WORDS (6u + 2u + 4u + 4u + VULKAN_NUM_SPEC_CONSTANTS \
+      + 3u * VULKAN_NUM_VERTEX_ATTRIBS + 2u * VULKAN_NUM_VERTEX_BUFFERS)
+   /* key (2), colour attachments, their formats, depth format, samples of
+    * each attachment and of the depth one, transient mask, op flags,
+    * subpasses, then per subpass: colour, input, resolve counts, depth
+    * mode and the three index lists */
+#define PIPELINE_SUBPASS_WORDS (4u + 3u * VULKAN_NUM_ATTACHMENTS)
+#define PIPELINE_PASS_WORDS (2u + 1u + VULKAN_NUM_ATTACHMENTS + 1u \
+      + (VULKAN_NUM_ATTACHMENTS + 1u) + 3u \
+      + PIPELINE_PASS_SUBPASSES * PIPELINE_SUBPASS_WORDS)
+
+   typedef struct PipelineRecord
+   {
+      uint64_t          hash;          /* its key in the program's table */
+      uint64_t          program;
+      uint64_t          render_pass;   /* compatible; 0 for compute */
+      uint32_t          compute;
+      uint32_t          subpass;
+      PipelineState     static_state;
+      PotentialState    potential;
+      VertexAttribState attribs[VULKAN_NUM_VERTEX_ATTRIBS];
+      uint32_t          strides[VULKAN_NUM_VERTEX_BUFFERS];
+      uint32_t          input_rates[VULKAN_NUM_VERTEX_BUFFERS];
+   } PipelineRecord;
+
+   typedef struct PipelinePass
+   {
+      uint64_t               key;
+      uint32_t               formats[VULKAN_NUM_ATTACHMENTS];
+      uint32_t               samples[VULKAN_NUM_ATTACHMENTS + 1];
+      uint32_t               num_color;
+      uint32_t               depth_format;   /* VK_FORMAT_UNDEFINED: none */
+      uint32_t               lazy;
+      uint32_t               op_flags;
+      uint32_t               num_subpasses;  /* 0: the default one */
+      RenderPassInfo_Subpass subpasses[PIPELINE_PASS_SUBPASSES];
+   } PipelinePass;
+
+#ifdef HAVE_THREADS
+   typedef struct PipelineWarmJob
+   {
+      Program              *program;
+      const RenderPass     *rp;      /* NULL for compute */
+      const PipelineRecord *rec;     /* NULL: compute without spec constants */
+      Hash                  hash;
+   } PipelineWarmJob;
+
+   typedef struct PipelineWarmResult
+   {
+      Program   *program;
+      Hash       hash;
+      VkPipeline pipeline;
+      uint32_t   plain;   /* a compute pipeline without spec constants */
+   } PipelineWarmResult;
+
+   struct PipelineWarm
+   {
+      Device                *device;
+      sthread_t             *thread;
+      retro_waitable_spsc_t  jobs;     /* render thread -> warm thread */
+      retro_spsc_t           results;  /* warm thread -> render thread */
+      /* The list as read at start: not changed while the thread lives. */
+      PipelineRecord        *loaded;
+      uint8_t               *released; /* per loaded record */
+      unsigned               num_loaded;
+      unsigned               num_pending;
+      /* Records made this session: render thread only. */
+      PipelineRecord        *added;
+      unsigned               num_added;
+      unsigned               cap_added;
+      /* Hashes of every record, loaded or added (0 = empty slot). */
+      uint64_t              *known;
+      /* Every compatible render pass seen, read or made. */
+      PipelinePass          *passes;
+      unsigned               num_passes;
+      unsigned               cap_passes;
+      /* Compute jobs held back until the listed ones are queued. */
+      PipelineWarmJob       *held;
+      unsigned               num_held;
+      unsigned               cap_held;
+      uint32_t               saved_crc;
+      bool                   dirty;
+   };
+
+   static uint32_t *pipeline_words_put64(uint32_t *w, uint64_t v)
+   {
+      w[0] = (uint32_t)v;
+      w[1] = (uint32_t)(v >> 32);
+      return w + 2;
+   }
+
+   static uint64_t pipeline_words_get64(const uint32_t *w)
+   {
+      return (uint64_t)w[0] | ((uint64_t)w[1] << 32);
+   }
+
+   static void pipeline_record_write(const PipelineRecord *r, uint32_t *w)
+   {
+      unsigned i;
+      w = pipeline_words_put64(w, r->hash);
+      w = pipeline_words_put64(w, r->program);
+      w = pipeline_words_put64(w, r->render_pass);
+      *w++ = r->compute;
+      *w++ = r->subpass;
+      for (i = 0; i < 4; i++)
+         *w++ = r->static_state.words[i];
+      for (i = 0; i < 4; i++)
+      {
+         uint32_t bits;
+         memcpy(&bits, &r->potential.blend_constants[i], sizeof(bits));
+         *w++ = bits;
+      }
+      for (i = 0; i < VULKAN_NUM_SPEC_CONSTANTS; i++)
+         *w++ = r->potential.spec_constants[i];
+      for (i = 0; i < VULKAN_NUM_VERTEX_ATTRIBS; i++)
+      {
+         *w++ = r->attribs[i].binding;
+         *w++ = (uint32_t)r->attribs[i].format;
+         *w++ = r->attribs[i].offset;
+      }
+      for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         *w++ = r->strides[i];
+      for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         *w++ = r->input_rates[i];
+   }
+
+   static void pipeline_record_read(PipelineRecord *r, const uint32_t *w)
+   {
+      unsigned i;
+      memset(r, 0, sizeof(*r));
+      r->hash        = pipeline_words_get64(w);
+      r->program     = pipeline_words_get64(w + 2);
+      r->render_pass = pipeline_words_get64(w + 4);
+      w += 6;
+      r->compute = *w++;
+      r->subpass = *w++;
+      for (i = 0; i < 4; i++)
+         r->static_state.words[i] = *w++;
+      for (i = 0; i < 4; i++)
+      {
+         uint32_t bits = *w++;
+         memcpy(&r->potential.blend_constants[i], &bits, sizeof(bits));
+      }
+      for (i = 0; i < VULKAN_NUM_SPEC_CONSTANTS; i++)
+         r->potential.spec_constants[i] = *w++;
+      for (i = 0; i < VULKAN_NUM_VERTEX_ATTRIBS; i++)
+      {
+         r->attribs[i].binding = *w++;
+         r->attribs[i].format  = (VkFormat)*w++;
+         r->attribs[i].offset  = *w++;
+      }
+      for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         r->strides[i] = *w++;
+      for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         r->input_rates[i] = *w++;
+   }
+
+   static void pipeline_pass_write(const PipelinePass *p, uint32_t *w)
+   {
+      unsigned i, j;
+      w = pipeline_words_put64(w, p->key);
+      *w++ = p->num_color;
+      for (i = 0; i < VULKAN_NUM_ATTACHMENTS; i++)
+         *w++ = p->formats[i];
+      *w++ = p->depth_format;
+      for (i = 0; i < VULKAN_NUM_ATTACHMENTS + 1; i++)
+         *w++ = p->samples[i];
+      *w++ = p->lazy;
+      *w++ = p->op_flags;
+      *w++ = p->num_subpasses;
+      for (i = 0; i < PIPELINE_PASS_SUBPASSES; i++)
+      {
+         const RenderPassInfo_Subpass *s = &p->subpasses[i];
+         *w++ = s->num_color_attachments;
+         *w++ = s->num_input_attachments;
+         *w++ = s->num_resolve_attachments;
+         *w++ = (uint32_t)s->depth_stencil_mode;
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            *w++ = s->color_attachments[j];
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            *w++ = s->input_attachments[j];
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            *w++ = s->resolve_attachments[j];
+      }
+   }
+
+   /* False for a pass this cannot be made from (counts out of range). */
+   static bool pipeline_pass_read(PipelinePass *p, const uint32_t *w)
+   {
+      unsigned i, j;
+      memset(p, 0, sizeof(*p));
+      p->key = pipeline_words_get64(w);
+      w += 2;
+      p->num_color = *w++;
+      for (i = 0; i < VULKAN_NUM_ATTACHMENTS; i++)
+         p->formats[i] = *w++;
+      p->depth_format = *w++;
+      for (i = 0; i < VULKAN_NUM_ATTACHMENTS + 1; i++)
+         p->samples[i] = *w++;
+      p->lazy          = *w++;
+      p->op_flags      = *w++;
+      p->num_subpasses = *w++;
+      for (i = 0; i < PIPELINE_PASS_SUBPASSES; i++)
+      {
+         RenderPassInfo_Subpass *s = &p->subpasses[i];
+         s->num_color_attachments   = *w++;
+         s->num_input_attachments   = *w++;
+         s->num_resolve_attachments = *w++;
+         s->depth_stencil_mode      = (RenderPassInfo_DepthStencil)*w++;
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            s->color_attachments[j] = *w++;
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            s->input_attachments[j] = *w++;
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS; j++)
+            s->resolve_attachments[j] = *w++;
+         if (   s->num_color_attachments > VULKAN_NUM_ATTACHMENTS
+             || s->num_input_attachments > VULKAN_NUM_ATTACHMENTS
+             || s->num_resolve_attachments > VULKAN_NUM_ATTACHMENTS)
+            return false;
+         /* an attachment a subpass names is one the pass has */
+         for (j = 0; j < s->num_color_attachments; j++)
+            if (s->color_attachments[j] >= p->num_color)
+               return false;
+         for (j = 0; j < s->num_input_attachments; j++)
+            if (s->input_attachments[j] > p->num_color)
+               return false;
+         for (j = 0; j < s->num_resolve_attachments; j++)
+            if (s->resolve_attachments[j] >= p->num_color)
+               return false;
+      }
+      return p->num_color <= VULKAN_NUM_ATTACHMENTS
+         && (p->num_color || p->depth_format != VK_FORMAT_UNDEFINED)
+         && p->num_subpasses <= PIPELINE_PASS_SUBPASSES;
+   }
+
+   /* The key commandbuffer_flush_graphics_pipeline / _compute_pipeline
+    * give the state in @r on @program: a record whose stored key is not
+    * this one is not built (a list from another build of the core). The
+    * attribute bindings it names are checked to be in range as well. */
+   static bool pipeline_record_key(const PipelineRecord *r,
+         const Program *program, Hash *out)
+   {
+      const CombinedResourceLayout *layout =
+         pipeline_layout_get_resource_layout(program_get_pipeline_layout(program));
+      uint32_t combined_spec_constant;
+      uint32_t active_vbos = 0;
+      uint32_t _feit, bit;
+      Hasher   h;
+
+      hasher_init(&h);
+      if (r->compute)
+         hasher_u64(&h, r->program);
+      else
+      {
+         FOR_EACH_BIT(layout->attribute_mask, _feit, bit)
+         {
+            if (r->attribs[bit].binding >= VULKAN_NUM_VERTEX_BUFFERS)
+               return false;
+            hasher_u32(&h, bit);
+            active_vbos |= 1u << r->attribs[bit].binding;
+            hasher_u32(&h, r->attribs[bit].binding);
+            hasher_u32(&h, r->attribs[bit].format);
+            hasher_u32(&h, r->attribs[bit].offset);
+         }
+         FOR_EACH_BIT(active_vbos, _feit, bit)
+         {
+            hasher_u32(&h, r->input_rates[bit]);
+            hasher_u32(&h, r->strides[bit]);
+         }
+         hasher_u64(&h, r->render_pass);
+         hasher_u32(&h, r->subpass);
+         hasher_u64(&h, r->program);
+         hasher_data(&h, r->static_state.words, sizeof(r->static_state.words));
+         if (r->static_state.state.blend_enable)
+         {
+            bool b0 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(r->static_state.state.src_color_blend));
+            bool b1 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(r->static_state.state.src_alpha_blend));
+            bool b2 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(r->static_state.state.dst_color_blend));
+            bool b3 = COMBINER_NEEDS_BLEND_CONSTANT((VkBlendFactor)(r->static_state.state.dst_alpha_blend));
+            if (b0 || b1 || b2 || b3)
+               hasher_data(&h, (const uint32_t *)(r->potential.blend_constants),
+                     sizeof(r->potential.blend_constants));
+         }
+      }
+      combined_spec_constant = layout->combined_spec_constant_mask
+         & r->static_state.state.spec_constant_mask;
+      hasher_u32(&h, combined_spec_constant);
+      FOR_EACH_BIT(combined_spec_constant, _feit, bit)
+         hasher_u32(&h, r->potential.spec_constants[bit]);
+      *out = hasher_get(&h);
+      return true;
+   }
+
+   /* Open-addressed set of the hashes on the list: true when @hash was
+    * not in it (and now is). */
+   static bool pipeline_warm_known_insert(struct PipelineWarm *w, uint64_t hash)
+   {
+      uint32_t i = (uint32_t)(hash ^ (hash >> 32)) & (PIPELINE_LIST_KNOWN - 1u);
+      if (!hash)
+         hash = 1; /* 0 marks an empty slot */
+      for (;;)
+      {
+         if (w->known[i] == hash)
+            return false;
+         if (!w->known[i])
+         {
+            w->known[i] = hash;
+            return true;
+         }
+         i = (i + 1u) & (PIPELINE_LIST_KNOWN - 1u);
+      }
+   }
+
+   static bool pipeline_warm_known(const struct PipelineWarm *w, uint64_t hash)
+   {
+      uint32_t i = (uint32_t)(hash ^ (hash >> 32)) & (PIPELINE_LIST_KNOWN - 1u);
+      if (!hash)
+         hash = 1;
+      while (w->known[i])
+      {
+         if (w->known[i] == hash)
+            return true;
+         i = (i + 1u) & (PIPELINE_LIST_KNOWN - 1u);
+      }
+      return false;
+   }
+
+   static void pipeline_warm_build(struct PipelineWarm *w,
+         const PipelineWarmJob *job, PipelineWarmResult *res)
+   {
+      static const PipelineState     no_state;
+      static const PotentialState    no_potential;
+      static const VertexAttribState no_attribs[VULKAN_NUM_VERTEX_ATTRIBS];
+      VkDeviceSize      strides[VULKAN_NUM_VERTEX_BUFFERS];
+      VkVertexInputRate input_rates[VULKAN_NUM_VERTEX_BUFFERS];
+      PipelineDesc      d;
+      unsigned          i;
+
+      d.device       = w->device;
+      d.program      = job->program;
+      d.rp           = job->rp;
+      d.subpass      = 0;
+      d.static_state = &no_state;
+      d.potential    = &no_potential;
+      d.attribs      = no_attribs;
+      d.strides      = strides;
+      d.input_rates  = input_rates;
+      memset(strides, 0, sizeof(strides));
+      memset(input_rates, 0, sizeof(input_rates));
+      if (job->rec)
+      {
+         d.subpass      = job->rec->subpass;
+         d.static_state = &job->rec->static_state;
+         d.potential    = &job->rec->potential;
+         d.attribs      = job->rec->attribs;
+         for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         {
+            strides[i]     = job->rec->strides[i];
+            input_rates[i] = (VkVertexInputRate)job->rec->input_rates[i];
+         }
+      }
+      res->program  = job->program;
+      res->hash     = job->hash;
+      res->plain    = job->rec ? 0 : 1;
+      res->pipeline = job->rp ? pipeline_build_graphics(&d)
+                              : pipeline_build_compute(&d);
+   }
+
+   static void pipeline_warm_thread(void *data)
+   {
+      struct PipelineWarm *w = (struct PipelineWarm *)data;
+      PipelineWarmJob      job;
+      PipelineWarmResult   res;
+
+      for (;;)
+      {
+         /* Parked until a job is written or the queue is cancelled,
+          * both of which notify the readable eventcount: no bound, no
+          * clock read. */
+         while (retro_spsc_read_avail(&w->jobs.queue) < sizeof(job))
+         {
+            const int key = retro_eventcount_prepare_wait(&w->jobs.readable);
+            if (retro_waitable_spsc_cancelled(&w->jobs))
+            {
+               retro_eventcount_cancel_wait(&w->jobs.readable);
+               return;
+            }
+            if (retro_spsc_read_avail(&w->jobs.queue) >= sizeof(job))
+               retro_eventcount_cancel_wait(&w->jobs.readable);
+            else
+               retro_eventcount_commit_wait(&w->jobs.readable, key);
+         }
+         if (retro_waitable_spsc_cancelled(&w->jobs))
+            return;
+         retro_waitable_spsc_read_quiet(&w->jobs, &job, sizeof(job));
+         pipeline_warm_build(w, &job, &res);
+         if (res.pipeline == VK_NULL_HANDLE)
+            continue;
+         /* Room for every job was made at the start; a full queue only
+          * loses this one, which the render thread then builds. */
+         if (retro_spsc_write_avail(&w->results) < sizeof(res)
+               || retro_spsc_write(&w->results, &res, sizeof(res)) != sizeof(res))
+            vkDestroyPipeline(device_get_device(w->device), res.pipeline, NULL);
+      }
+   }
+
+   static void pipeline_warm_submit(struct PipelineWarm *w,
+         const PipelineWarmJob *job)
+   {
+      if (retro_spsc_write_avail(&w->jobs.queue) >= sizeof(*job))
+         retro_waitable_spsc_write(&w->jobs, job, sizeof(*job));
+   }
+
+   /* Hands the thread every listed pipeline whose program and render pass
+    * exist now. Render thread; called when either kind of object is made. */
+   static void pipeline_warm_release(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      unsigned i;
+
+      if (!w || !w->num_pending)
+         return;
+      for (i = 0; i < w->num_loaded; i++)
+      {
+         const PipelineRecord *r = &w->loaded[i];
+         PipelineWarmJob       job;
+         Hash                  key;
+
+         if (w->released[i])
+            continue;
+         if (!(job.program = program_map_find(&self->programs, r->program)))
+            continue;
+         job.rp = NULL;
+         if (!r->compute
+               && !(job.rp = render_pass_map_find(&self->render_passes, r->render_pass)))
+            continue;
+         w->released[i] = 1;
+         w->num_pending--;
+         /* the right kind of program, a subpass the pass has, and the key
+          * this build gives that state */
+         if (   (r->compute != 0) != (program_get_shader(job.program, ShaderStage_Compute) != NULL)
+             || (job.rp && r->subpass >= SubpassInfoVec_size(&job.rp->subpasses))
+             || !pipeline_record_key(r, job.program, &key) || key != r->hash
+             || program_get_pipeline(job.program, r->hash) != VK_NULL_HANDLE)
+            continue;
+         job.rec  = r;
+         job.hash = r->hash;
+         pipeline_warm_submit(w, &job);
+      }
+   }
+
+   /* Queues the compute jobs held back. Render thread, once per frame. */
+   static void device_warm_flush_held(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      unsigned i;
+      if (!w || !w->num_held)
+         return;
+      for (i = 0; i < w->num_held; i++)
+         if (program_get_pipeline(w->held[i].program, w->held[i].hash) == VK_NULL_HANDLE)
+            pipeline_warm_submit(w, &w->held[i]);
+      w->num_held = 0;
+   }
+
+   /* A program was made: the listed pipelines of it are released, and a
+    * compute one without spec constants, which has only the one pipeline,
+    * is built too - straight away with no list to come first, else after
+    * the listed ones are queued. */
+   static void device_warm_program_made(Device *self, Program *program)
+   {
+      struct PipelineWarm *w = self->warm;
+      if (!w)
+         return;
+      pipeline_warm_release(self);
+      if (program_get_shader(program, ShaderStage_Compute)
+            && !pipeline_layout_get_resource_layout(
+               program_get_pipeline_layout(program))->combined_spec_constant_mask)
+      {
+         PipelineWarmJob job;
+         Hasher          h;
+         hasher_init(&h);
+         hasher_u64(&h, program->intrusive_node.key);
+         hasher_u32(&h, 0);
+         job.program = program;
+         job.rp      = NULL;
+         job.rec     = NULL;
+         job.hash    = hasher_get(&h);
+         if (pipeline_warm_known(w, job.hash))
+            return; /* listed: released above */
+         if (!w->num_loaded)
+            pipeline_warm_submit(w, &job);
+         else
+         {
+            if (w->num_held == w->cap_held)
+            {
+               unsigned         cap = w->cap_held ? w->cap_held * 2 : 32;
+               PipelineWarmJob *n   = (PipelineWarmJob *)realloc(w->held, cap * sizeof(*n));
+               if (!n)
+                  return;
+               w->held     = n;
+               w->cap_held = cap;
+            }
+            w->held[w->num_held++] = job;
+         }
+      }
+   }
+
+   /* A compatible render pass was made: what it was made from is kept for
+    * the list, and the listed pipelines in it are released. */
+   static void device_warm_pass_made(Device *self, Hash key,
+         const RenderPassInfo *info, const VkFormat *formats, uint32_t lazy)
+   {
+      struct PipelineWarm *w = self->warm;
+      PipelinePass        *p;
+      unsigned             i;
+
+      if (!w)
+         return;
+      for (i = 0; i < w->num_passes; i++)
+         if (w->passes[i].key == key)
+            break;
+      if (i == w->num_passes && w->num_passes < PIPELINE_LIST_PASSES_MAX
+            && info->num_subpasses <= PIPELINE_PASS_SUBPASSES)
+      {
+         if (w->num_passes == w->cap_passes)
+         {
+            unsigned      cap = w->cap_passes ? w->cap_passes * 2 : 16;
+            PipelinePass *n   = (PipelinePass *)realloc(w->passes, cap * sizeof(*n));
+            if (!n)
+               goto release;
+            w->passes     = n;
+            w->cap_passes = cap;
+         }
+         p = &w->passes[w->num_passes++];
+         memset(p, 0, sizeof(*p));
+         p->key       = key;
+         p->num_color = info->num_color_attachments;
+         for (i = 0; i < info->num_color_attachments; i++)
+         {
+            p->formats[i] = (uint32_t)formats[i];
+            p->samples[i] = (uint32_t)image_get_create_info(
+                  imageview_get_image(info->color_attachments[i]))->samples;
+         }
+         if (info->depth_stencil)
+         {
+            p->depth_format = (uint32_t)imageview_get_format(info->depth_stencil);
+            p->samples[VULKAN_NUM_ATTACHMENTS] = (uint32_t)image_get_create_info(
+                  imageview_get_image(info->depth_stencil))->samples;
+         }
+         p->lazy          = lazy;
+         p->op_flags      = info->op_flags & RENDER_PASS_OP_DEPTH_STENCIL_READ_ONLY_BIT;
+         p->num_subpasses = info->subpasses ? info->num_subpasses : 0;
+         for (i = 0; i < p->num_subpasses; i++)
+            p->subpasses[i] = info->subpasses[i];
+         w->dirty = true;
+      }
+release:
+      pipeline_warm_release(self);
+   }
+
+   /* A 1x1 attachment of @format: what a listed pass is made from again. */
+   static ImageHandle pipeline_pass_stand_in(Device *self, VkFormat format,
+         uint32_t samples, bool lazy)
+   {
+      ImageCreateInfo info = lazy
+         ? image_create_info_transient_render_target(1, 1, format)
+         : image_create_info_render_target(1, 1, format);
+      info.samples = (VkSampleCountFlagBits)(samples ? samples : 1);
+      return device_create_image(self, &info, NULL);
+   }
+
+   /* Makes the listed compatible render passes again. Render thread, once
+    * the device can make images; before any program exists. */
+   static void device_warm_make_passes(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      unsigned             i, j;
+
+      if (!w)
+         return;
+      for (i = 0; i < w->num_passes; i++)
+      {
+         const PipelinePass *p = &w->passes[i];
+         ImageHandle    images[VULKAN_NUM_ATTACHMENTS + 1];
+         RenderPassInfo info;
+         bool           ok = true;
+
+         if (render_pass_map_find(&self->render_passes, p->key))
+            continue;
+         memset(images, 0, sizeof(images));
+         render_pass_info_defaults(&info);
+         for (j = 0; ok && j < p->num_color; j++)
+         {
+            images[j] = pipeline_pass_stand_in(self, (VkFormat)p->formats[j],
+                  p->samples[j], (p->lazy >> j) & 1);
+            if ((ok = ih_is_valid(&images[j])))
+               info.color_attachments[j] = image_get_view(ih_get(&images[j]));
+         }
+         if (ok && p->depth_format != VK_FORMAT_UNDEFINED)
+         {
+            images[VULKAN_NUM_ATTACHMENTS] = pipeline_pass_stand_in(self,
+                  (VkFormat)p->depth_format, p->samples[VULKAN_NUM_ATTACHMENTS],
+                  (p->lazy >> p->num_color) & 1);
+            if ((ok = ih_is_valid(&images[VULKAN_NUM_ATTACHMENTS])))
+               info.depth_stencil = image_get_view(ih_get(&images[VULKAN_NUM_ATTACHMENTS]));
+         }
+         if (ok)
+         {
+            info.num_color_attachments = p->num_color;
+            info.op_flags              = p->op_flags;
+            info.num_subpasses         = p->num_subpasses;
+            info.subpasses             = p->num_subpasses ? p->subpasses : NULL;
+            /* (a pass that came out under another key is someone else's,
+             * and harmless: it is only ever found by its own) */
+            device_request_render_pass(self, &info, true);
+         }
+         for (j = 0; j < VULKAN_NUM_ATTACHMENTS + 1; j++)
+            ih_reset(&images[j]);
+      }
+   }
+
+   static void device_warm_record_plain(Device *self, Program *program, Hash hash)
+   {
+      static const PipelineState  no_state;
+      static const PotentialState no_potential;
+      PipelineDesc d;
+      memset(&d, 0, sizeof(d));
+      d.program      = program;
+      d.static_state = &no_state;
+      d.potential    = &no_potential;
+      device_warm_record(self, &d, hash, true);
+   }
+
+   /* The pipelines the thread has handed back, into their programs' tables
+    * (where one the render thread built meanwhile is kept, and the
+    * thread's dropped). */
+   static unsigned pipeline_warm_drain(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      PipelineWarmResult   res;
+      unsigned             n = 0;
+
+      while (retro_spsc_read_avail(&w->results) >= sizeof(res))
+      {
+         retro_spsc_read(&w->results, &res, sizeof(res));
+         program_add_pipeline(res.program, res.hash, res.pipeline);
+         /* (a listed one is on the list; one that was not, built because
+          * its program was made, goes on it here, as the render thread
+          * finds it in the table from now on) */
+         if (res.plain)
+            device_warm_record_plain(self, res.program, res.hash);
+         n++;
+      }
+      return n;
+   }
+
+   static int device_warm_take(Device *self, Program *program, Hash hash,
+         VkPipeline *out)
+   {
+      VkPipeline pipeline;
+      if (!self->warm || !pipeline_warm_drain(self))
+         return 0;
+      if ((pipeline = program_get_pipeline(program, hash)) == VK_NULL_HANDLE)
+         return 0;
+      *out = pipeline;
+      return 1;
+   }
+
+   static void device_warm_record(Device *self, const PipelineDesc *d,
+         Hash hash, bool compute)
+   {
+      struct PipelineWarm *w = self->warm;
+      PipelineRecord      *r;
+      unsigned             i;
+
+      if (!w || w->num_loaded + w->num_added >= PIPELINE_LIST_MAX
+            || !pipeline_warm_known_insert(w, hash))
+         return;
+      if (w->num_added == w->cap_added)
+      {
+         unsigned        cap = w->cap_added ? w->cap_added * 2 : 64;
+         PipelineRecord *n   = (PipelineRecord *)realloc(w->added, cap * sizeof(*n));
+         if (!n)
+            return;
+         w->added     = n;
+         w->cap_added = cap;
+      }
+      r = &w->added[w->num_added++];
+      memset(r, 0, sizeof(*r));
+      r->hash         = hash;
+      r->program      = d->program->intrusive_node.key;
+      r->render_pass  = compute ? 0 : d->rp->intrusive_node.key;
+      r->compute      = compute ? 1 : 0;
+      r->subpass      = compute ? 0 : d->subpass;
+      r->static_state = *d->static_state;
+      r->potential    = *d->potential;
+      if (!compute)
+      {
+         memcpy(r->attribs, d->attribs, sizeof(r->attribs));
+         for (i = 0; i < VULKAN_NUM_VERTEX_BUFFERS; i++)
+         {
+            r->strides[i]     = (uint32_t)d->strides[i];
+            r->input_rates[i] = (uint32_t)d->input_rates[i];
+         }
+      }
+      w->dirty = true;
+   }
+
+   static char *device_pipeline_list_path(const Device *self, bool create)
+   {
+      char   *path = device_pipeline_cache_path(self, create);
+      char   *name;
+      char    hex[17];
+      uint8_t id[8];
+      size_t  room;
+
+      if (!path)
+         return NULL;
+      /* the cache blob's name, without the driver's UUID: shorter than it,
+       * so written over it in the same buffer */
+      name = (char *)path_basename(path);
+      room = strlen(name) + 1;
+      id[0] = (uint8_t)(self->gpu_props.vendorID >> 24);
+      id[1] = (uint8_t)(self->gpu_props.vendorID >> 16);
+      id[2] = (uint8_t)(self->gpu_props.vendorID >> 8);
+      id[3] = (uint8_t)(self->gpu_props.vendorID);
+      id[4] = (uint8_t)(self->gpu_props.deviceID >> 24);
+      id[5] = (uint8_t)(self->gpu_props.deviceID >> 16);
+      id[6] = (uint8_t)(self->gpu_props.deviceID >> 8);
+      id[7] = (uint8_t)(self->gpu_props.deviceID);
+      pipeline_cache_hex(hex, id, 8);
+      strlcpy(name, "vulkan_pipeline_list_", room);
+      strlcat(name, hex, room);
+      strlcat(name, ".bin", room);
+      return path;
+   }
+
+   /* The list on disk: header (magic, version, words per record, records,
+    * words per pass, passes, CRC32 of what follows), then the records and
+    * the passes as little-endian words. Anything else - another version, a
+    * truncated or damaged file - is not read, and is replaced by the next
+    * save. */
+   static void device_pipeline_list_load(Device *self, struct PipelineWarm *w)
+   {
+      char          *path = device_pipeline_list_path(self, false);
+      void          *buf  = NULL;
+      int64_t        len  = 0;
+      const char    *why  = NULL;
+      const uint8_t *d;
+      uint32_t       count = 0, passes = 0;
+      uint64_t       body  = 0;
+
+      if (!path)
+         return;
+      if (!path_is_valid(path)
+            || filestream_read_file(path, &buf, &len) != 1 || !buf)
+      {
+         free(path);
+         free(buf);
+         return;
+      }
+      d = (const uint8_t *)buf;
+      if (len < (int64_t)PIPELINE_LIST_FILE_HEADER)
+         why = "too short";
+      else if (memcmp(d, PIPELINE_LIST_FILE_MAGIC, 8) != 0)
+         why = "bad magic";
+      else if (pipeline_cache_rd32(d + 8) != PIPELINE_LIST_FILE_VERSION
+            || pipeline_cache_rd32(d + 12) != PIPELINE_RECORD_WORDS
+            || pipeline_cache_rd32(d + 20) != PIPELINE_PASS_WORDS)
+         why = "another version";
+      else if ((count = pipeline_cache_rd32(d + 16)) > PIPELINE_LIST_MAX
+            || (passes = pipeline_cache_rd32(d + 24)) > PIPELINE_LIST_PASSES_MAX
+            || len != (int64_t)(PIPELINE_LIST_FILE_HEADER
+               + (body = ((uint64_t)count * PIPELINE_RECORD_WORDS
+                     + (uint64_t)passes * PIPELINE_PASS_WORDS) * 4u)))
+         why = "size mismatch";
+      else if (encoding_crc32(0, d + PIPELINE_LIST_FILE_HEADER, (size_t)body)
+            != pipeline_cache_rd32(d + 28))
+         why = "CRC mismatch";
+      else if ((count && (!(w->loaded = (PipelineRecord *)calloc(count, sizeof(*w->loaded)))
+               || !(w->released = (uint8_t *)calloc(count, 1))))
+            || (passes && !(w->passes = (PipelinePass *)calloc(passes, sizeof(*w->passes)))))
+         why = "out of memory";
+
+      if (why)
+      {
+         LOGI("[Vulkan pipeline list] ignoring %s: %s\n", path, why);
+         free(w->loaded);
+         free(w->released);
+         free(w->passes);
+         w->loaded   = NULL;
+         w->released = NULL;
+         w->passes   = NULL;
+      }
+      else
+      {
+         uint32_t       words[PIPELINE_PASS_WORDS > PIPELINE_RECORD_WORDS
+            ? PIPELINE_PASS_WORDS : PIPELINE_RECORD_WORDS];
+         const uint8_t *p = d + PIPELINE_LIST_FILE_HEADER;
+         uint32_t       i, j;
+         for (i = 0; i < count; i++)
+         {
+            for (j = 0; j < PIPELINE_RECORD_WORDS; j++, p += 4)
+               words[j] = pipeline_cache_rd32(p);
+            pipeline_record_read(&w->loaded[w->num_loaded], words);
+            if (pipeline_warm_known_insert(w, w->loaded[w->num_loaded].hash))
+               w->num_loaded++;
+         }
+         w->cap_passes = passes;
+         for (i = 0; i < passes; i++)
+         {
+            for (j = 0; j < PIPELINE_PASS_WORDS; j++, p += 4)
+               words[j] = pipeline_cache_rd32(p);
+            if (pipeline_pass_read(&w->passes[w->num_passes], words))
+               w->num_passes++;
+         }
+         w->num_pending = w->num_loaded;
+         w->saved_crc   = pipeline_cache_rd32(d + 28);
+         LOGI("[Vulkan pipeline list] %u pipelines in %u render passes listed in %s\n",
+               w->num_loaded, w->num_passes, path);
+      }
+      free(path);
+      free(buf);
+   }
+
+   static void device_pipeline_list_save(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      uint32_t words[PIPELINE_PASS_WORDS > PIPELINE_RECORD_WORDS
+         ? PIPELINE_PASS_WORDS : PIPELINE_RECORD_WORDS];
+      unsigned count, i, j;
+      size_t   body;
+      uint8_t *buf;
+      uint8_t *p;
+      uint32_t crc;
+      char    *path;
+
+      if (!w || !w->dirty)
+         return;
+      w->dirty = false;
+      count = w->num_loaded + w->num_added;
+      body  = ((size_t)count * PIPELINE_RECORD_WORDS
+            + (size_t)w->num_passes * PIPELINE_PASS_WORDS) * 4u;
+      if (!(buf = (uint8_t *)malloc(PIPELINE_LIST_FILE_HEADER + body)))
+         return;
+      p = buf + PIPELINE_LIST_FILE_HEADER;
+      for (i = 0; i < count; i++)
+      {
+         pipeline_record_write(i < w->num_loaded ? &w->loaded[i]
+               : &w->added[i - w->num_loaded], words);
+         for (j = 0; j < PIPELINE_RECORD_WORDS; j++, p += 4)
+            pipeline_cache_wr32(p, words[j]);
+      }
+      for (i = 0; i < w->num_passes; i++)
+      {
+         pipeline_pass_write(&w->passes[i], words);
+         for (j = 0; j < PIPELINE_PASS_WORDS; j++, p += 4)
+            pipeline_cache_wr32(p, words[j]);
+      }
+      crc = encoding_crc32(0, buf + PIPELINE_LIST_FILE_HEADER, body);
+      memcpy(buf, PIPELINE_LIST_FILE_MAGIC, 8);
+      pipeline_cache_wr32(buf + 8, PIPELINE_LIST_FILE_VERSION);
+      pipeline_cache_wr32(buf + 12, PIPELINE_RECORD_WORDS);
+      pipeline_cache_wr32(buf + 16, count);
+      pipeline_cache_wr32(buf + 20, PIPELINE_PASS_WORDS);
+      pipeline_cache_wr32(buf + 24, w->num_passes);
+      pipeline_cache_wr32(buf + 28, crc);
+      if (crc != w->saved_crc && (path = device_pipeline_list_path(self, true)))
+      {
+         if (filestream_write_file_atomic(path, buf,
+                  (int64_t)(PIPELINE_LIST_FILE_HEADER + body)))
+            w->saved_crc = crc;
+         else
+            LOGE("[Vulkan pipeline list] write failed: %s\n", path);
+         free(path);
+      }
+      free(buf);
+   }
+
+   static void device_warm_start(Device *self)
+   {
+      struct PipelineWarm *w = (struct PipelineWarm *)calloc(1, sizeof(*w));
+      size_t room;
+
+      self->warm = NULL;
+      if (!w)
+         return;
+      w->device = self;
+      if (!(w->known = (uint64_t *)calloc(PIPELINE_LIST_KNOWN, sizeof(*w->known))))
+      {
+         free(w);
+         return;
+      }
+      device_pipeline_list_load(self, w);
+      /* Room for a job and a result for every listed pipeline, and for
+       * every compute program a renderer makes. */
+      room = (size_t)w->num_loaded + 256u;
+      if (!retro_waitable_spsc_init(&w->jobs, room * sizeof(PipelineWarmJob)))
+         goto fail_jobs;
+      if (!retro_spsc_init(&w->results, room * sizeof(PipelineWarmResult)))
+         goto fail_results;
+      if (!(w->thread = sthread_create(pipeline_warm_thread, w)))
+         goto fail_thread;
+      self->warm = w;
+      return;
+
+fail_thread:
+      retro_spsc_free(&w->results);
+fail_results:
+      retro_waitable_spsc_free(&w->jobs);
+fail_jobs:
+      free(w->loaded);
+      free(w->released);
+      free(w->passes);
+      free(w->known);
+      free(w);
+   }
+
+   /* Stops and joins the thread (it finishes the pipeline it is building),
+    * and destroys what it built that nobody took. Before anything it reads
+    * is destroyed. The list stays for the save that follows. */
+   static void device_warm_stop(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      PipelineWarmResult   res;
+
+      if (!w || !w->thread)
+         return;
+      retro_waitable_spsc_cancel(&w->jobs);
+      sthread_join(w->thread);
+      w->thread = NULL;
+      while (retro_spsc_read_avail(&w->results) >= sizeof(res))
+      {
+         retro_spsc_read(&w->results, &res, sizeof(res));
+         vkDestroyPipeline(self->device, res.pipeline, NULL);
+      }
+   }
+
+   static void device_warm_free(Device *self)
+   {
+      struct PipelineWarm *w = self->warm;
+      if (!w)
+         return;
+      device_warm_stop(self);
+      retro_spsc_free(&w->results);
+      retro_waitable_spsc_free(&w->jobs);
+      free(w->loaded);
+      free(w->released);
+      free(w->added);
+      free(w->passes);
+      free(w->held);
+      free(w->known);
+      free(w);
+      self->warm = NULL;
+   }
+#else
+   static int device_warm_take(Device *self, Program *program, Hash hash,
+         VkPipeline *out)
+   {
+      return 0;
+   }
+   static void device_warm_record(Device *self, const PipelineDesc *d,
+         Hash hash, bool compute) { }
+#endif
+
    static void device_init(Device *self)
    {
       /* Device is malloc'd with uninitialised storage; in the C++ source it was
@@ -17543,8 +18650,15 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
     * implicit member destruction used to perform, deepest-owned last. */
    static void device_deinit(Device *self)
    {
+#ifdef HAVE_THREADS
+      device_warm_stop(self);
+#endif
       device_wait_idle_nolock(self);
       device_pipeline_cache_save(self);
+#ifdef HAVE_THREADS
+      device_pipeline_list_save(self);
+      device_warm_free(self);
+#endif
 
       framebuffer_allocator_clear(&self->framebuffer_allocator);
       attachment_allocator_clear(&self->transient_allocator);
@@ -17638,7 +18752,12 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       hash = hasher_get(&hasher);
       ret = program_map_find(&self->programs, hash);
       if (!ret)
+      {
          ret = program_map_emplace_yield_compute(&self->programs, hash, self, compute);
+#ifdef HAVE_THREADS
+         device_warm_program_made(self, ret);
+#endif
+      }
       return ret;
    }
 
@@ -17664,7 +18783,12 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
       ret = program_map_find(&self->programs, hash);
 
       if (!ret)
+      {
          ret = program_map_emplace_yield_graphics(&self->programs, hash, self, vertex, fragment);
+#ifdef HAVE_THREADS
+         device_warm_program_made(self, ret);
+#endif
+      }
       return ret;
    }
 
@@ -17827,6 +18951,9 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
 
       /* Needs gpu_props: the on-disk blob is matched against the GPU. */
       device_pipeline_cache_create(self);
+#ifdef HAVE_THREADS
+      device_warm_start(self);
+#endif
 
       self->graphics_queue_family_index = context_get_graphics_queue_family(context);
       self->graphics_queue = context_get_graphics_queue(context);
@@ -17859,6 +18986,11 @@ static void fixup_src_stage(VkPipelineStageFlags *src_stages, bool fixup)
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
       bufferpool_init(&self->managers.ubo, self, 256 * 1024, max_((VkDeviceSize)16u, self->gpu_props.limits.minUniformBufferOffsetAlignment),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+#ifdef HAVE_THREADS
+      /* Can make images now: the listed render passes, before the renderer
+       * makes its programs and with them releases the listed pipelines. */
+      device_warm_make_passes(self);
+#endif
    }
 
    static void device_init_stock_samplers(Device *self){
@@ -18858,9 +19990,17 @@ static void device_next_frame_context(Device *self)
 
    /* Debounced pipeline cache flush: write once compilation has been quiet
     * for PIPELINE_CACHE_FLUSH_FRAMES frames. */
+#ifdef HAVE_THREADS
+   device_warm_flush_held(self);
+#endif
    if (self->pipeline_cache_dirty &&
        ++self->pipeline_cache_quiet_frames >= PIPELINE_CACHE_FLUSH_FRAMES)
+   {
       device_pipeline_cache_save(self);
+#ifdef HAVE_THREADS
+      device_pipeline_list_save(self);
+#endif
+   }
 }
 
    static void per_frame_begin(struct PerFrame *self)
@@ -20051,7 +21191,13 @@ static void image_resource_holder_fini(struct ImageResourceHolder *self)
 
       ret = render_pass_map_find(&self->render_passes, hash);
       if (!ret)
+      {
          ret = render_pass_map_emplace_yield(&self->render_passes, hash, self, info);
+#ifdef HAVE_THREADS
+         if (compatible)
+            device_warm_pass_made(self, hash, info, formats, lazy);
+#endif
+      }
       return ret;
       }
    }
