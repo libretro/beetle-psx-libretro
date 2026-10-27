@@ -83,6 +83,50 @@ int rwebm_video_blit_i420_fp16(uint16_t *dst, unsigned dst_stride,
       const uint16_t *u, const uint16_t *v, int uvs,
       unsigned matrix, unsigned transfer, unsigned range);
 
+/* Source-primary-aware counterparts. primaries 1 is already BT.709;
+ * 9 is BT.2020, also the HDR default for absent/unspecified primaries.
+ * The legacy entry points above retain their BT.2020 HDR assumption.
+ * Primaries affect HDR gamut conversion and the linear HLG OOTF only;
+ * matrix remains the independent YCbCr matrix code point. */
+/* Caller-owned PQ table. Initialize before publishing it to row-band
+ * workers; keep immutable until those workers finish. The legacy blits
+ * remain stateless and need no shared cache or allocation. */
+typedef struct rwebm_video_hdr_tone
+{
+   uint16_t pq[1024];
+   unsigned peak;
+   int ready;
+} rwebm_video_hdr_tone_t;
+
+void rwebm_video_hdr_tone_init(rwebm_video_hdr_tone_t *tone, unsigned max_cll);
+void rwebm_video_blit_i420_hbd_tone(uint32_t *dst, unsigned dst_stride,
+      unsigned w, unsigned h, const uint16_t *y, int ys,
+      const uint16_t *u, const uint16_t *v, int uvs,
+      unsigned matrix, unsigned transfer, unsigned range,
+      unsigned max_cll, unsigned primaries, int abgr,
+      const rwebm_video_hdr_tone_t *tone);
+void rwebm_video_blit_i420_10bit_tone(uint32_t *dst, unsigned dst_stride,
+      unsigned w, unsigned h, const uint16_t *y, int ys,
+      const uint16_t *u, const uint16_t *v, int uvs,
+      unsigned matrix, unsigned transfer, unsigned range,
+      unsigned max_cll, unsigned primaries,
+      const rwebm_video_hdr_tone_t *tone);
+
+void rwebm_video_blit_i420_hbd_color(uint32_t *dst, unsigned dst_stride,
+      unsigned w, unsigned h, const uint16_t *y, int ys,
+      const uint16_t *u, const uint16_t *v, int uvs,
+      unsigned matrix, unsigned transfer, unsigned range,
+      unsigned max_cll, unsigned primaries, int abgr);
+void rwebm_video_blit_i420_10bit_color(uint32_t *dst, unsigned dst_stride,
+      unsigned w, unsigned h, const uint16_t *y, int ys,
+      const uint16_t *u, const uint16_t *v, int uvs,
+      unsigned matrix, unsigned transfer, unsigned range,
+      unsigned max_cll, unsigned primaries);
+int rwebm_video_blit_i420_fp16_color(uint16_t *dst, unsigned dst_stride,
+      unsigned w, unsigned h, const uint16_t *y, int ys,
+      const uint16_t *u, const uint16_t *v, int uvs,
+      unsigned matrix, unsigned transfer, unsigned range, unsigned primaries);
+
 bool rwebm_video_set_buf_ptr(rwebm_video_t *webm, void *data, size_t len);
 
 /* Request packed XRGB2101010 (10-bit) output for 10-bit HDR sources; 8-bit
@@ -180,9 +224,13 @@ int rwebm_video_stream_skip(rwebm_video_stream_t *stream, int *duration_ms);
  * GPU next returns a non-pixel token; take the lease with hw_frame.
  * A NULL next while waiting is a retry, not EOS. Owner-thread calls. */
 int rwebm_video_stream_set_hw(rwebm_video_stream_t *stream, int enable);
+/* Exclusive decoder owner; withdraw hardware preference and restart. */
+void rwebm_video_stream_stop_hw(rwebm_video_stream_t *stream);
 int rwebm_video_stream_hw_frame(rwebm_video_stream_t *stream,
       video_hw_frame_t *out);
 int rwebm_video_stream_waiting(const rwebm_video_stream_t *stream);
+void *rwebm_video_stream_h264(rwebm_video_stream_t *stream);
+void *rwebm_video_stream_h265(rwebm_video_stream_t *stream);
 
 /* Select the channel order of subsequent frames: non-zero emits ARGB
  * words (memory order B,G,R,A on little-endian), zero restores the
@@ -245,6 +293,17 @@ void rwebm_video_stream_set_avail(rwebm_video_stream_t *stream,
  * resident: [media_floor, consumed + lookahead). */
 size_t rwebm_video_stream_media_floor(rwebm_video_stream_t *stream);
 size_t rwebm_video_stream_consumed(rwebm_video_stream_t *stream);
+/* Read demand may lead the release frontier while a coded packet is held
+ * for timestamp lookahead. A window owner pins the returned encoded span
+ * before moving to the demand frontier; prefix owners retain consumed(). */
+size_t rwebm_video_stream_feed_frontier(rwebm_video_stream_t *stream);
+void rwebm_video_stream_pin_span(rwebm_video_stream_t *stream,
+      size_t *lo, size_t *hi);
+/* Exclusively owned feeder query: pending complete element, not a release
+ * frontier. Keep the normal per-poll I/O budget while admitting its span. */
+void rwebm_video_stream_read_span(rwebm_video_stream_t *stream,
+      size_t *lo, size_t *hi);
+
 /* Container duration in nanoseconds, 0 when the file does not say. */
 int64_t rwebm_video_stream_duration_ns(rwebm_video_stream_t *stream);
 
@@ -260,7 +319,38 @@ int64_t rwebm_video_stream_duration_ns(rwebm_video_stream_t *stream);
 void rwebm_video_stream_complete_scan(rwebm_video_stream_t *stream,
       const uint8_t *buf, size_t len);
 
+/* Last advance exhausted input and drained output without failure. */
+int rwebm_video_stream_completed(const rwebm_video_stream_t *stream);
+
 void rwebm_video_stream_rewind(rwebm_video_stream_t *stream);
+
+/* Owner-thread seek. Begin selects a cue (or rewinds without
+ * one); each step reads <=256 headers or decodes one packet. Step is
+ * -1 failure, 0 retry/feed consumed(), 1 target ready for next(). The
+ * first video packet at or after ns is retained without decoding.
+ * New begin/rewind cancels. AV1 hardware preroll yields on backpressure
+ * or after at most 32 stream steps / 4 ms. VP9 hardware preroll decodes
+ * one packet per step and retains submission state across backpressure. */
+/* Query only while the stream is exclusively owned, before publishing a
+ * playback session. AV1 requires an admitted hardware decoder. */
+int64_t rwebm_video_stream_start_ns(const rwebm_video_stream_t *stream);
+/* Last displayed packet timestamp, on the exclusive decode owner;
+ * -1 before a picture or after rewind. Hidden packets do not advance it. */
+int64_t rwebm_video_stream_frame_time_ns(const rwebm_video_stream_t *stream);
+/* Movie coordinates preserve requested positions in leading/tail video
+ * intervals; the raw bounded seek APIs remain unchanged. */
+int rwebm_video_stream_seek_movie_begin_ns(rwebm_video_stream_t *stream, int64_t ns);
+int rwebm_video_stream_seek_movie_step(rwebm_video_stream_t *stream,
+      int64_t *position_us);
+/* Format capability is available before native admission. The seek itself
+ * still requires an admitted decoder on the exclusive stream owner. */
+int rwebm_video_stream_seekable(const rwebm_video_stream_t *stream);
+int rwebm_video_stream_seek_begin_ns(rwebm_video_stream_t *stream, int64_t ns);
+int rwebm_video_stream_seek_span(rwebm_video_stream_t *stream,
+      size_t *lo, size_t *hi);
+int rwebm_video_stream_seek_step(rwebm_video_stream_t *stream,
+      int64_t *position_us);
+
 
 RETRO_END_DECLS
 

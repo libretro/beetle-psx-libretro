@@ -71,7 +71,7 @@ vcd_disc)
         $LC/formats/chd/rchd.c $LC/encodings/encoding_huffman.c
         $LC/formats/7z/r7z_lzma.c
         $LC/encodings/encoding_rzstd.c $LC/streams/trans_stream_rzstd.c
-        $LC/streams/chd_stream.c $LC/streams/memory_stream.c
+        $LC/streams/chd_stream.c $LC/vfs/vfs_prefetch.c $LC/streams/memory_stream.c
         $LC/streams/interface_stream.c $LC/streams/trans_stream.c
         $LC/streams/trans_stream_pipe.c $LC/streams/rzip_stream.c
         $LC/encodings/encoding_crc32.c $LC/encodings/encoding_deflate.c

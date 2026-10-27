@@ -20,7 +20,8 @@ CHD_SOURCES_C = \
                      $(LIBRETRO_COMM_DIR)/formats/7z/r7z_lzma.c \
                      $(LIBRETRO_COMM_DIR)/formats/flac/rflac.c \
                      $(LIBRETRO_COMM_DIR)/encodings/encoding_deflate.c \
-                     $(LIBRETRO_COMM_DIR)/features/features_cpu.c
+                     $(LIBRETRO_COMM_DIR)/features/features_cpu.c \
+                     $(LIBRETRO_COMM_DIR)/vfs/vfs_prefetch.c
 
 
 # Image decoders for the shared RHI HD-texture replacement system (rhi/rhi_tt.c).

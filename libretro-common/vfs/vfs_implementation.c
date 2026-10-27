@@ -788,7 +788,17 @@ libretro_vfs_implementation_file *retro_vfs_file_open_impl(
       stream->orig_path = strdup(path);
 
 #ifdef VFS_HAVE_FILE_MAPPING
-   if (stream->hints & RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS && mode == RETRO_VFS_FILE_ACCESS_READ)
+   /* Only a descriptor can be mapped: plain files, and SAF, which the
+    * descriptor branch opens. cdrom://, smb:// and nfs:// streams are
+    * opened by their own backends in the buffered branch and read
+    * through them, unmapped. */
+   if (     (stream->hints & RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS)
+         && mode == RETRO_VFS_FILE_ACCESS_READ
+         && (     stream->scheme == VFS_SCHEME_NONE
+#if defined(ANDROID) && defined(HAVE_SAF)
+               || stream->scheme == VFS_SCHEME_SAF
+#endif
+            ))
       stream->hints |= RFILE_HINT_UNBUFFERED;
    else
 #endif
@@ -1689,6 +1699,43 @@ int64_t retro_vfs_file_seek_impl(libretro_vfs_implementation_file *stream,
    return retro_vfs_file_seek_internal(stream, offset, seek_position);
 }
 
+int64_t retro_vfs_file_view_impl(libretro_vfs_implementation_file *stream,
+      uint64_t len, const uint8_t **ptr)
+{
+   if (!stream || !ptr || len > (uint64_t)INT64_MAX)
+      return -1;
+
+   if ((stream->hints & RFILE_HINT_UNBUFFERED) == 0)
+   {
+#ifdef HAVE_SMBCLIENT
+      if (stream->scheme == VFS_SCHEME_SMB)
+         return retro_vfs_file_view_smb(stream, len, ptr);
+#endif
+#ifdef HAVE_NFSCLIENT
+      if (stream->scheme == VFS_SCHEME_NFS)
+         return retro_vfs_file_view_nfs(stream, len, ptr);
+#endif
+      return -1;
+   }
+#ifdef VFS_HAVE_FILE_MAPPING
+   if (stream->mapped
+         && (stream->hints & RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS))
+   {
+      if (stream->mappos >= stream->mapsize)
+         return stream->mappos == stream->mapsize ? 0 : -1;
+      if (len > stream->mapsize - stream->mappos)
+         len = stream->mapsize - stream->mappos;
+#if defined(_WIN32) && !defined(_XBOX) && !defined(HAVE_MMAP)
+      vfs_win32_readahead(stream, stream->mappos, len);
+#endif
+      *ptr             = &stream->mapped[stream->mappos];
+      stream->mappos  += len;
+      return (int64_t)len;
+   }
+#endif
+   return -1;
+}
+
 int64_t retro_vfs_file_read_impl(libretro_vfs_implementation_file *stream,
       void *s, uint64_t len)
 {
@@ -2324,8 +2371,26 @@ typedef struct
 typedef BOOL (WINAPI *vfs_prefetch_t)(HANDLE, ULONG_PTR,
       vfs_win32_memory_range_t*, ULONG);
 
+#ifdef VFS_WIN32_PREFETCH_HOOK
+/* A test build points the call at its own stand-in (see
+ * samples/file/vfs/vfs_prefetch_offthread_test.c); nothing else
+ * defines this. */
+static BOOL WINAPI vfs_win32_prefetch_hooked(HANDLE process,
+      ULONG_PTR count, vfs_win32_memory_range_t *ranges, ULONG flags)
+{
+   (void)process;
+   (void)count;
+   (void)flags;
+   return VFS_WIN32_PREFETCH_HOOK(ranges->VirtualAddress,
+         (size_t)ranges->NumberOfBytes);
+}
+#endif
+
 static vfs_prefetch_t vfs_win32_p_prefetch;
-/* 0 unresolved, 1 PrefetchVirtualMemory, 2 toucher thread, 3 nothing */
+/* 0 unresolved, 1 PrefetchVirtualMemory, 2 page toucher, 3 nothing.
+ * Either of the first two runs on the stream's read-ahead thread, never
+ * on the caller: PrefetchVirtualMemory is not documented to return
+ * before its reads complete, and the caller is usually a frame. */
 static int            vfs_win32_prefetch_mode;
 
 /* RETRO_VFS_PREFETCH=touch|none overrides the choice, for tests */
@@ -2334,21 +2399,28 @@ static int vfs_win32_prefetch_resolve(void)
    if (!vfs_win32_prefetch_mode)
    {
       const char *force = getenv("RETRO_VFS_PREFETCH");
-      HMODULE     k32   = GetModuleHandleA("kernel32.dll");
       int         mode  = 2;
 
       if (force && !*force)
          force = NULL;
-      if (k32 && !force)
-         vfs_win32_p_prefetch = (vfs_prefetch_t)GetProcAddress(k32,
-               "PrefetchVirtualMemory");
+      if (!force)
+      {
+#ifdef VFS_WIN32_PREFETCH_HOOK
+         vfs_win32_p_prefetch = vfs_win32_prefetch_hooked;
+#else
+         HMODULE k32 = GetModuleHandleA("kernel32.dll");
+         if (k32)
+            vfs_win32_p_prefetch = (vfs_prefetch_t)GetProcAddress(k32,
+                  "PrefetchVirtualMemory");
+#endif
+      }
       if (vfs_win32_p_prefetch)
          mode = 1;
       if (force && !strcmp(force, "none"))
          mode = 3;
 #ifndef HAVE_THREADS
-      if (mode == 2)
-         mode = 3;
+      /* no thread to run either on */
+      mode = 3;
 #endif
       vfs_win32_prefetch_mode = mode;
    }
@@ -2357,17 +2429,18 @@ static int vfs_win32_prefetch_resolve(void)
 
 /* Distance read ahead of a sequential reader, how far past the last
  * read's end the next read may start and still count as sequential,
- * and the toucher's step. */
+ * and the unit ranges are published and touched in. */
 #define VFS_RA_AHEAD (4u * 1024u * 1024u)
 #define VFS_RA_GAP   (256u * 1024u)
 #define VFS_WARM_UNIT (64u * 1024u)
 
 #ifdef HAVE_THREADS
-/* Before Windows 8: a thread touches the view ahead of the reader, one
- * read per page. The fault brings the page into the process as a
- * mapped read would, so the reader finds it resident, with nothing
- * copied. The range is published as unit indices and a generation;
- * a torn pair only warms a stale range once, and is clamped. */
+/* The stream's read-ahead thread. The caller publishes a range as unit
+ * indices and a generation and returns; the thread brings in what of it
+ * is not already done, with PrefetchVirtualMemory or, before Windows 8,
+ * by touching a byte per page so the fault brings each page into the
+ * process as a mapped read would. A torn pair only warms a stale range
+ * once, and is clamped. */
 typedef struct vfs_win32_warm
 {
    uint64_t                size;
@@ -2379,6 +2452,7 @@ typedef struct vfs_win32_warm
    retro_atomic_int_t      hi;
    retro_atomic_int_t      gen;
    retro_atomic_int_t      stop;
+   int                     mode;     /* 1 or 2, as resolved */
    int                     req_lo;   /* reader side only */
    int                     req_hi;
 } vfs_win32_warm_t;
@@ -2403,18 +2477,39 @@ static void vfs_win32_warm_thread(void *data)
          int lo = retro_atomic_load_acquire_int(&w->lo);
          seen   = g;
          hi     = retro_atomic_load_acquire_int(&w->hi);
+         /* a range that goes on from the last continues where that one
+          * got to, so no byte is asked for twice */
          if (cur < lo || cur >= hi)
             cur = lo;
       }
       if (cur < hi)
       {
          uint64_t o   = (uint64_t)cur * VFS_WARM_UNIT;
-         uint64_t end = o + VFS_WARM_UNIT;
+         uint64_t end = (uint64_t)hi * VFS_WARM_UNIT;
          if (end > w->size)
             end = w->size;
-         for (; o < end; o += w->page)
-            sink += w->base[o];
-         cur++;
+         if (o >= end)
+         {
+            cur = hi;
+            continue;
+         }
+         if (w->mode == 1)
+         {
+            vfs_win32_memory_range_t range;
+            range.VirtualAddress = (PVOID)(w->base + o);
+            range.NumberOfBytes  = (SIZE_T)(end - o);
+            vfs_win32_p_prefetch(GetCurrentProcess(), 1, &range, 0);
+            cur = hi;
+         }
+         else
+         {
+            /* a unit at a time, so a new range is seen between units */
+            if (end > o + VFS_WARM_UNIT)
+               end = o + VFS_WARM_UNIT;
+            for (; o < end; o += w->page)
+               sink += w->base[o];
+            cur++;
+         }
          continue;
       }
       {
@@ -2443,7 +2538,7 @@ static void vfs_win32_warm_free(void *data)
 }
 
 static void vfs_win32_warm(libretro_vfs_implementation_file *stream,
-      size_t lo_byte, size_t hi_byte, size_t page)
+      size_t lo_byte, size_t hi_byte, size_t page, int mode)
 {
    vfs_win32_warm_t *w = (vfs_win32_warm_t*)stream->warm;
    int               lo, hi;
@@ -2456,6 +2551,7 @@ static void vfs_win32_warm(libretro_vfs_implementation_file *stream,
       w->base      = stream->mapped;
       w->size      = stream->mapsize;
       w->page      = page;
+      w->mode      = mode;
       retro_atomic_int_init(&w->lo, 0);
       retro_atomic_int_init(&w->hi, 0);
       retro_atomic_int_init(&w->gen, 0);
@@ -2482,9 +2578,10 @@ static void vfs_win32_warm(libretro_vfs_implementation_file *stream,
 }
 #endif
 
-/* A mapped read that follows on from the last one hints the next
- * VFS_RA_AHEAD bytes each time half of the hinted span is used up.
- * The view itself starts no read-ahead on Windows. */
+/* A mapped read that follows on from the last one hints the
+ * VFS_RA_AHEAD bytes past its end each time half of the hinted span is
+ * used up. The read's own bytes are not in the hint: the read is about
+ * to fault them in itself. The view starts no read-ahead on Windows. */
 static void vfs_win32_readahead(libretro_vfs_implementation_file *stream,
       uint64_t pos, uint64_t len)
 {
@@ -2500,7 +2597,7 @@ static void vfs_win32_readahead(libretro_vfs_implementation_file *stream,
    if (!seq || end <= stream->ra_next || end >= stream->mapsize)
       return;
    stream->ra_next = end + VFS_RA_AHEAD / 2;
-   retro_vfs_file_prefetch_impl(stream, pos, len + VFS_RA_AHEAD);
+   retro_vfs_file_prefetch_impl(stream, end, VFS_RA_AHEAD);
 }
 #endif
 
@@ -2549,23 +2646,16 @@ void retro_vfs_file_prefetch_impl(
       posix_madvise(stream->mapped + lo, hi - lo, POSIX_MADV_WILLNEED);
 #endif
 #else
-      switch (vfs_win32_prefetch_resolve())
       {
-         case 1:
-            {
-               vfs_win32_memory_range_t range;
-               range.VirtualAddress = stream->mapped + lo;
-               range.NumberOfBytes  = hi - lo;
-               vfs_win32_p_prefetch(GetCurrentProcess(), 1, &range, 0);
-            }
-            break;
+         const int mode = vfs_win32_prefetch_resolve();
 #ifdef HAVE_THREADS
-         case 2:
-            vfs_win32_warm(stream, lo, hi, page);
-            break;
+         if (mode == 1 || mode == 2)
+            vfs_win32_warm(stream, lo, hi, page, mode);
+#else
+         (void)mode;
+         (void)lo;
+         (void)hi;
 #endif
-         default:
-            break;
       }
 #endif
       return;
@@ -3659,7 +3749,6 @@ struct retro_vfs_copy_handle *retro_vfs_copy_begin_impl(
    int64_t src_size = 0;
    int     sflags, dflags;
    bool    native   = true;
-   char    dst_buf[PATH_MAX_LENGTH];
 
    if (!src || !*src || !dst || !*dst)
       return NULL;
@@ -3706,14 +3795,18 @@ struct retro_vfs_copy_handle *retro_vfs_copy_begin_impl(
       if (last && last > dst)
       {
          size_t n = (size_t)(last - dst);
-         if (n >= sizeof(dst_buf))
+         char  *dst_dir;
+         int    parent_ok;
+         if (n >= PATH_MAX_LENGTH || !(dst_dir = (char*)malloc(n + 1)))
             return NULL;
-         memcpy(dst_buf, dst, n);
-         dst_buf[n] = '\0';
+         memcpy(dst_dir, dst, n);
+         dst_dir[n] = '\0';
          /* mkdir reports "exists" for a file of that name too, so
           * confirm the parent really is a directory. */
-         if (     vfs_copy_mkdir_parents(dst_buf) != 0
-               || !(retro_vfs_stat_full(dst_buf, NULL, NULL) & RETRO_VFS_STAT_IS_DIRECTORY))
+         parent_ok =   vfs_copy_mkdir_parents(dst_dir) == 0
+                    && (retro_vfs_stat_full(dst_dir, NULL, NULL) & RETRO_VFS_STAT_IS_DIRECTORY);
+         free(dst_dir);
+         if (!parent_ok)
             return NULL;
       }
    }
@@ -4156,23 +4249,24 @@ const char *retro_vfs_dirent_get_name_impl(libretro_vfs_implementation_dir *rdir
 
 #if !defined(_WIN32) && !defined(VITA) && !defined(__PSL1GHT__) && !defined(__PS3__)
 /* Split out of retro_vfs_dirent_is_dir_impl() so that the d_type test
- * there does not have to carry this scratch buffer. Filesystems that
- * populate d_type - ext4, APFS, NTFS - answer from the dirent alone and
- * never reach this, but the array and the struct stat were declared in
- * the same scope as the test, so every entry paid a 2224-byte frame
- * plus, under -fstack-protector-strong, a canary written and re-read at
- * offset 2200 of a frame the fast path otherwise never touches. */
+ * there does not carry this one's frame. Filesystems that populate
+ * d_type - ext4, APFS, NTFS - answer from the dirent alone and never
+ * reach this. The joined path is on the heap: next to the stat it is
+ * cheap, and it keeps the frame within the 2 KiB thread-stack budget. */
 static VFS_NOINLINE bool retro_vfs_dirent_is_dir_stat(
       libretro_vfs_implementation_dir *rdir)
 {
    struct stat buf;
-   char path[PATH_MAX_LENGTH];
+   bool        is_dir;
+   char       *path = (char*)malloc(PATH_MAX_LENGTH);
 
-   fill_pathname_join_special(path, rdir->orig_path,
-         retro_vfs_dirent_get_name_impl(rdir), sizeof(path));
-   if (stat(path, &buf) < 0)
+   if (!path)
       return false;
-   return S_ISDIR(buf.st_mode);
+   fill_pathname_join_special(path, rdir->orig_path,
+         retro_vfs_dirent_get_name_impl(rdir), PATH_MAX_LENGTH);
+   is_dir = stat(path, &buf) == 0 && S_ISDIR(buf.st_mode);
+   free(path);
+   return is_dir;
 }
 #endif
 
@@ -4217,22 +4311,25 @@ bool retro_vfs_dirent_is_dir_impl(libretro_vfs_implementation_dir *rdir)
 }
 
 /* The join-and-stat fallback: one full-path stat per entry, which is
- * exactly what a caller without dirent_stat would do itself, so it is
- * never worse than today.  Split out so the PATH_MAX_LENGTH local
- * stays off the fast paths' stack.  Only compiled where some branch
- * of dirent_stat reaches it. */
+ * exactly what a caller without dirent_stat would do itself.  Split out
+ * so the fast paths do not carry its frame, and the joined path is on
+ * the heap to keep this one within the 2 KiB thread-stack budget.  Only
+ * compiled where some branch of dirent_stat reaches it. */
 #if defined(HAVE_SMBCLIENT) || defined(HAVE_NFSCLIENT) || (defined(ANDROID) && defined(HAVE_SAF)) \
       || !(defined(_WIN32) || defined(VITA) \
             || defined(VFS_HAVE_FSTATAT))
 static VFS_NOINLINE int retro_vfs_dirent_stat_slow(
       libretro_vfs_implementation_dir *rdir, int64_t *size, int64_t *mtime)
 {
-   char path[PATH_MAX_LENGTH];
+   char       *path;
+   int         flags;
    const char *name = retro_vfs_dirent_get_name_impl(rdir);
-   if (!name || !rdir->orig_path)
+   if (!name || !rdir->orig_path || !(path = (char*)malloc(PATH_MAX_LENGTH)))
       return 0;
-   fill_pathname_join_special(path, rdir->orig_path, name, sizeof(path));
-   return retro_vfs_stat_full(path, size, mtime);
+   fill_pathname_join_special(path, rdir->orig_path, name, PATH_MAX_LENGTH);
+   flags = retro_vfs_stat_full(path, size, mtime);
+   free(path);
+   return flags;
 }
 #endif
 

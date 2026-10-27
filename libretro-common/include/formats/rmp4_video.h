@@ -117,11 +117,9 @@ rmp4_video_stream_t *rmp4_video_stream_open_hw_avail(const uint8_t *buf,
 
 void rmp4_video_stream_close(rmp4_video_stream_t *stream);
 
-/* num_frames is the number of coded video packets, saturating at the
- * pre-scan cap (a few thousand): treat it as "at least this many", an
- * upper bound on displayed frames only below the cap (the stream may
- * carry non-shown frames).  loop_count is always 0: video loops
- * indefinitely. */
+/* num_frames is the number of coded video samples accepted by the
+ * demuxer, an upper bound on displayed frames (some may be non-shown).
+ * loop_count is always 0: video loops indefinitely. */
 void rmp4_video_stream_get_info(const rmp4_video_stream_t *stream,
       unsigned *width, unsigned *height, int *num_frames, int *loop_count);
 
@@ -250,8 +248,16 @@ void rmp4_video_stream_set_avail(rmp4_video_stream_t *stream,
 /* Bounded-memory streaming support (see rmp4_media_floor/consumed). */
 size_t rmp4_video_stream_media_floor(rmp4_video_stream_t *s);
 size_t rmp4_video_stream_consumed(rmp4_video_stream_t *s);
+void rmp4_video_stream_read_span(const rmp4_video_stream_t *s,
+      size_t *lo, size_t *hi);
+/* Exact input range while seeking through AV1 metadata; 0 otherwise. */
+int rmp4_video_stream_seek_span(rmp4_video_stream_t *s,
+      size_t *lo, size_t *hi);
 /* Container duration in nanoseconds (mvhd), 0 when absent. */
 int64_t rmp4_video_stream_duration_ns(rmp4_video_stream_t *s);
+
+/* Last advance exhausted input and drained output without failure. */
+int rmp4_video_stream_completed(const rmp4_video_stream_t *stream);
 
 void rmp4_video_stream_rewind(rmp4_video_stream_t *stream);
 
@@ -261,17 +267,49 @@ void rmp4_video_stream_rewind(rmp4_video_stream_t *stream);
  * returns the frame at the position. Returns the position in
  * ms actually reached (the next slot's timestamp), or -1 on a
  * stream without timing. */
+/* Resumable owner-thread seek. Begin selects a presentation target;
+ * each step examines at most 256 key flags or decodes one packet.
+ * Step returns -1 failed, 0 retry (feed the consumed byte frontier if
+ * waiting for input), 1 ready for next(). The target picture is not
+ * consumed. A new begin or rewind cancels an unfinished request. */
+int rmp4_video_stream_seek_begin_ns(rmp4_video_stream_t *stream, int64_t ns);
+int rmp4_video_stream_seek_step(rmp4_video_stream_t *stream,
+      int64_t *position_us);
+
 int64_t rmp4_video_stream_seek_ms(rmp4_video_stream_t *stream, int64_t ms);
 
 /* Seek to a zero-based display slot, clamped to the timeline. The next
  * decode returns that frame. As seek_ms, returns its timestamp in ms. */
 int64_t rmp4_video_stream_seek_frame(rmp4_video_stream_t *stream, int frame);
 
+/* Zero-based ordinal of the next displayed picture, including pictures
+ * consumed while seeking. Returns -1 for a null stream. */
+int rmp4_video_stream_frame_index(const rmp4_video_stream_t *stream);
+
 /* Timestamp span of the display timeline: last frame's presentation
  * time minus the first's, in ms.  (frames-1)/span is the stream's true
  * mean rate; the track duration also counts the final frame's own
  * duration, which skews a rate derived from it. */
 int64_t rmp4_video_stream_span_ms(const rmp4_video_stream_t *stream);
+
+/* Leading empty edit before this video track, in movie nanoseconds.
+ * Zero for a stream without such an edit, or a NULL stream. Durations
+ * and raw decoder seek coordinates remain relative to the video track. */
+int64_t rmp4_video_stream_presentation_delay_ns(const rmp4_video_stream_t *stream);
+
+/* Movie-relative timestamp of the most recently decoded display frame,
+ * including the leading empty edit. Query only on the decoder owner,
+ * after a successful next/skip. -1 before a frame, after rewind, or
+ * when no timestamp is available. Decoder-relative seek APIs are unchanged. */
+int64_t rmp4_video_stream_frame_time_ns(const rmp4_video_stream_t *stream);
+
+/* Movie-relative bounded seek, including leading and trailing empty
+ * video intervals. The decoder-relative APIs below remain unchanged. */
+int rmp4_video_stream_seek_movie_begin_ns(rmp4_video_stream_t *stream, int64_t ns);
+int rmp4_video_stream_seek_movie_step(rmp4_video_stream_t *stream,
+      int64_t *position_us);
+
+
 
 RETRO_END_DECLS
 
