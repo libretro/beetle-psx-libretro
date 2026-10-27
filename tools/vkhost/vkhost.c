@@ -28,6 +28,13 @@
  *   way a threaded frontend does (see "the frontend's queue" below).
  *   HOST_HDR_*: the display presented through GET_HDR_METADATA and
  *   GET_DISPLAY_METADATA; see tools/hdr_display/host_metadata.h.
+ *   VKHOST_LOAD_PAUSE_MS: wait this long between loading the content and
+ *     the first frame, as a frontend's menu or load screen does.
+ *   VKHOST_SAVE_DIR: the save directory handed to the core (default
+ *     /tmp/vkhost_save).
+ *   The pipelines the core builds are counted by thread: the run ends
+ *   with how many the frame's thread built, before and after the first
+ *   frame, and how many the core's own threads built.
  *   VKHOST_NEXT_CONTENT: after the teardown (context_destroy, unload,
  *   deinit), run this content as a second session in the same process -
  *   the core stays loaded, as with a statically linked frontend - and dump
@@ -277,10 +284,46 @@ static VKAPI_ATTR void VKAPI_CALL core_vkCmdDispatch(VkCommandBuffer cb,
       uint32_t x, uint32_t y, uint32_t z)
 { dispatch_groups += (unsigned long long)x * y * z; real_cmd_dispatch(cb, x, y, z); }
 
+/* Pipelines the core builds, by thread: on the thread that runs the core
+ * (retro_load_game, context_reset, retro_run - the frame's thread), and on
+ * any thread of the core's own. A pipeline built on the frame's thread
+ * after the first frame is a stall in the middle of play. */
+static pthread_t     host_thread;
+static int           frames_started;
+static unsigned long pipelines_host, pipelines_host_running, pipelines_other;
+static PFN_vkCreateGraphicsPipelines real_create_graphics_pipelines;
+static PFN_vkCreateComputePipelines  real_create_compute_pipelines;
+/* The longest retro_run after the first, and which frame it was. */
+static double longest_frame_ms;
+static int    longest_frame;
+static void count_pipelines(uint32_t n)
+{
+   if (pthread_equal(pthread_self(), host_thread))
+   {
+      __atomic_add_fetch(&pipelines_host, n, __ATOMIC_SEQ_CST);
+      if (frames_started)
+         __atomic_add_fetch(&pipelines_host_running, n, __ATOMIC_SEQ_CST);
+   }
+   else
+      __atomic_add_fetch(&pipelines_other, n, __ATOMIC_SEQ_CST);
+}
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkCreateGraphicsPipelines(VkDevice d,
+      VkPipelineCache c, uint32_t n, const VkGraphicsPipelineCreateInfo *i,
+      const VkAllocationCallbacks *a, VkPipeline *o)
+{ count_pipelines(n); return real_create_graphics_pipelines(d, c, n, i, a, o); }
+static VKAPI_ATTR VkResult VKAPI_CALL core_vkCreateComputePipelines(VkDevice d,
+      VkPipelineCache c, uint32_t n, const VkComputePipelineCreateInfo *i,
+      const VkAllocationCallbacks *a, VkPipeline *o)
+{ count_pipelines(n); return real_create_compute_pipelines(d, c, n, i, a, o); }
+
 static PFN_vkVoidFunction core_queue_entry(const char *name, PFN_vkVoidFunction real)
 {
    if (!real)
       return real;
+   if (!strcmp(name, "vkCreateGraphicsPipelines"))
+   { real_create_graphics_pipelines = (PFN_vkCreateGraphicsPipelines)real; return (PFN_vkVoidFunction)core_vkCreateGraphicsPipelines; }
+   if (!strcmp(name, "vkCreateComputePipelines"))
+   { real_create_compute_pipelines = (PFN_vkCreateComputePipelines)real; return (PFN_vkVoidFunction)core_vkCreateComputePipelines; }
    if (!strcmp(name, "vkCmdDispatch"))
    { real_cmd_dispatch = (PFN_vkCmdDispatch)real; return (PFN_vkVoidFunction)core_vkCmdDispatch; }
    if (!strcmp(name, "vkCreateImage"))
@@ -745,6 +788,9 @@ int main(int argc, char **argv)
    if (argc > 3 && strcmp(argv[3], "-")) state_path = argv[3];
    if (argc > 4) frames = atoi(argv[4]);
    if (argc > 5) outdir = argv[5];
+   host_thread = pthread_self();
+   if (getenv("VKHOST_SAVE_DIR"))
+      snprintf(savedir, sizeof(savedir), "%s", getenv("VKHOST_SAVE_DIR"));
    snprintf(cmdbuf, sizeof(cmdbuf), "mkdir -p %s %s %s", outdir, sysdir, savedir);
    if (system(cmdbuf) != 0)
       fprintf(stderr, "[vkhost] could not create %s\n", outdir);
@@ -986,12 +1032,38 @@ run_frames_sw:
             clock_gettime(CLOCK_MONOTONIC, &t0);
          }
          apply_vars_at(i);
+         /* VKHOST_LOAD_PAUSE_MS: the time a frontend leaves between loading
+          * the content and running it (its menu, a load screen), in which
+          * the core's own threads keep working. */
+         if (i == 0 && getenv("VKHOST_LOAD_PAUSE_MS"))
+         {
+            long ms = atol(getenv("VKHOST_LOAD_PAUSE_MS"));
+            struct timespec ts;
+            ts.tv_sec  = ms / 1000;
+            ts.tv_nsec = (ms % 1000) * 1000000L;
+            while (nanosleep(&ts, &ts) != 0) ;
+         }
          if (i == frames / 2)
          {
             object_creates_half  = object_creates;
             dispatch_groups_half = dispatch_groups;
          }
-         retro_run_fn();
+         {
+            struct timespec f0, f1;
+            double ms;
+            clock_gettime(CLOCK_MONOTONIC, &f0);
+            retro_run_fn();
+            clock_gettime(CLOCK_MONOTONIC, &f1);
+            ms = (f1.tv_sec - f0.tv_sec) * 1e3 + (f1.tv_nsec - f0.tv_nsec) / 1e6;
+            if (frames_started && ms > longest_frame_ms)
+            {
+               longest_frame_ms = ms;
+               longest_frame    = i;
+            }
+         }
+         /* (the first frame makes the render passes, and with them what
+          * the pipelines are made for) */
+         frames_started = 1;
          {
             /* VKHOST_SAVE_STATE=path:frame - checkpoint mid-run so long
              * cold-boot treks can be chained across invocations. */
@@ -1064,6 +1136,12 @@ run_frames_sw:
          object_creates - object_creates_half);
    fprintf(stderr, "[vkhost] steady state: %llu compute workgroups dispatched in the second half of the run\n",
          dispatch_groups - dispatch_groups_half);
+   fprintf(stderr, "[vkhost] pipelines: %lu built on the frame's thread (%lu of them during play), %lu on the core's own threads\n",
+         __atomic_load_n(&pipelines_host, __ATOMIC_SEQ_CST),
+         __atomic_load_n(&pipelines_host_running, __ATOMIC_SEQ_CST),
+         __atomic_load_n(&pipelines_other, __ATOMIC_SEQ_CST));
+   fprintf(stderr, "[vkhost] longest frame after the first: %.2f ms (frame %d)\n",
+         longest_frame_ms, longest_frame);
    fprintf(stderr, "[vkhost] done: %d frames run, %u valid, %d validation errors, %d warnings,"
            " %d unlocked uses of the frontend's queue, %d waits with its lock held\n",
            frames, frame_valid, validation_errors, validation_warnings,
