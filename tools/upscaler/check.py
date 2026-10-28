@@ -48,9 +48,13 @@ def read_log(path):
     return frames
 
 
+TOLERANCE = 2
+
+
 def close(a, b):
-    """the same colour, give or take the scanout's dither"""
-    return abs(a[0] - b[0]) <= 2 and abs(a[1] - b[1]) <= 2 and abs(a[2] - b[2]) <= 2
+    """the same colour, give or take the scanout's dither (or, under
+    adaptive smoothing, the blur a jittered edge moves)"""
+    return abs(a[0] - b[0]) <= TOLERANCE and abs(a[1] - b[1]) <= TOLERANCE and abs(a[2] - b[2]) <= TOLERANCE
 
 
 def load(out, n, w, h, fmt):
@@ -79,9 +83,15 @@ def main():
     ap.add_argument("last", type=int)
     ap.add_argument("--scene", action="store_true")
     ap.add_argument("--still", action="store_true")
+    ap.add_argument("--tolerance", type=int, default=2,
+                    help="how far apart, per channel, the same colour may be (2; adaptive smoothing blurs edges)")
+    ap.add_argument("--halo", type=int, default=0,
+                    help="pixels a still pixel may be from something moving and prove nothing (adaptive smoothing's blur)")
     ap.add_argument("--gte-depth", type=float,
                     help="the depth the scene's GTE triangle (magenta) must carry (PGXP on: 512 / (512 + 512))")
     a = ap.parse_args()
+    global TOLERANCE
+    TOLERANCE = a.tolerance
 
     frames = read_log(a.log)
     failures = []
@@ -150,6 +160,15 @@ def main():
             if mv[2 * i] == 0.0 and mv[2 * i + 1] == 0.0 and abs(mvp[2 * i]) + abs(mvp[2 * i + 1]) > 0.5:
                 continue
             y, x = divmod(i, w)
+            # under adaptive smoothing a still pixel beside something
+            # moving, in this frame or the one before, carries its blur:
+            # it proves nothing either way
+            if a.halo and mv[2 * i] == 0.0 and mv[2 * i + 1] == 0.0 and any(
+                    mv[2 * (yy * w + xx)] != 0.0 or mv[2 * (yy * w + xx) + 1] != 0.0
+                    or mvp[2 * (yy * w + xx)] != 0.0 or mvp[2 * (yy * w + xx) + 1] != 0.0
+                    for yy in range(max(0, y - a.halo), min(h, y + a.halo + 1))
+                    for xx in range(max(0, x - a.halo), min(w, x + a.halo + 1))):
+                continue
             q = {}
             for name, use in (("motion", 1), ("still", 0)):
                 q[name] = (int(round(x - jn[0] - use * mv[2 * i] + jp[0])),
@@ -195,14 +214,17 @@ def main():
             if bg != 1.0 or tri >= 1.0:
                 failures.append("frame %d: depth %s at the background, %s on the triangle" % (n, bg, tri))
             if a.gte_depth is not None:
-                # PGXP's depth on the GTE triangle: what is drawn in its
-                # box, (10, 100) to (73, 140), which nothing else enters
-                gte = [depth[y * w + x] for y in range(100 * s, 141 * s) for x in range(10 * s, 120 * s)
-                       if not close(c[y * w + x], bg_color)]
-                off = [d for d in gte if abs(d - a.gte_depth) > 0.01]
-                if len(gte) < 600 * s * s or off:
-                    failures.append("frame %d: %d of the GTE triangle's %d pixels off depth %.3f (%s)"
-                                    % (n, len(off), len(gte), a.gte_depth, off[:3]))
+                # PGXP's depth on the GTE triangles: what is drawn in
+                # their boxes, (10, 100) to (73, 140) sent by DMA and
+                # (10, 150) to (73, 190) written to the port, which
+                # nothing else enters
+                for top, how in ((100, "DMA"), (150, "port")):
+                    gte = [depth[y * w + x] for y in range(top * s, (top + 41) * s) for x in range(10 * s, 120 * s)
+                           if not close(c[y * w + x], bg_color)]
+                    off = [d for d in gte if abs(d - a.gte_depth) > 0.01]
+                    if len(gte) < 600 * s * s or off:
+                        failures.append("frame %d: %d of the GTE triangle's (%s) %d pixels off depth %.3f (%s)"
+                                        % (n, len(off), how, len(gte), a.gte_depth, off[:3]))
 
     if failures:
         print("\n".join(failures))

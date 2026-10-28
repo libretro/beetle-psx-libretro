@@ -4,11 +4,14 @@
 # check.py checks what the core hands it: inputs with every frame, the
 # Halton jitter, motion vectors that take each changed pixel back to where
 # the frame before had it, the transparency mask on the translucent quad
-# only and depth on what is drawn (PGXP's on the GTE triangle in the
-# pgxp lane, drawn with PGXP on). The core must ask for the upscaler in
+# only and depth on what is drawn (PGXP's on the GTE triangles in the
+# pgxp lanes, drawn with PGXP on, on the interpreter and on lightrec;
+# the smooth lane has adaptive smoothing on). The core must ask for the upscaler in
 # retro_load_game, draw at the factor the request fits (2x for 640x480,
-# 1x for 320x240, 4x for 1280x960, whatever Internal GPU Resolution says),
-# and, as the other Vulkan paths, create no Vulkan objects once warm.
+# 1x for 320x240, 4x for 1280x960, whatever Internal GPU Resolution says)
+# without the frontend's video ever being reinitialised for it (a factor
+# change rebuilds the renderer in place: the switch lane), and, as the
+# other Vulkan paths, create no Vulkan objects once warm.
 #
 # Usage (from the repository root, after a HAVE_HW=1 build):
 #   sh tools/upscaler/lanes.sh [core.so]
@@ -63,12 +66,39 @@ while IFS='|' read -r name request res expect flags vars; do
       echo "$name: Vulkan validation errors" >&2
       fail=1
    fi
+   # the factor is the renderer's business: the frontend's video is
+   # never reinitialised for it
+   if grep -q "context reset" "$OUT/$name.log"; then
+      echo "$name: the upscaler's factor reinitialised the frontend's video" >&2
+      fail=1
+   fi
 done <<LANES
 2x|640,480|4x|2x, 640x480|--scene
 1x|320,240,160,120,640,480|2x|1x, 320x240|--scene
 4x|1280,960|1x|4x, 1280x960|--scene
 pgxp|640,480|2x|2x, 640x480|--scene --gte-depth 0.5|;${P}_pgxp_mode=memory only;${P}_pgxp_texture=enabled
+lightrec|640,480|2x|2x, 640x480|--scene --gte-depth 0.5|;${P}_pgxp_mode=memory only;${P}_pgxp_texture=enabled;${P}_cpu_dynarec=execute
+smooth|640,480|4x|2x, 640x480|--scene --tolerance 8 --halo 2|;${P}_adaptive_smoothing=enabled
 LANES
+
+# the request changes mid-run (the output did): the core moves from 2x to
+# 4x in place, with no frontend reinit, and keeps handing inputs over
+mkdir -p "$OUT/switch"
+VKHOST_UPSCALER="640,480" VKHOST_UPSCALER_AT="40:1280,960" VKHOST_UPSCALER_LOG="$OUT/switch/upscaler.txt" \
+   VKHOST_DUMP_INTERVAL=1 VKHOST_DUMP_RAW=1 \
+   VKHOST_VARS="${P}_renderer=hardware_vk;${P}_internal_resolution=2x;${P}_msaa=2x" \
+   tools/vkhost/vkhost "$CORE" "$OUT/motion.exe" - "$FRAMES" "$OUT/switch" > "$OUT/switch.log" 2>&1 || { cat "$OUT/switch.log"; exit 1; }
+if ! grep -q "drawing at 2x, 640x480" "$OUT/switch.log" || ! grep -q "drawing at 4x, 1280x960" "$OUT/switch.log" \
+      || grep -q "context reset" "$OUT/switch.log" || ! grep -q " 0 validation errors" "$OUT/switch.log"; then
+   echo "switch: the core did not move from 2x to 4x in place" >&2
+   grep "Temporal upscaler\|context reset\|validation errors" "$OUT/switch.log" >&2 || true
+   fail=1
+fi
+if ! python3 tools/upscaler/check.py "$OUT/switch" "$OUT/switch/upscaler.txt" "$FIRST" "$FRAMES" --scene > "$OUT/switch.check" 2>&1; then
+   cat "$OUT/switch.check"
+   echo "switch: check.py failed after the switch" >&2
+   fail=1
+fi
 
 # a request no factor fits: the core says so and renders as the options say
 mkdir -p "$OUT/unfit"

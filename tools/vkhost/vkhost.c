@@ -46,6 +46,8 @@
  *   retro_load_game (counted) and get it after context_reset. Each dumped
  *   frame gets its motion vectors, depth and mask beside it
  *   (frame_NNNN.mv.raw, .depth.raw, .mask.raw).
+ *   VKHOST_UPSCALER_AT="frame:rw,rh[,...]": from that frame on, the request
+ *   is this one (the same form), as when the output changes.
  *   VKHOST_UPSCALER_LOG: one line per presented frame with the inputs the
  *   core handed over (jitter, flags, the images' sizes and formats), or
  *   "none".
@@ -454,19 +456,34 @@ static void up_set_inputs(void *h, const struct retro_hw_upscaler_inputs *in)
    up_have_inputs = in != NULL;
    if (in) up_inputs = *in;
 }
-static void up_init(void)
+static int up_parse_request(const char *e, struct retro_hw_upscaler_request *req)
 {
    unsigned v[8] = { 0 }; int n;
-   const char *e = getenv("VKHOST_UPSCALER");
-   if (!e) return;
    n = sscanf(e, "%u,%u,%u,%u,%u,%u,%u,%u", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7]);
-   if (n < 2) return;
+   if (n < 2) return 0;
    if (n < 6) { v[2] = v[0] / 4; v[3] = v[1] / 4; v[4] = v[0] * 2; v[5] = v[1] * 2; }
    if (n < 8) { v[6] = v[0] * 2; v[7] = v[1] * 2; }
-   up_req.render_width = v[0]; up_req.render_height = v[1];
-   up_req.min_render_width = v[2]; up_req.min_render_height = v[3];
-   up_req.max_render_width = v[4]; up_req.max_render_height = v[5];
-   up_req.output_width = v[6]; up_req.output_height = v[7];
+   req->render_width = v[0]; req->render_height = v[1];
+   req->min_render_width = v[2]; req->min_render_height = v[3];
+   req->max_render_width = v[4]; req->max_render_height = v[5];
+   req->output_width = v[6]; req->output_height = v[7];
+   return 1;
+}
+/* VKHOST_UPSCALER_AT: the request changes at its frame */
+static void up_request_at(int frame)
+{
+   const char *at = getenv("VKHOST_UPSCALER_AT");
+   const char *colon;
+   if (!up_on || !at || !(colon = strchr(at, ':')) || atoi(at) != frame)
+      return;
+   if (up_parse_request(colon + 1, &up_req))
+      fprintf(stderr, "[vkhost] frame %d: upscaler asks for %ux%u\n", frame,
+            up_req.render_width, up_req.render_height);
+}
+static void up_init(void)
+{
+   const char *e = getenv("VKHOST_UPSCALER");
+   if (!e || !up_parse_request(e, &up_req)) return;
    up_iface.interface_version = RETRO_HW_RENDER_UPSCALER_INTERFACE_VERSION;
    up_iface.handle = &up_iface;
    up_iface.get_request = up_get_request;
@@ -1379,6 +1396,7 @@ run_frames_sw:
             clock_gettime(CLOCK_MONOTONIC, &t0);
          }
          apply_vars_at(i);
+         up_request_at(i);
          /* VKHOST_LOAD_PAUSE_MS: the time a frontend leaves between loading
           * the content and running it (its menu, a load screen), in which
           * the core's own threads keep working. */

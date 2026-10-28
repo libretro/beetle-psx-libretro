@@ -11,6 +11,9 @@ the drawing area set to that buffer, display the other), 320x240:
     H 512: a pixel a unit) sliding right a pixel a frame, sent as games
     send theirs, by DMA from a packet in RAM: with PGXP on, its vertices
     carry a depth
+  - the same triangle 50 lower, its vertices written to GP0 straight
+    from the CPU (sw of the register MFC2 filled) and from the GTE
+    (swc2): PGXP's value must go with each word
   - a semi-transparent quad (B/2 + F/2) standing still at the bottom right:
     the only translucent thing, for the transparency mask
 Each frame it also stores its iteration count at 0x801FFFF0, which is not
@@ -36,6 +39,7 @@ def mtc0(rt, rd):       return 0x40800000 | (rt << 16) | (rd << 11)
 def mtc2(rt, rd):       return 0x48800000 | (rt << 16) | (rd << 11)
 def ctc2(rt, rd):       return 0x48C00000 | (rt << 16) | (rd << 11)
 def mfc2(rt, rd):       return 0x48000000 | (rt << 16) | (rd << 11)
+def swc2(rt, rs, off):  return (0x3A << 26) | (rs << 21) | (rt << 16) | (off & 0xffff)
 RTPS = 0x4A180001
 def sw(rt, rs, off):    return (0x2B << 26) | (rs << 21) | (rt << 16) | (off & 0xffff)
 def lw(rt, rs, off):    return (0x23 << 26) | (rs << 21) | (rt << 16) | (off & 0xffff)
@@ -149,6 +153,19 @@ dw = here()
 emit(lw(T0, T4, 8)); emit(NOP)
 emit(and_(T0, T0, T7))
 branch(bne, T0, ZERO, dw)                              # until it is done
+# the same triangle at (10, 150), each vertex word written to the port
+li32(T0, 150 << 16); emit(ctc2(T0, 25))
+cmd(0x20FF00FF)
+for i, (vx, vy) in enumerate(((0, 0), (40, 0), (0, 40))):
+    li32(T0, (vy << 16) | vx); emit(mtc2(T0, 0))
+    li32(T0, 512); emit(mtc2(T0, 1))
+    emit(NOP); emit(RTPS); emit(NOP); emit(NOP); emit(NOP)
+    if i == 0:
+        emit(mfc2(T1, 14)); emit(NOP); emit(NOP)
+        gp0r(T1)
+    else:
+        emit(swc2(14, S1, 0))
+li32(T0, 100 << 16); emit(ctc2(T0, 25))
 # the translucent quad, standing still
 cmd(0x2A00FF00)                                        # flat semi-transparent green
 gp0(xy(220, 170)); gp0(xy(300, 170)); gp0(xy(220, 230)); gp0(xy(300, 230))

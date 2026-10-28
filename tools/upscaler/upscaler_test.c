@@ -11,6 +11,8 @@
  *   VRAM; a sprite too;
  * - what stays standing still, as does a jump too far, a stranger, and
  *   a frame shown twice;
+ * - a primitive whose signature changed (an animated texture) is
+ *   matched by its family among what no signature matched;
  * - the depth is the drawing order, or PGXP's where a primitive has it,
  *   and translucency splits the draws;
  * - the factor follows the request;
@@ -41,14 +43,20 @@ static uint64_t sig(uint32_t a)
    return psx_upscaler_hash(psx_upscaler_hash_init(), a);
 }
 
-static void tri_w(psx_upscaler_t *u, double x0, double y0, double x1, double y1,
-      double x2, double y2, double w, unsigned flags, uint64_t s)
+static void tri_wf(psx_upscaler_t *u, double x0, double y0, double x1, double y1,
+      double x2, double y2, double w, unsigned flags, uint64_t s, uint64_t family)
 {
    psx_upscaler_point_t p[3];
    p[0].x = (float)x0; p[0].y = (float)y0; p[0].w = (float)w;
    p[1].x = (float)x1; p[1].y = (float)y1; p[1].w = (float)w;
    p[2].x = (float)x2; p[2].y = (float)y2; p[2].w = (float)w;
-   psx_upscaler_primitive(u, p, 3, flags, s);
+   psx_upscaler_primitive(u, p, 3, flags, s, family);
+}
+
+static void tri_w(psx_upscaler_t *u, double x0, double y0, double x1, double y1,
+      double x2, double y2, double w, unsigned flags, uint64_t s)
+{
+   tri_wf(u, x0, y0, x1, y1, x2, y2, w, flags, s, s);
 }
 
 static void tri(psx_upscaler_t *u, double x0, double y0, double x1, double y1,
@@ -66,7 +74,7 @@ static void sprite(psx_upscaler_t *u, double x, double y, double w, double h,
    p[2].x = (float)x;       p[2].y = (float)(y + h);
    p[3].x = (float)(x + w); p[3].y = (float)(y + h);
    p[0].w = p[1].w = p[2].w = p[3].w = 1.0f;
-   psx_upscaler_primitive(u, p, 4, PSX_UPSCALER_SPRITE, s);
+   psx_upscaler_primitive(u, p, 4, PSX_UPSCALER_SPRITE, s, s);
 }
 
 /* The vertex of @g at render pixel (x, y) within a pixel, if any */
@@ -198,6 +206,44 @@ static void test_ordinals_depth_and_draws(void)
    psx_upscaler_free(u);
 }
 
+/* A primitive whose signature changed (an animated texture: other
+ * texture coordinates) is matched by its family, among what no
+ * signature matched */
+static void test_family(void)
+{
+   psx_upscaler_t *u = psx_upscaler_new();
+   psx_upscaler_geometry_t g;
+   const psx_upscaler_vertex_t *v;
+   const uint64_t family = sig(100);
+
+   psx_upscaler_configure(u, true, 8, false);
+   psx_upscaler_set_draw_area(u, 0, 0, 319, 239);
+   tri_wf(u, 20, 20, 60, 20, 20, 60, 1.0, 0, sig(101), family);
+   tri_wf(u, 120, 20, 160, 20, 120, 60, 1.0, 0, sig(102), family);
+   psx_upscaler_resolve(u, 0, 0, 320, 240, SCALE, &g);
+
+   /* the first's texture animated and it moved next to the second,
+    * which moved a little with its texture as it was: the second is
+    * matched by signature, and the first by family with what is left,
+    * not with the second's nearer old place */
+   tri_wf(u, 110, 24, 150, 24, 110, 64, 1.0, 0, sig(103), family);
+   tri_wf(u, 121, 21, 161, 21, 121, 61, 1.0, 0, sig(102), family);
+   psx_upscaler_resolve(u, 0, 0, 320, 240, SCALE, &g);
+   v = vertex_at(&g, 121 * SCALE + g.jitter_x, 21 * SCALE + g.jitter_y);
+   CHECK(v && near(v->motion_x, 1 * SCALE, 1e-4) && near(v->motion_y, 1 * SCALE, 1e-4),
+         "the signature match comes first");
+   v = vertex_at(&g, 110 * SCALE + g.jitter_x, 24 * SCALE + g.jitter_y);
+   CHECK(v && near(v->motion_x, 90 * SCALE, 1e-4) && near(v->motion_y, 4 * SCALE, 1e-4),
+         "an animated texture is matched by its family among what is left");
+
+   /* another family stands still */
+   tri_wf(u, 112, 26, 152, 26, 112, 66, 1.0, 0, sig(104), sig(105));
+   psx_upscaler_resolve(u, 0, 0, 320, 240, SCALE, &g);
+   v = vertex_at(&g, 112 * SCALE + g.jitter_x, 26 * SCALE + g.jitter_y);
+   CHECK(v && v->motion_x == 0.0f && v->motion_y == 0.0f, "another family stands still");
+   psx_upscaler_free(u);
+}
+
 static void test_reset(void)
 {
    psx_upscaler_t *u = psx_upscaler_new();
@@ -249,6 +295,7 @@ int main(void)
    test_inactive_and_jitter();
    test_motion();
    test_ordinals_depth_and_draws();
+   test_family();
    test_reset();
    test_factor();
    if (s_failures)

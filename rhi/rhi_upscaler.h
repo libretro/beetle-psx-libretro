@@ -11,9 +11,11 @@
  * into, and when that area is displayed it is matched with the primitive
  * of the frame shown before that was drawn under the same state (texture,
  * palette, blending, texture coordinates, flat colour) with the same
- * ordinal among those; the motion vector pass draws where each of its
- * vertices went. A primitive without a match, or one that went further
- * than anything moves in a frame, stands still. Lines and fills are not
+ * ordinal among those, else with one of the same family (that state
+ * less the texture coordinates and colour: an animated texture, a
+ * fade) that nothing else matched; the motion vector pass draws where
+ * each of its vertices went. A primitive without a match, or one that
+ * went further than anything moves in a frame, stands still. Lines and fills are not
  * kept: they stand still with what is under them.
  *
  * Plain C89, no Vulkan: the renderer feeds it and draws its geometry. */
@@ -94,10 +96,12 @@ void psx_upscaler_set_draw_area(psx_upscaler_t *u, unsigned x0,
 /* Before a polygon (3 or 4 vertices, a quad's in the command's order) or
  * sprite (4 corners: top left, top right, bottom left, bottom right) is
  * drawn: keeps it. @signature tells primitives drawn alike apart from
- * others (psx_upscaler_hash). */
+ * others (psx_upscaler_hash); @family is the signature less what the
+ * same thing changes from frame to frame (texture coordinates, a flat
+ * colour), matched by when nothing matches the signature. */
 void psx_upscaler_primitive(psx_upscaler_t *u,
       const psx_upscaler_point_t *points, unsigned count,
-      unsigned flags, uint64_t signature);
+      unsigned flags, uint64_t signature, uint64_t family);
 
 /* At a scanout: the frame shown is the area of VRAM whose top left is
  * (@x, @y), @width x @height native pixels, rendered at @scale times

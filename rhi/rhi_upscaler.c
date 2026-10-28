@@ -26,7 +26,12 @@
 typedef struct upscaler_prim
 {
    uint64_t signature;
+   /* The signature less what changes on the same thing from frame to
+    * frame (texture coordinates, a flat colour): matched by when
+    * nothing matches the signature */
+   uint64_t family;
    uint32_t ordinal;
+   uint32_t family_ordinal;
    uint32_t flags;
    unsigned count;
    float x[4], y[4], w[4];
@@ -46,11 +51,16 @@ typedef struct upscaler_record
    upscaler_prim_t *prims;
    unsigned num_prims;
    unsigned cap_prims;
-   /* signature -> primitives drawn under it so far */
+   /* signature -> primitives drawn under it so far, and the same for
+    * the family */
    upscaler_table_t ordinals;
+   upscaler_table_t family_ordinals;
    uint64_t serial;
    unsigned x0, y0, x1, y1;
    float jitter_x, jitter_y;
+   /* What its primitives are relative to: VRAM until shown, then the
+    * display's top left */
+   int origin_x, origin_y;
    bool used;
    bool shown;
 } upscaler_record_t;
@@ -67,8 +77,17 @@ struct psx_upscaler
    unsigned num_prev;
    unsigned cap_prev;
    upscaler_table_t prev_table;
+   /* (family, family ordinal) -> its primitive */
+   upscaler_table_t prev_family;
    /* (signature, corners) -> its primitive */
    upscaler_table_t prev_exact;
+   /* Each primitive's match in prev while a frame is resolved, and
+    * which of prev are matched, so a family match takes none a
+    * signature match has */
+   const upscaler_prim_t **matches;
+   unsigned cap_matches;
+   unsigned char *claimed;
+   unsigned cap_claimed;
 
    psx_upscaler_vertex_t *vertices;
    unsigned cap_vertices;
@@ -185,6 +204,12 @@ static uint64_t upscaler_prim_key(uint64_t signature, uint32_t ordinal)
    return signature ^ ((uint64_t)ordinal * U64(0xff51afd7, 0xed558ccd));
 }
 
+static uint64_t upscaler_family_key(uint64_t family, uint32_t ordinal)
+{
+   return (family ^ U64(0xc2b2ae3d, 0x27d4eb4f))
+      ^ ((uint64_t)ordinal * U64(0xff51afd7, 0xed558ccd));
+}
+
 static uint64_t upscaler_corner_word(float v)
 {
    uint32_t w;
@@ -292,9 +317,13 @@ void psx_upscaler_free(psx_upscaler_t *u)
    {
       free(u->records[i].prims);
       upscaler_table_free(&u->records[i].ordinals);
+      upscaler_table_free(&u->records[i].family_ordinals);
    }
    free(u->prev);
+   free(u->matches);
+   free(u->claimed);
    upscaler_table_free(&u->prev_table);
+   upscaler_table_free(&u->prev_family);
    upscaler_table_free(&u->prev_exact);
    free(u->vertices);
    free(u->draws);
@@ -311,6 +340,7 @@ static void upscaler_forget(psx_upscaler_t *u)
    }
    u->num_prev      = 0;
    upscaler_table_clear(&u->prev_table);
+   upscaler_table_clear(&u->prev_family);
    upscaler_table_clear(&u->prev_exact);
    u->shown_serial  = 0;
    u->jitter_index  = 0;
@@ -429,11 +459,14 @@ static upscaler_record_t *upscaler_record_for_draw(psx_upscaler_t *u)
       rec->jitter_y  = upscaler_halton(j, 3) - 0.5f;
       rec->num_prims = 0;
       upscaler_table_clear(&rec->ordinals);
+      upscaler_table_clear(&rec->family_ordinals);
       rec->serial    = ++u->serial;
       rec->x0        = u->area_x0;
       rec->y0        = u->area_y0;
       rec->x1        = u->area_x1;
       rec->y1        = u->area_y1;
+      rec->origin_x  = 0;
+      rec->origin_y  = 0;
       rec->used      = true;
       rec->shown     = false;
    }
@@ -444,11 +477,12 @@ static upscaler_record_t *upscaler_record_for_draw(psx_upscaler_t *u)
 
 void psx_upscaler_primitive(psx_upscaler_t *u,
       const psx_upscaler_point_t *points, unsigned count,
-      unsigned flags, uint64_t signature)
+      unsigned flags, uint64_t signature, uint64_t family)
 {
    upscaler_record_t *rec;
    upscaler_prim_t *p;
    uint32_t *ordinal;
+   uint32_t *family_ordinal;
    unsigned i;
 
    if (!u || !u->active || count < 3 || count > 4)
@@ -460,9 +494,13 @@ void psx_upscaler_primitive(psx_upscaler_t *u,
       return;
    if (!(ordinal = upscaler_table_get(&rec->ordinals, signature)))
       return;
-   p            = &rec->prims[rec->num_prims++];
-   p->signature = signature;
-   p->ordinal   = (*ordinal)++;
+   if (!(family_ordinal = upscaler_table_get(&rec->family_ordinals, family)))
+      return;
+   p                 = &rec->prims[rec->num_prims++];
+   p->signature      = signature;
+   p->family         = family;
+   p->ordinal        = (*ordinal)++;
+   p->family_ordinal = (*family_ordinal)++;
    p->flags     = flags;
    p->count     = count;
    for (i = 0; i < count; i++)
@@ -473,46 +511,38 @@ void psx_upscaler_primitive(psx_upscaler_t *u,
    }
 }
 
-/* The primitive of the frame before that @p (relative to its display)
- * is: of those drawn under its signature with an ordinal near its own,
- * the nearest; NULL when none is near enough */
-static const upscaler_prim_t *upscaler_match(const psx_upscaler_t *u,
-      const upscaler_prim_t *p)
+/* Of the primitives of the frame before drawn under @key (a signature
+ * or a family) with an ordinal near @ordinal, the nearest to @p that
+ * is not claimed; NULL when none is near enough */
+static const upscaler_prim_t *upscaler_match_near(const psx_upscaler_t *u,
+      const upscaler_prim_t *p, const upscaler_table_t *table,
+      uint64_t key, uint32_t ordinal, bool by_family)
 {
    int k;
    const upscaler_prim_t *best = NULL;
    float best_cost             = 0.0f;
    const float far2            = UPSCALER_FARTHEST * UPSCALER_FARTHEST;
-   uint32_t exact              = upscaler_table_find(&u->prev_exact, upscaler_exact_key(p));
-
-   /* Where the same primitive was drawn the frame before, it stood
-    * still, however many drawn under its signature came and went before
-    * it */
-   if (exact)
-   {
-      const upscaler_prim_t *q = &u->prev[exact - 1];
-      if (     q->signature == p->signature && q->count == p->count
-            && !memcmp(q->x, p->x, sizeof(p->x))
-            && !memcmp(q->y, p->y, sizeof(p->y)))
-         return q;
-   }
 
    for (k = -UPSCALER_ORDINAL_WINDOW; k <= UPSCALER_ORDINAL_WINDOW; k++)
    {
       unsigned j;
       uint32_t index;
       const upscaler_prim_t *q;
-      float cost   = 0.0f;
-      long ordinal = (long)p->ordinal + k;
-      if (ordinal < 0)
+      float cost = 0.0f;
+      long o     = (long)ordinal + k;
+      if (o < 0)
          continue;
-      index = upscaler_table_find(&u->prev_table,
-            upscaler_prim_key(p->signature, (uint32_t)ordinal));
+      index = upscaler_table_find(table, by_family
+            ? upscaler_family_key(key, (uint32_t)o)
+            : upscaler_prim_key(key, (uint32_t)o));
       if (!index)
          continue;
       q = &u->prev[index - 1];
-      if (q->signature != p->signature || q->ordinal != (uint32_t)ordinal
-            || q->count != p->count)
+      if (by_family
+            ? (q->family != key || q->family_ordinal != (uint32_t)o)
+            : (q->signature != key || q->ordinal != (uint32_t)o))
+         continue;
+      if (q->count != p->count || (u->claimed && u->claimed[index - 1]))
          continue;
       for (j = 0; j < p->count; j++)
       {
@@ -533,9 +563,42 @@ static const upscaler_prim_t *upscaler_match(const psx_upscaler_t *u,
    return best;
 }
 
+/* The primitive of the frame before that @p (relative to its display)
+ * is: the same one drawn in the same place, else of those drawn under
+ * its signature with an ordinal near its own, the nearest; NULL when
+ * none is near enough (upscaler_match_family then) */
+static const upscaler_prim_t *upscaler_match(const psx_upscaler_t *u,
+      const upscaler_prim_t *p)
+{
+   uint32_t exact = upscaler_table_find(&u->prev_exact, upscaler_exact_key(p));
+
+   /* Where the same primitive was drawn the frame before, it stood
+    * still, however many drawn under its signature came and went before
+    * it */
+   if (exact)
+   {
+      const upscaler_prim_t *q = &u->prev[exact - 1];
+      if (     q->signature == p->signature && q->count == p->count
+            && !memcmp(q->x, p->x, sizeof(p->x))
+            && !memcmp(q->y, p->y, sizeof(p->y)))
+         return q;
+   }
+   return upscaler_match_near(u, p, &u->prev_table, p->signature, p->ordinal, false);
+}
+
+/* For a primitive nothing matched: the one of its family (the same
+ * texture, blending and so on, with other texture coordinates or
+ * colour: an animated texture, a fade) with an ordinal near its own,
+ * among those no primitive matched */
+static const upscaler_prim_t *upscaler_match_family(const psx_upscaler_t *u,
+      const upscaler_prim_t *p)
+{
+   return upscaler_match_near(u, p, &u->prev_family, p->family, p->family_ordinal, true);
+}
+
 /* The pass's triangles for @rec, each primitive relative to the
  * display's top left (@x, @y) */
-static void upscaler_build(psx_upscaler_t *u, const upscaler_record_t *rec,
+static void upscaler_build(psx_upscaler_t *u, upscaler_record_t *rec,
       int x, int y, unsigned scale, bool still, psx_upscaler_geometry_t *out)
 {
    static const unsigned char polygon[6] = { 0, 1, 2, 1, 2, 3 };
@@ -548,35 +611,63 @@ static void upscaler_build(psx_upscaler_t *u, const upscaler_record_t *rec,
    if (     !upscaler_grow((void**)&u->vertices, &u->cap_vertices,
                rec->num_prims * 6, sizeof(*u->vertices))
          || !upscaler_grow((void**)&u->draws, &u->cap_draws,
-               rec->num_prims, sizeof(*u->draws)))
+               rec->num_prims, sizeof(*u->draws))
+         || !upscaler_grow((void**)&u->matches, &u->cap_matches,
+               rec->num_prims, sizeof(*u->matches)))
       return;
+   if (u->num_prev && !upscaler_grow((void**)&u->claimed, &u->cap_claimed,
+            u->num_prev, sizeof(*u->claimed)))
+      return;
+   if (u->num_prev)
+      memset(u->claimed, 0, u->num_prev);
 
+   /* Each primitive relative to the display, matched by its signature
+    * first; what that leaves is matched by family among what that left */
    for (i = 0; i < rec->num_prims; i++)
    {
-      upscaler_prim_t p = rec->prims[i];
+      upscaler_prim_t *p = &rec->prims[i];
       const upscaler_prim_t *q;
+      for (j = 0; j < p->count; j++)
+      {
+         p->x[j] -= (float)(x - rec->origin_x);
+         p->y[j] -= (float)(y - rec->origin_y);
+      }
+      q = still ? NULL : upscaler_match(u, p);
+      u->matches[i] = q;
+      if (q)
+         u->claimed[q - u->prev] = 1;
+   }
+   if (!still)
+      for (i = 0; i < rec->num_prims; i++)
+      {
+         const upscaler_prim_t *q;
+         if (u->matches[i])
+            continue;
+         q = upscaler_match_family(u, &rec->prims[i]);
+         u->matches[i] = q;
+         if (q)
+            u->claimed[q - u->prev] = 1;
+      }
+   for (i = 0; i < rec->num_prims; i++)
+   {
+      upscaler_prim_t *p = &rec->prims[i];
+      const upscaler_prim_t *q = u->matches[i];
       psx_upscaler_vertex_t *v = &u->vertices[num_vertices];
-      const unsigned char *order = (p.flags & PSX_UPSCALER_SPRITE) ? sprite : polygon;
-      unsigned count = p.count == 4 ? 6 : 3;
-      unsigned flags = p.flags & PSX_UPSCALER_TRANSLUCENT;
+      const unsigned char *order = (p->flags & PSX_UPSCALER_SPRITE) ? sprite : polygon;
+      unsigned count = p->count == 4 ? 6 : 3;
+      unsigned flags = p->flags & PSX_UPSCALER_TRANSLUCENT;
       float depth    = 1.0f - (float)(i + 1) * UPSCALER_DEPTH_STEP;
 
-      for (j = 0; j < p.count; j++)
-      {
-         p.x[j] -= (float)x;
-         p.y[j] -= (float)y;
-      }
-      q = still ? NULL : upscaler_match(u, &p);
       for (j = 0; j < count; j++)
       {
          unsigned c    = order[j];
-         v[j].x        = p.x[c] * s + out->jitter_x;
-         v[j].y        = p.y[c] * s + out->jitter_y;
+         v[j].x        = p->x[c] * s + out->jitter_x;
+         v[j].y        = p->y[c] * s + out->jitter_y;
          v[j].z        = depth < 0.0f ? 0.0f : depth;
          /* PGXP's depth where the primitive has it: a w of 1 is none */
-         v[j].depth    = p.w[c] > 1.0f ? p.w[c] / (p.w[c] + UPSCALER_DEPTH_HALF) : v[j].z;
-         v[j].motion_x = q ? (p.x[c] - q->x[c]) * s : 0.0f;
-         v[j].motion_y = q ? (p.y[c] - q->y[c]) * s : 0.0f;
+         v[j].depth    = p->w[c] > 1.0f ? p->w[c] / (p->w[c] + UPSCALER_DEPTH_HALF) : v[j].z;
+         v[j].motion_x = q ? (p->x[c] - q->x[c]) * s : 0.0f;
+         v[j].motion_y = q ? (p->y[c] - q->y[c]) * s : 0.0f;
       }
       if (num_draws && u->draws[num_draws - 1].flags == flags)
          u->draws[num_draws - 1].count += count;
@@ -589,19 +680,22 @@ static void upscaler_build(psx_upscaler_t *u, const upscaler_record_t *rec,
       }
       num_vertices += count;
    }
+   rec->origin_x     = x;
+   rec->origin_y     = y;
    out->vertices     = u->vertices;
    out->draws        = u->draws;
    out->num_vertices = num_vertices;
    out->num_draws    = num_draws;
 }
 
-/* Keeps @rec as the frame shown, relative to its display's top left */
-static void upscaler_keep(psx_upscaler_t *u, const upscaler_record_t *rec,
-      int x, int y)
+/* Keeps @rec, built relative to its display's top left, as the frame
+ * shown */
+static void upscaler_keep(psx_upscaler_t *u, const upscaler_record_t *rec)
 {
-   unsigned i, j;
+   unsigned i;
    u->num_prev = 0;
    upscaler_table_clear(&u->prev_table);
+   upscaler_table_clear(&u->prev_family);
    upscaler_table_clear(&u->prev_exact);
    if (!upscaler_grow((void**)&u->prev, &u->cap_prev,
             rec->num_prims, sizeof(*u->prev)))
@@ -610,13 +704,12 @@ static void upscaler_keep(psx_upscaler_t *u, const upscaler_record_t *rec,
    {
       uint32_t *slot;
       u->prev[i] = rec->prims[i];
-      for (j = 0; j < u->prev[i].count; j++)
-      {
-         u->prev[i].x[j] -= (float)x;
-         u->prev[i].y[j] -= (float)y;
-      }
       if (!(slot = upscaler_table_get(&u->prev_table,
                upscaler_prim_key(u->prev[i].signature, u->prev[i].ordinal))))
+         break;
+      *slot = i + 1;
+      if (!(slot = upscaler_table_get(&u->prev_family,
+               upscaler_family_key(u->prev[i].family, u->prev[i].family_ordinal))))
          break;
       *slot = i + 1;
       if (!(slot = upscaler_table_get(&u->prev_exact, upscaler_exact_key(&u->prev[i]))))
@@ -658,7 +751,7 @@ void psx_upscaler_resolve(psx_upscaler_t *u, int x, int y,
       upscaler_build(u, rec, x, y, scale, still, out);
       if (!still)
       {
-         upscaler_keep(u, rec, x, y);
+         upscaler_keep(u, rec);
          u->shown_serial = rec->serial;
          u->jitter_index++;
       }

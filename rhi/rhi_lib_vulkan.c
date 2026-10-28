@@ -10427,12 +10427,14 @@ static void renderer_build_native_interpolants(Renderer *self,
 
 /* Keeps a polygon or sprite for the temporal upscaler, with what tells
  * it from others: its texture, palette, blending, texture coordinates
- * and, flat, its colour; a Gouraud polygon's colours change with its
- * lighting */
+ * and, flat, its colour (a Gouraud polygon's colours change with its
+ * lighting); and its family, the same less the texture coordinates and
+ * colour, for when those are what changed */
 static void renderer_upscaler_keep(Renderer *self, const Vertex *vertices, unsigned count)
 {
    psx_upscaler_point_t points[4];
    uint64_t signature;
+   uint64_t family;
    unsigned flags = 0;
    unsigned i;
    bool flat = true;
@@ -10462,12 +10464,14 @@ static void renderer_upscaler_keep(Renderer *self, const Vertex *vertices, unsig
    {
       signature = psx_upscaler_hash(signature, self->render_state.texture_offset_x | (self->render_state.texture_offset_y << 16));
       signature = psx_upscaler_hash(signature, self->render_state.palette_offset_x | (self->render_state.palette_offset_y << 16));
+   }
+   family = signature;
+   if (self->render_state.texture_mode != TextureMode_None)
       for (i = 0; i < count; i++)
          signature = psx_upscaler_hash(signature, vertices[i].u | ((uint32_t)vertices[i].v << 16));
-   }
    if (flat)
       signature = psx_upscaler_hash(signature, vertices[0].color);
-   psx_upscaler_primitive(self->upscaler, points, count, flags, signature);
+   psx_upscaler_primitive(self->upscaler, points, count, flags, signature, family);
    /* drawn with its record's jitter: a game drawing the other buffer
     * mid-frame has it from here on */
    { float jx, jy;
@@ -22312,6 +22316,8 @@ static void upscaler_hand_over(Renderer *r, Image *scanout, unsigned index);
 static const struct retro_hw_render_upscaler_interface *upscaler_iface;
 static bool upscaler_on;
 static bool upscaler_reset_pending = true;
+/* What the renderer was built for (it may have settled for less) */
+static unsigned built_scaling, built_msaa;
 
 /* Owning vector of retro_vulkan_image (POD), replacing A dynamic array of
  * retro_vulkan_image. resize() grows/shrinks the backing array; grown slots are
@@ -22587,6 +22593,8 @@ static void vk_context_reset(void)
    device_set_context(device, *&context);
 
    renderer = (Renderer *)malloc(sizeof(Renderer));
+   built_scaling = scaling;
+   built_msaa    = msaa;
    renderer_init(renderer, device, scaling, msaa, owned_u32_empty(&save_state.vram) ? NULL : &save_state);
    if (!renderer_is_valid(renderer))
    {
@@ -23177,10 +23185,12 @@ void rhi_vulkan_refresh_variables(void)
 
 /* The frontend's temporal upscaler (RETRO_ENVIRONMENT_GET_HW_RENDER_UPSCALER_INTERFACE).
  * While it takes the frames, the internal resolution is the factor that
- * fits the size it asks for, without multisampling, supersampling or
- * adaptive smoothing, which would blur what it antialiases itself, and
- * the renderer jitters the primitives and hands over their motion
- * vectors, depth and transparency mask with each frame. */
+ * fits the size it asks for, without multisampling or supersampling,
+ * which would blur what it antialiases itself (adaptive smoothing
+ * stays: it smooths native-resolution 2D art, which an upscaler keeps
+ * as the detail it is), and the renderer jitters the primitives and
+ * hands over their motion vectors, depth and transparency mask with
+ * each frame. */
 static struct retro_hw_upscaler_request upscaler_request;
 static struct retro_hw_upscaler_inputs upscaler_inputs;
 static bool upscaler_options_hidden;
@@ -23222,7 +23232,6 @@ static void upscaler_override_options(void)
       BEETLE_OPT(internal_resolution),
       BEETLE_OPT(msaa),
       BEETLE_OPT(super_sampling),
-      BEETLE_OPT(adaptive_smoothing),
       NULL
    };
    struct retro_core_option_display display;
@@ -23287,7 +23296,11 @@ static void upscaler_poll(void)
 
    if (upscaler_iface && upscaler_iface->get_request(upscaler_iface->handle, &upscaler_request))
    {
+      static struct retro_hw_upscaler_request last_request;
       psx_upscaler_range_t range;
+      /* a changed request (the output changed) is picked for afresh */
+      bool changed      = memcmp(&last_request, &upscaler_request, sizeof(last_request)) != 0;
+      last_request      = upscaler_request;
       requested         = true;
       range.want_width  = upscaler_request.render_width;
       range.min_width   = upscaler_request.min_render_width;
@@ -23295,7 +23308,7 @@ static void upscaler_poll(void)
       range.max_width   = upscaler_request.max_render_width;
       range.max_height  = upscaler_request.max_render_height;
       factor = psx_upscaler_factor(&range, upscaler_native_width, upscaler_native_height, 16,
-            upscaler_on ? upscaler_factor : 0, upscaler_picked_width, upscaler_picked_height);
+            upscaler_on && !changed ? upscaler_factor : 0, upscaler_picked_width, upscaler_picked_height);
       on = factor != 0;
    }
    if (on != upscaler_on)
@@ -23314,15 +23327,12 @@ static void upscaler_poll(void)
    }
    else if (on)
    {
-      unsigned old_scaling = scaling, old_msaa = msaa;
-      bool old_super_sampling = super_sampling;
+      /* the renderer follows at the frame boundary
+       * (rhi_vulkan_apply_pending_geometry); the maximum size reported
+       * stays the options', which only sizes a frontend's software
+       * frame scratch */
       upscaler_on = true;
       upscaler_override_options();
-      if (renderer && (scaling != old_scaling || msaa != old_msaa || super_sampling != old_super_sampling))
-      {
-         rhi_vulkan_fill_av_info(&pending_av_info);
-         geometry_change_pending = true;
-      }
    }
    if (upscaler_iface)
       upscaler_log(requested, on, factor);
@@ -23440,24 +23450,57 @@ static void ensure_sync_index_resources(void)
    }
 }
 
-/* Perform a renderer rebuild that rhi_vulkan_refresh_variables deferred (a
- * scaling / super_sampling / msaa change). Called from the top of prepare_frame
- * BEFORE the frame is begun on the device, so the renderer is torn down and
- * rebuilt between frames -- never under work already submitted for an in-flight
- * frame. Preserves VRAM across the rebuild exactly as vk_context_reset does
- * (save -> idle -> release scanout handles -> fini -> init with the saved
- * state). */
+/* Rebuilds the renderer at the scaling and msaa now set, on the same
+ * device and context, with VRAM and its state carried over as
+ * vk_context_reset carries them: no frontend reinit, no swapchain or
+ * upscaler feature torn down, the programs and pipelines kept. Between
+ * frames only. */
+static void rhi_vulkan_rebuild_renderer(void)
+{
+   SaveState st;
+   if (!renderer || !device)
+      return;
+   renderer_save_vram_state(renderer, &st);
+   renderer_fini(renderer);
+   free(renderer);
+   renderer = (Renderer *)malloc(sizeof(Renderer));
+   built_scaling = scaling;
+   built_msaa    = msaa;
+   renderer_init(renderer, device, scaling, msaa, &st);
+   savestate_destroy(&st);
+   if (!renderer_is_valid(renderer))
+   {
+      renderer_fini(renderer);
+      free(renderer);
+      renderer = NULL;
+      return;
+   }
+   upscaler_reset_pending = true;
+   tt_log_startup("vk renderer rebuilt: scaling=%u msaa=%u\n",
+         (unsigned)scaling, (unsigned)msaa);
+}
+
+/* Fire a geometry change rhi_vulkan_refresh_variables deferred, and
+ * rebuild the renderer where it no longer matches the scaling or msaa
+ * set (the frontend reinitialises its video only when the maximum size
+ * changed; the temporal upscaler's factor never goes through it).
+ * Called from the top of retro_run BEFORE prepare_frame begins a frame,
+ * so the frontend's synchronous video-driver reinit
+ * (context_destroy/context_reset) and the rebuild run with no frame in
+ * flight and nothing from this core on the call stack below it. */
 void rhi_vulkan_apply_pending_geometry(void)
 {
-   /* Fire a deferred geometry change recorded by refresh_variables. Called from
-    * the top of retro_run BEFORE prepare_frame begins a frame, so the frontend's
-    * synchronous video-driver reinit (context_destroy/context_reset) runs with
-    * no frame in flight and nothing from this core on the call stack below it. */
    if (geometry_change_pending)
    {
       struct retro_system_av_info info = pending_av_info;
       geometry_change_pending = false;
       environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
+   }
+   if (device && renderer)
+   {
+      upscaler_poll();
+      if (renderer && (built_scaling != scaling || built_msaa != msaa))
+         rhi_vulkan_rebuild_renderer();
    }
 }
 
@@ -23546,7 +23589,6 @@ void rhi_vulkan_prepare_frame(void)
       return;
    renderer->upload_serial++;
 
-   upscaler_poll();
    psx_upscaler_configure(renderer->upscaler, upscaler_on && !show_vram,
          upscaler_jitter_phase(), upscaler_reset_pending);
    upscaler_reset_pending = false;
@@ -23659,7 +23701,7 @@ void rhi_vulkan_finalize_frame(const void *fb, unsigned width,
    /* Auto-create the dump/replacement folders once enabled + a game is loaded (after
     * the config above so it picks the right rect/pages folder). */
    texture_tracker_ensure_directories(renderer->tracker, dump_textures, replace_textures);
-   renderer->render_state.adaptive_smoothing = adaptive_smoothing && !upscaler_on;
+   renderer->render_state.adaptive_smoothing = adaptive_smoothing;
    renderer->render_state.crop_overscan = vulkan_crop_overscan;
    renderer->render_state.offset_cycles = image_offset_cycles;
    renderer_set_visible_scanlines(renderer, initial_scanline, last_scanline, initial_scanline_pal, last_scanline_pal);
