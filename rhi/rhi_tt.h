@@ -386,11 +386,17 @@ struct LoadedImage {
 };
 typedef struct LoadedImage LoadedImage;
 
+typedef struct TTStaging TTStaging; /* opaque; backend-defined */
+
 /* A decoded texture as a set of mip levels. C-style dynamic array: `levels`
- * is a malloc'd array of `count` LoadedImage, owning all buffers. */
+ * is a malloc'd array of `count` LoadedImage. The level buffers are malloc'd
+ * and owned by the levels, unless `staging` is set: then they all point into
+ * that one piece of backend upload memory (TTGpuBackend.staging_alloc),
+ * which the levels own instead and give back through staging_release. */
 struct LoadedLevels {
    LoadedImage *levels;
    int          count;
+   TTStaging   *staging;
 };
 typedef struct LoadedLevels LoadedLevels;
 
@@ -460,6 +466,19 @@ struct TTGpuBackend {
    void (*page_blit)(void *ctx, TTGpuImage *page, TTGpuImage *src,
          const TTPageBlit *blit);
    void (*page_end)(void *ctx, TTGpuImage *page);
+
+   /* Optional; both NULL when the backend has none. Upload memory the GPU
+    * copies from, mapped for the CPU, for a width x height RGBA8 chain of
+    * `levels` levels: level_data[i] receives level i's address (rows
+    * packed). The decoder writes the levels there and upload_levels then
+    * only records the copy, so the bytes are never copied on the CPU.
+    * Returns NULL when there is no such memory. The memory stays valid
+    * until staging_release, which keeps it from being reused until the GPU
+    * has finished every copy recorded from it. Writing it from another
+    * thread is fine; both calls are the render thread's. */
+   TTStaging *(*staging_alloc)(void *ctx, int width, int height, int levels,
+         uint8_t **level_data);
+   void (*staging_release)(void *ctx, TTStaging *staging);
 };
 typedef struct TTGpuBackend TTGpuBackend;
 

@@ -2530,6 +2530,8 @@ static TTGpuBackend gl_tt_make_backend(gl_renderer *r)
    vt.page_begin       = gl_tt_page_begin;
    vt.page_blit        = gl_tt_page_blit;
    vt.page_end         = gl_tt_page_end;
+   vt.staging_alloc    = NULL;
+   vt.staging_release  = NULL;
    return vt;
 }
 

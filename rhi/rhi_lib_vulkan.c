@@ -1727,6 +1727,10 @@ static size_t tfl_get_layer_size(const struct TextureFormatLayout *self,
    {
       return self->mips[mip].block_image_height * tfl_get_row_size(self, mip);
    }
+static void tfl_set_2d(struct TextureFormatLayout *self, VkFormat format,
+      uint32_t width, uint32_t height, uint32_t array_layers, uint32_t mip_levels);
+static void tfl_build_buffer_image_copies(const struct TextureFormatLayout *self,
+      VkBufferImageCopy *copies, unsigned *num_copies);
 static const TextureFormatLayoutMipInfo *tfl_get_mip_info(const struct TextureFormatLayout *self,
       uint32_t mip)
    {
@@ -6019,6 +6023,7 @@ static bool owned_u32_empty(const struct OwnedU32Buf *b) { return b->n == 0; }
    uint32_t vram_gpu_written[VRAM_PROV_WORDS];
          bool texture_tracking_enabled;
          TextureTracker *tracker;
+         bool hd_staging_uncached; /* no cached host memory for HD upload memory */
 
          CommandBufferHandle cmd;
 
@@ -6921,6 +6926,7 @@ static void renderer_init(Renderer *self,
    self->reuseable_scanout.data       = NULL;
    fbatlas_init(&self->atlas);
    self->tracker = NULL; /* created below via texture_tracker_new once the GPU backend is up */
+   self->hd_staging_uncached = false;
    /* Sanity check settings, 16x IR with 16x MSAA will exhaust most GPUs VRAM alone. */
    if (self->scaling == 16 && self->msaa > 1)
    {
@@ -11442,6 +11448,24 @@ static ImageHandle renderer_upload_texture(Renderer *self,
    info.misc = 0u;
    info.initial_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+   if (levels->staging) {
+      /* Decoded straight into upload memory (vk_tt_staging_alloc): record
+       * the copy from it, nothing to copy here. Flushes it first when the
+       * memory is not coherent. */
+      Buffer *buffer = (Buffer *)levels->staging;
+      InitialImageBuffer staging;
+      TextureFormatLayout layout;
+      tfl_init(&layout);
+      tfl_set_2d(&layout, info.format, info.width, info.height, 1, n);
+      buffer_add_reference(buffer);
+      staging.buffer = bh_make(buffer);
+      tfl_build_buffer_image_copies(&layout, staging.blits, &staging.num_blits);
+      device_unmap_host_buffer(self->device, buffer, MEMORY_ACCESS_WRITE_BIT);
+      image = device_create_image_from_staging_buffer(self->device, &info, &staging);
+      bh_reset(&staging.buffer);
+      return image;
+   }
+
    for (i = 0; i < n; i++) {
       initial[i].data = levels->levels[i].owned_data;
       initial[i].row_length = 0;
@@ -11482,6 +11506,58 @@ static TTGpuImage *vk_tt_upload_levels(void *ctx, const LoadedLevels *levels)
    Renderer *self = (Renderer *)ctx;
    ImageHandle h = renderer_upload_texture(self, (LoadedLevels *)levels);
    return (TTGpuImage *)ih_get(&h); /* carries the +1 from device_create_image */
+}
+
+/* Upload memory for a decoded chain: one persistently mapped, cached
+ * host buffer laid out as the copy into the image wants it, so the decoder
+ * writes the levels where the GPU copies them from. The buffer's last
+ * reference goes through the device's deferred destruction, so its memory is
+ * not reused before the frame that recorded a copy from it has retired.
+ * Without cached host memory (reading the level above to build each mip
+ * from uncached memory would be slow) there is none, and the levels go
+ * through device_create_image's staging copy as before. */
+static TTStaging *vk_tt_staging_alloc(void *ctx, int width, int height,
+      int levels, uint8_t **level_data)
+{
+   Renderer *self = (Renderer *)ctx;
+   Device   *device = self->device;
+   TextureFormatLayout layout;
+   BufferCreateInfo info;
+   BufferHandle buffer;
+   uint8_t *mapped;
+   int i;
+   if (self->hd_staging_uncached || levels <= 0 || levels > 16)
+      return NULL;
+   tfl_init(&layout);
+   tfl_set_2d(&layout, VK_FORMAT_R8G8B8A8_UNORM, width, height, 1, levels);
+   memset(&info, 0, sizeof(info));
+   info.domain = BufferDomain_CachedHost;
+   info.size   = tfl_get_required_size(&layout);
+   info.usage  = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+   buffer = device_create_buffer(device, &info, NULL);
+   if (!bh_get(&buffer))
+      return NULL;
+   if (!(device->mem_props.memoryTypes[bh_get(&buffer)->alloc.memory_type].propertyFlags
+            & VK_MEMORY_PROPERTY_HOST_CACHED_BIT)) {
+      self->hd_staging_uncached = true;
+      bh_reset(&buffer);
+      return NULL;
+   }
+   mapped = (uint8_t *)device_map_host_buffer(device, bh_get(&buffer), MEMORY_ACCESS_WRITE_BIT);
+   if (!mapped) {
+      bh_reset(&buffer);
+      return NULL;
+   }
+   tfl_set_buffer(&layout, mapped, tfl_get_required_size(&layout));
+   for (i = 0; i < levels; i++)
+      level_data[i] = (uint8_t *)tfl_data(&layout, 0, (unsigned)i);
+   return (TTStaging *)bh_get(&buffer); /* the buffer's one reference */
+}
+
+static void vk_tt_staging_release(void *ctx, TTStaging *staging)
+{
+   (void)ctx;
+   buffer_release_reference((Buffer *)staging);
 }
 
 static void vk_tt_image_addref(void *ctx, TTGpuImage *img)
@@ -11627,6 +11703,8 @@ static TTGpuBackend vk_tt_make_backend(Renderer *self)
    vt.page_begin       = vk_tt_page_begin;
    vt.page_blit        = vk_tt_page_blit;
    vt.page_end         = vk_tt_page_end;
+   vt.staging_alloc    = vk_tt_staging_alloc;
+   vt.staging_release  = vk_tt_staging_release;
    return vt;
 }
 

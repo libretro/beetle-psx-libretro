@@ -46,6 +46,9 @@ bool tt_io_channel_promote(tt_io_channel *c, tt_io_match_t match, void *ctx);
 tt_io_node *tt_io_channel_take_responses(tt_io_channel *c);
 /* Waits for a response to be there, for at most timeout_us. */
 void tt_io_channel_wait_response(tt_io_channel *c, int64_t timeout_us);
+/* Waits for a response to be there, however long that takes. For waiting
+ * on work a worker has already been given. */
+void tt_io_channel_wait_response_unbounded(tt_io_channel *c);
 /* Tells the workers to leave, drops what they cannot see yet, and gives
  * up the caller's reference. Requests not yet taken are dropped. */
 void tt_io_channel_stop(tt_io_channel *c);

@@ -300,6 +300,22 @@ void tt_io_channel_wait_response(tt_io_channel *c, int64_t timeout_us)
    retro_eventcount_commit_wait_timeout(&c->delivered, key, timeout_us);
 }
 
+void tt_io_channel_wait_response_unbounded(tt_io_channel *c)
+{
+   int key;
+
+   if (!c)
+      return;
+   tt_io_channel_feed(c);
+   key = retro_eventcount_prepare_wait(&c->delivered);
+   if (retro_atomic_load_acquire_ptr(&c->responses))
+   {
+      retro_eventcount_cancel_wait(&c->delivered);
+      return;
+   }
+   retro_eventcount_commit_wait(&c->delivered, key);
+}
+
 void tt_io_channel_stop(tt_io_channel *c)
 {
    unsigned    i;
