@@ -264,12 +264,14 @@ endif
    ifeq ($(HAVE_VULKAN), 1)
       SOURCES_CXX += $(wildcard $(CORE_DIR)/parallel-psx/SPIRV-Cross/*.cpp) \
                      $(CORE_DIR)/rhi/rhi_spirv_reflect.cpp
-      SOURCES_C   += $(CORE_DIR)/rhi/rhi_lib_vulkan.c
+      SOURCES_C   += $(CORE_DIR)/rhi/rhi_lib_vulkan.c \
+                     $(CORE_DIR)/rhi/rhi_upscaler.c
 
       # The Vulkan RHI TU targets MSVC C89, which rejects declarations after
       # statements. GCC/Clang only diagnose this under an explicit flag, so make
       # it a hard error for this one object (target-specific, no global impact).
       $(CORE_DIR)/rhi/rhi_lib_vulkan.o: CFLAGS += -Werror=declaration-after-statement
+      $(CORE_DIR)/rhi/rhi_upscaler.o: CFLAGS += -Werror=declaration-after-statement
 
       EXTRA_INCLUDES += -I$(CORE_DIR)/parallel-psx/SPIRV-Cross \
                         -I$(CORE_DIR)/parallel-psx/khronos/include

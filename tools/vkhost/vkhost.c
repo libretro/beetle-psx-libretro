@@ -39,6 +39,18 @@
  *   deinit), run this content as a second session in the same process -
  *   the core stays loaded, as with a statically linked frontend - and dump
  *   its frames to <outdir>/next.
+ *   VKHOST_UPSCALER="rw,rh[,minw,minh,maxw,maxh[,outw,outh]]": offer the
+ *   core a frontend temporal upscaler (GET_HW_RENDER_UPSCALER_INTERFACE,
+ *   lrhost's LRHOST_UPSCALER) asking for rw x rh frames, by default within
+ *   rw/4..rw*2 and an output twice the size. The core must ask for it in
+ *   retro_load_game (counted) and get it after context_reset. Each dumped
+ *   frame gets its motion vectors, depth and mask beside it
+ *   (frame_NNNN.mv.raw, .depth.raw, .mask.raw).
+ *   VKHOST_UPSCALER_LOG: one line per presented frame with the inputs the
+ *   core handed over (jitter, flags, the images' sizes and formats), or
+ *   "none".
+ *   VKHOST_UPSCALER_STATS: read the transparency mask back every frame and
+ *   append to the log line how much of it is set, in thousandths.
  *
  * Exits non-zero on any validation error, on any use the core makes of
  * the frontend's queue without holding lock_queue, and on any wait it
@@ -99,6 +111,10 @@ static struct retro_hw_render_callback hw_render;
 static const struct retro_hw_render_context_negotiation_interface_vulkan *negotiation;
 static struct retro_hw_render_interface_vulkan iface;
 static struct retro_vulkan_context vkctx;
+/* the core's context is up (context_reset ran, context_destroy has not) */
+static int context_live;
+static unsigned av_max_width, av_max_height;
+static void host_reinit_context(void);
 static VkInstance instance;
 static VkPhysicalDevice gpu;
 static VkDebugUtilsMessengerEXT messenger;
@@ -414,6 +430,262 @@ static void *queue_thread_main(void *unused)
 }
 static void vk_set_signal_semaphore(void *handle, VkSemaphore sem) { (void)handle; (void)sem; }
 
+/* ---- the frontend's temporal upscaler (VKHOST_UPSCALER) ----
+ *
+ * Offered the way lrhost offers it, so the same checker scripts read
+ * both: the core asks in retro_load_game (false, counted), asks again
+ * after context_reset and gets the interface, reads the request every
+ * frame and hands its inputs over before set_image. Each presented frame
+ * is logged, and a dumped frame gets its inputs read back beside it. */
+static struct retro_hw_render_upscaler_interface up_iface;
+static struct retro_hw_upscaler_request up_req;
+static struct retro_hw_upscaler_inputs up_inputs;
+static int  up_on, up_announced, up_have_inputs, up_ready, up_dumpable;
+static long up_frames;
+static FILE *up_log;
+
+static bool up_get_request(void *h, struct retro_hw_upscaler_request *r)
+{
+   (void)h; *r = up_req; return true;
+}
+static void up_set_inputs(void *h, const struct retro_hw_upscaler_inputs *in)
+{
+   (void)h;
+   up_have_inputs = in != NULL;
+   if (in) up_inputs = *in;
+}
+static void up_init(void)
+{
+   unsigned v[8] = { 0 }; int n;
+   const char *e = getenv("VKHOST_UPSCALER");
+   if (!e) return;
+   n = sscanf(e, "%u,%u,%u,%u,%u,%u,%u,%u", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7]);
+   if (n < 2) return;
+   if (n < 6) { v[2] = v[0] / 4; v[3] = v[1] / 4; v[4] = v[0] * 2; v[5] = v[1] * 2; }
+   if (n < 8) { v[6] = v[0] * 2; v[7] = v[1] * 2; }
+   up_req.render_width = v[0]; up_req.render_height = v[1];
+   up_req.min_render_width = v[2]; up_req.min_render_height = v[3];
+   up_req.max_render_width = v[4]; up_req.max_render_height = v[5];
+   up_req.output_width = v[6]; up_req.output_height = v[7];
+   up_iface.interface_version = RETRO_HW_RENDER_UPSCALER_INTERFACE_VERSION;
+   up_iface.handle = &up_iface;
+   up_iface.get_request = up_get_request;
+   up_iface.set_inputs = up_set_inputs;
+   up_on = 1;
+}
+
+/* The host's own readback objects for the upscaler's images, made on
+ * first use and freed before context_destroy. Created and submitted
+ * through the loader's entry points, not the core's wrapped ones, so the
+ * host's reads count as neither the core's objects nor its submits. */
+static VkCommandPool   up_pool;
+static VkCommandBuffer up_cmd;
+static VkFence         up_fence;
+static VkBuffer        up_rb;
+static VkDeviceMemory  up_rb_mem;
+static VkDeviceSize    up_rb_cap;
+static void           *up_rb_map;
+
+static int up_readback_ensure(VkDeviceSize size)
+{
+   VkDevice dev = vkctx.device;
+   if (!up_pool)
+   {
+      VkCommandPoolCreateInfo pi = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+      VkCommandBufferAllocateInfo ai = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+      VkFenceCreateInfo fi = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+      pi.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+      pi.queueFamilyIndex = vkctx.queue_family_index;
+      if (vkCreateCommandPool(dev, &pi, NULL, &up_pool) != VK_SUCCESS)
+         return 0;
+      ai.commandPool = up_pool; ai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; ai.commandBufferCount = 1;
+      vkAllocateCommandBuffers(dev, &ai, &up_cmd);
+      vkCreateFence(dev, &fi, NULL, &up_fence);
+   }
+   if (size > up_rb_cap)
+   {
+      VkBufferCreateInfo bi = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+      VkMemoryAllocateInfo mi = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+      VkMemoryRequirements req; VkPhysicalDeviceMemoryProperties mp;
+      uint32_t i, type = UINT32_MAX;
+      if (up_rb)
+      {
+         vkUnmapMemory(dev, up_rb_mem);
+         vkDestroyBuffer(dev, up_rb, NULL);
+         vkFreeMemory(dev, up_rb_mem, NULL);
+         up_rb = VK_NULL_HANDLE; up_rb_mem = VK_NULL_HANDLE; up_rb_map = NULL; up_rb_cap = 0;
+      }
+      bi.size = size; bi.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+      if (vkCreateBuffer(dev, &bi, NULL, &up_rb) != VK_SUCCESS)
+         return 0;
+      vkGetBufferMemoryRequirements(dev, up_rb, &req);
+      vkGetPhysicalDeviceMemoryProperties(gpu, &mp);
+      for (i = 0; i < mp.memoryTypeCount; i++)
+      {
+         VkMemoryPropertyFlags f = mp.memoryTypes[i].propertyFlags;
+         if (!(req.memoryTypeBits & (1u << i)) || !(f & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+            continue;
+         if (type == UINT32_MAX || (f & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+            type = i;
+         if (f & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+            break;
+      }
+      if (type == UINT32_MAX)
+      {
+         vkDestroyBuffer(dev, up_rb, NULL); up_rb = VK_NULL_HANDLE;
+         return 0;
+      }
+      mi.allocationSize = req.size;
+      mi.memoryTypeIndex = type;
+      if (vkAllocateMemory(dev, &mi, NULL, &up_rb_mem) != VK_SUCCESS)
+      {
+         vkDestroyBuffer(dev, up_rb, NULL); up_rb = VK_NULL_HANDLE;
+         return 0;
+      }
+      vkBindBufferMemory(dev, up_rb, up_rb_mem, 0);
+      vkMapMemory(dev, up_rb_mem, 0, VK_WHOLE_SIZE, 0, &up_rb_map);
+      up_rb_cap = size;
+   }
+   return up_rb != VK_NULL_HANDLE;
+}
+
+static void up_readback_free(void)
+{
+   VkDevice dev = vkctx.device;
+   if (!dev) return;
+   if (up_rb)
+   {
+      vkUnmapMemory(dev, up_rb_mem);
+      vkDestroyBuffer(dev, up_rb, NULL);
+      vkFreeMemory(dev, up_rb_mem, NULL);
+   }
+   if (up_pool)
+   {
+      vkDestroyFence(dev, up_fence, NULL);
+      vkDestroyCommandPool(dev, up_pool, NULL);
+   }
+   up_rb = VK_NULL_HANDLE; up_rb_mem = VK_NULL_HANDLE; up_rb_map = NULL; up_rb_cap = 0;
+   up_pool = VK_NULL_HANDLE; up_cmd = VK_NULL_HANDLE; up_fence = VK_NULL_HANDLE;
+}
+
+/* Copies one of the upscaler's images to the host, after the frame:
+ * malloc'd, *size bytes, NULL when there is no image. The copy follows the
+ * core's submissions on the same queue, so the barrier from the image's
+ * state orders it after the writes without waiting the device idle. */
+static void *up_read_image(const struct retro_hw_upscaler_image *img, size_t *size)
+{
+   VkCommandBufferBeginInfo bi = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+   VkImageMemoryBarrier b = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+   VkBufferImageCopy region; VkSubmitInfo si = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+   VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+   unsigned bpp = 4; void *out;
+   if (img->format == VK_FORMAT_D32_SFLOAT) aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+   else if (img->format == VK_FORMAT_D16_UNORM) { aspect = VK_IMAGE_ASPECT_DEPTH_BIT; bpp = 2; }
+   else if (img->format == VK_FORMAT_R32G32_SFLOAT) bpp = 8;
+   else if (img->format == VK_FORMAT_R8_UNORM) bpp = 1;
+   *size = (size_t)img->width * img->height * bpp;
+   if (!img->image || !*size || !vkctx.device || !up_readback_ensure(*size))
+      return NULL;
+
+   vkResetCommandBuffer(up_cmd, 0);
+   bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+   vkBeginCommandBuffer(up_cmd, &bi);
+   b.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT; b.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+   b.oldLayout = (VkImageLayout)img->state; b.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+   b.srcQueueFamilyIndex = b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   b.image = (VkImage)(uintptr_t)img->image;
+   b.subresourceRange.aspectMask = aspect; b.subresourceRange.levelCount = 1; b.subresourceRange.layerCount = 1;
+   vkCmdPipelineBarrier(up_cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &b);
+   memset(&region, 0, sizeof(region));
+   region.imageSubresource.aspectMask = aspect;
+   region.imageSubresource.layerCount = 1;
+   region.imageExtent.width = img->width; region.imageExtent.height = img->height; region.imageExtent.depth = 1;
+   vkCmdCopyImageToBuffer(up_cmd, b.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, up_rb, 1, &region);
+   b.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT; b.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+   b.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; b.newLayout = (VkImageLayout)img->state;
+   vkCmdPipelineBarrier(up_cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1, &b);
+   vkEndCommandBuffer(up_cmd);
+   si.commandBufferCount = 1; si.pCommandBuffers = &up_cmd;
+
+   /* the host's own submit, under the frontend's lock as dump_frame's is */
+   host_lock_queue();
+   vkResetFences(vkctx.device, 1, &up_fence);
+   vkQueueSubmit(vkctx.queue, 1, &si, up_fence);
+   host_unlock_queue();
+   vkWaitForFences(vkctx.device, 1, &up_fence, VK_TRUE, UINT64_MAX);
+
+   out = malloc(*size);
+   if (out) memcpy(out, up_rb_map, *size);
+   return out;
+}
+
+/* One line per presented frame to VKHOST_UPSCALER_LOG: n is the 1-based
+ * presented frame number, the colour dump's frame_NNNN. */
+static void up_log_frame(unsigned long n, unsigned w, unsigned h)
+{
+   if (!up_log && getenv("VKHOST_UPSCALER_LOG"))
+      up_log = fopen(getenv("VKHOST_UPSCALER_LOG"), "w");
+   if (up_log)
+   {
+      if (up_have_inputs)
+      {
+         fprintf(up_log, "%lu %ux%u jitter %.6f %.6f flags %u mv %ux%u fmt %u depth %ux%u fmt %u mask %ux%u fmt %u", n, w, h,
+                 up_inputs.jitter_x, up_inputs.jitter_y, up_inputs.flags,
+                 up_inputs.motion_vectors.width, up_inputs.motion_vectors.height, up_inputs.motion_vectors.format,
+                 up_inputs.depth.width, up_inputs.depth.height, up_inputs.depth.format,
+                 up_inputs.transparency_mask.width, up_inputs.transparency_mask.height,
+                 up_inputs.transparency_mask.format);
+         /* the colour image's format, for reading its dump */
+         if (last_image)
+            fprintf(up_log, " color fmt %u", (unsigned)last_image->create_info.format);
+         /* VKHOST_UPSCALER_STATS: the mask read back, how much of the
+          * frame it covers, in thousandths */
+         if (getenv("VKHOST_UPSCALER_STATS"))
+         {
+            size_t sz, i, set = 0;
+            unsigned char *px = (unsigned char *)up_read_image(&up_inputs.transparency_mask, &sz);
+            if (px)
+            {
+               for (i = 0; i < sz; i++)
+                  set += px[i] != 0;
+               fprintf(up_log, " masked %lu", (unsigned long)(sz ? set * 1000 / sz : 0));
+            }
+            free(px);
+         }
+         fputc('\n', up_log);
+      }
+      else
+         fprintf(up_log, "%lu %ux%u none\n", n, w, h);
+      fflush(up_log);
+   }
+   if (up_have_inputs)
+      up_frames++;
+   /* the inputs stay valid as long as the colour image: dump_frame's
+    * caller reads them beside it */
+   up_dumpable    = up_have_inputs;
+   up_have_inputs = 0;
+}
+
+/* Beside a dumped frame_NNNN.ppm: frame_NNNN.mv.raw, .depth.raw, .mask.raw */
+static void up_dump_images(const char *outdir, int n)
+{
+   const struct retro_hw_upscaler_image *imgs[3];
+   const char *names[3] = { "mv", "depth", "mask" };
+   unsigned k;
+   if (!up_dumpable)
+      return;
+   imgs[0] = &up_inputs.motion_vectors; imgs[1] = &up_inputs.depth;
+   imgs[2] = &up_inputs.transparency_mask;
+   for (k = 0; k < 3; k++)
+   {
+      char fn[640]; size_t sz; FILE *df;
+      void *px = up_read_image(imgs[k], &sz);
+      snprintf(fn, sizeof(fn), "%s/frame_%04d.%s.raw", outdir, n, names[k]);
+      if (px && (df = fopen(fn, "wb")) != NULL) { fwrite(px, 1, sz, df); fclose(df); }
+      free(px);
+   }
+}
+
 /* ---- environment ---- */
 static bool env_cb(unsigned cmd, void *data)
 {
@@ -464,6 +736,25 @@ static bool env_cb(unsigned cmd, void *data)
          return true;
       }
       case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:
+      {
+         /* As RetroArch: when the maximum size changes the video driver
+          * is reinitialised at once, the core's context destroyed and
+          * reset, with nothing in flight; otherwise only the geometry
+          * is taken */
+         struct retro_system_av_info *info = (struct retro_system_av_info *)data;
+         bool reinit = info->geometry.max_width != av_max_width
+               || info->geometry.max_height != av_max_height;
+         av_max_width  = info->geometry.max_width;
+         av_max_height = info->geometry.max_height;
+         if (reinit && context_live && hw_render.context_destroy && hw_render.context_reset && vkctx.device)
+         {
+            fprintf(stderr, "[vkhost] av_info %ux%u (max %ux%u): context reset\n",
+                  info->geometry.base_width, info->geometry.base_height,
+                  info->geometry.max_width, info->geometry.max_height);
+            host_reinit_context();
+         }
+         return true;
+      }
       case RETRO_ENVIRONMENT_SET_GEOMETRY:
          return true;
       case RETRO_ENVIRONMENT_GET_VARIABLE:
@@ -506,16 +797,96 @@ static bool env_cb(unsigned cmd, void *data)
       case RETRO_ENVIRONMENT_GET_HDR_METADATA:
       case RETRO_ENVIRONMENT_GET_DISPLAY_METADATA:
          return host_hdr_metadata(cmd, data);
+      case RETRO_ENVIRONMENT_GET_HW_RENDER_UPSCALER_INTERFACE:
+         if (!up_on) return false;
+         /* in retro_load_game, before the context: counted, no interface */
+         if (!up_ready) { up_announced++; return false; }
+         *(const struct retro_hw_render_upscaler_interface **)data = &up_iface;
+         return true;
       default:
          return false;
    }
+}
+
+/* The core's device through its negotiation interface, as RetroArch
+ * makes it at load and again at each video reinit, and the render
+ * interface over it */
+static int host_create_device(void)
+{
+   memset(&vkctx, 0, sizeof(vkctx));
+   if (negotiation_offer >= 2)
+   {
+      /* RetroArch: create_device2 when the core has it */
+      if (!negotiation || negotiation->interface_version < 2 || !negotiation->create_device2)
+      { fprintf(stderr, "[vkhost] the core did not offer create_device2\n"); return 0; }
+      wrapper_calls = 0;
+      if (!negotiation->create_device2(&vkctx, instance, gpu, VK_NULL_HANDLE,
+               core_gipa, create_device_wrapper, NULL))
+      { fprintf(stderr, "[vkhost] core create_device2 failed\n"); return 0; }
+      if (wrapper_calls != 1 || wrapper_gpu != gpu || vkctx.gpu != gpu)
+      { fprintf(stderr, "[vkhost] the core did not create its device through the frontend (%u)\n", wrapper_calls); return 0; }
+   }
+   else if (negotiation && negotiation->create_device)
+   {
+      static const VkPhysicalDeviceFeatures no_features; /* zeroed, as RetroArch passes */
+      if (!negotiation->create_device(&vkctx, instance, gpu, VK_NULL_HANDLE,
+               core_gipa, NULL, 0, NULL, 0, &no_features))
+      { fprintf(stderr, "[vkhost] core create_device failed\n"); return 0; }
+   }
+   else { fprintf(stderr, "[vkhost] no negotiation interface\n"); return 0; }
+
+   iface.interface_type = RETRO_HW_RENDER_INTERFACE_VULKAN;
+   iface.interface_version = RETRO_HW_RENDER_INTERFACE_VULKAN_VERSION;
+   iface.handle = NULL;
+   iface.instance = instance;
+   iface.gpu = vkctx.gpu;
+   iface.device = vkctx.device;
+   iface.get_device_proc_addr = (PFN_vkGetDeviceProcAddr)core_gipa(instance, "vkGetDeviceProcAddr");
+   iface.get_instance_proc_addr = core_gipa;
+   iface.queue = vkctx.queue;
+   iface.queue_index = vkctx.queue_family_index;
+   iface.set_image = vk_set_image;
+   iface.get_sync_index = vk_get_sync_index;
+   iface.get_sync_index_mask = vk_get_sync_index_mask;
+   iface.wait_sync_index = vk_wait_sync_index;
+   iface.set_command_buffers = vk_set_command_buffers;
+   iface.lock_queue = vk_lock_queue;
+   iface.unlock_queue = vk_unlock_queue;
+   iface.set_signal_semaphore = vk_set_signal_semaphore;
+   return 1;
+}
+
+/* RetroArch on SET_SYSTEM_AV_INFO: the video driver is reinitialised at
+ * once, with nothing in flight: the core's context destroyed, its device
+ * destroyed and made again through the negotiation interface, the
+ * context reset. The image presented last is gone with the device. */
+static void host_reinit_context(void)
+{
+   host_lock_queue();
+   vkDeviceWaitIdle(vkctx.device);
+   host_unlock_queue();
+   context_live = 0;
+   up_readback_free();
+   hw_render.context_destroy();
+   if (negotiation && negotiation->destroy_device)
+      negotiation->destroy_device();
+   vkDestroyDevice(vkctx.device, NULL);
+   last_image = NULL;
+   if (!host_create_device())
+   {
+      fprintf(stderr, "[vkhost] device recreation failed\n");
+      exit(3);
+   }
+   hw_render.context_reset();
+   context_live = 1;
 }
 
 static void video_cb(const void *data, unsigned width, unsigned height, size_t pitch)
 { (void)pitch; if (data == RETRO_HW_FRAME_BUFFER_VALID) { frame_valid++;
    if (last_w != width || last_h != height)
       fprintf(stderr, "[vkhost] geometry %ux%u\n", width, height);
-   last_w = width; last_h = height; } }
+   last_w = width; last_h = height;
+   if (up_on) up_log_frame(frame_valid, width, height); } }
 static void input_poll_cb(void) {}
 static int cur_frame;
 /* VKHOST_INPUT: comma list of first-last:joypad_id held ranges, e.g.
@@ -828,6 +1199,8 @@ int main(int argc, char **argv)
       }
    }
 
+   up_init();
+
    core = dlopen(core_path, RTLD_NOW | RTLD_LOCAL);
    if (!core) { fprintf(stderr, "dlopen: %s\n", dlerror()); return 2; }
 
@@ -857,7 +1230,11 @@ session:
       void (*retro_get_system_av_info_fn)(struct retro_system_av_info *) =
          dlsym(core, "retro_get_system_av_info");
       if (retro_get_system_av_info_fn)
+      {
          retro_get_system_av_info_fn(&av);
+         av_max_width  = av.geometry.max_width;
+         av_max_height = av.geometry.max_height;
+      }
    }
 
    if (!negotiation && !hw_render.context_reset)
@@ -868,46 +1245,8 @@ session:
    if (!create_instance()) { fprintf(stderr, "[vkhost] instance failed\n"); return 3; }
    gipa = vkGetInstanceProcAddr;
 
-   memset(&vkctx, 0, sizeof(vkctx));
-   if (negotiation_offer >= 2)
-   {
-      /* RetroArch: create_device2 when the core has it */
-      if (!negotiation || negotiation->interface_version < 2 || !negotiation->create_device2)
-      { fprintf(stderr, "[vkhost] the core did not offer create_device2\n"); return 3; }
-      wrapper_calls = 0;
-      if (!negotiation->create_device2(&vkctx, instance, gpu, VK_NULL_HANDLE,
-               core_gipa, create_device_wrapper, NULL))
-      { fprintf(stderr, "[vkhost] core create_device2 failed\n"); return 3; }
-      if (wrapper_calls != 1 || wrapper_gpu != gpu || vkctx.gpu != gpu)
-      { fprintf(stderr, "[vkhost] the core did not create its device through the frontend (%u)\n", wrapper_calls); return 3; }
-   }
-   else if (negotiation && negotiation->create_device)
-   {
-      static const VkPhysicalDeviceFeatures no_features; /* zeroed, as RetroArch passes */
-      if (!negotiation->create_device(&vkctx, instance, gpu, VK_NULL_HANDLE,
-               core_gipa, NULL, 0, NULL, 0, &no_features))
-      { fprintf(stderr, "[vkhost] core create_device failed\n"); return 3; }
-   }
-   else { fprintf(stderr, "[vkhost] no negotiation interface\n"); return 3; }
-
-   iface.interface_type = RETRO_HW_RENDER_INTERFACE_VULKAN;
-   iface.interface_version = RETRO_HW_RENDER_INTERFACE_VULKAN_VERSION;
-   iface.handle = NULL;
-   iface.instance = instance;
-   iface.gpu = vkctx.gpu;
-   iface.device = vkctx.device;
-   iface.get_device_proc_addr = (PFN_vkGetDeviceProcAddr)core_gipa(instance, "vkGetDeviceProcAddr");
-   iface.get_instance_proc_addr = core_gipa;
-   iface.queue = vkctx.queue;
-   iface.queue_index = vkctx.queue_family_index;
-   iface.set_image = vk_set_image;
-   iface.get_sync_index = vk_get_sync_index;
-   iface.get_sync_index_mask = vk_get_sync_index_mask;
-   iface.wait_sync_index = vk_wait_sync_index;
-   iface.set_command_buffers = vk_set_command_buffers;
-   iface.lock_queue = vk_lock_queue;
-   iface.unlock_queue = vk_unlock_queue;
-   iface.set_signal_semaphore = vk_set_signal_semaphore;
+   if (!host_create_device())
+      return 3;
 
    if (getenv("VKHOST_QUEUE_THREAD") && vkctx.queue)
    {
@@ -915,7 +1254,11 @@ session:
       pthread_create(&queue_thread, NULL, queue_thread_main, NULL);
    }
 
+   /* from here the upscaler interface is handed out (a core asks for it
+    * in context_reset), until context_destroy */
+   up_ready = 1;
    if (hw_render.context_reset) hw_render.context_reset();
+   context_live = hw_render.context_reset != NULL;
 
 run_frames_sw:
 
@@ -1105,6 +1448,8 @@ run_frames_sw:
             char path[600];
             snprintf(path, sizeof(path), "%s/frame_%04d.ppm", outdir, i + 1);
             dump_frame(path);
+            if (up_on)
+               up_dump_images(outdir, i + 1);
          } }
       }
 
@@ -1131,6 +1476,9 @@ run_frames_sw:
 
    /* The core's teardown uses the queue as well, so it is counted before
     * the verdict; the queue thread runs until then. */
+   up_ready = 0;
+   up_readback_free();
+   context_live = 0;
    if (hw_render.context_destroy && vkctx.device) hw_render.context_destroy();
    if (queue_thread_run)
    {
@@ -1149,6 +1497,9 @@ run_frames_sw:
          __atomic_load_n(&pipelines_other, __ATOMIC_SEQ_CST));
    fprintf(stderr, "[vkhost] longest frame after the first: %.2f ms (frame %d)\n",
          longest_frame_ms, longest_frame);
+   if (up_on)
+      fprintf(stderr, "[vkhost] upscaler: asked for in retro_load_game %d, frames with inputs %ld\n",
+            up_announced, up_frames);
    fprintf(stderr, "[vkhost] done: %d frames run, %u valid, %d validation errors, %d warnings,"
            " %d unlocked uses of the frontend's queue, %d waits with its lock held\n",
            frames, frame_valid, validation_errors, validation_warnings,

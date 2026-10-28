@@ -51,6 +51,7 @@ mkdir -p prebuilt
 
 # Quads
 "$GLSLC" -o prebuilt/quad.vert.inc -mfmt=c quad.vert
+
 "$GLSLC" -o prebuilt/unscaled.quad.frag.inc -mfmt=c -DUNSCALED quad.frag
 "$GLSLC" -o prebuilt/scaled.quad.frag.inc -mfmt=c -DSCALED quad.frag
 "$GLSLC" -o prebuilt/bpp24.quad.frag.inc -mfmt=c -DUNSCALED -DBPP24 quad.frag
@@ -63,6 +64,10 @@ mkdir -p prebuilt
 "$GLSLC" -o prebuilt/hdr.unscaled.quad.frag.inc -mfmt=c -DHDR -DUNSCALED quad.frag
 "$GLSLC" -o prebuilt/hdr.bpp24.quad.frag.inc -mfmt=c -DHDR -DUNSCALED -DBPP24 quad.frag
 "$GLSLC" -o prebuilt/hdr.bpp24.yuv.quad.frag.inc -mfmt=c -DHDR -DUNSCALED -DBPP24 -DBPP24_YUV quad.frag
+
+# Temporal upscaler motion vector pass
+"$GLSLC" -o prebuilt/upscaler_motion.vert.inc -mfmt=c upscaler_motion.vert
+"$GLSLC" -o prebuilt/upscaler_motion.frag.inc -mfmt=c upscaler_motion.frag
 
 # Copy VRAM shaders
 "$GLSLC" -o prebuilt/copy_vram.comp.inc -mfmt=c copy_vram.comp
