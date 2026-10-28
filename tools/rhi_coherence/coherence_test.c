@@ -7,7 +7,9 @@
  * VRAM wrap), and readbacks of random rects, whole-VRAM savestate reads
  * included. A readback transfers only the rects tt_coh_read_rects returns.
  * After every readback the CPU copy must equal the GPU over the requested
- * rect - what an always-read-everything baseline guarantees.
+ * rect - what an always-read-everything baseline guarantees. State loads
+ * upload what they change and the dirty blocks, and must leave the GPU
+ * equal to the CPU copy everywhere - what a whole-VRAM upload guarantees.
  *
  * Also reports how many pixels the bounded reads moved against reading
  * each requested rect whole.
@@ -157,6 +159,52 @@ static void op_read(unsigned x, unsigned y, unsigned w, unsigned h)
          }
 }
 
+/* A state load: the CPU copy takes the state's pixels, and the GPU gets
+ * every 32-pixel group of an 8-row block row the load changed or
+ * tt_coh_dirty_groups names - less than gpu.c hands it, which rounds to
+ * 64-byte spans and 16-row bands. Afterwards the GPU must equal the CPU
+ * copy everywhere, as after uploading all of VRAM. */
+static uint16_t state[W * H];
+
+static void op_load(void)
+{
+   unsigned k, n = rnd(4), br, g, y, i;
+   memcpy(state, cpu, sizeof(state));
+   for (k = 0; k < n; k++)
+   {
+      unsigned x = rnd(W), yy = rnd(H), w = 1 + rnd(200), h = 1 + rnd(100), j;
+      for (j = 0; j < h; j++)
+         for (i = 0; i < w; i++)
+            *px(state, x + i, yy + j) = (uint16_t)rnd(65536);
+   }
+   for (br = 0; br < H / 8; br++)
+   {
+      uint32_t groups = tt_coh_dirty_groups(br);
+      for (y = br * 8; y < br * 8 + 8; y++)
+         for (g = 0; g < 32; g++)
+            if (memcmp(&state[y * W + g * 32], &cpu[y * W + g * 32], 64))
+               groups |= 1u << g;
+      for (g = 0; g < 32; g++)
+         if (groups & (1u << g))
+         {
+            for (y = br * 8; y < br * 8 + 8; y++)
+               memcpy(&gpu[y * W + g * 32], &state[y * W + g * 32], 64);
+            tt_coh_clean_rect(g * 32, br * 8, 32, 8);
+            tt_coh_da_pending = true;
+         }
+   }
+   memcpy(cpu, state, sizeof(cpu));
+   for (i = 0; i < W * H; i++)
+      if (gpu[i] != cpu[i])
+      {
+         if (failures < 8)
+            fprintf(stderr, "FAIL load: pixel (%u,%u) not uploaded\n",
+                  i % W, i / W);
+         failures++;
+         return;
+      }
+}
+
 static void run_stream(unsigned seed, unsigned ops)
 {
    unsigned n;
@@ -178,8 +226,10 @@ static void run_stream(unsigned seed, unsigned ops)
          op_upload(false);
       else if (k < 81)
          op_upload(true);
-      else if (k < 97)
+      else if (k < 96)
          op_read(rnd(W), rnd(H), 1 + rnd(256), 1 + rnd(256));
+      else if (k < 98)
+         op_load();
       else
          op_read(0, 0, W, H);   /* savestate */
    }

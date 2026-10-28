@@ -1153,6 +1153,13 @@ bool rhi_intf_context_ready(void)
    return false;
 }
 
+/* The 32-pixel column groups of the 8-row block row `br` where the GPU's
+ * VRAM may differ from GPU.vram, bit n for pixels [32n, 32n + 32). */
+uint32_t rhi_intf_vram_dirty_groups(unsigned br)
+{
+   return tt_coh_dirty_groups(br);
+}
+
 void rhi_intf_toggle_display(bool status)
 {
 #ifdef RHI_DUMP

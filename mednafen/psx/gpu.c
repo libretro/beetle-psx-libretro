@@ -3116,44 +3116,108 @@ void GPU_RestoreStateP2(bool load)
 
 static void gpu_restore_state_p3(bool upload_all);
 
+static int gpu_full_upload = -1;
+
+static bool gpu_full_vram_upload(void)
+{
+   if (gpu_full_upload < 0)
+   {
+      const char *e   = getenv("BEETLE_FULL_VRAM_UPLOAD");
+      gpu_full_upload = (e && *e && *e != '0') ? 1 : 0;
+   }
+   return gpu_full_upload != 0;
+}
+
 void GPU_RestoreStateP3(void)
 {
    gpu_restore_state_p3(true);
 }
 
-/* Hand the hardware renderer the VRAM rows a diff load changed, in bands
- * of 16 rows cut to the changed columns. Rows the load left alone already
- * hold the same pixels on the GPU - at its internal resolution, which a
- * re-upload of the 1x copy would throw away. */
-static void gpu_upload_changed_rows(void)
+/* Upload rows [y0, y1) of each run of set 32-pixel column groups. */
+static void gpu_upload_cols(uint32_t cols, unsigned y0, unsigned y1)
 {
-   unsigned band;
+   unsigned g = 0;
+   while (cols)
+   {
+      unsigned n = 0;
+      while (!(cols & 1u))
+      {
+         cols >>= 1;
+         g++;
+      }
+      while (cols & 1u)
+      {
+         cols >>= 1;
+         n++;
+      }
+      rhi_intf_load_image(g * 32, y0, n * 32, y1 - y0, GPU.vram,
+            false, false);
+      g += n;
+   }
+}
+
+/* Hand the hardware renderer the VRAM rows a diff load changed, in bands
+ * of 16 rows cut to runs of changed 32-pixel column groups, a band joining
+ * the one above when it continues it over the same columns. Rows the load
+ * left alone already hold the same pixels on the GPU - at its internal
+ * resolution, which a re-upload of the 1x copy would throw away. With
+ * `dirty` the GPU matches GPU.vram only where the coherence map says so,
+ * and its dirty blocks go up as well. */
+static void gpu_upload_changed_rows(bool dirty)
+{
+   unsigned band, py0 = 0, py1 = 0;
+   uint32_t pcols = 0;
 
    for (band = 0; band < 512; band += 16)
    {
-      unsigned y, y0 = 512, y1 = 0, x0 = 1024, x1 = 0;
+      unsigned y, y0 = 512, y1 = 0;
+      uint32_t cols = 0;
+
+      if (dirty)
+      {
+         uint32_t d0 = rhi_intf_vram_dirty_groups(band >> 3);
+         uint32_t d1 = rhi_intf_vram_dirty_groups((band >> 3) + 1);
+         if (d0)
+         {
+            y0 = band;
+            y1 = band + 8;
+         }
+         if (d1)
+         {
+            if (!d0)
+               y0 = band + 8;
+            y1 = band + 16;
+         }
+         cols = d0 | d1;
+      }
 
       for (y = band; y < band + 16; y++)
       {
          uint16_t e = state_vram_rows[y];
-         unsigned a, b;
          if (!(e & MDFNSS_DIFF_CHANGED))
             continue;
-         /* 64-byte blocks are 32 pixels. */
-         a = MDFNSS_DIFF_FIRST(e) * 32;
-         b = (MDFNSS_DIFF_LAST(e) + 1) * 32;
+         /* 64-byte blocks are the 32-pixel groups. */
+         cols |= (uint32_t)(2u << MDFNSS_DIFF_LAST(e))
+               - (1u << MDFNSS_DIFF_FIRST(e));
          if (y < y0)
             y0 = y;
-         y1 = y + 1;
-         if (a < x0)
-            x0 = a;
-         if (b > x1)
-            x1 = b;
+         if (y1 < y + 1)
+            y1 = y + 1;
       }
-      if (y0 < y1)
-         rhi_intf_load_image(x0, y0, x1 - x0, y1 - y0, GPU.vram,
-               false, false);
+
+      if (!cols)
+         continue;
+      if (cols == pcols && y0 == py1)
+      {
+         py1 = y1;
+         continue;
+      }
+      gpu_upload_cols(pcols, py0, py1);
+      pcols = cols;
+      py0   = y0;
+      py1   = y1;
    }
+   gpu_upload_cols(pcols, py0, py1);
 }
 
 static void gpu_restore_state_p3(bool upload_all)
@@ -3207,7 +3271,7 @@ static void gpu_restore_state_p3(bool upload_all)
                            1024, 512,
                            GPU.vram, false, false);
    else
-      gpu_upload_changed_rows();
+      gpu_upload_changed_rows(!rhi_intf_has_software_renderer());
 
    rhi_intf_set_vram_framebuffer_coords(GPU.DisplayFB_XStart, GPU.DisplayFB_YStart);
    rhi_intf_set_horizontal_display_range(GPU.HorizStart, GPU.HorizEnd);
@@ -3223,14 +3287,14 @@ int GPU_StateAction(StateMem *sm, int load, int data_only)
    uint16_t off_u = !load && GPU.InCmd == INCMD_QUAD ? GPU.off_u : 0;
    uint16_t off_v = !load && GPU.InCmd == INCMD_QUAD ? GPU.off_v : 0;
    bool may_be_2d = !load && GPU.InCmd == INCMD_QUAD && GPU.may_be_2d;
-   /* A load only has to hand the hardware renderer the VRAM it changed
-    * when the GPU's copy is known to match GPU.vram: the software
-    * framebuffer keeps the two in step and the context is up. Everything
-    * else uploads all of VRAM. */
+   /* A load only has to hand the hardware renderer the VRAM it changed,
+    * plus, without the software framebuffer, the blocks the coherence map
+    * does not know to match GPU.vram. The context must be up. With
+    * BEETLE_FULL_VRAM_UPLOAD=1 every load uploads all of VRAM. */
    bool diff_load = load && GPU.upscale_shift == 0
          && rhi_intf_is_type() != RHI_SOFTWARE
-         && rhi_intf_has_software_renderer()
-         && rhi_intf_context_ready();
+         && rhi_intf_context_ready()
+         && !gpu_full_vram_upload();
    /* The one exception: a CPU->VRAM transfer half way through has put its
     * pixels in GPU.vram but not yet on the GPU, so what it has written
     * goes up too, whether the load changes it or not. */

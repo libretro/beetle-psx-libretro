@@ -272,6 +272,25 @@ static void tt_coh_mark_draw_area(void)
    }
 }
 
+/* Block row `br`'s dirty blocks as a mask of 32-pixel column groups, bit
+ * n for pixels [32n, 32n + 32). A state load hands the GPU these besides
+ * what it changed in the CPU copy. */
+static uint32_t tt_coh_dirty_groups(uint32_t br)
+{
+   const uint8_t *row  = tt_coh_clean + (br & (TT_COH_BH - 1)) * TT_COH_BW;
+   uint32_t       mask = 0, g, q;
+   if (!tt_coh_skip_enabled)
+      return 0xffffffffu;
+   /* Four blocks a group, one byte each, 1 when clean. */
+   for (g = 0; g < TT_COH_BW / 4; g++)
+   {
+      memcpy(&q, row + g * 4, sizeof(q));
+      if (q != 0x01010101u)
+         mask |= 1u << g;
+   }
+   return mask;
+}
+
 /* The rects a readback of (x,y,w,h) actually has to fetch; 0 when the
  * whole rect is already coherent. Wrapping rects are fetched whole. */
 static unsigned tt_coh_read_rects(uint32_t x, uint32_t y, uint32_t w, uint32_t h,

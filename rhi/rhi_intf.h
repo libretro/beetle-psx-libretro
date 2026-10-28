@@ -179,6 +179,7 @@ void rhi_intf_toggle_display(bool status);
 
 bool rhi_intf_has_software_renderer(void);
 bool rhi_intf_context_ready(void);
+uint32_t rhi_intf_vram_dirty_groups(unsigned br);
 
 double rhi_common_get_timing_fps(void);
 
