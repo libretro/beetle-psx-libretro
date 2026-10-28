@@ -3065,8 +3065,8 @@ static char retro_slash = '/';
 #include <sys/stat.h>
 #endif
 
-   /* HD Texture Folder mode: 0 = content dir (default), 1 = system, 2 = save. */
-   static int texture_dir_mode = 0;
+   /* HD Texture Folder mode: see struct tt_dir_mode. */
+   static struct tt_dir_mode texture_dir_mode = { RETRO_ATOMIC_INT_INITIALIZER(0) };
 
    /* Replace Textures on/off for this game session, kept across renderer
     * rebuilds; reset when the game is unloaded. */
@@ -3078,10 +3078,11 @@ static char retro_slash = '/';
     * below append retro_slash uniformly. */
    static char *texture_root(char *out, size_t cap) {
       const char *dir = retro_cd_base_directory;       /* 0 = content (default) */
+      const int   mode = tt_dir_mode_get(&texture_dir_mode);
       size_t len;
-      if (texture_dir_mode == 1 && retro_base_directory[0] != '\0')
+      if (mode == 1 && retro_base_directory[0] != '\0')
          dir = retro_base_directory;                    /* 1 = system */
-      else if (texture_dir_mode == 2 && retro_save_directory[0] != '\0')
+      else if (mode == 2 && retro_save_directory[0] != '\0')
          dir = retro_save_directory;                    /* 2 = save */
       strncpy(out, dir, cap - 1);
       out[cap - 1] = '\0';
@@ -7603,7 +7604,7 @@ void texture_tracker_session_reset(void)
 
 void texture_tracker_set_texture_dir_mode(int mode)
 {
-   texture_dir_mode = mode;
+   tt_dir_mode_set(&texture_dir_mode, mode);
 }
 
 TextureTrackerSaveState *tts_new(void)

@@ -47,3 +47,9 @@ tools/crop_window/crop_window_test.exe
 # Python bytecode from the VCD authoring script (tools/vcd)
 __pycache__/
 *.pyc
+tools/tt_replace/tt_dir_mode_test
+tools/tt_replace/tt_dir_mode_test.exe
+tools/tt_replace/tt_dir_mode_test_asan
+tools/tt_replace/tt_dir_mode_test_asan.exe
+tools/tt_replace/tt_dir_mode_test_tsan
+tools/tt_replace/tt_dir_mode_test_tsan.exe

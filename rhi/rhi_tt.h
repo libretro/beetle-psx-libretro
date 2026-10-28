@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <boolean.h>
 #include <retro_inline.h>
+#include <retro_atomic.h>
 #include "libretro.h"
 
 #ifdef __cplusplus
@@ -540,6 +541,28 @@ void texture_tracker_set_texture_dir_mode(int mode);
  * toggle), so the next game starts from the menu value. The state outlives
  * renderer rebuilds on purpose; call this when the game is unloaded. */
 void texture_tracker_session_reset(void);
+
+/* HD Texture Folder mode (0 = content, 1 = system, 2 = save). The render
+ * thread sets it every frame from the option; the I/O workers read it to
+ * build replacement paths. A worker reads it once per path, and a change
+ * re-scans the replacements anyway, so one atomic int is all it needs. */
+struct tt_dir_mode
+{
+   retro_atomic_int_t mode;
+};
+
+/* Render thread: stored only when it changes. */
+static INLINE void tt_dir_mode_set(struct tt_dir_mode *d, int mode)
+{
+   if (retro_atomic_load_relaxed_int(&d->mode) != mode)
+      retro_atomic_store_release_int(&d->mode, mode);
+}
+
+/* Any thread. */
+static INLINE int tt_dir_mode_get(struct tt_dir_mode *d)
+{
+   return retro_atomic_load_acquire_int(&d->mode);
+}
 
 /* Replace Textures on/off for one game session. A changed menu value and
  * the in-game toggle both set it; every tracker, a rebuilt one included,
