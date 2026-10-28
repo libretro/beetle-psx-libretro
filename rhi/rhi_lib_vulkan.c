@@ -4735,6 +4735,11 @@ static void cbh_move(struct CommandBufferHandle *dst,
    {
       SemaphoreHandleVec wait_semaphores;
       VkPipelineStageVec wait_stages;
+      /* The fence of the latest submit on the queue, when that submit was
+       * not asked for one: it signals once everything submitted to the
+       * queue so far has completed, so it can serve as the frame's fence
+       * without a submit of its own. */
+      VkFence tail_fence;
       bool need_fence;
    };
    typedef struct QueueData QueueData;
@@ -19219,6 +19224,18 @@ fail_jobs:
    }
 
    POD_VEC_DECLARE(VkFlagsVec, VkFlags);
+   /* The queue's tail fence, once a later submit follows it: waited and
+    * recycled with the frame, as any fence of the frame. */
+   static void device_retire_tail_fence(Device *self, QueueData *data)
+   {
+      if (data->tail_fence != VK_NULL_HANDLE)
+      {
+         FenceVec_push(&device_frame(self)->wait_fences, &data->tail_fence);
+         FenceVec_push(&device_frame(self)->recycle_fences, &data->tail_fence);
+         data->tail_fence = VK_NULL_HANDLE;
+      }
+   }
+
    static void device_submit_empty_inner(Device *self, CommandBufferType type, VkFence *fence,
          unsigned semaphore_count, Semaphore *semaphores){
             VkResult result;
@@ -19286,6 +19303,7 @@ fail_jobs:
       { bool queue_locked = device_queue_lock(self, queue);
       result = vkQueueSubmit(queue, 1, &submit, cleared_fence);
       device_queue_unlock(self, queue_locked); }
+      device_retire_tail_fence(self, data);
 
       if (result != VK_SUCCESS)
          LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
@@ -19519,7 +19537,9 @@ fail_jobs:
          }
       }
 
-      cleared_fence = fence ? fencemanager_request_cleared_fence(&self->managers.fence) : VK_NULL_HANDLE;
+      /* Asked for or not, the submit carries a fence: unasked, it becomes
+       * the queue's tail fence. */
+      cleared_fence = fencemanager_request_cleared_fence(&self->managers.fence);
 
       { unsigned i; for (i = 0; i < semaphore_count; i++) {
          VkSemaphore cleared_semaphore = semaphoremanager_request_cleared_semaphore(&self->managers.semaphore);
@@ -19565,6 +19585,7 @@ fail_jobs:
       device_queue_unlock(self, queue_locked); }
       if (result != VK_SUCCESS)
          LOGE("vkQueueSubmit failed (code: %d).\n", (int)(result));
+      device_retire_tail_fence(self, data);
       cbhvec_clear(submissions);
 
       CommandBufferVec_free_storage(&cmds);
@@ -19594,7 +19615,14 @@ fail_jobs:
          data->need_fence = false;
       }
       else
+      {
+         /* A fence handed to a failed submit never signals: never a tail. */
+         if (result == VK_SUCCESS)
+            data->tail_fence = cleared_fence;
+         else if (cleared_fence != VK_NULL_HANDLE)
+            fencemanager_recycle_fence(&self->managers.fence, cleared_fence);
          data->need_fence = true;
+      }
       }
       }
    }
@@ -19640,36 +19668,36 @@ fail_jobs:
       device_submit_staging(self, &cmd, usage, false);
    }
 
-   static void device_end_frame_nolock(Device *self){
-      /* Make sure we have a fence which covers all submissions in the frame. */
+   /* The frame's fence for a queue: the tail fence when nothing was
+    * submitted or left waiting since, which covers the whole frame, else a
+    * submit of its own as ever. */
+   static void device_end_frame_queue(Device *self, CommandBufferType type)
+   {
+      QueueData *data = device_get_queue_data(self, type);
       VkFence fence;
 
-      if (self->transfer.need_fence || !cbhvec_empty(&device_frame(self)->transfer_submissions))
+      if (!data->need_fence && cbhvec_empty(device_get_queue_submissions(self, type)))
+         return;
+      if (data->tail_fence != VK_NULL_HANDLE
+            && cbhvec_empty(device_get_queue_submissions(self, type))
+            && sem_handle_vec_size(&data->wait_semaphores) == 0)
       {
-         fence = VK_NULL_HANDLE;
-         device_submit_queue(self, Type_AsyncTransfer, &fence, 0, NULL);
-         if (fence != VK_NULL_HANDLE)
-            FenceVec_push(&device_frame(self)->recycle_fences, &fence);
-         self->transfer.need_fence = false;
+         device_retire_tail_fence(self, data);
+         data->need_fence = false;
+         return;
       }
+      fence = VK_NULL_HANDLE;
+      device_submit_queue(self, type, &fence, 0, NULL);
+      if (fence != VK_NULL_HANDLE)
+         FenceVec_push(&device_frame(self)->recycle_fences, &fence);
+      data->need_fence = false;
+   }
 
-      if (self->graphics.need_fence || !cbhvec_empty(&device_frame(self)->graphics_submissions))
-      {
-         fence = VK_NULL_HANDLE;
-         device_submit_queue(self, Type_Generic, &fence, 0, NULL);
-         if (fence != VK_NULL_HANDLE)
-            FenceVec_push(&device_frame(self)->recycle_fences, &fence);
-         self->graphics.need_fence = false;
-      }
-
-      if (self->compute.need_fence || !cbhvec_empty(&device_frame(self)->compute_submissions))
-      {
-         fence = VK_NULL_HANDLE;
-         device_submit_queue(self, Type_AsyncCompute, &fence, 0, NULL);
-         if (fence != VK_NULL_HANDLE)
-            FenceVec_push(&device_frame(self)->recycle_fences, &fence);
-         self->compute.need_fence = false;
-      }
+   static void device_end_frame_nolock(Device *self){
+      /* Make sure we have a fence which covers all submissions in the frame. */
+      device_end_frame_queue(self, Type_AsyncTransfer);
+      device_end_frame_queue(self, Type_Generic);
+      device_end_frame_queue(self, Type_AsyncCompute);
    }
 
    static void device_flush_frame_nolock(Device *self){

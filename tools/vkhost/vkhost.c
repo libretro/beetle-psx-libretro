@@ -182,6 +182,9 @@ static int queue_waits_locked;
 static PFN_vkWaitForFences real_wait_for_fences;
 static PFN_vkGetDeviceProcAddr real_gdpa;
 static PFN_vkQueueSubmit real_queue_submit;
+/* vkQueueSubmit calls the core makes (each one a lock_queue/unlock_queue
+ * pair when the queue is the frontend's) */
+static unsigned long queue_submits, queue_submits_half;
 static PFN_vkQueueWaitIdle real_queue_wait_idle;
 static PFN_vkDeviceWaitIdle real_device_wait_idle;
 
@@ -226,6 +229,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL core_vkQueueSubmit(VkQueue queue,
       uint32_t count, const VkSubmitInfo *submits, VkFence fence)
 {
    core_uses_queue("vkQueueSubmit", queue);
+   __atomic_add_fetch(&queue_submits, 1, __ATOMIC_SEQ_CST);
    return real_queue_submit(queue, count, submits, fence);
 }
 static VKAPI_ATTR VkResult VKAPI_CALL core_vkQueueWaitIdle(VkQueue queue)
@@ -1047,6 +1051,7 @@ run_frames_sw:
          {
             object_creates_half  = object_creates;
             dispatch_groups_half = dispatch_groups;
+            queue_submits_half   = __atomic_load_n(&queue_submits, __ATOMIC_SEQ_CST);
          }
          {
             struct timespec f0, f1;
@@ -1136,6 +1141,8 @@ run_frames_sw:
          object_creates - object_creates_half);
    fprintf(stderr, "[vkhost] steady state: %llu compute workgroups dispatched in the second half of the run\n",
          dispatch_groups - dispatch_groups_half);
+   fprintf(stderr, "[vkhost] steady state: %lu queue submits in the second half of the run (%d frames, with teardown)\n",
+         __atomic_load_n(&queue_submits, __ATOMIC_SEQ_CST) - queue_submits_half, frames - frames / 2);
    fprintf(stderr, "[vkhost] pipelines: %lu built on the frame's thread (%lu of them during play), %lu on the core's own threads\n",
          __atomic_load_n(&pipelines_host, __ATOMIC_SEQ_CST),
          __atomic_load_n(&pipelines_host_running, __ATOMIC_SEQ_CST),
