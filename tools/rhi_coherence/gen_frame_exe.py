@@ -19,7 +19,10 @@ Options (any order after the output path):
   feedback  copies part of the previous frame's buffer into the texture
             page the sprites sample, so each frame depends on what the GPU
             rendered before
-usage: gen_frame_exe.py out.exe [readback] [additive] [drawarea] [feedback]"""
+  static    the texture page is uploaded once and never changes (no
+            per-frame upload or VRAM copy), so its texture keeps one hash,
+            as an HD replacement pack needs
+usage: gen_frame_exe.py out.exe [readback] [additive] [drawarea] [feedback] [static]"""
 import struct, sys
 BASE = 0xA0010000
 GP0 = 0x1F801810
@@ -29,6 +32,7 @@ READBACK = 'readback' in sys.argv[2:]
 ADDITIVE = 'additive' in sys.argv[2:]
 DRAWAREA = 'drawarea' in sys.argv[2:]
 FEEDBACK = 'feedback' in sys.argv[2:]
+STATIC = 'static' in sys.argv[2:]
 
 def addiu(rt, rs, imm): return (9 << 26) | (rs << 21) | (rt << 16) | (imm & 0xffff)
 def andi(rt, rs, imm):  return (0xC << 26) | (rs << 21) | (rt << 16) | (imm & 0xffff)
@@ -103,7 +107,8 @@ emit(sw(T2, S1, 4))
 # background (fill ignores the draw offset: fill both halves' current one)
 emit(andi(T1, S5, 1)); emit(sll(T1, T1, 24))  # y = 256 -> << 16
 cmd(0x02201830); emit(sw(T1, S1, 0)); gp0(xy(320, 240))
-upload(512, 0, 64, 64)
+if not STATIC:
+    upload(512, 0, 64, 64)
 if FEEDBACK:
     # render-to-texture feedback: copy part of the PREVIOUS frame's buffer
     # into the texture page the sprites sample, so each frame depends on
@@ -149,7 +154,8 @@ emit(addiu(S3, S3, 17)); emit(andi(S3, S3, 191))
 emit(addiu(S4, S4, 1))
 branch(bne, S4, S6, s)
 # VRAM -> VRAM copy
-cmd(0x80000000); gp0(xy(512, 0)); gp0(xy(768, 0)); gp0((64 << 16) | 64)
+if not STATIC:
+    cmd(0x80000000); gp0(xy(512, 0)); gp0(xy(768, 0)); gp0((64 << 16) | 64)
 if READBACK:
     cmd(0xC0000000); gp0(xy(0, 0)); gp0((16 << 16) | 16)
     emit(addiu(T2, ZERO, 0)); emit(addiu(T3, ZERO, 128))
