@@ -23503,6 +23503,12 @@ static void renderer_reduce_cached_color(Renderer *self)
    ih_reset(&self->last_scanout);
 }
 
+/* Out of line: a frame rarely starts with work recorded. */
+static RHI_NOINLINE void renderer_flush_between_frames(Renderer *self)
+{
+   renderer_flush(self);
+}
+
 void rhi_vulkan_prepare_frame(void)
 {
    enum dither_mode pattern = psx_hdr_active ? DITHER_OFF : psx_gpu_dither_mode;
@@ -23525,6 +23531,9 @@ void rhi_vulkan_prepare_frame(void)
       return;
    }
 
+   /* Uploads recorded between frames, a state load's, go first. */
+   if (renderer && cbh_is_valid(&renderer->cmd))
+      renderer_flush_between_frames(renderer);
    inside_frame = true;
    device_flush_frame_nolock(device);
    vulkan->wait_sync_index(vulkan->handle);
@@ -24161,9 +24170,6 @@ void rhi_vulkan_load_image(
       }
       device_unmap_host_buffer(renderer->device, mapped, MEMORY_ACCESS_WRITE_BIT);
 
-      /* This is called on state loading. */
-      if (!inside_frame)
-         renderer_flush(renderer);
       /* The staging buffer of its own, when the ring could not hold the
        * rect; the recorded copy keeps its own reference. */
       bh_reset(&handle);
