@@ -54,6 +54,7 @@
  *   VKHOST_UPSCALER_STATS: read the transparency mask back every frame and
  *   append to the log line how much of it is set, in thousandths.
  *   VKHOST_SYNC_VALIDATION=1: enable the layer's synchronization validation.
+ *   HOST_VARIABLE_SIZE=1: accept variable savestate sizes, as RetroArch.
  *   VKHOST_RAM_OUT: path:offset:length - after the last frame, write that
  *   window of system RAM to path (content can copy VRAM there via GP0).
  *
@@ -776,6 +777,13 @@ static bool env_cb(unsigned cmd, void *data)
          return true;
       }
       case RETRO_ENVIRONMENT_SET_GEOMETRY:
+         return true;
+      case RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS:
+         /* HOST_VARIABLE_SIZE=1: accept variable state sizes, as RetroArch
+          * does, so the core sizes each state with a counting pass. */
+         if (!getenv("HOST_VARIABLE_SIZE"))
+            return false;
+         *(uint64_t *)data |= RETRO_SERIALIZATION_QUIRK_FRONT_VARIABLE_SIZE;
          return true;
       case RETRO_ENVIRONMENT_GET_VARIABLE:
       {

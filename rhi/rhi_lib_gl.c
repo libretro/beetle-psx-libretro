@@ -7292,7 +7292,7 @@ static void gl_context_reset(void)
       static_renderer.inited = true;
       static_renderer.state  = GL_STATE_VALID;
 
-      GPU_RestoreStateP1(true);
+      GPU_RestoreStateP1(true, false);
       GPU_RestoreStateP2(true);
       GPU_RestoreStateP3();
 

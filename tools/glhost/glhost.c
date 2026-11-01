@@ -12,6 +12,7 @@
  *
  * Usage: glhost <core.so> <content> [savestate|-] [frames] [outdir]
  *   GLHOST_VARS: semicolon list of key=value core option overrides.
+ *   HOST_VARIABLE_SIZE=1: accept variable savestate sizes, as RetroArch.
  *   HOST_HDR_*: the display presented through GET_HDR_METADATA and
  *   GET_DISPLAY_METADATA; see tools/hdr_display/host_metadata.h.
  */
@@ -260,6 +261,13 @@ static bool env_cb(unsigned cmd, void *data)
       }
       case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:
       case RETRO_ENVIRONMENT_SET_GEOMETRY:
+         return true;
+      case RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS:
+         /* HOST_VARIABLE_SIZE=1: accept variable state sizes, as RetroArch
+          * does, so the core sizes each state with a counting pass. */
+         if (!getenv("HOST_VARIABLE_SIZE"))
+            return false;
+         *(uint64_t *)data |= RETRO_SERIALIZATION_QUIRK_FRONT_VARIABLE_SIZE;
          return true;
       case RETRO_ENVIRONMENT_GET_VARIABLE:
       {

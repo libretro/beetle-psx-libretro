@@ -11,6 +11,10 @@
 # logs any pixel the map left stale. Every lane must log none, at 1x and
 # 2x, and must actually have split reads to check.
 #
+# The 1x lanes run again with HOST_VARIABLE_SIZE, as RetroArch hosts the
+# core: each savestate is then sized by a counting pass first, which must
+# not read VRAM back - both runs make exactly as many whole-VRAM reads.
+#
 # Usage (from the repository root, after a HAVE_HW=1 build):
 #   sh tools/rhi_coherence/rollback_lanes.sh [core.so]
 set -e
@@ -59,6 +63,23 @@ for res in 1x 2x; do
          fail=1
       fi
    done
+done
+V="${P}_renderer_software_fb=disabled;${P}_internal_resolution=1x"
+HOST_VARIABLE_SIZE=1 VKHOST_PREEMPT=1 VKHOST_VARS="${P}_renderer=hardware_vk;$V" \
+   tools/vkhost/vkhost "$CORE" "$OUT/frame.exe" - "$FRAMES" "$OUT/vk_var" \
+   > "$OUT/vk_var.log" 2>&1 || { cat "$OUT/vk_var.log"; exit 1; }
+HOST_VARIABLE_SIZE=1 GLHOST_PREEMPT=2 GLHOST_VARS="${P}_renderer=hardware_gl;$V" \
+   tools/glhost/glhost "$CORE" "$OUT/frame.exe" - "$FRAMES" "$OUT/gl_var" \
+   > "$OUT/gl_var.log" 2>&1 || { cat "$OUT/gl_var.log"; exit 1; }
+for r in vk gl; do
+   fixed=$(grep -c "\[rhi_coherence\] read (0,0 1024x512)" "$OUT/${r}_1x.log" || true)
+   var=$(grep -c "\[rhi_coherence\] read (0,0 1024x512)" "$OUT/${r}_var.log" || true)
+   stale=$(grep -c "\[rhi_coherence\] stale" "$OUT/${r}_var.log" || true)
+   printf '%s variable size: %s whole-VRAM reads (fixed size: %s), %s stale\n' \
+      "$r" "$var" "$fixed" "$stale"
+   if [ "$var" != "$fixed" ] || [ "$stale" != 0 ]; then
+      fail=1
+   fi
 done
 [ "$fail" = 0 ] || exit 1
 echo "rhi_coherence: rollback lanes passed"
