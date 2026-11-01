@@ -4450,24 +4450,23 @@ static TTRect fromSRect(SRect rect) {
       texture_tracker_clear_palette_cache(self, dst);
    }
 
-   static uint32_t texture_tracker_dbgHashVram(struct TextureTracker *self,
+   static uint32_t texture_tracker_hash_vram(struct TextureTracker *self,
          TTRect rect,
          uint16_t *vram){
-      unsigned x = rect.x,
-          y = rect.y,
-          w = rect.width,
-          h = rect.height;
-      size_t n = (size_t)w * (size_t)h;
-      uint16_t *buf = (uint16_t *)malloc(n * sizeof(uint16_t));
-      size_t bi = 0;
-      uint32_t hash;
-      { int j; for (j = y; j < (int)(y + h); j++) {
-         { int i; for (i = x; i < (int)(x + w); i++) {
-            buf[bi++] = vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))];
-         } }
-      } }
-      hash = crc32(0, (unsigned char*)buf, rect.width * rect.height * sizeof(uint16_t));
-      free(buf);
+      /* The CRC of the rect's rows chained in place: the same value as over
+       * a packed copy, without making one. Rows split where x wraps. */
+      unsigned first = rect.width < FB_WIDTH - (rect.x & (FB_WIDTH - 1))
+            ? rect.width : FB_WIDTH - (rect.x & (FB_WIDTH - 1));
+      uint32_t hash = 0;
+      unsigned j;
+      (void)self;
+      for (j = 0; j < rect.height; j++)
+      {
+         const uint16_t *row = vram + ((rect.y + j) & (FB_HEIGHT - 1)) * FB_WIDTH;
+         hash = crc32(hash, row + (rect.x & (FB_WIDTH - 1)), first * sizeof(uint16_t));
+         if (first < rect.width)
+            hash = crc32(hash, row, (rect.width - first) * sizeof(uint16_t));
+      }
       return hash;
    }
 
@@ -4529,7 +4528,7 @@ static TTRect fromSRect(SRect rect) {
          return;
       }
 
-      hash = texture_tracker_dbgHashVram(self, rect, vram);
+      hash = texture_tracker_hash_vram(self, rect, vram);
 
       texture_tracker_mirror_store(self, rect, vram); /* keep the page mirror current */
 
@@ -4594,21 +4593,9 @@ static TTRect fromSRect(SRect rect) {
       upload = NULL;
       { bool preexisting = false;
       {
-         uint32_t hash;
-         unsigned x = rect.x,
-             y = rect.y,
-             w = rect.width,
-             h = rect.height;
-         size_t img_n = (size_t)w * (size_t)h;
-         uint16_t *img = (uint16_t *)malloc(img_n * sizeof(uint16_t));
-         size_t vi = 0;
-         int j, i;
-         for (j = y; j < (int)(y + h); j++) {
-            for (i = x; i < (int)(x + w); i++) {
-               img[vi++] = vram[j * FB_WIDTH + (i & (FB_WIDTH - 1))];
-            }
-         }
-         hash = crc32(0, (unsigned char*)img, rect.width * rect.height * sizeof(uint16_t));
+         /* Hashed in place; the packed copy is made only for a new upload,
+          * which keeps it. */
+         uint32_t hash = texture_tracker_hash_vram(self, rect, vram);
          /* TODO: check for hash collision, by checking if existing upload has
           * different dimensions. not sure how to recover if it does, but the
           * odds of a collision are probably much higher than the odds that both
@@ -4616,10 +4603,17 @@ static TTRect fromSRect(SRect rect) {
           * to simply ignore the newest upload and clear instead. */
          upload = texture_tracker_find_upload(self, hash);    /* borrowed */
          if (upload == NULL) {
+            size_t img_n = (size_t)rect.width * (size_t)rect.height;
+            uint16_t *img = (uint16_t *)malloc(img_n * sizeof(uint16_t));
+            size_t vi = 0;
+            unsigned j, i;
+            for (j = 0; j < rect.height; j++)
+               for (i = 0; i < rect.width; i++)
+                  img[vi++] = vram[((rect.y + j) & (FB_HEIGHT - 1)) * FB_WIDTH
+                        + ((rect.x + i) & (FB_WIDTH - 1))];
             upload = texture_upload_new();  /* owns +1 */
             upload->image = img;            /* transfer ownership */
             upload->image_count = (int)img_n;
-            img = NULL;
             upload->width = rect.width;
             upload->height = rect.height;
             upload->hash = hash;
@@ -4635,7 +4629,6 @@ static TTRect fromSRect(SRect rect) {
             preexisting = true;
             texture_upload_acquire(upload); /* take our own ref on the borrowed result */
          }
-         free(img); /* NULL if ownership was transferred */
       }
 
       restore = NULL;

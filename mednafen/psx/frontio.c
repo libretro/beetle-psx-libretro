@@ -1333,7 +1333,6 @@ void FrontIO_SaveMemcard(FrontIO *self_, unsigned int which)
 
  if((self->DevicesMC[which])->vt->GetNVSize((self->DevicesMC[which])) && (self->DevicesMC[which])->vt->GetNVDirtyCount((self->DevicesMC[which])))
  {
-  (self->DevicesMC[which])->vt->ReadNV((self->DevicesMC[which]), (self->DevicesMC[which])->vt->GetNVData((self->DevicesMC[which])), 0, (1 << 17));
   (self->DevicesMC[which])->vt->ResetNVDirtyCount((self->DevicesMC[which]));
  }
 }
@@ -1353,7 +1352,7 @@ void FrontIO_SaveMemcardToPath(FrontIO *self_, unsigned int which, const char *p
     if (!mf)
        return;
 
-    (self->DevicesMC[which])->vt->ReadNV((self->DevicesMC[which]), (self->DevicesMC[which])->vt->GetNVData((self->DevicesMC[which])), 0, (1 << 17));
+    /* GetNVData is the card itself: write it as it is. */
     filestream_write(mf, (self->DevicesMC[which])->vt->GetNVData((self->DevicesMC[which])), (1 << 17));
 
     filestream_close(mf);	/*  Call before resetting the NV dirty count! */
@@ -1378,8 +1377,6 @@ void FrontIO_SaveMemcardToPathAsync(FrontIO *self_, unsigned int which,
    if ((self->DevicesMC[which])->vt->GetNVSize((self->DevicesMC[which]))
          && (self->DevicesMC[which])->vt->GetNVDirtyCount((self->DevicesMC[which])))
    {
-      (self->DevicesMC[which])->vt->ReadNV((self->DevicesMC[which]),
-            (self->DevicesMC[which])->vt->GetNVData((self->DevicesMC[which])), 0, (1 << 17));
       /* writer copies synchronously, so it is safe to reset the dirty count
        * and let the emulator mutate the card immediately after. */
       writer(path, (self->DevicesMC[which])->vt->GetNVData((self->DevicesMC[which])), (1 << 17));

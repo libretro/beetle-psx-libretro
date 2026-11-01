@@ -5,6 +5,8 @@
 # replaced, so draws across it are served a fused page, rebuilt in place
 # each frame as the halves are sent again. Builds a synthetic pack from a
 # dump of that content (make_pack.py) and checks:
+#   - the dump is named by the hashes HD packs are keyed by, which must
+#     not move (an upload's CRC over its packed rows, then its palette's);
 #   - the pack is used (frames differ from the run without it);
 #   - the page clear, the blits into it and its layout changes are ordered:
 #     no synchronization hazard on a transfer command or a barrier.
@@ -33,6 +35,10 @@ TT="${P}_renderer=hardware_vk;${P}_track_textures=enabled"
 VKHOST_VARS="$TT;${P}_dump_textures=enabled;${P}_replace_textures=disabled" \
    tools/vkhost/vkhost "$CORE" "$OUT/content/hd.exe" - "$FRAMES" "$OUT/native" \
    > "$OUT/native.log" 2>&1 || { tail -20 "$OUT/native.log"; exit 1; }
+names=$(ls "$OUT/content/hd-texture-dump" | tr '\n' ' ')
+if [ "$names" != "7041fe9a-13893d6f.png 8bb0ea93-13893d6f.png " ]; then
+   echo "fused_page_sync: dump names moved: $names"; exit 1
+fi
 python3 tools/tt_replace/make_pack.py "$OUT/content/hd-texture-dump" \
    "$OUT/content/hd-texture-replacements" > /dev/null
 
