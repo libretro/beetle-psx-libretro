@@ -138,6 +138,24 @@ static void count_gen_buffers(GLsizei n, GLuint *o)
 { gl_creates += (unsigned long)n; real_gen_buffers(n, o); }
 static void count_gen_framebuffers(GLsizei n, GLuint *o)
 { gl_creates += (unsigned long)n; real_gen_framebuffers(n, o); }
+/* Bytes glReadPixels hands the core back: the CPU-GPU readback volume.
+ * The host's own reads (frame dumps and hashes) set host_reading. */
+static unsigned long long gl_read_bytes, gl_read_bytes_half;
+static int host_reading;
+void glReadPixels(GLint x, GLint y, GLsizei w, GLsizei h, GLenum f, GLenum t, void *d)
+{
+   typedef void (*readpixels_t)(GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void *);
+   static readpixels_t real;
+   unsigned bpp = t == GL_FLOAT ? 4u : (t == GL_UNSIGNED_BYTE ? 1u : 0u);
+   unsigned comps = f == GL_RGBA || f == GL_RGBA_INTEGER ? 4u : f == GL_RGB ? 3u : 1u;
+   if (!real)
+      real = (readpixels_t)dlsym(RTLD_NEXT, "glReadPixels");
+   if (!bpp)   /* packed or 16-bit types: one 16-bit value a pixel */
+      bpp = 2u, comps = 1u;
+   if (!host_reading)
+      gl_read_bytes += (unsigned long long)w * (unsigned long long)h * bpp * comps;
+   real(x, y, w, h, f, t, d);
+}
 void glGenTextures(GLsizei n, GLuint *o)
 {
    static gen_t real;
@@ -336,8 +354,10 @@ static void video_cb(const void *data, unsigned width, unsigned height, size_t p
      if (soft_buf && pbind)
      {
         pbind(GL_FRAMEBUFFER, fbo);
+        host_reading = 1;
         glReadPixels(0, 0, (GLsizei)width, (GLsizei)height,
                      GL_RGBA, GL_UNSIGNED_BYTE, soft_buf);
+        host_reading = 0;
         fprintf(stderr, "[glhost] frame %u hash %08x%s\n",
                 input_frame, fnv1a(soft_buf, need),
                 in_replay ? " (replay)" : "");
@@ -506,14 +526,18 @@ static void dump_frame(const char *path)
       {
          char  rawpath[1100];
          FILE *rf;
+         host_reading = 1;
          glReadPixels(0, 0, w, h, GL_RGBA, GL_FLOAT, fb);
+         host_reading = 0;
          snprintf(rawpath, sizeof(rawpath), "%s.raw", path);
          rf = fopen(rawpath, "wb");
          if (rf) { fwrite(fb, sizeof(float), (size_t)w * h * 4, rf); fclose(rf); }
          free(fb);
       }
    }
+   host_reading = 1;
    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+   host_reading = 0;
    f = fopen(path, "wb");
    if (f)
    {
@@ -710,6 +734,7 @@ int main(int argc, char **argv)
            upload_texels_half = upload_texels;
            gl_respec_half     = gl_respec;
            gl_sync_maps_half  = gl_sync_maps;
+           gl_read_bytes_half = gl_read_bytes;
            gl_creates_half    = gl_creates;
         }
         if (preempt && (i < 5 || (i % 50) == 0))
@@ -810,6 +835,8 @@ int main(int argc, char **argv)
            gl_respec - gl_respec_half, gl_creates - gl_creates_half);
    fprintf(stderr, "[glhost] steady state: %lu synchronized buffer maps in the second half of the run\n",
            gl_sync_maps - gl_sync_maps_half);
+   fprintf(stderr, "[glhost] steady state: %llu bytes read back in the second half of the run\n",
+           gl_read_bytes - gl_read_bytes_half);
    fprintf(stderr, "[glhost] done: %d frames run, %u presented, last %ux%u\n",
            frames, frames_presented, last_w, last_h);
 

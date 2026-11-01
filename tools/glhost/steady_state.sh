@@ -8,7 +8,9 @@
 # re-specification shows up as hundreds. Buffer maps that may wait for the
 # GPU (no GL_MAP_UNSYNCHRONIZED_BIT) are held to one per frame: only the
 # command vertex ring's wrap takes one, and a per-draw map shows up as
-# thousands.
+# thousands. The rollback lanes read VRAM back every frame; with a float
+# (HDR) or byte (32 bpp) target the words are packed on the GPU, so they
+# read back no more than the 16-bit target does (within a tenth).
 #
 # Usage (from the repository root, after a HAVE_HW=1 build):
 #   sh tools/glhost/steady_state.sh [core.so]
@@ -31,7 +33,8 @@ python3 tools/rhi_coherence/gen_frame_exe.py "$OUT/frame.exe" drawarea feedback
 fail=0
 while IFS='|' read -r name preempt vars; do
    [ -n "$name" ] || continue
-   env ${preempt:+GLHOST_PREEMPT=$preempt} GLHOST_VARS="${P}_renderer=hardware_gl;$vars" \
+   scrgb=; [ "$name" = rollback_hdr ] && scrgb=1
+   env ${preempt:+GLHOST_PREEMPT=$preempt} ${scrgb:+HOST_HDR_SCRGB=1} GLHOST_VARS="${P}_renderer=hardware_gl;$vars" \
       tools/glhost/glhost "$CORE" "$OUT/frame.exe" - "$FRAMES" "$OUT/$name" \
       > "$OUT/$name.log" 2>&1 || { cat "$OUT/$name.log"; exit 1; }
    r=$(sed -n 's/.*steady state: \([0-9]*\) buffer re-specifications.*/\1/p' "$OUT/$name.log")
@@ -47,6 +50,15 @@ while IFS='|' read -r name preempt vars; do
    if [ -z "$m" ] || [ "$m" -gt $((FRAMES / 2)) ]; then
       fail=1
    fi
+   b=$(sed -n 's/.*steady state: \([0-9]*\) bytes read back.*/\1/p' "$OUT/$name.log")
+   case "$name" in
+   rollback) base_read=$b ;;
+   rollback_*)
+      printf '%-10s %s bytes read back, %s with the 16-bit target\n' "$name" "$b" "$base_read"
+      if [ -z "$b" ] || [ $((b * 10)) -gt $((base_read * 11)) ]; then
+         fail=1
+      fi ;;
+   esac
 done <<LANES
 plain||
 4x||${P}_internal_resolution=4x
@@ -54,6 +66,8 @@ hdr_aces2||${P}_color_format=30bit_hdr;${P}_hdr_display_transform=aces2full
 hdr_post||${P}_color_format=30bit_hdr;${P}_hdr_bloom=standard;${P}_hdr_chromatic=heavy
 composite||${P}_video_cable=composite
 rollback|2|${P}_renderer_software_fb=disabled
+rollback_hdr|2|${P}_renderer_software_fb=disabled;${P}_color_format=64bit_scrgb
+rollback_32|2|${P}_renderer_software_fb=disabled;${P}_depth=32bpp
 LANES
 [ "$fail" = 0 ] || exit 1
 echo "glhost: steady state lanes passed"

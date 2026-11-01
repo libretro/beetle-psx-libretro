@@ -234,6 +234,7 @@ static void gl_diag_errors(const char *site)
 #include "shaders_gl/image_load_vertex.glsl.h"
 #include "shaders_gl/image_load_fragment.glsl.h"
 #include "shaders_gl/vram_copy.glsl.h"
+#include "shaders_gl/vram_pack.glsl.h"
 #include "shaders_gl/hdr_transform.glsl.h"
 #include "hdr_transform.h"
 
@@ -1263,6 +1264,13 @@ struct gl_renderer {
    GLenum   rb_scratch_format;
    void    *rb_cpu;
    size_t   rb_cpu_len;
+   /* Float and byte targets are read through vram_pack into an R16UI
+    * target, VRAM-sized, as PlayStation words. */
+   gl_program *rb_pack_program;
+   GLint    rb_pack_loc[5];
+   GLuint   rb_pack_tex;
+   GLuint   rb_pack_fbo;
+   bool     rb_pack_failed;
 
    /* Subcarrier phase carried in from every field before this one, in
     * cycles. Advanced once per displayed field; wrapped to [0,1) so a long
@@ -3412,6 +3420,10 @@ static gl_draw_buffer *gl_draw_buffer_build(const char *vertex_shader_src,
    }
    return db;
 }
+
+/* Unit the VRAM copy snapshot and the readback pack sample from; no
+ * other program uses it. */
+#define GL_COPY_UNIT 5
 
 enum
 {
@@ -5800,6 +5812,18 @@ static void gl_renderer_free(gl_renderer *renderer)
    if (renderer->rb_scratch_tex)
       glDeleteTextures(1, &renderer->rb_scratch_tex);
    free(renderer->rb_cpu);
+   if (renderer->rb_pack_program)
+   {
+      gl_program_free(renderer->rb_pack_program);
+      free(renderer->rb_pack_program);
+      renderer->rb_pack_program = NULL;
+   }
+   if (renderer->rb_pack_fbo)
+      glDeleteFramebuffers(1, &renderer->rb_pack_fbo);
+   if (renderer->rb_pack_tex)
+      glDeleteTextures(1, &renderer->rb_pack_tex);
+   renderer->rb_pack_fbo = renderer->rb_pack_tex = 0;
+   renderer->rb_pack_failed = false;
    renderer->rb_read_fbo = renderer->rb_scratch_fbo = renderer->rb_scratch_tex = 0;
    renderer->rb_cpu      = NULL;
    renderer->rb_cpu_len  = 0;
@@ -9025,6 +9049,113 @@ void rhi_gl_load_image(
  *     desktop / GLES3 drivers expose it, so this is a fallback rather
  *     than a hot path.
  */
+#ifndef HAVE_OPENGLES3
+enum
+{
+   GL_PACK_LOC_RECT = 0,
+   GL_PACK_LOC_SRC,
+   GL_PACK_LOC_ORIGIN,
+   GL_PACK_LOC_SCALE,
+   GL_PACK_LOC_MODE
+};
+
+/* Reads the native rect (x, y, w, h) of a float or byte fb_out as
+ * PlayStation words straight into dst (rows VRAM_WIDTH_PIXELS apart):
+ * vram_pack writes them on the GPU, so 2 bytes a pixel cross and the CPU
+ * converts nothing. mode as vram_pack. The caller has flushed, set
+ * GL_PACK_ALIGNMENT 1 and disabled the scissor, and restores the read and
+ * draw framebuffers. False when the program or target is unavailable. */
+static bool gl_read_vram_packed(gl_renderer *renderer,
+      unsigned x, unsigned y, unsigned w, unsigned h,
+      uint16_t *dst, int mode)
+{
+   const GLint *loc = renderer->rb_pack_loc;
+   unsigned s = renderer->internal_upscaling ? renderer->internal_upscaling : 1;
+   GLint program, vao, active, unit_tex, viewport[4];
+   GLboolean blend, depth, stencil;
+   bool ok;
+
+   if (renderer->rb_pack_failed)
+      return false;
+   if (!renderer->rb_pack_program)
+   {
+      const struct gl_uniform_map *u;
+      renderer->rb_pack_program = gl_program_build(image_load_vertex,
+            vram_pack_fragment);
+      if (!renderer->rb_pack_program)
+      {
+         renderer->rb_pack_failed = true;
+         return false;
+      }
+      u = &renderer->rb_pack_program->uniforms;
+      renderer->rb_pack_loc[GL_PACK_LOC_RECT]   = gl_uniform_map_get(u, "rect");
+      renderer->rb_pack_loc[GL_PACK_LOC_SRC]    = gl_uniform_map_get(u, "src");
+      renderer->rb_pack_loc[GL_PACK_LOC_ORIGIN] = gl_uniform_map_get(u, "origin");
+      renderer->rb_pack_loc[GL_PACK_LOC_SCALE]  = gl_uniform_map_get(u, "scale");
+      renderer->rb_pack_loc[GL_PACK_LOC_MODE]   = gl_uniform_map_get(u, "mode");
+   }
+
+   glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+   glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
+   glGetIntegerv(GL_VIEWPORT, viewport);
+   glGetIntegerv(GL_ACTIVE_TEXTURE, &active);
+   glActiveTexture(GL_TEXTURE0 + GL_COPY_UNIT);
+   glGetIntegerv(GL_TEXTURE_BINDING_2D, &unit_tex);
+   blend   = glIsEnabled(GL_BLEND);
+   depth   = glIsEnabled(GL_DEPTH_TEST);
+   stencil = glIsEnabled(GL_STENCIL_TEST);
+
+   if (!renderer->rb_pack_tex)
+   {
+      glGenTextures(1, &renderer->rb_pack_tex);
+      glBindTexture(GL_TEXTURE_2D, renderer->rb_pack_tex);
+      glTexStorage2D(GL_TEXTURE_2D, 1, GL_R16UI,
+            (GLsizei)VRAM_WIDTH_PIXELS, (GLsizei)VRAM_HEIGHT);
+      glGenFramebuffers(1, &renderer->rb_pack_fbo);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, renderer->rb_pack_fbo);
+      glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+            GL_TEXTURE_2D, renderer->rb_pack_tex, 0);
+   }
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, renderer->rb_pack_fbo);
+   ok = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+   if (ok)
+   {
+      glDisable(GL_BLEND);
+      glDisable(GL_DEPTH_TEST);
+      glDisable(GL_STENCIL_TEST);
+      glViewport(0, 0, VRAM_WIDTH_PIXELS, VRAM_HEIGHT);
+      glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
+      glUseProgram(renderer->rb_pack_program->id);
+      glUniform1i(loc[GL_PACK_LOC_SRC], GL_COPY_UNIT);
+      /* The texel a NEAREST blit down to 1x picks: the middle one. */
+      glUniform2i(loc[GL_PACK_LOC_ORIGIN],
+            (GLint)(x * s + s / 2), (GLint)(y * s + s / 2));
+      glUniform1i(loc[GL_PACK_LOC_SCALE], (GLint)s);
+      glUniform1i(loc[GL_PACK_LOC_MODE], mode);
+      gl_draw_rect(renderer, loc[GL_PACK_LOC_RECT], 0, 0, w, h);
+
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, renderer->rb_pack_fbo);
+      glReadBuffer(GL_COLOR_ATTACHMENT0);
+      glPixelStorei(GL_PACK_ROW_LENGTH, (GLint)VRAM_WIDTH_PIXELS);
+      glReadPixels(0, 0, (GLsizei)w, (GLsizei)h,
+            GL_RED_INTEGER, GL_UNSIGNED_SHORT, dst);
+      ok = glGetError() == GL_NO_ERROR;
+   }
+   if (!ok)
+      renderer->rb_pack_failed = true;
+
+   glBindTexture(GL_TEXTURE_2D, (GLuint)unit_tex);
+   glActiveTexture((GLenum)active);
+   glUseProgram((GLuint)program);
+   glBindVertexArray((GLuint)vao);
+   glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+   if (blend)   glEnable(GL_BLEND);
+   if (depth)   glEnable(GL_DEPTH_TEST);
+   if (stencil) glEnable(GL_STENCIL_TEST);
+   return ok;
+}
+#endif
+
 bool rhi_gl_read_vram(uint16_t x, uint16_t y,
                       uint16_t w, uint16_t h,
                       uint16_t *vram)
@@ -9125,6 +9256,17 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
    glPixelStorei(GL_PACK_ALIGNMENT, 1);
 #ifdef GL_PACK_ROW_LENGTH
    glPixelStorei(GL_PACK_ROW_LENGTH, direct ? (GLint)VRAM_WIDTH_PIXELS : 0);
+#endif
+
+#ifndef HAVE_OPENGLES3
+   /* Float and byte targets: words packed on the GPU, read into place. */
+   if ((is_fp16 || is_32bpp) &&
+       gl_read_vram_packed(renderer, x, y, w, h, dst,
+             is_fp16 ? 0 : renderer->byte_color_storage ? 1 : 2))
+   {
+      ok = true;
+      goto read_done;
+   }
 #endif
 
    if (!direct)
@@ -9409,6 +9551,9 @@ bool rhi_gl_read_vram(uint16_t x, uint16_t y,
    }
 #endif
 
+#ifndef HAVE_OPENGLES3
+read_done:
+#endif
    if (ok)
    {
       /* A 1555 read through the tight scratch: rows of the rect, in
@@ -9937,8 +10082,6 @@ enum
    GL_COPY_LOC_SNAPSHOT
 };
 
-/* Unit the copy snapshot is sampled from; no other program uses it. */
-#define GL_COPY_UNIT 5
 
 struct gl_copy_piece
 {
