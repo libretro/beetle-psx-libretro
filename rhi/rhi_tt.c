@@ -7245,6 +7245,9 @@ static int64_t page_bytes(FusionRects *fusion)
          ? (size_t)tt_img_width(ih_get(&page.texture)) * (size_t)tt_img_height(ih_get(&page.texture)) * 4u
          : 0;
       fused_page_vec_push(&self->pages, &page);
+      /* push copied the page, taking its own references: drop the stack
+       * page's, or its rects, their uploads and its image leak. */
+      fp_destroy(&page);
       return hd_handle_make_fused(fused_page_vec_size(&self->pages) - 1);
    }
    static void fused_pages_mark_dirty(struct FusedPages *self, TTRect rect) {

@@ -1,0 +1,17 @@
+# The drivers' own allocations (Mesa, LLVM, the loaders), not the core's.
+leak:libLLVM
+leak:libgallium
+leak:libvulkan_lvp
+leak:libvulkan.so
+leak:libVkLayer
+leak:libEGL
+leak:libGLX
+leak:libglapi
+leak:libdrm
+leak:dri
+leak:libgbm
+leak:libexpat
+leak:libdbus
+leak:libwayland
+leak:libX11
+leak:libxcb
