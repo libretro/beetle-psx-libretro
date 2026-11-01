@@ -11798,12 +11798,13 @@ static TTGpuImage *vk_tt_page_begin(void *ctx, TTGpuImage *reuse,
          image_get_height((Image *)reuse, 0) == (unsigned)height)
    {
       /* Same handle back (no reference change): switch back into
-       * transfer dst layout for the rebuild. */
+       * transfer dst layout for the rebuild, after the draws that
+       * sampled the old contents. */
       page = (Image *)reuse;
       commandbuffer_image_barrier(cbh_get(cmd), page,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
    }
    else
@@ -11814,6 +11815,12 @@ static TTGpuImage *vk_tt_page_begin(void *ctx, TTGpuImage *reuse,
       page = ih_get(&h);
    }
    commandbuffer_clear_image(cbh_get(cmd), page, &fallthrough);
+   /* The blits land after the clear. */
+   commandbuffer_image_barrier(cbh_get(cmd), page,
+         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
    return (TTGpuImage *)page;
 }
 
@@ -11832,12 +11839,13 @@ static void vk_tt_page_blit(void *ctx, TTGpuImage *page_in, TTGpuImage *src_in,
    dst_offset.x = b->dst_x; dst_offset.y = b->dst_y; dst_offset.z = 0;
    dst_extent.x = b->dst_w; dst_extent.y = b->dst_h; dst_extent.z = 1;
 
-   /* Switch the source into transfer src */
+   /* Switch the source into transfer src, after its sampling draws and
+    * before the blits read it. */
    commandbuffer_image_barrier(cbh_get(cmd), src,
          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
 
    for (dstLevel = 0; dstLevel < mip_levels; dstLevel++) {
       int srcLevel = max_(0, dstLevel - b->full_res_levels);
@@ -11858,24 +11866,30 @@ static void vk_tt_page_blit(void *ctx, TTGpuImage *page_in, TTGpuImage *src_in,
       dst_extent.y = max_(dst_extent.y >> 1, 1);
    }
 
-   /* Change the source back to shader read */
+   /* Change the source back to shader read once the blits read it, and
+    * order the next source's blits into the page after these. */
    commandbuffer_image_barrier(cbh_get(cmd), src,
          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
+         VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+   commandbuffer_image_barrier(cbh_get(cmd), page,
+         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
 }
 
 static void vk_tt_page_end(void *ctx, TTGpuImage *page_in)
 {
    Renderer *self = (Renderer *)ctx;
    CommandBufferHandle *cmd = renderer_command_buffer_hack_fixme(self);
-   /* Make the fused texture readable by shaders */
+   /* Make the fused texture's blit writes visible to the shaders */
    commandbuffer_image_barrier(cbh_get(cmd), (Image *)page_in,
          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0);
+         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 }
 
 static TTGpuBackend vk_tt_make_backend(Renderer *self)

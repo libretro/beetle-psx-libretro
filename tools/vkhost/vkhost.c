@@ -53,6 +53,7 @@
  *   "none".
  *   VKHOST_UPSCALER_STATS: read the transparency mask back every frame and
  *   append to the log line how much of it is set, in thousandths.
+ *   VKHOST_SYNC_VALIDATION=1: enable the layer's synchronization validation.
  *   VKHOST_RAM_OUT: path:offset:length - after the last frame, write that
  *   window of system RAM to path (content can copy VRAM there via GP0).
  *
@@ -939,6 +940,9 @@ static bool create_instance(void)
 {
    const char *layers[] = { "VK_LAYER_KHRONOS_validation" };
    const char *exts[]   = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
+   static const VkValidationFeatureEnableEXT sync_enable =
+      VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT;
+   static VkValidationFeaturesEXT sync_features;
    VkApplicationInfo app = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
    VkInstanceCreateInfo ci = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
 
@@ -957,6 +961,15 @@ static bool create_instance(void)
    ci.ppEnabledLayerNames = layers;
    ci.enabledExtensionCount = 1;
    ci.ppEnabledExtensionNames = exts;
+   /* VKHOST_SYNC_VALIDATION=1: the layer's synchronization validation too;
+    * its hazards are validation errors and fail the run. */
+   if (getenv("VKHOST_SYNC_VALIDATION") && ci.enabledLayerCount)
+   {
+      sync_features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+      sync_features.enabledValidationFeatureCount = 1;
+      sync_features.pEnabledValidationFeatures = &sync_enable;
+      ci.pNext = &sync_features;
+   }
    if (vkCreateInstance(&ci, NULL, &instance) != VK_SUCCESS)
       return false;
 
