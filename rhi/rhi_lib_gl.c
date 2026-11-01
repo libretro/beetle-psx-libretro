@@ -1187,6 +1187,8 @@ struct gl_vram_sync_tile
     * pending writers, this provenance survives synchronization and frames. */
    uint64_t gpu_written_mask;
    uint64_t scaled_dirty_mask;
+   /* Written since the last end-of-frame resolve: on vram_sync.pending. */
+   bool pending;
 };
 
 
@@ -1355,8 +1357,11 @@ struct gl_renderer {
    {
       uint64_t sequence;
       /* Dependency snapshots can consume writer records without updating the
-       * native mirror. Keep frame bounds separately until its final resolve. */
-      uint16_t frame_rect[4];
+       * native mirror. The tiles written since the frame's final resolve
+       * are kept separately, as indices ty * GL_VRAM_SYNC_TILES_X + tx: the
+       * resolve covers them and the clear touches only them. */
+      uint16_t pending[GL_VRAM_SYNC_TILES_Y * GL_VRAM_SYNC_TILES_X];
+      unsigned pending_count;
       struct gl_vram_sync_tile tiles
             [GL_VRAM_SYNC_TILES_Y][GL_VRAM_SYNC_TILES_X];
    } vram_sync;
@@ -2571,20 +2576,96 @@ static TTRect gl_tt_texture_vram_rect(gl_renderer *r,
    return out;
 }
 
+static void gl_draw_rect(gl_renderer *renderer, GLint rect,
+      unsigned x0, unsigned y0, unsigned x1, unsigned y1);
+
 static void gl_vram_sync_clear(gl_renderer *renderer)
 {
-   unsigned ty;
-   unsigned tx;
-
-   memset(renderer->vram_sync.frame_rect, 0,
-         sizeof(renderer->vram_sync.frame_rect));
+   unsigned i;
 
    /* Synchronization makes pending writers current, but does not change
-    * where the pixels originated. Preserve GPU-written provenance. */
-   for (ty = 0; ty < GL_VRAM_SYNC_TILES_Y; ty++)
-      for (tx = 0; tx < GL_VRAM_SYNC_TILES_X; tx++)
-         memset(renderer->vram_sync.tiles[ty][tx].writers, 0,
-               sizeof(renderer->vram_sync.tiles[ty][tx].writers));
+    * where the pixels originated. Preserve GPU-written provenance. Only
+    * tiles on the pending list can hold writers. */
+   for (i = 0; i < renderer->vram_sync.pending_count; i++)
+   {
+      unsigned t = renderer->vram_sync.pending[i];
+      struct gl_vram_sync_tile *tile = &renderer->vram_sync.tiles
+            [t / GL_VRAM_SYNC_TILES_X][t % GL_VRAM_SYNC_TILES_X];
+      memset(tile->writers, 0, sizeof(tile->writers));
+      tile->pending = false;
+   }
+   renderer->vram_sync.pending_count = 0;
+}
+
+/* More rects than this and the resolve draws the pending tiles' bounds. */
+#define GL_VRAM_SYNC_RESOLVE_RECTS 32u
+
+/* Draw `rect` over the tiles on the pending list, in native VRAM units:
+ * each run of pending tiles in a tile row, a run repeated in the rows
+ * below joining it, as one rect. Many rects become one rect around them
+ * all, which still lies within what the tiles span. */
+static void gl_vram_sync_draw_pending(gl_renderer *renderer, GLint rect)
+{
+   /* Row bitmaps, GL_VRAM_SYNC_TILES_X bits each. */
+   uint64_t rows[GL_VRAM_SYNC_TILES_Y][GL_VRAM_SYNC_TILES_X / 64];
+   unsigned tx0 = GL_VRAM_SYNC_TILES_X, tx1 = 0;
+   unsigned ty0 = GL_VRAM_SYNC_TILES_Y, ty1 = 0;
+   unsigned i, ty, pass, rects = 0;
+
+   memset(rows, 0, sizeof(rows));
+   for (i = 0; i < renderer->vram_sync.pending_count; i++)
+   {
+      unsigned t  = renderer->vram_sync.pending[i];
+      unsigned tx = t % GL_VRAM_SYNC_TILES_X;
+      ty          = t / GL_VRAM_SYNC_TILES_X;
+      rows[ty][tx >> 6] |= (uint64_t)1 << (tx & 63);
+      if (tx < tx0)      tx0 = tx;
+      if (tx + 1 > tx1)  tx1 = tx + 1;
+      if (ty < ty0)      ty0 = ty;
+      if (ty + 1 > ty1)  ty1 = ty + 1;
+   }
+   if (tx1 <= tx0)
+      return;
+
+   /* Pass 0 counts the rects, pass 1 draws them. */
+   for (pass = 0; pass < 2; pass++)
+   {
+      unsigned top = ty0;
+      for (ty = ty0; ty < ty1; ty++)
+      {
+         unsigned x;
+         /* A band of identical rows ends before the next row that differs. */
+         if (ty + 1 < ty1 &&
+               !memcmp(rows[ty], rows[ty + 1], sizeof(rows[ty])))
+            continue;
+         for (x = tx0; x < tx1; )
+         {
+            unsigned end;
+            if (!((rows[ty][x >> 6] >> (x & 63)) & 1))
+            {
+               x++;
+               continue;
+            }
+            for (end = x + 1; end < tx1 &&
+                  ((rows[ty][end >> 6] >> (end & 63)) & 1); end++) ;
+            if (pass)
+               gl_draw_rect(renderer, rect,
+                     x * GL_VRAM_SYNC_TILE_SIZE, top * GL_VRAM_SYNC_TILE_SIZE,
+                     end * GL_VRAM_SYNC_TILE_SIZE, (ty + 1) * GL_VRAM_SYNC_TILE_SIZE);
+            else
+               rects++;
+            x = end;
+         }
+         top = ty + 1;
+      }
+      if (!pass && rects > GL_VRAM_SYNC_RESOLVE_RECTS)
+      {
+         gl_draw_rect(renderer, rect,
+               tx0 * GL_VRAM_SYNC_TILE_SIZE, ty0 * GL_VRAM_SYNC_TILE_SIZE,
+               tx1 * GL_VRAM_SYNC_TILE_SIZE, ty1 * GL_VRAM_SYNC_TILE_SIZE);
+         return;
+      }
+   }
 }
 
 /* Return the bits covered by a native VRAM rectangle inside one 8x8 tile.
@@ -2830,30 +2911,6 @@ static void gl_vram_sync_mark_rect(gl_renderer *renderer,
    if (!w || !h)
       return;
 
-   {
-      uint16_t *frame = renderer->vram_sync.frame_rect;
-      unsigned x0 = x % VRAM_WIDTH_PIXELS;
-      unsigned y0 = y % VRAM_HEIGHT;
-      unsigned x1 = x0 + w;
-      unsigned y1 = y0 + h;
-      /* Wrapped writes conservatively cover the whole affected axis. */
-      if (x1 > VRAM_WIDTH_PIXELS) { x0 = 0; x1 = VRAM_WIDTH_PIXELS; }
-      if (y1 > VRAM_HEIGHT) { y0 = 0; y1 = VRAM_HEIGHT; }
-      if (frame[2] && frame[3])
-      {
-         unsigned old_x1 = frame[0] + frame[2];
-         unsigned old_y1 = frame[1] + frame[3];
-         if (frame[0] < x0) x0 = frame[0];
-         if (frame[1] < y0) y0 = frame[1];
-         if (old_x1 > x1) x1 = old_x1;
-         if (old_y1 > y1) y1 = old_y1;
-      }
-      frame[0] = (uint16_t)x0;
-      frame[1] = (uint16_t)y0;
-      frame[2] = (uint16_t)(x1 - x0);
-      frame[3] = (uint16_t)(y1 - y0);
-   }
-
    sequence = ++renderer->vram_sync.sequence;
    gl_vram_sync_update_gpu_written_rect(renderer, x, y, w, h, true);
    x %= VRAM_WIDTH_PIXELS;
@@ -2928,6 +2985,12 @@ static void gl_vram_sync_mark_rect(gl_renderer *renderer,
                (uint16_t)(write_x1 - write_x);
          renderer->vram_sync.tiles[ty][tx].writers[slot].h =
                (uint16_t)(write_y1 - write_y);
+         if (!renderer->vram_sync.tiles[ty][tx].pending)
+         {
+            renderer->vram_sync.tiles[ty][tx].pending = true;
+            renderer->vram_sync.pending[renderer->vram_sync.pending_count++] =
+                  (uint16_t)(ty * GL_VRAM_SYNC_TILES_X + tx);
+         }
       }
    }
 }
@@ -8040,9 +8103,8 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
    /* Resolve rendered bounds into native VRAM for next-frame sampling.
     * CPU uploads already update both surfaces. Retain pending bounds if the
     * draw buffer is unavailable, so a later successful frame can retry. */
-   if (renderer->vram_sync.frame_rect[2] && renderer->vram_sync.frame_rect[3])
+   if (renderer->vram_sync.pending_count)
    {
-      uint16_t *rect = renderer->vram_sync.frame_rect;
       const GLint *loc = renderer->image_load_loc;
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, renderer->fb_out.id);
@@ -8060,8 +8122,7 @@ void rhi_gl_finalize_frame(const void *fb, unsigned width,
       glUniform1ui(loc[GL_LOAD_LOC_UPSCALING], renderer->internal_upscaling);
       glUniform1ui(loc[GL_LOAD_LOC_CONVERSION],
             gl_native_mirror_conversion(renderer));
-      gl_draw_rect(renderer, loc[GL_LOAD_LOC_RECT], rect[0], rect[1],
-            rect[0] + rect[2], rect[1] + rect[3]);
+      gl_vram_sync_draw_pending(renderer, loc[GL_LOAD_LOC_RECT]);
       gl_vram_sync_clear(renderer);
 
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);

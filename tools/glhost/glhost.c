@@ -156,6 +156,37 @@ void glReadPixels(GLint x, GLint y, GLsizei w, GLsizei h, GLenum f, GLenum t, vo
       gl_read_bytes += (unsigned long long)w * (unsigned long long)h * bpp * comps;
    real(x, y, w, h, f, t, d);
 }
+/* Pixels covered by the core's rect draws: a four-vertex strip drawn
+ * after glUniform4f gave a rect (x0, y0, x1, y1) in whole VRAM pixels, as
+ * the image load, copy and resolve passes do. */
+static unsigned long long gl_rect_pixels, gl_rect_pixels_half;
+static GLfloat last_rect[4];
+static int last_rect_valid;
+typedef void (*uniform4f_t)(GLint, GLfloat, GLfloat, GLfloat, GLfloat);
+static uniform4f_t real_uniform4f;
+static void count_uniform4f(GLint loc, GLfloat a, GLfloat b, GLfloat c, GLfloat d)
+{
+   last_rect[0] = a; last_rect[1] = b; last_rect[2] = c; last_rect[3] = d;
+   last_rect_valid = a >= 0 && b >= 0 && c > a && d > b && c <= 1024 && d <= 512
+         && a == (GLfloat)(int)a && b == (GLfloat)(int)b
+         && c == (GLfloat)(int)c && d == (GLfloat)(int)d;
+   real_uniform4f(loc, a, b, c, d);
+}
+typedef void (*drawarrays_t)(GLenum, GLint, GLsizei);
+static drawarrays_t real_draw_arrays;
+static void count_draw_arrays(GLenum mode, GLint first, GLsizei count)
+{
+   if (mode == GL_TRIANGLE_STRIP && first == 0 && count == 4 && last_rect_valid)
+      gl_rect_pixels += (unsigned long long)((last_rect[2] - last_rect[0])
+            * (last_rect[3] - last_rect[1]));
+   real_draw_arrays(mode, first, count);
+}
+void glDrawArrays(GLenum mode, GLint first, GLsizei count)
+{
+   if (!real_draw_arrays)
+      real_draw_arrays = (drawarrays_t)dlsym(RTLD_NEXT, "glDrawArrays");
+   count_draw_arrays(mode, first, count);
+}
 void glGenTextures(GLsizei n, GLuint *o)
 {
    static gen_t real;
@@ -191,6 +222,10 @@ static retro_proc_address_t get_proc_address(const char *sym)
       { real_map_buffer_range = (mapbufrange_t)f; return (retro_proc_address_t)count_map_buffer_range; }
       if (!strcmp(sym, "glGenBuffers"))
       { real_gen_buffers = (gen_t)f; return (retro_proc_address_t)count_gen_buffers; }
+      if (!strcmp(sym, "glUniform4f"))
+      { real_uniform4f = (uniform4f_t)f; return (retro_proc_address_t)count_uniform4f; }
+      if (!strcmp(sym, "glDrawArrays"))
+      { real_draw_arrays = (drawarrays_t)f; return (retro_proc_address_t)count_draw_arrays; }
       if (!strcmp(sym, "glGenFramebuffers"))
       { real_gen_framebuffers = (gen_t)f; return (retro_proc_address_t)count_gen_framebuffers; }
       return f;
@@ -735,6 +770,7 @@ int main(int argc, char **argv)
            gl_respec_half     = gl_respec;
            gl_sync_maps_half  = gl_sync_maps;
            gl_read_bytes_half = gl_read_bytes;
+           gl_rect_pixels_half = gl_rect_pixels;
            gl_creates_half    = gl_creates;
         }
         if (preempt && (i < 5 || (i % 50) == 0))
@@ -837,6 +873,8 @@ int main(int argc, char **argv)
            gl_sync_maps - gl_sync_maps_half);
    fprintf(stderr, "[glhost] steady state: %llu bytes read back in the second half of the run\n",
            gl_read_bytes - gl_read_bytes_half);
+   fprintf(stderr, "[glhost] steady state: %llu pixels of rect draws in the second half of the run\n",
+           gl_rect_pixels - gl_rect_pixels_half);
    fprintf(stderr, "[glhost] done: %d frames run, %u presented, last %ux%u\n",
            frames, frames_presented, last_w, last_h);
 

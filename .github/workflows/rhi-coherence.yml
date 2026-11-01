@@ -18,6 +18,9 @@ name: VRAM readback coherence
 # vram copies: overlapping, wrapping and masked GP0(80h) copies over native
 # and rendered pixels, read back whole on both hardware renderers, must
 # equal a model of the hardware copy order (tools/glhost/copy_lanes.sh).
+# gl resolve: the end-of-frame resolve into native VRAM covers the tiles a
+# frame wrote, not their bounds, and VRAM still matches a model
+# (tools/glhost/resolve_lanes.sh).
 
 on:
   push:
@@ -84,3 +87,5 @@ jobs:
         run: sh tools/glhost/steady_state.sh "$PWD/mednafen_psx_hw_libretro.so"
       - name: VRAM copy lanes
         run: sh tools/glhost/copy_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"
+      - name: OpenGL resolve lanes
+        run: sh tools/glhost/resolve_lanes.sh "$PWD/mednafen_psx_hw_libretro.so"
